@@ -16,7 +16,8 @@
 //                   t: Float32Array (per vertex, 0..1 along its fibre), fibres, segments}
 //                  subsampled real fibres (low ~2.5k, medium ~10k, high ~25k), every point through mapPoint()
 //   graph          {n, edges: [{a, b, count, len, rep}], adj: [[{j, e}]]}  region graph from ALL labelled fibre ends
-//                  (count = fibres in the bundle, len = median fibre length in mm, rep = representative fibre index)
+//                  (count = fibres in the bundle, len = median fibre length in mm, rep = representative fibre index:
+//                  the bundle's fibre with the shortest centre-to-centre walk, walk = that walk in mm)
 //   pathBetween(i, j) -> [Vector3...] with .lengths (Float32Array cumulative, city units), .total, .hops ([regions])
 //                  shortest path over the region graph (strong bundles preferred), each hop following its
 //                  representative fibre (oriented start -> end), passing through every district on the way, smoothed
@@ -179,11 +180,16 @@ export function buildBrainData(raw, quality) {
     if (!list) bundles.set(key, (list = []));
     list.push(s);
   }
+  // representative fibre of a bundle: the shortest walk from district centre to district centre (fibre length + the
+  // gaps between its ends and the two centres), so paths do not detour along long fibres or far-off fibre ends
+  const endGap = (s, k, node) => { const p = (s * K + k) * 3, q = nodes[node].q; return Math.hypot(P[p] - q[0], P[p + 1] - q[1], P[p + 2] - q[2]); };
+  const walkCost = s => flen[s] + 2 * (endGap(s, 0, endNode(E[2 * s])) + endGap(s, K - 1, endNode(E[2 * s + 1])));
   const edges = [], adj = Array.from({ length: N }, () => []);
   for (const key of [...bundles.keys()].sort((x, y) => x - y)) {
     const list = bundles.get(key).slice().sort((x, y) => flen[x] - flen[y] || x - y);
-    const rep = list[list.length >> 1];
-    const e = { a: Math.floor(key / N), b: key % N, count: list.length, len: flen[rep], rep };
+    let rep = list[0], repCost = Infinity;
+    for (const s of list) { const c = walkCost(s); if (c < repCost) { repCost = c; rep = s; } }
+    const e = { a: Math.floor(key / N), b: key % N, count: list.length, len: flen[list[list.length >> 1]], rep, walk: repCost };
     const ei = edges.push(e) - 1;
     adj[e.a].push({ j: e.b, e: ei }); adj[e.b].push({ j: e.a, e: ei });
   }
@@ -201,9 +207,13 @@ export function buildBrainData(raw, quality) {
 
   const defaults = byGroup("default");
   const home = centroidNearest(defaults);
-  const homeCluster = [home, ...defaults.filter(i => i !== home && direct(home, i))
-    .sort((x, y) => districts[x].pos.distanceTo(districts[home].pos) - districts[y].pos.distanceTo(districts[home].pos) || x - y)
-    .slice(0, 3)];
+  // home cluster: the home district + up to 3 nearby default districts, preferring ones joined to every district already
+  // in the cluster by a direct bundle (walks inside the flat are then one short hop)
+  const nearHome = defaults.filter(i => i !== home && direct(home, i))
+    .sort((x, y) => districts[x].pos.distanceTo(districts[home].pos) - districts[y].pos.distanceTo(districts[home].pos) || x - y);
+  const homeCluster = [home];
+  for (const i of nearHome) if (homeCluster.length < 4 && homeCluster.every(c => direct(c, i))) homeCluster.push(i);
+  for (const i of nearHome) if (homeCluster.length < 4 && !homeCluster.includes(i)) homeCluster.push(i);
   const rewardAll = nodes.map((n, i) => i).filter(i => /Accumbens|Caudate|Putamen/.test(nodes[i].name));
   const accumbens = rewardAll.filter(i => /Accumbens/.test(nodes[i].name));
   const reward = [centroidNearest(accumbens.length ? accumbens : rewardAll, rewardAll)];
@@ -289,7 +299,7 @@ export function buildBrainData(raw, quality) {
       for (const { j: v, e } of adj[u]) {
         const ed = edges[e];
         if (ed.count < minCount) continue;
-        const w = ed.len * (1 + 3 / Math.sqrt(ed.count));      // strong bundles are cheaper
+        const w = ed.walk * (1 + 1.5 / Math.sqrt(ed.count));   // strong bundles are cheaper
         if (dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = u; }
       }
     }
@@ -306,7 +316,7 @@ export function buildBrainData(raw, quality) {
     let out;
     if (i === j) out = finishPath([districts[i].pos.clone(), districts[i].pos.clone()], [i]);
     else {
-      const hops = route(i, j, 3) || route(i, j, 1) || [i, j];
+      const hops = route(i, j, 1) || [i, j];
       const pts = [districts[i].pos.clone()];
       for (let h = 0; h + 1 < hops.length; h++) {
         const u = hops[h], v = hops[h + 1];
@@ -315,7 +325,12 @@ export function buildBrainData(raw, quality) {
           const ed = edges[eIdx.e], line = fibreCity(ed.rep);
           const forward = endNode(E[2 * ed.rep]) === u;            // orient the fibre start -> end
           const seq = forward ? line : line.slice().reverse();
-          for (let k = 1; k < seq.length - 1; k++) pts.push(seq[k].clone());
+          // trim the fibre's spurs: join it at its point nearest to u's centre, leave it at its point nearest to v's
+          const pu = districts[u].pos, pv = districts[v].pos;
+          let k0 = 0, k1 = seq.length - 1;
+          for (let k = 1; k < seq.length; k++) if (seq[k].distanceToSquared(pu) < seq[k0].distanceToSquared(pu)) k0 = k;
+          for (let k = seq.length - 2; k > k0; k--) if (seq[k].distanceToSquared(pv) < seq[k1].distanceToSquared(pv)) k1 = k;
+          for (let k = k0; k <= k1; k++) pts.push(seq[k].clone());
         }
         pts.push(districts[v].pos.clone());
       }
