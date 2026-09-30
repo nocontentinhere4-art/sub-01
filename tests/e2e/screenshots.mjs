@@ -287,7 +287,7 @@ const SCENARIOS = {
       const idleShare = diffShare(shotBefore, await c.page.screenshot({ type: "png" }), rect);      // baseline over the same 2.5 s
       const fx0 = await c.fx();
       const before = c.chatCount, shotSend = await c.page.screenshot({ type: "png" });
-      await c.page.fill("#chat input", "fresh bread and a happy morning in the park");
+      await c.page.fill("#chat input[aria-label=message]", "fresh bread and a happy morning in the park");
       await c.page.keyboard.press("Enter");
       await c.waitFor(() => c.chatCount > before, 10000, "the chat message to come back");
       let rainSeen = null, rainStartMs = null, fxMin = fx0 ? fx0.free : null;
@@ -365,7 +365,7 @@ const SCENARIOS = {
       // a replay needs a memory of the day; chat is limited to 1 message / 10 s, so send one stimulus, then wait (4-8 s per replay)
       const msg = "fresh bread from the bakery and a happy walk in the park";
       const before = c.chatCount;
-      await c.page.fill("#chat input", msg);
+      await c.page.fill("#chat input[aria-label=message]", msg);
       await c.page.keyboard.press("Enter");
       await c.waitFor(() => c.chatCount > before, 10000, "the chat message to come back");
       await c.waitFor(() => c.replays > 0, 30000, "a replay event (deja vu)");
