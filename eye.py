@@ -23,10 +23,10 @@ HOME = "a quiet dark laboratory room at night with one large window over a sleep
 
 SYSTEM = """You write the inner view of SUB-01, a simulated brain built from public MRI scans.
 You receive its current state as JSON. Reply with JSON only:
-{"new_objects": [...], "scene": "...", "thought": "..."}
+{"new_objects": [{"said": "...", "en": "..."}], "scene": "...", "thought": "..."}
 - new_objects: up to 3 concrete, drawable things (nouns, 1-3 words, English) mentioned in recent_messages that are
   not already in world. Skip abstract words, people, brands, tickers, coins, money.
-- new_objects must be words the messages actually used (translate to English), never things you invent.
+- new_objects: "said" = the exact words used in the message (any language), "en" = English name. Never invent.
 - scene: one first-person view (max 45 words, English). Awake, it is always inside "home" (its persistent place)
   and contains the strongest world objects; in dreams, home melts into the replayed messages.
   Follow the style: awake = coherent, realistic, lighting from mood; rem = surreal dream mixing the replayed
@@ -144,8 +144,9 @@ class Eye:
         new, scene, thought = self._ask(state)
         fresh = [x for x, ts in self.heard if t - ts < 3 * 3600 and x not in self.absorbed]
         if fresh:                                        # a message shapes the world once; objects must come from it
-            words = set(re.findall(r"[a-z\u00C0-\u017F]{3,}", " ".join(fresh).lower()))
-            keep = [n for n in new if set(re.findall(r"[a-z\u00C0-\u017F]{3,}", str(n).lower())) & words]
+            said = " ".join(fresh).lower()
+            keep = [o.get("en") or o.get("said") for o in new
+                    if isinstance(o, dict) and o.get("said") and str(o["said"]).lower().strip() in said]
             self.world.add(keep, t, fresh[-1])
             self.absorbed.update(fresh)
         style = STYLE.get(stage, STYLE["AWAKE"])
