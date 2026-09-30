@@ -65,6 +65,8 @@
     #panel { width:auto; border-left:none; border-top:1px solid #1c1c26; flex:1; }
     #eeg { height:90px; } #chatbox { min-height:240px; }
   }
+  #eyebox { position:absolute; right:18px; top:18px; width:min(42%, 560px); background:rgba(4,4,6,.72); padding:10px; border:1px solid #1c1c26; border-radius:6px; z-index:2; }
+  @media (max-width: 800px) { #eyebox { position:static; width:auto; margin:8px; } }
   #eye-frame { position:relative; width:100%; aspect-ratio:16/9; background:#07070b; border:1px solid #1c1c26; border-radius:4px; overflow:hidden; }
   #eye-frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 2.5s ease; }
   #eye-frame img.on { opacity:1; }
@@ -84,10 +86,6 @@
       <div id="debtrow"><span>sleep debt</span><div class="track"><div id="debt"></div></div><span id="debtv">0.0 h</span></div>
       <div id="woken">woken 0 times tonight</div>
     </div>
-    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
-      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · sleeps 00:00–08:00 Rome time.</div>
-  </div>
-  <div id="panel">
     <div id="eyebox" style="display:none">
       <div class="lbl">What SUB-01 sees <span id="eye-stage" style="color:#ff6a00"></span></div>
       <div id="eye-frame"><img id="eye-a" alt=""><img id="eye-b" alt=""></div>
@@ -95,6 +93,10 @@
       <div id="eye-why"></div>
       <div id="eye-note">AI-generated from the model's state and your messages · not what the real person sees or thinks</div>
     </div>
+    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
+      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · sleeps 00:00–08:00 Rome time.</div>
+  </div>
+  <div id="panel">
     <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
     <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
     <div id="chatbox">
