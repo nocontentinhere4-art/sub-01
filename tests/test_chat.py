@@ -44,7 +44,8 @@ def test_topic_drive_is_not_summed_with_the_content_rules():
 @pytest.mark.parametrize("nick,ok", [
     ("", True), ("Bob", True), ("anna_b-2", True), ("zoë", True), ("a b c", True), ("x" * 20, True),
     ("x" * 21, False), ("bob.com", False), ("a@b", False), ("$WIF", False), ("idiot", False),
-    ("SUB-01", False), ("sub01 fan", False), ("12345678901", False), ("<b>", False),
+    ("SUB-01", False), ("\u0405UB-01", False), ("Sub-O1", False), ("SUB-Ol", False), ("\u0430nna", False),
+    ("Subito", True), ("Sublime", True), ("admin", False), ("\u00c9milie", True), ("sub01 fan", False), ("12345678901", False), ("<b>", False),
 ])
 def test_check_nick(nick, ok):
     assert chat.check_nick(nick)[0] is ok

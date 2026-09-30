@@ -173,7 +173,10 @@ def test_bakery_hours_edges():
     assert not lf.request("buy_bread", at(6, 59), "")[0]
     assert lf.request("buy_bread", at(7, 0), "")[0]
     lf = make()
-    assert lf.request("buy_bread", at(19, 59), "")[0]
+    assert lf.request("buy_bread", at(19, 45), "")[0]
+    lf = make()
+    ok, why = lf.request("buy_bread", at(19, 59), "")
+    assert not ok and "about to close" in why            # no point setting off a minute before closing
     lf = make()
     assert not lf.request("buy_bread", at(20, 0), "")[0]
 
@@ -182,7 +185,7 @@ def test_park_is_daylight_only():
     lf = make()
     assert not lf.request("park", at(21), "")[0]
     assert "dark" in lf.request("park", at(21), "")[1]
-    assert lf.request("park", at(20, 29), "")[0]
+    assert lf.request("park", at(18, 30), "")[0]
     lf = make()
     assert not lf.request("park", at(6, 30), "")[0]
     lf = make()
@@ -280,8 +283,10 @@ def test_snapshot_open_follows_the_clock():
     tick(lf, at(12))
     assert lf.snapshot()["open"] == {"bakery": True, "park": True}
     assert lf.snapshot()["npc"]["baker"]["present"] is True
+    tick(lf, at(19, 15))
+    assert lf.snapshot()["open"] == {"bakery": True, "park": False}     # 1 Oct: sunset about 18:50
     tick(lf, at(20, 15))
-    assert lf.snapshot()["open"] == {"bakery": False, "park": True}
+    assert lf.snapshot()["open"] == {"bakery": False, "park": False}
     assert lf.snapshot()["npc"]["baker"]["present"] is False
     tick(lf, at(22))
     assert lf.snapshot()["open"] == {"bakery": False, "park": False}
@@ -300,3 +305,59 @@ def test_desire_from_chat_still_works():
     lf = make(activity="window", place="window")
     lf.hear("vado a comprare il pane", at(10))
     assert lf.desire("buy_bread", at(10)) > 0.5
+
+
+# ---- review fixes: daylight, closed on arrival, repeated requests, turn-back route, baker pose ---------------
+def test_park_daylight_is_seasonal():
+    from datetime import datetime as D
+    summer, winter = D(2026, 6, 21, 12, tzinfo=ROME).timestamp(), D(2026, 12, 21, 12, tzinfo=ROME).timestamp()
+    assert 20.0 < life.sun_hours(summer)[1] < 21.5 and 16.0 < life.sun_hours(winter)[1] < 17.3
+    assert life.is_open("park", D(2026, 6, 21, 20, 15, tzinfo=ROME).timestamp())
+    assert not life.is_open("park", D(2026, 12, 21, 17, 30, tzinfo=ROME).timestamp())
+
+
+def test_request_for_the_activity_already_under_way_leaves_the_plan_alone():
+    lf = make(activity="window", place="window", hunger=0.9)
+    lf.until = 1e18
+    assert lf.request("buy_bread", at(10), "hungry")[0]
+    until, log, route_, path = lf.until, list(lf.log), list(lf.route), list(lf.path)
+    tick(lf, at(10), n=20)
+    ok, why = lf.request("buy_bread", at(10, 1), "still hungry")
+    assert ok and why == "already on the way"
+    assert lf.until == until and lf.log == log and lf.route == route_
+
+
+def test_buy_bread_request_while_eating_does_not_restart_eating():
+    lf = make(activity="eat", place="table", bread=1, hunger=0.8)
+    lf.until = 1e18
+    until = lf.until
+    ok, why = lf.request("buy_bread", at(10), "hungry")
+    assert not ok and "eating" in why and lf.until == until and len(lf.log) == 0
+
+
+def test_arriving_after_closing_buys_no_bread():
+    lf = make(activity="buy_bread", place="counter", hunger=0.8)
+    lf.until = 0.0
+    tick(lf, at(20, 5))
+    assert lf.bread == 0
+
+
+def test_baker_is_only_serving_when_present():
+    lf = make(activity="buy_bread", place="counter")
+    tick(lf, at(20, 30))
+    b = lf.snapshot()["npc"]["baker"]
+    assert b == {"present": False, "pose": "away"}
+    tick(lf, at(12))
+    assert lf.snapshot()["npc"]["baker"]["pose"] in ("serving", "standing")
+
+
+def test_turn_back_route_reports_the_half_edge_walk():
+    lf = make(activity="window", place="bed")
+    lf.until = 1e18
+    lf.path = ["street_bakery"]                       # walking street_home -> street_bakery, a third of the way
+    lf.place = "street_home"
+    lf.x, lf.z = 4.0 + 17.0 / 3, 10.0
+    lf._walk_to("street_park")                        # the park is behind: turn back
+    assert lf.route[:3] == ["street_bakery", "street_home", "street_park"]
+    s = lf.snapshot()
+    assert s["walking"] and 0.0 < s["progress"] < 0.5

@@ -181,6 +181,16 @@ def topical_networks(text):
 # --- nicknames -----------------------------------------------------------------------
 NICK_MAX = 20
 NICK_OK = re.compile(r"^[\w -]+$")
+NICK_RESERVED = re.compile(r"sub\s*[-_]?\s*0?1|system|admin|moderator", re.I)
+NICK_RESERVED_FOLDED = re.compile(r"sub\s*[-_]?\s*0?1(?!\w)", re.I)    # 'Sub-O1', 'SUB-Ol': 0/O and 1/l/I confusion
+_LOOKALIKE = str.maketrans({"o": "0", "O": "0", "l": "1", "I": "1"})
+
+
+def _nick_char_ok(ch):
+    """Latin letters (with accents), digits, space, _ and - only: no Cyrillic/Greek look-alikes of 'SUB-01'."""
+    if ch in " _-" or ch.isdigit():
+        return True
+    return ch.isalpha() and unicodedata.name(ch, "").startswith("LATIN")
 
 
 def check_nick(nick):
@@ -193,12 +203,13 @@ def check_nick(nick):
         return True, None
     if len(nick) > NICK_MAX:
         return False, f"nickname: max {NICK_MAX} characters"
-    if not NICK_OK.match(nick):
-        return False, "nickname: letters, digits, space, _ and - only"
+    if not NICK_OK.match(nick) or not all(_nick_char_ok(ch) for ch in nick):
+        return False, "nickname: Latin letters, digits, space, _ and - only"
     reason = blocked(nick)
     if reason:
         return False, "nickname: " + reason
-    if re.search(r"sub\s*[-_]?\s*0?1|system|admin|moderator", nick, re.I):
+    norm = unicodedata.normalize("NFKC", nick)
+    if NICK_RESERVED.search(norm) or NICK_RESERVED_FOLDED.search(norm.translate(_LOOKALIKE)):
         return False, "nickname: reserved"
     return True, None
 

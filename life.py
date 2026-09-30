@@ -31,7 +31,9 @@ WORLD = {"places": PLACES, "edges": EDGES,
          "street": [-22, 8.5, 30, 11.5]}
 
 WALK_SPEED = 1.3            # m / real second
-OPENING = {"bakery": (7.0, 20.0), "park": (7.0, 20.5)}   # local (Europe/Rome) hours: bakery 07:00-20:00, park daylight
+OPENING = {"bakery": (7.0, 20.0)}   # local (Europe/Rome) hours: bakery 07:00-20:00; the park is open in daylight (sun_hours)
+LAST_ORDER_MIN = 10         # the bakery is not worth walking to in the last 10 minutes before closing
+ROME_LAT, ROME_LON = 41.9, 12.5
 TIRED_ENERGY = 0.2          # energy (1 - sleep pressure) below this: too tired to go to the park
 HUNGRY_TO_EAT = 0.3         # "buy bread" while bread is at home turns into eating only when at least this hungry
 ACTIVITIES = {              # place, pose, (min, max) simulated minutes
@@ -94,10 +96,35 @@ def hhmm_h(t):
     return lt.hour + lt.minute / 60
 
 
+def sun_hours(t):
+    """(sunrise, sunset) in local Rome hours for the date of `t`: seasonal (a December sunset is about 16:40),
+    from the solar declination and the equation of time. Good to a few minutes, which is all a park gate needs."""
+    lt = local(t)
+    n = lt.timetuple().tm_yday
+    b = math.radians(360.0 / 365.0 * (n - 81))
+    decl = math.radians(23.44) * math.sin(b)
+    eot_min = 9.87 * math.sin(2 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)
+    cos_h = (math.sin(math.radians(-0.83)) - math.sin(math.radians(ROME_LAT)) * math.sin(decl)) / (
+        math.cos(math.radians(ROME_LAT)) * math.cos(decl))
+    half = math.degrees(math.acos(max(-1.0, min(1.0, cos_h)))) / 15.0          # half the day length, hours
+    off = lt.utcoffset().total_seconds() / 3600.0
+    noon = 12.0 + off - ROME_LON / 15.0 - eot_min / 60.0
+    return noon - half, noon + half
+
+
 def is_open(what, t):
-    """Opening hours on the Rome clock: what in OPENING ('bakery', 'park')."""
-    a, b = OPENING[what]
-    return a <= hhmm_h(t) < b
+    """Opening hours on the Rome clock: 'bakery' (fixed 07:00-20:00) or 'park' (between sunrise and sunset)."""
+    h = hhmm_h(t)
+    if what == "park":
+        a, b = sun_hours(t)
+    else:
+        a, b = OPENING[what]
+    return a <= h < b
+
+
+def bakery_reachable(t):
+    """Open now and not about to close (nobody sets off for the bakery in the last minutes)."""
+    return is_open("bakery", t) and hhmm_h(t) < OPENING["bakery"][1] - LAST_ORDER_MIN / 60
 
 
 def fmt_h(h):
@@ -146,8 +173,8 @@ class Life:
         h = local(t).hour + local(t).minute / 60
         if stage != "AWAKE":
             return "sleep"
-        open_bakery = 7 <= h < 20
-        day = 8 <= h < 20
+        open_bakery = bakery_reachable(t)
+        day = is_open("park", t)
         r = self.rng.random
         s = {
             "eat": (1.3 * self.hunger + 0.2 + (0.6 if self.hunger > 0.35 else 0)) if self.bread else 0.0,
@@ -167,16 +194,19 @@ class Life:
     def _walk_to(self, goal):
         """Plan the walk to `goal`. While already walking, never cut across: the agent finishes the current edge
         (forward) or turns back along it, whichever is shorter, and continues on the waypoint graph from there."""
+        start = self.place
         if self.path:
             a, b = self.place, self.path[0]
             pos = (self.x, self.z)
             fwd = math.dist(pos, PLACES[b]) + path_length(route(b, goal))
             back = math.dist(pos, PLACES[a]) + path_length(route(a, goal))
             first = b if fwd <= back else a
+            if first == a and a != b and math.dist(pos, PLACES[a]) > 0.05:
+                start = b                                  # turning back: the half-edge walk is b -> a (then on)
             self.path = [first] + route(first, goal)[1:]
         elif goal != self.place or (self.x, self.z) != PLACES[goal]:
             self.path = route(self.place, goal)[1:]
-        names = [self.place] + self.path
+        names = [start] + self.path
         self.route = [n for i, n in enumerate(names) if i == 0 or n != names[i - 1]] if self.path else []
 
     def remaining(self):
@@ -204,14 +234,20 @@ class Life:
             return False, "that is not something to request"
         if act == self.activity and not self.path:
             return False, "already doing that"
+        if act == self.activity and self.path:
+            return True, "already on the way"                 # the plan is left alone (no re-roll, no duplicate log)
         if act == "buy_bread":
             if self.bread:
                 if self.hunger < HUNGRY_TO_EAT:
                     return False, "already has bread at home and is not hungry"
+                if self.activity == "eat":
+                    return False, "already has bread at home and is eating it"
                 self.start("eat", t, "has bread at home: eats instead")
                 return False, "already has bread at home: eats it instead"
-            if not is_open("bakery", t):
+            if not bakery_reachable(t):
                 a, b = OPENING["bakery"]
+                if is_open("bakery", t):
+                    return False, f"the bakery is about to close (open {fmt_h(a)}-{fmt_h(b)}): too late to get there"
                 return False, f"the bakery is closed now (open {fmt_h(a)}-{fmt_h(b)})"
         elif act == "eat":
             if not self.bread:
@@ -273,7 +309,10 @@ class Life:
         woke = stage == "AWAKE" and self.activity == "sleep"
         if t >= self.until or must_sleep or woke:
             if self.activity == "buy_bread" and self.place == "counter":
-                self.bread += 2
+                if is_open("bakery", t):
+                    self.bread += 2
+                else:
+                    self.log = (self.log + [{"t": t, "what": "the bakery closed before getting there: no bread"}])[-30:]
             if self.activity == "eat" and self.bread:
                 self.bread -= 1
                 self.hunger = max(0.0, self.hunger - 0.6)
@@ -290,7 +329,7 @@ class Life:
 
     def open_now(self):
         t = self.t if self.t is not None else time.time()
-        return {k: is_open(k, t) for k in OPENING}
+        return {k: is_open(k, t) for k in ("bakery", "park")}
 
     def snapshot(self):
         op = self.open_now()
@@ -303,8 +342,8 @@ class Life:
                 "route": list(self.route) if self.path else [], "progress": self.progress(),
                 "energy": self.energy, "open": op,
                 "npc": {"baker": {"present": op["bakery"],
-                                  "pose": "serving" if self.place in ("counter", "bakery_in") and not self.path
-                                  else "standing" if op["bakery"] else "away"}}}
+                                  "pose": ("serving" if self.place in ("counter", "bakery_in") and not self.path
+                                           else "standing") if op["bakery"] else "away"}}}
 
     def to_dict(self):
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,

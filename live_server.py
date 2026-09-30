@@ -648,7 +648,7 @@ if __name__ == "__main__":
                    "(e.g. buy_bread: it walks to the bakery)")
     p.add_argument("--force-market", choices=["pump", "dump"], help="demo only: biased demo trades so the market "
                    "mood reads pumping / dumping")
-    p.add_argument("--force-stage", choices=["NREM", "REM"], help="demo only: hold the sleep engine in that stage")
+    p.add_argument("--force-stage", choices=["NREM", "REM"], help="demo only: hold the sleep engine in that stage (bypasses SleepEngine.update: fixed stage, synthetic replays every few seconds; for screenshots only)")
     p.add_argument("--no-llm", action="store_true", help="never call a language model for inner speech")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     a = p.parse_args()
