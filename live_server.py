@@ -28,9 +28,11 @@ from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
 from eye import Eye, market_mood
+from real_baseline import RealBaseline
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
+BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
 RPC_WS = "wss://api.mainnet-beta.solana.com"
@@ -88,6 +90,8 @@ class Live:
         self.pool_name = "demo" if demo else mint[:6]
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
+        self.baseline = None             # set by main() unless --no-real-baseline
+        self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
         self.recent_replays = []         # REM replays for the eye's dreams
         self.last_groups = {}
@@ -235,6 +239,9 @@ class Live:
         while True:
             now = time.time()
             events = self.sleep_tick()
+            if self.baseline:                                         # his recorded activity drives excitability
+                gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
+                b.drive = BASELINE_DRIVE * gain * np.clip(self.baseline.advance(TICK), -2.0, 3.0)
             due = [t for t in self.pending if t["at"] <= now]
             self.pending = [t for t in self.pending if t["at"] > now]
             for tr in due:
@@ -251,7 +258,8 @@ class Live:
                    "sync": round(st["sync"], 3), "stats": self.stats,
                    "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
                    "pool": self.pool_name, "events": events,
-                   "sleep": self.engine.status() | {"burst": round(self.burst, 2)}}
+                   "sleep": self.engine.status() | {"burst": round(self.burst, 2)},
+                   "baseline": self.baseline.status() if self.baseline else None}
             self.last_groups = groups
             await self.broadcast(msg)
             if events:
@@ -266,6 +274,9 @@ class Live:
     async def run_eye(self):
         loop = asyncio.get_running_loop()
         while True:
+            if not self.clients:                                      # nobody watching: don't spend GPU (and heat)
+                await asyncio.sleep(5)
+                continue
             stage = self.engine.stage
             t = self.clock.now()
             if stage == "AWAKE" and self.recent_replays:
@@ -278,7 +289,7 @@ class Live:
             except Exception as e:                                    # never let the eye stop the brain
                 print("eye error:", repr(e), flush=True)
                 await asyncio.sleep(10)
-            await asyncio.sleep({"AWAKE": 20, "REM": 15}.get(stage, 60))
+            await asyncio.sleep(self.eye_every * {"AWAKE": 1.0, "REM": 0.75}.get(stage, 3.0))
 
     # --- http ----------------------------------------------------------------
     async def ws_handler(self, request):
@@ -326,9 +337,19 @@ async def main(args):
         (HERE / "out" / f"{name}.{ext}").write_bytes(await request.read())
         return web.Response(text="ok")
     app.router.add_post("/snap", snap)
+    if not args.no_real_baseline and list((HERE / "out" / "rest").glob("*.npz")):
+        live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
     if args.eye:
-        live.eye = Eye(HERE / "out" / "eye" / "frames", data_dir / "world.json")
+        live.eye = Eye(HERE / "out" / "eye" / "frames", data_dir / "world.json", width=640, height=360, steps=6)
+        live.eye_every = args.eye_every
         app.router.add_static("/eye", HERE / "out" / "eye" / "frames")
+
+    async def frames(request):                    # recent eye frames for the world page
+        log = HERE / "out" / "eye" / "frames" / "frames.jsonl"
+        rows = log.read_text().splitlines()[-int(request.query.get("n", "40")):] if log.exists() else []
+        world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
+        return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
+    app.router.add_get("/api/frames", frames)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "index.html"))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
@@ -353,6 +374,8 @@ if __name__ == "__main__":
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
     p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
+    p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
+    p.add_argument("--no-real-baseline", action="store_true", help="simulated background only")
     p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     asyncio.run(main(p.parse_args()))

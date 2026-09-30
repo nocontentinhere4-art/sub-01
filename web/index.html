@@ -307,6 +307,7 @@ function connect(){
     act = m.act; if (!base) base = act.slice(); else base = base.map((b,i)=>b*0.998 + act[i]*0.002);
     document.getElementById("pool").textContent = m.pool;
     document.getElementById("sync").textContent = `global synchrony ${(m.sync*100).toFixed(1)}%`;
+    if (m.baseline) document.getElementById("sync").textContent += ` · background: his real recorded activity (${m.baseline.run}, min ${m.baseline.minute})`;
     const gmax = Math.max(...Object.values(m.groups), 0.001);
     for (const g of SHOW) if (m.groups[g]!==undefined) document.getElementById("b-"+g).style.width = (100*m.groups[g]/Math.max(gmax,0.35))+"%";
     for (const k in traces) { traces[k].push(m.wave[k]||0); if (traces[k].length>300) traces[k].shift(); }

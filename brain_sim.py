@@ -59,6 +59,7 @@ class Brain:
         self.buf = (rng.normal(0, 0.1, (self.hist, self.n)) + 1j * rng.normal(0, 0.1, (self.hist, self.n)))
         self.t = 0
         self.stim = np.zeros(self.n)
+        self.drive = np.zeros(self.n)        # slow drive from recorded real activity (RealBaseline), not decayed
         self.group_idx = {k: [i for i, nm in enumerate(self.names) if any(p in nm for p in pats)]
                           for k, pats in GROUPS.items()}
         self.group_idx["language"] = [i for i, nm in enumerate(self.names) if LANGUAGE(nm)]
@@ -83,7 +84,7 @@ class Brain:
             z = self.buf[now]
             zd = self.buf[(self.t - self.delay) % self.hist, self._cols]      # z_j(t - tau_ij)
             coupling = self.g * ((self.W * zd).sum(1) - self.W.sum(1) * z)
-            a_eff = self.a + self.stim                                           # stimulus pushes toward oscillation
+            a_eff = self.a + self.stim + self.drive                              # stimulus pushes toward oscillation
             # exponential integrator for the local dynamics (explicit Euler would
             # inflate the fast rotation), coupling and noise added explicitly
             local = np.exp((a_eff + 1j * self.omega - np.abs(z) ** 2) * dt)
