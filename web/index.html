@@ -65,8 +65,19 @@
     #panel { width:auto; border-left:none; border-top:1px solid #1c1c26; flex:1; }
     #eeg { height:90px; } #chatbox { min-height:240px; }
   }
-  #eyebox { position:absolute; right:18px; top:18px; width:min(42%, 560px); background:rgba(4,4,6,.72); padding:10px; border:1px solid #1c1c26; border-radius:6px; z-index:2; }
-  @media (max-width: 800px) { #eyebox { position:static; width:auto; margin:8px; } }
+  #worldcol { width:460px; border-left:1px solid #1c1c26; padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+  #panel { width:300px !important; }
+  #worldlist { display:flex; flex-wrap:wrap; gap:6px; font-size:12px; }
+  #worldlist span.obj { border:1px solid #2a2a36; border-radius:3px; padding:2px 7px; }
+  #worldlist span.obj b { color:#ff6a00; font-weight:normal; margin-left:5px; }
+  .dimtxt { color:#55556a; }
+  #earlier { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  #earlier img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:3px; border:1px solid #1c1c26; }
+  #fulllink { color:#7a7a8c; font-size:11px; text-decoration:none; }
+  @media (max-width: 1200px) { #worldcol { width:400px; } #panel { width:260px !important; } }
+  @media (max-width: 1000px) { #wrap { flex-direction:column; overflow-y:auto; } #scene { flex:none; height:55vh; }
+    #worldcol, #panel { width:auto !important; border-left:none; border-top:1px solid #1c1c26; overflow:visible; }
+    html,body { overflow:auto; } }
   #eye-frame { position:relative; width:100%; aspect-ratio:16/9; background:#07070b; border:1px solid #1c1c26; border-radius:4px; overflow:hidden; }
   #eye-frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 2.5s ease; }
   #eye-frame img.on { opacity:1; }
@@ -86,25 +97,32 @@
       <div id="debtrow"><span>sleep debt</span><div class="track"><div id="debt"></div></div><span id="debtv">0.0 h</span></div>
       <div id="woken">woken 0 times tonight</div>
     </div>
-    <div id="eyebox" style="display:none">
+    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
+      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · sleeps 00:00–08:00 Rome time.</div>
+  </div>
+  <div id="worldcol">
+    <div id="eyebox">
       <div class="lbl">What SUB-01 sees <span id="eye-stage" style="color:#ff6a00"></span></div>
       <div id="eye-frame"><img id="eye-a" alt=""><img id="eye-b" alt=""></div>
       <div id="eye-thought"></div>
       <div id="eye-why"></div>
+      <div class="lbl" style="margin-top:12px">In its world now</div>
+      <div id="worldlist"><span class="dimtxt">empty — name something in the chat</span></div>
+      <div class="lbl" style="margin-top:12px">Earlier</div>
+      <div id="earlier"></div>
       <div id="eye-note">AI-generated from the model's state and your messages · not what the real person sees or thinks</div>
     </div>
-    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
-      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · sleeps 00:00–08:00 Rome time.</div>
-  </div>
-  <div id="panel">
-    <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
-    <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
     <div id="chatbox">
       <div class="lbl">Chat · every message is a stimulus</div>
       <div id="chat"></div>
       <form id="chatform"><input id="chatin" maxlength="280" placeholder="send a stimulus…" autocomplete="off"><button>send</button></form>
       <div id="chatnote">max 280 characters · 1 message / 10 s · no links, addresses, tickers or money requests</div>
     </div>
+    <a id="fulllink" href="/world.html">open the world full screen →</a>
+  </div>
+  <div id="panel">
+    <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
+    <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
     <details id="nightbox" open><summary>Last night</summary><div id="lastnight">no night recorded yet</div></details>
     <details><summary>How messages become stimuli</summary><div id="rules"></div></details>
     <div id="stats"></div>
@@ -262,7 +280,21 @@ document.getElementById("chatform").addEventListener("submit", ev => {
 });
 
 let eyeFront = "eye-a";
+async function refreshWorld(){
+  try {
+    const d = await (await fetch("/api/frames?n=7")).json();
+    const wl = document.getElementById("worldlist");
+    wl.innerHTML = d.world.length ? "" : '<span class="dimtxt">empty — name something in the chat</span>';
+    for (const o of d.world) { const e = document.createElement("span"); e.className = "obj";
+      e.textContent = o.name; const b = document.createElement("b"); b.textContent = o.strength; e.appendChild(b); wl.appendChild(e); }
+    const ea = document.getElementById("earlier"); ea.innerHTML = "";
+    for (const f of d.frames.slice(0, -1).reverse().slice(0, 6)) { const i = document.createElement("img");
+      i.src = f.img; i.title = `${f.t} ${f.stage} · ${f.thought || ""}`; i.loading = "lazy"; ea.appendChild(i); }
+  } catch (e) {}
+}
+refreshWorld();
 function showEye(f){
+  refreshWorld();
   document.getElementById("eyebox").style.display = "";
   const back = eyeFront === "eye-a" ? "eye-b" : "eye-a", img = document.getElementById(back);
   img.onload = () => { img.classList.add("on"); document.getElementById(eyeFront).classList.remove("on"); eyeFront = back; };
