@@ -2,7 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements-server.txt .
 RUN pip install --no-cache-dir -r requirements-server.txt
-COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py live_server.py ./
+COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py ./
 COPY web ./web
 COPY out/connectome.npz out/atlas_names.json ./out/
 COPY out/rest ./out/rest

@@ -23,7 +23,7 @@ FORGET_BELOW = 0.15
 MAX_OBJECTS = 40
 KEEP_FRAMES = 600
 LLM_ID = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
-HOME = "a quiet dark laboratory room at night with one large window over a sleeping city"
+HOME = "a small minimal apartment: a bed, a table, a desk with a monitor, one window over a quiet street"
 
 SYSTEM = """You write the inner view of SUB-01, a simulated brain built from public MRI scans.
 You receive its current state as JSON. Reply with JSON only:
@@ -31,8 +31,9 @@ You receive its current state as JSON. Reply with JSON only:
 - new_objects: up to 3 concrete, drawable things (nouns, 1-3 words, English) mentioned in recent_messages that are
   not already in world. Skip abstract words, people, brands, tickers, coins, money.
 - new_objects: "said" = the exact words used in the message (any language), "en" = English name. Never invent.
-- scene: one first-person view (max 45 words, English). Awake, it is always inside "home" (its persistent place)
-  and contains the strongest world objects; in dreams, home melts into the replayed messages.
+- scene: one first-person view (max 45 words, English) of exactly what it sees while "doing" that activity
+  (the bakery counter, the park bench, the phone screen in bed, the chart on the desk...). Include the strongest
+  world objects when they fit; in dreams, the place melts into the replayed messages.
   Follow the style: awake = coherent, realistic, lighting from mood; rem = surreal dream mixing the replayed
   messages, impossible geometry; nrem = almost black, slow blurred shapes. Never draw people's faces, text,
   logos, violence, nudity or real persons.
@@ -211,11 +212,11 @@ class Eye:
             thought = ""
         return out.get("new_objects") or [], scene, thought
 
-    def step(self, t, stage, groups, market, replays, sim_hhmm):
+    def step(self, t, stage, groups, market, replays, sim_hhmm, doing=""):
         """One frame. Blocking (runs in a worker thread): returns the frame record."""
         self._load()
         recent = [x for x, ts in self.heard if t - ts < 3 * 3600][-5:]
-        state = {"time": sim_hhmm, "home": HOME, **mood(groups, stage, market), "world": self.world.top(t),
+        state = {"time": sim_hhmm, "home": HOME, "doing": doing, **mood(groups, stage, market), "world": self.world.top(t),
                  "recent_messages": recent, "replayed_messages": replays[-4:]}
         new, scene, thought = self._ask(state)
         fresh = [x for x, ts in self.heard if t - ts < 3 * 3600 and x not in self.absorbed]

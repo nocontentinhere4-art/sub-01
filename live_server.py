@@ -30,6 +30,7 @@ from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, st
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
 from eye import Eye, load_env, market_mood
 from real_baseline import RealBaseline
+from life import WORLD, Life
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -91,6 +92,10 @@ class Live:
         self.pool_name = "demo" if demo else mint[:6]
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
+        life_path = Path(data_dir) / "life.json"
+        self.life_path = life_path
+        self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
+        self.time_scale = time_scale
         self.baseline = None             # set by main() unless --no-real-baseline
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
@@ -181,6 +186,7 @@ class Live:
         m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits)
         if self.eye:
             self.eye.hear(text, t)
+        self.life.hear(text, t)
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
@@ -262,11 +268,19 @@ class Live:
                    "sleep": self.engine.status() | {"burst": round(self.burst, 2)},
                    "baseline": self.baseline.status() if self.baseline else None}
             self.last_groups = groups
+            base = sum(groups.values()) / max(1, len(groups))
+            rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
+            hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
+            tsim = self.clock.now()
+            self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
+                             self.engine.pressure(tsim))
+            msg["life"] = self.life.snapshot()
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
+                self.life_path.write_text(json.dumps(self.life.to_dict()))
                 last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
@@ -284,7 +298,8 @@ class Live:
                 self.recent_replays = []                              # dreams end when it wakes up
             try:
                 rec = await loop.run_in_executor(None, self.eye.step, t, stage, self.last_groups,
-                                                 market_mood(self.recent_trades), list(self.recent_replays), hhmm(t))
+                                                 market_mood(self.recent_trades), list(self.recent_replays), hhmm(t),
+                                                 self.life.snapshot()["doing"])
                 self.last_frame = rec
                 await self.broadcast({"type": "eye", **rec})
             except Exception as e:                                    # never let the eye stop the brain
@@ -301,7 +316,7 @@ class Live:
         if self.trust_proxy and request.headers.get("X-Forwarded-For"):
             key = request.headers["X-Forwarded-For"].split(",")[0].strip()
         await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.items[-30:]],
-                            "rules": [[cond, list(groups)] for cond, groups in RULES]})
+                            "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
         await ws.send_json(self.nights())
         if self.last_frame:
             await ws.send_json({"type": "eye", **self.last_frame})
@@ -391,7 +406,8 @@ async def main(args):
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
         return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
     app.router.add_get("/api/frames", frames)
-    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "index.html"))
+    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html"))       # the life is the front page
+    app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html"))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
     await runner.setup()
