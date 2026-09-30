@@ -15,9 +15,10 @@
 //   update(dt, env)    NREM: global dim + slow (rain / pulses at half speed). REM: the world warps (screen-space warp +
 //                      fov breathing) and the day's messages drift through the city as translucent words (déjà vu,
 //                      from env.replays [{text, t, seq}]).
-//   render()           RenderPass -> UnrealBloomPass (medium / high) -> one combined fx pass (glitch + warp + tint +
-//                      dim + vignette + ACES / sRGB output). Low quality: no bloom, and the composer only runs while an
-//                      effect is active (plain renderer.render otherwise) so phones keep 30 fps.
+//   render()           RenderPass -> OutputPass (ACES + sRGB, so the frame is display-ready and bounded) -> UnrealBloomPass
+//                      (medium / high; full at night, gentler by day) -> one combined fx pass (glitch + warp + tint + dim +
+//                      vignette). Low quality: no bloom, and the composer only runs while an effect is active (plain
+//                      renderer.render otherwise) so phones keep 30 fps.
 //   ?fxhold=1 (screenshots only) holds a glitch burst on; ?fxpost=0 disables the composer (debug); window.__sub01.fx
 //   mirrors the effect state.
 //   prefers-reduced-motion: glitch bursts are weak and short (no tearing / block displacement), warp and fov breathing
@@ -28,13 +29,15 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 export const RAIN_GAP = 0.6;                 // s between two rained messages (extra messages queue up, max RAIN_QUEUE)
 export const RAIN_QUEUE = 8;
 export const MAX_WORDS = 28, MAX_WORD_LEN = 16, MAX_GLYPHS = 150;   // per message
 export const BURST_GAP = [0.4, 1.6];         // s between two glitch bursts (>= 0.4 s -> < 3 Hz), each 60..220 ms long
 export const ORANGE = 0xff6a00;
-// bloom (medium / high) works on the display-ready scene: only the bright cores of roads, words and towers glow
+// bloom (medium / high) works on the display-ready (tone-mapped, bounded) frame: only the bright cores of roads, words
+// and towers glow, and the daytime sky cannot blow the frame out
 export const BLOOM = { strength: 0.35, radius: 0.3, threshold: 0.8 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -97,9 +100,15 @@ function makeAtlas() {
   cv.width = COLS * CELL_W; cv.height = rows * CELL_H;
   const x = cv.getContext("2d");
   x.clearRect(0, 0, cv.width, cv.height);
-  x.font = `bold 27px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-  x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = "#fff";
-  [...ATLAS_CHARS].forEach((c, i) => x.fillText(c, (i % COLS) * CELL_W + CELL_W / 2, Math.floor(i / COLS) * CELL_H + CELL_H / 2 + 1));
+  x.font = `bold 26px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+  x.textAlign = "center"; x.textBaseline = "middle";
+  x.lineJoin = "round"; x.lineWidth = 5; x.strokeStyle = "#000"; x.fillStyle = "#fff";
+  // black stroke under a white fill: alpha = coverage of ink + outline, red = ink only (the shader colours the ink and
+  // keeps the outline dark, so the words stay legible on the bright daytime city as well as at night)
+  [...ATLAS_CHARS].forEach((c, i) => {
+    const cx = (i % COLS) * CELL_W + CELL_W / 2, cy = Math.floor(i / COLS) * CELL_H + CELL_H / 2 + 1;
+    x.strokeText(c, cx, cy); x.fillText(c, cx, cy);
+  });
   const tex = new THREE.CanvasTexture(cv);
   tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false;
   return { tex, cols: COLS, rows, w: cv.width, h: cv.height };
@@ -139,10 +148,12 @@ const GLYPH_FRAG = /* glsl */`
   uniform sampler2D atlas; uniform vec3 color; uniform vec3 ghost; uniform float level;
   varying vec2 vUv; varying float vAlpha; varying float vMode;
   void main() {
-    float a = texture2D(atlas, vUv).a * vAlpha * level;
+    vec4 t = texture2D(atlas, vUv);
+    float a = t.a * vAlpha * level;
     if (a < 0.01) discard;
-    vec3 c = mix(color, ghost, vMode);
-    gl_FragColor = vec4(c * a, a);
+    vec3 ink = mix(color, ghost, vMode);
+    vec3 c = mix(vec3(0.02, 0.01, 0.0), ink, t.r);            // dark outline around the coloured ink
+    gl_FragColor = vec4(c, a * mix(1.0, 0.75, vMode));
   }`;
 
 const SPLASH_VERT = /* glsl */`
@@ -187,7 +198,7 @@ const WAVE_FRAG = /* glsl */`
   }`;
 
 // the combined screen pass: glitch (dump) + jitter (choppy) + warp (REM) + warm tint (pump) + dim (NREM) + vignette,
-// in display space (the scene pass already applied the renderer's tone mapping and output colour space)
+// in display space (the OutputPass right after the scene pass already applied tone mapping and the output colour space)
 const FX_SHADER = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, resolution: { value: new THREE.Vector2(1, 1) },
@@ -206,9 +217,9 @@ const FX_SHADER = {
       vec2 uv = vUv;
       if (warp > 0.001) {                                                       // REM: the world breathes and bends
         vec2 c = uv - 0.5; float r = length(c);
-        float breathe = 1.0 - warp * 0.05 * (0.5 + 0.5 * sin(time * 0.8));
-        uv = 0.5 + c * (breathe + warp * 0.10 * r * r * sin(time * 0.5 + r * 7.0));
-        uv += warp * 0.010 * vec2(sin(uv.y * 7.0 + time * 0.9), cos(uv.x * 6.0 - time * 0.7));
+        float breathe = 1.0 - warp * 0.06 * (0.5 + 0.5 * sin(time * 0.8));
+        uv = 0.5 + c * (breathe + warp * 0.16 * r * r * sin(time * 0.5 + r * 7.0));
+        uv += warp * 0.014 * vec2(sin(uv.y * 7.0 + time * 0.9), cos(uv.x * 6.0 - time * 0.7));
       }
       if (jitter > 0.001) uv += jitter * 0.0015 * vec2(hash(floor(time * 24.0)) - 0.5, hash(floor(time * 24.0) + 7.0) - 0.5);
       vec2 guv = uv;
@@ -257,6 +268,7 @@ export function createFx(renderer, scene, camera, data, quality) {
   const urlq = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
   const hold = urlq.get("fxhold") === "1";
   const noPost = urlq.get("fxpost") === "0";           // ?fxpost=0: never use the composer (debug / comparison)
+  const clockScale = Math.min(10, Math.max(0.1, +urlq.get("fxspeed") || 1));   // ?fxspeed=N: screenshots only
   const rng = Math.random;
   const R = data.radius || 400;
   const root = new THREE.Group(); root.name = "fx"; scene.add(root);
@@ -282,10 +294,10 @@ export function createFx(renderer, scene, camera, data, quality) {
   gg.instanceCount = POOL;
   const glyphMat = new THREE.ShaderMaterial({
     uniforms: { time: { value: 0 }, resolution: { value: resolution }, atlas: { value: atlas.tex },
-      color: { value: new THREE.Color(ORANGE).multiplyScalar(1.6) }, ghost: { value: new THREE.Color(0xffe2c0) },
+      color: { value: new THREE.Color(0xff8a2a).multiplyScalar(1.5) }, ghost: { value: new THREE.Color(0xffe2c0) },
       level: { value: 1 } },
     vertexShader: GLYPH_VERT, fragmentShader: GLYPH_FRAG,
-    transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false,   // words are light: never hidden by a tower
+    transparent: true, depthWrite: false, depthTest: false, fog: false,   // words are light: never hidden by a tower
   });
   const glyphs = new THREE.Mesh(gg, glyphMat); glyphs.frustumCulled = false; glyphs.renderOrder = 20; root.add(glyphs);
   const expires = new Float32Array(POOL);             // fx time after which the slot is free
@@ -362,7 +374,7 @@ export function createFx(renderer, scene, camera, data, quality) {
   const lineCv = document.createElement("canvas"); lineCv.width = 1024; lineCv.height = 168;
   const lineTex = new THREE.CanvasTexture(lineCv); lineTex.colorSpace = THREE.SRGBColorSpace;
   const lineMat = new THREE.SpriteMaterial({ map: lineTex, transparent: true, opacity: 0, depthWrite: false, depthTest: false,
-    toneMapped: false, sizeAttenuation: false, fog: false });
+    sizeAttenuation: false, fog: false });      // tone-mapped like the rest so it looks the same with and without the composer
   const line = new THREE.Sprite(lineMat); line.renderOrder = 30; line.visible = false; root.add(line);
   line.scale.set(0.12 * lineCv.width / lineCv.height, 0.12, 1);
   let lineUntil = -1, lineStart = 0, lineAnchor = null;
@@ -384,18 +396,18 @@ export function createFx(renderer, scene, camera, data, quality) {
   let composer = null, bloom = null, fxPass = null;
   function ensureComposer() {
     if (composer || noPost) return composer;
+    // RenderPass (linear, half-float target) -> OutputPass (the renderer's ACES tone mapping + sRGB output, exactly as
+    // a direct render would apply them, so the construct looks the same with and without the composer and low quality
+    // can toggle it per frame) -> UnrealBloomPass (medium / high) -> fx pass. Bloom and the fx pass see bounded display
+    // values: a bright daytime sky cannot blow the frame out through the bloom mip chain.
     composer = new EffectComposer(renderer);
-    // The scene is rendered into the composer's targets exactly as it would be onto the canvas (the renderer applies its
-    // tone mapping and output colour space when the target is flagged like an XR target), so the construct looks the
-    // same with and without post-processing; bloom and the fx pass then work in display space.
-    for (const rt of [composer.renderTarget1, composer.renderTarget2]) { rt.isXRRenderTarget = true; rt.texture.colorSpace = renderer.outputColorSpace; }
     composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new OutputPass());
     if (!low && q.bloom !== false) {
       bloom = new UnrealBloomPass(resolution.clone(), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
       composer.addPass(bloom);
     }
     fxPass = new ShaderPass(FX_SHADER);
-    fxPass.material.toneMapped = false;                 // the input is already display-ready (see above)
     fxPass.uniforms.resolution.value = resolution;
     fxPass.uniforms.vignette.value = low ? 0.25 : 0.35;
     fxPass.uniforms.tear.value = reduced ? 0 : 1;
@@ -429,7 +441,7 @@ export function createFx(renderer, scene, camera, data, quality) {
     const words = splitWords(msg.text);
     if (!words.length) return;
     const regions = regionsOf(msg), n = regions.length;
-    const sizePx = (low ? 17 : 19) * pr;
+    const sizePx = (low ? 20 : 23) * pr;
     for (let k = 0; k < words.length; k++) {
       const d = data.districts[regions[k % n]];
       const ang = rng() * 6.283, rad = 4 + rng() * 11;
@@ -461,7 +473,7 @@ export function createFx(renderer, scene, camera, data, quality) {
 
   // ---------------- per frame ----------------
   function update(dt, env) {
-    dt = Math.min(0.1, Math.max(0, +dt || 0));
+    dt = Math.min(0.1, Math.max(0, +dt || 0)) * clockScale;
     wall += dt;
     stage = env?.stage || "AWAKE"; view = env?.view || view;
     speed = stage === "NREM" ? 0.45 : stage === "REM" ? 0.8 : 1;
@@ -501,7 +513,10 @@ export function createFx(renderer, scene, camera, data, quality) {
       u.split.value = (reduced ? 2 : 4.5) * pr; u.jitter.value = cur.jitter; u.warp.value = cur.warp; u.dim.value = cur.dim;
       u.pump.value = cur.pump;
     }
-    if (bloom) bloom.strength = BLOOM.strength * (1 + cur.pump * 0.6 * (0.5 + 0.5 * Math.sin(wall * 1.1)) - cur.dim * 0.5);
+    if (bloom) {
+      const dayK = Math.max(0, Math.min(1, +env?.dayK || 0));
+      bloom.strength = BLOOM.strength * (1 - 0.6 * dayK) * (1 + cur.pump * 0.6 * (0.5 + 0.5 * Math.sin(wall * 1.1)) - cur.dim * 0.5);
+    }
 
     // pump waves on the ground
     wave.visible = cur.pump > 0.01;
@@ -533,7 +548,7 @@ export function createFx(renderer, scene, camera, data, quality) {
     const words = splitWords(text, { maxWords: 12, maxLen: MAX_WORD_LEN, maxGlyphs: 80 });
     if (!words.length) return;
     camera.getWorldDirection(fwd); rightV.crossVectors(fwd, camera.up).normalize();
-    const sizePx = (low ? 18 : 21) * pr;
+    const sizePx = (low ? 20 : 23) * pr;
     for (let k = 0; k < words.length; k++) {
       if (view === "orbit") {
         const ang = rng() * 6.283, rad = rng() * R * 0.85;
@@ -571,7 +586,8 @@ export function createFx(renderer, scene, camera, data, quality) {
   }
 
   const api = { rain, innerLine, weather, update, render, resize, dispose,
-    get state() { return { ...cur, burst: burster.seed, queued: queue.length, free: free.length, composer: !!composer, reduced, hold }; } };
+    get state() { return { ...cur, burst: burster.seed, queued: queue.length, free: free.length, pending: pendingSplash.length, time: fxTime,
+      composer: !!composer, reduced, hold }; } };
   try { if (window.__sub01) Object.defineProperty(window.__sub01, "fx", { configurable: true, enumerable: true, get: () => api.state }); } catch { /* debug only */ }
   return api;
 }
