@@ -89,7 +89,7 @@ def test_nick_store_is_capped_and_drops_the_oldest(tmp_path):
 
 
 def test_winning_chat_speech_carries_the_chats_cid(tmp_path):
-    live = make(tmp_path)
+    live = make(tmp_path, start=live_server.parse_start("14:00"))   # awake: the result must not depend on the wall clock
     watcher = FakeWS()
     live.clients.add(watcher)
     run(chat(live, FakeWS(), "ho fame, vai a comprare il pane", "Anna"))
