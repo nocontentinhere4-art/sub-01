@@ -19,22 +19,51 @@
     margin-right:6px; animation:pulse 1.2s infinite; vertical-align:middle; }
   @keyframes pulse { 50% { opacity:.25; } }
   #foot { position:absolute; left:20px; right:20px; bottom:14px; color:var(--dim); font-size:11px; pointer-events:none; }
-  #panel { width:340px; border-left:1px solid #1c1c26; padding:16px; display:flex; flex-direction:column; gap:14px; overflow:hidden; }
+  #panel { width:340px; border-left:1px solid #1c1c26; padding:16px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
   .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
   .bar { display:flex; align-items:center; gap:8px; font-size:12px; margin:3px 0; }
   .bar span:first-child { width:92px; color:var(--dim); }
   .bar .track { flex:1; height:6px; background:#15151d; border-radius:3px; overflow:hidden; }
   .bar .fill { height:100%; background:linear-gradient(90deg,#5a189a,#c77dff,#ffd166); width:0; transition:width .15s; }
   #eeg { width:100%; height:150px; background:#07070b; border:1px solid #15151d; border-radius:4px; }
-  #feed { flex:1; overflow:hidden; font-size:12px; }
+  #feed { overflow:hidden; font-size:12px; }
   #feed div { padding:3px 0; border-bottom:1px solid #111118; white-space:nowrap; }
   .buy { color:var(--buy); } .sell { color:var(--sell); }
   #stats { font-size:12px; color:var(--dim); }
   #stats b { color:var(--fg); font-weight:normal; }
+  /* sleep status */
+  #status { display:flex; align-items:center; gap:10px; margin-top:10px; font-size:12px; }
+  #stage { padding:2px 8px; border-radius:3px; font-size:11px; letter-spacing:.12em; border:1px solid currentColor; }
+  #stage.AWAKE { color:#ffd166; } #stage.NREM { color:#4cc9f0; } #stage.REM { color:#c77dff; }
+  #clock { color:var(--fg); }
+  #debtrow { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); margin-top:6px; width:230px; }
+  #debtrow .track { flex:1; height:4px; background:#15151d; border-radius:2px; overflow:hidden; }
+  #debt { height:100%; width:0; background:linear-gradient(90deg,#4cc9f0,#ff4d6d); transition:width .5s; }
+  #woken { font-size:11px; color:var(--dim); margin-top:4px; }
+  #honest { color:var(--fg); opacity:.85; margin-bottom:4px; }
+  /* chat */
+  #chatbox { flex:1; min-height:170px; display:flex; flex-direction:column; }
+  #chat { flex:1; overflow-y:auto; font-size:12px; display:flex; flex-direction:column-reverse; }
+  .msg { padding:4px 0; border-bottom:1px solid #111118; word-wrap:break-word; }
+  .msg .tm { color:var(--dim); margin-right:6px; }
+  .msg .hits { display:block; margin-top:2px; }
+  .chip { display:inline-block; font-size:10px; padding:0 5px; margin:1px 3px 0 0; border-radius:2px; background:#1a1a26; color:#b9b9d0; }
+  .msg .zz { font-size:10px; color:#4cc9f0; margin-left:4px; }
+  #chatform { display:flex; gap:6px; margin-top:6px; }
+  #chatin { flex:1; min-width:0; background:#0c0c12; color:var(--fg); border:1px solid #23232f; border-radius:3px; padding:6px 8px; font:inherit; font-size:12px; }
+  #chatform button { background:#1c1c28; color:var(--fg); border:1px solid #2c2c3a; border-radius:3px; font:inherit; font-size:12px; padding:0 10px; cursor:pointer; }
+  #chatnote { font-size:10px; color:var(--dim); min-height:13px; margin-top:3px; }
+  #chatnote.err { color:var(--sell); }
+  details { font-size:11px; color:var(--dim); }
+  details summary { cursor:pointer; letter-spacing:.1em; text-transform:uppercase; }
+  #lastnight div, #rules div { padding:2px 0; }
+  #lastnight .q { color:var(--fg); }
+  #feed { flex:none; height:90px; }
+  .sys { color:#4cc9f0; }
   @media (max-width: 800px) {
     #wrap { flex-direction:column; } #scene { flex:none; height:58vh; }
     #panel { width:auto; border-left:none; border-top:1px solid #1c1c26; flex:1; }
-    #eeg { height:90px; }
+    #eeg { height:90px; } #chatbox { min-height:240px; }
   }
 </style>
 </head>
@@ -45,13 +74,24 @@
       <h1>SUB-01</h1>
       <div class="sub"><span class="live"></span>LIVE · <span id="pool">connecting…</span></div>
       <div class="sub" id="sync">sync —</div>
+      <div id="status"><span id="stage" class="AWAKE">AWAKE</span><span id="clock">--:--</span><span class="sub" style="margin:0">Rome</span></div>
+      <div id="debtrow"><span>sleep debt</span><div class="track"><div id="debt"></div></div><span id="debtv">0.0 h</span></div>
+      <div id="woken">woken 0 times tonight</div>
     </div>
-    <div id="foot">Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
-      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade is a stimulus · a model of brain activity, not a mind.</div>
+    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
+      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · sleeps 00:00–08:00 Rome time.</div>
   </div>
   <div id="panel">
     <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
     <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
+    <div id="chatbox">
+      <div class="lbl">Chat · every message is a stimulus</div>
+      <div id="chat"></div>
+      <form id="chatform"><input id="chatin" maxlength="280" placeholder="send a stimulus…" autocomplete="off"><button>send</button></form>
+      <div id="chatnote">max 280 characters · 1 message / 10 s · no links, addresses, tickers or money requests</div>
+    </div>
+    <details id="nightbox" open><summary>Last night</summary><div id="lastnight">no night recorded yet</div></details>
+    <details><summary>How messages become stimuli</summary><div id="rules"></div></details>
     <div id="stats"></div>
     <div class="lbl" style="margin-bottom:0">Stimuli</div>
     <div id="feed"></div>
@@ -61,8 +101,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
-const SHOW = ["visual","somatomotor","attention","salience","limbic","control","default","reward","memory","relay"];
-const LABEL = {visual:"visual",somatomotor:"motor",attention:"attention",salience:"salience",limbic:"limbic",
+const SHOW = ["language","visual","somatomotor","attention","salience","limbic","control","default","reward","memory","relay"];
+const LABEL = {language:"language",visual:"visual",somatomotor:"motor",attention:"attention",salience:"salience",limbic:"limbic",
   control:"control",default:"default",reward:"reward",memory:"memory",relay:"thalamus"};
 const WAVE_COL = {reward:"#39f5a0", salience:"#ff4d6d", visual:"#4cc9f0", default:"#c77dff", relay:"#ffd166"};
 
@@ -80,7 +120,10 @@ controls.target.set(0, 0, 0);
 function resize(){ const w=host.clientWidth, h=host.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
 
-let nodes=[], nodeMeshes=[], glows=[], fibreMat=null;
+let nodes=[], nodeMeshes=[], glows=[], fibreMat=null, cortexMat=null;
+// night look: brightness + pulse speed per stage (eased), REM bursts from the server
+const LOOK = {AWAKE:{level:1, speed:1, rot:0.5}, NREM:{level:0.35, speed:0.25, rot:0.12}, REM:{level:0.5, speed:0.6, rot:0.25}};
+let stage = "AWAKE", look = {...LOOK.AWAKE}, phase = 0, burst = 0, lastFrame = performance.now();
 const plasma = t => { // compact plasma-like ramp
   const stops=[[13,8,135],[126,3,168],[204,71,120],[248,149,64],[240,249,33]];
   t=Math.max(0,Math.min(1,t))*(stops.length-1); const i=Math.floor(t), f=t-i, a=stops[i], b=stops[Math.min(i+1,stops.length-1)];
@@ -118,10 +161,10 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
   g.setAttribute("nodes", new THREE.BufferAttribute(nod,2));
   g.setAttribute("tpos", new THREE.BufferAttribute(tp,1));
   fibreMat = new THREE.ShaderMaterial({
-    uniforms: { act:{value:actTex}, time:{value:0}, opacity:{value:0.018} },
+    uniforms: { act:{value:actTex}, time:{value:0}, opacity:{value:0.018}, boost:{value:0}, level:{value:1} },
     vertexShader: `
       attribute vec3 dcol; attribute vec2 nodes; attribute float tpos;
-      uniform sampler2D act; uniform float time;
+      uniform sampler2D act; uniform float time; uniform float boost; uniform float level;
       varying vec3 vCol;
       float actAt(float i){ return i < 0.0 ? 0.0 : texture2D(act, vec2((i+0.5)/256.0, 0.5)).r * 3.0; }
       void main(){
@@ -129,7 +172,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
         float drive = clamp((max(a,b) - 1.15) / 0.9, 0.0, 1.0);          // above the region's own baseline
         float dir = a >= b ? tpos : 1.0 - tpos;                            // pulses leave the more active end
         float wave = pow(0.5 + 0.5*sin(dir*22.0 - time*7.0), 8.0);
-        float glow = 0.6 + drive * (0.6 + 3.5*wave);
+        float glow = 0.6 + level * drive * (0.6 + 3.5*wave) + boost * (0.4 + 1.5*wave);   // night: calmer
         vCol = mix(dcol, vec3(1.0), drive*wave*0.35) * glow;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
@@ -142,8 +185,9 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
     const cg = new THREE.BufferGeometry();
     cg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vb), 3));
     cg.setIndex(new THREE.BufferAttribute(new Uint32Array(ib), 1));
-    scene.add(new THREE.Mesh(cg, new THREE.MeshBasicMaterial({color:0x9d8cff, transparent:true, opacity:0.04,
-      depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending})));
+    cortexMat = new THREE.MeshBasicMaterial({color:0x9d8cff, transparent:true, opacity:0.04,
+      depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending});
+    scene.add(new THREE.Mesh(cg, cortexMat));
   });
   // ---- region centres (same native space as the fibres) ----
   const sph = new THREE.SphereGeometry(1, 12, 12);
@@ -168,10 +212,67 @@ const eeg = document.getElementById("eeg"), ex = eeg.getContext("2d");
 const traces = {}; for (const k in WAVE_COL) traces[k] = [];
 const feed = document.getElementById("feed");
 
+const chatEl = document.getElementById("chat"), chatNote = document.getElementById("chatnote");
+const DEFAULT_NOTE = chatNote.textContent;
+function el(tag, cls, text){ const x = document.createElement(tag); if (cls) x.className = cls; if (text!==undefined) x.textContent = text; return x; }
+function addChat(c){
+  const d = el("div", "msg");
+  d.append(el("span", "tm", c.t), el("span", "", c.text));
+  if (c.asleep) d.append(el("span", "zz", `heard while asleep (${c.stage})`));
+  const hits = el("span", "hits"); for (const n of c.networks) hits.append(el("span", "chip", n)); d.append(hits);
+  chatEl.prepend(d); while (chatEl.children.length > 80) chatEl.lastChild.remove();
+}
+function addSys(text){
+  feed.insertAdjacentElement("afterbegin", el("div", "sys", text));
+  while (feed.children.length > 60) feed.lastChild.remove();
+}
+function renderNights(m){
+  const box = document.getElementById("lastnight"), n = m.last || m.tonight;
+  document.querySelector("#nightbox summary").textContent = m.last ? `Last night · ${m.last.date}` : "Tonight so far";
+  box.replaceChildren();
+  if (!n) { box.append(el("div", "", "no night recorded yet")); return; }
+  const tm = s => s ? s.slice(11) : "…";
+  box.append(el("div", "", `asleep ${tm(n.sleep_onset)} → ${tm(n.woke_up)} · debt ${n.sleep_debt.start} → ${n.sleep_debt.end ?? "…"} h`));
+  box.append(el("div", "", n.wakeups.length ? `woken ${n.wakeups.length}×:` : "slept through, never woken"));
+  for (const w of n.wakeups) box.append(el("div", "", `  ${tm(w.t)} by ${w.cause}`));
+  box.append(el("div", "", n.replays.length ? "replayed in REM (dream ingredients):" : "nothing replayed"));
+  for (const r of n.replays.slice(-12)) box.append(el("div", "q", `  ${tm(r.t)} ↺ “${r.text}” (heard ${tm(r.received)})`));
+}
+let sock = null;
+document.getElementById("chatform").addEventListener("submit", ev => {
+  ev.preventDefault(); const inp = document.getElementById("chatin"), text = inp.value.trim();
+  if (!text) return;
+  if (!sock || sock.readyState !== 1) { chatNote.textContent = "still connecting, try again in a moment"; chatNote.className = "err"; return; }
+  sock.send(JSON.stringify({type:"chat", text})); inp.value = "";
+});
+
 function connect(){
-  const ws = new WebSocket(`ws://${location.host}/ws`);
+  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
+    if (m.type === "hello") {
+      chatEl.replaceChildren(); m.chat.forEach(addChat);
+      const r = document.getElementById("rules"); r.replaceChildren();
+      for (const [cond, groups] of m.rules) r.append(el("div", "", `${cond} → ${groups.join(", ")}`));
+      r.append(el("div", "", "asleep: stimulus × stage gain (NREM ≈ 0.15, REM ≈ 0.4)"));
+      return;
+    }
+    if (m.type === "chat") { addChat(m); return; }
+    if (m.type === "chat_ack") {
+      chatNote.textContent = m.ok ? DEFAULT_NOTE : `not sent: ${m.reason}`; chatNote.className = m.ok ? "" : "err"; return;
+    }
+    if (m.type === "nights") { renderNights(m); return; }
+    if (m.type !== "tick") return;
+    const sl = m.sleep;
+    if (sl) {
+      stage = sl.stage; burst = Math.max(burst, sl.burst);
+      const st = document.getElementById("stage"); st.textContent = sl.stage; st.className = sl.stage;
+      document.getElementById("clock").textContent = sl.clock;
+      document.getElementById("debt").style.width = Math.min(100, sl.debt / 4 * 100) + "%";
+      document.getElementById("debtv").textContent = `${sl.debt.toFixed(1)} h`;
+      document.getElementById("woken").textContent = `woken ${sl.woken_tonight} time${sl.woken_tonight===1?"":"s"} tonight`;
+    }
+    for (const ev of m.events || []) addSys(ev.type === "replay" ? `${ev.t} REM replay ↺ “${ev.text}”` : ev.text);
     act = m.act; if (!base) base = act.slice(); else base = base.map((b,i)=>b*0.998 + act[i]*0.002);
     document.getElementById("pool").textContent = m.pool;
     document.getElementById("sync").textContent = `global synchrony ${(m.sync*100).toFixed(1)}%`;
@@ -200,15 +301,24 @@ function drawEEG(){
 
 function animate(){
   requestAnimationFrame(animate); controls.update();
-  if (fibreMat) fibreMat.uniforms.time.value = performance.now()/1000;
+  const now = performance.now(), dt = Math.min(0.1, (now - lastFrame)/1000); lastFrame = now;
+  const tgt = LOOK[stage] || LOOK.AWAKE, k = 1 - Math.exp(-dt/2.5);      // ease over a few seconds
+  for (const key in look) look[key] += (tgt[key] - look[key]) * k;
+  phase += dt * look.speed; burst *= Math.exp(-dt/0.5);
+  controls.autoRotateSpeed = look.rot;
+  if (fibreMat) { fibreMat.uniforms.time.value = phase; fibreMat.uniforms.opacity.value = 0.018 * look.level; fibreMat.uniforms.level.value = look.level;
+    fibreMat.uniforms.boost.value = stage === "REM" ? 0.6 * burst : 0; }
+  if (cortexMat) cortexMat.opacity = 0.04 * (0.5 + 0.5*look.level);
   if (act && nodeMeshes.length) {
-    const rel = act.map((a,i)=> a/Math.max(base[i],0.02));
+    const raw = act.map((a,i)=> a/Math.max(base[i],0.02));
+    const gm = Math.max(1e-3, raw.reduce((x,y)=>x+y, 0) / raw.length);   // stage changes rescale the whole brain:
+    const rel = raw.map(r => r/gm);                                       // show regional contrast, not the global jump
     rel.forEach((r,i)=>{ actData[i*4] = Math.min(255, Math.round(r/3*255)); });
     actTex.needsUpdate = true;
     nodeMeshes.forEach((m,i)=>{ const t=(Math.min(3,rel[i])-0.6)/1.8;
       m.material.color = plasma(t); m.material.opacity = 0;
       m.scale.setScalar(1.2+1.8*Math.max(0,t));
-      glows[i].material.opacity = Math.max(0,Math.min(0.22,(rel[i]-1.25)*0.25)); glows[i].material.color = plasma(t); });
+      glows[i].material.opacity = look.level * Math.max(0,Math.min(0.22,(rel[i]-1.25)*0.25)); glows[i].material.color = plasma(t); });
   }
   drawEEG(); renderer.render(scene, camera);
 }

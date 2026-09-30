@@ -26,6 +26,8 @@ GROUPS = {
     "memory": ["Hippocampus"],
     "relay": ["Thalamus"],
 }
+# chat messages: left-hemisphere temporal + frontal-operculum parcels (language proxy)
+LANGUAGE = lambda nm: "_LH_" in nm and ("Temp" in nm or "FrOper" in nm)
 
 
 class Brain:
@@ -47,20 +49,32 @@ class Brain:
         self.delay = np.round(L / 1000.0 / velocity_m_s / dt).astype(int)  # mm -> steps
         self.hist = int(self.delay.max()) + 1
         self.dt, self.a, self.g, self.noise = dt, a, g, noise
+        self.g0 = g
         rng = np.random.default_rng(seed)
         self.rng = rng
-        # small per-region frequency spread around f_hz
-        self.omega = 2 * np.pi * (f_hz + rng.normal(0, 0.5, self.n))
+        # small per-region frequency spread around f_hz (5 %, i.e. 0.5 Hz at 10 Hz)
+        self.df = rng.normal(0, 0.05, self.n)
+        self.f_hz = f_hz
+        self.omega = 2 * np.pi * f_hz * (1 + self.df)
         self.buf = (rng.normal(0, 0.1, (self.hist, self.n)) + 1j * rng.normal(0, 0.1, (self.hist, self.n)))
         self.t = 0
         self.stim = np.zeros(self.n)
         self.group_idx = {k: [i for i, nm in enumerate(self.names) if any(p in nm for p in pats)]
                           for k, pats in GROUPS.items()}
+        self.group_idx["language"] = [i for i, nm in enumerate(self.names) if LANGUAGE(nm)]
         self._cols = np.arange(self.n)[None, :]
 
     def stimulate(self, group, amount):
         """Add drive to a group of regions; it decays with a ~2 s time constant."""
         self.stim[self.group_idx[group]] += amount
+
+    def set_rhythm(self, f_hz, coupling=1.0, noise=None):
+        """Change the global rhythm (used by the sleep engine): frequency, coupling x baseline, noise."""
+        self.f_hz = f_hz
+        self.omega = 2 * np.pi * f_hz * (1 + self.df)
+        self.g = self.g0 * coupling
+        if noise is not None:
+            self.noise = noise
 
     def step(self, k=1):
         dt = self.dt

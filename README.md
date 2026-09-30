@@ -16,7 +16,9 @@ A whole-brain model of one real human brain, built from public MRI data and wire
 | Cortical surface | `build_cortex.py` | `web/cortex*.bin` |
 | Resting-state activity (streamed, raw deleted) | `process_rest.py N` | `out/rest/*.npz` |
 | Nodes / edges for the page | `export_web.py` | `web/brain.json` |
-| Live page + model + Solana log stream | `live_server.py --mint <MINT>` or `--demo` | http://localhost:8765 |
+| Live page + model + Solana log stream + chat + sleep | `live_server.py --mint <MINT>` or `--demo` | http://localhost:8765 |
+| Sleep/wake engine, memory replay | `sleep.py` (used by `live_server.py`) | `data/state.json`, `data/nights/YYYY-MM-DD.json` |
+| Chat filter + message -> stimulus rules | `chat.py` (used by `live_server.py`) | |
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -30,3 +32,32 @@ from OpenNeuro, keeps a region x time series per run in `out/rest/` (~240 KB eac
 the raw file. It only needs `out/labels_t1.nii.gz` and `out/t1_brain_1mm.nii.gz` (skull-stripped,
 committed), so it runs on a fresh clone: `pip install -r requirements.txt && python process_rest.py 132`.
 Sanity check on run 1: homotopic (left/right) correlation 0.52 vs 0.22 for all pairs.
+
+## Sleep, chat and memory (Phase A)
+
+No language model, no generated text: everything below is a rule table.
+
+- **Clock:** Europe/Rome. Awake ~08:00-00:00, asleep 00:00-08:00; with high sleep pressure it goes to bed after 20:00.
+  `--time-scale 60` runs one sim hour per real minute, `--start 23:55` starts the demo clock there.
+- **Stages** (Stuart-Landau parameters glide over ~1-2 min, never jump):
+  AWAKE 10 Hz, normal coupling, stimulus gain 1.0 · NREM 1-3 Hz, 2-3x coupling, high synchrony, gain ~0.15
+  (deepest in early cycles) · REM 6 Hz, 0.6x coupling, more noise, gain 0.4 (longer in later cycles). ~90 min cycles.
+- **Arousal:** messages and large trades (>= $5k) add to it, it decays over minutes; crossing the threshold wakes it
+  ("woken at 03:12 by 5 messages"); after 10 quiet minutes it falls asleep again.
+- **Sleep debt:** +1 h per hour awake at night, +0.25 h per wake-up, repaid by sleep (faster before midnight).
+  A tired brain is less reactive (lower gain) and noisier the next day.
+- **Chat:** max 280 characters, 1 message / 10 s per client, duplicates dropped. The filter runs first and blocks links,
+  Solana/ETH addresses, $TICKERS, insults, requests for money and personal data (e-mail, phone): blocked messages are
+  never shown or stored. Accepted messages hit: language (left temporal + frontal operculum) + somatomotor always,
+  reward (positive words), fear + salience (threat words), attention + control (questions), default network
+  (mentions of SUB-01 / "you"). Asleep, the drive is scaled by the stage gain and the message is marked "heard while asleep".
+- **Memory + replay:** accepted messages are stored with time, stage, stimulus pattern and emotional tag. In REM the
+  hippocampus replays them at 35 % amplitude, picked by recency, emotion and "arrived tonight" (with habituation).
+  Each night is written to `data/nights/YYYY-MM-DD.json` (stage timeline, wake-ups + cause, sleep debt, replayed
+  messages = "dream ingredients"). State is saved every minute to `data/state.json`. IPs are only kept for the
+  10 s rate-limit window; nothing about who sent a message is stored.
+
+```bash
+python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
+python tests/test_sleep.py                                    # or: python -m pytest tests/
+```

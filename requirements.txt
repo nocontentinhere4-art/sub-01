@@ -8,3 +8,4 @@ aiohttp
 scikit-image
 trimesh
 fast-simplification
+tzdata
