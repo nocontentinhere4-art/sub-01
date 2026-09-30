@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUB-01 · fibres</title>
+<style>
+  html,body { margin:0; height:100%; background:#000; overflow:hidden; color:#e8e8ee;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  #hud { position:absolute; left:22px; top:18px; pointer-events:none; }
+  #hud h1 { margin:0; font-size:24px; letter-spacing:.14em; }
+  #hud div { color:#8a8a9c; font-size:12px; margin-top:5px; }
+  #foot { position:absolute; left:22px; right:22px; bottom:16px; color:#6e6e80; font-size:11px; pointer-events:none; }
+  body.clean #hud, body.clean #foot { display:none; }
+</style>
+</head>
+<body>
+<div id="hud"><h1>SUB-01</h1><div id="count">loading fibres…</div>
+  <div>colour = fibre direction · red left–right · green front–back · blue up–down</div></div>
+<div id="foot">Real nerve-fibre bundles traced from one human's diffusion MRI (OpenNeuro ds000031, public domain). Not generated, not simulated.</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+if (q.has("clean")) document.body.classList.add("clean");
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
+const view = q.get("view") || "side";
+const views = {side:[-330,20,0], top:[0,0,330], front:[0,330,40], angle:[-240,160,140]};
+camera.up.set(0,0,1); camera.position.set(...views[view]);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.autoRotate = !q.has("still"); controls.autoRotateSpeed = 0.5;
+function resize(){ renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+Promise.all([fetch("fibres.json").then(r=>r.json()), fetch("fibres.bin").then(r=>r.arrayBuffer())]).then(([meta, buf])=>{
+  const P = new Float32Array(buf), n = meta.n, k = meta.pts;
+  const pos = new Float32Array(n*(k-1)*6), col = new Float32Array(n*(k-1)*6);
+  let o = 0;
+  for (let s=0; s<n; s++) for (let i=0; i<k-1; i++) {
+    const a = (s*k+i)*3, b = a+3;
+    const dx=P[b]-P[a], dy=P[b+1]-P[a+1], dz=P[b+2]-P[a+2], L=Math.hypot(dx,dy,dz)||1;
+    const r=Math.abs(dx)/L, g=Math.abs(dy)/L, bl=Math.abs(dz)/L;
+    for (let j=0;j<3;j++){ pos[o+j]=P[a+j]; pos[o+3+j]=P[b+j]; }
+    col[o]=col[o+3]=r; col[o+1]=col[o+4]=g; col[o+2]=col[o+5]=bl; o+=6;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col,3));
+  scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({vertexColors:true, transparent:true,
+    opacity: +(q.get("op")||0.35), blending:THREE.AdditiveBlending, depthWrite:false})));
+  document.getElementById("count").textContent =
+    `${n.toLocaleString()} of ${meta.total.toLocaleString()} traced fibre bundles shown`;
+});
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>

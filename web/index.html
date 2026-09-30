@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUB-01 · live</title>
+<style>
+  :root { --bg:#000; --fg:#e8e8ee; --dim:#7a7a8c; --buy:#39f5a0; --sell:#ff4d6d; --acc:#c77dff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow:hidden; }
+  #wrap { display:flex; height:100%; }
+  #scene { flex:1; position:relative; min-width:0; }
+  #scene canvas { display:block; }
+  #hud { position:absolute; left:20px; top:18px; pointer-events:none; }
+  #hud h1 { margin:0; font-size:22px; letter-spacing:.12em; }
+  #hud .sub { color:var(--dim); font-size:12px; margin-top:4px; }
+  .live { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--sell);
+    margin-right:6px; animation:pulse 1.2s infinite; vertical-align:middle; }
+  @keyframes pulse { 50% { opacity:.25; } }
+  #foot { position:absolute; left:20px; right:20px; bottom:14px; color:var(--dim); font-size:11px; pointer-events:none; }
+  #panel { width:340px; border-left:1px solid #1c1c26; padding:16px; display:flex; flex-direction:column; gap:14px; overflow:hidden; }
+  .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
+  .bar { display:flex; align-items:center; gap:8px; font-size:12px; margin:3px 0; }
+  .bar span:first-child { width:92px; color:var(--dim); }
+  .bar .track { flex:1; height:6px; background:#15151d; border-radius:3px; overflow:hidden; }
+  .bar .fill { height:100%; background:linear-gradient(90deg,#5a189a,#c77dff,#ffd166); width:0; transition:width .15s; }
+  #eeg { width:100%; height:150px; background:#07070b; border:1px solid #15151d; border-radius:4px; }
+  #feed { flex:1; overflow:hidden; font-size:12px; }
+  #feed div { padding:3px 0; border-bottom:1px solid #111118; white-space:nowrap; }
+  .buy { color:var(--buy); } .sell { color:var(--sell); }
+  #stats { font-size:12px; color:var(--dim); }
+  #stats b { color:var(--fg); font-weight:normal; }
+  @media (max-width: 800px) {
+    #wrap { flex-direction:column; } #scene { flex:none; height:58vh; }
+    #panel { width:auto; border-left:none; border-top:1px solid #1c1c26; flex:1; }
+    #eeg { height:90px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="scene">
+    <div id="hud">
+      <h1>SUB-01</h1>
+      <div class="sub"><span class="live"></span>LIVE · <span id="pool">connecting…</span></div>
+      <div class="sub" id="sync">sync —</div>
+    </div>
+    <div id="foot">Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
+      the fibres are real (traced from diffusion MRI) · ~180 regions simulated · every trade is a stimulus · a model of brain activity, not a mind.</div>
+  </div>
+  <div id="panel">
+    <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
+    <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
+    <div id="stats"></div>
+    <div class="lbl" style="margin-bottom:0">Stimuli</div>
+    <div id="feed"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const SHOW = ["visual","somatomotor","attention","salience","limbic","control","default","reward","memory","relay"];
+const LABEL = {visual:"visual",somatomotor:"motor",attention:"attention",salience:"salience",limbic:"limbic",
+  control:"control",default:"default",reward:"reward",memory:"memory",relay:"thalamus"};
+const WAVE_COL = {reward:"#39f5a0", salience:"#ff4d6d", visual:"#4cc9f0", default:"#c77dff", relay:"#ffd166"};
+
+// ---------- three.js scene ----------
+const host = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
+camera.up.set(0, 0, 1); camera.position.set(-250, 170, 120);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.5;
+controls.target.set(0, 0, 0);
+function resize(){ const w=host.clientWidth, h=host.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+let nodes=[], nodeMeshes=[], glows=[], fibreMat=null;
+const plasma = t => { // compact plasma-like ramp
+  const stops=[[13,8,135],[126,3,168],[204,71,120],[248,149,64],[240,249,33]];
+  t=Math.max(0,Math.min(1,t))*(stops.length-1); const i=Math.floor(t), f=t-i, a=stops[i], b=stops[Math.min(i+1,stops.length-1)];
+  return new THREE.Color((a[0]+(b[0]-a[0])*f)/255,(a[1]+(b[1]-a[1])*f)/255,(a[2]+(b[2]-a[2])*f)/255);
+};
+// per-region activity (relative to its own baseline) lives in a 256x1 texture read by the fibre shader
+const actData = new Uint8Array(256*4);
+const actTex = new THREE.DataTexture(actData, 256, 1, THREE.RGBAFormat);
+
+Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=>r.json()),
+             fetch("fibres.bin").then(r=>r.arrayBuffer()), fetch("fibres_ends.bin").then(r=>r.arrayBuffer())])
+.then(([d, meta, fbuf, ebuf])=>{
+  nodes = d.nodes;
+  const lab2node = new Int16Array(512).fill(-1);
+  nodes.forEach((n,i)=> lab2node[n.lab] = i);
+  // ---- real tractography: one line segment per step, coloured by direction ----
+  const P = new Float32Array(fbuf), E = new Int16Array(ebuf), n = meta.n, k = meta.pts, segs = n*(k-1);
+  const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), nod = new Float32Array(segs*4), tp = new Float32Array(segs*2);
+  let o = 0;
+  for (let s=0; s<n; s++) {
+    const na = lab2node[E[2*s]] ?? -1, nb = lab2node[E[2*s+1]] ?? -1;
+    for (let i=0; i<k-1; i++, o++) {
+      const a = (s*k+i)*3, b = a+3;
+      const dx=P[b]-P[a], dy=P[b+1]-P[a+1], dz=P[b+2]-P[a+2], L=Math.hypot(dx,dy,dz)||1;
+      for (let j=0;j<3;j++){ pos[o*6+j]=P[a+j]; pos[o*6+3+j]=P[b+j]; }
+      const c=[Math.abs(dx)/L, Math.abs(dy)/L, Math.abs(dz)/L];
+      for (let j=0;j<3;j++){ dcol[o*6+j]=c[j]; dcol[o*6+3+j]=c[j]; }
+      nod[o*4]=nod[o*4+2]=na; nod[o*4+1]=nod[o*4+3]=nb;
+      tp[o*2]=i/(k-1); tp[o*2+1]=(i+1)/(k-1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  g.setAttribute("dcol", new THREE.BufferAttribute(dcol,3));
+  g.setAttribute("nodes", new THREE.BufferAttribute(nod,2));
+  g.setAttribute("tpos", new THREE.BufferAttribute(tp,1));
+  fibreMat = new THREE.ShaderMaterial({
+    uniforms: { act:{value:actTex}, time:{value:0}, opacity:{value:0.018} },
+    vertexShader: `
+      attribute vec3 dcol; attribute vec2 nodes; attribute float tpos;
+      uniform sampler2D act; uniform float time;
+      varying vec3 vCol;
+      float actAt(float i){ return i < 0.0 ? 0.0 : texture2D(act, vec2((i+0.5)/256.0, 0.5)).r * 3.0; }
+      void main(){
+        float a = actAt(nodes.x), b = actAt(nodes.y);
+        float drive = clamp((max(a,b) - 1.15) / 0.9, 0.0, 1.0);          // above the region's own baseline
+        float dir = a >= b ? tpos : 1.0 - tpos;                            // pulses leave the more active end
+        float wave = pow(0.5 + 0.5*sin(dir*22.0 - time*7.0), 8.0);
+        float glow = 0.6 + drive * (0.6 + 3.5*wave);
+        vCol = mix(dcol, vec3(1.0), drive*wave*0.35) * glow;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `uniform float opacity; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol*opacity, 1.0); }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  scene.add(new THREE.LineSegments(g, fibreMat));
+  // ---- region centres (same native space as the fibres) ----
+  const sph = new THREE.SphereGeometry(1, 12, 12);
+  const glowTex = (()=>{ const c=document.createElement("canvas"); c.width=c.height=64; const x=c.getContext("2d");
+    const gr=x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,"rgba(255,255,255,1)"); gr.addColorStop(1,"rgba(255,255,255,0)");
+    x.fillStyle=gr; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+  for (const nd of nodes) {
+    const m = new THREE.Mesh(sph, new THREE.MeshBasicMaterial({color:0x5a189a, transparent:true, opacity:0.0}));
+    m.position.set(...nd.q); nodeMeshes.push(m);   // not drawn: the fibres carry the signal
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffffff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
+    sp.position.set(...nd.q); sp.scale.setScalar(7); scene.add(sp); glows.push(sp);
+  }
+  connect();
+});
+
+// ---------- live data ----------
+let act=null, base=null;
+const bars = document.getElementById("bars");
+for (const g of SHOW) bars.insertAdjacentHTML("beforeend",
+  `<div class="bar"><span>${LABEL[g]}</span><div class="track"><div class="fill" id="b-${g}"></div></div></div>`);
+const eeg = document.getElementById("eeg"), ex = eeg.getContext("2d");
+const traces = {}; for (const k in WAVE_COL) traces[k] = [];
+const feed = document.getElementById("feed");
+
+function connect(){
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    act = m.act; if (!base) base = act.slice(); else base = base.map((b,i)=>b*0.998 + act[i]*0.002);
+    document.getElementById("pool").textContent = m.pool;
+    document.getElementById("sync").textContent = `global synchrony ${(m.sync*100).toFixed(1)}%`;
+    const gmax = Math.max(...Object.values(m.groups), 0.001);
+    for (const g of SHOW) if (m.groups[g]!==undefined) document.getElementById("b-"+g).style.width = (100*m.groups[g]/Math.max(gmax,0.35))+"%";
+    for (const k in traces) { traces[k].push(m.wave[k]||0); if (traces[k].length>300) traces[k].shift(); }
+    const s = m.stats; document.getElementById("stats").innerHTML =
+      `buys <b>${s.buys}</b> · sells <b>${s.sells}</b> · volume <b>$${Math.round(s.usd).toLocaleString()}</b>`;
+    for (const t of m.trades) {
+      const region = t.kind==="buy" ? "→ reward" : "→ salience";
+      const link = t.tx ? `<a href="https://solscan.io/tx/${t.tx}" target="_blank" style="color:inherit;text-decoration:none">` : "<span>";
+      feed.insertAdjacentHTML("afterbegin", `<div class="${t.kind}">${link}${t.kind.toUpperCase().padEnd(4)} $${t.usd.toFixed(t.usd<10?2:0).padStart(7)} ${region}</${t.tx?"a":"span"}></div>`);
+      while (feed.children.length > 60) feed.lastChild.remove();
+    }
+  };
+  ws.onclose = () => setTimeout(connect, 1500);
+}
+
+function drawEEG(){
+  const w = eeg.width = eeg.clientWidth*devicePixelRatio, h = eeg.height = eeg.clientHeight*devicePixelRatio;
+  ex.clearRect(0,0,w,h); const keys = Object.keys(traces), lane = h/keys.length;
+  keys.forEach((k,i)=>{ const tr=traces[k]; if(tr.length<2) return;
+    ex.strokeStyle=WAVE_COL[k]; ex.lineWidth=1.2*devicePixelRatio; ex.beginPath();
+    tr.forEach((v,j)=>{ const x=j/300*w, y=lane*(i+0.5)-v*lane*1.6; j?ex.lineTo(x,y):ex.moveTo(x,y); }); ex.stroke(); });
+}
+
+function animate(){
+  requestAnimationFrame(animate); controls.update();
+  if (fibreMat) fibreMat.uniforms.time.value = performance.now()/1000;
+  if (act && nodeMeshes.length) {
+    const rel = act.map((a,i)=> a/Math.max(base[i],0.02));
+    rel.forEach((r,i)=>{ actData[i*4] = Math.min(255, Math.round(r/3*255)); });
+    actTex.needsUpdate = true;
+    nodeMeshes.forEach((m,i)=>{ const t=(Math.min(3,rel[i])-0.6)/1.8;
+      m.material.color = plasma(t); m.material.opacity = 0;
+      m.scale.setScalar(1.2+1.8*Math.max(0,t));
+      glows[i].material.opacity = Math.max(0,Math.min(0.22,(rel[i]-1.25)*0.25)); glows[i].material.color = plasma(t); });
+  }
+  drawEEG(); renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

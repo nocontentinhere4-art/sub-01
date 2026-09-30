@@ -1,0 +1,15 @@
+# raw MRI stays on OpenNeuro (ds000031): scripts re-download it
+data/
+.venv/
+__pycache__/
+*.log
+out_2022/
+# large intermediates / media
+out/*.nii.gz
+out/*.webm
+out/*.mp4
+out/hf_*.png
+out/orbit_frame.png
+out/check_labels.png
+out/*_raw.png
+.DS_Store
