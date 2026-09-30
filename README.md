@@ -63,3 +63,45 @@ No language model, no generated text: everything below is a rule table.
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
 python tests/test_sleep.py                                    # or: python -m pytest tests/
 ```
+
+## End-to-end screenshots ("the construct")
+
+`tests/e2e/screenshots.mjs` starts `live_server.py --demo` (temp data dir, free port) once per scenario, opens the page in
+headless Chromium (software WebGL) and captures: `home`, `walk` (first-person walk along the real fibre road from the home
+district to the reward district, captured at `life.progress` 0.3-0.7), `chat` (message rain in the **orbit view** with
+`?nofollow=1`, so the rain and the landing districts are in frame: `chat-falling` ~1 s and `chat` ~3 s of fx time after the words
+start falling), `dump` (market glitch, `?fxhold=1`), `night`, `rem`, `orbit` (`?view=orbit`) and `mobile` (390x844). With `--gif` the
+walk is run a second time as `walk-gif`: up to 60 frames of the 3D canvas (captured in the page, ~3 fps under software rendering, 800x500
+viewport) over the whole ~22 s walk, written to `walk.gif` with the real gaps between frames as delays (real-time playback; it fails
+below 20 frames or 10 s).
+
+Every scenario fails on console errors, WebGL errors (`GL_INVALID_*`, context lost), a Python traceback in the server log, a missing
+or covered honesty line, or while a construct module it needs (`city`, `fx`, `travel`) is still a `STUB` file (`--allow-stubs` skips
+that; a stream must remove the `// STUB` header when it replaces its file). Pixel checks measure the **3D canvas alone** (all DOM
+overlays are hidden for that capture); `--selftest` proves it by hiding the canvas over a black page and
+expecting both the blank-canvas and the almost-black check to fail. Assertions are state-based where the page exposes state:
+- life ticks: outbound route home -> bakery, `life.progress` advancing;
+- `window.__sub01.fx` (fx stream debug fields `free, queued, pending, glitch, warp, hold, time`; the chat/dump/rem scenarios depend on
+  them, so they are part of the contract in practice) and `?fxhold=1`: rain in flight and landed (waited on fx time, not wall time),
+  glitch, warp;
+- the camera: the harness hooks the `viewMatrix` uniform uploads of the main canvas (or reads `window.__sub01.camera` if a page ever
+  exposes it), so `walk` asserts on camera POSITION: net displacement along the road far above the idle drift measured in `home`;
+- the chat rain is also checked in the pixels: new amber glyph pixels outside the scene's own flicker zone (two idle frames define it) must
+  far exceed the same count on a third idle frame, so a pool-state-only pass cannot hide an invisible effect.
+
+A failing scenario writes its captures as `<name>.FAILED.<ext>` (and `walk.FAILED.gif`), never over the good files.
+
+```
+cd tests/e2e && npm install && npx playwright install chromium     # gifenc, pngjs, playwright + its Chromium
+node tests/e2e/screenshots.mjs [--only=home,walk] [--gif] [--format=png|jpg] [--out=docs/real-world/screenshots] [--allow-stubs] [--selftest]
+```
+
+Env: `E2E_CHROME` (use a specific Chromium instead of Playwright's), `E2E_PYTHON` (default `.venv/bin/python` or `python3`),
+`E2E_TOOLS` (extra directory holding `node_modules/playwright`). `night` compares against the `home` canvas brightness measured in
+the SAME run (run them together; an older `report.json` is never used).
+
+Output goes to `docs/real-world/screenshots/` (`<scenario>.png|jpg`, `walk.gif` with `--gif`, `report.json` with fps / draw calls /
+triangles per scenario). The fps values are **software-rendered** (SwiftShader, no GPU) and only useful to compare scenarios,
+not as device performance. Exit code is non-zero if any scenario fails; servers are always killed, a timed-out scenario is
+cancelled (server and browser context closed, no files written) before the next one starts; per-scenario timeout 150 s.
+The screenshots are generated from the merged construct and committed with the PR, not from this stream alone.
