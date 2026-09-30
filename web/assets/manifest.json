@@ -1,6 +1,6 @@
 {
  "version": 1,
- "about": "Describes web/assets for the loaders. URLs are root-absolute (the server serves web/ at /). Units: metres, +Y up, right-handed, glTF convention. World transform of a model = scale, then rotationY (about +Y), placed so that origin.y = surfaceY + yOffset. size[] is the final size after scale and rotationY. Every model carries Draco geometry + WebP textures: load with GLTFLoader + DRACOLoader (decoders in web/vendor/three).",
+ "about": "Describes web/assets for the loaders. URLs are root-absolute (the server serves web/ at /). Units: metres, +Y up, right-handed, glTF convention. World transform of a model = scale, then rotationY (about +Y), placed so that origin.y = surfaceY + yOffset. size[] is the final size after scale and rotationY. Every model carries Draco geometry + WebP textures: load with GLTFLoader + DRACOLoader (decoders in web/vendor/three). Optional per-model hints: seatY (height of the sitting surface above the model's floor contact, metres, measured by ray cast on the baked geometry), backTopY, surfaceY (top of a table/desk/bed spring plane). Use these instead of parsing notes. 'variants' lists per-node yOffset/size for files that hold several props. Re-measure with tools/measure_glb.mjs.",
  "hdri": {
   "day": "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
   "dusk": "/assets/hdri/qwantani_dusk_2_1k.hdr",
@@ -104,7 +104,8 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "bare spring frame, spring plane at y=0.49 m; add a procedural mattress+duvet (denim_fabric) ~0.15 m thick and throw_pillows_01 at the head end"
+   "notes": "bare spring frame, spring plane at y=0.49 m; add a procedural mattress+duvet (denim_fabric) ~0.15 m thick and throw_pillows_01 at the head end (surfaceY = spring plane)",
+   "surfaceY": 0.49
   },
   "throw_pillows_01": {
    "url": "/assets/models/throw_pillows_01.glb",
@@ -168,17 +169,18 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "LOW table: 0.55 m high, 1.8 m long (coffee/side table, bakery bench). Not a dining table; do not non-uniformly scale it"
+   "notes": "LOW table: 0.55 m high, 1.8 m long (coffee/side table, bakery bench). Not a dining table; do not non-uniformly scale it",
+   "surfaceY": 0.549
   },
   "WoodenChair_01": {
    "url": "/assets/models/WoodenChair_01.glb",
-   "scale": 0.9,
+   "scale": 0.68,
    "rotationY": 0,
    "yOffset": 0.001,
    "size": [
-    0.619,
-    2.047,
-    0.592
+    0.468,
+    1.546,
+    0.448
    ],
    "tris": 16878,
    "area": "apartment",
@@ -200,7 +202,9 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "gothic high-back chair: seat top ~0.43 m after scale, back 2.05 m; faces +z"
+   "notes": "gothic high-back chair (a 2 m throne at scale 1): at scale 0.68 the seat is 0.449 m high (measured by vertical ray casts at four points: flat seat), back top 1.55 m; faces +z. Pair with metal_office_desk (top 0.709 m) for sit_desk. A procedural desk chair is the preferred alternative (see ASSETS.md gaps)",
+   "seatY": 0.449,
+   "backTopY": 1.546
   },
   "metal_office_desk": {
    "url": "/assets/models/metal_office_desk.glb",
@@ -232,7 +236,8 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "top at 0.71 m after scale; pair with WoodenChair_01"
+   "notes": "top at 0.709 m after scale (surfaceY); pair with a chair whose seat is ~0.45 m (WoodenChair_01 at scale 0.68)",
+   "surfaceY": 0.709
   },
   "classic_laptop": {
    "url": "/assets/models/classic_laptop.glb",
@@ -360,7 +365,9 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "two-seat sofa 1.8 m wide, seat top ~0.44 m; back at -z"
+   "notes": "two-seat sofa 1.8 m wide, seat cushion top 0.437 m (measured; 0.36 m between the cushions), back top 0.92 m; back at -z",
+   "seatY": 0.437,
+   "backTopY": 0.916
   },
   "electric_stove": {
    "url": "/assets/models/electric_stove.glb",
@@ -590,7 +597,27 @@
     "fire_hydrant",
     "fire_hydrant_aged"
    ],
-   "minQuality": "medium"
+   "minQuality": "medium",
+   "variants": {
+    "fire_hydrant": {
+     "yOffset": 0.0,
+     "size": [
+      0.275,
+      0.799,
+      0.318
+     ],
+     "centreX": -0.305
+    },
+    "fire_hydrant_aged": {
+     "yOffset": 0.0,
+     "size": [
+      0.275,
+      0.799,
+      0.318
+     ],
+     "centreX": 0.296
+    }
+   }
   },
   "metal_trash_can": {
    "url": "/assets/models/metal_trash_can.glb",
@@ -622,11 +649,31 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "file holds TWO bins with lids (nodes 'metal_trash_can_rust' x=-0.5 and 'metal_trash_can_handle_left' x=+0.23); a loose lid dips 0.16 m below y=0 by design, so yOffset 0. Each bin ~0.72 m tall after scale",
+   "notes": "file holds TWO bins with lids (nodes 'metal_trash_can_rust' and 'metal_trash_can_handle_left'). Measured on the baked mesh vertices: both bins stand on y=0 (lid included), each 0.62 x 0.725 x 0.44 m after scale. The earlier -0.164 raw min-y was a loose bounding-box artefact of a rotated node (three's Box3.setFromObject uses transformed node boxes), not geometry below the floor. Use yOffset 0 for both variants. size[]/rawSize are that loose box (see variants for real sizes)",
    "nodes": [
     "metal_trash_can_rust",
     "metal_trash_can_handle_left"
-   ]
+   ],
+   "variants": {
+    "metal_trash_can_rust": {
+     "yOffset": 0.0,
+     "size": [
+      0.619,
+      0.725,
+      0.44
+     ],
+     "centreX": -0.453
+    },
+    "metal_trash_can_handle_left": {
+     "yOffset": 0.0,
+     "size": [
+      0.622,
+      0.725,
+      0.444
+     ],
+     "centreX": 0.349
+    }
+   }
   },
   "planter_box_01": {
    "url": "/assets/models/planter_box_01.glb",
@@ -790,13 +837,13 @@
   },
   "painted_wooden_bench": {
    "url": "/assets/models/painted_wooden_bench.glb",
-   "scale": 0.85,
+   "scale": 0.7,
    "rotationY": 0,
    "yOffset": 0.0,
    "size": [
-    0.99,
-    0.756,
-    0.422
+    0.815,
+    0.622,
+    0.348
    ],
    "tris": 624,
    "area": "park",
@@ -818,7 +865,8 @@
    "textures": [
     "webp1024x1024"
    ],
-   "notes": "a small hall-style bench (0.99 m wide after scale, seat ~0.55 m), not a park bench: place in pairs or build the long park bench procedurally"
+   "notes": "a small hall-style bench (0.82 m wide at scale 0.7, seat 0.456 m high measured by ray cast, back top 0.62 m), not a park bench: place in pairs or build the long park bench procedurally",
+   "seatY": 0.456
   },
   "island_tree_01": {
    "url": "/assets/models/island_tree_01.glb",

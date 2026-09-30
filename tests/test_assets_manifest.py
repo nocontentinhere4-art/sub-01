@@ -44,19 +44,32 @@ def test_every_referenced_file_exists():
         assert _disk(u).is_file(), u
 
 
+def _credit_tokens():
+    """Lower-case tokens that credit a file: last path segment of every URL and every word-like token of
+    the non-struck-through rows (so a row may name the file, its stem, or its source URL slug)."""
+    live = "\n".join(l for l in CREDITS.splitlines() if "~~" not in l).lower()
+    toks = set(re.findall(r"[a-z0-9_.\-]+", live))
+    toks |= {u.rstrip("/").rsplit("/", 1)[-1] for u in re.findall(r"https?://\S+", live)}
+    return toks
+
+
 def test_every_asset_file_is_in_manifest_and_credited():
     referenced = set(MAN["hdri"].values()) | {m["url"] for m in MAN["models"].values()}
     for t in MAN["textures"].values():
         referenced |= {t["map"], t["normalMap"], t["roughnessMap"]}
-    credited = {m.lower() for m in re.findall(r"polyhaven\.com/a/([A-Za-z0-9_]+)", CREDITS.replace("~~", ""))}
+    toks = _credit_tokens()
     assert "CC0" in CREDITS
     for f in sorted(ASSETS.rglob("*")):
-        if not f.is_file() or f.name in ("CREDITS.md", "manifest.json") or "character" in f.relative_to(ASSETS).parts:
+        if not f.is_file() or f.name in ("CREDITS.md", "manifest.json"):
             continue
+        parts = f.relative_to(ASSETS).parts
         rel = "/assets/" + f.relative_to(ASSETS).as_posix()
-        assert rel in referenced, f"not in manifest: {rel}"
+        # the character library is reported separately in manifest.character: skip it only for the coverage check
+        if "character" not in parts:
+            assert rel in referenced, f"not in manifest: {rel}"
         slug = f.parent.name if f.parent.parent.name == "textures" else re.sub(r"_1k$", "", f.stem)
-        assert slug.lower() in credited, f"not in CREDITS.md: {rel}"
+        names = {slug.lower(), f.name.lower(), f.stem.lower()}
+        assert names & toks, f"not credited in CREDITS.md (name the file, its stem or its source slug): {rel}"
 
 
 def test_total_bytes_matches_disk():

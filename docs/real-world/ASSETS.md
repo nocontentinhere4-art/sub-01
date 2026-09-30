@@ -13,9 +13,12 @@ texture sets (27 JPG, 1024 px), 26 Draco GLB models (WebP textures, 1024 px max)
   (`floor`, `desk`, `bed`, `counter`, `wall`, `ceiling`), `front` where its front faces in the file, `origin` where the pivot sits.
 - Every model loads with `GLTFLoader` + `DRACOLoader` (WebP textures need a recent three; tested with r186. The r128 copy in the
   `_tools` sandbox is too old to use here and was not tested). Materials are standard PBR (map, normalMap, roughnessMap/metalnessMap packed).
-- Textures: `map` is sRGB, `normalMap` is OpenGL (+Y up, no flip), `roughnessMap` is linear grey. `repeatPerMetre` is an **estimate**
-  of the real-world size of one tile (about 1-2 m) taken from the image content; tune it by eye.
-- Optional hints on models: `minQuality` (`medium`/`high`: skip or replace on lower presets), `nodes` (file contains several variants,
+- Textures: `map` is sRGB, `normalMap` is OpenGL (+Y up, no flip), `roughnessMap` is linear grey. `repeatPerMetre` is the number of **texture
+  repeats per metre** (set `texture.repeat` = surface size in metres x repeatPerMetre), i.e. 1 / tile size: 0.33 means one tile covers
+  about 3 m. It is an estimate taken from the image content; tune it by eye. Do not invert it.
+- Optional hints on models: `seatY` (height of the sitting surface above the model's floor contact, measured by vertical ray casts on the
+  baked geometry), `backTopY`, `surfaceY` (top of a table/desk, or the bed spring plane), `variants` (per-node `yOffset`, real `size` and
+  `centreX` for files that hold several props), `minQuality` (`medium`/`high`: skip or replace on lower presets), `nodes` (file contains several variants,
   clone one by node name), `notes`.
 - `areas.<name>` lists the HDRIs, texture sets and models to fetch when entering an area, with the byte size, for lazy loading.
 
@@ -37,7 +40,7 @@ Sorted by area. `scale`, `rotation`, `yOffset` are the values stored in the mani
 | `potted_plant_01` | apartment | bush | 1.0 | 0 | 0.0 | 0.587 x 1.336 x 0.634 | 153,761 | 1132 KB | - |
 | `drawer_cabinet` | apartment | cabinet | 0.8 | 0 | 0.0 | 0.913 x 1.505 x 0.39 | 13,630 | 187 KB | +z |
 | `modern_ceiling_lamp_01` | apartment | ceiling_lamp | 0.7 | 0 | -0.821 | 0.302 x 0.666 x 0.302 | 5,456 | 139 KB | - |
-| `WoodenChair_01` | apartment | chair | 0.9 | 0 | 0.001 | 0.619 x 2.047 x 0.592 | 16,878 | 316 KB | +z |
+| `WoodenChair_01` | apartment | chair | 0.68 | 0 | 0.001 | 0.468 x 1.546 x 0.448 | 16,878 | 316 KB | +z |
 | `wall_clock` | apartment | clock | 1.0 | 0 | 0.0 | 0.32 x 0.32 x 0.047 | 3,551 | 150 KB | dial faces +z |
 | `metal_office_desk` | apartment | desk | 0.9 | 0 | 0.0 | 1.8 x 0.709 x 0.852 | 4,856 | 158 KB | sitter at +z (drawer pedestals face +z) |
 | `desk_lamp_arm_01` | apartment | lamp | 0.75 | 0 | 0.066 | 0.152 x 0.67 x 0.461 | 19,630 | 425 KB | - |
@@ -54,8 +57,8 @@ Sorted by area. `scale`, `rotation`, `yOffset` are the values stored in the mani
 | `fire_hydrant` | street | hydrant | 1.0 | 0 | 0.0 | 0.875 x 0.799 x 0.318 | 78,000 | 741 KB | - |
 | `planter_box_01` | street | planter | 1.0 | 0 | 0.0 | 0.913 x 0.425 x 0.414 | 6,898 | 324 KB | long axis x |
 | `street_lamp_01` | street | street_lamp | 1.0 | 0 | 0.0 | 0.704 x 3.871 x 0.387 | 20,038 | 221 KB | - |
-| `metal_trash_can` | street | trash | 0.8 | 0 | 0.0 | 1.564 x 0.968 x 0.445 | 13,664 | 807 KB | - |
-| `painted_wooden_bench` | park | bench | 0.85 | 0 | 0.0 | 0.99 x 0.756 x 0.422 | 624 | 255 KB | +z (seat faces +z, back at -z) |
+| `metal_trash_can` | street | trash | 0.8 | 0 | 0.0 | 1.422 x 0.725 x 0.445 (two bins, 0.62 wide each) | 13,664 | 807 KB | - |
+| `painted_wooden_bench` | park | bench | 0.7 | 0 | 0.0 | 0.815 x 0.622 x 0.348 | 624 | 255 KB | +z (seat faces +z, back at -z) |
 | `grass_medium_01` | park | bush | 1.0 | 0 | 0.0 | 5.605 x 0.342 x 0.327 | 19,242 | 559 KB | strip along x |
 | `rock_moss_set_01` | park | rock | 0.5 | 0 | 0.0 | 4.003 x 0.884 x 3.474 | 61,417 | 480 KB | - |
 | `island_tree_01` | park | tree | 1.0 | 0 | 0.02 | 4.755 x 5.027 x 4.817 | 1,298,266 | 8571 KB | - |
@@ -64,12 +67,18 @@ Notes that matter when placing (full list in each model's `notes`):
 
 - **Bed** is a bare metal spring frame (spring plane y=0.49 m); the mattress, duvet and pillows on it are procedural / `throw_pillows_01`.
   Head end (taller rail) is at **-z**.
-- **WoodenTable_01** is a low table (0.55 m), not a dining table. **WoodenChair_01** is a gothic high-back chair (seat 0.43 m, back 2.05 m at scale 0.9).
+- **WoodenTable_01** is a low table (0.55 m), not a dining table. **WoodenChair_01** is a gothic high-back chair (a 2.3 m throne
+  at scale 1). At the manifest scale 0.68 its seat is **0.449 m** high (`seatY`, measured by ray casts: flat seat) and the back top 1.55 m; the
+  desk top is 0.709 m (`surfaceY`), so a sitter's thighs clear the desk by ~0.26 m. (An earlier version of this file said 0.43 m at scale 0.9;
+  that was wrong, the real seat at 0.9 was 0.594 m.) A procedural desk chair is the preferred option for `sit_desk`.
 - **Shelf_01** has its origin at the **back face** (z from 0 to +0.26): put it flush on the wall. **wall_clock** has its origin at the dial centre.
   **modern_ceiling_lamp_01** hangs from its origin: `origin.y = ceilingY + yOffset` with yOffset = -0.821.
-- **fire_hydrant** and **metal_trash_can** contain TWO variants each (nodes named in `nodes`); take one, drop the other.
+- **fire_hydrant** and **metal_trash_can** contain TWO variants each (nodes named in `nodes`); take one, drop the other. Per-variant `yOffset`
+  (both 0: each variant, lid included, stands exactly on y=0), real size and `centreX` are in `variants`. The 0.16 m "below the floor" that
+  three's `Box3.setFromObject` reports for the bins is a loose bounding box of a rotated node, not geometry; `size`/`rawSize` of the bin entry
+  is that loose box, use `variants[...].size`.
   **rock_moss_set_01** is a scatter of 6 rocks over ~4x3.5 m (after scale), **grass_medium_01** is a 5.6 m strip of tufts: instance and scatter them.
-- **painted_wooden_bench** is a small hall bench (0.99 m wide), not a park bench.
+- **painted_wooden_bench** is a small hall bench (0.82 m wide at scale 0.7, seat 0.456 m = `seatY`), not a park bench. Sofa seat cushions are 0.437 m (`seatY`).
 - **classic_laptop** is a 1990s grey laptop; its screen is a flat dark texture, so use an emissive overlay for a lit screen.
 - Light sources (street lamp, ceiling lamp, desk lamp) have no emissive light: add lights / emissive materials in the world code.
 
@@ -122,6 +131,7 @@ Generic animation libraries usually cover idle/walk/sit/lie; `sit_desk`, `lie_ph
 | Bread loaves, baguettes, rolls, pastries | only one croissant | instance the croissant, add procedural baguette/round loaf (lathe/capsule shapes) |
 | Car, bicycle, scooter, any traffic | none | simple procedural car silhouettes (a few boxes) if wanted |
 | Street furniture: kerb, road markings, crossing, bollards, signs, bins other than the trash can, shutters | only lamp, hydrant, trash can, planter, bench | procedural, textures `asphalt_02`, `cobblestone_01`, `brushed_concrete` |
+| Desk chair for `sit_desk` | only the 2 m gothic `WoodenChair_01` (usable at scale 0.68, but odd) | preferred: a small procedural desk chair (seat ~0.45 m) |
 | Park: hedges/bushes, flowers, park benches (long), paths, fountain, water, ground cover | `grass_medium_01` is a tuft strip, bench is a small hall bench, tree is very heavy | procedural hedges/ground with `grass_path_2`, simple procedural tree for low/medium |
 | Sky objects: sun/moon discs, stars, clouds, birds | HDRIs are static (day, dusk, night) | blend between the three HDRIs by Rome time; add sun/moon light and a simple moon mesh |
 | Kitchen items (kettle, pans, plates, cups, bowls, food for the `eat` action) | only a stove; the coffee cart has mugs | procedural small props |
@@ -133,7 +143,7 @@ Generic animation libraries usually cover idle/walk/sit/lie; `sit_desk`, `lie_ph
 
 All 58 asset files are covered by a row in `web/assets/CREDITS.md` and every row is Poly Haven (CC0 1.0, public domain):
 5/5 HDRIs, 9/9 texture sets (3 maps each), 26/26 models (two removed models, Fir Tree 01 and Jacaranda Tree, are struck through and have no file).
-`tests/test_assets_manifest.py` checks this mechanically (slug of every file against the `polyhaven.com/a/<slug>` URLs in CREDITS.md).
+`tests/test_assets_manifest.py` checks this mechanically (every file, including any under `web/assets/character/`, must be named in CREDITS.md by file name, slug or source URL; struck-through rows are ignored). Re-measure models with `tools/measure_glb.mjs`.
 I did **not** edit CREDITS.md. Gaps to report to the asset owner:
 
 1. CREDITS.md is per asset (set), not per file, and has no separate **licence column**: the licence (CC0) is stated once in the header.
@@ -145,4 +155,4 @@ I did **not** edit CREDITS.md. Gaps to report to the asset owner:
 5. Baked-in brand-like text in textures (not a licence issue for CC0, but visible on camera): `CoffeeCart_01` (coffee machine and can labels), `electric_stove` (maker name on the panel),
    `classic_laptop` (label on the lid), `wall_clock` (brand on the dial). They are Poly Haven CC0 assets with fictional/vintage marks; if the project wants no brand text on screen, keep those props
    small/out of close-ups or cover them.
-6. No character/animation files yet, so nothing to audit for Quaternius (CC0 as well, but it must be added to CREDITS.md by the owner when the files arrive).
+6. No character/animation files yet (origin/assets/cc0 is still at bc7d7d7). When the Quaternius files land under `web/assets/character/`, the owner must add their CREDITS.md rows; `tests/test_assets_manifest.py` fails until every file there is credited.
