@@ -79,6 +79,73 @@ RULES = [  # (condition, {group: drive at gain 1}) - shown on the page as "netwo
 ]
 
 
+# Topic table (EN + IT keywords -> networks). Shown on the page next to RULES; the construct uses it to decide which
+# districts a message lands on. "kw" entries ending in * are prefixes (mangi* = mangio, mangiare, mangiato...);
+# "first" entries only count as the first word of the message. Drives are at gain 1, before the sleep-stage gain.
+REGION_RULES = [
+    {"topic": "food / bread", "networks": {"reward": 6.0, "limbic": 3.0},
+     "kw": ["bread", "pane", "bakery", "baker", "forno", "panetteria", "food", "cibo", "eat", "eating", "mangi*",
+            "hungry", "fame", "breakfast", "colazione", "lunch", "pranzo", "dinner", "cena", "pizza", "pasta",
+            "cake", "torta", "dolce", "coffee", "caffe", "cornetto", "croissant", "cookie", "biscotti*"]},
+    {"topic": "outside / park", "networks": {"limbic": 5.0, "memory": 4.0, "visual": 2.0},
+     "kw": ["park", "parco", "outside", "fuori", "walk", "walking", "passeggi*", "garden", "giardino", "tree", "trees",
+            "albero", "alberi", "sun", "sunny", "sole", "sunset", "tramonto", "air", "aria", "nature", "natura",
+            "flowers", "fiori", "bench", "panchina"]},
+    {"topic": "market / chart", "networks": {"salience": 6.0, "attention": 4.0},
+     "kw": ["market", "mercato", "chart", "charts", "grafico", "candle", "candles", "candela", "candele", "price",
+            "prezzo", "pump", "pumping", "dump", "dumping", "volume", "trade", "trades", "trading", "trader",
+            "bull", "bear", "bullish", "bearish"]},
+    {"topic": "phone / social", "networks": {"visual": 4.0, "default": 3.0, "attention": 2.0},
+     "kw": ["phone", "telefono", "cellulare", "tiktok", "social", "scroll", "scrolling", "video", "videos",
+            "instagram", "feed", "followers", "meme", "memes"]},
+    {"topic": "greetings / people", "networks": {"default": 6.0, "language": 3.0},
+     "kw": ["hello", "hi", "hey", "ciao", "salve", "buongiorno", "buonasera", "buonanotte", "goodnight", "gm", "gn",
+            "morning", "evening", "friend", "friends", "amico", "amici", "everyone", "everybody", "tutti", "ragazzi",
+            "people", "gente", "family", "famiglia", "welcome", "benvenuto"]},
+    {"topic": "feelings", "networks": {"limbic": 6.0, "default": 3.0},
+     "kw": ["feel", "feeling", "feelings", "senti", "sento", "sad", "triste", "happy", "felice", "lonely", "tired", "stanco", "stanca",
+            "sleepy", "sonno", "calm", "calmo", "worried", "preoccupat*", "angry", "arrabbiat*", "emotion", "emozione", "emozioni", "mood", "anxious", "ansia",
+            "love", "amore", "joy", "gioia", "fear", "paura", "scared", "afraid"]},
+    {"topic": "questions", "networks": {"attention": 6.0, "control": 5.0}, "question": True,
+     "first": ["who", "what", "why", "how", "when", "where", "which", "do", "does", "did", "are", "is", "can",
+               "could", "will", "would", "should", "chi", "cosa", "perche", "come", "quando", "dove",
+               "quale", "quali", "quanto", "quanti", "puoi", "sai"]},
+]
+REGION_RULE_ROWS = [[r["topic"] + " (" + ", ".join((r.get("kw") or r.get("first"))[:6]) + ", ...)",
+                     list(r["networks"])] for r in REGION_RULES]
+_TOKEN = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)?")
+
+
+def _fold(text):
+    """Lower-case letters without accents (perche == perché), for the topic table."""
+    return unicodedata.normalize("NFKD", text.lower()).encode("ascii", "ignore").decode()
+
+
+def _kw_hit(tokens, kws):
+    for k in kws:
+        if k.endswith("*"):
+            p = k[:-1]
+            if any(t.startswith(p) for t in tokens):
+                return True
+        elif k in tokens:
+            return True
+    return False
+
+
+def topics(text):
+    """[(topic, {group: drive})] for every REGION_RULES row the text matches."""
+    toks = _TOKEN.findall(_fold(text))
+    tokset = set(toks)
+    out = []
+    for r in REGION_RULES:
+        hit = _kw_hit(tokset, r.get("kw", ()))
+        if r.get("question") and ("?" in text or (toks and toks[0] in r["first"])):
+            hit = True
+        if hit:
+            out.append((r["topic"], r["networks"]))
+    return out
+
+
 def words(text):
     return set(re.findall(r"[a-z']+", text.lower()))
 
@@ -96,8 +163,55 @@ def stimulus(text):
         if on:
             for g, a in groups.items():
                 stim[g] = stim.get(g, 0.0) + a
+    for _, nets in topics(text):          # topic table: per network the strongest drive wins (never summed twice)
+        for g, a in nets.items():
+            stim[g] = max(stim.get(g, 0.0), a)
     emotion = "threat" if hos else "positive" if pos else "neutral"
     return stim, list(stim), emotion
+
+
+def topical_networks(text):
+    """Networks a message lands on for the construct: the topic-table and content rules, without the universal
+    'every message' row (language + somatomotor) unless nothing else hit."""
+    nets = list(stimulus(text)[0])
+    base = set(RULES[0][1])
+    return [g for g in nets if g not in base] or ["language"]
+
+
+# --- nicknames -----------------------------------------------------------------------
+NICK_MAX = 20
+NICK_OK = re.compile(r"^[\w -]+$")
+NICK_RESERVED = re.compile(r"sub\s*[-_]?\s*0?1|system|admin|moderator", re.I)
+NICK_RESERVED_FOLDED = re.compile(r"sub\s*[-_]?\s*0?1(?!\w)", re.I)    # 'Sub-O1', 'SUB-Ol': 0/O and 1/l/I confusion
+_LOOKALIKE = str.maketrans({"o": "0", "O": "0", "l": "1", "I": "1"})
+
+
+def _nick_char_ok(ch):
+    """Latin letters (with accents), digits, space, _ and - only: no Cyrillic/Greek look-alikes of 'SUB-01'."""
+    if ch in " _-" or ch.isdigit():
+        return True
+    return ch.isalpha() and unicodedata.name(ch, "").startswith("LATIN")
+
+
+def check_nick(nick):
+    """Optional nickname -> (ok, reason). Empty = anonymous (ok). <= 20 chars, letters / digits / space / _ -, and it
+    must pass the same filter as messages; it cannot imitate SUB-01."""
+    nick = (nick or "").strip() if isinstance(nick, str) else None
+    if nick is None:
+        return False, "nickname must be text"
+    if not nick:
+        return True, None
+    if len(nick) > NICK_MAX:
+        return False, f"nickname: max {NICK_MAX} characters"
+    if not NICK_OK.match(nick) or not all(_nick_char_ok(ch) for ch in nick):
+        return False, "nickname: Latin letters, digits, space, _ and - only"
+    reason = blocked(nick)
+    if reason:
+        return False, "nickname: " + reason
+    norm = unicodedata.normalize("NFKC", nick)
+    if NICK_RESERVED.search(norm) or NICK_RESERVED_FOLDED.search(norm.translate(_LOOKALIKE)):
+        return False, "nickname: reserved"
+    return True, None
 
 
 # --- limits --------------------------------------------------------------------------

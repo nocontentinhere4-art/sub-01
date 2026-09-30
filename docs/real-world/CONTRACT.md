@@ -71,7 +71,9 @@ def safe_text(s: str) -> bool
 - `chat`: + `"nick"`, `"returning": bool`, `"regions": [brain region indices]`, `"cid"` (candidate id)
 - `tick` (20 Hz): unchanged + `life` snapshot with `npc`, `energy`, `open`
 - `mind` (each cycle): as returned by `Mind.cycle`
-- `speech`: `{"type":"speech","text","kind","lang","about","action":{"act","ok","reason"}|null,"t"}`
+- `speech`: `{"type":"speech","text","kind","lang","about","cid","action":{"act","ok","reason"}|null,"t"}` -
+  `about` is the topic (free text: "bread", "a message", "a dream"); `cid` is the id of the winning chat candidate
+  (`"chat:N"`, equal to `chat.cid`) when the line belongs to a chat message that won the workspace, else `null`.
 Brain region indices = index into `tick.act` = index into `web/brain.json` nodes (same order).
 
 ## Client (web) — "the construct" (CHANGE OF DIRECTION: no photorealistic world)
@@ -94,7 +96,7 @@ The CC0 photoreal assets in `web/assets/` are no longer used by the main view (k
   ends, each hop following a representative fibre polyline) from the start district to the goal district at that progress.
 - **Chat rain**: each accepted `chat` message falls as orange "rain" made of its own words and lands on the districts
   it stimulates (`regions` from chat.py's rule table), which flash (mini brain flashes too). If the message wins the
-  workspace (`speech.about == chat.cid`), show its inner line.
+  workspace (`speech.cid == chat.cid`; client: `chatByCid.get(m.cid)`), show its inner line.
 - **Weather** = market (`tick.market`: pumping -> warm pulses; dumping -> glitches/distortion; choppy/calm).
 - **Sleep**: NREM -> city dims and slows; REM -> world warps and replays the day's messages as floating words
   (déjà vu; `tick.events` of type replay). Night (Rome time) -> darker sky, lit roads.
