@@ -27,6 +27,7 @@ from aiohttp import web
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
+from eye import Eye, market_mood
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -86,6 +87,11 @@ class Live:
         self.seen = set()
         self.pool_name = "demo" if demo else mint[:6]
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
+        self.eye = None                  # set by main() with --eye
+        self.recent_trades = []          # (t, kind, usd) for the eye's market mood
+        self.recent_replays = []         # REM replays for the eye's dreams
+        self.last_groups = {}
+        self.last_frame = None
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -104,6 +110,7 @@ class Live:
             b.stimulate("relay", 10 * gain)
             b.stimulate("attention", 8 * gain)
         self.stats["usd"] += tr["usd"]
+        self.recent_trades = [x for x in self.recent_trades if time.time() - x[0] < 300] + [(time.time(), tr["kind"], tr["usd"])]
 
     async def rpc_trades(self):
         """Stream every pump.fun / PumpSwap trade of the mint straight from Solana logs."""
@@ -167,6 +174,8 @@ class Live:
         for g, a in stim.items():
             self.brain.stimulate(g, a * gain)
         m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits)
+        if self.eye:
+            self.eye.hear(text, t)
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
@@ -200,6 +209,7 @@ class Live:
                 for g, a in m["stimulus"].items():
                     b.stimulate(g, REPLAY_AMP * a)
                 e.record_replay(t, m)
+                self.recent_replays = (self.recent_replays + [m["text"]])[-8:]
                 out.append({"type": "replay", "t": hhmm(t), "text": m["text"], "networks": m["networks"],
                             "received": hhmm(m["t"])})
             else:
@@ -237,11 +247,12 @@ class Live:
             wave = {k: float(z.real[i].mean()) for k, i in gidx.items()}
             st = b.state()
             msg = {"type": "tick", "act": np.round(act, 3).tolist(), "wave": wave,
-                   "groups": {k: round(float(act[i].mean()), 3) for k, i in gidx.items()},
+                   "groups": (groups := {k: round(float(act[i].mean()), 3) for k, i in gidx.items()}),
                    "sync": round(st["sync"], 3), "stats": self.stats,
                    "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
                    "pool": self.pool_name, "events": events,
                    "sleep": self.engine.status() | {"burst": round(self.burst, 2)}}
+            self.last_groups = groups
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
@@ -250,6 +261,24 @@ class Live:
                 last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
+
+    # --- the eye: what SUB-01 "sees" ----------------------------------------------
+    async def run_eye(self):
+        loop = asyncio.get_running_loop()
+        while True:
+            stage = self.engine.stage
+            t = self.clock.now()
+            if stage == "AWAKE" and self.recent_replays:
+                self.recent_replays = []                              # dreams end when it wakes up
+            try:
+                rec = await loop.run_in_executor(None, self.eye.step, t, stage, self.last_groups,
+                                                 market_mood(self.recent_trades), list(self.recent_replays), hhmm(t))
+                self.last_frame = rec
+                await self.broadcast({"type": "eye", **rec})
+            except Exception as e:                                    # never let the eye stop the brain
+                print("eye error:", repr(e), flush=True)
+                await asyncio.sleep(10)
+            await asyncio.sleep({"AWAKE": 20, "REM": 15}.get(stage, 60))
 
     # --- http ----------------------------------------------------------------
     async def ws_handler(self, request):
@@ -262,6 +291,8 @@ class Live:
         await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.items[-30:]],
                             "rules": [[cond, list(groups)] for cond, groups in RULES]})
         await ws.send_json(self.nights())
+        if self.last_frame:
+            await ws.send_json({"type": "eye", **self.last_frame})
         self.clients.add(ws)
         async for msg in ws:
             if msg.type != aiohttp.WSMsgType.TEXT:
@@ -295,6 +326,9 @@ async def main(args):
         (HERE / "out" / f"{name}.{ext}").write_bytes(await request.read())
         return web.Response(text="ok")
     app.router.add_post("/snap", snap)
+    if args.eye:
+        live.eye = Eye(HERE / "out" / "eye" / "frames", data_dir / "world.json")
+        app.router.add_static("/eye", HERE / "out" / "eye" / "frames")
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "index.html"))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
@@ -303,6 +337,8 @@ async def main(args):
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     tasks = [live.run_brain(), live.demo_trades() if args.demo else live.rpc_trades()]
+    if live.eye:
+        tasks.append(live.run_eye())
     try:
         await asyncio.gather(*tasks)
     finally:
@@ -317,5 +353,6 @@ if __name__ == "__main__":
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
     p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
+    p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     asyncio.run(main(p.parse_args()))

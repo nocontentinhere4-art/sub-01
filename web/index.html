@@ -65,6 +65,12 @@
     #panel { width:auto; border-left:none; border-top:1px solid #1c1c26; flex:1; }
     #eeg { height:90px; } #chatbox { min-height:240px; }
   }
+  #eye-frame { position:relative; width:100%; aspect-ratio:16/9; background:#07070b; border:1px solid #1c1c26; border-radius:4px; overflow:hidden; }
+  #eye-frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 2.5s ease; }
+  #eye-frame img.on { opacity:1; }
+  #eye-thought { margin-top:8px; font-size:13px; color:#f0f0f6; font-style:italic; min-height:1.2em; }
+  #eye-why { margin-top:4px; font-size:11px; color:#7a7a8c; }
+  #eye-note { margin-top:4px; font-size:10px; color:#55556a; }
 </style>
 </head>
 <body>
@@ -82,6 +88,13 @@
       the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · sleeps 00:00–08:00 Rome time.</div>
   </div>
   <div id="panel">
+    <div id="eyebox" style="display:none">
+      <div class="lbl">What SUB-01 sees <span id="eye-stage" style="color:#ff6a00"></span></div>
+      <div id="eye-frame"><img id="eye-a" alt=""><img id="eye-b" alt=""></div>
+      <div id="eye-thought"></div>
+      <div id="eye-why"></div>
+      <div id="eye-note">AI-generated from the model's state and your messages · not what the real person sees or thinks</div>
+    </div>
     <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
     <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
     <div id="chatbox">
@@ -246,6 +259,21 @@ document.getElementById("chatform").addEventListener("submit", ev => {
   sock.send(JSON.stringify({type:"chat", text})); inp.value = "";
 });
 
+let eyeFront = "eye-a";
+function showEye(f){
+  document.getElementById("eyebox").style.display = "";
+  const back = eyeFront === "eye-a" ? "eye-b" : "eye-a", img = document.getElementById(back);
+  img.onload = () => { img.classList.add("on"); document.getElementById(eyeFront).classList.remove("on"); eyeFront = back; };
+  img.src = f.img;
+  document.getElementById("eye-stage").textContent = `· ${f.stage} ${f.t}`;
+  document.getElementById("eye-thought").textContent = f.thought ? `“${f.thought}”` : "";
+  const w = f.why || {}, bits = [];
+  if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${x.slice(0, 40)}”`).join(", "));
+  if (w.replayed && w.replayed.length) bits.push("dreaming of: " + w.replayed.slice(-2).map(x => `“${x.slice(0, 40)}”`).join(", "));
+  if (w.world && w.world.length) bits.push("in its world: " + w.world.map(o => o.name).join(", "));
+  if (w.mood) bits.push(`market ${w.mood.market}`);
+  document.getElementById("eye-why").textContent = bits.join(" · ");
+}
 function connect(){
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   ws.onmessage = e => {
@@ -258,6 +286,7 @@ function connect(){
       return;
     }
     if (m.type === "chat") { addChat(m); return; }
+    if (m.type === "eye") { showEye(m); return; }
     if (m.type === "chat_ack") {
       chatNote.textContent = m.ok ? DEFAULT_NOTE : `not sent: ${m.reason}`; chatNote.className = m.ok ? "" : "err"; return;
     }
