@@ -408,8 +408,25 @@ async def main(args):
         return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
     app.router.add_get("/api/frames", frames)
 
+    gmaps_ok = {}
+
+    async def gmaps_works(key, referer):
+        """Only hand the Maps key to browsers once Google really serves Street View with it (billing on)."""
+        if key not in gmaps_ok or time.time() - gmaps_ok[key][1] > 3600:
+            url = ("https://maps.googleapis.com/maps/api/streetview/metadata?location=35.70545,139.57455&radius=50&key="
+                   + key)
+            try:
+                async with aiohttp.ClientSession() as http, http.get(url, headers={"Referer": referer}) as r:
+                    ok = (await r.json()).get("status") == "OK"
+            except Exception:
+                ok = False
+            gmaps_ok[key] = (ok, time.time())
+        return gmaps_ok[key][0]
+
     async def config(request):                    # browser config (Maps JS keys are referrer-restricted by design)
-        return web.json_response({"gmaps": os.environ.get("GOOGLE_MAPS_KEY", "")})
+        key = os.environ.get("GOOGLE_MAPS_KEY", "")
+        referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
+        return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else ""})
     app.router.add_get("/api/config", config)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html"))       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html"))
