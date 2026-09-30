@@ -136,7 +136,7 @@ export function createPhone() {
     if (vid < 0 && feed.length) vid = 0;
     if (feed.length && vid >= feed.length) vid = 0;
     if (!visible || dismissed) return;
-    title.textContent = app ? `phone · ${app}${app === "tiktok" && feed[vid] ? ` ${vid + 1}/${feed.length}` : ""}` : "phone · idle";
+    title.textContent = app ? `${app}${app === "tiktok" && feed[vid] ? ` ${vid + 1}/${feed.length}` : ""}` : "idle";
     ovCv.setAttribute("aria-label", `Phone screen: ${app || "idle"}`);
     if (app) drawApp(ovCtx, OV_W, OV_H, app, state, candlesOf(state)); else drawLock(ovCtx, OV_W, OV_H, state.clock);
     if (big && app === "tiktok" && feed[vid]) { dbg.embed = embedSrc(feed[vid].id); showEmbed(feed[vid].id); }
