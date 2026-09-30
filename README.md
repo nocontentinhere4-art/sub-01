@@ -63,3 +63,20 @@ No language model, no generated text: everything below is a rule table.
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
 python tests/test_sleep.py                                    # or: python -m pytest tests/
 ```
+
+## End-to-end screenshots ("the construct")
+
+`tests/e2e/screenshots.mjs` starts `live_server.py --demo` (temp data dir, free port) once per scenario, opens the page in
+headless Chromium (software WebGL) and captures: `home`, `walk` (first-person walk along the real fibre road to the reward
+district, captured at `life.progress` 0.3-0.7), `chat` (message rain landing), `dump` (market glitch), `night`, `rem`,
+`orbit` (`?view=orbit`) and `mobile` (390x844). Every scenario fails on console errors, a blank/uniform canvas, a missing
+honesty line, or while a construct module it needs (`city`, `fx`, `travel`) is still a `STUB` file (`--allow-stubs` skips that).
+
+```
+cd tests/e2e && npm install          # gifenc + pngjs (playwright is taken from /home/user/wt/_tools or ./node_modules)
+node tests/e2e/screenshots.mjs [--only=home,walk] [--gif] [--out=docs/real-world/screenshots] [--allow-stubs]
+```
+
+Output goes to `docs/real-world/screenshots/` (`<scenario>.png`, `walk.gif` with `--gif`, `report.json` with fps / draw calls /
+triangles per scenario). The fps values are **software-rendered** (SwiftShader, no GPU) and only useful to compare scenarios,
+not as device performance. Exit code is non-zero if any scenario fails; servers are always killed, per-scenario timeout 150 s.

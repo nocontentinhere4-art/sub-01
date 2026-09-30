@@ -1,0 +1,3 @@
+{ "name": "sub01-e2e", "private": true, "type": "module",
+  "description": "headless screenshot check; playwright is resolved from /home/user/wt/_tools or ./node_modules",
+  "dependencies": { "gifenc": "^1.0.3", "pngjs": "^7.0.0" } }
