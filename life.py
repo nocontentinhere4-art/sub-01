@@ -97,6 +97,9 @@ class Life:
         self.phone_app = "chart"
         self.log = s.get("log", [])            # recent events for the page
         self.say = ""
+        target = ACTIVITIES[self.activity][0]
+        if target != self.place:                          # restored mid-activity somewhere else: walk there
+            self.path = route(self.place, target)[1:]
 
     # --- inputs ---------------------------------------------------------------------------------
     def hear(self, text, t):

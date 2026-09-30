@@ -84,9 +84,12 @@
   #eye-thought { margin-top:8px; font-size:13px; color:#f0f0f6; font-style:italic; min-height:1.2em; }
   #eye-why { margin-top:4px; font-size:11px; color:#7a7a8c; }
   #eye-note { margin-top:4px; font-size:10px; color:#55556a; }
+  body.mini #worldcol, body.mini #panel, body.mini #foot, body.mini #hud { display:none !important; }
+  body.mini #scene { position:fixed; inset:0; }
 </style>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).has("mini")) document.body.classList.add("mini");</script>
 <div id="wrap">
   <div id="scene">
     <div id="hud">
@@ -148,6 +151,7 @@ host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
 camera.up.set(0, 0, 1); camera.position.set(-250, 170, 120);
+if (new URLSearchParams(location.search).has("mini")) camera.position.multiplyScalar(0.62);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.5;
 controls.target.set(0, 0, 0);
@@ -174,10 +178,11 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
   const lab2node = new Int16Array(512).fill(-1);
   nodes.forEach((n,i)=> lab2node[n.lab] = i);
   // ---- real tractography: one line segment per step, coloured by direction ----
-  const P = new Float32Array(fbuf), E = new Int16Array(ebuf), n = meta.n, k = meta.pts, segs = n*(k-1);
+  const MINI = new URLSearchParams(location.search).has("mini"), keepEvery = MINI ? 3 : 1;
+  const P = new Float32Array(fbuf), E = new Int16Array(ebuf), k = meta.pts, n = Math.floor(meta.n / keepEvery), segs = n*(k-1);
   const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), nod = new Float32Array(segs*4), tp = new Float32Array(segs*2);
   let o = 0;
-  for (let s=0; s<n; s++) {
+  for (let s0=0; s0<n; s0++) { const s = s0 * keepEvery;
     const na = lab2node[E[2*s]] ?? -1, nb = lab2node[E[2*s+1]] ?? -1;
     for (let i=0; i<k-1; i++, o++) {
       const a = (s*k+i)*3, b = a+3;
