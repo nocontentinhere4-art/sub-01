@@ -139,3 +139,68 @@ def test_demo_flags_are_refused_without_demo(flag):
     r = subprocess.run([sys.executable, str(ROOT / "live_server.py"), "--port", "0", *flag],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode == 2 and "demo" in r.stderr
+
+
+class SlowLLM:
+    """A language model that answers after the wait for it has almost run out."""
+    def __call__(self, system, user):
+        time.sleep(1.0)
+        return "sto pensando al pane"
+
+
+def test_held_chat_line_is_not_lost_when_an_action_winner_follows(tmp_path):
+    live = make(tmp_path, start=live_server.parse_start("14:00"))
+    live.mind.llm = SlowLLM()
+    watcher = FakeWS()
+    live.clients.add(watcher)
+    run(chat(live, FakeWS(), "ho fame, vai a comprare il pane", "Anna"))
+    cid = watcher.of("chat")[0]["cid"]
+
+    async def go():
+        live.life.hunger = 0.97
+        live.life.bread = False
+        for _ in range(40):
+            live.clock.sim0 += 10
+            live.life.hunger = 0.97
+            live.mind.next_proposal, live.mind.cooldown = 0.0, {}     # let an action winner come at once
+            await live.mind_step()
+            if any(s["cid"] == cid for s in watcher.of("speech")):
+                break
+            await asyncio.sleep(0.1)
+    run(go())
+    assert any(s["cid"] == cid for s in watcher.of("speech")), "the winning chat never got its inner line"
+
+
+def test_release_held_sends_the_rule_line_at_once(tmp_path):
+    live = make(tmp_path)
+    live.mind.pending = {"text": "x", "kind": "rule", "lang": "en", "about": "a", "action": None,
+                         "_llm": True, "_req": 7, "_deadline": live.mind.clock() + 99, "_ctx": {}}
+    assert live.mind.speech_due() is None
+    assert live.mind.release_held() and live.mind.speech_due()["text"] == "x"
+    assert live.mind.llm_result(7, "late answer") is False
+
+
+def test_hello_is_served_by_the_real_handler_and_is_json(tmp_path):
+    from aiohttp import web, ClientSession
+    from aiohttp.test_utils import TestServer
+    live = make(tmp_path)
+
+    async def go():
+        app = web.Application()
+        app.router.add_get("/ws", live.ws_handler)
+        async with TestServer(app) as srv, ClientSession() as cs:
+            async with cs.ws_connect(srv.make_url("/ws")) as ws:
+                hello = json.loads((await ws.receive()).data)
+                await ws.close()
+        return hello
+    hello = run(go())
+    assert hello["type"] == "hello" and hello["regions"] and hello["region_rules"] and "mind" in hello
+    json.dumps(hello)
+
+
+def test_bad_nicks_are_rate_limited_too(tmp_path):
+    live = make(tmp_path)
+    me = FakeWS()
+    run(live.handle_chat(me, "k", "hi", "admin"))
+    run(live.handle_chat(me, "k", "hi", "admin"))
+    assert me.of("chat_ack")[1]["reason"] == "too fast"
