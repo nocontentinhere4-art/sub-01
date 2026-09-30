@@ -12,9 +12,8 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-from dipy.align import affine_registration, syn_registration
+from dipy.align import affine_registration
 from dipy.align.imaffine import AffineMap
-from nilearn import datasets, image
 from scipy import signal
 
 S3 = "https://s3.amazonaws.com/openneuro.org/"
@@ -25,31 +24,8 @@ TMP.mkdir(exist_ok=True)
 
 
 def atlas_in_t1():
-    """Schaefer-200 + Harvard-Oxford deep nuclei warped into the 2022 T1 (1 mm), cached."""
-    cache = Path("out/labels_t1.nii.gz")
-    if cache.exists():
-        return nib.load(cache)
-    t1 = image.resample_img(nib.load("data/sub-01_ses-2022_T1w.nii.gz"), target_affine=np.diag([1.0] * 3),
-                            interpolation="continuous", force_resample=True, copy_header=True)
-    mni = datasets.load_mni152_template(resolution=1)
-    _, aff = affine_registration(mni.get_fdata(), t1.get_fdata(), moving_affine=mni.affine, static_affine=t1.affine,
-                                 nbins=32, pipeline=["center_of_mass", "translation", "rigid", "affine"],
-                                 level_iters=[10000, 1000, 100])
-    _, mapping = syn_registration(mni.get_fdata(), t1.get_fdata(), moving_affine=mni.affine,
-                                  static_affine=t1.affine, prealign=aff, level_iters=[10, 10, 5])
-    names = [str(x) for x in np.load("out/connectome.npz", allow_pickle=True)["names"]]
-    sch = datasets.fetch_atlas_schaefer_2018(n_rois=200, yeo_networks=7, resolution_mm=1)
-    ho = datasets.fetch_atlas_harvard_oxford("sub-maxprob-thr25-1mm")
-    cort = image.resample_to_img(sch.maps, mni, interpolation="nearest", force_resample=True, copy_header=True)
-    sub = image.resample_to_img(ho.maps, mni, interpolation="nearest", force_resample=True, copy_header=True)
-    lab = mapping.transform(cort.get_fdata(), interpolation="nearest").astype(np.int16)
-    sub_t1 = mapping.transform(sub.get_fdata(), interpolation="nearest").astype(np.int16)
-    ho_names = list(ho.labels)
-    for k, nm in enumerate(names[200:], start=201):                    # same numbering as the connectome
-        lab[sub_t1 == ho_names.index(nm)] = k
-    img = nib.Nifti1Image(lab, t1.affine)
-    nib.save(img, cache)
-    return img
+    """Atlas already warped into the 2022 T1 (1 mm) by atlas_subject.py."""
+    return nib.load("out/labels_t1.nii.gz")
 
 
 def process(key, labels_t1, n_regions):
@@ -65,9 +41,7 @@ def process(key, labels_t1, n_regions):
         data = bold.get_fdata(dtype=np.float32)
         mean = data.mean(-1)
         t1 = labels_t1  # only its grid/affine is used for the T1 intensity below
-        t1_int = image.resample_img(nib.load("data/sub-01_ses-2022_T1w.nii.gz"), target_affine=labels_t1.affine,
-                                    target_shape=labels_t1.shape, interpolation="continuous",
-                                    force_resample=True, copy_header=True).get_fdata()
+        t1_int = nib.load("out/t1_1mm.nii.gz").get_fdata()
         _, t1_to_bold = affine_registration(t1_int * (labels_t1.get_fdata() > 0), mean, moving_affine=t1.affine,
                                             static_affine=bold.affine, nbins=32,
                                             pipeline=["center_of_mass", "translation", "rigid"],
@@ -97,7 +71,7 @@ def process(key, labels_t1, n_regions):
 
 def main():
     n_runs = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    names = np.load("out/connectome.npz", allow_pickle=True)["names"]
+    names = json.load(open("out/atlas_names.json"))
     labels_t1 = atlas_in_t1()
     keys = Path("rest_runs.txt").read_text().split()
     for key in keys[:n_runs]:
