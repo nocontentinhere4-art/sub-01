@@ -17,3 +17,6 @@ out/*_raw.png
 !out/labels_t1.nii.gz
 !out/t1_brain_1mm.nii.gz
 !out/brainmask_t1.nii.gz
+# QC-rejected resting-state runs and interrupted writes (see process_rest.py)
+out/rest/rejected/
+out/rest/*.part.npz
