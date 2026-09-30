@@ -349,7 +349,10 @@ def test_llm_not_requested_without_viewers_or_model():
 
 @pytest.mark.parametrize("reply", ["I am conscious and I feel alive", "you should buy now, the price will moon",
                                    "sono una persona vera", "compra adesso, il prezzo salirà",
-                                   "I remember the MRI scans of my body", "x" * 200, "", None])
+                                   "I remember the MRI scans of my body", "x" * 200, "", None,
+                                   "I am real, you know", "I grew up near here", "the chart will go up tomorrow",
+                                   "going to Milan with Luca", "hello there 🙂", "follow @someone", "see you at 5",
+                                   "ciao, sto bene grazie"])
 def test_unsafe_llm_output_falls_back_to_rule_line(reply):
     m, clock = make(llm=FakeLLM(reply))
     settle(m, clock, ctx(viewers=2))
@@ -386,9 +389,30 @@ REJECT = [
     "the person whose brain this is", "my MRI scans", "the real person behind this", "la persona reale",
     "quando ero piccolo andavo al mare", "my mother used to bake", "mia madre faceva il pane",
     "check www.example.com", "you stupid idiot", "$SUB is great", "x" * 121, "", "two\nlines",
+    # consciousness-adjacent claims (EN + IT)
+    "I am real", "I exist and I feel things", "I have a mind of my own", "I am aware of myself",
+    "I feel pain sometimes", "I am a mind", "I think therefore I am", "I am not a robot", "I feel like a person",
+    "Sono sveglio e sento dolore", "Io esisto davvero", "Ho una mente mia", "mi sento vivo", "sono una mente",
+    "provo emozioni vere",
+    # invented biography (EN + IT)
+    "I grew up in Milan", "I was born in 1990", "I remember my grandmother", "I used to work in an office",
+    "my hometown is lovely", "years ago I lived abroad", "sono nato a Roma", "da bambino giocavo qui",
+    "mia nonna faceva il pane", "Ricordo quando ero a scuola", "my best friend lives there", "mio zio era fornaio",
+    # buy / sell / trade / bet (EN + IT)
+    "acquista ora", "acquistare subito", "time to trade this", "go long now", "vai lungo", "ape in", "hodl",
+    "bullish on this one", "all in now", "load up the bags", "this will pump", "scommetti tutto", "bet everything",
+    # predictions (EN + IT)
+    "the chart will go up tomorrow", "it will surely rise", "il grafico salirà domani", "sale sicuro",
+    "the candles will be green tomorrow", "it goes higher for sure",
+    # words hidden in nicknames: '_', camelCase and digits do not protect them
+    "kind words, Alive_Bob", "kind words, coin_king", "I_am_alive", "kind words, moonboy", "kind words, AliveBob",
+    "hey alive99",
 ]
 ACCEPT = ["ah, devo prendere il pane", "il forno è chiuso, ci vado domattina", "that chart again...",
-          "the park is calm", "ho sonno", "a question... let me think", "green candles again"]
+          "the park is calm", "ho sonno", "a question... let me think", "green candles again",
+          "I'm getting hungry", "I'm a bit tired", "I am at the bakery", "sono a casa, finalmente",
+          "mi sento un po' stanco", "the moon is out", "moonlight on the street", "a rich smell of bread",
+          "kind words, ada_99", "bed soon, I think", "a bag of bread would be nice"]
 
 
 @pytest.mark.parametrize("s", REJECT)
@@ -441,3 +465,146 @@ def test_cycle_under_5ms_with_50_memories_and_20_messages():
     per = (time.perf_counter() - t0) / n * 1000
     assert len(m.msgs) == 20
     assert per < 5.0, f"{per:.2f} ms per cycle"
+
+
+def test_safe_llm_text_extra_rules():
+    assert mind.safe_llm_text("il pane mi aspetta", "it")
+    assert mind.safe_llm_text("Kind words, Marco. Thanks", "en", "marco")
+    assert mind.safe_llm_text("ok, I'm going to the window", "en")
+    assert not mind.safe_llm_text("ok, I'm going to Milan", "en")           # a name that is not the nickname
+    assert not mind.safe_llm_text("the bakery 🥖", "en")
+    assert not mind.safe_llm_text("see you at 5", "en")
+    assert not mind.safe_llm_text("#bread", "en")
+    assert not mind.safe_llm_text("il pane mi aspetta", "en")               # wrong language
+    assert not mind.safe_llm_text("I am real", "en")
+
+
+# ---- nicknames -------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("nick", ["moonboy", "Alive_Bob", "coin_king", "I_am_alive"])
+def test_unsafe_nick_keeps_a_matching_line_without_the_nick(nick):
+    for seed in range(6):                                    # both template choices, whatever the rng picks
+        m, clock = make(seed=seed)
+        settle(m, clock, ctx())
+        m.hear(msg("you look great, lovely", nick), T0 + 40)
+        out = m.cycle(T0 + 40, ctx())
+        b = out["broadcast"]
+        assert b["kind"] == "chat"
+        assert b["speech"] in TPL["chat_positive"]["en"] and "{" not in b["speech"], b["speech"]
+        assert b["nick"] is None and nick.lower() not in json.dumps(out).lower()
+        assert nick.lower() not in m.focus().lower()
+
+
+def test_unsafe_chat_text_is_not_echoed_in_labels_or_diary(tmp_path):
+    m, clock = make(store=DiaryStore(tmp_path))
+    settle(m, clock, ctx())
+    m.hear(msg("go buy the dip and sell everything", "x"), T0 + 40)
+    out = m.cycle(T0 + 40, ctx())
+    dump = json.dumps(out) + m.focus()
+    assert "sell everything" not in dump and "dip" not in dump
+    m.flush()
+    assert "sell" not in (tmp_path / "diary").joinpath(
+        datetime.fromtimestamp(T0, ROME).date().isoformat() + ".json").read_text()
+
+
+def test_line_fallback_is_key_specific():
+    m, _ = make()
+    assert m._line("chat_question", "en", nick="moonboy") == "a question... let me think"
+    assert m._line("chat_neutral", "it", nick="coin_king") == "un messaggio nuovo"
+    assert m._line("dream", "en", snip="buy now") == "a strange dream"
+    assert m._line("no_other", "en", why="the price is wrong") == "not now"
+    assert m._line("need_hunger", "it") in TPL["need_hunger"]["it"]
+
+
+# ---- robustness / output ---------------------------------------------------------------------------------------
+def test_bad_rel_values_are_ignored():
+    m, _ = make()
+    out = m.cycle(T0, ctx(rel={"fear": None, "reward": "x", "default": float("nan"), "salience": float("inf")}))
+    assert all(c["salience"] >= 0 for c in out["candidates"])
+    assert out["self"]["feeling"] == "calm"
+
+
+def test_cycle_returns_copies():
+    m, clock = make()
+    settle(m, clock, ctx())
+    m.hear(msg("go buy some bread please", "ada"), T0 + 40)
+    out = m.cycle(T0 + 40, ctx())
+    snap = json.dumps(out)
+    m.outcome("buy_bread", False, "the bakery is closed", T0 + 40)
+    m.cycle(T0 + 42, ctx(hunger=0.9))
+    assert json.dumps(out) == snap
+
+
+def test_chat_message_rewinning_does_not_propose_again():
+    m, clock = make()
+    settle(m, clock, ctx())
+    cid = m.hear(msg("go buy some bread please", "ada"), T0 + 40)
+    b = m.cycle(T0 + 40, ctx())["broadcast"]
+    assert b["id"] == cid and b["action"]["act"] == "buy_bread"
+    m.outcome("buy_bread", False, "busy", T0 + 40)
+    for i in range(60):                                      # past the decline cooldown, message still alive
+        clock.advance(2.2)
+        out = m.cycle(T0 + 42 + 2 * i, ctx())
+        if out["winner"] == cid:
+            assert out["broadcast"]["action"] is None
+        m.speech_due()
+
+
+def test_unsatisfied_need_does_not_repeat_every_20s():
+    m, clock = make()
+    settle(m, clock, ctx())
+    lines = 0
+    for i in range(300):                                     # 10 minutes at 100% hunger, every action declined
+        out = m.cycle(T0 + 2 * i, ctx(hunger=1.0))
+        b = out["broadcast"]
+        if b and b["action"]:
+            m.outcome(b["action"]["act"], False, "the bakery is closed", T0 + 2 * i)
+        if m.speech_due():
+            lines += 1
+        clock.advance(2)
+    assert 2 <= lines <= 20, lines
+
+
+# ---- diary aggregates past the cap -----------------------------------------------------------------------------
+def test_diary_summary_counts_the_whole_day_past_the_cap(tmp_path):
+    store = DiaryStore(tmp_path)
+    m, clock = make(store=store)
+    day1 = datetime.fromtimestamp(T0, ROME).date().isoformat()
+    start = datetime(2026, 10, 1, 0, 30, tzinfo=ROME).timestamp()
+    n_lines = 0
+    for i in range(mind.DIARY_CAP * 3):
+        t = start + i * 60                                   # through the whole day
+        if i % 7 == 0:
+            m.hear(msg(f"hello number {i}, how is the street?", "ada"), t)
+        c = ctx(hunger=0.3 + 0.6 * (i % 50 > 40), market="pumping" if i % 90 < 5 else "calm")
+        m.cycle(t, c)
+        if m.speech_due():
+            n_lines += 1
+        clock.advance(20)
+    m.flush()
+    agg = m.summary(day1)
+    assert agg["entries"] > mind.DIARY_CAP
+    entries = m.diary(day1)
+    assert len(entries) <= mind.DIARY_CAP
+    assert entries[0]["t"] < "03:00" and entries[-1]["t"] > "20:00"        # detail spans the day
+    assert all(e["kind"] != "chat" or "hello" not in e["label"] for e in entries)
+    saved = json.loads((tmp_path / "diary" / f"{day1}.json").read_text())
+    assert saved["summary"]["entries"] == agg["entries"]
+    m2 = Mind(state=json.loads(json.dumps(m.to_dict())), rng=random.Random(2), clock_fn=FakeClock(),
+              store=DiaryStore(tmp_path))
+    y = m2.cycle(T0 + 86400, ctx())["self"]["yesterday"]
+    assert y["date"] == day1 and y["entries"] == agg["entries"] and y["chats"] >= 1 and y["topics"]
+    m3 = Mind(rng=random.Random(2), clock_fn=FakeClock(), store=DiaryStore(tmp_path))      # from the file only
+    assert m3.cycle(T0 + 86400, ctx())["self"]["yesterday"]["entries"] == agg["entries"]
+
+
+def test_repeated_declines_back_off_and_go_quiet():
+    m, clock = make()
+    m.outcome("buy_bread", False, "the bakery is closed", T0)
+    first = m.cooldown["buy_bread"] - clock()
+    assert m.speech_due()["text"] == "the bakery's closed, tomorrow morning then"
+    clock.advance(30)
+    m.outcome("buy_bread", False, "the bakery is closed", T0 + 30)
+    assert m.cooldown["buy_bread"] - clock() == 2 * first
+    assert m.speech_due() is None                           # same decline line again soon: recorded, not spoken
+    m.outcome("buy_bread", True, "ok", T0 + 60)
+    assert m.declines["buy_bread"] == 0 and m.speech_due()["action"]["ok"] is True
