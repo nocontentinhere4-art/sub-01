@@ -93,12 +93,20 @@ GAIN_SLOPE = {"DA": 0.25, "5HT": 0.3, "NE": 0.4, "ACh": 0.25}   # d gain / d lev
 GAIN_SPAN = 0.5                                                  # gain stays in (0.5, 1.5)
 
 
+def _finite(x, default):
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return default
+    return x if math.isfinite(x) else default
+
+
 def coupling(receptors=None):
     """{modulator: (n,) net signed receptor weighting c_m,i = sum_r sign_r * w_r * d_r,i / mean_i(d_r,i)}.
 
     Dividing by the mean makes the weights (not the arbitrary density units) set each system's net balance; the
-    receptor map sets which regions are affected more or less. For RECEPTORS the mean over 214 regions equals the
-    cortical mean because the subcortical fallback is the cortical mean."""
+    receptor map sets which regions are affected more or less. For RECEPTORS the mean over 214 regions is close to the
+    cortical mean (the subcortical fallback is the pre-cap cortical mean)."""
     rec = RECEPTORS if receptors is None else receptors
     n = len(next(iter(rec.values())))
     c = {m: np.zeros(n) for m in LEVEL_KEYS}
@@ -126,7 +134,8 @@ def region_gain(levels, receptors=None, n=None):
         size = n
     drive = np.zeros(size)
     for m in LEVEL_KEYS:
-        dl = float(levels.get(m, 1.0)) - 1.0
+        lev = _finite(levels.get(m, 1.0), 1.0)           # NaN/inf/None from a bad feed -> baseline, never NaN gain
+        dl = lev - 1.0
         if dl != 0.0:
             drive += GAIN_SLOPE[m] * dl * c[m]
     return 1.0 + GAIN_SPAN * np.tanh(drive / GAIN_SPAN)
@@ -157,6 +166,7 @@ DEFAULTS = {
     "phasic_max": 2.0,
     "level_max": 3.0,
 }
+USD_MAX = 1e9            # USD; larger sizes are clipped (keeps log size and RPE finite)
 BUY_KINDS = {"buy", "pump"}
 SELL_KINDS = {"sell", "dump"}
 
@@ -201,10 +211,17 @@ class Neuromodulators:
 
     # -- events ----------------------------------------------------------------------------------------------
     def on_trade(self, kind, usd, t=None):
-        """A trade. Returns {"rpe", "da", "ne"} (the phasic increments applied)."""
+        """A trade. Returns {"rpe", "da", "ne"} (the phasic increments applied).
+
+        `t` (seconds) must run on the same clock as the `dt` given to update(), since both feed the learned
+        inter-pump interval. A non-finite `usd` (bad feed) is ignored, so NaN/inf can never enter the state."""
         p = self.p
         kind = str(kind).lower()
-        x = math.log1p(max(float(usd), 0.0) / p["usd_ref"])
+        usd = _finite(usd, None)
+        if usd is None:
+            return {"rpe": 0.0, "da": 0.0, "ne": 0.0}
+        t = _finite(t, None) if t is not None else None
+        x = math.log1p(min(max(usd, 0.0), USD_MAX) / p["usd_ref"])
         da = ne = rpe = 0.0
         if kind in BUY_KINDS:
             rpe = x - self.V                                           # delta = r - V  (Rescorla & Wagner 1972)
@@ -235,7 +252,7 @@ class Neuromodulators:
     def update(self, dt, sleep_levels=None):
         """Advance dt seconds. sleep_levels: the sleep engine's modulators dict (missing keys -> 1.0)."""
         p = self.p
-        dt = max(0.0, float(dt))
+        dt = max(0.0, _finite(dt, 0.0))
         self.t += dt
         self.since_buy += dt
         self.last["omission"] = 0.0
@@ -250,7 +267,7 @@ class Neuromodulators:
         target = sleep_levels or {}
         a = 1.0 - math.exp(-dt / p["tau_tonic"]) if p["tau_tonic"] > 0 else 1.0
         for k in LEVEL_KEYS:
-            self.tonic[k] += a * (float(target.get(k, 1.0)) - self.tonic[k])
+            self.tonic[k] += a * (_finite(target.get(k, 1.0), 1.0) - self.tonic[k])
             tau = p["tau_da"] if k == "DA" else p["tau_ne"] if k == "NE" else p["tau_other"]
             self.phasic[k] *= math.exp(-dt / tau)
         self.vol *= math.exp(-dt / p["tau_vol"])

@@ -224,3 +224,18 @@ def test_state_roundtrip():
     m2 = Neuromodulators.from_dict(json.loads(json.dumps(m.to_dict())))
     assert m2.levels == m.levels
     assert np.array_equal(m2.region_gain(), m.region_gain())
+
+
+def test_bad_inputs_never_poison_state():
+    # NaN / inf / None from a bad trade feed or sleep engine must not enter the state or the gain
+    m = Neuromodulators()
+    for bad in (float("nan"), float("inf"), -float("inf"), None, "x"):
+        assert m.on_trade("buy", bad, t=0.0) == {"rpe": 0.0, "da": 0.0, "ne": 0.0}
+        assert m.on_trade("sell", bad) == {"rpe": 0.0, "da": 0.0, "ne": 0.0}
+    m.on_trade("buy", 1e30, t=float("nan"))                      # huge size clipped, NaN time ignored
+    m.update(float("nan"), {"DA": float("nan"), "NE": None, "ACh": float("inf")})
+    m.update(1.0, {"DA": float("nan")})
+    assert all(np.isfinite(v) for v in m.levels.values())
+    assert np.all(np.isfinite(m.region_gain()))
+    assert np.all(np.isfinite(region_gain({"DA": float("nan"), "NE": float("inf"), "5HT": None})))
+    assert np.array_equal(region_gain({"DA": float("nan"), "NE": float("inf")}), np.ones(214))

@@ -9,7 +9,7 @@ phenomenological rules chosen to make the model respond in a documented way. The
 anyone's brain chemistry.
 
 Code: `twin/neurochem.py` (runtime; numpy only), `twin/build_receptors.py` (offline data build),
-`twin/plot_receptors.py` (figure), `tests/test_neurochem.py` (19 tests).
+`twin/plot_receptors.py` (figure), `tests/test_neurochem.py` (20 tests).
 Data: `twin/data/receptors_214.csv`, `twin/data/zilles2017_all_layers.csv`, sources and licences in
 `twin/data/RECEPTORS_SOURCES.md`.
 
@@ -151,6 +151,10 @@ Trade responses (fresh state, wake):
 - A 5000 USD pump after that habituation: RPE 4.1, DA 2.64.
 - One sell: NE 1.26 / 1.90 / 2.73 for 50 / 500 / 5000 USD.
 - 20 alternating 2000 USD buys/sells: NE 1.59 at the end, versus 1.00 for 20 identical 20 USD buys.
+
+Robustness: a non-finite trade size, time, level or sleep-engine value (NaN/inf/None from a bad feed) is ignored or
+replaced by baseline, so it cannot enter the state or the gain; trade sizes are clipped at 1e9 USD. `t` in `on_trade`
+must be on the same clock (seconds) as `dt` in `update`.
 
 Cost: `update` about 3 us, `region_gain` about 9 us per call, well within the live-server budget.
 
