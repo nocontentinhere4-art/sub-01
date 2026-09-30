@@ -15,6 +15,7 @@ import base64
 import struct
 import json
 import math
+import os
 import random
 import time
 from datetime import datetime
@@ -341,12 +342,13 @@ async def main(args):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
-        live.eye = Eye(HERE / "out" / "eye" / "frames", data_dir / "world.json", width=640, height=360, steps=6)
+        frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
+        live.eye = Eye(frames_dir, data_dir / "world.json", width=640, height=360, steps=6)
         live.eye_every = args.eye_every
-        app.router.add_static("/eye", HERE / "out" / "eye" / "frames")
+        app.router.add_static("/eye", frames_dir)
 
     async def frames(request):                    # recent eye frames for the world page
-        log = HERE / "out" / "eye" / "frames" / "frames.jsonl"
+        log = live.eye.log if live.eye else HERE / "missing"
         rows = log.read_text().splitlines()[-int(request.query.get("n", "40")):] if log.exists() else []
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
         return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
@@ -355,7 +357,7 @@ async def main(args):
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
     await runner.setup()
-    await web.TCPSite(runner, "127.0.0.1", args.port).start()
+    await web.TCPSite(runner, args.host, args.port).start()
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     tasks = [live.run_brain(), live.demo_trades() if args.demo else live.rpc_trades()]
@@ -369,9 +371,11 @@ async def main(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--mint", default="6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx")
+    p.add_argument("--mint", default=os.environ.get("MINT", "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"))
     p.add_argument("--demo", action="store_true")
-    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8765)))
+    p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    p.add_argument("--frames-dir", help="where eye frames are written (default out/eye/frames)")
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
     p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")

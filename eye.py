@@ -14,12 +14,14 @@ import math
 import os
 import re
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 WORLD_HALF_LIFE_H = 6.0            # simulated hours for an object's strength to halve
 FORGET_BELOW = 0.15
 MAX_OBJECTS = 40
+KEEP_FRAMES = 600
 LLM_ID = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
 HOME = "a quiet dark laboratory room at night with one large window over a sleeping city"
 
@@ -103,6 +105,20 @@ def load_env(path):
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
+def replicate_post(url, token, payload, tries=5):
+    """POST a prediction, waiting on 429s (low-credit accounts are limited to ~6 requests/min, burst 1)."""
+    body = json.dumps(payload).encode()
+    for i in range(tries):
+        req = urllib.request.Request(url, data=body, method="POST", headers={
+            "Authorization": f"Bearer {token}", "Content-Type": "application/json", "Prefer": "wait=30"})
+        try:
+            return json.loads(urllib.request.urlopen(req, timeout=60).read())
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or i == tries - 1:
+                raise
+            time.sleep(float(e.headers.get("Retry-After") or 0) or 10 * (i + 1))
+
+
 class ReplicateImages:
     """FLUX schnell on Replicate: ~1-2 s per image, nothing runs on this Mac's GPU."""
     URL = "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions"
@@ -114,15 +130,26 @@ class ReplicateImages:
         from io import BytesIO
 
         from PIL import Image
-        body = json.dumps({"input": {"prompt": prompt, "seed": seed, "aspect_ratio": "16:9", "num_outputs": 1,
-                                     "output_format": "jpg", "output_quality": 88, "go_fast": True}}).encode()
-        req = urllib.request.Request(self.URL, data=body, method="POST", headers={
-            "Authorization": f"Bearer {self.token}", "Content-Type": "application/json", "Prefer": "wait=30"})
-        out = json.loads(urllib.request.urlopen(req, timeout=60).read())
+        out = replicate_post(self.URL, self.token, {"input": {
+            "prompt": prompt, "seed": seed, "aspect_ratio": "16:9", "num_outputs": 1,
+            "output_format": "jpg", "output_quality": 88, "go_fast": True}})
         if out.get("status") not in ("succeeded", "processing", "starting") or not out.get("output"):
             raise RuntimeError(f"replicate: {out.get('status')} {str(out.get('error'))[:200]}")
         url = out["output"][0] if isinstance(out["output"], list) else out["output"]
         return Image.open(BytesIO(urllib.request.urlopen(url, timeout=60).read())).resize((width, height))
+
+
+class ReplicateLLM:
+    """Thoughts via Llama 3 8B on Replicate (~2-3 s): no local GPU, runs anywhere."""
+    URL = "https://api.replicate.com/v1/models/meta/meta-llama-3-8b-instruct/predictions"
+
+    def __init__(self, token):
+        self.token = token
+
+    def ask(self, system, user):
+        out = replicate_post(self.URL, self.token, {"input": {
+            "system_prompt": system, "prompt": user, "max_tokens": 260, "temperature": 0.7}}).get("output") or ""
+        return "".join(out) if isinstance(out, list) else str(out)
 
 
 class Eye:
@@ -143,6 +170,8 @@ class Eye:
         self.heard = self.heard[-12:]
 
     def _load(self):
+        if self.llm is None and os.environ.get("REPLICATE_API_TOKEN"):
+            self.llm = ReplicateLLM(os.environ["REPLICATE_API_TOKEN"])
         if self.llm is None:
             from mlx_lm import load
             self.llm, self.tok = load(LLM_ID)
@@ -156,10 +185,13 @@ class Eye:
                               quantize=self.quantize, model_path=None)
 
     def _ask(self, state):
-        from mlx_lm import generate
-        msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": json.dumps(state)}]
-        prompt = self.tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
-        raw = generate(self.llm, self.tok, prompt=prompt, max_tokens=220)
+        if isinstance(self.llm, ReplicateLLM):
+            raw = self.llm.ask(SYSTEM, json.dumps(state))
+        else:
+            from mlx_lm import generate
+            msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": json.dumps(state)}]
+            prompt = self.tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
+            raw = generate(self.llm, self.tok, prompt=prompt, max_tokens=220)
         m = re.search(r"\{.*\}", raw, re.S)
         try:
             out = json.loads(m.group(0)) if m else {}
@@ -186,7 +218,8 @@ class Eye:
             self.world.add(keep, t, fresh[-1])
             self.absorbed.update(fresh)
         style = STYLE.get(stage, STYLE["AWAKE"])
-        prompt = f"{scene or 'an empty quiet room'}. {style}. no text, no people"
+        # image models ignore "no X": describe the absence positively instead
+        prompt = f"{scene or 'an empty quiet room'}. {style}. uninhabited scene, empty of humans, seen through the viewer's own eyes, clean surfaces without writing"
         name = f"{int(time.time() * 1000)}.jpg"
         t0 = time.time()
         if isinstance(self.img, ReplicateImages):
@@ -203,6 +236,9 @@ class Eye:
                "why": {"messages": recent, "replayed": replays[-4:], "world": self.world.top(t, 5),
                        "mood": {k: v for k, v in state.items() if k in ("reward", "fear", "salience", "market")}},
                "render_s": round(time.time() - t0, 1)}
+        jpgs = sorted(self.out.glob("*.jpg"))
+        for old in jpgs[:-KEEP_FRAMES]:                    # bounded disk use on a server volume
+            old.unlink(missing_ok=True)
         with self.log.open("a") as f:
             f.write(json.dumps(rec) + "\n")
         self.world_path.write_text(json.dumps(self.world.to_dict()))

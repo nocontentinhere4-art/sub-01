@@ -1,0 +1,6 @@
+# runtime only (the live server); the MRI pipeline uses requirements.txt
+numpy
+scipy
+aiohttp
+pillow
+tzdata
