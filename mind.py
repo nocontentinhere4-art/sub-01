@@ -736,7 +736,8 @@ class Mind:
                 act = "eat" if life.get("bread") else "buy_bread"
                 reason = "hungry"
             elif name == "boredom":
-                day = 8 <= h < 20
+                po = life.get("open")
+                day = bool(po["park"]) if isinstance(po, dict) and "park" in po else 8 <= h < 20   # life knows the daylight
                 act = self.rng.choice(["park", "phone", "window"] if day else ["phone", "window"])
                 reason = "bored"
         elif kind == "market":
