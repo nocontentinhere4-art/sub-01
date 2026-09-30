@@ -98,7 +98,7 @@ new ResizeObserver(() => resize()).observe(host);
 const phone = createPhone();
 $("phone-overlay").appendChild(phone.overlayEl);
 let net = null;
-const hud = createHud({ send: obj => (net ? net.send(obj) : false) });
+const hud = createHud({ send: obj => (net ? net.send(obj) : false), onView: v => setView(v), view });   // the HUD builds #view + #quality
 const minibrain = createMiniBrain($("minibrain"), { quality });
 
 // ---------------- construct modules (built when the brain data is loaded) ----------------
@@ -282,20 +282,16 @@ net = connect({
   mind(m) { hud.mind(m); },
   speech(m) {
     hud.speech(m);
-    const chat = m.about ? chatByCid.get(m.about) || null : null;
+    const chat = m.cid ? chatByCid.get(m.cid) || null : null;
     hook("fx.innerLine", () => fx?.innerLine({ ...m, chat }));
   },
 });
 
 // ---------------- HUD tools: view switch (#view), quality switch (#quality) ----------------
-const viewBtn = document.createElement("button");
-viewBtn.type = "button";
-viewBtn.title = "switch view (v)";
 function setView(v) {
   view = v === "orbit" ? "orbit" : "first";
   stats.view = view;
-  viewBtn.textContent = view === "first" ? "overview" : "first person";
-  viewBtn.setAttribute("aria-label", `switch to ${viewBtn.textContent}`);
+  hud.setView(view);
   document.body.classList.toggle("view-orbit", view === "orbit");
   document.body.classList.toggle("view-first", view === "first");
   hook("travel.setView", () => travel?.setView(view));
@@ -303,13 +299,10 @@ function setView(v) {
   if (view === "first") u.searchParams.delete("view"); else u.searchParams.set("view", view);
   history.replaceState(null, "", u);
 }
-viewBtn.onclick = () => setView(view === "first" ? "orbit" : "first");
-($("view") || $("tools")).appendChild(viewBtn);
 addEventListener("keydown", e => {
   if (e.key === "v" && !/input|textarea|select/i.test(document.activeElement?.tagName || "")) setView(view === "first" ? "orbit" : "first");
 });
 setView(view);
-Quality.mountSwitch($("quality"));
 
 function applyQuality(q) {
   stats.quality = q.name;
