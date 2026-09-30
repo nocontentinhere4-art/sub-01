@@ -105,6 +105,16 @@ test("pathBetween home -> reward follows fibres continuously", () => {
   assert.equal(low.pathBetween(a, a).total, 0);
 });
 
+test("walks inside the flat stay short (direct bundle, trimmed fibre ends)", () => {
+  const home = ["bed", "window", "desk", "table"];
+  for (const p of home) for (const q of home) {
+    const i = low.placeDistrict(p), j = low.placeDistrict(q);
+    if (i === j) continue;
+    const path = low.pathBetween(i, j), straight = low.districts[i].pos.distanceTo(low.districts[j].pos);
+    assert.ok(path.total < 3 * straight, `${p} -> ${q}: ${path.total.toFixed(0)} vs straight ${straight.toFixed(0)}`);
+  }
+});
+
 test("loadBrainData caches the fetch", async () => {
   let calls = 0;
   const fetch = async f => { calls++; const name = f.replace(/^.*\//, "");
