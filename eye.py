@@ -37,7 +37,7 @@ You receive its current state as JSON. Reply with JSON only:
   messages, impossible geometry; nrem = almost black, slow blurred shapes. Never draw people's faces, text,
   logos, violence, nudity or real persons.
 - thought: one short inner line (max 16 words) in the language of the most recent message (Italian or English),
-  reacting to what it sees. Never ask for money, never tell anyone to buy or sell, never claim to be human,
+  reacting to what it sees. It is a brain without a body: no heart, hands or breath. Never ask for money, never tell anyone to buy or sell, never claim to be human,
   conscious, or the real person the scans came from."""
 
 STYLE = {
@@ -112,11 +112,19 @@ def replicate_post(url, token, payload, tries=5):
         req = urllib.request.Request(url, data=body, method="POST", headers={
             "Authorization": f"Bearer {token}", "Content-Type": "application/json", "Prefer": "wait=30"})
         try:
-            return json.loads(urllib.request.urlopen(req, timeout=60).read())
+            out = json.loads(urllib.request.urlopen(req, timeout=60).read())
         except urllib.error.HTTPError as e:
             if e.code != 429 or i == tries - 1:
                 raise
             time.sleep(float(e.headers.get("Retry-After") or 0) or 10 * (i + 1))
+            continue
+        # "Prefer: wait" can return before the model is done (cold start): poll the prediction until it ends
+        deadline = time.time() + 120
+        while out.get("status") in ("starting", "processing") and time.time() < deadline:
+            time.sleep(1.5)
+            get = urllib.request.Request(out["urls"]["get"], headers={"Authorization": f"Bearer {token}"})
+            out = json.loads(urllib.request.urlopen(get, timeout=30).read())
+        return out
 
 
 class ReplicateImages:
@@ -133,7 +141,7 @@ class ReplicateImages:
         out = replicate_post(self.URL, self.token, {"input": {
             "prompt": prompt, "seed": seed, "aspect_ratio": "16:9", "num_outputs": 1,
             "output_format": "jpg", "output_quality": 88, "go_fast": True}})
-        if out.get("status") not in ("succeeded", "processing", "starting") or not out.get("output"):
+        if out.get("status") != "succeeded" or not out.get("output"):
             raise RuntimeError(f"replicate: {out.get('status')} {str(out.get('error'))[:200]}")
         url = out["output"][0] if isinstance(out["output"], list) else out["output"]
         return Image.open(BytesIO(urllib.request.urlopen(url, timeout=60).read())).resize((width, height))
