@@ -24,6 +24,7 @@ unpkg, tiktok.com and api.replicate.com are BLOCKED in this sandbox (they work i
   never download or re-host videos.
 - Keep the password gate, the chat filter and rate limits untouched. Never commit or print secrets (`.env`,
   `REPLICATE_API_TOKEN`, `SITE_PASSWORD`); never log tokens.
+- The construct has its own style: no "Matrix" name, logos or green code rain.
 - Server stays light (Railway): no local ML, mind cycle < 5 ms, no new heavy deps. Client work runs on the viewer's GPU.
 - Replicate calls only while someone is watching (clients > 0), rate-limited.
 
@@ -73,34 +74,53 @@ def safe_text(s: str) -> bool
 - `speech`: `{"type":"speech","text","kind","lang","about","action":{"act","ok","reason"}|null,"t"}`
 Brain region indices = index into `tick.act` = index into `web/brain.json` nodes (same order).
 
-## Client (web)
-- three.js is vendored (no CDN): `web/vendor/three/` = `three.module.min.js` + needed `examples/jsm` addons +
-  draco/basis decoders, loaded through an importmap. `/brain` (web/index.html) may keep its current CDN build.
-- `web/life.html` = shell (HUD markup, CSS, importmap) + `web/world/main.js` (entry). One module per stream:
-  | file | owner stream | exports |
-  |---|---|---|
-  | `web/world/main.js` | foundation / integration | boot, WS client, render loop, URL params |
-  | `web/world/net.js` | foundation | `connect(handlers)` WS with reconnect (wss on https) |
-  | `web/world/quality.js` | foundation | `Quality` presets low/medium/high, auto by device, `?q=` |
-  | `web/world/world/*.js` | world | `createWorld(renderer, scene, camera, assets, quality)` -> `{update(dt, env), setLab(on), anchors}` |
-  | `web/world/assets.js` | world | manifest loader, lazy-loading, fallbacks when a file is missing |
-  | `web/world/character.js` | character | `createCharacter(scene, assets)` -> `{update(dt, life), object}`; `createBaker(...)` |
-  | `web/world/phone.js` | phone | `createPhone()` -> `{texture, overlayEl, update(state), setApp(app)}` |
-  | `web/world/hud.js` | hud | chat (with nickname), workspace bars, inner speech, clock/stage, honesty line |
-  | `web/world/minibrain.js` | hud | mini fibre brain; `flash(regions, color)` + pulse from chat box to brain |
-- URL params for tests/screenshots: `?cam=apartment|street|bakery|park|phone|brain`, `?q=low|medium|high`,
-  `?lab=1`, `?nofollow=1`. `window.__sub01` exposes `{ready: bool, fps: number, drawCalls, triangles}`.
-- Assets: `web/assets/` comes from branch `assets/cc0`, maintained by the user: CC0 Poly Haven HDRIs (`hdri/`),
-  PBR texture sets (`textures/<name>/*_diffuse|_nor_gl|_rough_1k.jpg`), Draco-compressed GLB models (`models/`), and
-  `CREDITS.md`. A Quaternius rigged character + animation library will arrive under `web/assets/character/`
-  (merge `origin/assets/cc0` again to pick it up). Streams do NOT download or add other assets and do not modify
-  these files; `web/assets/manifest.json` (assets stream) describes them for the loaders. Anything missing is built
-  procedurally and listed in `docs/real-world/STATUS.md`. Lazy-load per area; every loader has a procedural fallback.
-- Rendering: ACES filmic tone mapping, sRGB output, HDRI environment, soft shadows, bloom (+SSAO/GTAO on high),
-  day/night from Rome time (`tick.sleep.clock`), lit windows + street lamps at night, lab-mode toggle kept.
-  Targets: 60 fps desktop, 30 fps mid phone; quality switch in the HUD.
+## Client (web) — "the construct" (CHANGE OF DIRECTION: no photorealistic world)
+Main view: SUB-01 lives inside a world built from its own brain data. Own style: dark, orange/neon
+(#ff6a00 family, warm whites, deep blue-black). NOT a copy of The Matrix: no such name, no logos, no green code rain.
+The CC0 photoreal assets in `web/assets/` are no longer used by the main view (kept, credited, not loaded).
+- **Districts** = the 214 atlas regions: positions from the real centroids (`web/brain.json` nodes `q`, same order as
+  `tick.act`), spread out as a city (radial expansion + flattening onto a ground plane, deterministic); building
+  height/glow = live region activity (`tick.act` relative to each region's running baseline).
+- **Streets** = the real tractography: `web/fibres.bin` (n x pts x 3 float32, see `fibres.json`) + `fibres_ends.bin`
+  (int16 pair of atlas labels per fibre, `-1`/0 = unlabelled; map labels -> node index via `nodes[i].lab`) become light
+  roads between districts (bundled/subsampled per quality).
+- **Places** (life.py place -> district): home = default-network district (bed/window/table/desk/doors = default-network
+  regions around it), bakery/food = reward district (Accumbens/Caudate/Putamen; bakery_door/bakery_in/counter),
+  park = calm limbic/memory district (Hippocampus / limbic; park_gate/bench), fear district (Amygdala + salience)
+  stays dark unless `groups.fear`/`groups.salience` rise. street_* waypoints lie on the road between districts.
+- **Walking**: life.py stays the brain of behaviour. `tick.life` gains `route` (place names of the current walk,
+  start..goal) and `progress` (0..1 of walked distance, timed like today: WALK_SPEED on the waypoint graph). The
+  first-person camera travels along the real fibre path (shortest path over the region graph built from labelled fibre
+  ends, each hop following a representative fibre polyline) from the start district to the goal district at that progress.
+- **Chat rain**: each accepted `chat` message falls as orange "rain" made of its own words and lands on the districts
+  it stimulates (`regions` from chat.py's rule table), which flash (mini brain flashes too). If the message wins the
+  workspace (`speech.about == chat.cid`), show its inner line.
+- **Weather** = market (`tick.market`: pumping -> warm pulses; dumping -> glitches/distortion; choppy/calm).
+- **Sleep**: NREM -> city dims and slows; REM -> world warps and replays the day's messages as floating words
+  (déjà vu; `tick.events` of type replay). Night (Rome time) -> darker sky, lit roads.
+- **Views**: first person (default), orbit/overview, and the mini real-brain PiP (existing minibrain.js) always on.
+- Performance: phones 30 fps (quality low: instanced districts, <= ~3k fibres, no heavy post), desktop 60 fps
+  (medium/high: more fibres, bloom). One draw call per system where possible (InstancedMesh, merged LineSegments,
+  shader-driven activity via textures/attributes, no per-frame allocations).
+
+### Modules (`web/construct/`, ES modules, vendored three via the importmap in `web/life.html`)
+| file | owner stream | exports |
+|---|---|---|
+| `data.js` | core | `loadBrainData(quality)` -> `{nodes, districts:[{i,name,group,pos:Vector3,role}], placeDistrict(place)->i, roads:{positions, pairs}, graph, pathBetween(i,j)->[Vector3...], districtOf(role)}` |
+| `main.js` | core / integration | boot, websocket, render loop, views switch, URL params, hooks below |
+| `city.js` | city | `createCity(scene, data, quality)` -> `{update(dt, env, act), flash(regions, color), setFear(k), object}` |
+| `travel.js` | travel | `createTravel(camera, controls, data)` -> `{update(dt, life, env), setView('first'|'orbit'), view}` |
+| `fx.js` | fx | `createFx(renderer, scene, camera, data, quality)` -> `{rain(msg), innerLine(speech), weather(market), update(dt, env), render()}` (owns post-processing: bloom, glitch, warp) |
+| `web/world/hud.js`, `minibrain.js`, `phone.js`, `net.js`, `quality.js` | hud / foundation | reused from the foundation (hud adds a view switch; phone = HUD overlay only) |
+env = {romeHour, dayK, night, stage, lab, sleep, quality, market, groups}. URL params: `?view=first|orbit`,
+`?q=low|medium|high`, `?nofollow=1`; `window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view}`.
+
+### Server additions for the construct
+- `tick.life.route`, `tick.life.progress`; `tick.market` (pumping/dumping/choppy/calm, existing market_mood).
+- Demo-only flags (require `--demo`): `--life-activity <act>`, `--force-market pump|dump`, `--force-stage NREM|REM`.
 
 ## Tests
 - `tests/test_mind.py`, `tests/test_life.py`, existing `tests/test_sleep.py` (pytest).
-- `tests/e2e/`: headless screenshot check (day, night, lab, phone, bakery, chat flash) against
-  `live_server.py --demo --start HH:MM`; fails on console errors or blank canvas.
+- `tests/e2e/`: headless screenshot check against `live_server.py --demo`: home, walking the fibre road to the reward
+  district, chat rain landing, dump glitch, night, REM (+ GIF, + 390x844 mobile); fails on console errors, blank
+  canvas or missing honesty line.
