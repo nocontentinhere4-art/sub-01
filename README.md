@@ -25,8 +25,10 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ## Resting-state activity (real recorded brain activity)
 
-`process_rest.py N` streams the first N of the 132 resting-state runs listed in `rest_runs.txt`
-from OpenNeuro, keeps a region x time series per run in `out/rest/` (~240 KB each) and deletes
-the raw file. It only needs `out/labels_t1.nii.gz` and `out/t1_brain_1mm.nii.gz` (skull-stripped,
+`process_rest.py N [--workers 6]` streams the first N of the 132 resting-state runs listed in `rest_runs.txt`
+from OpenNeuro in parallel worker processes (~1.9 GB RAM each), keeps a region x time series per run in
+`out/rest/` (~240 KB each) and deletes the raw file. Runs already in `out/rest/` are skipped. It only needs `out/labels_t1.nii.gz` and `out/t1_brain_1mm.nii.gz` (skull-stripped,
 committed), so it runs on a fresh clone: `pip install -r requirements.txt && python process_rest.py 132`.
-Sanity check on run 1: homotopic (left/right) correlation 0.52 vs 0.22 for all pairs.
+After processing (or with `--validate` alone) it runs a QC: mean homotopic (left/right, name-matched) correlation
+vs mean correlation over all pairs, per run, written to `out/rest/qc.json`. Runs with homotopic < 0.3 (likely bad
+registration or motion) are moved to `out/rest/rejected/` (not committed) and not re-downloaded on later runs.
