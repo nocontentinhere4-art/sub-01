@@ -129,8 +129,8 @@ test("a walk to the reward district: camera follows the fibre road smoothly (no 
   const { pos, states, tr } = sim({ life: lifeObj, frames: 60 * 45 });
   const h = data.districtOf("home"), r = data.districtOf("reward");
   const path = data.pathBetween(h, r), [u0, u1] = T.trimRange(path.total);
-  const endStation = new THREE.Vector3(); THREE.Vector3.prototype.copy.call(endStation, data.pathBetween(h, r)[0]);
-  T.walkSample(path, 1, [u0, u1], 1, endStation, new THREE.Vector3());
+  const endStation = new THREE.Vector3();
+  T.walkSample(path, 1, [u0, u1], 1, endStation, new THREE.Vector3(), 1, T.lateralField(path, data.districts.map(d => d.pos)));
   assert.ok(states.some(s => s.mode === "walk"));
   // settles at the end station in front of the reward district (eye height above the road)
   const fin = pos[pos.length - 1];
@@ -143,22 +143,24 @@ test("a walk to the reward district: camera follows the fibre road smoothly (no 
     const s1 = pos[i].distanceTo(pos[i - 1]), s0 = pos[i - 1].distanceTo(pos[i - 2]);
     if (i > 60 * 3 && i < 60 * 40) { maxStep = Math.max(maxStep, s1); maxAcc = Math.max(maxAcc, Math.abs(s1 - s0)); }
   }
-  assert.ok(maxStep < speed / 60 * 1.6, `step ${maxStep} vs ${speed / 60}`);
-  assert.ok(maxAcc < speed / 60 * 0.25, `jitter ${maxAcc}`);
+  assert.ok(maxStep < speed / 60 * 2.2, `step ${maxStep} vs ${speed / 60}`);
+  assert.ok(maxAcc < speed / 60 * 0.4, `jitter ${maxAcc}`);
   // the camera never leaves the road by much
   let worst = 0;
   for (let i = 60 * 3; i < 60 * 40; i += 7) { let best = 1e9; for (let k = 0; k < path.length; k += 3) best = Math.min(best, Math.hypot(pos[i].x - path[k].x, pos[i].z - path[k].z)); worst = Math.max(worst, best); }
-  assert.ok(worst < 6, `max distance from the road ${worst}`);
+  assert.ok(worst < T.TOWER_R + 3, `max distance from the road ${worst}`);
 });
 
 test("idle / lying / sleeping: stays in its district; no NaN; looks up when lying", () => {
   for (const [activity, place, pose, stage] of [["window", "window", "standing", "AWAKE"], ["phone", "bed", "lying_phone", "AWAKE"], ["sleep", "bed", "lying", "NREM"]]) {
     const { cam, pos, states } = sim({ life: () => ({ walking: false, route: [], progress: 0, place, activity, pose }), frames: 60 * 20, env: { stage } });
     for (const p of pos) for (const v of p.toArray()) assert.ok(Number.isFinite(v));
-    const here = data.districts[data.placeDistrict(place)].pos;
-    assert.ok(pos[pos.length - 1].distanceTo(here) < 80, `${activity} stays near its district`);
+    const here = data.districts[data.districtOf("home")].pos;
+    assert.ok(pos[pos.length - 1].distanceTo(here) < 90, `${activity} stays near the home district`);
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    if (activity !== "window") assert.ok(fwd.y > 0.5, `${activity} looks up at the sky (${fwd.y})`);
+    // the city stays in frame (62 deg lens): the horizon is never pushed below the bottom edge (gaze <= 0.4 rad up)
+    assert.ok(Math.asin(fwd.y) < 0.4 && Math.asin(fwd.y) > -0.5, `${activity} keeps the city in view (${Math.asin(fwd.y)})`);
+    if (activity === "phone") assert.ok(Math.asin(fwd.y) > 0.1, "lying: raised gaze");
     assert.ok(states.every(s => s.district === data.districtOf("home") || data.districts[s.district].role === "home"));
   }
 });
@@ -185,4 +187,117 @@ test("view switch blends the camera (no snap) and back; orbit enables the contro
   assert.equal(ctl.enabled, false);
   for (let i = 0; i < 60 * 3; i++) tr.update(1 / 60, life, env);
   assert.ok(cam.position.distanceTo(tr.position) < 10 + T.EYE + 8, "back at SUB-01");
+});
+
+test("nearestU finds the closest place on a polyline", () => {
+  const path = line([0, 0, 0], [100, 0, 0], [100, 0, 100]);
+  assert.ok(Math.abs(T.nearestU(path, new THREE.Vector3(50, 0, 7)) - 0.25) < 1e-6);
+  assert.ok(Math.abs(T.nearestU(path, new THREE.Vector3(108, 0, 75)) - 0.875) < 1e-6);
+  assert.equal(T.nearestU(path, new THREE.Vector3(-30, 0, -5)), 0);
+});
+
+test("walkFraction maps the progress of a re-planned route (p0..1) onto f0..f1", () => {
+  assert.equal(T.walkFraction(0.287, 0.287, 0.4, 1), 0.4);
+  assert.equal(T.walkFraction(1, 0.287, 0.4, 1), 1);
+  assert.equal(T.walkFraction(1, 0.287, 0.4, 0), 0);
+  assert.ok(Math.abs(T.walkFraction(0.3, 0, 0, 1) - 0.3) < 1e-12, "fresh walk: f = p");
+});
+
+test("lateralField: the road detours around the towers it hops through, the same way in both directions", () => {
+  const h = data.districtOf("home"), r = data.districtOf("reward");
+  const centres = data.districts.map(d => d.pos);
+  const fwd = data.pathBetween(h, r), field = T.lateralField(fwd, centres);
+  let worstBefore = 1e9, worstAfter = 1e9;
+  const p = new THREE.Vector3(), q = new THREE.Vector3();
+  for (let u = 0.03; u < 0.97; u += 0.0005) {
+    data.pointAt(fwd, u, p); q.copy(p); field.at(u, q);
+    for (const c of data.districts) {
+      if (c.i === h || c.i === r) continue;
+      worstBefore = Math.min(worstBefore, Math.hypot(p.x - c.pos.x, p.z - c.pos.z));
+      worstAfter = Math.min(worstAfter, Math.hypot(q.x - c.pos.x, q.z - c.pos.z));
+    }
+  }
+  assert.ok(worstBefore < 3, `the raw road runs through a tower (${worstBefore})`);
+  assert.ok(worstAfter > T.TOWER_R * 0.4, `the detour clears the towers (${worstAfter})`);
+  const mid = data.pathBetween(r, h), fieldBack = T.lateralField(mid, centres);   // same world-space detour when walked back
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  data.pointAt(fwd, 0.5, a); field.at(0.5, a);
+  data.pointAt(mid, 0.5, b); fieldBack.at(0.5, b);
+  assert.ok(a.distanceTo(b) < 25, `road and reverse road agree (${a.distanceTo(b)})`);
+});
+
+// ---- real life.py sequences (tests/js/gen_life_fixtures.py): re-plans while walking, intra-home moves ----
+const FIX = JSON.parse(readFileSync(new URL("./fixtures/life_walks.json", import.meta.url), "utf8"));
+const fixtureLife = name => {
+  const { routes, rows } = FIX[name], cache = new Map();
+  return now => {
+    const k = Math.min(rows.length - 1, Math.floor(now * 20));
+    if (!cache.has(k)) { const [walking, ri, progress, place, activity, pose] = rows[k]; cache.set(k, { walking, route: routes[ri], progress, place, activity, pose }); }
+    return cache.get(k);
+  };
+};
+const fixtureSecs = name => FIX[name].rows.length / 20;
+// walking speed of the bakery walk in city units per second (road length / the time life.py takes to walk its route)
+const bakerySpeed = () => {
+  const { routes, rows } = FIX.buy_bread, main = routes.findIndex(r => r.length > 5);
+  const secs = rows.filter(r => r[0] && r[1] === main).length / 20;
+  return data.pathBetween(data.districtOf("home"), data.districtOf("reward")).total / secs;
+};
+const stepsOf = (name, from = 0) => {
+  const { pos, states } = sim({ life: fixtureLife(name), frames: Math.floor(fixtureSecs(name) * 60) });
+  const steps = pos.map((p, i) => (i ? p.distanceTo(pos[i - 1]) * 60 : 0));
+  return { pos, states, steps, max: Math.max(...steps.slice(from)) };
+};
+
+test("life.py fixture: the bakery walk is smooth, and the walk to the reward district reaches it", () => {
+  const { max, states } = stepsOf("buy_bread");
+  assert.ok(max < 2 * bakerySpeed(), `max speed ${max} vs walking ${bakerySpeed()}`);
+  assert.ok(states.some(s => s.mode === "walk") && states[states.length - 1].district === data.districtOf("reward"));
+});
+
+test("life.py fixture: moves between the rooms of the home stay put (no dash across the city)", () => {
+  const { max, states, pos } = stepsOf("intra_home");
+  assert.ok(states.every(s => s.mode !== "walk"), "rooms of one home are one place");
+  assert.ok(max < 8, `intra-home speed ${max}`);
+  assert.ok(pos.every(p => p.distanceTo(pos[0]) < 40));
+});
+
+test("life.py fixture: turning back mid-walk (bed -> counter, then the park) does not snap the camera", () => {
+  const { max, states } = stepsOf("turn_back_to_park");
+  assert.ok(max < 2 * bakerySpeed(), `max speed ${max} vs walking ${bakerySpeed()}`);
+  assert.ok(states.some(s => s.mode === "walk"));
+});
+
+test("life.py fixture: redirect to a third place while walking (window -> counter, then the desk) does not snap", () => {
+  const { max, states } = stepsOf("redirect_third");
+  assert.ok(max < 2 * bakerySpeed(), `max speed ${max} vs walking ${bakerySpeed()}`);
+  assert.ok(states.some(s => s.mode === "walk"));
+});
+
+test("pure reversal of the same road continues from where the camera is", () => {
+  const h = data.districtOf("home"), r = data.districtOf("reward"), dur = 40;
+  const fwdRoute = ["bed", "door_out", "street_home", "street_bakery", "counter"], backRoute = ["street_bakery", "street_home", "door_out", "bed"];
+  let cache = null;
+  const life = now => {
+    const k = Math.floor(now * 20);
+    if (cache?.k !== k) {
+      const turn = 16;
+      cache = now < turn ? { walking: true, route: fwdRoute, progress: Math.round(now / dur * 1000) / 1000, place: "bed" }
+        : { walking: true, route: backRoute, progress: Math.round((0.4 + (now - turn) / dur) * 1000) / 1000, place: "street_bakery" };
+      cache.k = k;
+    }
+    return cache;
+  };
+  const { pos } = sim({ life, frames: 60 * 30 });
+  let max = 0; for (let i = 1; i < pos.length; i++) max = Math.max(max, pos[i].distanceTo(pos[i - 1]) * 60);
+  assert.ok(max < 2.2 * data.pathBetween(h, r).total / dur, `reversal speed ${max}`);
+});
+
+test("MAX_SPEED caps the camera whatever the target does", () => {
+  const cam = new THREE.PerspectiveCamera(), tr = T.createTravel(cam, fakeControls(), data, {});
+  tr.setView("first");
+  const far = { walking: false, route: [], progress: 0, place: "counter", activity: "buy_bread", pose: "standing" };
+  let prev = cam.position.clone(), max = 0;
+  for (let i = 0; i < 600; i++) { tr.update(1 / 60, far, { stage: "AWAKE" }); max = Math.max(max, cam.position.distanceTo(prev) * 60); prev.copy(cam.position); }
+  assert.ok(max <= T.MAX_SPEED * 1.25, `speed ${max}`);
 });

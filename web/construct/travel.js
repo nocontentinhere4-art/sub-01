@@ -22,6 +22,10 @@ export const EYE = 4.5;              // camera height above the road / ground (c
 export const STANDOFF = 56;          // distance in front of a district where SUB-01 stands
 export const LOOK_AHEAD = 30;        // look this far ahead along the road while walking
 const BLEND_S = 1.5;                 // view switch duration
+export const TOWER_R = 15;           // the camera keeps this far (xz) from the centre of a district it passes
+export const MAX_SPEED = 64;         // city units / s: hard cap of the first-person camera (walks run at ~25-35)
+const OFFSET_S = 1.75;               // a walk that starts away from its road blends in over this time
+const FOLLOW = 0.6;                  // orbit: how far towards SUB-01 the view target sits
 
 // ---------------- pure helpers (unit-tested in tests/js/travel.test.mjs) ----------------
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -55,14 +59,85 @@ export function trimRange(total, standoff = STANDOFF) {
   return [s / total, 1 - s / total];
 }
 
+/** Closest point of the polyline to p (xz plane): its position along the road as a fraction 0..1 of the total length. */
+export function nearestU(path, p) {
+  const total = Math.max(1e-6, path.total);
+  let best = Infinity, bu = 0;
+  for (let k = 0; k + 1 < path.length; k++) {
+    const a = path[k], b = path[k + 1], sx = b.x - a.x, sz = b.z - a.z, l2 = sx * sx + sz * sz;
+    const s = l2 > 1e-9 ? clamp(((p.x - a.x) * sx + (p.z - a.z) * sz) / l2, 0, 1) : 0;
+    const d = Math.hypot(a.x + sx * s - p.x, a.z + sz * s - p.z);
+    if (d < best) { best = d; bu = (path.lengths[k] + (path.lengths[k + 1] - path.lengths[k]) * s) / total; }
+  }
+  return bu;
+}
+
+/**
+ * Detour around the district towers a road runs through (the roads hop through district centres, where a tower stands):
+ * near every passed centre the road is moved sideways (along its own normal, in a smooth bump) until it clears the
+ * centre by `R` (xz). Which side is fixed in the world (independent of the direction of travel), so a road and its
+ * reverse agree. -> {at(u, out)} adds the offset at u.
+ */
+export function lateralField(path, centres, R = TOWER_R, spacing = 2) {
+  const total = Math.max(1e-6, path.total), n = Math.max(2, Math.ceil(total / spacing)), H = 3 * R;
+  const dx = new Float32Array(n + 1), dz = new Float32Array(n + 1), nx = new Float32Array(n + 1), nz = new Float32Array(n + 1);
+  const p = new THREE.Vector3(), q = new THREE.Vector3(), eps = Math.min(0.02, 4 / total);
+  for (let i = 0; i <= n; i++) {                                         // left normal of the road at every sample
+    pointAt(path, Math.max(0, i / n - eps), p); pointAt(path, Math.min(1, i / n + eps), q);
+    const l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+    nx[i] = -(q.z - p.z) / l; nz[i] = (q.x - p.x) / l;
+  }
+  const first = path[0], last = path[path.length - 1];
+  for (const c of centres) {
+    if ((first && Math.hypot(first.x - c.x, first.z - c.z) < 1) || (last && Math.hypot(last.x - c.x, last.z - c.z) < 1)) continue;   // the stations' own districts
+    let best = Infinity, bk = -1, bs = 0;
+    for (let k = 0; k + 1 < path.length; k++) {
+      const a = path[k], b = path[k + 1], sx = b.x - a.x, sz = b.z - a.z, l2 = sx * sx + sz * sz;
+      const s = l2 > 1e-9 ? clamp(((c.x - a.x) * sx + (c.z - a.z) * sz) / l2, 0, 1) : 0;
+      const d = Math.hypot(a.x + sx * s - c.x, a.z + sz * s - c.z);
+      if (d < best) { best = d; bk = k; bs = s; }
+    }
+    if (bk < 0 || best >= R) continue;
+    const a = path[bk], b = path[bk + 1], sl = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+    const uc = (path.lengths[bk] + (path.lengths[bk + 1] - path.lengths[bk]) * bs) / total;
+    const lx = -(b.z - a.z) / sl, lz = (b.x - a.x) / sl;                // left normal at the closest approach
+    const lat = (a.x + (b.x - a.x) * bs - c.x) * lx + (a.z + (b.z - a.z) * bs - c.z) * lz;
+    let side = Math.sign(lat);
+    if (Math.abs(lat) < 0.5) side = (lx > 0 || (lx === 0 && lz > 0)) ? 1 : -1;   // on the centre: fixed world side (+x / +z)
+    const shift = side * (R - Math.abs(lat)), hu = H / total;
+    for (let i = Math.max(0, Math.floor((uc - hu) * n)); i <= Math.min(n, Math.ceil((uc + hu) * n)); i++) {
+      const x = Math.abs(i / n - uc) / hu;
+      if (x >= 1) continue;
+      const w = 0.5 * (1 + Math.cos(Math.PI * x)) * shift;
+      dx[i] += nx[i] * w; dz[i] += nz[i] * w;
+    }
+  }
+  const rad = Math.max(1, Math.round(R * 0.35 / spacing)), tmpA = new Float32Array(n + 1);   // round off kinks of the road
+  for (const arr of [dx, dz]) for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i <= n; i++) { let sum = 0, cnt = 0; for (let k = Math.max(0, i - rad); k <= Math.min(n, i + rad); k++) { sum += arr[k]; cnt++; } tmpA[i] = sum / cnt; }
+    arr.set(tmpA);
+  }
+  return {
+    at(u, out) {
+      const f = clamp(u, 0, 1) * n, i = Math.min(n - 1, Math.floor(f)), w = f - i;
+      out.x += dx[i] + (dx[i + 1] - dx[i]) * w; out.z += dz[i] + (dz[i + 1] - dz[i]) * w;
+      return out;
+    },
+  };
+}
+
 /** Position on the road (and a point `look` units ahead in the direction of travel) at walk fraction f (0..1). */
-export function walkSample(path, f, range, look, outPos, outAhead, dir = 1) {
+export function walkSample(path, f, range, look, outPos, outAhead, dir = 1, field = null) {
   const [u0, u1] = range, total = Math.max(1e-6, path.total);
-  const u = u0 + (u1 - u0) * clamp(f, 0, 1);
+  const u = u0 + (u1 - u0) * clamp(f, 0, 1), ua = clamp(u + dir * look / total, 0, 1);
   pointAt(path, u, outPos);
-  pointAt(path, clamp(u + dir * look / total, 0, 1), outAhead);
+  pointAt(path, ua, outAhead);
+  if (field) { field.at(u, outPos); field.at(ua, outAhead); }
   return outPos;
 }
+
+/** Walk fraction of the road for the server progress p: progress from `p0` (the switch) to 1 runs f0 -> f1. */
+export const walkFraction = (p, p0, f0, f1) => f0 + (f1 - f0) * clamp((p - p0) / Math.max(1e-6, 1 - p0), 0, 1);
 
 /**
  * Server progress arrives at 20 Hz, quantised to 0.001: turn it into a smooth value. The rate is the slope over the
@@ -94,12 +169,19 @@ export function createTravel(camera, controls, data, { scene } = {}) {
   const groupIdx = {};
   D.forEach(d => (groupIdx[d.group] ||= []).push(d.i));
 
+  // A place is its district's MAIN district: every room of the home (bed, window, desk, table ...) is one place for
+  // travel, as are the bakery places and the park places. Only walks between different roles ride a road.
   const districtFor = place => {
-    const d = data.placeDistrict(place);
-    if (d != null) return d;
-    const role = STREET_ROLE[place];
-    return role ? data.districtOf(role) : null;
+    let d = data.placeDistrict(place);
+    if (d == null) { const role = STREET_ROLE[place]; d = role ? data.districtOf(role) : null; }
+    if (d == null) return null;
+    const r = D[d].role;
+    return r && data.roles[r] && data.roles[r].length ? data.roles[r][0] : d;
   };
+
+  // ---- tower detours, per road (cached) ----
+  const centres = D.map(d => d.pos), fields = new Map();
+  const fieldOf = path => { let f = fields.get(path); if (!f) fields.set(path, f = lateralField(path, centres)); return f; };
 
   // ---- stations: where SUB-01 stands in front of a district (the ends of the roads) ----
   const stations = new Map();
@@ -109,7 +191,7 @@ export function createTravel(camera, controls, data, { scene } = {}) {
     s = new THREE.Vector3();
     const [from, to] = i === homeD ? [homeD, rewardD] : [i, homeD];
     const path = from !== to ? data.pathBetween(from, to) : null;
-    if (path && path.total > STANDOFF * 2) pointAt(path, trimRange(path.total)[0], s);
+    if (path && path.total > STANDOFF * 2) { const u = trimRange(path.total)[0]; pointAt(path, u, s); fieldOf(path).at(u, s); }
     else {
       const p = D[i].pos, len = Math.hypot(p.x, p.z), out = len > 30;
       s.set(p.x + (out ? p.x / len : 0) * STANDOFF, p.y, p.z + (out ? p.z / len : 1) * STANDOFF);
@@ -122,11 +204,12 @@ export function createTravel(camera, controls, data, { scene } = {}) {
   const pos = new Damped(3), yaw = new Damped(1), pitch = new Damped(1);
   const tracker = new ProgressTracker();
   const here = new THREE.Vector3();                 // SUB-01 on the ground
+  const tp = new Float64Array(3), prevPos = new Float64Array(3), offV = new THREE.Vector3();
   const tPos = new THREE.Vector3(), ahead = new THREE.Vector3(), tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
   const fromPos = new THREE.Vector3(), fpPos = new THREE.Vector3(), fpQ = new THREE.Quaternion();
   const rig = new THREE.PerspectiveCamera();
   let t = 0, view = "first", walk = null, prevWalk = null, lastLife = null, lastProg = -1, lastDistrict = homeD;
-  let walkW = 0, bobPhase = 0, lastWalking = false, mode = "idle";
+  let walkW = 0, bobPhase = 0, lastWalking = false, mode = "idle", walkKey = null, lastWalkT = -1e9;
   let focus = -1, focusUntil = 0, focusNext = 6, seed = 12345;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   let userYaw = 0, userPitch = 0, dragging = false, dragAt = -1e9, dragId = null, lx = 0, ly = 0, lastTouch = -1e9;
@@ -137,18 +220,38 @@ export function createTravel(camera, controls, data, { scene } = {}) {
     outQ.copy(rig.quaternion);
   }
 
-  function startWalk(route, p0) {
+  // A walk starts (or the route changes while walking: life.py re-plans mid-walk and its progress on the new route does
+  // not start at 0). Fresh walk: progress p runs the road from the start station. Mid-walk switch: the camera keeps
+  // the place it is at - the same road (turn-back) continues from the current fraction, a new road is entered at its
+  // point nearest to the camera, and progress p0..1 of the new route maps to that point .. the goal station.
+  function startWalk(route, pInit) {
     const a = districtFor(route[0]), b = districtFor(route[route.length - 1]);
-    if (a == null || b == null || a === b) { walk = null; return; }       // a walk inside one district: stay put
-    let path, pa = a, pb = b, f0 = 0;
-    if (prevWalk && lastWalking && ((prevWalk.pa === a && prevWalk.pb === b) || (prevWalk.pa === b && prevWalk.pb === a))) {
+    walkKey = route[0] + ">" + route[route.length - 1];
+    const old = walk;
+    walk = null;
+    if (a == null || b == null || a === b) { if (b != null) lastDistrict = b; return; }   // inside one place: stay put
+    const mid = !!prevWalk && t - lastWalkT < 1.5;
+    let path, pa = a, pb = b, f0 = 0, p0 = 0;
+    const range0 = () => trimRange(path.total);
+    if (mid && ((prevWalk.pa === a && prevWalk.pb === b) || (prevWalk.pa === b && prevWalk.pb === a))) {
       path = prevWalk.path; pa = prevWalk.pa; pb = prevWalk.pb;           // turning back: the same road, the other way
-      f0 = prevWalk.f;
-    } else path = data.pathBetween(a, b);
-    walk = { a, b, pa, pb, path, range: trimRange(path.total), f0, f1: b === pb ? 1 : 0, f: f0, key: route[0] + ">" + route[route.length - 1] };
-    fromPos.set(pos.x[0], pos.x[1] - EYE, pos.x[2]);
-    tracker.reset(clamp(p0, 0, 1), t);
+      f0 = old ? old.f : prevWalk.f; p0 = pInit;
+    } else {
+      path = data.pathBetween(a, b);
+      if (mid) {
+        fromPos.set(pos.x[0], 0, pos.x[2]);
+        const [u0, u1] = range0();
+        f0 = clamp((nearestU(path, fromPos) - u0) / Math.max(1e-6, u1 - u0), 0, 1); p0 = pInit;
+      }
+    }
+    const f1 = b === pb ? 1 : 0;
+    walk = { a, b, pa, pb, path, range: range0(), f0, f1, p0, f: walkFraction(pInit, p0, f0, f1), field: fieldOf(path), t0: t, off: offV.clone() };
+    tracker.reset(clamp(pInit, 0, 1), t);
     lastProg = -1;
+    fromPos.set(pos.x[0], pos.x[1] - EYE, pos.x[2]);                     // the camera may be away from the road: blend in
+    walkSample(path, walk.f, walk.range, 1, tmp, tmp2, f1 >= f0 ? 1 : -1, walk.field);
+    walk.off.subVectors(fromPos, tmp); walk.off.y = 0;
+    if (!mid) { const len = walk.off.length(); if (len < 0.5) walk.off.set(0, 0, 0); }
   }
 
   function update(dt, life, env) {
@@ -160,19 +263,19 @@ export function createTravel(camera, controls, data, { scene } = {}) {
     const routeOk = !!(life && life.walking && Array.isArray(life.route) && life.route.length >= 2);
     if (routeOk) {
       const key = life.route[0] + ">" + life.route[life.route.length - 1];
-      if (!lastWalking || !walk || walk.key !== key) startWalk(life.route, +life.progress || 0);
+      if (!lastWalking || walkKey !== key) startWalk(life.route, +life.progress || 0);
       if (walk) {
         const p = +life.progress || 0;
         if (life !== lastLife || p !== lastProg) { tracker.push(p, t); lastProg = p; }
-        walk.f = walk.f0 + (walk.f1 - walk.f0) * tracker.update(dt, t);
+        walk.f = walkFraction(tracker.update(dt, t), walk.p0, walk.f0, walk.f1);
       }
     } else if (walk) {                                                    // arrived (or the walk was cancelled)
-      if (tracker.value > 0.6) lastDistrict = walk.b;
+      lastDistrict = walk.b;
       walk = null;
     }
     lastLife = life;
     const walking = routeOk && !!walk;
-    if (walking) prevWalk = walk;
+    if (walking) { prevWalk = walk; lastWalkT = t; }
     lastWalking = routeOk;
     walkW += ((walking ? 1 : 0) - walkW) * (1 - Math.exp(-dt * 3));
 
@@ -180,8 +283,8 @@ export function createTravel(camera, controls, data, { scene } = {}) {
     let yawT, pitchT, sPos = 0.6, sYaw = 0.45, sPitch = 0.6;
     if (walking) {
       mode = "walk";
-      walkSample(walk.path, walk.f, walk.range, LOOK_AHEAD, tPos, ahead, walk.f1 >= walk.f0 ? 1 : -1);
-      tPos.lerpVectors(fromPos, tPos, smooth01(tracker.value / 0.1));      // leave the station smoothly
+      walkSample(walk.path, walk.f, walk.range, LOOK_AHEAD, tPos, ahead, walk.f1 >= walk.f0 ? 1 : -1, walk.field);
+      tPos.addScaledVector(walk.off, 1 - smooth01((t - walk.t0) / OFFSET_S));   // a walk that starts off the road blends in
       here.copy(tPos);
       tPos.y += EYE;
       tmp.subVectors(ahead, tPos);
@@ -199,15 +302,15 @@ export function createTravel(camera, controls, data, { scene } = {}) {
       const toward = tmp.lengthSq() > 1e-4 ? yawOf(tmp.x, tmp.z) : yaw.x[0];
       const dist = Math.max(8, Math.hypot(tmp.x, tmp.z));
       const lying = life?.activity === "sleep" || life?.activity === "phone" || /lying/.test(life?.pose || "");
-      if (sleeping) {                                                      // slow drift, looking at the sky
+      if (sleeping) {                                                      // slow drift high over the home district, the city stays in frame
         mode = "sleep";
         const th = t * 0.03;
-        tPos.x += Math.cos(th) * 10; tPos.z += Math.sin(th) * 10; tPos.y += 7 + 3 * Math.sin(t * 0.05);
-        yawT = toward + t * 0.035; pitchT = 0.95 + 0.05 * Math.sin(t * 0.09);
+        tPos.x += Math.cos(th) * 10; tPos.z += Math.sin(th) * 10; tPos.y += 14 + 3 * Math.sin(t * 0.05);
+        yawT = toward + 0.5 * Math.sin(t * 0.04); pitchT = -0.06 + 0.04 * Math.sin(t * 0.09);
         sPos = 1.4; sYaw = 1.6; sPitch = 1.6;
-      } else if (lying) {                                                  // in bed with the phone: looks up at the sky
+      } else if (lying) {                                                  // in bed with the phone: raised gaze, towers and roads still in view
         mode = "lying";
-        yawT = toward + 0.35 * Math.sin(t * 0.07); pitchT = 0.78 + 0.06 * Math.sin(t * 0.13);
+        yawT = toward + 0.35 * Math.sin(t * 0.07); pitchT = 0.3 + 0.04 * Math.sin(t * 0.13);
         sPos = 0.8; sYaw = 1.2; sPitch = 1.2;
       } else {
         mode = "idle";
@@ -240,7 +343,13 @@ export function createTravel(camera, controls, data, { scene } = {}) {
     if (!dragging && t - dragAt > 2.5) { const k = Math.exp(-dt * 0.9); userYaw *= k; userPitch *= k; }
     yawT += userYaw; pitchT = clamp(pitchT + userPitch, -0.6, 1.3);
 
-    pos.step([tPos.x, tPos.y, tPos.z], sPos, dt);
+    prevPos.set(pos.x);
+    tp[0] = tPos.x; tp[1] = tPos.y; tp[2] = tPos.z;
+    pos.step(tp, sPos, dt);
+    {                                                                      // the camera never outruns MAX_SPEED (re-plans, station changes)
+      const dx = pos.x[0] - prevPos[0], dy = pos.x[1] - prevPos[1], dz = pos.x[2] - prevPos[2], d = Math.hypot(dx, dy, dz), lim = MAX_SPEED * dt;
+      if (d > lim && dt > 0) { const k = lim / d; for (let c = 0; c < 3; c++) { pos.x[c] = prevPos[c] + (pos.x[c] - prevPos[c]) * k; pos.v[c] *= k; } }
+    }
     yaw.step(yawT, sYaw, dt, true);
     pitch.step(pitchT, sPitch, dt);
 
@@ -270,7 +379,7 @@ export function createTravel(camera, controls, data, { scene } = {}) {
       const follow = !!env?.follow;
       controls.enablePan = !follow;
       if (follow) {                                                        // the target drifts towards where SUB-01 is
-        tmp.set(here.x * 0.35, 0, here.z * 0.35);
+        tmp.set(here.x * FOLLOW, 0, here.z * FOLLOW);
         tmp2.copy(tmp).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * 0.5));
         controls.target.add(tmp2); camera.position.add(tmp2);
       }
@@ -286,8 +395,8 @@ export function createTravel(camera, controls, data, { scene } = {}) {
   let blend = null, ready = false;
   function computeOrbitGoal() {
     const R = data.radius;
-    orbitGoal.target.set(here.x * 0.35, 0, here.z * 0.35);
-    orbitGoal.pos.set(here.x * 0.35 + R * 0.12, R * 1.0, here.z * 0.35 + R * 1.1);
+    orbitGoal.target.set(here.x * FOLLOW, 0, here.z * FOLLOW);
+    orbitGoal.pos.set(here.x * FOLLOW + R * 0.12, R * 1.0, here.z * FOLLOW + R * 1.1);
     setPose(orbitGoal.q, orbitGoal.pos, orbitGoal.target);
   }
   function enterOrbit() {
@@ -302,6 +411,7 @@ export function createTravel(camera, controls, data, { scene } = {}) {
     ready = true;
     view = next; api.view = view;
     controls.enabled = false; controls.autoRotate = false;
+    dragging = false; dragId = null;
     if (view === "orbit") computeOrbitGoal();
     if (first || instant) {
       blend = null;
@@ -318,6 +428,7 @@ export function createTravel(camera, controls, data, { scene } = {}) {
       lastTouch = t;
       if (view !== "first" || blend || dragging) return;
       dragging = true; dragId = e.pointerId; lx = e.clientX; ly = e.clientY;
+      try { el.setPointerCapture?.(e.pointerId); } catch { /* synthetic pointer: no capture */ }
     });
     el.addEventListener("pointermove", e => {
       if (!dragging || e.pointerId !== dragId) return;
@@ -325,9 +436,15 @@ export function createTravel(camera, controls, data, { scene } = {}) {
       userPitch = clamp(userPitch - (e.clientY - ly) * 0.003, -0.5, 0.5);
       lx = e.clientX; ly = e.clientY; dragAt = t;
     });
-    const end = e => { if (dragging && e.pointerId === dragId) { dragging = false; dragAt = t; } };
+    const end = e => { if (dragging && e.pointerId === dragId) { dragging = false; dragAt = t; try { el.releasePointerCapture?.(e.pointerId); } catch { /* already released */ } } };
     el.addEventListener("pointerup", end);
     el.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", end);
+    if (typeof window !== "undefined" && window.addEventListener) {        // released over the side panel / outside the window
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+      window.addEventListener("blur", () => { if (dragging) { dragging = false; dragAt = t; } });
+    }
   }
   controls.addEventListener?.("start", () => { lastTouch = t; });
   controls.addEventListener?.("end", () => { lastTouch = t; });
