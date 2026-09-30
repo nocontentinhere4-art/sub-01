@@ -117,6 +117,18 @@ The CC0 photoreal assets in `web/assets/` are no longer used by the main view (k
 env = {romeHour, dayK, night, stage, lab, sleep, quality, market, groups}. URL params: `?view=first|orbit`,
 `?q=low|medium|high`, `?nofollow=1`; `window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view}`.
 
+Core additions (as implemented on `feature/rw-core`; other streams build on these shapes):
+- `data.js` also returns `roles {home, reward, park, fear, salience: [i...]}`, `pointAt(path, u, out)`,
+  `mapPoint(x, y, z, out)` (brain mm -> city), `radius`, `scale`, `lab2node`, and `groupRegions {group: [i...]}`
+  (brain.json groups + `language`, same rule as brain_sim.py; fallback for `hello.regions`). `pathBetween` returns a
+  Vector3 array with `.lengths` (cumulative), `.total`, `.hops`.
+- `travel.js`: `createTravel(camera, controls, data, {scene})`, also exposes `position`.
+- `fx.js`: also `resize(w, h)` (and optional `dispose()`, called when a quality switch recreates fx with the new preset).
+- `city.flash(regions)` / `minibrain.flash(regions)` receive region indices: `chat.regions` plus every group in
+  `chat.networks` expanded through `hello.regions`. `fx.rain(msg)` gets `msg.regions` = the topical `chat.regions`.
+- `web/life.html`: `#view` (view switch container, was `#lab`) and `#fx` (overlay for rain / inner line text).
+- env extras: `groupRel`, `groupSelf`, `replays [{text, t, seq}]`, `walking`, `time`, `view`, `follow`.
+
 ### Server additions for the construct
 - `tick.life.route`, `tick.life.progress`; `tick.market` (pumping/dumping/choppy/calm, existing market_mood).
 - Demo-only flags (require `--demo`): `--life-activity <act>`, `--force-market pump|dump`, `--force-stage NREM|REM`.

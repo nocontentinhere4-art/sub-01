@@ -7,25 +7,28 @@
 <link rel="icon" href="data:,">
 <title>SUB-01 · life</title>
 <!--
-  Shell for the life page. The 3D world and every panel are filled by ES modules under /world/ (entry: /world/main.js).
-  three.js is vendored under /vendor/three/ and loaded through the importmap below (no CDN).
+  Shell for the life page: "the construct", a world built from SUB-01's own brain data (districts = the 214 atlas
+  regions, streets = the real tractography). Entry: /construct/main.js (ES modules under /construct/ and the reused
+  HUD / mini brain / phone / net / quality modules under /world/). The old photoreal world files under /world/ are kept
+  but no longer loaded. three.js is vendored under /vendor/three/ and loaded through the importmap below (no CDN).
 
   HUD containers (stable ids; each stream fills its own, see docs/real-world/CONTRACT.md):
     #scene          canvas host (main.js). Children with class .ov are overlays on top of the canvas.
     #hud            the whole HUD layer (scene + side panel).
     #status         top-left: title, nav, #doing (what it is doing), #meta (clock / sleep stage)   (hud.js)
     #speech         under #status: inner-speech line + what it "sees" (eye thought)               (hud.js)
-    #tools          top-right bar holding #lab and #quality
-    #lab            lab-mode toggle + follow-camera toggle                                          (main.js)
+    #tools          top-right bar holding #view and #quality
+    #view           view switch: first person (default) / overview (orbit)                         (main.js)
     #quality        quality switch auto / low / medium / high                                       (quality.js)
+    #fx             overlay layer for the fx stream (rain words, inner line, glitch); pointer-events off (fx.js)
     #phone-overlay  bottom-left phone screen while it uses the phone; main.js mounts phone.overlayEl
                     here and adds class .on while the phone is in use                               (phone.js)
-    #minibrain      bottom-right mini brain (placeholder until the hud stream's fibre brain)         (minibrain.js)
+    #minibrain      bottom-right mini real brain (picture in picture)                              (minibrain.js)
     #side           side panel (right on desktop, below the scene on phones) holding:
       #workspace    workspace / needs bars + today's log                                            (hud.js)
       #chat         chat log + send form (+ nickname)                                               (hud.js)
     #honesty        honesty line, always visible (fixed to the viewport bottom). Never remove or hide it.
-  Body classes set by main.js: .ready (first frame drawn), .lab, .q-low|.q-medium|.q-high, .cam-<name> with ?cam=.
+  Body classes set by main.js: .ready (first frame drawn), .view-first | .view-orbit, .q-low|.q-medium|.q-high.
 -->
 <script type="importmap">
 { "imports": {
@@ -43,7 +46,7 @@
 
   /* ---- mobile first: scene on top, panel below (the page scrolls) ---- */
   #hud { position:relative; }
-  #scene { position:relative; height:62svh; min-height:320px; overflow:hidden; background:#0a0c12; }
+  #scene { position:relative; height:62svh; min-height:320px; overflow:hidden; background:#05060c; }
   #scene canvas { display:block; width:100%; height:100%; touch-action:none; }
   .ov { position:absolute; z-index:2; }
   #scene::before { content:""; position:absolute; left:0; right:0; top:0; height:150px; z-index:1; pointer-events:none;
@@ -71,6 +74,7 @@
   #honesty { position:fixed; left:0; right:0; bottom:0; z-index:50; min-height:var(--honesty-h);
             padding:6px 12px calc(6px + env(safe-area-inset-bottom)); background:rgba(5,5,7,.94); border-top:1px solid var(--line);
             color:#a4a4b6; font-size:10px; line-height:1.4; text-align:center; }
+  #fx { inset:0; pointer-events:none; overflow:hidden; z-index:1; }
   #boot { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); font-size:12px; z-index:1; pointer-events:none; }
   body.ready #boot { display:none; }
 
@@ -98,7 +102,7 @@
 <body>
 <div id="hud">
   <div id="scene">
-    <div id="boot">loading the world…</div>
+    <div id="boot">building the construct from its brain data…</div>
     <div id="status" class="ov">
       <h1>SUB-01</h1><span id="nav"><a class="on" href="/">LIFE</a><a href="/brain">BRAIN</a><a href="/world.html">DREAMS</a></span>
       <div id="doing">connecting…</div>
@@ -106,9 +110,10 @@
     </div>
     <div id="speech" class="ov" aria-live="polite"></div>
     <div id="tools" class="ov">
-      <div id="lab" class="row"></div>
+      <div id="view" class="row"></div>
       <div id="quality" class="row"></div>
     </div>
+    <div id="fx" class="ov" aria-hidden="true"></div>
     <div id="phone-overlay" class="ov"></div>
     <div id="minibrain" class="ov"></div>
   </div>
@@ -118,6 +123,6 @@
   </div>
 </div>
 <div id="honesty">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>
-<script type="module" src="/world/main.js"></script>
+<script type="module" src="/construct/main.js"></script>
 </body>
 </html>
