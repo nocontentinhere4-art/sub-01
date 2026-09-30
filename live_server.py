@@ -325,11 +325,48 @@ def parse_start(hm):
     return datetime.now(ROME).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
 
 
+LOGIN_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>SUB-01</title><body style="margin:0;height:100vh;display:grid;place-items:center;background:#040406;
+color:#ececf2;font-family:ui-monospace,Menlo,monospace"><form method=post action=/login style="display:grid;gap:12px">
+<div style="background:#ff6a00;color:#0a0a0a;font-size:28px;letter-spacing:.12em;padding:2px 12px">SUB-01</div>
+<input name=password type=password placeholder="password" autofocus style="background:#0c0c12;color:#ececf2;
+border:1px solid #2a2a36;padding:10px;font:inherit"><button style="background:#ececf2;border:0;padding:10px;
+font:inherit">enter</button>{msg}</form></body>"""
+
+
+def password_gate(password):
+    """Private preview: one shared password (SITE_PASSWORD), remembered in an HttpOnly cookie."""
+    import hashlib
+    import hmac
+    token = hashlib.sha256(("sub01:" + password).encode()).hexdigest()
+
+    @web.middleware
+    async def gate(request, handler):
+        if request.path == "/login":
+            if request.method == "POST":
+                form = await request.post()
+                if hmac.compare_digest(str(form.get("password", "")), password):
+                    resp = web.HTTPFound("/")
+                    resp.set_cookie("sub01", token, max_age=30 * 86400, httponly=True, samesite="Lax",
+                                    secure=request.headers.get("X-Forwarded-Proto") == "https")
+                    raise resp
+                return web.Response(text=LOGIN_PAGE.format(msg="<small>wrong password</small>"),
+                                    content_type="text/html", status=401)
+            return web.Response(text=LOGIN_PAGE.format(msg=""), content_type="text/html")
+        if hmac.compare_digest(request.cookies.get("sub01", ""), token):
+            return await handler(request)
+        if request.path == "/ws" or request.path.startswith("/api/"):
+            raise web.HTTPUnauthorized()
+        raise web.HTTPFound("/login")
+    return gate
+
+
 async def main(args):
     data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 else "")
     live = Live(args.mint, args.demo, args.time_scale, data_dir,
                 parse_start(args.start) if args.start else None, args.trust_proxy)
-    app = web.Application(client_max_size=64 * 1024 ** 2)
+    middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
+    app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app.router.add_get("/ws", live.ws_handler)
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
@@ -337,7 +374,8 @@ async def main(args):
         ext = request.query.get("ext", "png") if request.query.get("ext") in ("png", "webm", "mp4") else "png"
         (HERE / "out" / f"{name}.{ext}").write_bytes(await request.read())
         return web.Response(text="ok")
-    app.router.add_post("/snap", snap)
+    if args.host in ("127.0.0.1", "localhost"):
+        app.router.add_post("/snap", snap)        # local-only helper: never exposed on a public host
     if not args.no_real_baseline and list((HERE / "out" / "rest").glob("*.npz")):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
     if args.eye:
