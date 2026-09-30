@@ -78,7 +78,13 @@ export function createCity(scene, data, quality) {
     if (i == null) continue;
     const sp = textSprite(PLACE_LABEL[role]);
     sp.position.copy(data.districts[i].pos).add(new THREE.Vector3(0, 70, 0));
-    root.add(sp); labels.push({ sp, i, role });
+    // fade out a label when the camera is close to its district (first person at home: keeps it off the HUD text)
+    const L = { sp, i, role, base: 0.9 };
+    sp.onBeforeRender = (r, sc, cam) => {
+      const d = cam.position.distanceTo(sp.position);
+      sp.material.opacity = L.base * THREE.MathUtils.smoothstep(d, 160, 340);
+    };
+    root.add(sp); labels.push(L);
   }
 
   let fear = 0, t = 0;
@@ -98,7 +104,8 @@ export function createCity(scene, data, quality) {
       level[i] += (a - level[i]) * k;
       if (act) actData[i * 4] = Math.min(255, Math.round(a / 3 * 255));
       const d = data.districts[i];
-      const dark = d.role === "fear" || (d.role === "salience" && fear < 0.2) ? 0.12 + 0.88 * fear : 1;
+      // fear district: dark unless fear rises; salience: dim at rest, fully lit from fear 0.4 (continuous)
+      const dark = d.role === "fear" ? 0.12 + 0.88 * fear : d.role === "salience" ? Math.min(1, 0.12 + 2.2 * fear) : 1;
       const up = Math.max(0, level[i] - 0.6);
       const h = (6 + 40 * up + (d.role === "home" && d.cluster === 0 ? 14 : 0)) * (0.6 + 0.4 * sleepK);
       s.set(foot[i], h, foot[i]);
@@ -111,7 +118,7 @@ export function createCity(scene, data, quality) {
     if (act) actTex.needsUpdate = true;
     towers.instanceMatrix.needsUpdate = true;
     towers.instanceColor.needsUpdate = true;
-    for (const L of labels) L.sp.material.opacity = (L.role === "fear" ? 0.25 + 0.75 * fear : 0.9) * (0.5 + 0.5 * sleepK);
+    for (const L of labels) L.base = (L.role === "fear" ? 0.25 + 0.75 * fear : 0.9) * (0.5 + 0.5 * sleepK);
   }
 
   const groupIdx = {};

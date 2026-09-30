@@ -116,3 +116,12 @@ test("loadBrainData caches the fetch", async () => {
   assert.equal(a, b);
   assert.equal(calls, 4);
 });
+
+test("groupRegions: brain.json groups + language (brain_sim.py LANGUAGE rule) for chat.networks fallback", () => {
+  const g = low.groupRegions;
+  const nodes = raw.brain.nodes;
+  for (const grp of new Set(nodes.map(n => n.group))) assert.deepEqual(g[grp], nodes.flatMap((n, i) => n.group === grp ? [i] : []));
+  assert.ok(g.language && g.language.length > 0, "language group");
+  for (const i of g.language) assert.ok(/^LH_/.test(nodes[i].name) && /Temp|FrOper/.test(nodes[i].name), nodes[i].name);
+  assert.equal(g.language.length, nodes.filter(n => /^LH_.*(Temp|FrOper)/.test(n.name)).length);
+});

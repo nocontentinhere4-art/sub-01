@@ -20,6 +20,8 @@
 //   pathBetween(i, j) -> [Vector3...] with .lengths (Float32Array cumulative, city units), .total, .hops ([regions])
 //                  shortest path over the region graph (strong bundles preferred), each hop following its
 //                  representative fibre (oriented start -> end), passing through every district on the way, smoothed
+//   groupRegions   {group: [region indices]}: brain.json groups + "language" (same rule as brain_sim.py LANGUAGE:
+//                  left temporal / frontal-operculum parcels). Client fallback for hello.regions (chat.networks -> indices)
 //   pointAt(path, u, out) -> out      point at fraction u (0..1) of the walked length of a path
 //   mapPoint(x, y, z, out) -> out     brain mm (fibres / node q space) -> city space
 //   radius, scale, quality
@@ -323,13 +325,23 @@ export function buildBrainData(raw, quality) {
     return out;
   }
 
+  const groupRegions = regionGroups(nodes);
+
   return {
     nodes, districts, roles, districtOf, placeDistrict, roads, graph, pathBetween, pointAt, mapPoint,
-    radius, scale: SCALE, quality: q, lab2node,
+    radius, scale: SCALE, quality: q, lab2node, groupRegions,
   };
 }
 
 // ---------------- helpers ----------------
+/** brain_sim.py LANGUAGE rule on brain.json names (which lack the atlas "7Networks_" prefix). */
+export const isLanguage = name => /(^|_)LH_/.test(name) && /Temp|FrOper/.test(name);
+/** {group: [region indices]} from brain.json groups, plus "language" (chat messages stimulate it). */
+export function regionGroups(nodes) {
+  const out = {};
+  nodes.forEach((n, i) => { (out[n.group] ||= []).push(i); if (isLanguage(n.name)) (out.language ||= []).push(i); });
+  return out;
+}
 function isDeep(n) { return /Thalamus|Caudate|Putamen|Pallidum|Hippocampus|Amygdala|Accumbens/.test(n.name) || n.lab > 200; }
 function dist3(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); }
 function clampF(f, n) { return f < 0 ? 0 : f > n - 1.0001 ? n - 1.0001 : f; }

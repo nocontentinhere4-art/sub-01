@@ -1,3 +1,5 @@
+// UNUSED since the construct: web/life.html now loads web/construct/main.js. Kept for reference only (it refers to
+// #lab / .cam-* elements that life.html no longer has); safe to delete in the integration branch.
 // Life page entry (foundation / integration). Boots the renderer, the websocket client and the render loop, and wires
 // the stream modules together. Each stream only replaces its own file (see docs/real-world/CONTRACT.md):
 //   world/index.js  createWorld(renderer, scene, camera, assets, quality, layout) -> {update(dt, env), setLab(on), anchors}

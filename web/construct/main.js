@@ -51,6 +51,7 @@ const FALLBACK_WORLD = {
     ["door_out", "street_home"], ["street_home", "street_bakery"], ["street_home", "street_park"], ["street_bakery", "bakery_door"],
     ["bakery_door", "bakery_in"], ["bakery_in", "counter"], ["street_park", "park_gate"], ["park_gate", "bench"]],
 };
+// activity -> place: keep in sync with life.py ACTIVITIES (hello.world only carries places / edges)
 const ACT_PLACE = { sleep: "bed", phone: "bed", eat: "table", buy_bread: "counter", chart: "desk", window: "window", park: "bench" };
 
 // a hook that throws is reported once and the page keeps running
@@ -101,7 +102,7 @@ const hud = createHud({ send: obj => (net ? net.send(obj) : false) });
 const minibrain = createMiniBrain($("minibrain"), { quality });
 
 // ---------------- construct modules (built when the brain data is loaded) ----------------
-let data = null, city = null, travel = null, fx = null, building = null;
+let data = null, city = null, travel = null, fx = null, fxQuality = null, building = null;
 function build(q) {
   const want = q.name;
   building = loadBrainData(q).then(d => {
@@ -110,7 +111,10 @@ function build(q) {
     data = d;
     city = createCity(scene, d, q);
     if (!travel) { travel = createTravel(camera, controls, d, { scene }); travel.setView(view); }
-    if (!fx) { fx = createFx(renderer, scene, camera, d, q); fx.weather(market); resize(); }
+    if (!fx || fxQuality !== q.name) {                        // fx presets (bloom / post) follow the quality
+      if (fx) hook("fx.dispose", () => fx.dispose?.());
+      fx = createFx(renderer, scene, camera, d, q); fxQuality = q.name; fx.weather(market); resize();
+    }
     stats.districts = d.districts.length; stats.fibres = d.roads.fibres;
   }).catch(e => { console.error("[construct] brain data failed:", e); $("boot").textContent = "could not load the brain data"; });
 }
@@ -123,6 +127,7 @@ const groupRel = {}, groupBase = {}, groupSelf = {};
 const flow = []; let flowSum = 0;
 const chatLines = [];
 const chatByCid = new Map();
+let serverRegions = null;                                    // hello.regions {group: [region indices]} (contract)
 const replays = []; let replaySeq = 0;
 const trades = [];                                           // [t, +1 buy / -1 sell] of the last minute (market fallback)
 
@@ -219,13 +224,33 @@ function waypointRoute(a, b) {
   return r;
 }
 
+// Region indices a chat message stimulates: chat.regions (server, topical) first, then every network in chat.networks
+// (incl. "language" + "somatomotor", which chat.py drives for every message) through hello.regions, falling back to
+// brain.json groups + the client-side language rule (data.groupRegions).
+function chatRegions(m) {
+  const out = [], seen = new Set();
+  const add = i => { if (Number.isInteger(i) && !seen.has(i)) { seen.add(i); out.push(i); } };
+  for (const i of Array.isArray(m.regions) ? m.regions : []) add(i);
+  const map = serverRegions || data?.groupRegions || {};
+  const nets = Array.isArray(m.networks) ? m.networks : m.networks && typeof m.networks === "object" ? Object.keys(m.networks) : [];
+  for (const g of nets) {
+    const idx = map[g] || data?.groupRegions?.[g];
+    if (idx) idx.forEach(add);
+    else if (!data && !seen.has(g)) { seen.add(g); out.push(g); } // no map yet: pass the name, city / minibrain resolve groups
+  }
+  return out;
+}
+
 function onChat(m) {
   chatLines.push(m); if (chatLines.length > 40) chatLines.shift();
   if (m.cid) { chatByCid.set(m.cid, m); if (chatByCid.size > 60) chatByCid.delete(chatByCid.keys().next().value); }
   hud.chat(m);
-  const regions = m.regions && m.regions.length ? m.regions : m.networks;
-  hook("fx.rain", () => fx?.rain(m));
-  if (regions) {
+  const regions = chatRegions(m);
+  stats.lastChatRegions = regions.length;                    // debug / e2e: districts the last chat message flashed
+  // rain lands on the topical districts (chat.regions, chat.py REGION_RULES); the city + mini brain flash everything hit
+  const land = Array.isArray(m.regions) && m.regions.length ? m : { ...m, regions: regions.filter(Number.isInteger) };
+  hook("fx.rain", () => fx?.rain(land));
+  if (regions.length) {
     hook("city.flash", () => city?.flash(regions, 0xff6a00));
     minibrain.flash(regions, 0xff6a00); minibrain.pulse($("chat"));
   }
@@ -236,6 +261,7 @@ net = connect({
   close() { stats.connected = false; },
   hello(m) {
     if (m.world && m.world.places && m.world.edges) { world = m.world; routeCache.clear(); }
+    if (m.regions && typeof m.regions === "object" && !Array.isArray(m.regions)) serverRegions = m.regions;
     chatLines.length = 0; (m.chat || []).forEach(x => chatLines.push(x));
     hud.hello(m); minibrain.hello(m);
   },
