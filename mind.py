@@ -892,6 +892,14 @@ class Mind:
         p = self.pending
         return bool(p and p.get("_req") and p.get("_deadline") and now < p["_deadline"])
 
+    def release_held(self):
+        """Stop waiting for the language model: the held line goes out as its rule line (a late answer is dropped)."""
+        p = self.pending
+        if p and p.get("_req"):
+            p["_req"], p["_deadline"], p["_llm"] = None, None, False
+            return True
+        return False
+
     def speech_due(self):
         """Pending inner-speech line {"text","kind","lang","about","action"} or None (then cleared)."""
         now = self.clock()

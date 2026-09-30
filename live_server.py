@@ -103,7 +103,11 @@ class Live:
         self.eye = None                  # set by main() with --eye
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
-        self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
+        try:
+            life_state = json.loads(life_path.read_text()) if life_path.exists() else None
+        except (ValueError, OSError):
+            life_state = None                                        # a truncated file must not stop the server
+        self.life = Life(life_state)
         self.forced_activity = life_activity
         if life_activity:                                            # demo-only: force the first activity
             self.life.start(life_activity, self.clock.now(), "demo: " + life_activity)
@@ -122,6 +126,7 @@ class Live:
         self.last_market = "calm"
         self.rel = {}
         self._pend_obj = self._pend_cid = None
+        self._tasks = set()
         self.nicks_path = self.data_dir / "nicks.json"
         try:
             self.nicks = json.loads(self.nicks_path.read_text()) if self.nicks_path.exists() else {}
@@ -251,6 +256,8 @@ class Live:
         if ok and nick and not safe_text(nick):
             ok, reason = False, "nickname: not allowed"
         if not ok:
+            if not self.limiter.allow(("nick", key)):                      # bad nicknames are rate-limited too
+                reason = "too fast"
             await ws.send_json({"type": "chat_ack", "ok": False, "reason": reason})
             return
         ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
@@ -391,16 +398,24 @@ class Live:
             if events:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
-                self.save_all()
                 last_save = now
+                try:                                              # file writes can stall: keep them off the tick loop
+                    await asyncio.get_running_loop().run_in_executor(None, self.save_all)
+                except Exception as e:                            # e.g. state changed mid-dump: retried next minute
+                    print("save error:", repr(e), flush=True)
+                    last_save = now - SAVE_S + 5
             self.tick_ms.append((time.perf_counter() - t_start) * 1000)
             next_t += TICK
+            if next_t < time.time() - TICK:                       # fell behind (stall): do not burst to catch up
+                next_t = time.time()
             await asyncio.sleep(max(0.0, next_t - time.time()))
 
     def save_all(self):
         """Persist sleep state + memory, the life, the workspace state + diary and the nickname table."""
         self.store.save(self.engine, self.memory)
-        self.life_path.write_text(json.dumps(self.life.to_dict()))
+        tmp = self.life_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.life.to_dict()))
+        tmp.replace(self.life_path)
         tmp = self.mind_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.mind.to_dict(), ensure_ascii=False))
         tmp.replace(self.mind_path)
@@ -424,6 +439,8 @@ class Live:
         self.last_mind = msg
         b = msg["broadcast"]
         if b and b["action"]:
+            if self.mind.release_held():                             # a line is waiting for the language model:
+                await self.send_speech(t)                            # send it as its rule line before the outcome replaces it
             if self.forced_activity and (self.life.activity != self.forced_activity
                                          or (not self.life.path and t >= self.life.until)):
                 self.forced_activity = None                          # the forced demo activity is over
@@ -438,7 +455,9 @@ class Live:
         self.mind_ms.append((time.perf_counter() - t0) * 1000)
         await self.broadcast(msg)
         if req:
-            asyncio.get_running_loop().create_task(self.run_llm(req))
+            task = asyncio.get_running_loop().create_task(self.run_llm(req))
+            self._tasks.add(task)                                    # keep a reference until it is done
+            task.add_done_callback(self._tasks.discard)
         await self.send_speech(t)
 
     async def send_speech(self, t):
@@ -571,7 +590,7 @@ def password_gate(password):
 
 
 async def main(args):
-    data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 else "")
+    data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 or args.demo else "")
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN: read before the workspace picks its language model
     live = Live(args.mint, args.demo, args.time_scale, data_dir,
@@ -625,10 +644,21 @@ async def main(args):
     tasks = [live.run_brain(), live.run_mind(), live.demo_trades() if args.demo else live.rpc_trades()]
     if live.eye:
         tasks.append(live.run_eye())
+    import signal
+    work = asyncio.gather(*tasks)
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, work.cancel)                # a redeploy (SIGTERM) still saves the state
+        except (NotImplementedError, RuntimeError):
+            pass
     try:
-        await asyncio.gather(*tasks)
+        await work
+    except asyncio.CancelledError:
+        pass
     finally:
         live.save_all()
+        await runner.cleanup()
 
 
 if __name__ == "__main__":

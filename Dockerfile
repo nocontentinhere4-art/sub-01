@@ -7,4 +7,4 @@ COPY web ./web
 COPY out/connectome.npz out/atlas_names.json ./out/
 COPY out/rest ./out/rest
 # /data is a persistent volume: sleep state, memory, nights, world, eye frames
-CMD ["sh", "-c", "python live_server.py --host 0.0.0.0 --port ${PORT:-8080} --eye --trust-proxy --data-dir /data --frames-dir /data/frames ${EXTRA_ARGS:-}"]
+CMD ["sh", "-c", "exec python live_server.py --host 0.0.0.0 --port ${PORT:-8080} --eye --trust-proxy --data-dir /data --frames-dir /data/frames ${EXTRA_ARGS:-}"]

@@ -185,7 +185,10 @@ def test_park_is_daylight_only():
     lf = make()
     assert not lf.request("park", at(21), "")[0]
     assert "dark" in lf.request("park", at(21), "")[1]
-    assert lf.request("park", at(18, 30), "")[0]
+    assert lf.request("park", at(18, 0), "")[0]
+    lf = make()
+    ok, why = lf.request("park", at(18, 40), "")               # sunset ~18:48: no margin left
+    assert not ok and "dark" in why
     lf = make()
     assert not lf.request("park", at(6, 30), "")[0]
     lf = make()
@@ -361,3 +364,12 @@ def test_turn_back_route_reports_the_half_edge_walk():
     assert lf.route[:3] == ["street_bakery", "street_home", "street_park"]
     s = lf.snapshot()
     assert s["walking"] and 0.0 < s["progress"] < 0.5
+
+
+def test_short_activities_are_finished_before_another_request_takes_over():
+    lf = make()
+    lf.start("eat", at(12), "eats")
+    lf.path, lf.route = [], []
+    ok, why = lf.request("phone", at(12, 2), "")
+    assert not ok and why.startswith("busy")
+    assert lf.request("phone", at(13), "")[0]                   # after it is over
