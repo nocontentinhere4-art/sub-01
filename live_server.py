@@ -6,7 +6,7 @@
 
 Buys drive the reward + visual regions, sells drive salience + amygdala, large
 trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
-A sleep/wake cycle on the Europe/Rome clock (sleep.py) changes the rhythm and how much
+A sleep circuit on the local Asia/Tokyo clock (sleep.py, SUB01_TZ) changes the rhythm and how much
 any stimulus gets through; during REM, stored messages are replayed. Page on http://localhost:8765.
 """
 import argparse
@@ -336,7 +336,7 @@ class Live:
 
 
 def parse_start(hm):
-    """'HH:MM' -> sim epoch of that Rome time today."""
+    """'HH:MM' -> sim epoch of that local (SUB01_TZ) time today."""
     h, m = map(int, hm.split(":"))
     return datetime.now(ROME).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
 
@@ -453,7 +453,7 @@ if __name__ == "__main__":
     p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     p.add_argument("--frames-dir", help="where eye frames are written (default out/eye/frames)")
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
-    p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
+    p.add_argument("--start", help="local (SUB01_TZ) time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
     p.add_argument("--no-real-baseline", action="store_true", help="simulated background only")

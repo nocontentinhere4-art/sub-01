@@ -397,7 +397,7 @@ function animate(t){
       controls.target.lerp(target, 0.05); const desired = target.clone().add(new THREE.Vector3(0, 9, 12));
       camera.position.lerp(desired, 0.02); }
   }
-  // light: Rome time of day; lab mode = cold, dark, orange accents
+  // light: local (Tokyo) time of day; lab mode = cold, dark, orange accents
   const h = romeHour(), dayK = Math.max(0, Math.sin(Math.PI * (h - 6) / 14));
   const night = dayK < 0.15;
   const sky = lab ? new THREE.Color(0x07080c) : new THREE.Color().setHSL(0.58, 0.45, 0.08 + 0.55 * dayK);
