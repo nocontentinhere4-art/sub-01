@@ -49,6 +49,10 @@
   #brainpip span { position:absolute; left:8px; bottom:6px; right:8px; font-size:10px; color:#bdbdca; text-shadow:0 1px 4px #000; }
   #brainpip b { color:#ff6a00; font-weight:normal; }
   @media (max-width: 900px) { #brainpip { width:46%; bottom:12px; } }
+  #sv { position:absolute; inset:0; display:none; z-index:1; }
+  #svlabel { position:absolute; left:16px; bottom:30px; z-index:2; font-size:11px; color:#e8e8ee; background:rgba(0,0,0,.55);
+    padding:4px 8px; border-radius:3px; display:none; }
+  #hud, #tools, #phone, #brainpip, #foot { z-index:3; }
 </style>
 </head>
 <body>
@@ -62,6 +66,8 @@
     </div>
     <div id="tools"><button id="b-follow" class="on">follow</button><button id="b-lab">lab mode</button></div>
     <div id="phone"><div class="top">SUB-01's phone · <span id="app"></span></div><canvas id="phonecv" width="360" height="620"></canvas><iframe id="tiktok" allow="encrypted-media" style="display:none"></iframe></div>
+    <div id="sv"></div>
+    <div id="svlabel">first person · the real streets of Kichijōji, Tokyo · Google Street View</div>
     <a id="brainpip" href="/brain" title="open the brain">
       <iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe>
       <span>its brain, live · real fibres from MRI · <b id="pipstage">AWAKE</b></span>
@@ -250,12 +256,46 @@ function addChat(m){ chatLines.push(m); if (chatLines.length > 40) chatLines.shi
   const d = document.createElement("div"); d.textContent = `${m.t || ""} ${m.text}`; const c = document.getElementById("chat"); c.appendChild(d); c.scrollTop = 1e9; }
 
 let lastLog = "";
+// ---------------- first person on the real streets (Google Street View) ----------------
+let gm = null, pano = null, svService = null, lastQ = null, svHeading = 0, wantHeading = 0, svOn = false;
+fetch("/api/config").then(r => r.json()).then(c => {
+  if (!c.gmaps) return;
+  window.initGmaps = () => { gm = google.maps; svService = new gm.StreetViewService(); };
+  const sc = document.createElement("script");
+  sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(c.gmaps)}&v=weekly&callback=initGmaps&loading=async`;
+  sc.async = true; document.head.appendChild(sc);
+}).catch(() => {});
+function metres(a, b){ const k = 111320, dy = (a.lat - b.lat) * k, dx = (a.lng - b.lng) * k * Math.cos(a.lat * Math.PI / 180); return Math.hypot(dx, dy); }
+function updateStreet(geo){
+  const div = document.getElementById("sv"), lab = document.getElementById("svlabel");
+  const show = !!(geo && gm);
+  if (show !== svOn) { svOn = show; div.style.display = lab.style.display = show ? "block" : "none"; }
+  if (!show) return;
+  if (!pano) pano = new gm.StreetViewPanorama(div, {disableDefaultUI: true, clickToGo: false, linksControl: false,
+    showRoadLabels: false, motionTracking: false, scrollwheel: false, addressControl: false});
+  wantHeading = geo.heading;
+  if (!lastQ || metres(lastQ, geo) > 7) {                  // step to the nearest real panorama every ~7 m
+    lastQ = {lat: geo.lat, lng: geo.lng};
+    svService.getPanorama({location: lastQ, radius: 35, source: gm.StreetViewSource.OUTDOOR,
+      preference: gm.StreetViewPreference.NEAREST}, (data, status) => {
+      if (status === "OK" && data && data.location) pano.setPano(data.location.pano);
+    });
+  }
+}
+function turnStreet(){                                    // smooth look direction
+  if (!pano || !svOn) return;
+  let d = ((wantHeading - svHeading + 540) % 360) - 180; svHeading += d * 0.06;
+  pano.setPov({heading: svHeading, pitch: -2});
+}
+setInterval(turnStreet, 50);
+
 function onLife(L, S){
+  updateStreet(L.geo);
   life = L;
   const asleep = stage !== "AWAKE";
   document.getElementById("pipstage").textContent = stage;
   document.getElementById("doing").textContent = asleep ? `${stage === "REM" ? "dreaming" : "deeply asleep"} in bed` : L.doing + (L.walking ? " · on the way" : "");
-  document.getElementById("meta").textContent = `${clock} Rome · ${stage}${L.say ? " · " + L.say : ""}`;
+  document.getElementById("meta").textContent = `${clock} ${(S && S.tz) || ""} · ${stage}${L.say ? " · " + L.say : ""}`;
   document.getElementById("n-hunger").style.width = (L.hunger * 100) + "%";
   document.getElementById("n-boredom").style.width = (L.boredom * 100) + "%";
   document.getElementById("n-sleep").style.width = Math.min(100, ((S && S.tired) || 0) * 100) + "%";
@@ -263,7 +303,7 @@ function onLife(L, S){
   const logKey = JSON.stringify(L.log);
   if (logKey !== lastLog) { lastLog = logKey; document.getElementById("log").innerHTML = "";
     for (const e of L.log.slice().reverse()) { const d = document.createElement("div"); const s = document.createElement("span");
-      const dt = new Date(e.t * 1000); s.textContent = dt.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit", timeZone:"Europe/Rome"});
+      const dt = new Date(e.t * 1000); s.textContent = dt.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tokyo"});
       d.appendChild(s); d.appendChild(document.createTextNode(e.what)); document.getElementById("log").appendChild(d); } }
   // phone overlay
   const ph = document.getElementById("phone"), tk = document.getElementById("tiktok"), cv = document.getElementById("phonecv");

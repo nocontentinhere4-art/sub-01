@@ -96,6 +96,7 @@ class Live:
         self.life_path = life_path
         self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
         self.time_scale = time_scale
+        self.life.time_scale = time_scale
         self.baseline = None             # set by main() unless --no-real-baseline
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
@@ -406,6 +407,10 @@ async def main(args):
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
         return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
     app.router.add_get("/api/frames", frames)
+
+    async def config(request):                    # browser config (Maps JS keys are referrer-restricted by design)
+        return web.json_response({"gmaps": os.environ.get("GOOGLE_MAPS_KEY", "")})
+    app.router.add_get("/api/config", config)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html"))       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html"))
     app.router.add_static("/", HERE / "web")

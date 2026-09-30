@@ -13,6 +13,7 @@ Rules (all times Rome local, sim clock):
   sleep and faster by going to bed early. Debt makes the waking brain less reactive and noisier.
 """
 import json
+import os
 import math
 import random
 import time
@@ -20,7 +21,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-ROME = ZoneInfo("Europe/Rome")
+ROME = ZoneInfo(os.environ.get("SUB01_TZ", "Asia/Tokyo"))   # where SUB-01 lives (name kept for history)
+TZ_LABEL = os.environ.get("SUB01_TZ", "Asia/Tokyo").split("/")[-1]
 
 # Stuart-Landau parameters per stage: f_hz, coupling (x baseline g), noise, a (bifurcation), stimulus gain
 AWAKE = dict(f_hz=10.0, coupling=1.0, noise=0.5, a=-5.0, gain=1.0)
@@ -304,7 +306,7 @@ class SleepEngine:
         return datetime.fromisoformat(self.night["sleep_onset"]).replace(tzinfo=ROME).timestamp()
 
     def status(self):
-        return {"stage": self.stage, "clock": hhmm(self.t), "date": local(self.t).strftime("%a %d %b"),
+        return {"stage": self.stage, "clock": hhmm(self.t), "tz": TZ_LABEL, "date": local(self.t).strftime("%a %d %b"),
                 "debt": round(self.debt, 2), "tired": round(self.tired, 2), "depth": round(self.depth, 2),
                 "gain": round(self.gain, 3), "arousal": round(self.arousal, 2),
                 "woken_tonight": len(self.night["wakeups"]) if self.night else 0}

@@ -7,9 +7,11 @@ messages add short-lived desires ("vai a comprare il pane"). Walking happens in 
 graph, so what viewers see is continuous. It is a simulation driven by a brain model, not a person.
 """
 import heapq
+import json
 import math
 import random
 import re
+from pathlib import Path
 
 from sleep import local
 
@@ -29,7 +31,27 @@ WORLD = {"places": PLACES, "edges": EDGES,
          "apartment": [0, 0, 8, 6], "bakery": [17, 14, 25, 20], "park": [-19, 13, -7, 23],
          "street": [-22, 8.5, 30, 11.5]}
 
-WALK_SPEED = 1.3            # m / real second
+WALK_SPEED = 1.3            # m / real second (indoors and in the 3D model)
+
+# ---- the real streets (Kichijoji, Tokyo): outdoor legs of the 3D graph are mapped onto real walking routes ----
+TOKYO = json.loads((Path(__file__).parent / "web" / "tokyo_routes.json").read_text())
+OUTDOOR = {"bakery_door": ("home-bakery", ["door_out", "street_home", "street_bakery", "bakery_door"]),
+           "park_gate": ("home-park", ["door_out", "street_home", "street_park", "park_gate"])}
+
+
+def along(latlng, f):
+    """Point and heading at fraction f of a polyline [[lat, lng], ...]."""
+    seg = [math.dist(a, b) for a, b in zip(latlng, latlng[1:])]
+    goal, acc = max(0.0, min(1.0, f)) * sum(seg), 0.0
+    for (a, b), d in zip(zip(latlng, latlng[1:]), seg):
+        if acc + d >= goal and d > 0:
+            t = (goal - acc) / d
+            lat, lng = a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])
+            heading = math.degrees(math.atan2((b[1] - a[1]) * math.cos(math.radians(a[0])), b[0] - a[0])) % 360
+            return lat, lng, heading
+        acc += d
+    a, b = latlng[-2], latlng[-1]
+    return b[0], b[1], math.degrees(math.atan2((b[1] - a[1]) * math.cos(math.radians(a[0])), b[0] - a[0])) % 360
 ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "sleep": ("bed", "lying", (0, 0)),
     "phone": ("bed", "lying_phone", (12, 40)),
@@ -97,6 +119,8 @@ class Life:
         self.phone_app = "chart"
         self.log = s.get("log", [])            # recent events for the page
         self.say = ""
+        self.time_scale = 1.0
+        self.geo = None                        # real position in Tokyo while outside
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
@@ -163,6 +187,11 @@ class Life:
             dx, dz = tx - self.x, tz - self.z
             d = math.hypot(dx, dz)
             step = WALK_SPEED * dt_real
+            out = self.outdoor_leg()
+            if out:                                       # outside: take as long as the real Tokyo walk
+                name, nodes, length = out
+                real_s = TOKYO["routes"][name]["meters"] / WALK_SPEED / max(1.0, self.time_scale)
+                step = length / real_s * dt_real
             self.heading = math.atan2(dx, dz)
             if d <= step:
                 self.x, self.z = tx, tz
@@ -170,6 +199,7 @@ class Life:
             else:
                 self.x += dx / d * step
                 self.z += dz / d * step
+            self.update_geo()
             return
         # arrived: effects of finishing the activity, then pick the next one
         if self.activity == "sleep" and stage != "AWAKE":
@@ -193,13 +223,42 @@ class Life:
                 why = "wakes up"
             self.start(nxt, t, why)
 
+    def outdoor_leg(self):
+        """(route name, 3D nodes, 3D length) when the current step is on the street between home and a destination."""
+        here, nxt = self.place, (self.path[0] if self.path else None)
+        for dest, (name, nodes) in OUTDOOR.items():
+            if here in nodes and nxt in nodes:
+                return name, nodes, sum(math.dist(PLACES[a], PLACES[b]) for a, b in zip(nodes, nodes[1:]))
+        return None
+
+    def update_geo(self):
+        """Real Tokyo position: fraction of the way along the outdoor 3D legs -> same fraction of the real route."""
+        out = self.outdoor_leg()
+        if not out:
+            if not self.path and self.place in ("counter", "bakery_in", "bench"):
+                return                                    # inside the shop / on the bench: keep the last street point
+            if not self.path or self.place in ("door_in", "bed", "table", "desk", "window"):
+                self.geo = None                           # at home
+            return
+        name, nodes, length = out
+        cum = [0.0]
+        for p, q in zip(nodes, nodes[1:]):
+            cum.append(cum[-1] + math.dist(PLACES[p], PLACES[q]))
+        i, forward = nodes.index(self.place), nodes.index(self.path[0]) > nodes.index(self.place)
+        moved = math.dist(PLACES[self.place], (self.x, self.z))
+        f = (cum[i] + moved if forward else cum[i] - moved) / length
+        lat, lng, hd = along(TOKYO["routes"][name]["latlng"], f)
+        if not forward:
+            hd = (hd + 180) % 360
+        self.geo = {"lat": round(lat, 6), "lng": round(lng, 6), "heading": round(hd), "route": name, "f": round(f, 3)}
+
     def snapshot(self):
         return {"x": round(self.x, 2), "z": round(self.z, 2), "heading": round(self.heading, 2),
                 "walking": bool(self.path), "activity": self.activity, "doing": LABEL[self.activity],
                 "pose": "walking" if self.path else ACTIVITIES[self.activity][1], "place": self.place,
                 "hunger": round(self.hunger, 2), "boredom": round(self.boredom, 2), "bread": self.bread,
                 "phone": self.phone_app if self.activity == "phone" and not self.path else None,
-                "say": self.say, "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
+                "geo": self.geo, "say": self.say, "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
 
     def to_dict(self):
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
