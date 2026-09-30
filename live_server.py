@@ -1,10 +1,13 @@
-"""SUB-01 live: runs the whole-brain model in real time and feeds it Solana trades.
+"""SUB-01 live: runs the whole-brain model in real time and feeds it Solana trades and chat messages.
 
     python live_server.py --mint <token mint>   # real pump.fun / PumpSwap trades
     python live_server.py --demo                                         # synthetic trades
+    python live_server.py --demo --time-scale 60 --start 23:55           # one sim hour per real minute
 
 Buys drive the reward + visual regions, sells drive salience + amygdala, large
-trades hit the thalamus + attention network. Page on http://localhost:8765.
+trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
+A sleep/wake cycle on the Europe/Rome clock (sleep.py) changes the rhythm and how much
+any stimulus gets through; during REM, stored messages are replayed. Page on http://localhost:8765.
 """
 import argparse
 import asyncio
@@ -14,6 +17,7 @@ import json
 import math
 import random
 import time
+from datetime import datetime
 from pathlib import Path
 
 import aiohttp
@@ -21,9 +25,13 @@ import numpy as np
 from aiohttp import web
 
 from brain_sim import Brain
+from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
+from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
+SAVE_S = 60                     # persist sleep state + memory every minute (real time)
+REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
 RPC_WS = "wss://api.mainnet-beta.solana.com"
 DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
@@ -54,9 +62,24 @@ def decode_trades(logs):
 
 
 class Live:
-    def __init__(self, mint, demo):
+    def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
         self.mint, self.demo = mint, demo
+        self.trust_proxy = trust_proxy
+        self.store = Store(data_dir)
+        saved, mem = self.store.load()
+        self.memory = Memory(mem)
+        if start is None and saved and time_scale != 1:
+            start = saved["t"]                                   # accelerated clock resumes where it stopped
+        self.clock = Clock(time_scale, start)
+        now = self.clock.now()
+        self.engine = SleepEngine.from_dict(saved) if saved else SleepEngine(now)
+        self.engine.t = min(self.engine.t, now)
+        self.engine.update(now)
+        self.limiter, self.dedupe = RateLimiter(), Dedupe()
+        for m in self.memory.items[-200:]:
+            self.dedupe.recent.append(dedupe_key(m["text"]))
+        self.burst = 0.0
         self.sol_usd = 150.0
         self.clients = set()
         self.pending = []           # trades waiting to be played into the brain
@@ -66,7 +89,8 @@ class Live:
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
-        s = min(15.0, 2.0 + 3.0 * math.log10(1.0 + tr["usd"]))
+        gain = self.engine.stimulus(self.clock.now(), "trade", tr["usd"])     # asleep: less gets through
+        s = gain * min(15.0, 2.0 + 3.0 * math.log10(1.0 + tr["usd"]))
         b = self.brain
         if tr["kind"] == "buy":
             b.stimulate("reward", s)
@@ -77,8 +101,8 @@ class Live:
             b.stimulate("fear", s)
             self.stats["sells"] += 1
         if tr["usd"] >= 1000:
-            b.stimulate("relay", 10)
-            b.stimulate("attention", 8)
+            b.stimulate("relay", 10 * gain)
+            b.stimulate("attention", 8 * gain)
         self.stats["usd"] += tr["usd"]
 
     async def rpc_trades(self):
@@ -125,14 +149,82 @@ class Live:
             usd = math.exp(random.gauss(3.5, 1.6))
             self.pending.append({"kind": kind, "usd": usd, "tx": "", "who": "demo", "at": time.time()})
 
+    # --- chat -> stimuli + memory -----------------------------------------------
+    @staticmethod
+    def public(m):
+        return {"text": m["text"], "t": hhmm(m["t"]), "networks": m["networks"], "emotion": m["emotion"],
+                "asleep": m["asleep"], "stage": m["stage"]}
+
+    async def handle_chat(self, ws, key, text):
+        ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
+        if not ok:
+            await ws.send_json({"type": "chat_ack", "ok": False, "reason": reason})
+            return
+        text = text.strip()
+        t = self.clock.now()
+        stim, hits, emotion = chat_stimulus(text)
+        gain = self.engine.stimulus(t, "message")
+        for g, a in stim.items():
+            self.brain.stimulate(g, a * gain)
+        m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits)
+        await ws.send_json({"type": "chat_ack", "ok": True})
+        await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
+
+    def nights(self):
+        def summary(n):
+            if not n:
+                return None
+            return {"date": n["date"], "sleep_onset": n["sleep_onset"], "woke_up": n["woke_up"],
+                    "wakeups": n["wakeups"], "replays": n["replays"][-20:], "sleep_debt": n["sleep_debt"]}
+        return {"type": "nights", "last": summary(self.engine.last_night), "tonight": summary(self.engine.night)}
+
+    async def broadcast(self, msg):
+        data = json.dumps(msg)
+        for ws in list(self.clients):
+            try:
+                await ws.send_str(data)
+            except Exception:
+                self.clients.discard(ws)
+
+    def sleep_tick(self):
+        """Advance the sleep engine, apply its parameters to the model, run REM replays and bursts."""
+        b, e = self.brain, self.engine
+        t = self.clock.now()
+        out = []
+        for ev in e.update(t, dt_real=TICK):
+            if ev["type"] == "replay":
+                m = self.memory.pick(t, e.night_start(), replayed=e.replay_counts())
+                if m is None:
+                    continue
+                b.stimulate("memory", 6.0)                                   # hippocampus drives the replay
+                for g, a in m["stimulus"].items():
+                    b.stimulate(g, REPLAY_AMP * a)
+                e.record_replay(t, m)
+                out.append({"type": "replay", "t": hhmm(t), "text": m["text"], "networks": m["networks"],
+                            "received": hhmm(m["t"])})
+            else:
+                out.append(ev | {"t": hhmm(t)})
+                if ev.get("natural"):
+                    self.store.save(e, self.memory)                          # night closed: write it now
+        p = e.params
+        b.set_rhythm(p["f_hz"], p["coupling"], p["noise"])
+        b.a = p["a"]
+        if e.stage == "REM" and random.random() < TICK / 4.0:              # brief REM bursts (~every 4 s)
+            self.burst = 1.0
+            b.stimulate("relay", 4.0)
+            b.stimulate("visual", 3.0)
+        self.burst *= math.exp(-TICK / 0.4)
+        return out
+
     # --- simulation loop -------------------------------------------------------
     async def run_brain(self):
         b = self.brain
         steps = int(TICK / b.dt)
         gidx = {k: v for k, v in b.group_idx.items() if v}
-        next_t = time.time()
+        next_t = last_save = time.time()
         while True:
             now = time.time()
+            events = self.sleep_tick()
             due = [t for t in self.pending if t["at"] <= now]
             self.pending = [t for t in self.pending if t["at"] > now]
             for tr in due:
@@ -148,29 +240,52 @@ class Live:
                    "groups": {k: round(float(act[i].mean()), 3) for k, i in gidx.items()},
                    "sync": round(st["sync"], 3), "stats": self.stats,
                    "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
-                   "pool": self.pool_name}
-            data = json.dumps(msg)
-            for ws in list(self.clients):
-                try:
-                    await ws.send_str(data)
-                except Exception:
-                    self.clients.discard(ws)
+                   "pool": self.pool_name, "events": events,
+                   "sleep": self.engine.status() | {"burst": round(self.burst, 2)}}
+            await self.broadcast(msg)
+            if events:
+                await self.broadcast(self.nights())
+            if now - last_save >= SAVE_S:
+                self.store.save(self.engine, self.memory)
+                last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
 
     # --- http ----------------------------------------------------------------
     async def ws_handler(self, request):
-        ws = web.WebSocketResponse(heartbeat=20)
+        ws = web.WebSocketResponse(heartbeat=20, max_msg_size=4096)
         await ws.prepare(request)
+        # rate-limit key; kept only in memory for this connection and the 10 s limiter window
+        key = request.remote
+        if self.trust_proxy and request.headers.get("X-Forwarded-For"):
+            key = request.headers["X-Forwarded-For"].split(",")[0].strip()
+        await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.items[-30:]],
+                            "rules": [[cond, list(groups)] for cond, groups in RULES]})
+        await ws.send_json(self.nights())
         self.clients.add(ws)
-        async for _ in ws:
-            pass
+        async for msg in ws:
+            if msg.type != aiohttp.WSMsgType.TEXT:
+                continue
+            try:
+                d = json.loads(msg.data)
+            except ValueError:
+                continue
+            if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
+                await self.handle_chat(ws, key, d["text"])
         self.clients.discard(ws)
         return ws
 
 
+def parse_start(hm):
+    """'HH:MM' -> sim epoch of that Rome time today."""
+    h, m = map(int, hm.split(":"))
+    return datetime.now(ROME).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
+
+
 async def main(args):
-    live = Live(args.mint, args.demo)
+    data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 else "")
+    live = Live(args.mint, args.demo, args.time_scale, data_dir,
+                parse_start(args.start) if args.start else None, args.trust_proxy)
     app = web.Application(client_max_size=64 * 1024 ** 2)
     app.router.add_get("/ws", live.ws_handler)
 
@@ -185,9 +300,13 @@ async def main(args):
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "127.0.0.1", args.port).start()
-    print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint})")
+    print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
+          f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     tasks = [live.run_brain(), live.demo_trades() if args.demo else live.rpc_trades()]
-    await asyncio.gather(*tasks)
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        live.store.save(live.engine, live.memory)
 
 
 if __name__ == "__main__":
@@ -195,4 +314,8 @@ if __name__ == "__main__":
     p.add_argument("--mint", default="6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx")
     p.add_argument("--demo", action="store_true")
     p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
+    p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
+    p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
+    p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     asyncio.run(main(p.parse_args()))
