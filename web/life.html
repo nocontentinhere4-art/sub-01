@@ -2,326 +2,122 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050507">
+<link rel="icon" href="data:,">
 <title>SUB-01 · life</title>
+<!--
+  Shell for the life page. The 3D world and every panel are filled by ES modules under /world/ (entry: /world/main.js).
+  three.js is vendored under /vendor/three/ and loaded through the importmap below (no CDN).
+
+  HUD containers (stable ids; each stream fills its own, see docs/real-world/CONTRACT.md):
+    #scene          canvas host (main.js). Children with class .ov are overlays on top of the canvas.
+    #hud            the whole HUD layer (scene + side panel).
+    #status         top-left: title, nav, #doing (what it is doing), #meta (clock / sleep stage)   (hud.js)
+    #speech         under #status: inner-speech line + what it "sees" (eye thought)               (hud.js)
+    #tools          top-right bar holding #lab and #quality
+    #lab            lab-mode toggle + follow-camera toggle                                          (main.js)
+    #quality        quality switch auto / low / medium / high                                       (quality.js)
+    #phone-overlay  bottom-left phone screen while it uses the phone; main.js mounts phone.overlayEl
+                    here and adds class .on while the phone is in use                               (phone.js)
+    #minibrain      bottom-right mini brain (placeholder until the hud stream's fibre brain)         (minibrain.js)
+    #side           side panel (right on desktop, below the scene on phones) holding:
+      #workspace    workspace / needs bars + today's log                                            (hud.js)
+      #chat         chat log + send form (+ nickname)                                               (hud.js)
+    #honesty        honesty line, always visible (fixed to the viewport bottom). Never remove or hide it.
+  Body classes set by main.js: .ready (first frame drawn), .lab, .q-low|.q-medium|.q-high, .cam-<name> with ?cam=.
+-->
+<script type="importmap">
+{ "imports": {
+    "three": "/vendor/three/build/three.module.min.js",
+    "three/addons/": "/vendor/three/examples/jsm/"
+} }
+</script>
 <style>
-  :root { --bg:#050507; --fg:#ececf2; --dim:#80808f; --or:#ff6a00; }
+  :root { --bg:#050507; --fg:#ececf2; --dim:#80808f; --or:#ff6a00; --line:#1c1c26; --panel:rgba(8,8,12,.72);
+          --honesty-h:40px; --side-w:340px; }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow:hidden; }
-  #wrap { display:flex; height:100%; }
-  #scene { flex:1; position:relative; min-width:0; }
-  #scene canvas { display:block; }
-  #hud { position:absolute; left:16px; top:14px; pointer-events:none; max-width:60%; }
-  #hud h1 { margin:0; font-size:20px; letter-spacing:.12em; display:inline-block; background:var(--or); color:#0a0a0a; padding:2px 10px; }
-  #nav { display:inline-block; margin-left:10px; font-size:12px; pointer-events:auto; }
-  #nav a { color:var(--dim); text-decoration:none; margin-right:10px; } #nav a.on { color:var(--fg); }
-  #doing { margin-top:10px; font-size:15px; text-shadow:0 1px 6px #000; }
-  #meta { color:var(--dim); font-size:12px; margin-top:4px; text-shadow:0 1px 6px #000; }
-  #thought { margin-top:8px; font-size:15px; font-style:italic; color:#fff; text-shadow:0 1px 8px #000; max-width:560px; }
-  #tools { position:absolute; right:14px; top:14px; display:flex; gap:6px; }
-  #tools button { background:rgba(10,10,14,.75); color:var(--fg); border:1px solid #2a2a36; font:inherit; font-size:11px; padding:5px 9px; cursor:pointer; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  body { min-height:100svh; padding-bottom:calc(var(--honesty-h) + env(safe-area-inset-bottom)); overflow-x:hidden; }
+  button, input, select { font:inherit; }
+
+  /* ---- mobile first: scene on top, panel below (the page scrolls) ---- */
+  #hud { position:relative; }
+  #scene { position:relative; height:62svh; min-height:320px; overflow:hidden; background:#0a0c12; }
+  #scene canvas { display:block; width:100%; height:100%; touch-action:none; }
+  .ov { position:absolute; z-index:2; }
+  #scene::before { content:""; position:absolute; left:0; right:0; top:0; height:150px; z-index:1; pointer-events:none;
+            background:linear-gradient(rgba(5,5,7,.6), rgba(5,5,7,0)); }       /* keeps the HUD text readable on a bright sky */
+  #status { left:12px; top:10px; right:12px; pointer-events:none; }
+  #status h1 { margin:0; font-size:17px; letter-spacing:.12em; display:inline-block; background:var(--or); color:#0a0a0a; padding:2px 8px; }
+  #nav { display:block; margin-top:5px; font-size:11px; pointer-events:auto; width:max-content; }
+  #nav a { color:var(--dim); text-decoration:none; margin-right:8px; } #nav a.on { color:var(--fg); }
+  #doing { margin-top:8px; font-size:14px; text-shadow:0 1px 6px #000; }
+  #meta { color:#b5b5c4; font-size:11px; margin-top:3px; text-shadow:0 1px 6px #000; }
+  #speech { left:12px; right:12px; top:112px; pointer-events:none; font-size:13px; font-style:italic; color:#fff;
+            text-shadow:0 1px 8px #000; max-width:560px; }
+  #tools { right:10px; top:10px; display:flex; align-items:flex-start; gap:4px; }
+  #tools .row { display:flex; gap:4px; }
+  #tools button, #tools select { background:rgba(10,10,14,.78); color:var(--fg); border:1px solid #2a2a36; font-size:10px;
+            padding:4px 6px; cursor:pointer; min-height:30px; }
   #tools button.on { border-color:var(--or); color:var(--or); }
-  #phone { position:absolute; left:16px; bottom:16px; width:210px; height:400px; border-radius:26px; background:#0b0b10;
-    border:3px solid #26262f; box-shadow:0 10px 40px rgba(0,0,0,.6); padding:34px 10px 14px; display:none; }
-  #phone .top { position:absolute; top:12px; left:0; right:0; text-align:center; font-size:10px; color:var(--dim); }
-  #phone canvas, #phone iframe { width:100%; height:100%; border:0; border-radius:10px; background:#000; display:block; }
-  #foot { position:absolute; left:16px; right:16px; bottom:8px; color:#5a5a6a; font-size:10px; pointer-events:none; text-align:right; }
-  #side { width:330px; border-left:1px solid #1c1c26; padding:14px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+  #phone-overlay { left:10px; bottom:10px; width:100px; height:190px; display:none; }
+  #phone-overlay.on { display:block; }
+  #minibrain { right:10px; bottom:10px; width:40%; max-width:360px; aspect-ratio:4/3; border:1px solid #2a2a36; border-radius:8px;
+            overflow:hidden; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); }
+  body.cam-brain #minibrain { width:auto; max-width:none; left:4%; right:4%; bottom:4%; }
+  #side { padding:12px; display:flex; flex-direction:column; gap:14px; border-top:1px solid var(--line); }
   .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
-  .bar { display:flex; align-items:center; gap:8px; font-size:12px; margin:4px 0; }
-  .bar span:first-child { width:70px; color:var(--dim); }
-  .track { flex:1; height:6px; background:#15151d; border-radius:3px; overflow:hidden; }
-  .fill { height:100%; background:linear-gradient(90deg,#5a189a,#ff6a00); width:0; transition:width .4s; }
-  #log div { font-size:12px; padding:3px 0; border-bottom:1px solid #111118; }
-  #log span { color:var(--dim); margin-right:6px; }
-  #chat { font-size:12px; max-height:180px; overflow-y:auto; }
-  #chat div { padding:3px 0; border-bottom:1px solid #111118; }
-  form { display:flex; gap:6px; }
-  input { flex:1; background:#0c0c12; color:var(--fg); border:1px solid #2a2a36; padding:8px; font:inherit; font-size:12px; }
-  form button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12px; }
-  #ack { font-size:11px; color:var(--dim); min-height:1.2em; }
-  #note { font-size:10px; color:#55556a; }
-  @media (max-width: 900px) { #wrap { flex-direction:column; overflow-y:auto; } #scene { flex:none; height:62vh; }
-    #side { width:auto; border-left:none; } html,body { overflow:auto; } #phone { width:150px; height:280px; } }
-  #brainpip { position:absolute; right:14px; bottom:26px; width:min(34%, 380px); aspect-ratio:4/3; border:1px solid #2a2a36;
-    border-radius:8px; overflow:hidden; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); display:block; }
-  #brainpip iframe { width:100%; height:100%; border:0; pointer-events:none; display:block; }
-  #brainpip span { position:absolute; left:8px; bottom:6px; right:8px; font-size:10px; color:#bdbdca; text-shadow:0 1px 4px #000; }
-  #brainpip b { color:#ff6a00; font-weight:normal; }
-  @media (max-width: 900px) { #brainpip { width:46%; bottom:12px; } }
+  #honesty { position:fixed; left:0; right:0; bottom:0; z-index:50; min-height:var(--honesty-h);
+            padding:6px 12px calc(6px + env(safe-area-inset-bottom)); background:rgba(5,5,7,.94); border-top:1px solid var(--line);
+            color:#a4a4b6; font-size:10px; line-height:1.4; text-align:center; }
+  #boot { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); font-size:12px; z-index:1; pointer-events:none; }
+  body.ready #boot { display:none; }
+
+  /* ---- wider screens: scene fills the viewport, panel on the right ---- */
+  @media (min-width: 900px) {
+    body { height:100vh; overflow:hidden; padding-bottom:0; }
+    #hud { display:grid; grid-template-columns:1fr var(--side-w); height:calc(100vh - var(--honesty-h)); }
+    #scene { height:100%; }
+    #side { border-top:none; border-left:1px solid var(--line); overflow-y:auto; padding:14px; }
+    #status { left:16px; top:14px; right:auto; max-width:60%; }
+    #status h1 { font-size:20px; padding:2px 10px; }
+    #nav { display:inline-block; font-size:12px; margin:0 0 0 10px; }
+    #tools { gap:6px; }
+    #tools button, #tools select { font-size:11px; padding:5px 9px; }
+    #doing { font-size:15px; margin-top:10px; }
+    #meta { font-size:12px; }
+    #speech { left:16px; top:96px; font-size:15px; right:auto; width:min(560px, 55%); }
+    #tools { right:14px; top:14px; flex-direction:row; }
+    #phone-overlay { left:16px; bottom:16px; width:190px; height:360px; }
+    #minibrain { right:14px; bottom:14px; width:min(34%, 380px); }
+    #honesty { font-size:11px; padding-top:11px; }
+  }
 </style>
 </head>
 <body>
-<div id="wrap">
+<div id="hud">
   <div id="scene">
-    <div id="hud">
+    <div id="boot">loading the world…</div>
+    <div id="status" class="ov">
       <h1>SUB-01</h1><span id="nav"><a class="on" href="/">LIFE</a><a href="/brain">BRAIN</a><a href="/world.html">DREAMS</a></span>
       <div id="doing">connecting…</div>
       <div id="meta"></div>
-      <div id="thought"></div>
     </div>
-    <div id="tools"><button id="b-follow" class="on">follow</button><button id="b-lab">lab mode</button></div>
-    <div id="phone"><div class="top">SUB-01's phone · <span id="app"></span></div><canvas id="phonecv" width="360" height="620"></canvas><iframe id="tiktok" allow="encrypted-media" style="display:none"></iframe></div>
-    <a id="brainpip" href="/brain" title="open the brain">
-      <iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe>
-      <span>its brain, live · real fibres from MRI · <b id="pipstage">AWAKE</b></span>
-    </a>
-    <div id="foot">A life simulated in real time, driven by a brain model built from one real person's public MRI. Not a mind, not the person.</div>
+    <div id="speech" class="ov" aria-live="polite"></div>
+    <div id="tools" class="ov">
+      <div id="lab" class="row"></div>
+      <div id="quality" class="row"></div>
+    </div>
+    <div id="phone-overlay" class="ov"></div>
+    <div id="minibrain" class="ov"></div>
   </div>
   <div id="side">
-    <div><div class="lbl">Needs</div>
-      <div class="bar"><span>hunger</span><div class="track"><div class="fill" id="n-hunger"></div></div></div>
-      <div class="bar"><span>boredom</span><div class="track"><div class="fill" id="n-boredom"></div></div></div>
-      <div class="bar"><span>sleepiness</span><div class="track"><div class="fill" id="n-sleep"></div></div></div>
-      <div class="bar"><span>bread</span><span id="n-bread" style="color:#ececf2">0</span></div>
-    </div>
-    <div><div class="lbl">Today</div><div id="log"></div></div>
-    <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
-      <div id="chat"></div>
-      <form id="f"><input id="in" maxlength="280" placeholder="e.g. vai a comprare il pane" autocomplete="off"><button>send</button></form>
-      <div id="ack"></div>
-    </div>
-    <div id="note">It decides with its own needs and brain state: a suggestion makes an activity more likely, it does not command it. Phone content: its own chart and chat, plus public TikToks from a curated list shown through TikTok's official embed.</div>
+    <div id="workspace"></div>
+    <div id="chat"></div>
   </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script>
-// ---------------- scene ----------------
-const host = document.getElementById("scene");
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-host.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
-camera.position.set(4, 16, 22);
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.47; controls.target.set(4, 0, 4);
-function resize(){ const w=host.clientWidth, h=host.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
-addEventListener("resize", resize); resize();
-
-const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3226, 0.7); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-20, 30, 10); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, {left:-35, right:35, top:35, bottom:-35});
-scene.add(sun);
-
-const M = c => new THREE.MeshStandardMaterial({color:c, roughness:0.85, metalness:0.0});
-function box(w, h, d, c, x, y, z, parent=scene){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c));
-  m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; }
-function cyl(r, h, c, x, y, z, parent=scene, seg=12){ const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg), M(c));
-  m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; }
-function label(text, bg, fg, w=2.4, h=0.6){ const c=document.createElement("canvas"); c.width=512; c.height=128; const x=c.getContext("2d");
-  x.fillStyle=bg; x.fillRect(0,0,512,128); x.fillStyle=fg; x.font="bold 64px Menlo, monospace"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(text,256,68);
-  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)})); return m; }
-
-const nightLights = [];      // things that glow at night
-let world = null;
-
-function buildWorld(W){
-  world = W;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 90), M(0x6f7a5a)); ground.rotation.x = -Math.PI/2; ground.position.set(4,0,10);
-  ground.receiveShadow = true; scene.add(ground);
-  const [sx0, sz0, sx1, sz1] = W.street;
-  box(sx1-sx0+30, 0.04, sz1-sz0, 0x2c2e33, (sx0+sx1)/2, 0.02, (sz0+sz1)/2);
-  box(sx1-sx0+30, 0.12, 1.2, 0x9a9a96, (sx0+sx1)/2, 0.06, sz0-0.6); box(sx1-sx0+30, 0.12, 1.2, 0x9a9a96, (sx0+sx1)/2, 0.06, sz1+0.6);
-  for (let x = sx0-10; x < sx1+10; x += 4) box(1.6, 0.05, 0.12, 0xe8e2c8, x, 0.05, (sz0+sz1)/2);
-  // apartment (cut-away: low front wall so we can see inside)
-  const [ax0, az0, ax1, az1] = W.apartment, aw = ax1-ax0, ad = az1-az0, cx = (ax0+ax1)/2, cz = (az0+az1)/2;
-  box(aw, 0.1, ad, 0xb99a74, cx, 0.05, cz);                                            // wooden floor
-  box(aw, 2.8, 0.2, 0xe9e4da, cx, 1.4, az0);                                           // back wall
-  box(0.2, 2.8, ad, 0xe9e4da, ax0, 1.4, cz); box(0.2, 2.8, ad, 0xe9e4da, ax1, 1.4, cz);
-  box(3.3, 0.7, 0.2, 0xe9e4da, ax0+1.65, 0.35, az1); box(3.3, 0.7, 0.2, 0xe9e4da, ax1-1.65, 0.35, az1); // low front wall + door gap
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({color:0x9fd3ff, emissive:0x223344, transparent:true, opacity:0.55}));
-  glass.position.set(4, 1.7, az0+0.11); scene.add(glass); nightLights.push([glass.material, 0x223344, 0xffc46b]);
-  box(2.4, 0.08, 0.1, 0x6b5a48, 4, 1.02, az0+0.14); box(2.4, 0.08, 0.1, 0x6b5a48, 4, 2.38, az0+0.14);
-  // bed, table + chair, desk + monitor
-  const bp = W.places.bed; box(2.0, 0.45, 1.5, 0x46506e, bp[0]-0.2, 0.3, bp[1]-0.1); box(0.5, 0.2, 1.2, 0xf1efe8, bp[0]-1.0, 0.62, bp[1]-0.1);
-  box(1.3, 0.12, 1.4, 0x7d8bb0, bp[0]+0.15, 0.58, bp[1]-0.1);
-  const tp = W.places.table; box(1.4, 0.08, 0.9, 0x8a6a4a, tp[0], 0.78, tp[1]-0.7); for (const [dx,dz] of [[-0.6,-0.35],[0.6,-0.35],[-0.6,0.35],[0.6,0.35]]) cyl(0.04, 0.75, 0x5a4636, tp[0]+dx, 0.38, tp[1]-0.7+dz, scene, 6);
-  box(0.5, 0.06, 0.5, 0x5a4636, tp[0], 0.46, tp[1]); box(0.5, 0.55, 0.06, 0x5a4636, tp[0], 0.75, tp[1]+0.24);
-  // desk against the back wall: the screen faces the room (and the camera), SUB-01 sits with its back to us
-  const dp = W.places.desk; box(1.5, 0.07, 0.7, 0x2e2e33, dp[0], 0.76, dp[1]-0.65); box(0.05, 0.75, 0.6, 0x222226, dp[0]-0.7, 0.38, dp[1]-0.65); box(0.05, 0.75, 0.6, 0x222226, dp[0]+0.7, 0.38, dp[1]-0.65);
-  box(1.08, 0.66, 0.04, 0x111114, dp[0], 1.2, dp[1]-0.93);
-  monitor = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.6), new THREE.MeshBasicMaterial({map: chartTex}));
-  monitor.position.set(dp[0], 1.2, dp[1]-0.9); scene.add(monitor);
-  box(0.5, 0.06, 0.5, 0x333338, dp[0], 0.46, dp[1]); // stool
-  const lamp = new THREE.PointLight(0xffd6a0, 0, 9); lamp.position.set(4, 2.5, 3); scene.add(lamp); roomLamp = lamp;
-  // neighbours along the street
-  for (const [x, w, h, c] of [[-16,7,6,0xb9a38c],[-7,5,4.5,0x8e9aa6],[13,6,4.5,0xa89484],[27,7,8,0x9aa39a],[-24,6,5,0x8b8f99]])
-    { const b = box(w, h, 6, c, x, h/2, 2.5); for (let y = 1.5; y < h-0.5; y += 2) for (let k = -w/2+1; k < w/2; k += 1.6) {
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.9), new THREE.MeshStandardMaterial({color:0x33404d, emissive:0x000000}));
-        win.position.set(x+k, y, 5.51); scene.add(win); nightLights.push([win.material, 0x000000, Math.random() < 0.55 ? 0xffc46b : 0x000000]); } }
-  // bakery (cut-away towards the street)
-  const [bx0, bz0, bx1, bz1] = W.bakery, bcx = (bx0+bx1)/2, bcz = (bz0+bz1)/2;
-  box(bx1-bx0, 0.1, bz1-bz0, 0xd9cbb5, bcx, 0.05, bcz);
-  // street side (north) is the real facade with the door; the far side (south) is cut low so the camera sees in
-  box(3.2, 3.2, 0.2, 0xd8b98a, bx0+1.6, 1.6, bz0); box(3.2, 3.2, 0.2, 0xd8b98a, bx1-1.6, 1.6, bz0); box(bx1-bx0, 0.8, 0.2, 0xd8b98a, bcx, 2.8, bz0);
-  box(bx1-bx0, 0.9, 0.2, 0xd8b98a, bcx, 0.45, bz1);
-  box(0.2, 3.2, bz1-bz0, 0xd8b98a, bx0, 1.6, bcz); box(0.2, 3.2, bz1-bz0, 0xd8b98a, bx1, 1.6, bcz);
-  const cp = W.places.counter; box(3.2, 1.0, 0.7, 0x7b5236, cp[0], 0.5, cp[1]+0.75);
-  for (let i = 0; i < 9; i++) { const loaf = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), M(0xc98b43)); loaf.scale.set(1.6, 0.8, 1);
-    loaf.position.set(bx0+1.2+(i%3)*0.7 + (i>=6?5:0) - (i>=3&&i<6?-5.6:0), 1.35, bz0+0.45); scene.add(loaf); }
-  box(2.4, 0.08, 0.4, 0x6b4a30, bx0+1.9, 1.2, bz0+0.45); box(2.4, 0.08, 0.4, 0x6b4a30, bx1-1.9, 1.2, bz0+0.45);
-  const sign = label("BAKERY · PANE", "#1a1208", "#ffcf8a", 4.2, 0.8); sign.position.set(bcx, 3.6, bz0-0.12); sign.rotation.y = Math.PI; scene.add(sign);
-  for (let i = 0; i < 8; i++) box(1, 0.08, 1.4, i % 2 ? 0xffffff : 0xd8452b, bx0+0.5+i, 3.05, bz0-0.6).rotation.x = -0.35;
-  // park
-  const [px0, pz0, px1, pz1] = W.park;
-  box(px1-px0, 0.06, pz1-pz0, 0x5f8f4e, (px0+px1)/2, 0.03, (pz0+pz1)/2);
-  box(1.4, 0.07, pz1-pz0-1, 0xc2b28f, W.places.bench[0], 0.07, (pz0+pz1)/2);
-  for (const [x, z] of [[-17,15],[-16,21],[-10,16],[-9,21.5],[-17.5,18],[-8.5,14.5]]) { cyl(0.18, 1.6, 0x6b4a30, x, 0.8, z, scene, 8);
-    const c = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), M(0x3f7a3a)); c.position.set(x, 2.3, z); c.castShadow = true; scene.add(c); }
-  const bp2 = W.places.bench; box(1.8, 0.08, 0.5, 0x7a5638, bp2[0], 0.48, bp2[1]+0.3); box(1.8, 0.45, 0.08, 0x7a5638, bp2[0], 0.75, bp2[1]+0.55);
-  // street lights
-  for (let x = sx0; x <= sx1; x += 9) { cyl(0.06, 4, 0x2b2b30, x, 2, sz1+1.3, scene, 6);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({color:0xffffff, emissive:0x000000}));
-    bulb.position.set(x, 4.05, sz1+1.3); scene.add(bulb); nightLights.push([bulb.material, 0x000000, 0xffd48a]);
-    const pl = new THREE.PointLight(0xffc988, 0, 11); pl.position.set(x, 3.9, sz1+1.2); scene.add(pl); streetLamps.push(pl); }
-}
-let monitor = null, roomLamp = null; const streetLamps = [];
-
-// ---------------- the character (stylised, no face: never the real person) ----------------
-const body = new THREE.Group(); scene.add(body);
-const skin = M(0xe0c4a4), shirt = M(0xeeeeee), pants = M(0x3a4a6a);
-const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.7, 12), shirt); torso.position.y = 1.15; torso.castShadow = true; body.add(torso);
-const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 14), skin); head.position.y = 1.72; head.castShadow = true; body.add(head);
-const tag = label("SUB-01", "#ff6a00", "#0a0a0a", 0.36, 0.1); tag.position.set(0, 1.28, 0.265); body.add(tag);
-const legs = [], arms = [];
-for (const s of [-1, 1]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 8), pants); l.geometry.translate(0, -0.4, 0);
-  l.position.set(0.11*s, 0.8, 0); l.castShadow = true; body.add(l); legs.push(l);
-  const a = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.62, 8), shirt); a.geometry.translate(0, -0.31, 0);
-  a.position.set(0.3*s, 1.45, 0); a.castShadow = true; body.add(a); arms.push(a); }
-const phoneMesh = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.17, 0.015), new THREE.MeshBasicMaterial({color:0x111111}));
-const phoneScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.15), new THREE.MeshBasicMaterial({map:null, color:0x88aaff}));
-phoneScreen.position.z = 0.009; phoneMesh.add(phoneScreen); phoneMesh.visible = false; body.add(phoneMesh);
-const loafHand = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), M(0xc98b43)); loafHand.scale.set(1.8, 0.8, 1); loafHand.visible = false; body.add(loafHand);
-const zzz = label("z z z", "rgba(0,0,0,0)", "#bcd0ff", 0.8, 0.25); zzz.visible = false; scene.add(zzz);
-
-// ---------------- chart / phone canvases (its real inputs: live trades + chat) ----------------
-const chartCv = document.createElement("canvas"); chartCv.width = 512; chartCv.height = 300;
-const chartTex = new THREE.CanvasTexture(chartCv);
-const flow = []; let flowSum = 0; const chatLines = [];
-function drawChart(cv, tall){
-  const x = cv.getContext("2d"), W = cv.width, H = cv.height;
-  x.fillStyle = "#07080c"; x.fillRect(0, 0, W, H);
-  x.fillStyle = "#ff6a00"; x.fillRect(0, 0, W, tall ? 44 : 30); x.fillStyle = "#0a0a0a"; x.font = `bold ${tall?24:18}px Menlo, monospace`;
-  x.fillText(`${poolName} · order flow`, 10, tall ? 30 : 21);
-  if (flow.length > 1) { const lo = Math.min(...flow), hi = Math.max(...flow), top = tall ? 70 : 44;
-    const n = flow.length, cw = W / Math.max(40, n);
-    for (let i = 1; i < n; i++) { const up = flow[i] >= flow[i-1], y0 = top + (H-top-20) * (1 - (flow[i-1]-lo)/(hi-lo||1)), y1 = top + (H-top-20) * (1 - (flow[i]-lo)/(hi-lo||1));
-      x.fillStyle = up ? "#39f5a0" : "#ff4d6d"; x.fillRect(i*cw, Math.min(y0,y1), Math.max(2, cw-2), Math.max(2, Math.abs(y1-y0))); } }
-  chartTex.needsUpdate = true;
-}
-function drawChat(cv){
-  const x = cv.getContext("2d"), W = cv.width, H = cv.height;
-  x.fillStyle = "#0a0a10"; x.fillRect(0, 0, W, H); x.fillStyle = "#ff6a00"; x.fillRect(0, 0, W, 44);
-  x.fillStyle = "#0a0a0a"; x.font = "bold 24px Menlo, monospace"; x.fillText("chat", 12, 30);
-  x.font = "20px Menlo, monospace"; let y = 80;
-  for (const m of chatLines.slice(-9)) { x.fillStyle = "#9a9aae"; x.fillText(m.t || "", 12, y); x.fillStyle = "#ececf2";
-    const words = m.text.split(" "); let line = ""; y += 26;
-    for (const w of words) { if ((line + w).length > 26) { x.fillText(line, 12, y); y += 24; line = ""; } line += w + " "; }
-    x.fillText(line, 12, y); y += 34; if (y > H - 20) break; }
-}
-
-// ---------------- live state ----------------
-let life = null, prev = null, poolName = "", stage = "AWAKE", clock = "--:--", lab = false, follow = true, feed = [];
-fetch("/phone_feed.json").then(r => r.ok ? r.json() : []).then(f => feed = Array.isArray(f) ? f : []).catch(() => {});
-const shown = {x: 1.6, z: 1.3, h: 0};
-
-function connect(){
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-  ws.onmessage = e => {
-    const m = JSON.parse(e.data);
-    if (m.type === "hello") { if (m.world && !world) buildWorld(m.world); (m.chat || []).forEach(addChat); return; }
-    if (m.type === "chat") { addChat(m); return; }
-    if (m.type === "chat_ack") { document.getElementById("ack").textContent = m.ok ? "sent — it heard you" : "not sent: " + m.reason; return; }
-    if (m.type === "eye") { if (m.thought) document.getElementById("thought").textContent = `“${m.thought}”`; return; }
-    if (m.type !== "tick") return;
-    poolName = m.pool || ""; stage = (m.sleep && m.sleep.stage) || "AWAKE"; clock = (m.sleep && m.sleep.clock) || clock;
-    for (const t of m.trades || []) { flowSum += (t.kind === "buy" ? 1 : -1) * Math.log10(1 + t.usd); flow.push(flowSum); if (flow.length > 90) flow.shift(); }
-    if (m.life) onLife(m.life, m.sleep);
-  };
-  ws.onclose = () => setTimeout(connect, 1500);
-  document.getElementById("f").onsubmit = ev => { ev.preventDefault(); const i = document.getElementById("in");
-    if (i.value.trim()) ws.send(JSON.stringify({type: "chat", text: i.value})); i.value = ""; };
-}
-function addChat(m){ chatLines.push(m); if (chatLines.length > 40) chatLines.shift();
-  const d = document.createElement("div"); d.textContent = `${m.t || ""} ${m.text}`; const c = document.getElementById("chat"); c.appendChild(d); c.scrollTop = 1e9; }
-
-let lastLog = "";
-function onLife(L, S){
-  life = L;
-  const asleep = stage !== "AWAKE";
-  document.getElementById("pipstage").textContent = stage;
-  document.getElementById("doing").textContent = asleep ? `${stage === "REM" ? "dreaming" : "deeply asleep"} in bed` : L.doing + (L.walking ? " · on the way" : "");
-  document.getElementById("meta").textContent = `${clock} Rome · ${stage}${L.say ? " · " + L.say : ""}`;
-  document.getElementById("n-hunger").style.width = (L.hunger * 100) + "%";
-  document.getElementById("n-boredom").style.width = (L.boredom * 100) + "%";
-  document.getElementById("n-sleep").style.width = Math.min(100, ((S && S.tired) || 0) * 100) + "%";
-  document.getElementById("n-bread").textContent = L.bread;
-  const logKey = JSON.stringify(L.log);
-  if (logKey !== lastLog) { lastLog = logKey; document.getElementById("log").innerHTML = "";
-    for (const e of L.log.slice().reverse()) { const d = document.createElement("div"); const s = document.createElement("span");
-      const dt = new Date(e.t * 1000); s.textContent = dt.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit", timeZone:"Europe/Rome"});
-      d.appendChild(s); d.appendChild(document.createTextNode(e.what)); document.getElementById("log").appendChild(d); } }
-  // phone overlay
-  const ph = document.getElementById("phone"), tk = document.getElementById("tiktok"), cv = document.getElementById("phonecv");
-  if (L.phone && !asleep) {
-    ph.style.display = "block"; let app = L.phone;
-    if (app === "tiktok" && !feed.length) app = "chart";
-    document.getElementById("app").textContent = app;
-    if (app === "tiktok") { const id = feed[Math.floor(Date.now() / 45000) % feed.length];
-      const src = `https://www.tiktok.com/embed/v2/${id}`; if (tk.src !== src) tk.src = src; tk.style.display = "block"; cv.style.display = "none"; }
-    else { tk.style.display = "none"; tk.removeAttribute("src"); cv.style.display = "block"; app === "chat" ? drawChat(cv) : drawChart(cv, true); }
-  } else { ph.style.display = "none"; tk.removeAttribute("src"); }
-}
-
-// ---------------- animation ----------------
-document.getElementById("b-follow").onclick = e => { follow = !follow; e.target.classList.toggle("on", follow); };
-document.getElementById("b-lab").onclick = e => { lab = !lab; e.target.classList.toggle("on", lab); };
-controls.addEventListener("start", () => { follow = false; document.getElementById("b-follow").classList.remove("on"); });
-
-function romeHour(){ const [h, m] = clock.split(":").map(Number); return isNaN(h) ? 12 : h + m / 60; }
-function animate(t){
-  requestAnimationFrame(animate);
-  const time = t / 1000;
-  if (life) {
-    shown.x += (life.x - shown.x) * 0.15; shown.z += (life.z - shown.z) * 0.15;
-    let dh = life.heading - shown.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); shown.h += dh * 0.2;
-    body.position.set(shown.x, 0, shown.z); body.rotation.set(0, shown.h, 0);
-    const pose = stage !== "AWAKE" ? "lying" : life.pose, walk = pose === "walking";
-    legs.forEach((l, i) => { l.rotation.x = walk ? Math.sin(time * 7 + i * Math.PI) * 0.6 : 0; });
-    arms.forEach((a, i) => { a.rotation.x = walk ? Math.sin(time * 7 + i * Math.PI + Math.PI) * 0.5 : 0; a.rotation.z = 0; });
-    body.position.y = walk ? Math.abs(Math.sin(time * 7)) * 0.05 : 0;
-    if (pose === "sitting" || pose === "sitting_desk") { body.position.y = -0.35; legs.forEach(l => l.rotation.x = -1.45);
-      body.rotation.y = Math.PI; if (pose === "sitting_desk") arms.forEach(a => a.rotation.x = -1.0); }
-    if (pose === "lying" || pose === "lying_phone") { body.rotation.set(-Math.PI / 2, 0, Math.PI / 2); body.position.set(1.35, 0.95, 1.2);
-      if (pose === "lying_phone") { arms[1].rotation.x = -2.3; } }
-    phoneMesh.visible = pose === "lying_phone";
-    if (phoneMesh.visible) { phoneMesh.position.set(0.25, 1.5, 0.55); phoneMesh.rotation.set(-0.3, 0, 0); phoneScreen.material.color.setHex(0xaad0ff); }
-    loafHand.visible = walk && life.bread > 0; loafHand.position.set(0.32, 1.0, 0.18);
-    zzz.visible = stage !== "AWAKE"; zzz.position.set(1.5, 2.1 + Math.sin(time) * 0.1, 1.2); zzz.lookAt(camera.position);
-    if (follow) { const target = new THREE.Vector3(shown.x, 0.8, shown.z);
-      controls.target.lerp(target, 0.05); const desired = target.clone().add(new THREE.Vector3(0, 9, 12));
-      camera.position.lerp(desired, 0.02); }
-  }
-  // light: Rome time of day; lab mode = cold, dark, orange accents
-  const h = romeHour(), dayK = Math.max(0, Math.sin(Math.PI * (h - 6) / 14));
-  const night = dayK < 0.15;
-  const sky = lab ? new THREE.Color(0x07080c) : new THREE.Color().setHSL(0.58, 0.45, 0.08 + 0.55 * dayK);
-  scene.background = sky; scene.fog = new THREE.Fog(sky, 40, 110);
-  sun.intensity = lab ? 0.25 : 0.15 + 0.95 * dayK; sun.color.setHex(lab ? 0x9fb6ff : 0xfff2dc);
-  sun.position.set(-30 + 60 * ((h - 6) / 14), 10 + 30 * dayK, 12);
-  hemi.intensity = lab ? 0.25 : 0.25 + 0.5 * dayK;
-  nightLights.forEach(([mat, off, on]) => mat.emissive.setHex(night || lab ? on : off));
-  streetLamps.forEach(l => l.intensity = night || lab ? 1.2 : 0);
-  if (roomLamp) roomLamp.intensity = (night || lab) && stage === "AWAKE" ? 1.4 : 0;
-  if (monitor && Math.floor(time * 2) !== animate.k) { animate.k = Math.floor(time * 2); drawChart(chartCv, false); }
-  controls.update(); renderer.render(scene, camera);
-}
-requestAnimationFrame(animate);
-connect();
-</script>
+<div id="honesty">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>
+<script type="module" src="/world/main.js"></script>
 </body>
 </html>
