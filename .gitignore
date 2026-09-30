@@ -20,3 +20,6 @@ out/*_raw.png
 # QC-rejected resting-state runs and interrupted writes (see process_rest.py)
 out/rest/rejected/
 out/rest/*.part.npz
+
+# secrets (API keys) never go to git
+.env

@@ -11,8 +11,10 @@ Images and thoughts are AI-generated from the model's state. They are not what t
 """
 import json
 import math
+import os
 import re
 import time
+import urllib.request
 from pathlib import Path
 
 WORLD_HALF_LIFE_H = 6.0            # simulated hours for an object's strength to halve
@@ -91,6 +93,38 @@ def mood(groups, stage, market):
             "market": market}
 
 
+def load_env(path):
+    """Read KEY=VALUE lines from a local, git-ignored .env into os.environ (never printed or logged)."""
+    p = Path(path)
+    if p.exists():
+        for line in p.read_text().splitlines():
+            if "=" in line and not line.strip().startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+class ReplicateImages:
+    """FLUX schnell on Replicate: ~1-2 s per image, nothing runs on this Mac's GPU."""
+    URL = "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions"
+
+    def __init__(self, token):
+        self.token = token
+
+    def generate(self, prompt, seed, width, height):
+        from io import BytesIO
+
+        from PIL import Image
+        body = json.dumps({"input": {"prompt": prompt, "seed": seed, "aspect_ratio": "16:9", "num_outputs": 1,
+                                     "output_format": "jpg", "output_quality": 88, "go_fast": True}}).encode()
+        req = urllib.request.Request(self.URL, data=body, method="POST", headers={
+            "Authorization": f"Bearer {self.token}", "Content-Type": "application/json", "Prefer": "wait=30"})
+        out = json.loads(urllib.request.urlopen(req, timeout=60).read())
+        if out.get("status") not in ("succeeded", "processing", "starting") or not out.get("output"):
+            raise RuntimeError(f"replicate: {out.get('status')} {str(out.get('error'))[:200]}")
+        url = out["output"][0] if isinstance(out["output"], list) else out["output"]
+        return Image.open(BytesIO(urllib.request.urlopen(url, timeout=60).read())).resize((width, height))
+
+
 class Eye:
     def __init__(self, out_dir, world_path, width=768, height=432, steps=8, quantize=4):
         self.out = Path(out_dir)
@@ -112,6 +146,8 @@ class Eye:
         if self.llm is None:
             from mlx_lm import load
             self.llm, self.tok = load(LLM_ID)
+        if self.img is None and os.environ.get("REPLICATE_API_TOKEN"):
+            self.img = ReplicateImages(os.environ["REPLICATE_API_TOKEN"])
         if self.img is None:
             from mflux.models.common.resolution.config_resolution import ConfigResolution
             from mflux.models.z_image.variants.z_image import ZImage
@@ -153,9 +189,12 @@ class Eye:
         prompt = f"{scene or 'an empty quiet room'}. {style}. no text, no people"
         name = f"{int(time.time() * 1000)}.jpg"
         t0 = time.time()
-        image = self.img.generate_image(seed=int(t) % 100000, prompt=prompt, width=self.size[0], height=self.size[1],
-                                        num_inference_steps=self.steps, guidance=0.0)
-        pil = getattr(image, "image", None) or image
+        if isinstance(self.img, ReplicateImages):
+            pil = self.img.generate(prompt, int(t) % 100000, *self.size)
+        else:
+            image = self.img.generate_image(seed=int(t) % 100000, prompt=prompt, width=self.size[0],
+                                            height=self.size[1], num_inference_steps=self.steps, guidance=0.0)
+            pil = getattr(image, "image", None) or image
         if stage == "NREM":                               # deep sleep: keep only a faint trace of the scene
             from PIL import ImageEnhance
             pil = ImageEnhance.Brightness(pil).enhance(0.25)

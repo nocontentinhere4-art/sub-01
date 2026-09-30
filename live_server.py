@@ -27,7 +27,7 @@ from aiohttp import web
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
-from eye import Eye, market_mood
+from eye import Eye, load_env, market_mood
 from real_baseline import RealBaseline
 
 HERE = Path(__file__).parent
@@ -340,6 +340,7 @@ async def main(args):
     if not args.no_real_baseline and list((HERE / "out" / "rest").glob("*.npz")):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
     if args.eye:
+        load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         live.eye = Eye(HERE / "out" / "eye" / "frames", data_dir / "world.json", width=640, height=360, steps=6)
         live.eye_every = args.eye_every
         app.router.add_static("/eye", HERE / "out" / "eye" / "frames")
