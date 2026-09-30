@@ -32,6 +32,7 @@ WORLD = {"places": PLACES, "edges": EDGES,
 
 WALK_SPEED = 1.3            # m / real second
 OPENING = {"bakery": (7.0, 20.0)}   # local (Europe/Rome) hours: bakery 07:00-20:00; the park is open in daylight (sun_hours)
+PARK_DUSK_MIN = 20          # nobody sets off for the park in the last 20 minutes before sunset
 LAST_ORDER_MIN = 10         # the bakery is not worth walking to in the last 10 minutes before closing
 ROME_LAT, ROME_LON = 41.9, 12.5
 TIRED_ENERGY = 0.2          # energy (1 - sleep pressure) below this: too tired to go to the park
@@ -236,6 +237,8 @@ class Life:
             return False, "already doing that"
         if act == self.activity and self.path:
             return True, "already on the way"                 # the plan is left alone (no re-roll, no duplicate log)
+        if self.activity in ("buy_bread", "eat") and not self.path and t < self.until:
+            return False, f"busy: finishing {LABEL[self.activity]}"     # short need-satisfying activity: let it end
         if act == "buy_bread":
             if self.bread:
                 if self.hunger < HUNGRY_TO_EAT:
@@ -257,6 +260,8 @@ class Life:
         elif act == "park":
             if not is_open("park", t):
                 return False, "too dark for the park now (daylight only)"
+            if sun_hours(t)[1] - hhmm_h(t) < PARK_DUSK_MIN / 60:
+                return False, "too dark for the park soon (it is almost dusk)"
             if self.energy < TIRED_ENERGY:
                 return False, f"too tired for the park (energy {self.energy:.0%})"
         self.start(act, t, reason or f"starts: {LABEL[act]}")

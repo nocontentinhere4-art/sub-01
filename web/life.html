@@ -43,7 +43,7 @@
           --honesty-h:40px; --side-w:340px; }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--bg); color:var(--fg); font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-  body { min-height:100svh; padding-bottom:calc(var(--honesty-h) + env(safe-area-inset-bottom)); overflow-x:hidden; }
+  body { min-height:100svh; padding-bottom:var(--honesty-band, calc(var(--honesty-h) + env(safe-area-inset-bottom))); overflow-x:hidden; }
   button, input, select { font:inherit; }
 
   /* ---- mobile first: scene on top, panel below (the page scrolls) ---- */
@@ -85,7 +85,7 @@
   /* ---- wider screens: scene fills the viewport, panel on the right ---- */
   @media (min-width: 900px) {
     body { height:100vh; overflow:hidden; padding-bottom:0; }
-    #hud { display:grid; grid-template-columns:1fr var(--side-w); height:calc(100vh - var(--honesty-h)); }
+    #hud { display:grid; grid-template-columns:1fr var(--side-w); height:calc(100vh - var(--honesty-band, var(--honesty-h))); }
     #scene { height:100%; }
     #side { border-top:none; border-left:1px solid var(--line); overflow-y:auto; padding:14px; }
     #chat-log { max-height:150px !important; }

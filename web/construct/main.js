@@ -21,6 +21,7 @@
 // it answers); tick.market -> fx.weather (on change); tick.groups -> city.setFear.
 // URL params: ?view=first|orbit  ?q=low|medium|high  ?nofollow=1   (key "v" toggles the view)
 // window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view, districts, fibres}
+//   (+ debug: lastChatRegions, lastSpeechChat = the last speech's cid matched a chat message seen on this page)
 // It is a model of brain activity, not a mind.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -60,6 +61,11 @@ function hook(name, fn) {
   try { fn(); }
   catch (e) { if (!failed.has(name)) { failed.add(name); console.error(`[construct] ${name} failed:`, e); } }
 }
+
+// the fixed honesty band can wrap to several lines on a phone: pad the page by its real height
+const honestyEl = $("honesty");
+if (honestyEl) new ResizeObserver(() => document.documentElement.style.setProperty("--honesty-band", honestyEl.offsetHeight + "px"))
+  .observe(honestyEl);
 
 // ---------------- renderer, scene, camera ----------------
 const quality = Quality.init();
@@ -282,7 +288,8 @@ net = connect({
   mind(m) { hud.mind(m); },
   speech(m) {
     hud.speech(m);
-    const chat = m.cid ? chatByCid.get(m.cid) || null : null;
+    const chat = m.cid ? chatByCid.get(m.cid) || null : null;   // speech.cid = the winning chat candidate (contract)
+    stats.lastSpeechChat = !!chat;                          // debug / e2e: the last speech answered a known chat message
     hook("fx.innerLine", () => fx?.innerLine({ ...m, chat }));
   },
 });
@@ -338,6 +345,17 @@ function updatePhoneState() {
   $("phone-overlay").classList.toggle("on", phoneState.visible);
 }
 
+// per-frame hooks, in the contract's fixed order; closures are bound once (no per-frame allocation)
+let frameDt = 0;
+const HOOKS = [
+  ["city", () => city?.update(frameDt, env, act)],
+  ["travel", () => travel?.update(frameDt, life, env)],
+  ["fx", () => fx?.update(frameDt, env)],
+  ["phone", () => phone.update(phoneState)],
+  ["hud", () => hud.update(frameDt, env)],
+  ["minibrain", () => minibrain.update(frameDt, env)],
+];
+const renderFx = () => fx.render();
 let last = performance.now(), fpsAcc = 0, fpsN = 0, framesDrawn = 0;
 function frame(now) {
   requestAnimationFrame(frame);
@@ -345,18 +363,14 @@ function frame(now) {
   fpsAcc += dt; fpsN++;
   if (fpsAcc >= 0.5) { stats.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
 
+  frameDt = dt;
   updateEnv(dt);
   updatePhoneState();
-  hook("city", () => city?.update(dt, env, act));
-  hook("travel", () => travel?.update(dt, life, env));
-  hook("fx", () => fx?.update(dt, env));
-  hook("phone", () => phone.update(phoneState));
-  hook("hud", () => hud.update(dt, env));
-  hook("minibrain", () => minibrain.update(dt, env));
+  for (let k = 0; k < HOOKS.length; k++) hook(HOOKS[k][0], HOOKS[k][1]);
 
   if (controls.enabled) controls.update();
   renderer.info.reset();
-  if (fx) hook("fx.render", () => fx.render()); else renderer.render(scene, camera);
+  if (fx) hook("fx.render", renderFx); else renderer.render(scene, camera);
   stats.drawCalls = renderer.info.render.calls;
   stats.triangles = renderer.info.render.triangles;
   if (city && ++framesDrawn === 2) { stats.ready = true; document.body.classList.add("ready"); }
