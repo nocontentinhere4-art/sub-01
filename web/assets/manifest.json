@@ -1,0 +1,1043 @@
+{
+ "version": 1,
+ "about": "Describes web/assets for the loaders. URLs are root-absolute (the server serves web/ at /). Units: metres, +Y up, right-handed, glTF convention. World transform of a model = scale, then rotationY (about +Y), placed so that origin.y = surfaceY + yOffset. size[] is the final size after scale and rotationY. Every model carries Draco geometry + WebP textures: load with GLTFLoader + DRACOLoader (decoders in web/vendor/three).",
+ "hdri": {
+  "day": "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
+  "dusk": "/assets/hdri/qwantani_dusk_2_1k.hdr",
+  "night": "/assets/hdri/satara_night_1k.hdr",
+  "interior": "/assets/hdri/small_empty_room_1_1k.hdr",
+  "city": "/assets/hdri/potsdamer_platz_1k.hdr"
+ },
+ "textures": {
+  "herringbone_parquet": {
+   "map": "/assets/textures/herringbone_parquet/herringbone_parquet_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/herringbone_parquet/herringbone_parquet_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/herringbone_parquet/herringbone_parquet_rough_1k.jpg",
+   "repeatPerMetre": 1.0,
+   "use": "apartment floor"
+  },
+  "white_stucco": {
+   "map": "/assets/textures/white_stucco/white_stucco_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/white_stucco/white_stucco_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/white_stucco/white_stucco_rough_1k.jpg",
+   "repeatPerMetre": 0.5,
+   "use": "walls (apartment, bakery, facades)"
+  },
+  "asphalt_02": {
+   "map": "/assets/textures/asphalt_02/asphalt_02_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/asphalt_02/asphalt_02_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/asphalt_02/asphalt_02_rough_1k.jpg",
+   "repeatPerMetre": 0.33,
+   "use": "road"
+  },
+  "brushed_concrete": {
+   "map": "/assets/textures/brushed_concrete/brushed_concrete_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/brushed_concrete/brushed_concrete_rough_1k.jpg",
+   "repeatPerMetre": 0.5,
+   "use": "pavement / kerbs / ceiling"
+  },
+  "brick_4": {
+   "map": "/assets/textures/brick_4/brick_4_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/brick_4/brick_4_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/brick_4/brick_4_rough_1k.jpg",
+   "repeatPerMetre": 1.0,
+   "use": "facades, bakery wall"
+  },
+  "grass_path_2": {
+   "map": "/assets/textures/grass_path_2/grass_path_2_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/grass_path_2/grass_path_2_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/grass_path_2/grass_path_2_rough_1k.jpg",
+   "repeatPerMetre": 0.5,
+   "use": "park ground"
+  },
+  "brown_floor_tiles": {
+   "map": "/assets/textures/brown_floor_tiles/brown_floor_tiles_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/brown_floor_tiles/brown_floor_tiles_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/brown_floor_tiles/brown_floor_tiles_rough_1k.jpg",
+   "repeatPerMetre": 0.6,
+   "use": "bakery floor"
+  },
+  "cobblestone_01": {
+   "map": "/assets/textures/cobblestone_01/cobblestone_01_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/cobblestone_01/cobblestone_01_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/cobblestone_01/cobblestone_01_rough_1k.jpg",
+   "repeatPerMetre": 1.0,
+   "use": "street / park paths"
+  },
+  "denim_fabric": {
+   "map": "/assets/textures/denim_fabric/denim_fabric_diffuse_1k.jpg",
+   "normalMap": "/assets/textures/denim_fabric/denim_fabric_nor_gl_1k.jpg",
+   "roughnessMap": "/assets/textures/denim_fabric/denim_fabric_rough_1k.jpg",
+   "repeatPerMetre": 1.5,
+   "use": "sofa / bed cover / blanket"
+  }
+ },
+ "models": {
+  "old_bed_frame": {
+   "url": "/assets/models/old_bed_frame.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.905,
+    1.201,
+    2.002
+   ],
+   "tris": 46481,
+   "area": "apartment",
+   "role": "bed",
+   "bytes": 474328,
+   "anchor": "floor",
+   "front": "head end at -z (taller rail 1.20 m), foot end +z (0.84 m)",
+   "origin": "base-centre",
+   "rawSize": [
+    0.905,
+    1.201,
+    2.002
+   ],
+   "rawMin": [
+    -0.448,
+    0,
+    -0.998
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "bare spring frame, spring plane at y=0.49 m; add a procedural mattress+duvet (denim_fabric) ~0.15 m thick and throw_pillows_01 at the head end"
+  },
+  "throw_pillows_01": {
+   "url": "/assets/models/throw_pillows_01.glb",
+   "scale": 0.9,
+   "rotationY": 0,
+   "yOffset": 0.002,
+   "size": [
+    0.932,
+    0.405,
+    0.679
+   ],
+   "tris": 6356,
+   "area": "apartment",
+   "role": "pillows",
+   "bytes": 870356,
+   "anchor": "bed",
+   "front": "-",
+   "origin": "base-centre",
+   "rawSize": [
+    1.036,
+    0.45,
+    0.755
+   ],
+   "rawMin": [
+    -0.519,
+    -0.002,
+    -0.328
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "two pillows; place on the mattress top (~0.64 m) at the head end"
+  },
+  "WoodenTable_01": {
+   "url": "/assets/models/WoodenTable_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    1.8,
+    0.549,
+    0.657
+   ],
+   "tris": 950,
+   "area": "apartment",
+   "role": "table",
+   "bytes": 226116,
+   "anchor": "floor",
+   "front": "long axis x",
+   "origin": "base-centre",
+   "rawSize": [
+    1.8,
+    0.549,
+    0.657
+   ],
+   "rawMin": [
+    -0.9,
+    0,
+    -0.329
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "LOW table: 0.55 m high, 1.8 m long (coffee/side table, bakery bench). Not a dining table; do not non-uniformly scale it"
+  },
+  "WoodenChair_01": {
+   "url": "/assets/models/WoodenChair_01.glb",
+   "scale": 0.9,
+   "rotationY": 0,
+   "yOffset": 0.001,
+   "size": [
+    0.619,
+    2.047,
+    0.592
+   ],
+   "tris": 16878,
+   "area": "apartment",
+   "role": "chair",
+   "bytes": 316256,
+   "anchor": "floor",
+   "front": "+z",
+   "origin": "base-centre",
+   "rawSize": [
+    0.688,
+    2.274,
+    0.658
+   ],
+   "rawMin": [
+    -0.344,
+    -0.001,
+    -0.367
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "gothic high-back chair: seat top ~0.43 m after scale, back 2.05 m; faces +z"
+  },
+  "metal_office_desk": {
+   "url": "/assets/models/metal_office_desk.glb",
+   "scale": 0.9,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    1.8,
+    0.709,
+    0.852
+   ],
+   "tris": 4856,
+   "area": "apartment",
+   "role": "desk",
+   "bytes": 157900,
+   "anchor": "floor",
+   "front": "sitter at +z (drawer pedestals face +z)",
+   "origin": "base-centre",
+   "rawSize": [
+    2,
+    0.788,
+    0.947
+   ],
+   "rawMin": [
+    -1,
+    0,
+    -0.469
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "top at 0.71 m after scale; pair with WoodenChair_01"
+  },
+  "classic_laptop": {
+   "url": "/assets/models/classic_laptop.glb",
+   "scale": 0.55,
+   "rotationY": 0,
+   "yOffset": 0.001,
+   "size": [
+    0.359,
+    0.299,
+    0.267
+   ],
+   "tris": 13128,
+   "area": "apartment",
+   "role": "laptop",
+   "bytes": 288264,
+   "anchor": "desk",
+   "front": "keyboard towards +z, screen hinge at -z",
+   "origin": "base-centre",
+   "rawSize": [
+    0.652,
+    0.543,
+    0.486
+   ],
+   "rawMin": [
+    -0.326,
+    -0.001,
+    -0.242
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "1990s grey laptop, 0.36x0.30x0.27 m after scale; screen is a flat dark texture - overlay an emissive plane if a lit screen is wanted"
+  },
+  "desk_lamp_arm_01": {
+   "url": "/assets/models/desk_lamp_arm_01.glb",
+   "scale": 0.75,
+   "rotationY": 0,
+   "yOffset": 0.066,
+   "size": [
+    0.152,
+    0.67,
+    0.461
+   ],
+   "tris": 19630,
+   "area": "apartment",
+   "role": "lamp",
+   "bytes": 424824,
+   "anchor": "desk",
+   "front": "-",
+   "origin": "base-arm",
+   "rawSize": [
+    0.202,
+    0.893,
+    0.614
+   ],
+   "rawMin": [
+    -0.118,
+    -0.088,
+    -0.297
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "anglepoise lamp, clamp base at origin, arm reaches to +z; min y is -0.088 (clamp) so yOffset lifts it onto the desk"
+  },
+  "Shelf_01": {
+   "url": "/assets/models/Shelf_01.glb",
+   "scale": 0.9,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.903,
+    1.872,
+    0.231
+   ],
+   "tris": 182,
+   "area": "apartment",
+   "role": "shelf",
+   "bytes": 321640,
+   "anchor": "floor",
+   "front": "+z",
+   "origin": "base-back",
+   "rawSize": [
+    1.003,
+    2.08,
+    0.257
+   ],
+   "rawMin": [
+    -0.502,
+    0,
+    0
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "origin at the BACK face (z 0..+0.257): place flush to a wall at z = wallZ, front +z; tall slim bookcase"
+  },
+  "Sofa_01": {
+   "url": "/assets/models/Sofa_01.glb",
+   "scale": 1.15,
+   "rotationY": 0,
+   "yOffset": 0.001,
+   "size": [
+    1.807,
+    0.917,
+    0.757
+   ],
+   "tris": 4009,
+   "area": "apartment",
+   "role": "sofa",
+   "bytes": 187232,
+   "anchor": "floor",
+   "front": "+z",
+   "origin": "base-centre",
+   "rawSize": [
+    1.571,
+    0.797,
+    0.658
+   ],
+   "rawMin": [
+    -0.778,
+    -0.001,
+    -0.361
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "two-seat sofa 1.8 m wide, seat top ~0.44 m; back at -z"
+  },
+  "electric_stove": {
+   "url": "/assets/models/electric_stove.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.503,
+    0.859,
+    0.648
+   ],
+   "tris": 12532,
+   "area": "apartment",
+   "role": "stove",
+   "bytes": 233000,
+   "anchor": "floor",
+   "front": "+z",
+   "origin": "base-centre",
+   "rawSize": [
+    0.503,
+    0.859,
+    0.648
+   ],
+   "rawMin": [
+    -0.251,
+    0,
+    -0.3
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "real size, 0.5x0.86x0.65 m; front +z"
+  },
+  "drawer_cabinet": {
+   "url": "/assets/models/drawer_cabinet.glb",
+   "scale": 0.8,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.913,
+    1.505,
+    0.39
+   ],
+   "tris": 13630,
+   "area": "apartment",
+   "role": "cabinet",
+   "bytes": 186948,
+   "anchor": "floor",
+   "front": "+z",
+   "origin": "base-centre",
+   "rawSize": [
+    1.141,
+    1.881,
+    0.488
+   ],
+   "rawMin": [
+    -0.571,
+    0,
+    -0.248
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "open shelves + drawers, 1.5 m tall after scale"
+  },
+  "wall_clock": {
+   "url": "/assets/models/wall_clock.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.32,
+    0.32,
+    0.047
+   ],
+   "tris": 3551,
+   "area": "apartment",
+   "role": "clock",
+   "bytes": 149648,
+   "anchor": "wall",
+   "front": "dial faces +z",
+   "origin": "dial-centre",
+   "rawSize": [
+    0.32,
+    0.32,
+    0.047
+   ],
+   "rawMin": [
+    -0.16,
+    -0.16,
+    0
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "origin = dial centre, back of clock at z=0; place at the wall with y = desired centre height (~1.9 m). Hands are a separate node 'wall_clock_minute_hand' (rotate about z if animating); glass is transmissive (costly) material"
+  },
+  "modern_ceiling_lamp_01": {
+   "url": "/assets/models/modern_ceiling_lamp_01.glb",
+   "scale": 0.7,
+   "rotationY": 0,
+   "yOffset": -0.821,
+   "size": [
+    0.302,
+    0.666,
+    0.302
+   ],
+   "tris": 5456,
+   "area": "apartment",
+   "role": "ceiling_lamp",
+   "bytes": 139304,
+   "anchor": "ceiling",
+   "front": "-",
+   "origin": "cord-top",
+   "rawSize": [
+    0.432,
+    0.952,
+    0.432
+   ],
+   "rawMin": [
+    -0.216,
+    0.221,
+    -0.214
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "pendant: cord top is at y=+1.173 (raw), bulb bottom at 0.221; place origin at ceilingY - 1.173*scale. Globe is a separate mesh: set emissive / add a PointLight at night"
+  },
+  "potted_plant_01": {
+   "url": "/assets/models/potted_plant_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.587,
+    1.336,
+    0.634
+   ],
+   "tris": 153761,
+   "area": "apartment",
+   "role": "bush",
+   "bytes": 1131940,
+   "anchor": "floor",
+   "front": "-",
+   "origin": "base-centre",
+   "rawSize": [
+    0.587,
+    1.336,
+    0.634
+   ],
+   "rawMin": [
+    -0.338,
+    0,
+    -0.364
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "indoor potted plant 1.34 m; HEAVY: 153,761 tris for one plant (leaves) - use one instance, medium/high quality only",
+   "minQuality": "medium"
+  },
+  "street_lamp_01": {
+   "url": "/assets/models/street_lamp_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.704,
+    3.871,
+    0.387
+   ],
+   "tris": 20038,
+   "area": "street",
+   "role": "street_lamp",
+   "bytes": 220728,
+   "anchor": "floor",
+   "front": "-",
+   "origin": "base-centre",
+   "rawSize": [
+    0.704,
+    3.871,
+    0.387
+   ],
+   "rawMin": [
+    -0.352,
+    0,
+    -0.193
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "3.87 m post, lantern glass is an alpha material; add a PointLight/emissive at night"
+  },
+  "fire_hydrant": {
+   "url": "/assets/models/fire_hydrant.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.875,
+    0.799,
+    0.318
+   ],
+   "tris": 78000,
+   "area": "street",
+   "role": "hydrant",
+   "bytes": 740592,
+   "anchor": "floor",
+   "front": "-",
+   "origin": "two variants",
+   "rawSize": [
+    0.875,
+    0.799,
+    0.318
+   ],
+   "rawMin": [
+    -0.442,
+    0,
+    -0.127
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "file holds TWO hydrants (node 'fire_hydrant' at x=-0.3 and 'fire_hydrant_aged' at x=+0.3, each 0.27x0.80x0.32 m, ~39k tris each). Clone one node (getObjectByName) and discard the other; HEAVY for a small prop",
+   "nodes": [
+    "fire_hydrant",
+    "fire_hydrant_aged"
+   ],
+   "minQuality": "medium"
+  },
+  "metal_trash_can": {
+   "url": "/assets/models/metal_trash_can.glb",
+   "scale": 0.8,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    1.564,
+    0.968,
+    0.445
+   ],
+   "tris": 13664,
+   "area": "street",
+   "role": "trash",
+   "bytes": 806912,
+   "anchor": "floor",
+   "front": "-",
+   "origin": "two variants",
+   "rawSize": [
+    1.955,
+    1.21,
+    0.556
+   ],
+   "rawMin": [
+    -0.953,
+    -0.164,
+    -0.278
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "file holds TWO bins with lids (nodes 'metal_trash_can_rust' x=-0.5 and 'metal_trash_can_handle_left' x=+0.23); a loose lid dips 0.16 m below y=0 by design, so yOffset 0. Each bin ~0.72 m tall after scale",
+   "nodes": [
+    "metal_trash_can_rust",
+    "metal_trash_can_handle_left"
+   ]
+  },
+  "planter_box_01": {
+   "url": "/assets/models/planter_box_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.913,
+    0.425,
+    0.414
+   ],
+   "tris": 6898,
+   "area": "street",
+   "role": "planter",
+   "bytes": 324044,
+   "anchor": "floor",
+   "front": "long axis x",
+   "origin": "base-centre",
+   "rawSize": [
+    0.913,
+    0.425,
+    0.414
+   ],
+   "rawMin": [
+    -0.457,
+    0,
+    -0.207
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "wooden crate planter 0.91x0.43x0.41 m, empty (black liner) - add procedural plants/soil"
+  },
+  "CoffeeCart_01": {
+   "url": "/assets/models/CoffeeCart_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": -0.004,
+   "size": [
+    2.168,
+    1.718,
+    1.073
+   ],
+   "tris": 27080,
+   "area": "bakery",
+   "role": "cart",
+   "bytes": 514580,
+   "anchor": "floor",
+   "front": "+z (sliding door)",
+   "origin": "base-centre",
+   "rawSize": [
+    2.168,
+    1.718,
+    1.073
+   ],
+   "rawMin": [
+    -1.397,
+    0.004,
+    -0.558
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "coffee/service cart with machine, mugs and cans; 'CoffeeCart_01_mugs'/'_props'/'_cart' are separate nodes. Brand-like text is baked in the texture (see ASSETS.md). Bbox x includes a power cord to -x"
+  },
+  "wooden_display_shelves_01": {
+   "url": "/assets/models/wooden_display_shelves_01.glb",
+   "scale": 1.0,
+   "rotationY": -1.5708,
+   "yOffset": 0.0,
+   "size": [
+    1.078,
+    1.556,
+    0.371
+   ],
+   "tris": 2854,
+   "area": "bakery",
+   "role": "display",
+   "bytes": 156216,
+   "anchor": "floor",
+   "front": "open face is +x in the file; rotationY=-pi/2 makes it face +z",
+   "origin": "base-centre",
+   "rawSize": [
+    0.371,
+    1.556,
+    1.078
+   ],
+   "rawMin": [
+    -0.186,
+    0,
+    -0.539
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "3x3 cube shelf 1.08 wide x 1.56 tall; size[] is AFTER the rotation"
+  },
+  "croissant": {
+   "url": "/assets/models/croissant.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.001,
+   "size": [
+    0.2,
+    0.062,
+    0.076
+   ],
+   "tris": 1988,
+   "area": "bakery",
+   "role": "bread",
+   "bytes": 335076,
+   "anchor": "counter",
+   "front": "-",
+   "origin": "base-centre",
+   "rawSize": [
+    0.2,
+    0.062,
+    0.076
+   ],
+   "rawMin": [
+    -0.102,
+    -0.001,
+    -0.032
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "one croissant 0.20x0.06x0.08 m (only bread model; other loaves/baguettes are procedural)"
+  },
+  "wicker_basket_01": {
+   "url": "/assets/models/wicker_basket_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.001,
+   "size": [
+    0.383,
+    0.117,
+    0.295
+   ],
+   "tris": 21674,
+   "area": "bakery",
+   "role": "basket",
+   "bytes": 386752,
+   "anchor": "counter",
+   "front": "-",
+   "origin": "base-centre",
+   "rawSize": [
+    0.383,
+    0.117,
+    0.295
+   ],
+   "rawMin": [
+    -0.192,
+    -0.001,
+    -0.148
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "open wicker basket 0.38x0.12x0.30 m, good for bread/croissants inside; 21.7k tris"
+  },
+  "painted_wooden_bench": {
+   "url": "/assets/models/painted_wooden_bench.glb",
+   "scale": 0.85,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    0.99,
+    0.756,
+    0.422
+   ],
+   "tris": 624,
+   "area": "park",
+   "role": "bench",
+   "bytes": 254928,
+   "anchor": "floor",
+   "front": "+z (seat faces +z, back at -z)",
+   "origin": "base-centre",
+   "rawSize": [
+    1.165,
+    0.889,
+    0.497
+   ],
+   "rawMin": [
+    -0.576,
+    0,
+    -0.254
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "a small hall-style bench (0.99 m wide after scale, seat ~0.55 m), not a park bench: place in pairs or build the long park bench procedurally"
+  },
+  "island_tree_01": {
+   "url": "/assets/models/island_tree_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.02,
+   "size": [
+    4.755,
+    5.027,
+    4.817
+   ],
+   "tris": 1298266,
+   "area": "park",
+   "role": "tree",
+   "bytes": 8570692,
+   "anchor": "floor",
+   "front": "-",
+   "origin": "base-centre",
+   "rawSize": [
+    4.755,
+    5.027,
+    4.817
+   ],
+   "rawMin": [
+    -2.344,
+    -0.02,
+    -2.584
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "5.0 m tree, HEAVY: 1,298,266 tris and 8.5 MB. Use at most 1-2 instances, high quality only, lazy-load; on low/medium build a procedural tree",
+   "minQuality": "high"
+  },
+  "grass_medium_01": {
+   "url": "/assets/models/grass_medium_01.glb",
+   "scale": 1.0,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    5.605,
+    0.342,
+    0.327
+   ],
+   "tris": 19242,
+   "area": "park",
+   "role": "bush",
+   "bytes": 558904,
+   "anchor": "floor",
+   "front": "strip along x",
+   "origin": "base-centre",
+   "rawSize": [
+    5.605,
+    0.342,
+    0.327
+   ],
+   "rawMin": [
+    -2.553,
+    -0.026,
+    -0.158
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "a 5.6 m strip of grass tufts (0.34 m high, alpha cards, 19k tris): scatter as instances. Not a bush; hedges/bushes are procedural"
+  },
+  "rock_moss_set_01": {
+   "url": "/assets/models/rock_moss_set_01.glb",
+   "scale": 0.5,
+   "rotationY": 0,
+   "yOffset": 0.0,
+   "size": [
+    4.003,
+    0.884,
+    3.474
+   ],
+   "tris": 61417,
+   "area": "park",
+   "role": "rock",
+   "bytes": 480352,
+   "anchor": "floor",
+   "front": "-",
+   "origin": "scatter centre",
+   "rawSize": [
+    8.005,
+    1.768,
+    6.949
+   ],
+   "rawMin": [
+    -3.914,
+    -0.661,
+    -3.824
+   ],
+   "textures": [
+    "webp1024x1024"
+   ],
+   "notes": "a scatter of 6 mossy rocks over 8x7 m (raw); scale 0.5 gives ~4x3.5 m, rocks 0.3-0.9 m. The deepest rock is sunk by design (raw min y -0.66) so yOffset 0 with the ground at y=0"
+  }
+ },
+ "character": {
+  "url": null,
+  "clips": {
+   "idle": null,
+   "walk": null,
+   "sit": null,
+   "sit_desk": null,
+   "lie": null,
+   "lie_phone": null,
+   "eat": null,
+   "look_window": null,
+   "serve": null
+  },
+  "expected": {
+   "dir": "web/assets/character/",
+   "note": "Quaternius rigged character + animation library not on assets/cc0 yet. Expected: one rigged GLB (e.g. web/assets/character/character.glb) and/or animation GLBs; once present, re-run the asset inspection, set character.url and map each clip name below. Clips without a match stay null (character.js must fall back to a procedural pose).",
+   "clipSlots": [
+    "idle",
+    "walk",
+    "sit",
+    "sit_desk",
+    "lie",
+    "lie_phone",
+    "eat",
+    "look_window",
+    "serve"
+   ]
+  }
+ },
+ "areas": {
+  "shared": {
+   "hdri": [
+    "day",
+    "dusk",
+    "night"
+   ],
+   "textures": [],
+   "models": [],
+   "bytes": 4886683
+  },
+  "apartment": {
+   "hdri": [
+    "interior"
+   ],
+   "textures": [
+    "herringbone_parquet",
+    "white_stucco",
+    "denim_fabric",
+    "brushed_concrete"
+   ],
+   "models": [
+    "old_bed_frame",
+    "throw_pillows_01",
+    "WoodenTable_01",
+    "WoodenChair_01",
+    "metal_office_desk",
+    "classic_laptop",
+    "desk_lamp_arm_01",
+    "Shelf_01",
+    "Sofa_01",
+    "electric_stove",
+    "drawer_cabinet",
+    "wall_clock",
+    "modern_ceiling_lamp_01",
+    "potted_plant_01"
+   ],
+   "bytes": 14438912
+  },
+  "street": {
+   "hdri": [
+    "city"
+   ],
+   "textures": [
+    "asphalt_02",
+    "cobblestone_01",
+    "brick_4",
+    "brushed_concrete",
+    "white_stucco"
+   ],
+   "models": [
+    "street_lamp_01",
+    "fire_hydrant",
+    "metal_trash_can",
+    "planter_box_01"
+   ],
+   "bytes": 12846036
+  },
+  "bakery": {
+   "hdri": [
+    "interior"
+   ],
+   "textures": [
+    "brown_floor_tiles",
+    "brick_4",
+    "white_stucco"
+   ],
+   "models": [
+    "CoffeeCart_01",
+    "wooden_display_shelves_01",
+    "croissant",
+    "wicker_basket_01"
+   ],
+   "bytes": 7691631
+  },
+  "park": {
+   "hdri": [],
+   "textures": [
+    "grass_path_2",
+    "cobblestone_01"
+   ],
+   "models": [
+    "painted_wooden_bench",
+    "island_tree_01",
+    "grass_medium_01",
+    "rock_moss_set_01"
+   ],
+   "bytes": 13207499
+  }
+ },
+ "files": 58,
+ "totalBytes": 42987487,
+ "characterBytes": 0
+}
