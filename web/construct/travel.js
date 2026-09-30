@@ -23,7 +23,7 @@ export const STANDOFF = 56;          // distance in front of a district where SU
 export const LOOK_AHEAD = 30;        // look this far ahead along the road while walking
 const BLEND_S = 1.5;                 // view switch duration
 export const TOWER_R = 15;           // the camera keeps this far (xz) from the centre of a district it passes
-export const MAX_SPEED = 64;         // city units / s: hard cap of the first-person camera (walks run at ~25-35)
+export const MAX_SPEED = 54;         // city units / s: hard cap of the first-person camera (walks run at ~25-35)
 const OFFSET_S = 1.75;               // a walk that starts away from its road blends in over this time
 const FOLLOW = 0.6;                  // orbit: how far towards SUB-01 the view target sits
 
