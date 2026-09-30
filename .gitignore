@@ -13,3 +13,7 @@ out/orbit_frame.png
 out/check_labels.png
 out/*_raw.png
 .DS_Store
+# small subject-space files process_rest.py needs (so a fresh clone can run it without the DWI step)
+!out/labels_t1.nii.gz
+!out/t1_brain_1mm.nii.gz
+!out/brainmask_t1.nii.gz

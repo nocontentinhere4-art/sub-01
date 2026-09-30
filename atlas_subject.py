@@ -41,6 +41,7 @@ def main():
     mask = warp(nib.load(icbm["mask"]), nearest=False) > 0.5
     mask = ndimage.binary_fill_holes(mask)
     nib.save(nib.Nifti1Image(mask.astype(np.uint8), t1.affine), "out/brainmask_t1.nii.gz")
+    nib.save(nib.Nifti1Image((T * mask).astype(np.float32), t1.affine), "out/t1_brain_1mm.nii.gz")  # no face
     print("brain mask", int(mask.sum()), "voxels (~cm3)", flush=True)
 
     sch = datasets.fetch_atlas_schaefer_2018(n_rois=200, yeo_networks=7, resolution_mm=1)

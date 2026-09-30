@@ -41,7 +41,7 @@ def process(key, labels_t1, n_regions):
         data = bold.get_fdata(dtype=np.float32)
         mean = data.mean(-1)
         t1 = labels_t1  # only its grid/affine is used for the T1 intensity below
-        t1_int = nib.load("out/t1_1mm.nii.gz").get_fdata()
+        t1_int = nib.load("out/t1_brain_1mm.nii.gz").get_fdata()   # skull-stripped: no face in the repo
         _, t1_to_bold = affine_registration(t1_int * (labels_t1.get_fdata() > 0), mean, moving_affine=t1.affine,
                                             static_affine=bold.affine, nbins=32,
                                             pipeline=["center_of_mass", "translation", "rigid"],
