@@ -119,7 +119,7 @@ def replicate_post(url, token, payload, tries=5):
             time.sleep(float(e.headers.get("Retry-After") or 0) or 10 * (i + 1))
             continue
         # "Prefer: wait" can return before the model is done (cold start): poll the prediction until it ends
-        deadline = time.time() + 120
+        deadline = time.time() + 240
         while out.get("status") in ("starting", "processing") and time.time() < deadline:
             time.sleep(1.5)
             get = urllib.request.Request(out["urls"]["get"], headers={"Authorization": f"Bearer {token}"})
@@ -231,7 +231,15 @@ class Eye:
         name = f"{int(time.time() * 1000)}.jpg"
         t0 = time.time()
         if isinstance(self.img, ReplicateImages):
-            pil = self.img.generate(prompt, int(t) % 100000, *self.size)
+            try:
+                pil = self.img.generate(prompt, int(t) % 100000, *self.size)
+            except Exception as e:                        # provider queue/outage: keep thinking, reuse last view
+                last = sorted(self.out.glob("*.jpg"))
+                if not last:
+                    raise
+                print("eye: image failed, reusing last view:", repr(e)[:160], flush=True)
+                from PIL import Image
+                pil = Image.open(last[-1])
         else:
             image = self.img.generate_image(seed=int(t) % 100000, prompt=prompt, width=self.size[0],
                                             height=self.size[1], num_inference_steps=self.steps, guidance=0.0)
