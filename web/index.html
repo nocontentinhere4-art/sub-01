@@ -47,7 +47,7 @@
       <div class="sub" id="sync">sync —</div>
     </div>
     <div id="foot">Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
-      the fibres are real (traced from diffusion MRI) · ~180 regions simulated · every trade is a stimulus · a model of brain activity, not a mind.</div>
+      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade is a stimulus · a model of brain activity, not a mind.</div>
   </div>
   <div id="panel">
     <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
@@ -137,6 +137,14 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   });
   scene.add(new THREE.LineSegments(g, fibreMat));
+  // ---- real cortical surface (from the T1 scan) as a faint glass shell ----
+  Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), fetch("cortex_idx.bin").then(r=>r.arrayBuffer())]).then(([vb, ib])=>{
+    const cg = new THREE.BufferGeometry();
+    cg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vb), 3));
+    cg.setIndex(new THREE.BufferAttribute(new Uint32Array(ib), 1));
+    scene.add(new THREE.Mesh(cg, new THREE.MeshBasicMaterial({color:0x9d8cff, transparent:true, opacity:0.04,
+      depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending})));
+  });
   // ---- region centres (same native space as the fibres) ----
   const sph = new THREE.SphereGeometry(1, 12, 12);
   const glowTex = (()=>{ const c=document.createElement("canvas"); c.width=c.height=64; const x=c.getContext("2d");
