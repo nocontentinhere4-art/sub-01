@@ -15,14 +15,17 @@
 //   update(dt, env)    NREM: global dim + slow (rain / pulses at half speed). REM: the world warps (screen-space warp +
 //                      fov breathing) and the day's messages drift through the city as translucent words (déjà vu,
 //                      from env.replays [{text, t, seq}]).
-//   render()           RenderPass -> OutputPass (ACES + sRGB, so the frame is display-ready and bounded) -> UnrealBloomPass
-//                      (medium / high; full at night, gentler by day) -> one combined fx pass (glitch + warp + tint + dim +
-//                      vignette). Low quality: no bloom, and the composer only runs while an effect is active (plain
-//                      renderer.render otherwise) so phones keep 30 fps.
-//   ?fxhold=1 (screenshots only) holds a glitch burst on; ?fxpost=0 disables the composer (debug); window.__sub01.fx
-//   mirrors the effect state.
-//   prefers-reduced-motion: glitch bursts are weak and short (no tearing / block displacement), warp and fov breathing
-//                      are reduced, jitter is off.
+//   render()           RenderPass (into a multisampled half-float target: quality.msaa samples, so medium / high keep
+//                      antialiasing through the composer) -> OutputPass (ACES + sRGB, so the frame is display-ready and
+//                      bounded) -> UnrealBloomPass (medium / high; full at night, gentler by day) -> one combined fx pass
+//                      (glitch + warp + tint + dim + vignette). Low quality: no bloom, no msaa, and the composer only runs
+//                      while an effect is active (plain renderer.render otherwise, the vignette fades with the effect
+//                      level so the switch is invisible) so phones keep 30 fps.
+//   Debug / screenshot URL params (harmless: clamped, no state beyond this module): ?fxhold=1 keeps a glitch burst on
+//   while the market dumps; ?fxspeed=N (0.1..10) scales the fx clock so rain lands sooner (e2e uses fxspeed=3 and waits
+//   on window.__sub01.fx.pending == 0); ?fxpost=0 disables the composer. window.__sub01.fx mirrors the effect state.
+//   prefers-reduced-motion (read live via matchMedia "change"): glitch bursts are weak and short (no tearing / block
+//                      displacement), REM shows a static warm tint instead of the warp / fov breathing, jitter is off.
 // It is a model of brain activity, not a mind.
 import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
@@ -60,6 +63,44 @@ export function splitWords(text, { maxWords = MAX_WORDS, maxLen = MAX_WORD_LEN, 
   return out;
 }
 
+/**
+ * Wrap text into at most maxLines lines at word boundaries. fits(str) -> bool says whether a line fits (canvas
+ * measureText in the page, a length check in the tests). A word longer than a line is cut. When the text does not fit
+ * in maxLines, the last line ends in an ellipsis at a word boundary (never mid-word, never squeezed).
+ */
+export function wrapText(text, fits, maxLines = 2) {
+  const words = String(text ?? "").trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = "";
+  for (let i = 0; i < words.length; i++) {
+    let w = words[i];
+    while (!fits(w)) w = w.slice(0, -1);                     // an overlong word: cut it
+    const cand = cur ? cur + " " + w : w;
+    if (fits(cand)) { cur = cand; continue; }
+    lines.push(cur); cur = w;
+    if (lines.length === maxLines) {                          // no room for the rest: ellipsis on the last line
+      let last = lines[maxLines - 1] + "…";
+      while (!fits(last) && last.length > 1) { last = last.replace(/…$/, "").replace(/\s*\S*$/, "") + "…"; }
+      lines[maxLines - 1] = last;
+      return lines;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+const CUR_KEYS = ["pump", "glitch", "jitter", "warp", "dim", "rem"];   // smoothed effect levels (no per-frame Object.keys)
+
+/** True when the renderer's GL context is a software rasterizer (same test as quality.js autoPick, on the live context). */
+export function softwareGL(renderer) {
+  try {
+    const gl = renderer.getContext();
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const r = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    return /swiftshader|llvmpipe|software|basic render/i.test(r);
+  } catch { return false; }
+}
+
 /** Weather targets per market mood (0..1 each). reduced = prefers-reduced-motion. */
 export function marketTargets(market, reduced = false) {
   const m = String(market || "calm").toLowerCase();
@@ -94,6 +135,7 @@ export function createBurster(rng = Math.random) {
 // glyph atlas (canvas -> texture, alpha only; the colour comes from the shader)
 // ---------------------------------------------------------------------------------------------------------------------
 const CELL_W = 32, CELL_H = 40, COLS = 16;
+const ADVANCE = 0.55;   // glyph advance in cells: a bold 26px monospace glyph fills ~half of the 32px cell (+ its outline)
 function makeAtlas() {
   const rows = Math.ceil(ATLAS_CHARS.length / COLS);
   const cv = document.createElement("canvas");
@@ -139,6 +181,7 @@ const GLYPH_VERT = /* glsl */`
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     vec4 clip = projectionMatrix * mv;
     float px = aWord.y * clamp(sqrt(200.0 / max(-mv.z, 1.0)), 0.85, 1.5);   // ~constant pixel size, a little bigger up close
+    // quad = one 32x40 atlas cell (aspect 0.8); the glyph ink fills ~half of it, so aWord.x (the advance) is ADVANCE cells
     vec2 off = (position.xy * vec2(0.8, 1.0) + vec2(aWord.x, 0.0)) * px / resolution * 2.0;
     clip.xy += off * clip.w;
     gl_Position = clip;
@@ -203,14 +246,14 @@ const FX_SHADER = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, resolution: { value: new THREE.Vector2(1, 1) },
     glitch: { value: 0 }, seed: { value: 0 }, split: { value: 0 }, tear: { value: 1 }, blocks: { value: 1 },
-    jitter: { value: 0 }, warp: { value: 0 }, dim: { value: 0 }, pump: { value: 0 }, vignette: { value: 0.35 },
+    jitter: { value: 0 }, warp: { value: 0 }, rem: { value: 0 }, dim: { value: 0 }, pump: { value: 0 }, vignette: { value: 0.35 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse; uniform float time; uniform vec2 resolution;
-    uniform float glitch, seed, split, tear, blocks, jitter, warp, dim, pump, vignette;
+    uniform float glitch, seed, split, tear, blocks, jitter, warp, rem, dim, pump, vignette;
     varying vec2 vUv;
     float hash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
     void main() {
@@ -221,7 +264,11 @@ const FX_SHADER = {
         uv = 0.5 + c * (breathe + warp * 0.16 * r * r * sin(time * 0.5 + r * 7.0));
         uv += warp * 0.014 * vec2(sin(uv.y * 7.0 + time * 0.9), cos(uv.x * 6.0 - time * 0.7));
       }
-      if (jitter > 0.001) uv += jitter * 0.0015 * vec2(hash(floor(time * 24.0)) - 0.5, hash(floor(time * 24.0) + 7.0) - 0.5);
+      if (jitter > 0.001) {                                                     // choppy: a smooth ~7 Hz wander, not a vibration
+        float jt = time * 7.0, jf = floor(jt), jr = smoothstep(0.0, 1.0, fract(jt));
+        vec2 n = mix(vec2(hash(jf), hash(jf + 7.0)), vec2(hash(jf + 1.0), hash(jf + 8.0)), jr) - 0.5;
+        uv += jitter * 0.0015 * n;
+      }
       vec2 guv = uv;
       float g = glitch;
       if (g > 0.001) {                                                          // dump: tearing + block displacement
@@ -252,7 +299,8 @@ const FX_SHADER = {
         float l = dot(col, vec3(0.30, 0.59, 0.11));
         col = mix(col, vec3(l) * vec3(0.55, 0.62, 0.85), dim * 0.45) * (1.0 - 0.45 * dim);
       }
-      col += warp * 0.02 * vec3(1.0, 0.5, 0.2) * (0.5 + 0.5 * sin(time * 0.3 + uv.y * 3.0));
+      col += rem * 0.025 * vec3(1.0, 0.5, 0.2) * (0.6 + 0.4 * sin(time * 0.3 + uv.y * 3.0));   // REM: a warm dream tint (also the
+                                                                                            // whole REM look under reduced motion)
       float vg = smoothstep(1.25, 0.35, length(vUv - 0.5) * 1.45);
       col *= mix(1.0, vg, vignette);
       gl_FragColor = vec4(col, 1.0);
@@ -263,7 +311,12 @@ const FX_SHADER = {
 export function createFx(renderer, scene, camera, data, quality) {
   const q = quality && typeof quality === "object" ? quality : { name: quality || "medium", post: true, bloom: true };
   const low = q.name === "low" || !q.post;
-  const reduced = (() => { try { return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
+  // prefers-reduced-motion, kept live: a setting changed mid-session is picked up on the next frame
+  const motionMq = (() => { try { return window.matchMedia?.("(prefers-reduced-motion: reduce)") || null; } catch { return null; } })();
+  let reduced = !!motionMq?.matches;
+  let market = "calm";
+  const onMotionChange = e => { reduced = !!e.matches; applyReduced(); };
+  try { motionMq?.addEventListener?.("change", onMotionChange); } catch { /* old browsers: read once */ }
   // ?fxhold=1 (screenshots only): keeps a glitch burst on instead of the random short bursts
   const urlq = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
   const hold = urlq.get("fxhold") === "1";
@@ -314,13 +367,13 @@ export function createFx(renderer, scene, camera, data, quality) {
   /** Lay one word (string) down as glyph instances. mode 0 rain (start -> end, dur), 1 drift. Returns false if the pool is full. */
   function putWord(word, start, end, t0, dur, mode, sizePx) {
     if (free.length < word.length) return false;
-    const phase = rng() * 6.283, half = (word.length - 1) * 0.4;
+    const phase = rng() * 6.283, half = (word.length - 1) * ADVANCE * 0.5;
     for (let k = 0; k < word.length; k++) {
       const i = free.pop();
       aStart.setXYZ(i, start.x, start.y, start.z); aEnd.setXYZ(i, end.x, end.y, end.z);
       aTime.setXY(i, t0, dur);
       glyphRect(word[k], rect); aGlyph.setXYZW(i, rect[0], rect[1], rect[2], rect[3]);
-      aWord.setXYZ(i, k * 0.8 - half, sizePx, phase); aMode.setX(i, mode);
+      aWord.setXYZ(i, k * ADVANCE - half, sizePx, phase); aMode.setX(i, mode);
       expires[i] = t0 + dur * 1.6 + 0.1;
     }
     glyphsDirty = true;
@@ -371,26 +424,56 @@ export function createFx(renderer, scene, camera, data, quality) {
   wave.position.y = 0.6; wave.visible = false; wave.renderOrder = 5; root.add(wave);
 
   // ---------------- inner line (one canvas, one sprite, reused) ----------------
-  const lineCv = document.createElement("canvas"); lineCv.width = 1024; lineCv.height = 168;
+  const lineCv = document.createElement("canvas"); lineCv.width = 1024; lineCv.height = 192;
   const lineTex = new THREE.CanvasTexture(lineCv); lineTex.colorSpace = THREE.SRGBColorSpace;
   const lineMat = new THREE.SpriteMaterial({ map: lineTex, transparent: true, opacity: 0, depthWrite: false, depthTest: false,
     sizeAttenuation: false, fog: false });      // tone-mapped like the rest so it looks the same with and without the composer
   const line = new THREE.Sprite(lineMat); line.renderOrder = 30; line.visible = false; root.add(line);
-  line.scale.set(0.12 * lineCv.width / lineCv.height, 0.12, 1);
+  line.scale.set(0.135 * lineCv.width / lineCv.height, 0.135, 1);
   let lineUntil = -1, lineStart = 0, lineAnchor = null;
+  const MONO = `ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+  function roundRect(x, l, t, w, h, r) {
+    x.beginPath(); x.moveTo(l + r, t); x.arcTo(l + w, t, l + w, t + h, r); x.arcTo(l + w, t + h, l, t + h, r);
+    x.arcTo(l, t + h, l, t, r); x.arcTo(l, t, l + w, t, r); x.closePath();
+  }
+  /** The inner line: up to two lines wrapped at word boundaries (ellipsis if longer), on a dark translucent backing so it
+   *  stays legible on the bright daytime horizon and is bloom-safe; the provenance label is big enough to read on a phone. */
   function drawLine(text, label) {
     const x = lineCv.getContext("2d");
-    x.clearRect(0, 0, lineCv.width, lineCv.height);
+    const W = lineCv.width, H = lineCv.height, pad = 36;
+    x.clearRect(0, 0, W, H);
     x.textAlign = "center"; x.textBaseline = "middle";
-    let fs = 40; x.font = `italic ${fs}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-    while (fs > 22 && x.measureText(text).width > lineCv.width - 60) { fs -= 2; x.font = `italic ${fs}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`; }
-    x.shadowColor = "rgba(255,106,0,0.95)"; x.shadowBlur = 22;
-    x.fillStyle = "#ffe6cf"; x.fillText(text, lineCv.width / 2, 74, lineCv.width - 40);
+    let fs = 40; x.font = `italic ${fs}px ${MONO}`;
+    let lines = wrapText(text, s => x.measureText(s).width <= W - 2 * pad, 1);
+    if (lines.length !== 1 || lines[0] !== text.trim().split(/\s+/).join(" ")) {   // not on one line: two smaller lines
+      fs = 32; x.font = `italic ${fs}px ${MONO}`;
+      lines = wrapText(text, s => x.measureText(s).width <= W - 2 * pad, 2);
+    }
+    const lh = fs + 8, textH = lines.length * lh, labelH = 34;
+    const top = Math.max(6, (H - textH - labelH - 10) / 2), boxW = Math.min(W - 8, Math.max(...lines.map(s => x.measureText(s).width), 0) + 2 * pad);
+    x.font = `30px ${MONO}`;
+    const boxW2 = Math.min(W - 8, Math.max(boxW, x.measureText(label).width + 2 * pad));
+    x.fillStyle = "rgba(6, 3, 10, 0.62)"; roundRect(x, (W - boxW2) / 2, top - 6, boxW2, textH + labelH + 18, 18); x.fill();
+    x.strokeStyle = "rgba(255,106,0,0.35)"; x.lineWidth = 2; x.stroke();
+    x.font = `italic ${fs}px ${MONO}`;
+    x.shadowColor = "rgba(255,106,0,0.9)"; x.shadowBlur = 16;
+    x.fillStyle = "#ffe6cf";
+    lines.forEach((s, i) => x.fillText(s, W / 2, top + lh * (i + 0.5)));
     x.shadowBlur = 0; x.shadowColor = "transparent";
-    x.font = `20px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-    x.fillStyle = "rgba(255,180,120,0.9)"; x.fillText(label, lineCv.width / 2, 128);
+    x.font = `30px ${MONO}`;
+    x.fillStyle = "rgba(255,180,120,0.95)"; x.fillText(label, W / 2, top + textH + 6 + labelH / 2);
     lineTex.needsUpdate = true;
   }
+
+  // ---------------- state ----------------
+  let fxTime = 0, wall = 0, speed = 1;
+  const target = { pump: 0, glitch: 0, jitter: 0, warp: 0, dim: 0, rem: 0 };
+  const cur = { pump: 0, glitch: 0, jitter: 0, warp: 0, dim: 0, rem: 0 };
+  let active = false;                                   // any smoothed effect above threshold (composer needed on low)
+  const burster = createBurster(rng);
+  const queue = []; let nextRain = 0;
+  let lastReplaySeq = -1, baseFov = null, stage = "AWAKE", view = "first";
+  const fwd = new THREE.Vector3(), rightV = new THREE.Vector3(), tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
 
   // ---------------- post-processing ----------------
   let composer = null, bloom = null, fxPass = null;
@@ -400,7 +483,17 @@ export function createFx(renderer, scene, camera, data, quality) {
     // a direct render would apply them, so the construct looks the same with and without the composer and low quality
     // can toggle it per frame) -> UnrealBloomPass (medium / high) -> fx pass. Bloom and the fx pass see bounded display
     // values: a bright daytime sky cannot blow the frame out through the bloom mip chain.
-    composer = new EffectComposer(renderer);
+    // The scene pass renders into an explicit multisampled target (quality.msaa samples on medium / high, 0 on low), so the
+    // renderer's antialiasing is not lost behind the composer: the one-pixel fibre roads and district edges would
+    // otherwise stair-step and shimmer while the camera walks. EffectComposer clones it for its second target and
+    // setSize resizes both; the composer.setSize below (CSS size) also fixes its width/height bookkeeping, which the
+    // constructor reads from the target in device pixels.
+    // (A software GL renderer - SwiftShader / llvmpipe in headless captures - gets 0 samples: 4x MSAA there costs ~5x per
+    // frame for no visible gain, and quality.js auto-picks low on such devices anyway.)
+    const samples = low || q.antialias === false || softwareGL(renderer) ? 0 : (q.msaa | 0);
+    const rt = new THREE.WebGLRenderTarget(Math.max(1, Math.round(size.x * pr)), Math.max(1, Math.round(size.y * pr)),
+      { type: THREE.HalfFloatType, samples });
+    composer = new EffectComposer(renderer, rt);
     composer.addPass(new RenderPass(scene, camera));
     composer.addPass(new OutputPass());
     if (!low && q.bloom !== false) {
@@ -409,23 +502,18 @@ export function createFx(renderer, scene, camera, data, quality) {
     }
     fxPass = new ShaderPass(FX_SHADER);
     fxPass.uniforms.resolution.value = resolution;
-    fxPass.uniforms.vignette.value = low ? 0.25 : 0.35;
-    fxPass.uniforms.tear.value = reduced ? 0 : 1;
-    fxPass.uniforms.blocks.value = reduced ? 0 : 1;
+    fxPass.uniforms.vignette.value = low ? 0 : 0.35;     // low: faded in with the effect level (see update)
     composer.addPass(fxPass);
+    applyReduced();
     composer.setSize(size.x, size.y);
     return composer;
   }
+  function applyReduced() {
+    if (fxPass) { fxPass.uniforms.tear.value = reduced ? 0 : 1; fxPass.uniforms.blocks.value = reduced ? 0 : 1; }
+    Object.assign(target, marketTargets(market, reduced));
+  }
   if (!low) ensureComposer();
 
-  // ---------------- state ----------------
-  let fxTime = 0, wall = 0, speed = 1;
-  const target = { pump: 0, glitch: 0, jitter: 0, warp: 0, dim: 0 };
-  const cur = { pump: 0, glitch: 0, jitter: 0, warp: 0, dim: 0 };
-  const burster = createBurster(rng);
-  const queue = []; let nextRain = 0;
-  let lastReplaySeq = -1, baseFov = null, stage = "AWAKE", view = "first";
-  const fwd = new THREE.Vector3(), rightV = new THREE.Vector3(), tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
 
   const validRegion = i => Number.isInteger(i) && i >= 0 && i < data.districts.length;
   function regionsOf(msg) {
@@ -460,7 +548,7 @@ export function createFx(renderer, scene, camera, data, quality) {
 
   function innerLine(speech) {
     if (!speech || typeof speech.text !== "string" || !speech.text.trim()) return;
-    const text = speech.text.trim().slice(0, 140);
+    const text = speech.text.trim().slice(0, 220);       // wrapText cuts the rest at a word boundary with an ellipsis
     const label = speech.kind === "llm" ? "inner speech (generated)" : "inner speech (rule)";
     drawLine(text, label);
     lineStart = wall; lineUntil = wall + Math.min(9, 3.5 + text.length * 0.05);
@@ -469,7 +557,7 @@ export function createFx(renderer, scene, camera, data, quality) {
     line.visible = true;
   }
 
-  function weather(market) { Object.assign(target, marketTargets(market, reduced)); }
+  function weather(m) { market = m; Object.assign(target, marketTargets(market, reduced)); }
 
   // ---------------- per frame ----------------
   function update(dt, env) {
@@ -481,13 +569,19 @@ export function createFx(renderer, scene, camera, data, quality) {
 
     // sleep targets
     target.dim = stage === "NREM" ? 1 : stage === "REM" ? 0.25 : 0;
-    target.warp = stage === "REM" ? (reduced ? 0.3 : 1) : 0;
+    target.rem = stage === "REM" ? 1 : 0;                               // warm dream tint (the whole REM look when reduced)
+    target.warp = stage === "REM" && !reduced ? 1 : 0;                  // reduced motion: no screen swim at all
     const k = 1 - Math.exp(-dt * 1.5);
-    for (const key of Object.keys(cur)) cur[key] += (target[key] - cur[key]) * k;
+    for (let i = 0; i < CUR_KEYS.length; i++) { const key = CUR_KEYS[i]; cur[key] += (target[key] - cur[key]) * k; }
 
-    // rain queue (rate-limited) and landings
+    // rain queue (rate-limited) and landings (landing times are not monotonic: scan, swap-remove, no allocation)
     if (queue.length && wall >= nextRain) { nextRain = wall + RAIN_GAP; dropMessage(queue.shift()); }
-    while (pendingSplash.length && pendingSplash[0].t <= fxTime) { const s = pendingSplash.shift(); splashAt(s.x, s.y, s.z, s.r); }
+    for (let i = pendingSplash.length - 1; i >= 0; i--) {
+      const s = pendingSplash[i];
+      if (s.t > fxTime) continue;
+      splashAt(s.x, s.y, s.z, s.r);
+      pendingSplash[i] = pendingSplash[pendingSplash.length - 1]; pendingSplash.pop();
+    }
     sweep(fxTime);
 
     // déjà vu: replayed messages drift through the city during REM
@@ -505,13 +599,17 @@ export function createFx(renderer, scene, camera, data, quality) {
     // glitch bursts (dump / choppy), never more than one burst per BURST_GAP[0] s
     const burst = hold ? cur.glitch * 0.8 : burster.tick(wall, cur.glitch);
     const glitchNow = burst + cur.glitch * 0.06;
-    const active = glitchNow > 0.01 || cur.warp > 0.01 || cur.dim > 0.01 || cur.pump > 0.01 || cur.jitter > 0.01;
+    // "active" follows the smoothed levels (not the bursts), so on low the composer stays on through a whole dump and
+    // fades out once, instead of toggling with every burst
+    const level = Math.max(cur.glitch, cur.warp, cur.dim, cur.pump, cur.jitter, cur.rem);
+    active = level > 0.01;
     if (active && !composer) ensureComposer();
     if (fxPass) {
       const u = fxPass.uniforms;
       u.time.value = wall; u.glitch.value = glitchNow; u.seed.value = burster.seed;
-      u.split.value = (reduced ? 2 : 4.5) * pr; u.jitter.value = cur.jitter; u.warp.value = cur.warp; u.dim.value = cur.dim;
-      u.pump.value = cur.pump;
+      u.split.value = (reduced ? 2 : 4.5) * pr; u.jitter.value = cur.jitter; u.warp.value = cur.warp; u.rem.value = cur.rem;
+      u.dim.value = cur.dim; u.pump.value = cur.pump;
+      if (low) u.vignette.value = 0.25 * Math.min(1, Math.max(0, (level - 0.01) / 0.12));   // fades with the effect: no pop
     }
     if (bloom) {
       const dayK = Math.max(0, Math.min(1, +env?.dayK || 0));
@@ -540,7 +638,7 @@ export function createFx(renderer, scene, camera, data, quality) {
       lineMat.opacity = a;
       if (wall > lineUntil) line.visible = false;
       else if (view === "orbit" && lineAnchor) line.position.set(lineAnchor.x, lineAnchor.y + 105, lineAnchor.z);
-      else { camera.getWorldDirection(fwd); line.position.copy(camera.position).addScaledVector(fwd, 150).y += 14; }
+      else { camera.getWorldDirection(fwd); line.position.copy(camera.position).addScaledVector(fwd, 150).y += 20; }   // above the horizon band
     }
   }
 
@@ -563,9 +661,7 @@ export function createFx(renderer, scene, camera, data, quality) {
   }
 
   function render() {
-    const useComposer = composer && (!low || fxPass.uniforms.glitch.value > 0.01 || cur.warp > 0.01 || cur.dim > 0.01
-      || cur.pump > 0.01 || cur.jitter > 0.01);
-    if (useComposer) composer.render();
+    if (composer && (!low || active)) composer.render();
     else renderer.render(scene, camera);
   }
 
@@ -579,6 +675,7 @@ export function createFx(renderer, scene, camera, data, quality) {
 
   function dispose() {
     scene.remove(root);
+    try { motionMq?.removeEventListener?.("change", onMotionChange); } catch { /* ignore */ }
     if (baseFov !== null) { camera.fov = baseFov; camera.updateProjectionMatrix(); baseFov = null; }
     gg.dispose(); glyphMat.dispose(); sg.dispose(); splashMat.dispose(); wave.geometry.dispose(); waveMat.dispose();
     lineTex.dispose(); lineMat.dispose(); atlas.tex.dispose();
@@ -587,7 +684,7 @@ export function createFx(renderer, scene, camera, data, quality) {
 
   const api = { rain, innerLine, weather, update, render, resize, dispose,
     get state() { return { ...cur, burst: burster.seed, queued: queue.length, free: free.length, pending: pendingSplash.length, time: fxTime,
-      composer: !!composer, reduced, hold }; } };
+      composer: !!composer, active, reduced, hold, msaa: composer ? (composer.renderTarget1.samples | 0) : 0 }; } };
   try { if (window.__sub01) Object.defineProperty(window.__sub01, "fx", { configurable: true, enumerable: true, get: () => api.state }); } catch { /* debug only */ }
   return api;
 }

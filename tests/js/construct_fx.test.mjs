@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 
 register("./three-hooks.mjs", import.meta.url);
-const { splitWords, marketTargets, createBurster, BURST_GAP, MAX_WORDS, MAX_GLYPHS, createFx } = await import("../../web/construct/fx.js");
+const { splitWords, marketTargets, createBurster, wrapText, BURST_GAP, MAX_WORDS, MAX_GLYPHS, createFx } = await import("../../web/construct/fx.js");
 
 test("exports the contract surface", () => { assert.equal(typeof createFx, "function"); });
 
@@ -47,4 +47,18 @@ test("glitch bursts stay below 3 Hz and short, and stop when the level drops", (
   assert.ok(maxOn < 0.25, "bursts are short: " + maxOn);
   let calm = 0; for (let t = 60; t < 70; t += 1 / 60) calm += b.tick(t, 0);
   assert.equal(calm, 0);
+});
+
+test("wrapText wraps the inner line at word boundaries and ends a cut line with an ellipsis, never mid-word", () => {
+  const fits = n => s => s.length <= n;
+  assert.deepEqual(wrapText("giusto, un pezzo di pane", fits(40), 1), ["giusto, un pezzo di pane"]);
+  assert.deepEqual(wrapText("giusto, un pezzo di pane", fits(12), 2), ["giusto, un", "pezzo di…"]);
+  assert.deepEqual(wrapText("giusto, un pezzo di pane e poi a casa", fits(16), 2), ["giusto, un pezzo", "di pane e poi a…"]);
+  assert.deepEqual(wrapText("  spaced   out  ", fits(20), 2), ["spaced out"]);
+  assert.deepEqual(wrapText("", fits(20), 2), []); assert.deepEqual(wrapText(null, fits(20), 2), []);
+  assert.deepEqual(wrapText("abcdefghijklmnop", fits(6), 1), ["abcdef"]);               // an overlong word is cut, not squeezed
+  const two = wrapText("uno due tre quattro cinque sei sette otto nove dieci undici", fits(14), 2);
+  assert.equal(two.length, 2);
+  assert.ok(two[1].endsWith("…") && two.every(l => l.length <= 14));
+  assert.ok(!/\S…$/.test(two[1]) || two[1].replace("…", "").split(" ").every(w => "uno due tre quattro cinque sei sette otto nove dieci undici".split(" ").includes(w)), "cut only between words");
 });
