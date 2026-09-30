@@ -90,8 +90,12 @@ Brain region indices = index into `tick.act` = index into `web/brain.json` nodes
   | `web/world/minibrain.js` | hud | mini fibre brain; `flash(regions, color)` + pulse from chat box to brain |
 - URL params for tests/screenshots: `?cam=apartment|street|bakery|park|phone|brain`, `?q=low|medium|high`,
   `?lab=1`, `?nofollow=1`. `window.__sub01` exposes `{ready: bool, fps: number, drawCalls, triangles}`.
-- Assets: `web/assets/` (+ `manifest.json`, `CREDITS.md`), glTF/GLB with Draco or Meshopt, textures KTX2 or WebP,
-  total <= 100 MB (aim <= 40 MB), lazy-loaded per area; every loader has a procedural fallback.
+- Assets: `web/assets/` comes from branch `assets/cc0`, maintained by the user: CC0 Poly Haven HDRIs (`hdri/`),
+  PBR texture sets (`textures/<name>/*_diffuse|_nor_gl|_rough_1k.jpg`), Draco-compressed GLB models (`models/`), and
+  `CREDITS.md`. A Quaternius rigged character + animation library will arrive under `web/assets/character/`
+  (merge `origin/assets/cc0` again to pick it up). Streams do NOT download or add other assets and do not modify
+  these files; `web/assets/manifest.json` (assets stream) describes them for the loaders. Anything missing is built
+  procedurally and listed in `docs/real-world/STATUS.md`. Lazy-load per area; every loader has a procedural fallback.
 - Rendering: ACES filmic tone mapping, sRGB output, HDRI environment, soft shadows, bloom (+SSAO/GTAO on high),
   day/night from Rome time (`tick.sleep.clock`), lit windows + street lamps at night, lab-mode toggle kept.
   Targets: 60 fps desktop, 30 fps mid phone; quality switch in the HUD.
