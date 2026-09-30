@@ -67,16 +67,29 @@ python tests/test_sleep.py                                    # or: python -m py
 ## End-to-end screenshots ("the construct")
 
 `tests/e2e/screenshots.mjs` starts `live_server.py --demo` (temp data dir, free port) once per scenario, opens the page in
-headless Chromium (software WebGL) and captures: `home`, `walk` (first-person walk along the real fibre road to the reward
-district, captured at `life.progress` 0.3-0.7), `chat` (message rain landing), `dump` (market glitch), `night`, `rem`,
-`orbit` (`?view=orbit`) and `mobile` (390x844). Every scenario fails on console errors, a blank/uniform canvas, a missing
-honesty line, or while a construct module it needs (`city`, `fx`, `travel`) is still a `STUB` file (`--allow-stubs` skips that).
+headless Chromium (software WebGL) and captures: `home`, `walk` (first-person walk along the real fibre road from the home
+district to the reward district, captured at `life.progress` 0.3-0.7; `--gif` assembles ~60 frames at real-time playback),
+`chat` (message rain, captured ~3 s after the first word starts falling, plus `chat-falling`), `dump` (market glitch,
+`?fxhold=1`), `night`, `rem`, `orbit` (`?view=orbit`) and `mobile` (390x844).
+
+Every scenario fails on console errors, a Python traceback in the server log, a missing honesty line, or while a construct
+module it needs (`city`, `fx`, `travel`) is still a `STUB` file (`--allow-stubs` skips that; a stream must remove the `// STUB`
+header when it replaces its file). Pixel checks measure the **3D canvas alone** (all DOM overlays are hidden for that capture);
+`--selftest` proves it by hiding the canvas and expecting the blank-canvas check to fail. Scenario assertions are state-based
+where possible (life ticks: outbound route home -> bakery, first-person view; `window.__sub01.fx`: rain in flight, glitch,
+warp) and otherwise must clearly exceed an idle pixel baseline (the scene is never static).
 
 ```
-cd tests/e2e && npm install          # gifenc + pngjs (playwright is taken from /home/user/wt/_tools or ./node_modules)
-node tests/e2e/screenshots.mjs [--only=home,walk] [--gif] [--out=docs/real-world/screenshots] [--allow-stubs]
+cd tests/e2e && npm install && npx playwright install chromium     # gifenc, pngjs, playwright + its Chromium
+node tests/e2e/screenshots.mjs [--only=home,walk] [--gif] [--format=png|jpg] [--out=docs/real-world/screenshots] [--allow-stubs] [--selftest]
 ```
 
-Output goes to `docs/real-world/screenshots/` (`<scenario>.png`, `walk.gif` with `--gif`, `report.json` with fps / draw calls /
+Env: `E2E_CHROME` (use a specific Chromium instead of Playwright's), `E2E_PYTHON` (default `.venv/bin/python` or `python3`),
+`E2E_TOOLS` (extra directory holding `node_modules/playwright`). `night` compares against the `home` canvas brightness of the
+same run (or of the last `report.json`).
+
+Output goes to `docs/real-world/screenshots/` (`<scenario>.png|jpg`, `walk.gif` with `--gif`, `report.json` with fps / draw calls /
 triangles per scenario). The fps values are **software-rendered** (SwiftShader, no GPU) and only useful to compare scenarios,
-not as device performance. Exit code is non-zero if any scenario fails; servers are always killed, per-scenario timeout 150 s.
+not as device performance. Exit code is non-zero if any scenario fails; servers are always killed, a timed-out scenario is
+cancelled (server and browser context closed, no files written) before the next one starts; per-scenario timeout 150 s.
+The screenshots are generated from the merged construct and committed with the PR, not from this stream alone.

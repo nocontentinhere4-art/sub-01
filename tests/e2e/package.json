@@ -1,3 +1,4 @@
 { "name": "sub01-e2e", "private": true, "type": "module",
-  "description": "headless screenshot check; playwright is resolved from /home/user/wt/_tools or ./node_modules",
-  "dependencies": { "gifenc": "^1.0.3", "pngjs": "^7.0.0" } }
+  "description": "headless screenshot check of the construct (node screenshots.mjs); needs Chromium: npx playwright install chromium, or E2E_CHROME=/path/to/chrome",
+  "dependencies": { "gifenc": "^1.0.3", "pngjs": "^7.0.0" },
+  "devDependencies": { "playwright": "^1.54.0" } }
