@@ -35,9 +35,9 @@ or logs (never print an API key, pod secret or Authorization header).
   error, and at the latest after `max_minutes` (default 60). Never more than 1 of our pods at a time (check
   `GET /pods` for names starting `sub01-spiking-` before creating). Never stop/modify/delete a pod whose name does not
   start with `sub01-spiking-` (e.g. the user's pod `BRAIN`).
-- Total budget cap: `SUB01_GPU_HOURS_CAP` (default 4.0 GPU-hours over the whole cost log); per-day cap
-  `SUB01_MAX_HOURS_PER_DAY` (default 2.5); per-session cap `SUB01_MAX_SESSION_MIN` (default 120 on Railway, 60 for
-  validation).
+- Budget cap: `SUB01_GPU_HOURS_CAP` (validation: 4.0 GPU-hours over the whole cost log; Railway: 8.0 over a rolling
+  `SUB01_GPU_CAP_DAYS`=7 days); per-day cap `SUB01_MAX_HOURS_PER_DAY` (default 1.0); per-session cap
+  `SUB01_MAX_SESSION_MIN` (default 60, from pod creation, on Railway and for validation).
 - Cost log: one JSON line per pod in `<data_dir>/spiking/costs.jsonl`:
   `{"pod_id", "name", "gpu", "cost_per_hr", "start": iso, "stop": iso, "hours", "cost_usd", "reason", "purpose"}`
   (written on stop; a `{"event":"start", ...}` line is written at creation so a crash still leaves a trace).

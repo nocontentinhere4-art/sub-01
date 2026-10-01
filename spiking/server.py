@@ -28,6 +28,14 @@ RELAY_MIN_S = 0.25                  # at most 4 state frames per second go to th
 GOOD_MIN_S = 30.0
 
 
+def _days(a, b):
+    """Whole days from ISO date a to ISO date b (None if either is missing or malformed)."""
+    try:
+        return (datetime.fromisoformat(str(b)) - datetime.fromisoformat(str(a))).days
+    except ValueError:
+        return None
+
+
 class SpikingHub:
     def __init__(self, live, data_dir, secret=None, clock=time.monotonic):
         self.live = live
@@ -85,7 +93,8 @@ class SpikingHub:
         for s in rec.get("scores") or []:
             if not isinstance(s, dict) or "hc" not in s:
                 continue
-            rows.append({"day": s.get("item_day") or rec.get("day"), "item": str(s.get("item") or s.get("text", ""))[:200],
+            day = s.get("item_day") or rec.get("day")
+            rows.append({"day": day, "days_since": _days(day, rec.get("day")), "item": str(s.get("item") or s.get("text", ""))[:200],
                          "source": "reading" if s.get("source") == "reading" else "chat",
                          "recalled": bool(s.get("hc_recalled")), "score": s.get("hc"), "threshold": thr,
                          "label": rec.get("label"), "test_day": rec.get("day"), "session": rec.get("session"),
@@ -97,7 +106,8 @@ class SpikingHub:
         return rows
 
     def memory(self, max_lines=2000):
-        """The latest day whose readings were tested: prefer the next-day test, else the test after sleep."""
+        """Readings of the latest next-day test (the previous session's items, cued in the next session); if no
+        next-day test of readings exists yet, the latest test after sleep. One test = one session's rows."""
         try:
             lines = (self.dir / ITEMS_FILE).read_text().splitlines()[-max_lines:]
         except OSError:
@@ -108,26 +118,24 @@ class SpikingHub:
                 rows.append(json.loads(ln))
             except ValueError:
                 pass
-        days = sorted({r["day"] for r in rows if r.get("source") == "reading" and r.get("day")})
         out = {"day": None, "label": None, "items": [], "note": MEMORY_NOTE}
-        if not days:
-            return out
-        day = days[-1]
-        for label in ("next day", "after sleep", "after encoding"):
-            sel = [r for r in rows if r.get("day") == day and r.get("label") == label]
-            if sel:
-                newest = max(sel, key=lambda r: r.get("received", ""))
-                key = lambda r: r.get("session") or r.get("received")              # rows of the newest test only
-                sel = [r for r in sel if key(r) == key(newest)]
-                last = newest.get("received")
-                seen, items = set(), []
-                for r in reversed(sel):                                 # newest first, one row per item
-                    if (r["item"], r["source"]) not in seen:
-                        seen.add((r["item"], r["source"]))
-                        items.append({k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold")})
-                items.sort(key=lambda r: (r["source"] != "reading", not r["recalled"]))
-                out.update(day=day, label=label, tested=last, items=items)
-                break
+        key = lambda r: (r.get("session") or "", r.get("label"), r.get("test_day"))     # one test
+        for label in ("next day", "after sleep"):
+            sel = [r for r in rows if r.get("label") == label and r.get("source") == "reading"]
+            if not sel:
+                continue
+            newest = max(sel, key=lambda r: r.get("received", ""))
+            day = max(r.get("day") or "" for r in sel if key(r) == key(newest))              # its latest item day
+            test = [r for r in rows if key(r) == key(newest) and r.get("day") == day]
+            seen, items = set(), []
+            for r in reversed(test):                                    # one row per item
+                if (r["item"], r["source"]) not in seen:
+                    seen.add((r["item"], r["source"]))
+                    items.append({k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold")})
+            items.sort(key=lambda r: (r["source"] != "reading", not r["recalled"]))
+            out.update(day=day, label=label, tested=newest.get("received"), items=items,
+                       test_day=newest.get("test_day"), days_since=newest.get("days_since"))
+            break
         return out
 
     async def memory_get(self, request):

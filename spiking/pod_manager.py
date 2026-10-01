@@ -3,7 +3,8 @@
 `SUB01_SESSIONS` = "daily 21:00-22:00 Asia/Tokyo" by default (several windows separated by ';'; the zone defaults
 to Asia/Tokyo; a window may cross midnight); "off" disables. The manager also needs SUB01_POD_SECRET, a server URL
 and RUNPOD_API_KEY (Railway env; never logged). Hard caps: SUB01_MAX_HOURS_PER_DAY (1.0), SUB01_MAX_SESSION_MIN
-(60) and, in RunPodOps, SUB01_GPU_HOURS_CAP (4.0 over the whole cost log). Learned weights stay on the server's
+(60, counted from pod creation, boot included) and, in RunPodOps, SUB01_GPU_HOURS_CAP (8.0) over a rolling
+SUB01_GPU_CAP_DAYS (7) window. Learned weights stay on the server's
 /data volume (spiking/server.py), never on paid RunPod storage (pods have no volume).
 Each session tests yesterday's items from half cues, stores today's chat messages and readings, sleeps (REM
 replay) and tests again; Pong runs only with SUB01_PONG=1 (it has not learned so far).
@@ -30,7 +31,7 @@ DEFAULT_TZ = "Asia/Tokyo"
 HELLO_TIMEOUT_S = 15 * 60
 LOST_S = 3 * 60
 STOP_LEAD_S = 90                    # ask the pod to wrap up (upload weights) this long before the deadline
-MIN_MINUTES = 10                    # a shorter session is not worth a pod
+MIN_MINUTES = 25                    # boot + build + one test cycle: a shorter session is not worth a pod
 DEFAULT_SESSIONS = "daily 21:00-22:00 Asia/Tokyo"
 OFF = ("off", "none", "0", "false", "disabled")
 PHASES = ["recall_yesterday", "encode", "memory_test", "sleep", "memory_test", "free"]
@@ -142,7 +143,8 @@ class PodManager:
         self.has_key = bool(env.get("RUNPOD_API_KEY") or env.get("SUB01_RUNPOD_PROXY_AUTH") == "1"
                             or api is not None or ops is not None)
         self.log = CostLog(self.dir / "costs.jsonl")
-        self.ops = ops or RunPodOps(api=api, log=self.log, hours_cap=env.get("SUB01_GPU_HOURS_CAP") or None)
+        self.ops = ops or RunPodOps(api=api, log=self.log, hours_cap=float(env.get("SUB01_GPU_HOURS_CAP") or 8.0),
+                                    cap_days=float(env.get("SUB01_GPU_CAP_DAYS") or 7))
         self.send_stop = None                  # async callable set by the server: forwards {"type":"stop"} to the pod
         self.current = None                    # state of the running session
         self.done_windows = set()
@@ -227,8 +229,11 @@ class PodManager:
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    self.last_result = f"error: {type(e).__name__}: {e}"
-                    print("spiking session failed:", self.last_result, flush=True)
+                    self.last_result = f"error: {type(e).__name__}"
+                    if type(e).__name__ == "CapExceeded":
+                        print(f"spiking: GPU-hour cap reached, sessions paused ({e})", flush=True)
+                    else:
+                        print("spiking session failed:", self.last_result, flush=True)   # no API bodies in logs
         finally:
             self.shutdown()
 
@@ -257,7 +262,7 @@ class PodManager:
                 items.append({"text": str(m["text"]), "source": src, "item": str(m.get("item") or m["text"]),
                               "emotion": m.get("emotion", "neutral")})
         msgs = [{"text": it["text"], "emotion": it["emotion"]} for it in items if it["source"] == "chat"]
-        max_min = max(5, int(minutes) - 10)
+        max_min = max(5, int(minutes) - 15)                     # pod-side budget: boot (~5-10 min) is billed too
         phases = list(PHASES)
         if self.pong:
             phases[phases.index("encode") + 1:phases.index("encode") + 1] = PONG_PHASES
@@ -310,6 +315,7 @@ class PodManager:
         token = secrets.token_hex(24)
         env = dict(podpack.boot_env(token), SUB01_SESSION=json.dumps(cfg), SUB01_SERVER_URL=self.server_url,
                    SUB01_POD_SECRET=self.secret, SUB01_SESSION_ID=cfg["session_id"])
+        t_create = self.clock()                                  # billed from here: boot counts against the hour
         pod = await loop.run_in_executor(None, self.ops.create, env, "session", "spiking.session", minutes)
         pod_id = pod["id"]
         try:                                                     # code + data go up after boot (create body < 100 KB)
@@ -320,7 +326,7 @@ class PodManager:
         t0 = self.clock()
         self.current = {"session_id": cfg["session_id"], "pod_id": pod_id, "started": t0, "hello": False,
                         "last_seen": t0, "disconnected_at": None, "done": None,
-                        "deadline": t0 + timedelta(minutes=minutes)}
+                        "deadline": t_create + timedelta(minutes=minutes)}
         print(f"spiking session {cfg['session_id']} started ({minutes:.0f} min max)", flush=True)
         reason = "error"
         try:

@@ -185,3 +185,65 @@ def test_results_rows_and_api_memory(tmp_path):
         assert "a model, not a mind" in m["note"] and "partial cue" in m["note"]
         assert (await client.post("/api/spiking/result", json=posts[0])).status == 401   # pod secret needed to write
     run(with_client(tmp_path, go))
+
+
+def test_card_keeps_the_next_day_result_through_the_whole_session(tmp_path):
+    """A real session writes: next day (yesterday's items), after encoding (today's), after sleep (today's)."""
+    async def go(client, hub, live):
+        for p in (mt("after sleep", "2026-09-30", "2026-09-30", "s0", [("Moon", "reading", 2.0)]),
+                  mt("next day", "2026-09-30", "2026-10-01", "s1", [("Moon", "reading", 1.2), ("hi", "chat", 0.1)]),
+                  mt("after encoding", "2026-10-01", "2026-10-01", "s1", [("Tea", "reading", 1.0)]),
+                  mt("after sleep", "2026-10-01", "2026-10-01", "s1", [("Tea", "reading", 1.4)])):
+            await client.post("/api/spiking/result", json=p, headers=AUTH)
+        m = await (await client.get("/api/memory")).json()
+        assert (m["label"], m["day"], m["test_day"], m["days_since"]) == ("next day", "2026-09-30", "2026-10-01", 1)
+        assert [i["item"] for i in m["items"]] == ["Moon", "hi"]
+        # a skipped day: the next-day test is 3 days later and says so
+        await client.post("/api/spiking/result", headers=AUTH,
+                          json=mt("next day", "2026-10-01", "2026-10-04", "s2", [("Tea", "reading", 0.9)]))
+        m = await (await client.get("/api/memory")).json()
+        assert (m["day"], m["days_since"]) == ("2026-10-01", 3)
+    run(with_client(tmp_path, go))
+
+
+def test_card_falls_back_to_after_sleep_before_any_next_day_test(tmp_path):
+    async def go(client, hub, live):
+        await client.post("/api/spiking/result", headers=AUTH,
+                          json=mt("after sleep", "2026-10-01", "2026-10-01", "s1", [("Tea", "reading", 1.4)]))
+        m = await (await client.get("/api/memory")).json()
+        assert m["label"] == "after sleep" and [i["item"] for i in m["items"]] == ["Tea"]
+    run(with_client(tmp_path, go))
+
+
+def test_gpu_hour_cap_is_a_rolling_window(tmp_path):
+    from spiking.costs import CostLog
+    from spiking.pod_manager import PodManager
+    now = [tk(1, 21)]
+    log = CostLog(tmp_path / "c.jsonl", clock=lambda: now[0])
+    for day in range(1, 10):                                 # nine 1-hour sessions on nine days
+        now[0] = tk(day, 21)
+        log.start(f"p{day}", f"sub01-spiking-{day}", "g", 0.27, "session")
+        now[0] = tk(day, 22)
+        log.stop(f"p{day}", "session end")
+    assert round(log.total_hours(), 6) == 9.0 and round(log.hours_since(7), 6) == 7.0
+    mgr = PodManager(tmp_path, "https://srv", "s", env={"RUNPOD_API_KEY": "k"})
+    assert (mgr.ops.hours_cap, mgr.ops.cap_days) == (8.0, 7.0)          # 1 h/day keeps running past day 4
+
+
+def test_daily_session_labels_and_tests_only_todays_items(tmp_path):
+    torch = pytest.importorskip("torch")
+    from spiking.session import run_session
+    prev = torch.get_num_threads()
+    torch.set_num_threads(2)
+    try:
+        cfg = {"n_neurons": 20000, "device": "cpu", "seed": 1, "day": "2026-10-01", "max_minutes": 10,
+               "config": {"hc_scale": 6}, "phases": ["recall_yesterday", "encode", "memory_test"], "lures": 3,
+               "items": ITEMS_D1[:2], "validate": True, "session_id": "s-test"}
+        res = run_session(cfg, tmp_path)
+    finally:
+        torch.set_num_threads(prev)
+    assert res["error"] is None
+    tests = res["phases"]["memory_test"]
+    assert tests[0]["label"] == "next day" and tests[0]["skipped"]                 # nothing from an earlier day
+    assert tests[1]["label"] == "after encoding"                                     # not None after the skip
+    assert {s["item_day"] for s in tests[1]["scores"]} == {"2026-10-01"}

@@ -99,6 +99,8 @@ python -m spiking.validate --cpu --n 20000                                  # CP
 python -m spiking.validate --gpu                                            # 1M neurons on one RunPod pod (deleted after)
 ```
 
-Railway env: `SUB01_SESSIONS` (e.g. `daily 21:00-23:00 Asia/Tokyo`), `SUB01_POD_SECRET`, `RUNPOD_API_KEY`; optional
-caps `SUB01_MAX_SESSION_MIN` (120), `SUB01_MAX_HOURS_PER_DAY` (2.5), `SUB01_GPU_HOURS_CAP` (4). Learned weights and
-results live in `/data/spiking/`.
+Railway env: `SUB01_POD_SECRET` and `RUNPOD_API_KEY` turn the daily session on; `SUB01_SESSIONS` (default
+`daily 21:00-22:00 Asia/Tokyo`, `off` disables). Optional caps: `SUB01_MAX_SESSION_MIN` (60, counted from pod
+creation), `SUB01_MAX_HOURS_PER_DAY` (1), `SUB01_GPU_HOURS_CAP` (8) per `SUB01_GPU_CAP_DAYS` (7, rolling);
+`SUB01_PONG=1` adds Pong (it has not learned so far). Learned weights and results live in `/data/spiking/`
+(per-item recall rows in `memory_tests.jsonl`, shown by `GET /api/memory` and the room page's memory card).

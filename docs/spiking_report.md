@@ -111,17 +111,21 @@ sequences so before / after / controls are paired. Controls: the same network wi
 - Pods: only `NVIDIA RTX A5000` (fallback `NVIDIA RTX 4000 Ada Generation`), 1 GPU, on-demand, secure cloud,
   `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`, 30 GB container disk, no volume, port 8000. Names start with
   `sub01-spiking-`; every stop/delete re-fetches the pod and refuses anything else (the user's `BRAIN` pod was never
-  touched). At most one pod; total GPU-hour cap (`SUB01_GPU_HOURS_CAP`, 4 h), per-day and per-session caps; deadline
+  touched). At most one pod; GPU-hour cap (`SUB01_GPU_HOURS_CAP`: 4 h lifetime for validation, 8 h per rolling 7 days
+  for the daily sessions), per-day (1 h) and per-session (60 min from creation) caps; deadline
   timer, `atexit`/SIGTERM cleanup, startup recovery on Railway; during validation an independent watchdog deleted any
   of our pods older than 62 min. Every pod is logged in `data/spiking/costs.jsonl`.
-- Railway (`spiking/pod_manager.py`): `SUB01_SESSIONS` (e.g. `daily 21:00-23:00 Asia/Tokyo`), uploads the pack,
+- Railway (`spiking/pod_manager.py`): `SUB01_SESSIONS` (default `daily 21:00-22:00 Asia/Tokyo`), uploads the pack,
   waits for the pod's websocket hello (15 min), deletes the pod at session end, on `done`, on any error, if the stream
   is lost > 3 min. Learned weights are stored in `/data/spiking/weights.npz` (dense float16, ~120 MB at 1 M neurons;
-  the previous file is kept); results in `/data/spiking/*.jsonl` (`memory_tests.jsonl`: `{day, cues, recalled,
-  scores, ...}`).
-- Daily session phases: encode the day's winning messages → Pong training → Pong exam (+ no-learning control) →
-  memory test → compressed night (NREM/REM, replay) → memory test → free run with live chat until the session ends.
-  The sleep engine's REM never falls in the 21:00–23:00 window, so consolidation happens in the session's own
+  the previous file is kept); results in `/data/spiking/*.jsonl` (`memory_tests.jsonl`: one row per tested item
+  `{day, item, source, recalled, score, threshold, label, test_day, days_since}`; whole tests in
+  `memory_test_runs.jsonl`).
+- Daily session phases: next-day test of the previous session's items (half cues vs lures, after the forgetting
+  between sessions) → encode the day's top 5 chat messages and top 5 readings (title + keywords) → memory test →
+  compressed night (NREM/REM, replay) → memory test → free run with live chat until the session ends. Pong training
+  and exam only with `SUB01_PONG=1` (it has not learned: 17.5 % vs 25 % for the no-plasticity control).
+  The sleep engine's REM never falls in the 21:00–22:00 window, so consolidation happens in the session's own
   compressed night; if a session overlaps the real night, REM stage messages from the server trigger replay live.
 
 ## 5. What is still unrealistic

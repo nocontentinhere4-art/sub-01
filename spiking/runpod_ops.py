@@ -38,11 +38,12 @@ def _pods(raw):
 
 class RunPodOps:
     def __init__(self, api=None, log=None, prefix=PREFIX, hours_cap=None, sleep=time.sleep, clock=time.monotonic,
-                 opener=None, install_hooks=True):
+                 opener=None, install_hooks=True, cap_days=None):
         self.api = api or runpod_api.api
         self.log = log
         self.prefix = prefix
         self.hours_cap = float(hours_cap if hours_cap is not None else os.environ.get("SUB01_GPU_HOURS_CAP") or 4.0)
+        self.cap_days = cap_days                  # None: cap over the whole cost log; else a rolling window
         self.sleep, self.clock = sleep, clock
         self.opener = opener or urllib.request.urlopen
         self.deadlines = {}                       # pod_id -> clock() value after which it must be deleted
@@ -73,7 +74,7 @@ class RunPodOps:
         with self._lock:
             if self.ours():
                 raise RuntimeError("a pod of ours already exists; at most one at a time")
-            used = self.log.total_hours() if self.log else 0.0
+            used = (self.log.hours_since(self.cap_days) if self.cap_days else self.log.total_hours()) if self.log else 0.0
             if used + max_minutes / 60 > self.hours_cap + 1e-9:
                 raise CapExceeded(f"GPU-hour cap: {used:.2f} h used + {max_minutes / 60:.2f} h > {self.hours_cap:.2f} h")
             name = f"{self.prefix}{purpose}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"

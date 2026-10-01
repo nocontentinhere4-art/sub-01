@@ -475,9 +475,12 @@ class Session:
                 elif ph == "validate_pong":
                     self.validate_pong()
                 elif ph == "memory_test":
-                    n_before = len(self.results["phases"].get("memory_test", []))
+                    n_before = len([r for r in self.results["phases"].get("memory_test", [])
+                                    if r.get("label") != "next day"])
                     slept = any(k.endswith(":sleep") for k in self.results.get("timing", {}))
-                    self.ph_memory_test("after sleep" if slept else ("after encoding" if n_before == 0 else None))
+                    today = [m for m in self.mem.registry if m.get("day") == self.cfg.get("day")]
+                    self.ph_memory_test("after sleep" if slept else ("after encoding" if n_before == 0 else None),
+                                        items=today or None)               # yesterday's: the next-day test
                 elif ph == "pong_exam":
                     self.ph_pong_exam()
                 else:

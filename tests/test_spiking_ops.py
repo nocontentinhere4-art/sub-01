@@ -285,7 +285,7 @@ def test_ops_falls_back_to_4000_ada(tmp_path):
     ops2, api2, _ = make_ops(tmp_path / "b", api=FakeApi(fail_gpus=set(podpack.GPUS)))
     with pytest.raises(RuntimeError):
         ops2.create(ENV, "session", max_minutes=30)
-    assert len([c for c in api2.calls if c[0] == "POST"]) == 2 and ops2.ours() == []
+    assert len([c for c in api2.calls if c[0] == "POST"]) == len(podpack.GPUS) and ops2.ours() == []      # tried each type once
 
 
 def test_ops_guard_deletes_on_exception_and_interrupt(tmp_path):
@@ -525,7 +525,7 @@ def test_manager_session_end_stops_and_deletes(tmp_path):
     post = [c[2] for c in api.calls if c[0] == "POST"][0]
     cfg = json.loads(post["env"]["SUB01_SESSION"])
     assert cfg["session_id"] == "s-20261001-2100" and cfg["n_neurons"] == 1_000_000 and cfg["validate"] is False
-    assert len(cfg["messages"]) == 5 and cfg["max_minutes"] == 50 and cfg["day"] == "2026-10-01"
+    assert len(cfg["messages"]) == 5 and cfg["max_minutes"] == 45 and cfg["day"] == "2026-10-01"
     assert [it["source"] for it in cfg["items"]] == ["chat"] * 5
     assert cfg["phases"][0] == "recall_yesterday" and "pong_train" not in cfg["phases"]            # Pong is opt-in
     assert post["env"]["SUB01_SERVER_URL"] == "https://srv.example" and post["env"]["SUB01_POD_SECRET"] == "pod-secret"

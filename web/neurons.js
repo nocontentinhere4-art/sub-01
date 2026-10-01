@@ -11,7 +11,8 @@ window.Neurons = (() => {
   "use strict";
   const FIXED = "1 million simulated spiking neurons inside the real wiring of one person's brain; a model, not a mind; not the person.";
   const HONEST = "Learning results are reported as measured, including when it does not learn.";
-  const PONG_NOTE = "Pong: not learning yet. In the last full validation it hit 17.5 % after training vs 25 % with plasticity switched off.";
+  const PONG_NOTE = "Pong: not learning yet. In the last full validation (1M neurons) it hit 17.5 % after training vs 25 % with plasticity switched off.";
+  const PONG_CONTROLS = ["no_plasticity", "random"];
   const PHASES = { load: "loading", recall_yesterday: "next-day memory test", encode: "storing today's messages and readings", pong_train: "learning Pong",
     pong_exam: "Pong exam (learning frozen)", memory_test: "memory test", sleep: "sleep: replaying memories", free: "free run" };
   const CONTROL_NAMES = { random: "random paddle", random_paddle: "random paddle", no_plasticity: "no plasticity",
@@ -187,14 +188,14 @@ window.Neurons = (() => {
     return bits.length ? "Memory test: " + bits.join(" · ") : null;
   }
   function pongLearns(ex) {                               // only "learning" when it beats every control clearly
-    const c = (ex && ex.controls) || {}, ctl = Object.values(c).filter(num);
+    const c = (ex && ex.controls) || {}, ctl = PONG_CONTROLS.map(k => c[k]).filter(num);
     return !!ex && num(ex.hit_rate) && ctl.length > 0 && ex.hit_rate > Math.max(...ctl) + 0.05;
   }
   function examLine(ex) {
     if (!ex || typeof ex !== "object") return null;
     let s = `Pong${pongLearns(ex) ? "" : " (not learning yet)"} exam: ${int(ex.hits)}/${int(ex.rallies)} hits (${ex.frozen === false ? "learning not frozen" : "learning frozen"})`;
     const c = ex.controls || {};
-    for (const k of Object.keys(c)) if (num(c[k])) s += ` · ${controlName(k)} ${pct(c[k])}`;
+    for (const k of PONG_CONTROLS) if (num(c[k])) s += ` · ${controlName(k)} ${pct(c[k])}`;
     if (num(ex.day)) s += ` · day ${ex.day}`;
     return s;
   }
@@ -250,7 +251,7 @@ window.Neurons = (() => {
   function renderStatus() {
     const st = S.status, last = (st && st.last) || {}, res = S.el.results; res.replaceChildren();
     const lines = [examLine(last.exam), memoryLine(last.memory_test), benchLine(last.bench)].filter(Boolean);
-    if ((last.exam || last.pong_curve) && !pongLearns(last.exam)) lines.unshift(PONG_NOTE);
+    if (!last.exam && last.pong_curve) lines.unshift(PONG_NOTE);           // no exam numbers of its own: the last validation
     renderCurve(last.pong_curve);
     const any = lines.length || (last.pong_curve && Array.isArray(last.pong_curve.points) && last.pong_curve.points.length);
     if (!S.live) {

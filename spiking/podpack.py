@@ -20,7 +20,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE = "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"
-GPUS = ("NVIDIA RTX A5000", "NVIDIA RTX 4000 Ada Generation")
+GPUS = ("NVIDIA RTX A5000", "NVIDIA RTX 4000 Ada Generation",   # validated
+        "NVIDIA A40", "NVIDIA RTX A4500", "NVIDIA GeForce RTX 4090", "NVIDIA L40")   # fallbacks: >= 20 GB, < $0.85/h
 MAX_CHARS = 900_000
 REST_PREFIX = "out/rest/"
 STATIC_FILES = ["spiking/region_volumes.json", "real_baseline.py", "out/connectome.npz", "out/atlas_names.json"]

@@ -5,7 +5,7 @@ to now, at its recorded rate, so the budget caps stay conservative.
 """
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sleep import ROME
@@ -86,6 +86,11 @@ class CostLog:
 
     def total_hours(self):
         return sum(r["hours"] for r in self._records())
+
+    def hours_since(self, days):
+        """GPU hours of pods started in the last `days` days (rolling window)."""
+        cut = self.clock() - timedelta(days=days)
+        return sum(r["hours"] for r in self._records() if _parse(r["start"]) >= cut)
 
     def total_usd(self):
         return sum(r["cost_usd"] for r in self._records())
