@@ -171,10 +171,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const DEBUG = new URLSearchParams(location.search).has("debug");
+// the room: a clean model built from separate objects with PBR materials and baked ambient occlusion (room_clean.glb);
+// ?room=old shows the earlier single-mesh scan with its lighting baked into the texture
+const OLD_ROOM = new URLSearchParams(location.search).get("room") === "old";
 const FIXED_HOUR = DEBUG && new URLSearchParams(location.search).get("hour");   // preview a time of day
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -221,6 +225,9 @@ lamp.shadow.autoUpdate = false; lamp.shadow.needsUpdate = true;   // 6 cube face
 const monitorGlow = new THREE.PointLight(0xbcd4ff, 0, 1.8, 2);  // light from the monitor onto him
 const phoneGlow = new THREE.PointLight(0xcfe0ff, 0, 0.7, 2);    // light from the phone onto his face
 scene.add(monitorGlow, phoneGlow);
+// the clean room is lit for real: soft sky light comes in through the window (an area light the size of the glass)
+let skyLight = null;
+if (!OLD_ROOM) { RectAreaLightUniformsLib.init(); skyLight = new THREE.RectAreaLight(0xdfe8ff, 0, 1.5, 0.8); scene.add(skyLight); }
 
 // ---------- places measured on the room model (after fit(room, 4); floor at y = 0.16; ~1 unit = 1 m) ----------
 const F = 0.16;
@@ -232,9 +239,11 @@ const ANCHOR = {
   window:  {p:[-0.05, F, 0.25], r:-Math.PI / 2},     // standing, looking towards the window
   middle:  {p:[0.35, F, 0.05], r:0.6},
 };
-// surfaces on the baked model that get live content: centre, size (w x h), rotation about y (facing direction)
+// surfaces that get live content: centre, size (w x h), rotation about y (facing direction); `off`: how far in front of
+// the given centre the screen plane goes. These are the old model's (measured by ray casting); the clean room carries
+// them as named nodes (SURF_monitor, SURF_window, SURF_lamp) and readMarkers() replaces them when it loads
 const SURF = {
-  monitor: {c:[-1.097, 1.322, -1.172], w:0.68, h:0.40, ry:0.117, rx:-0.09},     // measured by ray casting on the model
+  monitor: {c:[-1.097, 1.322, -1.172], w:0.68, h:0.40, ry:0.117, rx:-0.09, off:0.045},
   window:  {c:[-1.872, 1.685, 0.14], w:1.48, h:0.80, ry:Math.PI / 2, mullion:0.44},
   lamp:    {c:[-1.42, 1.40, -1.15]},
 };
@@ -263,12 +272,51 @@ function fit(obj, size){ const b = new THREE.Box3().setFromObject(obj), s = new 
   const b2 = new THREE.Box3().setFromObject(obj), c = new THREE.Vector3(); b2.getCenter(c);
   obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= b2.min.y; }
 
-load("room/room.glb").then(g => {
-  room = g.scene; fit(room, 4); scene.add(room);
-  room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = false; roomMats.push(o.material);
-    o.material.envMapIntensity = 0.25; if (o.material.map) o.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); } });
+load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
+  room = g.scene; scene.add(room);
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  if (OLD_ROOM) {
+    fit(room, 4);
+    room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = false; roomMats.push(o.material);
+      o.material.envMapIntensity = 0.25; if (o.material.map) o.material.map.anisotropy = aniso; } });
+  } else {
+    // authored in world units (floor top at y = F): no fitting. The static room casts shadows too, so the sun only comes
+    // in through the window; the desk lamp's own shade must not shadow the lamp's light.
+    readMarkers(room);
+    // the model is cut open (no ceiling, no front or right wall); for the sun's shadow map close it with slabs that
+    // only cast shadows (they write neither colour nor depth), so daylight enters through the window alone
+    const shell = new THREE.Mesh(mergeBoxes([[[-2.05, 2.05], [2.39, 2.47], [-1.65, 1.65]], [[-2.05, 2.05], [0, 2.47], [1.6, 1.66]], [[2.0, 2.06], [0, 2.47], [-1.65, 1.65]]]),
+      new THREE.MeshBasicMaterial({colorWrite:false, depthWrite:false}));
+    shell.castShadow = true; shell.receiveShadow = false; shell.name = "shadow_shell"; scene.add(shell);
+    room.traverse(o => { if (!o.isMesh) return;
+      const lampPart = /desk_lamp/i.test(o.name) || /desk_lamp/i.test(o.parent && o.parent.name || "");
+      o.receiveShadow = true; o.castShadow = !lampPart;
+      const m = o.material; if (!roomMats.includes(m)) roomMats.push(m);
+      m.envMap = scene.environment;   // set explicitly: only then does three.js honour the envMapIntensity set in lighting()
+      for (const k of ["map", "normalMap", "roughnessMap"]) if (m[k]) m[k].anisotropy = Math.min(8, aniso);
+    });
+  }
   $("boot").classList.add("off"); setTimeout(() => $("boot").remove(), 800); buildSurfaces();
 }).catch(bootError);
+function mergeBoxes(list){           // axis-aligned boxes [[x0,x1],[y0,y1],[z0,z1]] -> one geometry
+  const pos = [], idx = [];
+  for (const [[x0, x1], [y0, y1], [z0, z1]] of list) {
+    const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    const base = pos.length / 3; pos.push(...g.attributes.position.array); idx.push(...g.index.array.map(i => i + base));
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); return g;
+}
+// the clean room names the places that get live content; read them (world space) into SURF
+function readMarkers(root){
+  root.updateMatrixWorld(true);
+  const get = n => root.getObjectByName(n), p = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const mon = get("SURF_monitor"), win = get("SURF_window"), lmp = get("SURF_lamp");
+  if (mon) { mon.getWorldPosition(p); e.setFromQuaternion(mon.getWorldQuaternion(q), "YXZ"); const x = mon.userData;
+    SURF.monitor = {c:p.toArray(), w:x.w, h:x.h, ry:e.y, rx:e.x, off:0.001}; }
+  if (win) { win.getWorldPosition(p); e.setFromQuaternion(win.getWorldQuaternion(q), "YXZ"); const x = win.userData;
+    SURF.window = {c:p.toArray(), w:x.w, h:x.h, ry:e.y, mullion:x.mullion ?? -1}; }
+  if (lmp) SURF.lamp = {c:lmp.getWorldPosition(p).toArray()};
+}
 
 load("room/boy.glb").then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
@@ -332,11 +380,17 @@ function buildSurfaces(){
   const m = SURF.monitor;
   monitor = makeScreen(m.w, m.h);
   monitor.mesh.rotation.set(m.rx, m.ry, 0, "YXZ"); monitor.mesh.position.set(...m.c);
-  monitor.mesh.position.add(new THREE.Vector3(0, 0, 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
+  monitor.mesh.position.add(new THREE.Vector3(0, 0, m.off ?? 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
   monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
   const w = SURF.window;
   sky = new THREE.Mesh(new THREE.PlaneGeometry(w.w, w.h), skyMaterial);
   sky.position.set(...w.c); sky.rotation.y = w.ry; scene.add(sky);
+  skyMaterial.uniforms.uAspect.value = w.w / w.h; skyMaterial.uniforms.uMullion.value = w.mullion;
+  if (skyLight) {                    // just inside the glass, shining into the room
+    skyLight.width = w.w; skyLight.height = w.h;
+    skyLight.position.set(...w.c).add(new THREE.Vector3(0, 0, 0.12).applyAxisAngle(UP, w.ry));
+    skyLight.lookAt(skyLight.position.clone().add(new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, w.ry)));
+  }
   const L = SURF.lamp; lamp.position.set(...L.c);
   if (DEBUG) for (const k of Object.keys(SURF)) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({color:0xff00ff}));
     d.position.set(...SURF[k].c); scene.add(d); }
@@ -408,11 +462,11 @@ function holdPhone(){
 // window: the sky over Tokyo follows the clock (day, dusk, night with stars and lit windows)
 // one small plane, so the shader can afford a few octaves of noise for the clouds
 const skyMaterial = new THREE.ShaderMaterial({
-  uniforms:{ uSun:{value:0.5}, uTime:{value:0}, uRain:{value:0}, uHour:{value:12.0} },
+  uniforms:{ uSun:{value:0.5}, uTime:{value:0}, uRain:{value:0}, uHour:{value:12.0}, uAspect:{value:SURF.window.w / SURF.window.h}, uMullion:{value:SURF.window.mullion} },
   toneMapped:false,
   vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader:`
-    varying vec2 vUv; uniform float uSun; uniform float uTime; uniform float uHour;
+    varying vec2 vUv; uniform float uSun; uniform float uTime; uniform float uHour; uniform float uAspect; uniform float uMullion;
     float h1(float x){ return fract(sin(x * 127.1) * 43758.5453); }
     float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -420,7 +474,7 @@ const skyMaterial = new THREE.ShaderMaterial({
     float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int k = 0; k < 4; k++) { v += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }
     float disc(vec2 p, vec2 c, float r){ return smoothstep(r, r * 0.72, length(p - c)); }
     void main(){
-      const float ASPECT = ${(SURF.window.w / SURF.window.h).toFixed(3)};
+      float ASPECT = uAspect;
       vec2 p = vec2(vUv.x * ASPECT, vUv.y);                       // square units, so discs are round
       float day = smoothstep(-0.08, 0.25, uSun);
       float dusk = clamp(1.0 - abs(uSun - 0.02) / 0.22, 0.0, 1.0);
@@ -478,7 +532,7 @@ const skyMaterial = new THREE.ShaderMaterial({
       }
       // --- the window's frame: the middle bar, and a faint sheen on the glass
       col += vec3(0.02, 0.022, 0.03) * smoothstep(0.6, 1.0, vUv.y) * (0.3 + 0.7 * day);
-      col = mix(col, vec3(0.05, 0.035, 0.025), step(abs(vUv.x - ${SURF.window.mullion.toFixed(3)}), 0.012));
+      col = mix(col, vec3(0.05, 0.035, 0.025), step(abs(vUv.x - uMullion), 0.012));   // uMullion < 0: the model has real frames
       gl_FragColor = vec4(col, 1.0);
     }`,
 });
@@ -629,6 +683,7 @@ let hour = FIXED_HOUR ? +FIXED_HOUR : 12, stage = "AWAKE", lampOn = 0, roomOn = 
 const roomTint = new THREE.Color(), WHITE = new THREE.Color(1, 1, 1);
 const cSunDay = new THREE.Color(0xfff0dc), cSunDusk = new THREE.Color(0xff9a5c), cMoon = new THREE.Color(0x7d93d8);
 const cNight = new THREE.Color(0.22, 0.27, 0.50), cWarm = new THREE.Color(1.0, 0.86, 0.68), cScreen = new THREE.Color(0xbcd4ff);
+const cSkyDay = new THREE.Color(0xe4ecff), cSkyDusk = new THREE.Color(0xffb27a);
 // the patch of light the window throws on the floor: a soft two-pane rectangle, additive, no extra light or shadow pass
 const pool = (() => {
   const c = document.createElement("canvas"); c.width = 256; c.height = 160; const g = c.getContext("2d");
@@ -667,12 +722,26 @@ function lighting(dt){
   ceiling.intensity = 4.2 * roomOn;
   lamp.intensity = 2.8 * lampOn;
   renderer.toneMappingExposure = 0.74 + 0.28 * day + 0.1 * roomOn + 0.04 * lampOn;
-  // the textures have the light baked in: dim and cool them when the lights are off (night, asleep or out),
-  // and warm them a little when the room light or the desk lamp is on, so the evening feels cosy rather than grey
-  const screenLight = (monitor && monitor.mesh.material !== offMat ? 0.12 : 0) + (phone.visible ? 0.05 : 0);
-  const level = clamp(0.15 + 0.85 * day + 0.75 * roomOn + 0.22 * lampOn + screenLight + 0.15 * dusk, 0, 1);
-  roomTint.copy(cNight).lerp(WHITE, level).lerp(cWarm, (0.22 * roomOn + 0.18 * lampOn) * (1 - day) + 0.08 * dusk);
-  for (const m of roomMats) m.color.copy(roomTint);
+  if (OLD_ROOM) {
+    // the textures have the light baked in: dim and cool them when the lights are off (night, asleep or out),
+    // and warm them a little when the room light or the desk lamp is on, so the evening feels cosy rather than grey
+    const screenLight = (monitor && monitor.mesh.material !== offMat ? 0.12 : 0) + (phone.visible ? 0.05 : 0);
+    const level = clamp(0.15 + 0.85 * day + 0.75 * roomOn + 0.22 * lampOn + screenLight + 0.15 * dusk, 0, 1);
+    roomTint.copy(cNight).lerp(WHITE, level).lerp(cWarm, (0.22 * roomOn + 0.18 * lampOn) * (1 - day) + 0.08 * dusk);
+    for (const m of roomMats) m.color.copy(roomTint);
+  } else {
+    // real materials, real light: the sky through the window (area light) and the sun's patch (shadowed by the walls) by
+    // day, a blue moonlit window at night; the ceiling light and the desk lamp warm the room in the evening. Reflections
+    // of the (neutral) environment follow the overall light level, so metal and glass do not glow in the dark.
+    skyLight.color.copy(cMoon).lerp(cSkyDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSkyDay, day);
+    skyLight.intensity = 0.3 + 7.0 * day + 2.0 * dusk;
+    sun.intensity = 0.15 + 3.2 * day + 1.2 * dusk;
+    hemi.intensity = 0.08 + 0.7 * day + 0.22 * roomOn + 0.06 * lampOn;
+    hemi.color.lerp(cNight, 1 - Math.max(day, roomOn, 0.6 * lampOn));   // with the lights off at night: dim and blue
+    const env = 0.04 + 0.5 * day + 0.12 * roomOn + 0.05 * lampOn;
+    for (const m of roomMats) m.envMapIntensity = env;
+    pool.visible = false;
+  }
   // the window's light on the floor: long and warm when the sun is low, short at noon, a faint blue moon pool at night
   const low = clamp(1 - sunEl, 0.25, 1);
   pool.position.x = w.c[0] + 0.25 + 0.7 * low; pool.scale.x = 0.55 + 0.9 * low;
@@ -856,7 +925,7 @@ function frame(now){
 requestAnimationFrame(frame);
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
-  place, screens, play, actions, bones, GRIP,
+  place, screens, play, actions, bones, GRIP, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   act: a => { const l = {activity:a, place:"room"}; place(l); screens(l, "AWAKE"); boy.position.copy(tgt); boy.rotation.y = targetRot; mixer.update(1); } });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, hand:{get:() => hand}, head:{get:() => head},
     monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}, mixer:{get:() => mixer}}); }
