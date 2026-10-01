@@ -34,6 +34,16 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Chromium runs as root in the image, so its own sandbox is off (`--no-sandbox`); running the server as a non-root user
   would turn it back on (needs `/data` volume ownership checked on Railway).
 
+## Reading memory (PR `feature/reading-memory`)
+- What he reads is a stimulus: up to 8 keywords (title + extract) through chat.py's rules at 0.5x a chat message,
+  + language/attention 1.5, times the sleep gain. Stored in `sleep.Memory` with `source="reading"`; REM replay
+  weighs a reading 0.6x and caps the reading pool at 0.6x the chat pool (chat from people wins most nights).
+- Curiosity: link titles scored by `chat.TOPICS` lexicon x the tick's relative network activity + novelty
+  (7 days) + noise, softmax (`SUB01_CURIOSITY_TEMP`, 0.5); the "why" names only above-average networks.
+- Shown: room reading card ("will it come back tonight?" Monte Carlo estimate), diary "read that day · replayed
+  that night", eye dream prompts (replayed titles as images only). Wording: it does not understand the text.
+- Screens: bot checks (CAPTCHA / "unusual traffic") are recognised and left, never solved or clicked.
+
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.
   Never present it as "his wiring produces his activity" (`analysis/null_test.py`).
@@ -52,6 +62,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `/` → `room.html`, `/diary`, `/api/diary`, `/api/reading`, the `run_research` task, `NOCACHE`, the diary hooks in
   `run_eye`, `SOLANA_WS` + RPC backoff.
 - Dockerfile copies `diary.py research.py` plus whatever the slow layer needs (`twin/`, `out/connectome_v2.npz`).
+
+- Sleep engine = the Phillips-Robinson circuit (PR #11, `docs/twin/sleep.md`). Rollback: revert its merge commit; a
+  `state.json` saved by the circuit loads and runs in the old rule engine (checked 2026-10-01), so no state reset.
 
 ## Hard rules
 - No secrets in git or logs; keep the password gate; skull-stripped T1 only (no face).

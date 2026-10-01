@@ -1,6 +1,6 @@
 # Sleep: a sleep-wake circuit instead of a schedule (`sleep.py`)
 
-SUB-01 is a digital twin model of one real person's brain structure and recorded activity; it is not a mind, it is
+SUB-01 is a model of brain activity built from one person's public MRI data; it is not a mind, it is
 not conscious, and it is not the person. This section covers only the sleep engine, which decides when the
 simulated brain is awake, in NREM or in REM sleep, and hands the whole-brain model its stage parameters and
 neuromodulator levels. The old engine was a rule table: asleep 00:00-08:00, 90-minute cycles by the clock, and a

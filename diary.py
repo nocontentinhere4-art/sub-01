@@ -3,14 +3,15 @@
 During REM the eye renders a dream frame every DREAM_EVERY_S of simulated time (at most MAX_UNATTENDED per
 night without viewers, so the cost stays at a few cents a night). Frames seen live by viewers during REM are
 added too. When the night closes (natural wake-up), the diary gets a short title + text written by the language
-model from the dream scenes and the replayed chat messages, plus a ready-to-post share text. Nothing is posted
-anywhere automatically.
+model from the dream scenes, the replayed chat messages and the titles of articles it read that day and replayed,
+plus a ready-to-post share text. Nothing is posted anywhere automatically. Replays of chat messages and of
+readings are listed apart ("read that day · replayed that night").
 
 data/diary/<night date>.json   one file per night
 data/diary/img/<date>/*.jpg    the night's frames (kept apart from the eye's rolling frame buffer)
 
-Dreams are AI-generated from the model's state and from REM replays of chat messages. They are not the real
-person's dreams, and nothing here claims the model dreams in the way a person does.
+Dreams are AI-generated from the model's state and from REM replays of chat messages and readings. They are not the
+real person's dreams, and nothing here claims the model dreams in the way a person does or understands what it read.
 """
 import json
 import re
@@ -27,10 +28,11 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 SYSTEM = """You write the morning entry of a dream diary for SUB-01, a simulated brain model built from public MRI scans.
 You receive JSON: the dream scenes the model's image generator produced during REM, the chat messages it replayed,
-and when it slept. Reply with JSON only: {"title": "...", "text": "..."}
+the titles of encyclopedia articles it read during the day and replayed, and when it slept. Reply with JSON only: {"title": "...", "text": "..."}
 - title: max 8 words, English, evocative, no quotes, no hashtags.
 - text: 2-3 sentences, max 60 words, English, third person ("SUB-01 dreamt..."), concrete images from the scenes,
-  weave in the replayed messages. Calm, precise, a little strange.
+  weave in the replayed messages; replayed_articles may appear only as images or places, never as facts it learned.
+  Calm, precise, a little strange.
 - Never say or imply that SUB-01 is conscious, alive, sentient, human or a person, or the person the scans came
   from. No money, prices, tokens, buying or selling. No people's names."""
 
@@ -99,6 +101,7 @@ class Diary:
         shutil.copyfile(src, self.img / date / src.name)
         d["frames"].append({"t": rec["t"], "img": f"/diary-img/{date}/{src.name}", "thought": rec.get("thought", ""),
                             "scene": rec.get("scene", ""), "replayed": (rec.get("why") or {}).get("replayed", []),
+                            "articles": (rec.get("why") or {}).get("replayed_articles", []),
                             "attended": bool(attended)})
         d["last_sim"] = t_sim
         if not attended:
@@ -119,21 +122,34 @@ class Diary:
         d = self.load(n["date"])
         return None if d and d["closed"] else n["date"]
 
-    def close(self, night, llm=None):
-        """Write title, text and share text for a finished night. `llm.ask(system, user)` is optional."""
+    def close(self, night, llm=None, read_today=()):
+        """Write title, text and share text for a finished night. `llm.ask(system, user)` is optional.
+        `read_today` = [{title, url}] of the articles read during the day before this night."""
         d = self.entry(night["date"])
-        replays = [r["text"] for r in night.get("replays", [])]
-        counts = {}
+        allr = night.get("replays", [])
+        replays = [r["text"] for r in allr if r.get("source", "chat") != "reading"]
+        counts, rcounts = {}, {}
         for x in replays:
             counts[x] = counts.get(x, 0) + 1
+        for r in allr:
+            if r.get("source") == "reading":
+                rcounts[r["text"]] = rcounts.get(r["text"], 0) + 1
         top = sorted(counts, key=lambda x: -counts[x])[:5]
+        today = {}
+        for a in read_today:
+            today.setdefault(a["title"], {"title": a["title"], "url": a.get("url", ""), "replayed": 0, "today": True})
+        for title, n in rcounts.items():
+            today.setdefault(title, {"title": title, "url": "", "replayed": 0, "today": False})["replayed"] = n
+        read = sorted(today.values(), key=lambda a: (-a["replayed"], not a["today"]))[:30]
+        top_read = [a["title"] for a in read if a["replayed"]][:3]
         facts = {"sleep_onset": (night.get("sleep_onset") or "")[-5:], "woke_up": (night.get("woke_up") or "")[-5:],
                  "wakeups": len(night.get("wakeups", [])), "replays": len(replays), "top_replayed": top,
-                 "dream_frames": len(d["frames"])}
+                 "reading_replays": sum(rcounts.values()), "read": read, "dream_frames": len(d["frames"])}
         title = text = ""
         if llm is not None and d["frames"]:
             user = json.dumps({"scenes": [f["scene"] for f in d["frames"] if f["scene"]][-12:],
-                               "replayed_messages": top, "slept": f"{facts['sleep_onset']}-{facts['woke_up']}"})
+                               "replayed_messages": top, "replayed_articles": top_read,
+                               "slept": f"{facts['sleep_onset']}-{facts['woke_up']}"})
             for _ in range(2):                         # one retry: small models sometimes break the JSON
                 try:
                     raw = llm.ask(SYSTEM, user)
@@ -148,7 +164,9 @@ class Diary:
         if not text:
             text = (f"SUB-01 slept {facts['sleep_onset']}-{facts['woke_up']} and replayed {len(replays)} "
                     f"message{'s' * (len(replays) != 1)} during REM" +
-                    (f", most often “{top[0][:80]}”." if top else "."))
+                    (f", most often “{top[0][:80]}”." if top else ".") +
+                    (f" It also replayed {facts['reading_replays']} of the things it read, such as "
+                     f"“{top_read[0][:80]}”." if top_read else ""))
         d.update(title=title or f"Night of {night['date']}", text=text, facts=facts, closed=True,
                  share=self.share(night["date"], title, facts), closed_at=time.time())
         self.save(d)
@@ -164,6 +182,9 @@ class Diary:
             lines.append(f"In REM it replayed {facts['replays']} of your messages.")
             if facts["top_replayed"]:
                 lines.append(f"Most often: “{facts['top_replayed'][0][:90]}”")
+        read = [a["title"] for a in facts.get("read", []) if a["replayed"]]
+        if read:
+            lines.append(f"It also replayed what it read: “{read[0][:70]}”.")
         lines.append("A model of brain activity, not a mind.")
         out = "\n".join(lines)
         while len(out) > SHARE_MAX and len(lines) > 2:

@@ -547,7 +547,7 @@ def test_replay_picks_messages_received_that_night():
     mem3 = Memory()
     mem3.add(loc(2, "01:00"), "scary", "NREM", {}, "threat", [])
     mem3.add(loc(2, "01:01"), "calm", "NREM", {}, "neutral", [])
-    worn = {"2026-10-02T01:00": 9}
+    worn = {Memory.key(mem3.items[0]): 9}                 # "scary", received 01:00
     picks = [mem3.pick(loc(2, "02:00"), e.night_start(), rng, worn)["text"] for _ in range(500)]
     assert picks.count("calm") > picks.count("scary")
 
@@ -609,3 +609,12 @@ if __name__ == "__main__":
                 print(f"FAIL {name}: {type(ex).__name__}: {ex}")
     print(f"{'FAILED' if failed else 'OK'}: {failed} failed")
     sys.exit(1 if failed else 0)
+
+
+def test_expected_replays_come_from_the_circuit():
+    """The "will it come back tonight?" estimate uses the circuit's own REM time, not the old fixed schedule."""
+    import sleep
+    sleep._EXPECTED_REPLAYS = None
+    n = sleep.expected_replays()
+    assert 15 < n < 40                                           # ~108 min REM / 4 min per replay ~ 27
+    assert sleep.expected_replays() == n                          # cached: computed once

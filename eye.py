@@ -33,7 +33,8 @@ You receive its current state as JSON. Reply with JSON only:
 - new_objects: "said" = the exact words used in the message (any language), "en" = English name. Never invent.
 - scene: one first-person view (max 45 words, English) of exactly what it sees while "doing" that activity
   (the bakery counter, the park bench, the phone screen in bed, the chart on the desk...). Include the strongest
-  world objects when they fit; in dreams, the place melts into the replayed messages.
+  world objects when they fit; in dreams, the place melts into the replayed messages and replayed_articles
+  (titles of encyclopedia articles it read that day: use them only as images or places, never as written text).
   Follow the style: awake = coherent, realistic, lighting from mood; rem = surreal dream mixing the replayed
   messages, impossible geometry; nrem = almost black, slow blurred shapes. Never draw people's faces, text,
   logos, violence, nudity or real persons.
@@ -212,12 +213,14 @@ class Eye:
             thought = ""
         return out.get("new_objects") or [], scene, thought
 
-    def step(self, t, stage, groups, market, replays, sim_hhmm, doing=""):
+    def step(self, t, stage, groups, market, replays, sim_hhmm, doing="", articles=()):
         """One frame. Blocking (runs in a worker thread): returns the frame record."""
         self._load()
         recent = [x for x, ts in self.heard if t - ts < 3 * 3600][-5:]
         state = {"time": sim_hhmm, "home": HOME, "doing": doing, **mood(groups, stage, market), "world": self.world.top(t),
                  "recent_messages": recent, "replayed_messages": replays[-4:]}
+        if articles:
+            state["replayed_articles"] = list(articles)[-3:]
         new, scene, thought = self._ask(state)
         fresh = [x for x, ts in self.heard if t - ts < 3 * 3600 and x not in self.absorbed]
         if fresh:                                        # a message shapes the world once; objects must come from it
@@ -252,7 +255,8 @@ class Eye:
             pil = ImageEnhance.Brightness(pil).enhance(0.25)
         pil.convert("RGB").save(self.out / name, quality=88)
         rec = {"t": sim_hhmm, "stage": stage, "img": f"/eye/{name}", "thought": thought, "scene": scene,
-               "why": {"messages": recent, "replayed": replays[-4:], "world": self.world.top(t, 5),
+               "why": {"messages": recent, "replayed": replays[-4:], "replayed_articles": list(articles)[-3:],
+                       "world": self.world.top(t, 5),
                        "mood": {k: v for k, v in state.items() if k in ("reward", "fear", "salience", "market")}},
                "render_s": round(time.time() - t0, 1), "reused": reused}
         jpgs = sorted(self.out.glob("*.jpg"))
