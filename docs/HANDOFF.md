@@ -63,6 +63,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   `run_eye`, `SOLANA_WS` + RPC backoff.
 - Dockerfile copies `diary.py research.py` plus whatever the slow layer needs (`twin/`, `out/connectome_v2.npz`).
 
+- Sleep engine = the Phillips-Robinson circuit (PR #11, `docs/twin/sleep.md`). Rollback: revert its merge commit; a
+  `state.json` saved by the circuit loads and runs in the old rule engine (checked 2026-10-01), so no state reset.
+
 ## Hard rules
 - No secrets in git or logs; keep the password gate; skull-stripped T1 only (no face).
 - RunPod: max 1 pod per task, delete on finish/error/60 min, log costs, never touch the pod named "BRAIN".
