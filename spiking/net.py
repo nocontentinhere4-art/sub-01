@@ -8,8 +8,10 @@
   synapse = mean fibre length / 6 m/s; delays are realised with a ring buffer of future inputs.
 - Background drive: a constant mean (mu) + white noise, modulated per region by the person's recorded
   resting-state activity (real_baseline), refreshed every 50 ms.
-- Inhibition-dominated balance (Brunel 2000): K_E - g K_I = 75 - 5*25 < 0, so recurrent input is net
-  inhibitory and keeps rates low (1-10 Hz) while the external drive keeps neurons near threshold.
+- Inhibition-dominated, noise-driven asynchronous regime: K_E - g K_I = 75 - 5*25 < 0, so recurrent input is net
+  inhibitory (about -0.5 mV per Hz of population rate) and damps fluctuations; with only 100 synapses per neuron
+  this is not a large-K Brunel balanced state - the rate (~3-5 Hz) is set mainly by the external drive
+  (mu = 15 mV, sigma = 4 mV; a Siegert mean-field estimate gives ~5.7 Hz with recurrence, ~5.9 Hz without).
 
 The synapse set is generated with numpy from the seed (identical on CPU and GPU), sorted by source neuron
 (CSR); a spike reads only its own outgoing row (event-driven, like gpu/bench_lif.py).
@@ -171,7 +173,7 @@ class SpikingNet:
         self.region_of = torch.from_numpy(self.region_of_np).to(dev)
         self.is_exc = torch.from_numpy(self.is_exc_np).to(dev)
         self.count = torch.zeros(n, device=dev)                   # spikes per neuron since start
-        self.region_count = torch.zeros(self.reg.n, device=dev)  # spikes per region since start
+        self.region_count = torch.zeros(self.reg.n, dtype=torch.float64, device=dev)  # float64: no 2^24 stall
         self.t = 0                                                 # steps
         self.n_spikes = 0
         self.a = c.dt / c.tau_m
@@ -255,7 +257,7 @@ class SpikingNet:
             v[spk] = c.v_reset
             self.ref[spk] = self.n_ref
             self.count.index_add_(0, spk, torch.ones(ns, device=self.device))
-            self.region_count.index_add_(0, self.region_of[spk], torch.ones(ns, device=self.device))
+            self.region_count.index_add_(0, self.region_of[spk], torch.ones(ns, dtype=torch.float64, device=self.device))
             start = self.rowptr[spk]
             cnt = self.rowptr[spk + 1] - start
             csum = torch.cumsum(cnt, 0)
@@ -309,7 +311,7 @@ class SpikingNet:
     def region_rates_since(self, snap):
         t0, _, r0 = snap
         dur = max(1, self.t - t0) * self.cfg.dt / 1000.0
-        size = torch.as_tensor(self.size, dtype=torch.float32, device=self.device)
+        size = torch.as_tensor(self.size, dtype=torch.float64, device=self.device)
         return ((self.region_count - r0) / size / dur).cpu().numpy()
 
     def group_rates(self, region_rates):
@@ -317,9 +319,12 @@ class SpikingNet:
         return {g: float((region_rates[ix] * sz[ix]).sum() / sz[ix].sum()) for g, ix in self.reg.groups.items() if ix}
 
     def enable_raster(self, n_rows=200, seed=0):
-        """Record spikes of a fixed, region-stratified sample of neurons (for the page)."""
+        """Record spikes of a fixed sample of neurons for the page: one per region where possible, rest uniform."""
         rng = np.random.default_rng(seed)
-        ids = np.sort(rng.choice(self.n, size=min(n_rows, self.n), replace=False))
+        per = [int(self.off[r] + rng.integers(self.size[r])) for r in range(self.reg.n)][:n_rows]
+        rest = np.setdiff1d(np.arange(self.n), per)
+        ids = np.sort(np.concatenate([per, rng.choice(rest, size=max(0, min(n_rows, self.n) - len(per)),
+                                                      replace=False)]).astype(np.int64))
         rows = torch.full((self.n,), -1, dtype=torch.int16, device=self.device)
         rows[torch.as_tensor(ids, device=self.device)] = torch.arange(len(ids), dtype=torch.int16, device=self.device)
         self.raster_rows, self.raster_ids, self.raster_log = rows, ids, []

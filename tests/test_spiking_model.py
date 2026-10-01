@@ -141,12 +141,12 @@ def test_pattern_completion_small_net():
     for m in msgs:
         mem.encode(m, "d1")
     dw = n.plast.dw.clone()
-    res = mem.test("d1", lures=4)
+    res = mem.test("d1", lures=6)
     assert torch.equal(dw, n.plast.dw)                                  # the test itself does not learn
     assert len(res["recalled"]) >= 2
     hc = [s["hc"] for s in res["scores"]]
     lure = [c["hc"] for c in res["control_scores"]]
-    assert np.mean(hc) > max(lure) + 0.05
+    assert np.mean(hc) > max(lure) + 1.0                                # Hz above the best lure
 
 
 def test_words_are_hashed_deterministically():
@@ -155,6 +155,21 @@ def test_words_are_hashed_deterministically():
     assert np.array_equal(a.word_neurons("bread"), b.word_neurons("bread"))
     assert not np.array_equal(a.word_neurons("bread"), a.word_neurons("coffee"))
     assert words("The bread, the BREAD and coffee!") == ["bread", "coffee"]
+
+
+def test_sleep_control_restores_state_and_replays(net):
+    mem = MemorySystem(net)
+    from spiking.memory import sleep_block
+    mem.encode("warm bread in the quiet morning", "d1")
+    g, ns = net.baseline_gain, net.noise_gain
+    none = sleep_block(net, mem, 0.05, cycles=1, rem_frac=0.9, replay_every_s=0.3, replay=False)
+    some = sleep_block(net, mem, 0.05, cycles=1, rem_frac=0.9, replay_every_s=0.3, replay=True)
+    assert none == [] and len(some) >= 1
+    assert (net.baseline_gain, net.noise_gain, net.mu_offset) == (g, ns, 0.0)
+
+
+def test_region_counter_does_not_saturate(net):
+    assert net.region_count.dtype == torch.float64
 
 
 def test_exam_uses_frozen_weights(net):

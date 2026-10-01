@@ -67,7 +67,7 @@ optional `SUB01_POD_SECRET`, `SUB01_SESSION_ID`.
 
 ```json
 {"session_id": "s-20261001-2100", "day": "2026-10-01", "n_neurons": 1000000, "seed": 1,
- "max_minutes": 110, "phases": ["load", "encode", "pong_train", "pong_exam", "memory_test", "sleep", "memory_test", "free"],
+ "max_minutes": 110, "phases": ["encode", "pong_train", "pong_exam", "memory_test", "sleep", "memory_test", "free"],
  "pong_train_minutes": 20, "messages": [{"text": "...", "emotion": "positive"}], "elapsed_days": 1.0,
  "validate": false}
 ```

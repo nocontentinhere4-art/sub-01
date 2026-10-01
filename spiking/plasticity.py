@@ -5,25 +5,30 @@ Two rules write into the same learned component dw of each plastic synapse i -> 
 1. Three-factor STDP x dopamine (task learning, Pong):
     pre trace   x_i: decays with tau+, +1 per spike of i;   post trace y_j: decays with tau-, +1 per spike of j
     eligibility e_ij (decays with tau_e = 1 s, bridging the delay to the reward):
-        on a spike of j:  e += A+ * (x_i - x_theta)           (pre before post -> potentiation, if i was active)
+        on a spike of j:  e += A+ * (x_i - x_theta)           (pre before post -> potentiation if x_i > x_theta;
+                                                               a post spike slightly depresses inputs from silent i)
         on a spike of i:  e -= A- * y_j + h                   (post before pre -> depression; h = heterosynaptic)
-    d(dw)/dt = eta_c^DA * DA(t) * (e - <e>_c)                 (DA: phasic dopamine, decays with tau_DA = 200 ms)
+    d(dw)/dt = eta_c^DA * DA(t) * (e - <e>_c)                 (DA: phasic dopamine, decays with tau_DA = 200 ms;
+                                                               only synapses onto somatomotor neurons, config.da_groups)
    For Poisson firing the expected drift of e is r_j A+ (r_i tau+ - x_theta) - r_i (A- tau- r_j + h): with
    A+ = 1, A- = 0.5, tau = 20 ms, x_theta = 0.1, h = 0.1 it is +8/s for a pair firing together at 40 Hz and
    ~0 or negative for 40 -> 13 Hz, 13 -> 40 Hz and background pairs. The update uses e relative to its class mean
    <e>_c (zero-sum: a reward does not uniformly grow or shrink all synapses).
 
 2. Fast Hebbian rate rule (memory encoding and REM consolidation), applied once per presentation window T:
-    dw += eta_c^M * [dr_i - theta]_+ * (dr_j - theta) * T,   dr = rate in the window - rate just before, theta = 10 Hz
-   (the depressing branch, dr_j < theta, is scaled by 0.25). Exactly zero for background pairs; potentiates
-   co-active pairs, weakly depresses synapses from active onto inactive neurons (interference with older assemblies). M = ENC (awake encoding, hippocampal rate ~50x cortical) or
-   CONS (REM replay, cortical only). Applied after the window, so a growing assembly cannot run away while
-   it is being driven.
+    dw += eta_c^M * [dr_i - theta]_+ * (dr_j - theta) * T,   dr = rate in the window - the neuron's 10 s running rate,
+   theta = 15 Hz for encoding (about 3 sd of the Poisson noise of a 500 ms window), 6 Hz for replay (~2 sd)
+   (the depressing branch, dr_j < theta, is scaled by 0.25). Zero unless the presynaptic neuron is well above
+   its own running rate (background pairs cross the threshold only by rare noise excursions); potentiates
+   co-active pairs, weakly depresses synapses from active onto inactive neurons (interference with older
+   assemblies). M = ENC (awake encoding, hippocampal rate ~50x cortical) or CONS (REM replay, cortical only).
+   Applied after the window, so a growing assembly cannot run away while it is being driven.
 
 Weights: w = clamp(w0 + dw, 0, w_max); w0 = the connectome-derived weight, never changed. Class c = "hc" if the
 postsynaptic neuron is hippocampal, else "ctx". Homeostasis (every second): intrinsic excitability offset
 theta_j += eta_theta (r_j - r*) (bounded), and multiplicative synaptic scaling of the plastic weight,
-w0 + dw <- (w0 + dw) (1 - eta_s (r_j - r*) / r*) (stored as a change of dw; w0 itself is never modified). Conduction delays are ignored in the STDP timing (traces use emission times).
+w0 + dw <- (w0 + dw) (1 - eta_s (r_j - r*) / r*) (stored as a change of dw; w0 itself is never modified).
+Conduction delays are ignored in the STDP timing (traces use emission times).
 """
 import json
 import math
@@ -77,6 +82,11 @@ class Plasticity:
         hc = torch.zeros(net.reg.n, dtype=torch.bool, device=dev)
         hc[list(net.hc_regions)] = True
         self.cls = hc[net.region_of[self.pdst.long()]].to(torch.uint8)   # 1 = hippocampal post
+        self.cls_long = self.cls.long()
+        da = torch.zeros(net.reg.n, dtype=torch.bool, device=dev)
+        for g in c.da_groups:
+            da[net.reg.groups[g]] = True
+        self.da_mask = da[net.region_of[self.pdst.long()]].float()      # where dopamine can change weights
         self.w0 = net.w[self.pidx].clone()
         self._wmax_t = None
         self.dw = torch.zeros(self.P, device=dev)
@@ -90,7 +100,6 @@ class Plasticity:
         self.mod = {m: 0.0 for m in MODS}
         self.frozen = False
         self.stdp = True               # eligibility bookkeeping; off in phases where no dopamine can arrive
-        self.defer = False             # accumulate dw but express it only at commit() (memory encoding)
         self.rate = torch.full((n,), c.rate_target, device=dev)
         self.last_homeo = None
         self.updates = 0
@@ -143,13 +152,12 @@ class Plasticity:
             self.mod["da"] = 0.0
         if abs(m[0]) < 1e-9 and abs(m[1]) < 1e-9:
             return
-        cls = self.cls.long()
-        sums = torch.zeros(2, device=self.dev).index_add_(0, cls, self.elig)
+        cls = self.cls_long
+        sums = torch.stack(((self.elig * (1 - self.cls)).sum(), (self.elig * self.cls).sum()))
         mean = sums / torch.tensor([max(1, k) for k in self.n_cls], device=self.dev, dtype=torch.float32)
         mt = torch.tensor(m, device=self.dev, dtype=torch.float32)
-        self.dw.add_(mt[cls] * (self.elig - mean[cls]) * (dt_ms / 1000.0))
-        if not self.defer:
-            self._apply()
+        self.dw.add_(mt[cls] * (self.elig - mean[cls]) * self.da_mask * (dt_ms / 1000.0))
+        self._apply()
         self.updates += 1
 
     def set_stdp(self, on):
@@ -161,16 +169,12 @@ class Plasticity:
             self.mod["da"] = 0.0
         self.stdp = bool(on)
 
-    def commit(self):
-        self.defer = False
-        self._apply()
-
     def hebbian(self, dr, mod, seconds, theta=None):
         """Fast Hebbian rate rule on the rate change dr (N,) over a window of `seconds` (see module doc)."""
         if self.frozen:
             return
         theta = self.cfg.hebb_theta if theta is None else theta
-        eta = torch.tensor([self.cfg.eta["ctx"][mod], self.cfg.eta["hc"][mod]], device=self.dev)
+        eta = torch.tensor([self.cfg.eta["ctx"][mod], self.cfg.eta["hc"][mod]], device=self.dev, dtype=dr.dtype)
         pre = (dr[self.psrc.long()] - theta).clamp_(min=0.0)
         nz = pre > 0
         if not bool(nz.any()):
@@ -208,8 +212,7 @@ class Plasticity:
             net._dirty = True
             f = (1.0 - c.eta_scale * err / c.rate_target).clamp_(0.9, 1.1)[self.pdst.long()]
             self.dw.copy_((self.w0 + self.dw) * f - self.w0)        # scale the whole plastic weight
-            if not self.defer:
-                self._apply()
+            self._apply()
         self.last_homeo = now
 
     # --- inspection ---------------------------------------------------------------------------------------------

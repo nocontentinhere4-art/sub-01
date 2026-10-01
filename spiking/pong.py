@@ -56,7 +56,7 @@ class Game:
             if abs(self.y - self.paddle) <= self.h / 2 + self.r:
                 self.hits += 1
                 self.vx = abs(self.vx)
-                self.vy += self.rng.normal(0, 0.15)            # a little spin so trajectories vary
+                self.vy = float(np.clip(self.vy + self.rng.normal(0, 0.15), -0.55, 0.55))   # spin, bounded
                 self.x = self.r
                 return "hit"
             self.misses += 1
@@ -160,6 +160,7 @@ class Pong:
         self.reward, self.good_pulse = reward, good_pulse
         self.p_hit = 0.3
         self.on_frame = on_frame
+        self.shown = self.game                 # the game currently on screen (exams use their own ball sequences)
         self.dopamine_level = 0.0
         self.last_good = -1e9
         self.curve = []
@@ -175,55 +176,57 @@ class Pong:
         p.dopamine(min(self.good_pulse, 0.5 * self.reward))
         return True
 
-    def play(self, rallies, mode="train"):
-        """Play `rallies` approaches; returns (hits, rallies)."""
-        net, io, g, p = self.net, self.io, self.game, self.net.plast
+    def play(self, rallies, mode="train", game_seed=None):
+        """Play `rallies` approaches; returns (hits, rallies). game_seed: a fresh, reproducible ball sequence
+        (exams use the same seeds before/after training and for the controls -> paired comparisons)."""
+        net, io, p = self.net, self.io, self.net.plast
+        g = self.game if game_seed is None else Game(np.random.default_rng(game_seed))
         frozen_before = p.frozen if p is not None else None
         if p is not None:
-            p.frozen = mode != "train"
-        if mode != "random" and not io.calibrated:
-            was = p.frozen if p is not None else None
+            p.frozen = True
+        try:
+            if mode != "random" and not io.calibrated:
+                io.calibrate(g)
             if p is not None:
-                p.frozen = True
-            io.calibrate(g)
-            if p is not None:
-                p.frozen = was
-        h0, r0 = g.hits, g.rally
-        stim_left = 0
-        vsum, vn = 0.0, 0
-        while g.rally - r0 < rallies:
-            if stim_left > 0:                                    # after a miss: the game pauses, noise plays
-                if stim_left % 50 == 0:
-                    net.set_region_drive("pong", io.unpredictable())
-                net.run(FRAME_MS)
-                io.motor(FRAME_MS)
-                stim_left -= FRAME_MS
-                if self.on_frame is not None:
-                    self.on_frame(self)
-                continue
-            if mode == "random":
-                z = io.random_z(FRAME_MS)
-            else:
-                net.set_region_drive("pong", io.encode(g))
-                net.run(FRAME_MS)
-                z = io.motor(FRAME_MS)
-            v = io.velocity(z)
-            vsum, vn = vsum + abs(v), vn + 1
-            ev = g.step(FRAME_MS / 1000.0, v)
-            if ev == "hit":
-                self.p_hit += 0.05 * (1 - self.p_hit)
-                if mode == "train" and p is not None:
-                    p.dopamine(self.reward * max(0.2, 1.0 - self.p_hit))
-            elif ev == "miss":
-                self.p_hit += 0.05 * (0 - self.p_hit)
-                if mode != "random":
+                p.frozen = mode != "train"
+            io.last_rc = None                                    # no rate over a gap since the last play()
+            h0, r0 = g.hits, g.rally
+            stim_left = 0
+            vsum, vn = 0.0, 0
+            while g.rally - r0 < rallies:
+                if stim_left > 0:                                # after a miss: the game pauses, noise plays
+                    if stim_left % 50 == 0:
+                        net.set_region_drive("pong", io.unpredictable())
+                    net.run(FRAME_MS)
+                    io.motor(FRAME_MS)
+                    stim_left -= FRAME_MS
+                    if self.on_frame is not None:
+                        self.on_frame(self)
+                    continue
+                if mode == "random":
+                    z = io.random_z(FRAME_MS)
+                else:
+                    net.set_region_drive("pong", io.encode(g))
+                    net.run(FRAME_MS)
+                    z = io.motor(FRAME_MS)
+                v = io.velocity(z)
+                vsum, vn = vsum + abs(v), vn + 1
+                ev = g.step(FRAME_MS / 1000.0, v)
+                if ev is not None and mode == "train":
+                    expected = self.p_hit                        # reward-prediction error vs the prior expectation
+                    self.p_hit += 0.05 * ((ev == "hit") - self.p_hit)
+                    if ev == "hit" and p is not None:
+                        p.dopamine(self.reward * max(0.2, 1.0 - expected))
+                if ev == "miss" and mode != "random":
                     stim_left = 500
-            if self.on_frame is not None and mode != "random":
-                self.on_frame(self)
-        net.set_region_drive("pong", None)
-        if p is not None:
-            p.frozen = frozen_before
+                if self.on_frame is not None and mode != "random":
+                    self.on_frame(self)
+        finally:
+            net.set_region_drive("pong", None)
+            if p is not None:
+                p.frozen = frozen_before
         self.abs_v.append(round(vsum / max(1, vn), 3))
+        self.shown = g
         return g.hits - h0, g.rally - r0
 
     def train(self, blocks, block_rallies=20, on_block=None):
@@ -235,8 +238,8 @@ class Pong:
                 on_block(self.curve[-1])
         return self.curve
 
-    def exam(self, rallies=20):
-        h, n = self.play(rallies, "exam")
+    def exam(self, rallies=20, game_seed=None):
+        h, n = self.play(rallies, "exam", game_seed=game_seed)
         return {"rallies": n, "hits": h, "hit_rate": round(h / n, 4), "frozen": True, "mean_abs_v": self.abs_v[-1]}
 
 

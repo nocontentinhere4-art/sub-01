@@ -185,7 +185,7 @@ class Session:
                    "groups": {k: round(v, 2) for k, v in groups.items() if k in GROUP_KEYS},
                    "raster": {"n": len(net.raster_ids), "t0": int(self.last_frame_t), "t1": int(net.t),
                               "spikes": net.pop_raster(self.last_frame_t)[:4000]},
-                   "pong": self.pong.game.frame() if (self.pong is not None and self.phase.startswith("pong")) else None,
+                   "pong": self.pong.shown.frame() if (self.pong is not None and "pong" in self.phase) else None,
                    "dopamine": round(p.mod["da"], 3) if p is not None else 0.0}
             self.link.send(msg)
         else:
@@ -197,13 +197,13 @@ class Session:
         if kind == "stop":
             self.stopping = True
             raise StopSession("stop requested")
-        if kind == "good" and self.pong is not None:
+        if kind == "good" and self.pong is not None and self.phase in ("pong_train", "free"):
             self.pong.good()
         elif kind == "sleep" and msg.get("stage") in ("AWAKE", "NREM", "REM"):
             self.stage = msg["stage"]
         elif kind == "chat" and isinstance(msg.get("text"), str):
-            ws = words(msg["text"])
-            if ws and getattr(self, "mem", None) is not None:
+            ws = words(msg["text"])                              # only in the free run: never during exams / tests
+            if ws and getattr(self, "mem", None) is not None and self.phase == "free":
                 self.net.set_neuron_drive("chat", self.mem.pattern(ws), 4.0)
                 self.chat_until = self.net.t + 300
                 self.pending_chat.append(msg["text"])
@@ -230,7 +230,7 @@ class Session:
                       **{k: v for k, v in (c.get("config") or {}).items()})
         t0 = time.time()
         self.net = net = SpikingNet(conf, device=dev, verbose=True)
-        self.results["build"] = {"device": dev, "gpu": torch.cuda.get_device_name(0) if dev == "cuda" else None,
+        self.results["build"] = {"device": dev, "gpu": torch.cuda.get_device_name(0) if str(dev).startswith("cuda") else None,
                                  "n_neurons": net.n, "synapses": net.n_syn, "max_delay_ms": net.D - 1,
                                  "plastic_synapses": net.plast.P if net.plast else 0, "build_s": round(time.time() - t0, 1),
                                  "config_hash": conf.config_hash(), "config": conf.to_dict(),
@@ -273,7 +273,11 @@ class Session:
             net.run(200)
             net.sync()
             t0, s0, n0 = time.time(), net.t, net.n_spikes
-            net.run(int(self.cfg.get("bench_ms", 5000)))
+            ms = int(self.cfg.get("bench_ms", 5000))
+            for k in range(0, ms, 1000):                     # with learning on, a reward every second (as in Pong)
+                if p is not None and not frozen:
+                    p.dopamine(0.8)
+                net.run(min(1000, ms - k))
             net.sync()
             wall = time.time() - t0
             steps = net.t - s0
@@ -354,19 +358,23 @@ class Session:
             self.pong = Pong(self.net, seed=int(self.cfg.get("seed", 1)))
         return self.pong
 
-    def _exam_no_learning(self, rallies):
+    def _exam_no_learning(self, rallies, game_seed=None):
         """Control: the same network with every learned change removed (frozen), same exam."""
         p = self.net.plast
         if p is None:
-            return self._pong().exam(rallies)
-        dw = p.dw.clone()
+            return self._pong().exam(rallies, game_seed=game_seed)
+        dw, theta = p.dw.clone(), self.net.theta.clone()
         p.dw.zero_()
         p._apply()
+        self.net.theta.zero_()                                       # also the homeostatic excitability
+        self.net._dirty = True
         try:
-            return self._pong().exam(rallies)
+            return self._pong().exam(rallies, game_seed=game_seed)
         finally:
             p.dw.copy_(dw)
             p._apply()
+            self.net.theta.copy_(theta)
+            self.net._dirty = True
 
     def ph_pong_train(self):
         pong = self._pong()
@@ -384,8 +392,9 @@ class Session:
     def ph_pong_exam(self, label="exam"):
         pong = self._pong()
         rallies = int(self.cfg.get("exam_rallies", 20))
-        exam = pong.exam(rallies)
-        ctrl = self._exam_no_learning(rallies) if self.net.plast is not None else None
+        seed = 1000 + len(self.results["phases"].get("exam", []))
+        exam = pong.exam(rallies, game_seed=seed)
+        ctrl = self._exam_no_learning(rallies, game_seed=seed) if self.net.plast is not None else None
         rnd = random_paddle(2000, seed=int(self.cfg.get("seed", 1)))
         out = {"label": label, **exam, "controls": {"no_plasticity": ctrl["hit_rate"] if ctrl else None,
                                                      "no_plasticity_hits": ctrl["hits"] if ctrl else None,
@@ -395,9 +404,7 @@ class Session:
 
     def ph_sleep(self, replay=True, label=None):
         minutes = float(self.cfg.get("sleep_minutes", 4))
-        reps = sleep_block(self.net, self.mem, minutes, cycles=int(self.cfg.get("sleep_cycles", 2))) if replay else None
-        if not replay:
-            self.net.run(minutes * 60_000)
+        reps = sleep_block(self.net, self.mem, minutes, cycles=int(self.cfg.get("sleep_cycles", 2)), replay=replay)
         out = {"minutes_sim": minutes, "replay": replay, "label": label,
                "replays": [r["text"] for r in reps] if reps else []}
         self.result("sleep", out)
@@ -462,13 +469,15 @@ class Session:
         self.ph_memory_test("after encoding")
         p = self.net.plast
         dw0 = p.dw.clone()
-        theta0 = self.net.theta.clone()
+        theta0, rate0 = self.net.theta.clone(), p.rate.clone()
         reg0 = json.loads(json.dumps(self.mem.registry))
         self.ph_sleep(replay=False, label="control: same time, no replay")
         self.ph_memory_test("after sleep without replay (control)")
         p.dw.copy_(dw0)
         p._apply()
         self.net.theta.copy_(theta0)
+        p.rate.copy_(rate0)
+        p.last_homeo = None
         self.net._dirty = True
         self.mem.registry = reg0
         self.ph_sleep(replay=True, label="sleep with REM replay")
@@ -478,13 +487,14 @@ class Session:
         """Exams before training (= no plasticity), training curve, exams after (frozen) + controls."""
         pong = self._pong()
         reps = int(self.cfg.get("exam_repeats", 2))
-        pre = [pong.exam(int(self.cfg.get("exam_rallies", 20))) for _ in range(reps)]
+        er = int(self.cfg.get("exam_rallies", 20))
+        pre = [pong.exam(er, game_seed=500 + k) for k in range(reps)]      # same ball sequences before / after
         self.result("exam", {"label": "before training (no learning yet)", "exams": pre,
                              "hits": sum(e["hits"] for e in pre), "rallies": sum(e["rallies"] for e in pre),
                              "hit_rate": round(sum(e["hits"] for e in pre) / sum(e["rallies"] for e in pre), 4)})
         self.ph_pong_train()
-        post = [pong.exam(int(self.cfg.get("exam_rallies", 20))) for _ in range(reps)]
-        ctrl = [self._exam_no_learning(int(self.cfg.get("exam_rallies", 20))) for _ in range(reps)]
+        post = [pong.exam(er, game_seed=500 + k) for k in range(reps)]
+        ctrl = [self._exam_no_learning(er, game_seed=500 + k) for k in range(reps)]
         rnd = random_paddle(5000, seed=int(self.cfg.get("seed", 1)))
         trk = tracking_paddle(500)
         self.result("exam", {"label": "after training (frozen)", "exams": post,
@@ -505,7 +515,7 @@ class Session:
                 info = net.plast.save(wpath, {**self.mem.to_meta(), "last_day": self.cfg.get("day"),
                                               "sessions": int(net.plast.meta.get("sessions", 0)) + 1})
                 self.results["weights"] = {**info, "stats": net.plast.stats(), "bytes": wpath.stat().st_size}
-                if self.link is not None and not self.cfg.get("validate"):
+                if self.link is not None and not self.cfg.get("validate") and err is None:
                     self.results["weights"]["upload_status"] = self.link.put_weights(wpath)
         except Exception as e:
             err = err or f"save: {type(e).__name__}: {e}"

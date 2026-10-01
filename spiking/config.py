@@ -60,9 +60,11 @@ class Config:
     # learning rates per synapse class. "da": mV per (unit dopamine x unit eligibility x s) (three-factor STDP);
     # "enc" / "cons": fast Hebbian rate rule for memory, mV per (Hz x Hz x s) on rates above baseline
     eta: dict = field(default_factory=lambda: {
-        "ctx": {"da": 0.02, "enc": 0.0005, "cons": 0.001},
-        "hc": {"da": 0.02, "enc": 0.025, "cons": 0.0},
+        "ctx": {"da": 0.5, "enc": 0.0005, "cons": 0.002},
+        "hc": {"da": 0.0, "enc": 0.025, "cons": 0.0},
     })
+    da_groups: tuple = ("somatomotor",)  # dopamine-gated plasticity only at synapses onto these neurons (M1-like;
+                                        # Hosp et al. 2011: M1 dopamine is needed for motor skill learning)
     hebb_theta: float = 10.0            # Hz above baseline: pre must exceed it; post above it potentiates, below depresses
     hebb_ltd: float = 0.25              # depression (post below theta) is 4x weaker than potentiation
     homeo_every: int = 1000             # steps between homeostatic updates
@@ -89,7 +91,7 @@ class Config:
     @classmethod
     def from_dict(cls, d):
         names = {f.name for f in fields(cls)}
-        return cls(**{k: (tuple(v) if k == "delay_local" else v) for k, v in d.items() if k in names})
+        return cls(**{k: (tuple(v) if k in ("delay_local", "da_groups") else v) for k, v in d.items() if k in names})
 
 
 def small(**kw):
