@@ -44,6 +44,7 @@
   .card .kw b { font-weight:400; color:var(--fg); }
   .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
     border-top:1px solid var(--line); font-size:11px; color:#c9c9d6; }
+  .card .tn[hidden] { display:none; }
   .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
   #screencard .frame { position:relative; border-radius:6px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12); }
   #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
@@ -109,7 +110,7 @@
     <div class="t" id="r-title"></div>
     <div class="m" id="r-text"></div>
     <div class="kw" id="r-kw"></div>
-    <div class="tn"><span>will it come back tonight?</span><b id="r-tonight">…</b></div>
+    <div class="tn" id="r-tn"><span>will it come back tonight?</span><b id="r-tonight">…</b></div>
     <div class="s" id="r-why"></div>
     <div class="s" id="r-note">What it reads becomes stimuli and dream material; it does not understand the text.</div>
   </div>
@@ -546,7 +547,6 @@ fetch("tokyo_routes.json").then(r => r.json()).then(d => {
 fetch("/api/browsing").then(r => r.json()).then(d => { if (!d.on) $("h-screen").textContent = "Reading is real Wikipedia (CC BY-SA): what it reads becomes stimuli and dream material; it does not understand the text."; }).catch(() => {});
 const NET = {somatomotor:"body-movement", default:"default-mode", fear:"threat", relay:"thalamic relay"};
 function tonightText(c){
-  if (c == null) return "estimating…";
   const p = Math.round(c * 100);
   return `${p < 5 ? "unlikely" : p > 85 ? "very likely" : p >= 50 ? "likely" : "maybe"} · ${p > 95 ? ">95" : p < 5 ? "<5" : "≈" + p}%`;
 }
@@ -582,7 +582,8 @@ function connect(){
       $("r-link").href = r.url || "#"; $("r-why").textContent = r.why || "";
       const kw = r.keywords || [], nets = (r.networks || []).map(n => NET[n] || n);
       $("r-kw").innerHTML = kw.length ? `keywords <b>${esc(kw.join(", "))}</b>${nets.length ? ` → stimulus to ${esc(nets.join(", "))}${r.gain != null && r.gain < 0.99 ? ` (${Math.round(r.gain * 100)}% gets through)` : ""}` : ""}` : "";
-      $("r-tonight").textContent = tonightText(r.tonight);
+      $("r-tn").hidden = r.tonight == null;                         // older entries / stale estimate: no line
+      if (r.tonight != null) $("r-tonight").textContent = tonightText(r.tonight);
       $("r-tonight").title = "estimated chance it is replayed in REM tonight, with what memory holds now; chat messages from people weigh more"; }
     else $("readcard").hidden = true;
     place(life); screens(life, stage);

@@ -135,12 +135,15 @@ def curiosity(cands, rel, history, t, rng, temperature=TEMPERATURE):
     w = [math.exp((r[1] - top) / max(temperature, 1e-6)) for r in rows]
     k = rng.choices(range(len(rows)), weights=w)[0]
     title, score, contrib, novel = rows[k]
-    nets = sorted(contrib, key=lambda g: -contrib[g])[:2]
-    if nets:
+    hot = {g: c for g, c in contrib.items() if rel.get(g, 1.0) > 1.0}        # only above-average areas count as "active"
+    nets = sorted(hot, key=lambda g: -hot[g])[:2]
+    if nets and sum(hot.values()) >= NOVELTY:
         names = [NET_NAME.get(g, g) for g in nets]
         why = f"chose it: {' and '.join(names)} areas were most active (its title maps there)"
+    elif novel:
+        why = "chose it: new to it (not read in the last 7 days)"
     else:
-        why = "chose it: nothing in the title matched the active areas, " + ("it was new to it" if novel else "by chance")
+        why = "chose it by chance"
     return title, {"why": why, "networks": nets, "p": round(w[k] / sum(w), 3), "candidates": len(rows),
                    "novel": novel}
 

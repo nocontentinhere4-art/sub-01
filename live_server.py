@@ -28,7 +28,7 @@ from aiohttp import web
 
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
-from sleep import ROME, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime
+from sleep import ROME, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime, night_date
 from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
@@ -209,6 +209,13 @@ class Live:
         """Estimated chance this memory is replayed tonight (blocking: run in a worker thread)."""
         return round(self.memory.replay_chance(m, next_bedtime(self.clock.now())), 2)
 
+    def reading_now(self, t):
+        """The article on the desk for the tick; its tonight estimate only while it is about the coming night."""
+        art = self.reader.current()
+        if art and "tonight" in art and art.get("tonight_night") != night_date(next_bedtime(t)):
+            art = {k: v for k, v in art.items() if k != "tonight"}
+        return art
+
     async def handle_chat(self, ws, key, text):
         ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
         if not ok:
@@ -231,8 +238,10 @@ class Live:
         def summary(n):
             if not n:
                 return None
+            reading = sum(1 for r in n["replays"] if r.get("source") == "reading")
             return {"date": n["date"], "sleep_onset": n["sleep_onset"], "woke_up": n["woke_up"],
-                    "wakeups": n["wakeups"], "replays": n["replays"][-20:], "sleep_debt": n["sleep_debt"]}
+                    "wakeups": n["wakeups"], "replays": n["replays"][-20:], "sleep_debt": n["sleep_debt"],
+                    "n_replays": {"chat": len(n["replays"]) - reading, "reading": reading}}
         return {"type": "nights", "last": summary(self.engine.last_night), "tonight": summary(self.engine.night)}
 
     async def broadcast(self, msg):
@@ -320,7 +329,7 @@ class Live:
                              self.engine.pressure(tsim))
             msg["life"] = self.life.snapshot()
             if self.life.activity == "research" and not self.life.path:
-                msg["life"]["reading"] = self.reader.current()
+                msg["life"]["reading"] = self.reading_now(tsim)
             if self.browser and (dev := self.screen_device()):
                 msg["life"]["screen"] = self.browser.screens[dev].status()
             await self.broadcast(msg)
@@ -347,6 +356,7 @@ class Live:
                 m = self.absorb_reading(art)
                 try:
                     art["tonight"] = await loop.run_in_executor(None, self.tonight_chance, m)
+                    art["tonight_night"] = night_date(next_bedtime(self.clock.now()))
                 except Exception as e:                     # an estimate must never stop the reading
                     print("research: replay estimate failed:", repr(e)[:120], flush=True)
                 await self.broadcast({"type": "reading", **art})
