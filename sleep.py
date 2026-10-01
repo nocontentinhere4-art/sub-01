@@ -61,8 +61,8 @@ NU_VH = 0.19           # mV nM^-1, somnogen H -> VLPO
 NU_VC = -6.3           # mV, circadian drive -> VLPO (C in [0, 1])
 A_M = 1.0              # mV, constant cholinergic/orexinergic drive to MA (nu_ma * Q_a)
 CHI = 10.8 * 3600.0    # s, somnogen clearance time
-MU = 5.0               # nM s, somnogen production per MA firing. PR2007: 3.6 (= 1e-3 nM h) -> ~6.1 h sleep/day
-                       # in our integration; calibrated to 5.0 -> ~7.9 h (the only change to the published set)
+MU = 5.0               # nM s, somnogen production per MA firing. PR2007/sleepR: 3.6 (= 1e-3 nM h) -> 6.4 h/day asleep by
+                       # V_v > V_m (7.8 h by sleepR's dH<0 rule); calibrated to 5.0 -> ~7.95 h (V_v > V_m)
 CIRC_PEAK_H = 16.85    # local clock hour where C = 1 (strongest wake drive); calibrated: sleep ~23:55-07:55,
                        # C minimum at ~04:50 (near the usual core-temperature minimum)
 
@@ -94,9 +94,9 @@ MORNING_HOUR, WAKE_HOUR, EVENING_HOUR = 5, 8, 20   # natural wake from 05:00 clo
 TRANSITION_S = 30.0          # exponential glide time constant (sim s) of the stage parameters: ~95 % after 90 s
 TRANSITION_REAL_S = 1.0      # ...but never faster than this in real seconds (high --time-scale)
 STEP_S = 5.0                 # max integration substep (s); the populations have tau = 10 s
-COARSE_STEP_S = 30.0         # substep for long catch-up jumps (> COARSE_AFTER_S), still quasi-static
+COARSE_STEP_S = 10.0
 COARSE_AFTER_S = 2 * 3600.0
-MAX_STEPS = 6000             # per update() call
+MAX_STEPS = 13000
 MAX_GAP_S = 36 * 3600.0      # longer gaps (server off for days): restart on the rested cycle, debt decays
 SWITCH_MV = 2.0              # hysteresis on V_v - V_m and V_on - V_off for naming the state
 QM_WAKE = 4.25               # s^-1, MA firing in resting wake on the reference cycle (checked in the tests)

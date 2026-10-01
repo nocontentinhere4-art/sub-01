@@ -344,6 +344,57 @@ def test_update_is_cheap_and_bounded():
     assert time.perf_counter() - t0 < 0.5 and e.stage in ("AWAKE", "NREM", "REM")
 
 
+def test_circuit_matches_independent_ode_solver():
+    """V_m, V_v, H of step_circuit (exponential Euler, 5 s substeps) must follow the PR2007 equations as written in
+    docs/twin/sleep.md, integrated here with scipy LSODA (the REM variables do not feed back into them)."""
+    from scipy.integrate import solve_ivp
+
+    def Q(v):
+        return sleep.Q_MAX / (1 + np.exp((sleep.THETA - v) / sleep.SIGMA))
+
+    def f(t, y):
+        vv, vm, H = y
+        C = 0.5 * (1 + np.cos(2 * np.pi * (t / 3600 - sleep.CIRC_PEAK_H) / 24))
+        return [(sleep.NU_VM * Q(vm) + sleep.NU_VC * C + sleep.NU_VH * H - vv) / sleep.TAU_V,
+                (sleep.NU_MV * Q(vv) + sleep.A_M - vm) / sleep.TAU_M, (sleep.MU * Q(vm) - H) / sleep.CHI]
+
+    ref = sleep.Reference.get()
+    y0 = ref.states[12 * 60][:3]                         # 12:00 on the reference cycle: (V_m, V_v, H)
+    sol = solve_ivp(f, [12 * 3600, 36 * 3600], [y0[1], y0[0], y0[2]], method="LSODA", rtol=1e-8, atol=1e-9,
+                    t_eval=np.arange(12 * 3600, 36 * 3600, 600.0))
+    s = [*y0, -10.0, 2.0, 0.0]
+    n_switch = 0
+    for k, t in enumerate(sol.t):
+        if k:
+            for j in range(120):                          # 600 s in 5 s substeps
+                sleep.step_circuit(s, 5.0, (t - 600 + 5 * (j + 1)) % 86400.0, 0.0)
+        assert abs(s[2] - sol.y[2][k]) < 0.15, (t / 3600, s[2], sol.y[2][k])        # H within 0.15 nM
+        if abs(sol.y[0][k] - sol.y[1][k]) > 4.0:                                     # away from the ~1 min switches
+            assert (s[1] > s[0]) == (sol.y[0][k] > sol.y[1][k]), t / 3600
+        n_switch += (k > 0) and ((sol.y[0][k] > sol.y[1][k]) != (sol.y[0][k - 1] > sol.y[1][k - 1]))
+    assert n_switch == 2                                   # one sleep onset, one wake-up in 24 h
+
+
+def test_hypnogram_does_not_depend_on_step_size():
+    """update() in 1 s, 180 s (time-scale 3600) and 600 s ticks, and one 20 h catch-up jump, give the same night."""
+    def night(step, jump=False):
+        e = SleepEngine(loc(1, "12:00"), rng=random.Random(0))
+        t = loc(1, "12:00")
+        if jump:
+            e.update(loc(2, "08:30"))
+        else:
+            while t < loc(2, "08:30"):
+                t += step
+                e.update(t)
+        return [(x["stage"], datetime.fromisoformat(x["t"]).replace(tzinfo=TZ).timestamp())
+                for x in e.last_night["timeline"]]
+    ref = night(5.0)
+    assert [s for s, _ in ref].count("REM") >= 4, ref
+    for other in (night(1.0), night(180.0), night(600.0), night(None, jump=True)):
+        assert [s for s, _ in other] == [s for s, _ in ref], (other, ref)
+        assert max(abs(a - b) for (_, a), (_, b) in zip(other, ref)) <= 6 * 60, (other, ref)
+
+
 # --- chat ----------------------------------------------------------------------------------------
 def test_filter_blocks_urls_addresses_tickers_money_insults():
     bad = ["see https://example.com", "www.scam.io now", "pump.fun", "t.me/group",

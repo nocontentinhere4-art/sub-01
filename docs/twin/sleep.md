@@ -47,13 +47,21 @@ C(t) = 0.5 (1 + cos(2 pi (t_local - t_peak) / 24 h))
 
 I could not reach the paper itself from the sandbox (journal and model-repository hosts are blocked). The
 published values were cross-checked against the MIT-licensed R package `sleepR`
-(github.com/PabRod/sleepR, `philrob_default_parms`), which implements PR2007. Integrating those values with
-LSODA (scipy) and with our own integrator gives **6.1 h of sleep per day**. Two things were calibrated, and they
-are the only changes to the published set:
+(github.com/PabRod/sleepR, `philrob_default_parms`), which implements PR2007; the review re-read them there. So
+the constants are "as in sleepR", not checked against the paper's own Table 1.
 
-- **mu = 5.0 nM s** (was 3.6). Raising somnogen production per unit of MA firing gives ~7.95 h of sleep per day,
-  close to the ~8 h the project asks for. Changing A_m barely moves sleep length (5.95-6.14 h for A_m 0.2-1.0).
-  nu_vh = 0.23 would also give ~7 h. We chose mu because it is a single scalar.
+How long the published set sleeps depends on how "asleep" is defined (reviewer check, LSODA, steady 24 h cycle):
+- `sleepR` calls the model asleep when H is falling (dH/dt < 0): **7.8 h per day** with the published values.
+- Here the state must drive behaviour (stages, modulators, wake-ups), so "asleep" means the VLPO has overtaken
+  the MA group (V_v > V_m): **6.4 h per day** with the published values (6.1 h with the 2 mV naming hysteresis).
+  The V_v > V_m criterion is stricter, because V_m lingers near zero for a while after H starts to fall.
+
+So the two calibrations below are needed only because of that choice of criterion; they are the only changes to
+the published set:
+
+- **mu = 5.0 nM s** (was 3.6). Raising somnogen production per unit of MA firing gives ~7.95 h of sleep per day by
+  the V_v > V_m criterion (by the dH < 0 criterion the same value would give 8.9 h). Other single-scalar routes
+  to ~7-8 h also work: A_m = 0.2 mV gives 7.3 h, nu_vh = 0.23 gives 7.3 h. We chose mu because it is one scalar.
 - **Circadian phase.** C peaks at 16:51 local time, so its minimum is at 04:51, near the usual core-temperature
   minimum. With this phase the undisturbed model falls asleep at **23:56** and wakes at **07:54** on the
   Asia/Tokyo clock (`SUB01_TZ`). C is locked to the local clock: there is no light-driven pacemaker, no jet lag
@@ -184,14 +192,14 @@ The numbers themselves are ours and were not fitted. `twin/neurochem.py` reads t
 
 ## 6. Engine, integration and interface
 
-- **Integration.** `update(t, dt_real)` integrates in substeps of at most 5 s, or at most 30 s when catching up
-  more than 2 h, capped at 6000 substeps. The scheme is exponential Euler in Gauss-Seidel order, so even a large
+- **Integration.** `update(t, dt_real)` integrates in substeps of at most 5 s, or at most 10 s when catching up
+  more than 2 h, capped at 13000 substeps (36 h). The scheme is exponential Euler in Gauss-Seidel order, so even a large
   step relaxes onto a flip-flop branch instead of oscillating between branches. H and p use exact exponential
   updates.
 - **Transitions.** Sleep, wake and REM transitions are found at the substep where they happen, and timeline
   stamps use that time.
 - **Cost.** Measured 0.1 ms per call at `--time-scale 3600` (180 s of sim time per 50 ms tick) and 0.008 ms per
-  call at real time. A 20 h catch-up takes 6 ms. A gap of more than 36 h (server off for days) restarts the model
+  call at real time. A 20 h catch-up takes about 20 ms (36 h: 30 ms), and its hypnogram agrees with stepping in 1-minute ticks to within about 3 min per transition (30 s substeps were tried first and dropped a REM episode). A gap of more than 36 h (server off for days) restarts the model
   on the rested cycle, and the debt decays by exp(-gap/chi).
 - **Unchanged public interface.**
   - `params` keeps the keys `f_hz, coupling, noise, a, gain`. The AWAKE/NREM_LIGHT/NREM_DEEP/REM tables are
@@ -218,7 +226,7 @@ The numbers themselves are ours and were not fitted. `twin/neurochem.py` reads t
   (NREM + REM; REM onsets are 77-100 min apart), with the **first REM after 75 min**.
 - **REM share 22.4 %.** REM episodes grow from 10 to 30 min across the night.
 - Deepest NREM (depth index 0.8) is in the first cycle. Late-night NREM is light.
-- `python -m pytest tests/test_sleep.py -q`: 24 tests, about 10 s. They cover the 24 h hypnogram, modulators per
+- `python -m pytest tests/test_sleep.py -q`: 26 tests, about 11 s. They cover the 24 h hypnogram, an independent LSODA check of the PR2007 equations, step-size invariance, modulators per
   stage, circuit status, old-state loading, cost, sleep deprivation, and all earlier behaviours: accelerated-clock
   cycling, smooth transitions, wake by messages or a large trade, no wake from small trades, debt, replay, night
   files and persistence.
