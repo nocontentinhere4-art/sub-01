@@ -36,6 +36,7 @@ from life import WORLD, Life
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
+NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
 RPC_WS = os.environ.get("SOLANA_WS", "wss://api.mainnet-beta.solana.com")   # e.g. a Helius wss URL (env, never logged)
@@ -465,9 +466,9 @@ async def main(args):
         referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
         return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else ""})
     app.router.add_get("/api/config", config)
-    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html"))       # the life is the front page
-    app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html"))
-    app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html"))
+    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html", headers=NOCACHE))       # the life is the front page
+    app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
+    app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
     await runner.setup()
