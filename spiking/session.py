@@ -17,6 +17,7 @@ import threading
 import time
 import traceback
 import urllib.request
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -211,7 +212,8 @@ class Session:
                 self.pending_chat.append(msg["text"])
 
     def result(self, kind, payload):
-        rec = {"type": "result", "kind": kind, "day": self.cfg.get("day"), **payload}
+        rec = {"type": "result", "kind": kind, "day": self.cfg.get("day"), "session": self.cfg.get("session_id"),
+               **payload}
         self.results["phases"].setdefault(kind, []).append(payload)
         if self.link is not None:
             self.link.send(rec)
@@ -518,7 +520,8 @@ class Session:
         """Two days in one pod: day 1 encodes chat + readings, sleeps with replay, is tested; a day of forgetting
         passes (the decay applied between real sessions); day 2 first tests day 1's items from half cues (the
         "next morning" test), then encodes its own items and sleeps."""
-        d1, d2 = self.cfg.get("day1", "day-1"), self.cfg.get("day2", "day-2")
+        d2 = self.cfg.get("day") or date.today().isoformat()
+        d1 = (date.fromisoformat(d2) - timedelta(days=1)).isoformat()
         day1 = self.cfg.get("items_day1") or DEMO_ITEMS[:6]
         day2 = self.cfg.get("items_day2") or DEMO_ITEMS[6:]
         self.ph_encode(self._norm(day1), d1)

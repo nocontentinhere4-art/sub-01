@@ -488,15 +488,19 @@ def reasons(log):
     return [json.loads(x)["reason"] for x in log.path.read_text().splitlines() if '"stop"' in x]
 
 
-def test_manager_disabled_without_env(tmp_path, capsys):
+def test_manager_disabled_when_off_or_missing_env(tmp_path, capsys):
     api = FakeApi()
-    mgr = PodManager(tmp_path, "https://srv", "s", api=api, env={})
+    mgr = PodManager(tmp_path, "https://srv", "s", api=api, env={"SUB01_SESSIONS": "off"})
     assert not mgr.enabled() and not mgr.enabled()
     assert capsys.readouterr().out.count("disabled") == 1                      # said once
     run(mgr.run())
     assert api.calls == []                                                     # no RunPod call at all
     assert PodManager(tmp_path, "https://srv", "", api=api, env={"SUB01_SESSIONS": "21:00-23:00"}).enabled() is False
     assert PodManager(tmp_path, "https://srv", "s", api=api, env={"SUB01_SESSIONS": "21:00-23:00"}).enabled() is True
+    # no RunPod key on the server (Railway env RUNPOD_API_KEY): disabled, nothing is called
+    nokey = PodManager(tmp_path, "https://srv", "s", env={})
+    assert nokey.enabled() is False and "RUNPOD_API_KEY" in capsys.readouterr().out
+    assert PodManager(tmp_path, "https://srv", "s", env={"RUNPOD_API_KEY": "k"}).enabled() is True
     st = mgr.status()
     assert st["live"] is False and st["session"] is None and st["next_session"] is None
 
@@ -515,12 +519,15 @@ def test_manager_session_end_stops_and_deletes(tmp_path):
     res = run(mgr.run_session(tk(1, 21), tk(1, 23)))
     assert res == "session end" and reasons(log) == ["session end"]
     assert api.pods == [p for p in api.pods if p["name"] == "BRAIN"] and len(api.pods) == 1
-    assert len(stops) == 1 and stops[0] >= tk(1, 21) + timedelta(minutes=118)              # asked to wrap up first
+    assert len(stops) == 1 and stops[0] >= tk(1, 21) + timedelta(minutes=58)               # asked to wrap up first
+    assert stops[0] <= tk(1, 21) + timedelta(minutes=60)                                    # 60 min cap per session
     assert keep[0]["live"] is True and keep[0]["session"]["phase"] == "pong_train"
     post = [c[2] for c in api.calls if c[0] == "POST"][0]
     cfg = json.loads(post["env"]["SUB01_SESSION"])
     assert cfg["session_id"] == "s-20261001-2100" and cfg["n_neurons"] == 1_000_000 and cfg["validate"] is False
-    assert len(cfg["messages"]) == 5 and cfg["max_minutes"] == 110 and cfg["day"] == "2026-10-01"
+    assert len(cfg["messages"]) == 5 and cfg["max_minutes"] == 50 and cfg["day"] == "2026-10-01"
+    assert [it["source"] for it in cfg["items"]] == ["chat"] * 5
+    assert cfg["phases"][0] == "recall_yesterday" and "pong_train" not in cfg["phases"]            # Pong is opt-in
     assert post["env"]["SUB01_SERVER_URL"] == "https://srv.example" and post["env"]["SUB01_POD_SECRET"] == "pod-secret"
     assert post["env"]["SUB01_SESSION_ID"] == "s-20261001-2100" and post["name"].startswith("sub01-spiking-")
     assert mgr.current is None
@@ -782,7 +789,8 @@ def test_server_results_and_status(tmp_path):
         assert (await client.post("/api/spiking/result", data=b"{bad", headers=AUTH)).status == 400
         lines = (tmp_path / "spiking" / "exams.jsonl").read_text().splitlines()
         assert len(lines) == 1 and json.loads(lines[0])["hits"] == 9 and "received" in json.loads(lines[0])
-        assert json.loads((tmp_path / "spiking" / "memory_tests.jsonl").read_text())["scores"] == [0.8]
+        assert json.loads((tmp_path / "spiking" / "memory_test_runs.jsonl").read_text())["scores"] == [0.8]
+        assert not (tmp_path / "spiking" / "memory_tests.jsonl").exists()      # no per-item rows in that record
         last = json.loads((tmp_path / "spiking" / "last.json").read_text())
         assert set(last) == {"exam", "memory_test"}
         st = await (await client.get("/api/spiking/status")).json()

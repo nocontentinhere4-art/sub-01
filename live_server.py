@@ -525,7 +525,7 @@ async def main(args):
     manager = None
     if spiking_server:
         hub = spiking_server.attach(app, live, data_dir)
-        manager = spiking_manager.from_env(data_dir, lambda: spiking_manager.top_messages(live.memory, live.clock.now()))
+        manager = spiking_manager.from_env(data_dir, get_items=lambda: spiking_manager.top_items(live.memory, live.clock.now()))
         if manager.enabled():
             hub.manager, manager.send_stop = manager, hub.forward_stop
         else:

@@ -11,7 +11,8 @@ window.Neurons = (() => {
   "use strict";
   const FIXED = "1 million simulated spiking neurons inside the real wiring of one person's brain; a model, not a mind; not the person.";
   const HONEST = "Learning results are reported as measured, including when it does not learn.";
-  const PHASES = { load: "loading", encode: "storing today's messages", pong_train: "learning Pong",
+  const PONG_NOTE = "Pong: not learning yet. In the last full validation it hit 17.5 % after training vs 25 % with plasticity switched off.";
+  const PHASES = { load: "loading", recall_yesterday: "next-day memory test", encode: "storing today's messages and readings", pong_train: "learning Pong",
     pong_exam: "Pong exam (learning frozen)", memory_test: "memory test", sleep: "sleep: replaying memories", free: "free run" };
   const CONTROL_NAMES = { random: "random paddle", random_paddle: "random paddle", no_plasticity: "no plasticity",
     frozen: "no plasticity", no_learning: "no plasticity" };
@@ -185,9 +186,13 @@ window.Neurons = (() => {
     if (num(mt.day)) bits.push(`day ${mt.day}`);
     return bits.length ? "Memory test: " + bits.join(" · ") : null;
   }
+  function pongLearns(ex) {                               // only "learning" when it beats every control clearly
+    const c = (ex && ex.controls) || {}, ctl = Object.values(c).filter(num);
+    return !!ex && num(ex.hit_rate) && ctl.length > 0 && ex.hit_rate > Math.max(...ctl) + 0.05;
+  }
   function examLine(ex) {
     if (!ex || typeof ex !== "object") return null;
-    let s = `Exam: ${int(ex.hits)}/${int(ex.rallies)} hits (${ex.frozen === false ? "learning not frozen" : "learning frozen"})`;
+    let s = `Pong${pongLearns(ex) ? "" : " (not learning yet)"} exam: ${int(ex.hits)}/${int(ex.rallies)} hits (${ex.frozen === false ? "learning not frozen" : "learning frozen"})`;
     const c = ex.controls || {};
     for (const k of Object.keys(c)) if (num(c[k])) s += ` · ${controlName(k)} ${pct(c[k])}`;
     if (num(ex.day)) s += ` · day ${ex.day}`;
@@ -224,7 +229,7 @@ window.Neurons = (() => {
       p.setAttribute("stroke", col); p.setAttribute("stroke-width", width); p.setAttribute("vector-effect", "non-scaling-stroke");
       if (dash) p.setAttribute("stroke-dasharray", dash); svg.append(p); };
     for (const lv of [0.25, 0.5, 0.75]) line(`M${pad} ${Y(lv)} H${W - pad}`, "#15151d", null, 1);
-    const capBits = [`learning curve · hit rate per training block, ${n} block${n === 1 ? "" : "s"} (orange)`];
+    const capBits = [`Pong training · hit rate per block, ${n} block${n === 1 ? "" : "s"} (orange)`];
     const ctl = pc.controls && typeof pc.controls === "object" ? pc.controls : {};
     const dashes = { "random paddle": "5 4", "no plasticity": "1.5 3" }; let di = 0;
     for (const k of Object.keys(ctl)) {
@@ -245,6 +250,7 @@ window.Neurons = (() => {
   function renderStatus() {
     const st = S.status, last = (st && st.last) || {}, res = S.el.results; res.replaceChildren();
     const lines = [examLine(last.exam), memoryLine(last.memory_test), benchLine(last.bench)].filter(Boolean);
+    if ((last.exam || last.pong_curve) && !pongLearns(last.exam)) lines.unshift(PONG_NOTE);
     renderCurve(last.pong_curve);
     const any = lines.length || (last.pong_curve && Array.isArray(last.pong_curve.points) && last.pong_curve.points.length);
     if (!S.live) {

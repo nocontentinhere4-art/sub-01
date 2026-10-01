@@ -1,8 +1,12 @@
 """Schedules GPU sessions inside the Railway server process: start a pod, watch it, always delete it.
 
-`SUB01_SESSIONS` = "daily 21:00-23:00 Asia/Tokyo" (several windows separated by ';'; the zone defaults to
-Asia/Tokyo; a window may cross midnight). Unset or empty = disabled. Hard caps: SUB01_MAX_HOURS_PER_DAY (2.5),
-SUB01_MAX_SESSION_MIN (120) and, in RunPodOps, SUB01_GPU_HOURS_CAP (4.0 over the whole cost log).
+`SUB01_SESSIONS` = "daily 21:00-22:00 Asia/Tokyo" by default (several windows separated by ';'; the zone defaults
+to Asia/Tokyo; a window may cross midnight); "off" disables. The manager also needs SUB01_POD_SECRET, a server URL
+and RUNPOD_API_KEY (Railway env; never logged). Hard caps: SUB01_MAX_HOURS_PER_DAY (1.0), SUB01_MAX_SESSION_MIN
+(60) and, in RunPodOps, SUB01_GPU_HOURS_CAP (4.0 over the whole cost log). Learned weights stay on the server's
+/data volume (spiking/server.py), never on paid RunPod storage (pods have no volume).
+Each session tests yesterday's items from half cues, stores today's chat messages and readings, sleeps (REM
+replay) and tests again; Pong runs only with SUB01_PONG=1 (it has not learned so far).
 A pod is deleted at session end, when the pod reports done, on any error, with no hello in 15 min, when the
 stream is lost for more than 3 min, and at shutdown. Blocking RunPod calls run in a thread executor.
 Never imports torch or spiking.net.
@@ -17,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from sleep import ROME, local
+from sleep import ROME, day_of
 from spiking import podpack
 from spiking.costs import CostLog
 from spiking.runpod_ops import RunPodOps
@@ -27,7 +31,11 @@ HELLO_TIMEOUT_S = 15 * 60
 LOST_S = 3 * 60
 STOP_LEAD_S = 90                    # ask the pod to wrap up (upload weights) this long before the deadline
 MIN_MINUTES = 10                    # a shorter session is not worth a pod
-PHASES = ["encode", "pong_train", "pong_exam", "memory_test", "sleep", "memory_test", "free"]
+DEFAULT_SESSIONS = "daily 21:00-22:00 Asia/Tokyo"
+OFF = ("off", "none", "0", "false", "disabled")
+PHASES = ["recall_yesterday", "encode", "memory_test", "sleep", "memory_test", "free"]
+PONG_PHASES = ["pong_train", "pong_exam"]                  # inserted after encode with SUB01_PONG=1
+MAX_PER_SOURCE = 5
 WINDOW = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
 
 
@@ -84,12 +92,29 @@ def next_session(now, spec):
     return Schedule.parse(spec).next_session(now)
 
 
-def top_messages(memory, t, n=5):
-    """Today's accepted messages with the highest Memory.weight, as [{"text", "emotion"}] (never empty text)."""
-    today = local(t).date()
-    cand = [m for m in memory.items if m["t"] <= t and local(m["t"]).date() == today]
+def _today(memory, t, source):
+    today = day_of(t)
+    cand = [m for m in memory.items if m["t"] <= t and day_of(m["t"]) == today
+            and m.get("source", "chat") == source]
     cand.sort(key=lambda m: memory.weight(m, t, None), reverse=True)
-    return [{"text": m["text"], "emotion": m["emotion"]} for m in cand[:n]]
+    return cand
+
+
+def top_messages(memory, t, n=5):
+    """Today's accepted chat messages (not readings) with the highest Memory.weight, as [{"text", "emotion"}]."""
+    return [{"text": m["text"], "emotion": m["emotion"]} for m in _today(memory, t, "chat")[:n]]
+
+
+def top_items(memory, t, n=MAX_PER_SOURCE):
+    """The day's items for the GPU session: top n chat messages and top n readings (title + keywords, hashed like
+    chat), as [{"text", "source", "item", "emotion"}]."""
+    out = [{"text": m["text"], "source": "chat", "item": m["text"], "emotion": m["emotion"]}
+           for m in _today(memory, t, "chat")[:n]]
+    for m in _today(memory, t, "reading")[:n]:
+        title = m.get("title") or m["text"]
+        out.append({"text": " ".join([title] + list(m.get("keywords") or [])), "source": "reading", "item": title,
+                    "emotion": m["emotion"]})
+    return out
 
 
 def _utcnow():
@@ -98,7 +123,7 @@ def _utcnow():
 
 class PodManager:
     def __init__(self, data_dir, server_url, secret, api=None, clock=None, get_messages=None, schedule=None,
-                 ops=None, sleep=None, env=None, tick=5.0):
+                 ops=None, sleep=None, env=None, tick=5.0, get_items=None):
         env = os.environ if env is None else env
         self.dir = Path(data_dir) / "spiking"
         self.server_url, self.secret = (server_url or "").rstrip("/"), secret
@@ -106,9 +131,16 @@ class PodManager:
         self._sleep = sleep or asyncio.sleep
         self.tick = tick
         self.get_messages = get_messages or (lambda: [])
-        self.schedule = schedule if schedule is not None else Schedule.parse(env.get("SUB01_SESSIONS", ""))
-        self.max_hours_day = float(env.get("SUB01_MAX_HOURS_PER_DAY") or 2.5)
-        self.max_session_min = float(env.get("SUB01_MAX_SESSION_MIN") or 120)
+        self.get_items = get_items
+        spec = env.get("SUB01_SESSIONS")
+        spec = DEFAULT_SESSIONS if spec is None or not spec.strip() else spec
+        self.schedule = schedule if schedule is not None else Schedule.parse("" if spec.strip().lower() in OFF else spec)
+        self.max_hours_day = float(env.get("SUB01_MAX_HOURS_PER_DAY") or 1.0)
+        self.max_session_min = float(env.get("SUB01_MAX_SESSION_MIN") or 60)
+        self.pong = env.get("SUB01_PONG") == "1"
+        # RunPod credentials: the Railway env var, or a proxy that injects them (sandbox), or an injected client
+        self.has_key = bool(env.get("RUNPOD_API_KEY") or env.get("SUB01_RUNPOD_PROXY_AUTH") == "1"
+                            or api is not None or ops is not None)
         self.log = CostLog(self.dir / "costs.jsonl")
         self.ops = ops or RunPodOps(api=api, log=self.log, hours_cap=env.get("SUB01_GPU_HOURS_CAP") or None)
         self.send_stop = None                  # async callable set by the server: forwards {"type":"stop"} to the pod
@@ -127,6 +159,8 @@ class PodManager:
             why = "SUB01_POD_SECRET is not set"
         elif not self.server_url:
             why = "no server URL (SUB01_SERVER_URL)"
+        elif not self.has_key:
+            why = "RUNPOD_API_KEY is not set"
         if why and not self._warned:
             self._warned = True
             print(f"spiking pod manager disabled: {why}", flush=True)
@@ -209,15 +243,28 @@ class PodManager:
     def session_config(self, start, minutes, now):
         day = now.astimezone(ROME).date()
         try:
-            msgs = [{"text": str(m["text"]), "emotion": m.get("emotion", "neutral")}
-                    for m in (self.get_messages() or [])[:5] if m.get("text")]
+            if self.get_items is not None:
+                raw = list(self.get_items() or [])
+            else:
+                raw = [dict(m, source="chat") for m in (self.get_messages() or [])]
         except Exception:
-            msgs = []
+            raw = []
+        items, n = [], {}
+        for m in raw:
+            src = "reading" if m.get("source") == "reading" else "chat"
+            if m.get("text") and n.get(src, 0) < MAX_PER_SOURCE:
+                n[src] = n.get(src, 0) + 1
+                items.append({"text": str(m["text"]), "source": src, "item": str(m.get("item") or m["text"]),
+                              "emotion": m.get("emotion", "neutral")})
+        msgs = [{"text": it["text"], "emotion": it["emotion"]} for it in items if it["source"] == "chat"]
         max_min = max(5, int(minutes) - 10)
+        phases = list(PHASES)
+        if self.pong:
+            phases[phases.index("encode") + 1:phases.index("encode") + 1] = PONG_PHASES
         return {"session_id": "s-" + start.astimezone(ROME).strftime("%Y%m%d-%H%M"), "day": day.isoformat(),
                 "n_neurons": 1_000_000, "seed": 1, "max_minutes": max_min,      # fixed: same synapses every day
-                "phases": PHASES, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
-                "messages": msgs, "elapsed_days": self.elapsed_days(now), "validate": False}
+                "phases": phases, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
+                "messages": msgs, "items": items, "elapsed_days": self.elapsed_days(now), "validate": False}
 
     def elapsed_days(self, now):
         state = self.dir / "manager.json"
@@ -325,9 +372,10 @@ class PodManager:
             raise err
 
 
-def from_env(data_dir, get_messages=None):
+def from_env(data_dir, get_messages=None, get_items=None):
     """Manager configured from the Railway environment (server URL from SUB01_SERVER_URL or the Railway domain)."""
     url = os.environ.get("SUB01_SERVER_URL", "")
     if not url and os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
         url = "https://" + os.environ["RAILWAY_PUBLIC_DOMAIN"]
-    return PodManager(data_dir, url, os.environ.get("SUB01_POD_SECRET", ""), get_messages=get_messages)
+    return PodManager(data_dir, url, os.environ.get("SUB01_POD_SECRET", ""), get_messages=get_messages,
+                      get_items=get_items)

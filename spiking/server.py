@@ -18,7 +18,9 @@ from spiking.costs import CostLog
 
 SPIKING_KEY = web.AppKey("spiking", object)
 POD_PATHS = ("/api/spiking/pod", "/api/spiking/weights", "/api/spiking/result")
-KINDS = {"pong_curve": "pong_curves", "exam": "exams", "memory_test": "memory_tests", "bench": "bench"}
+KINDS = {"pong_curve": "pong_curves", "exam": "exams", "memory_test": "memory_test_runs", "bench": "bench"}
+ITEMS_FILE = "memory_tests.jsonl"   # one row per tested item: {day, item, source, recalled, score, ...}
+MEMORY_NOTE = "Recall by a simulated spiking network from a partial cue; a model, not a mind."
 EXTRA_KINDS = {"encode": "encodes", "rates": "rates", "delays": "delays", "sleep": "sleeps"}   # stored, not on the page
 MAX_WS_MSG = 1 << 20
 MAX_WEIGHTS = 512 * 1024 ** 2
@@ -68,11 +70,68 @@ class SpikingHub:
         rec = {k: v for k, v in msg.items() if k != "type"} | {"received": datetime.now(timezone.utc).isoformat()}
         with open(self.dir / f"{files[kind]}.jsonl", "a") as f:
             f.write(json.dumps(rec) + "\n")
+        if kind == "memory_test":
+            self.store_items(rec)
         self.last[kind] = rec
         tmp = self.dir / "last.json.tmp"
         tmp.write_text(json.dumps(self.last))
         os.replace(tmp, self.dir / "last.json")
         return True
+
+    def store_items(self, rec):
+        """memory_tests.jsonl: one row per item of a memory test (day = the day the item was stored)."""
+        thr = (rec.get("thresholds") or {}).get("hc")
+        rows = []
+        for s in rec.get("scores") or []:
+            if not isinstance(s, dict) or "hc" not in s:
+                continue
+            rows.append({"day": s.get("item_day") or rec.get("day"), "item": str(s.get("item") or s.get("text", ""))[:200],
+                         "source": "reading" if s.get("source") == "reading" else "chat",
+                         "recalled": bool(s.get("hc_recalled")), "score": s.get("hc"), "threshold": thr,
+                         "label": rec.get("label"), "test_day": rec.get("day"), "session": rec.get("session"),
+                         "received": rec["received"]})
+        if rows:
+            with open(self.dir / ITEMS_FILE, "a") as f:
+                for r in rows:
+                    f.write(json.dumps(r) + "\n")
+        return rows
+
+    def memory(self, max_lines=2000):
+        """The latest day whose readings were tested: prefer the next-day test, else the test after sleep."""
+        try:
+            lines = (self.dir / ITEMS_FILE).read_text().splitlines()[-max_lines:]
+        except OSError:
+            lines = []
+        rows = []
+        for ln in lines:
+            try:
+                rows.append(json.loads(ln))
+            except ValueError:
+                pass
+        days = sorted({r["day"] for r in rows if r.get("source") == "reading" and r.get("day")})
+        out = {"day": None, "label": None, "items": [], "note": MEMORY_NOTE}
+        if not days:
+            return out
+        day = days[-1]
+        for label in ("next day", "after sleep", "after encoding"):
+            sel = [r for r in rows if r.get("day") == day and r.get("label") == label]
+            if sel:
+                newest = max(sel, key=lambda r: r.get("received", ""))
+                key = lambda r: r.get("session") or r.get("received")              # rows of the newest test only
+                sel = [r for r in sel if key(r) == key(newest)]
+                last = newest.get("received")
+                seen, items = set(), []
+                for r in reversed(sel):                                 # newest first, one row per item
+                    if (r["item"], r["source"]) not in seen:
+                        seen.add((r["item"], r["source"]))
+                        items.append({k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold")})
+                items.sort(key=lambda r: (r["source"] != "reading", not r["recalled"]))
+                out.update(day=day, label=label, tested=last, items=items)
+                break
+        return out
+
+    async def memory_get(self, request):
+        return web.json_response(self.memory())
 
     # --- forwards to the pod (sync entry points: they schedule the send) --------------
     @property
@@ -237,4 +296,5 @@ def attach(app, live, data_dir, secret=None):
     app.router.add_post("/api/spiking/weights", hub.weights_post)
     app.router.add_post("/api/spiking/result", hub.result_post)
     app.router.add_get("/api/spiking/status", hub.status_get)
+    app.router.add_get("/api/memory", hub.memory_get)
     return hub
