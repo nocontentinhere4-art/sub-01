@@ -23,6 +23,7 @@ GROUPS = {
     "default": ["_Default_"],
     "reward": ["Accumbens", "Caudate", "Putamen"],
     "fear": ["Amygdala"],
+    "insula": ["_SalVentAttn_FrOperIns"],   # anterior insula / frontal operculum proxy (interoception, twin/body.py)
     "memory": ["Hippocampus"],
     "relay": ["Thalamus"],
 }

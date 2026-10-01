@@ -14,6 +14,9 @@ import re
 from pathlib import Path
 
 from sleep import local
+from twin.body import Body
+
+CARBS_PER_BREAD_G = 30.0    # one piece of bread: a ~60 g roll at ~50 % carbohydrate (USDA FoodData Central, white bread ~49 g/100 g)
 
 # ---- the world (metres; x east, z south). Sent to the client, which builds the 3D scene from it. ----------
 PLACES = {
@@ -103,7 +106,9 @@ def route(a, b):
 
 
 class Life:
-    def __init__(self, state=None, rng=None):
+    def __init__(self, state=None, rng=None, body=None):
+        """body: a twin.body.Body updated by the caller (live_server). Without one, Life makes and steps its own
+        (backwards compatible); its state is then saved in to_dict()["body"]."""
         s = state or {}
         self.rng = rng or random.Random()
         self.place = s.get("place", "bed")
@@ -112,7 +117,13 @@ class Life:
         self.path = []                         # remaining waypoints while walking
         self.activity = s.get("activity", "window")
         self.until = s.get("until", 0.0)       # sim time when the activity ends
-        self.hunger = s.get("hunger", 0.4)
+        self.own_body = body is None
+        if body is None:
+            bs = s.get("body")
+            if bs is None and "hunger" in s:               # legacy save: only the old hunger number
+                bs = {"ghrelin": min(1.0, max(0.0, s["hunger"]))}
+            body = Body(bs)
+        self.body = body
         self.boredom = s.get("boredom", 0.3)
         self.bread = s.get("bread", 0)
         self.desires = s.get("desires", {})    # activity -> (strength, sim time)
@@ -124,6 +135,15 @@ class Life:
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
+
+    @property
+    def hunger(self):
+        """0..1, from the body's blood glucose and gut/ghrelin-like proxy (no rule of its own)."""
+        return self.body.hunger
+
+    def exertion(self):
+        """0..1 physical effort for the body: walking about 0.3."""
+        return 0.3 if (self.path or self.activity == "park") else 0.0
 
     # --- inputs ---------------------------------------------------------------------------------
     def hear(self, text, t):
@@ -172,15 +192,15 @@ class Life:
         self.log = (self.log + [{"t": t, "what": why}])[-30:]
 
     # --- per tick -----------------------------------------------------------------------------------
-    def update(self, t, dt_real, dt_sim, stage, rel, market_hot, pressure):
-        self.hunger = min(1.0, self.hunger + dt_sim / (5 * 3600))
+    def update(self, t, dt_real, dt_sim, stage, rel, market_hot, pressure, levels=None, amygdala=0.0):
+        if self.own_body:                                 # an external body is stepped by its owner
+            self.body.update(dt_sim, levels, amygdala, stage, exertion=self.exertion())
         if self.activity in ("window", "chart"):
             self.boredom = min(1.0, self.boredom + dt_sim / (2 * 3600))
         if self.activity == "phone":
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
-            self.hunger = min(1.0, self.hunger + dt_sim / (8 * 3600))
         # walking (real time, so viewers see continuous motion)
         if self.path:
             tx, tz = PLACES[self.path[0]]
@@ -211,7 +231,7 @@ class Life:
                 self.bread += 2
             if self.activity == "eat" and self.bread:
                 self.bread -= 1
-                self.hunger = max(0.0, self.hunger - 0.6)
+                self.body.eat(CARBS_PER_BREAD_G)
             nxt = self.choose(t, stage, rel, market_hot, pressure)
             why = {
                 "sleep": "falls asleep" if self.place == "bed" else "goes to bed",
@@ -261,5 +281,8 @@ class Life:
                 "geo": self.geo, "say": self.say, "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
 
     def to_dict(self):
-        return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
-                "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log}
+        d = {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
+             "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log}
+        if self.own_body:
+            d["body"] = self.body.to_dict()
+        return d
