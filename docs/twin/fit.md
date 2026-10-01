@@ -197,8 +197,9 @@ Per run (held-out):
 What this means:
 - **The twin beats both baselines.** It is the only model of the three whose FC has any relation to the recorded FC,
   and its FC-dynamics distribution is close to the recorded one (KS 0.12, against 0.88 and 1.00). The shuffled
-  connectome, run through the same model with its own full search, gives r = 0.00. So what the twin gets right
-  comes from the person's wiring, not from the dynamics alone.
+  connectome, run through the same model with its own full search, gives r = 0.00, so the small positive r of the
+  twin depends on the person's wiring and not on the dynamics alone. Both baselines are near a floor, though (see
+  the baseline paragraph in the independent re-score section below).
 - **The static FC match is weak.** r = 0.10 is far below the test-retest ceiling (0.97), below the plain
   correlation between the person's connectome and the recorded FC (0.21), and below the r = 0.4-0.6 often reported
   for whole-brain models, which are mostly fitted to group-average connectomes and group FC. A simulated run
@@ -238,6 +239,32 @@ good FCD match.
 ![FCD](fit_fcd.png)
 ![landscape](fit_landscape.png)
 ![scores](fit_scores.png)
+
+### Independent re-score (second reviewer, different code)
+
+A reviewer re-computed the held-out numbers with separate code that imports nothing from `twin/fit.py` (own
+Fisher-z FC, own windowed FCD, own preprocessing; only `twin.model.simulate_bold` / `TwinBrain` for the simulation),
+taking the held-out sessions from `web/twin_score.json`, reading `twin/params.json`, and using seeds not used in the
+pipeline (424242 and 777):
+- 5 replicates x 6 simulated 10-minute runs: r = 0.098 ± 0.001, KS = 0.125 ± 0.054, simulated mean FC 0.074
+  (pipeline: 0.097 ± 0.004, 0.12 ± 0.07, 0.072).
+- `TwinBrain()` stepped like the live server (params from `params.json`, BOLD read with `bold()` every 1.16 s,
+  2 runs): r = 0.096, KS = 0.17, mean FC 0.070, so the fitted batch simulator and the live model agree.
+- Reference numbers re-computed from the recordings: test-retest ceiling 0.970, connectome vs FC 0.213 (all pairs)
+  and 0.240 (connected pairs), mean FC 0.362 (held-out) and 0.341 (fit half).
+- The held-out sessions are disjoint from the fit sessions and every QC-kept run belongs to one of them.
+
+Sensitivity of the old-model baseline to its oscillation parameter `a`, which the committed search keeps at the awake
+value -5 (fit-half score, one 20-minute record per point, velocity 8 m/s, noise 0.25, g 5 and 40, a = -2, -0.5, 0, 0.5):
+r between -0.007 and 0.005 and KS 1.00 in all eight cases, so the near-zero score of the old model is not an artefact
+of fixing `a` (the oscillation amplitude carries no slow BOLD-band signal that depends on the wiring).
+
+How to read the baseline comparison: both baselines are close to a floor (FC r about 0, FCD KS 0.9-1.0), so "the twin
+beats them" shows that the twin's FC is not noise, not that it is competitive with good whole-brain fits. The FCD
+contrast is also parameter dependent: in the search, the shuffled connectome reached KS 0.46 at G 10 (score worse
+because r was -0.07), against 0.88 at its selected parameters. A matching FCD distribution only says that the
+windowed FC of the model is about as reproducible from window to window as the recorded one (median FCD around 0.3);
+it does not show that the model reproduces which regions co-fluctuate, which is what the weak static r measures.
 
 ### Exploration before the search (not part of the committed pipeline)
 

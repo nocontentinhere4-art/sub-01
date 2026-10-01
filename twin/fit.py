@@ -921,7 +921,7 @@ def write_outputs(final, out_root=ROOT, log=print):
 
     refs = final["refs"]
     score = {
-        "label": "similarity to his real brain (held-out)",
+        "label": "twin model vs recorded resting-state fMRI (held-out sessions): weak static match, FC-dynamics match",
         "what": "a digital twin model of one real person's brain structure and recorded activity; not a mind, "
                 "not conscious, not the person",
         "heldout": {"fc_r": _r(th["fc_r"]), "fc_r_sd": _r(th["fc_r_sd"]), "fcd_ks": _r(th["fcd_ks"]),
