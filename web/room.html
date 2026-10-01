@@ -353,8 +353,21 @@ const phone = new THREE.Group();
   phone.userData.size = [0.078, 0.162, 0.008];
   phone.visible = false;
 }
+// a right hand gripping a phone, one rigid mesh (generated: GPT Image 2.5 picture -> Tripo H3.1, baked into phone space:
+// origin at the phone's centre, +y its top, +z out of the screen). While he holds the phone it replaces his own hand
+// (the rig has no finger bones) and the phone body; our screen plane lies on its glass. `wrist` is where his wrist bone
+// goes (2 cm inside the cut, which hides in the sleeve), `fore` the direction the forearm leaves the hand.
+const HAND = {size:[0.0765, 0.155, 0.0203], wrist:new THREE.Vector3(0.0658, -0.1105, 0.0058), fore:new THREE.Vector3(0.746, -0.666, 0.028).normalize(), mesh:null};
+load("room/hand_phone.glb").then(g => {
+  const m = HAND.mesh = g.scene, [w, h, d] = HAND.size, s = phone.userData.screen;
+  m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; Object.assign(o.material, {roughness:0.7, metalness:0, envMapIntensity:0.5}); o.material.color.set(0xf4e8e4); } });   // a touch paler, like his face
+  phone.add(m); phone.children[0].visible = false; phone.userData.size = HAND.size;
+  // our screen on its glass, narrow enough to clear the fingertips that curl over its left edge
+  s.mesh.geometry.dispose(); s.mesh.geometry = new THREE.PlaneGeometry(w * 0.84, h * 0.93); s.aspect = 0.84 * w / (0.93 * h); s.mesh.position.z = d / 2 + 0.0006;
+}).catch(() => {});
 // holding the phone in his right hand: the phone sits in front of his chest facing his eyes; the right arm starts from
-// the "hold" pose and a two-bone IK puts the wrist below the phone, the hand turned so that the phone lies on the palm
+// the "hold" pose and a two-bone IK puts the wrist where the gripping HAND needs it. Until that model has loaded
+// (or if it fails), his own hand is turned so that the phone lies on the palm
 // with the fingers running diagonally up behind it. The rig has no finger bones (the hand mesh is rigid and slightly
 // cupped), so the phone is lifted off the palm just enough that no hand vertex is inside it or in front of the screen
 const GRIP = {fwd:0.32, down:0.19, side:0.03, diag:0.3, curl:0.1, reach:0.095, gap:0.002, look:0.7};
@@ -427,11 +440,13 @@ function holdPhone(){
   _hy.copy(_y).addScaledVector(_x, -G.diag).addScaledVector(_z, -G.curl).normalize();
   _hz.copy(_z).addScaledVector(_hy, -_hy.dot(_z)).normalize();
   _D.crossVectors(_hy, _hz); _m.makeBasis(_D, _hy, _hz); _qh.setFromRotationMatrix(_m);
-  const W = wristOnPhone();                                                        // the wrist, in phone space
+  const W = HAND.mesh ? HAND.wrist : wristOnPhone();                               // the wrist, in phone space
   phone.localToWorld(_T.copy(W));
-  B.RightArm.getWorldPosition(_P).addScaledVector(UP, -0.5).addScaledVector(_r, 0.25).addScaledVector(_f, -0.1);   // elbow down, a little out
+  if (HAND.mesh) _P.copy(HAND.fore).applyQuaternion(phone.quaternion).multiplyScalar(0.3).add(_T).addScaledVector(UP, -0.2);   // elbow along the forearm
+  else B.RightArm.getWorldPosition(_P).addScaledVector(UP, -0.5).addScaledVector(_r, 0.25).addScaledVector(_f, -0.1);   // elbow down, a little out
   reach(B.RightArm, B.RightForeArm, B.RightHand, _T, _P);
   setWorldQuat(B.RightHand, _qh);
+  if (HAND.mesh) B.RightHand.scale.setScalar(0.001);                              // his own hand folds away into the sleeve
   // the arm may fall short: hang the phone on the hand where it actually is
   B.RightHand.getWorldPosition(phone.position).sub(_T.copy(W).applyQuaternion(phone.quaternion)); phone.updateMatrixWorld(true);
   // look at the screen: the face looks along (0, 1, 1) of the head bone (its bind frame is pitched 45°; cm): turn it part of the way
