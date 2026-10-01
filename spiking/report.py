@@ -223,7 +223,13 @@ def write_report(gpu_dir=DOCS / "gpu", cpu_dir=DOCS / "cpu"):
             figs.append("fig_rates.png")
     except Exception as e:                                     # figures are optional
         out.append(f"\n(figures skipped: {type(e).__name__})")
-    (DOCS / "results.md").write_text("\n".join(out) + "\n")
+    text = "\n".join(out) + "\n"
+    (DOCS / "results.md").write_text(text)
+    rep = ROOT / "docs" / "spiking_report.md"
+    a, b = "<!-- results:begin -->", "<!-- results:end -->"
+    if rep.exists() and a in rep.read_text():
+        r = rep.read_text()
+        rep.write_text(r[:r.index(a) + len(a)] + "\n" + text + r[r.index(b):])
     return {"results_md": str(DOCS / "results.md"), "figures": figs}
 
 
