@@ -68,3 +68,33 @@ limits in `docs/twin/sleep.md`); chat filtering and replay are rule tables.
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
 python tests/test_sleep.py                                    # or: python -m pytest tests/
 ```
+
+## v2: the digital twin (neural mass model, neuromodulators, body, plasticity)
+
+SUB-01 v2 is *a digital twin model of one real person's brain structure and recorded activity; not a mind, not
+conscious, not the person.* The live server now runs the fitted neural mass model (`twin/model.py`, Wilson-Cowan E/I
+regions on the connectome, parameters fitted on half of the recorded resting-state sessions) instead of the 10 Hz
+Stuart-Landau oscillators, and wires in:
+
+- **neuromodulators** (`twin/neurochem.py`): trades give phasic dopamine (reward prediction error) and noradrenaline;
+  tonic levels follow the sleep circuit; receptor-weighted per-region gain;
+- **a small body** (`twin/body.py`): heart rate, breathing, blood glucose, hunger; the simulated life eats when hungry;
+- **toy plasticity** (`twin/plasticity.py`): bounded Hebbian drift while awake and one memory per night, consolidated in
+  the first REM episode (a log entry with the sha256 of the weights plus a 1 % weight change);
+- a compact **Twin panel** on `/brain` and `/` with the held-out similarity score and its label, neuromodulator bars,
+  vitals, sleep pressure, the memories and the drift from the original connectome.
+
+The held-out match to the recorded fMRI is **weak and static** (FC r = 0.10 on sessions the fit never saw; it does reproduce
+how FC fluctuates over time). The panel says so. Everything, with equations, sources, licences, held-out scores, CPU numbers
+and a list of what is still not realistic, is in [`docs/twin_report.md`](docs/twin_report.md) (sections in `docs/twin/`).
+
+```bash
+python live_server.py --demo                  # twin model is the default; --model sl (or SUB01_MODEL=sl) = old model
+python live_server.py --demo --time-scale 600 --start 23:30   # accelerated night (state in data/demo/)
+python -m pytest tests -q                     # includes tests/test_integration.py (headless accelerated night, < 90 s)
+OMP_NUM_THREADS=1 python twin/measure_cpu_live.py   # CPU at real time -> twin/data/cpu_live.json (target <= 30 % of a core)
+```
+
+Runtime state (`data/`, git-ignored) now also holds `twin_state.json`, `weights.npz`, `memories.json`. The original
+`out/connectome.npz` is never written. The Docker image copies `twin/` (with `twin/data` and `twin/params.json`) and
+`web/twin_score.json`; no new dependency (numpy, scipy, aiohttp).

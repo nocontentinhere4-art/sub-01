@@ -81,8 +81,12 @@ unchanged. `update(..., levels=None, amygdala=0.0)` pass the neuromodulators to 
 
 Interface additions to the contract: `Body.update(..., exertion=0.0)`, `Body(state, rng=None)`, `Body.from_dict`,
 `brain_sim.GROUPS["insula"]`, `Life(body=)`. `Dockerfile` now copies `twin/` (life.py imports it).
-Wiring still to do in live_server: create one Body, persist it, step it, pass `max(0, rel["fear"] - 1)` as
-`amygdala`, call `brain.stimulate("insula", v)` for `intero_drive()`.
+Wiring in `live_server.py` (done): one `Body` is created (state in `data/twin_state.json`), stepped with the
+accumulated sim time whenever at least 1 sim second has passed (one call can cover ~180 s at `--time-scale 3600`) with the
+neuromodulator levels, `amygdala = max(0, rel["fear"] - 1)` of the previous tick, the sleep stage and `life.exertion()`;
+`intero_drive()` is applied every tick as `brain.stimulate("insula", v * stimulus_gain * TICK / 2 s)`, i.e. a continuous
+input whose steady-state stimulus level equals `v` (stimuli decay with a 2 s time constant) and which the sleep engine's
+stimulus gain scales down while asleep. Life uses the body for hunger and calls `body.eat`.
 
 ## Not realistic
 - No hormones (insulin is a single lumped state; no glucagon, cortisol, leptin, real ghrelin), no liver/kidney, no fat

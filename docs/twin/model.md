@@ -6,8 +6,8 @@ the population dynamics that run on the person's connectome, and the BOLD signal
 
 `TwinBrain` replaces the old Stuart-Landau model (`brain_sim.Brain`, unchanged) behind the same interface.
 `brain_sim.make_brain(kind)` builds either model. The environment variable `SUB01_MODEL` picks the default, which is
-`twin`. `live_server.py` still calls `Brain()` directly, so whoever integrates the branches must switch it to
-`make_brain()`. All numbers below come from `python -m twin.bench_model`, run on 1 BLAS thread in the build sandbox,
+`twin`. `live_server.py` builds its brain with `make_brain()`: `--model twin|sl` (or `SUB01_MODEL`), so the old model
+still runs on the same pages. All numbers below come from `python -m twin.bench_model`, run on 1 BLAS thread in the build sandbox,
 and are stored in `twin/data/model_bench.json`.
 
 ## Choice of model

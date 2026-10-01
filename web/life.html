@@ -88,6 +88,7 @@
       <div class="bar"><span>sleepiness</span><div class="track"><div class="fill" id="n-sleep"></div></div></div>
       <div class="bar"><span>bread</span><span id="n-bread" style="color:#ececf2">0</span></div>
     </div>
+    <div><div class="lbl">Twin model</div><div id="twin-host"></div></div>
     <div><div class="lbl">Today</div><div id="log"></div></div>
     <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
       <div id="chat"></div>
@@ -102,6 +103,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="twin_panel.js"></script>
 <script>
 // ---------------- scene ----------------
 const host = document.getElementById("scene");
@@ -244,6 +246,7 @@ let life = null, prev = null, poolName = "", stage = "AWAKE", clock = "--:--", l
 fetch("/phone_feed.json").then(r => r.ok ? r.json() : []).then(f => feed = Array.isArray(f) ? f : []).catch(() => {});
 const shown = {x: 1.6, z: 1.3, h: 0};
 
+const twinPanel = window.TwinPanel ? TwinPanel.mount(document.getElementById("twin-host")) : null;
 function connect(){
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   ws.onmessage = e => {
@@ -253,6 +256,7 @@ function connect(){
     if (m.type === "chat_ack") { document.getElementById("ack").textContent = m.ok ? "sent — it heard you" : "not sent: " + m.reason; return; }
     if (m.type === "eye") { if (m.thought) document.getElementById("thought").textContent = `“${m.thought}”`; return; }
     if (m.type !== "tick") return;
+    if (m.twin && twinPanel) twinPanel.update(m.twin);
     poolName = m.pool || ""; stage = (m.sleep && m.sleep.stage) || "AWAKE"; clock = (m.sleep && m.sleep.clock) || clock;
     for (const t of m.trades || []) { flowSum += (t.kind === "buy" ? 1 : -1) * Math.log10(1 + t.usd); flow.push(flowSum); if (flow.length > 90) flow.shift(); }
     if (m.life) onLife(m.life, m.sleep);

@@ -127,6 +127,7 @@
   <div id="panel">
     <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
     <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
+    <div><div class="lbl">Twin model</div><div id="twin-host"></div></div>
     <details id="nightbox" open><summary>Last night</summary><div id="lastnight">no night recorded yet</div></details>
     <details><summary>How messages become stimuli</summary><div id="rules"></div></details>
     <div id="stats"></div>
@@ -137,6 +138,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="twin_panel.js"></script>
 <script>
 const SHOW = ["language","visual","somatomotor","attention","salience","limbic","control","default","reward","memory","relay"];
 const LABEL = {language:"language",visual:"visual",somatomotor:"motor",attention:"attention",salience:"salience",limbic:"limbic",
@@ -244,6 +246,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
 
 // ---------- live data ----------
 let act=null, base=null;
+const twinPanel = window.TwinPanel ? TwinPanel.mount(document.getElementById("twin-host")) : null;
 const bars = document.getElementById("bars");
 for (const g of SHOW) bars.insertAdjacentHTML("beforeend",
   `<div class="bar"><span>${LABEL[g]}</span><div class="track"><div class="fill" id="b-${g}"></div></div></div>`);
@@ -332,6 +335,7 @@ function connect(){
     }
     if (m.type === "nights") { renderNights(m); return; }
     if (m.type !== "tick") return;
+    if (m.twin && twinPanel) twinPanel.update(m.twin);
     const sl = m.sleep;
     if (sl) {
       stage = sl.stage; burst = Math.max(burst, sl.burst);
@@ -345,7 +349,7 @@ function connect(){
     act = m.act; if (!base) base = act.slice(); else base = base.map((b,i)=>b*0.998 + act[i]*0.002);
     document.getElementById("pool").textContent = m.pool;
     document.getElementById("sync").textContent = `global synchrony ${(m.sync*100).toFixed(1)}%`;
-    if (m.baseline) document.getElementById("sync").textContent += ` · background: his real recorded activity (${m.baseline.run}, min ${m.baseline.minute})`;
+    if (m.baseline) document.getElementById("sync").textContent += ` · optional background: replay of a recorded real session (${m.baseline.run}, min ${m.baseline.minute}), not produced by the wiring`;
     const gmax = Math.max(...Object.values(m.groups), 0.001);
     for (const g of SHOW) if (m.groups[g]!==undefined) document.getElementById("b-"+g).style.width = (100*m.groups[g]/Math.max(gmax,0.35))+"%";
     for (const k in traces) { traces[k].push(m.wave[k]||0); if (traces[k].length>300) traces[k].shift(); }
