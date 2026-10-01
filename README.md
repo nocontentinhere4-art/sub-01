@@ -82,7 +82,8 @@ Stuart-Landau oscillators, and wires in:
 - **toy plasticity** (`twin/plasticity.py`): bounded Hebbian drift while awake and one memory per night, consolidated in
   the first REM episode (a log entry with the sha256 of the weights plus a 1 % weight change);
 - a compact **Twin panel** on `/brain` and `/` with the held-out similarity score and its label, neuromodulator bars,
-  vitals, sleep pressure, the memories and the drift from the original connectome.
+  vitals, sleep pressure, the memories and the drift from the original connectome; every number carries a plain-word
+  explanation (text or `title` tooltip) and is labelled as simulated or as a held-out comparison.
 
 The held-out match to the recorded fMRI is **weak and static** (FC r = 0.10 on sessions the fit never saw; it does reproduce
 how FC fluctuates over time). The panel says so. Everything, with equations, sources, licences, held-out scores, CPU numbers
