@@ -110,3 +110,46 @@ def test_browser_never_shows_local_pages():
             await runner.cleanup()
 
     asyncio.run(run())
+
+
+GOOGLE_SORRY = ("I'm not a robot\nreCAPTCHA\nAbout this page\nOur systems have detected unusual traffic from your "
+                "computer network. This page checks to see if it's really you sending the requests, and not a robot.")
+
+
+@pytest.mark.parametrize("body", [GOOGLE_SORRY, "Checking your browser before accessing example.com",
+                                  "Press & Hold to confirm you are a human (and not a bot).",
+                                  "Please verify you are human"])
+def test_bot_wall_text_is_recognised(body):
+    assert Browser.wall_text(body)
+
+
+@pytest.mark.parametrize("body", ["CAPTCHA is a type of challenge-response test used in computing.",
+                                  "Robots in Japan: a history of industrial robots", "Traffic in Tokyo is unusual."])
+def test_articles_about_captchas_are_not_walls(body):
+    assert not Browser.wall_text(body)
+
+
+def test_bot_wall_page_is_left_not_shown():
+    """A CAPTCHA page (here: a reCAPTCHA frame on a normal-looking page) is never screenshotted; he leaves it."""
+    async def run():
+        b = Browser()
+        try:
+            sc = await b._ensure("desk")
+        except Exception as e:                                                 # no usable Chromium here
+            pytest.skip(f"chromium did not start: {e!r}"[:200])
+        try:
+            await sc.page.set_content("<title>Search</title><p>" + "results " * 40 + "</p>"
+                                      "<iframe src='about:blank#https://www.google.com/recaptcha/api2/anchor'></iframe>")
+            await sc.page.evaluate("() => document.querySelector('iframe').setAttribute('src', "
+                                   "'https://www.google.com/recaptcha/api2/anchor?k=x')")
+            assert await b._walled(sc.page)
+            sc.info = {"title": "Search", "url": "x", "host": "x", "why": "", "t": 0, "kind": "search"}
+            await b._shoot(sc)
+            assert sc.shot is None and sc.info["kind"] == "left"
+            await sc.page.set_content("<title>Bread</title><p>" + "bread is baked " * 40 + "</p>")
+            assert not await b._walled(sc.page)
+        finally:
+            await b.close()
+            await b.pw.stop()
+
+    asyncio.run(run())

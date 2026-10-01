@@ -247,7 +247,7 @@ def test_replay_picks_messages_received_that_night():
     mem3 = Memory()
     mem3.add(rome(2, "01:00"), "scary", "NREM", {}, "threat", [])
     mem3.add(rome(2, "01:01"), "calm", "NREM", {}, "neutral", [])
-    worn = {"2026-10-02T01:00": 9}
+    worn = {Memory.key(mem3.items[0]): 9}                 # "scary", received 01:00
     picks = [mem3.pick(rome(2, "02:00"), e.night_start(), rng, worn)["text"] for _ in range(500)]
     assert picks.count("calm") > picks.count("scary")
 
