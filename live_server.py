@@ -97,7 +97,7 @@ class Live:
         self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
         self.time_scale = time_scale
         self.life.time_scale = time_scale
-        self.baseline = None             # set by main() unless --no-real-baseline
+        self.baseline = None             # set by main() with --replay-real-session (else the fitted slow layer runs)
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
         self.recent_replays = []         # REM replays for the eye's dreams
@@ -247,9 +247,11 @@ class Live:
         while True:
             now = time.time()
             events = self.sleep_tick()
-            if self.baseline:                                         # his recorded activity drives excitability
-                gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
+            gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
+            if self.baseline:                                         # replaying a real recorded session (optional)
                 b.drive = BASELINE_DRIVE * gain * np.clip(self.baseline.advance(TICK), -2.0, 3.0)
+            else:                                                     # spontaneous slow layer fitted to his data
+                b.slow_gain = gain
             due = [t for t in self.pending if t["at"] <= now]
             self.pending = [t for t in self.pending if t["at"] > now]
             for tr in due:
@@ -267,7 +269,8 @@ class Live:
                    "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
                    "pool": self.pool_name, "events": events,
                    "sleep": self.engine.status() | {"burst": round(self.burst, 2)},
-                   "baseline": self.baseline.status() if self.baseline else None}
+                   "baseline": self.baseline.status() if self.baseline else None,
+                   "slow": b.slow.status() if b.slow_on else None}
             self.last_groups = groups
             base = sum(groups.values()) / max(1, len(groups))
             rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
@@ -392,8 +395,9 @@ async def main(args):
         return web.Response(text="ok")
     if args.host in ("127.0.0.1", "localhost"):
         app.router.add_post("/snap", snap)        # local-only helper: never exposed on a public host
-    if not args.no_real_baseline and list((HERE / "out" / "rest").glob("*.npz")):
+    if args.replay_real_session and list((HERE / "out" / "rest").glob("*.npz")):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
+        live.brain.use_slow_layer(False)          # the recording replaces the model's own slow activity
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
@@ -456,7 +460,9 @@ if __name__ == "__main__":
     p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
-    p.add_argument("--no-real-baseline", action="store_true", help="simulated background only")
+    p.add_argument("--replay-real-session", action="store_true", default=os.environ.get("REPLAY_REAL_SESSION") == "1",
+                   help="replay his recorded resting-state fMRI as the background instead of the fitted slow layer")
+    p.add_argument("--no-real-baseline", action="store_true", help=argparse.SUPPRESS)   # old flag (now the default)
     p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     asyncio.run(main(p.parse_args()))
