@@ -148,7 +148,7 @@ def test_replay_of_a_reading_reapplies_its_stimulus_and_is_recorded():
     brain = FakeBrain()
     brain.set_rhythm = lambda *a: None
     live = SimpleNamespace(brain=brain, engine=e, memory=mem, clock=SimpleNamespace(now=lambda: t), burst=0.0,
-                           recent_replays=[], recent_read_replays=[], store=None)
+                           recent_replays=[], recent_read_replays=[], store=None, spiking=None)
     out = Live.sleep_tick(live)
     assert out[0]["type"] == "replay" and out[0]["source"] == "reading" and out[0]["text"] == "Bread"
     for g, a in stim.items():
@@ -224,6 +224,16 @@ def test_curiosity_prefers_titles_of_the_most_active_networks(monkeypatch):
     assert "chose it: memory" in art["why"] and "followed a link from “Tokyo”" in art["why"]
     assert art["curiosity"]["networks"][0] == "memory" and 0 < art["curiosity"]["p"] <= 1
     assert len(art["keywords"]) <= 8
+
+
+def test_curiosity_why_names_only_above_average_areas():
+    quiet = {"memory": 0.5, "reward": 0.5, "somatomotor": 0.5}
+    _, info = R.curiosity(["History of Kyoto"], quiet, {}, 0.0, random.Random(0))
+    assert "most active" not in info["why"] and "new to it" in info["why"] and info["networks"] == []
+    _, info = R.curiosity(["History of Kyoto"], quiet, {"History of Kyoto": 0.0}, 3600.0, random.Random(0))
+    assert info["why"] == "chose it by chance"
+    _, info = R.curiosity(["History of Kyoto"], MEMORY_HOT, {}, 0.0, random.Random(0))
+    assert info["why"].startswith("chose it: memory areas were most active")
 
 
 def test_curiosity_novelty_and_temperature():

@@ -55,11 +55,17 @@ BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
                       r"before you continue|consent", re.I)
 # bot checks recognised in the page text or by their challenge frames: he leaves these pages, never solves them
-BODY_WALL = re.compile(r"unusual traffic from your computer|i'?m not a robot|are you a (robot|human)|verify you are human|"
-                       r"checking (if the site connection is secure|your browser)|press (and|&) hold|"
+# (only on short pages: a real bot check is a page of its own, not a sentence inside an article)
+WALL_MAX_CHARS = 2000
+BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you are (a )?human|"
+                       r"checking (if the site connection is secure|your browser)|"
                        r"complete the security check|please solve (this|the) (captcha|puzzle)", re.I)
-WALL_FRAMES = """() => !!document.querySelector('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
-  + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"], #captcha-form, .g-recaptcha, .h-captcha')"""
+# a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
+WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
+  + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
+    if (f.closest('.grecaptcha-badge')) return false;
+    const r = f.getBoundingClientRect(), cs = getComputedStyle(f);
+    return r.width >= 200 && r.height >= 60 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.1; })"""
 LOGIN_LINK = re.compile(r"log ?in|sign ?(in|up)|register|account|cart|checkout|basket|subscribe|donate|password|"
                         r"privacy|cookie|terms|legal|imprint|impressum|careers|advertis", re.I)
 SKIP_EXT = re.compile(r"\.(pdf|zip|rar|7z|exe|dmg|apk|mp3|mp4|mov|avi|mkv|iso|tar|gz|docx?|xlsx?|pptx?)(\?|$)", re.I)
@@ -279,7 +285,9 @@ class Browser:
                     sc.scrolls_left -= 1
                     await sc.page.evaluate("() => window.scrollBy({top: innerHeight * 0.7, behavior: 'smooth'})")
                     await sc.page.wait_for_timeout(900)
-                    await self._shoot(sc)
+                    if not await self._shoot(sc):                   # turned into a bot check: left
+                        sc.next_at = time.time() + 15
+                        return None
                 else:
                     ok = await self._next(sc, list(heard), interest)
                     if not ok:
@@ -331,8 +339,8 @@ class Browser:
         if await self._open(sc, url, why, "search", title=f"{q} — search", min_text=0, shoot=False):
             results = await self._links(sc, "#b_results li.b_algo h2 a, li.b_algo a.tilk")
             results = [(u, t) for u, t in results if "bing.com" not in u and "microsoft.com" not in u]
-            if results:
-                await self.show(sc)                                    # only a results page is worth showing
+            if results and not await self.show(sc):                   # only a results page is worth showing
+                results = []
         if not results:
             wiki = "https://en.wikipedia.org/w/index.php?" + urllib.parse.urlencode({"search": q})
             if not await self._open(sc, wiki, why, "search", title=f"{q} — Wikipedia"):
@@ -401,26 +409,31 @@ class Browser:
         sc.info = {"title": (title or page_title or host)[:140], "url": page.url, "host": host.removeprefix("www."),
                    "why": why.replace("opened “”", f"opened {host.removeprefix('www.')}"), "t": time.time(), "kind": kind}
         sc.scrolls_left = self.rng.randint(*SCROLLS) if kind == "page" else 0
-        if shoot:
-            await self.show(sc)
+        if shoot and not await self.show(sc):
+            return False
         return True
 
     @staticmethod
     def wall_text(body):
-        return bool(BODY_WALL.search(body[:3000]))
+        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
 
     async def _walled(self, page, body=None):
-        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) is on the page."""
+        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) fills the page."""
         if body is None:
-            body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 3000)")
+            body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+        if len(body.strip()) >= WALL_MAX_CHARS:
+            return False
         return self.wall_text(body) or await page.evaluate(WALL_FRAMES)
 
     async def show(self, sc):
-        """Screenshot the current page and log the visit (only pages that passed the guard get here)."""
-        await self._shoot(sc)
+        """Screenshot the current page and log the visit (only pages that passed the guard get here).
+        False when the page turned out to be a bot check (then nothing is shown or logged)."""
+        if not await self._shoot(sc):
+            return False
         i = sc.info
         self.log = (self.log + [{"t": i["t"], "device": sc.name, "title": i["title"], "url": i["url"], "host": i["host"],
                                  "why": i["why"]}])[-KEEP:]
+        return True
 
     async def _leave(self, sc):
         sc.scrolls_left = 0
@@ -436,6 +449,7 @@ class Browser:
         if await self._walled(sc.page):                                 # a page can turn into a bot check later
             print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
             await self._leave(sc)
-            return
+            return False
         sc.shot = await sc.page.screenshot(type="jpeg", quality=72 if sc.name == "desk" else 68)
         sc.shot_id += 1
+        return True

@@ -117,14 +117,16 @@ GOOGLE_SORRY = ("I'm not a robot\nreCAPTCHA\nAbout this page\nOur systems have d
 
 
 @pytest.mark.parametrize("body", [GOOGLE_SORRY, "Checking your browser before accessing example.com",
-                                  "Press & Hold to confirm you are a human (and not a bot).",
-                                  "Please verify you are human"])
+                                  "Please verify you are human", "Complete the security check to access the site."])
 def test_bot_wall_text_is_recognised(body):
     assert Browser.wall_text(body)
 
 
 @pytest.mark.parametrize("body", ["CAPTCHA is a type of challenge-response test used in computing.",
-                                  "Robots in Japan: a history of industrial robots", "Traffic in Tokyo is unusual."])
+                                  "Robots in Japan: a history of industrial robots", "Traffic in Tokyo is unusual.",
+                                  "To reset it, press and hold the power button for 10 seconds.",
+                                  "“Are you a robot?” asks the Turing test. I'm not a robot, says the machine.",
+                                  "A long article. " * 150 + "Our systems detected unusual traffic from your network."])
 def test_articles_about_captchas_are_not_walls(body):
     assert not Browser.wall_text(body)
 
@@ -142,10 +144,16 @@ def test_bot_wall_page_is_left_not_shown():
                                       "<iframe src='about:blank#https://www.google.com/recaptcha/api2/anchor'></iframe>")
             await sc.page.evaluate("() => document.querySelector('iframe').setAttribute('src', "
                                    "'https://www.google.com/recaptcha/api2/anchor?k=x')")
+            await sc.page.set_viewport_size({"width": 1280, "height": 800})
+            await sc.page.evaluate("() => { const f = document.querySelector('iframe'); f.width = 304; f.height = 78; }")
             assert await b._walled(sc.page)
             sc.info = {"title": "Search", "url": "x", "host": "x", "why": "", "t": 0, "kind": "search"}
-            await b._shoot(sc)
-            assert sc.shot is None and sc.info["kind"] == "left"
+            assert not await b.show(sc)
+            assert sc.shot is None and sc.info["kind"] == "left" and b.log == []        # not shown, not logged
+            # the invisible reCAPTCHA v3 badge on an ordinary page is not a wall
+            await sc.page.set_content("<title>Bakery</title><p>" + "fresh bread daily " * 40 + "</p><div class='grecaptcha-badge'>"
+                                      "<iframe width=256 height=60 src='https://www.google.com/recaptcha/api2/anchor?k=x&size=invisible'></iframe></div>")
+            assert not await b._walled(sc.page)
             await sc.page.set_content("<title>Bread</title><p>" + "bread is baked " * 40 + "</p>")
             assert not await b._walled(sc.page)
         finally:
