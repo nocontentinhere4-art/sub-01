@@ -127,11 +127,10 @@ class SpikingHub:
             newest = max(sel, key=lambda r: r.get("received", ""))
             day = max(r.get("day") or "" for r in sel if key(r) == key(newest))              # its latest item day
             test = [r for r in rows if key(r) == key(newest) and r.get("day") == day]
-            seen, items = set(), []
-            for r in reversed(test):                                    # one row per item
-                if (r["item"], r["source"]) not in seen:
-                    seen.add((r["item"], r["source"]))
-                    items.append({k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold")})
+            by_item = {}                                                # one row per item, in test order
+            for r in test:
+                by_item[(r["item"], r["source"])] = {k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold")}
+            items = list(by_item.values())
             items.sort(key=lambda r: (r["source"] != "reading", not r["recalled"]))
             out.update(day=day, label=label, tested=newest.get("received"), items=items,
                        test_day=newest.get("test_day"), days_since=newest.get("days_since"))
