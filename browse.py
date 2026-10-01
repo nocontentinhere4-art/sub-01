@@ -80,6 +80,22 @@ WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], 
     if (f.closest('.grecaptcha-badge')) return false;
     const r = f.getBoundingClientRect(), cs = getComputedStyle(f);
     return r.width >= 200 && r.height >= 60 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.1; })"""
+# links whose URL path leads to an account, a form or a purchase, whatever their text says
+LOGIN_HREF = re.compile(r"/(log-?in|sign-?in|sign-?up|signin|signup|register|join|account|my-?account|checkout|cart|"
+                        r"basket|subscribe|donate|password|auth|oauth2?|sso)(/|\?|$|\.)", re.I)
+
+
+def display_ok(text):
+    """Text that may be shown on the public screen card: no links, addresses, tickers, money, slurs or blocked
+    topics (the chat filter's rules, without its phone-number rule, which catches year ranges)."""
+    import chat
+    from research import BLOCK as TOPIC_BLOCK
+    t = text or ""
+    return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.TICKER.search(t)
+                or chat.EMAIL.search(t) or chat.MONEY.search(t) or chat.SLUR_RE.search(chat.normalise(t))
+                or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+
+
 LOGIN_LINK = re.compile(r"log ?in|sign ?(in|up)|register|account|cart|checkout|basket|subscribe|donate|password|"
                         r"privacy|cookie|terms|legal|imprint|impressum|careers|advertis", re.I)
 SKIP_EXT = re.compile(r"\.(pdf|zip|rar|7z|exe|dmg|apk|mp3|mp4|mov|avi|mkv|iso|tar|gz|docx?|xlsx?|pptx?)(\?|$)", re.I)
@@ -260,6 +276,7 @@ class Browser:
             self.browser = await self.pw.chromium.launch(**kw)
             for sc in self.screens.values():
                 sc.ctx = sc.page = None
+                sc.info, sc.history, sc.awaiting, sc.scrolls_left = None, [], None, 0
         sc = self.screens[device]
         if sc.ctx is None:
             opts = dict(DESK if device == "desk" else PHONE, accept_downloads=False, java_script_enabled=True,
@@ -285,6 +302,7 @@ class Browser:
                     pass
                 sc.ctx = sc.page = None
                 sc.scrolls_left, sc.next_at, sc.pending_link = 0, 0.0, None
+                sc.info, sc.history, sc.awaiting = None, [], None
         if device is None and self.browser is not None:
             try:
                 await self.browser.close()
@@ -319,7 +337,7 @@ class Browser:
                         sc.next_at = time.time() + 15
                         return None
                 elif (self.decide and sc.info and sc.info.get("kind") in ("page", "search") and sc.page is not None
-                      and not self._fresh_chat(heard)):
+                      and sc.page.url.startswith("http") and not self._fresh_chat(heard)):
                     page = await self.page_info(sc)
                     if page["links"] or page["can_back"]:
                         sc.awaiting, sc.awaiting_since = page, time.time()
@@ -358,8 +376,8 @@ class Browser:
         seen, cand = set(), []
         for href, label, area, visible in raw:
             label = " ".join(label.split())
-            if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or BAD_WORDS.search(label)
-                    or href in seen):
+            if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
+                    or not display_ok(label) or href in seen):
                 continue
             u = urllib.parse.urlsplit(href)
             if (u.netloc, u.path) == (cur.netloc, cur.path) or (search and u.netloc == cur.netloc):
@@ -384,15 +402,19 @@ class Browser:
             try:
                 ok = False
                 if kind in ("click", "open_video"):
-                    href = next((l["href"] for l in page["links"] if l["id"] == action.get("target")), None)
+                    want = action.get("href")                       # matched by URL: link ids are per capture
+                    href = next((l["href"] for l in page["links"] if l["href"] == want), None)
                     ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
                 elif kind == "search" and action.get("target"):
                     from eyes import query_ok                       # checked again here, in the browser's process
                     q = query_ok(action["target"])
                     ok = bool(q) and await self._search(sc, q, f"searched “{q}” — {why}")
                 elif kind == "back" and len(sc.history) >= 2:
-                    sc.history.pop()
-                    ok = await self._open(sc, sc.history.pop(), f"went back — {why}", "page")
+                    saved = list(sc.history)
+                    sc.history = saved[:-2]
+                    ok = await self._open(sc, saved[-2], f"went back — {why}", "page")
+                    if not ok:
+                        sc.history = saved
                 elif kind == "scroll":
                     sc.scrolls_left = self.rng.randint(1, 3)
                     if sc.info:

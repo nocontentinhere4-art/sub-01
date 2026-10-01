@@ -128,6 +128,7 @@ class Brain:
     def clone(self):
         """Independent copy of the dynamic state (history buffer, stimulus, drives, slow layer, random stream) that
         shares the fixed wiring arrays: used to try out a stimulus without touching the live brain (brain_vote.py)."""
+        self.lag_coupling()                                   # built once on the live brain, shared read-only
         c = copy.copy(self)
         c.buf, c.stim, c.drive, c.slow_x = self.buf.copy(), self.stim.copy(), self.drive.copy(), self.slow_x.copy()
         c.omega = self.omega.copy()

@@ -5,6 +5,10 @@ A per-topic preference table. A page's topics are the networks of the option tha
 brain responded (value of reward / attention / fear activity relative to his recent average, squashed to -1..1); when
 he leaves, the prediction error  delta = response - predict(topics)  moves each topic's preference by ALPHA * delta
 (a reward-prediction-error rule). Preferences decay toward 0 with time constant TAU_DAYS, so unvisited tastes fade.
+The first PageWatch.SKIP_S (10 s) of a stay are not counted: the chosen option's own stimulus (2 s decay) is gone by
+then, so a choice does not confirm itself (checked: same response with and without it, within 0.003). The model has
+no other input from the page, so the stay response also carries whatever else drives the brain meanwhile (chat,
+trades, readings, its own slow activity): tastes are a slow, noisy average, not a judgement of the page.
 
 The interface is three methods, kept small so the spiking brain (feature/spiking-brain) can replace the table with
 dopamine-modulated synapses later:  topics(option, title) -> [str],  predict(topics) -> float in [-1, 1],
@@ -17,7 +21,7 @@ from pathlib import Path
 
 from research import keywords
 
-ALPHA = 0.3
+ALPHA = 0.2
 TAU_DAYS = 7.0
 CAP = 400                     # topics kept (the weakest are dropped)
 MIN_ABS = 0.01
@@ -51,8 +55,11 @@ class Tastes:
         """Reward-prediction-error update; `response` in [-1, 1]. Returns the prediction error."""
         if not topics:
             return 0.0
+        response = float(response)
+        if not math.isfinite(response):                       # a broken measurement teaches nothing
+            return 0.0
         self.decay()
-        response = max(-1.0, min(1.0, float(response)))
+        response = max(-1.0, min(1.0, response))
         delta = response - self.predict(topics)
         now = self.clock()
         for t in topics:
@@ -89,8 +96,8 @@ class Tastes:
         items = sorted(self.pref.items(), key=lambda kv: -kv[1])
         fmt = lambda kv: {"topic": kv[0].split(":", 1)[1], "kind": "network" if kv[0].startswith("net:") else "word",
                           "pref": round(kv[1], 3)}
-        return {"likes": [fmt(kv) for kv in items[:n] if kv[1] > 0],
-                "dislikes": [fmt(kv) for kv in items[::-1][:n] if kv[1] < 0], "topics": len(self.pref),
+        return {"favoured": [fmt(kv) for kv in items[:n] if kv[1] > 0],
+                "avoided": [fmt(kv) for kv in items[::-1][:n] if kv[1] < 0], "topics": len(self.pref),
                 "rule": f"prediction error x {ALPHA}, decay {TAU_DAYS:g} days",
                 "note": "Learned from the brain model's simulated response to pages; not enjoyment or understanding."}
 
@@ -98,8 +105,8 @@ class Tastes:
 class PageWatch:
     """Measures the brain's response while he stays on a page (fed every tick with the relative group activity)."""
 
-    SKIP_S = 3.0              # the chosen stimulus itself is still decaying at first: not counted
-    SCALE = 0.25              # response units -> tanh
+    SKIP_S = 10.0             # the chosen option's own stimulus (2 s decay) must be gone, or every choice "pays off"
+    SCALE = 0.5               # response units -> tanh
     BASE_TAU_S = 600.0        # running baseline of the same measure
 
     def __init__(self):

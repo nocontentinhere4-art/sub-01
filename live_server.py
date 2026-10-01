@@ -34,7 +34,7 @@ from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
 from research import Reader, reading_stimulus
-from browse import Browser
+from browse import Browser, display_ok
 import brain_vote
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
@@ -387,13 +387,16 @@ class Live:
             return {"device": dev, "restarting": True}
         st = self.browser.screens.get(dev)
         dec = self.decisions.get(dev)
-        if st and dec:
+        if st and not display_ok(st.get("title", "")):           # the public card never shows such a title
+            st = dict(st, title=st.get("host", ""))
+        # the options belong to the page they were considered on and to the page the choice led to, no later one
+        if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")):
             st = dict(st, decision={k: dec.get(k) for k in ("options", "reason", "eyes", "ms", "temperature", "page")})
         return st
 
     async def run_browse(self):
         """Drive the screens through the browser service; if it is down the brain and the page carry on."""
-        idle_since, last_save, ready, open_dev = time.time(), time.time(), False, None
+        idle_since, last_save, last_sync, ready, open_dev = time.time(), time.time(), time.time(), False, None
         while True:
             await asyncio.sleep(1)
             dev = self.screen_device()
@@ -406,8 +409,13 @@ class Live:
                         open_dev = None
                     continue
                 idle_since = now
-                if self.local_browser and not await self.local_browser.ensure():
-                    raise BrowserDown("browser process did not start")
+                if self.local_browser:
+                    proc = await self.local_browser.ensure()
+                    if proc == "down":
+                        raise BrowserDown("browser process did not start")
+                    if proc != "ok":                            # a new process: give it the saved log again
+                        ready, open_dev = False, None
+                        self.end_page()
                 if not ready:
                     await self.browser.init(self.browsing_state)
                     ready = True
@@ -422,19 +430,26 @@ class Live:
                 st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
                 if st:
                     await self.broadcast({"type": "screen", **self.screen_status(dev)})
+                if now - last_sync > 30:                        # the log shown on /api/browsing stays fresh
+                    await self.sync_browsing()
+                    last_sync = now
                 if now - last_save > 300:
-                    s = await self.browser.state()
-                    self.browsing_state = {"log": s.get("log", []), "used": s.get("used", [])}
                     self.browsing_path.write_text(json.dumps(self.browsing_state, ensure_ascii=False))
                     last_save = now
             except BrowserDown as e:
                 if not self.browser.restarting:
                     print("browser down:", e, flush=True)
                     self.browser.restarting = True
-                    await self.broadcast({"type": "screen", "device": dev, "restarting": True})
+                    if dev:
+                        await self.broadcast({"type": "screen", "device": dev, "restarting": True})
                 self.end_page()
                 ready, open_dev = False, None
                 await asyncio.sleep(5)
+
+    async def sync_browsing(self):
+        s = await self.browser.state()
+        if s.get("log") or not self.browsing_state.get("log"):
+            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", [])}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
@@ -449,9 +464,23 @@ class Live:
     async def decide(self, dev, page, interest=None):
         """The eyes list options for the page; the brain model votes; the browser carries the choice out."""
         loop = asyncio.get_running_loop()
-        opts, meta = await loop.run_in_executor(None, self.eyes.propose, page, interest)
+        try:
+            opts, meta = await asyncio.wait_for(loop.run_in_executor(None, self.eyes.propose, page, interest), 60)
+        except asyncio.TimeoutError:                           # the AI is too slow: the page's own links
+            from eyes import local_options
+            opts, meta = local_options(page, interest), {"source": "local", "why_local": "AI too slow"}
         if not opts:
             return await self.browser.act(dev, {"action": "leave"}, "nothing safe to do on this page", interest)
+        try:
+            return await self._vote_and_act(dev, page, opts, meta, interest)
+        except BrowserDown:
+            raise
+        except Exception as e:                                 # a failing vote must not stall the screens
+            print("decide failed:", repr(e)[:160], flush=True)
+            return await self.browser.act(dev, {"action": "leave"}, "the brain vote failed; wandered on", interest)
+
+    async def _vote_and_act(self, dev, page, opts, meta, interest):
+        loop = asyncio.get_running_loop()
         t = self.clock.now()
         mood = {"boredom": self.life.boredom, "pressure": self.engine.pressure(t), "tired": self.engine.tired}
         gain = self.engine.gain
@@ -464,13 +493,19 @@ class Live:
         brain_vote.apply(self.brain, chosen, gain)             # the live brain receives the chosen stimulus
         self.end_page()
         self.pagewatch.start(topics[dec["chosen"]], time.time())
-        self.targets[chosen.get("href") or chosen.get("target") or chosen["action"]] = time.time()
-        dec.update(device=dev, t=hhmm(t), page=page.get("title", "")[:120], eyes=meta)
+        now = time.time()
+        self.targets = {k: v for k, v in self.targets.items() if now - v < 7 * 86400}
+        self.targets[chosen.get("href") or chosen.get("target") or chosen["action"]] = now
+        title = page.get("title", "")[:120]
+        dec.update(device=dev, t=hhmm(t), page=title if display_ok(title) else page.get("host", ""), eyes=meta,
+                   page_url=page.get("url"))
         self.decisions[dev] = dec
         self.decision_log = (self.decision_log + [dec])[-30:]
         await self.broadcast({"type": "decision", **dec})
-        return await self.browser.act(dev, {k: chosen.get(k) for k in ("action", "target", "label")},
-                                      dec["reason"], interest)
+        st = await self.browser.act(dev, {k: chosen.get(k) for k in ("action", "target", "label", "href")},
+                                    dec["reason"], interest)
+        dec["status_id"] = (st or {}).get("id")
+        return st
 
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
@@ -722,6 +757,10 @@ async def main(args):
     finally:
         live.store.save(live.engine, live.memory)
         if live.browser:
+            try:
+                await asyncio.wait_for(live.sync_browsing(), 5)  # the newest log, if the browser still answers
+            except (BrowserDown, asyncio.TimeoutError):
+                pass
             live.browsing_path.write_text(json.dumps(live.browsing_state, ensure_ascii=False))
             if live.local_browser:
                 await live.local_browser.aclose()

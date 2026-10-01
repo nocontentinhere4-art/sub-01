@@ -31,6 +31,8 @@ from aiohttp import web
 HERE = Path(__file__).parent
 TOKEN_HEADER = "X-Browse-Token"
 MEM_MB = float(os.environ.get("BROWSE_MEM_MB") or 1200)
+STEP_LIMIT_S, ACT_LIMIT_S = 70.0, 110.0                         # a hung page (endless script) is abandoned
+HUNG_AFTER = 3                                                  # consecutive failed calls: restart the child
 ENV_KEEP = ("PATH", "HOME", "LANG", "TZ", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH", "FONTCONFIG_PATH", "PYTHONPATH",
             "BROWSE_PROXY", "BROWSE_IGNORE_TLS", "BROWSE_CHROMIUM", "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")
 
@@ -67,22 +69,36 @@ def make_app(browser, token=None):
         return dev
 
     async def init(request):
+        """Restore the saved log, only into a fresh service (never over a running one's newer log)."""
         d = await body(request)
         st = d.get("state") or {}
-        browser.log = list(st.get("log", browser.log))[-60:]
-        browser.used = set(st.get("used", browser.used))
-        return web.json_response({"ok": True})
+        fresh = not browser.log and not browser.used
+        if fresh:
+            browser.log = list(st.get("log", []))[-60:]
+            browser.used = set(st.get("used", []))
+        return web.json_response({"ok": True, "applied": fresh})
+
+    async def limited(coro, limit, dev):
+        try:
+            return await asyncio.wait_for(coro, limit)
+        except asyncio.TimeoutError:                            # e.g. a page whose script never returns
+            print(f"browse service: {dev} took over {limit:.0f}s, closing it", flush=True)
+            await browser.close(dev)
+            return None
 
     async def step(request):
         d = await body(request)
-        out = await browser.step(device(d), list(d.get("heard") or [])[-5:], d.get("interest"))
+        dev = device(d)
+        out = await limited(browser.step(dev, list(d.get("heard") or [])[-5:], d.get("interest")), STEP_LIMIT_S, dev)
         if out and "decide" in out:
             return web.json_response({"decide": out["decide"]})
         return web.json_response({"status": out})
 
     async def act(request):
         d = await body(request)
-        st = await browser.act(device(d), d.get("action") or {}, str(d.get("why") or "")[:200], d.get("interest"))
+        dev = device(d)
+        st = await limited(browser.act(dev, d.get("action") or {}, str(d.get("why") or "")[:200], d.get("interest")),
+                           ACT_LIMIT_S, dev)
         return web.json_response({"status": st})
 
     async def close(request):
@@ -115,24 +131,40 @@ def make_app(browser, token=None):
     return app
 
 
-def tree_rss_mb(pid):
-    """Resident memory of a process and all its descendants (Linux /proc; 0 elsewhere)."""
-    children, rss = {}, {}
+def descendants(pid):
+    """pid and all its descendants (Linux /proc)."""
+    children = {}
     for p in Path("/proc").glob("[0-9]*"):
         try:
-            stat = (p / "stat").read_text()
-            ppid = int(stat.rsplit(")", 1)[1].split()[1])
-            pages = int((p / "statm").read_text().split()[1])
+            ppid = int((p / "stat").read_text().rsplit(")", 1)[1].split()[1])
         except (OSError, ValueError, IndexError):
             continue
         children.setdefault(ppid, []).append(int(p.name))
-        rss[int(p.name)] = pages * os.sysconf("SC_PAGE_SIZE") / 2 ** 20 if hasattr(os, "sysconf") else 0
-    total, todo = 0.0, [pid]
+    out, todo = [], [pid]
     while todo:
         q = todo.pop()
-        total += rss.get(q, 0.0)
+        out.append(q)
         todo += children.get(q, [])
-    return total
+    return out
+
+
+def mem_mb(pid):
+    """Proportional memory (PSS: shared pages split between processes) of one process, else its RSS; 0 if gone."""
+    try:
+        for line in Path(f"/proc/{pid}/smaps_rollup").read_text().splitlines():
+            if line.startswith("Pss:"):
+                return int(line.split()[1]) / 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        return int(Path(f"/proc/{pid}/statm").read_text().split()[1]) * os.sysconf("SC_PAGE_SIZE") / 2 ** 20
+    except (OSError, ValueError, IndexError, AttributeError):
+        return 0.0
+
+
+def tree_rss_mb(pid):
+    """Memory of a process and all its descendants (Chromium's renderers included), counted as PSS."""
+    return sum(mem_mb(p) for p in descendants(pid))
 
 
 # --- the client (in the brain's process) ---------------------------------------------------------------------------
@@ -146,6 +178,13 @@ class BrowserClient:
         self.log = []
         self.shots = {}                                         # device -> (shot id, jpeg bytes)
         self.restarting = False
+        self.failures = 0                                       # consecutive failed calls (hung service)
+
+    def reset(self):
+        """A new service process: nothing cached from the old one is valid (shot ids start again at 1)."""
+        self.restarting, self.failures = True, 0
+        self.screens.clear()
+        self.shots.clear()
 
     async def _session(self):
         if self.http is None or self.http.closed:
@@ -159,8 +198,14 @@ class BrowserClient:
                                  timeout=aiohttp.ClientTimeout(total=timeout or self.timeout)) as r:
                 if r.status != 200:
                     raise BrowserDown(f"{path}: HTTP {r.status}")
-                return await r.json()
+                out = await r.json()
+            self.failures = 0
+            return out
+        except BrowserDown:
+            self.failures += 1
+            raise
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError) as e:
+            self.failures += 1
             raise BrowserDown(f"{path}: {type(e).__name__}") from None
 
     async def _get(self, path, timeout=10.0):
@@ -175,14 +220,16 @@ class BrowserClient:
         await self._post("/init", {"state": state}, timeout=10)
 
     async def step(self, device, heard=(), interest=None):
-        d = await self._post("/step", {"device": device, "heard": list(heard), "interest": interest})
+        d = await self._post("/step", {"device": device, "heard": list(heard), "interest": interest},
+                             timeout=STEP_LIMIT_S + 20)
         self.restarting = False
         if d.get("status"):
             self.screens[device] = d["status"]
         return d
 
     async def act(self, device, action, why="", interest=None):
-        d = await self._post("/act", {"device": device, "action": action, "why": why, "interest": interest})
+        d = await self._post("/act", {"device": device, "action": action, "why": why, "interest": interest},
+                             timeout=ACT_LIMIT_S + 20)
         if d.get("status"):
             self.screens[device] = d["status"]
         return d.get("status")
@@ -265,28 +312,38 @@ class LocalBrowser:
 
     async def kill(self):
         if self.proc is not None and self.proc.returncode is None:
+            tree = descendants(self.proc.pid)                   # Chromium may run in its own process group
             try:
-                os.killpg(self.proc.pid, signal.SIGKILL)       # the whole group: Chromium children too
+                os.killpg(self.proc.pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
-                self.proc.kill()
+                pass
+            for pid in tree:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
             await self.proc.wait()
-        self.proc = None
 
     async def ensure(self):
-        """True when a healthy service is running (starting or restarting it if needed)."""
+        """-> "ok" (running), "started" / "restarted" (a new process: re-send the saved state) or "down"."""
+        why = None
         if self.alive() and tree_rss_mb(self.proc.pid) > self.mem_mb:
-            print(f"browse service over {self.mem_mb:.0f} MB: restarting", flush=True)
-            await self.kill()
-        if not self.alive():
-            if self.proc is not None:
-                self.restarts += 1
-                self.client.restarting = True                   # the screen says "browser restarting" meanwhile
-                self.client.screens.clear()
-            await self.kill()
-            ok = await self.spawn()
-            print("browse service " + ("started" if ok else "did not start"), flush=True)
-            return ok
-        return True
+            why = f"over {self.mem_mb:.0f} MB"
+        elif self.alive() and self.client.failures >= HUNG_AFTER:
+            why = f"{self.client.failures} calls failed (hung?)"
+        elif self.alive():
+            return "ok"
+        restarting = self.proc is not None
+        if why:
+            print(f"browse service {why}: restarting", flush=True)
+        await self.kill()
+        if restarting:
+            self.restarts += 1
+            self.client.reset()                                 # the screen says "browser restarting" meanwhile
+        ok = await self.spawn()
+        print("browse service " + ("restarted" if restarting and ok else "started" if ok else "did not start"),
+              flush=True)
+        return ("restarted" if restarting else "started") if ok else "down"
 
     async def aclose(self):
         await self.client.aclose()

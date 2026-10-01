@@ -222,11 +222,13 @@ def test_preference_update_is_a_prediction_error_rule(tmp_path):
     topics = Tastes.topics({"label": "sourdough bread", "networks": {"reward": 0.8, "visual": 0.1}}, "Bread")
     assert topics[0] == "net:reward" and "kw:sourdough" in topics and "net:visual" not in topics
     d1 = t.learn(topics, 1.0)
-    assert d1 == 1.0 and abs(t.predict(topics) - 0.3) < 1e-9
+    assert d1 == 1.0 and abs(t.predict(topics) - 0.2) < 1e-9
     d2 = t.learn(topics, 1.0)
-    assert abs(d2 - 0.7) < 1e-9 and t.predict(topics) > 0.5                  # smaller error, same direction
+    assert abs(d2 - 0.8) < 1e-9 and t.predict(topics) > 0.3                  # smaller error, same direction
     t.learn(["kw:storm"], -1.0)
-    assert t.predict(["kw:storm"]) < 0 and t.top()["dislikes"][0]["topic"] == "storm"
+    assert t.predict(["kw:storm"]) < 0 and t.top()["avoided"][0]["topic"] == "storm"
+    before = dict(t.pref)
+    assert t.learn(topics, float("nan")) == 0.0 and t.pref == before          # a broken measurement teaches nothing
     saved = Tastes(tmp_path / "tastes.json", clock=lambda: now[0])
     assert saved.pref == t.pref
     p = t.predict(topics)
@@ -238,8 +240,8 @@ def test_preference_update_is_a_prediction_error_rule(tmp_path):
 def test_page_watch_measures_the_stay():
     w = PageWatch()
     w.start(["kw:bread"], 0.0)
-    for k in range(100):                                                       # reward above its running baseline
-        w.feed({"reward": 1.0 if k < 30 else 2.0, "attention": 1.0, "fear": 1.0}, k * 0.1, 0.1)
+    for k in range(300):                                                       # reward above its running baseline
+        w.feed({"reward": 1.0 if k < 100 else 2.0, "attention": 1.0, "fear": 1.0}, k * 0.1, 0.1)
     topics, r = w.finish()
     assert topics == ["kw:bread"] and 0 < r <= 1
     w.start(["kw:x"], 0.0)
@@ -382,6 +384,7 @@ def test_decide_wires_eyes_vote_tastes_and_act(brain, tmp_path):
                            targets={}, vote_rng=np.random.default_rng(0))
     live.novel = lambda o: Live.novel(live, o)
     live.end_page = lambda: Live.end_page(live)
+    live._vote_and_act = lambda *a: Live._vote_and_act(live, *a)
     reward = live.brain.group_idx["reward"]
     before = live.brain.stim[reward].copy()
     st = run(Live.decide(live, "desk", dict(PAGE, device="desk"), "bread"))
@@ -455,14 +458,110 @@ def test_browser_act_rechecks_targets_in_its_own_process():
 
     async def main():
         sc = b.screens["desk"]
-        for action in ({"action": "click", "target": "https://evil.example/x"},      # not an id of the stored page
-                       {"action": "click", "target": "L77"},
+        for action in ({"action": "click", "target": "L1", "href": "https://evil.example/x"},  # not on the stored page
+                       {"action": "click", "target": "L1"},                                   # no URL to match
                        {"action": "search", "target": "buy crypto tokens now"},
                        {"action": "search", "target": "https://evil.example"},
-                       {"action": "click", "target": "L1"}):
+                       {"action": "click", "target": "L9", "href": "https://en.wikipedia.org/wiki/Sourdough"}):
             sc.page, sc.awaiting = object(), dict(PAGE)
             await b.act("desk", action)
         sc.page, sc.awaiting = object(), None
-        assert await b.act("desk", {"action": "click", "target": "L1"}) is None      # nothing pending: ignored
+        assert await b.act("desk", {"action": "click", "href": "https://en.wikipedia.org/wiki/Sourdough"}) is None
+        assert sc.awaiting is None                                             # nothing pending: ignored
     run(main())
     assert opened == ["https://en.wikipedia.org/wiki/Sourdough"] and searched == [] and len(wandered) == 4
+
+
+# --- review fixes ----------------------------------------------------------------------------------------------------
+def test_cached_options_follow_the_link_not_its_number(tmp_path):
+    reply = json.dumps({"options": [{"action": "click", "target": "L1", "label": "sourdough", "networks": {"reward": 1}},
+                                    {"action": "click", "target": "L3", "label": "wheat"}]})
+    prov = FakeProvider(reply)
+    eyes = E.Eyes(prov, E.Budget(tmp_path / "c.jsonl"))
+    first, _ = eyes.propose(PAGE)
+    # the same page captured again: links renumbered, wheat gone
+    again = dict(PAGE, links=[dict(PAGE["links"][2], id="L1", href="https://en.wikipedia.org/wiki/Rye", text="Rye"),
+                              dict(PAGE["links"][0], id="L2")])
+    second, meta = eyes.propose(again)
+    assert len(prov.calls) == 1 and "no new call" in meta["source"]
+    sour = [o for o in second if o["label"] == "sourdough"][0]
+    assert sour["target"] == "L2" and sour["href"] == "https://en.wikipedia.org/wiki/Sourdough"
+    assert not [o for o in second if o["label"] == "wheat"]
+
+
+@pytest.mark.parametrize("label", ["buy $BONK now", "visit example.com", "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+                                   "send 2 sol to me", "token price today"])
+def test_labels_shown_on_the_card_pass_the_chat_filter(label):
+    assert E.validate([{"action": "scroll", "label": label}], PAGE) == []
+    page = dict(PAGE, links=[{"id": "L1", "href": "https://en.wikipedia.org/wiki/X", "text": label}])
+    assert E.validate([{"action": "click", "target": "L1", "label": "ok"}], page) == []
+
+
+def test_login_and_checkout_urls_are_dropped_whatever_their_text():
+    page = dict(PAGE, links=[{"id": "L1", "href": "https://shop.example/checkout?x=1", "text": "Get started"},
+                             {"id": "L2", "href": "https://site.example/join/", "text": "Join the club"},
+                             {"id": "L3", "href": "https://site.example/joinery", "text": "Joinery history"}])
+    out = E.validate([{"action": "click", "target": f"L{i}", "label": f"x{i}"} for i in (1, 2, 3)], page)
+    assert [o["target"] for o in out] == ["L3"]
+    assert "untrusted" in E.SYSTEM
+
+
+def test_screen_card_shows_options_only_for_their_pages():
+    dec = {"options": [], "reason": "r", "eyes": {}, "ms": 1, "temperature": 0.2, "page": "A", "page_url": "u-a",
+           "status_id": 7}
+    live = SimpleNamespace(browser=SimpleNamespace(restarting=False, screens={}), decisions={"desk": dec})
+    for st, shown in (({"url": "u-a", "id": 3, "title": "A"}, True), ({"url": "u-b", "id": 7, "title": "B"}, True),
+                      ({"url": "u-c", "id": 9, "title": "C"}, False)):
+        live.browser.screens["desk"] = st
+        assert ("decision" in Live.screen_status(live, "desk")) == shown
+    live.browser.screens["desk"] = {"url": "u-c", "id": 9, "title": "$BONK to the moon", "host": "example.org"}
+    assert Live.screen_status(live, "desk")["title"] == "example.org"
+
+
+def test_service_restores_the_log_only_once_and_gives_up_on_a_hung_page(monkeypatch):
+    from aiohttp.test_utils import TestServer
+    import browse_service as S
+
+    class Hung(FakeBrowser):
+        closed = 0
+
+        async def step(self, device, heard, interest):
+            await asyncio.sleep(10)
+
+        async def close(self, device=None):
+            Hung.closed += 1
+
+    monkeypatch.setattr(S, "STEP_LIMIT_S", 0.2)
+
+    async def main():
+        fb = Hung()
+        server = TestServer(make_app(fb, token="t"))
+        await server.start_server()
+        c = BrowserClient(f"http://127.0.0.1:{server.port}", "t")
+        try:
+            await c.init({"log": [{"title": "old"}], "used": ["hi"]})
+            fb.log.append({"title": "newer"})
+            await c.init({"log": [{"title": "stale"}], "used": []})          # a running service keeps its log
+            assert [x["title"] for x in fb.log] == ["old", "newer"] and fb.used == {"hi"}
+            d = await c.step("desk")
+            assert d == {"status": None} and Hung.closed == 1                 # abandoned after the limit
+        finally:
+            await c.aclose()
+            await server.close()
+    run(main())
+
+
+def test_supervisor_restarts_a_hung_service_and_resets_the_client():
+    async def main():
+        lb = LocalBrowser()
+        try:
+            assert await lb.ensure() == "started"
+            assert await lb.ensure() == "ok"
+            pid = lb.proc.pid
+            lb.client.screens["desk"], lb.client.shots["desk"] = {"id": 1}, (1, b"old")
+            lb.client.failures = 3                                            # three calls in a row failed
+            assert await lb.ensure() == "restarted" and lb.proc.pid != pid and lb.restarts == 1
+            assert lb.client.restarting and not lb.client.screens and not lb.client.shots
+        finally:
+            await lb.aclose()
+    run(main())

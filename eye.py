@@ -107,21 +107,21 @@ def load_env(path):
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
-def replicate_post(url, token, payload, tries=5):
+def replicate_post(url, token, payload, tries=5, poll_s=240, timeout=60):
     """POST a prediction, waiting on 429s (low-credit accounts are limited to ~6 requests/min, burst 1)."""
     body = json.dumps(payload).encode()
     for i in range(tries):
         req = urllib.request.Request(url, data=body, method="POST", headers={
             "Authorization": f"Bearer {token}", "Content-Type": "application/json", "Prefer": "wait=30"})
         try:
-            out = json.loads(urllib.request.urlopen(req, timeout=60).read())
+            out = json.loads(urllib.request.urlopen(req, timeout=timeout).read())
         except urllib.error.HTTPError as e:
             if e.code != 429 or i == tries - 1:
                 raise
             time.sleep(float(e.headers.get("Retry-After") or 0) or 10 * (i + 1))
             continue
         # "Prefer: wait" can return before the model is done (cold start): poll the prediction until it ends
-        deadline = time.time() + 240
+        deadline = time.time() + poll_s
         while out.get("status") in ("starting", "processing") and time.time() < deadline:
             time.sleep(1.5)
             get = urllib.request.Request(out["urls"]["get"], headers={"Authorization": f"Bearer {token}"})
