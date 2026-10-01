@@ -240,7 +240,7 @@ const SURF = {
 };
 const PLACE2ANCHOR = {bed:"bedside", desk:"desk", table:"desk", window:"window", door_in:"door", door_out:"door"};
 const ACT = {                                        // activity -> [anchor, clip]
-  sleep:["bedlie","sleep"], phone:["bedside","sit"], order_food:["middle","call"], research:["desk","sit"],
+  sleep:["bedlie","sleep"], phone:["bedside","phone_sit"], order_food:["middle","phone_stand"], research:["desk","sit"],
   chart:["desk","sit"], eat:["desk","eat"], window:["window","idle"], get_delivery:["door","door"],
 };
 
@@ -283,12 +283,29 @@ load("room/boy.glb").then(g => {
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
   scene.add(phone);
-  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", call:"boy_call", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
+  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
     load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
 }).catch(bootError);
-function addClips(name, clips){ if (!clips || !clips.length || !mixer) return; actions[name] = mixer.clipAction(clips[0]); if (want) play(want); }
+const clips = {};
+// "hold" is a static upper-body pose (right arm, neck, head) taken from a texting animation on the same rig: it replaces
+// those bones of the sitting / standing idle clips; the left arm keeps the idle pose (resting on his knee / hanging)
+function addClips(name, list){
+  if (!list || !list.length || !mixer) return; clips[name] = list[0]; if (name !== "hold") actions[name] = mixer.clipAction(list[0]);
+  const h = clips.hold && clips.hold.tracks, own = h && new Set(h.map(t => t.name));
+  if (h) for (const [n, b] of [["phone_sit", "sit"], ["phone_stand", "idle"]]) if (clips[b] && !actions[n]) {
+    // still poses: the sit clip is a "thinker" idle (hunches, chin on hand), the idle clip looks around; holdPhone() breathes
+    const base = n === "phone_sit" ? still(clips.sit, 0.5, 4, tr => tr.startsWith("Left") ? 0.1 : 0.35) : still(clips.idle, 0.2, 0.2, () => 0);
+    actions[n] = mixer.clipAction(new THREE.AnimationClip(n, 1, [...base.filter(t => !own.has(t.name)), ...h]));
+  }
+  if (want) play(want);
+}
+function still(clip, t0, t1, kOf){                  // a still pose between two moments of a clip (k = 0: at t0, 1: at t1; per track)
+  return clip.tracks.map(tr => { const i = tr.createInterpolant(), a = i.evaluate(t0).slice(), b = i.evaluate(t1).slice(), k = kOf(tr.name);
+    if (tr instanceof THREE.QuaternionKeyframeTrack) THREE.Quaternion.slerpFlat(a, 0, a, 0, b, 0, k); else for (let j = 0; j < a.length; j++) a[j] += (b[j] - a[j]) * k;
+    return new tr.constructor(tr.name, [0, 1], [...a, ...a]); });
+}
 function play(name){
-  want = name; const a = actions[name] || actions.idle || actions.sit; if (!a || a === current) return;
+  want = name; const a = actions[name] || actions[{phone_sit:"sit", phone_stand:"idle"}[name]] || actions.idle || actions.sit; if (!a || a === current) return;
   a.reset().fadeIn(0.4).play(); if (current) current.fadeOut(0.4); current = a;
 }
 
@@ -335,8 +352,15 @@ const phone = new THREE.Group();
   phone.userData.screen.mesh.position.z = 0.0042; phone.add(phone.userData.screen.mesh);
   phone.visible = false;
 }
-// holding the phone: the phone floats in front of his chest, facing his eyes; both arms reach it (two-bone IK)
+// holding the phone in his right hand: the phone sits in front of his chest facing his eyes; the right arm starts from
+// the "hold" pose and a two-bone IK puts the wrist below the phone's right edge, the hand turned so that the palm lies
+// on its back with the fingers running diagonally up across it (the rig has no finger bones, so they cannot curl)
+const GRIP = {fwd:0.32, down:0.19, side:0.03, diag:0.65, curl:0.15, reach:0.07, back:0.02, look:0.7};
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _H = new THREE.Vector3(), _D = new THREE.Vector3(), _N = new THREE.Vector3();
+const _K = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _eye = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3();
+const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _hy = new THREE.Vector3(), _hz = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _qh = new THREE.Quaternion();
 function aimBone(bone, from, to){                    // rotate `bone` so that the point `from` (world) moves towards `to`
   bone.getWorldPosition(_a);
   _b.subVectors(from, _a).normalize(); _c.subVectors(to, _a).normalize();
@@ -346,35 +370,39 @@ function aimBone(bone, from, to){                    // rotate `bone` so that th
   bone.updateMatrixWorld(true);
 }
 function reach(upper, lower, end, target, pole){
-  const S = upper.getWorldPosition(new THREE.Vector3()), E = lower.getWorldPosition(new THREE.Vector3()), H = end.getWorldPosition(new THREE.Vector3());
-  const a = S.distanceTo(E), b = E.distanceTo(H), toT = new THREE.Vector3().subVectors(target, S);
-  const d = clamp(toT.length(), Math.abs(a - b) + 1e-3, a + b - 1e-3); toT.normalize();
+  upper.getWorldPosition(_S); lower.getWorldPosition(_E); end.getWorldPosition(_H);
+  const a = _S.distanceTo(_E), b = _E.distanceTo(_H); _D.subVectors(target, _S);
+  const d = clamp(_D.length(), Math.abs(a - b) + 1e-3, a + b - 1e-3); _D.normalize();
   const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
-  const perp = new THREE.Vector3().subVectors(pole, S); perp.addScaledVector(toT, -perp.dot(toT)).normalize();
-  const E2 = S.clone().addScaledVector(toT, x).addScaledVector(perp, h);
-  aimBone(upper, E, E2);
-  aimBone(lower, end.getWorldPosition(new THREE.Vector3()), target);
+  _N.subVectors(pole, _S).addScaledVector(_D, -_N.dot(_D)).normalize();
+  _K.copy(_S).addScaledVector(_D, x).addScaledVector(_N, h);
+  aimBone(upper, _E, _K);
+  end.getWorldPosition(_H); aimBone(lower, _H, target);
 }
+function setWorldQuat(bone, q){ bone.parent.getWorldQuaternion(_q).invert(); bone.quaternion.copy(_q.multiply(q)); bone.updateMatrixWorld(true); }
 const UP = new THREE.Vector3(0, 1, 0);
 function holdPhone(){
-  const B = bones; if (!B.RightArm || !B.LeftArm || !head) return;
+  const B = bones, G = GRIP, t = performance.now() / 1000; if (!B.RightArm || !B.LeftArm || !head) return;
+  if (B.Spine01) B.Spine01.rotateX(0.012 * Math.sin(t * 1.6));                    // breathing (the poses are still)
   boy.updateMatrixWorld(true);
-  const ry = boy.rotation.y, fwd = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry));
-  const hp = head.getWorldPosition(new THREE.Vector3());
-  const sR = B.RightArm.getWorldPosition(new THREE.Vector3()), sL = B.LeftArm.getWorldPosition(new THREE.Vector3());
-  const side = new THREE.Vector3().subVectors(sR, sL).normalize();
-  const P = hp.clone().addScaledVector(UP, -0.36).addScaledVector(fwd, 0.30);
-  phone.position.copy(P); phone.lookAt(hp); phone.rotateX(-0.25);
-  phone.updateMatrixWorld(true);
-  const down = UP.clone().negate();
-  for (const [s, sh] of [[1, sR], [-1, sL]]) {
-    const pre = s > 0 ? "Right" : "Left";
-    const T = P.clone().addScaledVector(side, 0.042 * s).addScaledVector(down, 0.05).addScaledVector(fwd, -0.01);
-    const pole = sh.clone().addScaledVector(down, 0.5).addScaledVector(side, 0.35 * s).addScaledVector(fwd, -0.2);
-    reach(B[pre + "Arm"], B[pre + "ForeArm"], B[pre + "Hand"], T, pole);
-  }
-  // look down at it
-  const n = B.Neck || B.neck; head.rotateX(0.25); if (n) n.rotateX(0.15); head.updateMatrixWorld(true);
+  B.RightArm.getWorldPosition(_r).sub(B.LeftArm.getWorldPosition(_a)).setY(0).normalize(); _f.crossVectors(UP, _r);   // his right, facing
+  (B.headfront || head).getWorldPosition(_eye).addScaledVector(UP, 0.02);
+  B.RightArm.getWorldPosition(_c).add(_a).multiplyScalar(0.5);                    // between the shoulders
+  phone.position.copy(_c).addScaledVector(_f, G.fwd + 0.006 * Math.sin(t * 0.7)).addScaledVector(UP, -G.down + 0.005 * Math.sin(t * 0.43))
+    .addScaledVector(_r, G.side);
+  phone.lookAt(_eye); phone.updateMatrixWorld(true);
+  _x.setFromMatrixColumn(phone.matrixWorld, 0); _y.setFromMatrixColumn(phone.matrixWorld, 1); _z.setFromMatrixColumn(phone.matrixWorld, 2);
+  // hand frame: +y runs along the fingers (measured on the skinned mesh), -z is the palm
+  _hy.copy(_y).addScaledVector(_x, -G.diag).addScaledVector(_z, -G.curl).normalize();
+  _hz.copy(_z).negate().addScaledVector(_hy, _hy.dot(_z)).normalize();
+  _D.crossVectors(_hy, _hz); _m.makeBasis(_D, _hy, _hz); _qh.setFromRotationMatrix(_m);
+  _T.copy(phone.position).addScaledVector(_hy, -G.reach).addScaledVector(_z, -G.back);           // the wrist
+  B.RightArm.getWorldPosition(_P).addScaledVector(UP, -0.5).addScaledVector(_r, 0.25).addScaledVector(_f, -0.1);   // elbow down, a little out
+  reach(B.RightArm, B.RightForeArm, B.RightHand, _T, _P);
+  setWorldQuat(B.RightHand, _qh);
+  // look at the screen: the face looks along (0, 1, 1) of the head bone (its bind frame is pitched 45°; cm): turn it part of the way
+  head.localToWorld(_E.set(0, 30, 30)); head.getWorldPosition(_S);
+  _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look); aimBone(head, _E, _T);
 }
 
 // window: the sky over Tokyo follows the clock (day, dusk, night with stars and lit windows)
@@ -581,19 +609,18 @@ let follow = true, userMovedAt = 0;
 $("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", follow); $("cam").textContent = follow ? "camera: follows him" : "camera: free"; };
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
-const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3();
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
 function updateCameraGoal(){
   if (screenOn === "desk" && monitor) {
     const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
     camGoal.target.set(...m.c);
     camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
-  } else if (screenOn === "phone" && phone.visible && head && bones.RightArm) {
-    // over his right shoulder, a little above and behind: his hands and the phone's screen in view
-    phone.getWorldPosition(v1); head.getWorldPosition(v2);
-    const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry));                       // facing
-    const side = bones.RightArm.getWorldPosition(new THREE.Vector3()).sub(bones.LeftArm.getWorldPosition(new THREE.Vector3())).setY(0).normalize();
-    camGoal.target.copy(v1).lerp(v2, 0.35);
-    camGoal.pos.copy(v2).addScaledVector(UP, 0.55).addScaledVector(side, 0.62).addScaledVector(v3, -0.5);
+  } else if (screenOn === "phone" && phone.visible && head) {
+    // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
+    phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
+    const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
+    camGoal.target.copy(v1).lerp(v2, 0.3);
+    camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
   } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
 }
 
@@ -828,9 +855,11 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
-  setHour: h => { hour = h; }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading });
+  setHour: h => { hour = h; }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
+  place, screens, play, actions, bones, GRIP,
+  act: a => { const l = {activity:a, place:"room"}; place(l); screens(l, "AWAKE"); boy.position.copy(tgt); boy.rotation.y = targetRot; mixer.update(1); } });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, hand:{get:() => hand}, head:{get:() => head},
-    monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}}); }
+    monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}, mixer:{get:() => mixer}}); }
 </script>
 </body>
 </html>
