@@ -1,0 +1,111 @@
+{
+ "note": "digital twin model of one person's brain structure and recorded activity; not a mind",
+ "threads": 1,
+ "realtime": {
+  "wall_s_per_sim_s": {
+   "AWAKE": 0.1006,
+   "NREM_DEEP": 0.0898
+  },
+  "dt_s": 0.001
+ },
+ "throughput": {
+  "B1": {
+   "sim_s_per_wall_s_per_set": 12.78,
+   "aggregate": 12.78
+  },
+  "B8": {
+   "sim_s_per_wall_s_per_set": 3.2,
+   "aggregate": 25.64
+  }
+ },
+ "stages": {
+  "AWAKE": {
+   "mean_E": 0.123,
+   "sd_E": 0.051,
+   "peak_hz_region": 18.0,
+   "peak_hz_global": 11.2,
+   "slow_power_frac_lt4hz": 0.01,
+   "sync": 0.15,
+   "display_abs_x": 0.37,
+   "up_state_frac": 0.0
+  },
+  "NREM_LIGHT": {
+   "mean_E": 0.115,
+   "sd_E": 0.106,
+   "peak_hz_region": 5.0,
+   "peak_hz_global": 3.1,
+   "slow_power_frac_lt4hz": 0.08,
+   "sync": 0.4,
+   "display_abs_x": 0.27,
+   "up_state_frac": 0.08
+  },
+  "NREM_DEEP": {
+   "mean_E": 0.331,
+   "sd_E": 0.442,
+   "peak_hz_region": 0.9,
+   "peak_hz_global": 0.9,
+   "slow_power_frac_lt4hz": 0.93,
+   "sync": 0.94,
+   "display_abs_x": 0.3,
+   "up_state_frac": 0.34
+  },
+  "REM": {
+   "mean_E": 0.082,
+   "sd_E": 0.013,
+   "peak_hz_region": 11.6,
+   "peak_hz_global": 9.5,
+   "slow_power_frac_lt4hz": 0.05,
+   "sync": 0.09,
+   "display_abs_x": 0.3,
+   "up_state_frac": 0.0
+  }
+ },
+ "reactivity": {
+  "stimulus": "reward group, 8.0 units, 0-1 s window",
+  "AWAKE": {
+   "specific_dE": 0.0627,
+   "sem": 0.0004,
+   "display_delta": 0.075
+  },
+  "NREM_LIGHT": {
+   "specific_dE": 0.043,
+   "sem": 0.0009,
+   "display_delta": 0.106
+  },
+  "NREM_DEEP": {
+   "specific_dE": 0.0153,
+   "sem": 0.0039,
+   "display_delta": 0.054
+  },
+  "REM": {
+   "specific_dE": 0.0723,
+   "sem": 0.0008,
+   "display_delta": 0.141
+  }
+ },
+ "hrf": {
+  "input": "u = 1 for 0.5 s",
+  "peak_s": 4.47,
+  "peak_pct": 1.713,
+  "undershoot_pct": -0.126,
+  "undershoot_s": 12.6
+ },
+ "driven": {
+  "seconds": 300.0,
+  "run": "ses-074",
+  "best_lag_s": 5,
+  "mean_region_r_bold_vs_recording": 0.905,
+  "bold_sd_pct": 1.023
+ },
+ "resting_fc": {
+  "sim_seconds": 900.0,
+  "empirical_runs": 131,
+  "emp_mean_fc": 0.337,
+  "sim_mean_fc": 0.038,
+  "r_simFC_empFC": 0.119,
+  "r_SC_empFC": 0.215,
+  "r_simFC_SC": 0.362,
+  "split_half_r_simFC": 0.579,
+  "bold_sd_pct": 0.0153
+ }
+}
