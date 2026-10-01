@@ -230,6 +230,8 @@ def export(a):
             "null_p_geometry": round(p("geometry", "ec_held_fc_r"), 3), "null_p_strength": round(p("strength", "ec_held_fc_r"), 3),
             "wiring_only_null_p_geometry": round(p("geometry", "g_held_fc_r"), 3),
             "wiring_only_null_p_strength": round(p("strength", "g_held_fc_r"), 3),
+            "wiring_only_null_mean_geometry": round(s["nulls"]["geometry"]["g_held_fc_r"]["null_mean"], 3),
+            "wiring_only_null_mean_strength": round(s["nulls"]["strength"]["g_held_fc_r"]["null_mean"], 3),
             "split": json.loads(str(inp["split"])), "fit": "twin/hopf.py + analysis/real_wiring.py"}
     out = ROOT / "twin" / "data" / "slow_layer.npz"
     out.parent.mkdir(parents=True, exist_ok=True)
