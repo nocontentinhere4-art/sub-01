@@ -38,7 +38,7 @@ TICK = 0.05                     # seconds of simulated time per broadcast (real 
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
-RPC_WS = "wss://api.mainnet-beta.solana.com"
+RPC_WS = os.environ.get("SOLANA_WS", "wss://api.mainnet-beta.solana.com")   # e.g. a Helius wss URL (env, never logged)
 DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
 AMM_BUY = bytes.fromhex("67f4521f2cf57777")      # PumpSwap BuyEvent
@@ -136,11 +136,13 @@ class Live:
             except Exception as e:
                 print("name lookup failed:", e)
             asyncio.create_task(self.sol_price(http))
+            backoff = 2.0
             while True:
                 try:
                     async with http.ws_connect(RPC_WS, heartbeat=30) as ws:
                         await ws.send_json({"jsonrpc": "2.0", "id": 1, "method": "logsSubscribe",
                                             "params": [{"mentions": [self.mint]}, {"commitment": "confirmed"}]})
+                        backoff = 2.0
                         async for m in ws:
                             v = json.loads(m.data).get("params", {}).get("result", {}).get("value")
                             if not v or v.get("err"):
@@ -149,9 +151,11 @@ class Live:
                                 tr["usd"] = tr.pop("sol") * self.sol_usd
                                 tr["tx"], tr["who"], tr["at"] = v["signature"], "", time.time()
                                 self.pending.append(tr)
-                except Exception as e:
-                    print("rpc stream error, reconnecting:", e, flush=True)
-                    await asyncio.sleep(2)
+                except Exception as e:                    # public RPCs refuse some cloud IPs: back off, don't hammer
+                    if backoff == 2.0 or backoff >= 60:
+                        print(f"rpc stream error, retrying every {backoff:.0f}s:", str(e).split(", url=")[0], flush=True)
+                    await asyncio.sleep(backoff)
+                    backoff = min(60.0, backoff * 2)
 
     async def sol_price(self, http):
         while True:
