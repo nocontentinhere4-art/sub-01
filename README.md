@@ -36,7 +36,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | MRtrix3 tractography on a RunPod pod (gradient check, msmt-CSD, iFOD2, SIFT2) | `analysis/runpod_job.py` + `analysis/pod/tract.sh` | `data/analysis/connectome_v2_raw.tar.gz` |
 | Consistency threshold, lengths, centroids | `analysis/build_connectome_v2.py` | `out/connectome_v2.npz` (v1 `out/connectome.npz` kept) |
 | Hopf slow layer: fit on half of the runs, test on the other half, 100 + 100 nulls | `analysis/real_wiring.py prep / nulls / run / report / export` | `docs/real_wiring/`, `twin/data/slow_layer.npz` |
-| Old quick checks (reconstructed) | `analysis/null_test.py`, `analysis/hopf_test.py` | |
+| Old quick checks (originals; reconstructions with `--conn` for v1/v2) | `analysis/null_test.py`, `analysis/hopf_test.py` (`analysis/*_test_recon.py`) | |
 
 Pods follow fixed rules (`analysis/runpod_job.py`): only CPU or RTX A5000 pods, one at a time, deleted on finish, error or
 60 min, 2 h in total, every pod logged in `data/analysis/costs.jsonl`; pods it did not create are never touched.

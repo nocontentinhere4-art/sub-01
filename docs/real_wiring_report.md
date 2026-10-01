@@ -44,8 +44,9 @@ recorded session").
 
 ## 1. What was wrong (reproduced)
 
-The original `analysis/null_test.py` and `analysis/hopf_test.py` were not in the repository; both are reconstructed
-here and reproduce the reported numbers on the v1 connectome:
+The original `analysis/null_test.py` and `analysis/hopf_test.py` were not in the repository when this work was done;
+both were reconstructed (now `analysis/null_test_recon.py` and `analysis/hopf_test_recon.py`, next to the originals,
+which have since been added to `main`) and reproduce the reported numbers on the v1 connectome:
 
 - v1 density 44.8 %, SC-FC r = 0.207 (log(1 + streamlines), all pairs, mean FC of the 131 runs).
 - The deployed 10 Hz Stuart-Landau model alone: held-out FC r ≈ 0.02; the BOLD-band Hopf model on v1 with only the
