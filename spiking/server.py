@@ -19,6 +19,7 @@ from spiking.costs import CostLog
 SPIKING_KEY = web.AppKey("spiking", object)
 POD_PATHS = ("/api/spiking/pod", "/api/spiking/weights", "/api/spiking/result")
 KINDS = {"pong_curve": "pong_curves", "exam": "exams", "memory_test": "memory_tests", "bench": "bench"}
+EXTRA_KINDS = {"encode": "encodes", "rates": "rates", "delays": "delays", "sleep": "sleeps"}   # stored, not on the page
 MAX_WS_MSG = 1 << 20
 MAX_WEIGHTS = 512 * 1024 ** 2
 RELAY_MIN_S = 0.25                  # at most 4 state frames per second go to the page
@@ -61,10 +62,11 @@ class SpikingHub:
     # --- results ------------------------------------------------------------------
     def store_result(self, msg):
         kind = msg.get("kind")
-        if kind not in KINDS:
+        files = KINDS | EXTRA_KINDS
+        if kind not in files:
             return False
         rec = {k: v for k, v in msg.items() if k != "type"} | {"received": datetime.now(timezone.utc).isoformat()}
-        with open(self.dir / f"{KINDS[kind]}.jsonl", "a") as f:
+        with open(self.dir / f"{files[kind]}.jsonl", "a") as f:
             f.write(json.dumps(rec) + "\n")
         self.last[kind] = rec
         tmp = self.dir / "last.json.tmp"

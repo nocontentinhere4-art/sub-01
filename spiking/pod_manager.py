@@ -27,7 +27,7 @@ HELLO_TIMEOUT_S = 15 * 60
 LOST_S = 3 * 60
 STOP_LEAD_S = 90                    # ask the pod to wrap up (upload weights) this long before the deadline
 MIN_MINUTES = 10                    # a shorter session is not worth a pod
-PHASES = ["load", "encode", "pong_train", "pong_exam", "memory_test", "sleep", "memory_test", "free"]
+PHASES = ["encode", "pong_train", "pong_exam", "memory_test", "sleep", "memory_test", "free"]
 WINDOW = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
 
 
@@ -215,7 +215,7 @@ class PodManager:
             msgs = []
         max_min = max(5, int(minutes) - 10)
         return {"session_id": "s-" + start.astimezone(ROME).strftime("%Y%m%d-%H%M"), "day": day.isoformat(),
-                "n_neurons": 1_000_000, "seed": day.toordinal() % 100000, "max_minutes": max_min,
+                "n_neurons": 1_000_000, "seed": 1, "max_minutes": max_min,      # fixed: same synapses every day
                 "phases": PHASES, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
                 "messages": msgs, "elapsed_days": self.elapsed_days(now), "validate": False}
 

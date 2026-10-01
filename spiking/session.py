@@ -258,7 +258,7 @@ class Session:
         self.results["build"]["weights_loaded"] = meta is not None
         net.hook = self.hook
         if self.link is not None:
-            self.link.send({"type": "hello", "session": c.get("session_id"), "n_neurons": net.n,
+            self.link.send({"type": "hello", "session": c.get("session_id") or self.link.sid, "n_neurons": net.n,
                             "device": self.results["build"]["gpu"] or dev, "phases": c.get("phases")})
         net.run(500)                                                     # settle
 
@@ -425,6 +425,8 @@ class Session:
             phases = self.cfg.get("phases") or ["bench", "rates", "delays"]
             for i, ph in enumerate(phases):
                 self.phase, self.progress = ph, 0.0
+                if self.net.plast is not None:                   # eligibility only where dopamine can arrive
+                    self.net.plast.set_stdp(ph in ("bench", "pong_train", "validate_pong", "free"))
                 self.status()
                 self.log("start")
                 t0 = time.time()
@@ -433,7 +435,9 @@ class Session:
                 elif ph == "validate_pong":
                     self.validate_pong()
                 elif ph == "memory_test":
-                    self.ph_memory_test()
+                    n_before = len(self.results["phases"].get("memory_test", []))
+                    slept = any(k.endswith(":sleep") for k in self.results.get("timing", {}))
+                    self.ph_memory_test("after sleep" if slept else ("after encoding" if n_before == 0 else None))
                 elif ph == "pong_exam":
                     self.ph_pong_exam()
                 else:

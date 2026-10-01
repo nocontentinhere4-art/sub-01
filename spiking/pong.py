@@ -88,7 +88,8 @@ class PongInterface:
         self.sm_r = [i for i in sm if self.hemi[i] == "R"]
         self.size = net.size
         self.rng = np.random.default_rng(seed)
-        self.z_mean, self.z_var = 0.0, 1.0
+        self.z_mean, self.z_var = 0.0, 0.01
+        self.calibrated = False
         self.diff_ema = 0.0
         self.last_rc = None
         self.stim_until = -1
@@ -112,7 +113,7 @@ class PongInterface:
 
     def motor(self, dt_ms):
         """z-scored L-R somatomotor rate difference over the last frame (smoothed 50 ms)."""
-        rc = self.net.region_count.cpu().numpy()
+        rc = self.net.region_count.cpu().numpy().copy()       # copy: on CPU .numpy() aliases the live counter
         if self.last_rc is None:
             self.last_rc = rc
             return 0.0
@@ -126,6 +127,18 @@ class PongInterface:
         self.z_mean += a * (self.diff_ema - self.z_mean)
         self.z_var += a * ((self.diff_ema - self.z_mean) ** 2 - self.z_var)
         return (self.diff_ema - self.z_mean) / math.sqrt(self.z_var + 1e-9)
+
+    def calibrate(self, game, ms=5000):
+        """Settle the read-out statistics (running mean / sd of L-R) with random ball positions, paddle still."""
+        rng = np.random.default_rng(1)
+        for k in range(ms // FRAME_MS):
+            if k % 50 == 0:
+                game.x, game.y = rng.uniform(0.05, 0.95), rng.uniform(0.05, 0.95)
+                self.net.set_region_drive("pong", self.encode(game))
+            self.net.run(FRAME_MS)
+            self.motor(FRAME_MS)
+        game.reset()
+        self.calibrated = True
 
     def velocity(self, z):
         return self.v_max * math.tanh(z / 2.0)
@@ -150,6 +163,7 @@ class Pong:
         self.dopamine_level = 0.0
         self.last_good = -1e9
         self.curve = []
+        self.abs_v = []                    # mean |paddle velocity| per play() call (is the paddle moving at all?)
 
     def good(self):
         """Chat 'good!': small dopamine pulse, at most one per 30 s of simulated time, always < the hit reward."""
@@ -167,8 +181,16 @@ class Pong:
         frozen_before = p.frozen if p is not None else None
         if p is not None:
             p.frozen = mode != "train"
+        if mode != "random" and not io.calibrated:
+            was = p.frozen if p is not None else None
+            if p is not None:
+                p.frozen = True
+            io.calibrate(g)
+            if p is not None:
+                p.frozen = was
         h0, r0 = g.hits, g.rally
         stim_left = 0
+        vsum, vn = 0.0, 0
         while g.rally - r0 < rallies:
             if stim_left > 0:                                    # after a miss: the game pauses, noise plays
                 if stim_left % 50 == 0:
@@ -185,7 +207,9 @@ class Pong:
                 net.set_region_drive("pong", io.encode(g))
                 net.run(FRAME_MS)
                 z = io.motor(FRAME_MS)
-            ev = g.step(FRAME_MS / 1000.0, io.velocity(z))
+            v = io.velocity(z)
+            vsum, vn = vsum + abs(v), vn + 1
+            ev = g.step(FRAME_MS / 1000.0, v)
             if ev == "hit":
                 self.p_hit += 0.05 * (1 - self.p_hit)
                 if mode == "train" and p is not None:
@@ -199,19 +223,21 @@ class Pong:
         net.set_region_drive("pong", None)
         if p is not None:
             p.frozen = frozen_before
+        self.abs_v.append(round(vsum / max(1, vn), 3))
         return g.hits - h0, g.rally - r0
 
     def train(self, blocks, block_rallies=20, on_block=None):
         for b in range(blocks):
             h, n = self.play(block_rallies, "train")
-            self.curve.append({"block": len(self.curve), "rallies": n, "hit_rate": round(h / n, 4)})
+            self.curve.append({"block": len(self.curve), "rallies": n, "hit_rate": round(h / n, 4),
+                               "mean_abs_v": self.abs_v[-1]})
             if on_block:
                 on_block(self.curve[-1])
         return self.curve
 
     def exam(self, rallies=20):
         h, n = self.play(rallies, "exam")
-        return {"rallies": n, "hits": h, "hit_rate": round(h / n, 4), "frozen": True}
+        return {"rallies": n, "hits": h, "hit_rate": round(h / n, 4), "frozen": True, "mean_abs_v": self.abs_v[-1]}
 
 
 def random_paddle(rallies=2000, seed=0):

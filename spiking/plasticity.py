@@ -46,6 +46,17 @@ def _segments(ptr, ids, device):
     return torch.repeat_interleave(start - (csum - cnt), cnt, output_size=tot) + torch.arange(tot, device=device)
 
 
+def _segments2(ptr_a, ptr_b, ids, device):
+    """_segments for two pointer arrays with one host sync instead of two."""
+    sa, sb = ptr_a[ids], ptr_b[ids]
+    ca, cb = ptr_a[ids + 1] - sa, ptr_b[ids + 1] - sb
+    csa, csb = torch.cumsum(ca, 0), torch.cumsum(cb, 0)
+    ta, tb = torch.stack((csa[-1], csb[-1])).tolist()
+    qa = torch.repeat_interleave(sa - (csa - ca), ca, output_size=ta) + torch.arange(ta, device=device) if ta else None
+    qb = torch.repeat_interleave(sb - (csb - cb), cb, output_size=tb) + torch.arange(tb, device=device) if tb else None
+    return qa, qb
+
+
 class Plasticity:
     def __init__(self, net):
         self.net = net
@@ -67,6 +78,7 @@ class Plasticity:
         hc[list(net.hc_regions)] = True
         self.cls = hc[net.region_of[self.pdst.long()]].to(torch.uint8)   # 1 = hippocampal post
         self.w0 = net.w[self.pidx].clone()
+        self._wmax_t = None
         self.dw = torch.zeros(self.P, device=dev)
         self.elig = torch.zeros(self.P, device=dev)
         self.x = torch.zeros(n, device=dev)
@@ -77,6 +89,7 @@ class Plasticity:
         self.n_cls = [int((self.cls == k).sum()) for k in (0, 1)]
         self.mod = {m: 0.0 for m in MODS}
         self.frozen = False
+        self.stdp = True               # eligibility bookkeeping; off in phases where no dopamine can arrive
         self.defer = False             # accumulate dw but express it only at commit() (memory encoding)
         self.rate = torch.full((n,), c.rate_target, device=dev)
         self.last_homeo = None
@@ -100,24 +113,24 @@ class Plasticity:
         if self.frozen:
             return
         c = self.cfg
-        if spk.numel():
-            pre = spk[self.net.is_exc[spk]]
-            if pre.numel():
-                q = _segments(self.prow, pre, self.dev)
-                if q is not None:                               # depression on presynaptic spikes
-                    self.elig.index_add_(0, q, -(c.a_minus * self.y[self.pdst[q].long()] + self.h))
-                q = _segments(self.pcol_ptr, pre, self.dev)
-                if q is not None:                               # potentiation on postsynaptic spikes
-                    q = self.pcol[q]
-                    self.elig.index_add_(0, q, c.a_plus * (self.x[self.psrc[q].long()] - c.x_theta))
-        self.x.mul_(self.dp)
-        self.y.mul_(self.dm)
-        if spk.numel():
-            self.x[spk] += 1.0
-            self.y[spk] += 1.0
         t = self.net.t + 1
-        if t % c.elig_every == 0:
-            self._update(c.elig_every * c.dt)
+        if self.stdp:
+            if spk.numel():
+                pre = spk[self.net.is_exc[spk]]
+                if pre.numel():
+                    q_pre, q_post = _segments2(self.prow, self.pcol_ptr, pre, self.dev)
+                    if q_pre is not None:                       # depression on presynaptic spikes
+                        self.elig.index_add_(0, q_pre, -(c.a_minus * self.y[self.pdst[q_pre].long()] + self.h))
+                    if q_post is not None:                      # potentiation on postsynaptic spikes
+                        q = self.pcol[q_post]
+                        self.elig.index_add_(0, q, c.a_plus * (self.x[self.psrc[q].long()] - c.x_theta))
+            self.x.mul_(self.dp)
+            self.y.mul_(self.dm)
+            if spk.numel():
+                self.x[spk] += 1.0
+                self.y[spk] += 1.0
+            if t % c.elig_every == 0:
+                self._update(c.elig_every * c.dt)
         if t % c.homeo_every == 0:
             self._homeostasis()
 
@@ -126,7 +139,7 @@ class Plasticity:
         self.elig.mul_(math.exp(-dt_ms / c.tau_elig))
         m = self._m_class()
         self.mod["da"] *= math.exp(-dt_ms / c.tau_da)
-        if abs(self.mod["da"]) < 1e-4:
+        if abs(self.mod["da"]) < 1e-2:                     # >= 99 % of a burst's integral has been applied
             self.mod["da"] = 0.0
         if abs(m[0]) < 1e-9 and abs(m[1]) < 1e-9:
             return
@@ -138,6 +151,15 @@ class Plasticity:
         if not self.defer:
             self._apply()
         self.updates += 1
+
+    def set_stdp(self, on):
+        """Eligibility traces only matter where dopamine can arrive (Pong, free run); clear them when switching."""
+        if on != self.stdp:
+            self.elig.zero_()
+            self.x.zero_()
+            self.y.zero_()
+            self.mod["da"] = 0.0
+        self.stdp = bool(on)
 
     def commit(self):
         self.defer = False
@@ -160,15 +182,16 @@ class Plasticity:
         self._apply()
 
     def _wmax(self):
-        c = self.cfg
-        return torch.where(self.cls.bool(), torch.tensor(c.w_max_hc, device=self.dev),
-                           torch.tensor(c.w_max_ctx, device=self.dev))
+        if self._wmax_t is None:
+            c = self.cfg
+            self._wmax_t = torch.where(self.cls.bool(), torch.tensor(c.w_max_hc, device=self.dev),
+                                       torch.tensor(c.w_max_ctx, device=self.dev))
+        return self._wmax_t
 
     def _apply(self):
         """Clamp the learned part so w stays in [0, w_max] and write the effective weights."""
-        wmax = self._wmax()
         torch.maximum(self.dw, -self.w0, out=self.dw)
-        torch.minimum(self.dw, wmax - self.w0, out=self.dw)
+        torch.minimum(self.dw, self._wmax() - self.w0, out=self.dw)
         self.net.w[self.pidx] = self.w0 + self.dw
 
     def _homeostasis(self):

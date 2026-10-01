@@ -63,3 +63,23 @@ No language model, no generated text: everything below is a rule table.
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
 python tests/test_sleep.py                                    # or: python -m pytest tests/
 ```
+
+## Spiking brain (v3, `spiking/`)
+
+One million simulated spiking neurons inside the real wiring of one person's brain; a model, not a mind; not the
+person. One leaky integrate-and-fire population per atlas region (size proportional to the region's volume),
+long-range synapses sampled from the streamline counts with delays from the fibre lengths (6 m/s), driven by the
+recorded resting-state activity. Three-factor plasticity (STDP eligibility x dopamine), fast hippocampal Hebbian
+memory with REM replay, and a Pong task after DishBrain (Kagan et al. 2022). It runs in scheduled GPU sessions on
+RunPod; the Railway server keeps the learned weights. Full description, equations, results and limits:
+[docs/spiking_report.md](docs/spiking_report.md).
+
+```bash
+python -m pytest tests/test_spiking_model.py tests/test_spiking_ops.py -q   # CPU, small networks
+python -m spiking.validate --cpu --n 20000                                  # CPU validation
+python -m spiking.validate --gpu                                            # 1M neurons on one RunPod pod (deleted after)
+```
+
+Railway env: `SUB01_SESSIONS` (e.g. `daily 21:00-23:00 Asia/Tokyo`), `SUB01_POD_SECRET`, `RUNPOD_API_KEY`; optional
+caps `SUB01_MAX_SESSION_MIN` (120), `SUB01_MAX_HOURS_PER_DAY` (2.5), `SUB01_GPU_HOURS_CAP` (4). Learned weights and
+results live in `/data/spiking/`.
