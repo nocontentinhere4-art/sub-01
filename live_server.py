@@ -32,6 +32,7 @@ from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
+from research import Reader
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -100,6 +101,8 @@ class Live:
         self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
         self.time_scale = time_scale
         self.life.time_scale = time_scale
+        self.reading_path = Path(data_dir) / "reading.json"
+        self.reader = Reader(json.loads(self.reading_path.read_text()) if self.reading_path.exists() else None)
         self.baseline = None             # set by main() unless --no-real-baseline
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
@@ -283,15 +286,31 @@ class Live:
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
                              self.engine.pressure(tsim))
             msg["life"] = self.life.snapshot()
+            if self.life.activity == "research" and not self.life.path:
+                msg["life"]["reading"] = self.reader.current()
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
                 self.life_path.write_text(json.dumps(self.life.to_dict()))
+                self.reading_path.write_text(json.dumps(self.reader.to_dict(), ensure_ascii=False))
                 last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
+
+    # --- the computer: what it reads (Wikipedia only) ---------------------------------
+    async def run_research(self):
+        loop = asyncio.get_running_loop()
+        while True:
+            await asyncio.sleep(5)
+            t = self.clock.now()
+            if self.life.activity != "research" or self.life.path or not self.reader.due(t):
+                continue
+            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
+            art = await loop.run_in_executor(None, self.reader.read, t, heard)
+            if art:
+                await self.broadcast({"type": "reading", **art})
 
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
@@ -439,6 +458,10 @@ async def main(args):
     app.router.add_get("/api/diary", diary_index)
     app.router.add_get("/api/diary/{date}", diary_night)
 
+    async def reading(request):                   # what it read at the computer, newest last
+        return web.json_response({"log": live.reader.log[-20:]})
+    app.router.add_get("/api/reading", reading)
+
     async def frames(request):                    # recent eye frames for the world page
         log = live.eye.log if live.eye else HERE / "missing"
         rows = log.read_text().splitlines()[-int(request.query.get("n", "40")):] if log.exists() else []
@@ -466,7 +489,7 @@ async def main(args):
         referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
         return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else ""})
     app.router.add_get("/api/config", config)
-    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html", headers=NOCACHE))       # the life is the front page
+    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
     app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
     app.router.add_static("/", HERE / "web")
@@ -475,7 +498,7 @@ async def main(args):
     await web.TCPSite(runner, args.host, args.port).start()
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
-    tasks = [live.run_brain(), live.demo_trades() if args.demo else live.rpc_trades()]
+    tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades()]
     if live.eye:
         tasks.append(live.run_eye())
     try:
