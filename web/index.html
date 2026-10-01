@@ -253,7 +253,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
 // ---------- story ----------
 const tickerEl = $("ticker");
 function tick(html){ tickerEl.insertAdjacentHTML("afterbegin", `<div>${html}</div>`); while (tickerEl.children.length > 4) tickerEl.lastChild.remove(); }
-let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, sync = 0, baseline = null;
+let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, sync = 0, baseline = null, slow = null;
 function story(){
   const now = performance.now();
   if (heard && now - heard.at < 9000) return `heard <em>“${esc(heard.text)}”</em>. the signal is travelling along its real fibres.`;
@@ -265,7 +265,8 @@ function story(){
 }
 function subline(){
   if (!sleepInfo) return "";
-  if (stage === "AWAKE") return (baseline ? `his real recorded resting activity runs underneath (${esc(baseline.run)})` : "simulated background activity")
+  if (stage === "AWAKE") return (baseline ? `replaying a real recorded session underneath (${esc(baseline.run)})`
+      : slow ? `background: ${esc(slow.label)}` : "simulated background activity")
     + ` · global synchrony ${(sync * 100).toFixed(0)}%`;
   return `stimulus gain ${Math.round(sleepInfo.gain * 100)}% · sleep debt ${sleepInfo.debt.toFixed(1)} h · woken ${sleepInfo.woken_tonight}× tonight`;
 }
@@ -348,7 +349,7 @@ function connect(){
       doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
       $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
     }
-    sync = m.sync || 0; baseline = m.baseline;
+    sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     for (const ev of m.events || []) {
       if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
         tick(`${esc(ev.t)} · replay <b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
