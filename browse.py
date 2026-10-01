@@ -216,7 +216,9 @@ class Browser:
             # The browser gets a minimal environment: none of the server's secrets (API tokens, site password).
             root = hasattr(os, "geteuid") and os.geteuid() == 0
             kw = {"args": ["--disable-dev-shm-usage", "--mute-audio", "--disable-extensions",
-                           "--disable-background-networking", "--disable-sync", "--no-first-run"]
+                           "--disable-background-networking", "--disable-sync", "--no-first-run",
+                           "--renderer-process-limit=2", "--js-flags=--max-old-space-size=256",
+                           "--disable-gpu", "--disable-software-rasterizer"]
                           + (["--no-sandbox"] if root else []),
                   "chromium_sandbox": not root,
                   "env": {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "TZ", "TMPDIR",
@@ -259,6 +261,12 @@ class Browser:
             except Exception:
                 pass
             self.browser = None
+        if device is None and self.pw is not None:          # the driver itself may be dead: start a fresh one next time
+            try:
+                await self.pw.stop()
+            except Exception:
+                pass
+            self.pw = None
 
     # --- one step ------------------------------------------------------------------------------------------------
     async def step(self, device, heard=(), interest=None):
@@ -286,7 +294,8 @@ class Browser:
                 self.failures += 1
                 print(f"browse ({device}):", repr(e)[:160], flush=True)
                 sc.next_at = time.time() + min(120, 10 * self.failures)
-                if self.failures >= 3:
+                dead = re.search(r"Connection closed|Target crashed|Browser has been closed|driver", repr(e))
+                if dead or self.failures >= 3:                 # crashed renderer or driver: restart everything cleanly
                     await self.close()
                 return None
 
