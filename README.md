@@ -4,7 +4,10 @@ A whole-brain model of one real human brain, built from public MRI data and wire
 
 - **Data:** MyConnectome, OpenNeuro [ds000031](https://openneuro.org/datasets/ds000031) (public domain, PDDL). Raw scans are never stored here; the scripts download what they need.
 - **Real parts:** nerve-fibre tractography (diffusion MRI), cortical surface (T1), recorded resting-state activity (fMRI).
-- **Simulated part:** region-to-region dynamics (delayed Stuart–Landau oscillators on the subject's connectome).
+- **Simulated part:** region-to-region dynamics in two layers on the subject's connectome: a slow (BOLD-band) Hopf layer
+  fitted on half of the subject's resting-state runs and tested on the other half, which modulates a fast ~10 Hz
+  delayed Stuart-Landau layer used for the live display. How much of the result comes from the wiring itself, compared
+  with randomised wiring, is reported in [docs/real_wiring_report.md](docs/real_wiring_report.md).
 - It is a model of brain activity, not a mind, and makes no claim of consciousness.
 
 ## Pipeline
@@ -19,11 +22,27 @@ A whole-brain model of one real human brain, built from public MRI data and wire
 | Live page + model + Solana log stream + chat + sleep | `live_server.py --mint <MINT>` or `--demo` | http://localhost:8765 |
 | Sleep/wake engine, memory replay | `sleep.py` (used by `live_server.py`) | `data/state.json`, `data/nights/YYYY-MM-DD.json` |
 | Chat filter + message -> stimulus rules | `chat.py` (used by `live_server.py`) | |
+| His computer and phone screens: real web pages (headless Chromium, read-only, guarded) | `browse.py` (`--browse` / `BROWSE=1`) | `/api/screen/{desk,phone}.jpg`, `data/browsing.json` |
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./fetch_data.sh   # ~900 MB from OpenNeuro into data/ (git-ignored)
 ```
+
+## Real wiring: connectome v2 and the slow layer
+
+| Step | Script | Output |
+|---|---|---|
+| ACT tissue map from the T1 (tried, not used: it truncated streamlines) | `analysis/make_5tt.py` | (pod input) |
+| MRtrix3 tractography on a RunPod pod (gradient check, msmt-CSD, iFOD2, SIFT2) | `analysis/runpod_job.py` + `analysis/pod/tract.sh` | `data/analysis/connectome_v2_raw.tar.gz` |
+| Consistency threshold, lengths, centroids | `analysis/build_connectome_v2.py` | `out/connectome_v2.npz` (v1 `out/connectome.npz` kept) |
+| Hopf slow layer: fit on half of the runs, test on the other half, 100 + 100 nulls | `analysis/real_wiring.py prep / nulls / run / report / export` | `docs/real_wiring/`, `twin/data/slow_layer.npz` |
+| Old quick checks (originals; reconstructions with `--conn` for v1/v2) | `analysis/null_test.py`, `analysis/hopf_test.py` (`analysis/*_test_recon.py`) | |
+
+Pods follow fixed rules (`analysis/runpod_job.py`): only CPU or RTX A5000 pods, one at a time, deleted on finish, error or
+60 min, 2 h in total, every pod logged in `data/analysis/costs.jsonl`; pods it did not create are never touched.
+`live_server.py` runs the fitted slow layer by default (`SUB01_SLOW=wiring` uses the wiring-only version);
+`--replay-real-session` replays a recorded session instead (the previous default).
 
 ## Resting-state activity (real recorded brain activity)
 

@@ -37,7 +37,7 @@ You receive its current state as JSON. Reply with JSON only:
   Follow the style: awake = coherent, realistic, lighting from mood; rem = surreal dream mixing the replayed
   messages, impossible geometry; nrem = almost black, slow blurred shapes. Never draw people's faces, text,
   logos, violence, nudity or real persons.
-- thought: one short inner line (max 16 words) in the language of the most recent message (Italian or English),
+- thought: one short inner line (max 16 words) in the language of the most recent message (Italian or English; English if there is none),
   reacting to what it sees. It is a brain without a body: no heart, hands or breath. Never ask for money, never tell anyone to buy or sell, never claim to be human,
   conscious, or the real person the scans came from."""
 
@@ -231,6 +231,7 @@ class Eye:
         prompt = f"{scene or 'an empty quiet room'}. {style}. uninhabited scene, empty of humans, seen through the viewer's own eyes, clean surfaces without writing"
         name = f"{int(time.time() * 1000)}.jpg"
         t0 = time.time()
+        reused = False
         if isinstance(self.img, ReplicateImages):
             try:
                 pil = self.img.generate(prompt, int(t) % 100000, *self.size)
@@ -241,6 +242,7 @@ class Eye:
                 print("eye: image failed, reusing last view:", repr(e)[:160], flush=True)
                 from PIL import Image
                 pil = Image.open(last[-1])
+                reused = True
         else:
             image = self.img.generate_image(seed=int(t) % 100000, prompt=prompt, width=self.size[0],
                                             height=self.size[1], num_inference_steps=self.steps, guidance=0.0)
@@ -252,7 +254,7 @@ class Eye:
         rec = {"t": sim_hhmm, "stage": stage, "img": f"/eye/{name}", "thought": thought, "scene": scene,
                "why": {"messages": recent, "replayed": replays[-4:], "world": self.world.top(t, 5),
                        "mood": {k: v for k, v in state.items() if k in ("reward", "fear", "salience", "market")}},
-               "render_s": round(time.time() - t0, 1)}
+               "render_s": round(time.time() - t0, 1), "reused": reused}
         jpgs = sorted(self.out.glob("*.jpg"))
         for old in jpgs[:-KEEP_FRAMES]:                    # bounded disk use on a server volume
             old.unlink(missing_ok=True)

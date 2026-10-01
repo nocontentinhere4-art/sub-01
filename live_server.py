@@ -29,9 +29,12 @@ from aiohttp import web
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
-from eye import Eye, load_env, market_mood
+from eye import Eye, ReplicateLLM, load_env, market_mood
+from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
+from research import Reader
+from browse import Browser
 
 try:                                             # the GPU spiking brain is optional: the server runs without it
     from spiking import pod_manager as spiking_manager, server as spiking_server
@@ -43,9 +46,10 @@ HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 GOOD = re.compile(r"\bgood\b!?", re.I)    # chat 'good!' -> dopamine pulse on the spiking pod
+NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
-RPC_WS = "wss://api.mainnet-beta.solana.com"
+RPC_WS = os.environ.get("SOLANA_WS", "wss://api.mainnet-beta.solana.com")   # e.g. a Helius wss URL (env, never logged)
 DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
 AMM_BUY = bytes.fromhex("67f4521f2cf57777")      # PumpSwap BuyEvent
@@ -100,12 +104,17 @@ class Live:
         self.pool_name = "demo" if demo else mint[:6]
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
+        self.diary = None                # dream diary, set by main() with --eye
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
         self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
         self.time_scale = time_scale
         self.life.time_scale = time_scale
-        self.baseline = None             # set by main() unless --no-real-baseline
+        self.reading_path = Path(data_dir) / "reading.json"
+        self.reader = Reader(json.loads(self.reading_path.read_text()) if self.reading_path.exists() else None)
+        self.browsing_path = Path(data_dir) / "browsing.json"
+        self.browser = None              # set by main() with --browse: a real headless browser on the open web
+        self.baseline = None             # set by main() with --replay-real-session (else the fitted slow layer runs)
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
         self.recent_replays = []         # REM replays for the eye's dreams
@@ -143,11 +152,13 @@ class Live:
             except Exception as e:
                 print("name lookup failed:", e)
             asyncio.create_task(self.sol_price(http))
+            backoff = 2.0
             while True:
                 try:
                     async with http.ws_connect(RPC_WS, heartbeat=30) as ws:
                         await ws.send_json({"jsonrpc": "2.0", "id": 1, "method": "logsSubscribe",
                                             "params": [{"mentions": [self.mint]}, {"commitment": "confirmed"}]})
+                        backoff = 2.0
                         async for m in ws:
                             v = json.loads(m.data).get("params", {}).get("result", {}).get("value")
                             if not v or v.get("err"):
@@ -156,9 +167,11 @@ class Live:
                                 tr["usd"] = tr.pop("sol") * self.sol_usd
                                 tr["tx"], tr["who"], tr["at"] = v["signature"], "", time.time()
                                 self.pending.append(tr)
-                except Exception as e:
-                    print("rpc stream error, reconnecting:", e, flush=True)
-                    await asyncio.sleep(2)
+                except Exception as e:                    # public RPCs refuse some cloud IPs: back off, don't hammer
+                    if backoff == 2.0 or backoff >= 60:
+                        print(f"rpc stream error, retrying every {backoff:.0f}s:", str(e).split(", url=")[0], flush=True)
+                    await asyncio.sleep(backoff)
+                    backoff = min(60.0, backoff * 2)
 
     async def sol_price(self, http):
         while True:
@@ -262,9 +275,11 @@ class Live:
         while True:
             now = time.time()
             events = self.sleep_tick()
-            if self.baseline:                                         # his recorded activity drives excitability
-                gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
+            gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
+            if self.baseline:                                         # replaying a real recorded session (optional)
                 b.drive = BASELINE_DRIVE * gain * np.clip(self.baseline.advance(TICK), -2.0, 3.0)
+            else:                                                     # spontaneous slow layer fitted to his data
+                b.slow_gain = gain
             due = [t for t in self.pending if t["at"] <= now]
             self.pending = [t for t in self.pending if t["at"] > now]
             for tr in due:
@@ -282,7 +297,8 @@ class Live:
                    "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
                    "pool": self.pool_name, "events": events,
                    "sleep": self.engine.status() | {"burst": round(self.burst, 2)},
-                   "baseline": self.baseline.status() if self.baseline else None}
+                   "baseline": self.baseline.status() if self.baseline else None,
+                   "slow": b.slow.status() if b.slow_on else None}
             self.last_groups = groups
             base = sum(groups.values()) / max(1, len(groups))
             rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
@@ -291,25 +307,83 @@ class Live:
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
                              self.engine.pressure(tsim))
             msg["life"] = self.life.snapshot()
+            if self.life.activity == "research" and not self.life.path:
+                msg["life"]["reading"] = self.reader.current()
+            if self.browser and (dev := self.screen_device()):
+                msg["life"]["screen"] = self.browser.screens[dev].status()
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
                 self.life_path.write_text(json.dumps(self.life.to_dict()))
+                self.reading_path.write_text(json.dumps(self.reader.to_dict(), ensure_ascii=False))
                 last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
+
+    # --- the computer: what it reads (Wikipedia only) ---------------------------------
+    async def run_research(self):
+        loop = asyncio.get_running_loop()
+        while True:
+            await asyncio.sleep(5)
+            t = self.clock.now()
+            if self.life.activity != "research" or self.life.path or not self.reader.due(t):
+                continue
+            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
+            art = await loop.run_in_executor(None, self.reader.read, t, heard)
+            if art:
+                await self.broadcast({"type": "reading", **art})
+
+    # --- the screens: a real browser on the open web (desk + phone) -------------------
+    def screen_device(self):
+        if self.life.path or self.engine.stage != "AWAKE":
+            return None
+        return {"research": "desk", "phone": "phone"}.get(self.life.activity)
+
+    async def run_browse(self):
+        idle_since, last_save = time.time(), time.time()
+        while True:
+            await asyncio.sleep(1)
+            dev = self.screen_device()
+            now = time.time()
+            if dev is None:
+                if self.browser.browser is not None and now - idle_since > 120:   # put away: free the memory
+                    await self.browser.close()
+                continue
+            idle_since = now
+            other = "phone" if dev == "desk" else "desk"
+            if self.browser.screens[other].ctx is not None:
+                await self.browser.close(other)
+            t = self.clock.now()
+            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
+            art = self.reader.current()
+            st = await self.browser.step(dev, heard, art["title"] if art else None)
+            if st:
+                await self.broadcast({"type": "screen", **st})
+            if now - last_save > 300:
+                self.browsing_path.write_text(json.dumps(self.browser.to_dict(), ensure_ascii=False))
+                last_save = now
 
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
         loop = asyncio.get_running_loop()
         while True:
-            if not self.clients:                                      # nobody watching: don't spend GPU (and heat)
+            t = self.clock.now()
+            if self.diary and (date := self.diary.pending_close(self.engine)):      # morning: write last night's entry
+                try:
+                    tok = os.environ.get("REPLICATE_API_TOKEN")
+                    llm = self.eye.llm or (ReplicateLLM(tok) if tok else None)
+                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm)
+                    print(f"diary: night of {date} written", flush=True)
+                except Exception as e:
+                    print("diary error:", repr(e), flush=True)
+            attended = bool(self.clients)
+            dream = bool(self.diary) and not attended and self.diary.due(self.engine, t)
+            if not attended and not dream:                            # nobody watching and no dream due: spend nothing
                 await asyncio.sleep(5)
                 continue
             stage = self.engine.stage
-            t = self.clock.now()
             if stage == "AWAKE" and self.recent_replays:
                 self.recent_replays = []                              # dreams end when it wakes up
             try:
@@ -318,9 +392,14 @@ class Live:
                                                  self.life.snapshot()["doing"])
                 self.last_frame = rec
                 await self.broadcast({"type": "eye", **rec})
+                if self.diary and stage == "REM" and self.engine.night is not None:
+                    self.diary.add(self.engine.night["date"], rec, t, attended)
             except Exception as e:                                    # never let the eye stop the brain
                 print("eye error:", repr(e), flush=True)
                 await asyncio.sleep(10)
+            if dream:
+                await asyncio.sleep(5)                                # unattended: the diary paces itself
+                continue
             await asyncio.sleep(self.eye_every * {"AWAKE": 1.0, "REM": 0.75}.get(stage, 3.0))
 
     # --- http ----------------------------------------------------------------
@@ -417,14 +496,53 @@ async def main(args):
         return web.Response(text="ok")
     if args.host in ("127.0.0.1", "localhost"):
         app.router.add_post("/snap", snap)        # local-only helper: never exposed on a public host
-    if not args.no_real_baseline and list((HERE / "out" / "rest").glob("*.npz")):
+    if args.replay_real_session and list((HERE / "out" / "rest").glob("*.npz")):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
+        live.brain.use_slow_layer(False)          # the recording replaces the model's own slow activity
+    if args.browse:
+        if Browser.available():
+            bpath = data_dir / "browsing.json"
+            live.browser = Browser(json.loads(bpath.read_text()) if bpath.exists() else None)
+        else:
+            print("--browse: playwright is not installed, screens stay on Wikipedia reading", flush=True)
+
+    async def screen_shot(request):               # latest screenshot of the desk or phone screen
+        dev = request.match_info["device"]
+        sc = live.browser.screens.get(dev) if live.browser else None
+        if not sc or not sc.shot:
+            raise web.HTTPNotFound()
+        return web.Response(body=sc.shot, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    app.router.add_get("/api/screen/{device}.jpg", screen_shot)
+
+    async def browsing(request):                  # pages shown on his screens, newest last
+        return web.json_response({"on": bool(live.browser), "log": live.browser.log[-30:] if live.browser else []})
+    app.router.add_get("/api/browsing", browsing)
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
         live.eye = Eye(frames_dir, data_dir / "world.json", width=640, height=360, steps=6)
         live.eye_every = args.eye_every
         app.router.add_static("/eye", frames_dir)
+        live.diary = Diary(data_dir, frames_dir)
+        app.router.add_static("/diary-img", live.diary.img)
+
+    async def diary_index(request):                # nights written so far, newest first
+        return web.json_response({"nights": live.diary.index() if live.diary else []})
+
+    async def diary_night(request):
+        try:
+            d = live.diary.load(request.match_info["date"]) if live.diary else None
+        except ValueError:
+            d = None
+        if d is None:
+            raise web.HTTPNotFound()
+        return web.json_response(d)
+    app.router.add_get("/api/diary", diary_index)
+    app.router.add_get("/api/diary/{date}", diary_night)
+
+    async def reading(request):                   # what it read at the computer, newest last
+        return web.json_response({"log": live.reader.log[-20:]})
+    app.router.add_get("/api/reading", reading)
 
     async def frames(request):                    # recent eye frames for the world page
         log = live.eye.log if live.eye else HERE / "missing"
@@ -453,17 +571,20 @@ async def main(args):
         referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
         return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else ""})
     app.router.add_get("/api/config", config)
-    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html"))       # the life is the front page
-    app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html"))
+    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
+    app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
+    app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, args.host, args.port).start()
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
-    tasks = [live.run_brain(), live.demo_trades() if args.demo else live.rpc_trades()]
+    tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades()]
     if live.eye:
         tasks.append(live.run_eye())
+    if live.browser:
+        tasks.append(live.run_browse())
     if manager:
         tasks.append(manager.run())
     try:
@@ -472,6 +593,9 @@ async def main(args):
         live.store.save(live.engine, live.memory)
         if manager:
             manager.shutdown()
+        if live.browser:
+            live.browsing_path.write_text(json.dumps(live.browser.to_dict(), ensure_ascii=False))
+            await live.browser.close()
 
 
 if __name__ == "__main__":
@@ -485,7 +609,11 @@ if __name__ == "__main__":
     p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
-    p.add_argument("--no-real-baseline", action="store_true", help="simulated background only")
+    p.add_argument("--replay-real-session", action="store_true", default=os.environ.get("REPLAY_REAL_SESSION") == "1",
+                   help="replay his recorded resting-state fMRI as the background instead of the fitted slow layer")
+    p.add_argument("--no-real-baseline", action="store_true", help=argparse.SUPPRESS)   # old flag (now the default)
     p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
+    p.add_argument("--browse", action="store_true", default=os.environ.get("BROWSE") == "1",
+                   help="real headless browser on the open web for his computer and phone screens (needs playwright)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     asyncio.run(main(p.parse_args()))

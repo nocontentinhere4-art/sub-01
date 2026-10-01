@@ -60,16 +60,24 @@ ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "chart": ("desk", "sitting_desk", (10, 25)),
     "window": ("window", "standing", (3, 8)),
     "park": ("bench", "sitting", (20, 45)),
+    "research": ("desk", "sitting_desk", (15, 45)),
+    "order_food": ("bed", "lying_phone", (2, 4)),
+    "get_delivery": ("door_in", "standing", (1, 2)),
 }
+COOK_MIN = (8, 15)          # simulated minutes before the courier leaves the shop
+COURIER_SPEED = 4.0         # m / simulated second (bike)
 LABEL = {"sleep": "sleeping", "phone": "in bed scrolling the phone", "eat": "eating bread at the table",
          "buy_bread": "buying bread", "chart": "watching the chart at the desk", "window": "looking out of the window",
-         "park": "sitting on the park bench"}
+         "park": "sitting on the park bench", "research": "reading at the computer",
+         "order_food": "ordering food on the phone", "get_delivery": "getting the delivery at the door"}
 DESIRES = [  # chat words -> short-lived desire
     (r"\b(pane|bread|fame|hungry|mangia|eat|colazione|breakfast)\b", "buy_bread"),
     (r"\b(tiktok|telefono|phone|scroll|social|video)\b", "phone"),
     (r"\b(parco|park|fuori|outside|passeggia|walk|aria)\b", "park"),
     (r"\b(grafico|chart|candele|candles|prezzo|price|pump|dump)\b", "chart"),
     (r"\b(finestra|window|guarda fuori|look outside)\b", "window"),
+    (r"\b(sushi|ramen|pizza|delivery|consegna|ordina|order|cibo|food|uber)\b", "order_food"),
+    (r"\b(learn|impara|studia|study|research|ricerca|cerca|wikipedia|why|perch[eé]|how|come mai)\b|\?", "research"),
 ]
 
 
@@ -121,6 +129,9 @@ class Life:
         self.say = ""
         self.time_scale = 1.0
         self.geo = None                        # real position in Tokyo while outside
+        self.food = s.get("food", 0)           # delivered meals waiting to be eaten
+        self.delivery = s.get("delivery")      # {"ordered", "leaves", "arrives"} sim times, while one is on its way
+        self._t = 0.0
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
@@ -143,15 +154,21 @@ class Life:
         if stage != "AWAKE":
             return "sleep"
         open_bakery = 7 <= h < 20
+        kitchen_open = 10 <= h < 23.5
+        has_food = self.bread or self.food
         day = 8 <= h < 20
         r = self.rng.random
         s = {
-            "eat": (1.3 * self.hunger + 0.2 + (0.6 if self.hunger > 0.35 else 0)) if self.bread else 0.0,
-            "buy_bread": (1.1 * self.hunger + self.desire("buy_bread", t)) if (not self.bread and open_bakery) else 0.0,
+            "eat": (1.3 * self.hunger + 0.2 + (0.6 if self.hunger > 0.35 else 0)) if has_food else 0.0,
+            "buy_bread": (0.9 * self.hunger + self.desire("buy_bread", t)) if (not has_food and open_bakery) else 0.0,
+            "order_food": (1.0 * self.hunger + 0.15 + self.desire("order_food", t))
+                          if (not has_food and not self.delivery and kitchen_open and self.hunger > 0.3) else 0.0,
+            "research": 0.42 + 0.3 * (1 - self.boredom) + self.desire("research", t)
+                        + 0.2 * max(0, rel.get("attention", 1) - 1),
             "phone": 0.7 * self.boredom + (0.5 if h >= 22.5 or h < 1 else 0) + 0.25 * pressure
                      + self.desire("phone", t) + 0.2 * max(0, rel.get("salience", 1) - 1),
-            "chart": 0.35 * market_hot + 0.4 * max(0, rel.get("salience", 1) - 1) + self.desire("chart", t) + 0.1,
-            "park": (0.5 * self.boredom + 0.8 * max(0, rel.get("reward", 1) - 1) + self.desire("park", t))
+            "chart": 0.35 * market_hot + 0.4 * max(0, rel.get("salience", 1) - 1) + self.desire("chart", t),
+            "park": (0.8 * self.boredom + 0.05 + 0.8 * max(0, rel.get("reward", 1) - 1) + self.desire("park", t))
                     if day and rel.get("fear", 1) < 1.3 else 0.0,
             "window": 0.2 + 0.15 * max(0, rel.get("fear", 1) - 1) + self.desire("window", t),
         }
@@ -172,9 +189,26 @@ class Life:
         self.log = (self.log + [{"t": t, "what": why}])[-30:]
 
     # --- per tick -----------------------------------------------------------------------------------
+    def courier(self, t):
+        """Where the delivery is: {"status", "eta_min", "geo"} or None."""
+        d = self.delivery
+        if not d:
+            return None
+        if t < d["leaves"]:
+            return {"status": "being prepared", "eta_min": round((d["arrives"] - t) / 60), "geo": None}
+        route = TOKYO["routes"]["shop-home"]
+        f = min(1.0, (t - d["leaves"]) / max(1.0, d["arrives"] - d["leaves"]))
+        lat, lng, hd = along(route["latlng"], f)
+        return {"status": "at the door" if f >= 1 else "on the way", "eta_min": max(0, round((d["arrives"] - t) / 60)),
+                "geo": {"lat": round(lat, 6), "lng": round(lng, 6), "heading": round(hd)}}
+
     def update(self, t, dt_real, dt_sim, stage, rel, market_hot, pressure):
+        self._t = t
         self.hunger = min(1.0, self.hunger + dt_sim / (5 * 3600))
-        if self.activity in ("window", "chart"):
+        if self.delivery and t >= self.delivery["arrives"] and not self.path and self.activity != "get_delivery" \
+                and self.place not in ("counter", "bakery_in", "bench") and stage == "AWAKE":
+            self.start("get_delivery", t, "the courier rings: goes to the door")
+        if self.activity in ("window", "chart", "research"):
             self.boredom = min(1.0, self.boredom + dt_sim / (2 * 3600))
         if self.activity == "phone":
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
@@ -209,16 +243,30 @@ class Life:
         if t >= self.until or must_sleep or woke:
             if self.activity == "buy_bread" and self.place == "counter":
                 self.bread += 2
-            if self.activity == "eat" and self.bread:
+            if self.activity == "eat" and self.food:
+                self.food -= 1
+                self.hunger = max(0.0, self.hunger - 0.8)
+            elif self.activity == "eat" and self.bread:
                 self.bread -= 1
                 self.hunger = max(0.0, self.hunger - 0.6)
+            if self.activity == "order_food" and not self.delivery:
+                leaves = t + 60 * self.rng.uniform(*COOK_MIN)
+                ride = TOKYO["routes"]["shop-home"]["meters"] / COURIER_SPEED
+                self.delivery = {"ordered": t, "leaves": leaves, "arrives": leaves + ride}
+            if self.activity == "get_delivery" and self.delivery and t >= self.delivery["arrives"]:
+                self.delivery = None
+                self.food += 1
             nxt = self.choose(t, stage, rel, market_hot, pressure)
             why = {
                 "sleep": "falls asleep" if self.place == "bed" else "goes to bed",
                 "eat": "hungry: eats some bread", "buy_bread": "hungry and no bread left: goes to the bakery",
                 "phone": "bored: picks up the phone", "chart": "the market is moving: checks the chart",
                 "park": "feels good: goes out to the park", "window": "looks out of the window",
+                "research": "curious: sits at the computer to read", "order_food": "hungry: orders food on the phone",
+                "get_delivery": "the courier rings: goes to the door",
             }[nxt]
+            if nxt == "eat" and self.food:
+                why = "eats the delivery at the desk"
             if woke:
                 why = "wakes up"
             self.start(nxt, t, why)
@@ -258,8 +306,9 @@ class Life:
                 "pose": "walking" if self.path else ACTIVITIES[self.activity][1], "place": self.place,
                 "hunger": round(self.hunger, 2), "boredom": round(self.boredom, 2), "bread": self.bread,
                 "phone": self.phone_app if self.activity == "phone" and not self.path else None,
-                "geo": self.geo, "say": self.say, "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
+                "geo": self.geo, "say": self.say, "food": self.food, "courier": self.courier(self._t), "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
 
     def to_dict(self):
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
+                "food": self.food, "delivery": self.delivery,
                 "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log}

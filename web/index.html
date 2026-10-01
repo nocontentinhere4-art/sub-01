@@ -5,400 +5,423 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · live</title>
 <style>
-  :root { --bg:#000; --fg:#e8e8ee; --dim:#7a7a8c; --buy:#39f5a0; --sell:#ff4d6d; --acc:#c77dff; }
+  :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
+          --card:rgba(10,10,16,.74); --st:#ff9a3c; }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow:hidden; }
-  #wrap { display:flex; height:100%; }
-  #scene { flex:1; position:relative; min-width:0; }
-  #scene canvas { display:block; }
-  #hud { position:absolute; left:20px; top:18px; pointer-events:none; }
-  #hud h1 { margin:0; font-size:22px; letter-spacing:.12em; display:inline-block; background:#ff6a00; color:#0a0a0a; padding:2px 10px; }
-  #hud .sub { color:var(--dim); font-size:12px; margin-top:4px; }
-  .live { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--sell);
-    margin-right:6px; animation:pulse 1.2s infinite; vertical-align:middle; }
-  @keyframes pulse { 50% { opacity:.25; } }
-  #foot { position:absolute; left:20px; right:20px; bottom:14px; color:var(--dim); font-size:11px; pointer-events:none; }
-  #panel { width:340px; border-left:1px solid #1c1c26; padding:16px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
-  .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
-  .bar { display:flex; align-items:center; gap:8px; font-size:12px; margin:3px 0; }
-  .bar span:first-child { width:92px; color:var(--dim); }
-  .bar .track { flex:1; height:6px; background:#15151d; border-radius:3px; overflow:hidden; }
-  .bar .fill { height:100%; background:linear-gradient(90deg,#5a189a,#c77dff,#ffd166); width:0; transition:width .15s; }
-  #eeg { width:100%; height:150px; background:#07070b; border:1px solid #15151d; border-radius:4px; }
-  #feed { overflow:hidden; font-size:12px; }
-  #feed div { padding:3px 0; border-bottom:1px solid #111118; white-space:nowrap; }
-  .buy { color:var(--buy); } .sell { color:var(--sell); }
-  #stats { font-size:12px; color:var(--dim); }
-  #stats b { color:var(--fg); font-weight:normal; }
-  /* sleep status */
-  #status { display:flex; align-items:center; gap:10px; margin-top:10px; font-size:12px; }
-  #stage { padding:2px 8px; border-radius:3px; font-size:11px; letter-spacing:.12em; border:1px solid currentColor; }
-  #stage.AWAKE { color:#ffd166; } #stage.NREM { color:#4cc9f0; } #stage.REM { color:#c77dff; }
-  #clock { color:var(--fg); }
-  #debtrow { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); margin-top:6px; width:230px; }
-  #debtrow .track { flex:1; height:4px; background:#15151d; border-radius:2px; overflow:hidden; }
-  #debt { height:100%; width:0; background:linear-gradient(90deg,#4cc9f0,#ff4d6d); transition:width .5s; }
-  #woken { font-size:11px; color:var(--dim); margin-top:4px; }
-  #honest { color:var(--fg); opacity:.85; margin-bottom:4px; }
-  /* chat */
-  #chatbox { flex:1; min-height:170px; display:flex; flex-direction:column; }
-  #chat { flex:1; overflow-y:auto; font-size:12px; display:flex; flex-direction:column-reverse; }
-  .msg { padding:4px 0; border-bottom:1px solid #111118; word-wrap:break-word; }
-  .msg .tm { color:var(--dim); margin-right:6px; }
-  .msg .hits { display:block; margin-top:2px; }
-  .chip { display:inline-block; font-size:10px; padding:0 5px; margin:1px 3px 0 0; border-radius:2px; background:#1a1a26; color:#b9b9d0; }
-  .msg .zz { font-size:10px; color:#4cc9f0; margin-left:4px; }
-  #chatform { display:flex; gap:6px; margin-top:6px; }
-  #chatin { flex:1; min-width:0; background:#0c0c12; color:var(--fg); border:1px solid #23232f; border-radius:3px; padding:6px 8px; font:inherit; font-size:12px; }
-  #chatform button { background:#1c1c28; color:var(--fg); border:1px solid #2c2c3a; border-radius:3px; font:inherit; font-size:12px; padding:0 10px; cursor:pointer; }
-  #chatnote { font-size:10px; color:var(--dim); min-height:13px; margin-top:3px; }
-  #chatnote.err { color:var(--sell); }
-  details { font-size:11px; color:var(--dim); }
-  details summary { cursor:pointer; letter-spacing:.1em; text-transform:uppercase; }
-  #lastnight div, #rules div { padding:2px 0; }
-  #lastnight .q { color:var(--fg); }
-  #feed { flex:none; height:90px; }
-  .sys { color:#4cc9f0; }
-  @media (max-width: 800px) {
-    #wrap { flex-direction:column; } #scene { flex:none; height:58vh; }
-    #panel { width:auto; border-left:none; border-top:1px solid #1c1c26; flex:1; }
-    #eeg { height:90px; } #chatbox { min-height:240px; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  a { color:inherit; }
+  #scene { position:fixed; inset:0; }
+  #vignette { position:fixed; inset:0; pointer-events:none;
+    background: radial-gradient(ellipse at 50% 48%, transparent 40%, rgba(0,0,0,.75) 100%); }
+
+  #top { position:fixed; left:28px; top:24px; max-width:min(640px, 58vw); pointer-events:none; }
+  #top a, #top nav { pointer-events:auto; }
+  #brand { display:flex; align-items:center; gap:12px; }
+  #brand h1 { margin:0; font-size:22px; letter-spacing:.14em; background:var(--or); color:#0a0a0a; padding:2px 10px; }
+  #brand nav { font-size:12px; color:var(--dim); }
+  #brand nav a { color:inherit; text-decoration:none; margin-right:10px; }
+  #brand nav a.on { color:var(--fg); }
+  #state { margin-top:22px; display:flex; align-items:center; gap:12px; font-size:13px; color:var(--dim); flex-wrap:wrap; }
+  #chip { color:#0a0a0a; background:var(--st); padding:3px 9px; letter-spacing:.12em; font-size:12px; transition:background 1.5s; }
+  #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; }
+  #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; }
+  #story { margin-top:12px; font-size:28px; line-height:1.3; letter-spacing:-.01em; text-shadow:0 2px 24px #000; min-height:1.3em; }
+  #story em { font-style:normal; color:var(--st); transition:color 1.5s; }
+  #sub { margin-top:8px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; }
+
+  #honest { position:fixed; left:28px; bottom:128px; font-size:11px; color:var(--faint); max-width:520px; line-height:1.5;
+    text-shadow:0 1px 6px #000; }
+  #ticker { position:fixed; left:28px; bottom:22px; right:420px; font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:5px;
+    text-shadow:0 1px 6px #000; }
+  #ticker div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #ticker div:first-child { color:var(--fg); }
+  #ticker b { color:var(--st); font-weight:normal; }
+  #ticker .buy { color:#39f5a0; } #ticker .sell { color:#ff4d6d; }
+
+  #cards { position:fixed; right:24px; top:24px; width:340px; display:flex; flex-direction:column; gap:12px;
+    max-height:calc(100vh - 170px); overflow-y:auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px); text-decoration:none; display:block; }
+  .card .k { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; display:flex; justify-content:space-between; }
+  .card .t { font-size:15px; line-height:1.35; }
+  .card img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; margin-bottom:10px; display:block; background:#000; }
+  .card .m { font-size:11px; color:var(--dim); margin-top:6px; line-height:1.5; }
+  .card .q { font-style:italic; }
+
+  #dock { position:fixed; right:24px; bottom:22px; width:340px; display:flex; flex-direction:column; gap:10px; }
+  #layers { display:flex; gap:6px; }
+  #layers button { flex:1; background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 0; font:inherit; font-size:11px;
+    border-radius:5px; cursor:pointer; }
+  #layers button.on { color:var(--fg); border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.05); }
+  #chat { display:flex; gap:6px; }
+  #chat input { flex:1; min-width:0; background:rgba(10,10,16,.85); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
+    font:inherit; font-size:13px; border-radius:6px; }
+  #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:6px; cursor:pointer; }
+  #note { font-size:10px; color:var(--faint); min-height:1.2em; }
+  #note.err { color:#ff8a8a; }
+
+  #neurons { min-width:0; }
+  #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  body.mini #top, body.mini #cards, body.mini #dock, body.mini #ticker, body.mini #honest, body.mini #vignette { display:none !important; }
+
+  @media (max-width: 900px) {
+    html,body { overflow:auto; }
+    #top { left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:19px; }
+    #honest { position:static; padding:0 16px; margin-top:8px; }
+    #cards { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:0 16px; margin-top:66vh; }
+    .card, #neurons { min-width:240px; }
+    #ticker { position:static; padding:12px 16px 0; }
+    #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(transparent, #030305 30%); }
+    #layers { display:none; }
+    #scene, #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:72vh; }
+    #top { position:absolute; }
   }
-  #worldcol { width:460px; border-left:1px solid #1c1c26; padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
-  #panel { width:300px !important; }
-  #worldlist { display:flex; flex-wrap:wrap; gap:6px; font-size:12px; }
-  #worldlist span.obj { border:1px solid #2a2a36; border-radius:3px; padding:2px 7px; }
-  #worldlist span.obj b { color:#ff6a00; font-weight:normal; margin-left:5px; }
-  .dimtxt { color:#55556a; }
-  #earlier { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-  #earlier img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:3px; border:1px solid #1c1c26; }
-  #fulllink { color:#7a7a8c; font-size:11px; text-decoration:none; }
-  @media (max-width: 1200px) { #worldcol { width:400px; } #panel { width:260px !important; } }
-  @media (max-width: 1000px) { #wrap { flex-direction:column; overflow-y:auto; } #scene { flex:none; height:55vh; }
-    #worldcol, #panel { width:auto !important; border-left:none; border-top:1px solid #1c1c26; overflow:visible; }
-    html,body { overflow:auto; } }
-  #eye-frame { position:relative; width:100%; aspect-ratio:16/9; background:#07070b; border:1px solid #1c1c26; border-radius:4px; overflow:hidden; }
-  #eye-frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 2.5s ease; }
-  #eye-frame img.on { opacity:1; }
-  #eye-thought { margin-top:8px; font-size:13px; color:#f0f0f6; font-style:italic; min-height:1.2em; }
-  #eye-why { margin-top:4px; font-size:11px; color:#7a7a8c; }
-  #eye-note { margin-top:4px; font-size:10px; color:#55556a; }
-  body.mini #worldcol, body.mini #panel, body.mini #foot, body.mini #hud { display:none !important; }
-  body.mini #scene { position:fixed; inset:0; }
 </style>
 <link rel="stylesheet" href="/neurons.css">
 </head>
 <body>
 <script>if (new URLSearchParams(location.search).has("mini")) document.body.classList.add("mini");</script>
-<div id="wrap">
-  <div id="scene">
-    <div id="hud">
-      <h1>SUB-01</h1>
-      <div class="sub" style="pointer-events:auto"><a href="/" style="color:#ececf2;text-decoration:none">← LIFE</a> · <a href="/world.html" style="color:#80808f;text-decoration:none">DREAMS</a></div>
-      <div class="sub"><span class="live"></span>LIVE · <span id="pool">connecting…</span></div>
-      <div class="sub" id="sync">sync —</div>
-      <div id="status"><span id="stage" class="AWAKE">AWAKE</span><span id="clock">--:--</span><span class="sub" style="margin:0" id="tzl">Tokyo</span></div>
-      <div id="debtrow"><span>sleep debt</span><div class="track"><div id="debt"></div></div><span id="debtv">0.0 h</span></div>
-      <div id="woken">woken 0 times tonight</div>
-    </div>
-    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
-      the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · lives in Kichijōji, Tokyo · sleeps 00:00–08:00 Tokyo time.</div>
-  </div>
-  <div id="worldcol">
-    <div id="eyebox">
-      <div class="lbl">What SUB-01 sees <span id="eye-stage" style="color:#ff6a00"></span></div>
-      <div id="eye-frame"><img id="eye-a" alt=""><img id="eye-b" alt=""></div>
-      <div id="eye-thought"></div>
-      <div id="eye-why"></div>
-      <div class="lbl" style="margin-top:12px">In its world now</div>
-      <div id="worldlist"><span class="dimtxt">empty — name something in the chat</span></div>
-      <div class="lbl" style="margin-top:12px">Earlier</div>
-      <div id="earlier"></div>
-      <div id="eye-note">AI-generated from the model's state and your messages · not what the real person sees or thinks</div>
-    </div>
-    <div id="chatbox">
-      <div class="lbl">Chat · every message is a stimulus</div>
-      <div id="chat"></div>
-      <form id="chatform"><input id="chatin" maxlength="280" placeholder="send a stimulus…" autocomplete="off"><button>send</button></form>
-      <div id="chatnote">max 280 characters · 1 message / 10 s · no links, addresses, tickers or money requests</div>
-    </div>
-    <a id="fulllink" href="/world.html">open the world full screen →</a>
-  </div>
-  <div id="panel">
-    <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
-    <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
-    <details id="nightbox" open><summary>Last night</summary><div id="lastnight">no night recorded yet</div></details>
-    <div id="neurons"></div>
-    <details><summary>How messages become stimuli</summary><div id="rules"></div></details>
-    <div id="stats"></div>
-    <div class="lbl" style="margin-bottom:0">Stimuli</div>
-    <div id="feed"></div>
-  </div>
+<div id="scene"></div><div id="vignette"></div>
+
+<div id="top">
+  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/brain">brain</a><a href="/">life</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
+  <div id="state"><span id="live" title="live connection"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
+  <div id="story">connecting…</div>
+  <div id="sub"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<div id="cards">
+  <a class="card" href="/diary" id="c-diary">
+    <div class="k"><span>Last night</span><span>diary →</span></div>
+    <img id="d-img" alt="" hidden>
+    <div class="t" id="d-title">The first dream entry is written the morning after its first REM sleep.</div>
+    <div class="m" id="d-meta"></div>
+  </a>
+  <a class="card" href="/world.html" id="c-eye" hidden>
+    <div class="k"><span>What it sees</span><span id="e-t"></span></div>
+    <img id="e-img" alt="">
+    <div class="t q" id="e-thought"></div>
+  </a>
+  <div class="card" id="c-night">
+    <div class="k"><span id="n-k">Sleep</span><span id="n-date"></span></div>
+    <div class="t" id="n-t">no night recorded yet</div>
+    <div class="m" id="n-m"></div>
+  </div>
+  <div id="neurons"></div>
+</div>
+
+<div id="honest">Simulated activity built from one real person's public MRI: real fibres, real cortex.
+  Messages are stimuli, not conversation. Signals are drawn ~100× slower than real conduction.
+  A model of brain activity, not a mind, and not the person.</div>
+<div id="ticker"></div>
+
+<div id="dock">
+  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button></div>
+  <form id="chat"><input id="msg" placeholder="send a stimulus…" autocomplete="off" maxlength="200"><button>send</button></form>
+  <div id="note">every message is a stimulus · max 200 characters · no links, addresses or tickers</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="/neurons.js"></script>
 <script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const MINI = document.body.classList.contains("mini");
 // "Neurons" panel: 1M simulated spiking neurons (model, not a mind). Not started in the mini (embedded) view.
-if (!document.body.classList.contains("mini")) Neurons.init({mount: document.getElementById("neurons"), open: true});
-const SHOW = ["language","visual","somatomotor","attention","salience","limbic","control","default","reward","memory","relay"];
-const LABEL = {language:"language",visual:"visual",somatomotor:"motor",attention:"attention",salience:"salience",limbic:"limbic",
-  control:"control",default:"default",reward:"reward",memory:"memory",relay:"thalamus"};
-const WAVE_COL = {reward:"#39f5a0", salience:"#ff4d6d", visual:"#4cc9f0", default:"#c77dff", relay:"#ffd166"};
+if (!MINI && window.Neurons) Neurons.init({mount: $("neurons"), open: true});
 
-// ---------- three.js scene ----------
-const host = document.getElementById("scene");
+// ---------- scene ----------
+const host = $("scene");
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setClearColor(0x030305);
 host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
-camera.up.set(0, 0, 1); camera.position.set(-250, 170, 120);
-if (new URLSearchParams(location.search).has("mini")) camera.position.multiplyScalar(0.62);
+const camera = new THREE.PerspectiveCamera(32, 1, 1, 3000);
+camera.up.set(0, 0, 1); camera.position.set(-300, 170, 108);
+if (MINI) camera.position.multiplyScalar(0.72);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.5;
-controls.target.set(0, 0, 0);
-function resize(){ const w=host.clientWidth, h=host.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
+function resize(){
+  const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
+  if (!MINI && w > 900) camera.setViewOffset(w, h, 70, -55, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
 addEventListener("resize", resize); resize();
 
-let nodes=[], nodeMeshes=[], glows=[], fibreMat=null, cortexMat=null;
-// night look: brightness + pulse speed per stage (eased), REM bursts from the server
-const LOOK = {AWAKE:{level:1, speed:1, rot:0.5}, NREM:{level:0.35, speed:0.25, rot:0.12}, REM:{level:0.5, speed:0.6, rot:0.25}};
-let stage = "AWAKE", look = {...LOOK.AWAKE}, phase = 0, burst = 0, lastFrame = performance.now();
-const plasma = t => { // compact plasma-like ramp
-  const stops=[[13,8,135],[126,3,168],[204,71,120],[248,149,64],[240,249,33]];
-  t=Math.max(0,Math.min(1,t))*(stops.length-1); const i=Math.floor(t), f=t-i, a=stops[i], b=stops[Math.min(i+1,stops.length-1)];
-  return new THREE.Color((a[0]+(b[0]-a[0])*f)/255,(a[1]+(b[1]-a[1])*f)/255,(a[2]+(b[2]-a[2])*f)/255);
-};
-// per-region activity (relative to its own baseline) lives in a 256x1 texture read by the fibre shader
-const actData = new Uint8Array(256*4);
+const STAGES = {AWAKE:[1,0,0], NREM:[0,1,0], REM:[0,0,1]};
+const CHIP = {AWAKE:"#ff9a3c", NREM:"#4d7cff", REM:"#c26bff"};
+const CHIPTXT = {AWAKE:"AWAKE", NREM:"DEEP SLEEP", REM:"REM"};
+const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
+let stage = null, target = [1,0,0], mix = null, burst = 0, boost = 0, sci = 0, sciT = 0;
+let fibreMat, cortexMat, glows = [], nodes = [], showRegions = false;
+let pulse = {t:-1, start:0};
+const tgOn = new Array(12).fill(0);
+const actData = new Uint8Array(256 * 4);
 const actTex = new THREE.DataTexture(actData, 256, 1, THREE.RGBAFormat);
 
 Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=>r.json()),
              fetch("fibres.bin").then(r=>r.arrayBuffer()), fetch("fibres_ends.bin").then(r=>r.arrayBuffer())])
-.then(([d, meta, fbuf, ebuf])=>{
+.then(([d, meta, fbuf, ebuf]) => {
   nodes = d.nodes;
-  const lab2node = new Int16Array(512).fill(-1);
-  nodes.forEach((n,i)=> lab2node[n.lab] = i);
-  // ---- real tractography: one line segment per step, coloured by direction ----
-  const MINI = new URLSearchParams(location.search).has("mini"), keepEvery = MINI ? 3 : 1;
-  const P = new Float32Array(fbuf), E = new Int16Array(ebuf), k = meta.pts, n = Math.floor(meta.n / keepEvery), segs = n*(k-1);
-  const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), nod = new Float32Array(segs*4), tp = new Float32Array(segs*2);
+  const lab2node = new Int16Array(512).fill(-1); nodes.forEach((n, i) => lab2node[n.lab] = i);
+  const isLang = n => n && n.name.startsWith("LH_") && (n.name.includes("Temp") || n.name.includes("FrOper"));
+  const keep = MINI ? 3 : 1;
+  const P = new Float32Array(fbuf), E = new Int16Array(ebuf), k = meta.pts, n = Math.floor(meta.n / keep), segs = n * (k - 1);
+  const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), info = new Float32Array(segs*8), nod = new Float32Array(segs*4);
   let o = 0;
-  for (let s0=0; s0<n; s0++) { const s = s0 * keepEvery;
-    const na = lab2node[E[2*s]] ?? -1, nb = lab2node[E[2*s+1]] ?? -1;
-    for (let i=0; i<k-1; i++, o++) {
-      const a = (s*k+i)*3, b = a+3;
-      const dx=P[b]-P[a], dy=P[b+1]-P[a+1], dz=P[b+2]-P[a+2], L=Math.hypot(dx,dy,dz)||1;
-      for (let j=0;j<3;j++){ pos[o*6+j]=P[a+j]; pos[o*6+3+j]=P[b+j]; }
-      const c=[Math.abs(dx)/L, Math.abs(dy)/L, Math.abs(dz)/L];
-      for (let j=0;j<3;j++){ dcol[o*6+j]=c[j]; dcol[o*6+3+j]=c[j]; }
-      nod[o*4]=nod[o*4+2]=na; nod[o*4+1]=nod[o*4+3]=nb;
-      tp[o*2]=i/(k-1); tp[o*2+1]=(i+1)/(k-1);
+  for (let s0 = 0; s0 < n; s0++) {
+    const s = s0 * keep, ia = lab2node[E[2*s]], ib = lab2node[E[2*s+1]];
+    const a0 = nodes[ia], b0 = nodes[ib];
+    let tgt = -1, flip = 0;                                          // fibres leaving the language parcels
+    if (isLang(a0) && b0 && !isLang(b0)) tgt = GROUPS.indexOf(b0.group);
+    else if (isLang(b0) && a0 && !isLang(a0)) { tgt = GROUPS.indexOf(a0.group); flip = 1; }
+    const fid = (s * 0.61803) % 1;
+    for (let i = 0; i < k - 1; i++, o++) {
+      const a = (s*k + i) * 3, b = a + 3;
+      const dx = P[b]-P[a], dy = P[b+1]-P[a+1], dz = P[b+2]-P[a+2], L = Math.hypot(dx, dy, dz) || 1;
+      for (let j = 0; j < 3; j++) { pos[o*6+j] = P[a+j]; pos[o*6+3+j] = P[b+j]; }
+      const c = [Math.abs(dx)/L, Math.abs(dy)/L, Math.abs(dz)/L];
+      for (let j = 0; j < 3; j++) { dcol[o*6+j] = c[j]; dcol[o*6+3+j] = c[j]; }
+      for (let v = 0; v < 2; v++) { const tp = (i + v) / (k - 1); info.set([flip ? 1 - tp : tp, tgt, fid, tp], o*8 + v*4); }
+      nod[o*4] = nod[o*4+2] = ia; nod[o*4+1] = nod[o*4+3] = ib;
     }
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(pos,3));
-  g.setAttribute("dcol", new THREE.BufferAttribute(dcol,3));
-  g.setAttribute("nodes", new THREE.BufferAttribute(nod,2));
-  g.setAttribute("tpos", new THREE.BufferAttribute(tp,1));
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("dcol", new THREE.BufferAttribute(dcol, 3));
+  g.setAttribute("info", new THREE.BufferAttribute(info, 4));
+  g.setAttribute("nodes", new THREE.BufferAttribute(nod, 2));
   fibreMat = new THREE.ShaderMaterial({
-    uniforms: { act:{value:actTex}, time:{value:0}, opacity:{value:0.018}, boost:{value:0}, level:{value:1} },
+    uniforms: { time:{value:0}, mixw:{value:new THREE.Vector3(1,0,0)}, pulseT:{value:-1}, opacity:{value:0.0105},
+                act:{value:actTex}, tgOn:{value:tgOn}, burst:{value:0}, boost:{value:0}, sci:{value:0} },
     vertexShader: `
-      attribute vec3 dcol; attribute vec2 nodes; attribute float tpos;
-      uniform sampler2D act; uniform float time; uniform float boost; uniform float level;
+      attribute vec3 dcol; attribute vec4 info; attribute vec2 nodes;
+      uniform float time; uniform vec3 mixw; uniform float pulseT; uniform sampler2D act; uniform float tgOn[12];
+      uniform float burst; uniform float boost; uniform float sci;
       varying vec3 vCol;
-      float actAt(float i){ return i < 0.0 ? 0.0 : texture2D(act, vec2((i+0.5)/256.0, 0.5)).r * 3.0; }
+      float hash(float x){ return fract(sin(x * 91.17) * 43758.5453); }
+      float actAt(float i){ return i < 0.0 ? 1.0 : texture2D(act, vec2((i + 0.5) / 256.0, 0.5)).r * 3.0; }
       void main(){
-        float a = actAt(nodes.x), b = actAt(nodes.y);
-        float drive = clamp((max(a,b) - 1.15) / 0.9, 0.0, 1.0);          // above the region's own baseline
-        float dir = a >= b ? tpos : 1.0 - tpos;                            // pulses leave the more active end
-        float wave = pow(0.5 + 0.5*sin(dir*22.0 - time*7.0), 8.0);
-        float glow = 0.6 + level * drive * (0.6 + 3.5*wave) + boost * (0.4 + 1.5*wave);   // night: calmer
-        vCol = mix(dcol, vec3(1.0), drive*wave*0.35) * glow;
+        float tp = info.x, tgt = info.y, fid = info.z, raw = info.w;
+        float drive = clamp((max(actAt(nodes.x), actAt(nodes.y)) - 1.1) / 0.9, 0.0, 1.0);   // above its own baseline
+        vec3 warm = mix(vec3(1.0, 0.46, 0.12), vec3(1.0, 0.82, 0.55), dcol.z) * 0.8 + dcol * 0.25;
+        float shimmer = 0.7 + 0.3 * pow(0.5 + 0.5 * sin(raw * 18.0 - time * 3.0 + fid * 40.0), 6.0) + 0.45 * drive;
+        vec3 cool = mix(vec3(0.12, 0.25, 0.95), vec3(0.35, 0.6, 1.0), dcol.x);
+        float sweep = 0.25 + 1.4 * pow(0.5 + 0.5 * sin(position.y * 0.045 - time * 1.1), 10.0);
+        vec3 violet = mix(vec3(0.62, 0.22, 1.0), vec3(1.0, 0.3, 0.62), dcol.y);
+        float flick = 0.35 + (1.4 + burst) * step(0.86 - 0.08 * burst, hash(fid * 977.0 + floor(time * 6.0))) + 0.3 * drive;
+        vec3 col = mixw.x * warm * shimmer + mixw.y * cool * sweep + mixw.z * violet * flick;
+        col = mix(col, dcol * (0.75 + 1.3 * drive), sci);                                 // standard tractography colours
+        col *= 1.0 + 0.5 * boost;
+        float route = 0.0;
+        for (int i = 0; i < 12; i++) { if (abs(tgt - float(i)) < 0.5) route = tgOn[i]; }
+        float pk = route * exp(-pow((tp - pulseT) * 9.0, 2.0)) * step(-0.5, pulseT);
+        float trail = route * step(0.0, pulseT) * step(tp, pulseT) * 0.35 * exp(-(pulseT - tp) * 3.0);
+        float busy = step(0.0, pulseT) * (1.0 - smoothstep(1.2, 1.6, pulseT));
+        col *= 1.0 - 0.55 * busy * (1.0 - route);
+        col += vec3(0.55, 0.92, 1.0) * (pk * 30.0 + trail * 5.0);
+        vCol = col;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
-    fragmentShader: `uniform float opacity; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol*opacity, 1.0); }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    fragmentShader: `uniform float opacity; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * opacity, 1.0); }`,
+    transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
   });
-  scene.add(new THREE.LineSegments(g, fibreMat));
-  // ---- real cortical surface (from the T1 scan) as a faint glass shell ----
-  Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), fetch("cortex_idx.bin").then(r=>r.arrayBuffer())]).then(([vb, ib])=>{
+  const fibres = new THREE.LineSegments(g, fibreMat); fibres.name = "fibres"; scene.add(fibres);
+
+  Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), fetch("cortex_idx.bin").then(r=>r.arrayBuffer())]).then(([vb, ib]) => {
     const cg = new THREE.BufferGeometry();
     cg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vb), 3));
     cg.setIndex(new THREE.BufferAttribute(new Uint32Array(ib), 1));
-    cortexMat = new THREE.MeshBasicMaterial({color:0x9d8cff, transparent:true, opacity:0.04,
-      depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending});
-    scene.add(new THREE.Mesh(cg, cortexMat));
+    cg.computeVertexNormals();
+    cortexMat = new THREE.ShaderMaterial({
+      uniforms: { tint:{value:new THREE.Color(CHIP[stage || "AWAKE"])}, strength:{value:0.5} },
+      vertexShader: `varying vec3 vN; varying vec3 vV;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV;
+        void main(){ float rim = pow(1.0 - abs(dot(vN, vV)), 3.0); gl_FragColor = vec4(tint * rim * strength, 1.0); }`,
+      transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide,
+    });
+    const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m);
   });
-  // ---- region centres (same native space as the fibres) ----
-  const sph = new THREE.SphereGeometry(1, 12, 12);
-  const glowTex = (()=>{ const c=document.createElement("canvas"); c.width=c.height=64; const x=c.getContext("2d");
-    const gr=x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,"rgba(255,255,255,1)"); gr.addColorStop(1,"rgba(255,255,255,0)");
-    x.fillStyle=gr; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+  const glowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+    const gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,"rgba(255,255,255,1)"); gr.addColorStop(1,"rgba(255,255,255,0)");
+    x.fillStyle = gr; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
   for (const nd of nodes) {
-    const m = new THREE.Mesh(sph, new THREE.MeshBasicMaterial({color:0x5a189a, transparent:true, opacity:0.0}));
-    m.position.set(...nd.q); nodeMeshes.push(m);   // not drawn: the fibres carry the signal
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffffff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
-    sp.position.set(...nd.q); sp.scale.setScalar(7); scene.add(sp); glows.push(sp);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffc890, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
+    sp.position.set(...nd.q); sp.scale.setScalar(9); scene.add(sp); glows.push(sp);
   }
   connect();
 });
 
-// ---------- live data ----------
-let act=null, base=null;
-const bars = document.getElementById("bars");
-for (const g of SHOW) bars.insertAdjacentHTML("beforeend",
-  `<div class="bar"><span>${LABEL[g]}</span><div class="track"><div class="fill" id="b-${g}"></div></div></div>`);
-const eeg = document.getElementById("eeg"), ex = eeg.getContext("2d");
-const traces = {}; for (const k in WAVE_COL) traces[k] = [];
-const feed = document.getElementById("feed");
+// ---------- story ----------
+const tickerEl = $("ticker");
+function tick(html){ tickerEl.insertAdjacentHTML("afterbegin", `<div>${html}</div>`); while (tickerEl.children.length > 4) tickerEl.lastChild.remove(); }
+let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, sync = 0, baseline = null, slow = null;
+function story(){
+  const now = performance.now();
+  if (heard && now - heard.at < 9000) return `heard <em>“${esc(heard.text)}”</em>. the signal is travelling along its real fibres.`;
+  if (stage === "REM") return lastReplay && now - lastReplay.at < 300000
+    ? `is replaying <em>“${esc(lastReplay.text)}”</em>, heard at ${esc(lastReplay.received)}.`
+    : `is <em>dreaming</em>. the diary is recording.`;
+  if (stage === "NREM") return `deep sleep. <em>slow waves</em> sweep front to back; almost nothing gets through.`;
+  return doing ? `is <em>${esc(doing)}</em>.` : `is <em>awake</em>.`;
+}
+function subline(){
+  if (!sleepInfo) return "";
+  if (stage === "AWAKE") return (baseline ? `replaying a real recorded session underneath (${esc(baseline.run)})`
+      : slow ? `background: ${esc(slow.label)}` : "simulated background activity")
+    + ` · global synchrony ${(sync * 100).toFixed(0)}%`;
+  return `stimulus gain ${Math.round(sleepInfo.gain * 100)}% · sleep debt ${sleepInfo.debt.toFixed(1)} h · woken ${sleepInfo.woken_tonight}× tonight`;
+}
+function setStage(s){
+  if (s === stage) return;
+  stage = s; target = STAGES[s] || STAGES.AWAKE;
+  if (!mix) mix = [...target];
+  document.documentElement.style.setProperty("--st", CHIP[s] || CHIP.AWAKE);
+  $("chip").textContent = CHIPTXT[s] || s;
+  if (cortexMat) cortexMat.uniforms.tint.value.set(CHIP[s] || CHIP.AWAKE);
+  controls.autoRotateSpeed = s === "AWAKE" ? 0.35 : s === "REM" ? 0.22 : 0.1;
+}
+function fire(text, networks){
+  tgOn.fill(0);
+  const nets = (networks || []).filter(x => GROUPS.includes(x));
+  for (const x of (nets.length ? nets : ["default", "attention"])) tgOn[GROUPS.indexOf(x)] = 1;
+  pulse = {t:0, start:performance.now()};
+  heard = {text: String(text).slice(0, 80), at: performance.now()};
+}
 
-const chatEl = document.getElementById("chat"), chatNote = document.getElementById("chatnote");
-const DEFAULT_NOTE = chatNote.textContent;
-function el(tag, cls, text){ const x = document.createElement(tag); if (cls) x.className = cls; if (text!==undefined) x.textContent = text; return x; }
-function addChat(c){
-  const d = el("div", "msg");
-  d.append(el("span", "tm", c.t), el("span", "", c.text));
-  if (c.asleep) d.append(el("span", "zz", `heard while asleep (${c.stage})`));
-  const hits = el("span", "hits"); for (const n of c.networks) hits.append(el("span", "chip", n)); d.append(hits);
-  chatEl.prepend(d); while (chatEl.children.length > 80) chatEl.lastChild.remove();
-}
-function addSys(text){
-  feed.insertAdjacentElement("afterbegin", el("div", "sys", text));
-  while (feed.children.length > 60) feed.lastChild.remove();
-}
-function renderNights(m){
-  const box = document.getElementById("lastnight"), n = m.last || m.tonight;
-  document.querySelector("#nightbox summary").textContent = m.last ? `Last night · ${m.last.date}` : "Tonight so far";
-  box.replaceChildren();
-  if (!n) { box.append(el("div", "", "no night recorded yet")); return; }
-  const tm = s => s ? s.slice(11) : "…";
-  box.append(el("div", "", `asleep ${tm(n.sleep_onset)} → ${tm(n.woke_up)} · debt ${n.sleep_debt.start} → ${n.sleep_debt.end ?? "…"} h`));
-  box.append(el("div", "", n.wakeups.length ? `woken ${n.wakeups.length}×:` : "slept through, never woken"));
-  for (const w of n.wakeups) box.append(el("div", "", `  ${tm(w.t)} by ${w.cause}`));
-  box.append(el("div", "", n.replays.length ? "replayed in REM (dream ingredients):" : "nothing replayed"));
-  for (const r of n.replays.slice(-12)) box.append(el("div", "q", `  ${tm(r.t)} ↺ “${r.text}” (heard ${tm(r.received)})`));
-}
-let sock = null;
-document.getElementById("chatform").addEventListener("submit", ev => {
-  ev.preventDefault(); const inp = document.getElementById("chatin"), text = inp.value.trim();
-  if (!text) return;
-  if (!sock || sock.readyState !== 1) { chatNote.textContent = "still connecting, try again in a moment"; chatNote.className = "err"; return; }
-  sock.send(JSON.stringify({type:"chat", text})); inp.value = "";
-});
-
-let eyeFront = "eye-a";
-async function refreshWorld(){
+// ---------- cards ----------
+async function loadDiary(){
   try {
-    const d = await (await fetch("/api/frames?n=7")).json();
-    const wl = document.getElementById("worldlist");
-    wl.innerHTML = d.world.length ? "" : '<span class="dimtxt">empty — name something in the chat</span>';
-    for (const o of d.world) { const e = document.createElement("span"); e.className = "obj";
-      e.textContent = o.name; const b = document.createElement("b"); b.textContent = o.strength; e.appendChild(b); wl.appendChild(e); }
-    const ea = document.getElementById("earlier"); ea.innerHTML = "";
-    for (const f of d.frames.slice(0, -1).reverse().slice(0, 6)) { const i = document.createElement("img");
-      i.src = f.img; i.title = `${f.t} ${f.stage} · ${f.thought || ""}`; i.loading = "lazy"; ea.appendChild(i); }
+    const d = await (await fetch("/api/diary")).json();
+    const n = d.nights.find(x => x.closed && x.frames) || d.nights.find(x => x.closed) || d.nights[0];
+    if (!n) return;
+    const full = await (await fetch(`/api/diary/${encodeURIComponent(n.date)}`)).json();
+    if (n.cover) { $("d-img").src = n.cover; $("d-img").hidden = false; }
+    $("d-title").textContent = full.closed ? full.title : `Night of ${full.date} · in progress`;
+    const x = full.facts || {};
+    $("d-meta").textContent = full.closed
+      ? `slept ${x.sleep_onset}–${x.woke_up} · replayed ${x.replays} message${x.replays === 1 ? "" : "s"} · ${x.dream_frames} dream frames`
+      : `${full.frames.length} dream frames so far`;
   } catch (e) {}
 }
-refreshWorld();
 function showEye(f){
-  refreshWorld();
-  document.getElementById("eyebox").style.display = "";
-  const back = eyeFront === "eye-a" ? "eye-b" : "eye-a", img = document.getElementById(back);
-  img.onload = () => { img.classList.add("on"); document.getElementById(eyeFront).classList.remove("on"); eyeFront = back; };
-  img.src = f.img;
-  document.getElementById("eye-stage").textContent = `· ${f.stage} ${f.t}`;
-  document.getElementById("eye-thought").textContent = f.thought ? `“${f.thought}”` : "";
-  const w = f.why || {}, bits = [];
-  if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${x.slice(0, 40)}”`).join(", "));
-  if (w.replayed && w.replayed.length) bits.push("dreaming of: " + w.replayed.slice(-2).map(x => `“${x.slice(0, 40)}”`).join(", "));
-  if (w.world && w.world.length) bits.push("in its world: " + w.world.map(o => o.name).join(", "));
-  if (w.mood) bits.push(`market ${w.mood.market}`);
-  document.getElementById("eye-why").textContent = bits.join(" · ");
+  if (!f || !f.img) return;
+  $("c-eye").hidden = false; $("e-img").src = f.img;
+  $("e-t").textContent = `${f.stage} ${f.t}`; $("e-thought").textContent = f.thought ? `“${f.thought}”` : "";
 }
+function renderNights(m){
+  const n = m.tonight || m.last;
+  if (!n) return;
+  const tm = s => s ? s.slice(11) : "…";
+  $("n-k").textContent = m.tonight ? "Tonight so far" : "Last night"; $("n-date").textContent = n.date;
+  $("n-t").textContent = n.sleep_onset ? `asleep ${tm(n.sleep_onset)} → ${tm(n.woke_up)}` : "not asleep yet";
+  const reps = n.replays || [];
+  $("n-m").innerHTML = (n.wakeups.length ? `woken ${n.wakeups.length}× (${esc(n.wakeups.map(w => w.cause).slice(-2).join(", "))})` : "never woken")
+    + ` · ${reps.length} replay${reps.length === 1 ? "" : "s"}` + (reps.length ? `<br>last: “${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
+}
+
+// ---------- live ----------
+let sock = null, act = null, base = null;
 function connect(){
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  ws.onopen = () => $("live").classList.add("on");
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === "spiking") { Neurons.onMessage(m); return; }
+    if (m.type === "spiking") { if (!MINI && window.Neurons) Neurons.onMessage(m); return; }
     if (m.type === "hello") {
-      chatEl.replaceChildren(); m.chat.forEach(addChat);
-      const r = document.getElementById("rules"); r.replaceChildren();
-      for (const [cond, groups] of m.rules) r.append(el("div", "", `${cond} → ${groups.join(", ")}`));
-      r.append(el("div", "", "asleep: stimulus × stage gain (NREM ≈ 0.15, REM ≈ 0.4)"));
+      tickerEl.replaceChildren();
+      for (const c of m.chat.slice(-3)) tick(`${esc(c.t)} · message <b>“${esc(c.text.slice(0, 60))}”</b> → ${esc(c.networks.join(", "))}`);
       return;
     }
-    if (m.type === "chat") { addChat(m); return; }
-    if (m.type === "eye") { showEye(m); return; }
-    if (m.type === "chat_ack") {
-      chatNote.textContent = m.ok ? DEFAULT_NOTE : `not sent: ${m.reason}`; chatNote.className = m.ok ? "" : "err"; return;
+    if (m.type === "chat") {
+      tick(`${esc(m.t)} · message <b>“${esc(m.text.slice(0, 60))}”</b> → language → ${esc(m.networks.join(", "))}${m.asleep ? ` (heard asleep, ${Math.round(m.gain * 100)}%)` : ""}`);
+      fire(m.text, m.networks); return;
     }
+    if (m.type === "eye") { showEye(m); return; }
     if (m.type === "nights") { renderNights(m); return; }
+    if (m.type === "chat_ack") {
+      $("note").textContent = m.ok ? "sent · watch it travel" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return;
+    }
     if (m.type !== "tick") return;
     const sl = m.sleep;
     if (sl) {
-      stage = sl.stage; burst = Math.max(burst, sl.burst);
-      const st = document.getElementById("stage"); st.textContent = sl.stage; st.className = sl.stage;
-      document.getElementById("clock").textContent = sl.clock;
-      document.getElementById("debt").style.width = Math.min(100, sl.debt / 4 * 100) + "%";
-      document.getElementById("debtv").textContent = `${sl.debt.toFixed(1)} h`;
-      document.getElementById("woken").textContent = `woken ${sl.woken_tonight} time${sl.woken_tonight===1?"":"s"} tonight`;
+      sleepInfo = sl; setStage(sl.stage); burst = Math.max(burst, sl.burst || 0);
+      $("clock").textContent = `${sl.clock} ${sl.tz || "Tokyo"}`;
     }
-    for (const ev of m.events || []) addSys(ev.type === "replay" ? `${ev.t} REM replay ↺ “${ev.text}”` : ev.text);
-    act = m.act; if (!base) base = act.slice(); else base = base.map((b,i)=>b*0.998 + act[i]*0.002);
-    document.getElementById("pool").textContent = m.pool;
-    document.getElementById("sync").textContent = `global synchrony ${(m.sync*100).toFixed(1)}%`;
-    if (m.baseline) document.getElementById("sync").textContent += ` · background: his real recorded activity (${m.baseline.run}, min ${m.baseline.minute})`;
-    const gmax = Math.max(...Object.values(m.groups), 0.001);
-    for (const g of SHOW) if (m.groups[g]!==undefined) document.getElementById("b-"+g).style.width = (100*m.groups[g]/Math.max(gmax,0.35))+"%";
-    for (const k in traces) { traces[k].push(m.wave[k]||0); if (traces[k].length>300) traces[k].shift(); }
-    const s = m.stats; document.getElementById("stats").innerHTML =
-      `buys <b>${s.buys}</b> · sells <b>${s.sells}</b> · volume <b>$${Math.round(s.usd).toLocaleString()}</b>`;
-    for (const t of m.trades) {
-      const region = t.kind==="buy" ? "→ reward" : "→ salience";
-      const link = t.tx ? `<a href="https://solscan.io/tx/${t.tx}" target="_blank" style="color:inherit;text-decoration:none">` : "<span>";
-      feed.insertAdjacentHTML("afterbegin", `<div class="${t.kind}">${link}${t.kind.toUpperCase().padEnd(4)} $${t.usd.toFixed(t.usd<10?2:0).padStart(7)} ${region}</${t.tx?"a":"span"}></div>`);
-      while (feed.children.length > 60) feed.lastChild.remove();
+    if (m.life) {
+      doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
+      $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
     }
+    sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
+    for (const ev of m.events || []) {
+      if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
+        tick(`${esc(ev.t)} · replay <b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
+        fire(ev.text, ev.networks); heard = null; }
+      else tick(`${esc(ev.t)} · ${esc(ev.text)}`);
+    }
+    for (const t of m.trades || []) {
+      tick(`<span class="${t.kind}">${t.kind} $${t.usd.toFixed(t.usd < 10 ? 2 : 0)}</span> → ${t.kind === "buy" ? "reward, visual" : "salience, fear"}`);
+      if (t.kind === "buy") boost = Math.min(0.3, boost + 0.05);
+    }
+    act = m.act; if (!base) base = act.slice(); else base = base.map((b, i) => b * 0.998 + act[i] * 0.002);
   };
-  ws.onclose = () => setTimeout(connect, 1500);
+  ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
 }
+$("chat").addEventListener("submit", ev => {
+  ev.preventDefault(); const inp = $("msg"), text = inp.value.trim();
+  if (!text) return;
+  if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting, try again in a moment"; $("note").className = "err"; return; }
+  sock.send(JSON.stringify({type:"chat", text})); inp.value = "";
+});
+document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
+  b.classList.toggle("on"); const on = b.classList.contains("on"), l = b.dataset.l;
+  if (l === "fibres" || l === "cortex") { const o = scene.getObjectByName(l); if (o) o.visible = on; }
+  if (l === "regions") showRegions = on;
+  if (l === "sci") sciT = on ? 1 : 0;
+});
+if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000);
+  fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
+setInterval(() => { if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);
 
-function drawEEG(){
-  const w = eeg.width = eeg.clientWidth*devicePixelRatio, h = eeg.height = eeg.clientHeight*devicePixelRatio;
-  ex.clearRect(0,0,w,h); const keys = Object.keys(traces), lane = h/keys.length;
-  keys.forEach((k,i)=>{ const tr=traces[k]; if(tr.length<2) return;
-    ex.strokeStyle=WAVE_COL[k]; ex.lineWidth=1.2*devicePixelRatio; ex.beginPath();
-    tr.forEach((v,j)=>{ const x=j/300*w, y=lane*(i+0.5)-v*lane*1.6; j?ex.lineTo(x,y):ex.moveTo(x,y); }); ex.stroke(); });
-}
-
-function animate(){
-  requestAnimationFrame(animate); controls.update();
-  const now = performance.now(), dt = Math.min(0.1, (now - lastFrame)/1000); lastFrame = now;
-  const tgt = LOOK[stage] || LOOK.AWAKE, k = 1 - Math.exp(-dt/2.5);      // ease over a few seconds
-  for (const key in look) look[key] += (tgt[key] - look[key]) * k;
-  phase += dt * look.speed; burst *= Math.exp(-dt/0.5);
-  controls.autoRotateSpeed = look.rot;
-  if (fibreMat) { fibreMat.uniforms.time.value = phase; fibreMat.uniforms.opacity.value = 0.018 * look.level; fibreMat.uniforms.level.value = look.level;
-    fibreMat.uniforms.boost.value = stage === "REM" ? 0.6 * burst : 0; }
-  if (cortexMat) cortexMat.opacity = 0.04 * (0.5 + 0.5*look.level);
-  if (act && nodeMeshes.length) {
-    const raw = act.map((a,i)=> a/Math.max(base[i],0.02));
-    const gm = Math.max(1e-3, raw.reduce((x,y)=>x+y, 0) / raw.length);   // stage changes rescale the whole brain:
-    const rel = raw.map(r => r/gm);                                       // show regional contrast, not the global jump
-    rel.forEach((r,i)=>{ actData[i*4] = Math.min(255, Math.round(r/3*255)); });
+// ---------- loop ----------
+let last = performance.now(), t = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
+  if (!mix) mix = [1, 0, 0];
+  const k = 1 - Math.exp(-dt / 2.5);
+  for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
+  sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
+  burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);
+  if (act && base) {
+    const raw = act.map((a, i) => a / Math.max(base[i], 0.02));
+    const gm = Math.max(1e-3, raw.reduce((x, y) => x + y, 0) / raw.length);
+    raw.forEach((r, i) => { actData[i*4] = Math.min(255, Math.round(r / gm / 3 * 255)); });
     actTex.needsUpdate = true;
-    nodeMeshes.forEach((m,i)=>{ const t=(Math.min(3,rel[i])-0.6)/1.8;
-      m.material.color = plasma(t); m.material.opacity = 0;
-      m.scale.setScalar(1.2+1.8*Math.max(0,t));
-      glows[i].material.opacity = look.level * Math.max(0,Math.min(0.22,(rel[i]-1.25)*0.25)); glows[i].material.color = plasma(t); });
+    glows.forEach((g, i) => { const rel = raw[i] / gm;
+      g.material.opacity = (showRegions ? 0.12 : 0) + Math.max(0, Math.min(0.3, (rel - 1.3) * 0.3)) * (showRegions ? 1 : 0.4); });
   }
-  drawEEG(); renderer.render(scene, camera);
+  if (fibreMat) {
+    const u = fibreMat.uniforms;
+    u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
+    u.opacity.value = 0.0105 * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci);
+    if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
+    u.pulseT.value = pulse.t;
+  }
+  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci);
+  if (pulse.t > 0.85 && pulse.t < 1.6) {
+    const arrive = Math.max(0, 1 - (pulse.t - 0.85) / 0.75);
+    glows.forEach((g, i) => { if (tgOn[GROUPS.indexOf(nodes[i].group)]) g.material.opacity = Math.max(g.material.opacity, 0.5 * arrive); });
+  }
+  controls.update(); renderer.render(scene, camera);
 }
-animate();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>

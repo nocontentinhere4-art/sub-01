@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUB-01 · room</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --bg:#08080b; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
+          --card:rgba(10,10,16,.78); }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  a { color:inherit; }
+  #scene { position:fixed; inset:0; }
+  #scene canvas { display:block; }
+  #top { position:fixed; left:28px; top:24px; max-width:min(620px, 56vw); pointer-events:none; z-index:5; }
+  #top a, #top nav, #top button { pointer-events:auto; }
+  #brand { display:flex; align-items:center; gap:12px; }
+  #brand h1 { margin:0; font-size:22px; letter-spacing:.14em; background:var(--or); color:#0a0a0a; padding:2px 10px; }
+  #brand nav { font-size:12px; color:var(--dim); }
+  #brand nav a { color:inherit; text-decoration:none; margin-right:10px; }
+  #brand nav a.on { color:var(--fg); }
+  #state { margin-top:20px; display:flex; align-items:center; gap:12px; font-size:13px; color:var(--dim); flex-wrap:wrap; }
+  #chip { color:#0a0a0a; background:#ff9a3c; padding:3px 9px; letter-spacing:.12em; font-size:12px; }
+  #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; }
+  #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; }
+  #story { margin-top:12px; font-size:26px; line-height:1.3; text-shadow:0 2px 20px #000; }
+  #story em { font-style:normal; color:#ff9a3c; }
+  #why { margin-top:8px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; }
+  #cam { margin-top:10px; background:rgba(10,10,16,.7); color:var(--dim); border:1px solid var(--line); border-radius:5px;
+    font:inherit; font-size:11px; padding:5px 9px; cursor:pointer; }
+  #cam.on { color:var(--fg); border-color:rgba(255,255,255,.25); }
+
+  #side { position:fixed; right:24px; top:24px; width:350px; display:flex; flex-direction:column; gap:12px; z-index:5;
+    max-height:calc(100vh - 140px); overflow-y:auto; scrollbar-width:none; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px); }
+  .card .k { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; display:flex; justify-content:space-between; gap:8px; }
+  .card .t { font-size:15px; line-height:1.35; }
+  .card .m { font-size:12px; color:#c9c9d6; margin-top:6px; line-height:1.5; }
+  .card .s { font-size:10px; color:var(--faint); margin-top:8px; }
+  #screencard .frame { position:relative; border-radius:6px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12); }
+  #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
+  #screencard.phone .frame { width:190px; margin:0 auto; border-radius:22px; border:6px solid #15151b; box-shadow:0 0 0 1px rgba(255,255,255,.12); }
+  #screencard.phone .frame img { aspect-ratio:390/844; object-fit:cover; object-position:top; }
+  #screencard .url { font-size:11px; color:var(--dim); margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #map { height:230px; border-radius:8px; overflow:hidden; background:#111; }
+  .darktiles { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+  #mapcard.out #map { height:340px; }
+  #brainpip { position:fixed; left:28px; bottom:96px; width:min(300px, 26vw); aspect-ratio:4/3; border:1px solid var(--line); border-radius:10px;
+    overflow:hidden; background:#000; z-index:5; display:block; }
+  #brainpip iframe { width:100%; height:100%; border:0; pointer-events:none; }
+  #brainpip span { position:absolute; left:8px; bottom:6px; font-size:10px; color:#bdbdca; text-shadow:0 1px 4px #000; }
+  #honest { position:fixed; left:28px; bottom:18px; right:420px; font-size:11px; color:var(--faint); line-height:1.5; z-index:5;
+    text-shadow:0 1px 6px #000; }
+  #dock { position:fixed; right:24px; bottom:18px; width:350px; z-index:5; }
+  #chat { display:flex; gap:6px; }
+  #chat input { flex:1; min-width:0; background:rgba(10,10,16,.88); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
+    font:inherit; font-size:13px; border-radius:6px; }
+  #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:6px; cursor:pointer; }
+  #note { font-size:10px; color:var(--faint); margin-top:4px; min-height:1.2em; }
+  #note.err { color:#ff8a8a; }
+  #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:14px; color:#d8d8e2; background:rgba(0,0,0,.55);
+    padding:10px 16px; border-radius:6px; display:none; z-index:4; text-align:center; }
+  #boot { position:fixed; inset:0; display:grid; place-items:center; color:var(--dim); font-size:12px; z-index:3; pointer-events:none; }
+  #boot .bar { width:220px; height:2px; background:rgba(255,255,255,.1); margin-top:10px; overflow:hidden; }
+  #boot .bar i { display:block; height:100%; width:0; background:var(--or); transition:width .2s; }
+  #boot.err { pointer-events:auto; color:#ff9a9a; }
+  #boot button { margin-top:10px; font:inherit; font-size:12px; background:var(--fg); color:#0a0a0a; border:0; padding:6px 12px; border-radius:5px; cursor:pointer; }
+  @media (max-width: 900px) {
+    html,body { overflow:auto; }
+    #scene { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
+    #top { position:absolute; left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:18px; }
+    #side { position:static; width:auto; max-height:none; margin:62vh 16px 0; }
+    #brainpip { position:relative; left:auto; bottom:auto; width:auto; margin:12px 16px 0; }
+    #honest { position:static; padding:12px 16px 90px; }
+    #dock { left:16px; right:16px; width:auto; position:fixed; bottom:10px; }
+  }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div id="boot"><div><div id="boot-t">loading the room…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
+<div id="away"></div>
+<div id="top">
+  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
+  <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
+  <div id="story">connecting…</div>
+  <div id="why"></div>
+  <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
+</div>
+
+<div id="side">
+  <div class="card" id="screencard" hidden>
+    <div class="k"><span id="s-k">On his screen</span><a id="s-link" href="#" target="_blank" rel="noopener noreferrer">open ↗</a></div>
+    <div class="frame"><img id="s-img" alt="what is on his screen"></div>
+    <div class="t" id="s-title" style="margin-top:10px"></div>
+    <div class="url" id="s-url"></div>
+    <div class="s" id="s-why"></div>
+  </div>
+  <div class="card" id="readcard" hidden>
+    <div class="k"><span>On his mind</span><a id="r-link" href="#" target="_blank" rel="noopener">wikipedia ↗</a></div>
+    <div class="t" id="r-title"></div>
+    <div class="m" id="r-text"></div>
+    <div class="s" id="r-why"></div>
+  </div>
+  <div class="card" id="mapcard">
+    <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
+    <div id="map"></div>
+  </div>
+  <div class="card" id="needs">
+    <div class="k"><span>Body</span><span id="n-food"></span></div>
+    <div class="m" id="n-text"></div>
+  </div>
+</div>
+
+<a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
+<div id="honest">Fictional character, living a simulated life. His choices come from a brain model built from one real person's
+  public MRI scans; the character is not that person and does not look like him. <span id="h-screen">His screens show real web
+  pages, loaded live by a headless browser: he only reads and scrolls, never logs in, posts or buys; adult, violent and
+  gambling sites are skipped.</span> Food orders and the courier are simulated. A model of brain activity, not a mind.</div>
+<div id="dock">
+  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
+  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const DEBUG = new URLSearchParams(location.search).has("debug");
+const FIXED_HOUR = DEBUG && new URLSearchParams(location.search).get("hour");   // preview a time of day
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+// ---------- renderer, scene, camera ----------
+const host = $("scene");
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x08080b);
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.35;
+const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minPolarAngle = 0.35; controls.maxPolarAngle = 1.35; controls.minDistance = 0.4; controls.maxDistance = 12;
+const OVERVIEW = {pos:new THREE.Vector3(5.2, 5.0, 6.0), target:new THREE.Vector3(0, 0.6, 0)};
+camera.position.copy(OVERVIEW.pos); controls.target.copy(OVERVIEW.target);
+function resize(){ const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
+  if (w > 900) camera.setViewOffset(w, h, 120, -10, w, h); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+// ---------- lights (driven by the Tokyo clock and by what he is doing) ----------
+const hemi = new THREE.HemisphereLight(0xfff1dd, 0x1a1a24, 0.6); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe2c0, 1.0);        // daylight / moonlight through the window
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+Object.assign(sun.shadow.camera, {left:-3, right:3, top:3, bottom:-3, near:0.5, far:20});
+scene.add(sun, sun.target);
+const ceiling = new THREE.PointLight(0xffd9a8, 0, 7, 1.6);     // room light in the evening
+ceiling.position.set(0.1, 2.3, 0.1); scene.add(ceiling);
+const lamp = new THREE.PointLight(0xffb468, 0, 2.2, 1.8);      // desk lamp
+lamp.castShadow = true; lamp.shadow.mapSize.set(512, 512); lamp.shadow.bias = -0.002; scene.add(lamp);
+const monitorGlow = new THREE.PointLight(0xbcd4ff, 0, 1.8, 2);  // light from the monitor onto him
+const phoneGlow = new THREE.PointLight(0xcfe0ff, 0, 0.7, 2);    // light from the phone onto his face
+scene.add(monitorGlow, phoneGlow);
+
+// ---------- places measured on the room model (after fit(room, 4); floor at y = 0.16; ~1 unit = 1 m) ----------
+const F = 0.16;
+const ANCHOR = {
+  desk:    {p:[-1.17, F, -0.64], r:-2.6},            // on the desk chair, facing the monitor
+  bedlie:  {p:[-0.7, -0.223, 1.044], r:Math.PI / 2},  // root offset: the clip lifts the hips ~1.1 m  // lying on the bed
+  bedside: {p:[-0.45, 0.33, 0.6], r:Math.PI},        // sitting on the edge of the bed with the phone
+  door:    {p:[1.22, F, -0.92], r:2.2},              // in front of the door
+  window:  {p:[-0.05, F, 0.25], r:-Math.PI / 2},     // standing, looking towards the window
+  middle:  {p:[0.35, F, 0.05], r:0.6},
+};
+// surfaces on the baked model that get live content: centre, size (w x h), rotation about y (facing direction)
+const SURF = {
+  monitor: {c:[-1.097, 1.322, -1.172], w:0.68, h:0.40, ry:0.117, rx:-0.09},     // measured by ray casting on the model
+  window:  {c:[-1.872, 1.685, 0.14], w:1.48, h:0.80, ry:Math.PI / 2, mullion:0.44},
+  lamp:    {c:[-1.42, 1.40, -1.15]},
+};
+const PLACE2ANCHOR = {bed:"bedside", desk:"desk", table:"desk", window:"window", door_in:"door", door_out:"door"};
+const ACT = {                                        // activity -> [anchor, clip]
+  sleep:["bedlie","sleep"], phone:["bedside","sit"], order_food:["middle","call"], research:["desk","sit"],
+  chart:["desk","sit"], eat:["desk","eat"], window:["window","idle"], get_delivery:["door","door"],
+};
+
+// ---------- loading (meshopt-compressed models, with progress and a retry) ----------
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const progress = {};
+function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) => a + p[0], 0), t = v.reduce((a, p) => a + p[1], 0);
+  const bar = $("boot-bar"); if (t && bar) bar.style.width = `${Math.round(100 * l / t)}%`; }
+function load(url){ return new Promise((ok, fail) => loader.load(url, ok,
+  e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
+function bootError(e){
+  console.error(e); $("boot").classList.add("err");
+  $("boot-t").innerHTML = `the room did not load (${esc(e && e.message || "network error")}).<br><button onclick="location.reload()">try again</button>`;
+}
+
+let room = null, boy = null, mixer = null, actions = {}, current = null, want = null, hand = null, head = null;
+const bones = {}, roomMats = [];
+function fit(obj, size){ const b = new THREE.Box3().setFromObject(obj), s = new THREE.Vector3(); b.getSize(s);
+  const k = size / Math.max(s.x, s.z); obj.scale.multiplyScalar(k);
+  const b2 = new THREE.Box3().setFromObject(obj), c = new THREE.Vector3(); b2.getCenter(c);
+  obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= b2.min.y; }
+
+load("room/room.glb").then(g => {
+  room = g.scene; fit(room, 4); scene.add(room);
+  room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = false; roomMats.push(o.material);
+    o.material.envMapIntensity = 0.25; if (o.material.map) o.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); } });
+  $("boot").remove(); buildSurfaces();
+}).catch(bootError);
+
+load("room/boy.glb").then(g => {
+  boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
+  boy.traverse(o => {
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
+      const m = o.material; m.emissive.setRGB(0, 0, 0); m.emissiveIntensity = 0;   // was self-lit: let the room light him
+      m.roughness = 0.78; m.envMapIntensity = 0.5; }
+    if (o.isBone) bones[o.name] = o;
+    if (o.isBone && o.name === "RightHand") hand = o;
+    if (o.isBone && o.name === "Head") head = o;
+  });
+  mixer = new THREE.AnimationMixer(boy);
+  addClips("sit", g.animations);
+  scene.add(phone);
+  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", call:"boy_call", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
+    load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
+}).catch(bootError);
+function addClips(name, clips){ if (!clips || !clips.length || !mixer) return; actions[name] = mixer.clipAction(clips[0]); if (want) play(want); }
+function play(name){
+  want = name; const a = actions[name] || actions.idle || actions.sit; if (!a || a === current) return;
+  a.reset().fadeIn(0.4).play(); if (current) current.fadeOut(0.4); current = a;
+}
+
+// ---------- live surfaces: monitor, phone, window ----------
+const texLoader = new THREE.TextureLoader();
+function screenTexture(canvasOrImg){ const t = canvasOrImg instanceof HTMLCanvasElement ? new THREE.CanvasTexture(canvasOrImg) : new THREE.Texture(canvasOrImg);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.needsUpdate = true; return t; }
+// a screen is a plane: off = dark glass, on = an unlit image (screens emit their own light)
+const offMat = new THREE.MeshStandardMaterial({color:0x050608, roughness:0.15, metalness:0.0, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+function makeScreen(w, h){
+  const on = new THREE.MeshBasicMaterial({color:0xffffff, toneMapped:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), offMat);
+  return {mesh, on, tex:null, id:null, aspect:w / h,
+    set(tex){ if (this.tex && this.tex !== tex) this.tex.dispose(); this.tex = tex; this.on.map = tex; this.on.needsUpdate = true; this.mesh.material = this.on; },
+    off(){ this.mesh.material = offMat; this.id = null; }};
+}
+let monitor = null, sky = null;
+// cover-crop a texture to the screen's aspect, showing the top of the page
+function fitTop(tex, aspect){ const img = tex.image, a = img.width / img.height;
+  tex.repeat.set(a > aspect ? aspect / a : 1, a > aspect ? 1 : a / aspect); tex.offset.set(a > aspect ? (1 - tex.repeat.x) / 2 : 0, 1 - tex.repeat.y); }
+
+function buildSurfaces(){
+  const m = SURF.monitor;
+  monitor = makeScreen(m.w, m.h);
+  monitor.mesh.rotation.set(m.rx, m.ry, 0, "YXZ"); monitor.mesh.position.set(...m.c);
+  monitor.mesh.position.add(new THREE.Vector3(0, 0, 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
+  monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+  const w = SURF.window;
+  sky = new THREE.Mesh(new THREE.PlaneGeometry(w.w, w.h), skyMaterial);
+  sky.position.set(...w.c); sky.rotation.y = w.ry; scene.add(sky);
+  const L = SURF.lamp; lamp.position.set(...L.c);
+  if (DEBUG) for (const k of Object.keys(SURF)) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({color:0xff00ff}));
+    d.position.set(...SURF[k].c); scene.add(d); }
+}
+
+// the phone: a real object in his right hand; its screen shows the page he is on
+const phone = new THREE.Group();
+{
+  const body = new THREE.Mesh(new RoundedBoxGeometry(0.074, 0.152, 0.008, 4, 0.008),
+    new THREE.MeshStandardMaterial({color:0x1b1c22, roughness:0.35, metalness:0.6}));
+  body.castShadow = true; phone.add(body);
+  phone.userData.screen = makeScreen(0.068, 0.146);
+  phone.userData.screen.mesh.position.z = 0.0042; phone.add(phone.userData.screen.mesh);
+  phone.visible = false;
+}
+// holding the phone: the phone floats in front of his chest, facing his eyes; both arms reach it (two-bone IK)
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+function aimBone(bone, from, to){                    // rotate `bone` so that the point `from` (world) moves towards `to`
+  bone.getWorldPosition(_a);
+  _b.subVectors(from, _a).normalize(); _c.subVectors(to, _a).normalize();
+  _q.setFromUnitVectors(_b, _c);
+  bone.getWorldQuaternion(_q2); _q2.premultiply(_q);
+  bone.parent.getWorldQuaternion(_q).invert(); bone.quaternion.copy(_q.multiply(_q2));
+  bone.updateMatrixWorld(true);
+}
+function reach(upper, lower, end, target, pole){
+  const S = upper.getWorldPosition(new THREE.Vector3()), E = lower.getWorldPosition(new THREE.Vector3()), H = end.getWorldPosition(new THREE.Vector3());
+  const a = S.distanceTo(E), b = E.distanceTo(H), toT = new THREE.Vector3().subVectors(target, S);
+  const d = clamp(toT.length(), Math.abs(a - b) + 1e-3, a + b - 1e-3); toT.normalize();
+  const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const perp = new THREE.Vector3().subVectors(pole, S); perp.addScaledVector(toT, -perp.dot(toT)).normalize();
+  const E2 = S.clone().addScaledVector(toT, x).addScaledVector(perp, h);
+  aimBone(upper, E, E2);
+  aimBone(lower, end.getWorldPosition(new THREE.Vector3()), target);
+}
+const UP = new THREE.Vector3(0, 1, 0);
+function holdPhone(){
+  const B = bones; if (!B.RightArm || !B.LeftArm || !head) return;
+  boy.updateMatrixWorld(true);
+  const ry = boy.rotation.y, fwd = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry));
+  const hp = head.getWorldPosition(new THREE.Vector3());
+  const sR = B.RightArm.getWorldPosition(new THREE.Vector3()), sL = B.LeftArm.getWorldPosition(new THREE.Vector3());
+  const side = new THREE.Vector3().subVectors(sR, sL).normalize();
+  const P = hp.clone().addScaledVector(UP, -0.36).addScaledVector(fwd, 0.30);
+  phone.position.copy(P); phone.lookAt(hp); phone.rotateX(-0.25);
+  phone.updateMatrixWorld(true);
+  const down = UP.clone().negate();
+  for (const [s, sh] of [[1, sR], [-1, sL]]) {
+    const pre = s > 0 ? "Right" : "Left";
+    const T = P.clone().addScaledVector(side, 0.042 * s).addScaledVector(down, 0.05).addScaledVector(fwd, -0.01);
+    const pole = sh.clone().addScaledVector(down, 0.5).addScaledVector(side, 0.35 * s).addScaledVector(fwd, -0.2);
+    reach(B[pre + "Arm"], B[pre + "ForeArm"], B[pre + "Hand"], T, pole);
+  }
+  // look down at it
+  const n = B.Neck || B.neck; head.rotateX(0.25); if (n) n.rotateX(0.15); head.updateMatrixWorld(true);
+}
+
+// window: the sky over Tokyo follows the clock (day, dusk, night with stars and lit windows)
+const skyMaterial = new THREE.ShaderMaterial({
+  uniforms:{ uSun:{value:0.5}, uTime:{value:0}, uRain:{value:0} },
+  toneMapped:false,
+  vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader:`
+    varying vec2 vUv; uniform float uSun; uniform float uTime;
+    float h1(float x){ return fract(sin(x * 127.1) * 43758.5453); }
+    float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    void main(){
+      float day = smoothstep(-0.08, 0.25, uSun), dusk = (1.0 - abs(uSun - 0.02) / 0.22); dusk = clamp(dusk, 0.0, 1.0);
+      vec3 top = mix(vec3(0.01, 0.015, 0.05), vec3(0.32, 0.55, 0.86), day);
+      vec3 hor = mix(vec3(0.06, 0.07, 0.14), vec3(0.78, 0.86, 0.93), day);
+      hor = mix(hor, vec3(1.0, 0.55, 0.3), dusk * 0.8); top = mix(top, vec3(0.2, 0.22, 0.45), dusk * 0.5);
+      vec3 col = mix(hor, top, smoothstep(0.25, 1.0, vUv.y));
+      // stars
+      vec2 g = floor(vUv * vec2(90.0, 110.0));
+      float st = step(0.992, h2(g)) * (1.0 - day) * smoothstep(0.45, 0.8, vUv.y) * (0.6 + 0.4 * sin(uTime * 2.0 + h2(g) * 30.0));
+      col += vec3(st);
+      // the city: blocks of buildings, lit windows at night, haze by day
+      float x = vUv.x * 14.0, cell = floor(x);
+      float bh = 0.12 + 0.30 * h1(cell) + (abs(cell - 9.0) < 0.5 ? 0.22 : 0.0);
+      float bh2 = 0.08 + 0.18 * h1(cell + 40.0);
+      float back = step(vUv.y, bh2 + 0.12), front = step(vUv.y, bh);
+      vec3 bday = vec3(0.55, 0.62, 0.70), bnight = vec3(0.025, 0.03, 0.045);
+      vec3 bcol = mix(bnight, bday, day);
+      col = mix(col, mix(bcol, hor, 0.45), back * (1.0 - front));
+      if (front > 0.5) {
+        vec2 w = vec2(fract(x) * 6.0, vUv.y * 70.0), wc = floor(w) + cell * 13.0;
+        float win = step(0.25, fract(w.x)) * step(0.3, fract(w.y)) * step(0.55, h2(wc + floor(uTime / 40.0)));
+        vec3 lit = vec3(1.0, 0.82, 0.55) * (0.7 + 0.3 * h2(wc));
+        col = bcol + win * lit * (1.0 - day) * 0.9 + win * day * 0.04;
+      }
+      // the window's frame: the middle bar between the two panes
+      col = mix(col, vec3(0.05, 0.035, 0.025), step(abs(vUv.x - ${SURF.window.mullion.toFixed(3)}), 0.012));
+      // the city's glow on the horizon at night
+      col += vec3(0.25, 0.12, 0.06) * (1.0 - day) * smoothstep(0.5, 0.0, vUv.y) * 0.5;
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+});
+
+// ---------- what is on the screens ----------
+let screenOn = null;               // "desk" | "phone" | null (from the server)
+let lastStatus = {};               // device -> status
+let trades = [];                   // recent trade flow, for the chart view
+function showScreen(st){
+  if (!st) return;
+  lastStatus[st.device] = st;
+  const target = st.device === "desk" ? monitor : phone.userData.screen;
+  if (!target || target.id === st.id) return;
+  target.id = st.id;
+  const url = `/api/screen/${st.device}.jpg?id=${st.id}`;
+  const img = new Image(); img.decoding = "async";
+  img.onload = () => { const t = screenTexture(img); fitTop(t, target.aspect); target.set(t);
+    if (screenOn === st.device) { $("s-img").src = url; } };
+  img.src = url;
+  if (screenOn === st.device) panel(st);
+}
+function panel(st){
+  const card = $("screencard");
+  if (!st) { card.hidden = true; return; }
+  card.hidden = false; card.classList.toggle("phone", st.device === "phone");
+  $("s-k").textContent = st.device === "phone" ? "On his phone" : "On his computer";
+  $("s-title").textContent = st.title || ""; $("s-url").textContent = st.url || "";
+  $("s-why").textContent = st.why || ""; $("s-link").href = st.url || "#";
+  const src = `/api/screen/${st.device}.jpg?id=${st.id}`;
+  if (!$("s-img").src.endsWith(src)) $("s-img").src = src;
+}
+// views drawn here (no browser needed): the market chart at the desk, the food app on the phone
+const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 600; const cx = cv.getContext("2d");
+const pv = document.createElement("canvas"); pv.width = 390; pv.height = 844; const px = pv.getContext("2d");
+let cvTex = null, pvTex = null;
+function drawChart(){
+  cx.fillStyle = "#0b0d12"; cx.fillRect(0, 0, cv.width, cv.height);
+  cx.fillStyle = "#8a8fa3"; cx.font = "24px monospace"; cx.fillText("trade flow · last minutes (buys up, sells down)", 36, 54);
+  const now = Date.now() / 1000, W = cv.width - 72, H = cv.height - 160, y0 = 120 + H / 2;
+  cx.strokeStyle = "#232838"; cx.beginPath(); cx.moveTo(36, y0); cx.lineTo(36 + W, y0); cx.stroke();
+  for (const t of trades) { const x = 36 + W * (1 - (now - t.t) / 300); if (x < 36) continue;
+    const h = Math.min(H / 2, 12 + 24 * Math.log10(1 + t.usd)); cx.fillStyle = t.kind === "buy" ? "#39f5a0" : "#ff5a6e";
+    cx.fillRect(x - 3, t.kind === "buy" ? y0 - h : y0, 6, h); }
+  if (!cvTex) { cvTex = screenTexture(cv); fitTop(cvTex, SURF.monitor.w / SURF.monitor.h); } cvTex.needsUpdate = true; return cvTex;
+}
+function drawReading(r){
+  const c = document.createElement("canvas"); c.width = 1100; c.height = 650; const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = "#f6f6f6"; g.fillRect(0, 0, c.width, 64); g.fillStyle = "#202122"; g.font = "22px serif"; g.fillText("WIKIPEDIA · The Free Encyclopedia", 28, 40);
+  g.font = "44px serif"; g.fillText(r.title.slice(0, 40), 40, 140); g.fillStyle = "#a2a9b1"; g.fillRect(40, 158, 1020, 1);
+  g.fillStyle = "#202122"; g.font = "24px sans-serif";
+  const words = (r.extract || "").split(" "); let line = "", y = 205;
+  for (const w of words) { if (g.measureText(line + w).width > 1000) { g.fillText(line, 40, y); line = ""; y += 36; if (y > 620) break; } line += w + " "; }
+  if (y <= 620) g.fillText(line, 40, y);
+  const t = screenTexture(c); fitTop(t, SURF.monitor.w / SURF.monitor.h); return t;
+}
+function drawFood(c){
+  px.fillStyle = "#f6f4ef"; px.fillRect(0, 0, 390, 844);
+  px.fillStyle = "#111"; px.font = "bold 30px sans-serif"; px.fillText("Your order", 24, 90);
+  px.font = "20px sans-serif"; px.fillStyle = "#444"; px.fillText(c ? c.status : "choosing what to eat…", 24, 130);
+  if (c && c.eta_min) { px.fillStyle = "#111"; px.font = "bold 64px sans-serif"; px.fillText(`${c.eta_min} min`, 24, 230); }
+  px.fillStyle = "#d9d4c7"; px.fillRect(24, 280, 342, 300); px.fillStyle = "#06c167"; px.beginPath(); px.arc(120, 430, 14, 0, 7); px.fill();
+  px.fillStyle = "#111"; px.beginPath(); px.arc(270, 380, 10, 0, 7); px.fill();
+  px.fillStyle = "#666"; px.font = "16px sans-serif"; px.fillText("simulated delivery · Kichijōji", 24, 620);
+  if (!pvTex) { pvTex = screenTexture(pv); } pvTex.needsUpdate = true; return pvTex;
+}
+
+// ---------- camera: overview, or close to what he is looking at ----------
+let follow = true, userMovedAt = 0;
+$("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", follow); $("cam").textContent = follow ? "camera: follows him" : "camera: free"; };
+controls.addEventListener("start", () => { userMovedAt = performance.now(); });
+const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3();
+function updateCameraGoal(){
+  if (screenOn === "desk" && monitor) {
+    const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
+    camGoal.target.set(...m.c);
+    camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+  } else if (screenOn === "phone" && phone.visible && head && bones.RightArm) {
+    // over his right shoulder, a little above and behind: his hands and the phone's screen in view
+    phone.getWorldPosition(v1); head.getWorldPosition(v2);
+    const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry));                       // facing
+    const side = bones.RightArm.getWorldPosition(new THREE.Vector3()).sub(bones.LeftArm.getWorldPosition(new THREE.Vector3())).setY(0).normalize();
+    camGoal.target.copy(v1).lerp(v2, 0.35);
+    camGoal.pos.copy(v2).addScaledVector(UP, 0.55).addScaledVector(side, 0.62).addScaledVector(v3, -0.5);
+  } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
+}
+
+// ---------- day and night (from his Tokyo clock) ----------
+let hour = FIXED_HOUR ? +FIXED_HOUR : 12, stage = "AWAKE", lampOn = 0, roomOn = 0;
+const roomTint = new THREE.Color(), WHITE = new THREE.Color(1, 1, 1);
+const cSunDay = new THREE.Color(0xfff0dc), cSunDusk = new THREE.Color(0xff9a5c), cMoon = new THREE.Color(0x6f86c9);
+function lighting(dt){
+  const sunEl = Math.sin(Math.PI * (hour - 5.6) / 12.2);           // Tokyo, autumn: ~05:35 to ~17:45
+  skyMaterial.uniforms.uSun.value = sunEl;
+  const day = smooth(-0.08, 0.3, sunEl), dusk = clamp(1 - Math.abs(sunEl - 0.03) / 0.25, 0, 1);
+  const awake = stage === "AWAKE", home = boy && boy.visible;
+  const evening = awake && day < 0.55 && home;
+  roomOn += ((evening ? 1 : 0) - roomOn) * Math.min(1, dt * 2);
+  const wantLamp = awake && home && (screenOn === "desk" || (current === actions.eat)) && day < 0.7;
+  lampOn += ((wantLamp ? 1 : 0) - lampOn) * Math.min(1, dt * 3);
+  sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
+  sun.intensity = 0.25 + 2.2 * day + 0.6 * dusk;
+  const w = SURF.window; sun.position.set(w.c[0] - 3.5, w.c[1] + 1.2 + 2.5 * Math.max(0, sunEl), w.c[2] + 1.0); sun.target.position.set(0.2, 0.3, 0.1);
+  hemi.intensity = 0.15 + 0.55 * day + 0.35 * roomOn;
+  hemi.color.setHSL(0.09, 0.4, 0.6 + 0.2 * day);
+  ceiling.intensity = 4.0 * roomOn;
+  lamp.intensity = 2.4 * lampOn;
+  renderer.toneMappingExposure = 0.75 + 0.25 * day + 0.1 * roomOn;
+  // the textures have the light baked in: dim and cool them when the lights are off (night, asleep or out)
+  const screenLight = (monitor && monitor.mesh.material !== offMat ? 0.12 : 0) + (phone.visible ? 0.05 : 0);
+  const level = clamp(0.16 + 0.84 * day + 0.75 * roomOn + 0.22 * lampOn + screenLight + 0.15 * dusk, 0, 1);
+  roomTint.setRGB(0.3, 0.36, 0.62).lerp(WHITE, level);
+  for (const m of roomMats) m.color.copy(roomTint);
+  monitorGlow.intensity = monitor && monitor.mesh.material !== offMat ? 0.9 * (1.2 - day) : 0;
+  phoneGlow.intensity = phone.visible ? 0.35 * (1.3 - day) : 0;
+  if (phone.visible) phone.getWorldPosition(phoneGlow.position);
+}
+
+// ---------- the boy follows the life simulation ----------
+const tgt = new THREE.Vector3(), tmp = new THREE.Vector3();
+let targetRot = 0, visible = true, lastLife = null;
+function place(life){
+  const outside = !!life.geo || ["street_home","street_bakery","street_park","bakery_door","bakery_in","counter","park_gate","bench"].includes(life.place);
+  visible = !outside;
+  const [an, clip] = ACT[life.activity] || [PLACE2ANCHOR[life.place] || "middle", "idle"];
+  const anchor = ANCHOR[life.walking ? (PLACE2ANCHOR[life.path_to] || an) : an];
+  tgt.set(...anchor.p); targetRot = anchor.r;
+  play(life.walking ? "walk" : clip);
+}
+function screens(life, st){
+  const atDesk = !life.path && ["research","chart"].includes(life.activity) && st === "AWAKE";
+  const onPhone = !life.path && ["phone","order_food"].includes(life.activity) && st === "AWAKE" && visible;
+  phone.visible = onPhone && !!hand;
+  screenOn = life.activity === "research" && atDesk ? "desk" : life.activity === "phone" && onPhone ? "phone" : null;
+  if (life.screen) showScreen(life.screen);
+  // desk monitor
+  if (monitor) {
+    if (life.activity === "chart" && atDesk) { monitor.id = null; monitor.set(drawChart()); }
+    else if (screenOn === "desk") { const s = lastStatus.desk; if (s && monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
+    else if (atDesk && life.activity === "research" && life.reading) {            // no browser: the article he is reading
+      if (monitor.id !== "wiki:" + life.reading.title) { monitor.set(drawReading(life.reading)); monitor.id = "wiki:" + life.reading.title; } }
+    else if (st !== "AWAKE" || !visible) monitor.off();
+  }
+  // phone
+  const ps = phone.userData.screen;
+  if (life.activity === "order_food" && onPhone) { ps.id = null; ps.set(drawFood(life.courier)); }
+  panel(screenOn ? lastStatus[screenOn] : null);
+}
+
+// ---------- map ----------
+const map = L.map("map", {zoomControl:false, attributionControl:true}).setView([35.7055, 139.5745], 15);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, className:"darktiles",
+  attribution:"© OpenStreetMap"}).addTo(map);
+const dot = (c, r) => L.circleMarker([0, 0], {radius:r, color:c, weight:2, fillColor:c, fillOpacity:.9});
+let homeMk, meMk = dot("#ff9a3c", 7), courierMk = dot("#39f5a0", 6), routes = null;
+fetch("tokyo_routes.json").then(r => r.json()).then(d => {
+  routes = d; homeMk = L.circleMarker(d.places.home, {radius:5, color:"#ececf2", weight:1, fillOpacity:.3}).addTo(map).bindTooltip("home");
+  meMk.setLatLng(d.places.home).addTo(map);
+});
+fetch("/api/browsing").then(r => r.json()).then(d => { if (!d.on) $("h-screen").textContent = "Reading is real Wikipedia (CC BY-SA)."; }).catch(() => {});
+
+// ---------- live ----------
+const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery"};
+let sock = null;
+function connect(){
+  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  ws.onopen = () => $("live").classList.add("on");
+  ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
+    if (m.type === "screen") { showScreen(m); return; }
+    if (m.type !== "tick" || !m.life) return;
+    const life = m.life, sl = m.sleep || {};
+    lastLife = life; stage = sl.stage || "AWAKE";
+    const hm = /(\d+):(\d+)/.exec(sl.clock || ""); if (hm && !FIXED_HOUR) hour = +hm[1] + hm[2] / 60;
+    for (const t of m.trades || []) trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd});
+    trades = trades.filter(t => Date.now() / 1000 - t.t < 300);
+    $("chip").textContent = sl.stage === "AWAKE" ? "AWAKE" : sl.stage === "REM" ? "REM" : "ASLEEP";
+    $("chip").style.background = sl.stage === "AWAKE" ? "#ff9a3c" : sl.stage === "REM" ? "#c26bff" : "#4d7cff";
+    $("clock").textContent = `${sl.clock || ""} Tokyo`;
+    const outside = !!life.geo || ["counter","bakery_in","bench","park_gate","bakery_door"].includes(life.place);
+    $("where").textContent = outside ? "· out in Kichijōji" : "· in his room";
+    const r = life.reading, sc = life.screen;
+    const short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
+    $("story").innerHTML = sc && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"}: <em>${esc(short(sc.title))}</em>.`
+      : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`;
+    $("why").textContent = life.say || "";
+    if (r && !sc) { $("readcard").hidden = false; $("r-title").textContent = r.title; $("r-text").textContent = r.extract;
+      $("r-link").href = r.url || "#"; $("r-why").textContent = r.why || ""; }
+    else $("readcard").hidden = true;
+    place(life); screens(life, stage);
+    $("away").style.display = outside ? "block" : "none";
+    $("away").textContent = outside ? `the room is empty · he is ${life.walking ? "walking" : LABEL_AWAY[life.activity] || "out"} — see the map` : "";
+    $("mapcard").classList.toggle("out", outside);
+    if (routes) {
+      const pos = life.geo ? [life.geo.lat, life.geo.lng] : outside && life.activity === "park" ? routes.places.park
+        : outside ? routes.places.bakery : routes.places.home;
+      meMk.setLatLng(pos);
+      const c = life.courier;
+      if (c && c.geo) { courierMk.setLatLng([c.geo.lat, c.geo.lng]).addTo(map); } else courierMk.remove();
+      $("m-st").textContent = c ? `courier: ${c.status}${c.eta_min ? ` · ${c.eta_min} min` : ""}` : outside ? "he is out" : "he is home";
+      if (outside || (c && c.geo)) map.panTo(c && c.geo && !outside ? [c.geo.lat, c.geo.lng] : pos, {animate:true});
+    }
+    $("n-food").textContent = life.food ? `${life.food} meal waiting` : life.bread ? `${life.bread} bread` : "nothing to eat";
+    $("n-text").innerHTML = `hunger ${Math.round(life.hunger * 100)}% · boredom ${Math.round(life.boredom * 100)}%`
+      + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : "");
+  };
+}
+if (!(DEBUG && new URLSearchParams(location.search).has("nolive"))) connect();
+$("chat").addEventListener("submit", ev => {
+  ev.preventDefault(); const t = $("msg").value.trim(); if (!t) return;
+  if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting"; $("note").className = "err"; return; }
+  sock.send(JSON.stringify({type:"chat", text:t})); $("msg").value = "";
+});
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, clock.getDelta());
+  skyMaterial.uniforms.uTime.value += dt;
+  if (mixer) mixer.update(dt);
+  if (boy) {
+    boy.visible = visible;
+    tmp.copy(tgt).sub(boy.position); const d = tmp.length();
+    if (d > 0.02) { const step = Math.min(d, 0.9 * dt); boy.position.addScaledVector(tmp.normalize(), step);
+      if (Math.hypot(tmp.x, tmp.z) > 0.05) boy.rotation.y = Math.atan2(tmp.x, tmp.z); }
+    else { let dr = targetRot - boy.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); boy.rotation.y += dr * Math.min(1, 4 * dt); }
+    if (phone.visible && boy.visible) holdPhone();
+  }
+  lighting(dt);
+  if (follow && performance.now() - userMovedAt > 20000) {
+    updateCameraGoal();
+    const k = 1 - Math.exp(-dt * 1.2);
+    camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
+  }
+  controls.update(); renderer.render(scene, camera);
+}
+frame();
+if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
+  setHour: h => { hour = h; }, setScreen: s => { screenOn = s; } });
+  Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, hand:{get:() => hand}, head:{get:() => head},
+    monitor:{get:() => monitor}, sky:{get:() => sky}}); }
+</script>
+</body>
+</html>
