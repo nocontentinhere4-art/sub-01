@@ -9,6 +9,7 @@ Never imports torch or spiking.net.
 """
 import asyncio
 import json
+import secrets
 import os
 import re
 import sys
@@ -258,11 +259,17 @@ class PodManager:
         if minutes < MIN_MINUTES:
             return f"skipped: only {minutes:.0f} min allowed (daily cap / window)"
         cfg = self.session_config(start, minutes, now)
-        env = await loop.run_in_executor(None, self._pack or podpack.pack)
-        env = dict(env, SUB01_SESSION=json.dumps(cfg), SUB01_SERVER_URL=self.server_url,
+        data = await loop.run_in_executor(None, self._pack or podpack.pack_bytes)
+        token = secrets.token_hex(24)
+        env = dict(podpack.boot_env(token), SUB01_SESSION=json.dumps(cfg), SUB01_SERVER_URL=self.server_url,
                    SUB01_POD_SECRET=self.secret, SUB01_SESSION_ID=cfg["session_id"])
         pod = await loop.run_in_executor(None, self.ops.create, env, "session", "spiking.session", minutes)
         pod_id = pod["id"]
+        try:                                                     # code + data go up after boot (create body < 100 KB)
+            await loop.run_in_executor(None, self.ops.upload, pod_id, data, token)
+        except BaseException:
+            await self._delete(pod_id, "pack upload failed")
+            raise
         t0 = self.clock()
         self.current = {"session_id": cfg["session_id"], "pod_id": pod_id, "started": t0, "hello": False,
                         "last_seen": t0, "disconnected_at": None, "done": None,

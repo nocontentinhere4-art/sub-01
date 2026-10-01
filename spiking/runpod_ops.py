@@ -160,6 +160,25 @@ class RunPodOps:
         with self.opener(req, timeout=timeout) as r:
             return r.read()
 
+    def upload(self, pod_id, data, token, timeout=900, interval=10):
+        """PUT the pack to the pod's bootstrap server once it answers (credential-free; one-time token)."""
+        self.wait_http(pod_id, "status.json", timeout=timeout, interval=interval)
+        last = None
+        for i in range(5):
+            try:
+                req = urllib.request.Request(self.proxy_url(pod_id, "upload"), data=data, method="PUT",
+                                             headers={"X-Upload-Token": token, "User-Agent": "sub01/1.0",
+                                                      "Content-Type": "application/octet-stream"})
+                with self.opener(req, timeout=300) as r:
+                    if r.status == 200:
+                        return True
+            except Exception as e:
+                last = e
+                if getattr(e, "code", None) in (400, 403):              # rejected for good (bad pack / token)
+                    break
+            self.sleep(5 * (i + 1))
+        raise RuntimeError(f"pack upload to {pod_id} failed ({type(last).__name__ if last else 'no 200'})")
+
     def wait_http(self, pod_id, path, timeout=600, interval=5):
         end = self.clock() + timeout
         last = None

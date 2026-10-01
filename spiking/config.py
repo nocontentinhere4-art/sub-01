@@ -24,6 +24,8 @@ class Config:
     k_long: int = 30                    # excitatory, other regions, source region ~ streamline counts
     k_hc_rec: int = 100                 # extra E->E recurrent collaterals for hippocampal E (CA3-like)
     k_hc_rec_i: int = 100               # ...and onto hippocampal interneurons (feedback inhibition tracks assemblies)
+    k_vis_sm: int = 0                   # POSITIVE CONTROL ONLY (not the real wiring): direct visual -> somatomotor E->E
+    j_vis_sm: float = 0.1               # initial weight of that hypothetical projection (plastic)
     # --- LIF neuron ------------------------------------------------------------------------------------
     dt: float = 1.0
     tau_m: float = 20.0
@@ -72,8 +74,8 @@ class Config:
     tau_forget_hc_days: float = 3.0     # learned hippocampal weights decay between sessions
     tau_forget_ctx_days: float = 60.0   # learned cortical weights decay (much slower)
 
-    STRUCTURAL = ("n_neurons", "seed", "frac_exc", "min_region", "hc_scale", "k_e_local", "k_i_local", "k_long", "k_hc_rec", "k_hc_rec_i",
-                  "dt", "j_e", "g_i", "j_hc_rec", "j_hc_ei", "delay_local", "velocity_mm_ms")
+    STRUCTURAL = ("n_neurons", "seed", "frac_exc", "min_region", "hc_scale", "k_e_local", "k_i_local", "k_long", "k_hc_rec", "k_hc_rec_i", "k_vis_sm",
+                  "dt", "j_e", "g_i", "j_hc_rec", "j_hc_ei", "j_vis_sm", "delay_local", "velocity_mm_ms")
 
     def config_hash(self):
         """Identity of the synapse set: learned weights only load into a network with the same hash."""

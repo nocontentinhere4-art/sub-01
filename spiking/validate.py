@@ -9,6 +9,7 @@ errors and on the deadline; the cost log is data/spiking/costs.jsonl.
 """
 import argparse
 import json
+import secrets
 import sys
 import time
 from datetime import date
@@ -48,8 +49,10 @@ def run_gpu(args, ops=None, out_dir=GPU_DIR, interval=20, say=print):
                          extra=json.loads(args.extra) if getattr(args, "extra", None) else None)
     out_dir = Path(args.out) if getattr(args, "out", None) else out_dir
     ops = ops or RunPodOps(log=CostLog(ROOT / "data" / "spiking" / "costs.jsonl"))
-    env = podpack.pack(verbose=True)
-    env["SUB01_SESSION"] = json.dumps(cfg)
+    token = secrets.token_hex(24)
+    data = podpack.pack_bytes()
+    say(f"pack: {len(data) / 1e6:.2f} MB (uploaded to the pod after boot)")
+    env = dict(podpack.boot_env(token, args.module), SUB01_SESSION=json.dumps(cfg))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     pod = ops.create(env, "validate", args.module, minutes)
@@ -59,6 +62,8 @@ def run_gpu(args, ops=None, out_dir=GPU_DIR, interval=20, say=print):
     try:
         deadline = ops.deadlines[pod_id]
         with ops.guard(pod_id, deadline):
+            ops.upload(pod_id, data, token, timeout=min(900, max(60, deadline - ops.clock() - 60)))
+            say("pack uploaded")
             last = None
             while True:
                 if ops.clock() >= deadline:

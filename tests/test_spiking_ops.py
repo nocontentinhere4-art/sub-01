@@ -3,10 +3,17 @@
 No network, no RunPod calls: every API is a recording fake. Run: python -m pytest tests/test_spiking_ops.py -q
 """
 import asyncio
+import base64
 import hashlib
 import io
 import json
+import os
+import socket
+import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -68,7 +75,43 @@ class FakeApi:
 def make_ops(tmp_path, api=None, cap=4.0, clock=None, **kw):
     api = api or FakeApi()
     log = CostLog(tmp_path / "costs.jsonl", **({"clock": clock} if clock else {}))
+    kw.setdefault("opener", FakePodHttp())                    # never a real network call
     return RunPodOps(api=api, log=log, hours_cap=cap, sleep=lambda s: None, install_hooks=False, **kw), api, log
+
+
+class Resp:
+    def __init__(self, data=b"", status=200):
+        self.data, self.status = data, status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        return self.data
+
+
+class FakePodHttp:
+    """Stands in for the pod behind proxy.runpod.net: status.json answers at once, PUT /upload is recorded."""
+
+    def __init__(self, upload_code=200, put_error=None):
+        self.upload_code, self.put_error, self.puts, self.gets = upload_code, put_error, [], []
+
+    def __call__(self, req, timeout=0):
+        name = req.full_url.split("proxy.runpod.net/")[1]
+        if req.get_method() == "PUT":
+            self.puts.append((name, req.data, dict(req.header_items())))
+            if self.put_error:
+                raise self.put_error
+            if self.upload_code != 200:
+                raise urllib.error.HTTPError(req.full_url, self.upload_code, "refused", {}, None)
+            return Resp(b"ok")
+        self.gets.append(name)
+        if name == "status.json":
+            return Resp(b'{"phase": "waiting_upload", "done": false}')
+        raise urllib.error.HTTPError(req.full_url, 404, "nf", {}, None)
 
 
 class FakeClock:
@@ -149,6 +192,29 @@ def test_create_body_and_start_cmd():
     assert "python3 -m http.server 8000 -d /out" in s and "echo $? > /out/exit_code; sleep 600" in s
     assert "python3 -m spiking.validate_pod > /out/session.log 2>&1" in s and "mkdir -p /app /out" in s
     assert podpack.start_cmd()[2].count("python3 -m spiking.session") == 1
+
+
+def test_create_body_boot_env_and_size_limit():
+    token = "t" * 48
+    env = podpack.boot_env(token, "spiking.session")
+    body = podpack.create_body(env, "sub01-spiking-x")
+    assert body["dockerStartCmd"] == podpack.boot_cmd() and body["env"]["SUB01_UPLOAD_TOKEN"] == token
+    assert len(json.dumps(body)) < 90_000 and "SUB01_PACK_0" not in body["env"]
+    assert base64.b64decode(env["SUB01_BOOT"]).decode() == podpack.BOOT_PY
+    compile(podpack.BOOT_PY, "boot.py", "exec")                                   # the bootstrap is valid Python
+    with pytest.raises(AssertionError):
+        podpack.boot_env("short")
+    with pytest.raises(AssertionError):                                           # a pack in env vars is too big
+        podpack.create_body(dict(env, SUB01_BIG="x" * 100_000), "n")
+    with pytest.raises(AssertionError):
+        podpack.create_body(env, "n", "NVIDIA H100 80GB HBM3")
+
+
+def test_pack_bytes_members():
+    import tarfile
+    names = tarfile.open(fileobj=io.BytesIO(podpack.pack_bytes(k=1)), mode="r:xz").getnames()
+    assert "real_baseline.py" in names and "out/connectome.npz" in names and "out/rest/qc.json" in names
+    assert any(n.startswith("spiking/") and n.endswith(".py") for n in names)
 
 
 # --- cost log ------------------------------------------------------------------------
@@ -297,12 +363,6 @@ def test_ops_delete_failure_raises_and_keeps_log_open(tmp_path):
 def test_ops_exit_cleanup_and_proxy_fetch_has_no_key(tmp_path, monkeypatch):
     seen = []
 
-    class Resp:
-        def __init__(self, data): self.data = data
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def read(self): return self.data
-
     def opener(req, timeout=0):
         seen.append((req.full_url, dict(req.header_items())))
         if len(seen) < 3:
@@ -317,6 +377,35 @@ def test_ops_exit_cleanup_and_proxy_fetch_has_no_key(tmp_path, monkeypatch):
     assert not any(k.lower() == "authorization" for _, h in seen for k in h)
     ops._exit_cleanup()
     assert ops.ours() == [] and [p["name"] for p in api.pods] == ["BRAIN"]
+
+
+def test_ops_upload_puts_with_token_and_no_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("RUNPOD_API_KEY", "secret-key-123")
+    http = FakePodHttp()
+    ops, api, log = make_ops(tmp_path, opener=http)
+    pod = ops.create(ENV, "session", max_minutes=30)
+    assert ops.upload(pod["id"], b"PACK", "tok" * 12) is True
+    name, data, headers = http.puts[0]
+    assert name == "upload" and data == b"PACK" and headers["X-upload-token"] == "tok" * 12
+    assert "Authorization" not in headers and http.gets == ["status.json"]          # waited for the bootstrap first
+
+
+def test_ops_upload_403_is_final_and_5xx_retries_boundedly(tmp_path):
+    http = FakePodHttp(upload_code=403)
+    ops, api, log = make_ops(tmp_path, opener=http)
+    pod = ops.create(ENV, "session", max_minutes=30)
+    with pytest.raises(RuntimeError):
+        ops.upload(pod["id"], b"PACK", "t" * 40)
+    assert len(http.puts) == 1                                                       # no retry loop on 403
+    http = FakePodHttp(upload_code=502)
+    ops.opener = http
+    with pytest.raises(RuntimeError):
+        ops.upload(pod["id"], b"PACK", "t" * 40)
+    assert len(http.puts) == 5                                                       # bounded retries otherwise
+    ops.opener = FakePodHttp(put_error=OSError("reset"))
+    with pytest.raises(RuntimeError):
+        ops.upload(pod["id"], b"PACK", "t" * 40)
+    assert len(ops.opener.puts) == 5
 
 
 def test_ops_wait_http_timeout(tmp_path):
@@ -374,10 +463,10 @@ def make_mgr(tmp_path, now, api=None, env=None, schedule="21:00-23:00", **kw):
     fc = FakeClock(now, kw.pop("stop_at", None))
     api = api or FakeApi()
     log = CostLog(tmp_path / "spiking" / "costs.jsonl", clock=fc.now)
-    ops = RunPodOps(api=api, log=log, hours_cap=4.0, sleep=lambda s: None, install_hooks=False)
+    ops = RunPodOps(api=api, log=log, hours_cap=4.0, sleep=lambda s: None, install_hooks=False, opener=FakePodHttp())
     mgr = PodManager(tmp_path, "https://srv.example", "pod-secret", clock=fc.now, sleep=fc.sleep, ops=ops, tick=5.0,
                      schedule=Schedule.parse(schedule), env=env or {}, get_messages=kw.pop("get_messages", None))
-    mgr._pack = lambda: {"SUB01_PACK_0": "x"}
+    mgr._pack = lambda: b"tar-bytes"
     stops = []
 
     async def send_stop():
@@ -491,6 +580,32 @@ def test_manager_done_deletes_and_error_deletes(tmp_path):
     fc.script.append((tk(1, 21, 1), mgr.on_hello))
     fc.script.append((tk(1, 21, 2), lambda: mgr.on_done({"ok": False, "error": "cuda out of memory"})))
     assert run(mgr.run_session(tk(1, 21), tk(1, 23))).startswith("done with error") and len(api.pods) == 1
+
+
+def test_manager_uploads_pack_after_create(tmp_path):
+    mgr, fc, api, log, stops = make_mgr(tmp_path, tk(1, 21))
+    fc.script.append((tk(1, 21, 2), mgr.on_hello))
+    beats(mgr, fc, tk(1, 21, 2), until=tk(1, 21, 10))
+    assert run(mgr.run_session(tk(1, 21), tk(1, 23))) == "stream lost"
+    name, data, headers = mgr.ops.opener.puts[0]
+    env = [c[2] for c in api.calls if c[0] == "POST"][0]["env"]
+    assert name == "upload" and data == b"tar-bytes" and headers["X-upload-token"] == env["SUB01_UPLOAD_TOKEN"]
+    assert "SUB01_PACK_0" not in env and len(env["SUB01_UPLOAD_TOKEN"]) >= 32
+
+
+def test_manager_deletes_pod_when_upload_fails(tmp_path):
+    mgr, fc, api, log, stops = make_mgr(tmp_path, tk(1, 21))
+    mgr.ops.opener = FakePodHttp(upload_code=403)
+    with pytest.raises(RuntimeError):
+        run(mgr.run_session(tk(1, 21), tk(1, 23)))
+    assert [p["name"] for p in api.pods] == ["BRAIN"] and reasons(log) == ["pack upload failed"]
+    assert mgr.current is None and len(mgr.ops.opener.puts) == 1
+    # any other exception from upload (e.g. a timeout waiting for the pod) also deletes it
+    mgr, fc, api, log, stops = make_mgr(tmp_path / "t", tk(1, 21))
+    mgr.ops.upload = lambda *a, **k: (_ for _ in ()).throw(TimeoutError("pod never answered"))
+    with pytest.raises(TimeoutError):
+        run(mgr.run_session(tk(1, 21), tk(1, 23)))
+    assert [p["name"] for p in api.pods] == ["BRAIN"] and reasons(log) == ["pack upload failed"]
 
 
 def test_manager_cancel_deletes_pod(tmp_path):
@@ -812,18 +927,17 @@ def test_live_server_forwarding_hooks(tmp_path):
 def test_validate_gpu_with_fake_pod(tmp_path, monkeypatch):
     from spiking import validate
 
-    class Resp:
-        def __init__(self, data): self.data = data
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def read(self): return self.data
-
     polls = [0]
     files = {"results.json": json.dumps({"files": ["curve.png", "../evil.png", "notes.json", "x.exe"]}).encode(),
              "session.log": b"log", "curve.png": b"PNG", "notes.json": b"{}", "../evil.png": b"bad"}
 
+    puts = []
+
     def opener(req, timeout=0):
         name = req.full_url.split("proxy.runpod.net/")[1]
+        if req.get_method() == "PUT":
+            puts.append((name, req.data, req.get_header("X-upload-token")))
+            return Resp(b"ok")
         if name == "status.json":
             polls[0] += 1
             if polls[0] == 1:
@@ -831,7 +945,7 @@ def test_validate_gpu_with_fake_pod(tmp_path, monkeypatch):
             return Resp(json.dumps({"phase": "pong_train", "progress": 0.5, "t_sim": 3.0,
                                     "done": polls[0] >= 3, "error": None}).encode())
         return Resp(files[name])
-    monkeypatch.setattr(validate.podpack, "pack", lambda **kw: dict(ENV))
+    monkeypatch.setattr(validate.podpack, "pack_bytes", lambda **kw: b"tar-bytes")
     ops, api, log = make_ops(tmp_path / "ops", opener=opener)
     lines = []
     args = validate.argparse.Namespace(gpu=True, minutes=50, n=1000000, phases=None, pong_minutes=10,
@@ -844,11 +958,13 @@ def test_validate_gpu_with_fake_pod(tmp_path, monkeypatch):
     assert cfg["validate"] is True and cfg["n_neurons"] == 1000000 and post["name"].startswith("sub01-spiking-validate-")
     assert any("no pods of ours remain" in x for x in lines) and any("total spend" in x for x in lines)
     assert ("DELETE", "/pods/brain1") not in api.mutating()
+    assert post["dockerStartCmd"] == podpack.boot_cmd() and "SUB01_BOOT" in post["env"]
+    assert puts == [("upload", b"tar-bytes", post["env"]["SUB01_UPLOAD_TOKEN"])] and "SUB01_PACK_0" not in post["env"]
 
 
 def test_validate_gpu_deletes_when_polling_fails(tmp_path, monkeypatch):
     from spiking import validate
-    monkeypatch.setattr(validate.podpack, "pack", lambda **kw: dict(ENV))
+    monkeypatch.setattr(validate.podpack, "pack_bytes", lambda **kw: b"tar-bytes")
     ops, api, log = make_ops(tmp_path / "ops", opener=lambda req, timeout=0: (_ for _ in ()).throw(OSError("down")))
     t = [0.0]
     ops.clock = lambda: t[0]
@@ -865,3 +981,62 @@ def test_validate_write_report_hook_skips_when_missing(tmp_path):
     lines = []
     if not (ROOT / "spiking" / "report.py").exists():
         assert validate.write_report(tmp_path, tmp_path, say=lines.append) is None and lines
+
+
+# --- the bootstrap, for real ---------------------------------------------------------
+def http_call(port, method, path, data=None, token=None):
+    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method=method,
+                                 headers={"X-Upload-Token": token} if token is not None else {})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+
+def test_boot_py_subprocess_end_to_end(tmp_path):
+    out, app = tmp_path / "out", tmp_path / "app"
+    with socket.socket() as sk:
+        sk.bind(("127.0.0.1", 0))
+        port = sk.getsockname()[1]
+    token = "k" * 48
+    pack = podpack._tar_xz({"dummymod.py": (
+        b"import json, os, time\n"
+        b"out = os.environ['SUB01_OUT_DIR']\n"
+        b"json.dump({'phase': 'run', 'done': False, 'error': None}, open(out + '/status.json', 'w'))\n"
+        b"time.sleep(0.2)\n"
+        b"json.dump({'phase': 'end', 'done': True, 'error': None}, open(out + '/status.json.tmp', 'w'))\n"
+        b"os.replace(out + '/status.json.tmp', out + '/status.json')\n")})
+    env = dict(os.environ, SUB01_OUT_DIR=str(out), SUB01_APP_DIR=str(app), SUB01_BOOT_PORT=str(port),
+               SUB01_UPLOAD_TOKEN=token, SUB01_MODULE="dummymod")
+    boot = tmp_path / "boot.py"
+    boot.write_text(podpack.BOOT_PY)
+    proc = subprocess.Popen([sys.executable, str(boot)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        def wait(cond, secs=20):
+            end = time.monotonic() + secs
+            while time.monotonic() < end:
+                try:
+                    if cond():
+                        return True
+                except OSError:
+                    pass
+                time.sleep(0.05)
+            return False
+        assert wait(lambda: http_call(port, "GET", "/status.json")[0] == 200)
+        assert json.loads(http_call(port, "GET", "/status.json")[1])["phase"] == "waiting_upload"
+        assert http_call(port, "PUT", "/upload", pack, "wrong-token")[0] == 403
+        assert http_call(port, "PUT", "/upload", pack)[0] == 403                              # no token
+        assert http_call(port, "PUT", "/elsewhere", pack, token)[0] == 403
+        assert http_call(port, "PUT", "/upload", b"", token)[0] == 403                        # empty body
+        assert http_call(port, "PUT", "/upload", b"not an archive", token)[0] == 400          # bad pack: not consumed
+        code, body = http_call(port, "PUT", "/upload", pack, token)
+        assert code == 200 and body == b"ok"
+        assert http_call(port, "PUT", "/upload", pack, token)[0] == 403                       # one upload only
+        assert wait(lambda: json.loads(http_call(port, "GET", "/status.json")[1]).get("done") is True)
+        assert json.loads(http_call(port, "GET", "/status.json")[1])["phase"] == "end"
+        assert wait(lambda: (out / "exit_code").exists()) and (out / "exit_code").read_text() == "0"
+        assert (app / "dummymod.py").exists() and (out / "session.log").exists()
+    finally:
+        proc.kill()
+        proc.wait(timeout=10)

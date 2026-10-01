@@ -132,6 +132,14 @@ class SpikingNet:
                 src_l.append(i32(s)); dst_l.append(i32(np.repeat(ti, c.k_hc_rec_i)))
                 w_l.append(np.full(s.size, c.j_hc_ei, np.float32)); kind_l.append(np.full(s.size, 4, np.uint8))
                 d_l.append(u8(rng.integers(d0, d1 + 1, size=s.size)))
+        if c.k_vis_sm > 0:                       # positive control: a projection the real wiring does not have
+            vis_e = np.concatenate([self.region_neurons(r, exc_only=True) for r in self.reg.groups["visual"]])
+            for r in self.reg.groups["somatomotor"]:
+                te = np.arange(self.off[r], self.off[r] + self.n_exc[r])
+                s = vis_e[rng.integers(0, len(vis_e), size=(len(te), c.k_vis_sm))]
+                src_l.append(i32(s)); dst_l.append(i32(np.repeat(te, c.k_vis_sm)))
+                w_l.append(np.full(s.size, c.j_vis_sm, np.float32)); kind_l.append(np.full(s.size, 5, np.uint8))
+                d_l.append(u8(np.full(s.size, 5)))
         dev = self.device
         src = torch.from_numpy(np.concatenate(src_l).astype(np.int32)).to(dev)
         del src_l

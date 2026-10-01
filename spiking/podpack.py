@@ -1,7 +1,11 @@
-"""Pack the code and data a pod needs into environment variables (no GitHub credentials on the pod).
+"""Get the code and data onto a pod without GitHub credentials.
 
-`pack()` -> {"SUB01_PACK_0": b64, ...}; `start_cmd()` unpacks them and runs a module; `create_body()` is the RunPod
-create-pod JSON. Only the two allowed GPU types can ever be requested.
+RunPod refuses create requests above ~100 KB, so the create body carries only a small bootstrap (`boot_env`): the
+pod starts an HTTP server on port 8000 that serves /out and accepts ONE upload of the code+data pack
+(`pack_bytes()`, tar.xz) at PUT /upload with a random per-pod token (X-Upload-Token, constant-time compare). The
+controller (validate / pod_manager) uploads through https://<podId>-8000.proxy.runpod.net/upload; then the pod
+unpacks into /app and runs the session module. `create_body()` is the RunPod create-pod JSON; only the two
+allowed GPU types can ever be requested. `pack()`/`unpack()` (env-var chunks) remain for small packs and tests.
 """
 import base64
 import glob
@@ -110,6 +114,77 @@ def unpack(env, dest):
     return names
 
 
+BOOT_PY = r'''
+import hmac, http.server, io, json, os, subprocess, sys, tarfile, threading, time
+TOKEN, MODULE = os.environ["SUB01_UPLOAD_TOKEN"], os.environ.get("SUB01_MODULE", "spiking.session")
+OUT, APP = os.environ.get("SUB01_OUT_DIR", "/out"), os.environ.get("SUB01_APP_DIR", "/app")
+PORT = int(os.environ.get("SUB01_BOOT_PORT", "8000"))
+MAX = 300 * 1024 * 1024
+state = {"received": False}
+os.makedirs(OUT, exist_ok=True)
+def status(**kw):
+    open(OUT + "/status.json.tmp", "w").write(json.dumps(dict({"done": False, "error": None, "progress": 0}, **kw)))
+    os.replace(OUT + "/status.json.tmp", OUT + "/status.json")
+def run():
+    log = open(OUT + "/session.log", "w")
+    try:
+        subprocess.run([sys.executable, "-c", "import numpy, aiohttp"], check=True, capture_output=True)
+    except Exception:
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "numpy", "aiohttp"], stdout=log, stderr=log)
+    code = subprocess.run([sys.executable, "-m", MODULE], cwd=APP, stdout=log, stderr=subprocess.STDOUT).returncode
+    open(OUT + "/exit_code", "w").write(str(code))
+    try:
+        st = json.load(open(OUT + "/status.json"))
+    except Exception:
+        st = {}
+    if not st.get("done"):
+        status(phase="crashed", done=True, error="session exited with code %d" % code)
+class H(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *a, **k):
+        super().__init__(*a, directory=OUT, **k)
+    def log_message(self, *a):
+        pass
+    def do_PUT(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if self.path != "/upload" or state["received"] or n <= 0 or n > MAX or \
+                not hmac.compare_digest(self.headers.get("X-Upload-Token", ""), TOKEN):
+            self.send_response(403); self.end_headers(); return
+        data = self.rfile.read(n)
+        try:
+            with tarfile.open(fileobj=io.BytesIO(data), mode="r:xz") as tf:
+                tf.extractall(APP, filter="data")
+        except Exception as e:
+            self.send_response(400); self.end_headers(); self.wfile.write(type(e).__name__.encode()); return
+        state["received"] = True
+        status(phase="unpacked")
+        self.send_response(200); self.end_headers(); self.wfile.write(b"ok")
+        threading.Thread(target=run, daemon=True).start()
+status(phase="waiting_upload")
+http.server.ThreadingHTTPServer(("", PORT), H).serve_forever()
+'''
+
+
+def pack_bytes(k=3, root=ROOT, max_trs=None, extra=None):
+    """tar.xz of the default code + data set and a few resting-state runs (uploaded to the pod after boot)."""
+    root = Path(root)
+    members = {rel: (root / rel).read_bytes() for rel in default_files(root)}
+    members.update(rest_subset(k=k, rest_dir=root / "out" / "rest", max_trs=max_trs))
+    members.update(extra or {})
+    return _tar_xz(members)
+
+
+def boot_env(token, module="spiking.session"):
+    """The small env the create request carries: bootstrap script, upload token, module to run."""
+    assert len(token) >= 32
+    return {"SUB01_BOOT": base64.b64encode(BOOT_PY.encode()).decode(), "SUB01_UPLOAD_TOKEN": token,
+            "SUB01_MODULE": module}
+
+
+def boot_cmd():
+    script = "mkdir -p /app /out && printf '%s' \"$SUB01_BOOT\" | base64 -d > /app/boot.py && cd /app && exec python3 /app/boot.py"
+    return ["bash", "-c", script]
+
+
 def start_cmd(module="spiking.session"):
     """The pod's docker start command: unpack, serve /out on 8000, run the module, keep results readable 10 min."""
     script = (f"mkdir -p /app /out && cd /app\n"
@@ -121,11 +196,15 @@ def start_cmd(module="spiking.session"):
 
 
 def create_body(env, name, gpu="NVIDIA RTX A5000", module="spiking.session"):
-    """RunPod create-pod JSON: one on-demand secure-cloud GPU, no volume, port 8000 proxied."""
+    """RunPod create-pod JSON: one on-demand secure-cloud GPU, no volume, port 8000 proxied.
+
+    With a bootstrap env (SUB01_BOOT) the pod waits for the pack upload; otherwise it unpacks SUB01_PACK_* itself."""
     assert gpu in GPUS, f"GPU type not allowed: {gpu}"
-    return {"name": name, "imageName": IMAGE, "gpuTypeIds": [gpu], "gpuCount": 1, "interruptible": False,
+    body = {"name": name, "imageName": IMAGE, "gpuTypeIds": [gpu], "gpuCount": 1, "interruptible": False,
             "cloudType": "SECURE", "containerDiskInGb": 30, "volumeInGb": 0, "ports": ["8000/http"],
-            "env": dict(env), "dockerStartCmd": start_cmd(module)}
+            "env": dict(env), "dockerStartCmd": boot_cmd() if "SUB01_BOOT" in env else start_cmd(module)}
+    assert len(json.dumps(body)) < 90_000, "create request too large for RunPod (~100 KB limit)"
+    return body
 
 
 if __name__ == "__main__":
