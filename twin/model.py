@@ -17,10 +17,10 @@ in NREM sleep (low acetylcholine unblocks K+ adaptation currents; McCormick 1992
 
 (xi: unit white noise; in code dE gets + sigma sqrt(dt) N(0,1) per step. Integration: stochastic Heun, dt = 1 ms.)
 
-Local E/I balance: c_IE,k is set so that every region sits at the target excitatory rate rho at rest, i.e. the
-fixed point that the inhibitory synaptic plasticity rule of Vogels et al. (2011, Science 334:1569),
-dc_IE/dt = eta I (E - rho), converges to (Hellyer et al. 2016, PLoS Comput Biol 12:e1004720; Abeysuriya 2018).
-It is solved analytically instead of simulated (no warm-up cost). Option isp_frac < 1 leaves part of the mean
+Local E/I balance: c_IE,k is set so that every region's deterministic fixed point sits at the target excitatory
+rate rho, i.e. where the inhibitory synaptic plasticity rule of Vogels et al. (2011, Science 334:1569),
+dc_IE/dt = -eta I (E - rho), would settle without fluctuations (used by Hellyer et al. 2016, NeuroImage 124:85;
+Abeysuriya 2018). It is solved analytically (no warm-up cost); isp_refine() simulates the rule itself. Option isp_frac < 1 leaves part of the mean
 long-range input to a homeostatic intrinsic offset h_k instead (default isp_frac = 1, h_k = 0).
 
 Sleep / live inputs: the sleep engine's a (-5 awake/REM ... 0 deep NREM) sets depth d = (a + 5) / 5, which scales
