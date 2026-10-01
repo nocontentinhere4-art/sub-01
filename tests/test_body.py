@@ -170,6 +170,7 @@ def test_life_two_days_eats_a_few_times():
         eng = SleepEngine(t0, rng=random.Random(seed))
         eng.update(t0)
         life = Life(None, rng=random.Random(seed))
+        life.time_scale = 10.0                              # 10 s sim per 1 s real step: walks at the same sim speed as live
         t, prev, eats, gl, hu = t0, life.activity, {}, [], []
         while t < t0 + 2 * 86400:
             t += 10.0

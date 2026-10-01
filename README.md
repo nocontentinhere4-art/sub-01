@@ -56,17 +56,22 @@ registration or motion) are moved to `out/rest/rejected/` (not committed) and no
 
 ## Sleep, chat and memory (Phase A)
 
-No language model, no generated text: everything below is a rule table.
+No language model, no generated text. Sleep is a small published circuit model (`sleep.py`, details and numbers in
+`docs/twin/sleep.md`); chat and memory are rule tables.
 
-- **Clock:** Europe/Rome. Awake ~08:00-00:00, asleep 00:00-08:00; with high sleep pressure it goes to bed after 20:00.
+- **Clock:** Asia/Tokyo (`SUB01_TZ`). Undisturbed it sleeps ~23:56-07:54 with 5 NREM-REM cycles of ~90 min.
   `--time-scale 60` runs one sim hour per real minute, `--start 23:55` starts the demo clock there.
+- **Sleep circuit:** sleep/wake is the Phillips & Robinson (2007) MA/VLPO flip-flop driven by a homeostatic
+  somnogen H and a circadian drive C; NREM/REM is a REM-on/REM-off flip-flop with a slow REM pressure (our
+  parameters), so REM episodes lengthen and NREM gets lighter across the night. The engine also exports tonic
+  neuromodulator levels `{DA, 5HT, NE, ACh}` per state (`engine.modulators`), which drive `twin/neurochem.py`.
 - **Stages** (Stuart-Landau parameters glide over ~1-2 min, never jump):
   AWAKE 10 Hz, normal coupling, stimulus gain 1.0 · NREM 1-3 Hz, 2-3x coupling, high synchrony, gain ~0.15
-  (deepest in early cycles) · REM 6 Hz, 0.6x coupling, more noise, gain 0.4 (longer in later cycles). ~90 min cycles.
-- **Arousal:** messages and large trades (>= $5k) add to it, it decays over minutes; crossing the threshold wakes it
-  ("woken at 03:12 by 5 messages"); after 10 quiet minutes it falls asleep again.
-- **Sleep debt:** +1 h per hour awake at night, +0.25 h per wake-up, repaid by sleep (faster before midnight).
-  A tired brain is less reactive (lower gain) and noisier the next day.
+  (deepest in early cycles) · REM 6 Hz, 0.6x coupling, more noise, gain 0.4 (longer in later cycles).
+- **Arousal:** messages and large trades (>= $5k) are input to the MA population and decay over minutes; when it
+  flips the switch the brain wakes ("woken at 03:12 by 5 messages"); once the input fades it falls asleep again.
+- **Sleep debt:** H above the rested cycle, in hours of lost sleep. Lost sleep and wake-ups raise it, sleep repays it,
+  high debt sends it to bed earlier. A tired brain is less reactive (lower gain) and noisier the next day.
 - **Chat:** max 280 characters, 1 message / 10 s per client, duplicates dropped. The filter runs first and blocks links,
   Solana/ETH addresses, $TICKERS, insults, requests for money and personal data (e-mail, phone): blocked messages are
   never shown or stored. Accepted messages hit: language (left temporal + frontal operculum) + somatomotor always,

@@ -6,8 +6,9 @@
 
 Buys drive the reward + visual regions, sells drive salience + amygdala, large
 trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
-A sleep/wake cycle on the Europe/Rome clock (sleep.py) changes the rhythm and how much
-any stimulus gets through; during REM, stored messages are replayed. Page on http://localhost:8765.
+A sleep circuit on the local Asia/Tokyo clock (sleep.py: Phillips-Robinson MA/VLPO flip-flop + REM-on/REM-off
+oscillator) changes the rhythm, how much any stimulus gets through and the tonic neuromodulator levels;
+during REM, stored messages are replayed. Page on http://localhost:8765.
 """
 import argparse
 import asyncio
@@ -27,7 +28,7 @@ from aiohttp import web
 
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
-from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
+from sleep import TZ, Clock, Memory, SleepEngine, Store, hhmm
 from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
@@ -41,11 +42,6 @@ HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
-# tonic neuromodulator targets per stage (1.0 = resting wake): monoamines fall in NREM and go almost silent in REM,
-# acetylcholine is low in NREM and high in REM (Pace-Schott & Hobson 2002, Nat Rev Neurosci 3:591)
-STAGE_MOD = {"AWAKE": {"DA": 1.0, "5HT": 1.0, "NE": 1.0, "ACh": 1.0},
-             "NREM": {"DA": 0.8, "5HT": 0.5, "NE": 0.5, "ACh": 0.3},
-             "REM": {"DA": 0.9, "5HT": 0.05, "NE": 0.05, "ACh": 1.2}}
 NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
@@ -306,7 +302,7 @@ class Live:
             base = sum(groups.values()) / max(1, len(groups))
             rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
             # neuromodulators x receptor maps -> regional excitability; the body -> interoceptive drive to the insula
-            levels = self.neuro.update(TICK, STAGE_MOD.get(self.engine.stage, STAGE_MOD["NREM"]))
+            levels = self.neuro.update(TICK, self.engine.modulators)      # tonic levels read from the sleep circuit
             b.neuromod = NEURO_K * (self.neuro.region_gain(levels)[self.nm_idx] - 1.0)
             amyg = max(0.0, rel.get("fear", 1.0) - 1.0)
             body_levels = dict(levels, NE=min(levels["NE"], 1.5))       # the market can quicken his pulse, not race it
@@ -444,9 +440,9 @@ class Live:
 
 
 def parse_start(hm):
-    """'HH:MM' -> sim epoch of that Rome time today."""
+    """'HH:MM' -> sim epoch of that local (Tokyo) time today."""
     h, m = map(int, hm.split(":"))
-    return datetime.now(ROME).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
+    return datetime.now(TZ).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
 
 
 LOGIN_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -606,7 +602,7 @@ if __name__ == "__main__":
     p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     p.add_argument("--frames-dir", help="where eye frames are written (default out/eye/frames)")
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
-    p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
+    p.add_argument("--start", help="local (Tokyo) time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
     p.add_argument("--replay-real-session", action="store_true", default=os.environ.get("REPLAY_REAL_SESSION") == "1",
