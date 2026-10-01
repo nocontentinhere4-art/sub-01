@@ -1,11 +1,11 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 21:45 UTC** (pass 4). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-01 22:00 UTC** (pass 5). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 Nothing is ready to merge yet. #9 and #20 now merge cleanly with `main` (#9 through coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10).
 
-**Owner decision needed:** which model the brain-decides "eyes" use (`OPENROUTER_MODEL`), and the daily cap (proposed $1/day). `OPENROUTER_API_KEY` is already on Railway, so #20 spends from the moment it merges.
+Brain-decides model and budget: **decided** (Haiku 4.5, $1.00/day cap; see Decisions). Nothing for the owner to set on Railway.
 When a PR is marked **READY TO MERGE (needs owner)**, it is listed here:
 
 | PR | status | why it needs the owner |
@@ -85,8 +85,15 @@ findings "NOT verified", and its reviews are partial on large diffs.
   of the following session. "Tested every morning" in the goal means this daily next-day test. A morning slot is
   only a change to `SUB01_SESSIONS`.
 - **2026-10-01: review-bot findings are advisory.** The coordinator verifies them before they become required changes.
-- **2026-10-01: paid-model choice stays with the owner.** Coordinator rule: every paid call has a hard daily USD
-  cap and a log line before it can merge.
+- **2026-10-01: paid-model choice stays with the owner** unless the owner delegates it. Coordinator rule: every paid
+  call has a hard daily USD cap and a log line before it can merge.
+- **2026-10-01: brain-decides "eyes" use Claude Haiku 4.5 (OpenRouter `anthropic/claude-haiku-4.5`, or `claude-haiku-4-5`
+  direct), capped at $1.00 per Tokyo day.** The owner delegated this decision.
+  - The task is listing 3–5 safe options from a page; the brain model decides, so Opus quality is not needed.
+  - Haiku is ≈ $0.004 per page, about 5× cheaper than Opus 5.5, and reliable at the JSON format; Llama is not.
+  - Over the cap, he browses with the page's own links, and the brain still votes.
+  - The default is set in code, so nothing needs setting on Railway.
+  - Haiku takes no effort or thinking parameters, so the requests are built per model (#20, change 6).
 
 ## Known risks
 - **CPU:** the brain loop alone uses ~63 % of one core (~31 ms per 50 ms tick, `main`, `--demo`, no Chromium).
@@ -120,7 +127,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Eye: Replicate FLUX schnell + Llama, only while watched | cents | up to ~960 frames/day with no cap → cap at $1/day (#15) |
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
-| Brain-decides eyes (#20; OpenRouter key already on Railway) | $0 (not merged) | ≤ cap (proposed $1/day; uncapped it would be up to ~$12/day on Opus 5.5) |
+| Brain-decides eyes (#20; Haiku 4.5 via OpenRouter, key already on Railway) | $0 (not merged) | ≤ $1.00/day hard cap (≈ $0.004 per page) |
 
 ## Launch checklist (owner)
 - [ ] All milestones 7–15 merged; CI green; `/healthz` monitored (uptime alert to your phone/email).
