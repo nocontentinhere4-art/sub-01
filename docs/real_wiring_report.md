@@ -13,18 +13,18 @@ All numbers are on the held-out half of his runs (sessions never used for fittin
 | | before (v1 connectome) | now (v2 connectome, Hopf slow layer) |
 |---|---|---|
 | Wiring vs recorded FC, no model (SC-FC r) | 0.197 | **0.276**, better than all 200 randomised networks (p = 0.01) |
-| Model on the wiring alone (one fitted coupling): FC similarity, noise-free | ≈ 0.02 at realistic coupling | **0.232**, better than all 100 geometry- (best 0.218) and all 100 strength-preserving (best 0.168) randomised brains, p = 0.01 / 0.01 |
-| … same, measured on 20 simulated 10-minute runs | ≈ 0.02 (same as randomised wiring) | **0.206**; strength nulls mean 0.166 (best 0.177), p = 0.01; geometry nulls mean 0.162 (best 0.215), **p = 0.059** |
-| … per-region fit (median FC-row r) | — | 0.221, p = 0.01 / 0.01 |
-| … FC dynamics (FCD KS, lower is better) | 0.78 (no dynamics) | 0.098: better than all geometry nulls (p = 0.01) but **not** better than strength nulls (p = 0.47) |
-| Effective connectivity fitted on the wiring (≈ 9,200 parameters) | 0.59 | **0.591**, but randomised wiring fitted the same way does as well (p = 0.60 strength, 0.13 geometry) |
+| Model on the wiring alone (one fitted coupling): FC similarity, noise-free | 0.037 | **0.232**, better than all 100 geometry- (best 0.218) and all 100 strength-preserving (best 0.168) randomised brains, p = 0.01 / 0.01 |
+| … same, measured on 20 simulated 10-minute runs | 0.031 (randomised wiring ≈ 0.00-0.01; all near zero) | **0.206**; strength nulls mean 0.166 (best 0.177), p = 0.01; geometry nulls mean 0.162 (best 0.215), **p = 0.059** |
+| … per-region fit (median FC-row r) | 0.03 | 0.221, p = 0.01 / 0.01 |
+| … FC dynamics (FCD KS, lower is better) | 0.154 | 0.098: better than all geometry nulls (p = 0.01) but **not** better than strength nulls (p = 0.47) |
+| Effective connectivity fitted on the wiring (≈ 9,200 parameters for v2) | 0.616 (not wiring-specific either) | **0.591**, but randomised wiring fitted the same way does as well (p = 0.60 strength, 0.13 geometry) |
 
 So, honestly:
 
 1. **The new connectome carries more of the person's functional organisation** than the old one (SC-FC 0.28 vs
    0.20, both clearly above randomised wiring).
 2. **With the new connectome, a model driven by the wiring alone now produces activity that resembles his recorded
-   activity on unseen sessions** (r = 0.21-0.23 vs ≈ 0.02 before). In the noise-free comparison it beats all 200
+   activity on unseen sessions** (r = 0.21-0.23 vs 0.03-0.04 with the old connectome). In the noise-free comparison it beats all 200
    randomised brains. In the finite-data comparison it beats every brain that keeps each region's total connection
    strength, but **not clearly the brains that keep the spatial layout** (p = 0.059). The margin is small: randomised
    brains already reach r ≈ 0.16-0.17, so the specific wiring adds about 0.04-0.07 of r on top of what each region's
@@ -49,7 +49,7 @@ here and reproduce the reported numbers on the v1 connectome:
 
 - v1 density 44.8 %, SC-FC r = 0.207 (log(1 + streamlines), all pairs, mean FC of the 131 runs).
 - The deployed 10 Hz Stuart-Landau model alone: held-out FC r ≈ 0.02; the BOLD-band Hopf model on v1 with only the
-  coupling fitted: FC r 0.016 on held-out sessions at the coupling that gives realistic dynamics (the analytic
+  coupling fitted: FC r 0.03 on held-out sessions at the coupling that gives realistic dynamics (the analytic
   optimum at vanishing coupling, r ≈ 0.2, is a first-order copy of SC whose correlations are far too weak to measure).
 - v1 inter-hemispheric connections: only 46 of the 85 homotopic (left-right mirror) region pairs have any streamline;
   the median weight over all 85 pairs is 1 streamline (20 among the 46 that have any). Pairs are matched by
@@ -198,14 +198,21 @@ Robustness and caveats:
 
 ### Connectome v1 (old) through the same pipeline
 
-| held-out metric (v1) | his wiring | geometry nulls p | strength nulls p |
-|---|---|---|---|
-| SC-FC r | 0.197 (single log transform; the first run's rows, p-values from them, used a double log: 0.175) | 0.010 | 0.010 |
-| wiring only: FC r | 0.016 | 0.149 | 0.010 (best null 0.016: a tie) |
-| EC: FC r | 0.594 | 1.000 | 0.663 |
+Same final settings (corrected frequencies, G 0.3-300), 100 + 100 nulls generated from the v1 weights.
 
-(first complete run, G 0.01-3; v1 has a weak FC signal at every coupling, r ≈ 0.02-0.04, so the grid does not
-change the conclusion.)
+| held-out metric (v1) | his wiring | geometry nulls: mean (best) | p | strength nulls: mean (best) | p |
+|---|---|---|---|---|---|
+| SC-FC r | 0.197 | 0.132 (0.144) | **0.010** | 0.006 (0.018) | **0.010** |
+| wiring only: FC r, noise-free | 0.037 | 0.004 (0.027) | **0.010** | 0.012 (0.016) | **0.010** |
+| wiring only: FC r, 20 simulated runs | 0.031 | 0.004 (0.036) | 0.020 | 0.007 (0.018) | **0.010** |
+| wiring only: FCD KS | 0.154 | 0.095 (0.047) | 0.832 | 0.173 (0.135) | 0.119 |
+| EC: FC r, 20 simulated runs | 0.616 | 0.195 (0.657) | 0.188 | 0.609 (0.653) | 0.327 |
+
+With v1 the wiring-only model is "better than randomised" only in a technical sense: every network, his included,
+sits near zero (r ≤ 0.04). The dense (45 %) v1 connectome cannot drive a pattern that resembles his FC; v2 can
+(0.21-0.23). Geometry nulls of v1 also run to the top of the coupling grid (72 of 100).
+
+![nulls v1](real_wiring/nulls_v1.png)
 
 ## 5. What runs live
 
