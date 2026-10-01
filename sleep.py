@@ -2,7 +2,8 @@
 
 Pure bookkeeping on a (possibly accelerated) Europe/Rome clock; live_server.py feeds it
 stimuli and applies `engine.params` to the Stuart-Landau model every tick. No language
-model and no generated text: replay re-applies stored stimulus patterns, nothing more.
+model and no generated text: replay re-applies stored stimulus patterns (of chat messages and
+of articles it read), nothing more.
 
 Rules (all times Rome local, sim clock):
 - awake ~08:00-00:00, asleep 00:00-08:00; falls asleep early (after 20:00) if sleep pressure >= 1
@@ -79,34 +80,110 @@ class Clock:
 
 
 class Memory:
-    """Accepted chat messages: time, stage when received, stimulus pattern and emotional tag."""
+    """Accepted chat messages (source "chat") and articles it read (source "reading"): time, stage when received,
+    stimulus pattern and emotional tag. Readings compete for REM replay at READING_WEIGHT, and their pool never
+    outweighs READING_POOL x the chat pool, so messages from people still win most nights."""
 
     EMO_WEIGHT = {"threat": 3.0, "positive": 2.5, "neutral": 1.0}
+    READING_WEIGHT = 0.6
+    READING_POOL = 0.6
 
     def __init__(self, items=None, cap=2000):
         self.items = list(items or [])
         self.cap = cap
 
-    def add(self, t, text, stage, stimulus, emotion, networks):
+    def add(self, t, text, stage, stimulus, emotion, networks, source="chat", **extra):
         m = {"t": t, "text": text, "stage": stage, "stimulus": stimulus, "emotion": emotion,
-             "networks": networks, "asleep": stage != "AWAKE"}
+             "networks": networks, "asleep": stage != "AWAKE", "source": source, **extra}
         self.items.append(m)
         del self.items[:-self.cap]
         return m
 
+    def chat(self):
+        return [m for m in self.items if m.get("source", "chat") == "chat"]
+
+    @staticmethod
+    def key(m):
+        """Habituation key of a memory; matches replay_key() of its night record."""
+        return replay_key(stamp(m["t"]), m["text"])
+
     def weight(self, m, t, night_start, replayed=0):
         recency = math.exp(-max(0.0, t - m["t"]) / (24 * 3600))
         tonight = 4.0 if night_start is not None and m["t"] >= night_start else 1.0
-        return recency * self.EMO_WEIGHT.get(m["emotion"], 1.0) * tonight / (1 + replayed)   # habituation
+        src = self.READING_WEIGHT if m.get("source") == "reading" else 1.0
+        return recency * self.EMO_WEIGHT.get(m["emotion"], 1.0) * tonight * src / (1 + replayed)   # habituation
+
+    def weights(self, cand, t, night_start, replayed):
+        w = [self.weight(m, t, night_start, replayed.get(self.key(m), 0)) for m in cand]
+        return self.cap_readings(w, [m.get("source") == "reading" for m in cand])
+
+    def cap_readings(self, w, is_read):
+        chat = sum(x for x, r in zip(w, is_read) if not r)
+        read = sum(x for x, r in zip(w, is_read) if r)
+        if chat > 0 and read > self.READING_POOL * chat:
+            k = self.READING_POOL * chat / read
+            w = [x * k if r else x for x, r in zip(w, is_read)]
+        return w
 
     def pick(self, t, night_start, rng=random, replayed=None):
-        """Weighted by recency, emotion and 'arrived tonight'; `replayed` = {received stamp: count} tonight."""
+        """Weighted by recency, emotion, source and 'arrived tonight'; `replayed` = {key: count} tonight."""
         cand = [m for m in self.items if m["t"] <= t]
         if not cand:
             return None
-        replayed = replayed or {}
-        w = [self.weight(m, t, night_start, replayed.get(stamp(m["t"]), 0)) for m in cand]
-        return rng.choices(cand, weights=w)[0]
+        return rng.choices(cand, weights=self.weights(cand, t, night_start, replayed or {}))[0]
+
+    def replay_chance(self, m, t_night, n_replays=None, sims=200, seed=0):
+        """Estimated chance that `m` is replayed at least once in a night starting at t_night, with what memory
+        holds now (no new messages). Monte Carlo of pick() with habituation and the reading cap."""
+        import numpy as np
+        n_replays = expected_replays() if n_replays is None else n_replays
+        cand = [x for x in self.items if x["t"] <= t_night and t_night - x["t"] < 4 * 86400] or [m]
+        if not any(x is m for x in cand):
+            cand.append(m)
+        base = np.array([self.weight(x, t_night, None) for x in cand])
+        is_read = np.array([x.get("source") == "reading" for x in cand])
+        me = next(i for i, x in enumerate(cand) if x is m)
+        rng = np.random.default_rng(seed)
+        counts = np.zeros((sims, len(cand)))
+        for _ in range(int(round(n_replays))):
+            w = base / (1 + counts)
+            chat, read = (w * ~is_read).sum(1), (w * is_read).sum(1)
+            k = np.where((chat > 0) & (read > self.READING_POOL * chat),
+                         self.READING_POOL * chat / np.maximum(read, 1e-12), 1.0)
+            w = np.where(is_read, w * k[:, None], w)
+            c = np.cumsum(w, 1)
+            pick = (c < rng.random(sims)[:, None] * c[:, -1:]).sum(1)
+            counts[np.arange(sims), np.minimum(pick, len(cand) - 1)] += 1
+        return float((counts[:, me] > 0).mean())
+
+
+def replay_key(received, text):
+    return f"{received}|{text}"
+
+
+def expected_replays(hours=8.0, start_cycle=0):
+    """Mean number of REM replays in a night of `hours` sleep (REM time / REPLAY_MEAN_S)."""
+    rem, k, left = 0.0, start_cycle, hours * 3600
+    while left > 0:
+        rem_frac = min(0.45, 0.12 + 0.08 * k)
+        nrem = CYCLE_S * (1 - rem_frac)
+        rem += max(0.0, min(left, CYCLE_S) - nrem)
+        left -= CYCLE_S
+        k += 1
+    return rem / REPLAY_MEAN_S
+
+
+def day_of(t):
+    """The waking day t belongs to, named like the night that follows it (08:00 -> 08:00 next morning)."""
+    return (local(t) - timedelta(hours=WAKE_HOUR)).date().isoformat()
+
+
+def next_bedtime(t):
+    """Sim epoch of the coming night's usual sleep onset (00:30 local), or t if it is already night."""
+    d = local(t)
+    if d.hour < WAKE_HOUR:
+        return t
+    return (d.replace(hour=0, minute=30, second=0, microsecond=0) + timedelta(days=1)).timestamp()
 
 
 class SleepEngine:
@@ -291,12 +368,13 @@ class SleepEngine:
     def record_replay(self, t, m):
         self.night["replays"].append({"t": stamp(t), "text": m["text"], "emotion": m["emotion"],
                                       "networks": m["networks"], "received": stamp(m["t"]),
-                                      "received_stage": m["stage"]})
+                                      "received_stage": m["stage"], "source": m.get("source", "chat")})
 
     def replay_counts(self):
         counts = {}
         for r in (self.night or {}).get("replays", []):
-            counts[r["received"]] = counts.get(r["received"], 0) + 1
+            k = replay_key(r["received"], r["text"])
+            counts[k] = counts.get(k, 0) + 1
         return counts
 
     def night_start(self):

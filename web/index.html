@@ -315,7 +315,10 @@ function renderNights(m){
   $("n-t").textContent = n.sleep_onset ? `asleep ${tm(n.sleep_onset)} → ${tm(n.woke_up)}` : "not asleep yet";
   const reps = n.replays || [];
   $("n-m").innerHTML = (n.wakeups.length ? `woken ${n.wakeups.length}× (${esc(n.wakeups.map(w => w.cause).slice(-2).join(", "))})` : "never woken")
-    + ` · ${reps.length} replay${reps.length === 1 ? "" : "s"}` + (reps.length ? `<br>last: “${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
+    + (n.n_replays ? ` · ${n.n_replays.chat} message replay${n.n_replays.chat === 1 ? "" : "s"}`
+        + (n.n_replays.reading ? ` · ${n.n_replays.reading} of what it read` : "")
+      : ` · ${reps.length} replay${reps.length === 1 ? "" : "s"}`)
+    + (reps.length ? `<br>last: ${reps[reps.length - 1].source === "reading" ? "read " : ""}“${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
 }
 
 // ---------- live ----------
@@ -352,7 +355,7 @@ function connect(){
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     for (const ev of m.events || []) {
       if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
-        tick(`${esc(ev.t)} · replay <b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
+        tick(`${esc(ev.t)} · replay ${ev.source === "reading" ? "of what it read " : ""}<b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
         fire(ev.text, ev.networks); heard = null; }
       else tick(`${esc(ev.t)} · ${esc(ev.text)}`);
     }
