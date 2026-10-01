@@ -1,9 +1,9 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 20:20 UTC**. Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-01 20:25 UTC** (pass 2). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-Nothing is ready to merge yet. Every open PR first has to merge current `main`, because they all conflict with #10.
+Nothing is ready to merge yet. #9's conflict with `main` is cleared (coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10), and brain-decides still conflicts too.
 When a PR is marked **READY TO MERGE (needs owner)**, it is listed here:
 
 | PR | status | why it needs the owner |
@@ -34,8 +34,8 @@ cheap to run, with the password gate kept until launch day.
 | 7 | Room lag fix, phone grip, sky | in progress: needs main merge | #8 |
 | 8 | Reading memory (readings → stimuli, REM replay, curiosity) | in progress: needs main merge | #7 |
 | 9 | Sleep circuit (Phillips-Robinson) | in progress: waits for #7 | #11 |
-| 10 | Spiking memory on GPU, daily test card | in progress: needs main merge + torch-free tests | #9 |
-| 11 | Brain decides what he clicks | in progress: **no PR opened yet** | `feature/brain-decides` |
+| 10 | Spiking memory on GPU, daily test card | in progress: merges cleanly now; needs torch-free tests, re-merge after #7/#11 | #9 |
+| 11 | Brain decides what he clicks | in progress: **no PR opened yet** (review fixes pushed, `a8c928e`) | `feature/brain-decides` |
 | 12 | CI (tests + demo smoke on every PR) | todo | issue #12 |
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | todo | issue #13 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
@@ -57,7 +57,7 @@ cheap to run, with the password gate kept until launch day.
 
 Rule: at least 60 minutes between merges to `main`. Every branch brings `main` in with a merge commit. Never force-push.
 
-## Pre-review: `feature/brain-decides` (head `98e6c33`, no PR yet)
+## Pre-review: `feature/brain-decides` (reviewed at `98e6c33`; `a8c928e` since, no PR yet)
 Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, including `/api/decisions` and
 `/api/tastes`. Tick cost is the same as `main`. Required before it can be marked ready:
 1. Open the PR. Merge `main` now (it conflicts in `live_server.py`), and again after #9 (`Dockerfile`, `live_server.py`).
@@ -106,6 +106,8 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
 - **Stale branches** (`feature/rw-*`, `feature/twin-*`, `feature/real-world`, `assets/cc0`, `test/integration`,
   `claude/youthful-bohr-*`, `claude/affectionate-brown-*`): delete them after launch. The coordinator never deletes
   branches.
+- **Coordinator pushes to PR branches:** only merge commits that clear conflicts, and only when the owner asks. The
+  first was #9's `fe60d9f` (2026-10-01). Authoring sessions must pull before pushing.
 
 ## Costs per day (estimates; the ledger in #15 will replace them)
 | item | now | at launch |
