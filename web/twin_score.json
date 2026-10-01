@@ -1,0 +1,250 @@
+{
+ "label": "twin model vs recorded resting-state fMRI (held-out sessions): weak static match, FC-dynamics match",
+ "what": "a digital twin model of one real person's brain structure and recorded activity; not a mind, not conscious, not the person",
+ "heldout": {
+  "fc_r": 0.097,
+  "fc_r_sd": 0.004,
+  "fcd_ks": 0.12,
+  "fcd_ks_sd": 0.069,
+  "fc_r_pooled": 0.098,
+  "mean_fc_sim": 0.072,
+  "mean_fc_recorded": 0.362,
+  "n_runs": 73,
+  "n_acquisitions": 73,
+  "n_runs_fcd": 49,
+  "n_sessions": 47,
+  "replicates": 5,
+  "simulated_runs_per_replicate": 6,
+  "fc_r_vs_simulated_runs": {
+   "1": 0.094,
+   "2": 0.094,
+   "4": 0.095,
+   "8": 0.095,
+   "16": 0.098,
+   "30": 0.098
+  }
+ },
+ "fit": {
+  "fc_r": 0.093,
+  "fcd_ks": 0.14,
+  "search_score_mean": -0.0497,
+  "search_score_sd_over_seeds": 0.0325,
+  "search_fc_r_sd_over_seeds": 0.01,
+  "search_seeds": 4,
+  "n_runs": 58,
+  "n_acquisitions": 50,
+  "n_runs_fcd": 45,
+  "n_sessions": 47
+ },
+ "baselines": {
+  "shuffled_connectome": {
+   "fc_r": -0.001,
+   "fc_r_sd": 0.009,
+   "fcd_ks": 0.882,
+   "fcd_ks_sd": 0.14,
+   "fc_r_pooled": -0.004,
+   "mean_fc": 0.01,
+   "params": {
+    "G": 1.0,
+    "velocity": 3.0,
+    "noise": 0.02
+   },
+   "search_evaluations": 96
+  },
+  "old_model": {
+   "fc_r": 0.006,
+   "fc_r_sd": 0.009,
+   "fcd_ks": 0.999,
+   "fcd_ks_sd": 0.0,
+   "fc_r_pooled": 0.015,
+   "mean_fc": 0.001,
+   "params": {
+    "g": 58.9385,
+    "noise": 0.2577,
+    "velocity": 8.0
+   },
+   "search_evaluations": 96
+  },
+  "sc_fc_direct_r": 0.213,
+  "sc_fc_direct_r_connected_pairs_log": 0.24,
+  "test_retest_ceiling_r": 0.97
+ },
+ "per_run": {
+  "sim_pooled_vs_single_run": {
+   "mean": 0.074,
+   "sd": 0.023,
+   "p10": 0.044,
+   "p90": 0.103
+  },
+  "sim_run_vs_single_run": {
+   "mean": 0.071,
+   "sd": 0.022,
+   "p10": 0.042,
+   "p90": 0.1
+  },
+  "run_to_run": {
+   "mean": 0.547,
+   "sd": 0.131,
+   "p10": 0.386,
+   "p90": 0.72
+  },
+  "n_runs": 73
+ },
+ "params": {
+  "G": 2.8455,
+  "velocity": 7.1094,
+  "noise": 0.078
+ },
+ "split": {
+  "rule": "sessions sorted by scan date (sub-01_sessions.tsv), alternately fit / held-out; multi-echo files of one acquisition merged",
+  "fit_sessions": [
+   "011",
+   "014",
+   "016",
+   "018",
+   "020",
+   "022",
+   "024",
+   "026",
+   "028",
+   "030",
+   "032",
+   "034",
+   "036",
+   "038",
+   "040",
+   "042",
+   "044",
+   "046",
+   "048",
+   "050",
+   "053",
+   "055",
+   "057",
+   "059",
+   "061",
+   "063",
+   "065",
+   "067",
+   "069",
+   "071",
+   "073",
+   "075",
+   "077",
+   "079",
+   "081",
+   "083",
+   "085",
+   "087",
+   "089",
+   "092",
+   "094",
+   "096",
+   "098",
+   "100",
+   "102",
+   "104",
+   "2022"
+  ],
+  "heldout_sessions": [
+   "013",
+   "015",
+   "017",
+   "019",
+   "021",
+   "023",
+   "025",
+   "027",
+   "029",
+   "031",
+   "033",
+   "035",
+   "037",
+   "039",
+   "041",
+   "043",
+   "045",
+   "047",
+   "049",
+   "051",
+   "054",
+   "056",
+   "058",
+   "060",
+   "062",
+   "064",
+   "066",
+   "068",
+   "070",
+   "072",
+   "074",
+   "076",
+   "078",
+   "080",
+   "082",
+   "084",
+   "086",
+   "088",
+   "091",
+   "093",
+   "095",
+   "097",
+   "099",
+   "101",
+   "103",
+   "WashU",
+   "2022b"
+  ]
+ },
+ "search": {
+  "method": "grid (36 points) then CMA-ES (4 generations x 12) on log-scaled parameters, then the best 4 candidates re-run with 3 new seeds; same procedure for each baseline; every evaluation 2 simulated runs of 518 volumes at TR 1.16 s",
+  "objective": "r(simulated FC, recorded FC) - KS(simulated FCD, recorded FCD), fit half only",
+  "evaluations": 288,
+  "sim_seconds": 442500,
+  "live_check": [
+   {
+    "params": {
+     "G": 2.84546,
+     "velocity": 7.10938,
+     "noise": 0.07795
+    },
+    "ok": true
+   }
+  ]
+ },
+ "robustness": {
+  "chronological_split": {
+   "rule": "first half of the sessions by date -> fit, second half -> held-out; parameters chosen from the grid only (the CMA-ES path used the interleaved fit half)",
+   "params": {
+    "G": 3.5,
+    "velocity": 8.0,
+    "noise": 0.06
+   },
+   "fc_r": 0.125,
+   "fc_r_sd": 0.004,
+   "fcd_ks": 0.133,
+   "fit_sessions": 47,
+   "heldout_sessions": 47,
+   "test_retest_ceiling_r": 0.929,
+   "sc_fc_direct_r": 0.222
+  },
+  "without_live_constraint": {
+   "rule": "best grid point with any G (the fitted model is limited to G <= 3.5 so that the sleep stages still work in the live server); same held-out protocol",
+   "params": {
+    "G": 16.0,
+    "velocity": 8.0,
+    "noise": 0.15
+   },
+   "fc_r": 0.151,
+   "fc_r_sd": 0.008,
+   "fcd_ks": 0.101,
+   "fcd_ks_sd": 0.035,
+   "mean_fc": 0.283
+  }
+ },
+ "notes": "Digital twin model of one real person's brain structure and recorded activity; not a mind, not conscious, not the person. Scores compare simulated resting-state fMRI with recordings from sessions never used in the fit (split by session). fc_r: correlation over 22791 region pairs between simulated FC (each replicate 6 simulated 10-min runs) and the held-out mean FC; fcd_ks: Kolmogorov-Smirnov distance between FC-dynamics distributions (0 = identical, 1 = disjoint). The twin reaches r = 0.10, below what the log connectome weights alone give (r = 0.21) and far below the test-retest ceiling of the recordings themselves (r = 0.97). Same held-out data: shuffled connectome r = -0.00, old Stuart-Landau model r = 0.01. Typical published whole-brain fits reach r ~ 0.3-0.6, mostly with group-average connectomes. The fit is limited to coupling G <= 3.5 so that sleep stages still behave in the live model. Simulated mean FC (0.07) is lower than recorded (0.36). FCD is compared on the main-protocol runs (TR 1.16 s) only.",
+ "params_check": {
+  "realtime_s_per_sim_s_1thread": 0.095,
+  "budget": 0.3
+ }
+}

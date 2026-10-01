@@ -1,0 +1,10 @@
+{
+ "note": "digital twin model of one real person's brain structure and recorded activity; not a mind, not the person",
+ "source": "python -m twin.fit all (twin/fit.py); see docs/twin/fit.md",
+ "fitted_to": "interleaved fit half of the QC-kept MyConnectome resting runs (ds000031, CC0); objective r(FC) - KS(FCD); all other model parameters are the defaults of twin/model.py",
+ "params": {
+  "G": 2.8455,
+  "velocity": 7.1094,
+  "noise": 0.078
+ }
+}

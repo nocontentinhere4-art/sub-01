@@ -9,3 +9,4 @@ scikit-image
 trimesh
 fast-simplification
 tzdata
+cma

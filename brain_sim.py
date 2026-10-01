@@ -6,6 +6,7 @@ lengths. External stimuli (e.g. market events) are injected into named groups
 of regions. This simulates large-scale activity rhythms only - not thoughts,
 memories or consciousness.
 """
+import os
 from pathlib import Path
 
 import numpy as np
@@ -106,6 +107,19 @@ class Brain:
         amp = np.abs(z)
         sync = float(np.abs(np.mean(np.exp(1j * np.angle(z)))))
         return {k: float(amp[i].mean()) for k, i in self.group_idx.items()} | {"sync": sync}
+
+
+def make_brain(kind=None, **kw):
+    """Model factory: "twin" (twin.model.TwinBrain, Wilson-Cowan E/I + BOLD) or "sl" (this file's Brain).
+
+    Default from the environment variable SUB01_MODEL (default "twin")."""
+    kind = (kind or os.environ.get("SUB01_MODEL", "twin")).strip().lower()
+    if kind == "sl":
+        return Brain(**kw)
+    if kind == "twin":
+        from twin.model import TwinBrain
+        return TwinBrain(**kw)
+    raise ValueError(f"unknown brain model {kind!r} (use 'twin' or 'sl')")
 
 
 if __name__ == "__main__":
