@@ -17,6 +17,10 @@ from sleep import local
 from twin.body import Body
 
 CARBS_PER_BREAD_G = 30.0    # one piece of bread: a ~60 g roll at ~50 % carbohydrate (USDA FoodData Central, white bread ~49 g/100 g)
+# Eating thresholds on the body's hunger scale (design choices, not fitted): below SATED it does not eat at all,
+# above EAT_AT it is meal time. With the body's ghrelin-like proxy this gives a few eating episodes per waking day
+# (the old +0.2 constant and 0.35 threshold made it eat about every hour once hunger came from the body).
+SATED, EAT_AT = 0.35, 0.55
 
 # ---- the world (metres; x east, z south). Sent to the client, which builds the 3D scene from it. ----------
 PLACES = {
@@ -142,8 +146,8 @@ class Life:
         return self.body.hunger
 
     def exertion(self):
-        """0..1 physical effort for the body: walking about 0.3."""
-        return 0.3 if (self.path or self.activity == "park") else 0.0
+        """0..1 physical effort for the body: walking about 0.3, sitting on the park bench 0.1."""
+        return 0.3 if self.path else 0.1 if self.activity == "park" else 0.0
 
     # --- inputs ---------------------------------------------------------------------------------
     def hear(self, text, t):
@@ -165,9 +169,11 @@ class Life:
         open_bakery = 7 <= h < 20
         day = 8 <= h < 20
         r = self.rng.random
+        hu = self.hunger                                # from the body (twin/body.py): ~0.2 just fed, ~0.6 at meal time
         s = {
-            "eat": (1.3 * self.hunger + 0.2 + (0.6 if self.hunger > 0.35 else 0)) if self.bread else 0.0,
-            "buy_bread": (1.1 * self.hunger + self.desire("buy_bread", t)) if (not self.bread and open_bakery) else 0.0,
+            "eat": (1.3 * hu + (0.6 if hu > EAT_AT else 0.0) if hu > SATED else 0.0) if self.bread else 0.0,
+            "buy_bread": ((1.1 * hu if hu > SATED else 0.0) + self.desire("buy_bread", t))
+                         if (not self.bread and open_bakery) else 0.0,
             "phone": 0.7 * self.boredom + (0.5 if h >= 22.5 or h < 1 else 0) + 0.25 * pressure
                      + self.desire("phone", t) + 0.2 * max(0, rel.get("salience", 1) - 1),
             "chart": 0.35 * market_hot + 0.4 * max(0, rel.get("salience", 1) - 1) + self.desire("chart", t) + 0.1,

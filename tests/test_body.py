@@ -87,9 +87,10 @@ def test_hr_stage_and_arousal():
     rem, resp_r, sd_r, rsd_r = mean_hr("REM")
     assert 60 <= awake <= 78
     assert 45 <= nrem < awake - 8
+    assert nrem + 2 < rem < awake                           # REM above NREM, not above daytime wake
     assert sd_r > sd_n and rsd_r > rsd_n                    # REM more variable than NREM
     assert 12 <= resp_a <= 18
-    assert 10 <= resp_n < resp_a and rsd_n < rsd_a          # slower and more regular in NREM
+    assert 12 <= resp_n < resp_a and rsd_n < rsd_a          # NREM: rate about the same, more regular
     assert 12 <= resp_r <= 19
     ne_hi = mean_hr("AWAKE", levels={"NE": 1.5})
     amy_hi = mean_hr("AWAKE", amygdala=1.0)
@@ -157,3 +158,29 @@ def test_life_without_body_and_legacy_state():
     assert abs(again.hunger - life.hunger) < 1e-9
     legacy = Life({"hunger": 0.7})
     assert 0.3 < legacy.hunger < 0.7 and h0 is not None
+
+
+def test_life_two_days_eats_a_few_times():
+    """Life + its own body + the sleep engine for 2 simulated days (10 s steps): it eats a few times per waking day,
+    never starves, never eats constantly, and glucose stays in a healthy range."""
+    from datetime import datetime
+    from sleep import ROME, SleepEngine, local
+    t0 = datetime(2026, 10, 5, 7, 30, tzinfo=ROME).timestamp()
+    for seed in (0, 1):
+        eng = SleepEngine(t0, rng=random.Random(seed))
+        eng.update(t0)
+        life = Life(None, rng=random.Random(seed))
+        t, prev, eats, gl, hu = t0, life.activity, {}, [], []
+        while t < t0 + 2 * 86400:
+            t += 10.0
+            eng.update(t, dt_real=1.0)
+            life.update(t, 1.0, 10.0, eng.stage, {}, 0.0, eng.pressure(t))
+            if life.activity != prev and life.activity == "eat":
+                day = local(t).day
+                eats[day] = eats.get(day, 0) + 1
+            prev = life.activity
+            gl.append(life.body.glucose)
+            hu.append(life.hunger)
+        assert len(eats) == 2 and all(3 <= n <= 8 for n in eats.values()), eats
+        assert max(hu) < 0.95 and min(hu) > 0.05
+        assert 70 < min(gl) and max(gl) < 180

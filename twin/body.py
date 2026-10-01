@@ -1,7 +1,7 @@
 """A minimal body for the SUB-01 digital twin: heart rate, breathing, blood glucose, hunger, interoceptive drive.
 
 This is a digital twin model of one real person's brain structure and recorded activity, plus a deliberately small
-body model so the brain has something to be hungry about. Not a mind, not conscious, not the person. The parameters
+body model so the brain model receives a hunger signal. Not a mind, not conscious, not the person. The parameters
 are textbook adult values (see docs/twin/body.md for equations, sources and what is not realistic); none are fitted
 to the recorded person.
 
@@ -16,25 +16,30 @@ import numpy as np
 HR_INTRINSIC = 95.0     # bpm, intrinsic rate of a ~40 y adult: 118.1 - 0.57 * age (Jose & Collison 1970)
 A_VAGAL = 45.0          # bpm per unit vagal tone (full pharmacological vagal block raises HR by ~30-40 bpm)
 A_SYMP = 70.0           # bpm per unit sympathetic tone
-# resting autonomic tone per stage: (sympathetic, vagal). NREM: vagal dominance, low sympathetic (Somers 1993;
-# Trinder 2001); REM: sympathetic bursts and surges, vagal tone lower than NREM (Somers 1993).
-TONE = {"AWAKE": (0.15, 0.75), "NREM": (0.04, 0.93), "REM": (0.20, 0.72)}
+# resting autonomic tone per stage: (sympathetic, vagal). AWAKE is daytime wake (not supine rest). NREM: vagal dominance,
+# low sympathetic, HR a few bpm below relaxed wake (Somers 1993; Trinder 2001); REM: sympathetic surges, vagal tone
+# lower than NREM, mean HR above NREM and near relaxed wake, with large variability (Somers 1993; Trinder 2001).
+TONE = {"AWAKE": (0.15, 0.75), "NREM": (0.04, 0.88), "REM": (0.10, 0.85)}
 TAU_SYMP, TAU_VAGAL = 20.0, 5.0       # s, sympathetic effects are slow, vagal effects fast (Berger 1989)
 K_NE, K_AMYG = 0.30, 0.30             # sympathetic tone per unit NE excess (NE level - 1) / amygdala excess
 HR_NOISE_SD = {"AWAKE": 1.5, "NREM": 0.8, "REM": 3.5}           # bpm, slow beat-to-beat-scale variability
-RESP_BASE = {"AWAKE": 14.5, "NREM": 12.0, "REM": 14.5}          # breaths/min (Douglas 1982; Gould 1988)
+# breaths/min: in NREM ventilation falls ~13-15 % mainly through tidal volume, rate nearly unchanged (Douglas 1982);
+# REM breathing is faster and irregular, more so with dense eye movements (Douglas 1982; Gould 1988)
+RESP_BASE = {"AWAKE": 14.5, "NREM": 14.0, "REM": 15.0}
 RESP_NOISE_SD = {"AWAKE": 1.0, "NREM": 0.35, "REM": 2.2}        # slow, regular in NREM, irregular in REM
 NOISE_TAU = 30.0                                                # s, correlation time of the variability
 
 # ---- glucose: Bergman minimal model + two-compartment gut (Bergman 1979; Dalla Man 2006) ----
 BW = 70.0               # kg
 VG = 1.88               # dl/kg, glucose distribution volume (Dalla Man 2007)
-KGRI, KABS = 0.056, 0.057   # 1/min, stomach emptying and gut absorption (Dalla Man 2006)
-F_ABS = 0.45            # net fraction of ingested carbohydrate reaching plasma (0.9 absorbed, Dalla Man 2006, minus first-pass splanchnic uptake; tuned)
+KGRI, KABS = 0.056, 0.057   # 1/min, stomach emptying (kmax) and gut absorption (Dalla Man 2007, healthy subjects)
+F_ABS = 0.45            # net fraction of ingested carbohydrate reaching plasma (f = 0.9 absorbed, Dalla Man 2007, minus first-pass splanchnic uptake; tuned)
 P1, P2, P3 = 0.03, 0.02, 2.0e-5     # 1/min, 1/min, 1/min^2 per uU/ml (Bergman 1979 range; P3 tuned)
 N_INS, GAMMA = 0.27, 0.030          # insulin clearance 1/min; secretion uU/ml/min^2 per mg/dl above set-point (tuned)
 I_BASAL = 8.0           # uU/ml, fasting insulin
-G_START, G_FLOOR, TAU_FAST_H = 88.0, 72.0, 9.0   # mg/dl: fasting set-point decays toward the floor (glycogen use)
+# mg/dl, h: fasting set-point decays slowly toward the floor (glycogen use): ~85 after an overnight fast, ~80 at 24 h,
+# ~72 at 72 h, roughly the fall reported in prolonged fasting (Cahill 1970); phenomenological, not a liver model
+G_START, G_FLOOR, TAU_FAST_H = 92.0, 70.0, 30.0
 K_EXERCISE = 0.0010     # 1/min extra insulin-independent uptake at full exertion (muscle contraction)
 
 # ---- hunger: gut/ghrelin-like proxy + glucose term (Cummings 2001: ghrelin rises before meals, falls after) ----

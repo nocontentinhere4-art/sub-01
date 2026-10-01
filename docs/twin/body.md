@@ -16,14 +16,18 @@ constants 20 s (sympathetic, slow) and 5 s (vagal, fast) (Berger et al. 1989, Am
 
 The additive sympatho-vagal form follows Berntson et al. (1991, Psychol Rev; 1993, Psychophysiology); the intrinsic rate
 118.1 - 0.57 age (Jose and Collison 1970, Cardiovasc Res) gives ~95 bpm at 40 y. `hypo = max(0, (70-G)/20)` is a small
-sympathoadrenal counter-regulation. Stage tone (S, V): awake (0.15, 0.75), NREM (0.04, 0.93), REM (0.20, 0.72)
-(qualitative pattern: Somers et al. 1993 NEJM; Trinder et al. 2001 Psychophysiology). `NE` is the neuromodulator level
+sympathoadrenal counter-regulation. Stage tone (S, V): awake (0.15, 0.75), NREM (0.04, 0.88), REM (0.10, 0.85)
+(qualitative pattern: Somers et al. 1993 NEJM; Trinder et al. 2001 J Sleep Res). "Awake" is daytime wake, not supine
+rest, so it sits above the sleep values. Resulting means: awake 71.5, NREM 58.0, REM 63.1 bpm (sd over 30 s samples
+1.4 / 0.8 / 3.4); NE 1.5 -> 86; NE 1.6 plus amygdala 1.0 -> 118. `NE` is the neuromodulator level
 (1.0 = resting wake) and `amygdala` the activity excess over rest (0 = baseline), both supplied by the caller.
 `noise` is an Ornstein-Uhlenbeck process (tau 30 s) with sd 1.5 (awake), 0.8 (NREM), 3.5 (REM) bpm.
 
-**Breathing.** rate = base(stage) + 9 (S - S_stage) + noise; base 14.5 (awake), 12.0 (NREM), 14.5 (REM) per min, sd
-1.0 / 0.35 / 2.2 (slow, regular in NREM, irregular in REM; Douglas et al. 1982 Am Rev Respir Dis; Gould et al. 1988),
-clipped 6-35.
+**Breathing.** rate = base(stage) + 9 (S - S_stage) + noise; base 14.5 (awake), 14.0 (NREM), 15.0 (REM) per min, sd
+1.0 / 0.35 / 2.2, clipped 6-35. In NREM minute ventilation falls by roughly 13-15 % almost entirely through tidal volume,
+with the breathing rate nearly unchanged and very regular; REM breathing is faster and irregular, more so with dense
+eye movements (Douglas et al. 1982 Thorax; Gould et al. 1988 Am Rev Respir Dis). Only the rate is modelled, so the
+NREM ventilation drop is not visible here.
 
 **Glucose.** Bergman minimal model (Bergman et al. 1979, Am J Physiol) with a two-compartment gut (stomach -> gut ->
 plasma, Dalla Man et al. 2006, IEEE Trans Biomed Eng):
@@ -36,12 +40,18 @@ plasma, Dalla Man et al. 2006, IEEE Trans Biomed Eng):
 
 Euler steps of <= 60 s. `F = 0.45` is the net fraction reaching plasma (0.9 absorbed minus first-pass splanchnic
 uptake) and `p3`, `gamma` were tuned by hand to give a realistic mixed-meal curve; they are not literature values.
-`Gset`, the fasting set-point, drifts from 88 toward 72 mg/dl with a 9 h time constant after the last meal (a
-phenomenological stand-in for hepatic glycogen depletion; real fasting glucose is defended much more tightly).
+`Gset`, the fasting set-point, drifts from 92 toward 70 mg/dl with a 30 h time constant after the last meal: ~88 at
+6 h, ~85 after an overnight fast (12 h), ~80 at 24 h, ~72 at 72 h, roughly the slow fall seen in prolonged fasting
+(Cahill 1970 NEJM). It is a phenomenological stand-in for hepatic glycogen depletion and gluconeogenesis, not a liver
+model.
 
-Results (default parameters): 30 g carbohydrate -> peak 127 mg/dl at 40 min, 89 at 2 h, 83 at 3 h; 60 g -> peak ~160;
-75 g -> peak 185 (too high compared with a healthy OGTT of ~140-160; the model is kept for typical meals of 30-60 g).
-A 24 h loop with three meals stays between ~70 and ~160 mg/dl.
+Results (default parameters, from 3 h after the previous meal): 30 g carbohydrate -> peak 131 mg/dl at 40 min (+39
+over fasting, close to what ~30 g of white bread does in healthy adults), 94 at 2 h, 89 at 3 h; 60 g -> peak 170 (+78);
+75 g -> peak 189 (+97, too high: a healthy 75 g OGTT peaks around 140-160 mg/dl, because absorption here is linear
+in the load). Life eats 30 g at a time, where the curve is reasonable. The result is the same with Euler steps of 1 s
+or 180 s (peak 168 vs 170 for 60 g; value at 4 h identical to 0.01 mg/dl), so the live server's large ticks are safe.
+A 24 h loop with three meals stays between ~70 and ~190 mg/dl (asserted); the 2-day Life loop below stays at 84-165,
+mean ~100 mg/dl.
 
 **Hunger (0..1).** `0.6 * ghrelin_proxy + 0.4 * clip((100 - G)/30, 0, 1)`. The proxy relaxes toward 1 with tau 5 h and
 is multiplied by exp(-carbs/35 g) at each meal (pre-meal rise and post-meal fall of ghrelin: Cummings et al. 2001,
@@ -56,8 +66,15 @@ hypothalamus, so there is no hypothalamic input; the amounts are choices, not fi
 
 ## Life integration
 `Life(state, rng, body=None)`: `hunger` is now a read-only property of the body (the old +1/5 h rule and the -0.6 per
-meal rule are removed). Eating one piece of bread calls `body.eat(30)` (`CARBS_PER_BREAD_G`: a ~60 g roll at ~50 %
-carbohydrate, USDA FoodData Central). With an external `body`, its owner (live_server) must step it with
+meal rule are removed). Eating one piece of bread calls `body.eat(30)` (`CARBS_PER_BREAD_G`: a ~60 g roll at ~50 % carbohydrate, USDA FoodData
+Central). The eat / buy-bread decision was re-scaled to the body's hunger (`SATED = 0.35`: no eating below it;
+`EAT_AT = 0.55`: meal-time bonus above it; the old constant +0.2 for eating whenever bread was at home is gone). With
+the old thresholds the body-driven Life ate about every hour (11-16 breads a day, glucose up to ~210 mg/dl). Now a
+2-day Life + Body + SleepEngine run (real time and x60) eats 5-6 times per waking day (one or two breads at
+breakfast, then about every 2-2.5 h); hunger stays in 0.1-0.8 (asserted in `tests/test_body.py`). Over that run the
+glucose term is about a quarter of the mean hunger (0.11 of 0.46) and moves with it (r = 0.94). At `--time-scale
+3600` Life eats only 1-2 times a day because indoor walking still takes real seconds (= sim hours); that is a Life
+limitation that predates the body. Exertion: walking 0.3, sitting on the park bench 0.1. With an external `body`, its owner (live_server) must step it with
 `body.update(dt_sim, levels, amygdala, stage, exertion=life.exertion())`; without one, Life makes its own body, steps it,
 and saves it in `to_dict()["body"]` (a legacy save with only `hunger` seeds the ghrelin proxy). Snapshot keys are
 unchanged. `update(..., levels=None, amygdala=0.0)` pass the neuromodulators to an owned body.
@@ -72,15 +89,15 @@ Wiring still to do in live_server: create one Body, persist it, step it, pass `m
   or protein digestion; every meal is pure carbohydrate with the same absorption.
 - No diabetes, no glucose-lowering drugs, no exercise beyond a crude uptake term; one fixed 70 kg body.
 - Heart rate: no baroreflex, no respiratory sinus arrhythmia or beat-level HRV, no circadian HR, no blood pressure;
-  the variability is generic coloured noise. REM mean HR comes out slightly above resting wake; real REM is similar to
-  or a little above NREM with large surges.
+  the variability is generic coloured noise. REM surges are only larger noise, not discrete bursts.
 - Breathing is a rate only (no depth, apnoea, CO2 chemoreflex).
 - The brain feedback (insula drive) and every gain are design choices.
 - Data and licences: no external data. All numbers are from the cited papers or hand-tuned.
 
 ## References
-Bergman et al. 1979 Am J Physiol 236:E667; Dalla Man et al. 2006 IEEE Trans Biomed Eng 53:1794 and 2007 53:1740;
+Bergman et al. 1979 Am J Physiol 236:E667; Dalla Man et al. 2006 IEEE Trans Biomed Eng 53:2472 and 2007 54:1740;
+Cahill 1970 NEJM 282:668;
 Berntson et al. 1991 Psychol Rev 98:459; Berntson et al. 1993 Psychophysiology 30:183; Berger et al. 1989 Am J Physiol
 256:H142; Jose and Collison 1970 Cardiovasc Res 4:160; Somers et al. 1993 NEJM 328:303; Trinder et al. 2001
-Psychophysiology 38:232 (autonomic activity across sleep); Douglas et al. 1982 Am Rev Respir Dis 125:286; Gould et al. 1988 Am Rev
+J Sleep Res 10:253 (autonomic activity across sleep); Douglas et al. 1982 Thorax 37:840; Gould et al. 1988 Am Rev
 Respir Dis 138:874; Cummings et al. 2001 Diabetes 50:1714; Craig 2002 Nat Rev Neurosci 3:655.
