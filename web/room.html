@@ -345,17 +345,19 @@ function buildSurfaces(){
 // the phone: a real object in his right hand; its screen shows the page he is on
 const phone = new THREE.Group();
 {
-  const body = new THREE.Mesh(new RoundedBoxGeometry(0.074, 0.152, 0.008, 4, 0.008),
+  const body = new THREE.Mesh(new RoundedBoxGeometry(0.078, 0.162, 0.008, 4, 0.008),
     new THREE.MeshStandardMaterial({color:0x1b1c22, roughness:0.35, metalness:0.6}));
   body.castShadow = true; phone.add(body);
-  phone.userData.screen = makeScreen(0.068, 0.146);
+  phone.userData.screen = makeScreen(0.072, 0.156);
   phone.userData.screen.mesh.position.z = 0.0042; phone.add(phone.userData.screen.mesh);
+  phone.userData.size = [0.078, 0.162, 0.008];
   phone.visible = false;
 }
 // holding the phone in his right hand: the phone sits in front of his chest facing his eyes; the right arm starts from
-// the "hold" pose and a two-bone IK puts the wrist below the phone's right edge, the hand turned so that the palm lies
-// on its back with the fingers running diagonally up across it (the rig has no finger bones, so they cannot curl)
-const GRIP = {fwd:0.32, down:0.19, side:0.03, diag:0.65, curl:0.15, reach:0.07, back:0.02, look:0.7};
+// the "hold" pose and a two-bone IK puts the wrist below the phone, the hand turned so that the phone lies on the palm
+// with the fingers running diagonally up behind it. The rig has no finger bones (the hand mesh is rigid and slightly
+// cupped), so the phone is lifted off the palm just enough that no hand vertex is inside it or in front of the screen
+const GRIP = {fwd:0.32, down:0.19, side:0.03, diag:0.3, curl:0.1, reach:0.095, gap:0.002, look:0.7};
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _H = new THREE.Vector3(), _D = new THREE.Vector3(), _N = new THREE.Vector3();
 const _K = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _eye = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3();
@@ -381,6 +383,35 @@ function reach(upper, lower, end, target, pole){
 }
 function setWorldQuat(bone, q){ bone.parent.getWorldQuaternion(_q).invert(); bone.quaternion.copy(_q.multiply(q)); bone.updateMatrixWorld(true); }
 const UP = new THREE.Vector3(0, 1, 0);
+// the hand's vertices in RightHand bone space (bind pose, cm): the hand and the forearm skin right at the wrist
+let handCloud = null;
+const grip = {key:"", w:new THREE.Vector3()}, _qp = new THREE.Quaternion();
+function handVertices(){
+  let sm = null; boy.traverse(o => { if (o.isSkinnedMesh && !sm && o.skeleton.bones.includes(bones.RightHand)) sm = o; });
+  const sk = sm.skeleton, P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
+  const hi = sk.bones.indexOf(bones.RightHand), fi = sk.bones.indexOf(bones.RightForeArm), out = [];
+  _m.multiplyMatrices(sk.boneInverses[hi], sm.bindMatrix);
+  for (let i = 0; i < P.count; i++) {
+    let b = -1, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
+    if (b !== hi && b !== fi) continue;
+    _a.fromBufferAttribute(P, i).applyMatrix4(_m); if (b === hi || _a.length() < 5) out.push(_a.x, _a.y, _a.z);
+  }
+  return new Float32Array(out);
+}
+// where the wrist goes in phone space so that the phone lies on the palm: along the fingers from the phone's centre,
+// and back from its rear face by the highest hand vertex under its outline, plus a gap (only when GRIP changes)
+function wristOnPhone(){
+  const G = GRIP, s = bones.RightHand.getWorldScale(_b).x, key = `${G.diag} ${G.curl} ${G.reach} ${G.gap} ${s.toFixed(5)}`;
+  if (key === grip.key) return grip.w;
+  handCloud = handCloud || handVertices();
+  _qp.copy(phone.quaternion).invert().multiply(_qh);                              // hand rotation in phone space
+  const [w, h, d] = phone.userData.size, hw = w / 2 + 0.003, hh = h / 2 + 0.003, C = handCloud;
+  _b.set(0, G.reach, 0).applyQuaternion(_qp); grip.w.set(-_b.x, -_b.y, 0);
+  let top = -Infinity;
+  for (let i = 0; i < C.length; i += 3) { _a.set(C[i], C[i + 1], C[i + 2]).multiplyScalar(s).applyQuaternion(_qp);
+    if (Math.abs(grip.w.x + _a.x) < hw && Math.abs(grip.w.y + _a.y) < hh) top = Math.max(top, _a.z); }
+  grip.w.z = -d / 2 - G.gap - (isFinite(top) ? top : 0); grip.key = key; return grip.w;
+}
 function holdPhone(){
   const B = bones, G = GRIP, t = performance.now() / 1000; if (!B.RightArm || !B.LeftArm || !head) return;
   if (B.Spine01) B.Spine01.rotateX(0.012 * Math.sin(t * 1.6));                    // breathing (the poses are still)
@@ -392,14 +423,17 @@ function holdPhone(){
     .addScaledVector(_r, G.side);
   phone.lookAt(_eye); phone.updateMatrixWorld(true);
   _x.setFromMatrixColumn(phone.matrixWorld, 0); _y.setFromMatrixColumn(phone.matrixWorld, 1); _z.setFromMatrixColumn(phone.matrixWorld, 2);
-  // hand frame: +y runs along the fingers (measured on the skinned mesh), -z is the palm
+  // hand frame (measured on the skinned mesh): +y runs along the fingers, +z is the palm (the fingers curl that way)
   _hy.copy(_y).addScaledVector(_x, -G.diag).addScaledVector(_z, -G.curl).normalize();
-  _hz.copy(_z).negate().addScaledVector(_hy, _hy.dot(_z)).normalize();
+  _hz.copy(_z).addScaledVector(_hy, -_hy.dot(_z)).normalize();
   _D.crossVectors(_hy, _hz); _m.makeBasis(_D, _hy, _hz); _qh.setFromRotationMatrix(_m);
-  _T.copy(phone.position).addScaledVector(_hy, -G.reach).addScaledVector(_z, -G.back);           // the wrist
+  const W = wristOnPhone();                                                        // the wrist, in phone space
+  phone.localToWorld(_T.copy(W));
   B.RightArm.getWorldPosition(_P).addScaledVector(UP, -0.5).addScaledVector(_r, 0.25).addScaledVector(_f, -0.1);   // elbow down, a little out
   reach(B.RightArm, B.RightForeArm, B.RightHand, _T, _P);
   setWorldQuat(B.RightHand, _qh);
+  // the arm may fall short: hang the phone on the hand where it actually is
+  B.RightHand.getWorldPosition(phone.position).sub(_T.copy(W).applyQuaternion(phone.quaternion)); phone.updateMatrixWorld(true);
   // look at the screen: the face looks along (0, 1, 1) of the head bone (its bind frame is pitched 45°; cm): turn it part of the way
   head.localToWorld(_E.set(0, 30, 30)); head.getWorldPosition(_S);
   _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look); aimBone(head, _E, _T);
