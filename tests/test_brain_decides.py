@@ -161,6 +161,9 @@ MIXED = [REWARD, FEAR, {"action": "search", "label": "maps", "networks": {"atten
 
 
 def test_lookahead_matches_the_live_model_exactly(brain):
+    brain = brain.clone()
+    brain.neuromod = np.linspace(-0.5, 0.5, brain.n)                       # every term of a_eff in play
+    brain.stim[:5] += 3.0
     ref = brain.clone()
     zs = [np.abs(ref.step(1)) for _ in range(50)]
     amp = V.simulate(brain.clone(), [np.zeros(brain.n)], seconds=0.05)

@@ -14,6 +14,12 @@ import re
 from pathlib import Path
 
 from sleep import local
+from twin.body import Body
+
+CARBS_PER_BREAD_G = 30.0    # one piece of bread: a ~60 g roll at ~50 % carbohydrate (USDA FoodData Central)
+CARBS_PER_MEAL_G = 70.0     # a delivered meal (a bowl of ramen: ~70 g carbohydrate)
+# eating thresholds on the body's hunger scale (design choices): below SATED it does not eat, above EAT_AT it is meal time
+SATED, EAT_AT = 0.35, 0.55
 
 # ---- the world (metres; x east, z south). Sent to the client, which builds the 3D scene from it. ----------
 PLACES = {
@@ -111,7 +117,8 @@ def route(a, b):
 
 
 class Life:
-    def __init__(self, state=None, rng=None):
+    def __init__(self, state=None, rng=None, body=None):
+        """body: a twin.body.Body stepped by the caller (live_server). Without one, Life makes and steps its own."""
         s = state or {}
         self.rng = rng or random.Random()
         self.place = s.get("place", "bed")
@@ -120,7 +127,13 @@ class Life:
         self.path = []                         # remaining waypoints while walking
         self.activity = s.get("activity", "window")
         self.until = s.get("until", 0.0)       # sim time when the activity ends
-        self.hunger = s.get("hunger", 0.4)
+        self.own_body = body is None
+        if body is None:
+            bs = s.get("body")
+            if bs is None and "hunger" in s:               # older save: only the old hunger number
+                bs = {"ghrelin": min(1.0, max(0.0, s["hunger"]))}
+            body = Body(bs)
+        self.body = body
         self.boredom = s.get("boredom", 0.3)
         self.bread = s.get("bread", 0)
         self.desires = s.get("desires", {})    # activity -> (strength, sim time)
@@ -135,6 +148,15 @@ class Life:
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
+
+    @property
+    def hunger(self):
+        """0..1, from the body's blood glucose and gut/ghrelin-like proxy (twin/body.py), no rule of its own."""
+        return self.body.hunger
+
+    def exertion(self):
+        """0..1 physical effort for the body: walking ~0.3, sitting on the park bench 0.1."""
+        return 0.3 if self.path else 0.1 if self.activity == "park" else 0.0
 
     # --- inputs ---------------------------------------------------------------------------------
     def hear(self, text, t):
@@ -156,13 +178,15 @@ class Life:
         open_bakery = 7 <= h < 20
         kitchen_open = 10 <= h < 23.5
         has_food = self.bread or self.food
+        hu = self.hunger                                   # from the body: ~0.2 just fed, ~0.6 at meal time
         day = 8 <= h < 20
         r = self.rng.random
         s = {
-            "eat": (1.3 * self.hunger + 0.2 + (0.6 if self.hunger > 0.35 else 0)) if has_food else 0.0,
-            "buy_bread": (0.9 * self.hunger + self.desire("buy_bread", t)) if (not has_food and open_bakery) else 0.0,
-            "order_food": (1.0 * self.hunger + 0.15 + self.desire("order_food", t))
-                          if (not has_food and not self.delivery and kitchen_open and self.hunger > 0.3) else 0.0,
+            "eat": (1.3 * hu + (0.6 if hu > EAT_AT else 0.0) if hu > SATED else 0.0) if has_food else 0.0,
+            "buy_bread": ((0.9 * hu if hu > SATED else 0.0) + self.desire("buy_bread", t))
+                         if (not has_food and open_bakery) else 0.0,
+            "order_food": (1.0 * hu + 0.15 + self.desire("order_food", t))
+                          if (not has_food and not self.delivery and kitchen_open and hu > SATED) else 0.0,
             "research": 0.42 + 0.3 * (1 - self.boredom) + self.desire("research", t)
                         + 0.2 * max(0, rel.get("attention", 1) - 1),
             "phone": 0.7 * self.boredom + (0.5 if h >= 22.5 or h < 1 else 0) + 0.25 * pressure
@@ -202,9 +226,10 @@ class Life:
         return {"status": "at the door" if f >= 1 else "on the way", "eta_min": max(0, round((d["arrives"] - t) / 60)),
                 "geo": {"lat": round(lat, 6), "lng": round(lng, 6), "heading": round(hd)}}
 
-    def update(self, t, dt_real, dt_sim, stage, rel, market_hot, pressure):
+    def update(self, t, dt_real, dt_sim, stage, rel, market_hot, pressure, levels=None, amygdala=0.0):
         self._t = t
-        self.hunger = min(1.0, self.hunger + dt_sim / (5 * 3600))
+        if self.own_body:                                  # an external body is stepped by its owner
+            self.body.update(dt_sim, levels, amygdala, stage, exertion=self.exertion())
         if self.delivery and t >= self.delivery["arrives"] and not self.path and self.activity != "get_delivery" \
                 and self.place not in ("counter", "bakery_in", "bench") and stage == "AWAKE":
             self.start("get_delivery", t, "the courier rings: goes to the door")
@@ -214,7 +239,6 @@ class Life:
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
-            self.hunger = min(1.0, self.hunger + dt_sim / (8 * 3600))
         # walking (real time, so viewers see continuous motion)
         if self.path:
             tx, tz = PLACES[self.path[0]]
@@ -245,10 +269,10 @@ class Life:
                 self.bread += 2
             if self.activity == "eat" and self.food:
                 self.food -= 1
-                self.hunger = max(0.0, self.hunger - 0.8)
+                self.body.eat(CARBS_PER_MEAL_G)
             elif self.activity == "eat" and self.bread:
                 self.bread -= 1
-                self.hunger = max(0.0, self.hunger - 0.6)
+                self.body.eat(CARBS_PER_BREAD_G)
             if self.activity == "order_food" and not self.delivery:
                 leaves = t + 60 * self.rng.uniform(*COOK_MIN)
                 ride = TOKYO["routes"]["shop-home"]["meters"] / COURIER_SPEED
@@ -304,11 +328,12 @@ class Life:
         return {"x": round(self.x, 2), "z": round(self.z, 2), "heading": round(self.heading, 2),
                 "walking": bool(self.path), "activity": self.activity, "doing": LABEL[self.activity],
                 "pose": "walking" if self.path else ACTIVITIES[self.activity][1], "place": self.place,
-                "hunger": round(self.hunger, 2), "boredom": round(self.boredom, 2), "bread": self.bread,
+                "hunger": round(self.hunger, 2), "vitals": self.body.vitals(), "boredom": round(self.boredom, 2), "bread": self.bread,
                 "phone": self.phone_app if self.activity == "phone" and not self.path else None,
                 "geo": self.geo, "say": self.say, "food": self.food, "courier": self.courier(self._t), "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
 
     def to_dict(self):
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
                 "food": self.food, "delivery": self.delivery,
-                "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log}
+                "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log,
+                **({"body": self.body.to_dict()} if self.own_body else {})}

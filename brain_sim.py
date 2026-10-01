@@ -32,6 +32,7 @@ GROUPS = {
     "default": ["_Default_"],
     "reward": ["Accumbens", "Caudate", "Putamen"],
     "fear": ["Amygdala"],
+    "insula": ["_SalVentAttn_FrOperIns"],   # anterior insula / frontal operculum proxy (interoception, twin/body.py)
     "memory": ["Hippocampus"],
     "relay": ["Thalamus"],
 }
@@ -79,6 +80,7 @@ class Brain:
         # slow layer: spontaneous BOLD-band activity from the fitted Hopf model (None if not fitted / disabled)
         self.slow, self.slow_gain = None, 1.0
         self.slow_x = np.zeros(self.n)
+        self.neuromod = np.zeros(self.n)     # excitability from neuromodulator levels x receptor maps (twin/neurochem.py)
         if slow and (HERE / "twin" / "data" / "slow_layer.npz").exists():
             from twin.hopf import SlowLayer
             self.slow = SlowLayer(seed=seed)
@@ -108,7 +110,7 @@ class Brain:
             if self.slow_on and self.t % 100 == 0:                     # slow layer: every 100 steps (0.1 s)
                 self.slow_x = SLOW_DRIVE * self.slow_gain * np.clip(
                     self.slow.advance(100 * dt)[self._slow_idx], -2.0, 3.0)
-            a_eff = self.a + self.stim + self.drive + self.slow_x                 # stimulus pushes toward oscillation
+            a_eff = self.a + self.stim + self.drive + self.slow_x + self.neuromod                 # stimulus pushes toward oscillation
             # exponential integrator for the local dynamics (explicit Euler would
             # inflate the fast rotation), coupling and noise added explicitly
             local = np.exp((a_eff + 1j * self.omega - np.abs(z) ** 2) * dt)
@@ -131,6 +133,7 @@ class Brain:
         self.lag_coupling()                                   # built once on the live brain, shared read-only
         c = copy.copy(self)
         c.buf, c.stim, c.drive, c.slow_x = self.buf.copy(), self.stim.copy(), self.drive.copy(), self.slow_x.copy()
+        c.neuromod = self.neuromod.copy()
         c.omega = self.omega.copy()
         c.rng = copy.deepcopy(self.rng)
         c.slow = copy.deepcopy(self.slow) if self.slow is not None else None

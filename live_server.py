@@ -33,6 +33,8 @@ from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
+from twin.body import Body
+from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
 from browse import Browser, display_ok
 import brain_vote
@@ -44,6 +46,12 @@ HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
+# tonic neuromodulator targets per stage (1.0 = resting wake): monoamines fall in NREM and go almost silent in REM,
+# acetylcholine is low in NREM and high in REM (Pace-Schott & Hobson 2002, Nat Rev Neurosci 3:591)
+STAGE_MOD = {"AWAKE": {"DA": 1.0, "5HT": 1.0, "NE": 1.0, "ACh": 1.0},
+             "NREM": {"DA": 0.8, "5HT": 0.5, "NE": 0.5, "ACh": 0.3},
+             "REM": {"DA": 0.9, "5HT": 0.05, "NE": 0.05, "ACh": 1.2}}
+NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
 RPC_WS = os.environ.get("SOLANA_WS", "wss://api.mainnet-beta.solana.com")   # e.g. a Helius wss URL (env, never logged)
@@ -104,7 +112,16 @@ class Live:
         self.diary = None                # dream diary, set by main() with --eye
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
-        self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
+        self.body_path = Path(data_dir) / "body.json"
+        bs = json.loads(self.body_path.read_text()) if self.body_path.exists() else {}
+        life_state = json.loads(life_path.read_text()) if life_path.exists() else None
+        if not bs.get("body") and life_state and "hunger" in life_state:      # first start: carry the old hunger over
+            bs["body"] = {"ghrelin": min(1.0, max(0.0, life_state["hunger"]))}
+        self.body = Body(bs.get("body"))
+        self.neuro = Neuromodulators(state=bs.get("neuro"))
+        atlas = json.load(open(HERE / "out" / "atlas_names.json"))
+        self.nm_idx = np.array([atlas.index(n) for n in self.brain.names])
+        self.life = Life(life_state, body=self.body)
         self.time_scale = time_scale
         self.life.time_scale = time_scale
         self.reading_path = Path(data_dir) / "reading.json"
@@ -147,6 +164,7 @@ class Live:
             b.stimulate("relay", 10 * gain)
             b.stimulate("attention", 8 * gain)
         self.stats["usd"] += tr["usd"]
+        self.neuro.on_trade(tr["kind"], tr["usd"], t=time.time())          # buys: dopamine RPE; sells: noradrenaline
         self.recent_trades = [x for x in self.recent_trades if time.time() - x[0] < 300] + [(time.time(), tr["kind"], tr["usd"])]
 
     async def rpc_trades(self):
@@ -337,11 +355,21 @@ class Live:
             self.last_groups = groups
             base = sum(groups.values()) / max(1, len(groups))
             rel = self.last_rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
+            # neuromodulators x receptor maps -> regional excitability; the body -> interoceptive drive to the insula
+            levels = self.neuro.update(TICK, STAGE_MOD.get(self.engine.stage, STAGE_MOD["NREM"]))
+            b.neuromod = NEURO_K * (self.neuro.region_gain(levels)[self.nm_idx] - 1.0)
+            amyg = max(0.0, rel.get("fear", 1.0) - 1.0)
+            body_levels = dict(levels, NE=min(levels["NE"], 1.5))       # the market can quicken his pulse, not race it
+            self.body.update(TICK * self.time_scale, body_levels, min(amyg, 0.4), self.engine.stage,
+                             exertion=self.life.exertion())
+            for grp, amt in self.body.intero_drive().items():
+                b.stimulate(grp, amt * TICK / 2.0)                    # settles at `amt` (stimuli decay with tau 2 s)
             hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
             tsim = self.clock.now()
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
                              self.engine.pressure(tsim))
             msg["life"] = self.life.snapshot()
+            msg["neuro"] = {k: round(v, 2) for k, v in levels.items()}
             if self.life.activity == "research" and not self.life.path:
                 msg["life"]["reading"] = self.reading_now(tsim)
             if self.browser and (dev := self.screen_device()):
@@ -353,6 +381,7 @@ class Live:
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
                 self.life_path.write_text(json.dumps(self.life.to_dict()))
+                self.body_path.write_text(json.dumps({"body": self.body.to_dict(), "neuro": self.neuro.to_dict()}))
                 self.reading_path.write_text(json.dumps(self.reader.to_dict(), ensure_ascii=False))
                 last_save = now
             next_t += TICK

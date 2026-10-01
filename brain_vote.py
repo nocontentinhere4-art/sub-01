@@ -70,7 +70,7 @@ def simulate(clone, stims, seconds=VOTE_S):
         coup = b.g * ((M @ H.reshape(hist * n, K)) - Ws[:, None] * z)
         if slow is not None and t % 100 == 0:
             slow_x = SLOW_DRIVE * b.slow_gain * np.clip(slow.advance(100 * dt)[b._slow_idx], -2.0, 3.0)
-        a_eff = b.a + stim + (b.drive + slow_x)[:, None]
+        a_eff = b.a + stim + (b.drive + slow_x + getattr(b, "neuromod", 0.0))[:, None]   # same terms as Brain.step
         local = np.exp((a_eff + 1j * b.omega[:, None] - np.abs(z) ** 2) * dt)
         noise = b.noise * math.sqrt(dt) * (rng.normal(size=n) + 1j * rng.normal(size=n))
         new = z * local + dt * coup + noise[:, None]
