@@ -54,6 +54,12 @@ BAD_WORDS = re.compile(
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
                       r"before you continue|consent", re.I)
+# bot checks recognised in the page text or by their challenge frames: he leaves these pages, never solves them
+BODY_WALL = re.compile(r"unusual traffic from your computer|i'?m not a robot|are you a (robot|human)|verify you are human|"
+                       r"checking (if the site connection is secure|your browser)|press (and|&) hold|"
+                       r"complete the security check|please solve (this|the) (captcha|puzzle)", re.I)
+WALL_FRAMES = """() => !!document.querySelector('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
+  + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"], #captcha-form, .g-recaptcha, .h-captcha')"""
 LOGIN_LINK = re.compile(r"log ?in|sign ?(in|up)|register|account|cart|checkout|basket|subscribe|donate|password|"
                         r"privacy|cookie|terms|legal|imprint|impressum|careers|advertis", re.I)
 SKIP_EXT = re.compile(r"\.(pdf|zip|rar|7z|exe|dmg|apk|mp3|mp4|mov|avi|mkv|iso|tar|gz|docx?|xlsx?|pptx?)(\?|$)", re.I)
@@ -387,7 +393,7 @@ class Browser:
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
-                  else "bot wall" if BOT_WALL.search(page_title) else None)
+                  else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body) else None)
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             return await self._leave(sc)
@@ -398,6 +404,16 @@ class Browser:
         if shoot:
             await self.show(sc)
         return True
+
+    @staticmethod
+    def wall_text(body):
+        return bool(BODY_WALL.search(body[:3000]))
+
+    async def _walled(self, page, body=None):
+        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) is on the page."""
+        if body is None:
+            body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 3000)")
+        return self.wall_text(body) or await page.evaluate(WALL_FRAMES)
 
     async def show(self, sc):
         """Screenshot the current page and log the visit (only pages that passed the guard get here)."""
@@ -417,5 +433,9 @@ class Browser:
         return False
 
     async def _shoot(self, sc):
+        if await self._walled(sc.page):                                 # a page can turn into a bot check later
+            print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
+            await self._leave(sc)
+            return
         sc.shot = await sc.page.screenshot(type="jpeg", quality=72 if sc.name == "desk" else 68)
         sc.shot_id += 1
