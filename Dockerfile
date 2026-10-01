@@ -6,11 +6,15 @@ ENV PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=
 RUN pip install --no-cache-dir -r requirements-server.txt \
  && python -m playwright install --with-deps --only-shell chromium \
  && rm -rf /var/lib/apt/lists/*
-COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py ./
+COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py \
+     browse_service.py eyes.py brain_vote.py tastes.py ./
 COPY twin ./twin
 COPY web ./web
 COPY out/connectome.npz out/atlas_names.json ./out/
 COPY out/rest ./out/rest
 # /data is a persistent volume: sleep state, memory, nights, world, eye frames, browsing log
-# BROWSE=1: his computer and phone screens show real web pages (headless Chromium); set BROWSE=0 to turn it off
+# BROWSE=1: his computer and phone screens show real web pages (headless Chromium); set BROWSE=0 to turn it off.
+# Chromium runs in its own process (browse_service.py, a child with a memory watchdog). To run it as a separate Railway
+# service instead: same repo, start command `python browse_service.py --host :: --port $PORT`, no public domain,
+# BROWSE_SERVICE_TOKEN set on both services, and BROWSE_SERVICE_URL=http://<service>.railway.internal:<port> here.
 CMD ["sh", "-c", "python live_server.py --host 0.0.0.0 --port ${PORT:-8080} --eye --trust-proxy --data-dir /data --frames-dir /data/frames ${EXTRA_ARGS:-}"]

@@ -106,7 +106,8 @@ def test_browser_never_shows_local_pages():
             assert "secret" not in body
         finally:
             await b.close()
-            await b.pw.stop()
+            if b.pw:                                                          # close() may already have stopped it
+                await b.pw.stop()
             await runner.cleanup()
 
     asyncio.run(run())
@@ -158,6 +159,7 @@ def test_bot_wall_page_is_left_not_shown():
             assert not await b._walled(sc.page)
         finally:
             await b.close()
-            await b.pw.stop()
+            if b.pw:                                                          # close() may already have stopped it
+                await b.pw.stop()
 
     asyncio.run(run())

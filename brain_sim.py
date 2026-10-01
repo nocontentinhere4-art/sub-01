@@ -14,6 +14,7 @@ Two layers:
   homotopic edges) and scored on the other half. It generates the spontaneous slow fluctuations and modulates the fast
   layer's excitability, the role that replaying the recorded fMRI (real_baseline.py, now optional) used to play.
 """
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -123,6 +124,27 @@ class Brain:
         for _ in range(int(seconds / self.dt / every)):
             out.append(self.step(every).real.copy())
         return np.array(out)
+
+    def clone(self):
+        """Independent copy of the dynamic state (history buffer, stimulus, drives, slow layer, random stream) that
+        shares the fixed wiring arrays: used to try out a stimulus without touching the live brain (brain_vote.py)."""
+        c = copy.copy(self)
+        c.buf, c.stim, c.drive, c.slow_x = self.buf.copy(), self.stim.copy(), self.drive.copy(), self.slow_x.copy()
+        c.omega = self.omega.copy()
+        c.rng = copy.deepcopy(self.rng)
+        c.slow = copy.deepcopy(self.slow) if self.slow is not None else None
+        return c
+
+    def lag_coupling(self):
+        """Sparse M with coupling_i = sum_j W_ij z_j(t - d_ij) = M @ H.ravel(), H[d] = z(t - d): the same delayed
+        coupling as step(), as one sparse product that many clones can share (built once, ~46k entries)."""
+        if getattr(self, "_lagM", None) is None:
+            import scipy.sparse as sp
+            n = self.n
+            rows, cols = np.repeat(np.arange(n), n), np.tile(np.arange(n), n)
+            self._lagM = sp.csr_matrix((self.W.reshape(-1), (rows, self.delay.reshape(-1) * n + cols)),
+                                       shape=(n, self.hist * n))
+        return self._lagM
 
     def use_slow_layer(self, on):
         """Switch the fitted slow layer on/off (off while replaying a real recorded session through `drive`)."""

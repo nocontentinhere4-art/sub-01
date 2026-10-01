@@ -35,6 +35,10 @@ from real_baseline import RealBaseline
 from life import WORLD, Life
 from research import Reader, reading_stimulus
 from browse import Browser
+import brain_vote
+from browse_service import BrowserClient, BrowserDown, LocalBrowser
+from eyes import Eyes
+from tastes import PageWatch, Tastes
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -106,7 +110,17 @@ class Live:
         self.reading_path = Path(data_dir) / "reading.json"
         self.reader = Reader(json.loads(self.reading_path.read_text()) if self.reading_path.exists() else None)
         self.browsing_path = Path(data_dir) / "browsing.json"
-        self.browser = None              # set by main() with --browse: a real headless browser on the open web
+        self.browser = None              # BrowserClient (main() with --browse): Chromium runs in its own process
+        self.local_browser = None        # LocalBrowser when that process is our child (no BROWSE_SERVICE_URL)
+        self.browsing_state = json.loads(self.browsing_path.read_text()) if self.browsing_path.exists() else {}
+        self.eyes = None                 # eyes.py: an AI lists options; the brain model picks (brain_vote.py)
+        self.tastes = Tastes(Path(data_dir) / "tastes.json")
+        self.pagewatch = PageWatch()
+        self.decisions = {}              # device -> last decision record (shown in the screen card)
+        self.decision_log = []
+        self.targets = {}                # link / search -> wall time last chosen (novelty)
+        seed = os.environ.get("BRAIN_DECIDES_SEED")
+        self.vote_rng = np.random.default_rng(int(seed) if seed else None)
         self.baseline = None             # set by main() with --replay-real-session (else the fitted slow layer runs)
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
@@ -331,7 +345,8 @@ class Live:
             if self.life.activity == "research" and not self.life.path:
                 msg["life"]["reading"] = self.reading_now(tsim)
             if self.browser and (dev := self.screen_device()):
-                msg["life"]["screen"] = self.browser.screens[dev].status()
+                msg["life"]["screen"] = self.screen_status(dev)
+                self.pagewatch.feed(rel, now, TICK)
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
@@ -367,28 +382,95 @@ class Live:
             return None
         return {"research": "desk", "phone": "phone"}.get(self.life.activity)
 
+    def screen_status(self, dev):
+        if self.browser.restarting:
+            return {"device": dev, "restarting": True}
+        st = self.browser.screens.get(dev)
+        dec = self.decisions.get(dev)
+        if st and dec:
+            st = dict(st, decision={k: dec.get(k) for k in ("options", "reason", "eyes", "ms", "temperature", "page")})
+        return st
+
     async def run_browse(self):
-        idle_since, last_save = time.time(), time.time()
+        """Drive the screens through the browser service; if it is down the brain and the page carry on."""
+        idle_since, last_save, ready, open_dev = time.time(), time.time(), False, None
         while True:
             await asyncio.sleep(1)
             dev = self.screen_device()
             now = time.time()
-            if dev is None:
-                if self.browser.browser is not None and now - idle_since > 120:   # put away: free the memory
-                    await self.browser.close()
-                continue
-            idle_since = now
-            other = "phone" if dev == "desk" else "desk"
-            if self.browser.screens[other].ctx is not None:
-                await self.browser.close(other)
-            t = self.clock.now()
-            art = self.reader.current()
-            st = await self.browser.step(dev, self.heard(t), art["title"] if art else None)
-            if st:
-                await self.broadcast({"type": "screen", **st})
-            if now - last_save > 300:
-                self.browsing_path.write_text(json.dumps(self.browser.to_dict(), ensure_ascii=False))
-                last_save = now
+            try:
+                if dev is None:
+                    if open_dev and now - idle_since > 120:     # put away: the service frees the memory
+                        self.end_page()
+                        await self.browser.close()
+                        open_dev = None
+                    continue
+                idle_since = now
+                if self.local_browser and not await self.local_browser.ensure():
+                    raise BrowserDown("browser process did not start")
+                if not ready:
+                    await self.browser.init(self.browsing_state)
+                    ready = True
+                if open_dev and open_dev != dev:
+                    self.end_page()
+                    await self.browser.close(open_dev)
+                open_dev = dev
+                t = self.clock.now()
+                art = self.reader.current()
+                interest = art["title"] if art else None
+                d = await self.browser.step(dev, self.heard(t), interest)
+                st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
+                if st:
+                    await self.broadcast({"type": "screen", **self.screen_status(dev)})
+                if now - last_save > 300:
+                    s = await self.browser.state()
+                    self.browsing_state = {"log": s.get("log", []), "used": s.get("used", [])}
+                    self.browsing_path.write_text(json.dumps(self.browsing_state, ensure_ascii=False))
+                    last_save = now
+            except BrowserDown as e:
+                if not self.browser.restarting:
+                    print("browser down:", e, flush=True)
+                    self.browser.restarting = True
+                    await self.broadcast({"type": "screen", "device": dev, "restarting": True})
+                self.end_page()
+                ready, open_dev = False, None
+                await asyncio.sleep(5)
+
+    def end_page(self):
+        """He leaves the page: its measured brain response updates his tastes."""
+        res = self.pagewatch.finish()
+        if res:
+            self.tastes.learn(*res)
+
+    def novel(self, option):
+        key = option.get("href") or option.get("target") or option["action"]
+        return option["action"] in ("click", "open_video", "search") and time.time() - self.targets.get(key, 0) > 7 * 86400
+
+    async def decide(self, dev, page, interest=None):
+        """The eyes list options for the page; the brain model votes; the browser carries the choice out."""
+        loop = asyncio.get_running_loop()
+        opts, meta = await loop.run_in_executor(None, self.eyes.propose, page, interest)
+        if not opts:
+            return await self.browser.act(dev, {"action": "leave"}, "nothing safe to do on this page", interest)
+        t = self.clock.now()
+        mood = {"boredom": self.life.boredom, "pressure": self.engine.pressure(t), "tired": self.engine.tired}
+        gain = self.engine.gain
+        topics = [Tastes.topics(o, page.get("title", "")) for o in opts]
+        tastes = [self.tastes.predict(tp) for tp in topics]
+        clone = self.brain.clone()                            # snapshot on the event loop, simulated in a thread
+        dec = await loop.run_in_executor(None, lambda: brain_vote.vote(
+            clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng))
+        chosen = opts[dec["chosen"]]
+        brain_vote.apply(self.brain, chosen, gain)             # the live brain receives the chosen stimulus
+        self.end_page()
+        self.pagewatch.start(topics[dec["chosen"]], time.time())
+        self.targets[chosen.get("href") or chosen.get("target") or chosen["action"]] = time.time()
+        dec.update(device=dev, t=hhmm(t), page=page.get("title", "")[:120], eyes=meta)
+        self.decisions[dev] = dec
+        self.decision_log = (self.decision_log + [dec])[-30:]
+        await self.broadcast({"type": "decision", **dec})
+        return await self.browser.act(dev, {k: chosen.get(k) for k in ("action", "target", "label")},
+                                      dec["reason"], interest)
 
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
@@ -456,6 +538,20 @@ class Live:
         return ws
 
 
+async def supervised(name, fn, backoff=5.0):
+    """Run a background task forever: an unexpected error is logged and the task restarts, so a part such as the
+    screens' browser can fail without stopping the brain loop (asyncio.gather would otherwise end the server)."""
+    while True:
+        try:
+            await fn()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"{name} task failed, restarting in {backoff:.0f}s:", repr(e)[:160], flush=True)
+            await asyncio.sleep(backoff)
+
+
 def parse_start(hm):
     """'HH:MM' -> sim epoch of that Rome time today."""
     h, m = map(int, hm.split(":"))
@@ -517,23 +613,42 @@ async def main(args):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
         live.brain.use_slow_layer(False)          # the recording replaces the model's own slow activity
     if args.browse:
-        if Browser.available():
-            bpath = data_dir / "browsing.json"
-            live.browser = Browser(json.loads(bpath.read_text()) if bpath.exists() else None)
+        load_env(HERE / ".env")                   # REPLICATE_API_TOKEN / ANTHROPIC_API_KEY for the eyes (never logged)
+        if os.environ.get("BROWSE_SERVICE_URL"):  # Chromium as its own Railway service
+            live.browser = BrowserClient(os.environ["BROWSE_SERVICE_URL"], os.environ.get("BROWSE_SERVICE_TOKEN", ""))
+        elif Browser.available():                 # Chromium in a child process with its own memory watchdog
+            live.local_browser = LocalBrowser()
+            live.browser = live.local_browser.client
         else:
             print("--browse: playwright is not installed, screens stay on Wikipedia reading", flush=True)
+        live.eyes = Eyes(data_dir=data_dir)
 
     async def screen_shot(request):               # latest screenshot of the desk or phone screen
         dev = request.match_info["device"]
-        sc = live.browser.screens.get(dev) if live.browser else None
-        if not sc or not sc.shot:
+        try:
+            shot = await live.browser.shot(dev) if live.browser and dev in ("desk", "phone") else None
+        except BrowserDown:
+            shot = None
+        if not shot:
             raise web.HTTPNotFound()
-        return web.Response(body=sc.shot, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
+        return web.Response(body=shot, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
     app.router.add_get("/api/screen/{device}.jpg", screen_shot)
 
     async def browsing(request):                  # pages shown on his screens, newest last
-        return web.json_response({"on": bool(live.browser), "log": live.browser.log[-30:] if live.browser else []})
+        log = (live.browser.log or live.browsing_state.get("log", [])) if live.browser else []
+        return web.json_response({"on": bool(live.browser), "log": log[-30:]})
     app.router.add_get("/api/browsing", browsing)
+
+    async def tastes(request):                    # what kinds of pages have paid off in the brain's response
+        return web.json_response(live.tastes.top())
+    app.router.add_get("/api/tastes", tastes)
+
+    async def decisions(request):                 # the brain's last choices on the screens, with the options it saw
+        return web.json_response({"decisions": live.decision_log[-20:],
+                                  "eyes": live.eyes.budget.summary() if live.eyes else None,
+                                  "note": "An AI reads the page and lists options; his brain model picks. "
+                                          "It does not understand what it reads."})
+    app.router.add_get("/api/decisions", decisions)
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
@@ -601,14 +716,17 @@ async def main(args):
     if live.eye:
         tasks.append(live.run_eye())
     if live.browser:
-        tasks.append(live.run_browse())
+        tasks.append(supervised("browse", live.run_browse))
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
         if live.browser:
-            live.browsing_path.write_text(json.dumps(live.browser.to_dict(), ensure_ascii=False))
-            await live.browser.close()
+            live.browsing_path.write_text(json.dumps(live.browsing_state, ensure_ascii=False))
+            if live.local_browser:
+                await live.local_browser.aclose()
+            else:
+                await live.browser.aclose()
 
 
 if __name__ == "__main__":

@@ -51,6 +51,17 @@
   #screencard.phone .frame { width:190px; margin:0 auto; border-radius:22px; border:6px solid #15151b; box-shadow:0 0 0 1px rgba(255,255,255,.12); }
   #screencard.phone .frame img { aspect-ratio:390/844; object-fit:cover; object-position:top; }
   #screencard .url { font-size:11px; color:var(--dim); margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #screencard .opts { margin-top:10px; padding-top:8px; border-top:1px solid var(--line); }
+  #screencard .opts .h { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+  #screencard .op { display:grid; grid-template-columns:1fr 64px 34px; gap:8px; align-items:center; font-size:11px; color:#a9a9b8; padding:2px 0; }
+  #screencard .op span:first-child { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #screencard .op.on { color:var(--fg); }
+  #screencard .op .bar { position:relative; height:6px; background:rgba(255,255,255,.07); border-radius:3px; }
+  #screencard .op .bar i { position:absolute; top:0; bottom:0; border-radius:3px; background:#80808f; }
+  #screencard .op.on .bar i { background:#ff9a3c; } #screencard .op .bar i.neg { background:#ff7a7a; }
+  #screencard .op .bar::after { content:""; position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:rgba(255,255,255,.25); }
+  #screencard .op b { font-weight:400; text-align:right; color:var(--dim); }
+  #screencard .restarting { padding:18px 0; text-align:center; color:var(--dim); font-size:12px; }
   #map { height:230px; border-radius:8px; overflow:hidden; background:#111; }
   .darktiles { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
   #mapcard.out #map { height:340px; }
@@ -104,6 +115,9 @@
     <div class="t" id="s-title" style="margin-top:10px"></div>
     <div class="url" id="s-url"></div>
     <div class="s" id="s-why"></div>
+    <div class="opts" id="s-opts" hidden><div class="h" id="s-opts-h">options considered · brain response</div><div id="s-rows"></div>
+      <div class="s" id="s-reason"></div>
+      <div class="s">An AI reads the page and lists options; his brain model picks. It does not understand what it reads.</div></div>
   </div>
   <div class="card" id="readcard" hidden>
     <div class="k"><span>On his mind</span><a id="r-link" href="#" target="_blank" rel="noopener">wikipedia ↗</a></div>
@@ -128,7 +142,8 @@
 <div id="honest">Fictional character, living a simulated life. His choices come from a brain model built from one real person's
   public MRI scans; the character is not that person and does not look like him. <span id="h-screen">His screens show real web
   pages, loaded live by a headless browser: he only reads and scrolls, never logs in, posts or buys; adult, violent and
-  gambling sites are skipped.</span> Food orders and the courier are simulated. A model of brain activity, not a mind.</div>
+  gambling sites and bot checks are skipped. An AI reads each page and lists options; his brain model picks one. It
+  does not understand what it reads.</span> Food orders and the courier are simulated. A model of brain activity, not a mind.</div>
 <div id="dock">
   <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
   <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
@@ -394,6 +409,7 @@ let lastStatus = {};               // device -> status
 let trades = [];                   // recent trade flow, for the chart view
 function showScreen(st){
   if (!st) return;
+  if (st.restarting) { lastStatus[st.device] = st; if (screenOn === st.device) panel(st); return; }
   lastStatus[st.device] = st;
   const target = st.device === "desk" ? monitor : phone.userData.screen;
   if (!target || target.id === st.id) return;
@@ -410,6 +426,24 @@ function panel(st){
   if (!st) { card.hidden = true; return; }
   card.hidden = false; card.classList.toggle("phone", st.device === "phone");
   $("s-k").textContent = st.device === "phone" ? "On his phone" : "On his computer";
+  card.querySelector(".frame").hidden = !!st.restarting;
+  if (st.restarting) {
+    $("s-title").innerHTML = `<div class="restarting">browser restarting…</div>`; $("s-url").textContent = "";
+    $("s-why").textContent = "the screen's browser runs apart from the brain; the brain model keeps running"; $("s-opts").hidden = true;
+    return;
+  }
+  const dec = st.decision;
+  $("s-opts").hidden = !(dec && dec.options && dec.options.length);
+  if (dec && dec.options) {
+    $("s-opts-h").textContent = `options considered${dec.page ? " on “" + dec.page.slice(0, 40) + (dec.page.length > 40 ? "…" : "") + "”" : ""} · brain response`;
+    $("s-rows").innerHTML = dec.options.map(o => {
+      const v = Math.max(-1, Math.min(1, +o.value || 0)), w = Math.abs(v) * 50;
+      return `<div class="op${o.chosen ? " on" : ""}" title="${esc(o.action)} · p=${o.p}"><span>${o.chosen ? "▸ " : ""}${esc(o.label)}</span>`
+        + `<span class="bar"><i class="${v < 0 ? "neg" : ""}" style="left:${v < 0 ? 50 - w : 50}%;width:${w}%"></i></span>`
+        + `<b>${Math.round(o.p * 100)}%</b></div>`;
+    }).join("");
+    $("s-reason").textContent = dec.reason + (dec.eyes && dec.eyes.source !== "ai" && dec.eyes.source ? " · options from the page's own links (" + (dec.eyes.why_local || "no AI") + ")" : "");
+  }
   $("s-title").textContent = st.title || ""; $("s-url").textContent = st.url || "";
   $("s-why").textContent = st.why || ""; $("s-link").href = st.url || "#";
   const src = `/api/screen/${st.device}.jpg?id=${st.id}`;
@@ -575,7 +609,8 @@ function connect(){
     $("where").textContent = outside ? "· out in Kichijōji" : "· in his room";
     const r = life.reading, sc = life.screen;
     const short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
-    $("story").innerHTML = sc && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"}: <em>${esc(short(sc.title))}</em>.`
+    $("story").innerHTML = sc && sc.restarting && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"} (browser restarting).`
+      : sc && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"}: <em>${esc(short(sc.title))}</em>.`
       : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`;
     $("why").textContent = life.say || "";
     if (r && !sc) { $("readcard").hidden = false; $("r-title").textContent = r.title; $("r-text").textContent = r.extract;
