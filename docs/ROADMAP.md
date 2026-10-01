@@ -1,12 +1,18 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 22:00 UTC** (pass 5). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-01 23:40 UTC** (pass 6). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-Nothing is ready to merge yet. #9 and #20 now merge cleanly with `main` (#9 through coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10).
+**Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
+coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
+used the old engine's schedule). `main` passes 225 tests (192 + 10 skipped without torch), the demo smoke passes,
+and a simulated night sleeps 23:54, reaches REM at 01:09, wakes, and makes 24 replays.
 
-Brain-decides model and budget: **decided** (Haiku 4.5, $1.00/day cap; see Decisions). Nothing for the owner to set on Railway.
-When a PR is marked **READY TO MERGE (needs owner)**, it is listed here:
+Owner actions now:
+- **Spiking memory test (#9) is on `main` but idle** until you add `RUNPOD_API_KEY` and `SUB01_POD_SECRET` on Railway.
+  Make sure the `/data` volume has ≥ 300 MB free. It then runs 21:00–22:00 Tokyo daily (≤ 1 GPU-hour/day, ≈
+  $0.27–0.85/day, 8 GPU-hours/week cap).
+- Nothing else to merge yet: #20 and #8 still need their required changes (see their reviews).
 
 | PR | status | why it needs the owner |
 |---|---|---|
@@ -33,11 +39,11 @@ cheap to run, with the password gate kept until launch day.
 | 4 | Dream diary, Wikipedia reading | done | main |
 | 5 | Body + neuromodulators | done | #10 |
 | 6 | PCI test (below the cut-off in every state; published as is) | done | main `cd5e25b` |
-| 7 | Room lag fix, phone grip, sky | in progress: needs main merge | #8 |
-| 8 | Reading memory (readings → stimuli, REM replay, curiosity) | in progress: needs main merge | #7 |
-| 9 | Sleep circuit (Phillips-Robinson) | in progress: waits for #7 | #11 |
-| 10 | Spiking memory on GPU, daily test card | in progress: merges cleanly now; needs torch-free tests, re-merge after #7/#11 | #9 |
-| 11 | Brain decides what he clicks | in progress: live-tested OK (182 tests; real pages; fake OpenRouter); blocker = daily USD cap; re-merge after #9/#11 | #20 |
+| 7 | Room lag fix, phone grip, sky, rebuilt bedroom | in progress: needs main merge, rate clamp, review of the new room | #8 |
+| 8 | Reading memory (readings → stimuli, REM replay, curiosity) | done | #7 |
+| 9 | Sleep circuit (Phillips-Robinson) | done | #11 |
+| 10 | Spiking memory on GPU, daily test card | done (idle until the RunPod keys are set on Railway) | #9 |
+| 11 | Brain decides what he clicks | in progress: needs the $1/day cap, Haiku default, main merge (conflicts: Dockerfile, live_server.py) | #20 |
 | 12 | CI (tests + demo smoke on every PR) | todo | issue #12 |
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | todo | issue #13 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
@@ -49,16 +55,15 @@ cheap to run, with the password gate kept until launch day.
 | 19 | Launch | todo | owner |
 
 ## Merge order
-1. **#8** room: frontend + a tested feed filter. The coordinator merges it once it has merged `main`.
-2. **#7** reading memory (owner: `sleep.py`).
-3. **#11** sleep circuit (owner: `sleep.py`). It merges `main` after #7.
-4. **#9** spiking (owner: RunPod spend, Dockerfile). It merges `main` after #7 and #11.
-5. **#20** brain-decides (owner: Dockerfile, API spend, browser process). It merges `main` after #9 and #11.
-6. Then **#21** atomic writes, **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a time on `live_server.py`.
+1. **#8** room (the coordinator merges it once the review is satisfied) and **#20** brain-decides (owner: Dockerfile,
+   API spend). They are independent; whichever is ready first goes first.
+2. Then **#21** atomic writes, **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a
+   time on `live_server.py`.
 
 **#12** CI and **#13** about page touch no shared files and can merge at any time.
 
-Rule: at least 60 minutes between merges to `main`. Every branch brings `main` in with a merge commit. Never force-push.
+Rule: at least 60 minutes between merges to `main`, unless the owner says otherwise (the owner did so on
+2026-10-01 for #7, #11 and #9). Every branch brings `main` in with a merge commit. Never force-push.
 
 ## Review bots
 `graphify-labs[bot]` reviews every PR: a summary, "Worth a look" findings and inline coupling notes. It marks its own
@@ -84,6 +89,10 @@ findings "NOT verified", and its reviews are partial on large diffs.
   encodes the day's readings, runs compressed sleep and the after-sleep test, and runs the next-day test at the start
   of the following session. "Tested every morning" in the goal means this daily next-day test. A morning slot is
   only a change to `SUB01_SESSIONS`.
+- **2026-10-01: #7, #11 and #9 merged at the owner's request**, before their authors pushed the last fixes. The
+  coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
+  `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
+  and the `?rate=` bug.
 - **2026-10-01: review-bot findings are advisory.** The coordinator verifies them before they become required changes.
 - **2026-10-01: paid-model choice stays with the owner** unless the owner delegates it. Coordinator rule: every paid
   call has a hard daily USD cap and a log line before it can merge.
@@ -110,8 +119,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
 - **No CI:** a broken `main` deploys straight to Railway. Fix: #12.
-- **Test bug on `main`:** `tests/test_browse.py::test_browser_never_shows_local_pages` fails whenever Chromium is
-  available (it stops the driver twice after `3c682df`). Fixed on `feature/brain-decides`.
+- ~~Test bug on `main` (Chromium tests stopped the driver twice)~~: fixed with the #7 merge.
 - **Honesty:** the PCI and Pong results are negative and must stay visible as such. "Digital twin" wording suggests
   a copy of the person; use "a model built from one person's public MRI data".
 - **Stale branches** (`feature/rw-*`, `feature/twin-*`, `feature/real-world`, `assets/cc0`, `test/integration`,
