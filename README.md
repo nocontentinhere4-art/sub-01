@@ -22,6 +22,7 @@ A whole-brain model of one real human brain, built from public MRI data and wire
 | Live page + model + Solana log stream + chat + sleep | `live_server.py --mint <MINT>` or `--demo` | http://localhost:8765 |
 | Sleep/wake engine, memory replay | `sleep.py` (used by `live_server.py`) | `data/state.json`, `data/nights/YYYY-MM-DD.json` |
 | Chat filter + message -> stimulus rules | `chat.py` (used by `live_server.py`) | |
+| His computer and phone screens: real web pages (headless Chromium, read-only, guarded) | `browse.py` (`--browse` / `BROWSE=1`) | `/api/screen/{desk,phone}.jpg`, `data/browsing.json` |
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt

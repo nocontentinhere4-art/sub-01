@@ -33,6 +33,7 @@ from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
 from research import Reader
+from browse import Browser
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -103,6 +104,8 @@ class Live:
         self.life.time_scale = time_scale
         self.reading_path = Path(data_dir) / "reading.json"
         self.reader = Reader(json.loads(self.reading_path.read_text()) if self.reading_path.exists() else None)
+        self.browsing_path = Path(data_dir) / "browsing.json"
+        self.browser = None              # set by main() with --browse: a real headless browser on the open web
         self.baseline = None             # set by main() with --replay-real-session (else the fitted slow layer runs)
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
@@ -291,6 +294,8 @@ class Live:
             msg["life"] = self.life.snapshot()
             if self.life.activity == "research" and not self.life.path:
                 msg["life"]["reading"] = self.reader.current()
+            if self.browser and (dev := self.screen_device()):
+                msg["life"]["screen"] = self.browser.screens[dev].status()
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
@@ -314,6 +319,36 @@ class Live:
             art = await loop.run_in_executor(None, self.reader.read, t, heard)
             if art:
                 await self.broadcast({"type": "reading", **art})
+
+    # --- the screens: a real browser on the open web (desk + phone) -------------------
+    def screen_device(self):
+        if self.life.path or self.engine.stage != "AWAKE":
+            return None
+        return {"research": "desk", "phone": "phone"}.get(self.life.activity)
+
+    async def run_browse(self):
+        idle_since, last_save = time.time(), time.time()
+        while True:
+            await asyncio.sleep(1)
+            dev = self.screen_device()
+            now = time.time()
+            if dev is None:
+                if self.browser.browser is not None and now - idle_since > 120:   # put away: free the memory
+                    await self.browser.close()
+                continue
+            idle_since = now
+            other = "phone" if dev == "desk" else "desk"
+            if self.browser.screens[other].ctx is not None:
+                await self.browser.close(other)
+            t = self.clock.now()
+            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
+            art = self.reader.current()
+            st = await self.browser.step(dev, heard, art["title"] if art else None)
+            if st:
+                await self.broadcast({"type": "screen", **st})
+            if now - last_save > 300:
+                self.browsing_path.write_text(json.dumps(self.browser.to_dict(), ensure_ascii=False))
+                last_save = now
 
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
@@ -439,6 +474,24 @@ async def main(args):
     if args.replay_real_session and list((HERE / "out" / "rest").glob("*.npz")):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
         live.brain.use_slow_layer(False)          # the recording replaces the model's own slow activity
+    if args.browse:
+        if Browser.available():
+            bpath = data_dir / "browsing.json"
+            live.browser = Browser(json.loads(bpath.read_text()) if bpath.exists() else None)
+        else:
+            print("--browse: playwright is not installed, screens stay on Wikipedia reading", flush=True)
+
+    async def screen_shot(request):               # latest screenshot of the desk or phone screen
+        dev = request.match_info["device"]
+        sc = live.browser.screens.get(dev) if live.browser else None
+        if not sc or not sc.shot:
+            raise web.HTTPNotFound()
+        return web.Response(body=sc.shot, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    app.router.add_get("/api/screen/{device}.jpg", screen_shot)
+
+    async def browsing(request):                  # pages shown on his screens, newest last
+        return web.json_response({"on": bool(live.browser), "log": live.browser.log[-30:] if live.browser else []})
+    app.router.add_get("/api/browsing", browsing)
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
@@ -505,10 +558,15 @@ async def main(args):
     tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades()]
     if live.eye:
         tasks.append(live.run_eye())
+    if live.browser:
+        tasks.append(live.run_browse())
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
+        if live.browser:
+            live.browsing_path.write_text(json.dumps(live.browser.to_dict(), ensure_ascii=False))
+            await live.browser.close()
 
 
 if __name__ == "__main__":
@@ -526,5 +584,7 @@ if __name__ == "__main__":
                    help="replay his recorded resting-state fMRI as the background instead of the fitted slow layer")
     p.add_argument("--no-real-baseline", action="store_true", help=argparse.SUPPRESS)   # old flag (now the default)
     p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
+    p.add_argument("--browse", action="store_true", default=os.environ.get("BROWSE") == "1",
+                   help="real headless browser on the open web for his computer and phone screens (needs playwright)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     asyncio.run(main(p.parse_args()))
