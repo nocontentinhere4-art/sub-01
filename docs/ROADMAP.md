@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 20:50 UTC** (pass 3). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-01 21:45 UTC** (pass 4). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 Nothing is ready to merge yet. #9 and #20 now merge cleanly with `main` (#9 through coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10).
@@ -37,7 +37,7 @@ cheap to run, with the password gate kept until launch day.
 | 8 | Reading memory (readings → stimuli, REM replay, curiosity) | in progress: needs main merge | #7 |
 | 9 | Sleep circuit (Phillips-Robinson) | in progress: waits for #7 | #11 |
 | 10 | Spiking memory on GPU, daily test card | in progress: merges cleanly now; needs torch-free tests, re-merge after #7/#11 | #9 |
-| 11 | Brain decides what he clicks | in progress: needs a daily USD cap, re-merge after #9/#11 | #20 |
+| 11 | Brain decides what he clicks | in progress: live-tested OK (182 tests; real pages; fake OpenRouter); blocker = daily USD cap; re-merge after #9/#11 | #20 |
 | 12 | CI (tests + demo smoke on every PR) | todo | issue #12 |
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | todo | issue #13 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
