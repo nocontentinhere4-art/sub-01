@@ -32,8 +32,12 @@ import re
 from pathlib import Path
 
 import numpy as np
-import torch
 from scipy import signal, stats
+
+try:                       # torch is needed for fitting (batched, CPU/GPU); the live SlowLayer is numpy-only
+    import torch
+except ImportError:        # the live server (requirements-server.txt) does not install torch
+    torch = None
 
 ROOT = Path(__file__).resolve().parents[1]
 A_BIF = -0.02
@@ -208,8 +212,8 @@ def sc_matrix(W):
 
 
 # ----------------------------------------------------------------------------------------------- linear Hopf (torch)
-def _t(x, dev, dtype=torch.float64):
-    return torch.as_tensor(np.asarray(x), dtype=dtype, device=dev)
+def _t(x, dev, dtype=None):
+    return torch.as_tensor(np.asarray(x), dtype=dtype or torch.float64, device=dev)
 
 
 def linear_stats(C, a, w, beta=BETA, lag_s=LAG_S):
@@ -283,9 +287,10 @@ def fit_ec(C0, mask, a, w, fc_emp, covt_emp, iters=400, eps_fc=0.02, eps_tau=0.0
 
 
 # ----------------------------------------------------------------------------------------------- nonlinear simulation
-def simulate(C, a, w, seconds, tr, beta=BETA, dt=0.1, transient_s=120.0, seed=0, dev="cpu", dtype=torch.float32):
+def simulate(C, a, w, seconds, tr, beta=BETA, dt=0.1, transient_s=120.0, seed=0, dev="cpu", dtype=None):
     """Euler-Maruyama simulation of the full (nonlinear) Hopf model, batched.
     C: (B, n, n); returns x sampled every TR after the transient: numpy (B, T, n) (raw, not yet band-passed)."""
+    dtype = dtype or torch.float32
     g = torch.Generator(device=dev).manual_seed(int(seed))
     C = _t(C, dev, dtype)
     B, n = C.shape[0], C.shape[-1]

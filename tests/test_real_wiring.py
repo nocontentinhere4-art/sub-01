@@ -155,3 +155,16 @@ def test_null_comparison_results_are_complete():
             for k in ("g_held_fc_r", "ec_held_fc_r", "ec_held_fcd_ks", "scfc_held_r"):
                 p = s["nulls"][fam][k]["p"]
                 assert 0 < p <= 1
+
+
+@pytest.mark.skipif(not SLOW.exists(), reason="slow layer not fitted")
+def test_live_model_does_not_need_torch(tmp_path):
+    """The live server installs requirements-server.txt (no torch): brain_sim + the slow layer must still load."""
+    import subprocess
+    stub = tmp_path / "torch"
+    stub.mkdir()
+    (stub / "__init__.py").write_text('raise ImportError("no torch on the server")')
+    code = "import brain_sim; b = brain_sim.Brain(); b.run(0.5); assert b.slow_on; import twin.hopf as H; assert H.torch is None"
+    env = {"PYTHONPATH": f"{tmp_path}:{ROOT}", "PATH": "/usr/bin:/bin", "OMP_NUM_THREADS": "1"}
+    r = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr[-2000:]
