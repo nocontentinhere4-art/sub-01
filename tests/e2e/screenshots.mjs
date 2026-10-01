@@ -271,7 +271,7 @@ const REWARD_PLACES = new Set(["street_bakery", "bakery_door", "bakery_in", "cou
 const jpgOpts = () => (FORMAT === "jpeg" ? { type: "jpeg", quality: 82 } : { type: "png" });
 
 // ---------------------------------------------------------------- scenarios
-// live_server.py only honours --start together with --time-scale != 1; 1.001 keeps the clock effectively real-time.
+// --start HH:MM pins the demo clock (live_server honours it at any scale; 1.001 keeps it compatible with older servers).
 const at = (hhmm, ...rest) => ["--start", hhmm, "--time-scale", "1.001", ...rest];
 const num = v => (typeof v === "number" && Number.isFinite(v) ? v : null);
 /** fx stream state (window.__sub01.fx); null while fx is a stub. Fails the scenario unless --allow-stubs. */

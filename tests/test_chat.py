@@ -54,3 +54,13 @@ def test_check_nick(nick, ok):
 def test_check_nick_reason_and_non_text():
     assert chat.check_nick("x" * 21)[1].startswith("nickname")
     assert chat.check_nick(5)[0] is False
+
+
+def test_italian_threat_and_positive_words_reach_fear_and_reward():
+    from chat import stimulus, topical_networks
+    stim, nets, emo = stimulus("ho paura, c'è un pericolo")
+    assert emo == "threat" and stim["fear"] > 0 and stim["salience"] > 0
+    assert "fear" in topical_networks("ho paura del buio")
+    stim, nets, emo = stimulus("grazie, sei gentile")
+    assert emo == "positive" and stim["reward"] > 0
+    assert stimulus("vai a comprare il pane")[2] == "neutral"       # a plain request stays neutral

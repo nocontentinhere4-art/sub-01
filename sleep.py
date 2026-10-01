@@ -65,12 +65,13 @@ def lerp(p, q, x):
 
 
 class Clock:
-    """Rome sim clock. scale=60 -> one sim hour per real minute. `start` = sim epoch to start at."""
+    """Rome sim clock. scale=60 -> one sim hour per real minute. `start` = sim epoch to start at (honoured at any scale,
+    so `--start 10:00` alone gives a real-time demo at 10:00; production passes no start)."""
 
     def __init__(self, scale=1.0, start=None):
         self.scale = scale
         self.real0 = time.time()
-        self.sim0 = self.real0 if start is None or scale == 1 else start
+        self.sim0 = self.real0 if start is None else start
 
     def now(self):
         return self.sim0 + (time.time() - self.real0) * self.scale

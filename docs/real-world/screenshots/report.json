@@ -1,0 +1,969 @@
+{
+  "generated": "2026-10-01T00:04:02.007Z",
+  "note": "fps, drawCalls and triangles are measured with SOFTWARE rendering (headless Chromium + SwiftShader, no GPU). fps is NOT representative of a phone or desktop GPU; use it only to compare scenarios. Target on real devices: 30 fps phones, 60 fps desktop.",
+  "renderer": "software (SwiftShader)",
+  "stubModules": [],
+  "passed": [
+    "home",
+    "walk",
+    "walk-gif",
+    "chat",
+    "dump",
+    "night",
+    "rem",
+    "orbit",
+    "mobile"
+  ],
+  "failed": [],
+  "scenarios": {
+    "home": {
+      "pass": true,
+      "seconds": 29.2,
+      "description": "home district, default-network city around the window (daylight)",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/home.jpg",
+      "fps_software_rendered": 12,
+      "drawCalls": 10,
+      "triangles": 15144,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 47.7,
+        "std": 27.05,
+        "colours": 308,
+        "brightShare": 0.1781,
+        "rgb": [
+          58,
+          44,
+          57
+        ]
+      },
+      "details": {
+        "place": "window",
+        "clock": "10:00",
+        "idleSpanSeconds": 12,
+        "cameraCaptured": true,
+        "idleCameraDrift": 0
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=27.05 colours=308 mean=47.7"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=47.7 brightShare=0.1781"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "daytime clock (started 10:00)",
+          "ok": true,
+          "detail": "10:00"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "walk": {
+      "pass": true,
+      "seconds": 32.5,
+      "description": "first-person walk along the real fibre road from home to the reward district",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/walk.jpg",
+      "fps_software_rendered": 11,
+      "drawCalls": 13,
+      "triangles": 15150,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 42.7,
+        "std": 41.15,
+        "colours": 320,
+        "brightShare": 0.1763,
+        "rgb": [
+          57,
+          38,
+          45
+        ]
+      },
+      "details": {
+        "walkProgress": 0.432,
+        "route": "bed>door_in>door_out>street_home>street_bakery>bakery_door>bakery_in>counter",
+        "view": "first",
+        "progressStart": 0.207,
+        "progressEnd": 0.954,
+        "progressMonotone": true,
+        "routeHasStreet": true,
+        "cameraSamples": 43,
+        "cameraStart": [
+          -61.8,
+          13.9,
+          141.4
+        ],
+        "cameraEnd": [
+          13.4,
+          12.8,
+          122.1
+        ],
+        "cameraNetTravel": 77.64,
+        "cameraPathLength": 111.43,
+        "spanSeconds": 19,
+        "idleCameraDrift": 0,
+        "idleSpanSeconds": 12
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=41.15 colours=320 mean=42.7"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=42.7 brightShare=0.1763"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "outbound walk: route starts at a home place",
+          "ok": true,
+          "detail": "bed>door_in>door_out>street_home>street_bakery>bakery_door>bakery_in>counter"
+        },
+        {
+          "what": "outbound walk: route ends at the reward district (bakery)",
+          "ok": true,
+          "detail": "bed>door_in>door_out>street_home>street_bakery>bakery_door>bakery_in>counter"
+        },
+        {
+          "what": "page reports the first-person view (window.__sub01.view == 'first')",
+          "ok": true,
+          "detail": "first"
+        },
+        {
+          "what": "life.progress advances along the route",
+          "ok": true,
+          "detail": "0.207 -> 0.954"
+        },
+        {
+          "what": "camera position could be read (WebGL viewMatrix / window.__sub01.camera)",
+          "ok": true,
+          "detail": "43 samples"
+        },
+        {
+          "what": "the camera moves along the road (net displacement start -> end of the walk)",
+          "ok": true,
+          "detail": "net=77.64 units, path=111.43, needed > 20.00 = max(20, 5 x idle drift 0); start [-61.8,13.9,141.4] -> end [13.4,12.8,122.1], 19 s"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "walk-gif": {
+      "pass": true,
+      "seconds": 45.1,
+      "description": "the walk as a GIF: 3D canvas frames captured in-page (~3 fps under software rendering) over the whole walk, played back at real speed",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/walk.gif",
+      "fps_software_rendered": 10,
+      "drawCalls": 12,
+      "triangles": 15148,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 7236,
+        "mean": 50.6,
+        "std": 43.42,
+        "colours": 253,
+        "brightShare": 0.208,
+        "rgb": [
+          57,
+          48,
+          54
+        ]
+      },
+      "details": {
+        "route": "bed>door_in>door_out>street_home>street_bakery>bakery_door>bakery_in>counter",
+        "progressStart": 0.145,
+        "progressEnd": 0.96,
+        "gifFrames": 54
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=43.42 colours=253 mean=50.6"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=50.6 brightShare=0.208"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "captured the whole outbound walk (life.progress start < 0.25, end >= 0.9)",
+          "ok": true,
+          "detail": "0.145 -> 0.96"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "walk.gif written",
+          "ok": true,
+          "detail": "54 of 54 captured frames over 25.6 s, real-time playback (frame delays = real gaps, no clamp), 640x256, 1.9 MB"
+        }
+      ],
+      "consoleErrors": []
+    },
+    "chat": {
+      "pass": true,
+      "seconds": 79.1,
+      "description": "chat message falls as orange rain made of its words and lands on the districts it stimulates (orbit view, so the rain is in frame)",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/chat.jpg",
+      "fps_software_rendered": 10,
+      "drawCalls": 21,
+      "triangles": 15364,
+      "quality": "low",
+      "view": "orbit",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 24.1,
+        "std": 32.03,
+        "colours": 335,
+        "brightShare": 0.0952,
+        "rgb": [
+          30,
+          22,
+          28
+        ]
+      },
+      "details": {
+        "view": "orbit",
+        "chatEchoed": true,
+        "regionsFlashed": 135,
+        "fxExposed": true,
+        "rainSeen": true,
+        "poolFreeAtRest": 700,
+        "poolFreeAtFalling": 665,
+        "poolFreeAtCapture": 665,
+        "fxTimeAtDrop": 3.3001000000000005,
+        "fxTimeAtCapture": 6.450099999999992,
+        "splashSeen": true,
+        "peakPending": 9,
+        "idleGlyphNoise": 4,
+        "fallingGlyphPixels": 726
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=32.03 colours=335 mean=24.1"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=24.1 brightShare=0.0952"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "orbit view, so the rain is in frame",
+          "ok": true,
+          "detail": "orbit"
+        },
+        {
+          "what": "chat stimulated at least one district",
+          "ok": true,
+          "detail": "regions=135"
+        },
+        {
+          "what": "rain started: the message words are in flight (fx pool / queue)",
+          "ok": true,
+          "detail": "free at rest=700"
+        },
+        {
+          "what": "rain still in the air at the landing capture",
+          "ok": true,
+          "detail": "free at rest=700, at capture=665"
+        },
+        {
+          "what": "words landed (a splash was processed, fx pending fell below its peak)",
+          "ok": true,
+          "detail": "peak pending=9, fx time at drop=3.3001000000000005, at capture=6.450099999999992"
+        },
+        {
+          "what": "the falling words are visible: new amber glyph pixels in the 3D canvas far above idle",
+          "ok": true,
+          "detail": "glyph pixels outside the idle flicker zone: falling=726, idle frame=4, needed > 150"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "dump": {
+      "pass": true,
+      "seconds": 18.7,
+      "description": "market dump: glitches / distortion weather",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/dump.jpg",
+      "fps_software_rendered": 12,
+      "drawCalls": 10,
+      "triangles": 15144,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 48.6,
+        "std": 23.38,
+        "colours": 845,
+        "brightShare": 0.1895,
+        "rgb": [
+          65,
+          43,
+          53
+        ]
+      },
+      "details": {
+        "market": "dumping",
+        "fx": {
+          "pump": 0,
+          "glitch": 0.37319019290986155,
+          "jitter": 0.39173959783627244,
+          "warp": 0,
+          "dim": 0,
+          "rem": 0,
+          "burst": 0,
+          "queued": 0,
+          "free": 700,
+          "pending": 0,
+          "time": 0.8165,
+          "composer": true,
+          "active": true,
+          "reduced": false,
+          "hold": true,
+          "msaa": 0
+        }
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=23.38 colours=845 mean=48.6"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=48.6 brightShare=0.1895"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "market is dumping",
+          "ok": true,
+          "detail": "dumping"
+        },
+        {
+          "what": "glitch effect is active at capture (fx.glitch > 0.3, held burst)",
+          "ok": true,
+          "detail": "glitch=0.37319019290986155 hold=true"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "night": {
+      "pass": true,
+      "seconds": 15.5,
+      "description": "night in the construct: darker sky, lit roads",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/night.jpg",
+      "fps_software_rendered": 11,
+      "drawCalls": 10,
+      "triangles": 15144,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 30.4,
+        "std": 39.39,
+        "colours": 283,
+        "brightShare": 0.0897,
+        "rgb": [
+          42,
+          27,
+          29
+        ]
+      },
+      "details": {
+        "clock": "22:30",
+        "stage": "AWAKE"
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=39.39 colours=283 mean=30.4"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=30.4 brightShare=0.0897"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "night clock (started 22:30)",
+          "ok": true,
+          "detail": "22:30"
+        },
+        {
+          "what": "the city is darker than at home in daylight (canvas mean luminance)",
+          "ok": true,
+          "detail": "night=30.4 home=47.7"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "rem": {
+      "pass": true,
+      "seconds": 19.4,
+      "description": "REM: world warps and replays the day's messages",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/rem.jpg",
+      "fps_software_rendered": 12,
+      "drawCalls": 12,
+      "triangles": 15148,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 22.4,
+        "std": 26.29,
+        "colours": 243,
+        "brightShare": 0.0696,
+        "rgb": [
+          32,
+          20,
+          19
+        ]
+      },
+      "details": {
+        "stage": "REM",
+        "replays": 1,
+        "replayTexts": [
+          "fresh bread from the bakery and a happy walk in the park"
+        ],
+        "replayedSentMessage": true,
+        "fx": {
+          "pump": 0.5034395248530594,
+          "glitch": 0,
+          "jitter": 0,
+          "warp": 0.5034395248530594,
+          "dim": 0.12585988121326486,
+          "rem": 0.5034395248530594,
+          "burst": 0,
+          "queued": 0,
+          "free": 610,
+          "pending": 12,
+          "time": 0.5733600000000006,
+          "composer": true,
+          "active": true,
+          "reduced": false,
+          "hold": false,
+          "msaa": 0
+        }
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=26.29 colours=243 mean=22.4"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=22.4 brightShare=0.0696"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "replay events arrive with text",
+          "ok": true,
+          "detail": "replays=1"
+        },
+        {
+          "what": "the day's message (sent during this scenario) is replayed",
+          "ok": true,
+          "detail": "[\"fresh bread from the bakery and a happy walk in the park\"]"
+        },
+        {
+          "what": "the world warps (fx.warp > 0.05)",
+          "ok": true,
+          "detail": "warp=0.5034395248530594"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "orbit": {
+      "pass": true,
+      "seconds": 19.4,
+      "description": "orbit / overview of the whole city",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/orbit.jpg",
+      "fps_software_rendered": 12,
+      "drawCalls": 20,
+      "triangles": 15362,
+      "quality": "low",
+      "view": "orbit",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 26496,
+        "mean": 23.1,
+        "std": 29.62,
+        "colours": 366,
+        "brightShare": 0.0994,
+        "rgb": [
+          28,
+          21,
+          27
+        ]
+      },
+      "details": {
+        "view": "orbit"
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=29.62 colours=366 mean=23.1"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=23.1 brightShare=0.0994"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "view is orbit",
+          "ok": true,
+          "detail": "orbit"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    },
+    "mobile": {
+      "pass": true,
+      "seconds": 8.9,
+      "description": "phone layout 390x844 (quality low)",
+      "error": null,
+      "screenshot": "docs/real-world/screenshots/mobile.jpg",
+      "fps_software_rendered": 14,
+      "drawCalls": 11,
+      "triangles": 15146,
+      "quality": "low",
+      "view": "first",
+      "districts": 214,
+      "fibres": 2500,
+      "pixels": {
+        "samples": 5720,
+        "mean": 47.6,
+        "std": 23.69,
+        "colours": 346,
+        "brightShare": 0.2,
+        "rgb": [
+          61,
+          43,
+          54
+        ]
+      },
+      "details": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "quality": "low"
+      },
+      "checks": [
+        {
+          "what": "page ready (window.__sub01.ready)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "honesty line present and visible",
+          "ok": true,
+          "detail": "visible=true exactText=true"
+        },
+        {
+          "what": "honesty line is not covered by another element",
+          "ok": true,
+          "detail": "covered by null"
+        },
+        {
+          "what": "canvas is not blank / uniform",
+          "ok": true,
+          "detail": "std=23.69 colours=346 mean=47.6"
+        },
+        {
+          "what": "canvas is not almost black",
+          "ok": true,
+          "detail": "mean=47.6 brightShare=0.2"
+        },
+        {
+          "what": "no console errors",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "no WebGL errors (GL_INVALID_*, context lost) in the console",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "what": "websocket connected",
+          "ok": true,
+          "detail": "connected=true"
+        },
+        {
+          "what": "no horizontal page scroll",
+          "ok": true,
+          "detail": "390 vs 390"
+        },
+        {
+          "what": "phones render at quality 'low'",
+          "ok": true,
+          "detail": "low"
+        },
+        {
+          "what": "scenario modules are real implementations (not STUB files)",
+          "ok": true,
+          "detail": "still a STUB in this checkout:  (merge that stream, or pass --allow-stubs)"
+        },
+        {
+          "what": "no Python traceback in the server log",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "consoleErrors": []
+    }
+  }
+}

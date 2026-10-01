@@ -19,9 +19,10 @@
 //   life = tick.life + {stage}; route / progress are filled in from the waypoint graph if the server does not send them.
 // Messages: chat -> hud.chat + fx.rain + city.flash + minibrain.flash; speech -> hud.speech + fx.innerLine (with the chat
 // it answers); tick.market -> fx.weather (on change); tick.groups -> city.setFear.
-// URL params: ?view=first|orbit  ?q=low|medium|high  ?nofollow=1   (key "v" toggles the view)
-// window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view, districts, fibres}
-//   (+ debug: lastChatRegions, lastSpeechChat = the last speech's cid matched a chat message seen on this page)
+// URL params: ?view=first|orbit  ?q=low|medium|high  ?nofollow=1  ?lab=1   (key "v" toggles the view, "l" the lab look)
+// window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view, districts, fibres, camera: [x, y, z], lab}
+//   (+ debug: lastChatRegions, lastSpeechChat = the last speech's cid matched a chat message seen on this page,
+//    fear = the 0..1 fear level passed to city.setFear; fx adds __sub01.fx {free, queued, pending, glitch, warp, hold, time})
 // It is a model of brain activity, not a mind.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -30,7 +31,7 @@ import { Quality } from "../world/quality.js";
 import { createPhone } from "../world/phone.js";
 import { createHud } from "../world/hud.js";
 import { createMiniBrain } from "../world/minibrain.js";
-import { loadBrainData } from "./data.js";
+import { loadBrainData, loadBrainRaw } from "./data.js";
 import { createCity } from "./city.js";
 import { createTravel } from "./travel.js";
 import { createFx } from "./fx.js";
@@ -39,8 +40,9 @@ const params = new URLSearchParams(location.search);
 const $ = id => document.getElementById(id);
 let view = params.get("view") === "orbit" ? "orbit" : "first";
 const follow = params.get("nofollow") !== "1";
+let lab = params.get("lab") === "1";                          // lab look: cold blue-white diagnostic city (city.js uLab)
 const stats = (window.__sub01 = { ready: false, fps: 0, drawCalls: 0, triangles: 0, quality: null, connected: false, view,
-  districts: 0, fibres: 0 });
+  districts: 0, fibres: 0, camera: [0, 0, 0], lab, fear: 0 });
 
 // life.py layout (hello.world): used only to time walks when tick.life has no route / progress yet
 const FALLBACK_WORLD = {
@@ -105,7 +107,7 @@ const phone = createPhone();
 $("phone-overlay").appendChild(phone.overlayEl);
 let net = null;
 const hud = createHud({ send: obj => (net ? net.send(obj) : false), onView: v => setView(v), view });   // the HUD builds #view + #quality
-const minibrain = createMiniBrain($("minibrain"), { quality });
+const minibrain = createMiniBrain($("minibrain"), { quality, raw: loadBrainRaw() });   // one download for both views
 
 // ---------------- construct modules (built when the brain data is loaded) ----------------
 let data = null, city = null, travel = null, fx = null, fxQuality = null, building = null;
@@ -164,7 +166,9 @@ function updateGroups(m) {
     groupSelf[k] = v / Math.max(groupBase[k], 1e-3);
   }
   const fear = Math.max(groupSelf.fear || 0, groupSelf.salience || 0);   // above its own usual level
-  hook("city.setFear", () => city?.setFear(Math.max(0, Math.min(1, (fear - 1.15) / 0.5))));
+  const k = Math.max(0, Math.min(1, (fear - 1.15) / 0.5));
+  stats.fear = Math.round(k * 100) / 100;
+  hook("city.setFear", () => city?.setFear(k));
 }
 
 function updateMarket(m) {
@@ -306,9 +310,19 @@ function setView(v) {
   if (view === "first") u.searchParams.delete("view"); else u.searchParams.set("view", view);
   history.replaceState(null, "", u);
 }
+function setLab(on) {
+  lab = !!on; stats.lab = lab;
+  document.body.classList.toggle("lab", lab);
+  const u = new URL(location.href);
+  if (lab) u.searchParams.set("lab", "1"); else u.searchParams.delete("lab");
+  history.replaceState(null, "", u);
+}
 addEventListener("keydown", e => {
-  if (e.key === "v" && !/input|textarea|select/i.test(document.activeElement?.tagName || "")) setView(view === "first" ? "orbit" : "first");
+  if (/input|textarea|select/i.test(document.activeElement?.tagName || "")) return;
+  if (e.key === "v") setView(view === "first" ? "orbit" : "first");
+  else if (e.key === "l") setLab(!lab);
 });
+document.body.classList.toggle("lab", lab);
 setView(view);
 
 function applyQuality(q) {
@@ -332,7 +346,7 @@ function updateEnv(dt) {
   env.romeHour = romeHour();
   env.dayK = Math.max(0, Math.sin(Math.PI * (env.romeHour - 6) / 14));
   env.night = env.dayK < 0.15;
-  env.stage = stage; env.sleep = sleep; env.quality = Quality.current; env.market = market;
+  env.stage = stage; env.lab = lab; env.sleep = sleep; env.quality = Quality.current; env.market = market;
   env.groups = lastGroups; env.time += dt; env.view = view; env.walking = !!life?.walking;
 }
 
@@ -371,6 +385,8 @@ function frame(now) {
   if (controls.enabled) controls.update();
   renderer.info.reset();
   if (fx) hook("fx.render", renderFx); else renderer.render(scene, camera);
+  const cp = camera.position, sc = stats.camera;
+  sc[0] = Math.round(cp.x * 10) / 10; sc[1] = Math.round(cp.y * 10) / 10; sc[2] = Math.round(cp.z * 10) / 10;
   stats.drawCalls = renderer.info.render.calls;
   stats.triangles = renderer.info.render.triangles;
   if (city && ++framesDrawn === 2) { stats.ready = true; document.body.classList.add("ready"); }

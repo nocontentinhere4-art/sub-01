@@ -21,8 +21,10 @@ Panels are collapsible (state in localStorage); on phones (< 900 px) needs and r
 
 `minibrain.js`: the real tractography (`fibres.bin`, every 40th / 15th / 8th fibre for low / medium / high, one LineSegments)
 with the activity shader of `/brain`, plus the 214 regions as glow points. `flash(regions, color)` lights regions (indices or group
-names), `pulse(fromEl)` sends a dot from the chat box to it. The fibre file is fetched after the construct is ready
-(`window.__sub01.ready`) so the two views share one download through the browser cache. Redraws at 30 fps (20 on low),
+names), `pulse(fromEl)` sends a dot from the chat box to it. It reads the construct's raw data promise
+(`createMiniBrain(el, {quality, raw: loadBrainRaw()})`, `web/construct/data.js`), so `brain.json` and the 17 MB `fibres.bin` are
+downloaded once per page (the browser cache did not dedupe them: startup was 36 MB, now 19 MB); its fibre geometry is still built
+only after the construct is ready (`window.__sub01.ready`). Without `raw` it fetches the files itself. Redraws at 30 fps (20 on low),
 skipped while hidden. `/brain` (`web/index.html`) flashes the regions of every `chat` message too.
 
 Tests: `node --test tests/js/hud_util.test.mjs tests/js/phone_util.test.mjs`, `pytest tests/test_phone_feed.py`.

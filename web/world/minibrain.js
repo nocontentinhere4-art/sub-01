@@ -2,7 +2,9 @@
 // as one LineSegments with the same activity-driven fibre shader as /brain (web/index.html), plus the 214 atlas regions
 // of web/brain.json as glow points. Always on, bottom-right of the life page; click opens /brain.
 //
-// createMiniBrain(el, {quality}) -> {hello(m), tick(m), flash(regions, color), pulse(fromEl), update(dt, env), dispose()}
+// createMiniBrain(el, {quality, raw}) -> {hello(m), tick(m), flash(regions, color), pulse(fromEl), update(dt, env), dispose()}
+//   raw (optional): Promise<{brain, meta, fibres, ends}> shared with the construct (data.js loadBrainRaw), so the page
+//   downloads brain.json / fibres.bin once; without it the files are fetched here.
 //   el        the #minibrain container
 //   tick(m)   m.act = activity per brain region (index = web/brain.json node index), m.sleep.stage
 //   flash(regions, color)  regions = [brain region indices] (chat.regions) or [group names] (chat.networks)
@@ -26,7 +28,7 @@ const CSS = `
 const FIBRE_STEP = { low: 40, medium: 15, high: 8 };
 const LOOK = { AWAKE: { level: 1, speed: 1, rot: 0.5 }, NREM: { level: 0.35, speed: 0.25, rot: 0.12 }, REM: { level: 0.5, speed: 0.6, rot: 0.25 } };
 
-export function createMiniBrain(el, { quality } = {}) {
+export function createMiniBrain(el, { quality, raw = null } = {}) {
   const noop = { hello() {}, tick() {}, flash() {}, pulse() {}, update() {}, dispose() {} };
   if (!el) return noop;
   const dbg = (window.__minibrain = { regions: 0, fibres: 0, flashes: 0 });
@@ -62,7 +64,7 @@ export function createMiniBrain(el, { quality } = {}) {
 
   const qname = (quality && quality.name) || "medium";
 
-  fetch("/brain.json").then(r => (r.ok ? r.json() : null)).then(d => {
+  (raw ? raw.then(x => x.brain) : fetch("/brain.json").then(r => (r.ok ? r.json() : null))).then(d => {
     if (disposed || !d || !Array.isArray(d.nodes)) return;
     nodes = d.nodes; dbg.regions = nodes.length;
     const n = nodes.length, pos = new Float32Array(n * 3);
@@ -91,7 +93,8 @@ export function createMiniBrain(el, { quality } = {}) {
       if (disposed) return;
       const s = window.__sub01;
       if (s && !s.ready && waited < 25000) { waited += 400; setTimeout(go, 400); return; }
-      Promise.all([fetch("/fibres.json").then(r => r.json()), fetch("/fibres.bin").then(r => r.arrayBuffer()), fetch("/fibres_ends.bin").then(r => r.arrayBuffer())])
+      (raw ? raw.then(x => [x.meta, x.fibres, x.ends])
+        : Promise.all([fetch("/fibres.json").then(r => r.json()), fetch("/fibres.bin").then(r => r.arrayBuffer()), fetch("/fibres_ends.bin").then(r => r.arrayBuffer())]))
         .then(([meta, fbuf, ebuf]) => { if (!disposed) buildFibres(nodesList, meta, fbuf, ebuf); })
         .catch(e => console.warn("[minibrain] fibres:", e && e.message));
     };

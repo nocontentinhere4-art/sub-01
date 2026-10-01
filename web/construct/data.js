@@ -2,6 +2,8 @@
 //
 //   loadBrainData(quality, {fetch, base}) -> Promise<data>     fetches brain.json + fibres.json + fibres.bin +
 //       fibres_ends.bin once (cached) and builds the city for that quality (cached per quality name).
+//   loadBrainRaw({fetch, base}) -> Promise<raw>                    the four files, downloaded once per page and shared
+//       (the mini brain PiP reads the same promise, so fibres.bin crosses the network only once)
 //   buildBrainData(raw, quality) -> data                          pure builder (used by the node tests)
 //       raw = {brain: brain.json object, meta: fibres.json object, fibres: ArrayBuffer, ends: ArrayBuffer}
 //
@@ -59,6 +61,13 @@ export function loadBrainData(quality, { fetch: fetchFn = globalThis.fetch, base
   const q = qname(quality);
   const key = base + "|" + q;
   if (BUILT.has(key)) return BUILT.get(key);
+  const p = loadBrainRaw({ fetch: fetchFn, base }).then(raw => buildBrainData(raw, q));
+  BUILT.set(key, p);
+  p.catch(() => BUILT.delete(key));
+  return p;
+}
+
+export function loadBrainRaw({ fetch: fetchFn = globalThis.fetch, base = "/" } = {}) {
   if (!RAW.has(base)) {
     const get = (f, kind) => fetchFn(base + f).then(r => {
       if (!r.ok) throw new Error(`${f}: HTTP ${r.status}`);
@@ -68,10 +77,7 @@ export function loadBrainData(quality, { fetch: fetchFn = globalThis.fetch, base
       .then(([brain, meta, fibres, ends]) => ({ brain, meta, fibres, ends })));
     RAW.get(base).catch(() => RAW.delete(base));
   }
-  const p = RAW.get(base).then(raw => buildBrainData(raw, q));
-  BUILT.set(key, p);
-  p.catch(() => BUILT.delete(key));
-  return p;
+  return RAW.get(base);
 }
 
 function qname(quality) {

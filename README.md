@@ -7,6 +7,49 @@ A whole-brain model of one real human brain, built from public MRI data and wire
 - **Simulated part:** region-to-region dynamics (delayed Stuart–Landau oscillators on the subject's connectome).
 - It is a model of brain activity, not a mind, and makes no claim of consciousness.
 
+## The construct (main page, `/`)
+
+The front page (`web/life.html`, modules in `web/construct/`) is "the construct": SUB-01 lives inside a world built from its own
+brain data. Own style: dark blue-black, orange/neon light, warm whites.
+
+- **Districts** are the 214 atlas regions, placed from their real centroids (spread out and flattened into a city); building
+  height and glow follow the live activity of that region (`tick.act` against its running baseline).
+- **Streets** are the real tractography (`web/fibres.bin`): each fibre becomes a light road between the districts its two ends
+  touch (2.5k / 10k / 25k fibres for quality low / medium / high).
+- **Places**: home = a default-network district, bakery = the reward district (accumbens / caudate / putamen), park = a
+  limbic / memory district, fear = amygdala + salience (dark unless fear rises, then it flickers red).
+- **Walking**: `life.py` decides what it does; `tick.life.route` / `progress` drive a first-person camera along the real fibre
+  path from district to district (shortest path over the fibre graph).
+- **Chat rain**: an accepted message falls as orange rain made of its own words and lands on the districts it stimulates
+  (`chat.regions`, from the transparent topic table); the city and the mini brain flash. If the message wins the workspace
+  its inner-speech line appears in the world (`speech.cid == chat.cid`).
+- **Weather** = the market (pumping: warm pulses; dumping: glitches). **Night** (Rome time): darker sky, lit roads.
+  **Sleep**: NREM dims and slows the city; REM warps it and replays the day's messages as floating words.
+- **Views**: first person (default) and overview (`v` key or the switch), plus the mini real-brain picture-in-picture.
+  URL: `?view=orbit`, `?q=low|medium|high`, `?nofollow=1`, `?lab=1` (`l` key: cold diagnostic look).
+- The photoreal CC0 assets in `web/assets/` (credited in `web/assets/CREDITS.md`) are kept but no longer loaded by the main view.
+
+The honesty line stays visible on every page: *Simulated brain activity built from one real person's public MRI. Messages are
+stimuli, not conversation. It is not a mind and it is not the person.*
+
+## The workspace (`mind.py`)
+
+An architecture inspired by theories of consciousness (Global Workspace). It is a model of brain activity, not a mind.
+Every ~2 s a few candidates compete for one shared workspace: needs (hunger, boredom, sleep pressure), recent chat messages,
+stored memories, market events, perceptions of its surroundings and, in REM, dream replays. Salience is a transparent formula:
+kind weight x the live activity of the candidate's brain networks + need / novelty / recency terms, minus inhibition of return
+(a recent winner is suppressed for ~30 s and repeated winners habituate), plus a little noise. Sleep gates the competition and
+nothing wins below a threshold. The single winner is broadcast: it may propose an action (`life.request(act, t, reason)`, which
+accepts or declines with a reason tied to needs, state and opening hours), produces a short inner-speech line (rule-based; an
+optional language model may rephrase it at most once per 30 s / 60 per hour, only while someone is watching, and every line must
+pass `mind.safe_text`), flags memory encoding and gives the eye a focus. A small self-model (doing / state summary / wanting /
+recent history) and a daily diary (`data/diary/YYYY-MM-DD.json`) give continuity. The page shows the candidates, the winner
+and the self-model live. Generated text never asks for money, never tells anyone to buy or sell and makes no promises.
+
+Example chain (covered by `tests/test_integration.py`): "ho fame, vai a comprare il pane" -> the chat candidate wins -> inner
+line "ah, devo prendere il pane" with `action: buy_bread ok` -> life walks home -> bakery counter (the camera follows the fibre
+road into the reward district) -> later carries the bread home to the table.
+
 ## Pipeline
 
 | Step | Script | Output |
@@ -63,6 +106,28 @@ No language model, no generated text: everything below is a rule table.
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
 python tests/test_sleep.py                                    # or: python -m pytest tests/
 ```
+
+## Tests
+
+```bash
+.venv/bin/python -m pytest tests/ -q                     # 266 tests: mind, life, chat, sleep, server, integration chain
+node --test tests/js/*.test.mjs                          # 46 tests: data / city / travel / fx / hud / phone helpers
+node tests/e2e/screenshots.mjs --gif --format=jpg        # 9 headless scenarios + walk.gif (see below)
+```
+
+## Performance (measured 2026-09-30 on a shared 4-CPU sandbox, load average 5-8)
+
+| | value |
+|---|---|
+| server tick (20 Hz, budget 50 ms) | mean 48-51 ms, p95 58-69 ms (`/api/perf`); `Brain.step` alone is ~43 ms of it on this machine |
+| workspace cycle (budget 5 ms) | mean 0.4-0.6 ms, p95 0.8-1.3 ms |
+| startup download | 19.2 MB (fibres.bin 16.5 MB, brain.json 1.6 MB, three.js 0.7 MB); was 36 MB before the mini brain shared the download |
+| draw calls / triangles, low | 10 / 15.1k first person, 20 / 15.4k overview (2.5k fibres) |
+| medium | 23 / 22.4k first person, 32 / 22.7k overview (10k fibres) |
+| high | 25 / 26.5k first person, 33 / 26.7k overview (25k fibres) |
+
+Client numbers are from `window.__sub01` in headless Chromium with **software rendering** (SwiftShader): its 12-15 fps says
+nothing about phones or desktop GPUs; real-device frame rates are still to be measured.
 
 ## End-to-end screenshots ("the construct")
 

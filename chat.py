@@ -62,10 +62,18 @@ def blocked(text):
 # --- message -> stimulus rule table ----------------------------------------------------
 POSITIVE = {"love", "loved", "lovely", "happy", "glad", "good", "great", "nice", "beautiful", "wonderful", "amazing",
             "thanks", "thank", "joy", "calm", "peace", "hope", "sweet", "smile", "friend", "kind", "cute", "yay",
-            "awesome", "cool", "best", "fun", "hug", "warm", "gm", "gn", "sleep well", "sweet dreams", "welcome"}
+            "awesome", "cool", "best", "fun", "hug", "warm", "gm", "gn", "sleep well", "sweet dreams", "welcome",
+            # Italian (the page's examples are Italian): accents are dropped by words(), so only accent-free forms here
+            "grazie", "bello", "bella", "felice", "contento", "contenta", "amore", "gioia", "pace", "calma", "dolce",
+            "sorriso", "gentile", "carino", "carina", "fantastico", "fantastica", "bravo", "brava", "abbraccio",
+            "benvenuto", "benvenuta", "sogni d'oro"}
 HOSTILE = {"hate", "kill", "die", "dead", "death", "attack", "threat", "danger", "dangerous", "hurt", "pain",
            "war", "gun", "blood", "angry", "rage", "destroy", "scared", "fear", "afraid", "scream", "fire",
-           "crash", "dump", "rug", "rugged", "panic", "nightmare", "monster", "hunt", "fight"}
+           "crash", "dump", "rug", "rugged", "panic", "nightmare", "monster", "hunt", "fight",
+           # Italian
+           "paura", "pericolo", "pericoloso", "pericolosa", "spavento", "spaventato", "spaventata", "terrore", "morte",
+           "morto", "morta", "uccidere", "attacco", "minaccia", "guerra", "sangue", "dolore", "rabbia", "odio",
+           "incubo", "mostro", "panico", "fuoco", "urlo", "lotta", "crollo"}
 QUESTION_START = ("who", "what", "why", "how", "when", "where", "which", "do", "does", "did", "are", "is", "can",
                   "could", "will", "would", "should")
 SELF = re.compile(r"\b(sub[\s-]?01|you|your|yours|you're|youre|yourself|u)\b", re.I)

@@ -115,7 +115,13 @@ The CC0 photoreal assets in `web/assets/` are no longer used by the main view (k
 | `fx.js` | fx | `createFx(renderer, scene, camera, data, quality)` -> `{rain(msg), innerLine(speech), weather(market), update(dt, env), render()}` (owns post-processing: bloom, glitch, warp) |
 | `web/world/hud.js`, `minibrain.js`, `phone.js`, `net.js`, `quality.js` | hud / foundation | reused from the foundation (hud adds a view switch; phone = HUD overlay only) |
 env = {romeHour, dayK, night, stage, lab, sleep, quality, market, groups}. URL params: `?view=first|orbit`,
-`?q=low|medium|high`, `?nofollow=1`; `window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view}`.
+`?q=low|medium|high`, `?nofollow=1`, `?lab=1` (key `l`; cold diagnostic look), `?fxhold=1` (fx: freeze landed rain / glitch for
+screenshots); `window.__sub01 = {ready, fps, drawCalls, triangles, quality, connected, view, districts, fibres, camera: [x,y,z], lab}`.
+The e2e depends on these debug fields too, so they are contract (removing one breaks `tests/e2e/screenshots.mjs`):
+`__sub01.fx = {free, queued, pending, glitch, warp, hold, time}` (fx.js), `lastChatRegions`, `lastSpeechChat` and `fear`
+(0..1 passed to `city.setFear`) (main.js).
+Shared download: `data.js` `loadBrainRaw()` -> Promise<{brain, meta, fibres, ends}>; the mini brain receives it as
+`createMiniBrain(el, {quality, raw})`, so the page fetches `brain.json` / `fibres.bin` once.
 
 Core additions (as implemented on `feature/rw-core`; other streams build on these shapes):
 - `data.js` also returns `roles {home, reward, park, fear, salience: [i...]}`, `pointAt(path, u, out)`,
@@ -132,9 +138,12 @@ Core additions (as implemented on `feature/rw-core`; other streams build on thes
 ### Server additions for the construct
 - `tick.life.route`, `tick.life.progress`; `tick.market` (pumping/dumping/choppy/calm, existing market_mood).
 - Demo-only flags (require `--demo`): `--life-activity <act>`, `--force-market pump|dump`, `--force-stage NREM|REM`.
+  `--start HH:MM` is honoured at any `--time-scale` (also 1 = real time); production passes no start.
+- `/api/perf`: `{tick: {n, mean_ms, p95_ms, max_ms}, mind: {...}, clients, llm_calls}` (budget: tick 50 ms, mind cycle 5 ms).
 
 ## Tests
-- `tests/test_mind.py`, `tests/test_life.py`, existing `tests/test_sleep.py` (pytest).
+- `tests/test_mind.py`, `tests/test_life.py`, `tests/test_server.py`, `tests/test_chat.py`, `tests/test_integration.py` (bread chat ->
+  workspace -> speech cid -> walk to the bakery and home), existing `tests/test_sleep.py` (pytest); `tests/js/*.test.mjs` (node --test).
 - `tests/e2e/`: headless screenshot check against `live_server.py --demo`: home, walking the fibre road to the reward
   district, chat rain landing, dump glitch, night, REM (+ GIF, + 390x844 mobile); fails on console errors, blank
   canvas or missing honesty line.
