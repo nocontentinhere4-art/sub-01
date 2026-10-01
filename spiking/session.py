@@ -3,7 +3,9 @@
 Loads the learned weights (from the server, or none), runs the phases, streams compact state to the server over
 a websocket authenticated with SUB01_POD_SECRET, writes /out/status.json + /out/results.json (read by
 validate / pod_manager through the pod's port 8000) and uploads the learned weights at the end.
-Phases: bench, rates, delays, encode, pong_train, pong_exam, memory_test, sleep, free.
+Phases: bench, rates, delays, recall_yesterday, encode, pong_train, pong_exam, memory_test, sleep, free.
+Items (cfg "items") are the day's chat messages and readings, each {text, source: chat|reading, item}; a reading's
+text is its title + keywords. recall_yesterday tests the previous session's items before anything new is stored.
 In validate mode extra controls run (no-plasticity Pong, random paddle, sleep without replay).
 """
 import json
@@ -335,23 +337,50 @@ class Session:
                "velocity_m_s": net.cfg.velocity_mm_ms}
         self.result("delays", out)
 
-    def ph_encode(self):
-        msgs = [m["text"] if isinstance(m, dict) else str(m) for m in (self.cfg.get("messages") or [])][:5]
+    def day_items(self):
+        """The day's items: cfg "items" ({text, source, item}), else cfg "messages" as chat; max 5 of each source."""
+        raw = self.cfg.get("items")
+        if raw is None:
+            raw = [{"text": m["text"] if isinstance(m, dict) else str(m), "source": "chat"}
+                   for m in (self.cfg.get("messages") or [])]
+        out, n = [], {}
+        for it in raw:
+            src = "reading" if it.get("source") == "reading" else "chat"
+            if it.get("text") and n.get(src, 0) < MAX_PER_SOURCE:
+                n[src] = n.get(src, 0) + 1
+                out.append({"text": str(it["text"]), "source": src, "item": str(it.get("item") or it["text"])})
+        return out
+
+    def ph_encode(self, items=None, day=None):
+        items = self.day_items() if items is None else items
+        day = day or self.cfg.get("day")
         stored = []
-        for i, text in enumerate(msgs):
-            r = self.mem.encode(text, self.cfg.get("day"))
+        for i, it in enumerate(items):
+            r = self.mem.encode(it["text"], day, it["source"], it["item"])
             if r:
-                stored.append({"text": text, "words": r["words"], "drive_rate": round(r["drive_rate"], 2)})
-            self.progress = (i + 1) / max(1, len(msgs))
+                stored.append({"text": it["text"], "item": it["item"], "source": it["source"], "words": r["words"],
+                               "drive_rate": round(r["drive_rate"], 2)})
+            self.progress = (i + 1) / max(1, len(items))
         self.result("encode", {"stored": stored, "n_registry": len(self.mem.registry)})
 
-    def ph_memory_test(self, label=None):
-        res = self.mem.test(self.cfg.get("day"), lures=int(self.cfg.get("lures", 6)))
+    def ph_memory_test(self, label=None, items=None, day=None):
+        res = self.mem.test(day or self.cfg.get("day"), lures=int(self.cfg.get("lures", 6)), items=items)
         res.pop("kind", None)
         if label:
             res["label"] = label
         self.result("memory_test", res)
         return res
+
+    def ph_recall_yesterday(self, today=None):
+        """Half-cue recall of the previous session's items, a day later (after forgetting), before new encoding."""
+        today = today or self.cfg.get("day")
+        days = sorted({m.get("day") for m in self.mem.registry if m.get("day") and m.get("day") != today})
+        if not days:
+            self.result("memory_test", {"label": "next day", "skipped": "nothing stored on an earlier day",
+                                        "scores": [], "recalled": []})
+            return None
+        items = [m for m in self.mem.registry if m.get("day") == days[-1]]
+        return self.ph_memory_test("next day", items=items, day=today)
 
     def _pong(self):
         if self.pong is None:
@@ -439,6 +468,8 @@ class Session:
                 t0 = time.time()
                 if ph == "validate_memory":
                     self.validate_memory()
+                elif ph == "validate_reading":
+                    self.validate_reading()
                 elif ph == "validate_pong":
                     self.validate_pong()
                 elif ph == "memory_test":
@@ -482,6 +513,29 @@ class Session:
         self.mem.registry = reg0
         self.ph_sleep(replay=True, label="sleep with REM replay")
         self.ph_memory_test("after sleep with replay")
+
+    def validate_reading(self):
+        """Two days in one pod: day 1 encodes chat + readings, sleeps with replay, is tested; a day of forgetting
+        passes (the decay applied between real sessions); day 2 first tests day 1's items from half cues (the
+        "next morning" test), then encodes its own items and sleeps."""
+        d1, d2 = self.cfg.get("day1", "day-1"), self.cfg.get("day2", "day-2")
+        day1 = self.cfg.get("items_day1") or DEMO_ITEMS[:6]
+        day2 = self.cfg.get("items_day2") or DEMO_ITEMS[6:]
+        self.ph_encode(self._norm(day1), d1)
+        self.ph_memory_test("after encoding", day=d1)
+        self.ph_sleep(replay=True, label="day 1 sleep with REM replay")
+        self.ph_memory_test("after sleep", day=d1)
+        if self.net.plast is not None:
+            self.net.plast.forget(float(self.cfg.get("elapsed_days", 1.0)))
+        self.ph_recall_yesterday(today=d2)
+        self.ph_encode(self._norm(day2), d2)
+        self.ph_sleep(replay=True, label="day 2 sleep with REM replay")
+        self.ph_memory_test("after sleep", items=[m for m in self.mem.registry if m.get("day") == d2], day=d2)
+
+    @staticmethod
+    def _norm(items):
+        return [{"text": it["text"], "source": it.get("source", "chat"), "item": it.get("item") or it["text"]}
+                for it in items]
 
     def validate_pong(self):
         """Exams before training (= no plasticity), training curve, exams after (frozen) + controls."""
@@ -532,6 +586,21 @@ class Session:
         self.status(done=True, error=err)
 
 
+MAX_PER_SOURCE = 5
+# synthetic validation items: invented chat lines + public Wikipedia titles with keywords (no real chat content)
+DEMO_ITEMS = [
+    {"text": "good morning little brain, the sun is warm today", "source": "chat"},
+    {"text": "a red bicycle crossed the bridge near the river", "source": "chat"},
+    {"text": "Inokashira Park park pond cherry blossoms kichijoji zoo boats", "source": "reading",
+     "item": "Inokashira Park"},
+    {"text": "Bread flour dough yeast baking oven crust wheat", "source": "reading", "item": "Bread"},
+    {"text": "Moon orbit tides craters lunar apollo satellite phases", "source": "reading", "item": "Moon"},
+    {"text": "Origami paper folding crane sheet japanese craft", "source": "reading", "item": "Origami"},
+    {"text": "do you dream about the ocean and its waves", "source": "chat"},
+    {"text": "Tea leaves brewing ceremony matcha kettle cups", "source": "reading", "item": "Tea"},
+    {"text": "Lighthouse tower lamp coast ships beacon keeper", "source": "reading", "item": "Lighthouse"},
+    {"text": "Snow crystals winter flakes cold mountains white", "source": "reading", "item": "Snow"},
+]
 DEMO_MESSAGES = [  # synthetic messages for validation (no real chat content)
     {"text": "good morning little brain, the sun is warm today", "emotion": "positive"},
     {"text": "a red bicycle crossed the bridge near the river", "emotion": "neutral"},

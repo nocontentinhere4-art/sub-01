@@ -1,4 +1,7 @@
-"""Memory in the synapses: chat messages -> sparse patterns -> hippocampal assemblies -> REM consolidation.
+"""Memory in the synapses: chat messages and readings -> sparse patterns -> hippocampal assemblies -> REM replay.
+
+Items are chat messages (source "chat") or articles it read (source "reading": title + keywords, hashed the same
+way). Each stored item keeps its source, a display name (`item`: the message or the article title) and its day.
 
 - Pattern: every content word of an (already filtered) chat message is hashed (sha256) to a fixed random 2 %
   of the excitatory neurons of each language / visual / default-network parcel, and to 0.5 % of the excitatory
@@ -110,7 +113,7 @@ class MemorySystem:
         return snap
 
     # --- encoding ----------------------------------------------------------------------------------------------
-    def encode(self, text, day=None):
+    def encode(self, text, day=None, source="chat", item=None):
         ws = words(text)
         if not ws:
             return None
@@ -122,7 +125,8 @@ class MemorySystem:
         drive_rate = float(net.rates_since(snap, ids).mean())
         index = self.split(ids)[0]
         self._rest()
-        rec = {"text": text, "words": ws, "day": day, "index": index.astype(int).tolist(), "drive_rate": drive_rate}
+        rec = {"text": text, "words": ws, "day": day, "index": index.astype(int).tolist(), "drive_rate": drive_rate,
+               "source": source, "item": item or text}
         self.registry = [m for m in self.registry if m["text"] != text] + [rec]
         del self.registry[:-self.cap]
         return rec
@@ -162,7 +166,8 @@ class MemorySystem:
             p.frozen = True
         try:
             items = [m for m in (items if items is not None else self.registry) if len(m["words"]) >= 2]
-            res = [{"text": m["text"], **self._probe(m["words"])} for m in items]
+            res = [{"text": m["text"], "item": m.get("item", m["text"]), "source": m.get("source", "chat"),
+                    "item_day": m.get("day"), **self._probe(m["words"])} for m in items]
             lengths = [len(m["words"]) for m in items] or [6]
             lure_res = []
             for i in range(lures):
@@ -174,7 +179,8 @@ class MemorySystem:
         thr = {k: max((r[k] for r in lure_res), default=0.0) for k in ("hc", "ctx")}
         scores, recalled = [], []
         for r in res:
-            s = {"text": r["text"], "hc": round(r["hc"], 3), "ctx": round(r["ctx"], 3),
+            s = {"text": r["text"], "item": r["item"], "source": r["source"], "item_day": r["item_day"],
+                 "hc": round(r["hc"], 3), "ctx": round(r["ctx"], 3),
                  "hc_full": r.get("hc_full_hz"), "ctx_full": r.get("ctx_full_hz"),
                  "hc_recalled": bool(r["hc"] > thr["hc"]), "ctx_recalled": bool(r["ctx"] > thr["ctx"])}
             scores.append(s)
