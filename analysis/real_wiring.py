@@ -3,7 +3,7 @@
 The BOLD-band Hopf slow layer (twin/hopf.py) is fitted on HALF of the subject's 131 QC-passed resting-state runs and
 scored on the OTHER half (split by session). The identical pipeline is run on the real connectome and on randomised
 connectomes that keep its geometry (Betzel & Bassett 2018, degree + edge-length preserving) or its node strengths
-(simulated annealing, Milisav et al. 2024), both from netneurotools (BSD-3).
+(simulated annealing, Milisav et al.), both from netneurotools (BSD-3).
 
     python analysis/real_wiring.py prep   --conn out/connectome_v2.npz --tag v2 --nulls 100
     python analysis/real_wiring.py run    --tag v2 --workers 30            # heavy part (RunPod CPU pod)

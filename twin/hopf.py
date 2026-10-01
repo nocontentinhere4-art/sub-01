@@ -12,7 +12,7 @@ with a_j = -0.02 (just below the bifurcation: noisy damped oscillations), beta =
 peak frequency of region j's BOLD in 0.008-0.08 Hz measured on the FIT half of the runs, and C = G * SC (stage 1,
 only the global coupling G is fitted) or C = EC (stage 2, effective connectivity).
 
-Linear (fluctuation) approximation used for fitting (Ponce-Alvarez & Deco 2024 PLoS Comput Biol "The Hopf whole-brain
+Linear (fluctuation) approximation used for fitting (Ponce-Alvarez & Deco 2024 Sci Rep "The Hopf whole-brain
 model and its linear approximation"; Gilson et al. 2016 PLoS Comput Biol for the Lyapunov / lagged-covariance method):
 with z = x + i y and a near 0, dz = M z dt + noise, M = diag(a + i w) - diag(sum_k C_jk) + C. The stationary complex
 covariance P = <z z^H> solves  M P + P M^H + 2 beta^2 I = 0, so Cov(x) = Re(P) / 2 and the lagged covariance

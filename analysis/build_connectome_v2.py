@@ -11,7 +11,7 @@ and the size of each independent tracking chunk). Output: out/connectome_v2.npz 
 Consistency threshold. Within one subject there is no group to compute consistency over, so the tracking itself is
 split: it ran as K independent chunks of equal size with different random seeds. Probabilistic tracking with
 0.5 M streamlines per chunk reaches ~42 % of all region pairs in EVERY chunk, so presence alone cannot thin the
-network. Following consistency-based thresholding (Roberts et al. 2017 NeuroImage 145:1-42, there across subjects),
+network. Following consistency-based thresholding (Roberts et al. 2017 NeuroImage 145:118-129, there across subjects),
 an edge's consistency is the coefficient of variation of its SIFT2 weight across the K chunks; edges present in all
 chunks are ranked by CV and the most consistent ones are kept up to DENSITY. False-positive edges from probabilistic
 tracking are mostly weak and erratic (Maier-Hein et al. 2017 Nat Commun 8:1349), so they drop out first.
