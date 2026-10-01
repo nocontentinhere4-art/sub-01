@@ -565,3 +565,68 @@ def test_supervisor_restarts_a_hung_service_and_resets_the_client():
         finally:
             await lb.aclose()
     run(main())
+
+
+class FakeOpenRouter:
+    """A local stand-in for https://openrouter.ai/api/v1/chat/completions."""
+
+    def __init__(self, codes=(200,), cost=0.0123):
+        import http.server
+        import threading
+        self.codes, self.seen, outer = list(codes), [], self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                outer.seen.append((self.path, dict(self.headers), json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+                code = outer.codes.pop(0) if outer.codes else 200
+                out = json.dumps({"choices": [{"message": {"role": "assistant",
+                                                           "content": '{"options": [{"action": "scroll", "label": "more"}]}'}}],
+                                  "usage": {"prompt_tokens": 1400, "completion_tokens": 90, "cost": cost}}
+                                 if code == 200 else {"error": {"code": code, "message": "nope"}}).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            def log_message(self, *a):
+                pass
+        self.srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.srv.server_port}/api/v1"
+
+    def close(self):
+        self.srv.shutdown()
+
+
+def test_openrouter_provider_request_reply_and_reported_cost(tmp_path, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    assert isinstance(E.default_provider(), E.OpenRouterEyes)
+    fake = FakeOpenRouter(codes=(429, 200))                                   # one rate limit, then an answer
+    try:
+        eyes = E.Eyes(E.OpenRouterEyes("sk-or-test-key", url=fake.url), E.Budget(tmp_path / "c.jsonl"))
+        opts, meta = eyes.propose(PAGE)
+    finally:
+        fake.close()
+    assert meta["source"] == "ai" and meta["provider"] == "openrouter" and opts[0]["action"] == "scroll"
+    path, headers, body = fake.seen[-1]
+    assert len(fake.seen) == 2 and path == "/api/v1/chat/completions"
+    assert headers["Authorization"] == "Bearer sk-or-test-key"
+    assert body["model"] == "anthropic/claude-opus-5.5" and body["reasoning"] == {"effort": "low"}
+    assert body["usage"] == {"include": True} and body["messages"][0] == {"role": "system", "content": E.SYSTEM}
+    row = json.loads((tmp_path / "c.jsonl").read_text())
+    assert row["usd"] == 0.0123 and (row["in"], row["out"]) == (1400, 90) and row["provider"] == "openrouter"
+
+
+def test_openrouter_bad_key_falls_back_and_never_logs_the_key(tmp_path):
+    fake = FakeOpenRouter(codes=(401,))
+    try:
+        eyes = E.Eyes(E.OpenRouterEyes("sk-or-secret-key", url=fake.url), E.Budget(tmp_path / "c.jsonl"))
+        opts, meta = eyes.propose(PAGE, "bread")
+    finally:
+        fake.close()
+    assert meta["source"] == "local" and len(opts) >= E.MIN_OPTIONS and len(fake.seen) == 1     # no retry on 401
+    log = (tmp_path / "c.jsonl").read_text()
+    assert "openrouter HTTP 401" in log and "secret" not in log
+    assert eyes.budget.summary()["last_error"] == "openrouter HTTP 401"

@@ -2,7 +2,9 @@
 
 After a page has been read, its title, visible text and up to 40 links (numbered L1..L40) go to a language model:
 Claude when ANTHROPIC_API_KEY is set (BRAIN_DECIDES_CLAUDE_MODEL, default claude-opus-5-5 at low effort), else
-Replicate (REPLICATE_API_TOKEN, BRAIN_DECIDES_REPLICATE_MODEL, default meta/meta-llama-3-70b-instruct). It answers
+OpenRouter when OPENROUTER_API_KEY is set (OPENROUTER_MODEL, default anthropic/claude-opus-5.5 at low reasoning
+effort; the cost OpenRouter reports per call is logged), else Replicate (REPLICATE_API_TOKEN,
+BRAIN_DECIDES_REPLICATE_MODEL, default meta/meta-llama-3-70b-instruct). It answers
 with 3-5 options {action, target, label, networks}. Nothing it says is trusted:
 - links are referred to by their number, and a number must be one of the links really on the page (no invented URLs);
 - every target goes through the browse.py guard (url_ok, blocked words, login/sign-up links), search queries through
@@ -33,9 +35,14 @@ MIN_OPTIONS = 3
 MAX_CALLS_PER_HOUR = int(os.environ.get("BRAIN_DECIDES_MAX_CALLS_PER_HOUR") or 30)
 CLAUDE_MODEL = os.environ.get("BRAIN_DECIDES_CLAUDE_MODEL") or "claude-opus-5-5"
 REPLICATE_MODEL = os.environ.get("BRAIN_DECIDES_REPLICATE_MODEL") or "meta/meta-llama-3-70b-instruct"
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-opus-5.5"
+OPENROUTER_URL = (os.environ.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
 PRICES = {  # USD per million tokens (input, output), for the spend log
     "claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-4-5": (1.0, 5.0),
-    "meta/meta-llama-3-70b-instruct": (0.65, 2.75), "meta/meta-llama-3-8b-instruct": (0.05, 0.25)}
+    "meta/meta-llama-3-70b-instruct": (0.65, 2.75), "meta/meta-llama-3-8b-instruct": (0.05, 0.25),
+    # OpenRouter (estimate only when a response carries no cost)
+    "anthropic/claude-opus-5.5": (4.0, 20.0), "anthropic/claude-sonnet-5.5": (2.0, 10.0),
+    "anthropic/claude-haiku-4.5": (1.0, 5.0), "meta-llama/llama-3.3-70b-instruct": (0.10, 0.32)}
 VIDEO = re.compile(r"(youtube\.com/watch|youtu\.be/|vimeo\.com/\d|nicovideo\.jp/watch|dailymotion\.com/video|"
                    r"/video[s]?/|/watch\b)", re.I)
 
@@ -74,9 +81,11 @@ class Budget:
         self.calls = [t for t in self.calls if now - t < 3600]
         return len(self.calls) < self.per_hour
 
-    def record(self, provider, model, tokens_in, tokens_out, ok, note=""):
-        pin, pout = PRICES.get(model, (0.0, 0.0))
-        usd = (tokens_in * pin + tokens_out * pout) / 1e6
+    def record(self, provider, model, tokens_in, tokens_out, ok, note="", usd=None):
+        """`usd`: the cost the provider reported, else an estimate from PRICES."""
+        if usd is None:
+            pin, pout = PRICES.get(model, (0.0, 0.0))
+            usd = (tokens_in * pin + tokens_out * pout) / 1e6
         row = {"t": self.clock(), "provider": provider, "model": model, "in": int(tokens_in), "out": int(tokens_out),
                "usd": round(usd, 6), "ok": bool(ok), "note": note[:80]}
         self.calls.append(row["t"])
@@ -99,7 +108,9 @@ class Budget:
     def summary(self):
         rows, now = self.rows(), self.clock()
         day = [r for r in rows if now - r["t"] < 86400]
+        errors = [r for r in rows if not r.get("ok") and r.get("note")]
         return {"calls_last_hour": len([t for t in self.calls if now - t < 3600]), "max_per_hour": self.per_hour,
+                "last_error": errors[-1]["note"] if errors and errors[-1] is rows[-1] else None,
                 "calls_today": len(day), "usd_today": round(sum(r["usd"] for r in day), 4),
                 "usd_total": round(sum(r["usd"] for r in rows), 4)}
 
@@ -142,12 +153,46 @@ class ReplicateEyes:
                 m.get("output_token_count") or len(text) // 4)
 
 
+class OpenRouterEyes:
+    """OpenRouter's chat-completions endpoint (OPENROUTER_API_KEY, never logged)."""
+    name = "openrouter"
+
+    def __init__(self, key, model=OPENROUTER_MODEL, url=OPENROUTER_URL, timeout=30):
+        self.key, self.model, self.url, self.timeout = key, model, url, timeout
+
+    def ask(self, system, user):
+        import urllib.error
+        import urllib.request
+        body = json.dumps({"model": self.model, "max_tokens": 4000, "temperature": 0.3,
+                           "reasoning": {"effort": "low"}, "usage": {"include": True},
+                           "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
+        req = urllib.request.Request(self.url + "/chat/completions", data=body.encode(), method="POST", headers={
+            "Authorization": f"Bearer {self.key}", "Content-Type": "application/json", "X-Title": "SUB-01"})
+        for attempt in range(2):                                  # one retry on rate limits / server errors
+            try:
+                d = json.loads(urllib.request.urlopen(req, timeout=self.timeout).read())
+                break
+            except urllib.error.HTTPError as e:
+                if attempt or e.code not in (429, 500, 502, 503, 504):
+                    raise RuntimeError(f"openrouter HTTP {e.code}") from None
+                time.sleep(2)
+        if d.get("error"):
+            raise RuntimeError(f"openrouter error {str(d['error'].get('code', ''))[:20]}")
+        msg = ((d.get("choices") or [{}])[0].get("message") or {})
+        u = d.get("usage") or {}
+        cost = u.get("cost")
+        return (msg.get("content") or "", u.get("prompt_tokens", 0), u.get("completion_tokens", 0),
+                float(cost) if isinstance(cost, (int, float)) else None)
+
+
 def default_provider():
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
             return ClaudeEyes()
         except ImportError:
-            print("eyes: ANTHROPIC_API_KEY set but the anthropic package is missing; using Replicate", flush=True)
+            print("eyes: ANTHROPIC_API_KEY set but the anthropic package is missing", flush=True)
+    if os.environ.get("OPENROUTER_API_KEY"):
+        return OpenRouterEyes(os.environ["OPENROUTER_API_KEY"])
     if os.environ.get("REPLICATE_API_TOKEN"):
         return ReplicateEyes(os.environ["REPLICATE_API_TOKEN"])
     return None
@@ -314,12 +359,13 @@ class Eyes:
         else:
             model = getattr(self.provider, "model", "")
             try:
-                raw, tin, tout = self.provider.ask(SYSTEM, prompt(page))
+                raw, tin, tout, *cost = self.provider.ask(SYSTEM, prompt(page))
                 opts = validate(parse(raw), page)
-                self.budget.record(self.provider.name, model, tin, tout, bool(opts))
+                self.budget.record(self.provider.name, model, tin, tout, bool(opts), usd=cost[0] if cost else None)
                 meta = {"source": "ai", "provider": self.provider.name, "model": model, "kept": len(opts)}
             except Exception as e:                                # a provider error never stops the browsing
-                self.budget.record(self.provider.name, model, 0, 0, False, type(e).__name__)
+                self.budget.record(self.provider.name, model, 0, 0, False,
+                                   str(e)[:80] if isinstance(e, RuntimeError) else type(e).__name__)
                 meta["why_local"] = f"AI error ({type(e).__name__})"
             self.asked[url] = opts
             if len(self.asked) > 50:

@@ -46,7 +46,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 
 ## Brain decides what he clicks (PR `feature/brain-decides`)
 - Eyes (`eyes.py`): after a page, an AI lists 3-5 options from the title, visible text and up to 40 numbered links
-  (Claude `claude-opus-5-5` at low effort if `ANTHROPIC_API_KEY`, else Replicate Llama 3 70B). Links by number only,
+  (Claude `claude-opus-5-5` at low effort if `ANTHROPIC_API_KEY`; else OpenRouter if `OPENROUTER_API_KEY`, set on
+  Railway, model `OPENROUTER_MODEL` default `anthropic/claude-opus-5.5`, real cost per call logged; else Replicate
+  Llama 3 70B). Links by number only,
   every target through the browse.py guard, search queries through the chat filter; max 1 call per page and
   `BRAIN_DECIDES_MAX_CALLS_PER_HOUR` (30); spend in `/data/eyes_costs.jsonl`. No key / over cap: local options.
 - Vote (`brain_vote.py`): `Brain.clone()` + all options simulated 300 ms side by side (one sparse product per step,
