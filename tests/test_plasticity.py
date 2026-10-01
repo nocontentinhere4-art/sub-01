@@ -120,4 +120,100 @@ def test_drift_metrics_and_hook(tmp_path):
     p.W[j, i] *= 1.03
     d = p.drift()
     assert d["edges_changed"] == 1 and abs(d["max_edge_rel"] - 0.03) < 1e-9 and d["rel_frobenius"] > 0
-    assert p.publish_hook_ok() if hasattr(p, "publish_hook_ok") else p.publish_hash({}) is None
+    assert p.publish_hash({"sha256": "0" * 64}) is None
+
+
+def test_no_network_or_wallet_code():
+    src = (ROOT / "twin" / "plasticity.py").read_text()
+    for bad in ("import socket", "urllib", "requests", "http.client", "aiohttp", "web3", "eth_", "private_key"):
+        assert bad not in src
+
+
+def test_invalid_inputs_cannot_break_caps(tmp_path):
+    p, W0 = fresh(tmp_path, eta=1e-5, tau=1e9)
+    rng = np.random.default_rng(4)
+    p.hebbian(rng.random(p.n), 10.0)
+    W1 = p.W.copy()
+    bad = rng.random(p.n)
+    bad[7] = np.nan
+    p.hebbian(bad, 10.0)
+    bad[7] = np.inf
+    p.hebbian(bad, 10.0)
+    p.hebbian(rng.random(p.n), float("nan"))
+    p.hebbian(rng.random(p.n), -10.0)
+    p.hebbian(rng.random(p.n + 1), 10.0)
+    assert np.array_equal(p.W, W1)                  # all ignored
+    for _ in range(300):                            # huge dt and huge activity: caps still hold
+        p.hebbian(rng.random(p.n) * 1e6, 1e9)
+    D = p.W - W0
+    assert np.all(np.isfinite(p.W)) and np.allclose(p.W, p.W.T)
+    assert np.linalg.norm(D) / np.linalg.norm(W0) <= p.total_cap + 1e-9
+    assert np.all(np.abs(D) <= p.edge_cap * W0 + 1e-12) and np.all(D[~p.mask] == 0)
+    import pytest
+    for regions in ([-1], [p.n], [True]):
+        with pytest.raises(ValueError):
+            p.record_response(0.0, "x", regions, 1.0)
+    p.record_response(0.0, "nan strength", [1, 2], float("nan"))
+    p.record_response(1.0, "real", [1, 2], 0.5)
+    assert p.consolidate("d")["message"] == "real"
+
+
+def test_one_memory_per_day(tmp_path):
+    p, _ = fresh(tmp_path)
+    p.record_response(0.0, "a", [1, 2, 3], 1.0)
+    assert p.consolidate("2026-02-01") is not None
+    p.record_response(1.0, "b", [1, 2, 3], 1.0)       # arrives after tonight's memory
+    W = p.W.copy()
+    assert p.consolidate("2026-02-01") is None        # second REM bout of the same night: nothing
+    assert np.array_equal(p.W, W) and len(p.pending) == 1
+    assert p.consolidate("2026-02-02")["message"] == "b"
+    assert [m["day"] for m in json.loads(p.memories_path.read_text())] == ["2026-02-01", "2026-02-02"]
+
+
+def test_crash_after_commit_is_repaired(tmp_path, monkeypatch):
+    import twin.plasticity as tp
+    p, W0 = fresh(tmp_path)
+    p.record_response(0.0, "kept", [10, 11, 12, 13], 1.0)
+    real = tp._atomic_write
+
+    def dying(path, writer):                          # process "dies" right after weights.npz is committed
+        if Path(path).name != "weights.npz":
+            raise KeyboardInterrupt("simulated crash")
+        real(path, writer)
+    monkeypatch.setattr(tp, "_atomic_write", dying)
+    try:
+        p.consolidate("2026-03-01")
+    except KeyboardInterrupt:
+        pass
+    monkeypatch.setattr(tp, "_atomic_write", real)
+    assert not p.memories_path.exists()
+    q = Plasticity(W0, tmp_path, names=p.names)       # restart repairs the log and drops the consumed message
+    mem = json.loads(q.memories_path.read_text())
+    assert len(mem) == 1 and mem[0]["message"] == "kept" and mem[0]["sha256"] == weights_sha256(q.W)
+    assert q.pending == [] and q.consolidate("2026-03-02") is None
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_failed_write_keeps_old_file(tmp_path):
+    import twin.plasticity as tp
+    f = tmp_path / "x.json"
+    tp._atomic_write(f, lambda h: h.write(b"old"))
+
+    def boom(h):
+        h.write(b"partial")
+        raise RuntimeError("disk full")
+    try:
+        tp._atomic_write(f, boom)
+    except RuntimeError:
+        pass
+    assert f.read_bytes() == b"old" and not list(tmp_path.glob("*.tmp"))
+
+
+def test_plausible_day_with_real_correlations(tmp_path):
+    """A day (10 s steps) of activity whose spatial correlations come from the recorded resting-state runs."""
+    p, _ = fresh(tmp_path)
+    X = np.concatenate([np.load(f)["ts"] for f in sorted((ROOT / "out" / "rest").glob("*.npz"))[:4]])
+    for k in range(8640):
+        p.hebbian(np.clip(0.45 + 0.1 * X[k % len(X)], 0, 2), 10.0)
+    d = p.drift()
+    assert 0 < d["rel_frobenius"] < 1e-3 and d["max_edge_rel"] < 5e-3      # measured ~2e-5 and ~2e-4
