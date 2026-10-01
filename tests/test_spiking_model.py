@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
+torch = pytest.importorskip("torch")                      # GPU model tests: skipped where torch is absent (CI, Railway image)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from spiking.config import Config  # noqa: E402
