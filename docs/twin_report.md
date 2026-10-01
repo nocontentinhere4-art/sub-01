@@ -1468,6 +1468,9 @@ The component sections list their own limits (links in each section's last part)
 - It beats a shuffled connectome and the old Stuart-Landau model, but both are near a floor, so that shows the
   twin's FC is not noise, not that it is competitive with good whole-brain fits. Mean simulated FC is 0.072 against
   0.362 recorded (the recordings have no global-signal regression).
+- The shuffled connectome keeps the weight distribution but not each region's strength or the wiring's geometry. The
+  twin was **not** compared with geometry- or strength-preserving null connectomes, so it is not shown that the
+  person's specific wiring, beyond its overall strengths and distances, is what gives the (weak) match.
 - Three global parameters are fitted (G, velocity, noise). Nothing regional, no receptor or hemodynamic fit. The live
   limit G <= 3.5 (so the sleep stages stay stable) costs static FC (r 0.15 without it).
 - The held-out score is for the resting model with all neuromodulator levels at 1.0 and the original weights. It was
@@ -1481,6 +1484,8 @@ The component sections list their own limits (links in each section's last part)
 - Streamline counts from single-subject tractography are not synaptic strengths; the connectome misses many
   interhemispheric fibres and is undirected. One conduction velocity. One E/I population per parcel, no thalamic modes,
   no spindles. Sleep and neuromodulation are parameter changes (gain, excitability, adaptation, gate), not receptor kinetics.
+- The sleep stages change excitability, coupling and noise, and the neuromodulator gain follows the same sleep circuit,
+  so the effect of sleep is partly counted twice; the overlap was not separated or fitted.
 - In REM the sleep engine's coupling lowers mean activity below wake (real REM cortex is about as active as wake).
   Deep-NREM up states are stronger than real ones. The `f_hz` rhythm of the old model is ignored by the twin.
 - Simulated BOLD fluctuations are about 50 times smaller than recorded ones unless the recorded signal is fed in.
@@ -1516,6 +1521,10 @@ The component sections list their own limits (links in each section's last part)
 **Running it**
 - Persistence is local files in the data directory (a Railway volume); if it is lost, so are the weights and memories.
 - CPU numbers come from a shared sandbox core, not from a Railway vCPU.
+- With `--model sl` the panel shows the old Stuart-Landau model's own held-out score (no static or FC-dynamics match),
+  never the twin's, and plasticity is off (that model has no weight hook, so there is no drift and no memory).
+- State is saved every minute (and on Ctrl-C); a kill, including the SIGTERM of a redeploy, can lose up to a minute of sleep,
+  body and weight state (a REM consolidation is saved at once).
 - No consciousness, experience, feeling or intention is claimed or modelled. Chat messages are stimuli, not conversation.
 
 ## 9. How to run

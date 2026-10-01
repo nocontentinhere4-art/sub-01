@@ -197,6 +197,12 @@ def test_old_model_still_works(tmp_path):
         json.dumps(msg)
         assert "twin" in msg and np.isfinite(msg["act"]).all()
     assert (tmp_path / "sl").exists() or live.plast.data_dir == tmp_path / "sl"       # weights kept per model
+    # the old model does not use plastic weights: no drift and no memory are reported for it, and its page score
+    # is its own held-out score, never the twin's
+    assert not live.plastic and msg["twin"]["drift"]["edges_changed"] == 0 and msg["twin"]["memories"]["count"] == 0
+    sc = json.loads((ROOT / "web" / "twin_score.json").read_text())
+    assert msg["twin"]["score"]["fc_r"] == sc["baselines"]["old_model"]["fc_r"] != sc["heldout"]["fc_r"]
+    assert "Stuart-Landau" in msg["twin"]["score"]["label"]
 
 
 def test_pages_docker_and_gitignore_are_wired():

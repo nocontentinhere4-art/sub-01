@@ -101,14 +101,17 @@
         scoreKey = k1;
         const fc = typeof sc.fc_r === "number" ? sc.fc_r.toFixed(2) : "–", ks = typeof sc.fcd_ks === "number" ? sc.fcd_ks.toFixed(2) : "–";
         const ceil = typeof sc.ceiling_r === "number" ? sc.ceiling_r.toFixed(2) : null;
+        const how = typeof sc.fc_r === "number" && sc.fc_r < 0.05 ? "no match" : "a weak match";
         scoreTop.replaceChildren(
           document.createTextNode("How close to the real recordings? "),
           el("b", "", `r = ${fc}`),
           document.createTextNode(` on ${sc.n_runs || "?"} fMRI runs the model never saw (0 = no match, 1 = identical).` +
-            (ceil ? ` Runs of the same person agree at r = ${ceil}: a weak match.` : " A weak match.") +
-            ` How the pattern changes over time matches better: distance ${ks} (0 same, 1 unrelated).`));
+            (ceil ? ` The two halves of the person's own recordings agree at r = ${ceil}, so this is ${how}.` : ` ${how[0].toUpperCase()}${how.slice(1)}.`) +
+            (typeof sc.fcd_ks === "number" && sc.fcd_ks >= 0.3
+              ? ` How the pattern changes over time does not match either: distance ${ks} (0 same, 1 unrelated).`
+              : ` How the pattern changes over time matches better: distance ${ks} (0 same, 1 unrelated).`)));
         scoreTop.title = "r is the correlation between which regions rise and fall together in the model and in the recordings. Static match (correlation of functional connectivity, FC) and dynamics match (Kolmogorov-Smirnov distance between FC-dynamics distributions, FCD), both on held-out recordings: sessions the fit never saw. Measured with all neuromodulator levels at 1.0 and the original weights, without the recorded-session replay.";
-        label.textContent = "source: " + (sc.label || "") + (sc.label && !/weak/i.test(sc.label) ? " (weak static match)" : "");
+        label.textContent = "source: " + (sc.label || "") + (sc.label && !/weak|no static/i.test(sc.label) ? " (weak static match)" : "");
       }
       for (const [k] of LEVELS) {
         const v = (tw.levels || {})[k];

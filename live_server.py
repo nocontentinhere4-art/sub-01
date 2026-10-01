@@ -132,8 +132,11 @@ class Live:
         W0 = getattr(self.brain, "W0", self.brain.W)
         pdir = self.data_dir if self.model == "twin" else self.data_dir / self.model     # weights belong to one model
         self.plast = Plasticity(W0, pdir, names=self.brain.names)
+        # plasticity only where the brain uses the weights (TwinBrain.set_weights); the old model has no such hook, so
+        # with --model sl no Hebbian drift and no "memory" (a weight change the model would never see) is reported
+        self.plastic = hasattr(self.brain, "set_weights")
         self.consolidated_day = tstate.get("consolidated_day")      # night (date) that already had its REM consolidation
-        self.score = self.load_score()
+        self.score = self.load_score(self.model)
         self.memories = self.load_memories()
         if hasattr(self.brain, "set_weights") and self.plast.drift()["rel_frobenius"] > 0:
             self.brain.set_weights(self.plast.W)                    # resume with the weights learned so far
@@ -162,12 +165,21 @@ class Live:
 
     # --- twin state ---------------------------------------------------------------
     @staticmethod
-    def load_score():
-        """web/twin_score.json -> the few numbers and the honest label shown on the pages."""
+    def load_score(model="twin"):
+        """web/twin_score.json -> the few numbers and the honest label shown on the pages.
+
+        The held-out score belongs to the model that runs: the twin's numbers for --model twin, the old
+        Stuart-Landau model's own held-out numbers (baselines.old_model) for --model sl, never the twin's."""
         d = load_json(TWIN_SCORE, {})
-        h = d.get("heldout", {})
-        return {"label": d.get("label", ""), "fc_r": h.get("fc_r"), "fcd_ks": h.get("fcd_ks"),
-                "n_runs": h.get("n_runs"), "ceiling_r": d.get("baselines", {}).get("test_retest_ceiling_r")}
+        h, base = d.get("heldout", {}), d.get("baselines", {})
+        out = {"label": d.get("label", ""), "fc_r": h.get("fc_r"), "fcd_ks": h.get("fcd_ks"),
+               "n_runs": h.get("n_runs"), "ceiling_r": base.get("test_retest_ceiling_r")}
+        if model == "sl":
+            old = base.get("old_model", {})
+            out |= {"label": "old Stuart-Landau model vs recorded resting-state fMRI (held-out sessions): "
+                             "no static match, no FC-dynamics match",
+                    "fc_r": old.get("fc_r"), "fcd_ks": old.get("fcd_ks")}
+        return out
 
     def load_memories(self):
         mem = load_json(self.plast.memories_path, [])
@@ -276,7 +288,8 @@ class Live:
             self.brain.stimulate(g, a * gain)
         m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits)
         # measure the model's response over the next PROBE_S model seconds (tick() finishes it and records it)
-        self.probes.append({"t": t, "text": text, "before": before, "acc": np.zeros(self.brain.n), "k": 0})
+        if self.plastic:
+            self.probes.append({"t": t, "text": text, "before": before, "acc": np.zeros(self.brain.n), "k": 0})
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
@@ -417,7 +430,7 @@ class Live:
         self.act_hist.append(act)
         self.finish_probes(act)
         # plasticity: Hebbian while awake on the activity averaged over HEBB_EVERY_S of sim time
-        if e.stage == "AWAKE":
+        if e.stage == "AWAKE" and self.plastic:
             self.heb_acc = act.copy() if self.heb_acc is None else self.heb_acc + act
             self.heb_dt += dt_sim
             self.heb_n += 1
@@ -427,7 +440,8 @@ class Live:
                 self.w_dirty = True
         else:
             self.heb_acc, self.heb_dt, self.heb_n = None, 0.0, 0
-        self.consolidate_if_due(t, events)
+        if self.plastic:
+            self.consolidate_if_due(t, events)
         self.push_weights(t)
         if self.n_ticks % 20 == 1:
             self.drift = self.plast.drift()
