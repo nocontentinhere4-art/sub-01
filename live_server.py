@@ -8,6 +8,12 @@ Buys drive the reward + visual regions, sells drive salience + amygdala, large
 trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
 A sleep circuit on the local Asia/Tokyo clock (sleep.py, SUB01_TZ) changes the rhythm and how much
 any stimulus gets through; during REM, stored messages are replayed. Page on http://localhost:8765.
+
+The brain model is chosen with --model twin|sl (env SUB01_MODEL, default twin: twin/model.py; sl: the old
+Stuart-Landau model in brain_sim.py). Around it run the v2 twin components (docs/twin_report.md): neuromodulators
+(twin/neurochem.py) that set a per-region gain, a small body (twin/body.py) that feeds hunger and heart rate back,
+and toy plasticity with one memory a night (twin/plasticity.py). This is a digital twin model of one real person's
+brain structure and recorded activity; not a mind, not conscious, not the person.
 """
 import argparse
 import asyncio
@@ -18,6 +24,7 @@ import math
 import os
 import random
 import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -25,18 +32,31 @@ import aiohttp
 import numpy as np
 from aiohttp import web
 
-from brain_sim import Brain
+from brain_sim import make_brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
 from eye import Eye, load_env, market_mood
 from real_baseline import RealBaseline
 from life import WORLD, Life
+from twin.body import Body
+from twin.neurochem import Neuromodulators
+from twin.plasticity import Plasticity
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
+STIM_TAU = 2.0                  # s, decay of brain.stimulate() drive (brain_sim.Brain and twin.model.TwinBrain)
+PROBE_S = 2.0                   # model seconds before / after a chat message used to measure the brain response
+PROBE_TICKS = int(PROBE_S / TICK)   # ticks of model time in a probe window
+PROBE_REGIONS = 8               # regions recorded as "the response" of one message (largest activity increase)
+BODY_EVERY_S = 1.0              # the body is stepped when this much sim time has accumulated (one call can be ~180 s)
+HEBB_EVERY_S = 5.0              # plasticity.hebbian() is called with the activity averaged over this much sim time
+WEIGHTS_EVERY_S = 60.0          # brain.set_weights(plasticity.W) at most once per sim minute ...
+WEIGHTS_MIN_TICKS = 40          # ... and at most once per 2 s of real time
+MEMORY_TEXT_MAX = 80            # characters of a memory's message shown in the tick message
+TWIN_SCORE = HERE / "web" / "twin_score.json"
 RPC_WS = "wss://api.mainnet-beta.solana.com"
 DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
@@ -66,11 +86,20 @@ def decode_trades(logs):
     return out
 
 
+def load_json(path, default):
+    try:
+        return json.loads(Path(path).read_text())
+    except Exception:
+        return default
+
+
 class Live:
-    def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
-        self.brain = Brain()
+    def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False, model=None):
+        self.model = (model or os.environ.get("SUB01_MODEL", "twin")).strip().lower()
+        self.brain = make_brain(self.model)
         self.mint, self.demo = mint, demo
         self.trust_proxy = trust_proxy
+        self.data_dir = Path(data_dir)
         self.store = Store(data_dir)
         saved, mem = self.store.load()
         self.memory = Memory(mem)
@@ -94,15 +123,86 @@ class Live:
         self.eye = None                  # set by main() with --eye
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
-        self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
+        life_state = json.loads(life_path.read_text()) if life_path.exists() else None
+        # --- v2 twin components (docs/twin_contracts.md); their state lives in the data dir, never in out/ -----------
+        self.twin_path = self.data_dir / "twin_state.json"
+        tstate = load_json(self.twin_path, {})
+        self.neuro = Neuromodulators(state=tstate.get("neuro"))
+        self.body = Body(tstate.get("body") or (life_state or {}).get("body"))
+        W0 = getattr(self.brain, "W0", self.brain.W)
+        pdir = self.data_dir if self.model == "twin" else self.data_dir / self.model     # weights belong to one model
+        self.plast = Plasticity(W0, pdir, names=self.brain.names)
+        # plasticity only where the brain uses the weights (TwinBrain.set_weights); the old model has no such hook, so
+        # with --model sl no Hebbian drift and no "memory" (a weight change the model would never see) is reported
+        self.plastic = hasattr(self.brain, "set_weights")
+        self.consolidated_day = tstate.get("consolidated_day")      # night (date) that already had its REM consolidation
+        self.score = self.load_score(self.model)
+        self.memories = self.load_memories()
+        if hasattr(self.brain, "set_weights") and self.plast.drift()["rel_frobenius"] > 0:
+            self.brain.set_weights(self.plast.W)                    # resume with the weights learned so far
+        self.life = Life(life_state, body=self.body)
         self.time_scale = time_scale
         self.life.time_scale = time_scale
-        self.baseline = None             # set by main() unless --no-real-baseline
+        self.baseline = None             # set by main() unless --no-real-baseline (optional: "replaying a real session")
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
         self.recent_replays = []         # REM replays for the eye's dreams
         self.last_groups = {}
         self.last_frame = None
+        # tick state
+        self.steps = int(TICK / self.brain.dt)                  # integration steps per tick
+        self.gidx = {k: v for k, v in self.brain.group_idx.items() if v}
+        self.n_ticks = 0
+        self.last_sim_t = None
+        self.last_amyg = 0.0             # amygdala activity excess over its resting level (previous tick)
+        self.act_hist = deque(maxlen=PROBE_TICKS)      # last 2 model seconds of per-region activity
+        self.probes = []                 # accepted chat messages whose brain response is being measured
+        self.body_acc = 0.0              # sim seconds not yet given to the body
+        self.heb_acc, self.heb_dt, self.heb_n = None, 0.0, 0
+        self.w_dirty, self.w_last_t, self.w_last_tick = False, None, 0
+        self.drift = self.plast.drift()
+        self.perf = {"ticks": 0, "tick_s": 0.0, "model_s": 0.0}     # thread CPU seconds, see /api/perf
+
+    # --- twin state ---------------------------------------------------------------
+    @staticmethod
+    def load_score(model="twin"):
+        """web/twin_score.json -> the few numbers and the honest label shown on the pages.
+
+        The held-out score belongs to the model that runs: the twin's numbers for --model twin, the old
+        Stuart-Landau model's own held-out numbers (baselines.old_model) for --model sl, never the twin's."""
+        d = load_json(TWIN_SCORE, {})
+        h, base = d.get("heldout", {}), d.get("baselines", {})
+        out = {"label": d.get("label", ""), "fc_r": h.get("fc_r"), "fcd_ks": h.get("fcd_ks"),
+               "n_runs": h.get("n_runs"), "ceiling_r": base.get("test_retest_ceiling_r")}
+        if model == "sl":
+            old = base.get("old_model", {})
+            out |= {"label": "old Stuart-Landau model vs recorded resting-state fMRI (held-out sessions): "
+                             "no static match, no FC-dynamics match",
+                    "fc_r": old.get("fc_r"), "fcd_ks": old.get("fcd_ks")}
+        return out
+
+    def load_memories(self):
+        mem = load_json(self.plast.memories_path, [])
+        return mem if isinstance(mem, list) else []
+
+    def save_twin(self):
+        """Persist neuromodulators, body and plasticity (weights.npz) in the data dir."""
+        Store._write(self.twin_path, {"neuro": self.neuro.to_dict(), "body": self.body.to_dict(),
+                                      "consolidated_day": self.consolidated_day})
+        self.plast.save()
+
+    def twin_snapshot(self, levels, st):
+        """Small "twin" object for the tick message: score, neuromodulators, vitals, sleep, memories, drift."""
+        v = self.body.vitals()
+        return {"score": self.score,
+                "levels": {k: round(x, 2) for k, x in levels.items()},
+                "vitals": v | {"hunger": round(self.body.hunger, 2)},
+                "sleep": {"stage": st["stage"], "H": st["H"], "C": st["C"], "pressure": st["pressure"]},
+                "memories": {"count": len(self.memories),
+                             "last": [{"n": m["n"], "day": m["day"], "message": m["message"][:MEMORY_TEXT_MAX],
+                                       "sha256": m["sha256"][:12]} for m in self.memories[-5:]]},
+                "drift": {"rel_frobenius": float(f"{self.drift['rel_frobenius']:.3g}"),
+                          "edges_changed": self.drift["edges_changed"]}}
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -121,6 +221,7 @@ class Live:
             b.stimulate("relay", 10 * gain)
             b.stimulate("attention", 8 * gain)
         self.stats["usd"] += tr["usd"]
+        self.neuro.on_trade(tr["kind"], tr["usd"], self.clock.now())       # phasic DA (pumps) / NE (dumps, volatility)
         self.recent_trades = [x for x in self.recent_trades if time.time() - x[0] < 300] + [(time.time(), tr["kind"], tr["usd"])]
 
     async def rpc_trades(self):
@@ -173,21 +274,32 @@ class Live:
         return {"text": m["text"], "t": hhmm(m["t"]), "networks": m["networks"], "emotion": m["emotion"],
                 "asleep": m["asleep"], "stage": m["stage"]}
 
-    async def handle_chat(self, ws, key, text):
+    def accept_chat(self, text, key):
+        """Filter, store and play one chat message into the brain. Returns (ok, reason_or_None, memory_item, stimulus_gain)."""
         ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
         if not ok:
-            await ws.send_json({"type": "chat_ack", "ok": False, "reason": reason})
-            return
+            return False, reason, None, 0.0
         text = text.strip()
         t = self.clock.now()
         stim, hits, emotion = chat_stimulus(text)
         gain = self.engine.stimulus(t, "message")
+        before = (np.mean(self.act_hist, axis=0) if self.act_hist else np.zeros(self.brain.n))
         for g, a in stim.items():
             self.brain.stimulate(g, a * gain)
         m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits)
+        # measure the model's response over the next PROBE_S model seconds (tick() finishes it and records it)
+        if self.plastic:
+            self.probes.append({"t": t, "text": text, "before": before, "acc": np.zeros(self.brain.n), "k": 0})
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
+        return True, None, m, gain
+
+    async def handle_chat(self, ws, key, text):
+        ok, reason, m, gain = self.accept_chat(text, key)
+        if not ok:
+            await ws.send_json({"type": "chat_ack", "ok": False, "reason": reason})
+            return
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
@@ -239,49 +351,136 @@ class Live:
         return out
 
     # --- simulation loop -------------------------------------------------------
+    def finish_probes(self, act):
+        """Add this tick's activity to every open chat probe; a finished one becomes a recorded response."""
+        for pr in self.probes:
+            pr["acc"] += act
+            pr["k"] += 1
+        done = [pr for pr in self.probes if pr["k"] >= PROBE_TICKS]
+        for pr in done:
+            self.probes.remove(pr)
+            inc = pr["acc"] / pr["k"] - pr["before"]              # activity increase over the 2 s after vs the 2 s before
+            top = np.argsort(inc)[::-1][:PROBE_REGIONS]
+            self.plast.record_response(pr["t"], pr["text"], [int(i) for i in top], float(inc[top].sum()))
+
+    def consolidate_if_due(self, t, events):
+        """First REM episode of each night: one memory (plasticity.consolidate), then push the weights to the brain."""
+        e = self.engine
+        day = (e.night or {}).get("date")
+        if e.stage != "REM" or day is None or self.consolidated_day == day:
+            return
+        self.consolidated_day = day
+        rec = self.plast.consolidate(day)
+        if rec:
+            self.memories = self.load_memories()
+            self.w_dirty = True
+            self.push_weights(t, force=True)
+            events.append({"type": "memory", "t": hhmm(t), "n": rec["n"],
+                           "text": f"memory #{rec['n']} consolidated in REM: \u201c{rec['message'][:MEMORY_TEXT_MAX]}\u201d"})
+        self.save_twin()
+
+    def push_weights(self, t, force=False):
+        """brain.set_weights(plasticity.W): once per sim minute (and not more often than every 2 s of real time)."""
+        if not (self.w_dirty and hasattr(self.brain, "set_weights")):
+            return
+        if not force and (self.n_ticks - self.w_last_tick < WEIGHTS_MIN_TICKS
+                          or (self.w_last_t is not None and t - self.w_last_t < WEIGHTS_EVERY_S)):
+            return
+        self.brain.set_weights(self.plast.W)
+        self.w_dirty, self.w_last_t, self.w_last_tick = False, t, self.n_ticks
+        self.drift = self.plast.drift()
+
+    def tick(self, now=None):
+        """One broadcast step (TICK of model time). Returns the tick message (a dict) and the events of this step."""
+        now = time.time() if now is None else now
+        cpu0 = time.thread_time()
+        b, e = self.brain, self.engine
+        self.n_ticks += 1
+        t = self.clock.now()
+        dt_sim = (t - self.last_sim_t) if self.last_sim_t is not None else TICK * self.time_scale
+        self.last_sim_t = t
+        dt_sim = max(0.0, dt_sim)
+        events = self.sleep_tick()
+        levels = self.neuro.update(dt_sim, sleep_levels=e.modulators)       # tonic follows the sleep circuit
+        if self.baseline:                                         # optional: replaying a recorded real session as drive
+            gain = {"AWAKE": 1.0, "REM": 0.7}.get(e.stage, 0.3)
+            b.drive = BASELINE_DRIVE * gain * np.clip(self.baseline.advance(TICK), -2.0, 3.0)
+        due = [x for x in self.pending if x["at"] <= now]
+        self.pending = [x for x in self.pending if x["at"] > now]
+        for tr in due:
+            self.apply(tr)
+        levels = self.neuro.levels                                # includes the phasic kicks of these trades
+        if hasattr(b, "set_gain"):
+            b.set_gain(self.neuro.region_gain(levels, n=b.n))
+        # body: stepped in sim time (a tick can be ~180 s at --time-scale 3600), feeds back into the insula proxy
+        self.body_acc += dt_sim
+        if self.body_acc >= BODY_EVERY_S:
+            self.body.update(self.body_acc, levels, self.last_amyg, e.stage, exertion=self.life.exertion())
+            self.body_acc = 0.0
+        for g, v in self.body.intero_drive().items():            # continuous input: v is the steady-state stimulus level
+            if self.gidx.get(g):
+                b.stimulate(g, v * e.gain * TICK / STIM_TAU)
+        cpu_m = time.thread_time()
+        acc = np.zeros(b.n)
+        for _ in range(self.steps // 5):
+            z = b.step(5)
+            acc += np.abs(z)
+        act = acc / (self.steps // 5)
+        self.perf["model_s"] += time.thread_time() - cpu_m
+        self.act_hist.append(act)
+        self.finish_probes(act)
+        # plasticity: Hebbian while awake on the activity averaged over HEBB_EVERY_S of sim time
+        if e.stage == "AWAKE" and self.plastic:
+            self.heb_acc = act.copy() if self.heb_acc is None else self.heb_acc + act
+            self.heb_dt += dt_sim
+            self.heb_n += 1
+            if self.heb_dt >= HEBB_EVERY_S:
+                self.plast.hebbian(self.heb_acc / self.heb_n, self.heb_dt, stage="AWAKE")
+                self.heb_acc, self.heb_dt, self.heb_n = None, 0.0, 0
+                self.w_dirty = True
+        else:
+            self.heb_acc, self.heb_dt, self.heb_n = None, 0.0, 0
+        if self.plastic:
+            self.consolidate_if_due(t, events)
+        self.push_weights(t)
+        if self.n_ticks % 20 == 1:
+            self.drift = self.plast.drift()
+        wave = {k: float(z.real[i].mean()) for k, i in self.gidx.items()}
+        st = b.state()
+        groups = {k: round(float(act[i].mean()), 3) for k, i in self.gidx.items()}
+        sleep = self.engine.status()
+        msg = {"type": "tick", "act": np.round(act, 3).tolist(), "wave": wave, "groups": groups,
+               "sync": round(st["sync"], 3), "stats": self.stats,
+               "trades": [{k: x[k] for k in ("kind", "usd", "tx", "who")} for x in due],
+               "pool": self.pool_name, "events": events,
+               "sleep": sleep | {"burst": round(self.burst, 2)},
+               "baseline": self.baseline.status() if self.baseline else None,
+               "twin": self.twin_snapshot(levels, sleep)}
+        self.last_groups = groups
+        base = sum(groups.values()) / max(1, len(groups))
+        rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
+        self.last_amyg = max(0.0, rel.get("fear", 1.0) - 1.0)
+        hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
+        tsim = self.clock.now()
+        self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
+                         self.engine.pressure(tsim))
+        msg["life"] = self.life.snapshot()
+        self.perf["ticks"] += 1
+        self.perf["tick_s"] += time.thread_time() - cpu0
+        return msg, events
+
     async def run_brain(self):
-        b = self.brain
-        steps = int(TICK / b.dt)
-        gidx = {k: v for k, v in b.group_idx.items() if v}
         next_t = last_save = time.time()
         while True:
             now = time.time()
-            events = self.sleep_tick()
-            if self.baseline:                                         # his recorded activity drives excitability
-                gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
-                b.drive = BASELINE_DRIVE * gain * np.clip(self.baseline.advance(TICK), -2.0, 3.0)
-            due = [t for t in self.pending if t["at"] <= now]
-            self.pending = [t for t in self.pending if t["at"] > now]
-            for tr in due:
-                self.apply(tr)
-            acc = np.zeros(b.n)
-            for _ in range(steps // 5):
-                z = b.step(5)
-                acc += np.abs(z)
-            act = acc / (steps // 5)
-            wave = {k: float(z.real[i].mean()) for k, i in gidx.items()}
-            st = b.state()
-            msg = {"type": "tick", "act": np.round(act, 3).tolist(), "wave": wave,
-                   "groups": (groups := {k: round(float(act[i].mean()), 3) for k, i in gidx.items()}),
-                   "sync": round(st["sync"], 3), "stats": self.stats,
-                   "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
-                   "pool": self.pool_name, "events": events,
-                   "sleep": self.engine.status() | {"burst": round(self.burst, 2)},
-                   "baseline": self.baseline.status() if self.baseline else None}
-            self.last_groups = groups
-            base = sum(groups.values()) / max(1, len(groups))
-            rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
-            hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
-            tsim = self.clock.now()
-            self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
-                             self.engine.pressure(tsim))
-            msg["life"] = self.life.snapshot()
+            msg, events = self.tick(now)
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
                 self.life_path.write_text(json.dumps(self.life.to_dict()))
+                self.save_twin()
                 last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
@@ -380,7 +579,7 @@ def password_gate(password):
 async def main(args):
     data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 else "")
     live = Live(args.mint, args.demo, args.time_scale, data_dir,
-                parse_start(args.start) if args.start else None, args.trust_proxy)
+                parse_start(args.start) if args.start else None, args.trust_proxy, args.model)
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app.router.add_get("/ws", live.ws_handler)
@@ -407,6 +606,8 @@ async def main(args):
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
         return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
     app.router.add_get("/api/frames", frames)
+    if args.host in ("127.0.0.1", "localhost"):                   # local-only: CPU seconds of the loop (twin/measure_cpu_live.py)
+        app.router.add_get("/api/perf", lambda r: web.json_response(live.perf | {"model": live.model}))
 
     gmaps_ok = {}
 
@@ -435,7 +636,7 @@ async def main(args):
     await runner.setup()
     await web.TCPSite(runner, args.host, args.port).start()
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
-          f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
+          f"time x{args.time_scale:g}, model {live.model}, state in {data_dir})", flush=True)
     tasks = [live.run_brain(), live.demo_trades() if args.demo else live.rpc_trades()]
     if live.eye:
         tasks.append(live.run_eye())
@@ -443,6 +644,7 @@ async def main(args):
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
+        live.save_twin()
 
 
 if __name__ == "__main__":
@@ -456,6 +658,8 @@ if __name__ == "__main__":
     p.add_argument("--start", help="local (SUB01_TZ) time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
+    p.add_argument("--model", choices=("twin", "sl"), default=None,
+                   help="brain model: twin (twin/model.py, default) or sl (old Stuart-Landau); env SUB01_MODEL")
     p.add_argument("--no-real-baseline", action="store_true", help="simulated background only")
     p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")

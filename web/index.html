@@ -101,7 +101,7 @@
       <div id="debtrow"><span>sleep debt</span><div class="track"><div id="debt"></div></div><span id="debtv">0.0 h</span></div>
       <div id="woken">woken 0 times tonight</div>
     </div>
-    <div id="foot"><div id="honest">Simulated brain activity built from one real person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
+    <div id="foot"><div id="honest">A digital twin model of one real person's brain structure and recorded activity; not a mind, not conscious, not the person. Messages are stimuli, not conversation.</div>Whole-brain simulation built from one real human's public MRI scans (OpenNeuro ds000031, public domain) ·
       the fibres are real (traced from diffusion MRI) · 214 regions simulated · cortex from the real T1 scan · every trade and message is a stimulus · lives in Kichijōji, Tokyo · sleeps 00:00–08:00 Tokyo time.</div>
   </div>
   <div id="worldcol">
@@ -125,18 +125,20 @@
     <a id="fulllink" href="/world.html">open the world full screen →</a>
   </div>
   <div id="panel">
-    <div><div class="lbl">Brain networks</div><div id="bars"></div></div>
-    <div><div class="lbl">Signals</div><canvas id="eeg"></canvas></div>
+    <div><div class="lbl" title="Simulated activity of each group of regions, relative to the most active one right now. Not a measurement.">Brain networks · simulated</div><div id="bars"></div></div>
+    <div><div class="lbl" title="Simulated activity traces of five networks (reward, salience, visual, default, thalamus), last 15 seconds. Not an EEG recording.">Signals · simulated</div><canvas id="eeg"></canvas></div>
+    <div><div class="lbl" title="How the twin compares with the real recordings, and the simulated chemistry, body, memories and wiring drift.">Twin model · how real is it?</div><div id="twin-host"></div></div>
     <details id="nightbox" open><summary>Last night</summary><div id="lastnight">no night recorded yet</div></details>
     <details><summary>How messages become stimuli</summary><div id="rules"></div></details>
     <div id="stats"></div>
-    <div class="lbl" style="margin-bottom:0">Stimuli</div>
+    <div class="lbl" style="margin-bottom:0" title="Live trades of a public market pool and chat messages, turned into brief inputs to the model. Shown as data only; nothing here is advice.">Stimuli · trades, messages</div>
     <div id="feed"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="twin_panel.js"></script>
 <script>
 const SHOW = ["language","visual","somatomotor","attention","salience","limbic","control","default","reward","memory","relay"];
 const LABEL = {language:"language",visual:"visual",somatomotor:"motor",attention:"attention",salience:"salience",limbic:"limbic",
@@ -244,6 +246,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
 
 // ---------- live data ----------
 let act=null, base=null;
+const twinPanel = window.TwinPanel ? TwinPanel.mount(document.getElementById("twin-host")) : null;
 const bars = document.getElementById("bars");
 for (const g of SHOW) bars.insertAdjacentHTML("beforeend",
   `<div class="bar"><span>${LABEL[g]}</span><div class="track"><div class="fill" id="b-${g}"></div></div></div>`);
@@ -332,6 +335,7 @@ function connect(){
     }
     if (m.type === "nights") { renderNights(m); return; }
     if (m.type !== "tick") return;
+    if (m.twin && twinPanel) twinPanel.update(m.twin);
     const sl = m.sleep;
     if (sl) {
       stage = sl.stage; burst = Math.max(burst, sl.burst);
@@ -345,7 +349,7 @@ function connect(){
     act = m.act; if (!base) base = act.slice(); else base = base.map((b,i)=>b*0.998 + act[i]*0.002);
     document.getElementById("pool").textContent = m.pool;
     document.getElementById("sync").textContent = `global synchrony ${(m.sync*100).toFixed(1)}%`;
-    if (m.baseline) document.getElementById("sync").textContent += ` · background: his real recorded activity (${m.baseline.run}, min ${m.baseline.minute})`;
+    if (m.baseline) document.getElementById("sync").textContent += ` · optional background: replay of a recorded real session (${m.baseline.run}, min ${m.baseline.minute}), not produced by the wiring`;
     const gmax = Math.max(...Object.values(m.groups), 0.001);
     for (const g of SHOW) if (m.groups[g]!==undefined) document.getElementById("b-"+g).style.width = (100*m.groups[g]/Math.max(gmax,0.35))+"%";
     for (const k in traces) { traces[k].push(m.wave[k]||0); if (traces[k].length>300) traces[k].shift(); }

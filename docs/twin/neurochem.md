@@ -177,8 +177,10 @@ Cost: `update` about 3 us, `region_gain` about 9 us per call, well within the li
 - 5-HT and ACh have no phasic drive here; they only follow the sleep engine.
 - There is no receptor desensitisation, no volume transmission, and no feedback from brain activity to the
   neuromodulator nuclei.
-- Possible double counting: the sleep engine also changes `a`, coupling and noise. How it combines with this gain
-  must be checked when the branches are merged.
+- Double counting: the sleep engine also changes `a`, coupling and noise, and the tonic neuromodulator levels follow
+  the same circuit state. In the live server the two act on different terms of the model (the receptor-weighted gain
+  on the sigmoid slope; the stage on excitability, adaptation, the thalamic gate, G and noise), so the effect of sleep is
+  partly counted twice. The overlap was not separated or fitted.
 - The Zilles table's own SD/CV columns are not internally consistent for many entries. We use only the "all
   layers" mean and cap one outlier (alpha1 in area 6).
 

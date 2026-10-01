@@ -3,8 +3,11 @@ WORKDIR /app
 COPY requirements-server.txt .
 RUN pip install --no-cache-dir -r requirements-server.txt
 COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py ./
+# the v2 twin: package (model, neurochem, body, plasticity, params.json), its small data files, the held-out score
 COPY twin ./twin
+COPY twin/data ./twin/data
 COPY web ./web
+COPY web/twin_score.json ./web/twin_score.json
 COPY out/connectome.npz out/atlas_names.json ./out/
 COPY out/rest ./out/rest
 # /data is a persistent volume: sleep state, memory, nights, world, eye frames

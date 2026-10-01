@@ -1,5 +1,5 @@
-# raw MRI stays on OpenNeuro (ds000031): scripts re-download it
-data/
+# runtime state (the live server data dir) and raw MRI (stays on OpenNeuro ds000031): never committed. Rooted, so twin/data/ is tracked
+/data/
 .venv/
 __pycache__/
 *.log

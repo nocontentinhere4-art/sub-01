@@ -77,18 +77,19 @@
     <div id="svlabel">first person · the real streets of Kichijōji, Tokyo · Google Street View</div>
     <a id="brainpip" href="/brain" title="open the brain">
       <iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe>
-      <span>its brain, live · real fibres from MRI · <b id="pipstage">AWAKE</b></span>
+      <span>its brain model, live · fibres traced from the real MRI · <b id="pipstage">AWAKE</b></span>
     </a>
-    <div id="foot">A life simulated in real time, driven by a brain model built from one real person's public MRI. Not a mind, not the person.</div>
+    <div id="foot">A life simulated in real time, driven by a digital twin model of one real person's brain structure and recorded activity; not a mind, not conscious, not the person.</div>
   </div>
   <div id="side">
-    <div><div class="lbl">Needs</div>
+    <div><div class="lbl" title="Simulated needs of the character, 0 to 1. Hunger comes from the body model; sleepiness from the sleep model.">Needs · simulated</div>
       <div class="bar"><span>hunger</span><div class="track"><div class="fill" id="n-hunger"></div></div></div>
       <div class="bar"><span>boredom</span><div class="track"><div class="fill" id="n-boredom"></div></div></div>
       <div class="bar"><span>sleepiness</span><div class="track"><div class="fill" id="n-sleep"></div></div></div>
       <div class="bar"><span>bread</span><span id="n-bread" style="color:#ececf2">0</span></div>
     </div>
-    <div><div class="lbl">Today</div><div id="log"></div></div>
+    <div><div class="lbl" title="How the twin compares with the real recordings, and the simulated chemistry, body, memories and wiring drift.">Twin model · how real is it?</div><div id="twin-host"></div></div>
+    <div><div class="lbl" title="What the simulated character did today, Tokyo time.">Today</div><div id="log"></div></div>
     <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
       <div id="chat"></div>
       <form id="f"><input id="in" maxlength="280" placeholder="e.g. vai a comprare il pane" autocomplete="off"><button>send</button></form>
@@ -102,6 +103,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="twin_panel.js"></script>
 <script>
 // ---------------- scene ----------------
 const host = document.getElementById("scene");
@@ -244,6 +246,7 @@ let life = null, prev = null, poolName = "", stage = "AWAKE", clock = "--:--", l
 fetch("/phone_feed.json").then(r => r.ok ? r.json() : []).then(f => feed = Array.isArray(f) ? f : []).catch(() => {});
 const shown = {x: 1.6, z: 1.3, h: 0};
 
+const twinPanel = window.TwinPanel ? TwinPanel.mount(document.getElementById("twin-host")) : null;
 function connect(){
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   ws.onmessage = e => {
@@ -253,6 +256,7 @@ function connect(){
     if (m.type === "chat_ack") { document.getElementById("ack").textContent = m.ok ? "sent — it heard you" : "not sent: " + m.reason; return; }
     if (m.type === "eye") { if (m.thought) document.getElementById("thought").textContent = `“${m.thought}”`; return; }
     if (m.type !== "tick") return;
+    if (m.twin && twinPanel) twinPanel.update(m.twin);
     poolName = m.pool || ""; stage = (m.sleep && m.sleep.stage) || "AWAKE"; clock = (m.sleep && m.sleep.clock) || clock;
     for (const t of m.trades || []) { flowSum += (t.kind === "buy" ? 1 : -1) * Math.log10(1 + t.usd); flow.push(flowSum); if (flow.length > 90) flow.shift(); }
     if (m.life) onLife(m.life, m.sleep);
