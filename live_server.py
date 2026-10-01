@@ -31,7 +31,7 @@ from chat import (REGION_RULES, RULES, Dedupe, RateLimiter, check as chat_check,
                   stimulus as chat_stimulus, topical_networks)
 from sleep import (REPLAY_MEAN_S, ROME, TRANSITION_REAL_S, TRANSITION_S, Clock, Memory, SleepEngine, Store, hhmm,
                    lerp, stamp)
-from eye import Eye, ReplicateLLM, load_env, market_mood
+from eye import Eye, ReplicateLLM, load_env, market_mood, public_frame
 from real_baseline import RealBaseline
 from life import ACTIVITIES, WORLD, Life
 from mind import DiaryStore, Mind, safe_text
@@ -80,6 +80,7 @@ class Live:
         self.force_market, self.force_stage = force_market, force_stage      # demo-only (checked in the CLI)
         self.mint, self.demo = mint, demo
         self.trust_proxy = trust_proxy
+        self.proxy_hops = 1              # trusted proxies in front of the server (--proxy-hops)
         self.store = Store(data_dir)
         saved, mem = self.store.load()
         self.memory = Memory(mem)
@@ -503,8 +504,8 @@ class Live:
                 rec = await loop.run_in_executor(None, self.eye.step, t, stage, self.last_groups,
                                                  market_mood(self.recent_trades), list(self.recent_replays), hhmm(t),
                                                  self._eye_doing())
-                self.last_frame = rec
-                await self.broadcast({"type": "eye", **rec})
+                self.last_frame = public_frame(rec)                    # checked thought, no raw scene
+                await self.broadcast({"type": "eye", **self.last_frame})
             except Exception as e:                                    # never let the eye stop the brain
                 print("eye error:", repr(e), flush=True)
                 await asyncio.sleep(10)
@@ -516,13 +517,23 @@ class Live:
         return f"{doing}; {focus}" if focus else doing
 
     # --- http ----------------------------------------------------------------
+    def client_key(self, request):
+        """Rate-limit key; kept only in memory for this connection and the 10 s limiter window.
+        Behind a reverse proxy (--trust-proxy) the client address is the entry the trusted proxy appended to
+        X-Forwarded-For: the right-most one (or the proxy_hops-th from the right for a chain of trusted proxies).
+        Entries further left are written by the client itself and are never used, so a forged header cannot
+        give a client a fresh key per message."""
+        key = request.remote
+        if self.trust_proxy:
+            hops = [h.strip() for h in request.headers.get("X-Forwarded-For", "").split(",") if h.strip()]
+            if hops:
+                key = hops[-min(self.proxy_hops, len(hops))]
+        return key
+
     async def ws_handler(self, request):
         ws = web.WebSocketResponse(heartbeat=20, max_msg_size=4096)
         await ws.prepare(request)
-        # rate-limit key; kept only in memory for this connection and the 10 s limiter window
-        key = request.remote
-        if self.trust_proxy and request.headers.get("X-Forwarded-For"):
-            key = request.headers["X-Forwarded-For"].split(",")[0].strip()
+        key = self.client_key(request)
         await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.items[-30:]],
                             "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD,
                             "regions": {g: list(i) for g, i in self.brain.group_idx.items() if i},
@@ -559,7 +570,9 @@ color:#ececf2;font-family:ui-monospace,Menlo,monospace"><form method=post action
 <div style="background:#ff6a00;color:#0a0a0a;font-size:28px;letter-spacing:.12em;padding:2px 12px">SUB-01</div>
 <input name=password type=password placeholder="password" autofocus style="background:#0c0c12;color:#ececf2;
 border:1px solid #2a2a36;padding:10px;font:inherit"><button style="background:#ececf2;border:0;padding:10px;
-font:inherit">enter</button>{msg}</form></body>"""
+font:inherit">enter</button>{msg}</form><div style="position:fixed;left:0;right:0;bottom:0;padding:8px 12px;
+text-align:center;color:#a4a4b6;font-size:11px;border-top:1px solid #1c1c26">Simulated brain activity built from one real
+person's public MRI. Messages are stimuli, not conversation. It is not a mind and it is not the person.</div></body>"""
 
 
 def password_gate(password):
@@ -597,6 +610,7 @@ async def main(args):
                 parse_start(args.start) if args.start else None, args.trust_proxy,
                 args.life_activity, {"pump": "pump", "dump": "dump"}.get(args.force_market), args.force_stage,
                 not args.no_llm)
+    live.proxy_hops = max(1, args.proxy_hops)
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app.router.add_get("/ws", live.ws_handler)
@@ -620,7 +634,7 @@ async def main(args):
         log = live.eye.log if live.eye else HERE / "missing"
         rows = log.read_text().splitlines()[-int(request.query.get("n", "40")):] if log.exists() else []
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
-        return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
+        return web.json_response({"frames": [public_frame(json.loads(r)) for r in rows], "world": world})
     app.router.add_get("/api/frames", frames)
 
     async def perf(request):                      # compute time per tick / per workspace cycle (budget: 50 ms / 5 ms)
@@ -680,7 +694,10 @@ if __name__ == "__main__":
                    "mood reads pumping / dumping")
     p.add_argument("--force-stage", choices=["NREM", "REM"], help="demo only: hold the sleep engine in that stage (bypasses SleepEngine.update: fixed stage, synthetic replays every few seconds; for screenshots only)")
     p.add_argument("--no-llm", action="store_true", help="never call a language model for inner speech")
-    p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
+    p.add_argument("--trust-proxy", action="store_true",
+                   help="rate-limit by the X-Forwarded-For entry the reverse proxy appended (right-most)")
+    p.add_argument("--proxy-hops", type=int, default=1,
+                   help="with --trust-proxy: number of trusted proxies that each append to X-Forwarded-For")
     a = p.parse_args()
     for flag in ("life_activity", "force_market", "force_stage"):
         if getattr(a, flag) and not a.demo:

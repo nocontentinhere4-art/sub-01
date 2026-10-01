@@ -18,6 +18,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from mind import lang_of, safe_llm_text
+
 WORLD_HALF_LIFE_H = 6.0            # simulated hours for an object's strength to halve
 FORGET_BELOW = 0.15
 MAX_OBJECTS = 40
@@ -47,6 +49,28 @@ STYLE = {
     "NREM": "almost completely dark, slow blurred abstract shapes, deep blue and black, very low light",
 }
 BAD = re.compile(r"https?://|www\.|\$[a-z]{2,10}\b|[1-9A-HJ-NP-Za-km-z]{32,44}|0x[0-9a-f]{40}", re.I)
+
+
+def safe_thought(thought):
+    """The eye's thought is language-model output shown on three pages: it is kept only when it passes the same
+    check as the workspace's language-model lines (mind.safe_llm_text, which includes mind.safe_text and the chat
+    filter: no claim of being conscious / alive / a person, no buy / sell / money, no memories or family of the
+    real person, no links or names). Anything else becomes "" (the pages then show no thought)."""
+    thought = " ".join(str(thought or "").split()).strip().strip('"“”«»').strip()
+    if not thought or BAD.search(thought):
+        return ""
+    return thought if safe_llm_text(thought, lang_of(thought)) else ""
+
+
+PUBLIC_FRAME = ("t", "stage", "img", "thought", "why", "render_s")
+
+
+def public_frame(rec):
+    """What may leave the server for a frame (websocket `eye`, /api/frames): the thought re-checked (rows logged
+    before the check existed included) and never the raw language-model scene (it is only the image prompt)."""
+    out = {k: rec[k] for k in PUBLIC_FRAME if k in rec}
+    out["thought"] = safe_thought(out.get("thought"))
+    return out
 
 
 class World:
@@ -207,9 +231,7 @@ class Eye:
         except ValueError:
             out = {}
         scene = str(out.get("scene", ""))[:400]
-        thought = str(out.get("thought", ""))[:140]
-        if BAD.search(thought):
-            thought = ""
+        thought = safe_thought(str(out.get("thought", ""))[:140])   # unchecked text never leaves _ask
         return out.get("new_objects") or [], scene, thought
 
     def step(self, t, stage, groups, market, replays, sim_hhmm, doing=""):
@@ -249,7 +271,8 @@ class Eye:
             from PIL import ImageEnhance
             pil = ImageEnhance.Brightness(pil).enhance(0.25)
         pil.convert("RGB").save(self.out / name, quality=88)
-        rec = {"t": sim_hhmm, "stage": stage, "img": f"/eye/{name}", "thought": thought, "scene": scene,
+        # the raw scene is only the image prompt: it is not stored or served (it is not checked text)
+        rec = {"t": sim_hhmm, "stage": stage, "img": f"/eye/{name}", "thought": thought,
                "why": {"messages": recent, "replayed": replays[-4:], "world": self.world.top(t, 5),
                        "mood": {k: v for k, v in state.items() if k in ("reward", "fear", "salience", "market")}},
                "render_s": round(time.time() - t0, 1)}

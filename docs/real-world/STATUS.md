@@ -3,8 +3,8 @@
 Direction: the photorealistic world is cancelled. The main view (`/`, `web/life.html`) is the construct: SUB-01 lives inside
 a world built from its own brain data. It is a model of brain activity, not a mind; the workspace is an architecture inspired by
 theories of consciousness (Global Workspace). The photoreal CC0 assets in `web/assets/` are kept and credited
-(`web/assets/CREDITS.md`, `docs/real-world/ASSETS.md`) but the main view no longer loads them; the old photoreal page
-(`web/world.html`, `web/world/main.js`) is unused.
+(`web/assets/CREDITS.md`, `docs/real-world/ASSETS.md`) but the main view no longer loads them; the old photoreal module
+`web/world/main.js` is no longer loaded by any page. `web/world.html` is the DREAMS page (the eye's frames, linked from the nav).
 
 Merged streams: server, core, city, travel, fx, hud, e2e (+ integration fixes below).
 
@@ -25,7 +25,22 @@ Merged streams: server, core, city, travel, fx, hud, e2e (+ integration fixes be
 Screenshots: `docs/real-world/screenshots/` (`home`, `walk`, `chat-falling`, `chat` (rain), `dump`, `night`, `rem`, `orbit`,
 `mobile` as jpg, `walk.gif`, `report.json`).
 
-## Integration fixes in this round
+## Final review fixes (cross-model reviews)
+
+- **Eye thought gated:** the eye's language-model "thought" (shown on `/brain`, `/world.html` and in the life HUD) was only
+  checked for links / tickers. It now has to pass `mind.safe_llm_text` (so `mind.safe_text` + the chat filter) in `Eye._ask`,
+  else it is dropped (no thought shown). The raw scene text is only the image prompt: it is no longer written to
+  `frames.jsonl`, broadcast or returned by `/api/frames`; both the websocket `eye` message and `/api/frames` go through
+  `eye.public_frame`, which re-checks the thought of rows logged before the fix. Tests: `tests/test_eye.py` ("I am conscious",
+  "buy the dip", "I remember my mother", Italian variants, ...).
+- **Honesty line on every page:** `web/world.html` (DREAMS) had a paraphrase and `web/fibres.html` had none. Both now show the
+  exact line in a fixed `#honesty` bar (on `fibres.html` it stays visible with `?clean`); the password page shows it too.
+- **Rate limit behind the proxy:** with `--trust-proxy` (always on in the Dockerfile) the key was the left-most
+  `X-Forwarded-For` entry, which the client writes: a forged header gave a fresh key per message. The key is now the right-most
+  entry (the one the trusted proxy appended; `--proxy-hops N` for a chain). Tests: a forged leading entry over the real websocket
+  handler still gets "one message every 10 s", while another real client is not blocked.
+
+## Integration fixes in the previous round
 
 - The mini brain re-downloaded `brain.json` and the 17 MB `fibres.bin` (the browser cache did not dedupe them): startup was 36 MB.
   `data.js` now exports `loadBrainRaw()` and the mini brain reads the same promise: 19.2 MB.
@@ -56,7 +71,10 @@ depending on quality and view; 19.2 MB downloaded at startup. Client fps here is
   reward district label; the arrived view at the bakery is a close wall of towers; label fan-out snaps on a view switch.
 - `FALLBACK_WORLD` / `ACT_PLACE` in `main.js` only matter if the server sends no route / progress (kept as a fallback).
 - A late language-model answer for a released held line still counts against the hourly budget (minor).
-- `web/world.html` + `web/world/main.js` (photoreal page) can be deleted once nobody needs the reference.
+- `web/world/main.js` + the photoreal `web/world/world/*` modules can be deleted once nobody needs the reference
+  (`web/world/hud.js`, `minibrain.js`, `phone.js`, `net.js`, `quality.js` are still used by the construct).
+- **Proxy hops on Railway** are assumed to be 1 (right-most `X-Forwarded-For` entry). If the platform puts more than one proxy
+  in front, every client would share one key (stricter, never looser); then set `EXTRA_ARGS=--proxy-hops N`.
 
 ## Next steps
 

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-01T00:04:02.007Z",
+  "generated": "2026-10-01T00:27:47.240Z",
   "note": "fps, drawCalls and triangles are measured with SOFTWARE rendering (headless Chromium + SwiftShader, no GPU). fps is NOT representative of a phone or desktop GPU; use it only to compare scenarios. Target on real devices: 30 fps phones, 60 fps desktop.",
   "renderer": "software (SwiftShader)",
   "stubModules": [],
@@ -18,27 +18,27 @@
   "scenarios": {
     "home": {
       "pass": true,
-      "seconds": 29.2,
+      "seconds": 26.1,
       "description": "home district, default-network city around the window (daylight)",
       "error": null,
       "screenshot": "docs/real-world/screenshots/home.jpg",
       "fps_software_rendered": 12,
-      "drawCalls": 10,
-      "triangles": 15144,
+      "drawCalls": 11,
+      "triangles": 15146,
       "quality": "low",
       "view": "first",
       "districts": 214,
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 47.7,
-        "std": 27.05,
-        "colours": 308,
-        "brightShare": 0.1781,
+        "mean": 48.8,
+        "std": 32.09,
+        "colours": 340,
+        "brightShare": 0.1674,
         "rgb": [
           58,
-          44,
-          57
+          45,
+          56
         ]
       },
       "details": {
@@ -67,12 +67,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=27.05 colours=308 mean=47.7"
+          "detail": "std=32.09 colours=340 mean=48.8"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=47.7 brightShare=0.1781"
+          "detail": "mean=48.8 brightShare=0.1674"
         },
         {
           "what": "no console errors",
@@ -109,11 +109,11 @@
     },
     "walk": {
       "pass": true,
-      "seconds": 32.5,
+      "seconds": 30.1,
       "description": "first-person walk along the real fibre road from home to the reward district",
       "error": null,
       "screenshot": "docs/real-world/screenshots/walk.jpg",
-      "fps_software_rendered": 11,
+      "fps_software_rendered": 12,
       "drawCalls": 13,
       "triangles": 15150,
       "quality": "low",
@@ -122,38 +122,38 @@
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 42.7,
-        "std": 41.15,
-        "colours": 320,
-        "brightShare": 0.1763,
+        "mean": 40,
+        "std": 30.07,
+        "colours": 290,
+        "brightShare": 0.1318,
         "rgb": [
-          57,
-          38,
-          45
+          51,
+          36,
+          44
         ]
       },
       "details": {
-        "walkProgress": 0.432,
+        "walkProgress": 0.534,
         "route": "bed>door_in>door_out>street_home>street_bakery>bakery_door>bakery_in>counter",
         "view": "first",
-        "progressStart": 0.207,
-        "progressEnd": 0.954,
+        "progressStart": 0.183,
+        "progressEnd": 0.956,
         "progressMonotone": true,
         "routeHasStreet": true,
-        "cameraSamples": 43,
+        "cameraSamples": 37,
         "cameraStart": [
-          -61.8,
+          -64.7,
           13.9,
-          141.4
+          136
         ],
         "cameraEnd": [
-          13.4,
-          12.8,
-          122.1
+          3.4,
+          13.1,
+          139.6
         ],
-        "cameraNetTravel": 77.64,
-        "cameraPathLength": 111.43,
-        "spanSeconds": 19,
+        "cameraNetTravel": 68.2,
+        "cameraPathLength": 118.16,
+        "spanSeconds": 20.5,
         "idleCameraDrift": 0,
         "idleSpanSeconds": 12
       },
@@ -176,12 +176,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=41.15 colours=320 mean=42.7"
+          "detail": "std=30.07 colours=290 mean=40"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=42.7 brightShare=0.1763"
+          "detail": "mean=40 brightShare=0.1318"
         },
         {
           "what": "no console errors",
@@ -216,17 +216,17 @@
         {
           "what": "life.progress advances along the route",
           "ok": true,
-          "detail": "0.207 -> 0.954"
+          "detail": "0.183 -> 0.956"
         },
         {
           "what": "camera position could be read (WebGL viewMatrix / window.__sub01.camera)",
           "ok": true,
-          "detail": "43 samples"
+          "detail": "37 samples"
         },
         {
           "what": "the camera moves along the road (net displacement start -> end of the walk)",
           "ok": true,
-          "detail": "net=77.64 units, path=111.43, needed > 20.00 = max(20, 5 x idle drift 0); start [-61.8,13.9,141.4] -> end [13.4,12.8,122.1], 19 s"
+          "detail": "net=68.2 units, path=118.16, needed > 20.00 = max(20, 5 x idle drift 0); start [-64.7,13.9,136] -> end [3.4,13.1,139.6], 20.5 s"
         },
         {
           "what": "scenario modules are real implementations (not STUB files)",
@@ -243,34 +243,34 @@
     },
     "walk-gif": {
       "pass": true,
-      "seconds": 45.1,
+      "seconds": 47.4,
       "description": "the walk as a GIF: 3D canvas frames captured in-page (~3 fps under software rendering) over the whole walk, played back at real speed",
       "error": null,
       "screenshot": "docs/real-world/screenshots/walk.gif",
       "fps_software_rendered": 10,
-      "drawCalls": 12,
-      "triangles": 15148,
+      "drawCalls": 11,
+      "triangles": 15146,
       "quality": "low",
       "view": "first",
       "districts": 214,
       "fibres": 2500,
       "pixels": {
         "samples": 7236,
-        "mean": 50.6,
-        "std": 43.42,
-        "colours": 253,
-        "brightShare": 0.208,
+        "mean": 46.3,
+        "std": 36.72,
+        "colours": 306,
+        "brightShare": 0.2206,
         "rgb": [
           57,
-          48,
-          54
+          43,
+          49
         ]
       },
       "details": {
         "route": "bed>door_in>door_out>street_home>street_bakery>bakery_door>bakery_in>counter",
-        "progressStart": 0.145,
-        "progressEnd": 0.96,
-        "gifFrames": 54
+        "progressStart": 0.119,
+        "progressEnd": 0.967,
+        "gifFrames": 55
       },
       "checks": [
         {
@@ -291,12 +291,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=43.42 colours=253 mean=50.6"
+          "detail": "std=36.72 colours=306 mean=46.3"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=50.6 brightShare=0.208"
+          "detail": "mean=46.3 brightShare=0.2206"
         },
         {
           "what": "no console errors",
@@ -316,7 +316,7 @@
         {
           "what": "captured the whole outbound walk (life.progress start < 0.25, end >= 0.9)",
           "ok": true,
-          "detail": "0.145 -> 0.96"
+          "detail": "0.119 -> 0.967"
         },
         {
           "what": "scenario modules are real implementations (not STUB files)",
@@ -331,14 +331,14 @@
         {
           "what": "walk.gif written",
           "ok": true,
-          "detail": "54 of 54 captured frames over 25.6 s, real-time playback (frame delays = real gaps, no clamp), 640x256, 1.9 MB"
+          "detail": "55 of 55 captured frames over 21.9 s, real-time playback (frame delays = real gaps, no clamp), 640x256, 1.9 MB"
         }
       ],
       "consoleErrors": []
     },
     "chat": {
       "pass": true,
-      "seconds": 79.1,
+      "seconds": 73.4,
       "description": "chat message falls as orange rain made of its words and lands on the districts it stimulates (orbit view, so the rain is in frame)",
       "error": null,
       "screenshot": "docs/real-world/screenshots/chat.jpg",
@@ -351,14 +351,14 @@
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 24.1,
-        "std": 32.03,
-        "colours": 335,
-        "brightShare": 0.0952,
+        "mean": 22.1,
+        "std": 29.43,
+        "colours": 329,
+        "brightShare": 0.0914,
         "rgb": [
-          30,
-          22,
-          28
+          26,
+          20,
+          27
         ]
       },
       "details": {
@@ -370,12 +370,12 @@
         "poolFreeAtRest": 700,
         "poolFreeAtFalling": 665,
         "poolFreeAtCapture": 665,
-        "fxTimeAtDrop": 3.3001000000000005,
-        "fxTimeAtCapture": 6.450099999999992,
+        "fxTimeAtDrop": 3.666900000000002,
+        "fxTimeAtCapture": 6.983499999999984,
         "splashSeen": true,
         "peakPending": 9,
-        "idleGlyphNoise": 4,
-        "fallingGlyphPixels": 726
+        "idleGlyphNoise": 18,
+        "fallingGlyphPixels": 939
       },
       "checks": [
         {
@@ -396,12 +396,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=32.03 colours=335 mean=24.1"
+          "detail": "std=29.43 colours=329 mean=22.1"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=24.1 brightShare=0.0952"
+          "detail": "mean=22.1 brightShare=0.0914"
         },
         {
           "what": "no console errors",
@@ -441,12 +441,12 @@
         {
           "what": "words landed (a splash was processed, fx pending fell below its peak)",
           "ok": true,
-          "detail": "peak pending=9, fx time at drop=3.3001000000000005, at capture=6.450099999999992"
+          "detail": "peak pending=9, fx time at drop=3.666900000000002, at capture=6.983499999999984"
         },
         {
           "what": "the falling words are visible: new amber glyph pixels in the 3D canvas far above idle",
           "ok": true,
-          "detail": "glyph pixels outside the idle flicker zone: falling=726, idle frame=4, needed > 150"
+          "detail": "glyph pixels outside the idle flicker zone: falling=939, idle frame=18, needed > 150"
         },
         {
           "what": "scenario modules are real implementations (not STUB files)",
@@ -463,35 +463,35 @@
     },
     "dump": {
       "pass": true,
-      "seconds": 18.7,
+      "seconds": 14.2,
       "description": "market dump: glitches / distortion weather",
       "error": null,
       "screenshot": "docs/real-world/screenshots/dump.jpg",
       "fps_software_rendered": 12,
-      "drawCalls": 10,
-      "triangles": 15144,
+      "drawCalls": 9,
+      "triangles": 15142,
       "quality": "low",
       "view": "first",
       "districts": 214,
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 48.6,
-        "std": 23.38,
-        "colours": 845,
-        "brightShare": 0.1895,
+        "mean": 47.6,
+        "std": 24.62,
+        "colours": 911,
+        "brightShare": 0.1846,
         "rgb": [
-          65,
+          62,
           43,
-          53
+          51
         ]
       },
       "details": {
         "market": "dumping",
         "fx": {
           "pump": 0,
-          "glitch": 0.37319019290986155,
-          "jitter": 0.39173959783627244,
+          "glitch": 0.503439524853059,
+          "jitter": 0,
           "warp": 0,
           "dim": 0,
           "rem": 0,
@@ -499,7 +499,7 @@
           "queued": 0,
           "free": 700,
           "pending": 0,
-          "time": 0.8165,
+          "time": 0.4667000000000003,
           "composer": true,
           "active": true,
           "reduced": false,
@@ -526,12 +526,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=23.38 colours=845 mean=48.6"
+          "detail": "std=24.62 colours=911 mean=47.6"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=48.6 brightShare=0.1895"
+          "detail": "mean=47.6 brightShare=0.1846"
         },
         {
           "what": "no console errors",
@@ -556,7 +556,7 @@
         {
           "what": "glitch effect is active at capture (fx.glitch > 0.3, held burst)",
           "ok": true,
-          "detail": "glitch=0.37319019290986155 hold=true"
+          "detail": "glitch=0.503439524853059 hold=true"
         },
         {
           "what": "scenario modules are real implementations (not STUB files)",
@@ -573,27 +573,27 @@
     },
     "night": {
       "pass": true,
-      "seconds": 15.5,
+      "seconds": 13.8,
       "description": "night in the construct: darker sky, lit roads",
       "error": null,
       "screenshot": "docs/real-world/screenshots/night.jpg",
-      "fps_software_rendered": 11,
-      "drawCalls": 10,
-      "triangles": 15144,
+      "fps_software_rendered": 14,
+      "drawCalls": 9,
+      "triangles": 15142,
       "quality": "low",
       "view": "first",
       "districts": 214,
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 30.4,
-        "std": 39.39,
-        "colours": 283,
-        "brightShare": 0.0897,
+        "mean": 26,
+        "std": 28.85,
+        "colours": 338,
+        "brightShare": 0.0696,
         "rgb": [
-          42,
-          27,
-          29
+          37,
+          23,
+          26
         ]
       },
       "details": {
@@ -619,12 +619,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=39.39 colours=283 mean=30.4"
+          "detail": "std=28.85 colours=338 mean=26"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=30.4 brightShare=0.0897"
+          "detail": "mean=26 brightShare=0.0696"
         },
         {
           "what": "no console errors",
@@ -649,7 +649,7 @@
         {
           "what": "the city is darker than at home in daylight (canvas mean luminance)",
           "ok": true,
-          "detail": "night=30.4 home=47.7"
+          "detail": "night=26 home=48.8"
         },
         {
           "what": "scenario modules are real implementations (not STUB files)",
@@ -666,11 +666,11 @@
     },
     "rem": {
       "pass": true,
-      "seconds": 19.4,
+      "seconds": 18.4,
       "description": "REM: world warps and replays the day's messages",
       "error": null,
       "screenshot": "docs/real-world/screenshots/rem.jpg",
-      "fps_software_rendered": 12,
+      "fps_software_rendered": 13,
       "drawCalls": 12,
       "triangles": 15148,
       "quality": "low",
@@ -679,14 +679,14 @@
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 22.4,
-        "std": 26.29,
-        "colours": 243,
-        "brightShare": 0.0696,
+        "mean": 26.8,
+        "std": 27.16,
+        "colours": 228,
+        "brightShare": 0.129,
         "rgb": [
-          32,
-          20,
-          19
+          39,
+          24,
+          23
         ]
       },
       "details": {
@@ -697,17 +697,17 @@
         ],
         "replayedSentMessage": true,
         "fx": {
-          "pump": 0.5034395248530594,
-          "glitch": 0,
+          "pump": 0.41135654529795995,
+          "glitch": 0.1392920235749422,
           "jitter": 0,
-          "warp": 0.5034395248530594,
-          "dim": 0.12585988121326486,
-          "rem": 0.5034395248530594,
-          "burst": 0,
+          "warp": 0.6671122723316397,
+          "dim": 0.16677806808290993,
+          "rem": 0.6671122723316397,
+          "burst": 0.7312602895564806,
           "queued": 0,
           "free": 610,
           "pending": 12,
-          "time": 0.5733600000000006,
+          "time": 0.5866400000000003,
           "composer": true,
           "active": true,
           "reduced": false,
@@ -734,12 +734,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=26.29 colours=243 mean=22.4"
+          "detail": "std=27.16 colours=228 mean=26.8"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=22.4 brightShare=0.0696"
+          "detail": "mean=26.8 brightShare=0.129"
         },
         {
           "what": "no console errors",
@@ -769,7 +769,7 @@
         {
           "what": "the world warps (fx.warp > 0.05)",
           "ok": true,
-          "detail": "warp=0.5034395248530594"
+          "detail": "warp=0.6671122723316397"
         },
         {
           "what": "scenario modules are real implementations (not STUB files)",
@@ -786,11 +786,11 @@
     },
     "orbit": {
       "pass": true,
-      "seconds": 19.4,
+      "seconds": 17,
       "description": "orbit / overview of the whole city",
       "error": null,
       "screenshot": "docs/real-world/screenshots/orbit.jpg",
-      "fps_software_rendered": 12,
+      "fps_software_rendered": 13,
       "drawCalls": 20,
       "triangles": 15362,
       "quality": "low",
@@ -799,14 +799,14 @@
       "fibres": 2500,
       "pixels": {
         "samples": 26496,
-        "mean": 23.1,
-        "std": 29.62,
-        "colours": 366,
-        "brightShare": 0.0994,
+        "mean": 23.7,
+        "std": 31.77,
+        "colours": 329,
+        "brightShare": 0.0978,
         "rgb": [
           28,
-          21,
-          27
+          22,
+          28
         ]
       },
       "details": {
@@ -831,12 +831,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=29.62 colours=366 mean=23.1"
+          "detail": "std=31.77 colours=329 mean=23.7"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=23.1 brightShare=0.0994"
+          "detail": "mean=23.7 brightShare=0.0978"
         },
         {
           "what": "no console errors",
@@ -873,11 +873,11 @@
     },
     "mobile": {
       "pass": true,
-      "seconds": 8.9,
+      "seconds": 8.6,
       "description": "phone layout 390x844 (quality low)",
       "error": null,
       "screenshot": "docs/real-world/screenshots/mobile.jpg",
-      "fps_software_rendered": 14,
+      "fps_software_rendered": 15,
       "drawCalls": 11,
       "triangles": 15146,
       "quality": "low",
@@ -887,13 +887,13 @@
       "pixels": {
         "samples": 5720,
         "mean": 47.6,
-        "std": 23.69,
-        "colours": 346,
-        "brightShare": 0.2,
+        "std": 24.89,
+        "colours": 170,
+        "brightShare": 0.1948,
         "rgb": [
-          61,
-          43,
-          54
+          59,
+          44,
+          55
         ]
       },
       "details": {
@@ -920,12 +920,12 @@
         {
           "what": "canvas is not blank / uniform",
           "ok": true,
-          "detail": "std=23.69 colours=346 mean=47.6"
+          "detail": "std=24.89 colours=170 mean=47.6"
         },
         {
           "what": "canvas is not almost black",
           "ok": true,
-          "detail": "mean=47.6 brightShare=0.2"
+          "detail": "mean=47.6 brightShare=0.1948"
         },
         {
           "what": "no console errors",

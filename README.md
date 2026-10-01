@@ -45,6 +45,8 @@ optional language model may rephrase it at most once per 30 s / 60 per hour, onl
 pass `mind.safe_text`), flags memory encoding and gives the eye a focus. A small self-model (doing / state summary / wanting /
 recent history) and a daily diary (`data/diary/YYYY-MM-DD.json`) give continuity. The page shows the candidates, the winner
 and the self-model live. Generated text never asks for money, never tells anyone to buy or sell and makes no promises.
+The eye (`--eye`, DREAMS page) follows the same rule: its language-model "thought" is kept only when it passes
+`mind.safe_llm_text` (else no thought is shown), and the raw scene text is only the image prompt (never stored or served).
 
 Example chain (covered by `tests/test_integration.py`): "ho fame, vai a comprare il pane" -> the chat candidate wins -> inner
 line "ah, devo prendere il pane" with `action: buy_bread ok` -> life walks home -> bakery counter (the camera follows the fibre
@@ -100,7 +102,9 @@ No language model, no generated text: everything below is a rule table.
   hippocampus replays them at 35 % amplitude, picked by recency, emotion and "arrived tonight" (with habituation).
   Each night is written to `data/nights/YYYY-MM-DD.json` (stage timeline, wake-ups + cause, sleep debt, replayed
   messages = "dream ingredients"). State is saved every minute to `data/state.json`. IPs are only kept for the
-  10 s rate-limit window; nothing about who sent a message is stored.
+  10 s rate-limit window; nothing about who sent a message is stored. Behind a reverse proxy (`--trust-proxy`, set in the
+  Dockerfile) the key is the right-most `X-Forwarded-For` entry, the one the proxy appended (`--proxy-hops N` for a chain of
+  N trusted proxies); entries further left are client-controlled and ignored, so a forged header cannot reset the limit.
 
 ```bash
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
@@ -110,7 +114,7 @@ python tests/test_sleep.py                                    # or: python -m py
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q                     # 266 tests: mind, life, chat, sleep, server, integration chain
+.venv/bin/python -m pytest tests/ -q                     # 293 tests: mind, life, chat, sleep, server, eye, integration chain
 node --test tests/js/*.test.mjs                          # 46 tests: data / city / travel / fx / hud / phone helpers
 node tests/e2e/screenshots.mjs --gif --format=jpg        # 9 headless scenarios + walk.gif (see below)
 ```
