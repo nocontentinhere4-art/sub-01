@@ -352,7 +352,7 @@ function connect(){
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     for (const ev of m.events || []) {
       if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
-        tick(`${esc(ev.t)} · replay <b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
+        tick(`${esc(ev.t)} · replay ${ev.source === "reading" ? "of what it read " : ""}<b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
         fire(ev.text, ev.networks); heard = null; }
       else tick(`${esc(ev.t)} · ${esc(ev.text)}`);
     }

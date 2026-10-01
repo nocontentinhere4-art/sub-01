@@ -7,7 +7,8 @@
 Buys drive the reward + visual regions, sells drive salience + amygdala, large
 trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
 A sleep/wake cycle on the Europe/Rome clock (sleep.py) changes the rhythm and how much
-any stimulus gets through; during REM, stored messages are replayed. Page on http://localhost:8765.
+any stimulus gets through; during REM, stored messages and articles it read are replayed.
+Page on http://localhost:8765.
 """
 import argparse
 import asyncio
@@ -27,12 +28,12 @@ from aiohttp import web
 
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
-from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
+from sleep import ROME, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime
 from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
-from research import Reader
+from research import Reader, reading_stimulus
 from browse import Browser
 
 HERE = Path(__file__).parent
@@ -86,7 +87,7 @@ class Live:
         self.engine.t = min(self.engine.t, now)
         self.engine.update(now)
         self.limiter, self.dedupe = RateLimiter(), Dedupe()
-        for m in self.memory.items[-200:]:
+        for m in self.memory.chat()[-200:]:
             self.dedupe.recent.append(dedupe_key(m["text"]))
         self.burst = 0.0
         self.sol_usd = 150.0
@@ -110,7 +111,9 @@ class Live:
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
         self.recent_replays = []         # REM replays for the eye's dreams
+        self.recent_read_replays = []    # ...and titles of replayed readings
         self.last_groups = {}
+        self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
 
     # --- trades -> stimuli ---------------------------------------------------
@@ -186,6 +189,26 @@ class Live:
         return {"text": m["text"], "t": hhmm(m["t"]), "networks": m["networks"], "emotion": m["emotion"],
                 "asleep": m["asleep"], "stage": m["stage"]}
 
+    def heard(self, t):
+        """Recent chat texts (not readings), newest last."""
+        return [m["text"] for m in self.memory.chat()[-5:] if t - m["t"] < 3 * 3600]
+
+    def absorb_reading(self, art):
+        """An article it opened becomes a stimulus (chat rules at half gain + language/attention) and a memory."""
+        t = self.clock.now()
+        stim, hits, emotion = reading_stimulus(art["title"], art.get("keywords", []))
+        gain = self.engine.gain                               # asleep = attenuated, as for chat
+        for g, a in stim.items():
+            self.brain.stimulate(g, a * gain)
+        m = self.memory.add(t, art["title"], self.engine.stage, stim, emotion, hits, source="reading",
+                            title=art["title"], keywords=art.get("keywords", []), url=art.get("url", ""))
+        art.update(networks=hits, emotion=emotion, gain=round(gain, 2))
+        return m
+
+    def tonight_chance(self, m):
+        """Estimated chance this memory is replayed tonight (blocking: run in a worker thread)."""
+        return round(self.memory.replay_chance(m, next_bedtime(self.clock.now())), 2)
+
     async def handle_chat(self, ws, key, text):
         ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
         if not ok:
@@ -234,9 +257,13 @@ class Live:
                 for g, a in m["stimulus"].items():
                     b.stimulate(g, REPLAY_AMP * a)
                 e.record_replay(t, m)
-                self.recent_replays = (self.recent_replays + [m["text"]])[-8:]
+                src = m.get("source", "chat")
+                if src == "reading":
+                    self.recent_read_replays = (self.recent_read_replays + [m["text"]])[-8:]
+                else:
+                    self.recent_replays = (self.recent_replays + [m["text"]])[-8:]
                 out.append({"type": "replay", "t": hhmm(t), "text": m["text"], "networks": m["networks"],
-                            "received": hhmm(m["t"])})
+                            "received": hhmm(m["t"]), "source": src})
             else:
                 out.append(ev | {"t": hhmm(t)})
                 if ev.get("natural"):
@@ -286,7 +313,7 @@ class Live:
                    "slow": b.slow.status() if b.slow_on else None}
             self.last_groups = groups
             base = sum(groups.values()) / max(1, len(groups))
-            rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
+            rel = self.last_rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
             hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
             tsim = self.clock.now()
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
@@ -315,9 +342,13 @@ class Live:
             t = self.clock.now()
             if self.life.activity != "research" or self.life.path or not self.reader.due(t):
                 continue
-            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
-            art = await loop.run_in_executor(None, self.reader.read, t, heard)
+            art = await loop.run_in_executor(None, self.reader.read, t, self.heard(t), dict(self.last_rel))
             if art:
+                m = self.absorb_reading(art)
+                try:
+                    art["tonight"] = await loop.run_in_executor(None, self.tonight_chance, m)
+                except Exception as e:                     # an estimate must never stop the reading
+                    print("research: replay estimate failed:", repr(e)[:120], flush=True)
                 await self.broadcast({"type": "reading", **art})
 
     # --- the screens: a real browser on the open web (desk + phone) -------------------
@@ -341,9 +372,8 @@ class Live:
             if self.browser.screens[other].ctx is not None:
                 await self.browser.close(other)
             t = self.clock.now()
-            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
             art = self.reader.current()
-            st = await self.browser.step(dev, heard, art["title"] if art else None)
+            st = await self.browser.step(dev, self.heard(t), art["title"] if art else None)
             if st:
                 await self.broadcast({"type": "screen", **st})
             if now - last_save > 300:
@@ -359,7 +389,9 @@ class Live:
                 try:
                     tok = os.environ.get("REPLICATE_API_TOKEN")
                     llm = self.eye.llm or (ReplicateLLM(tok) if tok else None)
-                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm)
+                    read = [{"title": m["text"], "url": m.get("url", "")} for m in self.memory.items
+                            if m.get("source") == "reading" and day_of(m["t"]) == date]
+                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm, read)
                     print(f"diary: night of {date} written", flush=True)
                 except Exception as e:
                     print("diary error:", repr(e), flush=True)
@@ -369,12 +401,12 @@ class Live:
                 await asyncio.sleep(5)
                 continue
             stage = self.engine.stage
-            if stage == "AWAKE" and self.recent_replays:
-                self.recent_replays = []                              # dreams end when it wakes up
+            if stage == "AWAKE" and (self.recent_replays or self.recent_read_replays):
+                self.recent_replays, self.recent_read_replays = [], []   # dreams end when it wakes up
             try:
                 rec = await loop.run_in_executor(None, self.eye.step, t, stage, self.last_groups,
                                                  market_mood(self.recent_trades), list(self.recent_replays), hhmm(t),
-                                                 self.life.snapshot()["doing"])
+                                                 self.life.snapshot()["doing"], list(self.recent_read_replays))
                 self.last_frame = rec
                 await self.broadcast({"type": "eye", **rec})
                 if self.diary and stage == "REM" and self.engine.night is not None:
@@ -395,7 +427,7 @@ class Live:
         key = request.remote
         if self.trust_proxy and request.headers.get("X-Forwarded-For"):
             key = request.headers["X-Forwarded-For"].split(",")[0].strip()
-        await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.items[-30:]],
+        await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
                             "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
         await ws.send_json(self.nights())
         if self.last_frame:
