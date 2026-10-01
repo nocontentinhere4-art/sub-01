@@ -44,7 +44,7 @@
   .card .kw b { font-weight:400; color:var(--fg); }
   .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
     border-top:1px solid var(--line); font-size:11px; color:#c9c9d6; }
-  .card .tn b { font-weight:400; color:var(--fg); font-size:13px; }
+  .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
   #screencard .frame { position:relative; border-radius:6px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12); }
   #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
   #screencard.phone .frame { width:190px; margin:0 auto; border-radius:22px; border:6px solid #15151b; box-shadow:0 0 0 1px rgba(255,255,255,.12); }
@@ -548,7 +548,7 @@ const NET = {somatomotor:"body-movement", default:"default-mode", fear:"threat",
 function tonightText(c){
   if (c == null) return "estimating…";
   const p = Math.round(c * 100);
-  return `${p < 5 ? "unlikely" : p > 85 ? "very likely" : p >= 50 ? "likely" : "maybe"} · ≈${p}%`;
+  return `${p < 5 ? "unlikely" : p > 85 ? "very likely" : p >= 50 ? "likely" : "maybe"} · ${p > 95 ? ">95" : p < 5 ? "<5" : "≈" + p}%`;
 }
 
 // ---------- live ----------
