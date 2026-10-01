@@ -13,7 +13,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 ## Pages (all on `main`)
 | path | file | what |
 |---|---|---|
-| `/` | `web/room.html` | his room in 3D (Higgsfield/Meshy GLBs in `web/room/`), map of Kichijoji when he is out, reading card, mini brain |
+| `/` | `web/room.html` | his room in 3D (three.js r169; Higgsfield/Meshy GLBs in `web/room/`, meshopt + WebP, 3 MB), Tokyo day/night through the window, live screens (monitor + phone in his hands, arm IK), camera follows what he looks at, map when he is out, mini brain. `?debug&nolive&hour=21` previews a time of day |
 | `/brain` | `web/index.html` | brain v2: full-screen real fibres coloured by sleep stage; chat messages travel along real fibres; `?mini` for the PiP |
 | `/diary` | `web/diary.html` | dream diary written each morning (Tokyo) from unattended REM frames |
 | `/world.html` | eye frames | what the eye (Replicate FLUX + Llama 3) "sees" |
@@ -22,9 +22,17 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `brain_sim.py` (10 Hz delayed Stuart-Landau), `real_baseline.py` (replays his fMRI as drive), `sleep.py` (Asia/Tokyo),
   `chat.py` (filter), `eye.py` (Replicate), `diary.py`, `life.py` (needs-based life: research at the computer,
   order_food → simulated courier on a real OSM bike route, get_delivery, bakery/park outings with real routes),
-  `research.py` (Wikipedia-only curiosity chain, sensitive topics skipped), `live_server.py` (aiohttp; pages served
-  with `Cache-Control: no-cache`; `/api/diary`, `/api/reading`, `/api/frames`).
-- `Dockerfile` must copy every runtime module (currently also `diary.py research.py`).
+  `research.py` (Wikipedia curiosity chain, sensitive topics skipped; its article seeds what he searches),
+  `browse.py` (`BROWSE=1`, on in the Dockerfile: headless Chromium on the open web for the desk + phone screens;
+  Bing SafeSearch strict with a Wikipedia → external-sources fallback; read-only, never types/logs in/buys; guard skips
+  adult, gore, self-harm, extremism, drugs, gambling and crypto-trading sites/pages; every request to private/internal
+  addresses is blocked; Chromium gets no secrets in its env), `live_server.py` (aiohttp; pages served
+  with `Cache-Control: no-cache`; `/api/diary`, `/api/reading`, `/api/frames`, `/api/browsing`, `/api/screen/{desk,phone}.jpg`).
+- `Dockerfile` must copy every runtime module (currently also `diary.py research.py browse.py`) and installs Chromium
+  (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
+  multi-threaded BLAS spins when Chromium shares the CPU.
+- Chromium runs as root in the image, so its own sandbox is off (`--no-sandbox`); running the server as a non-root user
+  would turn it back on (needs `/data` volume ownership checked on Railway).
 
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.
