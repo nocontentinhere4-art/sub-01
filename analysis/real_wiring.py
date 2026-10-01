@@ -189,6 +189,7 @@ def run(a):
 
 
 METRICS = [("scfc_held_r", "SC-FC r (held-out FC)", 1), ("g_held_fc_r", "G-only: FC r", 1),
+           ("g_held_fc_r_analytic", "G-only: FC r (noise-free)", 1), ("ec_held_fc_r_analytic", "EC: FC r (noise-free)", 1),
            ("g_held_fcd_ks", "G-only: FCD KS", -1), ("ec_held_fc_r", "EC: FC r", 1), ("ec_held_fcd_ks", "EC: FCD KS", -1),
            ("g_region_med", "G-only: median region r", 1), ("ec_region_med", "EC: median region r", 1)]
 

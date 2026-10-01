@@ -155,21 +155,18 @@ def fcd_pool(runs, **kw):
     return np.concatenate([fcd(r["ts"], r["tr"], **kw) for r in runs])
 
 
-def peak_freqs(runs, band=BAND):
-    """Per-region peak frequency (Hz) of the BOLD power spectrum (Welch, averaged over runs) inside `band`.
-    KNOWN ISSUE (kept so that stored results stay reproducible, see docs/real_wiring_report.md section 4): spectra of runs
-    with different TR are summed on the frequency axis of the FIRST run, so TR = 1.16 s runs are labelled ~16 % too high
-    in frequency and runs with a different number of samples (TR = 2.5 s) are skipped."""
-    acc, f = None, None
+def peak_freqs(runs, band=BAND, df=0.001):
+    """Per-region peak frequency (Hz) of the BOLD power spectrum inside `band`. Each run's Welch spectrum (with its own
+    TR) is normalised to unit power in the band and interpolated onto a common 0.001 Hz grid before averaging, so runs
+    with different TRs and lengths all count with the right frequency axis."""
+    grid = np.arange(band[0], band[1] + df / 2, df)
+    acc = np.zeros((len(grid), runs[0]["ts"].shape[1]))
     for r in runs:
         x = np.nan_to_num(r["ts"])
         f, p = signal.welch(x, fs=1.0 / r["tr"], nperseg=min(256, len(x)), axis=0)
-        if acc is None:
-            acc, f0 = p, f
-        elif len(f) == len(f0):
-            acc = acc + p
-    sel = (f0 >= band[0]) & (f0 <= band[1])
-    return f0[sel][np.argmax(acc[sel], 0)]
+        q = np.array([np.interp(grid, f, p[:, k]) for k in range(p.shape[1])]).T
+        acc += q / (q.sum(0, keepdims=True) + 1e-30)
+    return grid[np.argmax(acc, 0)]
 
 
 def upper(m):
