@@ -18,6 +18,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -38,9 +39,16 @@ from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
 from browse import Browser
 
+try:                                             # the GPU spiking brain is optional: the server runs without it
+    from spiking import pod_manager as spiking_manager, server as spiking_server
+except Exception as _e:
+    spiking_manager = spiking_server = None
+    print("spiking routes unavailable:", type(_e).__name__, flush=True)
+
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
+GOOD = re.compile(r"\bgood\b!?", re.I)    # chat 'good!' -> dopamine pulse on the spiking pod
 NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
 NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
@@ -127,6 +135,7 @@ class Live:
         self.last_groups = {}
         self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
+        self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -244,6 +253,10 @@ class Live:
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
+        if self.spiking:                                   # no-op when no GPU pod is connected
+            self.spiking.forward_chat(text, emotion)
+            if GOOD.search(text):
+                self.spiking.forward_good()
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
@@ -290,6 +303,8 @@ class Live:
                 out.append(ev | {"t": hhmm(t)})
                 if ev.get("natural"):
                     self.store.save(e, self.memory)                          # night closed: write it now
+        if self.spiking:
+            self.spiking.forward_sleep(e.stage)
         p = e.params
         b.set_rhythm(p["f_hz"], p["coupling"], p["noise"])
         b.a = p["a"]
@@ -514,6 +529,8 @@ def password_gate(password):
                 return web.Response(text=LOGIN_PAGE.format(msg="<small>wrong password</small>"),
                                     content_type="text/html", status=401)
             return web.Response(text=LOGIN_PAGE.format(msg=""), content_type="text/html")
+        if spiking_server and request.path in spiking_server.POD_PATHS:
+            return await handler(request)                  # the pod authenticates with its own secret in the handler
         if hmac.compare_digest(request.cookies.get("sub01", ""), token):
             return await handler(request)
         if request.path == "/ws" or request.path.startswith("/api/"):
@@ -529,6 +546,14 @@ async def main(args):
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app.router.add_get("/ws", live.ws_handler)
+    manager = None
+    if spiking_server:
+        hub = spiking_server.attach(app, live, data_dir)
+        manager = spiking_manager.from_env(data_dir, get_items=lambda: spiking_manager.top_items(live.memory, live.clock.now()))
+        if manager.enabled():
+            hub.manager, manager.send_stop = manager, hub.forward_stop
+        else:
+            manager = None
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
@@ -626,10 +651,14 @@ async def main(args):
         tasks.append(live.run_eye())
     if live.browser:
         tasks.append(live.run_browse())
+    if manager:
+        tasks.append(manager.run())
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
+        if manager:
+            manager.shutdown()
         if live.browser:
             live.browsing_path.write_text(json.dumps(live.browser.to_dict(), ensure_ascii=False))
             await live.browser.close()

@@ -51,8 +51,14 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   on held-out sessions, beat strength-preserving nulls, borderline vs geometry-preserving nulls. **Merge this.**
 - PR #4 (`feature/digital-twin`): weaker fit (0.10), overlaps PR #5; do not merge as is (salvage receptor maps
   under CC BY 4.0, the sleep circuit, the body model later).
-- `feature/spiking-brain` (no PR yet): 1M LIF neurons stable on an RTX 4000 Ada; memory recall 5/5 works and REM replay
-  strengthens cortex; **Pong does not learn** (17.5 % vs 25 % no-plasticity control) — say so if shown.
+- `feature/spiking-brain`: 1M LIF neurons stable on an RTX 4000 Ada / A5000; memory recall works and REM replay
+  strengthens cortex; **Pong does not learn** (17.5 % vs 25 % no-plasticity control): off by default (`SUB01_PONG=1`),
+  labelled "not learning yet" when shown.
+  Daily session (Railway `spiking/pod_manager.py`, default 21:00-22:00 Tokyo, 1 h/day from pod creation, 8 GPU-h per
+  rolling 7 days, needs `SUB01_POD_SECRET` + `RUNPOD_API_KEY`): next-day test of yesterday's items → encode today's top
+  5 chat + top 5 readings → test → compressed sleep with replay → test. Weights on `/data/spiking/` (pods have no
+  volume). Per-item rows `memory_tests.jsonl` → `GET /api/memory` → room card "Does it remember what it read
+  yesterday?". GPU check 2026-10-01 (A5000, 1M): 6/6 items recalled from half cues a simulated day later.
 - PR #3 (brain-city "construct") is superseded by the room.
 - `netneurolab/hansen_receptors` is CC BY-NC-SA → not usable.
 

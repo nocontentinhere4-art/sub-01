@@ -6,8 +6,9 @@ ENV PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=
 RUN pip install --no-cache-dir -r requirements-server.txt \
  && python -m playwright install --with-deps --only-shell chromium \
  && rm -rf /var/lib/apt/lists/*
-COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py ./
+COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py runpod_api.py ./
 COPY twin ./twin
+COPY spiking ./spiking
 COPY web ./web
 COPY out/connectome.npz out/atlas_names.json ./out/
 COPY out/rest ./out/rest

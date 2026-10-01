@@ -87,3 +87,25 @@ No language model, no generated text. Sleep is a small published circuit model (
 python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
 python tests/test_sleep.py                                    # or: python -m pytest tests/
 ```
+
+## Spiking brain (v3, `spiking/`)
+
+One million simulated spiking neurons inside the real wiring of one person's brain; a model, not a mind; not the
+person. One leaky integrate-and-fire population per atlas region (size proportional to the region's volume),
+long-range synapses sampled from the streamline counts with delays from the fibre lengths (6 m/s), driven by the
+recorded resting-state activity. Three-factor plasticity (STDP eligibility x dopamine), fast hippocampal Hebbian
+memory with REM replay, and a Pong task after DishBrain (Kagan et al. 2022). It runs in scheduled GPU sessions on
+RunPod; the Railway server keeps the learned weights. Full description, equations, results and limits:
+[docs/spiking_report.md](docs/spiking_report.md).
+
+```bash
+python -m pytest tests/test_spiking_model.py tests/test_spiking_ops.py -q   # CPU, small networks
+python -m spiking.validate --cpu --n 20000                                  # CPU validation
+python -m spiking.validate --gpu                                            # 1M neurons on one RunPod pod (deleted after)
+```
+
+Railway env: `SUB01_POD_SECRET` and `RUNPOD_API_KEY` turn the daily session on; `SUB01_SESSIONS` (default
+`daily 21:00-22:00 Asia/Tokyo`, `off` disables). Optional caps: `SUB01_MAX_SESSION_MIN` (60, counted from pod
+creation), `SUB01_MAX_HOURS_PER_DAY` (1), `SUB01_GPU_HOURS_CAP` (8) per `SUB01_GPU_CAP_DAYS` (7, rolling);
+`SUB01_PONG=1` adds Pong (it has not learned so far). Learned weights and results live in `/data/spiking/`
+(per-item recall rows in `memory_tests.jsonl`, shown by `GET /api/memory` and the room page's memory card).

@@ -45,6 +45,9 @@
   .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
     border-top:1px solid var(--line); font-size:11px; color:#c9c9d6; }
   .card .tn[hidden] { display:none; }
+  #memcard .it { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:4px 0; border-bottom:1px solid var(--line); }
+  #memcard .it span:last-child { flex:none; color:var(--dim); font-size:11px; white-space:nowrap; }
+  #memcard .it .y { color:#39f5a0; } #memcard .it .n { color:#ff7a7a; }
   .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
   #screencard .frame { position:relative; border-radius:6px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12); }
   #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
@@ -113,6 +116,12 @@
     <div class="tn" id="r-tn"><span>will it come back tonight?</span><b id="r-tonight">…</b></div>
     <div class="s" id="r-why"></div>
     <div class="s" id="r-note">What it reads becomes stimuli and dream material; it does not understand the text.</div>
+  </div>
+  <div class="card" id="memcard" hidden>
+    <div class="k"><span>Does it remember what it read yesterday?</span><span id="mem-day"></span></div>
+    <div id="mem-items"></div>
+    <div class="s" id="mem-how"></div>
+    <div class="s">Recall by a simulated spiking network from a partial cue; a model, not a mind.</div>
   </div>
   <div class="card" id="mapcard">
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
@@ -546,6 +555,25 @@ fetch("tokyo_routes.json").then(r => r.json()).then(d => {
 });
 fetch("/api/browsing").then(r => r.json()).then(d => { if (!d.on) $("h-screen").textContent = "Reading is real Wikipedia (CC BY-SA): what it reads becomes stimuli and dream material; it does not understand the text."; }).catch(() => {});
 const NET = {somatomotor:"body-movement", default:"default-mode", fear:"threat", relay:"thalamic relay"};
+const MEM_LABEL = {"after sleep": "tested after its compressed sleep, the same evening (the next-day test runs at the next session)"};
+const memWhen = d => d.label === "next day"
+  ? `tested ${d.days_since > 1 ? d.days_since + " days" : "a day"} later, at the next session, after forgetting` : MEM_LABEL[d.label] || "";
+function loadMemory(){
+  fetch("/api/memory").then(r => r.ok ? r.json() : null).then(d => {
+    const items = d && d.items ? d.items.filter(x => x.source === "reading") : [];
+    $("memcard").hidden = !items.length;
+    if (!items.length) return;
+    const k = items.filter(x => x.recalled).length;
+    $("mem-day").textContent = `read ${d.day} · ${k}/${items.length}`;
+    $("mem-items").innerHTML = items.map(x => `<div class="it"><span>${esc(x.item)}</span><span>`
+      + `<b class="${x.recalled ? "y" : "n"}">${x.recalled ? "recalled" : "not recalled"}</b>`
+      + `${x.score != null ? ` · ${(+x.score).toFixed(1)} Hz` : ""}</span></div>`).join("");
+    $("mem-how").textContent = `${memWhen(d)}. Half of each title's words are given as a cue; `
+      + `score = extra firing of the other half's neurons (Hz). Recalled = above every never-stored lure`
+      + `${items[0].threshold != null ? ` (best lure ${(+items[0].threshold).toFixed(1)} Hz)` : ""}.`;
+  }).catch(() => {});
+}
+loadMemory(); setInterval(loadMemory, 10 * 60 * 1000);
 function tonightText(c){
   const p = Math.round(c * 100);
   return `${p < 5 ? "unlikely" : p > 85 ? "very likely" : p >= 50 ? "likely" : "maybe"} · ${p > 95 ? ">95" : p < 5 ? "<5" : "≈" + p}%`;
