@@ -44,7 +44,12 @@ S(x)          = 1 / (1 + exp(-beta g_k (x - theta)))
 
 Where the terms come from:
 - **E and I equations:** Wilson & Cowan (1972), in the whole-brain form of Abeysuriya et al. (2018). The model has
-  delayed long-range E->E coupling and local E/I populations.
+  delayed long-range E->E coupling and local E/I populations. Differences from Abeysuriya et al. (2018), all chosen
+  here and not taken from that paper: (1) the I->I self-coupling c_II = -1 (their Eq. 2 is
+  tau_I dI/dt = -I + S(c_EI E + noise), with no c_II and no Q; Wilson & Cowan 1972 do contain I->I); (2) the
+  adaptation variable A; (3) the gain, excitability offset and external-input gate; (4) the noise, which is added
+  to dE (sigma sqrt(dt) N(0,1) per step) and only to E, whereas they add Gaussian input noise inside the sigmoid to
+  both populations; (5) rho = 0.14 instead of 0.15; (6) stochastic Heun instead of 4th-order Runge-Kutta.
 - **Adaptation A:** spike-frequency adaptation as a slow negative feedback on E. It is the standard mechanism for
   up/down-state slow oscillations; Cakan et al. (2022) used it in a whole-brain sleep model.
 - **g_k:** the `set_gain` vector, a per-region gain on the slope of the sigmoid (neural gain; Eldar et al. 2013).
@@ -83,9 +88,11 @@ stimulation left it stuck in a high-activity state (E about 0.45). With `isp_fra
 | symbol | key | value | unit | source |
 |---|---|---|---|---|
 | tau_E, tau_I | tau_e, tau_i | 0.010, 0.020 | s | Abeysuriya et al. 2018 (Table 1) |
-| c_EE, c_EI, c_II | c_ee, c_ei, c_ii | 3.5, 3.75, -1 | - | Abeysuriya et al. 2018 |
-| P, Q | P, Q | 0.31, 0 | input units | Abeysuriya et al. 2018 |
-| beta, theta | beta, theta | 4, 1 | - | Abeysuriya et al. 2018 |
+| c_EE, c_EI | c_ee, c_ei | 3.5, 3.75 | - | Abeysuriya et al. 2018 (Table 1) |
+| c_II | c_ii | -1 | - | chosen here, not in Abeysuriya et al. 2018 (see below) |
+| P | P | 0.31 | input units | Abeysuriya et al. 2018 (Table 1) |
+| Q | Q | 0 | input units | not in Abeysuriya et al. 2018 (no I input there) |
+| beta, theta | beta, theta | 4, 1 | - | Abeysuriya et al. 2018 (Table 1 has mu = 1, sigma = 0.25, so beta = 1/sigma = 4) |
 | rho | rho | 0.14 | rate (0..1) | 0.15 in Abeysuriya et al. 2018; see below |
 | G | G | 3.0 | - | pre-fit default; fitted later |
 | v | velocity | 6 | m/s | as brain_sim; typical 5-10 m/s; fitted later |
@@ -99,11 +106,18 @@ stimulation left it stuck in a high-activity state (E about 0.45). With `isp_fra
 | dt | dt | 0.001 | s | stability check above |
 
 On the sources:
-- **Abeysuriya values:** the journal and PubMed Central hosts were blocked from the build sandbox, so I could not
-  re-check these values against the paper here. They should be verified against Table 1 before any publication.
-  - A linear stability analysis of one node with these values gives a self-consistent picture. At E = 0.15 the
-    balanced node oscillates at about 9.8 Hz, slightly above a Hopf bifurcation, with eigenvalue real part +5/s.
-  - The Hopf point is at rho of about 0.138.
+- **Abeysuriya values (checked by the reviewer against the PLOS Computational Biology full text, Table 1 and
+  Eqs. 1-4):** c_EE 3.5, c_EI 3.75, c_IE(0) -2.5, mu 1, sigma 0.25, P 0.31, tau_E 0.01 s, tau_I 0.02 s, rho 0.15.
+  The paper has no I->I coupling and no input to I.
+  - The reviewer's linear analysis of one isolated node with exactly the paper's equations (c_II = 0, c_IE = -2.5)
+    gives a Hopf bifurcation at P = 0.335 (paper: 0.34) and 10-11.3 Hz near it (paper: about 11 Hz), so the
+    sigmoid, time constants and signs are implemented as published.
+  - **c_II = -1 is an addition made here.** With c_II = 0 and the balanced c_IE the deep-NREM and light-NREM
+    settings saturate (mean E 0.99 and 0.51 in a 10 s test) because the sleep engine's coupling x2 / x3 is not
+    compensated by inhibition; c_II = -1 keeps all four stages in a usable range. The price is that the awake
+    regional rhythm is at about 18 Hz (beta) instead of about 10 Hz (c_II = 0 gave a 10.4 Hz awake rhythm).
+  - The model's own isolated-node Hopf point (G = 0, balanced at rho, c_II = -1) is at rho of about 0.138; at
+    E = 0.15 the node oscillates at about 9.8 Hz with eigenvalue real part +5/s.
 - **Why rho = 0.14:** I set rho to 0.14, just at the Hopf point. Each node is then a noise-driven oscillator with
   waxing and waning amplitude rather than a fixed limit cycle.
 - **Changing parameters:** all keys can be overridden by `TwinBrain(params=...)` or by `twin/params.json`, which the
@@ -159,7 +173,7 @@ nu0 = 40.3/s, r0 = 25/s, TE = 0.04 s, with k1 = 4.3 nu0 E0 TE, k2 = epsilon r0 E
 | `stimulate(group, x)` | adds x to that group's stimulus, which decays with tau = 2 s. Input = 0.08 x 20 tanh(stim / 20) (saturating) |
 | `b.drive` (recorded resting signal x 1.6 per z-unit x stage gain) | input = 0.08 x drive (slow excitability) |
 | `set_gain(g)` | g_k multiplies the sigmoid slope (neuromodulation) |
-| `set_weights(W)` | replaces W (same normalisation as `W0`), keeps the delay history and by default re-solves c_IE at the baseline G (slow homeostasis assumed to have converged) |
+| `set_weights(W)` | replaces W (same normalisation as `W0`), keeps the delay history and by default re-solves c_IE at the baseline G (slow homeostasis assumed to have converged); a refined c_IE from `params.json` / `isp_seconds` is kept as an additive correction |
 
 The physiological reasons for the depth mapping:
 - **Adaptation b_A = 3 d:** low acetylcholine in NREM unblocks K+ adaptation currents (McCormick 1992).
@@ -186,7 +200,7 @@ Measured per stage, over 10 s after 3 s of settling (bench `stages`):
 
 Deep NREM gives synchronous slow oscillations of about 0.9 Hz, alternating up and down states (Steriade et al. 1993
 describe < 1 Hz). The awake rhythm is beta-range (about 18 Hz at the regional level). In Abeysuriya's model the
-frequency rises with coupling because the balancing inhibition grows; the fit may move it.
+frequency may depend on coupling; here it is set by c_II, the balance and the delays, and the fit may move it.
 
 **Reactivity.** A stimulus of 8 units to the reward group, compared over the 0-1 s window (bench `reactivity`,
 10 trials):
@@ -263,7 +277,7 @@ through the model and the hemodynamics intact. The recording is itself the input
   resting-state runs used for the FC comparison and the drive.
 - **SPM12:** source read only to check the hemodynamic constants; no code copied.
 - **Neurolib, TVB:** looked at for orientation (MIT, GPL); no code copied.
-- **Not re-checked:** the Abeysuriya et al. (2018) table values (see Parameters).
+- **Abeysuriya et al. (2018) Table 1:** checked against the open-access full text (see Parameters).
 
 ## What is not realistic
 
@@ -280,6 +294,13 @@ through the model and the hemodynamics intact. The recording is itself the input
   - The sleep engine's coupling x3 in deep NREM drives up states to near-maximal rates (E about 0.9), higher than real
     cortical up states.
   - `f_hz` is ignored.
+- **Equations differ from the cited paper:** I->I coupling (c_II = -1), adaptation, gain/gate terms, noise placement
+  and rho are choices made here (see Equations); c_II = 0 (the paper's form) is not usable for the sleep stages.
+- **REM:** the sleep engine's coupling x0.6 is not compensated by inhibition, so mean E in REM (0.082) is below the
+  awake value (0.123); real REM cortex is about as active as wake.
+- **BOLD baseline:** the balloon input is u = 0.25 (E / rho - 1), so a mean rate below rho gives a constant negative
+  BOLD offset (about -0.6 % at the default, up to -2 % for other parameters). Only the fluctuations
+  are comparable with recorded data (which are z-scored), not the absolute level.
 - **Balance:** the inhibitory balance is the analytic fixed point (mean rate about 12 % below target). It is not
   updated during the day; only `set_weights` re-solves it.
 - **Fluctuations without the drive:**

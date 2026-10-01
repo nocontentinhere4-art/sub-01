@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 import brain_sim  # noqa: E402
 import sleep  # noqa: E402
-from twin.model import DEFAULTS, Balloon, TwinBrain, isp_refine, simulate_bold  # noqa: E402
+from twin.model import DEFAULTS, Balloon, TwinBrain, _DelayNet, balance, isp_refine, load_connectome, simulate_bold  # noqa: E402
 
 TICK = 0.05          # live_server.TICK
 BASELINE_DRIVE = 1.6  # live_server.BASELINE_DRIVE
@@ -358,3 +358,58 @@ def test_realtime_budget_single_thread():
     per_s = (time.perf_counter() - t0) / 2.0
     print(f"wall per simulated second: {per_s:.3f} s")
     assert per_s <= 0.3
+
+
+# --- review additions: delay indexing, balance, refined c_IE kept by set_weights -------------------------------
+@pytest.mark.parametrize("B", [1, 3])
+def test_delay_ring_buffer_matches_brute_force(B):
+    """Every edge reads exactly E_j(t - d_ij steps) (d = round(L / v / dt) >= 1), also after the ring wraps."""
+    W, L, _, _ = load_connectome()
+    n, dt = len(W), 0.001
+    vel = [6.0, 4.0, 9.0][:B]
+    net = _DelayNet(W, L, vel if B > 1 else 6.0, dt, B, init=0.0)
+    dd = [np.maximum(np.round(L / 1000.0 / v / dt).astype(int), 1) for v in vel]
+    ii, jj = np.nonzero(W)
+    rng = np.random.default_rng(0)
+    hist = []
+    for _ in range(net.H + 40):                     # more than one full wrap of the buffer
+        out = net.delayed_input()
+        ref = np.zeros((B, n))
+        for b in range(B):
+            idx = len(hist) - 1 - dd[b][ii, jj]     # the newest pushed sample is delay 0
+            val = np.array([hist[k][b, j] if k >= 0 else 0.0 for k, j in zip(idx, jj)])
+            np.add.at(ref[b], ii, W[ii, jj] * val)
+        assert np.abs(out - ref).max() < 1e-12
+        x = rng.random((B, n))
+        net.push(x)
+        hist.append(x)
+
+
+def test_ei_balance_fixed_point_is_at_target():
+    """balance(): with the returned c_IE the deterministic node (no noise) sits exactly at E = rho, I = I*."""
+    from twin.model import sigmoid
+    W, _, _, _ = load_connectome()
+    p = dict(DEFAULTS)
+    for G in (1.0, 3.0):
+        c, i_star, home = balance(p, W, G)
+        rho = p["rho"]
+        x_e = p["c_ee"] * rho + c * i_star + p["P"] + home + G * W.sum(1) * rho
+        assert np.allclose(sigmoid(x_e, p["beta"], p["theta"]), rho, atol=1e-9)
+        assert np.isclose(sigmoid(p["c_ei"] * rho + p["c_ii"] * i_star + p["Q"], p["beta"], p["theta"]), i_star, atol=1e-9)
+
+
+def test_set_weights_keeps_refined_cie_and_negative_edges():
+    rng = np.random.default_rng(1)
+    refine = rng.normal(0.0, 0.05, 214)
+    base = brain(seed=3)
+    c0 = base.c_ie + refine
+    b = brain(seed=3, c_ie=c0)
+    assert np.allclose(b.c_ie, c0)
+    b.set_weights(b.W0.copy())                       # identical weights: the fitted c_IE must survive
+    assert np.allclose(b.c_ie, c0)
+    W = b.W0.copy()
+    i, j = b.group_idx["reward"][0], b.group_idx["visual"][0]
+    W[i, j] = -0.02                                  # a (non-physical) negative edge still gets its delay
+    b.set_weights(W)
+    b.step(50)
+    assert np.all(np.isfinite(b.E))

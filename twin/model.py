@@ -6,8 +6,12 @@ not conscious and not the person. Full write-up: docs/twin/model.md.
 
 Local dynamics (one excitatory E_k and one inhibitory I_k population per region k), Wilson & Cowan (1972,
 Biophys J 12:1-24) in the form used for whole-brain MEG modelling by Abeysuriya et al. (2018, PLoS Comput
-Biol 14:e1006007), plus a slow spike-frequency-adaptation variable A_k that is weak in wakefulness and grows
-in NREM sleep (low acetylcholine unblocks K+ adaptation currents; McCormick 1992, Prog Neurobiol 39:337):
+Biol 14:e1006007; their Table 1 gives tau_E, tau_I, c_EE, c_EI, P, beta = 1/0.25, theta = 1, rho), plus a slow
+spike-frequency-adaptation variable A_k that is weak in wakefulness and grows in NREM sleep (low acetylcholine
+unblocks K+ adaptation currents; McCormick 1992, Prog Neurobiol 39:337). Differences from Abeysuriya 2018,
+all chosen here and not taken from that paper: an inhibitory self-coupling c_II = -1 (their Eq. 2 has none;
+Wilson & Cowan 1972 do have I -> I), the adaptation term, the external/gain/gate terms, the noise (added to dE
+instead of inside the sigmoid), rho = 0.14 (they use 0.15) and Heun instead of RK4:
 
     tau_E dE_k/dt = -E_k + S_E( c_EE E_k + c_IE,k I_k - b_A A_k + P + p_k + h_k + dP(a)
                                + G sum_j W_kj E_j(t - L_kj / v) + gate(a) u_k(t) )  + tau_E sigma xi_k(t)
@@ -56,7 +60,8 @@ ROOT = HERE.parent
 PARAMS_PATH = HERE / "params.json"
 
 # ---------------------------------------------------------------------------------------------------------
-# parameters (units in comments). Local E/I values: Abeysuriya et al. 2018 (Table 1); see docs/twin/model.md
+# parameters (units in comments). Local E/I values: Abeysuriya et al. 2018 (Table 1) except c_ii, Q (not in the
+# paper) and rho (0.15 there); see docs/twin/model.md
 # ---------------------------------------------------------------------------------------------------------
 DEFAULTS = dict(
     # local Wilson-Cowan node
@@ -64,9 +69,9 @@ DEFAULTS = dict(
     tau_i=0.020,        # s, inhibitory time constant
     c_ee=3.5,           # E->E local coupling (dimensionless)
     c_ei=3.75,          # E->I local coupling
-    c_ii=-1.0,          # I->I local coupling
+    c_ii=-1.0,          # I->I local coupling: NOT in Abeysuriya 2018 (their Eq. 2 has none); chosen here, see docs
     P=0.31,             # constant background input to E
-    Q=0.0,              # constant background input to I
+    Q=0.0,              # constant background input to I (not in Abeysuriya 2018)
     beta=4.0,           # sigmoid slope
     theta=1.0,          # sigmoid threshold
     rho=0.14,           # target excitatory rate at rest (0..1); Abeysuriya 2018 used 0.15, see docs
@@ -205,10 +210,10 @@ class _DelayNet:
         Ws = np.broadcast_to(W, (B, n, n))
         v = np.broadcast_to(np.asarray(velocity, float), (B,))
         d = [np.maximum(np.round(L / 1000.0 / v[b] / dt).astype(int), 1) for b in range(B)]
-        self.H = H = int(max(dd[Ws[b] > 0].max() if (Ws[b] > 0).any() else 1 for b, dd in enumerate(d))) + 1
+        self.H = H = int(max(dd[Ws[b] != 0].max() if (Ws[b] != 0).any() else 1 for b, dd in enumerate(d))) + 1
         rows, cols, vals = [], [], []
         for b in range(B):                       # B iterations at construction only
-            i, j = np.nonzero(Ws[b])
+            i, j = np.nonzero(Ws[b])                 # any non-zero weight keeps its own delay
             rows.append(b * n + i)
             cols.append((H - 1 - d[b][i, j]) * (B * n) + b * n + j)
             vals.append(Ws[b][i, j])
@@ -294,10 +299,12 @@ class TwinBrain:
         self._a = -5.0
         self._depth = 0.0
         self.c_ie, self.i_star, self.p_home = balance(p, self.W, self.G0, self.excitability)
+        analytic = self.c_ie
         if p.get("c_ie") is not None:                           # precomputed (e.g. refined by the fit)
             self.c_ie = np.asarray(p["c_ie"], float).reshape(self.n)
         elif p["isp_seconds"] > 0:
             self.c_ie = isp_refine(p, self.W, p["isp_seconds"], seed=seed, path=path)
+        self._cie_corr = self.c_ie - analytic                   # refinement beyond the analytic balance (0 by default)
         rho = p["rho"]
         self.E = np.full(self.n, rho) + 0.01 * self.rng.standard_normal(self.n)
         self.I = np.full(self.n, self.i_star)
@@ -345,7 +352,8 @@ class TwinBrain:
 
     def set_weights(self, W, rebalance=True):
         """Replace model-space weights (same normalisation as self.W). rebalance=True re-solves the inhibitory
-        balance at the baseline coupling (slow homeostatic plasticity assumed converged)."""
+        balance at the baseline coupling (slow homeostatic plasticity assumed converged); a refinement of c_IE
+        supplied by params.json / isp_seconds is kept as an additive correction to the analytic solution."""
         W = np.asarray(W, float)
         assert W.shape == (self.n, self.n)
         self.W = W.copy()
@@ -357,8 +365,9 @@ class TwinBrain:
             self.net.pos = pos
         else:
             self.net.buf[:] = self.E
-        if rebalance:
-            self.c_ie, _, self.p_home = balance(self.p, self.W, self.G0, self.excitability)
+        if rebalance:                                   # keeps a fitted / simulated-ISP refinement of c_IE
+            c, _, self.p_home = balance(self.p, self.W, self.G0, self.excitability)
+            self.c_ie = np.minimum(c + self._cie_corr, 0.0)
 
     def stimulate(self, group, amount):
         """Add drive to a group of regions; it decays with a ~2 s time constant (like brain_sim)."""
