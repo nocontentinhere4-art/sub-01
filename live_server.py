@@ -28,7 +28,8 @@ from aiohttp import web
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
 from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
-from eye import Eye, load_env, market_mood
+from eye import Eye, ReplicateLLM, load_env, market_mood
+from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
 
@@ -92,6 +93,7 @@ class Live:
         self.pool_name = "demo" if demo else mint[:6]
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
+        self.diary = None                # dream diary, set by main() with --eye
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
         self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
@@ -290,11 +292,21 @@ class Live:
     async def run_eye(self):
         loop = asyncio.get_running_loop()
         while True:
-            if not self.clients:                                      # nobody watching: don't spend GPU (and heat)
+            t = self.clock.now()
+            if self.diary and (date := self.diary.pending_close(self.engine)):      # morning: write last night's entry
+                try:
+                    tok = os.environ.get("REPLICATE_API_TOKEN")
+                    llm = self.eye.llm or (ReplicateLLM(tok) if tok else None)
+                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm)
+                    print(f"diary: night of {date} written", flush=True)
+                except Exception as e:
+                    print("diary error:", repr(e), flush=True)
+            attended = bool(self.clients)
+            dream = bool(self.diary) and not attended and self.diary.due(self.engine, t)
+            if not attended and not dream:                            # nobody watching and no dream due: spend nothing
                 await asyncio.sleep(5)
                 continue
             stage = self.engine.stage
-            t = self.clock.now()
             if stage == "AWAKE" and self.recent_replays:
                 self.recent_replays = []                              # dreams end when it wakes up
             try:
@@ -303,9 +315,14 @@ class Live:
                                                  self.life.snapshot()["doing"])
                 self.last_frame = rec
                 await self.broadcast({"type": "eye", **rec})
+                if self.diary and stage == "REM" and self.engine.night is not None:
+                    self.diary.add(self.engine.night["date"], rec, t, attended)
             except Exception as e:                                    # never let the eye stop the brain
                 print("eye error:", repr(e), flush=True)
                 await asyncio.sleep(10)
+            if dream:
+                await asyncio.sleep(5)                                # unattended: the diary paces itself
+                continue
             await asyncio.sleep(self.eye_every * {"AWAKE": 1.0, "REM": 0.75}.get(stage, 3.0))
 
     # --- http ----------------------------------------------------------------
@@ -400,6 +417,22 @@ async def main(args):
         live.eye = Eye(frames_dir, data_dir / "world.json", width=640, height=360, steps=6)
         live.eye_every = args.eye_every
         app.router.add_static("/eye", frames_dir)
+        live.diary = Diary(data_dir, frames_dir)
+        app.router.add_static("/diary-img", live.diary.img)
+
+    async def diary_index(request):                # nights written so far, newest first
+        return web.json_response({"nights": live.diary.index() if live.diary else []})
+
+    async def diary_night(request):
+        try:
+            d = live.diary.load(request.match_info["date"]) if live.diary else None
+        except ValueError:
+            d = None
+        if d is None:
+            raise web.HTTPNotFound()
+        return web.json_response(d)
+    app.router.add_get("/api/diary", diary_index)
+    app.router.add_get("/api/diary/{date}", diary_night)
 
     async def frames(request):                    # recent eye frames for the world page
         log = live.eye.log if live.eye else HERE / "missing"
@@ -430,6 +463,7 @@ async def main(args):
     app.router.add_get("/api/config", config)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "life.html"))       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html"))
+    app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html"))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
     await runner.setup()
