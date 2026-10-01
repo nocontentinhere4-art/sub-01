@@ -387,7 +387,9 @@ class Browser:
                     href = next((l["href"] for l in page["links"] if l["id"] == action.get("target")), None)
                     ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
                 elif kind == "search" and action.get("target"):
-                    ok = await self._search(sc, action["target"], f"searched “{action['target']}” — {why}")
+                    from eyes import query_ok                       # checked again here, in the browser's process
+                    q = query_ok(action["target"])
+                    ok = bool(q) and await self._search(sc, q, f"searched “{q}” — {why}")
                 elif kind == "back" and len(sc.history) >= 2:
                     sc.history.pop()
                     ok = await self._open(sc, sc.history.pop(), f"went back — {why}", "page")

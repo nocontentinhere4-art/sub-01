@@ -431,3 +431,38 @@ def test_claude_provider_request_and_reply(monkeypatch):
     assert seen["path"].startswith("/v1/messages") and b["model"] == "claude-opus-5-5"
     assert b["output_config"] == {"effort": "low"} and b["fallbacks"] == "default"
     assert "server-side-fallback-2026-07-01" in seen["beta"] and b["system"] == E.SYSTEM
+
+
+def test_browser_act_rechecks_targets_in_its_own_process():
+    """Even if the brain's process sent a bad action, the browser process only opens links it extracted itself
+    and only searches queries that pass the filter."""
+    from browse import Browser
+    b = Browser(decide=True)
+    opened, searched, wandered = [], [], []
+
+    async def _open(sc, url, why, kind, **kw):
+        opened.append(url)
+        return True
+
+    async def _search(sc, q, why):
+        searched.append(q)
+        return True
+
+    async def _next(sc, heard, interest):
+        wandered.append(1)
+        return False
+    b._open, b._search, b._next = _open, _search, _next
+
+    async def main():
+        sc = b.screens["desk"]
+        for action in ({"action": "click", "target": "https://evil.example/x"},      # not an id of the stored page
+                       {"action": "click", "target": "L77"},
+                       {"action": "search", "target": "buy crypto tokens now"},
+                       {"action": "search", "target": "https://evil.example"},
+                       {"action": "click", "target": "L1"}):
+            sc.page, sc.awaiting = object(), dict(PAGE)
+            await b.act("desk", action)
+        sc.page, sc.awaiting = object(), None
+        assert await b.act("desk", {"action": "click", "target": "L1"}) is None      # nothing pending: ignored
+    run(main())
+    assert opened == ["https://en.wikipedia.org/wiki/Sourdough"] and searched == [] and len(wandered) == 4
