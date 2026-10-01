@@ -600,7 +600,14 @@ function connect(){
       if (outside || (c && c.geo)) map.panTo(c && c.geo && !outside ? [c.geo.lat, c.geo.lng] : pos, {animate:true});
     }
     $("n-food").textContent = life.food ? `${life.food} meal waiting` : life.bread ? `${life.bread} bread` : "nothing to eat";
-    $("n-text").innerHTML = `hunger ${Math.round(life.hunger * 100)}% · boredom ${Math.round(life.boredom * 100)}%`
+    const v = life.vitals || {}, nm = m.neuro || {};
+    const bar = (k, x) => `<span title="${k}: ${x} (1.0 = resting wake)" style="display:inline-block;width:46px">${k}`
+      + `<i style="display:block;height:4px;border-radius:2px;background:#2a2a36"><i style="display:block;height:4px;border-radius:2px;`
+      + `width:${Math.min(100, Math.round(x / 1.6 * 100))}%;background:#ff9a3c"></i></i></span>`;
+    $("n-text").innerHTML = (v.hr_bpm ? `♥ ${Math.round(v.hr_bpm)} bpm · breath ${Math.round(v.resp_per_min)}/min · glucose ${Math.round(v.glucose_mg_dl)} mg/dl<br>` : "")
+      + `hunger ${Math.round(life.hunger * 100)}% · boredom ${Math.round(life.boredom * 100)}%`
+      + (nm.DA !== undefined ? `<div style="display:flex;gap:6px;margin-top:6px;font-size:10px;color:#8a8a9c">`
+        + ["DA", "5HT", "NE", "ACh"].map(k => bar(k, nm[k])).join("") + `</div>` : "")
       + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : "");
   };
 }
