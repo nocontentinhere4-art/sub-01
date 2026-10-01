@@ -159,6 +159,8 @@ const GROUPS = ["attention","control","default","fear","limbic","memory","other"
 let stage = null, target = [1,0,0], mix = null, burst = 0, boost = 0, sci = 0, sciT = 0;
 let fibreMat, cortexMat, glows = [], nodes = [], showRegions = false;
 let pulse = {t:-1, start:0};
+const OPACITY = MINI ? 0.021 : 0.0105;     // the mini keeps 1 fibre in 6: each drawn twice as bright
+let actNew = false, onScreen = true, drawnAt = 0;
 const tgOn = new Array(12).fill(0);
 const actData = new Uint8Array(256 * 4);
 const actTex = new THREE.DataTexture(actData, 256, 1, THREE.RGBAFormat);
@@ -169,7 +171,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
   nodes = d.nodes;
   const lab2node = new Int16Array(512).fill(-1); nodes.forEach((n, i) => lab2node[n.lab] = i);
   const isLang = n => n && n.name.startsWith("LH_") && (n.name.includes("Temp") || n.name.includes("FrOper"));
-  const keep = MINI ? 3 : 1;
+  const keep = MINI ? 6 : 1;
   const P = new Float32Array(fbuf), E = new Int16Array(ebuf), k = meta.pts, n = Math.floor(meta.n / keep), segs = n * (k - 1);
   const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), info = new Float32Array(segs*8), nod = new Float32Array(segs*4);
   let o = 0;
@@ -196,7 +198,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
   g.setAttribute("info", new THREE.BufferAttribute(info, 4));
   g.setAttribute("nodes", new THREE.BufferAttribute(nod, 2));
   fibreMat = new THREE.ShaderMaterial({
-    uniforms: { time:{value:0}, mixw:{value:new THREE.Vector3(1,0,0)}, pulseT:{value:-1}, opacity:{value:0.0105},
+    uniforms: { time:{value:0}, mixw:{value:new THREE.Vector3(1,0,0)}, pulseT:{value:-1}, opacity:{value:OPACITY},
                 act:{value:actTex}, tgOn:{value:tgOn}, burst:{value:0}, boost:{value:0}, sci:{value:0} },
     vertexShader: `
       attribute vec3 dcol; attribute vec4 info; attribute vec2 nodes;
@@ -253,14 +255,14 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
     x.fillStyle = gr; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
   for (const nd of nodes) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffc890, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
-    sp.position.set(...nd.q); sp.scale.setScalar(9); scene.add(sp); glows.push(sp);
+    sp.position.set(...nd.q); sp.scale.setScalar(9); sp.visible = false; scene.add(sp); glows.push(sp);
   }
   connect();
 });
 
 // ---------- story ----------
 const tickerEl = $("ticker");
-function tick(html){ tickerEl.insertAdjacentHTML("afterbegin", `<div>${html}</div>`); while (tickerEl.children.length > 4) tickerEl.lastChild.remove(); }
+function tick(html){ if (MINI) return; tickerEl.insertAdjacentHTML("afterbegin", `<div>${html}</div>`); while (tickerEl.children.length > 4) tickerEl.lastChild.remove(); }
 let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, sync = 0, baseline = null, slow = null;
 function story(){
   const now = performance.now();
@@ -351,11 +353,11 @@ function connect(){
     const sl = m.sleep;
     if (sl) {
       sleepInfo = sl; setStage(sl.stage); burst = Math.max(burst, sl.burst || 0);
-      $("clock").textContent = `${sl.clock} ${sl.tz || "Tokyo"}`;
+      if (!MINI) $("clock").textContent = `${sl.clock} ${sl.tz || "Tokyo"}`;
     }
     if (m.life) {
       doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
-      $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
+      if (!MINI) $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
     }
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     for (const ev of m.events || []) {
@@ -368,7 +370,7 @@ function connect(){
       tick(`<span class="${t.kind}">${t.kind} $${t.usd.toFixed(t.usd < 10 ? 2 : 0)}</span> → ${t.kind === "buy" ? "reward, visual" : "salience, fear"}`);
       if (t.kind === "buy") boost = Math.min(0.3, boost + 0.05);
     }
-    act = m.act; if (!base) base = act.slice(); else base = base.map((b, i) => b * 0.998 + act[i] * 0.002);
+    act = m.act; actNew = true; if (!base) base = act.slice(); else base = base.map((b, i) => b * 0.998 + act[i] * 0.002);
   };
   ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
 }
@@ -381,24 +383,29 @@ $("chat").addEventListener("submit", ev => {
 document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
   b.classList.toggle("on"); const on = b.classList.contains("on"), l = b.dataset.l;
   if (l === "fibres" || l === "cortex") { const o = scene.getObjectByName(l); if (o) o.visible = on; }
-  if (l === "regions") showRegions = on;
+  if (l === "regions") { showRegions = on; actNew = true; }
   if (l === "sci") sciT = on ? 1 : 0;
 });
+if (MINI && "IntersectionObserver" in window)    // the room's picture-in-picture: draw only while it is on screen
+  new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
 if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000);
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
-setInterval(() => { if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);
+if (!MINI) setInterval(() => { if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);
 
 // ---------- loop ----------
 let last = performance.now(), t = 0;
 function frame(now){
   requestAnimationFrame(frame);
+  if (MINI && (!onScreen || document.hidden || now - drawnAt < 1000 / 30 - 3)) return;   // mini: <= 30 fps
+  drawnAt = now;
   const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
   if (!mix) mix = [1, 0, 0];
   const k = 1 - Math.exp(-dt / 2.5);
   for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
   sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
   burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);
-  if (act && base) {
+  if (act && base && (actNew || pulse.t >= 0)) {          // new activity arrives 20x a second, not every frame
+    actNew = false;
     const raw = act.map((a, i) => a / Math.max(base[i], 0.02));
     const gm = Math.max(1e-3, raw.reduce((x, y) => x + y, 0) / raw.length);
     raw.forEach((r, i) => { actData[i*4] = Math.min(255, Math.round(r / gm / 3 * 255)); });
@@ -409,7 +416,7 @@ function frame(now){
   if (fibreMat) {
     const u = fibreMat.uniforms;
     u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
-    u.opacity.value = 0.0105 * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci);
+    u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci);
     if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
     u.pulseT.value = pulse.t;
   }
@@ -418,6 +425,7 @@ function frame(now){
     const arrive = Math.max(0, 1 - (pulse.t - 0.85) / 0.75);
     glows.forEach((g, i) => { if (tgOn[GROUPS.indexOf(nodes[i].group)]) g.material.opacity = Math.max(g.material.opacity, 0.5 * arrive); });
   }
+  for (const g of glows) g.visible = g.material.opacity > 0.002;
   controls.update(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
