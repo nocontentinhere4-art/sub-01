@@ -1,9 +1,11 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 20:25 UTC** (pass 2). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-01 20:50 UTC** (pass 3). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-Nothing is ready to merge yet. #9's conflict with `main` is cleared (coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10), and brain-decides still conflicts too.
+Nothing is ready to merge yet. #9 and #20 now merge cleanly with `main` (#9 through coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10).
+
+**Owner decision needed:** which model the brain-decides "eyes" use (`OPENROUTER_MODEL`), and the daily cap (proposed $1/day). `OPENROUTER_API_KEY` is already on Railway, so #20 spends from the moment it merges.
 When a PR is marked **READY TO MERGE (needs owner)**, it is listed here:
 
 | PR | status | why it needs the owner |
@@ -35,14 +37,15 @@ cheap to run, with the password gate kept until launch day.
 | 8 | Reading memory (readings → stimuli, REM replay, curiosity) | in progress: needs main merge | #7 |
 | 9 | Sleep circuit (Phillips-Robinson) | in progress: waits for #7 | #11 |
 | 10 | Spiking memory on GPU, daily test card | in progress: merges cleanly now; needs torch-free tests, re-merge after #7/#11 | #9 |
-| 11 | Brain decides what he clicks | in progress: **no PR opened yet** (review fixes pushed, `a8c928e`) | `feature/brain-decides` |
+| 11 | Brain decides what he clicks | in progress: needs a daily USD cap, re-merge after #9/#11 | #20 |
 | 12 | CI (tests + demo smoke on every PR) | todo | issue #12 |
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | todo | issue #13 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
-| 18 | Brain loop 3× cheaper | todo, after brain-decides | issue #19 |
+| 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
+| 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | todo, after #9 + #20 | issue #21 |
 | 19 | Launch | todo | owner |
 
 ## Merge order
@@ -50,28 +53,24 @@ cheap to run, with the password gate kept until launch day.
 2. **#7** reading memory (owner: `sleep.py`).
 3. **#11** sleep circuit (owner: `sleep.py`). It merges `main` after #7.
 4. **#9** spiking (owner: RunPod spend, Dockerfile). It merges `main` after #7 and #11.
-5. **brain-decides** (owner: Dockerfile, API spend, browser process). It opens its PR now and merges `main` after #9.
-6. Then **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a time on `live_server.py`.
+5. **#20** brain-decides (owner: Dockerfile, API spend, browser process). It merges `main` after #9 and #11.
+6. Then **#21** atomic writes, **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a time on `live_server.py`.
 
 **#12** CI and **#13** about page touch no shared files and can merge at any time.
 
 Rule: at least 60 minutes between merges to `main`. Every branch brings `main` in with a merge commit. Never force-push.
 
-## Pre-review: `feature/brain-decides` (reviewed at `98e6c33`; `a8c928e` since, no PR yet)
-Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, including `/api/decisions` and
-`/api/tastes`. Tick cost is the same as `main`. Required before it can be marked ready:
-1. Open the PR. Merge `main` now (it conflicts in `live_server.py`), and again after #9 (`Dockerfile`, `live_server.py`).
-2. **Add a hard daily USD cap for the eyes** (e.g. `BRAIN_DECIDES_MAX_USD_PER_DAY`, default 1.00) on top of
-   30 calls/hour.
-   - At the call cap that is 720 calls/day.
-   - My estimate is ~4k input + ~0.4k output tokens per call on `claude-opus-5-5` ($4/$20 per MTok), about
-     $0.024 per call, so up to ~$17/day.
-   - Post measured tokens per call from a sample of real pages.
-3. Put prompt caching (`cache_control`) on the fixed system prompt.
-4. Pin `anthropic>=1.11,<2`.
-5. The vote runs ~260 ms of numpy in an executor thread. Measure brain tick lag p95 while votes run, and post it.
-6. The model is the owner's choice (`BRAIN_DECIDES_CLAUDE_MODEL`). Say in the PR which model and what daily cost you
-   propose.
+## Review bots
+`graphify-labs[bot]` reviews every PR: a summary, "Worth a look" findings and inline coupling notes. It marks its own
+findings "NOT verified", and its reviews are partial on large diffs.
+- The coordinator verifies its findings. Authors fix only the ones the coordinator's review lists as required.
+- Ignore its "Health regression" coupling counts on test functions.
+- Verified real so far:
+  - #8: `?rate=` overflow and unbounded per-client buffering → required change on #8;
+  - `main`: non-atomic JSON state writes, from #10 → issue #21.
+- Checked and not real: #8 HTML injection (all user text is escaped); #10 `Life.hunger` read-only (nothing writes
+  it); #11 removed constants (aliases kept, PCI imports work); #20 NumPy group indexes and the fragment login guard;
+  #7 thread races (no crash path in CPython).
 
 ## Decisions
 - **2026-10-01: merge order** as above. #8 goes first because it is smallest and mostly frontend. #7 goes next
@@ -85,6 +84,7 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
   encodes the day's readings, runs compressed sleep and the after-sleep test, and runs the next-day test at the start
   of the following session. "Tested every morning" in the goal means this daily next-day test. A morning slot is
   only a change to `SUB01_SESSIONS`.
+- **2026-10-01: review-bot findings are advisory.** The coordinator verifies them before they become required changes.
 - **2026-10-01: paid-model choice stays with the owner.** Coordinator rule: every paid call has a hard daily USD
   cap and a log line before it can merge.
 
@@ -94,7 +94,11 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
 - **Bandwidth at launch:** `/ws` is 20 ticks/s × ~3.1 KB, about 62 KB/s per brain-page viewer. 300 viewers would be
   ~19 MB/s of Railway egress. Fix: #14.
 - **Unbounded spend:** the eye (Replicate) has no daily cap and no log. With viewers always present it renders up to
-  ~960 frames/day. Fix: #15. Brain-decides needs a USD cap (above).
+  ~960 frames/day. Fix: #15. #20 needs a daily USD cap (Opus 5.5 via OpenRouter is ≈ $0.50/hour at the 30-call cap).
+- **State files:** `life.json`, `body.json`, `reading.json` and `browsing.json` are written non-atomically, so a kill mid-write
+  crash-loops the server at the next start. Fix: #21.
+- **Vote load:** on one core with a vote every 5 s, brain ticks are up to 157 ms late (p95 69 ms). Fine at one vote
+  per page; #19 adds headroom.
 - **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
@@ -116,7 +120,7 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
 | Eye: Replicate FLUX schnell + Llama, only while watched | cents | up to ~960 frames/day with no cap → cap at $1/day (#15) |
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
-| Brain-decides eyes (Anthropic or Replicate) | $0 (not on) | ≤ cap (proposed $1/day) |
+| Brain-decides eyes (#20; OpenRouter key already on Railway) | $0 (not merged) | ≤ cap (proposed $1/day; uncapped it would be up to ~$12/day on Opus 5.5) |
 
 ## Launch checklist (owner)
 - [ ] All milestones 7–15 merged; CI green; `/healthz` monitored (uptime alert to your phone/email).
@@ -129,5 +133,5 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
       pressure, no wallet or on-chain action by the project.
 - [ ] X account ready. Posts follow the same wording rules (no consciousness claims, no price talk).
 - [ ] Secrets set on Railway only: `SITE_PASSWORD`, `REPLICATE_API_TOKEN`, `RUNPOD_API_KEY`, `SUB01_POD_SECRET`,
-      optional `ANTHROPIC_API_KEY`; later `SUB01_ADMIN_TOKEN`.
+      `OPENROUTER_API_KEY` (set), optional `ANTHROPIC_API_KEY`; later `SUB01_ADMIN_TOKEN`.
 - [ ] Launch day: remove `SITE_PASSWORD`; watch `/api/health` and spend for the first 24 h.
