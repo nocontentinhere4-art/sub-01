@@ -9,6 +9,7 @@
 | `mind` | page notes, the day plan, chat replies (Haiku 4.5) | `/data/eyes_costs.jsonl` (provider `mind/…`) | `SUB01_CAP_MIND_USD` = 1.00 |
 | all of the above | | | `SUB01_CAP_TOTAL_USD` = 3.10 |
 | `runpod` | the nightly spiking memory test | `/data/spiking/costs.jsonl` | its own: 1 GPU-h/day, 8 GPU-h per 7 days |
+| `clips` | posts of the daily clips (#59), only with `TIKTOK_POST_TOKEN` / `YOUTUBE_*` set | `/data/costs.jsonl` ($0 rows) | none: at most 1 post per platform per day |
 
 `costs.py` adds the three files up on the Tokyo day (`sleep.ROME`). Each cost is written to one file only, so nothing
 is counted twice. The eyes and the mind still share one ledger with its $2.00/day total and 30 calls/hour
@@ -47,6 +48,8 @@ curl -s -H "X-Admin-Token: $SUB01_ADMIN_TOKEN" https://sub01-production.up.railw
 - `caps` and `capped_now`: the caps in force, and which ones are reached now. Each part's flag is its own cap only;
   `total` reached stops every part.
 - `days`: the last 7 Tokyo days, newest first, per service plus `total`; `last_7_days_total`.
+- `posts_today`: clip posts that went through today, per platform (`{"tiktok": 1}`); failed attempts are $0 rows with
+  0 units. The clips themselves (ffmpeg, Pillow) cost CPU only; see `/admin/clips` for the list and the last log lines.
 
 The eye's and the diary's costs are estimates from Replicate's list prices: $0.003 per FLUX schnell image, and
 $0.05/$0.25 per million tokens for Llama 3 8B, with token counts from Replicate's metrics. Replicate's billing page is the
@@ -133,3 +136,15 @@ When the login cookie expires, or the site shows a sign-in button or a login wal
 logged out until the next restart. The log says it once (`sessions: tiktok logged out (expired)`), and `/api/browsing`
 shows `logged out` with the reason. To refresh: repeat the steps above and replace the variable. Without the
 variables he browses logged out, as before.
+
+## Music on Spotify (#68): optional keys, free
+He listens to music through **Spotify's official embed player** only; the server never plays, downloads or relays audio.
+It works without keys, from a curated list of public tracks (`music_curated.json`). With keys he searches Spotify:
+1. developer.spotify.com → **Dashboard → Create app** (any name; any redirect URI, e.g. `http://127.0.0.1:8080`; Web API).
+2. In the app's settings copy the **Client ID** and **Client secret**.
+3. Railway → the service → **Variables**: `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`. Never commit or paste them
+   anywhere else. They are read from the environment only and never logged or returned.
+
+Check: `/api/music` → `source` reads "Spotify Web API search" and `api` reads "ok". `api: "down: …"` (status only, no
+secrets) means the token or search failed; he uses the curated list meanwhile. Free: the Web API costs nothing, so there
+is no cap. To refresh the curated list: `python analysis/build_music_list.py` (dev machine, reads public playlist metadata).

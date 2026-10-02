@@ -66,10 +66,11 @@ window.Neurons = (() => {
     S.el.curve = h("div", "nx-curve"); S.el.curvecap = h("div", "nx-cap");
     S.el.results = h("div", "nx-results");
     S.el.day = h("div", "nx-day nx-hidden");
+    S.el.learn = h("div", "nx-day nx-hidden");
     S.el.next = h("div", "nx-row");
     S.el.note = h("div", "nx-note", HONEST);
     S.el.fixed = h("div", "nx-fixed", FIXED);
-    body.append(S.el.count, S.el.liverow, S.el.grouprow, S.el.raster, S.el.rastercap, pr, S.el.curve, S.el.curvecap, S.el.day, S.el.results, S.el.next, S.el.note, S.el.fixed);
+    body.append(S.el.count, S.el.liverow, S.el.grouprow, S.el.raster, S.el.rastercap, pr, S.el.curve, S.el.curvecap, S.el.day, S.el.learn, S.el.results, S.el.next, S.el.note, S.el.fixed);
     det.append(sum, body); mount.append(det); S.el.root = det;
     det.addEventListener("toggle", () => { S.open = det.open; ensureLoop(); });
     if (window.ResizeObserver) new ResizeObserver(() => { S.sized = false; }).observe(det);
@@ -255,6 +256,24 @@ window.Neurons = (() => {
     if (d.cpu && num(d.cpu.avg_pct)) box.append(h("div", "nx-cap", `its process: ${floor2(d.cpu.avg_pct)} % of one CPU core on average`));
     if (d.card) box.append(h("div", "nx-note", d.card + (d.note ? " " + d.note : "")));
   }
+  // ---------- real decisions, per Tokyo day (#70, /api/spiking/status "learning"): as measured, no extra claims ----------
+  function renderLearning(L) {
+    const box = S.el.learn; if (!box) return;
+    box.replaceChildren();
+    const days = L && Array.isArray(L.days) ? L.days.filter(d => d && d.day).slice(-5) : [];
+    if (!days.length) { show("learn", false); return; }
+    show("learn", true);
+    box.append(h("div", "nx-row", "Real decisions, per day"));
+    const net = (s, name) => s && num(s.with_outcome) && s.with_outcome > 0
+      ? `${name} picks paid off ${pct(s.paid_off_frac)} of ${int(s.with_outcome)}` : null;
+    for (const d of days.slice().reverse()) {
+      const r = d.replay || {}, bits = [net(d.gpu, "1M GPU"), net(d.other, "20k CPU")].filter(Boolean);
+      if (num(r.learned) || num(r.frozen_twin))
+        bits.push(`replay: learned ${pct(r.learned)} vs frozen twin ${pct(r.frozen_twin)}${num(r.chance) ? ` vs chance ${pct(r.chance)}` : ""}${num(r.n) ? ` (${int(r.n)} decisions)` : ""}`);
+      box.append(h("div", "nx-cap", `${d.day} · ${bits.length ? bits.join(" · ") : "no decision with an outcome"}`));
+    }
+    if (L.note) box.append(h("div", "nx-note", String(L.note)));
+  }
   function controlName(k) { return CONTROL_NAMES[k] || String(k).replace(/_/g, " "); }
   function memoryLine(mt) {
     if (!mt || typeof mt !== "object") return null;
@@ -336,6 +355,7 @@ window.Neurons = (() => {
     const lines = [examLine(last.exam), memoryLine(last.memory_test), benchLine(last.bench)].filter(Boolean);
     if (!last.exam && last.pong_curve) lines.unshift(PONG_NOTE);           // no exam numbers of its own: the last validation
     renderCurve(last.pong_curve);
+    try { renderLearning(st && st.learning); } catch (e) { /* a malformed answer must never break the panel */ }
     const any = lines.length || (last.pong_curve && Array.isArray(last.pong_curve.points) && last.pong_curve.points.length);
     if (!S.live) {
       const n = num(st && st.session && st.session.n_neurons) ? st.session.n_neurons : (last.bench && num(last.bench.n_neurons) ? last.bench.n_neurons : null);

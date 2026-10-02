@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 14:55 UTC** (pass 29). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 16:15 UTC** (pass 30d). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -144,6 +144,14 @@ cheap to run, with the password gate kept until launch day.
 | 18k | Room movement (walk around furniture, sit, lie down) | done (+ chair and bed follow-ups) | #28, #42 |
 | 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | done | #47 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
+| 18m | 1M spiking network on GPU through his waking hours (caps 17 h, $14/day, 120 h/week) | done; on with `SUB01_DAY_LIVE=1`; learns (#74: 0.45–0.69 vs frozen 0.24–0.38) | #67, #74 |
+| 18n | 20k spiking network on the server CPU votes and learns live (GPU fallback) | done | #65 |
+| 18o | Browse like a young guy (interests, Shorts/TikTok, finance read-only, logged-in view-only feeds) | done | #64, #66, #69 |
+| 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | done | #72 |
+| 18s | Room polish: no floating props, lamp out of the wall, a lived-in room, sharper phone screen | in progress | #75 |
+| 18t | A better character (fingers, face, clothes; same animations) | in progress | #76 |
+| 18p | Active neurons visible inside the 3D brain | in progress | #62 |
+| 18q | Music via Spotify's official embed, picked by the brain vote | done (server, /brain, /life); room after #63 | #71 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
@@ -294,6 +302,60 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 30d:** merged #74 (#70): the 1M network's live decisions learn.
+- **1M on GPU, 240 trials:** learned 0.45–0.69 correct, against 0.24–0.38 for the frozen twin and 0.24–0.30 for random (chance 0.29).
+- **Criterion:** reached in 9/10 runs before and after the reversal. The frozen twin and random never reached it.
+- **Why #67 showed no learning:** it had too few rounds, not a bad race.
+- **New live read-out:** `diff`, which is robust to the 2.4 → 5.3 Hz baseline drift. It is a reasoned choice, not a measured win.
+- **Sample size:** 3 networks, so small samples.
+- **RunPod:** $0.106, 3 pods one at a time, all deleted; only "BRAIN" remains.
+- **Coordinator run:** 964 tests passed, tick 7.5 ms.
+
+**Pass 30c:** merged #72 (#59): daily clips for the official social accounts.
+- Up to 3 vertical clips a day (day, dream, his brain's choice), each frame labelled "AI · fictional character · simulated brain".
+- Rendered at nice 19 with a CPU cap; no tick cost.
+- Auto-post is off without tokens, and posts are private or drafts flagged as AI-made.
+- `/admin/clips` sits behind the admin token or the password cookie.
+- Image +300 MB (ffmpeg).
+- Coordinator run: 955 tests passed, tick 7.8 ms.
+
+#74 (#70) is approved and waits for its docs conflict fix.
+
+The owner asked for room work: fix the floating post-it and the lamp in the wall, the room looks empty, a better phone screen
+and graphics, and a better character. New tasks:
+- **#75 room polish:** `room_build/` and `room_clean.glb`, plus new files; `room.html` only after #63.
+- **#76 a better character:** a CC0 MakeHuman/MPFB2 route, finger bones, `boy2.glb` behind `?boy=new`; integration after #63.
+
+#63 now gates five pieces of room work (music headphones, #62's mini brain, #75, #76, its own food), so it merges first.
+
+**Pass 30b:** merged #71 (#68 server side): he listens to music.
+- His brain vote picks 3–5 candidate tracks by time of day, tastes, taught words and chat wishes.
+- Playback is only through Spotify's official embed, started by each viewer on their own device. The server reads JSON only.
+- Without `SPOTIFY_CLIENT_ID`/`SECRET` it falls back to a curated list.
+- Coordinator run: 935 tests passed; `--music` smoke 9.4 ms with the spiking child running.
+- The room part (headphones, head nod) comes after #63.
+
+Also merged #73 (coordinator): `boot.py` now writes `exit_code` atomically. This fixes an intermittent end-to-end test
+seen while reviewing #72.
+
+#72 (#59 daily clips) is approved and waits only for its merge of main. Note: the image grows by +300 MB (ffmpeg),
+accepted.
+
+**Pass 30:** merged #69 (#56 part 2). He now browses like a young guy: interests rotate with the hour, there are
+Shorts/TikTok sessions, he looks up things he has seen, and finance is read-only with a "nothing here is financial
+advice" line. In the coordinator's day simulation, Wikipedia's share of pages fell from 28 % to 4 %, and topic entropy
+rose from 2.96 to 3.48 bits.
+
+Also merged #65 (#55): a 20k-neuron spiking network runs on the server CPU as a numpy-only child process.
+- It votes in browsing choices as one small term (0.3 × lean) and learns from the stay's response.
+- The 1M GPU network is asked first, through `day_live_decide`; the rate model is the last fallback.
+- Every decision goes to `/data/spiking/decisions-*.jsonl`. The card shows the learned curve against a frozen twin and chance.
+- Coordinator run: 901 tests passed. Smoke run with no torch: tick 7.9 ms; the child takes 2.9 CPU-s at start, idles
+  at 2 % of a core, and sent 26 frames to /ws.
+
+Started #62 (active neurons in the 3D brain), on /brain and /life only. The room's mini brain follows after #63, and
+`session.py`/`choice.py` stay with #70. #71 (music) is waiting for a merge of main (Dockerfile COPY conflict).
 
 **Pass 29:** merged #67 (#58), the 1M network live on GPU through his waking hours. It is off until
 `SUB01_DAY_LIVE=1`, with caps of 17 h/day, $14/day, 120 h/week and 6 restarts. Measured A4000 secure at $0.25/h ≈

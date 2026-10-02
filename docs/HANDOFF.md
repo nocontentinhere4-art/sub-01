@@ -40,7 +40,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   so a kill mid-write cannot crash-loop the server. JSONL logs append with `append_jsonl` and are read skipping torn lines.
   New JSON state must use these too.
 - `Dockerfile` must copy every runtime module (currently also `diary.py research.py browse.py`) and installs Chromium
-  (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
+  (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB) and ffmpeg + DejaVu fonts for the clips (#59). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
   multi-threaded BLAS spins when Chromium shares the CPU.
 - Live feed: plain `/ws` = 20 ticks/s with per-region activity (brain page); the room connects with `/ws?rate=5&lite=1`
   (5/s, no `act`, trades/events of skipped ticks kept). Room: shadow maps updated by hand (~30/s), DPR capped at 1.5
@@ -238,6 +238,35 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
 
+## Music on Spotify (#68, PR `feature/music`)
+- Legal frame: **Spotify's official embed player only** (`open.spotify.com/embed/track/<id>`, compact 80 px). Each
+  visitor presses play on their own device (30 s preview, or the full track when logged in to Spotify). The server never
+  streams, downloads or relays audio: `music.py` only calls the Web API (search + track metadata) and oEmbed, both JSON
+  (`http_json` refuses to read a non-JSON body); preview URLs are never read.
+- `music.py`: with `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (Railway; client-credentials flow, never logged or
+  returned) the Web API's search (market JP; `audio-features` / `recommendations` are not used, restricted since
+  Nov 2024). Without keys, or when the API fails: `music_curated.json` (9 genres x ~14 public tracks: Tokyo city pop,
+  J-pop, lofi, hip-hop, anime, indie, electronic, jazz, piano), built by `analysis/build_music_list.py` from public
+  playlists' embed metadata (explicit / 19+ tracks dropped); each picked ID is checked once with oEmbed (no key) and
+  cached in `/data/music.json`. Queries: time of day (morning jazz/piano, evening hip-hop/city pop, late-night lofi),
+  favoured taste words, words taught in the last 2 days, `mind.next_interest`, and chat wishes ("play …", "metti …",
+  through `chat.blocked`; `music.wish`).
+- His brain chooses: 3-5 candidates are `brain_vote` options (`action: "listen"`); their networks come from the genre
+  tags + title + artist through `chat.networks_for` (no audio analysis). Music calls `brain_vote.vote`
+  directly (the rate model; `brain_vote.Backend` / spiking only votes on browsing so far).
+  The stay response while a track plays (a second `PageWatch`) goes to `tastes.learn` with the topics
+  `net:*`, `kw:*` and `kw:<genre>`, so a music taste forms over days.
+- `life.py`: `listen_music` (on the bed, 8-25 sim min; boredom, sleep pressure, evening, a chat wish; needs first: food
+  outranks it and interrupts it). Background music is a flag, not an activity: `Life.music_bg_ok()` (reading or chess
+  at the desk, the park bench, walking outside); `live_server` rolls once per activity (`MUSIC_BG_P` 0.4). The snapshot
+  carries `life.music` = {title, artist, mode} for the room's headphones.
+- `GET /api/music`: now playing (title, artist, album art, Spotify URL, embed URL, the vote's options and reason), today's
+  tracks with why each was picked, the source, live wishes. `music` websocket messages on start and end; one row per
+  track in `/data/music.jsonl`. Cards on `/brain` and `/life.html`; the room (headphones, head nod) waits for #63.
+- Mind and diary: each track is a `music` item in the mind's memory (`day_notes()["listened"]`); the diary gets the
+  day's genres and the one playing when he fell asleep ("it fell asleep after city pop"; genres only, no artist names).
+- Wording: "his brain model leaned toward …", never "he loves this song".
+
 ## His spiking neurons in the day (#55, `docs/spiking/live_cpu.md`)
 - `spiking/live.py`: a 20k-neuron spiking network runs in a child process (`python -m spiking.live`). It uses numpy and
   the same construction as `net.py` via `spiking/wiring.py`, no torch. It speaks the decision protocol shared with #58
@@ -261,8 +290,8 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `/brain`: a **neurons** layer button (≤ 20k `THREE.Points`, `web/neurons3d.js` + `web/neurons3d.json`); offline it
   reads "neurons offline" and never shows spikes. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
   only changes the iframe `src`. The Neurons panel (`/brain`, `/life`) reads the compact raster (one row a region).
-- GPU frames have no per-region rates until `spiking/session.py` adds `msg["rq"] = frames.quantise_rates(rr)` in
-  `frame()` (left to #70); until then the page tints regions by their network group's rate and says so.
+- GPU frames carry per-region rates (`session.py` `frame()`: `"rq": quantise_rates(rr)`); a pod without it is tinted
+  by network group rates, labelled. The panel also lists #70's real decisions per day (learned vs frozen twin).
 
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
@@ -280,6 +309,29 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   a logged-in site (captions, hashtags, creators) pass `video_text_ok`.
 - `/api/browsing` → `accounts`: `{"tiktok": {"state": "logged in" | "logged out", "reason"}}`. Risk note and cookie
   refresh steps in `docs/OPERATIONS.md`.
+
+## Daily clips for the social accounts (#59, PR `feature/daily-clips`)
+- `clips.py`: up to three vertical clips a day (1080x1920, 15-40 s, H.264, no audio) in `/data/clips/`, kept 14 Tokyo
+  days: `day` ("A day in 30 s": desk screenshots / eye frames sampled every 20 min, captions from the life and reading
+  logs), `dream` (the closed diary night: its frames, title and sentences), `choice` (a chess position with the 5
+  candidates and the vote bars, or a browsing options card). Every frame has the corner label "AI · fictional character
+  · simulated brain"; every clip ends on a card with the site name. Captions go through `clips.safe` (no finance words,
+  no "thinks/feels"/mind claims, no links); life-log motives are cut ("hungry: orders food" -> "orders food"); the chart
+  activity is never sampled; a browsing card with one unsafe option is left out whole.
+- The server only samples (cheap reads every 60 s). Renders run in a child at `nice 19` with no secrets in its env,
+  RLIMIT_CPU 120 s over Pillow + ffmpeg (`-threads 1 -preset veryfast`), one at a time, only at Tokyo 01:00-07:00 or
+  with at most `SUB01_CLIPS_LOW_VIEWERS` (20) websockets. A day clip costs ~17 CPU-s, dream ~13, choice ~8.
+  `analysis/bench_clips.py` measures the tick with renders running (see the PR for numbers).
+- Room capture (`CLIPS_ROOM=1`, off by default): 6 frames of `/` in a headless Chromium child, once a day. Software
+  WebGL makes it ~380 CPU-s per capture, so it stays off on Railway's shared CPU.
+- `/admin/clips` (the site password's cookie, the `SUB01_ADMIN_TOKEN` header, or the token typed into its form, which
+  sets an HttpOnly cookie on `/admin`): today's and recent clips, download, the ready caption (<= 150 characters with
+  the label, + `#AI #AIgenerated #digitaltwin #Tokyo #simulation`) and a copy button.
+- Auto-post, off unless set: `TIKTOK_POST_TOKEN` (Content Posting API; `TIKTOK_POST_MODE` draft (default, inbox) or
+  direct with `is_aigc` and `TIKTOK_PRIVACY` SELF_ONLY), `YOUTUBE_CLIENT_ID` + `YOUTUBE_CLIENT_SECRET` +
+  `YOUTUBE_REFRESH_TOKEN` (resumable upload, `YOUTUBE_PRIVACY` private, `containsSyntheticMedia`). One post per
+  platform per Tokyo day, also when it fails; each is a $0 `clips` row in `costs.jsonl` (`/api/costs` → `posts_today`).
+  `CLIPS=0` turns the whole thing off.
 
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.

@@ -20,7 +20,7 @@ import os
 import secrets
 import time
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import aiohttp
@@ -38,9 +38,15 @@ ITEMS_FILE = "memory_tests.jsonl"   # one row per tested item: {day, item, sourc
 MEMORY_NOTE = "Recall by a simulated spiking network from a partial cue; a model, not a mind."
 EXTRA_KINDS = {"encode": "encodes", "rates": "rates", "delays": "delays", "sleep": "sleeps",   # stored, not on the page
                "choice_curve": "choice_curves", "choice_exam": "choice_exams", "choice_replay": "choice_replays",
-               "live": "live", "live_bench": "live_bench"}
+               "live": "live", "live_bench": "live_bench", "live_learn": "live_learn"}
 NET_LABEL = "1M-neuron network on GPU"     # the decision card's name for this network (#58)
 DECISIONS_FILE = "gpu_decisions-{day}.jsonl"
+LEARNING_FILES = ("decisions-{day}.jsonl", DECISIONS_FILE)   # #55's log and ours, merged by id (#70)
+LEARNING_DAYS = 14                  # days in the status's learning curve
+LEARNING_TTL_S = 60.0
+LEARNING_NOTE = ("Real decisions: the fraction of picks whose later outcome was positive, per day. Replay: on the "
+                 "same day's decisions, how often the network's own pick agrees with the outcomes, learned vs its "
+                 "frozen twin (every learned change removed). Measured numbers only; a model, not a mind.")
 MAX_OPTIONS = 8
 MAX_ANSWERED = 512                  # decisions the pod answered that can still get their reward
 MAX_WS_MSG = 1 << 20
@@ -77,6 +83,7 @@ class SpikingHub:
         self._waiting = {}                  # decision id -> future
         self.answered = OrderedDict()       # decision id -> Tokyo day of the decision
         self.decide_stats = {"asked": 0, "answered": 0, "timeouts": 0, "rewards": 0}
+        self._learning = (-1e9, None)       # (monotonic time, cached learning curve)
         self._manager = None
         self.budget = frames.Budget(clock=lambda: self.clock())     # what each viewer gets of both networks' frames
         self.sample = frames.Sample.one_per_region(200, 214)        # the GPU raster's neurons (set on hello)
@@ -436,6 +443,43 @@ class SpikingHub:
         return web.json_response({"ok": True})
 
     # --- page ---------------------------------------------------------------------
+    def learning(self):
+        """The real decisions' learning curve (choice.payoff_by_day) over the last LEARNING_DAYS Tokyo days, from
+        the decision logs and the night replays; cached for LEARNING_TTL_S."""
+        t, cached = self._learning
+        if cached is not None and time.monotonic() - t < LEARNING_TTL_S:
+            return cached
+        from spiking.choice import payoff_by_day
+        today = datetime.now(ROME).date()
+        rows = {}
+        for k in range(LEARNING_DAYS - 1, -1, -1):
+            day = (today - timedelta(days=k)).isoformat()
+            for name in LEARNING_FILES:
+                try:
+                    lines = (self.dir / name.format(day=day)).read_text().splitlines()
+                except OSError:
+                    continue
+                for ln in lines:
+                    try:
+                        rows.setdefault(day, []).append(json.loads(ln))
+                    except ValueError:
+                        continue
+        first = (today - timedelta(days=LEARNING_DAYS - 1)).isoformat()
+        replays = []
+        try:
+            for ln in (self.dir / f"{EXTRA_KINDS['choice_replay']}.jsonl").read_text().splitlines()[-200:]:
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                if isinstance(r, dict) and str(r.get("day") or "") >= first:
+                    replays.append(r)
+        except OSError:
+            pass
+        out = {"days": payoff_by_day(rows, replays), "note": LEARNING_NOTE}
+        self._learning = (time.monotonic(), out)
+        return out
+
     def status(self):
         mgr = self.manager.status() if self.manager else {}
         live = bool(mgr.get("live")) if mgr else self.connected and self.session is not None
@@ -447,6 +491,7 @@ class SpikingHub:
                 "day_live": mgr.get("day_live") if mgr else None,
                 "decisions": {"live_ready": self.live_ready, **self.decide_stats},
                 "stream": dict(self.budget.sent),
+                "learning": self.learning(),
                 "last": {k: self.last.get(k) for k in KINDS},
                 "spend": mgr.get("spend") or CostLog(self.dir / "costs.jsonl").summary()}
 

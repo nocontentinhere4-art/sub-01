@@ -21,7 +21,9 @@
   `/brain?mini&neurons=1`; nothing else is needed. A room that draws its own brain can instead call
   `Neurons3D.create({THREE, scene, nodes, cortex, sizes})` (`web/neurons3d.js`, works with r128 and r169).
 - `/life` (`web/life.html`) and `/brain`: the Neurons panel (`web/neurons.js`) reads the compact frames; its raster now
-  has one row a region (214) and shows the sampled spikes.
+  has one row a region (214) and shows the sampled spikes. It also lists the real decisions per Tokyo day from
+  `/api/spiking/status` → `learning` (#70): picks that paid off per network, and the night replay's learned vs frozen
+  twin agreement, as measured.
 - Drawing: one `THREE.Points` draw call, attributes uploaded only when spikes arrive and the layer is on; the page
   draws nothing while the brain is off screen (IntersectionObserver, now for the full page too) or the tab is hidden.
 
@@ -37,20 +39,11 @@ Both networks' `{"type": "spiking"}` frames are made compact before any viewer g
 
 - CPU network (`spiking/live.py`, frame builder only): records every neuron's spikes (row = neuron id; the network
   itself is unchanged), measures per-region rates, packs a uniform sample of ≤ 400 spikes.
-- GPU network (`spiking/server.py`): the hub turns the pod's `raster.spikes` (200 rows, one neuron a region) into
-  `n3.sq`; which region and slot each row is comes from `frames.gpu_sample(n_neurons)`, the same draws as
-  `net.enable_raster`. Its frames carry no per-region rates yet: the page then tints each region by its network group's
-  rate and says so.
-- **The one call `spiking/session.py` needs** (for #70), in `frame()` next to the other fields of `msg` (it already
-  computes `rr = net.region_rates_since(self.frame_snap)` there):
-
-  ```python
-  from spiking import frames          # top of the file
-  msg["rq"] = frames.quantise_rates(rr)
-  ```
-  `viewer_frame` passes it through as `n3.rq`. (Optional, later: a larger raster sample than one neuron a region,
-  e.g. `net.enable_raster(1000)`; `frames.gpu_sample` then falls back to the one-neuron-a-region map, so that would
-  need its ids sent once in `hello`.)
+- GPU network (`spiking/server.py`, `spiking/session.py`): the session's `frame()` adds `"rq":
+  frames.quantise_rates(rr)` (the per-region rates it already measured); the hub turns the pod's `raster.spikes` (200
+  rows, one neuron a region) into `n3.sq`, which region and slot each row is coming from `frames.gpu_sample(n_neurons)`,
+  the same draws as `net.enable_raster`. A pod built before this change sends no `rq`: the page then tints each region
+  by its network group's rate and says so.
 
 ### Per-viewer budget (`frames.Budget`, one on the server)
 A token bucket of 3 000 B/s (burst 1 500 B) over both networks, as the server serialises each frame:
@@ -72,8 +65,8 @@ Measured (`tests/test_neurons3d.py::test_stream_per_viewer_under_3_kb_s`, a real
 - room (lite feed): 0 B/s of spiking frames.
 
 ## Honesty
-- Every flash is a recorded spike of a model neuron, sampled; every tint is a measured rate (or, for the GPU until #70
-  adds `rq`, its network group's measured rate, labelled). With no frames the layer is off and says offline.
+- Every flash is a recorded spike of a model neuron, sampled; every tint is a measured rate (or, from a pod without `rq`, its network group's
+  measured rate, labelled). With no frames the layer is off and says offline.
 - The recorded stream in `tests/neurons3d_shots.py` (real frames of the 20k CPU network recorded in the test process)
   is replayed by the test into the page's socket handler for screenshots and FPS only; the server never serves it.
 - Wording: "a model, not a mind"; nothing says he understands, feels, is conscious or alive.

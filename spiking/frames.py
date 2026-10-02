@@ -7,7 +7,7 @@ pairs, ~4-36 KB a frame) is replaced by
 
   "n3": {"v": 1,
          "rq": base64, one byte a region (214): the region's spike rate on a log scale (quantise_rates), when the
-               producer measured per-region rates (the CPU network does; the GPU session needs one call, below),
+               producer measured per-region rates (both networks do: spiking/live.py and spiking/session.py),
          "sq": base64, 3 bytes a spike: region index, neuron slot 0-255 inside the region, time in the frame (0-255 of
                `span`) (pack_spikes): a uniform sample of the recorded spikes, at most SPIKE_CAP (400),
          "span": simulated ms the frame covers, "ns": spikes recorded in the frame (before the sample),
@@ -22,10 +22,8 @@ Nothing here invents activity: every packed spike is a recorded spike of a sampl
 measured per-region rates has no "rq" (the page then tints the regions by their network's group rate and says so).
 With no live network nothing is sent, and the page says the neurons are offline.
 
-GPU session (spiking/session.py, owned by #70): its frame() already computes the per-region rates `rr`; the one call
-it needs, next to the other fields of `msg`, is
-    msg["rq"] = frames.quantise_rates(rr)
-viewer_frame passes a producer's "rq" through.
+GPU session (spiking/session.py): its frame() sends "rq": quantise_rates(rr), the per-region rates it measures anyway;
+viewer_frame passes a producer's "rq" through (a pod built before that sends none).
 """
 import base64
 import json

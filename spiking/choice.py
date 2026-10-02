@@ -93,6 +93,88 @@ def race(cum_counts, sizes, dt_ms, thr_hz, min_ms=0):
     return int(np.argmax(r)), cum.shape[0] * dt_ms, True
 
 
+READOUTS = ("race", "scaled", "diff", "window")
+
+
+class Readout:
+    """How a decision is read from the action pools (#70). Shared by ChoiceTask and LiveChooser; pure numpy, so a CPU
+    network can use it too. Every check_ms the caller passes the spike counts of each offered pool since cue onset;
+    check() returns the winner or None (keep running). Nothing is decided before min_ms; at the timeout the caller
+    takes final() (the highest pool, flagged as a timeout).
+
+    Calibration (calibrate()): the pool rates at calib_ms in repeated presentations of one offer on the network as it
+    is (P presentations x K pools, pool sizes n_cal). Modes:
+    - race:   the first pool whose mean rate is above mean + thr_z sd (sd over pools and presentations): the #39 rule.
+              At 1M neurons the pools have ~4,000 neurons, sd is ~0.3 Hz and the threshold is crossed at the first check.
+    - scaled: the race with thr_z scaled with pool size, thr = mean + thr_z sd sqrt(n_cal / ref_pool) (never below
+              the race): the margin a ref_pool-neuron pool would need, so it stays about the same in Hz at any size.
+    - diff:   a race on the lead of the top pool over the second: decide when r1 - r2 > diff_k sd_d(t, n), where
+              sd_d is the noise sd of a pool-rate difference (the sd over presentations of r_i - r_j, pooled over
+              pairs: the pools' fixed biases are not noise), scaled as Poisson noise to the time since onset and to
+              the offered pools' size: sd_d(t, n) = sd_d * sqrt(calib_ms / t) * sqrt(n_cal / n).
+    - window: a fixed integration window: the highest pool at window_ms.
+    """
+
+    def __init__(self, mode="race", thr_z=2.0, ref_pool=100, diff_k=3.0, window_ms=200, min_ms=50, calib_ms=100):
+        if mode not in READOUTS:
+            raise ValueError(f"unknown read-out {mode!r} (one of {READOUTS})")
+        self.mode, self.thr_z, self.ref_pool, self.diff_k = mode, float(thr_z), float(ref_pool), float(diff_k)
+        self.window_ms, self.min_ms, self.calib_ms = int(window_ms), int(min_ms), int(calib_ms)
+        self.mean = self.sd = self.sd_diff = self.n_cal = None
+        self.thr_hz = None                       # race / scaled: the threshold in Hz (None: not calibrated)
+
+    @property
+    def calibrated(self):
+        return self.mean is not None or self.thr_hz is not None
+
+    def calibrate(self, rates, sizes):
+        """rates: (P presentations, K pools) mean rates at calib_ms; sizes: the K pool sizes."""
+        r = np.asarray(rates, dtype=float)
+        self.mean, self.sd = float(r.mean()), float(r.std())
+        self.n_cal = float(np.mean(np.maximum(1, np.asarray(sizes, dtype=float))))
+        k = r.shape[1]
+        var = [np.var(r[:, i] - r[:, j], ddof=1) for i in range(k) for j in range(i + 1, k)] if r.shape[0] > 1 else []
+        self.sd_diff = float(np.sqrt(np.mean(var))) if var else 0.0
+        z = self.thr_z * (max(1.0, math.sqrt(self.n_cal / self.ref_pool)) if self.mode == "scaled" else 1.0)
+        self.thr_hz = self.mean + z * self.sd
+        return self.info()
+
+    def info(self):
+        out = {"readout": self.mode, "pool_rate_mean_hz": round(self.mean, 2) if self.mean is not None else None,
+               "pool_rate_sd_hz": round(self.sd, 3) if self.sd is not None else None,
+               "threshold_hz": round(self.thr_hz, 2) if self.thr_hz is not None else None, "thr_z": self.thr_z,
+               "pool_size_calib": round(self.n_cal, 1) if self.n_cal is not None else None}
+        if self.mode == "scaled":
+            out["ref_pool"] = self.ref_pool
+        if self.mode == "diff":
+            out.update(diff_k=self.diff_k, diff_sd_hz=round(self.sd_diff, 3) if self.sd_diff is not None else None)
+        if self.mode == "window":
+            out["window_ms"] = self.window_ms
+        return out
+
+    def rates(self, counts, sizes, ms):
+        return np.asarray(counts, dtype=float) / np.maximum(1, np.asarray(sizes, dtype=float)) / (ms / 1000.0)
+
+    def check(self, counts, sizes, ms):
+        """The winner at this check (index into the offered pools), or None to keep running."""
+        if ms < self.min_ms or not self.calibrated:
+            return None
+        r = self.rates(counts, sizes, ms)
+        if self.mode == "window":
+            return int(np.argmax(r)) if ms >= self.window_ms else None
+        if self.mode == "diff":
+            if len(r) < 2 or self.sd_diff is None:
+                return None
+            top = np.sort(r)[::-1]
+            n = float(np.mean(np.maximum(1, np.asarray(sizes, dtype=float))))
+            sd = self.sd_diff * math.sqrt(self.calib_ms / ms) * math.sqrt(self.n_cal / n)
+            return int(np.argmax(r)) if top[0] - top[1] > self.diff_k * sd else None
+        return int(np.argmax(r)) if (r > self.thr_hz).any() else None
+
+    def final(self, counts, sizes, ms):
+        return int(np.argmax(self.rates(counts, sizes, ms)))
+
+
 def trials_to_criterion(correct, window=20, need=14, start=0):
     """Number of trials from `start` until `need` of the last `window` are correct (None if never)."""
     c = np.asarray(correct[start:], dtype=int)
@@ -146,7 +228,7 @@ class ChoiceTask:
 
     def __init__(self, net, labels=None, k=4, probs=None, cue_frac=0.15, cue_amp=8.0, check_ms=10, min_ms=50,
                  timeout_ms=250, iti_ms=150, thr_z=2.0, eta=0.6, alpha=0.1, v0=0.5, bonus_mv=0.0,
-                 eta_decay=0.0, seed=0):
+                 eta_decay=0.0, seed=0, readout="race", readout_kw=None):
         import torch
         from .memory import MemorySystem
         self.torch = torch
@@ -157,6 +239,7 @@ class ChoiceTask:
         self.cue_amp, self.check_ms, self.min_ms, self.timeout_ms, self.iti_ms = cue_amp, check_ms, min_ms, timeout_ms, iti_ms
         self.thr_z, self.eta, self.alpha, self.v0, self.bonus_mv, self.eta_decay = thr_z, eta, alpha, v0, bonus_mv, eta_decay
         self.seed = seed
+        self.readout = Readout(readout, thr_z=thr_z, min_ms=min_ms, **(readout_kw or {}))
         reg = net.reg
         cue_regions = sorted(set(sum((reg.groups[g] for g in CUE_GROUPS), [])))
         cue_space = np.concatenate([net.region_neurons(r, exc_only=True) for r in cue_regions])
@@ -176,10 +259,17 @@ class ChoiceTask:
             self.syn = {"q": torch.as_tensor(q, device=net.device), "pre": psrc[q], "post": pdst[q]}
         self.V = np.full(k, v0)
         self.n_chosen = np.zeros(k)
-        self.thr_hz = None
         self.trial = 0                                               # trials of training so far (schedule clock)
         self.log = []
         self.last = None                                             # last trial (for the live frame)
+
+    @property
+    def thr_hz(self):
+        return self.readout.thr_hz
+
+    @thr_hz.setter
+    def thr_hz(self, v):
+        self.readout.thr_hz = v
 
     # --- pools ------------------------------------------------------------------------------------------------
     def pools(self, offered):
@@ -222,14 +312,12 @@ class ChoiceTask:
                 row = [float(net.count[pt].sum()) - b for pt, b in zip(pool_t, base)]
                 cum.append(row)
                 ms = (t + 1) * self.check_ms
-                if self.thr_hz is not None and ms >= self.min_ms:
-                    r = np.array(row) / sizes / (ms / 1000.0)
-                    if (r > self.thr_hz).any():
-                        winner = (int(np.argmax(r)), ms, False)
-                        break
+                w = self.readout.check(row, sizes, ms)
+                if w is not None:
+                    winner = (w, ms, False)
+                    break
             if winner is None:
-                w, _, _ = race(cum[-1:], sizes, len(cum) * self.check_ms, float("inf"))
-                winner = (w, len(cum) * self.check_ms, True)
+                winner = (self.readout.final(cum[-1], sizes, len(cum) * self.check_ms), len(cum) * self.check_ms, True)
             pre = net.rates_since(snap, self.syn["pre"]) if (learn and self.syn is not None) else None
         finally:
             net.set_neuron_drive("choice_cue", None)
@@ -256,26 +344,32 @@ class ChoiceTask:
         return float((eta * delta * tag).abs().sum())
 
     def calibrate(self, presentations=12):
-        """Threshold = mean + thr_z sd of the pool rates at 100 ms, on the network as it is (plasticity frozen)."""
+        """The read-out's calibration (see Readout): the pool rates at 100 ms of the full offer, on the network as
+        it is (plasticity frozen). A threshold set by hand before (thr_hz) is kept."""
         p = self.net.plast
         was = p.frozen if p is not None else None
         if p is not None:
             p.frozen = True
-        rates = []
-        thr, self.thr_hz = self.thr_hz, None
+        rows, sizes = [], None
+        ro, thr = self.readout, self.readout.thr_hz
+        self.readout = Readout(ro.mode, thr_z=ro.thr_z, ref_pool=ro.ref_pool, diff_k=ro.diff_k,
+                               window_ms=ro.window_ms, min_ms=10 ** 9, calib_ms=ro.calib_ms)   # never decides
         try:
             for _ in range(presentations):
                 offered = list(range(self.k))
                 _, _, _, _, pools, cum = self._present(offered, learn=False)
-                i = min(len(cum), max(1, 100 // self.check_ms)) - 1
-                rates.extend((cum[i] / np.array([len(pl) for pl in pools]) / ((i + 1) * self.check_ms / 1000)).tolist())
+                i = min(len(cum), max(1, ro.calib_ms // self.check_ms)) - 1
+                sizes = np.array([len(pl) for pl in pools])
+                rows.append(cum[i] / np.maximum(1, sizes) / ((i + 1) * self.check_ms / 1000))
                 self.net.run(self.iti_ms)
         finally:
+            self.readout = ro
             if p is not None:
                 p.frozen = was
-        self.thr_hz = float(np.mean(rates) + self.thr_z * np.std(rates)) if thr is None else thr
-        self.calib = {"pool_rate_mean_hz": round(float(np.mean(rates)), 2), "pool_rate_sd_hz": round(float(np.std(rates)), 2),
-                      "threshold_hz": round(self.thr_hz, 2)}
+        ro.calibrate(rows, sizes)
+        if thr is not None:
+            ro.thr_hz = thr
+        self.calib = ro.info()
         return self.calib
 
     def run(self, trials, schedule, mode="train", offered=None, on_trial=None):
@@ -362,7 +456,7 @@ def experiment(net, trials=160, k=4, probs=None, reversal=True, seed=0, frozen_n
     # frozen control first (same network, no learning), on its own copy of the same reward stream
     ctrl_net = frozen_net if frozen_net is not None else net
     ctrl = ChoiceTask(ctrl_net, k=k, probs=probs, seed=seed, **task_kw)
-    ctrl.thr_hz = task.thr_hz
+    ctrl.readout = task.readout
     r = ctrl.run(trials, RewardSchedule(probs, rev, seed=seed), mode="exam")
     out["frozen"] = {**summarize(r["correct"], r["rewards"], rev, window, need), "timeout_frac": r["timeout_frac"]}
     res = task.train(trials, RewardSchedule(probs, rev, seed=seed), on_trial=on_trial)
@@ -379,6 +473,8 @@ def experiment(net, trials=160, k=4, probs=None, reversal=True, seed=0, frozen_n
 LIVE_WORDS = 3                   # content words of a label that become its cue
 LIVE_WORD_FRAC = 0.05            # per word: 3 words ~ the 15 % cue of one ChoiceTask label
 MAX_LIVE_LABELS = 4096           # per-label value estimates kept (least recently used dropped)
+LIVE_READOUT = "diff"            # #70: learned as well as the race at 1M and does not depend on the absolute pool
+                                 # rate, which drifts (docs/spiking/choice.md, "Read-outs at scale")
 
 
 def label_key(label):
@@ -395,7 +491,7 @@ class LiveChooser:
     - Cue of a label: the union of its first LIVE_WORDS content words, each hashed as in memory.py at
       LIVE_WORD_FRAC of the excitatory neurons of every visual and language parcel; labels that share a word
       share part of their cue. Pools: the striatal neurons split among the offered labels by hashed affinity.
-    - decide() runs the race and returns the pick, the pool rates and an eligibility tag set at the decision
+    - decide() runs the read-out (Readout, default LIVE_READOUT) and returns the pick, the pool rates and an eligibility tag set at the decision
       (pre = cue-neuron rate in the window, post = +1 chosen pool, -1/(K-1) other offered pools).
     - reward() applies dw += eta_l * delta * tag with delta = value - V[label] (the #39 rule). Stability fix
       (docs/spiking/choice.md: preferences flipped back and forth): a slow value estimate (alpha 0.05 instead of
@@ -405,12 +501,16 @@ class LiveChooser:
     """
 
     def __init__(self, net, cue_amp=8.0, check_ms=10, min_ms=50, timeout_ms=250, thr_z=2.0, eta=0.6,
-                 eta_min=0.15, eta_tau=20.0, alpha=0.05, word_frac=LIVE_WORD_FRAC):
+                 eta_min=0.15, eta_tau=20.0, alpha=0.05, word_frac=LIVE_WORD_FRAC, readout=LIVE_READOUT,
+                 readout_kw=None):
         import torch
         from .memory import MemorySystem
         self.torch, self.net = torch, net
         self.cue_amp, self.check_ms, self.min_ms, self.timeout_ms = cue_amp, check_ms, min_ms, timeout_ms
         self.thr_z, self.eta, self.eta_min, self.eta_tau, self.alpha = thr_z, eta, eta_min, eta_tau, alpha
+        self.readout = Readout(readout, thr_z=thr_z, min_ms=min_ms, **(readout_kw or {}))
+        if self.readout.mode == "window":                              # the window must fit before the timeout
+            self.timeout_ms = max(self.timeout_ms, self.readout.window_ms)
         reg = net.reg
         cue_regions = sorted(set(sum((reg.groups[g] for g in CUE_GROUPS), [])))
         self.cue_space = np.concatenate([net.region_neurons(r, exc_only=True) for r in cue_regions])
@@ -418,7 +518,7 @@ class LiveChooser:
         self.action = net.group_neurons(ACTION_GROUP, exc_only=True)
         self._cues, self._aff = {}, {}
         self.V, self.n = {}, {}
-        self.thr_hz, self.calib = None, None
+        self.calib = None
         self.syn = None
         p = net.plast
         if p is not None:
@@ -429,6 +529,14 @@ class LiveChooser:
             psrc, pdst = p.psrc.long().cpu().numpy(), p.pdst.long().cpu().numpy()
             q = np.nonzero(in_cue[psrc] & is_act[pdst])[0]
             self.syn = {"q": q, "pre": psrc[q], "post": pdst[q]}
+
+    @property
+    def thr_hz(self):
+        return self.readout.thr_hz
+
+    def reset(self):
+        """Forget the value estimates and reward counts (a fresh learner on the same network)."""
+        self.V, self.n = {}, {}
 
     # --- cues and pools -----------------------------------------------------------------------------------------
     def cue(self, label):
@@ -474,15 +582,13 @@ class LiveChooser:
                 net.run(self.check_ms)
                 ms = (t + 1) * self.check_ms
                 row = np.array([float(net.count[pt].sum()) - b for pt, b in zip(pool_t, base)])
-                if self.thr_hz is not None and ms >= self.min_ms:
-                    r = row / sizes / (ms / 1000.0)
-                    if (r > self.thr_hz).any():
-                        winner = int(np.argmax(r))
-                        break
+                winner = self.readout.check(row, sizes, ms)
+                if winner is not None:
+                    break
             rates = row / sizes / (ms / 1000.0)
             timeout = winner is None
             if timeout:
-                winner = int(np.argmax(rates))
+                winner = self.readout.final(row, sizes, ms)
             elig = None
             if learn and self.syn is not None:
                 sel = np.isin(self.syn["pre"], cue_ids)
@@ -528,28 +634,27 @@ class LiveChooser:
         return {"delta": round(delta, 4), "eta": round(eta, 4), "dw_abs": round(float(d.abs().sum()), 4)}
 
     def calibrate(self, presentations=12, iti_ms=150, labels=DEFAULT_LABELS[:4]):
-        """Threshold = mean + thr_z sd of the pool rates at 100 ms (no learning), as ChoiceTask.calibrate."""
+        """The read-out's calibration (see Readout): the pool rates at 100 ms of one 4-label offer, no learning."""
         p = self.net.plast
         was = p.frozen if p is not None else None
         if p is not None:
             p.frozen = True
-        rates = []
-        self.thr_hz = None
-        i = min(int(self.timeout_ms // self.check_ms), max(1, 100 // self.check_ms))
+        ro = self.readout
+        rows = []
+        i = min(int(self.timeout_ms // self.check_ms), max(1, ro.calib_ms // self.check_ms))
+        to = self.timeout_ms
+        self.readout = Readout(ro.mode, min_ms=10 ** 9)                  # never decides: runs to the timeout
         try:
+            self.timeout_ms = i * self.check_ms
             for _ in range(presentations):
-                to, self.timeout_ms = self.timeout_ms, i * self.check_ms
-                try:
-                    rates.extend(self.decide(list(labels), learn=False)["pool_rates"])
-                finally:
-                    self.timeout_ms = to
+                rows.append(self.decide(list(labels), learn=False)["pool_rates"])
                 self.net.run(iti_ms)
         finally:
+            self.readout, self.timeout_ms = ro, to
             if p is not None:
                 p.frozen = was
-        self.thr_hz = float(np.mean(rates) + self.thr_z * np.std(rates))
-        self.calib = {"pool_rate_mean_hz": round(float(np.mean(rates)), 2), "pool_rate_sd_hz": round(float(np.std(rates)), 2),
-                      "threshold_hz": round(self.thr_hz, 2), "thr_z": self.thr_z}
+        ro.calibrate(rows, [len(pl) for pl in self.pools(list(labels))])
+        self.calib = ro.info()
         return self.calib
 
     # --- persistence (kept in the learned-weights meta) ----------------------------------------------------------
@@ -574,3 +679,162 @@ def replay_fit(decisions, picks):
         n += 1
         hits += int((mine == d["pick"]) if v > 0 else (mine != d["pick"]))
     return (round(hits / n, 4) if n else None), n
+
+
+# --- the live learning benchmark (#70): #39's bandit with variable offers and real labels -------------------------
+BANDIT_LABELS = ("Tea ceremony history", "Moon landing archive", "Inokashira park map", "Sourdough bread starter",
+                 "Stock market news", "Football transfer rumours", "Lighthouse keepers", "Origami crane tutorial")
+BANDIT_PROBS = (0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0.25, 0.15)
+
+
+def bandit_stream(trials, n_labels, kmin=2, kmax=6, seed=0):
+    """The offers (2-6 of the labels, a random subset each trial) and the uniform numbers that decide the rewards:
+    the same stream for the learned run, the frozen twin and the random chooser."""
+    rng = np.random.default_rng(seed)
+    offers = [sorted(rng.choice(n_labels, size=int(rng.integers(kmin, min(kmax, n_labels) + 1)), replace=False).tolist())
+              for _ in range(trials)]
+    return offers, rng.random(trials)
+
+
+def bandit_value(rewarded):
+    """The dopamine value of an outcome: +1 paid off, -1 did not (a signed outcome, as chess's +1 / -1)."""
+    return 1.0 if rewarded else -1.0
+
+
+def bandit_random(schedule, offers, u, seed=0, window=20, need=14):
+    rng = np.random.default_rng(seed)
+    correct, rewards = [], []
+    for t, off in enumerate(offers):
+        c = int(off[int(rng.integers(len(off)))])
+        correct.append(int(c == schedule.best(t, off)))
+        rewards.append(float(u[t] < schedule.probs(t)[c]))
+    return {**summarize(correct, rewards, schedule.reversal_at, window, need),
+            "chance": round(float(np.mean([1.0 / len(o) for o in offers])), 4)}
+
+
+def bandit_run(live, schedule, offers, u, labels, learn, iti_ms=150, on_trial=None, window=20, need=14):
+    """One pass of the bandit on a LiveChooser: decide among the offered labels, reward the pick from the hidden
+    probabilities (the same uniform numbers in every pass), dopamine only when `learn`. Returns the summary."""
+    net = live.net
+    p = net.plast
+    was = p.frozen if p is not None else None
+    if p is not None and not learn:
+        p.frozen = True
+    correct, rewards, timeouts, rts = [], [], [], []
+    try:
+        for t, off in enumerate(offers):
+            r = live.decide([labels[i] for i in off], learn=learn)
+            c = off[r["pick"]]
+            paid = bool(u[t] < schedule.probs(t)[c])
+            if learn:
+                live.reward(r["elig"], bandit_value(paid))
+            correct.append(int(c == schedule.best(t, off)))
+            rewards.append(float(paid))
+            timeouts.append(int(r["timeout"]))
+            rts.append(r["sim_ms"])
+            if on_trial:
+                on_trial(t)
+            net.run(iti_ms)
+    finally:
+        if p is not None:
+            p.frozen = was
+    rt = np.asarray(rts)
+    return {**summarize(correct, rewards, schedule.reversal_at, window, need),
+            "timeout_frac": round(float(np.mean(timeouts)), 3), "mean_rt_ms": round(float(rt.mean()), 1),
+            "decided_at_first_check_frac": round(float(np.mean(rt <= live.readout.min_ms)), 3)}
+
+
+def bandit_experiment(live, trials=240, readouts=("race", "scaled", "diff", "window"), readout_kw=None,
+                      labels=BANDIT_LABELS, probs=BANDIT_PROBS, reversal=True, seed=0, iti_ms=150, on_trial=None,
+                      on_readout=None):
+    """For each read-out, on the same network: calibrate, the frozen twin (plasticity frozen, the same offers and
+    reward stream), then the learned run from the same starting weights; the learned changes are removed again
+    after each read-out. A random chooser on the same stream. Returns all the numbers, whatever they are."""
+    net = live.net
+    p = net.plast
+    rev = trials // 2 if reversal else None
+    sch = RewardSchedule(list(probs), rev, seed=seed)
+    offers, u = bandit_stream(trials, len(labels), seed=seed)
+    out = {"labels": list(labels), "probs": list(probs), "trials": trials, "reversal_at": rev,
+           "offers": "2-6 of the labels per trial", "value": "+1 paid off / -1 not",
+           "criterion": "14 of the last 20 trials correct (correct: the best offered option)",
+           "random": bandit_random(sch, offers, u, seed=seed + 1), "readouts": {}}
+    dw0 = p.dw.clone() if p is not None else None
+    theta0 = net.theta.clone()
+    kw = readout_kw or {}
+    keep, values = live.readout, (dict(live.V), dict(live.n))
+    for j, mode in enumerate(readouts):
+        live.readout = Readout(mode, thr_z=live.thr_z, min_ms=live.min_ms, **kw.get(mode, {}))
+        to = live.timeout_ms
+        if mode == "window":
+            live.timeout_ms = max(to, live.readout.window_ms)
+        live.reset()
+        try:
+            calib = live.calibrate()
+            frozen = bandit_run(live, sch, offers, u, labels, learn=False, iti_ms=iti_ms)
+            learned = bandit_run(live, sch, offers, u, labels, learn=True, iti_ms=iti_ms,
+                                 on_trial=(lambda t, j=j: on_trial((j + 0.5 + 0.5 * (t + 1) / trials) / len(readouts)))
+                                 if on_trial else None)
+            out["readouts"][mode] = {"calibration": calib, "learned": learned, "frozen": frozen,
+                                     "labels_valued": len(live.V)}
+            if on_readout:
+                on_readout(mode, out)
+        finally:
+            live.timeout_ms = to
+            if p is not None:
+                p.dw.copy_(dw0)
+                p._apply()
+            net.theta.copy_(theta0)
+            net._dirty = True
+    live.readout = keep
+    live.V, live.n = values
+    return out
+
+
+# --- real decisions: did the picks pay off, and the night replay's learned vs frozen fit (#70) ----------------------
+def payoff_by_day(rows_by_day, replays=None):
+    """The learning curve of the real decisions, one entry per Tokyo day (oldest first), whatever it shows.
+
+    rows_by_day: {day: [jsonl rows of that day's decision logs]} (#55's decisions-<day>.jsonl and the hub's
+    gpu_decisions-<day>.jsonl): decision rows {id, options, pick, net} and reward rows {id, reward}, merged by id.
+    A pick "paid off" when its later reward is > 0. Per network ("gpu" and the rest): decisions, those with an
+    outcome, and the fraction that paid off. replays: the night's choice_replay results ({day, fit_before,
+    fit_frozen_twin, fit_after, fit_n}): on the same real decisions, how often the network's own pick agrees with the
+    outcomes, learned (before the night's replay) vs its frozen twin (every learned change removed)."""
+    rep = {}
+    for r in replays or []:
+        if isinstance(r, dict) and r.get("day"):
+            rep[str(r["day"])] = r                                      # the last replay of a day wins
+    out = []
+    for day in sorted(set(rows_by_day) | set(rep)):
+        merged = {}
+        for r in rows_by_day.get(day) or []:
+            if not isinstance(r, dict) or r.get("id") is None:
+                continue
+            cur = merged.setdefault(str(r["id"]), {})
+            if isinstance(r.get("pick"), int) and not isinstance(r.get("pick"), bool):
+                cur.setdefault("net", str(r.get("net") or "cpu"))
+                if r.get("net") == "gpu":                               # #55 logs the GPU's id too: the GPU's label wins
+                    cur["net"] = "gpu"
+                cur["picked"] = True
+            rew = r.get("reward", r.get("value"))
+            if isinstance(rew, (int, float)) and not isinstance(rew, bool) and math.isfinite(rew):
+                cur["reward"] = float(rew)
+        nets = {}
+        for d in merged.values():
+            if not d.get("picked"):
+                continue
+            s = nets.setdefault("gpu" if d["net"] == "gpu" else "other", {"decisions": 0, "with_outcome": 0, "paid_off": 0})
+            s["decisions"] += 1
+            if "reward" in d:
+                s["with_outcome"] += 1
+                s["paid_off"] += int(d["reward"] > 0)
+        for s in nets.values():
+            s["paid_off_frac"] = round(s["paid_off"] / s["with_outcome"], 4) if s["with_outcome"] else None
+        row = {"day": day, **nets}
+        r = rep.get(day)
+        if r:
+            row["replay"] = {"n": r.get("fit_n"), "learned": r.get("fit_before"), "frozen_twin": r.get("fit_frozen_twin"),
+                             "after_replay": r.get("fit_after")}
+        out.append(row)
+    return out

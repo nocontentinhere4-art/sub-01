@@ -775,7 +775,7 @@ def test_server_weights_roundtrip_and_prev(tmp_path, monkeypatch):
 def test_server_results_and_status(tmp_path):
     async def go(client, hub, live):
         st = await (await client.get("/api/spiking/status")).json()
-        assert set(st) == {"live", "session", "next_session", "day_live", "decisions", "stream", "last", "spend"} and st["live"] is False
+        assert set(st) == {"live", "session", "next_session", "day_live", "decisions", "stream", "learning", "last", "spend"} and st["live"] is False
         assert st["day_live"] is None and st["decisions"]["live_ready"] is False
         assert st["session"] is None and st["next_session"] is None
         assert set(st["last"]) == {"exam", "memory_test", "pong_curve", "bench"} and set(st["last"].values()) == {None}
@@ -1045,7 +1045,7 @@ def test_boot_py_subprocess_end_to_end(tmp_path):
         assert http_call(port, "PUT", "/upload", pack, token)[0] == 403                       # one upload only
         assert wait(lambda: json.loads(http_call(port, "GET", "/status.json")[1]).get("done") is True)
         assert json.loads(http_call(port, "GET", "/status.json")[1])["phase"] == "end"
-        assert wait(lambda: (out / "exit_code").exists()) and (out / "exit_code").read_text() == "0"
+        assert wait(lambda: (out / "exit_code").read_text() == "0")      # OSError until it exists; never seen empty
         assert (app / "dummymod.py").exists() and (out / "session.log").exists()
     finally:
         proc.kill()
