@@ -80,6 +80,8 @@
     border-radius:5px; cursor:pointer; }
   #n3close button.on { color:var(--or); border-color:rgba(255,106,0,.55); }
   @media (min-width: 901px) { body.closeup #cards { display:none; } }
+  body.closeup #dock { background:rgba(3,3,5,.74); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); padding:12px 14px;
+    margin:-12px -14px; border-radius:10px; }                   /* a close-up's neurons fill the screen: a scrim behind the panel (#88 A follow-up) */
   #chat { display:flex; gap:6px; }
   #chat input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
     font:inherit; font-size:13px; border-radius:8px; transition:border-color .2s; }

@@ -29,6 +29,7 @@ const nr = NeuronRender.open(container, {
   live: false,                 // is a spiking network live now? (updated by onFrame / setLive; see Activity)
   onClose(reason) {},          // the viewer zoomed out past the block ("zoomout") or pressed ✕ ("button")
   onInfo(info) {},             // counts changed (first build, LOD or style change): same object as nr.info()
+  debug: false,                // show fps in the overlay (default: only when the page URL has ?debug)
   groupRate(msg) {},           // optional: Hz of this region's network group from a frame without n3.rq (a pod built
                                //   before #62's per-region rates); the module quantises it like quantise_rates
 });
