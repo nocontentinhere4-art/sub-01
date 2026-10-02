@@ -1,8 +1,11 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 07:30 UTC** (pass 20). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 07:40 UTC** (pass 20b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 20b:** merged #47 (#43): the maps are drawn from a static OSM extract (130 KB), with no tile server and ODbL
+attribution. /about now states the search-box typing honestly. #46 (the mind in the room) started.
+
 **Pass 20:** merged #45, the mind layer live: page notes, a day plan voted by the brain, chat replies at the
 computer tagged "his reply (AI-written)". 531 tests with torch and Chromium, 0 skipped; tick 34.2–34.9 ms. The
 coordinator checked the caps on the real `Share` objects: mind $1.00 and eyes $1.00 each block at their cap, the total
@@ -51,7 +54,8 @@ Who is on what (cloud sessions, 2026-10-02):
 |---|---|---|
 | #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | merged as #40 (its 2 novelty hooks ride with #33 phase B) |
 | #31 teach him | `session_017R5d56EEZVdrsHDbvQuww9` | done: #41 (server, /brain) + #44 (room) |
-| #43 map without OSM tiles | `session_015XP5haU96uvbRUJf3p7Tam` | started 06:50 (`feature/static-map`) |
+| #43 map without OSM tiles | `session_015XP5haU96uvbRUJf3p7Tam` | merged as #47 |
+| #46 the mind in the room | `session_01Ek5DZG7cEvc1v7TV8PrEkz` | started 07:37 (`feature/mind-room`) |
 | #33 mind layer | `session_01KwLm3oYfsh8KhXjWTbrUPt` | done: #37 + #45 |
 | #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | started 07:25 (`perf/brain-step`) |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
@@ -59,7 +63,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py` / `brain_sim.py`, one at a time: **#19** (in progress) → #18 → #17 → #15. `web/room.html`: #43 map (in progress) → #46 the mind in the room.
+Next on `live_server.py` / `brain_sim.py`, one at a time: **#19** (in progress) → #18 → #17 → #15. `web/room.html`: #46 the mind in the room (in progress).
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -100,7 +104,7 @@ cheap to run, with the password gate kept until launch day.
 | 18i | Faster learning of tastes (adaptive rate, overnight replay of surprising pages) | done | #38 |
 | 18j | Spiking brain learns to choose (dopamine reward vs frozen and random controls) | done; nightly run needs `SUB01_CHOICE=1` on Railway (~90 s inside the 1 h) | #39 |
 | 18k | Room movement (walk around furniture, sit, lie down) | done (+ chair and bed follow-ups) | #28, #42 |
-| 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | in progress | issue #43 |
+| 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | done | #47 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done on the server (#37, #45); room view next | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
@@ -183,8 +187,9 @@ findings "NOT verified", and its reviews are partial on large diffs.
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
 ## Known risks
-- **Map tiles:** `room.html` and `life.html` load `tile.openstreetmap.org` directly; OSM already shows "Access blocked".
-  Must be fixed before launch: #43.
+- ~~Map tiles~~: fixed by #47 (static vector map).
+- **YouTube walk footage on /life** showed "error 153" in headless Chromium (a missing Referer?). Check it on the real
+  site before launch.
 - **CPU:** the brain loop alone uses ~63 % of one core (~31 ms per 50 ms tick, `main`, `--demo`, no Chromium).
   Chromium shares the CPU, so ticks can run late. Fix: #19.
 - **Bandwidth at launch:** after #34, 7.3 KB/s per brain-page viewer and 4.0 KB/s per room viewer. 300 steady viewers ≈
