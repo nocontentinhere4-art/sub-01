@@ -101,7 +101,7 @@
   #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
-  #desk [hidden] { display:none !important; }
+  #desk [hidden], #cards [hidden] { display:none !important; }   /* .card's display:block beat [hidden] (#89) */
   #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
   #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
@@ -652,7 +652,10 @@ function drawDA(){
 function screenEmbed(el, src, h, label){
   if ((el.dataset.src || "") === (src || "")) return;
   el.dataset.src = src || "";
-  el.innerHTML = src ? `<div class="m">${esc(label)}</div><iframe src="${esc(src)}" title="${esc(label)}" loading="lazy" style="width:100%;height:${+h || 80}px;border:0;border-radius:8px" allow="encrypted-media; fullscreen; picture-in-picture"></iframe>` : "";
+  el.innerHTML = src ? `<div class="m">${esc(label)}</div><iframe src="${esc(src)}" title="${esc(label)}" style="width:100%;height:${+h || 80}px;border:0;border-radius:8px" allow="encrypted-media; fullscreen; picture-in-picture"></iframe>` : "";
+  const fr = el.querySelector("iframe"); if (!fr) return;
+  fr.onload = () => { fr.dataset.loaded = "1"; };
+  setTimeout(() => { if (el.dataset.src === src && !fr.dataset.loaded) el.innerHTML = `<div class="m">${esc(label)} — the player did not load</div>`; }, 8000);
 }
 function renderScreens(d){
   if (!d || MINI) return;

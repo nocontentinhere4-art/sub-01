@@ -813,6 +813,9 @@ class Live:
         dec = self.decisions.get(dev)
         if st and not display_ok(st.get("title", "")):           # the public card never shows such a title
             st = dict(st, title=st.get("host", ""))
+        elif st and (m := screens.TIKTOK_ID.search(str(st.get("url") or ""))):   # #89: viewers may play it in
+            st = dict(st, embed={"src": screens.TIKTOK_EMBED.format(m.group(1)),     # TikTok's official player
+                                 "label": "TikTok (official embed)"})
         # the options belong to the page they were considered on and to the page the choice led to, no later one
         if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")
                            or (st.get("video") and st.get("url") == dec.get("led_to"))):   # a chosen video playing
@@ -921,6 +924,9 @@ class Live:
             return b
         gain = self.engine.gain
         self.neuro.burst(DA_BURST_K * b["size"])
+        cpu = getattr(getattr(self, "decider", None), "cpu", None)
+        if cpu is not None and hasattr(cpu, "burst"):          # the neurons panel's dopamine reading moves too
+            cpu.burst(min(1.0, b["size"]))
         self.brain.stimulate("reward", DA_REWARD * b["size"] * gain)
         await self.broadcast({"type": "dopamine", "size": b["size"], "rpe": b["rpe"], "novelty": b["novelty"],
                               "interest": b["interest"], "expect": b["expect"], "n": b["n"], "kind": kind,

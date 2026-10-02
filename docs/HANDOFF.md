@@ -220,6 +220,13 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     from the curated list" / "Spotify search down: …"), and the latest TikTok item in TikTok's official embed player
     ("TikTok (official embed)", `autoplay=0&muted=1`; only for captions that pass the filter). Both on `/brain` and
     `/life`.
+  - Live visual check (coordinator): `/life`'s phone overlay shows only a real screen (the phone screenshot, or TikTok's
+    official embed player for a public TikTok, `screen_status` → `embed`, with the screenshot of the oEmbed card as
+    the fallback when the player does not load in 8 s); nothing at all when there is no screenshot (no blank box, no
+    chart). `/brain`: `.card`'s `display:block` beat `[hidden]`, so the empty "Now playing" and "At his desk" cards
+    showed placeholders; `#cards [hidden]` now hides them (the screens panel says "no music playing"). The neurons
+    panel's "dopamine" now moves with each burst: `LiveClient.burst` → the spiking child's `burst` (display only, no
+    weight change), decaying with `DA_SHOW_TAU_S` (30 s).
   - `tests/test_novelty.py` replays the live hosts and titles (Studio Ghibli ×3 + variants, the MediaWiki page ×3, the
     abc article ×2 → 3 pages opened; Contact Us, the ABC home page, CC licence deeds, privacy/terms/about never
     offered; "tiktok videos" → the shorts feed). `analysis/novelty_replay.py` runs the real choice path for 3

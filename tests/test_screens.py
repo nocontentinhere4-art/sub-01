@@ -356,3 +356,45 @@ def test_music_is_in_the_screens_panel_and_says_where_it_comes_from(tmp_path):
                       "embed": "https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC", "embed_height": 152}
     now = live.music_line()["now"]
     assert now["title"] == "Plastic Love" and now["embed"].startswith("https://open.spotify.com/embed/")
+
+
+def test_a_burst_moves_the_neurons_panel_dopamine_and_decays():
+    from spiking import live as SL
+    b = SimpleNamespace(last_da=0.0, da_t=time.time())
+    b.dopamine_now = lambda: SL.LiveBrain.dopamine_now(b)
+    SL.LiveBrain.burst(b, 0.4)
+    assert b.dopamine_now() == pytest.approx(0.4, abs=0.01)
+    SL.LiveBrain.burst(b, 0.1)                                  # a smaller burst does not lower the reading
+    assert b.last_da == 0.4
+    b.da_t -= SL.DA_SHOW_TAU_S * 3
+    assert b.dopamine_now() < 0.03                               # back towards 0 after a while
+    sent = []
+    SL.handle(SimpleNamespace(burst=lambda v: sent.append(v)), json.dumps({"type": "burst", "value": 0.3}).encode(),
+              lambda m: sent.append(m))
+    assert sent == [0.3]                                         # applied, no answer line
+
+
+def test_a_new_short_sends_the_burst_to_the_spiking_child(tmp_path):
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    got = []
+    live.decider = SimpleNamespace(cpu=SimpleNamespace(burst=lambda v: got.append(v)))
+
+    async def bc(msg):
+        pass
+    live.broadcast = bc
+    run(live.on_screen({"url": "https://www.youtube.com/shorts/zzzzzzzz1", "title": "Tiny sushi", "device": "phone",
+                        "id": 1}))
+    assert got and 0 < got[0] <= 1
+
+
+def test_the_life_phone_shows_only_a_real_screen_and_tiktok_gets_its_embed(tmp_path):
+    html = (ROOT / "web" / "life.html").read_text()
+    assert 'id="phonecv"' not in html and 'id="phonefr"' in html            # no chart / blank box fallback
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    live.browser = SimpleNamespace(restarting=False, screens={"phone": {
+        "url": "https://www.tiktok.com/@scout2015/video/6718335390845095173", "title": "Scramble up ur name",
+        "host": "tiktok.com", "id": 3}})
+    st = live.screen_status("phone")
+    assert st["embed"]["label"] == "TikTok (official embed)" and "autoplay=0" in st["embed"]["src"]
+    css = (ROOT / "web" / "index.html").read_text()
+    assert "#cards [hidden]" in css                                          # empty cards are really hidden
