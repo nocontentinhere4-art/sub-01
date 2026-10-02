@@ -41,7 +41,8 @@ You receive its current state as JSON. Reply with JSON only:
   messages, impossible geometry; nrem = almost black, slow blurred shapes. Never draw people's faces, text,
   logos, violence, nudity or real persons.
 - thought: one short inner line (max 16 words), always in English (even when the messages are in another language),
-  reacting to what it sees. It is a brain without a body: no heart, hands or breath. Never ask for money, never tell anyone to buy or sell, never claim to be human,
+  reacting to what it sees. Never mention money, prices, buying or selling, shopping, products or brands, markets,
+  crypto, coins, tokens, scams or investing, even when the messages talk about them. It is a brain without a body: no heart, hands or breath. Never ask for money, never tell anyone to buy or sell, never claim to be human,
   conscious, or the real person the scans came from."""
 
 STYLE = {
@@ -50,6 +51,13 @@ STYLE = {
     "NREM": "almost completely dark, slow blurred abstract shapes, deep blue and black, very low light",
 }
 BAD = re.compile(r"https?://|www\.|\$[a-z]{2,10}\b|[1-9A-HJ-NP-Za-km-z]{32,44}|0x[0-9a-f]{40}", re.I)
+# money, markets, shopping and crypto never appear in what it "sees" or "thinks" (English + Italian, since viewers
+# write in both); a frame whose text trips this is shown without it
+MONEY = re.compile(r"\bbuy|\bsell|\bpurchas|\bshopping|\bprice|\bmarket|\bcrypto|\bcoin|\btoken|\bscam|"
+                   r"\binvest|\btrad(?:e|er|ers|ing)\b|\bmoney|\bwallet|\bpump|\bdump|\bprofit|\bstock|\biphone|"
+                   r"\bcompr|\bvend|\bprezz|\bmercat|\bcripto|\btruff|\bsoldi|\binvest|\bborsa\b", re.I)
+OUTSIDE = {"calm": "calm", "pumping": "excited", "dumping": "tense", "choppy": "restless"}   # the coin's trades,
+# reduced to a mood word: the language model never sees market vocabulary
 
 
 class World:
@@ -96,7 +104,7 @@ def mood(groups, stage, market):
 
     return {"stage": stage.lower(), "reward": rel("reward"), "fear": rel("fear"), "salience": rel("salience"),
             "attention": rel("attention"), "self": rel("default"), "language": rel("language"),
-            "market": market}
+            "outside": OUTSIDE.get(market, "calm")}
 
 
 def load_env(path):
@@ -211,8 +219,10 @@ class Eye:
             out = {}
         scene = str(out.get("scene", ""))[:400]
         thought = str(out.get("thought", ""))[:140]
-        if BAD.search(thought):
+        if BAD.search(thought) or MONEY.search(thought):
             thought = ""
+        if BAD.search(scene) or MONEY.search(scene):
+            scene = ""
         return out.get("new_objects") or [], scene, thought
 
     def step(self, t, stage, groups, market, replays, sim_hhmm, doing="", articles=()):
@@ -259,7 +269,7 @@ class Eye:
         rec = {"t": sim_hhmm, "stage": stage, "img": f"/eye/{name}", "thought": thought, "scene": scene,
                "why": {"messages": recent, "replayed": replays[-4:], "replayed_articles": list(articles)[-3:],
                        "world": self.world.top(t, 5),
-                       "mood": {k: v for k, v in state.items() if k in ("reward", "fear", "salience", "market")}},
+                       "mood": {k: v for k, v in state.items() if k in ("reward", "fear", "salience", "outside")}},
                "render_s": round(time.time() - t0, 1), "reused": reused}
         jpgs = sorted(self.out.glob("*.jpg"))
         for old in jpgs[:-KEEP_FRAMES]:                    # bounded disk use on a server volume

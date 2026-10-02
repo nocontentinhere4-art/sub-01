@@ -159,3 +159,16 @@ def test_bad_dates_rejected():
         for bad in ("../state", "2026-10-01/../../x", "latest"):
             with pytest.raises(ValueError):
                 d.load(bad)
+
+
+def test_eye_never_thinks_about_money_or_markets():
+    """Thoughts and scenes mentioning buying, markets, crypto or scams (English or Italian) are dropped, and the
+    language model only sees the coin's trades as a mood word, never market vocabulary."""
+    import eye
+    for bad in ["Should I buy a new phone?", "Come comprare?", "il mercato è instabile", "crypto scams everywhere",
+                "Rischia di essere truffato.", "the price keeps going up"]:
+        assert eye.MONEY.search(bad), bad
+    for ok in ["Unsettling silence.", "I walk past the supermarket in the rain", "The bakery shop smells warm"]:
+        assert not eye.MONEY.search(ok), ok
+    m = eye.mood({"reward": 1.0}, "AWAKE", "pumping")
+    assert "market" not in m and m["outside"] == "excited"
