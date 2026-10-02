@@ -1,8 +1,12 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 04:50 UTC** (pass 17b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 05:40 UTC** (pass 18). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 18:** merged #41 teach him (server side + /brain card; 522 tests with torch and Chromium, 0 skipped; tick
+32.6 ms). The room teach card follows in a small PR after the room follow-up PR (still in progress). #33 phase B
+(mind wired into the live server, shared $2/day ledger) started on `feature/mind-live`.
+
 **Pass 17:** merged #38 (tastes learn faster: Kalman gain per topic + overnight replay; simulated top 5 found ~2.5×
 sooner at noise 0.1; 346 tests, tick 32.5 ms) and #39 (spiking network learns to choose: 1M neurons on GPU reached
 criterion in 84 trials, re-learned after reversal in 22, exam 1.00 vs 0.275 with learning removed and 0.26 random;
@@ -30,14 +34,14 @@ Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
 |---|---|---|
 | #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | merged as #40 (its 2 novelty hooks ride with #33 phase B) |
-| #31 teach him | `session_017R5d56EEZVdrsHDbvQuww9` | started 04:45 (server first; `web/room.html` after the room PR) |
-| #33 mind layer, phase A (`mind.py`) | `session_01KwLm3oYfsh8KhXjWTbrUPt` | merged as #37 (338 tests, smoke 33.1 ms); phase B waits its turn |
+| #31 teach him | `session_017R5d56EEZVdrsHDbvQuww9` | merged as #41; room card waits for the room PR |
+| #33 mind layer | `session_01KwLm3oYfsh8KhXjWTbrUPt` | phase A merged as #37; phase B started 05:35 (`feature/mind-live`) |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | asked for a new branch from `main` |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py`, one at a time: **#31** teach him (in progress) → **#33 phase B** → #19 → #18 → #17 → #15.
+Next on `live_server.py`, one at a time: **#33 phase B** (in progress) → #19 → #18 → #17 → #15. `web/room.html`: room follow-ups → #31 room card → any #33 room change.
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -74,12 +78,12 @@ cheap to run, with the password gate kept until launch day.
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | done | #40 |
 | 18e | Daily memory test on the GPU switched on | key added 2026-10-02; needs `SUB01_POD_SECRET` too | #9 |
-| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | in progress | issue #31 |
+| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | done on /brain (#41); room card next | issue #31 |
 | 18i | Faster learning of tastes (adaptive rate, overnight replay of surprising pages) | done | #38 |
 | 18j | Spiking brain learns to choose (dopamine reward vs frozen and random controls) | done; nightly run needs `SUB01_CHOICE=1` on Railway (~90 s inside the 1 h) | #39 |
 | 18k | Room movement (walk around furniture, sit, lie down) | done; follow-ups in a new PR | #28 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
-| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A done (#37, standalone, not wired); phase B after #29 → #36 → #31 | issue #33 |
+| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A done (#37); phase B in progress | issue #33 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
