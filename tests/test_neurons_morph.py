@@ -131,3 +131,14 @@ def test_brain_page_wording():
     assert "cerebellum" not in html.lower() and "purkinje" not in html.lower()
     for text in (html.lower(), (ROOT / "web" / "neurons3d.js").read_text().lower()):
         assert "his real neurons" not in text and "scanned person's neurons" not in text
+
+
+def test_every_cell_differs_a_little():
+    """No stamped grid: per instance a turn about the main axis, a lean of up to +-10 degrees, +-15 % size, half of
+    them mirrored (x only), and position jitter inside the layer."""
+    d = _node_check()
+    for kind in KINDS:
+        v = d[kind]["variety"]
+        assert 5 <= v["tilt_deg"] <= 10.0 + 1e-6
+        assert 0.85 - 1e-6 <= v["scale_min"] < 0.9 and 1.1 < v["scale_max"] <= 1.15 + 1e-6
+        assert 0.35 < v["mirrored_frac"] < 0.65 and v["yaw_octants"] == 8
