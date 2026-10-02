@@ -84,7 +84,7 @@
     tex.needsUpdate = true;
     const striatum = nodes.map(n => n.group === "reward");
     const mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uRates: { value: tex }, uSize: { value: o.pointSize || 0.9 }, uScale: { value: 1000 },
+      uniforms: { uTime: { value: 0 }, uRates: { value: tex }, uSize: { value: o.pointSize || 1.3 }, uScale: { value: 1000 },
                   uFade: { value: 0 }, uFlashS: { value: FLASH_S } },
       vertexShader: `
         attribute float aReg; attribute float aFlash;
@@ -96,10 +96,10 @@
           float dt = uTime - aFlash;
           float f = dt < 0.0 ? 0.0 : exp(-dt / uFlashS);
           vec3 base = mix(vec3(0.16, 0.2, 0.34), vec3(1.0, 0.45, 0.12), rate);
-          vCol = base * (0.35 + 0.65 * rate) + vec3(1.0, 0.86, 0.6) * 2.4 * f + vec3(1.0, 0.5, 0.1) * 0.9 * t.g;
-          vA = 0.28 + 0.3 * rate + 0.7 * f + 0.3 * t.g;
+          vCol = base * (0.45 + 0.75 * rate) + vec3(1.0, 0.86, 0.6) * 3.0 * f + vec3(1.0, 0.5, 0.1) * 0.9 * t.g;
+          vA = 0.5 + 0.4 * rate + 0.8 * f + 0.3 * t.g;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = uSize * (1.0 + 2.2 * f + 0.6 * t.g) * uScale / -mv.z;
+          gl_PointSize = max(1.5, uSize * (1.0 + 1.5 * f + 0.6 * t.g) * uScale / -mv.z);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `

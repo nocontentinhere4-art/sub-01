@@ -64,9 +64,10 @@
   #layers button[data-l="neurons"].off { color:var(--faint); }
   #n3cap { font-size:10px; line-height:1.5; color:var(--dim); }
   #n3cap b { color:var(--fg); font-weight:normal; } #n3cap .s { display:block; color:var(--faint); }
-  #n3mini { display:none; position:fixed; left:6px; right:6px; bottom:4px; font-size:8px; line-height:1.3; color:#8a8a9c; pointer-events:none;
+  #n3mini { display:none; position:fixed; left:6px; right:6px; top:4px; font-size:8px; line-height:1.3; color:#8a8a9c; pointer-events:none;
     text-shadow:0 1px 4px #000; }
   body.mini.n3 #n3mini { display:block; }
+  body.n3 #cards { max-height:calc(100vh - 250px); }
   #chat { display:flex; gap:6px; }
   #chat input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
     font:inherit; font-size:13px; border-radius:8px; transition:border-color .2s; }
@@ -227,7 +228,7 @@ function neuronsOn(on){
   const b = document.querySelector('#layers button[data-l="neurons"]'); if (b) b.classList.toggle("on", on);
   if (on && !n3d && nodes.length && cortexPos) {
     const make = meta => { if (n3d) return;
-      n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, sizes: meta && meta.sizes, maxPoints: MINI ? 8000 : 20000, pointSize: MINI ? 1.3 : 0.9});
+      n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, sizes: meta && meta.sizes, maxPoints: MINI ? 8000 : innerWidth < 600 ? 12000 : 20000, pointSize: MINI ? 1.8 : 1.3});
       n3d.resize(renderer.domElement.height, camera.fov); n3d.setVisible(n3want); };
     if (n3meta) make(n3meta);
     else fetch("neurons3d.json").then(r => r.json()).then(m => { n3meta = m; make(m); }).catch(() => make(null));
@@ -256,7 +257,7 @@ const CHIP = {AWAKE:"#ff9a3c", NREM:"#4d7cff", REM:"#c26bff"};
 const CHIPTXT = {AWAKE:"AWAKE", NREM:"DEEP SLEEP", REM:"REM"};
 const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
 let stage = null, target = [1,0,0], mix = null, burst = 0, boost = 0, sci = 0, sciT = 0;
-let fibreMat, cortexMat, glows = [], nodes = [], showRegions = false;
+let fibreMat, cortexMat, glows = [], nodes = [], showRegions = false, n3dim = 0;
 let pulse = {t:-1, start:0};
 const OPACITY = MINI ? 0.021 : 0.0105;     // the mini keeps 1 fibre in 6: each drawn twice as bright
 let actNew = false, onScreen = true, drawnAt = 0;
@@ -628,6 +629,9 @@ function frame(now){
   const k = 1 - Math.exp(-dt / 2.5);
   for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
   sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
+  const n3live = n3want && performance.now() - n3wall < 10000;                   // neurons on: the fibres step back
+  n3dim += ((n3live ? 1 : 0) - n3dim) * (1 - Math.exp(-Math.min(2, (now - (frame.n3at || now)) / 1000) / 0.6));
+  frame.n3at = now;                                                               // wall clock: a slow device fades too
   burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);
   const tween = actTo && now - actAt < actDt;            // between two ticks: blend them
   if (actTo && (actNew || tween)) {
@@ -646,11 +650,11 @@ function frame(now){
   if (fibreMat) {
     const u = fibreMat.uniforms;
     u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
-    u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci);
+    u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.7 * n3dim);
     if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
     u.pulseT.value = pulse.t;
   }
-  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci);
+  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci) * (1 - 0.4 * n3dim);
   if (pulse.t > 0.85 && pulse.t < 1.6) {
     const arrive = Math.max(0, 1 - (pulse.t - 0.85) / 0.75);
     glows.forEach((g, i) => { if (tgOn[GROUPS.indexOf(nodes[i].group)]) g.material.opacity = Math.max(g.material.opacity, 0.5 * arrive); });

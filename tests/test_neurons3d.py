@@ -207,10 +207,10 @@ def test_stream_per_viewer_under_3_kb_s(tmp_path, cpu_frames):
             await _until(lambda: hub.session is not None)
             for i in range(240):                                    # GPU: 8 frames/s offered (relay keeps 4/s) for 30 s
                 clock[0] += 0.125
-                await pod.send_json(gpu[i % len(gpu)])
+                await pod.send_json(dict(gpu[i % len(gpu)], t_sim=float(i)))
+                await _until(lambda: (hub.last_state or {}).get("t_sim") == float(i))   # handled at this clock
                 if i % 10 == 5:                                     # the CPU network's idle pulse: dropped meanwhile
                     await hub.relay(dec[0])
-                await asyncio.sleep(0)
             await _until(lambda: len(got["brain"]) == hub.budget.sent["frames"])
             gpu_part = got["brain"][n_cpu:]
             await pod.close()
@@ -233,7 +233,8 @@ def test_stream_per_viewer_under_3_kb_s(tmp_path, cpu_frames):
     assert 25 <= len(full) <= 35                                    # the panel's numbers once a second
     assert all("spikes_per_s" not in f and "n" not in f["raster"] for f in gpu_frames_out if "groups" not in f)
     shown = [len(F.unpack_spikes(f["n3"]["sq"], f["n3"]["span"])) for f in gpu_frames_out]
-    assert np.mean(shown) >= 60                                     # spikes still flash: ~60-100 a frame
+    print(f"spikes shown a GPU frame: mean {np.mean(shown):.0f} (of {np.mean([f['n3']['ns'] for f in gpu_frames_out]):.0f} recorded)")
+    assert np.mean(shown) >= 60                                     # spikes still flash
     assert got["life"] == got["brain"]                              # the life page's plain feed gets the same
     assert got["room"] == []                                        # the room's lite feed does not draw them
 
@@ -329,3 +330,14 @@ def test_brain_page_wording_and_toggle():
 def test_neurons_assets_are_in_the_image():
     docker = (ROOT / "Dockerfile").read_text()
     assert "COPY spiking ./spiking" in docker and "COPY web ./web" in docker      # frames.py, neurons3d.* ship
+
+
+def test_budget_survives_a_clock_set_back():
+    t = [1e6]
+    b = F.Budget(clock=lambda: t[0])
+    t[0] = 10.0                                                    # e.g. the hub's clock replaced: no negative refill
+    sample = F.Sample.one_per_region(200, 214)
+    f = F.viewer_frame({"type": "spiking", "net": "gpu", "phase": "x", "raster": {"n": 200, "t0": 0, "t1": 250,
+                        "spikes": [[i % 250, i % 200] for i in range(400)]}}, sample)
+    out = b.fit(f)
+    assert out["n3"]["sq"] and b.tokens >= 0

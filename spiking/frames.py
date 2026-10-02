@@ -192,7 +192,7 @@ class Budget:
     def fit(self, frame):
         """The frame to broadcast (thinned), or None to skip it. Frames without "n3" (e.g. live: false) pass as is."""
         now = self.clock()
-        self.tokens = min(self.burst, self.tokens + (now - self.t) * self.rate)
+        self.tokens = min(self.burst, self.tokens + max(0.0, now - self.t) * self.rate)   # a clock set back: no refill
         self.t = now
         n3 = frame.get("n3")
         if not isinstance(n3, dict):
