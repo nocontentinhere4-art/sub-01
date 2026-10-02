@@ -164,3 +164,15 @@ https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`
 
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).
+
+## Candidate character `boy3` (not wired yet)
+`boy3.glb` is an original character, not based on any real person. The steps:
+1. A text-prompted full-body reference image (front A-pose) made with Higgsfield (`gpt_image_2_5`).
+2. That image turned into a textured, PBR, auto-rigged mesh with Meshy 6 (`meshy_v7_image_to_3d` via Higgsfield): 34k
+   vertices and the same 24-bone rig names as `boy.glb`.
+3. Compressed with glTF-Transform (meshopt, WebP 1024 px).
+
+The clips `boy3_{door,eat,idle,sleep,walk,text}.glb`, and the sit clip embedded in `boy3.glb`, are the existing
+`boy_*.glb` clips retargeted with `room_build/retarget_meshy.mjs`. The retarget is world-space and relative to the rest
+pose, so each bone keeps the clip's rotation change from the old rest pose. The hips translation is scaled by the
+hip-height ratio (1.047). The page still loads `boy.glb`; the switch belongs to #76.
