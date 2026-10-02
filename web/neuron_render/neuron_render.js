@@ -361,10 +361,11 @@
       float glow = uLive * uRate;
       vec3 col; float alpha = vDepth;
       if (uStyle > 1.5) {
-        // EM-like: grey membrane shading (facing surfaces pale, grazing edges dark like a stained membrane), myelin paler
-        float I = 0.14 + 0.72 * pow(ndv, 0.9) - 0.35 * pow(1.0 - ndv, 2.0);                // a 3D EM reconstruction: dark grazing edges
-        vec3 alb = vec3(0.5, 0.49, 0.47);
-        alb = mix(alb, vec3(0.8, 0.79, 0.76), kMy); alb = mix(alb, vec3(0.44, 0.45, 0.48), kGlia);
+        // EM-like: a scanning-electron look on the reconstructed surface: mid-grey facing surfaces, bright grazing edges
+        // (the secondary-electron edge effect), myelin paler, glia darker
+        float I = 0.42 + 0.5 * pow(ndv, 0.8) + 1.1 * pow(1.0 - ndv, 2.5);
+        vec3 alb = vec3(0.62, 0.62, 0.6);
+        alb = mix(alb, vec3(0.8, 0.8, 0.77), kMy); alb = mix(alb, vec3(0.42, 0.43, 0.46), kGlia);
         alb = mix(alb, vec3(0.42, 0.40, 0.44), kNuc); alb = mix(alb, vec3(0.22, 0.2, 0.24), kNucl);
         col = alb * I * (0.6 + 0.4 * vBright);
         col += uColAct * (0.5 * glow * kDend * 0.3 + 1.4 * vSoma * kSoma + 0.8 * vSoma * exp(-vDist / 40.0) * kDend + 2.0 * vPulse * (kAxon + kBout + 0.5 * kMy));
@@ -470,8 +471,8 @@
   const VS_EM = `varying vec2 vUv; varying float vDepth; uniform float uDepthK;
     void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0); gl_Position = projectionMatrix * mv; }`;
   const FS_EM = `precision highp float; uniform sampler2D tEm; uniform float uStyle; varying vec2 vUv; varying float vDepth;
-    void main(){ float g = texture2D(tEm, vUv).r; vec2 d = vUv / 5.0 - 0.5; float edge = smoothstep(0.5, 0.25, max(abs(d.x), abs(d.y)));
-      g = pow(g, 1.3); gl_FragColor = vec4(vec3(0.05 + 0.4 * g) * (0.35 + 0.65 * edge), vDepth); }`;
+    void main(){ float g = texture2D(tEm, vUv).r; vec2 d = vUv / 9.0 - 0.5; float edge = smoothstep(0.5, 0.3, max(abs(d.x), abs(d.y)));
+      g = pow(g, 1.4); gl_FragColor = vec4(vec3(0.015 + 0.2 * g) * (0.5 + 0.5 * edge), vDepth); }`;
   const VS_QUAD = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
   const FS_DOWN = `precision highp float; uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
     void main(){ vec4 s = texture2D(tSrc, vUv + uTexel * vec2(-0.5, -0.5)) + texture2D(tSrc, vUv + uTexel * vec2(0.5, -0.5))
@@ -713,7 +714,7 @@
       const tex = new THREE.TextureLoader().load(em.url); tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
       tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping;        // the crop (~200 um) is mirrored 3x3 to fill the field behind the block
       uni.tEm.value = tex;
-      const pg = new THREE.PlaneGeometry(em.um * 5, em.um * 5); const uv = pg.getAttribute("uv"); for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 5, uv.getY(i) * 5);
+      const pg = new THREE.PlaneGeometry(em.um * 9, em.um * 9); const uv = pg.getAttribute("uv"); for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 9, uv.getY(i) * 9);
       emPlane = new THREE.Mesh(pg, matEm); emPlane.position.set(em.centre[0], em.centre[1], zBack);
       emPlane.frustumCulled = false; emPlane.name = "nr-em"; scene.add(emPlane); meshes.push(emPlane); counts.drawCalls++;
       // the focus cell first in the slot mapping; glia never spike
@@ -825,8 +826,8 @@
       uni.uStyle.value = sv; matComp.uniforms.uStyle.value = sv;
       uni.uNucAlpha.value = fl ? 0.4 : 0.55; uni.uDim.value = fl ? 0.09 : (em ? 0.05 : 0.015);
       matComp.uniforms.uBloom.value = fl ? 0.9 : (em ? 0.15 : 0.4); matBright.uniforms.uTh.value = fl ? 0.45 : 0.7;
-      matComp.uniforms.uExposure.value = fl ? 1.25 : 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : (em ? 0.5 : 0.6);
-      matComp.uniforms.uBg.value.set(em ? 0.04 : (fl ? 0.002 : 0.015), em ? 0.04 : (fl ? 0.006 : 0.018), em ? 0.042 : (fl ? 0.003 : 0.028));
+      matComp.uniforms.uExposure.value = fl ? 1.25 : 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : (em ? 0.3 : 0.6);
+      matComp.uniforms.uBg.value.set(em ? 0.012 : (fl ? 0.002 : 0.015), em ? 0.012 : (fl ? 0.006 : 0.018), em ? 0.014 : (fl ? 0.003 : 0.028));
       if (emPlane) emPlane.visible = em;
       if (bgPoints) bgPoints.visible = !em;
       hud.querySelectorAll("button[data-s]").forEach(b => { b.classList.toggle("on", b.dataset.s === S.style); if (b.dataset.s === "render") b.style.display = S.h01 ? "none" : ""; });
