@@ -8,7 +8,10 @@ An AI (eyes.py) only lists options, each tagged with the networks it would mostl
 3. value = d_reward + 0.6 d_attention + 0.3 d_visual (videos only) - 0.8 d_fear, where d_x is the mean amplitude of
    group x relative to the clone without stimulus;
 4. the values (scaled to the best one), the learned taste for the option's topics (tastes.py) and a small novelty bonus
-   go through a softmax whose temperature rises with boredom and sleep pressure;
+   go through a softmax whose temperature rises with boredom and sleep pressure. Leaving (#29) is boredom- and
+   taste-driven: the leave option gets LEAVE_BORED x boredom + LEAVE_CHAIN x the chain's pull (0 on the first page,
+   1 after 30 pages in a row), and its taste term is the opposite of the taste for the page he is on (its topics are
+   the page's), so a page whose topics have paid off holds him and one that has not lets him go;
 5. the live brain then receives the chosen option's stimulus.
 It is a rule on simulated activity, not understanding or liking: the model does not know what the page says.
 """
@@ -21,11 +24,14 @@ from brain_sim import SLOW_DRIVE
 
 VOTE_S = 0.3                 # simulated look-ahead per option
 STIM_AMP = 8.0               # drive per unit network weight (a chat message drives 6-8 per rule)
-MAX_OPTIONS = 5
+MAX_OPTIONS = 6
 VALUE = {"reward": 1.0, "attention": 0.6, "fear": -0.8}
 VIDEO_VISUAL = 0.3
 TASTE_W = 0.5                # weight of the learned preference next to the brain response (both ~[-1, 1])
 NOVELTY = 0.3                # bonus for a link or search he has not done recently
+LEAVE_BORED = 0.5            # leave bonus per unit boredom (0..1)
+LEAVE_CHAIN = 0.6            # leave bonus at the end of a long chain of pages (eyes.leave_pull, 0..1)
+VIDEO_ACTIONS = ("open_video", "play_video")
 T0 = 0.15                    # softmax temperature when rested and not bored
 NAMES = {"reward": "reward", "attention": "attention", "visual": "visual", "fear": "threat", "language": "language",
          "memory": "memory", "default": "default-mode", "salience": "salience", "somatomotor": "body-movement",
@@ -109,10 +115,12 @@ def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None,
     tastes = list(tastes) if tastes is not None else [0.0] * len(options)
     novel = list(novel) if novel is not None else [False] * len(options)
     deltas = responses(clone, options, gain, seconds)
-    vals = [value(d, o.get("action") == "open_video") for d, o in zip(deltas, options)]
+    vals = [value(d, o.get("action") in VIDEO_ACTIONS) for d, o in zip(deltas, options)]
     scale = max(abs(v) for v in vals)
     vn = [v / scale if scale > 1e-9 else 0.0 for v in vals]
-    total = [v + TASTE_W * ts + (NOVELTY if nv else 0.0) for v, ts, nv in zip(vn, tastes, novel)]
+    tastes = [-ts if o.get("action") == "leave" else ts for o, ts in zip(options, tastes)]
+    leave = [leave_bonus(o, mood) for o in options]
+    total = [v + TASTE_W * ts + (NOVELTY if nv else 0.0) + lv for v, ts, nv, lv in zip(vn, tastes, novel, leave)]
     T = temperature(mood.get("boredom", 0.0), mood.get("pressure", 0.0), mood.get("tired", 0.0))
     top = max(total)
     w = np.array([math.exp((x - top) / T) for x in total])
@@ -122,12 +130,37 @@ def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None,
              "response": round(v, 5), "value": round(n_, 3), "taste": round(ts, 3), "novel": bool(nv),
              "p": round(float(pk), 3), "chosen": i == k}
             for i, (o, v, n_, ts, nv, pk) in enumerate(zip(options, vals, vn, tastes, novel, p))]
+    for row, lv in zip(rows, leave):
+        if row["action"] == "leave":
+            row["leave_bonus"] = round(lv, 3)
     return {"options": rows, "chosen": k, "temperature": round(T, 3), "gain": round(gain, 3),
             "reason": reason(options, deltas, vals, total, k, mood, tastes),
             "ms": round((time.perf_counter() - t0) * 1000), "clones": len(options) + 1, "seconds": seconds}
 
 
+def leave_bonus(option, mood):
+    """Extra pull of the leave option: boredom, and the length of the chain of pages (eyes.leave_pull)."""
+    if option.get("action") != "leave":
+        return 0.0
+    try:
+        pull = float(option.get("pull") or 0.0)
+    except (TypeError, ValueError):
+        pull = 0.0
+    pull = min(1.0, max(0.0, pull)) if pull == pull else 0.0
+    return LEAVE_BORED * min(1.0, max(0.0, mood.get("boredom", 0.0))) + LEAVE_CHAIN * pull
+
+
 def reason(options, deltas, vals, total, k, mood, tastes):
+    if options[k].get("action") == "leave":
+        bits = []
+        if mood.get("boredom", 0.0) >= 0.5:
+            bits.append("bored")
+        if float(options[k].get("pull") or 0.0) >= 0.5:
+            bits.append("a long chain of pages")
+        if tastes[k] > 0.2:
+            bits.append("this page's topics have not paid off")
+        if bits:
+            return "moved on: " + ", ".join(bits)
     d = deltas[k]
     up = sorted((g for g in ("reward", "attention", "visual") if d.get(g, 0.0) > 0), key=lambda g: -d[g])[:2]
     if up and vals[k] > 0:
