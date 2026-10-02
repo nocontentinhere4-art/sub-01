@@ -33,11 +33,11 @@
     fresh: { cerebrum: [0.74, 0.60, 0.56], cerebellum: [0.66, 0.50, 0.47], brainstem: [0.80, 0.70, 0.66],
              grey: [0.68, 0.56, 0.54], white: [0.92, 0.88, 0.85], csf: [0.30, 0.17, 0.17],
              artery: [0.72, 0.10, 0.10], vein: [0.36, 0.12, 0.20], nerve: [0.93, 0.88, 0.75], gland: [0.72, 0.42, 0.42], cord: [0.80, 0.70, 0.66],
-             spec: 0.45, shine: 48, wrap: 0.45, scatter: 0.25 },
+             spec: 0.55, shine: 56, wrap: 0.32, scatter: 0.22 },
     fixed: { cerebrum: [0.62, 0.57, 0.53], cerebellum: [0.57, 0.52, 0.48], brainstem: [0.70, 0.65, 0.60],
              grey: [0.60, 0.56, 0.52], white: [0.90, 0.87, 0.82], csf: [0.16, 0.15, 0.14],
              artery: [0.42, 0.20, 0.17], vein: [0.30, 0.20, 0.24], nerve: [0.86, 0.82, 0.72], gland: [0.60, 0.50, 0.45], cord: [0.70, 0.65, 0.60],
-             spec: 0.10, shine: 12, wrap: 0.30, scatter: 0.0 },
+             spec: 0.10, shine: 12, wrap: 0.22, scatter: 0.0 },
   };
   PALETTE.bundles = PALETTE.fixed;
   const PART = { cerebrum: 1, cerebellum: 2, brainstem: 3 };
@@ -57,10 +57,30 @@
     }
     return out;
   }
+  // signed volume (cm3) of an indexed triangle mesh: negative when the winding is clockwise seen from outside
+  // (marching-cubes meshes often are); the shaders and the sulcal depth follow the sign instead of trusting it
+  function signedVolume(pos, idx) {
+    let v = 0;
+    for (let i = 0; i < idx.length; i += 3) {
+      const a = idx[i] * 3, b = idx[i + 1] * 3, c = idx[i + 2] * 3;
+      v += pos[a] * (pos[b + 1] * pos[c + 2] - pos[b + 2] * pos[c + 1]) - pos[a + 1] * (pos[b] * pos[c + 2] - pos[b + 2] * pos[c])
+         + pos[a + 2] * (pos[b] * pos[c + 1] - pos[b + 1] * pos[c]);
+    }
+    return v / 6000;
+  }
+  // connected components of an indexed mesh (union-find): vertex -> component size, so crumbs can be left out
+  function componentSizes(nVerts, idx) {
+    const parent = new Int32Array(nVerts); for (let i = 0; i < nVerts; i++) parent[i] = i;
+    const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+    for (let i = 0; i < idx.length; i += 3) { const a = find(idx[i]), b = find(idx[i + 1]), c = find(idx[i + 2]); parent[b] = a; parent[c] = a; }
+    const count = new Int32Array(nVerts); for (let i = 0; i < nVerts; i++) count[find(i)]++;
+    const size = new Int32Array(nVerts); for (let i = 0; i < nVerts; i++) size[i] = count[find(i)];
+    return size;
+  }
   // how deep each vertex sits below a smoothed copy of its own surface (0 crown of a gyrus .. 1 bottom of a sulcus):
   // Laplacian smoothing over the index buffer, then the signed distance along the normal, normalised by its 98th centile
-  function sulcalDepth(pos, idx, normals, iters) {
-    const n = pos.length / 3, deg = new Float32Array(n);
+  function sulcalDepth(pos, idx, normals, iters, sign) {
+    const n = pos.length / 3, deg = new Float32Array(n), sg = sign || 1;
     let s = Float32Array.from(pos);
     for (let i = 0; i < idx.length; i += 3) for (let k = 0; k < 3; k++) deg[idx[i + k]] += 2;
     for (let it = 0; it < (iters || 12); it++) {
@@ -79,7 +99,7 @@
     }
     const depth = new Float32Array(n);
     for (let v = 0; v < n; v++) {
-      let d = 0; for (let k = 0; k < 3; k++) d += (s[3 * v + k] - pos[3 * v + k]) * normals[3 * v + k];
+      let d = 0; for (let k = 0; k < 3; k++) d += (s[3 * v + k] - pos[3 * v + k]) * normals[3 * v + k] * sg;
       depth[v] = Math.max(0, d);                                                   // the smooth surface lies above a sulcus
     }
     const sorted = Float32Array.from(depth).sort(), hi = sorted[Math.floor(0.98 * (n - 1))] || 1;
@@ -126,14 +146,15 @@
       vec3 L = normalize(vec3(-0.45, 0.55, 0.70)), L2 = normalize(vec3(0.6, -0.2, 0.4));
       vec3 a = pow(albedo, vec3(2.2));
       float nl = dot(N, L), wrap = clamp((nl + uWrap) / (1.0 + uWrap), 0.0, 1.0);
-      float fill = 0.25 * clamp(dot(N, L2), 0.0, 1.0), sky = 0.18 + 0.12 * N.y;
+      float fill = 0.14 * clamp(dot(N, L2), 0.0, 1.0), sky = 0.08 + 0.07 * N.y;
       vec3 H = normalize(L + V), spec = vec3(1.0) * uSpec * pow(max(dot(N, H), 0.0), uShine);
       float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
       vec3 scat = a * vec3(1.0, 0.72, 0.68) * uScatter * pow(clamp((nl + 0.7) / 1.7, 0.0, 1.0), 1.5);
-      vec3 c = a * (wrap * 1.05 + fill + sky) * (1.0 - 0.65 * ao) + scat + (spec + fres * 0.12) * (1.0 - 0.8 * ao);
+      float cav = 1.0 - 0.75 * pow(ao, 0.7);
+      vec3 c = a * (wrap * 1.15 + fill + sky) * cav + scat * cav + (spec + fres * 0.10) * (1.0 - 0.9 * ao);
       return pow(max(c, 0.0), vec3(1.0 / 2.2));
     }`;
-  const CLIP = `uniform vec4 uClip; uniform float uClipOn; varying vec3 vW;
+  const CLIP = `uniform vec4 uClip; uniform float uClipOn; uniform float uFlip; varying vec3 vW;
     void clipIt() { if (uClipOn > 0.5 && dot(vW, uClip.xyz) > uClip.w) discard; }`;
   const TISSUE_V = `
     attribute float part; attribute float depth;
@@ -152,9 +173,11 @@
     ${LIGHT}
     void main() {
       clipIt();
-      if (uHide > 0.5 && vPart > 1.5) discard;                 // his cerebellum / brainstem come as their own finer meshes
-      vec3 N = normalize(vN);
-      if (!gl_FrontFacing) { gl_FragColor = vec4(pow(pow(uWhite, vec3(2.2)) * 0.55, vec3(1.0 / 2.2)), 1.0); return; }   // the inside of the shell at a cut
+      if (vPart < 0.5) discard;                                // a crumb of the mesh (a disconnected fragment)
+      if (uHide > 0.5 && vPart > 1.5) discard;                 // (off) his cerebellum / brainstem come as their own finer meshes
+      vec3 N = normalize(vN) * uFlip;                           // computed normals follow the winding; uFlip makes them outward
+      bool outside = gl_FrontFacing == (uFlip > 0.0);
+      if (!outside) { gl_FragColor = vec4(pow(pow(uWhite, vec3(2.2)) * 0.55, vec3(1.0 / 2.2)), 1.0); return; }   // the inside of the shell at a cut
       vec3 base = vPart < 1.5 ? uCerebrum : (vPart < 2.5 ? uCerebellum : uBrainstem);
       gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth), 1.0);
     }`;
@@ -223,7 +246,8 @@
     const origCortexMat = cortex ? cortex.material : null, origFibreMat = fibres ? fibres.material : null;
     const origDpr = renderer && renderer.getPixelRatio ? renderer.getPixelRatio() : 1;
     const v3 = a => new THREE.Vector3(a[0], a[1], a[2]);
-    const uClip = { value: new THREE.Vector4(0, 1, 0, 0) }, uClipOn = { value: 0 };
+    const uClip = { value: new THREE.Vector4(0, 1, 0, 0) }, uClipOn = { value: 0 }, uFlip = { value: 1 };
+    let winding = 0;                                                              // +1 CCW / -1 CW of the cortex mesh, from its signed volume
     const palU = pal => ({ uSpec: { value: pal.spec }, uShine: { value: pal.shine }, uWrap: { value: pal.wrap }, uScatter: { value: pal.scatter } });
     const bbox = { min: [1e9, 1e9, 1e9], max: [-1e9, -1e9, -1e9] };
     if (cortex && cortex.geometry && cortex.geometry.attributes.position) {
@@ -234,12 +258,12 @@
     // --- materials ---
     const tissueMat = pal => new THREE.ShaderMaterial({
       uniforms: Object.assign({ uCerebrum: { value: v3(pal.cerebrum) }, uCerebellum: { value: v3(pal.cerebellum) }, uBrainstem: { value: v3(pal.brainstem) },
-        uWhite: { value: v3(pal.white) }, uHide: { value: 0 }, uClip, uClipOn, uBase: { value: v3(pal.cerebrum) } }, palU(pal)),
+        uWhite: { value: v3(pal.white) }, uHide: { value: 0 }, uClip, uClipOn, uFlip, uBase: { value: v3(pal.cerebrum) } }, palU(pal)),
       vertexShader: TISSUE_V, fragmentShader: TISSUE_F, side: THREE.DoubleSide });
     const partMat = (pal, kind) => new THREE.ShaderMaterial({
-      uniforms: Object.assign({ uBase: { value: v3(pal[kind]) }, uClip, uClipOn }, palU(pal), { uSpec: { value: kind === "artery" ? pal.spec * 1.3 : pal.spec * 0.6 } }),
+      uniforms: Object.assign({ uBase: { value: v3(pal[kind]) }, uClip, uClipOn, uFlip }, palU(pal), { uSpec: { value: kind === "artery" ? pal.spec * 1.3 : pal.spec * 0.6 } }),
       vertexShader: PART_V, fragmentShader: PART_F, side: THREE.DoubleSide });
-    const bundleMat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0.5 }, uMute: { value: 0.45 }, uClip, uClipOn },
+    const bundleMat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0.55 }, uMute: { value: 0.45 }, uClip, uClipOn },
       vertexShader: BUNDLE_V, fragmentShader: BUNDLE_F, transparent: true, depthWrite: false });
     const ghostMat = new THREE.ShaderMaterial({ vertexShader: GHOST_V, fragmentShader: GHOST_F, transparent: true, depthWrite: false, side: THREE.FrontSide });
     const mats = { fresh: tissueMat(PALETTE.fresh), fixed: tissueMat(PALETTE.fixed) };
@@ -251,18 +275,22 @@
       if (!cortex || !cortex.geometry) return;
       const g = cortex.geometry, pos = g.attributes.position.array, idx = g.index.array;
       if (!g.attributes.normal) g.computeVertexNormals();
-      const part = new Float32Array(pos.length / 3);
-      for (let i = 0; i < part.length; i++) part[i] = partBytes ? partBytes[i] || 1 : 1;
+      if (!winding) { winding = signedVolume(pos, idx) < 0 ? -1 : 1; uFlip.value = winding; }
+      const part = new Float32Array(pos.length / 3), size = componentSizes(part.length, idx);
+      for (let i = 0; i < part.length; i++) part[i] = size[i] < part.length * 0.01 ? 0 : (partBytes ? partBytes[i] || 1 : 1);   // crumbs: 0, not drawn
       g.setAttribute("part", new THREE.BufferAttribute(part, 1));
-      g.setAttribute("depth", new THREE.BufferAttribute(sulcalDepth(pos, idx, g.attributes.normal.array), 1));
+      g.setAttribute("depth", new THREE.BufferAttribute(sulcalDepth(pos, idx, g.attributes.normal.array, 12, winding), 1));
     }
     function addHisMesh(name, pos, idx, part) {
+      if (!winding) prepCortex(null);
+      if ((signedVolume(pos, idx) < 0 ? -1 : 1) !== winding)                         // the same winding as the cortex: one uFlip for all
+        for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
       g.setIndex(new THREE.BufferAttribute(idx, 1));
       g.computeVertexNormals();
       g.setAttribute("part", new THREE.BufferAttribute(new Float32Array(pos.length / 3).fill(part), 1));
-      g.setAttribute("depth", new THREE.BufferAttribute(sulcalDepth(pos, idx, g.attributes.normal.array, name === "cerebellum" ? 8 : 12), 1));
+      g.setAttribute("depth", new THREE.BufferAttribute(sulcalDepth(pos, idx, g.attributes.normal.array, name === "cerebellum" ? 8 : 12, winding), 1));
       const m = new THREE.Mesh(g, mats[st.view === "fixed" ? "fixed" : "fresh"]); m.name = "his_" + name; m.frustumCulled = false;
       group.add(m); hisMeshes.push(m);
       return m;
@@ -292,7 +320,7 @@
           prepCortex(new Uint8Array(cp));
           addHisMesh("cerebellum", new Float32Array(cb), idx("cerebellum", cbi), PART.cerebellum);
           addHisMesh("brainstem", new Float32Array(bs), idx("brainstem", bsi), PART.brainstem);
-          for (const k in mats) mats[k].uniforms.uHide.value = 1;
+          for (const k in mats) mats[k].uniforms.uHide.value = 0;        // the coarse parts stay under the fine meshes: no holes
           st.meshes = true; st.loading--; apply();
         }).catch(e => { st.loading--; prepCortex(null); apply(); console.warn("anatomy meshes", e); });
     }
@@ -349,7 +377,7 @@
         else cortex.material = origCortexMat;
       }
       if (fibres) fibres.material = real ? bundleMat : origFibreMat;
-      bundleMat.uniforms.uOpacity.value = st.view === "bundles" ? 0.55 : 0.5;
+      bundleMat.visible = st.view === "bundles";                                    // under an opaque specimen the fibres are not drawn at all
       for (const m of hisMeshes) { m.visible = st.view === "fresh" || st.view === "fixed"; m.material = mats[st.view === "fixed" ? "fixed" : "fresh"]; }
       for (const m of partMeshes) {
         const k = m.userData.kind;
@@ -404,7 +432,8 @@
     function state() {
       return { view: st.view, layers: Object.assign({}, st.layers), cut: Object.assign({}, st.cut, cutPlane(st.cut.axis, st.cut.t, bbox)), meshes: st.meshes, parts: st.parts,
                atlas: st.atlas, tier: st.tier, fps: st.fps, loading: st.loading, drawn: group.children.filter(c => c.visible).map(c => c.name),
-               bbox, cortexSwapped: !!cortex && cortex.material !== origCortexMat, fibresSwapped: !!fibres && fibres.material !== origFibreMat };
+               bbox, winding, fibresDrawn: !fibres || fibres.material !== bundleMat || bundleMat.visible,
+               cortexSwapped: !!cortex && cortex.material !== origCortexMat, fibresSwapped: !!fibres && fibres.material !== origFibreMat };
     }
     function dispose() {
       st.view = "glow"; apply(); setTier("high");
@@ -415,5 +444,5 @@
     return { setView, setLayer, setCut, setTier, update, state, dispose, meta: () => meta, VIEWS, group };
   }
 
-  root.BrainAnatomy = { create, parseParts, sulcalDepth, cutPlane, tissueColour, captionFor, PALETTE, PART, AXES, VIEWS, LIVE_FPS };
+  root.BrainAnatomy = { create, parseParts, sulcalDepth, signedVolume, componentSizes, cutPlane, tissueColour, captionFor, PALETTE, PART, AXES, VIEWS, LIVE_FPS };
 })(typeof window !== "undefined" ? window : globalThis);

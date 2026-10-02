@@ -497,11 +497,11 @@
     "elements": [],
     "faces_in": 14000,
     "faces": 14000,
-    "verts": 7048,
-    "pressed": 2108,
+    "verts": 7024,
+    "pressed": 1743,
     "pos": 353772,
     "source": "atlas (VENAT)",
-    "idx": 396060,
+    "idx": 395916,
     "idx_type": "uint16",
     "n_idx": 42000
    }
@@ -556,9 +556,9 @@
   "source_url": "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/",
   "version": "BP3D 4.0 (isa_BP3D_4.0_obj_99)",
   "venat": {
-   "threshold": 0.2,
-   "min_voxels": 1500,
-   "pressed": 2108,
+   "threshold": 0.4,
+   "min_voxels": 500,
+   "pressed": 1743,
    "attribution": "VENAT venous atlas, Huck et al. 2019 (Brain Struct Funct 224:2467; figshare 10.6084/m9.figshare.7205960), CC BY 4.0",
    "licence": "CC BY 4.0",
    "source_url": "https://ndownloader.figshare.com/files/13267316",

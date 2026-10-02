@@ -14,8 +14,8 @@ onto it like the arteries (bp3d_parts.press_to_surface).
 """
 import numpy as np
 
-TH = 0.2                   # partial volume of vein, 0..0.83 in the atlas
-MIN_VOX = 1500             # 0.19 cm3 at 0.5 mm: the sinuses and named veins, not specks
+TH = 0.4                   # partial volume of vein, 0..0.83 in the atlas (below 0.4 the sinuses merge into fat blobs)
+MIN_VOX = 500              # 0.06 cm3 at 0.5 mm: the sinuses and named veins, not specks
 FACES = 14000
 URL = "https://ndownloader.figshare.com/files/13267316"
 ATTRIBUTION = ("VENAT venous atlas, Huck et al. 2019 (Brain Struct Funct 224:2467; figshare 10.6084/m9.figshare.7205960), "
@@ -35,8 +35,8 @@ def build_veins(path, affine_tpl_to_his, web_from_t1, cortex, cnorm, log=print):
     sizes[0] = 0
     keep = np.isin(lab, np.nonzero(sizes >= MIN_VOX)[0])
     log(f"veins: {int(m.sum())} voxels above {TH}, {n} pieces, {int((sizes >= MIN_VOX).sum())} kept ({int(keep.sum())} voxels)")
-    sm = ndimage.gaussian_filter(np.where(keep, pv, 0.0), 1.0)
-    verts, faces, _, _ = measure.marching_cubes(sm, TH * 0.9)
+    sm = ndimage.gaussian_filter(np.where(keep, pv, 0.0), 0.7)
+    verts, faces, _, _ = measure.marching_cubes(sm, TH * 0.95)
     v = nib.affines.apply_affine(img.affine, verts)                                  # MNI mm
     v = nib.affines.apply_affine(np.linalg.inv(affine_tpl_to_his), v)               # his T1 world
     v = nib.affines.apply_affine(web_from_t1, v)                                      # the page frame
