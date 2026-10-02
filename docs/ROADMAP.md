@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 12:00 UTC** (pass 26, final for the task list). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 13:50 UTC** (pass 27). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -223,6 +223,10 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: the 1M spiking network runs on GPU through his waking hours** (owner's choice: ≈ $4–14/day,
+  ≈ $130–400/month). Off in code until `SUB01_DAY_LIVE=1`. Caps: `SUB01_DAY_MAX_HOURS` 17/day, `SUB01_GPU_USD_PER_DAY`
+  $14, 120 GPU-h/week, ≤ 6 restarts/day. One pod at a time; never the pod "BRAIN". The fallback is the 20k CPU network
+  (#55), then the rate model. Task #58.
 - **2026-10-02: #15 goes before #17.** After the outage, a health check and the Railway healthcheck path matter more
   than YouTube and chess.
 - **2026-10-02: review checklist gains "new module → Dockerfile COPY".** After the #45 incident, every PR that adds a
@@ -267,6 +271,13 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 27 (owner: "turn his neurons on, more things, more internet searching", "is he fed?", "I want the big one"):**
+new tasks:
+- #55: a small spiking network on the server CPU votes and learns live; it is the fallback for #58;
+- #56: many more free search sources, with queries from memory, wishes and taught words;
+- #57: he went hungry while chatting (147 min/day above meal time with chat waiting); fix with needs first and a 24 h konbini;
+- #58: the 1M network on GPU through his waking hours.
 
 ## Launch readiness (2026-10-02, after pass 26)
 **All task issues are closed and no PRs are open.** 27 PRs were merged today, #27–#54: attribution, tastes page,
