@@ -71,6 +71,7 @@ cheap to run, with the password gate kept until launch day.
 | 18e | Daily memory test on the GPU switched on | waiting on the owner (RunPod keys on Railway) | #9 |
 | 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | todo, after #14 + #28 | issue #31 |
 | 18g | /tastes page (what he leans towards, over days) | in progress | issue #30 |
+| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A in progress (standalone `mind.py`); phase B after #14, #29, #28 | issue #33 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
@@ -125,6 +126,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
   - any money: purchases, wallets, crypto;
   - adult or gore content on the public screens;
   - the character mentioning or promoting the coin, or pretending to be human.
+- **2026-10-02: the mind layer** (owner): a language model becomes his inner voice, governed by the brain model (mood, energy, choices). Wording: "an AI reads and remembers for him; his brain model chooses"; never that he understands, feels or is conscious. The shared AI cap is raised to $2.00 per Tokyo day (eyes + mind).
 - **2026-10-02: the site is English-only** (owner). Viewers may write in any language and Italian words still reach the brain as stimuli, but nothing shown or generated is in another language.
 - **2026-10-02: CI-only and docs-only merges do not count for the 60-minute spacing:** they don't change what runs on Railway.
 - **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
