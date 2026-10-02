@@ -60,6 +60,10 @@
   .card .t { font-size:14.5px; line-height:1.4; }
   .card .m { font-size:12px; color:#c9c9d6; margin-top:6px; line-height:1.55; }
   .card .s { font-size:10.5px; color:var(--faint); margin-top:8px; line-height:1.45; }
+  #musiccard .mu { display:flex; gap:10px; align-items:center; margin-bottom:9px; }
+  #musiccard .mu img { width:46px; height:46px; border-radius:6px; flex:none; object-fit:cover; }
+  #musiccard .mu .t { overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  #musiccard iframe { width:100%; height:80px; border:0; border-radius:12px; display:block; background:#111; }
   #screencard .frame { position:relative; border-radius:7px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12);
     box-shadow:0 0 0 3px #101014, 0 0 38px -8px rgba(140,170,255,.30); }
   #screencard .frame::after { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
@@ -213,6 +217,13 @@
     <div class="opts" id="s-opts" hidden><div class="h" id="s-opts-h">options considered · brain response</div><div id="s-rows"></div>
       <div class="s" id="s-reason"></div>
       <div class="s" id="s-foot">An AI reads the page and lists options; his brain model picks.</div></div>
+  </div>
+  <div class="card" id="musiccard" hidden>
+    <div class="k"><span>Now playing</span><span id="mu-k"></span></div>
+    <div class="mu"><img id="mu-art" alt="" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
+    <iframe id="mu-embed" title="Spotify player" allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    <div class="s" id="mu-card">his brain model picked this track; press play to listen on your own device</div>
   </div>
   <div class="card" id="readcard" hidden>
     <div class="k"><span>On his mind</span><a id="r-link" href="#" target="_blank" rel="noopener">wikipedia ↗</a></div>
@@ -1694,6 +1705,26 @@ function doVariant(V, c){
 }
 const MOUSE = new THREE.Vector3(-0.785, 0.985, -0.975);
 
+// ---- now playing (#75): what he listens to (#68), as /brain shows it: art, title · artist, Spotify's official embed
+// (compact; the visitor presses play on their own device, nothing autoplays). Hidden when nothing plays
+let musicNow = null, musicEmbed = "";
+const SPOTIFY_EMBED = /^https:\/\/open\.spotify\.com\/embed\/track\/[A-Za-z0-9]{22}(\?[\w=&]*)?$/;
+function renderMusic(){
+  const m = musicNow; $("musiccard").hidden = !m; if (!m) return;
+  $("mu-k").textContent = m.mode === "background" ? "in the background" : "headphones on";
+  $("mu-t").textContent = m.title || ""; $("mu-a").textContent = [m.artist, m.genre_label].filter(Boolean).join(" · ");
+  const art = $("mu-art"), ok = /^https:\/\//.test(m.art || ""); art.hidden = !ok; if (ok && art.src !== m.art) art.src = m.art;
+  if (SPOTIFY_EMBED.test(m.embed || "") && m.embed !== musicEmbed) { musicEmbed = m.embed; $("mu-embed").src = m.embed; }
+  $("mu-card").textContent = m.card || "his brain model picked this track; press play to listen on your own device";
+}
+async function loadMusic(){
+  try { const d = await (await fetch("/api/music")).json(); musicNow = d.now ? {...d.now, card:d.card} : null; renderMusic(); } catch {}
+}
+loadMusic();
+function onMusic(m){
+  if (m.playing) { musicNow = {...m, card:musicNow && musicNow.id === m.id ? musicNow.card : null}; renderMusic(); }
+  else if (musicNow && musicNow.id === m.id) { musicNow = null; renderMusic(); }
+}
 // ---- music (#68): headphones on while a track plays (life.music), and a small nod to it
 const BEAT = 1.7;                                      // Hz: the page does not know the track's tempo; an easy pace
 const musicOn = () => !!(lastLife && lastLife.music) && visible;
@@ -2107,7 +2138,9 @@ function connect(){
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
     if (m.type === "chess") { onChess(m); return; }
-    if (m.type === "hello") {          // the latest chat and his replies, merged by time (hh:mm)
+    if (m.type === "music") { onMusic(m); return; }
+    if (m.type === "hello") {
+      if ("music" in m) { musicNow = m.music ? {...m.music, card:musicNow && m.music && musicNow.id === m.music.id ? musicNow.card : null} : null; renderMusic(); }          // the latest chat and his replies, merged by time (hh:mm)
       talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
               ...(m.replies || []).map(r => ({his:true, t:r.t || "", text:String(r.text || ""), re:r.replying_to || "", tag:r.tag || REPLY_TAG}))]
         .filter(x => x.text).map((x, i) => [x, i]).sort((a, b) => a[0].t < b[0].t ? -1 : a[0].t > b[0].t ? 1 : a[1] - b[1]).map(a => a[0]).slice(-40);
@@ -2248,7 +2281,7 @@ function animate(dt){                                // one step of him: clips, 
   return moving;
 }
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
-  setHour: h => { hour = h; }, setDoor, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
+  setHour: h => { hour = h; }, setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); renderer.render(scene, camera); }, animate_: animate,
