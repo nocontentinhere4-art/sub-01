@@ -1,8 +1,12 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 07:40 UTC** (pass 20b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 08:10 UTC** (pass 21). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 21:** merged #48 (#19): the brain loop is **6× cheaper**. Bench 31.7 → 5.0 ms; whole server 34 → 9.0 ms per
+50 ms tick (8.5 ms with --mind), about 18 % of a core. Identity test vs the old step < 1e-9, 541 tests, 0 skipped. It
+also explains the post-vote slowdown (malloc churn from old temporaries). #18 Chromium non-root started.
+
 **Pass 20b:** merged #47 (#43): the maps are drawn from a static OSM extract (130 KB), with no tile server and ODbL
 attribution. /about now states the search-box typing honestly. #46 (the mind in the room) started.
 
@@ -57,13 +61,14 @@ Who is on what (cloud sessions, 2026-10-02):
 | #43 map without OSM tiles | `session_015XP5haU96uvbRUJf3p7Tam` | merged as #47 |
 | #46 the mind in the room | `session_01Ek5DZG7cEvc1v7TV8PrEkz` | started 07:37 (`feature/mind-room`) |
 | #33 mind layer | `session_01KwLm3oYfsh8KhXjWTbrUPt` | done: #37 + #45 |
-| #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | started 07:25 (`perf/brain-step`) |
+| #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | merged as #48 (6×) |
+| #18 Chromium non-root | `session_01Fbtw3qXpLr5WZAjU7jQiDT` | started 08:10 (`chore/chromium-nonroot`; Dockerfile) |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py` / `brain_sim.py`, one at a time: **#19** (in progress) → #18 → #17 → #15. `web/room.html`: #46 the mind in the room (in progress).
+Next on `live_server.py` / Dockerfile, one at a time: **#18** (in progress) → #17 → #15. `web/room.html`: #46 the mind in the room (in progress).
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -97,7 +102,7 @@ cheap to run, with the password gate kept until launch day.
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
-| 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
+| 18 | Brain loop 3× cheaper | done (6×: 34 → 9 ms per tick) | #48 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | done | #40 |
 | 18e | Daily memory test on the GPU switched on | key added 2026-10-02; needs `SUB01_POD_SECRET` too | #9 |
 | 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | done | #41, #44 |
@@ -190,8 +195,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - ~~Map tiles~~: fixed by #47 (static vector map).
 - **YouTube walk footage on /life** showed "error 153" in headless Chromium (a missing Referer?). Check it on the real
   site before launch.
-- **CPU:** the brain loop alone uses ~63 % of one core (~31 ms per 50 ms tick, `main`, `--demo`, no Chromium).
-  Chromium shares the CPU, so ticks can run late. Fix: #19.
+- ~~CPU~~: fixed by #48. The whole server is ~9 ms per 50 ms tick (~18 % of a core), leaving room for Chromium.
 - **Bandwidth at launch:** after #34, 7.3 KB/s per brain-page viewer and 4.0 KB/s per room viewer. 300 steady viewers ≈
   1.6 MB/s ≈ 140 GB/day of Railway egress: watch the bill after launch. The per-IP cap (4) trusts the first
   `X-Forwarded-For` entry, which a client can forge; the global cap (400) still holds.
