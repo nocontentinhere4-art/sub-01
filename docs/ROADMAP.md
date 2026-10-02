@@ -1,8 +1,13 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 10:20 UTC** (pass 24). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 11:20 UTC** (pass 25). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
+10–600 s watch; chess with python-chess, a depth-2 opponent, and the brain vote picking among 5 scorer moves ("his brain
+model picks among 5 candidate moves from a simple move scorer"). 601 tests with torch and Chromium; tick 8.8 ms. The
+room desk view is the last open PR.
+
 **Pass 24:** merged #52 (#46, the mind in the room). He sits at the desk to answer chat on the monitor; replies are
 tagged "his reply (AI-written)". The day plan shows "voted by his brain model", or "yesterday's, kept while the AI rests"
 when the AI is resting, plus the resting line. 531 tests; tick 8.1 ms. #17 continues: server PR first, then the room
@@ -89,7 +94,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | merged as #48 (6×) |
 | #18 Chromium non-root | `session_01Fbtw3qXpLr5WZAjU7jQiDT` | merged as #50 (found the #49 outage) |
 | #15 costs, caps, /healthz | `session_01M9bv9k1WFLctqBLSHXWPwr` | merged as #51 |
-| #17 YouTube + chess | `session_01F3jQL1rvBNU5TaF7Sygkqi` | started 09:04 (`feature/youtube-chess`; room part after #46) |
+| #17 YouTube + chess | `session_01F3jQL1rvBNU5TaF7Sygkqi` | server side merged as #53; room desk view in progress (`feature/youtube-chess-room`) |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
@@ -127,7 +132,7 @@ cheap to run, with the password gate kept until launch day.
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | done (follow-up for credits pending; links from the pages come with the room fix) | #23 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | done (300 viewers: 71 % of a core, 4–7 KB/s each) | #34 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | done | #51 |
-| 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
+| 16 | YouTube (muted) + chess, chosen by the brain vote | done on /brain (#53); room view in progress | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | done (uid 1000; sandbox on where the host allows it) | #50 |
 | 18 | Brain loop 3× cheaper | done (6×: 34 → 9 ms per tick) | #48 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | done | #40 |
