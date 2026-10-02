@@ -1,9 +1,9 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 01:30 UTC** (pass 9). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 01:55 UTC** (pass 10). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-**Merged on 2026-10-02:** #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
+**Merged on 2026-10-02:** #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
 
 **Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
 coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
@@ -15,7 +15,13 @@ Owner actions now:
   Make sure the `/data` volume has ≥ 300 MB free. It then runs 21:00–22:00 Tokyo daily (≤ 1 GPU-hour/day, ≈
   $0.27–0.85/day, 8 GPU-hours/week cap).
 - **OpenRouter spend starts with this deploy** (your `OPENROUTER_API_KEY` is on Railway): Haiku 4.5, capped at $1.00 per Tokyo day. Check `/api/decisions` → `eyes` (`calls_today`, `usd_today`, `last_error`) after the deploy.
-- Everything open is merged. Next: #21 (atomic writes) is in progress; #12 CI and #13 about page are in progress.
+- In progress:
+  - #21 atomic writes (branch `fix/atomic-state` pushed, PR pending);
+  - room movement fix (`fix/room-bed-phone`): he glides in the destination pose straight through the furniture
+    instead of walking, plus the bed-phone pose and the disclaimer overlap;
+  - about-page follow-up (new-room credits, GPU cost line).
+- **Live QA is blocked:** `SUB01_SITE_PASSWORD` is not set in either cloud environment (checked by two worker
+  sessions). Add it to the **SUB-01** environment, then the coordinator starts a QA session.
 
 Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
@@ -56,8 +62,8 @@ cheap to run, with the password gate kept until launch day.
 | 9 | Sleep circuit (Phillips-Robinson) | done | #11 |
 | 10 | Spiking memory on GPU, daily test card | done (idle until the RunPod keys are set on Railway) | #9 |
 | 11 | Brain decides what he clicks (Haiku 4.5 eyes, $1/day cap) | done | #20 |
-| 12 | CI (tests + demo smoke on every PR) | in progress | issue #12 |
-| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | in progress | issue #13 |
+| 12 | CI (tests + demo smoke on every PR) | done | #22 |
+| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | done (follow-up for credits pending; links from the pages come with the room fix) | #23 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
@@ -103,6 +109,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
   coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
   `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
   and the `?rate=` bug.
+- **2026-10-02: CI-only and docs-only merges do not count for the 60-minute spacing:** they don't change what runs on Railway.
 - **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
   I rendered both in headless Chromium. The new room is cleaner, and its provenance is documented as CC0 or made for
   the project (`web/room/CREDITS.md`); the old room is a single AI-generated mesh. A later PR removes the old GLBs.
@@ -131,13 +138,14 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
-- **No CI:** a broken `main` deploys straight to Railway. Fix: #12.
+- ~~No CI~~: CI runs on every PR since #22.
 - ~~Test bug on `main` (Chromium tests stopped the driver twice)~~: fixed with the #7 merge.
 - **Honesty:** the PCI and Pong results are negative and must stay visible as such. "Digital twin" wording suggests
   a copy of the person; use "a model built from one person's public MRI data".
 - **Stale branches** (`feature/rw-*`, `feature/twin-*`, `feature/real-world`, `assets/cc0`, `test/integration`,
   `claude/youthful-bohr-*`, `claude/affectionate-brown-*`): delete them after launch. The coordinator never deletes
   branches.
+- **Character movement in the room** (seen live by the owner): in-room activity changes glide straight to the new spot in the destination pose, through the furniture. The fix is in progress (`fix/room-bed-phone`).
 - **Coordinator pushes to PR branches:** only merge commits that clear conflicts, and only when the owner asks. The
   first was #9's `fe60d9f` (2026-10-01). Authoring sessions must pull before pushing.
 
