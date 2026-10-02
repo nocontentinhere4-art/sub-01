@@ -3,10 +3,13 @@
 Loads the learned weights (from the server, or none), runs the phases, streams compact state to the server over
 a websocket authenticated with SUB01_POD_SECRET, writes /out/status.json + /out/results.json (read by
 validate / pod_manager through the pod's port 8000) and uploads the learned weights at the end.
-Phases: bench, rates, delays, recall_yesterday, encode, pong_train, pong_exam, memory_test, sleep, free.
+Phases: bench, rates, delays, recall_yesterday, encode, pong_train, pong_exam, choice_train, choice_exam,
+memory_test, sleep, free.
 Items (cfg "items") are the day's chat messages and readings, each {text, source: chat|reading, item}; a reading's
 text is its title + keywords. recall_yesterday tests the previous session's items before anything new is stored.
 In validate mode extra controls run (no-plasticity Pong, random paddle, sleep without replay).
+choice_train / choice_exam (spiking/choice.py): the K-armed choice task with its controls (frozen network on the
+same trials, random chooser, reversal halfway).
 """
 import json
 import math
@@ -23,6 +26,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from .choice import ChoiceTask, RewardSchedule, random_chooser, summarize
 from .config import Config
 from .memory import MemorySystem, sleep_block, words
 from .net import SpikingNet
@@ -133,6 +137,7 @@ class Session:
         self.phase, self.progress = "start", 0.0
         self.last_frame_wall, self.last_frame_t, self.last_frame_n, self.frame_snap = 0.0, 0, 0, None
         self.pong = None
+        self.choice = None
         self.stage = "AWAKE"
         self.chat_until = -1
         self.stopping = False
@@ -189,7 +194,9 @@ class Session:
                    "raster": {"n": len(net.raster_ids), "t0": int(self.last_frame_t), "t1": int(net.t),
                               "spikes": net.pop_raster(self.last_frame_t)[:4000]},
                    "pong": self.pong.shown.frame() if (self.pong is not None and "pong" in self.phase) else None,
-                   "dopamine": round(p.mod["da"], 3) if p is not None else 0.0}
+                   "choice": self.choice.last if (self.choice is not None and "choice" in self.phase) else None,
+                   "dopamine": (self.choice.last or {}).get("dopamine", 0.0) if (self.choice is not None and "choice" in self.phase)
+                   else (round(p.mod["da"], 3) if p is not None else 0.0)}
             self.link.send(msg)
         else:
             net.raster_log.clear() if net.raster_rows is not None else None
@@ -432,6 +439,71 @@ class Session:
                                                      "random": rnd["hit_rate"]}}
         self.result("exam", out)
         return out
+
+    # --- choice task (spiking/choice.py) ----------------------------------------------------------------------------
+    def _choice(self):
+        if self.choice is None:
+            c = self.cfg
+            kw = {k[len("choice_"):]: c[k] for k in ("choice_cue_frac", "choice_eta", "choice_bonus_mv", "choice_thr_z",
+                                                       "choice_timeout_ms", "choice_iti_ms", "choice_alpha") if k in c}
+            k = int(c.get("choice_k", 4))
+            self.choice = ChoiceTask(self.net, labels=c.get("choice_labels"), k=k, probs=c.get("choice_probs"),
+                                     seed=int(c.get("seed", 1)), **kw)
+            self.choice.calibrate()
+        return self.choice
+
+    def ph_choice_train(self):
+        """Frozen control on the same trials first (no weight change), then training with dopamine; reversal halfway;
+        a random chooser on the same schedule. All three in one result, whatever the numbers are."""
+        task = self._choice()
+        n = int(self.cfg.get("choice_trials", 200))
+        rev = n // 2 if self.cfg.get("choice_reversal", True) else None
+        seed = int(self.cfg.get("seed", 1))
+        frozen = task.run(n, RewardSchedule(task.probs, rev, seed=seed), mode="exam")
+        self.progress = 0.5
+        t0 = task.trial
+        learned = task.train(n, RewardSchedule(task.probs, rev, seed=seed),
+                             on_trial=lambda tr: setattr(self, "progress", 0.5 + 0.5 * (task.trial - t0) / n))
+        out = {"k": task.k, "labels": task.labels, "probs": task.probs, "trials": n, "reversal_at": rev,
+               "criterion": "14 of the last 20 trials correct", "calibration": task.calib,
+               "pool_sizes": [len(pl) for pl in task.pools(range(task.k))], "cue_sizes": [len(c) for c in task.cues],
+               "cue_pool_synapses": task.synapse_count(),
+               "learned": {**summarize(learned["correct"], learned["rewards"], rev), "timeout_frac": learned["timeout_frac"],
+                           "mean_rt_ms": learned["mean_rt_ms"]},
+               "frozen": {**summarize(frozen["correct"], frozen["rewards"], rev), "timeout_frac": frozen["timeout_frac"]},
+               "random": random_chooser(RewardSchedule(task.probs, rev, seed=seed), n, task.k, seed=seed + 1),
+               "dw_cue_pool_mean_mv": task.dw_stats()}
+        self.log("learned", out["learned"]["trials_to_criterion"], out["learned"].get("trials_to_criterion_after_reversal"),
+                 "frozen", out["frozen"]["frac_correct"], "random", out["random"]["frac_correct"])
+        self.result("choice_curve", out)
+
+    def ph_choice_exam(self):
+        """Frozen exam on the current hidden probabilities (after the reversal if training reversed), the same exam
+        with every learned change removed, and the random chooser."""
+        task = self._choice()
+        n = int(self.cfg.get("choice_exam_trials", 40))
+        rev = int(self.cfg.get("choice_trials", 200)) // 2 if self.cfg.get("choice_reversal", True) else None
+        probs = RewardSchedule(task.probs, rev).probs(task.trial).tolist()
+        exam = task.exam(n, probs)
+        p = self.net.plast
+        ctrl = None
+        if p is not None:
+            dw, theta = p.dw.clone(), self.net.theta.clone()
+            p.dw.zero_()
+            p._apply()
+            self.net.theta.zero_()
+            self.net._dirty = True
+            try:
+                ctrl = task.exam(n, probs)
+            finally:
+                p.dw.copy_(dw)
+                p._apply()
+                self.net.theta.copy_(theta)
+                self.net._dirty = True
+        rnd = random_chooser(RewardSchedule(probs, None, seed=int(self.cfg.get("seed", 1))), 2000, task.k)
+        self.result("choice_exam", {"label": "after training (frozen)", "probs": probs, **exam,
+                                    "controls": {"no_learning": ctrl["frac_correct"] if ctrl else None,
+                                                 "random": rnd["frac_correct"], "chance": round(1.0 / task.k, 4)}})
 
     def ph_sleep(self, replay=True, label=None):
         minutes = float(self.cfg.get("sleep_minutes", 4))

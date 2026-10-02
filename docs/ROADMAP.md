@@ -1,38 +1,40 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 03:10 UTC** (pass 15). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 04:45 UTC** (pass 17). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-**Merged on 2026-10-02:** #26 English-only output (owner-approved), #24 atomic state-file writes (owner-approved; CI green), #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
+**Pass 17:** merged #38 (tastes learn faster: Kalman gain per topic + overnight replay; simulated top 5 found ~2.5×
+sooner at noise 0.1; 346 tests, tick 32.5 ms) and #39 (spiking network learns to choose: 1M neurons on GPU reached
+criterion in 84 trials, re-learned after reversal in 22, exam 1.00 vs 0.275 with learning removed and 0.26 random;
+CPU learning test re-run by the coordinator with torch: 20 passed). RunPod checked read-only: only "BRAIN" (EXITED,
+untouched). #31 waits for #29 (`live_server.py`) and the room follow-up PR (`web/room.html`).
 
-**Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
-coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
-used the old engine's schedule). `main` passes 225 tests (192 + 10 skipped without torch), the demo smoke passes,
-and a simulated night sleeps 23:54, reaches REM at 01:09, wakes, and makes 24 replays.
+**Pass 16 (owner: "finish everything on your own, what's missing with the neurons and the rest, verify and proceed"):**
+merged #37 (mind layer phase A, new files only), #27 (MyConnectome attribution), #32 (/tastes page), #28 (room movement: walks around furniture, sits, lies
+down) and #34 (launch load). Before merging, the coordinator merged all four onto `main` locally: 291 tests passed
+(10 skipped), smoke OK at 32.5 ms per 50 ms tick, and the #34 load test with 300 viewers passed (71 % of one core,
+tick late p95 3.3 ms, RSS 173 MB).
 
 Owner actions now:
-- **Spiking memory test (#9) is on `main` but idle** until you add `RUNPOD_API_KEY` and `SUB01_POD_SECRET` on Railway.
-  Make sure the `/data` volume has ≥ 300 MB free. It then runs 21:00–22:00 Tokyo daily (≤ 1 GPU-hour/day, ≈
-  $0.27–0.85/day, 8 GPU-hours/week cap).
-- **OpenRouter spend starts with this deploy** (your `OPENROUTER_API_KEY` is on Railway): Haiku 4.5, capped at $1.00 per Tokyo day. Check `/api/decisions` → `eyes` (`calls_today`, `usd_today`, `last_error`) after the deploy.
-- In progress:
-  - room movement fix (`fix/room-bed-phone`): he glides in the destination pose straight through the furniture
-    instead of walking, plus the bed-phone pose and the disclaimer overlap;
-- Live QA: blocked. `SUB01_SITE_PASSWORD` was added to Railway's variables, but sessions read the **Claude** SUB-01 environment's variables. The Railway copy is unused and can be deleted.
-- **Railway credit: "24 days or $4.17 left"** (owner's screenshot, 2026-10-02). The service stops when it runs out; move to a paid plan before launch.
+- **RunPod:** the owner added the RunPod key on Railway (2026-10-02). The pod manager also needs **`SUB01_POD_SECRET`**
+  (any long random string). Without it the log says `spiking pod manager disabled: SUB01_POD_SECRET is not set`. With
+  both set, the first GPU session runs tonight at 21:00 Tokyo (12:00 UTC): ≤ 1 GPU-hour/day, ≈ $0.27–0.85/day.
+- **`SUB01_CHOICE=1` on Railway** (optional): adds the choice training to the nightly GPU hour (~90 s, no extra cost).
+- **GPU budget beyond 1 h/day:** not decided. Caps stay as they are until the owner names a daily amount.
+- **Email account for him** (18d), **reply to Russ**, **Railway paid plan**: owner only.
+- **Railway credit: "24 days or $4.17 left"** (owner's screenshot, 2026-10-02). The service stops when it runs out.
 
 Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
 |---|---|---|
-| #8 room | `session_01Xrq53UQH9EHy4bgPj9B2yL` (author) | merged; follow-ups later (remove old room after 2026-10-09, lived-in props) |
-| #21 atomic writes | `session_0116sSeY5bUXiQqiKPtPBUMz` (new) | started 01:26 |
-| #20 brain-decides | `session_01881q1gcHZBtokE8qi8QjxC` (author) | merged; asked for a docstring-only follow-up (`fix/eyes-docstring`) |
-| #12 CI | `session_011qiRnsxURjY8wayHe8dz6u` (new) | started 00:41 |
-| #13 about page | `session_0129Vcj2Bg6kjc4KDPP3qnBT` (new) | started 00:41 |
+| #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | in progress |
+| #33 mind layer, phase A (`mind.py`) | `session_01KwLm3oYfsh8KhXjWTbrUPt` | merged as #37 (338 tests, smoke 33.1 ms); phase B waits its turn |
+| #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
+| #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
+| room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | asked for a new branch from `main` |
+| `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-| PR | status | why it needs the owner |
-|---|---|---|
-| — | — | — |
+Next on `live_server.py`, one at a time: **#29** → **#31** teach him (also needs the room follow-up PR merged) → **#33 phase B** → #19 → #18 → #17 → #15.
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -62,16 +64,19 @@ cheap to run, with the password gate kept until launch day.
 | 11 | Brain decides what he clicks (Haiku 4.5 eyes, $1/day cap) | done | #20 |
 | 12 | CI (tests + demo smoke on every PR) | done | #22 |
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | done (follow-up for credits pending; links from the pages come with the room fix) | #23 |
-| 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
+| 14 | Launch load: cheaper feeds, viewer caps, load test | done (300 viewers: 71 % of a core, 4–7 KB/s each) | #34 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | in progress | issue #29 |
-| 18e | Daily memory test on the GPU switched on | waiting on the owner (RunPod keys on Railway) | #9 |
-| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | todo, after #14 + #28 | issue #31 |
-| 18g | /tastes page (what he leans towards, over days) | in progress | issue #30 |
-| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A in progress (standalone `mind.py`); phase B after #14, #29, #28 | issue #33 |
+| 18e | Daily memory test on the GPU switched on | key added 2026-10-02; needs `SUB01_POD_SECRET` too | #9 |
+| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | todo, after #29 + room follow-ups | issue #31 |
+| 18i | Faster learning of tastes (adaptive rate, overnight replay of surprising pages) | done | #38 |
+| 18j | Spiking brain learns to choose (dopamine reward vs frozen and random controls) | done; nightly run needs `SUB01_CHOICE=1` on Railway (~90 s inside the 1 h) | #39 |
+| 18k | Room movement (walk around furniture, sit, lie down) | done; follow-ups in a new PR | #28 |
+| 18g | /tastes page (what he leans towards, over days) | done | #32 |
+| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A done (#37, standalone, not wired); phase B after #29 → #36 → #31 | issue #33 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
@@ -143,11 +148,20 @@ findings "NOT verified", and its reviews are partial on large diffs.
   - The default is set in code, so nothing needs setting on Railway.
   - Haiku takes no effort or thinking parameters, so the requests are built per model (#20, change 6).
 
+- **2026-10-02: owner delegated finishing ("finish everything on your own, verify and proceed").** The coordinator
+  merges verified PRs, including those that touch `live_server.py`, after running tests, smoke and (for load) the load
+  test on `main` plus the PR. Unchanged: spending caps (GPU 1 h/day, AI $1–2/day), the password gate, the safety rules,
+  never touching the pod "BRAIN".
+- **2026-10-02: "accelerate learning" = three separate tracks.** Understanding = the mind layer (#33, LLM, capped).
+  Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
+  against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
+
 ## Known risks
 - **CPU:** the brain loop alone uses ~63 % of one core (~31 ms per 50 ms tick, `main`, `--demo`, no Chromium).
   Chromium shares the CPU, so ticks can run late. Fix: #19.
-- **Bandwidth at launch:** `/ws` is 20 ticks/s × ~3.1 KB, about 62 KB/s per brain-page viewer. 300 viewers would be
-  ~19 MB/s of Railway egress. Fix: #14.
+- **Bandwidth at launch:** after #34, 7.3 KB/s per brain-page viewer and 4.0 KB/s per room viewer. 300 steady viewers ≈
+  1.6 MB/s ≈ 140 GB/day of Railway egress: watch the bill after launch. The per-IP cap (4) trusts the first
+  `X-Forwarded-For` entry, which a client can forge; the global cap (400) still holds.
 - **Unbounded spend:** the eye (Replicate) has no daily cap and no log. With viewers always present it renders up to
   ~960 frames/day. Fix: #15. #20 needs a daily USD cap (Opus 5.5 via OpenRouter is ≈ $0.50/hour at the 30-call cap).
 - **State files:** `life.json`, `body.json`, `reading.json` and `browsing.json` are written non-atomically, so a kill mid-write
@@ -164,7 +178,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - **Stale branches** (`feature/rw-*`, `feature/twin-*`, `feature/real-world`, `assets/cc0`, `test/integration`,
   `claude/youthful-bohr-*`, `claude/affectionate-brown-*`): delete them after launch. The coordinator never deletes
   branches.
-- **Character movement in the room** (seen live by the owner): in-room activity changes glide straight to the new spot in the destination pose, through the furniture. The fix is in progress (`fix/room-bed-phone`).
+- ~~Character movement in the room~~: fixed by #28 (2026-10-02). Bed clip and chair follow-ups are in a new PR.
 - **Coordinator pushes to PR branches:** only merge commits that clear conflicts, and only when the owner asks. The
   first was #9's `fe60d9f` (2026-10-01). Authoring sessions must pull before pushing.
 

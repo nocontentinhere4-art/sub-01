@@ -8,7 +8,8 @@ HTTP API (every call needs the header X-Browse-Token = BROWSE_SERVICE_TOKEN when
   POST /step  {device, heard, interest} scroll / open the next page; or {"decide": page} when the brain should choose
   POST /act   {device, action, why, interest}  carry out the brain's choice
   POST /close {device|null}             put a screen away (or everything)
-  GET  /shot/{device}.jpg               latest screenshot        GET /state   log + screen status       GET /health
+  GET  /shot/{device}.jpg               latest screenshot        GET /health
+  GET  /state   log + screen status, every text typed (site search boxes only) and every banner pressed away
 The service never sees the server's secrets: it runs with a minimal environment (see LocalBrowser.spawn).
 
 In the brain's process, BrowserClient talks to it with short timeouts; if it does not answer it raises BrowserDown,
@@ -114,7 +115,9 @@ def make_app(browser, token=None):
 
     async def state(request):
         return web.json_response({**browser.to_dict(), "screens": {k: s.status() for k, s in browser.screens.items()},
-                                  "open": browser.browser is not None})
+                                  "open": browser.browser is not None,
+                                  "typed": getattr(browser, "typed", [])[-30:],
+                                  "dismissed": getattr(browser, "dismissed", [])[-30:]})
 
     async def health(request):
         return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(tree_rss_mb(os.getpid()), 1)})

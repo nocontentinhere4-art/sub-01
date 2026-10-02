@@ -515,6 +515,8 @@ class Live:
                             "received": hhmm(m["t"]), "source": src})
             else:
                 out.append(ev | {"t": hhmm(t)})
+                if ev["type"] == "sleep":
+                    self.tastes.replay()                                     # overnight replay of today's stays
                 if ev.get("natural"):
                     self.store.save(e, self.memory)                          # night closed: write it now
         if self.spiking:
