@@ -242,13 +242,18 @@ class Clock:
 
 
 class Memory:
-    """Accepted chat messages (source "chat") and articles it read (source "reading"): time, stage when received,
-    stimulus pattern and emotional tag. Readings compete for REM replay at READING_WEIGHT, and their pool never
-    outweighs READING_POOL x the chat pool, so messages from people still win most nights."""
+    """Accepted chat messages (source "chat"), articles it read (source "reading") and words viewers taught it (source
+    "taught"): time, stage when received, stimulus pattern and emotional tag. Readings compete for REM replay at
+    READING_WEIGHT, and their pool never outweighs READING_POOL x the pool of what people wrote (chat + taught), so
+    messages from people still win most nights. Taught items are encoded more strongly (TAUGHT_WEIGHT), but their
+    pool is capped at TAUGHT_POOL x everything else, so they cannot take every REM replay."""
 
     EMO_WEIGHT = {"threat": 3.0, "positive": 2.5, "neutral": 1.0}
     READING_WEIGHT = 0.6
     READING_POOL = 0.6
+    TAUGHT_WEIGHT = 1.5
+    TAUGHT_POOL = 1.0            # taught <= 1.0 x the rest: at most half the replay chance when anything else is there
+    SOURCE_WEIGHT = {"reading": READING_WEIGHT, "taught": TAUGHT_WEIGHT}
 
     def __init__(self, items=None, cap=2000):
         self.items = list(items or [])
@@ -272,12 +277,13 @@ class Memory:
     def weight(self, m, t, night_start, replayed=0):
         recency = math.exp(-max(0.0, t - m["t"]) / (24 * 3600))
         tonight = 4.0 if night_start is not None and m["t"] >= night_start else 1.0
-        src = self.READING_WEIGHT if m.get("source") == "reading" else 1.0
+        src = self.SOURCE_WEIGHT.get(m.get("source"), 1.0)
         return recency * self.EMO_WEIGHT.get(m["emotion"], 1.0) * tonight * src / (1 + replayed)   # habituation
 
     def weights(self, cand, t, night_start, replayed):
         w = [self.weight(m, t, night_start, replayed.get(self.key(m), 0)) for m in cand]
-        return self.cap_readings(w, [m.get("source") == "reading" for m in cand])
+        w = self.cap_readings(w, [m.get("source") == "reading" for m in cand])
+        return self.cap_taught(w, [m.get("source") == "taught" for m in cand])
 
     def cap_readings(self, w, is_read):
         chat = sum(x for x, r in zip(w, is_read) if not r)
@@ -285,6 +291,14 @@ class Memory:
         if chat > 0 and read > self.READING_POOL * chat:
             k = self.READING_POOL * chat / read
             w = [x * k if r else x for x, r in zip(w, is_read)]
+        return w
+
+    def cap_taught(self, w, is_taught):
+        rest = sum(x for x, r in zip(w, is_taught) if not r)
+        taught = sum(x for x, r in zip(w, is_taught) if r)
+        if rest > 0 and taught > self.TAUGHT_POOL * rest:
+            k = self.TAUGHT_POOL * rest / taught
+            w = [x * k if r else x for x, r in zip(w, is_taught)]
         return w
 
     def pick(self, t, night_start, rng=random, replayed=None):
@@ -296,7 +310,7 @@ class Memory:
 
     def replay_chance(self, m, t_night, n_replays=None, sims=200, seed=0):
         """Estimated chance that `m` is replayed at least once in a night starting at t_night, with what memory
-        holds now (no new messages). Monte Carlo of pick() with habituation and the reading cap."""
+        holds now (no new messages). Monte Carlo of pick() with habituation and the reading and taught caps."""
         import numpy as np
         n_replays = expected_replays() if n_replays is None else n_replays
         cand = [x for x in self.items if x["t"] <= t_night and t_night - x["t"] < 4 * 86400] or [m]
@@ -304,6 +318,7 @@ class Memory:
             cand.append(m)
         base = np.array([self.weight(x, t_night, None) for x in cand])
         is_read = np.array([x.get("source") == "reading" for x in cand])
+        is_taught = np.array([x.get("source") == "taught" for x in cand])
         me = next(i for i, x in enumerate(cand) if x is m)
         rng = np.random.default_rng(seed)
         counts = np.zeros((sims, len(cand)))
@@ -313,6 +328,10 @@ class Memory:
             k = np.where((chat > 0) & (read > self.READING_POOL * chat),
                          self.READING_POOL * chat / np.maximum(read, 1e-12), 1.0)
             w = np.where(is_read, w * k[:, None], w)
+            rest, taught = (w * ~is_taught).sum(1), (w * is_taught).sum(1)
+            k = np.where((rest > 0) & (taught > self.TAUGHT_POOL * rest),
+                         self.TAUGHT_POOL * rest / np.maximum(taught, 1e-12), 1.0)
+            w = np.where(is_taught, w * k[:, None], w)
             c = np.cumsum(w, 1)
             pick = (c < rng.random(sims)[:, None] * c[:, -1:]).sum(1)
             counts[np.arange(sims), np.minimum(pick, len(cand) - 1)] += 1

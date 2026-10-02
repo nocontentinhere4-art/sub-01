@@ -69,6 +69,18 @@
   #note { font-size:10px; color:var(--faint); min-height:1.2em; }
   #note.err { color:#ff8a8a; }
 
+  #teach form { display:flex; flex-direction:column; gap:6px; }
+  #teach .row { display:flex; gap:6px; }
+  #teach input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14);
+    padding:8px 10px; font:inherit; font-size:12.5px; border-radius:7px; }
+  #teach input:focus { outline:none; border-color:rgba(255,154,60,.6); }
+  #teach input#t-nick { flex:0 0 38%; }
+  #teach button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12.5px; border-radius:7px; cursor:pointer; }
+  #teach ul { list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.5; }
+  #teach li { display:flex; justify-content:space-between; gap:8px; }
+  #teach li span:last-child { color:var(--dim); white-space:nowrap; }
+  #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
+  #t-note.err { color:#ff8a8a; }
   #neurons { min-width:0; }
   #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
@@ -116,6 +128,18 @@
     <div class="k"><span id="n-k">Sleep</span><span id="n-date"></span></div>
     <div class="t" id="n-t">no night recorded yet</div>
     <div class="m" id="n-m"></div>
+  </div>
+  <div class="card" id="teach">
+    <div class="k"><span>Teach him something</span><span id="t-left"></span></div>
+    <form id="t-form">
+      <input id="t-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
+      <div class="row"><input id="t-nick" placeholder="nickname (optional)" autocomplete="off" maxlength="16"><button>teach</button></div>
+    </form>
+    <div class="m" id="t-note">one per viewer per day · no links, addresses or tickers</div>
+    <div class="k" style="margin:12px 0 0"><span>Taught today</span></div>
+    <ul id="t-today"><li><span class="m">nothing yet today</span></li></ul>
+    <div id="t-yday" hidden><div class="k" style="margin:12px 0 0"><span id="t-yk">Remembered from yesterday</span></div><ul id="t-ylist"></ul></div>
+    <div class="m" id="t-honest"></div>
   </div>
   <div id="neurons"></div>
 </div>
@@ -335,9 +359,39 @@ function renderNights(m){
   $("n-m").innerHTML = (n.wakeups.length ? `woken ${n.wakeups.length}× (${esc(n.wakeups.map(w => w.cause).slice(-2).join(", "))})` : "never woken")
     + (n.n_replays ? ` · ${n.n_replays.chat} message replay${n.n_replays.chat === 1 ? "" : "s"}`
         + (n.n_replays.reading ? ` · ${n.n_replays.reading} of what it read` : "")
+        + (n.n_replays.taught ? ` · ${n.n_replays.taught} of what viewers taught` : "")
       : ` · ${reps.length} replay${reps.length === 1 ? "" : "s"}`)
-    + (reps.length ? `<br>last: ${reps[reps.length - 1].source === "reading" ? "read " : ""}“${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
+    + (reps.length ? `<br>last: ${{reading: "read ", taught: "taught "}[reps[reps.length - 1].source] || ""}“${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
 }
+
+// ---------- teach him something ----------
+function taughtRow(it, withResult){
+  const who = it.nick ? ` <span class="m">— ${esc(it.nick)}</span>` : "";
+  let right = `replayed in his sleep: ${it.replayed} time${it.replayed === 1 ? "" : "s"}`;
+  if (withResult && it.result) right = it.result.recalled
+    ? `<span class="ok">recalled</span> · ${it.result.score} vs lure ${it.result.best_lure} Hz`
+    : `<span class="no">not recalled</span> · ${it.result.score} vs lure ${it.result.best_lure} Hz`;
+  else if (withResult && it.testable === false) right += " · too short to test from half a cue";
+  return `<li><span>“${esc(it.text)}”${who}</span><span>${right}</span></li>`;
+}
+async function loadTaught(){
+  try {
+    const d = await (await fetch("/api/taught")).json();
+    $("t-left").textContent = `${d.left} of ${d.per_day} left today`;
+    $("t-today").innerHTML = d.today.length ? d.today.slice().reverse().map(it => taughtRow(it, false)).join("")
+      : `<li><span class="m">nothing yet today</span></li>`;
+    $("t-yday").hidden = !d.yesterday.length;
+    $("t-yk").textContent = d.gpu ? "Remembered from yesterday" : "Taught yesterday";
+    $("t-ylist").innerHTML = d.yesterday.map(it => taughtRow(it, d.gpu)).join("");
+    $("t-honest").textContent = d.note;
+  } catch (e) {}
+}
+$("t-form").addEventListener("submit", ev => {
+  ev.preventDefault(); const text = $("t-text").value.trim(), nick = $("t-nick").value.trim();
+  if (!text) return;
+  if (!sock || sock.readyState !== 1) { $("t-note").textContent = "still connecting, try again in a moment"; $("t-note").className = "m err"; return; }
+  sock.send(JSON.stringify({type:"teach", text, nick}));
+});
 
 // ---------- live ----------
 // q=1: the server's brain feed (act as one log-scaled byte a region, only the fields drawn here); 10 ticks/s,
@@ -366,6 +420,16 @@ function connect(){
     }
     if (m.type === "eye") { showEye(m); return; }
     if (m.type === "nights") { renderNights(m); return; }
+    if (m.type === "teach_ack") {
+      $("t-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
+      $("t-note").className = m.ok ? "m" : "m err";
+      if (m.ok) { $("t-text").value = ""; loadTaught(); }
+      return;
+    }
+    if (m.type === "taught") {
+      tick(`${esc(m.t)} · taught <b>“${esc(m.text.slice(0, 60))}”</b>${m.nick ? ` by ${esc(m.nick)}` : ""} → ${esc(m.networks.join(", "))}`);
+      fire(m.text, m.networks); if (!MINI) loadTaught(); return;
+    }
     if (m.type === "chat_ack") {
       $("note").textContent = m.ok ? "sent · watch it travel" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return;
     }
@@ -382,7 +446,7 @@ function connect(){
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     for (const ev of m.events || []) {
       if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
-        tick(`${esc(ev.t)} · replay ${ev.source === "reading" ? "of what it read " : ""}<b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
+        tick(`${esc(ev.t)} · replay ${{reading: "of what it read ", taught: "of what it was taught "}[ev.source] || ""}<b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
         fire(ev.text, ev.networks); heard = null; }
       else tick(`${esc(ev.t)} · ${esc(ev.text)}`);
     }
@@ -423,7 +487,7 @@ document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
 });
 if (MINI && "IntersectionObserver" in window)    // the room's picture-in-picture: draw only while it is on screen
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
-if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000);
+if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000);
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
 if (!MINI) setInterval(() => { if (full) $("story").textContent = FULL_TXT;
   else if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);

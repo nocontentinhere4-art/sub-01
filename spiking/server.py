@@ -93,7 +93,7 @@ class SpikingHub:
                 continue
             day = s.get("item_day") or rec.get("day")
             rows.append({"day": day, "days_since": _days(day, rec.get("day")), "item": str(s.get("item") or s.get("text", ""))[:200],
-                         "source": "reading" if s.get("source") == "reading" else "chat",
+                         "source": s.get("source") if s.get("source") in ("reading", "taught") else "chat",
                          "recalled": bool(s.get("hc_recalled")), "score": s.get("hc"), "threshold": thr,
                          "label": rec.get("label"), "test_day": rec.get("day"), "session": rec.get("session"),
                          "received": rec["received"]})
@@ -132,6 +132,27 @@ class SpikingHub:
                        test_day=newest.get("test_day"), days_since=newest.get("days_since"))
             break
         return out
+
+    def taught_results(self, max_lines=2000):
+        """{(day, item): row} of the latest next-day test of each taught item (re-read only when the file changes)."""
+        path = self.dir / ITEMS_FILE
+        try:
+            mtime = path.stat().st_mtime_ns
+        except OSError:
+            return {}
+        if getattr(self, "_taught", (None,))[0] != mtime:
+            out = {}
+            for ln in path.read_text().splitlines()[-max_lines:]:
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                if isinstance(r, dict) and r.get("source") == "taught" and r.get("label") == "next day":
+                    k = (r.get("day"), r.get("item"))
+                    if k not in out or r.get("received", "") >= out[k].get("received", ""):
+                        out[k] = r
+            self._taught = (mtime, out)
+        return self._taught[1]
 
     async def memory_get(self, request):
         return web.json_response(self.memory())

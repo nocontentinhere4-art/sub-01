@@ -347,14 +347,15 @@ class Session:
         self.result("delays", out)
 
     def day_items(self):
-        """The day's items: cfg "items" ({text, source, item}), else cfg "messages" as chat; max 5 of each source."""
+        """The day's items: cfg "items" ({text, source: chat|reading|taught, item}), else cfg "messages" as chat; max 5
+        of each source."""
         raw = self.cfg.get("items")
         if raw is None:
             raw = [{"text": m["text"] if isinstance(m, dict) else str(m), "source": "chat"}
                    for m in (self.cfg.get("messages") or [])]
         out, n = [], {}
         for it in raw:
-            src = "reading" if it.get("source") == "reading" else "chat"
+            src = it.get("source") if it.get("source") in ("reading", "taught") else "chat"
             if it.get("text") and n.get(src, 0) < MAX_PER_SOURCE:
                 n[src] = n.get(src, 0) + 1
                 out.append({"text": str(it["text"]), "source": src, "item": str(it.get("item") or it["text"])})

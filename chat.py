@@ -197,3 +197,66 @@ def check(text, key, limiter, dedupe):
     if dedupe.seen(text):
         return False, "duplicate"
     return True, None
+
+
+# --- "teach him something" (#31) -------------------------------------------------------
+TEACH_MAX_WORDS = 6
+NICK_MAX = 16
+TEACH_PER_DAY = 30          # taught items per Tokyo day in total, first come
+
+
+def clean_nick(nick):
+    """-> (nickname or "", reason or None). Display only, never a stimulus; the same rules as a chat message."""
+    nick = re.sub(r"\s+", " ", (nick or "")).strip()
+    if not nick:
+        return "", None
+    if len(nick) > NICK_MAX:
+        return "", f"nickname: max {NICK_MAX} characters"
+    reason = blocked(nick)
+    return ("", "nickname: " + reason) if reason else (nick, None)
+
+
+class TeachLimits:
+    """One teach per viewer per day (keyed like the chat limiter: the client address, kept only in memory and only
+    for the current day) and at most `per_day` taught items per day in total, counted from what memory holds."""
+
+    def __init__(self, per_day=TEACH_PER_DAY):
+        self.per_day = per_day
+        self.day, self.keys = None, set()
+
+    def check(self, key, day, taught_today):
+        """`taught_today`: texts already taught that day. -> reason or None (does not record anything)."""
+        if day != self.day:
+            self.day, self.keys = day, set()
+        if key in self.keys:
+            return "one teach per viewer per day"
+        if len(taught_today) >= self.per_day:
+            return f"he has been taught {self.per_day} things today; try again tomorrow"
+        return None
+
+    def note(self, key):
+        self.keys.add(key)
+
+
+def check_teach(text, nick, key, limits, day, taught_today):
+    """Full pipeline for one taught word or phrase -> (ok, reason, text, nick). Filter first, then limits."""
+    text = re.sub(r"\s+", " ", (text or "")).strip()
+    if not text:
+        return False, "empty", "", ""
+    reason = blocked(text)
+    if reason:
+        return False, reason, "", ""
+    if len(text.split()) > TEACH_MAX_WORDS:
+        return False, f"max {TEACH_MAX_WORDS} words", "", ""
+    if len(text) > 80:
+        return False, "too long", "", ""
+    nick, reason = clean_nick(nick)
+    if reason:
+        return False, reason, "", ""
+    if dedupe_key(text) in {dedupe_key(x) for x in taught_today}:
+        return False, "already taught today", "", ""
+    reason = limits.check(key, day, taught_today)
+    if reason:
+        return False, reason, "", ""
+    limits.note(key)
+    return True, None, text, nick
