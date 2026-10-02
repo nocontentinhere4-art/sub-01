@@ -128,21 +128,21 @@ for (const side of ["Left", "Right"]) {
   const surf = Math.max(...pts.filter(p => p.y > 3 && p.y < 9 && Math.abs(p.dot(T)) < 3).map(p => p.dot(Z)));
   HANDF[side] = {T, Y, Z, surf, right: T.dot(X) > 0};
 }
-// a socket placed in the palm frame: p = [along T, along Y, off the palm (from its skin)] cm; axes = the socket's x, y, z
-// as combinations of T, Y, Z
-function socket(side, [pt, py, pz], axes) {
+// a socket placed in the palm frame: p = [along T, along Y, off the palm (from its skin)] cm; y, z = the socket's own
+// y and z axes as combinations of T, Y, Z (x follows)
+function socket(side, [pt, py, pz], yk, zk) {
   const F = HANDF[side], v = k => F.T.clone().multiplyScalar(k[0]).addScaledVector(F.Y, k[1]).addScaledVector(F.Z, k[2]).normalize();
-  let [x, y, z] = axes.map(v); if (new THREE.Vector3().crossVectors(x, y).dot(z) < 0) x.negate();     // keep it right-handed
+  const y = v(yk), x = new THREE.Vector3().crossVectors(y, v(zk)).normalize(), z = new THREE.Vector3().crossVectors(x, y);
   const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
   return {parent: side + "Hand", p: F.T.clone().multiplyScalar(pt).addScaledVector(F.Y, py).addScaledVector(F.Z, F.surf + pz).toArray(), q: q.toArray()};
 }
 // the phone: its back on the palm and fingers, screen facing the palm's way, its top towards the thumb, the fingers
-// wrapped round its far long edge and the thumb over the screen. Chopsticks: through the thumb's web, along the index.
-// Spoon: like a pencil, resting on the middle finger. Tuned on boy_test.html (T.hand("hand_phone"))
+// wrapped round its far long edge and the thumb over the screen. Chopsticks: in the thumb's web, along the index finger,
+// tips past the fingertips. Spoon: held like a pencil, its bowl past the fingertips. Tuned on boy_test.html (T.hand(...))
 SOCKETS = {
-  socket_phone: socket("Right", [-1.0, 9.5, 0.45], [[0, -1, 0], [1, 0, 0], [0, 0, 1]]),
-  socket_chopsticks: socket("Right", [2.0, 8.0, 0.8], [[0.3, 1, 0.2], [0.2, -0.1, 1], [1, -0.3, -0.1]]),
-  socket_spoon: socket("Right", [2.0, 7.0, 0.8], [[1, 0, 0], [0.2, 1, 0.3], [0, -0.3, 1]]),
+  socket_phone: socket("Right", [-1.0, 9.5, 0.45], [1, 0, 0], [0, 0, 1]),
+  socket_chopsticks: socket("Right", [1.5, 7.5, 1.0], [0.25, 1, 0.15], [0, -0.15, 1]),
+  socket_spoon: socket("Right", [1.0, 4.0, 1.0], [0.2, 1, 0.3], [0, -0.3, 1]),
 };
 console.log("palms:", Object.entries(HANDF).map(([k, f]) => `${k} Z ${f.Z.toArray().map(x => x.toFixed(2))} T ${f.T.toArray().map(x => x.toFixed(2))} surf ${f.surf.toFixed(1)}`).join(" | "));
 

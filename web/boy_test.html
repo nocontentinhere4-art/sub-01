@@ -33,6 +33,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { boy2Extras } from "./room/boy2.js";
 
 const Q = new URLSearchParams(location.search), $ = id => document.getElementById(id);
 const CMP = Q.has("cmp"), WHO = Q.get("boy") || "new", SHOT = Q.has("shot");
@@ -62,6 +63,7 @@ seat.position.set(0, 0.47, -0.1); seat.receiveShadow = seat.castShadow = true; s
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const load = url => new Promise((ok, fail) => loader.load(url, ok, undefined, fail));
 const chars = [];
+const g2names = ["hand_relaxed", "hand_phone", "hand_chopsticks", "hand_spoon", "hand_type", "hand_mouse"];
 async function makeChar(kind, x) {
   const pre = kind === "new" ? "room/boy2" : "room/boy";
   const g = await load(pre + ".glb"), root = g.scene, bones = {};
@@ -74,11 +76,10 @@ async function makeChar(kind, x) {
   });
   const c = {kind, root, bones, morphs, mixer: new THREE.AnimationMixer(root), clips: {}, actions: {}, hands: {}, current: null, hand: null};
   const sit = g.animations[0]; c.clips.sit = sit;
-  const blink = g.animations.find(a => a.name === "blink"); if (blink) { c.blink = c.mixer.clipAction(blink); c.blink.setLoop(THREE.LoopOnce); c.blink.clampWhenFinished = false; }
   await Promise.all(Object.entries(CLIPS).filter(([, f]) => f).map(async ([name, f]) => {
     try { c.clips[name] = (await load(`${pre}_${f}.glb`)).animations[0]; } catch (e) { console.warn(name, e); }
   }));
-  if (kind === "new") for (const a of (await load("room/boy2_hands.glb")).animations) { c.hands[a.name] = c.mixer.clipAction(a); }
+  if (kind === "new") { c.x = boy2Extras(g, c.mixer); await c.x.loadHands(load); c.hands = Object.fromEntries(g2names.map(n => [n, true])); }
   for (const [n, clip] of Object.entries(c.clips)) c.actions[n] = c.mixer.clipAction(clip);
   chars.push(c); return c;
 }
@@ -98,24 +99,11 @@ const PROPS = {
     const h = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.15, 0.003), m); const b = new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 8), m); b.scale.set(0.8, 1.2, 0.3); b.position.y = 0.09; g.add(h, b); return g; }],
 };
 function hand(c, name) {
-  if (!c.hands[name]) return;
+  if (!c.x) return;
   for (const [n, [sock, make]] of Object.entries(PROPS)) { const host = c.root.getObjectByName(sock); if (!host) continue;
     host.userData.prop ??= (() => { const m = make(); m.traverse(o => o.castShadow = true); m.scale.setScalar(100); host.add(m); return m; })();   // sockets are in cm
     host.userData.prop.visible = n === name; }
-  if (c.hand && c.hand !== c.hands[name]) c.hand.stop();
-  c.hand = c.hands[name]; c.hand.reset().play();
-}
-// eyes: a glance every 1-3 s, small (a few degrees), resting on the middle
-const eyes = {yaw: 0, pitch: 0, ty: 0, tp: 0, next: 0};
-const _q = new THREE.Quaternion(), _e = new THREE.Euler();
-function eyesUpdate(c, now) {
-  if (!c.bones.LeftEye) return;
-  if (now > eyes.next) { eyes.next = now + 1 + Math.random() * 2; const far = Math.random() < 0.3;
-    eyes.ty = far ? (Math.random() - 0.5) * 0.35 : (Math.random() - 0.5) * 0.12; eyes.tp = (Math.random() - 0.5) * 0.12; }
-  eyes.yaw += (eyes.ty - eyes.yaw) * 0.35; eyes.pitch += (eyes.tp - eyes.pitch) * 0.35;
-  for (const s of ["Left", "Right"]) { const b = c.bones[s + "Eye"];
-    b.userData.rest ??= b.quaternion.clone();
-    b.quaternion.copy(b.userData.rest).multiply(_q.setFromEuler(_e.set(-eyes.pitch, eyes.yaw, 0))); }
+  c.x.pose(name, 0);
 }
 
 // ------------------------------------------------------------------ UI
@@ -126,8 +114,7 @@ function buildUI() {
   for (const n of Object.keys(CLIPS)) btn(n, n === clipName, () => { clipName = n; for (const c of chars) play(c, n); buildUI(); });
   ui.appendChild(Object.assign(document.createElement("div"), {className: "sep"}));
   const nc = chars.find(c => c.kind === "new");
-  if (nc) for (const n of Object.keys(nc.hands)) btn(n.replace("hand_", ""), nc.hand === nc.hands[n], () => { poseName = n; nc.handName = n; hand(nc, n); buildUI(); });
-  btn("blink", false, () => chars.forEach(c => c.blink && c.blink.reset().play()));
+  if (nc) for (const n of g2names) btn(n.replace("hand_", ""), nc.x.poseName === n, () => { poseName = n; nc.handName = n; hand(nc, n); buildUI(); });
   btn(paused ? "play" : "pause", paused, () => { paused = !paused; buildUI(); });
   btn("seat", seat.visible, () => { seat.visible = !seat.visible; buildUI(); });
 }
@@ -135,16 +122,16 @@ const T = window.T = {
   ready: false,
   // freeze a frame: clip name, time (s; or a fraction 0..1 of the clip with frac), hand pose for the new one
   set(clip, t, pose, frac) { clipName = clip; for (const c of chars) { if (pose && c.kind === "new") c.handName = pose; play(c, clip, 0);
-      const d = c.clips[clip] ? c.clips[clip].duration : 1; c.current.time = frac ? t * d : t; c.mixer.update(0); if (c.hand) { c.hand.time = 0; } c.mixer.update(0); }
+      const d = c.clips[clip] ? c.clips[clip].duration : 1; c.current.time = frac ? t * d : t; c.mixer.update(0); }
     render(); return chars.map(c => c.clips[clip] && c.clips[clip].duration); },
   view(x, y, z, tx, ty, tz, fov) { camera.position.set(x, y, z); controls.target.set(tx, ty, tz); if (fov) { camera.fov = fov; camera.updateProjectionMatrix(); } controls.update(); render(); },
   blink(w) { for (const c of chars) for (const m of c.morphs) m.morphTargetInfluences[m.morphTargetDictionary.blink] = w; render(); },
-  eyes(yaw, pitch) { eyes.ty = eyes.yaw = yaw; eyes.tp = eyes.pitch = pitch; eyes.next = Infinity; for (const c of chars) eyesUpdate(c, 0); render(); },
+  eyes(yaw, pitch) { for (const c of chars) if (c.x) { c.x.look(yaw, pitch); c.x.update(0); } render(); },
   seat(v) { seat.visible = v; render(); },
   apart(dx, dz) { chars.forEach((c, i) => { const k = chars.length > 1 ? i - (chars.length - 1) / 2 : 0; c.root.position.set(k * dx, 0, k * dz); }); render(); },
   // a close look at a hand in the rest pose with a finger pose on: from the side (thumb side) or from the palm side
   hand(pose, side = "Right", from = "side") { T.rest(); const c = chars.find(c => c.kind === "new") || chars[0];
-    if (c.hands[pose]) { hand(c, pose); c.mixer.update(0); }
+    hand(c, pose); c.mixer.update(0);
     const b = c.bones[side + "Hand"], v = b.getWorldPosition(b.position.clone()).add(new THREE.Vector3(0, -0.06, 0)), s = side === "Right" ? -1 : 1;
     const d = from === "side" ? [s * 0.42, 0.05, 0.12] : from === "palm" ? [s * 0.1, -0.05, -0.42] : [s * 0.05, 0.1, 0.42];
     T.view(v.x + d[0], v.y + d[1], v.z + d[2], v.x, v.y, v.z, 30); },
@@ -157,13 +144,12 @@ const T = window.T = {
 function render() { renderer.render(scene, camera); }
 
 const clock = new THREE.Clock();
-let nextBlink = 2, frames = 0, fpsT = 0, fps = 0;
+let frames = 0, fpsT = 0, fps = 0;
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.1), now = clock.elapsedTime;
   if (!paused) {
-    if (now > nextBlink) { nextBlink = now + 2.5 + Math.random() * 4; chars.forEach(c => c.blink && c.blink.reset().play()); }
-    for (const c of chars) { c.mixer.update(dt); eyesUpdate(c, now); }
+    for (const c of chars) { c.mixer.update(dt); if (c.x) c.x.update(dt); }
   }
   render(); frames++;
   if (now - fpsT > 1) { fps = frames / (now - fpsT); frames = 0; fpsT = now;
