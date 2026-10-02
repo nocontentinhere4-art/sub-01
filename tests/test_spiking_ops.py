@@ -1012,7 +1012,8 @@ def test_boot_py_subprocess_end_to_end(tmp_path):
     pack = podpack._tar_xz({"dummymod.py": (
         b"import json, os, time\n"
         b"out = os.environ['SUB01_OUT_DIR']\n"
-        b"json.dump({'phase': 'run', 'done': False, 'error': None}, open(out + '/status.json', 'w'))\n"
+        b"json.dump({'phase': 'run', 'done': False, 'error': None}, open(out + '/status.json.tmp', 'w'))\n"
+        b"os.replace(out + '/status.json.tmp', out + '/status.json')\n"     # atomic, as boot.py: never read half-written
         b"time.sleep(0.2)\n"
         b"json.dump({'phase': 'end', 'done': True, 'error': None}, open(out + '/status.json.tmp', 'w'))\n"
         b"os.replace(out + '/status.json.tmp', out + '/status.json')\n")})
