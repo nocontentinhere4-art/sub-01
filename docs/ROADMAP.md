@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 16:15 UTC** (pass 30d). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 16:45 UTC** (pass 30e). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -76,7 +76,7 @@ Owner actions now:
 - **RunPod:** the owner added the RunPod key on Railway (2026-10-02). The pod manager also needs **`SUB01_POD_SECRET`**
   (any long random string). Without it the log says `spiking pod manager disabled: SUB01_POD_SECRET is not set`. With
   both set, the first GPU session runs tonight at 21:00 Tokyo (12:00 UTC): ≤ 1 GPU-hour/day, ≈ $0.27–0.85/day.
-- **Turn the 1M network on (after #67):** `SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1`, `SUB01_CHOICE=1` on Railway.
+- **Turn the 1M network on (after #67):** done 2026-10-02 16:30 UTC (`SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1`, `SUB01_CHOICE=1`).
 - **`SUB01_CHOICE=1` on Railway** (optional): adds the choice training to the nightly GPU hour (~90 s, no extra cost).
 - **After #51, on Railway:** set the healthcheck path to `/healthz`, set a long random `SUB01_ADMIN_TOKEN`, add a free
   uptime monitor (e.g. UptimeRobot) on `/healthz`, and set a usage alert (see docs/OPERATIONS.md).
@@ -150,7 +150,7 @@ cheap to run, with the password gate kept until launch day.
 | 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | done | #72 |
 | 18s | Room polish: no floating props, lamp out of the wall, a lived-in room, sharper phone screen | in progress | #75 |
 | 18t | A better character (fingers, face, clothes; same animations) | in progress | #76 |
-| 18p | Active neurons visible inside the 3D brain | in progress | #62 |
+| 18p | Active neurons visible inside the 3D brain | done (/brain, /life); room mini brain after #63 | #77 |
 | 18q | Music via Spotify's official embed, picked by the brain vote | done (server, /brain, /life); room after #63 | #71 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
@@ -302,6 +302,23 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 30e:** merged #77 (#62): his active neurons are visible inside the 3D brain on /brain and /life.
+- Spikes flash per region; region rates tint the clouds.
+- The stream is ≈ 3 KB/s per viewer.
+- No fake spikes: there is an offline state, and the caption is honest when the budget holds spikes back.
+- GPU frames now carry per-region rates (`rq`).
+- The Neurons card shows real decisions per day: paid-off picks per network, and the replay learned vs frozen twin.
+- Coordinator run: 978 tests passed; tick 7.1 ms. FPS on a real phone is still to be checked by the owner.
+- The room mini brain gets a one-line change after #63.
+
+**Owner set `SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1` and `SUB01_CHOICE=1` on Railway (16:30 UTC).** The site restarted
+and `/healthz` is ok; RunPod shows only "BRAIN". The first day-live pod should start when he wakes (Tokyo morning, about
+22–23 UTC). The coordinator checks it at 23:15 UTC.
+- The owner asked about biollm.com. Declined: it is a consumer app with no API and no verifiable data, and it conflicts
+  with the rule against unproven claims.
+- The owner asked about the RunPod MCP server. Not needed: the site's pod manager runs on its own, and the coordinator
+  already has read access to RunPod.
 
 **Pass 30d:** merged #74 (#70): the 1M network's live decisions learn.
 - **1M on GPU, 240 trials:** learned 0.45–0.69 correct, against 0.24–0.38 for the frozen twin and 0.24–0.30 for random (chance 0.29).
