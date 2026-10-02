@@ -223,6 +223,12 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: browse like a real young guy** (owner): a varied interest profile with a daily rhythm; no topic over
+  ~25 % of pages and Wikipedia at most ~15 %; YouTube Shorts in Restricted Mode as the short-video feed; follow-up
+  searches from things he saw. Memecoin and stock news and charts are **read-only**. Exchanges, DEX, wallets, launchpads
+  and "buy" pages stay blocked, and so does anything about **this project's own coin**. Finance pages carry "nothing
+  here is financial advice"; chat replies keep their no-finance rule. **Not TikTok**: no logged-out safety mode can
+  be enforced on a public screen. Added to #56.
 - **2026-10-02: the 1M spiking network runs on GPU through his waking hours** (owner's choice: ≈ $4–14/day,
   ≈ $130–400/month). Off in code until `SUB01_DAY_LIVE=1`. Caps: `SUB01_DAY_MAX_HOURS` 17/day, `SUB01_GPU_USD_PER_DAY`
   $14, 120 GPU-h/week, ≤ 6 restarts/day. One pod at a time; never the pod "BRAIN". The fallback is the 20k CPU network
