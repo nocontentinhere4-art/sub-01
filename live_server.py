@@ -6,8 +6,9 @@
 
 Buys drive the reward + visual regions, sells drive salience + amygdala, large
 trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
-A sleep/wake cycle on the Europe/Rome clock (sleep.py) changes the rhythm and how much
-any stimulus gets through; during REM, stored messages are replayed. Page on http://localhost:8765.
+A sleep circuit on the local Asia/Tokyo clock (sleep.py: Phillips-Robinson MA/VLPO flip-flop + REM-on/REM-off
+oscillator) changes the rhythm, how much any stimulus gets through and the tonic neuromodulator levels;
+during REM, stored messages and articles it read are replayed. Page on http://localhost:8765.
 """
 import argparse
 import asyncio
@@ -17,6 +18,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -27,18 +29,28 @@ from aiohttp import web
 
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
-from sleep import ROME, Clock, Memory, SleepEngine, Store, hhmm
+from sleep import ROME, TZ, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime, night_date
 from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
 from life import WORLD, Life
-from research import Reader
+from twin.body import Body
+from twin.neurochem import Neuromodulators
+from research import Reader, reading_stimulus
 from browse import Browser
+
+try:                                             # the GPU spiking brain is optional: the server runs without it
+    from spiking import pod_manager as spiking_manager, server as spiking_server
+except Exception as _e:
+    spiking_manager = spiking_server = None
+    print("spiking routes unavailable:", type(_e).__name__, flush=True)
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
+GOOD = re.compile(r"\bgood\b!?", re.I)    # chat 'good!' -> dopamine pulse on the spiking pod
 NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
+NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
 RPC_WS = os.environ.get("SOLANA_WS", "wss://api.mainnet-beta.solana.com")   # e.g. a Helius wss URL (env, never logged)
@@ -78,7 +90,11 @@ class Feed:
     /ws?rate=5 sends ~5 ticks a second, carrying the trades and events of the skipped ticks;
     &lite=1 leaves out the per-region activity (for pages that do not draw the brain, e.g. the room)."""
 
+    RATES = (1.0, 20.0)                                 # ticks a second a client may ask for
+
     def __init__(self, rate=None, lite=False):
+        if rate is not None:                            # clamped: a tiny rate would buffer trades/events without bound
+            rate = min(max(rate, self.RATES[0]), self.RATES[1])
         self.every = max(1, round(1.0 / (TICK * rate))) if rate else 1
         self.lite, self.n, self.trades, self.events = lite, 0, [], []
 
@@ -88,8 +104,8 @@ class Feed:
             rate = float(query.get("rate", ""))
         except ValueError:
             rate = None
-        if rate is not None and not (0 < rate < 1e6):
-            rate = None
+        if rate is not None and not (math.isfinite(rate) and rate > 0):
+            rate = None                                 # unusable: every tick, as plain /ws
         return cls(rate, query.get("lite") in ("1", "true"))
 
     def take(self, msg, data):
@@ -126,7 +142,7 @@ class Live:
         self.engine.t = min(self.engine.t, now)
         self.engine.update(now)
         self.limiter, self.dedupe = RateLimiter(), Dedupe()
-        for m in self.memory.items[-200:]:
+        for m in self.memory.chat()[-200:]:
             self.dedupe.recent.append(dedupe_key(m["text"]))
         self.burst = 0.0
         self.sol_usd = 150.0
@@ -140,7 +156,16 @@ class Live:
         self.diary = None                # dream diary, set by main() with --eye
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
-        self.life = Life(json.loads(life_path.read_text()) if life_path.exists() else None)
+        self.body_path = Path(data_dir) / "body.json"
+        bs = json.loads(self.body_path.read_text()) if self.body_path.exists() else {}
+        life_state = json.loads(life_path.read_text()) if life_path.exists() else None
+        if not bs.get("body") and life_state and "hunger" in life_state:      # first start: carry the old hunger over
+            bs["body"] = {"ghrelin": min(1.0, max(0.0, life_state["hunger"]))}
+        self.body = Body(bs.get("body"))
+        self.neuro = Neuromodulators(state=bs.get("neuro"))
+        atlas = json.load(open(HERE / "out" / "atlas_names.json"))
+        self.nm_idx = np.array([atlas.index(n) for n in self.brain.names])
+        self.life = Life(life_state, body=self.body)
         self.time_scale = time_scale
         self.life.time_scale = time_scale
         self.reading_path = Path(data_dir) / "reading.json"
@@ -151,8 +176,11 @@ class Live:
         self.eye_every = 90.0            # seconds between eye frames while awake (--eye-every)
         self.recent_trades = []          # (t, kind, usd) for the eye's market mood
         self.recent_replays = []         # REM replays for the eye's dreams
+        self.recent_read_replays = []    # ...and titles of replayed readings
         self.last_groups = {}
+        self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
+        self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -171,6 +199,7 @@ class Live:
             b.stimulate("relay", 10 * gain)
             b.stimulate("attention", 8 * gain)
         self.stats["usd"] += tr["usd"]
+        self.neuro.on_trade(tr["kind"], tr["usd"], t=time.time())          # buys: dopamine RPE; sells: noradrenaline
         self.recent_trades = [x for x in self.recent_trades if time.time() - x[0] < 300] + [(time.time(), tr["kind"], tr["usd"])]
 
     async def rpc_trades(self):
@@ -227,6 +256,33 @@ class Live:
         return {"text": m["text"], "t": hhmm(m["t"]), "networks": m["networks"], "emotion": m["emotion"],
                 "asleep": m["asleep"], "stage": m["stage"]}
 
+    def heard(self, t):
+        """Recent chat texts (not readings), newest last."""
+        return [m["text"] for m in self.memory.chat()[-5:] if t - m["t"] < 3 * 3600]
+
+    def absorb_reading(self, art):
+        """An article it opened becomes a stimulus (chat rules at half gain + language/attention) and a memory."""
+        t = self.clock.now()
+        stim, hits, emotion = reading_stimulus(art["title"], art.get("keywords", []))
+        gain = self.engine.gain                               # asleep = attenuated, as for chat
+        for g, a in stim.items():
+            self.brain.stimulate(g, a * gain)
+        m = self.memory.add(t, art["title"], self.engine.stage, stim, emotion, hits, source="reading",
+                            title=art["title"], keywords=art.get("keywords", []), url=art.get("url", ""))
+        art.update(networks=hits, emotion=emotion, gain=round(gain, 2))
+        return m
+
+    def tonight_chance(self, m):
+        """Estimated chance this memory is replayed tonight (blocking: run in a worker thread)."""
+        return round(self.memory.replay_chance(m, next_bedtime(self.clock.now())), 2)
+
+    def reading_now(self, t):
+        """The article on the desk for the tick; its tonight estimate only while it is about the coming night."""
+        art = self.reader.current()
+        if art and "tonight" in art and art.get("tonight_night") != night_date(next_bedtime(t)):
+            art = {k: v for k, v in art.items() if k != "tonight"}
+        return art
+
     async def handle_chat(self, ws, key, text):
         ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
         if not ok:
@@ -242,6 +298,10 @@ class Live:
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
+        if self.spiking:                                   # no-op when no GPU pod is connected
+            self.spiking.forward_chat(text, emotion)
+            if GOOD.search(text):
+                self.spiking.forward_good()
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
@@ -249,8 +309,10 @@ class Live:
         def summary(n):
             if not n:
                 return None
+            reading = sum(1 for r in n["replays"] if r.get("source") == "reading")
             return {"date": n["date"], "sleep_onset": n["sleep_onset"], "woke_up": n["woke_up"],
-                    "wakeups": n["wakeups"], "replays": n["replays"][-20:], "sleep_debt": n["sleep_debt"]}
+                    "wakeups": n["wakeups"], "replays": n["replays"][-20:], "sleep_debt": n["sleep_debt"],
+                    "n_replays": {"chat": len(n["replays"]) - reading, "reading": reading}}
         return {"type": "nights", "last": summary(self.engine.last_night), "tonight": summary(self.engine.night)}
 
     async def broadcast(self, msg):
@@ -280,13 +342,19 @@ class Live:
                 for g, a in m["stimulus"].items():
                     b.stimulate(g, REPLAY_AMP * a)
                 e.record_replay(t, m)
-                self.recent_replays = (self.recent_replays + [m["text"]])[-8:]
+                src = m.get("source", "chat")
+                if src == "reading":
+                    self.recent_read_replays = (self.recent_read_replays + [m["text"]])[-8:]
+                else:
+                    self.recent_replays = (self.recent_replays + [m["text"]])[-8:]
                 out.append({"type": "replay", "t": hhmm(t), "text": m["text"], "networks": m["networks"],
-                            "received": hhmm(m["t"])})
+                            "received": hhmm(m["t"]), "source": src})
             else:
                 out.append(ev | {"t": hhmm(t)})
                 if ev.get("natural"):
                     self.store.save(e, self.memory)                          # night closed: write it now
+        if self.spiking:
+            self.spiking.forward_sleep(e.stage)
         p = e.params
         b.set_rhythm(p["f_hz"], p["coupling"], p["noise"])
         b.a = p["a"]
@@ -332,14 +400,24 @@ class Live:
                    "slow": b.slow.status() if b.slow_on else None}
             self.last_groups = groups
             base = sum(groups.values()) / max(1, len(groups))
-            rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
+            rel = self.last_rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
+            # neuromodulators x receptor maps -> regional excitability; the body -> interoceptive drive to the insula
+            levels = self.neuro.update(TICK, self.engine.modulators)      # tonic levels read from the sleep circuit
+            b.neuromod = NEURO_K * (self.neuro.region_gain(levels)[self.nm_idx] - 1.0)
+            amyg = max(0.0, rel.get("fear", 1.0) - 1.0)
+            body_levels = dict(levels, NE=min(levels["NE"], 1.5))       # the market can quicken his pulse, not race it
+            self.body.update(TICK * self.time_scale, body_levels, min(amyg, 0.4), self.engine.stage,
+                             exertion=self.life.exertion())
+            for grp, amt in self.body.intero_drive().items():
+                b.stimulate(grp, amt * TICK / 2.0)                    # settles at `amt` (stimuli decay with tau 2 s)
             hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
             tsim = self.clock.now()
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
                              self.engine.pressure(tsim))
             msg["life"] = self.life.snapshot()
+            msg["neuro"] = {k: round(v, 2) for k, v in levels.items()}
             if self.life.activity == "research" and not self.life.path:
-                msg["life"]["reading"] = self.reader.current()
+                msg["life"]["reading"] = self.reading_now(tsim)
             if self.browser and (dev := self.screen_device()):
                 msg["life"]["screen"] = self.browser.screens[dev].status()
             await self.broadcast(msg)
@@ -348,6 +426,7 @@ class Live:
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
                 self.life_path.write_text(json.dumps(self.life.to_dict()))
+                self.body_path.write_text(json.dumps({"body": self.body.to_dict(), "neuro": self.neuro.to_dict()}))
                 self.reading_path.write_text(json.dumps(self.reader.to_dict(), ensure_ascii=False))
                 last_save = now
             next_t += TICK
@@ -361,9 +440,14 @@ class Live:
             t = self.clock.now()
             if self.life.activity != "research" or self.life.path or not self.reader.due(t):
                 continue
-            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
-            art = await loop.run_in_executor(None, self.reader.read, t, heard)
+            art = await loop.run_in_executor(None, self.reader.read, t, self.heard(t), dict(self.last_rel))
             if art:
+                m = self.absorb_reading(art)
+                try:
+                    art["tonight"] = await loop.run_in_executor(None, self.tonight_chance, m)
+                    art["tonight_night"] = night_date(next_bedtime(self.clock.now()))
+                except Exception as e:                     # an estimate must never stop the reading
+                    print("research: replay estimate failed:", repr(e)[:120], flush=True)
                 await self.broadcast({"type": "reading", **art})
 
     # --- the screens: a real browser on the open web (desk + phone) -------------------
@@ -387,9 +471,8 @@ class Live:
             if self.browser.screens[other].ctx is not None:
                 await self.browser.close(other)
             t = self.clock.now()
-            heard = [m["text"] for m in self.memory.items[-5:] if t - m["t"] < 3 * 3600]
             art = self.reader.current()
-            st = await self.browser.step(dev, heard, art["title"] if art else None)
+            st = await self.browser.step(dev, self.heard(t), art["title"] if art else None)
             if st:
                 await self.broadcast({"type": "screen", **st})
             if now - last_save > 300:
@@ -405,7 +488,9 @@ class Live:
                 try:
                     tok = os.environ.get("REPLICATE_API_TOKEN")
                     llm = self.eye.llm or (ReplicateLLM(tok) if tok else None)
-                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm)
+                    read = [{"title": m["text"], "url": m.get("url", "")} for m in self.memory.items
+                            if m.get("source") == "reading" and day_of(m["t"]) == date]
+                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm, read)
                     print(f"diary: night of {date} written", flush=True)
                 except Exception as e:
                     print("diary error:", repr(e), flush=True)
@@ -415,12 +500,12 @@ class Live:
                 await asyncio.sleep(5)
                 continue
             stage = self.engine.stage
-            if stage == "AWAKE" and self.recent_replays:
-                self.recent_replays = []                              # dreams end when it wakes up
+            if stage == "AWAKE" and (self.recent_replays or self.recent_read_replays):
+                self.recent_replays, self.recent_read_replays = [], []   # dreams end when it wakes up
             try:
                 rec = await loop.run_in_executor(None, self.eye.step, t, stage, self.last_groups,
                                                  market_mood(self.recent_trades), list(self.recent_replays), hhmm(t),
-                                                 self.life.snapshot()["doing"])
+                                                 self.life.snapshot()["doing"], list(self.recent_read_replays))
                 self.last_frame = rec
                 await self.broadcast({"type": "eye", **rec})
                 if self.diary and stage == "REM" and self.engine.night is not None:
@@ -441,31 +526,33 @@ class Live:
         key = request.remote
         if self.trust_proxy and request.headers.get("X-Forwarded-For"):
             key = request.headers["X-Forwarded-For"].split(",")[0].strip()
-        await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.items[-30:]],
+        await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
                             "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
         await ws.send_json(self.nights())
         if self.last_frame:
             await ws.send_json({"type": "eye", **self.last_frame})
         self.feeds[ws] = Feed.from_query(request.query)
         self.clients.add(ws)
-        async for msg in ws:
-            if msg.type != aiohttp.WSMsgType.TEXT:
-                continue
-            try:
-                d = json.loads(msg.data)
-            except ValueError:
-                continue
-            if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
-                await self.handle_chat(ws, key, d["text"])
-        self.clients.discard(ws)
-        self.feeds.pop(ws, None)
+        try:
+            async for msg in ws:
+                if msg.type != aiohttp.WSMsgType.TEXT:
+                    continue
+                try:
+                    d = json.loads(msg.data)
+                except ValueError:
+                    continue
+                if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
+                    await self.handle_chat(ws, key, d["text"])
+        finally:                                       # also on errors / cancellation: never leak a client or its buffer
+            self.clients.discard(ws)
+            self.feeds.pop(ws, None)
         return ws
 
 
 def parse_start(hm):
-    """'HH:MM' -> sim epoch of that Rome time today."""
+    """'HH:MM' -> sim epoch of that local (Tokyo) time today."""
     h, m = map(int, hm.split(":"))
-    return datetime.now(ROME).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
+    return datetime.now(TZ).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
 
 
 LOGIN_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -496,6 +583,8 @@ def password_gate(password):
                 return web.Response(text=LOGIN_PAGE.format(msg="<small>wrong password</small>"),
                                     content_type="text/html", status=401)
             return web.Response(text=LOGIN_PAGE.format(msg=""), content_type="text/html")
+        if spiking_server and request.path in spiking_server.POD_PATHS:
+            return await handler(request)                  # the pod authenticates with its own secret in the handler
         if hmac.compare_digest(request.cookies.get("sub01", ""), token):
             return await handler(request)
         if request.path == "/ws" or request.path.startswith("/api/"):
@@ -511,6 +600,14 @@ async def main(args):
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app.router.add_get("/ws", live.ws_handler)
+    manager = None
+    if spiking_server:
+        hub = spiking_server.attach(app, live, data_dir)
+        manager = spiking_manager.from_env(data_dir, get_items=lambda: spiking_manager.top_items(live.memory, live.clock.now()))
+        if manager.enabled():
+            hub.manager, manager.send_stop = manager, hub.forward_stop
+        else:
+            manager = None
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
@@ -608,10 +705,14 @@ async def main(args):
         tasks.append(live.run_eye())
     if live.browser:
         tasks.append(live.run_browse())
+    if manager:
+        tasks.append(manager.run())
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
+        if manager:
+            manager.shutdown()
         if live.browser:
             live.browsing_path.write_text(json.dumps(live.browser.to_dict(), ensure_ascii=False))
             await live.browser.close()
@@ -625,7 +726,7 @@ if __name__ == "__main__":
     p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     p.add_argument("--frames-dir", help="where eye frames are written (default out/eye/frames)")
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
-    p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
+    p.add_argument("--start", help="local (Tokyo) time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
     p.add_argument("--replay-real-session", action="store_true", default=os.environ.get("REPLAY_REAL_SESSION") == "1",

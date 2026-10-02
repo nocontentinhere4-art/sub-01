@@ -1,4 +1,5 @@
-"""Public chat for SUB-01: message filter, rate limit, duplicate check and the message -> stimulus rules.
+"""Public chat for SUB-01: message filter, rate limit, duplicate check, the message -> stimulus rules and the
+word -> network lexicon also used for what it reads (research.py).
 
 Everything here is a transparent rule table; no external API and no language model.
 The filter runs first: blocked messages are never shown, stored or turned into stimuli.
@@ -81,6 +82,57 @@ RULES = [  # (condition, {group: drive at gain 1}) - shown on the page as "netwo
 
 def words(text):
     return set(re.findall(r"[a-z']+", text.lower()))
+
+
+# --- word -> network lexicon (EN/IT) ---------------------------------------------------
+# Used to say which networks a topic leans on (curiosity in research.py) next to the rule table above.
+# A crude, hand-written association table: it does not model meaning, it only routes words to stimulus groups.
+TOPICS = {
+    "memory": "memory remember history historical ancient archive museum past heritage century medieval empire "
+              "dynasty ruins archaeology tradition childhood nostalgia diary memoria ricordo storia antico museo "
+              "passato archivio tradizione",
+    "reward": "food bread bakery cake sweet chocolate coffee tea ramen sushi cuisine dish festival game games music "
+              "song album dance party holiday gift garden flower cat cats dog dogs pane cibo musica festa gioco "
+              "dolce caffe giardino fiore gatto",
+    "visual": "art painting painter colour color light photography photograph film cinema animation anime manga "
+              "sculpture architecture design image sky star stars moon sun rainbow arte pittura luce foto cielo "
+              "stella luna sole colore",
+    "somatomotor": "sport sports football baseball soccer swimming running walking cycling bicycle martial dance "
+                   "body hand muscle exercise yoga climbing tennis calcio corsa bicicletta corpo mano",
+    "language": "language word words poem poetry poet novel book books writer writing literature alphabet "
+                "grammar dialect translation script letter lingua parola poesia libro romanzo scrittore",
+    "attention": "puzzle chess mathematics math physics science experiment discovery map maps navigation "
+                 "telescope microscope astronomy matematica fisica scienza scoperta mappa",
+    "control": "logic algorithm computer programming engineering machine rule law system planning economics "
+               "strategy logica algoritmo computer ingegneria macchina regola",
+    "default": "dream dreams sleep self mind philosophy imagination memory story myth legend soul identity "
+               "meditation sogno sonno mente filosofia mito leggenda",
+    "limbic": "smell taste perfume emotion mood love friendship family home nostalgia odore gusto emozione "
+              "amicizia famiglia casa",
+    "salience": "alarm siren noise surprise accident emergency earthquake volcano storm thunder sirena rumore "
+                "sorpresa terremoto vulcano tempesta",
+    "fear": "danger predator shark storm earthquake volcano tsunami ghost monster pericolo squalo fantasma mostro",
+    "relay": "signal radio telephone network broadcast sensor neuron neurons brain segnale radio cervello",
+}
+TOPIC = {}
+for _g, _ws in TOPICS.items():
+    for _w in _ws.split():
+        if _g not in TOPIC.setdefault(_w, []):
+            TOPIC[_w].append(_g)
+
+
+def networks_for(text):
+    """-> {group: weight}: words of `text` routed through the rule words (POSITIVE / HOSTILE) and TOPICS."""
+    out = {}
+    for w in re.findall(r"[a-zà-ÿ']+", text.lower()):
+        groups = TOPIC.get(w) or TOPIC.get(w[:-1] if w.endswith("s") else "") or []
+        if w in POSITIVE:
+            groups = groups + ["reward"]
+        if w in HOSTILE:
+            groups = groups + ["fear", "salience"]
+        for g in groups:
+            out[g] = out.get(g, 0.0) + 1.0
+    return out
 
 
 def stimulus(text):

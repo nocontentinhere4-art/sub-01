@@ -54,6 +54,18 @@ BAD_WORDS = re.compile(
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
                       r"before you continue|consent", re.I)
+# bot checks recognised in the page text or by their challenge frames: he leaves these pages, never solves them
+# (only on short pages: a real bot check is a page of its own, not a sentence inside an article)
+WALL_MAX_CHARS = 2000
+BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you are (a )?human|"
+                       r"checking (if the site connection is secure|your browser)|"
+                       r"complete the security check|please solve (this|the) (captcha|puzzle)", re.I)
+# a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
+WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
+  + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
+    if (f.closest('.grecaptcha-badge')) return false;
+    const r = f.getBoundingClientRect(), cs = getComputedStyle(f);
+    return r.width >= 200 && r.height >= 60 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.1; })"""
 LOGIN_LINK = re.compile(r"log ?in|sign ?(in|up)|register|account|cart|checkout|basket|subscribe|donate|password|"
                         r"privacy|cookie|terms|legal|imprint|impressum|careers|advertis", re.I)
 SKIP_EXT = re.compile(r"\.(pdf|zip|rar|7z|exe|dmg|apk|mp3|mp4|mov|avi|mkv|iso|tar|gz|docx?|xlsx?|pptx?)(\?|$)", re.I)
@@ -216,7 +228,9 @@ class Browser:
             # The browser gets a minimal environment: none of the server's secrets (API tokens, site password).
             root = hasattr(os, "geteuid") and os.geteuid() == 0
             kw = {"args": ["--disable-dev-shm-usage", "--mute-audio", "--disable-extensions",
-                           "--disable-background-networking", "--disable-sync", "--no-first-run"]
+                           "--disable-background-networking", "--disable-sync", "--no-first-run",
+                           "--renderer-process-limit=2", "--js-flags=--max-old-space-size=256",
+                           "--disable-gpu", "--disable-software-rasterizer"]
                           + (["--no-sandbox"] if root else []),
                   "chromium_sandbox": not root,
                   "env": {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "TZ", "TMPDIR",
@@ -259,6 +273,12 @@ class Browser:
             except Exception:
                 pass
             self.browser = None
+        if device is None and self.pw is not None:          # the driver itself may be dead: start a fresh one next time
+            try:
+                await self.pw.stop()
+            except Exception:
+                pass
+            self.pw = None
 
     # --- one step ------------------------------------------------------------------------------------------------
     async def step(self, device, heard=(), interest=None):
@@ -273,7 +293,9 @@ class Browser:
                     sc.scrolls_left -= 1
                     await sc.page.evaluate("() => window.scrollBy({top: innerHeight * 0.7, behavior: 'smooth'})")
                     await sc.page.wait_for_timeout(900)
-                    await self._shoot(sc)
+                    if not await self._shoot(sc):                   # turned into a bot check: left
+                        sc.next_at = time.time() + 15
+                        return None
                 else:
                     ok = await self._next(sc, list(heard), interest)
                     if not ok:
@@ -286,7 +308,8 @@ class Browser:
                 self.failures += 1
                 print(f"browse ({device}):", repr(e)[:160], flush=True)
                 sc.next_at = time.time() + min(120, 10 * self.failures)
-                if self.failures >= 3:
+                dead = re.search(r"Connection closed|Target crashed|Browser has been closed|driver", repr(e))
+                if dead or self.failures >= 3:                 # crashed renderer or driver: restart everything cleanly
                     await self.close()
                 return None
 
@@ -325,8 +348,8 @@ class Browser:
         if await self._open(sc, url, why, "search", title=f"{q} — search", min_text=0, shoot=False):
             results = await self._links(sc, "#b_results li.b_algo h2 a, li.b_algo a.tilk")
             results = [(u, t) for u, t in results if "bing.com" not in u and "microsoft.com" not in u]
-            if results:
-                await self.show(sc)                                    # only a results page is worth showing
+            if results and not await self.show(sc):                   # only a results page is worth showing
+                results = []
         if not results:
             wiki = "https://en.wikipedia.org/w/index.php?" + urllib.parse.urlencode({"search": q})
             if not await self._open(sc, wiki, why, "search", title=f"{q} — Wikipedia"):
@@ -387,7 +410,7 @@ class Browser:
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
-                  else "bot wall" if BOT_WALL.search(page_title) else None)
+                  else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body) else None)
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             return await self._leave(sc)
@@ -395,16 +418,31 @@ class Browser:
         sc.info = {"title": (title or page_title or host)[:140], "url": page.url, "host": host.removeprefix("www."),
                    "why": why.replace("opened “”", f"opened {host.removeprefix('www.')}"), "t": time.time(), "kind": kind}
         sc.scrolls_left = self.rng.randint(*SCROLLS) if kind == "page" else 0
-        if shoot:
-            await self.show(sc)
+        if shoot and not await self.show(sc):
+            return False
         return True
 
+    @staticmethod
+    def wall_text(body):
+        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+
+    async def _walled(self, page, body=None):
+        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) fills the page."""
+        if body is None:
+            body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+        if len(body.strip()) >= WALL_MAX_CHARS:
+            return False
+        return self.wall_text(body) or await page.evaluate(WALL_FRAMES)
+
     async def show(self, sc):
-        """Screenshot the current page and log the visit (only pages that passed the guard get here)."""
-        await self._shoot(sc)
+        """Screenshot the current page and log the visit (only pages that passed the guard get here).
+        False when the page turned out to be a bot check (then nothing is shown or logged)."""
+        if not await self._shoot(sc):
+            return False
         i = sc.info
         self.log = (self.log + [{"t": i["t"], "device": sc.name, "title": i["title"], "url": i["url"], "host": i["host"],
                                  "why": i["why"]}])[-KEEP:]
+        return True
 
     async def _leave(self, sc):
         sc.scrolls_left = 0
@@ -417,5 +455,10 @@ class Browser:
         return False
 
     async def _shoot(self, sc):
+        if await self._walled(sc.page):                                 # a page can turn into a bot check later
+            print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
+            await self._leave(sc)
+            return False
         sc.shot = await sc.page.screenshot(type="jpeg", quality=72 if sc.name == "desk" else 68)
         sc.shot_id += 1
+        return True

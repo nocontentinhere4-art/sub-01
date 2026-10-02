@@ -69,6 +69,9 @@
   #note { font-size:10px; color:var(--faint); min-height:1.2em; }
   #note.err { color:#ff8a8a; }
 
+  #neurons { min-width:0; }
+  #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
   body.mini #top, body.mini #cards, body.mini #dock, body.mini #ticker, body.mini #honest, body.mini #vignette { display:none !important; }
 
   @media (max-width: 900px) {
@@ -76,7 +79,7 @@
     #top { left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:19px; }
     #honest { position:static; padding:0 16px; margin-top:8px; }
     #cards { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:0 16px; margin-top:66vh; }
-    .card { min-width:240px; }
+    .card, #neurons { min-width:240px; }
     #ticker { position:static; padding:12px 16px 0; }
     #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(transparent, #030305 30%); }
     #layers { display:none; }
@@ -84,6 +87,7 @@
     #top { position:absolute; }
   }
 </style>
+<link rel="stylesheet" href="/neurons.css">
 </head>
 <body>
 <script>if (new URLSearchParams(location.search).has("mini")) document.body.classList.add("mini");</script>
@@ -113,6 +117,7 @@
     <div class="t" id="n-t">no night recorded yet</div>
     <div class="m" id="n-m"></div>
   </div>
+  <div id="neurons"></div>
 </div>
 
 <div id="honest">Simulated activity built from one real person's public MRI: real fibres, real cortex.
@@ -128,10 +133,13 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="/neurons.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MINI = document.body.classList.contains("mini");
+// "Neurons" panel: 1M simulated spiking neurons (model, not a mind). Not started in the mini (embedded) view.
+if (!MINI && window.Neurons) Neurons.init({mount: $("neurons"), open: true});
 
 // ---------- scene ----------
 const host = $("scene");
@@ -325,7 +333,10 @@ function renderNights(m){
   $("n-t").textContent = n.sleep_onset ? `asleep ${tm(n.sleep_onset)} → ${tm(n.woke_up)}` : "not asleep yet";
   const reps = n.replays || [];
   $("n-m").innerHTML = (n.wakeups.length ? `woken ${n.wakeups.length}× (${esc(n.wakeups.map(w => w.cause).slice(-2).join(", "))})` : "never woken")
-    + ` · ${reps.length} replay${reps.length === 1 ? "" : "s"}` + (reps.length ? `<br>last: “${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
+    + (n.n_replays ? ` · ${n.n_replays.chat} message replay${n.n_replays.chat === 1 ? "" : "s"}`
+        + (n.n_replays.reading ? ` · ${n.n_replays.reading} of what it read` : "")
+      : ` · ${reps.length} replay${reps.length === 1 ? "" : "s"}`)
+    + (reps.length ? `<br>last: ${reps[reps.length - 1].source === "reading" ? "read " : ""}“${esc(reps[reps.length - 1].text.slice(0, 60))}”` : "");
 }
 
 // ---------- live ----------
@@ -335,6 +346,7 @@ function connect(){
   ws.onopen = () => $("live").classList.add("on");
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
+    if (m.type === "spiking") { if (!MINI && window.Neurons) Neurons.onMessage(m); return; }
     if (m.type === "hello") {
       tickerEl.replaceChildren();
       for (const c of m.chat.slice(-3)) tick(`${esc(c.t)} · message <b>“${esc(c.text.slice(0, 60))}”</b> → ${esc(c.networks.join(", "))}`);
@@ -362,7 +374,7 @@ function connect(){
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     for (const ev of m.events || []) {
       if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
-        tick(`${esc(ev.t)} · replay <b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
+        tick(`${esc(ev.t)} · replay ${ev.source === "reading" ? "of what it read " : ""}<b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
         fire(ev.text, ev.networks); heard = null; }
       else tick(`${esc(ev.t)} · ${esc(ev.text)}`);
     }

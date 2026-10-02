@@ -56,6 +56,19 @@
     box-shadow:0 0 0 3px #101014, 0 0 38px -8px rgba(140,170,255,.30); }
   #screencard .frame::after { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
     background:linear-gradient(165deg, rgba(255,255,255,.07), transparent 38%); }
+  .card .kw { font-size:11px; color:#c9c9d6; margin-top:10px; line-height:1.5; }
+  .card .kw b { font-weight:400; color:var(--fg); }
+  .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
+    border-top:1px solid var(--line); font-size:11px; color:#c9c9d6; }
+  .card .tn[hidden] { display:none; }
+  .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
+  #memcard .it { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:5px 0; border-bottom:1px solid var(--line); }
+  #memcard .it:last-child { border-bottom:0; }
+  #memcard .it span:last-child { flex:none; color:var(--dim); font-size:11px; white-space:nowrap; }
+  #memcard .it .y { color:#39f5a0; } #memcard .it .n { color:#ff7a7a; }
+  .nm { display:flex; gap:8px; margin-top:8px; font-size:10px; color:var(--dim); }
+  .nm span { flex:1; } .nm i { display:block; height:4px; border-radius:2px; background:#2a2a36; margin-top:3px; overflow:hidden; }
+  .nm i i { margin:0; background:linear-gradient(90deg, #ff9a3c, #ffc27a); transition:width .6s; }
   #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
   #screencard.phone .frame { width:176px; margin:2px auto 0; border-radius:26px; border:7px solid #111116;
     box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 14px 30px -12px #000, 0 0 36px -10px rgba(140,170,255,.28); }
@@ -137,7 +150,16 @@
     <div class="k"><span>On his mind</span><a id="r-link" href="#" target="_blank" rel="noopener">wikipedia ↗</a></div>
     <div class="t" id="r-title"></div>
     <div class="m" id="r-text"></div>
+    <div class="kw" id="r-kw"></div>
+    <div class="tn" id="r-tn"><span>will it come back tonight?</span><b id="r-tonight" title="estimated chance it is replayed in REM tonight, with what memory holds now; chat messages from people weigh more">…</b></div>
     <div class="s" id="r-why"></div>
+    <div class="s" id="r-note">What it reads becomes stimuli and dream material; it does not understand the text.</div>
+  </div>
+  <div class="card" id="memcard" hidden>
+    <div class="k"><span>Does it remember what it read yesterday?</span><span id="mem-day"></span></div>
+    <div id="mem-items"></div>
+    <div class="s" id="mem-how"></div>
+    <div class="s">Recall by a simulated spiking network from a partial cue; a model, not a mind.</div>
   </div>
   <div class="card" id="mapcard">
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
@@ -846,7 +868,31 @@ fetch("tokyo_routes.json").then(r => r.json()).then(d => {
   routes = d; homeMk = L.circleMarker(d.places.home, {radius:6, color:"#ececf2", weight:1.5, fillColor:"#ececf2", fillOpacity:.15}).addTo(map).bindTooltip("home");
   meMk.setLatLng(d.places.home).addTo(map);
 });
-fetch("/api/browsing").then(r => r.json()).then(d => { if (!d.on) $("h-screen").textContent = "Reading is real Wikipedia (CC BY-SA)."; }).catch(() => {});
+fetch("/api/browsing").then(r => r.json()).then(d => { if (!d.on) $("h-screen").textContent = "Reading is real Wikipedia (CC BY-SA): what it reads becomes stimuli and dream material; it does not understand the text."; }).catch(() => {});
+const NET = {somatomotor:"body-movement", default:"default-mode", fear:"threat", relay:"thalamic relay"};
+const MEM_LABEL = {"after sleep": "tested after its compressed sleep, the same evening (the next-day test runs at the next session)"};
+const memWhen = d => d.label === "next day"
+  ? `tested ${d.days_since > 1 ? d.days_since + " days" : "a day"} later, at the next session, after forgetting` : MEM_LABEL[d.label] || "";
+function loadMemory(){
+  fetch("/api/memory").then(r => r.ok ? r.json() : null).then(d => {
+    const items = d && d.items ? d.items.filter(x => x.source === "reading") : [];
+    $("memcard").hidden = !items.length;
+    if (!items.length) return;
+    const k = items.filter(x => x.recalled).length;
+    $("mem-day").textContent = `read ${d.day} · ${k}/${items.length}`;
+    $("mem-items").innerHTML = items.map(x => `<div class="it"><span>${esc(x.item)}</span><span>`
+      + `<b class="${x.recalled ? "y" : "n"}">${x.recalled ? "recalled" : "not recalled"}</b>`
+      + `${x.score != null ? ` · ${(+x.score).toFixed(1)} Hz` : ""}</span></div>`).join("");
+    $("mem-how").textContent = `${memWhen(d)}. Half of each title's words are given as a cue; `
+      + `score = extra firing of the other half's neurons (Hz). Recalled = above every never-stored lure`
+      + `${items[0].threshold != null ? ` (best lure ${(+items[0].threshold).toFixed(1)} Hz)` : ""}.`;
+  }).catch(() => {});
+}
+loadMemory(); setInterval(loadMemory, 10 * 60 * 1000);
+function tonightText(c){
+  const p = Math.round(c * 100);
+  return `${p < 5 ? "unlikely" : p > 85 ? "very likely" : p >= 50 ? "likely" : "maybe"} · ${p > 95 ? ">95" : p < 5 ? "<5" : "≈" + p}%`;
+}
 
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery"};
@@ -891,7 +937,11 @@ function applyTick(m){
       : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`);
     put("why", "textContent", life.say || "");
     if (r && !sc) { put("readcard", "hidden", false); put("r-title", "textContent", r.title); put("r-text", "textContent", r.extract);
-      put("r-link", "href", r.url || "#"); put("r-why", "textContent", r.why || ""); }
+      put("r-link", "href", r.url || "#"); put("r-why", "textContent", r.why || "");
+      const kw = r.keywords || [], nets = (r.networks || []).map(n => NET[n] || n);
+      put("r-kw", "innerHTML", kw.length ? `keywords <b>${esc(kw.join(", "))}</b>${nets.length ? ` → stimulus to ${esc(nets.join(", "))}${r.gain != null && r.gain < 0.99 ? ` (${Math.round(r.gain * 100)}% gets through)` : ""}` : ""}` : "");
+      put("r-tn", "hidden", r.tonight == null);                    // older entries / stale estimate: no line
+      if (r.tonight != null) put("r-tonight", "textContent", tonightText(r.tonight)); }
     else put("readcard", "hidden", true);
     place(life); screens(life, stage);
     put("away", "display", outside ? "block" : "none");
@@ -910,7 +960,11 @@ function applyTick(m){
       }
     }
     put("n-food", "textContent", life.food ? `${life.food} meal waiting` : life.bread ? `${life.bread} bread` : "nothing to eat");
-    put("n-text", "innerHTML", `hunger ${Math.round(life.hunger * 100)}% · boredom ${Math.round(life.boredom * 100)}%`
+    const v = life.vitals || {}, nm = m.neuro || {};
+    const bar = (k, x) => `<span title="${k}: ${x} (1.0 = resting wake)">${k}<i><i style="width:${Math.min(100, Math.round(x / 1.6 * 100))}%"></i></i></span>`;
+    put("n-text", "innerHTML", (v.hr_bpm ? `♥ ${Math.round(v.hr_bpm)} bpm · breath ${Math.round(v.resp_per_min)}/min · glucose ${Math.round(v.glucose_mg_dl)} mg/dl<br>` : "")
+      + `hunger ${Math.round(life.hunger * 100)}% · boredom ${Math.round(life.boredom * 100)}%`
+      + (nm.DA !== undefined ? `<div class="nm">` + ["DA", "5HT", "NE", "ACh"].map(k => bar(k, nm[k])).join("") + `</div>` : "")
       + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : ""));
 }
 if (!(DEBUG && new URLSearchParams(location.search).has("nolive"))) connect();
