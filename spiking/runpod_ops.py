@@ -69,8 +69,9 @@ class RunPodOps:
         return None
 
     # --- create --------------------------------------------------------------------
-    def create(self, env, purpose, module="spiking.session", max_minutes=60):
-        """Create the one allowed pod (A5000, else 4000 Ada), log its start, remember its deadline."""
+    def create(self, env, purpose, module="spiking.session", max_minutes=60, gpus=None):
+        """Create the one allowed pod, log its start, remember its deadline. `gpus`: [(gpu type, cloud)] tried in
+        order (default: podpack.GPUS on the secure cloud: A5000, else 4000 Ada, ...)."""
         with self._lock:
             if self.ours():
                 raise RuntimeError("a pod of ours already exists; at most one at a time")
@@ -78,10 +79,10 @@ class RunPodOps:
             if used + max_minutes / 60 > self.hours_cap + 1e-9:
                 raise CapExceeded(f"GPU-hour cap: {used:.2f} h used + {max_minutes / 60:.2f} h > {self.hours_cap:.2f} h")
             name = f"{self.prefix}{purpose}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-            pod, gpu, last = None, None, None
-            for gpu in podpack.GPUS:
+            pod, gpu, cloud, last = None, None, "SECURE", None
+            for gpu, cloud in (gpus or [(g, "SECURE") for g in podpack.GPUS]):
                 try:
-                    pod = self.api("/pods", "POST", podpack.create_body(env, name, gpu, module))
+                    pod = self.api("/pods", "POST", podpack.create_body(env, name, gpu, module, cloud))
                     break
                 except Exception as e:                                    # no capacity / refused: try the next type
                     last = e
@@ -98,7 +99,8 @@ class RunPodOps:
                 if rate is None:
                     rate = next((p.get("costPerHr") for p in self.pods() if p.get("id") == pod_id), None)
                 if self.log:
-                    self.log.start(pod_id, name, gpu, rate or 0.0, purpose)
+                    self.log.start(pod_id, name, gpu if cloud == "SECURE" else f"{gpu} ({cloud.lower()})", rate or 0.0,
+                                   purpose)
             except Exception:
                 self.delete(pod_id, "log failure")
                 raise
