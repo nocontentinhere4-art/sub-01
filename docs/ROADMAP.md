@@ -68,6 +68,9 @@ cheap to run, with the password gate kept until launch day.
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | in progress | issue #29 |
+| 18e | Daily memory test on the GPU switched on | waiting on the owner (RunPod keys on Railway) | #9 |
+| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | todo, after #14 + #28 | issue #31 |
+| 18g | /tastes page (what he leans towards, over days) | in progress | issue #30 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
