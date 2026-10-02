@@ -138,7 +138,9 @@ def test_views_swap_and_restore_the_pages_materials(check):
     v = check["views"]
     assert v["fresh"]["cortexMat"] == "swapped" and v["fresh"]["fibresMat"] == "swapped" and v["fresh"]["meshes"] is True
     assert {"his_cerebellum", "his_brainstem"} <= set(v["fresh"]["drawn"]) and "cut_cap" not in v["fresh"]["drawn"]
-    assert sorted(v["fresh"]["cortexPart"]) == [1, 2, 3]                                # his cortex vertices carry their part
+    assert sorted(v["fresh"]["cortexPart"]) == [0, 1, 2, 3]                             # his cortex vertices carry their part (0: a crumb, not drawn)
+    assert v["fresh"]["winding"] == -1 and v["fresh"]["fibresDrawn"] is False             # cortex.bin is wound clockwise: handled; no fibre ends poking through
+    assert v["bundles"]["fibresDrawn"] is True and v["glow"]["fibresDrawn"] is True
     assert v["fixed"]["cut"] is True and "cut_cap" in v["fixed"]["drawn"]
     assert v["bundles"]["cortexMat"] == "swapped" and v["bundles"]["fibresMat"] == "swapped" and v["bundles"]["cut"] is False
     assert "his_cerebellum" not in v["bundles"]["drawn"]

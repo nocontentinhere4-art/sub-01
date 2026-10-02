@@ -76,6 +76,7 @@ const tick = () => new Promise(r => setTimeout(r, 5));
     const st = anat.state();
     views[v] = { cortexMat: cortexMesh.material === cortexMesh.material && cortexMesh.material.name === "orig-cortex" ? "orig" : "swapped",
                  fibresMat: fibres.material.name === "orig-fibres" ? "orig" : "swapped", drawn: st.drawn, meshes: st.meshes, cut: st.cut.on, caption,
+                 winding: st.winding, fibresDrawn: st.fibresDrawn,
                  cortexPart: cg.attributes.part ? Array.from(new Set(cg.attributes.part.array)).sort() : null };
   }
   anat.setView("fresh"); anat.setLayer("vessels", true); anat.setLayer("nerves", true);
