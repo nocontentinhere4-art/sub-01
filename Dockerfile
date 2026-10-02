@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements-server.txt \
  && python -m playwright install --with-deps --only-shell chromium \
  && rm -rf /var/lib/apt/lists/*
 COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py \
-     runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py ./
+     runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py ./
 COPY twin ./twin
 COPY spiking ./spiking
 COPY web ./web
