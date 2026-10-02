@@ -134,11 +134,11 @@ const FRAG = /* glsl */`
 
     // --- the sky
     float w = night + blue + golden + day + 1e-3;
-    vec3 zen = (night * vec3(0.004, 0.006, 0.020) + blue * vec3(0.020, 0.045, 0.150) + golden * vec3(0.10, 0.19, 0.44) + day * vec3(0.10, 0.28, 0.72)) / w;
-    vec3 hor = (night * vec3(0.040, 0.030, 0.050) + blue * vec3(0.16, 0.14, 0.30) + golden * vec3(0.95, 0.46, 0.20) + day * vec3(0.62, 0.74, 0.90)) / w;
-    vec3 mid = (night * vec3(0.012, 0.016, 0.045) + blue * vec3(0.06, 0.08, 0.22) + golden * vec3(0.42, 0.33, 0.42) + day * vec3(0.33, 0.52, 0.86)) / w;
+    vec3 zen = (night * vec3(0.004, 0.006, 0.020) + blue * vec3(0.020, 0.045, 0.150) + golden * vec3(0.10, 0.19, 0.44) + day * vec3(0.08, 0.26, 0.74)) / w;
+    vec3 hor = (night * vec3(0.040, 0.030, 0.050) + blue * vec3(0.16, 0.14, 0.30) + golden * vec3(0.95, 0.46, 0.20) + day * vec3(0.56, 0.70, 0.90)) / w;
+    vec3 mid = (night * vec3(0.012, 0.016, 0.045) + blue * vec3(0.06, 0.08, 0.22) + golden * vec3(0.42, 0.33, 0.42) + day * vec3(0.24, 0.46, 0.86)) / w;
     float e = max(dir.y, 0.0);
-    vec3 sky = mix(hor, mid, smoothstep(0.0, 0.18, e)); sky = mix(sky, zen, smoothstep(0.12, 0.7, e));
+    vec3 sky = mix(hor, mid, smoothstep(0.0, 0.10, e)); sky = mix(sky, zen, smoothstep(0.06, 0.45, e));
     vec3 horizonCol = mix(hor, mid, 0.45);                          // the haze's colour: the low sky, a little greyer
     // the sun: a warm glow around it, a disc; the moon at night
     float cs = dot(dir, uSunDir);

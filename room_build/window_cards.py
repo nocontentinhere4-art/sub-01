@@ -559,7 +559,7 @@ def card_far(rng):
                 if rng.random() < 0.7: c.light(xx, y, xx + 1.2, y + 0.9, 0)
         x += w + rng.uniform(4, 22)
     # a few towers, far away (generic office towers and one slender mast; no landmark is copied)
-    for tx, tw, th, kind in ((38, 9, 36, "office"), (96, 12, 28, "office"), (142, 3, 44, "mast"), (190, 14, 40, "office"), (236, 10, 33, "office")):
+    for tx, tw, th, kind in ((38, 9, 36, "office"), (96, 12, 28, "office"), (118, 3, 38, "mast"), (190, 14, 40, "office"), (236, 10, 33, "office")):
         top = GROUND + th
         col = (176, 188, 206)
         if kind == "office":
