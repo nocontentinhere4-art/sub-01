@@ -361,6 +361,35 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   platform per Tokyo day, also when it fails; each is a $0 `clips` row in `costs.jsonl` (`/api/costs` → `posts_today`).
   `CLIPS=0` turns the whole thing off.
 
+## Trades and sleep (fix 2026-10-02, PR `fix/sleep-and-trades`)
+- **No trade feed until our coin launches.** `--mint` defaults to the env var `MINT`, which is unset, so there is no
+  Solana stream at all and the pool label reads "no coin yet".
+  - Until 2026-10-02 the default was a third-party token, `6GmAFS…`, a Raydium LaunchLab coin.
+  - Its LaunchLab `TradeEvent` has the same Anchor discriminator as pump.fun's, so the decoder read it as
+    793,100 SOL buys ("$97M trades"). Each one added arousal and woke him: arousal reached 215 and the debt 105 h,
+    with no REM and no dreams.
+- **At launch:** set `MINT` on Railway to our pump.fun mint, and optionally `SOLANA_WS` to a private RPC.
+  - The feed then turns on, and the trade → brain wiring (`Live.apply`, `SleepEngine.stimulus`) is unchanged.
+  - The pool name and our PumpSwap pool address(es) come from DexScreener, re-read every 10 min, so a graduation is
+    picked up.
+- **Decoding** (`decode_trades`, tested on real mainnet transactions in `tests/fixtures/solana_trades.json`):
+  - an event counts only if it was emitted by pump.fun (`6EF8…F6P`) or PumpSwap (`pAMM…EA`), tracked through the
+    invoke stack in the logs;
+  - a bonding-curve `TradeEvent` must carry our mint;
+  - a PumpSwap event must be about one of our pools; no pool known means no PumpSwap trades;
+  - amounts are lamports / 1e9.
+- **Guards:**
+  - any single trade above `MAX_TRADE_USD` ($250k) is ignored, and logged at most once a minute;
+  - total arousal is capped at `AROUSAL_MAX` (2 × the wake threshold);
+  - past 18 h of sleep debt (more than one whole lost night), sleep pressure gradually overrides outside arousal
+    (`SleepEngine.arousal_drive`). Chat can still keep him up for one night, as before. Under a nonstop stream of the
+    largest allowed trades he still sleeps about 7.8 h a day, and the debt levels off at about 24 h.
+- **Restarts:** every load clamps arousal to the wake threshold, trims the cause log, and caps the debt at 12 h.
+  - The one-time repair `2026-10-02-trades` also drops the fake debt (to ≤ 2 h) and tonight's broken night record;
+    `last_night` is kept as history.
+  - In simulation he then falls asleep around midnight Tokyo with about 75 min of REM and replays.
+- This fix adds no word or content filters (owner's instruction: chat words, vulgar ones included, are kept as they are).
+
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.
   Never present it as "his wiring produces his activity" (`analysis/null_test.py`).
