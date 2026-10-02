@@ -17,7 +17,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 ## Pages (all on `main`)
 | path | file | what |
 |---|---|---|
-| `/` | `web/room.html` | his room in 3D (three.js r169; Higgsfield/Meshy GLBs in `web/room/`, meshopt + WebP, 3 MB), Tokyo day/night through the window, live screens (monitor + phone in his hands, arm IK), camera follows what he looks at, map when he is out, mini brain. `?debug&nolive&hour=21` previews a time of day |
+| `/` | `web/room.html` | his room in 3D (three.js r169; Higgsfield/Meshy GLBs in `web/room/`, meshopt + WebP, 3 MB), Tokyo day/night through the window, live screens (monitor + phone in his hands, arm IK), camera follows what he looks at, map when he is out, mini brain. `?debug&nolive&hour=21` previews a time of day. Rendering (#98 G6): `web/room_post.js` (N8AO ambient occlusion, bloom, depth of field, a grade per hour, SMAA/FXAA; quality tiers high/medium/low picked from the GPU and adapted to the frame rate; `?post=high|medium|low` pins one), the room captured as its own environment map, sun shafts, a contact shadow under his feet, the desk lamp as a spot light; `tests/test_room_post.py`, screenshots and FPS with `python tests/room_render_shots.py` (`docs/design/room-render/`) |
 | `/brain` | `web/index.html` | brain v2: full-screen real fibres coloured by sleep stage; chat messages travel along real fibres; `?mini` for the PiP |
 | `/diary` | `web/diary.html` | dream diary written each morning (Tokyo) from unattended REM frames |
 | `/world.html` | eye frames | what the eye (Replicate FLUX + Llama 3) "sees" |

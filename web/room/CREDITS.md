@@ -94,6 +94,15 @@ set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somew
 
     node build_food.mjs "<kit>/Models/GLB format" ../web/room/food.glb      # 84 KB
 
+## Rendering (#98 G6): post-processing libraries, loaded from the CDN at run time (nothing copied into the repository)
+- **three.js** r169 (MIT, © three.js authors; https://github.com/mrdoob/three.js): the renderer and its example passes
+  (EffectComposer, RenderPass, ShaderPass, SMAAPass, UnrealBloomPass, FXAAShader, RoomEnvironment), from jsDelivr.
+- **N8AO** 1.9.4 (ISC licence, © N8python; https://github.com/N8python/n8ao): screen-space ambient occlusion, from jsDelivr
+  (`n8ao` in the page's import map). Its optional `postprocessing` base class is replaced by a one-line shim in the import map.
+- The grade (ACES tone mapping, white balance, split toning, vignette, grain), the depth of field, the sun shafts, the
+  contact shadow and the captured room environment are original code in `web/room_post.js`, written for this project and
+  released under CC0. No HDRI is shipped: the environment map is a cube render of the room itself.
+
 ## Map card
 The map of his neighbourhood (room card and `/life`) is © OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`, one static extract made by
