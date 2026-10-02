@@ -9,6 +9,7 @@ Starts `live_server.py --demo` (BROWSE=0, no live spiking network), then in head
   anatomy module's state (meshes, parts, atlas loaded; tier) and page errors, and an FPS reading per view at 390 px with
   the CPU throttled x4. Headless Chromium draws WebGL in software (SwiftShader): the FPS numbers here are a floor and
   the >= 30 FPS phone check needs a real device (docs/HANDOFF.md says the same for the neuron forest).
+--cdn-dir serves three.min.js and OrbitControls.js from local copies when the sandbox has no route to the CDNs.
 """
 import argparse
 import json
@@ -47,6 +48,7 @@ def main():
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
     ap.add_argument("--fps-s", type=float, default=5.0)
     ap.add_argument("--sizes", default="1920,390")
+    ap.add_argument("--cdn-dir", default=None, help="serve three.min.js and OrbitControls.js from local copies (no route to the CDNs)")
     args = ap.parse_args()
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -68,6 +70,10 @@ def main():
                 pg = ctx.new_page()
                 errors = []
                 pg.on("pageerror", lambda e: errors.append(str(e)))
+                if args.cdn_dir:
+                    cdn = Path(args.cdn_dir)
+                    pg.route("**/three.min.js", lambda r: r.fulfill(path=str(cdn / "three.min.js"), content_type="text/javascript"))
+                    pg.route("**/OrbitControls.js", lambda r: r.fulfill(path=str(cdn / "OrbitControls.js"), content_type="text/javascript"))
                 pg.goto(base + "/brain", wait_until="load")
                 try:
                     pg.wait_for_function("typeof scene !== 'undefined' && scene.getObjectByName('cortex') && scene.getObjectByName('fibres')", timeout=120000)
