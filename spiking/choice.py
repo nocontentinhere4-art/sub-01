@@ -373,3 +373,204 @@ def experiment(net, trials=160, k=4, probs=None, reversal=True, seed=0, frozen_n
     out["dw_cue_pool_mean_mv"] = task.dw_stats()
     out["task"] = task
     return out
+
+
+# --- real labels, variable offers: the live decisions (#58) ------------------------------------------------------
+LIVE_WORDS = 3                   # content words of a label that become its cue
+LIVE_WORD_FRAC = 0.05            # per word: 3 words ~ the 15 % cue of one ChoiceTask label
+MAX_LIVE_LABELS = 4096           # per-label value estimates kept (least recently used dropped)
+
+
+def label_key(label):
+    """The label as the network sees it: its first content words (case, punctuation and stop words dropped)."""
+    from .words import words
+    ws = words(str(label))[:LIVE_WORDS]
+    return " ".join(ws) if ws else str(label).strip().lower()[:80]
+
+
+class LiveChooser:
+    """Decisions among real option labels (2-6 of them, any text) on a SpikingNet: the ChoiceTask race and its
+    dopamine rule, with cues and pools built per decision.
+
+    - Cue of a label: the union of its first LIVE_WORDS content words, each hashed as in memory.py at
+      LIVE_WORD_FRAC of the excitatory neurons of every visual and language parcel; labels that share a word
+      share part of their cue. Pools: the striatal neurons split among the offered labels by hashed affinity.
+    - decide() runs the race and returns the pick, the pool rates and an eligibility tag set at the decision
+      (pre = cue-neuron rate in the window, post = +1 chosen pool, -1/(K-1) other offered pools).
+    - reward() applies dw += eta_l * delta * tag with delta = value - V[label] (the #39 rule). Stability fix
+      (docs/spiking/choice.md: preferences flipped back and forth): a slow value estimate (alpha 0.05 instead of
+      0.1) and a learning rate that decays with the number of rewards a label has had,
+      eta_l = max(eta_min, eta / sqrt(1 + n_label / eta_tau)). `value` may be a reward-prediction error already
+      (the tastes signal, mean ~0) or an outcome (chess: +1 / 0 / -1); V absorbs a constant offset either way.
+    """
+
+    def __init__(self, net, cue_amp=8.0, check_ms=10, min_ms=50, timeout_ms=250, thr_z=2.0, eta=0.6,
+                 eta_min=0.15, eta_tau=20.0, alpha=0.05, word_frac=LIVE_WORD_FRAC):
+        import torch
+        from .memory import MemorySystem
+        self.torch, self.net = torch, net
+        self.cue_amp, self.check_ms, self.min_ms, self.timeout_ms = cue_amp, check_ms, min_ms, timeout_ms
+        self.thr_z, self.eta, self.eta_min, self.eta_tau, self.alpha = thr_z, eta, eta_min, eta_tau, alpha
+        reg = net.reg
+        cue_regions = sorted(set(sum((reg.groups[g] for g in CUE_GROUPS), [])))
+        self.cue_space = np.concatenate([net.region_neurons(r, exc_only=True) for r in cue_regions])
+        self.mem = MemorySystem(net, frac=word_frac)
+        self.action = net.group_neurons(ACTION_GROUP, exc_only=True)
+        self._cues, self._aff = {}, {}
+        self.V, self.n = {}, {}
+        self.thr_hz, self.calib = None, None
+        self.syn = None
+        p = net.plast
+        if p is not None:
+            in_cue = np.zeros(net.n, bool)
+            in_cue[self.cue_space] = True
+            is_act = np.zeros(net.n, bool)
+            is_act[self.action] = True
+            psrc, pdst = p.psrc.long().cpu().numpy(), p.pdst.long().cpu().numpy()
+            q = np.nonzero(in_cue[psrc] & is_act[pdst])[0]
+            self.syn = {"q": q, "pre": psrc[q], "post": pdst[q]}
+
+    # --- cues and pools -----------------------------------------------------------------------------------------
+    def cue(self, label):
+        key = label_key(label)
+        if key not in self._cues:
+            from .words import words
+            ws = words(key) or [key]
+            ids = np.unique(np.concatenate([self.mem.word_neurons(w) for w in ws]))
+            self._cues[key] = np.intersect1d(ids, self.cue_space)
+        return self._cues[key]
+
+    def affinity(self, label):
+        key = label_key(label)
+        if key not in self._aff:
+            self._aff[key] = _affinity(key, len(self.action))
+        return self._aff[key]
+
+    def pools(self, labels):
+        """Disjoint striatal pools for the offered labels (a repeated label gets an empty pool: it cannot win)."""
+        aff = np.stack([self.affinity(lb) for lb in labels])
+        owner = np.argmax(aff, axis=0)
+        return [self.action[owner == i] for i in range(len(labels))]
+
+    # --- one decision -------------------------------------------------------------------------------------------
+    def decide(self, labels, learn=True, force=None):
+        """Race among `labels`. Returns {pick, pool_rates, sim_ms, timeout, elig}; elig (for reward()) is None
+        without plasticity or when learn is False. `force`: tag that option as chosen (night replay of a real
+        decision) while still reporting the network's own pick."""
+        torch, net = self.torch, self.net
+        labels = [str(x) for x in labels]
+        if len(labels) < 2:
+            raise ValueError("a decision needs at least two options")
+        pools = self.pools(labels)
+        sizes = np.array([max(1, len(pl)) for pl in pools])
+        pool_t = [torch.as_tensor(pl, device=net.device) for pl in pools]
+        cue_ids = np.unique(np.concatenate([self.cue(lb) for lb in labels]))
+        net.set_neuron_drive("live_cue", cue_ids, self.cue_amp)
+        snap = net.snapshot()
+        base = [float(net.count[pt].sum()) for pt in pool_t]
+        row, winner, ms = None, None, 0
+        try:
+            for t in range(int(self.timeout_ms // self.check_ms)):
+                net.run(self.check_ms)
+                ms = (t + 1) * self.check_ms
+                row = np.array([float(net.count[pt].sum()) - b for pt, b in zip(pool_t, base)])
+                if self.thr_hz is not None and ms >= self.min_ms:
+                    r = row / sizes / (ms / 1000.0)
+                    if (r > self.thr_hz).any():
+                        winner = int(np.argmax(r))
+                        break
+            rates = row / sizes / (ms / 1000.0)
+            timeout = winner is None
+            if timeout:
+                winner = int(np.argmax(rates))
+            elig = None
+            if learn and self.syn is not None:
+                sel = np.isin(self.syn["pre"], cue_ids)
+                if sel.any():
+                    pre = net.rates_since(snap, self.syn["pre"][sel])
+                    chosen = winner if force is None else int(force)
+                    post = np.zeros(net.n, dtype=np.float32)
+                    for i, pl in enumerate(pools):
+                        post[pl] = 1.0 if i == chosen else -1.0 / max(1, len(labels) - 1)
+                    tag = ((pre - 5.0) / 40.0).clamp(0.0, 1.0) * torch.as_tensor(post[self.syn["post"][sel]],
+                                                                                    device=net.device)
+                    elig = {"q": torch.as_tensor(self.syn["q"][sel], device=net.device), "tag": tag,
+                            "label": label_key(labels[chosen])}
+        finally:
+            net.set_neuron_drive("live_cue", None)
+        return {"pick": winner, "pool_rates": [round(float(x), 3) for x in rates], "sim_ms": float(ms),
+                "timeout": bool(timeout), "elig": elig}
+
+    def eta_for(self, key):
+        return max(self.eta_min, self.eta / math.sqrt(1.0 + self.n.get(key, 0) / self.eta_tau))
+
+    def reward(self, elig, value):
+        """Dopamine for one decision: delta = value - V[chosen label]; returns {delta, eta, dw_abs}."""
+        if elig is None:
+            return {"delta": 0.0, "eta": 0.0, "dw_abs": 0.0}
+        key = elig["label"]
+        value = float(np.clip(float(value), -1.0, 1.0))
+        v = self.V.pop(key, 0.0)
+        delta = value - v
+        self.V[key] = v + self.alpha * delta                           # re-inserted last: LRU order
+        eta = self.eta_for(key)
+        self.n[key] = self.n.get(key, 0) + 1
+        while len(self.V) > MAX_LIVE_LABELS:
+            old = next(iter(self.V))
+            self.V.pop(old)
+            self.n.pop(old, None)
+        p = self.net.plast
+        if p is None or p.frozen or delta == 0.0:
+            return {"delta": round(delta, 4), "eta": round(eta, 4), "dw_abs": 0.0}
+        d = eta * delta * elig["tag"]
+        p.dw.index_add_(0, elig["q"], d)
+        p._apply()
+        return {"delta": round(delta, 4), "eta": round(eta, 4), "dw_abs": round(float(d.abs().sum()), 4)}
+
+    def calibrate(self, presentations=12, iti_ms=150, labels=DEFAULT_LABELS[:4]):
+        """Threshold = mean + thr_z sd of the pool rates at 100 ms (no learning), as ChoiceTask.calibrate."""
+        p = self.net.plast
+        was = p.frozen if p is not None else None
+        if p is not None:
+            p.frozen = True
+        rates = []
+        self.thr_hz = None
+        i = min(int(self.timeout_ms // self.check_ms), max(1, 100 // self.check_ms))
+        try:
+            for _ in range(presentations):
+                to, self.timeout_ms = self.timeout_ms, i * self.check_ms
+                try:
+                    rates.extend(self.decide(list(labels), learn=False)["pool_rates"])
+                finally:
+                    self.timeout_ms = to
+                self.net.run(iti_ms)
+        finally:
+            if p is not None:
+                p.frozen = was
+        self.thr_hz = float(np.mean(rates) + self.thr_z * np.std(rates))
+        self.calib = {"pool_rate_mean_hz": round(float(np.mean(rates)), 2), "pool_rate_sd_hz": round(float(np.std(rates)), 2),
+                      "threshold_hz": round(self.thr_hz, 2), "thr_z": self.thr_z}
+        return self.calib
+
+    # --- persistence (kept in the learned-weights meta) ----------------------------------------------------------
+    def to_meta(self):
+        return {"V": {k: round(v, 5) for k, v in self.V.items()}, "n": dict(self.n)}
+
+    def from_meta(self, meta):
+        meta = meta or {}
+        self.V = {str(k): float(v) for k, v in (meta.get("V") or {}).items()}
+        self.n = {str(k): int(v) for k, v in (meta.get("n") or {}).items()}
+
+
+def replay_fit(decisions, picks):
+    """How well a network's own picks agree with the outcome of real decisions: for each rewarded decision
+    (value > 0) a hit when it picks the real pick, for each punished one (value < 0) a hit when it picks another
+    option. Returns (fit fraction or None, n)."""
+    hits = n = 0
+    for d, mine in zip(decisions, picks):
+        v = d.get("reward")
+        if v is None or v == 0:
+            continue
+        n += 1
+        hits += int((mine == d["pick"]) if v > 0 else (mine != d["pick"]))
+    return (round(hits / n, 4) if n else None), n

@@ -128,8 +128,12 @@ def value(delta, video=False):
 
 
 def spiking_term(spiking, k):
-    """The spiking network's lean per option (-1..1), or None when its answer is missing or does not fit."""
+    """The spiking network's lean per option (-1..1), or None when its answer is missing or does not fit. An answer with
+    a pick but no pool rates (the GPU network can send none) leans +1 to its pick and -1/(k-1) to the others."""
     rates = (spiking or {}).get("pool_rates")
+    pick = (spiking or {}).get("pick")
+    if rates is None and isinstance(pick, int) and not isinstance(pick, bool) and 0 <= pick < k and k >= 2:
+        return np.array([1.0 if i == pick else -1.0 / (k - 1) for i in range(k)])
     if not isinstance(rates, (list, tuple)) or len(rates) != k or k < 2:
         return None
     try:
@@ -184,7 +188,7 @@ def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None,
         net = spiking.get("net") if spiking.get("net") in NETWORKS else "cpu"
         sp_rec = {"used": True, "net": net, "network": NETWORKS[net], "weight": SPIKING_W,
                   "pick": int(spiking.get("pick", top_k)), "leaned_to": options[top_k]["label"],
-                  "pool_rates": [round(float(x), 3) for x in spiking["pool_rates"]],
+                  "pool_rates": [round(float(x), 3) for x in spiking["pool_rates"]] if spiking.get("pool_rates") else None,
                   "sim_ms": spiking.get("sim_ms"), "n_neurons": spiking.get("n_neurons"), "id": spiking.get("id")}
     return {"options": rows, "chosen": k, "temperature": round(T, 3), "gain": round(gain, 3), "spiking": sp_rec,
             "reason": reason(options, deltas, vals, total, k, mood, tastes),
@@ -263,9 +267,12 @@ class Backend:
         return f"{kind[:1]}-{int(self.clock() * 1000)}-{self.n}"
 
     @staticmethod
-    def _fits(ans, k):
-        return isinstance(ans, dict) and isinstance(ans.get("pool_rates"), (list, tuple)) and len(ans["pool_rates"]) == k \
-            and isinstance(ans.get("pick"), int) and 0 <= ans["pick"] < k
+    def _fits(ans, k, rates_optional=False):
+        if not (isinstance(ans, dict) and isinstance(ans.get("pick"), int) and not isinstance(ans["pick"], bool)
+                and 0 <= ans["pick"] < k):
+            return False
+        rates = ans.get("pool_rates")
+        return (rates is None and rates_optional) or (isinstance(rates, (list, tuple)) and len(rates) == k)
 
     async def ask(self, options, kind="browse"):
         """-> the answer of the first network that answered in time ({"net": "gpu"|"cpu", "id", "pick",
@@ -278,7 +285,7 @@ class Backend:
                 ans = await asyncio.wait_for(fn(labels, kind, self.gpu_deadline_ms), self.gpu_deadline_ms / 1000 + 0.5)
             except Exception:
                 ans = None
-            if self._fits(ans, len(labels)):
+            if self._fits(ans, len(labels), rates_optional=True):     # the id #58 logged it under: no double count
                 return {**ans, "net": "gpu", "id": str(ans.get("id") or did)}
             if ans is not None:
                 why.append("GPU network answer did not fit")
@@ -303,8 +310,8 @@ class Backend:
         if self.log is not None:
             self.log.decision(ans["id"], kind, labels, chosen, net, t=t, **extra)
         self.pending = {"id": ans["id"], "net": net, "followed": int(chosen), "t": t} if rewarded else None
-        rates = ans.get("pool_rates") if net != "rate" else None
-        ln = [round(float(x), 3) for x in np.tanh((np.array(rates) - np.mean(rates)) / 2.0)] if rates else None
+        lt = spiking_term(ans, len(labels)) if net != "rate" else None
+        ln = [round(float(x), 3) for x in lt] if lt is not None else None
         self.last = {"t": round(t), "kind": kind, "net": net, "network": NETWORKS[net], "labels": labels,
                      "followed": int(chosen), "followed_label": labels[int(chosen)], "lean": ln,
                      "leaned_to": labels[int(np.argmax(ln))] if ln else None,

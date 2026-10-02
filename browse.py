@@ -31,6 +31,20 @@ the brain decides again. While he watches, each screenshot is compared with the 
 live server turns that into visual drive. Titles and channel names pass the guard and the chat filter
 (video_text_ok); comments and live chat are hidden, never opened; nothing is liked, subscribed or signed in to.
 
+More of the web (#56): a search goes to the source that fits the query (search_sources.route: DuckDuckGo, Bing,
+Wikipedia, Wikimedia Commons, arXiv, Hacker News, Open Library, YouTube, or a recipes / news site's own search box),
+rotated and limited to search_sources.PER_HOST_HOUR requests per host per hour, with robots.txt respected (also
+before typing into any site's search box). Results are parsed from the page (or the source's public JSON API), and
+every result's URL and title passes the guard before it is numbered for the brain; the card says where he searched,
+for what, and why ("searched arXiv for “sleep spindles” — from his reading notes").
+
+Logged in, view-only (#60): with `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` set (sessions.py), pages of that
+site open in a separate in-memory context per screen that alone carries the session's cookies; everything else stays
+in the logged-out context. There, links that are actions (like, follow, comment, share, DM, upload, live, buy...) or
+private pages (settings, inbox, studio, history, billing...) are never offered or opened, private pages are left
+before they are shown (URL and DOM, view_only.py), and the account's avatar, name and the action buttons are hidden
+before every screenshot. A sign-in button or wall logs that site out for good (until a restart).
+
 Optional: needs `pip install playwright` + a Chromium (`playwright install --with-deps chromium`). Without it the
 server runs as before (Wikipedia reading only).
 """
@@ -42,6 +56,10 @@ import re
 import socket
 import time
 import urllib.parse
+
+import search_sources as SS
+import sessions as SE
+import view_only as VO
 
 KEEP = 60                              # visits kept in the log
 SCROLL_EVERY_S = 7.0                   # seconds between scroll + screenshot on a page
@@ -141,7 +159,8 @@ BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a
 WALL_MAX_CHARS = 2000
 BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you are (a )?human|"
                        r"checking (if the site connection is secure|your browser)|"
-                       r"complete the security check|please solve (this|the) (captcha|puzzle)", re.I)
+                       r"complete the security check|please solve (this|the) (captcha|puzzle)|"
+                       r"bots use duckduckgo too|confirm this search was made by a human", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -467,9 +486,15 @@ class Screen:
         self.watch_until = 0.0                              # wall time the current video ends (0: not watching)
         self.watch_s = 0.0
         self.scene = 0.0                                    # change between the last two screenshots while watching
+        self.public = None                                  # (ctx, page) logged out: every site but a logged-in one
+        self.sites = {}                                     # site -> (ctx, page) carrying that site's session (#60)
+        self.site = None                                    # the logged-in site sc.ctx / sc.page belong to, or None
 
     def status(self):
         return dict(self.info, id=self.shot_id, device=self.name, chain=self.chain) if self.info and self.shot else None
+
+    def contexts(self):
+        return [p for p in [self.public, *self.sites.values()] if p]
 
 
 CHROMIUM_ARGS = ["--disable-dev-shm-usage", "--mute-audio", "--disable-extensions", "--disable-background-networking",
@@ -494,8 +519,10 @@ def launch_kwargs(sandbox, proxy=None, environ=None):
 class Browser:
     """Drives both screens. `step(device, ...)` is called by the live server every couple of seconds."""
 
-    def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False, decide=False):
+    def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False, decide=False, sessions=None):
         s = state or {}
+        self.sessions = SE.load_sessions() if sessions is None else sessions   # #60: logged out without the env vars
+        self.login_redirect = None                          # a logged-in context was sent to a login page
         self.decide = decide                                # True: the brain picks the next action (act())
         self.log = s.get("log", [])                         # visits shown: [{t, device, title, url, host, why}]
         self.used = set(s.get("used", []))                  # chat texts already searched
@@ -513,9 +540,19 @@ class Browser:
         self.dismissed = []                                 # banners / modals pressed away: [{t, host, label, kind}]
         self.sandbox = None                                 # Chromium's own sandbox on? (None: not launched yet)
         self.no_sandbox = False                             # a sandboxed launch failed once: stay without it
+        self.limits = SS.Limits(state=s.get("searches"))    # per-host requests per hour, searches per source today
+        self.robots = SS.Robots()
 
     def to_dict(self):
-        return {"log": self.log[-KEEP:], "used": list(self.used)[-200:]}
+        return {"log": self.log[-KEEP:], "used": list(self.used)[-200:], "searches": self.limits.to_dict()}
+
+    def accounts(self):
+        """For /api/browsing: per site "logged in" / "logged out" and why. Never a cookie."""
+        out = {}
+        for site, s in self.sessions.items():
+            s.check()
+            out[site] = {"state": "logged in" if s.logged_in else "logged out", "reason": s.status()["reason"]}
+        return out
 
     @staticmethod
     def available():
@@ -550,33 +587,93 @@ class Browser:
                 print("browse: !!! running as root: Chromium sandbox OFF (--no-sandbox) !!!", flush=True)
             self.sandbox = sandbox
             for sc in self.screens.values():
-                sc.ctx = sc.page = None
+                sc.ctx = sc.page = sc.public = sc.site = None
+                sc.sites = {}
                 sc.info, sc.history, sc.awaiting, sc.scrolls_left, sc.chain = None, [], None, 0, 0
         sc = self.screens[device]
         if sc.ctx is None:
-            opts = dict(DESK if device == "desk" else PHONE, accept_downloads=False, java_script_enabled=True,
-                        locale="en-US", timezone_id="Asia/Tokyo", ignore_https_errors=self.ignore_tls,
-                        permissions=[], color_scheme="light", service_workers="block")
-            if device == "desk":
-                opts["user_agent"] = DESK_UA
-            sc.ctx = await self.browser.new_context(**opts)
-            await sc.ctx.add_cookies(YOUTUBE_COOKIES)            # YouTube's Restricted Mode, before any page loads
-            await sc.ctx.route("**/*", self.guard.route)
-            sc.page = await sc.ctx.new_page()
-            sc.ctx.on("page", lambda p: asyncio.ensure_future(p.close()) if p != sc.page else None)   # no pop-ups
-            sc.page.on("dialog", lambda d: asyncio.ensure_future(d.dismiss()))
-            sc.page.set_default_timeout(NAV_TIMEOUT_MS)
+            sc.public = await self._new_context(device, YOUTUBE_COOKIES, self.guard.route)
+            sc.ctx, sc.page = sc.public
+            sc.site = None
         return sc
+
+    async def _new_context(self, device, cookies, route):
+        opts = dict(DESK if device == "desk" else PHONE, accept_downloads=False, java_script_enabled=True,
+                    locale="en-US", timezone_id="Asia/Tokyo", ignore_https_errors=self.ignore_tls,
+                    permissions=[], color_scheme="light", service_workers="block")
+        if device == "desk":
+            opts["user_agent"] = DESK_UA
+        ctx = await self.browser.new_context(**opts)
+        await ctx.add_cookies(cookies)                      # YouTube's Restricted Mode (and a session), before any page
+        await ctx.route("**/*", route)
+        page = await ctx.new_page()
+        ctx.on("page", lambda p: asyncio.ensure_future(p.close()) if p != page else None)   # no pop-ups
+        page.on("dialog", lambda d: asyncio.ensure_future(d.dismiss()))
+        page.set_default_timeout(NAV_TIMEOUT_MS)
+        return ctx, page
+
+    def _session(self, url):
+        """The logged-in session for this URL's site, or None (no secret, expired, or another site)."""
+        s = self.sessions.get(SE.site_for_url(url) or "")
+        return s if s is not None and s.check() else None
+
+    def _site_route(self, site):
+        """A logged-in context: its pages stay on that site's own domains and never open a private page; every
+        request also passes the guard."""
+        domains = SE.SITES[site]["domains"]
+
+        async def route(route):
+            req = route.request
+            if req.is_navigation_request() and req.frame.parent_frame is None:
+                u = urllib.parse.urlsplit(req.url)
+                if not SE.host_in(u.hostname or "", domains) or VO.private_url(req.url):
+                    if LOGIN_HREF.search(u.path + "?") or SE.host_in(u.hostname or "", ("accounts.google.com",)):
+                        self.login_redirect = site              # sent to a login page: the session has ended
+                    return await route.abort()
+            return await self.guard.route(route)
+        return route
+
+    async def _use(self, sc, url):
+        """Point the screen at the context for `url`: the site's logged-in one when it has a session, else the
+        logged-out one. The session's cookies are only ever added to its own context."""
+        s = self._session(url)
+        if s is None:
+            if sc.site is not None:
+                sc.ctx, sc.page = sc.public
+                sc.site = None
+            return
+        if s.site not in sc.sites:
+            sc.sites[s.site] = await self._new_context(sc.name, s.cookies(), self._site_route(s.site))
+        sc.ctx, sc.page = sc.sites[s.site]
+        sc.site = s.site
+
+    async def _logout(self, sc, reason):
+        """A session ended (expired, sign-in button or wall): that site is browsed logged out from now on."""
+        site = sc.site
+        s = self.sessions.get(site or "")
+        if s is not None:
+            s.expire(reason)
+        for other in self.screens.values():
+            pair = other.sites.pop(site, None)
+            if pair:
+                if other.site == site:
+                    other.ctx, other.page, other.site = (*other.public, None) if other.public else (None, None, None)
+                try:
+                    await pair[0].close()
+                except Exception:
+                    pass
 
     async def close(self, device=None):
         """Close one screen (he put the phone down) or everything (asleep / shutting down)."""
         for name, sc in self.screens.items():
             if device in (None, name) and sc.ctx is not None:
-                try:
-                    await sc.ctx.close()
-                except Exception:
-                    pass
-                sc.ctx = sc.page = None
+                for ctx, _ in sc.contexts():
+                    try:
+                        await ctx.close()
+                    except Exception:
+                        pass
+                sc.ctx = sc.page = sc.public = sc.site = None
+                sc.sites = {}
                 sc.scrolls_left, sc.next_at, sc.pending_link = 0, 0.0, None
                 sc.info, sc.history, sc.awaiting, sc.chain = None, [], None, 0
                 sc.mode, sc.watch_until, sc.scene = None, 0.0, 0.0
@@ -672,7 +769,45 @@ class Browser:
         text = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 6000)")
         raw = await page.evaluate(LINKS_JS)
         search = sc.info.get("kind") == "search"
+        if search and sc.info.get("results"):                   # a results page: its parsed results, guarded again
+            return self.result_page(sc, page.url)
         return self.pick_links(raw, page.url, text, sc, search)
+
+    @staticmethod
+    def safe_results(results):
+        """Results that may be numbered for the brain and shown: the guard on the URL (url_ok, login/sign-up links)
+        and on the title (display_ok; videos also the chat filter); a snippet that fails display_ok is dropped."""
+        out = []
+        for r in results or []:
+            url, title = str(r.get("url") or ""), " ".join(str(r.get("title") or "").split())
+            host = urllib.parse.urlsplit(url).hostname or ""
+            if (len(title) < 3 or not url_ok(url) or LOGIN_HREF.search(url) or LOGIN_LINK.search(title)
+                    or not display_ok(title) or BAD_WORDS.search(title)
+                    or ((is_youtube(host) or r.get("video")) and not video_text_ok(title))):
+                continue
+            snippet = " ".join(str(r.get("snippet") or "").split())
+            if snippet and (not display_ok(snippet) or BAD_WORDS.search(snippet)):
+                snippet = ""
+            out.append(dict(r, url=url, title=title[:140], snippet=snippet[:240]))
+        return out
+
+    def result_page(self, sc, url):
+        """A search results page for the eyes: its results (title, snippet, host), numbered, nothing else."""
+        links = []
+        results = [r for r in self.safe_results(sc.info.get("results"))
+                   if not (sc.site or self._session(r["url"])) or VO.link_ok(r["url"], r["title"])]
+        for i, r in enumerate(results[:PAGE_LINKS]):
+            link = {"id": f"L{i + 1}", "href": r["url"], "text": r["title"][:100], "result": True,
+                    "host": (urllib.parse.urlsplit(r["url"]).hostname or "").removeprefix("www."), "area": 0,
+                    "video": bool(VIDEO_LINK.search(r["url"]) or r.get("video"))}
+            if r.get("snippet"):
+                link["snippet"] = r["snippet"]
+            links.append(link)
+        text = " ".join(f"{l['text']}. {l.get('snippet', '')}" for l in links)
+        return {"device": sc.name, "url": url, "title": sc.info.get("title", ""), "host": sc.info.get("host", ""),
+                "kind": "search", "text": " ".join(text.split())[:1500], "links": links,
+                "can_back": len(sc.history) >= 2, "search_box": False, "chain": sc.chain, "max_chain": MAX_CHAIN,
+                "search": sc.info.get("search")}
 
     def pick_links(self, raw, url, text, sc, search=False):
         """Numbered, guarded links for the eyes. Pagination ("next"), comment threads and (on Wikipedia) external
@@ -693,6 +828,8 @@ class Browser:
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
                     or not display_ok(label) or (yt and not video_text_ok(label))):
                 continue
+            if (sc.site or self._session(href)) and not VO.link_ok(href, label, aria or ""):
+                continue                                        # #60: logged in, an action or a private page
             if href in seen:                                    # YouTube: the thumbnail link comes first, labelled
                 if yt and len(label) > len(seen[href]["text"]):  # with the duration; the title link is the label
                     seen[href]["text"] = label
@@ -747,7 +884,8 @@ class Browser:
                 elif kind == "search" and action.get("target"):
                     from eyes import query_ok                       # checked again here, in the browser's process
                     q = query_ok(action["target"])
-                    ok = bool(q) and await self._search(sc, q, f"searched “{q}” — {why}")
+                    origin = "follow_up" if SS.FOLLOW_LABEL.match(str(action.get("label") or "")) else "page"
+                    ok = bool(q) and await self._search(sc, q, f"{SS.ORIGINS[origin]} — {why}", origin)
                 elif kind == "site_search" and action.get("target"):
                     from eyes import query_ok                       # the query filter, again in this process
                     q = query_ok(action["target"])
@@ -782,10 +920,10 @@ class Browser:
         """Pick where to go: a fresh chat message -> search; a result from the last search; a link that matches
         his interests; else a search on what he read last or something familiar; sometimes a seed site. A new chain
         of pages starts here."""
+        from eyes import query_ok
         sc.chain = 0
         if sc.mode == "video":                                  # watching videos: a YouTube search (no typing)
-            from eyes import query_ok
-            q = query_ok(interest or "") or self.rng.choice(VIDEO_TOPICS)
+            q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)
             if await self._open(sc, youtube_search_url(q), f"looked for videos about “{q}”", "page",
                                 title=f"{q} — YouTube"):
                 sc.scrolls_left = 0
@@ -799,19 +937,27 @@ class Browser:
             if text in self.used:
                 continue
             self.used.add(text)
+            wished = query_ok(SS.wish(text))                    # "look up ...": the viewer's words, filtered
+            if wished:
+                return await self._search(sc, wished, f"{SS.ORIGINS['chat']}: “{text[:60]}”", "chat")
             q = " ".join(sorted(words(text), key=len, reverse=True)[:3])
             if q:
-                return await self._search(sc, q, f"from chat: “{text[:60]}”")
+                return await self._search(sc, q, f"from chat: “{text[:60]}”", "chat")
             break
         r = self.rng.random()
-        if sc.info and sc.info.get("kind") == "page" and r < 0.55:
-            link = await self._pick_link(sc, interest)
+        if sc.info and sc.info.get("kind") == "page" and r < 0.4:
+            link = await self._pick_link(sc, SS.interest_text(interest))
             if link and await self._open(sc, link[0], f"followed “{' '.join(link[1].split())[:50]}” from {sc.info['host']}",
                                          "page"):
                 return True
-        if r < 0.8:
-            topic = interest or self.rng.choice(FAMILIAR)
-            return await self._search(sc, topic, f"curious about “{topic[:50]}”")
+        if r < 0.88:                                            # #56: he searches more, from his own sources
+            topic = query_ok(SS.interest_text(interest))
+            origin = interest.get("from", "") if isinstance(interest, dict) and topic else ""
+            origin = origin if origin in SS.ORIGINS else ""
+            if not topic:
+                topic, origin = self.rng.choice(FAMILIAR), "familiar"
+            why = SS.ORIGINS[origin] if origin not in ("", "familiar") else f"curious about “{topic[:50]}”"
+            return await self._search(sc, topic, why, origin)
         return await self._open(sc, self.rng.choice(SEEDS), "opened a site he likes", "page")
 
     async def _site_search(self, sc, q, why):
@@ -829,6 +975,11 @@ class Browser:
             self.last_skip = "not a search box"
             return False
         host = urllib.parse.urlsplit(page.url).hostname or ""
+        target = self.site_search_url(page.url, again, q)
+        if target and not await self.robots.check(target, lambda u: self._fetch(sc, u), self.limits):
+            self.last_skip = "robots.txt"                           # the site asks robots not to search: type nothing
+            print(f"browse: site_search on {host} refused by robots.txt", flush=True)
+            return False
         field = " ".join(x for x in (again.get("type") or "text", again.get("name"), again.get("placeholder"))
                          if x)[:60]
         self.typed = (self.typed + [{"t": time.time(), "device": sc.name, "host": host.removeprefix("www."),
@@ -841,6 +992,36 @@ class Browser:
         except Exception:                                          # results shown in place (no navigation)
             pass
         return await self._settle(sc, why, "page", min_text=80)
+
+    @staticmethod
+    def site_search_url(page_url, f, q):
+        """The URL a site search box would load (its GET form's action + ?name=q), for the robots.txt check; None
+        on a page that is not on the web (local test pages)."""
+        if not str(page_url).startswith(("http://", "https://")):
+            return None
+        action = urllib.parse.urljoin(page_url, f.get("form_action") or page_url) if f.get("form") else page_url
+        u = urllib.parse.urlsplit(action)
+        query = urllib.parse.urlencode({f["name"]: q}) if f.get("name") else u.query
+        return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path or "/", query, ""))
+
+    async def _fetch(self, sc, url, hops=3):
+        """GET outside the page (robots.txt, a search source's JSON API), with the browser's guard: public http(s)
+        hosts only, every redirect checked again. -> (status, text); (0, "") when refused or failed."""
+        for _ in range(hops + 1):
+            u = urllib.parse.urlsplit(url)
+            if not url_ok(url) or not await self.guard.resolves_public(u.hostname or ""):
+                return 0, ""
+            try:
+                r = await sc.ctx.request.get(url, timeout=NAV_TIMEOUT_MS, max_redirects=0, fail_on_status_code=False)
+            except Exception as e:
+                print(f"browse: could not fetch {url[:80]}: {repr(e)[:100]}", flush=True)
+                return 0, ""
+            if r.status in (301, 302, 303, 307, 308) and r.headers.get("location"):
+                url = urllib.parse.urljoin(url, r.headers["location"])
+                continue
+            text = (await r.text())[:2_000_000] if r.status == 200 else ""
+            return r.status, text
+        return 0, ""
 
     async def _play_muted(self, sc):
         """A video page: start its first video muted (Chromium also runs with --mute-audio). The <video> state, or
@@ -890,33 +1071,105 @@ class Browser:
             sc.info = dict(sc.info, video=dict(sc.info["video"], watching=False, left_s=0, scene=0.0),
                            why=f"watched for {mins:g} min (muted); deciding again")
 
-    async def _search(self, sc, q, why):
-        """Search the web (Bing, SafeSearch strict); if it shows no results (bot check), search Wikipedia instead and
-        leave by one of the article's external sources. Either way the next step opens a page on the open web."""
-        url = "https://www.bing.com/search?" + urllib.parse.urlencode({"q": q, "adlt": "strict", "setlang": "en"})
-        results = []
-        if await self._open(sc, url, why, "search", title=f"{q} — search", min_text=0, shoot=False):
-            results = await self._links(sc, "#b_results li.b_algo h2 a, li.b_algo a.tilk")
-            results = [(u, t) for u, t in results if "bing.com" not in u and "microsoft.com" not in u]
-            if results and not await self.show(sc):                   # only a results page is worth showing
-                results = []
-        if not results:
-            wiki = "https://en.wikipedia.org/w/index.php?" + urllib.parse.urlencode({"search": q})
-            if not await self._open(sc, wiki, why, "search", title=f"{q} — Wikipedia"):
-                return False
-            if "/wiki/Special:Search" in sc.page.url:           # a results list: open the first hit next
-                results = await self._links(sc, ".mw-search-result-heading a")
-            else:                                               # an article: leave by one of its sources
-                results = await self._links(sc, "#bodyContent a.external.text, #bodyContent .references a.external")
-                results = [(u, t) for u, t in results if "wikipedia.org" not in u and "wikimedia" not in u
-                           and "archive.org" not in u and "doi.org" not in u]
-                self.rng.shuffle(results)
-            sc.scrolls_left = self.rng.randint(1, 3)
-        else:
-            sc.scrolls_left = 0
-        if results and not self.decide:                     # brain decides: it picks among the results itself
-            u, t = results[min(len(results) - 1, int(self.rng.random() ** 2 * 4))]   # mostly the top results
+    TRIES = 2                                                  # sources tried per search before the fallback
+
+    async def _search(self, sc, q, why="", origin=""):
+        """Search on the source that fits the query (search_sources.route: topic, rotation, per-host limits, robots);
+        if none of the first TRIES gives results, search Wikipedia and leave by one of the article's external sources.
+        `why` ends the card's line ("searched arXiv for “sleep spindles” — from his reading notes")."""
+        tried = []
+        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video")[:self.TRIES]:
+            tried.append(name)
+            if await self._search_on(sc, name, q, why, origin):
+                if not self.decide and sc.info.get("results"):  # brain decides: it picks among the results itself
+                    res = sc.info["results"]
+                    r = res[min(len(res) - 1, int(self.rng.random() ** 2 * 4))]    # mostly the top results
+                    sc.pending_link = (r["url"], f"searched “{q[:40]}”, opened “{r['title'][:50]}”")
+                return True
+        if "wikipedia" in tried or not self.limits.allow("en.wikipedia.org"):
+            return False
+        self.limits.note("en.wikipedia.org")
+        wiki = "https://en.wikipedia.org/w/index.php?" + urllib.parse.urlencode({"search": q})
+        if not await self._open(sc, wiki, f"searched Wikipedia for “{q[:50]}”" + (f" — {why}" if why else ""),
+                                "search", title=f"{q} — Wikipedia"):
+            return False
+        if "/wiki/Special:Search" in sc.page.url:               # a results list: open the first hit next
+            results = await self._links(sc, ".mw-search-result-heading a")
+        else:                                                   # an article: leave by one of its sources
+            results = await self._links(sc, "#bodyContent a.external.text, #bodyContent .references a.external")
+            results = [(u, t) for u, t in results if "wikipedia.org" not in u and "wikimedia" not in u
+                       and "archive.org" not in u and "doi.org" not in u]
+            self.rng.shuffle(results)
+        sc.scrolls_left = self.rng.randint(1, 3)
+        self.limits.count("wikipedia", q, origin)
+        if results and not self.decide:
+            u, t = results[min(len(results) - 1, int(self.rng.random() ** 2 * 4))]
             sc.pending_link = (u, f"searched “{q[:40]}”, opened “{t[:50]}”")
+        return True
+
+    async def _search_on(self, sc, name, q, why, origin):
+        """One search on one source: robots.txt and the per-host limit first, then its results page (or its JSON API
+        plus the page for the screen, or its home page's own search box); results parsed and guarded. True when a
+        results page with at least one safe result is on the screen."""
+        src = SS.SOURCES[name]
+        label = src["label"]
+        line = f"searched {label} for “{q[:50]}”" + (f" — {why}" if why else "")
+        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
+        if src.get("site"):                                     # the site's own search box (#40's rules)
+            host = SS.host_of(name)
+            if not self.limits.allow(host):
+                self.limits.refuse(name, "rate limit")
+                return False
+            self.limits.note(host)
+            if not await self._open(sc, src["site"], line, "page", shoot=False):
+                return False
+            self.limits.note(host)
+            if not await self._site_search(sc, q, line):
+                self.limits.refuse(name, self.last_skip or "site search failed")
+                return False
+            results = src["parse"](await sc.page.content(), sc.page.url)
+            shown = True                                        # _site_search's page is on the screen already
+        else:
+            shown = False
+            url = src["url"](q)
+            api = src["api"](q) if src.get("api") else None
+            for u in filter(None, (url, api)):
+                if not await self.robots.check(u, fetch, self.limits):
+                    self.limits.refuse(name, "robots.txt")
+                    self.last_skip = "robots.txt"
+                    return False
+            hosts = {urllib.parse.urlsplit(u).hostname for u in filter(None, (url, api))}
+            if not all(self.limits.allow(h) for h in hosts):
+                self.limits.refuse(name, "rate limit")
+                return False
+            results = []
+            if api:                                             # results from the public JSON API (not shown)
+                self.limits.note(urllib.parse.urlsplit(api).hostname)
+                status, text = await fetch(api)
+                results = src["parse"](text, api) if status == 200 else []
+                if not self.safe_results(results):
+                    self.limits.refuse(name, "no results")
+                    return False
+            self.limits.note(urllib.parse.urlsplit(url).hostname)
+            if not await self._open(sc, url, line, "search", title=f"{q} — {label}", min_text=0, shoot=False):
+                return False
+            if not api:
+                results = src["parse"](await sc.page.content(), sc.page.url)
+        safe = self.safe_results(results)
+        if not safe:
+            self.limits.refuse(name, "no results")
+            self.last_skip = "no results"
+            await self._leave(sc)
+            return False
+        sc.info = dict(sc.info, kind="search", title=f"{q} — {label}"[:140], results=safe[:SS.MAX_RESULTS],
+                       search={"source": name, "engine": label, "query": q, "from": SS.ORIGINS.get(origin, "")},
+                       search_box=False)
+        sc.scrolls_left = 0
+        if not shown and not await self.show(sc):
+            return False
+        if self.log and self.log[-1].get("url") == sc.info["url"]:   # the visit log says where and what he searched
+            self.log[-1] = dict(self.log[-1], title=sc.info["title"], search=sc.info["search"])
+        self.limits.count(name, q, origin)
         return True
 
     async def _links(self, sc, selector):
@@ -943,12 +1196,21 @@ class Browser:
 
     async def _open(self, sc, url, why, kind, title=None, min_text=80, shoot=True):
         """Load a page; if the guard rejects it, leave it (blank) so nothing of it is shown, scrolled or followed."""
-        if not url_ok(url):
+        if not url_ok(url) or VO.private_url(url):
             return False
+        if self._session(url) and not VO.link_ok(url):          # #60: re-checked just before it is opened
+            self.last_skip = "action"
+            return False
+        await self._use(sc, url)
         page = sc.page
+        self.login_redirect = None
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         except Exception as e:
+            if sc.site and self.login_redirect == sc.site:
+                await self._logout(sc, "sent to log in")
+                self.last_skip = "logged out"
+                return await self._leave(sc)
             if "Timeout" not in repr(e):
                 print(f"browse: could not open {url[:80]}: {repr(e)[:100]}", flush=True)
                 self.last_skip = "did not load"
@@ -967,12 +1229,23 @@ class Browser:
         await page.evaluate(UNBLOCK_JS)
         if not url_ok(page.url):
             return await self._leave(sc)
+        if sc.site:                                                    # #60: logged in
+            s = self.sessions.get(sc.site)
+            if s is not None and s.looks_signed_out(await page.evaluate(SE.SIGNED_OUT_JS,
+                                                                         SE.SIGNED_OUT_SELECTORS[sc.site])):
+                await self._logout(sc, "signed out")
+                self.last_skip = "logged out"
+                return await self._leave(sc)
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
                   else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
                   or await self._login_walled(page, body) else None)
+        if reason == "sign-in wall" and sc.site:                       # #60: the session no longer works
+            await self._logout(sc, "login wall")
+        if not reason and sc.site and not video_text_ok(re.sub(r"\s*[-|]\s*(YouTube|TikTok)$", "", page_title)):
+            reason = "guard"                                           # captions, hashtags, creators (#56 guard)
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             self.last_skip = reason
@@ -1031,6 +1304,8 @@ class Browser:
                     if k is None:
                         continue
                     b = next(x for x in buttons if x["i"] == k)
+                    if sc.site and VO.action_target(label=b.get("label") or b.get("aria") or ""):
+                        continue                                # #60: logged in, never an action button
                     await frame.evaluate("i => { const el = document.querySelector(`[data-sub01-btn=\"${i}\"]`); "
                                          "if (el) el.click(); }", k)
                 except Exception:
@@ -1080,10 +1355,29 @@ class Browser:
             pass
         return False
 
+    async def _private_ok(self, sc):
+        """#60: nothing private reaches the screen (the URL, then the DOM), and on a logged-in site the account's
+        avatar, name and action buttons are hidden just before the screenshot. False: the page was left."""
+        page = sc.page
+        why = VO.private_url(page.url)
+        if not why and sc.site:
+            why = VO.private_dom(await page.evaluate(VO.PRIVATE_DOM_JS, VO.PRIVATE_SELECTORS))
+        if why:
+            print(f"browse: left {urllib.parse.urlsplit(page.url).hostname} (private page: {why})", flush=True)
+            self.last_skip = "private"
+            await self._leave(sc)
+            return False
+        if sc.site:
+            await page.evaluate(VO.ADD_STYLE_JS, VO.HIDE_ACCOUNT_CSS)   # once per document, also after SPA moves
+            await page.evaluate(VO.HIDE_ACCOUNT_JS)
+        return True
+
     async def _shoot(self, sc):
         if await self._walled(sc.page):                                 # a page can turn into a bot check later
             print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
             await self._leave(sc)
+            return False
+        if not await self._private_ok(sc):
             return False
         sc.shot = await sc.page.screenshot(type="jpeg", quality=72 if sc.name == "desk" else 68)
         sc.shot_id += 1

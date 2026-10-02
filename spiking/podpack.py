@@ -21,7 +21,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE = "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"
 GPUS = ("NVIDIA RTX A5000", "NVIDIA RTX 4000 Ada Generation",   # validated
-        "NVIDIA A40", "NVIDIA RTX A4500", "NVIDIA GeForce RTX 4090", "NVIDIA L40")   # fallbacks: >= 20 GB, < $0.85/h
+        "NVIDIA A40", "NVIDIA RTX A4500", "NVIDIA GeForce RTX 4090", "NVIDIA L40",   # fallbacks: >= 20 GB, < $0.85/h
+        "NVIDIA RTX A4000", "NVIDIA L4")                        # 1M neurons use 5.7 GB (day-live list, #58)
+CLOUDS = ("SECURE", "COMMUNITY")
 MAX_CHARS = 900_000
 REST_PREFIX = "out/rest/"
 STATIC_FILES = ["spiking/region_volumes.json", "real_baseline.py", "out/connectome.npz", "out/atlas_names.json"]
@@ -196,13 +198,14 @@ def start_cmd(module="spiking.session"):
     return ["bash", "-c", script]
 
 
-def create_body(env, name, gpu="NVIDIA RTX A5000", module="spiking.session"):
-    """RunPod create-pod JSON: one on-demand secure-cloud GPU, no volume, port 8000 proxied.
+def create_body(env, name, gpu="NVIDIA RTX A5000", module="spiking.session", cloud="SECURE"):
+    """RunPod create-pod JSON: one on-demand GPU (secure cloud unless asked), no volume, port 8000 proxied.
 
     With a bootstrap env (SUB01_BOOT) the pod waits for the pack upload; otherwise it unpacks SUB01_PACK_* itself."""
     assert gpu in GPUS, f"GPU type not allowed: {gpu}"
+    assert cloud in CLOUDS, f"cloud type not allowed: {cloud}"
     body = {"name": name, "imageName": IMAGE, "gpuTypeIds": [gpu], "gpuCount": 1, "interruptible": False,
-            "cloudType": "SECURE", "containerDiskInGb": 30, "volumeInGb": 0, "ports": ["8000/http"],
+            "cloudType": cloud, "containerDiskInGb": 30, "volumeInGb": 0, "ports": ["8000/http"],
             "env": dict(env), "dockerStartCmd": boot_cmd() if "SUB01_BOOT" in env else start_cmd(module)}
     assert len(json.dumps(body)) < 90_000, "create request too large for RunPod (~100 KB limit)"
     return body

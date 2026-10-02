@@ -8,7 +8,7 @@ its pick, every pool's rate and the simulated decision time. brain_vote.vote add
 (SPIKING_W) next to the rate model's value, the taste and the novelty; the rate model stays the main decider.
 
 Why numpy and not spiking/net.py: torch is not in the server image (it would add ~700 MB), and at 20k neurons an
-event-driven numpy step is fast enough (~0.3 ms per simulated ms on one core, measured in docs/spiking/live.md).
+event-driven numpy step is fast enough (~0.3 ms per simulated ms on one core, measured in docs/spiking/live_cpu.md).
 net.py and this file share the numpy construction (wiring.py), so the synapses are identical; the dynamics are the
 same LIF equations, without the recorded resting-state drive (the day network idles between decisions and gets the
 plain background drive).
@@ -559,7 +559,7 @@ def handle(brain, line, send):
               "error": f"{type(e).__name__}: {str(e)[:120]}"})
 
 def synthetic(brain, trials=100, seed=0, follow=0.7, vocab=None, probs=None, alpha=0.1, kmin=2, kmax=6):
-    """A synthetic reward stream for checks (tests, docs/spiking/live.md): `vocab` labels with hidden reward
+    """A synthetic reward stream for checks (tests, docs/spiking/live_cpu.md): `vocab` labels with hidden reward
     probabilities; each decision offers a random 2-6 of them; the option followed is the network's pick with
     probability `follow` (else a random offered one, standing in for the rate model); reward ~ Bernoulli(p); dopamine
     = r - V[label], V += alpha (r - V) (a slow value estimate, like the tastes' prediction). Scored: the network's

@@ -1,4 +1,4 @@
-"""Numbers for docs/spiking/live.md (#55): the daytime spiking network on one CPU core, numpy only.
+"""Numbers for docs/spiking/live_cpu.md (#55): the daytime spiking network on one CPU core, numpy only.
 
     python docs/spiking/live/run_live_checks.py cost          # build, CPU per decision (with the frozen twin)
     python docs/spiking/live/run_live_checks.py learn SEED [ETA_HALF]   # synthetic stream, 20k, 150 decisions

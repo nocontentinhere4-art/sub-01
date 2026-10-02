@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 12:00 UTC** (pass 26, final for the task list). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 14:40 UTC** (pass 28b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -223,6 +223,31 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: music through Spotify's official embed only** (owner asked for Spotify). The server never streams,
+  downloads or relays audio. Visitors press play on their own device: a 30 s preview, or the full track if they are
+  logged in to Spotify. His brain model picks tracks among candidates (#68). Optional `SPOTIFY_CLIENT_ID/SECRET` (free
+  developer app); otherwise a curated list of playlists.
+- **2026-10-02: social accounts, both uses** (owner).
+  - (a) Official SUB-01 accounts post daily AI-labelled clips (#59): manual, or the official APIs once approved.
+  - (b) He browses logged in to his own TikTok/YouTube, view-only (#60, after #56). No likes, follows, comments or
+    DMs, and private pages never reach a public screen.
+  - The owner creates the accounts; Claude cannot sign up. Terms-of-service ban risk on (b) is accepted; he falls back
+    to logged out.
+- **2026-10-02: browse like a real young guy, no restrictions** (owner; this supersedes the earlier same-day note).
+  - Variety comes from an interest profile, the daily rhythm, boredom and novelty; there are no external topic quotas.
+  - YouTube (incl. Shorts) and TikTok, logged out: muted, bounded, sign-in walls left.
+  - All crypto and finance pages are read-only allowed, including exchanges, DEX, launchpads and this project's own
+    coin.
+  - Kept, non-negotiable:
+    - the guard's harmful categories (adult, gore, self-harm, extremism, illegal), because the screens are public;
+    - no actions with money: no wallet, no buy/sell/swap/connect/sign clicks, no logins, typing only into search boxes;
+    - no financial advice in his words, and "nothing here is financial advice" on finance pages, to protect the owner
+      legally.
+  - Task #56.
+- **2026-10-02: the 1M spiking network runs on GPU through his waking hours** (owner's choice: ≈ $4–14/day,
+  ≈ $130–400/month). Off in code until `SUB01_DAY_LIVE=1`. Caps: `SUB01_DAY_MAX_HOURS` 17/day, `SUB01_GPU_USD_PER_DAY`
+  $14, 120 GPU-h/week, ≤ 6 restarts/day. One pod at a time; never the pod "BRAIN". The fallback is the 20k CPU network
+  (#55), then the rate model. Task #58.
 - **2026-10-02: #15 goes before #17.** After the outage, a health check and the Railway healthcheck path matter more
   than YouTube and chess.
 - **2026-10-02: review checklist gains "new module → Dockerfile COPY".** After the #45 incident, every PR that adds a
@@ -233,6 +258,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - ~~Map tiles~~: fixed by #47 (static vector map).
 - **YouTube walk footage on /life** showed "error 153" in headless Chromium (a missing Referer?). Check it on the real
   site before launch.
+- ~~Dark rectangle top-left in the room~~: not visible on a real GPU (owner's screenshot, 2026-10-02); headless only.
 - ~~CPU~~: fixed by #48. The whole server is ~9 ms per 50 ms tick (~18 % of a core), leaving room for Chromium.
 - **Bandwidth at launch:** after #34, 7.3 KB/s per brain-page viewer and 4.0 KB/s per room viewer. 300 steady viewers ≈
   1.6 MB/s ≈ 140 GB/day of Railway egress: watch the bill after launch. The per-IP cap (4) trusts the first
@@ -267,6 +293,36 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 28b:** merged #66 (#60): logged-in, view-only TikTok and YouTube from the `SUB01_SESSION_*` secrets.
+Chromium's env is scrubbed, cookies are domain-scoped, actions and private pages are blocked, and the avatar is
+hidden. 789 tests. After deploy, `/api/browsing` → `accounts.tiktok` should read "logged in". #63 now also covers
+real food: props, courier bags, dishes, hand-to-mouth eating.
+
+**Pass 28:** merged #64 (#56 part 1): 10 free search sources routed by topic, ≤ 20 requests/host/hour, follow-up
+searches, and queries from notes, reading, taught words, tastes and chat. Searches 31 → 52/hour, with no paid calls on
+result pages. Parsers are fixture-tested only; check `/api/browsing` after deploy. Next: #56 part 2 (variety, TikTok
+and Shorts, finance) and #60 integration, both in browse.py.
+
+**Pass 27c:** the owner's live screenshot (23:05 Tokyo) shows the site up after the #49 fix, with the mind plan,
+the teach card and the static map live. It also shows no dark rectangle on a real GPU, so it was a SwiftShader-only
+artifact. He stood frozen while ordering food: `phone_stand` is a `still()` pose in the middle of the room. New #63
+(natural movement: no frozen poses, living idles, smooth transitions) is started. The owner set `SUB01_SESSION_TIKTOK`;
+#60 is started, with new files first and integration after #56.
+
+**Pass 27b:** merged #61 (#57): he eats before chatting. In the coordinator's re-run, minutes above meal time with
+chat waiting went 124–211 → **0** (9 runs); deliveries are eaten within 2 min; a 24 h konbini. New tasks:
+- #59 daily clips for the official social accounts (started);
+- #60 logged-in, view-only TikTok/YouTube (after #56);
+- #62 active neurons inside the 3D brain (after #55 and #58).
+The owner has created the TikTok account.
+
+**Pass 27 (owner: "turn his neurons on, more things, more internet searching", "is he fed?", "I want the big one"):**
+new tasks:
+- #55: a small spiking network on the server CPU votes and learns live; it is the fallback for #58;
+- #56: many more free search sources, with queries from memory, wishes and taught words;
+- #57: he went hungry while chatting (147 min/day above meal time with chat waiting); fix with needs first and a 24 h konbini;
+- #58: the 1M network on GPU through his waking hours.
 
 ## Launch readiness (2026-10-02, after pass 26)
 **All task issues are closed and no PRs are open.** 27 PRs were merged today, #27–#54: attribution, tastes page,

@@ -1,4 +1,4 @@
-# SUB-01 — handoff for new sessions (state on 2026-10-01)
+# SUB-01 — handoff for new sessions (state on 2026-10-02)
 
 Read this first. It replaces the local memory that cloud sessions cannot see.
 
@@ -124,6 +124,38 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   music, science and video pages; Wikipedia's external sources and pagination / comment links keep a place among the
   40 links. Costs unchanged: 1 eyes call per page, 30/hour, $1.00/Tokyo day.
 
+## More of the internet (#56, PR `feature/more-search`)
+- `search_sources.py` (pure: parsers, routing, limits, robots, queries; no network): searches go to Bing (SafeSearch
+  strict), DuckDuckGo HTML (`kp=1`), Wikipedia search, Wikimedia Commons (images), arXiv listing search, Hacker News
+  (the Algolia API for results, its page for the screen), Open Library (subject pages + their JSON: robots.txt
+  disallows Open Library's `/search` and `/api`), YouTube results (Restricted Mode cookie as #53), and through their
+  own search box (#40's `site_search` rules) RecipeTin Eats and Science News (robots.txt rules out AP News', Just One
+  Cookbook's, King Arthur's and the Guardian's search pages). No keys, nothing paid.
+- `route(q)`: topic regexes pick the fitting sources (science → arXiv, book → Open Library, how-to → DuckDuckGo,
+  recipe → RecipeTin Eats, images → Commons, tech → HN, video → YouTube, "what is" → Wikipedia), the general engines
+  follow; the least used fitting source in the last hour goes first. `Limits`: ≤ 20 requests per host per rolling hour
+  (`PER_HOST_HOUR`; results pages, API calls and robots.txt all count), searches per source per Tokyo day, refusals
+  (robots / rate limit / no results). Saved with the browsing log (`browsing.json` → `searches`) and restored on a
+  browser restart. `Robots`: robots.txt fetched once a day per host through `Browser._fetch` (the guard: public
+  hosts only, every redirect re-checked); also checked before typing into any site's search box.
+- `browse.py`: `_search` tries the first 2 routed sources, then the old Wikipedia fallback. Results are parsed from
+  the page HTML (or the JSON API) and every URL / title / snippet passes `Browser.safe_results` (url_ok, login links,
+  display_ok, blocked words; videos also the chat filter) before the brain sees it. The card: "searched arXiv for
+  “sleep spindles” — from his reading notes"; `info.search` = {source, engine, query, from}; the visit log carries it.
+- Queries (`live_interest`, a one-line hook in `run_browse`): mind.next_interest() (weight 3, all 1–3 queries),
+  what he was reading (1), words taught in the last 2 days (1.5), favoured taste words (1); each through
+  `eyes.query_ok`. Chat wishes ("look up …", "what is …?", `search_sources.wish`) are searched as asked, filtered.
+  `_next` searches more often (search 48 %, link 40 %, seed 12 %; was 25/55/20).
+- `eyes.py`: a results page never costs a call: `result_options` builds the options from the result titles +
+  snippets (lexicon networks), one refined search from the results' words, back, leave. On content pages
+  `with_follow_ups` adds ≤ 2 searches from the page's own words (`follow_ups`: a name, "what is <term>?") in place
+  of the last options (still ≤ 6, leave kept). `analysis/search_budget.py` (model, uniform vote): searches/hour
+  31 → 52, eyes calls on results pages 9.1/h → 0, content pages with AI options 29 % → 45 %, cost unchanged
+  ($0.076 per desk-hour at the 30/h cap: $1.00 lasts ~13 desk-hours).
+- `/api/browsing` adds `searches` (per source today, per host last hour, refusals, the last 10 searches).
+- Fixtures: `tests/data/search/` (saved 2026-10-02); `tests/test_more_search.py`. A source's markup can change:
+  a parser that finds nothing makes the search fall through to the next source (and `refused_today` says so).
+
 ## YouTube and chess at the desk (#17, PR `feature/youtube-chess`)
 - `life.py`: two more activities chosen by needs, `watch_video` (boredom, visual response, a chat wish; only with a
   browser: `Life.can_watch`) and `play_chess` (attention, a chat wish; at most one game per simulated hour,
@@ -169,7 +201,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
 
-## His spiking neurons in the day (#55, `docs/spiking/live.md`)
+## His spiking neurons in the day (#55, `docs/spiking/live_cpu.md`)
 - `spiking/live.py`: a 20k-neuron spiking network runs in a child process (`python -m spiking.live`). It uses numpy and
   the same construction as `net.py` via `spiking/wiring.py`, no torch. It speaks the decision protocol shared with #58
   (decide / decision / reward, JSON lines) and streams `{"type":"spiking","net":"cpu"}` frames to the Neurons panel.
@@ -182,6 +214,23 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `/api/spiking/live` feeds the "In the day" part of the Neurons card. `SUB01_SPIKING_LIVE=0` turns the CPU network off.
 - Measured: tick 8.8–9.5 ms vs 8.9–9.2 on main. The child uses ~0.4 CPU-s per decision and 1.4–2 % of a core
   between decisions (its idle pulse).
+
+## Logged-in TikTok and YouTube, view-only (#60)
+- `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
+  / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is
+  unexpired; a sign-in button, a login wall or a redirect to a login page logs that site out until the next restart
+  (one log line). Values are never logged or returned; YouTube keeps Restricted Mode (`PREF f2=8000000` replaces the
+  session's PREF). Without the variables nothing changes.
+- `browse.py`: per screen, one in-memory context per logged-in site (`Screen.sites`) alongside the logged-out one
+  (`Screen.public`); `_open` picks the context by URL (`_use`). Logged-in contexts only navigate on their own domains
+  and never to a private URL (`_site_route`). The env vars reach the browse service process (`browse_service.ENV_KEEP`)
+  but never Chromium (`browse.CHROMIUM_ENV`).
+- `view_only.py`: private pages (URL in `_open` and in the route, DOM + URL before every screenshot in `_private_ok`),
+  action links never offered (`pick_links`, `result_page`) or opened (`_open`), dismiss buttons never an action, and
+  the avatar / name / action buttons hidden before every screenshot (`HIDE_ACCOUNT_CSS`, `HIDE_ACCOUNT_JS`). Titles on
+  a logged-in site (captions, hashtags, creators) pass `video_text_ok`.
+- `/api/browsing` → `accounts`: `{"tiktok": {"state": "logged in" | "logged out", "reason"}}`. Risk note and cookie
+  refresh steps in `docs/OPERATIONS.md`.
 
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.

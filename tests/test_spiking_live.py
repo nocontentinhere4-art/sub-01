@@ -284,7 +284,13 @@ def test_backend_asks_gpu_then_cpu_then_falls_back_to_the_rate_model(tmp_path):
         for gans in (None, RuntimeError("pod gone"), {"pick": 0, "pool_rates": [1.0]}):   # down, failing, wrong
             a = await V.Backend(cpu=FakeCPU(), gpu=FakeGPU(gans)).ask(opts)
             assert a["net"] == "cpu" and a["pick"] == 1
-        a = await V.Backend(cpu=FakeCPU(), gpu=object()).ask(opts)       # #58 not merged yet: no day_live_decide
+        a = await V.Backend(cpu=FakeCPU(), gpu=object()).ask(opts)       # a GPU object without day_live_decide
+        assert a["net"] == "cpu"
+        a = await V.Backend(cpu=FakeCPU(), gpu=FakeGPU({"id": "g-8", "pick": 1, "pool_rates": None})).ask(opts)
+        assert a["net"] == "gpu" and a["id"] == "g-8"                    # #58 may send a pick without rates
+        assert V.spiking_term(a, 3).tolist() == [-0.5, 1.0, -0.5]
+        from spiking import pod_manager                                    # the real #58 API: off -> None at once
+        a = await V.Backend(cpu=FakeCPU(), gpu=pod_manager).ask(opts)
         assert a["net"] == "cpu"
         a = await V.Backend(cpu=FakeCPU(up=False), gpu=FakeGPU(None)).ask(opts)
         assert a["net"] == "rate" and "offline" in a["why"]

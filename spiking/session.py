@@ -4,12 +4,19 @@ Loads the learned weights (from the server, or none), runs the phases, streams c
 a websocket authenticated with SUB01_POD_SECRET, writes /out/status.json + /out/results.json (read by
 validate / pod_manager through the pod's port 8000) and uploads the learned weights at the end.
 Phases: bench, rates, delays, recall_yesterday, encode, pong_train, pong_exam, choice_train, choice_exam,
-memory_test, sleep, free.
+memory_test, sleep, free, live_decide, live_bench.
 Items (cfg "items") are the day's chat messages and readings, each {text, source: chat|reading, item}; a reading's
 text is its title + keywords. recall_yesterday tests the previous session's items before anything new is stored.
 In validate mode extra controls run (no-plasticity Pong, random paddle, sleep without replay).
 choice_train / choice_exam (spiking/choice.py): the K-armed choice task with its controls (frozen network on the
-same trials, random chooser, reversal halfway).
+same trials, random chooser, reversal halfway). With cfg "decisions" (the day's real decisions, #58) choice_train
+replays them instead.
+Day mode (#58, docs/spiking/live.md): live_decide keeps the network running (at most at real time) through his
+waking hours and answers the server's {"type": "decide"} messages with the race on the real option labels
+(choice.LiveChooser); {"type": "reward"} applies the dopamine to that decision. The learned weights are uploaded
+every `upload_every_min` (30) minutes and at the end. {"type": "night", "day", "items", "decisions"} ends the
+phase; the remaining phases (the night: recall_yesterday, encode, choice_train on the day's decisions, sleep,
+memory_test) then run on the same pod with that config.
 """
 import json
 import math
@@ -20,13 +27,14 @@ import threading
 import time
 import traceback
 import urllib.request
+from collections import OrderedDict, deque
 from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
 import torch
 
-from .choice import ChoiceTask, RewardSchedule, random_chooser, summarize
+from .choice import ChoiceTask, LiveChooser, RewardSchedule, random_chooser, replay_fit, summarize
 from .config import Config
 from .memory import MemorySystem, sleep_block, words
 from .net import SpikingNet
@@ -35,6 +43,10 @@ from .pong import Pong, random_paddle, tracking_paddle
 ROOT = Path(__file__).resolve().parent.parent
 GROUP_KEYS = ("visual", "somatomotor", "attention", "salience", "limbic", "control", "default", "reward", "fear",
               "memory", "relay", "language")
+MAX_OPTIONS = 8                     # a decide message with more options is refused
+MAX_PENDING = 256                   # decisions waiting for their reward (oldest dropped)
+PENDING_S = 3 * 3600                # a reward later than this finds no eligibility left
+MAX_DECISIONS = 400                 # real decisions replayed at night
 
 
 class StopSession(Exception):
@@ -49,6 +61,7 @@ class Link:
         self.server, self.secret, self.sid = server.rstrip("/"), secret, session_id
         self.out, self.inbox = queue.Queue(maxsize=200), queue.Queue()
         self.connected = False
+        self.connects = 0                                                # live_decide re-announces itself on each
         self.stop = threading.Event()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -67,6 +80,7 @@ class Link:
                 async with aiohttp.ClientSession() as http, http.ws_connect(url, headers=headers, heartbeat=20,
                                                                            max_msg_size=1 << 20) as ws:
                     self.connected = True
+                    self.connects += 1
 
                     async def reader():
                         async for m in ws:
@@ -141,6 +155,14 @@ class Session:
         self.stage = "AWAKE"
         self.chat_until = -1
         self.stopping = False
+        self.live = None                    # choice.LiveChooser (live_decide, night replay)
+        self.decide_q, self.reward_q = deque(), deque()
+        self.pending = OrderedDict()        # decision id -> (wall time, eligibility)
+        self.night = None                   # the night message once received
+        self.live_stats = {"decisions": 0, "rewards": 0, "late": 0, "refused": 0, "unknown_reward": 0,
+                           "wall_ms": [], "uploads": 0, "upload_errors": 0}
+        self._upload = None                 # background weight upload thread
+        self.live_rt = None                 # live_decide: simulated / wall time
         self.status()
 
     # --- status / streaming -------------------------------------------------------------------------------------
@@ -207,6 +229,15 @@ class Session:
         if kind == "stop":
             self.stopping = True
             raise StopSession("stop requested")
+        if kind == "decide":
+            self.decide_q.append((msg, time.time()))
+            return
+        if kind == "reward":
+            self.reward_q.append(msg)
+            return
+        if kind == "night":
+            self.night = msg
+            return
         if kind == "good" and self.pong is not None and self.phase in ("pong_train", "free"):
             self.pong.good()
         elif kind == "sleep" and msg.get("stage") in ("AWAKE", "NREM", "REM"):
@@ -455,7 +486,10 @@ class Session:
 
     def ph_choice_train(self):
         """Frozen control on the same trials first (no weight change), then training with dopamine; reversal halfway;
-        a random chooser on the same schedule. All three in one result, whatever the numbers are."""
+        a random chooser on the same schedule. All three in one result, whatever the numbers are. With the day's
+        real decisions in cfg "decisions" (day mode), they are replayed instead (ph_choice_replay)."""
+        if self.cfg.get("decisions"):
+            return self.ph_choice_replay()
         task = self._choice()
         n = int(self.cfg.get("choice_trials", 200))
         rev = n // 2 if self.cfg.get("choice_reversal", True) else None
@@ -477,6 +511,54 @@ class Session:
         self.log("learned", out["learned"]["trials_to_criterion"], out["learned"].get("trials_to_criterion_after_reversal"),
                  "frozen", out["frozen"]["frac_correct"], "random", out["random"]["frac_correct"])
         self.result("choice_curve", out)
+
+    def real_decisions(self):
+        """cfg "decisions" with a reward, at most MAX_DECISIONS (the latest): [{options, pick, reward}]."""
+        out = []
+        for d in self.cfg.get("decisions") or []:
+            try:
+                opts = [str(o)[:200] for o in d["options"]][:MAX_OPTIONS]
+                pick, rew = int(d["pick"]), d.get("reward")
+            except (KeyError, TypeError, ValueError):
+                continue
+            if len(opts) >= 2 and 0 <= pick < len(opts) and isinstance(rew, (int, float)) and math.isfinite(rew):
+                out.append({"options": opts, "pick": pick, "reward": float(rew)})
+        return out[-MAX_DECISIONS:]
+
+    def ph_choice_replay(self):
+        """Night replay of the day's real decisions: each offer is presented again, the option he really took is
+        tagged as chosen and its real outcome is the dopamine (LiveChooser rule). Before and after, frozen: how
+        often the network's own pick agrees with the outcomes (choice.replay_fit). Reported whatever it is."""
+        live = self._live()
+        decs = self.real_decisions()
+        passes = max(1, int(self.cfg.get("replay_passes", 1)))
+        p = self.net.plast
+
+        def frozen_picks():
+            was = p.frozen if p is not None else None
+            if p is not None:
+                p.frozen = True
+            try:
+                return [live.decide(d["options"], learn=False)["pick"] for d in decs]
+            finally:
+                if p is not None:
+                    p.frozen = was
+        before = replay_fit(decs, frozen_picks())
+        agree = 0
+        for k in range(passes):
+            for i, d in enumerate(decs):
+                r = live.decide(d["options"], learn=True, force=d["pick"])
+                agree += int(r["pick"] == d["pick"])
+                live.reward(r["elig"], d["reward"])
+                self.net.run(100)
+                self.progress = (k * len(decs) + i + 1) / max(1, passes * len(decs))
+        after = replay_fit(decs, frozen_picks())
+        self.result("choice_replay", {"decisions": len(decs), "passes": passes,
+                                      "rewarded": sum(d["reward"] > 0 for d in decs),
+                                      "punished": sum(d["reward"] < 0 for d in decs),
+                                      "fit_before": before[0], "fit_after": after[0], "fit_n": after[1],
+                                      "own_pick_agreed_during_replay": round(agree / max(1, passes * len(decs)), 4),
+                                      "calibration": live.calib, "labels_valued": len(live.V)})
 
     def ph_choice_exam(self):
         """Frozen exam on the current hidden probabilities (after the reversal if training reversed), the same exam
@@ -505,6 +587,210 @@ class Session:
         self.result("choice_exam", {"label": "after training (frozen)", "probs": probs, **exam,
                                     "controls": {"no_learning": ctrl["frac_correct"] if ctrl else None,
                                                  "random": rnd["frac_correct"], "chance": round(1.0 / task.k, 4)}})
+
+    # --- day mode: live decisions (#58) ----------------------------------------------------------------------------
+    def _live(self):
+        if self.live is None:
+            c = self.cfg
+            kw = {k[len("live_"):]: c[k] for k in ("live_thr_z", "live_eta", "live_eta_min", "live_eta_tau",
+                                                     "live_alpha", "live_timeout_ms", "live_cue_amp") if k in c}
+            self.live = LiveChooser(self.net, **kw)
+            if self.net.plast is not None:
+                self.live.from_meta(self.net.plast.meta.get("live_choice"))
+            self.live.calibrate()
+            self.log("live chooser calibrated:", self.live.calib)
+        return self.live
+
+    def drain(self, timeout=0.0):
+        """Commands from the server outside net.run (the hook reads them during it); waits up to `timeout` s."""
+        if self.link is None:
+            if timeout > 0:
+                time.sleep(timeout)
+            return
+        try:
+            msg = self.link.inbox.get(timeout=timeout) if timeout > 0 else self.link.inbox.get_nowait()
+        except queue.Empty:
+            return
+        self.command(msg)
+        while True:
+            try:
+                msg = self.link.inbox.get_nowait()
+            except queue.Empty:
+                return
+            self.command(msg)
+
+    def answer(self, msg, received):
+        """One decide message -> one decision message (also when it is too late: the server drops it)."""
+        st = self.live_stats
+        did = str(msg.get("id", ""))[:64]
+        opts = msg.get("options")
+        if not did or not isinstance(opts, list) or not 2 <= len(opts) <= MAX_OPTIONS:
+            st["refused"] += 1
+            if self.link is not None:
+                self.link.send({"type": "decision", "id": did, "error": "bad decide message"})
+            return None
+        late = (time.time() - received) * 1000 > float(msg.get("deadline_ms") or 2000)
+        if late:                                         # its deadline passed while queued: do not spend sim on it
+            st["late"] += 1
+            if self.link is not None:
+                self.link.send({"type": "decision", "id": did, "error": "late"})
+            return None
+        r = self._live().decide([str(o)[:200] for o in opts], learn=True)
+        wall_ms = round((time.time() - received) * 1000, 1)
+        self.pending[did] = (time.time(), r["elig"])
+        while len(self.pending) > MAX_PENDING:
+            self.pending.popitem(last=False)
+        st["decisions"] += 1
+        st["wall_ms"] = (st["wall_ms"] + [wall_ms])[-500:]
+        out = {"type": "decision", "id": did, "pick": r["pick"], "pool_rates": r["pool_rates"], "sim_ms": r["sim_ms"],
+               "n_neurons": self.net.n, "wall_ms": wall_ms, "timeout": r["timeout"]}
+        if self.link is not None:
+            self.link.send(out)
+        return out
+
+    def apply_reward(self, msg):
+        did = str(msg.get("id", ""))
+        got = self.pending.pop(did, None)
+        try:
+            value = float(msg.get("value"))
+        except (TypeError, ValueError):
+            value = float("nan")
+        if got is None or time.time() - got[0] > PENDING_S or not math.isfinite(value):
+            self.live_stats["unknown_reward"] += 1
+            return None
+        self.live_stats["rewards"] += 1
+        return self._live().reward(got[1], value)
+
+    def weights_meta(self):
+        meta = {**self.mem.to_meta(), "last_day": self.cfg.get("day"),
+                "sessions": int(self.net.plast.meta.get("sessions", 0)) + 1}
+        if self.live is not None:
+            meta["live_choice"] = self.live.to_meta()
+        return meta
+
+    def upload_weights(self, reason="periodic"):
+        """Save the learned weights now and upload them in a background thread (skipped while one is running)."""
+        net = self.net
+        if net.plast is None or self.link is None or (self._upload is not None and self._upload.is_alive()):
+            return False
+        path = self.out / "weights.live.npz"
+        net.plast.save(path, {**self.weights_meta(), "sessions": int(net.plast.meta.get("sessions", 0))})
+        st = self.live_stats
+
+        def up():
+            try:
+                self.link.put_weights(path)
+                st["uploads"] += 1
+                self.log("weights uploaded", reason)
+            except Exception as e:
+                st["upload_errors"] += 1
+                self.log("weights upload failed:", type(e).__name__)
+        self._upload = threading.Thread(target=up, daemon=True)
+        self._upload.start()
+        return True
+
+    def live_summary(self):
+        st = self.live_stats
+        w = sorted(st["wall_ms"])
+        pct = (lambda q: w[min(len(w) - 1, int(q * len(w)))] if w else None)
+        return {k: v for k, v in st.items() if k != "wall_ms"} | {
+            "wall_ms_p50": pct(0.5), "wall_ms_p95": pct(0.95), "wall_ms_max": w[-1] if w else None,
+            "labels_valued": len(self.live.V) if self.live else 0, "calibration": self.live.calib if self.live else None,
+            "realtime_x": self.live_rt}
+
+    def ph_live_decide(self):
+        """His waking day: run the network at most at real time and answer decide / reward messages until the
+        night message (or a stop / the deadline). Weights go to the server every upload_every_min minutes."""
+        net = self.net
+        live = self._live()
+        seen = None
+        every = 60.0 * float(self.cfg.get("upload_every_min", 30))
+        chunk = int(self.cfg.get("live_chunk_ms", 20))
+        next_up, next_sum = time.time() + every, time.time() + 300
+        anchor_wall, anchor_t = time.time(), net.t
+        t_wall0, t_sim0 = time.time(), net.t
+        self.live_rt = None
+        while self.night is None:
+            if time.time() > self.deadline:
+                raise StopSession("deadline")
+            if self.link is not None and self.link.connects != seen:  # (re)connected: the hub forgets us
+                seen = self.link.connects
+                self.link.send({"type": "hello", "session": self.cfg.get("session_id") or self.link.sid,
+                                "n_neurons": net.n, "device": self.results["build"]["gpu"] or str(net.device),
+                                "phases": self.cfg.get("phases")})
+                self.link.send({"type": "live_ready", "n_neurons": net.n, "calibration": live.calib})
+            self.drain()
+            while self.decide_q:
+                self.answer(*self.decide_q.popleft())
+            while self.reward_q:
+                self.apply_reward(self.reward_q.popleft())
+            now = time.time()
+            if now >= next_up:
+                next_up = now + every
+                self.upload_weights("periodic")
+            if now >= next_sum:
+                next_sum = now + 300
+                self.live_rt = round((net.t - t_sim0) * net.cfg.dt / 1000.0 / max(1e-6, now - t_wall0), 3)
+                self.result("live", self.live_summary())
+            ahead = (net.t - anchor_t) * net.cfg.dt / 1000.0 - (now - anchor_wall)
+            if ahead > 0:                                # at most real time: wait for messages instead
+                self.drain(timeout=min(ahead, 0.05))
+            else:
+                if ahead < -1.0:                         # slower than real time: never try to catch up in bursts
+                    anchor_wall, anchor_t = now, net.t
+                net.run(chunk)
+        self.live_rt = round((net.t - t_sim0) * net.cfg.dt / 1000.0 / max(1e-6, time.time() - t_wall0), 3)
+        self.result("live", self.live_summary() | {"ended": "night"})
+        self.start_night(self.night)
+
+    def start_night(self, msg):
+        """The night config from the server replaces the day's: its day, items and real decisions."""
+        for k in ("day", "items", "decisions", "elapsed_days"):
+            if k in msg:
+                self.cfg[k] = msg[k]
+        self.log("night:", len(self.cfg.get("items") or []), "items,", len(self.cfg.get("decisions") or []), "decisions")
+
+    def ph_live_bench(self):
+        """GPU benchmark at the live load, no server needed: free-running speed with the live settings (STDP off),
+        then `live_bench_n` decisions among 2-6 random labels with a reward each (decision wall time, sim ms)."""
+        net = self.net
+        live = self._live()
+        rng = np.random.default_rng(int(self.cfg.get("seed", 1)))
+        vocab = ("moon tea bread river chess knight bishop pawn castle music video park museum recipe forum news map "
+                 "ocean snow lamp bird stone rope salt cloud apple garden train station bakery cat dog").split()
+        net.run(200)
+        net.sync()
+        t0, s0 = time.time(), net.t
+        net.run(int(self.cfg.get("bench_ms", 5000)))
+        net.sync()
+        free = (net.t - s0) / (time.time() - t0)
+        walls, sims, tos = [], [], 0
+        n = int(self.cfg.get("live_bench_n", 40))
+        t1, s1 = time.time(), net.t
+        for i in range(n):
+            k = int(rng.integers(2, 7))
+            labels = [" ".join(rng.choice(vocab, size=int(rng.integers(1, 4)), replace=False)) for _ in range(k)]
+            a = time.time()
+            r = live.decide(labels, learn=True)
+            net.sync()
+            walls.append((time.time() - a) * 1000)
+            sims.append(r["sim_ms"])
+            tos += int(r["timeout"])
+            live.reward(r["elig"], float(rng.choice([-1.0, 0.0, 1.0])))
+            net.run(500)
+            self.progress = (i + 1) / n
+        net.sync()
+        mixed = (net.t - s1) / (time.time() - t1)
+        self.result("live_bench", {"gpu": self.results["build"]["gpu"], "n_neurons": net.n,
+                                   "steps_per_s_free": round(free, 1), "realtime_x_free": round(free / 1000.0, 3),
+                                   "steps_per_s_with_decisions": round(mixed, 1),
+                                   "realtime_x_with_decisions": round(mixed / 1000.0, 3), "decisions": n,
+                                   "decision_wall_ms_p50": round(float(np.percentile(walls, 50)), 1),
+                                   "decision_wall_ms_p95": round(float(np.percentile(walls, 95)), 1),
+                                   "decision_wall_ms_max": round(float(np.max(walls)), 1),
+                                   "decision_sim_ms_mean": round(float(np.mean(sims)), 1),
+                                   "timeout_frac": round(tos / n, 3), "calibration": live.calib,
+                                   "gpu_mem_gb": round(net.memory_gb(), 2) if net.memory_gb() else None})
 
     def ph_sleep(self, replay=True, label=None):
         minutes = float(self.cfg.get("sleep_minutes", 4))
@@ -644,9 +930,10 @@ class Session:
         try:
             if net is not None and net.plast is not None:
                 net.hook = None
+                if self._upload is not None:
+                    self._upload.join(timeout=300)                   # a periodic upload must not race the last one
                 wpath = self.out / "weights.npz"
-                info = net.plast.save(wpath, {**self.mem.to_meta(), "last_day": self.cfg.get("day"),
-                                              "sessions": int(net.plast.meta.get("sessions", 0)) + 1})
+                info = net.plast.save(wpath, self.weights_meta())
                 self.results["weights"] = {**info, "stats": net.plast.stats(), "bytes": wpath.stat().st_size}
                 if self.link is not None and not self.cfg.get("validate") and err is None:
                     self.results["weights"]["upload_status"] = self.link.put_weights(wpath)
