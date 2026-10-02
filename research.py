@@ -177,6 +177,12 @@ class Reader:
     def due(self, t):
         return t >= self.next_t and not (self.seen and t - self.seen.get("t", 0) < READ_EVERY_S)
 
+    def record(self, art):
+        """A reading that came from the browser (#79): in the log ("on his mind", /api/reading) like an article."""
+        self.log = (self.log + [art])[-KEEP:]
+        self.history[art["title"]] = art.get("t", 0)
+        return art
+
     def saw(self, status, t):
         """The browser showed a page or a video (a screen status). Only titles fit for the public card are kept."""
         from browse import display_ok

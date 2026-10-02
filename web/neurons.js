@@ -4,6 +4,8 @@
    Data in:
      - Neurons.onMessage(msg) from the page's existing websocket: frames {"type":"spiking", ...state}
        (t_sim, phase, n_neurons, spikes_per_s, mean_rate_hz, realtime_x, groups, raster, pong, dopamine).
+       Since #62 the server sends them compact (spiking/frames.py): the numbers at most once a second, and the
+       raster as n3.sq (3 bytes a recorded spike: region, slot, time); the raster then has one row a region.
      - GET /api/spiking/status on load and every 60 s:
        {live, session, next_session, last:{exam, memory_test, pong_curve, bench}, spend}.
      - GET /api/spiking/live on load and every 60 s (#55): the small daytime network that votes in his choices
@@ -22,6 +24,7 @@ window.Neurons = (() => {
     frozen: "no plasticity", no_learning: "no plasticity" };
   const GROUP_LABEL = { somatomotor: "motor", relay: "thalamus" };
   const LIVE_MS = 10000, WINDOW_MS = 2000, RECENT_MS = 20, CAP = 24000;
+  const NUMBERS = ["n_neurons", "t_sim", "spikes_per_s", "mean_rate_hz", "realtime_x", "groups", "dopamine"];   // once a second
 
   const S = { inited: false, open: true, live: false, lastWall: -1e9, st: null, status: null, raf: 0, timers: [],
     el: {}, tHead: 0, tDraw: 0, rx: 1, rate: 0, prevWall: 0, rows: 1, prevPhase: null, refetch: 0, sized: false,
@@ -63,10 +66,11 @@ window.Neurons = (() => {
     S.el.curve = h("div", "nx-curve"); S.el.curvecap = h("div", "nx-cap");
     S.el.results = h("div", "nx-results");
     S.el.day = h("div", "nx-day nx-hidden");
+    S.el.learn = h("div", "nx-day nx-hidden");
     S.el.next = h("div", "nx-row");
     S.el.note = h("div", "nx-note", HONEST);
     S.el.fixed = h("div", "nx-fixed", FIXED);
-    body.append(S.el.count, S.el.liverow, S.el.grouprow, S.el.raster, S.el.rastercap, pr, S.el.curve, S.el.curvecap, S.el.day, S.el.results, S.el.next, S.el.note, S.el.fixed);
+    body.append(S.el.count, S.el.liverow, S.el.grouprow, S.el.raster, S.el.rastercap, pr, S.el.curve, S.el.curvecap, S.el.day, S.el.learn, S.el.results, S.el.next, S.el.note, S.el.fixed);
     det.append(sum, body); mount.append(det); S.el.root = det;
     det.addEventListener("toggle", () => { S.open = det.open; ensureLoop(); });
     if (window.ResizeObserver) new ResizeObserver(() => { S.sized = false; }).observe(det);
@@ -81,11 +85,30 @@ window.Neurons = (() => {
     else if (m.raster || m.t_sim != null) S.gpuWall = performance.now();
     try { frame(m); } catch (e) { /* a malformed frame must never break the page */ }
   }
+  function unb64(t) { const b = atob(t || ""), out = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; }
   function frame(m) {
+    if (S.st && S.st.net === m.net) {                   // frames between two full ones carry no numbers: keep the last
+      m = Object.assign({}, m);
+      for (const k of NUMBERS) if (m[k] == null && S.st[k] != null) m[k] = S.st[k];
+    }
     S.st = m; S.lastWall = performance.now();
     if (num(m.realtime_x) && m.realtime_x > 0) S.rx = Math.min(m.realtime_x, 50);
-    const r = m.raster;
-    if (r && Array.isArray(r.spikes)) {
+    const r = m.raster, n3 = m.n3;
+    if (r && n3 && typeof n3.sq === "string" && !Array.isArray(r.spikes)) {   // compact: one row a region
+      const t0 = num(r.t0) ? r.t0 : S.tHead, t1 = num(r.t1) ? r.t1 : t0 + 250, span = Math.max(1, t1 - t0);
+      S.rows = 214;
+      setText("rastercap", `spike raster · sampled spikes, one row a region (${S.rows}) · last ${WINDOW_MS / 1000} s · orange = newest ${RECENT_MS} ms`);
+      if (t1 < S.tHead - 5000) { S.count = 0; S.head = 0; S.tDraw = 0; }
+      const b = unb64(n3.sq);
+      for (let i = 0; i + 2 < b.length; i += 3) {
+        S.rt[S.head] = t0 + b[i + 2] * span / 255; S.rr[S.head] = b[i];
+        S.head = (S.head + 1) % CAP; if (S.count < CAP) S.count++; }
+      if (t1 > S.tHead) {
+        const dw = S.lastWall - S.prevWall;
+        if (S.prevWall > 0 && dw > 20 && dw < 5000) { const q = Math.max(0, Math.min(50, (t1 - S.tHead) / dw)); S.rate = S.rate > 0 ? S.rate * 0.7 + q * 0.3 : q; }
+        S.tHead = t1; S.prevWall = S.lastWall;
+      }
+    } else if (r && Array.isArray(r.spikes)) {
       const t0 = num(r.t0) ? r.t0 : (num(m.t_sim) ? m.t_sim * 1000 - 250 : S.tHead);
       const t1 = num(r.t1) ? r.t1 : t0 + 250;
       if (num(r.n) && r.n > 0) S.rows = Math.min(255, r.n);
@@ -233,6 +256,24 @@ window.Neurons = (() => {
     if (d.cpu && num(d.cpu.avg_pct)) box.append(h("div", "nx-cap", `its process: ${floor2(d.cpu.avg_pct)} % of one CPU core on average`));
     if (d.card) box.append(h("div", "nx-note", d.card + (d.note ? " " + d.note : "")));
   }
+  // ---------- real decisions, per Tokyo day (#70, /api/spiking/status "learning"): as measured, no extra claims ----------
+  function renderLearning(L) {
+    const box = S.el.learn; if (!box) return;
+    box.replaceChildren();
+    const days = L && Array.isArray(L.days) ? L.days.filter(d => d && d.day).slice(-5) : [];
+    if (!days.length) { show("learn", false); return; }
+    show("learn", true);
+    box.append(h("div", "nx-row", "Real decisions, per day"));
+    const net = (s, name) => s && num(s.with_outcome) && s.with_outcome > 0
+      ? `${name} picks paid off ${pct(s.paid_off_frac)} of ${int(s.with_outcome)}` : null;
+    for (const d of days.slice().reverse()) {
+      const r = d.replay || {}, bits = [net(d.gpu, "1M GPU"), net(d.other, "20k CPU")].filter(Boolean);
+      if (num(r.learned) || num(r.frozen_twin))
+        bits.push(`replay: learned ${pct(r.learned)} vs frozen twin ${pct(r.frozen_twin)}${num(r.chance) ? ` vs chance ${pct(r.chance)}` : ""}${num(r.n) ? ` (${int(r.n)} decisions)` : ""}`);
+      box.append(h("div", "nx-cap", `${d.day} · ${bits.length ? bits.join(" · ") : "no decision with an outcome"}`));
+    }
+    if (L.note) box.append(h("div", "nx-note", String(L.note)));
+  }
   function controlName(k) { return CONTROL_NAMES[k] || String(k).replace(/_/g, " "); }
   function memoryLine(mt) {
     if (!mt || typeof mt !== "object") return null;
@@ -314,6 +355,7 @@ window.Neurons = (() => {
     const lines = [examLine(last.exam), memoryLine(last.memory_test), benchLine(last.bench)].filter(Boolean);
     if (!last.exam && last.pong_curve) lines.unshift(PONG_NOTE);           // no exam numbers of its own: the last validation
     renderCurve(last.pong_curve);
+    try { renderLearning(st && st.learning); } catch (e) { /* a malformed answer must never break the panel */ }
     const any = lines.length || (last.pong_curve && Array.isArray(last.pong_curve.points) && last.pong_curve.points.length);
     if (!S.live) {
       const n = num(st && st.session && st.session.n_neurons) ? st.session.n_neurons : (last.bench && num(last.bench.n_neurons) ? last.bench.n_neurons : null);

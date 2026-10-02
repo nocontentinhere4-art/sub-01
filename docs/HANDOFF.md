@@ -156,6 +156,26 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Fixtures: `tests/data/search/` (saved 2026-10-02); `tests/test_more_search.py`. A source's markup can change:
   a parser that finds nothing makes the search fall through to the next source (and `refused_today` says so).
 
+## Readings from real browsing (#79, PR `feature/readings-from-browsing`)
+- Before: `run_research` read Wikipedia every 4 simulated min at the desk, whatever the browser showed, and those
+  were all his readings (the reading stimulus, reading memory, REM replay, the memory test, the diary).
+- `readings.py` (pure) `BrowseReadings`: a page he stayed on (`MIN_DWELL_S`: shorts 15 s, videos 60 s, pages 45 s,
+  simulated) becomes the reading, at most one per `READ_GAP_S` (= research.READ_EVERY_S, the old rate), the best
+  page of each gap (longer stay, real text), stale after 30 min; Wikipedia only while it stays ≤ 10 % of the day's
+  readings (`WIKI_MAX`). Kind: video, short, forum, news, finance, wiki, page; host kept. Safety: the title must pass
+  `display_ok`; finance pages give only their topic word ("memecoins", "stocks"; no URL, ticker, price); logged-in
+  pages only their public title; the excerpt keeps only sentences that pass `display_ok`.
+- `live_server.py`: `take_reading()` (absorb, "on his mind" via `Reader.record`, tonight estimate, the `reading`
+  broadcast with `host`/`kind`/`via`, old fields kept); memory items carry `host`, `kind`, `via`. `run_research`
+  reads Wikipedia only when `wiki_fallback()`: no browser (BROWSE=0 / no playwright) or the browser down for more
+  than `WIKI_FALLBACK_S` (300 s). Every reading is logged with its source. The diary's read list has `kind`/`verb`
+  ("watched" for videos and shorts); `/brain` and `/diary` say "read or watched". `web/room.html` untouched (#63).
+- `analysis/readings_day.py` (model, 8 h at the screens): before 15 readings/h, 100 % Wikipedia; after 11.4/h,
+  Wikipedia 9.5 %, shorts 23 %, news 19 %, pages 19 %, forums 13 %, finance (topic word only) 12 %, videos 5 %.
+- `/api/memory`: `pod_manager.top_items` gives readings `host`/`kind`; `session_config` writes them to
+  `/data/spiking/item_meta.json` ({item: {host, kind}}, last 500), the pod's items stay as they were; the hub's
+  `store_items` adds them to the reading rows of `memory_tests.jsonl`, and `/api/memory` items return them.
+
 ## Browse like a real young guy (#56 scope extension, part 2)
 - Owner: "he focuses too much on one topic … no guy like him would spend all day on Wikipedia", then "NO
   RESTRICTIONS" (comment 2 replaces B.5 and D of comment 1).
@@ -280,6 +300,26 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `/api/spiking/live` feeds the "In the day" part of the Neurons card. `SUB01_SPIKING_LIVE=0` turns the CPU network off.
 - Measured: tick 8.8–9.5 ms vs 8.9–9.2 on main. The child uses ~0.4 CPU-s per decision and 1.4–2 % of a core
   between decisions (its idle pulse).
+
+## His active neurons inside the 3D brain (#62, `docs/spiking/neurons3d.md`)
+- `spiking/frames.py` (numpy, no torch): both spiking networks' frames go to the pages compact: `n3.rq` (1 byte a
+  region of spike rate, log 0.1–100 Hz), `n3.sq` (3 bytes a recorded spike: region, slot 0–255, time; ≤ 400 a frame),
+  `n3.race` (a decision race is running). `Budget` (one, in `SpikingHub.relay`; the CPU child's frames go through it
+  too) keeps each viewer ≤ 3 KB/s of spiking frames: numbers once a second, spikes cut to fit, CPU frames dropped
+  while the GPU streams. The room's lite feed gets none (it never drew them).
+- `/brain`: a **neurons** layer button (≤ 20k `THREE.Points`, `web/neurons3d.js` + `web/neurons3d.json`); offline it
+  reads "neurons offline" and never shows spikes. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
+  only changes the iframe `src`. The Neurons panel (`/brain`, `/life`) reads the compact raster (one row a region).
+- GPU frames carry per-region rates (`session.py` `frame()`: `"rq": quantise_rates(rr)`); a pod without it is tinted
+  by network group rates, labelled. The panel also lists #70's real decisions per day (learned vs frozen twin).
+
+## Neurons with their real shape (#78, `docs/spiking/neurons3d.md` § close-ups)
+- `/brain` close-ups ("close-up: cortex · striatum · thalamus · hippocampus · amygdala", or zoom in with neurons on): 120–220 real
+  reconstructed neurons (NeuroMorpho.Org, CC BY 4.0, `web/neurons_morph.json`, built by
+  `analysis/build_morphologies.py`; credits `docs/spiking/morphology_credits.md` and `/about`), ≤ 60k segments,
+  one instanced draw call per cell type. A sampled neuron's spike runs soma → axon in the shader, slowed ~500×.
+- Illustrative shapes, never the scanned person's; the network uses point neurons. Only regions the model simulates
+  get a close-up (no cerebellum / Purkinje: not one of the 214 regions).
 
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies

@@ -465,7 +465,8 @@ def test_session_answers_decides_learns_and_uploads_periodically(tmp_path):
     assert s.live_stats["rewards"] == 1 and s.live_stats["unknown_reward"] == 1
     assert len(link.puts) >= 3                                          # >= 2 periodic + the final upload
     replay = res["phases"]["choice_replay"][0]
-    assert replay["decisions"] == 2 and replay["fit_n"] == 2
+    assert replay["decisions"] == 2 and replay["fit_n"] == 2 and "fit_frozen_twin" in replay
+    assert replay["paid_off_frac"] == 0.5
     z = np.load(tmp_path / "out" / "weights.npz")
     meta = json.loads(str(z["meta"]))
     assert "tea ceremony" in meta["live_choice"]["V"] and meta["live_choice"]["n"]["tea ceremony"] >= 2

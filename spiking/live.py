@@ -42,8 +42,9 @@ Protocol: the decision protocol shared with the 1M-neuron GPU network (#58), one
         an extension of this child, is the option the vote followed: default the network's own pick)
         -> {"type": "rewarded", "id": "b-1", "ok", "eta", "n_learn"}
     {"type": "status", "id": "s-1"} -> {"type": "status", "id": "s-1", "cpu_s", "uptime_s", "n_decisions", ...}
-Unasked, it streams {"type": "spiking", "net": "cpu", ...} frames like the GPU session's (groups, mean rate, a raster
-of 200 sampled neurons) at most every FRAME_S while it simulates. Between decisions it runs IDLE_MS of background
+Unasked, it streams {"type": "spiking", "net": "cpu", ...} frames like the GPU session's (groups, mean rate), in the
+compact form of spiking/frames.py (per-region rates + a sample of every neuron's spikes, #62), at most every FRAME_S
+while it simulates. Between decisions it runs IDLE_MS of background
 activity every IDLE_EVERY_S, so the page's raster keeps a pulse (~1-2 % of a core). The parent's deadline is enforced by
 the parent (LiveClient): a late answer is dropped there. The child exits when its stdin closes or on {"type": "stop"}.
 
@@ -61,6 +62,7 @@ from pathlib import Path
 
 import numpy as np
 
+from spiking import frames
 from spiking.config import Config
 from spiking.regions import Regions
 from spiking.wiring import Layout, input_regions, synapse_lists, word_neurons
@@ -87,7 +89,6 @@ VERSION = 1
 CALIB_LABELS = ("apple", "river", "cloud", "stone", "lamp", "bird", "salt", "rope")
 FRAME_S = 0.2                     # at most 5 frames/s to the page
 RASTER_ROWS = 200
-RASTER_CAP = 1000                 # spikes per frame
 IDLE_MS = int(os.environ.get("SUB01_SPIKING_LIVE_IDLE_MS", 50))     # background run between decisions (0: none)
 IDLE_EVERY_S = 2.0
 GROUP_KEYS = ("visual", "somatomotor", "attention", "salience", "limbic", "control", "default", "reward", "fear",
@@ -352,6 +353,7 @@ class LiveBrain:
         self.calib = None
         self.emit, self.phase, self.last_da = None, "idle", 0.0     # emit(frame): the page's raster (serve() sets it)
         self.net.enable_raster()
+        self._record_all()
         self._frame_reset()
         self.load()
         if self.ch.thr_hz is None:
@@ -415,7 +417,8 @@ class LiveBrain:
             self.flush()
 
     def flush(self):
-        """Send one frame with everything since the last one (nothing if no simulated time passed)."""
+        """Send one frame with everything since the last one (nothing if no simulated time passed). The page gets the
+        compact form (spiking/frames.py): per-region rates, one byte each, and a sample of the recorded spikes."""
         net = self.net
         if self.emit is None or net.t <= self.f_t:
             self._frame_reset()
@@ -428,18 +431,32 @@ class LiveBrain:
         sz = net.size
         groups = {g: round(float((rr[ix] * sz[ix]).sum() / sz[ix].sum()), 2) for g, ix in net.reg.groups.items()
                   if ix and g in GROUP_KEYS}
-        spikes = [[int(t - self.f_t), int(r)] for t, rows in net.raster for r in rows.tolist()][:RASTER_CAP]
+        if net.raster:
+            spikes = np.concatenate([np.stack([np.full(len(rows), t - self.f_t), rows.astype(np.int64)], 1)
+                                     for t, rows in net.raster])
+        else:
+            spikes = np.zeros((0, 2), dtype=np.int64)
         n_sp = float(d.sum())
         frame = {"type": "spiking", "net": "cpu", "live": True, "phase": self.phase, "n_neurons": net.n,
                  "t_sim": round(net.t / 1000.0, 2), "spikes_per_s": round(n_sp / sim_s, 1),
                  "mean_rate_hz": round(n_sp / sim_s / net.n, 3), "realtime_x": round(sim_s / max(1e-6, now - self.f_wall), 3),
                  "groups": groups, "raster": {"n": len(net.raster_ids), "t0": int(self.f_t), "t1": int(net.t), "spikes": spikes},
                  "dopamine": round(self.last_da, 3)}
+        frame = frames.viewer_frame(frame, self.sample, rates=rr, race=self.phase == "deciding")
         self._frame_reset()
         try:
             self.emit(frame)
         except Exception:
             pass
+
+    def _record_all(self):
+        """The frames record every neuron's spikes (row = neuron id; the page gets a sample of them, frames.py), so
+        each dot of the 3D view is one model neuron. Only the recording: the network itself is unchanged."""
+        net = self.net
+        if net.n <= np.iinfo(np.int16).max:
+            net.row_of = np.arange(net.n, dtype=np.int16)
+            net.raster_ids, net.raster = np.arange(net.n), []
+        self.sample = frames.Sample.from_ids(net.raster_ids, net.off, net.size)
 
     def idle(self, ms=IDLE_MS):
         """Background activity between decisions (no cue), shown on the page."""
