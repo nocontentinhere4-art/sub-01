@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 14:05 UTC** (pass 27b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 14:10 UTC** (pass 27c). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -254,6 +254,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - ~~Map tiles~~: fixed by #47 (static vector map).
 - **YouTube walk footage on /life** showed "error 153" in headless Chromium (a missing Referer?). Check it on the real
   site before launch.
+- ~~Dark rectangle top-left in the room~~: not visible on a real GPU (owner's screenshot, 2026-10-02); headless only.
 - ~~CPU~~: fixed by #48. The whole server is ~9 ms per 50 ms tick (~18 % of a core), leaving room for Chromium.
 - **Bandwidth at launch:** after #34, 7.3 KB/s per brain-page viewer and 4.0 KB/s per room viewer. 300 steady viewers ≈
   1.6 MB/s ≈ 140 GB/day of Railway egress: watch the bill after launch. The per-IP cap (4) trusts the first
@@ -288,6 +289,12 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 27c:** the owner's live screenshot (23:05 Tokyo) shows the site up after the #49 fix, with the mind plan,
+the teach card and the static map live. It also shows no dark rectangle on a real GPU, so it was a SwiftShader-only
+artifact. He stood frozen while ordering food: `phone_stand` is a `still()` pose in the middle of the room. New #63
+(natural movement: no frozen poses, living idles, smooth transitions) is started. The owner set `SUB01_SESSION_TIKTOK`;
+#60 is started, with new files first and integration after #56.
 
 **Pass 27b:** merged #61 (#57): he eats before chatting. In the coordinator's re-run, minutes above meal time with
 chat waiting went 124–211 → **0** (9 runs); deliveries are eaten within 2 min; a 24 h konbini. New tasks:
