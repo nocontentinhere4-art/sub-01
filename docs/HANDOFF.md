@@ -45,9 +45,15 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Live feed: plain `/ws` = 20 ticks/s with per-region activity (brain page); the room connects with `/ws?rate=5&lite=1`
   (5/s, no `act`, trades/events of skipped ticks kept). Room: shadow maps updated by hand (~30/s), DPR capped at 1.5
   with adaptive resolution, nothing rendered while the tab is hidden; brain `?mini` draws 1/6 of the fibres at ≤30 fps.
-- Room model: `web/room/room_clean.glb` (3.9 MB) is a clean rebuild — modelled in Blender by `room_build/build_room.py`
+- Room model: `web/room/room_clean.glb` (4.0 MB) is a clean rebuild — modelled in Blender by `room_build/build_room.py`
   (headless Blender 4.2), Poly Haven CC0 props/textures, AO baked into a second UV set; credits in `web/room/CREDITS.md`.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
+  #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
+  report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
+  support; `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
+  modelled in the build (no new downloads), all off the walking graph; the headphones on the wall hook are their own
+  node `headphones` (no AO) so the page can take them off. `web/room_phone.js`: the phone screen drawn on a canvas
+  (status bar, rounded corners, off state, face glow).
 - Phone grip: while he uses the phone his `RightHand` bone is collapsed into the sleeve and `web/room/hand_phone.glb`
   (a hand gripping a phone, Higgsfield GPT Image + Tripo H3.1, 129 KB) is attached at the wrist; the live screen sits on its glass.
 - Phone pose: one-handed grip; right arm/neck/head from `web/room/boy_text.glb` (Meshy `Texting_Walk_inplace` #676,

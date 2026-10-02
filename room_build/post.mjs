@@ -30,6 +30,9 @@ if (AO && fs.existsSync(AO)) {
 const chairNode = root.listNodes().find(n => n.getName() === "chair");
 // (an extra marks its materials, so dedup/join can never fold the chair back into the static room)
 if (chairNode) for (const p of chairNode.getMesh().listPrimitives()) p.getMaterial().setExtras({movable: "chair"});
+// the headphones on the wall hook are their own node too (#75; a later change puts them on his head), with no AO
+const hpNode = root.listNodes().find(n => n.getName() === "headphones");
+if (hpNode) for (const p of hpNode.getMesh().listPrimitives()) p.getMaterial().setExtras({movable: "headphones"});
 if (chairNode && AO_CHAIR && fs.existsSync(AO_CHAIR)) {
   const png = await sharp(AO_CHAIR).greyscale().blur(0.6).toColourspace("b-w").png().toBuffer();
   const tex = doc.createTexture("chair_ao").setImage(png).setMimeType("image/png").setURI("chair_ao.png");
@@ -61,9 +64,9 @@ await doc.transform(
 );
 // quantisation (in meshopt) folds a dequantising scale and offset into each mesh node's transform; so that "chair" keeps
 // its pivot (on the floor under the gas lift), its mesh goes into a child node and "chair" stays a plain transform node
-{
-  const ch = root.listNodes().find(n => n.getName() === "chair");
-  if (ch && ch.getMesh()) { const mesh = ch.getMesh(); ch.setMesh(null); ch.addChild(doc.createNode("chair_mesh").setMesh(mesh)); }
+for (const name of ["chair", "headphones"]) {
+  const ch = root.listNodes().find(n => n.getName() === name);
+  if (ch && ch.getMesh()) { const mesh = ch.getMesh(); ch.setMesh(null); ch.addChild(doc.createNode(name + "_mesh").setMesh(mesh)); }
 }
 await doc.transform(meshopt({encoder: MeshoptEncoder, level: "medium"}));
 // props: shrink their textures further
@@ -84,3 +87,5 @@ console.log("textures:", root.listTextures().map(t => `${t.getName()} ${t.getIma
 console.log("nodes:", root.listNodes().filter(n => !n.getMesh()).map(n => n.getName()).join(", "));
 const ch = root.listNodes().find(n => n.getName() === "chair");
 if (ch) console.log("chair:", JSON.stringify({t: ch.getTranslation(), r: ch.getRotation(), s: ch.getScale(), children: ch.listChildren().map(c => c.getName())}));
+const hpn = root.listNodes().find(n => n.getName() === "headphones");
+if (hpn) console.log("headphones:", JSON.stringify({t: hpn.getTranslation(), children: hpn.listChildren().map(c => c.getName())}));
