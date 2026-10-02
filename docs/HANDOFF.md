@@ -332,7 +332,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   label, style, live, onClose, onInfo})`, every spiking frame goes to `nr.onFrame(m)`; `nr.info()` gives the counts
   for the caption (cells, triangles vs cap, spines and the dendrite length they cover, boutons, nodes of Ranvier).
 - Activity, never faked: a recorded spike of a sampled neuron flashes the soma and runs an action potential down the
-  axon at the real speed / 5000 (saltatory where myelinated), boutons glow on arrival, dendrites glow with the region's
+  axon at the real speed / 10000 (saltatory where myelinated), boutons glow on arrival, dendrites glow with the region's
   rate; no frames for 10 s → static cells, "no live network". The caption carries the #88 sentence word for word.
 - Budget: `LOD.phone` cap 250k triangles (3 hero + 12 mid + 60 line cells), `LOD.desktop` 1M; `budget()` trims mid
   cells, then spines of the last hero cells. Measured only under software WebGL here (`docs/screens/neuron_render/

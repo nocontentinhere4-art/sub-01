@@ -265,7 +265,8 @@ function closeupOpen(kind, region){
   if (r < 0) return;
   n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
   n3close = NeuronRender.open(host, {THREE, region: r, kind, label: regionLabel(nodes[r]), style: n3style,
-    live: performance.now() - n3wall < 10000, onClose: () => closeupExit(), onInfo: () => neuronsText()});
+    live: performance.now() - n3wall < 10000, onClose: () => closeupExit(), onInfo: () => neuronsText(),
+    groupRate: m => m.groups && nodes[r] ? m.groups[nodes[r].group] : null});   // a pod without per-region rates
   document.body.classList.add("closeup"); n3lodAt = performance.now();
   document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
   neuronsText();

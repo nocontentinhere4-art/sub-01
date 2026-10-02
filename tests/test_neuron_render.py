@@ -100,7 +100,7 @@ def test_triangle_budget_per_lod(check):
 
 def test_caption_and_constants(check):
     assert check["constants"]["caption"] == CAPTION
-    assert check["constants"]["slowdown"] == 5000
+    assert check["constants"]["slowdown"] == 10000
     assert set(check["constants"]["kinds"]) == {"cortex", "striatum", "thalamus", "hippocampus", "amygdala"}
     src = JS.read_text()
     assert "no demo mode" in src and 'm.live === false) return' in src                 # no frames -> no activity

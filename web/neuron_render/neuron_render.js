@@ -23,7 +23,7 @@
 (function (root) {
   "use strict";
   const ASSET = "neuron_render/cells.json", LIVE_MS = 10000;
-  const SLOWDOWN = 5000;                                         // pulses: real conduction speed / SLOWDOWN
+  const SLOWDOWN = 10000;                                        // pulses: real conduction speed / SLOWDOWN
   const CAPTION = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn " +
     "from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells " +
     "are enlarged and pulses slowed to be visible. A model, not a mind.";
@@ -56,6 +56,8 @@
   };
   const K = { SOMA: 0, AXON: 1, BASAL: 2, APICAL: 3, MYELIN: 4, SPINE: 5, BOUTON: 6, NUCLEUS: 7, NUCLEOLUS: 8 };
 
+  // rate (Hz) -> the byte quantise_rates sends (a pod without per-region rates: its network group's rate, labelled by the page)
+  const rateByte = hz => !(hz >= 0.1) ? 0 : Math.max(1, Math.min(255, Math.round(1 + 254 * Math.log(Math.min(hz, 100) / 0.1) / Math.log(1000))));
   function unb64(s) { if (!s) return new Uint8Array(0); const b = atob(s), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
   function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a;
     t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -672,9 +674,9 @@
     function applyStyle() {
       const fl = S.style === "fluorescence";
       uni.uStyle.value = fl ? 0 : 1; matComp.uniforms.uStyle.value = fl ? 0 : 1;
-      uni.uNucAlpha.value = fl ? 0.4 : 0.55; uni.uDim.value = fl ? 0.09 : 0.025;
+      uni.uNucAlpha.value = fl ? 0.4 : 0.55; uni.uDim.value = fl ? 0.09 : 0.015;
       matComp.uniforms.uBloom.value = fl ? 0.9 : 0.4; matBright.uniforms.uTh.value = fl ? 0.45 : 0.7;
-      matComp.uniforms.uExposure.value = 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : 0.6;
+      matComp.uniforms.uExposure.value = fl ? 1.25 : 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : 0.6;
       matComp.uniforms.uBg.value.set(fl ? 0.002 : 0.015, fl ? 0.006 : 0.018, fl ? 0.003 : 0.028);
       hud.querySelectorAll("button[data-s]").forEach(b => b.classList.toggle("on", b.dataset.s === S.style));
     }
@@ -703,7 +705,7 @@
       if (!S.userTouched) cam.theta += 0.00004 * Math.min(50, now - (render.at || now));
       render.at = now;
       placeCamera();
-      uni.uTime.value = (now - S.t0) / 1000;
+      uni.uTime.value = S.clock != null ? S.clock : (now - S.t0) / 1000;
       const live = isLive(now);
       uni.uLive.value += ((live ? 1 : 0) - uni.uLive.value) * 0.08;
       const r = S.rate ? Math.max(0, Math.min(1, (S.rate / 255 - 0.42) / 0.44)) : 0;
@@ -745,7 +747,7 @@
       const c = cells[k]; if (!c) return;
       c.A.spk[c.j] = t; c.A.sa.needsUpdate = true; S.spikes++;
     }
-    function spike(slot, delayMs) { if (!cells.length) return; const k = Math.min(cells.length - 1, Math.floor((slot || 0) * cells.length / 256)); spikeCell(k, clock(performance.now()) + (delayMs || 0) / 1000); }
+    function spike(slot, delayMs) { if (!cells.length) return; const k = Math.min(cells.length - 1, Math.floor((slot || 0) * cells.length / 256)); S.spikeAt = clock(performance.now()) + (delayMs || 0) / 1000; spikeCell(k, S.spikeAt); }
     function rates(rq) { if (typeof rq === "number") S.rate = rq; else if (rq && rq.length > S.region) S.rate = rq[S.region]; }
     function onFrame(m) {
       if (!m || m.type !== "spiking" || !m.n3 || m.live === false) return;
@@ -753,11 +755,15 @@
       if (gap > 30 && gap < 2000) S.gap = 0.7 * S.gap + 0.3 * gap;
       S.lastWall = now; S.forcedOffline = false;
       if (m.n3.rq) { const q = unb64(m.n3.rq); if (q.length > S.region) S.rate = q[S.region]; }
+      else if (o.groupRate) { const hz = o.groupRate(m); if (hz != null) S.rate = rateByte(hz) || S.rate; }
       const b = unb64(m.n3.sq), play = Math.min(600, S.gap) / 1000, t = clock(now);
       for (let i = 0; i + 2 < b.length; i += 3) { if (b[i] !== S.region) continue;
         spikeCell(Math.min(cells.length - 1, Math.floor(b[i + 1] * cells.length / 256)), t + (b[i + 2] / 255) * play); }
     }
     function setLive(on) { if (on) { S.lastWall = performance.now(); S.forcedOffline = false; } else S.forcedOffline = true; }
+    // test hook: freeze the renderer's clock at `seconds` after the last spike() (null: wall clock). Screenshots under
+    // software WebGL take seconds each; the action-potential strip is taken at fixed clock times with it.
+    function debugTime(seconds) { S.clock = seconds == null ? null : S.spikeAt + seconds; }
     function info() {
       const types = {}; for (const c of cells) types[c.type] = (types[c.type] || 0) + 1;
       return { kind, region: S.region, label: S.label, style: S.style, lod: lodOf(), cells: cells.length, heroCells: counts.heroCells,
@@ -781,12 +787,12 @@
       renderer.dispose();
       for (const el of [canvas, hud, stat]) if (el.parentNode) el.parentNode.removeChild(el);
     }
-    const nr = { onFrame, spike, rates, setLive, setStyle, style: () => S.style, setLod: l => { if (LOD[l] || l === "auto") { S.lodName = l; } }, lod: lodOf,
+    const nr = { onFrame, spike, rates, setLive, debugTime, setStyle, style: () => S.style, setLod: l => { if (LOD[l] || l === "auto") { S.lodName = l; } }, lod: lodOf,
                  focus: i => { if (cells[i]) { S.focus = i; focusPos = cells[i].pos; fit(); } }, resize, info, caption, close, scene, camera, renderer, cells };
     load(o.assetUrl).then(() => { if (!S.closed) build(); }).catch(e => { console.error("NeuronRender:", e); });
     return nr;
   }
 
-  const NR = { open, load, kindOf, plan, cellGeometry, lineGeometry, budget, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, K, CELLS: null };
+  const NR = { open, load, kindOf, plan, cellGeometry, lineGeometry, budget, rateByte, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, K, CELLS: null };
   root.NeuronRender = NR;
 })(typeof window !== "undefined" ? window : globalThis);

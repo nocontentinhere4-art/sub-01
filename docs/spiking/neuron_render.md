@@ -82,8 +82,8 @@ Sources:
   at the unmyelinated speed; along a myelinated internode the whole internode lights at the moment the pulse reaches
   the node before it, and the next node after the internode's conduction time (saltatory). **Boutons** glow when the
   pulse arrives. **Dendrites** glow with the region's measured rate; the soma flash leaks ~40 µm into the proximal
-  dendrites. Speeds are the real ones divided by `SLOWDOWN` = 5000: ~1 mm/s on screen in a myelinated trunk, ~60 µm/s
-  in thin collaterals (a 300 µm collateral takes ~5 s; the pulse fades along the way).
+  dendrites. Speeds are the real ones divided by `SLOWDOWN` = 10000: ~0.6 mm/s on screen in a myelinated trunk (a ~50 µm
+  internode every ~80 ms), ~30 µm/s in thin collaterals (a 300 µm collateral takes ~10 s; the pulse fades along the way).
 - No frames for 10 s (or `setLive(false)`) → nothing moves; the caption says "no live network: static cells, no
   activity". There is no demo mode and no recorded stream on the server.
 - A real action potential is ~1 ms long: at 0.3 m/s that is ~300 µm of axon, longer than most of these arbors. It is
@@ -116,4 +116,5 @@ under the caps. **The ≥ 30 FPS check on a mid phone still needs a real device.
   unmyelinated axon, spines at the stated density), the triangle budget at both LODs (the focus cell keeps its spines),
   the caption word for word, the sources in this file, the call site on `/brain`.
 - `python tests/neuron_render_shots.py`: screenshots at 1280 and 390 px of every close-up region in both styles,
-  offline and live, an action-potential strip, the side-by-side with the reference micrograph, counts and timings.
+  offline and live, an action-potential strip (frames at fixed clock times after the spike, through the `debugTime` test
+  hook: a software-WebGL screenshot takes seconds), the side-by-side with the reference micrograph, counts and timings.

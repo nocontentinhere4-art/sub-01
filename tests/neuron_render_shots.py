@@ -122,18 +122,20 @@ def main():
             ctx, pg, errors = page(1280, 800)
             pg.evaluate("f => window.__replay(f)", frames)
             closeup(pg, "cortex", region, "fluorescence")
+            # software WebGL takes seconds per screenshot, so the renderer's clock is frozen at fixed times after the spike
+            # (nr.debugTime, a test hook): what a viewer sees at those moments on a device that keeps up
             pg.evaluate("n3close.spike(0, 0)")                  # slot 0 -> drawn cell 0, the cell in focus
-            t0 = time.time()
-            strip, times = [], []
-            for i in range(4):
+            strip, times = [], [0.08, 0.25, 0.5, 1.0, 2.0]
+            for i, t in enumerate(times):
+                pg.evaluate(f"n3close.debugTime({t})")
+                pg.wait_for_timeout(1200)
                 name = f"ap_{i + 1}.png"
                 shot(pg, name)
-                times.append(round(time.time() - t0, 2))
                 strip.append(name)
-                pg.wait_for_timeout(150)
-            res["ap_strip_s"] = times
+            pg.evaluate("n3close.debugTime(null)")
+            res["ap_strip_clock_s"] = times
             from PIL import Image
-            ims = [Image.open(out / n).crop((240, 120, 1040, 680)) for n in strip]
+            ims = [Image.open(out / n).crop((390, 230, 890, 730)) for n in strip]
             W = sum(i.width for i in ims) + 10 * (len(ims) - 1)
             im = Image.new("RGB", (W, ims[0].height))
             x = 0
