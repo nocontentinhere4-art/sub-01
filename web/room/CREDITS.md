@@ -94,6 +94,27 @@ set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somew
 
     node build_food.mjs "<kit>/Models/GLB format" ../web/room/food.glb      # 84 KB
 
+## His motion: clips generated with NVIDIA ARDY (#98 G3)
+`boy_m_*.glb` (listed in `boy_m_manifest.json`) are motions generated from text prompts with **ARDY**
+(https://github.com/nv-tlabs/ardy, NVIDIA; the paper's authors are credited there), checkpoint
+`nvidia/ARDY-Core-RP-20FPS-Horizon40`, on one RunPod GPU pod (`room_build/ardy/`: `job.sh`, `gen.py`, `specs.json` and
+`specs_v2.json` with the prompts; `README.md` to rebuild), then retargeted onto `boy.glb`'s rig by
+`room_build/ardy_to_boy.mjs`. The character is the same original one; the clips move his bones only. Licences:
+- ARDY's code: Apache-2.0.
+- The ARDY checkpoint: the **NVIDIA Open Model License** (https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/):
+  commercially usable; "NVIDIA claims no ownership rights in outputs. You are responsible for outputs and their subsequent
+  uses." The generated clips are outputs, so they may ship in this public, commercial web app; the model itself is not
+  redistributed here. Attribution, as the licence asks for distributed models (kept here for clarity): "Licensed by NVIDIA
+  Corporation under the NVIDIA Open Model License".
+- ARDY's text encoder is LLM2Vec (McGill-NLP, MIT) on top of Meta Llama 3 8B Instruct (**Llama 3 Community License**,
+  https://llama.meta.com/llama3/license). Only the text prompts went through it, offline, on the pod; nothing of it is
+  shipped. The weights were taken from the public `NousResearch/Meta-Llama-3-8B-Instruct` re-upload, whose four
+  safetensors shards have the same SHA-256 as `meta-llama/Meta-Llama-3-8B-Instruct`'s (verified on the pod, `job.sh`);
+  no Hugging Face token was used. "Built with Meta Llama 3."
+- The clips' retargeting, `boy_motion.js` (the procedural layer: breathing, weight shifts, foot and hand IK, eyes, the pop
+  killer) and the scripts above are made for this project, CC0.
+No Mixamo or other non-redistributable animation is used.
+
 ## Map card
 The map of his neighbourhood (room card and `/life`) is © OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`, one static extract made by

@@ -2473,6 +2473,21 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     root:boy.position.toArray().map(x => +x.toFixed(3)), ry:+boy.rotation.y.toFixed(2)}) });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, current:{get:() => current}, want:{get:() => want}, hand:{get:() => hand}, head:{get:() => head},
     monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}, mixer:{get:() => mixer}}); }
+
+// ===== #98 G3: the motion layer (feature/gl-motion) lives in web/room/boy_motion.js; this block is this branch's only change here. =====
+// Clips generated with NVIDIA ARDY (boy_m_*.glb) take the place of some actions, and after each animate() the module adds
+// breathing, weight shifts, foot IK on the floor, hands on the keyboard / mouse / bowl, eye and head look-at and a pop
+// killer. It gets the page's internals here, and registers every bone it moves with touch(). ?debug: window.motion.
+{
+  const animate0 = animate; let motion = null;
+  import("./room/boy_motion.js").then(m => { motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
+    get boy(){ return boy; }, get mixer(){ return mixer; }, touch, reach, aimBone, setWorldQuat,
+    state: () => ({ctx:ctxNow, at, step, goal, current, holdW, peek, phoneWanted, life:lastLife, T, iv:IV.cur && IV.cur.n,
+      held:Object.keys(PROP.held).length > 0 || bag === "hand" || !!(trash && trash.held)}),
+    setCurrent: a => { current = a; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
+  animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+}
+// ===== end #98 G3 =====
 </script>
 </body>
 </html>

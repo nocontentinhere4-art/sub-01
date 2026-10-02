@@ -1,0 +1,179 @@
+"""Old vs new motion sheet for the room's character (#98 G3). Run by hand (no `test_` prefix):
+
+    python tests/motion_shots.py --out docs/screens/motion
+
+Serves web/ statically (no live server: the page runs with ?debug&nolive and is driven through its debug API), opens
+room.html in headless Chromium at 1280 and 390 px, and for each situation (at the desk, eating, standing, walking,
+at the window, on the phone in bed) takes frames with the motion layer OFF (the page as before: web/room/boy_motion.js
+is blocked, so the hook's import fails and nothing changes) and ON. Each frame is checked in the page: the lowest foot
+or toe sole against the floor, NaN in any bone. Writes <out>/sheet_1280.jpg, sheet_390.jpg (old row over new row per
+situation), the single frames, and results.json. The CDN scripts (three.js, leaflet) are served from room_build's
+node_modules (the sandbox may have no route to the CDNs); Chromium renders WebGL in software.
+"""
+import argparse
+import http.server
+import json
+import os
+import socketserver
+import sys
+import threading
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+NM = ROOT / "room_build" / "node_modules"
+SITUATIONS = [("desk", "research", {}), ("eat", "eat", {"eating": "ramen", "food": 1}), ("stand", "idle_home", {"place": "room"}),
+              ("window", "window", {}), ("phone_bed", "phone", {}), ("sleep", "sleep", {})]
+# measured in the page: the lowest sole, NaN, the frame time of animate()
+PROBE = """() => {
+  const b = window.boy, bones = window.bones; if (!b) return null; b.updateMatrixWorld(true);
+  const v = new THREE.Vector3(); let low = 9, nan = 0;
+  for (const n of ["LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"]) { const o = bones[n]; if (!o) continue; o.getWorldPosition(v);
+    low = Math.min(low, v.y - (n.endsWith("Foot") ? 0.125 : 0.037)); }
+  for (const n in bones) { const q = bones[n].quaternion; if (![q.x, q.y, q.z, q.w].every(Number.isFinite)) nan++; }
+  const legs = {}; for (const n of ["Hips", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightFoot", "RightToeBase"]) if (bones[n]) { bones[n].getWorldPosition(v); legs[n] = +v.y.toFixed(3); }
+  const rest = window.motion && window.motion.rest ? {ankle: window.motion.rest.ankle, toe: window.motion.rest.toe, p: Object.fromEntries(Object.entries(window.motion.rest.p || {}).map(([k, v]) => [k, v.toArray().map(x => +x.toFixed(3))]))} : null;
+  return {lowest_sole: +(low - 0.16).toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
+    swapped: window.motion ? Object.keys(window.motion.swapped) : [], log: window.motion ? window.motion.log : []};
+}"""
+
+
+# the camera close to him: a three-quarter view from his front-left, the whole body in frame
+FRAME = """() => { const b = window.boy; if (!b) return; const t = new THREE.Vector3(); b.getWorldPosition(t); t.y += 0.8;
+  const r = b.rotation.y, box = p => { p.x = Math.min(1.85, Math.max(-1.75, p.x)); p.z = Math.min(1.5, Math.max(-1.3, p.z)); p.y = Math.min(2.3, p.y); return p; };
+  // the whole body in frame: of eight directions around him (his front half first), the one with most room inside the walls
+  let best = null;
+  for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8]) { const d = new THREE.Vector3(Math.sin(r + a), 0, Math.cos(r + a));
+    const c = box(t.clone().addScaledVector(d, 3.2).add(new THREE.Vector3(0, 0.8, 0))), dist = c.distanceTo(t) - (Math.abs(a) > 1.5 ? 0.6 : 0);
+    if (!best || dist > best.dist) best = {c, dist}; }
+  camera.fov = 46; camera.updateProjectionMatrix(); camera.position.copy(best.c); controls.target.copy(t); controls.update(); renderer.render(scene, camera); }"""
+
+
+def serve(port):
+    class H(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *a, **k):
+            super().__init__(*a, directory=str(ROOT / "web"), **k)
+
+        def log_message(self, *a):
+            pass
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    srv = socketserver.ThreadingTCPServer(("127.0.0.1", port), H)
+    srv.daemon_threads = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=8793)
+    ap.add_argument("--out", default="docs/screens/motion")
+    ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
+    ap.add_argument("--widths", default="1280,390")
+    ap.add_argument("--frames", type=int, default=3, help="frames per situation, 1.2 s apart")
+    ap.add_argument("--modes", default="old,new")
+    ap.add_argument("--only", default="", help="comma-separated situations")
+    args = ap.parse_args()
+    out = ROOT / args.out
+    out.mkdir(parents=True, exist_ok=True)
+    srv = serve(args.port)
+    base = f"http://127.0.0.1:{args.port}"
+    from playwright.sync_api import sync_playwright
+    results = {}
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(executable_path=args.chromium, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+            for w in [int(x) for x in args.widths.split(",")]:
+                h = 720 if w > 900 else 844
+                for mode in args.modes.split(","):
+                    ctx = browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=1, is_mobile=w < 900, has_touch=w < 900)
+                    pg = ctx.new_page()
+                    errors = []
+                    pg.on("pageerror", lambda e: errors.append(str(e)))
+
+                    def cdn(route, request):
+                        url = request.url
+                        if "three@0.169.0/" in url:
+                            path = NM / "three" / url.split("three@0.169.0/", 1)[1]
+                        elif "leaflet@1.9.4/dist/" in url:
+                            path = NM / "leaflet" / "dist" / url.split("dist/", 1)[1]
+                        else:
+                            return route.abort()
+                        ct = "text/javascript" if path.suffix == ".js" else "text/css" if path.suffix == ".css" else "application/octet-stream"
+                        return route.fulfill(path=str(path), content_type=ct) if path.exists() else route.abort()
+                    pg.route("**/cdn.jsdelivr.net/**", cdn)
+                    pg.route("**/unpkg.com/**", cdn)
+                    pg.route("**/api/**", lambda r: r.fulfill(status=404, body=""))
+                    pg.route("**/tokyo_*.json", lambda r: r.fulfill(status=404, body=""))
+                    if mode == "old":
+                        pg.route("**/room/boy_motion.js", lambda r: r.abort())
+                    pg.goto(f"{base}/room.html?debug&nolive&hour=14", wait_until="load")
+                    pg.wait_for_function("window.boy && window.room && window.actions && window.actions.walk && window.actions.sleep", timeout=120000)
+                    pg.wait_for_timeout(1500)
+                    if mode == "new":
+                        pg.wait_for_function("window.motion && window.motion.manifest && Object.keys(window.motion.swapped).length > 0", timeout=60000)
+                    pg.evaluate("() => { window.FREEZE = true; settle(); for (const id of ['top', 'side', 'dock', 'corner', 'vignette']) document.getElementById(id).style.display = 'none'; }")
+                    for key, activity, extra in SITUATIONS:
+                        if args.only and key not in args.only.split(","):
+                            continue
+                        life = {"activity": activity, "place": "room", "vitals": {"resp_per_min": 14}, **extra}
+                        pg.evaluate("(l) => { act(l.activity, l); sim(1 / 30, 120); }", life)
+                        if key == "phone_bed":
+                            pg.evaluate("() => { sim(1 / 30, 1500); }")   # time to lie back
+                        for k in range(args.frames):
+                            pg.evaluate("() => { sim(1 / 30, 36); }")
+                            if not pg.evaluate("() => { const b = window.boy; return b && b.visible; }"):
+                                continue
+                            pg.evaluate(FRAME)
+                            probe = pg.evaluate(PROBE)
+                            name = f"{key}_{mode}_{w}_{k}.jpg"
+                            try:
+                                pg.screenshot(path=str(out / name), type="jpeg", quality=80, timeout=90000)
+                            except Exception as e:  # noqa: BLE001
+                                print("screenshot failed", name, str(e)[:80], flush=True)
+                            results[name] = {**(probe or {}), "errors": errors[:3]}
+                            print(name, probe, flush=True)
+                    ctx.close()
+            browser.close()
+    finally:
+        srv.shutdown()
+    (out / "results.json").write_text(json.dumps(results, indent=1))
+    sheet(out, results, [int(x) for x in args.widths.split(",")])
+
+
+def sheet(out, results, widths):
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        print("no PIL: no sheet")
+        return
+    for w in widths:
+        cols = [k for k, _, _ in SITUATIONS]
+        rows = [("old", 0), ("new", 0), ("old", 2), ("new", 2)]
+        tw = 320 if w > 900 else 160
+        imgs = {}
+        for (mode, k) in rows:
+            for c in cols:
+                f = out / f"{c}_{mode}_{w}_{k}.jpg"
+                if f.exists():
+                    im = Image.open(f)
+                    imgs[(mode, k, c)] = im.resize((tw, int(im.height * tw / im.width)))
+        if not imgs:
+            continue
+        th = max(im.height for im in imgs.values())
+        S = Image.new("RGB", (tw * len(cols), (th + 18) * len(rows) + 20), (10, 10, 12))
+        d = ImageDraw.Draw(S)
+        for j, c in enumerate(cols):
+            d.text((j * tw + 6, 4), c, fill=(220, 220, 230))
+        for i, (mode, k) in enumerate(rows):
+            y = 20 + i * (th + 18)
+            d.text((6, y + 2), f"{mode} (frame {k})", fill=(255, 154, 60) if mode == "new" else (160, 160, 175))
+            for j, c in enumerate(cols):
+                im = imgs.get((mode, k, c))
+                if im:
+                    S.paste(im, (j * tw, y + 16))
+        S.save(out / f"sheet_{w}.jpg", quality=82)
+        print("wrote", out / f"sheet_{w}.jpg")
+
+
+if __name__ == "__main__":
+    main()
