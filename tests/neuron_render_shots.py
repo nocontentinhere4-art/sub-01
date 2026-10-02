@@ -147,6 +147,7 @@ def main():
                 x += (v.x + 1) / 2 * innerWidth; y += (1 - v.y) / 2 * innerHeight; d += m.dist[i]; n++; }
               return n ? {x: x / n, y: y / n, dist: d / n, n} : null; }"""
             pg.mouse.click(640, 300)                            # stops the slow auto-rotation, so the frames line up
+            pg.evaluate("document.getElementById('dock').style.visibility = 'hidden'")   # the page's panel would cover the axon's path
             strip, fronts = [], []
             times = [0.3, 1.0, 2.0, 4.0, 8.0] if h01 else [0.1, 1.5, 1.7, 1.9, 2.1]   # procedural: the initial segment (48 um) at the unmyelinated speed ~1.6 s, then ~0.6 mm/s
             for i, t in enumerate(times):
@@ -156,7 +157,7 @@ def main():
                 shot(pg, name)
                 strip.append(name)
                 fronts.append(pg.evaluate(FRONT, t) if h01 else None)
-            pg.evaluate("n3close.debugTime(null)")
+            pg.evaluate("n3close.debugTime(null); document.getElementById('dock').style.visibility = ''")
             res["ap_strip_clock_s"] = times
             res["ap_front_um"] = [round(f["dist"], 1) if f else None for f in fronts]
             from PIL import Image

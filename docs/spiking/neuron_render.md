@@ -114,10 +114,11 @@ Sources:
 - A real action potential is ~1 ms long: at 0.3 m/s that is ~300 µm of axon, longer than most of these arbors. It is
   drawn as a short bright front (~90 ms at the slowed clock): a visual convention, said in the caption's "pulses slowed".
 - On the H01 cells (#99) the axon is its real ~0.5 µm (a pixel) and the focus cell's 4.1 mm of axon take ~34 s at the
-  slowed clock, so the front is drawn 2.5× wider (~8 µm) with a ~20 µm tail behind it, fades over 20 s instead of 8,
-  and the axon swells by 1 µm under it (`uPulseW`, `uPulseTail`, `uPulseFade`, `uPulseSwell`, set in `buildH01`): the
-  same visual convention, so a viewer can follow the pulse along the real axon. The timing is the real conduction
-  speed / 10 000 along the real path (`ap_front_um` in `results.json`: the front's path distance at each strip frame).
+  slowed clock, so the front is drawn ~3× wider (~9 µm) with a ~35 µm tail behind it, fades over 20 s instead of 8,
+  and a train of ~6 µm glow sprites rides the axon's own vertices under it (`pulsePoints`; `uPulseW`, `uPulseTail`,
+  `uPulseFade` set in `buildH01`; the mesh itself is never deformed): the same visual convention, so a viewer can follow
+  the pulse along the real axon. The timing is the real conduction speed / 10 000 along the real path (`ap_front_um`
+  in `results.json`: the front's path distance from the soma at each strip frame).
 
 ## Look
 - **Fluorescence:** GFP-like green (a few cells tdTomato-like orange: the basket cells in cortex, ~15 % of the mid tier
@@ -145,8 +146,8 @@ Sources:
 interneuron as heroes, 7 mid, 6 far as skeleton lines, 2 astrocytes + 2 oligodendrocytes), **280 451 triangles** of
 1 000 000, 31 draw calls, 1 442 presynaptic and 15 593 incoming synapses, 1 105 µm of myelinated axon, 2.44 MB of
 cells + 0.53 MB EM slice (2.99 MB); phone set 17 cells, **150 995 triangles** of 250 000, 26 draw calls, 1.45 MB + EM
-(2.01 MB). Under the mid-phone profile (CPU ×4, 390 px) the main-thread time is **3.7 ms a frame** at 4.2 fps in the
-software rasteriser (0.9 ms unthrottled); the set decodes in ~0.1 s from the local server and `nr.ready` resolves
+(2.01 MB). Under the mid-phone profile (CPU ×4, 390 px) the main-thread time is **1.9–3.7 ms a frame** (two runs, at
+2.9–4.2 fps in the software rasteriser; 0.9 ms unthrottled); the set decodes in ~0.1 s from the local server and `nr.ready` resolves
 ~260 ms after `openAt()` when `prefetch()` ran first. The NeuroMorpho numbers below for cortex are now the
 `*_before.png` shots (`NeuronRender.H01_SETS.cortex = null`), kept as the fallback and for the before/after pair.
 

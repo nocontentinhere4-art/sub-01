@@ -95,7 +95,7 @@ nr.onFrame(msg)                // every {"type":"spiking"} websocket frame, as r
 nr.spike(slot, delayMs = 0)    // alternative to onFrame: one recorded spike of this region (slot 0-255), to play after delayMs
 nr.rates(rq)                   // alternative to onFrame: Uint8Array(214) of rate bytes (quantise_rates) or a number for this region
 nr.setLive(false)              // force offline (e.g. the socket closed): static cells, caption "no live network"
-nr.debugTime(s | null)         // test hook: freeze the clock s seconds after the last spike() (screenshots under software GL)
+nr.debugTime(s | null)         // test hook: freeze the clock s seconds after the last spike(); frames bring no new spikes while held
 ```
 
 What a spike does: the cell's soma flashes; an action potential runs from the soma along the axon at the real

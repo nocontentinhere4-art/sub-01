@@ -325,7 +325,7 @@
   const VS_CELL = `
     attribute vec3 aOff; attribute vec3 aNrm; attribute float aR; attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uPixK, uFloorPx, uDepthK, uPulseW, uPulseTail, uPulseFade, uPulseSwell;
+    uniform float uTime, uPixK, uFloorPx, uDepthK, uPulseW, uPulseTail, uPulseFade;
     varying vec3 vN, vV; varying float vDepth, vKind, vCol, vSoma, vPulse, vR, vDist, vBright;
     ${ROT}
     void main(){
@@ -342,11 +342,10 @@
         else { float x = dt - aArrive;                                                                           // the travelling front (+ a tail on the real axons)
           pulse = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 0.6)) * exp(-aArrive / uPulseFade); }
       }
-      vec3 nrm = rotq(iQuat, aNrm);
-      vec3 w = c + off * rr + nrm * (uPulseSwell * min(1.0, pulse));                                             // the real (thin) axons swell a little under the front
+      vec3 w = c + off * rr;
       vec4 mv = modelViewMatrix * vec4(w, 1.0);
       gl_Position = projectionMatrix * mv;
-      vN = normalize(normalMatrix * nrm); vV = -mv.xyz;
+      vN = normalize(normalMatrix * rotq(iQuat, aNrm)); vV = -mv.xyz;
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       vPulse = pulse; vKind = aKind; vCol = iCol; vR = rr; vDist = aDist; vBright = iBright;
     }`;
@@ -458,6 +457,21 @@
       vKind = aKind;
       float um = aKind < 10.5 ? 0.9 : 0.6;                          // a bouton ~0.9 um, a PSD ~0.6 um
       gl_PointSize = max(2.0, um * uScale / -mv.z + 1.5 * vFlash * uScale / -mv.z); }`;
+  const VS_PULSE = `
+    attribute float aArrive;
+    uniform float uTime, uSpike, uScale, uPulseW, uPulseTail, uPulseFade;
+    varying float vP;
+    void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      float dt = uTime - uSpike, on = step(0.0, dt), x = dt - aArrive;
+      vP = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 1.2)) * exp(-aArrive / uPulseFade);
+      gl_Position = vP < 0.01 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv;                          // nothing drawn away from the front
+      gl_PointSize = clamp(6.0 * uScale / -mv.z, 3.0, 48.0) * (0.6 + 0.4 * min(1.0, vP)); }`;           // ~6 um of glow: the decimated axon has a vertex every few um
+  const FS_PULSE = `
+    precision highp float;
+    uniform vec3 uColAct;
+    varying float vP;
+    void main(){ vec2 c = gl_PointCoord - 0.5; float d2 = dot(c, c); if (d2 > 0.25) discard;
+      gl_FragColor = vec4(uColAct * 1.6 * min(1.5, vP) * exp(-d2 * 10.0), 1.0); }`;
   const FS_SYN = `
     precision highp float;
     uniform float uStyle, uLive, uRate; uniform vec3 uColAct;
@@ -592,7 +606,7 @@
       uDofMax: { value: 0.7 }, uBloom: { value: 0.9 }, uExposure: { value: 1.0 }, uStyle: { value: 0 }, uBg: { value: new THREE.Vector3() } },
       vertexShader: VS_QUAD, fragmentShader: FS_COMP, depthTest: false, depthWrite: false });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), matDown); quad.frustumCulled = false; quadScene.add(quad);
-    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 },
+    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 },
                   uStyle: { value: 0 }, uRate: { value: 0 }, uLive: { value: 0 }, uNucAlpha: { value: 0.45 }, uDim: { value: 0.3 },
                   uColA: { value: new THREE.Vector3(0.25, 1.0, 0.35) }, uColB: { value: new THREE.Vector3(1.0, 0.42, 0.15) },
                   uColMy: { value: new THREE.Vector3(0.6, 0.75, 1.0) }, uColAct: { value: new THREE.Vector3(1.0, 0.95, 0.7) },
@@ -659,11 +673,24 @@
       const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 1; pts.name = "nr-syn-" + c.id;
       return pts;
     }
+    function pulsePoints(c) {                                   // #99: the pulse's glow along the real axon's own vertices (sprites, additive)
+      const m = c.mesh, idx = [];
+      for (let i = 0; i < m.nv; i++) { const k = m.kind[i]; if ((k === 1 || k === 4 || k === 5) && m.arrive[i] >= 0) idx.push(i); }
+      if (!idx.length) return null;
+      const pos = new Float32Array(idx.length * 3), ar = new Float32Array(idx.length);
+      idx.forEach((i, j) => { pos[3 * j] = m.pos[3 * i]; pos[3 * j + 1] = m.pos[3 * i + 1]; pos[3 * j + 2] = m.pos[3 * i + 2]; ar[j] = m.arrive[i]; });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("aArrive", new THREE.BufferAttribute(ar, 1));
+      const mat = additive(new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uSpike: { value: -1e4 } }), vertexShader: VS_PULSE, fragmentShader: FS_PULSE }));
+      const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.renderOrder = 2; pts.name = "nr-pulse-" + c.id;
+      return pts;
+    }
     function buildH01(data) {
       S.h01 = data;
       // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the front is drawn
-      // 2.5× wider with a ~20 µm tail, fades over 20 s instead of 8, and swells the axon by 1 µm under it: a visual convention, said in the docs
-      uni.uPulseW.value = 0.25; uni.uPulseTail.value = 0.7; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 1.0;
+      // 2.5× wider with a ~35 µm tail, fades over 20 s instead of 8, and a train of glow sprites (pulsePoints) rides the axon's own
+      // vertices under it, so the mesh is never deformed: a visual convention, said in the docs
+      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 0.8; uni.uPulseFade.value = 20;
       const ident = new Float32Array([0, 0, 0, 1]);
       const oneInstance = (g, bright, col) => {
         g.setAttribute("iOff", new THREE.InstancedBufferAttribute(new Float32Array(3), 3));
@@ -699,6 +726,7 @@
           cells.push({ tier, type, A, j: 0, geom: g, pos: c.soma.slice(), tri: m.nf, triNoSpines: m.nf, spines: 0, h01: c, glia: isGlia });
           counts.triangles += m.nf; counts.drawCalls++; if (tier === "hero") counts.heroCells++;
           if (c.syn && !isGlia) { const pts = synPoints(c); scene.add(pts); meshes.push(pts); synMeshes.push({ pts, cell: cells[cells.length - 1] }); counts.boutons += c.syn.npre; counts.drawCalls++; }
+          if (!isGlia) { const pp = pulsePoints(c); if (pp) { scene.add(pp); meshes.push(pp); synMeshes.push({ pts: pp, cell: cells[cells.length - 1] }); counts.drawCalls++; } }
         } else if (c.skel) {                                       // the far tier: the real skeleton as lines
           const k = c.skel, pos = [], kd = [], di = [], ar = [];
           for (let i = 0; i < k.n; i++) { const p = k.parent[i]; if (p < 0) continue;
@@ -732,7 +760,7 @@
       finish();
     }
     function buildProcedural() {
-      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0;
+      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8;
       const rnd = mulberry(880 + Object.keys(KINDS).indexOf(kind) + (L === LOD.phone ? 7 : 0));
       const split = n => Kd.types.map(([t, f]) => [t, Math.max(0, Math.round(n * f))]);
       const want = { hero: split(L.hero), mid: split(L.mid), far: split(L.far) };
@@ -940,6 +968,7 @@
       S.lastWall = now; S.forcedOffline = false;
       if (m.n3.rq) { const q = unb64(m.n3.rq); if (q.length > S.region) S.rate = q[S.region]; }
       else if (o.groupRate) { const hz = o.groupRate(m); if (hz != null) S.rate = rateByte(hz) || S.rate; }
+      if (S.clock != null) return;                                 // the clock is held by the test hook (debugTime): no new spikes
       const b = unb64(m.n3.sq), play = Math.min(600, S.gap) / 1000, t = clock(now);
       const n = spikable().length;
       for (let i = 0; i + 2 < b.length; i += 3) { if (b[i] !== S.region || !n) continue;
