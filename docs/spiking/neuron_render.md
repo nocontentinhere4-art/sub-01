@@ -93,7 +93,10 @@ Sources:
 - **Fluorescence:** GFP-like green (a few cells tdTomato-like orange: the basket cells in cortex, ~15 % of the mid tier
   elsewhere) on black; intensity grows with the thickness traversed (thick processes and somata brightest), a faint
   bluish myelin channel; bloom. **3D render:** soft wrap lighting, a reddish translucent edge, pale cream myelin, a
-  lavender nucleus; dim cooler tissue around. Toggle in the HUD (top right of the brain) or `nr.setStyle()`.
+  lavender nucleus; dim cooler tissue around. Toggle in the HUD (top right of the brain) or `nr.setStyle()`. In cortex the
+  render style draws 3 hero cells and half the mid tier (five full arbors overlapped into a ball of yarn); `info().triangles`
+  follows. The bottom-left overlay shows cells, triangles and live/offline; fps only with `?debug` in the page's URL (or
+  `debug: true`). While a close-up is open the page's right-hand panel gets a dark translucent scrim (`body.closeup #dock`).
 - **Depth of field:** every material writes linear depth into the alpha channel of the scene target; the composite
   mixes the sharp image with a quarter-resolution blur by the distance from the focus cell's depth (sharp within ±8 %
   of 2.5 × the camera distance). **Bloom:** bright pass of the quarter-resolution image, two wide blurs, added.

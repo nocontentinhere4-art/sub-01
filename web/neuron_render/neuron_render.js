@@ -490,7 +490,9 @@
     const kind = o.kind, Kd = KINDS[kind];
     if (!Kd) throw new Error("NeuronRender.open: unknown kind " + kind);
     const isPhone = () => (root.innerWidth || 1000) < 700;
+    const DEBUG = o.debug != null ? !!o.debug : /[?&]debug\b/.test(root.location ? root.location.search : "");   // fps in the overlay only then
     const S = { kind, region: o.region, label: o.label || "", style: o.style === "render" ? "render" : "fluorescence", lodName: o.lod || "auto",
+                trimTri: 0,
                 live: !!o.live, lastWall: o.live ? performance.now() : -1e9, forcedOffline: false, rate: 0, rateT: 0, spikes: 0, gap: 200, prev: 0,
                 onScreen: true, closed: false, fps: 0, jsMs: 0, frames: 0, jsSum: 0, fpsAt: performance.now(), focus: 0, t0: performance.now(),
                 userTouched: false, zoomedOut: false };
@@ -679,6 +681,15 @@
       matComp.uniforms.uExposure.value = fl ? 1.25 : 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : 0.6;
       matComp.uniforms.uBg.value.set(fl ? 0.002 : 0.015, fl ? 0.006 : 0.018, fl ? 0.003 : 0.028);
       hud.querySelectorAll("button[data-s]").forEach(b => b.classList.toggle("on", b.dataset.s === S.style));
+      // the 3D-render style of cortex is dense (five full arbors overlap): there, only 3 hero cells and half the mid tier
+      if (built && kind === "cortex") {
+        const lighter = !fl;
+        S.trimTri = 0;
+        for (const c of cells) if (c.tier === "hero") { const mesh = meshes.find(m => m.geometry === c.geom); const hide = lighter && cells.indexOf(c) >= 3;
+          if (mesh) mesh.visible = !hide; if (hide) S.trimTri += c.tri; }
+        for (const T of sets) if (T.tier === "mid") { const full = T.full != null ? T.full : (T.full = T.geom.instanceCount);
+          T.geom.instanceCount = lighter ? Math.max(2, Math.round(full * 0.5)) : full; S.trimTri += (full - T.geom.instanceCount) * T.tri; }
+      }
     }
     function setStyle(s) { if (s !== "render" && s !== "fluorescence") return; if (S.style === s) return; S.style = s; applyStyle(); if (o.onInfo) o.onInfo(info()); }
     // size and render targets
@@ -736,7 +747,7 @@
       render(now);
       S.jsSum += performance.now() - t; S.frames++;
       if (now - S.fpsAt >= 1000) { S.fps = S.frames * 1000 / (now - S.fpsAt); S.jsMs = S.frames ? S.jsSum / S.frames : 0; S.frames = 0; S.jsSum = 0; S.fpsAt = now;
-        const i = info(); const txt = `${i.cells} cells · ${(i.triangles / 1000).toFixed(0)}k triangles · ${i.live ? "live" : "offline: static"} · ${i.fps.toFixed(0)} fps`;
+        const i = info(); const txt = `${i.cells} cells · ${(i.triangles / 1000).toFixed(0)}k triangles · ${i.live ? "live" : "offline: static"}` + (DEBUG ? ` · ${i.fps.toFixed(0)} fps` : "");
         if (stat.textContent !== txt) stat.textContent = txt; }
     }
     root.requestAnimationFrame(frame);
@@ -767,7 +778,7 @@
     function info() {
       const types = {}; for (const c of cells) types[c.type] = (types[c.type] || 0) + 1;
       return { kind, region: S.region, label: S.label, style: S.style, lod: lodOf(), cells: cells.length, heroCells: counts.heroCells,
-        triangles: counts.triangles, triangleCap: L.cap, lineSegments: counts.lines, spines: counts.spines, spineUm: Math.round(counts.spineUm), dendUm: Math.round(counts.dendUm),
+        triangles: counts.triangles - S.trimTri, triangleCap: L.cap, lineSegments: counts.lines, spines: counts.spines, spineUm: Math.round(counts.spineUm), dendUm: Math.round(counts.dendUm),
         boutons: counts.boutons, nodesOfRanvier: counts.nodes, drawCalls: counts.drawCalls, live: isLive(), spikes: S.spikes, fps: S.fps, jsMs: S.jsMs,
         offScreen: !S.onScreen, slowdown: SLOWDOWN, halfFloat: halfOk, webgl2: isGL2,
         types: Object.keys(types).map(t => ({ type: t, n: types[t], species: CELLS.cells[t].species, id: CELLS.cells[t].nmo_id, radii: CELLS.cells[t].radii, myelinated: !!TYPES[t].myelin, spines: TYPES[t].spines })) };
