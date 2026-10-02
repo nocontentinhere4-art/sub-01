@@ -101,3 +101,18 @@ https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`
 
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).
+
+## The view out of the window (#98 G7)
+`web/room/window_view.js` draws the outside on the glass marker (`SURF_window`): a parallax shader that casts each view
+ray from the room's camera through the glass onto cards behind it (the house across the lane, a row of apartment blocks,
+the far skyline, the street plane, the sky at infinity), so the view has true depth from every camera. The cards in
+`web/room/window/` (`near`, `mid`, `far`, `ground`, their lights masks `*_l` and `noise`, WebP, under 200 KB together) are
+drawn entirely from code by `room_build/window_cards.py` (Pillow + numpy, one fixed seed): no photographs, no downloaded
+assets, no fonts, no text, no brands, no signage, no real landmark copied (the towers are generic shapes). Everything in
+this section is original work made for this project and released under **CC0 1.0**. Rebuild:
+
+    python room_build/window_cards.py --preview     # ~30 s; writes web/room/window/*.webp and room_build/out/window_cards.png
+
+The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
+pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented
+as a forecast or an observation.
