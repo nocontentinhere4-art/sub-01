@@ -319,6 +319,12 @@ findings "NOT verified", and its reviews are partial on large diffs.
   - Same 24-bone rig as `boy.glb`; the existing clips are retargeted with `room_build/retarget_meshy.mjs`.
   - Branch `claude/loving-davinci-6hqmjx` (bd5804e); preview in `docs/design/boy3/`.
   - The #76 worker compares boy2 (MakeHuman, with fingers and blink) and boy3 in the room and picks one in #80.
+  - **Decision (owner, 20:40 UTC): keep the ORIGINAL character (`boy.glb`).**
+    - He saw boy4 (boy3's outfit with the original face) and said "bruttissimo, meglio il nostro personaggio
+      originale".
+    - boy2, boy3 and boy4 are not shipped. They stay only on branch `claude/loving-davinci-6hqmjx`, unmerged.
+    - #80 is now limited to better motion for the original rig (new clips retargeted, where they beat the current
+      ones) and the room fixes. If nothing retargets cleanly, #80 is closed.
 
 **Pass 33b:** live check (the coordinator logged in with the owner's approval) and merge of #92 (#89).
 - **Sleep fix confirmed live:** NREM since 03:19 Tokyo, debt 2.0 h, woken 0×. The day-live pod stopped; only "BRAIN" is left.
