@@ -59,8 +59,9 @@ From `room_build/`, with Blender 4.2 and Node 22:
 A fictional young Japanese man of about 20, made with **MakeHuman / MPFB 2** (https://static.makehumancommunity.org,
 MPFB 2.0.17 for Blender 4.2, an add-on under GPL 3; models exported from it are CC0). He is MakeHuman's generic average
 body set to male, about 20, "Asian" macro, slim; no face sliders were moved to look like anyone, and he is not modelled
-on any real person. Every part is CC0 from the MakeHuman community asset packs
-(https://static.makehumancommunity.org/assets/assetpacks.html):
+on any real person. The parts come from the MakeHuman community asset packs
+(https://static.makehumancommunity.org/assets/assetpacks.html); all are CC0 except the hoodie and the slides, which are
+**CC-BY 4.0 by Elvaerwyn** (attribution below, changes listed in the table):
 
 | part | asset | pack | author | licence |
 |---|---|---|---|---|
@@ -68,21 +69,29 @@ on any real person. Every part is CC0 from the MakeHuman community asset packs
 | skin | `young_asian_male` (re-tinted) | makehuman_system_assets | MakeHuman team | CC0 |
 | eyes | `low-poly` eyes, `brown` material (hue shifted to dark brown) | makehuman_system_assets | MakeHuman team | CC0 |
 | eyebrows, eyelashes | `eyebrow001`, `eyelashes01` | makehuman_system_assets | MakeHuman team | CC0 |
-| hair | `short02` (darkened) | makehuman_system_assets | MakeHuman team | CC0 |
-| sweater | `toigo_fisherman_sweater` (re-dyed navy) | shirts01 | Margaret Toigo | CC0 |
-| trousers | `toigo_wool_pants` (re-dyed charcoal) | pants01 | Margaret Toigo | CC0 |
-| socks | `joepal_crude_low_socks` (light grey) | underwear04 | Joel Palmius | CC0 |
+| hair | `culturalibre_hair_05` (darkened, decimated; original by swift502, CC0, blendswap.com/blend/24099) | hair01 | culturalibre | CC0 |
+| hoodie | `elvs_hooded_sweat_jacket1` "Hooded sweat jacket" (re-dyed navy, fitted to a male chest, decimated; makehumancommunity.org/node/1450) | shirts02 | **Elvaerwyn** | **CC-BY** |
+| T-shirt under the hoodie | painted on the skin of the chest (original work) | | this project | CC0 |
+| joggers | `toigo_wool_pants` (re-dyed heather grey, loosened and tapered at the ankles) | pants01 | Margaret Toigo | CC0 |
+| socks | `joepal_crude_low_socks` (white) | underwear04 | Joel Palmius | CC0 |
+| slides | `elvs_male_flip_flop_sandals1` "Male flip flop sandals" (black, decimated; makehumancommunity.org/node/1453) | shoes02 | **Elvaerwyn** | **CC-BY** |
+| fabric weave (colour variation, roughness, relief) | `jersey_melange` (hoodie), `jogging_melange` (joggers), `cotton_jersey` (socks) | Poly Haven | colormass, Rico Cilliers | CC0 |
 | blink (eyelids and lashes) | `eyeBlinkLeft`, `eyeBlinkRight` face units | faceunits01 | Mika Suominen | CC0 |
 
+Hoodie and slides: © Elvaerwyn, CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/), from the MakeHuman community
+asset packs shirts02 and shoes02; modified as listed above.
+
 `room_build/build_boy.py` (headless Blender + MPFB) assembles him, poses him into the old rig's rest pose, deletes the
-skin under the clothes, bakes one 2048² atlas (skin, eyes, clothes) and one 1024² atlas (hair, brows, lashes, alpha
-tested) and exports the bind pose. `room_build/boy_post.mjs` gives him the old skeleton's bone names and frames (so
+skin under the clothes, bakes 2048² atlases for the skin, eyes and clothes (colour, normal map, and occlusion/roughness;
+the skin's pores and the fabrics' weave are baked in) and a 1024² one for the hair, brows and lashes (colour and
+alpha, alpha tested), and exports the bind pose. `room_build/boy_post.mjs` gives him the old skeleton's bone names and frames (so
 every clip of the old rig plays on him), plus finger, eye and socket bones, a `blink` morph, and writes `boy2.glb`, a
 `boy2_<clip>.glb` for every `boy_<clip>.glb`, and `boy2_hands.glb` (finger poses). The clips themselves are the old
 ones (below), retargeted; the finger poses are original work for this project (CC0).
 
 Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension, its user data folder holding the packs above):
 
+    python ph.py tex 1k jersey_melange jogging_melange cotton_jersey
     node boy_ref.mjs                     # the old rig's rest pose and palms -> out/boy_ref.json
     blender -b -P build_boy.py           # -> out/boy2_raw.glb, out/boy2_bind.json, out/boy2_*.png (about 2 minutes)
     node boy_post.mjs                    # -> ../web/room/boy2*.glb
@@ -91,9 +100,10 @@ Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension, its user data 
 `web/boy_test.html` plays every clip and finger pose (`?cmp` puts the old one next to him).
 
 ## The first character
-`boy.glb` and the clips `boy_*.glb` (shown by default) are the earlier AI-generated character (Meshy, via Higgsfield),
-and `hand_phone.glb` the phone-gripping hand (GPT Image + Tripo); the clips are Meshy animations re-rigged on its
-skeleton.
+`boy.glb` and the clips `boy_*.glb` (shown by default) are the earlier AI-generated character (Meshy, via Higgsfield;
+generated content under those services' terms, not a Creative Commons licence), and `hand_phone.glb` the
+phone-gripping hand (GPT Image + Tripo, via Higgsfield); the clips are Meshy library animations re-rigged on its
+skeleton. The second character plays the same clips, retargeted.
 
 ## Map card
 The map of his neighbourhood (room card and `/life`) is © OpenStreetMap contributors (ODbL,

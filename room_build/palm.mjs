@@ -19,3 +19,14 @@ export function handPoints(prim, skin, side) {
     if (s > 0.9) out.push(new THREE.Vector3(...P.getElement(i, p)).applyMatrix4(inv)); }
   return out;
 }
+// the axis of a limb segment, measured on the skin: the principal direction of the vertices skinned (> 60 %) to `bone`
+// (world space, the bind pose), pointing the bone's way (+y). `verts` are world positions, `weightOf(i)` that weight
+export function limbAxis(verts, weightOf, boneY) {
+  const pts = verts.filter((_, i) => weightOf(i) > 0.6); if (pts.length < 20) return null;
+  const c = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(pts.length);
+  const m = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (const p of pts) { const d = [p.x - c.x, p.y - c.y, p.z - c.z]; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) m[i][j] += d[i] * d[j]; }
+  let v = new THREE.Vector3(...boneY).normalize();                 // power iteration from the bone's direction
+  for (let k = 0; k < 50; k++) v = new THREE.Vector3(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z, m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z, m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z).normalize();
+  return v.dot(new THREE.Vector3(...boneY)) < 0 ? v.negate() : v;
+}

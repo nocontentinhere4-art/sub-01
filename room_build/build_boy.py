@@ -40,20 +40,30 @@ AGE = 0.1875 + (20 - 11) / (25 - 11) * 0.3125      # MakeHuman's age slider: 0.1
 MACRO = {"gender": 1.0, "age": AGE, "muscle": 0.45, "weight": 0.36, "proportions": 0.55, "height": 0.42,
          "cupsize": 0.5, "firmness": 0.5, "race": {"asian": 1.0, "caucasian": 0.0, "african": 0.0}}
 HEIGHT = 1.71                                       # metres, top of the head (the old one: 1.72)
-# parts: (mhclo, kind, mhmat or None for the asset's own, colour treatment)
-#   tint (r, g, b): texture x colour; grey (r, g, b): texture's luminance x colour (re-dyes a coloured garment);
-#   hsv (hue shift, saturation, value)
+# the parts. color: tint (r, g, b) = texture x colour; grey (r, g, b) = the texture's luminance x colour (re-dyes a
+# garment); hsv (hue shift, saturation, value). Colours are linear. fabric: a Poly Haven CC0 cloth (room_build/tex/<id>,
+# `python ph.py tex 1k <id>`) whose weave tints, roughens and bumps the garment, tiled at its real size. normal: the
+# strength of the garment's own normal map (seams, zip, pocket). rough: a fixed roughness. decimate: the share of
+# triangles kept. texel: its share of the atlas. role: what the build does with it (the top hides the trousers' waist,
+# the trousers become joggers)
 PARTS = [
-    ("eyes/low-poly/low-poly.mhclo", "eyes", "eyes/materials/brown.mhmat", ("hsv", (0.035, 0.72, 0.68))),
-    ("eyebrows/eyebrow001/eyebrow001.mhclo", "eyebrows", None, ("tint", (0.22, 0.18, 0.16))),
-    ("eyelashes/eyelashes01/eyelashes01.mhclo", "eyelashes", None, None),
-    ("hair/short02/short02.mhclo", "hair", None, ("tint", (0.17, 0.14, 0.12))),
-    # colours are linear: a navy sweater, charcoal trousers, light grey socks
-    ("clothes/toigo_fisherman_sweater/toigo_fisherman_sweater.mhclo", "clothes", None, ("grey", (0.053, 0.075, 0.165))),
-    ("clothes/toigo_wool_pants/toigo_wool_pants.mhclo", "clothes", None, ("grey", (0.105, 0.105, 0.115))),
-    ("clothes/joepal_crude_low_socks/joepal_crude_low_socks.mhclo", "clothes", None, ("grey", (0.50, 0.50, 0.49))),
+    dict(mhclo="eyes/low-poly/low-poly.mhclo", kind="eyes", mhmat="eyes/materials/brown.mhmat", color=("hsv", (0.035, 0.72, 0.62)), rough=0.04, texel=0.05),
+    dict(mhclo="eyebrows/eyebrow001/eyebrow001.mhclo", kind="eyebrows", color=("tint", (0.09, 0.07, 0.06)), rough=0.7, texel=0.14),
+    dict(mhclo="eyelashes/eyelashes01/eyelashes01.mhclo", kind="eyelashes", color=("tint", (0.25, 0.22, 0.2)), rough=0.7, texel=0.12),
+    dict(mhclo="hair/culturalibre_hair_05/culturalibre_hair_05.mhclo", kind="hair", color=("tint", (0.085, 0.068, 0.058)), rough=0.5, decimate=0.6, texel=1.0),
+    # a navy zip hoodie (hood down) over a dark T-shirt, heather-grey joggers, white socks, black slides
+    dict(mhclo="clothes/elvs_hooded_sweat_jacket1/elvs_hooded_sweat_jacket1.mhclo", kind="clothes", role="top", color=("grey", (0.030, 0.040, 0.085)),
+         fabric="jersey_melange", normal=0.45, decimate=0.22, texel=0.42),
+    dict(mhclo="clothes/toigo_wool_pants/toigo_wool_pants.mhclo", kind="clothes", role="bottom", color=("grey", (0.16, 0.16, 0.165)),
+         fabric="jogging_melange", loosen=0.008, decimate=0.62, texel=0.3),
+    dict(mhclo="clothes/joepal_crude_low_socks/joepal_crude_low_socks.mhclo", kind="clothes", role="socks", color=("grey", (0.62, 0.62, 0.6)),
+         fabric="cotton_jersey", texel=0.05),
+    dict(mhclo="clothes/elvs_male_flip_flop_sandals1/elvs_male_flip_flop_sandals1.mhclo", kind="clothes", role="feet", color=("grey", (0.03, 0.03, 0.032)),
+         rough=0.45, decimate=0.04, texel=0.05),
 ]
-SKIN = ("skins/young_asian_male/young_asian_male.mhmat", ("tint", (0.98, 0.90, 0.82)))
+SKIN = dict(mhmat="skins/young_asian_male/young_asian_male.mhmat", kind="skin", color=("tint", (0.93, 0.76, 0.64)), rough=0.5, pores=True, texel=2.6)
+FABRIC_TILE = {"jersey_melange": 0.29, "jogging_melange": 0.27, "cotton_jersey": 0.26}    # metres per tile (Poly Haven)
+TEX = os.path.join(HERE, "tex")
 ALPHA_KINDS = {"hair", "eyebrows", "eyelashes"}
 
 
@@ -72,23 +82,30 @@ def build_human():
     base.name = "body"
     rig = HumanService.add_builtin_rig(base, "game_engine", import_weights=True)
     parts = []
-    for mhclo, kind, mhmat, col in PARTS:
-        o = HumanService.add_mhclo_asset(asset(mhclo), base, asset_type=kind, subdiv_levels=0, material_type="MAKESKIN")
-        o["kind"] = kind; o["mhmat"] = asset(mhmat) if mhmat else ""; o["color"] = json.dumps(col)
-        o["mhclo"] = mhclo
+    for P in PARTS:
+        o = HumanService.add_mhclo_asset(asset(P["mhclo"]), base, asset_type=P["kind"], subdiv_levels=0, material_type="MAKESKIN")
+        o["kind"] = P["kind"]; o["part"] = json.dumps(P)
         parts.append(o)
-    base["kind"] = "skin"; base["mhmat"] = asset(SKIN[0]); base["color"] = json.dumps(SKIN[1])
+    base["kind"] = "skin"; base["part"] = json.dumps(SKIN)
     return base, rig, parts
 
 
 def read_mhmat(path):
-    tex = None
+    """(diffuse texture, normal map) files of a MakeHuman material."""
+    out = {}
     for line in open(path, encoding="utf-8", errors="replace"):
-        if line.startswith("diffuseTexture"):
-            name = line.split(None, 1)[1].strip()
-            for cand in (os.path.join(os.path.dirname(path), name), os.path.join(os.path.dirname(path), "textures", os.path.basename(name))):
-                if os.path.isfile(cand): tex = cand
-    return tex
+        for key in ("diffuseTexture", "normalmapTexture"):
+            if line.startswith(key + " "):
+                name = line.split(None, 1)[1].strip()
+                for cand in (os.path.join(os.path.dirname(path), name), os.path.join(os.path.dirname(path), "textures", os.path.basename(name))):
+                    if os.path.isfile(cand): out[key] = cand
+    return out.get("diffuseTexture"), out.get("normalmapTexture")
+
+
+def part(o): return json.loads(o["part"])
+
+
+def role(parts, r): return next((p for p in parts if part(p).get("role") == r), None)
 
 
 def mean_luminance(image):
@@ -101,39 +118,98 @@ def mean_luminance(image):
     return float((lin @ np.array([0.2126, 0.7152, 0.0722])).mean())
 
 
+def uv_tiling(o, tile):
+    """How many times a fabric tile of `tile` metres repeats per unit of the part's own UVs (from areas)."""
+    me = o.data; uv = me.uv_layers[0].data; a3 = auv = 0.0
+    for p in me.polygons:
+        a3 += p.area; pts = [uv[i].uv for i in p.loop_indices]
+        auv += abs(sum(pts[k].x * pts[(k + 1) % len(pts)].y - pts[(k + 1) % len(pts)].x * pts[k].y for k in range(len(pts)))) / 2
+    return math.sqrt(a3 / max(auv, 1e-9)) / tile
+
+
 def source_material(o):
-    """A plain material for each part: its CC0 diffuse texture (re-dyed per PARTS), read through the part's own UVs."""
-    mhmat = o["mhmat"] or ""
+    """A material for each part, read through the part's own UVs: its CC0 colour texture (re-dyed per PARTS), and the
+    roughness and normal (garment normal map, fabric weave, skin pores) the bake turns into the atlases."""
+    P = part(o)
+    mhmat = asset(P["mhmat"]) if P.get("mhmat") else ""
     if not mhmat:            # the asset's own material file sits next to its mhclo
-        d = os.path.dirname(asset(o["mhclo"]))
+        d = os.path.dirname(asset(P["mhclo"]))
         mhmat = next((os.path.join(d, f) for f in sorted(os.listdir(d)) if f.endswith(".mhmat")), "")
-    tex = read_mhmat(mhmat)
-    col = json.loads(o["color"])
+    tex, nrm = read_mhmat(mhmat)
+    col = P.get("color")
     m = bpy.data.materials.new("src_" + o.name); m.use_nodes = True
     nt = m.node_tree; N, L = nt.nodes, nt.links
-    bsdf = N["Principled BSDF"]; bsdf.inputs["Roughness"].default_value = 0.7
+    bsdf = N["Principled BSDF"]
     uv = N.new("ShaderNodeUVMap"); uv.uv_map = o.data.uv_layers[0].name
     img = N.new("ShaderNodeTexImage"); img.image = bpy.data.images.load(tex, check_existing=True); img.name = "src"
     L.new(uv.outputs["UV"], img.inputs["Vector"])
     c = img.outputs["Color"]
+    def mul(a, b):          # colour x colour
+        mx = N.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = "MULTIPLY"; mx.inputs[0].default_value = 1.0
+        L.new(a, mx.inputs[6])
+        if isinstance(b, tuple): mx.inputs[7].default_value = (*b, 1.0)
+        else: L.new(b, mx.inputs[7])
+        return mx.outputs[2]
     if col and col[0] == "hsv":                  # hue shift, saturation, value (the eyes: red-brown to dark brown)
         hs = N.new("ShaderNodeHueSaturation"); h, sa, va = col[1]
         hs.inputs["Hue"].default_value = 0.5 + h; hs.inputs["Saturation"].default_value = sa; hs.inputs["Value"].default_value = va
-        L.new(c, hs.inputs["Color"]); c = hs.outputs["Color"]; col = None
-    if col:
-        mode, rgb = col
-        if mode == "grey":
-            bw = N.new("ShaderNodeRGBToBW"); L.new(c, bw.inputs["Color"]); c = bw.outputs["Val"]
-            # the garment's brightest knit/weave is about 1: keep its relief, centred on the new colour
-            ga = N.new("ShaderNodeMath"); ga.operation = "MULTIPLY_ADD"; ga.inputs[1].default_value = 0.7; ga.inputs[2].default_value = 0.5
-            L.new(c, ga.inputs[0]); c = ga.outputs[0]
-            # outside the garment's islands the texture is transparent black: a hem's UVs that reach there get the mean
-            fill = N.new("ShaderNodeMix"); fill.data_type = "FLOAT"; fill.inputs["A"].default_value = 0.5 + 0.7 * mean_luminance(img.image)
-            L.new(img.outputs["Alpha"], fill.inputs["Factor"]); L.new(c, fill.inputs["B"]); c = fill.outputs["Result"]
-        mix = N.new("ShaderNodeMix"); mix.data_type = "RGBA"; mix.blend_type = "MULTIPLY"; mix.inputs["Factor"].default_value = 1.0
-        L.new(c, mix.inputs["A"]); mix.inputs["B"].default_value = (*rgb, 1.0); c = mix.outputs["Result"]
+        L.new(c, hs.inputs["Color"]); c = hs.outputs["Color"]
+    elif col and col[0] == "grey":
+        bw = N.new("ShaderNodeRGBToBW"); L.new(c, bw.inputs["Color"]); c = bw.outputs["Val"]
+        # the garment's own light and dark (cuffs, seams, zip) kept, centred on the new colour
+        ga = N.new("ShaderNodeMath"); ga.operation = "MULTIPLY_ADD"; ga.inputs[1].default_value = 0.7; ga.inputs[2].default_value = 0.5
+        L.new(c, ga.inputs[0]); c = ga.outputs[0]
+        # outside the garment's islands the texture may be transparent: there it takes the mean
+        fill = N.new("ShaderNodeMix"); fill.data_type = "FLOAT"; fill.inputs[2].default_value = 0.5 + 0.7 * mean_luminance(img.image)
+        L.new(img.outputs["Alpha"], fill.inputs[0]); L.new(c, fill.inputs[3]); c = fill.outputs[0]
+        c = mul(c, tuple(col[1]))
+    elif col:
+        c = mul(c, tuple(col[1]))
+    rough = None; height = None
+    if P.get("fabric"):                          # the weave: its colour variation, roughness and relief, tiled at true size
+        fab = P["fabric"]; k = uv_tiling(o, FABRIC_TILE[fab])
+        mp = N.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (k, k, 1); L.new(uv.outputs["UV"], mp.inputs["Vector"])
+        def ftex(name, colour=False):
+            t = N.new("ShaderNodeTexImage"); t.image = bpy.data.images.load(os.path.join(TEX, fab, name), check_existing=True)
+            if not colour: t.image.colorspace_settings.name = "Non-Color"
+            L.new(mp.outputs["Vector"], t.inputs["Vector"]); return t
+        fd = ftex("Diffuse.jpg", True); fb = N.new("ShaderNodeRGBToBW"); L.new(fd.outputs["Color"], fb.inputs["Color"])
+        mean = mean_luminance(fd.image)
+        nm = N.new("ShaderNodeMath"); nm.operation = "MULTIPLY"; nm.inputs[1].default_value = 1 / max(mean, 1e-3); L.new(fb.outputs["Val"], nm.inputs[0])
+        st = N.new("ShaderNodeMix"); st.data_type = "FLOAT"; st.inputs[0].default_value = 0.4; st.inputs[2].default_value = 1.0
+        L.new(nm.outputs[0], st.inputs[3])
+        cc = N.new("ShaderNodeCombineColor"); [L.new(st.outputs[0], cc.inputs[i]) for i in range(3)]
+        c = mul(c, cc.outputs["Color"])
+        # cotton fleece is matt: the scan's roughness (mean ~0.6) mapped to 0.72-1
+        fr = N.new("ShaderNodeMapRange"); fr.inputs["To Min"].default_value = 0.72; fr.inputs["To Max"].default_value = 1.0
+        L.new(ftex("Rough.jpg").outputs["Color"], fr.inputs["Value"]); rough = fr.outputs["Result"]
+        height = ftex("Displacement.jpg").outputs["Color"]
+    if P.get("pores"):                           # skin: fine pores and a little roughness variation (original, procedural)
+        tc = N.new("ShaderNodeTexCoord"); nz = N.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 900.0
+        nz.inputs["Detail"].default_value = 2.0; L.new(tc.outputs["Object"], nz.inputs["Vector"]); height = nz.outputs["Fac"]
+        big = N.new("ShaderNodeTexNoise"); big.inputs["Scale"].default_value = 35.0; L.new(tc.outputs["Object"], big.inputs["Vector"])
+        rr = N.new("ShaderNodeMapRange"); rr.inputs["To Min"].default_value = P["rough"] - 0.08; rr.inputs["To Max"].default_value = P["rough"] + 0.1
+        L.new(big.outputs["Fac"], rr.inputs["Value"]); rough = rr.outputs["Result"]
+    normal = None
+    if nrm and P.get("normal"):
+        nimg = N.new("ShaderNodeTexImage"); nimg.image = bpy.data.images.load(nrm, check_existing=True); nimg.image.colorspace_settings.name = "Non-Color"
+        L.new(uv.outputs["UV"], nimg.inputs["Vector"])
+        nn = N.new("ShaderNodeNormalMap"); nn.uv_map = o.data.uv_layers[0].name; nn.inputs["Strength"].default_value = P["normal"]
+        L.new(nimg.outputs["Color"], nn.inputs["Color"]); normal = nn.outputs["Normal"]
+    if height is not None:
+        bp = N.new("ShaderNodeBump"); bp.inputs["Strength"].default_value = 0.25 if P.get("pores") else 0.3
+        bp.inputs["Distance"].default_value = 0.0004 if P.get("pores") else 0.0015
+        L.new(height, bp.inputs["Height"])
+        if normal is not None: L.new(normal, bp.inputs["Normal"])
+        normal = bp.outputs["Normal"]
+    if normal is not None: L.new(normal, bsdf.inputs["Normal"])
     rgb_out = N.new("NodeReroute"); rgb_out.name = "basecolor"; L.new(c, rgb_out.inputs[0])
     L.new(rgb_out.outputs[0], bsdf.inputs["Base Color"])
+    r_out = N.new("NodeReroute"); r_out.name = "rough"
+    if rough is not None: L.new(rough, r_out.inputs[0])
+    else:
+        rv = N.new("ShaderNodeValue"); rv.outputs[0].default_value = P.get("rough", 0.7); L.new(rv.outputs[0], r_out.inputs[0])
+    L.new(r_out.outputs[0], bsdf.inputs["Roughness"])
     a_out = N.new("NodeReroute"); a_out.name = "alpha"
     if o["kind"] in ALPHA_KINDS:
         L.new(img.outputs["Alpha"], a_out.inputs[0]); L.new(a_out.outputs[0], bsdf.inputs["Alpha"])
@@ -268,25 +344,37 @@ def palm_of(base, rig, pb_name):
     return (minor if (ct - c).dot(minor) > 0 else -minor).normalized()
 
 
+ARM_IN = 12.0                                      # degrees
+
+
 def pose_to_reference(base, rig, ref):
     """Turn MPFB's A-pose into the old rig's rest pose, bone by bone (directions, then elbow/knee hinges and palms)."""
     B = ref["bones"]; P = rig.pose.bones
     rig.data.pose_position = "POSE"
     bpy.context.view_layer.objects.active = rig; bpy.ops.object.mode_set(mode="POSE")
-    want = lambda n: g2b(B[MAP[n]]["y"]).normalized()
     front, back = Vector((0, -1, 0)), Vector((0, 1, 0))
+    # the new shoulders are ~4 cm wider than the old ones: the arm chains turn ARM_IN closer to the body in the bind pose
+    # (the bones keep the old frames), so the arms hang at his sides in every clip, as the old ones did
+    tilt = {}
+    for s in ("l", "r"):
+        q = Quaternion(front, math.radians(ARM_IN)); v = g2b(B[MAP[f"upperarm_{s}"]]["y"])
+        tilt[s] = q if abs((q @ v).x) < abs(v.x) else Quaternion(front, -math.radians(ARM_IN))
+    def adj(n, v):
+        v = g2b(v)
+        return (tilt[n[-1]] @ v) if n.split("_")[0] in ("upperarm", "lowerarm", "hand") else v
+    want = lambda n: adj(n, B[MAP[n]]["y"]).normalized()
     for s in ("l", "r"):
         for n in (f"clavicle_{s}", f"upperarm_{s}", f"lowerarm_{s}", f"thigh_{s}", f"calf_{s}", f"foot_{s}", f"ball_{s}"):
             rotate_pose(P[n], bone_dir(P[n]).rotation_difference(want(n)).to_matrix())
         # elbow: turn the upper arm about itself until MPFB's elbow hinge is the old one, then re-aim the forearm
         for up, lo, fr in ((f"upperarm_{s}", f"lowerarm_{s}", front), (f"thigh_{s}", f"calf_{s}", back)):
-            old = g2b(B[MAP[lo]]["hinge"])
+            old = adj(lo, B[MAP[lo]]["hinge"])
             a = twist_to(P[up], bone_dir(P[up]), hinge_of(P[lo], fr), old)
             rotate_pose(P[lo], bone_dir(P[lo]).rotation_difference(want(lo)).to_matrix())
             log(f"{up}: twisted {math.degrees(a):.0f} deg to the old hinge")
         # hand: aim it, then roll the palm onto the old one (half in the forearm, the rest at the wrist)
         h, lo = P[f"hand_{s}"], P[f"lowerarm_{s}"]
-        old_palm = g2b(B[MAP[h.name]]["palm"])
+        old_palm = adj(h.name, B[MAP[h.name]]["palm"])
         rotate_pose(h, bone_dir(h).rotation_difference(want(h.name)).to_matrix())
         for share in (0.3, 1.0, 1.0):
             pal = palm_of(base, rig, h.name)
@@ -357,10 +445,76 @@ def smooth_crotch(rig, pants, radius=0.11, iterations=24):
     log(f"crotch: {sum(1 for k in w.values() if k > 0)} trouser vertices smoothed")
 
 
+def joggers(rig, pants, top=0.30, bottom=0.07, squeeze=0.22):
+    """Straight trousers into joggers: each leg narrows towards the ankle (to `squeeze` less wide at the hem), gathered
+    like an elastic cuff. Heights in metres before scaling."""
+    me = pants.data
+    d = part(pants).get("loosen", 0)
+    for v in me.vertices: v.co += v.normal * d                 # a looser fit (slim trousers -> joggers)
+    pts = [pants.matrix_world @ v.co for v in me.vertices]
+    for side in (1, -1):
+        idx = [i for i, p in enumerate(pts) if p.x * side > 0 and p.z < top + 0.05]
+        # the leg's centre at each height (2 cm bands)
+        bands = {}
+        for i in idx: bands.setdefault(round(pts[i].z / 0.02), []).append(pts[i])
+        centre = {k: sum(v, Vector()) / len(v) for k, v in bands.items()}
+        for i in idx:
+            p = pts[i]
+            if p.z >= top: continue
+            t = min(1.0, (top - p.z) / (top - bottom)); f = 1 - squeeze * t * t * (3 - 2 * t)
+            c = centre[round(p.z / 0.02)]; q = Vector((c.x + (p.x - c.x) * f, c.y + (p.y - c.y) * f, p.z))
+            me.vertices[i].co = pants.matrix_world.inverted() @ q
+    me.update()
+
+
+def fit_top(base, top, max_gap=0.025, zmin=1.0):
+    """The hoodie is a women's cut: pull its front back to within `max_gap` of the body (no bust), then smooth there."""
+    dg = bpy.context.evaluated_depsgraph_get(); bm = bmesh.new(); bm.from_object(base, dg); bm.transform(base.matrix_world)
+    tree = BVHTree.FromBMesh(bm); bm.free()
+    me = top.data; mw = top.matrix_world; inv = mw.inverted(); moved = {}
+    for v in me.vertices:
+        p = mw @ v.co
+        if p.z < zmin or p.y > 0.02: continue                      # the front of the torso (he faces -y)
+        hit = tree.ray_cast(p, Vector((0, 1, 0)), 0.25)
+        if hit[0] is None: continue
+        gap = hit[3]
+        if gap > max_gap: moved[v.index] = (gap - max_gap)
+    for i, d in moved.items(): me.vertices[i].co = inv @ ((mw @ me.vertices[i].co) + Vector((0, d, 0)))
+    bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
+    sel = {i for i in moved}
+    for v in list(bm.verts):
+        if v.index in moved: sel.update(e.other_vert(v).index for e in v.link_edges)
+    for _ in range(4):
+        new = {}
+        for i in sel:
+            v = bm.verts[i]
+            if v.link_edges: new[v] = v.co + (sum((e.other_vert(v).co for e in v.link_edges), Vector()) / len(v.link_edges) - v.co) * 0.4
+        for v, co in new.items(): v.co = co
+    bm.to_mesh(me); bm.free(); me.update()
+    log(f"top: {len(moved)} vertices pulled to the body")
+
+
+def tshirt_under(base, rig, color=(0.022, 0.022, 0.025)):
+    """A dark crew-neck T-shirt under the open zip: the chest skin below the neck gets a cotton-jersey material."""
+    neck = (rig.matrix_world @ rig.data.bones["neck_01"].head_local).z
+    src = base.data.materials[0]; m = src.copy(); m.name = "src_tshirt"; nt = m.node_tree; N, L = nt.nodes, nt.links
+    rr = N["basecolor"]
+    for l in list(rr.inputs[0].links): L.remove(l)
+    rgb = N.new("ShaderNodeRGB"); rgb.outputs[0].default_value = (*color, 1.0); L.new(rgb.outputs[0], rr.inputs[0])
+    ro = N["rough"]
+    for l in list(ro.inputs[0].links): L.remove(l)
+    rv = N.new("ShaderNodeValue"); rv.outputs[0].default_value = 0.85; L.new(rv.outputs[0], ro.inputs[0])
+    base.data.materials.append(m); slot = len(base.data.materials) - 1; n = 0
+    for p in base.data.polygons:
+        c = base.matrix_world @ p.center
+        if c.z < neck - 0.035 and abs(c.x) < 0.2 and c.z > neck - 0.4: p.material_index = slot; n += 1
+    log(f"t-shirt: {n} faces")
+
+
 def delete_hidden_skin(base, covers, reach=0.035, inset=0.002):
     """Delete the skin under the clothes: a face goes when every corner sees cloth within `reach` along its normal
-    (hair is alpha-tested, so the scalp stays). Also used for the trousers' waist under the sweater: there the ray
-    starts `inset` inside, so the bits that poke through the sweater's hem go as well."""
+    (hair is alpha-tested, so the scalp stays). Also used for the trousers' waist under the top: there the ray
+    starts `inset` inside, so the bits that poke through the top's hem go as well."""
     dg = bpy.context.evaluated_depsgraph_get()
     trees = []
     for c in covers:
@@ -410,17 +564,27 @@ def delete_enclosed(base, others, above=1.3, reach=0.12, share=0.9):
 
 
 # triangle budget: these parts are decimated (edge collapse keeps their UVs and weights)
-DECIMATE = {"short02": 0.62, "toigo_wool_pants": 0.62}
-
-
 def decimate(objs):
+    """Edge-collapse the parts PARTS gives a `decimate` share (it keeps their UVs and weights)."""
     for o in objs:
-        r = next((v for k, v in DECIMATE.items() if o.name.endswith(k)), None)
+        r = part(o).get("decimate")
         if not r: continue
         bpy.context.view_layer.objects.active = o
         m = o.modifiers.new("dec", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.ratio = r; m.use_collapse_triangulate = False
         bpy.ops.object.modifier_move_to_index(modifier="dec", index=0)
         bpy.ops.object.modifier_apply(modifier="dec")
+
+
+def decimate_body(base, rig, ratio=0.8):
+    """The skin below the neck (hands, feet, neck) loses a share of its triangles; the face keeps all of them."""
+    neck = (rig.matrix_world @ rig.data.bones["neck_01"].head_local).z
+    g = base.vertex_groups.new(name="decimate")
+    g.add([v.index for v in base.data.vertices if (base.matrix_world @ v.co).z < neck], 1.0, "REPLACE")
+    bpy.context.view_layer.objects.active = base
+    m = base.modifiers.new("dec", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.ratio = ratio; m.vertex_group = "decimate"
+    m.vertex_group_factor = 1.0; m.use_collapse_triangulate = False
+    bpy.ops.object.modifier_move_to_index(modifier="dec", index=0); bpy.ops.object.modifier_apply(modifier="dec")
+    base.vertex_groups.remove(base.vertex_groups["decimate"])
 
 
 def darken_scalp(base, color=(0.11, 0.085, 0.075), amount=0.85):
@@ -450,19 +614,13 @@ def join_parts(base, parts):
         while len(uvs) > 1: uvs.remove(uvs[-1])
         uvs[0].name = "UVMap"
         # the atlas UV starts as a copy, scaled per part by how much texture it deserves (the face most)
-        a = uvs.new(name="atlas"); w = math.sqrt(TEXEL.get(o["kind"] if o["kind"] != "clothes" else o.name.split(".", 1)[1], 0.3))
+        a = uvs.new(name="atlas"); w = math.sqrt(part(o).get("texel", 0.3))
         for d in a.data: d.uv = d.uv * w
-        for i, p in enumerate(o.data.polygons): pass
     bpy.ops.object.select_all(action="DESELECT")
     for o in objs: o.select_set(True)
     bpy.context.view_layer.objects.active = base
     bpy.ops.object.join()
     base.name = "boy2"; return base
-
-
-# relative texel share in the atlases (UV area scale before packing)
-TEXEL = {"skin": 2.6, "eyes": 0.04, "toigo_fisherman_sweater": 0.4, "toigo_wool_pants": 0.3, "joepal_crude_low_socks": 0.05,
-         "hair": 1.0, "eyebrows": 0.12, "eyelashes": 0.12}
 
 
 def pack_atlas(o):
@@ -483,36 +641,45 @@ def pack_atlas(o):
 
 
 def bake_atlas(o, size_main=2048, size_alpha=1024):
-    """Bake every part's (re-dyed) texture into the two atlases; returns (main RGB image, hair RGBA image)."""
+    """Bake every part's material into the atlases: for the opaque parts colour, tangent-space normal, roughness and
+    ambient occlusion (2048²); for the hair, brows and lashes colour and alpha (1024²). Saved as out/boy2_*.png."""
     sc = bpy.context.scene; sc.render.engine = "CYCLES"; sc.cycles.samples = 1; sc.cycles.device = "CPU"
     sc.render.bake.margin = 6; sc.render.bake.use_clear = True
-    main = bpy.data.images.new("atlas_main", size_main, size_main, alpha=False)
-    col = bpy.data.images.new("atlas_hair", size_alpha, size_alpha, alpha=False)
-    alp = bpy.data.images.new("atlas_hair_a", size_alpha, size_alpha, alpha=False)
-    def setup(which):
+    def img(name, size, data):
+        im = bpy.data.images.new(name, size, size, alpha=False, float_buffer=False)
+        if data: im.colorspace_settings.name = "Non-Color"
+        return im
+    I = {"color": img("main_color", size_main, False), "normal": img("main_normal", size_main, True),
+         "rough": img("main_rough", size_main, True), "ao": img("main_ao", size_main, True),
+         "hair_color": img("hair_color", size_alpha, False), "hair_alpha": img("hair_alpha", size_alpha, True)}
+    scratch = img("scratch", 64, True)
+    def setup(src, main, hair, emit=True):
+        """Each material: what goes to the output (an emission of reroute `src`, or the BSDF) and the bake target."""
         for m in o.data.materials:
-            nt = m.node_tree; N, L = nt.nodes, nt.links
-            em = N.get("bake_emit") or N.new("ShaderNodeEmission"); em.name = "bake_emit"
-            out = N["Material Output"]
-            src = N["basecolor"] if which == "color" else N["alpha"]
-            for l in list(em.inputs["Color"].links): L.remove(l)
-            if src.inputs[0].links: L.new(src.outputs[0], em.inputs["Color"])
-            else: em.inputs["Color"].default_value = (1, 1, 1, 1)
-            L.new(em.outputs[0], out.inputs["Surface"])
+            nt = m.node_tree; N, L = nt.nodes, nt.links; out = N["Material Output"]
+            if emit:
+                em = N.get("bake_emit") or N.new("ShaderNodeEmission"); em.name = "bake_emit"
+                for l in list(em.inputs["Color"].links): L.remove(l)
+                r = N[src]
+                if r.inputs[0].links: L.new(r.outputs[0], em.inputs["Color"])
+                else: em.inputs["Color"].default_value = (1, 1, 1, 1)
+                L.new(em.outputs[0], out.inputs["Surface"])
+            else: L.new(N["Principled BSDF"].outputs[0], out.inputs["Surface"])
             t = N.get("bake_target") or N.new("ShaderNodeTexImage"); t.name = "bake_target"
-            t.image = (alp if which == "alpha" else col) if m.get("alpha") else main
+            t.image = (hair or scratch) if m.get("alpha") else (main or scratch)
             N.active = t; t.select = True
-    for which in ("color", "alpha"):
-        setup(which)
-        if which == "alpha":     # only the hair image needs the alpha pass: keep the main atlas from being re-baked
-            for m in o.data.materials:
-                if not m.get("alpha"): m.node_tree.nodes["bake_target"].image = bpy.data.images.get("scratch") or bpy.data.images.new("scratch", 64, 64)
+    def bake(kind, **kw):
         bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
-        bpy.ops.object.bake(type="EMIT", uv_layer="atlas", margin=6, use_clear=True)
-        log("baked", which)
-    for im, nm in ((main, "boy2_main.png"), (col, "boy2_hair_rgb.png"), (alp, "boy2_hair_a.png")):
-        im.filepath_raw = os.path.join(OUT, nm); im.file_format = "PNG"; im.save()
-    return main, col, alp
+        bpy.ops.object.bake(type=kind, uv_layer="atlas", margin=6, use_clear=True, **kw)
+    setup("basecolor", I["color"], I["hair_color"]); bake("EMIT"); log("baked colour")
+    setup("alpha", None, I["hair_alpha"]); bake("EMIT"); log("baked alpha")
+    setup("rough", I["rough"], None); bake("EMIT"); log("baked roughness")
+    setup(None, I["normal"], None, emit=False); bake("NORMAL", normal_space="TANGENT"); log("baked normals")
+    sc.cycles.samples = 48
+    setup(None, I["ao"], None, emit=False); bake("AO"); log("baked ambient occlusion")
+    for k, im in I.items():
+        im.filepath_raw = os.path.join(OUT, f"boy2_{k}.png"); im.file_format = "PNG"; im.save()
+    return I
 
 
 def final_materials(o):
@@ -556,7 +723,7 @@ def export(o, rig):
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, "boy2_raw.glb"), use_selection=True, export_format="GLB",
                               export_skins=True, export_morph=True, export_morph_normal=False, export_animations=False,
                               export_materials="PLACEHOLDER", export_texcoords=True, export_normals=True, export_yup=True,
-                              export_def_bones=False, export_all_influences=False, export_attributes=False)
+                              export_def_bones=False, export_all_influences=False, export_attributes=False, export_tangents=True)
     # the joints in glTF axes (metres), for boy_post.mjs: heads, tails and frames of MPFB's bones in the bind pose
     bones = {}
     for b in rig.data.bones:
@@ -586,13 +753,14 @@ if __name__ == "__main__":
         render_preview("boy2_hand", [base] + parts, views=(("front", 0), ("out", 90), ("back", 180)), focus=hl, scale=0.35)
     apply_pose(rig, [base] + parts)
     add_eye_bones(rig, next(p for p in parts if p["kind"] == "eyes"))
-    sweater = next(p for p in parts if p.name.endswith("sweater")); pants = next(p for p in parts if p.name.endswith("pants"))
-    smooth_crotch(rig, pants)
+    sweater = role(parts, "top"); pants = role(parts, "bottom")
+    smooth_crotch(rig, pants); joggers(rig, pants); fit_top(base, sweater)
     delete_hidden_skin(base, [p for p in parts if p["kind"] == "clothes"], inset=0.02)
     delete_hidden_skin(pants, [sweater], reach=0.07, inset=0.03)
     delete_enclosed(base, [p for p in parts if p["kind"] == "eyes"])
     decimate(parts)
-    darken_scalp(base)
+    darken_scalp(base); tshirt_under(base, rig)
+    decimate_body(base, rig)
     for o in [base] + parts:
         for m in o.data.materials: m["alpha"] = o["kind"] in ALPHA_KINDS; m["kind"] = o["kind"]
     log("triangles:", {o.name: tris(o) for o in [base] + parts}, "total", sum(tris(o) for o in [base] + parts))

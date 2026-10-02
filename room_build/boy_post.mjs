@@ -154,18 +154,27 @@ skin.setInverseBindMatrices(ibm); meshNode.setSkin(skin);
 
 // ------------------------------------------------------------------ materials: one opaque atlas, one alpha-tested
 const [primBody, primHair] = mesh.listPrimitives();
-const mainPng = await sharp("out/boy2_main.png").removeAlpha().webp({quality: 88}).toBuffer();
-const hairRgb = await sharp("out/boy2_hair_rgb.png").removeAlpha().raw().toBuffer({resolveWithObject: true});
-const hairA = await sharp("out/boy2_hair_a.png").greyscale().raw().toBuffer();
+const mainPng = await sharp("out/boy2_color.png").removeAlpha().webp({quality: 90}).toBuffer();
+const normalPng = await sharp("out/boy2_normal.png").removeAlpha().webp({quality: 92}).toBuffer();
+// occlusion, roughness, metalness (glTF's R, G, B): the AO softened (it is baked in the bind pose), no metal
+const ao = await sharp("out/boy2_ao.png").greyscale().raw().toBuffer({resolveWithObject: true}), rg = await sharp("out/boy2_rough.png").greyscale().raw().toBuffer();
+const orm = Buffer.alloc(ao.info.width * ao.info.height * 3);
+for (let i = 0; i < ao.info.width * ao.info.height; i++) { orm[i * 3] = 255 - Math.round((255 - ao.data[i]) * 0.45); orm[i * 3 + 1] = rg[i]; orm[i * 3 + 2] = 0; }
+const ormPng = await sharp(orm, {raw: {width: ao.info.width, height: ao.info.height, channels: 3}}).webp({quality: 90}).toBuffer();
+const hairRgb = await sharp("out/boy2_hair_color.png").removeAlpha().raw().toBuffer({resolveWithObject: true});
+const hairA = await sharp("out/boy2_hair_alpha.png").greyscale().raw().toBuffer();
 const rgba = Buffer.alloc(hairRgb.info.width * hairRgb.info.height * 4);
 for (let i = 0; i < hairRgb.info.width * hairRgb.info.height; i++) {
   for (let c = 0; c < 3; c++) rgba[i * 4 + c] = hairRgb.data[i * 3 + c]; rgba[i * 4 + 3] = hairA[i];
 }
 const hairWebp = await sharp(rgba, {raw: {width: hairRgb.info.width, height: hairRgb.info.height, channels: 4}}).webp({quality: 88, alphaQuality: 90}).toBuffer();
 const texMain = doc.createTexture("boy2_body").setImage(mainPng).setMimeType("image/webp");
+const texNormal = doc.createTexture("boy2_body_normal").setImage(normalPng).setMimeType("image/webp");
+const texOrm = doc.createTexture("boy2_body_orm").setImage(ormPng).setMimeType("image/webp");
 const texHair = doc.createTexture("boy2_hair").setImage(hairWebp).setMimeType("image/webp");
 doc.createExtension(ALL_EXTENSIONS.find(e => e.EXTENSION_NAME === "EXT_texture_webp")).setRequired(true);
-const matBody = doc.createMaterial("boy2_body").setBaseColorTexture(texMain).setRoughnessFactor(0.82).setMetallicFactor(0);
+const matBody = doc.createMaterial("boy2_body").setBaseColorTexture(texMain).setNormalTexture(texNormal)
+  .setOcclusionTexture(texOrm).setMetallicRoughnessTexture(texOrm).setRoughnessFactor(1).setMetallicFactor(1);
 const matHair = doc.createMaterial("boy2_hair").setBaseColorTexture(texHair).setRoughnessFactor(0.65).setMetallicFactor(0)
   .setAlphaMode("MASK").setAlphaCutoff(0.4).setDoubleSided(true);
 primBody.setMaterial(matBody); primHair.setMaterial(matHair);

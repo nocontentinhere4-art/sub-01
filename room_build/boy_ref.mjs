@@ -6,7 +6,7 @@ import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { MeshoptDecoder } from "meshoptimizer";
 import * as THREE from "three";
-import { palmOf, handPoints } from "./palm.mjs";
+import { palmOf, handPoints, limbAxis } from "./palm.mjs";
 const [,, IN = "../web/room/boy.glb", OUT = "out/boy_ref.json"] = process.argv;
 await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({"meshopt.decoder": MeshoptDecoder});
@@ -25,5 +25,20 @@ for (const j of joints) {
 // the palms (world): build_boy.py rolls the new hands onto them
 const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0], skin = doc.getRoot().listSkins()[0];
 for (const side of ["Left", "Right"]) bones[side + "Hand"].palm = palmOf(handPoints(prim, skin, side)).applyQuaternion(new THREE.Quaternion(...bones[side + "Hand"].quat)).toArray();
+// the limbs' axes as the old mesh shows them (its auto-rig did not centre the bones in the arms): build_boy.py poses the
+// new arms and legs onto these, so they hang as close to the body as the old ones in every clip
+{
+  const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), W = prim.getAttribute("WEIGHTS_0"), names = skin.listJoints().map(j => j.getName());
+  const verts = [], jw = [];
+  // bind-pose world positions: the inverse of a joint's inverse bind matrix maps its space back to the world
+  const m0 = new THREE.Matrix4().fromArray(skin.getInverseBindMatrices().getElement(0, [])), w0 = new THREE.Matrix4().fromArray(skin.listJoints()[0].getWorldMatrix());
+  const toWorld = w0.multiply(m0);
+  for (let i = 0; i < P.getCount(); i++) { verts.push(new THREE.Vector3(...P.getElement(i, [])).applyMatrix4(toWorld)); jw.push([J.getElement(i, []), W.getElement(i, [])]); }
+  for (const b of ["LeftArm", "LeftForeArm", "RightArm", "RightForeArm", "LeftUpLeg", "LeftLeg", "RightUpLeg", "RightLeg"]) {
+    const ji = names.indexOf(b), wOf = i => { const [j, w] = jw[i]; let s = 0; for (let k = 0; k < 4; k++) if (j[k] === ji) s += w[k]; return s; };
+    const a = limbAxis(verts, wOf, bones[b].y); if (a) bones[b].axis = a.toArray();
+    console.log(b, "bone", bones[b].y.map(x => x.toFixed(2)).join(","), "mesh", a && a.toArray().map(x => x.toFixed(2)).join(","), "angle", a && (Math.acos(Math.min(1, a.dot(new THREE.Vector3(...bones[b].y)))) * 57.3).toFixed(1));
+  }
+}
 fs.writeFileSync(OUT, JSON.stringify({source: IN, bones}, null, 1));
 console.log(`${Object.keys(bones).length} bones -> ${OUT}`);
