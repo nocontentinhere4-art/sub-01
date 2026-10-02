@@ -260,7 +260,7 @@ def test_reader_keeps_a_7_day_history(monkeypatch):
 # --- 5. safety: the blocklist still applies -------------------------------------------------------------
 def test_blocklist_still_enforced(monkeypatch):
     # "museum history" would score high with memory active, but the blocked titles never reach the pick
-    links = ["Nazi history museum", "Massacre memorial archive", "Bitcoin history", "Bread"]
+    links = ["Nazi history museum", "Massacre memorial archive", "Casino history", "Bread"]
     fake_wiki(monkeypatch, links=links)
     for s in range(30):
         art = reader_after(seed=s).read(1000.0, [], MEMORY_HOT)
@@ -269,7 +269,8 @@ def test_blocklist_still_enforced(monkeypatch):
     fake_wiki(monkeypatch, links=["Ancient museum archive", "Bread"], blocked_extract={"Ancient museum archive"})
     for s in range(10):
         assert reader_after(seed=s).read(1000.0, [], MEMORY_HOT)["title"] == "Bread"
-    assert not R.safe("Crypto trading archive") and not R.safe("Suicide") and R.safe("Inokashira Park")
+    assert not R.safe("Casino archive") and not R.safe("Suicide") and R.safe("Inokashira Park")
+    assert R.safe("Bitcoin history")                      # finance may be read since #56 (read-only, never advice)
 
 
 def test_links_filter_uses_the_blocklist(monkeypatch):

@@ -611,7 +611,7 @@ class Mind:
             if a in used and b in used:
                 continue
             q = E.query_ok(f"{a} {b}")
-            if not q:
+            if not q or FINANCE.search(q):                        # the mind stays off finance (its FINANCE rule)
                 continue
             used |= {a, b}
             out.append({"query": q, "topics": [a, b],
@@ -622,7 +622,7 @@ class Mind:
             if len(out) >= n:
                 break
             q = E.query_ok(tp)
-            if q and tp not in used:
+            if q and tp not in used and not FINANCE.search(q):
                 used.add(tp)
                 out.append({"query": q, "topics": [tp], "why": f"read about {tp} recently"})
         return out
