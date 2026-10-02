@@ -116,6 +116,7 @@ def make_app(browser, token=None):
     async def state(request):
         return web.json_response({**browser.to_dict(), "screens": {k: s.status() for k, s in browser.screens.items()},
                                   "open": browser.browser is not None,
+                                  "sandbox": getattr(browser, "sandbox", None), "uid": os.getuid(),
                                   "typed": getattr(browser, "typed", [])[-30:],
                                   "dismissed": getattr(browser, "dismissed", [])[-30:]})
 

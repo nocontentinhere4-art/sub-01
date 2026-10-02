@@ -405,6 +405,25 @@ class Screen:
         return dict(self.info, id=self.shot_id, device=self.name, chain=self.chain) if self.info and self.shot else None
 
 
+CHROMIUM_ARGS = ["--disable-dev-shm-usage", "--mute-audio", "--disable-extensions", "--disable-background-networking",
+                 "--disable-sync", "--no-first-run", "--renderer-process-limit=2", "--js-flags=--max-old-space-size=256",
+                 "--disable-gpu", "--disable-software-rasterizer"]
+CHROMIUM_ENV = ("PATH", "HOME", "LANG", "TZ", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH", "FONTCONFIG_PATH")
+
+
+def launch_kwargs(sandbox, proxy=None, environ=None):
+    """playwright `chromium.launch` arguments; `--no-sandbox` only when `sandbox` is False."""
+    environ = os.environ if environ is None else environ
+    kw = {"args": CHROMIUM_ARGS + ([] if sandbox else ["--no-sandbox"]),
+          "chromium_sandbox": bool(sandbox),
+          "env": {k: v for k, v in environ.items() if k in CHROMIUM_ENV}}
+    if environ.get("BROWSE_CHROMIUM"):
+        kw["executable_path"] = environ["BROWSE_CHROMIUM"]
+    if proxy:
+        kw["proxy"] = {"server": proxy}
+    return kw
+
+
 class Browser:
     """Drives both screens. `step(device, ...)` is called by the live server every couple of seconds."""
 
@@ -425,6 +444,8 @@ class Browser:
         self.last_skip = None                               # why the last page was left unshown (guard, bot wall...)
         self.typed = []                                     # every text typed: [{t, device, host, field, query}]
         self.dismissed = []                                 # banners / modals pressed away: [{t, host, label, kind}]
+        self.sandbox = None                                 # Chromium's own sandbox on? (None: not launched yet)
+        self.no_sandbox = False                             # a sandboxed launch failed once: stay without it
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:]}
@@ -443,22 +464,24 @@ class Browser:
             from playwright.async_api import async_playwright
             if self.pw is None:
                 self.pw = await async_playwright().start()
-            # Chromium's own sandbox stays on unless we run as root (Docker default), where Chromium refuses it.
+            # Chromium's own sandbox stays on unless we run as root, where Chromium refuses it (the image drops to
+            # uid 1000, #18). If a sandboxed launch fails (no user namespaces in the runtime), relaunch without it.
             # The browser gets a minimal environment: none of the server's secrets (API tokens, site password).
             root = hasattr(os, "geteuid") and os.geteuid() == 0
-            kw = {"args": ["--disable-dev-shm-usage", "--mute-audio", "--disable-extensions",
-                           "--disable-background-networking", "--disable-sync", "--no-first-run",
-                           "--renderer-process-limit=2", "--js-flags=--max-old-space-size=256",
-                           "--disable-gpu", "--disable-software-rasterizer"]
-                          + (["--no-sandbox"] if root else []),
-                  "chromium_sandbox": not root,
-                  "env": {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "TZ", "TMPDIR",
-                                                                      "PLAYWRIGHT_BROWSERS_PATH", "FONTCONFIG_PATH")}}
-            if os.environ.get("BROWSE_CHROMIUM"):
-                kw["executable_path"] = os.environ["BROWSE_CHROMIUM"]
-            if self.proxy:
-                kw["proxy"] = {"server": self.proxy}
-            self.browser = await self.pw.chromium.launch(**kw)
+            sandbox = not (root or self.no_sandbox)
+            try:
+                self.browser = await self.pw.chromium.launch(**launch_kwargs(sandbox, self.proxy))
+            except Exception as e:
+                if not sandbox:
+                    raise
+                self.no_sandbox = True
+                print("browse: !!! CHROMIUM SANDBOX FAILED TO START, falling back to --no-sandbox !!!",
+                      repr(e)[:300], flush=True)
+                sandbox = False
+                self.browser = await self.pw.chromium.launch(**launch_kwargs(False, self.proxy))
+            if root:
+                print("browse: !!! running as root: Chromium sandbox OFF (--no-sandbox) !!!", flush=True)
+            self.sandbox = sandbox
             for sc in self.screens.values():
                 sc.ctx = sc.page = None
                 sc.info, sc.history, sc.awaiting, sc.scrolls_left, sc.chain = None, [], None, 0, 0
