@@ -196,98 +196,36 @@
    }
   ]
  },
- "night_replay_cpu_20k_torch": {
-  "build": {
-   "n_neurons": 20000,
-   "synapses": 2019400,
-   "device": "cpu",
-   "torch": "2.14.1+cpu"
-  },
-  "timing": {
-   "0:choice_train": {
-    "wall_s": 114.0
-   },
-   "1:choice_exam": {
-    "wall_s": 64.9
-   }
-  },
-  "phases": {
-   "choice_real": [
-    {
-     "choices": 120,
-     "labels": 6,
-     "calibration": {
-      "pool_rate_mean_hz": 3.99,
-      "pool_rate_sd_hz": 1.22,
-      "threshold_hz": 6.43
-     },
-     "frozen_before": {
-      "choices": 120,
-      "paid_off": 49,
-      "matched_paid_off": 0.3469,
-      "chance": 0.317,
-      "matched_not_paid_off": 0.2817,
-      "timeout_frac": 0.35,
-      "mean_rt_ms": 131.1
-     },
-     "learning_passes": [
-      {
-       "choices": 120,
-       "paid_off": 49,
-       "matched_paid_off": 0.5306,
-       "chance": 0.317,
-       "matched_not_paid_off": 0.2254,
-       "timeout_frac": 0.008,
-       "mean_rt_ms": 58.2
-      },
-      {
-       "choices": 120,
-       "paid_off": 49,
-       "matched_paid_off": 0.3878,
-       "chance": 0.317,
-       "matched_not_paid_off": 0.2113,
-       "timeout_frac": 0.008,
-       "mean_rt_ms": 59.3
-      }
-     ],
-     "n_learn": 240,
-     "note": "scored on the same choices it learns from (no held-out set): a replay, not a test"
-    }
-   ],
-   "choice_real_exam": [
-    {
-     "label": "after tonight's replay (frozen)",
-     "choices": 120,
-     "paid_off": 49,
-     "matched_paid_off": 0.4898,
-     "chance": 0.317,
-     "matched_not_paid_off": 0.1972,
-     "timeout_frac": 0.042,
-     "mean_rt_ms": 66.7,
-     "controls": {
-      "no_learning": {
-       "choices": 120,
-       "paid_off": 49,
-       "matched_paid_off": 0.2857,
-       "chance": 0.317,
-       "matched_not_paid_off": 0.2817,
-       "timeout_frac": 0.192,
-       "mean_rt_ms": 100.8
-      }
-     }
-    }
-   ]
-  }
- },
  "tick_smoke_demo_ms": {
   "main": [
    9.1,
-   9.0
+   9.0,
+   8.9,
+   9.2
   ],
   "this_branch": [
    9.2,
    9.0,
    9.5
+  ],
+  "this_branch_with_frames": [
+   9.4,
+   8.8
   ]
+ },
+ "child_between_decisions_pct_of_core": {
+  "idle_pulse_50ms_every_2s": [
+   1.4,
+   2.0
+  ],
+  "no_pulse": 0.0
+ },
+ "night_replay_cpu_20k_torch_dropped_scope": {
+  "frozen": 0.347,
+  "learning_pass_1": 0.531,
+  "learned_removed": 0.286,
+  "chance": 0.317,
+  "paid_off": 49,
+  "choices": 120
  }
 }

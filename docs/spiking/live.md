@@ -2,18 +2,24 @@
 
 Step 3 of "his own neurons decide". Until now the spiking network ran only at night on a RunPod GPU. Now a small
 simulated spiking network (20,000 neurons), built on the same wiring, runs on the server CPU all day. It takes part in
-his real browsing choices as one small term of the vote, and it learns from what follows. The 1M-neuron network replays
-the same day's choices at night (with `SUB01_CHOICE=1`).
+his real browsing choices as one small term of the vote, and it learns from what follows.
+
+Since #58, the 1M-neuron network on a GPU pod is asked first when it is on. This small network answers when the pod
+is down or over its cap, and the rate model alone decides when neither answers. Every decision and its reward are logged
+for the night session (#58 sends them to the pod).
 
 **Short answer.** It works as built, at about 0.4 s of CPU per decision in its own process. The 50 ms brain tick is
-unchanged (9.0–9.5 ms vs 9.0–9.1 ms on `main`). On a synthetic reward stream with variable offers it beats its frozen
+unchanged (8.8–9.5 ms vs 8.9–9.2 ms on `main`). On a synthetic reward stream with variable offers it beats its frozen
 twin and chance: 0.57–0.65 correct vs 0.28–0.32 (chance 0.28–0.29), 3 of 3 seeds. The decaying learning rate keeps the
 preference from drifting: 0.56–0.70 over the last 50 decisions, against 0.38–0.46 without it. There are no live numbers
 yet, because nothing has been deployed. The page shows them as they come, whatever they are.
 
-Code: `spiking/live.py` (the network, the child process, the server-side client), `spiking/wiring.py` (the numpy
-construction shared with `net.py`), the term in `brain_vote.py`, `RealChoiceTask` in `spiking/choice.py`, the night phases
-in `spiking/session.py`, and the day's choices in `spiking/pod_manager.py`. Tests are in `tests/test_spiking_live.py`.
+Code:
+- `spiking/live.py`: the network, the child process, the server-side client, the day's decisions log and the card;
+- `spiking/wiring.py`: the numpy construction shared with `net.py`;
+- `brain_vote.py`: the term in `vote` and the decision backend `Backend` (GPU, then CPU, then the rate model).
+
+Tests are in `tests/test_spiking_live.py`.
 Numbers are in `docs/spiking/live/results.json`, and the scripts are in `docs/spiking/live/`.
 
 ## Design
@@ -21,7 +27,8 @@ Numbers are in `docs/spiking/live/results.json`, and the scripts are in `docs/sp
 | part | choice | why |
 |---|---|---|
 | engine | **numpy**, its own module (`spiking/live.py`), sharing the construction with `net.py` through `spiking/wiring.py` | torch is not in the server image (~700 MB). At 20k neurons an event-driven numpy step costs ~0.6 ms per simulated ms on one core. The same config and seed give the same synapses as `net.py`, checked bit for bit in a test (with torch). The dynamics are the same LIF equations. There is no recorded resting-state drive: the network idles between decisions |
-| process | a child process (`python -m spiking.live`), JSON lines on stdin/stdout, started and supervised by `LiveClient` in the server (restarted with a backoff). It exits when its stdin closes | the brain tick never waits for it. A decision runs in the child while the event loop goes on |
+| process | a child process (`python -m spiking.live`) speaking the decision protocol shared with #58 as JSON lines on stdin/stdout. It is started and supervised by `LiveClient` in the server (restarted with a backoff), and exits when its stdin closes | the brain tick never waits for it. A decision runs in the child while the event loop goes on |
+| backend | `brain_vote.Backend.ask`: the GPU pod's `day_live_decide` (#58; looked up at each call, absent before #58) with a 1.5 s deadline, then this CPU network (2 s), then nothing. The answer carries `net`: `gpu`, `cpu` or `rate`, and the decision record says which network answered ("1M-neuron network on GPU" / "20k-neuron network on CPU" / "rate model only") | one protocol, so `vote` does not care which network answered |
 | size | 20,000 neurons (`SUB01_SPIKING_LIVE_NEURONS`), 2,019,400 synapses. **754** of them are plastic (cue → striatum) | the size of the #39 CPU runs |
 | cues | each content word of a label (≤ 4) is hashed exactly as `memory.py` does (`wiring.word_neurons`), at 8 % of the E neurons of every parcel. The visual and language parcels are kept | the same word lands on the same neurons in every label. Option labels change on every page, so the only way something learned can carry over is through shared words |
 | pools | the striatal E neurons, split among the offered labels by the hashed affinity of #39, averaged over the label's words and rank-normalised. Any 2–6 options | disjoint pools. Labels that share words share striatal neurons. The word count does not change pool size |
@@ -33,7 +40,8 @@ Numbers are in `docs/spiking/live/results.json`, and the scripts are in `docs/sp
 | stability fix | η = 0.6 mV / (1 + n / 50), never below 0.15 mV (`ETA_HALF`, `ETA_FLOOR`) | the drift that `docs/spiking/choice.md` named. Measured below |
 | weights | `/data/spiking/live_weights.npz` (dw, counters, threshold, config hash), written atomically (tmp + fsync + rename) after every learned decision and loaded at start. A torn file is kept aside as `.corrupt-<time>`, and a file for another network is ignored | as `state_io` does for JSON |
 | frozen twin | a copy that shares the synapse arrays and never learns. It gets the same offers and the same noise (the seed is set per decision) | the fair control for the learning curve. Its picks are logged, not voted |
-| log | `/data/spiking/live_choices.jsonl`, one row per decision when he leaves its page: labels (as cue words), K, pick, twin pick, followed, tastes response and prediction error | the card's curve, and the night's input |
+| log | `/data/spiking/decisions-YYYY-MM-DD.jsonl` (Tokyo day, `state_io.append_jsonl`), the format agreed with #58. A decision row is `{"t", "id", "kind", "options", "pick", "net", "reward": null}`, where `pick` is the option followed; it adds `net_pick` (the network's own pick) and, for `cpu`, `twin_pick`. A reward row, appended to the same file when he leaves the page, is `{"t", "id", "reward", "response"}`: `reward` is the tastes prediction error, `response` the stay's response (> 0 = paid off). Every browse decision is logged, whichever network answered | the card's curve, and the night's input (#58) |
+| frames | the child streams `{"type": "spiking", "net": "cpu", ...}` frames in the GPU session's format (groups, mean rate, a raster of 200 sampled neurons), at most 5/s while it simulates. Between decisions it runs 50 ms of background activity every 2 s, so the raster keeps a pulse | the Neurons panel on `/brain` draws them like the GPU's. GPU frames win while they come. #62 draws them in 3D |
 
 `/api/spiking/live` (behind the password gate) feeds the "In the day" part of the Neurons card on `/brain`. It shows:
 live or offline, choices today, the decisions it learned from, the lean of the last choice ("his spiking neurons leaned
@@ -55,23 +63,23 @@ it. A network that only "agrees with the vote" scores high on both.
 | one decision, learner + frozen twin | mean **375 ms** CPU, p95 595 ms, max 757 ms (100 decisions, 2–6 options) |
 | one decision without the twin | 203 ms |
 | simulated decision time | mean 110 ms. 22 of 100 reached the 250 ms timeout (forced choice) |
-| between decisions | 0.00 % of a core (blocked on its pipe) |
+| between decisions | 1.4–2.0 % of a core (the 50 ms idle pulse every 2 s, for the page's raster; `SUB01_SPIKING_LIVE_IDLE_MS=0` turns it off and then it uses 0.00 %) |
 | child peak RSS | 128 MB (learner + twin, 20k) |
 
 The budget was < 10 % of one core = 360 CPU-s per hour, which is ~960 decisions per hour. Browsing makes one decision
 per page. The eyes allow 30 AI calls per hour, plus local-option pages. At 30–120 decisions per hour that is
-**~0.3–1.3 % of one core**. The rate on Railway has not been measured yet. Check it on the card ("its process: … % of
+**~0.3–1.3 % of one core**, plus 1.4–2.0 % for the idle pulse: ~2–3 % in all. The rate on Railway has not been measured yet. Check it on the card ("its process: … % of
 one CPU core on average", sampled every minute) or in `tests/smoke_demo.py` (the `SPIKING CHILD` line).
 
 **The 50 ms tick** (`tests/smoke_demo.py --measure 30`, demo mode, BROWSE=0, same machine, runs alternated):
 
 | | runs |
 |---|---|
-| `main` | 9.1, 9.0 ms CPU per tick |
-| this branch | 9.2, 9.0, 9.5 ms |
+| `main` | 9.1, 9.0, 8.9, 9.2 ms CPU per tick |
+| this branch | 9.2, 9.0, 9.5 ms; with the frames on `/ws`: 9.4, 8.8 ms |
 
 The child's CPU is not in these numbers: it runs in its own process. In the demo there are no browsing decisions, so the
-child only starts (2.3 CPU-s) and then idles. The protocol test also checks that a child which never answers is
+child only starts (~3 CPU-s), then runs its idle pulse (26 frames reached `/ws` in 30 s). The protocol test also checks that a child which never answers is
 skipped after its timeout while a 50 ms ticker on the same event loop keeps ticking (max gap < 150 ms).
 
 ## Learning on a synthetic stream (20k, numpy, 150 decisions)
@@ -104,38 +112,13 @@ In the pytest version (10k, 100 decisions, seed 1, ~25 s) the network learned 0.
 
 ## The night uses the day
 
-With `SUB01_CHOICE=1`, `pod_manager` adds the day's decisions that have an outcome (Tokyo day; the newest 150, trimmed
-to stay under 30,000 characters of the ~100 KB create request) to the session config as `choices`. `choice_train` then
-runs `RealChoiceTask` instead of the fixed words:
-- a frozen pass on the day's choices;
-- two learning passes in the day's order. The recorded prediction error is the dopamine for the followed option, with
-  live.py's gain and decaying η;
-- `choice_exam`: a frozen pass after learning, and the same pass with every learned change removed.
+The night session belongs to #58. It reads the day's decisions files (format above) and replays the day's real choices
+on the 1M network. An earlier version of this PR had its own night replay; it was dropped when #58 took over
+`pod_manager.py`, `session.py` and `server.py`.
 
-Labels become cues and pools with the same functions as in the day, at 1M neurons. The scores are the same as on the card.
-
-These phases are wrapped: an error there is stored as a result, and the night goes on to its memory test and sleep. The
-results are stored on the server (`choice_real.jsonl`, `choice_real_exams.jsonl`) and in the report. No GPU cap changed.
-
-**CPU check (torch, 20k, 120 synthetic choices, `docs/spiking/live/run_night_cpu.py`):** 49 of the choices paid off,
-chance 0.317.
-
-| pass | matched the paid-off option | matched when it did not pay off |
-|---|---|---|
-| frozen, before | 0.347 | 0.282 |
-| learning pass 1 | **0.531** | 0.225 |
-| learning pass 2 | 0.388 | 0.211 |
-| frozen, after | 0.490 | 0.197 |
-| learned changes removed | 0.286 | 0.282 |
-
-The score is on the same choices it learns from, with no held-out set: this is a replay, not a test. With 49 paid-off
-choices one match is 2 points. The second pass is worse than the first: replaying the day twice is not obviously
-better, and it was not tuned.
-
-**No GPU run was made for this PR.** A pod of the same project (`sub01-spiking-live-bench-…`, not created by this task)
-was running when this was ready, and the pod tools allow one of ours at a time. The night code path is the one checked
-above on CPU. The first real night with `SUB01_CHOICE=1` will be its first run at 1M. If it fails, it fails without
-stopping the memory test.
+A CPU check of that replay (torch, 20k, 120 synthetic choices) was made before it was dropped: frozen 0.35, after one
+learning pass 0.53, with learning removed 0.29, chance 0.32. That was 49 paid-off choices, scored on the same choices
+it learned from. No GPU run was made for this PR.
 
 ## Reading it honestly
 
@@ -159,4 +142,4 @@ stopping the memory test.
 | `SUB01_SPIKING_LIVE` | `1` | `0` does not start the child: the vote is the rate model's alone |
 | `SUB01_SPIKING_W` | `0.3` | the weight of its lean in the vote |
 | `SUB01_SPIKING_LIVE_NEURONS` | `20000` | the network's size. Learned weights are only loaded into the same size |
-| `SUB01_CHOICE` | off | the night's choice phases. With it, the day's real choices are replayed |
+| `SUB01_SPIKING_LIVE_IDLE_MS` | `50` | background activity between decisions, every 2 s, for the page's raster (`0`: none) |

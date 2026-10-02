@@ -215,23 +215,6 @@ def write_report(gpu_dir=DOCS / "gpu", cpu_dir=DOCS / "cpu"):
             ctl = e.get("controls", {})
             out.append(f"- choice exam ({label}, frozen, {e['trials']} trials): {e['frac_correct']} correct; same network "
                        f"with learned changes removed {ctl.get('no_learning')}, random {ctl.get('random')}")
-        for c in _ph(res, "choice_real"):
-            if c.get("error"):
-                out.append(f"- the day's real choices ({label}): failed, {c['error']}")
-                continue
-            f = c["frozen_before"]
-            out.append(f"\n#### The day's real choices replayed ({label}, {res['build']['n_neurons']:,} neurons, "
-                       f"{c['choices']} choices, {f['paid_off']} paid off)\n")
-            out.append("| pass | matched the option that paid off | chance | matched when it did not pay off |")
-            out.append("|---|---|---|---|")
-            for name, r in [("frozen, before tonight", f)] + [(f"learning pass {i + 1}", x)
-                                                             for i, x in enumerate(c["learning_passes"])]:
-                out.append(f"| {name} | {r['matched_paid_off']} | {r['chance']} | {r['matched_not_paid_off']} |")
-            out.append(f"- {c.get('note')}")
-        for e in [x for x in _ph(res, "choice_real_exam") if not x.get("error")]:
-            ctl = (e.get("controls") or {}).get("no_learning") or {}
-            out.append(f"- real choices after the replay (frozen): matched {e['matched_paid_off']} of the paid-off ones "
-                       f"(chance {e['chance']}); with every learned change removed {ctl.get('matched_paid_off')}")
     rows = _costs()
     if rows:
         out.append("\n#### RunPod spend\n")

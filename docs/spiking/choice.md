@@ -147,5 +147,4 @@ sets with real labels, a stability fix for the drifting preference (for example 
 a higher race threshold at 1M neurons.
 
 **Update (#55):** variable offer sets with real labels, and the stability fix (a decaying learning rate), are now in
-`spiking/live.py`. A small network uses them in the day, and the night replays the day's real choices. See
-`docs/spiking/live.md`. The higher race threshold at 1M was not tried.
+`spiking/live.py`, where a small network uses them in the day. See `docs/spiking/live.md`. The higher race threshold at 1M was not tried.

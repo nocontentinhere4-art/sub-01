@@ -1,8 +1,8 @@
 """His spiking neurons in the day (#55): spiking/live.py, its child-process protocol, the brain_vote term, the night.
 
 numpy only (no torch), so it runs in CI and in the server image. The learning check builds a 10k-neuron network and
-its frozen twin (~25 s on one core). The torch checks at the end (same synapses as net.py, the night's replay of real
-choices) are skipped where torch is absent.
+its frozen twin (~25 s on one core). The torch check at the end (the same synapses as net.py) is skipped where torch is
+absent.
 
     python -m pytest tests/test_spiking_live.py -q
 """
@@ -42,7 +42,7 @@ def test_variable_offer_sets_any_labels(small):
     for labels in offers:
         d = small.decide(labels)
         assert d["pick"] in range(len(labels)) and len(d["pool_rates"]) == len(labels)
-        assert 0 < d["decision_ms"] <= L.TIMEOUT_MS and np.isfinite(d["pool_rates"]).all()
+        assert 0 < d["sim_ms"] <= L.TIMEOUT_MS and np.isfinite(d["pool_rates"]).all()
         assert d["twin_pick"] in range(len(labels)) and len(d["twin_rates"]) == len(labels)
     assert len(small.decide([str(i) + " option" for i in range(9)])["pool_rates"]) == L.MAX_OPTIONS
     with pytest.raises(ValueError):
@@ -111,6 +111,8 @@ def test_learn_tags_the_followed_pool_only_for_that_decision(small):
     assert not np.any(up[(q < 0) | ~np.isin(q, small.ch.action)])  # only synapses onto offered pools moved
     assert small.learn("x", 0, 0.5)["ok"] is False                 # one dopamine per decision
     assert d["pick"] in (0, 1, 2)
+    small.decide(["a b", "c d"], did="own")
+    assert small.learn("own", None, -0.2)["ok"]                    # no "followed": the network's own pick
 
 
 def test_weights_persist_across_a_restart_and_a_torn_file_is_kept_aside(tmp_path):
@@ -146,9 +148,13 @@ SAME = [{"action": "click", "label": f"page {c}", "networks": {"reward": 0.5}} f
 def test_vote_without_and_with_the_spiking_term(brain):
     base = V.vote(brain.clone(), SAME, 1.0, rng=np.random.default_rng(0))
     assert base["spiking"]["used"] is False and all(o["spiking"] is None for o in base["options"])
-    sp = {"pick": 2, "pool_rates": [4.0, 4.0, 12.0], "decision_ms": 60, "n_neurons": 20000, "id": 5}
+    assert base["spiking"]["network"] == "rate model only"
+    sp = {"pick": 2, "pool_rates": [4.0, 4.0, 12.0], "sim_ms": 60, "n_neurons": 20000, "id": "b-5", "net": "cpu"}
     d = V.vote(brain.clone(), SAME, 1.0, rng=np.random.default_rng(0), spiking=sp)
     assert d["spiking"]["used"] and d["spiking"]["leaned_to"] == "page c" and d["spiking"]["weight"] == V.SPIKING_W
+    assert d["spiking"]["network"] == "20k-neuron network on CPU"
+    assert V.vote(brain.clone(), SAME, 1.0, rng=np.random.default_rng(0),
+                  spiking=dict(sp, net="gpu"))["spiking"]["network"] == "1M-neuron network on GPU"
     assert d["options"][2]["spiking"] > 0.9 and d["options"][0]["spiking"] < 0
     assert d["options"][2]["p"] > base["options"][2]["p"]           # the term moves the vote toward its lean...
     assert max(o["p"] for o in d["options"]) < 0.999                 # ...as one term among others
@@ -169,36 +175,38 @@ async def _ready(cl, s=60):
     return False
 
 
-def test_child_process_protocol_learning_log_and_restart(tmp_path):
+def test_child_process_protocol_frames_learning_and_restart(tmp_path):
     async def go():
         cl = L.LiveClient(tmp_path, n_neurons=SMALL)
+        frames = []
+
+        async def on_frame(f):
+            frames.append(f)
+        cl.on_frame = on_frame
         assert (await cl.decide(["a b", "c d"]))["why"] == "spiking network offline"
         await cl.start()
         try:
             assert await _ready(cl)
-            ans = await cl.decide(["read about bread", "tokyo parks", "wander somewhere else"])
-            assert len(ans["pool_rates"]) == 3 and ans["pick"] in range(3) and ans["wall_ms"] < 2000
-            cl.followed(ans, 1)
-            assert cl.view()["last"]["followed_label"] == "tokyo parks"
-            cl.outcome(0.3, 0.2)                                    # he left the page: dopamine for that decision
+            ans = await cl.decide(["read about bread", "tokyo parks", "wander somewhere else"], did="b-1")
+            assert ans["type"] == "decision" and ans["id"] == "b-1" and len(ans["pool_rates"]) == 3
+            assert ans["pick"] in range(3) and ans["sim_ms"] > 0 and ans["n_neurons"] == SMALL and ans["wall_ms"] < 2000
+            await asyncio.sleep(0.2)
+            f = [x for x in frames if x.get("phase") == "deciding"]
+            assert f and f[-1]["net"] == "cpu" and f[-1]["n_neurons"] == SMALL and "reward" in f[-1]["groups"]
+            r = f[-1]["raster"]
+            assert r["n"] == L.RASTER_ROWS and r["t1"] > r["t0"] and all(0 <= s[1] < r["n"] for s in r["spikes"])
+            assert len(json.dumps(f[-1])) < 30_000                     # small frames
+            assert cl.reward("b-1", 0.2, followed=1)                    # dopamine for that decision
             st = await cl.call("status")
             assert st["n_learn"] == 1 and st["n_decisions"] == 1
-            rows = [json.loads(x) for x in (tmp_path / "spiking" / "live_choices.jsonl").read_text().splitlines()]
-            assert rows[-1]["followed"] == 1 and rows[-1]["labels"] == ["read about bread", "tokyo parks", "wander somewhere else"]
-            assert rows[-1]["delta"] == 0.2 and rows[-1]["k"] == 3
-            cl.outcome(0.1, 0.1)                                    # nothing pending: nothing logged
-            assert len((tmp_path / "spiking" / "live_choices.jsonl").read_text().splitlines()) == 1
-            ans = await cl.decide(["x y", "z w"])
-            cl.followed(ans, 0)
-            cl.outcome(None, None)                                  # a stay too short to measure: logged, not learned
-            assert (await cl.call("status"))["n_learn"] == 1
-            v = cl.view()
-            assert v["state"] == "live" and v["decisions_today"] == 2 and v["learned_today"] == 1
-            assert "takes part in his choices and learns from simulated reward" in v["card"]
-            cl.proc.kill()                                          # the child dies: the vote goes on without it
+            n0 = len(frames)
+            await asyncio.sleep(L.IDLE_EVERY_S + 1.0)                   # between decisions: an idle pulse
+            assert any(x.get("phase") == "idle" for x in frames[n0:])
+            assert cl.state() == "live"
+            cl.proc.kill()                                              # the child dies: the vote goes on without it
             await cl.proc.wait()
             await asyncio.sleep(0.2)
-            assert "offline" in (await cl.decide(["a", "b"]))["why"] or not cl.ready
+            assert "offline" in (await cl.decide(["a", "b"]))["why"]
         finally:
             await cl.stop()
         assert (tmp_path / "spiking" / "live_weights.npz").exists()
@@ -235,46 +243,105 @@ def test_a_slow_child_is_skipped_after_the_timeout_and_never_blocks_the_loop(tmp
     run(go())
 
 
-# --- the night uses the day ------------------------------------------------------------------------------------------
-def _log(tmp_path, rows):
-    p = tmp_path / "spiking" / "live_choices.jsonl"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text("".join(json.dumps(r) + "\n" for r in rows))
+# --- the decision backend: GPU first, CPU second, rate model last; the day's decisions log -------------------------
+class FakeGPU:
+    def __init__(self, ans):
+        self.ans, self.asked, self.rewards = ans, [], []
+
+    async def day_live_decide(self, options, kind, deadline_ms):
+        self.asked.append((list(options), kind, deadline_ms))
+        if isinstance(self.ans, Exception):
+            raise self.ans
+        return self.ans
+
+    async def day_live_reward(self, did, value):
+        self.rewards.append((did, value))
 
 
-def test_day_choices_go_to_the_night_session_with_SUB01_CHOICE(tmp_path):
-    from datetime import datetime, timezone
-    from spiking import pod_manager as M
-    now = datetime(2026, 10, 2, 11, 0, tzinfo=timezone.utc)          # 20:00 Tokyo
-    day = "2026-10-02"
-    rows = [{"t": 1, "day": day, "labels": ["read bread", "tokyo parks"], "k": 2, "pick": 0, "twin_pick": 1,
-             "followed": i % 2, "response": 0.2, "delta": 0.1} for i in range(5)]
-    rows += [{"t": 1, "day": "2026-10-01", "labels": ["old", "day"], "k": 2, "pick": 0, "twin_pick": 0, "followed": 0,
-              "response": 0.2, "delta": 0.1},
-             {"t": 1, "day": day, "labels": ["no", "outcome"], "k": 2, "pick": 0, "twin_pick": 0, "followed": 0,
-              "response": None, "delta": None}]
-    _log(tmp_path, rows)
-    env = {"SUB01_CHOICE": "1", "SUB01_SESSIONS": "daily 21:00-22:00"}
-    m = M.PodManager(tmp_path, "http://x", "s" * 32, env=env, clock=lambda: now, api=object())
-    cfg = m.session_config(now, 60, now)
-    assert len(cfg["choices"]) == 5 and cfg["choices"][0] == {"labels": ["read bread", "tokyo parks"], "followed": 0,
-                                                               "delta": 0.1, "response": 0.2}
-    assert "choice_train" in cfg["phases"]
-    off = M.PodManager(tmp_path, "http://x", "s" * 32, env={"SUB01_SESSIONS": "daily 21:00-22:00"},
-                           clock=lambda: now, api=object())
-    assert "choices" not in off.session_config(now, 60, now)
-    _log(tmp_path, [dict(rows[0], labels=["w" * 80] * 6, k=6) for _ in range(400)])   # the create request stays small
-    cfg = m.session_config(now, 60, now)
-    assert 0 < len(cfg["choices"]) <= M.MAX_CHOICES and len(json.dumps(cfg["choices"])) <= M.CHOICES_MAX_CHARS
+class FakeCPU:
+    def __init__(self, up=True):
+        self.up, self.rewards = up, []
+
+    async def decide(self, options, kind="browse", did=None, timeout=None):
+        if not self.up:
+            return {"why": "spiking network offline"}
+        return {"type": "decision", "id": did, "pick": 1, "pool_rates": [5.0] * len(options), "sim_ms": 80.0,
+                "n_neurons": 20000, "twin_pick": 0}
+
+    def reward(self, did, value, followed=None):
+        self.rewards.append((did, value, followed))
+        return True
+
+
+def test_backend_asks_gpu_then_cpu_then_falls_back_to_the_rate_model(tmp_path):
+    async def go():
+        opts = ["read about bread", "tokyo parks", "wander somewhere else"]
+        gpu_ok = {"id": "g-7", "pick": 2, "pool_rates": [3.0, 3.5, 4.0], "sim_ms": 60.0, "n_neurons": 1_000_000}
+        g = FakeGPU(gpu_ok)
+        b = V.Backend(cpu=FakeCPU(), gpu=g, log=L.DecisionLog(tmp_path))
+        a = await b.ask(opts, "browse")
+        assert a["net"] == "gpu" and a["id"] == "g-7" and g.asked[0][1:] == ("browse", 1500)
+        for gans in (None, RuntimeError("pod gone"), {"pick": 0, "pool_rates": [1.0]}):   # down, failing, wrong
+            a = await V.Backend(cpu=FakeCPU(), gpu=FakeGPU(gans)).ask(opts)
+            assert a["net"] == "cpu" and a["pick"] == 1
+        a = await V.Backend(cpu=FakeCPU(), gpu=object()).ask(opts)       # #58 not merged yet: no day_live_decide
+        assert a["net"] == "cpu"
+        a = await V.Backend(cpu=FakeCPU(up=False), gpu=FakeGPU(None)).ask(opts)
+        assert a["net"] == "rate" and "offline" in a["why"]
+        assert (await V.Backend().ask(opts))["net"] == "rate"
+
+        # the reward goes to the network that decided, and both rows land in the day's file
+        b.followed(await b.ask(opts), 2, opts)
+        b.outcome(0.4, 0.25)
+        await asyncio.sleep(0)                                          # the GPU reward is sent as a task
+        assert g.rewards == [("g-7", 0.25)]
+        cpu = FakeCPU()
+        bc = V.Backend(cpu=cpu, gpu=FakeGPU(None), log=b.log)
+        ac = await bc.ask(opts)
+        bc.followed(ac, 0, opts)
+        assert bc.last["network"] == "20k-neuron network on CPU" and bc.last["followed_label"] == opts[0]
+        bc.outcome(-0.3, -0.1)
+        assert cpu.rewards == [(ac["id"], -0.1, 0)]
+        bc.followed(await bc.ask(opts), 1, opts)
+        bc.outcome(None, None)                                            # a stay too short to measure: no reward
+        assert len(cpu.rewards) == 1
+        br = V.Backend(log=b.log)
+        br.followed(await br.ask(opts), 0, opts)
+        assert br.last["network"] == "rate model only" and br.last["leaned_to"] is None
+        await asyncio.sleep(0)
+        return b.log
+    log = run(go())
+    files = list((tmp_path / "spiking").glob("decisions-*.jsonl"))
+    assert len(files) == 1 and files[0].name == f"decisions-{L._today()}.jsonl"
+    rows = [json.loads(x) for x in files[0].read_text().splitlines()]
+    dec = [r for r in rows if "options" in r]
+    assert [r["net"] for r in dec] == ["gpu", "cpu", "cpu", "rate"]
+    assert set(dec[0]) >= {"t", "id", "kind", "options", "pick", "net", "reward"} and dec[0]["reward"] is None
+    assert dec[0]["pick"] == 2 and dec[0]["net_pick"] == 2 and dec[1]["twin_pick"] == 0 and dec[1]["net_pick"] == 1
+    rew = [r for r in rows if "options" not in r]
+    assert rew == [{"t": rew[0]["t"], "id": "g-7", "reward": 0.25, "response": 0.4},
+                   {"t": rew[1]["t"], "id": dec[1]["id"], "reward": -0.1, "response": -0.3}]
+    j = log.joined()
+    assert len(j) == 4 and j[1]["reward"] == -0.1 and j[1]["response"] == -0.3 and j[2]["reward"] is None
 
 
 def test_score_compares_with_the_twin_and_chance():
-    rows = [{"response": 0.5, "k": 2, "pick": 0, "twin_pick": 1, "followed": 0}] * 10 + \
-           [{"response": -0.5, "k": 4, "pick": 0, "twin_pick": 0, "followed": 1}] * 5 + [{"response": None, "k": 3}]
+    rows = [{"net": "cpu", "response": 0.5, "options": ["a", "b"], "net_pick": 0, "twin_pick": 1, "pick": 0}] * 10 + \
+           [{"net": "cpu", "response": -0.5, "options": list("abcd"), "net_pick": 0, "twin_pick": 0, "pick": 1}] * 5 + \
+           [{"net": "cpu", "response": None, "options": ["a", "b", "c"]},
+            {"net": "gpu", "response": 0.5, "options": ["a", "b"], "net_pick": 0, "pick": 0}]
     s = L.score(rows)
     assert s["paid_off"] == 10 and s["decisions_with_outcome"] == 15
     assert s["matched_paid_off"] == {"learned": 1.0, "twin": 0.0, "chance": 0.5}
     assert s["matched_not_paid_off"]["learned"] == 0.0 and s["curve"][0]["n"] == 10
+
+
+def test_card_view_off_and_on(tmp_path):
+    assert L.view(None) == {"state": "off"}
+    b = V.Backend(cpu=L.LiveClient(tmp_path, n_neurons=SMALL), log=L.DecisionLog(tmp_path))
+    v = L.view(b)
+    assert v["state"] == "offline" and v["decisions_today"] == 0 and v["by_net_today"] == {"gpu": 0, "cpu": 0, "rate": 0}
+    assert "takes part in his choices and learns from simulated reward" in v["card"] and "5,000 neurons" in v["card"]
 
 
 # --- with torch: the same synapses as net.py, and the night's replay ------------------------------------------------
@@ -292,29 +359,3 @@ def test_live_net_has_the_synapses_of_net_py():
     assert np.array_equal(ch.cue("bread"), np.intersect1d(MemorySystem(a, frac=L.WORD_FRAC).word_neurons("bread"),
                                                           ch.cue_space))
     del torch
-
-
-def test_night_replays_real_choices_on_the_torch_network():
-    pytest.importorskip("torch")
-    from spiking.choice import RealChoiceTask
-    from spiking.net import SpikingNet
-    net = SpikingNet(Config(n_neurons=10_000), "cpu")
-    rng = np.random.default_rng(0)
-    vocab = ["read bread", "tokyo parks", "train timetable", "jazz records"]
-    choices = []
-    for _ in range(30):
-        k = int(rng.integers(2, 5))
-        off = list(rng.choice(4, size=k, replace=False))
-        fol = int(rng.integers(k))
-        r = 0.5 if off[fol] == 0 else -0.5
-        choices.append({"labels": [vocab[i] for i in off], "followed": fol, "delta": r, "response": r})
-    choices.append({"labels": ["only one"], "followed": 0, "delta": 1.0})          # dropped: not a choice
-    task = RealChoiceTask(net, choices)
-    task.calibrate()
-    frozen = task.replay(learn=False)
-    assert not task.net.plast.dw.abs().max() > 0
-    learned = task.replay(learn=True)
-    assert frozen["choices"] == learned["choices"] == 30 and task.n_learn == 30
-    assert float(task.net.plast.dw.abs().max()) > 0
-    print(f"\nnight replay (10k, torch CPU, 30 choices): frozen {frozen['matched_paid_off']}, "
-          f"learning pass {learned['matched_paid_off']}, chance {frozen['chance']}")

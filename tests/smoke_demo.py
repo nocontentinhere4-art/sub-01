@@ -215,7 +215,8 @@ async def run(args, proc):
                     await asyncio.sleep(5)
                     idle = cpu_seconds(child) - c1
                     print(f"SPIKING CHILD (#55): {c1:.2f} CPU-s since it started (build + calibration; {c:.2f} of them "
-                          f"in the window); idle between decisions {100 * idle / 5:.2f}% of one core")
+                          f"in the window); between decisions {100 * idle / 5:.2f}% of one core (its idle pulse); "
+                          f"{seen.get('spiking', 0)} spiking frames on /ws")
             else:
                 print("TICK COST: not measured (/proc not available on this OS)")
             async with s.get(base + "/api/health", headers=ADMIN) as r:   # after the CPU reading

@@ -160,11 +160,10 @@ class ChoiceTask:
         reg = net.reg
         cue_regions = sorted(set(sum((reg.groups[g] for g in CUE_GROUPS), [])))
         cue_space = np.concatenate([net.region_neurons(r, exc_only=True) for r in cue_regions])
-        self.cue_space, self.cue_frac = cue_space, cue_frac
-        self.mem = MemorySystem(net, frac=cue_frac)                  # the memory.py hashing, at the cue density
-        self.cues = [self._cue(w) for w in self.labels]
+        mem = MemorySystem(net, frac=cue_frac)                       # the memory.py hashing, at the cue density
+        self.cues = [np.intersect1d(mem.word_neurons(w), cue_space) for w in self.labels]
         self.action = net.group_neurons(ACTION_GROUP, exc_only=True)
-        self.aff = np.stack([self._affinity(w) for w in self.labels])                    # (K, n_action)
+        self.aff = np.stack([_affinity(w, len(self.action)) for w in self.labels])       # (K, n_action)
         p = net.plast
         self.syn = None
         if p is not None:                                            # plastic cue -> action synapses (ids into dw)
@@ -181,12 +180,6 @@ class ChoiceTask:
         self.trial = 0                                               # trials of training so far (schedule clock)
         self.log = []
         self.last = None                                             # last trial (for the live frame)
-
-    def _cue(self, label):
-        return np.intersect1d(self.mem.word_neurons(label), self.cue_space)
-
-    def _affinity(self, label):
-        return _affinity(label, len(self.action))
 
     # --- pools ------------------------------------------------------------------------------------------------
     def pools(self, offered):
@@ -245,7 +238,7 @@ class ChoiceTask:
         w, ms, to = winner
         return offered[w], ms, to, pre, pools, np.asarray(cum)
 
-    def _learn(self, chosen, offered, pools, pre_rates, delta, eta=None):
+    def _learn(self, chosen, offered, pools, pre_rates, delta):
         p = self.net.plast
         if p is None or p.frozen or self.syn is None or delta == 0.0:
             return 0.0
@@ -256,15 +249,14 @@ class ChoiceTask:
             post[pl] = 1.0 if o == chosen else -1.0 / max(1, ko - 1)
         pre = ((pre_rates - 5.0) / 40.0).clamp(0.0, 1.0)
         tag = pre * torch.as_tensor(post[self.syn["post"]], device=self.net.device)
-        eta = self.eta / (1.0 + self.eta_decay * self.trial) if eta is None else eta
+        eta = self.eta / (1.0 + self.eta_decay * self.trial)
         q = self.syn["q"]
         p.dw.index_add_(0, q, eta * delta * tag)
         p._apply()
         return float((eta * delta * tag).abs().sum())
 
-    def calibrate(self, presentations=12, offers=None):
-        """Threshold = mean + thr_z sd of the pool rates at 100 ms, on the network as it is (plasticity frozen).
-        offers: the offered option lists to present (default: all K options, `presentations` times)."""
+    def calibrate(self, presentations=12):
+        """Threshold = mean + thr_z sd of the pool rates at 100 ms, on the network as it is (plasticity frozen)."""
         p = self.net.plast
         was = p.frozen if p is not None else None
         if p is not None:
@@ -272,8 +264,9 @@ class ChoiceTask:
         rates = []
         thr, self.thr_hz = self.thr_hz, None
         try:
-            for offered in (offers or [list(range(self.k))] * presentations):
-                _, _, _, _, pools, cum = self._present(list(offered), learn=False)
+            for _ in range(presentations):
+                offered = list(range(self.k))
+                _, _, _, _, pools, cum = self._present(offered, learn=False)
                 i = min(len(cum), max(1, 100 // self.check_ms)) - 1
                 rates.extend((cum[i] / np.array([len(pl) for pl in pools]) / ((i + 1) * self.check_ms / 1000)).tolist())
                 self.net.run(self.iti_ms)
@@ -350,78 +343,6 @@ class ChoiceTask:
                 s = m & np.isin(self.syn["post"], pl)
                 out[i, j] = float(dw[s].mean()) if s.any() else 0.0
         return np.round(out, 4).tolist()
-
-
-class RealChoiceTask(ChoiceTask):
-    """The day's real choices (#55), replayed at night: each logged decision of the small daytime network
-    (spiking/live.py) - its offered labels, the option that was followed and the tastes prediction error of the stay
-    - is offered again here. Labels become cues and pools with live.py's functions (the same words land on the same
-    neurons at any size), the network races, and the recorded prediction error is the dopamine for the followed
-    option, with live.py's rule (DA_GAIN, decaying eta). Score: among the choices whose followed option paid off
-    (response > 0), how often the network's pick was that option; chance = mean 1/K."""
-
-    def __init__(self, net, choices, seed=0, **kw):
-        from . import live
-        self.live = live
-        self.choices = [c for c in choices if 2 <= len(c.get("labels") or []) <= live.MAX_OPTIONS]
-        vocab = sorted({str(x) for c in self.choices for x in c["labels"]})
-        kw.setdefault("eta", live.ETA)
-        super().__init__(net, labels=vocab, k=len(vocab), probs=[0.5] * len(vocab), seed=seed, **kw)
-        self.index = {lb: i for i, lb in enumerate(self.labels)}
-        self.n_learn = 0
-
-    def _cue(self, label):
-        return self.live.label_cue(self.net, label, self.cue_space, self.mem.input_regions)
-
-    def _affinity(self, label):
-        return self.live.label_affinity(label, len(self.action))
-
-    def calibrate(self, presentations=12, offers=None):
-        rng = np.random.default_rng(self.seed)
-        offers = offers or [list(rng.choice(self.k, size=min(4, self.k), replace=False)) for _ in range(presentations)]
-        return super().calibrate(presentations, offers)
-
-    def replay(self, learn, on_trial=None):
-        """One pass over the day's choices, in order. learn=False: plasticity frozen."""
-        p = self.net.plast
-        was = p.frozen if p is not None else None
-        if p is not None and not learn:
-            p.frozen = True
-        rows = []
-        try:
-            for c in self.choices:
-                off = [self.index[str(x)] for x in c["labels"]]
-                pick, ms, to, pre, pools, _ = self._present(off, learn=learn)
-                fol = off[int(c["followed"])]
-                if learn and c.get("delta") is not None:
-                    da = max(-1.0, min(1.0, self.live.DA_GAIN * float(c["delta"])))
-                    eta = self.live.ETA * max(self.live.ETA_FLOOR, 1.0 / (1.0 + self.n_learn / self.live.ETA_HALF))
-                    self._learn(fol, off, pools, pre, da, eta=eta)
-                    self.n_learn += 1
-                    self.trial += 1
-                resp = c.get("response")
-                rows.append({"pick": off.index(pick), "followed": int(c["followed"]), "k": len(off),
-                             "paid_off": resp is not None and float(resp) > 0, "rt_ms": ms, "timeout": bool(to)})
-                if on_trial:
-                    on_trial(rows[-1])
-                self.net.run(self.iti_ms)
-        finally:
-            if p is not None:
-                p.frozen = was
-        return real_score(rows)
-
-
-def real_score(rows):
-    """Match rate on the choices that paid off (pick == followed option), chance = mean 1/K, and the same on the
-    rest (a control: a network that always picks what was followed anyway would score high on both)."""
-    paid = [r for r in rows if r["paid_off"]]
-    rest = [r for r in rows if not r["paid_off"]]
-    m = lambda rs: round(float(np.mean([r["pick"] == r["followed"] for r in rs])), 4) if rs else None
-    return {"choices": len(rows), "paid_off": len(paid), "matched_paid_off": m(paid),
-            "chance": round(float(np.mean([1.0 / r["k"] for r in paid])), 4) if paid else None,
-            "matched_not_paid_off": m(rest),
-            "timeout_frac": round(float(np.mean([r["timeout"] for r in rows])), 3) if rows else None,
-            "mean_rt_ms": round(float(np.mean([r["rt_ms"] for r in rows])), 1) if rows else None}
 
 
 def experiment(net, trials=160, k=4, probs=None, reversal=True, seed=0, frozen_net=None, window=20, need=14,

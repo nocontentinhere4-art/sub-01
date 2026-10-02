@@ -16,7 +16,8 @@ window.Neurons = (() => {
   const PONG_NOTE = "Pong: not learning yet. In the last full validation (1M neurons) it hit 17.5 % after training vs 25 % with plasticity switched off.";
   const PONG_CONTROLS = ["no_plasticity", "random"];
   const PHASES = { load: "loading", recall_yesterday: "next-day memory test", encode: "storing today's messages and readings", pong_train: "learning Pong",
-    pong_exam: "Pong exam (learning frozen)", memory_test: "memory test", sleep: "sleep: replaying memories", free: "free run" };
+    pong_exam: "Pong exam (learning frozen)", memory_test: "memory test", sleep: "sleep: replaying memories", free: "free run",
+    deciding: "deciding (small network on the CPU)", idle: "between choices (small network on the CPU)" };
   const CONTROL_NAMES = { random: "random paddle", random_paddle: "random paddle", no_plasticity: "no plasticity",
     frozen: "no plasticity", no_learning: "no plasticity" };
   const GROUP_LABEL = { somatomotor: "motor", relay: "thalamus" };
@@ -75,6 +76,9 @@ window.Neurons = (() => {
   // ---------- live frames ----------
   function onMessage(m) {
     if (!S.inited || !m || m.type !== "spiking") return;
+    // the small CPU network (#55) streams too; while the GPU network streams, its frames win the raster
+    if (m.net === "cpu") { if (performance.now() - (S.gpuWall || -1e9) < LIVE_MS) return; }
+    else if (m.raster || m.t_sim != null) S.gpuWall = performance.now();
     try { frame(m); } catch (e) { /* a malformed frame must never break the page */ }
   }
   function frame(m) {
@@ -207,12 +211,17 @@ window.Neurons = (() => {
     head.append(document.createTextNode("In the day · "), h("b", null, d.state === "live" ? "live" : d.state === "starting" ? "starting" : "offline"),
       document.createTextNode(` · ${int(d.n_neurons)} neurons · ${int(d.decisions_today)} choices today · learned from ${int(d.learned_today)}`));
     box.append(head);
+    const bn = d.by_net_today || {};
+    if (num(d.decisions_today) && d.decisions_today > 0)
+      box.append(h("div", "nx-cap", `answered today by: 1M network on GPU ${int(bn.gpu || 0)} · 20k network on CPU ${int(bn.cpu || 0)} · rate model only ${int(bn.rate || 0)}`));
     const L = d.last;
-    if (L && Array.isArray(L.labels) && L.leaned_to) {
+    if (L && Array.isArray(L.labels)) {
       const r = h("div", "nx-row");
-      r.append(document.createTextNode("Last choice: his spiking neurons leaned toward "), h("b", null, `“${String(L.leaned_to).slice(0, 80)}”`));
-      if (L.followed_label && L.followed_label !== L.leaned_to) r.append(document.createTextNode(` · he followed “${String(L.followed_label).slice(0, 80)}”`));
-      else if (L.followed_label) r.append(document.createTextNode(" · he followed it"));
+      if (L.leaned_to) {
+        r.append(document.createTextNode(`Last choice (${L.network || "spiking network"}): his spiking neurons leaned toward `), h("b", null, `“${String(L.leaned_to).slice(0, 80)}”`));
+        if (L.followed_label && L.followed_label !== L.leaned_to) r.append(document.createTextNode(` · he followed “${String(L.followed_label).slice(0, 80)}”`));
+        else if (L.followed_label) r.append(document.createTextNode(" · he followed it"));
+      } else r.append(document.createTextNode(`Last choice: rate model only${L.why ? " (" + String(L.why).slice(0, 80) + ")" : ""}`));
       box.append(r);
     }
     const sc = d.score || {}, mp = sc.matched_paid_off || {}, mn = sc.matched_not_paid_off || {};

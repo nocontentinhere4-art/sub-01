@@ -9,9 +9,7 @@ Items (cfg "items") are the day's chat messages and readings, each {text, source
 text is its title + keywords. recall_yesterday tests the previous session's items before anything new is stored.
 In validate mode extra controls run (no-plasticity Pong, random paddle, sleep without replay).
 choice_train / choice_exam (spiking/choice.py): the K-armed choice task with its controls (frozen network on the
-same trials, random chooser, reversal halfway). With cfg "choices" (the day's real choices of the small daytime
-network, spiking/live.py, #55) they replay those instead of the fixed words: choice_real (frozen pass, learning
-passes) and choice_real_exam (frozen after learning, and with every learned change removed).
+same trials, random chooser, reversal halfway).
 """
 import json
 import math
@@ -28,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .choice import ChoiceTask, RealChoiceTask, RewardSchedule, random_chooser, summarize
+from .choice import ChoiceTask, RewardSchedule, random_chooser, summarize
 from .config import Config
 from .memory import MemorySystem, sleep_block, words
 from .net import SpikingNet
@@ -455,64 +453,9 @@ class Session:
             self.choice.calibrate()
         return self.choice
 
-    def _safe(self, fn, kind):
-        """The day's real choices are new data every night: an error there is reported, and the night goes on to
-        its memory test and sleep instead of stopping."""
-        try:
-            fn()
-        except StopSession:
-            raise
-        except Exception as e:
-            traceback.print_exc()
-            self.result(kind, {"error": f"{type(e).__name__}: {str(e)[:200]}"})
-
-    def _real(self):
-        if self.choice is None:
-            c = self.cfg
-            self.choice = RealChoiceTask(self.net, c["choices"], seed=int(c.get("seed", 1)))
-            self.choice.calibrate()
-        return self.choice
-
-    def ph_choice_real(self):
-        """The day's real choices: a frozen pass first (the same network before tonight's learning), then
-        `choice_real_passes` learning passes in the day's order, each scored on the same choices."""
-        task = self._real()
-        passes = int(self.cfg.get("choice_real_passes", 2))
-        frozen = task.replay(learn=False)
-        self.progress = 1.0 / (passes + 1)
-        learned = []
-        for i in range(passes):
-            learned.append(task.replay(learn=True))
-            self.progress = (i + 2) / (passes + 1)
-        out = {"choices": len(task.choices), "labels": task.k, "calibration": task.calib, "frozen_before": frozen,
-               "learning_passes": learned, "n_learn": task.n_learn,
-               "note": "scored on the same choices it learns from (no held-out set): a replay, not a test"}
-        self.log("real choices", len(task.choices), "frozen", frozen["matched_paid_off"],
-                 "learned", [x["matched_paid_off"] for x in learned], "chance", frozen["chance"])
-        self.result("choice_real", out)
-
-    def ph_choice_real_exam(self):
-        task = self._real()
-        after = task.replay(learn=False)
-        p = self.net.plast
-        ctrl = None
-        if p is not None:
-            dw = p.dw.clone()
-            p.dw.zero_()
-            p._apply()
-            try:
-                ctrl = task.replay(learn=False)
-            finally:
-                p.dw.copy_(dw)
-                p._apply()
-        self.result("choice_real_exam", {"label": "after tonight's replay (frozen)", **after,
-                                         "controls": {"no_learning": ctrl}})
-
     def ph_choice_train(self):
         """Frozen control on the same trials first (no weight change), then training with dopamine; reversal halfway;
         a random chooser on the same schedule. All three in one result, whatever the numbers are."""
-        if self.cfg.get("choices"):
-            return self._safe(self.ph_choice_real, "choice_real")
         task = self._choice()
         n = int(self.cfg.get("choice_trials", 200))
         rev = n // 2 if self.cfg.get("choice_reversal", True) else None
@@ -538,8 +481,6 @@ class Session:
     def ph_choice_exam(self):
         """Frozen exam on the current hidden probabilities (after the reversal if training reversed), the same exam
         with every learned change removed, and the random chooser."""
-        if self.cfg.get("choices"):
-            return self._safe(self.ph_choice_real_exam, "choice_real_exam")
         task = self._choice()
         n = int(self.cfg.get("choice_exam_trials", 40))
         rev = int(self.cfg.get("choice_trials", 200)) // 2 if self.cfg.get("choice_reversal", True) else None

@@ -170,18 +170,18 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
 
 ## His spiking neurons in the day (#55, `docs/spiking/live.md`)
-- `spiking/live.py`: a 20k-neuron spiking network (numpy, the same construction as `net.py` via `spiking/wiring.py`, no
-  torch) runs in a child process (`python -m spiking.live`, JSON lines on stdin/stdout, started and restarted by
-  `LiveClient`). For each browsing decision it gets the option labels as cues (memory.py word hashing), races its
-  striatal pools (#39) and answers in ~0.4 s CPU (with its frozen twin). `brain_vote.vote(..., spiking=)` adds
-  `SPIKING_W` (0.3) x its lean; no answer within 2 s or the process down → the term is skipped. Rows carry `spiking`.
-- Learns live: when he leaves the page, the tastes prediction error is the dopamine of that decision (#39 rule, tagged
-  on the option followed; decaying eta = the stability fix). Weights: `/data/spiking/live_weights.npz` (atomic). Log:
-  `/data/spiking/live_choices.jsonl`. `/api/spiking/live` → the "In the day" part of the Neurons card (learning curve
-  vs frozen twin and chance). Off: `SUB01_SPIKING_LIVE=0`.
-- Night: with `SUB01_CHOICE=1` the pod's `choice_train`/`choice_exam` replay the day's real choices (`RealChoiceTask`);
-  an error there is reported and the night goes on. No GPU cap changed.
-- Measured: tick 9.0–9.5 ms vs 9.0–9.1 on main; child idle 0 %, ~0.3–1.3 % of a core at 30–120 decisions/hour.
+- `spiking/live.py`: a 20k-neuron spiking network runs in a child process (`python -m spiking.live`). It uses numpy and
+  the same construction as `net.py` via `spiking/wiring.py`, no torch. It speaks the decision protocol shared with #58
+  (decide / decision / reward, JSON lines) and streams `{"type":"spiking","net":"cpu"}` frames to the Neurons panel.
+- `brain_vote.Backend`: the GPU pod's 1M network first (`pod_manager.day_live_decide`, #58), then the CPU child within
+  2 s, then the rate model alone. `vote(..., spiking=)` adds `SPIKING_W` (0.3) x the lean, and the record says which
+  network answered.
+- Rewards: the tastes prediction error of the stay goes to the network that decided (CPU: the #39 rule, with a
+  decaying learning rate). Weights are in `/data/spiking/live_weights.npz`.
+- Every browse decision and its reward go to `/data/spiking/decisions-YYYY-MM-DD.jsonl`, which #58 reads at night.
+- `/api/spiking/live` feeds the "In the day" part of the Neurons card. `SUB01_SPIKING_LIVE=0` turns the CPU network off.
+- Measured: tick 8.8–9.5 ms vs 8.9–9.2 on main. The child uses ~0.4 CPU-s per decision and 1.4–2 % of a core
+  between decisions (its idle pulse).
 
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.

@@ -8,8 +8,7 @@ SUB01_GPU_CAP_DAYS (7) window. Learned weights stay on the server's
 /data volume (spiking/server.py), never on paid RunPod storage (pods have no volume).
 Each session tests yesterday's items from half cues, stores today's chat messages and readings, sleeps (REM
 replay) and tests again; Pong runs only with SUB01_PONG=1 (it has not learned so far), the K-armed choice task
-(spiking/choice.py) only with SUB01_CHOICE=1; then it replays the day's real choices of the small daytime network
-(spiking/live.py, #55) when there are any, else the fixed words.
+(spiking/choice.py) only with SUB01_CHOICE=1.
 A pod is deleted at session end, when the pod reports done, on any error, with no hello in 15 min, when the
 stream is lost for more than 3 min, and at shutdown. Blocking RunPod calls run in a thread executor.
 Never imports torch or spiking.net.
@@ -27,7 +26,6 @@ from zoneinfo import ZoneInfo
 from sleep import ROME, day_of
 from spiking import podpack
 from spiking.costs import CostLog
-from spiking.live import day_choices
 from spiking.runpod_ops import RunPodOps
 from spiking.words import half_cue_ok
 from state_io import load_json, save_json
@@ -43,8 +41,6 @@ PHASES = ["recall_yesterday", "encode", "memory_test", "sleep", "memory_test", "
 PONG_PHASES = ["pong_train", "pong_exam"]                  # inserted after encode with SUB01_PONG=1
 CHOICE_PHASES = ["choice_train", "choice_exam"]            # inserted after encode (and Pong) with SUB01_CHOICE=1
 MAX_PER_SOURCE = 5
-MAX_CHOICES = 150                   # the day's real choices sent to the night's choice_train (#55), newest first kept
-CHOICES_MAX_CHARS = 30_000          # ...within RunPod's ~100 KB create request (podpack.create_body)
 SOURCES = ("chat", "reading", "taught")
 WINDOW = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
 
@@ -286,20 +282,10 @@ class PodManager:
         if self.choice:
             at = phases.index("pong_exam") + 1 if self.pong else phases.index("encode") + 1
             phases[at:at] = CHOICE_PHASES
-        cfg = {"session_id": "s-" + start.astimezone(ROME).strftime("%Y%m%d-%H%M"), "day": day.isoformat(),
-               "n_neurons": 1_000_000, "seed": 1, "max_minutes": max_min,      # fixed: same synapses every day
-               "phases": phases, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
-               "messages": msgs, "items": items, "elapsed_days": self.elapsed_days(now), "validate": False}
-        if self.choice:                  # #55: the night's choice_train replays the day's real choices (spiking/live.py)
-            try:
-                choices = day_choices(self.dir.parent, day.isoformat(), cap=MAX_CHOICES)
-            except Exception:
-                choices = []
-            while choices and len(json.dumps(choices)) > CHOICES_MAX_CHARS:     # the create request has a size limit
-                choices = choices[len(choices) // 4 + 1:]
-            if choices:
-                cfg["choices"] = choices
-        return cfg
+        return {"session_id": "s-" + start.astimezone(ROME).strftime("%Y%m%d-%H%M"), "day": day.isoformat(),
+                "n_neurons": 1_000_000, "seed": 1, "max_minutes": max_min,      # fixed: same synapses every day
+                "phases": phases, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
+                "messages": msgs, "items": items, "elapsed_days": self.elapsed_days(now), "validate": False}
 
     def elapsed_days(self, now):
         state = self.dir / "manager.json"

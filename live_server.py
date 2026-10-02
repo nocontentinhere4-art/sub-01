@@ -289,7 +289,7 @@ class Live:
         self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
         self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
-        self.spiking_live = None         # spiking_live.LiveClient (main()): a small spiking network votes too (#55)
+        self.decider = None              # brain_vote.Backend (main()): a spiking network votes too, GPU or CPU (#55)
         self.mind = None                 # mind.py (main()): an AI reads and remembers for him; his brain model chooses
         self.chat_inbox = []             # (sim t, text) of recent chat messages he may answer at the computer
         self.replies = []                # his recent replies (AI-written), for the hello and /api/mind
@@ -825,8 +825,8 @@ class Live:
         """He leaves the page: its measured brain response updates his tastes."""
         res = self.pagewatch.finish()
         delta = self.tastes.learn(*res) if res else None
-        if getattr(self, "spiking_live", None):               # the stay's prediction error = its dopamine (#55)
-            self.spiking_live.outcome(res[1] if res else None, delta)
+        if getattr(self, "decider", None):                    # the stay's prediction error = its dopamine (#55)
+            self.decider.outcome(res[1] if res else None, delta)
 
     def novel(self, option):
         return option["action"] in NOVEL_ACTIONS and time.time() - self.targets.get(target_key(option), 0) > 7 * 86400
@@ -859,8 +859,8 @@ class Live:
         topics = [Tastes.topics(o, page.get("title", "")) for o in opts]
         tastes = [self.tastes.predict(tp) for tp in topics]
         clone = self.brain.clone()                            # snapshot on the event loop, simulated in a thread
-        sl = getattr(self, "spiking_live", None)
-        sp = await sl.decide([o["label"] for o in opts]) if sl else None    # his spiking network's answer, <= 2 s
+        decider = getattr(self, "decider", None)
+        sp = await decider.ask([o["label"] for o in opts], "browse") if decider else None   # GPU, else CPU, <= ~3.5 s
         dec = await loop.run_in_executor(None, lambda: brain_vote.vote(
             clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng, spiking=sp))
         chosen = opts[dec["chosen"]]
@@ -872,8 +872,8 @@ class Live:
             dec["watch_min"] = mins
         self.end_page()
         self.pagewatch.start(topics[dec["chosen"]], time.time())
-        if sl:
-            sl.followed(sp, dec["chosen"])
+        if decider:
+            decider.followed(sp, dec["chosen"], [o["label"] for o in opts], "browse")
         now = time.time()
         self.targets = {k: v for k, v in self.targets.items() if now - v < 7 * 86400}
         self.targets[target_key(chosen)] = now
@@ -1372,10 +1372,13 @@ async def main(args):
         else:
             manager = None
 
-    if os.environ.get("SUB01_SPIKING_LIVE", "1") != "0":   # his spiking neurons in the day (#55); 0 turns them off
-        live.spiking_live = spiking_live.LiveClient(data_dir, int(os.environ.get("SUB01_SPIKING_LIVE_NEURONS") or
-                                                                  spiking_live.N_NEURONS))
-    spiking_live.attach(app, live.spiking_live)
+    cpu_net = None                                # his spiking neurons in the day (#55); SUB01_SPIKING_LIVE=0: no CPU net
+    if os.environ.get("SUB01_SPIKING_LIVE", "1") != "0":
+        cpu_net = spiking_live.LiveClient(data_dir, int(os.environ.get("SUB01_SPIKING_LIVE_NEURONS") or
+                                                        spiking_live.N_NEURONS))
+        cpu_net.on_frame = live.broadcast         # its frames feed the Neurons panel like the GPU session's
+    live.decider = brain_vote.Backend(cpu=cpu_net, gpu=spiking_manager, log=spiking_live.DecisionLog(data_dir))
+    spiking_live.attach(app, live.decider)
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
@@ -1516,16 +1519,16 @@ async def main(args):
         tasks.append(supervised("mind", live.run_mind))
     if manager:
         tasks.append(manager.run())
-    if live.spiking_live:
-        tasks.append(supervised("spiking live", live.spiking_live.run))
+    if cpu_net:
+        tasks.append(supervised("spiking live", cpu_net.run))
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
         if manager:
             manager.shutdown()
-        if live.spiking_live:
-            await live.spiking_live.stop()
+        if cpu_net:
+            await cpu_net.stop()
         if live.browser:
             try:
                 await asyncio.wait_for(live.sync_browsing(), 5)  # the newest log, if the browser still answers

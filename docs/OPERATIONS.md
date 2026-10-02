@@ -89,10 +89,11 @@ A 503 means the brain loop stalled or the process is restarting. Look at the Rai
 
 ## The daytime spiking network (#55)
 No paid service: a child process of the server (`python -m spiking.live`) on the same CPU. Its startup costs ~2 CPU-s
-(build + calibration). Each browsing decision costs ~0.4 CPU-s, and between decisions it uses no CPU. The Neurons card
+(build + calibration). Each browsing decision costs ~0.4 CPU-s. Between decisions, its idle pulse for the page's
+raster uses 1.4–2 % of a core (`SUB01_SPIKING_LIVE_IDLE_MS=0`: none). The Neurons card
 on `/brain` shows "its process: … % of one CPU core on average" (budget: < 10 %). `SUB01_SPIKING_LIVE=0` turns it off.
 The vote then is the rate model's alone, as it is whenever the process is down or slower than 2 s. Its state:
-`/data/spiking/live_weights.npz` and `/data/spiking/live_choices.jsonl`.
+`/data/spiking/live_weights.npz`. The day's decisions are in `/data/spiking/decisions-YYYY-MM-DD.jsonl`.
 
 ## Railway usage alerts
 Workspace → **Usage** → **Usage limits**:

@@ -34,12 +34,18 @@ the page can compare: how often its pick matched the option that later paid off,
 Wording: a small simulated spiking network built on the same wiring takes part in his choices and learns from a
 simulated reward. Never "he thinks / understands / wants".
 
-Protocol (one JSON object per line on stdin / stdout):
-    {"id": 1, "op": "decide", "labels": [...]} -> {"id": 1, "pick", "pool_rates", "decision_ms", "timeout",
-                                                    "twin_pick", "twin_rates", "cpu_ms", "n_neurons"}
-    {"id": 2, "op": "learn", "decision": 1, "followed": 0, "delta": 0.3} -> {"id": 2, "ok", "eta", "n_learn"}
-    {"id": 3, "op": "status"} -> {"id": 3, "cpu_s", "uptime_s", "n_decisions", "n_learn", ...}
-The child exits when its stdin closes (the server died) or on {"op": "stop"}.
+Protocol: the decision protocol shared with the 1M-neuron GPU network (#58), one JSON object per line on stdin/stdout.
+    {"type": "decide", "id": "b-1", "options": [label, ...], "kind": "browse|chess|plan", "deadline_ms": 2000}
+        -> {"type": "decision", "id": "b-1", "pick", "pool_rates", "sim_ms", "n_neurons",
+            + here: "timeout", "twin_pick", "twin_rates", "cpu_ms", "threshold_hz"}
+    {"type": "reward", "id": "b-1", "value": 0.3, "followed": 0}   (value = the tastes prediction error; "followed",
+        an extension of this child, is the option the vote followed: default the network's own pick)
+        -> {"type": "rewarded", "id": "b-1", "ok", "eta", "n_learn"}
+    {"type": "status", "id": "s-1"} -> {"type": "status", "id": "s-1", "cpu_s", "uptime_s", "n_decisions", ...}
+Unasked, it streams {"type": "spiking", "net": "cpu", ...} frames like the GPU session's (groups, mean rate, a raster
+of 200 sampled neurons) at most every FRAME_S while it simulates. Between decisions it runs IDLE_MS of background
+activity every IDLE_EVERY_S, so the page's raster keeps a pulse (~1-2 % of a core). The parent's deadline is enforced by
+the parent (LiveClient): a late answer is dropped there. The child exits when its stdin closes or on {"type": "stop"}.
 
     python -m spiking.live --data-dir /data --neurons 20000
 """
@@ -48,6 +54,7 @@ import hashlib
 import json
 import math
 import os
+import select
 import sys
 import time
 from pathlib import Path
@@ -78,9 +85,16 @@ MAX_OPTIONS = 6
 PENDING = 8                       # decisions kept for a late dopamine (the next page's decision comes first)
 VERSION = 1
 CALIB_LABELS = ("apple", "river", "cloud", "stone", "lamp", "bird", "salt", "rope")
+FRAME_S = 0.2                     # at most 5 frames/s to the page
+RASTER_ROWS = 200
+RASTER_CAP = 1000                 # spikes per frame
+IDLE_MS = int(os.environ.get("SUB01_SPIKING_LIVE_IDLE_MS", 50))     # background run between decisions (0: none)
+IDLE_EVERY_S = 2.0
+GROUP_KEYS = ("visual", "somatomotor", "attention", "salience", "limbic", "control", "default", "reward", "fear",
+              "memory", "relay", "language")
 
 
-# --- labels -> cues and pools (torch-free; spiking/choice.py uses the same functions at night) ---------------------
+# --- labels -> cues and pools (torch-free: they work on any network with the wiring.py layout) -------------------------
 def label_words(label):
     ws = words(str(label or ""), max_words=LABEL_WORDS)
     return ws or [str(label or "").strip().lower()[:40] or "nothing"]
@@ -144,7 +158,17 @@ class LiveNet(Layout):
         self.n_ref = int(round(cfg.t_ref / cfg.dt))
         self.noise_sd = np.float32(cfg.sigma_ext * math.sqrt(self.a))
         self.build_s = time.time() - t0
+        self.row_of, self.raster_ids, self.raster = None, [], []
+        self.hook = None                                         # hook(net) every CHECK_MS steps (frames)
         self._state()
+
+    def enable_raster(self, n_rows=RASTER_ROWS, seed=0):
+        """Record the spikes of a fixed sample for the page: one neuron per region (net.py's choice), first n_rows."""
+        rng = np.random.default_rng(seed)
+        ids = np.sort([int(self.off[r] + rng.integers(self.size[r])) for r in range(self.reg.n)][:n_rows])
+        self.row_of = np.full(self.n, -1, dtype=np.int16)
+        self.row_of[ids] = np.arange(len(ids), dtype=np.int16)
+        self.raster_ids, self.raster = ids, []
 
     def _state(self, seed=0):
         c = self.cfg
@@ -162,6 +186,7 @@ class LiveNet(Layout):
         tw = object.__new__(LiveNet)
         tw.__dict__.update(self.__dict__)
         tw.w = self.w.copy()
+        tw.row_of, tw.raster_ids, tw.raster, tw.hook = None, [], [], None
         tw._state(seed=1)
         return tw
 
@@ -189,6 +214,11 @@ class LiveNet(Layout):
             v[spk] = c.v_reset
             self.ref[spk] = self.n_ref
             self.count[spk] += 1
+            if self.row_of is not None:
+                rows = self.row_of[spk]
+                rows = rows[rows >= 0]
+                if rows.size:
+                    self.raster.append((self.t, rows))
             start = self.rowptr[spk]
             cnt = self.rowptr[spk + 1] - start
             tot = int(cnt.sum())
@@ -200,8 +230,10 @@ class LiveNet(Layout):
         return spk.size
 
     def run(self, ms):
-        for _ in range(int(round(ms / self.cfg.dt))):
+        for i in range(int(round(ms / self.cfg.dt))):
             self.step()
+            if self.hook is not None and self.t % CHECK_MS == 0:
+                self.hook(self)
 
 
 # --- one decision on one network -------------------------------------------------------------------------------------
@@ -318,6 +350,9 @@ class LiveBrain:
         self.log = log
         self.t_start = time.time()
         self.calib = None
+        self.emit, self.phase, self.last_da = None, "idle", 0.0     # emit(frame): the page's raster (serve() sets it)
+        self.net.enable_raster()
+        self._frame_reset()
         self.load()
         if self.ch.thr_hz is None:
             dw, self.dw = self.dw, np.zeros_like(self.dw)
@@ -370,6 +405,53 @@ class LiveBrain:
     def eta(self):
         return ETA * max(ETA_FLOOR, 1.0 / (1.0 + self.n_learn / ETA_HALF))
 
+    # --- frames for the page (the GPU session's format, net "cpu") ---------------------------------------------------
+    def _frame_reset(self):
+        self.f_wall, self.f_t, self.f_count = time.time(), self.net.t, self.net.count.copy()
+        self.net.raster.clear()
+
+    def _hook(self, net):
+        if self.emit is not None and time.time() - self.f_wall >= FRAME_S:
+            self.flush()
+
+    def flush(self):
+        """Send one frame with everything since the last one (nothing if no simulated time passed)."""
+        net = self.net
+        if self.emit is None or net.t <= self.f_t:
+            self._frame_reset()
+            return
+        now = time.time()
+        steps = net.t - self.f_t
+        sim_s = steps * net.cfg.dt / 1000.0
+        d = net.count - self.f_count
+        rr = np.add.reduceat(d, net.off) / net.size / sim_s
+        sz = net.size
+        groups = {g: round(float((rr[ix] * sz[ix]).sum() / sz[ix].sum()), 2) for g, ix in net.reg.groups.items()
+                  if ix and g in GROUP_KEYS}
+        spikes = [[int(t - self.f_t), int(r)] for t, rows in net.raster for r in rows.tolist()][:RASTER_CAP]
+        n_sp = float(d.sum())
+        frame = {"type": "spiking", "net": "cpu", "live": True, "phase": self.phase, "n_neurons": net.n,
+                 "t_sim": round(net.t / 1000.0, 2), "spikes_per_s": round(n_sp / sim_s, 1),
+                 "mean_rate_hz": round(n_sp / sim_s / net.n, 3), "realtime_x": round(sim_s / max(1e-6, now - self.f_wall), 3),
+                 "groups": groups, "raster": {"n": len(net.raster_ids), "t0": int(self.f_t), "t1": int(net.t), "spikes": spikes},
+                 "dopamine": round(self.last_da, 3)}
+        self._frame_reset()
+        try:
+            self.emit(frame)
+        except Exception:
+            pass
+
+    def idle(self, ms=IDLE_MS):
+        """Background activity between decisions (no cue), shown on the page."""
+        self.phase = "idle"
+        self.net.drive()
+        self.net.hook = self._hook
+        try:
+            self.net.run(ms)
+        finally:
+            self.net.hook = None
+        self.flush()
+
     # --- the protocol ----------------------------------------------------------------------------------------------
     def decide(self, labels, did=None):
         t0 = time.process_time()
@@ -378,27 +460,36 @@ class LiveBrain:
             raise ValueError("need 2-6 options")
         self.n_decisions += 1
         seed = self.n_decisions * 7919 + 17
-        pick, rates, ms, timeout, pre, post = self.ch.present(labels, seed)
-        out = {"pick": pick, "pool_rates": [round(float(r), 3) for r in rates], "decision_ms": ms,
+        self.phase = "deciding"
+        self.net.hook = self._hook
+        try:
+            pick, rates, ms, timeout, pre, post = self.ch.present(labels, seed)
+        finally:
+            self.net.hook = None
+            self.flush()
+            self.phase = "idle"
+        out = {"pick": pick, "pool_rates": [round(float(r), 3) for r in rates], "sim_ms": float(ms),
                "timeout": bool(timeout), "n_neurons": self.net.n, "threshold_hz": round(self.ch.thr_hz, 3)}
         if self.tw is not None:
             tp, tr, _, _, _, _ = self.tw.present(labels, seed)
             out.update(twin_pick=tp, twin_rates=[round(float(r), 3) for r in tr])
         act = pre > 0
-        self.pending[did if did is not None else self.n_decisions] = (np.flatnonzero(act), pre[act], post[act], len(labels))
+        self.pending[did if did is not None else self.n_decisions] = (np.flatnonzero(act), pre[act], post[act], len(labels),
+                                                                      pick)
         while len(self.pending) > PENDING:
             self.pending.pop(next(iter(self.pending)))
         out["cpu_ms"] = round((time.process_time() - t0) * 1000, 1)
         return out
 
     def learn(self, did, followed, delta):
-        """Dopamine for decision `did`: the option that was followed and the tastes prediction error of its stay."""
+        """Dopamine for decision `did`: the tastes prediction error of the stay, tagged on the option that was followed
+        (None: the network's own pick)."""
         tag = self.pending.pop(did, None)
         if tag is None:
             return {"ok": False, "why": "unknown or too old decision"}
-        q, pre, post, k = tag
+        q, pre, post, k, own = tag
         try:
-            delta, followed = float(delta), int(followed)
+            delta, followed = float(delta), int(own if followed is None else followed)
         except (TypeError, ValueError):
             return {"ok": False, "why": "bad delta"}
         if not math.isfinite(delta) or not 0 <= followed < k:
@@ -407,6 +498,7 @@ class LiveBrain:
         p = np.where(post == followed, 1.0, np.where(post >= 0, -1.0 / max(1, k - 1), 0.0)).astype(np.float32)
         eta = self.eta()
         self.dw[q] += np.float32(eta * da) * pre * p
+        self.last_da = da
         self._apply()
         self.n_learn += 1
         self.save()
@@ -422,31 +514,49 @@ class LiveBrain:
                 "build_s": round(self.net.build_s, 2), "twin": self.tw is not None}
 
 
-def serve(brain, inp, out):
-    """Answer one JSON line per request until stdin closes."""
+def serve(brain, fd_in, out, idle_ms=IDLE_MS, idle_every=IDLE_EVERY_S):
+    """Answer one JSON line per request until stdin closes; frames go out as they come; idle background runs when
+    nothing arrives for `idle_every` seconds."""
     def send(obj):
         out.write(json.dumps(obj) + "\n")
         out.flush()
-    send({"op": "ready", **brain.status()})
-    for line in inp:
-        try:
-            msg = json.loads(line)
-            op, rid = msg.get("op"), msg.get("id")
-            if op == "decide":
-                send({"id": rid, **brain.decide(msg.get("labels") or [], did=rid)})
-            elif op == "learn":
-                send({"id": rid, **brain.learn(msg.get("decision"), msg.get("followed"), msg.get("delta"))})
-            elif op == "status":
-                send({"id": rid, **brain.status()})
-            elif op == "stop":
-                send({"id": rid, "ok": True})
+    brain.emit = send
+    send({"type": "ready", **brain.status()})
+    buf = b""
+    while True:
+        ready, _, _ = select.select([fd_in], [], [], idle_every if idle_ms > 0 else None)
+        if not ready:
+            brain.idle(idle_ms)
+            continue
+        chunk = os.read(fd_in, 1 << 16)
+        if not chunk:
+            return
+        buf += chunk
+        while b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            if line.strip() and handle(brain, line, send) == "stop":
                 return
-            else:
-                send({"id": rid, "error": "unknown op"})
-        except Exception as e:                                # one bad request never kills the network
-            send({"id": (msg.get("id") if isinstance(locals().get("msg"), dict) else None),
-                  "error": f"{type(e).__name__}: {str(e)[:120]}"})
 
+
+def handle(brain, line, send):
+    msg = {}
+    try:
+        msg = json.loads(line)
+        kind, rid = msg.get("type"), msg.get("id")
+        if kind == "decide":
+            send({"type": "decision", "id": rid, **brain.decide(msg.get("options") or [], did=rid)})
+        elif kind == "reward":
+            send({"type": "rewarded", "id": rid, **brain.learn(rid, msg.get("followed"), msg.get("value"))})
+        elif kind == "status":
+            send({"type": "status", "id": rid, **brain.status()})
+        elif kind == "stop":
+            send({"type": "stopped", "id": rid})
+            return "stop"
+        else:
+            send({"type": "error", "id": rid, "error": "unknown type"})
+    except Exception as e:                                # one bad request never kills the network
+        send({"type": "error", "id": msg.get("id") if isinstance(msg, dict) else None,
+              "error": f"{type(e).__name__}: {str(e)[:120]}"})
 
 def synthetic(brain, trials=100, seed=0, follow=0.7, vocab=None, probs=None, alpha=0.1, kmin=2, kmax=6):
     """A synthetic reward stream for checks (tests, docs/spiking/live.md): `vocab` labels with hidden reward
@@ -478,13 +588,13 @@ def synthetic(brain, trials=100, seed=0, follow=0.7, vocab=None, probs=None, alp
             "twin_last50": round(float(a[-50:, 1].mean()), 3), "curve": blk(0), "twin_curve": blk(1)}
 
 
-# --- the server side: starts the child, asks it, feeds it dopamine, keeps the day's log ------------------------------
+# --- the server side: the child process, the day's decisions log, the card ------------------------------------------
 CARD = ("A small simulated spiking network ({n} neurons) built on the same wiring takes part in his choices and learns "
         "from simulated reward.")
 NOTE = ("Its lean is one small term in the vote (weight {w}); the rate model stays the main decider. \"Paid off\" = the "
         "stay on the chosen page raised his brain model's reward/attention activity above its recent average. Its lean "
         "also nudges which option is followed, so a match is a little more likely for it than for the frozen twin even "
-        "without learning; the not-paid-off column shows how much.")
+        "without learning; the not-paid-off numbers show how much.")
 
 
 def _today(t=None):
@@ -493,43 +603,97 @@ def _today(t=None):
     return datetime.fromtimestamp(time.time() if t is None else t, TZ).date().isoformat()
 
 
-def score(rows, block=10):
-    """Learning curve from logged decisions with an outcome: among the decisions whose followed option paid off, how
-    often the network's pick was that option (learned, frozen twin, chance = mean 1/K); in blocks of `block`."""
-    rows = [r for r in rows if isinstance(r, dict) and r.get("response") is not None and r.get("k")]
+class DecisionLog:
+    """The day's decisions, one file per Tokyo day: /data/spiking/decisions-YYYY-MM-DD.jsonl (append-only, state_io).
+    Read at night by the GPU session (#58).
+        decision row: {"t", "id", "kind": "browse|chess|plan", "options": [label, ...], "pick": int (the option
+                       followed), "net": "gpu|cpu|rate", "reward": null, + "net_pick" (the network's own pick),
+                       "twin_pick" (cpu: its frozen twin's pick)}
+        reward row (later, same file as its decision): {"t", "id", "reward": float (the tastes prediction error, the
+                       dopamine), + "response" (the stay's tastes response, -1..1; > 0 = it paid off)}"""
+
+    def __init__(self, data_dir):
+        self.dir = Path(data_dir) / "spiking"
+
+    def path(self, day):
+        return self.dir / f"decisions-{day}.jsonl"
+
+    def _append(self, day, row):
+        from state_io import append_jsonl
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            append_jsonl(self.path(day), row)
+        except OSError as e:
+            print("spiking: could not log a decision:", repr(e)[:120], flush=True)
+
+    def decision(self, did, kind, options, pick, net, t=None, **extra):
+        t = time.time() if t is None else t
+        self._append(_today(t), {"t": round(t, 3), "id": str(did), "kind": kind, "options": [str(o) for o in options],
+                                 "pick": int(pick), "net": net, "reward": None, **extra})
+
+    def reward(self, did, value, t_decision, t=None, **extra):
+        t = time.time() if t is None else t
+        self._append(_today(t_decision), {"t": round(t, 3), "id": str(did), "reward": round(float(value), 4), **extra})
+
+    def joined(self, days=7, now=None):
+        """Decision rows of the last `days` Tokyo days with their reward ("reward") and "response" filled in."""
+        from datetime import date, timedelta
+        from state_io import read_jsonl
+        today = date.fromisoformat(_today(now))
+        out, by_id = [], {}
+        for k in range(days - 1, -1, -1):
+            for r in read_jsonl(self.path((today - timedelta(days=k)).isoformat())):
+                if not isinstance(r, dict) or "id" not in r:
+                    continue
+                if "options" in r:
+                    row = dict(r, day=(today - timedelta(days=k)).isoformat())
+                    by_id[r["id"]] = row
+                    out.append(row)
+                elif r["id"] in by_id and r.get("reward") is not None:
+                    by_id[r["id"]].update(reward=r["reward"], response=r.get("response"))
+        return out
+
+
+def score(rows, block=10, net="cpu"):
+    """Learning curve of the CPU network from logged decisions with an outcome: among the decisions whose followed
+    option paid off (response > 0), how often its own pick was that option (learned, frozen twin, chance = mean 1/K),
+    in blocks of `block`; and the same on the decisions that did not pay off."""
+    rows = [r for r in rows if isinstance(r, dict) and r.get("net") == net and r.get("response") is not None
+            and r.get("options")]
     paid = [r for r in rows if r["response"] > 0]
     unpaid = [r for r in rows if r["response"] <= 0]
-    m = lambda rs, key: round(float(np.mean([r.get(key) == r["followed"] for r in rs])), 3) if rs else None
-    chance = lambda rs: round(float(np.mean([1.0 / r["k"] for r in rs])), 3) if rs else None
-    curve = [{"n": len(paid[i:i + block]), "learned": m(paid[i:i + block], "pick"), "twin": m(paid[i:i + block], "twin_pick"),
-              "chance": chance(paid[i:i + block])} for i in range(0, len(paid), block)]
+    m = lambda rs, key: round(float(np.mean([r.get(key) == r["pick"] for r in rs])), 3) if rs else None
+    chance = lambda rs: round(float(np.mean([1.0 / len(r["options"]) for r in rs])), 3) if rs else None
+    curve = [{"n": len(paid[i:i + block]), "learned": m(paid[i:i + block], "net_pick"),
+              "twin": m(paid[i:i + block], "twin_pick"), "chance": chance(paid[i:i + block])}
+             for i in range(0, len(paid), block)]
     return {"decisions_with_outcome": len(rows), "paid_off": len(paid),
-            "matched_paid_off": {"learned": m(paid, "pick"), "twin": m(paid, "twin_pick"), "chance": chance(paid)},
-            "matched_not_paid_off": {"learned": m(unpaid, "pick"), "twin": m(unpaid, "twin_pick"), "chance": chance(unpaid)},
+            "matched_paid_off": {"learned": m(paid, "net_pick"), "twin": m(paid, "twin_pick"), "chance": chance(paid)},
+            "matched_not_paid_off": {"learned": m(unpaid, "net_pick"), "twin": m(unpaid, "twin_pick"),
+                                     "chance": chance(unpaid)},
             "curve": curve, "block": block}
 
 
 class LiveClient:
-    """The server's handle on the child process (asyncio). decide() never waits more than `timeout` seconds."""
+    """The server's handle on the child process (asyncio). decide() never waits more than its timeout (2 s)."""
 
     def __init__(self, data_dir, n_neurons=N_NEURONS, timeout=2.0, python=sys.executable, twin=True):
-        self.dir = Path(data_dir) / "spiking"
         self.data_dir = Path(data_dir)
-        self.log_path = self.dir / "live_choices.jsonl"
         self.n_neurons, self.timeout, self.python, self.twin = n_neurons, timeout, python, twin
         self.proc, self.ready, self.info = None, False, {}
         self.futs, self.next_id = {}, 0
-        self.pending = None                  # the decision whose page he is on: learns when he leaves it
-        self.last = None                     # the last decision, for the card
         self.slow, self.restarts, self.errors = 0, 0, 0
         self.cpu = {}
+        self.on_frame = None                 # async callable(frame): the server broadcasts it to the pages
+        self.last_frame = 0.0
         self._reader_task = None
         self._stopping = False
 
     # --- the child process ---------------------------------------------------------------------------------------
     async def start(self):
         import asyncio
-        env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "TZ", "SUB01_TZ", "PYTHONPATH")}
+        env = {k: v for k, v in os.environ.items()
+               if k in ("PATH", "HOME", "LANG", "TZ", "SUB01_TZ", "PYTHONPATH", "SUB01_SPIKING_LIVE_IDLE_MS")}
         env.update(OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", PYTHONUNBUFFERED="1")
         args = [self.python, "-m", "spiking.live", "--data-dir", str(self.data_dir), "--neurons", str(self.n_neurons)]
         if not self.twin:
@@ -553,14 +717,24 @@ class LiveClient:
                     msg = json.loads(line)
                 except ValueError:
                     continue
-                if msg.get("op") == "ready":
+                kind = msg.get("type")
+                if kind == "ready":
                     self.info, self.ready = msg, True
                     print(f"spiking live: ready, {msg.get('n_neurons')} neurons, {msg.get('n_learn')} learned decisions",
                           flush=True)
-                    continue
-                fut = self.futs.pop(msg.get("id"), None)
-                if fut is not None and not fut.done():
-                    fut.set_result(msg)                   # an answer after its timeout finds no future: dropped
+                elif kind == "spiking":
+                    self.last_frame = time.time()
+                    if self.on_frame is not None:
+                        try:
+                            await self.on_frame(msg)
+                        except Exception as e:                # the page feed must never stop the reader
+                            print("spiking live: frame not sent:", repr(e)[:120], flush=True)
+                elif kind in ("decision", "status", "error"):
+                    fut = self.futs.pop(msg.get("id"), None)
+                    if fut is not None and not fut.done():
+                        fut.set_result(msg)               # an answer after its timeout finds no future: dropped
+                elif kind == "rewarded" and msg.get("ok"):
+                    self.info["n_learn"] = msg.get("n_learn")
         finally:
             self.ready = False
             for f in self.futs.values():
@@ -568,7 +742,7 @@ class LiveClient:
                     f.set_result(None)
             self.futs.clear()
 
-    def _send(self, msg):
+    def send(self, msg):
         if not self.alive():
             return False
         try:
@@ -577,15 +751,16 @@ class LiveClient:
         except (BrokenPipeError, ConnectionResetError, RuntimeError):
             return False
 
-    async def call(self, op, timeout=None, **kw):
+    async def call(self, msg_type, rid=None, timeout=None, **kw):
         import asyncio
         if not self.ready:
             return None
-        self.next_id += 1
-        rid = self.next_id
+        if rid is None:
+            self.next_id += 1
+            rid = f"{msg_type[0]}-{self.next_id}"
         fut = asyncio.get_running_loop().create_future()
         self.futs[rid] = fut
-        if not self._send({"id": rid, "op": op, **kw}):
+        if not self.send({"type": msg_type, "id": rid, **kw}):
             self.futs.pop(rid, None)
             return None
         try:
@@ -624,7 +799,7 @@ class LiveClient:
         import asyncio
         self._stopping = True
         if self.alive():
-            self._send({"op": "stop"})
+            self.send({"type": "stop"})
             try:
                 self.proc.stdin.close()
                 await asyncio.wait_for(self.proc.wait(), 5)
@@ -632,103 +807,67 @@ class LiveClient:
                 self.proc.kill()
                 await self.proc.wait()
 
-    # --- one choice ---------------------------------------------------------------------------------------------
-    async def decide(self, labels):
-        """The network's answer for these option labels, or {"why": ...} when it is down or too slow (the vote then
-        skips the term)."""
-        labels = [str(x) for x in labels][:MAX_OPTIONS]
-        if len(labels) < 2:
+    # --- the protocol --------------------------------------------------------------------------------------------
+    async def decide(self, options, kind="browse", did=None, timeout=None):
+        """The network's decision for these option labels, or {"why": ...} when it is down, too slow or wrong."""
+        options = [str(x) for x in options][:MAX_OPTIONS]
+        if len(options) < 2:
             return {"why": "fewer than 2 options"}
         if not self.ready:
             return {"why": "spiking network offline"}
         t0 = time.perf_counter()
-        ans = await self.call("decide", labels=labels)
+        timeout = self.timeout if timeout is None else timeout
+        ans = await self.call("decide", rid=did, timeout=timeout, options=options, kind=kind,
+                              deadline_ms=int(timeout * 1000))
         if ans is None:
             self.slow += 1
-            return {"why": f"spiking network slower than {self.timeout:g} s"}
-        if "error" in ans or len(ans.get("pool_rates") or []) != len(labels):
+            return {"why": f"spiking network slower than {timeout:g} s"}
+        if ans.get("type") != "decision" or len(ans.get("pool_rates") or []) != len(options):
             self.errors += 1
             return {"why": "spiking network error"}
         ans["wall_ms"] = round((time.perf_counter() - t0) * 1000)
-        ans["labels"] = labels
         return ans
 
-    def followed(self, ans, chosen):
-        """The vote followed option `chosen`: remember it until he leaves the page (then it learns)."""
-        self.pending = None
-        if not ans or "pool_rates" not in ans:
-            return
-        ln = lean(ans["pool_rates"])
-        self.pending = {"id": ans["id"], "labels": ans["labels"], "pick": ans["pick"], "twin_pick": ans.get("twin_pick"),
-                        "followed": int(chosen), "k": len(ans["labels"]), "t": time.time()}
-        self.last = {"labels": ans["labels"], "lean": [round(float(x), 3) for x in ln], "pick": ans["pick"],
-                     "twin_pick": ans.get("twin_pick"), "followed": int(chosen), "decision_ms": ans.get("decision_ms"),
-                     "cpu_ms": ans.get("cpu_ms"), "t": round(time.time())}
+    def reward(self, did, value, followed=None):
+        """Dopamine for decision `did` (fire and forget; the child acknowledges with a "rewarded" line)."""
+        msg = {"type": "reward", "id": str(did), "value": float(value)}
+        if followed is not None:
+            msg["followed"] = int(followed)
+        return self.send(msg)
 
-    def outcome(self, response=None, delta=None):
-        """He left the page the pending decision led to: its tastes response / prediction error (None if the stay was
-        too short to measure) is logged, and the prediction error is the dopamine of that decision."""
-        from state_io import append_jsonl
-        p, self.pending = self.pending, None
-        if p is None:
-            return
-        ok = delta is not None and math.isfinite(float(delta))
-        if ok:
-            self.next_id += 1
-            self._send({"id": self.next_id, "op": "learn", "decision": p["id"], "followed": p["followed"],
-                        "delta": float(delta)})
-        row = {"t": round(p["t"]), "day": _today(p["t"]), "labels": [" ".join(label_words(x)) for x in p["labels"]],
-               "k": p["k"], "pick": p["pick"], "twin_pick": p["twin_pick"], "followed": p["followed"],
-               "response": round(float(response), 4) if ok and response is not None else None,
-               "delta": round(float(delta), 4) if ok else None}
-        try:
-            self.dir.mkdir(parents=True, exist_ok=True)
-            append_jsonl(self.log_path, row)
-        except OSError as e:
-            print("spiking live: could not log:", repr(e)[:120], flush=True)
-
-    # --- the card -----------------------------------------------------------------------------------------------
-    def view(self):
-        from state_io import read_jsonl
-        rows = read_jsonl(self.log_path, last=5000)
-        today = _today()
-        n = self.info.get("n_neurons") or self.n_neurons
-        last = None
-        if self.last:
-            L = self.last
-            top = int(np.argmax(L["lean"]))
-            last = {**L, "leaned_to": L["labels"][top], "pick_label": L["labels"][L["pick"]],
-                    "followed_label": L["labels"][L["followed"]]}
-        w = float(os.environ.get("SUB01_SPIKING_W", 0.3))
-        return {"state": "live" if self.ready else ("starting" if self.alive() else "offline"),
-                "n_neurons": n, "card": CARD.format(n=f"{n:,}"), "note": NOTE.format(w=w), "weight": w,
-                "decisions_today": sum(1 for r in rows if r.get("day") == today),
-                "learned_today": sum(1 for r in rows if r.get("day") == today and r.get("delta") is not None),
-                "n_decisions": self.info.get("n_decisions"), "n_learn": self.info.get("n_learn"), "eta": self.info.get("eta"),
-                "last": last, "score": score(rows), "today": score([r for r in rows if r.get("day") == today]),
-                "cpu": {k: v for k, v in self.cpu.items() if not k.startswith("_")},
-                "slow": self.slow, "restarts": self.restarts, "timeout_s": self.timeout}
+    def state(self):
+        return "live" if self.ready else ("starting" if self.alive() else "offline")
 
 
-def day_choices(data_dir, day, cap=150):
-    """The day's decisions with an outcome, for the night's GPU session (pod_manager): offered labels (as their cue
-    words), the option followed and its prediction error; the newest `cap`."""
-    from state_io import read_jsonl
-    rows = [r for r in read_jsonl(Path(data_dir) / "spiking" / "live_choices.jsonl", last=5000)
-            if r.get("day") == day and r.get("delta") is not None and 2 <= len(r.get("labels") or []) <= MAX_OPTIONS
-            and isinstance(r.get("followed"), int) and 0 <= r["followed"] < len(r["labels"])]
-    return [{"labels": [str(x)[:80] for x in r["labels"]], "followed": r["followed"], "delta": r["delta"],
-             "response": r.get("response")} for r in rows[-cap:]]
+def view(backend):
+    """GET /api/spiking/live: the "In the day" part of the Neurons card."""
+    cpu = getattr(backend, "cpu", None) if backend else None
+    log = getattr(backend, "log", None) if backend else None
+    if cpu is None and log is None:
+        return {"state": "off"}
+    rows = log.joined(7) if log else []
+    today = _today()
+    td = [r for r in rows if r.get("day") == today]
+    n = (cpu.info.get("n_neurons") if cpu else None) or (cpu.n_neurons if cpu else N_NEURONS)
+    w = float(os.environ.get("SUB01_SPIKING_W", 0.3))
+    by_net = {k: sum(1 for r in td if r.get("net") == k) for k in ("gpu", "cpu", "rate")}
+    return {"state": cpu.state() if cpu else "off", "n_neurons": n, "card": CARD.format(n=f"{n:,}"), "note": NOTE.format(w=w),
+            "weight": w, "decisions_today": len(td), "by_net_today": by_net,
+            "learned_today": sum(1 for r in td if r.get("net") == "cpu" and r.get("reward") is not None),
+            "n_decisions": cpu.info.get("n_decisions") if cpu else None, "n_learn": cpu.info.get("n_learn") if cpu else None,
+            "last": getattr(backend, "last", None), "score": score(rows), "today": score(td),
+            "cpu": {k: v for k, v in (cpu.cpu if cpu else {}).items() if not k.startswith("_")},
+            "slow": cpu.slow if cpu else None, "restarts": cpu.restarts if cpu else None,
+            "timeout_s": cpu.timeout if cpu else None}
 
 
-def attach(app, client):
-    """GET /api/spiking/live: the card on /brain (behind the site's password gate like every /api/ path)."""
+def attach(app, backend):
+    """GET /api/spiking/live (behind the site's password gate like every /api/ path)."""
     from aiohttp import web
 
     async def get(request):
-        return web.json_response(client.view() if client else {"state": "off"})
+        return web.json_response(view(backend))
     app.router.add_get("/api/spiking/live", get)
-
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -742,7 +881,7 @@ def main(argv=None):
     brain = LiveBrain(a.neurons, Path(a.data_dir) / "spiking" / "live_weights.npz", twin=not a.no_twin, log=log)
     log(f"spiking live: {brain.net.n:,} neurons, {brain.net.n_syn:,} synapses, {len(brain.dw):,} plastic, "
         f"threshold {brain.ch.thr_hz:.2f} Hz, built in {brain.net.build_s:.1f} s")
-    serve(brain, sys.stdin, proto)
+    serve(brain, sys.stdin.fileno(), proto)
 
 
 if __name__ == "__main__":
