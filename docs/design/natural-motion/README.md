@@ -70,10 +70,15 @@ every 4 s, which was the "same loop for minutes" in the report.
   - A clip that ended a sit-down blend at weight 0 kept `weight = 0`, and `reset()` does not restore it, so a later
     fade-in faded in nothing (he sank into the bed). `play()` sets the weight to 1 first.
   - `touch()` now also keeps bone positions (the hips move for weight shifts).
+  - `holdPhone()` decided "lying" from the current clip only; going from the phone to music in bed, the arm came down
+    as if he sat up, through the duvet. It now also reads the torso.
 
 ## Evidence
 All frames are from headless Chromium (SwiftShader WebGL) driving the page in `?debug&nolive`. The rAF loop is frozen
-and the page's own `sim()` steps him, so every case is exactly reproducible. Scripts are in `tools/` here.
+and the page's own `sim()` steps him, so every case is exactly reproducible. Scripts are in `tools/` here (`cap.mjs`: strips and WebMs; `sweep.mjs`, `sweep_m.mjs`: penetration;
+`perf.mjs`: timing; `ui.mjs`: screenshots; run against `python -m http.server -d web`). The strips and WebMs were
+captured just before the last two small fixes (a clip's weight reset in `play()`, and how `holdPhone()` tells he is
+lying); the penetration sweeps are on the final code.
 
 - `strip_<case>.jpg` (after) and `before/strip_<case>.jpg` (main before this PR): one frame every 0.5 s, for order_food,
   phone, phone lying, window (the walk there and the lean), get_delivery (whole, and the door close up), eating a meal
@@ -81,8 +86,12 @@ and the page's own `sim()` steps him, so every case is exactly reproducible. Scr
 - `webm/<case>.webm` (after): 10 fps, the same cases.
 - `screens/*_1280.png`, `screens/*_390.png`: the whole page at the window, eating, on the phone and listening to music.
 - **Penetration** (the #42 check, every skinned vertex inside the bed or the chair): `penetration_sweep.txt`.
-  PENETRATION_PLACEHOLDER
-- **Performance** (mid phone profile: 390×844, DPR 2, CPU ×4 by CDP): `perf.txt`. PERF_PLACEHOLDER
+  **0 bed and 0 chair vertices** over the whole chained sweep (17 activity changes, about 12 simulated minutes,
+  every vertex every 0.25 s) with three random seeds, plus a run with `listen_music`; and 0 in every captured case.
+- **Performance** (mid phone profile: 390×844, DPR 2, CPU ×4 by CDP): `perf.txt`. The new layers cost at most about
+  +1 ms of script per frame at CPU ×4 (0.6–1.5 ms against 0.2–0.7 ms before). Draw calls go from 41–43 to 45–53 per frame (small props); triangles +0.2%. No new skinned meshes. The real frame rate
+  cannot be measured headless: SwiftShader draws WebGL on the CPU, so both before and after run at ~0.1 FPS at
+  390×844. That is a limit of this environment, not a result.
 
 ## Not done here (part 2, and server side)
 - Real dishes matching `delivery.dish`; bread, courier and konbini bags; the dish emptying; the container into the bin;

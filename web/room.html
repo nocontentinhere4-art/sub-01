@@ -480,7 +480,8 @@ function play(name, fade = 0.4){
   want = name; const a = actions[name] || actions[ALIAS[name]] || actions.idle || actions.sit;
   if (!a || a === current) return;
   for (const x of Object.values(actions)) if (x !== a && x !== current && x.isRunning() && x.getEffectiveWeight() > 0) x.fadeOut(fade);   // (half steps)
-  a.reset().setEffectiveWeight(1).fadeIn(fade).play(); if (current) current.fadeOut(fade); current = a;   // (a pose step may have left its weight at 0)
+  a.reset(); a.weight = 1;                             // (a pose step may have left its weight at 0; reset() keeps it)
+  a.fadeIn(fade).play(); if (current) current.fadeOut(fade); current = a;
 }
 
 // ---------- live surfaces: monitor, phone, window ----------
@@ -617,7 +618,7 @@ const RAMP = ["RightArm", "RightForeArm", "RightHand"], _q0 = RAMP.map(() => new
 // w: 0..1, how far the arm and head have gone from the clip's pose to the grip (it ramps up when he picks the phone up)
 function holdPhone(w){
   const B = bones, G = GRIP, t = T; if (!B.RightArm || !B.LeftArm || !head) return;
-  const lying = current && current === actions.phone_lie;
+  const lying = (current && current === actions.phone_lie) || TU.y < 0.5;   // (the torso, so a clip change mid-ramp keeps it right)
   touch(B.RightArm, B.RightForeArm, B.RightHand, head);
   boy.updateMatrixWorld(true);                         // (he breathes in alive(), before this)
   const fl = thumb(t);                                 // a flick or a tap of the thumb: the phone dips and tips a little
