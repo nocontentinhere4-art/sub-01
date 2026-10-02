@@ -105,6 +105,51 @@ def test_load_json_expect_none_accepts_any_type(tmp_path):
     assert load_json(p, expect=None) == [1, 2]
 
 
+def test_load_json_unreadable_file_raises_and_is_left_alone(tmp_path, monkeypatch):
+    """EIO or permissions: defaults would let the next save overwrite good state, so this raises as before."""
+    p = tmp_path / "state.json"
+    save_json(p, {"engine": {}, "memory": []})
+
+    def eio(self):
+        raise OSError(5, "Input/output error")
+    monkeypatch.setattr(Path, "read_bytes", eio)
+    with pytest.raises(OSError):
+        load_json(p, {})
+    monkeypatch.undo()
+    assert load_json(p) == {"engine": {}, "memory": []}
+    assert not corrupt_files(tmp_path, "state.json")
+
+
+def test_tastes_and_spiking_hub_still_start_on_an_unreadable_file(tmp_path, monkeypatch):
+    from tastes import Tastes
+    from spiking import server as spiking_server
+    (tmp_path / "tastes.json").mkdir()                       # reading a directory raises IsADirectoryError (OSError)
+    (tmp_path / "spiking" / "last.json").mkdir(parents=True)
+    assert Tastes(tmp_path / "tastes.json").pref == {}
+    assert spiking_server.SpikingHub(object(), tmp_path, secret="x").last == {}
+
+
+def test_save_json_concurrent_writers_of_one_file(tmp_path):
+    import threading
+    p = tmp_path / "world.json"
+    errors = []
+
+    def writer(k):
+        try:
+            for i in range(50):
+                save_json(p, {"k": k, "i": i, "pad": "x" * 2000})
+        except Exception as e:                                # noqa: BLE001 - any failure fails the test
+            errors.append(e)
+    ts = [threading.Thread(target=writer, args=(k,)) for k in range(4)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert errors == []
+    assert load_json(p)["i"] == 49
+    assert sorted(x.name for x in tmp_path.iterdir()) == ["world.json"]
+
+
 # --- jsonl -----------------------------------------------------------------------------------------------------------
 def test_jsonl_torn_last_line_is_skipped_and_not_glued_to_the_next_row(tmp_path):
     p = tmp_path / "eyes_costs.jsonl"

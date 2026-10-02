@@ -2,22 +2,39 @@
 
 save_json writes `<path>.tmp`, flushes and fsyncs it, then renames it onto `<path>` (os.replace is atomic on POSIX),
 so a reader sees either the old file or the new one, never half of one. load_json never raises on a missing or
-broken file: it logs one line, keeps the broken file aside as `<path>.corrupt-<UTC time>` for a look later, and
-returns the default, so one torn file cannot crash-loop the server at startup.
+torn or corrupt file: it logs one line, keeps the broken file aside as `<path>.corrupt-<UTC time>` for a look later,
+and returns the default, so one torn file cannot crash-loop the server at startup. A file that exists but cannot be
+read (EIO, permissions) still raises: returning defaults there would let the next save overwrite good state.
 
 Append-only logs (`*.jsonl`) are not replaced: append_jsonl starts a new line if a crash left the last one torn, and
 read_jsonl skips lines that do not parse.
 """
 import json
 import os
+import threading
 import time
 from pathlib import Path
 
 
+_locks = {}
+_locks_guard = threading.Lock()
+
+
+def _lock(path):
+    with _locks_guard:
+        return _locks.setdefault(str(path), threading.Lock())
+
+
 def save_json(path, obj, **dumps_kw):
-    """Atomically replace `path` with json.dumps(obj, **dumps_kw)."""
+    """Atomically replace `path` with json.dumps(obj, **dumps_kw). Writers of one path in this process take turns
+    (they share `<path>.tmp`)."""
     path = Path(path)
     data = json.dumps(obj, **dumps_kw)                    # serialise first: a bad object leaves the old file alone
+    with _lock(path.absolute()):
+        _write_replace(path, data)
+
+
+def _write_replace(path, data):
     tmp = path.with_name(path.name + ".tmp")
     try:
         with open(tmp, "w", encoding="utf-8") as f:
@@ -34,14 +51,12 @@ def save_json(path, obj, **dumps_kw):
 
 
 def load_json(path, default=None, expect=dict):
-    """The parsed file, or `default` when it is missing, unreadable, not JSON, or not an `expect` (None: any type)."""
+    """The parsed file, or `default` when it is missing, not JSON, or not an `expect` (None: any type). Other read
+    errors (OSError) are raised, as before."""
     path = Path(path)
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
-        return default
-    except OSError as e:
-        print(f"state: cannot read {path} ({type(e).__name__}), starting from defaults", flush=True)
         return default
     try:
         obj = json.loads(raw.decode("utf-8"))

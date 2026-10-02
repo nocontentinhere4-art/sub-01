@@ -32,7 +32,10 @@ class Tastes:
         self.path = Path(path) if path else None
         self.clock = clock
         self.pref, self.seen, self.last = {}, {}, clock()
-        d = load_json(self.path, {}) if self.path else {}
+        try:
+            d = load_json(self.path, {}) if self.path else {}
+        except OSError:                                   # unreadable: start empty, as before
+            d = {}
         self.pref, self.seen, self.last = d.get("pref", {}), d.get("seen", {}), d.get("last", self.last)
 
     # --- the interface ---------------------------------------------------------------------------------------------

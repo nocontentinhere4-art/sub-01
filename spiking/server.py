@@ -52,7 +52,10 @@ class SpikingHub:
         self._relayed = -1e9
         self._good = -1e9
         self._tasks = set()
-        self.last = load_json(self.dir / "last.json", {})
+        try:
+            self.last = load_json(self.dir / "last.json", {})
+        except OSError:
+            self.last = {}
 
     # --- auth ---------------------------------------------------------------------
     @property
