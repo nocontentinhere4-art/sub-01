@@ -11,7 +11,12 @@ import * as THREE from "three";
 
 export function boy2Extras(gltf, mixer) {
   const root = gltf.scene, bones = {}, morphs = [];
-  root.traverse(o => { if (o.isBone) bones[o.name] = o; if (o.isMesh && o.morphTargetDictionary && "blink" in o.morphTargetDictionary) morphs.push(o); });
+  root.traverse(o => { if (o.isBone) bones[o.name] = o; if (o.isMesh && o.morphTargetDictionary && "blink" in o.morphTargetDictionary) morphs.push(o);
+    // soft shading: a faint warm light through the colour map lifts the shadowed side (skin reads less flat, like light
+    // under the skin); on the dark clothes it is too faint to see
+    if (o.isMesh && o.material && o.material.map && o.material.name === "boy2_body") {
+      o.material.emissiveMap = o.material.map; o.material.emissive.setRGB(1.0, 0.82, 0.72); o.material.emissiveIntensity = 0.07; }
+  });
   const sockets = {phone: root.getObjectByName("socket_phone"), chopsticks: root.getObjectByName("socket_chopsticks"), spoon: root.getObjectByName("socket_spoon")};
   const hands = {}, eyes = [bones.LeftEye, bones.RightEye].filter(Boolean), eyeRest = eyes.map(b => b.quaternion.clone());
   let current = null, closed = 0, blinkT = -1, nextBlink = 1.5 + Math.random() * 3, look = {y: 0, p: 0, ty: 0, tp: 0, next: 1};
