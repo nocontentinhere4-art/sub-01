@@ -223,6 +223,12 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: social accounts, both uses** (owner).
+  - (a) Official SUB-01 accounts post daily AI-labelled clips (#59): manual, or the official APIs once approved.
+  - (b) He browses logged in to his own TikTok/YouTube, view-only (#60, after #56). No likes, follows, comments or
+    DMs, and private pages never reach a public screen.
+  - The owner creates the accounts; Claude cannot sign up. Terms-of-service ban risk on (b) is accepted; he falls back
+    to logged out.
 - **2026-10-02: browse like a real young guy, no restrictions** (owner; this supersedes the earlier same-day note).
   - Variety comes from an interest profile, the daily rhythm, boredom and novelty; there are no external topic quotas.
   - YouTube (incl. Shorts) and TikTok, logged out: muted, bounded, sign-in walls left.
