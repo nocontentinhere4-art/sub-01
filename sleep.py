@@ -88,6 +88,12 @@ TAU_PW = 30 * 60.0     # s, REM pressure decays while awake (so no REM at sleep 
 G_AROUSAL = 1.8        # mV of MA drive per arousal unit (1 unit = one message)
 AROUSAL_TAU_S = 5 * 60
 WAKE_THRESHOLD = 3.0   # nominal arousal that wakes it in mid-night NREM (what actually decides is the flip-flop)
+AROUSAL_MAX = 2 * WAKE_THRESHOLD   # total arousal cap: no input stream (chat, trades) can pin it awake for days
+OVERRIDE_DEBT_H = 18.0         # past this much sleep debt (more than one whole lost night, ~17 h), sleep pressure
+OVERRIDE_WIDTH_H = 4.0         # overrides outside arousal: its MA drive is divided by 1 + ((debt - 18 h) / 4 h)^2
+DEBT_MAX_RESTART_H = 12.0      # sleep debt is capped at this on a restart (a bad input stream must not carry over)
+REPAIRS = ("2026-10-02-trades",)   # one-time state repairs, applied once to a saved state (see from_dict)
+REPAIR_DEBT_H = 2.0            # the 2026-10-02 repair: the debt the fake trades built is reset to at most this
 AROUSAL_NATURAL = 0.3  # a wake-up with less arousal than this counts as natural (no external cause)
 BIG_TRADE_USD = 5000
 REPLAY_MEAN_S = 4 * 60 # mean interval between REM replays
@@ -394,6 +400,7 @@ class SleepEngine:
         self.night = None                              # current night record (see open_night)
         self.last_night = None                         # summary of the previous closed night
         self.next_replay = None
+        self.repairs = list(REPAIRS)                   # a fresh engine needs none of the one-time repairs
         if self.asleep:
             self.open_night(now)
             self.night["sleep_onset"] = stamp(now)
@@ -462,6 +469,15 @@ class SleepEngine:
         return p
 
     # --- inputs --------------------------------------------------------------------
+    def arousal_drive(self):
+        """mV of drive to the MA population from outside arousal. Up to OVERRIDE_DEBT_H of debt it is the plain
+        G_AROUSAL x arousal (a message wakes him, chat can keep him up a whole night, as before); beyond, a body that
+        has lost more than a night falls asleep anyway: the drive shrinks fast with the extra debt, so no input stream
+        can keep him awake for days (a nonstop stream of the largest allowed trades: ~7.8 h of sleep a day, debt
+        levelling off at ~24 h)."""
+        over = max(0.0, self.debt - OVERRIDE_DEBT_H)
+        return G_AROUSAL * self.arousal / (1.0 + (over / OVERRIDE_WIDTH_H) ** 2)
+
     def stimulus(self, t, kind, usd=0.0):
         """Register a chat message ('message') or trade ('trade') as arousal input to the MA population.
         Returns the current stimulus gain."""
@@ -471,7 +487,7 @@ class SleepEngine:
         elif kind == "trade" and usd >= BIG_TRADE_USD:
             amount = min(1.5 * WAKE_THRESHOLD, usd / BIG_TRADE_USD)
         if amount > 0:
-            self.arousal += amount
+            self.arousal = min(AROUSAL_MAX, self.arousal + amount)
             self.last_stim = t
             self.arousal_log.append([t, amount, kind, usd])
         return self.gain
@@ -498,7 +514,7 @@ class SleepEngine:
             for i in range(1, n + 1):
                 ts = t0 + i * h
                 self.arousal *= math.exp(-h * (slow if self.asleep else 1.0) / AROUSAL_TAU_S)
-                self.C = step_circuit(s, h, (ts + off) % 86400.0, G_AROUSAL * self.arousal)
+                self.C = step_circuit(s, h, (ts + off) % 86400.0, self.arousal_drive())
                 self.V_m, self.V_v, self.H, self.V_on, self.V_off, self.rem_p = s
                 self.t = ts
                 self._classify(ts, ev)
@@ -641,7 +657,7 @@ class SleepEngine:
         s = [self.V_m, self.V_v, self.H, self.V_on, self.V_off, self.rem_p]
         tod = (self.t + tod_offset(self.t)) % 86400.0
         for _ in range(10):
-            self.C = step_circuit(s, 1.0, tod, G_AROUSAL * self.arousal)
+            self.C = step_circuit(s, 1.0, tod, self.arousal_drive())
         self.V_m, self.V_v, self.H, self.V_on, self.V_off, self.rem_p = s
 
     def record_replay(self, t, m):
@@ -674,7 +690,7 @@ class SleepEngine:
 
     # --- persistence ---------------------------------------------------------------
     STATE_KEYS = ("t", "asleep", "rem", "stage", "depth", "onset", "k_base", "awake_since", "last_wake", "arousal",
-                  "arousal_log", "last_stim", "night", "last_night", "params", "C") + CIRCUIT
+                  "arousal_log", "last_stim", "night", "last_night", "params", "C", "repairs") + CIRCUIT
 
     def to_dict(self):
         return {k: getattr(self, k) for k in self.STATE_KEYS} | {"debt": round(self.debt, 3)}
@@ -689,7 +705,37 @@ class SleepEngine:
             e.debt = d.get("debt", 0.0)
             e.rem = e.stage == "REM"
             e._sync_branch()
+        if "repairs" not in d:
+            e.repairs = []
+        broken = (float(d.get("arousal") or 0.0) > AROUSAL_MAX or e.debt > DEBT_MAX_RESTART_H
+                  or any("trade" in str(w.get("cause", "")) for w in ((e.night or {}).get("wakeups") or [])))
+        # a restart never carries a runaway input over: arousal at most the wake threshold, a short cause log,
+        # sleep debt at most DEBT_MAX_RESTART_H
+        e.arousal = min(max(0.0, float(e.arousal)), WAKE_THRESHOLD)
+        e.arousal_log = list(e.arousal_log or [])[-20:]
+        if e.debt > DEBT_MAX_RESTART_H:
+            e.debt = DEBT_MAX_RESTART_H
+        e.repair(broken)
         return e
+
+    def repair(self, broken):
+        """One-time repairs of a saved state, each applied once (the tag is saved with the state).
+        2026-10-02-trades: a third-party token's mis-decoded "trades" ($97M each) pinned him awake (arousal 215,
+        debt 105 h) and broke the night record; drop the arousal, the debt those trades built (at 12 h of debt the
+        model's first night has ~15 min of REM; at 2 h, ~75 min) and tonight's record (last_night stays as history),
+        so the next sleep starts a clean night with REM and replays."""
+        if "2026-10-02-trades" not in self.repairs and broken:
+            self.arousal, self.arousal_log = 0.0, []
+            if self.debt > REPAIR_DEBT_H:
+                self.debt = REPAIR_DEBT_H
+            if self.night is not None:
+                self.night, self.k_base, self.next_replay = None, 0, None
+                if self.asleep:
+                    self.open_night(self.t)
+                    self.night["sleep_onset"] = stamp(self.t)
+                    self.night["timeline"].append({"t": stamp(self.t), "stage": self.stage})
+        if "2026-10-02-trades" not in self.repairs:
+            self.repairs.append("2026-10-02-trades")       # a healthy old state needs nothing: marked done too
 
 
 class Store:
