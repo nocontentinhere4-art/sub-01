@@ -14,12 +14,12 @@ The interface is three methods, kept small so the spiking brain (feature/spiking
 dopamine-modulated synapses later:  topics(option, title) -> [str],  predict(topics) -> float in [-1, 1],
 learn(topics, response) -> delta. Nothing here is enjoyment: it is a running average of simulated activity.
 """
-import json
 import math
 import time
 from pathlib import Path
 
 from research import keywords
+from state_io import load_json, save_json
 
 ALPHA = 0.2
 TAU_DAYS = 7.0
@@ -32,12 +32,8 @@ class Tastes:
         self.path = Path(path) if path else None
         self.clock = clock
         self.pref, self.seen, self.last = {}, {}, clock()
-        if self.path and self.path.exists():
-            try:
-                d = json.loads(self.path.read_text())
-                self.pref, self.seen, self.last = d.get("pref", {}), d.get("seen", {}), d.get("last", self.last)
-            except (OSError, ValueError):
-                pass
+        d = load_json(self.path, {}) if self.path else {}
+        self.pref, self.seen, self.last = d.get("pref", {}), d.get("seen", {}), d.get("last", self.last)
 
     # --- the interface ---------------------------------------------------------------------------------------------
     @staticmethod
@@ -87,9 +83,7 @@ class Tastes:
     def save(self):
         if not self.path:
             return
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"pref": self.pref, "seen": self.seen, "last": self.last}))
-        tmp.replace(self.path)
+        save_json(self.path, {"pref": self.pref, "seen": self.seen, "last": self.last})
 
     def top(self, n=12):
         self.decay()

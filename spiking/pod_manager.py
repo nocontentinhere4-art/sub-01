@@ -26,6 +26,7 @@ from sleep import ROME, day_of
 from spiking import podpack
 from spiking.costs import CostLog
 from spiking.runpod_ops import RunPodOps
+from state_io import load_json, save_json
 
 DEFAULT_TZ = "Asia/Tokyo"
 HELLO_TIMEOUT_S = 15 * 60
@@ -285,7 +286,7 @@ class PodManager:
     def _load_done(self):
         """Windows already used (kept across restarts so a crash loop cannot start a second pod in one window)."""
         try:
-            for s in json.loads((self.dir / "manager.json").read_text()).get("windows_done", []):
+            for s in load_json(self.dir / "manager.json", {}).get("windows_done", []):
                 self.done_windows.add(datetime.fromisoformat(s))
         except Exception:
             pass
@@ -294,12 +295,9 @@ class PodManager:
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             path = self.dir / "manager.json"
-            try:
-                state = json.loads(path.read_text())
-            except Exception:
-                state = {}
+            state = load_json(path, {})
             state.update(updates, windows_done=[d.isoformat() for d in sorted(self.done_windows)[-10:]])
-            path.write_text(json.dumps(state))
+            save_json(path, state)                          # atomic: a torn file would forget windows_done
         except OSError:
             pass
 

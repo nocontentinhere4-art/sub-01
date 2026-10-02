@@ -42,6 +42,7 @@ import brain_vote
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
 from tastes import PageWatch, Tastes
+from state_io import load_json, read_jsonl, save_json
 
 try:                                             # the GPU spiking brain is optional: the server runs without it
     from spiking import pod_manager as spiking_manager, server as spiking_server
@@ -161,8 +162,8 @@ class Live:
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
         self.body_path = Path(data_dir) / "body.json"
-        bs = json.loads(self.body_path.read_text()) if self.body_path.exists() else {}
-        life_state = json.loads(life_path.read_text()) if life_path.exists() else None
+        bs = load_json(self.body_path, {})              # state_io: a torn file is kept aside, never a crash loop
+        life_state = load_json(life_path)
         if not bs.get("body") and life_state and "hunger" in life_state:      # first start: carry the old hunger over
             bs["body"] = {"ghrelin": min(1.0, max(0.0, life_state["hunger"]))}
         self.body = Body(bs.get("body"))
@@ -173,11 +174,11 @@ class Live:
         self.time_scale = time_scale
         self.life.time_scale = time_scale
         self.reading_path = Path(data_dir) / "reading.json"
-        self.reader = Reader(json.loads(self.reading_path.read_text()) if self.reading_path.exists() else None)
+        self.reader = Reader(load_json(self.reading_path))
         self.browsing_path = Path(data_dir) / "browsing.json"
         self.browser = None              # BrowserClient (main() with --browse): Chromium runs in its own process
         self.local_browser = None        # LocalBrowser when that process is our child (no BROWSE_SERVICE_URL)
-        self.browsing_state = json.loads(self.browsing_path.read_text()) if self.browsing_path.exists() else {}
+        self.browsing_state = load_json(self.browsing_path, {})
         self.eyes = None                 # eyes.py: an AI lists options; the brain model picks (brain_vote.py)
         self.tastes = Tastes(Path(data_dir) / "tastes.json")
         self.pagewatch = PageWatch()
@@ -440,9 +441,9 @@ class Live:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
                 self.store.save(self.engine, self.memory)
-                self.life_path.write_text(json.dumps(self.life.to_dict()))
-                self.body_path.write_text(json.dumps({"body": self.body.to_dict(), "neuro": self.neuro.to_dict()}))
-                self.reading_path.write_text(json.dumps(self.reader.to_dict(), ensure_ascii=False))
+                save_json(self.life_path, self.life.to_dict())
+                save_json(self.body_path, {"body": self.body.to_dict(), "neuro": self.neuro.to_dict()})
+                save_json(self.reading_path, self.reader.to_dict(), ensure_ascii=False)
                 last_save = now
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
@@ -524,7 +525,7 @@ class Live:
                     await self.sync_browsing()
                     last_sync = now
                 if now - last_save > 300:
-                    self.browsing_path.write_text(json.dumps(self.browsing_state, ensure_ascii=False))
+                    save_json(self.browsing_path, self.browsing_state, ensure_ascii=False)
                     last_save = now
             except BrowserDown as e:
                 if not self.browser.restarting:
@@ -832,9 +833,9 @@ async def main(args):
 
     async def frames(request):                    # recent eye frames for the world page
         log = live.eye.log if live.eye else HERE / "missing"
-        rows = log.read_text().splitlines()[-int(request.query.get("n", "40")):] if log.exists() else []
+        rows = read_jsonl(log, last=int(request.query.get("n", "40")))         # a torn last line is skipped
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
-        return web.json_response({"frames": [json.loads(r) for r in rows], "world": world})
+        return web.json_response({"frames": rows, "world": world})
     app.router.add_get("/api/frames", frames)
 
     gmaps_ok = {}
@@ -884,7 +885,7 @@ async def main(args):
                 await asyncio.wait_for(live.sync_browsing(), 5)  # the newest log, if the browser still answers
             except (BrowserDown, asyncio.TimeoutError):
                 pass
-            live.browsing_path.write_text(json.dumps(live.browsing_state, ensure_ascii=False))
+            save_json(live.browsing_path, live.browsing_state, ensure_ascii=False)
             if live.local_browser:
                 await live.local_browser.aclose()
             else:
