@@ -87,6 +87,7 @@ MAX_OPTIONS = 6
 PENDING = 8                       # decisions kept for a late dopamine (the next page's decision comes first)
 VERSION = 1
 CALIB_LABELS = ("apple", "river", "cloud", "stone", "lamp", "bird", "salt", "rope")
+DA_SHOW_TAU_S = 30.0              # the page's dopamine reading decays back to 0 (wall seconds) after a burst (#89)
 FRAME_S = 0.2                     # at most 5 frames/s to the page
 RASTER_ROWS = 200
 IDLE_MS = int(os.environ.get("SUB01_SPIKING_LIVE_IDLE_MS", 50))     # background run between decisions (0: none)
@@ -352,6 +353,7 @@ class LiveBrain:
         self.t_start = time.time()
         self.calib = None
         self.emit, self.phase, self.last_da = None, "idle", 0.0     # emit(frame): the page's raster (serve() sets it)
+        self.da_t = time.time()                                       # when last_da was set (it decays on the page)
         self.net.enable_raster()
         self._record_all()
         self._frame_reset()
@@ -441,7 +443,7 @@ class LiveBrain:
                  "t_sim": round(net.t / 1000.0, 2), "spikes_per_s": round(n_sp / sim_s, 1),
                  "mean_rate_hz": round(n_sp / sim_s / net.n, 3), "realtime_x": round(sim_s / max(1e-6, now - self.f_wall), 3),
                  "groups": groups, "raster": {"n": len(net.raster_ids), "t0": int(self.f_t), "t1": int(net.t), "spikes": spikes},
-                 "dopamine": round(self.last_da, 3)}
+                 "dopamine": round(self.dopamine_now(), 3)}
         frame = frames.viewer_frame(frame, self.sample, rates=rr, race=self.phase == "deciding")
         self._frame_reset()
         try:
@@ -515,12 +517,26 @@ class LiveBrain:
         p = np.where(post == followed, 1.0, np.where(post >= 0, -1.0 / max(1, k - 1), 0.0)).astype(np.float32)
         eta = self.eta()
         self.dw[q] += np.float32(eta * da) * pre * p
-        self.last_da = da
+        self.last_da, self.da_t = da, time.time()
         self._apply()
         self.n_learn += 1
         self.save()
         return {"ok": True, "eta": round(eta, 4), "da": round(da, 4), "n_learn": self.n_learn,
                 "dw_abs_mean": round(float(np.abs(self.dw).mean()), 5)}
+
+    def dopamine_now(self):
+        """The phasic dopamine reading for the page: the last value, decaying with DA_SHOW_TAU_S."""
+        return self.last_da * math.exp(-max(0.0, time.time() - self.da_t) / DA_SHOW_TAU_S)
+
+    def burst(self, value):
+        """#89: a new short / page on his screens: the simulated dopamine-like burst shows on the panel (no weight
+        changes: only `learn` changes weights)."""
+        try:
+            v = max(0.0, min(1.0, float(value)))
+        except (TypeError, ValueError):
+            return
+        if math.isfinite(v) and v > self.dopamine_now():
+            self.last_da, self.da_t = v, time.time()
 
     def status(self):
         return {"n_neurons": self.net.n, "n_synapses": self.net.n_syn, "n_plastic": len(self.dw),
@@ -564,6 +580,8 @@ def handle(brain, line, send):
             send({"type": "decision", "id": rid, **brain.decide(msg.get("options") or [], did=rid)})
         elif kind == "reward":
             send({"type": "rewarded", "id": rid, **brain.learn(rid, msg.get("followed"), msg.get("value"))})
+        elif kind == "burst":                             # fire and forget: no answer
+            brain.burst(msg.get("value"))
         elif kind == "status":
             send({"type": "status", "id": rid, **brain.status()})
         elif kind == "stop":
@@ -851,6 +869,10 @@ class LiveClient:
         if followed is not None:
             msg["followed"] = int(followed)
         return self.send(msg)
+
+    def burst(self, value):
+        """#89: a dopamine-like burst from his screens, shown on the neurons panel (fire and forget)."""
+        return self.send({"type": "burst", "value": round(float(value), 4)})
 
     def state(self):
         return "live" if self.ready else ("starting" if self.alive() else "offline")

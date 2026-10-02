@@ -28,6 +28,10 @@ from urllib.robotparser import RobotFileParser
 
 PER_HOST_HOUR = 20                  # requests per rolling hour per host (searches, API calls, robots.txt)
 MAX_RESULTS = 10
+BLOCK_AFTER = 2                      # consecutive failures before a source is set aside (#89: rotate, never loop)
+BLOCK_S = 3600.0                     # first block; doubles on each new block, at most BLOCK_MAX_S
+BLOCK_MAX_S = 6 * 3600.0
+NOT_BROKEN = ("rate limit", "opened in the last 7 days")     # refusals that do not mean the source is broken
 ROBOTS_TTL_S = 86400.0
 ROBOTS_RETRY_S = 600.0              # a robots.txt that could not be read refuses the host for 10 min only
 UA_TOKEN = "Mozilla"                # robots.txt rules are read for a generic browser ('*' unless Mozilla is named)
@@ -466,6 +470,9 @@ class Limits:
         self.today = {k: int(v) for k, v in (s.get("today") or {}).items() if isinstance(v, int)}
         self.refused = {k: int(v) for k, v in (s.get("refused") or {}).items() if isinstance(v, int)}
         self.last = list(s.get("last") or [])[-20:]          # recent searches: [{t, source, query, from}]
+        self.fails = {k: int(v) for k, v in (s.get("fails") or {}).items() if isinstance(v, int)}
+        self.blocked = {k: dict(v) for k, v in (s.get("blocked") or {}).items()
+                        if isinstance(v, dict) and isinstance(v.get("until"), (int, float))}
         self._roll()
 
     def _roll(self):
@@ -491,10 +498,18 @@ class Limits:
         self.hits.setdefault(host, []).append(self.clock())
 
     def source_ok(self, name):
-        return all(self.allow(h) for h in hosts_of(name))
+        return not self.is_blocked(name) and all(self.allow(h) for h in hosts_of(name))
+
+    def is_blocked(self, name):
+        b = self.blocked.get(name)
+        return bool(b) and b["until"] > self.clock()
 
     def count(self, name, query="", origin=""):
         self._roll()
+        self.fails.pop(name, None)                          # it works: failures start again from zero
+        b = self.blocked.get(name)
+        if b and b["until"] <= self.clock():
+            self.blocked[name] = dict(b, n=0)
         self.today[name] = self.today.get(name, 0) + 1
         self.last = (self.last + [{"t": round(self.clock()), "source": name, "query": query[:60],
                                    "from": origin[:60]}])[-20:]
@@ -503,6 +518,14 @@ class Limits:
         self._roll()
         key = f"{name}: {why}"
         self.refused[key] = self.refused.get(key, 0) + 1
+        if why in NOT_BROKEN:
+            return
+        self.fails[name] = self.fails.get(name, 0) + 1
+        if self.fails[name] >= BLOCK_AFTER:                 # set aside for a while: the next sources get their turn
+            n = int((self.blocked.get(name) or {}).get("n", 0)) + 1
+            secs = min(BLOCK_MAX_S, BLOCK_S * 2 ** (n - 1))
+            self.blocked[name] = {"until": round(self.clock() + secs), "why": str(why)[:80], "n": n}
+            self.fails[name] = 0
 
     def recent(self, name):
         """Searches on this source in the last hour (rotation: the least used fitting source goes first)."""
@@ -513,7 +536,13 @@ class Limits:
     def to_dict(self):
         self._roll()
         return {"day": self.day, "today": dict(self.today), "refused": dict(self.refused),
-                "hits": {h: [round(t, 1) for t in ts] for h, ts in self.hits.items()}, "last": self.last[-20:]}
+                "hits": {h: [round(t, 1) for t in ts] for h, ts in self.hits.items()}, "last": self.last[-20:],
+                "fails": dict(self.fails), "blocked": dict(self.blocked)}
+
+    def blocked_now(self):
+        """Sources set aside right now: {name: {label, why, until (epoch s)}}."""
+        return {k: {"label": SOURCES.get(k, {}).get("label", k), "why": v.get("why", ""), "until": v["until"]}
+                for k, v in self.blocked.items() if v["until"] > self.clock()}
 
     def public(self):
         """For /api/browsing: searches per source on this Tokyo day, requests per host in the last hour."""
@@ -524,7 +553,7 @@ class Limits:
                 "per_host_last_hour": {h: len(ts) for h, ts in sorted(self.hits.items())},
                 "per_host_limit": self.per_host, "refused_today": dict(self.refused),
                 "recent": [dict(x, label=SOURCES.get(x.get("source"), {}).get("label", x.get("source")))
-                           for x in self.last[-10:]]}
+                           for x in self.last[-10:]], "blocked": self.blocked_now()}
 
 
 # --- robots.txt ------------------------------------------------------------------------------------------------------
@@ -597,6 +626,11 @@ def route(q, limits=None, rng=None, video=False, wiki_share=0.0):
                 score[s] = max(score.get(s, 0.0), 1.0 if i == 0 else 0.6)
     for s in GENERAL:
         score.setdefault(s, 0.35)
+    for s in SOURCES:                                       # #89: every other working source, last (rotation)
+        if s != "youtube":                                  # videos only for a video query or watching videos
+            score.setdefault(s, 0.15)
+    if video:
+        score.pop("wikipedia", None)                        # a video search never ends on Wikipedia
     if not ol_slug(q or ""):
         score.pop("openlibrary", None)
     for s in [k for k in score if SOURCES.get(k, {}).get("feed")]:
@@ -762,8 +796,8 @@ def live_interest(live, art=None, rng=None):
     except Exception:
         pass
     try:
-        if live.life.activity == "phone" and getattr(live.life, "phone_app", None) == "tiktok":
-            extra["feed"] = "shorts"                       # the phone's short-video app (#56: Shorts / TikTok)
+        if live.life.activity == "phone":
+            extra["feed"] = "shorts"                       # #89: on the phone he scrolls shorts (TikTok / Shorts)
     except Exception:
         pass
     return dict(it, **extra) if it else dict(extra, query="", **{"from": ""})

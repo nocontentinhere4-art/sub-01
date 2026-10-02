@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 18:25 UTC** (pass 33). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 19:10 UTC** (pass 33b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -305,6 +305,31 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 33b:** live check (the coordinator logged in with the owner's approval) and merge of #92 (#89).
+- **Sleep fix confirmed live:** NREM since 03:19 Tokyo, debt 2.0 h, woken 0×. The day-live pod stopped; only "BRAIN" is left.
+- **Found live:**
+  - **Browsing:** 30 pages, all on the phone: 8 on Wikipedia, 0 YouTube/Shorts/TikTok, the same page reopened (Studio Ghibli ×5 in 2 min), footer and licence clicks.
+  - **Music:** Spotify search 502 from the server.
+  - **Room:** he sleeps on top of the duvet, diagonally, with his slides on.
+  - **/life:** an old low-poly house and a blank white box.
+  - **/brain:** empty "now playing" and "at his desk" cards.
+- **#92 merged** (coordinator run: 1087 passed, smoke 7.8 ms). It fixes:
+  - the Wikipedia fallback loop and the footer links;
+  - the 7-day no-reopen rule;
+  - phone time defaulting to the shorts feed;
+  - TikTok through the official player;
+  - the screens panel;
+  - DA bursts;
+  - the room's fake Wikipedia frame;
+  - /life's real phone screen;
+  - the hidden empty cards.
+
+  It is verified live when he wakes, at 00:30 UTC.
+- **New:**
+  - #93: /life uses the real room scene.
+  - #63 worker: sleep pose and animation audit, after #84.
+  - #76: mocap animations first (Quaternius UAL CC0 plus keyframed CC0 poses), then a face pass.
 
 **Pass 33 (18:25 UTC):** merged #86, #87 and #85.
 - **#86 (#78 follow-up):** neuron close-ups now read as tissue.
