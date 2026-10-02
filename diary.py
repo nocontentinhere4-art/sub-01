@@ -31,12 +31,13 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SYSTEM = """You write the morning entry of a dream diary for SUB-01, a simulated brain model built from public MRI scans.
 You receive JSON: the dream scenes the model's image generator produced during REM, the chat messages it replayed,
 the titles of encyclopedia articles it read during the day and replayed, and when it slept; read_notes and
-conversations are what an AI noted for it that day (page summaries, chat lines and the replies an AI wrote).
+conversations are what an AI noted for it that day (page summaries, chat lines and the replies an AI wrote);
+music is the genres of the tracks its brain model picked that day and the one playing when it fell asleep.
 Reply with JSON only: {"title": "...", "text": "..."}
 - title: max 8 words, English, evocative, no quotes, no hashtags.
 - text: 2-3 sentences, max 60 words, English, third person ("SUB-01 dreamt..."), concrete images from the scenes,
   weave in the replayed messages; replayed_articles, read_notes and conversations may appear only as images, places
-  or a line of talk, never as facts it learned or things it felt.
+  or a line of talk, never as facts it learned or things it felt; music only as a sound or a mood, never as liking.
   Calm, precise, a little strange.
 - Never say or imply that SUB-01 is conscious, alive, sentient, human or a person, or the person the scans came
   from. No money, prices, tokens, buying or selling. No people's names."""
@@ -55,6 +56,30 @@ def clean_line(s, limit):
         end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
         s = cut[:end + 1] if end > limit // 3 else cut.rsplit(" ", 1)[0] + "\u2026"
     return s
+
+
+def music_facts(rows):
+    """Tracks its brain model picked that day (music.Music.day rows) -> a few facts for the entry, or None. Genres and
+    titles only: artists are people's names and stay out of the diary."""
+    rows = [r for r in rows if isinstance(r, dict) and r.get("title")]
+    if not rows:
+        return None
+    counts = {}
+    for r in rows:
+        g = r.get("genre_label") or "music"
+        counts[g] = counts.get(g, 0) + 1
+    last = rows[-1]
+    return {"tracks": len(rows), "genres": sorted(counts, key=lambda g: -counts[g])[:3],
+            "last": str(last["title"])[:80], "asleep_genre": (last.get("genre_label") or "music")
+            if last.get("ended") == "fell asleep" else None}
+
+
+def music_line(m):
+    if not m:
+        return ""
+    n = m["tracks"]
+    line = f" Its brain model picked {n} track{'s' * (n != 1)} that day, mostly {m['genres'][0]}"
+    return line + (f"; it fell asleep after {m['asleep_genre']}." if m["asleep_genre"] else ".")
 
 
 class Diary:
@@ -130,6 +155,7 @@ class Diary:
         `read_today` = [{title, url}] of the articles read during the day before this night; `notes` =
         mind.Mind.day_notes(date): {read: [summaries], topics: [...], talked: [{who, said, reply}]} (optional)."""
         notes = notes or {}
+        music = music_facts(notes.get("music") or [])
         d = self.entry(night["date"])
         allr = night.get("replays", [])
         replays = [r["text"] for r in allr if r.get("source", "chat") != "reading"]
@@ -150,7 +176,8 @@ class Diary:
         facts = {"sleep_onset": (night.get("sleep_onset") or "")[-5:], "woke_up": (night.get("woke_up") or "")[-5:],
                  "wakeups": len(night.get("wakeups", [])), "replays": len(replays), "top_replayed": top,
                  "reading_replays": sum(rcounts.values()), "read": read, "dream_frames": len(d["frames"]),
-                 "read_topics": list(notes.get("topics", []))[:5], "conversations": len(notes.get("talked", []))}
+                 "read_topics": list(notes.get("topics", []))[:5], "conversations": len(notes.get("talked", [])),
+                 **({"music": music} if music else {})}
         title = text = ""
         if llm is not None and d["frames"]:
             user = json.dumps({"scenes": [f["scene"] for f in d["frames"] if f["scene"]][-12:],
@@ -158,7 +185,9 @@ class Diary:
                                "read_notes": list(notes.get("read", []))[:5],
                                "conversations": [f"{c.get('who', 'a viewer')}: {c.get('said', '')[:120]} / "
                                                  f"reply: {c.get('reply', '')[:160]}" for c in notes.get("talked", [])[:3]],
-                               "slept": f"{facts['sleep_onset']}-{facts['woke_up']}"})
+                               "slept": f"{facts['sleep_onset']}-{facts['woke_up']}",
+                               **({"music": {"genres": music["genres"], "fell_asleep_to": music["asleep_genre"]}}
+                                  if music else {})})
             for _ in range(2):                         # one retry: small models sometimes break the JSON
                 try:
                     raw = llm.ask(SYSTEM, user)
@@ -176,7 +205,8 @@ class Diary:
                     (f", most often “{top[0][:80]}”." if top else ".") +
                     (f" It also replayed {facts['reading_replays']} of the things it read, such as "
                      f"“{top_read[0][:80]}”." if top_read else "") +
-                    (f" That day it read about {', '.join(facts['read_topics'][:3])}." if facts["read_topics"] else ""))
+                    (f" That day it read about {', '.join(facts['read_topics'][:3])}." if facts["read_topics"] else "") +
+                    music_line(music))
         d.update(title=title or f"Night of {night['date']}", text=text, facts=facts, closed=True,
                  share=self.share(night["date"], title, facts), closed_at=time.time())
         self.save(d)

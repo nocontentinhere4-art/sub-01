@@ -135,7 +135,8 @@ def run():
     except Exception:
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "numpy", "aiohttp"], stdout=log, stderr=log)
     code = subprocess.run([sys.executable, "-m", MODULE], cwd=APP, stdout=log, stderr=subprocess.STDOUT).returncode
-    open(OUT + "/exit_code", "w").write(str(code))
+    open(OUT + "/exit_code.tmp", "w").write(str(code))           # atomic, like status(): never read empty
+    os.replace(OUT + "/exit_code.tmp", OUT + "/exit_code")
     try:
         st = json.load(open(OUT + "/status.json"))
     except Exception:

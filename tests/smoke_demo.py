@@ -20,6 +20,7 @@ import argparse
 import asyncio
 import os
 import secrets
+import re
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,7 @@ import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
 PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes",
-         "/api/taught", "/api/mind", "/api/chess"]
+         "/api/taught", "/api/mind", "/api/chess", "/api/music", "/api/spiking/live"]
 ADMIN = {"X-Admin-Token": secrets.token_hex(16)}     # the server gets it as SUB01_ADMIN_TOKEN
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
 TORN = {                 # state files read back at startup, each cut off mid-write
@@ -66,6 +67,19 @@ def browser_mb(server_pid):
     from browse_service import descendants, tree_rss_mb
     return sum(tree_rss_mb(p) for p in descendants(server_pid) if p != server_pid
                and "browse_service" in Path(f"/proc/{p}/cmdline").read_bytes().decode(errors="replace"))
+
+
+def spiking_child(server_pid):
+    """Pid of the daytime spiking network's process (spiking/live.py, #55), or None."""
+    sys.path.insert(0, str(ROOT))
+    from browse_service import descendants
+    for p in descendants(server_pid):
+        try:
+            if b"spiking.live" in Path(f"/proc/{p}/cmdline").read_bytes():
+                return p
+        except OSError:
+            pass
+    return None
 
 
 def cpu_seconds(pid):
@@ -133,14 +147,18 @@ async def run(args, proc):
             # tick cost: server CPU seconds over a window of /ws, divided by the ticks received in it
             linux = Path(f"/proc/{proc.pid}/stat").exists()
             cpu0 = cpu_seconds(proc.pid) if linux else None
+            child = spiking_child(proc.pid) if linux else None
+            child0 = cpu_seconds(child) if child else None
             t0, ticks, seen, sent, next_chat = time.monotonic(), 0, {}, 0, time.monotonic()
-            chatty = args.mind or args.youtube_chess
-            games, videos, peak = [], [], 0.0
+            chatty = args.mind or args.youtube_chess or args.music
+            games, videos, peak, tracks = [], [], 0.0, []
             while time.monotonic() - t0 < args.measure:
                 if chatty and time.monotonic() >= next_chat:      # one message per 11 s (chat limit: 1 per 10 s)
                     sent += 1
                     if args.mind:
                         text = f"are you a real person? {sent}"
+                    elif args.music:
+                        text = f"play some city pop {sent}" if sent % 2 else f"metti un po' di lofi {sent}"
                     elif args.browse and sent % 2 == 0:
                         text = f"put on some youtube {sent}"
                     else:
@@ -162,6 +180,12 @@ async def run(args, proc):
                     print(f"chess: game over after {msg['plies']} plies, {msg['result']} ({msg['reason']}); "
                           f"last card: {(msg.get('vote') or {}).get('move')} of "
                           f"{[o['label'] for o in (msg.get('vote') or {}).get('options', [])]}")
+                if msg.get("type") == "music" and msg.get("playing"):
+                    tracks.append(msg)
+                    print(f"music: {msg.get('title')!r} ({msg.get('genre_label')}, {msg.get('mode')}) of "
+                          f"{len(msg.get('options') or [])} options; {msg.get('reason')}; embed {msg.get('embed')}")
+                    if args.music and len(tracks) >= 3:
+                        break
                 if msg.get("type") == "screen" and (msg.get("video") or {}).get("watching"):
                     peak = max(peak, browser_mb(proc.pid))
                     if not videos or videos[-1]["url"] != msg.get("url"):
@@ -181,6 +205,14 @@ async def run(args, proc):
                           f"watchdog at BROWSE_MEM_MB)")
                     if not videos:
                         failures.append("--youtube-chess --browse: no video was watched")
+            if args.music:
+                embed = re.compile(r"^https://open\.spotify\.com/embed/track/[A-Za-z0-9]{22}\?")
+                print(f"music: {len(tracks)} track(s) picked in {wall:.0f} s real")
+                if not tracks:
+                    failures.append("--music: no track was picked")
+                elif not all(embed.match(m.get("embed") or "") and 3 <= len(m.get("options") or []) <= 5
+                             for m in tracks):
+                    failures.append("--music: a track without the official embed URL or without 3-5 options")
             if args.mind:
                 print(f"mind: {sent} chat messages sent, {seen.get('chat_reply', 0)} replies (AI-written tag), "
                       f"{seen.get('plan', 0)} plan event(s)")
@@ -194,6 +226,14 @@ async def run(args, proc):
                 cpu = cpu_seconds(proc.pid) - cpu0
                 print(f"TICK COST: {1000 * cpu / ticks:.1f} ms CPU per {1000 * TICK_S:.0f} ms tick "
                       f"({100 * cpu / wall:.0f}% of one core, {cpu:.2f} CPU-s over {wall:.1f} s)")
+                if child:                                 # its start (build + calibration) falls in the window
+                    c = cpu_seconds(child) - child0
+                    c1 = cpu_seconds(child)
+                    await asyncio.sleep(5)
+                    idle = cpu_seconds(child) - c1
+                    print(f"SPIKING CHILD (#55): {c1:.2f} CPU-s since it started (build + calibration; {c:.2f} of them "
+                          f"in the window); between decisions {100 * idle / 5:.2f}% of one core (its idle pulse); "
+                          f"{seen.get('spiking', 0)} spiking frames on /ws")
             else:
                 print("TICK COST: not measured (/proc not available on this OS)")
             async with s.get(base + "/api/health", headers=ADMIN) as r:   # after the CPU reading
@@ -214,6 +254,8 @@ def main():
     p.add_argument("--mind", action="store_true", help="60x clock from 09:00 with chat messages: plan + replies run")
     p.add_argument("--youtube-chess", action="store_true", help="60x clock from 10:00: a chess game (and a video with "
                                                                     "--browse) must happen during the measurement")
+    p.add_argument("--music", action="store_true", help="60x clock from 20:00 with \"play ...\" wishes: his brain model "
+                                                         "must pick tracks (#68)")
     p.add_argument("--browse", action="store_true", help="BROWSE=1: the real browser (playwright, Chromium, network)")
     args = p.parse_args()
 
@@ -235,6 +277,8 @@ def main():
         cmd += ["--time-scale", "60", "--start", "09:00"]
     elif args.youtube_chess:
         cmd += ["--time-scale", "60", "--start", "10:00"]
+    elif args.music:
+        cmd += ["--time-scale", "60", "--start", "20:00"]
     print(f"$ BROWSE={env['BROWSE']} python live_server.py", " ".join(cmd[2:]))
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:

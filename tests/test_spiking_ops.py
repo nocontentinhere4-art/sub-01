@@ -1012,7 +1012,8 @@ def test_boot_py_subprocess_end_to_end(tmp_path):
     pack = podpack._tar_xz({"dummymod.py": (
         b"import json, os, time\n"
         b"out = os.environ['SUB01_OUT_DIR']\n"
-        b"json.dump({'phase': 'run', 'done': False, 'error': None}, open(out + '/status.json', 'w'))\n"
+        b"json.dump({'phase': 'run', 'done': False, 'error': None}, open(out + '/status.json.tmp', 'w'))\n"
+        b"os.replace(out + '/status.json.tmp', out + '/status.json')\n"     # atomic, as boot.py: never read half-written
         b"time.sleep(0.2)\n"
         b"json.dump({'phase': 'end', 'done': True, 'error': None}, open(out + '/status.json.tmp', 'w'))\n"
         b"os.replace(out + '/status.json.tmp', out + '/status.json')\n")})
@@ -1044,7 +1045,7 @@ def test_boot_py_subprocess_end_to_end(tmp_path):
         assert http_call(port, "PUT", "/upload", pack, token)[0] == 403                       # one upload only
         assert wait(lambda: json.loads(http_call(port, "GET", "/status.json")[1]).get("done") is True)
         assert json.loads(http_call(port, "GET", "/status.json")[1])["phase"] == "end"
-        assert wait(lambda: (out / "exit_code").exists()) and (out / "exit_code").read_text() == "0"
+        assert wait(lambda: (out / "exit_code").read_text() == "0")      # OSError until it exists; never seen empty
         assert (app / "dummymod.py").exists() and (out / "session.log").exists()
     finally:
         proc.kill()

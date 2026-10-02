@@ -168,8 +168,7 @@ def test_newly_allowed_sites(url):
 @pytest.mark.parametrize("url", [
     "https://www.pornhub.com/", "https://old.reddit.com.nsfw.example/", "https://www.xvideos.com/", "https://nudes.example/",
     "https://bestgore.com/", "https://www.pokerstars.com/", "https://www.bet365.com/", "https://casino.example/",
-    "https://www.binance.com/", "https://metamask.io/", "https://phantom.app/", "https://pump.fun/x",
-    "https://www.kraken.com/", "https://www.4chan.org/", "https://kiwifarms.net/",
+    "https://metamask.io/", "https://phantom.app/", "https://www.4chan.org/", "https://kiwifarms.net/",
 ])
 def test_still_blocked_sites(url):
     assert not url_ok(url)

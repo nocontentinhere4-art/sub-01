@@ -156,6 +156,43 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Fixtures: `tests/data/search/` (saved 2026-10-02); `tests/test_more_search.py`. A source's markup can change:
   a parser that finds nothing makes the search fall through to the next source (and `refused_today` says so).
 
+## Browse like a real young guy (#56 scope extension, part 2)
+- Owner: "he focuses too much on one topic … no guy like him would spend all day on Wikipedia", then "NO
+  RESTRICTIONS" (comment 2 replaces B.5 and D of comment 1).
+- `interests.py` (pure): `PROFILE` (seed weight, searches, page words per topic: music, anime, games, sports, food,
+  fashion, tech, memes, crypto, markets, tokyo, science, a little wikipedia; edit here), tastes move a topic 0.5–1.6x
+  (`taste_multipliers`, computed in the live server, passed with the interest), `RHYTHM` by Tokyo hour (morning news
+  + weather, lunch short videos, afternoon interests, evening YouTube + games, late night Shorts on the phone).
+  `Variety` (per Tokyo day, saved in `browsing.json` → `searches.variety`): topic counts, Wikipedia share, the run of
+  pages on one topic. No outside quota: `saturation` lowers a topic's weight past 15 % of the day (Wikipedia past
+  10 %, also in `route`), and after 3+ pages on one topic `streak_pull` raises the leave option's pull
+  (`eyes.leave_pull`, read by brain_vote's LEAVE_CHAIN) and the share of profile searches (`Browser.profile_share`).
+  `analysis/variety_day.py` (model): topic entropy 2.96 → 3.48 bits (max 3.58), top topic 22 % → 14 %, Wikipedia
+  28 % → 4 % of pages.
+- Short videos on the phone (`short_videos.py`, one place per site; `Browser._shorts` drives it; `Screen.mode ==
+  "shorts"` when the rhythm's feed or the phone app says so). Navigation goes through `_open`, so #60's per-site
+  logged-in context (`_use`) and view_only.py's private / action filters apply when a session exists: a YouTube
+  Shorts search (Restricted Mode cookie) or a TikTok tag page (logged out; robots.txt disallows TikTok's /search),
+  shorts queued, each next short picked by the vote among the queued ones (local options, no paid call), muted,
+  ≤ `SHORTS_MAX_S` (45 s). TikTok: comments / likes / follow / login boxes hidden (`HIDE_TIKTOK`), a login wall is
+  left, captions + hashtags + creator names through `video_text_ok`. The TikTok parser's fixture is synthetic: check
+  a live run.
+- Seen things (`search_sources.seen_things`): video titles and channels on his screens ("saw it in a video"), page
+  titles ("saw it on his screen"), walk places ("passed it on a walk"), the room eye's objects; each query carries
+  its origin into the card's why.
+- `research.py`: one source among many. `Reader.saw()` (one line in `run_browse`) keeps the last page / video the
+  browser showed; `current()` returns the newer of that and the last Wikipedia article, so "on his mind" is what he
+  really reads; `due()` waits while he browses.
+- Finance (owner, "NO RESTRICTIONS"): exchanges, DEX / swap pages, launchpads, chart pages, forums and our own coin's
+  pages are viewable read-only. Still blocked: the harmful categories (adult, gore, self-harm, extremism, illegal),
+  gambling, wallet apps (metamask, phantom, walletconnect). `money_action` (buy, sell, swap, connect, sign, deposit,
+  withdraw, stake, claim, mint, …; and buy/connect/claim/mint/create/launch/wallet URLs): never numbered, never offered,
+  refused in `act` even when the brain picks such a link. `eyes.query_ok` refuses buy/sell wording; labels too.
+  `finance_note`: finance pages add "He is just browsing; nothing here is financial advice." to the card (`advice`,
+  and in `why`). `display_ok` (his words: mind notes, the card title, video titles) stays strict, finance talk
+  included; `title_ok` (web titles, link labels, results) shows prices and tickers. mind.py's FINANCE rule stays and
+  `next_interest` skips finance.
+
 ## YouTube and chess at the desk (#17, PR `feature/youtube-chess`)
 - `life.py`: two more activities chosen by needs, `watch_video` (boredom, visual response, a chat wish; only with a
   browser: `Life.can_watch`) and `play_chess` (attention, a chat wish; at most one game per simulated hour,
@@ -200,6 +237,49 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Chromium runs in `browse_service.py` (child process, memory watchdog `BROWSE_MEM_MB` 1200, exits if the parent
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
+
+## Music on Spotify (#68, PR `feature/music`)
+- Legal frame: **Spotify's official embed player only** (`open.spotify.com/embed/track/<id>`, compact 80 px). Each
+  visitor presses play on their own device (30 s preview, or the full track when logged in to Spotify). The server never
+  streams, downloads or relays audio: `music.py` only calls the Web API (search + track metadata) and oEmbed, both JSON
+  (`http_json` refuses to read a non-JSON body); preview URLs are never read.
+- `music.py`: with `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (Railway; client-credentials flow, never logged or
+  returned) the Web API's search (market JP; `audio-features` / `recommendations` are not used, restricted since
+  Nov 2024). Without keys, or when the API fails: `music_curated.json` (9 genres x ~14 public tracks: Tokyo city pop,
+  J-pop, lofi, hip-hop, anime, indie, electronic, jazz, piano), built by `analysis/build_music_list.py` from public
+  playlists' embed metadata (explicit / 19+ tracks dropped); each picked ID is checked once with oEmbed (no key) and
+  cached in `/data/music.json`. Queries: time of day (morning jazz/piano, evening hip-hop/city pop, late-night lofi),
+  favoured taste words, words taught in the last 2 days, `mind.next_interest`, and chat wishes ("play …", "metti …",
+  through `chat.blocked`; `music.wish`).
+- His brain chooses: 3-5 candidates are `brain_vote` options (`action: "listen"`); their networks come from the genre
+  tags + title + artist through `chat.networks_for` (no audio analysis). Music calls `brain_vote.vote`
+  directly (the rate model; `brain_vote.Backend` / spiking only votes on browsing so far).
+  The stay response while a track plays (a second `PageWatch`) goes to `tastes.learn` with the topics
+  `net:*`, `kw:*` and `kw:<genre>`, so a music taste forms over days.
+- `life.py`: `listen_music` (on the bed, 8-25 sim min; boredom, sleep pressure, evening, a chat wish; needs first: food
+  outranks it and interrupts it). Background music is a flag, not an activity: `Life.music_bg_ok()` (reading or chess
+  at the desk, the park bench, walking outside); `live_server` rolls once per activity (`MUSIC_BG_P` 0.4). The snapshot
+  carries `life.music` = {title, artist, mode} for the room's headphones.
+- `GET /api/music`: now playing (title, artist, album art, Spotify URL, embed URL, the vote's options and reason), today's
+  tracks with why each was picked, the source, live wishes. `music` websocket messages on start and end; one row per
+  track in `/data/music.jsonl`. Cards on `/brain` and `/life.html`; the room (headphones, head nod) waits for #63.
+- Mind and diary: each track is a `music` item in the mind's memory (`day_notes()["listened"]`); the diary gets the
+  day's genres and the one playing when he fell asleep ("it fell asleep after city pop"; genres only, no artist names).
+- Wording: "his brain model leaned toward …", never "he loves this song".
+
+## His spiking neurons in the day (#55, `docs/spiking/live_cpu.md`)
+- `spiking/live.py`: a 20k-neuron spiking network runs in a child process (`python -m spiking.live`). It uses numpy and
+  the same construction as `net.py` via `spiking/wiring.py`, no torch. It speaks the decision protocol shared with #58
+  (decide / decision / reward, JSON lines) and streams `{"type":"spiking","net":"cpu"}` frames to the Neurons panel.
+- `brain_vote.Backend`: the GPU pod's 1M network first (`pod_manager.day_live_decide`, #58), then the CPU child within
+  2 s, then the rate model alone. `vote(..., spiking=)` adds `SPIKING_W` (0.3) x the lean, and the record says which
+  network answered.
+- Rewards: the tastes prediction error of the stay goes to the network that decided (CPU: the #39 rule, with a
+  decaying learning rate). Weights are in `/data/spiking/live_weights.npz`.
+- Every browse decision and its reward go to `/data/spiking/decisions-YYYY-MM-DD.jsonl`, which #58 reads at night.
+- `/api/spiking/live` feeds the "In the day" part of the Neurons card. `SUB01_SPIKING_LIVE=0` turns the CPU network off.
+- Measured: tick 8.8–9.5 ms vs 8.9–9.2 on main. The child uses ~0.4 CPU-s per decision and 1.4–2 % of a core
+  between decisions (its idle pulse).
 
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies

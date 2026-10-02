@@ -93,6 +93,14 @@ Service → **Settings → Deploy → Healthcheck Path**: `/healthz`. You can do
 A 503 means the brain loop stalled or the process is restarting. Look at the Railway logs and at `/api/health`
 (`last_tick_s_ago`, `tick_ms`).
 
+## The daytime spiking network (#55)
+No paid service: a child process of the server (`python -m spiking.live`) on the same CPU. Its startup costs ~2 CPU-s
+(build + calibration). Each browsing decision costs ~0.4 CPU-s. Between decisions, its idle pulse for the page's
+raster uses 1.4–2 % of a core (`SUB01_SPIKING_LIVE_IDLE_MS=0`: none). The Neurons card
+on `/brain` shows "its process: … % of one CPU core on average" (budget: < 10 %). `SUB01_SPIKING_LIVE=0` turns it off.
+The vote then is the rate model's alone, as it is whenever the process is down or slower than 2 s. Its state:
+`/data/spiking/live_weights.npz`. The day's decisions are in `/data/spiking/decisions-YYYY-MM-DD.jsonl`.
+
 ## Railway usage alerts
 Workspace → **Usage** → **Usage limits**:
 - set a **custom email alert** at an amount below what you are willing to spend in a month;
@@ -128,3 +136,15 @@ When the login cookie expires, or the site shows a sign-in button or a login wal
 logged out until the next restart. The log says it once (`sessions: tiktok logged out (expired)`), and `/api/browsing`
 shows `logged out` with the reason. To refresh: repeat the steps above and replace the variable. Without the
 variables he browses logged out, as before.
+
+## Music on Spotify (#68): optional keys, free
+He listens to music through **Spotify's official embed player** only; the server never plays, downloads or relays audio.
+It works without keys, from a curated list of public tracks (`music_curated.json`). With keys he searches Spotify:
+1. developer.spotify.com → **Dashboard → Create app** (any name; any redirect URI, e.g. `http://127.0.0.1:8080`; Web API).
+2. In the app's settings copy the **Client ID** and **Client secret**.
+3. Railway → the service → **Variables**: `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`. Never commit or paste them
+   anywhere else. They are read from the environment only and never logged or returned.
+
+Check: `/api/music` → `source` reads "Spotify Web API search" and `api` reads "ok". `api: "down: …"` (status only, no
+secrets) means the token or search failed; he uses the curated list meanwhile. Free: the Web API costs nothing, so there
+is no cap. To refresh the curated list: `python analysis/build_music_list.py` (dev machine, reads public playlist metadata).

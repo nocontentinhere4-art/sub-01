@@ -32,7 +32,7 @@ import time
 from pathlib import Path
 
 from brain_sim import GROUPS
-from browse import BAD_HOST, BAD_WORDS, LOGIN_HREF, LOGIN_LINK, display_ok, url_ok, words
+from browse import BAD_HOST, BAD_WORDS, LOGIN_HREF, LOGIN_LINK, money_action, title_ok, url_ok, words
 from chat import blocked as chat_blocked, networks_for
 from research import BLOCK as TOPIC_BLOCK
 from search_sources import follow_ups, interest_text
@@ -308,19 +308,23 @@ def parse(raw):
 
 
 def clean_label(s, fallback=""):
-    """At most 8 words, and only text that may be shown on the public card (display_ok: no links, addresses,
-    tickers, money, blocked topics)."""
+    """At most 8 words, and only text that may be shown on the public card (title_ok: no links, addresses, money
+    requests, blocked topics) and with no buy / sell wording (#56)."""
     s = " ".join(str(s or fallback).split()[:8])[:60]
-    return s if s and display_ok(s) else ""
+    return s if s and title_ok(s) and not BUY_SELL.search(s) else ""
 
 
 def query_ok(q):
     q = " ".join(str(q or "").split())
     if not 2 <= len(q) <= 60 or len(q.split()) > 6:
         return None
-    if chat_blocked(q) or BAD_WORDS.search(q) or BAD_HOST.search(q) or TOPIC_BLOCK.search(q) or "/" in q:
+    if (chat_blocked(q) or BAD_WORDS.search(q) or BAD_HOST.search(q) or TOPIC_BLOCK.search(q) or "/" in q
+            or BUY_SELL.search(q)):
         return None
     return q
+
+
+BUY_SELL = re.compile(r"\b(buy|buying|sell|selling|swap|invest|investing|ape into|to the moon)\b", re.I)   # never typed
 
 
 def clean_networks(nets, text=""):
@@ -355,7 +359,8 @@ def validate(items, page):
             t = str(it.get("target") or "").strip()
             link = links.get(t) or links.get(t.upper()) or by_href.get(t)
             if (not link or not url_ok(link["href"]) or LOGIN_LINK.search(link["text"]) or LOGIN_HREF.search(link["href"])
-                    or not display_ok(link["text"])):
+                    or not title_ok(link["text"]) or money_action(link["text"], link["href"])
+                    or money_action(str(it.get("label") or ""))):
                 continue
             if LINK_FLAG[action] and not link.get(LINK_FLAG[action]):
                 continue
@@ -408,9 +413,11 @@ def leave_pull(page):
     it to the leave option, with his boredom."""
     try:
         chain, top = float(page.get("chain") or 0), float(page.get("max_chain") or 30)
+        streak = float(page.get("streak_pull") or 0.0)     # #56: several pages in a row on one topic
     except (TypeError, ValueError):
         return 0.0
-    return round(max(0.0, min(1.0, chain / top)), 3) if top > 0 else 0.0
+    pull = max(0.0, min(1.0, chain / top)) if top > 0 else 0.0
+    return round(max(pull, max(0.0, min(1.0, streak)) if streak == streak else 0.0), 3)
 
 
 def local_options(page, interest=None, rng=None, n=MAX_OPTIONS):

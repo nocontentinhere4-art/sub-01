@@ -6,6 +6,8 @@
        (t_sim, phase, n_neurons, spikes_per_s, mean_rate_hz, realtime_x, groups, raster, pong, dopamine).
      - GET /api/spiking/status on load and every 60 s:
        {live, session, next_session, last:{exam, memory_test, pong_curve, bench}, spend}.
+     - GET /api/spiking/live on load and every 60 s (#55): the small daytime network that votes in his choices
+       {state, n_neurons, card, note, decisions_today, learned_today, last, score, cpu}.
    Nothing here talks to any other host. Errors are silent: the panel then says "no session has run yet". */
 window.Neurons = (() => {
   "use strict";
@@ -14,7 +16,8 @@ window.Neurons = (() => {
   const PONG_NOTE = "Pong: not learning yet. In the last full validation (1M neurons) it hit 17.5 % after training vs 25 % with plasticity switched off.";
   const PONG_CONTROLS = ["no_plasticity", "random"];
   const PHASES = { load: "loading", recall_yesterday: "next-day memory test", encode: "storing today's messages and readings", pong_train: "learning Pong",
-    pong_exam: "Pong exam (learning frozen)", memory_test: "memory test", sleep: "sleep: replaying memories", free: "free run" };
+    pong_exam: "Pong exam (learning frozen)", memory_test: "memory test", sleep: "sleep: replaying memories", free: "free run",
+    deciding: "deciding (small network on the CPU)", idle: "between choices (small network on the CPU)" };
   const CONTROL_NAMES = { random: "random paddle", random_paddle: "random paddle", no_plasticity: "no plasticity",
     frozen: "no plasticity", no_learning: "no plasticity" };
   const GROUP_LABEL = { somatomotor: "motor", relay: "thalamus" };
@@ -59,10 +62,11 @@ window.Neurons = (() => {
     S.el.pong = h("canvas", "nx-pong"); S.el.pongstats = h("div", "nx-pongstats"); pr.append(S.el.pong, S.el.pongstats);
     S.el.curve = h("div", "nx-curve"); S.el.curvecap = h("div", "nx-cap");
     S.el.results = h("div", "nx-results");
+    S.el.day = h("div", "nx-day nx-hidden");
     S.el.next = h("div", "nx-row");
     S.el.note = h("div", "nx-note", HONEST);
     S.el.fixed = h("div", "nx-fixed", FIXED);
-    body.append(S.el.count, S.el.liverow, S.el.grouprow, S.el.raster, S.el.rastercap, pr, S.el.curve, S.el.curvecap, S.el.results, S.el.next, S.el.note, S.el.fixed);
+    body.append(S.el.count, S.el.liverow, S.el.grouprow, S.el.raster, S.el.rastercap, pr, S.el.curve, S.el.curvecap, S.el.day, S.el.results, S.el.next, S.el.note, S.el.fixed);
     det.append(sum, body); mount.append(det); S.el.root = det;
     det.addEventListener("toggle", () => { S.open = det.open; ensureLoop(); });
     if (window.ResizeObserver) new ResizeObserver(() => { S.sized = false; }).observe(det);
@@ -72,6 +76,9 @@ window.Neurons = (() => {
   // ---------- live frames ----------
   function onMessage(m) {
     if (!S.inited || !m || m.type !== "spiking") return;
+    // the small CPU network (#55) streams too; while the GPU network streams, its frames win the raster
+    if (m.net === "cpu") { if (performance.now() - (S.gpuWall || -1e9) < LIVE_MS) return; }
+    else if (m.raster || m.t_sim != null) S.gpuWall = performance.now();
     try { frame(m); } catch (e) { /* a malformed frame must never break the page */ }
   }
   function frame(m) {
@@ -172,6 +179,60 @@ window.Neurons = (() => {
     } catch (e) { /* no server / not logged in / no sessions yet: keep whatever we had */ }
     renderStatus();
   }
+  // ---------- the daytime network (#55): a small spiking network votes in his choices and learns ----------
+  async function fetchDay() {
+    try {
+      const r = await fetch(S.dayUrl, { cache: "no-store", credentials: "same-origin" });
+      if (!r.ok) throw new Error(r.status);
+      const j = await r.json(); if (j && typeof j === "object") S.day = j;
+    } catch (e) { /* not logged in / an older server: the block stays hidden */ }
+    try { renderDay(); } catch (e) { /* a malformed answer must never break the page */ }
+  }
+  function dayCurve(curve) {
+    const pts = (Array.isArray(curve) ? curve : []).filter(b => b && num(b.learned) && num(b.twin) && num(b.chance));
+    if (pts.length < 2) return null;
+    const W = 300, H = 46, pad = 3, n = pts.length;
+    const X = i => pad + i / (n - 1) * (W - 2 * pad), Y = v => H - pad - Math.max(0, Math.min(1, v)) * (H - 2 * pad);
+    const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
+    const line = (key, col, dash, width) => { const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", pts.map((b, i) => `${i ? "L" : "M"}${X(i)} ${Y(b[key])}`).join(" ")); p.setAttribute("fill", "none");
+      p.setAttribute("stroke", col); p.setAttribute("stroke-width", width); p.setAttribute("vector-effect", "non-scaling-stroke");
+      if (dash) p.setAttribute("stroke-dasharray", dash); svg.append(p); };
+    line("chance", "#55556a", "1.5 3", 1); line("twin", "#80808f", "5 4", 1); line("learned", "#ff6a00", null, 1.5);
+    const box = h("div", "nx-curve"); box.append(svg); return box;
+  }
+  function renderDay() {
+    const d = S.day, box = S.el.day; if (!box) return;
+    box.replaceChildren();
+    if (!d || d.state === "off" || !num(d.n_neurons)) { show("day", false); return; }
+    show("day", true);
+    const head = h("div", "nx-row");
+    head.append(document.createTextNode("In the day · "), h("b", null, d.state === "live" ? "live" : d.state === "starting" ? "starting" : "offline"),
+      document.createTextNode(` · ${int(d.n_neurons)} neurons · ${int(d.decisions_today)} choices today · learned from ${int(d.learned_today)}`));
+    box.append(head);
+    const bn = d.by_net_today || {};
+    if (num(d.decisions_today) && d.decisions_today > 0)
+      box.append(h("div", "nx-cap", `answered today by: 1M network on GPU ${int(bn.gpu || 0)} · 20k network on CPU ${int(bn.cpu || 0)} · rate model only ${int(bn.rate || 0)}`));
+    const L = d.last;
+    if (L && Array.isArray(L.labels)) {
+      const r = h("div", "nx-row");
+      if (L.leaned_to) {
+        r.append(document.createTextNode(`Last choice (${L.network || "spiking network"}): his spiking neurons leaned toward `), h("b", null, `“${String(L.leaned_to).slice(0, 80)}”`));
+        if (L.followed_label && L.followed_label !== L.leaned_to) r.append(document.createTextNode(` · he followed “${String(L.followed_label).slice(0, 80)}”`));
+        else if (L.followed_label) r.append(document.createTextNode(" · he followed it"));
+      } else r.append(document.createTextNode(`Last choice: rate model only${L.why ? " (" + String(L.why).slice(0, 80) + ")" : ""}`));
+      box.append(r);
+    }
+    const sc = d.score || {}, mp = sc.matched_paid_off || {}, mn = sc.matched_not_paid_off || {};
+    const cv = dayCurve(sc.curve); if (cv) box.append(cv);
+    if (num(sc.paid_off) && sc.paid_off > 0) {
+      box.append(h("div", "nx-cap", `Its pick matched the option that later paid off: ${pct(mp.learned)} (orange) · frozen twin ${pct(mp.twin)} (dashed) · chance ${pct(mp.chance)} (dotted) · ${int(sc.paid_off)} paid-off choices`
+        + (num(mn.learned) ? ` · when it did not pay off: ${pct(mn.learned)} vs twin ${pct(mn.twin)}` : "")));
+    } else box.append(h("div", "nx-cap", "no choice with an outcome yet"));
+    if (d.cpu && num(d.cpu.avg_pct)) box.append(h("div", "nx-cap", `its process: ${floor2(d.cpu.avg_pct)} % of one CPU core on average`));
+    if (d.card) box.append(h("div", "nx-note", d.card + (d.note ? " " + d.note : "")));
+  }
   function controlName(k) { return CONTROL_NAMES[k] || String(k).replace(/_/g, " "); }
   function memoryLine(mt) {
     if (!mt || typeof mt !== "object") return null;
@@ -269,10 +330,10 @@ window.Neurons = (() => {
   function init(opts) {
     if (S.inited) return S.el.root;
     const o = opts || {}, mount = o.mount || document.body; if (!mount) return null;
-    S.statusUrl = o.statusUrl || "/api/spiking/status"; S.open = o.open !== false;
+    S.statusUrl = o.statusUrl || "/api/spiking/status"; S.dayUrl = o.dayUrl || "/api/spiking/live"; S.open = o.open !== false;
     build(mount, S.open); S.inited = true;
-    setLive(false); fetchStatus();
-    S.timers.push(setInterval(fetchStatus, 60000), setInterval(tick, 1000));
+    setLive(false); fetchStatus(); fetchDay();
+    S.timers.push(setInterval(fetchStatus, 60000), setInterval(fetchDay, 60000), setInterval(tick, 1000));
     document.addEventListener("visibilitychange", ensureLoop);
     return S.el.root;
   }

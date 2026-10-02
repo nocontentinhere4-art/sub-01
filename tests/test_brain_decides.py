@@ -56,7 +56,7 @@ def test_only_links_on_the_page_and_the_guard():
     assert all(o["href"] in {l["href"] for l in PAGE["links"]} for o in out)
 
 
-@pytest.mark.parametrize("q,ok", [("Tokyo bakeries", True), ("how sourdough rises", True), ("cheap crypto tokens", False),
+@pytest.mark.parametrize("q,ok", [("Tokyo bakeries", True), ("how sourdough rises", True), ("cheap crypto tokens", True),
                                   ("$SOL price today", False), ("https://x.com", False), ("buy bitcoin now", False),
                                   ("one two three four five six seven", False), ("casino night", False),
                                   ("x", False), ("porn", False)])
@@ -495,7 +495,7 @@ def test_cached_options_follow_the_link_not_its_number(tmp_path):
 
 
 @pytest.mark.parametrize("label", ["buy $BONK now", "visit example.com", "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-                                   "send 2 sol to me", "token price today"])
+                                   "send 2 sol to me", "Buy Bitcoin instantly", "crypto giveaway"])
 def test_labels_shown_on_the_card_pass_the_chat_filter(label):
     assert E.validate([{"action": "scroll", "label": label}], PAGE) == []
     page = dict(PAGE, links=[{"id": "L1", "href": "https://en.wikipedia.org/wiki/X", "text": label}])
