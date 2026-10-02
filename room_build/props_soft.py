@@ -155,8 +155,15 @@ def smooth_mesh(o, factor=0.4, repeat=1):
     bm.to_mesh(o.data); bm.free(); o.data.update()
 
 
-def place(o, loc=(0, 0, 0), ry=0.0):
-    transform(o, loc=loc, ry=ry); project_uv(o); return o
+def thin(o):
+    """a thin thing (piping, a cord, a strap): its AO islands would get no texel, so the bake gives it the white corner"""
+    o["ao_small"] = 1; return o
+
+
+def sheet(o, thickness):
+    """a thin cloth sheet: thickened symmetrically, without rim faces (their islands get no AO texel and render black)"""
+    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = thickness; md.offset = 0; md.use_even_offset = True; md.use_rim = False
+    return md
 
 
 def rounded_rect(y0, y1, z0, z1, r, ins, levels, n_top=10, n_bot=4, n_arc=5):
@@ -183,16 +190,16 @@ def curtain(nm, za, zb, side):
     into ten pencil pleats that merge into four soft folds towards the hem; the hem, the heading and the side hems are
     double (thicker), the hem edge waves a little with the folds, and the panel flares slightly at the bottom."""
     ROD_Y, IX, WY0 = G["ROD_Y"], G["IX"], G["WY0"]
-    nz_, ny = 72, 30; top = ROD_Y - 0.012; bot = WY0 + 0.0012; W = zb - za; x0 = IX + 0.07; grid = []
+    nz_, ny = 64, 26; top = ROD_Y - 0.012; bot = WY0 + 0.0012; W = zb - za; x0 = IX + 0.07; grid = []
     for j in range(ny + 1):
         t = j / ny; y = top + (bot - top) * t; row = []
         k = min(1.0, t / 0.75) ** 0.8                                   # 0 at the heading (pleats) -> 1 lower down (folds)
         for i in range(nz_ + 1):
-            s = i / nz_; z = za + W * s; ph = 2 * math.pi * 10 * s
-            f_top = math.sin(ph) + 0.22 * math.sin(3 * ph)                                       # pointed pencil pleats
+            s = i / nz_; z = za + W * s; ph = 2 * math.pi * 8 * s
+            f_top = math.sin(ph) + 0.10 * math.sin(3 * ph)                                       # pencil pleats (soft enough for the shell)
             f_low = math.sin(2 * math.pi * 4.0 * s + 0.6 + 0.5 * side) + 0.3 * math.sin(2 * math.pi * 1.5 * s + 2.0)
-            x = x0 + (1 - k) * 0.020 * f_top + k * 0.030 * f_low + 0.004 * nz(Vector((s * 5, t * 3, side)))
-            zz = z + side * 0.03 * t * t * (s - 0.5) + 0.004 * math.sin(ph) * (1 - k)            # flare; the pleats gather z too
+            x = x0 + (1 - k) * 0.013 * f_top + k * 0.030 * f_low + 0.004 * nz(Vector((s * 5, t * 3, side)))
+            zz = z + side * 0.03 * t * t * (s - 0.5) + 0.003 * math.sin(ph) * (1 - k)            # flare; the pleats gather z too
             yy = y + (0.004 * (0.5 + 0.5 * math.sin(2 * math.pi * 4.0 * s + 0.6 + 0.5 * side + 1.0)) if j == ny else 0)
             row.append(Vector((x, yy, zz)))
         grid.append(row)
@@ -201,8 +208,7 @@ def curtain(nm, za, zb, side):
     for v in o.data.vertices:
         p = gl(v.co); hem = p.y < bot + 0.06 or p.y > top - 0.07 or abs(p.z - za) < 0.025 or abs(p.z - zb) < 0.025
         vg.add([v.index], 1.0 if hem else 0.0, 'REPLACE')
-    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.013; md.offset = 0; md.use_even_offset = True
-    md.vertex_group = "hem"; md.thickness_vertex_group = 0.42
+    md = sheet(o, 0.010); md.vertex_group = "hem"; md.thickness_vertex_group = 0.5          # double hems and heading: 10 mm, the panel 5 mm
     return o
 
 
@@ -231,10 +237,10 @@ def mattress():
     me = o.data
     for pg in me.polygons:                                        # the ticking below the sheet's hem
         pg.material_index = 1 if gl(pg.center).y < band - 0.001 else 0
-    paint(o, lambda p: srgb("#cfd1d6"))
+    paint(o, lambda p: srgb("#aeb3bd"))
     random.seed(31)
-    displace(o, lambda p, n: (0.003 if p.y > band + 0.002 else 0.0) +                            # the sheet's own thickness
-             (0.0035 * nz(p, 9.0, 1) + 0.002 * nz(p, 23.0, 2) if n.y > 0.7 and y0 + 0.2 < p.y else 0.0))   # wrinkles on top
+    displace(o, lambda p, n: 0.003 * smooth01(band - 0.004, band + 0.004, p.y) +                   # the sheet's own thickness
+             (0.005 * nz(p, 6.0, 1) + 0.0025 * nz(p, 16.0, 2) if n.y > 0.7 and y0 + 0.2 < p.y else 0.0))   # wrinkles on top
     return o
 
 
@@ -242,64 +248,76 @@ def pillow():
     """a pillow in its case: a soft superellipse body (flatter underneath), the side seam as a thin piped ridge, the
     case's envelope flap at one end (a step), a head dent and small wrinkles"""
     MAT_Y = G["MAT_Y"]
-    PW, PL, PT = 0.42, 0.64, 0.12; nv, nth = 30, 40; rings = []
+    PW, PL, PT = 0.42, 0.64, 0.105; nv, nth = 40, 44; rings = []
     for j in range(nv + 1):
-        v = j / nv * 2 - 1; e = max(0.0, 1 - abs(v) ** 7)
-        a = PW / 2 * (0.06 + 0.94 * e ** 0.45); h = PT / 2 * (0.02 + 0.98 * e ** 0.7); zc = v * PL / 2 * (1 - 0.03 * e)
+        v = j / nv * 2 - 1; e = max(0.0, 1 - abs(v) ** 5)
+        a = PW / 2 * (0.06 + 0.94 * e ** 0.4); h = PT / 2 * (0.02 + 0.98 * e ** 0.6); zc = v * PL / 2 * (1 - 0.03 * e)
         pts = []
         for i in range(nth):
             th = 2 * math.pi * i / nth; c, s = math.cos(th), math.sin(th)
-            x = a * math.copysign(abs(c) ** (2 / 2.5), c); y = h * math.copysign(abs(s) ** (2 / 2.5), s)
-            if y < 0: y *= 0.62                                                  # flatter underneath
+            x = a * math.copysign(abs(c) ** (2 / 2.2), c); y = h * math.copysign(abs(s) ** (2 / 2.2), s)
+            if y < 0: y *= 0.6                                                   # flatter underneath
             pts.append(Vector((x, y, zc)))
         rings.append(pts)
     o = tube_obj("pillow", "sheet", rings, cap=(True, True))
     random.seed(32)
     def d(p, n):
         out = 0.0
-        if n.y > 0.5:
-            out -= 0.026 * math.exp(-(p.x * p.x + (p.z + 0.07) ** 2) / 0.028)   # where his head rests
-            out += 0.002 if p.z > 0.19 else 0.0                                 # the envelope flap of the case
-        if abs(n.y) < 0.6 and abs(p.x) > PW / 2 - 0.012: out += 0.003            # the side seam's piping
-        return out + 0.0025 * nz(p, 14.0, 3)
+        if n.y > 0.3:
+            out -= 0.034 * math.exp(-(p.x * p.x * 0.8 + (p.z + 0.06) ** 2) / 0.03)   # where his head rests
+            out += 0.002 * smooth01(0.17, 0.21, p.z)                              # the envelope flap of the case (a soft step)
+        if abs(n.y) < 0.6: out += 0.003 * bump(abs(p.x), PW / 2, 0.03)            # the side seam's piping
+        return out + 0.0035 * nz(p, 9.0, 3) + 0.0015 * nz(p, 24.0, 4)
     displace(o, d)
     o.data.transform(Matrix.Translation(B(-1.58, MAT_Y + 0.006 + 0.62 * PT / 2 + 0.004, 0.87)) @ Matrix.Rotation(0.06, 4, 'Z') @ Matrix.Rotation(-0.05, 4, 'Y'))
     o.data.update(); return o
 
 
 def duvet(mattress_o, pillow_o):
-    """the duvet: a cloth simulation dropped onto the bed with its head end turned back (a real fold over itself, with
-    self-collision), then box-quilted: six by five channels, the stitch lines sunk, the puffs raised, with a piped
-    border and small wrinkles; thickened and the rim rounded"""
+    """the duvet: a cloth simulation dropped flat onto the bed, then its head end turned back over itself (the first
+    24 cm wrapped round a 2 cm fold and laid on top, column by column of the simulated grid: a stable fold, where a
+    self-colliding simulation of the folded sheet blew up), then box-quilted: five by six channels, the stitch lines
+    sunk, the puffs raised, a flat piped border, small wrinkles; thickened to 3 cm"""
     BZ0, BZ1, MAT_Y = G["BZ0"], G["BZ1"], G["MAT_Y"]
-    NX, NY = 64, 74; L, W = 1.30, 1.54
+    NX, NY = 60, 70; L, W = 1.30, 1.54; R = 0.022
     bpy.ops.mesh.primitive_grid_add(x_subdivisions=NX, y_subdivisions=NY, size=1.0, location=(0, 0, 0))
     d = bpy.context.active_object; d.name = "duvet"
     d.scale = (L, W, 1); bpy.ops.object.transform_apply(scale=True)
     me = d.data
     uv0 = [(v.co.x / L + 0.5, v.co.y / W + 0.5) for v in me.vertices]          # the flat duvet's own coordinates
-    xf = -L / 2 + 0.24                                                           # the fold line: the head end turned back
-    flap = [v.co.x < xf for v in me.vertices]
-    for v, fl in zip(me.vertices, flap):
-        if fl: v.co.x = 2 * xf - v.co.x; v.co.z += 0.05
+    nc = len({round(u, 5) for u, _ in uv0}); nr = len({round(w, 5) for _, w in uv0})
+    ij = [(round(u * (nc - 1)), round(w * (nr - 1))) for u, w in uv0]; at = {k: n for n, k in enumerate(ij)}
+    xf = -L / 2 + 0.24; i_f = round((xf + L / 2) / L * (nc - 1)); xf = -L / 2 + L * i_f / (nc - 1)   # the fold line, on a grid column
+    flap = [i < i_f for (i, _) in ij]
     d.location = B(-0.85, MAT_Y + 0.13, (BZ0 + BZ1) / 2 + 0.01); bpy.ops.object.transform_apply(location=True)
     colliders = [mattress_o, pillow_o, bpy.data.objects["bed_base"], bpy.data.objects["bed_head"], bpy.data.objects["floor"]]
     for o in colliders:
         o.modifiers.new("col", "COLLISION"); o.collision.thickness_outer = 0.004; o.collision.cloth_friction = 10
     cl = d.modifiers.new("cloth", "CLOTH"); s = cl.settings
     s.quality = 8; s.mass = 0.4; s.tension_stiffness = 20; s.compression_stiffness = 20; s.shear_stiffness = 8; s.bending_stiffness = 1.0
-    s.air_damping = 2.0
-    cl.collision_settings.distance_min = 0.014; cl.collision_settings.use_self_collision = True; cl.collision_settings.self_distance_min = 0.04
-    cl.collision_settings.self_friction = 8
+    s.air_damping = 2.0; cl.collision_settings.distance_min = 0.012; cl.collision_settings.use_self_collision = False
     cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 60
-    for f in range(1, 50): SC.frame_set(f)
+    for f in range(1, 48): SC.frame_set(f)
     bpy.context.view_layer.objects.active = d; bpy.ops.object.modifier_apply(modifier="cloth")
     for o in colliders:
         for m in list(o.modifiers):
             if m.type == 'COLLISION': o.modifiers.remove(m)
     SC.frame_set(1)
     smooth_mesh(d, 0.35, 1)
-    me = d.data; me.update()
+    me = d.data
+    # the turn-back: each flap vertex goes round the fold (radius R) and back over the main part, above the column it lands on
+    dx = L / (nc - 1); pos = [v.co.copy() for v in me.vertices]
+    for n, ((i, j), fl) in enumerate(zip(ij, flap)):
+        if not fl: continue
+        dist = (i_f - i) * dx; anchor = pos[at[(i_f, j)]]
+        if dist < math.pi * R:
+            th = dist / R; p = anchor + Vector((R * math.sin(th), 0, R * (1 - math.cos(th))))
+        else:
+            land = (i_f + round((dist - math.pi * R) / dx), j)
+            k = min(nc - 1, land[0]); base = pos[at[(k, j)]]
+            p = Vector((base.x + (land[0] - k) * dx, base.y, base.z + 2 * R + 0.003 * nz(gl(base), 5.0, 6)))
+        me.vertices[n].co = p
+    me.update()
     cu, cw = L / 5, W / 6
     for v, (u, w), fl in zip(me.vertices, uv0, flap):
         fu, fw = (u * L / cu) % 1.0, (w * W / cw) % 1.0
@@ -310,7 +328,6 @@ def duvet(mattress_o, pillow_o):
     me.update()
     me.materials.append(MATS["duvet"])
     md = d.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.03; md.offset = 0; md.use_even_offset = True
-    bv = d.modifiers.new("bev", "BEVEL"); bv.width = 0.011; bv.segments = 2; bv.limit_method = 'ANGLE'; bv.angle_limit = math.radians(70)
     for p in me.polygons: p.use_smooth = True
     STATIC.append(d); return d
 
@@ -374,7 +391,7 @@ def cushion():
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     body = new_obj("cushion", bm, "cushion")
     path = [(top[j][i] + bot[j][i]) / 2 for (j, i) in edge]                                  # the piping along the side seam
-    pipe = tube_along("cushion_pipe", "cushion", path + path[:1], 0.0045, 0.0045, n=8, ref="h")
+    pipe = thin(tube_along("cushion_pipe", "cushion", path + path[:1], 0.0045, 0.0045, n=8, ref="h"))
     parts = [body, pipe]
     for o in parts: transform(o, loc=(1.32, 0, 0.98), ry=0.28)
     G["settle"](parts, FY); [project_uv(o) for o in parts]
@@ -418,7 +435,7 @@ def sock(nm, clip, y_top, ry, colour, heel, stripes=()):
         pts = []
         for i in range(n):
             th = 2 * math.pi * i / n; ct, st = math.cos(th), math.sin(th)
-            r = 1 + 0.06 * math.cos(8 * th) * ribw + heel_amp * max(0.0, -ct) ** 1.5
+            r = 1 + 0.11 * math.cos(8 * th) * ribw + heel_amp * max(0.0, -ct) ** 1.5
             p = c + w * (a * r * ct) + nn * (b * (1 + 0.5 * heel_amp * max(0.0, -ct)) * st)
             p.y -= droop * abs(ct) ** 1.5                                                # the cuff's edges hang below the clip
             pts.append(p)
@@ -450,8 +467,7 @@ def towel(c0, c1, y_top):
             if 0.84 < t < 0.92: x += 0.0015                                                          # the dobby border
             row.append(Vector((x, y, zz)))
         grid.append(row)
-    o = grid_obj("towel", "terry", grid)
-    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.006; md.offset = 0; md.use_even_offset = True
+    o = grid_obj("towel", "terry", grid); sheet(o, 0.006)
     ry = math.atan2(c1[0] - c0[0], c1[1] - c0[1])
     if math.cos(ry) < 0: ry += math.pi                                   # its folds and corners come forward into the room, never into the window wall
     transform(o, loc=((c0[0] + c1[0]) / 2, 0, (c0[1] + c1[1]) / 2), ry=ry)
@@ -491,10 +507,11 @@ def hoodie(HX):
     IZ = G["IZ"]; random.seed(41); parts = []
     zb = IZ + 0.128                                                            # the body's mid plane (in front of the tote)
     # the hood: a bunched bag with the hook's tip inside it
-    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14, radius=1.0)
+    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=28, v_segments=16, radius=1.0)
     for v in bm.verts:
-        p = Vector((v.co.x * 0.10, v.co.z * 0.066, -v.co.y * 0.052))
-        g = 1 + 0.07 * nz(p, 28.0, 10) + 0.05 * math.sin(7 * math.atan2(p.z, p.x)) * (1 - p.y / 0.066) ** 2 * 0.5
+        p = Vector((v.co.x * 0.10, v.co.z * 0.066, -v.co.y * 0.055))
+        ang = math.atan2(p.z, p.x); up = (p.y + 0.066) / 0.132
+        g = 1 + 0.13 * nz(p, 16.0, 10) + 0.10 * math.sin(9 * ang + 2 * up) * (1 - up) ** 0.5 * 0.5   # gathered: the fabric bunches round the hook
         p.x *= g; p.z *= g
         if p.y < -0.02: p.x *= 1 + 1.6 * (-p.y - 0.02)                                 # opens out onto the shoulders
         v.co = B(HX + p.x, 1.70 + p.y, IZ + 0.125 + p.z)
@@ -507,15 +524,15 @@ def hoodie(HX):
         if t > 0.92: hw *= 0.95                                                   # the ribbed hem hugs
         for i in range(nx + 1):
             s = i / nx * 2 - 1; x = HX + s * hw
-            z = (zb + 0.022 * (1 - s * s) * math.sin(math.pi * min(1.0, t * 1.1)) ** 0.7
-                 + 0.013 * (math.sin(2 * math.pi * 2.5 * s + 1.2 * t) + 0.5 * math.sin(2 * math.pi * 1.2 * s + 3.0)) * smooth01(0.1, 0.45, t)
-                 + 0.012 * smooth01(0.60, 0.66, t) * (1 - smooth01(0.86, 0.90, t)) * (1 - smooth01(0.62, 0.74, abs(s)))   # the pocket
-                 + 0.003 * nz(Vector((s, t, 0)), 6.0, 11))
+            z = (zb + 0.018 * (1 - s * s) * math.sin(math.pi * min(1.0, t * 1.1)) ** 0.7
+                 + 0.02 * (math.sin(2 * math.pi * 2.5 * s + 1.2 * t) + 0.5 * math.sin(2 * math.pi * 1.2 * s + 3.0)) * smooth01(0.1, 0.45, t)
+                 + 0.018 * smooth01(0.60, 0.66, t) * (1 - smooth01(0.86, 0.90, t)) * (1 - smooth01(0.62, 0.74, abs(s)))   # the pocket
+                 + 0.005 * nz(Vector((s, t, 0)), 6.0, 11))
             row.append(Vector((x, y, z)))
         grid.append(row)
     body = grid_obj("hoodie", ["hoodie", "rib"], grid)
     for pg in body.data.polygons: pg.material_index = 1 if gl(pg.center).y < y_hem + 0.045 else 0
-    md = body.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.014; md.offset = 0; md.use_even_offset = True
+    sheet(body, 0.012)
     parts.append(body)
     # sleeves: hanging at the sides, flattened, a ribbed cuff
     for sgn in (-1, 1):
@@ -524,14 +541,14 @@ def hoodie(HX):
         n_ = len(path)
         def taper(u, n_=n_):
             return (0.5 + 0.5 * smooth01(0.0, 0.12, u)) * (1 - 0.22 * smooth01(0.3, 0.84, u)) * (0.78 if u > 0.87 else 1.0)
-        sl = tube_along("hoodie_sleeve", ["hoodie", "rib"], path, 0.05, 0.023, n=16, ref=Vector((1, 0, 0)), taper=taper,
-                        fn=lambda th, u: 1 + 0.04 * math.sin(3 * th + 9 * u) * smooth01(0.15, 0.4, u), cap=(False, True))
+        sl = tube_along("hoodie_sleeve", ["hoodie", "rib"], path, 0.042, 0.018, n=16, ref=Vector((1, 0, 0)), taper=taper,
+                        fn=lambda th, u: 1 + 0.07 * math.sin(3 * th + 9 * u) * smooth01(0.15, 0.4, u) + 0.03 * nz(Vector((th, u * 4, 0)), 1.0, 15), cap=(False, True))
         for pg in sl.data.polygons: pg.material_index = 1 if gl(pg.center).y < 1.19 else 0
         parts.append(sl)
     # drawstrings
     for sgn in (-1, 1):
         path = tube_pts([Vector((HX + sgn * 0.022, 1.655, IZ + 0.17)), Vector((HX + sgn * 0.03, 1.60, IZ + 0.168)), Vector((HX + sgn * 0.045, 1.52, IZ + 0.165))], 6)
-        st = tube_along("hoodie_string", "painted", path, 0.0028, 0.0028, n=6, cap=(False, True)); set_vcol(st, srgb("#ece8e0")); parts.append(st)
+        st = thin(tube_along("hoodie_string", "painted", path, 0.0028, 0.0028, n=6, cap=(False, True))); set_vcol(st, srgb("#ece8e0")); parts.append(st)
     return parts
 
 
@@ -549,13 +566,12 @@ def tote(xc):
         for i in range(n):
             th = 2 * math.pi * i / n; ct, st = math.cos(th), math.sin(th)
             x = math.copysign(abs(ct) ** (2 / 3.6), ct); z = math.copysign(abs(st) ** (2 / 3.6), st)
-            r = 1 + 0.03 * math.sin(3 * th + 5 * t) * (1 - t) ** 0.5 * (1 - abs(z)) + 0.012 * nz(Vector((th, t, 0)), 2.0, 12)
+            r = 1 + 0.07 * math.sin(3 * th + 5 * t) * (1 - t) ** 0.5 * (1 - abs(z)) + 0.025 * nz(Vector((th, t * 3, 0)), 2.0, 12)   # creases
             p = c + Vector((a * x * r, 0, b * z * r))
             if k == 0: p.y = 1.60 + 0.022 * math.exp(-((abs(p.x - xc) - 0.09) / 0.035) ** 2)          # peaks at the handles
             pts.append(p)
         rings.append(pts)
-    body = tube_obj("tote", "canvas", rings, cap=(False, True))
-    md = body.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.004; md.offset = 0
+    body = tube_obj("tote", "canvas", rings, cap=(False, True)); sheet(body, 0.004)
     for zz in (zd + 0.004, zd + 0.004 + 0.026):                                   # the two handles, over the hook's tip
         pts = []
         for k in range(13):
@@ -564,7 +580,7 @@ def tote(xc):
             y = 1.60 + 0.165 * math.sin(ang) ** 0.7
             z = zz + (IZ + 0.102 - zz) * math.sin(ang) ** 2
             pts.append(Vector((x, y, z)))
-        tube_along("tote_strap", "canvas", pts, 0.0017, 0.013, n=8, ref=Vector((0, 0, 1)), cap=(True, True))
+        thin(tube_along("tote_strap", "canvas", pts, 0.0017, 0.013, n=8, ref=Vector((0, 0, 1)), cap=(True, True)))
     return body
 
 
@@ -595,11 +611,11 @@ def backpack():
         for i in range(11):
             th = math.pi * i / 10; row.append(Vector((0.065 + 0.058 * math.cos(th) * rr ** 0.3, y, 0.15 + 0.034 * math.sin(th) * rr)))
         grid.append(row)
-    sp = grid_obj("bag_side_pocket", "bag", grid); md = sp.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.004; md.offset = 0
+    sp = grid_obj("bag_side_pocket", "bag", grid); sheet(sp, 0.004)
     # a grab handle, and a strap's end on the floor
-    tube_along("bag_loop", "bag", tube_pts([Vector((0.045, 0.42, -0.04)), Vector((0.055, 0.455, 0)), Vector((0.045, 0.42, 0.04))], 6), 0.0065, 0.0065, n=8)
-    tube_along("bag_strap", "bag", tube_pts([Vector((0.02, 0.012, 0.16)), Vector((0.06, 0.012, 0.205)), Vector((0.11, 0.013, 0.225)), Vector((0.15, 0.014, 0.215))], 6),
-               0.013, 0.0025, n=8, ref="h", cap=(False, True))
+    thin(tube_along("bag_loop", "bag", tube_pts([Vector((0.045, 0.42, -0.04)), Vector((0.055, 0.455, 0)), Vector((0.045, 0.42, 0.04))], 6), 0.0065, 0.0065, n=8))
+    thin(tube_along("bag_strap", "bag", tube_pts([Vector((0.02, 0.012, 0.16)), Vector((0.06, 0.012, 0.205)), Vector((0.11, 0.013, 0.225)), Vector((0.15, 0.014, 0.215))], 6),
+                    0.013, 0.0025, n=8, ref="h", cap=(False, True)))
     box("bag_buckle", "plastic_black", (0.12, 0.155), (0.008, 0.02), (0.20, 0.232), bevel=0.003, seg=1)
     parts = [o for o in STATIC[n0:]]
     for o in parts: o.data.transform(Matrix.Translation(B(BX1 + 0.049, 0, 1.24)) @ Matrix.Rotation(-0.11, 4, 'Y')); o.data.update()
@@ -616,8 +632,8 @@ def jeans():
     tube_along("jeans", "denim", [Vector((-0.14 + 0.16 * k / 7, 0.045, 0)) for k in range(8)], 0.17, 0.042, n=32, ref="h",
                taper=lambda u: (1 - 0.06 * (1 - u), 1 - 0.2 * (1 - u) ** 2), fn=lambda th, u: 1 + 0.03 * math.sin(4 * th + 3 * u), cap=(True, True), p=2.8)
     Z, Y = Vector((0, 0, 1)), Vector((0, 1, 0))
-    tube_obj("jeans", "denim", [ring(c, Z, Y, 0.16 + dr, 0.034 + dr, 32, p=2.8) for c, dr in
-                                ((Vector((-0.146, 0.045, 0)), 0.0), (Vector((-0.146, 0.045, 0)), 0.006), (Vector((-0.136, 0.045, 0)), 0.006), (Vector((-0.136, 0.045, 0)), 0.0))])
+    thin(tube_obj("jeans", "denim", [ring(c, Z, Y, 0.16 + dr, 0.034 + dr, 32, p=2.8) for c, dr in
+                                     ((Vector((-0.146, 0.045, 0)), 0.0), (Vector((-0.146, 0.045, 0)), 0.006), (Vector((-0.136, 0.045, 0)), 0.006), (Vector((-0.136, 0.045, 0)), 0.0))]))
     # the legs: flat tubes (wide axis horizontal) along two curves, one folded back, the other crossing over it
     for k, ctrl in enumerate(([(0.0, 0.03, -0.07), (0.12, 0.03, -0.10), (0.20, 0.034, -0.03), (0.16, 0.038, 0.07), (0.04, 0.042, 0.09)],
                               [(0.0, 0.045, 0.06), (0.10, 0.085, 0.08), (0.19, 0.09, 0.0), (0.14, 0.08, -0.09), (0.02, 0.068, -0.11)])):
@@ -626,7 +642,7 @@ def jeans():
                    taper=lambda u: (1 + 0.06 * smooth01(0.85, 1.0, u), 1 - 0.1 * u), fn=lambda th, u, k=k: 1 + 0.035 * math.sin(3 * th + 7 * u + k), cap=(False, True))
     parts = [o for o in STATIC[n0:]]
     for o in parts:
-        displace(o, lambda p, nrm: 0.002 * nz(p, 20.0, 14))
+        displace(o, lambda p, nrm: 0.004 * nz(p, 14.0, 14) + 0.0015 * nz(p, 40.0, 16))
         transform(o, loc=(0.45, 0, 1.38), ry=0.5)
     G["settle"](parts, FY); [project_uv(o) for o in parts]
     return parts
@@ -667,7 +683,7 @@ def tee(duvet_o, pillow_o, mattress_o):
     SC.frame_set(1)
     smooth_mesh(o, 0.3, 1)
     paint(o, lambda p: srgb("#7d93a6"))
-    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.005; md.offset = 0
+    sheet(o, 0.005)
     return o
 
 

@@ -81,7 +81,8 @@ window.ready = false;
 loader.load(new URLSearchParams(location.search).get("glb"), g => {
   scene.add(g.scene); g.scene.updateMatrixWorld(true);
   g.scene.traverse(o => { if (!o.isMesh) return; const lampPart = /desk_lamp/i.test(o.name) || /desk_lamp/i.test(o.parent && o.parent.name || "");
-    o.receiveShadow = true; o.castShadow = !lampPart; if (!mats.includes(o.material)) mats.push(o.material); o.material.envMap = scene.environment; });
+    o.receiveShadow = true; o.castShadow = !lampPart; if (!mats.includes(o.material)) mats.push(o.material); o.material.envMap = scene.environment;
+    if (new URLSearchParams(location.search).has("noao")) { o.material.aoMap = null; o.material.needsUpdate = true; } });
   const w = g.scene.getObjectByName("SURF_window"); const p = new THREE.Vector3(); w.getWorldPosition(p);
   win = {c:p.toArray(), w:w.userData.w, h:w.userData.h};
   skyLight.width = win.w; skyLight.height = win.h; skyLight.position.set(p.x + 0.12, p.y, p.z); skyLight.lookAt(p.x + 1, p.y, p.z);
@@ -130,7 +131,7 @@ def render(glb, tag, out, chromium, only=None):
             pg = ctx.new_page(); route_three(pg)
             pg.route("**/view.html*", lambda r: r.fulfill(body=VIEWER, content_type="text/html"))
             pg.route("**/model.glb", lambda r: r.fulfill(path=str(glb), content_type="model/gltf-binary"))
-            pg.goto("http://room.local/view.html?glb=model.glb"); pg.wait_for_function("window.ready === true", timeout=120000)
+            pg.goto("http://room.local/view.html?glb=model.glb" + ("&noao" if os.environ.get("SHOTS_NOAO") else "")); pg.wait_for_function("window.ready === true", timeout=120000)
             for name, pos, target, fov, mode, _ in shots:
                 pg.evaluate(f"shoot({json.dumps(mode)}, {json.dumps(pos)}, {json.dumps(target)}, {fov})")
                 pg.wait_for_timeout(300)

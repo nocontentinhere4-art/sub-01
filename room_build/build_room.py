@@ -876,7 +876,7 @@ STATIC_OBJS = [o for o in STATIC if o.name in bpy.data.objects]
 for o in STATIC_OBJS:
     area = sum(p.area for p in o.data.polygons) * (o.matrix_world.to_scale()[0] ** 2)
     a = o.data.attributes.new("small", 'INT', 'FACE')
-    for d in a.data: d.value = 1 if area < 0.006 else 0
+    for d in a.data: d.value = 1 if (area < 0.006 or o.get("ao_small")) else 0   # ao_small: thin things (piping, cords, straps) whose islands get no texel
 room = join(STATIC_OBJS, "room_static"); room.data.name = "room_static"
 # the headphones: one node of their own (origin where the band rests on the hook), like the chair
 for o in hp:
