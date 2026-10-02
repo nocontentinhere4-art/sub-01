@@ -8,7 +8,9 @@ this project and released under CC0.
 The walls, floor, window with aluminium sashes, curtains, desk, monitor, keyboard, mouse, speakers, mug, pen cup, office
 chair, storage bed, mattress, pillow, duvet, bookshelf and books, fridge, door, hook rail and tote bag, air conditioner,
 rug, doormat and poster frames are all built from code in `room_build/build_room.py`. The duvet's drape comes from a
-Blender cloth simulation. The ambient occlusion is baked with Cycles into `room_ao` (second UV set).
+Blender cloth simulation. The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
+is its own node, `chair` (origin on the floor under the gas lift), so it can be moved: it has its own materials and its
+own AO (`chair_ao`, self-occlusion only), and the room's AO is baked without it.
 
 The posters (`posters.png`, packed into the GLB) are original graphics drawn by `room_build/tex_prep.py`. Their Japanese
 text is set in **Noto Sans JP** (© Adobe, SIL Open Font License 1.1). Only rendered pixels are used; the font file is not
@@ -50,8 +52,8 @@ From `room_build/`, with Blender 4.2 and Node 22:
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
     python tex_prep.py
-    blender -b -P build_room.py          # about 8 minutes: most of it is the AO bake
-    npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb
+    blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
+    npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
 
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).

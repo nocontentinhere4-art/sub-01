@@ -1,11 +1,11 @@
-// node post.mjs in.glb ao.png out.glb : AO lightmap as occlusion (texCoord 1), WebP textures, meshopt; prints a report
+// node post.mjs in.glb ao.png out.glb [ao_chair.png] : AO lightmaps as occlusion (texCoord 1), WebP textures, meshopt; prints a report
 import fs from "node:fs";
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { dedup, prune, flatten, join, weld, meshopt, textureCompress, resample } from "@gltf-transform/functions";
 import { MeshoptEncoder, MeshoptDecoder } from "meshoptimizer";
 import sharp from "sharp";
-const [,, IN, AO, OUT] = process.argv;
+const [,, IN, AO, OUT, AO_CHAIR] = process.argv;
 await MeshoptEncoder.ready; await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({"meshopt.encoder": MeshoptEncoder, "meshopt.decoder": MeshoptDecoder});
 const doc = await io.read(IN);
@@ -26,6 +26,17 @@ if (AO && fs.existsSync(AO)) {
     m.setOcclusionTexture(tex); m.getOcclusionTextureInfo().setTexCoord(1); m.setOcclusionStrength(1.0);
   }
 }
+// the chair is its own node (it moves) with its own materials and its own AO (self-occlusion)
+const chairNode = root.listNodes().find(n => n.getName() === "chair");
+// (an extra marks its materials, so dedup/join can never fold the chair back into the static room)
+if (chairNode) for (const p of chairNode.getMesh().listPrimitives()) p.getMaterial().setExtras({movable: "chair"});
+if (chairNode && AO_CHAIR && fs.existsSync(AO_CHAIR)) {
+  const png = await sharp(AO_CHAIR).greyscale().blur(0.6).toColourspace("b-w").png().toBuffer();
+  const tex = doc.createTexture("chair_ao").setImage(png).setMimeType("image/png").setURI("chair_ao.png");
+  for (const p of chairNode.getMesh().listPrimitives()) {
+    const m = p.getMaterial(); m.setOcclusionTexture(tex); m.getOcclusionTextureInfo().setTexCoord(1); m.setOcclusionStrength(1.0);
+  }
+}
 // the clocks' glass uses transmission, which costs three.js a whole extra render pass: plain alpha-blended glass instead
 for (const m of root.listMaterials()) {
   const t = m.getExtension("KHR_materials_transmission");
@@ -44,11 +55,17 @@ await doc.transform(
   // normal maps keep more quality (their relief is subtle); each texture is encoded once (later passes skip WebP)
   textureCompress({encoder: sharp, targetFormat: "webp", formats: /png|jpeg/, slots: /normalTexture/, resize: [1024, 1024], quality: 92}),
   textureCompress({encoder: sharp, targetFormat: "webp", formats: /png|jpeg/, pattern: /floor_diff/, resize: [2048, 2048], quality: 84}),
-  textureCompress({encoder: sharp, targetFormat: "webp", formats: /png|jpeg/, pattern: /room_ao/, quality: 88}),
+  textureCompress({encoder: sharp, targetFormat: "webp", formats: /png|jpeg/, pattern: /room_ao|chair_ao/, quality: 88}),
   textureCompress({encoder: sharp, targetFormat: "webp", formats: /png|jpeg/, resize: [1024, 1024], quality: 84}),
   prune({keepLeaves: true, keepAttributes: false}),
-  meshopt({encoder: MeshoptEncoder, level: "medium"}),
 );
+// quantisation (in meshopt) folds a dequantising scale and offset into each mesh node's transform; so that "chair" keeps
+// its pivot (on the floor under the gas lift), its mesh goes into a child node and "chair" stays a plain transform node
+{
+  const ch = root.listNodes().find(n => n.getName() === "chair");
+  if (ch && ch.getMesh()) { const mesh = ch.getMesh(); ch.setMesh(null); ch.addChild(doc.createNode("chair_mesh").setMesh(mesh)); }
+}
+await doc.transform(meshopt({encoder: MeshoptEncoder, level: "medium"}));
 // props: shrink their textures further
 for (const t of root.listTextures()) {
   if (isProp(t)) {
@@ -65,3 +82,5 @@ for (const n of root.listNodes()) { const m = n.getMesh(); if (!m) continue; for
 console.log(`out ${OUT}: ${(sz / 1048576).toFixed(2)} MB, ${prims} primitives (draw calls), ${Math.round(tris)} triangles`);
 console.log("textures:", root.listTextures().map(t => `${t.getName()} ${t.getImage().byteLength >> 10}K`).join(", "));
 console.log("nodes:", root.listNodes().filter(n => !n.getMesh()).map(n => n.getName()).join(", "));
+const ch = root.listNodes().find(n => n.getName() === "chair");
+if (ch) console.log("chair:", JSON.stringify({t: ch.getTranslation(), r: ch.getRotation(), s: ch.getScale(), children: ch.listChildren().map(c => c.getName())}));
