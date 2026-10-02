@@ -13,9 +13,14 @@ An AI (eyes.py) only lists options, each tagged with the networks it would mostl
    1 after 30 pages in a row), and its taste term is the opposite of the taste for the page he is on (its topics are
    the page's), so a page whose topics have paid off holds him and one that has not lets him go;
 5. the live brain then receives the chosen option's stimulus.
+His spiking neurons (#55): a small simulated spiking network on the same wiring (spiking/live.py, a child process)
+races its striatal pools on the option labels; when its answer came in time, each option gets SPIKING_W x its lean
+(tanh((pool rate - mean rate) / 2 Hz), -1..1) as one more term. Without an answer (process down or slower than 2 s)
+the term is skipped and the vote is the rate model's alone. Every row records the term ("spiking", None if skipped).
 It is a rule on simulated activity, not understanding or liking: the model does not know what the page says.
 """
 import math
+import os
 import time
 
 import numpy as np
@@ -32,6 +37,7 @@ NOVELTY = 0.3                # bonus for a link or search he has not done recent
 LEAVE_BORED = 0.5            # leave bonus per unit boredom (0..1)
 LEAVE_CHAIN = 0.6            # leave bonus at the end of a long chain of pages (eyes.leave_pull, 0..1)
 VIDEO_ACTIONS = ("open_video", "play_video")
+SPIKING_W = float(os.environ.get("SUB01_SPIKING_W", 0.3))   # the spiking network's lean, next to value/taste/novelty
 T0 = 0.15                    # softmax temperature when rested and not bored
 WATCH_MIN, WATCH_MAX = 2.0, 10.0   # simulated minutes he watches a chosen video before the brain decides again (#17)
 NAMES = {"reward": "reward", "attention": "attention", "visual": "visual", "fear": "threat", "language": "language",
@@ -117,9 +123,24 @@ def value(delta, video=False):
     return v + (VIDEO_VISUAL * delta.get("visual", 0.0) if video else 0.0)
 
 
-def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None, seconds=VOTE_S):
+def spiking_term(spiking, k):
+    """The spiking network's lean per option (-1..1), or None when its answer is missing or does not fit."""
+    rates = (spiking or {}).get("pool_rates")
+    if not isinstance(rates, (list, tuple)) or len(rates) != k or k < 2:
+        return None
+    try:
+        r = np.array([float(x) for x in rates])
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(r).all():
+        return None
+    return np.tanh((r - r.mean()) / 2.0)
+
+
+def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None, seconds=VOTE_S, spiking=None):
     """Pick one option. `clone` = brain.clone() taken on the event loop; options = validated eyes.py options;
-    mood = {boredom, pressure, tired}; tastes = [prediction in -1..1] per option; novel = [bool] per option.
+    mood = {boredom, pressure, tired}; tastes = [prediction in -1..1] per option; novel = [bool] per option;
+    spiking = the spiking network's answer for these options ({pick, pool_rates, decision_ms, ...}) or None.
     Returns the decision record (also what the page shows)."""
     t0 = time.perf_counter()
     options = list(options)[:MAX_OPTIONS]
@@ -135,7 +156,10 @@ def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None,
     vn = [v / scale if scale > 1e-9 else 0.0 for v in vals]
     tastes = [-ts if o.get("action") == "leave" else ts for o, ts in zip(options, tastes)]
     leave = [leave_bonus(o, mood) for o in options]
-    total = [v + TASTE_W * ts + (NOVELTY if nv else 0.0) + lv for v, ts, nv, lv in zip(vn, tastes, novel, leave)]
+    sp = spiking_term(spiking, len(options))
+    spk = [None] * len(options) if sp is None else [float(x) for x in sp]
+    total = [v + TASTE_W * ts + (NOVELTY if nv else 0.0) + lv + (SPIKING_W * s_ if s_ is not None else 0.0)
+             for v, ts, nv, lv, s_ in zip(vn, tastes, novel, leave, spk)]
     T = temperature(mood.get("boredom", 0.0), mood.get("pressure", 0.0), mood.get("tired", 0.0))
     top = max(total)
     w = np.array([math.exp((x - top) / T) for x in total])
@@ -143,12 +167,20 @@ def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None,
     k = int(rng.choice(len(options), p=p))
     rows = [{"action": o["action"], "label": o["label"], "target": o.get("target"), "networks": o["networks"],
              "response": round(v, 5), "value": round(n_, 3), "taste": round(ts, 3), "novel": bool(nv),
-             "p": round(float(pk), 3), "chosen": i == k}
-            for i, (o, v, n_, ts, nv, pk) in enumerate(zip(options, vals, vn, tastes, novel, p))]
+             "p": round(float(pk), 3), "chosen": i == k, "spiking": None if sv is None else round(sv, 3)}
+            for i, (o, v, n_, ts, nv, pk, sv) in enumerate(zip(options, vals, vn, tastes, novel, p, spk))]
     for row, lv in zip(rows, leave):
         if row["action"] == "leave":
             row["leave_bonus"] = round(lv, 3)
-    return {"options": rows, "chosen": k, "temperature": round(T, 3), "gain": round(gain, 3),
+    if sp is None:
+        sp_rec = {"used": False, "why": (spiking or {}).get("why") or ("no answer" if spiking is None else "did not fit")}
+    else:
+        top_k = int(np.argmax(spk))
+        sp_rec = {"used": True, "weight": SPIKING_W, "pick": int(spiking.get("pick", top_k)),
+                  "leaned_to": options[top_k]["label"], "pool_rates": [round(float(x), 3) for x in spiking["pool_rates"]],
+                  "decision_ms": spiking.get("decision_ms"), "n_neurons": spiking.get("n_neurons"),
+                  "id": spiking.get("id")}
+    return {"options": rows, "chosen": k, "temperature": round(T, 3), "gain": round(gain, 3), "spiking": sp_rec,
             "reason": reason(options, deltas, vals, total, k, mood, tastes),
             "ms": round((time.perf_counter() - t0) * 1000), "clones": len(options) + 1, "seconds": seconds}
 

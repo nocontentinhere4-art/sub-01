@@ -145,3 +145,7 @@ Cost: one pod, 0.04 GPU-hours, $0.02. It was deleted at the end, and the "BRAIN"
 Next, before wiring this into his real choices (`brain_vote.py` / `tastes.py`, not touched here): variable offer
 sets with real labels, a stability fix for the drifting preference (for example a slower V, or a decaying η), and
 a higher race threshold at 1M neurons.
+
+**Update (#55):** variable offer sets with real labels, and the stability fix (a decaying learning rate), are now in
+`spiking/live.py`. A small network uses them in the day, and the night replays the day's real choices. See
+`docs/spiking/live.md`. The higher race threshold at 1M was not tried.

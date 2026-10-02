@@ -23,6 +23,7 @@ KINDS = {"pong_curve": "pong_curves", "exam": "exams", "memory_test": "memory_te
 ITEMS_FILE = "memory_tests.jsonl"   # one row per tested item: {day, item, source, recalled, score, ...}
 MEMORY_NOTE = "Recall by a simulated spiking network from a partial cue; a model, not a mind."
 EXTRA_KINDS = {"encode": "encodes", "rates": "rates", "delays": "delays", "sleep": "sleeps"}   # stored, not on the page
+EXTRA_KINDS |= {"choice_real": "choice_real", "choice_real_exam": "choice_real_exams"}   # #55: the night's replay of real choices (shown by spiking/live.py)
 MAX_WS_MSG = 1 << 20
 MAX_WEIGHTS = 512 * 1024 ** 2
 RELAY_MIN_S = 0.25                  # at most 4 state frames per second go to the page
