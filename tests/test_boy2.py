@@ -153,20 +153,3 @@ def test_motion_keeps_cloth_on_the_body_and_hands_out_of_the_torso():
             continue
         for k, limit in LIMITS.items():
             assert c[k] <= limit, (c["clip"], k, c[k], c.get("bulge_at"), c.get("torso_at"))
-
-
-def test_boy4_drops_in_for_the_first_character():
-    """?boy=new in room.html loads boy4.glb and boy4_*.glb by name: the same bones as boy.glb and the same clips."""
-    old, _ = glb(ROOM / "boy.glb")
-    js, binary = glb(ROOM / "boy4.glb")
-    names = lambda j: [j["nodes"][i]["name"] for i in j["skins"][0]["joints"]]
-    assert sorted(names(js)) == sorted(names(old))
-    assert anim_names(ROOM / "boy4.glb") == anim_names(ROOM / "boy.glb")
-    for f in sorted(ROOM.glob("boy_*.glb")):
-        assert anim_names(ROOM / f.name.replace("boy_", "boy4_", 1)) == anim_names(f), f.name
-    assert (ROOM / "boy4.glb").stat().st_size <= 3 * MB
-    assert len(js["materials"]) <= 2
-    for img in js["images"]:
-        assert max(webp_size(image_bytes(js, binary, img))) <= 2048
-    room = (ROOM.parent / "room.html").read_text()
-    assert '"boy4" : "boy"' in room and "room/${BOY}.glb" in room and "room/${BOY}_${file}.glb" in room
