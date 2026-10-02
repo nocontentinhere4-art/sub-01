@@ -4,6 +4,8 @@
    Data in:
      - Neurons.onMessage(msg) from the page's existing websocket: frames {"type":"spiking", ...state}
        (t_sim, phase, n_neurons, spikes_per_s, mean_rate_hz, realtime_x, groups, raster, pong, dopamine).
+       Since #62 the server sends them compact (spiking/frames.py): the numbers at most once a second, and the
+       raster as n3.sq (3 bytes a recorded spike: region, slot, time); the raster then has one row a region.
      - GET /api/spiking/status on load and every 60 s:
        {live, session, next_session, last:{exam, memory_test, pong_curve, bench}, spend}.
      - GET /api/spiking/live on load and every 60 s (#55): the small daytime network that votes in his choices
@@ -22,6 +24,7 @@ window.Neurons = (() => {
     frozen: "no plasticity", no_learning: "no plasticity" };
   const GROUP_LABEL = { somatomotor: "motor", relay: "thalamus" };
   const LIVE_MS = 10000, WINDOW_MS = 2000, RECENT_MS = 20, CAP = 24000;
+  const NUMBERS = ["n_neurons", "t_sim", "spikes_per_s", "mean_rate_hz", "realtime_x", "groups", "dopamine"];   // once a second
 
   const S = { inited: false, open: true, live: false, lastWall: -1e9, st: null, status: null, raf: 0, timers: [],
     el: {}, tHead: 0, tDraw: 0, rx: 1, rate: 0, prevWall: 0, rows: 1, prevPhase: null, refetch: 0, sized: false,
@@ -81,11 +84,30 @@ window.Neurons = (() => {
     else if (m.raster || m.t_sim != null) S.gpuWall = performance.now();
     try { frame(m); } catch (e) { /* a malformed frame must never break the page */ }
   }
+  function unb64(t) { const b = atob(t || ""), out = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; }
   function frame(m) {
+    if (S.st && S.st.net === m.net) {                   // frames between two full ones carry no numbers: keep the last
+      m = Object.assign({}, m);
+      for (const k of NUMBERS) if (m[k] == null && S.st[k] != null) m[k] = S.st[k];
+    }
     S.st = m; S.lastWall = performance.now();
     if (num(m.realtime_x) && m.realtime_x > 0) S.rx = Math.min(m.realtime_x, 50);
-    const r = m.raster;
-    if (r && Array.isArray(r.spikes)) {
+    const r = m.raster, n3 = m.n3;
+    if (r && n3 && typeof n3.sq === "string" && !Array.isArray(r.spikes)) {   // compact: one row a region
+      const t0 = num(r.t0) ? r.t0 : S.tHead, t1 = num(r.t1) ? r.t1 : t0 + 250, span = Math.max(1, t1 - t0);
+      S.rows = 214;
+      setText("rastercap", `spike raster · sampled spikes, one row a region (${S.rows}) · last ${WINDOW_MS / 1000} s · orange = newest ${RECENT_MS} ms`);
+      if (t1 < S.tHead - 5000) { S.count = 0; S.head = 0; S.tDraw = 0; }
+      const b = unb64(n3.sq);
+      for (let i = 0; i + 2 < b.length; i += 3) {
+        S.rt[S.head] = t0 + b[i + 2] * span / 255; S.rr[S.head] = b[i];
+        S.head = (S.head + 1) % CAP; if (S.count < CAP) S.count++; }
+      if (t1 > S.tHead) {
+        const dw = S.lastWall - S.prevWall;
+        if (S.prevWall > 0 && dw > 20 && dw < 5000) { const q = Math.max(0, Math.min(50, (t1 - S.tHead) / dw)); S.rate = S.rate > 0 ? S.rate * 0.7 + q * 0.3 : q; }
+        S.tHead = t1; S.prevWall = S.lastWall;
+      }
+    } else if (r && Array.isArray(r.spikes)) {
       const t0 = num(r.t0) ? r.t0 : (num(m.t_sim) ? m.t_sim * 1000 - 250 : S.tHead);
       const t1 = num(r.t1) ? r.t1 : t0 + 250;
       if (num(r.n) && r.n > 0) S.rows = Math.min(255, r.n);

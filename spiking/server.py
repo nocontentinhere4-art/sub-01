@@ -27,6 +27,7 @@ import aiohttp
 from aiohttp import web
 
 from sleep import ROME
+from spiking import frames
 from spiking.costs import CostLog
 from state_io import append_jsonl, load_json, save_json
 
@@ -45,6 +46,7 @@ MAX_ANSWERED = 512                  # decisions the pod answered that can still 
 MAX_WS_MSG = 1 << 20
 MAX_WEIGHTS = 512 * 1024 ** 2
 RELAY_MIN_S = 0.25                  # at most 4 state frames per second go to the page
+RACE_SHOW_S = 1.0                   # the page highlights the action pools this long after a decision (#62)
 GOOD_MIN_S = 30.0
 
 
@@ -76,6 +78,10 @@ class SpikingHub:
         self.answered = OrderedDict()       # decision id -> Tokyo day of the decision
         self.decide_stats = {"asked": 0, "answered": 0, "timeouts": 0, "rewards": 0}
         self._manager = None
+        self.budget = frames.Budget(clock=lambda: self.clock())     # what each viewer gets of both networks' frames
+        self.sample = frames.Sample.one_per_region(200, 214)        # the GPU raster's neurons (set on hello)
+        self._samples = {}
+        self._race_until = -1e9
         try:
             self.last = load_json(self.dir / "last.json", {})
         except OSError:
@@ -277,6 +283,7 @@ class SpikingHub:
                 return None
         finally:
             self._waiting.pop(did, None)
+            self._race_until = self.clock() + RACE_SHOW_S
         pick, rates = d.get("pick"), d.get("pool_rates")
         if not isinstance(pick, int) or isinstance(pick, bool) or not 0 <= pick < len(opts):
             return None
@@ -342,6 +349,7 @@ class SpikingHub:
         kind = d.get("type")
         if kind == "hello":
             self.session = {k: d.get(k) for k in ("session", "n_neurons", "device", "phases")}
+            self.sample = self.gpu_sample(d.get("n_neurons"))
             if self.manager:
                 self.manager.on_hello(d)
         elif kind == "state":
@@ -351,7 +359,9 @@ class SpikingHub:
             now = self.clock()
             if now - self._relayed >= RELAY_MIN_S:
                 self._relayed = now
-                await self.live.broadcast({k: v for k, v in d.items() if k != "type"} | {"type": "spiking"})
+                race = bool(self._waiting) or now < self._race_until
+                await self.relay(frames.viewer_frame({"net": "gpu"} | {k: v for k, v in d.items() if k != "type"}
+                                                     | {"type": "spiking"}, self.sample, race=race))
         elif kind == "result":
             self.store_result(d)
         elif kind == "live_ready":
@@ -365,6 +375,24 @@ class SpikingHub:
             if self.manager:
                 self.manager.on_done(d)
             await self.live.broadcast({"type": "spiking", "live": False, "done": True, "ok": bool(d.get("ok"))})
+
+    # --- frames for the pages (#62) -------------------------------------------------
+    def gpu_sample(self, n_neurons):
+        """Which region and slot each of the GPU raster's 200 rows is (frames.gpu_sample, cached per network size)."""
+        try:
+            n = int(n_neurons)
+        except (TypeError, ValueError):
+            return frames.Sample.one_per_region(200, 214)
+        if n not in self._samples:
+            self._samples[n] = frames.gpu_sample(n)
+        return self._samples[n]
+
+    async def relay(self, frame):
+        """A spiking frame of either network to the pages, through the shared per-viewer budget (frames.Budget)."""
+        out = self.budget.fit(frame)
+        if out is not None:
+            await self.live.broadcast(out)
+        return out
 
     # --- weights ------------------------------------------------------------------
     async def weights_get(self, request):
@@ -418,6 +446,7 @@ class SpikingHub:
         return {"live": live, "session": session, "next_session": mgr.get("next_session") if mgr else None,
                 "day_live": mgr.get("day_live") if mgr else None,
                 "decisions": {"live_ready": self.live_ready, **self.decide_stats},
+                "stream": dict(self.budget.sent),
                 "last": {k: self.last.get(k) for k in KINDS},
                 "spend": mgr.get("spend") or CostLog(self.dir / "costs.jsonl").summary()}
 
