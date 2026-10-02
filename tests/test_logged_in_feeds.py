@@ -424,3 +424,203 @@ def test_no_session_secret_in_the_repo():
 def test_time_is_real_by_default():
     s = S.load_session("tiktok", tiktok_env(cookie_editor("sessionid", exp=time.time() + 3600)))
     assert s.logged_in and s.check()
+
+
+# --- integration: browse.py / browse_service.py ----------------------------------------------------------------------
+def logged_in(*sites):
+    env = {"SUB01_SESSION_TIKTOK": json.dumps([cookie_editor("sessionid", exp=time.time() + 86400)]),
+           "SUB01_SESSION_YOUTUBE": json.dumps([playwright_cookie("SID", expires=time.time() + 86400)])}
+    return {site: S.load_session(site, env if site in sites else {}) for site in S.SITES}
+
+
+def browser(*sites):
+    import browse
+    return browse.Browser(decide=True, sessions=logged_in(*sites))
+
+
+RAW = [["https://www.tiktok.com/@chef/video/1", "Ramen at midnight in Kichijoji", 9000, True, "", False, ""],
+       ["https://www.tiktok.com/@chef", "chef tanaka profile", 900, True, "", False, "Follow chef tanaka"],
+       ["https://www.tiktok.com/messages", "Messages inbox", 900, True, "", False, ""],
+       ["https://www.tiktok.com/upload?lang=en", "Upload video", 900, True, "", False, ""],
+       ["https://www.tiktok.com/coin", "Get Coins now", 900, True, "", False, ""],
+       ["https://www.tiktok.com/@chef/video/2", "Like", 900, True, "", False, ""],
+       ["https://www.tiktok.com/tag/ramen", "#ramen tag page", 900, True, "", False, ""]]
+
+
+def test_logged_in_pages_never_offer_actions_or_private_pages():
+    import eyes as E
+    from browse import Screen
+    b = browser("tiktok")
+    sc = Screen("phone")
+    sc.info, sc.site = {"title": "For You", "host": "tiktok.com", "kind": "page"}, "tiktok"
+    page = b.pick_links(RAW, "https://www.tiktok.com/foryou", "feed", sc)
+    hrefs = [l["href"] for l in page["links"]]
+    assert hrefs == ["https://www.tiktok.com/@chef/video/1", "https://www.tiktok.com/tag/ramen"]
+    rows = {l["id"]: [l["href"], l["text"], 0, True, "", False, ""] for l in page["links"]}
+    import random
+    for seed in range(20):                       # the vote's options come only from these links
+        for o in E.local_options(page, "ramen", random.Random(seed)):
+            assert V.option_ok(o, rows) or o["action"] not in ("click", "open_video", "play_video")
+            if o.get("target") in rows:
+                assert V.link_ok(rows[o["target"]][0])
+
+
+def test_logged_out_keeps_the_old_link_rules():
+    from browse import Screen
+    b = browser()
+    sc = Screen("phone")
+    sc.info = {"title": "For You", "host": "tiktok.com", "kind": "page"}
+    hrefs = [l["href"] for l in b.pick_links(RAW, "https://www.tiktok.com/foryou", "feed", sc)["links"]]
+    assert "https://www.tiktok.com/@chef" in hrefs                     # no session: #60's filter is not applied
+
+
+def test_links_to_a_logged_in_site_are_filtered_from_any_page():
+    from browse import Screen
+    b = browser("youtube")
+    sc = Screen("desk")
+    sc.info = {"title": "ramen blog", "host": "example.com", "kind": "page"}
+    raw = [["https://www.youtube.com/watch?v=abc", "Ramen in Tokyo, a night walk", 900, True, "", False, ""],
+           ["https://www.youtube.com/@ramen?sub_confirmation=1", "Ramen channel page", 900, True, "", False, ""],
+           ["https://www.youtube.com/feed/history", "Your watch history", 900, True, "", False, ""]]
+    assert [l["href"] for l in b.pick_links(raw, "https://example.com/", "x", sc)["links"]] == [
+        "https://www.youtube.com/watch?v=abc"]
+
+
+def test_result_pages_on_a_logged_in_site_drop_private_results():
+    from browse import Screen
+    b = browser("youtube")
+    sc = Screen("desk")
+    sc.site = "youtube"
+    sc.info = {"title": "results", "host": "youtube.com", "kind": "search", "results": [
+        {"url": "https://www.youtube.com/watch?v=a", "title": "Tokyo ramen walk at night"},
+        {"url": "https://www.youtube.com/playlist?list=WL", "title": "Watch later playlist"}]}
+    page = b.result_page(sc, "https://www.youtube.com/results?search_query=ramen")
+    assert [l["href"] for l in page["links"]] == ["https://www.youtube.com/watch?v=a"]
+
+
+def test_accounts_status_for_api_browsing_has_no_secret():
+    b = browser("tiktok")
+    acc = b.accounts()
+    assert acc == {"tiktok": {"state": "logged in", "reason": None},
+                   "youtube": {"state": "logged out", "reason": "missing"}}
+    b.sessions["tiktok"].expire("login wall")
+    assert b.accounts()["tiktok"] == {"state": "logged out", "reason": "login wall"}
+    assert SECRET not in json.dumps(acc)
+
+
+def test_service_state_shows_accounts_without_cookies():
+    from aiohttp.test_utils import TestClient, TestServer
+    from browse_service import make_app
+    b = browser("tiktok", "youtube")
+
+    async def main():
+        client = TestClient(TestServer(make_app(b, token="t")))
+        await client.start_server()
+        try:
+            return await (await client.get("/state", headers={"X-Browse-Token": "t"})).text()
+        finally:
+            await client.close()
+    raw = asyncio.run(main())
+    st = json.loads(raw)
+    assert st["accounts"]["tiktok"]["state"] == "logged in" and st["accounts"]["youtube"]["state"] == "logged in"
+    assert SECRET not in raw and "sessionid" not in raw
+
+
+def test_sessions_reach_the_browser_process_but_not_chromium():
+    import browse
+    import browse_service
+    assert set(S.secret_env_names()) <= set(browse_service.ENV_KEEP)
+    assert not set(S.secret_env_names()) & set(browse.CHROMIUM_ENV)
+
+
+def test_api_browsing_lists_accounts():
+    src = (Path(__file__).resolve().parents[1] / "live_server.py").read_text()
+    assert '"accounts": getattr(live.browser, "accounts", None)' in src
+
+
+def test_open_refuses_private_and_action_urls_without_loading_them():
+    b = browser("youtube", "tiktok")
+
+    class NoPage:
+        url = "about:blank"
+
+        async def goto(self, *a, **k):
+            raise AssertionError("must not navigate")
+
+    from browse import Screen
+    sc = Screen("desk")
+    sc.page = NoPage()
+    for url in ["https://www.tiktok.com/messages", "https://www.youtube.com/feed/history",
+                "https://studio.youtube.com/", "https://www.youtube.com/playlist?list=WL"]:
+        assert asyncio.run(b._open(sc, url, "x", "page")) is False
+    assert asyncio.run(b._open(sc, "https://www.youtube.com/@x?sub_confirmation=1", "x", "page")) is False
+    assert b.last_skip == "action"
+
+
+async def _browser_screen(b, device="desk"):
+    try:
+        import playwright.async_api  # noqa: F401
+    except ImportError:
+        pytest.skip("playwright not installed")
+    try:
+        sc = await b._ensure(device)
+    except Exception as e:                                                       # no usable Chromium here
+        pytest.skip(f"chromium did not start: {e!r}"[:200])
+    return sc
+
+
+def test_chromium_session_cookies_live_only_in_their_sites_context():
+    b = browser("tiktok", "youtube")
+
+    async def go():
+        sc = await _browser_screen(b)
+        try:
+            public_ctx = sc.ctx
+            await b._use(sc, "https://www.tiktok.com/foryou")
+            assert sc.site == "tiktok" and sc.ctx is not public_ctx
+            tt = await sc.ctx.cookies()
+            assert {c["name"] for c in tt} == {"sessionid"}
+            assert all(S.host_in(c["domain"], ("tiktok.com",)) for c in tt if c["name"] == "sessionid")
+            await b._use(sc, "https://www.youtube.com/")
+            yt = await sc.ctx.cookies()
+            assert {c["name"] for c in yt} == {"SID", "PREF"} and "sessionid" not in {c["name"] for c in yt}
+            assert next(c for c in yt if c["name"] == "PREF")["value"] == "f2=8000000"    # Restricted Mode kept
+            await b._use(sc, "https://example.com/")
+            assert sc.site is None and sc.ctx is public_ctx
+            pub = await public_ctx.cookies()
+            assert {c["name"] for c in pub} == {"PREF"}                         # logged out: no session cookie
+            assert b.sessions["tiktok"].logged_in
+            await b._use(sc, "https://www.tiktok.com/foryou")
+            await b._logout(sc, "login wall")                                   # the fallback
+            assert sc.site is None and sc.ctx is public_ctx and "tiktok" not in sc.sites
+            assert not b.sessions["tiktok"].logged_in and b.accounts()["tiktok"]["state"] == "logged out"
+            await b._use(sc, "https://www.tiktok.com/foryou")
+            assert sc.site is None and sc.ctx is public_ctx
+        finally:
+            await b.close()
+    asyncio.run(go())
+
+
+def test_chromium_private_page_never_shot_and_avatar_hidden():
+    b = browser("youtube")
+
+    async def go():
+        sc = await _browser_screen(b)
+        try:
+            await b._use(sc, "https://www.youtube.com/")
+            await sc.page.set_content('<title>Watch history - YouTube</title><ytd-browse page-subtype="history">'
+                                      '<a href="/watch?v=a">a video he watched</a></ytd-browse>')
+            sc.shot, before = None, sc.shot_id
+            assert not await b._shoot(sc) and sc.shot is None and sc.shot_id == before
+            assert b.last_skip == "private"
+            await sc.page.set_content(YT_PAGE)
+            assert await b._shoot(sc) and sc.shot
+            vis = "id => getComputedStyle(document.querySelector(id)).visibility"
+            for sel in ["#avatar-btn", "#account-name", "#sub", "#like"]:
+                assert await sc.page.evaluate(vis, sel) == "hidden", sel
+            assert await sc.page.evaluate(vis, "#video") == "visible"
+            assert await b._shoot(sc) and await b._shoot(sc)
+            assert await sc.page.evaluate("() => document.querySelectorAll('#sub01-hide-account').length") == 1
+        finally:
+            await b.close()
+    asyncio.run(go())

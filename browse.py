@@ -38,6 +38,13 @@ before typing into any site's search box). Results are parsed from the page (or 
 every result's URL and title passes the guard before it is numbered for the brain; the card says where he searched,
 for what, and why ("searched arXiv for “sleep spindles” — from his reading notes").
 
+Logged in, view-only (#60): with `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` set (sessions.py), pages of that
+site open in a separate in-memory context per screen that alone carries the session's cookies; everything else stays
+in the logged-out context. There, links that are actions (like, follow, comment, share, DM, upload, live, buy...) or
+private pages (settings, inbox, studio, history, billing...) are never offered or opened, private pages are left
+before they are shown (URL and DOM, view_only.py), and the account's avatar, name and the action buttons are hidden
+before every screenshot. A sign-in button or wall logs that site out for good (until a restart).
+
 Optional: needs `pip install playwright` + a Chromium (`playwright install --with-deps chromium`). Without it the
 server runs as before (Wikipedia reading only).
 """
@@ -51,6 +58,8 @@ import time
 import urllib.parse
 
 import search_sources as SS
+import sessions as SE
+import view_only as VO
 
 KEEP = 60                              # visits kept in the log
 SCROLL_EVERY_S = 7.0                   # seconds between scroll + screenshot on a page
@@ -477,9 +486,15 @@ class Screen:
         self.watch_until = 0.0                              # wall time the current video ends (0: not watching)
         self.watch_s = 0.0
         self.scene = 0.0                                    # change between the last two screenshots while watching
+        self.public = None                                  # (ctx, page) logged out: every site but a logged-in one
+        self.sites = {}                                     # site -> (ctx, page) carrying that site's session (#60)
+        self.site = None                                    # the logged-in site sc.ctx / sc.page belong to, or None
 
     def status(self):
         return dict(self.info, id=self.shot_id, device=self.name, chain=self.chain) if self.info and self.shot else None
+
+    def contexts(self):
+        return [p for p in [self.public, *self.sites.values()] if p]
 
 
 CHROMIUM_ARGS = ["--disable-dev-shm-usage", "--mute-audio", "--disable-extensions", "--disable-background-networking",
@@ -504,8 +519,10 @@ def launch_kwargs(sandbox, proxy=None, environ=None):
 class Browser:
     """Drives both screens. `step(device, ...)` is called by the live server every couple of seconds."""
 
-    def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False, decide=False):
+    def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False, decide=False, sessions=None):
         s = state or {}
+        self.sessions = SE.load_sessions() if sessions is None else sessions   # #60: logged out without the env vars
+        self.login_redirect = None                          # a logged-in context was sent to a login page
         self.decide = decide                                # True: the brain picks the next action (act())
         self.log = s.get("log", [])                         # visits shown: [{t, device, title, url, host, why}]
         self.used = set(s.get("used", []))                  # chat texts already searched
@@ -528,6 +545,14 @@ class Browser:
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:], "searches": self.limits.to_dict()}
+
+    def accounts(self):
+        """For /api/browsing: per site "logged in" / "logged out" and why. Never a cookie."""
+        out = {}
+        for site, s in self.sessions.items():
+            s.check()
+            out[site] = {"state": "logged in" if s.logged_in else "logged out", "reason": s.status()["reason"]}
+        return out
 
     @staticmethod
     def available():
@@ -562,33 +587,93 @@ class Browser:
                 print("browse: !!! running as root: Chromium sandbox OFF (--no-sandbox) !!!", flush=True)
             self.sandbox = sandbox
             for sc in self.screens.values():
-                sc.ctx = sc.page = None
+                sc.ctx = sc.page = sc.public = sc.site = None
+                sc.sites = {}
                 sc.info, sc.history, sc.awaiting, sc.scrolls_left, sc.chain = None, [], None, 0, 0
         sc = self.screens[device]
         if sc.ctx is None:
-            opts = dict(DESK if device == "desk" else PHONE, accept_downloads=False, java_script_enabled=True,
-                        locale="en-US", timezone_id="Asia/Tokyo", ignore_https_errors=self.ignore_tls,
-                        permissions=[], color_scheme="light", service_workers="block")
-            if device == "desk":
-                opts["user_agent"] = DESK_UA
-            sc.ctx = await self.browser.new_context(**opts)
-            await sc.ctx.add_cookies(YOUTUBE_COOKIES)            # YouTube's Restricted Mode, before any page loads
-            await sc.ctx.route("**/*", self.guard.route)
-            sc.page = await sc.ctx.new_page()
-            sc.ctx.on("page", lambda p: asyncio.ensure_future(p.close()) if p != sc.page else None)   # no pop-ups
-            sc.page.on("dialog", lambda d: asyncio.ensure_future(d.dismiss()))
-            sc.page.set_default_timeout(NAV_TIMEOUT_MS)
+            sc.public = await self._new_context(device, YOUTUBE_COOKIES, self.guard.route)
+            sc.ctx, sc.page = sc.public
+            sc.site = None
         return sc
+
+    async def _new_context(self, device, cookies, route):
+        opts = dict(DESK if device == "desk" else PHONE, accept_downloads=False, java_script_enabled=True,
+                    locale="en-US", timezone_id="Asia/Tokyo", ignore_https_errors=self.ignore_tls,
+                    permissions=[], color_scheme="light", service_workers="block")
+        if device == "desk":
+            opts["user_agent"] = DESK_UA
+        ctx = await self.browser.new_context(**opts)
+        await ctx.add_cookies(cookies)                      # YouTube's Restricted Mode (and a session), before any page
+        await ctx.route("**/*", route)
+        page = await ctx.new_page()
+        ctx.on("page", lambda p: asyncio.ensure_future(p.close()) if p != page else None)   # no pop-ups
+        page.on("dialog", lambda d: asyncio.ensure_future(d.dismiss()))
+        page.set_default_timeout(NAV_TIMEOUT_MS)
+        return ctx, page
+
+    def _session(self, url):
+        """The logged-in session for this URL's site, or None (no secret, expired, or another site)."""
+        s = self.sessions.get(SE.site_for_url(url) or "")
+        return s if s is not None and s.check() else None
+
+    def _site_route(self, site):
+        """A logged-in context: its pages stay on that site's own domains and never open a private page; every
+        request also passes the guard."""
+        domains = SE.SITES[site]["domains"]
+
+        async def route(route):
+            req = route.request
+            if req.is_navigation_request() and req.frame.parent_frame is None:
+                u = urllib.parse.urlsplit(req.url)
+                if not SE.host_in(u.hostname or "", domains) or VO.private_url(req.url):
+                    if LOGIN_HREF.search(u.path + "?") or SE.host_in(u.hostname or "", ("accounts.google.com",)):
+                        self.login_redirect = site              # sent to a login page: the session has ended
+                    return await route.abort()
+            return await self.guard.route(route)
+        return route
+
+    async def _use(self, sc, url):
+        """Point the screen at the context for `url`: the site's logged-in one when it has a session, else the
+        logged-out one. The session's cookies are only ever added to its own context."""
+        s = self._session(url)
+        if s is None:
+            if sc.site is not None:
+                sc.ctx, sc.page = sc.public
+                sc.site = None
+            return
+        if s.site not in sc.sites:
+            sc.sites[s.site] = await self._new_context(sc.name, s.cookies(), self._site_route(s.site))
+        sc.ctx, sc.page = sc.sites[s.site]
+        sc.site = s.site
+
+    async def _logout(self, sc, reason):
+        """A session ended (expired, sign-in button or wall): that site is browsed logged out from now on."""
+        site = sc.site
+        s = self.sessions.get(site or "")
+        if s is not None:
+            s.expire(reason)
+        for other in self.screens.values():
+            pair = other.sites.pop(site, None)
+            if pair:
+                if other.site == site:
+                    other.ctx, other.page, other.site = (*other.public, None) if other.public else (None, None, None)
+                try:
+                    await pair[0].close()
+                except Exception:
+                    pass
 
     async def close(self, device=None):
         """Close one screen (he put the phone down) or everything (asleep / shutting down)."""
         for name, sc in self.screens.items():
             if device in (None, name) and sc.ctx is not None:
-                try:
-                    await sc.ctx.close()
-                except Exception:
-                    pass
-                sc.ctx = sc.page = None
+                for ctx, _ in sc.contexts():
+                    try:
+                        await ctx.close()
+                    except Exception:
+                        pass
+                sc.ctx = sc.page = sc.public = sc.site = None
+                sc.sites = {}
                 sc.scrolls_left, sc.next_at, sc.pending_link = 0, 0.0, None
                 sc.info, sc.history, sc.awaiting, sc.chain = None, [], None, 0
                 sc.mode, sc.watch_until, sc.scene = None, 0.0, 0.0
@@ -709,7 +794,9 @@ class Browser:
     def result_page(self, sc, url):
         """A search results page for the eyes: its results (title, snippet, host), numbered, nothing else."""
         links = []
-        for i, r in enumerate(self.safe_results(sc.info.get("results"))[:PAGE_LINKS]):
+        results = [r for r in self.safe_results(sc.info.get("results"))
+                   if not (sc.site or self._session(r["url"])) or VO.link_ok(r["url"], r["title"])]
+        for i, r in enumerate(results[:PAGE_LINKS]):
             link = {"id": f"L{i + 1}", "href": r["url"], "text": r["title"][:100], "result": True,
                     "host": (urllib.parse.urlsplit(r["url"]).hostname or "").removeprefix("www."), "area": 0,
                     "video": bool(VIDEO_LINK.search(r["url"]) or r.get("video"))}
@@ -741,6 +828,8 @@ class Browser:
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
                     or not display_ok(label) or (yt and not video_text_ok(label))):
                 continue
+            if (sc.site or self._session(href)) and not VO.link_ok(href, label, aria or ""):
+                continue                                        # #60: logged in, an action or a private page
             if href in seen:                                    # YouTube: the thumbnail link comes first, labelled
                 if yt and len(label) > len(seen[href]["text"]):  # with the duration; the title link is the label
                     seen[href]["text"] = label
@@ -1107,12 +1196,21 @@ class Browser:
 
     async def _open(self, sc, url, why, kind, title=None, min_text=80, shoot=True):
         """Load a page; if the guard rejects it, leave it (blank) so nothing of it is shown, scrolled or followed."""
-        if not url_ok(url):
+        if not url_ok(url) or VO.private_url(url):
             return False
+        if self._session(url) and not VO.link_ok(url):          # #60: re-checked just before it is opened
+            self.last_skip = "action"
+            return False
+        await self._use(sc, url)
         page = sc.page
+        self.login_redirect = None
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         except Exception as e:
+            if sc.site and self.login_redirect == sc.site:
+                await self._logout(sc, "sent to log in")
+                self.last_skip = "logged out"
+                return await self._leave(sc)
             if "Timeout" not in repr(e):
                 print(f"browse: could not open {url[:80]}: {repr(e)[:100]}", flush=True)
                 self.last_skip = "did not load"
@@ -1131,12 +1229,23 @@ class Browser:
         await page.evaluate(UNBLOCK_JS)
         if not url_ok(page.url):
             return await self._leave(sc)
+        if sc.site:                                                    # #60: logged in
+            s = self.sessions.get(sc.site)
+            if s is not None and s.looks_signed_out(await page.evaluate(SE.SIGNED_OUT_JS,
+                                                                         SE.SIGNED_OUT_SELECTORS[sc.site])):
+                await self._logout(sc, "signed out")
+                self.last_skip = "logged out"
+                return await self._leave(sc)
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
                   else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
                   or await self._login_walled(page, body) else None)
+        if reason == "sign-in wall" and sc.site:                       # #60: the session no longer works
+            await self._logout(sc, "login wall")
+        if not reason and sc.site and not video_text_ok(re.sub(r"\s*[-|]\s*(YouTube|TikTok)$", "", page_title)):
+            reason = "guard"                                           # captions, hashtags, creators (#56 guard)
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             self.last_skip = reason
@@ -1195,6 +1304,8 @@ class Browser:
                     if k is None:
                         continue
                     b = next(x for x in buttons if x["i"] == k)
+                    if sc.site and VO.action_target(label=b.get("label") or b.get("aria") or ""):
+                        continue                                # #60: logged in, never an action button
                     await frame.evaluate("i => { const el = document.querySelector(`[data-sub01-btn=\"${i}\"]`); "
                                          "if (el) el.click(); }", k)
                 except Exception:
@@ -1244,10 +1355,29 @@ class Browser:
             pass
         return False
 
+    async def _private_ok(self, sc):
+        """#60: nothing private reaches the screen (the URL, then the DOM), and on a logged-in site the account's
+        avatar, name and action buttons are hidden just before the screenshot. False: the page was left."""
+        page = sc.page
+        why = VO.private_url(page.url)
+        if not why and sc.site:
+            why = VO.private_dom(await page.evaluate(VO.PRIVATE_DOM_JS, VO.PRIVATE_SELECTORS))
+        if why:
+            print(f"browse: left {urllib.parse.urlsplit(page.url).hostname} (private page: {why})", flush=True)
+            self.last_skip = "private"
+            await self._leave(sc)
+            return False
+        if sc.site:
+            await page.evaluate(VO.ADD_STYLE_JS, VO.HIDE_ACCOUNT_CSS)   # once per document, also after SPA moves
+            await page.evaluate(VO.HIDE_ACCOUNT_JS)
+        return True
+
     async def _shoot(self, sc):
         if await self._walled(sc.page):                                 # a page can turn into a bot check later
             print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
             await self._leave(sc)
+            return False
+        if not await self._private_ok(sc):
             return False
         sc.shot = await sc.page.screenshot(type="jpeg", quality=72 if sc.name == "desk" else 68)
         sc.shot_id += 1

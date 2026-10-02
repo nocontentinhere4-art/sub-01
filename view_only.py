@@ -65,15 +65,14 @@ def private_url(url):
 
 # DOM: elements that only exist on private pages, and page headings that name one
 PRIVATE_SELECTORS = [
-    # YouTube (desktop + mobile)
+    # YouTube (desktop + mobile): the browse pages of history, "You", library, playlists, purchases; account settings
     'ytd-browse[page-subtype="history"]', 'ytd-browse[page-subtype="you"]', 'ytd-browse[page-subtype="library"]',
     'ytd-browse[page-subtype="playlists"]', 'ytd-browse[page-subtype="purchases"]', 'ytd-account-settings',
-    'ytd-multi-page-menu-renderer', 'ytd-active-account-header-renderer', 'ytd-notification-renderer',
-    'ytd-account-item-renderer', 'ytm-account-header-renderer',
-    # TikTok
+    'ytm-account-header-renderer',
+    # TikTok: inbox, chat, profile edit, settings, upload
     '[data-e2e="inbox-list"]', '[data-e2e="inbox-notifications"]', '[data-e2e="chat-list-item"]',
     '[data-e2e="message-input-area"]', '[data-e2e="edit-profile-popup"]', '[data-e2e="setting-container"]',
-    '[data-e2e="upload-container"]', '[class*="DivMessageContainer"]', '[class*="DivInboxContainer"]',
+    '[data-e2e="upload-container"]',
     # anywhere: a password or payment field means an account page
     'input[type="password"]', 'input[autocomplete^="cc-"]',
 ]
@@ -112,14 +111,14 @@ ACTION_LABEL = re.compile(
     r"order|shop(ping)?|add to (cart|bag|basket|playlist|favou?rites|queue)|cart|checkout|pay|subscribe now|"
     r"save[ds]?|saved|watch later|favou?rites?|bookmark|collect|download|report|block|mute|not interested|"
     r"don't recommend|notify|notifications? on|bell|duet|stitch|remix|use (this )?sound|edit|sign ?(in|out|up)|"
-    r"log ?(in|out)|switch account|connect|wallet|swap|sell|mention|tag)\b", re.I)
+    r"log ?(in|out)|switch account|connect|wallet|swap|sell)\b", re.I)
 # a link's text is a video title or a name when it is long: only short labels (button-like) are read as actions
 ACTION_LABEL_WORDS = 3
 # an option label that starts with an action verb ("like this video", "follow the creator")
 ACTION_VERB = re.compile(r"^\W*(un)?(like|dislike|love|heart|follow|subscribe|join|comment|reply|post|repost|share|send|"
                          r"message|dm|chat|upload|create|go live|gift|tip|donate|buy|purchase|order|shop|add to|pay|"
                          r"save|bookmark|favou?rite|collect|download|report|block|mute|notify|duet|stitch|remix|"
-                         r"use (this )?sound|edit|sign|log ?in|switch|connect|swap|sell|mention|tag)\b", re.I)
+                         r"use (this )?sound|edit|sign|log ?in|switch|connect|swap|sell)\b", re.I)
 # labels that look like actions but are plain navigation of the feed
 ACTION_LABEL_OK = re.compile(r"^(for you|following feed|home|shorts|explore|trending|next|previous|more|show more|"
                              r"read more|see more)$", re.I)
@@ -246,3 +245,7 @@ HIDE_ACCOUNT_JS = """() => {
     }
   }
   return n; }"""
+# page.evaluate(ADD_STYLE_JS, HIDE_ACCOUNT_CSS): the CSS goes in once per document, however often it is called
+ADD_STYLE_JS = """css => { if (document.getElementById('sub01-hide-account')) return false;
+  const s = document.createElement('style'); s.id = 'sub01-hide-account'; s.textContent = css;
+  (document.head || document.documentElement).appendChild(s); return true; }"""
