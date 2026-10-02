@@ -7,7 +7,8 @@ and RUNPOD_API_KEY (Railway env; never logged). Hard caps: SUB01_MAX_HOURS_PER_D
 SUB01_GPU_CAP_DAYS (7) window. Learned weights stay on the server's
 /data volume (spiking/server.py), never on paid RunPod storage (pods have no volume).
 Each session tests yesterday's items from half cues, stores today's chat messages and readings, sleeps (REM
-replay) and tests again; Pong runs only with SUB01_PONG=1 (it has not learned so far).
+replay) and tests again; Pong runs only with SUB01_PONG=1 (it has not learned so far), the K-armed choice task
+(spiking/choice.py) only with SUB01_CHOICE=1.
 A pod is deleted at session end, when the pod reports done, on any error, with no hello in 15 min, when the
 stream is lost for more than 3 min, and at shutdown. Blocking RunPod calls run in a thread executor.
 Never imports torch or spiking.net.
@@ -37,6 +38,7 @@ DEFAULT_SESSIONS = "daily 21:00-22:00 Asia/Tokyo"
 OFF = ("off", "none", "0", "false", "disabled")
 PHASES = ["recall_yesterday", "encode", "memory_test", "sleep", "memory_test", "free"]
 PONG_PHASES = ["pong_train", "pong_exam"]                  # inserted after encode with SUB01_PONG=1
+CHOICE_PHASES = ["choice_train", "choice_exam"]            # inserted after encode (and Pong) with SUB01_CHOICE=1
 MAX_PER_SOURCE = 5
 WINDOW = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
 
@@ -140,6 +142,7 @@ class PodManager:
         self.max_hours_day = float(env.get("SUB01_MAX_HOURS_PER_DAY") or 1.0)
         self.max_session_min = float(env.get("SUB01_MAX_SESSION_MIN") or 60)
         self.pong = env.get("SUB01_PONG") == "1"
+        self.choice = env.get("SUB01_CHOICE") == "1"
         # RunPod credentials: the Railway env var, or a proxy that injects them (sandbox), or an injected client
         self.has_key = bool(env.get("RUNPOD_API_KEY") or env.get("SUB01_RUNPOD_PROXY_AUTH") == "1"
                             or api is not None or ops is not None)
@@ -267,6 +270,9 @@ class PodManager:
         phases = list(PHASES)
         if self.pong:
             phases[phases.index("encode") + 1:phases.index("encode") + 1] = PONG_PHASES
+        if self.choice:
+            at = phases.index("pong_exam") + 1 if self.pong else phases.index("encode") + 1
+            phases[at:at] = CHOICE_PHASES
         return {"session_id": "s-" + start.astimezone(ROME).strftime("%Y%m%d-%H%M"), "day": day.isoformat(),
                 "n_neurons": 1_000_000, "seed": 1, "max_minutes": max_min,      # fixed: same synapses every day
                 "phases": phases, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
