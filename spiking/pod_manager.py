@@ -12,6 +12,17 @@ replay) and tests again; Pong runs only with SUB01_PONG=1 (it has not learned so
 A pod is deleted at session end, when the pod reports done, on any error, with no hello in 15 min, when the
 stream is lost for more than 3 min, and at shutdown. Blocking RunPod calls run in a thread executor.
 Never imports torch or spiking.net.
+
+Day-live mode (#58, SUB01_DAY_LIVE=1, off by default; docs/spiking/live.md) replaces the nightly window: the pod
+follows the sleep engine's stage (SpikingHub.forward_sleep -> on_stage). Awake for WAKE_CONFIRM_S: one pod starts
+and runs live_decide (the 1M network answers his decisions) for the waking day. Asleep for SLEEP_CONFIRM_S: the
+night message goes to the same pod (the day's items and real decisions), the night phases run, then the pod is
+deleted. No pod while asleep beyond those phases. Hard caps, enforced here, each with a log line:
+SUB01_DAY_MAX_HOURS (17 GPU-h per Tokyo day), SUB01_GPU_USD_PER_DAY ($14.00, RunPod's price x uptime),
+SUB01_GPU_HOURS_CAP (weekly; 120 in this mode), SUB01_DAY_MAX_RESTARTS (6 per day, with backoff). At a cap the
+pod is stopped and deleted and no pod starts until the next Tokyo day (the CPU network of #55 decides meanwhile).
+Exactly one pod: any other pod with our prefix is an orphan and is deleted; "BRAIN" is never touched (RunPodOps).
+GPU types: SUB01_GPU_TYPES, "type:CLOUD,type:CLOUD,..." tried in order (default DAY_GPUS).
 """
 import asyncio
 import json
@@ -43,6 +54,22 @@ CHOICE_PHASES = ["choice_train", "choice_exam"]            # inserted after enco
 MAX_PER_SOURCE = 5
 SOURCES = ("chat", "reading", "taught")
 WINDOW = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
+
+# --- day-live mode (#58) ---------------------------------------------------------------------------------------------
+NIGHT_PHASES = ["recall_yesterday", "encode", "choice_train", "memory_test", "sleep", "memory_test"]
+DAY_PHASES = ["live_decide"] + NIGHT_PHASES
+# cheapest first that kept up in the benchmarks (docs/spiking/live.md); secure cloud only by default, because the
+# pod carries SUB01_POD_SECRET (community hosts are third-party machines: opt in with SUB01_GPU_TYPES)
+DAY_GPUS = (("NVIDIA RTX A4000", "SECURE"), ("NVIDIA RTX A4500", "SECURE"), ("NVIDIA RTX A5000", "SECURE"),
+            ("NVIDIA RTX 4000 Ada Generation", "SECURE"), ("NVIDIA A40", "SECURE"))
+WAKE_CONFIRM_S = 5 * 60             # awake this long before a day pod starts (a brief waking starts nothing)
+SLEEP_CONFIRM_S = 10 * 60           # asleep this long before the night phases start
+NIGHT_MAX_MIN = 45                  # the night phases on the pod (a night-only pod gets the same)
+MIN_DAY_MIN = 30                    # a day pod with less time allowed than this is not started
+BACKOFF_S = (60, 300, 600, 1200, 2400, 3600)    # wait before the next pod after the n-th failure of the day
+ORPHAN_EVERY_S = 600
+UPLOAD_EVERY_MIN = 30
+DECISION_FILES = ("decisions-{day}.jsonl", "gpu_decisions-{day}.jsonl")   # #55's log, the hub's own log
 
 
 class Schedule:
@@ -152,11 +179,20 @@ class PodManager:
         self.max_session_min = float(env.get("SUB01_MAX_SESSION_MIN") or 60)
         self.pong = env.get("SUB01_PONG") == "1"
         self.choice = env.get("SUB01_CHOICE") == "1"
+        self.day_live = env.get("SUB01_DAY_LIVE") == "1"
+        self.day_max_hours = float(env.get("SUB01_DAY_MAX_HOURS") or 17)
+        self.usd_per_day = float(env.get("SUB01_GPU_USD_PER_DAY") or 14.0)
+        self.max_restarts = int(env.get("SUB01_DAY_MAX_RESTARTS") or 6)
+        self.gpus = parse_gpus(env.get("SUB01_GPU_TYPES")) if self.day_live else None
+        self.send_night = None                 # async callable set by the hub: forwards the night message
+        self.stage, self.stage_since = None, None
+        self.dl = {}                           # day-live state (per Tokyo day; saved in manager.json)
         # RunPod credentials: the Railway env var, or a proxy that injects them (sandbox), or an injected client
         self.has_key = bool(env.get("RUNPOD_API_KEY") or env.get("SUB01_RUNPOD_PROXY_AUTH") == "1"
                             or api is not None or ops is not None)
-        self.log = CostLog(self.dir / "costs.jsonl")
-        self.ops = ops or RunPodOps(api=api, log=self.log, hours_cap=float(env.get("SUB01_GPU_HOURS_CAP") or 8.0),
+        self.log = ops.log if ops is not None and getattr(ops, "log", None) is not None else CostLog(self.dir / "costs.jsonl")
+        week = float(env.get("SUB01_GPU_HOURS_CAP") or (120.0 if self.day_live else 8.0))
+        self.ops = ops or RunPodOps(api=api, log=self.log, hours_cap=week,
                                     cap_days=float(env.get("SUB01_GPU_CAP_DAYS") or 7))
         self.send_stop = None                  # async callable set by the server: forwards {"type":"stop"} to the pod
         self.current = None                    # state of the running session
@@ -168,7 +204,7 @@ class PodManager:
     # --- enablement ------------------------------------------------------------------
     def enabled(self):
         why = None
-        if not self.schedule.enabled:
+        if not self.schedule.enabled and not self.day_live:
             why = "SUB01_SESSIONS is not set"
         elif not self.secret:
             why = "SUB01_POD_SECRET is not set"
@@ -205,6 +241,13 @@ class PodManager:
         if c and c.get("hello") and not c.get("disconnected_at"):
             c["disconnected_at"] = self.clock()
 
+    def on_stage(self, stage):
+        """The sleep engine's stage (AWAKE / NREM / REM), on every change; stage_since counts from the last
+        awake <-> asleep switch (NREM <-> REM is the same sleep)."""
+        if self.stage is None or (stage == "AWAKE") != (self.stage == "AWAKE"):
+            self.stage_since = self.clock()
+        self.stage = stage
+
     # --- status ----------------------------------------------------------------------
     def status(self):
         c = self.current
@@ -214,8 +257,16 @@ class PodManager:
         if c:
             sess = {"session_id": c["session_id"], "started": c["started"].isoformat(),
                     "ends": c["deadline"].isoformat(), "phase": c.get("phase"), "t_sim": c.get("t_sim")}
-        return {"live": live, "session": sess, "next_session": nxt[0].isoformat() if nxt else None,
-                "spend": self.log.summary()}
+        out = {"live": live, "session": sess, "next_session": nxt[0].isoformat() if nxt else None,
+               "spend": self.log.summary()}
+        if self.day_live:
+            hours, usd = self.log.usage_on(self.clock().astimezone(ROME).date())
+            out["day_live"] = {"stage": self.stage, "pod": c.get("mode") if c else None,
+                               "blocked": self.dl.get("blocked"), "restarts_today": self.dl.get("restarts", 0),
+                               "today_hours": round(hours, 3), "today_usd": round(usd, 3),
+                               "caps": {"hours_per_day": self.day_max_hours, "usd_per_day": self.usd_per_day,
+                                        "hours_per_week": self.ops.hours_cap, "restarts_per_day": self.max_restarts}}
+        return out
 
     # --- the loop --------------------------------------------------------------------
     async def run(self):
@@ -228,6 +279,9 @@ class PodManager:
             except Exception as e:
                 print(f"spiking startup recovery failed: {type(e).__name__}", flush=True)
             self._load_done()
+            if self.day_live:
+                print("spiking: day-live mode on (SUB01_DAY_LIVE=1): the GPU pod follows his waking hours", flush=True)
+                return await self.run_day_live()
             while True:
                 nxt = self.schedule.next_session(self.clock(), self.done_windows)
                 if nxt is None:
@@ -389,6 +443,320 @@ class PodManager:
             print(f"spiking: could not delete pod {pod_id}: {type(e2).__name__}", file=sys.stderr, flush=True)
         if isinstance(err, asyncio.CancelledError):
             raise err
+
+    # --- day-live mode (#58) -----------------------------------------------------------
+    @staticmethod
+    def day_key(now, asleep=False):
+        """The waking day: awake, cut at 05:00 Tokyo (a morning from 05:00 is a new day); for a sleep, the day
+        its onset closes, cut at 08:00 as sleep.day_of (asleep at 01:00 or 06:00 still closes the day before)."""
+        return (now.astimezone(ROME) - timedelta(hours=8 if asleep else 5)).date().isoformat()
+
+    def _dl_load(self):
+        try:
+            self.dl = dict(load_json(self.dir / "manager.json", {}).get("day_live") or {})
+        except Exception:
+            self.dl = {}
+
+    def _dl_save(self):
+        self._save(day_live=self.dl)
+
+    def _dl_roll(self, now):
+        today = now.astimezone(ROME).date().isoformat()
+        if self.dl.get("day") != today:
+            if self.dl.get("day"):
+                print(f"spiking: Tokyo day {today}: day-live caps and restart count reset", flush=True)
+            self.dl = {"day": today, "restarts": 0, "blocked": None, "next_try": None,
+                       "nights": list(self.dl.get("nights") or [])[-7:]}
+            self._dl_save()
+
+    def _stage_for(self, now):
+        """'awake' / 'asleep' once the stage has held for its confirmation time, else None."""
+        if self.stage is None or self.stage_since is None:
+            return None
+        held = (now - self.stage_since).total_seconds()
+        if self.stage == "AWAKE":
+            return "awake" if held >= WAKE_CONFIRM_S else None
+        return "asleep" if held >= SLEEP_CONFIRM_S else None
+
+    def allowed_minutes(self, now, rate=None):
+        """Minutes left before the first cap (day hours, weekly hours, daily USD at `rate` $/h)."""
+        hours, usd = self.log.usage_on(now.astimezone(ROME).date())
+        left = [self.day_max_hours - hours, self.ops.hours_cap - self.log.hours_since(self.ops.cap_days or 7)]
+        if rate:
+            left.append((self.usd_per_day - usd) / rate)
+        elif usd >= self.usd_per_day:
+            left.append(0.0)
+        return max(0.0, min(left) * 60)
+
+    def cap_reason(self, now, rate=None):
+        hours, usd = self.log.usage_on(now.astimezone(ROME).date())
+        week = self.log.hours_since(self.ops.cap_days or 7)
+        lead = STOP_LEAD_S / 3600                                   # stop early enough to upload the weights
+        if hours + lead >= self.day_max_hours:
+            return f"day GPU-hour cap ({hours:.2f} h of SUB01_DAY_MAX_HOURS={self.day_max_hours:g})"
+        if usd + lead * (rate or 0.0) >= self.usd_per_day:
+            return f"daily USD cap (${usd:.2f} of SUB01_GPU_USD_PER_DAY={self.usd_per_day:.2f})"
+        if week + lead >= self.ops.hours_cap:
+            return f"weekly GPU-hour cap ({week:.2f} h of SUB01_GPU_HOURS_CAP={self.ops.hours_cap:g})"
+        return None
+
+    def _block(self, reason):
+        if self.dl.get("blocked") != reason:
+            self.dl["blocked"] = reason
+            self._dl_save()
+            print(f"spiking: {reason}: no GPU pod until the next Tokyo day; the CPU network decides", flush=True)
+
+    def weights_age_days(self, now):
+        w = self.dir / "weights.npz"
+        if not w.exists():
+            return 0.0
+        return round(max(0.0, (now - datetime.fromtimestamp(w.stat().st_mtime, timezone.utc)).total_seconds() / 86400), 4)
+
+    def day_decisions(self, since, now):
+        """The real decisions made since `since` (the waking day), with their reward, from #55's log and the hub's
+        own log, merged by id: [{options, pick, reward, kind}] (at most 300, labels cut to 120 characters)."""
+        days, d = [], since.astimezone(ROME).date()
+        while d <= now.astimezone(ROME).date():
+            days.append(d.isoformat())
+            d += timedelta(days=1)
+        rows, t0 = {}, since.timestamp()
+        for day in days:
+            for name in DECISION_FILES:
+                try:
+                    lines = (self.dir / name.format(day=day)).read_text().splitlines()
+                except OSError:
+                    continue
+                for ln in lines:
+                    try:
+                        r = json.loads(ln)
+                    except ValueError:
+                        continue
+                    if not isinstance(r, dict) or r.get("id") is None:
+                        continue
+                    if not isinstance(r.get("t"), (int, float)) or r["t"] < t0:
+                        continue
+                    cur = rows.setdefault(str(r["id"]), {"t": r["t"]})
+                    if isinstance(r.get("options"), list) and isinstance(r.get("pick"), int):
+                        cur.update(options=[str(o)[:120] for o in r["options"]][:8], pick=r["pick"],
+                                   kind=str(r.get("kind") or ""))
+                    rew = r.get("reward", r.get("value"))
+                    if isinstance(rew, (int, float)) and not isinstance(rew, bool):
+                        cur["reward"] = float(rew)
+        out = [{k: v for k, v in r.items() if k != "t"} for r in sorted(rows.values(), key=lambda r: r["t"])
+               if "options" in r and r.get("reward") is not None and 0 <= r["pick"] < len(r["options"])]
+        return out[-300:]
+
+    def day_phases(self, mode):
+        phases = list(DAY_PHASES if mode == "day" else NIGHT_PHASES)
+        if not self.choice:
+            phases.remove("choice_train")
+        return phases
+
+    def night_payload(self, c, now):
+        """The night message: the waking day's name, its top items (as for the nightly session) and, with
+        SUB01_CHOICE=1, its real decisions with their outcome."""
+        return {"day": c["key"], "items": self.session_config(now, 60, now)["items"],
+                "decisions": self.day_decisions(c["started"], now) if self.choice else [], "elapsed_days": 0.0}
+
+    def day_config(self, mode, now, key):
+        cfg = {"session_id": f"{mode[0]}-" + now.astimezone(ROME).strftime("%Y%m%d-%H%M"), "day": key,
+               "n_neurons": 1_000_000, "seed": 1, "phases": self.day_phases(mode), "validate": False,
+               "max_minutes": 20 * 60 if mode == "day" else NIGHT_MAX_MIN - 5, "upload_every_min": UPLOAD_EVERY_MIN,
+               "elapsed_days": self.weights_age_days(now), "mode": mode, "items": [], "messages": []}
+        if mode == "night":                          # no day pod ran (or it was lost): the night alone
+            since = datetime.fromisoformat(key).replace(hour=5, tzinfo=ROME)
+            cfg.update({k: v for k, v in self.night_payload({"key": key, "started": since}, now).items()
+                        if k != "elapsed_days"})
+        return cfg
+
+    async def _sweep_orphans(self):
+        """Delete every pod with our prefix that is not the current one (never another prefix: never BRAIN)."""
+        loop = asyncio.get_running_loop()
+        try:
+            pods = await loop.run_in_executor(None, self.ops.ours)
+        except Exception as e:
+            print(f"spiking: orphan check failed: {type(e).__name__}", flush=True)
+            return []
+        cur = self.current["pod_id"] if self.current else None
+        gone = []
+        for pod in pods:
+            if pod.get("id") and pod["id"] != cur:
+                print(f"spiking: deleting orphan pod {pod['id']} (ours, not tracked)", flush=True)
+                await self._delete(pod["id"], "orphan")
+                gone.append(pod["id"])
+        return gone
+
+    async def _start_pod(self, mode, now, key):
+        loop = asyncio.get_running_loop()
+        allowed = self.allowed_minutes(now)
+        need = MIN_DAY_MIN if mode == "day" else 20
+        if allowed < need:
+            self._block(self.cap_reason(now) or f"only {allowed:.0f} min of GPU time left under the caps")
+            return None
+        cfg = self.day_config(mode, now, key)
+        data = await loop.run_in_executor(None, self._pack or podpack.pack_bytes)
+        token = secrets.token_hex(24)
+        env = dict(podpack.boot_env(token), SUB01_SESSION=json.dumps(cfg), SUB01_SERVER_URL=self.server_url,
+                   SUB01_POD_SECRET=self.secret, SUB01_SESSION_ID=cfg["session_id"])
+        minutes = min(allowed, 20 * 60 if mode == "day" else NIGHT_MAX_MIN)
+        try:
+            pod = await loop.run_in_executor(None, lambda: self.ops.create(env, mode, "spiking.session", minutes,
+                                                                          self.gpus))
+        except Exception as e:
+            if type(e).__name__ == "CapExceeded":
+                self._block(f"weekly GPU-hour cap ({e})")
+                return None
+            self._failed(now, f"create failed: {type(e).__name__}")
+            return None
+        pod_id = pod["id"]
+        try:
+            await loop.run_in_executor(None, self.ops.upload, pod_id, data, token)
+        except BaseException as e:
+            await self._delete(pod_id, "pack upload failed")
+            if isinstance(e, asyncio.CancelledError):
+                raise
+            self._failed(now, "pack upload failed")
+            return None
+        rate = next((r.get("cost_per_hr") for r in self.log.open_pods() if r.get("pod_id") == pod_id), None)
+        t0 = self.clock()
+        self.current = {"session_id": cfg["session_id"], "pod_id": pod_id, "started": t0, "hello": False,
+                        "last_seen": t0, "disconnected_at": None, "done": None, "mode": mode, "key": key,
+                        "rate": rate, "deadline": t0 + timedelta(minutes=minutes), "stop_sent": None,
+                        "stop_reason": None,
+                        "night_deadline": t0 + timedelta(minutes=NIGHT_MAX_MIN) if mode == "night" else None}
+        self.dl["pods"] = self.dl.get("pods", 0) + 1
+        self._dl_save()
+        print(f"spiking: {mode} pod {pod_id} started ({cfg['session_id']}, ${rate or 0:.3f}/h)", flush=True)
+        return self.current
+
+    def _failed(self, now, reason):
+        n = self.dl["restarts"] = self.dl.get("restarts", 0) + 1
+        wait = BACKOFF_S[min(n, len(BACKOFF_S)) - 1]
+        self.dl["next_try"] = (now + timedelta(seconds=wait)).isoformat()
+        self._dl_save()
+        if n > self.max_restarts:
+            self._block(f"restart cap ({n - 1} restarts of SUB01_DAY_MAX_RESTARTS={self.max_restarts})")
+        else:
+            print(f"spiking: pod failed ({reason}); restart {n} of {self.max_restarts} in {wait} s", flush=True)
+
+    async def _end(self, reason, failure=False):
+        c = self.current
+        try:
+            await self._delete(c["pod_id"], reason)
+        finally:
+            self.current = None
+            self._save(last_session_end=self.clock().isoformat())
+        print(f"spiking: {c['mode']} pod {c['pod_id']} deleted ({reason})", flush=True)
+        if failure:
+            self._failed(self.clock(), reason)
+        return reason
+
+    async def _request_stop(self, c, reason, now):
+        if c["stop_sent"] is None:
+            c["stop_sent"], c["stop_reason"] = now, reason
+            print(f"spiking: stopping the {c['mode']} pod: {reason}", flush=True)
+            if self.send_stop:
+                try:
+                    await self.send_stop()
+                except Exception:
+                    pass
+
+    async def day_step(self, now):
+        """One look at the day-live state; starts, steers or deletes the pod. Returns what it did (tests)."""
+        self._dl_roll(now)
+        c = self.current
+        state = self._stage_for(now)
+        key = self.day_key(self.stage_since, asleep=True) if state == "asleep" else self.day_key(now)
+        nights = self.dl.setdefault("nights", [])
+        if c is None:
+            if self.dl.get("blocked"):
+                return None
+            if self.dl.get("next_try") and now < datetime.fromisoformat(self.dl["next_try"]):
+                return None
+            if state == "awake" and key not in nights:
+                return await self._start_pod("day", now, key) and "started day"
+            if state == "asleep" and key not in nights:
+                return await self._start_pod("night", now, key) and "started night"
+            return None
+        if c["done"] is not None:
+            ok = c["done"].get("ok", True)
+            if c["mode"] == "night" and key_done(nights, c["key"]):
+                self._dl_save()
+            if c["stop_reason"]:
+                return await self._end(c["stop_reason"])
+            if c["mode"] == "night":
+                return await self._end("night done" if ok else f"night done with error: {str(c['done'].get('error'))[:120]}")
+            return await self._end("done" if ok else f"done with error: {str(c['done'].get('error'))[:120]}",
+                                   failure=not ok)
+        if not c["hello"] and (now - c["started"]).total_seconds() > HELLO_TIMEOUT_S:
+            return await self._end("no hello within 15 min", failure=True)
+        if c["hello"] and (now - (c["disconnected_at"] or c["last_seen"])).total_seconds() > LOST_S:
+            return await self._end("stream lost", failure=True)
+        cap = self.cap_reason(now, c.get("rate"))
+        if cap:
+            self._block(cap)
+            await self._request_stop(c, cap, now)
+        if c["stop_sent"] is not None:
+            hard = self.allowed_minutes(now, c.get("rate")) <= 0
+            if hard or (now - c["stop_sent"]).total_seconds() > STOP_LEAD_S + 60:
+                return await self._end(c["stop_reason"] + (" (hard)" if hard else ""))
+            return None
+        if c["mode"] == "day" and state == "asleep":
+            if c["key"] in nights or not self.send_night:
+                await self._request_stop(c, "asleep (night already done)", now)
+                return "stopping"
+            payload = self.night_payload(c, now)
+            sent = await self.send_night(payload)
+            if sent is False:
+                await self._request_stop(c, "asleep (night message not delivered)", now)
+                return "stopping"
+            c["mode"], c["night_deadline"] = "night", now + timedelta(minutes=NIGHT_MAX_MIN)
+            print(f"spiking: asleep: night phases on the pod ({len(payload['items'])} items, "
+                  f"{len(payload['decisions'])} decisions)", flush=True)
+            return "night sent"
+        if c["mode"] == "night" and now >= c["night_deadline"]:
+            key_done(nights, c["key"])                       # one night per waking day, whatever its outcome
+            return await self._end("night deadline")
+        return None
+
+    async def run_day_live(self):
+        self._dl_load()
+        last_sweep = None
+        while True:
+            now = self.clock()
+            if last_sweep is None or (now - last_sweep).total_seconds() >= ORPHAN_EVERY_S:
+                last_sweep = now
+                await self._sweep_orphans()
+            try:
+                await self.day_step(now)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                print(f"spiking day-live step failed: {type(e).__name__}", flush=True)
+            await self._sleep(self.tick)
+
+
+def key_done(nights, key):
+    """Mark a waking day's night as done (True if newly added)."""
+    if key in nights:
+        return False
+    nights.append(key)
+    del nights[:-7]
+    return True
+
+
+def parse_gpus(spec):
+    """SUB01_GPU_TYPES "type:CLOUD,..." -> [(type, cloud)] (only types and clouds podpack allows); default DAY_GPUS."""
+    out = []
+    for part in (spec or "").split(","):
+        if not part.strip():
+            continue
+        gpu, _, cloud = part.strip().rpartition(":") if ":" in part else (part.strip(), "", "SECURE")
+        gpu, cloud = gpu.strip(), (cloud.strip() or "SECURE").upper()
+        if gpu not in podpack.GPUS or cloud not in podpack.CLOUDS:
+            raise ValueError(f"SUB01_GPU_TYPES: not allowed: {part.strip()!r}")
+        out.append((gpu, cloud))
+    return out or list(DAY_GPUS)
 
 
 def from_env(data_dir, get_messages=None, get_items=None):

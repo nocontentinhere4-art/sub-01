@@ -2,18 +2,31 @@
 
 The three pod routes bypass the site password gate and authenticate with `Authorization: Bearer <SUB01_POD_SECRET>`
 (hmac.compare_digest); without that variable on the server they answer 403. Never imports torch or spiking.net.
+
+Live decisions (#58, docs/spiking/live.md), the protocol shared with the CPU network of #55:
+  server -> pod  {"type": "decide", "id", "options": [label, ...], "kind": "browse|chess|plan", "deadline_ms"}
+  pod -> server  {"type": "decision", "id", "pick", "pool_rates", "sim_ms", "n_neurons"}
+  server -> pod  {"type": "reward", "id", "value"}
+`await hub.decide(options, kind, deadline_ms)` returns the decision (plus "net": "gpu" and the card label) or None
+(no live pod, or no answer in time: the caller falls back to the CPU network, then to the rate model);
+`hub.reward(id, value)` forwards the dopamine for a decision the pod answered. Both are logged to
+<data>/spiking/gpu_decisions-<Tokyo date>.jsonl.
 """
 import asyncio
 import hmac
 import json
+import math
 import os
+import secrets
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import aiohttp
 from aiohttp import web
 
+from sleep import ROME
 from spiking.costs import CostLog
 from state_io import append_jsonl, load_json, save_json
 
@@ -22,7 +35,13 @@ POD_PATHS = ("/api/spiking/pod", "/api/spiking/weights", "/api/spiking/result")
 KINDS = {"pong_curve": "pong_curves", "exam": "exams", "memory_test": "memory_test_runs", "bench": "bench"}
 ITEMS_FILE = "memory_tests.jsonl"   # one row per tested item: {day, item, source, recalled, score, ...}
 MEMORY_NOTE = "Recall by a simulated spiking network from a partial cue; a model, not a mind."
-EXTRA_KINDS = {"encode": "encodes", "rates": "rates", "delays": "delays", "sleep": "sleeps"}   # stored, not on the page
+EXTRA_KINDS = {"encode": "encodes", "rates": "rates", "delays": "delays", "sleep": "sleeps",   # stored, not on the page
+               "choice_curve": "choice_curves", "choice_exam": "choice_exams", "choice_replay": "choice_replays",
+               "live": "live", "live_bench": "live_bench"}
+NET_LABEL = "1M-neuron network on GPU"     # the decision card's name for this network (#58)
+DECISIONS_FILE = "gpu_decisions-{day}.jsonl"
+MAX_OPTIONS = 8
+MAX_ANSWERED = 512                  # decisions the pod answered that can still get their reward
 MAX_WS_MSG = 1 << 20
 MAX_WEIGHTS = 512 * 1024 ** 2
 RELAY_MIN_S = 0.25                  # at most 4 state frames per second go to the page
@@ -52,10 +71,26 @@ class SpikingHub:
         self._relayed = -1e9
         self._good = -1e9
         self._tasks = set()
+        self.live_ready = False             # the pod answers decide messages (it sent live_ready)
+        self._waiting = {}                  # decision id -> future
+        self.answered = OrderedDict()       # decision id -> Tokyo day of the decision
+        self.decide_stats = {"asked": 0, "answered": 0, "timeouts": 0, "rewards": 0}
+        self._manager = None
         try:
             self.last = load_json(self.dir / "last.json", {})
         except OSError:
             self.last = {}
+
+    @property
+    def manager(self):
+        return self._manager
+
+    @manager.setter
+    def manager(self, mgr):
+        """The PodManager; it also gets the night message sender (the server sets send_stop itself)."""
+        self._manager = mgr
+        if mgr is not None:
+            mgr.send_night = self.send_night
 
     # --- auth ---------------------------------------------------------------------
     @property
@@ -194,11 +229,79 @@ class SpikingHub:
         return self.forward({"type": "good"})
 
     def forward_sleep(self, stage):
-        """Forward the sleep engine stage when it changes (called every tick, cheap when unchanged)."""
+        """Forward the sleep engine stage when it changes (called every tick, cheap when unchanged); the pod
+        manager follows it in day-live mode."""
         if stage == self.stage:
             return False
         self.stage = stage
+        if self._manager is not None and hasattr(self._manager, "on_stage"):
+            self._manager.on_stage(stage)
         return self.forward({"type": "sleep", "stage": stage})
+
+    async def send_night(self, payload):
+        """End the pod's live phase: the night phases run with this config (day, items, decisions)."""
+        self.live_ready = False
+        return await self._send({k: v for k, v in payload.items() if k != "type"} | {"type": "night"})
+
+    # --- live decisions (#58) ------------------------------------------------------
+    def _log_decision(self, row):
+        day = datetime.now(ROME).date().isoformat()
+        try:
+            append_jsonl(self.dir / DECISIONS_FILE.format(day=day), row | {"t": round(time.time(), 3)})
+        except OSError:
+            pass
+        return day
+
+    async def decide(self, options, kind="browse", deadline_ms=2000, decision_id=None):
+        """Ask the GPU network to choose among `options` (2-8 labels). Returns the decision or None."""
+        opts = [str(o)[:200] for o in (options or [])]
+        if not self.live_ready or not self.connected or not 2 <= len(opts) <= MAX_OPTIONS:
+            return None
+        did = str(decision_id or secrets.token_hex(8))[:64]
+        fut = asyncio.get_running_loop().create_future()
+        self._waiting[did] = fut
+        self.decide_stats["asked"] += 1
+        t0 = time.monotonic()
+        try:
+            if not await self._send({"type": "decide", "id": did, "options": opts, "kind": str(kind),
+                                     "deadline_ms": int(deadline_ms)}):
+                return None
+            try:
+                d = await asyncio.wait_for(fut, max(0.05, deadline_ms / 1000.0))
+            except asyncio.TimeoutError:
+                self.decide_stats["timeouts"] += 1
+                print(f"spiking: no GPU decision within {int(deadline_ms)} ms (fallback)", flush=True)
+                return None
+        finally:
+            self._waiting.pop(did, None)
+        pick, rates = d.get("pick"), d.get("pool_rates")
+        if not isinstance(pick, int) or isinstance(pick, bool) or not 0 <= pick < len(opts):
+            return None
+        rates = [float(x) for x in rates] if isinstance(rates, list) and len(rates) == len(opts) else None
+        out = {"id": did, "pick": pick, "pool_rates": rates, "sim_ms": d.get("sim_ms"),
+               "n_neurons": d.get("n_neurons"), "net": "gpu", "label": NET_LABEL,
+               "rtt_ms": round((time.monotonic() - t0) * 1000, 1)}
+        self.decide_stats["answered"] += 1
+        day = self._log_decision({"id": did, "kind": str(kind), "options": opts, "pick": pick, "net": "gpu",
+                                  "pool_rates": rates, "sim_ms": out["sim_ms"], "rtt_ms": out["rtt_ms"]})
+        self.answered[did] = day
+        while len(self.answered) > MAX_ANSWERED:
+            self.answered.popitem(last=False)
+        return out
+
+    def reward(self, decision_id, value):
+        """Dopamine for a decision the GPU network made (False if it did not make it or no pod is connected)."""
+        did = str(decision_id)
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return False
+        if did not in self.answered or not math.isfinite(value):
+            return False
+        self.answered.pop(did)
+        self._log_decision({"id": did, "reward": value})
+        self.decide_stats["rewards"] += 1
+        return self.forward({"type": "reward", "id": did, "value": value})
 
     async def forward_stop(self):
         return await self._send({"type": "stop"})
@@ -211,7 +314,7 @@ class SpikingHub:
         old, self.ws = self.ws, ws
         if old is not None and not old.closed:
             await old.close()
-        self.session = None
+        self.session, self.live_ready = None, False
         if self.stage:
             await ws.send_json({"type": "sleep", "stage": self.stage})
         try:
@@ -220,7 +323,7 @@ class SpikingHub:
                     await self.on_frame(m.data)
         finally:
             if self.ws is ws:
-                self.ws, self.session, self.last_state = None, None, None
+                self.ws, self.session, self.last_state, self.live_ready = None, None, None, False
                 if self.manager:
                     self.manager.on_disconnect()
                 await self.live.broadcast({"type": "spiking", "live": False})
@@ -248,6 +351,13 @@ class SpikingHub:
                 await self.live.broadcast({k: v for k, v in d.items() if k != "type"} | {"type": "spiking"})
         elif kind == "result":
             self.store_result(d)
+        elif kind == "live_ready":
+            self.live_ready = True
+            print(f"spiking: GPU network answers decisions ({d.get('n_neurons')} neurons)", flush=True)
+        elif kind == "decision":
+            fut = self._waiting.get(str(d.get("id")))
+            if fut is not None and not fut.done():
+                fut.set_result(d)
         elif kind == "done":
             if self.manager:
                 self.manager.on_done(d)
@@ -303,6 +413,8 @@ class SpikingHub:
             session = {"session_id": self.session.get("session"), "device": self.session.get("device"),
                        "n_neurons": self.session.get("n_neurons")}
         return {"live": live, "session": session, "next_session": mgr.get("next_session") if mgr else None,
+                "day_live": mgr.get("day_live") if mgr else None,
+                "decisions": {"live_ready": self.live_ready, **self.decide_stats},
                 "last": {k: self.last.get(k) for k in KINDS},
                 "spend": mgr.get("spend") or CostLog(self.dir / "costs.jsonl").summary()}
 
