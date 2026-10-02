@@ -247,3 +247,34 @@ def test_daily_session_labels_and_tests_only_todays_items(tmp_path):
     assert tests[0]["label"] == "next day" and tests[0]["skipped"]                 # nothing from an earlier day
     assert tests[1]["label"] == "after encoding"                                     # not None after the skip
     assert {s["item_day"] for s in tests[1]["scores"]} == {"2026-10-01"}
+
+
+# --- #79: where each reading came from reaches /api/memory -----------------------------------------------------------
+def test_readings_carry_host_and_kind_to_api_memory(tmp_path):
+    t = tk(1, 21)
+    mem = Memory()
+    mem.add(t.timestamp() - 600, "Why do cats purr?", "AWAKE", {}, "neutral", [], source="reading",
+            title="Why do cats purr?", keywords=["cats"], host="old.reddit.com", kind="forum", via="browser")
+    mem.add(t.timestamp() - 300, "Sleep", "AWAKE", {}, "neutral", [], source="reading", title="Sleep",
+            keywords=["sleep"])                                                     # an old-style item: wiki
+    reads = [i for i in pod_manager.top_items(mem, t.timestamp()) if i["source"] == "reading"]
+    assert {(i["item"], i["host"], i["kind"]) for i in reads} == {("Why do cats purr?", "old.reddit.com", "forum"),
+                                                                    ("Sleep", "", "wiki")}
+    mgr, fc, api, log, stops = make_mgr(tmp_path, t)
+    mgr.get_items = lambda: pod_manager.top_items(mem, fc.now().timestamp())
+    cfg = mgr.session_config(t, 60, t)
+    assert all(set(i) == {"text", "source", "item", "emotion"} for i in cfg["items"])   # the pod's items unchanged
+    meta = json.loads((mgr.dir / pod_manager.ITEM_META).read_text())
+    assert meta["Why do cats purr?"] == {"host": "old.reddit.com", "kind": "forum"}
+
+    async def go(client, hub, live):
+        (tmp_path / "srv" / "spiking").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "srv" / "spiking" / pod_manager.ITEM_META).write_text(json.dumps(meta))
+        await client.post("/api/spiking/result", headers=AUTH, json=mt(
+            "next day", "2026-10-01", "2026-10-02", "s2", [("Why do cats purr?", "reading", 1.2), ("hi", "chat", 0.1)]))
+        m = await (await client.get("/api/memory")).json()
+        item = next(i for i in m["items"] if i["item"] == "Why do cats purr?")
+        assert item["host"] == "old.reddit.com" and item["kind"] == "forum" and item["recalled"] is True
+        chat = next(i for i in m["items"] if i["item"] == "hi")
+        assert chat.get("host") is None and chat.get("kind") is None              # only readings carry them
+    run(with_client(tmp_path / "srv", go))

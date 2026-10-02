@@ -172,8 +172,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   ("watched" for videos and shorts); `/brain` and `/diary` say "read or watched". `web/room.html` untouched (#63).
 - `analysis/readings_day.py` (model, 8 h at the screens): before 15 readings/h, 100 % Wikipedia; after 11.4/h,
   Wikipedia 9.5 %, shorts 23 %, news 19 %, pages 19 %, forums 13 %, finance (topic word only) 12 %, videos 5 %.
-- Not done here: `/api/memory` (spiking hub, from the pod's memory_tests rows) does not carry host/kind yet; it
-  needs `spiking/pod_manager.top_items` to pass `m["host"]`, `m["kind"]` through the pod (spiking owners).
+- `/api/memory`: `pod_manager.top_items` gives readings `host`/`kind`; `session_config` writes them to
+  `/data/spiking/item_meta.json` ({item: {host, kind}}, last 500), the pod's items stay as they were; the hub's
+  `store_items` adds them to the reading rows of `memory_tests.jsonl`, and `/api/memory` items return them.
 
 ## Browse like a real young guy (#56 scope extension, part 2)
 - Owner: "he focuses too much on one topic … no guy like him would spend all day on Wikipedia", then "NO

@@ -138,6 +138,10 @@ class SpikingHub:
     def store_items(self, rec):
         """memory_tests.jsonl: one row per item of a memory test (day = the day the item was stored)."""
         thr = (rec.get("thresholds") or {}).get("hc")
+        try:
+            meta = load_json(self.dir / "item_meta.json", {}) or {}   # #79: host / kind of each reading (pod_manager)
+        except OSError:
+            meta = {}
         rows = []
         for s in rec.get("scores") or []:
             if not isinstance(s, dict) or "hc" not in s:
@@ -148,6 +152,9 @@ class SpikingHub:
                          "recalled": bool(s.get("hc_recalled")), "score": s.get("hc"), "threshold": thr,
                          "label": rec.get("label"), "test_day": rec.get("day"), "session": rec.get("session"),
                          "received": rec["received"]})
+            m = meta.get(rows[-1]["item"]) if rows[-1]["source"] == "reading" else None
+            if isinstance(m, dict):
+                rows[-1].update(host=str(m.get("host") or ""), kind=str(m.get("kind") or ""))
         if rows:
             append_jsonl(self.dir / ITEMS_FILE, *rows)
         return rows
@@ -176,7 +183,8 @@ class SpikingHub:
             test = [r for r in rows if key(r) == key(newest) and r.get("day") == day]
             by_item = {}                                                # one row per item, in test order
             for r in test:
-                by_item[(r["item"], r["source"])] = {k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold")}
+                by_item[(r["item"], r["source"])] = {k: r.get(k) for k in ("item", "source", "recalled", "score", "threshold",
+                                                                            "host", "kind")}
             items = list(by_item.values())
             items.sort(key=lambda r: (r["source"] != "reading", not r["recalled"]))
             out.update(day=day, label=label, tested=newest.get("received"), items=items,
