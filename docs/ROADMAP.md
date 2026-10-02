@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 16:45 UTC** (pass 30e). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 17:00 UTC** (pass 31). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -302,6 +302,22 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 31:** no PRs open. #63 part 1 is due ~17:40 UTC; #75 and #76 are in progress; RunPod shows only "BRAIN"
+(he is asleep in Tokyo).
+
+New tasks:
+- **#78, neurons with their real shape** (`session_013KjJYiSDhQYs85Ddjfmdgv`). Cells come from NeuroMorpho.Org under
+  CC BY 4.0, with three citations per cell. Far away they show as points; close-ups show 100–300 full cells with
+  spikes running along the axon. The caption says the shapes are illustrative and the model uses point neurons.
+  - **Decision:** no Purkinje close-up. The 214-region model has no cerebellum, so it would show fake activity.
+    Hippocampus CA1 replaces it.
+- **#79, readings from real browsing** (`session_01GCTUbSh9sLTfmffpYtv3aR`). The owner still sees too much Wikipedia.
+  - **Cause:** the old `research.py` Wikipedia reader still runs in parallel (`run_research`) and feeds every "reading"
+    (memory card, replay, memory test, diary). #69 only changed the browser.
+  - **Fix:** readings come from pages he actually browsed. The Wikipedia reader stays only as a fallback.
+  - **Target:** ≤ 10 % Wikipedia in readings.
+  - **Scheduling:** `index.html`/`life.html` are shared with #78, but in different sections.
 
 **Pass 30e:** merged #77 (#62): his active neurons are visible inside the 3D brain on /brain and /life.
 - Spikes flash per region; region rates tint the clouds.
