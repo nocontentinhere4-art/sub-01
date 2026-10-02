@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 14:10 UTC** (pass 27c). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 14:20 UTC** (pass 28). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -289,6 +289,11 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 28:** merged #64 (#56 part 1): 10 free search sources routed by topic, ≤ 20 requests/host/hour, follow-up
+searches, and queries from notes, reading, taught words, tastes and chat. Searches 31 → 52/hour, with no paid calls on
+result pages. Parsers are fixture-tested only; check `/api/browsing` after deploy. Next: #56 part 2 (variety, TikTok
+and Shorts, finance) and #60 integration, both in browse.py.
 
 **Pass 27c:** the owner's live screenshot (23:05 Tokyo) shows the site up after the #49 fix, with the mind plan,
 the teach card and the static map live. It also shows no dark rectangle on a real GPU, so it was a SwiftShader-only
