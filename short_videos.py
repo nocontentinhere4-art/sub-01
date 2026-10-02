@@ -16,7 +16,7 @@ import urllib.parse
 from search_sources import _dedup, _result, parse_html, strip_tags
 
 SHORTS_MAX_S = 45.0                    # a short is watched at most this long (real seconds), then the next one
-TIKTOK_SHARE = 0.35                    # feeds that start on TikTok (else YouTube Shorts)
+TIKTOK_SHARE = 0.5                     # feeds that start on TikTok (else YouTube Shorts); #89: the owner wants TikTok
 TIKTOK_VIDEO = re.compile(r"^https://www\.tiktok\.com/@([\w.]{2,30})/video/(\d{8,25})$")
 
 
@@ -86,3 +86,58 @@ async def settle(page, host, page_title):
         return None
     await page.add_style_tag(content=HIDE_TIKTOK)
     return None if caption_ok(page_title) else "guard"
+
+
+# --- TikTok embed cards (#89): what the server can show when TikTok's feed is empty for it -------------------------
+NOTE_BLOCKED = "TikTok blocked from the server today → YouTube Shorts"
+NOTE_CARDS = "TikTok's feed is closed to the server: public TikTok videos shown as embed cards (not played)"
+
+
+def oembed_url(video_url):
+    return "https://www.tiktok.com/oembed?" + urllib.parse.urlencode({"url": video_url})
+
+
+def parse_oembed(text, video_url):
+    """TikTok's public oEmbed JSON -> {url, title, author, thumb, hashtags} or None."""
+    import json
+    try:
+        d = json.loads(text or "")
+    except ValueError:
+        return None
+    if not isinstance(d, dict) or not d.get("title") and not d.get("author_name"):
+        return None
+    cap = " ".join(str(d.get("title") or "").split())[:200]
+    thumb = str(d.get("thumbnail_url") or "")
+    return {"url": video_url, "title": strip_tags(cap) or f"a video by {d.get('author_name', '')}"[:140],
+            "author": " ".join(str(d.get("author_name") or "").split())[:60],
+            "thumb": thumb if thumb.startswith("https://") else "", "hashtags": re.findall(r"#\w+", cap)[:6]}
+
+
+def card_html(card):
+    """A dark phone-sized card: thumbnail, caption, creator, and what it is (no video, no buttons, no links)."""
+    import html as h
+    img = f'<img src="{h.escape(card["thumb"], quote=True)}" alt="">' if card.get("thumb") else ""
+    return ("<!doctype html><meta charset=utf-8><style>body{margin:0;background:#000;color:#eee;font:15px/1.35 "
+            "-apple-system,Helvetica,Arial,sans-serif}.w{max-width:420px;margin:0 auto;padding:14px}img{width:100%;"
+            "border-radius:10px;max-height:70vh;object-fit:cover}.c{margin-top:10px}.a{color:#9aa;margin-top:4px}"
+            ".n{color:#667;font-size:12px;margin-top:12px}</style><div class=w>" + img
+            + f'<div class=c>{h.escape(card["title"])}</div><div class=a>@{h.escape(card["author"])}</div>'
+            + f"<div class=n>{h.escape(card.get('site', 'TikTok'))} · public video · "
+            + f"{h.escape(card.get('how', 'its embed card (TikTok oEmbed)'))}; the video is not played</div></div>")
+
+
+NOTE_SHORTS_CARDS = "YouTube Shorts pages blocked from the server: shorts shown as cards (thumbnail, title; not played)"
+YT_SHORT = re.compile(r"^https://(?:www\.|m\.)?youtube\.com/shorts/([\w-]{6,20})(?:[?#]|$)")
+
+
+def youtube_card(result):
+    """A YouTube Short from the results page (already guarded) -> a card when the short's own page is blocked for the
+    server: its title, channel and YouTube's public thumbnail (no extra request beyond the image)."""
+    m = YT_SHORT.match(str((result or {}).get("url") or ""))
+    if not m:
+        return None
+    return {"url": result["url"], "title": str(result.get("title") or "")[:140],
+            "author": str(result.get("channel") or "")[:60], "hashtags": [],
+            "thumb": f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg", "host": "youtube.com",
+            "site": "YouTube Shorts", "how": "title and thumbnail from the results page"}
+

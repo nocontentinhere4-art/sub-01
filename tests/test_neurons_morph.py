@@ -124,8 +124,10 @@ def test_level_of_detail_switch():
 
 def test_brain_page_wording():
     html = (ROOT / "web" / "index.html").read_text()
-    assert SHAPES in html                                                        # word for word (#78)
-    assert "no live network: shapes only, no activity" in html
+    # #88 replaced the #78 sentence with its own caption (NeuronRender.CAPTION, checked word for word in
+    # tests/test_neuron_render.py); the page takes it from the renderer and keeps the offline wording
+    assert "const N3_SHAPES = NeuronRender.CAPTION" in html
+    assert "no live network: static cells, no activity" in html
     assert re.search(r'id="n3close".*data-k="cortex".*data-k="striatum".*data-k="thalamus".*data-k="hippocampus"'
                      r'.*data-k="amygdala"', html)
     assert "cerebellum" not in html.lower() and "purkinje" not in html.lower()

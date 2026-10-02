@@ -6,7 +6,8 @@
 <title>SUB-01 · live</title>
 <style>
   :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
-          --card:rgba(10,10,16,.74); --st:#ff9a3c; }
+          --card:rgba(10,10,16,.74); --st:#ff9a3c;
+          --panel-w:clamp(340px, 22vw, 420px); --dock-h:150px; }   /* --dock-h: the dock's real height, set by a ResizeObserver */
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
     font-family: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -35,15 +36,16 @@
 
   #honest { position:fixed; left:28px; bottom:128px; font-size:11px; color:var(--faint); max-width:520px; line-height:1.5;
     text-shadow:0 1px 6px #000; }
-  #ticker { position:fixed; left:28px; bottom:22px; right:420px; font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:5px;
+  #ticker { position:fixed; left:28px; bottom:22px; right:calc(var(--panel-w) + 56px); font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:5px;
     text-shadow:0 1px 6px #000; }
   #ticker div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #ticker div:first-child { color:var(--fg); }
   #ticker b { color:var(--st); font-weight:normal; }
   #ticker .buy { color:#39f5a0; } #ticker .sell { color:#ff4d6d; }
 
-  #cards { position:fixed; right:24px; top:24px; width:340px; display:flex; flex-direction:column; gap:12px;
-    max-height:calc(100vh - 170px); overflow-y:auto; }
+  /* the right column: the cards end 14 px above the dock, however tall the dock grows (layer row, close-up row, caption) */
+  #cards { position:fixed; right:24px; top:24px; width:var(--panel-w); display:flex; flex-direction:column; gap:12px;
+    max-height:calc(100vh - var(--dock-h) - 60px); overflow-y:auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:blur(14px) saturate(1.2);
     -webkit-backdrop-filter:blur(14px) saturate(1.2); text-decoration:none; display:block;
     box-shadow:0 10px 30px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05); transition:border-color .25s; }
@@ -61,25 +63,26 @@
   #music li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
   #music li.c { color:var(--fg); }
 
-  #dock { position:fixed; right:24px; bottom:22px; width:340px; display:flex; flex-direction:column; gap:10px; }
-  #layers { display:flex; gap:6px; }
-  #layers button { flex:1; background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 0; font:inherit; font-size:11px;
-    border-radius:5px; cursor:pointer; }
+  #dock { position:fixed; right:24px; bottom:22px; width:var(--panel-w); display:flex; flex-direction:column; gap:10px; }
+  #layers { display:flex; flex-wrap:wrap; gap:6px; }
+  #layers button { flex:1 1 auto; background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 7px; font:inherit; font-size:11px;
+    border-radius:5px; cursor:pointer; white-space:nowrap; }
   #layers button.on { color:var(--fg); border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.05); }
   #layers button[data-l="neurons"].on { color:var(--or); border-color:rgba(255,106,0,.55); }
   #layers button[data-l="neurons"].off { color:var(--faint); }
-  #n3cap { font-size:10px; line-height:1.5; color:var(--dim); }
+  #n3cap { font-size:10px; line-height:1.5; color:var(--dim); max-height:min(22vh, 200px); overflow-y:auto; }
   #n3cap b { color:var(--fg); font-weight:normal; } #n3cap .s { display:block; color:var(--faint); }
   #n3mini { display:none; position:fixed; left:6px; right:6px; top:4px; font-size:8px; line-height:1.3; color:#8a8a9c; pointer-events:none;
     text-shadow:0 1px 4px #000; }
   body.mini.n3 #n3mini { display:block; }
-  body.n3 #cards { max-height:calc(100vh - 250px); }
   #n3close { display:none; gap:6px; align-items:center; font-size:10px; color:var(--dim); flex-wrap:wrap; }
   body.n3:not(.mini) #n3close { display:flex; }
   #n3close button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:4px 8px; font:inherit; font-size:10.5px;
     border-radius:5px; cursor:pointer; }
   #n3close button.on { color:var(--or); border-color:rgba(255,106,0,.55); }
   @media (min-width: 901px) { body.closeup #cards { display:none; } }
+  body.closeup #dock { background:rgba(3,3,5,.74); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); padding:12px 14px;
+    margin:-12px -14px; border-radius:10px; }                   /* a close-up's neurons fill the screen: a scrim behind the panel (#88 A follow-up) */
   #chat { display:flex; gap:6px; }
   #chat input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
     font:inherit; font-size:13px; border-radius:8px; transition:border-color .2s; }
@@ -101,7 +104,7 @@
   #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
-  #desk [hidden] { display:none !important; }
+  #desk [hidden], #cards [hidden] { display:none !important; }   /* .card's display:block beat [hidden] (#89) */
   #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
   #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
@@ -125,7 +128,8 @@
     #cards { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:0 16px; margin-top:66vh; }
     .card, #neurons { min-width:240px; }
     #ticker { position:static; padding:12px 16px 0; }
-    #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(transparent, #030305 30%); }
+    #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(rgba(3,3,5,0), #030305 24px); }
+    #n3cap { max-height:16vh; }
     #layers button[data-l="sci"] { display:none; }
     #scene, #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:72vh; }
     #top { position:absolute; }
@@ -145,6 +149,17 @@
 </div>
 
 <div id="cards">
+  <div class="card" id="screens">
+    <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
+    <div class="m" id="sc-b"></div>
+    <div class="m" id="sc-share"></div>
+    <canvas id="da" width="300" height="64" style="width:100%;height:64px;margin:6px 0 2px"></canvas>
+    <div class="m" id="da-l">simulated dopamine-like reward signal in the model</div>
+    <div class="m" id="sc-src"></div>
+    <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
+    <div id="sc-tt"></div>
+    <ul id="sc-last"></ul>
+  </div>
   <div class="card" id="desk" hidden>
     <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
     <div id="desk-board" class="board" hidden></div>
@@ -200,7 +215,7 @@
 <div id="n3mini"></div>
 
 <div id="dock">
-  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain">neurons</button></div>
+  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div>
   <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button></div>
   <div id="n3cap" hidden></div>
   <form id="chat"><input id="msg" placeholder="send a stimulus…" autocomplete="off" maxlength="200"><button>send</button></form>
@@ -211,6 +226,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="/neurons.js"></script>
 <script src="/neurons3d.js"></script>
+<script src="/neuron_render/neuron_render.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -230,7 +246,7 @@ camera.up.set(0, 0, 1); camera.position.set(-300, 170, 108);
 if (MINI) camera.position.multiplyScalar(0.72);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
-let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, n3wall = -1e9, n3net = null;
+let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, cortexIdx = null, n3wall = -1e9, n3net = null;
 function resize(){
   const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
   if (!MINI && w > 900) camera.setViewOffset(w, h, 70, -55, w, h); else camera.clearViewOffset();
@@ -238,17 +254,23 @@ function resize(){
   if (n3d) n3d.resize(renderer.domElement.height, camera.fov);
 }
 addEventListener("resize", resize); resize();
+// the right column: the cards stop above the dock whatever its height (#88: the layer row overlapped the cards at 1920 px)
+if ("ResizeObserver" in window) new ResizeObserver(es => document.documentElement.style.setProperty("--dock-h",
+  Math.ceil(es[es.length - 1].target.getBoundingClientRect().height) + "px")).observe($("dock"));
 
-// ---------- neurons: his live spiking neurons as points inside the brain (#62, web/neurons3d.js) ----------
-// Only real frames from a live spiking network light them; with none, the toggle says the neurons are offline.
-const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.";
+// ---------- neurons: his live spiking neurons as small real cells inside the brain (#62, #88; web/neurons3d.js) ----------
+// Only real frames from a live spiking network light them; with none, the cells stand still and say they are offline.
+const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.";
+const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind.";
+const N3_STATIC = "static cells, no activity";
+let n3morph = null;                                  // neurons_morph.json: the forest's real cells (fetched with the toggle)
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
 const N3_NET = {gpu: "1M-neuron network on GPU", cpu: "20k-neuron network on CPU"};
-// close-ups with real neuron shapes (#78, web/neurons_morph.json): zoom in with neurons on, or a close-up button
-const N3_SHAPES = "Shapes are real reconstructed neurons from public databases and are illustrative: the simulated network uses point neurons (no dendrites are simulated). Pulses are slowed down to be visible.";
+// close-ups with real neuron shapes at microscopy scale (#88 A, web/neuron_render/): zoom in with neurons on, or a close-up button
+const N3_SHAPES = NeuronRender.CAPTION;             // the honest caption, word for word from #88
 const N3_TYPE = {pyramidal: "pyramidal", basket: "basket", medium_spiny: "medium spiny", relay: "thalamic relay",
                  ca1_pyramidal: "CA1 pyramidal", amygdala_principal: "amygdala principal"};
-let n3morph = null, n3close = null, n3closeScene = null, n3saved = null, n3fit = 1, n3lodAt = 0;
+let n3close = null, n3style = "fluorescence", n3saved = null, n3fit = 1e9, n3lodAt = 0;   // n3fit: the overlay closes itself on zoom-out
 const regionLabel = n => !n ? "" : n.name.replace(/^LH_/, "left ").replace(/^RH_/, "right ").replace(/_/g, " ");
 function closeupRegion(kind){                       // the most active region of that kind (its rate byte), else the first
   let best = -1, bv = -1;
@@ -259,55 +281,62 @@ function closeupRegion(kind){                       // the most active region of
 function closeupOpen(kind, region){
   if (!kind) return closeupExit();
   if (!n3want) neuronsOn(true);
-  const go = () => {
-    closeupExit(true);
-    const r = region != null && region >= 0 ? region : closeupRegion(kind);
-    n3close = Neurons3D.closeup({THREE, morph: n3morph, kind, region: r,
-      groupRate: m => m.groups && nodes[r] ? m.groups[nodes[r].group] : null});
-    if (!n3close) return;
-    n3closeScene = n3closeScene || new THREE.Scene();
-    n3close.group.rotation.x = Math.PI / 2;                          // cells are y-up; this scene is z-up like the brain
-    n3closeScene.add(n3close.group);
-    const b = n3close.box, c = [(b.min[0] + b.max[0]) / 2, -(b.min[2] + b.max[2]) / 2, (b.min[1] + b.max[1]) / 2];
-    const rad = 0.5 * Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
-    n3fit = rad / Math.sin(camera.fov * Math.PI / 360) * 1.05;     // whole block in view, clear of the dock
-    n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
-    controls.target.set(...c);
-    const v = [0.22, -0.96, 0.17];                                  // along the block's thin side
-    camera.position.set(c[0] + n3fit * v[0], c[1] + n3fit * v[1], c[2] + n3fit * v[2]);
-    document.body.classList.add("closeup"); n3lodAt = performance.now();
-    document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
-    neuronsText();
-  };
-  if (n3morph) go();
-  else fetch("neurons_morph.json").then(r => r.json()).then(m => { n3morph = m; go(); }).catch(() => {});
+  closeupExit(true);
+  const r = region != null && region >= 0 ? region : closeupRegion(kind);
+  if (r < 0) return;
+  n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
+  n3close = NeuronRender.open(host, {THREE, region: r, kind, label: regionLabel(nodes[r]), style: n3style,
+    live: performance.now() - n3wall < 10000, onClose: () => closeupExit(), onInfo: () => neuronsText(),
+    groupRate: m => m.groups && nodes[r] ? m.groups[nodes[r].group] : null});   // a pod without per-region rates
+  document.body.classList.add("closeup"); n3lodAt = performance.now();
+  document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
+  neuronsText();
 }
 function closeupExit(keepCamera){
-  if (n3close) { n3closeScene.remove(n3close.group); n3close.dispose(); n3close = null; }
-  if (!keepCamera && n3saved) { camera.position.copy(n3saved.pos); controls.target.copy(n3saved.target); n3saved = null; n3lodAt = performance.now(); }
+  if (n3close) { n3style = n3close.style(); n3close.close(); n3close = null; }
+  if (!keepCamera && n3saved) {
+    camera.position.copy(n3saved.pos); controls.target.copy(n3saved.target); n3saved = null; n3lodAt = performance.now();
+    const d = camera.position.distanceTo(controls.target), min = Neurons3D.LOD_IN * 1.3;   // back outside the zoom-in distance, or the LOD reopens it
+    if (d < min) camera.position.sub(controls.target).multiplyScalar(min / Math.max(1e-6, d)).add(controls.target);
+  }
   if (!keepCamera) { document.body.classList.remove("closeup"); document.querySelectorAll("#n3close button").forEach(x => x.classList.remove("on")); }
   neuronsText();
 }
 function closeupLine(){
   const i = n3close.info(), t = i.types.map(x => `${x.n} ${N3_TYPE[x.type] || x.type} (${x.species})`).join(" + ");
+  const n = x => (x || 0).toLocaleString("en-US");
+  const detail = `${i.cells} cells, ${i.heroCells} in full detail: ${n(i.spines)} spines on ${n(i.spineUm)} of ${n(i.dendUm)} µm of dendrite, `
+    + `${n(i.boutons)} boutons, ${n(i.nodesOfRanvier)} nodes of Ranvier · ${n(Math.round(i.triangles / 1000))}k of ${n(Math.round(i.triangleCap / 1000))}k triangles (${i.lod}) · ${i.style}`;
   return `<b>close-up · ${esc(regionLabel(nodes[i.region]))}</b> · ${esc(t)}`
-    + (i.live ? ` · each cell stands for a sampled model neuron here; spikes run soma → axon, slowed ~${Neurons3D.SLOWDOWN}×`
-              : ` · no live network: shapes only, no activity`)
-    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified · credits on /about</span>`;
+    + (i.live ? ` · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed ${n(i.slowdown)}× (node to node where myelinated)`
+              : ` · no live network: static cells, no activity`)
+    + `<span class="s">${esc(detail)}</span>`
+    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about</span>`;
 }
 function neuronsOn(on){
   n3want = on;
   document.body.classList.toggle("n3", on);
   const b = document.querySelector('#layers button[data-l="neurons"]'); if (b) b.classList.toggle("on", on);
-  if (on && !n3d && nodes.length && cortexPos) {
-    const make = meta => { if (n3d) return;
-      n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, sizes: meta && meta.sizes, maxPoints: MINI ? 8000 : innerWidth < 600 ? 12000 : 20000, pointSize: MINI ? 1.8 : 1.3});
-      n3d.resize(renderer.domElement.height, camera.fov); n3d.setVisible(n3want); };
-    if (n3meta) make(n3meta);
-    else fetch("neurons3d.json").then(r => r.json()).then(m => { n3meta = m; make(m); }).catch(() => make(null));
+  if (on && !n3d && nodes.length && cortexPos && !neuronsOn.loading) {
+    // the forest: every sampled neuron a small real cell (<= 40 segments); fewer cells on phones and in the mini
+    const make = () => { if (n3d) return;
+      n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, cortexIdx, morph: n3morph, sizes: n3meta && n3meta.sizes,
+                              maxCells: MINI ? 800 : innerWidth < 600 ? 1500 : 3000, somaSize: MINI ? 1.4 : 1.0});
+      n3d.resize(renderer.domElement.height, camera.fov); n3d.setVisible(n3want); neuronsText(); };
+    neuronsOn.loading = true;
+    Promise.all([n3meta || fetch("neurons3d.json").then(r => r.json()).catch(() => null),
+                 n3morph || fetch("neurons_morph.json").then(r => r.json()).catch(() => null)])
+      .then(([meta, morph]) => { n3meta = meta; n3morph = morph; neuronsOn.loading = false; make(); });
   }
   if (n3d) n3d.setVisible(on);
   neuronsText();
+}
+function forestLine(st){                            // what the forest draws, and the caption every view of it carries
+  if (!st || !st.types) return "";
+  const t = st.types.map(x => N3_TYPE[x.type] || x.type).join(", ");
+  return `<span class="s">cells enlarged ~${st.enlarge}× for visibility · ${st.cells.toLocaleString("en-US")} cells (${esc(t)}; ≤ ${Neurons3D.FOREST_SEG} segments each)`
+    + `${st.live ? ` · a spike glows soma → axon, slowed ~${Neurons3D.FOREST_SLOWDOWN}×; region rates tint the dendrites` : ""} · NeuroMorpho.Org, CC BY 4.0 · credits on /about</span>`
+    + `<span class="s">${esc(N3_HONEST)}</span>`;
 }
 function neuronsText(){
   const live = performance.now() - n3wall < 10000, b = document.querySelector('#layers button[data-l="neurons"]');
@@ -315,15 +344,15 @@ function neuronsText(){
   const st = n3d ? n3d.state() : null;
   let html = "";
   if (n3want && n3close) html = closeupLine() + (live ? "" : `<span class="s">${esc(N3_OFFLINE)}</span>`)
-    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;
-  else if (n3want && !live) html = esc(N3_OFFLINE);
+    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;   // N3_SHAPES: NeuronRender.CAPTION
+  else if (n3want && !live) html = `${esc(N3_OFFLINE)} · ${esc(N3_STATIC)}` + forestLine(st);
   else if (n3want) html = `<b>live · ${esc(N3_NET[n3net] || "spiking network")}</b>`
     + (Neurons3D.spikeLine(st) ? ` · ${esc(Neurons3D.spikeLine(st))}` : "")
     + (st && st.race ? ` · <b>a choice is racing in the striatum</b>` : "")
     + (st && st.tint === "groups" ? `<span class="s">colour: each region's network group rate (its frames carry no per-region rates)</span>` : "")
-    + `<span class="s">${esc(N3_CAPTION)}</span>`;
+    + forestLine(st) + `<span class="s">${esc(N3_CAPTION)}</span>`;
   const cap = $("n3cap"); if (cap) { cap.hidden = !n3want; if (cap.dataset.h !== html) { cap.dataset.h = html; cap.innerHTML = html; } }
-  const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, live · each dot a sampled model neuron · a model, not a mind" : N3_OFFLINE) : "";
+  const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, live · each cell a sampled model neuron, enlarged · a model, not a mind" : N3_OFFLINE + " · static cells") : "";
     if (mini.textContent !== t) mini.textContent = t; }
 }
 setInterval(neuronsText, 1000);
@@ -411,9 +440,9 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
 
   Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), fetch("cortex_idx.bin").then(r=>r.arrayBuffer())]).then(([vb, ib]) => {
     const cg = new THREE.BufferGeometry();
-    cortexPos = new Float32Array(vb);
+    cortexPos = new Float32Array(vb); cortexIdx = new Uint32Array(ib);
     cg.setAttribute("position", new THREE.BufferAttribute(cortexPos, 3));
-    cg.setIndex(new THREE.BufferAttribute(new Uint32Array(ib), 1));
+    cg.setIndex(new THREE.BufferAttribute(cortexIdx, 1));
     cg.computeVertexNormals();
     cortexMat = new THREE.ShaderMaterial({
       uniforms: { tint:{value:new THREE.Color(CHIP[stage || "AWAKE"])}, strength:{value:0.5} },
@@ -610,6 +639,61 @@ const unq = s => { const bin = atob(s), a = new Array(bin.length); for (let i = 
 let sock = null, act = null, base = null, actFrom = null, actTo = null, actAt = 0, actDt = 1000 / RATE;
 let full = false, retry = 0;                       // the server sends {"type":"full"} when it has no room for us
 const FULL_TXT = "the room is full, try again in a minute";
+// ---------- #89: his screens (what the browser really shows) and the dopamine-like trace ----------
+const DA_N = 240, daTrace = [], daSpikes = [];
+let daLast = 0, daCount = 0;                       // daCount: samples pushed so far (spikes keep their sample number)
+function daLevel(v){
+  const now = performance.now(); if (now - daLast < 500) return; daLast = now;
+  daTrace.push(v); daCount++; if (daTrace.length > DA_N) daTrace.shift(); drawDA();
+}
+function daSpike(m){
+  daSpikes.push({at: daCount, size: m.size, kind: m.kind}); if (daSpikes.length > 60) daSpikes.shift();
+  $("da-l").textContent = `${m.label}: ${m.why} · burst ${(+m.size).toFixed(2)}`
+    + (m.n > 1 ? ` · clip ${m.n} of this scroll session (habituating)` : "");
+  tick(`dopamine-like burst <b>${(+m.size).toFixed(2)}</b> · ${esc(m.why)} (novelty ${m.novelty}, predicted interest ${m.interest}, expectation ${m.expect}) → reward regions`);
+  drawDA();
+}
+function drawDA(){
+  const c = $("da"); if (!c || MINI) return; const g = c.getContext("2d"), W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H); g.fillStyle = "rgba(255,255,255,.04)"; g.fillRect(0, 0, W, H);
+  const lo = 0.6, hi = 2.2, y = v => H - 4 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo) * (H - 8);
+  g.strokeStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.moveTo(0, y(1)); g.lineTo(W, y(1)); g.stroke();
+  const off = DA_N - daTrace.length, x = i => (i + off) / (DA_N - 1) * W;
+  g.strokeStyle = "#ff6a00"; g.lineWidth = 1.5; g.beginPath();
+  daTrace.forEach((v, i) => i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v))); g.stroke();
+  g.fillStyle = "#ffd27a";
+  for (const s of daSpikes) { const i = s.at - (daCount - daTrace.length) - 1; if (i < 0) continue;
+    g.fillRect(x(i) - 1, H - 4 - Math.min(1, s.size) * (H - 8), 2, Math.min(1, s.size) * (H - 8)); }
+  g.fillStyle = "rgba(236,236,242,.6)"; g.font = "10px sans-serif"; g.fillText("DA", 4, 11);
+}
+// an official embed player (Spotify, TikTok) in the screens card: replaced only when its source changes, never autoplayed
+function screenEmbed(el, src, h, label){
+  if ((el.dataset.src || "") === (src || "")) return;
+  el.dataset.src = src || "";
+  el.innerHTML = src ? `<div class="m">${esc(label)}</div><iframe src="${esc(src)}" title="${esc(label)}" style="width:100%;height:${+h || 80}px;border:0;border-radius:8px" allow="encrypted-media; fullscreen; picture-in-picture"></iframe>` : "";
+  const fr = el.querySelector("iframe"); if (!fr) return;
+  fr.onload = () => { fr.dataset.loaded = "1"; };
+  setTimeout(() => { if (el.dataset.src === src && !fr.dataset.loaded) el.innerHTML = `<div class="m">${esc(label)} — the player did not load</div>`; }, 8000);
+}
+function renderScreens(d){
+  if (!d || MINI) return;
+  const b = d.browser || {};
+  $("sc-k").textContent = b.state === "up" ? "browser up" : b.state === "off" ? "browser off" : `browser ${b.state || "?"}`;
+  $("sc-b").textContent = (b.why ? `${b.why} (since ${b.since})` : `since ${b.since}`) + ((d.notes || []).length ? ` · ${d.notes[d.notes.length - 1].text}` : "");
+  const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
+  const bl = (d.sources || {}).blocked || [];
+  $("sc-src").textContent = bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "";
+  const mu = d.music || {}, now = mu.now;
+  $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
+  screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");
+  const tt = (d.last || []).find(x => x.embed);
+  screenEmbed($("sc-tt"), tt && tt.embed.src, 340, tt ? `${tt.embed.label}: ${tt.title}` : "");
+  $("sc-last").innerHTML = (d.last || []).slice(0, 10).map(x => `<li><span class="m">${esc(x.t)}</span> <b>${esc(x.kind)}</b> · ${esc(x.host)} · ${esc(x.title)}</li>`).join("");
+}
+function pollScreens(){ if (MINI) return; fetch("/api/screens").then(r => r.ok ? r.json() : null).then(renderScreens).catch(() => {}); }
+if (!MINI) { pollScreens(); setInterval(pollScreens, 5000); } else { const sc = document.getElementById("screens"); if (sc) sc.hidden = true; }
+
 function connect(){
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=${RATE}&q=1`);
   ws.onopen = () => $("live").classList.add("on");
@@ -637,6 +721,7 @@ function connect(){
     if (m.type === "music") { if (m.playing) { musicNow = m; renderMusic(); } else if (musicNow && musicNow.id === m.id) { musicNow = null; renderMusic(); } return; }
     if (m.type === "chess") { deskChess = m; renderDesk(); if (m.finished) setTimeout(() => { if (deskChess === m) { deskChess = null; renderDesk(); } }, 60000); return; }
     if (m.type === "screen") { if (m.device === "desk") { deskVideo = m.video ? m : null; renderDesk(); } return; }
+    if (m.type === "dopamine") { daSpike(m); return; }
     if (m.type === "nights") { renderNights(m); return; }
     if (m.type === "teach_ack") {
       $("t-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
@@ -657,6 +742,7 @@ function connect(){
       sleepInfo = sl; setStage(sl.stage); burst = Math.max(burst, sl.burst || 0);
       if (!MINI) $("clock").textContent = `${sl.clock} ${sl.tz || "Tokyo"}`;
     }
+    if (m.neuro && typeof m.neuro.DA === "number") daLevel(m.neuro.DA);
     if (m.life) {
       doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
       if (deskVideo && (m.life.walking || !/computer/.test(m.life.doing))) { deskVideo = null; renderDesk(); }
@@ -725,7 +811,7 @@ function frame(now){
   const k = 1 - Math.exp(-dt / 2.5);
   for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
   sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
-  const n3live = n3want && performance.now() - n3wall < 10000;                   // neurons on: the fibres step back
+  const n3live = n3want;                                                          // neurons on (live or static): the fibres step back
   n3dim += ((n3live ? 1 : 0) - n3dim) * (1 - Math.exp(-Math.min(2, (now - (frame.n3at || now)) / 1000) / 0.6));
   frame.n3at = now;                                                               // wall clock: a slow device fades too
   burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);
@@ -768,7 +854,7 @@ function frame(now){
       }
     }
   }
-  if (n3close) { n3close.update(now); controls.update(); renderer.render(n3closeScene, camera); return; }
+  if (n3close) return;                                                            // the close-up overlay draws itself (NeuronRender)
   controls.update(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);

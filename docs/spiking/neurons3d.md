@@ -1,11 +1,13 @@
 # His active neurons inside the 3D brain (#62)
 
-> Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands
-> for a sampled model neuron; a model, not a mind.
+> Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell
+> stands for a sampled model neuron; a model, not a mind.
 
 ## What the viewer sees
 - `/brain`: a fifth layer button, **neurons** (fibres · cortex · regions · science colours · neurons). On phones the
   layer row is now shown too (without "science colours").
+- **Since #88 B the points below are small real cells (§ "The whole-brain neuron forest"), and offline they stand
+  still instead of hiding; the rest of this section describes #62 as built.**
 - With a live spiking network, ≤ 20 000 points (12 000 on screens under 600 px, 8 000 in the mini) sit inside the brain: each region gets as many points as the 20k CPU
   network has neurons there (`web/neurons3d.json`), placed just under its parcel of the real cortex mesh
   (`cortex.bin`, nearest region centroid) or, for the 14 subcortical nuclei, in a small cloud around the centroid.
@@ -134,3 +136,116 @@ Measured (`tests/test_neurons3d.py::test_stream_per_viewer_under_3_kb_s`, a real
   `tests/js/neurons_morph_check.js`: cells / segments / draw calls per close-up, no activity offline or from another
   region, every close-up reacting to its own region, the LOD switch); screenshots and timings:
   `python tests/neurons_morph_shots.py` → `docs/screens/neurons_morph/`.
+
+## The whole-brain neuron forest (#88 B)
+> Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published
+> typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses
+> slowed to be visible. A model, not a mind.
+
+The owner's complaint was that the neurons looked like glowing balls. The whole-brain **neurons** view now draws every
+sampled model neuron as a small real cell instead of a dot.
+- **Cells:** the six NeuroMorpho.Org reconstructions of the close-ups (CC BY 4.0, `neurons_morph.json`; credits
+  unchanged). In the cortex they are pyramidal (80 %) and basket (20 %) cells. The striatum (caudate, putamen,
+  accumbens) uses the medium spiny cell; the thalamus, the relay cell; the hippocampus, the CA1 pyramid; and the
+  amygdala, its principal cell. The pallidum has no reconstruction in the set, so its few cells (≤ 12) are somata
+  only. None of these cells is from the scanned person.
+- **Simplified to ≤ 40 segments** (`Neurons3D.simplify`, in the page at start, ~5–40 ms a type):
+  1. the 300-segment tree is rebuilt;
+  2. the axon is kept only to its first 400 µm of path length (its long straight runs are clutter at this scale);
+  3. unbranched runs are straightened (Ramer–Douglas–Peucker, 4 % of the cell);
+  4. the shortest terminal branches are pruned first, the axon gets ≤ 35 % of the segments, and the last branch of
+     each kind (axon, basal, apical) is never pruned.
+
+  Result: pyramidal 14 axon + 26 dendrite segments; basket 11 + 29; medium spiny, relay and amygdala 2 + 37–38;
+  CA1 8 + 32.
+- **Enlarged ~14×** (the caption says "cells enlarged ~14× for visibility"). Relative sizes are kept: a medium spiny
+  cell stays much smaller than a pyramidal cell. Each soma is a round point of its real radius × 14, at least 2.5 px.
+- **Orientation:**
+  - Cortical pyramidal cells point their apical dendrite (+y in the asset) along the **local surface normal** of
+    `cortex.bin`, at the vertex the cell sits under. Normals are face normals summed per vertex over
+    `cortex_idx.bin`, flipped once so they point out (the mesh is wound inwards). Each cell then gets any turn about
+    that axis, and half of the cells are mirrored.
+  - Check: the page's normals agree with those of a heavily smoothed copy of the mesh on > 90 % of vertices
+    (96.7 % measured), and every pyramidal cell's apical axis matches its normal (dot > 0.999).
+  - CA1 pyramids point within 30° of one axis per region. The multipolar types (basket, medium spiny, relay,
+    amygdala) take any orientation.
+- **Activity:**
+  - A recorded spike in `n3.sq` lights the soma point and, in the shader, a glow runs from the soma along the axon
+    at 2 mm/s of the cell's real (unenlarged) length. That is ~250× slower than a thin unmyelinated axon.
+  - The region's measured rate (`n3.rq`) tints the dendrites from blue-grey to orange. The striatum is highlighted
+    while a decision race runs (as before).
+  - **Offline**, the cells stand still in a neutral colour: no glow, no tint. The caption reads "neurons offline … ·
+    static cells, no activity". Nothing is faked; the cells are shown so the view is not empty.
+- **Level of detail and cost:**
+  - 3000 cells on desktop, 1500 on screens < 600 px, and 800 in the room's mini. Each region gets cells in
+    proportion to its 20k-network population, at least 3.
+  - Desktop: 2 901 cells and 115 511 segments; phone: 1 407 cells and 56 016 segments.
+  - 7 draw calls: one instanced `LineSegments` per cell type (6) and one `THREE.Points` for the somata.
+  - Per-instance spike times are uploaded only when spikes arrive and the layer is drawn.
+  - The page draws nothing while the brain is off screen or the tab is hidden (unchanged).
+- **Stream:** unchanged (≈ 3 KB/s a viewer, `spiking/frames.py` untouched). More than one slot of a region can map to
+  the same cell (1 500–3 000 cells for 256 slots × 214 regions).
+- **Close-ups:** zooming in, or a close-up button, opens a region close-up as before. Agent A's renderer
+  (`web/neuron_render/`, #88 A) replaces the #78 line close-ups once its module lands; until then those are the
+  fallback.
+- **Panel layout:** at 1920 px the layer row ("fibres · cortex · regions · science colours · neurons") used to cover
+  the bottom of the cards column. The cards' `max-height` assumed a fixed dock height, but the dock grows with the
+  close-up row and the caption. Now:
+  - a `ResizeObserver` writes the dock's real height into `--dock-h`, and the cards end 14 px above it;
+  - the panel is `clamp(340px, 22vw, 420px)` wide;
+  - the layer buttons wrap instead of squashing "science colours" onto two lines;
+  - the caption scrolls past 30 % of the viewport height.
+- **Checks:**
+  - `tests/test_neuron_forest.py`, via node `tests/js/neuron_forest_check.js`: segments per cell, LOD caps, draw
+    calls, pyramidal alignment, normals against the smoothed mesh, offline static with no spike, a frame lighting
+    only its own region, the caption word for word, and the panel CSS.
+  - `python tests/neurons3d_shots.py --out docs/screens/neuron_forest`: screenshots at 1920, 1280 and 390 px, live
+    and offline, and the forest zoomed; the panel's boxes; counts; JS cost and FPS (`results.json`).
+
+### Measured (2026-10-02, this sandbox: headless Chromium, WebGL in software via SwiftShader, no GPU)
+- **Counts:**
+  - desktop: 2 901 cells and 115 511 segments;
+  - phone (< 600 px): 1 407 cells and 56 016 segments;
+  - mini: 800 cells requested, at least 3 a region;
+  - 7 draw calls in each case (6 instanced types + the somata);
+  - ≤ 40 segments in every cell.
+- **Panel:** the cards end above the dock at 1920, 1280 and 390 px, offline and live, and no layer button
+  overflows its label.
+
+  | width | cards end | dock starts |
+  |---|---|---|
+  | 1920 | y = 666 | y = 680 |
+  | 1280 | y = 377 | y = 391 |
+
+  At 390 the page scrolls and the dock is sticky, as before (`results.json`).
+- **Main-thread cost under ×4 CPU throttle** (390 px):
+  - building the 1 407-cell forest: 603–674 ms, once, when the toggle is first switched on. This is mostly
+    `simplify`, the cortex normals and the layout;
+  - 0.11–0.17 ms per incoming frame;
+  - 0.01–0.04 ms per rendered frame for the layer's own `update`;
+  - the page's whole `frame()`, with three.js submitting the draws: 4–7 ms with the forest on, 3–4 ms off.
+- **FPS** (390 px, fibres and cortex hidden, the recorded stream playing, counted from the page's own `frame()`):
+
+  | cells | segments | FPS ×1 | FPS ×4 |
+  |---|---|---|---|
+  | none | 0 | 19.2 | 13.0 |
+  | ~640 | 25 634 | 6.0 | 4.2 |
+  | ~800 | 31 548 | 5.2 | 3.4 |
+  | 1 407 (phone default) | 56 016 | 3.6 | 2.0–2.4 |
+  | 2 901 (desktop default) | 115 511 | 2.0 | 1.2 |
+
+  SwiftShader rasterises every line on the (throttled) CPU, so FPS falls with the segment count. JS per frame stays
+  at 1.2–1.9 ms unthrottled and 4–7 ms at ×4, so the layer's own work is not what limits FPS here.
+- **The ≥ 30 FPS phone target cannot be shown in this sandbox.** It needs a real device or a machine with a GPU.
+  56k instanced line segments (112k vertices, one texture fetch each) are a light load for a mid phone GPU, but
+  that is an expectation, not a measurement.
+  - Levers if a device falls short: `maxCells` for phones (one number in `web/index.html`), and `FOREST_SEG`.
+- **Off screen:** with the scene moved out of view, the IntersectionObserver reports it hidden and the page renders 0
+  frames in 2 s.
+- **Stream:** unchanged. The recorded 20k CPU stream measured 2 332 B/s per viewer while the screenshots were taken.
+
+Screenshots (`docs/screens/neuron_forest/`, JPEG):
+- `brain_{1920,1280,390}_offline.jpg`: static cells;
+- `brain_{1920,1280,390}_neurons.jpg`: live, from the recorded stream replayed into the page;
+- `forest_{1920,1280,390}_live_zoom.jpg`: the forest alone at half the camera distance;
+- `mini_{offline,neurons}.jpg`.

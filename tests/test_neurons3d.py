@@ -24,8 +24,8 @@ from spiking import server as S  # noqa: E402
 from spiking.config import Config  # noqa: E402
 
 SMALL = 5000
-CAPTION = ("Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot "
-           "stands for a sampled model neuron; a model, not a mind.")
+CAPTION = ("Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn "
+           "cell stands for a sampled model neuron; a model, not a mind.")
 OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on"
 
 
@@ -320,7 +320,7 @@ def test_brain_page_wording_and_toggle():
                      r'<button data-l="regions">regions</button>.*<button data-l="neurons"[^>]*>neurons</button>', html)
     assert '<script src="/neurons3d.js"></script>' in html
     js = (ROOT / "web" / "neurons3d.js").read_text()
-    assert "maxPoints || 20000" in js and "THREE.Points" in js      # one draw call, <= 20k points
+    assert "maxCells || 3000" in js and "InstancedBufferGeometry" in js   # the forest (#88): instanced cells, capped
     for page in ("index.html", "neurons3d.js", "neurons.js"):
         text = (ROOT / "web" / page).read_text().lower()
         for word in ("conscious", "understands", "he feels", "alive"):

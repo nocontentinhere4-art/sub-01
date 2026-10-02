@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 17:55 UTC** (pass 32). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 20:20 UTC** (pass 34). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -150,7 +150,7 @@ cheap to run, with the password gate kept until launch day.
 | 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | done | #72 |
 | 18u | Natural motion (no frozen poses), headphones while listening | done; food part 2 next | #82 |
 | 18v | Readings from real browsing (Wikipedia 100 % → 9.5 %) | done | #81 |
-| 18w | Sleep fix: no third-party trades, correct decoding, bounded arousal | PR #85, owner merges | #85 |
+| 18w | Sleep fix: no third-party trades, correct decoding, bounded arousal | done (merged 18:22 UTC) | #85 |
 | 18s | Room polish: no floating props, lamp out of the wall, a lived-in room, sharper phone screen | in progress | #75 |
 | 18t | A better character (fingers, face, clothes; same animations) | in progress | #76 |
 | 18p | Active neurons visible inside the 3D brain, with real neuron shapes | done (/brain, /life); room mini brain next | #77, #83 |
@@ -305,6 +305,80 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 34 (20:20 UTC):** merged #84, #96, #94 and #91. Each was checked by the coordinator.
+- **#84 (room polish and phone screen module):** 1101 passed, smoke OK at 7.2 ms per tick.
+- **#96:** the room's mini brain shows the neurons (`?mini&neurons=1`).
+- **#94 and #91 (#88 A polish and B, the whole-brain neuron forest):** tested together on main. 1106 passed. One
+  CPU-time test failed under load and passes on its own. Smoke OK.
+  - Open item: ≥ 30 FPS for the forest on a mid-range phone still needs a real device.
+- **#95 (#63 worker): the chess smoke fix.** The cause: `hungry_now()` ended a game he had just started, before the
+  board existed. The fix is in `life.py`; CI is running. The sleep pose audit comes next on the same branch.
+- **Character:** a second candidate, `boy3`, made with Higgsfield and Meshy 6. It is an original face, styled to the
+  owner's brief.
+  - Same 24-bone rig as `boy.glb`; the existing clips are retargeted with `room_build/retarget_meshy.mjs`.
+  - Branch `claude/loving-davinci-6hqmjx` (bd5804e); preview in `docs/design/boy3/`.
+  - The #76 worker compares boy2 (MakeHuman, with fingers and blink) and boy3 in the room and picks one in #80.
+
+**Pass 33b:** live check (the coordinator logged in with the owner's approval) and merge of #92 (#89).
+- **Sleep fix confirmed live:** NREM since 03:19 Tokyo, debt 2.0 h, woken 0×. The day-live pod stopped; only "BRAIN" is left.
+- **Found live:**
+  - **Browsing:** 30 pages, all on the phone: 8 on Wikipedia, 0 YouTube/Shorts/TikTok, the same page reopened (Studio Ghibli ×5 in 2 min), footer and licence clicks.
+  - **Music:** Spotify search 502 from the server.
+  - **Room:** he sleeps on top of the duvet, diagonally, with his slides on.
+  - **/life:** an old low-poly house and a blank white box.
+  - **/brain:** empty "now playing" and "at his desk" cards.
+- **#92 merged** (coordinator run: 1087 passed, smoke 7.8 ms). It fixes:
+  - the Wikipedia fallback loop and the footer links;
+  - the 7-day no-reopen rule;
+  - phone time defaulting to the shorts feed;
+  - TikTok through the official player;
+  - the screens panel;
+  - DA bursts;
+  - the room's fake Wikipedia frame;
+  - /life's real phone screen;
+  - the hidden empty cards.
+
+  It is verified live when he wakes, at 00:30 UTC.
+- **New:**
+  - #93: /life uses the real room scene.
+  - #63 worker: sleep pose and animation audit, after #84.
+  - #76: mocap animations first (Quaternius UAL CC0 plus keyframed CC0 poses), then a face pass.
+
+**Pass 33 (18:25 UTC):** merged #86, #87 and #85.
+- **#86 (#78 follow-up):** neuron close-ups now read as tissue.
+- **#87 (#63 part 2):** real food. The dish is picked at order time, arrives in the bag, is eaten bite by bite and
+  goes in the bin. Main + #87 + #85: 1031 tests passed.
+- **#85: the sleep fix.** Merged by the coordinator on the owner's "procedi".
+  - Live before it: absurd "trades" still showed (buy $94,902,346), he was awake at 03:00 Tokyo, and the 1M day-live
+    pod had started at 18:00 UTC ($0.49/h, within caps).
+
+Owner feedback and new tasks:
+- **"Neurons are glowing balls; I want them as real as possible, with Fable 5.1 and Opus 5.5 agents"** → #88:
+  - **A (Fable 5.1, `session_01CUqYBHvE9DFkQCQ3tKaDep`, draft PR #90):** a microscopy-grade close-up renderer in
+    `web/neuron_render/`. Real SWC radii, soma with nucleus, spines, myelin with nodes of Ranvier, boutons; a
+    fluorescence look; saltatory action potentials.
+  - **B (Opus 5.5, `session_011MftcyrW5FVGYgrg1keFNo`):** a whole-brain neuron forest in `neurons3d.js`. Pyramidal cells
+    point along the cortical normal. Also fixes the panel overlap at 1920 px.
+  - The API is agreed: `NeuronRender.open/onFrame/close`.
+- **"Still Wikipedia, no TikTok at all; I want dopamine spikes on TikTok"** → #89 (`session_01GCTUbSh9sLTfmffpYtv3aR`).
+  The diagnosis found certain causes:
+  - `room.html`'s `drawReading()` paints a fake "WIKIPEDIA – The Free Encyclopedia" frame around any reading title when
+    there is no desk screenshot;
+  - /life's phone showed TikTok only from an empty static `phone_feed.json`, so it never showed TikTok;
+  - logged-out TikTok returns no videos to a datacenter IP;
+  - YouTube `/watch` gets "unusual traffic" quickly;
+  - shorts ran only at lunch and late at night.
+
+  The fix:
+  - real host and kind on the monitor, and the real phone screenshot on /life;
+  - phone time defaults to the shorts feed;
+  - TikTok through its official embed player (oEmbed JSON on the server);
+  - an always-visible "screens" panel;
+  - phasic dopamine-like bursts per new short, with habituation, shown as a DA trace.
+- **"Ugly animations; log in and check everything":** the coordinator could not log in, because the session's security
+  classifier blocks using the site password. The owner is asked either to allow it or to send `/api/browsing` and the
+  Railway log lines.
 
 **Pass 32:** merged three PRs, one at a time, after one combined run of main + #85 + #81 + #82 + #83:
 1028 tests passed, smoke 7.6 ms.

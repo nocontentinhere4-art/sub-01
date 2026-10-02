@@ -1,6 +1,6 @@
 """SUB-01 live: runs the whole-brain model in real time and feeds it Solana trades and chat messages.
 
-    python live_server.py --mint <token mint>   # real pump.fun / PumpSwap trades
+    python live_server.py --mint <OUR token mint>   # real pump.fun / PumpSwap trades of our coin (env MINT; unset: no feed)
     python live_server.py --demo                                         # synthetic trades
     python live_server.py --demo --time-scale 60 --start 23:55           # one sim hour per real minute
 
@@ -48,7 +48,11 @@ import music as music_mod
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from search_sources import live_interest
+import interests
+import screens
+import search_sources
 from readings import BrowseReadings
+from screens import DA_LABEL, DopamineBursts, ScreensStatus
 from eyes import Eyes
 import mind as mind_mod
 from tastes import PageWatch, Tastes
@@ -82,9 +86,20 @@ DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
 AMM_BUY = bytes.fromhex("67f4521f2cf57777")      # PumpSwap BuyEvent
 AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
+# Anchor event discriminators are sha256("event:<Name>")[:8], so any program with a "TradeEvent" (e.g. Raydium
+# LaunchLab) emits the same 8 bytes with another layout: an event only counts when the program that emitted it is
+# pump.fun / PumpSwap, and when it is about our mint (bonding curve) or one of our pools (PumpSwap).
+PUMP_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+PUMP_AMM_PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+MAX_TRADE_USD = 250_000.0       # a single trade above this is a decoding error or noise: ignored (logged <= 1/min)
+POOLS_REFRESH_S = 600           # re-read our PumpSwap pool(s) from DexScreener (a bonding curve graduates live)
+B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
 WS_SNDBUF = 64 * 1024          # kernel send buffer of a websocket (instead of autotuned megabytes)
 WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
+WIKI_DOWN_EVERY_S = 3600        # while the browser is wanted but down: at most one Wikipedia reading an hour (#89)
+DA_BURST_K = 0.5                # phasic DA per unit burst (a strong buy's RPE gives ~0.4)
+DA_REWARD = 8.0                 # reward-region drive per unit burst (a buy drives reward with 6-12)
 WIKI_FALLBACK_S = 300           # the browser down this long (real seconds): Wikipedia feeds the readings (#79)
 VIDEO_DRIVE = 6.0               # visual drive of a full scene change while he watches a video (a chat rule is 6-8)
 CHESS_THINK_S = (15.0, 45.0)    # simulated seconds he takes per move (the vote itself takes ~0.3 s of CPU)
@@ -108,25 +123,67 @@ def target_key(option):
     return option["action"]
 
 
-def decode_trades(logs):
-    """Anchor events in 'Program data:' lines -> [{kind, sol}]."""
-    out = []
+def b58decode(text):
+    """Base58 (Solana addresses) -> bytes; ValueError on a bad character."""
+    n = 0
+    for c in text:
+        n = n * 58 + B58.index(c)
+    raw = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    return b"\0" * (len(text) - len(text.lstrip("1"))) + raw
+
+
+def b58encode(b):
+    n, out = int.from_bytes(b, "big"), ""
+    while n:
+        n, r = divmod(n, 58)
+        out = B58[r] + out
+    return "1" * (len(b) - len(b.lstrip(b"\0"))) + out
+
+
+def emitted(logs):
+    """'Program data:' lines with the program that emitted them (the innermost invoked program at that line)."""
+    stack, out = [], []
     for line in logs:
-        if not line.startswith("Program data: "):
+        if line.startswith("Program data: "):
+            out.append((stack[-1] if stack else None, line[14:]))
+        elif line.startswith("Program "):
+            p = line.split()
+            if len(p) >= 3 and p[2] == "invoke":
+                stack.append(p[1])
+            elif len(p) >= 3 and p[2] in ("success", "failed:", "failed") and stack:
+                stack.pop()
+    return out
+
+
+def decode_trades(logs, mint=None, pools=None):
+    """Anchor events of pump.fun / PumpSwap in a transaction's logs -> [{kind, sol}].
+    pump.fun bonding curve TradeEvent: mint (32), sol_amount u64, token_amount u64, is_buy bool, ... (lamports).
+    PumpSwap Buy/SellEvent: timestamp, base_amount, quote limit, user base/quote reserves, pool base/quote reserves,
+    quote_amount (u64 each), ..., pool pubkey at byte 120. Only events emitted by those two programs count; with
+    `mint`, a TradeEvent must be about that mint; with `pools`, a PumpSwap event must be about one of those pools
+    (a route through someone else's pool in the same transaction is not our trade). No pools known -> no PumpSwap."""
+    out = []
+    want_mint = b58decode(mint) if mint else None
+    for prog, data in emitted(logs):
+        try:
+            b = base64.b64decode(data)
+        except ValueError:
             continue
-        b = base64.b64decode(line[14:])
-        if b[:8] == PUMP_TRADE and len(b) >= 57:
-            sol, _, is_buy = struct.unpack_from("<QQ?", b, 40)          # after mint pubkey
+        if b[:8] == PUMP_TRADE and prog == PUMP_PROGRAM and len(b) >= 57:
+            if want_mint is not None and b[8:40] != want_mint:
+                continue
+            sol, _, is_buy = struct.unpack_from("<QQ?", b, 40)
             out.append({"kind": "buy" if is_buy else "sell", "sol": sol / 1e9})
-        elif b[:8] in (AMM_BUY, AMM_SELL) and len(b) >= 72:
-            # fields: ts, base_amount, quote_limit, user_base, user_quote, pool_base, pool_quote, quote_amount
+        elif b[:8] in (AMM_BUY, AMM_SELL) and prog == PUMP_AMM_PROGRAM and len(b) >= 152:
+            if pools is not None and b58encode(b[120:152]) not in pools:
+                continue
             f = struct.unpack_from("<8Q", b, 8)
             buy_base = b[:8] == AMM_BUY
-            if f[5] < f[6]:          # smaller raw reserve = SOL side, so SOL is the pool's base
+            if f[5] < f[6]:          # smaller raw reserve = SOL side (9 decimals vs the token's 6), so SOL is the base
                 sol, is_buy = f[1], not buy_base
-            else:
+            else:                    # the usual pump pool: base = the token, quote = WSOL
                 sol, is_buy = f[7], buy_base
-            out.append({"kind": "buy" if is_buy else "sell", "sol": sol / 1e9 if sol < 1e13 else 0.0})
+            out.append({"kind": "buy" if is_buy else "sell", "sol": sol / 1e9})
     return out
 
 
@@ -225,6 +282,20 @@ class Feed:
         return out
 
 
+def local_accounts():
+    """#89: per site "logged in" / "logged out" and why, read here when the browser process has not reported yet
+    (the same sessions it loads from the environment). Never a cookie."""
+    try:
+        import sessions as SE
+        out = {}
+        for site, sess in SE.load_sessions().items():
+            sess.check()
+            out[site] = {"state": "logged in" if sess.logged_in else "logged out", "reason": sess.status()["reason"]}
+        return out
+    except Exception as e:                                  # pragma: no cover - reported, never raised
+        return {"error": type(e).__name__}
+
+
 class Live:
     def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
@@ -250,7 +321,9 @@ class Live:
         self.init_sockets()
         self.pending = []           # trades waiting to be played into the brain
         self.seen = set()
-        self.pool_name = "demo" if demo else mint[:6]
+        self.pool_name = "demo" if demo else (mint[:6] if mint else "no coin yet")   # MINT unset: no feed
+        self.pools = set()                 # our PumpSwap pool address(es), from DexScreener (rpc_trades)
+        self.absurd_logged = 0.0           # last time an absurd trade was logged (at most once a minute)
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
         self.diary = None                # dream diary, set by main() with --eye
@@ -276,6 +349,10 @@ class Live:
         self.reading_path = Path(data_dir) / "reading.json"
         self.reader = Reader(load_json(self.reading_path))
         self.browse_readings = BrowseReadings()   # #79: readings come from the pages he stays on
+        self.screens = ScreensStatus()   # #89: what is really on his screens (/api/screens)
+        self.da_bursts = DopamineBursts()  # #89: a simulated dopamine-like burst when something new plays
+        self.browse_wanted = False       # main(): --browse was asked for (then Wikipedia is capped while it is down)
+        self.last_wiki_read = 0.0
         self.browser_down_since = None   # wall time the browser went down (Wikipedia is the fallback after a while)
         self.browsing_path = Path(data_dir) / "browsing.json"
         self.browser = None              # BrowserClient (main() with --browse): Chromium runs in its own process
@@ -341,16 +418,46 @@ class Live:
         self.neuro.on_trade(tr["kind"], tr["usd"], t=time.time())          # buys: dopamine RPE; sells: noradrenaline
         self.recent_trades = [x for x in self.recent_trades if time.time() - x[0] < 300] + [(time.time(), tr["kind"], tr["usd"])]
 
-    async def rpc_trades(self):
-        """Stream every pump.fun / PumpSwap trade of the mint straight from Solana logs."""
-        async with aiohttp.ClientSession() as http:
+    async def lookup_pools(self, http):
+        """Our token's name and PumpSwap pool(s) from DexScreener, refreshed every POOLS_REFRESH_S."""
+        while True:
             try:
                 async with http.get(DEXS.format(self.mint)) as r:
                     pairs = (await r.json()).get("pairs") or []
-                    if pairs:
-                        self.pool_name = f"${pairs[0]['baseToken']['symbol']}"
+                if pairs:
+                    self.pool_name = f"${pairs[0]['baseToken']['symbol']}"
+                self.pools = {p["pairAddress"] for p in pairs if p.get("dexId") == "pumpswap" and p.get("pairAddress")}
             except Exception as e:
-                print("name lookup failed:", e)
+                print("pool lookup failed:", type(e).__name__, flush=True)
+            await asyncio.sleep(POOLS_REFRESH_S)
+
+    def take_trade(self, tr, sig):
+        """A decoded trade -> the pending queue, unless it is absurd (a decoding error must never reach the brain)."""
+        tr["usd"] = tr.pop("sol") * self.sol_usd
+        if not (0.0 <= tr["usd"] <= MAX_TRADE_USD):
+            now = time.time()
+            if now - self.absurd_logged >= 60:
+                self.absurd_logged = now
+                print(f"ignored an absurd trade (${tr['usd']:,.0f} > ${MAX_TRADE_USD:,.0f}) in {sig[:16]}…", flush=True)
+            return False
+        tr["tx"], tr["who"], tr["at"] = sig, "", time.time()
+        self.pending.append(tr)
+        return True
+
+    async def rpc_trades(self):
+        """Stream every pump.fun / PumpSwap trade of OUR mint straight from Solana logs. No MINT: no feed at all."""
+        if not self.mint:
+            print("trade feed off: MINT is not set (no coin yet)", flush=True)
+            return
+        try:
+            ok = len(b58decode(self.mint)) == 32
+        except ValueError:
+            ok = False
+        if not ok:
+            print("trade feed off: MINT is not a valid Solana address", flush=True)
+            return
+        async with aiohttp.ClientSession() as http:
+            asyncio.create_task(self.lookup_pools(http))
             asyncio.create_task(self.sol_price(http))
             backoff = 2.0
             while True:
@@ -363,10 +470,8 @@ class Live:
                             v = json.loads(m.data).get("params", {}).get("result", {}).get("value")
                             if not v or v.get("err"):
                                 continue
-                            for tr in decode_trades(v["logs"]):
-                                tr["usd"] = tr.pop("sol") * self.sol_usd
-                                tr["tx"], tr["who"], tr["at"] = v["signature"], "", time.time()
-                                self.pending.append(tr)
+                            for tr in decode_trades(v["logs"], self.mint, self.pools):
+                                self.take_trade(tr, v["signature"])
                 except Exception as e:                    # public RPCs refuse some cloud IPs: back off, don't hammer
                     if backoff == 2.0 or backoff >= 60:
                         print(f"rpc stream error, retrying every {backoff:.0f}s:", str(e).split(", url=")[0], flush=True)
@@ -749,6 +854,9 @@ class Live:
             t = self.clock.now()
             if self.life.activity != "research" or self.life.path or not self.reader.due(t) or not self.wiki_fallback():
                 continue
+            if getattr(self, "browse_wanted", False) and time.time() - getattr(self, "last_wiki_read", 0.0) < WIKI_DOWN_EVERY_S:
+                continue                                        # the browser is wanted but down: Wikipedia stays rare
+            self.last_wiki_read = time.time()
             art = await loop.run_in_executor(None, self.reader.read, t, self.heard(t), dict(self.last_rel))
             if art:
                 art.update(host="en.wikipedia.org", kind="wiki", via="wikipedia")
@@ -785,6 +893,9 @@ class Live:
         dec = self.decisions.get(dev)
         if st and not display_ok(st.get("title", "")):           # the public card never shows such a title
             st = dict(st, title=st.get("host", ""))
+        elif st and (m := screens.TIKTOK_ID.search(str(st.get("url") or ""))):   # #89: viewers may play it in
+            st = dict(st, embed={"src": screens.TIKTOK_EMBED.format(m.group(1)),     # TikTok's official player
+                                 "label": "TikTok (official embed)"})
         # the options belong to the page they were considered on and to the page the choice led to, no later one
         if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")
                            or (st.get("video") and st.get("url") == dec.get("led_to"))):   # a chosen video playing
@@ -795,12 +906,15 @@ class Live:
     async def run_browse(self):
         """Drive the screens through the browser service; if it is down the brain and the page carry on."""
         idle_since, last_save, last_sync, ready, open_dev = time.time(), time.time(), time.time(), False, None
+        fails = 0                                               # consecutive outages: the restart backoff (#89)
         while True:
             await asyncio.sleep(1)
             dev = self.screen_device()
             now = time.time()
             try:
                 if dev is None:
+                    if (sc := getattr(self, "screens", None)) is not None:
+                        sc.idle("he is not at a screen (asleep or away): the browser starts when he picks one up")
                     if open_dev and now - idle_since > 120:     # put away: the service frees the memory
                         self.end_page()
                         br = getattr(self, "browse_readings", None)
@@ -820,6 +934,7 @@ class Live:
                 if not ready:
                     await self.browser.init(self.browsing_state)
                     ready = True
+                    await self.sync_browsing()                  # #89: searches / accounts known right away
                 if open_dev and open_dev != dev:
                     self.end_page()
                     await self.browser.close(open_dev)
@@ -833,7 +948,9 @@ class Live:
                 if st and (st.get("video") or {}).get("watching"):
                     self.video_drive(st["video"])
                 self.browser_down_since = None
+                fails = 0
                 if st:
+                    await self.on_screen(st)                    # #89: the screens status and the dopamine-like burst
                     self.reader.saw(st, t)                      # #56: "on his mind" is what he is actually reading
                     br = getattr(self, "browse_readings", None)
                     if br and (art := br.seen(st, t)):          # #79: a page he stayed on becomes the reading
@@ -851,14 +968,102 @@ class Live:
                     self.browser_down_since = time.time()       # Wikipedia takes over after WIKI_FALLBACK_S
                 if br := getattr(self, "browse_readings", None):
                     br.flush(self.clock.now())
+                if (sc := getattr(self, "screens", None)) and sc.browser_down(e):
+                    print("browser down:", e, "(restarting with backoff)", flush=True)   # once per outage
                 if not self.browser.restarting:
-                    print("browser down:", e, flush=True)
                     self.browser.restarting = True
                     if dev:
                         await self.broadcast({"type": "screen", "device": dev, "restarting": True})
                 self.end_page()
                 ready, open_dev = False, None
-                await asyncio.sleep(5)
+                fails = min(fails + 1, 5)
+                await asyncio.sleep(min(120, 5 * 2 ** (fails - 1)))   # 5, 10, 20, 40, 80 s
+
+    async def on_screen(self, st):
+        """#89: a screen status updates the screens status; a new clip or page gives a dopamine-like burst (novelty +
+        predicted interest - expectation, habituating over a scroll session) that drives the reward regions."""
+        sc = getattr(self, "screens", None)
+        if sc is None:
+            return None
+        kind = sc.seen(st)
+        note = getattr(self.browser, "feed_note", None)
+        if note:
+            sc.note(note)
+        da = getattr(self, "da_bursts", None)
+        if not kind or da is None:
+            return None
+        import interests
+        title = str(st.get("title") or "")
+        topic = interests.topic_of(title, st.get("host", "")) or st.get("host")
+        try:
+            interest = self.tastes.predict(Tastes.topics({"label": title, "networks": {}}, ""))
+        except Exception:
+            interest = 0.0
+        b = da.on_new(kind, topic, interest)
+        if not b or b["size"] <= 0:
+            return b
+        gain = self.engine.gain
+        self.neuro.burst(DA_BURST_K * b["size"])
+        cpu = getattr(getattr(self, "decider", None), "cpu", None)
+        if cpu is not None and hasattr(cpu, "burst"):          # the neurons panel's dopamine reading moves too
+            cpu.burst(min(1.0, b["size"]))
+        self.brain.stimulate("reward", DA_REWARD * b["size"] * gain)
+        await self.broadcast({"type": "dopamine", "size": b["size"], "rpe": b["rpe"], "novelty": b["novelty"],
+                              "interest": b["interest"], "expect": b["expect"], "n": b["n"], "kind": kind,
+                              "habituation": b["habituation"], "why": b["label"], "label": DA_LABEL,
+                              "da": round(self.neuro.levels["DA"], 3)})
+        return b
+
+    def screens_view(self):
+        """GET /api/screens: the browser up/down and why, the last 10 pages with kind and host, today's share by kind,
+        the feed's notes, and the recent dopamine-like bursts."""
+        out = self.screens.public(display_ok)
+        out["dopamine"] = {"label": DA_LABEL, "bursts": [{"t": round(b["t"]), "size": b["size"], "kind": b["kind"],
+                                                         "n": b["n"]} for b in self.da_bursts.trace[-60:]],
+                           "da": round(self.neuro.levels["DA"], 3)}
+        out["sources"] = self.browsing_sources()
+        out["music"] = self.music_line()
+        return out
+
+    def browsing_view(self):
+        """GET /api/browsing: the pages shown, searches per source, accounts. #89: before the browser process has
+        reported (it starts only when he picks up a screen, so after a redeploy while he sleeps it had not), the
+        counts saved with the browsing log and the accounts read here, with synced: false; they were null."""
+        if not self.browser:
+            return {"on": False, "log": [], "searches": None, "accounts": None, "synced": False, "browser": None}
+        log = self.browser.log or self.browsing_state.get("log", [])
+        searches = getattr(self.browser, "searches", None)
+        accounts = getattr(self.browser, "accounts", None)
+        synced = searches is not None
+        if searches is None and (st := self.browsing_state.get("searches")):
+            searches = dict(search_sources.Limits(state=st).public(),
+                            variety=interests.Variety(state=st.get("variety")).public())
+        if accounts is None:
+            accounts = local_accounts()
+        sc = getattr(self, "screens", None)
+        return {"on": True, "log": log[-30:], "searches": searches, "accounts": accounts, "synced": synced,
+                "browser": sc.public()["browser"] if sc else None}
+
+    def browsing_sources(self):
+        """Search sources set aside after repeated failures (#89), from the browser or the saved state."""
+        sv = getattr(self.browser, "searches", None) if self.browser else None
+        if sv is None:
+            st = (getattr(self, "browsing_state", None) or {}).get("searches")
+            sv = search_sources.Limits(state=st).public() if st else {}
+        return {"blocked": [dict(v, source=k, until=screens.hhmm(v["until"]))
+                            for k, v in (sv.get("blocked") or {}).items()]}
+
+    def music_line(self):
+        """#89: what he is listening to, with the official Spotify embed, and where the tracks come from."""
+        m = getattr(self, "music", None)
+        if m is None:
+            return None
+        now = m.public(m.now)
+        api = None if not m.api else ("down: " + m.api_down if m.api_down else "ok")
+        src = ("Spotify keys not set: playing from the curated list" if api is None else
+               f"Spotify search {api}: playing from the curated list" if api != "ok" else "Spotify")
+        return {"now": {k: now.get(k) for k in ("title", "artist", "embed", "embed_height", "url", "why")} if now
+                else None, "source": src, "label": "Spotify (official embed)"}
 
     def video_drive(self, video):
         """While he watches a video: the change between the last two screenshots drives the visual network (no
@@ -875,7 +1080,8 @@ class Live:
     async def sync_browsing(self):
         s = await self.browser.state()
         if s.get("log") or not self.browsing_state.get("log"):
-            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches")}
+            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches"),
+                                   "visited": s.get("visited") or self.browsing_state.get("visited")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
@@ -1539,6 +1745,9 @@ async def main(args):
     if args.replay_real_session and list((HERE / "out" / "rest").glob("*.npz")):
         live.baseline = RealBaseline(live.brain.names, HERE / "out" / "rest")
         live.brain.use_slow_layer(False)          # the recording replaces the model's own slow activity
+    live.browse_wanted = bool(args.browse)
+    if not args.browse:
+        live.screens.set_off("the browser is turned off (BROWSE=0)")
     if args.browse:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN / ANTHROPIC_API_KEY for the eyes (never logged)
         if os.environ.get("BROWSE_SERVICE_URL"):  # Chromium as its own Railway service
@@ -1548,6 +1757,7 @@ async def main(args):
             live.browser = live.local_browser.client
         else:
             print("--browse: playwright is not installed, screens stay on Wikipedia reading", flush=True)
+            live.screens.set_off("playwright is not installed: no browser")
         live.eyes = Eyes(data_dir=data_dir, budget=mind_mod.eyes_budget(data_dir))   # one ledger with the mind
     if os.environ.get("MIND", "1") != "0":
         load_env(HERE / ".env")                   # ANTHROPIC_API_KEY / OPENROUTER_API_KEY (never logged)
@@ -1571,11 +1781,9 @@ async def main(args):
     app.router.add_get("/api/screen/{device}.jpg", screen_shot)
 
     async def browsing(request):                  # pages shown on his screens, newest last
-        log = (live.browser.log or live.browsing_state.get("log", [])) if live.browser else []
-        return web.json_response({"on": bool(live.browser), "log": log[-30:],
-                                  "searches": getattr(live.browser, "searches", None) if live.browser else None,
-                                  "accounts": getattr(live.browser, "accounts", None) if live.browser else None})
+        return web.json_response(live.browsing_view())
     app.router.add_get("/api/browsing", browsing)
+    app.router.add_get("/api/screens", lambda r: web.json_response(live.screens_view()))   # #89: always visible
 
     async def tastes(request):                    # what kinds of pages have paid off in the brain's response
         return web.json_response(live.tastes.top())
@@ -1665,7 +1873,7 @@ async def main(args):
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, args.host, args.port).start()
-    print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
+    print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else (args.mint or 'no coin yet: trade feed off')}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     live.life.can_watch = bool(live.browser)     # no browser: no videos at the desk
     tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades(),
@@ -1702,9 +1910,9 @@ async def main(args):
                 await live.browser.aclose()
 
 
-if __name__ == "__main__":
+def build_parser():
     p = argparse.ArgumentParser()
-    p.add_argument("--mint", default=os.environ.get("MINT", "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"))
+    p.add_argument("--mint", default=os.environ.get("MINT", "").strip())   # our token, set at launch; empty: no trade feed
     p.add_argument("--demo", action="store_true")
     p.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8765)))
     p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
@@ -1720,4 +1928,8 @@ if __name__ == "__main__":
     p.add_argument("--browse", action="store_true", default=os.environ.get("BROWSE") == "1",
                    help="real headless browser on the open web for his computer and phone screens (needs playwright)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
-    asyncio.run(main(p.parse_args()))
+    return p
+
+
+if __name__ == "__main__":
+    asyncio.run(main(build_parser().parse_args()))
