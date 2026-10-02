@@ -1,4 +1,4 @@
-# SUB-01 — handoff for new sessions (state on 2026-10-01)
+# SUB-01 — handoff for new sessions (state on 2026-10-02)
 
 Read this first. It replaces the local memory that cloud sessions cannot see.
 
@@ -123,6 +123,38 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   closed; sign-in walls left (never signed in). ~58 seeds across forums (read-only), news, museums, maps, recipes,
   music, science and video pages; Wikipedia's external sources and pagination / comment links keep a place among the
   40 links. Costs unchanged: 1 eyes call per page, 30/hour, $1.00/Tokyo day.
+
+## More of the internet (#56, PR `feature/more-search`)
+- `search_sources.py` (pure: parsers, routing, limits, robots, queries; no network): searches go to Bing (SafeSearch
+  strict), DuckDuckGo HTML (`kp=1`), Wikipedia search, Wikimedia Commons (images), arXiv listing search, Hacker News
+  (the Algolia API for results, its page for the screen), Open Library (subject pages + their JSON: robots.txt
+  disallows Open Library's `/search` and `/api`), YouTube results (Restricted Mode cookie as #53), and through their
+  own search box (#40's `site_search` rules) RecipeTin Eats and Science News (robots.txt rules out AP News', Just One
+  Cookbook's, King Arthur's and the Guardian's search pages). No keys, nothing paid.
+- `route(q)`: topic regexes pick the fitting sources (science → arXiv, book → Open Library, how-to → DuckDuckGo,
+  recipe → RecipeTin Eats, images → Commons, tech → HN, video → YouTube, "what is" → Wikipedia), the general engines
+  follow; the least used fitting source in the last hour goes first. `Limits`: ≤ 20 requests per host per rolling hour
+  (`PER_HOST_HOUR`; results pages, API calls and robots.txt all count), searches per source per Tokyo day, refusals
+  (robots / rate limit / no results). Saved with the browsing log (`browsing.json` → `searches`) and restored on a
+  browser restart. `Robots`: robots.txt fetched once a day per host through `Browser._fetch` (the guard: public
+  hosts only, every redirect re-checked); also checked before typing into any site's search box.
+- `browse.py`: `_search` tries the first 2 routed sources, then the old Wikipedia fallback. Results are parsed from
+  the page HTML (or the JSON API) and every URL / title / snippet passes `Browser.safe_results` (url_ok, login links,
+  display_ok, blocked words; videos also the chat filter) before the brain sees it. The card: "searched arXiv for
+  “sleep spindles” — from his reading notes"; `info.search` = {source, engine, query, from}; the visit log carries it.
+- Queries (`live_interest`, a one-line hook in `run_browse`): mind.next_interest() (weight 3, all 1–3 queries),
+  what he was reading (1), words taught in the last 2 days (1.5), favoured taste words (1); each through
+  `eyes.query_ok`. Chat wishes ("look up …", "what is …?", `search_sources.wish`) are searched as asked, filtered.
+  `_next` searches more often (search 48 %, link 40 %, seed 12 %; was 25/55/20).
+- `eyes.py`: a results page never costs a call: `result_options` builds the options from the result titles +
+  snippets (lexicon networks), one refined search from the results' words, back, leave. On content pages
+  `with_follow_ups` adds ≤ 2 searches from the page's own words (`follow_ups`: a name, "what is <term>?") in place
+  of the last options (still ≤ 6, leave kept). `analysis/search_budget.py` (model, uniform vote): searches/hour
+  31 → 52, eyes calls on results pages 9.1/h → 0, content pages with AI options 29 % → 45 %, cost unchanged
+  ($0.076 per desk-hour at the 30/h cap: $1.00 lasts ~13 desk-hours).
+- `/api/browsing` adds `searches` (per source today, per host last hour, refusals, the last 10 searches).
+- Fixtures: `tests/data/search/` (saved 2026-10-02); `tests/test_more_search.py`. A source's markup can change:
+  a parser that finds nothing makes the search fall through to the next source (and `refused_today` says so).
 
 ## YouTube and chess at the desk (#17, PR `feature/youtube-chess`)
 - `life.py`: two more activities chosen by needs, `watch_video` (boredom, visual response, a chat wish; only with a

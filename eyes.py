@@ -18,6 +18,11 @@ next_page, open_comments, open_video, play_video (muted), back, scroll, leave. N
   go to <data>/eyes_costs.jsonl.
 Without a key, over the cap, or when the answer is unusable, a local proposer lists options from the page's own links
 with the chat.py lexicon. The choice among the options is made by the brain model (brain_vote.py), never here.
+
+Search results pages (#56) never cost a call: their options are built here from the result titles and snippets
+(result_options), tagged with networks by the same lexicon, so the paid call is only spent on content pages. On a
+content page up to 2 follow-up searches made from the page's own words (search_sources.follow_ups: a name, an unknown
+term) join the options, so a chain can go search -> page -> refine -> search.
 """
 import json
 import os
@@ -30,6 +35,7 @@ from brain_sim import GROUPS
 from browse import BAD_HOST, BAD_WORDS, LOGIN_HREF, LOGIN_LINK, display_ok, url_ok, words
 from chat import blocked as chat_blocked, networks_for
 from research import BLOCK as TOPIC_BLOCK
+from search_sources import follow_ups, interest_text
 from state_io import append_jsonl
 
 ACTIONS = ("click", "search", "site_search", "next_page", "open_comments", "back", "open_video", "play_video", "scroll",
@@ -40,6 +46,8 @@ NETWORKS = tuple(GROUPS) + ("language",)
 MAX_LINKS = 40
 MAX_OPTIONS = 6
 MIN_OPTIONS = 3
+MAX_FOLLOW_UPS = 2                                          # follow-up searches from the page's own words
+RESULT_OPTIONS = 4                                          # results offered from a search results page
 MAX_CALLS_PER_HOUR = int(os.environ.get("BRAIN_DECIDES_MAX_CALLS_PER_HOUR") or 30)
 MAX_USD_PER_DAY = float(os.environ.get("BRAIN_DECIDES_MAX_USD_PER_DAY") or 1.00)   # hard cap per Tokyo day
 # Default: Claude Haiku 4.5 (listing 3-5 safe options is a small task; the brain model makes the decision)
@@ -409,6 +417,7 @@ def local_options(page, interest=None, rng=None, n=MAX_OPTIONS):
     """Options without an AI: the page's most prominent links that match his interests, its comment thread and next
     page, a search (on the site's own box when it has one), scroll, back, leave."""
     rng = rng or random.Random(0)
+    interest = interest_text(interest) or None
     want = set(words(interest or "")) | set(words(page.get("title", "")))
     scored, special = [], []
     for l in page.get("links", []):
@@ -444,6 +453,49 @@ def local_options(page, interest=None, rng=None, n=MAX_OPTIONS):
     return (out[:n - 1] + leave)[:n]
 
 
+def is_results_page(page):
+    return page.get("kind") == "search" and any(l.get("result") for l in page.get("links", []))
+
+
+def result_options(page, interest=None, rng=None):
+    """Options for a search results page, without an AI: the best results (rank, words shared with his interest),
+    labelled with their titles and tagged with networks from title + snippet (the chat.py lexicon); one refined
+    search from the results' own words; back; leave."""
+    rng = rng or random.Random(0)
+    want = set(words(interest_text(interest))) | set(words(page.get("title", "")))
+    scored = []
+    for rank, l in enumerate(l for l in page.get("links", []) if l.get("result")):
+        text = f"{l['text']} {l.get('snippet', '')}"
+        s = 1.0 / (1 + 0.35 * rank) + 0.4 * len(want & set(words(text))) + 0.2 * rng.random()
+        scored.append((s, l, text))
+    scored.sort(key=lambda x: -x[0])
+    items = [{"action": "open_video" if l.get("video") else "click", "target": l["id"], "label": l["text"],
+              "networks": clean_networks(None, text)} for _, l, text in scored[:RESULT_OPTIONS]]
+    q = (page.get("search") or {}).get("query", "")
+    for f in follow_ups(page, n=1, query_ok=query_ok, seen=[q]):
+        items.append({"action": "search", "target": f["query"], "label": f["label"],
+                      "networks": clean_networks(None, f["query"])})
+    if page.get("can_back"):
+        items.append({"action": "back", "label": "go back"})
+    out = validate(items, page)
+    leave = validate([{"action": "leave", "label": "wander somewhere else"}], page)
+    return (out[:MAX_OPTIONS - 1] + leave)[:MAX_OPTIONS]
+
+
+def with_follow_ups(opts, page, n=MAX_FOLLOW_UPS):
+    """Up to `n` follow-up searches from the page's own words, in place of the last non-leave options (the total
+    stays at most MAX_OPTIONS; the leave option stays)."""
+    have = [o["target"] for o in opts if o["action"] in ("search", "site_search") and o.get("target")]
+    fs = validate([{"action": "search", "target": f["query"], "label": f["label"]}
+                   for f in follow_ups(page, n=n, query_ok=query_ok, seen=have)], page)
+    fs = [f for f in fs if f["target"] not in have][:n]
+    if not fs:
+        return opts
+    rest = [o for o in opts if o["action"] != "leave"]
+    leave = [o for o in opts if o["action"] == "leave"]
+    return rest[:MAX_OPTIONS - len(leave) - len(fs)] + fs + leave
+
+
 class Eyes:
     def __init__(self, provider=None, budget=None, data_dir=None):
         self.provider = provider if provider is not None else default_provider()
@@ -455,6 +507,9 @@ class Eyes:
         meta = {"source": "local", "provider": None}
         url = page.get("url", "")
         opts = []
+        if is_results_page(page):                                 # #56: no paid call on a results page
+            meta["why_local"] = "search results: options from the result titles and snippets (no AI call)"
+            return result_options(page, interest, rng), meta
         if url in self.asked:                                     # same page again: no new call, re-checked against
             opts = revalidate(self.asked[url], page)              # the links on the page as it is now
             meta = {"source": "ai (same page, no new call)", "provider": self.provider.name}
@@ -483,4 +538,6 @@ class Eyes:
         if opts and not any(o["action"] == "leave" for o in opts):   # he can always leave: the vote decides
             leave = validate([{"action": "leave", "label": "wander somewhere else"}], page)
             opts = opts[:MAX_OPTIONS - 1] + leave
+        if opts:
+            opts = with_follow_ups(opts, page)
         return opts, meta
