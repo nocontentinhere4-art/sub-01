@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 02:00 UTC** (pass 11). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 02:50 UTC** (pass 12). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Merged on 2026-10-02:** #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
@@ -19,7 +19,8 @@ Owner actions now:
   - #21 atomic writes: PR #24 ready for the owner;
   - room movement fix (`fix/room-bed-phone`): he glides in the destination pose straight through the furniture
     instead of walking, plus the bed-phone pose and the disclaimer overlap;
-- Live QA: owner added `SUB01_SITE_PASSWORD` to the SUB-01 environment; QA session `session_01G8spBAYkuUzx8L8Q1h6Wja` started at 01:47.
+- Live QA: blocked. `SUB01_SITE_PASSWORD` was added to Railway's variables, but sessions read the **Claude** SUB-01 environment's variables. The Railway copy is unused and can be deleted.
+- **Railway credit: "24 days or $4.17 left"** (owner's screenshot, 2026-10-02). The service stops when it runs out; move to a paid plan before launch.
 
 Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
@@ -32,7 +33,7 @@ Who is on what (cloud sessions, 2026-10-02):
 
 | PR | status | why it needs the owner |
 |---|---|---|
-| #24 atomic state-file writes | **READY TO MERGE (needs owner)**: 271 tests; proven fix (`main` crashes on a torn `life.json`, this PR starts and keeps the bad file aside) | touches `live_server.py`, `sleep.py`, `Dockerfile` |
+| #24 atomic state-file writes | **READY TO MERGE (needs owner)** on `877d7fe`, CI green: 271 tests; proven fix (`main` crashes on a torn `life.json`, this PR starts and keeps the bad file aside) | touches `live_server.py`, `sleep.py`, `Dockerfile` |
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -168,4 +169,5 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - [ ] X account ready. Posts follow the same wording rules (no consciousness claims, no price talk).
 - [ ] Secrets set on Railway only: `SITE_PASSWORD`, `REPLICATE_API_TOKEN`, `RUNPOD_API_KEY`, `SUB01_POD_SECRET`,
       `OPENROUTER_API_KEY` (set), optional `ANTHROPIC_API_KEY`; later `SUB01_ADMIN_TOKEN`.
+- [ ] Railway on a paid plan (trial credit showed 24 days / $4.17 left on 2026-10-02).
 - [ ] Launch day: remove `SITE_PASSWORD`; watch `/api/health` and spend for the first 24 h.
