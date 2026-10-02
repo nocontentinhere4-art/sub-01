@@ -212,8 +212,8 @@ const OLD = {};                                 // the old rig's rest (local TRS
 for (const n of (await io.read(path.join(WEB, "boy.glb"))).getRoot().listNodes())
   if (REF[n.getName()]) OLD[n.getName()] = {parent: REF[n.getName()].parent, p: V(n.getTranslation()), q: Q(n.getRotation()), s: V(n.getScale())};
 const NEW = Object.fromEntries(order.map(n => { const {p, q} = localOf(n); return [n, {parent: SK[n].parent, p, q, s: new THREE.Vector3(1, 1, 1)}]; }));
-function fk(locals, channels, name) {
-  const root = new THREE.Object3D(), b = {}; root.scale.setScalar(0.01);
+function fk(locals, channels, name, scale = 0.01) {
+  const root = new THREE.Object3D(), b = {}; root.scale.setScalar(scale);
   for (const [n, L] of Object.entries(locals)) { const o = b[n] = new THREE.Object3D(); o.name = n; o.position.copy(L.p); o.quaternion.copy(L.q); o.scale.copy(L.s); }
   for (const [n, L] of Object.entries(locals)) (L.parent ? b[L.parent] : root).add(b[n]);
   const tracks = channels.filter(c => b[c.node] && c.path !== "weights").map(c => {
@@ -244,6 +244,119 @@ function retarget(clip) {
   if (dropped.length) console.log(`  ${clip.name}: animated scale dropped (${dropped.join(", ")})`);
   return {name: clip.name, channels: out};
 }
+
+// ------------------------------------------------------------------ Quaternius' Universal Animation Library (CC0)
+// Its rig (UE-mannequin style, T-pose, facing +z, every bone bending about its local +x) is mapped onto ours: our skeleton
+// is posed into its T-pose bone by bone (limb directions, then the elbow and knee hinges and the palms, like
+// build_boy.py does with the old rig), which gives each bone a fixed offset; a UAL frame's world rotations times the
+// offsets are ours. The hips follow the UAL pelvis (scaled by leg length) with the feet held at the same height above
+// their rest. In place: the Standard pack has no root motion.
+const UAL_FILE = process.env.UAL || "/opt/ual/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb";
+const UMAP = {pelvis: "Hips", spine_01: "Spine02", spine_02: "Spine01", spine_03: "Spine", neck_01: "neck", Head: "Head"};
+for (const [s_, S_] of [["l", "Left"], ["r", "Right"]]) {
+  Object.assign(UMAP, {[`clavicle_${s_}`]: `${S_}Shoulder`, [`upperarm_${s_}`]: `${S_}Arm`, [`lowerarm_${s_}`]: `${S_}ForeArm`, [`hand_${s_}`]: `${S_}Hand`,
+    [`thigh_${s_}`]: `${S_}UpLeg`, [`calf_${s_}`]: `${S_}Leg`, [`foot_${s_}`]: `${S_}Foot`, [`ball_${s_}`]: `${S_}ToeBase`});
+  for (const [f, F] of [["thumb", "Thumb"], ["index", "Index"], ["middle", "Middle"], ["ring", "Ring"], ["pinky", "Pinky"]])
+    for (const k of [1, 2, 3]) UMAP[`${f}_0${k}_${s_}`] = `${S_}Hand${F}${k}`;
+}
+const MINE = Object.fromEntries(Object.entries(UMAP).map(([u, m]) => [m, u]));
+// the child joint that gives each bone its direction (ours, UAL's)
+const CHILD = {Spine02: "Spine01", Spine01: "Spine", Spine: "neck", neck: "Head"};
+for (const S_ of ["Left", "Right"]) {
+  Object.assign(CHILD, {[`${S_}Shoulder`]: `${S_}Arm`, [`${S_}Arm`]: `${S_}ForeArm`, [`${S_}ForeArm`]: `${S_}Hand`, [`${S_}Hand`]: `${S_}HandMiddle1`,
+    [`${S_}UpLeg`]: `${S_}Leg`, [`${S_}Leg`]: `${S_}Foot`, [`${S_}Foot`]: `${S_}ToeBase`});
+  for (const F of ["Thumb", "Index", "Middle", "Ring", "Pinky"]) { CHILD[`${S_}Hand${F}1`] = `${S_}Hand${F}2`; CHILD[`${S_}Hand${F}2`] = `${S_}Hand${F}3`; }
+}
+let UAL = null;
+async function loadUAL() {
+  if (!fs.existsSync(UAL_FILE)) { console.warn("  no UAL file:", UAL_FILE); return null; }
+  const ud = await io.read(UAL_FILE), ur = ud.getRoot(), skin = ur.listSkins()[0], joints = skin.listJoints(), jn = new Set(joints.map(j => j.getName()));
+  const U = {};
+  for (const j of joints) U[j.getName()] = {parent: jn.has(j.getParentNode()?.getName()) ? j.getParentNode().getName() : null,
+    p: V(j.getTranslation()), q: Q(j.getRotation()), s: V(j.getScale())};
+  const rest = fk(U, [], "rest", 1).at(0), W = {};
+  for (const n of Object.keys(U)) W[n] = {p: rest[n].getWorldPosition(new THREE.Vector3()), q: rest[n].getWorldQuaternion(new THREE.Quaternion())};
+  // UAL's palms, measured on its mannequin's skin like ours
+  const palms = {};
+  for (const [s_, S_] of [["l", "Left"], ["r", "Right"]]) {
+    const ids = new Set(joints.map((j, i) => /^(hand|index|middle|ring|pinky|thumb)_/.test(j.getName()) && j.getName().endsWith("_" + s_) ? i : -1).filter(i => i >= 0));
+    const inv = new THREE.Matrix4().fromArray(skin.getInverseBindMatrices().getElement(joints.findIndex(j => j.getName() === "hand_" + s_), [])), pts = [];
+    for (const m of ur.listMeshes()) for (const prim of m.listPrimitives()) {
+      const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), Wt = prim.getAttribute("WEIGHTS_0"); if (!J) continue;
+      for (let i = 0, j = [], w = [], q = []; i < P.getCount(); i++) { J.getElement(i, j); Wt.getElement(i, w); let sum = 0; for (let k = 0; k < 4; k++) if (ids.has(j[k])) sum += w[k];
+        if (sum > 0.9) pts.push(new THREE.Vector3(...P.getElement(i, q)).applyMatrix4(inv)); }
+    }
+    palms[S_] = palmOf(pts).applyQuaternion(W["hand_" + s_].q);
+  }
+  const anims = Object.fromEntries(ur.listAnimations().map(a => [a.getName(), a]));
+  return {U, W, palms, anims};
+}
+// our skeleton in UAL's T-pose: world rotations per bone
+function canonical(ual) {
+  const b = fk(NEW, [], "canon").at(0), W = ual.W, wp = n => b[n].getWorldPosition(new THREE.Vector3()), wq = n => b[n].getWorldQuaternion(new THREE.Quaternion());
+  const turn = (n, R) => { const pq = b[n].parent.getWorldQuaternion(new THREE.Quaternion()); b[n].quaternion.copy(pq.invert().multiply(R.clone().multiply(wq(n)))); b[n].updateMatrixWorld(true); };
+  const aim = n => { const c = CHILD[n]; if (!c || !MINE[n] || !MINE[c]) return;
+    const mine = wp(c).sub(wp(n)).normalize(), theirs = W[MINE[c]].p.clone().sub(W[MINE[n]].p).normalize();
+    turn(n, new THREE.Quaternion().setFromUnitVectors(mine, theirs)); };
+  const twist = (n, have, want) => { const a = wp(CHILD[n]).sub(wp(n)).normalize();
+    const h = have.clone().addScaledVector(a, -have.dot(a)).normalize(), w = want.clone().addScaledVector(a, -want.dot(a)).normalize();
+    turn(n, new THREE.Quaternion().setFromAxisAngle(a, Math.atan2(a.dot(new THREE.Vector3().crossVectors(h, w)), h.dot(w)))); };
+  const xOf = n => new THREE.Vector3(1, 0, 0).applyQuaternion(W[n].q);       // UAL's hinge (flex about +x)
+  const HINGE_LOCAL = {ForeArm: {Left: [-0.8, 0, 0.6], Right: [-0.8, 0, -0.6]}, Leg: {Left: [1, 0, 0], Right: [1, 0, 0]}};
+  const hingeOf = (n, side, kind) => new THREE.Vector3(...HINGE_LOCAL[kind][side]).normalize().applyQuaternion(wq(n));
+  for (const n of ["Spine02", "Spine01", "Spine", "neck"]) aim(n);
+  for (const S_ of ["Left", "Right"]) {
+    const s_ = S_[0].toLowerCase();
+    aim(`${S_}Shoulder`); aim(`${S_}Arm`); aim(`${S_}ForeArm`);
+    twist(`${S_}Arm`, hingeOf(`${S_}ForeArm`, S_, "ForeArm"), xOf(`lowerarm_${s_}`)); aim(`${S_}ForeArm`);
+    aim(`${S_}Hand`);
+    twist(`${S_}Hand`, HANDF[S_].Z.clone().applyQuaternion(wq(`${S_}Hand`)), ual.palms[S_]);
+    for (const F of ["Thumb", "Index", "Middle", "Ring", "Pinky"]) { aim(`${S_}Hand${F}1`); aim(`${S_}Hand${F}2`); }
+    aim(`${S_}UpLeg`); aim(`${S_}Leg`);
+    twist(`${S_}UpLeg`, hingeOf(`${S_}Leg`, S_, "Leg"), xOf(`calf_${s_}`)); aim(`${S_}Leg`);
+    aim(`${S_}Foot`);
+  }
+  const off = {};
+  for (const [m, u] of Object.entries(MINE)) off[m] = W[u].q.clone().invert().multiply(wq(m));
+  return off;
+}
+// a UAL clip on our skeleton, resampled at 30 fps, every bone keyed
+function fromUAL(ual, off, name, as, {loop = true} = {}) {
+  const a = ual.anims[name], ch = [];
+  for (const c of a.listChannels()) { const sm = c.getSampler(), acc = x => { const o = [], e = []; for (let i = 0; i < x.getCount(); i++) o.push(...x.getElement(i, e)); return o; };
+    ch.push({node: c.getTargetNode().getName(), path: c.getTargetPath(), times: acc(sm.getInput()), values: acc(sm.getOutput())}); }
+  const dur = Math.max(...ch.map(c => c.times[c.times.length - 1])), n = Math.max(2, Math.round(dur * 30) + 1), times = [...Array(n)].map((_, i) => i * dur / (n - 1));
+  const u = fk(ual.U, ch, name, 1), mine = fk(NEW, [], as);
+  const uRestAnkle = Math.min(ual.W.foot_l.p.y, ual.W.foot_r.p.y), uRestPelvis = ual.W.pelvis.p;
+  const k = (SK.Hips.pos.y - newRestAnkle) / (uRestPelvis.y - uRestAnkle);   // leg-length ratio
+  const outQ = Object.fromEntries(order.map(b => [b, []])), outT = [];
+  const armInv = new THREE.Matrix4().makeScale(100, 100, 100);
+  for (const t of times) {
+    const ub = u.at(t), mb = mine.at(0);
+    for (const b of order) {                       // parents first: our world rotation = UAL world x offset
+      const o = mb[b];
+      if (MINE[b]) { const uq = ub[MINE[b]].getWorldQuaternion(new THREE.Quaternion()).multiply(off[b]);
+        const pq = o.parent.getWorldQuaternion(new THREE.Quaternion()); o.quaternion.copy(pq.invert().multiply(uq)); }
+      else { const L = NEW[b]; o.quaternion.copy(L.q); }
+      o.updateMatrixWorld(true);
+      outQ[b].push(...o.quaternion.toArray());
+    }
+    // hips: UAL pelvis offset from its rest, scaled; then the lower ankle held as far above its rest as UAL's
+    const up = ub.pelvis.getWorldPosition(new THREE.Vector3()).sub(uRestPelvis).multiplyScalar(k);
+    const hipsW = SK.Hips.pos.clone().add(up);
+    mb.Hips.position.copy(hipsW.clone().applyMatrix4(armInv)); mb.Hips.updateMatrixWorld(true);
+    const dU = Math.min(ub.foot_l.getWorldPosition(new THREE.Vector3()).y, ub.foot_r.getWorldPosition(new THREE.Vector3()).y) - uRestAnkle;
+    const dM = ankle(mb) - newRestAnkle;
+    hipsW.y += dU * k - dM;
+    outT.push(...hipsW.applyMatrix4(armInv).toArray());
+  }
+  const channels = order.map(b => ({node: b, path: "rotation", times, values: outQ[b]}));
+  channels.push({node: "Hips", path: "translation", times, values: outT});
+  return {name: as, channels, duration: dur, hips0: outT.slice(0, 3).map(v => v / CM)};
+}
+// the room's names (#63's list) for what UAL Standard has
+const UAL_CLIPS = {stand_idle: "Idle_Loop", walk: "Walk_Loop", sit_down_chair: "Sitting_Enter", stand_up_chair: "Sitting_Exit",
+  sit_idle_upright: "Sitting_Idle_Loop", take_item: "PickUp_Table", door_open_pull: "Interact"};
 
 // finger poses. A pose: per finger the flex of its three joints (deg, + curls towards the palm) and its spread at the
 // knuckle (deg, + away from the middle finger); the thumb: its base turned about the hand's own axes (x across the
@@ -325,6 +438,20 @@ for (const f of clipFiles) {
   const {nodes: ns} = buildSkeleton(d, sc);
   for (const [name, spec] of Object.entries(POSES)) addClip(d, ns, name, poseChannels(spec));
   await finish(d, path.join(WEB, "boy2_hands.glb"));
+}
+UAL = await loadUAL();
+if (UAL) {
+  // all the new motion in one file, one animation per name of the room's list
+  const off = canonical(UAL), rows = [];
+  const d = new (await import("@gltf-transform/core")).Document(); d.createBuffer(); const sc = d.createScene();
+  const {nodes: ns} = buildSkeleton(d, sc);
+  for (const [as, name] of Object.entries(UAL_CLIPS)) {
+    if (!UAL.anims[name]) { console.warn("  UAL has no", name); continue; }
+    const r = fromUAL(UAL, off, name, as); addClip(d, ns, r.name, r.channels);
+    rows.push(`  ${as} <- UAL ${name}: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m`);
+  }
+  await finish(d, path.join(WEB, "boy2_motion.glb"));
+  console.log("boy2_motion.glb:\n" + rows.join("\n"));
 }
 const tris = mesh.listPrimitives().reduce((s, p) => s + p.getIndices().getCount() / 3, 0);
 console.log(`boy2: ${tris} triangles, ${mesh.listPrimitives().length} materials, ${joints.length} joints`);

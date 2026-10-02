@@ -80,6 +80,8 @@ async function makeChar(kind, x) {
     try { c.clips[name] = (await load(`${pre}_${f}.glb`)).animations[0]; } catch (e) { console.warn(name, e); }
   }));
   if (kind === "new") { c.x = boy2Extras(g, c.mixer); await c.x.loadHands(load); c.hands = Object.fromEntries(g2names.map(n => [n, true])); }
+  // the new motion set (boy2_motion.glb: the room's clip names)
+  if (kind === "new") try { for (const a of (await load("room/boy2_motion.glb")).animations) c.clips["m:" + a.name] = a; } catch (e) {}
   for (const [n, clip] of Object.entries(c.clips)) c.actions[n] = c.mixer.clipAction(clip);
   chars.push(c); return c;
 }
@@ -111,7 +113,8 @@ let clipName = Q.get("clip") || "idle", poseName = Q.get("pose") || null, paused
 function buildUI() {
   const ui = $("ui"); ui.innerHTML = "";
   const btn = (label, on, fn) => { const b = document.createElement("button"); b.textContent = label; b.className = on ? "on" : ""; b.onclick = fn; ui.appendChild(b); };
-  for (const n of Object.keys(CLIPS)) btn(n, n === clipName, () => { clipName = n; for (const c of chars) play(c, n); buildUI(); });
+  const names = [...new Set(chars.flatMap(c => Object.keys(c.clips)))].filter(n => n !== "blink");
+  for (const n of names) btn(n, n === clipName, () => { clipName = n; for (const c of chars) play(c, n); buildUI(); });
   ui.appendChild(Object.assign(document.createElement("div"), {className: "sep"}));
   const nc = chars.find(c => c.kind === "new");
   if (nc) for (const n of g2names) btn(n.replace("hand_", ""), nc.x.poseName === n, () => { poseName = n; nc.handName = n; hand(nc, n); buildUI(); });
