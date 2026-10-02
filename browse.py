@@ -10,6 +10,11 @@ pages and scrolls. Because the screens are shown live to everyone, a guard skips
 adult, gore, self-harm, extremism and drug sites/pages, gambling, and crypto trading sites (no buy pressure). Requests
 to private or internal addresses (localhost, cloud metadata, LAN) are blocked for every resource, not only pages.
 
+Brain decides (`decide=True`, the default in browse_service.py): when he has finished a page, step() does not move on
+by itself; it returns the page (title, visible text, up to 40 safe links) so that the live server can have an AI list
+options (eyes.py) and the brain model pick one (brain_vote.py); act() then carries the chosen action out. Bot checks
+(CAPTCHA, "unusual traffic") are never solved: such pages are left.
+
 Optional: needs `pip install playwright` + a Chromium (`playwright install --with-deps chromium`). Without it the
 server runs as before (Wikipedia reading only).
 """
@@ -26,6 +31,15 @@ KEEP = 60                              # visits kept in the log
 SCROLL_EVERY_S = 7.0                   # seconds between scroll + screenshot on a page
 SCROLLS = (3, 7)                       # scrolls per page before moving on
 NAV_TIMEOUT_MS = 20000
+DECIDE_WAIT_S = 90                     # waiting longer than this for the brain's choice: wander on as before
+PAGE_LINKS = 40
+VIDEO_LINK = re.compile(r"(youtube\.com/watch|youtu\.be/|vimeo\.com/\d|nicovideo\.jp/watch|dailymotion\.com/video|"
+                        r"/videos?/|/watch\b)", re.I)
+LINKS_JS = """() => [...document.querySelectorAll('a[href]')].map(a => {
+  const r = a.getBoundingClientRect(), cs = getComputedStyle(a);
+  return [a.href, (a.innerText || a.title || a.getAttribute('aria-label') || '').trim().slice(0, 120), r.width * r.height,
+          r.bottom > 0 && r.top < innerHeight * 3 && cs.visibility !== 'hidden' && cs.display !== 'none'];
+})"""
 DESK = {"viewport": {"width": 1280, "height": 800}, "device_scale_factor": 1}
 PHONE = {"viewport": {"width": 390, "height": 844}, "device_scale_factor": 2, "is_mobile": True, "has_touch": True,
          "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -66,6 +80,22 @@ WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], 
     if (f.closest('.grecaptcha-badge')) return false;
     const r = f.getBoundingClientRect(), cs = getComputedStyle(f);
     return r.width >= 200 && r.height >= 60 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.1; })"""
+# links whose URL path leads to an account, a form or a purchase, whatever their text says
+LOGIN_HREF = re.compile(r"/(log-?in|sign-?in|sign-?up|signin|signup|register|join|account|my-?account|checkout|cart|"
+                        r"basket|subscribe|donate|password|auth|oauth2?|sso)(/|\?|$|\.)", re.I)
+
+
+def display_ok(text):
+    """Text that may be shown on the public screen card: no links, addresses, tickers, money, slurs or blocked
+    topics (the chat filter's rules, without its phone-number rule, which catches year ranges)."""
+    import chat
+    from research import BLOCK as TOPIC_BLOCK
+    t = text or ""
+    return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.TICKER.search(t)
+                or chat.EMAIL.search(t) or chat.MONEY.search(t) or chat.SLUR_RE.search(chat.normalise(t))
+                or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+
+
 LOGIN_LINK = re.compile(r"log ?in|sign ?(in|up)|register|account|cart|checkout|basket|subscribe|donate|password|"
                         r"privacy|cookie|terms|legal|imprint|impressum|careers|advertis", re.I)
 SKIP_EXT = re.compile(r"\.(pdf|zip|rar|7z|exe|dmg|apk|mp3|mp4|mov|avi|mkv|iso|tar|gz|docx?|xlsx?|pptx?)(\?|$)", re.I)
@@ -185,6 +215,9 @@ class Screen:
         self.scrolls_left = 0
         self.next_at = 0.0
         self.pending_link = None                            # result to open next (after a search page)
+        self.history = []                                   # urls shown on this screen, newest last (for "back")
+        self.awaiting = None                                # page handed to the brain for a decision
+        self.awaiting_since = 0.0
 
     def status(self):
         return dict(self.info, id=self.shot_id, device=self.name) if self.info and self.shot else None
@@ -193,8 +226,9 @@ class Screen:
 class Browser:
     """Drives both screens. `step(device, ...)` is called by the live server every couple of seconds."""
 
-    def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False):
+    def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False, decide=False):
         s = state or {}
+        self.decide = decide                                # True: the brain picks the next action (act())
         self.log = s.get("log", [])                         # visits shown: [{t, device, title, url, host, why}]
         self.used = set(s.get("used", []))                  # chat texts already searched
         self.rng = rng or random.Random()
@@ -206,6 +240,7 @@ class Browser:
         self.guard = Guard(via_proxy=bool(self.proxy))
         self.lock = asyncio.Lock()
         self.failures = 0
+        self.last_skip = None                               # why the last page was left unshown (guard, bot wall...)
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:]}
@@ -242,6 +277,7 @@ class Browser:
             self.browser = await self.pw.chromium.launch(**kw)
             for sc in self.screens.values():
                 sc.ctx = sc.page = None
+                sc.info, sc.history, sc.awaiting, sc.scrolls_left = None, [], None, 0
         sc = self.screens[device]
         if sc.ctx is None:
             opts = dict(DESK if device == "desk" else PHONE, accept_downloads=False, java_script_enabled=True,
@@ -267,6 +303,7 @@ class Browser:
                     pass
                 sc.ctx = sc.page = None
                 sc.scrolls_left, sc.next_at, sc.pending_link = 0, 0.0, None
+                sc.info, sc.history, sc.awaiting = None, [], None
         if device is None and self.browser is not None:
             try:
                 await self.browser.close()
@@ -289,11 +326,26 @@ class Browser:
         async with self.lock:
             try:
                 sc = await self._ensure(device)
-                if sc.scrolls_left > 0 and sc.info:
+                moved_on = False
+                if self.decide and sc.awaiting is not None:      # the brain is choosing: hold the page
+                    if not self._fresh_chat(heard) and time.time() - sc.awaiting_since < DECIDE_WAIT_S:
+                        return None
+                    sc.awaiting, moved_on = None, True          # a new chat message, or no answer: move on
+                if sc.scrolls_left > 0 and sc.info and not moved_on:
                     sc.scrolls_left -= 1
                     await sc.page.evaluate("() => window.scrollBy({top: innerHeight * 0.7, behavior: 'smooth'})")
                     await sc.page.wait_for_timeout(900)
                     if not await self._shoot(sc):                   # turned into a bot check: left
+                        sc.next_at = time.time() + 15
+                        return None
+                elif (self.decide and sc.info and sc.info.get("kind") in ("page", "search") and sc.page is not None
+                      and sc.page.url.startswith("http") and not self._fresh_chat(heard) and not moved_on):
+                    page = await self.page_info(sc)
+                    if page["links"] or page["can_back"]:
+                        sc.awaiting, sc.awaiting_since = page, time.time()
+                        return {"decide": page, "device": sc.name}
+                    ok = await self._next(sc, list(heard), interest)
+                    if not ok:
                         sc.next_at = time.time() + 15
                         return None
                 else:
@@ -311,6 +363,78 @@ class Browser:
                 dead = re.search(r"Connection closed|Target crashed|Browser has been closed|driver", repr(e))
                 if dead or self.failures >= 3:                 # crashed renderer or driver: restart everything cleanly
                     await self.close()
+                return None
+
+    def _fresh_chat(self, heard):
+        return any(text not in self.used for text in list(heard)[-5:])
+
+    async def page_info(self, sc):
+        """What the eyes may see: title, visible text and up to PAGE_LINKS links that pass the guard (numbered)."""
+        page = sc.page
+        text = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 6000)")
+        raw = await page.evaluate(LINKS_JS)
+        cur = urllib.parse.urlsplit(page.url)
+        search = sc.info.get("kind") == "search"
+        seen, cand = set(), []
+        for href, label, area, visible in raw:
+            label = " ".join(label.split())
+            if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
+                    or not display_ok(label) or href in seen):
+                continue
+            u = urllib.parse.urlsplit(href)
+            if (u.netloc, u.path) == (cur.netloc, cur.path) or (search and u.netloc == cur.netloc):
+                continue                                        # same page; on a results page only the results
+            seen.add(href)
+            cand.append((bool(visible), area, href, label, u.hostname or ""))
+        cand.sort(key=lambda c: (not c[0], -c[1]))
+        links = [{"id": f"L{i + 1}", "href": h, "text": t[:100], "host": host.removeprefix("www."), "area": round(a),
+                  "video": bool(VIDEO_LINK.search(h))} for i, (_, a, h, t, host) in enumerate(cand[:PAGE_LINKS])]
+        return {"device": sc.name, "url": page.url, "title": sc.info.get("title", ""), "host": sc.info.get("host", ""),
+                "kind": sc.info.get("kind"), "text": " ".join(text.split())[:1500], "links": links,
+                "can_back": len(sc.history) >= 2}
+
+    async def act(self, device, action, why="", interest=None):
+        """Carry out the action the brain chose for the page it was given; returns the new screen status or None."""
+        sc = self.screens[device]
+        kind, why = action.get("action"), why or "his brain picked it"
+        async with self.lock:
+            page, sc.awaiting = sc.awaiting, None                  # claimed under the lock (no race with step)
+            if page is None or sc.page is None:
+                return None
+            try:
+                ok = False
+                self.last_skip = None
+                if kind in ("click", "open_video"):
+                    want = action.get("href")                       # matched by URL: link ids are per capture
+                    href = next((l["href"] for l in page["links"] if l["href"] == want), None)
+                    ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
+                elif kind == "search" and action.get("target"):
+                    from eyes import query_ok                       # checked again here, in the browser's process
+                    q = query_ok(action["target"])
+                    ok = bool(q) and await self._search(sc, q, f"searched “{q}” — {why}")
+                elif kind == "back" and len(sc.history) >= 2:
+                    saved = list(sc.history)
+                    sc.history = saved[:-2]
+                    ok = await self._open(sc, saved[-2], f"went back — {why}", "page")
+                    if not ok:
+                        sc.history = saved
+                elif kind == "scroll":
+                    sc.scrolls_left = self.rng.randint(1, 3)
+                    if sc.info:
+                        sc.info = dict(sc.info, why=f"kept reading — {why}")
+                    ok = True
+                if not ok:                                      # leave, or the chosen page could not be shown
+                    missed = None
+                    if kind in ("click", "open_video", "search", "back"):
+                        missed = f"could not show “{action.get('label', '')}” ({self.last_skip or 'refused'})"
+                    ok = await self._next(sc, [], interest)
+                    if ok and missed and sc.info:               # the card must not pretend the choice was shown
+                        sc.info = dict(sc.info, why=f"{missed}; {sc.info.get('why', '')}", missed=missed)
+                sc.next_at = time.time() + SCROLL_EVERY_S
+                self.failures = 0
+                return sc.status() if ok else None
+            except Exception as e:
+                print(f"browse ({device}) act:", repr(e)[:160], flush=True)
                 return None
 
     async def _next(self, sc, heard, interest):
@@ -364,7 +488,7 @@ class Browser:
             sc.scrolls_left = self.rng.randint(1, 3)
         else:
             sc.scrolls_left = 0
-        if results:
+        if results and not self.decide:                     # brain decides: it picks among the results itself
             u, t = results[min(len(results) - 1, int(self.rng.random() ** 2 * 4))]   # mostly the top results
             sc.pending_link = (u, f"searched “{q[:40]}”, opened “{t[:50]}”")
         return True
@@ -401,6 +525,7 @@ class Browser:
         except Exception as e:
             if "Timeout" not in repr(e):
                 print(f"browse: could not open {url[:80]}: {repr(e)[:100]}", flush=True)
+                self.last_skip = "did not load"
                 return await self._leave(sc)
         await page.add_style_tag(content=HIDE_BANNERS)
         await page.wait_for_timeout(2200)
@@ -413,6 +538,7 @@ class Browser:
                   else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body) else None)
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
+            self.last_skip = reason
             return await self._leave(sc)
         host = urllib.parse.urlsplit(page.url).hostname or ""
         sc.info = {"title": (title or page_title or host)[:140], "url": page.url, "host": host.removeprefix("www."),
@@ -442,6 +568,8 @@ class Browser:
         i = sc.info
         self.log = (self.log + [{"t": i["t"], "device": sc.name, "title": i["title"], "url": i["url"], "host": i["host"],
                                  "why": i["why"]}])[-KEEP:]
+        if not sc.history or sc.history[-1] != i["url"]:
+            sc.history = (sc.history + [i["url"]])[-20:]
         return True
 
     async def _leave(self, sc):
