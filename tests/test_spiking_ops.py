@@ -775,7 +775,7 @@ def test_server_weights_roundtrip_and_prev(tmp_path, monkeypatch):
 def test_server_results_and_status(tmp_path):
     async def go(client, hub, live):
         st = await (await client.get("/api/spiking/status")).json()
-        assert set(st) == {"live", "session", "next_session", "day_live", "decisions", "learning", "last", "spend"} and st["live"] is False
+        assert set(st) == {"live", "session", "next_session", "day_live", "decisions", "stream", "learning", "last", "spend"} and st["live"] is False
         assert st["day_live"] is None and st["decisions"]["live_ready"] is False
         assert st["session"] is None and st["next_session"] is None
         assert set(st["last"]) == {"exam", "memory_test", "pong_curve", "bench"} and set(st["last"].values()) == {None}

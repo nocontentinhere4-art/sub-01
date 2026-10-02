@@ -38,6 +38,7 @@ import torch
 from .choice import (READOUTS, ChoiceTask, LiveChooser, RewardSchedule, bandit_experiment, random_chooser,
                      replay_fit, summarize)
 from .config import Config
+from .frames import quantise_rates
 from .memory import MemorySystem, sleep_block, words
 from .net import SpikingNet
 from .pong import Pong, random_paddle, tracking_paddle
@@ -215,6 +216,7 @@ class Session:
                    "spikes_per_s": round(n_sp / sim_s, 1), "mean_rate_hz": round(n_sp / sim_s / net.n, 3),
                    "steps_per_s": round(dt_steps / wall, 1), "realtime_x": round(sim_s / wall, 3),
                    "groups": {k: round(v, 2) for k, v in groups.items() if k in GROUP_KEYS},
+                   "rq": quantise_rates(rr),                  # per-region rates, 1 byte each, for the 3D neurons (#62)
                    "raster": {"n": len(net.raster_ids), "t0": int(self.last_frame_t), "t1": int(net.t),
                               "spikes": net.pop_raster(self.last_frame_t)[:4000]},
                    "pong": self.pong.shown.frame() if (self.pong is not None and "pong" in self.phase) else None,

@@ -152,7 +152,7 @@ def dequantise_act(text):
 class Feed:
     """What a websocket client gets. Default (plain /ws): every tick, 20 a second, as before.
     /ws?rate=5 sends ~5 ticks a second, carrying the trades and events of the skipped ticks;
-    &lite=1 leaves out the per-region activity (for pages that do not draw the brain, e.g. the room);
+    &lite=1 leaves out the per-region activity and the spiking frames (for pages that do not draw the brain, e.g. the room);
     &q=1 is the brain page's feed: `act` quantised to one byte a region (`aq`, see quantise_act) and only the
     fields the brain page draws (well under 1.5 KB a tick).
     Clients asking for the same (rate, lite, q) share one Feed (Live.feed_for), so a tick is serialised once per
@@ -186,7 +186,7 @@ class Feed:
     def take(self, msg, data):
         """The text to send for `msg` (already serialised as `data`), or None to skip this tick."""
         if msg.get("type") != "tick":
-            return data
+            return None if self.lite and msg.get("type") == "spiking" else data    # the room does not draw them
         if self.every == 1 and not self.lite and not self.q:
             self.bps = len(data) / TICK
             return data
@@ -1485,7 +1485,8 @@ async def main(args):
     if os.environ.get("SUB01_SPIKING_LIVE", "1") != "0":
         cpu_net = spiking_live.LiveClient(data_dir, int(os.environ.get("SUB01_SPIKING_LIVE_NEURONS") or
                                                         spiking_live.N_NEURONS))
-        cpu_net.on_frame = live.broadcast         # its frames feed the Neurons panel like the GPU session's
+        # its frames feed the Neurons panel and the 3D neurons like the GPU session's, through the hub's per-viewer budget
+        cpu_net.on_frame = live.spiking.relay if live.spiking else live.broadcast
     live.decider = brain_vote.Backend(cpu=cpu_net, gpu=spiking_manager, log=spiking_live.DecisionLog(data_dir))
     spiking_live.attach(app, live.decider)
 
