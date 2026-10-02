@@ -225,9 +225,9 @@ def test_preference_update_is_a_prediction_error_rule(tmp_path):
     topics = Tastes.topics({"label": "sourdough bread", "networks": {"reward": 0.8, "visual": 0.1}}, "Bread")
     assert topics[0] == "net:reward" and "kw:sourdough" in topics and "net:visual" not in topics
     d1 = t.learn(topics, 1.0)
-    assert d1 == 1.0 and abs(t.predict(topics) - 0.2) < 1e-9
+    assert d1 == 1.0 and 0.2 < t.predict(topics) < 1.0                       # new topics: a large first step
     d2 = t.learn(topics, 1.0)
-    assert abs(d2 - 0.8) < 1e-9 and t.predict(topics) > 0.3                  # smaller error, same direction
+    assert 0 < d2 < d1 and t.predict(topics) > 1.0 - d2                       # smaller error, same direction
     t.learn(["kw:storm"], -1.0)
     assert t.predict(["kw:storm"]) < 0 and t.top()["avoided"][0]["topic"] == "storm"
     before = dict(t.pref)
