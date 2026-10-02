@@ -204,17 +204,20 @@ def main():
             pg.evaluate("f => window.__replay(f)", frames)
             pg.wait_for_timeout(1500)
             cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
-            off = pg.evaluate(f"window.__fps({int(args.fps_s * 1000)})")
-            off_ms = pg.evaluate(f"window.__frameMs({int(args.fps_s * 1000)})")
+            # FPS from the page's own frame() count (window.__fps' first reading is unreliable under throttle in software GL)
+            def fps_js():
+                m = pg.evaluate(f"window.__frameMs({int(args.fps_s * 1000)})")
+                return {"fps": round(m["frames"] / args.fps_s, 1), "js_ms_per_frame": m["js_ms_per_frame"]}
+            off = fps_js()
             toggle(pg)
             pg.wait_for_function("typeof n3d !== 'undefined' && n3d && n3d.state().cells > 0", timeout=120000)
             pg.wait_for_timeout(2000)
-            on = pg.evaluate(f"window.__fps({int(args.fps_s * 1000)})")
-            on_ms = pg.evaluate(f"window.__frameMs({int(args.fps_s * 1000)})")
-            # off screen: the page draws nothing (IntersectionObserver); count frame() calls that reach the renderer
-            hidden = pg.evaluate("""() => new Promise(res => { window.scrollTo(0, document.body.scrollHeight);
+            on = fps_js()
+            # off screen: the page draws nothing (IntersectionObserver): move the scene out of view, count renders
+            hidden = pg.evaluate("""() => new Promise(res => { document.getElementById('scene').style.transform = 'translateY(-3000px)';
               setTimeout(() => { const r = renderer.render.bind(renderer); let k = 0; renderer.render = (...a) => { k++; r(...a); };
-                setTimeout(() => { renderer.render = r; res({on_screen: onScreen, renders_in_2s: k}); window.scrollTo(0, 0); }, 2000); }, 800); })""")
+                setTimeout(() => { renderer.render = r; document.getElementById('scene').style.transform = '';
+                  res({on_screen: onScreen, renders_in_2s: k}); }, 2000); }, 1000); })""")
             js = pg.evaluate("""async f => {
               const nodes = (await (await fetch('brain.json')).json()).nodes;
               const cortex = new Float32Array(await (await fetch('cortex.bin')).arrayBuffer());
@@ -236,8 +239,7 @@ def main():
                       per_render_ms: +(tu / k).toFixed(4)};
             }""", frames)
             cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
-            results["fps_x4_390px_fibres_cortex_hidden"] = {"neurons_off": round(off, 1), "neurons_on": round(on, 1),
-                                                            "frame_js_off": off_ms, "frame_js_on": on_ms}
+            results["fps_x4_390px_fibres_cortex_hidden"] = {"neurons_off": off, "neurons_on": on}
             results["off_screen_390px"] = hidden
             results["neurons_layer_js_cost_x4"] = js
             results["fps_errors"] = errors
