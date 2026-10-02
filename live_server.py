@@ -787,6 +787,8 @@ class Live:
                 if st and (st.get("video") or {}).get("watching"):
                     self.video_drive(st["video"])
                 if st:
+                    self.reader.saw(st, t)                      # #56: "on his mind" is what he is actually reading
+                if st:
                     await self.broadcast({"type": "screen", **self.screen_status(dev)})
                 if now - last_sync > 30:                        # the log shown on /api/browsing stays fresh
                     await self.sync_browsing()

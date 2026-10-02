@@ -6,7 +6,12 @@ Which link is brain-guided: each link title is routed to networks through chat.p
 those networks are right now (relative activity from the live tick), plus a bonus for titles not read in the last
 7 days and a little noise; the pick is a softmax draw. Only the public Wikipedia API is used (text under CC BY-SA
 4.0, credited with a link on the page); no other website is visited and nothing is posted anywhere. Articles about
-violence, sex, self-harm, drugs, extremism, finance and real living people's private matters are skipped.
+violence, sex, self-harm, drugs, extremism, gambling and real living people's private matters are skipped
+(finance is allowed since #56: read-only, never advice).
+
+One source among many (#56): when the screens' browser showed him something lately (a video, an article, a forum
+thread), `saw()` keeps it, `current()` returns whichever is newer, so "on his mind" is what he is actually reading,
+and the Wikipedia chain waits (`due()`) until he has not looked at anything else for READ_EVERY_S.
 
 What it reads reaches the brain model only as a stimulus: up to 8 keywords (title + extract) go through chat.py's
 rule table at half the gain of a chat message, plus a small language + attention drive. The model does not
@@ -41,7 +46,7 @@ NET_NAME = {"memory": "memory", "reward": "reward", "visual": "visual", "somatom
 BLOCK = re.compile(
     r"murder|killing|massacre|genocide|terror|suicide|self.?harm|rape|sexual|porn|nude|drug|cocaine|heroin|"
     r"weapon|firearm|bomb|shooting|war crime|nazi|extremis|abuse|torture|execution|cannibal|"
-    r"stock|crypto|bitcoin|token|price|trading|casino|gambling|scandal|death of|assassination", re.I)
+    r"casino|gambling|scandal|death of|assassination", re.I)
 STOP = set("the a an and or but if of to in on at for with from by is are was were be been it this that these those "
            "i you he she we they me my your his her our their what why how who when where which not no yes so very "
            "just can will would could should do does did have has had il lo la i gli le un una e o ma di da in con su "
@@ -157,15 +162,37 @@ class Reader:
         self.next_t = 0.0
         self.rng = rng or random.Random()
         self.temperature = TEMPERATURE
+        self.seen = s.get("seen")             # the last page or video the browser showed him (#56)
 
     def to_dict(self):
-        return {"log": self.log[-KEEP:], "used": list(self.used)[-200:], "history": self.history}
+        return {"log": self.log[-KEEP:], "used": list(self.used)[-200:], "history": self.history, "seen": self.seen}
 
     def current(self):
-        return self.log[-1] if self.log else None
+        """What is on his mind: the newer of the last Wikipedia article and the last thing the browser showed."""
+        art = self.log[-1] if self.log else None
+        if self.seen and (art is None or self.seen.get("t", 0) >= art.get("t", 0)):
+            return self.seen
+        return art
 
     def due(self, t):
-        return t >= self.next_t
+        return t >= self.next_t and not (self.seen and t - self.seen.get("t", 0) < READ_EVERY_S)
+
+    def saw(self, status, t):
+        """The browser showed a page or a video (a screen status). Only titles fit for the public card are kept."""
+        from browse import display_ok
+        title = " ".join(str((status or {}).get("title") or "").split())[:140]
+        if not title or not display_ok(title) or status.get("restarting"):
+            return None
+        if self.seen and self.seen.get("url") == status.get("url"):
+            self.seen["t"] = t
+            return self.seen
+        video = bool(status.get("video")) or "youtube.com" in str(status.get("host")) or "tiktok.com" in str(
+            status.get("host"))
+        self.seen = {"title": title, "url": status.get("url", ""), "host": status.get("host", ""), "t": t,
+                     "source": "browser", "kind": "video" if video else "page", "extract": "",
+                     "why": "on his screen: " + ("a video" if video else str(status.get("host") or "a page")),
+                     "keywords": keywords(title)}
+        return self.seen
 
     def read(self, t, heard, rel=None):
         """Open one article (blocking: run in a worker thread). `heard` = recent chat texts, newest last;

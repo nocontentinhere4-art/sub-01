@@ -156,6 +156,41 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Fixtures: `tests/data/search/` (saved 2026-10-02); `tests/test_more_search.py`. A source's markup can change:
   a parser that finds nothing makes the search fall through to the next source (and `refused_today` says so).
 
+## Browse like a real young guy (#56 scope extension, part 2)
+- Owner: "he focuses too much on one topic … no guy like him would spend all day on Wikipedia", then "NO
+  RESTRICTIONS" (comment 2 replaces B.5 and D of comment 1).
+- `interests.py` (pure): `PROFILE` (seed weight, searches, page words per topic: music, anime, games, sports, food,
+  fashion, tech, memes, crypto, markets, tokyo, science, a little wikipedia; edit here), tastes move a topic 0.5–1.6x
+  (`taste_multipliers`, computed in the live server, passed with the interest), `RHYTHM` by Tokyo hour (morning news
+  + weather, lunch short videos, afternoon interests, evening YouTube + games, late night Shorts on the phone).
+  `Variety` (per Tokyo day, saved in `browsing.json` → `searches.variety`): topic counts, Wikipedia share, the run of
+  pages on one topic. No outside quota: `saturation` lowers a topic's weight past 15 % of the day (Wikipedia past
+  10 %, also in `route`), and after 3+ pages on one topic `streak_pull` raises the leave option's pull
+  (`eyes.leave_pull`, read by brain_vote's LEAVE_CHAIN) and the share of profile searches (`Browser.profile_share`).
+  `analysis/variety_day.py` (model): topic entropy 2.96 → 3.48 bits (max 3.58), top topic 22 % → 14 %, Wikipedia
+  28 % → 4 % of pages.
+- Short videos on the phone (`Screen.mode == "shorts"`, when the rhythm's feed or the phone app says so): a YouTube
+  Shorts search (Restricted Mode cookie) or a TikTok tag page (logged out; robots.txt disallows TikTok's /search),
+  shorts queued, each next short picked by the vote among the queued ones (local options, no paid call), muted,
+  ≤ `SHORTS_MAX_S` (45 s). TikTok: comments / likes / follow / login boxes hidden (`HIDE_TIKTOK`), a login wall is
+  left, captions + hashtags + creator names through `video_text_ok`. The TikTok parser's fixture is synthetic: check
+  a live run.
+- Seen things (`search_sources.seen_things`): video titles and channels on his screens ("saw it in a video"), page
+  titles ("saw it on his screen"), walk places ("passed it on a walk"), the room eye's objects; each query carries
+  its origin into the card's why.
+- `research.py`: one source among many. `Reader.saw()` (one line in `run_browse`) keeps the last page / video the
+  browser showed; `current()` returns the newer of that and the last Wikipedia article, so "on his mind" is what he
+  really reads; `due()` waits while he browses.
+- Finance (owner, "NO RESTRICTIONS"): exchanges, DEX / swap pages, launchpads, chart pages, forums and our own coin's
+  pages are viewable read-only. Still blocked: the harmful categories (adult, gore, self-harm, extremism, illegal),
+  gambling, wallet apps (metamask, phantom, walletconnect). `money_action` (buy, sell, swap, connect, sign, deposit,
+  withdraw, stake, claim, mint, …; and buy/connect/claim/mint/create/launch/wallet URLs): never numbered, never offered,
+  refused in `act` even when the brain picks such a link. `eyes.query_ok` refuses buy/sell wording; labels too.
+  `finance_note`: finance pages add "He is just browsing; nothing here is financial advice." to the card (`advice`,
+  and in `why`). `display_ok` (his words: mind notes, the card title, video titles) stays strict, finance talk
+  included; `title_ok` (web titles, link labels, results) shows prices and tickers. mind.py's FINANCE rule stays and
+  `next_interest` skips finance.
+
 ## YouTube and chess at the desk (#17, PR `feature/youtube-chess`)
 - `life.py`: two more activities chosen by needs, `watch_video` (boredom, visual response, a chat wish; only with a
   browser: `Life.can_watch`) and `play_chess` (attention, a chat wish; at most one game per simulated hour,

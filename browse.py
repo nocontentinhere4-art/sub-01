@@ -50,6 +50,7 @@ import socket
 import time
 import urllib.parse
 
+import interests as I
 import search_sources as SS
 
 KEEP = 60                              # visits kept in the log
@@ -58,8 +59,12 @@ SCROLLS = (3, 7)                       # scrolls per page before moving on
 NAV_TIMEOUT_MS = 20000
 DECIDE_WAIT_S = 90                     # waiting longer than this for the brain's choice: wander on as before
 PAGE_LINKS = 40
-VIDEO_LINK = re.compile(r"(youtube\.com/watch|youtu\.be/|vimeo\.com/\d|nicovideo\.jp/watch|dailymotion\.com/video|"
-                        r"/videos?/|/watch\b)", re.I)
+VIDEO_LINK = re.compile(r"(youtube\.com/watch|youtube\.com/shorts/|youtu\.be/|vimeo\.com/\d|nicovideo\.jp/watch|"
+                        r"dailymotion\.com/video|tiktok\.com/@[\w.]+/video/|/videos?/|/watch\b)", re.I)
+TIKTOK_HOST = re.compile(r"(^|\.)tiktok\.com$", re.I)
+HIDE_TIKTOK = """[data-e2e*="comment"],[class*="CommentList"],[class*="DivCommentContainer"],[data-e2e="browse-like"],
+[data-e2e="follow-button"],[class*="DivActionItemContainer"],[class*="LoginModal"],[id*="login"]{display:none !important}"""
+SHORTS_MAX_S = 45.0                    # a short is watched at most this long (real seconds), then the next one
 MAX_CHAIN = 30                         # pages in a row before he wanders off to something new (#29)
 # YouTube (#17): Restricted Mode for every context, bounded muted watching, scene changes as visual drive
 YOUTUBE_COOKIES = [{"name": "PREF", "value": "f2=8000000", "domain": ".youtube.com", "path": "/", "secure": True}]
@@ -125,13 +130,14 @@ LINK_ACTIONS = {"click": None, "open_video": "video", "play_video": "video", "ne
                 "open_comments": "comments"}
 
 # --- guard ---------------------------------------------------------------------------------------------------------
+# Crypto and finance pages (exchanges, DEX, launchpads, charts, our own coin's pages) may be viewed, read-only (owner,
+# #56: "NO RESTRICTIONS"); wallet apps stay blocked (he never connects a wallet), and nothing with money is ever
+# clicked (MONEY_ACTION). The harmful categories stay: adult, gore, self-harm, extremism, illegal; gambling too.
 BAD_HOST = re.compile(
     r"porn|xxx|xvideo|xhamster|redtube|youporn|sex|nsfw|onlyfans|fansly|hentai|escort|camgirl|chaturbate|stripchat|"
     r"livejasmin|adult|nude|naked|erotic|fetish|"
     r"casino|poker|betting|bet365|sportsbet|stake\.com|gambl|slots|lottery|"
-    r"binance|coinbase|kraken|bybit|okx|kucoin|bitget|mexc|gate\.io|htx|huobi|crypto\.com|dexscreener|dextools|"
-    r"pump\.fun|gmgn|birdeye|raydium|jup\.ag|jupiter|uniswap|pancakeswap|coinmarketcap|coingecko|tradingview|"
-    r"phantom\.app|metamask|solscan|etherscan|"
+    r"phantom\.app|metamask|walletconnect|"
     r"4chan|8kun|kiwifarms|bestgore|liveleak|theync|"
     r"railway\.app|up\.railway", re.I)
 # words that must not be on a page shown live (title anywhere; body when repeated)
@@ -140,8 +146,7 @@ BAD_WORDS = re.compile(
     r"gore|beheading|dismember\w*|suicide|self[- ]?harm|rape|raped|child abuse|"
     r"terrorist\w*|jihad\w*|neo-?nazi\w*|white power|"
     r"cocaine|heroin|meth|fentanyl|"
-    r"casino\w*|sportsbook|gambling|"
-    r"memecoin\w*|altcoin\w*|airdrop\w*|presale|pump and dump|100x)\b", re.I)
+    r"casino\w*|sportsbook|gambling)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
                       r"before you continue|consent", re.I)
@@ -164,7 +169,7 @@ LOGIN_HREF = re.compile(r"/(log-?in|sign-?in|sign-?up|signin|signup|servicelogin
 # place names that contain a blocked fragment ("sex" in Sussex): removed before the host check
 HOST_FALSE_HITS = re.compile(r"sussex|essex|middlesex|wessex", re.I)
 # a sign-in wall: the page is mostly a login / sign-up prompt (he leaves; he never signs in to get past it)
-LOGIN_WALL = re.compile(r"(log|sign) ?in to (continue|view|see|read|keep reading)|sign up to (continue|read|see|view)|"
+LOGIN_WALL = re.compile(r"(log|sign) ?in to (continue|view|see|read|keep reading|tiktok|watch)|sign up to (continue|read|see|view)|"
                         r"create (a free |an )?account to (continue|read|view)|you must be (logged|signed) in|"
                         r"please (log|sign) in", re.I)
 LOGIN_WALL_MAX_CHARS = 3000
@@ -287,18 +292,83 @@ def choose_dismiss(buttons):
 
 
 def display_ok(text):
-    """Text that may be shown on the public screen card: no links, addresses, tickers, money, slurs or blocked
-    topics (the chat filter's rules, without its phone-number rule, which catches year ranges)."""
+    """Text in his words or in the card's own lines (mind notes, the card title, video titles): no links, addresses,
+    tickers, money, slurs, blocked topics or finance talk (the chat filter's rules, without its phone-number rule,
+    which catches year ranges). Web titles and link labels use the looser title_ok (#56)."""
+    import chat
+    t = text or ""
+    return (title_ok(t) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
+
+
+def title_ok(text):
+    """A web page's title, a link label or a search result on the public screen (#56): finance words, prices and
+    tickers may show (crypto and stock pages are viewable), but never links, addresses, e-mails, money requests,
+    slurs or the guard's blocked words and topics."""
     import chat
     from research import BLOCK as TOPIC_BLOCK
     t = text or ""
-    return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.TICKER.search(t)
-                or chat.EMAIL.search(t) or chat.MONEY.search(t) or chat.SLUR_RE.search(chat.normalise(t))
+    return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
+                or MONEY_ASK.search(t) or chat.SLUR_RE.search(chat.normalise(t))
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+
+
+# finance talk kept out of his own words (mind.py's FINANCE rule for replies stays; research.BLOCK had these before #56)
+FINANCE_TALK = re.compile(r"stock|crypto|bitcoin|token|price|trading", re.I)
+
+
+# requests for money on a public card (the chat filter's money rule without plain prices: finance titles show them)
+MONEY_ASK = re.compile(r"\b(send|give|pay|tip|donate|lend|transfer|spare)\b.{0,20}\b(sol|eth|btc|usdc|usdt|crypto|"
+                       r"money|cash|funds|coins?|tokens?|dollars?|bucks|euros?)\b|\b(donations?|donate|giveaway|"
+                       r"venmo|paypal|cash ?app|zelle|seed phrase|private key)\b", re.I)
+# links and buttons that act with money or a wallet: never offered, never clicked, whatever the brain picks
+MONEY_ACTION = re.compile(r"\b(buy|sell|swap|trade( now)?|connect( (your )?wallet)?|sign( (the )?(message|transaction))?|"
+                          r"deposit|withdraw|stake|unstake|bridge|claim|mint|launch (a )?(coin|token)|create (a )?"
+                          r"(coin|token)|place (an )?order|invest( now)?|bet|get started|open (an )?account)\b", re.I)
+MONEY_HREF = re.compile(r"/(buy|sell|connect|deposit|withdraw|stake|bridge|claim|mint|create|launch|wallet)"
+                        r"(/|\?|$|-)|[?&](action|side)=(buy|sell)", re.I)
+# finance pages: the card adds the advice line
+FINANCE_HOST = re.compile(r"(^|\.)(binance|coinbase|kraken|bybit|okx|kucoin|bitget|mexc|gate|htx|huobi|crypto|"
+                          r"dexscreener|dextools|pump|gmgn|birdeye|raydium|jup|jupiter|uniswap|pancakeswap|"
+                          r"coinmarketcap|coingecko|tradingview|solscan|etherscan|coindesk|cointelegraph|decrypt|"
+                          r"theblock|bloomberg|marketwatch|investing|morningstar|nasdaq|nikkei|kabutan|minkabu|"
+                          r"stocktwits|seekingalpha|cnbc|reuters)\.\w+|finance\.yahoo\.\w+|"
+                          r"(^|\.)google\.\w+$", re.I)
+FINANCE_WORDS = re.compile(r"\b(crypto\w*|bitcoin|ethereum|solana|memecoins?|altcoins?|tokens?|dex|stocks?|shares|"
+                           r"nikkei|nasdaq|dow jones|s&p ?500|market cap|price chart|trading|exchange rate|forex|"
+                           r"\$[A-Z]{2,10})\b", re.I)
+ADVICE_LINE = "He is just browsing; nothing here is financial advice."
+
+
+def is_finance(url, title="", text=""):
+    """A crypto / stock / market page: the screen card adds ADVICE_LINE."""
+    u = urllib.parse.urlsplit(url or "")
+    host = (u.hostname or "").lower()
+    if FINANCE_HOST.search(host) and (not host.split(".")[-2:-1] == ["google"] or u.path.startswith("/finance")):
+        return True
+    return len(FINANCE_WORDS.findall(f"{title} {title} {(text or '')[:1500]}")) >= 3
+
+
+def finance_note(info, url, title="", body=""):
+    """A finance page's card: `finance`, the advice line, and the line appended to the card's why."""
+    if not is_finance(url, title, body) or (info or {}).get("finance"):
+        return info
+    return dict(info, finance=True, advice=ADVICE_LINE, why=f"{info.get('why', '')} · {ADVICE_LINE}".lstrip(" ·"))
+
+
+def money_action(label, href=""):
+    """A link or button that would act with money or a wallet (buy, sell, swap, connect, sign, ...)."""
+    return bool(MONEY_ACTION.search(label or "") or MONEY_HREF.search(urllib.parse.urlsplit(href or "").path + "?"
+                                                                       + urllib.parse.urlsplit(href or "").query))
 
 
 def is_youtube(host):
     return bool(YOUTUBE_HOST.search((host or "").rstrip(".")))
+
+
+def is_video_host(host):
+    """YouTube or TikTok: titles, captions and creator names also pass the chat filter (video_text_ok)."""
+    h = (host or "").rstrip(".")
+    return bool(YOUTUBE_HOST.search(h) or TIKTOK_HOST.search(h))
 
 
 def video_text_ok(text):
@@ -473,7 +543,8 @@ class Screen:
         self.awaiting = None                                # page handed to the brain for a decision
         self.awaiting_since = 0.0
         self.chain = 0                                      # pages shown in a row since he last wandered off
-        self.mode = None                                    # "video": he is watching videos (YouTube), else browsing
+        self.mode = None                                    # "video": YouTube at the desk; "shorts": the phone's
+        self.queue = []                                     # short-video feed (#56); else browsing. queue: next shorts
         self.watch_until = 0.0                              # wall time the current video ends (0: not watching)
         self.watch_s = 0.0
         self.scene = 0.0                                    # change between the last two screenshots while watching
@@ -524,10 +595,12 @@ class Browser:
         self.sandbox = None                                 # Chromium's own sandbox on? (None: not launched yet)
         self.no_sandbox = False                             # a sandboxed launch failed once: stay without it
         self.limits = SS.Limits(state=s.get("searches"))    # per-host requests per hour, searches per source today
+        self.variety = I.Variety(state=(s.get("searches") or {}).get("variety"))   # today's topics, Wikipedia share
         self.robots = SS.Robots()
 
     def to_dict(self):
-        return {"log": self.log[-KEEP:], "used": list(self.used)[-200:], "searches": self.limits.to_dict()}
+        return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
+                "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict())}
 
     @staticmethod
     def available():
@@ -612,12 +685,14 @@ class Browser:
         sc = self.screens[device]
         if time.time() < sc.next_at:
             return None
+        if mode is None and device == "phone" and isinstance(interest, dict) and interest.get("feed") == "shorts":
+            mode = "shorts"                                     # the rhythm / his phone app: a short-video feed
         async with self.lock:
             try:
                 sc = await self._ensure(device)
                 moved_on = False
-                if (mode == "video") != (sc.mode == "video"):      # switched between browsing and videos
-                    sc.mode, sc.awaiting, sc.watch_until = mode, None, 0.0
+                if mode != sc.mode:                             # switched between browsing, videos and shorts
+                    sc.mode, sc.awaiting, sc.watch_until, sc.queue = mode, None, 0.0, []
                     if sc.info:
                         moved_on = True                         # start afresh in the new mode
                 if sc.watch_until:                              # watching a video: screenshots until the time is up
@@ -691,19 +766,24 @@ class Browser:
     @staticmethod
     def safe_results(results):
         """Results that may be numbered for the brain and shown: the guard on the URL (url_ok, login/sign-up links)
-        and on the title (display_ok; videos also the chat filter); a snippet that fails display_ok is dropped."""
+        and on the title (title_ok; videos also the chat filter); a snippet that fails title_ok is dropped."""
         out = []
         for r in results or []:
             url, title = str(r.get("url") or ""), " ".join(str(r.get("title") or "").split())
             host = urllib.parse.urlsplit(url).hostname or ""
             if (len(title) < 3 or not url_ok(url) or LOGIN_HREF.search(url) or LOGIN_LINK.search(title)
-                    or not display_ok(title) or BAD_WORDS.search(title)
-                    or ((is_youtube(host) or r.get("video")) and not video_text_ok(title))):
+                    or not title_ok(title) or BAD_WORDS.search(title) or money_action(title, url)
+                    or ((is_video_host(host) or r.get("video")) and not video_text_ok(title))
+                    or not all(video_text_ok(h) for h in r.get("hashtags") or [])):
                 continue
             snippet = " ".join(str(r.get("snippet") or "").split())
-            if snippet and (not display_ok(snippet) or BAD_WORDS.search(snippet)):
+            if snippet and (not title_ok(snippet) or BAD_WORDS.search(snippet)):
                 snippet = ""
-            out.append(dict(r, url=url, title=title[:140], snippet=snippet[:240]))
+            r = dict(r, url=url, title=title[:140], snippet=snippet[:240])
+            if r.get("channel") and not video_text_ok(r["channel"]):     # a creator name that fails: not shown
+                r["channel"] = ""
+                r["snippet"] = "" if r["snippet"].startswith("@") else r["snippet"]
+            out.append(r)
         return out
 
     def result_page(self, sc, url):
@@ -720,7 +800,7 @@ class Browser:
         return {"device": sc.name, "url": url, "title": sc.info.get("title", ""), "host": sc.info.get("host", ""),
                 "kind": "search", "text": " ".join(text.split())[:1500], "links": links,
                 "can_back": len(sc.history) >= 2, "search_box": False, "chain": sc.chain, "max_chain": MAX_CHAIN,
-                "search": sc.info.get("search")}
+                "search": sc.info.get("search"), "streak_pull": I.streak_pull(self.variety)}
 
     def pick_links(self, raw, url, text, sc, search=False):
         """Numbered, guarded links for the eyes. Pagination ("next"), comment threads and (on Wikipedia) external
@@ -739,7 +819,7 @@ class Browser:
                                                                                 "wikidata.org"))
             yt = is_youtube(u.hostname or "")
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
-                    or not display_ok(label) or (yt and not video_text_ok(label))):
+                    or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)):
                 continue
             if href in seen:                                    # YouTube: the thumbnail link comes first, labelled
                 if yt and len(label) > len(seen[href]["text"]):  # with the duration; the title link is the label
@@ -771,7 +851,7 @@ class Browser:
         return {"device": sc.name, "url": url, "title": sc.info.get("title", ""), "host": sc.info.get("host", ""),
                 "kind": sc.info.get("kind"), "text": " ".join(text.split())[:1500], "links": links,
                 "can_back": len(sc.history) >= 2, "search_box": bool(sc.info.get("search_box")),
-                "chain": sc.chain, "max_chain": MAX_CHAIN}
+                "chain": sc.chain, "max_chain": MAX_CHAIN, "streak_pull": I.streak_pull(self.variety)}
 
     async def act(self, device, action, why="", interest=None):
         """Carry out the action the brain chose for the page it was given; returns the new screen status or None."""
@@ -789,7 +869,10 @@ class Browser:
                     link = next((l for l in page["links"] if l["href"] == want), None)
                     flag = LINK_ACTIONS[kind]                       # the link must really be of that kind
                     href = link["href"] if link and (flag is None or link.get(flag)) else None
+                    if href and (money_action(link.get("text", ""), href) or money_action(action.get("label", ""))):
+                        href, self.last_skip = None, "never acts with money"     # buy / sell / swap / connect / sign
                     ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
+                    sc.queue = [r for r in sc.queue if r.get("url") != href]
                     if ok and kind in ("play_video", "open_video") and await self._play_muted(sc):
                         await self._start_watch(sc, action.get("watch_s"))
                 elif kind == "search" and action.get("target"):
@@ -833,6 +916,8 @@ class Browser:
         of pages starts here."""
         from eyes import query_ok
         sc.chain = 0
+        if sc.mode == "shorts" and await self._shorts(sc, interest):
+            return True
         if sc.mode == "video":                                  # watching videos: a YouTube search (no typing)
             q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)
             if await self._open(sc, youtube_search_url(q), f"looked for videos about “{q}”", "page",
@@ -865,11 +950,48 @@ class Browser:
             topic = query_ok(SS.interest_text(interest))
             origin = interest.get("from", "") if isinstance(interest, dict) and topic else ""
             origin = origin if origin in SS.ORIGINS else ""
+            why = None
+            if not topic or self.rng.random() < self.profile_share():    # the interest profile, by the hour
+                d = interest if isinstance(interest, dict) else {}
+                p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"))
+                if query_ok(p["query"]):
+                    topic, origin = p["query"], "interests"
+                    why = f"{SS.ORIGINS['interests']} ({p['topic']}, {p['rhythm']})"
             if not topic:
                 topic, origin = self.rng.choice(FAMILIAR), "familiar"
-            why = SS.ORIGINS[origin] if origin not in ("", "familiar") else f"curious about “{topic[:50]}”"
+            why = why or (SS.ORIGINS[origin] if origin not in ("", "familiar") else f"curious about “{topic[:50]}”")
             return await self._search(sc, topic, why, origin)
         return await self._open(sc, self.rng.choice(SEEDS), "opened a site he likes", "page")
+
+    PROFILE_SHARE = 0.45                                       # searches from the interest profile (#56 extension)
+
+    def profile_share(self):
+        """How often a search comes from his interest profile rather than his notes / reading: more when he has
+        been on one topic for several pages (variety)."""
+        return min(0.9, self.PROFILE_SHARE + 0.4 * I.streak_pull(self.variety))
+
+    TIKTOK_SHARE = 0.35                                        # feeds that start on TikTok (else YouTube Shorts)
+
+    async def _shorts(self, sc, interest):
+        """The phone's short-video feed: a TikTok tag page or a YouTube Shorts search (Restricted Mode) on his
+        interest or the hour's profile topic; the shorts found are queued, and each one is picked by the vote
+        among the next ones (local options, no paid call), played muted for at most SHORTS_MAX_S."""
+        from eyes import query_ok
+        d = interest if isinstance(interest, dict) else {}
+        q, origin = query_ok(SS.interest_text(interest)), d.get("from", "")
+        if not q or self.rng.random() < 0.5:
+            p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"))
+            q, origin = query_ok(p["query"]), "interests"
+        if not q:
+            return False
+        names = ["tiktok", "shorts"] if self.rng.random() < self.TIKTOK_SHARE else ["shorts", "tiktok"]
+        why = SS.ORIGINS.get(origin if origin in SS.ORIGINS else "interests")
+        for name in names:
+            if self.limits.source_ok(name) and await self._search_on(sc, name, q, f"short videos — {why}", origin):
+                sc.queue = [r for r in sc.info.get("results", []) if r.get("video")]
+                if sc.queue:
+                    return True
+        return False
 
     async def _site_search(self, sc, q, why):
         """Type `q` into the page's own search box and press Enter. The field is re-checked right before typing,
@@ -949,6 +1071,8 @@ class Browser:
         except (TypeError, ValueError):
             w = 120.0
         w = min(MAX_WATCH_S, max(MIN_WATCH_S, w if w == w else 120.0))
+        if sc.mode == "shorts":
+            w = min(w, SHORTS_MAX_S)                            # a short, then the next one
         sc.watch_s, sc.watch_until, sc.scene, sc.scrolls_left = w, time.time() + w, 0.0, 0
         sc.next_at = time.time() + VIDEO_SHOT_S
         if sc.info:
@@ -981,6 +1105,9 @@ class Browser:
             mins = round(sc.watch_s / 60, 1)
             sc.info = dict(sc.info, video=dict(sc.info["video"], watching=False, left_s=0, scene=0.0),
                            why=f"watched for {mins:g} min (muted); deciding again")
+        if sc.mode == "shorts" and sc.info and sc.queue:      # the next shorts are the options (no paid call)
+            sc.info = dict(sc.info, kind="search", results=sc.queue[:SS.MAX_RESULTS],
+                           why=f"watched a short for {round(sc.watch_s)} s (muted); the next one?")
 
     TRIES = 2                                                  # sources tried per search before the fallback
 
@@ -989,7 +1116,8 @@ class Browser:
         if none of the first TRIES gives results, search Wikipedia and leave by one of the article's external sources.
         `why` ends the card's line ("searched arXiv for “sleep spindles” — from his reading notes")."""
         tried = []
-        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video")[:self.TRIES]:
+        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video",
+                             wiki_share=self.variety.wiki_share())[:self.TRIES]:
             tried.append(name)
             if await self._search_on(sc, name, q, why, origin):
                 if not self.decide and sc.info.get("results"):  # brain decides: it picks among the results itself
@@ -1143,6 +1271,12 @@ class Browser:
             return await self._leave(sc)
         host = urllib.parse.urlsplit(page.url).hostname or ""
         channel = ""
+        if TIKTOK_HOST.search(host):                                   # no comments, likes, follow or login boxes
+            await page.add_style_tag(content=HIDE_TIKTOK)
+            if not video_text_ok(re.sub(r"\s*\|\s*TikTok$", "", page_title)):
+                print(f"browse: skipped a TikTok page ({host}): caption refused", flush=True)
+                self.last_skip = "guard"
+                return await self._leave(sc)
         if is_youtube(host):                                           # titles and channels: guard + chat filter
             await page.add_style_tag(content=HIDE_YOUTUBE)             # no comments, live chat or buttons on screen
             channel = (await page.evaluate(CHANNEL_JS) or "").strip()
@@ -1158,6 +1292,7 @@ class Browser:
                    "search_box": kind == "page" and await self._has_search_box(page)}
         if channel:
             sc.info["channel"] = channel[:80]
+        sc.info = finance_note(sc.info, page.url, page_title, body)   # #56: viewing only, and the card says so
         sc.scrolls_left = self.rng.randint(*SCROLLS) if kind == "page" else 0
         if shoot and not await self.show(sc):
             return False
@@ -1232,6 +1367,9 @@ class Browser:
         if not sc.history or sc.history[-1] != i["url"]:
             sc.history = (sc.history + [i["url"]])[-20:]
             sc.chain += 1
+            topic = self.variety.note(i["title"], (i.get("search") or {}).get("query", ""), i["host"])
+            sc.info = dict(i, topic=topic)
+            self.log[-1]["topic"] = topic
         return True
 
     async def _leave(self, sc):
