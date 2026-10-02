@@ -390,9 +390,19 @@ for s in (-1, 1):
     cpart(box("ch_arm_post", "plastic_black", (s * 0.255 - 0.018, s * 0.255 + 0.018), (0.38, 0.68), (-0.02, 0.06), bevel=0.008, seg=2))
     cpart(box("ch_arm_bar", "plastic_black", (s * 0.15 - 0.02, s * 0.27), (0.375, 0.41), (0.0, 0.05), bevel=0.008, seg=2))
     cpart(box("ch_arm_pad", "plastic_black", (s * 0.255 - 0.04, s * 0.255 + 0.04), (0.68, 0.71), (-0.13, 0.11), bevel=0.012, seg=3))
+# the chair moves (he pulls it out and pushes it back): it is NOT part of the static mesh but one object of its own,
+# "chair", whose origin is the pivot on the floor under the gas lift. Its parts are placed in the room for the UV
+# projection, then joined and moved back into the object's own space; it gets its own materials and AO (self-occlusion)
+CH_M = Matrix.Translation(B(CH_C[0], FY, CH_C[1])) @ Matrix.Rotation(CH_RY, 4, 'Z')
 for o in chair:
-    o.data.transform(Matrix.Translation(B(CH_C[0], FY, CH_C[1])) @ Matrix.Rotation(CH_RY, 4, 'Z'))
-    o.data.update(); project_uv(o)
+    o.data.transform(CH_M); o.data.update(); project_uv(o)
+    STATIC.remove(o)
+    bpy.context.view_layer.objects.active = o
+    for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
+CHAIR = join(chair, "chair"); CHAIR.data.name = "chair"
+CHAIR.data.transform(CH_M.inverted()); CHAIR.matrix_world = CH_M
+for i, m in enumerate(CHAIR.data.materials):    # own copies: glTF keeps occlusion per material, and the chair has its own
+    c = m.copy(); c.name = "chair_" + m.name; CHAIR.data.materials[i] = c
 
 # ================================================================ bed (storage bed, mattress, sheet, pillow, duvet)
 BX0, BX1, BZ0, BZ1 = -1.90, -0.20, 0.25, 1.50
@@ -649,23 +659,43 @@ print("bake UV", room.data.uv_layers.active.name, [u.name for u in room.data.uv_
 print("small faces", sum(small), "of", len(small))
 print("STATIC tris", sum(len(p.vertices) - 2 for p in room.data.polygons), "materials", [m.name for m in room.data.materials])
 
+# the chair's own AO atlas (small: one object)
+cuv = CHAIR.data.uv_layers.new(name="AO")
+bpy.ops.object.select_all(action='DESELECT'); CHAIR.select_set(True); bpy.context.view_layer.objects.active = CHAIR
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+CHAIR.data.uv_layers.active = CHAIR.data.uv_layers["AO"]
+bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.004, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
+bpy.ops.uv.pack_islands(margin=0.004, rotate=True)
+bpy.ops.object.mode_set(mode='OBJECT')
+CHAIR.data.uv_layers.active = CHAIR.data.uv_layers["AO"]
+print("CHAIR tris", sum(len(p.vertices) - 2 for p in CHAIR.data.polygons), "materials", [m.name for m in CHAIR.data.materials],
+      "pivot", tuple(round(v, 4) for v in CHAIR.location), "rot z", round(CHAIR.rotation_euler.z, 4))
+
+def bake_ao(obj, size, path, hide):
+    """AO of `obj` into its "AO" UV set, with the objects in `hide` left out of the render"""
+    for o in hide: o.hide_render = True
+    img = bpy.data.images.new(obj.name + "_ao", size, size, alpha=False, float_buffer=False); img.colorspace_settings.name = "Non-Color"
+    for m in obj.data.materials:
+        nt = m.node_tree; t = nt.nodes.new("ShaderNodeTexImage"); t.image = img; t.name = "BAKE"
+        for n in nt.nodes: n.select = False
+        t.select = True; nt.nodes.active = t
+    bpy.ops.object.select_all(action='DESELECT'); obj.select_set(True); bpy.context.view_layer.objects.active = obj
+    obj.data.uv_layers.active = obj.data.uv_layers["AO"]
+    bpy.ops.object.bake(type='AO', margin=6, uv_layer="AO")
+    img.filepath_raw = path; img.file_format = 'PNG'; img.save()
+    for m in obj.data.materials: m.node_tree.nodes.remove(m.node_tree.nodes["BAKE"])
+    for o in hide: o.hide_render = False
+
 if not NOBAKE:
     SC.render.engine = 'CYCLES'; SC.cycles.device = 'CPU'; SC.cycles.samples = int(os.environ.get("AO_SAMPLES", "128"))
     w = bpy.data.worlds.new("w"); SC.world = w; w.light_settings.distance = 0.35
-    ao = bpy.data.images.new("ao", 2048, 2048, alpha=False, float_buffer=False); ao.colorspace_settings.name = "Non-Color"
-    for m in room.data.materials:
-        nt = m.node_tree; t = nt.nodes.new("ShaderNodeTexImage"); t.image = ao; t.name = "BAKE"
-        for n in nt.nodes: n.select = False
-        t.select = True; nt.nodes.active = t
-    # props and the boy-less room: all visible objects occlude
-    bpy.ops.object.select_all(action='DESELECT'); room.select_set(True); bpy.context.view_layer.objects.active = room
     SC.render.bake.margin = 6; SC.render.bake.use_selected_to_active = False
-    bpy.ops.object.bake(type='AO', margin=6, uv_layer="AO")
-    ao.filepath_raw = f"{OUT}/ao_raw.png"; ao.file_format = 'PNG'; ao.save()
-    for m in room.data.materials:
-        nt = m.node_tree; nt.nodes.remove(nt.nodes["BAKE"])
-room.data.uv_layers.active = room.data.uv_layers["UVMap"]
-room.data.uv_layers["UVMap"].active_render = True
+    # the room without the chair (it moves: no chair-shaped AO footprint may stay behind on the floor; the real-time
+    # shadows ground it), the props occlude; then the chair on its own (self-occlusion only, true wherever it stands)
+    bake_ao(room, 2048, f"{OUT}/ao_raw.png", [CHAIR])
+    bake_ao(CHAIR, 512, f"{OUT}/ao_chair.png", [o for o in SC.objects if o is not CHAIR and o.type == 'MESH'])
+for o in (room, CHAIR):
+    o.data.uv_layers.active = o.data.uv_layers["UVMap"]; o.data.uv_layers["UVMap"].active_render = True
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.export_scene.gltf(filepath=f"{OUT}/room_raw.glb", export_format='GLB', use_selection=False, export_extras=True, export_yup=True,
                           export_apply=True, export_texcoords=True, export_normals=True, export_tangents=False, export_materials='EXPORT',
