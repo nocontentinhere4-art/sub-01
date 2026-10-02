@@ -19,6 +19,8 @@ import shutil
 import time
 from pathlib import Path
 
+from state_io import load_json, save_json
+
 DREAM_EVERY_S = 6 * 60          # simulated seconds between unattended dream frames
 MIN_REAL_GAP_S = 20             # never faster than this in real seconds (accelerated clocks)
 MAX_UNATTENDED = 18             # unattended frames per night (~$0.003 each on FLUX schnell)
@@ -68,13 +70,11 @@ class Diary:
 
     def load(self, date):
         p = self.path(date)
-        return json.loads(p.read_text()) if p.exists() else None
+        return load_json(p)                            # a torn night is kept aside and starts again
 
     def save(self, d):
         p = self.path(d["date"])
-        tmp = p.with_suffix(".tmp")
-        tmp.write_text(json.dumps(d, indent=1, ensure_ascii=False))
-        tmp.replace(p)
+        save_json(p, d, indent=1, ensure_ascii=False)
 
     def entry(self, date):
         return self.load(date) or {"date": date, "frames": [], "unattended": 0, "last_sim": 0.0, "closed": False}
@@ -201,7 +201,9 @@ class Diary:
     def index(self, n=30):
         out = []
         for p in sorted(self.dir.glob("*.json"), reverse=True)[:n]:
-            d = json.loads(p.read_text())
+            d = load_json(p)
+            if d is None or "date" not in d or "frames" not in d:
+                continue
             out.append({"date": d["date"], "title": d.get("title", ""), "closed": d.get("closed", False),
                         "frames": len(d["frames"]), "cover": d["frames"][len(d["frames"]) // 2]["img"] if d["frames"] else None})
         return out

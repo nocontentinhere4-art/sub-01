@@ -1,9 +1,9 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 01:30 UTC** (pass 9). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 03:15 UTC** (pass 14). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-**Merged on 2026-10-02:** #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
+**Merged on 2026-10-02:** #26 English-only output (owner-approved), #24 atomic state-file writes (owner-approved; CI green), #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
 
 **Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
 coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
@@ -15,7 +15,11 @@ Owner actions now:
   Make sure the `/data` volume has ≥ 300 MB free. It then runs 21:00–22:00 Tokyo daily (≤ 1 GPU-hour/day, ≈
   $0.27–0.85/day, 8 GPU-hours/week cap).
 - **OpenRouter spend starts with this deploy** (your `OPENROUTER_API_KEY` is on Railway): Haiku 4.5, capped at $1.00 per Tokyo day. Check `/api/decisions` → `eyes` (`calls_today`, `usd_today`, `last_error`) after the deploy.
-- Everything open is merged. Next: #21 (atomic writes) is in progress; #12 CI and #13 about page are in progress.
+- In progress:
+  - room movement fix (`fix/room-bed-phone`): he glides in the destination pose straight through the furniture
+    instead of walking, plus the bed-phone pose and the disclaimer overlap;
+- Live QA: blocked. `SUB01_SITE_PASSWORD` was added to Railway's variables, but sessions read the **Claude** SUB-01 environment's variables. The Railway copy is unused and can be deleted.
+- **Railway credit: "24 days or $4.17 left"** (owner's screenshot, 2026-10-02). The service stops when it runs out; move to a paid plan before launch.
 
 Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
@@ -56,18 +60,18 @@ cheap to run, with the password gate kept until launch day.
 | 9 | Sleep circuit (Phillips-Robinson) | done | #11 |
 | 10 | Spiking memory on GPU, daily test card | done (idle until the RunPod keys are set on Railway) | #9 |
 | 11 | Brain decides what he clicks (Haiku 4.5 eyes, $1/day cap) | done | #20 |
-| 12 | CI (tests + demo smoke on every PR) | in progress | issue #12 |
-| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | in progress | issue #13 |
+| 12 | CI (tests + demo smoke on every PR) | done | #22 |
+| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | done (follow-up for credits pending; links from the pages come with the room fix) | #23 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
-| 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | in progress | issue #21 |
+| 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
 
 ## Merge order
-One task at a time on `live_server.py`: **#21** atomic writes (in progress) → **#14** launch load → **#19** perf →
+One task at a time on `live_server.py`: **#14** launch load (next) → **#19** perf →
 **#18** non-root → **#17** YouTube/chess → **#15** ops (last; it reads every cost log).
 
 **#12** CI and **#13** about page touch no shared files and can merge at any time.
@@ -103,6 +107,8 @@ findings "NOT verified", and its reviews are partial on large diffs.
   coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
   `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
   and the `?rate=` bug.
+- **2026-10-02: the site is English-only** (owner). Viewers may write in any language and Italian words still reach the brain as stimuli, but nothing shown or generated is in another language.
+- **2026-10-02: CI-only and docs-only merges do not count for the 60-minute spacing:** they don't change what runs on Railway.
 - **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
   I rendered both in headless Chromium. The new room is cleaner, and its provenance is documented as CC0 or made for
   the project (`web/room/CREDITS.md`); the old room is a single AI-generated mesh. A later PR removes the old GLBs.
@@ -131,13 +137,14 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
-- **No CI:** a broken `main` deploys straight to Railway. Fix: #12.
+- ~~No CI~~: CI runs on every PR since #22.
 - ~~Test bug on `main` (Chromium tests stopped the driver twice)~~: fixed with the #7 merge.
 - **Honesty:** the PCI and Pong results are negative and must stay visible as such. "Digital twin" wording suggests
   a copy of the person; use "a model built from one person's public MRI data".
 - **Stale branches** (`feature/rw-*`, `feature/twin-*`, `feature/real-world`, `assets/cc0`, `test/integration`,
   `claude/youthful-bohr-*`, `claude/affectionate-brown-*`): delete them after launch. The coordinator never deletes
   branches.
+- **Character movement in the room** (seen live by the owner): in-room activity changes glide straight to the new spot in the destination pose, through the furniture. The fix is in progress (`fix/room-bed-phone`).
 - **Coordinator pushes to PR branches:** only merge commits that clear conflicts, and only when the owner asks. The
   first was #9's `fe60d9f` (2026-10-01). Authoring sessions must pull before pushing.
 
@@ -162,4 +169,5 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - [ ] X account ready. Posts follow the same wording rules (no consciousness claims, no price talk).
 - [ ] Secrets set on Railway only: `SITE_PASSWORD`, `REPLICATE_API_TOKEN`, `RUNPOD_API_KEY`, `SUB01_POD_SECRET`,
       `OPENROUTER_API_KEY` (set), optional `ANTHROPIC_API_KEY`; later `SUB01_ADMIN_TOKEN`.
+- [ ] Railway on a paid plan (trial credit showed 24 days / $4.17 left on 2026-10-02).
 - [ ] Launch day: remove `SITE_PASSWORD`; watch `/api/health` and spend for the first 24 h.

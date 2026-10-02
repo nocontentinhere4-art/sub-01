@@ -93,7 +93,7 @@
     <div><div class="lbl">Today</div><div id="log"></div></div>
     <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
       <div id="chat"></div>
-      <form id="f"><input id="in" maxlength="280" placeholder="e.g. vai a comprare il pane" autocomplete="off"><button>send</button></form>
+      <form id="f"><input id="in" maxlength="280" placeholder="e.g. go and buy some bread" autocomplete="off"><button>send</button></form>
       <div id="ack"></div>
     </div>
     <div id="neurons"></div>
@@ -361,7 +361,7 @@ function onLife(L, S){
   const logKey = JSON.stringify(L.log);
   if (logKey !== lastLog) { lastLog = logKey; document.getElementById("log").innerHTML = "";
     for (const e of L.log.slice().reverse()) { const d = document.createElement("div"); const s = document.createElement("span");
-      const dt = new Date(e.t * 1000); s.textContent = dt.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tokyo"});
+      const dt = new Date(e.t * 1000); s.textContent = dt.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tokyo"});
       d.appendChild(s); d.appendChild(document.createTextNode(e.what)); document.getElementById("log").appendChild(d); } }
   // phone overlay
   const ph = document.getElementById("phone"), tk = document.getElementById("tiktok"), cv = document.getElementById("phonecv");

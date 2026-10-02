@@ -15,6 +15,7 @@ import aiohttp
 from aiohttp import web
 
 from spiking.costs import CostLog
+from state_io import append_jsonl, load_json, save_json
 
 SPIKING_KEY = web.AppKey("spiking", object)
 POD_PATHS = ("/api/spiking/pod", "/api/spiking/weights", "/api/spiking/result")
@@ -52,8 +53,8 @@ class SpikingHub:
         self._good = -1e9
         self._tasks = set()
         try:
-            self.last = json.loads((self.dir / "last.json").read_text())
-        except (OSError, ValueError):
+            self.last = load_json(self.dir / "last.json", {})
+        except OSError:
             self.last = {}
 
     # --- auth ---------------------------------------------------------------------
@@ -76,14 +77,11 @@ class SpikingHub:
         if kind not in files:
             return False
         rec = {k: v for k, v in msg.items() if k != "type"} | {"received": datetime.now(timezone.utc).isoformat()}
-        with open(self.dir / f"{files[kind]}.jsonl", "a") as f:
-            f.write(json.dumps(rec) + "\n")
+        append_jsonl(self.dir / f"{files[kind]}.jsonl", rec)
         if kind == "memory_test":
             self.store_items(rec)
         self.last[kind] = rec
-        tmp = self.dir / "last.json.tmp"
-        tmp.write_text(json.dumps(self.last))
-        os.replace(tmp, self.dir / "last.json")
+        save_json(self.dir / "last.json", self.last)
         return True
 
     def store_items(self, rec):
@@ -100,9 +98,7 @@ class SpikingHub:
                          "label": rec.get("label"), "test_day": rec.get("day"), "session": rec.get("session"),
                          "received": rec["received"]})
         if rows:
-            with open(self.dir / ITEMS_FILE, "a") as f:
-                for r in rows:
-                    f.write(json.dumps(r) + "\n")
+            append_jsonl(self.dir / ITEMS_FILE, *rows)
         return rows
 
     def memory(self, max_lines=2000):

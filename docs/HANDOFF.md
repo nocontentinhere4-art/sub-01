@@ -28,6 +28,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   adult, gore, self-harm, extremism, drugs, gambling and crypto-trading sites/pages; every request to private/internal
   addresses is blocked; Chromium gets no secrets in its env), `live_server.py` (aiohttp; pages served
   with `Cache-Control: no-cache`; `/api/diary`, `/api/reading`, `/api/frames`, `/api/browsing`, `/api/screen/{desk,phone}.jpg`).
+- State files under `--data-dir` go through `state_io.py` (#21): `save_json` (tmp + fsync + `os.replace`) and
+  `load_json` (a missing or torn file gives defaults; a torn one is kept as `<name>.corrupt-<UTC time>` with one log line),
+  so a kill mid-write cannot crash-loop the server. JSONL logs append with `append_jsonl` and are read skipping torn lines.
+  New JSON state must use these too.
 - `Dockerfile` must copy every runtime module (currently also `diary.py research.py browse.py`) and installs Chromium
   (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
   multi-threaded BLAS spins when Chromium shares the CPU.

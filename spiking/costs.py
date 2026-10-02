@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sleep import ROME
+from state_io import append_jsonl
 
 
 def _now():
@@ -28,8 +29,7 @@ class CostLog:
     def _append(self, rec):
         with self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.path, "a") as f:
-                f.write(json.dumps(rec) + "\n")
+            append_jsonl(self.path, rec)
 
     def rows(self):
         if not self.path.exists():
