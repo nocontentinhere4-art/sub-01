@@ -69,13 +69,16 @@ ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "research": ("desk", "sitting_desk", (15, 45)),
     "order_food": ("bed", "lying_phone", (2, 4)),
     "get_delivery": ("door_in", "standing", (1, 2)),
+    "chat": ("desk", "sitting_desk", (6, 15)),
 }
+PLAN_BONUS = 0.35           # the day plan (mind.py) tilts the choice toward its next step; needs still come first
 COOK_MIN = (8, 15)          # simulated minutes before the courier leaves the shop
 COURIER_SPEED = 4.0         # m / simulated second (bike)
 LABEL = {"sleep": "sleeping", "phone": "in bed scrolling the phone", "eat": "eating bread at the table",
          "buy_bread": "buying bread", "chart": "watching the chart at the desk", "window": "looking out of the window",
          "park": "sitting on the park bench", "research": "reading at the computer",
-         "order_food": "ordering food on the phone", "get_delivery": "getting the delivery at the door"}
+         "order_food": "ordering food on the phone", "get_delivery": "getting the delivery at the door",
+         "chat": "answering chat at the computer"}
 DESIRES = [  # chat words -> short-lived desire
     (r"\b(pane|bread|fame|hungry|mangia|eat|colazione|breakfast)\b", "buy_bread"),
     (r"\b(tiktok|telefono|phone|scroll|social|video)\b", "phone"),
@@ -145,6 +148,9 @@ class Life:
         self.food = s.get("food", 0)           # delivered meals waiting to be eaten
         self.delivery = s.get("delivery")      # {"ordered", "leaves", "arrives"} sim times, while one is on its way
         self._t = 0.0
+        self.plan_hint = None                  # life activity of the day plan's next step (live_server, mind.py)
+        self.chat_waiting = 0                  # chat messages he may answer at the computer (live_server)
+        self.started = []                      # (sim t, activity) of the latest starts, read by live_server
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
@@ -195,7 +201,10 @@ class Life:
             "park": (0.8 * self.boredom + 0.05 + 0.8 * max(0, rel.get("reward", 1) - 1) + self.desire("park", t))
                     if day and rel.get("fear", 1) < 1.3 else 0.0,
             "window": 0.2 + 0.15 * max(0, rel.get("fear", 1) - 1) + self.desire("window", t),
+            "chat": 0.6 + 0.25 * min(3, self.chat_waiting) if self.chat_waiting else 0.0,
         }
+        if s.get(self.plan_hint, 0.0) > 0:              # the plan only tilts what is possible now
+            s[self.plan_hint] += PLAN_BONUS
         if self.activity in s:
             s[self.activity] *= 0.4                     # avoid doing the same thing twice in a row
         return max(s, key=lambda k: s[k] + 0.15 * r())
@@ -209,6 +218,7 @@ class Life:
         if act == "phone":
             self.phone_app = self.rng.choice(["chart", "chat", "tiktok", "chart"])
         self.desires.pop(act, None)
+        self.started = (self.started + [(t, act)])[-20:]
         self.say = why
         self.log = (self.log + [{"t": t, "what": why}])[-30:]
 
@@ -235,7 +245,7 @@ class Life:
             self.start("get_delivery", t, "the courier rings: goes to the door")
         if self.activity in ("window", "chart", "research"):
             self.boredom = min(1.0, self.boredom + dt_sim / (2 * 3600))
-        if self.activity == "phone":
+        if self.activity in ("phone", "chat"):
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
@@ -288,7 +298,10 @@ class Life:
                 "park": "feels good: goes out to the park", "window": "looks out of the window",
                 "research": "curious: sits at the computer to read", "order_food": "hungry: orders food on the phone",
                 "get_delivery": "the courier rings: goes to the door",
+                "chat": "chat messages are waiting: sits at the computer to answer",
             }[nxt]
+            if nxt == self.plan_hint and nxt != "sleep":
+                why += "; it is in today's plan"
             if nxt == "eat" and self.food:
                 why = "eats the delivery at the desk"
             if woke:

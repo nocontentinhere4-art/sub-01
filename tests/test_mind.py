@@ -217,6 +217,14 @@ def test_plan_is_followed_loosely_and_revised(tmp_path, brain):
     assert m.due_slot() == "evening"
 
 
+def test_a_first_plan_in_the_afternoon_is_not_redone_for_the_morning(tmp_path):
+    clock = Clock(at(2026, 10, 2, 14, 30))
+    m = mind(tmp_path, clock=clock, provider=None)
+    assert m.due_slot() == "noon"
+    m.plan_day()
+    assert m.plan["slots"] == ["morning", "noon"] and m.due_slot() is None
+
+
 def test_over_the_cap_he_keeps_yesterdays_plan(tmp_path, brain):
     clock = Clock(at(2026, 10, 1, 8))
     m = mind(tmp_path, PLANS, clock=clock)

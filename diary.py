@@ -30,10 +30,13 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 SYSTEM = """You write the morning entry of a dream diary for SUB-01, a simulated brain model built from public MRI scans.
 You receive JSON: the dream scenes the model's image generator produced during REM, the chat messages it replayed,
-the titles of encyclopedia articles it read during the day and replayed, and when it slept. Reply with JSON only: {"title": "...", "text": "..."}
+the titles of encyclopedia articles it read during the day and replayed, and when it slept; read_notes and
+conversations are what an AI noted for it that day (page summaries, chat lines and the replies an AI wrote).
+Reply with JSON only: {"title": "...", "text": "..."}
 - title: max 8 words, English, evocative, no quotes, no hashtags.
 - text: 2-3 sentences, max 60 words, English, third person ("SUB-01 dreamt..."), concrete images from the scenes,
-  weave in the replayed messages; replayed_articles may appear only as images or places, never as facts it learned.
+  weave in the replayed messages; replayed_articles, read_notes and conversations may appear only as images, places
+  or a line of talk, never as facts it learned or things it felt.
   Calm, precise, a little strange.
 - Never say or imply that SUB-01 is conscious, alive, sentient, human or a person, or the person the scans came
   from. No money, prices, tokens, buying or selling. No people's names."""
@@ -122,9 +125,11 @@ class Diary:
         d = self.load(n["date"])
         return None if d and d["closed"] else n["date"]
 
-    def close(self, night, llm=None, read_today=()):
+    def close(self, night, llm=None, read_today=(), notes=None):
         """Write title, text and share text for a finished night. `llm.ask(system, user)` is optional.
-        `read_today` = [{title, url}] of the articles read during the day before this night."""
+        `read_today` = [{title, url}] of the articles read during the day before this night; `notes` =
+        mind.Mind.day_notes(date): {read: [summaries], topics: [...], talked: [{who, said, reply}]} (optional)."""
+        notes = notes or {}
         d = self.entry(night["date"])
         allr = night.get("replays", [])
         replays = [r["text"] for r in allr if r.get("source", "chat") != "reading"]
@@ -144,11 +149,15 @@ class Diary:
         top_read = [a["title"] for a in read if a["replayed"]][:3]
         facts = {"sleep_onset": (night.get("sleep_onset") or "")[-5:], "woke_up": (night.get("woke_up") or "")[-5:],
                  "wakeups": len(night.get("wakeups", [])), "replays": len(replays), "top_replayed": top,
-                 "reading_replays": sum(rcounts.values()), "read": read, "dream_frames": len(d["frames"])}
+                 "reading_replays": sum(rcounts.values()), "read": read, "dream_frames": len(d["frames"]),
+                 "read_topics": list(notes.get("topics", []))[:5], "conversations": len(notes.get("talked", []))}
         title = text = ""
         if llm is not None and d["frames"]:
             user = json.dumps({"scenes": [f["scene"] for f in d["frames"] if f["scene"]][-12:],
                                "replayed_messages": top, "replayed_articles": top_read,
+                               "read_notes": list(notes.get("read", []))[:5],
+                               "conversations": [f"{c.get('who', 'a viewer')}: {c.get('said', '')[:120]} / "
+                                                 f"reply: {c.get('reply', '')[:160]}" for c in notes.get("talked", [])[:3]],
                                "slept": f"{facts['sleep_onset']}-{facts['woke_up']}"})
             for _ in range(2):                         # one retry: small models sometimes break the JSON
                 try:
@@ -166,7 +175,8 @@ class Diary:
                     f"message{'s' * (len(replays) != 1)} during REM" +
                     (f", most often “{top[0][:80]}”." if top else ".") +
                     (f" It also replayed {facts['reading_replays']} of the things it read, such as "
-                     f"“{top_read[0][:80]}”." if top_read else ""))
+                     f"“{top_read[0][:80]}”." if top_read else "") +
+                    (f" That day it read about {', '.join(facts['read_topics'][:3])}." if facts["read_topics"] else ""))
         d.update(title=title or f"Night of {night['date']}", text=text, facts=facts, closed=True,
                  share=self.share(night["date"], title, facts), closed_at=time.time())
         self.save(d)

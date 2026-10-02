@@ -16,9 +16,15 @@ the live server):
 - Mind.reply(message, nickname, context): a short chat reply (<= 40 words) from his memories and mood, at most one
   every 2 min and 40 a Tokyo day, only while awake and at the desk. Every message is untrusted; every reply passes
   the chat filter and the checks below, or no reply is sent.
-Budget: one ledger with eyes.py (<data>/eyes_costs.jsonl, eyes.Budget), $2.00 per Tokyo day across both by default
-(BRAIN_DECIDES_MAX_USD_PER_DAY); every call is logged with its cost. Over the cap: no summaries (a keyword-only trace
-is kept), yesterday's plan, no replies, and status()["resting"] is True.
+Budget: one ledger with eyes.py (<data>/eyes_costs.jsonl, one eyes.Budget per file: shared_budget), $2.00 per Tokyo
+day across both (BRAIN_DECIDES_MAX_USD_PER_DAY). Each part sees it through a Share with its own daily cap: the eyes
+keep their $1.00 (eyes_budget), the mind gets the other $1.00 (mind_budget); the 30 calls/hour cap is shared. Every
+call is logged with its cost. Over the cap: no summaries (a keyword-only trace is kept), yesterday's plan, no
+replies, and status()["resting"] is True.
+Phase B (live_server.py): eyes pages and Wikipedia articles go to read() in a worker thread; next_interest() is the
+browser's interest; plan_day() runs off the brain loop and its next step tilts life.py's choice (needs come first);
+chat messages wait in an inbox and are answered while he sits at the computer (the "chat" activity), broadcast as
+"his reply (AI-written)"; the diary gets day_notes().
 Nothing here understands, feels or is conscious: the AI writes notes and words, the brain model's simulated activity
 makes the choices.
 """
@@ -40,6 +46,8 @@ from state_io import _write_replace, append_jsonl, load_json, read_jsonl, save_j
 MODEL = os.environ.get("MIND_CLAUDE_MODEL") or "claude-haiku-4-5"            # no effort / thinking fields for Haiku
 OPENROUTER_MODEL = os.environ.get("MIND_OPENROUTER_MODEL") or "anthropic/claude-haiku-4.5"
 SHARED_USD_PER_DAY = float(os.environ.get("BRAIN_DECIDES_MAX_USD_PER_DAY") or 2.00)
+EYES_USD_PER_DAY = float(os.environ.get("EYES_MAX_USD_PER_DAY") or E.MAX_USD_PER_DAY)   # the eyes keep their $1.00
+MIND_USD_PER_DAY = float(os.environ.get("MIND_MAX_USD_PER_DAY") or 1.00)              # the rest of the shared $2.00
 LEDGER = "eyes_costs.jsonl"                                                   # the same file eyes.Eyes writes
 
 REPLY_EVERY_S = 120.0
@@ -60,6 +68,10 @@ PLAN_ACTIVITIES = {          # activity -> (life.py activity, networks it mostly
     "chat": ("chat", {"language": 0.7, "default": 0.4, "reward": 0.3}),
     "chess": ("chess", {"attention": 0.9, "control": 0.6}),
 }
+PLAN_LABEL = {"read": "read", "browse": "browse the web", "video": "watch videos", "window": "look out of the window",
+              "park": "go to the park", "bakery": "buy bread", "cook": "cook", "order_food": "order food",
+              "sleep_in": "sleep in", "chat": "chat with viewers", "chess": "play chess"}
+CAPTION = "An AI reads and remembers for him; his brain model chooses."
 SLOTS = (("morning", 6), ("noon", 12), ("evening", 18))     # Tokyo hours: plan, then revise twice
 
 
@@ -79,6 +91,78 @@ def shared_budget(data_dir=None, max_usd_day=None, _cache={}):
             return b
         _cache[key] = b
     return _cache[key]
+
+
+class Share:
+    """One part's view (eyes or mind) of the shared ledger: the shared caps (calls per hour, dollars per Tokyo day in
+    total) plus this part's own dollars per Tokyo day, so neither part can take more than it had before and the total
+    stays at the shared cap. record() writes one row to the shared ledger: every call is counted once."""
+
+    def __init__(self, shared, part, max_usd_day):
+        self.shared, self.part, self.max_usd_day = shared, part, float(max_usd_day)
+        self.day, self.day_usd = None, 0.0
+        self.lock = threading.Lock()
+
+    def mine(self, row):
+        return str(row.get("provider", "")).startswith("mind/") == (self.part == "mind")
+
+    def _sync(self):
+        self.shared.why_not()                                     # rolls the shared Tokyo day over
+        if self.day != self.shared.day:
+            self.day = self.shared.day
+            self.day_usd = sum(r.get("usd", 0.0) for r in self.shared.rows()
+                               if self.mine(r) and self.shared.tokyo_day(r.get("t", 0)) == self.day)
+
+    def why_not(self):
+        why = self.shared.why_not()
+        if why:
+            return why
+        self._sync()
+        if self.day_usd >= self.max_usd_day:
+            return f"daily AI budget for the {self.part} (${self.max_usd_day:.2f}, Tokyo day) reached; resumes tomorrow"
+        return None
+
+    def allow(self):
+        return self.why_not() is None
+
+    def over_day(self):
+        self._sync()
+        return self.day_usd >= self.max_usd_day or self.shared.day_usd >= self.shared.max_usd_day
+
+    def record(self, *a, **kw):
+        with self.lock:
+            self._sync()
+            row = self.shared.record(*a, **kw)
+            self.day_usd += row["usd"]
+            return row
+
+    def summary(self):
+        s = self.shared.summary()
+        self._sync()
+        s.update(part=self.part, part_usd_today=round(self.day_usd, 4), part_max_usd_per_day=self.max_usd_day,
+                 shared_max_usd_per_day=self.shared.max_usd_day, paused_until_tomorrow=self.over_day())
+        return s
+
+    def __getattr__(self, k):                                     # rows, tokyo_day, path, per_hour, ...
+        return getattr(self.shared, k)
+
+
+def eyes_budget(data_dir=None, _cache={}):
+    """The eyes' view of the shared ledger (pass to eyes.Eyes(budget=...)): $1.00 a Tokyo day as before."""
+    return _part(data_dir, "eyes", EYES_USD_PER_DAY, _cache)
+
+
+def mind_budget(data_dir=None, _cache={}):
+    return _part(data_dir, "mind", MIND_USD_PER_DAY, _cache)
+
+
+def _part(data_dir, part, cap, cache):
+    key = str((Path(data_dir) / LEDGER).absolute()) if data_dir else None
+    if key is None:
+        return Share(shared_budget(None), part, cap)
+    if key not in cache:
+        cache[key] = Share(shared_budget(data_dir), part, cap)
+    return cache[key]
 
 
 def default_provider():
@@ -402,7 +486,7 @@ class Mind:
             self.dir.mkdir(parents=True, exist_ok=True)
         self.clock = clock
         self.provider = default_provider() if provider == "default" else provider
-        self.budget = budget if budget is not None else shared_budget(data_dir)
+        self.budget = budget if budget is not None else mind_budget(data_dir)
         self.memory = Memory(self.dir, clock=clock, cap=memory_cap)
         self.read_urls = {}                                       # url -> memory id (one call per page)
         st = (load_json(self.dir / "state.json", {}) if self.dir else {}) or {}
@@ -433,14 +517,16 @@ class Mind:
         return raw
 
     def over_cap(self):
-        """The shared daily dollar cap is reached (eyes + mind, Tokyo day)."""
+        """The daily dollar cap is reached: the mind's share or the shared total (eyes + mind, Tokyo day)."""
+        if isinstance(self.budget, Share):
+            return self.budget.over_day()
         self.budget.why_not()                                     # rolls the Tokyo day over first
         return self.budget.day_usd >= self.budget.max_usd_day
 
     def status(self):
         return {"resting": self.over_cap(), "ai": self.why_not_ai() or "ok", "memories": len(self.memory.items),
                 "replies_today": self.replies["n"], "plan": self.plan.get("steps"),
-                "caption": "An AI reads and remembers for him; his brain model chooses."}
+                "caption": CAPTION}
 
     # --- 2. reading with meaning ---
     def read(self, page, brain=None):
@@ -609,6 +695,8 @@ class Mind:
         now = self.clock()
         day = tokyo(now).date().isoformat()
         slot = slot or self.due_slot(now) or "morning"
+        # every slot already begun is covered: a first plan made at 14:00 is not redone for the morning
+        passed = {name for name, hour in SLOTS if tokyo(now).hour >= hour} | {slot}
         vocab = self.vocabulary(state)
         same_day = self.plan.get("day") == day
         done = [s for s in self.plan.get("steps", []) if s.get("done")] if same_day and slot != "morning" else []
@@ -619,7 +707,7 @@ class Mind:
         if self.over_cap() and self.prev_plan.get("steps"):
             steps = [{"activity": s["activity"], "done": False} for s in self.prev_plan["steps"]
                      if s["activity"] in vocab]
-            self.plan = {"day": day, "slots": sorted(set(self.plan.get("slots", []) if same_day else []) | {slot}),
+            self.plan = {"day": day, "slots": sorted(set(self.plan.get("slots", []) if same_day else []) | passed),
                          "steps": done + (steps[:n_left] if n_left else steps), "reason": self.prev_plan.get("reason", ""),
                          "source": "yesterday", "why": "daily AI budget reached: yesterday's plan", "t": now}
             self._save("plan.json", self.plan)
@@ -642,7 +730,7 @@ class Mind:
         else:
             k = 0
         chosen = cands[k]
-        self.plan = {"day": day, "slots": sorted(set(self.plan.get("slots", []) if same_day else []) | {slot}),
+        self.plan = {"day": day, "slots": sorted(set(self.plan.get("slots", []) if same_day else []) | passed),
                      "steps": done + [{"activity": a, "done": False} for a in chosen["steps"]],
                      "reason": chosen["reason"], "source": chosen["source"], "t": now,
                      "candidates": [{"steps": c["steps"], "reason": c["reason"],
@@ -700,6 +788,8 @@ class Mind:
         why = self.can_reply(ctx)
         if why:
             return {"reply": None, "why": why, "source": None}
+        if self.over_cap():                                       # over the cap he rests: no replies at all
+            return {"reply": None, "why": "resting (daily AI budget reached)", "source": None}
         who = clean(nickname, 3, 24) if nickname else ""
         if HUMAN_Q.search(msg):
             text, source = HONEST, "rule"
@@ -732,6 +822,69 @@ class Mind:
                         brain=ctx.get("brain"))
         return {"reply": text, "why": "ok", "source": source}
 
+    # --- for the live server (phase B) ---
+    @staticmethod
+    def taste_view(tastes):
+        """A copy of tastes.py's table, taken on the event loop, for use in a worker thread (predict, top, pref)."""
+        return TasteView(dict(getattr(tastes, "pref", {}) or {}), tastes.top(12) if tastes is not None else None)
+
+    def life_started(self, life_activity):
+        """life.py started `life_activity`: the first open plan step it carries out is done."""
+        for s in self.plan.get("steps", []):
+            if not s.get("done") and PLAN_ACTIVITIES[s["activity"]][0] == life_activity:
+                return self.step_done(s["activity"])
+        return False
+
+    def plan_public(self):
+        """Today's plan for the page: "Today he wants to: ..." with the reason and the brain vote."""
+        p = self.plan
+        if not p.get("steps"):
+            return None
+        open_ = [PLAN_LABEL[s["activity"]] for s in p["steps"] if not s.get("done")]
+        return {"day": p.get("day"), "text": "Today he wants to: " + (", ".join(open_) if open_ else "rest"),
+                "steps": [{"activity": s["activity"], "label": PLAN_LABEL[s["activity"]], "done": bool(s.get("done"))}
+                          for s in p["steps"]],
+                "reason": p.get("reason", ""), "source": p.get("source"), "slots": p.get("slots", []),
+                "vote": (p.get("vote") or {}).get("reason"), "why": p.get("why"),
+                "candidates": [{"text": ", ".join(PLAN_LABEL[a] for a in c["steps"]), "reason": c["reason"],
+                                "p": c.get("p")} for c in p.get("candidates", [])]}
+
+    def public_notes(self, n=10):
+        """The latest notes for the page: page summaries and conversations, tagged as AI-written."""
+        items = sorted(self.memory.items.values(), key=lambda it: it["t"])
+        read = [{"t": it["t"], "summary": it["summary"], "topics": it.get("topics", []), "host": it.get("host", "")}
+                for it in items if it["kind"] == "page" and it.get("summary")][-n:]
+        talked = [{"t": it["t"], "who": it.get("who", "a viewer"), "said": it.get("said", ""), "reply": it.get("reply", "")}
+                  for it in items if it["kind"] == "chat"][-n:]
+        return {"read": read, "talked": talked}
+
+    def day_notes(self, date):
+        """What an AI noted for him on Tokyo `date` (YYYY-MM-DD): page summaries, their topics, conversations (diary)."""
+        items = sorted((it for it in self.memory.items.values() if tokyo(it["t"]).date().isoformat() == date),
+                       key=lambda it: (-it["importance"], it["t"]))
+        pages = [it for it in items if it["kind"] == "page" and it.get("summary")]
+        topics = []
+        for it in pages:
+            topics += [tp for tp in it.get("topics", []) if tp not in topics]
+        return {"read": [it["summary"] for it in pages[:8]], "topics": topics[:8],
+                "talked": [{"who": it.get("who", "a viewer"), "said": it.get("said", ""), "reply": it.get("reply", "")}
+                           for it in items if it["kind"] == "chat"][:5]}
+
     def _save(self, name, obj):
         if self.dir:
             save_json(self.dir / name, obj)
+
+
+class TasteView:
+    """Read-only copy of a tastes.Tastes table (pref, predict, top) safe to use off the event loop."""
+
+    def __init__(self, pref, top=None):
+        self.pref, self._top = pref, top
+
+    def predict(self, topics):
+        vals = [self.pref[t] for t in topics if t in self.pref]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    def top(self, n=12):
+        t = self._top or {"favoured": [], "avoided": []}
+        return dict(t, favoured=t.get("favoured", [])[:n], avoided=t.get("avoided", [])[:n])
