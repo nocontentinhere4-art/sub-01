@@ -72,6 +72,17 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     (Chromium back on `--no-sandbox`, loud line in the logs). `/data` stays owned by uid 1000, which root reads and writes
     anyway. Full revert: revert the #18 PR (Dockerfile ENTRYPOINT + `entrypoint.sh` + browse.py); no data migration.
 
+## Costs, caps and health (#15, `docs/OPERATIONS.md`)
+- `costs.py`: one view of every paid service per Tokyo day. The eye and the diary write `/data/costs.jsonl`; the eyes
+  and the mind stay in their shared `/data/eyes_costs.jsonl`; RunPod stays in `/data/spiking/costs.jsonl`. It reads
+  them all and counts each cost once. Caps per Tokyo day are checked before every paid call: `SUB01_CAP_EYE_USD` 1.00,
+  `SUB01_CAP_DIARY_USD` 0.10, `SUB01_CAP_EYES_USD` 1.00 and `SUB01_CAP_MIND_USD` 1.00 (the existing shares),
+  `SUB01_CAP_TOTAL_USD` 3.10 (their sum; RunPod excluded). Over a cap the eye keeps its last frame ("resting its
+  eyes"), the diary writes its template, the eyes use local options, the mind rests.
+- `GET /healthz`: public, 200 if the brain loop ticked within 5 s, else 503. Set it as Railway's healthcheck path.
+  `GET /api/costs` and `/api/health` are admin-only (the password cookie, or the `SUB01_ADMIN_TOKEN` header). Tick
+  times sit in a 1200-entry ring buffer (`Live.tick_s`).
+
 ## Reading memory (PR `feature/reading-memory`)
 - What he reads is a stimulus: up to 8 keywords (title + extract) through chat.py's rules at 0.5x a chat message,
   + language/attention 1.5, times the sleep gain. Stored in `sleep.Memory` with `source="reading"`; REM replay
