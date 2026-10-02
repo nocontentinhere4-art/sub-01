@@ -48,6 +48,7 @@ import music as music_mod
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from search_sources import live_interest
+from readings import BrowseReadings
 from eyes import Eyes
 import mind as mind_mod
 from tastes import PageWatch, Tastes
@@ -84,6 +85,7 @@ AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
 WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
 WS_SNDBUF = 64 * 1024          # kernel send buffer of a websocket (instead of autotuned megabytes)
 WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
+WIKI_FALLBACK_S = 300           # the browser down this long (real seconds): Wikipedia feeds the readings (#79)
 VIDEO_DRIVE = 6.0               # visual drive of a full scene change while he watches a video (a chat rule is 6-8)
 CHESS_THINK_S = (15.0, 45.0)    # simulated seconds he takes per move (the vote itself takes ~0.3 s of CPU)
 CHESS_REPLY_S = (5.0, 15.0)     # ...and the opponent
@@ -273,6 +275,8 @@ class Live:
         self.life.time_scale = time_scale
         self.reading_path = Path(data_dir) / "reading.json"
         self.reader = Reader(load_json(self.reading_path))
+        self.browse_readings = BrowseReadings()   # #79: readings come from the pages he stays on
+        self.browser_down_since = None   # wall time the browser went down (Wikipedia is the fallback after a while)
         self.browsing_path = Path(data_dir) / "browsing.json"
         self.browser = None              # BrowserClient (main() with --browse): Chromium runs in its own process
         self.local_browser = None        # LocalBrowser when that process is our child (no BROWSE_SERVICE_URL)
@@ -403,7 +407,9 @@ class Live:
         for g, a in stim.items():
             self.brain.stimulate(g, a * gain)
         m = self.memory.add(t, art["title"], self.engine.stage, stim, emotion, hits, source="reading",
-                            title=art["title"], keywords=art.get("keywords", []), url=art.get("url", ""))
+                            title=art["title"], keywords=art.get("keywords", []), url=art.get("url", ""),
+                            host=art.get("host", "en.wikipedia.org"), kind=art.get("kind", "wiki"),
+                            via=art.get("via", "wikipedia"))
         art.update(networks=hits, emotion=emotion, gain=round(gain, 2))
         return m
 
@@ -727,25 +733,44 @@ class Live:
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
 
-    # --- the computer: what it reads (Wikipedia only) ---------------------------------
+    # --- the computer: what it reads -------------------------------------------------
+    def wiki_fallback(self):
+        """#79: Wikipedia feeds the readings only when the browser cannot: off (no playwright, BROWSE=0), or down /
+        restarting for more than WIKI_FALLBACK_S."""
+        if not self.browser:
+            return True
+        down = self.browser_down_since
+        return down is not None and time.time() - down > WIKI_FALLBACK_S
+
     async def run_research(self):
         loop = asyncio.get_running_loop()
         while True:
             await asyncio.sleep(5)
             t = self.clock.now()
-            if self.life.activity != "research" or self.life.path or not self.reader.due(t):
+            if self.life.activity != "research" or self.life.path or not self.reader.due(t) or not self.wiki_fallback():
                 continue
             art = await loop.run_in_executor(None, self.reader.read, t, self.heard(t), dict(self.last_rel))
             if art:
-                m = self.absorb_reading(art)
+                art.update(host="en.wikipedia.org", kind="wiki", via="wikipedia")
                 self.remember({"url": art.get("url", ""), "title": art["title"], "host": "en.wikipedia.org",
                                "text": art.get("extract", "")})
-                try:
-                    art["tonight"] = await loop.run_in_executor(None, self.tonight_chance, m)
-                    art["tonight_night"] = night_date(next_bedtime(self.clock.now()))
-                except Exception as e:                     # an estimate must never stop the reading
-                    print("research: replay estimate failed:", repr(e)[:120], flush=True)
-                await self.broadcast({"type": "reading", **art})
+                await self.take_reading(art)
+
+    async def take_reading(self, art):
+        """A reading (a page he stayed on, or the Wikipedia fallback) becomes a stimulus and a memory, is estimated
+        for tonight's replay and goes out on the feed with its host and kind."""
+        loop = asyncio.get_running_loop()
+        m = self.absorb_reading(art)
+        if art.get("via") == "browser":
+            self.reader.record(art)                        # "on his mind" and /api/reading show it
+        print(f"reading ({art.get('via', 'wikipedia')}, {art.get('kind', 'wiki')}): {art['title'][:60]!r}", flush=True)
+        try:
+            art["tonight"] = await loop.run_in_executor(None, self.tonight_chance, m)
+            art["tonight_night"] = night_date(next_bedtime(self.clock.now()))
+        except Exception as e:                             # an estimate must never stop the reading
+            print("research: replay estimate failed:", repr(e)[:120], flush=True)
+        await self.broadcast({"type": "reading", **art})
+        return m
 
     # --- the screens: a real browser on the open web (desk + phone) -------------------
     def screen_device(self):
@@ -778,6 +803,9 @@ class Live:
                 if dev is None:
                     if open_dev and now - idle_since > 120:     # put away: the service frees the memory
                         self.end_page()
+                        br = getattr(self, "browse_readings", None)
+                        if br and (art := br.flush(self.clock.now())):
+                            await self.take_reading(art)
                         await self.browser.close()
                         open_dev = None
                     continue
@@ -804,8 +832,12 @@ class Live:
                 st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
                 if st and (st.get("video") or {}).get("watching"):
                     self.video_drive(st["video"])
+                self.browser_down_since = None
                 if st:
                     self.reader.saw(st, t)                      # #56: "on his mind" is what he is actually reading
+                    br = getattr(self, "browse_readings", None)
+                    if br and (art := br.seen(st, t)):          # #79: a page he stayed on becomes the reading
+                        await self.take_reading(art)
                 if st:
                     await self.broadcast({"type": "screen", **self.screen_status(dev)})
                 if now - last_sync > 30:                        # the log shown on /api/browsing stays fresh
@@ -815,6 +847,10 @@ class Live:
                     save_json(self.browsing_path, self.browsing_state, ensure_ascii=False)
                     last_save = now
             except BrowserDown as e:
+                if getattr(self, "browser_down_since", None) is None:
+                    self.browser_down_since = time.time()       # Wikipedia takes over after WIKI_FALLBACK_S
+                if br := getattr(self, "browse_readings", None):
+                    br.flush(self.clock.now())
                 if not self.browser.restarting:
                     print("browser down:", e, flush=True)
                     self.browser.restarting = True
@@ -855,6 +891,8 @@ class Live:
         """The eyes list options for the page; the brain model votes; the browser carries the choice out."""
         loop = asyncio.get_running_loop()
         try:
+            if br := getattr(self, "browse_readings", None):           # the excerpt of a later reading (#79)
+                br.text(page.get("url"), page.get("text"))
             opts, meta = await asyncio.wait_for(loop.run_in_executor(None, self.eyes.propose, page, interest), 60)
         except asyncio.TimeoutError:                           # the AI is too slow: the page's own links
             from eyes import local_options
@@ -1213,7 +1251,8 @@ class Live:
                         if why:
                             print(f"diary: {why}; template text", flush=True)
                         llm = None if why else costs.MeteredLLM(llm, self.ledger, "diary")
-                    read = [{"title": m["text"], "url": m.get("url", "")} for m in self.memory.items
+                    read = [{"title": m["text"], "url": m.get("url", ""), "host": m.get("host", ""),
+                             "kind": m.get("kind", "wiki")} for m in self.memory.items
                             if m.get("source") == "reading" and day_of(m["t"]) == date]
                     notes = dict(self.mind.day_notes(date)) if getattr(self, "mind", None) else {}
                     notes["music"] = self.music.day(date)                       # what his brain model picked (#68)

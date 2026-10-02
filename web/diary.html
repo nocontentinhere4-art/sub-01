@@ -71,7 +71,8 @@ even when nobody is watching; the entry is written the next morning, Tokyo time.
   <aside>
     <section><div class="lbl">Messages replayed in REM</div><div id="replays"></div></section>
     <section><div class="lbl">Read that day · replayed that night</div><div id="read"></div>
-      <div class="hint">Wikipedia articles it opened during the day. What it reads becomes stimuli and dream material;
+      <div class="hint">Pages it stayed on during the day: articles, threads, videos, shorts (Wikipedia only when its
+      browser was off). What it reads or watches becomes stimuli and dream material;
       it does not understand the text. Readings count less than your messages when it picks what to replay.</div></section>
     <section id="sharebox"><div class="lbl">Share text</div>
       <textarea id="share" readonly></textarea>
@@ -118,7 +119,7 @@ async function open(date){
   const read = x.read || [];
   $("read").innerHTML = !night.closed ? `<div style="color:#55556a">written in the morning</div>`
     : read.length ? read.map(a => `<div>${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}`
-        + `<span class="${a.replayed ? "y" : ""}">${a.replayed ? `replayed ${a.replayed}×` : "not replayed"}${a.today ? "" : " · read earlier"}</span></div>`).join("")
+        + `<span class="${a.replayed ? "y" : ""}">${a.verb && a.verb !== "read" ? `${esc(a.verb)} · ` : ""}${a.replayed ? `replayed ${a.replayed}×` : "not replayed"}${a.today ? "" : " · read earlier"}</span></div>`).join("")
     : `<div style="color:#55556a">nothing read that day</div>`;
   $("sharebox").hidden = !night.closed;
   $("share").value = night.share || "";
