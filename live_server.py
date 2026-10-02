@@ -1,6 +1,6 @@
 """SUB-01 live: runs the whole-brain model in real time and feeds it Solana trades and chat messages.
 
-    python live_server.py --mint <token mint>   # real pump.fun / PumpSwap trades
+    python live_server.py --mint <OUR token mint>   # real pump.fun / PumpSwap trades of our coin (env MINT; unset: no feed)
     python live_server.py --demo                                         # synthetic trades
     python live_server.py --demo --time-scale 60 --start 23:55           # one sim hour per real minute
 
@@ -81,6 +81,14 @@ DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
 AMM_BUY = bytes.fromhex("67f4521f2cf57777")      # PumpSwap BuyEvent
 AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
+# Anchor event discriminators are sha256("event:<Name>")[:8], so any program with a "TradeEvent" (e.g. Raydium
+# LaunchLab) emits the same 8 bytes with another layout: an event only counts when the program that emitted it is
+# pump.fun / PumpSwap, and when it is about our mint (bonding curve) or one of our pools (PumpSwap).
+PUMP_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+PUMP_AMM_PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+MAX_TRADE_USD = 250_000.0       # a single trade above this is a decoding error or noise: ignored (logged <= 1/min)
+POOLS_REFRESH_S = 600           # re-read our PumpSwap pool(s) from DexScreener (a bonding curve graduates live)
+B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
 WS_SNDBUF = 64 * 1024          # kernel send buffer of a websocket (instead of autotuned megabytes)
 WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
@@ -106,25 +114,67 @@ def target_key(option):
     return option["action"]
 
 
-def decode_trades(logs):
-    """Anchor events in 'Program data:' lines -> [{kind, sol}]."""
-    out = []
+def b58decode(text):
+    """Base58 (Solana addresses) -> bytes; ValueError on a bad character."""
+    n = 0
+    for c in text:
+        n = n * 58 + B58.index(c)
+    raw = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    return b"\0" * (len(text) - len(text.lstrip("1"))) + raw
+
+
+def b58encode(b):
+    n, out = int.from_bytes(b, "big"), ""
+    while n:
+        n, r = divmod(n, 58)
+        out = B58[r] + out
+    return "1" * (len(b) - len(b.lstrip(b"\0"))) + out
+
+
+def emitted(logs):
+    """'Program data:' lines with the program that emitted them (the innermost invoked program at that line)."""
+    stack, out = [], []
     for line in logs:
-        if not line.startswith("Program data: "):
+        if line.startswith("Program data: "):
+            out.append((stack[-1] if stack else None, line[14:]))
+        elif line.startswith("Program "):
+            p = line.split()
+            if len(p) >= 3 and p[2] == "invoke":
+                stack.append(p[1])
+            elif len(p) >= 3 and p[2] in ("success", "failed:", "failed") and stack:
+                stack.pop()
+    return out
+
+
+def decode_trades(logs, mint=None, pools=None):
+    """Anchor events of pump.fun / PumpSwap in a transaction's logs -> [{kind, sol}].
+    pump.fun bonding curve TradeEvent: mint (32), sol_amount u64, token_amount u64, is_buy bool, ... (lamports).
+    PumpSwap Buy/SellEvent: timestamp, base_amount, quote limit, user base/quote reserves, pool base/quote reserves,
+    quote_amount (u64 each), ..., pool pubkey at byte 120. Only events emitted by those two programs count; with
+    `mint`, a TradeEvent must be about that mint; with `pools`, a PumpSwap event must be about one of those pools
+    (a route through someone else's pool in the same transaction is not our trade). No pools known -> no PumpSwap."""
+    out = []
+    want_mint = b58decode(mint) if mint else None
+    for prog, data in emitted(logs):
+        try:
+            b = base64.b64decode(data)
+        except ValueError:
             continue
-        b = base64.b64decode(line[14:])
-        if b[:8] == PUMP_TRADE and len(b) >= 57:
-            sol, _, is_buy = struct.unpack_from("<QQ?", b, 40)          # after mint pubkey
+        if b[:8] == PUMP_TRADE and prog == PUMP_PROGRAM and len(b) >= 57:
+            if want_mint is not None and b[8:40] != want_mint:
+                continue
+            sol, _, is_buy = struct.unpack_from("<QQ?", b, 40)
             out.append({"kind": "buy" if is_buy else "sell", "sol": sol / 1e9})
-        elif b[:8] in (AMM_BUY, AMM_SELL) and len(b) >= 72:
-            # fields: ts, base_amount, quote_limit, user_base, user_quote, pool_base, pool_quote, quote_amount
+        elif b[:8] in (AMM_BUY, AMM_SELL) and prog == PUMP_AMM_PROGRAM and len(b) >= 152:
+            if pools is not None and b58encode(b[120:152]) not in pools:
+                continue
             f = struct.unpack_from("<8Q", b, 8)
             buy_base = b[:8] == AMM_BUY
-            if f[5] < f[6]:          # smaller raw reserve = SOL side, so SOL is the pool's base
+            if f[5] < f[6]:          # smaller raw reserve = SOL side (9 decimals vs the token's 6), so SOL is the base
                 sol, is_buy = f[1], not buy_base
-            else:
+            else:                    # the usual pump pool: base = the token, quote = WSOL
                 sol, is_buy = f[7], buy_base
-            out.append({"kind": "buy" if is_buy else "sell", "sol": sol / 1e9 if sol < 1e13 else 0.0})
+            out.append({"kind": "buy" if is_buy else "sell", "sol": sol / 1e9})
     return out
 
 
@@ -248,7 +298,9 @@ class Live:
         self.init_sockets()
         self.pending = []           # trades waiting to be played into the brain
         self.seen = set()
-        self.pool_name = "demo" if demo else mint[:6]
+        self.pool_name = "demo" if demo else (mint[:6] if mint else "no coin yet")   # MINT unset: no feed
+        self.pools = set()                 # our PumpSwap pool address(es), from DexScreener (rpc_trades)
+        self.absurd_logged = 0.0           # last time an absurd trade was logged (at most once a minute)
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
         self.diary = None                # dream diary, set by main() with --eye
@@ -337,16 +389,46 @@ class Live:
         self.neuro.on_trade(tr["kind"], tr["usd"], t=time.time())          # buys: dopamine RPE; sells: noradrenaline
         self.recent_trades = [x for x in self.recent_trades if time.time() - x[0] < 300] + [(time.time(), tr["kind"], tr["usd"])]
 
-    async def rpc_trades(self):
-        """Stream every pump.fun / PumpSwap trade of the mint straight from Solana logs."""
-        async with aiohttp.ClientSession() as http:
+    async def lookup_pools(self, http):
+        """Our token's name and PumpSwap pool(s) from DexScreener, refreshed every POOLS_REFRESH_S."""
+        while True:
             try:
                 async with http.get(DEXS.format(self.mint)) as r:
                     pairs = (await r.json()).get("pairs") or []
-                    if pairs:
-                        self.pool_name = f"${pairs[0]['baseToken']['symbol']}"
+                if pairs:
+                    self.pool_name = f"${pairs[0]['baseToken']['symbol']}"
+                self.pools = {p["pairAddress"] for p in pairs if p.get("dexId") == "pumpswap" and p.get("pairAddress")}
             except Exception as e:
-                print("name lookup failed:", e)
+                print("pool lookup failed:", type(e).__name__, flush=True)
+            await asyncio.sleep(POOLS_REFRESH_S)
+
+    def take_trade(self, tr, sig):
+        """A decoded trade -> the pending queue, unless it is absurd (a decoding error must never reach the brain)."""
+        tr["usd"] = tr.pop("sol") * self.sol_usd
+        if not (0.0 <= tr["usd"] <= MAX_TRADE_USD):
+            now = time.time()
+            if now - self.absurd_logged >= 60:
+                self.absurd_logged = now
+                print(f"ignored an absurd trade (${tr['usd']:,.0f} > ${MAX_TRADE_USD:,.0f}) in {sig[:16]}…", flush=True)
+            return False
+        tr["tx"], tr["who"], tr["at"] = sig, "", time.time()
+        self.pending.append(tr)
+        return True
+
+    async def rpc_trades(self):
+        """Stream every pump.fun / PumpSwap trade of OUR mint straight from Solana logs. No MINT: no feed at all."""
+        if not self.mint:
+            print("trade feed off: MINT is not set (no coin yet)", flush=True)
+            return
+        try:
+            ok = len(b58decode(self.mint)) == 32
+        except ValueError:
+            ok = False
+        if not ok:
+            print("trade feed off: MINT is not a valid Solana address", flush=True)
+            return
+        async with aiohttp.ClientSession() as http:
+            asyncio.create_task(self.lookup_pools(http))
             asyncio.create_task(self.sol_price(http))
             backoff = 2.0
             while True:
@@ -359,10 +441,8 @@ class Live:
                             v = json.loads(m.data).get("params", {}).get("result", {}).get("value")
                             if not v or v.get("err"):
                                 continue
-                            for tr in decode_trades(v["logs"]):
-                                tr["usd"] = tr.pop("sol") * self.sol_usd
-                                tr["tx"], tr["who"], tr["at"] = v["signature"], "", time.time()
-                                self.pending.append(tr)
+                            for tr in decode_trades(v["logs"], self.mint, self.pools):
+                                self.take_trade(tr, v["signature"])
                 except Exception as e:                    # public RPCs refuse some cloud IPs: back off, don't hammer
                     if backoff == 2.0 or backoff >= 60:
                         print(f"rpc stream error, retrying every {backoff:.0f}s:", str(e).split(", url=")[0], flush=True)
@@ -1626,7 +1706,7 @@ async def main(args):
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, args.host, args.port).start()
-    print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
+    print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else (args.mint or 'no coin yet: trade feed off')}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     live.life.can_watch = bool(live.browser)     # no browser: no videos at the desk
     tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades(),
@@ -1663,9 +1743,9 @@ async def main(args):
                 await live.browser.aclose()
 
 
-if __name__ == "__main__":
+def build_parser():
     p = argparse.ArgumentParser()
-    p.add_argument("--mint", default=os.environ.get("MINT", "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"))
+    p.add_argument("--mint", default=os.environ.get("MINT", "").strip())   # our token, set at launch; empty: no trade feed
     p.add_argument("--demo", action="store_true")
     p.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8765)))
     p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
@@ -1681,4 +1761,8 @@ if __name__ == "__main__":
     p.add_argument("--browse", action="store_true", default=os.environ.get("BROWSE") == "1",
                    help="real headless browser on the open web for his computer and phone screens (needs playwright)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
-    asyncio.run(main(p.parse_args()))
+    return p
+
+
+if __name__ == "__main__":
+    asyncio.run(main(build_parser().parse_args()))
