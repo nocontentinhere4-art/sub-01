@@ -443,6 +443,59 @@ def test_a_chat_wish_makes_the_activity_likely():
     assert lf.until == NOON + 60
 
 
+def _hungry(lf, lo, hi):
+    """Sets the body's ghrelin-like proxy so that lo < hunger < hi."""
+    for g in np.linspace(0.0, 1.0, 201):
+        lf.body.ghrelin = g
+        if lo < lf.hunger < hi:
+            return lf
+    raise AssertionError((lo, hi))
+
+
+def _at(lf, act, t):
+    """He is doing `act` at its place since t (already arrived)."""
+    lf.start(act, t, "test")
+    lf.place, lf.path = L.ACTIVITIES[act][0], []
+    lf.x, lf.z = L.PLACES[lf.place]
+    return lf
+
+
+def test_a_game_in_progress_is_not_cut_by_a_mild_hunger():
+    """The chess smoke failure: the one-game-an-hour rule scored the game he had just started 0, so any hunger above
+    SATED ended it before live_server could set up the board. Mild hunger: he finishes the game, then eats."""
+    for seed in range(20):
+        lf = _hungry(_at(_life(seed=seed), "play_chess", NOON), L.SATED + 0.03, L.EAT_AT - 0.02)
+        for k in range(30):                                             # 30 simulated minutes at the board
+            lf.update(NOON + 60 * k, 1.0, 60.0, "AWAKE", {}, 0.0, 0.0)
+            lf.body.ghrelin = min(lf.body.ghrelin, 0.99)
+            if lf.hunger >= L.EAT_AT:
+                break
+            assert lf.activity == "play_chess", (seed, k, lf.hunger)
+    lf = _hungry(_at(_life(), "play_chess", NOON), L.EAT_AT + 0.1, 1.01)           # meal time: needs first still holds
+    assert lf.hungry_now(NOON + 60, {}, 0.0, 0.0)
+
+
+def test_a_heard_chess_wish_leads_to_a_game_within_minutes():
+    for seed in range(30):
+        for act in ("research", "chat", "window", "park"):
+            lf = _hungry(_life(seed=seed), 0.0, L.SATED)
+            lf.chat_waiting = 1 if act == "chat" else 0
+            _at(lf, act, NOON)
+            for _ in range(2 if act == "chat" else 1):                  # answering the chat: the wish is in it
+                lf.hear("let's play chess", NOON + 60)
+            t = NOON + 60
+            while lf.activity != "play_chess" and t < NOON + 5 * 60:
+                t += 30
+                lf.update(t, 0.5, 30.0, "AWAKE", {}, 0.0, 0.0)
+            assert lf.activity == "play_chess", (seed, act)
+    lf = _hungry(_at(_life(), "research", NOON), 0.0, L.SATED)           # one game an hour: no wish breaks that rule
+    lf.last_chess = NOON - 600
+    lf.hear("let's play chess", NOON + 60)
+    for k in range(10):
+        lf.update(NOON + 60 * (k + 1), 1.0, 60.0, "AWAKE", {}, 0.0, 0.0)
+    assert lf.activity == "research"
+
+
 def test_the_vote_card_stays_on_the_video_it_chose():
     dec = {"options": [], "reason": "r", "page_url": "https://www.youtube.com/results?search_query=x", "status_id": 3,
            "led_to": "https://www.youtube.com/watch?v=a1", "watch_min": 4.0}

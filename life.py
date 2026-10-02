@@ -27,6 +27,9 @@ FOOD_WAITING = 1.2          # a meal waiting at home and hunger above SATED: eat
 INTERRUPT_MARGIN = 0.3      # a food action that beats the current activity by this much ends it early
 FOOD_ACTS = ("eat", "buy_bread", "buy_konbini", "order_food", "get_delivery")
 INTERRUPTIBLE = ("phone", "chart", "window", "research", "chat", "watch_video", "play_chess", "listen_music")
+# a wish heard in the chat for one of these (a desire of at least WISH_MIN) that beats what he is doing at home, or on
+# the park bench, by INTERRUPT_MARGIN ends it early: "let's play chess" leads to a game within minutes, not hours
+WISH_INTERRUPTS, WISH_MIN = ("play_chess",), 0.5
 # background music (#68): a flag, not an activity; live_server may put a track on during these, or on a walk outside
 MUSIC_BG = ("research", "play_chess", "park")
 
@@ -221,8 +224,9 @@ class Life:
         u = max(0.0, (self.hunger - SATED) / (EAT_AT - SATED))
         return NEED_W * u ** 3
 
-    def scores(self, t, rel, market_hot, pressure):
-        """Utility of each activity now (awake), before the repeat penalty and the noise."""
+    def scores(self, t, rel, market_hot, pressure, going_on=False):
+        """Utility of each activity now (awake), before the repeat penalty and the noise. going_on: the score of
+        carrying on with the current activity, so a game already started is not held to the one-per-hour rule."""
         h = local(t).hour + local(t).minute / 60
         open_bakery = 7 <= h < 20
         kitchen_open = 10 <= h < 23.5
@@ -252,7 +256,8 @@ class Life:
             "watch_video": (0.15 + 0.55 * self.boredom + 0.25 * max(0, rel.get("visual", 1) - 1)
                             + self.desire("watch_video", t)) if self.can_watch else 0.0,
             "play_chess": (0.3 + 0.2 * (1 - self.boredom) + 0.25 * max(0, rel.get("attention", 1) - 1)
-                           + self.desire("play_chess", t)) if self.chess_ok(t) and 8 <= h < 23.5 else 0.0,
+                           + self.desire("play_chess", t))
+                          if (self.chess_ok(t) or going_on and self.activity == "play_chess") and 8 <= h < 23.5 else 0.0,
             # music (#68): when bored or tired, more in the evening; needs still come first (food gets NEED_W)
             "listen_music": (0.12 + 0.4 * self.boredom + 0.35 * min(1.0, max(0.0, pressure))
                              + (0.15 if 18 <= h or h < 1 else 0.0) + 0.15 * max(0, rel.get("reward", 1) - 1)
@@ -272,11 +277,25 @@ class Life:
         return max(s, key=lambda k: s[k] + 0.15 * r())
 
     def hungry_now(self, t, rel, market_hot, pressure):
-        """Needs first: a food action now beats what he is doing at home by INTERRUPT_MARGIN, so he stops early."""
+        """Needs first: a food action now beats what he is doing at home by INTERRUPT_MARGIN, so he stops early. A chess
+        game is only cut at meal time (EAT_AT): with a mild hunger he finishes the game, then eats."""
         if self.activity not in INTERRUPTIBLE or self.hunger <= SATED:
             return False
-        s = self.scores(t, rel, market_hot, pressure)
+        if self.activity == "play_chess" and self.hunger < EAT_AT:
+            return False
+        s = self.scores(t, rel, market_hot, pressure, going_on=True)
         return max(s[a] for a in FOOD_ACTS if a in s) > s.get(self.activity, 0.0) + INTERRUPT_MARGIN
+
+    def wish_now(self, t, rel, market_hot, pressure):
+        """A wish heard in the chat (WISH_INTERRUPTS) beats what he is doing at home, or on the park bench, by
+        INTERRUPT_MARGIN: he stops early to do it (the next choice still puts needs first)."""
+        if self.activity in WISH_INTERRUPTS or not (self.activity in INTERRUPTIBLE or self.activity == "park"):
+            return False
+        wished = [a for a in WISH_INTERRUPTS if self.desire(a, t) >= WISH_MIN]
+        if not wished:
+            return False
+        s = self.scores(t, rel, market_hot, pressure, going_on=True)
+        return max(s[a] for a in wished) > s.get(self.activity, 0.0) + INTERRUPT_MARGIN
 
     def chess_ok(self, t):
         """At most one chess game per simulated hour."""
@@ -360,7 +379,8 @@ class Life:
             return                                        # asleep: nothing to decide until the brain wakes up
         must_sleep = stage != "AWAKE"
         woke = stage == "AWAKE" and self.activity == "sleep"
-        if t >= self.until or must_sleep or woke or self.hungry_now(t, rel, market_hot, pressure):
+        if t >= self.until or must_sleep or woke or self.hungry_now(t, rel, market_hot, pressure) \
+                or self.wish_now(t, rel, market_hot, pressure):
             if self.activity == "buy_bread" and self.place == "counter":
                 self.bread += 2
             if self.activity == "buy_konbini" and self.place == "counter":
