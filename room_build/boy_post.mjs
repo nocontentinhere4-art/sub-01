@@ -320,8 +320,25 @@ function canonical(ual) {
   for (const [m, u] of Object.entries(MINE)) off[m] = W[u].q.clone().invert().multiply(wq(m));
   return off;
 }
-// a UAL clip on our skeleton, resampled at 30 fps, every bone keyed
-function fromUAL(ual, off, name, as, {loop = true} = {}) {
+// two-bone IK (as room.html's reach()): turn `upper` and `lower` so that `end` reaches `target`, the knee towards `pole`
+const _v = () => new THREE.Vector3();
+function aimBone(bone, from, to) {
+  const a = bone.getWorldPosition(_v()), q = new THREE.Quaternion().setFromUnitVectors(from.clone().sub(a).normalize(), to.clone().sub(a).normalize());
+  const wq = bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(q), pq = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+  bone.quaternion.copy(pq.invert().multiply(wq)); bone.updateMatrixWorld(true);
+}
+function reach(upper, lower, end, target, pole) {
+  const S = upper.getWorldPosition(_v()), E = lower.getWorldPosition(_v()), H = end.getWorldPosition(_v());
+  const a = S.distanceTo(E), b = E.distanceTo(H), D = target.clone().sub(S), d = Math.min(Math.max(D.length(), Math.abs(a - b) + 1e-4), a + b - 1e-4);
+  D.normalize(); const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const N = pole.clone().sub(S); N.addScaledVector(D, -N.dot(D)).normalize();
+  aimBone(upper, E, S.clone().addScaledVector(D, x).addScaledVector(N, h));
+  aimBone(lower, end.getWorldPosition(_v()), target);
+}
+// a UAL clip on our skeleton, resampled at 30 fps, every bone keyed. Feet: where a foot rests (near its floor height
+// and nearly still) it is pinned and the leg reaches it by IK, so nothing slides; `seat` lifts the hips by up to that much
+// as he sits (UAL's chair is lower than the room's), the feet staying where they were
+function fromUAL(ual, off, name, as, {seat = 0} = {}) {
   const a = ual.anims[name], ch = [];
   for (const c of a.listChannels()) { const sm = c.getSampler(), acc = x => { const o = [], e = []; for (let i = 0; i < x.getCount(); i++) o.push(...x.getElement(i, e)); return o; };
     ch.push({node: c.getTargetNode().getName(), path: c.getTargetPath(), times: acc(sm.getInput()), values: acc(sm.getOutput())}); }
@@ -329,34 +346,179 @@ function fromUAL(ual, off, name, as, {loop = true} = {}) {
   const u = fk(ual.U, ch, name, 1), mine = fk(NEW, [], as);
   const uRestAnkle = Math.min(ual.W.foot_l.p.y, ual.W.foot_r.p.y), uRestPelvis = ual.W.pelvis.p;
   const k = (SK.Hips.pos.y - newRestAnkle) / (uRestPelvis.y - uRestAnkle);   // leg-length ratio
-  const outQ = Object.fromEntries(order.map(b => [b, []])), outT = [];
-  const armInv = new THREE.Matrix4().makeScale(100, 100, 100);
-  for (const t of times) {
-    const ub = u.at(t), mb = mine.at(0);
-    for (const b of order) {                       // parents first: our world rotation = UAL world x offset
+  const armInv = new THREE.Matrix4().makeScale(100, 100, 100), sides = ["Left", "Right"];
+  // pose frame i: rotations from UAL, hips from its pelvis with the feet at UAL's height; returns the bones
+  const pose = i => {
+    const ub = u.at(times[i]), mb = mine.at(0);
+    for (const b of order) {
       const o = mb[b];
       if (MINE[b]) { const uq = ub[MINE[b]].getWorldQuaternion(new THREE.Quaternion()).multiply(off[b]);
-        const pq = o.parent.getWorldQuaternion(new THREE.Quaternion()); o.quaternion.copy(pq.invert().multiply(uq)); }
-      else { const L = NEW[b]; o.quaternion.copy(L.q); }
+        o.quaternion.copy(o.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(uq)); }
+      else o.quaternion.copy(NEW[b].q);
       o.updateMatrixWorld(true);
-      outQ[b].push(...o.quaternion.toArray());
     }
-    // hips: UAL pelvis offset from its rest, scaled; then the lower ankle held as far above its rest as UAL's
-    const up = ub.pelvis.getWorldPosition(new THREE.Vector3()).sub(uRestPelvis).multiplyScalar(k);
-    const hipsW = SK.Hips.pos.clone().add(up);
+    const hipsW = SK.Hips.pos.clone().add(ub.pelvis.getWorldPosition(_v()).sub(uRestPelvis).multiplyScalar(k));
     mb.Hips.position.copy(hipsW.clone().applyMatrix4(armInv)); mb.Hips.updateMatrixWorld(true);
-    const dU = Math.min(ub.foot_l.getWorldPosition(new THREE.Vector3()).y, ub.foot_r.getWorldPosition(new THREE.Vector3()).y) - uRestAnkle;
-    const dM = ankle(mb) - newRestAnkle;
-    hipsW.y += dU * k - dM;
-    outT.push(...hipsW.applyMatrix4(armInv).toArray());
+    const dU = Math.min(ub.foot_l.getWorldPosition(_v()).y, ub.foot_r.getWorldPosition(_v()).y) - uRestAnkle;
+    hipsW.y += dU * k - (ankle(mb) - newRestAnkle);
+    mb.Hips.position.copy(hipsW.clone().applyMatrix4(armInv)); mb.Hips.updateMatrixWorld(true);
+    return mb;
+  };
+  // pass 1: the feet's paths, and how far down he sits (0 standing .. 1 at the clip's lowest hips)
+  const feet = {Left: [], Right: []}, hipsY = [];
+  for (let i = 0; i < n; i++) { const mb = pose(i); for (const S_ of sides) feet[S_].push(mb[S_ + "Foot"].getWorldPosition(_v())); hipsY.push(mb.Hips.getWorldPosition(_v()).y); }
+  // how far he is down in a seat: 0 standing (hips at rest height) .. 1 from 25 cm lower
+  const sitK = i => seat ? Math.min(1, Math.max(0, (SK.Hips.pos.y - hipsY[i]) / 0.25)) : 0;
+  // contacts: low and slow; each run of contact frames pinned at its mean
+  const pin = {Left: [], Right: []};
+  for (const S_ of sides) {
+    const P = feet[S_], floor = Math.min(...P.map(p => p.y)), on = P.map((p, i) => p.y < floor + 0.025 &&
+      P[Math.min(n - 1, i + 1)].clone().sub(P[Math.max(0, i - 1)]).setY(0).length() / (2 / 30) < 0.25);
+    for (let i = 0; i < n;) { if (!on[i]) { pin[S_][i++] = null; continue; }
+      let j = i; while (j < n && on[j]) j++;
+      const m = P.slice(i, j).reduce((s, p) => s.add(p), _v()).divideScalar(j - i);
+      for (let t = i; t < j; t++) pin[S_][t] = m.clone(); i = j; }
+  }
+  // pass 2: seat lift, then the legs reach their pinned (or pass-1) foot positions
+  const outQ = Object.fromEntries(order.map(b => [b, []])), outT = [];
+  for (let i = 0; i < n; i++) {
+    const mb = pose(i), lift = seat * sitK(i);
+    if (lift) { mb.Hips.position.y += lift * CM; mb.Hips.updateMatrixWorld(true); }
+    for (const S_ of sides) {
+      const target = pin[S_][i] || feet[S_][i], knee = mb[S_ + "Leg"].getWorldPosition(_v()), fwd = new THREE.Vector3(0, 0, 0.3);
+      if (pin[S_][i] || lift) reach(mb[S_ + "UpLeg"], mb[S_ + "Leg"], mb[S_ + "Foot"], target, knee.add(fwd));
+    }
+    for (const b of order) outQ[b].push(...mb[b].quaternion.toArray());
+    outT.push(...mb.Hips.position.toArray());
   }
   const channels = order.map(b => ({node: b, path: "rotation", times, values: outQ[b]}));
   channels.push({node: "Hips", path: "translation", times, values: outT});
-  return {name: as, channels, duration: dur, hips0: outT.slice(0, 3).map(v => v / CM)};
+  const contacts = Object.fromEntries(sides.map(S_ => [S_, pin[S_].map((p, i) => p ? i : -1).filter(i => i >= 0)]));
+  // in place, a walking foot slides back on the floor at the walking speed: the room moves him forward at that speed
+  let speed = 0, nS = 0;
+  for (const S_ of sides) { const P = feet[S_], floor = Math.min(...P.map(p => p.y));
+    for (let i = 1; i < n; i++) if (P[i].y < floor + 0.02) { speed += Math.abs(P[i].z - P[i - 1].z) * 30; nS++; } }
+  return {name: as, channels, duration: dur, hips0: outT.slice(0, 3).map(v => v / CM), contacts, stanceSpeed: nS ? speed / nS : 0};
 }
 // the room's names (#63's list) for what UAL Standard has
-const UAL_CLIPS = {stand_idle: "Idle_Loop", walk: "Walk_Loop", sit_down_chair: "Sitting_Enter", stand_up_chair: "Sitting_Exit",
-  sit_idle_upright: "Sitting_Idle_Loop", take_item: "PickUp_Table", door_open_pull: "Interact"};
+// (the room's chair seat is at 0.50 m: the seated clips' hips go up to sit on it)
+const SEAT_LIFT = 0.12;                           // measured: the buttocks then rest at 0.49 m (1 cm into the cushion)
+const UAL_CLIPS = {stand_idle: ["Idle_Loop"], walk: ["Walk_Loop"], sit_down_chair: ["Sitting_Enter", {seat: SEAT_LIFT}],
+  stand_up_chair: ["Sitting_Exit", {seat: SEAT_LIFT}], sit_idle_upright: ["Sitting_Idle_Loop", {seat: SEAT_LIFT}],
+  take_item: ["PickUp_Table"], door_open_pull: ["Interact"]};
+
+// ------------------------------------------------------------------ authored clips (original work, CC0)
+// What UAL Standard lacks (the bed set first) is keyed here from its poses: the whole body turned about the hips,
+// hands and feet placed by IK, a few bones turned in world axes, then keys eased into each other at 30 fps. Heights are
+// the room's (floor 0, mattress top MATTRESS); the lowest skin is put exactly on the surface it lies on.
+const MATTRESS = 0.70;
+const ease = t => t * t * (3 - 2 * t);
+// a pose: local rotations of every bone + the hips' world position (m)
+function poseOfChannels(channels, t) {
+  const b = fk(NEW, channels, "pose").at(t);
+  return {q: Object.fromEntries(order.map(n => [n, b[n].quaternion.clone()])), hips: b.Hips.getWorldPosition(_v())};
+}
+function bonesOf(pose) {                        // FK bones of a pose, to edit with IK / world turns
+  const b = fk(NEW, [], "edit").at(0);
+  for (const n of order) b[n].quaternion.copy(pose.q[n]);
+  b.Hips.position.copy(pose.hips.clone().multiplyScalar(CM)); b.Hips.parent.updateMatrixWorld(true); b.Hips.updateMatrixWorld(true);
+  return b;
+}
+function poseOfBones(b) { b.Hips.updateMatrixWorld(true); return {q: Object.fromEntries(order.map(n => [n, b[n].quaternion.clone()])), hips: b.Hips.getWorldPosition(_v())}; }
+function turnWorld(b, n, axis, deg) {           // turn bone n (and what hangs on it) about a world axis through its joint
+  const R = new THREE.Quaternion().setFromAxisAngle(axis.clone().normalize(), deg * Math.PI / 180);
+  const wq = b[n].getWorldQuaternion(new THREE.Quaternion()).premultiply(R), pq = b[n].parent.getWorldQuaternion(new THREE.Quaternion());
+  b[n].quaternion.copy(pq.invert().multiply(wq)); b[n].updateMatrixWorld(true);
+}
+function turnBody(b, axis, deg) {               // the whole body about the hips
+  turnWorld(b, "Hips", axis, deg);
+}
+function placeHips(b, p) { b.Hips.position.copy(p.clone().multiplyScalar(CM)); b.Hips.updateMatrixWorld(true); }
+function armTo(b, side, target, pole) { reach(b[side + "Arm"], b[side + "ForeArm"], b[side + "Hand"], target, pole); }
+function legTo(b, side, target, pole) { reach(b[side + "UpLeg"], b[side + "Leg"], b[side + "Foot"], target, pole); }
+const wpos = (b, n) => b[n].getWorldPosition(_v());
+// the skin in a pose (bind positions skinned by the bones): for contact with the mattress / floor
+const SKIN_V = [];
+for (const prim of mesh.listPrimitives()) { const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), W = prim.getAttribute("WEIGHTS_0");
+  for (let i = 0; i < P.getCount(); i += 4) SKIN_V.push([V(P.getElement(i, [])), J.getElement(i, []), W.getElement(i, [])]); }
+const IBM = joints.map(n => world(n).invert());
+function skinLowest(b, filter = () => true) {
+  const M = joints.map((n, i) => b[n].matrixWorld.clone().multiply(IBM[i])), v = _v(), acc = _v();
+  let lo = Infinity;
+  for (const [p, j, w] of SKIN_V) { acc.set(0, 0, 0); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.copy(p).applyMatrix4(M[j[k]]), w[k]);
+    if (filter(acc) && acc.y < lo) lo = acc.y; }
+  return lo;
+}
+function onSurface(b, y) {                      // lower or raise him so his lowest skin rests on height y
+  const lo = skinLowest(b); placeHips(b, wpos(b, "Hips").add(new THREE.Vector3(0, y - lo, 0)));
+}
+// keys [[t, pose], ...] -> channels at 30 fps (eased slerp between keys); `breathe` adds a breath every `period` s
+function keyed(keys, {loop = false, breathe = 0, period = 4} = {}) {
+  const dur = keys[keys.length - 1][0], n = Math.max(2, Math.round(dur * 30) + 1), times = [...Array(n)].map((_, i) => i * dur / (n - 1));
+  const outQ = Object.fromEntries(order.map(b => [b, []])), outT = [];
+  for (const t of times) {
+    let i = 0; while (i < keys.length - 2 && t > keys[i + 1][0]) i++;
+    const [t0, A] = keys[i], [t1, B] = keys[Math.min(i + 1, keys.length - 1)], u = t1 > t0 ? ease(Math.min(1, Math.max(0, (t - t0) / (t1 - t0)))) : 0;
+    const br = breathe ? breathe * Math.sin(2 * Math.PI * t / period) : 0;
+    for (const bn of order) {
+      const q = A.q[bn].clone().slerp(B.q[bn], u);
+      if (br && (bn === "Spine01" || bn === "Spine")) q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), br * Math.PI / 180));
+      outQ[bn].push(...q.toArray());
+    }
+    outT.push(...A.hips.clone().lerp(B.hips, u).multiplyScalar(CM).toArray());
+  }
+  const channels = order.map(b => ({node: b, path: "rotation", times, values: outQ[b]}));
+  channels.push({node: "Hips", path: "translation", times, values: outT});
+  return {channels, duration: dur, hips0: outT.slice(0, 3).map(v => v / CM)};
+}
+const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
+const halfway = (a, b) => ({q: Object.fromEntries(order.map(n => [n, a.q[n].clone().slerp(b.q[n], 0.5)])), hips: a.hips.clone().lerp(b.hips, 0.5)});
+// the bed set. In each clip's own frame he lies with his head towards -z and his feet towards +z (like the old sleep
+// clip), on a mattress whose top is at MATTRESS; root under his hips
+function bodyFrame(b) {                         // L: towards the head, Lat: his left, F: the way his front faces
+  const hips = wpos(b, "Hips"), L = wpos(b, "neck").sub(hips).normalize();
+  const Lat = wpos(b, "LeftUpLeg").sub(wpos(b, "RightUpLeg")); Lat.addScaledVector(L, -Lat.dot(L)).normalize();
+  return {hips, L, Lat, F: new THREE.Vector3().crossVectors(Lat, L)};
+}
+const at = (o, ...terms) => { const p = o.clone(); for (const [v, k] of terms) p.addScaledVector(v, k); return p; };
+function torsoOn(b, y) {                        // his back (or side) on the surface: the lowest skin near the trunk
+  const hips = wpos(b, "Hips"), neck = wpos(b, "neck"), mid = hips.clone().lerp(neck, 0.5);
+  const lo = skinLowest(b, p => p.distanceTo(mid) < 0.42);
+  placeHips(b, hips.add(new THREE.Vector3(0, y - lo, 0)));
+}
+function bedPoses(stand, sit) {
+  // on his back: the standing idle laid down, legs straightened side by side (knees a touch bent, heels on the mattress),
+  // one hand resting on the belly and the other beside the hip, the head raised a little by the pillow
+  const back = bonesOf(stand);
+  placeHips(back, new THREE.Vector3(0, 1, 0)); turnBody(back, X, -90);
+  turnWorld(back, "neck", X, -10); turnWorld(back, "Head", X, -6);
+  torsoOn(back, MATTRESS);
+  { const {hips, L, Lat, F} = bodyFrame(back);
+    for (const [S_, k] of [["Left", 1], ["Right", -1]]) {
+      legTo(back, S_, at(hips, [L, -0.79], [Lat, k * 0.12], [F, -0.03]), at(hips, [L, -0.4], [F, 0.5], [Lat, k * 0.1]));
+      turnWorld(back, S_ + "Foot", Lat, -15);
+    }
+    armTo(back, "Left", at(wpos(back, "Spine02"), [F, 0.13], [Lat, 0.02], [L, -0.02]), at(wpos(back, "LeftArm"), [Lat, 0.35], [L, -0.25]));
+    armTo(back, "Right", at(hips, [Lat, -0.26], [F, -0.04], [L, -0.04]), at(wpos(back, "RightArm"), [Lat, -0.35], [L, -0.1], [F, 0.1]));
+    torsoOn(back, MATTRESS); }
+  // on a side: the seated pose (hips and knees bent) eased towards standing, rolled onto that side; the lower arm under
+  // the pillow (hand by the face), the upper hand on the mattress in front of the chest, the knees one over the other
+  const side = S_ => {
+    const blend = {q: Object.fromEntries(order.map(n => [n, sit.q[n].clone().slerp(stand.q[n], 0.5)])), hips: sit.hips.clone()};
+    const b = bonesOf(blend); placeHips(b, new THREE.Vector3(0, 1, 0));
+    turnBody(b, X, -90); turnBody(b, Z, S_ === "Left" ? 90 : -90);
+    torsoOn(b, MATTRESS);
+    const {hips, L, Lat, F} = bodyFrame(b), down = S_, up = S_ === "Left" ? "Right" : "Left", k = S_ === "Left" ? 1 : -1;  // k: Lat points down
+    legTo(b, down, at(hips, [L, -0.52], [F, 0.42], [Lat, k * 0.10]), at(hips, [L, -0.15], [F, 0.8]));
+    legTo(b, up, at(hips, [L, -0.48], [F, 0.50], [Lat, -k * 0.02]), at(hips, [L, -0.12], [F, 0.85], [Lat, -k * 0.05]));
+    armTo(b, down, at(wpos(b, "Head"), [F, 0.10], [L, 0.06], [Lat, k * 0.06]), at(wpos(b, down + "Arm"), [F, 0.3], [L, -0.15]));
+    armTo(b, up, at(wpos(b, "Spine"), [F, 0.22], [Lat, k * 0.2], [L, -0.10]), at(wpos(b, up + "Arm"), [F, 0.25], [Lat, -k * 0.15]));
+    turnWorld(b, "neck", F, k * 6);
+    torsoOn(b, MATTRESS);
+    return poseOfBones(b);
+  };
+  return {back: poseOfBones(back), left: side("Left"), right: side("Right")};
+}
 
 // finger poses. A pose: per finger the flex of its three joints (deg, + curls towards the palm) and its spread at the
 // knuckle (deg, + away from the middle finger); the thumb: its base turned about the hand's own axes (x across the
@@ -439,17 +601,43 @@ for (const f of clipFiles) {
   for (const [name, spec] of Object.entries(POSES)) addClip(d, ns, name, poseChannels(spec));
   await finish(d, path.join(WEB, "boy2_hands.glb"));
 }
+if (process.env.ORIENT) {
+  for (const f of ["boy_sleep.glb", "boy.glb", "boy_eat.glb"]) { const c = (await readClip(path.join(WEB, f)))[0], b = fk(OLD, c.channels, "x").at(0);
+    const w = n => b[n].getWorldPosition(_v()).toArray().map(v => +v.toFixed(2));
+    console.log(f, "hips", w("Hips"), "head", w("Head"), "Lfoot", w("LeftFoot"), "Rfoot", w("RightFoot"), "Lhand", w("LeftHand")); }
+  process.exit(0);
+}
 UAL = await loadUAL();
 if (UAL) {
   // all the new motion in one file, one animation per name of the room's list
   const off = canonical(UAL), rows = [];
   const d = new (await import("@gltf-transform/core")).Document(); d.createBuffer(); const sc = d.createScene();
   const {nodes: ns} = buildSkeleton(d, sc);
-  for (const [as, name] of Object.entries(UAL_CLIPS)) {
+  for (const [as, [name, opt]] of Object.entries(UAL_CLIPS)) {
     if (!UAL.anims[name]) { console.warn("  UAL has no", name); continue; }
-    const r = fromUAL(UAL, off, name, as); addClip(d, ns, r.name, r.channels);
-    rows.push(`  ${as} <- UAL ${name}: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m`);
+    const r = fromUAL(UAL, off, name, as, opt); addClip(d, ns, r.name, r.channels);
+    rows.push(`  ${as} <- UAL ${name}: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m, ` +
+      `foot contact frames L ${r.contacts.Left.length}/R ${r.contacts.Right.length}` + (as === "walk" ? `, stance foot speed ${r.stanceSpeed.toFixed(2)} m/s` : ""));
   }
+  // the bed set, keyed from UAL's standing idle and seated poses
+  const stand = poseOfChannels(fromUAL(UAL, off, "Idle_Loop", "stand").channels, 0);
+  const sit = poseOfChannels(fromUAL(UAL, off, "Sitting_Idle_Loop", "sit").channels, 0);
+  const bed = bedPoses(stand, sit);
+  const lift = (p, dy) => ({q: p.q, hips: p.hips.clone().add(new THREE.Vector3(0, dy, 0))});
+  const BED = {
+    lie_back_idle: keyed([[0, bed.back], [8, bed.back]], {breathe: 1.2, period: 4}),
+    lie_side_left: keyed([[0, bed.left], [8, bed.left]], {breathe: 1.0, period: 4}),
+    lie_side_right: keyed([[0, bed.right], [8, bed.right]], {breathe: 1.0, period: 4}),
+    sleep_breathing: keyed([[0, bed.back], [5, bed.back]], {breathe: 1.6, period: 5}),
+    sleep_breathing_left: keyed([[0, bed.left], [5, bed.left]], {breathe: 1.4, period: 5}),
+    sleep_breathing_right: keyed([[0, bed.right], [5, bed.right]], {breathe: 1.4, period: 5}),
+    roll_back_to_side_L: keyed([[0, bed.back], [1.4, lift(halfway(bed.back, bed.left), 0.04)], [3, bed.left]]),
+    roll_back_to_side_R: keyed([[0, bed.back], [1.4, lift(halfway(bed.back, bed.right), 0.04)], [3, bed.right]]),
+    roll_side_to_back_L: keyed([[0, bed.left], [1.6, lift(halfway(bed.left, bed.back), 0.04)], [3, bed.back]]),
+    roll_side_to_back_R: keyed([[0, bed.right], [1.6, lift(halfway(bed.right, bed.back), 0.04)], [3, bed.back]]),
+  };
+  for (const [as, r] of Object.entries(BED)) { addClip(d, ns, as, r.channels);
+    rows.push(`  ${as} <- keyed: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m (mattress top ${MATTRESS} m)`); }
   await finish(d, path.join(WEB, "boy2_motion.glb"));
   console.log("boy2_motion.glb:\n" + rows.join("\n"));
 }

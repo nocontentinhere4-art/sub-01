@@ -58,8 +58,11 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStan
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 // a chair seat and a bed edge at room.html's heights, so the sitting clips can be judged against something
 const seat = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.44), new THREE.MeshStandardMaterial({color: 0x333438, roughness: 0.8}));
-seat.position.set(0, 0.47, -0.1); seat.receiveShadow = seat.castShadow = true; seat.visible = false; scene.add(seat);
+seat.position.set(0, 0.47, -0.32);   // top at 0.50 m, like the room's chair seat.receiveShadow = seat.castShadow = true; seat.visible = false; scene.add(seat);
 
+// and a mattress at the room's height (top at 0.70 m) for the bed clips
+const bed = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.25, 2.0), new THREE.MeshStandardMaterial({color: 0x4a5a80, roughness: 0.9}));
+bed.position.set(0, 0.575, 0); bed.receiveShadow = true; bed.visible = false; scene.add(bed);
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const load = url => new Promise((ok, fail) => loader.load(url, ok, undefined, fail));
 const chars = [];
@@ -131,6 +134,7 @@ const T = window.T = {
   blink(w) { for (const c of chars) for (const m of c.morphs) m.morphTargetInfluences[m.morphTargetDictionary.blink] = w; render(); },
   eyes(yaw, pitch) { for (const c of chars) if (c.x) { c.x.look(yaw, pitch); c.x.update(0); } render(); },
   seat(v) { seat.visible = v; render(); },
+  bed(v) { bed.visible = v; render(); },
   apart(dx, dz) { chars.forEach((c, i) => { const k = chars.length > 1 ? i - (chars.length - 1) / 2 : 0; c.root.position.set(k * dx, 0, k * dz); }); render(); },
   // a close look at a hand in the rest pose with a finger pose on: from the side (thumb side) or from the palm side
   hand(pose, side = "Right", from = "side") { T.rest(); const c = chars.find(c => c.kind === "new") || chars[0];
