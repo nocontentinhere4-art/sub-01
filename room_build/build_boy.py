@@ -39,10 +39,10 @@ def asset(*p): return os.path.join(DATA, *p)
 AGE = 0.1875 + (20 - 11) / (25 - 11) * 0.3125      # MakeHuman's age slider: 0.1875 = 11 years, 0.5 = 25 years
 MACRO = {"gender": 1.0, "age": AGE, "muscle": 0.45, "weight": 0.36, "proportions": 0.55, "height": 0.42,
          "cupsize": 0.5, "firmness": 0.5, "race": {"asian": 1.0, "caucasian": 0.0, "african": 0.0}}
-# a few mild face shapes on top of the average (MakeHuman's own CC0 targets): a little larger eyes, a narrower chin, the
-# mouth's corners a touch up (a relaxed neutral face, not an expression). Not modelled on anyone
-FACE = {"eyes/l-eye-scale-incr": 0.3, "eyes/r-eye-scale-incr": 0.3, "chin/chin-triangle": 0.35, "chin/chin-width-decr": 0.2,
-        "mouth/mouth-angles-up": 0.25}
+# a few face shapes on top of the average (MakeHuman's own CC0 targets): larger eyes, a defined jaw and chin, the mouth's
+# corners up a little (a relaxed face at rest, not an expression). Slightly stylised; not modelled on anyone
+FACE = {"eyes/l-eye-scale-incr": 0.5, "eyes/r-eye-scale-incr": 0.5, "chin/chin-triangle": 0.3, "chin/chin-width-decr": 0.15,
+        "chin/chin-bones-incr": 0.35, "chin/chin-prominent-incr": 0.2, "mouth/mouth-angles-up": 0.45}
 HEIGHT = 1.71                                       # metres, top of the head (the old one: 1.72)
 # the parts. color: tint (r, g, b) = texture x colour; grey (r, g, b) = the texture's luminance x colour (re-dyes a
 # garment); hsv (hue shift, saturation, value). Colours are linear. fabric: a Poly Haven CC0 cloth (room_build/tex/<id>,
@@ -52,9 +52,10 @@ HEIGHT = 1.71                                       # metres, top of the head (t
 # the trousers become joggers)
 PARTS = [
     dict(mhclo="eyes/low-poly/low-poly.mhclo", kind="eyes", mhmat="eyes/materials/brown.mhmat", color=("hsv", (0.035, 0.72, 0.62)), rough=0.04, texel=0.05),
-    dict(mhclo="eyebrows/eyebrow001/eyebrow001.mhclo", kind="eyebrows", color=("tint", (0.09, 0.07, 0.06)), rough=0.7, texel=0.14),
+    dict(mhclo="eyebrows/eyebrow012/eyebrow012.mhclo", kind="eyebrows", color=("tint", (0.06, 0.05, 0.045)), rough=0.7, texel=0.14),
     dict(mhclo="eyelashes/eyelashes01/eyelashes01.mhclo", kind="eyelashes", color=("tint", (0.25, 0.22, 0.2)), rough=0.7, texel=0.12),
-    dict(mhclo="hair/culturalibre_hair_05/culturalibre_hair_05.mhclo", kind="hair", color=("tint", (0.085, 0.068, 0.058)), rough=0.78, decimate=0.6, texel=1.0),
+    # messy, layered, voluminous on top (re-dyed near-black brown)
+    dict(mhclo="hair/culturalibre_hair_06/culturalibre_hair_06.mhclo", kind="hair", color=("grey", (0.035, 0.028, 0.024)), rough=0.78, decimate=0.3, texel=1.0),
     # a navy zip hoodie (hood down) over a dark T-shirt, heather-grey joggers, white socks, black slides
     dict(mhclo="clothes/elvs_hooded_sweat_jacket1/elvs_hooded_sweat_jacket1.mhclo", kind="clothes", role="top", color=("grey", (0.030, 0.040, 0.085)),
          fabric="jersey_melange", normal=0.45, decimate=0.22, texel=0.42),
