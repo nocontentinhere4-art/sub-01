@@ -77,12 +77,19 @@ From `room_build/`, with Blender 4.2 and Node 22:
 ## His motion (`boy_moves.glb`, #76)
 New clips for the first character (`boy.glb`, its own 24-bone rig): in the room they take over walking, sitting at the
 desk (typing; also the base under eating), sleeping, and lying with the phone (`?moves=old` shows the first clips).
-- **Quaternius, Universal Animation Library (Standard), CC0 1.0** (https://quaternius.com/packs/universalanimationlibrary.html,
-  itch.io download, March 2025 release): `Idle_Loop` → `stand_idle`, `Walk_Loop` → `walk`, `Sitting_Enter` / `Sitting_Exit`
-  / `Sitting_Idle_Loop` → `sit_down_chair` / `stand_up_chair` / `sit_idle_upright` (and, raised to the mattress,
+- **Quaternius, Universal Animation Library (Standard)** (https://quaternius.com/packs/universalanimationlibrary.html),
+  obtained 2026-10-02. Licence, recorded on that date: the archive's own `License.txt` reads "CC0 1.0 Universal (CC0 1.0)
+  Public Domain Dedication, https://creativecommons.org/publicdomain/zero/1.0/ / Models by @Quaternius", and the pack
+  page says "CC0 License"; the site-wide Quaternius Asset License v1.0 (https://quaternius.com/license.html, last
+  updated 2026-08-28; its § 7: the version in effect when the assets were obtained governs) allows incorporating the
+  assets, original or modified, into a product and distributing that product without attribution, and forbids
+  redistributing them as a standalone asset or pack. The clips here are retargeted onto this project's rig inside the
+  site's own file (`boy_moves.glb`), not offered as a pack; credit to Quaternius is given anyway. Clips used:
+  `Idle_Loop` → `stand_idle`, `Walk_Loop` → `walk`, `Sitting_Enter` / `Sitting_Exit` / `Sitting_Idle_Loop` → `sit_down_chair` / `stand_up_chair` / `sit_idle_upright` (and, raised to the mattress,
   `sit_down_bed_edge` / `stand_up_bed_edge` / `sit_edge_idle`), `PickUp_Table` → `take_item`, `Interact` → `door_open_pull`;
   `Crouch_Idle_Loop` is a key pose of `crouch_drop`.
-- **Keyed for this project (original work, CC0)**, from those poses: the bed set (`lie_back_idle`, `lie_side_left/right`,
+- **Keyed for this project** (original keyframes and IK; the standing and seated poses they start from are UAL's,
+  under the terms above): the bed set (`lie_back_idle`, `lie_side_left/right`,
   `roll_*`, `sleep_breathing*`, `lie_down_from_edge`, `get_up_to_edge`, `lie_phone`), `type`, `mouse`, `walk_start`,
   `walk_stop`, `turn_in_place_*`, `lean_on_sill`, `stretch_arms_up`, `scratch_head`, `look_around`, `crouch_drop`,
   `put_down`, `sit_lean_back`, `sit_eat_chopsticks`, `sit_drink`.
