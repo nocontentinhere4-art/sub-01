@@ -212,7 +212,7 @@
     <div class="s" id="s-why"></div>
     <div class="opts" id="s-opts" hidden><div class="h" id="s-opts-h">options considered · brain response</div><div id="s-rows"></div>
       <div class="s" id="s-reason"></div>
-      <div class="s">An AI reads the page and lists options; his brain model picks.</div></div>
+      <div class="s" id="s-foot">An AI reads the page and lists options; his brain model picks.</div></div>
   </div>
   <div class="card" id="readcard" hidden>
     <div class="k"><span>On his mind</span><a id="r-link" href="#" target="_blank" rel="noopener">wikipedia ↗</a></div>
@@ -736,13 +736,44 @@ function showScreen(st){
   if (screenOn === st.device) panel(st);
 }
 let panelKey = null;
+const PAGE_FOOT = "An AI reads the page and lists options; his brain model picks.";
+function optRows(opts){
+  return opts.map(o => {
+    const v = Math.max(-1, Math.min(1, +o.value || 0)), w = Math.abs(v) * 50;
+    return `<div class="op${o.chosen ? " on" : ""}" title="p=${o.p}"><span>${o.chosen ? "▸ " : ""}${esc(o.label)}</span>`
+      + `<span class="bar"><i class="${v < 0 ? "neg" : ""}" style="left:${v < 0 ? 50 - w : 50}%;width:${w}%"></i></span>`
+      + `<b>${Math.round(o.p * 100)}%</b></div>`;
+  }).join("");
+}
+function chessPanel(g){             // chess at the desk (#17): the board is on the monitor, the vote is here
+  const key = `chess|${g.plies}|${g.result}`;
+  if (key === panelKey) return; panelKey = key;
+  const card = $("screencard"); card.hidden = false; card.classList.remove("phone");
+  $("s-k").textContent = "Chess at his desk"; $("s-link").hidden = true;
+  card.querySelector(".frame").hidden = false;
+  $("s-img").src = chessCanvas().toDataURL("image/jpeg", 0.85);
+  $("s-title").textContent = g.result ? `game over: ${g.result === "unfinished" ? "left unfinished" : g.result} (${g.reason}), ${g.plies} moves`
+    : `he plays ${g.color} · move ${Math.floor(g.plies / 2) + 1}`;
+  $("s-url").textContent = "a local board · no online play, no accounts";
+  const v = g.vote;
+  $("s-why").textContent = v ? `last move ${v.move}` : "a new game";
+  $("s-opts").hidden = !v;
+  if (v) {
+    $("s-opts-h").textContent = "candidate moves · brain response";
+    $("s-rows").innerHTML = optRows(v.options);
+    $("s-reason").textContent = v.reason;
+  }
+  $("s-foot").textContent = g.card;
+}
 function panel(st){
+  if (chessOn && chessGame) return chessPanel(chessGame);
   const key = st ? `${st.device}|${st.id}|${st.title}|${st.url}|${st.why}|${st.restarting ? 1 : 0}|${JSON.stringify(st.decision || null)}` : "";
   if (key === panelKey) return; panelKey = key;
   const card = $("screencard");
   if (!st) { card.hidden = true; return; }
   card.hidden = false; card.classList.toggle("phone", st.device === "phone");
   $("s-k").textContent = st.device === "phone" ? "On his phone" : "On his computer";
+  $("s-link").hidden = false; $("s-foot").textContent = PAGE_FOOT;
   card.querySelector(".frame").hidden = !!st.restarting;
   if (st.restarting) {
     $("s-title").innerHTML = `<div class="restarting">browser restarting…</div>`; $("s-url").textContent = "";
@@ -753,20 +784,71 @@ function panel(st){
   $("s-opts").hidden = !(dec && dec.options && dec.options.length);
   if (dec && dec.options) {
     $("s-opts-h").textContent = `options considered${dec.page ? " on “" + dec.page.slice(0, 40) + (dec.page.length > 40 ? "…" : "") + "”" : ""} · brain response`;
-    $("s-rows").innerHTML = dec.options.map(o => {
-      const v = Math.max(-1, Math.min(1, +o.value || 0)), w = Math.abs(v) * 50;
-      return `<div class="op${o.chosen ? " on" : ""}" title="${esc(o.action)} · p=${o.p}"><span>${o.chosen ? "▸ " : ""}${esc(o.label)}</span>`
-        + `<span class="bar"><i class="${v < 0 ? "neg" : ""}" style="left:${v < 0 ? 50 - w : 50}%;width:${w}%"></i></span>`
-        + `<b>${Math.round(o.p * 100)}%</b></div>`;
-    }).join("");
+    $("s-rows").innerHTML = optRows(dec.options);
     $("s-reason").textContent = dec.reason + (dec.outcome && !["opened", "done"].includes(dec.outcome) ? ` · ${dec.outcome}` : "")
       + (dec.eyes && dec.eyes.source !== "ai" && dec.eyes.source ? " · options from the page's own links (" + (dec.eyes.why_local || "no AI") + ")" : "");
   }
-  $("s-title").textContent = st.title || ""; $("s-url").textContent = st.url || "";
-  $("s-why").textContent = st.why || ""; $("s-link").href = st.url || "#";
+  $("s-title").textContent = (st.title || "") + (st.channel ? ` — ${st.channel}` : ""); $("s-url").textContent = st.url || "";
+  const w = st.video;                 // a video (#17): muted, for a bounded time, then the brain picks again
+  $("s-why").textContent = w && w.watching
+    ? `video, muted · watching ${Math.round((dec && dec.watch_min) || w.seconds / 60)} min, then his brain model picks again · picture change ${Math.round((w.scene || 0) * 100)}% drives the visual areas`
+    : (st.why || "");
+  $("s-link").href = st.url || "#";
   const src = `/api/screen/${st.device}.jpg?id=${st.id}`;
   if (!$("s-img").src.endsWith(src)) $("s-img").src = src;
 }
+// chess at the desk (#17): the board from `chess` messages / GET /api/chess
+let chessGame = null, chessOn = false, chessKey = null, chessTx = null, chessVer = 0, chessTxVer = -1;
+const chv = document.createElement("canvas"); chv.width = 1024; chv.height = 600; const chx = chv.getContext("2d");
+const GLYPH = {k:"♚", q:"♛", r:"♜", b:"♝", n:"♞", p:"♟"};
+function chessCanvas(){
+  const g = chessGame, W = chv.width, H = chv.height;
+  if (!g) return chv;
+  const k = `${g.fen}|${g.plies}|${g.result}`;
+  if (k === chessKey) return chv; chessKey = k; chessVer++;
+  chx.fillStyle = "#16130f"; chx.fillRect(0, 0, W, H);
+  const S = 64, X = 40, Y = 44, sq = [];
+  for (const r of g.fen.split(" ")[0].split("/")) for (const ch of r) { if (/\d/.test(ch)) for (let i = 0; i < +ch; i++) sq.push(""); else sq.push(ch); }
+  const lit = g.last ? [g.last.slice(0, 2), g.last.slice(2, 4)] : [], flip = g.color === "black";
+  chx.textAlign = "center"; chx.textBaseline = "middle"; chx.font = `${S * 0.78}px serif`;
+  for (let i = 0; i < 64; i++) {
+    const kk = flip ? 63 - i : i, file = kk % 8, rank = 8 - Math.floor(kk / 8), x = X + (i % 8) * S, y = Y + Math.floor(i / 8) * S;
+    chx.fillStyle = (file + rank) % 2 ? "#cdb999" : "#8a6f4e"; chx.fillRect(x, y, S, S);
+    if (lit.includes("abcdefgh"[file] + rank)) { chx.fillStyle = "rgba(255,154,60,.45)"; chx.fillRect(x, y, S, S); }
+    const p = sq[kk]; if (!p) continue;
+    const white = p === p.toUpperCase(), gl = GLYPH[p.toLowerCase()];
+    if (white) { chx.lineWidth = 3; chx.strokeStyle = "#111"; chx.strokeText(gl, x + S / 2, y + S / 2 + 3); chx.fillStyle = "#fffaf0"; }
+    else chx.fillStyle = "#111";
+    chx.fillText(gl, x + S / 2, y + S / 2 + 3);
+  }
+  chx.textAlign = "left"; chx.textBaseline = "alphabetic";
+  const R = X + 8 * S + 36;
+  chx.fillStyle = "#e6e2da"; chx.font = "bold 24px monospace"; chx.fillText("CHESS", R, 72);
+  chx.fillStyle = "#9a9384"; chx.font = "17px monospace";
+  chx.fillText(g.result ? `game over · ${g.result}` : `he plays ${g.color}`, R, 102);
+  const v = g.vote;
+  if (v) {
+    chx.fillStyle = "#9a9384"; chx.font = "15px monospace"; chx.fillText("candidate moves", R, 150);
+    v.options.forEach((o, i) => { const y = 184 + i * 40;
+      chx.fillStyle = o.chosen ? "#ff9a3c" : "#2a251e"; chx.fillRect(R, y - 18, Math.max(4, 150 * o.p), 26);
+      chx.fillStyle = o.chosen ? "#fff" : "#cfc8bb"; chx.font = `${o.chosen ? "bold " : ""}20px monospace`; chx.fillText(o.label, R + 8, y + 2);
+      chx.fillStyle = "#9a9384"; chx.font = "16px monospace"; chx.fillText(`${Math.round(o.p * 100)}%`, R + 168, y + 2); });
+  }
+  chx.fillStyle = "#6d6759"; chx.font = "13px monospace";
+  const words = (g.card || "").split(" "); let line = "", y = 420;
+  for (const w of words) { if (chx.measureText(line + w).width > W - R - 24) { chx.fillText(line, R, y); line = ""; y += 18; } line += w + " "; }
+  chx.fillText(line, R, y);
+  return chv;
+}
+function chessTex(){
+  chessCanvas();
+  if (!chessTx) { chessTx = screenTexture(chv); fitTop(chessTx, SURF.monitor.w / SURF.monitor.h); }
+  if (chessTxVer !== chessVer) { chessTxVer = chessVer; chessTx.needsUpdate = true; }
+  return chessTx;
+}
+function onChess(m){ chessGame = m; panelKey = null; }
+fetch("/api/chess").then(r => r.ok ? r.json() : null).then(d => { if (d && d.playing && d.game && !chessGame) onChess(d.game); }).catch(() => {});
+
 // views drawn here (no browser needed): the market chart at the desk, the food app on the phone
 const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 600; const cx = cv.getContext("2d");
 const pv = document.createElement("canvas"); pv.width = 390; pv.height = 844; const px = pv.getContext("2d");
@@ -1308,16 +1390,18 @@ function drive(dt){                                   // one frame of the plan; 
   return false;
 }
 function screens(life, st){
-  const atDesk = !life.path && ["research","chart"].includes(life.activity) && st === "AWAKE";
+  const atDesk = !life.path && ["research","chart","watch_video","play_chess"].includes(life.activity) && st === "AWAKE";
   const onPhone = !life.path && ["phone","order_food"].includes(life.activity) && st === "AWAKE" && visible;
   phone.visible = onPhone && !!hand;
   chatting = !life.path && life.activity === "chat" && st === "AWAKE" && visible;
-  screenOn = life.activity === "research" && atDesk ? "desk" : life.activity === "phone" && onPhone ? "phone" : null;
+  chessOn = atDesk && life.activity === "play_chess" && !!chessGame;
+  screenOn = ["research","watch_video"].includes(life.activity) && atDesk ? "desk" : life.activity === "phone" && onPhone ? "phone" : null;
   if (life.screen) showScreen(life.screen);
   // desk monitor
   if (monitor) {
     if (chatting) { monitor.id = null; const t = chatTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
     else if (life.activity === "chart" && atDesk) { monitor.id = null; const t = chartTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
+    else if (chessOn) { monitor.id = null; const t = chessTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
     else if (screenOn === "desk" && lastStatus.desk) { if (monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
     else if (atDesk && life.activity === "research" && life.reading) {            // no browser: the article he is reading
       if (monitor.id !== "wiki:" + life.reading.title) { monitor.set(drawReading(life.reading)); monitor.id = "wiki:" + life.reading.title; } }
@@ -1326,7 +1410,7 @@ function screens(life, st){
   // phone
   const ps = phone.userData.screen;
   if (life.activity === "order_food" && onPhone) { ps.id = null; const t = foodTex(life.courier); if (ps.tex !== t || ps.mesh.material !== ps.on) ps.set(t); }
-  panel(screenOn ? lastStatus[screenOn] : null);
+  panel(chessOn ? null : screenOn ? lastStatus[screenOn] : null);
 }
 
 // ---------- map ----------
@@ -1431,6 +1515,7 @@ function connect(){
     const m = JSON.parse(e.data);
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
+    if (m.type === "chess") { onChess(m); return; }
     if (m.type === "hello") {          // the latest chat and his replies, merged by time (hh:mm)
       talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
               ...(m.replies || []).map(r => ({his:true, t:r.t || "", text:String(r.text || ""), re:r.replying_to || "", tag:r.tag || REPLY_TAG}))]
