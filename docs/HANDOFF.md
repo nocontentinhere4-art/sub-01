@@ -23,7 +23,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 | `/world.html` | eye frames | what the eye (Replicate FLUX + Llama 3) "sees" |
 
 ## Runtime modules
-- `brain_sim.py` (10 Hz delayed Stuart-Landau), `real_baseline.py` (replays his fMRI as drive), `sleep.py` (Asia/Tokyo),
+- `brain_sim.py` (10 Hz delayed Stuart-Landau; `step` reads the delayed coupling with one sparse product per step on
+  the ring buffer, `ring_coupling()`, #19: ~4 ms CPU per 50 ms tick instead of ~30, same as the old dense step to ~1e-15
+  over 10 s (`tests/test_brain_step.py` asserts 1e-9); `analysis/bench_step.py` times both; the old step's 732 KB temporaries made the tick depend on glibc malloc state, which a vote in a worker thread shifted by ~2 ms; the new step allocates only region-sized arrays), `real_baseline.py` (replays his fMRI as drive), `sleep.py` (Asia/Tokyo),
   `chat.py` (filter), `eye.py` (Replicate), `diary.py`, `life.py` (needs-based life: research at the computer,
   order_food → simulated courier on a real OSM bike route, get_delivery, bakery/park outings with real routes),
   `research.py` (Wikipedia curiosity chain, sensitive topics skipped; its article seeds what he searches),

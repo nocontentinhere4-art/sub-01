@@ -102,11 +102,12 @@ class Brain:
 
     def step(self, k=1):
         dt = self.dt
+        ops, Ws = self.ring_coupling()
         for _ in range(k):
             now = self.t % self.hist
             z = self.buf[now]
-            zd = self.buf[(self.t - self.delay) % self.hist, self._cols]      # z_j(t - tau_ij)
-            coupling = self.g * ((self.W * zd).sum(1) - self.W.sum(1) * z)
+            # sum_j W_ij z_j(t - tau_ij) as one sparse product on the flat ring buffer (was a dense 214x214 gather)
+            coupling = self.g * (ops[now] @ self.buf.reshape(-1) - Ws * z)
             if self.slow_on and self.t % 100 == 0:                     # slow layer: every 100 steps (0.1 s)
                 self.slow_x = SLOW_DRIVE * self.slow_gain * np.clip(
                     self.slow.advance(100 * dt)[self._slow_idx], -2.0, 3.0)
@@ -131,6 +132,7 @@ class Brain:
         """Independent copy of the dynamic state (history buffer, stimulus, drives, slow layer, random stream) that
         shares the fixed wiring arrays: used to try out a stimulus without touching the live brain (brain_vote.py)."""
         self.lag_coupling()                                   # built once on the live brain, shared read-only
+        self.ring_coupling()
         c = copy.copy(self)
         c.buf, c.stim, c.drive, c.slow_x = self.buf.copy(), self.stim.copy(), self.drive.copy(), self.slow_x.copy()
         c.neuromod = self.neuromod.copy()
@@ -139,15 +141,35 @@ class Brain:
         c.slow = copy.deepcopy(self.slow) if self.slow is not None else None
         return c
 
+    def ring_coupling(self):
+        """(ops, W.sum(1)): ops[p] is a sparse M_p with (M_p @ buf.ravel())_i = sum_j W_ij z_j(t - d_ij) when
+        t % hist == p, the delayed coupling of step() read straight from the ring buffer. Only W's non-zero entries
+        (~45 %) are kept; the hist matrices share their values and row pointers, each has its own column index (~5 MB
+        in all). Built once and rebuilt if W or delay is replaced (analysis/null_test.py swaps W in); shared by clones."""
+        cache = getattr(self, "_ring", None)
+        if cache is None or cache[0] is not self.W or cache[1] is not self.delay or len(cache[2]) != self.hist:
+            import scipy.sparse as sp
+            n, hist = self.n, self.hist
+            i, j = np.nonzero(self.W)                          # row-major, so already in CSR order
+            data, d = self.W[i, j].astype(complex), self.delay[i, j]
+            indptr = np.concatenate([[0], np.cumsum(np.bincount(i, minlength=n))]).astype(np.int32)
+            ops = []
+            for p in range(hist):
+                cols = (((p - d) % hist) * n + j).astype(np.int32)
+                ops.append(sp.csr_matrix((data, cols, indptr), shape=(n, hist * n), copy=False))
+            cache = self._ring = (self.W, self.delay, ops, self.W.sum(1))
+        return cache[2], cache[3]
+
     def lag_coupling(self):
         """Sparse M with coupling_i = sum_j W_ij z_j(t - d_ij) = M @ H.ravel(), H[d] = z(t - d): the same delayed
         coupling as step(), as one sparse product that many clones can share (built once, ~46k entries)."""
-        if getattr(self, "_lagM", None) is None:
+        if getattr(self, "_lagM", None) is None or self._lagW is not self.W:
             import scipy.sparse as sp
             n = self.n
             rows, cols = np.repeat(np.arange(n), n), np.tile(np.arange(n), n)
             self._lagM = sp.csr_matrix((self.W.reshape(-1), (rows, self.delay.reshape(-1) * n + cols)),
                                        shape=(n, self.hist * n))
+            self._lagW = self.W
         return self._lagM
 
     def use_slow_layer(self, on):
