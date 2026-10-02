@@ -10,6 +10,8 @@ A whole-brain model of one real human brain, built from public MRI data and wire
   with randomised wiring, is reported in [docs/real_wiring_report.md](docs/real_wiring_report.md).
 - It is a model of brain activity, not a mind, and makes no claim of consciousness.
 
+CI: tests + demo smoke test on every PR (`.github/workflows/tests.yml`; locally `python tests/smoke_demo.py`).
+
 ## Pipeline
 
 | Step | Script | Output |
