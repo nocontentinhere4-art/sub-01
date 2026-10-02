@@ -1,10 +1,26 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 20:25 UTC** (pass 2). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 00:45 UTC** (pass 7). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-Nothing is ready to merge yet. #9's conflict with `main` is cleared (coordinator merge commit `fe60d9f`, at the owner's request). #7 and #8 still conflict with `main` (#10), and brain-decides still conflicts too.
-When a PR is marked **READY TO MERGE (needs owner)**, it is listed here:
+**Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
+coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
+used the old engine's schedule). `main` passes 225 tests (192 + 10 skipped without torch), the demo smoke passes,
+and a simulated night sleeps 23:54, reaches REM at 01:09, wakes, and makes 24 replays.
+
+Owner actions now:
+- **Spiking memory test (#9) is on `main` but idle** until you add `RUNPOD_API_KEY` and `SUB01_POD_SECRET` on Railway.
+  Make sure the `/data` volume has ≥ 300 MB free. It then runs 21:00–22:00 Tokyo daily (≤ 1 GPU-hour/day, ≈
+  $0.27–0.85/day, 8 GPU-hours/week cap).
+- Nothing else to merge yet: #20 and #8 still need their required changes (see their reviews).
+
+Who is on what (cloud sessions, 2026-10-02):
+| work | session | state |
+|---|---|---|
+| #8 room: merge main, rate clamp, tests, new-room numbers | `session_01Xrq53UQH9EHy4bgPj9B2yL` (author) | instructed 00:40 |
+| #20 brain-decides: $1/day cap, Haiku default, main merge | `session_01881q1gcHZBtokE8qi8QjxC` (author) | instructed 00:40 |
+| #12 CI | `session_011qiRnsxURjY8wayHe8dz6u` (new) | started 00:41 |
+| #13 about page | `session_0129Vcj2Bg6kjc4KDPP3qnBT` (new) | started 00:41 |
 
 | PR | status | why it needs the owner |
 |---|---|---|
@@ -31,47 +47,43 @@ cheap to run, with the password gate kept until launch day.
 | 4 | Dream diary, Wikipedia reading | done | main |
 | 5 | Body + neuromodulators | done | #10 |
 | 6 | PCI test (below the cut-off in every state; published as is) | done | main `cd5e25b` |
-| 7 | Room lag fix, phone grip, sky | in progress: needs main merge | #8 |
-| 8 | Reading memory (readings → stimuli, REM replay, curiosity) | in progress: needs main merge | #7 |
-| 9 | Sleep circuit (Phillips-Robinson) | in progress: waits for #7 | #11 |
-| 10 | Spiking memory on GPU, daily test card | in progress: merges cleanly now; needs torch-free tests, re-merge after #7/#11 | #9 |
-| 11 | Brain decides what he clicks | in progress: **no PR opened yet** (review fixes pushed, `a8c928e`) | `feature/brain-decides` |
-| 12 | CI (tests + demo smoke on every PR) | todo | issue #12 |
-| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | todo | issue #13 |
+| 7 | Room lag fix, phone grip, sky, rebuilt bedroom | in progress: needs main merge, rate clamp, review of the new room | #8 |
+| 8 | Reading memory (readings → stimuli, REM replay, curiosity) | done | #7 |
+| 9 | Sleep circuit (Phillips-Robinson) | done | #11 |
+| 10 | Spiking memory on GPU, daily test card | done (idle until the RunPod keys are set on Railway) | #9 |
+| 11 | Brain decides what he clicks | in progress: needs the $1/day cap, Haiku default, main merge (conflicts: Dockerfile, live_server.py) | #20 |
+| 12 | CI (tests + demo smoke on every PR) | in progress | issue #12 |
+| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | in progress | issue #13 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
-| 18 | Brain loop 3× cheaper | todo, after brain-decides | issue #19 |
+| 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
+| 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | todo, after #9 + #20 | issue #21 |
 | 19 | Launch | todo | owner |
 
 ## Merge order
-1. **#8** room: frontend + a tested feed filter. The coordinator merges it once it has merged `main`.
-2. **#7** reading memory (owner: `sleep.py`).
-3. **#11** sleep circuit (owner: `sleep.py`). It merges `main` after #7.
-4. **#9** spiking (owner: RunPod spend, Dockerfile). It merges `main` after #7 and #11.
-5. **brain-decides** (owner: Dockerfile, API spend, browser process). It opens its PR now and merges `main` after #9.
-6. Then **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a time on `live_server.py`.
+1. **#8** room (the coordinator merges it once the review is satisfied) and **#20** brain-decides (owner: Dockerfile,
+   API spend). They are independent; whichever is ready first goes first.
+2. Then **#21** atomic writes, **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a
+   time on `live_server.py`.
 
 **#12** CI and **#13** about page touch no shared files and can merge at any time.
 
-Rule: at least 60 minutes between merges to `main`. Every branch brings `main` in with a merge commit. Never force-push.
+Rule: at least 60 minutes between merges to `main`, unless the owner says otherwise (the owner did so on
+2026-10-01 for #7, #11 and #9). Every branch brings `main` in with a merge commit. Never force-push.
 
-## Pre-review: `feature/brain-decides` (reviewed at `98e6c33`; `a8c928e` since, no PR yet)
-Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, including `/api/decisions` and
-`/api/tastes`. Tick cost is the same as `main`. Required before it can be marked ready:
-1. Open the PR. Merge `main` now (it conflicts in `live_server.py`), and again after #9 (`Dockerfile`, `live_server.py`).
-2. **Add a hard daily USD cap for the eyes** (e.g. `BRAIN_DECIDES_MAX_USD_PER_DAY`, default 1.00) on top of
-   30 calls/hour.
-   - At the call cap that is 720 calls/day.
-   - My estimate is ~4k input + ~0.4k output tokens per call on `claude-opus-5-5` ($4/$20 per MTok), about
-     $0.024 per call, so up to ~$17/day.
-   - Post measured tokens per call from a sample of real pages.
-3. Put prompt caching (`cache_control`) on the fixed system prompt.
-4. Pin `anthropic>=1.11,<2`.
-5. The vote runs ~260 ms of numpy in an executor thread. Measure brain tick lag p95 while votes run, and post it.
-6. The model is the owner's choice (`BRAIN_DECIDES_CLAUDE_MODEL`). Say in the PR which model and what daily cost you
-   propose.
+## Review bots
+`graphify-labs[bot]` reviews every PR: a summary, "Worth a look" findings and inline coupling notes. It marks its own
+findings "NOT verified", and its reviews are partial on large diffs.
+- The coordinator verifies its findings. Authors fix only the ones the coordinator's review lists as required.
+- Ignore its "Health regression" coupling counts on test functions.
+- Verified real so far:
+  - #8: `?rate=` overflow and unbounded per-client buffering → required change on #8;
+  - `main`: non-atomic JSON state writes, from #10 → issue #21.
+- Checked and not real: #8 HTML injection (all user text is escaped); #10 `Life.hunger` read-only (nothing writes
+  it); #11 removed constants (aliases kept, PCI imports work); #20 NumPy group indexes and the fragment login guard;
+  #7 thread races (no crash path in CPython).
 
 ## Decisions
 - **2026-10-01: merge order** as above. #8 goes first because it is smallest and mostly frontend. #7 goes next
@@ -85,8 +97,23 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
   encodes the day's readings, runs compressed sleep and the after-sleep test, and runs the next-day test at the start
   of the following session. "Tested every morning" in the goal means this daily next-day test. A morning slot is
   only a change to `SUB01_SESSIONS`.
-- **2026-10-01: paid-model choice stays with the owner.** Coordinator rule: every paid call has a hard daily USD
-  cap and a log line before it can merge.
+- **2026-10-01: #7, #11 and #9 merged at the owner's request**, before their authors pushed the last fixes. The
+  coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
+  `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
+  and the `?rate=` bug.
+- **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
+  I rendered both in headless Chromium. The new room is cleaner, and its provenance is documented as CC0 or made for
+  the project (`web/room/CREDITS.md`); the old room is a single AI-generated mesh. A later PR removes the old GLBs.
+- **2026-10-01: review-bot findings are advisory.** The coordinator verifies them before they become required changes.
+- **2026-10-01: paid-model choice stays with the owner** unless the owner delegates it. Coordinator rule: every paid
+  call has a hard daily USD cap and a log line before it can merge.
+- **2026-10-01: brain-decides "eyes" use Claude Haiku 4.5 (OpenRouter `anthropic/claude-haiku-4.5`, or `claude-haiku-4-5`
+  direct), capped at $1.00 per Tokyo day.** The owner delegated this decision.
+  - The task is listing 3–5 safe options from a page; the brain model decides, so Opus quality is not needed.
+  - Haiku is ≈ $0.004 per page, about 5× cheaper than Opus 5.5, and reliable at the JSON format; Llama is not.
+  - Over the cap, he browses with the page's own links, and the brain still votes.
+  - The default is set in code, so nothing needs setting on Railway.
+  - Haiku takes no effort or thinking parameters, so the requests are built per model (#20, change 6).
 
 ## Known risks
 - **CPU:** the brain loop alone uses ~63 % of one core (~31 ms per 50 ms tick, `main`, `--demo`, no Chromium).
@@ -94,13 +121,16 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
 - **Bandwidth at launch:** `/ws` is 20 ticks/s × ~3.1 KB, about 62 KB/s per brain-page viewer. 300 viewers would be
   ~19 MB/s of Railway egress. Fix: #14.
 - **Unbounded spend:** the eye (Replicate) has no daily cap and no log. With viewers always present it renders up to
-  ~960 frames/day. Fix: #15. Brain-decides needs a USD cap (above).
+  ~960 frames/day. Fix: #15. #20 needs a daily USD cap (Opus 5.5 via OpenRouter is ≈ $0.50/hour at the 30-call cap).
+- **State files:** `life.json`, `body.json`, `reading.json` and `browsing.json` are written non-atomically, so a kill mid-write
+  crash-loops the server at the next start. Fix: #21.
+- **Vote load:** on one core with a vote every 5 s, brain ticks are up to 157 ms late (p95 69 ms). Fine at one vote
+  per page; #19 adds headroom.
 - **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
 - **No CI:** a broken `main` deploys straight to Railway. Fix: #12.
-- **Test bug on `main`:** `tests/test_browse.py::test_browser_never_shows_local_pages` fails whenever Chromium is
-  available (it stops the driver twice after `3c682df`). Fixed on `feature/brain-decides`.
+- ~~Test bug on `main` (Chromium tests stopped the driver twice)~~: fixed with the #7 merge.
 - **Honesty:** the PCI and Pong results are negative and must stay visible as such. "Digital twin" wording suggests
   a copy of the person; use "a model built from one person's public MRI data".
 - **Stale branches** (`feature/rw-*`, `feature/twin-*`, `feature/real-world`, `assets/cc0`, `test/integration`,
@@ -116,7 +146,7 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
 | Eye: Replicate FLUX schnell + Llama, only while watched | cents | up to ~960 frames/day with no cap → cap at $1/day (#15) |
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
-| Brain-decides eyes (Anthropic or Replicate) | $0 (not on) | ≤ cap (proposed $1/day) |
+| Brain-decides eyes (#20; Haiku 4.5 via OpenRouter, key already on Railway) | $0 (not merged) | ≤ $1.00/day hard cap (≈ $0.004 per page) |
 
 ## Launch checklist (owner)
 - [ ] All milestones 7–15 merged; CI green; `/healthz` monitored (uptime alert to your phone/email).
@@ -129,5 +159,5 @@ Tests 140 passed (1 skipped: no `anthropic` installed). The demo smoke passes, i
       pressure, no wallet or on-chain action by the project.
 - [ ] X account ready. Posts follow the same wording rules (no consciousness claims, no price talk).
 - [ ] Secrets set on Railway only: `SITE_PASSWORD`, `REPLICATE_API_TOKEN`, `RUNPOD_API_KEY`, `SUB01_POD_SECRET`,
-      optional `ANTHROPIC_API_KEY`; later `SUB01_ADMIN_TOKEN`.
+      `OPENROUTER_API_KEY` (set), optional `ANTHROPIC_API_KEY`; later `SUB01_ADMIN_TOKEN`.
 - [ ] Launch day: remove `SITE_PASSWORD`; watch `/api/health` and spend for the first 24 h.

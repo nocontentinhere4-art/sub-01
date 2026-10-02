@@ -6,9 +6,9 @@
 
 Buys drive the reward + visual regions, sells drive salience + amygdala, large
 trades hit the thalamus + attention network. Chat messages are stimuli (see chat.py).
-A sleep/wake cycle on the Europe/Rome clock (sleep.py) changes the rhythm and how much
-any stimulus gets through; during REM, stored messages and articles it read are replayed.
-Page on http://localhost:8765.
+A sleep circuit on the local Asia/Tokyo clock (sleep.py: Phillips-Robinson MA/VLPO flip-flop + REM-on/REM-off
+oscillator) changes the rhythm, how much any stimulus gets through and the tonic neuromodulator levels;
+during REM, stored messages and articles it read are replayed. Page on http://localhost:8765.
 """
 import argparse
 import asyncio
@@ -18,6 +18,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -28,7 +29,7 @@ from aiohttp import web
 
 from brain_sim import Brain
 from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
-from sleep import ROME, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime, night_date
+from sleep import ROME, TZ, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime, night_date
 from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
@@ -42,15 +43,17 @@ from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
 from tastes import PageWatch, Tastes
 
+try:                                             # the GPU spiking brain is optional: the server runs without it
+    from spiking import pod_manager as spiking_manager, server as spiking_server
+except Exception as _e:
+    spiking_manager = spiking_server = None
+    print("spiking routes unavailable:", type(_e).__name__, flush=True)
+
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
+GOOD = re.compile(r"\bgood\b!?", re.I)    # chat 'good!' -> dopamine pulse on the spiking pod
 NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
-# tonic neuromodulator targets per stage (1.0 = resting wake): monoamines fall in NREM and go almost silent in REM,
-# acetylcholine is low in NREM and high in REM (Pace-Schott & Hobson 2002, Nat Rev Neurosci 3:591)
-STAGE_MOD = {"AWAKE": {"DA": 1.0, "5HT": 1.0, "NE": 1.0, "ACh": 1.0},
-             "NREM": {"DA": 0.8, "5HT": 0.5, "NE": 0.5, "ACh": 0.3},
-             "REM": {"DA": 0.9, "5HT": 0.05, "NE": 0.05, "ACh": 1.2}}
 NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
@@ -146,6 +149,7 @@ class Live:
         self.last_groups = {}
         self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
+        self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -263,6 +267,10 @@ class Live:
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
+        if self.spiking:                                   # no-op when no GPU pod is connected
+            self.spiking.forward_chat(text, emotion)
+            if GOOD.search(text):
+                self.spiking.forward_good()
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
@@ -309,6 +317,8 @@ class Live:
                 out.append(ev | {"t": hhmm(t)})
                 if ev.get("natural"):
                     self.store.save(e, self.memory)                          # night closed: write it now
+        if self.spiking:
+            self.spiking.forward_sleep(e.stage)
         p = e.params
         b.set_rhythm(p["f_hz"], p["coupling"], p["noise"])
         b.a = p["a"]
@@ -356,7 +366,7 @@ class Live:
             base = sum(groups.values()) / max(1, len(groups))
             rel = self.last_rel = {k: v / max(base, 1e-6) for k, v in groups.items()}
             # neuromodulators x receptor maps -> regional excitability; the body -> interoceptive drive to the insula
-            levels = self.neuro.update(TICK, STAGE_MOD.get(self.engine.stage, STAGE_MOD["NREM"]))
+            levels = self.neuro.update(TICK, self.engine.modulators)      # tonic levels read from the sleep circuit
             b.neuromod = NEURO_K * (self.neuro.region_gain(levels)[self.nm_idx] - 1.0)
             amyg = max(0.0, rel.get("fear", 1.0) - 1.0)
             body_levels = dict(levels, NE=min(levels["NE"], 1.5))       # the market can quicken his pulse, not race it
@@ -617,9 +627,9 @@ async def supervised(name, fn, backoff=5.0):
 
 
 def parse_start(hm):
-    """'HH:MM' -> sim epoch of that Rome time today."""
+    """'HH:MM' -> sim epoch of that local (Tokyo) time today."""
     h, m = map(int, hm.split(":"))
-    return datetime.now(ROME).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
+    return datetime.now(TZ).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
 
 
 LOGIN_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -650,6 +660,8 @@ def password_gate(password):
                 return web.Response(text=LOGIN_PAGE.format(msg="<small>wrong password</small>"),
                                     content_type="text/html", status=401)
             return web.Response(text=LOGIN_PAGE.format(msg=""), content_type="text/html")
+        if spiking_server and request.path in spiking_server.POD_PATHS:
+            return await handler(request)                  # the pod authenticates with its own secret in the handler
         if hmac.compare_digest(request.cookies.get("sub01", ""), token):
             return await handler(request)
         if request.path == "/ws" or request.path.startswith("/api/"):
@@ -665,6 +677,14 @@ async def main(args):
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app.router.add_get("/ws", live.ws_handler)
+    manager = None
+    if spiking_server:
+        hub = spiking_server.attach(app, live, data_dir)
+        manager = spiking_manager.from_env(data_dir, get_items=lambda: spiking_manager.top_items(live.memory, live.clock.now()))
+        if manager.enabled():
+            hub.manager, manager.send_stop = manager, hub.forward_stop
+        else:
+            manager = None
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
@@ -781,10 +801,14 @@ async def main(args):
         tasks.append(live.run_eye())
     if live.browser:
         tasks.append(supervised("browse", live.run_browse))
+    if manager:
+        tasks.append(manager.run())
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
+        if manager:
+            manager.shutdown()
         if live.browser:
             try:
                 await asyncio.wait_for(live.sync_browsing(), 5)  # the newest log, if the browser still answers
@@ -805,7 +829,7 @@ if __name__ == "__main__":
     p.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     p.add_argument("--frames-dir", help="where eye frames are written (default out/eye/frames)")
     p.add_argument("--time-scale", type=float, default=1.0, help="sim seconds per real second (60: 1 h per minute)")
-    p.add_argument("--start", help="Rome time HH:MM to start the (accelerated) clock at, e.g. 23:55")
+    p.add_argument("--start", help="local (Tokyo) time HH:MM to start the (accelerated) clock at, e.g. 23:55")
     p.add_argument("--data-dir", help="state + nights directory (default data/, or data/demo when accelerated)")
     p.add_argument("--eye-every", type=float, default=90.0, help="seconds between eye frames while awake")
     p.add_argument("--replay-real-session", action="store_true", default=os.environ.get("REPLAY_REAL_SESSION") == "1",
