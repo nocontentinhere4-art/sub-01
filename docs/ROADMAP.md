@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 19:10 UTC** (pass 33b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 20:20 UTC** (pass 34). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -305,6 +305,20 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 34 (20:20 UTC):** merged #84, #96, #94 and #91. Each was checked by the coordinator.
+- **#84 (room polish and phone screen module):** 1101 passed, smoke OK at 7.2 ms per tick.
+- **#96:** the room's mini brain shows the neurons (`?mini&neurons=1`).
+- **#94 and #91 (#88 A polish and B, the whole-brain neuron forest):** tested together on main. 1106 passed. One
+  CPU-time test failed under load and passes on its own. Smoke OK.
+  - Open item: ≥ 30 FPS for the forest on a mid-range phone still needs a real device.
+- **#95 (#63 worker): the chess smoke fix.** The cause: `hungry_now()` ended a game he had just started, before the
+  board existed. The fix is in `life.py`; CI is running. The sleep pose audit comes next on the same branch.
+- **Character:** a second candidate, `boy3`, made with Higgsfield and Meshy 6. It is an original face, styled to the
+  owner's brief.
+  - Same 24-bone rig as `boy.glb`; the existing clips are retargeted with `room_build/retarget_meshy.mjs`.
+  - Branch `claude/loving-davinci-6hqmjx` (bd5804e); preview in `docs/design/boy3/`.
+  - The #76 worker compares boy2 (MakeHuman, with fingers and blink) and boy3 in the room and picks one in #80.
 
 **Pass 33b:** live check (the coordinator logged in with the owner's approval) and merge of #92 (#89).
 - **Sleep fix confirmed live:** NREM since 03:19 Tokyo, debt 2.0 h, woken 0×. The day-live pod stopped; only "BRAIN" is left.
