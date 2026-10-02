@@ -10,7 +10,8 @@ HTTP API (every call needs the header X-Browse-Token = BROWSE_SERVICE_TOKEN when
   POST /act   {device, action, why, interest}  carry out the brain's choice
   POST /close {device|null}             put a screen away (or everything)
   GET  /shot/{device}.jpg               latest screenshot        GET /health
-  GET  /state   log + screen status, every text typed (site search boxes only) and every banner pressed away
+  GET  /state   log + screen status, every text typed (site search boxes only), every banner pressed away, and
+                the searches per source today / requests per host this hour (`search_counts`, #56)
 The service never sees the server's secrets: it runs with a minimal environment (see LocalBrowser.spawn).
 
 In the brain's process, BrowserClient talks to it with short timeouts; if it does not answer it raises BrowserDown,
@@ -78,6 +79,9 @@ def make_app(browser, token=None):
         if fresh:
             browser.log = list(st.get("log", []))[-60:]
             browser.used = set(st.get("used", []))
+            if st.get("searches") and hasattr(browser, "limits"):   # rate limits and counts survive a restart
+                from search_sources import Limits
+                browser.limits = Limits(state=st["searches"])
         return web.json_response({"ok": True, "applied": fresh})
 
     async def limited(coro, limit, dev):
@@ -121,7 +125,8 @@ def make_app(browser, token=None):
                                   "open": browser.browser is not None,
                                   "sandbox": getattr(browser, "sandbox", None), "uid": os.getuid(),
                                   "typed": getattr(browser, "typed", [])[-30:],
-                                  "dismissed": getattr(browser, "dismissed", [])[-30:]})
+                                  "dismissed": getattr(browser, "dismissed", [])[-30:],
+                                  "search_counts": browser.limits.public() if hasattr(browser, "limits") else None})
 
     async def health(request):
         return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(tree_rss_mb(os.getpid()), 1)})
@@ -183,6 +188,7 @@ class BrowserClient:
         self.http = None
         self.screens = {}                                       # last status per device (for the tick message)
         self.log = []
+        self.searches = None                                    # searches per source today (/api/browsing, #56)
         self.shots = {}                                         # device -> (shot id, jpeg bytes)
         self.restarting = False
         self.failures = 0                                       # consecutive failed calls (hung service)
@@ -251,6 +257,7 @@ class BrowserClient:
             raise BrowserDown(f"/state: HTTP {status}")
         d = json.loads(raw)
         self.log = d.get("log", [])
+        self.searches = d.get("search_counts")
         for dev, st in (d.get("screens") or {}).items():
             if st:
                 self.screens[dev] = st

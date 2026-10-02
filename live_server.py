@@ -45,6 +45,7 @@ import brain_vote
 import chess_game
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
+from search_sources import live_interest
 from eyes import Eyes
 import mind as mind_mod
 from tastes import PageWatch, Tastes
@@ -293,6 +294,7 @@ class Live:
         self.replies = []                # his recent replies (AI-written), for the hello and /api/mind
         self.read_topics = {}            # page title -> topics an AI noted (the eye's dream scenes)
         self.interest = (0.0, None)      # (wall time, mind.next_interest()) cached for the browser
+        self.search_rng = random.Random()  # which of his query sources the browser's next search comes from (#56)
         self.plan_rng = np.random.default_rng(int(seed) + 1 if seed else None)
         self.bg = set()                  # background tasks (mind reading), kept referenced until done
         self.chess = None                # chess_game.Game while he plays at the desk (#17)
@@ -778,7 +780,7 @@ class Live:
                 open_dev = dev
                 t = self.clock.now()
                 art = self.reader.current()
-                interest = self.mind_interest() or (art["title"] if art else None)
+                interest = live_interest(self, art, self.search_rng)   # #56: notes, reading, taught words, tastes
                 mode = "video" if self.life.activity == "watch_video" else None
                 d = await self.browser.step(dev, self.heard(t), interest, mode)
                 st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
@@ -817,7 +819,7 @@ class Live:
     async def sync_browsing(self):
         s = await self.browser.state()
         if s.get("log") or not self.browsing_state.get("log"):
-            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", [])}
+            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
@@ -1404,7 +1406,8 @@ async def main(args):
 
     async def browsing(request):                  # pages shown on his screens, newest last
         log = (live.browser.log or live.browsing_state.get("log", [])) if live.browser else []
-        return web.json_response({"on": bool(live.browser), "log": log[-30:]})
+        return web.json_response({"on": bool(live.browser), "log": log[-30:],
+                                  "searches": getattr(live.browser, "searches", None) if live.browser else None})
     app.router.add_get("/api/browsing", browsing)
 
     async def tastes(request):                    # what kinds of pages have paid off in the brain's response
