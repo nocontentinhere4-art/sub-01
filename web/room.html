@@ -114,6 +114,7 @@
   #boot button { margin-top:10px; font:inherit; font-size:12px; background:var(--fg); color:#0a0a0a; border:0; padding:6px 12px; border-radius:5px; cursor:pointer; }
   @media (max-width: 900px) {
     html,body { overflow:auto; }
+    body { position:relative; }        /* body is the scroller: the scene and the header scroll away with the cards */
     #scene { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
     #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
     #top { position:absolute; left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:19px; }
@@ -846,7 +847,7 @@ function screens(life, st){
   // desk monitor
   if (monitor) {
     if (life.activity === "chart" && atDesk) { monitor.id = null; const t = chartTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
-    else if (screenOn === "desk") { const s = lastStatus.desk; if (s && monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
+    else if (screenOn === "desk" && lastStatus.desk) { if (monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
     else if (atDesk && life.activity === "research" && life.reading) {            // no browser: the article he is reading
       if (monitor.id !== "wiki:" + life.reading.title) { monitor.set(drawReading(life.reading)); monitor.id = "wiki:" + life.reading.title; } }
     else if (st !== "AWAKE" || !visible) monitor.off();
