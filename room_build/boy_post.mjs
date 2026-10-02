@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
-import { prune, weld, meshopt, dedup } from "@gltf-transform/functions";
+import { prune, weld, meshopt, dedup, resample } from "@gltf-transform/functions";
 import { MeshoptEncoder, MeshoptDecoder } from "meshoptimizer";
 import sharp from "sharp";
 import * as THREE from "three";
@@ -616,7 +616,7 @@ function poseChannels(spec) {
 // ------------------------------------------------------------------ write
 const report = [];
 async function finish(d, file) {
-  await d.transform(dedup(), prune({keepLeaves: true, keepAttributes: true}), meshopt({encoder: MeshoptEncoder, level: "medium"}));
+  await d.transform(dedup(), resample({tolerance: 1e-4}), prune({keepLeaves: true, keepAttributes: true}), meshopt({encoder: MeshoptEncoder, level: "medium"}));
   await io.write(file, d); const kb = fs.statSync(file).size / 1024; report.push(`${path.basename(file)} ${kb.toFixed(0)} KB`); return kb;
 }
 const sit = await readClip(path.join(WEB, "boy.glb"));
