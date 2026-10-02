@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 11:20 UTC** (pass 25). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 12:00 UTC** (pass 26, final for the task list). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -94,7 +94,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | merged as #48 (6×) |
 | #18 Chromium non-root | `session_01Fbtw3qXpLr5WZAjU7jQiDT` | merged as #50 (found the #49 outage) |
 | #15 costs, caps, /healthz | `session_01M9bv9k1WFLctqBLSHXWPwr` | merged as #51 |
-| #17 YouTube + chess | `session_01F3jQL1rvBNU5TaF7Sygkqi` | server side merged as #53; room desk view in progress (`feature/youtube-chess-room`) |
+| #17 YouTube + chess | `session_01F3jQL1rvBNU5TaF7Sygkqi` | done: #53 + #54 |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
@@ -132,7 +132,7 @@ cheap to run, with the password gate kept until launch day.
 | 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | done (follow-up for credits pending; links from the pages come with the room fix) | #23 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | done (300 viewers: 71 % of a core, 4–7 KB/s each) | #34 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | done | #51 |
-| 16 | YouTube (muted) + chess, chosen by the brain vote | done on /brain (#53); room view in progress | issue #17 |
+| 16 | YouTube (muted) + chess, chosen by the brain vote | done | #53, #54 |
 | 17 | Chromium as non-root (sandbox on) | done (uid 1000; sandbox on where the host allows it) | #50 |
 | 18 | Brain loop 3× cheaper | done (6×: 34 → 9 ms per tick) | #48 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | done | #40 |
@@ -268,10 +268,30 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
 
+## Launch readiness (2026-10-02, after pass 26)
+**All task issues are closed and no PRs are open.** 27 PRs were merged today, #27–#54: attribution, tastes page,
+room movement and follow-ups, launch load, mind layer (A, B, room), tastes faster, spiking choice, free browsing,
+teach him (server and room), static map, brain loop 6× cheaper, Dockerfile hotfix, non-root, costs/caps/healthz,
+YouTube + chess (server and room). Main has 600+ tests (with torch and Chromium), smoke OK, and a tick of ~9 ms per
+50 ms. Every paid call is capped (~$3.10/day AI and images + ≤ 1 GPU-h RunPod).
+
+Everything left is for the owner:
+1. Railway: healthcheck path `/healthz`, `SUB01_ADMIN_TOKEN`, an uptime monitor, a usage alert, and a paid plan.
+2. Railway: `SUB01_POD_SECRET`, unless already set with the RunPod key; optionally `SUB01_CHOICE=1`.
+3. After the next deploys, check the logs and the site:
+   - the site is up (the #49 outage is fixed);
+   - the `CHROMIUM SANDBOX FAILED` line (fine either way, but note it);
+   - YouTube plays muted on /brain (it could not be tested end to end in the sandbox);
+   - the /life walk video (headless showed YouTube error 153);
+   - the dark rectangle top-left in the room (headless SwiftShader only?).
+4. Decide the GPU budget beyond 1 h/day if you want faster neuron learning.
+5. Email for him (18d), the reply to Russ, the legal check for the coin, the X account.
+6. Launch day: remove `SITE_PASSWORD`; watch `/api/health` and `/api/costs` for 24 h.
+
 ## Launch checklist (owner)
-- [ ] All milestones 7–15 merged; CI green; `/healthz` monitored (uptime alert to your phone/email).
+- [x] All task milestones merged; CI green (2026-10-02). [ ] `/healthz` monitored (uptime alert to your phone/email).
 - [ ] Costs per day measured for 3 days with the password on, all caps set, Railway usage alert set.
-- [ ] Load test (#14) passed at 300 viewers.
+- [x] Load test (#14) passed at 300 viewers (#34).
 - [ ] `/about.html` live and linked from every page; footer disclaimer on every page.
 - [ ] Researcher email: tell the dataset's authors (OpenNeuro ds000031) what the site is, before launch. Do not
       name the scanned person anywhere on the site or on X.
