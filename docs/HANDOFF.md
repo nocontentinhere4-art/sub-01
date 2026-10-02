@@ -52,8 +52,25 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   (a hand gripping a phone, Higgsfield GPT Image + Tripo H3.1, 129 KB) is attached at the wrist; the live screen sits on its glass.
 - Phone pose: one-handed grip; right arm/neck/head from `web/room/boy_text.glb` (Meshy `Texting_Walk_inplace` #676,
   re-rigged on the same skeleton via Higgsfield, 8 credits) blended into frozen sit/idle poses (`phone_sit`, `phone_stand`).
-- Chromium runs as root in the image, so its own sandbox is off (`--no-sandbox`); running the server as a non-root user
-  would turn it back on (needs `/data` volume ownership checked on Railway).
+- Non-root (#18): the server and Chromium run as `sub01` (uid 1000), so Chromium can keep its own sandbox (no `--no-sandbox`).
+  The image still starts as root (no `USER` line on purpose): `entrypoint.sh` (`/usr/local/bin/sub01-entrypoint`)
+  `chown -R 1000:1000 /data` when anything in it is not uid 1000 yet (first start on the old root-owned volume; later
+  starts change nothing), then drops privileges for good with `setpriv` (util-linux, already in Debian slim; no new
+  package). Started as uid 1000 already (`docker run --user 1000`) it runs the CMD as is, and says loudly if `/data` is not
+  writable. Chromium lives in `/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`) so uid 1000 can start it. `browse.py`
+  passes `--no-sandbox` only as root or when a sandboxed launch fails (no user namespaces in the runtime); both print a
+  `!!!` line, and the fallback sticks until the service restarts. `/state` of `browse_service.py` shows `sandbox`, `uid`.
+  - Railway: nothing to set. Do not set `RAILWAY_RUN_UID` (the image must start as root to hand the volume over). A
+    custom start command or the separate browse service (`python browse_service.py ...`) must go through the
+    entrypoint: prefix it with `/usr/local/bin/sub01-entrypoint`. Signs it did not: `!!! running as root` in the logs.
+  - Whether the sandbox itself starts depends on the runtime (user namespaces): under Docker's default seccomp profile it
+    does not and Chromium falls back to `--no-sandbox` as uid 1000 (`!!! CHROMIUM SANDBOX FAILED`); with
+    `--security-opt seccomp=unconfined` it runs sandboxed (renderers in their own user namespace, seccomp filter on).
+    Railway's runtime: check the first deploy's logs.
+  - Check after a deploy: no `!!! running as root` line; `/api/browsing` keeps filling; files on `/data` keep updating.
+  - **Rollback:** set `RUN_AS_ROOT=1` on the Railway service and redeploy: everything runs as root as before #18
+    (Chromium back on `--no-sandbox`, loud line in the logs). `/data` stays owned by uid 1000, which root reads and writes
+    anyway. Full revert: revert the #18 PR (Dockerfile ENTRYPOINT + `entrypoint.sh` + browse.py); no data migration.
 
 ## Reading memory (PR `feature/reading-memory`)
 - What he reads is a stimulus: up to 8 keywords (title + extract) through chat.py's rules at 0.5x a chat message,

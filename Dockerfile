@@ -3,11 +3,21 @@ WORKDIR /app
 COPY requirements-server.txt .
 # small 214-region matrices: BLAS threads only spin, and the CPU is shared with the screens' browser
 ENV PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 BROWSE=1
+# Chromium outside /root, so uid 1000 can start it
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN pip install --no-cache-dir -r requirements-server.txt \
  && python -m playwright install --with-deps --only-shell chromium \
  && rm -rf /var/lib/apt/lists/*
+# #18: the server and Chromium run as sub01 (uid 1000), so Chromium can keep its sandbox. The image still starts as root:
+# entrypoint.sh hands the root-owned /data volume to uid 1000 and drops privileges with setpriv (util-linux, already in
+# Debian slim). No `USER` line on purpose: a container that starts as uid 1000 cannot fix a root-owned volume.
+# RUN_AS_ROOT=1 keeps everything root as before (rollback; Chromium back on --no-sandbox).
+COPY entrypoint.sh /usr/local/bin/sub01-entrypoint
+RUN chmod 755 /usr/local/bin/sub01-entrypoint \
+ && useradd --uid 1000 --user-group --create-home --shell /usr/sbin/nologin sub01 \
+ && mkdir -p /data/frames && chown -R 1000:1000 /data
 COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py \
-     runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py ./
+     runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py ./
 COPY twin ./twin
 COPY spiking ./spiking
 COPY web ./web
@@ -18,4 +28,5 @@ COPY out/rest ./out/rest
 # Chromium runs in its own process (browse_service.py, a child with a memory watchdog). To run it as a separate Railway
 # service instead: same repo, start command `python browse_service.py --host :: --port $PORT`, no public domain,
 # BROWSE_SERVICE_TOKEN set on both services, and BROWSE_SERVICE_URL=http://<service>.railway.internal:<port> here.
+ENTRYPOINT ["/usr/local/bin/sub01-entrypoint"]
 CMD ["sh", "-c", "python live_server.py --host 0.0.0.0 --port ${PORT:-8080} --eye --trust-proxy --data-dir /data --frames-dir /data/frames ${EXTRA_ARGS:-}"]
