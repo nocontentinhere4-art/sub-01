@@ -30,6 +30,12 @@ if (AO && fs.existsSync(AO)) {
 const chairNode = root.listNodes().find(n => n.getName() === "chair");
 // (an extra marks its materials, so dedup/join can never fold the chair back into the static room)
 if (chairNode) for (const p of chairNode.getMesh().listPrimitives()) p.getMaterial().setExtras({movable: "chair"});
+// the headphones on the wall hook are their own node too (#75; a later change puts them on his head), with no AO
+// and so are the things hanging on the door ("hangers", origin at the hinge: the page swings them with the leaf, #82)
+for (const name of ["headphones", "hangers"]) {
+  const n = root.listNodes().find(n => n.getName() === name);
+  if (n) for (const p of n.getMesh().listPrimitives()) p.getMaterial().setExtras({movable: name});
+}
 if (chairNode && AO_CHAIR && fs.existsSync(AO_CHAIR)) {
   const png = await sharp(AO_CHAIR).greyscale().blur(0.6).toColourspace("b-w").png().toBuffer();
   const tex = doc.createTexture("chair_ao").setImage(png).setMimeType("image/png").setURI("chair_ao.png");
@@ -61,9 +67,9 @@ await doc.transform(
 );
 // quantisation (in meshopt) folds a dequantising scale and offset into each mesh node's transform; so that "chair" keeps
 // its pivot (on the floor under the gas lift), its mesh goes into a child node and "chair" stays a plain transform node
-{
-  const ch = root.listNodes().find(n => n.getName() === "chair");
-  if (ch && ch.getMesh()) { const mesh = ch.getMesh(); ch.setMesh(null); ch.addChild(doc.createNode("chair_mesh").setMesh(mesh)); }
+for (const name of ["chair", "headphones", "hangers"]) {
+  const ch = root.listNodes().find(n => n.getName() === name);
+  if (ch && ch.getMesh()) { const mesh = ch.getMesh(); ch.setMesh(null); ch.addChild(doc.createNode(name + "_mesh").setMesh(mesh)); }
 }
 await doc.transform(meshopt({encoder: MeshoptEncoder, level: "medium"}));
 // props: shrink their textures further
@@ -84,3 +90,5 @@ console.log("textures:", root.listTextures().map(t => `${t.getName()} ${t.getIma
 console.log("nodes:", root.listNodes().filter(n => !n.getMesh()).map(n => n.getName()).join(", "));
 const ch = root.listNodes().find(n => n.getName() === "chair");
 if (ch) console.log("chair:", JSON.stringify({t: ch.getTranslation(), r: ch.getRotation(), s: ch.getScale(), children: ch.listChildren().map(c => c.getName())}));
+for (const name of ["headphones", "hangers"]) { const n = root.listNodes().find(n => n.getName() === name);
+  if (n) console.log(name + ":", JSON.stringify({t: n.getTranslation(), children: n.listChildren().map(c => c.getName())})); }

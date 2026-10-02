@@ -225,7 +225,7 @@ for zc in (WZ0 - 0.32, WZ1 + 0.36):
     box("rod_bracket", "metal_dark", (IX, IX + 0.075), (ROD_Y - 0.006, ROD_Y + 0.006), (zc + (0.04 if zc < 0 else -0.04) - 0.006, zc + (0.04 if zc < 0 else -0.04) + 0.006), bevel=0.002, seg=1)
 def curtain(nm, za, zb, side):
     """a gathered panel between za..zb (z), hanging from the rod to the sill; side: which way the folds open"""
-    bm = bmesh.new(); nz, ny = 40, 26; top = ROD_Y - 0.01; bot = WY0 - 0.07; folds = 6.5
+    bm = bmesh.new(); nz, ny = 40, 26; top = ROD_Y - 0.01; bot = WY0 + 0.0015; folds = 6.5   # the hem just clears the sill (it ran through its ends)
     grid = []
     for j in range(ny + 1):
         t = j / ny; y = top + (bot - top) * t; row = []
@@ -564,7 +564,7 @@ def tote(xc):
     for s in (-1, 1):                                          # straps up to the hook
         st = box("tote_strap", "painted", (-0.012, 0.012), (0, 0.17), (-0.003, 0.003)); set_vcol(st, srgb("#cdbf9f"))
         st.data.transform(Matrix.Translation(B(xc + s * 0.09, 1.60, IZ + 0.065)) @ Matrix.Rotation(-s * 0.48, 4, 'Y')); project_uv(st)
-tote(LX0 + 0.34)
+tote(LX0 + 0.46)                                   # (the hoodie hangs on the left hook)
 # light switch by the door, doormat in front of it
 box("switch_plate", "white", (0.93, 1.00), (1.17, 1.29), (IZ, IZ + 0.008), bevel=0.003, seg=2)
 box("switch_rocker", "white", (0.945, 0.985), (1.19, 1.27), (IZ + 0.008, IZ + 0.013), bevel=0.002, seg=1)
@@ -585,9 +585,99 @@ box("ac_flap", "white", (0.40, 0.96), (2.03, 2.05), (IZ + 0.185, IZ + 0.215), be
 mat("led", color=(0.1, 0.6, 0.3), rough=0.4, emit=((0.2, 1.0, 0.5), 2.0))
 box("ac_led", "led", (0.93, 0.94), (2.08, 2.09), (IZ + 0.209, IZ + 0.212))
 
+# ================================================================ the prop sweep (#75): nothing inside a wall, nothing floating
+# Every prop is registered with check(); sweep() measures its real (evaluated) vertices and reports each offender.
+def world_box(objs):
+    """world AABB of the evaluated meshes, in glTF coords: ([x0, y0, z0], [x1, y1, z1])"""
+    dg = bpy.context.evaluated_depsgraph_get(); lo = [1e9] * 3; hi = [-1e9] * 3
+    for o in objs:
+        if o.type != 'MESH': continue
+        ev = o.evaluated_get(dg); me = ev.to_mesh(); M = ev.matrix_world
+        for v in me.vertices:
+            w = M @ v.co
+            for i, c in enumerate((w.x, w.z, -w.y)): lo[i] = min(lo[i], c); hi[i] = max(hi[i], c)
+        ev.to_mesh_clear()
+    return lo, hi
+SWEEP = []
+# room.html's hard-coded places (#63) that no prop may enter: (x, y, z) ranges, glTF
+KEEP = {"his place at the window": ((-1.93, -1.30), (1.0, 1.95), (-0.24, 0.20)),       # he stands at (-1.56, -0.02), leaning on the sill
+        "the delivery bag's spot": ((-0.70, -0.42), (DTOP + 0.004, DTOP + 0.40), (-0.93, -0.80)),  # BAG_AT (-0.56, -0.855)
+        "the tea bottle's old spot": ((-1.43, -1.33), (DTOP + 0.004, DTOP + 0.30), (-0.95, -0.85)),
+        # #87 (food): the dish left of the keyboard, the tea bottle in front of the mouse, and where he crouches at the bin
+        # under the desk (-0.55, -1.22) to throw the empty dish away
+        "the dish's spot": ((-1.48, -1.26), (DTOP + 0.004, DTOP + 0.25), (-1.02, -0.84)),       # DISH_AT, a pizza 4 cm further left
+        "the tea bottle's spot": ((-0.87, -0.79), (DTOP + 0.004, DTOP + 0.30), (-0.89, -0.81)),  # BOTTLE_AT (-0.83, -0.85) r 3.2 cm, in front of the mouse
+        "his crouch at the bin": ((-0.85, -0.25), (FY + 0.02, DTOP - 0.04), (-1.08, -0.55))}      # (under the desk top)
+DOOR_SWING = (0.71, 0.9 + 0.15)                  # the leaf opens into the room (#82): 0.68 m plus 3 cm, up to 0.9 rad plus a margin
+# room.html's walking graph (#82: NODES, LINKS and the standing anchors): every prop up to his height keeps WALK_R off
+# each link (his shoulders and some air); flat things he walks over (rug, mats) and the plant (anchored by #63, its
+# leaves above the sill path's knees) are left out
+WALK_NODES = {"bs": (-0.36, -0.18), "ds": (-0.62, -0.35), "w": (0.15, -0.12), "c": (0.45, -0.35), "m": (0.35, 0.05), "d": (1.22, -0.92),
+              "f": (0.15, 0.75), "sl": (-1.10, -0.06), "g": (-0.62, -0.08),
+              "sill": (-1.56, -0.02), "doorway": (1.76, -0.98), "deskside": (-0.30, -0.40), "deskstand": (-0.68, -0.55)}
+WALK_LINKS = [("bs", "ds"), ("bs", "w"), ("ds", "w"), ("w", "m"), ("w", "c"), ("m", "c"), ("c", "d"), ("m", "d"), ("w", "f"), ("m", "f"),
+              ("bs", "g"), ("g", "sl"), ("w", "g"), ("sl", "sill"), ("d", "doorway"), ("ds", "deskstand"), ("bs", "deskside"), ("ds", "deskside")]
+WALK_R, WALK_H = 0.22, 1.9
+def walk_hit(lo, hi):
+    """the first walking link whose capsule (radius WALK_R) meets the box's floor plan, or None"""
+    for a, b in WALK_LINKS:
+        (ax, az), (bx, bz) = WALK_NODES[a], WALK_NODES[b]; n = max(1, int(math.hypot(bx - ax, bz - az) / 0.02))
+        for i in range(n + 1):
+            x, z = ax + (bx - ax) * i / n, az + (bz - az) * i / n
+            if math.hypot(x - min(max(x, lo[0]), hi[0]), z - min(max(z, lo[2]), hi[2])) < WALK_R: return f"{a}-{b}"
+    return None
+def check(name, objs, support, clear=0.0, minx=None, on_door=False, walk=True):
+    """support: ("y", h) rests on a surface at height h (its lowest vertex within 2 mm of it); ("wall", None) hangs flat on
+    the back wall (its rear within 2 mm of it); None: hangs from something (no support test). clear: the least distance
+    from the window wall and the back wall. minx: the window wall's face where the prop stands (the sill reaches past it).
+    Every prop also stays out of KEEP, off his walking graph (unless walk=False) and, unless on_door (it hangs on the
+    leaf and swings with it), out of the door's swing"""
+    SWEEP.append(dict(name=name, objs=[o for o in objs if o.type == 'MESH'], support=support, clear=clear, minx=IX if minx is None else minx, on_door=on_door, walk=walk))
+def settle(objs, y):
+    """drop modelled parts as one, so that their lowest vertex rests on y"""
+    bpy.context.view_layer.update(); lo, _ = world_box(objs)
+    for o in objs: o.data.transform(Matrix.Translation(B(0, y - lo[1], 0))); o.data.update()
+def named(*names):
+    return [o for o in STATIC if o.name in bpy.data.objects and o.name.split(".")[0] in names]
+def sweep():
+    bad, rows = 0, []
+    for e in SWEEP:
+        lo, hi = world_box(e["objs"]); cl = e["clear"]; tol = 0.0005; why = []
+        if lo[0] < e["minx"] + cl - tol: why.append(f"{(e['minx'] + cl - lo[0]) * 1000:.1f} mm into the window wall" + (f" (keep {cl * 100:.0f} cm)" if cl else ""))
+        if lo[2] < IZ + cl - tol: why.append(f"{(IZ + cl - lo[2]) * 1000:.1f} mm into the back wall" + (f" (keep {cl * 100:.0f} cm)" if cl else ""))
+        if hi[0] > X1 or hi[2] > Z1: why.append("outside the floor")
+        if lo[1] < FY - tol: why.append(f"{(FY - lo[1]) * 1000:.1f} mm under the floor")
+        if hi[1] > H: why.append("through the ceiling")
+        s = e["support"]; gap = None
+        if s and s[0] == "y": gap = lo[1] - s[1]
+        if s and s[0] == "wall": gap = lo[2] - IZ
+        if gap is not None and abs(gap) > 0.002:
+            why.append(f"{'floats' if gap > 0 else 'sinks'} {abs(gap) * 1000:.1f} mm {'above' if gap > 0 else 'into'} its support" if s[0] == "y"
+                       else f"{'stands off' if gap > 0 else 'sinks into'} the wall by {abs(gap) * 1000:.1f} mm")
+        for kn, (kx, ky, kz) in KEEP.items():                    # room.html's hard-coded spots (#63)
+            if lo[0] < kx[1] and hi[0] > kx[0] and lo[1] < ky[1] and hi[1] > ky[0] and lo[2] < kz[1] and hi[2] > kz[0]: why.append(f"in {kn}")
+        if not e["on_door"] and hi[1] > FY + 0.015 and lo[1] < LY1 and hi[2] > IZ and hi[0] > LX0:   # the door leaf's swing (a sector on the floor plan)
+            for i in range(41):
+                for j in range(1, 36):
+                    a_ = DOOR_SWING[1] * i / 40; r_ = DOOR_SWING[0] * j / 35; x_, z_ = LX0 + r_ * math.cos(a_), IZ + r_ * math.sin(a_)
+                    if lo[0] <= x_ <= hi[0] and lo[2] <= z_ <= hi[2]: break
+                else: continue
+                why.append("in the door's swing"); break
+        if e["walk"] and hi[1] > FY + 0.02 and lo[1] < WALK_H:
+            hit = walk_hit(lo, hi)
+            if hit: why.append(f"on his way {hit}")
+        sup = "-" if not s else f"y={s[1]:.3f}" if s[0] == "y" else "back wall"
+        rows.append(f"{'ok ' if not why else 'BAD'} {e['name']:<20} x {lo[0]:+.3f}..{hi[0]:+.3f}  y {lo[1]:.3f}..{hi[1]:.3f}  z {lo[2]:+.3f}..{hi[2]:+.3f}"
+                    f"  support {sup:<10} gap {'-' if gap is None else f'{gap * 1000:+.1f} mm':<9} {'; '.join(why)}")
+        bad += bool(why)
+    rep = "\n".join(rows) + f"\nSWEEP {len(SWEEP)} props, {bad} offenders"
+    print(rep); open(f"{OUT}/sweep.txt", "w").write(rep + "\n"); return bad
+
 # ================================================================ Poly Haven props (kept as their own meshes)
 PROPS = []
-def import_asset(k, loc, ry=0.0, scale=1.0, keep=None, drop=()):
+def import_asset(k, loc, ry=0.0, scale=1.0, keep=None, drop=(), rest="bottom", centre=False):
+    """rest: "bottom" puts the lowest vertex on loc's y (its support), "back" the rear face on loc's z (a wall), None
+    leaves it as authored; centre: the kept meshes' footprint centred on loc's x, z (a file's origin can be far away)"""
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=f"{AS}/{k}/{k}.gltf")
     new = [o for o in bpy.data.objects if o not in before]
@@ -598,10 +688,15 @@ def import_asset(k, loc, ry=0.0, scale=1.0, keep=None, drop=()):
     for o in new:
         if o.parent is None: o.parent = root
     root.location = B(*loc); root.rotation_euler = (0, 0, ry); root.scale = (scale,) * 3
-    PROPS.extend(o for o in new if o.type == 'MESH'); return root, new
+    meshes = [o for o in new if o.type == 'MESH']
+    bpy.context.view_layer.update(); lo, hi = world_box(meshes); d = [0.0, 0.0, 0.0]
+    if centre: d[0] = loc[0] - (lo[0] + hi[0]) / 2; d[2] = loc[2] - (lo[2] + hi[2]) / 2
+    if rest == "bottom": d[1] = loc[1] - lo[1]
+    elif rest == "back": d[2] = loc[2] - lo[2]
+    root.location = root.location + B(*d); bpy.context.view_layer.update()
+    PROPS.extend(meshes); return root, new
 # desk lamp: base at the back-left corner, its head reaching over towards the keyboard
 lamp_root, lamp_objs = import_asset("desk_lamp_arm_01", (-1.74, DTOP, -1.30), ry=0.0, scale=0.8)
-bpy.context.view_layer.update()
 lm = [o for o in lamp_objs if o.type == 'MESH'][0]
 def head_centre():
     me = lm.data; idx = [i for i, m in enumerate(me.materials) if m and m.name.endswith("_light")]
@@ -612,16 +707,285 @@ hc = head_centre(); base = lamp_root.location.copy()
 d0 = Vector((hc.x - base.x, hc.y - base.y)); want = Vector((-1.25 - (-1.74), -(-1.05) - (1.30)))   # Blender xy towards (x=-1.25, z=-1.05)
 ang = math.atan2(want.y, want.x) - math.atan2(d0.y, d0.x)
 lamp_root.rotation_euler = (0, 0, ang); bpy.context.view_layer.update()
+def off_walls(root, meshes, clear):
+    """slide an imported prop out of the window wall and the back wall until every vertex keeps `clear` off them"""
+    lo, _ = world_box(meshes); dx = max(0.0, IX + clear - lo[0]); dz = max(0.0, IZ + clear - lo[2])
+    root.location = root.location + B(dx, 0, dz); bpy.context.view_layer.update(); return dx, dz
+# its arm swings back behind the base: slide the lamp out until base and arm keep 1.5 cm off both walls
+ldx, ldz = off_walls(lamp_root, [lm], 0.015)
+LAMP_LO, LAMP_HI = world_box([lm])
+print("LAMP moved by", round(ldx, 3), round(ldz, 3), "box", [round(v, 3) for v in LAMP_LO], [round(v, 3) for v in LAMP_HI])
 hc = head_centre(); print("LAMP HEAD (blender)", tuple(round(v, 3) for v in hc))
-marker("SURF_lamp", (hc.x, hc.z - 0.02, -hc.y))
+marker("SURF_lamp", (hc.x, hc.z - 0.02, -hc.y))          # the page's lamp light: under the moved head
+check("desk_lamp", [lm], ("y", DTOP), clear=0.01)
 # plants: a philodendron on the floor by the window wall, a succulent on the desk
-pr, po = import_asset("potted_plant_02", (-1.66, FY, -0.36), ry=0.8, scale=0.85, drop=("dirt",))
-d = cyl("plant_soil", "painted", (-1.66, -0.36), 0.172, FY + 0.27, FY + 0.272, n=28); set_vcol(d, srgb("#2a2018"))
-import_asset("potted_plant_04", (-0.48, DTOP, -1.14), ry=0.3, scale=0.9)
-import_asset("wall_clock", (0.68, 1.70, IZ + 0.0), ry=0.0, scale=0.85)
-import_asset("alarm_clock_01", (-1.87, WY0, 0.62), ry=-math.pi / 2 + 0.35, scale=0.8)
-import_asset("cardboard_box_01", (0.10, STOP, -1.31), ry=0.1, scale=0.62)
-import_asset("office_notepads", (-0.47, DTOP, -0.92), ry=0.3, keep=("sticky_stack",))
+# (room.html anchors the plant at (-1.66, -0.36): it stays there, turned so that its leaves clear the window wall,
+# which they reached 10 cm into at ry 0.8, and lean towards the desk, away from where he stands at the window)
+pr, po = import_asset("potted_plant_02", (-1.66, FY, -0.36), ry=3 * math.pi / 2, scale=0.85, drop=("dirt",))
+assert abs(pr.location.x + 1.66) < 1e-6 and abs(-pr.location.y + 0.36) < 1e-6, "the plant left its anchor"
+check("floor_plant", po, ("y", FY), walk=False)
+PLANT = (pr.location.x, -pr.location.y)
+d = cyl("plant_soil", "painted", PLANT, 0.172, FY + 0.27, FY + 0.272, n=28); set_vcol(d, srgb("#2a2018"))
+check("desk_succulent", import_asset("potted_plant_04", (-0.48, DTOP, -1.14), ry=0.3, scale=0.9)[1], ("y", DTOP))
+check("wall_clock", import_asset("wall_clock", (0.68, 1.70, IZ), ry=0.0, scale=0.85, rest="back")[1], ("wall", None))
+SILL_X = -1.912                                  # the window sill, in front of the sash track
+check("alarm_clock", import_asset("alarm_clock_01", (-1.865, WY0, 0.62), ry=-math.pi / 2 + 0.35, scale=0.8)[1], ("y", WY0), minx=SILL_X)
+check("shelf_carton", import_asset("cardboard_box_01", (0.10, STOP, -1.30), ry=0.1, scale=0.62)[1], ("y", STOP))
+# the sticky notes: the file keeps them 0.45 m from its origin, so centre the stack itself; on top of the left speaker
+# (the desk's free spots near its front edge belong to room.html's delivery bag and tea bottle)
+SPK_TOP = DTOP + 0.20
+check("sticky_notes", import_asset("office_notepads", (-1.52, SPK_TOP, -1.30), ry=0.37, keep=("sticky_stack",), centre=True)[1], ("y", SPK_TOP))
+
+# ================================================================ lived-in things (#75): all modelled here (CC0), off his routes
+# The free floor (room.html NODES/LINKS) runs from the desk and the bed edge to the window, the middle and the door; these
+# stand in the corners it never reaches: the gap between desk and shelf, the bed's foot end, the front right, the doormat.
+mat("hoodie", color=srgb("#5d6470"), rough=0.95, nor="fabric_nor.jpg", nstr=0.9, uv=0.14)
+mat("bag", color=srgb("#2b3440"), rough=0.75, nor="fabric_nor.jpg", nstr=0.5, uv=0.10)
+mat("cushion", color=srgb("#9a8350"), rough=0.95, nor="fabric_nor.jpg", nstr=0.8, uv=0.12)
+mat("pinboard", diff="pinboard.png", rough=0.8)
+mat("cable", color=srgb("#1d1d20"), rough=0.5)
+
+def blob(nm, material, c, r, n=16, static=True):
+    """an ellipsoid centred at c with radii r (glTF axes)"""
+    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=n, v_segments=max(6, n // 2 + 2), radius=1.0)
+    for v in bm.verts: v.co = B(c[0] + v.co.x * r[0], c[1] + v.co.z * r[1], c[2] - v.co.y * r[2])
+    o = new_obj(nm, bm, material, static); [setattr(p, "use_smooth", True) for p in o.data.polygons]; project_uv(o); return o
+def rod(nm, material, p0, p1, r, n=8, static=True):
+    """a cylinder between two points (glTF)"""
+    a, b = B(*p0), B(*p1); d = b - a
+    o = cyl(nm, material, (0, 0), r, 0, d.length, n=n, static=static)
+    o.data.transform(Matrix.Translation(a) @ d.to_track_quat('Z', 'Y').to_matrix().to_4x4()); o.data.update(); project_uv(o); return o
+def torus(nm, material, c, R, r, axis="y", half=None, static=True, nmaj=28, nmin=8):
+    """a ring around the glTF axis through c; half="up"/"down" keeps one half"""
+    rot = {"y": (0, 0, 0), "z": (math.pi / 2, 0, 0), "x": (0, math.pi / 2, 0)}[axis]
+    bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=nmaj, minor_segments=nmin, location=B(*c), rotation=rot)
+    o = bpy.context.active_object; o.name = nm; o.data.materials.append(MATS[material]); bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    if half:
+        bm = bmesh.new(); bm.from_mesh(o.data); cz = B(*c).z
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if (v.co.z < cz - 1e-4 if half == "up" else v.co.z > cz + 1e-4)], context='VERTS'); bm.to_mesh(o.data); bm.free()
+    for p in o.data.polygons: p.use_smooth = True
+    if static: STATIC.append(o)
+    project_uv(o); return o
+def cable(nm, pts, r=0.0028):
+    """a smooth cable along the points (glTF), as a mesh: a NURBS curve stays inside its points' hull (never into a wall)"""
+    cu = bpy.data.curves.new(nm, 'CURVE'); cu.dimensions = '3D'; cu.bevel_depth = r; cu.bevel_resolution = 1; cu.resolution_u = 8
+    sp = cu.splines.new('NURBS'); sp.points.add(len(pts) - 1); sp.order_u = 3; sp.use_endpoint_u = True
+    for pt, p in zip(sp.points, pts): pt.co = (*B(*p), 1.0)
+    co = bpy.data.objects.new(nm + "_curve", cu); SC.collection.objects.link(co); bpy.context.view_layer.update()
+    me = bpy.data.meshes.new_from_object(co.evaluated_get(bpy.context.evaluated_depsgraph_get())); bpy.data.objects.remove(co)
+    o = bpy.data.objects.new(nm, me); SC.collection.objects.link(o); me.materials.clear(); me.materials.append(MATS["cable"])
+    for p in me.polygons: p.use_smooth = True
+    STATIC.append(o); project_uv(o); return o
+def puffy(nm, material, W, L, T_, nu=14, nv=14):
+    bm = bmesh.new(); top, bot = [], []
+    for j in range(nv + 1):
+        rt, rb = [], []
+        for i in range(nu + 1):
+            u = i / nu * 2 - 1; v = j / nv * 2 - 1; h = T_ / 2 * ((1 - u ** 4) * (1 - v ** 4)) ** 0.5 + 0.004
+            rt.append(bm.verts.new(Vector((u * W / 2, -v * L / 2, h)))); rb.append(bm.verts.new(Vector((u * W / 2, -v * L / 2, -h * 0.6))))
+        top.append(rt); bot.append(rb)
+    for j in range(nv):
+        for i in range(nu):
+            bm.faces.new([top[j][i], top[j][i + 1], top[j + 1][i + 1], top[j + 1][i]]); bm.faces.new([bot[j][i], bot[j + 1][i], bot[j + 1][i + 1], bot[j][i + 1]])
+    edge = [(0, i) for i in range(nu)] + [(j, nu) for j in range(nv)] + [(nv, i) for i in range(nu, 0, -1)] + [(j, 0) for j in range(nv, 0, -1)]
+    for k in range(len(edge)):
+        (j0, i0), (j1, i1) = edge[k], edge[(k + 1) % len(edge)]
+        try: bm.faces.new([top[j0][i0], bot[j0][i0], bot[j1][i1], top[j1][i1]])
+        except ValueError: pass
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5); bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    o = new_obj(nm, bm, material); [setattr(p, "use_smooth", True) for p in o.data.polygons]; return o
+def group(): return len(STATIC)
+def since(n): return [o for o in STATIC[n:] if o.name in bpy.data.objects]
+def vc(objs, h):
+    for o in objs: set_vcol(o, srgb(h))
+
+# --- a cork pinboard on the window wall above the desk (original drawing: a calendar page, notes, doodles); clear of the lamp
+PB_Z0, PB_Z1 = -1.40, -1.04; PB_Y0 = max(1.72, LAMP_HI[1] + 0.03); PB_Y1 = PB_Y0 + (PB_Z1 - PB_Z0)
+n0 = group()
+box("pinboard_frame", "oak", (IX, IX + 0.02), (PB_Y0 - 0.015, PB_Y1 + 0.015), (PB_Z0 - 0.015, PB_Z1 + 0.015), bevel=0.003, seg=1)
+bm = bmesh.new(); xf = IX + 0.022                      # 2 mm off the frame: no z-fighting from afar
+vs = [bm.verts.new(B(xf, y, z)) for (z, y) in ((PB_Z1, PB_Y0), (PB_Z0, PB_Y0), (PB_Z0, PB_Y1), (PB_Z1, PB_Y1))]
+bm.faces.new(vs); pbq = new_obj("pinboard", bm, "pinboard"); uvl = pbq.data.uv_layers.new(name="UVMap")
+for li, uv in zip(pbq.data.polygons[0].loop_indices, ((0, 0), (1, 0), (1, 1), (0, 1))): uvl.data[li].uv = uv
+check("pinboard", since(n0), None)
+assert PB_Y1 < WY1 + 0.05 or PB_Z1 < WZ0 - 0.06, "the pinboard runs into the window casing"
+
+# --- a game controller behind the keyboard, between the monitor's foot and the right speaker
+n0 = group(); pad = []
+pad.append(box("pad_body", "painted", (-0.052, 0.052), (0.0, 0.024), (-0.028, 0.02), bevel=0.01, seg=3))
+for s in (-1, 1):
+    g = blob("pad_grip", "painted", (s * 0.046, 0.011, 0.022), (0.022, 0.012, 0.036), n=14); g.data.transform(Matrix.Rotation(s * 0.35, 4, 'Z')); pad.append(g)
+vc(pad, "#e4e2dc")
+sticks = [cyl("pad_stick", "painted", c, 0.0085, 0.024, 0.034, n=12) for c in ((-0.022, 0.006), (0.016, 0.006))]
+dpad = [box("pad_dpad", "painted", (-0.042, -0.026), (0.024, 0.027), (-0.012, -0.006)), box("pad_dpad", "painted", (-0.037, -0.031), (0.024, 0.027), (-0.017, -0.001))]
+vc(sticks + dpad, "#2a2a2e")
+btn = [cyl("pad_btn", "painted", (0.034 + dx, -0.009 + dz), 0.0042, 0.023, 0.027, n=10) for dx, dz in ((0.009, 0), (-0.009, 0), (0, 0.009), (0, -0.009))]
+vc(btn, "#8c8f99")
+parts = since(n0)
+for o in parts: transform(o, loc=(-0.80, DTOP, -1.20), ry=-0.35)
+settle(parts, DTOP); [project_uv(o) for o in parts]; check("game_pad", parts, ("y", DTOP))
+
+# --- manga on the floor in the gap between the desk and the bookshelf
+n0 = group(); random.seed(5); yy = FY
+for i in range(9):
+    h = random.uniform(0.014, 0.019); b = box("manga", "painted", (-0.057, 0.057), (yy, yy + h), (-0.088, 0.088), bevel=0.0015, seg=1)
+    set_vcol(b, srgb(random.choice(["#e9e4d8", "#d8433a", "#2d4a6b", "#f2c12e", "#3f5b45", "#e9e4d8", "#1f1f24"])))
+    transform(b, loc=(-0.24 + random.uniform(-0.006, 0.006), 0, -1.32), ry=random.uniform(-0.18, 0.18)); yy += h
+check("manga_stack", since(n0), ("y", FY))
+
+# --- a wall hook above them; the headphones on it are their own node ("headphones", not in the static mesh or its AO),
+# so a later change can take them off the hook and put them on his head (#68)
+HP = (-0.24, 1.43)
+n0 = group()
+cyl("hp_hook", "metal_dark", HP, 0.006, IZ, IZ + 0.07, n=10, axis="z"); cyl("hp_hook_tip", "metal_dark", (HP[0], IZ + 0.07), 0.006, HP[1], HP[1] + 0.025, n=10)
+cyl("hp_hook_plate", "metal_dark", HP, 0.016, IZ, IZ + 0.004, n=16, axis="z")
+check("headphone_hook", since(n0), ("wall", None))
+mat("hp_shell", color=srgb("#26272c"), rough=0.4)
+mat("hp_pad", color=srgb("#141416"), rough=0.9, nor="fabric_nor.jpg", nstr=0.8, uv=0.10)
+HB_R = 0.078; HB_C = (HP[0], HP[1] + 0.006 - HB_R + 0.008, IZ + 0.05)             # the band's inner top rests on the hook
+hp = [torus("hp_band", "hp_shell", HB_C, HB_R, 0.008, axis="z", half="up", static=False)]
+for s in (-1, 1):
+    cx = HB_C[0] + s * HB_R; cy = HB_C[1] - 0.04
+    hp.append(rod("hp_yoke", "hp_shell", (cx, HB_C[1], HB_C[2]), (cx, cy + 0.03, HB_C[2]), 0.004, static=False))
+    hp.append(cyl("hp_cup", "hp_shell", (cy, HB_C[2]), 0.037, cx - s * 0.002, cx + s * 0.018, n=24, axis="x", static=False))
+    hp.append(cyl("hp_pad", "hp_pad", (cy, HB_C[2]), 0.033, cx - s * 0.016, cx - s * 0.002, n=24, axis="x", static=False))
+check("headphones", hp, None)
+
+# --- a hoodie on the door's left hook (the tote moved to the right one), hanging in front of the tote
+HX = LX0 + 0.22
+n0 = group(); bm = bmesh.new(); nx, ny = 12, 18; grid = []
+for j in range(ny + 1):
+    t = j / ny; row = []
+    hw = 0.03 + 0.15 * min(1, t / 0.22) ** 0.7                     # gathered at the hook, out to the shoulders
+    for i in range(nx + 1):
+        s = i / nx * 2 - 1; x = HX + s * hw
+        z = IZ + 0.10 + 0.032 * min(1, t / 0.15) + 0.028 * (1 - s * s) * math.sin(math.pi * min(1, t * 1.15)) + 0.008 * math.sin(9 * s + 4 * t) * t
+        row.append(bm.verts.new(B(x, 1.735 - 0.60 * t, z)))
+    grid.append(row)
+for j in range(ny):
+    for i in range(nx): bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
+hd = new_obj("hoodie", bm, "hoodie"); md = hd.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.02; md.offset = 1.0
+for p in hd.data.polygons: p.use_smooth = True
+project_uv(hd)
+hood = puffy("hoodie_hood", "hoodie", 0.19, 0.20, 0.026, nu=10, nv=10)           # the hood: a flat, soft panel over the shoulders
+for v in hood.data.vertices: v.co.x *= 1 - 0.35 * max(0.0, v.co.y) / 0.10       # narrower at its top
+hood.data.transform(Matrix.Translation(B(HX, 1.62, IZ + 0.168)) @ Matrix.Rotation(math.pi / 2, 4, 'X')); hood.data.update(); project_uv(hood)
+for s in (-1, 1):                                                                # sleeves hanging at its sides
+    rod("hoodie_sleeve", "hoodie", (HX + s * 0.17, 1.56, IZ + 0.14), (HX + s * 0.15, 1.16, IZ + 0.15), 0.036, n=12)
+    blob("hoodie_cuff", "hoodie", (HX + s * 0.15, 1.15, IZ + 0.15), (0.03, 0.025, 0.03), n=12)
+HOODIE = since(n0); check("hoodie", HOODIE, None, on_door=True)   # (it hangs on the leaf: it swings with it, see "hangers")
+
+# --- a backpack on the floor, leaning on the bed's foot end
+n0 = group()
+bb = box("bag_body", "bag", (0, 0.13), (0, 0.42), (-0.15, 0.15), bevel=0.045, seg=4)
+for v in bb.data.vertices:                                      # a fuller front, a softer top
+    g = Vector((v.co.x, v.co.z, -v.co.y)); g.x += 0.03 * (1 - (g.z / 0.15) ** 2) * math.sin(math.pi * min(1, g.y / 0.42)) * (g.x / 0.13); v.co = B(*g)
+box("bag_pocket", "bag", (0.13, 0.175), (0.05, 0.23), (-0.11, 0.11), bevel=0.02, seg=3)
+cyl("bag_loop", "bag", (0.06, 0.435), 0.007, -0.035, 0.035, n=8, axis="z")
+box("bag_zip", "plastic_black", (0.172, 0.18), (0.20, 0.215), (-0.08, 0.08), bevel=0.002, seg=1)
+parts = since(n0)
+for o in parts: o.data.transform(Matrix.Translation(B(BX1 + 0.049, 0, 1.24)) @ Matrix.Rotation(-0.11, 4, 'Y')); o.data.update()
+settle(parts, FY); [project_uv(o) for o in parts]; check("backpack", parts, ("y", FY))
+
+# --- the front right: a floor cushion (zabuton) and a small fan
+cu_ = puffy("cushion", "cushion", 0.55, 0.58, 0.09); transform(cu_, loc=(1.32, 0, 0.98), ry=0.28); settle([cu_], FY); project_uv(cu_)
+check("cushion", [cu_], ("y", FY))
+n0 = group(); FAN = (1.70, 0.30); FAN_RY = -2.2                    # facing the bed
+lathe("fan_base", "white", [(0, 0), (0.115, 0), (0.118, 0.012), (0.10, 0.03), (0.02, 0.034), (0, 0.034)], (0, 0), 0, n=28)
+cyl("fan_stem", "white", (0, 0), 0.014, 0.03, 0.36, n=12)
+cyl("fan_motor", "white", (0, 0.36), 0.045, -0.09, -0.01, n=20, axis="z")
+FC = (0, 0.36, -0.005)                                           # the grille: a rim, rings and spokes (the blades show through)
+torus("fan_rim", "white", FC, 0.13, 0.008, axis="z", nmaj=36)
+for k, (rr, dz) in enumerate(((0.10, 0.03), (0.065, 0.045), (0.03, 0.052))): torus("fan_ring", "white", (0, FC[1], FC[2] + dz), rr, 0.0025, axis="z", nmaj=28, nmin=5)
+for k in range(8):
+    a = k * math.pi / 4; rod("fan_spoke", "white", (0, FC[1], FC[2] + 0.054), (0.128 * math.cos(a), FC[1] + 0.128 * math.sin(a), FC[2] + 0.004), 0.0022, n=5)
+cyl("fan_badge", "white", (0, FC[1]), 0.022, FC[2] + 0.05, FC[2] + 0.06, n=16, axis="z")
+lathe("fan_back", "white", [(0.0, 0.0), (0.06, 0.004), (0.12, 0.03), (0.13, 0.05)], (0, 0), 0, n=32)
+for o in since(n0)[-1:]: o.data.transform(Matrix.Translation(B(0, 0.36, -0.055)) @ Matrix.Rotation(math.pi / 2, 4, 'X')); o.data.update()
+for i in range(3):                                               # blades seen through the cage
+    bl = blob("fan_blade", "painted", (0.055, 0, 0), (0.05, 0.022, 0.004), n=12); set_vcol(bl, srgb("#c9d3dc"))
+    bl.data.transform(Matrix.Translation(B(0, 0.36, -0.005)) @ Matrix.Rotation(i * 2 * math.pi / 3, 4, 'Y')); bl.data.update()
+parts = since(n0)
+for o in parts: transform(o, loc=(FAN[0], FY, FAN[1]), ry=FAN_RY)
+settle(parts, FY); [project_uv(o) for o in parts]; check("fan", parts, ("y", FY))
+
+# --- slippers by the floor cushion (the door's side is his place at the doorway and the leaf's swing, #82)
+def slipper(x, z, ry):
+    n0 = group(); L, W = 0.255, 0.095
+    sole = cyl("slipper_sole", "painted", (0, 0), 1.0, 0.0, 0.016, n=24)
+    sole.data.transform(Matrix.Diagonal((W / 2, L / 2, 1, 1))); sole.data.update()
+    bm = bmesh.new(); na, nl = 10, 6; grid = []                  # the upper: a half tube over the front
+    for j in range(nl + 1):
+        t = j / nl; zz = -L * 0.48 + t * L * 0.42; ww = W / 2 * (0.62 + 0.38 * math.sin(math.pi * min(1, 0.25 + t * 0.75)))
+        grid.append([bm.verts.new(B(ww * math.cos(math.pi * i / na), 0.012 + 0.04 * math.sin(math.pi * i / na) * (0.6 + 0.4 * t), zz)) for i in range(na + 1)])
+    for j in range(nl):
+        for i in range(na): bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
+    up = new_obj("slipper_upper", bm, "painted"); m = up.modifiers.new("solid", "SOLIDIFY"); m.thickness = 0.006
+    for p in up.data.polygons: p.use_smooth = True
+    set_vcol(sole, srgb("#3c3c40")); set_vcol(up, srgb("#8d98a6"))
+    parts = since(n0)
+    for o in parts: transform(o, loc=(x, 0, z), ry=ry)
+    settle(parts, FY); [project_uv(o) for o in parts]; return parts
+check("slippers", slipper(0.80, 0.95, -math.pi / 2 + 0.05) + slipper(0.80, 1.06, -math.pi / 2 - 0.04), ("y", FY))   # toes towards the cushion
+
+# --- a laundry pinch hanger on the curtain rod (socks and a hand towel), in front of the glass, above the bed's head end
+n0 = group(); PH = (-1.745, 1.98, 0.45); PH_R = 0.15                # clear of his head at the window (#63)
+torus("hanger_ring", "white", PH, PH_R, 0.004, axis="y", nmaj=36, nmin=6)
+rod("hanger_hook", "white", (PH[0], PH[1], PH[2]), (IX + 0.07, ROD_Y - 0.008, PH[2]), 0.003)
+torus("hanger_hook_tip", "white", (IX + 0.07, ROD_Y, PH[2]), 0.012, 0.0025, axis="z", half="up", nmaj=12, nmin=6)
+for k in range(4): rod("hanger_spoke", "white", PH, (PH[0] + PH_R * math.cos(k * math.pi / 2 + 0.4), PH[1], PH[2] + PH_R * math.sin(k * math.pi / 2 + 0.4)), 0.0025)
+clips = []
+for k in range(8):
+    a = k * math.pi / 4 + 0.2; cx, cz = PH[0] + PH_R * math.cos(a), PH[2] + PH_R * math.sin(a)
+    clips.append((cx, cz)); c = box("hanger_clip", "painted", (cx - 0.006, cx + 0.006), (PH[1] - 0.045, PH[1] - 0.002), (cz - 0.004, cz + 0.004)); set_vcol(c, srgb("#7fb8d9"))
+for k, col in ((1, "#2d2f36"), (2, "#2d2f36"), (5, "#c9c2b4"), (6, "#c9c2b4")):  # two pairs of socks
+    cx, cz = clips[k]; s_ = rod("sock", "painted", (cx, PH[1] - 0.045, cz), (cx, PH[1] - 0.24, cz), 0.022, n=10); set_vcol(s_, srgb(col))
+    f_ = rod("sock_foot", "painted", (cx, PH[1] - 0.225, cz), (cx + 0.07, PH[1] - 0.27, cz), 0.021, n=10); set_vcol(f_, srgb(col))
+(c0x, c0z), (c1x, c1z) = clips[3], clips[4]                      # a hand towel between two clips
+tw = box("towel", "painted", (-0.004, 0.004), (PH[1] - 0.33, PH[1] - 0.045), (-0.11, 0.11), bevel=0.002, seg=1); set_vcol(tw, srgb("#e9a65a"))
+transform(tw, loc=((c0x + c1x) / 2, 0, (c0z + c1z) / 2), ry=math.atan2(c1x - c0x, c1z - c0z)); project_uv(tw)
+check("laundry_hanger", since(n0), None, minx=SILL_X)
+
+# --- a small cat figure on the window sill
+n0 = group(); CAT = (-1.872, 0.40)                            # away from his hands on the sill (#63)
+blob("cat_body", "painted", (0, 0.016, 0), (0.017, 0.016, 0.022), n=14); blob("cat_head", "painted", (0, 0.044, 0.012), (0.015, 0.014, 0.014), n=14)
+for s in (-1, 1): cyl("cat_ear", "painted", (s * 0.008, 0.012), 0.005, 0.054, 0.064, r1=0.0005, n=8)
+cyl("cat_tail", "painted", (0, -0.022), 0.004, 0.0, 0.03, n=8)
+parts = since(n0); vc(parts, "#f4f0e8")
+for o in parts: transform(o, loc=(CAT[0], 0, CAT[1]), ry=-math.pi / 2 - 0.4)
+settle(parts, WY0); [project_uv(o) for o in parts]; check("cat_figure", parts, ("y", WY0), minx=SILL_X)
+
+# --- under the desk: a wall socket, a power strip on the floor, cables up the back edge to the monitor and the lamp
+n0 = group()
+box("socket_plate", "white", (-1.47, -1.39), (0.34, 0.46), (IZ, IZ + 0.008), bevel=0.003, seg=1)
+box("socket_plug", "white", (-1.445, -1.415), (0.38, 0.42), (IZ + 0.008, IZ + 0.03), bevel=0.004, seg=1)
+check("socket", since(n0), ("wall", None))
+n0 = group()
+box("power_strip", "white", (-1.32, -1.02), (FY, FY + 0.038), (IZ + 0.012, IZ + 0.062), bevel=0.006, seg=2)
+for i, px in enumerate((-1.27, -1.20, -1.13)): box("strip_plug", "plastic_black" if i else "white", (px - 0.016, px + 0.016), (FY + 0.038, FY + 0.06), (IZ + 0.022, IZ + 0.052), bevel=0.004, seg=1)
+settle(since(n0), FY); check("power_strip", since(n0), ("y", FY))
+n0 = group()
+cable("cable_socket", [(-1.43, 0.40, IZ + 0.03), (-1.42, 0.30, IZ + 0.05), (-1.37, FY + 0.006, IZ + 0.05), (-1.32, FY + 0.018, IZ + 0.037)])
+MB = (MON_C[0] - 0.02, MON_C[1] - 0.06, MON_C[2] - 0.07)                     # behind the monitor
+cable("cable_monitor", [(-1.20, FY + 0.06, IZ + 0.037), (-1.18, 0.40, IZ + 0.006), (-1.14, DTOP - 0.06, IZ + 0.005), (-1.12, DTOP + 0.004, IZ + 0.012),
+                         (-1.09, DTOP + 0.004, MB[2] - 0.08), (MB[0], DTOP + 0.06, MB[2] - 0.02), MB])
+LB = (lamp_root.location.x, DTOP + 0.004, -lamp_root.location.y)
+cable("cable_lamp", [(-1.13, FY + 0.06, IZ + 0.037), (-1.30, 0.42, IZ + 0.006), (-1.55, DTOP - 0.07, IZ + 0.005), (-1.60, DTOP + 0.004, IZ + 0.012), (LB[0] + 0.02, LB[1], LB[2] - 0.03)])
+check("cables", since(n0), None)
+
+# ================================================================ the sweep (before anything is joined; `-- --sweep` stops here)
+for nm, sup in (("mug", DTOP), ("pencup", DTOP), ("desk_book", DTOP), ("deskmat", DTOP), ("kb_body", DTOP + 0.003), ("mouse", DTOP + 0.003),
+                ("mon_base", DTOP), ("spk_l_box", DTOP), ("spk_r_box", DTOP), ("bin", FY), ("cupnoodle", FTOP), ("tissues", FTOP),
+                ("shelf_box", LEVELS[0] + T), ("doormat", FY), ("rug", FY)):
+    check(nm, named(nm), ("y", sup))
+for nm in ("curtain_a", "curtain_b"):
+    check(nm, named(nm), ("y", WY0), minx=SILL_X)                # hanging just above the sill, not through it
+for nm in ("poster_a_frame", "poster_b_frame", "poster_c_frame", "switch_plate", "ac_body"):
+    check(nm, named(nm), ("wall", None))
+bpy.context.view_layer.update()
+if sweep():
+    print("SWEEP FAILED: see the offenders above"); sys.exit(1)
+if "--sweep" in sys.argv: sys.exit(0)
 
 # ================================================================ finish: modifiers applied, static parts joined
 bpy.context.view_layer.update()
@@ -629,6 +993,10 @@ for o in STATIC:
     bpy.context.view_layer.objects.active = o
     for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
 for o in STATIC: project_uv(o)
+# the things hanging on the door (hook rail, hooks, tote, hoodie) are one node of their own, "hangers", whose origin is
+# the door's hinge as room.html builds its opening leaf (#82): the page turns it with the leaf
+HANG = named("hook_rail", "hook", "hook_tip", "tote", "tote_strap") + [o for o in HOODIE if o.name in bpy.data.objects]
+for o in HANG: STATIC.remove(o)
 STATIC_OBJS = [o for o in STATIC if o.name in bpy.data.objects]
 # tiny parts (keycaps, pens, wheels...) get no AO texels: flag them, so the atlas spends its pixels on big surfaces
 for o in STATIC_OBJS:
@@ -636,6 +1004,18 @@ for o in STATIC_OBJS:
     a = o.data.attributes.new("small", 'INT', 'FACE')
     for d in a.data: d.value = 1 if area < 0.006 else 0
 room = join(STATIC_OBJS, "room_static"); room.data.name = "room_static"
+# the headphones: one node of their own (origin where the band rests on the hook), like the chair
+for o in hp:
+    bpy.context.view_layer.objects.active = o
+    for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
+HPN = join(hp, "headphones"); HPN.data.name = "headphones"
+HP_M = Matrix.Translation(B(HP[0], HP[1] + 0.006, HB_C[2]))
+HPN.data.transform(HP_M.inverted()); HPN.matrix_world = HP_M
+HANGN = join(HANG, "hangers"); HANGN.data.name = "hangers"
+HANG_M = Matrix.Translation(B(LX0, FY + 0.008, IZ))
+HANGN.data.transform(HANG_M.inverted()); HANGN.matrix_world = HANG_M
+for i, m in enumerate(HANGN.data.materials):     # own copies (they move with the leaf); never named "door*": the page finds the leaf's by that
+    c = m.copy(); c.name = "hang_" + m.name; HANGN.data.materials[i] = c
 # lightmap UVs for the ambient occlusion bake
 uv2 = room.data.uv_layers.new(name="AO")
 room.data.uv_layers.active = uv2
@@ -692,7 +1072,7 @@ if not NOBAKE:
     SC.render.bake.margin = 6; SC.render.bake.use_selected_to_active = False
     # the room without the chair (it moves: no chair-shaped AO footprint may stay behind on the floor; the real-time
     # shadows ground it), the props occlude; then the chair on its own (self-occlusion only, true wherever it stands)
-    bake_ao(room, 2048, f"{OUT}/ao_raw.png", [CHAIR])
+    bake_ao(room, 2048, f"{OUT}/ao_raw.png", [CHAIR, HPN])        # (the headphones come off the hook: no footprint either)
     bake_ao(CHAIR, 512, f"{OUT}/ao_chair.png", [o for o in SC.objects if o is not CHAIR and o.type == 'MESH'])
 for o in (room, CHAIR):
     o.data.uv_layers.active = o.data.uv_layers["UVMap"]; o.data.uv_layers["UVMap"].active_render = True
