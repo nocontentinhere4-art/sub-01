@@ -1,8 +1,10 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-01 23:40 UTC** (pass 6). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 01:40 UTC** (pass 8). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Merged on 2026-10-02:** #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
+
 **Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
 coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
 used the old engine's schedule). `main` passes 225 tests (192 + 10 skipped without torch), the demo smoke passes,
@@ -12,7 +14,16 @@ Owner actions now:
 - **Spiking memory test (#9) is on `main` but idle** until you add `RUNPOD_API_KEY` and `SUB01_POD_SECRET` on Railway.
   Make sure the `/data` volume has ≥ 300 MB free. It then runs 21:00–22:00 Tokyo daily (≤ 1 GPU-hour/day, ≈
   $0.27–0.85/day, 8 GPU-hours/week cap).
-- Nothing else to merge yet: #20 and #8 still need their required changes (see their reviews).
+- **OpenRouter spend starts with this deploy** (your `OPENROUTER_API_KEY` is on Railway): Haiku 4.5, capped at $1.00 per Tokyo day. Check `/api/decisions` → `eyes` (`calls_today`, `usd_today`, `last_error`) after the deploy.
+- Left open: #8 (room) is being finished by its author.
+
+Who is on what (cloud sessions, 2026-10-02):
+| work | session | state |
+|---|---|---|
+| #8 room: merge main, rate clamp, tests, new-room numbers | `session_01Xrq53UQH9EHy4bgPj9B2yL` (author) | instructed 00:40 |
+| #20 brain-decides | `session_01881q1gcHZBtokE8qi8QjxC` (author) | merged; asked for a docstring-only follow-up (`fix/eyes-docstring`) |
+| #12 CI | `session_011qiRnsxURjY8wayHe8dz6u` (new) | started 00:41 |
+| #13 about page | `session_0129Vcj2Bg6kjc4KDPP3qnBT` (new) | started 00:41 |
 
 | PR | status | why it needs the owner |
 |---|---|---|
@@ -43,9 +54,9 @@ cheap to run, with the password gate kept until launch day.
 | 8 | Reading memory (readings → stimuli, REM replay, curiosity) | done | #7 |
 | 9 | Sleep circuit (Phillips-Robinson) | done | #11 |
 | 10 | Spiking memory on GPU, daily test card | done (idle until the RunPod keys are set on Railway) | #9 |
-| 11 | Brain decides what he clicks | in progress: needs the $1/day cap, Haiku default, main merge (conflicts: Dockerfile, live_server.py) | #20 |
-| 12 | CI (tests + demo smoke on every PR) | todo | issue #12 |
-| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | todo | issue #13 |
+| 11 | Brain decides what he clicks (Haiku 4.5 eyes, $1/day cap) | done | #20 |
+| 12 | CI (tests + demo smoke on every PR) | in progress | issue #12 |
+| 13 | Honest `/about.html` (numbers, credits, coin disclaimer) | in progress | issue #13 |
 | 14 | Launch load: cheaper feeds, viewer caps, load test | todo, after #8 | issue #14 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
@@ -55,15 +66,14 @@ cheap to run, with the password gate kept until launch day.
 | 19 | Launch | todo | owner |
 
 ## Merge order
-1. **#8** room (the coordinator merges it once the review is satisfied) and **#20** brain-decides (owner: Dockerfile,
-   API spend). They are independent; whichever is ready first goes first.
-2. Then **#21** atomic writes, **#19** perf, **#18** non-root, **#17** YouTube/chess and **#14 → #15** ops, one at a
-   time on `live_server.py`.
+1. **#8** room: the coordinator merges it once its review is satisfied.
+2. Then, one at a time on `live_server.py`: **#21** atomic writes (starts after #8), **#14** launch load (after #8),
+   **#19** perf, **#18** non-root, **#17** YouTube/chess, then **#15** ops (last; it reads every cost log).
 
 **#12** CI and **#13** about page touch no shared files and can merge at any time.
 
-Rule: at least 60 minutes between merges to `main`, unless the owner says otherwise (the owner did so on
-2026-10-01 for #7, #11 and #9). Every branch brings `main` in with a merge commit. Never force-push.
+Rule: at least 60 minutes between merges to `main`, unless the owner says otherwise. Every branch brings `main` in with
+a merge commit. Never force-push.
 
 ## Review bots
 `graphify-labs[bot]` reviews every PR: a summary, "Worth a look" findings and inline coupling notes. It marks its own
@@ -93,6 +103,9 @@ findings "NOT verified", and its reviews are partial on large diffs.
   coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
   `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
   and the `?rate=` bug.
+- **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
+  I rendered both in headless Chromium. The new room is cleaner, and its provenance is documented as CC0 or made for
+  the project (`web/room/CREDITS.md`); the old room is a single AI-generated mesh. A later PR removes the old GLBs.
 - **2026-10-01: review-bot findings are advisory.** The coordinator verifies them before they become required changes.
 - **2026-10-01: paid-model choice stays with the owner** unless the owner delegates it. Coordinator rule: every paid
   call has a hard daily USD cap and a log line before it can merge.

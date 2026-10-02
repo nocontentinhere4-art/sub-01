@@ -54,6 +54,27 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   that night", eye dream prompts (replayed titles as images only). Wording: it does not understand the text.
 - Screens: bot checks (CAPTCHA / "unusual traffic") are recognised and left, never solved or clicked.
 
+## Brain decides what he clicks (PR `feature/brain-decides`)
+- Eyes (`eyes.py`): after a page, an AI lists 3-5 options from the title, visible text and up to 40 numbered links
+  (decision 2026-10-01: Claude Haiku 4.5 by default, hard cap $1.00 per Tokyo day). Claude `claude-haiku-4-5` if
+  `ANTHROPIC_API_KEY` (`BRAIN_DECIDES_CLAUDE_MODEL`); else OpenRouter if `OPENROUTER_API_KEY` (set on Railway),
+  `OPENROUTER_MODEL` default `anthropic/claude-haiku-4.5`, real cost per call logged; else Replicate Llama 3 70B.
+  Request fields per model: no effort/thinking/fallbacks for Haiku 4.5; effort low for Opus/Sonnet (+ refusal
+  fallbacks on the 5.5 family). cache_control on the fixed system prompt (about 344 tokens: below every model's
+  cache minimum, so it caches nothing today). Links by number only, every target through the browse.py guard, search
+  queries through the chat filter; max 1 call per page, `BRAIN_DECIDES_MAX_CALLS_PER_HOUR` (30) and
+  `BRAIN_DECIDES_MAX_USD_PER_DAY` ($1.00, Tokyo day, from `/data/eyes_costs.jsonl`). No key / over a cap: local
+  options; `/api/decisions` shows why. A chosen page that is not shown (guard, bot wall) or redirects says so.
+- Vote (`brain_vote.py`): `Brain.clone()` + all options simulated 300 ms side by side (one sparse product per step,
+  ~260 ms for 5 options + baseline on one core; identical to `Brain.step`); value = d_reward + 0.6 d_attention
+  + 0.3 d_visual (videos) - 0.8 d_fear; + tastes + novelty; softmax, hotter when bored or sleepy. The live brain then
+  gets the chosen stimulus. `BRAIN_DECIDES_SEED` makes it reproducible.
+- Tastes (`tastes.py`, `/data/tastes.json`, `/api/tastes`): reward-prediction-error table over topics, 7-day decay.
+  Interface `topics / predict / learn` for the spiking branch to replace with dopamine-modulated synapses.
+- Chromium runs in `browse_service.py` (child process, memory watchdog `BROWSE_MEM_MB` 1200, exits if the parent
+  dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
+  restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
+
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.
   Never present it as "his wiring produces his activity" (`analysis/null_test.py`).
