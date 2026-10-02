@@ -277,11 +277,14 @@ if (!OLD_ROOM) { RectAreaLightUniformsLib.init(); skyLight = new THREE.RectAreaL
 // ---------- places measured on the room model (after fit(room, 4); floor at y = 0.16; ~1 unit = 1 m) ----------
 const F = 0.16;
 const ANCHOR = {
-  desk:    {p:[-1.17, F, -0.64], r:-2.6},            // on the desk chair, facing the monitor
-  bedlie:  {p:[-0.7, -0.223, 1.044], r:Math.PI / 2},  // root offset: the clip lifts the hips ~1.1 m  // lying on the bed
-  bedside: {p:[-0.45, 0.33, 0.6], r:Math.PI},        // sitting on the edge of the bed with the phone
+  // seated anchors give where his hips go (`seat`; the root follows from the clip) and where he stands to sit down;
+  // standing ones give the root (`p`). The clean room: chair at (-1.13, -0.585), seat top 0.665; the bed's mattress top
+  // y 0.82, frame x -1.90..-0.20 (headboard at -1.90), z 0.25..1.50 (open side at 0.25)
+  desk:    {seat:[-1.12, 0.76, -0.56], r:-2.85, ymax:F + 0.05, stand:[-0.68, -0.55]},   // on the desk chair, facing the monitor; he sits down from its side
+  bedlie:  {p:[-1.07, -0.17, 0.89], r:Math.PI / 2},  // on his back, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
+  bedside: {seat:[-0.753, 0.916, 0.399], r:Math.PI, stand:[-0.75, -0.08]},     // sitting on the edge: thighs on the mattress, feet on the floor
   door:    {p:[1.22, F, -0.92], r:2.2},              // in front of the door
-  window:  {p:[-0.05, F, 0.25], r:-Math.PI / 2},     // standing, looking towards the window
+  window:  {p:[0.08, F, -0.05], r:-Math.PI / 2},     // standing, looking out of the window over the foot of the bed
   middle:  {p:[0.35, F, 0.05], r:0.6},
 };
 // surfaces that get live content: centre, size (w x h), rotation about y (facing direction); `off`: how far in front of
@@ -385,21 +388,26 @@ const clips = {};
 function addClips(name, list){
   if (!list || !list.length || !mixer) return; clips[name] = list[0]; if (name !== "hold") actions[name] = mixer.clipAction(list[0]);
   const h = clips.hold && clips.hold.tracks, own = h && new Set(h.map(t => t.name));
-  if (h) for (const [n, b] of [["phone_sit", "sit"], ["phone_stand", "idle"]]) if (clips[b] && !actions[n]) {
-    // still poses: the sit clip is a "thinker" idle (hunches, chin on hand), the idle clip looks around; holdPhone() breathes
-    const base = n === "phone_sit" ? still(clips.sit, 0.5, 4, tr => tr.startsWith("Left") ? 0.1 : 0.35) : still(clips.idle, 0.2, 0.2, () => 0);
-    actions[n] = mixer.clipAction(new THREE.AnimationClip(n, 1, [...base.filter(t => !own.has(t.name)), ...h]));
+  for (const [n, [b, make, withHold]] of Object.entries(POSES)) if (clips[b] && (h || !withHold) && !actions[n]) {
+    const base = make(clips[b]);
+    actions[n] = mixer.clipAction(new THREE.AnimationClip(n, 1, withHold ? [...base.filter(t => !own.has(t.name)), ...h] : base));
   }
   if (want) play(want);
 }
+// still poses (holdPhone() breathes): the sit clip is a "thinker" idle (hunches, chin on hand), the idle clip looks
+// around. [base clip, its still pose, with the hold pose's right arm, neck and head on top]
+const leanSit = c => still(c, 0.5, 4, tr => tr.startsWith("Left") ? 0.1 : 0.35);
+const POSES = {phone_sit:["sit", leanSit, true], edge:["sit", leanSit, false], phone_stand:["idle", c => still(c, 0.2, 0.2, () => 0), true],
+  phone_lie:["sleep", c => still(c, 0, 0, () => 0), true]};
 function still(clip, t0, t1, kOf){                  // a still pose between two moments of a clip (k = 0: at t0, 1: at t1; per track)
   return clip.tracks.map(tr => { const i = tr.createInterpolant(), a = i.evaluate(t0).slice(), b = i.evaluate(t1).slice(), k = kOf(tr.name);
     if (tr instanceof THREE.QuaternionKeyframeTrack) THREE.Quaternion.slerpFlat(a, 0, a, 0, b, 0, k); else for (let j = 0; j < a.length; j++) a[j] += (b[j] - a[j]) * k;
     return new tr.constructor(tr.name, [0, 1], [...a, ...a]); });
 }
-function play(name){
-  want = name; const a = actions[name] || actions[{phone_sit:"sit", phone_stand:"idle"}[name]] || actions.idle || actions.sit; if (!a || a === current) return;
-  a.reset().fadeIn(0.4).play(); if (current) current.fadeOut(0.4); current = a;
+function play(name, fade = 0.4){
+  want = name; const a = actions[name] || actions[{phone_sit:"sit", edge:"sit", phone_stand:"idle", phone_lie:"sleep"}[name]] || actions.idle || actions.sit;
+  if (!a || a === current) return;
+  a.reset().fadeIn(fade).play(); if (current) current.fadeOut(fade); current = a;
 }
 
 // ---------- live surfaces: monitor, phone, window ----------
@@ -469,7 +477,7 @@ load("room/hand_phone.glb").then(g => {
 // (or if it fails), his own hand is turned so that the phone lies on the palm
 // with the fingers running diagonally up behind it. The rig has no finger bones (the hand mesh is rigid and slightly
 // cupped), so the phone is lifted off the palm just enough that no hand vertex is inside it or in front of the screen
-const GRIP = {fwd:0.32, down:0.19, side:0.03, diag:0.3, curl:0.1, reach:0.095, gap:0.002, look:0.7};
+const GRIP = {fwd:0.32, down:0.19, side:0.03, lie:0.30, diag:0.3, curl:0.1, reach:0.095, gap:0.002, look:0.7};
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _H = new THREE.Vector3(), _D = new THREE.Vector3(), _N = new THREE.Vector3();
 const _K = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _eye = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3();
@@ -524,15 +532,25 @@ function wristOnPhone(){
     if (Math.abs(grip.w.x + _a.x) < hw && Math.abs(grip.w.y + _a.y) < hh) top = Math.max(top, _a.z); }
   grip.w.z = -d / 2 - G.gap - (isFinite(top) ? top : 0); grip.key = key; return grip.w;
 }
-function holdPhone(){
+const RAMP = ["RightArm", "RightForeArm", "RightHand"], _q0 = RAMP.map(() => new THREE.Quaternion()), _up = new THREE.Vector3();
+// w: 0..1, how far the arm and head have gone from the clip's pose to the grip (it ramps up when he picks the phone up)
+function holdPhone(w){
   const B = bones, G = GRIP, t = performance.now() / 1000; if (!B.RightArm || !B.LeftArm || !head) return;
+  const lying = current && current === actions.phone_lie;
   if (B.Spine01) B.Spine01.rotateX(0.012 * Math.sin(t * 1.6));                    // breathing (the poses are still)
   boy.updateMatrixWorld(true);
+  RAMP.forEach((n, i) => _q0[i].copy(B[n].quaternion));
   B.RightArm.getWorldPosition(_r).sub(B.LeftArm.getWorldPosition(_a)).setY(0).normalize(); _f.crossVectors(UP, _r);   // his right, facing
   (B.headfront || head).getWorldPosition(_eye).addScaledVector(UP, 0.02);
-  B.RightArm.getWorldPosition(_c).add(_a).multiplyScalar(0.5);                    // between the shoulders
-  phone.position.copy(_c).addScaledVector(_f, G.fwd + 0.006 * Math.sin(t * 0.7)).addScaledVector(UP, -G.down + 0.005 * Math.sin(t * 0.43))
-    .addScaledVector(_r, G.side);
+  if (lying) {                                        // on his back: the phone up above his face, along his gaze, its top towards his crown
+    head.getWorldPosition(_S); head.localToWorld(_E.set(0, 30, 30)).sub(_S).normalize(); head.localToWorld(_up.set(0, 30, -30)).sub(_S).normalize();
+    phone.position.copy(_eye).addScaledVector(_E, G.lie + 0.006 * Math.sin(t * 0.7)); phone.up.copy(_up);
+  } else {
+    B.RightArm.getWorldPosition(_c).add(_a).multiplyScalar(0.5);                  // between the shoulders
+    phone.position.copy(_c).addScaledVector(_f, G.fwd + 0.006 * Math.sin(t * 0.7)).addScaledVector(UP, -G.down + 0.005 * Math.sin(t * 0.43))
+      .addScaledVector(_r, G.side);
+    phone.up.copy(UP);
+  }
   phone.lookAt(_eye); phone.updateMatrixWorld(true);
   _x.setFromMatrixColumn(phone.matrixWorld, 0); _y.setFromMatrixColumn(phone.matrixWorld, 1); _z.setFromMatrixColumn(phone.matrixWorld, 2);
   // hand frame (measured on the skinned mesh): +y runs along the fingers, +z is the palm (the fingers curl that way)
@@ -545,12 +563,13 @@ function holdPhone(){
   else B.RightArm.getWorldPosition(_P).addScaledVector(UP, -0.5).addScaledVector(_r, 0.25).addScaledVector(_f, -0.1);   // elbow down, a little out
   reach(B.RightArm, B.RightForeArm, B.RightHand, _T, _P);
   setWorldQuat(B.RightHand, _qh);
-  if (HAND.mesh) B.RightHand.scale.setScalar(0.001);                              // his own hand folds away into the sleeve
-  // the arm may fall short: hang the phone on the hand where it actually is
+  if (w < 1) { RAMP.forEach((n, i) => B[n].quaternion.slerpQuaternions(_q0[i], B[n].quaternion, w)); B.RightArm.updateMatrixWorld(true); }
+  if (HAND.mesh) { B.RightHand.scale.setScalar(0.001); B.RightHand.updateMatrixWorld(true); }   // his own hand folds away into the sleeve
+  // hang the phone on the hand where it actually is (the arm may fall short, or still be on its way up)
   B.RightHand.getWorldPosition(phone.position).sub(_T.copy(W).applyQuaternion(phone.quaternion)); phone.updateMatrixWorld(true);
   // look at the screen: the face looks along (0, 1, 1) of the head bone (its bind frame is pitched 45°; cm): turn it part of the way
   head.localToWorld(_E.set(0, 30, 30)); head.getWorldPosition(_S);
-  _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look); aimBone(head, _E, _T);
+  _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look * w); aimBone(head, _E, _T);
 }
 
 // window: the sky over Tokyo follows the clock (day, dusk, night with stars and lit windows)
@@ -788,8 +807,13 @@ function updateCameraGoal(){
     // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
     phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
     const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
-    camGoal.target.copy(v1).lerp(v2, 0.3);
-    camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
+    if (current === actions.phone_lie) {             // lying: from the open side of the bed, low: his face and the phone above it
+      camGoal.target.copy(v1).lerp(v2, 0.3);
+      camGoal.pos.copy(v2).addScaledVector(UP, 0.5).addScaledVector(v4, -1.0).addScaledVector(v3, 0.35);
+    } else {
+      camGoal.target.copy(v1).lerp(v2, 0.3);
+      camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
+    }
   } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
 }
 
@@ -871,15 +895,98 @@ function lighting(dt){
 }
 
 // ---------- the boy follows the life simulation ----------
-const tgt = new THREE.Vector3(), tmp = new THREE.Vector3();
-let targetRot = 0, visible = true, lastLife = null;
+let visible = true, lastLife = null;
+// He moves like a person: a change of place is a plan of steps -- get up (lying -> sitting on the edge -> standing),
+// walk a path over the free floor with the walk clip, turn to the anchor's heading, then sit or lie down. Getting up and
+// sitting down are "pose" steps: the root goes linearly from one place to the next while the clips crossfade over the
+// same time, so every in-between frame is one consistent blend (never two poses at two roots). He walks at y = F; the
+// height of a seat or the bed only comes in inside those steps. A new goal mid-walk re-plans from where he is.
+let at = null, goal = null, plan = [], step = null, holdW = 0, placed = false;
+const WALK_V = 0.9, STRIDE_V = 0.65;                  // m/s; the walk clip's feet move back at 0.65 m/s: it plays faster to match
+const HIPS = {sit:[0.235, 0.655, -0.364], eat:[-0.014, 0.48, 0.018]};   // the hips in the seated clips, from the root (facing +z)
+HIPS.edge = HIPS.phone_sit = HIPS.sit;
+const _w = new THREE.Vector3();
+function rootOf(name, clip, out){                     // where the root goes for an anchor and clip; returns the heading
+  const A = ANCHOR[name]; if (A.p) { out.set(...A.p); return A.r; }
+  const h = HIPS[clip] || HIPS.sit, c = Math.cos(A.r), sn = Math.sin(A.r);
+  out.set(A.seat[0] - (h[0] * c + h[2] * sn), Math.min(A.seat[1] - h[1], A.ymax ?? 9), A.seat[2] - (-h[0] * sn + h[2] * c)); return A.r;
+}
+const standOf = name => { const A = ANCHOR[name === "bedlie" ? "bedside" : name]; return A.stand || [A.p[0], A.p[2]]; };
 function place(life){
   const outside = !!life.geo || ["street_home","street_bakery","street_park","bakery_door","bakery_in","counter","park_gate","bench"].includes(life.place);
+  if (outside && visible && boy) { boy.rotation.y = rootOf("door", "idle", boy.position); at = "door"; plan = []; step = null; goal = {anchor:"door", clip:"idle"}; play("idle"); }
   visible = !outside;
-  const [an, clip] = ACT[life.activity] || [PLACE2ANCHOR[life.place] || "middle", "idle"];
-  const anchor = ANCHOR[life.walking ? (PLACE2ANCHOR[life.path_to] || an) : an];
-  tgt.set(...anchor.p); targetRot = anchor.r;
-  play(life.walking ? "walk" : clip);
+  if (outside) return;                                // gone: he comes back in at the door
+  let [an, clip] = ACT[life.activity] || [PLACE2ANCHOR[life.place] || "middle", "idle"];
+  if (life.walking) [an, clip] = [PLACE2ANCHOR[life.path_to] || an, "idle"];      // on his way out (or in): to the door
+  const inBed = at === "bedlie" || (goal && goal.anchor === "bedlie");          // lying, or lying down
+  if (inBed && !life.walking && ["phone", "order_food"].includes(life.activity)) [an, clip] = ["bedlie", "phone_lie"];   // stays lying, phone above his face
+  if (!goal || goal.anchor !== an || goal.clip !== clip) { goal = {anchor:an, clip}; if (!step || step.k !== "pose") replan(); else step.replan = true; }
+}
+function snap(name, clip){ boy.rotation.y = rootOf(name, clip, boy.position); at = name; plan = []; step = null; play(clip); }
+function replan(){                                    // the steps from where he is now to the goal
+  const g = goal, P = []; let cur = at; step = null;
+  const stay = () => ANCHOR[g.anchor].seat ? {k:"pose", to:g.anchor, clip:g.clip} : {k:"clip", clip:g.clip};   // a seat's root depends on the clip
+  if (cur === g.anchor) { plan = [stay()]; return; }
+  if (cur === "bedlie") { P.push({k:"pose", to:"bedside", clip:"edge"}); cur = "bedside"; }
+  if (cur === g.anchor) { plan = [...P, stay()]; return; }
+  if (cur && ANCHOR[cur].seat) P.push({k:"pose", stand:standOf(cur), clip:"idle"});   // stand up where he would sit down
+  const A = ANCHOR[g.anchor];
+  P.push({k:"walk", to:standOf(g.anchor)}, {k:"turn", r:ANCHOR[g.anchor === "bedlie" ? "bedside" : g.anchor].r});
+  if (g.anchor === "bedlie") P.push({k:"pose", to:"bedside", clip:"edge"}, {k:"pose", to:"bedlie", clip:g.clip});
+  else if (A.seat) P.push({k:"pose", to:g.anchor, clip:g.clip});
+  else P.push({k:"clip", clip:g.clip});
+  plan = P;
+}
+// the free floor: hand-placed waypoints between the furniture (room_build/build_room.py) and the walkable links
+const NODES = {bs:[-0.75, -0.08], ds:[-0.62, -0.35], w:[0.05, -0.02], c:[0.45, -0.35], m:[0.35, 0.05], d:[1.22, -0.92], f:[0.15, 0.75]};
+const LINKS = [["bs","ds"], ["bs","w"], ["ds","w"], ["w","m"], ["w","c"], ["m","c"], ["c","d"], ["m","d"], ["w","f"], ["m","f"]];
+const BLOCK = [[-1.90, -0.20, 0.25, 1.50], [-1.86, -0.36, -1.45, -0.80], [-1.42, -0.84, -0.88, -0.30], [-0.12, 0.32, -1.45, -1.17],
+  [0.45, 0.93, -1.45, -0.97], [-1.90, -1.42, -0.60, -0.12]];          // bed, desk, chair, shelf, fridge, plant (x0, x1, z0, z1)
+function free(a, b, pad = 0.12){                      // is the straight line a -> b clear of the furniture
+  const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.04);
+  for (let i = 1; i < n; i++) { const x = a[0] + (b[0] - a[0]) * i / n, z = a[1] + (b[1] - a[1]) * i / n;
+    for (const [x0, x1, z0, z1] of BLOCK) if (x > x0 - pad && x < x1 + pad && z > z0 - pad && z < z1 + pad) return false; }
+  return true;
+}
+function route(a, b){                                 // shortest path a -> b over the waypoints (a straight line when it is clear)
+  if (free(a, b)) return [b];
+  const pts = {...NODES, A:a, B:b}, adj = {}, D = (p, q) => Math.hypot(pts[p][0] - pts[q][0], pts[p][1] - pts[q][1]);
+  const link = (p, q) => { (adj[p] = adj[p] || []).push(q); (adj[q] = adj[q] || []).push(p); };
+  LINKS.forEach(([p, q]) => link(p, q));
+  for (const k of Object.keys(NODES)) { if (free(a, NODES[k])) link("A", k); if (free(NODES[k], b)) link(k, "B"); }
+  if (!adj.A) link("A", Object.keys(NODES).sort((p, q) => D("A", p) - D("A", q))[0]);   // boxed in: to the nearest waypoint
+  if (!adj.B) link(Object.keys(NODES).sort((p, q) => D("B", p) - D("B", q))[0], "B");
+  const dist = {A:0}, prev = {}, todo = new Set(Object.keys(pts));
+  while (todo.size) { let u = null; for (const k of todo) if (dist[k] != null && (u == null || dist[k] < dist[u])) u = k;
+    if (u == null || u === "B") break; todo.delete(u);
+    for (const v of adj[u] || []) { const d = dist[u] + D(u, v); if (dist[v] == null || d < dist[v]) { dist[v] = d; prev[v] = u; } } }
+  const out = []; for (let k = "B"; k && k !== "A"; k = prev[k]) out.unshift(pts[k]);
+  return out.length ? out : [b];
+}
+function turnTo(r, rate, dt){ let dr = r - boy.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); boy.rotation.y += clamp(dr, -rate * dt, rate * dt); return Math.abs(dr) < 0.03; }
+function drive(dt){                                   // one frame of the plan; returns whether he moves
+  if (!goal || !boy) return false;
+  if (!placed) { placed = true; snap(goal.anchor, goal.clip); return false; }    // the first tick: just be there
+  if (!step) { if (!plan.length) return false; step = plan.shift(); step.t = 0;
+    if (step.k === "pose") { step.p0 = boy.position.clone(); step.r0 = boy.rotation.y; step.p1 = new THREE.Vector3();
+      if (step.to) step.r1 = rootOf(step.to, step.clip, step.p1); else { step.p1.set(step.stand[0], F, step.stand[1]); step.r1 = step.r0; }
+      step.d = clamp(0.6 + 0.5 * step.p0.distanceTo(step.p1), 0.8, 1.0); let dr = step.r1 - step.r0; step.dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+      at = null; play(step.clip, step.d); }
+    else if (step.k === "walk") { at = null; step.pts = route([boy.position.x, boy.position.z], step.to); boy.position.y = F; play("walk", 0.3);
+      if (actions.walk) actions.walk.timeScale = WALK_V / STRIDE_V; }
+    else if (step.k === "turn") play("idle", 0.3);
+    else if (step.k === "clip") { play(step.clip, 0.8); at = goal.anchor; step = null; return false; } }
+  const S = step;
+  if (S.k === "pose") { S.t = Math.min(1, S.t + dt / S.d); boy.position.lerpVectors(S.p0, S.p1, S.t); boy.rotation.y = S.r0 + S.dr * S.t;
+    if (S.t >= 1) { at = S.to || null; step = null; if (S.replan) replan(); } return true; }
+  if (S.k === "walk") { let left = WALK_V * dt;
+    while (left > 0 && S.pts.length) { const q = S.pts[0]; _w.set(q[0] - boy.position.x, 0, q[1] - boy.position.z); const d = _w.length();
+      if (d > 0.03) turnTo(Math.atan2(_w.x, _w.z), 6, dt);
+      if (d <= left) { boy.position.x = q[0]; boy.position.z = q[1]; left -= d; S.pts.shift(); } else { boy.position.addScaledVector(_w.normalize(), left); left = 0; } }
+    if (!S.pts.length) step = null; return true; }
+  if (S.k === "turn") { if (turnTo(S.r, 3, dt)) { boy.rotation.y = Math.atan2(Math.sin(S.r), Math.cos(S.r)); step = null; } return true; }
+  return false;
 }
 function screens(life, st){
   const atDesk = !life.path && ["research","chart"].includes(life.activity) && st === "AWAKE";
@@ -1047,7 +1154,7 @@ function shadows(now, moving){
 }
 function frame(now){
   requestAnimationFrame(frame);
-  if (document.hidden) return;
+  if (document.hidden || (DEBUG && window.FREEZE)) return;       // ?debug: FREEZE and step the simulation with sim()
   adapt(now);
   const dt = Math.min(0.1, clock.getDelta());
   skyMaterial.uniforms.uTime.value += dt;
@@ -1055,11 +1162,9 @@ function frame(now){
   let moving = false;
   if (boy) {
     boy.visible = visible;
-    tmp.copy(tgt).sub(boy.position); const d = tmp.length(); moving = d > 0.02;
-    if (d > 0.02) { const step = Math.min(d, 0.9 * dt); boy.position.addScaledVector(tmp.normalize(), step);
-      if (Math.hypot(tmp.x, tmp.z) > 0.05) boy.rotation.y = Math.atan2(tmp.x, tmp.z); }
-    else { let dr = targetRot - boy.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); boy.rotation.y += dr * Math.min(1, 4 * dt); }
-    if (phone.visible && boy.visible) holdPhone();
+    moving = drive(dt);
+    holdW = phone.visible && boy.visible ? Math.min(1, holdW + dt / 0.7) : 0;     // the arm comes up to the phone
+    if (holdW > 0) holdPhone(holdW);
   }
   lighting(dt);
   if (follow && performance.now() - userMovedAt > 20000) {
@@ -1074,7 +1179,12 @@ requestAnimationFrame(frame);
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, actions, bones, GRIP, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
-  act: a => { const l = {activity:a, place:"room"}; place(l); screens(l, "AWAKE"); boy.position.copy(tgt); boy.rotation.y = targetRot; mixer.update(1); } });
+  sim: (dt, n = 1) => { boy.visible = visible; for (let i = 0; i < n; i++) { mixer.update(dt); drive(dt); holdW = phone.visible && boy.visible ? Math.min(1, holdW + dt / 0.7) : 0; if (holdW > 0) holdPhone(holdW); }
+    lighting(0.1); controls.update(); renderer.render(scene, camera); },
+  live: a => { const l = {activity:a, place:"room"}; place(l); screens(l, "AWAKE"); },
+  act: a => { const l = {activity:a, place:"room"}; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = 1; mixer.update(1); },
+  pose: () => ({at, step:step && {k:step.k, t:step.t && +step.t.toFixed(2), to:step.to}, plan:plan.map(p => p.k + (p.to ? ":" + p.to : "")), goal, clip:current && current.getClip().name,
+    root:boy.position.toArray().map(x => +x.toFixed(3)), ry:+boy.rotation.y.toFixed(2)}) });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, hand:{get:() => hand}, head:{get:() => head},
     monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}, mixer:{get:() => mixer}}); }
 </script>
