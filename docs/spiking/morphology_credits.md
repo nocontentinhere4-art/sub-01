@@ -1,7 +1,7 @@
 # Neuron shapes: credits (#78)
 
 The close-up neurons on `/brain`, and the small cells of its whole-brain "neurons" view (#88: the same six
-cells, simplified further to at most 40 segments and drawn ~14× enlarged), are real reconstructions from **NeuroMorpho.Org**, licensed under the
+cells, simplified further to at most 40 segments and drawn ~6× enlarged), are real reconstructions from **NeuroMorpho.Org**, licensed under the
 [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/)
 ([terms](https://neuromorpho.org/useterm.jsp)). They are simplified (at most 300 segments a cell),
 rotated and drawn as lines; these are changes to the original data. They are **illustrative**: the

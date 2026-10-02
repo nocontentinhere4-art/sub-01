@@ -321,7 +321,7 @@ function neuronsOn(on){
     // the forest: every sampled neuron a small real cell (<= 40 segments); fewer cells on phones and in the mini
     const make = () => { if (n3d) return;
       n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, cortexIdx, morph: n3morph, sizes: n3meta && n3meta.sizes,
-                              maxCells: MINI ? 800 : innerWidth < 600 ? 1500 : 3000, somaSize: MINI ? 1.4 : 1.0});
+                              maxCells: MINI ? 240 : innerWidth < 600 ? 300 : 600, somaSize: MINI ? 1.4 : 1.0});
       n3d.resize(renderer.domElement.height, camera.fov); n3d.setVisible(n3want); neuronsText(); };
     neuronsOn.loading = true;
     Promise.all([n3meta || fetch("neurons3d.json").then(r => r.json()).catch(() => null),
@@ -832,11 +832,11 @@ function frame(now){
   if (fibreMat) {
     const u = fibreMat.uniforms;
     u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
-    u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.7 * n3dim);
+    u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.85 * n3dim);   // neurons on: the fibres step well back (#88 B)
     if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
     u.pulseT.value = pulse.t;
   }
-  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci) * (1 - 0.4 * n3dim);
+  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci) * (1 - 0.7 * n3dim);   // a faint outline behind the cells
   if (pulse.t > 0.85 && pulse.t < 1.6) {
     const arrive = Math.max(0, 1 - (pulse.t - 0.85) / 0.75);
     glows.forEach((g, i) => { if (tgOn[GROUPS.indexOf(nodes[i].group)]) g.material.opacity = Math.max(g.material.opacity, 0.5 * arrive); });

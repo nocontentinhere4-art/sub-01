@@ -41,19 +41,21 @@ def test_caps_instancing_and_lod(check):
     for r in (d, p, m):
         assert r["max_segments_per_cell"] <= 40 and r["segments"] <= 40 * r["cells"]
         assert r["drawCalls"] == r["state_drawCalls"] == len(r["types"]) + 1 <= 7   # a call per type + the somata
-        assert r["enlarge"] == 14
-    assert d["cells"] <= 3000 and p["cells"] <= 1500 and m["cells"] <= 800         # fewer cells on phones
-    assert d["cells"] > p["cells"] > m["cells"] and d["segments"] <= 120_000 and p["segments"] <= 60_000
+        assert r["enlarge"] == 6
+    # #88 follow-up ("a Christmas tree"): few cells, so they stay separate; >= 1 a region so every region keeps its spikes
+    assert 214 <= m["cells"] <= 240 and 214 <= p["cells"] <= 300 and 300 < d["cells"] <= 600
+    assert d["cells"] > p["cells"] > m["cells"] and d["segments"] <= 24_000 and p["segments"] <= 12_000
     assert {t["type"] for t in d["types"]} == {"pyramidal", "basket", "medium_spiny", "relay", "ca1_pyramidal",
                                                "amygdala_principal"}
-    assert d["cells"] - d["shaped"] < 30                                          # pallidum only: somata, no shape
+    assert d["cells"] - d["shaped"] < 10                                          # pallidum only: somata, no shape
 
 
 def test_pyramidal_cells_follow_the_cortical_surface_normal(check):
     d = check["desktop"]
-    assert d["pyramidal_on_cortex"] == d["pyramidal_aligned"] > 1000 and d["pyramidal_min_dot"] > 0.999
+    assert d["pyramidal_on_cortex"] == d["pyramidal_aligned"] > 300 and d["pyramidal_min_dot"] > 0.999
     for t, s in d["spread"].items():                                              # the rest: no common direction
-        assert s["mean_len"] < (0.75 if t in ("ca1_pyramidal", "amygdala_principal") else 0.2), t
+        if s["n"] >= 20:                                                          # (a mean of a few cells says nothing)
+            assert s["mean_len"] < 0.3, (t, s)
 
 
 def test_normals_point_out_of_the_brain(check):
@@ -94,7 +96,7 @@ def test_page_wording_and_panel_layout():
     js = (ROOT / "web" / "neurons3d.js").read_text()
     assert HONEST in html                                                         # the issue's caption, word for word
     assert "cells enlarged ~${st.enlarge}× for visibility" in html and "static cells, no activity" in html
-    assert "maxCells: MINI ? 800 : innerWidth < 600 ? 1500 : 3000" in html and "cortexIdx" in html
+    assert "maxCells: MINI ? 240 : innerWidth < 600 ? 300 : 600" in html and "cortexIdx" in html
     # every page-level name the forest's loader uses is declared (a merge once dropped `let n3morph`)
     for name in ("n3morph", "n3meta", "cortexPos", "cortexIdx"):
         assert re.search(rf"(let|const|var)\s[^;]*\b{name}\s*=", html), name
@@ -105,3 +107,20 @@ def test_page_wording_and_panel_layout():
     assert 'setProperty("--dock-h"' in html and "ResizeObserver" in html
     assert re.search(r"#layers \{[^}]*flex-wrap:wrap", html)
     assert "body.n3 #cards" not in html
+
+
+def test_dim_like_a_sparse_stain():
+    """#88 follow-up: the first forest saturated to white ("a Christmas tree"). At rest every cell is dim (base <= 0.15
+    before additive blending, one muted hue a type, no white or saturated green); only a spike brightens it. The
+    measured luminance (tests/neuron_forest_look.py) is in docs/screens/neuron_forest_look/after_luminance.json."""
+    js = (ROOT / "web" / "neurons3d.js").read_text()
+    base = float(re.search(r"FOREST_BASE = ([0-9.]+)", js).group(1))
+    assert base <= 0.15
+    hues = re.search(r"const FOREST_HUE = \{(.*?)\};", js, re.S).group(1)
+    for rgb in re.findall(r"\[([0-9., ]+)\]", hues):
+        c = [float(x) for x in rgb.split(",")]
+        assert max(c) <= 0.9 and max(c) - min(c) <= 0.35, c                        # muted: no white, low saturation
+    assert "vec3(1.0, 0.88, 0.6) * 3.0" not in js and "* 2.2 * soma" not in js        # the old white flashes are gone
+    lum = json.loads((ROOT / "docs" / "screens" / "neuron_forest_look" / "after_luminance.json").read_text())
+    for k in ("1920_offline", "390_offline", "1920_live", "390_live"):
+        assert lum[k]["above_0_8_pct"] <= 2.0, (k, lum[k])
