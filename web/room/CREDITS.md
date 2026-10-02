@@ -55,5 +55,10 @@ From `room_build/`, with Blender 4.2 and Node 22:
     blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
 
+## Map card
+The map of his neighbourhood (room card and `/life`) is © OpenStreetMap contributors (ODbL,
+https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`, one static extract made by
+`python room_build/osm_area.py` (one Overpass API query, run by hand); no map tiles are loaded.
+
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).

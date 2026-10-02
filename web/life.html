@@ -52,9 +52,10 @@
   #sv, #walk { position:absolute; inset:0; display:none; z-index:1; background:#000; overflow:hidden; }
   #scene { overflow:hidden; }
   #walk iframe { width:100%; height:100%; border:0; pointer-events:none; transform:scale(1.18); }
-  .darktiles { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
-  #map { position:absolute; right:14px; top:52px; width:min(30%, 320px); aspect-ratio:1/1; z-index:3; border:1px solid #2a2a36; border-radius:8px; }
+  #map { position:absolute; right:14px; top:52px; width:min(30%, 320px); aspect-ratio:1/1; z-index:3; border:1px solid #2a2a36; border-radius:8px; background:#0d0e13; }
   @media (max-width: 900px) { #map { width:40%; } }
+  #map .leaflet-control-attribution { background:rgba(8,8,11,.6); color:#6a6a7e; font-size:8px; line-height:1.3; }
+  #map .leaflet-control-attribution a { color:#8f8fa3; }
   #svlabel { position:absolute; left:16px; bottom:30px; z-index:2; font-size:11px; color:#e8e8ee; background:rgba(0,0,0,.55);
     padding:4px 8px; border-radius:3px; display:none; }
   #hud, #tools, #phone, #brainpip, #foot { z-index:3; }
@@ -274,9 +275,30 @@ function addChat(m){ chatLines.push(m); if (chatLines.length > 40) chatLines.shi
 let lastLog = "";
 // ---------------- the real neighbourhood: live map (OpenStreetMap) + real street footage ----------------
 let tokyo = null, walkFeed = null, marker = null, walkOn = null;
-const map = L.map("map", {zoomControl: false, attributionControl: true}).setView([35.7050, 139.5735], 16);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', className: "darktiles"}).addTo(map);
+const map = L.map("map", {zoomControl: false, attributionControl: true, minZoom: 14, maxZoom: 18}).setView([35.7050, 139.5735], 16);
+map.attributionControl.setPrefix(false).addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)');
+// no tile server (OSMF's tile policy, issue #43): his ~2 x 1.5 km area is one static OSM extract (room_build/osm_area.py),
+// drawn as dark vector layers on one canvas
+const AREA_STYLE = {green:{fill:"#141f19"}, water:{fill:"#122033"}, stream:{line:"#1b2f4a", w:1.5},
+  building:{fill:"#191a22", line:"#20212b", w:0.5}, path:{line:"#282934", w:0.8, dash:"2 3"},
+  minor:{line:"#30313c", w:1.4}, major:{line:"#464755", w:2.6}, rail:{line:"#55556a", w:1.6, dash:"6 4"}};
+function drawArea(a){
+  const S = a.scale, o = [Math.round(a.origin[0] * S), Math.round(a.origin[1] * S)], lines = [];
+  map.createPane("area").style.zIndex = 250;                 // under the routes and markers, whichever loads first
+  const canvas = L.canvas({padding:0.5, pane:"area"});
+  const decode = f => { const p = []; for (let i = 0, y = o[0], x = o[1]; i < f.length; i += 2) { y += f[i]; x += f[i + 1]; p.push([y / S, x / S]); } return p; };
+  for (const k in AREA_STYLE) {
+    const st = AREA_STYLE[k], shapes = (a.layers[k] || []).map(decode), opt = {renderer:canvas, interactive:false, color:st.line,
+      weight:st.w || 0, stroke:!!st.line, dashArray:st.dash, fill:!!st.fill, fillColor:st.fill, fillOpacity:1, opacity:1};
+    if (!shapes.length) continue;
+    const lay = (st.fill ? L.polygon(shapes.map(r => [r]), opt) : L.polyline(shapes, opt)).addTo(map);
+    if (!st.fill) lines.push([lay, st.w]);
+  }
+  const widen = () => { const z = Math.pow(1.6, map.getZoom() - 15); for (const [lay, w] of lines) lay.setStyle({weight:w * z}); };
+  map.on("zoomend", widen); widen();
+  const [s, w, n, e] = a.bbox; map.setMaxBounds([[s - 0.004, w - 0.004], [n + 0.004, e + 0.004]]);
+}
+fetch("/tokyo_area.json").then(r => r.json()).then(drawArea);
 fetch("/tokyo_routes.json").then(r => r.json()).then(d => { tokyo = d;
   for (const k in d.routes) L.polyline(d.routes[k].latlng, {color: "#ff6a00", weight: 3, opacity: 0.55}).addTo(map);
   const [hl, hg] = d.places.home;

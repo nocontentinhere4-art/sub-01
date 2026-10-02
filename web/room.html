@@ -90,7 +90,6 @@
   #screencard.phone .frame img { aspect-ratio:390/844; object-fit:cover; object-position:top; }
   #screencard .url { font-size:11px; color:var(--dim); margin-top:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #map { height:230px; border-radius:8px; overflow:hidden; background:#0d0e13; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
-  .darktiles { filter:invert(1) hue-rotate(180deg) brightness(.58) contrast(1.2) saturate(.32); }
   .leaflet-container { background:#0d0e13 !important; font-family:inherit !important; }
   .leaflet-control-attribution { background:rgba(8,8,11,.6) !important; color:#6a6a7e !important; font-size:9px !important; }
   .leaflet-control-attribution a { color:#8f8fa3 !important; }
@@ -1200,10 +1199,30 @@ function screens(life, st){
 }
 
 // ---------- map ----------
-const map = L.map("map", {zoomControl:false, attributionControl:true}).setView([35.7055, 139.5745], 15);
-// OSM tiles, inverted and desaturated into a dark basemap (keyless; CARTO's dark tiles now need an API key)
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, className:"darktiles",
-  attribution:"© OpenStreetMap"}).addTo(map);
+const map = L.map("map", {zoomControl:false, attributionControl:true, minZoom:14, maxZoom:18}).setView([35.7055, 139.5745], 15);
+map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)');
+// no tile server (OSMF's tile policy, issue #43): his ~2 x 1.5 km area is one static OSM extract (room_build/osm_area.py),
+// drawn as dark vector layers on one canvas
+const AREA_STYLE = {green:{fill:"#141f19"}, water:{fill:"#122033"}, stream:{line:"#1b2f4a", w:1.5},
+  building:{fill:"#191a22", line:"#20212b", w:0.5}, path:{line:"#282934", w:0.8, dash:"2 3"},
+  minor:{line:"#30313c", w:1.4}, major:{line:"#464755", w:2.6}, rail:{line:"#55556a", w:1.6, dash:"6 4"}};
+function drawArea(a){
+  const S = a.scale, o = [Math.round(a.origin[0] * S), Math.round(a.origin[1] * S)], lines = [];
+  map.createPane("area").style.zIndex = 250;                 // under the routes and markers, whichever loads first
+  const canvas = L.canvas({padding:0.5, pane:"area"});
+  const decode = f => { const p = []; for (let i = 0, y = o[0], x = o[1]; i < f.length; i += 2) { y += f[i]; x += f[i + 1]; p.push([y / S, x / S]); } return p; };
+  for (const k in AREA_STYLE) {
+    const st = AREA_STYLE[k], shapes = (a.layers[k] || []).map(decode), opt = {renderer:canvas, interactive:false, color:st.line,
+      weight:st.w || 0, stroke:!!st.line, dashArray:st.dash, fill:!!st.fill, fillColor:st.fill, fillOpacity:1, opacity:1};
+    if (!shapes.length) continue;
+    const lay = (st.fill ? L.polygon(shapes.map(r => [r]), opt) : L.polyline(shapes, opt)).addTo(map);
+    if (!st.fill) lines.push([lay, st.w]);
+  }
+  const widen = () => { const z = Math.pow(1.6, map.getZoom() - 15); for (const [lay, w] of lines) lay.setStyle({weight:w * z}); };
+  map.on("zoomend", widen); widen();
+  const [s, w, n, e] = a.bbox; map.setMaxBounds([[s - 0.004, w - 0.004], [n + 0.004, e + 0.004]]);
+}
+fetch("tokyo_area.json").then(r => r.json()).then(drawArea);
 const dot = (c, r, cls) => L.circleMarker([0, 0], {radius:r, color:"#0a0a0d", weight:1.5, fillColor:c, fillOpacity:1, className:cls});
 let homeMk, meMk = dot("#ff9a3c", 7, "mk-me"), courierMk = dot("#39f5a0", 6, "mk-courier"), routes = null;
 fetch("tokyo_routes.json").then(r => r.json()).then(d => {
