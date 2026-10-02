@@ -176,7 +176,3 @@ The clips `boy3_{door,eat,idle,sleep,walk,text}.glb`, and the sit clip embedded 
 `boy_*.glb` clips retargeted with `room_build/retarget_meshy.mjs`. The retarget is world-space and relative to the rest
 pose, so each bone keeps the clip's rotation change from the old rest pose. The hips translation is scaled by the
 hip-height ratio (1.047). The page still loads `boy.glb`; the switch belongs to #76.
-
-`boy4.glb` and `boy4_*.glb` are the same pipeline with the face of the current character (`boy.glb`, itself Meshy-made
-for this project) on boy3's hair and outfit. This was the owner's choice on 2026-10-02. The reference image is a
-Higgsfield `gpt_image_2_5` edit: boy3's reference plus a render of `boy.glb`'s face.
