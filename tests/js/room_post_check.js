@@ -4,8 +4,11 @@
 // environment class per material, shadow snapping, the sun shafts' placement, the contact blob and the captured
 // environment's re-capture rule.
 "use strict";
-const path = require("path");
+const path = require("path"), fs = require("fs"), os = require("os");
 const root = path.resolve(__dirname, "..", "..");
+// the module is ESM in a directory without a package.json: node < 22.7 reads a .js file there as CommonJS, so it is
+// imported from a temporary .mjs copy (it has no relative imports)
+function esmCopy(file) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), "room-post-")); const out = path.join(dir, "room_post.mjs"); fs.copyFileSync(file, out); return out; }
 
 // ---- a tiny THREE: only what the module touches ----
 class V3 { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
@@ -70,7 +73,7 @@ function renderer() { return {toneMappingExposure: 0.9, capabilities: {isWebGL2:
 const camera = {near: 0.02, far: 200};
 
 async function main() {
-  const P = await import(path.join(root, "web", "room_post.js"));
+  const P = await import(esmCopy(path.join(root, "web", "room_post.js")));
   const out = {tiers: P.TIERS, chains: {}, fallbacks: {}, governor: {}, detect: {}, grade: {}, env: {}, snap: {}, shafts: {}, blob: {}, roomenv: {}};
   const scene = new Obj();
   // chains per tier, and the fallback when the resolution of a tier is forced
