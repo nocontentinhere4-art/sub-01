@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 13:50 UTC** (pass 27). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 14:05 UTC** (pass 27b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -288,6 +288,13 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 27b:** merged #61 (#57): he eats before chatting. In the coordinator's re-run, minutes above meal time with
+chat waiting went 124–211 → **0** (9 runs); deliveries are eaten within 2 min; a 24 h konbini. New tasks:
+- #59 daily clips for the official social accounts (started);
+- #60 logged-in, view-only TikTok/YouTube (after #56);
+- #62 active neurons inside the 3D brain (after #55 and #58).
+The owner has created the TikTok account.
 
 **Pass 27 (owner: "turn his neurons on, more things, more internet searching", "is he fed?", "I want the big one"):**
 new tasks:
