@@ -30,7 +30,7 @@ from pathlib import Path
 import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
-PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes",
+PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/screens", "/api/tastes",
          "/api/taught", "/api/mind", "/api/chess", "/api/music", "/api/spiking/live"]
 ADMIN = {"X-Admin-Token": secrets.token_hex(16)}     # the server gets it as SUB01_ADMIN_TOKEN
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms

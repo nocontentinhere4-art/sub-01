@@ -912,6 +912,16 @@ function drawReading(r){
   // the article he is reading, laid out like the real page: sidebar, title in serif, infobox placeholder, two-column body
   const c = document.createElement("canvas"); c.width = 1100; c.height = 650; const g = c.getContext("2d");
   g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  const host = String(r.host || "").replace(/^www\./, "");
+  if (host && !/(^|\.)wikipedia\.org$/.test(host)) {   // #89: not Wikipedia: the real host and kind, never a Wikipedia frame
+    const kind = {short: "short", video: "video", forum: "thread", news: "news", finance: "finance", page: "page"}[r.kind] || "page";
+    g.fillStyle = "#f1f3f4"; g.fillRect(0, 0, c.width, 56); g.fillStyle = "#5f6368"; g.font = "18px sans-serif"; g.fillText(`${host} · ${kind}`, 24, 36);
+    g.fillStyle = "#202124"; g.font = "bold 32px sans-serif"; g.fillText(String(r.title || "").slice(0, 52), 24, 112);
+    g.font = "17px sans-serif"; const ws = String(r.extract || "").split(" "); let ln = "", yy = 160;
+    for (const w of ws) { if (g.measureText(ln + w).width > 1040) { g.fillText(ln, 24, yy); ln = ""; yy += 27; if (yy > 630) break; } ln += w + " "; }
+    if (yy <= 630) g.fillText(ln, 24, yy);
+    const t = screenTexture(c); fitTop(t, SURF.monitor.w / SURF.monitor.h); return t;
+  }
   g.fillStyle = "#f8f9fa"; g.fillRect(0, 0, 176, c.height); g.fillStyle = "#a2a9b1"; g.fillRect(176, 0, 1, c.height);
   g.fillStyle = "#202122"; g.font = "bold 26px serif"; g.fillText("WIKIPEDIA", 22, 48); g.fillStyle = "#54595d"; g.font = "12px sans-serif"; g.fillText("The Free Encyclopedia", 22, 66);
   g.font = "14px sans-serif"; g.fillStyle = "#3366cc";
