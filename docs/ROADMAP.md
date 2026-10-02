@@ -21,7 +21,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
 |---|---|---|
 | #8 room | `session_01Xrq53UQH9EHy4bgPj9B2yL` (author) | merged; follow-ups later (remove old room after 2026-10-09, lived-in props) |
-| #21 atomic writes | `session_011` see below | started 01:30 |
+| #21 atomic writes | `session_0116sSeY5bUXiQqiKPtPBUMz` (new) | started 01:26 |
 | #20 brain-decides | `session_01881q1gcHZBtokE8qi8QjxC` (author) | merged; asked for a docstring-only follow-up (`fix/eyes-docstring`) |
 | #12 CI | `session_011qiRnsxURjY8wayHe8dz6u` (new) | started 00:41 |
 | #13 about page | `session_0129Vcj2Bg6kjc4KDPP3qnBT` (new) | started 00:41 |
