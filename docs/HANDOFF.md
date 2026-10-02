@@ -238,6 +238,20 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
 
+## His spiking neurons in the day (#55, `docs/spiking/live_cpu.md`)
+- `spiking/live.py`: a 20k-neuron spiking network runs in a child process (`python -m spiking.live`). It uses numpy and
+  the same construction as `net.py` via `spiking/wiring.py`, no torch. It speaks the decision protocol shared with #58
+  (decide / decision / reward, JSON lines) and streams `{"type":"spiking","net":"cpu"}` frames to the Neurons panel.
+- `brain_vote.Backend`: the GPU pod's 1M network first (`pod_manager.day_live_decide`, #58), then the CPU child within
+  2 s, then the rate model alone. `vote(..., spiking=)` adds `SPIKING_W` (0.3) x the lean, and the record says which
+  network answered.
+- Rewards: the tastes prediction error of the stay goes to the network that decided (CPU: the #39 rule, with a
+  decaying learning rate). Weights are in `/data/spiking/live_weights.npz`.
+- Every browse decision and its reward go to `/data/spiking/decisions-YYYY-MM-DD.jsonl`, which #58 reads at night.
+- `/api/spiking/live` feeds the "In the day" part of the Neurons card. `SUB01_SPIKING_LIVE=0` turns the CPU network off.
+- Measured: tick 8.8–9.5 ms vs 8.9–9.2 on main. The child uses ~0.4 CPU-s per decision and 1.4–2 % of a core
+  between decisions (its idle pulse).
+
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
   / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is
@@ -255,7 +269,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `/api/browsing` → `accounts`: `{"tiktok": {"state": "logged in" | "logged out", "reason"}}`. Risk note and cookie
   refresh steps in `docs/OPERATIONS.md`.
 
-
+## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.
   Never present it as "his wiring produces his activity" (`analysis/null_test.py`).
 - PR #5 (`feature/real-wiring`): connectome v2 (MRtrix3 + SIFT2) and a wiring-only Hopf slow layer reach FC r ≈ 0.21
