@@ -296,6 +296,12 @@ const DEBUG = new URLSearchParams(location.search).has("debug");
 // ?room=old shows the earlier single-mesh scan with its lighting baked into the texture
 const OLD_ROOM = new URLSearchParams(location.search).get("room") === "old";
 const FIXED_HOUR = DEBUG && new URLSearchParams(location.search).get("hour");   // preview a time of day
+// the character (#76): ?boy=new shows the candidate boy4 (boy3's hair and outfit with this character's face, the same
+// 24-bone rig, so the clips, anchors and poses below apply unchanged); the default is still boy.glb
+const BOY = new URLSearchParams(location.search).get("boy") === "new" ? "boy4" : "boy";
+// boy4 (?boy=new, #76): its retargeted standing pose (the door clip's first frame) puts the soles 2.4 cm lower than the
+// first character's, so rootOf() lifts his root by that much
+const LIFT = BOY === "boy4" ? {stand:0.024, lean:0.024, deliver:0.024, idle:0.024, phone_stand:0.024} : {};
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
@@ -448,7 +454,7 @@ function readMarkers(root){
   if (lmp) SURF.lamp = {c:lmp.getWorldPosition(p).toArray()};
 }
 
-load("room/boy.glb").then(g => {
+load(`room/${BOY}.glb`).then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
   boy.traverse(o => {
     if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
@@ -461,8 +467,8 @@ load("room/boy.glb").then(g => {
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
   scene.add(phone); makeProps();
-  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
-    load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
+  for (const [name, file] of Object.entries({sleep:"sleep", eat:"eat", hold:"text", idle:"idle", door:"door", walk:"walk"}))
+    load(`room/${BOY}_${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
 }).catch(bootError);
 const clips = {};
 // "hold" is a static upper-body pose (right arm, neck, head) taken from a texting animation on the same rig: it replaces
@@ -1254,7 +1260,7 @@ function chairSpots(){   // [where he pulls from (it comes round to face him); (
   return [S, S, [_cs.x + fo[0] * 0.70, _cs.z + fo[1] * 0.70], chairHeading(ro)];
 }
 function rootOf(name, clip, out){                     // where the root goes for an anchor and clip; returns the heading
-  const A = ANCHOR[name]; if (A.p) { out.set(...A.p); return A.r; }
+  const A = ANCHOR[name]; if (A.p) { out.set(...A.p); out.y += LIFT[clip] || 0; return A.r; }
   let seat = A.seat, r = A.r;
   if (name === "desk" && chairNode()) { CHAIR.node.localToWorld(_cs.set(0, 0.735, 0.02)); seat = [_cs.x, _cs.y, _cs.z]; r = chairHeading(CHAIR.node.rotation.y); }
   const h = HIPS[clip] || HIPS.sit, c = Math.cos(r), sn = Math.sin(r);
