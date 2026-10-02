@@ -4,7 +4,7 @@ Last pass: **2026-10-02 03:50 UTC** (pass 16). Updated after every coordinator p
 
 ## Waiting for the owner
 **Pass 16 (owner: "finish everything on your own, what's missing with the neurons and the rest, verify and proceed"):**
-merged #27 (MyConnectome attribution), #32 (/tastes page), #28 (room movement: walks around furniture, sits, lies
+merged #37 (mind layer phase A, new files only), #27 (MyConnectome attribution), #32 (/tastes page), #28 (room movement: walks around furniture, sits, lies
 down) and #34 (launch load). Before merging, the coordinator merged all four onto `main` locally: 291 tests passed
 (10 skipped), smoke OK at 32.5 ms per 50 ms tick, and the #34 load test with 300 viewers passed (71 % of one core,
 tick late p95 3.3 ms, RSS 173 MB).
@@ -21,7 +21,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
 |---|---|---|
 | #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | in progress |
-| #33 mind layer, phase A (`mind.py`) | `session_01KwLm3oYfsh8KhXjWTbrUPt` | in progress |
+| #33 mind layer, phase A (`mind.py`) | `session_01KwLm3oYfsh8KhXjWTbrUPt` | merged as #37 (338 tests, smoke 33.1 ms); phase B waits its turn |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | started 03:39 (spiking/ only) |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | started 03:45 (tastes.py + small sleep hook) |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | asked for a new branch from `main` |
@@ -69,7 +69,7 @@ cheap to run, with the password gate kept until launch day.
 | 18j | Spiking brain learns to choose (dopamine reward vs frozen and random controls) | in progress | issue #35 |
 | 18k | Room movement (walk around furniture, sit, lie down) | done; follow-ups in a new PR | #28 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
-| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A in progress (standalone `mind.py`); phase B after #14, #29, #28 | issue #33 |
+| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A done (#37, standalone, not wired); phase B after #29 → #36 → #31 | issue #33 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
