@@ -907,10 +907,11 @@ function lighting(dt){
 // ---------- the boy follows the life simulation ----------
 let visible = true, lastLife = null;
 // He moves like a person: a change of place is a plan of steps -- get up (lying -> sitting on the edge -> standing),
-// walk a path over the free floor with the walk clip, turn to the anchor's heading, then sit or lie down. Getting up and
-// sitting down are "pose" steps: the root goes linearly from one place to the next while the clips crossfade over the
-// same time, so every in-between frame is one consistent blend (never two poses at two roots). He walks at y = F; the
-// height of a seat or the bed only comes in inside those steps. A new goal mid-walk re-plans from where he is.
+// walk a path over the free floor with the walk clip, turn to the anchor's heading, then sit or lie down (at the desk he
+// pulls the chair out first and rides it back in). Getting up and sitting down are "pose" steps: the hips follow keyframes
+// while the two clips' weights follow them too, and the root is placed from the hips, so every in-between frame is one
+// consistent blend that stays out of the bed and the chair (debug: penetration()). He walks at y = F; the height of a
+// seat or the bed only comes in inside those steps. A new goal mid-walk re-plans from where he is.
 let at = null, goal = null, plan = [], step = null, holdW = 0, placed = false;
 const WALK_V = 0.9, STRIDE_V = 0.65;                  // m/s; the walk clip's feet move back at 0.65 m/s: it plays faster to match
 // where each clip has the hips, from the root (facing +z; measured): a move between two poses is planned for the hips
@@ -928,8 +929,7 @@ const CHAIR = {node:undefined, home:new THREE.Vector3(), ry:0, out:0.40, turn:-M
 const _cs = new THREE.Vector3();
 function chairNode(){
   if (CHAIR.node !== undefined || !room) return CHAIR.node || null;
-  if (DEBUG && new URLSearchParams(location.search).has("fakechair") && !room.getObjectByName("chair")) scene.add(fakeChair());
-  const n = room.getObjectByName("chair") || scene.getObjectByName("chair") || null;
+  const n = room.getObjectByName("chair") || null;
   CHAIR.node = n; if (n) { CHAIR.home.copy(n.position); CHAIR.ry = n.rotation.y; }
   return n;
 }
@@ -968,13 +968,6 @@ function chairVox(){                                  // ?debug: the chair as co
     V.cols[i * V.nz + k] = hits.length >= 2 ? hits.slice(0, hits.length - (hits.length % 2)) : null;
   }
   meshes.forEach(m => { m.material.side = THREE.FrontSide; }); placeChair(k0); return VOX = V;
-}
-function fakeChair(){                                 // ?debug&fakechair: a stand-in "chair" node of boxes where the baked chair is
-  const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({color:0xff3355, transparent:true, opacity:0.55});
-  const B = (x0, x1, y0, y1, z0, z1) => { const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m); b.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); g.add(b); };
-  B(-0.25, 0.25, 0.41, 0.505, -0.25, 0.23); B(-0.23, 0.23, 0.60, 1.16, 0.26, 0.33); B(-0.035, 0.035, 0.38, 0.84, 0.24, 0.30);
-  B(-0.03, 0.03, 0.08, 0.41, -0.03, 0.03); for (const sx of [-1, 1]) { B(sx * 0.255 - 0.04, sx * 0.255 + 0.04, 0.68, 0.71, -0.13, 0.11); B(sx * 0.255 - 0.018, sx * 0.255 + 0.018, 0.38, 0.68, -0.02, 0.06); }
-  g.name = "chair"; g.position.set(-1.13, F, -0.585); g.rotation.y = 0.54; return g;
 }
 const toWorld = (h, r, base, out) => out.set(base.x + h[0] * Math.cos(r) + h[2] * Math.sin(r), base.y + h[1], base.z - h[0] * Math.sin(r) + h[2] * Math.cos(r));
 const standOf = name => { const A = ANCHOR[name === "bedlie" ? "bedside" : name]; return A.stand || [A.p[0], A.p[2]]; };
