@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 14:20 UTC** (pass 28). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 14:40 UTC** (pass 28b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -289,6 +289,11 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 28b:** merged #66 (#60): logged-in, view-only TikTok and YouTube from the `SUB01_SESSION_*` secrets.
+Chromium's env is scrubbed, cookies are domain-scoped, actions and private pages are blocked, and the avatar is
+hidden. 789 tests. After deploy, `/api/browsing` → `accounts.tiktok` should read "logged in". #63 now also covers
+real food: props, courier bags, dishes, hand-to-mouth eating.
 
 **Pass 28:** merged #64 (#56 part 1): 10 free search sources routed by topic, ≤ 20 requests/host/hour, follow-up
 searches, and queries from notes, reading, taught words, tastes and chat. Searches 31 → 52/hour, with no paid calls on
