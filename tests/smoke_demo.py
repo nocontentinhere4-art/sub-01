@@ -145,17 +145,17 @@ async def run(args, proc):
                 failures.append("/ws: no ticks during the measurement window")
                 return failures
             print(f"ticks: {ticks} in {wall:.1f} s ({ticks / wall:.1f}/s, nominal {1 / TICK_S:.0f}/s)")
-            async with s.get(base + "/api/health", headers=ADMIN) as r:
-                h = await r.json() if r.status == 200 else {}
-            tm = h.get("tick_ms") or {}
-            print(f"/api/health: tick body p50 {tm.get('p50')} p95 {tm.get('p95')} ms over {tm.get('n')} ticks · "
-                  f"loop lag p95 {(h.get('loop_lag_ms') or {}).get('p95')} ms · RSS {h.get('rss_mb')} MB")
             if linux:
                 cpu = cpu_seconds(proc.pid) - cpu0
                 print(f"TICK COST: {1000 * cpu / ticks:.1f} ms CPU per {1000 * TICK_S:.0f} ms tick "
                       f"({100 * cpu / wall:.0f}% of one core, {cpu:.2f} CPU-s over {wall:.1f} s)")
             else:
                 print("TICK COST: not measured (/proc not available on this OS)")
+            async with s.get(base + "/api/health", headers=ADMIN) as r:   # after the CPU reading
+                h = await r.json() if r.status == 200 else {}
+            tm = h.get("tick_ms") or {}
+            print(f"/api/health: tick body p50 {tm.get('p50')} p95 {tm.get('p95')} ms over {tm.get('n')} ticks · "
+                  f"loop lag p95 {(h.get('loop_lag_ms') or {}).get('p95')} ms · RSS {h.get('rss_mb')} MB")
     return failures
 
 
