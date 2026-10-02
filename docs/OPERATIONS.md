@@ -24,6 +24,9 @@ Every cap is checked **before** each paid call. Over a cap, the feature takes it
   `resting` field of `/api/frames` and of the `eye` websocket message). Unwatched dream frames for the diary stop too.
 - **diary:** the morning entry uses its template text ("SUB-01 slept … and replayed …").
 - **eyes:** local options from the page's own links (`/api/decisions` shows `why_local`).
+  Search results pages never cost an eyes call (#56): their options are built locally from the result titles and
+  snippets. The extra search sources (DuckDuckGo, Wikipedia, Commons, arXiv, Hacker News, Open Library, YouTube, two
+  site search boxes) are free and keyless; each host gets at most 20 requests per hour (`/api/browsing` → `searches`).
 - **mind:** keyword-only notes, yesterday's plan, no chat replies ("resting").
 - **total:** all four of the above at once.
 
