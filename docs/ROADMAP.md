@@ -1,8 +1,15 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 08:25 UTC** (pass 21b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 08:35 UTC** (pass 22). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 22:** merged #50 (#18). The server and Chromium now run as uid 1000; the entrypoint hands the root-owned
+/data over once. Rollback: `RUN_AS_ROOT=1`. The coordinator built and ran the real image in Docker: all processes are
+uid 1000, a root 0600 file is readable and writable after the start, and `/api/config` returns 200. Under Docker's
+default seccomp Chromium's sandbox falls back to `--no-sandbox`, with a loud log line; check Railway's first deploy
+logs for `CHROMIUM SANDBOX FAILED`. `tests/test_dockerfile.py` now fails CI if a server import is missing from the
+image. #15 (costs, caps, /healthz) is next, ahead of #17: after today's outage, a health check comes first.
+
 **Pass 21b: incident.** #45 (merged ~07:30) made `live_server.py` import `mind`, but the Dockerfile's COPY list
 lacked `mind.py`. Any Railway image built from 07:30 to 08:24 stopped at start (`ModuleNotFoundError`), so the live
 site was probably down for about an hour. The #18 worker found it with `docker build`. Hotfix #49 (adds `mind.py`) was
@@ -68,13 +75,14 @@ Who is on what (cloud sessions, 2026-10-02):
 | #46 the mind in the room | `session_01Ek5DZG7cEvc1v7TV8PrEkz` | started 07:37 (`feature/mind-room`) |
 | #33 mind layer | `session_01KwLm3oYfsh8KhXjWTbrUPt` | done: #37 + #45 |
 | #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | merged as #48 (6×) |
-| #18 Chromium non-root | `session_01Fbtw3qXpLr5WZAjU7jQiDT` | started 08:10 (`chore/chromium-nonroot`; Dockerfile) |
+| #18 Chromium non-root | `session_01Fbtw3qXpLr5WZAjU7jQiDT` | merged as #50 (found the #49 outage) |
+| #15 costs, caps, /healthz | `session_01M9bv9k1WFLctqBLSHXWPwr` | started 08:33 (`feature/ops-costs-health`) |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py` / Dockerfile, one at a time: **#18** (in progress) → #17 → #15. `web/room.html`: #46 the mind in the room (in progress).
+Next on `live_server.py` / Dockerfile, one at a time: **#15** (in progress) → #17. `web/room.html`: #46 the mind in the room (in progress).
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -107,7 +115,7 @@ cheap to run, with the password gate kept until launch day.
 | 14 | Launch load: cheaper feeds, viewer caps, load test | done (300 viewers: 71 % of a core, 4–7 KB/s each) | #34 |
 | 15 | Cost ledger, daily caps, `/healthz`, monitoring | todo, after #9 + brain-decides + #14 | issue #15 |
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
-| 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
+| 17 | Chromium as non-root (sandbox on) | done (uid 1000; sandbox on where the host allows it) | #50 |
 | 18 | Brain loop 3× cheaper | done (6×: 34 → 9 ms per tick) | #48 |
 | 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | done | #40 |
 | 18e | Daily memory test on the GPU switched on | key added 2026-10-02; needs `SUB01_POD_SECRET` too | #9 |
@@ -197,6 +205,8 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: #15 goes before #17.** After the outage, a health check and the Railway healthcheck path matter more
+  than YouTube and chess.
 - **2026-10-02: review checklist gains "new module → Dockerfile COPY".** After the #45 incident, every PR that adds a
   top-level module imported by the server must add it to the Dockerfile. The coordinator checks this by importing
   `live_server` from the exact COPY file set, until #18's test does it in CI.
@@ -215,7 +225,8 @@ findings "NOT verified", and its reviews are partial on large diffs.
   crash-loops the server at the next start. Fix: #21.
 - **Vote load:** on one core with a vote every 5 s, brain ticks are up to 157 ms late (p95 69 ms). Fine at one vote
   per page; #19 adds headroom.
-- **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18. Since #40 it browses more freely (median
+- **Chromium sandbox:** since #50 Chromium runs as uid 1000. If Railway's seccomp blocks the sandbox, it falls back to
+  `--no-sandbox` (still non-root) with a loud log line. Since #40 it browses more freely (median
   ~450 MB, max 622 MB for the Chromium tree): part of the reason for Railway's paid plan.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
