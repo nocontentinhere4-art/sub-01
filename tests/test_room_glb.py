@@ -69,6 +69,52 @@ def test_every_imported_asset_is_credited():
         assert f"`{k}`" in credits, k
 
 
+def test_every_texture_is_credited():
+    """every Poly Haven texture tex_prep.py reads (tex/<id>/...) has a row in CREDITS.md"""
+    src = (ROOT / "room_build" / "tex_prep.py").read_text()
+    credits = (ROOT / "web" / "room" / "CREDITS.md").read_text()
+    used = set(re.findall(r'\{T\}/([a-z0-9_]+)/', src))
+    assert len(used) >= 14, used
+    for k in used:
+        assert f"`{k}`" in credits, k
+
+
+# ---- the soft goods (#98 G4, room_build/props_soft.py)
+SOFT_MATERIALS = ["sheet", "duvet", "curtain", "rug", "cushion", "bag", "knit", "terry", "denim", "jersey", "hang_hoodie", "hang_canvas", "hang_rib"]
+
+
+def triangles(g):
+    n = 0
+    for m in g["meshes"]:
+        for p in m["primitives"]:
+            acc = g["accessors"][p["indices"]] if "indices" in p else g["accessors"][p["attributes"]["POSITION"]]
+            n += acc["count"] // 3
+    return n
+
+
+def test_soft_goods_materials_present():
+    names = {m.get("name") for m in gltf()["materials"]}
+    for k in SOFT_MATERIALS:
+        assert k in names, k
+    assert "room_static" in nodes()
+
+
+def test_fabrics_have_their_normal_maps_and_sheen():
+    g = gltf(); by = {m.get("name"): m for m in g["materials"]}
+    for k in ("knit", "terry", "duvet", "curtain", "denim", "hang_hoodie"):
+        assert "normalTexture" in by[k], k
+    for k in ("knit", "terry", "curtain", "duvet"):
+        assert "KHR_materials_sheen" in by[k].get("extensions", {}), k
+
+
+def test_triangle_and_draw_call_budget():
+    """the room page must stay >= 30 FPS on a mid-range phone: the whole model stays under 230k triangles and 60 draw calls"""
+    g = gltf()
+    prims = sum(len(m["primitives"]) for m in g["meshes"])
+    assert prims <= 60, prims
+    assert 120_000 <= triangles(g) <= 230_000, triangles(g)
+
+
 def test_phone_screen_module_has_no_brand_ui():
     code = "\n".join(l for l in (ROOT / "web" / "room_phone.js").read_text().splitlines() if not l.strip().startswith("//"))
     for w in ("iOS", "Android", "Apple", "iPhone", "Google", "Samsung", "Galaxy", "Pixel"):
