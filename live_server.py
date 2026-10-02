@@ -43,6 +43,7 @@ from research import Reader, reading_stimulus
 from browse import Browser, display_ok
 import brain_vote
 import chess_game
+import clips
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
@@ -1390,6 +1391,10 @@ async def main(args):
         live.mind = mind_mod.Mind(data_dir, budget=mind_mod.mind_budget(data_dir), clock=live.clock.now)
 
     add_ops_routes(app, live, data_dir)
+    if os.environ.get("CLIPS", "1") != "0":       # #59: daily clips for the social accounts, made in nice'd children
+        live.clips = clips.ClipMaker(data_dir)
+        live.clips.ledger = live.ledger
+        clips.add_routes(app, live.clips, lambda r: admin_ok(r) or bool(r.app.get(GATED)))
 
     async def screen_shot(request):               # latest screenshot of the desk or phone screen
         dev = request.match_info["device"]
@@ -1504,6 +1509,8 @@ async def main(args):
         tasks.append(supervised("mind", live.run_mind))
     if manager:
         tasks.append(manager.run())
+    if getattr(live, "clips", None):
+        tasks.append(supervised("clips", lambda: live.clips.run(live, args.port), backoff=60))
     try:
         await asyncio.gather(*tasks)
     finally:

@@ -5,8 +5,10 @@ COPY requirements-server.txt .
 ENV PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 BROWSE=1
 # Chromium outside /root, so uid 1000 can start it
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# #59: ffmpeg (H.264) + DejaVu fonts for the daily clips (clips.py renders in nice'd children)
 RUN pip install --no-cache-dir -r requirements-server.txt \
  && python -m playwright install --with-deps --only-shell chromium \
+ && apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 # #18: the server and Chromium run as sub01 (uid 1000), so Chromium can keep its sandbox. The image still starts as root:
 # entrypoint.sh hands the root-owned /data volume to uid 1000 and drops privileges with setpriv (util-linux, already in
@@ -17,7 +19,7 @@ RUN chmod 755 /usr/local/bin/sub01-entrypoint \
  && useradd --uid 1000 --user-group --create-home --shell /usr/sbin/nologin sub01 \
  && mkdir -p /data/frames && chown -R 1000:1000 /data
 COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py \
-     runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py costs.py chess_game.py ./
+     runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py costs.py chess_game.py clips.py ./
 COPY twin ./twin
 COPY spiking ./spiking
 COPY web ./web
