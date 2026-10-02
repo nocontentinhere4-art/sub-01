@@ -53,3 +53,7 @@ jobs:
       - run: python tests/smoke_demo.py --port 8766 --data-dir "$RUNNER_TEMP/torn" --torn-state --measure 3
         env:
           BROWSE: "0"
+      # issue #33: the day plan (brain clone vote) and chat replies run while the tick cost is measured (60x clock)
+      - run: python tests/smoke_demo.py --port 8767 --data-dir "$RUNNER_TEMP/mind" --mind --measure 40
+        env:
+          BROWSE: "0"
