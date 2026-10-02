@@ -31,6 +31,16 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `Dockerfile` must copy every runtime module (currently also `diary.py research.py browse.py`) and installs Chromium
   (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
   multi-threaded BLAS spins when Chromium shares the CPU.
+- Live feed: plain `/ws` = 20 ticks/s with per-region activity (brain page); the room connects with `/ws?rate=5&lite=1`
+  (5/s, no `act`, trades/events of skipped ticks kept). Room: shadow maps updated by hand (~30/s), DPR capped at 1.5
+  with adaptive resolution, nothing rendered while the tab is hidden; brain `?mini` draws 1/6 of the fibres at ≤30 fps.
+- Room model: `web/room/room_clean.glb` (3.9 MB) is a clean rebuild — modelled in Blender by `room_build/build_room.py`
+  (headless Blender 4.2), Poly Haven CC0 props/textures, AO baked into a second UV set; credits in `web/room/CREDITS.md`.
+  Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
+- Phone grip: while he uses the phone his `RightHand` bone is collapsed into the sleeve and `web/room/hand_phone.glb`
+  (a hand gripping a phone, Higgsfield GPT Image + Tripo H3.1, 129 KB) is attached at the wrist; the live screen sits on its glass.
+- Phone pose: one-handed grip; right arm/neck/head from `web/room/boy_text.glb` (Meshy `Texting_Walk_inplace` #676,
+  re-rigged on the same skeleton via Higgsfield, 8 credits) blended into frozen sit/idle poses (`phone_sit`, `phone_stand`).
 - Chromium runs as root in the image, so its own sandbox is off (`--no-sandbox`); running the server as a non-root user
   would turn it back on (needs `/data` volume ownership checked on Railway).
 

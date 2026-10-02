@@ -6,54 +6,82 @@
 <title>SUB-01 · room</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  :root { --bg:#08080b; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
-          --card:rgba(10,10,16,.78); }
+  :root { --bg:#08080b; --fg:#ececf2; --dim:#8f8fa3; --faint:#5c5c72; --line:rgba(255,255,255,.08); --or:#ff6a00; --st:#ff9a3c;
+          --card:rgba(12,12,18,.72); --card2:rgba(12,12,18,.86); --glass:blur(14px) saturate(1.2); }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; -webkit-font-smoothing:antialiased; }
   a { color:inherit; }
   #scene { position:fixed; inset:0; }
   #scene canvas { display:block; }
+  /* a soft vignette and a touch of grain: a cheap, pure-CSS "lens" over the render */
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:2;
+    background:radial-gradient(ellipse at 52% 45%, transparent 48%, rgba(0,0,0,.42) 100%); }
   #top { position:fixed; left:28px; top:24px; max-width:min(620px, 56vw); pointer-events:none; z-index:5; }
   #top a, #top nav, #top button { pointer-events:auto; }
-  #brand { display:flex; align-items:center; gap:12px; }
-  #brand h1 { margin:0; font-size:22px; letter-spacing:.14em; background:var(--or); color:#0a0a0a; padding:2px 10px; }
-  #brand nav { font-size:12px; color:var(--dim); }
-  #brand nav a { color:inherit; text-decoration:none; margin-right:10px; }
+  #brand { display:flex; align-items:center; gap:14px; }
+  #brand h1 { margin:0; font-size:20px; letter-spacing:.16em; background:var(--or); color:#0a0a0a; padding:3px 10px 2px; border-radius:2px; }
+  #brand nav { font-size:12px; color:var(--dim); display:flex; gap:2px; }
+  #brand nav a { color:inherit; text-decoration:none; padding:4px 7px; border-radius:4px; transition:color .2s, background .2s; }
+  #brand nav a:hover { color:var(--fg); background:rgba(255,255,255,.06); }
   #brand nav a.on { color:var(--fg); }
-  #state { margin-top:20px; display:flex; align-items:center; gap:12px; font-size:13px; color:var(--dim); flex-wrap:wrap; }
-  #chip { color:#0a0a0a; background:#ff9a3c; padding:3px 9px; letter-spacing:.12em; font-size:12px; }
-  #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; }
-  #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; }
-  #story { margin-top:12px; font-size:26px; line-height:1.3; text-shadow:0 2px 20px #000; }
-  #story em { font-style:normal; color:#ff9a3c; }
-  #why { margin-top:8px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; }
-  #cam { margin-top:10px; background:rgba(10,10,16,.7); color:var(--dim); border:1px solid var(--line); border-radius:5px;
-    font:inherit; font-size:11px; padding:5px 9px; cursor:pointer; }
-  #cam.on { color:var(--fg); border-color:rgba(255,255,255,.25); }
+  #brand nav a.on::after { content:""; display:block; height:1px; margin-top:2px; background:var(--or); }
+  #state { margin-top:22px; display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--dim); flex-wrap:wrap; text-shadow:0 1px 8px #000; }
+  #chip { color:#0a0a0a; background:var(--st); padding:3px 9px 2px; letter-spacing:.14em; font-size:11px; border-radius:2px; transition:background 1.5s; }
+  #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; transition:background .4s; }
+  #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; animation:breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe { 50% { box-shadow:0 0 3px #39f5a0; } }
+  #story { margin-top:12px; font-size:27px; line-height:1.28; letter-spacing:-.01em; text-shadow:0 2px 24px #000, 0 1px 3px rgba(0,0,0,.8); min-height:1.3em; }
+  #story.in { animation:storyin .7s ease-out; }
+  @keyframes storyin { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+  #story em { font-style:normal; color:var(--st); }
+  #why { margin-top:9px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; max-width:52ch; line-height:1.5; }
+  #cam { margin-top:12px; background:rgba(10,10,16,.62); color:var(--dim); border:1px solid var(--line); border-radius:6px;
+    font:inherit; font-size:11px; padding:6px 10px; cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
+    transition:color .2s, border-color .2s; display:inline-flex; align-items:center; gap:7px; }
+  #cam::before { content:""; width:6px; height:6px; border-radius:50%; background:#4a4a58; }
+  #cam.on { color:var(--fg); border-color:rgba(255,255,255,.22); } #cam.on::before { background:var(--st); box-shadow:0 0 6px var(--st); }
 
   #side { position:fixed; right:24px; top:24px; width:350px; display:flex; flex-direction:column; gap:12px; z-index:5;
-    max-height:calc(100vh - 140px); overflow-y:auto; scrollbar-width:none; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px); }
-  .card .k { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; display:flex; justify-content:space-between; gap:8px; }
-  .card .t { font-size:15px; line-height:1.35; }
-  .card .m { font-size:12px; color:#c9c9d6; margin-top:6px; line-height:1.5; }
-  .card .s { font-size:10px; color:var(--faint); margin-top:8px; }
+    max-height:calc(100vh - 140px); overflow-y:auto; scrollbar-width:none; padding-bottom:4px; }
+  #side::-webkit-scrollbar { display:none; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:var(--glass);
+    -webkit-backdrop-filter:var(--glass); box-shadow:0 10px 30px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05); }
+  .card .k { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:9px; display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .card .k a { text-decoration:none; color:var(--faint); transition:color .2s; } .card .k a:hover { color:var(--fg); }
+  .card .t { font-size:14.5px; line-height:1.4; }
+  .card .m { font-size:12px; color:#c9c9d6; margin-top:6px; line-height:1.55; }
+  .card .s { font-size:10.5px; color:var(--faint); margin-top:8px; line-height:1.45; }
+  #screencard .frame { position:relative; border-radius:7px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 0 0 3px #101014, 0 0 38px -8px rgba(140,170,255,.30); }
+  #screencard .frame::after { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
+    background:linear-gradient(165deg, rgba(255,255,255,.07), transparent 38%); }
   .card .kw { font-size:11px; color:#c9c9d6; margin-top:10px; line-height:1.5; }
   .card .kw b { font-weight:400; color:var(--fg); }
   .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
     border-top:1px solid var(--line); font-size:11px; color:#c9c9d6; }
   .card .tn[hidden] { display:none; }
-  #memcard .it { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:4px 0; border-bottom:1px solid var(--line); }
+  .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
+  #memcard .it { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:5px 0; border-bottom:1px solid var(--line); }
+  #memcard .it:last-child { border-bottom:0; }
   #memcard .it span:last-child { flex:none; color:var(--dim); font-size:11px; white-space:nowrap; }
   #memcard .it .y { color:#39f5a0; } #memcard .it .n { color:#ff7a7a; }
-  .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
-  #screencard .frame { position:relative; border-radius:6px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12); }
+  .nm { display:flex; gap:8px; margin-top:8px; font-size:10px; color:var(--dim); }
+  .nm span { flex:1; } .nm i { display:block; height:4px; border-radius:2px; background:#2a2a36; margin-top:3px; overflow:hidden; }
+  .nm i i { margin:0; background:linear-gradient(90deg, #ff9a3c, #ffc27a); transition:width .6s; }
   #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
-  #screencard.phone .frame { width:190px; margin:0 auto; border-radius:22px; border:6px solid #15151b; box-shadow:0 0 0 1px rgba(255,255,255,.12); }
+  #screencard.phone .frame { width:176px; margin:2px auto 0; border-radius:26px; border:7px solid #111116;
+    box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 14px 30px -12px #000, 0 0 36px -10px rgba(140,170,255,.28); }
+  #screencard.phone .frame::before { content:""; position:absolute; left:50%; top:7px; width:48px; height:9px; margin-left:-24px; border-radius:6px; background:#0a0a0d; z-index:1; }
   #screencard.phone .frame img { aspect-ratio:390/844; object-fit:cover; object-position:top; }
-  #screencard .url { font-size:11px; color:var(--dim); margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #screencard .url { font-size:11px; color:var(--dim); margin-top:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #map { height:230px; border-radius:8px; overflow:hidden; background:#0d0e13; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
+  .darktiles { filter:invert(1) hue-rotate(180deg) brightness(.58) contrast(1.2) saturate(.32); }
+  .leaflet-container { background:#0d0e13 !important; font-family:inherit !important; }
+  .leaflet-control-attribution { background:rgba(8,8,11,.6) !important; color:#6a6a7e !important; font-size:9px !important; }
+  .leaflet-control-attribution a { color:#8f8fa3 !important; }
+  .mk-me { filter:drop-shadow(0 0 5px rgba(255,154,60,.9)); }
+  .mk-courier { filter:drop-shadow(0 0 5px rgba(57,245,160,.8)); }
   #screencard .opts { margin-top:10px; padding-top:8px; border-top:1px solid var(--line); }
   #screencard .opts .h { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
   #screencard .op { display:grid; grid-template-columns:1fr 64px 34px; gap:8px; align-items:center; font-size:11px; color:#a9a9b8; padding:2px 0; }
@@ -65,43 +93,54 @@
   #screencard .op .bar::after { content:""; position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:rgba(255,255,255,.25); }
   #screencard .op b { font-weight:400; text-align:right; color:var(--dim); }
   #screencard .restarting { padding:18px 0; text-align:center; color:var(--dim); font-size:12px; }
-  #map { height:230px; border-radius:8px; overflow:hidden; background:#111; }
-  .darktiles { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
   #mapcard.out #map { height:340px; }
-  #brainpip { position:fixed; left:28px; bottom:96px; width:min(300px, 26vw); aspect-ratio:4/3; border:1px solid var(--line); border-radius:10px;
-    overflow:hidden; background:#000; z-index:5; display:block; }
+  #brainpip { position:fixed; left:28px; bottom:96px; width:min(300px, 26vw); aspect-ratio:4/3; border:1px solid var(--line); border-radius:12px;
+    overflow:hidden; background:#000; z-index:5; display:block; box-shadow:0 10px 30px -14px rgba(0,0,0,.9); transition:border-color .25s; }
+  #brainpip:hover { border-color:rgba(255,255,255,.22); }
   #brainpip iframe { width:100%; height:100%; border:0; pointer-events:none; }
-  #brainpip span { position:absolute; left:8px; bottom:6px; font-size:10px; color:#bdbdca; text-shadow:0 1px 4px #000; }
-  #honest { position:fixed; left:28px; bottom:18px; right:420px; font-size:11px; color:var(--faint); line-height:1.5; z-index:5;
-    text-shadow:0 1px 6px #000; }
+  #brainpip span { position:absolute; left:10px; bottom:8px; font-size:10px; letter-spacing:.08em; color:#c6c6d4; text-shadow:0 1px 4px #000; }
+  #brainpip span::before { content:"◉ "; color:var(--st); }
+  #honest { position:fixed; left:28px; bottom:18px; right:420px; font-size:11px; color:var(--faint); line-height:1.55; z-index:5;
+    text-shadow:0 1px 6px #000; max-width:92ch; }
   #dock { position:fixed; right:24px; bottom:18px; width:350px; z-index:5; }
   #chat { display:flex; gap:6px; }
-  #chat input { flex:1; min-width:0; background:rgba(10,10,16,.88); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
-    font:inherit; font-size:13px; border-radius:6px; }
-  #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:6px; cursor:pointer; }
-  #note { font-size:10px; color:var(--faint); margin-top:4px; min-height:1.2em; }
+  #chat input { flex:1; min-width:0; background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
+    font:inherit; font-size:13px; border-radius:8px; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); transition:border-color .2s; }
+  #chat input:focus { outline:none; border-color:rgba(255,154,60,.6); }
+  #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:8px; cursor:pointer; }
+  #chat button:hover { background:#fff; }
+  #note { font-size:10px; color:var(--faint); margin-top:5px; min-height:1.2em; }
   #note.err { color:#ff8a8a; }
-  #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:14px; color:#d8d8e2; background:rgba(0,0,0,.55);
-    padding:10px 16px; border-radius:6px; display:none; z-index:4; text-align:center; }
-  #boot { position:fixed; inset:0; display:grid; place-items:center; color:var(--dim); font-size:12px; z-index:3; pointer-events:none; }
-  #boot .bar { width:220px; height:2px; background:rgba(255,255,255,.1); margin-top:10px; overflow:hidden; }
-  #boot .bar i { display:block; height:100%; width:0; background:var(--or); transition:width .2s; }
+  #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:13px; color:#d8d8e2; background:rgba(8,8,11,.6);
+    border:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
+    padding:10px 16px; border-radius:8px; display:none; z-index:4; text-align:center; }
+  #boot { position:fixed; inset:0; display:grid; place-items:center; color:var(--dim); font-size:12px; z-index:3; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 60%, #121218, #08080b 70%); transition:opacity .7s ease; }
+  #boot.off { opacity:0; }
+  #boot .w { font-size:34px; letter-spacing:.22em; color:var(--fg); margin-bottom:14px; text-align:center; }
+  #boot .w b { font-weight:normal; color:var(--or); }
+  #boot .bar { width:220px; height:2px; background:rgba(255,255,255,.1); margin-top:12px; overflow:hidden; border-radius:2px; }
+  #boot .bar i { display:block; height:100%; width:0; background:var(--or); transition:width .2s; box-shadow:0 0 8px var(--or); }
   #boot.err { pointer-events:auto; color:#ff9a9a; }
   #boot button { margin-top:10px; font:inherit; font-size:12px; background:var(--fg); color:#0a0a0a; border:0; padding:6px 12px; border-radius:5px; cursor:pointer; }
   @media (max-width: 900px) {
     html,body { overflow:auto; }
+    body { position:relative; }        /* body is the scroller: the scene and the header scroll away with the cards */
     #scene { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
-    #top { position:absolute; left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:18px; }
+    #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
+    #top { position:absolute; left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:19px; }
+    #brand h1 { font-size:16px; } #state { margin-top:14px; } #why { max-width:none; }
     #side { position:static; width:auto; max-height:none; margin:62vh 16px 0; }
     #brainpip { position:relative; left:auto; bottom:auto; width:auto; margin:12px 16px 0; }
-    #honest { position:static; padding:12px 16px 90px; }
-    #dock { left:16px; right:16px; width:auto; position:fixed; bottom:10px; }
+    #honest { position:static; padding:12px 16px 96px; max-width:none; }
+    #dock { left:12px; right:12px; width:auto; position:fixed; bottom:10px; }
+    #away { top:31vh; width:calc(100vw - 48px); }
   }
 </style>
 </head>
 <body>
-<div id="scene"></div>
-<div id="boot"><div><div id="boot-t">loading the room…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
+<div id="scene"></div><div id="vignette"></div>
+<div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
 <div id="top">
   <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
@@ -127,7 +166,7 @@
     <div class="t" id="r-title"></div>
     <div class="m" id="r-text"></div>
     <div class="kw" id="r-kw"></div>
-    <div class="tn" id="r-tn"><span>will it come back tonight?</span><b id="r-tonight">…</b></div>
+    <div class="tn" id="r-tn"><span>will it come back tonight?</span><b id="r-tonight" title="estimated chance it is replayed in REM tonight, with what memory holds now; chat messages from people weigh more">…</b></div>
     <div class="s" id="r-why"></div>
     <div class="s" id="r-note">What it reads becomes stimuli and dream material; it does not understand the text.</div>
   </div>
@@ -170,10 +209,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const DEBUG = new URLSearchParams(location.search).has("debug");
+// the room: a clean model built from separate objects with PBR materials and baked ambient occlusion (room_clean.glb);
+// ?room=old shows the earlier single-mesh scan with its lighting baked into the texture
+const OLD_ROOM = new URLSearchParams(location.search).get("room") === "old";
 const FIXED_HOUR = DEBUG && new URLSearchParams(location.search).get("hour");   // preview a time of day
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -181,12 +224,14 @@ const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t
 // ---------- renderer, scene, camera ----------
 const host = $("scene");
 const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
-renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+const DPR_MAX = Math.min(1.5, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, devicePixelRatio > 1 ? 1 : 0.75);   // adaptive, see adapt()
+let dpr = DPR_MAX;
+renderer.setPixelRatio(dpr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;          // shadow maps are redrawn only when needed, see shadows()
 renderer.setClearColor(0x08080b);
 host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
@@ -208,14 +253,19 @@ const hemi = new THREE.HemisphereLight(0xfff1dd, 0x1a1a24, 0.6); scene.add(hemi)
 const sun = new THREE.DirectionalLight(0xffe2c0, 1.0);        // daylight / moonlight through the window
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
 Object.assign(sun.shadow.camera, {left:-3, right:3, top:3, bottom:-3, near:0.5, far:20});
+sun.shadow.autoUpdate = false; sun.shadow.needsUpdate = true;
 scene.add(sun, sun.target);
 const ceiling = new THREE.PointLight(0xffd9a8, 0, 7, 1.6);     // room light in the evening
 ceiling.position.set(0.1, 2.3, 0.1); scene.add(ceiling);
 const lamp = new THREE.PointLight(0xffb468, 0, 2.2, 1.8);      // desk lamp
 lamp.castShadow = true; lamp.shadow.mapSize.set(512, 512); lamp.shadow.bias = -0.002; scene.add(lamp);
+lamp.shadow.autoUpdate = false; lamp.shadow.needsUpdate = true;   // 6 cube faces: drawn only while the lamp is lit
 const monitorGlow = new THREE.PointLight(0xbcd4ff, 0, 1.8, 2);  // light from the monitor onto him
 const phoneGlow = new THREE.PointLight(0xcfe0ff, 0, 0.7, 2);    // light from the phone onto his face
 scene.add(monitorGlow, phoneGlow);
+// the clean room is lit for real: soft sky light comes in through the window (an area light the size of the glass)
+let skyLight = null;
+if (!OLD_ROOM) { RectAreaLightUniformsLib.init(); skyLight = new THREE.RectAreaLight(0xdfe8ff, 0, 1.5, 0.8); scene.add(skyLight); }
 
 // ---------- places measured on the room model (after fit(room, 4); floor at y = 0.16; ~1 unit = 1 m) ----------
 const F = 0.16;
@@ -227,15 +277,17 @@ const ANCHOR = {
   window:  {p:[-0.05, F, 0.25], r:-Math.PI / 2},     // standing, looking towards the window
   middle:  {p:[0.35, F, 0.05], r:0.6},
 };
-// surfaces on the baked model that get live content: centre, size (w x h), rotation about y (facing direction)
+// surfaces that get live content: centre, size (w x h), rotation about y (facing direction); `off`: how far in front of
+// the given centre the screen plane goes. These are the old model's (measured by ray casting); the clean room carries
+// them as named nodes (SURF_monitor, SURF_window, SURF_lamp) and readMarkers() replaces them when it loads
 const SURF = {
-  monitor: {c:[-1.097, 1.322, -1.172], w:0.68, h:0.40, ry:0.117, rx:-0.09},     // measured by ray casting on the model
+  monitor: {c:[-1.097, 1.322, -1.172], w:0.68, h:0.40, ry:0.117, rx:-0.09, off:0.045},
   window:  {c:[-1.872, 1.685, 0.14], w:1.48, h:0.80, ry:Math.PI / 2, mullion:0.44},
   lamp:    {c:[-1.42, 1.40, -1.15]},
 };
 const PLACE2ANCHOR = {bed:"bedside", desk:"desk", table:"desk", window:"window", door_in:"door", door_out:"door"};
 const ACT = {                                        // activity -> [anchor, clip]
-  sleep:["bedlie","sleep"], phone:["bedside","sit"], order_food:["middle","call"], research:["desk","sit"],
+  sleep:["bedlie","sleep"], phone:["bedside","phone_sit"], order_food:["middle","phone_stand"], research:["desk","sit"],
   chart:["desk","sit"], eat:["desk","eat"], window:["window","idle"], get_delivery:["door","door"],
 };
 
@@ -258,12 +310,51 @@ function fit(obj, size){ const b = new THREE.Box3().setFromObject(obj), s = new 
   const b2 = new THREE.Box3().setFromObject(obj), c = new THREE.Vector3(); b2.getCenter(c);
   obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= b2.min.y; }
 
-load("room/room.glb").then(g => {
-  room = g.scene; fit(room, 4); scene.add(room);
-  room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = false; roomMats.push(o.material);
-    o.material.envMapIntensity = 0.25; if (o.material.map) o.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); } });
-  $("boot").remove(); buildSurfaces();
+load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
+  room = g.scene; scene.add(room);
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  if (OLD_ROOM) {
+    fit(room, 4);
+    room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = false; roomMats.push(o.material);
+      o.material.envMapIntensity = 0.25; if (o.material.map) o.material.map.anisotropy = aniso; } });
+  } else {
+    // authored in world units (floor top at y = F): no fitting. The static room casts shadows too, so the sun only comes
+    // in through the window; the desk lamp's own shade must not shadow the lamp's light.
+    readMarkers(room);
+    // the model is cut open (no ceiling, no front or right wall); for the sun's shadow map close it with slabs that
+    // only cast shadows (they write neither colour nor depth), so daylight enters through the window alone
+    const shell = new THREE.Mesh(mergeBoxes([[[-2.05, 2.05], [2.39, 2.47], [-1.65, 1.65]], [[-2.05, 2.05], [0, 2.47], [1.6, 1.66]], [[2.0, 2.06], [0, 2.47], [-1.65, 1.65]]]),
+      new THREE.MeshBasicMaterial({colorWrite:false, depthWrite:false}));
+    shell.castShadow = true; shell.receiveShadow = false; shell.name = "shadow_shell"; scene.add(shell);
+    room.traverse(o => { if (!o.isMesh) return;
+      const lampPart = /desk_lamp/i.test(o.name) || /desk_lamp/i.test(o.parent && o.parent.name || "");
+      o.receiveShadow = true; o.castShadow = !lampPart;
+      const m = o.material; if (!roomMats.includes(m)) roomMats.push(m);
+      m.envMap = scene.environment;   // set explicitly: only then does three.js honour the envMapIntensity set in lighting()
+      for (const k of ["map", "normalMap", "roughnessMap"]) if (m[k]) m[k].anisotropy = Math.min(8, aniso);
+    });
+  }
+  $("boot").classList.add("off"); setTimeout(() => $("boot").remove(), 800); buildSurfaces();
 }).catch(bootError);
+function mergeBoxes(list){           // axis-aligned boxes [[x0,x1],[y0,y1],[z0,z1]] -> one geometry
+  const pos = [], idx = [];
+  for (const [[x0, x1], [y0, y1], [z0, z1]] of list) {
+    const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    const base = pos.length / 3; pos.push(...g.attributes.position.array); idx.push(...g.index.array.map(i => i + base));
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); return g;
+}
+// the clean room names the places that get live content; read them (world space) into SURF
+function readMarkers(root){
+  root.updateMatrixWorld(true);
+  const get = n => root.getObjectByName(n), p = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const mon = get("SURF_monitor"), win = get("SURF_window"), lmp = get("SURF_lamp");
+  if (mon) { mon.getWorldPosition(p); e.setFromQuaternion(mon.getWorldQuaternion(q), "YXZ"); const x = mon.userData;
+    SURF.monitor = {c:p.toArray(), w:x.w, h:x.h, ry:e.y, rx:e.x, off:0.001}; }
+  if (win) { win.getWorldPosition(p); e.setFromQuaternion(win.getWorldQuaternion(q), "YXZ"); const x = win.userData;
+    SURF.window = {c:p.toArray(), w:x.w, h:x.h, ry:e.y, mullion:x.mullion ?? -1}; }
+  if (lmp) SURF.lamp = {c:lmp.getWorldPosition(p).toArray()};
+}
 
 load("room/boy.glb").then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
@@ -278,12 +369,29 @@ load("room/boy.glb").then(g => {
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
   scene.add(phone);
-  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", call:"boy_call", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
+  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
     load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
 }).catch(bootError);
-function addClips(name, clips){ if (!clips || !clips.length || !mixer) return; actions[name] = mixer.clipAction(clips[0]); if (want) play(want); }
+const clips = {};
+// "hold" is a static upper-body pose (right arm, neck, head) taken from a texting animation on the same rig: it replaces
+// those bones of the sitting / standing idle clips; the left arm keeps the idle pose (resting on his knee / hanging)
+function addClips(name, list){
+  if (!list || !list.length || !mixer) return; clips[name] = list[0]; if (name !== "hold") actions[name] = mixer.clipAction(list[0]);
+  const h = clips.hold && clips.hold.tracks, own = h && new Set(h.map(t => t.name));
+  if (h) for (const [n, b] of [["phone_sit", "sit"], ["phone_stand", "idle"]]) if (clips[b] && !actions[n]) {
+    // still poses: the sit clip is a "thinker" idle (hunches, chin on hand), the idle clip looks around; holdPhone() breathes
+    const base = n === "phone_sit" ? still(clips.sit, 0.5, 4, tr => tr.startsWith("Left") ? 0.1 : 0.35) : still(clips.idle, 0.2, 0.2, () => 0);
+    actions[n] = mixer.clipAction(new THREE.AnimationClip(n, 1, [...base.filter(t => !own.has(t.name)), ...h]));
+  }
+  if (want) play(want);
+}
+function still(clip, t0, t1, kOf){                  // a still pose between two moments of a clip (k = 0: at t0, 1: at t1; per track)
+  return clip.tracks.map(tr => { const i = tr.createInterpolant(), a = i.evaluate(t0).slice(), b = i.evaluate(t1).slice(), k = kOf(tr.name);
+    if (tr instanceof THREE.QuaternionKeyframeTrack) THREE.Quaternion.slerpFlat(a, 0, a, 0, b, 0, k); else for (let j = 0; j < a.length; j++) a[j] += (b[j] - a[j]) * k;
+    return new tr.constructor(tr.name, [0, 1], [...a, ...a]); });
+}
 function play(name){
-  want = name; const a = actions[name] || actions.idle || actions.sit; if (!a || a === current) return;
+  want = name; const a = actions[name] || actions[{phone_sit:"sit", phone_stand:"idle"}[name]] || actions.idle || actions.sit; if (!a || a === current) return;
   a.reset().fadeIn(0.4).play(); if (current) current.fadeOut(0.4); current = a;
 }
 
@@ -296,8 +404,9 @@ const offMat = new THREE.MeshStandardMaterial({color:0x050608, roughness:0.15, m
 function makeScreen(w, h){
   const on = new THREE.MeshBasicMaterial({color:0xffffff, toneMapped:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), offMat);
-  return {mesh, on, tex:null, id:null, aspect:w / h,
-    set(tex){ if (this.tex && this.tex !== tex) this.tex.dispose(); this.tex = tex; this.on.map = tex; this.on.needsUpdate = true; this.mesh.material = this.on; },
+  return {mesh, on, tex:null, id:null, aspect:w / h, glow:null,
+    set(tex){ if (this.tex && this.tex !== tex) this.tex.dispose(); this.tex = tex; this.on.map = tex; this.on.needsUpdate = true; this.mesh.material = this.on;
+      if (tex.image) this.glow = glowOf(tex.image); },
     off(){ this.mesh.material = offMat; this.id = null; }};
 }
 let monitor = null, sky = null;
@@ -309,11 +418,17 @@ function buildSurfaces(){
   const m = SURF.monitor;
   monitor = makeScreen(m.w, m.h);
   monitor.mesh.rotation.set(m.rx, m.ry, 0, "YXZ"); monitor.mesh.position.set(...m.c);
-  monitor.mesh.position.add(new THREE.Vector3(0, 0, 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
+  monitor.mesh.position.add(new THREE.Vector3(0, 0, m.off ?? 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
   monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
   const w = SURF.window;
   sky = new THREE.Mesh(new THREE.PlaneGeometry(w.w, w.h), skyMaterial);
   sky.position.set(...w.c); sky.rotation.y = w.ry; scene.add(sky);
+  skyMaterial.uniforms.uAspect.value = w.w / w.h; skyMaterial.uniforms.uMullion.value = w.mullion;
+  if (skyLight) {                    // just inside the glass, shining into the room
+    skyLight.width = w.w; skyLight.height = w.h;
+    skyLight.position.set(...w.c).add(new THREE.Vector3(0, 0, 0.12).applyAxisAngle(UP, w.ry));
+    skyLight.lookAt(skyLight.position.clone().add(new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, w.ry)));
+  }
   const L = SURF.lamp; lamp.position.set(...L.c);
   if (DEBUG) for (const k of Object.keys(SURF)) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({color:0xff00ff}));
     d.position.set(...SURF[k].c); scene.add(d); }
@@ -322,15 +437,37 @@ function buildSurfaces(){
 // the phone: a real object in his right hand; its screen shows the page he is on
 const phone = new THREE.Group();
 {
-  const body = new THREE.Mesh(new RoundedBoxGeometry(0.074, 0.152, 0.008, 4, 0.008),
+  const body = new THREE.Mesh(new RoundedBoxGeometry(0.078, 0.162, 0.008, 4, 0.008),
     new THREE.MeshStandardMaterial({color:0x1b1c22, roughness:0.35, metalness:0.6}));
   body.castShadow = true; phone.add(body);
-  phone.userData.screen = makeScreen(0.068, 0.146);
+  phone.userData.screen = makeScreen(0.072, 0.156);
   phone.userData.screen.mesh.position.z = 0.0042; phone.add(phone.userData.screen.mesh);
+  phone.userData.size = [0.078, 0.162, 0.008];
   phone.visible = false;
 }
-// holding the phone: the phone floats in front of his chest, facing his eyes; both arms reach it (two-bone IK)
+// a right hand gripping a phone, one rigid mesh (generated: GPT Image 2.5 picture -> Tripo H3.1, baked into phone space:
+// origin at the phone's centre, +y its top, +z out of the screen). While he holds the phone it replaces his own hand
+// (the rig has no finger bones) and the phone body; our screen plane lies on its glass. `wrist` is where his wrist bone
+// goes (2 cm inside the cut, which hides in the sleeve), `fore` the direction the forearm leaves the hand.
+const HAND = {size:[0.0765, 0.155, 0.0203], wrist:new THREE.Vector3(0.0658, -0.1105, 0.0058), fore:new THREE.Vector3(0.746, -0.666, 0.028).normalize(), mesh:null};
+load("room/hand_phone.glb").then(g => {
+  const m = HAND.mesh = g.scene, [w, h, d] = HAND.size, s = phone.userData.screen;
+  m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; Object.assign(o.material, {roughness:0.7, metalness:0, envMapIntensity:0.5}); o.material.color.set(0xf4e8e4); } });   // a touch paler, like his face
+  phone.add(m); phone.children[0].visible = false; phone.userData.size = HAND.size;
+  // our screen on its glass, narrow enough to clear the fingertips that curl over its left edge
+  s.mesh.geometry.dispose(); s.mesh.geometry = new THREE.PlaneGeometry(w * 0.84, h * 0.93); s.aspect = 0.84 * w / (0.93 * h); s.mesh.position.z = d / 2 + 0.0006;
+}).catch(() => {});
+// holding the phone in his right hand: the phone sits in front of his chest facing his eyes; the right arm starts from
+// the "hold" pose and a two-bone IK puts the wrist where the gripping HAND needs it. Until that model has loaded
+// (or if it fails), his own hand is turned so that the phone lies on the palm
+// with the fingers running diagonally up behind it. The rig has no finger bones (the hand mesh is rigid and slightly
+// cupped), so the phone is lifted off the palm just enough that no hand vertex is inside it or in front of the screen
+const GRIP = {fwd:0.32, down:0.19, side:0.03, diag:0.3, curl:0.1, reach:0.095, gap:0.002, look:0.7};
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _H = new THREE.Vector3(), _D = new THREE.Vector3(), _N = new THREE.Vector3();
+const _K = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _eye = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3();
+const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _hy = new THREE.Vector3(), _hz = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _qh = new THREE.Quaternion();
 function aimBone(bone, from, to){                    // rotate `bone` so that the point `from` (world) moves towards `to`
   bone.getWorldPosition(_a);
   _b.subVectors(from, _a).normalize(); _c.subVectors(to, _a).normalize();
@@ -340,74 +477,149 @@ function aimBone(bone, from, to){                    // rotate `bone` so that th
   bone.updateMatrixWorld(true);
 }
 function reach(upper, lower, end, target, pole){
-  const S = upper.getWorldPosition(new THREE.Vector3()), E = lower.getWorldPosition(new THREE.Vector3()), H = end.getWorldPosition(new THREE.Vector3());
-  const a = S.distanceTo(E), b = E.distanceTo(H), toT = new THREE.Vector3().subVectors(target, S);
-  const d = clamp(toT.length(), Math.abs(a - b) + 1e-3, a + b - 1e-3); toT.normalize();
+  upper.getWorldPosition(_S); lower.getWorldPosition(_E); end.getWorldPosition(_H);
+  const a = _S.distanceTo(_E), b = _E.distanceTo(_H); _D.subVectors(target, _S);
+  const d = clamp(_D.length(), Math.abs(a - b) + 1e-3, a + b - 1e-3); _D.normalize();
   const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
-  const perp = new THREE.Vector3().subVectors(pole, S); perp.addScaledVector(toT, -perp.dot(toT)).normalize();
-  const E2 = S.clone().addScaledVector(toT, x).addScaledVector(perp, h);
-  aimBone(upper, E, E2);
-  aimBone(lower, end.getWorldPosition(new THREE.Vector3()), target);
+  _N.subVectors(pole, _S).addScaledVector(_D, -_N.dot(_D)).normalize();
+  _K.copy(_S).addScaledVector(_D, x).addScaledVector(_N, h);
+  aimBone(upper, _E, _K);
+  end.getWorldPosition(_H); aimBone(lower, _H, target);
 }
+function setWorldQuat(bone, q){ bone.parent.getWorldQuaternion(_q).invert(); bone.quaternion.copy(_q.multiply(q)); bone.updateMatrixWorld(true); }
 const UP = new THREE.Vector3(0, 1, 0);
-function holdPhone(){
-  const B = bones; if (!B.RightArm || !B.LeftArm || !head) return;
-  boy.updateMatrixWorld(true);
-  const ry = boy.rotation.y, fwd = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry));
-  const hp = head.getWorldPosition(new THREE.Vector3());
-  const sR = B.RightArm.getWorldPosition(new THREE.Vector3()), sL = B.LeftArm.getWorldPosition(new THREE.Vector3());
-  const side = new THREE.Vector3().subVectors(sR, sL).normalize();
-  const P = hp.clone().addScaledVector(UP, -0.36).addScaledVector(fwd, 0.30);
-  phone.position.copy(P); phone.lookAt(hp); phone.rotateX(-0.25);
-  phone.updateMatrixWorld(true);
-  const down = UP.clone().negate();
-  for (const [s, sh] of [[1, sR], [-1, sL]]) {
-    const pre = s > 0 ? "Right" : "Left";
-    const T = P.clone().addScaledVector(side, 0.042 * s).addScaledVector(down, 0.05).addScaledVector(fwd, -0.01);
-    const pole = sh.clone().addScaledVector(down, 0.5).addScaledVector(side, 0.35 * s).addScaledVector(fwd, -0.2);
-    reach(B[pre + "Arm"], B[pre + "ForeArm"], B[pre + "Hand"], T, pole);
+// the hand's vertices in RightHand bone space (bind pose, cm): the hand and the forearm skin right at the wrist
+let handCloud = null;
+const grip = {key:"", w:new THREE.Vector3()}, _qp = new THREE.Quaternion();
+function handVertices(){
+  let sm = null; boy.traverse(o => { if (o.isSkinnedMesh && !sm && o.skeleton.bones.includes(bones.RightHand)) sm = o; });
+  const sk = sm.skeleton, P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
+  const hi = sk.bones.indexOf(bones.RightHand), fi = sk.bones.indexOf(bones.RightForeArm), out = [];
+  _m.multiplyMatrices(sk.boneInverses[hi], sm.bindMatrix);
+  for (let i = 0; i < P.count; i++) {
+    let b = -1, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
+    if (b !== hi && b !== fi) continue;
+    _a.fromBufferAttribute(P, i).applyMatrix4(_m); if (b === hi || _a.length() < 5) out.push(_a.x, _a.y, _a.z);
   }
-  // look down at it
-  const n = B.Neck || B.neck; head.rotateX(0.25); if (n) n.rotateX(0.15); head.updateMatrixWorld(true);
+  return new Float32Array(out);
+}
+// where the wrist goes in phone space so that the phone lies on the palm: along the fingers from the phone's centre,
+// and back from its rear face by the highest hand vertex under its outline, plus a gap (only when GRIP changes)
+function wristOnPhone(){
+  const G = GRIP, s = bones.RightHand.getWorldScale(_b).x, key = `${G.diag} ${G.curl} ${G.reach} ${G.gap} ${s.toFixed(5)}`;
+  if (key === grip.key) return grip.w;
+  handCloud = handCloud || handVertices();
+  _qp.copy(phone.quaternion).invert().multiply(_qh);                              // hand rotation in phone space
+  const [w, h, d] = phone.userData.size, hw = w / 2 + 0.003, hh = h / 2 + 0.003, C = handCloud;
+  _b.set(0, G.reach, 0).applyQuaternion(_qp); grip.w.set(-_b.x, -_b.y, 0);
+  let top = -Infinity;
+  for (let i = 0; i < C.length; i += 3) { _a.set(C[i], C[i + 1], C[i + 2]).multiplyScalar(s).applyQuaternion(_qp);
+    if (Math.abs(grip.w.x + _a.x) < hw && Math.abs(grip.w.y + _a.y) < hh) top = Math.max(top, _a.z); }
+  grip.w.z = -d / 2 - G.gap - (isFinite(top) ? top : 0); grip.key = key; return grip.w;
+}
+function holdPhone(){
+  const B = bones, G = GRIP, t = performance.now() / 1000; if (!B.RightArm || !B.LeftArm || !head) return;
+  if (B.Spine01) B.Spine01.rotateX(0.012 * Math.sin(t * 1.6));                    // breathing (the poses are still)
+  boy.updateMatrixWorld(true);
+  B.RightArm.getWorldPosition(_r).sub(B.LeftArm.getWorldPosition(_a)).setY(0).normalize(); _f.crossVectors(UP, _r);   // his right, facing
+  (B.headfront || head).getWorldPosition(_eye).addScaledVector(UP, 0.02);
+  B.RightArm.getWorldPosition(_c).add(_a).multiplyScalar(0.5);                    // between the shoulders
+  phone.position.copy(_c).addScaledVector(_f, G.fwd + 0.006 * Math.sin(t * 0.7)).addScaledVector(UP, -G.down + 0.005 * Math.sin(t * 0.43))
+    .addScaledVector(_r, G.side);
+  phone.lookAt(_eye); phone.updateMatrixWorld(true);
+  _x.setFromMatrixColumn(phone.matrixWorld, 0); _y.setFromMatrixColumn(phone.matrixWorld, 1); _z.setFromMatrixColumn(phone.matrixWorld, 2);
+  // hand frame (measured on the skinned mesh): +y runs along the fingers, +z is the palm (the fingers curl that way)
+  _hy.copy(_y).addScaledVector(_x, -G.diag).addScaledVector(_z, -G.curl).normalize();
+  _hz.copy(_z).addScaledVector(_hy, -_hy.dot(_z)).normalize();
+  _D.crossVectors(_hy, _hz); _m.makeBasis(_D, _hy, _hz); _qh.setFromRotationMatrix(_m);
+  const W = HAND.mesh ? HAND.wrist : wristOnPhone();                               // the wrist, in phone space
+  phone.localToWorld(_T.copy(W));
+  if (HAND.mesh) _P.copy(HAND.fore).applyQuaternion(phone.quaternion).multiplyScalar(0.3).add(_T).addScaledVector(UP, -0.2);   // elbow along the forearm
+  else B.RightArm.getWorldPosition(_P).addScaledVector(UP, -0.5).addScaledVector(_r, 0.25).addScaledVector(_f, -0.1);   // elbow down, a little out
+  reach(B.RightArm, B.RightForeArm, B.RightHand, _T, _P);
+  setWorldQuat(B.RightHand, _qh);
+  if (HAND.mesh) B.RightHand.scale.setScalar(0.001);                              // his own hand folds away into the sleeve
+  // the arm may fall short: hang the phone on the hand where it actually is
+  B.RightHand.getWorldPosition(phone.position).sub(_T.copy(W).applyQuaternion(phone.quaternion)); phone.updateMatrixWorld(true);
+  // look at the screen: the face looks along (0, 1, 1) of the head bone (its bind frame is pitched 45°; cm): turn it part of the way
+  head.localToWorld(_E.set(0, 30, 30)); head.getWorldPosition(_S);
+  _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look); aimBone(head, _E, _T);
 }
 
 // window: the sky over Tokyo follows the clock (day, dusk, night with stars and lit windows)
+// one small plane, so the shader can afford a few octaves of noise for the clouds
 const skyMaterial = new THREE.ShaderMaterial({
-  uniforms:{ uSun:{value:0.5}, uTime:{value:0}, uRain:{value:0} },
+  uniforms:{ uSun:{value:0.5}, uTime:{value:0}, uRain:{value:0}, uHour:{value:12.0}, uAspect:{value:SURF.window.w / SURF.window.h}, uMullion:{value:SURF.window.mullion} },
   toneMapped:false,
   vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader:`
-    varying vec2 vUv; uniform float uSun; uniform float uTime;
+    varying vec2 vUv; uniform float uSun; uniform float uTime; uniform float uHour; uniform float uAspect; uniform float uMullion;
     float h1(float x){ return fract(sin(x * 127.1) * 43758.5453); }
     float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }
+    float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int k = 0; k < 4; k++) { v += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }
+    float disc(vec2 p, vec2 c, float r){ return smoothstep(r, r * 0.72, length(p - c)); }
     void main(){
-      float day = smoothstep(-0.08, 0.25, uSun), dusk = (1.0 - abs(uSun - 0.02) / 0.22); dusk = clamp(dusk, 0.0, 1.0);
-      vec3 top = mix(vec3(0.01, 0.015, 0.05), vec3(0.32, 0.55, 0.86), day);
-      vec3 hor = mix(vec3(0.06, 0.07, 0.14), vec3(0.78, 0.86, 0.93), day);
-      hor = mix(hor, vec3(1.0, 0.55, 0.3), dusk * 0.8); top = mix(top, vec3(0.2, 0.22, 0.45), dusk * 0.5);
-      vec3 col = mix(hor, top, smoothstep(0.25, 1.0, vUv.y));
-      // stars
-      vec2 g = floor(vUv * vec2(90.0, 110.0));
-      float st = step(0.992, h2(g)) * (1.0 - day) * smoothstep(0.45, 0.8, vUv.y) * (0.6 + 0.4 * sin(uTime * 2.0 + h2(g) * 30.0));
-      col += vec3(st);
-      // the city: blocks of buildings, lit windows at night, haze by day
-      float x = vUv.x * 14.0, cell = floor(x);
-      float bh = 0.12 + 0.30 * h1(cell) + (abs(cell - 9.0) < 0.5 ? 0.22 : 0.0);
-      float bh2 = 0.08 + 0.18 * h1(cell + 40.0);
-      float back = step(vUv.y, bh2 + 0.12), front = step(vUv.y, bh);
-      vec3 bday = vec3(0.55, 0.62, 0.70), bnight = vec3(0.025, 0.03, 0.045);
-      vec3 bcol = mix(bnight, bday, day);
-      col = mix(col, mix(bcol, hor, 0.45), back * (1.0 - front));
-      if (front > 0.5) {
-        vec2 w = vec2(fract(x) * 6.0, vUv.y * 70.0), wc = floor(w) + cell * 13.0;
-        float win = step(0.25, fract(w.x)) * step(0.3, fract(w.y)) * step(0.55, h2(wc + floor(uTime / 40.0)));
-        vec3 lit = vec3(1.0, 0.82, 0.55) * (0.7 + 0.3 * h2(wc));
-        col = bcol + win * lit * (1.0 - day) * 0.9 + win * day * 0.04;
+      float ASPECT = uAspect;
+      vec2 p = vec2(vUv.x * ASPECT, vUv.y);                       // square units, so discs are round
+      float day = smoothstep(-0.08, 0.25, uSun);
+      float dusk = clamp(1.0 - abs(uSun - 0.02) / 0.22, 0.0, 1.0);
+      float night = 1.0 - smoothstep(-0.22, -0.02, uSun);
+      // --- sky: three bands, warmed at dusk
+      vec3 zen = mix(vec3(0.010, 0.016, 0.055), vec3(0.20, 0.44, 0.86), day);
+      vec3 mid = mix(vec3(0.035, 0.045, 0.11), vec3(0.52, 0.70, 0.92), day);
+      vec3 hor = mix(vec3(0.11, 0.09, 0.16), vec3(0.84, 0.89, 0.94), day);
+      hor = mix(hor, vec3(1.0, 0.50, 0.20), dusk * 0.85); mid = mix(mid, vec3(0.92, 0.52, 0.42), dusk * 0.45); zen = mix(zen, vec3(0.24, 0.20, 0.48), dusk * 0.55);
+      vec3 col = mix(hor, mid, smoothstep(0.0, 0.5, vUv.y)); col = mix(col, zen, smoothstep(0.45, 1.0, vUv.y));
+      col += vec3(0.30, 0.14, 0.07) * night * smoothstep(0.55, 0.0, vUv.y) * 0.55;        // the city's glow on the horizon
+      // --- stars (only at night, only high up, with a slow twinkle)
+      vec2 g = floor(p * vec2(60.0, 110.0));
+      float st = step(0.990, h2(g)) * night * smoothstep(0.35, 0.75, vUv.y) * (0.55 + 0.45 * sin(uTime * 1.7 + h2(g) * 40.0));
+      col += vec3(st) * (0.6 + 0.4 * h2(g + 3.0));
+      // --- sun by day, moon by night: each crosses the window once
+      float td = clamp((uHour - 5.6) / 12.2, 0.0, 1.0);                                   // 0 at sunrise, 1 at sunset
+      vec2 sunP = vec2(ASPECT * (0.12 + 0.76 * td), 0.30 + 0.62 * max(uSun, 0.0));
+      float sunVis = smoothstep(-0.06, 0.06, uSun);
+      vec3 sunCol = mix(vec3(1.0, 0.55, 0.25), vec3(1.0, 0.97, 0.90), smoothstep(0.0, 0.35, uSun));
+      float ds = length(p - sunP);
+      col += sunCol * sunVis * (disc(p, sunP, 0.042) * 1.4 + 0.34 / (1.0 + 45.0 * ds * ds) + 0.12 / (1.0 + 6.0 * ds * ds) * (0.4 + dusk));
+      float tn = fract((uHour - 17.8) / 12.2 + 1.0);                                       // 0 at sunset, 1 at sunrise
+      vec2 moonP = vec2(ASPECT * (0.15 + 0.70 * tn), 0.36 + 0.45 * sin(3.1416 * tn));
+      float dm = length(p - moonP);
+      float moon = disc(p, moonP, 0.030) * (1.0 - 0.92 * disc(p, moonP + vec2(0.013, 0.006), 0.027));   // a crescent
+      col += vec3(0.95, 0.97, 1.0) * night * moon + vec3(0.35, 0.40, 0.55) * night * 0.08 / (1.0 + 70.0 * dm * dm);
+      // --- clouds: slow, lit by the sun, barely there at night
+      float cn = fbm(p * vec2(1.9, 3.2) + vec2(uTime * 0.012, 0.0));
+      float cmask = smoothstep(0.50, 0.68, cn) * smoothstep(0.30, 0.62, vUv.y) * 0.85;
+      vec3 ccol = mix(vec3(0.06, 0.07, 0.11), vec3(0.98, 0.98, 1.0), day);
+      ccol = mix(ccol, vec3(1.0, 0.72, 0.52), dusk * 0.6);
+      col = mix(col, ccol, cmask);
+      // --- the city: a hazy far row, a near row with lit windows, and a tower with its aviation light
+      float cellB = floor(p.x * 13.0);
+      float hB = 0.16 + 0.12 * h1(cellB + 7.0) + 0.05 * h1(cellB * 3.0);
+      float cell = floor(p.x * 7.0 + 0.5 * h1(floor(p.x * 3.5)));
+      float hF = 0.06 + 0.22 * h1(cell) * (0.5 + 0.5 * h1(cell + 3.0));
+      float tx = ASPECT * 0.66, dtx = abs(p.x - tx);
+      float tower = max(step(dtx, 0.010) * step(vUv.y, 0.64), max(step(dtx, 0.024) * step(vUv.y, 0.40),
+                    max(step(dtx, 0.030) * step(abs(vUv.y - 0.43), 0.012), step(dtx, 0.022) * step(abs(vUv.y - 0.55), 0.010))));
+      float far = step(vUv.y, hB), near = max(step(vUv.y, hF), tower);
+      vec3 cday = vec3(0.56, 0.62, 0.70), cnight = vec3(0.020, 0.024, 0.040);
+      vec3 bfar = mix(mix(cnight * 1.6, cday, day), hor, 0.55 * day + 0.25 * night);
+      vec3 bnear = mix(cnight, cday * 0.85, day); bnear = mix(bnear, hor, 0.18 * day);
+      col = mix(col, bfar, far);
+      if (near > 0.5) {
+        vec2 w = vec2(p.x * 84.0, vUv.y * 70.0), wc = floor(w) + cell * 13.0;
+        float win = step(0.42, fract(w.x)) * step(0.45, fract(w.y)) * step(0.56, h2(wc)) * (1.0 - tower);
+        float warm = h2(wc + 11.0);
+        vec3 lit = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.80, 0.52), step(0.35, warm)) * (0.55 + 0.45 * h2(wc + 5.0));
+        float flick = 0.85 + 0.15 * step(0.5, h2(wc + floor(uTime / 23.0)));
+        col = bnear + win * lit * (1.0 - day) * flick + win * day * 0.05;
+        col += tower * vec3(0.9, 0.08, 0.05) * step(0.62, vUv.y) * night * (0.5 + 0.5 * step(0.5, fract(uTime * 0.6)));   // red light on top
       }
-      // the window's frame: the middle bar between the two panes
-      col = mix(col, vec3(0.05, 0.035, 0.025), step(abs(vUv.x - ${SURF.window.mullion.toFixed(3)}), 0.012));
-      // the city's glow on the horizon at night
-      col += vec3(0.25, 0.12, 0.06) * (1.0 - day) * smoothstep(0.5, 0.0, vUv.y) * 0.5;
+      // --- the window's frame: the middle bar, and a faint sheen on the glass
+      col += vec3(0.02, 0.022, 0.03) * smoothstep(0.6, 1.0, vUv.y) * (0.3 + 0.7 * day);
+      col = mix(col, vec3(0.05, 0.035, 0.025), step(abs(vUv.x - uMullion), 0.012));   // uMullion < 0: the model has real frames
       gl_FragColor = vec4(col, 1.0);
     }`,
 });
@@ -430,7 +642,10 @@ function showScreen(st){
   img.src = url;
   if (screenOn === st.device) panel(st);
 }
+let panelKey = null;
 function panel(st){
+  const key = st ? `${st.device}|${st.id}|${st.title}|${st.url}|${st.why}|${st.restarting ? 1 : 0}|${JSON.stringify(st.decision || null)}` : "";
+  if (key === panelKey) return; panelKey = key;
   const card = $("screencard");
   if (!st) { card.hidden = true; return; }
   card.hidden = false; card.classList.toggle("phone", st.device === "phone");
@@ -464,65 +679,142 @@ const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 600; c
 const pv = document.createElement("canvas"); pv.width = 390; pv.height = 844; const px = pv.getContext("2d");
 let cvTex = null, pvTex = null;
 function drawChart(){
-  cx.fillStyle = "#0b0d12"; cx.fillRect(0, 0, cv.width, cv.height);
-  cx.fillStyle = "#8a8fa3"; cx.font = "24px monospace"; cx.fillText("trade flow · last minutes (buys up, sells down)", 36, 54);
-  const now = Date.now() / 1000, W = cv.width - 72, H = cv.height - 160, y0 = 120 + H / 2;
-  cx.strokeStyle = "#232838"; cx.beginPath(); cx.moveTo(36, y0); cx.lineTo(36 + W, y0); cx.stroke();
-  for (const t of trades) { const x = 36 + W * (1 - (now - t.t) / 300); if (x < 36) continue;
-    const h = Math.min(H / 2, 12 + 24 * Math.log10(1 + t.usd)); cx.fillStyle = t.kind === "buy" ? "#39f5a0" : "#ff5a6e";
-    cx.fillRect(x - 3, t.kind === "buy" ? y0 - h : y0, 6, h); }
+  // a trading terminal: dark panel, grid, a time axis, buys up / sells down; no prices, no calls to action
+  const W = cv.width, H = cv.height, L = 60, R = W - 24, T = 92, B = H - 56, y0 = (T + B) / 2, now = Date.now() / 1000;
+  cx.fillStyle = "#0a0c11"; cx.fillRect(0, 0, W, H);
+  cx.fillStyle = "#11141b"; cx.fillRect(0, 0, W, 56);
+  cx.fillStyle = "#e6e8ef"; cx.font = "bold 22px monospace"; cx.fillText("TRADE FLOW", 24, 36);
+  cx.fillStyle = "#6f7488"; cx.font = "17px monospace"; cx.fillText("live · last 5 minutes · buys up, sells down", 190, 36);
+  const buys = trades.filter(t => t.kind === "buy").length, sells = trades.length - buys;
+  cx.textAlign = "right"; cx.fillStyle = "#39f5a0"; cx.fillText(`${buys} buys`, R - 110, 36); cx.fillStyle = "#ff5a6e"; cx.fillText(`${sells} sells`, R, 36); cx.textAlign = "left";
+  cx.strokeStyle = "#171a23"; cx.lineWidth = 1;
+  for (let i = 0; i <= 6; i++) { const y = T + (B - T) * i / 6; cx.beginPath(); cx.moveTo(L, y); cx.lineTo(R, y); cx.stroke(); }
+  cx.fillStyle = "#4b5064"; cx.font = "14px monospace"; cx.textAlign = "right";
+  for (let i = 0; i <= 5; i++) { const x = L + (R - L) * i / 5; cx.beginPath(); cx.moveTo(x, T); cx.lineTo(x, B); cx.stroke();
+    cx.fillText(`-${5 - i}m`, x + 14, B + 22); }
+  cx.textAlign = "left";
+  cx.strokeStyle = "#2a2f3f"; cx.beginPath(); cx.moveTo(L, y0); cx.lineTo(R, y0); cx.stroke();
+  for (const t of trades) { const x = L + (R - L) * (1 - (now - t.t) / 300); if (x < L) continue;
+    const h = Math.min((B - T) / 2 - 4, 10 + 26 * Math.log10(1 + t.usd)), buy = t.kind === "buy";
+    const g = cx.createLinearGradient(0, buy ? y0 - h : y0, 0, buy ? y0 : y0 + h);
+    g.addColorStop(0, buy ? "#39f5a0" : "#ff5a6e88"); g.addColorStop(1, buy ? "#39f5a088" : "#ff5a6e");
+    cx.fillStyle = g; cx.fillRect(x - 3, buy ? y0 - h : y0, 6, h); }
+  cx.fillStyle = "#39f5a0"; cx.fillRect(L - 46, T, 3, (B - T) / 2 - 2); cx.fillStyle = "#ff5a6e"; cx.fillRect(L - 46, y0 + 2, 3, (B - T) / 2 - 2);
+  cx.fillStyle = "#4b5064"; cx.font = "13px monospace"; cx.fillText("bar height = log(usd) · public trade feed · a picture of activity, not advice", 24, H - 16);
   if (!cvTex) { cvTex = screenTexture(cv); fitTop(cvTex, SURF.monitor.w / SURF.monitor.h); } cvTex.needsUpdate = true; return cvTex;
 }
+let chartAt = 0, chartDirty = true, foodKey = null;
+function chartTex(){                 // redraw when trades arrive, else twice a second (the bars scroll ~3 px/s)
+  const now = performance.now();
+  if (!cvTex || chartDirty || now - chartAt > 500) { chartDirty = false; chartAt = now; drawChart(); }
+  return cvTex;
+}
+function foodTex(c){                 // redraw only when the order changes
+  const k = c ? `${c.status}|${c.eta_min}` : "";
+  if (!pvTex || k !== foodKey) { foodKey = k; drawFood(c); }
+  return pvTex;
+}
 function drawReading(r){
+  // the article he is reading, laid out like the real page: sidebar, title in serif, infobox placeholder, two-column body
   const c = document.createElement("canvas"); c.width = 1100; c.height = 650; const g = c.getContext("2d");
   g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = "#f6f6f6"; g.fillRect(0, 0, c.width, 64); g.fillStyle = "#202122"; g.font = "22px serif"; g.fillText("WIKIPEDIA · The Free Encyclopedia", 28, 40);
-  g.font = "44px serif"; g.fillText(r.title.slice(0, 40), 40, 140); g.fillStyle = "#a2a9b1"; g.fillRect(40, 158, 1020, 1);
-  g.fillStyle = "#202122"; g.font = "24px sans-serif";
-  const words = (r.extract || "").split(" "); let line = "", y = 205;
-  for (const w of words) { if (g.measureText(line + w).width > 1000) { g.fillText(line, 40, y); line = ""; y += 36; if (y > 620) break; } line += w + " "; }
-  if (y <= 620) g.fillText(line, 40, y);
+  g.fillStyle = "#f8f9fa"; g.fillRect(0, 0, 176, c.height); g.fillStyle = "#a2a9b1"; g.fillRect(176, 0, 1, c.height);
+  g.fillStyle = "#202122"; g.font = "bold 26px serif"; g.fillText("WIKIPEDIA", 22, 48); g.fillStyle = "#54595d"; g.font = "12px sans-serif"; g.fillText("The Free Encyclopedia", 22, 66);
+  g.font = "14px sans-serif"; g.fillStyle = "#3366cc";
+  ["Main page", "Contents", "Current events", "Random article", "About Wikipedia", "Contact us"].forEach((s, i) => g.fillText(s, 22, 112 + i * 24));
+  g.fillStyle = "#f8f9fa"; g.fillRect(177, 0, 923, 44); g.fillStyle = "#a2a9b1"; g.fillRect(177, 44, 923, 1);
+  g.fillStyle = "#202122"; g.font = "14px sans-serif"; g.fillText("Article", 200, 28); g.fillStyle = "#3366cc"; g.fillText("Talk", 262, 28);
+  g.textAlign = "right"; g.fillText("Read   Edit   View history", 1070, 28); g.textAlign = "left";
+  g.fillStyle = "#000"; g.font = "32px serif"; g.fillText(r.title.slice(0, 48), 204, 92); g.fillStyle = "#a2a9b1"; g.fillRect(204, 104, 870, 1);
+  g.fillStyle = "#54595d"; g.font = "12px sans-serif"; g.fillText("From Wikipedia, the free encyclopedia", 204, 124);
+  g.fillStyle = "#f8f9fa"; g.fillRect(820, 140, 254, 300); g.strokeStyle = "#a2a9b1"; g.strokeRect(820.5, 140.5, 254, 300);
+  g.fillStyle = "#eaecf0"; g.fillRect(821, 141, 253, 30); g.fillStyle = "#202122"; g.font = "bold 14px sans-serif"; g.textAlign = "center";
+  g.fillText(r.title.slice(0, 26), 947, 161); g.textAlign = "left";
+  g.fillStyle = "#c8ccd1"; g.fillRect(836, 184, 222, 140);
+  for (let i = 0; i < 4; i++) { g.fillStyle = "#54595d"; g.font = "bold 12px sans-serif"; g.fillText("—", 834, 350 + i * 22); g.fillStyle = "#eaecf0"; g.fillRect(900, 340 + i * 22, 150, 10); }
+  g.fillStyle = "#202122"; g.font = "16px sans-serif";
+  const words = (r.extract || "").split(" "); let line = "", y = 158;
+  for (const w of words) { if (g.measureText(line + w).width > 590) { g.fillText(line, 204, y); line = ""; y += 25; if (y > 630) break; } line += w + " "; }
+  if (y <= 630) g.fillText(line, 204, y);
   const t = screenTexture(c); fitTop(t, SURF.monitor.w / SURF.monitor.h); return t;
 }
 function drawFood(c){
+  // a delivery app's tracking screen: header, big ETA, a map-like panel with the courier's route, order steps
   px.fillStyle = "#f6f4ef"; px.fillRect(0, 0, 390, 844);
-  px.fillStyle = "#111"; px.font = "bold 30px sans-serif"; px.fillText("Your order", 24, 90);
-  px.font = "20px sans-serif"; px.fillStyle = "#444"; px.fillText(c ? c.status : "choosing what to eat…", 24, 130);
-  if (c && c.eta_min) { px.fillStyle = "#111"; px.font = "bold 64px sans-serif"; px.fillText(`${c.eta_min} min`, 24, 230); }
-  px.fillStyle = "#d9d4c7"; px.fillRect(24, 280, 342, 300); px.fillStyle = "#06c167"; px.beginPath(); px.arc(120, 430, 14, 0, 7); px.fill();
-  px.fillStyle = "#111"; px.beginPath(); px.arc(270, 380, 10, 0, 7); px.fill();
-  px.fillStyle = "#666"; px.font = "16px sans-serif"; px.fillText("simulated delivery · Kichijōji", 24, 620);
+  px.fillStyle = "#06c167"; px.fillRect(0, 0, 390, 112);
+  px.fillStyle = "#fff"; px.font = "bold 20px sans-serif"; px.fillText("Your order", 24, 72); px.font = "13px sans-serif"; px.fillText("Kichijōji · simulated delivery", 24, 96);
+  px.fillStyle = "#111"; px.font = "bold 58px sans-serif";
+  px.fillText(c && c.eta_min ? `${c.eta_min} min` : "…", 24, 192);
+  px.font = "15px sans-serif"; px.fillStyle = "#555"; px.fillText(c ? c.status : "choosing what to eat…", 24, 222);
+  px.fillStyle = "#e9e5db"; px.fillRect(24, 250, 342, 300);
+  px.strokeStyle = "#f8f6f1"; px.lineWidth = 8; for (let i = 0; i < 5; i++) { px.beginPath(); px.moveTo(24, 290 + i * 60); px.lineTo(366, 300 + i * 55); px.stroke(); }
+  for (let i = 0; i < 4; i++) { px.beginPath(); px.moveTo(70 + i * 80, 250); px.lineTo(60 + i * 85, 550); px.stroke(); }
+  px.strokeStyle = "#06c167"; px.lineWidth = 4; px.setLineDash([8, 6]); px.beginPath(); px.moveTo(96, 468); px.lineTo(150, 420); px.lineTo(226, 392); px.lineTo(282, 334); px.stroke(); px.setLineDash([]);
+  px.fillStyle = "#06c167"; px.beginPath(); px.arc(96, 468, 11, 0, 7); px.fill(); px.fillStyle = "#fff"; px.beginPath(); px.arc(96, 468, 4, 0, 7); px.fill();
+  px.fillStyle = "#111"; px.beginPath(); px.arc(282, 334, 10, 0, 7); px.fill();
+  px.fillStyle = "#111"; px.font = "bold 12px sans-serif"; px.fillText("home", 298, 339);
+  const steps = ["order placed", "being prepared", "courier on the way", "delivered"], at = !c ? -1 : c.geo ? 2 : c.eta_min ? 1 : 0;
+  steps.forEach((s, i) => { const y = 596 + i * 38; px.fillStyle = i <= at ? "#06c167" : "#d6d2c8"; px.beginPath(); px.arc(36, y, 7, 0, 7); px.fill();
+    if (i < 3) { px.fillStyle = i < at ? "#06c167" : "#d6d2c8"; px.fillRect(34, y + 8, 4, 22); }
+    px.fillStyle = i <= at ? "#111" : "#999"; px.font = `${i === at ? "bold " : ""}15px sans-serif`; px.fillText(s, 60, y + 5); });
+  px.fillStyle = "#999"; px.font = "12px sans-serif"; px.fillText("Food orders and the courier are simulated.", 24, 790);
   if (!pvTex) { pvTex = screenTexture(pv); } pvTex.needsUpdate = true; return pvTex;
 }
+
+// the story line fades in whenever what he does changes (ticks rewrite it every second; only a new text restarts the fade)
+let storyWas = "";
+new MutationObserver(() => { const s = $("story"), t = s.textContent; if (t === storyWas) return; storyWas = t;
+  s.classList.remove("in"); void s.offsetWidth; s.classList.add("in"); }).observe($("story"), {childList:true});
 
 // ---------- camera: overview, or close to what he is looking at ----------
 let follow = true, userMovedAt = 0;
 $("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", follow); $("cam").textContent = follow ? "camera: follows him" : "camera: free"; };
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
-const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3();
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
 function updateCameraGoal(){
   if (screenOn === "desk" && monitor) {
     const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
     camGoal.target.set(...m.c);
     camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
-  } else if (screenOn === "phone" && phone.visible && head && bones.RightArm) {
-    // over his right shoulder, a little above and behind: his hands and the phone's screen in view
-    phone.getWorldPosition(v1); head.getWorldPosition(v2);
-    const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry));                       // facing
-    const side = bones.RightArm.getWorldPosition(new THREE.Vector3()).sub(bones.LeftArm.getWorldPosition(new THREE.Vector3())).setY(0).normalize();
-    camGoal.target.copy(v1).lerp(v2, 0.35);
-    camGoal.pos.copy(v2).addScaledVector(UP, 0.55).addScaledVector(side, 0.62).addScaledVector(v3, -0.5);
+  } else if (screenOn === "phone" && phone.visible && head) {
+    // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
+    phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
+    const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
+    camGoal.target.copy(v1).lerp(v2, 0.3);
+    camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
   } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
 }
 
 // ---------- day and night (from his Tokyo clock) ----------
 let hour = FIXED_HOUR ? +FIXED_HOUR : 12, stage = "AWAKE", lampOn = 0, roomOn = 0;
 const roomTint = new THREE.Color(), WHITE = new THREE.Color(1, 1, 1);
-const cSunDay = new THREE.Color(0xfff0dc), cSunDusk = new THREE.Color(0xff9a5c), cMoon = new THREE.Color(0x6f86c9);
+const cSunDay = new THREE.Color(0xfff0dc), cSunDusk = new THREE.Color(0xff9a5c), cMoon = new THREE.Color(0x7d93d8);
+const cNight = new THREE.Color(0.22, 0.27, 0.50), cWarm = new THREE.Color(1.0, 0.86, 0.68), cScreen = new THREE.Color(0xbcd4ff);
+const cSkyDay = new THREE.Color(0xe4ecff), cSkyDusk = new THREE.Color(0xffb27a);
+// the patch of light the window throws on the floor: a soft two-pane rectangle, additive, no extra light or shadow pass
+const pool = (() => {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 160; const g = c.getContext("2d");
+  g.fillStyle = "#fff"; try { g.filter = "blur(9px)"; } catch {}
+  g.fillRect(28, 26, 92, 108); g.fillRect(136, 26, 92, 108);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.6), new THREE.MeshBasicMaterial({map:t, transparent:true, opacity:0,
+    blending:THREE.AdditiveBlending, depthWrite:false, toneMapped:false}));
+  mesh.rotation.set(-Math.PI / 2, 0, Math.PI / 2); mesh.renderOrder = 1;
+  mesh.position.set(SURF.window.c[0] + 0.9, F + 0.004, SURF.window.c[2]); scene.add(mesh); return mesh;
+})();
+// what colour a screen throws on the room: the mean of its image, lifted so it reads as light
+const avgCv = document.createElement("canvas"); avgCv.width = avgCv.height = 8; const avgCx = avgCv.getContext("2d", {willReadFrequently:true});
+function glowOf(img){
+  try { avgCx.drawImage(img, 0, 0, 8, 8); const d = avgCx.getImageData(0, 0, 8, 8).data; let r = 0, g = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4, c = new THREE.Color(r / n / 255, g / n / 255, b / n / 255), hsl = {};
+    c.getHSL(hsl); return c.setHSL(hsl.h, Math.min(0.8, hsl.s * 1.4 + 0.1), 0.62 + 0.25 * hsl.l); }
+  catch { return null; }
+}
 function lighting(dt){
   const sunEl = Math.sin(Math.PI * (hour - 5.6) / 12.2);           // Tokyo, autumn: ~05:35 to ~17:45
-  skyMaterial.uniforms.uSun.value = sunEl;
+  skyMaterial.uniforms.uSun.value = sunEl; skyMaterial.uniforms.uHour.value = hour;
   const day = smooth(-0.08, 0.3, sunEl), dusk = clamp(1 - Math.abs(sunEl - 0.03) / 0.25, 0, 1);
   const awake = stage === "AWAKE", home = boy && boy.visible;
   const evening = awake && day < 0.55 && home;
@@ -530,20 +822,44 @@ function lighting(dt){
   const wantLamp = awake && home && (screenOn === "desk" || (current === actions.eat)) && day < 0.7;
   lampOn += ((wantLamp ? 1 : 0) - lampOn) * Math.min(1, dt * 3);
   sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
-  sun.intensity = 0.25 + 2.2 * day + 0.6 * dusk;
+  sun.intensity = 0.3 + 2.3 * day + 0.7 * dusk;
   const w = SURF.window; sun.position.set(w.c[0] - 3.5, w.c[1] + 1.2 + 2.5 * Math.max(0, sunEl), w.c[2] + 1.0); sun.target.position.set(0.2, 0.3, 0.1);
-  hemi.intensity = 0.15 + 0.55 * day + 0.35 * roomOn;
-  hemi.color.setHSL(0.09, 0.4, 0.6 + 0.2 * day);
-  ceiling.intensity = 4.0 * roomOn;
-  lamp.intensity = 2.4 * lampOn;
-  renderer.toneMappingExposure = 0.75 + 0.25 * day + 0.1 * roomOn;
-  // the textures have the light baked in: dim and cool them when the lights are off (night, asleep or out)
-  const screenLight = (monitor && monitor.mesh.material !== offMat ? 0.12 : 0) + (phone.visible ? 0.05 : 0);
-  const level = clamp(0.16 + 0.84 * day + 0.75 * roomOn + 0.22 * lampOn + screenLight + 0.15 * dusk, 0, 1);
-  roomTint.setRGB(0.3, 0.36, 0.62).lerp(WHITE, level);
-  for (const m of roomMats) m.color.copy(roomTint);
-  monitorGlow.intensity = monitor && monitor.mesh.material !== offMat ? 0.9 * (1.2 - day) : 0;
-  phoneGlow.intensity = phone.visible ? 0.35 * (1.3 - day) : 0;
+  hemi.intensity = 0.14 + 0.55 * day + 0.4 * roomOn;
+  hemi.color.setHSL(0.085, 0.45, 0.58 + 0.22 * day);
+  hemi.groundColor.setRGB(0.20, 0.13, 0.08).lerp(cNight, 1 - Math.max(day, roomOn));   // bounce off the wooden floor by day, blue at night
+  ceiling.intensity = 4.2 * roomOn;
+  lamp.intensity = 2.8 * lampOn;
+  renderer.toneMappingExposure = 0.74 + 0.28 * day + 0.1 * roomOn + 0.04 * lampOn;
+  if (OLD_ROOM) {
+    // the textures have the light baked in: dim and cool them when the lights are off (night, asleep or out),
+    // and warm them a little when the room light or the desk lamp is on, so the evening feels cosy rather than grey
+    const screenLight = (monitor && monitor.mesh.material !== offMat ? 0.12 : 0) + (phone.visible ? 0.05 : 0);
+    const level = clamp(0.15 + 0.85 * day + 0.75 * roomOn + 0.22 * lampOn + screenLight + 0.15 * dusk, 0, 1);
+    roomTint.copy(cNight).lerp(WHITE, level).lerp(cWarm, (0.22 * roomOn + 0.18 * lampOn) * (1 - day) + 0.08 * dusk);
+    for (const m of roomMats) m.color.copy(roomTint);
+  } else {
+    // real materials, real light: the sky through the window (area light) and the sun's patch (shadowed by the walls) by
+    // day, a blue moonlit window at night; the ceiling light and the desk lamp warm the room in the evening. Reflections
+    // of the (neutral) environment follow the overall light level, so metal and glass do not glow in the dark.
+    skyLight.color.copy(cMoon).lerp(cSkyDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSkyDay, day);
+    skyLight.intensity = 0.3 + 7.0 * day + 2.0 * dusk;
+    sun.intensity = 0.15 + 3.2 * day + 1.2 * dusk;
+    hemi.intensity = 0.08 + 0.7 * day + 0.22 * roomOn + 0.06 * lampOn;
+    hemi.color.lerp(cNight, 1 - Math.max(day, roomOn, 0.6 * lampOn));   // with the lights off at night: dim and blue
+    const env = 0.04 + 0.5 * day + 0.12 * roomOn + 0.05 * lampOn;
+    for (const m of roomMats) m.envMapIntensity = env;
+    pool.visible = false;
+  }
+  // the window's light on the floor: long and warm when the sun is low, short at noon, a faint blue moon pool at night
+  const low = clamp(1 - sunEl, 0.25, 1);
+  pool.position.x = w.c[0] + 0.25 + 0.7 * low; pool.scale.x = 0.55 + 0.9 * low;
+  pool.material.opacity = 0.34 * day * (0.6 + 0.4 * low) + 0.05 * (1 - day) * (1 - roomOn);
+  pool.material.color.copy(cMoon).lerp(cSunDusk, smooth(-0.1, 0.05, sunEl)).lerp(cSunDay, smooth(0.05, 0.45, sunEl));
+  const mOn = monitor && monitor.mesh.material !== offMat;
+  monitorGlow.intensity = mOn ? 1.0 * (1.2 - day) : 0;
+  monitorGlow.color.copy(mOn && monitor.glow || cScreen);
+  phoneGlow.intensity = phone.visible ? 0.4 * (1.3 - day) : 0;
+  phoneGlow.color.copy(phone.userData.screen.glow || cScreen);
   if (phone.visible) phone.getWorldPosition(phoneGlow.position);
 }
 
@@ -566,26 +882,27 @@ function screens(life, st){
   if (life.screen) showScreen(life.screen);
   // desk monitor
   if (monitor) {
-    if (life.activity === "chart" && atDesk) { monitor.id = null; monitor.set(drawChart()); }
-    else if (screenOn === "desk") { const s = lastStatus.desk; if (s && monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
+    if (life.activity === "chart" && atDesk) { monitor.id = null; const t = chartTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
+    else if (screenOn === "desk" && lastStatus.desk) { if (monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
     else if (atDesk && life.activity === "research" && life.reading) {            // no browser: the article he is reading
       if (monitor.id !== "wiki:" + life.reading.title) { monitor.set(drawReading(life.reading)); monitor.id = "wiki:" + life.reading.title; } }
     else if (st !== "AWAKE" || !visible) monitor.off();
   }
   // phone
   const ps = phone.userData.screen;
-  if (life.activity === "order_food" && onPhone) { ps.id = null; ps.set(drawFood(life.courier)); }
+  if (life.activity === "order_food" && onPhone) { ps.id = null; const t = foodTex(life.courier); if (ps.tex !== t || ps.mesh.material !== ps.on) ps.set(t); }
   panel(screenOn ? lastStatus[screenOn] : null);
 }
 
 // ---------- map ----------
 const map = L.map("map", {zoomControl:false, attributionControl:true}).setView([35.7055, 139.5745], 15);
+// OSM tiles, inverted and desaturated into a dark basemap (keyless; CARTO's dark tiles now need an API key)
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, className:"darktiles",
   attribution:"© OpenStreetMap"}).addTo(map);
-const dot = (c, r) => L.circleMarker([0, 0], {radius:r, color:c, weight:2, fillColor:c, fillOpacity:.9});
-let homeMk, meMk = dot("#ff9a3c", 7), courierMk = dot("#39f5a0", 6), routes = null;
+const dot = (c, r, cls) => L.circleMarker([0, 0], {radius:r, color:"#0a0a0d", weight:1.5, fillColor:c, fillOpacity:1, className:cls});
+let homeMk, meMk = dot("#ff9a3c", 7, "mk-me"), courierMk = dot("#39f5a0", 6, "mk-courier"), routes = null;
 fetch("tokyo_routes.json").then(r => r.json()).then(d => {
-  routes = d; homeMk = L.circleMarker(d.places.home, {radius:5, color:"#ececf2", weight:1, fillOpacity:.3}).addTo(map).bindTooltip("home");
+  routes = d; homeMk = L.circleMarker(d.places.home, {radius:6, color:"#ececf2", weight:1.5, fillColor:"#ececf2", fillOpacity:.15}).addTo(map).bindTooltip("home");
   meMk.setLatLng(d.places.home).addTo(map);
 });
 fetch("/api/browsing").then(r => r.json()).then(d => { if (!d.on) $("h-screen").textContent = "Reading is real Wikipedia (CC BY-SA): what it reads becomes stimuli and dream material; it does not understand the text."; }).catch(() => {});
@@ -616,9 +933,14 @@ function tonightText(c){
 
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery"};
-let sock = null;
+let sock = null, tickMsg = null, uiTimer = 0, uiAt = 0, panAt = 0, mePos = "";
+const UI_MS = 200;                   // the page follows the simulation 5x a second; frame() animates in between
+const shown = new Map();             // element.prop -> last value written: unchanged values are not rewritten
+function put(id, prop, v){ const k = id + "." + prop; if (shown.get(k) === v) return; shown.set(k, v);
+  const el = $(id); if (prop === "display" || prop === "background") el.style[prop] = v; else el[prop] = v; }
 function connect(){
-  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  // ~5 ticks a second without the per-region brain arrays (a server that ignores the query sends every tick: still fine)
+  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=5&lite=1`);
   ws.onopen = () => $("live").classList.add("on");
   ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
   ws.onmessage = e => {
@@ -626,54 +948,62 @@ function connect(){
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
     if (m.type !== "tick" || !m.life) return;
+    for (const t of m.trades || []) { trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd}); chartDirty = true; }
+    if (trades.length > 500) trades = trades.filter(t => Date.now() / 1000 - t.t < 300);
+    tickMsg = m; scheduleUI();
+  };
+}
+function scheduleUI(){               // at most every UI_MS, and not while the tab is hidden
+  if (uiTimer || document.hidden || !tickMsg) return;
+  uiTimer = setTimeout(() => { uiTimer = 0; uiAt = performance.now(); applyTick(tickMsg); }, Math.max(0, uiAt + UI_MS - performance.now()));
+}
+document.addEventListener("visibilitychange", scheduleUI);
+function applyTick(m){
     const life = m.life, sl = m.sleep || {};
     lastLife = life; stage = sl.stage || "AWAKE";
     const hm = /(\d+):(\d+)/.exec(sl.clock || ""); if (hm && !FIXED_HOUR) hour = +hm[1] + hm[2] / 60;
-    for (const t of m.trades || []) trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd});
     trades = trades.filter(t => Date.now() / 1000 - t.t < 300);
-    $("chip").textContent = sl.stage === "AWAKE" ? "AWAKE" : sl.stage === "REM" ? "REM" : "ASLEEP";
-    $("chip").style.background = sl.stage === "AWAKE" ? "#ff9a3c" : sl.stage === "REM" ? "#c26bff" : "#4d7cff";
-    $("clock").textContent = `${sl.clock || ""} Tokyo`;
+    put("chip", "textContent", sl.stage === "AWAKE" ? "AWAKE" : sl.stage === "REM" ? "REM" : "ASLEEP");
+    put("chip", "background", sl.stage === "AWAKE" ? "#ff9a3c" : sl.stage === "REM" ? "#c26bff" : "#4d7cff");
+    put("clock", "textContent", `${sl.clock || ""} Tokyo`);
     const outside = !!life.geo || ["counter","bakery_in","bench","park_gate","bakery_door"].includes(life.place);
-    $("where").textContent = outside ? "· out in Kichijōji" : "· in his room";
+    put("where", "textContent", outside ? "· out in Kichijōji" : "· in his room");
     const r = life.reading, sc = life.screen;
     const short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
-    $("story").innerHTML = sc && sc.restarting && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"} (browser restarting).`
+    put("story", "innerHTML", sc && sc.restarting && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"} (browser restarting).`
       : sc && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"}: <em>${esc(short(sc.title))}</em>.`
-      : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`;
-    $("why").textContent = life.say || "";
-    if (r && !sc) { $("readcard").hidden = false; $("r-title").textContent = r.title; $("r-text").textContent = r.extract;
-      $("r-link").href = r.url || "#"; $("r-why").textContent = r.why || "";
+      : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`);
+    put("why", "textContent", life.say || "");
+    if (r && !sc) { put("readcard", "hidden", false); put("r-title", "textContent", r.title); put("r-text", "textContent", r.extract);
+      put("r-link", "href", r.url || "#"); put("r-why", "textContent", r.why || "");
       const kw = r.keywords || [], nets = (r.networks || []).map(n => NET[n] || n);
-      $("r-kw").innerHTML = kw.length ? `keywords <b>${esc(kw.join(", "))}</b>${nets.length ? ` → stimulus to ${esc(nets.join(", "))}${r.gain != null && r.gain < 0.99 ? ` (${Math.round(r.gain * 100)}% gets through)` : ""}` : ""}` : "";
-      $("r-tn").hidden = r.tonight == null;                         // older entries / stale estimate: no line
-      if (r.tonight != null) $("r-tonight").textContent = tonightText(r.tonight);
-      $("r-tonight").title = "estimated chance it is replayed in REM tonight, with what memory holds now; chat messages from people weigh more"; }
-    else $("readcard").hidden = true;
+      put("r-kw", "innerHTML", kw.length ? `keywords <b>${esc(kw.join(", "))}</b>${nets.length ? ` → stimulus to ${esc(nets.join(", "))}${r.gain != null && r.gain < 0.99 ? ` (${Math.round(r.gain * 100)}% gets through)` : ""}` : ""}` : "");
+      put("r-tn", "hidden", r.tonight == null);                    // older entries / stale estimate: no line
+      if (r.tonight != null) put("r-tonight", "textContent", tonightText(r.tonight)); }
+    else put("readcard", "hidden", true);
     place(life); screens(life, stage);
-    $("away").style.display = outside ? "block" : "none";
-    $("away").textContent = outside ? `the room is empty · he is ${life.walking ? "walking" : LABEL_AWAY[life.activity] || "out"} — see the map` : "";
-    $("mapcard").classList.toggle("out", outside);
+    put("away", "display", outside ? "block" : "none");
+    put("away", "textContent", outside ? `the room is empty · he is ${life.walking ? "walking" : LABEL_AWAY[life.activity] || "out"} — see the map` : "");
+    if (shown.get("mapcard.out") !== outside) { shown.set("mapcard.out", outside); $("mapcard").classList.toggle("out", outside); }
     if (routes) {
       const pos = life.geo ? [life.geo.lat, life.geo.lng] : outside && life.activity === "park" ? routes.places.park
         : outside ? routes.places.bakery : routes.places.home;
-      meMk.setLatLng(pos);
+      if (String(pos) !== mePos) { mePos = String(pos); meMk.setLatLng(pos); }
       const c = life.courier;
       if (c && c.geo) { courierMk.setLatLng([c.geo.lat, c.geo.lng]).addTo(map); } else courierMk.remove();
-      $("m-st").textContent = c ? `courier: ${c.status}${c.eta_min ? ` · ${c.eta_min} min` : ""}` : outside ? "he is out" : "he is home";
-      if (outside || (c && c.geo)) map.panTo(c && c.geo && !outside ? [c.geo.lat, c.geo.lng] : pos, {animate:true});
+      put("m-st", "textContent", c ? `courier: ${c.status}${c.eta_min ? ` · ${c.eta_min} min` : ""}` : outside ? "he is out" : "he is home");
+      if (outside || (c && c.geo)) {                // follow him / the courier: one short pan a second, only if it moved
+        const to = c && c.geo && !outside ? [c.geo.lat, c.geo.lng] : pos, now = performance.now();
+        if (now - panAt > 1000 && map.latLngToContainerPoint(to).distanceTo(map.getSize().divideBy(2)) > 3) { panAt = now; map.panTo(to, {animate:true}); }
+      }
     }
-    $("n-food").textContent = life.food ? `${life.food} meal waiting` : life.bread ? `${life.bread} bread` : "nothing to eat";
+    put("n-food", "textContent", life.food ? `${life.food} meal waiting` : life.bread ? `${life.bread} bread` : "nothing to eat");
     const v = life.vitals || {}, nm = m.neuro || {};
-    const bar = (k, x) => `<span title="${k}: ${x} (1.0 = resting wake)" style="display:inline-block;width:46px">${k}`
-      + `<i style="display:block;height:4px;border-radius:2px;background:#2a2a36"><i style="display:block;height:4px;border-radius:2px;`
-      + `width:${Math.min(100, Math.round(x / 1.6 * 100))}%;background:#ff9a3c"></i></i></span>`;
-    $("n-text").innerHTML = (v.hr_bpm ? `♥ ${Math.round(v.hr_bpm)} bpm · breath ${Math.round(v.resp_per_min)}/min · glucose ${Math.round(v.glucose_mg_dl)} mg/dl<br>` : "")
+    const bar = (k, x) => `<span title="${k}: ${x} (1.0 = resting wake)">${k}<i><i style="width:${Math.min(100, Math.round(x / 1.6 * 100))}%"></i></i></span>`;
+    put("n-text", "innerHTML", (v.hr_bpm ? `♥ ${Math.round(v.hr_bpm)} bpm · breath ${Math.round(v.resp_per_min)}/min · glucose ${Math.round(v.glucose_mg_dl)} mg/dl<br>` : "")
       + `hunger ${Math.round(life.hunger * 100)}% · boredom ${Math.round(life.boredom * 100)}%`
-      + (nm.DA !== undefined ? `<div style="display:flex;gap:6px;margin-top:6px;font-size:10px;color:#8a8a9c">`
-        + ["DA", "5HT", "NE", "ACh"].map(k => bar(k, nm[k])).join("") + `</div>` : "")
-      + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : "");
-  };
+      + (nm.DA !== undefined ? `<div class="nm">` + ["DA", "5HT", "NE", "ACh"].map(k => bar(k, nm[k])).join("") + `</div>` : "")
+      + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : ""));
 }
 if (!(DEBUG && new URLSearchParams(location.search).has("nolive"))) connect();
 $("chat").addEventListener("submit", ev => {
@@ -684,14 +1014,41 @@ $("chat").addEventListener("submit", ev => {
 
 // ---------- loop ----------
 const clock = new THREE.Clock();
-function frame(){
+// adaptive resolution: lower the pixel ratio while frames are slow, raise it again after a while of fast frames
+let frameAt = 0, winN = 0, winSum = 0, winMax = 0, goodFor = 0, dprFail = 1e9;
+function adapt(now){
+  const ms = now - frameAt; frameAt = now;
+  if (!room || !boy || ms > 1000) { winN = winSum = winMax = 0; return; }   // loading, or back from a hidden tab
+  winN++; winSum += ms; winMax = Math.max(winMax, ms);
+  if (winSum < 1000 || winN < 3) return;
+  const avg = (winSum - winMax) / (winN - 1); winN = winSum = winMax = 0;    // one hitch (a shader compile) is not "slow"
+  if (avg > 26 && dpr > DPR_MIN) {                                    // under ~38 fps for a second
+    dprFail = Math.min(dprFail, dpr); setDpr(Math.max(DPR_MIN, dpr - 0.25)); goodFor = 0;
+  } else if (avg < 20 && dpr < DPR_MAX) {
+    if (++goodFor >= (dpr + 0.25 >= dprFail ? 60 : 5)) { setDpr(Math.min(DPR_MAX, dpr + 0.25)); goodFor = 0; }   // retry a failed level after 1 min
+  } else goodFor = 0;
+}
+function setDpr(v){ dpr = v; renderer.setPixelRatio(dpr); resize(); }
+// shadow maps: only the boy (and the phone) cast shadows, so redraw them ~30x a second while he is in the room
+// (every frame while he walks), once when he leaves, and the lamp's only while it is lit
+let shadowAt = 0, boyIn = null;
+function shadows(now, moving){
+  const inRoom = !!(boy && boy.visible);
+  if (inRoom !== boyIn || (inRoom && (moving || now - shadowAt > 30))) {
+    sun.shadow.needsUpdate = true; if (lamp.intensity > 0.01) lamp.shadow.needsUpdate = true; shadowAt = now; boyIn = inRoom;
+  }
+}
+function frame(now){
   requestAnimationFrame(frame);
+  if (document.hidden) return;
+  adapt(now);
   const dt = Math.min(0.1, clock.getDelta());
   skyMaterial.uniforms.uTime.value += dt;
   if (mixer) mixer.update(dt);
+  let moving = false;
   if (boy) {
     boy.visible = visible;
-    tmp.copy(tgt).sub(boy.position); const d = tmp.length();
+    tmp.copy(tgt).sub(boy.position); const d = tmp.length(); moving = d > 0.02;
     if (d > 0.02) { const step = Math.min(d, 0.9 * dt); boy.position.addScaledVector(tmp.normalize(), step);
       if (Math.hypot(tmp.x, tmp.z) > 0.05) boy.rotation.y = Math.atan2(tmp.x, tmp.z); }
     else { let dr = targetRot - boy.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); boy.rotation.y += dr * Math.min(1, 4 * dt); }
@@ -703,13 +1060,16 @@ function frame(){
     const k = 1 - Math.exp(-dt * 1.2);
     camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
   }
+  shadows(now, moving);
   controls.update(); renderer.render(scene, camera);
 }
-frame();
-if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
-  setHour: h => { hour = h; }, setScreen: s => { screenOn = s; } });
+requestAnimationFrame(frame);
+if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
+  setHour: h => { hour = h; }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
+  place, screens, play, actions, bones, GRIP, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
+  act: a => { const l = {activity:a, place:"room"}; place(l); screens(l, "AWAKE"); boy.position.copy(tgt); boy.rotation.y = targetRot; mixer.update(1); } });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, hand:{get:() => hand}, head:{get:() => head},
-    monitor:{get:() => monitor}, sky:{get:() => sky}}); }
+    monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}, mixer:{get:() => mixer}}); }
 </script>
 </body>
 </html>

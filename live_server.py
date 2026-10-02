@@ -86,6 +86,50 @@ def decode_trades(logs):
     return out
 
 
+LITE_DROP = ("act", "wave", "groups", "slow")     # per-region brain activity: only the brain page draws it
+
+
+class Feed:
+    """What one websocket client gets. Default (plain /ws): every tick, 20 a second, as before.
+    /ws?rate=5 sends ~5 ticks a second, carrying the trades and events of the skipped ticks;
+    &lite=1 leaves out the per-region activity (for pages that do not draw the brain, e.g. the room)."""
+
+    RATES = (1.0, 20.0)                                 # ticks a second a client may ask for
+
+    def __init__(self, rate=None, lite=False):
+        if rate is not None:                            # clamped: a tiny rate would buffer trades/events without bound
+            rate = min(max(rate, self.RATES[0]), self.RATES[1])
+        self.every = max(1, round(1.0 / (TICK * rate))) if rate else 1
+        self.lite, self.n, self.trades, self.events = lite, 0, [], []
+
+    @classmethod
+    def from_query(cls, query):
+        try:
+            rate = float(query.get("rate", ""))
+        except ValueError:
+            rate = None
+        if rate is not None and not (math.isfinite(rate) and rate > 0):
+            rate = None                                 # unusable: every tick, as plain /ws
+        return cls(rate, query.get("lite") in ("1", "true"))
+
+    def take(self, msg, data):
+        """The text to send for `msg` (already serialised as `data`), or None to skip this tick."""
+        if msg.get("type") != "tick" or (self.every == 1 and not self.lite):
+            return data
+        out = msg
+        if self.every > 1:
+            self.trades += msg.get("trades") or []
+            self.events += msg.get("events") or []
+            self.n += 1
+            if (self.n - 1) % self.every:              # the first tick goes out at once, then every n-th
+                return None
+            out = msg | {"trades": self.trades, "events": self.events}
+            self.trades, self.events = [], []
+        if self.lite:
+            out = {k: v for k, v in out.items() if k not in LITE_DROP}
+        return json.dumps(out)
+
+
 class Live:
     def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
@@ -107,6 +151,7 @@ class Live:
         self.burst = 0.0
         self.sol_usd = 150.0
         self.clients = set()
+        self.feeds = {}             # websocket -> Feed (its tick rate and fields)
         self.pending = []           # trades waiting to be played into the brain
         self.seen = set()
         self.pool_name = "demo" if demo else mint[:6]
@@ -287,10 +332,15 @@ class Live:
     async def broadcast(self, msg):
         data = json.dumps(msg)
         for ws in list(self.clients):
+            feed = self.feeds.get(ws)
+            out = feed.take(msg, data) if feed else data
+            if out is None:
+                continue
             try:
-                await ws.send_str(data)
+                await ws.send_str(out)
             except Exception:
                 self.clients.discard(ws)
+                self.feeds.pop(ws, None)
 
     def sleep_tick(self):
         """Advance the sleep engine, apply its parameters to the model, run REM replays and bursts."""
@@ -614,17 +664,21 @@ class Live:
         await ws.send_json(self.nights())
         if self.last_frame:
             await ws.send_json({"type": "eye", **self.last_frame})
+        self.feeds[ws] = Feed.from_query(request.query)
         self.clients.add(ws)
-        async for msg in ws:
-            if msg.type != aiohttp.WSMsgType.TEXT:
-                continue
-            try:
-                d = json.loads(msg.data)
-            except ValueError:
-                continue
-            if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
-                await self.handle_chat(ws, key, d["text"])
-        self.clients.discard(ws)
+        try:
+            async for msg in ws:
+                if msg.type != aiohttp.WSMsgType.TEXT:
+                    continue
+                try:
+                    d = json.loads(msg.data)
+                except ValueError:
+                    continue
+                if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
+                    await self.handle_chat(ws, key, d["text"])
+        finally:                                       # also on errors / cancellation: never leak a client or its buffer
+            self.clients.discard(ws)
+            self.feeds.pop(ws, None)
         return ws
 
 
