@@ -40,7 +40,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   so a kill mid-write cannot crash-loop the server. JSONL logs append with `append_jsonl` and are read skipping torn lines.
   New JSON state must use these too.
 - `Dockerfile` must copy every runtime module (currently also `diary.py research.py browse.py`) and installs Chromium
-  (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
+  (`playwright install --with-deps --only-shell chromium`, image ~1.7 GB) and ffmpeg + DejaVu fonts for the clips (#59). BLAS is single-threaded (`OPENBLAS_NUM_THREADS=1`):
   multi-threaded BLAS spins when Chromium shares the CPU.
 - Live feed: plain `/ws` = 20 ticks/s with per-region activity (brain page); the room connects with `/ws?rate=5&lite=1`
   (5/s, no `act`, trades/events of skipped ticks kept). Room: shadow maps updated by hand (~30/s), DPR capped at 1.5
@@ -297,6 +297,29 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   a logged-in site (captions, hashtags, creators) pass `video_text_ok`.
 - `/api/browsing` → `accounts`: `{"tiktok": {"state": "logged in" | "logged out", "reason"}}`. Risk note and cookie
   refresh steps in `docs/OPERATIONS.md`.
+
+## Daily clips for the social accounts (#59, PR `feature/daily-clips`)
+- `clips.py`: up to three vertical clips a day (1080x1920, 15-40 s, H.264, no audio) in `/data/clips/`, kept 14 Tokyo
+  days: `day` ("A day in 30 s": desk screenshots / eye frames sampled every 20 min, captions from the life and reading
+  logs), `dream` (the closed diary night: its frames, title and sentences), `choice` (a chess position with the 5
+  candidates and the vote bars, or a browsing options card). Every frame has the corner label "AI · fictional character
+  · simulated brain"; every clip ends on a card with the site name. Captions go through `clips.safe` (no finance words,
+  no "thinks/feels"/mind claims, no links); life-log motives are cut ("hungry: orders food" -> "orders food"); the chart
+  activity is never sampled; a browsing card with one unsafe option is left out whole.
+- The server only samples (cheap reads every 60 s). Renders run in a child at `nice 19` with no secrets in its env,
+  RLIMIT_CPU 120 s over Pillow + ffmpeg (`-threads 1 -preset veryfast`), one at a time, only at Tokyo 01:00-07:00 or
+  with at most `SUB01_CLIPS_LOW_VIEWERS` (20) websockets. A day clip costs ~17 CPU-s, dream ~13, choice ~8.
+  `analysis/bench_clips.py` measures the tick with renders running (see the PR for numbers).
+- Room capture (`CLIPS_ROOM=1`, off by default): 6 frames of `/` in a headless Chromium child, once a day. Software
+  WebGL makes it ~380 CPU-s per capture, so it stays off on Railway's shared CPU.
+- `/admin/clips` (the site password's cookie, the `SUB01_ADMIN_TOKEN` header, or the token typed into its form, which
+  sets an HttpOnly cookie on `/admin`): today's and recent clips, download, the ready caption (<= 150 characters with
+  the label, + `#AI #AIgenerated #digitaltwin #Tokyo #simulation`) and a copy button.
+- Auto-post, off unless set: `TIKTOK_POST_TOKEN` (Content Posting API; `TIKTOK_POST_MODE` draft (default, inbox) or
+  direct with `is_aigc` and `TIKTOK_PRIVACY` SELF_ONLY), `YOUTUBE_CLIENT_ID` + `YOUTUBE_CLIENT_SECRET` +
+  `YOUTUBE_REFRESH_TOKEN` (resumable upload, `YOUTUBE_PRIVACY` private, `containsSyntheticMedia`). One post per
+  platform per Tokyo day, also when it fails; each is a $0 `clips` row in `costs.jsonl` (`/api/costs` → `posts_today`).
+  `CLIPS=0` turns the whole thing off.
 
 ## Science status (be honest on the site)
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.

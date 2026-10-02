@@ -9,6 +9,8 @@ Where each cost is written (each one in exactly one file, so nothing is counted 
 - <data>/spiking/costs.jsonl   RunPod pod sessions (spiking/costs.py), read here as they are; an open pod is valued
                                up to now, like its own budget does.
 `spent_today(service)` and `days()` add the three up on the Tokyo day (sleep.ROME).
+Social posts of the daily clips (#59, clips.py) are written to costs.jsonl as service "clips" at $0: they are counted
+(`posts_today`), never billed.
 
 Daily caps (USD per Tokyo day, env vars):
 - SUB01_CAP_EYE_USD (1.00): eye frames and the eye's LLM; over it the eye keeps its last frame ("resting its eyes").
@@ -35,6 +37,7 @@ EYES_FILE = "eyes_costs.jsonl"                     # mind.LEDGER
 POD_FILE = Path("spiking") / "costs.jsonl"
 SERVICES = ("eye", "diary", "eyes", "mind", "runpod")
 NOT_IN_TOTAL = ("runpod",)
+OWN = ("eye", "diary", "clips")                    # the services written to costs.jsonl
 
 # USD per call / per million tokens (Replicate list prices, 2026-10); the eye logs estimates, Replicate bills by run
 FLUX_SCHNELL_USD = 0.003
@@ -78,7 +81,7 @@ class Ledger:
 
     # --- writing ----------------------------------------------------------------------------------------------
     def record(self, service, model, units, usd, note=""):
-        if service not in ("eye", "diary"):
+        if service not in OWN:
             raise ValueError(f"{service} costs are logged by their own module (see the docstring)")
         row = {"t": self.clock(), "service": service, "model": model, "units": units, "usd": round(float(usd), 6),
                "note": str(note)[:80]}
@@ -122,7 +125,7 @@ class Ledger:
 
     @staticmethod
     def _own(r):
-        if r.get("service") in ("eye", "diary"):
+        if r.get("service") in ("eye", "diary"):          # clips rows are $0: counted by posts_today only
             yield float(r.get("t", 0)), r["service"], float(r.get("usd", 0.0))
 
     @staticmethod
@@ -168,6 +171,16 @@ class Ledger:
         (spent,) = self.by_day(1).values()
         return sum(v for k, v in spent.items() if k not in NOT_IN_TOTAL)
 
+    def posts_today(self):
+        """Clip posts on this Tokyo day per platform (clips.py; $0 rows, units = 1 for a post that went through)."""
+        from state_io import read_jsonl
+        day, out = tokyo_day(self.clock()), {}
+        if self.path.exists():
+            for r in read_jsonl(self.path):
+                if r.get("service") == "clips" and tokyo_day(float(r.get("t", 0))) == day:
+                    out[r.get("model", "?")] = out.get(r.get("model", "?"), 0) + int(r.get("units", 0))
+        return out
+
     # --- caps -------------------------------------------------------------------------------------------------
     def total_why_not(self):
         cap = caps()["total"]
@@ -199,6 +212,7 @@ class Ledger:
                 | {"total": self.total_today() >= c["total"]},
                 "days": [{"day": d, **r2(v), "total": round(sum(v.values()), 4)} for d, v in per_day.items()],
                 "last_7_days_total": round(sum(sum(v.values()) for v in per_day.values()), 4),
+                "posts_today": self.posts_today(),
                 "note": "USD. eye + diary from costs.jsonl, eyes + mind from eyes_costs.jsonl, runpod from "
                         "spiking/costs.jsonl; RunPod is not in the total cap (its own GPU-hour caps)."}
 

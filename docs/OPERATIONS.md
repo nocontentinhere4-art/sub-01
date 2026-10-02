@@ -9,6 +9,7 @@
 | `mind` | page notes, the day plan, chat replies (Haiku 4.5) | `/data/eyes_costs.jsonl` (provider `mind/…`) | `SUB01_CAP_MIND_USD` = 1.00 |
 | all of the above | | | `SUB01_CAP_TOTAL_USD` = 3.10 |
 | `runpod` | the nightly spiking memory test | `/data/spiking/costs.jsonl` | its own: 1 GPU-h/day, 8 GPU-h per 7 days |
+| `clips` | posts of the daily clips (#59), only with `TIKTOK_POST_TOKEN` / `YOUTUBE_*` set | `/data/costs.jsonl` ($0 rows) | none: at most 1 post per platform per day |
 
 `costs.py` adds the three files up on the Tokyo day (`sleep.ROME`). Each cost is written to one file only, so nothing
 is counted twice. The eyes and the mind still share one ledger with its $2.00/day total and 30 calls/hour
@@ -47,6 +48,8 @@ curl -s -H "X-Admin-Token: $SUB01_ADMIN_TOKEN" https://sub01-production.up.railw
 - `caps` and `capped_now`: the caps in force, and which ones are reached now. Each part's flag is its own cap only;
   `total` reached stops every part.
 - `days`: the last 7 Tokyo days, newest first, per service plus `total`; `last_7_days_total`.
+- `posts_today`: clip posts that went through today, per platform (`{"tiktok": 1}`); failed attempts are $0 rows with
+  0 units. The clips themselves (ffmpeg, Pillow) cost CPU only; see `/admin/clips` for the list and the last log lines.
 
 The eye's and the diary's costs are estimates from Replicate's list prices: $0.003 per FLUX schnell image, and
 $0.05/$0.25 per million tokens for Llama 3 8B, with token counts from Replicate's metrics. Replicate's billing page is the
