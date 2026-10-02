@@ -138,17 +138,34 @@ def main():
             # software WebGL takes seconds per screenshot, so the renderer's clock is frozen at fixed times after the spike
             # (nr.debugTime, a test hook): what a viewer sees at those moments on a device that keeps up
             pg.evaluate("n3close.spike(0, 0)")                  # slot 0 -> drawn cell 0, the cell in focus
-            strip, times = [], [0.1, 1.5, 1.7, 1.9, 2.1]   # the initial segment (48 um) is crossed at the unmyelinated speed: ~1.6 s; then ~0.6 mm/s
+            h01 = pg.evaluate("n3close.info().source") == "H01"
+            # #99, H01: the real axon is ~0.5 um thick and 4 mm long, so each frame is cropped around the front, projected to the screen
+            # from the vertices whose arrival time is just before the frozen clock (the cell's own aArrive), and enlarged 2.5x
+            FRONT = """t => { const c = n3close.cells[0], m = c.h01.mesh, cam = n3close.camera; let n = 0, x = 0, y = 0, d = 0;
+              for (let i = 0; i < m.nv; i++) { const a = m.arrive[i], k = m.kind[i]; if (a < 0 || a > t || a < t - 0.12 || !(k === 1 || k === 4 || k === 5)) continue;
+                const v = new THREE.Vector3(m.pos[3 * i], m.pos[3 * i + 1], m.pos[3 * i + 2]).applyQuaternion(n3close.scene.quaternion).project(cam);
+                x += (v.x + 1) / 2 * innerWidth; y += (1 - v.y) / 2 * innerHeight; d += m.dist[i]; n++; }
+              return n ? {x: x / n, y: y / n, dist: d / n, n} : null; }"""
+            pg.mouse.click(640, 300)                            # stops the slow auto-rotation, so the frames line up
+            strip, fronts = [], []
+            times = [0.3, 1.0, 2.0, 4.0, 8.0] if h01 else [0.1, 1.5, 1.7, 1.9, 2.1]   # procedural: the initial segment (48 um) at the unmyelinated speed ~1.6 s, then ~0.6 mm/s
             for i, t in enumerate(times):
                 pg.evaluate(f"n3close.debugTime({t})")
                 pg.wait_for_timeout(1200)
                 name = f"ap_{i + 1}.png"
                 shot(pg, name)
                 strip.append(name)
+                fronts.append(pg.evaluate(FRONT, t) if h01 else None)
             pg.evaluate("n3close.debugTime(null)")
             res["ap_strip_clock_s"] = times
+            res["ap_front_um"] = [round(f["dist"], 1) if f else None for f in fronts]
             from PIL import Image
-            ims = [Image.open(out / n).crop((390, 230, 890, 730)) for n in strip]   # 1280 px frames
+            ims = []
+            for n, f in zip(strip, fronts):
+                im = Image.open(out / n)
+                if f: x, y = int(f["x"]), int(f["y"]); im = im.crop((x - 100, y - 100, x + 100, y + 100)).resize((500, 500), Image.LANCZOS)
+                else: im = im.crop((390, 230, 890, 730))                             # 1280 px frames
+                ims.append(im)
             W = sum(i.width for i in ims) + 10 * (len(ims) - 1)
             im = Image.new("RGB", (W, ims[0].height))
             x = 0

@@ -113,6 +113,11 @@ Sources:
   activity". There is no demo mode and no recorded stream on the server.
 - A real action potential is ~1 ms long: at 0.3 m/s that is ~300 µm of axon, longer than most of these arbors. It is
   drawn as a short bright front (~90 ms at the slowed clock): a visual convention, said in the caption's "pulses slowed".
+- On the H01 cells (#99) the axon is its real ~0.5 µm (a pixel) and the focus cell's 4.1 mm of axon take ~34 s at the
+  slowed clock, so the front is drawn 2.5× wider (~8 µm) with a ~20 µm tail behind it, fades over 20 s instead of 8,
+  and the axon swells by 1 µm under it (`uPulseW`, `uPulseTail`, `uPulseFade`, `uPulseSwell`, set in `buildH01`): the
+  same visual convention, so a viewer can follow the pulse along the real axon. The timing is the real conduction
+  speed / 10 000 along the real path (`ap_front_um` in `results.json`: the front's path distance at each strip frame).
 
 ## Look
 - **Fluorescence:** GFP-like green (a few cells tdTomato-like orange: the basket cells in cortex, ~15 % of the mid tier

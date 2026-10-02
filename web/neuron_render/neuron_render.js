@@ -325,7 +325,7 @@
   const VS_CELL = `
     attribute vec3 aOff; attribute vec3 aNrm; attribute float aR; attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uPixK, uFloorPx, uDepthK, uPulseW;
+    uniform float uTime, uPixK, uFloorPx, uDepthK, uPulseW, uPulseTail, uPulseFade, uPulseSwell;
     varying vec3 vN, vV; varying float vDepth, vKind, vCol, vSoma, vPulse, vR, vDist, vBright;
     ${ROT}
     void main(){
@@ -334,18 +334,20 @@
       vec4 cv = modelViewMatrix * vec4(c, 1.0);
       float fl = uFloorPx * (abs(aKind - 4.0) < 0.5 ? 2.4 : (abs(aKind - 5.0) < 0.5 ? 0.8 : 1.0));
       float rr = max(aR * iScale, fl * uPixK * -cv.z);
-      vec3 w = c + off * rr;
-      vec4 mv = modelViewMatrix * vec4(w, 1.0);
-      gl_Position = projectionMatrix * mv;
-      vN = normalize(normalMatrix * rotq(iQuat, aNrm)); vV = -mv.xyz;
-      vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       float dt = uTime - iSpike, on = step(0.0, dt);
       vSoma = on * exp(-dt / 0.3);
       float pulse = 0.0;
       if (aArrive >= 0.0) {
         if (abs(aKind - 6.0) < 0.5) pulse = on * step(aArrive, dt) * exp(-(dt - aArrive) / 0.9);                 // bouton: glows after arrival
-        else pulse = on * exp(-pow((dt - aArrive) / uPulseW, 2.0)) * exp(-aArrive / 8.0);                      // the travelling front
+        else { float x = dt - aArrive;                                                                           // the travelling front (+ a tail on the real axons)
+          pulse = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 0.6)) * exp(-aArrive / uPulseFade); }
       }
+      vec3 nrm = rotq(iQuat, aNrm);
+      vec3 w = c + off * rr + nrm * (uPulseSwell * min(1.0, pulse));                                             // the real (thin) axons swell a little under the front
+      vec4 mv = modelViewMatrix * vec4(w, 1.0);
+      gl_Position = projectionMatrix * mv;
+      vN = normalize(normalMatrix * nrm); vV = -mv.xyz;
+      vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       vPulse = pulse; vKind = aKind; vCol = iCol; vR = rr; vDist = aDist; vBright = iBright;
     }`;
   const FS_CELL = `
@@ -404,7 +406,7 @@
   const VS_LINE = `
     attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uDepthK, uPulseW;
+    uniform float uTime, uDepthK, uPulseW, uPulseFade;
     varying float vKind, vCol, vSoma, vPulse, vDist, vDepth;
     ${ROT}
     void main(){
@@ -414,7 +416,7 @@
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       float dt = uTime - iSpike, on = step(0.0, dt);
       vSoma = on * exp(-dt / 0.3);
-      vPulse = aArrive >= 0.0 ? on * exp(-pow((dt - aArrive) / uPulseW, 2.0)) * exp(-aArrive / 8.0) : 0.0;
+      vPulse = aArrive >= 0.0 ? on * exp(-pow((dt - aArrive) / uPulseW, 2.0)) * exp(-aArrive / uPulseFade) : 0.0;
       vKind = aKind; vCol = iCol; vDist = aDist;
     }`;
   const FS_LINE = `
@@ -590,7 +592,7 @@
       uDofMax: { value: 0.7 }, uBloom: { value: 0.9 }, uExposure: { value: 1.0 }, uStyle: { value: 0 }, uBg: { value: new THREE.Vector3() } },
       vertexShader: VS_QUAD, fragmentShader: FS_COMP, depthTest: false, depthWrite: false });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), matDown); quad.frustumCulled = false; quadScene.add(quad);
-    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 },
+    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 },
                   uStyle: { value: 0 }, uRate: { value: 0 }, uLive: { value: 0 }, uNucAlpha: { value: 0.45 }, uDim: { value: 0.3 },
                   uColA: { value: new THREE.Vector3(0.25, 1.0, 0.35) }, uColB: { value: new THREE.Vector3(1.0, 0.42, 0.15) },
                   uColMy: { value: new THREE.Vector3(0.6, 0.75, 1.0) }, uColAct: { value: new THREE.Vector3(1.0, 0.95, 0.7) },
@@ -659,6 +661,9 @@
     }
     function buildH01(data) {
       S.h01 = data;
+      // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the front is drawn
+      // 2.5× wider with a ~20 µm tail, fades over 20 s instead of 8, and swells the axon by 1 µm under it: a visual convention, said in the docs
+      uni.uPulseW.value = 0.25; uni.uPulseTail.value = 0.7; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 1.0;
       const ident = new Float32Array([0, 0, 0, 1]);
       const oneInstance = (g, bright, col) => {
         g.setAttribute("iOff", new THREE.InstancedBufferAttribute(new Float32Array(3), 3));
@@ -727,6 +732,7 @@
       finish();
     }
     function buildProcedural() {
+      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0;
       const rnd = mulberry(880 + Object.keys(KINDS).indexOf(kind) + (L === LOD.phone ? 7 : 0));
       const split = n => Kd.types.map(([t, f]) => [t, Math.max(0, Math.round(n * f))]);
       const want = { hero: split(L.hero), mid: split(L.mid), far: split(L.far) };
