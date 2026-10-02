@@ -5,6 +5,9 @@ pages and read APIs, checks that /ws sends a `tick` within 10 s, then prints the
 from /proc/<pid>/stat over 20 s of /ws (Linux only; skipped with a note elsewhere).
 With --torn-state the data dir first gets state files cut off mid-write (a kill during a save, issue #21): the server
 must still start, log one "is corrupt" line per file and keep each one aside as <name>.corrupt-<UTC time>.
+With --mind (#33) the clock runs 60x from 09:00 Tokyo and a chat message ("are you a real person? n", answered by a
+rule, no AI key needed) is sent every 11 s during the measurement, so the day plan (voted by a brain clone) and the
+chat replies run while the tick cost is measured; the run fails if no plan arrives.
 No `test_` prefix, so pytest does not collect it.
 """
 import argparse
@@ -19,7 +22,8 @@ from pathlib import Path
 import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
-PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes", "/api/taught"]
+PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes",
+         "/api/taught", "/api/mind"]
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
 TORN = {                 # state files read back at startup, each cut off mid-write
     "life.json": '{"activity": "research", "path": [], "hunger',
@@ -104,14 +108,26 @@ async def run(args, proc):
             # tick cost: server CPU seconds over a window of /ws, divided by the ticks received in it
             linux = Path(f"/proc/{proc.pid}/stat").exists()
             cpu0 = cpu_seconds(proc.pid) if linux else None
-            t0, ticks = time.monotonic(), 0
+            t0, ticks, seen, sent, next_chat = time.monotonic(), 0, {}, 0, time.monotonic()
             while time.monotonic() - t0 < args.measure:
+                if args.mind and time.monotonic() >= next_chat:   # one message per 11 s (chat limit: 1 per 10 s)
+                    sent += 1
+                    await ws.send_json({"type": "chat", "text": f"are you a real person? {sent}"})
+                    next_chat += 11
                 try:
-                    msg = await ws.receive_json(timeout=max(0.1, args.measure - (time.monotonic() - t0)))
+                    wait = min(args.measure - (time.monotonic() - t0), max(0.0, next_chat - time.monotonic())
+                               if args.mind else args.measure)
+                    msg = await ws.receive_json(timeout=max(0.1, wait))
                 except asyncio.TimeoutError:
-                    break
+                    continue
                 ticks += msg.get("type") == "tick"
+                seen[msg.get("type")] = seen.get(msg.get("type"), 0) + 1
             wall = time.monotonic() - t0
+            if args.mind:
+                print(f"mind: {sent} chat messages sent, {seen.get('chat_reply', 0)} replies (AI-written tag), "
+                      f"{seen.get('plan', 0)} plan event(s)")
+                if not seen.get("plan"):
+                    failures.append("--mind: no day plan arrived during the measurement")
             if not ticks:
                 failures.append("/ws: no ticks during the measurement window")
                 return failures
@@ -132,6 +148,7 @@ def main():
     p.add_argument("--measure", type=float, default=20.0, help="seconds of /ws used for the tick cost")
     p.add_argument("--startup-timeout", type=float, default=90.0)
     p.add_argument("--torn-state", action="store_true", help="start with truncated state files (issue #21)")
+    p.add_argument("--mind", action="store_true", help="60x clock from 09:00 with chat messages: plan + replies run")
     args = p.parse_args()
 
     tmp = None
@@ -147,6 +164,8 @@ def main():
     log = tempfile.TemporaryFile(mode="w+")
     cmd = [sys.executable, str(ROOT / "live_server.py"), "--demo", "--port", str(args.port),
            "--data-dir", args.data_dir]
+    if args.mind:
+        cmd += ["--time-scale", "60", "--start", "09:00"]
     print("$ BROWSE=0 python live_server.py", " ".join(cmd[2:]))
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:

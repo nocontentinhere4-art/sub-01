@@ -43,6 +43,7 @@ from browse import Browser, display_ok
 import brain_vote
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
+import mind as mind_mod
 from tastes import PageWatch, Tastes
 from state_io import load_json, read_jsonl, save_json
 
@@ -71,6 +72,19 @@ AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
 WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
 WS_SNDBUF = 64 * 1024          # kernel send buffer of a websocket (instead of autotuned megabytes)
 WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
+
+
+# the novelty bonus (brain_vote.NOVELTY): a link or search not chosen in the last 7 days; with #40's new actions
+NOVEL_ACTIONS = ("click", "open_video", "play_video", "next_page", "open_comments", "search", "site_search")
+
+
+def target_key(option):
+    """What novelty remembers: the link, or the query of a search (a site search for "bread" is not the web search)."""
+    if option.get("href"):
+        return option["href"]
+    if option.get("target"):
+        return f"{option['action']}:{option['target']}" if option["action"] == "site_search" else option["target"]
+    return option["action"]
 
 
 def decode_trades(logs):
@@ -256,6 +270,13 @@ class Live:
         self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
         self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
+        self.mind = None                 # mind.py (main()): an AI reads and remembers for him; his brain model chooses
+        self.chat_inbox = []             # (sim t, text) of recent chat messages he may answer at the computer
+        self.replies = []                # his recent replies (AI-written), for the hello and /api/mind
+        self.read_topics = {}            # page title -> topics an AI noted (the eye's dream scenes)
+        self.interest = (0.0, None)      # (wall time, mind.next_interest()) cached for the browser
+        self.plan_rng = np.random.default_rng(int(seed) + 1 if seed else None)
+        self.bg = set()                  # background tasks (mind reading), kept referenced until done
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -373,6 +394,8 @@ class Live:
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
+        if getattr(self, "mind", None):                    # he may answer it later, at the computer
+            self.chat_inbox = (self.chat_inbox + [(t, text)])[-10:]
         if self.spiking:                                   # no-op when no GPU pod is connected
             self.spiking.forward_chat(text, emotion)
             if GOOD.search(text):
@@ -564,7 +587,9 @@ class Live:
                 if src == "taught":
                     m["replays"] = m.get("replays", 0) + 1                   # shown on the teach card
                 if src == "reading":
-                    self.recent_read_replays = (self.recent_read_replays + [m["text"]])[-8:]
+                    topics = getattr(self, "read_topics", {}).get(m["text"])   # what an AI noted about it
+                    text = f"{m['text']} ({', '.join(topics[:3])})" if topics else m["text"]
+                    self.recent_read_replays = (self.recent_read_replays + [text])[-8:]
                 else:
                     self.recent_replays = (self.recent_replays + [m["text"]])[-8:]
                 out.append({"type": "replay", "t": hhmm(t), "text": m["text"], "networks": m["networks"],
@@ -667,6 +692,8 @@ class Live:
             art = await loop.run_in_executor(None, self.reader.read, t, self.heard(t), dict(self.last_rel))
             if art:
                 m = self.absorb_reading(art)
+                self.remember({"url": art.get("url", ""), "title": art["title"], "host": "en.wikipedia.org",
+                               "text": art.get("extract", "")})
                 try:
                     art["tonight"] = await loop.run_in_executor(None, self.tonight_chance, m)
                     art["tonight_night"] = night_date(next_bedtime(self.clock.now()))
@@ -724,7 +751,7 @@ class Live:
                 open_dev = dev
                 t = self.clock.now()
                 art = self.reader.current()
-                interest = art["title"] if art else None
+                interest = self.mind_interest() or (art["title"] if art else None)
                 d = await self.browser.step(dev, self.heard(t), interest)
                 st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
                 if st:
@@ -757,8 +784,7 @@ class Live:
             self.tastes.learn(*res)
 
     def novel(self, option):
-        key = option.get("href") or option.get("target") or option["action"]
-        return option["action"] in ("click", "open_video", "search") and time.time() - self.targets.get(key, 0) > 7 * 86400
+        return option["action"] in NOVEL_ACTIONS and time.time() - self.targets.get(target_key(option), 0) > 7 * 86400
 
     async def decide(self, dev, page, interest=None):
         """The eyes list options for the page; the brain model votes; the browser carries the choice out."""
@@ -768,6 +794,8 @@ class Live:
         except asyncio.TimeoutError:                           # the AI is too slow: the page's own links
             from eyes import local_options
             opts, meta = local_options(page, interest), {"source": "local", "why_local": "AI too slow"}
+        if getattr(self, "mind", None):
+            self.remember(page)                                # an AI notes what the page says (off the loop)
         if not opts:
             return await self.browser.act(dev, {"action": "leave"}, "nothing safe to do on this page", interest)
         try:
@@ -794,7 +822,7 @@ class Live:
         self.pagewatch.start(topics[dec["chosen"]], time.time())
         now = time.time()
         self.targets = {k: v for k, v in self.targets.items() if now - v < 7 * 86400}
-        self.targets[chosen.get("href") or chosen.get("target") or chosen["action"]] = now
+        self.targets[target_key(chosen)] = now
         title = page.get("title", "")[:120]
         dec.update(device=dev, t=hhmm(t), page=title if display_ok(title) else page.get("host", ""), eyes=meta,
                    page_url=page.get("url"))
@@ -821,6 +849,118 @@ class Live:
             return f"redirected to {host.removeprefix('www.')}"
         return "opened" if href else "done"
 
+    # --- the mind: an AI reads and remembers for him; his brain model chooses (mind.py) ---------------
+    def encoding(self):
+        """The brain's response at encoding (importance of a memory): reward / attention / fear vs their mean."""
+        rel = self.last_rel
+        return {g: rel.get(g, 1.0) - 1.0 for g in ("reward", "attention", "fear")}
+
+    def remember(self, page):
+        """mind.read(page) in a worker thread, in the background: neither the browsing nor the brain loop waits."""
+        if not self.mind or not page.get("title"):
+            return
+        page = {k: page.get(k, "") for k in ("url", "title", "host", "text")}
+        task = asyncio.get_running_loop().create_task(self._remember(page, self.encoding()))
+        self.bg.add(task)
+        task.add_done_callback(self.bg.discard)
+
+    async def _remember(self, page, brain):
+        try:
+            it = await asyncio.get_running_loop().run_in_executor(None, self.mind.read, page, brain)
+        except Exception as e:                                   # notes are optional: never stop the screens
+            print("mind: read failed:", repr(e)[:120], flush=True)
+            return
+        if not it:
+            return
+        if it.get("topics") and page["title"]:
+            self.read_topics[page["title"]] = it["topics"]
+            while len(self.read_topics) > 200:
+                self.read_topics.pop(next(iter(self.read_topics)))
+        if it.get("summary"):
+            await self.broadcast({"type": "mind_read", "t": hhmm(it["t"]), "summary": it["summary"],
+                                  "topics": it.get("topics", []), "host": it.get("host", ""),
+                                  "tag": "notes written by an AI"})
+
+    def mood(self, t):
+        return {"boredom": self.life.boredom, "pressure": self.engine.pressure(t), "tired": self.engine.tired}
+
+    def mind_interest(self):
+        """1-3 searches linking what he read recently (mind.next_interest), refreshed every minute; the first one is
+        the browser's interest. None without notes yet."""
+        if not self.mind:
+            return None
+        now = time.time()
+        if now - self.interest[0] > 60:
+            t = self.clock.now()
+            got = self.mind.next_interest(self.mind.taste_view(self.tastes), {"mood": self.mood(t)})
+            self.interest = (now, got)
+        got = self.interest[1]
+        return got[0]["query"] if got else None
+
+    def mind_view(self):
+        """GET /api/mind: the plan, the latest notes and replies, the shared AI budget."""
+        m = self.mind
+        if not m:
+            return {"on": False, "caption": mind_mod.CAPTION}
+        notes = m.public_notes()
+        for k in notes:
+            for x in notes[k]:
+                x["t"] = hhmm(x["t"])
+        return {"on": True, "caption": mind_mod.CAPTION, "status": m.status(), "plan": m.plan_public(),
+                "interests": self.interest[1] or [], "notes": notes, "replies": self.replies[-10:],
+                "budget": m.budget.summary(), "reply_tag": "his reply (AI-written)",
+                "note": "An AI writes notes on what he reads, proposes day plans and writes his chat replies; his brain "
+                        "model votes among the plans. It does not understand what it reads."}
+
+    async def run_mind(self):
+        """Off the brain loop: the day plan (each Tokyo morning, revised at noon and in the evening, voted by a clone
+        of the brain), the plan as a hint to life.py, and chat replies while he is at the computer."""
+        self.mind_seen = self.clock.now()
+        while True:
+            await asyncio.sleep(2)
+            await self.mind_step()
+
+    async def mind_step(self):
+        loop = asyncio.get_running_loop()
+        m = self.mind
+        t = self.clock.now()
+        awake = self.engine.stage == "AWAKE"
+        seen = getattr(self, "mind_seen", 0.0)
+        for ts, act in list(self.life.started):            # plan steps he carried out
+            if ts > seen:
+                m.life_started(act)
+                seen = ts
+        self.mind_seen = seen
+        if awake and m.due_slot(t):
+            state = {"mood": self.mood(t), "gain": self.engine.gain, "chat": True}
+            clone, view = self.brain.clone(), m.taste_view(self.tastes)    # snapshots on the event loop
+            try:
+                await loop.run_in_executor(None, lambda: m.plan_day(state, clone, view, self.plan_rng))
+                await self.broadcast({"type": "plan", **(m.plan_public() or {})})
+            except Exception as e:
+                print("mind: plan failed:", repr(e)[:160], flush=True)
+        nxt = m.next_step({"hunger": self.life.hunger, "pressure": self.engine.pressure(t)})
+        self.life.plan_hint = nxt["life"] if nxt else None
+        self.chat_inbox = [x for x in self.chat_inbox if t - x[0] < 1800]     # older ones are not answered
+        resting = m.over_cap()
+        self.life.chat_waiting = len(self.chat_inbox) if awake and not resting else 0
+        at_desk = self.life.activity == "chat" and not self.life.path
+        ready = awake and at_desk and not resting and m.can_reply({"awake": True, "at_desk": True}) is None
+        if self.chat_inbox and ready:
+            said = self.chat_inbox.pop()[1]                         # the newest message first
+            ctx = {"awake": True, "at_desk": True, "mood": self.mood(t), "doing": "at the computer",
+                   "brain": self.encoding()}
+            try:
+                r = await loop.run_in_executor(None, m.reply, said, None, ctx)
+            except Exception as e:
+                print("mind: reply failed:", repr(e)[:160], flush=True)
+                return
+            if r["reply"]:
+                rec = {"t": hhmm(self.clock.now()), "text": r["reply"], "to": "a viewer", "replying_to": said,
+                       "tag": "his reply (AI-written)", "source": r["source"]}
+                self.replies = (self.replies + [rec])[-30:]
+                await self.broadcast({"type": "chat_reply", **rec})
+
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
         loop = asyncio.get_running_loop()
@@ -832,7 +972,8 @@ class Live:
                     llm = self.eye.llm or (ReplicateLLM(tok) if tok else None)
                     read = [{"title": m["text"], "url": m.get("url", "")} for m in self.memory.items
                             if m.get("source") == "reading" and day_of(m["t"]) == date]
-                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm, read)
+                    notes = self.mind.day_notes(date) if getattr(self, "mind", None) else None
+                    await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm, read, notes)
                     print(f"diary: night of {date} written", flush=True)
                 except Exception as e:
                     print("diary error:", repr(e), flush=True)
@@ -890,6 +1031,7 @@ class Live:
                     except OSError:
                         pass
             await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
+                                "replies": getattr(self, "replies", [])[-10:],
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
             await ws.send_json(self.nights())
             if self.last_frame:
@@ -1013,7 +1155,10 @@ async def main(args):
             live.browser = live.local_browser.client
         else:
             print("--browse: playwright is not installed, screens stay on Wikipedia reading", flush=True)
-        live.eyes = Eyes(data_dir=data_dir)
+        live.eyes = Eyes(data_dir=data_dir, budget=mind_mod.eyes_budget(data_dir))   # one ledger with the mind
+    if os.environ.get("MIND", "1") != "0":
+        load_env(HERE / ".env")                   # ANTHROPIC_API_KEY / OPENROUTER_API_KEY (never logged)
+        live.mind = mind_mod.Mind(data_dir, budget=mind_mod.mind_budget(data_dir), clock=live.clock.now)
 
     async def screen_shot(request):               # latest screenshot of the desk or phone screen
         dev = request.match_info["device"]
@@ -1045,6 +1190,10 @@ async def main(args):
                                   "note": "An AI reads the page and lists options; his brain model picks. "
                                           "It does not understand what it reads."})
     app.router.add_get("/api/decisions", decisions)
+
+    async def mind_api(request):                  # the day plan, notes, replies and the shared AI budget
+        return web.json_response(live.mind_view())
+    app.router.add_get("/api/mind", mind_api)
     if args.eye:
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
@@ -1113,6 +1262,8 @@ async def main(args):
         tasks.append(live.run_eye())
     if live.browser:
         tasks.append(supervised("browse", live.run_browse))
+    if live.mind:
+        tasks.append(supervised("mind", live.run_mind))
     if manager:
         tasks.append(manager.run())
     try:
