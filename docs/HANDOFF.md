@@ -201,7 +201,24 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
 
-## Science status (be honest on the site)
+## Logged-in TikTok and YouTube, view-only (#60)
+- `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
+  / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is
+  unexpired; a sign-in button, a login wall or a redirect to a login page logs that site out until the next restart
+  (one log line). Values are never logged or returned; YouTube keeps Restricted Mode (`PREF f2=8000000` replaces the
+  session's PREF). Without the variables nothing changes.
+- `browse.py`: per screen, one in-memory context per logged-in site (`Screen.sites`) alongside the logged-out one
+  (`Screen.public`); `_open` picks the context by URL (`_use`). Logged-in contexts only navigate on their own domains
+  and never to a private URL (`_site_route`). The env vars reach the browse service process (`browse_service.ENV_KEEP`)
+  but never Chromium (`browse.CHROMIUM_ENV`).
+- `view_only.py`: private pages (URL in `_open` and in the route, DOM + URL before every screenshot in `_private_ok`),
+  action links never offered (`pick_links`, `result_page`) or opened (`_open`), dismiss buttons never an action, and
+  the avatar / name / action buttons hidden before every screenshot (`HIDE_ACCOUNT_CSS`, `HIDE_ACCOUNT_JS`). Titles on
+  a logged-in site (captions, hashtags, creators) pass `video_text_ok`.
+- `/api/browsing` → `accounts`: `{"tiktok": {"state": "logged in" | "logged out", "reason"}}`. Risk note and cookie
+  refresh steps in `docs/OPERATIONS.md`.
+
+
 - The old public "r = 0.40" came from replaying his recorded fMRI as drive; with no coupling at all it is 0.45.
   Never present it as "his wiring produces his activity" (`analysis/null_test.py`).
 - PR #5 (`feature/real-wiring`): connectome v2 (MRtrix3 + SIFT2) and a wiring-only Hopf slow layer reach FC r ≈ 0.21
