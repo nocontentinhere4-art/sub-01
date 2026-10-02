@@ -33,9 +33,21 @@ MAX_LINKS = 40
 MAX_OPTIONS = 5
 MIN_OPTIONS = 3
 MAX_CALLS_PER_HOUR = int(os.environ.get("BRAIN_DECIDES_MAX_CALLS_PER_HOUR") or 30)
-CLAUDE_MODEL = os.environ.get("BRAIN_DECIDES_CLAUDE_MODEL") or "claude-opus-5-5"
+MAX_USD_PER_DAY = float(os.environ.get("BRAIN_DECIDES_MAX_USD_PER_DAY") or 1.00)   # hard cap per Tokyo day
+# Default: Claude Haiku 4.5 (listing 3-5 safe options is a small task; the brain model makes the decision)
+CLAUDE_MODEL = os.environ.get("BRAIN_DECIDES_CLAUDE_MODEL") or "claude-haiku-4-5"
 REPLICATE_MODEL = os.environ.get("BRAIN_DECIDES_REPLICATE_MODEL") or "meta/meta-llama-3-70b-instruct"
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-opus-5.5"
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-4.5"
+# which models take which request fields (Haiku 4.5 rejects `effort`; refusal fallbacks exist on the newest only)
+EFFORT_MODELS = ("claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-mythos-5", "claude-opus-4-8",
+                 "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6")
+FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1")
+
+
+def takes_effort(model):
+    """Claude API id or OpenRouter slug (anthropic/claude-opus-5.5) -> does it accept an effort setting?"""
+    m = model.removeprefix("anthropic/").replace(".", "-")
+    return m.startswith(EFFORT_MODELS)
 OPENROUTER_URL = (os.environ.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
 PRICES = {  # USD per million tokens (input, output), for the spend log
     "claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-4-5": (1.0, 5.0),
@@ -64,22 +76,45 @@ with 3 to 5 options.
 
 
 class Budget:
-    """At most `per_hour` calls in any rolling hour; every call is logged with its tokens and estimated cost."""
+    """At most `per_hour` calls in any rolling hour and at most `max_usd_day` dollars per Tokyo day (the day of
+    sleep.TZ, counted from the log: the cost the provider reported, else the PRICES estimate). Every call is logged."""
 
-    def __init__(self, path=None, per_hour=MAX_CALLS_PER_HOUR, clock=time.time):
+    def __init__(self, path=None, per_hour=MAX_CALLS_PER_HOUR, clock=time.time, max_usd_day=MAX_USD_PER_DAY):
         self.path = Path(path) if path else None
-        self.per_hour, self.clock = per_hour, clock
+        self.per_hour, self.clock, self.max_usd_day = per_hour, clock, float(max_usd_day)
         self.calls = []                                           # timestamps of calls in the last hour
-        if self.path and self.path.exists():
-            now = clock()
-            for row in self.rows():
-                if now - row.get("t", 0) < 3600:
-                    self.calls.append(row["t"])
+        self.day, self.day_usd = None, 0.0                        # Tokyo date and its spend so far
+        now = clock()
+        for row in self.rows():
+            if now - row.get("t", 0) < 3600:
+                self.calls.append(row["t"])
+        self._sync_day(now)
+
+    @staticmethod
+    def tokyo_day(t):
+        from datetime import datetime
+        from sleep import TZ
+        return datetime.fromtimestamp(t, TZ).date().isoformat()
+
+    def _sync_day(self, now):
+        today = self.tokyo_day(now)
+        if today != self.day:                                     # a new Tokyo day: recount from the log
+            self.day = today
+            self.day_usd = sum(r.get("usd", 0.0) for r in self.rows() if self.tokyo_day(r.get("t", 0)) == today)
+
+    def why_not(self):
+        """None when a call is allowed, else the reason (shown as eyes.why_local)."""
+        now = self.clock()
+        self._sync_day(now)
+        self.calls = [t for t in self.calls if now - t < 3600]
+        if self.day_usd >= self.max_usd_day:
+            return f"daily AI budget (${self.max_usd_day:.2f}, Tokyo day) reached; AI options resume tomorrow"
+        if len(self.calls) >= self.per_hour:
+            return f"call cap ({self.per_hour}/hour) reached"
+        return None
 
     def allow(self):
-        now = self.clock()
-        self.calls = [t for t in self.calls if now - t < 3600]
-        return len(self.calls) < self.per_hour
+        return self.why_not() is None
 
     def record(self, provider, model, tokens_in, tokens_out, ok, note="", usd=None):
         """`usd`: the cost the provider reported, else an estimate from PRICES."""
@@ -89,6 +124,8 @@ class Budget:
         row = {"t": self.clock(), "provider": provider, "model": model, "in": int(tokens_in), "out": int(tokens_out),
                "usd": round(usd, 6), "ok": bool(ok), "note": note[:80]}
         self.calls.append(row["t"])
+        self._sync_day(row["t"])
+        self.day_usd += row["usd"]
         if self.path:
             with open(self.path, "a") as f:
                 f.write(json.dumps(row) + "\n")
@@ -107,11 +144,13 @@ class Budget:
 
     def summary(self):
         rows, now = self.rows(), self.clock()
-        day = [r for r in rows if now - r["t"] < 86400]
+        self._sync_day(now)
+        day = [r for r in rows if self.tokyo_day(r["t"]) == self.day]
         errors = [r for r in rows if not r.get("ok") and r.get("note")]
         return {"calls_last_hour": len([t for t in self.calls if now - t < 3600]), "max_per_hour": self.per_hour,
                 "last_error": errors[-1]["note"] if errors and errors[-1] is rows[-1] else None,
-                "calls_today": len(day), "usd_today": round(sum(r["usd"] for r in day), 4),
+                "tokyo_day": self.day, "calls_today": len(day), "usd_today": round(self.day_usd, 4),
+                "max_usd_per_day": self.max_usd_day, "paused_until_tomorrow": self.day_usd >= self.max_usd_day,
                 "usd_total": round(sum(r["usd"] for r in rows), 4)}
 
 
@@ -125,11 +164,21 @@ class ClaudeEyes:
         self.client = anthropic.Anthropic(timeout=30.0, max_retries=1)
         self.model = model
 
+    def request(self, system, user):
+        """The request for this model: effort only where accepted (not Haiku 4.5), no thinking parameter, refusal
+        fallbacks only on the models that have them, cache_control on the fixed system prompt."""
+        kw = {"model": self.model, "max_tokens": 4000, "messages": [{"role": "user", "content": user}],
+              "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]}
+        if takes_effort(self.model):
+            kw["output_config"] = {"effort": "low"}
+        if self.model in FALLBACK_MODELS:
+            kw.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")   # a declined request re-runs
+        return kw
+
     def ask(self, system, user):
-        r = self.client.beta.messages.create(
-            model=self.model, max_tokens=4000, system=system, output_config={"effort": "low"},
-            betas=["server-side-fallback-2026-07-01"], fallbacks="default",        # a declined request is re-run
-            messages=[{"role": "user", "content": user}])
+        kw = self.request(system, user)
+        api = self.client.beta.messages if "betas" in kw else self.client.messages
+        r = api.create(**kw)
         text = "" if r.stop_reason == "refusal" else "".join(b.text for b in r.content if b.type == "text")
         return text, r.usage.input_tokens, r.usage.output_tokens
 
@@ -160,12 +209,22 @@ class OpenRouterEyes:
     def __init__(self, key, model=OPENROUTER_MODEL, url=OPENROUTER_URL, timeout=30):
         self.key, self.model, self.url, self.timeout = key, model, url, timeout
 
+    def request(self, system, user):
+        """reasoning effort only for models that take it (not Haiku 4.5); cache_control on the fixed system prompt
+        for anthropic/* models (OpenRouter passes it on to Anthropic)."""
+        sys_msg = {"role": "system", "content": system}
+        if self.model.startswith("anthropic/"):
+            sys_msg["content"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+        body = {"model": self.model, "max_tokens": 4000, "temperature": 0.3, "usage": {"include": True},
+                "messages": [sys_msg, {"role": "user", "content": user}]}
+        if takes_effort(self.model):
+            body["reasoning"] = {"effort": "low"}
+        return body
+
     def ask(self, system, user):
         import urllib.error
         import urllib.request
-        body = json.dumps({"model": self.model, "max_tokens": 4000, "temperature": 0.3,
-                           "reasoning": {"effort": "low"}, "usage": {"include": True},
-                           "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
+        body = json.dumps(self.request(system, user))
         req = urllib.request.Request(self.url + "/chat/completions", data=body.encode(), method="POST", headers={
             "Authorization": f"Bearer {self.key}", "Content-Type": "application/json", "X-Title": "SUB-01"})
         for attempt in range(2):                                  # one retry on rate limits / server errors
@@ -354,8 +413,8 @@ class Eyes:
             meta = {"source": "ai (same page, no new call)", "provider": self.provider.name}
         elif self.provider is None:
             meta["why_local"] = "no AI key"
-        elif not self.budget.allow():
-            meta["why_local"] = f"call cap ({self.budget.per_hour}/hour) reached"
+        elif (why := self.budget.why_not()) is not None:
+            meta["why_local"] = why
         else:
             model = getattr(self.provider, "model", "")
             try:

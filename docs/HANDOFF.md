@@ -46,11 +46,15 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 
 ## Brain decides what he clicks (PR `feature/brain-decides`)
 - Eyes (`eyes.py`): after a page, an AI lists 3-5 options from the title, visible text and up to 40 numbered links
-  (Claude `claude-opus-5-5` at low effort if `ANTHROPIC_API_KEY`; else OpenRouter if `OPENROUTER_API_KEY`, set on
-  Railway, model `OPENROUTER_MODEL` default `anthropic/claude-opus-5.5`, real cost per call logged; else Replicate
-  Llama 3 70B). Links by number only,
-  every target through the browse.py guard, search queries through the chat filter; max 1 call per page and
-  `BRAIN_DECIDES_MAX_CALLS_PER_HOUR` (30); spend in `/data/eyes_costs.jsonl`. No key / over cap: local options.
+  (decision 2026-10-01: Claude Haiku 4.5 by default, hard cap $1.00 per Tokyo day). Claude `claude-haiku-4-5` if
+  `ANTHROPIC_API_KEY` (`BRAIN_DECIDES_CLAUDE_MODEL`); else OpenRouter if `OPENROUTER_API_KEY` (set on Railway),
+  `OPENROUTER_MODEL` default `anthropic/claude-haiku-4.5`, real cost per call logged; else Replicate Llama 3 70B.
+  Request fields per model: no effort/thinking/fallbacks for Haiku 4.5; effort low for Opus/Sonnet (+ refusal
+  fallbacks on the 5.5 family). cache_control on the fixed system prompt (about 344 tokens: below every model's
+  cache minimum, so it caches nothing today). Links by number only, every target through the browse.py guard, search
+  queries through the chat filter; max 1 call per page, `BRAIN_DECIDES_MAX_CALLS_PER_HOUR` (30) and
+  `BRAIN_DECIDES_MAX_USD_PER_DAY` ($1.00, Tokyo day, from `/data/eyes_costs.jsonl`). No key / over a cap: local
+  options; `/api/decisions` shows why. A chosen page that is not shown (guard, bot wall) or redirects says so.
 - Vote (`brain_vote.py`): `Brain.clone()` + all options simulated 300 ms side by side (one sparse product per step,
   ~260 ms for 5 options + baseline on one core; identical to `Brain.step`); value = d_reward + 0.6 d_attention
   + 0.3 d_visual (videos) - 0.8 d_fear; + tastes + novelty; softmax, hotter when bored or sleepy. The live brain then

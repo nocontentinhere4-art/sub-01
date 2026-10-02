@@ -451,7 +451,8 @@ function panel(st){
         + `<span class="bar"><i class="${v < 0 ? "neg" : ""}" style="left:${v < 0 ? 50 - w : 50}%;width:${w}%"></i></span>`
         + `<b>${Math.round(o.p * 100)}%</b></div>`;
     }).join("");
-    $("s-reason").textContent = dec.reason + (dec.eyes && dec.eyes.source !== "ai" && dec.eyes.source ? " · options from the page's own links (" + (dec.eyes.why_local || "no AI") + ")" : "");
+    $("s-reason").textContent = dec.reason + (dec.outcome && !["opened", "done"].includes(dec.outcome) ? ` · ${dec.outcome}` : "")
+      + (dec.eyes && dec.eyes.source !== "ai" && dec.eyes.source ? " · options from the page's own links (" + (dec.eyes.why_local || "no AI") + ")" : "");
   }
   $("s-title").textContent = st.title || ""; $("s-url").textContent = st.url || "";
   $("s-why").textContent = st.why || ""; $("s-link").href = st.url || "#";

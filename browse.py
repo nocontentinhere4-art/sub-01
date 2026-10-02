@@ -240,6 +240,7 @@ class Browser:
         self.guard = Guard(via_proxy=bool(self.proxy))
         self.lock = asyncio.Lock()
         self.failures = 0
+        self.last_skip = None                               # why the last page was left unshown (guard, bot wall...)
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:]}
@@ -325,11 +326,12 @@ class Browser:
         async with self.lock:
             try:
                 sc = await self._ensure(device)
+                moved_on = False
                 if self.decide and sc.awaiting is not None:      # the brain is choosing: hold the page
                     if not self._fresh_chat(heard) and time.time() - sc.awaiting_since < DECIDE_WAIT_S:
                         return None
-                    sc.awaiting = None                          # a new chat message, or no answer: as before
-                if sc.scrolls_left > 0 and sc.info:
+                    sc.awaiting, moved_on = None, True          # a new chat message, or no answer: move on
+                if sc.scrolls_left > 0 and sc.info and not moved_on:
                     sc.scrolls_left -= 1
                     await sc.page.evaluate("() => window.scrollBy({top: innerHeight * 0.7, behavior: 'smooth'})")
                     await sc.page.wait_for_timeout(900)
@@ -337,7 +339,7 @@ class Browser:
                         sc.next_at = time.time() + 15
                         return None
                 elif (self.decide and sc.info and sc.info.get("kind") in ("page", "search") and sc.page is not None
-                      and sc.page.url.startswith("http") and not self._fresh_chat(heard)):
+                      and sc.page.url.startswith("http") and not self._fresh_chat(heard) and not moved_on):
                     page = await self.page_info(sc)
                     if page["links"] or page["can_back"]:
                         sc.awaiting, sc.awaiting_since = page, time.time()
@@ -394,13 +396,14 @@ class Browser:
     async def act(self, device, action, why="", interest=None):
         """Carry out the action the brain chose for the page it was given; returns the new screen status or None."""
         sc = self.screens[device]
-        page, sc.awaiting = sc.awaiting, None
-        if page is None or sc.page is None:
-            return None
         kind, why = action.get("action"), why or "his brain picked it"
         async with self.lock:
+            page, sc.awaiting = sc.awaiting, None                  # claimed under the lock (no race with step)
+            if page is None or sc.page is None:
+                return None
             try:
                 ok = False
+                self.last_skip = None
                 if kind in ("click", "open_video"):
                     want = action.get("href")                       # matched by URL: link ids are per capture
                     href = next((l["href"] for l in page["links"] if l["href"] == want), None)
@@ -421,7 +424,12 @@ class Browser:
                         sc.info = dict(sc.info, why=f"kept reading — {why}")
                     ok = True
                 if not ok:                                      # leave, or the chosen page could not be shown
+                    missed = None
+                    if kind in ("click", "open_video", "search", "back"):
+                        missed = f"could not show “{action.get('label', '')}” ({self.last_skip or 'refused'})"
                     ok = await self._next(sc, [], interest)
+                    if ok and missed and sc.info:               # the card must not pretend the choice was shown
+                        sc.info = dict(sc.info, why=f"{missed}; {sc.info.get('why', '')}", missed=missed)
                 sc.next_at = time.time() + SCROLL_EVERY_S
                 self.failures = 0
                 return sc.status() if ok else None
@@ -517,6 +525,7 @@ class Browser:
         except Exception as e:
             if "Timeout" not in repr(e):
                 print(f"browse: could not open {url[:80]}: {repr(e)[:100]}", flush=True)
+                self.last_skip = "did not load"
                 return await self._leave(sc)
         await page.add_style_tag(content=HIDE_BANNERS)
         await page.wait_for_timeout(2200)
@@ -529,6 +538,7 @@ class Browser:
                   else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body) else None)
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
+            self.last_skip = reason
             return await self._leave(sc)
         host = urllib.parse.urlsplit(page.url).hostname or ""
         sc.info = {"title": (title or page_title or host)[:140], "url": page.url, "host": host.removeprefix("www."),

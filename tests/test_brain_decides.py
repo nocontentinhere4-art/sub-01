@@ -428,15 +428,17 @@ def test_claude_provider_request_and_reply(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_BASE_URL", f"http://127.0.0.1:{srv.server_port}")
     try:
         prov = E.default_provider()
-        assert isinstance(prov, E.ClaudeEyes) and prov.model == "claude-opus-5-5"
+        assert isinstance(prov, E.ClaudeEyes) and prov.model == "claude-haiku-4-5"        # the default
         text, tin, tout = prov.ask(E.SYSTEM, E.prompt(PAGE))
     finally:
         srv.shutdown()
     assert E.parse(text) == [{"action": "scroll", "label": "more"}] and (tin, tout) == (1234, 56)
     b = seen["body"]
-    assert seen["path"].startswith("/v1/messages") and b["model"] == "claude-opus-5-5"
-    assert b["output_config"] == {"effort": "low"} and b["fallbacks"] == "default"
-    assert "server-side-fallback-2026-07-01" in seen["beta"] and b["system"] == E.SYSTEM
+    assert seen["path"].startswith("/v1/messages")
+    # Haiku 4.5: no effort, no thinking, no refusal fallbacks (it has none); the system prompt carries cache_control
+    assert b["model"] == "claude-haiku-4-5" and not {"output_config", "thinking", "fallbacks"} & set(b)
+    assert "server-side-fallback" not in seen["beta"]
+    assert b["system"] == [{"type": "text", "text": E.SYSTEM, "cache_control": {"type": "ephemeral"}}]
 
 
 def test_browser_act_rechecks_targets_in_its_own_process():
@@ -616,8 +618,10 @@ def test_openrouter_provider_request_reply_and_reported_cost(tmp_path, monkeypat
     path, headers, body = fake.seen[-1]
     assert len(fake.seen) == 2 and path == "/api/v1/chat/completions"
     assert headers["Authorization"] == "Bearer sk-or-test-key"
-    assert body["model"] == "anthropic/claude-opus-5.5" and body["reasoning"] == {"effort": "low"}
-    assert body["usage"] == {"include": True} and body["messages"][0] == {"role": "system", "content": E.SYSTEM}
+    assert body["model"] == "anthropic/claude-haiku-4.5" and "reasoning" not in body       # Haiku 4.5: no effort
+    assert body["usage"] == {"include": True}
+    assert body["messages"][0] == {"role": "system", "content": [
+        {"type": "text", "text": E.SYSTEM, "cache_control": {"type": "ephemeral"}}]}
     row = json.loads((tmp_path / "c.jsonl").read_text())
     assert row["usd"] == 0.0123 and (row["in"], row["out"]) == (1400, 90) and row["provider"] == "openrouter"
 
@@ -633,3 +637,130 @@ def test_openrouter_bad_key_falls_back_and_never_logs_the_key(tmp_path):
     log = (tmp_path / "c.jsonl").read_text()
     assert "openrouter HTTP 401" in log and "secret" not in log
     assert eyes.budget.summary()["last_error"] == "openrouter HTTP 401"
+
+
+# --- coordinator review: Haiku default, request per model, daily cap, act fixes ---------------------------------------
+def test_request_fields_follow_the_model():
+    pytest.importorskip("anthropic")
+    import os
+    os.environ.setdefault("ANTHROPIC_API_KEY", "x")
+    haiku, opus = E.ClaudeEyes("claude-haiku-4-5").request("S", "U"), E.ClaudeEyes("claude-opus-5-5").request("S", "U")
+    assert not {"output_config", "thinking", "fallbacks", "betas"} & set(haiku)
+    assert opus["output_config"] == {"effort": "low"} and opus["fallbacks"] == "default"
+    assert opus["betas"] == ["server-side-fallback-2026-07-01"] and "thinking" not in opus
+    assert all(r["system"][0]["cache_control"] == {"type": "ephemeral"} for r in (haiku, opus))
+    sonnet = E.ClaudeEyes("claude-sonnet-5-5").request("S", "U")
+    assert sonnet["output_config"] == {"effort": "low"} and sonnet["fallbacks"] == "default"
+    old = E.ClaudeEyes("claude-opus-4-8").request("S", "U")                    # effort yes, fallbacks no
+    assert old["output_config"] == {"effort": "low"} and "fallbacks" not in old
+    h = E.OpenRouterEyes("k", "anthropic/claude-haiku-4.5").request("S", "U")
+    o = E.OpenRouterEyes("k", "anthropic/claude-opus-5.5").request("S", "U")
+    l = E.OpenRouterEyes("k", "meta-llama/llama-3.3-70b-instruct").request("S", "U")
+    assert "reasoning" not in h and o["reasoning"] == {"effort": "low"} and "reasoning" not in l
+    assert h["messages"][0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+    assert l["messages"][0]["content"] == "S"                                  # cache_control only for anthropic/*
+    assert E.CLAUDE_MODEL == "claude-haiku-4-5" and E.OPENROUTER_MODEL == "anthropic/claude-haiku-4.5"
+
+
+def test_daily_usd_cap_on_the_tokyo_day(tmp_path):
+    from datetime import datetime
+    from sleep import TZ
+    now = [datetime(2026, 10, 2, 9, 0, tzinfo=TZ).timestamp()]
+    budget = E.Budget(tmp_path / "c.jsonl", per_hour=100, clock=lambda: now[0], max_usd_day=1.00)
+
+    class Costly(FakeProvider):
+        def ask(self, system, user):
+            text, tin, tout = super().ask(system, user)
+            return text, tin, tout, 0.45                                       # the cost the provider reported
+
+    prov = Costly(json.dumps({"options": [{"action": "scroll", "label": "keep reading"}]}))
+    eyes = E.Eyes(prov, budget)
+    for i in range(4):
+        eyes.propose(dict(PAGE, url=f"https://en.wikipedia.org/wiki/P{i}"))
+        now[0] += 600
+    assert len(prov.calls) == 3                                                # 0.45 x 3 = 1.35 >= $1.00: stop
+    _, meta = eyes.propose(dict(PAGE, url="https://en.wikipedia.org/wiki/Q"))
+    assert len(prov.calls) == 3 and meta["source"] == "local" and "daily AI budget" in meta["why_local"]
+    s = budget.summary()
+    assert s["paused_until_tomorrow"] and s["usd_today"] == 1.35 and s["tokyo_day"] == "2026-10-02"
+    # a restart the same day still knows the spend (counted from the log)
+    assert E.Budget(tmp_path / "c.jsonl", clock=lambda: now[0], max_usd_day=1.0).why_not() is not None
+    now[0] = datetime(2026, 10, 3, 0, 5, tzinfo=TZ).timestamp()               # next Tokyo day
+    _, meta = eyes.propose(dict(PAGE, url="https://en.wikipedia.org/wiki/R"))
+    assert len(prov.calls) == 4 and meta["source"] == "ai" and budget.summary()["usd_today"] == 0.45
+
+
+def fake_browser_screen(b):
+    from browse import Browser  # noqa: F401
+    sc = b.screens["desk"]
+    sc.page = SimpleNamespace(url="https://en.wikipedia.org/wiki/Bread")
+    sc.info = {"title": "Bread", "url": sc.page.url, "host": "en.wikipedia.org", "why": "", "t": 0, "kind": "page"}
+    sc.shot, sc.scrolls_left = b"jpg", 0
+
+    async def ensure(device):
+        return sc
+    b._ensure = ensure
+    return sc
+
+
+def test_decide_timeout_moves_on_instead_of_handing_back_the_same_page(monkeypatch):
+    import browse
+    b = browse.Browser(decide=True)
+    sc = fake_browser_screen(b)
+    handed, wandered = [], []
+
+    async def page_info(sc_):
+        handed.append(1)
+        return dict(PAGE)
+
+    async def _next(sc_, heard, interest):
+        wandered.append(1)
+        sc_.info = dict(sc_.info, url="https://en.wikipedia.org/wiki/Elsewhere", why="wandered")
+        return True
+    b.page_info, b._next = page_info, _next
+
+    async def main():
+        assert "decide" in await b.step("desk")
+        sc.next_at = 0
+        assert await b.step("desk") is None                                   # still waiting for the brain
+        sc.awaiting_since -= browse.DECIDE_WAIT_S + 1                          # no answer in time
+        st = await b.step("desk")
+        assert st and "decide" not in st and wandered == [1] and handed == [1] and sc.awaiting is None
+    run(main())
+
+
+def test_act_claims_the_page_under_the_lock_and_reports_a_missed_choice():
+    import browse
+    b = browse.Browser(decide=True)
+    sc = fake_browser_screen(b)
+
+    async def _open(sc_, url, why, kind, **kw):
+        b.last_skip = "bot wall"
+        return False
+
+    async def _next(sc_, heard, interest):
+        sc_.info = dict(sc_.info, url="https://example.org/other", why="curious about bread")
+        return True
+    b._open, b._next = _open, _next
+
+    async def main():
+        sc.awaiting = dict(PAGE)
+        await b.lock.acquire()                                                 # a step is running
+        task = asyncio.create_task(b.act("desk", {"action": "click", "label": "sourdough",
+                                                  "href": "https://en.wikipedia.org/wiki/Sourdough"}))
+        await asyncio.sleep(0.05)
+        assert sc.awaiting is not None                                         # not claimed outside the lock
+        b.lock.release()
+        st = await task
+        assert sc.awaiting is None
+        assert st["missed"] == "could not show “sourdough” (bot wall)" and st["why"].startswith("could not show")
+        assert Live.outcome({"href": "https://en.wikipedia.org/wiki/Sourdough"}, st) == st["missed"]
+    run(main())
+
+
+def test_outcome_says_what_the_choice_led_to():
+    href = "https://fontawesome.com/icons"
+    assert Live.outcome({"href": href}, {"url": href + "#top"}) == "opened"
+    assert Live.outcome({"href": href}, {"url": "https://www.fontawesome.com/start"}) == "redirected to fontawesome.com"
+    assert Live.outcome({"href": href}, None) == "could not be carried out"
+    assert Live.outcome({"action": "scroll"}, {"url": "x"}) == "done"

@@ -430,7 +430,8 @@ class Live:
             st = dict(st, title=st.get("host", ""))
         # the options belong to the page they were considered on and to the page the choice led to, no later one
         if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")):
-            st = dict(st, decision={k: dec.get(k) for k in ("options", "reason", "eyes", "ms", "temperature", "page")})
+            st = dict(st, decision={k: dec.get(k) for k in ("options", "reason", "eyes", "ms", "temperature", "page",
+                                                            "outcome")})
         return st
 
     async def run_browse(self):
@@ -544,7 +545,22 @@ class Live:
         st = await self.browser.act(dev, {k: chosen.get(k) for k in ("action", "target", "label", "href")},
                                     dec["reason"], interest)
         dec["status_id"] = (st or {}).get("id")
+        dec["outcome"] = self.outcome(chosen, st)
         return st
+
+    @staticmethod
+    def outcome(chosen, st):
+        """What the chosen action led to, said plainly on the card: the voted page, a redirect, or not shown."""
+        import urllib.parse
+        if not st:
+            return "could not be carried out"
+        if st.get("missed"):
+            return st["missed"]
+        href = chosen.get("href")
+        if href and st.get("url") and st["url"].split("#")[0] != href.split("#")[0]:
+            host = urllib.parse.urlsplit(st["url"]).hostname or ""
+            return f"redirected to {host.removeprefix('www.')}"
+        return "opened" if href else "done"
 
     # --- the eye: what SUB-01 "sees" ----------------------------------------------
     async def run_eye(self):
