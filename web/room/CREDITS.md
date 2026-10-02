@@ -99,6 +99,18 @@ Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension, its user data 
 
 `web/boy_test.html` plays every clip and finger pose (`?cmp` puts the old one next to him).
 
+### His motion (`boy2_motion.glb`)
+- **Quaternius, Universal Animation Library (Standard), CC0 1.0** (https://quaternius.com/packs/universalanimationlibrary.html,
+  itch.io download, March 2025 release): `Idle_Loop` → `stand_idle`, `Walk_Loop` → `walk`, `Sitting_Enter` / `Sitting_Exit`
+  / `Sitting_Idle_Loop` → `sit_down_chair` / `stand_up_chair` / `sit_idle_upright` (and, raised to the mattress,
+  `sit_down_bed_edge` / `stand_up_bed_edge` / `sit_edge_idle`), `PickUp_Table` → `take_item`, `Interact` → `door_open_pull`;
+  `Crouch_Idle_Loop` is a key pose of `crouch_drop`. Retargeted by `room_build/boy_post.mjs` (T-pose correspondence, feet
+  pinned by IK, hips raised to the room's seat).
+- **Keyed for this project (original work, CC0)**, from those poses: the bed set (`lie_back_idle`, `lie_side_left/right`,
+  `roll_*`, `sleep_breathing*`, `lie_down_from_edge`, `get_up_to_edge`, `lie_phone`), `type`, `mouse`, `walk_start`,
+  `walk_stop`, `turn_in_place_*`, `lean_on_sill`, `stretch_arms_up`, `scratch_head`, `look_around`, `crouch_drop`,
+  `put_down`, `sit_lean_back`, `sit_eat_chopsticks`, `sit_drink`.
+
 ## The first character
 `boy.glb` and the clips `boy_*.glb` (shown by default) are the earlier AI-generated character (Meshy, via Higgsfield;
 generated content under those services' terms, not a Creative Commons licence), and `hand_phone.glb` the

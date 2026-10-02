@@ -520,6 +520,45 @@ function bedPoses(stand, sit) {
   return {back: poseOfBones(back), left: side("Left"), right: side("Right")};
 }
 
+// the hand turned so its fingers run along `fingers` and its palm faces `palm` (world directions)
+function handFacing(b, side, fingers, palm) {
+  const F = HANDF[side], Yw = fingers.clone().normalize(), Zw = palm.clone().addScaledVector(Yw, -palm.dot(Yw)).normalize();
+  const Xw = new THREE.Vector3().crossVectors(Yw, Zw);
+  const local = new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(F.Y, F.Z), F.Y, F.Z);   // hand-local palm frame
+  const worldM = new THREE.Matrix4().makeBasis(Xw, Yw, Zw).multiply(local.clone().invert());
+  const wq = new THREE.Quaternion().setFromRotationMatrix(worldM), pq = b[side + "Hand"].parent.getWorldQuaternion(new THREE.Quaternion());
+  b[side + "Hand"].quaternion.copy(pq.invert().multiply(wq)); b[side + "Hand"].updateMatrixWorld(true);
+}
+// seated work at the desk (room heights: desk top DESK; keyboard 0.30 m in front of his chest, 5 cm above the desk,
+// i.e. z = +0.03 in the clip's frame; mouse 0.35 m to his right of it): the upright seated idle, the hands on the keys by IK, palms down, a small lean and the
+// gaze to the screen; `work(t)` gives each hand's small motion
+const DESK = 0.97, KEYS = new THREE.Vector3(0, DESK + 0.05, 0.03);
+function deskClip(sitClip, dur, work) {
+  const keys = [], step = 1 / 6;
+  for (let t = 0; t <= dur + 1e-6; t += step) {
+    const tt = t >= dur - 1e-6 ? 0 : t;                 // the loop closes on its first key
+    const b = bonesOf(poseOfChannels(sitClip.channels, tt % sitClip.duration));
+    turnWorld(b, "Spine02", X, 3); turnWorld(b, "Spine01", X, 4); turnWorld(b, "Spine", X, 3); turnWorld(b, "neck", X, 4);
+    for (const S_ of ["Left", "Right"]) {
+      const w = work(S_, tt), sh = wpos(b, S_ + "Arm"), k = S_ === "Left" ? 1 : -1;
+      armTo(b, S_, w.at, at(sh, [X, k * 0.22], [Y, -0.45], [Z, -0.1]));
+      handFacing(b, S_, w.fingers || new THREE.Vector3(-k * 0.15, -0.25, 1), new THREE.Vector3(0, -1, 0));
+    }
+    keys.push([t, poseOfBones(b)]);
+  }
+  return keyed(keys);
+}
+// small, uneven key presses: each hand bobs a few millimetres at its own rhythm and drifts a little along the row
+const press = (S_, t, seed) => { const a = Math.sin(t * 7.3 + seed) * Math.sin(t * 2.1 + seed * 3); return Math.max(0, a) * 0.008; };
+
+// a pose blended between two (per bone slerp, hips lerp)
+const mixPose = (a, b, w) => ({q: Object.fromEntries(order.map(n => [n, a.q[n].clone().slerp(b.q[n], w)])), hips: a.hips.clone().lerp(b.hips, w)});
+// a clip from a function of time: f(t) -> pose, sampled every `step` s (the keys are eased into each other)
+function fromFn(dur, f, step = 1 / 10, opt = {}) { const keys = []; for (let t = 0; t <= dur + 1e-6; t += step) keys.push([Math.min(t, dur), f(Math.min(t, dur))]); return keyed(keys, opt); }
+const clipPose = (r, t) => poseOfChannels(r.channels, ((t % r.duration) + r.duration) % r.duration);
+// edit a pose: f(bones) changes it, the pose comes back
+const edit = (pose, f) => { const b = bonesOf(pose); f(b); return poseOfBones(b); };
+
 // finger poses. A pose: per finger the flex of its three joints (deg, + curls towards the palm) and its spread at the
 // knuckle (deg, + away from the middle finger); the thumb: its base turned about the hand's own axes (x across the
 // knuckles, y along the fingers, z the palm side), then its two joints' flex.
@@ -636,6 +675,85 @@ if (UAL) {
     roll_side_to_back_L: keyed([[0, bed.left], [1.6, lift(halfway(bed.left, bed.back), 0.04)], [3, bed.back]]),
     roll_side_to_back_R: keyed([[0, bed.right], [1.6, lift(halfway(bed.right, bed.back), 0.04)], [3, bed.back]]),
   };
+  // at the desk
+  const sitUp = fromUAL(UAL, off, "Sitting_Idle_Loop", "sit", {seat: SEAT_LIFT});
+  BED.type = deskClip(sitUp, 5, (S_, t) => { const k = S_ === "Left" ? 1 : -1;
+    return {at: at(KEYS, [X, k * 0.11 + 0.02 * Math.sin(t * 0.9 + k)], [Y, -press(S_, t, k)], [Z, -0.02])}; });
+  BED.mouse = deskClip(sitUp, 4, (S_, t) => S_ === "Left"
+    ? {at: at(KEYS, [X, 0.14], [Y, -0.02], [Z, -0.06])}
+    : {at: at(KEYS, [X, -0.35 + 0.03 * Math.sin(t * 1.6)], [Z, 0.02 * Math.sin(t * 2.3 + 1)], [Y, -0.01]), fingers: new THREE.Vector3(0.05, -0.3, 1)});
+  // ---- standing and walking
+  const idle = fromUAL(UAL, off, "Idle_Loop", "idle"), walkR = fromUAL(UAL, off, "Walk_Loop", "walk");
+  const crouch = fromUAL(UAL, off, "Crouch_Idle_Loop", "crouch");
+  // start / stop: the stance eases into the gait (and back) over 0.7 s
+  BED.walk_start = fromFn(0.7, t => mixPose(clipPose(idle, t), clipPose(walkR, t), ease(t / 0.7)));
+  BED.walk_stop = fromFn(0.7, t => mixPose(clipPose(walkR, t), clipPose(idle, t), ease(t / 0.7)));
+  // turns in place: the hips yaw by 90 deg while the legs take two small steps (half the walk's stride)
+  for (const [as, deg] of [["turn_in_place_L90", 90], ["turn_in_place_R90", -90], ["turn_in_place_180", 180]]) {
+    const dur = Math.abs(deg) > 90 ? 1.4 : 1.0;
+    BED[as] = fromFn(dur, t => edit(mixPose(clipPose(idle, t), clipPose(walkR, t * 1.2), 0.5 * Math.sin(Math.PI * t / dur)),
+      b => turnBody(b, Y, deg * ease(t / dur))));
+  }
+  // hands on the window sill (1.10 m, 0.35 m in front), leaning a little; a slow breath
+  BED.lean_on_sill = fromFn(8, t => edit(clipPose(idle, t), b => {
+    turnWorld(b, "Spine02", X, 8); turnWorld(b, "Spine01", X, 4);
+    for (const [S_, k] of [["Left", 1], ["Right", -1]]) { armTo(b, S_, new THREE.Vector3(k * 0.2, 1.10, 0.38), at(wpos(b, S_ + "Arm"), [X, k * 0.4], [Y, -0.3]));
+      handFacing(b, S_, new THREE.Vector3(-k * 0.2, 0, 1), new THREE.Vector3(0, -1, 0)); } }), 0.5, {breathe: 1.0, period: 4});
+  // arms up and down again; a hand to the side of the head, scratching; looking around with the feet planted
+  BED.stretch_arms_up = fromFn(3, t => { const u = t < 1.1 ? ease(t / 1.1) : t < 1.9 ? 1 : 1 - ease((t - 1.9) / 1.1);
+    return edit(clipPose(idle, t), b => { turnWorld(b, "Spine01", X, -6 * u); turnWorld(b, "neck", X, -10 * u);
+      for (const [S_, k] of [["Left", 1], ["Right", -1]]) { const rest = wpos(b, S_ + "Hand"), up = new THREE.Vector3(k * 0.16, 2.02, -0.02);
+        armTo(b, S_, rest.clone().lerp(up, u), at(wpos(b, S_ + "Arm"), [X, k * 0.5], [Y, -0.1 + 0.4 * u])); } }); }, 1 / 10);
+  BED.scratch_head = fromFn(2.5, t => { const u = t < 0.6 ? ease(t / 0.6) : t < 1.9 ? 1 : 1 - ease((t - 1.9) / 0.6);
+    return edit(clipPose(idle, t), b => { const head = wpos(b, "Head"), rest = wpos(b, "RightHand");
+      const spot = at(head, [X, -0.07], [Y, 0.13 + 0.012 * Math.sin(t * 25)], [Z, -0.02]);
+      armTo(b, "Right", rest.clone().lerp(spot, u), at(wpos(b, "RightArm"), [X, -0.4], [Y, 0.1 * u], [Z, 0.1]));
+      turnWorld(b, "neck", Z, 6 * u); }); }, 1 / 15);
+  BED.look_around = fromFn(4, t => edit(clipPose(idle, t), b => { const yaw = 35 * Math.sin(2 * Math.PI * t / 4) * Math.min(1, t, 4 - t);
+    turnWorld(b, "Spine", Y, yaw * 0.25); turnWorld(b, "neck", Y, yaw * 0.35); turnWorld(b, "Head", Y, yaw * 0.4); }), 1 / 8);
+  // down to the floor (a hand reaches 0.45 m forward, low) and up; a bag put on the desk (0.97 m)
+  BED.crouch_drop = fromFn(2.5, t => { const u = t < 0.9 ? ease(t / 0.9) : t < 1.6 ? 1 : 1 - ease((t - 1.6) / 0.9);
+    return edit(mixPose(clipPose(idle, t), clipPose(crouch, t), u), b => {
+      armTo(b, "Right", wpos(b, "RightHand").lerp(new THREE.Vector3(-0.12, 0.08, 0.45), u * 0.9), at(wpos(b, "RightArm"), [X, -0.3], [Z, 0.2])); }); }, 1 / 10);
+  BED.put_down = fromFn(1.5, t => { const u = t < 0.6 ? ease(t / 0.6) : t < 0.9 ? 1 : 1 - ease((t - 0.9) / 0.6);
+    return edit(clipPose(idle, t), b => { turnWorld(b, "Spine01", X, 10 * u);
+      armTo(b, "Right", wpos(b, "RightHand").lerp(new THREE.Vector3(-0.15, DESK + 0.12, 0.42), u), at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.2])); }); }, 1 / 10);
+  // ---- seated: lean back, eat with chopsticks (bowl in the left hand), drink
+  const chestOf = b => wpos(b, "Spine"), mouthOf = b => at(wpos(b, "Head"), [Y, 0.06], [Z, 0.10]);
+  BED.sit_lean_back = fromFn(6, t => edit(clipPose(sitUp, t), b => { turnWorld(b, "Spine02", X, -10); turnWorld(b, "Spine01", X, -4); turnWorld(b, "neck", X, 8); }), 1 / 6, {breathe: 1.0, period: 4});
+  BED.sit_eat_chopsticks = fromFn(5, t => edit(clipPose(sitUp, t), b => {
+    turnWorld(b, "Spine01", X, 6); turnWorld(b, "neck", X, 10);
+    const bowl = at(chestOf(b), [Z, 0.22], [Y, -0.22], [X, 0.04]);
+    armTo(b, "Left", bowl, at(wpos(b, "LeftArm"), [X, 0.35], [Y, -0.35]));
+    handFacing(b, "Left", new THREE.Vector3(-0.6, 0, 1), new THREE.Vector3(0, 1, 0));
+    const ph = (t % 2.5) / 2.5, up = ph < 0.4 ? 0 : ph < 0.6 ? ease((ph - 0.4) / 0.2) : ph < 0.75 ? 1 : 1 - ease((ph - 0.75) / 0.25);   // pick, bite, back
+    const pick = at(bowl, [Y, 0.06], [X, -0.06]), bite = at(mouthOf(b), [Z, 0.05], [Y, -0.04]);
+    armTo(b, "Right", pick.lerp(bite, up), at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.3]));
+    handFacing(b, "Right", new THREE.Vector3(0.5, 0.1, 1), new THREE.Vector3(-0.3, -0.2, 0.1)); }), 1 / 10);
+  BED.sit_drink = fromFn(4, t => { const u = t < 1.0 ? ease(t / 1.0) : t < 2.8 ? 1 : 1 - ease((t - 2.8) / 1.0), tip = t > 1.2 && t < 2.6 ? 1 : 0;
+    return edit(clipPose(sitUp, t), b => { const rest = at(chestOf(b), [Z, 0.25], [Y, -0.3], [X, -0.12]), lips = at(mouthOf(b), [Z, 0.04], [Y, -0.03]);
+      armTo(b, "Right", rest.lerp(lips, u), at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.35]));
+      handFacing(b, "Right", new THREE.Vector3(0.2, 1, 0.2), new THREE.Vector3(1, 0, 0));
+      turnWorld(b, "Head", X, -12 * tip * u); }); }, 1 / 10);
+  // ---- the bed's edge (mattress top MATTRESS): sitting (UAL's seated clips, raised to it), lying down and getting up
+  const EDGE_LIFT = SEAT_LIFT + (MATTRESS - 0.50);
+  const edgeSit = fromUAL(UAL, off, "Sitting_Idle_Loop", "edge", {seat: EDGE_LIFT});
+  BED.sit_edge_idle = fromFn(8, t => clipPose(edgeSit, t), 1 / 6, {breathe: 0.8, period: 4});
+  for (const [as, name] of [["sit_down_bed_edge", "Sitting_Enter"], ["stand_up_bed_edge", "Sitting_Exit"]]) {
+    const r = fromUAL(UAL, off, name, as, {seat: EDGE_LIFT}); BED[as] = {channels: r.channels, duration: r.duration, hips0: r.hips0}; }
+  // lying down from the edge, head towards his left (+x): sitting, leaning onto the left elbow, legs up, on the back
+  const sitEdge = clipPose(edgeSit, 0);
+  const lieX = edit(bed.back, b => { placeHips(b, new THREE.Vector3(0, 1, 0)); turnBody(b, Y, -90); torsoOn(b, MATTRESS);
+    placeHips(b, at(wpos(b, "Hips"), [X, -0.35], [Z, -0.55])); });
+  const leanL = edit(sitEdge, b => { turnBody(b, Z, 38); turnWorld(b, "neck", Z, -15);
+    armTo(b, "Left", at(wpos(b, "Hips"), [X, 0.30], [Y, -0.05], [Z, -0.1]), at(wpos(b, "LeftArm"), [Z, -0.3], [Y, -0.2])); placeHips(b, at(wpos(b, "Hips"), [Y, -0.03])); });
+  const legsUp = mixPose(leanL, lieX, 0.6);
+  BED.lie_down_from_edge = keyed([[0, sitEdge], [0.9, leanL], [1.7, legsUp], [2.5, lieX]]);
+  BED.get_up_to_edge = keyed([[0, lieX], [0.8, legsUp], [1.6, leanL], [2.5, sitEdge]]);
+  // the phone held above his face in the right hand, on his back
+  BED.lie_phone = fromFn(6, t => edit(bed.back, b => { const face = at(wpos(b, "Head"), [Y, 0.32], [Z, 0.08 + 0.01 * Math.sin(t)]);
+    armTo(b, "Right", face, at(wpos(b, "RightArm"), [X, -0.3], [Z, 0.25]));
+    handFacing(b, "Right", new THREE.Vector3(0.3, 0, -1), new THREE.Vector3(0, -1, 0)); turnWorld(b, "neck", X, -6); }), 1 / 6, {breathe: 1.0, period: 4});
   for (const [as, r] of Object.entries(BED)) { addClip(d, ns, as, r.channels);
     rows.push(`  ${as} <- keyed: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m (mattress top ${MATTRESS} m)`); }
   await finish(d, path.join(WEB, "boy2_motion.glb"));

@@ -111,3 +111,21 @@ def test_clips_target_only_bones_of_the_new_rig():
 def test_finger_poses():
     names = anim_names(ROOM / "boy2_hands.glb")
     assert names == ["hand_relaxed", "hand_phone", "hand_chopsticks", "hand_spoon", "hand_type", "hand_mouse"]
+
+
+def test_motion_set():
+    """#63's clip list, in one file; every clip keys every bone and moves the hips."""
+    names = anim_names(ROOM / "boy2_motion.glb")
+    for n in ["lie_back_idle", "lie_side_left", "lie_side_right", "roll_back_to_side_L", "roll_back_to_side_R",
+              "sit_idle_upright", "type", "mouse", "stand_idle", "walk", "walk_start", "walk_stop", "sit_down_chair",
+              "stand_up_chair", "sit_down_bed_edge", "stand_up_bed_edge", "sit_edge_idle", "lie_down_from_edge",
+              "get_up_to_edge", "lie_phone", "sleep_breathing", "door_open_pull", "take_item", "put_down", "crouch_drop",
+              "lean_on_sill", "stretch_arms_up", "scratch_head", "look_around", "sit_lean_back", "sit_eat_chopsticks",
+              "sit_drink", "turn_in_place_L90", "turn_in_place_R90"]:
+        assert n in names, n
+    js, _ = glb(ROOM / "boy2_motion.glb")
+    bones = {n["name"] for n in js["nodes"]} - {"Armature", "socket_phone", "socket_chopsticks", "socket_spoon"}
+    for a in js["animations"]:
+        rot = {js["nodes"][c["target"]["node"]]["name"] for c in a["channels"] if c["target"]["path"] == "rotation"}
+        assert rot == bones, a["name"]
+        assert any(c["target"]["path"] == "translation" for c in a["channels"]), a["name"]
