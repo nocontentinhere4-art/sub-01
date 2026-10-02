@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 20:20 UTC** (pass 34). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 20:55 UTC** (pass 35). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -305,6 +305,28 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 35 (20:55 UTC): the game-quality pass, #98.** The owner asked for "fino a 10 agenti Fable 5.1 high effort":
+the original character and the room should look like a game ("come gta 6"); the socks look like cones today.
+Eight Fable 5.1 sessions, each with its own files and branch:
+
+| stream | session | owns |
+|---|---|---|
+| G1 research | `session_01TkggML3LD8V548ES1VSWzQ` | `docs/research/game_look.md` |
+| G2 character asset (same rig and identity) | `session_01P57GRNVUAnrDS7UTVKjNWX` | `web/room/boy.glb`, `room_build/boy_asset/` |
+| G3 motion: NVIDIA ARDY clips (on a RunPod GPU, ≤ $10) + procedural layer | `session_01PgdfFVr2NQ1pv4XzcnVdho` | `web/room/boy_m_*.glb`, `web/room/boy_motion.js`, one `room.html` hook |
+| G4 soft goods (socks, towel, duvet, curtains) | `session_016aZgMaYz6zrDs9ixK1WSbH` | `room_build/props_soft.py` |
+| G5 hard surfaces | `session_01FkKWq952Y3xL491LFipsUr` | `room_build/props_hard.py` |
+| G6 rendering and post | `session_01WXcEt8rwJzruPUN8yCSpGc` | `web/room_post.js`, the renderer/lighting block of `room.html` |
+| G7 window and outside | `session_01TG1TVAJp29Fn6WptEZsjTq` | `web/room/window_view.js`, the sky/window block |
+| G8 visual QA and scorecard | `session_01NDriQn2UBDqaCZqVBJir2i` | `tests/visual/`, `docs/qa/` |
+
+- **ARDY** (nv-tlabs/ardy, the owner's link): the code is Apache-2.0 and the checkpoints are under the NVIDIA Open
+  Model License. Its text encoder is the gated Llama-3-8B-Instruct, so the owner may need to accept Meta's licence on
+  Hugging Face and add a token as a RunPod secret. G3 reports this before asking.
+- **Higgsfield caps:** G2 ≤ 200, G4 ≤ 80, G5 ≤ 80, G7 ≤ 40 credits (625 left at start).
+- **Binary GLBs:** `room_clean.glb` is rebuilt by G4 and G5, never hand-merged.
+- **#95 merged** (the chess fix: 1109 passed, chess smoke finished a game in 131 s).
 
 **Pass 34 (20:20 UTC):** merged #84, #96, #94 and #91. Each was checked by the coordinator.
 - **#84 (room polish and phone screen module):** 1101 passed, smoke OK at 7.2 ms per tick.
