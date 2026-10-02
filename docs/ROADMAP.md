@@ -1,8 +1,14 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 08:10 UTC** (pass 21). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 08:25 UTC** (pass 21b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 21b: incident.** #45 (merged ~07:30) made `live_server.py` import `mind`, but the Dockerfile's COPY list
+lacked `mind.py`. Any Railway image built from 07:30 to 08:24 stopped at start (`ModuleNotFoundError`), so the live
+site was probably down for about an hour. The #18 worker found it with `docker build`. Hotfix #49 (adds `mind.py`) was
+verified with the exact image file set and merged at 08:24. A regression test (local imports ⊆ Dockerfile COPY) is
+part of #18.
+
 **Pass 21:** merged #48 (#19): the brain loop is **6× cheaper**. Bench 31.7 → 5.0 ms; whole server 34 → 9.0 ms per
 50 ms tick (8.5 ms with --mind), about 18 % of a core. Identity test vs the old step < 1e-9, 541 tests, 0 skipped. It
 also explains the post-vote slowdown (malloc churn from old temporaries). #18 Chromium non-root started.
@@ -190,6 +196,10 @@ findings "NOT verified", and its reviews are partial on large diffs.
 - **2026-10-02: "accelerate learning" = three separate tracks.** Understanding = the mind layer (#33, LLM, capped).
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
+
+- **2026-10-02: review checklist gains "new module → Dockerfile COPY".** After the #45 incident, every PR that adds a
+  top-level module imported by the server must add it to the Dockerfile. The coordinator checks this by importing
+  `live_server` from the exact COPY file set, until #18's test does it in CI.
 
 ## Known risks
 - ~~Map tiles~~: fixed by #47 (static vector map).
