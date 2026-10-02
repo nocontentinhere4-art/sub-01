@@ -24,9 +24,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   order_food → simulated courier on a real OSM bike route, get_delivery, bakery/park outings with real routes),
   `research.py` (Wikipedia curiosity chain, sensitive topics skipped; its article seeds what he searches),
   `browse.py` (`BROWSE=1`, on in the Dockerfile: headless Chromium on the open web for the desk + phone screens;
-  Bing SafeSearch strict with a Wikipedia → external-sources fallback; read-only, never types/logs in/buys; guard skips
-  adult, gore, self-harm, extremism, drugs, gambling and crypto-trading sites/pages; every request to private/internal
-  addresses is blocked; Chromium gets no secrets in its env), `live_server.py` (aiohttp; pages served
+  Bing SafeSearch strict with a Wikipedia → external-sources fallback; the only typing is a filtered query into a
+  site's own search box (#29, checked in the browser process), never logs in/signs up/buys; guard skips
+  adult, gore, self-harm, extremism, drugs, gambling, crypto-trading/wallet and login/sign-up/checkout sites/pages;
+  every request to private/internal addresses is blocked; Chromium gets no secrets in its env), `live_server.py` (aiohttp; pages served
   with `Cache-Control: no-cache`; `/api/diary`, `/api/reading`, `/api/frames`, `/api/browsing`, `/api/screen/{desk,phone}.jpg`).
 - State files under `--data-dir` go through `state_io.py` (#21): `save_json` (tmp + fsync + `os.replace`) and
   `load_json` (a missing or torn file gives defaults; a torn one is kept as `<name>.corrupt-<UTC time>` with one log line),
@@ -57,6 +58,19 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Shown: room reading card ("will it come back tonight?" Monte Carlo estimate), diary "read that day · replayed
   that night", eye dream prompts (replayed titles as images only). Wording: it does not understand the text.
 - Screens: bot checks (CAPTCHA / "unusual traffic") are recognised and left, never solved or clicked.
+
+## Free browsing (#29, PR `feature/free-browsing`)
+- New actions: `site_search` (types only into a search input — `browse.search_field_ok` refuses password, email,
+  comment, message, login, payment fields, textareas, editable divs, POST forms and forms with a password field; the
+  field is re-checked just before typing; Enter only; every typed text is in the service's `/state` → `typed`),
+  `next_page`, `open_comments`, `play_video` (muted; YouTube details stay in #17). Eyes list up to 6 options; a
+  `leave` option is always offered; the brain vote stays the only decider.
+- Chains of up to 30 pages (`browse.MAX_CHAIN`); leaving is boredom-, chain- and taste-driven in `brain_vote.py`
+  (`LEAVE_BORED`, `LEAVE_CHAIN`, the leave option's taste is the opposite of the current page's).
+- Cookie / consent banners: the reject or "necessary only" button (`browse.choose_dismiss`), never accept; modals
+  closed; sign-in walls left (never signed in). ~58 seeds across forums (read-only), news, museums, maps, recipes,
+  music, science and video pages; Wikipedia's external sources and pagination / comment links keep a place among the
+  40 links. Costs unchanged: 1 eyes call per page, 30/hour, $1.00/Tokyo day.
 
 ## Brain decides what he clicks (PR `feature/brain-decides`)
 - Eyes (`eyes.py`): after a page, an AI lists 3-5 options from the title, visible text and up to 40 numbered links
