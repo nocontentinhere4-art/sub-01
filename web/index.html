@@ -74,6 +74,12 @@
     text-shadow:0 1px 4px #000; }
   body.mini.n3 #n3mini { display:block; }
   body.n3 #cards { max-height:calc(100vh - 250px); }
+  #n3close { display:none; gap:6px; align-items:center; font-size:10px; color:var(--dim); flex-wrap:wrap; }
+  body.n3:not(.mini) #n3close { display:flex; }
+  #n3close button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:4px 8px; font:inherit; font-size:10.5px;
+    border-radius:5px; cursor:pointer; }
+  #n3close button.on { color:var(--or); border-color:rgba(255,106,0,.55); }
+  @media (min-width: 901px) { body.closeup #cards { display:none; } }
   #chat { display:flex; gap:6px; }
   #chat input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
     font:inherit; font-size:13px; border-radius:8px; transition:border-color .2s; }
@@ -195,6 +201,7 @@
 
 <div id="dock">
   <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain">neurons</button></div>
+  <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button></div>
   <div id="n3cap" hidden></div>
   <form id="chat"><input id="msg" placeholder="send a stimulus…" autocomplete="off" maxlength="200"><button>send</button></form>
   <div id="note">every message is a stimulus · max 200 characters · no links, addresses or tickers</div>
@@ -237,6 +244,57 @@ addEventListener("resize", resize); resize();
 const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.";
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
 const N3_NET = {gpu: "1M-neuron network on GPU", cpu: "20k-neuron network on CPU"};
+// close-ups with real neuron shapes (#78, web/neurons_morph.json): zoom in with neurons on, or a close-up button
+const N3_SHAPES = "Shapes are real reconstructed neurons from public databases and are illustrative: the simulated network uses point neurons (no dendrites are simulated). Pulses are slowed down to be visible.";
+const N3_TYPE = {pyramidal: "pyramidal", basket: "basket", medium_spiny: "medium spiny", relay: "thalamic relay",
+                 ca1_pyramidal: "CA1 pyramidal", amygdala_principal: "amygdala principal"};
+let n3morph = null, n3close = null, n3closeScene = null, n3saved = null, n3fit = 1, n3lodAt = 0;
+const regionLabel = n => !n ? "" : n.name.replace(/^LH_/, "left ").replace(/^RH_/, "right ").replace(/_/g, " ");
+function closeupRegion(kind){                       // the most active region of that kind (its rate byte), else the first
+  let best = -1, bv = -1;
+  nodes.forEach((n, i) => { if (Neurons3D.kindOf(n) !== kind || (kind === "cortex" && !/^(LH|RH)_/.test(n.name))) return;
+    const v = n3d ? n3d.rate(i) : 0; if (v > bv) { bv = v; best = i; } });
+  return best;
+}
+function closeupOpen(kind, region){
+  if (!kind) return closeupExit();
+  if (!n3want) neuronsOn(true);
+  const go = () => {
+    closeupExit(true);
+    const r = region != null && region >= 0 ? region : closeupRegion(kind);
+    n3close = Neurons3D.closeup({THREE, morph: n3morph, kind, region: r,
+      groupRate: m => m.groups && nodes[r] ? m.groups[nodes[r].group] : null});
+    if (!n3close) return;
+    n3closeScene = n3closeScene || new THREE.Scene();
+    n3close.group.rotation.x = Math.PI / 2;                          // cells are y-up; this scene is z-up like the brain
+    n3closeScene.add(n3close.group);
+    const b = n3close.box, c = [(b.min[0] + b.max[0]) / 2, -(b.min[2] + b.max[2]) / 2, (b.min[1] + b.max[1]) / 2];
+    const rad = 0.5 * Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+    n3fit = rad / Math.sin(camera.fov * Math.PI / 360) * 1.05;     // whole block in view, clear of the dock
+    n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
+    controls.target.set(...c);
+    const v = [0.22, -0.96, 0.17];                                  // along the block's thin side
+    camera.position.set(c[0] + n3fit * v[0], c[1] + n3fit * v[1], c[2] + n3fit * v[2]);
+    document.body.classList.add("closeup"); n3lodAt = performance.now();
+    document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
+    neuronsText();
+  };
+  if (n3morph) go();
+  else fetch("neurons_morph.json").then(r => r.json()).then(m => { n3morph = m; go(); }).catch(() => {});
+}
+function closeupExit(keepCamera){
+  if (n3close) { n3closeScene.remove(n3close.group); n3close.dispose(); n3close = null; }
+  if (!keepCamera && n3saved) { camera.position.copy(n3saved.pos); controls.target.copy(n3saved.target); n3saved = null; n3lodAt = performance.now(); }
+  if (!keepCamera) { document.body.classList.remove("closeup"); document.querySelectorAll("#n3close button").forEach(x => x.classList.remove("on")); }
+  neuronsText();
+}
+function closeupLine(){
+  const i = n3close.info(), t = i.types.map(x => `${x.n} ${N3_TYPE[x.type] || x.type} (${x.species})`).join(" + ");
+  return `<b>close-up · ${esc(regionLabel(nodes[i.region]))}</b> · ${esc(t)}`
+    + (i.live ? ` · each cell stands for a sampled model neuron here; spikes run soma → axon, slowed ~${Neurons3D.SLOWDOWN}×`
+              : ` · no live network: shapes only, no activity`)
+    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified · credits on /about</span>`;
+}
 function neuronsOn(on){
   n3want = on;
   document.body.classList.toggle("n3", on);
@@ -256,7 +314,9 @@ function neuronsText(){
   if (b) { b.textContent = live || !n3want ? "neurons" : "neurons offline"; b.classList.toggle("off", !live); }
   const st = n3d ? n3d.state() : null;
   let html = "";
-  if (n3want && !live) html = esc(N3_OFFLINE);
+  if (n3want && n3close) html = closeupLine() + (live ? "" : `<span class="s">${esc(N3_OFFLINE)}</span>`)
+    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;
+  else if (n3want && !live) html = esc(N3_OFFLINE);
   else if (n3want) html = `<b>live · ${esc(N3_NET[n3net] || "spiking network")}</b>`
     + (Neurons3D.spikeLine(st) ? ` · ${esc(Neurons3D.spikeLine(st))}` : "")
     + (st && st.race ? ` · <b>a choice is racing in the striatum</b>` : "")
@@ -561,6 +621,7 @@ function connect(){
       if (m.live === false) n3wall = -1e9;
       else if (m.n3 && !(m.net === "cpu" && n3net === "gpu" && performance.now() - n3wall < 10000)) { n3wall = performance.now(); n3net = m.net || "gpu"; }
       if (n3d) n3d.onFrame(m);
+      if (n3close) n3close.onFrame(m);
       return;
     }
     if (m.type === "hello") {
@@ -642,8 +703,9 @@ document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
   if (l === "fibres" || l === "cortex") { const o = scene.getObjectByName(l); if (o) o.visible = on; }
   if (l === "regions") { showRegions = on; actNew = true; }
   if (l === "sci") sciT = on ? 1 : 0;
-  if (l === "neurons") neuronsOn(on);
+  if (l === "neurons") { neuronsOn(on); if (!on) closeupExit(); }
 });
+document.querySelectorAll("#n3close button").forEach(b => b.onclick = () => closeupOpen(b.dataset.k));
 if ("IntersectionObserver" in window)            // draw only while the brain is on screen (the room's PiP, a phone's scroll)
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
 if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000); loadChess(); loadMusic();
@@ -695,6 +757,18 @@ function frame(now){
   }
   for (const g of glows) g.visible = g.material.opacity > 0.002;
   if (n3d) n3d.update(now);
+  if (n3want && !MINI && now - n3lodAt > 800) {                    // level of detail: points <-> shapes by zoom
+    const d = camera.position.distanceTo(controls.target), mode = n3close ? "closeup" : "brain", next = Neurons3D.lod(mode, d, n3fit);
+    if (next !== mode) {
+      n3lodAt = now;
+      if (next === "brain") closeupExit();
+      else if (nodes.length) {                                    // the region nearest the camera, by its kind
+        let bi = 0, bd = 1e9; nodes.forEach((n, i) => { const q = n.q, dd = (q[0] - camera.position.x) ** 2 + (q[1] - camera.position.y) ** 2 + (q[2] - camera.position.z) ** 2; if (dd < bd) { bd = dd; bi = i; } });
+        closeupOpen(Neurons3D.kindOf(nodes[bi]) || "cortex", Neurons3D.kindOf(nodes[bi]) ? bi : -1);   // pallidum: cortex
+      }
+    }
+  }
+  if (n3close) { n3close.update(now); controls.update(); renderer.render(n3closeScene, camera); return; }
   controls.update(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);

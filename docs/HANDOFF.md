@@ -313,6 +313,14 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - GPU frames carry per-region rates (`session.py` `frame()`: `"rq": quantise_rates(rr)`); a pod without it is tinted
   by network group rates, labelled. The panel also lists #70's real decisions per day (learned vs frozen twin).
 
+## Neurons with their real shape (#78, `docs/spiking/neurons3d.md` § close-ups)
+- `/brain` close-ups ("close-up: cortex · striatum · thalamus · hippocampus · amygdala", or zoom in with neurons on): 120–220 real
+  reconstructed neurons (NeuroMorpho.Org, CC BY 4.0, `web/neurons_morph.json`, built by
+  `analysis/build_morphologies.py`; credits `docs/spiking/morphology_credits.md` and `/about`), ≤ 60k segments,
+  one instanced draw call per cell type. A sampled neuron's spike runs soma → axon in the shader, slowed ~500×.
+- Illustrative shapes, never the scanned person's; the network uses point neurons. Only regions the model simulates
+  get a close-up (no cerebellum / Purkinje: not one of the 214 regions).
+
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
   / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is
