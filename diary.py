@@ -28,6 +28,9 @@ KEEP_IMG_NIGHTS = 120           # nights whose images are kept on the volume
 SHARE_MAX = 280
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+READ_VERB = {"video": "watched", "short": "watched", "forum": "read", "news": "read", "wiki": "read",
+             "finance": "looked at", "page": "read"}           # #79: a reading's verb by the kind of page it was
+
 SYSTEM = """You write the morning entry of a dream diary for SUB-01, a simulated brain model built from public MRI scans.
 You receive JSON: the dream scenes the model's image generator produced during REM, the chat messages it replayed,
 the titles of encyclopedia articles it read during the day and replayed, and when it slept; read_notes and
@@ -167,8 +170,10 @@ class Diary:
                 rcounts[r["text"]] = rcounts.get(r["text"], 0) + 1
         top = sorted(counts, key=lambda x: -counts[x])[:5]
         today = {}
-        for a in read_today:
-            today.setdefault(a["title"], {"title": a["title"], "url": a.get("url", ""), "replayed": 0, "today": True})
+        for a in read_today:                            # #79: pages he stayed on (kind: video, short, forum, news, ...)
+            today.setdefault(a["title"], {"title": a["title"], "url": a.get("url", ""), "replayed": 0, "today": True,
+                                          "kind": a.get("kind", "wiki"), "host": a.get("host", ""),
+                                          "verb": READ_VERB.get(a.get("kind", "wiki"), "read")})
         for title, n in rcounts.items():
             today.setdefault(title, {"title": title, "url": "", "replayed": 0, "today": False})["replayed"] = n
         read = sorted(today.values(), key=lambda a: (-a["replayed"], not a["today"]))[:30]
@@ -203,8 +208,9 @@ class Diary:
             text = (f"SUB-01 slept {facts['sleep_onset']}-{facts['woke_up']} and replayed {len(replays)} "
                     f"message{'s' * (len(replays) != 1)} during REM" +
                     (f", most often “{top[0][:80]}”." if top else ".") +
-                    (f" It also replayed {facts['reading_replays']} of the things it read, such as "
-                     f"“{top_read[0][:80]}”." if top_read else "") +
+                    (f" It also replayed {facts['reading_replays']} of the things it read or watched, such as "
+                     f"“{top_read[0][:80]}” ({today.get(top_read[0], {}).get('verb', 'read')} that day)."
+                     if top_read else "") +
                     (f" That day it read about {', '.join(facts['read_topics'][:3])}." if facts["read_topics"] else "") +
                     music_line(music))
         d.update(title=title or f"Night of {night['date']}", text=text, facts=facts, closed=True,

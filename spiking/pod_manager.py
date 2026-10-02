@@ -138,6 +138,9 @@ def top_messages(memory, t, n=5):
     return [{"text": m["text"], "emotion": m["emotion"]} for m in _today(memory, t, "chat")[:n]]
 
 
+ITEM_META = "item_meta.json"                 # #79: host / kind of each reading sent to a session (for /api/memory)
+ITEM_META_KEEP = 500
+
 def top_items(memory, t, n=MAX_PER_SOURCE):
     """The day's items for the GPU session: top n chat messages, top n readings (title + keywords, hashed like
     chat) and up to n words viewers taught it (those with two or more content words first, then the most replayed), as [{"text", "source", "item", "emotion"}]."""
@@ -146,7 +149,7 @@ def top_items(memory, t, n=MAX_PER_SOURCE):
     for m in _today(memory, t, "reading")[:n]:
         title = m.get("title") or m["text"]
         out.append({"text": " ".join([title] + list(m.get("keywords") or [])), "source": "reading", "item": title,
-                    "emotion": m["emotion"]})
+                    "emotion": m["emotion"], "host": m.get("host", ""), "kind": m.get("kind", "wiki")})   # #79
     taught = sorted(_today(memory, t, "taught"), key=lambda m: (half_cue_ok(m["text"]), m.get("replays", 0)),
                     reverse=True)           # testable from a half cue, then the most replayed; ties: Memory.weight
     out += [{"text": m["text"], "source": "taught", "item": m["text"], "emotion": m["emotion"]} for m in taught[:n]]
@@ -328,6 +331,7 @@ class PodManager:
                 n[src] = n.get(src, 0) + 1
                 items.append({"text": str(m["text"]), "source": src, "item": str(m.get("item") or m["text"]),
                               "emotion": m.get("emotion", "neutral")})
+        self.save_item_meta(raw)
         msgs = [{"text": it["text"], "emotion": it["emotion"]} for it in items if it["source"] == "chat"]
         max_min = max(5, int(minutes) - 15)                     # pod-side budget: boot (~5-10 min) is billed too
         phases = list(PHASES)
@@ -340,6 +344,25 @@ class PodManager:
                 "n_neurons": 1_000_000, "seed": 1, "max_minutes": max_min,      # fixed: same synapses every day
                 "phases": phases, "pong_train_minutes": 20 if max_min >= 60 else max(3, max_min // 4),
                 "messages": msgs, "items": items, "elapsed_days": self.elapsed_days(now), "validate": False}
+
+    def save_item_meta(self, raw):
+        """#79: where each reading came from ({item: {host, kind}}, spiking/item_meta.json), for /api/memory. The pod
+        never sees it: the session's items keep their fields."""
+        try:
+            meta = load_json(self.dir / ITEM_META, {}) or {}
+        except OSError:
+            meta = {}
+        for m in raw:
+            if m.get("source") == "reading" and (m.get("item") or m.get("text")) and m.get("kind"):
+                meta[str(m.get("item") or m["text"])[:200]] = {"host": str(m.get("host") or "")[:80],
+                                                               "kind": str(m["kind"])[:20]}
+        while len(meta) > ITEM_META_KEEP:
+            meta.pop(next(iter(meta)))
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            save_json(self.dir / ITEM_META, meta)
+        except OSError as e:
+            print(f"spiking: item meta not saved ({type(e).__name__})", file=sys.stderr, flush=True)
 
     def elapsed_days(self, now):
         state = self.dir / "manager.json"
