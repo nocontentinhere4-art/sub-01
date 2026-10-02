@@ -189,6 +189,21 @@ def test_variants_are_shared_and_released():
     assert live.variants == {}
 
 
+def test_variant_phases_spread_the_sends_over_ticks():
+    """The brain page (10/s), the room (5/s lite) and its mini brain (5/s q) do not all send on the same tick."""
+    live = bare_live()
+    asyncio.run(live.broadcast(big_tick(0)))                            # the tick counter is not at 0
+    clients = {q: join(live, dict(x.split("=") for x in q.split("&")))
+               for q in ("rate=10&q=1", "rate=5&lite=1", "rate=5&q=1")}
+    per_tick = []
+    for i in range(40):
+        before = {q: len(ws.sent) for q, ws in clients.items()}
+        asyncio.run(live.broadcast(big_tick(i)))
+        per_tick.append(sum(len(ws.sent) - before[q] for q, ws in clients.items()))
+    assert [len(ws.sent) for ws in clients.values()] == [20, 10, 10]
+    assert max(per_tick) == 1                                           # never two of the three on one tick
+
+
 def test_quantised_act_round_trip():
     vals = [ACT_LO, 0.02, 0.047, 0.1, 0.33, 1.0, 2.5, 4.58, ACT_HI]
     back = dequantise_act(quantise_act(vals))
@@ -257,8 +272,9 @@ def test_a_failed_send_drops_the_client():
     bad = Broken()
     live.feeds[bad] = live.feed_for({"rate": "5", "lite": "1"})
     live.clients.add(bad)
-    asyncio.run(live.broadcast(big_tick(0)))
-    assert bad not in live.clients and bad not in live.feeds and len(live.variants) == 1 and len(ok.sent) == 1
+    for i in range(4):                                                   # its feed's phase comes round
+        asyncio.run(live.broadcast(big_tick(i)))
+    assert bad not in live.clients and bad not in live.feeds and len(live.variants) == 1 and len(ok.sent) == 4
 
 
 async def _open(client, ip):

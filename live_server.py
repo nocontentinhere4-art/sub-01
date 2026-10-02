@@ -19,6 +19,7 @@ import math
 import os
 import random
 import re
+import socket
 import time
 from datetime import datetime
 from pathlib import Path
@@ -64,6 +65,7 @@ PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeE
 AMM_BUY = bytes.fromhex("67f4521f2cf57777")      # PumpSwap BuyEvent
 AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
 WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
+WS_SNDBUF = 64 * 1024          # kernel send buffer of a websocket (instead of autotuned megabytes)
 WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
 
 
@@ -127,6 +129,7 @@ class Feed:
         self.every = max(1, round(1.0 / (TICK * rate))) if rate else 1
         self.lite, self.q, self.n, self.trades, self.events = lite, q and not lite, 0, [], []
         self.bps = 0.0                                  # bytes a second of this feed's ticks (slow-client check)
+        self.phase = 0                                  # global tick (mod every) its sends land on; see Live.feed_for
 
     @property
     def key(self):
@@ -391,8 +394,8 @@ class Live:
         self.ws_per_ip = {}         # client address -> open websockets (only counts, kept in memory)
         self.max_ws = int(os.environ.get("SUB01_MAX_WS", 400))
         self.max_ws_ip = int(os.environ.get("SUB01_MAX_WS_PER_IP", 4))
-        self.ws_stats = {"lag": [], "skipped": 0, "refused": 0, "t0": None, "ticks": 0, "at": time.monotonic(),
-                         "every": float(os.environ.get("SUB01_WS_STATS_S", 300))}
+        self.ws_stats = {"lag": [], "late": [], "skipped": 0, "refused": 0, "t0": None, "ticks": 0,
+                         "at": time.monotonic(), "every": float(os.environ.get("SUB01_WS_STATS_S", 300))}
 
     async def broadcast(self, msg):
         """Send to every client: serialised once, then once per feed variant; a slow client skips ticks."""
@@ -434,7 +437,9 @@ class Live:
         return held > min(max(feed.bps if feed else 0.0, WS_SLOW_MIN), WS_HIGH_WATER // 2)
 
     def note_tick(self):
-        """Brain tick lag, as broadcast sees it: how late this tick is against the fastest one on the 50 ms grid.
+        """Brain tick lag, as broadcast sees it, two ways: `late`, how late this tick's step started against its
+        50 ms slot (what sends to viewers can delay: a tick only starts late if the last one overran), and `jitter`,
+        how late this broadcast is against the fastest one on the 50 ms grid (adds the step's own variation).
         Logged every SUB01_WS_STATS_S seconds (default 300) with the socket counts; tests/load_ws.py reads it."""
         st, now = self.ws_stats, time.monotonic()
         st["ticks"] += 1
@@ -443,20 +448,36 @@ class Live:
             st["t0"], due = now - st["ticks"] * TICK, now
         if len(st["lag"]) < 20000:                     # bounded even with a long SUB01_WS_STATS_S
             st["lag"].append(now - due)
+            st["late"].append(max(0.0, getattr(self, "tick_late", 0.0)))
         if now - st["at"] >= st["every"]:
-            lag = sorted(st["lag"])
-            pct = lambda p: 1000 * lag[min(len(lag) - 1, int(p * len(lag)))]
-            variants = " ".join(f"{e}{'L' if lite else ''}{'Q' if q else ''}:{sum(f.key == (e, lite, q) for f in self.feeds.values())}"
+            pct = lambda xs, p: 1000 * xs[min(len(xs) - 1, int(p * len(xs)))]
+            late, lag = sorted(st["late"]), sorted(st["lag"])
+            n = {}
+            for f in self.feeds.values():
+                n[f.key] = n.get(f.key, 0) + 1
+            variants = " ".join(f"{e}{'L' if lite else ''}{'Q' if q else ''}:{n.get((e, lite, q), 0)}"
                                 for (e, lite, q) in sorted(self.variants))
-            print(f"ws stats: {len(self.sockets)} sockets ({variants or '-'}) · tick lag p50 {pct(0.5):.1f} "
-                  f"p95 {pct(0.95):.1f} max {1000 * lag[-1]:.1f} ms over {len(lag)} ticks · skipped "
+            print(f"ws stats: {len(self.sockets)} sockets ({variants or '-'}) · tick late p50 {pct(late, 0.5):.1f} "
+                  f"p95 {pct(late, 0.95):.1f} max {1000 * late[-1]:.1f} ms · jitter p50 {pct(lag, 0.5):.1f} "
+                  f"p95 {pct(lag, 0.95):.1f} max {1000 * lag[-1]:.1f} ms · over {len(lag)} ticks · skipped "
                   f"{st['skipped']} sends to slow clients · refused {st['refused']} (full)", flush=True)
-            st.update(lag=[], skipped=0, refused=0, at=now)
+            st.update(lag=[], late=[], skipped=0, refused=0, at=now)
 
     def feed_for(self, query):
-        """The shared Feed for this query's (rate, lite, q) variant."""
+        """The shared Feed for this query's (rate, lite, q) variant. A new variant gets the tick phase that collides
+        least with the others' sends (e.g. 10/s on even ticks, the room's two 5/s feeds on ticks 1 and 3 of 4),
+        so one tick does not carry every client's send."""
         feed = Feed.from_query(query)
-        return self.variants.setdefault(feed.key, feed)
+        if feed.key in self.variants:
+            return self.variants[feed.key]
+        e = feed.every
+        if e > 1:
+            busy = [sum(1 for v in self.variants.values() for t in range(60)
+                        if t % e == ph and (t - v.phase) % v.every == 0) for ph in range(e)]
+            feed.phase = busy.index(min(busy))
+            feed.n = (self.ws_stats["ticks"] - feed.phase + 1) % e     # its sends land on ticks == phase (mod e)
+        self.variants[feed.key] = feed
+        return feed
 
     def drop_client(self, ws):
         self.clients.discard(ws)
@@ -516,6 +537,7 @@ class Live:
         next_t = last_save = time.time()
         while True:
             now = time.time()
+            self.tick_late = now - next_t                             # this tick's start vs its 50 ms slot (ws stats)
             events = self.sleep_tick()
             gain = {"AWAKE": 1.0, "REM": 0.7}.get(self.engine.stage, 0.3)
             if self.baseline:                                         # replaying a real recorded session (optional)
@@ -782,7 +804,10 @@ class Live:
 
     # --- http ----------------------------------------------------------------
     async def ws_handler(self, request):
-        ws = web.WebSocketResponse(heartbeat=20, max_msg_size=4096)
+        # permessage-deflate costs CPU and ~0.2 MB of zlib state per socket: worth it for the room's lite feed (its
+        # repeated JSON shrinks ~15x), not for q=1 (base64 activity barely compresses; ~7 KB/s raw at 10 ticks/s)
+        compress = not Feed.from_query(request.query).q
+        ws = web.WebSocketResponse(heartbeat=20, max_msg_size=4096, compress=compress)
         await ws.prepare(request)
         # rate-limit + per-address cap key; kept only in memory for this connection and the 10 s limiter window
         key = self.client_ip(request)
@@ -800,6 +825,12 @@ class Live:
             if request.transport is not None:                    # sends never wait: see backlogged()
                 request.transport.set_write_buffer_limits(high=WS_HIGH_WATER)
                 self.transports[ws] = request.transport
+                sock = request.transport.get_extra_info("socket")
+                if sock is not None:                             # a small kernel buffer: a backlog shows up in
+                    try:                                         # the transport (and is skipped), not in the kernel
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, WS_SNDBUF)
+                    except OSError:
+                        pass
             await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
             await ws.send_json(self.nights())
