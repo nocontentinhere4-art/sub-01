@@ -77,8 +77,8 @@
   #teach input#t-nick { flex:0 0 38%; }
   #teach button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12.5px; border-radius:7px; cursor:pointer; }
   #teach ul { list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.5; }
-  #teach li { display:flex; justify-content:space-between; gap:8px; }
-  #teach li span:last-child { color:var(--dim); white-space:nowrap; }
+  #teach li { margin-bottom:6px; }
+  #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
   #neurons { min-width:0; }
@@ -366,13 +366,13 @@ function renderNights(m){
 
 // ---------- teach him something ----------
 function taughtRow(it, withResult){
-  const who = it.nick ? ` <span class="m">— ${esc(it.nick)}</span>` : "";
+  const who = it.nick ? ` <span style="color:var(--dim)">— ${esc(it.nick)}</span>` : "";
   let right = `replayed in his sleep: ${it.replayed} time${it.replayed === 1 ? "" : "s"}`;
   if (withResult && it.result) right = it.result.recalled
     ? `<span class="ok">recalled</span> · ${it.result.score} vs lure ${it.result.best_lure} Hz`
     : `<span class="no">not recalled</span> · ${it.result.score} vs lure ${it.result.best_lure} Hz`;
   else if (withResult && it.testable === false) right += " · too short to test from half a cue";
-  return `<li><span>“${esc(it.text)}”${who}</span><span>${right}</span></li>`;
+  return `<li>“${esc(it.text)}”${who}<span class="r">${right}</span></li>`;
 }
 async function loadTaught(){
   try {
