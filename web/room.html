@@ -41,9 +41,17 @@
     transition:color .2s, border-color .2s; display:inline-flex; align-items:center; gap:7px; }
   #cam::before { content:""; width:6px; height:6px; border-radius:50%; background:#4a4a58; }
   #cam.on { color:var(--fg); border-color:rgba(255,255,255,.22); } #cam.on::before { background:var(--st); box-shadow:0 0 6px var(--st); }
+  /* the day plan (from /api/mind and `plan` messages) and the resting line, under the story */
+  #plan { margin-top:10px; font-size:12px; color:#c9c9d6; line-height:1.5; max-width:60ch; text-shadow:0 1px 8px #000;
+    background:rgba(10,10,16,.55); border:1px solid var(--line); border-left:2px solid var(--st); border-radius:6px; padding:6px 10px;
+    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #plan[hidden], #plan .r[hidden], #plan .rs[hidden] { display:none; }
+  #plan .h { color:var(--dim); } #plan s { color:var(--faint); }
+  #plan .r { display:block; font-size:11px; color:var(--dim); margin-top:2px; }
+  #plan .rs { display:block; font-size:11px; color:#9fb4ff; margin-top:2px; }
 
   #side { position:fixed; right:24px; top:24px; width:350px; display:flex; flex-direction:column; gap:12px; z-index:5;
-    max-height:calc(100vh - 140px); overflow-y:auto; scrollbar-width:none; padding-bottom:4px; }
+    max-height:calc(100vh - 66px - var(--dockh, 74px)); overflow-y:auto; scrollbar-width:none; padding-bottom:4px; }
   #side::-webkit-scrollbar { display:none; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:var(--glass);
     -webkit-backdrop-filter:var(--glass); box-shadow:0 10px 30px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05); }
@@ -124,7 +132,21 @@
   #honest:hover .tx, #honest:focus-within .tx, #honest:focus .tx { white-space:normal; }
   #honest { font-size:11px; color:var(--faint); line-height:1.55; text-shadow:0 1px 6px #000; max-width:92ch;
     background:rgba(8,8,11,.55); padding:7px 10px; border-radius:8px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  /* with the mind on, the /about link line carries its caption, under the disclaimer (which stays one line) */
+  #honest .ln { flex:none; } #honest.mind { flex-wrap:wrap; row-gap:2px; } #honest.mind .ln { flex-basis:100%; }
+  #honest .cap { color:var(--dim); }
   #dock { position:fixed; right:24px; bottom:18px; width:350px; z-index:5; }
+  /* the room's chat feed: viewers' messages, and his replies, always with their AI-written tag */
+  #feed { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; max-height:168px; overflow-y:auto; scrollbar-width:none; }
+  #feed::-webkit-scrollbar { display:none; }
+  #feed[hidden] { display:none; }
+  #feed .ln { font-size:11.5px; line-height:1.45; color:#c9c9d6; background:var(--card); border:1px solid var(--line); border-radius:8px;
+    padding:5px 9px; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); overflow-wrap:anywhere; }
+  #feed .ln .w { color:var(--faint); font-size:10px; margin-right:6px; }
+  #feed .ln.his { color:var(--fg); background:rgba(40,24,10,.82); border-color:rgba(255,154,60,.35); border-left:2px solid var(--st); }
+  #feed .ln.his .tag { display:inline-block; font-size:9.5px; letter-spacing:.06em; color:#0a0a0a; background:var(--st); border-radius:2px;
+    padding:0 5px; margin-right:6px; }
+  #feed .ln.his .re { display:block; font-size:10px; color:var(--dim); margin-top:1px; }
   #chat { display:flex; gap:6px; }
   #chat input { flex:1; min-width:0; background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
     font:inherit; font-size:13px; border-radius:8px; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); transition:border-color .2s; }
@@ -156,8 +178,9 @@
     #corner { position:static; display:block; }
     #brainpip { display:block; width:auto; margin:12px 16px 0; }
     #honest .tx { white-space:normal; } #honest { display:block; }
-    #honest { padding:12px 16px 96px; max-width:none; background:none; border-radius:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
+    #honest { padding:12px 16px calc(22px + var(--dockh, 74px)); max-width:none; background:none; border-radius:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
     #dock { left:12px; right:12px; width:auto; position:fixed; bottom:10px; }
+    #feed { max-height:92px; } #plan { max-width:none; }
     #away { top:31vh; width:calc(100vw - 48px); }
   }
 </style>
@@ -171,6 +194,7 @@
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
   <div id="why"></div>
+  <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's AI budget is used up; back tomorrow.</span></div>
   <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
 </div>
 
@@ -226,9 +250,10 @@
 <a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
 <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
   An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
-  <a href="/about.html">More on /about.</a></div>
+  <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
 </div>
 <div id="dock">
+  <div id="feed" hidden aria-live="polite"></div>
   <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
   <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
 </div>
@@ -328,6 +353,7 @@ const PLACE2ANCHOR = {bed:"bedside", desk:"desk", table:"desk", window:"window",
 const ACT = {                                        // activity -> [anchor, clip]
   sleep:["bedlie","sleep"], phone:["bedside","phone_sit"], order_food:["middle","phone_stand"], research:["desk","sit"],
   chart:["desk","sit"], eat:["desk","eat"], window:["window","idle"], get_delivery:["door","door"],
+  chat:["desk","sit"],                               // answering chat at the computer (the mind layer, #33/#46)
 };
 
 // ---------- loading (meshopt-compressed models, with progress and a retry) ----------
@@ -687,6 +713,7 @@ const skyMaterial = new THREE.ShaderMaterial({
 
 // ---------- what is on the screens ----------
 let screenOn = null;               // "desk" | "phone" | null (from the server)
+let chatting = false;              // at the desk answering chat: the monitor shows the chat window
 let lastStatus = {};               // device -> status
 let trades = [];                   // recent trade flow, for the chart view
 function showScreen(st){
@@ -822,6 +849,97 @@ function drawFood(c){
   if (!pvTex) { pvTex = screenTexture(pv); } pvTex.needsUpdate = true; return pvTex;
 }
 
+// ---------- chat: viewers' messages and his replies (AI-written, always tagged) ----------
+const REPLY_TAG = "his reply (AI-written)";
+let talk = [], typing = null;        // [{his, t, text, re}] oldest first; typing: the newest reply while it types out on the monitor
+function addTalk(x){ talk.push(x); if (talk.length > 40) talk = talk.slice(-40); }
+function hearReply(m, live){         // a reply is only ever shown with its tag
+  if (!m || !m.text) return;
+  addTalk({his:true, t:m.t || "", text:String(m.text), re:m.replying_to || "", tag:m.tag || REPLY_TAG});
+  if (live) typing = {at:performance.now(), n:String(m.text).length};
+  chatDirty = true;
+}
+function renderFeed(){
+  const rows = talk.slice(-6);
+  put("feed", "hidden", !rows.length);
+  put("feed", "innerHTML", rows.map(x => x.his
+    ? `<div class="ln his"><span class="tag">${esc(x.tag)}</span><span class="w">${esc(x.t)}</span>${esc(x.text)}`
+      + (x.re ? `<span class="re">to a viewer: “${esc(x.re.length > 60 ? x.re.slice(0, 58) + "…" : x.re)}”</span>` : "") + `</div>`
+    : `<div class="ln"><span class="w">a viewer · ${esc(x.t)}</span>${esc(x.text)}</div>`).join(""));
+  const f = $("feed"); f.scrollTop = f.scrollHeight;
+}
+// the monitor while he answers chat: a plain chat window, his reply typing out
+const mv = document.createElement("canvas"); mv.width = 1024; mv.height = 600; const mx = mv.getContext("2d");
+let mvTex = null, chatDirty = true, chatAt = 0;
+function wrapLines(g, text, width, max){
+  const out = []; let line = "";
+  for (const w of String(text).split(/\s+/)) {
+    const t = line ? line + " " + w : w;
+    if (g.measureText(t).width > width && line) { out.push(line); line = w; if (out.length >= max) break; } else line = t;
+  }
+  if (line && out.length < max) out.push(line);
+  return out;
+}
+function drawChatWindow(now){
+  const W = mv.width, H = mv.height, g = mx;
+  g.fillStyle = "#0d0f15"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#151924"; g.fillRect(0, 0, W, 60);
+  g.fillStyle = "#e6e8ef"; g.font = "bold 24px sans-serif"; g.fillText("Chat", 28, 39);
+  g.fillStyle = "#7b8196"; g.font = "17px sans-serif"; g.fillText("messages from viewers · his replies are written by an AI", 102, 39);
+  // newest at the bottom: lay out from the bottom up until the window is full
+  const rows = talk.slice(-8), blocks = [], BW = 640;
+  for (const x of rows) {
+    g.font = "21px sans-serif";
+    let text = x.text;
+    if (x.his && typing && x === talk[talk.length - 1]) text = text.slice(0, Math.max(1, Math.floor((now - typing.at) / 1000 * 32)));
+    const lines = wrapLines(g, text, BW - 40, 4);
+    blocks.push({x, lines, h:lines.length * 28 + 46});
+  }
+  let y = H - 24;
+  for (let i = blocks.length - 1; i >= 0 && y > 80; i--) {
+    const {x, lines, h} = blocks[i], left = x.his ? W - 28 - BW : 28;
+    y -= h; if (y < 72) break;
+    g.fillStyle = x.his ? "#3a2510" : "#1b1f2b"; g.beginPath(); g.roundRect(left, y, BW, h - 10, 12); g.fill();
+    if (x.his) { g.fillStyle = "#ff9a3c"; g.fillRect(left, y + 8, 4, h - 26); }
+    g.font = "15px sans-serif"; g.fillStyle = x.his ? "#ffb877" : "#7b8196";
+    g.fillText(x.his ? `${x.tag} · ${x.t}` : `a viewer · ${x.t}`, left + 20, y + 26);
+    g.font = "21px sans-serif"; g.fillStyle = x.his ? "#fff1e2" : "#d5d8e2";
+    lines.forEach((l, k) => g.fillText(l, left + 20, y + 54 + k * 28));
+  }
+  if (!rows.length) { g.fillStyle = "#7b8196"; g.font = "20px sans-serif"; g.fillText("no messages yet", 28, 110); }
+  if (!mvTex) { mvTex = screenTexture(mv); fitTop(mvTex, SURF.monitor.w / SURF.monitor.h); } mvTex.needsUpdate = true; return mvTex;
+}
+function chatTex(){                  // redraw on new lines; ~12x a second while a reply types out
+  const now = performance.now(), live = typing && (now - typing.at) / 1000 * 32 < typing.n + 1;
+  if (typing && !live && !chatDirty && now - chatAt > 200) { typing = null; chatDirty = true; }
+  if (!mvTex || chatDirty || (live && now - chatAt > 80)) { chatDirty = false; chatAt = now; drawChatWindow(now); }
+  return mvTex;
+}
+
+// ---------- the mind layer: today's plan, resting, the caption (/api/mind and `plan` messages) ----------
+let mindPlan = null, mindResting = false;
+function renderPlan(){
+  const p = mindPlan, steps = p && p.steps || [];
+  put("plan", "hidden", !steps.length && !mindResting);
+  put("p-text", "innerHTML", steps.length ? `<span class="h">Today's plan (voted by his brain model):</span> `
+    + steps.map(s => s.done ? `<s>${esc(s.label)}</s>` : esc(s.label)).join(", ") : "");
+  put("p-reason", "textContent", steps.length && p.reason ? p.reason : "");
+  put("p-reason", "hidden", !(steps.length && p.reason));
+  put("p-rest", "hidden", !mindResting);
+}
+function loadMind(){
+  fetch("/api/mind").then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    const on = !!d.on;
+    if (shown.get("honest.mind") !== on) { shown.set("honest.mind", on); $("honest").classList.toggle("mind", on); }
+    put("mind-cap", "textContent", on && d.caption ? d.caption : "");
+    mindResting = !!(on && d.status && d.status.resting);
+    if (on) mindPlan = d.plan || null;
+    renderPlan();
+  }).catch(() => {});
+}
+loadMind(); setInterval(loadMind, 60 * 1000);
+
 // the story line fades in whenever what he does changes (ticks rewrite it every second; only a new text restarts the fade)
 let storyWas = "";
 new MutationObserver(() => { const s = $("story"), t = s.textContent; if (t === storyWas) return; storyWas = t;
@@ -834,7 +952,7 @@ controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
 function updateCameraGoal(){
-  if (screenOn === "desk" && monitor) {
+  if ((screenOn === "desk" || chatting) && monitor) {
     const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
     camGoal.target.set(...m.c);
     camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
@@ -885,7 +1003,7 @@ function lighting(dt){
   const awake = stage === "AWAKE", home = boy && boy.visible;
   const evening = awake && day < 0.55 && home;
   roomOn += ((evening ? 1 : 0) - roomOn) * Math.min(1, dt * 2);
-  const wantLamp = awake && home && (screenOn === "desk" || (current === actions.eat)) && day < 0.7;
+  const wantLamp = awake && home && (screenOn === "desk" || chatting || (current === actions.eat)) && day < 0.7;
   lampOn += ((wantLamp ? 1 : 0) - lampOn) * Math.min(1, dt * 3);
   sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
   sun.intensity = 0.3 + 2.3 * day + 0.7 * dusk;
@@ -1182,11 +1300,13 @@ function screens(life, st){
   const atDesk = !life.path && ["research","chart"].includes(life.activity) && st === "AWAKE";
   const onPhone = !life.path && ["phone","order_food"].includes(life.activity) && st === "AWAKE" && visible;
   phone.visible = onPhone && !!hand;
+  chatting = !life.path && life.activity === "chat" && st === "AWAKE" && visible;
   screenOn = life.activity === "research" && atDesk ? "desk" : life.activity === "phone" && onPhone ? "phone" : null;
   if (life.screen) showScreen(life.screen);
   // desk monitor
   if (monitor) {
-    if (life.activity === "chart" && atDesk) { monitor.id = null; const t = chartTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
+    if (chatting) { monitor.id = null; const t = chatTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
+    else if (life.activity === "chart" && atDesk) { monitor.id = null; const t = chartTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
     else if (screenOn === "desk" && lastStatus.desk) { if (monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
     else if (atDesk && life.activity === "research" && life.reading) {            // no browser: the article he is reading
       if (monitor.id !== "wiki:" + life.reading.title) { monitor.set(drawReading(life.reading)); monitor.id = "wiki:" + life.reading.title; } }
@@ -1300,6 +1420,15 @@ function connect(){
     const m = JSON.parse(e.data);
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
+    if (m.type === "hello") {          // the latest chat and his replies, merged by time (hh:mm)
+      talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
+              ...(m.replies || []).map(r => ({his:true, t:r.t || "", text:String(r.text || ""), re:r.replying_to || "", tag:r.tag || REPLY_TAG}))]
+        .filter(x => x.text).map((x, i) => [x, i]).sort((a, b) => a[0].t < b[0].t ? -1 : a[0].t > b[0].t ? 1 : a[1] - b[1]).map(a => a[0]).slice(-40);
+      typing = null; chatDirty = true; renderFeed(); return;
+    }
+    if (m.type === "chat") { if (m.text) { addTalk({his:false, t:m.t || "", text:String(m.text)}); chatDirty = true; renderFeed(); } return; }
+    if (m.type === "chat_reply") { hearReply(m, true); renderFeed(); return; }
+    if (m.type === "plan") { if (m.steps) { mindPlan = m; renderPlan(); } return; }
     if (m.type === "teach_ack") {
       $("tc-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
       $("tc-note").className = m.ok ? "s" : "s err";
@@ -1367,6 +1496,8 @@ function applyTick(m){
       + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : ""));
 }
 if (!(DEBUG && new URLSearchParams(location.search).has("nolive"))) connect();
+// the side cards stop above the dock, whatever the chat feed's height
+new ResizeObserver(() => document.documentElement.style.setProperty("--dockh", `${Math.ceil($("dock").offsetHeight) + 18}px`)).observe($("dock"));
 $("chat").addEventListener("submit", ev => {
   ev.preventDefault(); const t = $("msg").value.trim(); if (!t) return;
   if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting"; $("note").className = "err"; return; }
@@ -1413,6 +1544,7 @@ function frame(now){
     holdW = phone.visible && boy.visible ? Math.min(1, holdW + dt / 0.7) : 0;     // the arm comes up to the phone
     if (holdW > 0) holdPhone(holdW);
   }
+  if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
   lighting(dt);
   if (follow && performance.now() - userMovedAt > 20000) {
     updateCameraGoal();
@@ -1425,7 +1557,8 @@ function frame(now){
 requestAnimationFrame(frame);
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
-  place, screens, play, actions, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
+  place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
+  addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   sim: (dt, n = 1) => { boy.visible = visible; for (let i = 0; i < n; i++) { untouch(); mixer.update(dt); drive(dt); plantFeet(); armrests(); holdW = phone.visible && boy.visible ? Math.min(1, holdW + dt / 0.7) : 0; if (holdW > 0) holdPhone(holdW); }
     lighting(0.1); controls.update(); renderer.render(scene, camera); },
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top less 2 cm of give; rounded edge) and the chair
