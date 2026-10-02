@@ -23,6 +23,14 @@ options (eyes.py) and the brain model pick one (brain_vote.py); act() then carri
 search, site_search, next_page, open_comments, open_video, play_video, back, scroll, leave). Bot checks
 (CAPTCHA, "unusual traffic") are never solved: such pages are left.
 
+YouTube (#17): every context carries YouTube's Restricted Mode cookie (PREF f2=8000000). With the "video" mode (life
+activity watch_video) the desk opens a YouTube search for his interest (a URL, the query through eyes.query_ok; he
+types nothing), the brain picks a video among the options, and it plays muted (Chromium runs with --mute-audio and the
+<video> element is muted again at every screenshot) for a bounded time (act's `watch_s`, at most MAX_WATCH_S); then
+the brain decides again. While he watches, each screenshot is compared with the previous one (scene_change) and the
+live server turns that into visual drive. Titles and channel names pass the guard and the chat filter
+(video_text_ok); comments and live chat are hidden, never opened; nothing is liked, subscribed or signed in to.
+
 Optional: needs `pip install playwright` + a Chromium (`playwright install --with-deps chromium`). Without it the
 server runs as before (Wikipedia reading only).
 """
@@ -44,6 +52,34 @@ PAGE_LINKS = 40
 VIDEO_LINK = re.compile(r"(youtube\.com/watch|youtu\.be/|vimeo\.com/\d|nicovideo\.jp/watch|dailymotion\.com/video|"
                         r"/videos?/|/watch\b)", re.I)
 MAX_CHAIN = 30                         # pages in a row before he wanders off to something new (#29)
+# YouTube (#17): Restricted Mode for every context, bounded muted watching, scene changes as visual drive
+YOUTUBE_COOKIES = [{"name": "PREF", "value": "f2=8000000", "domain": ".youtube.com", "path": "/", "secure": True}]
+YOUTUBE_HOST = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$", re.I)
+MAX_WATCH_S = 600.0                    # a watch never lasts longer than this (real seconds), whatever is asked
+MIN_WATCH_S = 10.0                     # ...nor shorter (the accelerated demo clock: a few screenshots at least)
+VIDEO_SHOT_S = 4.0                     # a screenshot (and a scene-change measure) every few seconds while watching
+SCENE_FULL = 32.0                      # mean grey-level change (0..255) of the thumbnails that counts as a full cut
+HIDE_YOUTUBE = """ytd-comments,#comments,ytd-live-chat-frame,#chat,#chat-container,ytd-engagement-panel-section-list-renderer,
+#sponsor-button,#subscribe-button,ytd-subscribe-button-renderer,#actions,ytd-menu-renderer,tp-yt-paper-dialog,
+ytd-popup-container,ytd-consent-bump-v2-lightbox{display:none !important}"""
+# every <video> is muted and locked muted: the page's own `muted = false` / `volume = 1` become no-ops
+VIDEO_JS = """mode => { const P = HTMLMediaElement.prototype, d = n => Object.getOwnPropertyDescriptor(P, n);
+  const vs = [...document.querySelectorAll('video, audio')];
+  for (const v of vs) {
+    d('muted').set.call(v, true); d('volume').set.call(v, 0);
+    if (!v.__sub01_muted) {
+      Object.defineProperty(v, 'muted', {get: () => d('muted').get.call(v), set: () => {}, configurable: false});
+      Object.defineProperty(v, 'volume', {get: () => d('volume').get.call(v), set: () => {}, configurable: false});
+      v.__sub01_muted = true;
+    }
+  }
+  const v = vs.find(x => x.tagName === 'VIDEO');
+  if (!v) return null;
+  if (mode === 'play') { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+  if (mode === 'pause') v.pause();
+  return {muted: v.muted, volume: v.volume, paused: v.paused, t: v.currentTime || 0, duration: v.duration || 0}; }"""
+CHANNEL_JS = """() => { const a = document.querySelector('ytd-video-owner-renderer ytd-channel-name a, #owner #channel-name a, ytd-channel-name a');
+  return a ? (a.innerText || '').trim().slice(0, 80) : ''; }"""
 SITE_SEARCH_NAV_MS = 8000              # wait for the results page after Enter (some sites update in place)
 LINKS_JS = """() => [...document.querySelectorAll('a[href]')].map(a => {
   const r = a.getBoundingClientRect(), cs = getComputedStyle(a);
@@ -113,7 +149,7 @@ WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], 
     const r = f.getBoundingClientRect(), cs = getComputedStyle(f);
     return r.width >= 200 && r.height >= 60 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.1; })"""
 # links whose URL path leads to an account, a form or a purchase, whatever their text says
-LOGIN_HREF = re.compile(r"/(log-?in|sign-?in|sign-?up|signin|signup|register|join|account|my-?account|checkout|cart|"
+LOGIN_HREF = re.compile(r"/(log-?in|sign-?in|sign-?up|signin|signup|servicelogin|register|join|account|my-?account|checkout|cart|"
                         r"basket|subscribe|donate|password|auth|oauth2?|sso)(/|\?|$|\.)", re.I)
 # place names that contain a blocked fragment ("sex" in Sussex): removed before the host check
 HOST_FALSE_HITS = re.compile(r"sussex|essex|middlesex|wessex", re.I)
@@ -251,6 +287,31 @@ def display_ok(text):
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
 
 
+def is_youtube(host):
+    return bool(YOUTUBE_HOST.search((host or "").rstrip(".")))
+
+
+def video_text_ok(text):
+    """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked)."""
+    import chat
+    return display_ok(text) and chat.blocked(text or "") is None
+
+
+def scene_change(prev_jpeg, jpeg):
+    """0..1: how much the picture changed between two screenshots (mean absolute grey-level difference of 64x36
+    thumbnails, SCENE_FULL = a full cut). 0 without a previous shot."""
+    if not prev_jpeg or not jpeg:
+        return 0.0
+    import io
+    from PIL import Image, ImageChops, ImageStat
+    a, b = (Image.open(io.BytesIO(x)).convert("L").resize((64, 36)) for x in (prev_jpeg, jpeg))
+    return round(min(1.0, ImageStat.Stat(ImageChops.difference(a, b)).mean[0] / SCENE_FULL), 3)
+
+
+def youtube_search_url(q):
+    return "https://www.youtube.com/results?" + urllib.parse.urlencode({"search_query": q})
+
+
 LOGIN_LINK = re.compile(r"log ?in|sign ?(in|up)|register|account|cart|checkout|basket|subscribe|donate|password|"
                         r"privacy|cookie|terms|legal|imprint|impressum|careers|advertis", re.I)
 SKIP_EXT = re.compile(r"\.(pdf|zip|rar|7z|exe|dmg|apk|mp3|mp4|mov|avi|mkv|iso|tar|gz|docx?|xlsx?|pptx?)(\?|$)", re.I)
@@ -300,6 +361,8 @@ SEEDS = [                              # where he starts when nothing else pulls
     # blogs and tech
     "https://github.com/trending", "https://xkcd.com/", "https://waitbutwhy.com/", "https://www.kottke.org/",
 ]
+VIDEO_TOPICS = ["bread baking", "Tokyo night walk", "how the brain works", "Inokashira Park", "ramen making",
+                "train window Japan", "lo-fi music", "space documentary", "cat videos", "Studio Ghibli"]
 FAMILIAR = ["Kichijoji", "Inokashira Park", "Tokyo bakery", "how dreams work", "sleep science", "ramen", "Ghibli Museum",
             "night city photography", "lo-fi music", "how the brain works", "Japanese convenience store", "Tokyo trains"]
 STOP = set("the a an and or but if of to in on at for with from by is are was were be been it this that these those "
@@ -400,6 +463,10 @@ class Screen:
         self.awaiting = None                                # page handed to the brain for a decision
         self.awaiting_since = 0.0
         self.chain = 0                                      # pages shown in a row since he last wandered off
+        self.mode = None                                    # "video": he is watching videos (YouTube), else browsing
+        self.watch_until = 0.0                              # wall time the current video ends (0: not watching)
+        self.watch_s = 0.0
+        self.scene = 0.0                                    # change between the last two screenshots while watching
 
     def status(self):
         return dict(self.info, id=self.shot_id, device=self.name, chain=self.chain) if self.info and self.shot else None
@@ -493,6 +560,7 @@ class Browser:
             if device == "desk":
                 opts["user_agent"] = DESK_UA
             sc.ctx = await self.browser.new_context(**opts)
+            await sc.ctx.add_cookies(YOUTUBE_COOKIES)            # YouTube's Restricted Mode, before any page loads
             await sc.ctx.route("**/*", self.guard.route)
             sc.page = await sc.ctx.new_page()
             sc.ctx.on("page", lambda p: asyncio.ensure_future(p.close()) if p != sc.page else None)   # no pop-ups
@@ -511,6 +579,7 @@ class Browser:
                 sc.ctx = sc.page = None
                 sc.scrolls_left, sc.next_at, sc.pending_link = 0, 0.0, None
                 sc.info, sc.history, sc.awaiting, sc.chain = None, [], None, 0
+                sc.mode, sc.watch_until, sc.scene = None, 0.0, 0.0
         if device is None and self.browser is not None:
             try:
                 await self.browser.close()
@@ -525,8 +594,9 @@ class Browser:
             self.pw = None
 
     # --- one step ------------------------------------------------------------------------------------------------
-    async def step(self, device, heard=(), interest=None):
-        """Scroll the current page or open the next one; returns the new screen status when a screenshot was taken."""
+    async def step(self, device, heard=(), interest=None, mode=None):
+        """Scroll the current page or open the next one; returns the new screen status when a screenshot was taken.
+        mode "video": he is watching videos (life activity watch_video): pages come from a YouTube search."""
         sc = self.screens[device]
         if time.time() < sc.next_at:
             return None
@@ -534,6 +604,19 @@ class Browser:
             try:
                 sc = await self._ensure(device)
                 moved_on = False
+                if (mode == "video") != (sc.mode == "video"):      # switched between browsing and videos
+                    sc.mode, sc.awaiting, sc.watch_until = mode, None, 0.0
+                    if sc.info:
+                        moved_on = True                         # start afresh in the new mode
+                if sc.watch_until:                              # watching a video: screenshots until the time is up
+                    if time.time() < sc.watch_until and sc.info and sc.info.get("kind") == "page":
+                        if not await self._watch(sc):
+                            sc.next_at = time.time() + 15
+                            return None
+                        sc.next_at = time.time() + VIDEO_SHOT_S
+                        self.failures = 0
+                        return sc.status()
+                    await self._end_watch(sc)
                 if self.decide and sc.awaiting is not None:      # the brain is choosing: hold the page
                     if not self._fresh_chat(heard) and time.time() - sc.awaiting_since < DECIDE_WAIT_S:
                         return None
@@ -596,7 +679,7 @@ class Browser:
         sources are kept even when they are small or low on the page, so the brain can follow them (#29)."""
         cur = urllib.parse.urlsplit(url)
         wiki = (cur.hostname or "").endswith("wikipedia.org")
-        seen, cand = set(), []
+        seen, cand = {}, []
         for href, label, area, visible, *extra in raw:
             rel, external, aria = (list(extra) + ["", False, ""])[:3]
             label = " ".join(str(label or "").split())
@@ -606,15 +689,20 @@ class Browser:
             u = urllib.parse.urlsplit(href)
             ext = bool(external) and wiki and not (u.hostname or "").endswith(("wikipedia.org", "wikimedia.org",
                                                                                 "wikidata.org"))
+            yt = is_youtube(u.hostname or "")
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
-                    or not display_ok(label) or href in seen):
+                    or not display_ok(label) or (yt and not video_text_ok(label))):
+                continue
+            if href in seen:                                    # YouTube: the thumbnail link comes first, labelled
+                if yt and len(label) > len(seen[href]["text"]):  # with the duration; the title link is the label
+                    seen[href]["text"] = label
                 continue
             if (u.netloc, u.path, u.query) == (cur.netloc, cur.path, cur.query) or (
                     search and u.netloc == cur.netloc and kind != "next"):
                 continue                                        # same page; on a results page only the results
-            seen.add(href)
-            cand.append({"visible": bool(visible), "area": area, "href": href, "text": label, "host": u.hostname or "",
-                         "kind": kind, "external": ext})
+            seen[href] = {"visible": bool(visible), "area": area, "href": href, "text": label, "host": u.hostname or "",
+                          "kind": kind, "external": ext}
+            cand.append(seen[href])
         cand.sort(key=lambda c: (not c["visible"], -c["area"]))
         special = [c for c in cand if c["kind"]][:4] + [c for c in cand if c["external"] and not c["kind"]][:8]
         ids = {id(c) for c in special}
@@ -654,8 +742,8 @@ class Browser:
                     flag = LINK_ACTIONS[kind]                       # the link must really be of that kind
                     href = link["href"] if link and (flag is None or link.get(flag)) else None
                     ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
-                    if ok and kind == "play_video":
-                        await self._play_muted(sc)
+                    if ok and kind in ("play_video", "open_video") and await self._play_muted(sc):
+                        await self._start_watch(sc, action.get("watch_s"))
                 elif kind == "search" and action.get("target"):
                     from eyes import query_ok                       # checked again here, in the browser's process
                     q = query_ok(action["target"])
@@ -695,6 +783,13 @@ class Browser:
         his interests; else a search on what he read last or something familiar; sometimes a seed site. A new chain
         of pages starts here."""
         sc.chain = 0
+        if sc.mode == "video":                                  # watching videos: a YouTube search (no typing)
+            from eyes import query_ok
+            q = query_ok(interest or "") or self.rng.choice(VIDEO_TOPICS)
+            if await self._open(sc, youtube_search_url(q), f"looked for videos about “{q}”", "page",
+                                title=f"{q} — YouTube"):
+                sc.scrolls_left = 0
+                return True
         if sc.pending_link:
             url, why = sc.pending_link
             sc.pending_link = None
@@ -748,12 +843,52 @@ class Browser:
         return await self._settle(sc, why, "page", min_text=80)
 
     async def _play_muted(self, sc):
-        """A video page: start its first video muted (Chromium also runs with --mute-audio)."""
+        """A video page: start its first video muted (Chromium also runs with --mute-audio). The <video> state, or
+        None when the page has no video element."""
         try:
-            await sc.page.evaluate("""() => { const v = document.querySelector('video');
-                if (v) { v.muted = true; v.volume = 0; const p = v.play(); if (p && p.catch) p.catch(() => {}); } }""")
+            return await sc.page.evaluate(VIDEO_JS, "play")
+        except Exception:
+            return None
+
+    async def _start_watch(self, sc, watch_s=None):
+        """He watches the video for a bounded time (MIN_WATCH_S..MAX_WATCH_S real seconds); then the brain decides."""
+        try:
+            w = float(watch_s)
+        except (TypeError, ValueError):
+            w = 120.0
+        w = min(MAX_WATCH_S, max(MIN_WATCH_S, w if w == w else 120.0))
+        sc.watch_s, sc.watch_until, sc.scene, sc.scrolls_left = w, time.time() + w, 0.0, 0
+        sc.next_at = time.time() + VIDEO_SHOT_S
+        if sc.info:
+            sc.info = dict(sc.info, video={"watching": True, "seconds": round(w), "left_s": round(w), "scene": 0.0,
+                                           "muted": True, "channel": sc.info.get("channel", "")})
+
+    async def _watch(self, sc):
+        """One screenshot while watching: the video is muted again, the scene change measured. False if the page
+        turned into a bot check (then it is left)."""
+        state = await sc.page.evaluate(VIDEO_JS, None)
+        prev = sc.shot
+        if not await self._shoot(sc):
+            sc.watch_until = 0.0
+            return False
+        sc.scene = scene_change(prev, sc.shot)
+        v = dict(sc.info.get("video") or {})
+        v.update(watching=True, left_s=max(0, round(sc.watch_until - time.time())), scene=sc.scene,
+                 muted=bool(state is None or state.get("muted")), playing=bool(state and not state.get("paused")))
+        sc.info = dict(sc.info, video=v)
+        return True
+
+    async def _end_watch(self, sc):
+        """Time is up: the video is paused and the brain decides what next (the page goes back to the vote)."""
+        sc.watch_until, sc.scene = 0.0, 0.0
+        try:
+            await sc.page.evaluate(VIDEO_JS, "pause")
         except Exception:
             pass
+        if sc.info and sc.info.get("video"):
+            mins = round(sc.watch_s / 60, 1)
+            sc.info = dict(sc.info, video=dict(sc.info["video"], watching=False, left_s=0, scene=0.0),
+                           why=f"watched for {mins:g} min (muted); deciding again")
 
     async def _search(self, sc, q, why):
         """Search the web (Bing, SafeSearch strict); if it shows no results (bot check), search Wikipedia instead and
@@ -843,9 +978,22 @@ class Browser:
             self.last_skip = reason
             return await self._leave(sc)
         host = urllib.parse.urlsplit(page.url).hostname or ""
+        channel = ""
+        if is_youtube(host):                                           # titles and channels: guard + chat filter
+            await page.add_style_tag(content=HIDE_YOUTUBE)             # no comments, live chat or buttons on screen
+            channel = (await page.evaluate(CHANNEL_JS) or "").strip()
+            name = re.sub(r"\s*-\s*YouTube$", "", page_title)
+            if not video_text_ok(name):
+                print(f"browse: skipped a video ({host}): title refused", flush=True)
+                self.last_skip = "guard"
+                return await self._leave(sc)
+            if channel and not video_text_ok(channel):
+                channel = ""
         sc.info = {"title": (title or page_title or host)[:140], "url": page.url, "host": host.removeprefix("www."),
                    "why": why.replace("opened “”", f"opened {host.removeprefix('www.')}"), "t": time.time(), "kind": kind,
                    "search_box": kind == "page" and await self._has_search_box(page)}
+        if channel:
+            sc.info["channel"] = channel[:80]
         sc.scrolls_left = self.rng.randint(*SCROLLS) if kind == "page" else 0
         if shoot and not await self.show(sc):
             return False

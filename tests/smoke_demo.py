@@ -10,6 +10,10 @@ rule, no AI key needed) is sent every 11 s during the measurement, so the day pl
 chat replies run while the tick cost is measured; the run fails if no plan arrives.
 After the first tick (#15): /healthz answers 200, /api/costs and /api/health answer 401 without the admin token and
 200 with it (a random SUB01_ADMIN_TOKEN is set for the server), and /api/health's tick time is printed.
+With --youtube-chess (#17) the clock runs 60x from 10:00 Tokyo and a chat wish ("let's play chess", and with
+--browse also "watch a youtube video") is sent every 11 s: the run fails unless a chess game is played to its end (and,
+with --browse, a video is watched) during the measurement. --browse starts the real browser (BROWSE=1, needs
+playwright + Chromium + network) and prints the browser's peak memory while a video plays.
 No `test_` prefix, so pytest does not collect it.
 """
 import argparse
@@ -26,7 +30,7 @@ import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
 PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes",
-         "/api/taught", "/api/mind"]
+         "/api/taught", "/api/mind", "/api/chess"]
 ADMIN = {"X-Admin-Token": secrets.token_hex(16)}     # the server gets it as SUB01_ADMIN_TOKEN
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
 TORN = {                 # state files read back at startup, each cut off mid-write
@@ -54,6 +58,14 @@ def check_torn(data_dir, log_text):
         if not ok:
             failures.append(f"torn {name}: {len(lines)} log lines, {len(kept)} files kept aside")
     return failures
+
+
+def browser_mb(server_pid):
+    """Memory (PSS) of the browser service child and its Chromium processes, as its own watchdog counts it."""
+    sys.path.insert(0, str(ROOT))
+    from browse_service import descendants, tree_rss_mb
+    return sum(tree_rss_mb(p) for p in descendants(server_pid) if p != server_pid
+               and "browse_service" in Path(f"/proc/{p}/cmdline").read_bytes().decode(errors="replace"))
 
 
 def cpu_seconds(pid):
@@ -122,11 +134,21 @@ async def run(args, proc):
             linux = Path(f"/proc/{proc.pid}/stat").exists()
             cpu0 = cpu_seconds(proc.pid) if linux else None
             t0, ticks, seen, sent, next_chat = time.monotonic(), 0, {}, 0, time.monotonic()
+            chatty = args.mind or args.youtube_chess
+            games, videos, peak = [], [], 0.0
             while time.monotonic() - t0 < args.measure:
-                if args.mind and time.monotonic() >= next_chat:   # one message per 11 s (chat limit: 1 per 10 s)
+                if chatty and time.monotonic() >= next_chat:      # one message per 11 s (chat limit: 1 per 10 s)
                     sent += 1
-                    await ws.send_json({"type": "chat", "text": f"are you a real person? {sent}"})
+                    if args.mind:
+                        text = f"are you a real person? {sent}"
+                    elif args.browse and sent % 2 == 0:
+                        text = f"watch a youtube video {sent}"
+                    else:
+                        text = f"let's play chess {sent}"
+                    await ws.send_json({"type": "chat", "text": text})
                     next_chat += 11
+                    if args.browse:                               # the browser's memory while it works
+                        peak = max(peak, browser_mb(proc.pid))
                 try:
                     wait = min(args.measure - (time.monotonic() - t0), max(0.0, next_chat - time.monotonic())
                                if args.mind else args.measure)
@@ -135,7 +157,30 @@ async def run(args, proc):
                     continue
                 ticks += msg.get("type") == "tick"
                 seen[msg.get("type")] = seen.get(msg.get("type"), 0) + 1
+                if msg.get("type") == "chess" and msg.get("finished"):
+                    games.append(msg)
+                    print(f"chess: game over after {msg['plies']} plies, {msg['result']} ({msg['reason']}); "
+                          f"last card: {(msg.get('vote') or {}).get('move')} of "
+                          f"{[o['label'] for o in (msg.get('vote') or {}).get('options', [])]}")
+                if msg.get("type") == "screen" and (msg.get("video") or {}).get("watching"):
+                    peak = max(peak, browser_mb(proc.pid))
+                    if not videos or videos[-1]["url"] != msg.get("url"):
+                        print(f"video: {msg.get('title')!r} muted={msg['video'].get('muted')} "
+                              f"for {msg['video'].get('seconds')} s real; browser {browser_mb(proc.pid):.0f} MB")
+                    videos.append({"url": msg.get("url"), "mb": browser_mb(proc.pid)})
+                if args.youtube_chess and games and (videos or not args.browse) and len(games) >= 1:
+                    break
             wall = time.monotonic() - t0
+            if args.youtube_chess:
+                print(f"youtube-chess: {len(games)} chess game(s) finished, {len({v['url'] for v in videos})} video(s) "
+                      f"watched in {wall:.0f} s real ({wall:.0f} simulated min at 60x)")
+                if not games:
+                    failures.append("--youtube-chess: no chess game finished")
+                if args.browse:
+                    print(f"PEAK BROWSER MEMORY: {peak:.0f} MB (PSS of the browser service and Chromium; "
+                          f"watchdog at BROWSE_MEM_MB)")
+                    if not videos:
+                        failures.append("--youtube-chess --browse: no video was watched")
             if args.mind:
                 print(f"mind: {sent} chat messages sent, {seen.get('chat_reply', 0)} replies (AI-written tag), "
                       f"{seen.get('plan', 0)} plan event(s)")
@@ -167,6 +212,9 @@ def main():
     p.add_argument("--startup-timeout", type=float, default=90.0)
     p.add_argument("--torn-state", action="store_true", help="start with truncated state files (issue #21)")
     p.add_argument("--mind", action="store_true", help="60x clock from 09:00 with chat messages: plan + replies run")
+    p.add_argument("--youtube-chess", action="store_true", help="60x clock from 10:00: a chess game (and a video with "
+                                                                    "--browse) must happen during the measurement")
+    p.add_argument("--browse", action="store_true", help="BROWSE=1: the real browser (playwright, Chromium, network)")
     args = p.parse_args()
 
     tmp = None
@@ -175,7 +223,7 @@ def main():
         args.data_dir = tmp.name
     if args.torn_state:
         seed_torn(args.data_dir)
-    env = dict(os.environ, BROWSE="0", PYTHONUNBUFFERED="1")
+    env = dict(os.environ, BROWSE="1" if args.browse else "0", PYTHONUNBUFFERED="1")
     env.setdefault("OPENBLAS_NUM_THREADS", "1")
     env.setdefault("OMP_NUM_THREADS", "1")
     env["SUB01_ADMIN_TOKEN"] = ADMIN["X-Admin-Token"]
@@ -185,7 +233,9 @@ def main():
            "--data-dir", args.data_dir]
     if args.mind:
         cmd += ["--time-scale", "60", "--start", "09:00"]
-    print("$ BROWSE=0 python live_server.py", " ".join(cmd[2:]))
+    elif args.youtube_chess:
+        cmd += ["--time-scale", "60", "--start", "10:00"]
+    print(f"$ BROWSE={env['BROWSE']} python live_server.py", " ".join(cmd[2:]))
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:
         failures = asyncio.run(run(args, proc))

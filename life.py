@@ -70,7 +70,10 @@ ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "order_food": ("bed", "lying_phone", (2, 4)),
     "get_delivery": ("door_in", "standing", (1, 2)),
     "chat": ("desk", "sitting_desk", (6, 15)),
+    "watch_video": ("desk", "sitting_desk", (10, 30)),    # one or more muted videos, each 2-10 min (#17)
+    "play_chess": ("desk", "sitting_desk", (30, 60)),     # ends earlier when the game ends (live_server)
 }
+CHESS_EVERY = 3600          # at most one chess game per simulated hour (#17)
 PLAN_BONUS = 0.35           # the day plan (mind.py) tilts the choice toward its next step; needs still come first
 COOK_MIN = (8, 15)          # simulated minutes before the courier leaves the shop
 COURIER_SPEED = 4.0         # m / simulated second (bike)
@@ -78,7 +81,8 @@ LABEL = {"sleep": "sleeping", "phone": "in bed scrolling the phone", "eat": "eat
          "buy_bread": "buying bread", "chart": "watching the chart at the desk", "window": "looking out of the window",
          "park": "sitting on the park bench", "research": "reading at the computer",
          "order_food": "ordering food on the phone", "get_delivery": "getting the delivery at the door",
-         "chat": "answering chat at the computer"}
+         "chat": "answering chat at the computer", "watch_video": "watching a video at the computer (muted)",
+         "play_chess": "playing chess at the desk"}
 DESIRES = [  # chat words -> short-lived desire
     (r"\b(pane|bread|fame|hungry|mangia|eat|colazione|breakfast)\b", "buy_bread"),
     (r"\b(tiktok|telefono|phone|scroll|social|video)\b", "phone"),
@@ -86,6 +90,8 @@ DESIRES = [  # chat words -> short-lived desire
     (r"\b(grafico|chart|candele|candles|prezzo|price|pump|dump)\b", "chart"),
     (r"\b(finestra|window|guarda fuori|look outside)\b", "window"),
     (r"\b(sushi|ramen|pizza|delivery|consegna|ordina|order|cibo|food|uber)\b", "order_food"),
+    (r"\b(chess|scacchi)\b", "play_chess"),
+    (r"\b(youtube|video|videos|filmato)\b", "watch_video"),
     (r"\b(learn|impara|studia|study|research|ricerca|cerca|wikipedia|why|perch[eé]|how|come mai)\b|\?", "research"),
 ]
 
@@ -151,6 +157,8 @@ class Life:
         self.plan_hint = None                  # life activity of the day plan's next step (live_server, mind.py)
         self.chat_waiting = 0                  # chat messages he may answer at the computer (live_server)
         self.started = []                      # (sim t, activity) of the latest starts, read by live_server
+        self.last_chess = s.get("last_chess", -1e18)   # sim time the last chess game started (one per hour)
+        self.can_watch = True                  # live_server: False when there is no browser for the desk screen
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
@@ -202,6 +210,10 @@ class Life:
                     if day and rel.get("fear", 1) < 1.3 else 0.0,
             "window": 0.2 + 0.15 * max(0, rel.get("fear", 1) - 1) + self.desire("window", t),
             "chat": 0.6 + 0.25 * min(3, self.chat_waiting) if self.chat_waiting else 0.0,
+            "watch_video": (0.15 + 0.55 * self.boredom + 0.25 * max(0, rel.get("visual", 1) - 1)
+                            + self.desire("watch_video", t)) if self.can_watch else 0.0,
+            "play_chess": (0.3 + 0.2 * (1 - self.boredom) + 0.25 * max(0, rel.get("attention", 1) - 1)
+                           + self.desire("play_chess", t)) if self.chess_ok(t) and 8 <= h < 23.5 else 0.0,
         }
         if s.get(self.plan_hint, 0.0) > 0:              # the plan only tilts what is possible now
             s[self.plan_hint] += PLAN_BONUS
@@ -209,7 +221,17 @@ class Life:
             s[self.activity] *= 0.4                     # avoid doing the same thing twice in a row
         return max(s, key=lambda k: s[k] + 0.15 * r())
 
+    def chess_ok(self, t):
+        """At most one chess game per simulated hour."""
+        return t - self.last_chess >= CHESS_EVERY
+
+    def end_activity(self, t):
+        """The current activity is over now (the chess game ended): the next tick picks the next one."""
+        self.until = min(self.until, t)
+
     def start(self, act, t, why):
+        if act == "play_chess":
+            self.last_chess = t
         self.activity = act
         place, _, (a, b) = ACTIVITIES[act]
         self.until = t + 60 * self.rng.uniform(a, b)
@@ -245,7 +267,7 @@ class Life:
             self.start("get_delivery", t, "the courier rings: goes to the door")
         if self.activity in ("window", "chart", "research"):
             self.boredom = min(1.0, self.boredom + dt_sim / (2 * 3600))
-        if self.activity in ("phone", "chat"):
+        if self.activity in ("phone", "chat", "watch_video", "play_chess"):
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
@@ -299,6 +321,8 @@ class Life:
                 "research": "curious: sits at the computer to read", "order_food": "hungry: orders food on the phone",
                 "get_delivery": "the courier rings: goes to the door",
                 "chat": "chat messages are waiting: sits at the computer to answer",
+                "watch_video": "bored: puts a video on at the computer (muted)",
+                "play_chess": "sits down for a game of chess at the desk",
             }[nxt]
             if nxt == self.plan_hint and nxt != "sleep":
                 why += "; it is in today's plan"
@@ -349,4 +373,5 @@ class Life:
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
                 "food": self.food, "delivery": self.delivery,
                 "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log,
+                "last_chess": self.last_chess,
                 **({"body": self.body.to_dict()} if self.own_body else {})}

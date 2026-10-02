@@ -42,12 +42,13 @@ from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
 from browse import Browser, display_ok
 import brain_vote
+import chess_game
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
 import mind as mind_mod
 from tastes import PageWatch, Tastes
-from state_io import load_json, read_jsonl, save_json
+from state_io import append_jsonl, load_json, read_jsonl, save_json
 
 try:                                             # the GPU spiking brain is optional: the server runs without it
     from spiking import pod_manager as spiking_manager, server as spiking_server
@@ -79,6 +80,11 @@ AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
 WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
 WS_SNDBUF = 64 * 1024          # kernel send buffer of a websocket (instead of autotuned megabytes)
 WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
+VIDEO_DRIVE = 6.0               # visual drive of a full scene change while he watches a video (a chat rule is 6-8)
+CHESS_THINK_S = (15.0, 45.0)    # simulated seconds he takes per move (the vote itself takes ~0.3 s of CPU)
+CHESS_REPLY_S = (5.0, 15.0)     # ...and the opponent
+CHESS_MIN_GAP_S = 0.7           # real seconds between moves at least (the accelerated demo clock)
+CHESS_MAX_S = 90 * 60           # a game keeps him at the desk up to this long (simulated), then he gets up
 
 
 # the novelty bonus (brain_vote.NOVELTY): a link or search not chosen in the last 7 days; with #40's new actions
@@ -289,6 +295,11 @@ class Live:
         self.interest = (0.0, None)      # (wall time, mind.next_interest()) cached for the browser
         self.plan_rng = np.random.default_rng(int(seed) + 1 if seed else None)
         self.bg = set()                  # background tasks (mind reading), kept referenced until done
+        self.chess = None                # chess_game.Game while he plays at the desk (#17)
+        self.chess_last = None           # the last finished game (public view), for /api/chess
+        self.chess_path = Path(data_dir) / "chess.jsonl"
+        self.chess_rng = random.Random(int(seed) + 2 if seed else None)
+        self.chess_vote_rng = np.random.default_rng(int(seed) + 3 if seed else None)   # not shared across threads
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -720,7 +731,7 @@ class Live:
     def screen_device(self):
         if self.life.path or self.engine.stage != "AWAKE":
             return None
-        return {"research": "desk", "phone": "phone"}.get(self.life.activity)
+        return {"research": "desk", "phone": "phone", "watch_video": "desk"}.get(self.life.activity)
 
     def screen_status(self, dev):
         if self.browser.restarting:
@@ -732,7 +743,7 @@ class Live:
         # the options belong to the page they were considered on and to the page the choice led to, no later one
         if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")):
             st = dict(st, decision={k: dec.get(k) for k in ("options", "reason", "eyes", "ms", "temperature", "page",
-                                                            "outcome")})
+                                                            "outcome", "watch_min")})
         return st
 
     async def run_browse(self):
@@ -767,8 +778,11 @@ class Live:
                 t = self.clock.now()
                 art = self.reader.current()
                 interest = self.mind_interest() or (art["title"] if art else None)
-                d = await self.browser.step(dev, self.heard(t), interest)
+                mode = "video" if self.life.activity == "watch_video" else None
+                d = await self.browser.step(dev, self.heard(t), interest, mode)
                 st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
+                if st and (st.get("video") or {}).get("watching"):
+                    self.video_drive(st["video"])
                 if st:
                     await self.broadcast({"type": "screen", **self.screen_status(dev)})
                 if now - last_sync > 30:                        # the log shown on /api/browsing stays fresh
@@ -786,6 +800,18 @@ class Live:
                 self.end_page()
                 ready, open_dev = False, None
                 await asyncio.sleep(5)
+
+    def video_drive(self, video):
+        """While he watches a video: the change between the last two screenshots drives the visual network (no
+        audio: the video is muted). Scaled like every stimulus by the sleep engine's gain."""
+        try:
+            scene = min(1.0, max(0.0, float(video.get("scene") or 0.0)))
+        except (TypeError, ValueError):
+            return 0.0
+        amp = VIDEO_DRIVE * scene * self.engine.gain
+        if amp > 0:
+            self.brain.stimulate("visual", amp)
+        return amp
 
     async def sync_browsing(self):
         s = await self.browser.state()
@@ -833,6 +859,11 @@ class Live:
             clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng))
         chosen = opts[dec["chosen"]]
         brain_vote.apply(self.brain, chosen, gain)             # the live brain receives the chosen stimulus
+        act = {k: chosen.get(k) for k in ("action", "target", "label", "href")}
+        if chosen.get("action") in brain_vote.VIDEO_ACTIONS:     # how long he watches: boredom + the brain's response
+            mins = brain_vote.watch_minutes(mood["boredom"], dec["options"][dec["chosen"]]["value"])
+            act["watch_s"] = mins * 60 / max(1e-6, self.time_scale)
+            dec["watch_min"] = mins
         self.end_page()
         self.pagewatch.start(topics[dec["chosen"]], time.time())
         now = time.time()
@@ -844,8 +875,7 @@ class Live:
         self.decisions[dev] = dec
         self.decision_log = (self.decision_log + [dec])[-30:]
         await self.broadcast({"type": "decision", **dec})
-        st = await self.browser.act(dev, {k: chosen.get(k) for k in ("action", "target", "label", "href")},
-                                    dec["reason"], interest)
+        st = await self.browser.act(dev, act, dec["reason"], interest)
         dec["status_id"] = (st or {}).get("id")
         dec["outcome"] = self.outcome(chosen, st)
         return st
@@ -863,6 +893,83 @@ class Live:
             host = urllib.parse.urlsplit(st["url"]).hostname or ""
             return f"redirected to {host.removeprefix('www.')}"
         return "opened" if href else "done"
+
+    # --- chess at the desk (#17): his brain model picks among the scorer's 5 candidate moves --------------------------
+    def chess_view(self):
+        """GET /api/chess: the game on the board (or the last one), recent games, what the card says."""
+        g = self.chess.public() if self.chess else self.chess_last
+        return {"playing": self.chess is not None, "game": g, "games": read_jsonl(self.chess_path, last=10)[::-1],
+                "card": chess_game.CARD, "note": chess_game.NOTE}
+
+    def chess_pace(self, his):
+        lo, hi = CHESS_THINK_S if his else CHESS_REPLY_S
+        return max(CHESS_MIN_GAP_S, self.chess_rng.uniform(lo, hi) / max(1e-6, self.time_scale))
+
+    async def run_chess(self):
+        while True:
+            await asyncio.sleep(0.25)
+            await self.chess_step()
+
+    async def chess_step(self):
+        """One step of the game while he sits at the desk to play: a new game, his move (the brain vote, in a worker
+        thread), the opponent's move (depth-2 search, in a worker thread), or the end of the game."""
+        loop = asyncio.get_running_loop()
+        t = self.clock.now()
+        playing = self.life.activity == "play_chess" and not self.life.path and self.engine.stage == "AWAKE"
+        g = self.chess
+        if g is None:
+            if playing:
+                g = self.chess = chess_game.Game(t, rng=self.chess_rng)
+                g.next_at = time.time() + self.chess_pace(g.his_turn)
+                await self.broadcast({"type": "chess", **g.public()})
+            return
+        if not playing:
+            g.stop("he got up")
+            return await self.finish_chess(g, t)
+        if g.over:
+            return await self.finish_chess(g, t)
+        if self.life.until - t < 120 and t - g.started < CHESS_MAX_S:
+            self.life.until = t + 120                           # a game in progress keeps him at the desk
+        if time.time() < g.next_at:
+            return
+        if g.his_turn:
+            opts = await loop.run_in_executor(None, g.candidates)
+            mood = self.mood(t)
+            gain = self.engine.gain
+            clone = self.brain.clone()                          # snapshot on the event loop, simulated in a thread
+            dec = await loop.run_in_executor(None, lambda: brain_vote.vote(clone, opts, gain, mood,
+                                                                             rng=self.chess_vote_rng))
+            if self.chess is not g or g.over:
+                return
+            chosen = opts[dec["chosen"]]
+            brain_vote.apply(self.brain, chosen, gain)          # the live brain receives the chosen move's stimulus
+            san = g.push(chosen["target"])
+            g.votes.append({"move": san, "reason": dec["reason"], "ms": dec["ms"], "temperature": dec["temperature"],
+                            "options": [{"label": o["label"], "score": c["score"], "p": o["p"], "value": o["value"],
+                                         "networks": o["networks"], "chosen": o["chosen"]}
+                                        for o, c in zip(dec["options"], opts)]})
+        else:
+            m = await loop.run_in_executor(None, g.opponent)
+            if self.chess is not g or g.over or m is None:
+                return
+            g.push(m)
+        g.next_at = time.time() + self.chess_pace(g.his_turn)
+        await self.broadcast({"type": "chess", **g.public()})
+        if g.over:
+            await self.finish_chess(g, t)
+
+    async def finish_chess(self, g, t):
+        """The game is over (or he got up): one row in chess.jsonl; he leaves the board."""
+        if self.chess is not g:
+            return
+        self.chess, self.chess_last = None, g.public()
+        try:
+            append_jsonl(self.chess_path, g.record(t))
+        except OSError as e:
+            print("chess: could not log the game:", repr(e)[:120], flush=True)
+        if self.life.activity == "play_chess":
+            self.life.end_activity(t)
+        await self.broadcast({"type": "chess", **self.chess_last, "finished": True})
 
     # --- the mind: an AI reads and remembers for him; his brain model chooses (mind.py) ---------------
     def encoding(self):
@@ -1313,6 +1420,10 @@ async def main(args):
                                           "It does not understand what it reads."})
     app.router.add_get("/api/decisions", decisions)
 
+    async def chess_api(request):                 # the chess board at his desk, recent games, what the card says
+        return web.json_response(live.chess_view())
+    app.router.add_get("/api/chess", chess_api)
+
     async def mind_api(request):                  # the day plan, notes, replies and the shared AI budget
         return web.json_response(live.mind_view())
     app.router.add_get("/api/mind", mind_api)
@@ -1380,7 +1491,9 @@ async def main(args):
     await web.TCPSite(runner, args.host, args.port).start()
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else args.mint}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
-    tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades()]
+    live.life.can_watch = bool(live.browser)     # no browser: no videos at the desk
+    tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades(),
+             supervised("chess", live.run_chess)]
     if live.eye:
         tasks.append(live.run_eye())
     if live.browser:

@@ -44,7 +44,8 @@ def _fake_pw(fail_sandboxed):
         if fail_sandboxed and kw["chromium_sandbox"]:
             raise RuntimeError("No usable sandbox! (simulated)")
         page = mock.MagicMock()
-        ctx = mock.MagicMock(route=mock.AsyncMock(), new_page=mock.AsyncMock(return_value=page))
+        ctx = mock.MagicMock(route=mock.AsyncMock(), add_cookies=mock.AsyncMock(),
+                             new_page=mock.AsyncMock(return_value=page))
         return mock.MagicMock(new_context=mock.AsyncMock(return_value=ctx), is_connected=lambda: True)
 
     pw = mock.MagicMock()
