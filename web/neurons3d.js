@@ -28,6 +28,8 @@
   }
   // rate (Hz) -> the byte quantise_rates sends (for group-rate tinting when a network sends no per-region rates)
   const rateByte = hz => !(hz >= RATE_LO) ? 0 : Math.max(1, Math.min(255, Math.round(1 + 254 * Math.log(Math.min(hz, RATE_HI) / RATE_LO) / Math.log(RATE_HI / RATE_LO))));
+  function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
 
   // ---------- where the points go: inside each region, from its centroid and the cortex mesh ----------
@@ -182,6 +184,7 @@
   // region's rate. Only regions the network simulates get a close-up (no cerebellum: it is not one of the 214).
   // Illustrative shapes: the simulated network uses point neurons.
   const SEG_BUDGET = 60000, MAX_CELLS = 300, SOMA_SEGS = 3;
+  const TILT = 2 * 10 * Math.PI / 180, SCALE_JITTER = 0.15;       // per cell: lean +-10 degrees, size +-15 %
   const PULSE_UM_S = 1000, PULSE_W_UM = 70;                        // 1 mm/s on screen vs ~0.5 m/s in thin axons
   const SLOWDOWN = Math.round(0.5e6 / PULSE_UM_S);                 // ~500x slower than a thin unmyelinated axon
   const KINDS = {                                                  // close-up kind -> cell types, shares, cells drawn
@@ -213,21 +216,24 @@
     while (segs > budget) { const p = plan[0]; p.n--; segs -= morph.cells[p.type].n_seg + SOMA_SEGS; }   // rounding
     return { kind, cells: plan.reduce((a, p) => a + p.n, 0), segments: segs, drawCalls: plan.length, plan };
   }
-  // soma position of cell i of n in the block (micrometres; y up, pia at the top for cortex)
+  // soma position of cell i of n in the block (micrometres; y up, pia at the top for cortex). x is stratified: cell i
+  // lies anywhere in the i-th of n slices, so the block is evenly covered without clumps (which additive blending
+  // shows as bright columns) and without a visible grid.
   function placeCell(kind, type, i, n, rnd) {
+    const sx = ((i + rnd()) / n - 0.5);
     if (kind === "hippocampus")                                    // CA1: somata packed in stratum pyramidale
-      return [(rnd() - 0.5) * 2000, (rnd() - 0.5) * 70, (rnd() - 0.5) * 500];
+      return [sx * 2000, (rnd() - 0.5) * 120, (rnd() - 0.5) * 600];
     if (kind === "cortex") {                                       // L2/3 pyramids under the pia, basket cells around
       const y = type === "pyramidal" ? -150 - 650 * rnd() : -100 - 900 * rnd();
-      return [(rnd() - 0.5) * 2200, y, (rnd() - 0.5) * 700];
+      return [sx * 2200, y, (rnd() - 0.5) * 700];
     }
     const s = kind === "striatum" ? 520 : 760;                      // a cube of nucleus
-    return [(rnd() - 0.5) * s, (rnd() - 0.5) * s, (rnd() - 0.5) * s];
+    return [sx * s, (rnd() - 0.5) * s, (rnd() - 0.5) * s];
   }
   function closeup(o) {
     const THREE = o.THREE, morph = o.morph, kind = o.kind, plan = closeupPlan(kind, morph, o.budget);
     if (!plan || !plan.cells) return null;
-    const group = new THREE.Group(), rnd = rng(780 + Object.keys(KINDS).indexOf(kind));
+    const group = new THREE.Group(), rnd = mulberry(780 + Object.keys(KINDS).indexOf(kind));
     const UM = o.unit || 0.12;                                      // scene units per micrometre
     const uniforms = { uTime: { value: 0 }, uRate: { value: 0 }, uFade: { value: 0 }, uLive: { value: 0 },
                        uSpeed: { value: PULSE_UM_S }, uWidth: { value: PULSE_W_UM }, uUnit: { value: UM } };
@@ -246,28 +252,35 @@
       g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
       g.setAttribute("aDist", new THREE.BufferAttribute(dist, 1));
       g.setAttribute("aKind", new THREE.BufferAttribute(kd, 1));
-      const off = new Float32Array(p.n * 3), rot = new Float32Array(p.n * 2), sc = new Float32Array(p.n), spk = new Float32Array(p.n).fill(-1e4);
+      const off = new Float32Array(p.n * 3), rot = new Float32Array(p.n * 2), tilt = new Float32Array(p.n * 2),
+            sc = new Float32Array(p.n), spk = new Float32Array(p.n).fill(-1e4);
       for (let j = 0; j < p.n; j++) {
         off.set(placeCell(kind, p.type, j, p.n, rnd).map(v => v * UM), 3 * j);
         const a = rnd() * 6.2832;
-        rot[2 * j] = Math.cos(a); rot[2 * j + 1] = Math.sin(a);
-        sc[j] = (0.85 + 0.3 * rnd()) * (rnd() < 0.5 ? -1 : 1);       // mirrored copies (x only) add variety
+        rot[2 * j] = Math.cos(a); rot[2 * j + 1] = Math.sin(a);       // any turn about the cell's main (vertical) axis
+        tilt[2 * j] = (rnd() - 0.5) * TILT; tilt[2 * j + 1] = (rnd() - 0.5) * TILT;   // leaning up to +-10 degrees
+        sc[j] = (1 - SCALE_JITTER + 2 * SCALE_JITTER * rnd()) * (rnd() < 0.5 ? -1 : 1);   // +-15 %; half mirrored (x)
         cells.push({ t: types.length, j });
       }
       g.setAttribute("iOff", new THREE.InstancedBufferAttribute(off, 3));
       g.setAttribute("iRot", new THREE.InstancedBufferAttribute(rot, 2));
+      g.setAttribute("iTilt", new THREE.InstancedBufferAttribute(tilt, 2));
       g.setAttribute("iScale", new THREE.InstancedBufferAttribute(sc, 1));
       const sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
       g.setAttribute("iSpike", sa);
       g.instanceCount = p.n;
       const mat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
         vertexShader: `
-          attribute float aDist; attribute float aKind; attribute vec3 iOff; attribute vec2 iRot; attribute float iScale; attribute float iSpike;
+          attribute float aDist; attribute float aKind; attribute vec3 iOff; attribute vec2 iRot; attribute vec2 iTilt;
+          attribute float iScale; attribute float iSpike;
           uniform float uTime; uniform float uRate; uniform float uLive; uniform float uSpeed; uniform float uWidth; uniform float uUnit;
           varying vec3 vCol;
           void main(){
             vec3 p = position * abs(iScale);
             p.x *= sign(iScale);                                          // a mirrored copy: x only, never upside down
+            float cx = cos(iTilt.x), sx = sin(iTilt.x), cz = cos(iTilt.y), sz = sin(iTilt.y);
+            p = vec3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);      // lean about x...
+            p = vec3(cz * p.x - sz * p.y, sz * p.x + cz * p.y, p.z);      // ...and about z
             p = vec3(iRot.x * p.x + iRot.y * p.z, p.y, -iRot.y * p.x + iRot.x * p.z);
             vec3 w = p * uUnit + iOff;
             float dt = uTime - iSpike;
