@@ -1,14 +1,16 @@
-"""Screenshots and FPS of the neurons layer on /brain (#62). Run by hand (no `test_` prefix: pytest does not collect it):
+"""Screenshots and FPS of the neurons layer on /brain (#62; the forest of real cells, #88 B). Run by hand (no `test_` prefix: pytest does not collect it):
 
-    python tests/neurons3d_shots.py --out docs/screens/neurons3d
+    python tests/neurons3d_shots.py --out docs/screens/neuron_forest
 
 Starts `live_server.py --demo` (BROWSE=0, SUB01_SPIKING_LIVE=0: no live spiking network on the server), then in headless
 Chromium:
-  1. /brain with the neurons toggle on and no live network: the offline state (screenshots at 1280 and 390 px);
+  1. /brain with the neurons toggle on and no live network: the offline state, static cells (1920, 1280, 390 px), and
+     the right panel's layout (bounding boxes: the cards must end above the dock);
   2. a RECORDED stream: real frames of the 20k CPU network (spiking/live.py) recorded in this process while it decides,
      put through frames.Budget exactly as a viewer gets them, and replayed by this script into the page's own websocket
-     handler. The server never serves it; it exists for screenshots and the FPS check only. Screenshots at 1280 and
-     390 px, and the room's mini brain (/brain?mini&neurons=1 at the PiP's 300 x 225);
+     handler. The server never serves it; it exists for screenshots and the FPS check only. Screenshots at 1920, 1280
+     and 390 px (the page as it opens, and the forest alone, zoomed in, fibres and cortex hidden), and the room's mini
+     brain (/brain?mini&neurons=1 at the PiP's 300 x 225);
   3. FPS with the CPU throttled x4 (devtools Emulation.setCPUThrottlingRate), neurons off vs on, over --fps-s seconds,
      and the layer's own main-thread cost under the same throttle. Headless Chromium draws WebGL in software
      (SwiftShader): the fibres alone fall below 1 frame/s there, so FPS is measured with fibres and cortex hidden.
@@ -55,6 +57,10 @@ INJECT = """
     };
     step();
   };
+  // main-thread ms of the page's own frame() (a global function: rAF(frame) inside it picks up this wrapper)
+  window.__frameMs = (ms) => new Promise(res => { const f0 = window.frame; let n = 0, acc = 0;
+    window.frame = now => { const a = performance.now(); f0(now); acc += performance.now() - a; n++; };
+    setTimeout(() => { window.frame = f0; res({frames: n, js_ms_per_frame: n ? +(acc / n).toFixed(2) : null}); }, ms); });
   window.__fps = (ms) => new Promise(res => { let n = 0; const t0 = performance.now();
     const f = () => { n++; if (performance.now() - t0 < ms) requestAnimationFrame(f); else res(n * 1000 / (performance.now() - t0)); };
     requestAnimationFrame(f); });
@@ -104,7 +110,7 @@ def wait_ready(base, proc, timeout=120):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8791)
-    ap.add_argument("--out", default="docs/screens/neurons3d")
+    ap.add_argument("--out", default="docs/screens/neuron_forest")
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
     ap.add_argument("--cdn-dir", default=None)
     ap.add_argument("--fps-s", type=float, default=6.0)
@@ -150,26 +156,41 @@ def main():
             def toggle(pg):
                 pg.evaluate("document.querySelector('#layers button[data-l=\"neurons\"]').click()")
 
-            for w, h, mobile, tag in ((1280, 800, False, "1280"), (390, 844, True, "390")):
+            rects = """() => { const r = s => { const e = document.querySelector(s); if (!e || !e.offsetParent && getComputedStyle(e).position !== 'fixed') return null;
+                const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.right), Math.round(b.bottom)]; };
+              const o = {cards: r('#cards'), dock: r('#dock'), layers: r('#layers'), caption: r('#n3cap')};
+              o.cards_end_above_dock = !o.cards || !o.dock || getComputedStyle(document.querySelector('#cards')).position !== 'fixed' || o.cards[3] <= o.dock[1];
+              o.buttons_fit = [...document.querySelectorAll('#layers button')].filter(b => b.offsetParent).every(b => b.scrollWidth <= b.clientWidth + 1);
+              return o; }"""
+            for w, h, mobile, tag in ((1920, 1080, False, "1920"), (1280, 800, False, "1280"), (390, 844, True, "390")):
                 ctx, pg, errors = page_for(w, h, "/brain", mobile)
+                pg.evaluate("controls.autoRotate = false")
                 toggle(pg)
-                pg.wait_for_timeout(1500)
+                pg.wait_for_function("typeof n3d !== 'undefined' && n3d && n3d.state().cells > 0", timeout=120000)
+                pg.wait_for_timeout(2500)
                 cap = pg.inner_text("#n3cap")
                 btn = pg.inner_text('#layers button[data-l="neurons"]')
-                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_offline.png"))
-                results[f"offline_{tag}"] = {"button": btn, "caption": cap}
+                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_offline.jpg"), type="jpeg", quality=85)
+                results[f"offline_{tag}"] = {"button": btn, "caption": cap, "panel": pg.evaluate(rects),
+                                             "forest": pg.evaluate("n3d.state()")}
                 pg.evaluate("f => window.__replay(f)", frames)
                 pg.wait_for_function("document.querySelector('#n3cap').innerText.includes('live')", timeout=120000)
-                pg.wait_for_timeout(1800)
-                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_neurons.png"))
-                results[f"live_{tag}"] = {"caption": pg.inner_text("#n3cap"), "errors": errors}
+                pg.wait_for_timeout(2500)
+                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_neurons.jpg"), type="jpeg", quality=85)
+                results[f"live_{tag}"] = {"caption": pg.inner_text("#n3cap"), "panel": pg.evaluate(rects), "errors": errors}
+                # the forest alone, closer (the close-up switch held off): fibres and cortex hidden
+                for layer in ("fibres", "cortex"):
+                    pg.evaluate(f"document.querySelector('#layers button[data-l=\"{layer}\"]').click()")
+                pg.evaluate("""() => { n3lodAt = 1e12; camera.position.sub(controls.target).multiplyScalar(0.5).add(controls.target); }""")
+                pg.wait_for_timeout(2500)
+                pg.screenshot(timeout=180000, path=str(out / f"forest_{tag}_live_zoom.jpg"), type="jpeg", quality=85)
                 ctx.close()
 
             ctx, pg, errors = page_for(300, 225, "/brain?mini&neurons=1")
-            pg.screenshot(timeout=180000, path=str(out / "mini_offline.png"))
+            pg.screenshot(timeout=180000, path=str(out / "mini_offline.jpg"), type="jpeg", quality=85)
             pg.evaluate("f => window.__replay(f)", frames)
             pg.wait_for_timeout(3000)
-            pg.screenshot(timeout=180000, path=str(out / "mini_neurons.png"))
+            pg.screenshot(timeout=180000, path=str(out / "mini_neurons.jpg"), type="jpeg", quality=85)
             results["mini"] = {"text": pg.inner_text("#n3mini"), "errors": errors}
             ctx.close()
 
@@ -183,16 +204,28 @@ def main():
             pg.evaluate("f => window.__replay(f)", frames)
             pg.wait_for_timeout(1500)
             cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
-            off = pg.evaluate(f"window.__fps({int(args.fps_s * 1000)})")
+            # FPS from the page's own frame() count (window.__fps' first reading is unreliable under throttle in software GL)
+            def fps_js():
+                m = pg.evaluate(f"window.__frameMs({int(args.fps_s * 1000)})")
+                return {"fps": round(m["frames"] / args.fps_s, 1), "js_ms_per_frame": m["js_ms_per_frame"]}
+            off = fps_js()
             toggle(pg)
+            pg.wait_for_function("typeof n3d !== 'undefined' && n3d && n3d.state().cells > 0", timeout=120000)
             pg.wait_for_timeout(2000)
-            on = pg.evaluate(f"window.__fps({int(args.fps_s * 1000)})")
+            on = fps_js()
+            # off screen: the page draws nothing (IntersectionObserver): move the scene out of view, count renders
+            hidden = pg.evaluate("""() => new Promise(res => { document.getElementById('scene').style.transform = 'translateY(-3000px)';
+              setTimeout(() => { const r = renderer.render.bind(renderer); let k = 0; renderer.render = (...a) => { k++; r(...a); };
+                setTimeout(() => { renderer.render = r; document.getElementById('scene').style.transform = '';
+                  res({on_screen: onScreen, renders_in_2s: k}); }, 2000); }, 1000); })""")
             js = pg.evaluate("""async f => {
               const nodes = (await (await fetch('brain.json')).json()).nodes;
               const cortex = new Float32Array(await (await fetch('cortex.bin')).arrayBuffer());
+              const cortexIdx = new Uint32Array(await (await fetch('cortex_idx.bin')).arrayBuffer());
               const sizes = (await (await fetch('neurons3d.json')).json()).sizes;
+              const morph = await (await fetch('neurons_morph.json')).json();
               const t0 = performance.now();
-              const n = Neurons3D.create({THREE, scene: new THREE.Scene(), nodes, cortex, sizes});
+              const n = Neurons3D.create({THREE, scene: new THREE.Scene(), nodes, cortex, cortexIdx, morph, sizes, maxCells: 1500});
               const build = performance.now() - t0;
               n.setVisible(true);
               let tf = 0, tu = 0, k = 0;
@@ -201,11 +234,13 @@ def main():
                 for (let i = 0; i < 12; i++) { a = performance.now(); n.update(performance.now()); tu += performance.now() - a; k++; }
               }
               n.dispose();
-              return {points: n.points, build_ms: Math.round(build), per_frame_msg_ms: +(tf / (3 * f.length)).toFixed(3),
+              const st = n.state();
+              return {cells: st.cells, segments: st.segments, draw_calls: st.drawCalls, build_ms: Math.round(build), per_frame_msg_ms: +(tf / (3 * f.length)).toFixed(3),
                       per_render_ms: +(tu / k).toFixed(4)};
             }""", frames)
             cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
-            results["fps_x4_390px_fibres_cortex_hidden"] = {"neurons_off": round(off, 1), "neurons_on": round(on, 1)}
+            results["fps_x4_390px_fibres_cortex_hidden"] = {"neurons_off": off, "neurons_on": on}
+            results["off_screen_390px"] = hidden
             results["neurons_layer_js_cost_x4"] = js
             results["fps_errors"] = errors
             ctx.close()

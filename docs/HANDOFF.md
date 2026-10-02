@@ -394,8 +394,11 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   `n3.race` (a decision race is running). `Budget` (one, in `SpikingHub.relay`; the CPU child's frames go through it
   too) keeps each viewer ≤ 3 KB/s of spiking frames: numbers once a second, spikes cut to fit, CPU frames dropped
   while the GPU streams. The room's lite feed gets none (it never drew them).
-- `/brain`: a **neurons** layer button (≤ 20k `THREE.Points`, `web/neurons3d.js` + `web/neurons3d.json`); offline it
-  reads "neurons offline" and never shows spikes. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
+- `/brain`: a **neurons** layer button (`web/neurons3d.js` + `web/neurons3d.json`). Since #88 B a **forest of small
+  real cells**, not dots: each sampled neuron is a NeuroMorpho.Org cell of its region's type simplified to ≤ 40
+  segments, enlarged ~14× (labelled), pyramidal cells along the cortical surface normal; 3000 cells desktop, 1500
+  phone, 800 mini; one instanced draw call per type + the somata. Offline it reads "neurons offline", the cells stand
+  still and nothing glows. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
   only changes the iframe `src`. The Neurons panel (`/brain`, `/life`) reads the compact raster (one row a region).
 - GPU frames carry per-region rates (`session.py` `frame()`: `"rq": quantise_rates(rr)`); a pod without it is tinted
   by network group rates, labelled. The panel also lists #70's real decisions per day (learned vs frozen twin).
@@ -407,6 +410,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   one instanced draw call per cell type. A sampled neuron's spike runs soma → axon in the shader, slowed ~500×.
 - Illustrative shapes, never the scanned person's; the network uses point neurons. Only regions the model simulates
   get a close-up (no cerebellum / Purkinje: not one of the 214 regions).
+- Whole-brain forest (#88 B, `docs/spiking/neurons3d.md` § forest): the same six cells, ≤ 40 segments each; the
+  right panel's cards stop above the dock (`--dock-h`, a ResizeObserver). Agent A's close-up renderer
+  (`web/neuron_render/`, #88 A) takes over the close-ups once it lands; until then the #78 lines are the fallback.
 
 ## Neurons at microscopy scale: the close-up renderer (#88 A, `docs/spiking/neuron_render.md`)
 - `web/neuron_render/neuron_render.js` (classic script, `window.NeuronRender`; API in `docs/spiking/neuron_render_api.md`)

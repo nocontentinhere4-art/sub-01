@@ -6,7 +6,8 @@
 <title>SUB-01 · live</title>
 <style>
   :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
-          --card:rgba(10,10,16,.74); --st:#ff9a3c; }
+          --card:rgba(10,10,16,.74); --st:#ff9a3c;
+          --panel-w:clamp(340px, 22vw, 420px); --dock-h:150px; }   /* --dock-h: the dock's real height, set by a ResizeObserver */
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
     font-family: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -35,15 +36,16 @@
 
   #honest { position:fixed; left:28px; bottom:128px; font-size:11px; color:var(--faint); max-width:520px; line-height:1.5;
     text-shadow:0 1px 6px #000; }
-  #ticker { position:fixed; left:28px; bottom:22px; right:420px; font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:5px;
+  #ticker { position:fixed; left:28px; bottom:22px; right:calc(var(--panel-w) + 56px); font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:5px;
     text-shadow:0 1px 6px #000; }
   #ticker div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #ticker div:first-child { color:var(--fg); }
   #ticker b { color:var(--st); font-weight:normal; }
   #ticker .buy { color:#39f5a0; } #ticker .sell { color:#ff4d6d; }
 
-  #cards { position:fixed; right:24px; top:24px; width:340px; display:flex; flex-direction:column; gap:12px;
-    max-height:calc(100vh - 170px); overflow-y:auto; }
+  /* the right column: the cards end 14 px above the dock, however tall the dock grows (layer row, close-up row, caption) */
+  #cards { position:fixed; right:24px; top:24px; width:var(--panel-w); display:flex; flex-direction:column; gap:12px;
+    max-height:calc(100vh - var(--dock-h) - 60px); overflow-y:auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:blur(14px) saturate(1.2);
     -webkit-backdrop-filter:blur(14px) saturate(1.2); text-decoration:none; display:block;
     box-shadow:0 10px 30px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05); transition:border-color .25s; }
@@ -61,19 +63,18 @@
   #music li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
   #music li.c { color:var(--fg); }
 
-  #dock { position:fixed; right:24px; bottom:22px; width:340px; display:flex; flex-direction:column; gap:10px; }
-  #layers { display:flex; gap:6px; }
-  #layers button { flex:1; background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 0; font:inherit; font-size:11px;
-    border-radius:5px; cursor:pointer; }
+  #dock { position:fixed; right:24px; bottom:22px; width:var(--panel-w); display:flex; flex-direction:column; gap:10px; }
+  #layers { display:flex; flex-wrap:wrap; gap:6px; }
+  #layers button { flex:1 1 auto; background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 7px; font:inherit; font-size:11px;
+    border-radius:5px; cursor:pointer; white-space:nowrap; }
   #layers button.on { color:var(--fg); border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.05); }
   #layers button[data-l="neurons"].on { color:var(--or); border-color:rgba(255,106,0,.55); }
   #layers button[data-l="neurons"].off { color:var(--faint); }
-  #n3cap { font-size:10px; line-height:1.5; color:var(--dim); }
+  #n3cap { font-size:10px; line-height:1.5; color:var(--dim); max-height:min(22vh, 200px); overflow-y:auto; }
   #n3cap b { color:var(--fg); font-weight:normal; } #n3cap .s { display:block; color:var(--faint); }
   #n3mini { display:none; position:fixed; left:6px; right:6px; top:4px; font-size:8px; line-height:1.3; color:#8a8a9c; pointer-events:none;
     text-shadow:0 1px 4px #000; }
   body.mini.n3 #n3mini { display:block; }
-  body.n3 #cards { max-height:calc(100vh - 250px); }
   #n3close { display:none; gap:6px; align-items:center; font-size:10px; color:var(--dim); flex-wrap:wrap; }
   body.n3:not(.mini) #n3close { display:flex; }
   #n3close button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:4px 8px; font:inherit; font-size:10.5px;
@@ -127,7 +128,8 @@
     #cards { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:0 16px; margin-top:66vh; }
     .card, #neurons { min-width:240px; }
     #ticker { position:static; padding:12px 16px 0; }
-    #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(transparent, #030305 30%); }
+    #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(rgba(3,3,5,0), #030305 24px); }
+    #n3cap { max-height:16vh; }
     #layers button[data-l="sci"] { display:none; }
     #scene, #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:72vh; }
     #top { position:absolute; }
@@ -213,7 +215,7 @@
 <div id="n3mini"></div>
 
 <div id="dock">
-  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain">neurons</button></div>
+  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div>
   <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button></div>
   <div id="n3cap" hidden></div>
   <form id="chat"><input id="msg" placeholder="send a stimulus…" autocomplete="off" maxlength="200"><button>send</button></form>
@@ -244,7 +246,7 @@ camera.up.set(0, 0, 1); camera.position.set(-300, 170, 108);
 if (MINI) camera.position.multiplyScalar(0.72);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
-let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, n3wall = -1e9, n3net = null;
+let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, cortexIdx = null, n3wall = -1e9, n3net = null;
 function resize(){
   const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
   if (!MINI && w > 900) camera.setViewOffset(w, h, 70, -55, w, h); else camera.clearViewOffset();
@@ -252,10 +254,16 @@ function resize(){
   if (n3d) n3d.resize(renderer.domElement.height, camera.fov);
 }
 addEventListener("resize", resize); resize();
+// the right column: the cards stop above the dock whatever its height (#88: the layer row overlapped the cards at 1920 px)
+if ("ResizeObserver" in window) new ResizeObserver(es => document.documentElement.style.setProperty("--dock-h",
+  Math.ceil(es[es.length - 1].target.getBoundingClientRect().height) + "px")).observe($("dock"));
 
-// ---------- neurons: his live spiking neurons as points inside the brain (#62, web/neurons3d.js) ----------
-// Only real frames from a live spiking network light them; with none, the toggle says the neurons are offline.
-const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.";
+// ---------- neurons: his live spiking neurons as small real cells inside the brain (#62, #88; web/neurons3d.js) ----------
+// Only real frames from a live spiking network light them; with none, the cells stand still and say they are offline.
+const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.";
+const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind.";
+const N3_STATIC = "static cells, no activity";
+let n3morph = null;                                  // neurons_morph.json: the forest's real cells (fetched with the toggle)
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
 const N3_NET = {gpu: "1M-neuron network on GPU", cpu: "20k-neuron network on CPU"};
 // close-ups with real neuron shapes at microscopy scale (#88 A, web/neuron_render/): zoom in with neurons on, or a close-up button
@@ -309,15 +317,26 @@ function neuronsOn(on){
   n3want = on;
   document.body.classList.toggle("n3", on);
   const b = document.querySelector('#layers button[data-l="neurons"]'); if (b) b.classList.toggle("on", on);
-  if (on && !n3d && nodes.length && cortexPos) {
-    const make = meta => { if (n3d) return;
-      n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, sizes: meta && meta.sizes, maxPoints: MINI ? 8000 : innerWidth < 600 ? 12000 : 20000, pointSize: MINI ? 1.8 : 1.3});
-      n3d.resize(renderer.domElement.height, camera.fov); n3d.setVisible(n3want); };
-    if (n3meta) make(n3meta);
-    else fetch("neurons3d.json").then(r => r.json()).then(m => { n3meta = m; make(m); }).catch(() => make(null));
+  if (on && !n3d && nodes.length && cortexPos && !neuronsOn.loading) {
+    // the forest: every sampled neuron a small real cell (<= 40 segments); fewer cells on phones and in the mini
+    const make = () => { if (n3d) return;
+      n3d = Neurons3D.create({THREE, scene, nodes, cortex: cortexPos, cortexIdx, morph: n3morph, sizes: n3meta && n3meta.sizes,
+                              maxCells: MINI ? 800 : innerWidth < 600 ? 1500 : 3000, somaSize: MINI ? 1.4 : 1.0});
+      n3d.resize(renderer.domElement.height, camera.fov); n3d.setVisible(n3want); neuronsText(); };
+    neuronsOn.loading = true;
+    Promise.all([n3meta || fetch("neurons3d.json").then(r => r.json()).catch(() => null),
+                 n3morph || fetch("neurons_morph.json").then(r => r.json()).catch(() => null)])
+      .then(([meta, morph]) => { n3meta = meta; n3morph = morph; neuronsOn.loading = false; make(); });
   }
   if (n3d) n3d.setVisible(on);
   neuronsText();
+}
+function forestLine(st){                            // what the forest draws, and the caption every view of it carries
+  if (!st || !st.types) return "";
+  const t = st.types.map(x => N3_TYPE[x.type] || x.type).join(", ");
+  return `<span class="s">cells enlarged ~${st.enlarge}× for visibility · ${st.cells.toLocaleString("en-US")} cells (${esc(t)}; ≤ ${Neurons3D.FOREST_SEG} segments each)`
+    + `${st.live ? ` · a spike glows soma → axon, slowed ~${Neurons3D.FOREST_SLOWDOWN}×; region rates tint the dendrites` : ""} · NeuroMorpho.Org, CC BY 4.0 · credits on /about</span>`
+    + `<span class="s">${esc(N3_HONEST)}</span>`;
 }
 function neuronsText(){
   const live = performance.now() - n3wall < 10000, b = document.querySelector('#layers button[data-l="neurons"]');
@@ -325,15 +344,15 @@ function neuronsText(){
   const st = n3d ? n3d.state() : null;
   let html = "";
   if (n3want && n3close) html = closeupLine() + (live ? "" : `<span class="s">${esc(N3_OFFLINE)}</span>`)
-    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;
-  else if (n3want && !live) html = esc(N3_OFFLINE);
+    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;   // N3_SHAPES: NeuronRender.CAPTION
+  else if (n3want && !live) html = `${esc(N3_OFFLINE)} · ${esc(N3_STATIC)}` + forestLine(st);
   else if (n3want) html = `<b>live · ${esc(N3_NET[n3net] || "spiking network")}</b>`
     + (Neurons3D.spikeLine(st) ? ` · ${esc(Neurons3D.spikeLine(st))}` : "")
     + (st && st.race ? ` · <b>a choice is racing in the striatum</b>` : "")
     + (st && st.tint === "groups" ? `<span class="s">colour: each region's network group rate (its frames carry no per-region rates)</span>` : "")
-    + `<span class="s">${esc(N3_CAPTION)}</span>`;
+    + forestLine(st) + `<span class="s">${esc(N3_CAPTION)}</span>`;
   const cap = $("n3cap"); if (cap) { cap.hidden = !n3want; if (cap.dataset.h !== html) { cap.dataset.h = html; cap.innerHTML = html; } }
-  const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, live · each dot a sampled model neuron · a model, not a mind" : N3_OFFLINE) : "";
+  const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, live · each cell a sampled model neuron, enlarged · a model, not a mind" : N3_OFFLINE + " · static cells") : "";
     if (mini.textContent !== t) mini.textContent = t; }
 }
 setInterval(neuronsText, 1000);
@@ -421,9 +440,9 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
 
   Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), fetch("cortex_idx.bin").then(r=>r.arrayBuffer())]).then(([vb, ib]) => {
     const cg = new THREE.BufferGeometry();
-    cortexPos = new Float32Array(vb);
+    cortexPos = new Float32Array(vb); cortexIdx = new Uint32Array(ib);
     cg.setAttribute("position", new THREE.BufferAttribute(cortexPos, 3));
-    cg.setIndex(new THREE.BufferAttribute(new Uint32Array(ib), 1));
+    cg.setIndex(new THREE.BufferAttribute(cortexIdx, 1));
     cg.computeVertexNormals();
     cortexMat = new THREE.ShaderMaterial({
       uniforms: { tint:{value:new THREE.Color(CHIP[stage || "AWAKE"])}, strength:{value:0.5} },
@@ -792,7 +811,7 @@ function frame(now){
   const k = 1 - Math.exp(-dt / 2.5);
   for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
   sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
-  const n3live = n3want && performance.now() - n3wall < 10000;                   // neurons on: the fibres step back
+  const n3live = n3want;                                                          // neurons on (live or static): the fibres step back
   n3dim += ((n3live ? 1 : 0) - n3dim) * (1 - Math.exp(-Math.min(2, (now - (frame.n3at || now)) / 1000) / 0.6));
   frame.n3at = now;                                                               // wall clock: a slow device fades too
   burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);

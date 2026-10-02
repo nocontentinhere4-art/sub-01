@@ -1,21 +1,25 @@
-/* Neurons3D: his live spiking neurons as points inside the 3D brain (#62). Reusable: /brain draws it today, and the
-   room's mini brain can import it with a few lines (it needs only THREE, a scene, the region centroids and the cortex).
+/* Neurons3D: his live spiking neurons inside the 3D brain (#62), each drawn as a small real neuron (#88: the forest).
+   Reusable: /brain draws it today, and the room's mini brain can import it with a few lines (it needs only THREE, a
+   scene, the region centroids, the cortex and neurons_morph.json).
 
-   Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands
-   for a sampled model neuron; a model, not a mind.
+   Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell
+   stands for a sampled model neuron; a model, not a mind.
 
    Usage:
-     const n3 = Neurons3D.create({THREE, scene, nodes, cortex, sizes});
-       nodes  : brain.json nodes (214, in the spiking networks' region order): {q:[x,y,z], group}
-       cortex : Float32Array of cortex.bin vertex positions (optional; without it every region is a small sphere)
-       sizes  : neurons3d.json "sizes": points a region (the 20k network's populations; scaled to maxPoints)
+     const n3 = Neurons3D.create({THREE, scene, nodes, cortex, cortexIdx, morph, sizes, maxCells});
+       nodes     : brain.json nodes (214, in the spiking networks' region order): {q:[x,y,z], group, name}
+       cortex    : Float32Array of cortex.bin vertex positions (optional; without it every region is a small cloud)
+       cortexIdx : Uint32Array of cortex_idx.bin (optional): the surface normals pyramidal cells point along
+       morph     : neurons_morph.json (real NeuroMorpho.Org cells); without it every cell is a soma only
+       sizes     : neurons3d.json "sizes": cells a region (the 20k network's populations; scaled to maxCells)
      n3.resize(bufferHeightPx, fovDeg) on resize
      n3.onFrame(msg)       every {"type":"spiking"} websocket frame (spiking/frames.py: n3.rq rates, n3.sq spikes)
      n3.update(nowMs)      once per rendered frame (cheap: a few uniforms)
-     n3.setVisible(on)     the toggle; n3.state() -> {live, net, tint} for the caption
+     n3.setVisible(on)     the toggle; n3.state() -> {live, net, tint, cells, segments, drawCalls, enlarge, types} for the caption
    Data: one byte a region of spike rate (log scale 0.1-100 Hz, byte 0 = below), 3 bytes a spike (region, slot 0-255,
-   time 0-255 of the frame's span). Every flash is a recorded spike of a model neuron; with no frames nothing flashes.
-   One draw call (THREE.Points), at most maxPoints (20 000) points; nothing is uploaded while it is hidden. */
+   time 0-255 of the frame's span). Every glow is a recorded spike of a model neuron; with no frames the cells stand
+   still (offline). Drawing: one instanced LineSegments per cell type (<= 6) + one THREE.Points for the somata; <= 40
+   segments a cell, maxCells cells (3000 desktop, 1500 phone, 800 mini); nothing is uploaded while it is hidden. */
 (function (root) {
   "use strict";
   const LIVE_MS = 10000, RATE_LO = 0.1, RATE_HI = 100, FLASH_S = 0.35;
@@ -32,13 +36,14 @@
     t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
 
-  // ---------- where the points go: inside each region, from its centroid and the cortex mesh ----------
-  function layout(nodes, cortex, sizes, maxPoints) {
-    const R = nodes.length, total = sizes.reduce((a, b) => a + b, 0), k = Math.min(1, maxPoints / total);
+  // ---------- where the cells go: inside each region, from its centroid and the cortex mesh ----------
+  // vert[j]: the cortex vertex cell j sits under (-1: a nucleus cell), for the local surface normal
+  function layout(nodes, cortex, sizes, maxCells) {
+    const R = nodes.length, total = sizes.reduce((a, b) => a + b, 0), k = Math.min(1, maxCells / total);
     const count = sizes.map(s => Math.max(3, Math.floor(s * k)));
     const start = new Int32Array(R + 1);
     for (let r = 0; r < R; r++) start[r + 1] = start[r] + count[r];
-    const N = start[R], pos = new Float32Array(N * 3), reg = new Float32Array(N), rand = rng(62);
+    const N = start[R], pos = new Float32Array(N * 3), reg = new Float32Array(N), vert = new Int32Array(N).fill(-1), rand = rng(62);
     // cortex vertices -> nearest cortical centroid (the Schaefer parcels sit on the cortex; nuclei are inside)
     const cort = [], cells = nodes.map(() => []);
     nodes.forEach((n, i) => { if (/^(LH|RH)_/.test(n.name || "")) cort.push(i); });
@@ -58,7 +63,7 @@
         if (cell.length > 8) {                                     // just under the cortical surface of its parcel
           const v = cell[Math.floor(rand() * cell.length)], u = 0.04 + 0.2 * rand();
           x = cortex[3 * v] + (q[0] - cortex[3 * v]) * u; y = cortex[3 * v + 1] + (q[1] - cortex[3 * v + 1]) * u;
-          z = cortex[3 * v + 2] + (q[2] - cortex[3 * v + 2]) * u;
+          z = cortex[3 * v + 2] + (q[2] - cortex[3 * v + 2]) * u; vert[j] = v;
         } else {                                                    // a nucleus: a small cloud around its centroid
           const a = rand() * 6.2832, c = 2 * rand() - 1, s = Math.sqrt(1 - c * c), rr = rad * Math.cbrt(rand());
           x = q[0] + rr * s * Math.cos(a); y = q[1] + rr * s * Math.sin(a); z = q[2] + rr * c;
@@ -67,59 +72,245 @@
         reg[j] = r;
       }
     }
-    return { N, pos, reg, start, count };
+    return { N, pos, reg, start, count, vert };
+  }
+
+  // outward unit normals of the cortex mesh (face normals summed per vertex; the winding's sign checked against each
+  // hemisphere's centre). Without the index buffer: the direction from the parcel centroid to the vertex.
+  function cortexNormals(cortex, idx) {
+    const nv = cortex.length / 3, n = new Float32Array(cortex.length);
+    for (let f = 0; f + 2 < idx.length; f += 3) {
+      const a = 3 * idx[f], b = 3 * idx[f + 1], c = 3 * idx[f + 2];
+      const ux = cortex[b] - cortex[a], uy = cortex[b + 1] - cortex[a + 1], uz = cortex[b + 2] - cortex[a + 2];
+      const vx = cortex[c] - cortex[a], vy = cortex[c + 1] - cortex[a + 1], vz = cortex[c + 2] - cortex[a + 2];
+      const x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx;
+      for (const o of [a, b, c]) { n[o] += x; n[o + 1] += y; n[o + 2] += z; }
+    }
+    const ctr = [[0, 0, 0, 0], [0, 0, 0, 0]];                        // hemisphere centres (x < 0: left)
+    for (let v = 0; v < nv; v++) { const h = ctr[cortex[3 * v] < 0 ? 0 : 1]; h[0] += cortex[3 * v]; h[1] += cortex[3 * v + 1]; h[2] += cortex[3 * v + 2]; h[3]++; }
+    for (const h of ctr) for (let a = 0; a < 3; a++) h[a] /= Math.max(1, h[3]);
+    let out = 0;
+    for (let v = 0; v < nv; v++) {
+      const h = ctr[cortex[3 * v] < 0 ? 0 : 1], l = Math.hypot(n[3 * v], n[3 * v + 1], n[3 * v + 2]) || 1;
+      n[3 * v] /= l; n[3 * v + 1] /= l; n[3 * v + 2] /= l;
+      out += Math.sign(n[3 * v] * (cortex[3 * v] - h[0]) + n[3 * v + 1] * (cortex[3 * v + 1] - h[1]) + n[3 * v + 2] * (cortex[3 * v + 2] - h[2]));
+    }
+    if (out < 0) for (let i = 0; i < n.length; i++) n[i] = -n[i];   // the mesh is wound inwards: flip it once
+    return n;
+  }
+
+  // ---------- one real cell, simplified to <= maxSeg straight segments ----------
+  // The reconstruction (neurons_morph.json: <= 300 segments, soma at the origin, apical dendrite up +y) is rebuilt as a
+  // tree; unbranched runs between branch points are straightened (Ramer-Douglas-Peucker, tolerance 4 % of the cell),
+  // and the shortest terminal branches are pruned first until it fits. The last branch of a kind (axon, basal,
+  // apical) is never pruned, so every cell keeps its axon for the spike to run along; the axon gets <= 35 % of them.
+  // axonUm: draw the axon only to that path length from the soma (whole-brain view: its long straight runs are clutter).
+  const AXON_SHARE = 0.35;
+  function simplify(cell, maxSeg, axonUm) {
+    const P = cell.pos, K = cell.kind, D = cell.dist, key = (x, y, z) => `${Math.round(x * 100)},${Math.round(y * 100)},${Math.round(z * 100)}`;
+    const ids = new Map([[key(0, 0, 0), 0]]), xyz = [[0, 0, 0]], parent = [-1], kind = [0], dist = [0];
+    const id = (x, y, z, k, d) => { const s = key(x, y, z); let i = ids.get(s);
+      if (i === undefined) { i = xyz.length; ids.set(s, i); xyz.push([x, y, z]); parent.push(-1); kind.push(k); dist.push(d); } return i; };
+    for (let i = 0; i < cell.n_seg; i++) {
+      if (axonUm && K[i] === 1 && D[2 * i] >= axonUm) continue;        // the axon only to its first axonUm (path length)
+      const a = id(P[6 * i], P[6 * i + 1], P[6 * i + 2], K[i], D[2 * i]), b = id(P[6 * i + 3], P[6 * i + 4], P[6 * i + 5], K[i], D[2 * i + 1]);
+      if (b !== 0 && parent[b] < 0) { parent[b] = a; kind[b] = K[i]; dist[b] = D[2 * i + 1]; }
+    }
+    const M = xyz.length, kept = new Uint8Array(M).fill(1), ext = Math.max(...[0, 1, 2].map(a => cell.box[3 + a] - cell.box[a]));
+    const len = (a, b) => Math.hypot(xyz[a][0] - xyz[b][0], xyz[a][1] - xyz[b][1], xyz[a][2] - xyz[b][2]);
+    function rdp(pts, tol) {                                           // indices into xyz, endpoints kept
+      if (pts.length < 3) return pts;
+      const a = xyz[pts[0]], b = xyz[pts[pts.length - 1]], ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...ab) || 1e-9;
+      let wi = -1, wd = -1;
+      for (let i = 1; i < pts.length - 1; i++) { const p = xyz[pts[i]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+        const c = [ap[1] * ab[2] - ap[2] * ab[1], ap[2] * ab[0] - ap[0] * ab[2], ap[0] * ab[1] - ap[1] * ab[0]], d = Math.hypot(...c) / L;
+        if (d > wd) { wd = d; wi = i; } }
+      if (wd <= tol) return [pts[0], pts[pts.length - 1]];
+      return rdp(pts.slice(0, wi + 1), tol).concat(rdp(pts.slice(wi), tol).slice(1));
+    }
+    function chains() {                                                // runs from a key node up to the next key node
+      const kids = new Int32Array(M);
+      for (let i = 1; i < M; i++) if (kept[i] && parent[i] >= 0) kids[parent[i]]++;
+      const isKey = i => i === 0 || kids[i] !== 1 || kind[i] !== kind[parent[i]];
+      const out = [];
+      for (let i = 1; i < M; i++) {
+        if (!kept[i] || parent[i] < 0 || !isKey(i)) continue;
+        const pts = [i]; let j = i, L = 0;
+        while (j !== 0 && parent[j] >= 0 && (j === i || !isKey(j))) { L += len(j, parent[j]); j = parent[j]; pts.push(j); }
+        out.push({ pts: pts.reverse(), leaf: kids[i] === 0, kind: kind[i], L });
+      }
+      return out;
+    }
+    let tol = 0.04 * ext, ch = chains();
+    const segs = (c, axon) => c.reduce((a, x) => a + (axon == null || (x.kind === 1) === axon ? rdp(x.pts, tol).length - 1 : 0), 0);
+    for (let guard = 0; segs(ch) > maxSeg && guard < 2000; guard++) {
+      const leaves = ch.filter(c => c.leaf), perKind = {};
+      for (const c of leaves) perKind[c.kind] = (perKind[c.kind] || 0) + 1;
+      const ok = leaves.filter(c => perKind[c.kind] > 1).sort((a, b) => a.L - b.L);
+      const axonFirst = segs(ch, true) > AXON_SHARE * maxSeg;           // the axon gets at most its share
+      const cand = ok.find(c => (c.kind === 1) === axonFirst) || ok[0];
+      if (!cand) { tol *= 1.5; continue; }                             // only trunks left: straighten them more
+      for (let i = 1; i < cand.pts.length; i++) kept[cand.pts[i]] = 0;
+      ch = chains();
+    }
+    const out = [];
+    for (const c of ch) { const p = rdp(c.pts, tol); for (let i = 1; i < p.length; i++) out.push([p[i - 1], p[i], c.kind]); }
+    const n = out.length, pos = new Float32Array(n * 6), dst = new Float32Array(n * 2), kd = new Float32Array(n * 2);
+    let axon = 0;
+    out.forEach(([a, b, k], i) => { pos.set(xyz[a], 6 * i); pos.set(xyz[b], 6 * i + 3); dst[2 * i] = dist[a]; dst[2 * i + 1] = dist[b];
+      kd[2 * i] = kd[2 * i + 1] = k; if (k === 1) axon = Math.max(axon, dist[b]); });
+    return { n, pos, dist: dst, kind: kd, axon };
+  }
+
+  // ---------- the whole-brain forest (#88): every sampled model neuron drawn as a small real cell ----------
+  // Cell types by region: what the close-ups use. The pallidum has no reconstruction in the set: its cells are somata.
+  const FOREST_SEG = 40, ENLARGE = 14, FOREST_AXON_UM = 400;        // <= 40 segments a cell, drawn 14x their size; axon to 400 um
+  const FOREST_SPEED = 2000, FOREST_W = 90;                         // the spike's glow: 2 mm/s along the (unenlarged) axon
+  const FOREST_SLOWDOWN = Math.round(0.5e6 / FOREST_SPEED);         // ~250x slower than a thin unmyelinated axon
+  const FOREST_TYPES = { cortex: [["pyramidal", 0.8], ["basket", 0.2]], striatum: [["medium_spiny", 1]], thalamus: [["relay", 1]],
+                         hippocampus: [["ca1_pyramidal", 1]], amygdala: [["amygdala_principal", 1]] };
+  // per cell: which way it points. Pyramidal cells in the cortex: apical dendrite (+y) along the local surface normal,
+  // any turn about it. CA1 pyramids: within 30 degrees of one axis per region (a layered structure). The rest
+  // (multipolar): any orientation. Half of all cells mirrored (x).
+  function quatFromTo(u, v) {                                       // unit vectors -> [x, y, z, w]
+    const d = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+    if (d < -0.999999) return [1, 0, 0, 0];
+    const c = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], w = 1 + d, l = Math.hypot(c[0], c[1], c[2], w);
+    return [c[0] / l, c[1] / l, c[2] / l, w / l];
+  }
+  function quatMul(a, b) {
+    return [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+            a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  }
+  const yawQ = a => [0, Math.sin(a / 2), 0, Math.cos(a / 2)];      // a turn about the cell's own +y
+  function randDir(rnd) { const c = 2 * rnd() - 1, s = Math.sqrt(1 - c * c), a = 6.2832 * rnd(); return [s * Math.cos(a), s * Math.sin(a), c]; }
+  function coneDir(axis, deg, rnd) {                                // a direction within deg of axis
+    const c = 1 - (1 - Math.cos(deg * Math.PI / 180)) * rnd(), s = Math.sqrt(1 - c * c), a = 6.2832 * rnd();
+    const q = quatFromTo([0, 0, 1], axis), v = [s * Math.cos(a), s * Math.sin(a), c];
+    const t = [2 * (q[1] * v[2] - q[2] * v[1]), 2 * (q[2] * v[0] - q[0] * v[2]), 2 * (q[0] * v[1] - q[1] * v[0])];
+    return [v[0] + q[3] * t[0] + q[1] * t[2] - q[2] * t[1], v[1] + q[3] * t[1] + q[2] * t[0] - q[0] * t[2], v[2] + q[3] * t[2] + q[0] * t[1] - q[1] * t[0]];
   }
 
   function create(o) {
-    const THREE = o.THREE, nodes = o.nodes, R = nodes.length;
+    const THREE = o.THREE, nodes = o.nodes, R = nodes.length, morph = o.morph;
     const sizes = o.sizes && o.sizes.length === R ? o.sizes : nodes.map(() => 90);
-    const L = layout(nodes, o.cortex, sizes, o.maxPoints || 20000);
-    const flash = new Float32Array(L.N).fill(-1e4);
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(L.pos, 3));
-    g.setAttribute("aReg", new THREE.BufferAttribute(L.reg, 1));
-    const fa = new THREE.BufferAttribute(flash, 1); if (fa.setUsage) fa.setUsage(THREE.DynamicDrawUsage);
-    g.setAttribute("aFlash", fa);
-    g.computeBoundingSphere();
+    const L = layout(nodes, o.cortex, sizes, o.maxCells || 3000);
+    const normals = o.cortex && o.cortexIdx ? cortexNormals(o.cortex, o.cortexIdx) : null;
+    const rnd = mulberry(880), group = new THREE.Group(); group.name = "neurons"; group.visible = false;
     // per region: R = rate byte (smoothed), G = decision race highlight (striatum while a race runs)
     const texData = new Uint8Array(256 * 4), tex = new THREE.DataTexture(texData, 256, 1, THREE.RGBAFormat);
     tex.needsUpdate = true;
     const striatum = nodes.map(n => n.group === "reward");
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uRates: { value: tex }, uSize: { value: o.pointSize || 1.3 }, uScale: { value: 1000 },
-                  uFade: { value: 0 }, uFlashS: { value: FLASH_S } },
+    const uniforms = { uTime: { value: 0 }, uRates: { value: tex }, uFade: { value: 0 }, uLive: { value: 0 },
+                       uUnit: { value: ENLARGE / 1000 }, uSpeed: { value: FOREST_SPEED }, uWidth: { value: FOREST_W },
+                       uSize: { value: o.somaSize || 1.0 }, uScale: { value: 1000 } };
+    // which cell type each sampled neuron is drawn as
+    const shapes = {}, cellType = new Int16Array(L.N).fill(-1), cellInst = new Int32Array(L.N), types = [];
+    const regAxis = nodes.map(() => randDir(rnd));
+    for (let r = 0; r < R; r++) {
+      const tt = morph && morph.cells ? (FOREST_TYPES[kindOf(nodes[r])] || []).filter(([t]) => morph.cells[t]) : [];
+      for (let j = L.start[r]; j < L.start[r + 1]; j++) {
+        if (!tt.length) continue;                                   // pallidum (or no shapes): a soma only
+        let u = rnd(), t = tt[0][0];
+        for (const [name, f] of tt) { if (u < f) { t = name; break; } u -= f; }
+        if (!shapes[t]) { shapes[t] = { type: t, shape: simplify(morph.cells[t], FOREST_SEG, FOREST_AXON_UM), cells: [] }; shapes[t].ti = types.length; types.push(shapes[t]); }
+        cellType[j] = shapes[t].ti; cellInst[j] = shapes[t].cells.length; shapes[t].cells.push(j);
+      }
+    }
+    for (const T of types) {
+      const s = T.shape, n = T.cells.length, g = new THREE.InstancedBufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(s.pos, 3));
+      g.setAttribute("aDist", new THREE.BufferAttribute(s.dist, 1));
+      g.setAttribute("aKind", new THREE.BufferAttribute(s.kind, 1));
+      const off = new Float32Array(n * 3), quat = new Float32Array(n * 4), sc = new Float32Array(n), reg = new Float32Array(n),
+            spk = new Float32Array(n).fill(-1e4);
+      T.cells.forEach((j, i) => {
+        off.set(L.pos.subarray(3 * j, 3 * j + 3), 3 * i); reg[i] = L.reg[j];
+        let up;
+        if (T.type === "pyramidal" && L.vert[j] >= 0) {
+          const v = L.vert[j];
+          up = normals ? [normals[3 * v], normals[3 * v + 1], normals[3 * v + 2]]
+                       : (q => { const d = [o.cortex[3 * v] - q[0], o.cortex[3 * v + 1] - q[1], o.cortex[3 * v + 2] - q[2]], l = Math.hypot(...d) || 1; return d.map(x => x / l); })(nodes[L.reg[j]].q);
+        } else if (T.type === "ca1_pyramidal") up = coneDir(regAxis[L.reg[j]], 30, rnd);
+        else up = randDir(rnd);
+        quat.set(quatMul(quatFromTo([0, 1, 0], up), yawQ(rnd() * 6.2832)), 4 * i);
+        sc[i] = (0.85 + 0.3 * rnd()) * (rnd() < 0.5 ? -1 : 1);       // +-15 % size; half mirrored
+      });
+      g.setAttribute("iOff", new THREE.InstancedBufferAttribute(off, 3));
+      g.setAttribute("iQuat", new THREE.InstancedBufferAttribute(quat, 4));
+      g.setAttribute("iScale", new THREE.InstancedBufferAttribute(sc, 1));
+      g.setAttribute("iReg", new THREE.InstancedBufferAttribute(reg, 1));
+      const sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute("iSpike", sa);
+      g.instanceCount = n;
+      const mat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        vertexShader: `
+          attribute float aDist; attribute float aKind; attribute vec3 iOff; attribute vec4 iQuat; attribute float iScale;
+          attribute float iReg; attribute float iSpike;
+          uniform float uTime; uniform sampler2D uRates; uniform float uLive; uniform float uUnit; uniform float uSpeed; uniform float uWidth;
+          varying vec3 vCol;
+          void main(){
+            vec3 p = position * abs(iScale); p.x *= sign(iScale);
+            p += 2.0 * cross(iQuat.xyz, cross(iQuat.xyz, p) + iQuat.w * p);
+            vec4 t = texture2D(uRates, vec2((iReg + 0.5) / 256.0, 0.5));
+            float rate = uLive * smoothstep(0.42, 0.86, t.r);              // ~2-40 Hz on the log byte scale
+            float dt = uTime - iSpike, on = dt >= 0.0 ? 1.0 : 0.0;
+            float soma = on * exp(-dt / 0.3) * exp(-aDist / 60.0);
+            float front = dt * uSpeed;
+            float pulse = on * exp(-pow((aDist - front) / uWidth, 2.0)) * step(front, aDist + 3.0 * uWidth);
+            vec3 col;
+            if (aKind < 1.5) col = vec3(0.75, 0.5, 0.3) * 0.45 + vec3(1.0, 0.88, 0.6) * 3.0 * pulse;           // axon
+            else col = mix(vec3(0.34, 0.48, 0.85), vec3(1.0, 0.5, 0.18), rate) * (0.8 + 0.7 * rate)        // dendrites
+                       + vec3(1.0, 0.5, 0.1) * 0.6 * t.g * uLive;
+            vCol = col + vec3(1.0, 0.85, 0.6) * 2.2 * soma;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(iOff + p * uUnit, 1.0);
+          }`,
+        fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * 0.75 * uFade, 1.0); }` });
+      const lines = new THREE.LineSegments(g, mat);
+      lines.frustumCulled = false; lines.name = "forest-" + T.type;
+      group.add(lines);
+      Object.assign(T, { spk, sa, geom: g, mat });
+    }
+    // the somata: one point a cell (every sampled neuron, pallidum included), flashing on its spikes
+    const flash = new Float32Array(L.N).fill(-1e4), live = new Float32Array(L.N);
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.BufferAttribute(L.pos, 3));
+    sg.setAttribute("aReg", new THREE.BufferAttribute(L.reg, 1));
+    const fa = new THREE.BufferAttribute(flash, 1); if (fa.setUsage) fa.setUsage(THREE.DynamicDrawUsage);
+    sg.setAttribute("aFlash", fa);
+    const somaR = new Float32Array(L.N);
+    for (let j = 0; j < L.N; j++) somaR[j] = cellType[j] >= 0 ? morph.cells[types[cellType[j]].type].soma_r : 8;
+    sg.setAttribute("aSomaR", new THREE.BufferAttribute(somaR, 1));
+    const smat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
       vertexShader: `
-        attribute float aReg; attribute float aFlash;
-        uniform float uTime; uniform sampler2D uRates; uniform float uSize; uniform float uScale; uniform float uFlashS;
-        varying vec3 vCol; varying float vA;
+        attribute float aReg; attribute float aFlash; attribute float aSomaR;
+        uniform float uTime; uniform sampler2D uRates; uniform float uLive; uniform float uUnit; uniform float uSize; uniform float uScale;
+        varying vec3 vCol;
         void main(){
           vec4 t = texture2D(uRates, vec2((aReg + 0.5) / 256.0, 0.5));
-          float rate = smoothstep(0.42, 0.86, t.r);                 // ~2-40 Hz on the log byte scale
-          float dt = uTime - aFlash;
-          float f = dt < 0.0 ? 0.0 : exp(-dt / uFlashS);
-          vec3 base = mix(vec3(0.16, 0.2, 0.34), vec3(1.0, 0.45, 0.12), rate);
-          vCol = base * (0.45 + 0.75 * rate) + vec3(1.0, 0.86, 0.6) * 3.0 * f + vec3(1.0, 0.5, 0.1) * 0.9 * t.g;
-          vA = 0.5 + 0.4 * rate + 0.8 * f + 0.3 * t.g;
+          float rate = uLive * smoothstep(0.42, 0.86, t.r);
+          float dt = uTime - aFlash, f = dt < 0.0 ? 0.0 : exp(-dt / 0.35);
+          vCol = mix(vec3(0.5, 0.55, 0.7), vec3(1.0, 0.6, 0.3), rate) * 0.55 + vec3(1.0, 0.86, 0.6) * 3.0 * f;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = max(1.5, uSize * (1.0 + 1.5 * f + 0.6 * t.g) * uScale / -mv.z);
+          gl_PointSize = max(2.5, uSize * (1.0 + 1.5 * f) * 2.0 * aSomaR * uUnit * uScale / -mv.z);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        uniform float uFade; varying vec3 vCol; varying float vA;
+        uniform float uFade; varying vec3 vCol;
         void main(){
           vec2 c = gl_PointCoord - 0.5; float d = dot(c, c);
           if (d > 0.25) discard;
-          gl_FragColor = vec4(vCol * vA * uFade * (1.0 - 4.0 * d), 1.0);
-        }`,
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const points = new THREE.Points(g, mat);
-    points.name = "neurons"; points.visible = false; points.frustumCulled = false;
-    o.scene.add(points);
+          gl_FragColor = vec4(vCol * uFade * (1.0 - 3.0 * d), 1.0);
+        }` });
+    const somata = new THREE.Points(sg, smat);
+    somata.name = "forest-somata"; somata.frustumCulled = false;
+    group.add(somata);
+    o.scene.add(group);
+    const segments = types.reduce((a, T) => a + T.shape.n * T.cells.length, 0);
 
     const S = { on: false, fade: 0, net: null, lastWall: -1e9, gpuWall: -1e9, tint: null, rates: new Float32Array(R),
                 race: new Float32Array(R), raceOn: false, groups: null, prevArrive: 0, gap: 200, t0: performance.now(), dirty: false,
-                ns: 0, shown: 0 };
+                ns: 0, shown: 0, spikes: 0 };
     const clockS = now => (now - S.t0) / 1000;
 
     function onFrame(m) {
@@ -138,42 +329,52 @@
       if (n3.rq) { const q = unb64(n3.rq); if (q.length === R) { tint = "regions"; for (let r = 0; r < R; r++) S.rates[r] = S.rates[r] ? 0.55 * S.rates[r] + 0.45 * q[r] : q[r]; } }
       if (!tint && S.groups) { tint = "groups"; for (let r = 0; r < R; r++) { const hz = S.groups[nodes[r].group]; S.rates[r] = hz == null ? S.rates[r] * 0.9 : rateByte(hz); } }
       S.tint = tint; S.dirty = true;
-      // spikes: flash their dots, spread over the time until the next frame as they were spread over the frame
-      const b = unb64(n3.sq), span = Math.max(1, n3.span || 200), play = Math.min(600, S.gap) / 1000, t = clockS(now);
-      let lo = L.N, hi = -1;
+      // spikes: flash their cells, spread over the time until the next frame as they were spread over the frame
+      const b = unb64(n3.sq), play = Math.min(600, S.gap) / 1000, t = clockS(now);
       for (let i = 0; i + 2 < b.length; i += 3) {
         const r = b[i]; if (r >= R) continue;
-        const j = L.start[r] + Math.min(L.count[r] - 1, Math.floor(b[i + 1] * L.count[r] / 256));
-        flash[j] = t + (b[i + 2] / 255) * play; if (j < lo) lo = j; if (j > hi) hi = j;
+        const j = L.start[r] + Math.min(L.count[r] - 1, Math.floor(b[i + 1] * L.count[r] / 256)), at = t + (b[i + 2] / 255) * play;
+        flash[j] = at; S.spikes++;
+        if (cellType[j] >= 0) { const T = types[cellType[j]]; T.spk[cellInst[j]] = at; T.dirty = true; }
       }
       S.shown = b.length / 3;
-      if (hi >= 0 && S.on) { fa.needsUpdate = true; }
-      else if (hi >= 0) S.pendingFlash = true;
+      if (b.length >= 3) S.pending = true;                            // uploaded on the next drawn frame, if shown
     }
 
     function update(now) {
-      const live = now - S.lastWall < LIVE_MS;
-      const target = S.on && live ? 1 : 0;
+      const isLive = now - S.lastWall < LIVE_MS;
+      const target = S.on ? 1 : 0;                                    // offline: the cells stand still, never flash
       S.fade += (target - S.fade) * 0.08; if (Math.abs(S.fade - target) < 0.004) S.fade = target;
-      points.visible = S.fade > 0;
-      if (!points.visible) return;
-      mat.uniforms.uTime.value = clockS(now); mat.uniforms.uFade.value = S.fade;
+      group.visible = S.fade > 0;
+      if (!group.visible) return;
+      uniforms.uTime.value = clockS(now); uniforms.uFade.value = S.fade;
+      uniforms.uLive.value += ((isLive ? 1 : 0) - uniforms.uLive.value) * 0.05;
       let raceDirty = false;
       for (let r = 0; r < R; r++) { if (!striatum[r]) continue;
-        const v = S.race[r] + ((S.raceOn && live ? 1 : 0) - S.race[r]) * 0.06; if (Math.abs(v - S.race[r]) > 1e-3) { S.race[r] = v; raceDirty = true; } }
+        const v = S.race[r] + ((S.raceOn && isLive ? 1 : 0) - S.race[r]) * 0.06; if (Math.abs(v - S.race[r]) > 1e-3) { S.race[r] = v; raceDirty = true; } }
       if (S.dirty || raceDirty) {
         for (let r = 0; r < R; r++) { texData[4 * r] = Math.round(S.rates[r]); texData[4 * r + 1] = Math.round(255 * S.race[r]); }
         tex.needsUpdate = true; S.dirty = false;
       }
-      if (S.pendingFlash) { fa.needsUpdate = true; S.pendingFlash = false; }
+      if (S.pending) { fa.needsUpdate = true; for (const T of types) if (T.dirty) { T.sa.needsUpdate = true; T.dirty = false; } S.pending = false; }
     }
-    // drawing-buffer height (px) and vertical fov: a point of uSize mm is as large as 1 mm at its depth
-    function resize(h, fov) { mat.uniforms.uScale.value = h / (2 * Math.tan((fov || 32) * Math.PI / 360)); }
+    // drawing-buffer height (px) and vertical fov: a soma of r um is drawn ENLARGE x r at its depth
+    function resize(h, fov) { uniforms.uScale.value = h / (2 * Math.tan((fov || 32) * Math.PI / 360)); }
     function setVisible(on) { S.on = !!on; }
-    function state() { return { live: performance.now() - S.lastWall < LIVE_MS, net: S.net, tint: S.tint, race: S.raceOn, recorded: S.ns, shown: S.shown, points: L.N }; }
-    function dispose() { o.scene.remove(points); g.dispose(); mat.dispose(); tex.dispose(); }
+    function state() { return { live: performance.now() - S.lastWall < LIVE_MS, net: S.net, tint: S.tint, race: S.raceOn, recorded: S.ns,
+      shown: S.shown, points: L.N, cells: L.N, shaped: types.reduce((a, T) => a + T.cells.length, 0), segments,
+      drawCalls: types.length + 1, enlarge: ENLARGE, spikes: S.spikes,
+      types: types.map(T => ({ type: T.type, n: T.cells.length, segs: T.shape.n, id: morph.cells[T.type].nmo_id, species: morph.cells[T.type].species })) }; }
+    function dispose() { o.scene.remove(group); for (const T of types) { T.geom.dispose(); T.mat.dispose(); } sg.dispose(); smat.dispose(); tex.dispose(); }
     function rate(r) { return S.rates[r] || 0; }                    // smoothed rate byte of region r (0 = none yet)
-    return { object: points, onFrame, update, resize, setVisible, state, dispose, rate, points: L.N };
+    // for checks: cell j's type, its turned apical axis (+y) and where its soma is
+    function cell(j) { const t = cellType[j]; if (t < 0) return { type: null, pos: [...L.pos.subarray(3 * j, 3 * j + 3)], vert: L.vert[j] };
+      const T = types[t], i = cellInst[j], q = T.geom.getAttribute("iQuat").array.slice(4 * i, 4 * i + 4), v = [0, 1, 0];
+      const c = [q[1] * v[2] - q[2] * v[1] + q[3] * v[0], q[2] * v[0] - q[0] * v[2] + q[3] * v[1], q[0] * v[1] - q[1] * v[0] + q[3] * v[2]];
+      const up = [v[0] + 2 * (q[1] * c[2] - q[2] * c[1]), v[1] + 2 * (q[2] * c[0] - q[0] * c[2]), v[2] + 2 * (q[0] * c[1] - q[1] * c[0])];
+      return { type: T.type, up, pos: [...L.pos.subarray(3 * j, 3 * j + 3)], vert: L.vert[j], normal: normals && L.vert[j] >= 0 ? [...normals.subarray(3 * L.vert[j], 3 * L.vert[j] + 3)] : null,
+               spike: T.spk[i] }; }
+    return { object: group, onFrame, update, resize, setVisible, state, dispose, rate, cell, points: L.N, cells: L.N };
   }
 
   // ---------- close-up: real neuron shapes (#78) ----------
@@ -360,6 +561,6 @@
                  : `last frame: ${n} spikes recorded, none sent (the stream's 3 KB/s budget was used up)`;
   }
 
-  root.Neurons3D = { create, unb64, rateByte, spikeLine, closeup, closeupPlan, kindOf, lod, SEG_BUDGET, SLOWDOWN, PULSE_UM_S,
+  root.Neurons3D = { create, simplify, cortexNormals, FOREST_SEG, ENLARGE, FOREST_SLOWDOWN, unb64, rateByte, spikeLine, closeup, closeupPlan, kindOf, lod, SEG_BUDGET, SLOWDOWN, PULSE_UM_S,
                      LOD_IN, LOD_OUT };
 })(typeof window !== "undefined" ? window : globalThis);
