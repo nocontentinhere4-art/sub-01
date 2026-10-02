@@ -1,9 +1,9 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 01:55 UTC** (pass 10). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 02:00 UTC** (pass 11). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-**Merged on 2026-10-02:** #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
+**Merged on 2026-10-02:** #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
 
 **Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
 coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
@@ -16,12 +16,10 @@ Owner actions now:
   $0.27–0.85/day, 8 GPU-hours/week cap).
 - **OpenRouter spend starts with this deploy** (your `OPENROUTER_API_KEY` is on Railway): Haiku 4.5, capped at $1.00 per Tokyo day. Check `/api/decisions` → `eyes` (`calls_today`, `usd_today`, `last_error`) after the deploy.
 - In progress:
-  - #21 atomic writes (branch `fix/atomic-state` pushed, PR pending);
+  - #21 atomic writes: PR #24 ready for the owner;
   - room movement fix (`fix/room-bed-phone`): he glides in the destination pose straight through the furniture
     instead of walking, plus the bed-phone pose and the disclaimer overlap;
-  - about-page follow-up (new-room credits, GPU cost line).
-- **Live QA is blocked:** `SUB01_SITE_PASSWORD` is not set in either cloud environment (checked by two worker
-  sessions). Add it to the **SUB-01** environment, then the coordinator starts a QA session.
+- Live QA: owner added `SUB01_SITE_PASSWORD` to the SUB-01 environment; QA session `session_01G8spBAYkuUzx8L8Q1h6Wja` started at 01:47.
 
 Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
@@ -34,7 +32,7 @@ Who is on what (cloud sessions, 2026-10-02):
 
 | PR | status | why it needs the owner |
 |---|---|---|
-| — | — | — |
+| #24 atomic state-file writes | **READY TO MERGE (needs owner)**: 271 tests; proven fix (`main` crashes on a torn `life.json`, this PR starts and keeps the bad file aside) | touches `live_server.py`, `sleep.py`, `Dockerfile` |
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -69,7 +67,7 @@ cheap to run, with the password gate kept until launch day.
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
-| 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | in progress | issue #21 |
+| 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | ready for owner | #24 |
 | 19 | Launch | todo | owner |
 
 ## Merge order
