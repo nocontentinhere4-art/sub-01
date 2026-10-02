@@ -864,7 +864,8 @@ class Mind:
         return {"read": read, "talked": talked}
 
     def day_notes(self, date):
-        """What an AI noted for him on Tokyo `date` (YYYY-MM-DD): page summaries, their topics, conversations (diary)."""
+        """What an AI noted for him on Tokyo `date` (YYYY-MM-DD): page summaries, their topics, conversations, and the
+        tracks his brain model picked (#68) (diary)."""
         items = sorted((it for it in self.memory.items.values() if tokyo(it["t"]).date().isoformat() == date),
                        key=lambda it: (-it["importance"], it["t"]))
         pages = [it for it in items if it["kind"] == "page" and it.get("summary")]
@@ -873,7 +874,9 @@ class Mind:
             topics += [tp for tp in it.get("topics", []) if tp not in topics]
         return {"read": [it["summary"] for it in pages[:8]], "topics": topics[:8],
                 "talked": [{"who": it.get("who", "a viewer"), "said": it.get("said", ""), "reply": it.get("reply", "")}
-                           for it in items if it["kind"] == "chat"][:5]}
+                           for it in items if it["kind"] == "chat"][:5],
+                "listened": [it["summary"] for it in sorted(items, key=lambda it: it["t"])
+                             if it["kind"] == "music" and it.get("summary")][-10:]}
 
     def _save(self, name, obj):
         if self.dir:

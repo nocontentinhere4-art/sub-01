@@ -201,6 +201,34 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
 
+## Music on Spotify (#68, PR `feature/music`)
+- Legal frame: **Spotify's official embed player only** (`open.spotify.com/embed/track/<id>`, compact 80 px). Each
+  visitor presses play on their own device (30 s preview, or the full track when logged in to Spotify). The server never
+  streams, downloads or relays audio: `music.py` only calls the Web API (search + track metadata) and oEmbed, both JSON
+  (`http_json` refuses to read a non-JSON body); preview URLs are never read.
+- `music.py`: with `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (Railway; client-credentials flow, never logged or
+  returned) the Web API's search (market JP; `audio-features` / `recommendations` are not used, restricted since
+  Nov 2024). Without keys, or when the API fails: `music_curated.json` (9 genres x ~14 public tracks: Tokyo city pop,
+  J-pop, lofi, hip-hop, anime, indie, electronic, jazz, piano), built by `analysis/build_music_list.py` from public
+  playlists' embed metadata (explicit / 19+ tracks dropped); each picked ID is checked once with oEmbed (no key) and
+  cached in `/data/music.json`. Queries: time of day (morning jazz/piano, evening hip-hop/city pop, late-night lofi),
+  favoured taste words, words taught in the last 2 days, `mind.next_interest`, and chat wishes ("play …", "metti …",
+  through `chat.blocked`; `music.wish`).
+- His brain chooses: 3-5 candidates are `brain_vote` options (`action: "listen"`); their networks come from the genre
+  tags + title + artist through `chat.networks_for` (no audio analysis). #55's backend had not merged: `brain_vote.vote`
+  directly. The stay response while a track plays (a second `PageWatch`) goes to `tastes.learn` with the topics
+  `net:*`, `kw:*` and `kw:<genre>`, so a music taste forms over days.
+- `life.py`: `listen_music` (on the bed, 8-25 sim min; boredom, sleep pressure, evening, a chat wish; needs first: food
+  outranks it and interrupts it). Background music is a flag, not an activity: `Life.music_bg_ok()` (reading or chess
+  at the desk, the park bench, walking outside); `live_server` rolls once per activity (`MUSIC_BG_P` 0.4). The snapshot
+  carries `life.music` = {title, artist, mode} for the room's headphones.
+- `GET /api/music`: now playing (title, artist, album art, Spotify URL, embed URL, the vote's options and reason), today's
+  tracks with why each was picked, the source, live wishes. `music` websocket messages on start and end; one row per
+  track in `/data/music.jsonl`. Cards on `/brain` and `/life.html`; the room (headphones, head nod) waits for #63.
+- Mind and diary: each track is a `music` item in the mind's memory (`day_notes()["listened"]`); the diary gets the
+  day's genres and the one playing when he fell asleep ("it fell asleep after city pop"; genres only, no artist names).
+- Wording: "his brain model leaned toward …", never "he loves this song".
+
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
   / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is

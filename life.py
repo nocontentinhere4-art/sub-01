@@ -26,7 +26,9 @@ NEED_W = 1.6
 FOOD_WAITING = 1.2          # a meal waiting at home and hunger above SATED: eating it wins within minutes
 INTERRUPT_MARGIN = 0.3      # a food action that beats the current activity by this much ends it early
 FOOD_ACTS = ("eat", "buy_bread", "buy_konbini", "order_food", "get_delivery")
-INTERRUPTIBLE = ("phone", "chart", "window", "research", "chat", "watch_video", "play_chess")
+INTERRUPTIBLE = ("phone", "chart", "window", "research", "chat", "watch_video", "play_chess", "listen_music")
+# background music (#68): a flag, not an activity; live_server may put a track on during these, or on a walk outside
+MUSIC_BG = ("research", "play_chess", "park")
 
 # ---- the world (metres; x east, z south). Sent to the client, which builds the 3D scene from it. ----------
 PLACES = {
@@ -80,6 +82,7 @@ ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "chat": ("desk", "sitting_desk", (6, 15)),
     "watch_video": ("desk", "sitting_desk", (10, 30)),    # one or more muted videos, each 2-10 min (#17)
     "play_chess": ("desk", "sitting_desk", (30, 60)),     # ends earlier when the game ends (live_server)
+    "listen_music": ("bed", "lying_headphones", (8, 25)),  # tracks his brain model picks, shown as Spotify embeds (#68)
 }
 CHESS_EVERY = 3600          # at most one chess game per simulated hour (#17)
 PLAN_BONUS = 0.35           # the day plan (mind.py) tilts the choice toward its next step; needs still come first
@@ -91,7 +94,7 @@ LABEL = {"sleep": "sleeping", "phone": "in bed scrolling the phone", "eat": "eat
          "park": "sitting on the park bench", "research": "reading at the computer",
          "order_food": "ordering food on the phone", "get_delivery": "getting the delivery at the door",
          "chat": "answering chat at the computer", "watch_video": "watching a video at the computer (muted)",
-         "play_chess": "playing chess at the desk"}
+         "play_chess": "playing chess at the desk", "listen_music": "lying on the bed listening to music"}
 DESIRES = [  # chat words -> short-lived desire
     (r"\b(pane|bread|fame|hungry|mangia|eat|colazione|breakfast)\b", "buy_bread"),
     (r"\b(tiktok|telefono|phone|scroll|social|video)\b", "phone"),
@@ -100,6 +103,8 @@ DESIRES = [  # chat words -> short-lived desire
     (r"\b(finestra|window|guarda fuori|look outside)\b", "window"),
     (r"\b(sushi|ramen|pizza|delivery|consegna|ordina|order|cibo|food|uber)\b", "order_food"),
     (r"\b(chess|scacchi)\b", "play_chess"),
+    (r"\b(music|musica|song|songs|canzone|canzoni|spotify|playlist|metti|ascolta|listen|headphones|cuffie)\b"
+     r"|^\s*(play|put on)\b(?!.*\b(chess|scacchi|game)\b)", "listen_music"),
     (r"\b(youtube|video|videos|filmato)\b", "watch_video"),
     (r"\b(learn|impara|studia|study|research|ricerca|cerca|wikipedia|why|perch[eé]|how|come mai)\b|\?", "research"),
 ]
@@ -168,6 +173,7 @@ class Life:
         self.started = []                      # (sim t, activity) of the latest starts, read by live_server
         self.last_chess = s.get("last_chess", -1e18)   # sim time the last chess game started (one per hour)
         self.can_watch = True                  # live_server: False when there is no browser for the desk screen
+        self.music = None                      # live_server: {"title", "artist", "mode"} while a track plays (#68)
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
@@ -231,6 +237,10 @@ class Life:
                             + self.desire("watch_video", t)) if self.can_watch else 0.0,
             "play_chess": (0.3 + 0.2 * (1 - self.boredom) + 0.25 * max(0, rel.get("attention", 1) - 1)
                            + self.desire("play_chess", t)) if self.chess_ok(t) and 8 <= h < 23.5 else 0.0,
+            # music (#68): when bored or tired, more in the evening; needs still come first (food gets NEED_W)
+            "listen_music": (0.12 + 0.4 * self.boredom + 0.35 * min(1.0, max(0.0, pressure))
+                             + (0.15 if 18 <= h or h < 1 else 0.0) + 0.15 * max(0, rel.get("reward", 1) - 1)
+                             + self.desire("listen_music", t)),
         }
         if s.get(self.plan_hint, 0.0) > 0:              # the plan only tilts what is possible now
             s[self.plan_hint] += PLAN_BONUS
@@ -300,7 +310,7 @@ class Life:
             self.start("get_delivery", t, "the courier rings: goes to the door")
         if self.activity in ("window", "chart", "research"):
             self.boredom = min(1.0, self.boredom + dt_sim / (2 * 3600))
-        if self.activity in ("phone", "chat", "watch_video", "play_chess"):
+        if self.activity in ("phone", "chat", "watch_video", "play_chess", "listen_music"):
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
@@ -359,6 +369,8 @@ class Life:
                 "chat": "chat messages are waiting: sits at the computer to answer",
                 "watch_video": "bored: puts a video on at the computer (muted)",
                 "play_chess": "sits down for a game of chess at the desk",
+                "listen_music": "bored: lies down with his headphones on" if self.boredom >= 0.5
+                                else "lies down with his headphones on",
             }[nxt]
             if nxt == self.plan_hint and nxt != "sleep":
                 why += "; it is in today's plan"
@@ -367,6 +379,15 @@ class Life:
             if woke:
                 why = "wakes up"
             self.start(nxt, t, why)
+
+    def music_bg_ok(self):
+        """Background music is possible now (#68): at the desk reading or playing chess, on the park bench, or walking
+        outside."""
+        if self.activity == "listen_music" or self.activity == "sleep":
+            return False
+        if self.path:
+            return self.outdoor_leg() is not None
+        return self.activity in MUSIC_BG
 
     def outdoor_leg(self):
         """(route name, 3D nodes, 3D length) when the current step is on the street between home and a destination."""
@@ -403,7 +424,7 @@ class Life:
                 "pose": "walking" if self.path else ACTIVITIES[self.activity][1], "place": self.place,
                 "hunger": round(self.hunger, 2), "vitals": self.body.vitals(), "boredom": round(self.boredom, 2), "bread": self.bread,
                 "phone": self.phone_app if self.activity == "phone" and not self.path else None,
-                "geo": self.geo, "say": self.say, "food": self.food, "courier": self.courier(self._t), "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
+                "geo": self.geo, "say": self.say, "music": self.music, "food": self.food, "courier": self.courier(self._t), "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
 
     def to_dict(self):
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
