@@ -1048,3 +1048,13 @@ def test_boot_py_subprocess_end_to_end(tmp_path):
     finally:
         proc.kill()
         proc.wait(timeout=10)
+
+
+def test_manager_choice_phases_are_opt_in(tmp_path):
+    """SUB01_CHOICE=1 adds choice_train / choice_exam after encode (after Pong when both are on); off by default."""
+    order = lambda env: make_mgr(tmp_path, tk(1, 21), env=env)[0].session_config(tk(1, 21), 60, tk(1, 21))["phases"]
+    assert not {"choice_train", "choice_exam"} & set(order({}))
+    ph = order({"SUB01_CHOICE": "1"})
+    assert ph[ph.index("encode") + 1:ph.index("encode") + 3] == ["choice_train", "choice_exam"]
+    ph = order({"SUB01_CHOICE": "1", "SUB01_PONG": "1"})
+    assert ph[ph.index("encode") + 1:ph.index("encode") + 5] == ["pong_train", "pong_exam", "choice_train", "choice_exam"]

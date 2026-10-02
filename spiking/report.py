@@ -199,6 +199,22 @@ def write_report(gpu_dir=DOCS / "gpu", cpu_dir=DOCS / "cpu"):
             pts = curve[-1]["points"]
             out.append(f"- training: {len(pts)} blocks x {curve[-1].get('block_rallies', 20)} rallies; hit rate per block: "
                        + ", ".join(f"{p['hit_rate']:.2f}" for p in pts))
+    for label, res in (("GPU", gpu), ("CPU", cpu)):
+        for c in _ph(res, "choice_curve"):
+            out.append(f"\n#### Choice task ({label}, {res['build']['n_neurons']:,} neurons, K = {c['k']}, "
+                       f"p = {c['probs']}, reversal at trial {c.get('reversal_at')})\n")
+            out.append("| | trials to criterion | after reversal | fraction correct | last 20 before reversal | last 20 |")
+            out.append("|---|---|---|---|---|---|")
+            for name, key in (("learned (dopamine)", "learned"), ("same network, plasticity frozen", "frozen"),
+                              ("random chooser", "random")):
+                r = c[key]
+                out.append(f"| {name} | {r.get('trials_to_criterion')} | {r.get('trials_to_criterion_after_reversal')} | "
+                           f"{r.get('frac_correct')} | {r.get('frac_correct_last20_before_reversal')} | "
+                           f"{r.get('frac_correct_last20')} |")
+        for e in _ph(res, "choice_exam"):
+            ctl = e.get("controls", {})
+            out.append(f"- choice exam ({label}, frozen, {e['trials']} trials): {e['frac_correct']} correct; same network "
+                       f"with learned changes removed {ctl.get('no_learning')}, random {ctl.get('random')}")
     rows = _costs()
     if rows:
         out.append("\n#### RunPod spend\n")

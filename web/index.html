@@ -340,12 +340,20 @@ function renderNights(m){
 }
 
 // ---------- live ----------
-let sock = null, act = null, base = null;
+// q=1: the server's brain feed (act as one log-scaled byte a region, only the fields drawn here); 10 ticks/s,
+// 5 for the room's mini. Frames interpolate between ticks, so the drawing stays smooth.
+const RATE = MINI ? 5 : 10, ACT_LO = 0.01, ACT_HI = 10;
+const ACT_LUT = Float32Array.from({length:256}, (_, b) => ACT_LO * Math.pow(ACT_HI / ACT_LO, b / 255));
+const unq = s => { const bin = atob(s), a = new Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = ACT_LUT[bin.charCodeAt(i)]; return a; };
+let sock = null, act = null, base = null, actFrom = null, actTo = null, actAt = 0, actDt = 1000 / RATE;
+let full = false, retry = 0;                       // the server sends {"type":"full"} when it has no room for us
+const FULL_TXT = "the room is full, try again in a minute";
 function connect(){
-  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=${RATE}&q=1`);
   ws.onopen = () => $("live").classList.add("on");
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
+    if (m.type === "full") { full = true; if (!MINI) { $("story").textContent = FULL_TXT; $("sub").textContent = "reconnecting by itself"; } return; }
     if (m.type === "spiking") { if (!MINI && window.Neurons) Neurons.onMessage(m); return; }
     if (m.type === "hello") {
       tickerEl.replaceChildren();
@@ -382,9 +390,24 @@ function connect(){
       tick(`<span class="${t.kind}">${t.kind} $${t.usd.toFixed(t.usd < 10 ? 2 : 0)}</span> → ${t.kind === "buy" ? "reward, visual" : "salience, fear"}`);
       if (t.kind === "buy") boost = Math.min(0.3, boost + 0.05);
     }
-    act = m.act; actNew = true; if (!base) base = act.slice(); else base = base.map((b, i) => b * 0.998 + act[i] * 0.002);
+    const a = m.aq ? unq(m.aq) : m.act;           // m.act: a server without the q feed
+    if (!a) return;
+    full = false; retry = 0;
+    const now = performance.now();
+    if (actTo) actDt = Math.min(1000, Math.max(30, 0.8 * actDt + 0.2 * (now - actAt)));   // measured tick spacing
+    actFrom = act ? act.slice() : a; actTo = a; actAt = now; actNew = true;
+    const k = 0.002 * 20 / RATE;                   // same ~25 s baseline as at 20 ticks/s
+    if (!base) base = a.slice(); else base = base.map((b, i) => b * (1 - k) + a[i] * k);
   };
-  ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
+  ws.onclose = () => {
+    $("live").classList.remove("on");
+    // full: about a minute, then longer (to 4 min), with jitter so viewers do not all come back at once;
+    // otherwise 1.5 s doubling to 30 s
+    const wait = full ? 60000 * Math.min(4, 2 ** retry) * (0.75 + 0.5 * Math.random())
+                      : Math.min(30000, 1500 * 2 ** retry) * (0.75 + 0.5 * Math.random());
+    retry = Math.min(retry + 1, 5);
+    setTimeout(connect, wait);
+  };
 }
 $("chat").addEventListener("submit", ev => {
   ev.preventDefault(); const inp = $("msg"), text = inp.value.trim();
@@ -402,7 +425,8 @@ if (MINI && "IntersectionObserver" in window)    // the room's picture-in-pictur
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
 if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000);
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
-if (!MINI) setInterval(() => { if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);
+if (!MINI) setInterval(() => { if (full) $("story").textContent = FULL_TXT;
+  else if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);
 
 // ---------- loop ----------
 let last = performance.now(), t = 0;
@@ -416,7 +440,12 @@ function frame(now){
   for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
   sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
   burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);
-  if (act && base && (actNew || pulse.t >= 0)) {          // new activity arrives 20x a second, not every frame
+  const tween = actTo && now - actAt < actDt;            // between two ticks: blend them
+  if (actTo && (actNew || tween)) {
+    const w = Math.min(1, (now - actAt) / actDt);
+    act = w >= 1 ? actTo : actTo.map((b, i) => actFrom[i] + (b - actFrom[i]) * w);
+  }
+  if (act && base && (actNew || tween || pulse.t >= 0)) {   // only while something changes, not every frame
     actNew = false;
     const raw = act.map((a, i) => a / Math.max(base[i], 0.02));
     const gm = Math.max(1e-3, raw.reduce((x, y) => x + y, 0) / raw.length);

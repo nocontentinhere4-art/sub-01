@@ -7,6 +7,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   real tractography fibres, real cortex, his real resting-state recordings.
 - It "lives" as a **fictional young man in a Tokyo room** (Kichijoji). The character is invented and must never
   resemble, name or speak as the real scanned person. Never claim consciousness or that it is alive.
+- **Data attribution (agreed with the dataset's researcher, 2026-10-02):** credit the data to the **MyConnectome
+  project** (Poldrack et al. 2015, Nat Commun 6:8885; OpenNeuro ds000031) on `/about.html` and in the README. Do
+  not state or highlight whose brain it is anywhere (site, diary, X posts, coin material); never use the person or
+  the project's name to promote the site or the coin.
 - Live on Railway (`sub01-production.up.railway.app`, behind `SITE_PASSWORD`), auto-deploys from `main`.
 - Memecoin context: no financial advice, no buy pressure, no wallets or on-chain actions without explicit approval.
 
