@@ -166,7 +166,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `screens.py`: `ScreensStatus` (browser up/down/off + why + since, the last 10 pages with kind and host, today's share
   by kind: tiktok, shorts, youtube, news, forum, finance, wikipedia, search, other; feed notes) → `GET /api/screens`,
   the always-visible "His screens" card on `/brain` and the "His screens" block on `/life`.
-- `live_server.py`: `reading_now()` gives the room only Wikipedia readings; `run_research` with `--browse` asked for
+- `live_server.py`: `run_research` with `--browse` asked for
   but no browser running: at most one Wikipedia reading an hour (`WIKI_DOWN_EVERY_S`); browser outages logged once,
   restarted with backoff 5-80 s; `on_screen()` per status.
 - Phone = shorts (`live_interest`: phone activity → feed "shorts"). TikTok first in half the feeds
@@ -179,7 +179,54 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   session (clips < 5 min apart: × 1/(1 + 0.12 (n−1))); videos ½, pages ¼, nothing new 0. Applied as
   `Neuromodulators.burst(0.5 × size)` (the DA level, the room's DA bar) and `reward` drive 8 × size × sleep gain;
   broadcast `{"type": "dopamine", ...}` with "simulated dopamine-like reward signal in the model"; the DA trace with
-  spikes on `/brain`. `web/room.html` and `web/neurons3d.js` untouched.
+  spikes on `/brain`. `web/neurons3d.js` untouched.
+- Room monitor (coordinator-approved, `drawReading()` only): a reading whose host is not Wikipedia is drawn as
+  "host · kind" + title + excerpt ("youtube.com · short"), never inside the Wikipedia frame.
+- Follow-up after the live data of 18:30 UTC (30 phone pages, all Wikipedia / abc / MediaWiki / bandcamp / npr / CC,
+  the same pages reopened, footer links followed, "tiktok videos" ending on Wikipedia, `searches`/`accounts` null):
+  - Why it looped: every general engine failed from Railway, so `_search` fell back to a Wikipedia search every time
+    (titled "<query> — Wikipedia", hence "studio ghibli wikipedia — Wikipedia"), then followed whatever link scored
+    best, including footers. Now there is no Wikipedia fallback: `search_sources.Limits` sets a source aside after
+    `BLOCK_AFTER` (2) failures in a row for 1 h, doubling to 6 h (rate limits do not count); `route()` lists every
+    source (the general engines first, then all the others, YouTube only for video searches, never Wikipedia for
+    them); `_search` tries up to 4 working ones, then a seed site's front page (rotating, each at most every 6 h).
+    Blocked sources: `/api/browsing` → `searches.blocked`, the screens panel ("sources set aside").
+  - `novelty.py` (pure): `Visited` (saved as `browsing.json` → `visited`, restored by the service's `/init`): a URL,
+    a video id (YouTube watch/shorts, TikTok) or a near-duplicate title (site suffixes and the word "wikipedia"
+    removed) is never opened again within 7 days: `_open` (before loading), `_settle` (final URL and title),
+    `pick_links` / `_pick_link` / `result_page` (never offered), shorts queues and TikTok cards. Exempt: results pages,
+    seed front pages, going back. `footer_link`: about, contact, privacy, terms, legal, licences (and
+    creativecommons.org deeds), cookies, help, sitemap, wiki Help/Special/Talk-namespace pages and the site's own home
+    page are never offered (pagination and comment links stay).
+  - A search with a video word (tiktok, shorts, reels, video, clips) goes to the shorts feed on the phone
+    (`_shorts(force=True)`, the rest of the words as the topic, a discovery pick if nothing is left) and to YouTube at
+    the desk; never Wikipedia or the general engines.
+  - Novelty on the shorts feed (`interests.py`): a topic seen in the last 2 h weighs ×0.15; a query is not typed again
+    within a day; `pick(discover=True)` takes a topic not seen in 2 h from the profile, "trending" (headlines he saw
+    on front pages, `Variety.offer`) or the `DISCOVERY` pool; 70 % of shorts searches are discovery
+    (`FOLLOW_SHORTS` 0.3); follow-ups on things he saw ≤ 25 % of searches (`Visited.follow_ok`), else replaced by a
+    discovery pick. Per scroll session another clip on the same topic is shown only while new-topic clips stay ≥ 60 %
+    (`Browser.new_share_ok`); otherwise a new search, or, once youtube.com's per-host cap (20/h, not raised) is
+    reached, pages from a working source until it frees.
+  - Shorts from the server's network: when a short's own page is a bot wall / does not load, it is shown as a card from
+    its results-page entry (title, channel, YouTube's public thumbnail; `SV.youtube_card`, note "YouTube Shorts pages
+    blocked from the server"). TikTok cards as before; TikTok set aside when no card can be built.
+  - `searches: null` / `accounts: null`: both came only from the browser process, which starts only when he picks up a
+    screen; after a redeploy while he slept nothing had been asked. `/api/browsing` (`Live.browsing_view`) now falls
+    back to the counts saved in `browsing.json` and to the sessions read in the server (`local_accounts`), with
+    `synced: false`; the loop syncs right after `/init`. `chromium alive: false` with the browser idle is the same
+    thing: the screens panel now says "idle — he is not at a screen".
+  - Screens panel: "now playing" with Spotify's official embed (from the music state; "Spotify keys not set: playing
+    from the curated list" / "Spotify search down: …"), and the latest TikTok item in TikTok's official embed player
+    ("TikTok (official embed)", `autoplay=0&muted=1`; only for captions that pass the filter). Both on `/brain` and
+    `/life`.
+  - `tests/test_novelty.py` replays the live hosts and titles (Studio Ghibli ×3 + variants, the MediaWiki page ×3, the
+    abc article ×2 → 3 pages opened; Contact Us, the ABC home page, CC licence deeds, privacy/terms/about never
+    offered; "tiktok videos" → the shorts feed). `analysis/novelty_replay.py` runs the real choice path for 3
+    simulated hours with the network stubbed the way Railway answered (general engines fail): 0 URL repeats, ~117
+    unique URLs/h, Wikipedia 3 pages (random-article seed), shorts 19/h with 60 % new-topic clips (97 % of shorts
+    searches on a new topic), follow-ups 21 %, 0 footer links; the YouTube per-host cap is what limits the shorts.
+    Not a live browser.
 
 ## Readings from real browsing (#79, PR `feature/readings-from-browsing`)
 - Before: `run_research` read Wikipedia every 4 simulated min at the desk, whatever the browser showed, and those

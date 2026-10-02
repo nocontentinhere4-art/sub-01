@@ -151,6 +151,9 @@
     <div class="m" id="sc-share"></div>
     <canvas id="da" width="300" height="64" style="width:100%;height:64px;margin:6px 0 2px"></canvas>
     <div class="m" id="da-l">simulated dopamine-like reward signal in the model</div>
+    <div class="m" id="sc-src"></div>
+    <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
+    <div id="sc-tt"></div>
     <ul id="sc-last"></ul>
   </div>
   <div class="card" id="desk" hidden>
@@ -645,6 +648,12 @@ function drawDA(){
     g.fillRect(x(i) - 1, H - 4 - Math.min(1, s.size) * (H - 8), 2, Math.min(1, s.size) * (H - 8)); }
   g.fillStyle = "rgba(236,236,242,.6)"; g.font = "10px sans-serif"; g.fillText("DA", 4, 11);
 }
+// an official embed player (Spotify, TikTok) in the screens card: replaced only when its source changes, never autoplayed
+function screenEmbed(el, src, h, label){
+  if ((el.dataset.src || "") === (src || "")) return;
+  el.dataset.src = src || "";
+  el.innerHTML = src ? `<div class="m">${esc(label)}</div><iframe src="${esc(src)}" title="${esc(label)}" loading="lazy" style="width:100%;height:${+h || 80}px;border:0;border-radius:8px" allow="encrypted-media; fullscreen; picture-in-picture"></iframe>` : "";
+}
 function renderScreens(d){
   if (!d || MINI) return;
   const b = d.browser || {};
@@ -652,6 +661,13 @@ function renderScreens(d){
   $("sc-b").textContent = (b.why ? `${b.why} (since ${b.since})` : `since ${b.since}`) + ((d.notes || []).length ? ` · ${d.notes[d.notes.length - 1].text}` : "");
   const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
+  const bl = (d.sources || {}).blocked || [];
+  $("sc-src").textContent = bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "";
+  const mu = d.music || {}, now = mu.now;
+  $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
+  screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");
+  const tt = (d.last || []).find(x => x.embed);
+  screenEmbed($("sc-tt"), tt && tt.embed.src, 340, tt ? `${tt.embed.label}: ${tt.title}` : "");
   $("sc-last").innerHTML = (d.last || []).slice(0, 10).map(x => `<li><span class="m">${esc(x.t)}</span> <b>${esc(x.kind)}</b> · ${esc(x.host)} · ${esc(x.title)}</li>`).join("");
 }
 function pollScreens(){ if (MINI) return; fetch("/api/screens").then(r => r.ok ? r.json() : null).then(renderScreens).catch(() => {}); }

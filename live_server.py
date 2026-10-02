@@ -48,6 +48,9 @@ import music as music_mod
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from search_sources import live_interest
+import interests
+import screens
+import search_sources
 from readings import BrowseReadings
 from screens import DA_LABEL, DopamineBursts, ScreensStatus
 from eyes import Eyes
@@ -227,6 +230,20 @@ class Feed:
         if isinstance(out.get("baseline"), dict):
             out["baseline"] = {"run": out["baseline"].get("run")}
         return out
+
+
+def local_accounts():
+    """#89: per site "logged in" / "logged out" and why, read here when the browser process has not reported yet
+    (the same sessions it loads from the environment). Never a cookie."""
+    try:
+        import sessions as SE
+        out = {}
+        for site, sess in SE.load_sessions().items():
+            sess.check()
+            out[site] = {"state": "logged in" if sess.logged_in else "logged out", "reason": sess.status()["reason"]}
+        return out
+    except Exception as e:                                  # pragma: no cover - reported, never raised
+        return {"error": type(e).__name__}
 
 
 class Live:
@@ -428,8 +445,6 @@ class Live:
     def reading_now(self, t):
         """The article on the desk for the tick; its tonight estimate only while it is about the coming night."""
         art = self.reader.current()
-        if art and art.get("kind", "wiki") != "wiki":           # #89: the room draws life.reading as a Wikipedia page;
-            return None                                         # what he browses is on life.screen instead
         if art and "tonight" in art and art.get("tonight_night") != night_date(next_bedtime(t)):
             art = {k: v for k, v in art.items() if k != "tonight"}
         return art
@@ -815,6 +830,8 @@ class Live:
             now = time.time()
             try:
                 if dev is None:
+                    if (sc := getattr(self, "screens", None)) is not None:
+                        sc.idle("he is not at a screen (asleep or away): the browser starts when he picks one up")
                     if open_dev and now - idle_since > 120:     # put away: the service frees the memory
                         self.end_page()
                         br = getattr(self, "browse_readings", None)
@@ -834,6 +851,7 @@ class Live:
                 if not ready:
                     await self.browser.init(self.browsing_state)
                     ready = True
+                    await self.sync_browsing()                  # #89: searches / accounts known right away
                 if open_dev and open_dev != dev:
                     self.end_page()
                     await self.browser.close(open_dev)
@@ -917,7 +935,49 @@ class Live:
         out["dopamine"] = {"label": DA_LABEL, "bursts": [{"t": round(b["t"]), "size": b["size"], "kind": b["kind"],
                                                          "n": b["n"]} for b in self.da_bursts.trace[-60:]],
                            "da": round(self.neuro.levels["DA"], 3)}
+        out["sources"] = self.browsing_sources()
+        out["music"] = self.music_line()
         return out
+
+    def browsing_view(self):
+        """GET /api/browsing: the pages shown, searches per source, accounts. #89: before the browser process has
+        reported (it starts only when he picks up a screen, so after a redeploy while he sleeps it had not), the
+        counts saved with the browsing log and the accounts read here, with synced: false; they were null."""
+        if not self.browser:
+            return {"on": False, "log": [], "searches": None, "accounts": None, "synced": False, "browser": None}
+        log = self.browser.log or self.browsing_state.get("log", [])
+        searches = getattr(self.browser, "searches", None)
+        accounts = getattr(self.browser, "accounts", None)
+        synced = searches is not None
+        if searches is None and (st := self.browsing_state.get("searches")):
+            searches = dict(search_sources.Limits(state=st).public(),
+                            variety=interests.Variety(state=st.get("variety")).public())
+        if accounts is None:
+            accounts = local_accounts()
+        sc = getattr(self, "screens", None)
+        return {"on": True, "log": log[-30:], "searches": searches, "accounts": accounts, "synced": synced,
+                "browser": sc.public()["browser"] if sc else None}
+
+    def browsing_sources(self):
+        """Search sources set aside after repeated failures (#89), from the browser or the saved state."""
+        sv = getattr(self.browser, "searches", None) if self.browser else None
+        if sv is None:
+            st = (getattr(self, "browsing_state", None) or {}).get("searches")
+            sv = search_sources.Limits(state=st).public() if st else {}
+        return {"blocked": [dict(v, source=k, until=screens.hhmm(v["until"]))
+                            for k, v in (sv.get("blocked") or {}).items()]}
+
+    def music_line(self):
+        """#89: what he is listening to, with the official Spotify embed, and where the tracks come from."""
+        m = getattr(self, "music", None)
+        if m is None:
+            return None
+        now = m.public(m.now)
+        api = None if not m.api else ("down: " + m.api_down if m.api_down else "ok")
+        src = ("Spotify keys not set: playing from the curated list" if api is None else
+               f"Spotify search {api}: playing from the curated list" if api != "ok" else "Spotify")
+        return {"now": {k: now.get(k) for k in ("title", "artist", "embed", "embed_height", "url", "why")} if now
+                else None, "source": src, "label": "Spotify (official embed)"}
 
     def video_drive(self, video):
         """While he watches a video: the change between the last two screenshots drives the visual network (no
@@ -934,7 +994,8 @@ class Live:
     async def sync_browsing(self):
         s = await self.browser.state()
         if s.get("log") or not self.browsing_state.get("log"):
-            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches")}
+            self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches"),
+                                   "visited": s.get("visited") or self.browsing_state.get("visited")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
@@ -1634,10 +1695,7 @@ async def main(args):
     app.router.add_get("/api/screen/{device}.jpg", screen_shot)
 
     async def browsing(request):                  # pages shown on his screens, newest last
-        log = (live.browser.log or live.browsing_state.get("log", [])) if live.browser else []
-        return web.json_response({"on": bool(live.browser), "log": log[-30:],
-                                  "searches": getattr(live.browser, "searches", None) if live.browser else None,
-                                  "accounts": getattr(live.browser, "accounts", None) if live.browser else None})
+        return web.json_response(live.browsing_view())
     app.router.add_get("/api/browsing", browsing)
     app.router.add_get("/api/screens", lambda r: web.json_response(live.screens_view()))   # #89: always visible
 

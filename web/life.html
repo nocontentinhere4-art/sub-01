@@ -105,7 +105,7 @@
       <div class="m" id="mu-why"></div>
     </div>
     <div><div class="lbl">Today</div><div id="log"></div></div>
-    <div><div class="lbl">His screens</div><div id="screens">…</div></div>
+    <div><div class="lbl">His screens</div><div id="screens">…</div><div id="scr-music"></div><div id="scr-tt"></div></div>
     <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
       <div id="chat"></div>
       <form id="f"><input id="in" maxlength="280" placeholder="e.g. go and buy some bread" autocomplete="off"><button>send</button></form>
@@ -271,7 +271,18 @@ function renderScreens(d){
   el.innerHTML = `<div>browser <b>${esc(b.state || "?")}</b>${b.why ? ` — ${esc(b.why)}` : ""} (since ${esc(b.since || "")})</div>`
     + (d.notes || []).map(n => `<div>${esc(n.t)} · ${esc(n.text)}</div>`).join("")
     + `<div>today: ${share || "nothing yet"}</div>`
+    + ((d.sources || {}).blocked || []).map(x => `<div>set aside: ${esc(x.label)} (${esc(x.why)}, until ${esc(x.until)})</div>`).join("")
+    + (d.music ? `<div>${d.music.now ? `now playing: <b>${esc(d.music.now.title)}</b> — ${esc(d.music.now.artist)} · ` : "no music playing · "}${esc(d.music.source)}</div>` : "")
     + (d.last || []).slice(0, 10).map(x => `<div>${esc(x.t)} · <b>${esc(x.kind)}</b> · ${esc(x.host)} · ${esc(x.title)}</div>`).join("");
+  const mu = (d.music || {}).now, tt = (d.last || []).find(x => x.embed);
+  screenEmbed("scr-music", mu && mu.embed, (mu && mu.embed_height) || 80, (d.music || {}).label || "Spotify (official embed)", esc);
+  screenEmbed("scr-tt", tt && tt.embed.src, 340, tt ? `${tt.embed.label}: ${tt.title}` : "", esc);
+}
+// official embed players (Spotify, TikTok) under the screens block: replaced only when the source changes, no autoplay
+function screenEmbed(id, src, h, label, esc){
+  const el = document.getElementById(id); if (!el || (el.dataset.src || "") === (src || "")) return;
+  el.dataset.src = src || "";
+  el.innerHTML = src ? `<div>${esc(label)}</div><iframe src="${esc(src)}" title="${esc(label)}" loading="lazy" style="width:100%;height:${+h || 80}px;border:0;border-radius:8px" allow="encrypted-media; fullscreen; picture-in-picture"></iframe>` : "";
 }
 function pollScreens(){ fetch("/api/screens").then(r => r.ok ? r.json() : null).then(renderScreens).catch(() => {}); }
 pollScreens(); setInterval(pollScreens, 5000);

@@ -122,5 +122,22 @@ def card_html(card):
             "border-radius:10px;max-height:70vh;object-fit:cover}.c{margin-top:10px}.a{color:#9aa;margin-top:4px}"
             ".n{color:#667;font-size:12px;margin-top:12px}</style><div class=w>" + img
             + f'<div class=c>{h.escape(card["title"])}</div><div class=a>@{h.escape(card["author"])}</div>'
-            + "<div class=n>TikTok · public video · its embed card (TikTok oEmbed); the video is not played</div></div>")
+            + f"<div class=n>{h.escape(card.get('site', 'TikTok'))} · public video · "
+            + f"{h.escape(card.get('how', 'its embed card (TikTok oEmbed)'))}; the video is not played</div></div>")
+
+
+NOTE_SHORTS_CARDS = "YouTube Shorts pages blocked from the server: shorts shown as cards (thumbnail, title; not played)"
+YT_SHORT = re.compile(r"^https://(?:www\.|m\.)?youtube\.com/shorts/([\w-]{6,20})(?:[?#]|$)")
+
+
+def youtube_card(result):
+    """A YouTube Short from the results page (already guarded) -> a card when the short's own page is blocked for the
+    server: its title, channel and YouTube's public thumbnail (no extra request beyond the image)."""
+    m = YT_SHORT.match(str((result or {}).get("url") or ""))
+    if not m:
+        return None
+    return {"url": result["url"], "title": str(result.get("title") or "")[:140],
+            "author": str(result.get("channel") or "")[:60], "hashtags": [],
+            "thumb": f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg", "host": "youtube.com",
+            "site": "YouTube Shorts", "how": "title and thumbnail from the results page"}
 

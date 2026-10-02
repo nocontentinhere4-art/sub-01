@@ -160,10 +160,14 @@ def test_a_new_short_drives_the_reward_regions_and_goes_on_the_feed(tmp_path):
     assert v["dopamine"]["label"] == SC.DA_LABEL
 
 
-def test_the_room_never_gets_a_browsed_page_as_its_wikipedia_reading(tmp_path):
+def test_the_room_gets_the_real_host_and_kind_of_a_browsed_reading(tmp_path):
     live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
     live.reader.record({"title": "Ramen in 30 seconds", "kind": "short", "host": "youtube.com", "t": 10.0})
-    assert live.reading_now(live.clock.now()) is None
+    r = live.reading_now(live.clock.now())
+    assert (r["host"], r["kind"]) == ("youtube.com", "short")   # room.html draws "youtube.com · short", no Wikipedia
+    room = (ROOT / "web" / "room.html").read_text()
+    body = room[room.index("function drawReading("):room.index("function drawFood(")]
+    assert body.index("wikipedia\\.org") < body.index('"WIKIPEDIA"')       # the host check comes before the frame
     live.reader.record({"title": "Sleep", "kind": "wiki", "host": "en.wikipedia.org", "t": 20.0})
     assert live.reading_now(live.clock.now())["title"] == "Sleep"
 
@@ -296,3 +300,59 @@ def test_choosing_a_card_shows_it_and_never_opens_tiktok():
     sc.awaiting = {"links": [{"id": "L1", "href": card["url"], "text": card["title"], "video": True}], "can_back": False}
     run(b.act("phone", {"action": "open_video", "href": card["url"], "label": "pets"}))
     assert opened == [] and sc.info["card"] and sc.page.html                      # shown as a card, not navigated
+
+
+# --- #89 follow-up: the live data at 18:30 UTC ----------------------------------------------------------------------
+def test_a_blocked_short_page_becomes_a_card_from_the_results():
+    b, sc = _card_browser({})
+    item = {"url": "https://www.youtube.com/shorts/abcDEF12345", "title": "Melon pan in 30 seconds", "video": True,
+            "channel": "Tokyo Bakes"}
+    sc.queue = [item]
+
+    async def _open(sc_, url, *a, **k):
+        b.last_skip = "bot wall"                               # google.com/sorry from the server's network
+        return False
+    b._open = _open
+    sc.awaiting = {"links": [{"id": "L1", "href": item["url"], "text": item["title"], "video": True}],
+                   "can_back": False}
+    run(b.act("phone", {"action": "open_video", "href": item["url"], "label": "bread"}))
+    assert sc.info["card"] and sc.info["host"] == "youtube.com" and b.feed_note == SV.NOTE_SHORTS_CARDS
+    assert "i.ytimg.com/vi/abcDEF12345/" in sc.page.html[-1] and "YouTube Shorts" in sc.page.html[-1]
+    assert SC.screen_kind(dict(sc.info, device="phone")) == "shorts"
+
+
+def test_tiktok_rows_carry_the_official_embed_without_autoplay():
+    s = SC.ScreensStatus()
+    s.seen({"url": "https://www.tiktok.com/@scout2015/video/6718335390845095173", "title": "Scramble up ur name"})
+    row = s.public()["last"][0]
+    assert row["embed"]["label"] == "TikTok (official embed)" and "autoplay=0" in row["embed"]["src"]
+    s.seen({"url": "https://www.tiktok.com/@x.y/video/6718335390845095174", "title": "any caption"})
+    assert "embed" not in s.public(lambda t: False)["last"][0]  # a caption that fails the filter: no player
+    s.idle("he is not at a screen")
+    assert s.public()["browser"]["state"] == "idle"
+
+
+def test_browsing_view_is_never_null_before_the_first_sync(tmp_path):
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    lim = S.Limits()
+    lim.count("hn", "sourdough", "interests")
+    lim.refuse("ddg", "no results")
+    lim.refuse("ddg", "no results")
+    live.browsing_state = {"log": [], "searches": dict(lim.to_dict(), variety={})}
+    live.browser = SimpleNamespace(log=[], searches=None, accounts=None, feed_note=None)
+    v = live.browsing_view()
+    assert v["synced"] is False and v["searches"]["per_source_today"] == {"hn": 1}
+    assert isinstance(v["accounts"], dict) and "error" not in v["accounts"]
+    assert [x["source"] for x in live.screens_view()["sources"]["blocked"]] == ["ddg"]
+
+
+def test_music_is_in_the_screens_panel_and_says_where_it_comes_from(tmp_path):
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    live.music.api = None
+    assert live.screens_view()["music"]["source"] == "Spotify keys not set: playing from the curated list"
+    live.music.api, live.music.api_down = object(), "/search failed (status 502)"
+    assert live.music_line()["source"].startswith("Spotify search down: /search failed (status 502)")
+    live.music.now = {"id": "4uLU6hMCjMI75M1A2tKUQC", "title": "Plastic Love", "artist": "Mariya Takeuchi",
+                      "embed": "https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC", "embed_height": 152}
+    now = live.music_line()["now"]
+    assert now["title"] == "Plastic Love" and now["embed"].startswith("https://open.spotify.com/embed/")

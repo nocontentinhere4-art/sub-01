@@ -12,6 +12,10 @@ for things he saw, memecoins and stocks for example. No guy like him would spend
 - Variety: no quota is imposed from outside (owner, "NO RESTRICTIONS"). A topic that already filled a large share of
   today's pages weighs less (`saturation`), Wikipedia too, and after 3-4 pages in a row on one topic the leave
   option pulls harder (`streak_pull`, added to the vote's leave pull), so he does not get stuck on one topic.
+- Novelty (#89, owner): a topic seen in the last RECENT_S (2 h) weighs RECENT_W (x0.15); a query is not typed
+  again for QUERY_GAP_S (a day; a page or video is never reopened within 7 days, novelty.py); `pick(discover=True)` (most shorts, and follow-ups over their quarter) takes a
+  topic not seen in the last 2 h, from the profile or from discovery: headlines he saw on front pages (`offer`,
+  "trending") and a wide DISCOVERY pool of things outside his usual topics.
 Pure: no network, no AI. browse.py keeps a Variety per screen session and asks `pick` what to look up next.
 """
 import math
@@ -74,6 +78,32 @@ STREAK_FROM = 3                    # pages in a row on one topic before the leav
 SATURATION = 4.0                   # how fast a topic's weight falls with its share of today's pages
 FREE_SHARE = 0.15                  # shares below this cost nothing
 WIKI_FREE = 0.10
+RECENT_S = 2 * 3600                # a topic seen this recently weighs RECENT_W (#89)
+RECENT_W = 0.15
+QUERY_GAP_S = 86400                # a query is not typed again within a day (pages: 7 days, novelty.py)
+FOLLOW_SHORTS = 0.3                # shorts on his own interest / what he saw; the rest discovery (>= 60 % new topics)
+TRENDING_KEEP = 40
+# discovery: subjects outside his usual topics (one query each, each its own topic "discover:<words>")
+DISCOVERY = ["axolotl facts", "how glass is made", "bonsai for beginners", "deep sea anglerfish", "origami crane",
+             "Antarctica research station life", "how lighthouses work", "volcano eruption footage", "bee dance",
+             "kintsugi repair", "Iceland northern lights", "how vinyl records are made", "street magic tricks",
+             "octopus intelligence", "skateboard tricks", "parkour Tokyo", "calligraphy shodo", "Japanese carpentry joints",
+             "train driver cab view", "how sushi knives are forged", "sumo training morning", "capybara onsen",
+             "tsunami stone markers", "lucid dreaming tips", "speed cubing", "mechanical watch movement",
+             "drone racing", "chess blunders", "how elevators work", "giant squid", "jellyfish aquarium",
+             "glassblowing", "blacksmith forging", "pottery wheel", "aurora timelapse", "storm chasing",
+             "bioluminescent waves", "tardigrades", "mushroom foraging", "beekeeping", "ice cave", "desert night sky",
+             "magnetic slime", "domino toppling", "marble run", "satisfying cleaning", "miniature cooking",
+             "abandoned places Japan", "cherry blossom forecast", "taiko drumming", "kendama tricks", "yo-yo world champion",
+             "beatbox", "a cappella cover", "street piano", "busking Shibuya", "breakdance battle", "jazz drummer solo",
+             "orchestra behind the scenes", "film photography", "polaroid tips", "darkroom printing", "pixel art",
+             "stop motion animation", "claymation", "3D printing fails", "robot dog", "Mars rover", "ISS live",
+             "rocket launch", "solar eclipse", "meteor shower", "black hole image", "cats vs cucumbers",
+             "shiba inu", "red panda", "penguin parade", "sea otters holding hands", "owl cafe", "deer in Nara",
+             "snow monkeys", "how ramen noodles are made", "wagashi sweets", "latte art", "coffee roasting",
+             "matcha ceremony", "fermented foods", "knife sharpening", "fixing old electronics", "restoring rusty tools",
+             "tiny house tour", "capsule hotel tour", "Tokyo apartment tour", "night bus Japan", "ferry Seto Inland Sea",
+             "Okinawa beaches", "Hokkaido snow festival", "Kyoto autumn leaves", "Fuji climbing", "onsen etiquette"]
 
 
 def rhythm(hour):
@@ -130,7 +160,36 @@ class Variety:
         self.wiki = int(s.get("wiki") or 0)
         self.last = s.get("last")
         self.streak = int(s.get("streak") or 0)
+        self.seen_t = {k: float(v) for k, v in (s.get("seen_t") or {}).items() if isinstance(v, (int, float))}
+        self.queries = {k: float(v) for k, v in (s.get("queries") or {}).items() if isinstance(v, (int, float))}
+        self.trending = [x for x in (s.get("trending") or []) if isinstance(x, str)][-TRENDING_KEEP:]
         self._roll()
+
+    def recent(self, topic, within=RECENT_S):
+        """Seen in the last `within` seconds (across days)."""
+        return bool(topic) and self.clock() - self.seen_t.get(topic, -1e18) < within
+
+    def mark(self, topic=None, query=None):
+        """A topic / query was used now (a pick, a page)."""
+        now = self.clock()
+        if topic:
+            self.seen_t[topic] = now
+        if query:
+            self.queries[" ".join(str(query).lower().split())] = now
+        for d in (self.seen_t, self.queries):
+            for k in [k for k, t in d.items() if now - t > QUERY_GAP_S]:
+                del d[k]
+
+    def query_used(self, q):
+        return self.clock() - self.queries.get(" ".join(str(q).lower().split()), -1e18) < QUERY_GAP_S
+
+    def offer(self, titles):
+        """Headlines seen on a front page (news, forums): candidates for discovery ("trending")."""
+        for t in titles or []:
+            t = " ".join(str(t).split())[:80]
+            if 3 <= len(t.split()) <= 12 and t not in self.trending and not self.query_used(t):
+                self.trending.append(t)
+        self.trending = self.trending[-TRENDING_KEEP:]
 
     def _roll(self):
         day = self._day_of(self.clock())
@@ -146,6 +205,7 @@ class Variety:
             self.wiki += 1
         if topic:
             self.topics[topic] = self.topics.get(topic, 0) + 1
+            self.mark(topic)
         if topic and topic == self.last:
             self.streak += 1
         else:
@@ -170,11 +230,15 @@ class Variety:
     def to_dict(self):
         self._roll()
         return {"day": self.day, "topics": dict(self.topics), "pages": self.pages, "wiki": self.wiki,
-                "last": self.last, "streak": self.streak}
+                "last": self.last, "streak": self.streak, "seen_t": dict(self.seen_t), "queries": dict(self.queries),
+                "trending": list(self.trending)}
 
     def public(self):
         d = self.to_dict()
-        d.update(top_share=round(max(self.topics.values()) / self.pages, 3) if self.pages and self.topics else 0.0,
+        for k in ("seen_t", "queries", "trending"):
+            d.pop(k, None)
+        d.update(recent_topics=sorted(k for k in self.seen_t if self.recent(k)), trending_n=len(self.trending),
+                 top_share=round(max(self.topics.values()) / self.pages, 3) if self.pages and self.topics else 0.0,
                  wiki_share=round(self.wiki_share(), 3), entropy_bits=self.entropy())
         return d
 
@@ -202,22 +266,55 @@ def weights(variety=None, pref=None, hour=12.0, mult=None):
                 variety.share(topic))
             if variety.last == topic and variety.streak >= STREAK_FROM:
                 w *= 0.5                                    # he just had several pages of it
+            if variety.recent(topic):
+                w *= RECENT_W                               # #89: seen in the last 2 hours
         out[topic] = w
     return out
 
 
-def pick(variety=None, pref=None, hour=12.0, rng=None, mult=None):
-    """One search from the profile: {"query", "topic", "from": "interests", "rhythm"}."""
+def discovery_topic(q):
+    return "discover:" + "-".join(re.findall(r"[a-z0-9]+", str(q).lower())[:6] or ["x"])
+
+
+def pick(variety=None, pref=None, hour=12.0, rng=None, mult=None, discover=False):
+    """One search from the profile: {"query", "topic", "from": "interests", "rhythm"}. Queries typed in the last
+    week are left out. discover=True: a topic not seen in the last 2 h, from the profile or from discovery (trending
+    headlines he saw, the DISCOVERY pool); "new": True on the result."""
     rng = rng or random.Random()
     w = weights(variety, pref, hour, mult)
-    topics = [k for k in w if k != "wikipedia"]
-    total = sum(w[k] for k in topics)
-    x = rng.random() * total
-    for k in topics:
-        x -= w[k]
-        if x <= 0:
-            break
-    return {"query": rng.choice(PROFILE[k][1]), "topic": k, "from": "interests", "rhythm": rhythm(hour)["name"]}
+    fresh = (lambda q: not variety.query_used(q)) if variety is not None else (lambda q: True)
+    topics = [k for k in w if k != "wikipedia" and any(fresh(q) for q in PROFILE[k][1])]
+    if discover and variety is not None:
+        topics = [k for k in topics if not variety.recent(k)]
+    out = None
+    if discover and (not topics or rng.random() < 0.5):
+        trend = [t for t in (variety.trending if variety is not None else []) if fresh(t)
+                 and not (variety and variety.recent(topic_of(t) or discovery_topic(t)))]
+        pool = [q for q in DISCOVERY if fresh(q) and not (variety and variety.recent(discovery_topic(q)))]
+        if not pool and not trend and variety is not None:  # all typed today: the one typed longest ago
+            old = [q for q in DISCOVERY if not variety.recent(discovery_topic(q))]
+            pool = sorted(old, key=lambda q: variety.queries.get(q.lower(), 0))[:5]
+        if trend and (rng.random() < 0.5 or not pool):
+            q = rng.choice(trend)
+            variety.trending.remove(q)
+            out = {"query": q, "topic": topic_of(q) or discovery_topic(q), "source": "trending"}
+        elif pool:
+            q = rng.choice(pool)
+            out = {"query": q, "topic": discovery_topic(q), "source": "discovery"}
+    if out is None:
+        topics = topics or [k for k in w if k != "wikipedia"]
+        total = sum(w[k] for k in topics)
+        x = rng.random() * total
+        for k in topics:
+            x -= w[k]
+            if x <= 0:
+                break
+        qs = [q for q in PROFILE[k][1] if fresh(q)] or PROFILE[k][1]
+        out = {"query": rng.choice(qs), "topic": k, "source": "profile"}
+    if variety is not None:
+        out["new"] = not variety.recent(out["topic"])
+        variety.mark(out["topic"], out["query"])
+    return dict(out, **{"from": "interests", "rhythm": rhythm(hour)["name"]})
 
 
 def streak_pull(variety):

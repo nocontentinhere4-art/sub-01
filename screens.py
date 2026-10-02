@@ -31,6 +31,8 @@ HABITUATION = 0.12
 ALPHA = 0.15
 SCALE = {"tiktok": 1.0, "shorts": 1.0, "youtube": 0.5, "video": 0.5}
 PAGE_SCALE = 0.25
+TIKTOK_ID = re.compile(r"^https://www\.tiktok\.com/@[\w.]{2,30}/video/(\d{8,25})(?:[?#]|$)")
+TIKTOK_EMBED = "https://www.tiktok.com/player/v1/{}?autoplay=0&muted=1&rel=0"
 DA_LABEL = "simulated dopamine-like reward signal in the model"
 
 
@@ -88,6 +90,11 @@ class ScreensStatus:
     def set_off(self, why):
         self.state, self.why, self.since = "off", why, self.clock()
 
+    def idle(self, why):
+        """Nobody at a screen: the browser process is not needed (it starts when he picks one up)."""
+        if self.state not in ("off", "idle"):
+            self.state, self.why, self.since = "idle", why, self.clock()
+
     def browser_down(self, why):
         if self.state != "down":
             self.state, self.why, self.since = "down", str(why)[:120], self.clock()
@@ -120,20 +127,33 @@ class ScreensStatus:
         self._roll()
         self.counts[kind] = self.counts.get(kind, 0) + 1
         host = (urllib.parse.urlsplit(str(st.get("url"))).hostname or "").removeprefix("www.")
-        self.last = (self.last + [{"t": self.clock(), "kind": kind, "host": host, "device": dev,
-                                   "title": str(st.get("title") or host)[:90]}])[-LAST_N:]
+        item = {"t": self.clock(), "kind": kind, "host": host, "device": dev, "title": str(st.get("title") or host)[:90]}
+        if kind == "tiktok" and (m := TIKTOK_ID.search(str(st.get("url")))):
+            item["tiktok_id"] = m.group(1)   # viewers may play it in TikTok's official embed player (#89)
+        self.last = (self.last + [item])[-LAST_N:]
         return kind
+
+    @staticmethod
+    def _row(x, ok):
+        return _row_impl(x, ok)
 
     def public(self, display_ok=None):
         self._roll()
         total = sum(self.counts.values())
         ok = display_ok or (lambda s: True)
         return {"browser": {"state": self.state, "why": self.why, "since": hhmm(self.since), "restarts": self.restarts},
-                "last": [dict(x, t=hhmm(x["t"]), title=x["title"] if ok(x["title"]) else x["host"])
-                         for x in reversed(self.last)],
+                "last": [self._row(x, ok) for x in reversed(self.last)],
                 "today": {"tokyo_day": self.day, "total": total, "counts": dict(self.counts),
                           "share": {k: round(self.counts.get(k, 0) / total, 3) for k in KINDS} if total else {}},
                 "notes": [dict(n, t=hhmm(n["t"])) for n in self.notes]}
+
+
+def _row_impl(x, ok):
+    r = dict(x, t=hhmm(x["t"]), title=x["title"] if ok(x["title"]) else x["host"])
+    vid = r.pop("tiktok_id", None)
+    if vid and ok(x["title"]):                 # a caption that fails the filter: no player either
+        r["embed"] = {"src": TIKTOK_EMBED.format(vid), "label": "TikTok (official embed)"}
+    return r
 
 
 class DopamineBursts:

@@ -58,6 +58,7 @@ import time
 import urllib.parse
 
 import interests as I
+import novelty as NV
 import search_sources as SS
 import short_videos as SV
 import sessions as SE
@@ -552,6 +553,8 @@ class Screen:
         self.mode = None                                    # "video": YouTube at the desk; "shorts": the phone's
         self.queue = []                                     # short-video feed (#56); else browsing. queue: next shorts
         self.cards = {}                                     # TikTok embed cards by video URL (#89)
+        self.feed_topic, self.feed_fresh = None, False      # the feed's current topic; its first clip not shown yet
+        self.sess = [0.0, 0, 0]                             # scroll session: last clip time, clips, new-topic clips
         self.watch_until = 0.0                              # wall time the current video ends (0: not watching)
         self.watch_s = 0.0
         self.scene = 0.0                                    # change between the last two screenshots while watching
@@ -613,10 +616,17 @@ class Browser:
         self.limits = SS.Limits(state=s.get("searches"))    # per-host requests per hour, searches per source today
         self.variety = I.Variety(state=(s.get("searches") or {}).get("variety"))   # today's topics, Wikipedia share
         self.robots = SS.Robots()
+        self.visited = NV.Visited(state=s.get("visited"))   # #89: no page, video or near-same title twice in 7 days
+        self.seed_t = {}                                    # seed site -> last opened (rotation, SEED_GAP_S)
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
-                "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict())}
+                "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict()),
+                "visited": self.visited.to_dict()}
+
+    def fresh(self, url, title=None):
+        """Not opened in the last 7 days (the URL / video id, or a near-duplicate title)."""
+        return not self.visited.seen(url, title)
 
     def accounts(self):
         """For /api/browsing: per site "logged in" / "logged out" and why. Never a cookie."""
@@ -877,7 +887,8 @@ class Browser:
         """A search results page for the eyes: its results (title, snippet, host), numbered, nothing else."""
         links = []
         results = [r for r in self.safe_results(sc.info.get("results") if results is None else results)
-                   if not (sc.site or self._session(r["url"])) or VO.link_ok(r["url"], r["title"])]
+                   if (not (sc.site or self._session(r["url"])) or VO.link_ok(r["url"], r["title"]))
+                   and (r["url"] in getattr(sc, "cards", {}) or self.fresh(r["url"], r["title"]))]
         for i, r in enumerate(results[:PAGE_LINKS]):
             link = {"id": f"L{i + 1}", "href": r["url"], "text": r["title"][:100], "result": True,
                     "host": (urllib.parse.urlsplit(r["url"]).hostname or "").removeprefix("www."), "area": 0,
@@ -908,8 +919,10 @@ class Browser:
                                                                                 "wikidata.org"))
             yt = is_youtube(u.hostname or "")
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
-                    or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)):
-                continue
+                    or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)
+                    or (kind not in ("next", "comments") and NV.footer_link(label, href, url))
+                    or not self.fresh(href, label)):
+                continue                                        # #89: no footer links, nothing opened this week
             if (sc.site or self._session(href)) and not VO.link_ok(href, label, aria or ""):
                 continue                                        # #60: logged in, an action or a private page
             if href in seen:                                    # YouTube: the thumbnail link comes first, labelled
@@ -927,6 +940,8 @@ class Browser:
         ids = {id(c) for c in special}
         keep = special + [c for c in cand if id(c) not in ids][:max(0, PAGE_LINKS - len(special))]
         keep.sort(key=lambda c: cand.index(c))
+        if url in SEEDS or (cur.path in ("", "/") and not search):   # a front page: its headlines are "trending"
+            self.variety.offer([c["text"] for c in cand if not c["kind"] and c["host"] == (cur.hostname or "")][:15])
         links = []
         for i, c in enumerate(keep):
             link = {"id": f"L{i + 1}", "href": c["href"], "text": c["text"][:100],
@@ -966,6 +981,11 @@ class Browser:
                         ok = await self._show_card(sc, sc.cards[href], f"{action.get('label', '')} — {why}")
                     else:
                         ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
+                        item = next((r for r in sc.queue if r.get("url") == href), None)
+                        if (not ok and item and self.last_skip in ("bot wall", "did not load", "empty")
+                                and (card := SV.youtube_card(item))):     # #89: the short's page is blocked for the
+                            ok = await self._show_card(sc, card, f"{action.get('label', '')} — {why}")   # server
+                            self.feed_note = SV.NOTE_SHORTS_CARDS if ok else self.feed_note
                     sc.queue = [r for r in sc.queue if r.get("url") != href]
                     if ok and kind in ("play_video", "open_video") and await self._play_muted(sc):
                         await self._start_watch(sc, action.get("watch_s"))
@@ -982,7 +1002,7 @@ class Browser:
                 elif kind == "back" and len(sc.history) >= 2:
                     saved = list(sc.history)
                     sc.history = saved[:-2]
-                    ok = await self._open(sc, saved[-2], f"went back — {why}", "page")
+                    ok = await self._open(sc, saved[-2], f"went back — {why}", "page", revisit=True)
                     if not ok:
                         sc.history = saved
                 elif kind == "scroll":
@@ -1015,7 +1035,7 @@ class Browser:
         if sc.mode == "video":                                  # watching videos: a YouTube search (no typing)
             q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)
             if await self._open(sc, youtube_search_url(q), f"looked for videos about “{q}”", "page",
-                                title=f"{q} — YouTube"):
+                                title=f"{q} — YouTube", revisit=True):
                 sc.scrolls_left = 0
                 return True
         if sc.pending_link:
@@ -1055,7 +1075,22 @@ class Browser:
                 topic, origin = self.rng.choice(FAMILIAR), "familiar"
             why = why or (SS.ORIGINS[origin] if origin not in ("", "familiar") else f"curious about “{topic[:50]}”")
             return await self._search(sc, topic, why, origin)
-        return await self._open(sc, self.rng.choice(SEEDS), "opened a site he likes", "page")
+        return await self._seed(sc, "opened a site he likes")
+
+    SEED_GAP_S = 6 * 3600                                      # a seed site's front page at most every 6 hours
+
+    async def _seed(self, sc, why):
+        """A seed site's front page (a feed that changes, so not held to the 7-day rule), rotating: the ones opened in
+        the last SEED_GAP_S are left out; Wikipedia's random article only while Wikipedia stays under a tenth."""
+        now = time.time()
+        pool = [u for u in SEEDS if now - self.seed_t.get(u, 0) > self.SEED_GAP_S
+                and ("wikipedia.org" not in u or self.variety.wiki_share() < 0.10)]
+        self.rng.shuffle(pool)
+        for u in pool[:3]:
+            self.seed_t[u] = now
+            if await self._open(sc, u, why, "page", revisit=True):
+                return True
+        return False
 
     PROFILE_SHARE = 0.45                                       # searches from the interest profile (#56 extension)
 
@@ -1064,16 +1099,28 @@ class Browser:
         been on one topic for several pages (variety)."""
         return min(0.9, self.PROFILE_SHARE + 0.4 * I.streak_pull(self.variety))
 
-    async def _shorts(self, sc, interest):
+    async def _shorts(self, sc, interest, force=False):
         """The phone's short-video feed: a TikTok tag page or a YouTube Shorts search (Restricted Mode) on his
         interest or the hour's profile topic; the shorts found are queued, and each one is picked by the vote
         among the next ones (local options, no paid call), played muted for at most SHORTS_MAX_S."""
         from eyes import query_ok
         d = interest if isinstance(interest, dict) else {}
         q, origin = query_ok(SS.interest_text(interest)), d.get("from", "")
-        if not q or self.rng.random() < 0.5:
-            p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"))
+        if origin in NV.SEEN_ORIGINS and not self.visited.follow_ok():
+            q = None                                            # #89: follow-ups at most a quarter of searches
+        topic = new = None
+        if not q or (not force and self.rng.random() < 1 - I.FOLLOW_SHORTS):
+            # #89: most shorts come from topics he has not seen lately (discovery / trending), not his notes
+            p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
+                       discover=True)
             q, origin = query_ok(p["query"]), "interests"
+            topic, new = p["topic"], p["new"]
+        else:
+            topic = I.topic_of(q or "") or I.discovery_topic(q or "")
+            new = not self.variety.recent(topic)
+            self.variety.mark(topic, q)
+        sc.feed_topic, sc.feed_fresh = topic, new
+        self.visited.search(origin)
         if not q:
             return False
         names = SV.feed_order(self.rng)
@@ -1082,13 +1129,16 @@ class Browser:
         for name in names:
             if name == "tiktok" and not self._session("https://www.tiktok.com/"):
                 # logged out, the server gets an empty TikTok feed (#89): public videos as embed cards instead
-                if await self._tiktok_cards(sc, q, f"short videos — {why}"):
+                if self.limits.source_ok("tiktok") and await self._tiktok_cards(sc, q, f"short videos — {why}"):
                     self.feed_note = SV.NOTE_CARDS
                     return True
+                if self.limits.source_ok("tiktok"):
+                    self.limits.refuse("tiktok", "no videos reachable from the server")
                 self.feed_note = SV.NOTE_BLOCKED
                 continue
             if self.limits.source_ok(name) and await self._search_on(sc, name, q, f"short videos — {why}", origin):
-                sc.queue = [r for r in sc.info.get("results", []) if r.get("video")]
+                sc.queue = [r for r in sc.info.get("results", [])
+                            if r.get("video") and self.fresh(r["url"], r["title"])]
                 if sc.queue:
                     if name == "tiktok":
                         self.feed_note = None
@@ -1117,7 +1167,7 @@ class Browser:
             if urls:
                 break
         cards = []
-        for u in dict.fromkeys(urls).keys():
+        for u in [u for u in dict.fromkeys(urls) if self.fresh(u)]:
             if len(cards) >= 4:
                 break
             o = SV.oembed_url(u)
@@ -1126,7 +1176,8 @@ class Browser:
             self.limits.note("www.tiktok.com")
             status, text = await fetch(o)
             meta = SV.parse_oembed(text, u) if status == 200 else None
-            if (meta and video_text_ok(meta["title"]) and (not meta["author"] or video_text_ok(meta["author"]))
+            if (meta and self.fresh(u, meta["title"]) and video_text_ok(meta["title"])
+                    and (not meta["author"] or video_text_ok(meta["author"]))
                     and all(video_text_ok(h) for h in meta["hashtags"]) and (not meta["thumb"] or url_ok(meta["thumb"]))):
                 cards.append(meta)
         if not cards:
@@ -1138,13 +1189,14 @@ class Browser:
         return await self._show_card(sc, cards[0], why)
 
     async def _show_card(self, sc, card, why):
-        """One TikTok embed card on the screen (a local page: caption, creator, thumbnail; no video, no actions)."""
+        """One embed card on the screen: TikTok, or a YouTube Short whose page is blocked for the server (a local page:
+        caption, creator, thumbnail; no video, no actions)."""
         if getattr(sc, "site", None) and getattr(sc, "public", None):   # cards are never shown in a logged-in context
             sc.ctx, sc.page = sc.public
             sc.site = None
         await sc.page.set_content(SV.card_html(card), wait_until="domcontentloaded")
         await sc.page.wait_for_timeout(1200)                    # the thumbnail
-        sc.info = {"title": card["title"][:140], "url": card["url"], "host": "tiktok.com", "kind": "page",
+        sc.info = {"title": card["title"][:140], "url": card["url"], "host": card.get("host", "tiktok.com"), "kind": "page",
                    "why": why, "t": time.time(), "card": True, "channel": card["author"][:80]}
         sc.scrolls_left = 2
         sc.queue = [r for r in sc.queue if r.get("url") != card["url"]]
@@ -1181,7 +1233,7 @@ class Browser:
                 await box.press("Enter")                           # Enter only: no other button is pressed
         except Exception:                                          # results shown in place (no navigation)
             pass
-        return await self._settle(sc, why, "page", min_text=80)
+        return await self._settle(sc, why, "page", min_text=80, revisit=True)    # its own results page
 
     @staticmethod
     def site_search_url(page_url, f, q):
@@ -1263,46 +1315,50 @@ class Browser:
             mins = round(sc.watch_s / 60, 1)
             sc.info = dict(sc.info, video=dict(sc.info["video"], watching=False, left_s=0, scene=0.0),
                            why=f"watched for {mins:g} min (muted); deciding again")
+        if sc.mode == "shorts" and sc.queue and not self.new_share_ok(sc):
+            sc.queue = []                                       # #89: >= 60 % new topics per scroll session
+            if sc.info:
+                sc.info = dict(sc.info, kind="left", why="watched a short; next, something new")
         if sc.mode == "shorts" and sc.info and sc.queue:      # the next shorts are the options (no paid call)
             sc.info = dict(sc.info, kind="search", results=sc.queue[:SS.MAX_RESULTS],
                            why=f"watched a short for {round(sc.watch_s)} s (muted); the next one?")
 
-    TRIES = 2                                                  # sources tried per search before the fallback
+    TRIES = 4                                                  # sources tried per search (#89: no Wikipedia fallback)
 
     async def _search(self, sc, q, why="", origin=""):
-        """Search on the source that fits the query (search_sources.route: topic, rotation, per-host limits, robots);
-        if none of the first TRIES gives results, search Wikipedia and leave by one of the article's external sources.
+        """Search on the source that fits the query (search_sources.route: topic, rotation, per-host limits, robots,
+        sources blocked after repeated failures left out), trying up to TRIES working sources; when none gives
+        results, a seed site's front page instead (rotating), never the same Wikipedia search again (#89).
+        - a follow-up on something he saw beyond FOLLOW_MAX of recent searches becomes a discovery pick;
+        - a search with a video word (tiktok, shorts, videos...) goes to the short-video feed on the phone and to the
+          video sources at the desk, never to Wikipedia.
         `why` ends the card's line ("searched arXiv for “sleep spindles” — from his reading notes")."""
-        tried = []
+        if origin in NV.SEEN_ORIGINS and not self.visited.follow_ok():
+            p = I.pick(self.variety, hour=I.tokyo_hour(), rng=self.rng, discover=True)
+            if p.get("query"):
+                q, origin = p["query"], "interests"
+                why = f"{SS.ORIGINS['interests']} ({p['topic']}, something new)"
+        self.visited.search(origin)
+        vq = NV.video_query(q)
+        if vq is not None:
+            return await self._video_search(sc, vq, q, why, origin)
         for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video",
                              wiki_share=self.variety.wiki_share())[:self.TRIES]:
-            tried.append(name)
             if await self._search_on(sc, name, q, why, origin):
                 if not self.decide and sc.info.get("results"):  # brain decides: it picks among the results itself
-                    res = sc.info["results"]
-                    r = res[min(len(res) - 1, int(self.rng.random() ** 2 * 4))]    # mostly the top results
-                    sc.pending_link = (r["url"], f"searched “{q[:40]}”, opened “{r['title'][:50]}”")
+                    res = [r for r in sc.info["results"] if self.fresh(r["url"], r["title"])]
+                    if res:
+                        r = res[min(len(res) - 1, int(self.rng.random() ** 2 * 4))]    # mostly the top results
+                        sc.pending_link = (r["url"], f"searched “{q[:40]}”, opened “{r['title'][:50]}”")
                 return True
-        if "wikipedia" in tried or not self.limits.allow("en.wikipedia.org"):
-            return False
-        self.limits.note("en.wikipedia.org")
-        wiki = "https://en.wikipedia.org/w/index.php?" + urllib.parse.urlencode({"search": q})
-        if not await self._open(sc, wiki, f"searched Wikipedia for “{q[:50]}”" + (f" — {why}" if why else ""),
-                                "search", title=f"{q} — Wikipedia"):
-            return False
-        if "/wiki/Special:Search" in sc.page.url:               # a results list: open the first hit next
-            results = await self._links(sc, ".mw-search-result-heading a")
-        else:                                                   # an article: leave by one of its sources
-            results = await self._links(sc, "#bodyContent a.external.text, #bodyContent .references a.external")
-            results = [(u, t) for u, t in results if "wikipedia.org" not in u and "wikimedia" not in u
-                       and "archive.org" not in u and "doi.org" not in u]
-            self.rng.shuffle(results)
-        sc.scrolls_left = self.rng.randint(1, 3)
-        self.limits.count("wikipedia", q, origin)
-        if results and not self.decide:
-            u, t = results[min(len(results) - 1, int(self.rng.random() ** 2 * 4))]
-            sc.pending_link = (u, f"searched “{q[:40]}”, opened “{t[:50]}”")
-        return True
+        return await self._seed(sc, f"no search worked for “{q[:40]}”, opened a site he likes instead")
+
+    async def _video_search(self, sc, vq, q, why, origin):
+        """A search asking for videos: the phone's short-video feed, or a video source at the desk."""
+        topic = vq or None
+        if sc.name == "phone":
+            return await self._shorts(sc, {"query": topic, "from": origin}, force=True)
+        return self.limits.source_ok("youtube") and await self._search_on(sc, "youtube", topic or q, why, origin)
 
     async def _search_on(self, sc, name, q, why, origin):
         """One search on one source: robots.txt and the per-host limit first, then its results page (or its JSON API
@@ -1318,7 +1374,8 @@ class Browser:
                 self.limits.refuse(name, "rate limit")
                 return False
             self.limits.note(host)
-            if not await self._open(sc, src["site"], line, "page", shoot=False):
+            if not await self._open(sc, src["site"], line, "page", shoot=False, revisit=True):
+                self.limits.refuse(name, self.last_skip or "did not load")
                 return False
             self.limits.note(host)
             if not await self._site_search(sc, q, line):
@@ -1349,6 +1406,7 @@ class Browser:
                     return False
             self.limits.note(urllib.parse.urlsplit(url).hostname)
             if not await self._open(sc, url, line, "search", title=f"{q} — {label}", min_text=0, shoot=False):
+                self.limits.refuse(name, self.last_skip or "did not load")
                 return False
             if not api:
                 results = src["parse"](await sc.page.content(), sc.page.url)
@@ -1381,7 +1439,8 @@ class Browser:
         cur = urllib.parse.urlsplit(sc.page.url)
         cand = []
         for href, text, area in links:
-            if len(text) < 12 or not url_ok(href) or LOGIN_LINK.search(text) or BAD_WORDS.search(text):
+            if (len(text) < 12 or not url_ok(href) or LOGIN_LINK.search(text) or BAD_WORDS.search(text)
+                    or NV.footer_link(text, href, sc.page.url) or not self.fresh(href, text)):
                 continue
             u = urllib.parse.urlsplit(href)
             if (u.netloc, u.path) == (cur.netloc, cur.path):
@@ -1391,9 +1450,14 @@ class Browser:
         cand.sort(reverse=True)
         return (cand[0][1], cand[0][2]) if cand else None
 
-    async def _open(self, sc, url, why, kind, title=None, min_text=80, shoot=True):
-        """Load a page; if the guard rejects it, leave it (blank) so nothing of it is shown, scrolled or followed."""
+    async def _open(self, sc, url, why, kind, title=None, min_text=80, shoot=True, revisit=False):
+        """Load a page; if the guard rejects it, leave it (blank) so nothing of it is shown, scrolled or followed.
+        A page (not a results page) opened in the last 7 days is not opened again (#89) unless `revisit` (a seed
+        site's front page, a YouTube results page, going back)."""
         if not url_ok(url) or VO.private_url(url):
+            return False
+        if not revisit and kind != "search" and not self.fresh(url):
+            self.last_skip = "opened in the last 7 days"
             return False
         if self._session(url) and not VO.link_ok(url):          # #60: re-checked just before it is opened
             self.last_skip = "action"
@@ -1412,9 +1476,9 @@ class Browser:
                 print(f"browse: could not open {url[:80]}: {repr(e)[:100]}", flush=True)
                 self.last_skip = "did not load"
                 return await self._leave(sc)
-        return await self._settle(sc, why, kind, title, min_text, shoot)
+        return await self._settle(sc, why, kind, title, min_text, shoot, revisit)
 
-    async def _settle(self, sc, why, kind, title=None, min_text=80, shoot=True):
+    async def _settle(self, sc, why, kind, title=None, min_text=80, shoot=True, revisit=False):
         """A page has loaded: banners away, then the guard, bot walls and sign-in walls; then shown."""
         page = sc.page
         await page.wait_for_timeout(1800)
@@ -1443,6 +1507,8 @@ class Browser:
             await self._logout(sc, "login wall")
         if not reason and sc.site and not video_text_ok(re.sub(r"\s*[-|]\s*(YouTube|TikTok)$", "", page_title)):
             reason = "guard"                                           # captions, hashtags, creators (#56 guard)
+        if not reason and not revisit and kind != "search" and not self.fresh(page.url, title or page_title):
+            reason = "opened in the last 7 days"                       # redirected to, or the same page renamed
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             self.last_skip = reason
@@ -1542,6 +1608,10 @@ class Browser:
         i = sc.info
         self.log = (self.log + [{"t": i["t"], "device": sc.name, "title": i["title"], "url": i["url"], "host": i["host"],
                                  "why": i["why"]}])[-KEEP:]
+        if i.get("kind") != "search" and i["url"] not in SEEDS:
+            self.visited.add(i["url"], i["title"])                     # #89: not opened again for 7 days
+            if getattr(sc, "mode", None) == "shorts" and (i.get("card") or VIDEO_LINK.search(i["url"])):
+                self._clip(sc)
         if not sc.history or sc.history[-1] != i["url"]:
             sc.history = (sc.history + [i["url"]])[-20:]
             sc.chain += 1
@@ -1549,6 +1619,28 @@ class Browser:
             sc.info = dict(i, topic=topic)
             self.log[-1]["topic"] = topic
         return True
+
+    NEW_MIN = 0.6                                              # #89: new topics per scroll session, at least
+    SESSION_GAP_S = 300                                        # clips further apart start a new scroll session
+
+    def _clip(self, sc):
+        """A short was shown: counted in the scroll session, as new when it is the first of a topic not seen in 2 h."""
+        now = time.time()
+        if now - sc.sess[0] > self.SESSION_GAP_S:
+            sc.sess = [now, 0, 0]
+        sc.sess = [now, sc.sess[1] + 1, sc.sess[2] + (1 if sc.feed_fresh else 0)]
+        sc.feed_fresh = False
+
+    def new_share_ok(self, sc):
+        """Another clip on the current topic keeps new topics at NEW_MIN of this scroll session."""
+        t, n, new = sc.sess
+        if sc.feed_fresh or time.time() - t > self.SESSION_GAP_S:
+            return True                                         # the next clip is the first of a new topic
+        return new / (n + 1) >= self.NEW_MIN
+
+    def session_stats(self, sc):
+        t, n, new = sc.sess
+        return {"clips": n, "new_topics": new, "new_share": round(new / n, 2) if n else None}
 
     async def _leave(self, sc):
         sc.scrolls_left = 0

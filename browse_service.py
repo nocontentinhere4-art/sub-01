@@ -89,6 +89,9 @@ def make_app(browser, token=None):
                 from search_sources import Limits
                 browser.limits = Limits(state=st["searches"])
                 browser.variety = Variety(state=st["searches"].get("variety"))
+            if st.get("visited") and hasattr(browser, "visited"):  # #89: pages opened this week stay unopened
+                from novelty import Visited
+                browser.visited = Visited(state=st["visited"])
         return web.json_response({"ok": True, "applied": fresh})
 
     async def limited(coro, limit, dev):
