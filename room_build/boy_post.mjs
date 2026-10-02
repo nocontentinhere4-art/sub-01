@@ -175,7 +175,7 @@ const texHair = doc.createTexture("boy2_hair").setImage(hairWebp).setMimeType("i
 doc.createExtension(ALL_EXTENSIONS.find(e => e.EXTENSION_NAME === "EXT_texture_webp")).setRequired(true);
 const matBody = doc.createMaterial("boy2_body").setBaseColorTexture(texMain).setNormalTexture(texNormal)
   .setOcclusionTexture(texOrm).setMetallicRoughnessTexture(texOrm).setRoughnessFactor(1).setMetallicFactor(1);
-const matHair = doc.createMaterial("boy2_hair").setBaseColorTexture(texHair).setRoughnessFactor(0.65).setMetallicFactor(0)
+const matHair = doc.createMaterial("boy2_hair").setBaseColorTexture(texHair).setRoughnessFactor(0.85).setMetallicFactor(0)
   .setAlphaMode("MASK").setAlphaCutoff(0.4).setDoubleSided(true);
 primBody.setMaterial(matBody); primHair.setMaterial(matHair);
 for (const m of root.listMaterials()) if (m !== matBody && m !== matHair) m.dispose();
