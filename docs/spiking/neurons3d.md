@@ -201,3 +201,51 @@ sampled model neuron as a small real cell instead of a dot.
     only its own region, the caption word for word, and the panel CSS.
   - `python tests/neurons3d_shots.py --out docs/screens/neuron_forest`: screenshots at 1920, 1280 and 390 px, live
     and offline, and the forest zoomed; the panel's boxes; counts; JS cost and FPS (`results.json`).
+
+### Measured (2026-10-02, this sandbox: headless Chromium, WebGL in software via SwiftShader, no GPU)
+- **Counts:**
+  - desktop: 2 901 cells and 115 511 segments;
+  - phone (< 600 px): 1 407 cells and 56 016 segments;
+  - mini: 800 cells requested, at least 3 a region;
+  - 7 draw calls in each case (6 instanced types + the somata);
+  - ≤ 40 segments in every cell.
+- **Panel:** the cards end above the dock at 1920, 1280 and 390 px, offline and live, and no layer button
+  overflows its label.
+
+  | width | cards end | dock starts |
+  |---|---|---|
+  | 1920 | y = 666 | y = 680 |
+  | 1280 | y = 377 | y = 391 |
+
+  At 390 the page scrolls and the dock is sticky, as before (`results.json`).
+- **Main-thread cost under ×4 CPU throttle** (390 px):
+  - building the 1 407-cell forest: 603–674 ms, once, when the toggle is first switched on. This is mostly
+    `simplify`, the cortex normals and the layout;
+  - 0.11–0.17 ms per incoming frame;
+  - 0.01–0.04 ms per rendered frame for the layer's own `update`;
+  - the page's whole `frame()`, with three.js submitting the draws: 4–7 ms with the forest on, 3–4 ms off.
+- **FPS** (390 px, fibres and cortex hidden, the recorded stream playing, counted from the page's own `frame()`):
+
+  | cells | segments | FPS ×1 | FPS ×4 |
+  |---|---|---|---|
+  | none | 0 | 19.2 | 13.0 |
+  | ~640 | 25 634 | 6.0 | 4.2 |
+  | ~800 | 31 548 | 5.2 | 3.4 |
+  | 1 407 (phone default) | 56 016 | 3.6 | 2.0–2.4 |
+  | 2 901 (desktop default) | 115 511 | 2.0 | 1.2 |
+
+  SwiftShader rasterises every line on the (throttled) CPU, so FPS falls with the segment count. JS per frame stays
+  at 1.2–1.9 ms unthrottled and 4–7 ms at ×4, so the layer's own work is not what limits FPS here.
+- **The ≥ 30 FPS phone target cannot be shown in this sandbox.** It needs a real device or a machine with a GPU.
+  56k instanced line segments (112k vertices, one texture fetch each) are a light load for a mid phone GPU, but
+  that is an expectation, not a measurement.
+  - Levers if a device falls short: `maxCells` for phones (one number in `web/index.html`), and `FOREST_SEG`.
+- **Off screen:** with the scene moved out of view, the IntersectionObserver reports it hidden and the page renders 0
+  frames in 2 s.
+- **Stream:** unchanged. The recorded 20k CPU stream measured 2 332 B/s per viewer while the screenshots were taken.
+
+Screenshots (`docs/screens/neuron_forest/`, JPEG):
+- `brain_{1920,1280,390}_offline.jpg`: static cells;
+- `brain_{1920,1280,390}_neurons.jpg`: live, from the recorded stream replayed into the page;
+- `forest_{1920,1280,390}_live_zoom.jpg`: the forest alone at half the camera distance;
+- `mini_{offline,neurons}.jpg`.

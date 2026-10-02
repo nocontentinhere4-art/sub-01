@@ -1,6 +1,6 @@
 """Screenshots and FPS of the neurons layer on /brain (#62; the forest of real cells, #88 B). Run by hand (no `test_` prefix: pytest does not collect it):
 
-    python tests/neurons3d_shots.py --out docs/screens/neurons3d
+    python tests/neurons3d_shots.py --out docs/screens/neuron_forest
 
 Starts `live_server.py --demo` (BROWSE=0, SUB01_SPIKING_LIVE=0: no live spiking network on the server), then in headless
 Chromium:
@@ -110,7 +110,7 @@ def wait_ready(base, proc, timeout=120):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8791)
-    ap.add_argument("--out", default="docs/screens/neurons3d")
+    ap.add_argument("--out", default="docs/screens/neuron_forest")
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
     ap.add_argument("--cdn-dir", default=None)
     ap.add_argument("--fps-s", type=float, default=6.0)
@@ -170,27 +170,27 @@ def main():
                 pg.wait_for_timeout(2500)
                 cap = pg.inner_text("#n3cap")
                 btn = pg.inner_text('#layers button[data-l="neurons"]')
-                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_offline.png"))
+                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_offline.jpg"), type="jpeg", quality=85)
                 results[f"offline_{tag}"] = {"button": btn, "caption": cap, "panel": pg.evaluate(rects),
                                              "forest": pg.evaluate("n3d.state()")}
                 pg.evaluate("f => window.__replay(f)", frames)
                 pg.wait_for_function("document.querySelector('#n3cap').innerText.includes('live')", timeout=120000)
                 pg.wait_for_timeout(2500)
-                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_neurons.png"))
+                pg.screenshot(timeout=180000, path=str(out / f"brain_{tag}_neurons.jpg"), type="jpeg", quality=85)
                 results[f"live_{tag}"] = {"caption": pg.inner_text("#n3cap"), "panel": pg.evaluate(rects), "errors": errors}
                 # the forest alone, closer (the close-up switch held off): fibres and cortex hidden
                 for layer in ("fibres", "cortex"):
                     pg.evaluate(f"document.querySelector('#layers button[data-l=\"{layer}\"]').click()")
                 pg.evaluate("""() => { n3lodAt = 1e12; camera.position.sub(controls.target).multiplyScalar(0.5).add(controls.target); }""")
                 pg.wait_for_timeout(2500)
-                pg.screenshot(timeout=180000, path=str(out / f"forest_{tag}_live_zoom.png"))
+                pg.screenshot(timeout=180000, path=str(out / f"forest_{tag}_live_zoom.jpg"), type="jpeg", quality=85)
                 ctx.close()
 
             ctx, pg, errors = page_for(300, 225, "/brain?mini&neurons=1")
-            pg.screenshot(timeout=180000, path=str(out / "mini_offline.png"))
+            pg.screenshot(timeout=180000, path=str(out / "mini_offline.jpg"), type="jpeg", quality=85)
             pg.evaluate("f => window.__replay(f)", frames)
             pg.wait_for_timeout(3000)
-            pg.screenshot(timeout=180000, path=str(out / "mini_neurons.png"))
+            pg.screenshot(timeout=180000, path=str(out / "mini_neurons.jpg"), type="jpeg", quality=85)
             results["mini"] = {"text": pg.inner_text("#n3mini"), "errors": errors}
             ctx.close()
 
