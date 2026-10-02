@@ -261,6 +261,7 @@ if ("ResizeObserver" in window) new ResizeObserver(es => document.documentElemen
 const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.";
 const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind.";
 const N3_STATIC = "static cells, no activity";
+let n3morph = null;                                  // neurons_morph.json: the forest's real cells (fetched with the toggle)
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
 const N3_NET = {gpu: "1M-neuron network on GPU", cpu: "20k-neuron network on CPU"};
 // close-ups with real neuron shapes at microscopy scale (#88 A, web/neuron_render/): zoom in with neurons on, or a close-up button
@@ -341,7 +342,7 @@ function neuronsText(){
   const st = n3d ? n3d.state() : null;
   let html = "";
   if (n3want && n3close) html = closeupLine() + (live ? "" : `<span class="s">${esc(N3_OFFLINE)}</span>`)
-    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span><span class="s">${esc(N3_HONEST)}</span>`;
+    + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;   // N3_SHAPES: NeuronRender.CAPTION
   else if (n3want && !live) html = `${esc(N3_OFFLINE)} · ${esc(N3_STATIC)}` + forestLine(st);
   else if (n3want) html = `<b>live · ${esc(N3_NET[n3net] || "spiking network")}</b>`
     + (Neurons3D.spikeLine(st) ? ` · ${esc(Neurons3D.spikeLine(st))}` : "")

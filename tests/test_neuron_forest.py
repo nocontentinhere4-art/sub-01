@@ -95,6 +95,9 @@ def test_page_wording_and_panel_layout():
     assert HONEST in html                                                         # the issue's caption, word for word
     assert "cells enlarged ~${st.enlarge}× for visibility" in html and "static cells, no activity" in html
     assert "maxCells: MINI ? 800 : innerWidth < 600 ? 1500 : 3000" in html and "cortexIdx" in html
+    # every page-level name the forest's loader uses is declared (a merge once dropped `let n3morph`)
+    for name in ("n3morph", "n3meta", "cortexPos", "cortexIdx"):
+        assert re.search(rf"(let|const|var)\s[^;]*\b{name}\s*=", html), name
     for text in (html.lower(), js.lower()):
         assert "his real neurons" not in text and "scanned person's neurons" not in text and "from his brain" not in text
     # the right column: cards stop above the dock however tall it grows (#88: the toggles overlapped them at 1920 px)
