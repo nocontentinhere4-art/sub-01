@@ -509,3 +509,43 @@ def test_live_chooser_variable_offers_and_stable_rule():
     other.from_meta(json.loads(json.dumps(meta)))
     assert other.V == pytest.approx(live.V, abs=1e-5) and other.n == live.n
     assert live.reward(None, 1.0)["dw_abs"] == 0.0
+
+
+def test_day_live_api_for_brain_vote(tmp_path):
+    """pod_manager.day_live_decide / day_live_reward: None at once when off or no pod, never raise."""
+    async def go(client, hub, live):
+        pod_manager.register_hub(None)
+        assert await pod_manager.day_live_decide(["a", "b"]) is None
+        assert await pod_manager.day_live_reward("x", 1.0) is None
+        hub.manager = PodManager(tmp_path, "https://srv", "s", api=FakeApi(), env={})       # day-live off
+        assert pod_manager._hub is None
+        d = Day(tmp_path, tk(2, 8))
+        hub.manager = d.mgr                                                                 # day-live on
+        assert pod_manager._hub is hub
+        t0 = time.monotonic()
+        assert await pod_manager.day_live_decide(["a", "b"], "browse", 2000) is None      # no pod: at once
+        assert time.monotonic() - t0 < 0.05
+        ws = await client.ws_connect("/api/spiking/pod", headers=AUTH)
+        await ws.send_json({"type": "live_ready"})
+        assert await until(lambda: hub.live_ready)
+
+        async def pod():
+            m = await ws.receive_json()
+            await ws.send_json({"type": "decision", "id": m["id"], "pick": 1, "pool_rates": [1.0, 2.0],
+                                "sim_ms": 50.0, "n_neurons": 1_000_000})
+        task = asyncio.ensure_future(pod())
+        out = await pod_manager.day_live_decide(["a", "b"], "chess", 2000)
+        await task
+        assert out["pick"] == 1 and out["net"] == "gpu"
+        assert await pod_manager.day_live_reward(out["id"], 0.5) is None
+        assert (await ws.receive_json()) == {"type": "reward", "id": out["id"], "value": 0.5}
+
+        async def broken(*a, **k):
+            raise RuntimeError("boom")
+        hub.decide = broken
+        assert await pod_manager.day_live_decide(["a", "b"]) is None                       # never raises
+        hub.reward = lambda *a: 1 / 0
+        assert await pod_manager.day_live_reward("x", 1.0) is None
+        await ws.close()
+        pod_manager.register_hub(None)
+    asyncio.run(with_client(tmp_path, go))

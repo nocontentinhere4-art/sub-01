@@ -48,24 +48,29 @@ server → pod      {"type":"night","day":str,"items":[...],"decisions":[{"optio
 ### API for `brain_vote` (#55)
 
 ```python
-d = await live.spiking.decide(options, kind, deadline_ms=2000)
+from spiking import pod_manager
+d = await pod_manager.day_live_decide(options, kind, deadline_ms=2000)
+await pod_manager.day_live_reward(d["id"], value)
 ```
 
-- `d` is `None` when no pod is live, or when it has not answered by the deadline. The caller then uses the CPU
-  network, then the rate model.
+- Both coroutines never raise. They return `None` at once when day-live is off or no pod is live.
+- `d` is also `None` when the pod has not answered by the deadline. The caller then uses the CPU network, then the
+  rate model.
+- They wrap the hub's `live.spiking.decide(...)` and `live.spiking.reward(...)`; the hub registers itself when a
+  day-live manager is attached.
 - Otherwise `d` is the decision plus:
   - `"net": "gpu"`;
   - `"label": "1M-neuron network on GPU"`, the text the decision card shows;
   - `"rtt_ms"`.
-- `live.spiking.reward(d["id"], value)` forwards the dopamine for that decision. It returns `False` if the GPU did
-  not make the decision.
+- `day_live_reward` forwards the dopamine for that decision; a decision the GPU did not make is ignored.
 
 Every GPU decision and reward is logged by the hub to `/data/spiking/gpu_decisions-<Tokyo date>.jsonl`:
 - the decision: `{"t","id","kind","options","pick","net":"gpu","pool_rates","sim_ms","rtt_ms"}`;
 - its reward, on its own line: `{"t","id","reward"}`.
 
 At sleep onset the manager reads these files together with #55's `/data/spiking/decisions-<Tokyo date>.jsonl`:
-- the same shape: decision rows with `options` + `pick`, reward rows with `reward` (or `value`);
+- the format agreed with the coordinator: decision rows `{"t","id","kind","options","pick","net","reward":null}`,
+  then reward rows `{"t","id","reward"}` appended with `state_io.append_jsonl`;
 - merged by `id`;
 - decisions from the waking day only, with an outcome, at most 300.
 

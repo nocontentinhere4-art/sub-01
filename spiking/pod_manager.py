@@ -736,6 +736,41 @@ class PodManager:
             await self._sleep(self.tick)
 
 
+# --- the API for brain_vote (#55): the hub registers itself when a day-live manager is attached ------------------------
+_hub = None
+
+
+def register_hub(hub):
+    global _hub
+    _hub = hub
+
+
+async def day_live_decide(options, kind="browse", deadline_ms=2000):
+    """The 1M GPU network's decision among `options`, or None at once when day-live is off or no pod is live, and
+    None when it does not answer within `deadline_ms` (the caller falls back to the CPU network). Never raises."""
+    hub = _hub
+    try:
+        if hub is None or not getattr(hub.manager, "day_live", False) or not hub.connected or not hub.live_ready:
+            return None
+        return await hub.decide(options, kind, deadline_ms)
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        print(f"spiking: day_live_decide failed: {type(e).__name__}", flush=True)
+        return None
+
+
+async def day_live_reward(decision_id, value):
+    """Dopamine for a decision the GPU network made (ignored otherwise). Never raises; returns None."""
+    hub = _hub
+    try:
+        if hub is not None and getattr(hub.manager, "day_live", False):
+            hub.reward(decision_id, value)
+    except Exception as e:
+        print(f"spiking: day_live_reward failed: {type(e).__name__}", flush=True)
+    return None
+
+
 def key_done(nights, key):
     """Mark a waking day's night as done (True if newly added)."""
     if key in nights:

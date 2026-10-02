@@ -91,6 +91,9 @@ class SpikingHub:
         self._manager = mgr
         if mgr is not None:
             mgr.send_night = self.send_night
+            if getattr(mgr, "day_live", False):              # pod_manager.day_live_decide / day_live_reward use us
+                from spiking import pod_manager
+                pod_manager.register_hub(self)
 
     # --- auth ---------------------------------------------------------------------
     @property
