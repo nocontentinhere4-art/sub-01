@@ -107,6 +107,29 @@ def test_handle_teach_daily_cap_counts_from_memory(tmp_path):
     assert teach(live, "5.6.7.8", "early word")["ok"]
 
 
+def test_daily_cap_survives_a_restart_without_storing_viewer_keys(tmp_path):
+    path = tmp_path / "teach.json"
+    lim = chat.TeachLimits(per_day=3, path=path)
+    for i in range(3):
+        assert chat.check_teach(f"word {i}", "", f"ip{i}", lim, "d1", [])[0]     # memory lost: count from the file
+    saved = json.loads(path.read_text())
+    assert saved == {"day": "d1", "count": 3}                                    # no viewer keys on disk
+    lim2 = chat.TeachLimits(per_day=3, path=path)                                # restart
+    assert "try again tomorrow" in chat.check_teach("late", "", "ip9", lim2, "d1", [])[1]
+    assert chat.check_teach("fresh", "", "ip9", lim2, "d2", [])[0]               # a new day starts from zero
+    path.write_text('{"day": "d2", "cou')                                        # torn file: defaults, no crash
+    assert chat.TeachLimits(path=path).count == 0
+
+
+def test_live_restart_keeps_the_taught_items_and_the_cap(tmp_path):
+    t = tokyo(2, "15:00")
+    live = make_live(tmp_path, t)
+    assert teach(live, "a", "paper crane")["ok"]
+    live2 = make_live(tmp_path, t)                                               # no periodic save happened
+    assert [m["text"] for m in live2.memory.items if m.get("source") == "taught"] == ["paper crane"]
+    assert live2.teach_limits.count == 1 and live2.taught()["left"] == chat.TEACH_PER_DAY - 1
+
+
 # --- 2. replay weighting with its cap ---------------------------------------------------------------------
 def test_taught_weighs_1_5x_a_chat_message():
     mem, t = Memory(), tokyo(2, "23:00")

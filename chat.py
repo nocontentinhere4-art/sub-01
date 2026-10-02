@@ -9,6 +9,8 @@ import time
 import unicodedata
 from collections import deque
 
+from state_io import load_json, save_json
+
 MAX_LEN = 280
 RATE_S = 10.0
 
@@ -218,24 +220,35 @@ def clean_nick(nick):
 
 class TeachLimits:
     """One teach per viewer per day (keyed like the chat limiter: the client address, kept only in memory and only
-    for the current day) and at most `per_day` taught items per day in total, counted from what memory holds."""
+    for the current day) and at most `per_day` taught items per day in total. The day's total is also written to
+    `path` (state_io, atomic), so a restart cannot reopen the cap; viewer keys are never written to disk."""
 
-    def __init__(self, per_day=TEACH_PER_DAY):
-        self.per_day = per_day
-        self.day, self.keys = None, set()
+    def __init__(self, per_day=TEACH_PER_DAY, path=None):
+        self.per_day, self.path = per_day, path
+        self.day, self.keys, self.count = None, set(), 0
+        if path is not None:
+            d = load_json(path, {})
+            if isinstance(d.get("day"), str) and isinstance(d.get("count"), int):
+                self.day, self.count = d["day"], d["count"]
+
+    def _roll(self, day):
+        if day != self.day:
+            self.day, self.keys, self.count = day, set(), 0
 
     def check(self, key, day, taught_today):
         """`taught_today`: texts already taught that day. -> reason or None (does not record anything)."""
-        if day != self.day:
-            self.day, self.keys = day, set()
+        self._roll(day)
         if key in self.keys:
             return "one teach per viewer per day"
-        if len(taught_today) >= self.per_day:
+        if max(self.count, len(taught_today)) >= self.per_day:
             return f"he has been taught {self.per_day} things today; try again tomorrow"
         return None
 
-    def note(self, key):
+    def note(self, key, taught_today=()):
         self.keys.add(key)
+        self.count = max(self.count, len(taught_today)) + 1
+        if self.path is not None:
+            save_json(self.path, {"day": self.day, "count": self.count})
 
 
 def check_teach(text, nick, key, limits, day, taught_today):
@@ -258,5 +271,5 @@ def check_teach(text, nick, key, limits, day, taught_today):
     reason = limits.check(key, day, taught_today)
     if reason:
         return False, reason, "", ""
-    limits.note(key)
+    limits.note(key, taught_today)
     return True, None, text, nick

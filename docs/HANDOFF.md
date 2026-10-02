@@ -67,7 +67,8 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - A viewer sends `{"type":"teach","text","nick"}` on `/ws`: a word or a phrase of at most 6 words plus an optional
   nickname (max 16 characters). Both go through `chat.blocked` (no links, addresses, tickers, personal data, money
   requests, slurs). Limits are in `chat.TeachLimits`: one teach per viewer per Tokyo day, keyed by the chat limiter's
-  key and kept in memory only, and at most 30 a day in total, counted from memory. A phrase already taught that day
+  key and kept in memory only, and at most 30 a day in total, counted from memory and from `teach.json`
+  (state_io; day + count only, never viewer keys), so a restart cannot reopen the cap; a teach also saves `state.json`. A phrase already taught that day
   is refused.
 - The taught item becomes a stimulus (the chat rules) and a `sleep.Memory` item with `source="taught"`. It keeps
   `nick` for display only (never a stimulus) and `replays`, which `sleep_tick` counts. In REM it weighs 1.5× a

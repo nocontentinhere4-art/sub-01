@@ -206,7 +206,7 @@ class Live:
         self.engine.t = min(self.engine.t, now)
         self.engine.update(now)
         self.limiter, self.dedupe = RateLimiter(), Dedupe()
-        self.teach_limits = TeachLimits()          # one teach per viewer per day, TEACH_PER_DAY in total
+        self.teach_limits = TeachLimits(path=Path(data_dir) / "teach.json")   # 1 per viewer/day, TEACH_PER_DAY in total
         self.gpu_test = False                      # main(): True when the spiking pod manager is enabled
         for m in self.memory.chat()[-200:]:
             self.dedupe.recent.append(dedupe_key(m["text"]))
@@ -398,6 +398,7 @@ class Live:
         for g, a in stim.items():
             self.brain.stimulate(g, a * gain)
         m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits, source="taught", nick=nick, replays=0)
+        self.store.save(self.engine, self.memory)          # at most 30 a day: a restart never loses a taught item
         await ws.send_json({"type": "teach_ack", "ok": True})
         await self.broadcast({"type": "taught", "gain": round(gain, 2), **self.public(m), "nick": nick})
 
