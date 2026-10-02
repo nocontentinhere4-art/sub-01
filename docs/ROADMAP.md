@@ -223,6 +223,10 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: music through Spotify's official embed only** (owner asked for Spotify). The server never streams,
+  downloads or relays audio. Visitors press play on their own device: a 30 s preview, or the full track if they are
+  logged in to Spotify. His brain model picks tracks among candidates (#68). Optional `SPOTIFY_CLIENT_ID/SECRET` (free
+  developer app); otherwise a curated list of playlists.
 - **2026-10-02: social accounts, both uses** (owner).
   - (a) Official SUB-01 accounts post daily AI-labelled clips (#59): manual, or the official APIs once approved.
   - (b) He browses logged in to his own TikTok/YouTube, view-only (#60, after #56). No likes, follows, comments or
