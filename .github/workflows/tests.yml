@@ -1,0 +1,51 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # as in the Dockerfile: small matrices, BLAS threads only spin
+  OPENBLAS_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-server.txt
+      # no torch and no Chromium: the spiking tests skip without torch, the browser tests skip when no browser starts
+      - run: pip install -r requirements-server.txt pytest
+      - run: python -m pytest -q tests/
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-server.txt
+      - run: pip install -r requirements-server.txt
+      # live_server.py --demo with BROWSE=0: pages + read APIs answer 200, /ws ticks, and the CPU cost per tick
+      - run: python tests/smoke_demo.py --port 8765 --data-dir "$RUNNER_TEMP/data"
+        env:
+          BROWSE: "0"
