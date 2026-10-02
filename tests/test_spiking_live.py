@@ -18,6 +18,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import brain_vote as V  # noqa: E402
+from spiking import frames as frames_mod  # noqa: E402
 from spiking import live as L  # noqa: E402
 from spiking.config import Config  # noqa: E402
 
@@ -194,8 +195,12 @@ def test_child_process_protocol_frames_learning_and_restart(tmp_path):
             f = [x for x in frames if x.get("phase") == "deciding"]
             assert f and f[-1]["net"] == "cpu" and f[-1]["n_neurons"] == SMALL and "reward" in f[-1]["groups"]
             r = f[-1]["raster"]
-            assert r["n"] == L.RASTER_ROWS and r["t1"] > r["t0"] and all(0 <= s[1] < r["n"] for s in r["spikes"])
-            assert len(json.dumps(f[-1])) < 30_000                     # small frames
+            assert r["n"] == SMALL and r["t1"] > r["t0"] and "spikes" not in r       # every neuron recorded (#62)
+            n3 = f[-1]["n3"]                                            # ...and packed: region, slot, ms (frames.py)
+            sp = frames_mod.unpack_spikes(n3["sq"], n3["span"])
+            assert n3["race"] and n3["ns"] > 0 and 0 < len(sp) <= frames_mod.SPIKE_CAP and len(n3["rq"]) == 288
+            assert (sp[:, 0] < 214).all() and (sp[:, 2] <= n3["span"]).all()
+            assert len(json.dumps(f[-1])) < 3_000                      # small frames
             assert cl.reward("b-1", 0.2, followed=1)                    # dopamine for that decision
             st = await cl.call("status")
             assert st["n_learn"] == 1 and st["n_decisions"] == 1

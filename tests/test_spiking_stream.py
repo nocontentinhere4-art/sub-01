@@ -18,6 +18,7 @@ from aiohttp import web
 
 torch = pytest.importorskip("torch")
 
+from spiking import frames as spiking_frames
 from spiking import server as spiking_server
 from spiking.session import Link, Session
 
@@ -105,10 +106,15 @@ def test_session_streams_to_server(tmp_path, monkeypatch):
         torch.set_num_threads(prev_threads)
     hello = [d for k, d in mgr.events if k == "hello"][0]
     assert hello["type"] == "hello" and hello["session"] == "test-sess" and hello["n_neurons"] == 20000
-    f = frames[0]
-    assert f["n_neurons"] == 20000 and f["phase"] and isinstance(f["raster"]["spikes"], list)
+    f = frames[0]                                       # what the pages get: the compact form (#62, frames.py)
+    assert f["n_neurons"] == 20000 and f["phase"] and f["net"] == "gpu" and "spikes" not in f["raster"]
     assert {"visual", "somatomotor", "memory"} <= set(f["groups"]) and "t_sim" in f and "dopamine" in f
-    assert {"spikes_per_s", "mean_rate_hz", "steps_per_s", "realtime_x", "pong"} <= set(f)
+    assert {"spikes_per_s", "mean_rate_hz", "realtime_x"} <= set(f)
+    n3 = f["n3"]                                        # per-region rates from the session (rq) and packed spikes
+    rates = spiking_frames.dequantise_rates(n3["rq"])
+    assert len(rates) == 214 and (rates > 0).mean() > 0.5 and rates.max() < 100
+    sp = spiking_frames.unpack_spikes(n3["sq"], n3["span"])
+    assert len(sp) and (sp[:, 0] < 200).all()            # the 200-row raster: one neuron a region
     assert {m["phase"] for m in frames} & {"bench", "encode", "free"}
     sdir = data / "spiking"
     assert (sdir / "bench.jsonl").exists() and (sdir / "encodes.jsonl").exists()

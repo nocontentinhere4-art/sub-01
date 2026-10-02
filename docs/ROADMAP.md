@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 15:40 UTC** (pass 30b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 17:55 UTC** (pass 32). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -76,7 +76,7 @@ Owner actions now:
 - **RunPod:** the owner added the RunPod key on Railway (2026-10-02). The pod manager also needs **`SUB01_POD_SECRET`**
   (any long random string). Without it the log says `spiking pod manager disabled: SUB01_POD_SECRET is not set`. With
   both set, the first GPU session runs tonight at 21:00 Tokyo (12:00 UTC): ≤ 1 GPU-hour/day, ≈ $0.27–0.85/day.
-- **Turn the 1M network on (after #67):** `SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1`, `SUB01_CHOICE=1` on Railway.
+- **Turn the 1M network on (after #67):** done 2026-10-02 16:30 UTC (`SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1`, `SUB01_CHOICE=1`).
 - **`SUB01_CHOICE=1` on Railway** (optional): adds the choice training to the nightly GPU hour (~90 s, no extra cost).
 - **After #51, on Railway:** set the healthcheck path to `/healthz`, set a long random `SUB01_ADMIN_TOKEN`, add a free
   uptime monitor (e.g. UptimeRobot) on `/healthz`, and set a usage alert (see docs/OPERATIONS.md).
@@ -144,11 +144,16 @@ cheap to run, with the password gate kept until launch day.
 | 18k | Room movement (walk around furniture, sit, lie down) | done (+ chair and bed follow-ups) | #28, #42 |
 | 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | done | #47 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
-| 18m | 1M spiking network on GPU through his waking hours (caps 17 h, $14/day, 120 h/week) | done; on with `SUB01_DAY_LIVE=1`; learning at 1M → #70 | #67 |
+| 18m | 1M spiking network on GPU through his waking hours (caps 17 h, $14/day, 120 h/week) | done; on with `SUB01_DAY_LIVE=1`; learns (#74: 0.45–0.69 vs frozen 0.24–0.38) | #67, #74 |
 | 18n | 20k spiking network on the server CPU votes and learns live (GPU fallback) | done | #65 |
 | 18o | Browse like a young guy (interests, Shorts/TikTok, finance read-only, logged-in view-only feeds) | done | #64, #66, #69 |
-| 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | PR #72 approved | #59 |
-| 18p | Active neurons visible inside the 3D brain | in progress | #62 |
+| 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | done | #72 |
+| 18u | Natural motion (no frozen poses), headphones while listening | done; food part 2 next | #82 |
+| 18v | Readings from real browsing (Wikipedia 100 % → 9.5 %) | done | #81 |
+| 18w | Sleep fix: no third-party trades, correct decoding, bounded arousal | PR #85, owner merges | #85 |
+| 18s | Room polish: no floating props, lamp out of the wall, a lived-in room, sharper phone screen | in progress | #75 |
+| 18t | A better character (fingers, face, clothes; same animations) | in progress | #76 |
+| 18p | Active neurons visible inside the 3D brain, with real neuron shapes | done (/brain, /life); room mini brain next | #77, #83 |
 | 18q | Music via Spotify's official embed, picked by the brain vote | done (server, /brain, /life); room after #63 | #71 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
@@ -300,6 +305,92 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 32:** merged three PRs, one at a time, after one combined run of main + #85 + #81 + #82 + #83:
+1028 tests passed, smoke 7.6 ms.
+- **#81 (#79):** his readings come from what he browses. Wikipedia falls from 100 % to 9.5 % of readings, and the
+  Wikipedia reader is now only a fallback.
+- **#82 (#63 part 1):** natural motion. He holds the phone on the bed, eats at the desk, and lies with headphones
+  nodding to music. 0 penetration of bed or chair. This also covers the #68 room follow-up.
+- **#83 (#78):** neurons with their real shape (NeuroMorpho, CC BY 4.0). Close-ups of cortex, striatum, thalamus,
+  hippocampus and amygdala carry live spikes. Jitter follow-up asked.
+
+**Urgent owner task:** the sleep fix, **PR #85** (`fix/sleep-and-trades`, by the coordinator).
+- **Cause:** the default `--mint` was a third-party Raydium LaunchLab token. Its `TradeEvent` shares pump.fun's
+  discriminator, so it was decoded as 793,100 SOL buys. Those pinned him awake: arousal 215, debt 105 h, no REM.
+- **Fix:**
+  - `MINT` empty means no trade feed.
+  - The decoder checks the emitter program, our mint and our pools, and is tested on real mainnet transactions.
+  - A $250k cap per trade.
+  - Total arousal is capped. Past 18 h of debt, sleep pressure overrides outside arousal.
+  - Every restart clamps the state. A one-time repair resets the fake debt and tonight's broken record.
+- **Checks:** 996 tests passed; CI green.
+- **Waiting on:** the owner to merge.
+
+**Next:**
+- #84 (room polish) merges main, re-sweeps against #82's paths, then integrates into `room.html`.
+- #63 part 2 (food) comes as a new PR.
+- #83 follow-up: jitter, plus the room mini brain `neurons=1`.
+- #76 (character) stays in draft until it clearly beats the old one.
+
+**Pass 31:** no PRs open. #63 part 1 is due ~17:40 UTC; #75 and #76 are in progress; RunPod shows only "BRAIN"
+(he is asleep in Tokyo).
+
+New tasks:
+- **#78, neurons with their real shape** (`session_013KjJYiSDhQYs85Ddjfmdgv`). Cells come from NeuroMorpho.Org under
+  CC BY 4.0, with three citations per cell. Far away they show as points; close-ups show 100–300 full cells with
+  spikes running along the axon. The caption says the shapes are illustrative and the model uses point neurons.
+  - **Decision:** no Purkinje close-up. The 214-region model has no cerebellum, so it would show fake activity.
+    Hippocampus CA1 replaces it.
+- **#79, readings from real browsing** (`session_01GCTUbSh9sLTfmffpYtv3aR`). The owner still sees too much Wikipedia.
+  - **Cause:** the old `research.py` Wikipedia reader still runs in parallel (`run_research`) and feeds every "reading"
+    (memory card, replay, memory test, diary). #69 only changed the browser.
+  - **Fix:** readings come from pages he actually browsed. The Wikipedia reader stays only as a fallback.
+  - **Target:** ≤ 10 % Wikipedia in readings.
+  - **Scheduling:** `index.html`/`life.html` are shared with #78, but in different sections.
+
+**Pass 30e:** merged #77 (#62): his active neurons are visible inside the 3D brain on /brain and /life.
+- Spikes flash per region; region rates tint the clouds.
+- The stream is ≈ 3 KB/s per viewer.
+- No fake spikes: there is an offline state, and the caption is honest when the budget holds spikes back.
+- GPU frames now carry per-region rates (`rq`).
+- The Neurons card shows real decisions per day: paid-off picks per network, and the replay learned vs frozen twin.
+- Coordinator run: 978 tests passed; tick 7.1 ms. FPS on a real phone is still to be checked by the owner.
+- The room mini brain gets a one-line change after #63.
+
+**Owner set `SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1` and `SUB01_CHOICE=1` on Railway (16:30 UTC).** The site restarted
+and `/healthz` is ok; RunPod shows only "BRAIN". The first day-live pod should start when he wakes (Tokyo morning, about
+22–23 UTC). The coordinator checks it at 23:15 UTC.
+- The owner asked about biollm.com. Declined: it is a consumer app with no API and no verifiable data, and it conflicts
+  with the rule against unproven claims.
+- The owner asked about the RunPod MCP server. Not needed: the site's pod manager runs on its own, and the coordinator
+  already has read access to RunPod.
+
+**Pass 30d:** merged #74 (#70): the 1M network's live decisions learn.
+- **1M on GPU, 240 trials:** learned 0.45–0.69 correct, against 0.24–0.38 for the frozen twin and 0.24–0.30 for random (chance 0.29).
+- **Criterion:** reached in 9/10 runs before and after the reversal. The frozen twin and random never reached it.
+- **Why #67 showed no learning:** it had too few rounds, not a bad race.
+- **New live read-out:** `diff`, which is robust to the 2.4 → 5.3 Hz baseline drift. It is a reasoned choice, not a measured win.
+- **Sample size:** 3 networks, so small samples.
+- **RunPod:** $0.106, 3 pods one at a time, all deleted; only "BRAIN" remains.
+- **Coordinator run:** 964 tests passed, tick 7.5 ms.
+
+**Pass 30c:** merged #72 (#59): daily clips for the official social accounts.
+- Up to 3 vertical clips a day (day, dream, his brain's choice), each frame labelled "AI · fictional character · simulated brain".
+- Rendered at nice 19 with a CPU cap; no tick cost.
+- Auto-post is off without tokens, and posts are private or drafts flagged as AI-made.
+- `/admin/clips` sits behind the admin token or the password cookie.
+- Image +300 MB (ffmpeg).
+- Coordinator run: 955 tests passed, tick 7.8 ms.
+
+#74 (#70) is approved and waits for its docs conflict fix.
+
+The owner asked for room work: fix the floating post-it and the lamp in the wall, the room looks empty, a better phone screen
+and graphics, and a better character. New tasks:
+- **#75 room polish:** `room_build/` and `room_clean.glb`, plus new files; `room.html` only after #63.
+- **#76 a better character:** a CC0 MakeHuman/MPFB2 route, finger bones, `boy2.glb` behind `?boy=new`; integration after #63.
+
+#63 now gates five pieces of room work (music headphones, #62's mini brain, #75, #76, its own food), so it merges first.
 
 **Pass 30b:** merged #71 (#68 server side): he listens to music.
 - His brain vote picks 3–5 candidate tracks by time of day, tastes, taught words and chat wishes.
