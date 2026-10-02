@@ -1,10 +1,10 @@
 ok  desk_lamp            x -1.885..-1.434  y 0.970..1.684  z -1.424..-1.155  support y=0.970    gap +0.0 mm   
-ok  floor_plant          x -1.890..-1.258  y 0.160..0.875  z -0.590..-0.067  support y=0.160    gap -0.0 mm   
+ok  floor_plant          x -1.862..-1.303  y 0.160..0.875  z -0.697..-0.101  support y=0.160    gap -0.0 mm   
 ok  desk_succulent       x -0.555..-0.397  y 0.970..1.211  z -1.215..-1.046  support y=0.970    gap +0.0 mm   
 ok  wall_clock           x +0.544..+0.816  y 1.564..1.836  z -1.450..-1.410  support back wall  gap -0.0 mm   
 ok  alarm_clock          x -1.910..-1.830  y 1.270..1.409  z +0.564..+0.678  support y=1.270    gap -0.0 mm   
 ok  shelf_carton         x -0.025..+0.229  y 2.120..2.332  z -1.443..-1.122  support y=2.120    gap -0.0 mm   
-ok  sticky_notes         x -0.665..-0.575  y 0.970..0.992  z -0.915..-0.825  support y=0.970    gap +0.0 mm   
+ok  sticky_notes         x -1.566..-1.474  y 1.170..1.192  z -1.346..-1.254  support y=1.170    gap -0.0 mm   
 ok  pinboard             x -1.900..-1.878  y 1.705..2.095  z -1.415..-1.025  support -          gap -         
 ok  game_pad             x -0.877..-0.733  y 0.970..1.005  z -1.243..-1.143  support y=0.970    gap +0.0 mm   
 ok  manga_stack          x -0.311..-0.164  y 0.160..0.308  z -1.416..-1.224  support y=0.160    gap -0.0 mm   
@@ -14,9 +14,9 @@ ok  hoodie               x +1.124..+1.536  y 1.125..1.735  z -1.368..-1.264  sup
 ok  backpack             x -0.192..+0.015  y 0.160..0.601  z +1.090..+1.390  support y=0.160    gap -0.0 mm   
 ok  cushion              x +0.976..+1.664  y 0.160..0.238  z +0.625..+1.335  support y=0.160    gap -0.0 mm   
 ok  fan                  x +1.582..+1.818  y 0.160..0.658  z +0.182..+0.418  support y=0.160    gap -0.0 mm   
-ok  slippers             x +1.442..+1.674  y 0.172..0.224  z -1.297..-1.003  support y=0.172    gap +0.0 mm   
-ok  laundry_hanger       x -1.906..-1.581  y 1.650..2.224  z +0.132..+0.468  support -          gap -         
-ok  cat_figure           x -1.897..-1.848  y 1.270..1.334  z +0.081..+0.117  support y=1.270    gap -0.0 mm   
+ok  slippers             x +1.811..+1.995  y 0.160..0.212  z -1.247..-0.973  support y=0.160    gap -0.0 mm   
+ok  laundry_hanger       x -1.906..-1.581  y 1.650..2.224  z +0.282..+0.618  support -          gap -         
+ok  cat_figure           x -1.897..-1.848  y 1.270..1.334  z +0.381..+0.417  support y=1.270    gap -0.0 mm   
 ok  socket               x -1.470..-1.390  y 0.340..0.460  z -1.450..-1.420  support back wall  gap -0.0 mm   
 ok  power_strip          x -1.320..-1.020  y 0.160..0.220  z -1.438..-1.388  support y=0.160    gap -0.0 mm   
 ok  cables               x -1.640..-1.077  y 0.174..1.270  z -1.447..-1.257  support -          gap -         

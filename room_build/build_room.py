@@ -599,11 +599,17 @@ def world_box(objs):
         ev.to_mesh_clear()
     return lo, hi
 SWEEP = []
-def check(name, objs, support, clear=0.0, minx=None):
+# room.html's hard-coded places (#63) that no prop may enter: (x, y, z) ranges, glTF
+KEEP = {"his place at the window": ((-1.93, -1.30), (1.0, 1.95), (-0.24, 0.20)),       # he stands at (-1.56, -0.02), leaning on the sill
+        "the delivery bag's spot": ((-0.70, -0.46), (DTOP + 0.004, DTOP + 0.40), (-0.93, -0.80)),
+        "the tea bottle's spot": ((-1.43, -1.33), (DTOP + 0.004, DTOP + 0.30), (-0.95, -0.85))}
+DOOR_SWING = 0.71                                # the leaf (0.68 m, hinged at its left edge) plus 3 cm
+def check(name, objs, support, clear=0.0, minx=None, on_door=False):
     """support: ("y", h) rests on a surface at height h (its lowest vertex within 2 mm of it); ("wall", None) hangs flat on
     the back wall (its rear within 2 mm of it); None: hangs from something (no support test). clear: the least distance
-    from the window wall and the back wall. minx: the window wall's face where the prop stands (the sill reaches past it)"""
-    SWEEP.append(dict(name=name, objs=[o for o in objs if o.type == 'MESH'], support=support, clear=clear, minx=IX if minx is None else minx))
+    from the window wall and the back wall. minx: the window wall's face where the prop stands (the sill reaches past it).
+    Every prop also stays out of KEEP and, unless on_door (it hangs on the leaf), out of the door's swing"""
+    SWEEP.append(dict(name=name, objs=[o for o in objs if o.type == 'MESH'], support=support, clear=clear, minx=IX if minx is None else minx, on_door=on_door))
 def settle(objs, y):
     """drop modelled parts as one, so that their lowest vertex rests on y"""
     bpy.context.view_layer.update(); lo, _ = world_box(objs)
@@ -625,6 +631,11 @@ def sweep():
         if gap is not None and abs(gap) > 0.002:
             why.append(f"{'floats' if gap > 0 else 'sinks'} {abs(gap) * 1000:.1f} mm {'above' if gap > 0 else 'into'} its support" if s[0] == "y"
                        else f"{'stands off' if gap > 0 else 'sinks into'} the wall by {abs(gap) * 1000:.1f} mm")
+        for kn, (kx, ky, kz) in KEEP.items():                    # room.html's hard-coded spots (#63)
+            if lo[0] < kx[1] and hi[0] > kx[0] and lo[1] < ky[1] and hi[1] > ky[0] and lo[2] < kz[1] and hi[2] > kz[0]: why.append(f"in {kn}")
+        if not e["on_door"] and hi[1] > FY + 0.015 and lo[1] < LY1 and hi[2] > IZ and hi[0] > LX0:   # the door leaf's swing (a quarter disc on the floor plan)
+            cx, cz = min(max(LX0, lo[0]), hi[0]), min(max(IZ, lo[2]), hi[2])
+            if math.hypot(cx - LX0, cz - IZ) < DOOR_SWING: why.append("in the door's swing")
         sup = "-" if not s else f"y={s[1]:.3f}" if s[0] == "y" else "back wall"
         rows.append(f"{'ok ' if not why else 'BAD'} {e['name']:<20} x {lo[0]:+.3f}..{hi[0]:+.3f}  y {lo[1]:.3f}..{hi[1]:.3f}  z {lo[2]:+.3f}..{hi[2]:+.3f}"
                     f"  support {sup:<10} gap {'-' if gap is None else f'{gap * 1000:+.1f} mm':<9} {'; '.join(why)}")
@@ -678,8 +689,10 @@ hc = head_centre(); print("LAMP HEAD (blender)", tuple(round(v, 3) for v in hc))
 marker("SURF_lamp", (hc.x, hc.z - 0.02, -hc.y))          # the page's lamp light: under the moved head
 check("desk_lamp", [lm], ("y", DTOP), clear=0.01)
 # plants: a philodendron on the floor by the window wall, a succulent on the desk
-pr, po = import_asset("potted_plant_02", (-1.66, FY, -0.36), ry=0.8, scale=0.85, drop=("dirt",))
-off_walls(pr, [o for o in po if o.type == 'MESH'], 0.01)       # its leaves reached 10 cm into the window wall
+# (room.html anchors the plant at (-1.66, -0.36): it stays there, turned so that its leaves clear the window wall,
+# which they reached 10 cm into at ry 0.8, and lean towards the desk, away from where he stands at the window)
+pr, po = import_asset("potted_plant_02", (-1.66, FY, -0.36), ry=3 * math.pi / 2, scale=0.85, drop=("dirt",))
+assert abs(pr.location.x + 1.66) < 1e-6 and abs(-pr.location.y + 0.36) < 1e-6, "the plant left its anchor"
 check("floor_plant", po, ("y", FY))
 PLANT = (pr.location.x, -pr.location.y)
 d = cyl("plant_soil", "painted", PLANT, 0.172, FY + 0.27, FY + 0.272, n=28); set_vcol(d, srgb("#2a2018"))
@@ -688,8 +701,10 @@ check("wall_clock", import_asset("wall_clock", (0.68, 1.70, IZ), ry=0.0, scale=0
 SILL_X = -1.912                                  # the window sill, in front of the sash track
 check("alarm_clock", import_asset("alarm_clock_01", (-1.865, WY0, 0.62), ry=-math.pi / 2 + 0.35, scale=0.8)[1], ("y", WY0), minx=SILL_X)
 check("shelf_carton", import_asset("cardboard_box_01", (0.10, STOP, -1.30), ry=0.1, scale=0.62)[1], ("y", STOP))
-# the sticky notes: the file keeps them 0.45 m from its origin, so centre the stack itself on the desk, right of the mat
-check("sticky_notes", import_asset("office_notepads", (-0.62, DTOP, -0.87), ry=0.3, keep=("sticky_stack",), centre=True)[1], ("y", DTOP))
+# the sticky notes: the file keeps them 0.45 m from its origin, so centre the stack itself; on top of the left speaker
+# (the desk's free spots near its front edge belong to room.html's delivery bag and tea bottle)
+SPK_TOP = DTOP + 0.20
+check("sticky_notes", import_asset("office_notepads", (-1.52, SPK_TOP, -1.30), ry=0.37, keep=("sticky_stack",), centre=True)[1], ("y", SPK_TOP))
 
 # ================================================================ lived-in things (#75): all modelled here (CC0), off his routes
 # The free floor (room.html NODES/LINKS) runs from the desk and the bed edge to the window, the middle and the door; these
@@ -828,7 +843,7 @@ hood.data.transform(Matrix.Translation(B(HX, 1.62, IZ + 0.168)) @ Matrix.Rotatio
 for s in (-1, 1):                                                                # sleeves hanging at its sides
     rod("hoodie_sleeve", "hoodie", (HX + s * 0.17, 1.56, IZ + 0.14), (HX + s * 0.15, 1.16, IZ + 0.15), 0.036, n=12)
     blob("hoodie_cuff", "hoodie", (HX + s * 0.15, 1.15, IZ + 0.15), (0.03, 0.025, 0.03), n=12)
-check("hoodie", since(n0), None)
+check("hoodie", since(n0), None, on_door=True)              # (it hangs on the leaf: it swings with it)
 
 # --- a backpack on the floor, leaning on the bed's foot end
 n0 = group()
@@ -864,7 +879,7 @@ parts = since(n0)
 for o in parts: transform(o, loc=(FAN[0], FY, FAN[1]), ry=FAN_RY)
 settle(parts, FY); [project_uv(o) for o in parts]; check("fan", parts, ("y", FY))
 
-# --- slippers on the doormat, toes towards the door
+# --- slippers right of the door (the doormat is in the door's swing)
 def slipper(x, z, ry):
     n0 = group(); L, W = 0.255, 0.095
     sole = cyl("slipper_sole", "painted", (0, 0), 1.0, 0.0, 0.016, n=24)
@@ -880,11 +895,11 @@ def slipper(x, z, ry):
     set_vcol(sole, srgb("#3c3c40")); set_vcol(up, srgb("#8d98a6"))
     parts = since(n0)
     for o in parts: transform(o, loc=(x, 0, z), ry=ry)
-    settle(parts, FY + 0.012); [project_uv(o) for o in parts]; return parts
-check("slippers", slipper(1.50, -1.17, 0.12) + slipper(1.62, -1.13, -0.08), ("y", FY + 0.012))
+    settle(parts, FY); [project_uv(o) for o in parts]; return parts
+check("slippers", slipper(1.862, -1.10, 0.04) + slipper(1.945, -1.12, -0.03), ("y", FY))   # beside the door, out of its swing
 
-# --- a laundry pinch hanger on the curtain rod (socks and a hand towel), in front of the glass, above the bed's head
-n0 = group(); PH = (-1.745, 1.98, 0.30); PH_R = 0.15
+# --- a laundry pinch hanger on the curtain rod (socks and a hand towel), in front of the glass, above the bed's head end
+n0 = group(); PH = (-1.745, 1.98, 0.45); PH_R = 0.15                # clear of his head at the window (#63)
 torus("hanger_ring", "white", PH, PH_R, 0.004, axis="y", nmaj=36, nmin=6)
 rod("hanger_hook", "white", (PH[0], PH[1], PH[2]), (IX + 0.07, ROD_Y - 0.008, PH[2]), 0.003)
 torus("hanger_hook_tip", "white", (IX + 0.07, ROD_Y, PH[2]), 0.012, 0.0025, axis="z", half="up", nmaj=12, nmin=6)
@@ -902,7 +917,7 @@ transform(tw, loc=((c0x + c1x) / 2, 0, (c0z + c1z) / 2), ry=math.atan2(c1x - c0x
 check("laundry_hanger", since(n0), None, minx=SILL_X)
 
 # --- a small cat figure on the window sill
-n0 = group(); CAT = (-1.872, 0.10)
+n0 = group(); CAT = (-1.872, 0.40)                            # away from his hands on the sill (#63)
 blob("cat_body", "painted", (0, 0.016, 0), (0.017, 0.016, 0.022), n=14); blob("cat_head", "painted", (0, 0.044, 0.012), (0.015, 0.014, 0.014), n=14)
 for s in (-1, 1): cyl("cat_ear", "painted", (s * 0.008, 0.012), 0.005, 0.054, 0.064, r1=0.0005, n=8)
 cyl("cat_tail", "painted", (0, -0.022), 0.004, 0.0, 0.03, n=8)

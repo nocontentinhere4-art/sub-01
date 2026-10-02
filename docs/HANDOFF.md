@@ -50,7 +50,8 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
-  support; `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
+  support, or enters room.html's spots (his place at the window, the delivery bag's and the tea bottle's desk spots, the door's
+  swing; `KEEP`/`DOOR_SWING`); `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
   modelled in the build (no new downloads), all off the walking graph; the headphones on the wall hook are their own
   node `headphones` (no AO) so the page can take them off. `web/room_phone.js`: the phone screen drawn on a canvas
   (status bar, rounded corners, off state, face glow).

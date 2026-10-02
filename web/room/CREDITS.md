@@ -56,7 +56,8 @@ Poly Haven assets are CC0: https://polyhaven.com/license
 Every prop is placed from its real bounding box (an imported file's origin can be far from its mesh), and before
 anything is joined the build measures every prop: none may reach into the window wall or the back wall (the desk lamp
 keeps 1 cm off both), and each one's lowest vertex must lie within 2 mm of its support (desk, floor, sill, shelf; wall
-items within 2 mm of the wall). The report lists every prop and every offender (`room_build/out/sweep.txt`); any
+items within 2 mm of the wall). No prop may enter the places the page hard-codes (his place at the window, the delivery
+bag's and the tea bottle's spots on the desk) or the door's swing. The report lists every prop and every offender (`room_build/out/sweep.txt`); any
 offender stops the build.
 
 ## Rebuilding
