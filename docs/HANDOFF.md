@@ -281,6 +281,18 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Measured: tick 8.8–9.5 ms vs 8.9–9.2 on main. The child uses ~0.4 CPU-s per decision and 1.4–2 % of a core
   between decisions (its idle pulse).
 
+## His active neurons inside the 3D brain (#62, `docs/spiking/neurons3d.md`)
+- `spiking/frames.py` (numpy, no torch): both spiking networks' frames go to the pages compact: `n3.rq` (1 byte a
+  region of spike rate, log 0.1–100 Hz), `n3.sq` (3 bytes a recorded spike: region, slot 0–255, time; ≤ 400 a frame),
+  `n3.race` (a decision race is running). `Budget` (one, in `SpikingHub.relay`; the CPU child's frames go through it
+  too) keeps each viewer ≤ 3 KB/s of spiking frames: numbers once a second, spikes cut to fit, CPU frames dropped
+  while the GPU streams. The room's lite feed gets none (it never drew them).
+- `/brain`: a **neurons** layer button (≤ 20k `THREE.Points`, `web/neurons3d.js` + `web/neurons3d.json`); offline it
+  reads "neurons offline" and never shows spikes. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
+  only changes the iframe `src`. The Neurons panel (`/brain`, `/life`) reads the compact raster (one row a region).
+- GPU frames carry per-region rates (`session.py` `frame()`: `"rq": quantise_rates(rr)`); a pod without it is tinted
+  by network group rates, labelled. The panel also lists #70's real decisions per day (learned vs frozen twin).
+
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
   / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is

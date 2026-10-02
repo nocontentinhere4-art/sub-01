@@ -4,7 +4,7 @@ Loads the learned weights (from the server, or none), runs the phases, streams c
 a websocket authenticated with SUB01_POD_SECRET, writes /out/status.json + /out/results.json (read by
 validate / pod_manager through the pod's port 8000) and uploads the learned weights at the end.
 Phases: bench, rates, delays, recall_yesterday, encode, pong_train, pong_exam, choice_train, choice_exam,
-memory_test, sleep, free, live_decide, live_bench.
+memory_test, sleep, free, live_decide, live_bench, live_learn.
 Items (cfg "items") are the day's chat messages and readings, each {text, source: chat|reading, item}; a reading's
 text is its title + keywords. recall_yesterday tests the previous session's items before anything new is stored.
 In validate mode extra controls run (no-plasticity Pong, random paddle, sleep without replay).
@@ -16,7 +16,8 @@ waking hours and answers the server's {"type": "decide"} messages with the race 
 (choice.LiveChooser); {"type": "reward"} applies the dopamine to that decision. The learned weights are uploaded
 every `upload_every_min` (30) minutes and at the end. {"type": "night", "day", "items", "decisions"} ends the
 phase; the remaining phases (the night: recall_yesterday, encode, choice_train on the day's decisions, sleep,
-memory_test) then run on the same pod with that config.
+memory_test) then run on the same pod with that config. The decision read-out is cfg "live_readout" (choice.Readout:
+race / scaled / diff / window); live_learn measures them all (#70, docs/spiking/choice.md).
 """
 import json
 import math
@@ -34,8 +35,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .choice import ChoiceTask, LiveChooser, RewardSchedule, random_chooser, replay_fit, summarize
+from .choice import (READOUTS, ChoiceTask, LiveChooser, RewardSchedule, bandit_experiment, random_chooser,
+                     replay_fit, summarize)
 from .config import Config
+from .frames import quantise_rates
 from .memory import MemorySystem, sleep_block, words
 from .net import SpikingNet
 from .pong import Pong, random_paddle, tracking_paddle
@@ -213,6 +216,7 @@ class Session:
                    "spikes_per_s": round(n_sp / sim_s, 1), "mean_rate_hz": round(n_sp / sim_s / net.n, 3),
                    "steps_per_s": round(dt_steps / wall, 1), "realtime_x": round(sim_s / wall, 3),
                    "groups": {k: round(v, 2) for k, v in groups.items() if k in GROUP_KEYS},
+                   "rq": quantise_rates(rr),                  # per-region rates, 1 byte each, for the 3D neurons (#62)
                    "raster": {"n": len(net.raster_ids), "t0": int(self.last_frame_t), "t1": int(net.t),
                               "spikes": net.pop_raster(self.last_frame_t)[:4000]},
                    "pong": self.pong.shown.frame() if (self.pong is not None and "pong" in self.phase) else None,
@@ -543,6 +547,24 @@ class Session:
             finally:
                 if p is not None:
                     p.frozen = was
+
+        def twin_picks():
+            """The frozen twin: the same network with every learned change removed (it never learned)."""
+            if p is None:
+                return frozen_picks()
+            dw, theta = p.dw.clone(), self.net.theta.clone()
+            p.dw.zero_()
+            p._apply()
+            self.net.theta.zero_()
+            self.net._dirty = True
+            try:
+                return frozen_picks()
+            finally:
+                p.dw.copy_(dw)
+                p._apply()
+                self.net.theta.copy_(theta)
+                self.net._dirty = True
+        twin = replay_fit(decs, twin_picks())
         before = replay_fit(decs, frozen_picks())
         agree = 0
         for k in range(passes):
@@ -557,6 +579,9 @@ class Session:
                                       "rewarded": sum(d["reward"] > 0 for d in decs),
                                       "punished": sum(d["reward"] < 0 for d in decs),
                                       "fit_before": before[0], "fit_after": after[0], "fit_n": after[1],
+                                      "fit_frozen_twin": twin[0],
+                                      "paid_off_frac": round(sum(d["reward"] > 0 for d in decs) / len(decs), 4)
+                                      if decs else None,
                                       "own_pick_agreed_during_replay": round(agree / max(1, passes * len(decs)), 4),
                                       "calibration": live.calib, "labels_valued": len(live.V)})
 
@@ -593,7 +618,8 @@ class Session:
         if self.live is None:
             c = self.cfg
             kw = {k[len("live_"):]: c[k] for k in ("live_thr_z", "live_eta", "live_eta_min", "live_eta_tau",
-                                                     "live_alpha", "live_timeout_ms", "live_cue_amp") if k in c}
+                                                     "live_alpha", "live_timeout_ms", "live_cue_amp", "live_readout",
+                                                     "live_readout_kw") if k in c}
             self.live = LiveChooser(self.net, **kw)
             if self.net.plast is not None:
                 self.live.from_meta(self.net.plast.meta.get("live_choice"))
@@ -791,6 +817,30 @@ class Session:
                                    "decision_sim_ms_mean": round(float(np.mean(sims)), 1),
                                    "timeout_frac": round(tos / n, 3), "calibration": live.calib,
                                    "gpu_mem_gb": round(net.memory_gb(), 2) if net.memory_gb() else None})
+
+    def ph_live_learn(self):
+        """The learning benchmark of #70 at the live settings, no server needed: #39's bandit with variable offers
+        (2-6 of 8 real labels) and a reversal halfway, for each read-out in `bandit_readouts`: the frozen twin, the
+        learned run and a random chooser on the same offers and reward stream (choice.bandit_experiment). The result
+        is saved after every read-out, so a deadline keeps what was measured."""
+        net, c = self.net, self.cfg
+        live = self._live()
+        n = int(c.get("bandit_trials", 240))
+        modes = tuple(c.get("bandit_readouts") or READOUTS)
+        info = {"gpu": self.results["build"]["gpu"], "n_neurons": net.n}
+        t0 = time.time()
+
+        def saved(mode, out):
+            rec = {**info, **out, "wall_s": round(time.time() - t0, 1)}
+            self.results["phases"]["live_learn"] = [rec]
+            self.save_results()
+            self.log("read-out", mode, "learned", out["readouts"][mode]["learned"]["frac_correct"],
+                     "frozen", out["readouts"][mode]["frozen"]["frac_correct"], "random", out["random"]["frac_correct"])
+        out = bandit_experiment(live, trials=n, readouts=modes, readout_kw=c.get("bandit_readout_kw"),
+                                seed=int(c.get("seed", 1)), on_trial=lambda f: setattr(self, "progress", f),
+                                on_readout=saved)
+        self.results["phases"].pop("live_learn", None)
+        self.result("live_learn", {**info, **out, "wall_s": round(time.time() - t0, 1)})
 
     def ph_sleep(self, replay=True, label=None):
         minutes = float(self.cfg.get("sleep_minutes", 4))
