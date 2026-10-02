@@ -49,3 +49,7 @@ jobs:
       - run: python tests/smoke_demo.py --port 8765 --data-dir "$RUNNER_TEMP/data"
         env:
           BROWSE: "0"
+      # issue #21: a kill mid-write must not crash-loop the server; start once with truncated state files
+      - run: python tests/smoke_demo.py --port 8766 --data-dir "$RUNNER_TEMP/torn" --torn-state --measure 3
+        env:
+          BROWSE: "0"

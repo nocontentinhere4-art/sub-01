@@ -3,6 +3,8 @@
 Starts `live_server.py --demo` with BROWSE=0 in a temporary data dir, waits for /api/config, checks HTTP 200 on the
 pages and read APIs, checks that /ws sends a `tick` within 10 s, then prints the server's CPU cost per tick, read
 from /proc/<pid>/stat over 20 s of /ws (Linux only; skipped with a note elsewhere).
+With --torn-state the data dir first gets state files cut off mid-write (a kill during a save, issue #21): the server
+must still start, log one "is corrupt" line per file and keep each one aside as <name>.corrupt-<UTC time>.
 No `test_` prefix, so pytest does not collect it.
 """
 import argparse
@@ -19,6 +21,31 @@ import aiohttp
 ROOT = Path(__file__).resolve().parent.parent
 PATHS = ["/", "/brain", "/diary", "/api/diary", "/api/reading", "/api/frames", "/api/browsing"]
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
+TORN = {                 # state files read back at startup, each cut off mid-write
+    "life.json": '{"activity": "research", "path": [], "hunger',
+    "body.json": '{"body": {"ghrelin": 0.4, "glucose',
+    "reading.json": '{"log": [{"title": "Bread", "url": "https://en.wikipedia.org/wiki/Br',
+    "state.json": '{"engine": {"t": 1790000000.0, "stage": "AWAKE", "pressure": 0.3',
+}
+
+
+def seed_torn(data_dir):
+    d = Path(data_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    for name, text in TORN.items():
+        (d / name).write_text(text)
+
+
+def check_torn(data_dir, log_text):
+    failures = []
+    for name in TORN:
+        kept = list(Path(data_dir).glob(name + ".corrupt-*"))
+        lines = [ln for ln in log_text.splitlines() if f"{name} is corrupt" in ln]
+        ok = len(kept) == 1 and len(lines) == 1
+        print(f"{'ok  ' if ok else 'FAIL'} torn {name:<13} {len(lines)} log line, kept aside: {kept[0].name if kept else '-'}")
+        if not ok:
+            failures.append(f"torn {name}: {len(lines)} log lines, {len(kept)} files kept aside")
+    return failures
 
 
 def cpu_seconds(pid):
@@ -104,12 +131,15 @@ def main():
     p.add_argument("--data-dir", help="server state dir (default: a fresh temporary dir)")
     p.add_argument("--measure", type=float, default=20.0, help="seconds of /ws used for the tick cost")
     p.add_argument("--startup-timeout", type=float, default=90.0)
+    p.add_argument("--torn-state", action="store_true", help="start with truncated state files (issue #21)")
     args = p.parse_args()
 
     tmp = None
     if not args.data_dir:
         tmp = tempfile.TemporaryDirectory(prefix="sub01-smoke-")
         args.data_dir = tmp.name
+    if args.torn_state:
+        seed_torn(args.data_dir)
     env = dict(os.environ, BROWSE="0", PYTHONUNBUFFERED="1")
     env.setdefault("OPENBLAS_NUM_THREADS", "1")
     env.setdefault("OMP_NUM_THREADS", "1")
@@ -121,6 +151,9 @@ def main():
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:
         failures = asyncio.run(run(args, proc))
+        if args.torn_state:
+            log.seek(0)
+            failures += check_torn(args.data_dir, log.read())
     except Exception as e:                          # startup failure, connection refused, ...
         failures = [f"{type(e).__name__}: {e}"]
     finally:
