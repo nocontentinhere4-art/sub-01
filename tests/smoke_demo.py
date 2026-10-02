@@ -11,7 +11,7 @@ chat replies run while the tick cost is measured; the run fails if no plan arriv
 After the first tick (#15): /healthz answers 200, /api/costs and /api/health answer 401 without the admin token and
 200 with it (a random SUB01_ADMIN_TOKEN is set for the server), and /api/health's tick time is printed.
 With --youtube-chess (#17) the clock runs 60x from 10:00 Tokyo and a chat wish ("let's play chess", and with
---browse also "watch a youtube video") is sent every 11 s: the run fails unless a chess game is played to its end (and,
+--browse also "put on some youtube") is sent every 11 s: the run fails unless a chess game is played to its end (and,
 with --browse, a video is watched) during the measurement. --browse starts the real browser (BROWSE=1, needs
 playwright + Chromium + network) and prints the browser's peak memory while a video plays.
 No `test_` prefix, so pytest does not collect it.
@@ -142,7 +142,7 @@ async def run(args, proc):
                     if args.mind:
                         text = f"are you a real person? {sent}"
                     elif args.browse and sent % 2 == 0:
-                        text = f"watch a youtube video {sent}"
+                        text = f"put on some youtube {sent}"
                     else:
                         text = f"let's play chess {sent}"
                     await ws.send_json({"type": "chat", "text": text})
@@ -168,7 +168,7 @@ async def run(args, proc):
                         print(f"video: {msg.get('title')!r} muted={msg['video'].get('muted')} "
                               f"for {msg['video'].get('seconds')} s real; browser {browser_mb(proc.pid):.0f} MB")
                     videos.append({"url": msg.get("url"), "mb": browser_mb(proc.pid)})
-                if args.youtube_chess and games and (videos or not args.browse) and len(games) >= 1:
+                if args.youtube_chess and games and (len(videos) >= 8 or not args.browse):   # a few shots of a video
                     break
             wall = time.monotonic() - t0
             if args.youtube_chess:

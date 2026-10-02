@@ -441,3 +441,14 @@ def test_a_chat_wish_makes_the_activity_likely():
     lf.start("play_chess", NOON, "x")
     lf.end_activity(NOON + 60)
     assert lf.until == NOON + 60
+
+
+def test_the_vote_card_stays_on_the_video_it_chose():
+    dec = {"options": [], "reason": "r", "page_url": "https://www.youtube.com/results?search_query=x", "status_id": 3,
+           "led_to": "https://www.youtube.com/watch?v=a1", "watch_min": 4.0}
+    live = SimpleNamespace(browser=SimpleNamespace(restarting=False, screens={}), decisions={"desk": dec})
+    live.browser.screens["desk"] = {"id": 9, "url": "https://www.youtube.com/watch?v=a1", "title": "Sourdough",
+                                    "video": {"watching": True}}
+    assert Live.screen_status(live, "desk")["decision"]["watch_min"] == 4.0
+    live.browser.screens["desk"] = {"id": 10, "url": "https://www.youtube.com/watch?v=zz", "title": "Other"}
+    assert "decision" not in Live.screen_status(live, "desk")

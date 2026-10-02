@@ -81,7 +81,8 @@
   #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
-  #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
+  #desk [hidden] { display:none !important; }
+  #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
   #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
     color:#111; background:#cdb999; }
@@ -91,7 +92,7 @@
   #desk ul { list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.55; }
   #desk li { display:flex; justify-content:space-between; gap:8px; color:var(--dim); }
   #desk li.c { color:var(--fg); }
-  #desk li.c::before { content:"▸ "; color:var(--or); }
+  #desk li.c span:first-child::before { content:"▸ "; color:var(--or); }
   #neurons { min-width:0; }
   #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
@@ -124,6 +125,14 @@
 </div>
 
 <div id="cards">
+  <div class="card" id="desk" hidden>
+    <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
+    <div id="desk-board" class="board" hidden></div>
+    <img id="desk-img" alt="" hidden>
+    <div class="t" id="desk-t"></div>
+    <ul id="desk-opts"></ul>
+    <div class="m" id="desk-m"></div>
+  </div>
   <a class="card" href="/diary" id="c-diary">
     <div class="k"><span>Last night</span><span>diary →</span></div>
     <img id="d-img" alt="" hidden>
@@ -135,14 +144,6 @@
     <img id="e-img" alt="">
     <div class="t q" id="e-thought"></div>
   </a>
-  <div class="card" id="desk" hidden>
-    <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
-    <div id="desk-board" class="board" hidden></div>
-    <img id="desk-img" alt="" hidden>
-    <div class="t" id="desk-t"></div>
-    <ul id="desk-opts"></ul>
-    <div class="m" id="desk-m"></div>
-  </div>
   <div class="card" id="c-night">
     <div class="k"><span id="n-k">Sleep</span><span id="n-date"></span></div>
     <div class="t" id="n-t">no night recorded yet</div>

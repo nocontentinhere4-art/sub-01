@@ -741,7 +741,8 @@ class Live:
         if st and not display_ok(st.get("title", "")):           # the public card never shows such a title
             st = dict(st, title=st.get("host", ""))
         # the options belong to the page they were considered on and to the page the choice led to, no later one
-        if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")):
+        if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")
+                           or (st.get("video") and st.get("url") == dec.get("led_to"))):   # a chosen video playing
             st = dict(st, decision={k: dec.get(k) for k in ("options", "reason", "eyes", "ms", "temperature", "page",
                                                             "outcome", "watch_min")})
         return st
@@ -877,6 +878,7 @@ class Live:
         await self.broadcast({"type": "decision", **dec})
         st = await self.browser.act(dev, act, dec["reason"], interest)
         dec["status_id"] = (st or {}).get("id")
+        dec["led_to"] = (st or {}).get("url")
         dec["outcome"] = self.outcome(chosen, st)
         return st
 
@@ -907,7 +909,7 @@ class Live:
 
     async def run_chess(self):
         while True:
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(0.25 if self.life.activity == "play_chess" else 1.0)
             await self.chess_step()
 
     async def chess_step(self):
