@@ -437,6 +437,18 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Checks: `pytest tests/test_neuron_render.py` (node check `tests/js/neuron_render_check.js`); screenshots and timings
   `python tests/neuron_render_shots.py`.
 
+## Neurons at maximum realism: real H01 cells in the close-ups (#99 A, `docs/spiking/neuron_render.md` § #99)
+- `web/neuron_render/build/fetch_h01.py` builds `web/neuron_render/h01/` once from H01 (Shapson-Coe et al. 2024, human
+  temporal cortex EM, CC BY 4.0, `gs://h01-release`, cached in `data/h01_cache/`): proofread cells' decimated meshes,
+  their SWC skeletons with H01's axon/dendrite/soma/AIS/myelin classes, their synapses, glia from the automated
+  segmentation (labelled not proofread), a crop of the SEM image. Sets: desktop 2.99 MB / 280k triangles, phone 2.01 MB
+  / 151k; lazy-loaded (`h01.js`, gzip + `DecompressionStream`). Re-run the script to change the cell choice (`SETS`).
+- The cortex close-up draws them (`info().source === "H01"`): pulses along the real axon, boutons at real synapse
+  positions, an EM look and the fluorescence look, a µm scale bar; `entry` / `openAt` for B's seamless zoom. The other
+  regions keep the NeuroMorpho procedural cells, and any failure falls back to them.
+- Caption (`NeuronRender.CAPTION`) names the datasets and says the activity is simulated; credits on `/about` and in
+  `docs/spiking/morphology_credits.md`.
+
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
   / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is
