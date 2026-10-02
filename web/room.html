@@ -66,6 +66,20 @@
   #memcard .it:last-child { border-bottom:0; }
   #memcard .it span:last-child { flex:none; color:var(--dim); font-size:11px; white-space:nowrap; }
   #memcard .it .y { color:#39f5a0; } #memcard .it .n { color:#ff7a7a; }
+  #teachcard form { display:flex; flex-direction:column; gap:6px; }
+  #teachcard .row { display:flex; gap:6px; }
+  #teachcard input { flex:1; min-width:0; background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:8px 10px;
+    font:inherit; font-size:12.5px; border-radius:7px; }
+  #teachcard input:focus { outline:none; border-color:rgba(255,154,60,.6); }
+  #teachcard input#tc-nick { flex:0 0 40%; }
+  #teachcard button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12.5px; border-radius:7px; cursor:pointer; }
+  #teachcard .h { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:12px; }
+  #teachcard .it { font-size:12px; padding:5px 0; border-bottom:1px solid var(--line); }
+  #teachcard .it:last-child { border-bottom:0; }
+  #teachcard .it .r { display:block; color:var(--dim); font-size:11px; }
+  #teachcard .it .w { color:var(--dim); }
+  #teachcard .y { color:#39f5a0; } #teachcard .n { color:#ff7a7a; }
+  #tc-note.err { color:#ff8a8a; }
   .nm { display:flex; gap:8px; margin-top:8px; font-size:10px; color:var(--dim); }
   .nm span { flex:1; } .nm i { display:block; height:4px; border-radius:2px; background:#2a2a36; margin-top:3px; overflow:hidden; }
   .nm i i { margin:0; background:linear-gradient(90deg, #ff9a3c, #ffc27a); transition:width .6s; }
@@ -179,13 +193,25 @@
     <div class="kw" id="r-kw"></div>
     <div class="tn" id="r-tn"><span>will it come back tonight?</span><b id="r-tonight" title="estimated chance it is replayed in REM tonight, with what memory holds now; chat messages from people weigh more">…</b></div>
     <div class="s" id="r-why"></div>
-    <div class="s" id="r-note">What it reads becomes stimuli and dream material; it does not understand the text.</div>
+    <div class="s" id="r-note">What it reads becomes stimuli and dream material for his brain model.</div>
   </div>
   <div class="card" id="memcard" hidden>
     <div class="k"><span>Does it remember what it read yesterday?</span><span id="mem-day"></span></div>
     <div id="mem-items"></div>
     <div class="s" id="mem-how"></div>
     <div class="s">Recall by a simulated spiking network from a partial cue; a model, not a mind.</div>
+  </div>
+  <div class="card" id="teachcard">
+    <div class="k"><span>Teach him something</span><span id="tc-left"></span></div>
+    <form id="tc-form">
+      <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
+      <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
+    </form>
+    <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
+    <div class="h">Taught today</div>
+    <div id="tc-today"><div class="it"><span class="w">nothing yet today</span></div></div>
+    <div id="tc-yday" hidden><div class="h" id="tc-yk">Remembered from yesterday</div><div id="tc-ylist"></div></div>
+    <div class="s" id="tc-honest"></div>
   </div>
   <div class="card" id="mapcard">
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
@@ -1209,6 +1235,36 @@ function tonightText(c){
   return `${p < 5 ? "unlikely" : p > 85 ? "very likely" : p >= 50 ? "likely" : "maybe"} · ${p > 95 ? ">95" : p < 5 ? "<5" : "≈" + p}%`;
 }
 
+// ---------- teach him something (/api/taught) ----------
+function taughtRow(it, gpu){
+  let r = `replayed in his sleep: ${it.replayed} time${it.replayed === 1 ? "" : "s"}`;
+  if (gpu && it.result) r = `<b class="${it.result.recalled ? "y" : "n"}">${it.result.recalled ? "recalled" : "not recalled"}</b>`
+    + ` · ${(+it.result.score).toFixed(1)} Hz vs best lure ${(+it.result.best_lure).toFixed(1)} Hz`;
+  else if (gpu && it.testable === false) r += " · too short to test from half a cue";
+  return `<div class="it">“${esc(it.text)}”${it.nick ? ` <span class="w">— ${esc(it.nick)}</span>` : ""}<span class="r">${r}</span></div>`;
+}
+let taughtAt = 0;
+function loadTaught(){
+  taughtAt = performance.now();
+  fetch("/api/taught").then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    $("tc-left").textContent = `${d.left} of ${d.per_day} left today`;
+    $("tc-today").innerHTML = d.today.length ? d.today.slice().reverse().map(it => taughtRow(it, false)).join("")
+      : `<div class="it"><span class="w">nothing yet today</span></div>`;
+    $("tc-yday").hidden = !d.yesterday.length;
+    $("tc-yk").textContent = d.gpu ? "Remembered from yesterday" : "Taught yesterday";
+    $("tc-ylist").innerHTML = d.yesterday.map(it => taughtRow(it, d.gpu)).join("");
+    $("tc-honest").textContent = d.note;
+  }).catch(() => {});
+}
+loadTaught(); setInterval(loadTaught, 60 * 1000);
+$("tc-form").addEventListener("submit", ev => {
+  ev.preventDefault(); const text = $("tc-text").value.trim(), nick = $("tc-nick").value.trim();
+  if (!text) return;
+  if (!sock || sock.readyState !== 1) { $("tc-note").textContent = "still connecting"; $("tc-note").className = "s err"; return; }
+  sock.send(JSON.stringify({type:"teach", text, nick}));
+});
+
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery"};
 let sock = null, tickMsg = null, uiTimer = 0, uiAt = 0, panAt = 0, mePos = "";
@@ -1225,7 +1281,15 @@ function connect(){
     const m = JSON.parse(e.data);
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
+    if (m.type === "teach_ack") {
+      $("tc-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
+      $("tc-note").className = m.ok ? "s" : "s err";
+      if (m.ok) { $("tc-text").value = ""; loadTaught(); }
+      return;
+    }
+    if (m.type === "taught") { if (performance.now() - taughtAt > 2000) loadTaught(); return; }
     if (m.type !== "tick" || !m.life) return;
+    if ((m.events || []).some(ev => ev.type === "replay" && ev.source === "taught")) loadTaught();   // a new count
     for (const t of m.trades || []) { trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd}); chartDirty = true; }
     if (trades.length > 500) trades = trades.filter(t => Date.now() / 1000 - t.t < 300);
     tickMsg = m; scheduleUI();
