@@ -24,9 +24,14 @@
   "use strict";
   const ASSET = "neuron_render/cells.json", LIVE_MS = 10000;
   const SLOWDOWN = 10000;                                        // pulses: real conduction speed / SLOWDOWN
-  const CAPTION = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn " +
+  const CAPTION = "Shapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, " +
+    "Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and " +
+    "slowed down to be visible. A model, not a mind.";
+  const CAPTION_PROCEDURAL = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn " +
     "from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells " +
     "are enlarged and pulses slowed to be visible. A model, not a mind.";
+  const H01_SETS = { cortex: "cortex" };                          // close-up kinds with a real H01 set (web/neuron_render/h01/)
+  const H01_CITE = "Shapson-Coe A, Mohar M, Meirovitch Y et al. (2024) A petavoxel fragment of human cerebral cortex reconstructed at nanoscale resolution. Science 384:eadk4858";
   // published typical values per cell type (sources: docs/spiking/neuron_render.md). spines: per um of dendrite beyond
   // spineFree um from the soma; myelin: ais = premyelin axon initial segment (um), internode length (um), g-ratio,
   // node gap as drawn (um; real ~1 um), maxOrder = axon branch orders that are myelinated; boutonEvery (um) on the
@@ -54,7 +59,7 @@
     phone:   { cap: 250000, hero: 3, mid: 12, far: 60, sides: 5, sidesMid: 4, strideMid: 3, bg: 1800, field: 340, floorPx: 1.0, spineTri: 36000, dpr: 1.5 },
     desktop: { cap: 1000000, hero: 5, mid: 30, far: 90, sides: 7, sidesMid: 5, strideMid: 1, bg: 3200, field: 400, floorPx: 0.9, spineTri: 110000, dpr: 1.5 },
   };
-  const K = { SOMA: 0, AXON: 1, BASAL: 2, APICAL: 3, MYELIN: 4, SPINE: 5, BOUTON: 6, NUCLEUS: 7, NUCLEOLUS: 8 };
+  const K = { SOMA: 0, AXON: 1, BASAL: 2, APICAL: 3, MYELIN: 4, SPINE: 5, BOUTON: 6, NUCLEUS: 7, NUCLEOLUS: 8, GLIA: 9, SYN_PRE: 10, SYN_POST: 11 };
 
   // rate (Hz) -> the byte quantise_rates sends (a pod without per-region rates: its network group's rate, labelled by the page)
   const rateByte = hz => !(hz >= 0.1) ? 0 : Math.max(1, Math.min(255, Math.round(1 + 254 * Math.log(Math.min(hz, 100) / 0.1) / Math.log(1000))));
@@ -346,17 +351,26 @@
   const FS_CELL = `
     precision highp float;
     uniform float uStyle, uRate, uLive, uNucAlpha;
-    uniform vec3 uColA, uColB, uColMy, uColAct;
+    uniform vec3 uColA, uColB, uColG, uColMy, uColAct;
     varying vec3 vN, vV; varying float vDepth, vKind, vCol, vSoma, vPulse, vR, vDist, vBright;
     void main(){
       vec3 n = normalize(vN), v = normalize(vV); float ndv = max(0.0, dot(n, v));
       float kSoma = step(abs(vKind - 0.0), 0.5), kAxon = step(abs(vKind - 1.0), 0.5), kMy = step(abs(vKind - 4.0), 0.5);
       float kSpine = step(abs(vKind - 5.0), 0.5), kBout = step(abs(vKind - 6.0), 0.5), kNuc = step(abs(vKind - 7.0), 0.5), kNucl = step(abs(vKind - 8.0), 0.5);
-      float kDend = step(1.5, vKind) * step(vKind, 3.5) + kSpine;
+      float kDend = step(1.5, vKind) * step(vKind, 3.5) + kSpine, kGlia = step(abs(vKind - 9.0), 0.5);
       float glow = uLive * uRate;
       vec3 col; float alpha = vDepth;
-      if (uStyle < 0.5) {
-        vec3 base = mix(uColA, uColB, vCol);
+      if (uStyle > 1.5) {
+        // EM-like: grey membrane shading (facing surfaces pale, grazing edges dark like a stained membrane), myelin paler
+        float I = 0.14 + 0.72 * pow(ndv, 0.9) - 0.35 * pow(1.0 - ndv, 2.0);                // a 3D EM reconstruction: dark grazing edges
+        vec3 alb = vec3(0.5, 0.49, 0.47);
+        alb = mix(alb, vec3(0.8, 0.79, 0.76), kMy); alb = mix(alb, vec3(0.44, 0.45, 0.48), kGlia);
+        alb = mix(alb, vec3(0.42, 0.40, 0.44), kNuc); alb = mix(alb, vec3(0.22, 0.2, 0.24), kNucl);
+        col = alb * I * (0.6 + 0.4 * vBright);
+        col += uColAct * (0.5 * glow * kDend * 0.3 + 1.4 * vSoma * kSoma + 0.8 * vSoma * exp(-vDist / 40.0) * kDend + 2.0 * vPulse * (kAxon + kBout + 0.5 * kMy));
+        alpha = mix(alpha, uNucAlpha, kNuc); alpha = mix(alpha, 0.85, kNucl);
+      } else if (uStyle < 0.5) {
+        vec3 base = vCol < 0.5 ? uColA : (vCol < 1.5 ? uColB : uColG);
         float thick = clamp(vR / 1.2, 0.55, 1.0);
         float I = (0.35 + 0.75 * pow(ndv, 0.6)) * thick;
         I = mix(I, 0.7 + 0.3 * ndv, kSoma);
@@ -408,7 +422,7 @@
     varying float vKind, vCol, vSoma, vPulse, vDist, vDepth;
     void main(){
       float kSoma = step(abs(vKind), 0.5), kAxon = step(abs(vKind - 1.0), 0.5), kDend = step(1.5, vKind);
-      vec3 base = uStyle < 0.5 ? mix(uColA, uColB, vCol) : vec3(0.5, 0.48, 0.55);
+      vec3 base = uStyle < 0.5 ? mix(uColA, uColB, vCol) : (uStyle > 1.5 ? vec3(0.62, 0.62, 0.6) : vec3(0.5, 0.48, 0.55));
       float glow = uLive * uRate;
       vec3 col = base * uDim * (0.5 + 0.5 * kSoma + 0.5 * glow * kDend) * mix(1.0, 1.5, vDepth);
       col += base * 1.2 * vSoma * (kSoma + kDend * exp(-vDist / 40.0)) + uColAct * 2.0 * vPulse * kAxon;
@@ -430,6 +444,34 @@
       vec3 col = uStyle < 0.5 ? mix(uColA * 0.05 * streak, uColRed * 0.25 * blob, vKind) : mix(vec3(0.5, 0.45, 0.48) * 0.04 * streak, vec3(0.5, 0.36, 0.38) * blob * 0.12, vKind);
       gl_FragColor = vec4(col * uDim, 1.0);
     }`;
+  const VS_SYN = `
+    attribute float aArrive; attribute float aKind;
+    uniform float uTime, uSpike, uPixK, uDepthK, uScale;
+    varying float vFlash, vKind, vDepth;
+    void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+      vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
+      float dt = uTime - uSpike, on = step(0.0, dt);
+      vFlash = aArrive >= 0.0 ? on * step(aArrive, dt) * exp(-(dt - aArrive) / 0.9) : 0.0;
+      vKind = aKind;
+      float um = aKind < 10.5 ? 0.9 : 0.6;                          // a bouton ~0.9 um, a PSD ~0.6 um
+      gl_PointSize = max(2.0, um * uScale / -mv.z + 1.5 * vFlash * uScale / -mv.z); }`;
+  const FS_SYN = `
+    precision highp float;
+    uniform float uStyle, uLive, uRate; uniform vec3 uColAct;
+    varying float vFlash, vKind, vDepth;
+    void main(){
+      vec2 c = gl_PointCoord - 0.5; float d2 = dot(c, c); if (d2 > 0.25) discard;
+      float soft = exp(-d2 * 9.0);
+      float pre = step(vKind, 10.5);
+      vec3 col = uStyle > 1.5 ? mix(vec3(0.3, 0.32, 0.34), vec3(0.45, 0.4, 0.3), pre) * 0.5 : mix(vec3(0.55, 0.15, 0.6) * 0.5, vec3(1.0, 0.55, 0.2) * 0.45, pre);
+      col = col * (0.6 + 0.6 * uLive * uRate * (1.0 - pre)) + uColAct * 2.5 * vFlash;
+      gl_FragColor = vec4(col * soft, 1.0);
+    }`;
+  const VS_EM = `varying vec2 vUv; varying float vDepth; uniform float uDepthK;
+    void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0); gl_Position = projectionMatrix * mv; }`;
+  const FS_EM = `precision highp float; uniform sampler2D tEm; uniform float uStyle; varying vec2 vUv; varying float vDepth;
+    void main(){ float g = texture2D(tEm, vUv).r; vec2 d = vUv / 5.0 - 0.5; float edge = smoothstep(0.5, 0.25, max(abs(d.x), abs(d.y)));
+      g = pow(g, 1.3); gl_FragColor = vec4(vec3(0.05 + 0.4 * g) * (0.35 + 0.65 * edge), vDepth); }`;
   const VS_QUAD = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
   const FS_DOWN = `precision highp float; uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
     void main(){ vec4 s = texture2D(tSrc, vUv + uTexel * vec2(-0.5, -0.5)) + texture2D(tSrc, vUv + uTexel * vec2(0.5, -0.5))
@@ -491,8 +533,10 @@
     if (!Kd) throw new Error("NeuronRender.open: unknown kind " + kind);
     const isPhone = () => (root.innerWidth || 1000) < 700;
     const DEBUG = o.debug != null ? !!o.debug : /[?&]debug\b/.test(root.location ? root.location.search : "");   // fps in the overlay only then
-    const S = { kind, region: o.region, label: o.label || "", style: o.style === "render" ? "render" : "fluorescence", lodName: o.lod || "auto",
-                trimTri: 0,
+    const styleOf = s => s === "em" ? "em" : (s === "render" ? "render" : "fluorescence");
+    const S = { kind, region: o.region, label: o.label || "", style: styleOf(o.style), lodName: o.lod || "auto",
+                trimTri: 0, h01: null, entry: o.entry ? { ms: o.entry.ms || 1200, from: o.entry.from || 6, t0: 0, on: false } : null,
+                worldPos: o.worldPos || null, readyResolve: null,
                 live: !!o.live, lastWall: o.live ? performance.now() : -1e9, forcedOffline: false, rate: 0, rateT: 0, spikes: 0, gap: 200, prev: 0,
                 onScreen: true, closed: false, fps: 0, jsMs: 0, frames: 0, jsSum: 0, fpsAt: performance.now(), focus: 0, t0: performance.now(),
                 userTouched: false, zoomedOut: false };
@@ -505,15 +549,19 @@
         ".nr-hud{position:absolute;top:8px;right:8px;display:flex;gap:6px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;z-index:4}" +
         ".nr-hud button{background:rgba(0,0,0,.55);color:#ddd;border:1px solid #555;border-radius:4px;padding:3px 8px;cursor:pointer}" +
         ".nr-hud button.on{color:#ffb070;border-color:#ffb070}.nr-hud .nr-x{margin-left:4px}" +
-        ".nr-stat{position:absolute;left:8px;bottom:6px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9a9a;z-index:4;pointer-events:none;text-shadow:0 0 4px #000}";
+        ".nr-stat{position:absolute;left:8px;bottom:6px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9a9a;z-index:4;pointer-events:none;text-shadow:0 0 4px #000}" +
+        ".nr-bar{position:absolute;left:8px;bottom:24px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#ddd;z-index:4;pointer-events:none;text-shadow:0 0 4px #000}" +
+        ".nr-bar i{display:block;height:3px;background:#eee;margin:0 0 3px 0;box-shadow:0 0 3px #000}";
       root.document.head.appendChild(st);
     }
     const canvas = root.document.createElement("canvas"); canvas.className = "nr-canvas";
     const hud = root.document.createElement("div"); hud.className = "nr-hud";
-    hud.innerHTML = '<button data-s="fluorescence">fluorescence</button><button data-s="render">3D render</button><button class="nr-x" title="back to the whole brain">✕</button>';
+    hud.innerHTML = '<button data-s="fluorescence">fluorescence</button><button data-s="render">3D render</button><button data-s="em">EM</button><button class="nr-x" title="back to the whole brain">✕</button>';
+    const bar = root.document.createElement("div"); bar.className = "nr-bar"; bar.innerHTML = '<i></i><span></span>';
+    if (S.entry) canvas.style.opacity = "0";
     const stat = root.document.createElement("div"); stat.className = "nr-stat";
     if (root.getComputedStyle && root.getComputedStyle(container).position === "static") container.style.position = "relative";
-    container.appendChild(canvas); container.appendChild(hud); container.appendChild(stat);
+    container.appendChild(canvas); container.appendChild(hud); container.appendChild(stat); container.appendChild(bar);
     hud.querySelectorAll("button[data-s]").forEach(b => b.onclick = () => setStyle(b.dataset.s));
     hud.querySelector(".nr-x").onclick = () => { if (o.onClose) o.onClose("button"); };
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: "high-performance" });
@@ -536,6 +584,7 @@
                   uStyle: { value: 0 }, uRate: { value: 0 }, uLive: { value: 0 }, uNucAlpha: { value: 0.45 }, uDim: { value: 0.3 },
                   uColA: { value: new THREE.Vector3(0.25, 1.0, 0.35) }, uColB: { value: new THREE.Vector3(1.0, 0.42, 0.15) },
                   uColMy: { value: new THREE.Vector3(0.6, 0.75, 1.0) }, uColAct: { value: new THREE.Vector3(1.0, 0.95, 0.7) },
+                  uColG: { value: new THREE.Vector3(0.55, 0.7, 1.0) }, uSpike: { value: -1e4 }, tEm: { value: null },
                   uColRed: { value: new THREE.Vector3(0.8, 0.1, 0.05) }, uScale: { value: 1000 } };
     function cellMaterial(nucleus) {
       const m = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_CELL, fragmentShader: FS_CELL, side: THREE.FrontSide });
@@ -549,6 +598,8 @@
       m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor; return m; };
     const matLine = additive(new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_LINE, fragmentShader: FS_LINE }));
     const matBg = additive(new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_BG, fragmentShader: FS_BG }));
+    const matEm = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_EM, fragmentShader: FS_EM, blending: THREE.NoBlending });
+    let emPlane = null, synMeshes = [];
     // the cells
     const cells = [];                                            // drawn cell k -> {tier, type, mesh | (geomSet, j)}
     const meshes = [], sets = [], counts = { triangles: 0, spines: 0, boutons: 0, nodes: 0, drawCalls: 0, lines: 0, heroCells: 0, spineUm: 0, dendUm: 0, cap: L.cap };
@@ -574,7 +625,103 @@
       g.instanceCount = n;
       return { off, quat, sc, spk, sa, col, br };
     }
+    function finish() {
+      focusPos = cells[S.focus] ? cells[S.focus].pos : [0, 0, 0];
+      built = true;
+      applyStyle(); fit(); if (o.onInfo) o.onInfo(info());
+    }
+    // the H01 path: real cells, lazily loaded (web/neuron_render/h01.js + h01/<set>_<lod>.bin.gz)
+    function loadH01Module() {
+      if (NR.h01) return Promise.resolve(NR.h01);
+      return new Promise((res, rej) => { const sc = root.document.createElement("script"); sc.src = (o.base || "neuron_render/") + "h01.js";
+        sc.onload = () => NR.h01 ? res(NR.h01) : rej(new Error("h01.js")); sc.onerror = () => rej(new Error("h01.js")); root.document.head.appendChild(sc); });
+    }
     function build() {
+      const set = H01_SETS[kind];
+      if (set && typeof root.DecompressionStream === "function" && o.h01 !== false) {
+        loadH01Module().then(h => h.load(set, lodOf(), o.base ? o.base + "h01/" : undefined)).then(data => { if (!S.closed) buildH01(data); })
+          .catch(e => { console.warn("NeuronRender: H01 set unavailable, drawing the NeuroMorpho cells:", e); if (!S.closed) buildProcedural(); });
+      } else buildProcedural();
+    }
+    function synPoints(c, kindOffset) {                            // this cell's real synapses: boutons (pre) flash on arrival, inputs (post) glow dimly
+      const s = c.syn, n = s.npre + s.npost, kd = new Float32Array(n), ar = new Float32Array(n).fill(-1);
+      for (let i = 0; i < n; i++) { kd[i] = i < s.npre ? K.SYN_PRE : K.SYN_POST; if (i < s.npre) ar[i] = s.preArrive[i]; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(s.pos, 3)); g.setAttribute("aKind", new THREE.BufferAttribute(kd, 1)); g.setAttribute("aArrive", new THREE.BufferAttribute(ar, 1));
+      const m = additive(new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uSpike: { value: -1e4 } }), vertexShader: VS_SYN, fragmentShader: FS_SYN }));
+      const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 1; pts.name = "nr-syn-" + c.id;
+      return pts;
+    }
+    function buildH01(data) {
+      S.h01 = data;
+      const ident = new Float32Array([0, 0, 0, 1]);
+      const oneInstance = (g, bright, col) => {
+        g.setAttribute("iOff", new THREE.InstancedBufferAttribute(new Float32Array(3), 3));
+        g.setAttribute("iQuat", new THREE.InstancedBufferAttribute(ident.slice(), 4));
+        g.setAttribute("iScale", new THREE.InstancedBufferAttribute(new Float32Array([1]), 1));
+        const spk = new Float32Array([-1e4]), sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
+        g.setAttribute("iSpike", sa);
+        g.setAttribute("iCol", new THREE.InstancedBufferAttribute(new Float32Array([col]), 1));
+        g.setAttribute("iBright", new THREE.InstancedBufferAttribute(new Float32Array([bright]), 1));
+        g.instanceCount = 1;
+        return { off: new Float32Array(3), quat: ident, sc: new Float32Array([1]), spk, sa, col: new Float32Array([col]), br: new Float32Array([bright]) };
+      };
+      const tags = c => (c.tags || []);
+      for (const c of data.cells) {
+        const tg = tags(c).join(" "), isGlia = c.role === "glia", isInter = /interneuron/.test(tg);
+        const layer = (tags(c).find(t => /^L\d$|^WM$|^Layer/.test(t)) || "").replace("Layer ", "L");
+        const type = isGlia ? (/astro/i.test(tg) ? "astrocyte" : (/oligo/i.test(tg) ? "oligodendrocyte" : "glia")) : (isInter ? (layer + " interneuron").trim() : (layer + " pyramidal").trim());
+        if (c.mesh) {
+          const m = c.mesh, g = new THREE.InstancedBufferGeometry();
+          g.setAttribute("position", new THREE.BufferAttribute(m.pos, 3));
+          g.setIndex(new THREE.BufferAttribute(m.idx, 1));
+          g.computeVertexNormals();
+          g.setAttribute("aNrm", g.getAttribute("normal")); g.deleteAttribute("normal");
+          g.setAttribute("aOff", new THREE.BufferAttribute(new Float32Array(m.nv * 3), 3));
+          g.setAttribute("aR", new THREE.BufferAttribute(new Float32Array(m.nv), 1));
+          g.setAttribute("aKind", new THREE.BufferAttribute(Float32Array.from(m.kind), 1));
+          g.setAttribute("aDist", new THREE.BufferAttribute(m.dist, 1));
+          g.setAttribute("aArrive", new THREE.BufferAttribute(m.arrive, 1));
+          const tier = c.role === "focus" || c.role === "hero" ? "hero" : (isGlia ? "glia" : "mid");
+          const A = oneInstance(g, c.role === "focus" ? 1 : (tier === "hero" ? 0.8 : (isGlia ? 0.5 : 0.55)), isGlia ? 2 : (isInter ? 1 : 0));
+          const mesh = new THREE.Mesh(g, matCell); mesh.frustumCulled = false; mesh.name = "nr-h01-" + c.role + "-" + c.id;
+          scene.add(mesh); meshes.push(mesh);
+          cells.push({ tier, type, A, j: 0, geom: g, pos: c.soma.slice(), tri: m.nf, triNoSpines: m.nf, spines: 0, h01: c, glia: isGlia });
+          counts.triangles += m.nf; counts.drawCalls++; if (tier === "hero") counts.heroCells++;
+          if (c.syn && !isGlia) { const pts = synPoints(c); scene.add(pts); meshes.push(pts); synMeshes.push({ pts, cell: cells[cells.length - 1] }); counts.boutons += c.syn.npre; counts.drawCalls++; }
+        } else if (c.skel) {                                       // the far tier: the real skeleton as lines
+          const k = c.skel, pos = [], kd = [], di = [], ar = [];
+          for (let i = 0; i < k.n; i++) { const p = k.parent[i]; if (p < 0) continue;
+            pos.push(k.pos[3 * p], k.pos[3 * p + 1], k.pos[3 * p + 2], k.pos[3 * i], k.pos[3 * i + 1], k.pos[3 * i + 2]);
+            kd.push(k.kind[p], k.kind[i]); di.push(k.dist[p], k.dist[i]); ar.push(k.arrive[p], k.arrive[i]); }
+          const g = new THREE.InstancedBufferGeometry();
+          g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+          g.setAttribute("aKind", new THREE.BufferAttribute(new Float32Array(kd), 1));
+          g.setAttribute("aDist", new THREE.BufferAttribute(new Float32Array(di), 1));
+          g.setAttribute("aArrive", new THREE.BufferAttribute(new Float32Array(ar), 1));
+          const A = oneInstance(g, 0.4, isInter ? 1 : 0);
+          const lines = new THREE.LineSegments(g, matLine); lines.frustumCulled = false; lines.renderOrder = 1; lines.name = "nr-h01-far-" + c.id;
+          scene.add(lines); meshes.push(lines);
+          cells.push({ tier: "far", type, A, j: 0, geom: g, pos: c.soma.slice(), h01: c });
+          counts.lines += pos.length / 6; counts.drawCalls++;
+        }
+        counts.dendUm += c.dendUm || 0;
+      }
+      counts.myelinUm = data.cells.reduce((a, c) => a + (c.myelinatedUm || 0), 0);
+      // the real EM image behind the block (a slice through the focus soma, drawn at the slab's back face)
+      const em = data.em, zBack = Math.min(...data.cells.filter(c => c.bbox).map(c => c.bbox[0][2])) - 8;
+      const tex = new THREE.TextureLoader().load(em.url); tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+      tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping;        // the crop (~200 um) is mirrored 3x3 to fill the field behind the block
+      uni.tEm.value = tex;
+      const pg = new THREE.PlaneGeometry(em.um * 5, em.um * 5); const uv = pg.getAttribute("uv"); for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 5, uv.getY(i) * 5);
+      emPlane = new THREE.Mesh(pg, matEm); emPlane.position.set(em.centre[0], em.centre[1], zBack);
+      emPlane.frustumCulled = false; emPlane.name = "nr-em"; scene.add(emPlane); meshes.push(emPlane); counts.drawCalls++;
+      // the focus cell first in the slot mapping; glia never spike
+      cells.sort((a, b) => (a.h01.role === "focus" ? -1 : 0) - (b.h01.role === "focus" ? -1 : 0));
+      S.focus = 0;
+      finish();
+    }
+    function buildProcedural() {
       const rnd = mulberry(880 + Object.keys(KINDS).indexOf(kind) + (L === LOD.phone ? 7 : 0));
       const split = n => Kd.types.map(([t, f]) => [t, Math.max(0, Math.round(n * f))]);
       const want = { hero: split(L.hero), mid: split(L.mid), far: split(L.far) };
@@ -640,15 +787,15 @@
         mids.forEach((T, i) => { T.geom.instanceCount = bud.midN[i]; });
         heroes.forEach((c, i) => { if (bud.keep[i] < c.tri) { c.geom.setDrawRange(0, bud.keep[i] * 3); const dropped = Math.round((c.tri - bud.keep[i]) / 10); counts.spines -= dropped; c.spines -= dropped; } });
         counts.triangles = bud.total; }
-      focusPos = cells[S.focus] ? cells[S.focus].pos : [0, 0, 0];
-      built = true;
-      applyStyle(); fit(); if (o.onInfo) o.onInfo(info());
+      finish();
     }
     // camera: orbit around the focus cell; drag turns, wheel / pinch zooms; zooming out past the block closes
     const cam = { theta: 0.35, phi: 1.25, dist: 1000, dist0: 1000, target: [0, 0, 0] };
     function fit() {
       cam.target = focusPos.slice();
       cam.dist = cam.dist0 = (L.field / 2) / Math.tan(camera.fov * Math.PI / 360);
+      if (S.entry && !S.entry.on) { S.entry.on = true; S.entry.t0 = performance.now(); cam.dist = cam.dist0 * S.entry.from; }
+      if (o.cameraDir && o.cameraDir.length === 3) { const d = o.cameraDir; cam.theta = Math.atan2(-d[0], -d[2]); cam.phi = Math.acos(Math.max(-1, Math.min(1, -d[1]))); }
       camera.near = Math.max(1, cam.dist * 0.02); camera.far = cam.dist * 12; camera.updateProjectionMatrix();
     }
     function placeCamera() {
@@ -674,13 +821,15 @@
     }
     // style
     function applyStyle() {
-      const fl = S.style === "fluorescence";
-      uni.uStyle.value = fl ? 0 : 1; matComp.uniforms.uStyle.value = fl ? 0 : 1;
-      uni.uNucAlpha.value = fl ? 0.4 : 0.55; uni.uDim.value = fl ? 0.09 : 0.015;
-      matComp.uniforms.uBloom.value = fl ? 0.9 : 0.4; matBright.uniforms.uTh.value = fl ? 0.45 : 0.7;
-      matComp.uniforms.uExposure.value = fl ? 1.25 : 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : 0.6;
-      matComp.uniforms.uBg.value.set(fl ? 0.002 : 0.015, fl ? 0.006 : 0.018, fl ? 0.003 : 0.028);
-      hud.querySelectorAll("button[data-s]").forEach(b => b.classList.toggle("on", b.dataset.s === S.style));
+      const fl = S.style === "fluorescence", em = S.style === "em", sv = em ? 2 : (fl ? 0 : 1);
+      uni.uStyle.value = sv; matComp.uniforms.uStyle.value = sv;
+      uni.uNucAlpha.value = fl ? 0.4 : 0.55; uni.uDim.value = fl ? 0.09 : (em ? 0.05 : 0.015);
+      matComp.uniforms.uBloom.value = fl ? 0.9 : (em ? 0.15 : 0.4); matBright.uniforms.uTh.value = fl ? 0.45 : 0.7;
+      matComp.uniforms.uExposure.value = fl ? 1.25 : 1.0; matComp.uniforms.uDofMax.value = fl ? 0.75 : (em ? 0.5 : 0.6);
+      matComp.uniforms.uBg.value.set(em ? 0.04 : (fl ? 0.002 : 0.015), em ? 0.04 : (fl ? 0.006 : 0.018), em ? 0.042 : (fl ? 0.003 : 0.028));
+      if (emPlane) emPlane.visible = em;
+      if (bgPoints) bgPoints.visible = !em;
+      hud.querySelectorAll("button[data-s]").forEach(b => { b.classList.toggle("on", b.dataset.s === S.style); if (b.dataset.s === "render") b.style.display = S.h01 ? "none" : ""; });
       // the 3D-render style of cortex is dense (five full arbors overlap): there, only 3 hero cells and half the mid tier
       if (built && kind === "cortex") {
         const lighter = !fl;
@@ -691,7 +840,7 @@
           T.geom.instanceCount = lighter ? Math.max(2, Math.round(full * 0.5)) : full; S.trimTri += (full - T.geom.instanceCount) * T.tri; }
       }
     }
-    function setStyle(s) { if (s !== "render" && s !== "fluorescence") return; if (S.style === s) return; S.style = s; applyStyle(); if (o.onInfo) o.onInfo(info()); }
+    function setStyle(s) { if (s !== "render" && s !== "fluorescence" && s !== "em") return; if (S.style === s) return; S.style = s; applyStyle(); if (o.onInfo) o.onInfo(info()); }
     // size and render targets
     function resize() {
       const w = Math.max(2, container.clientWidth || 300), h = Math.max(2, container.clientHeight || 200), dpr = Math.min(root.devicePixelRatio || 1, L.dpr);
@@ -713,9 +862,19 @@
     const pass = (mat, src, dst, setup) => { quad.material = mat; mat.uniforms.tSrc.value = src.texture; if (setup) setup(); renderer.setRenderTarget(dst); renderer.render(quadScene, quadCam); };
     function render(now) {
       resize();
-      if (!S.userTouched) cam.theta += 0.00004 * Math.min(50, now - (render.at || now));
+      if (S.entry && S.entry.on) {                                 // the fly-in from B's zoom: ease out, the canvas fades in
+        const u = Math.min(1, (now - S.entry.t0) / S.entry.ms), e = 1 - Math.pow(1 - u, 3);
+        cam.dist = cam.dist0 * (S.entry.from + (1 - S.entry.from) * e); canvas.style.opacity = String(Math.min(1, u * 2.5));
+        if (u >= 1) { S.entry.on = false; cam.dist = cam.dist0; canvas.style.opacity = "1"; if (o.onEntryEnd) o.onEntryEnd(); }
+      }
+      if (!S.userTouched && !(S.entry && S.entry.on)) cam.theta += 0.00004 * Math.min(50, now - (render.at || now));
       render.at = now;
       placeCamera();
+      if (now - (render.barAt || 0) > 400) {                        // the scale bar: a round length that spans 60-160 px at the focus depth
+        render.barAt = now; const umPerPx = cam.dist * uni.uPixK.value * (root.devicePixelRatio ? Math.min(root.devicePixelRatio, L.dpr) : 1) / (renderer.getPixelRatio ? renderer.getPixelRatio() : 1);
+        let len = 10; for (const Lb of [1, 2, 5, 10, 20, 50, 100, 200, 500]) { len = Lb; if (Lb / umPerPx >= 60) break; }
+        const px = len / umPerPx; bar.firstChild.style.width = Math.round(px) + "px"; bar.lastChild.textContent = len + " µm";
+      }
       uni.uTime.value = S.clock != null ? S.clock : (now - S.t0) / 1000;
       const live = isLive(now);
       uni.uLive.value += ((live ? 1 : 0) - uni.uLive.value) * 0.08;
@@ -735,6 +894,7 @@
       pass(matBlur, rtQ4, rtQ2, () => matBlur.uniforms.uDir.value.set(0, 3.5 / qh));    // rtQ2: the bloom
       quad.material = matComp; matComp.uniforms.tScene.value = rtScene.texture; matComp.uniforms.tBlur.value = rtQ3.texture; matComp.uniforms.tBloom.value = rtQ2.texture;
       renderer.setRenderTarget(null); renderer.render(quadScene, quadCam);
+      if (S.readyResolve) { S.readyResolve(nr); S.readyResolve = null; }
     }
     // loop: nothing drawn while off screen, hidden or closed
     let io = null;
@@ -754,11 +914,13 @@
     // activity
     const clock = now => (now - S.t0) / 1000;
     const isLive = now => !S.forcedOffline && (now || performance.now()) - S.lastWall < LIVE_MS;
+    const spikable = () => cells.filter(c => !c.glia);
     function spikeCell(k, t) {
-      const c = cells[k]; if (!c) return;
+      const c = spikable()[k]; if (!c) return;
       c.A.spk[c.j] = t; c.A.sa.needsUpdate = true; S.spikes++;
+      for (const sm of synMeshes) if (sm.cell === c) sm.pts.material.uniforms.uSpike.value = t;
     }
-    function spike(slot, delayMs) { if (!cells.length) return; const k = Math.min(cells.length - 1, Math.floor((slot || 0) * cells.length / 256)); S.spikeAt = clock(performance.now()) + (delayMs || 0) / 1000; spikeCell(k, S.spikeAt); }
+    function spike(slot, delayMs) { const n = spikable().length; if (!n) return; const k = Math.min(n - 1, Math.floor((slot || 0) * n / 256)); S.spikeAt = clock(performance.now()) + (delayMs || 0) / 1000; spikeCell(k, S.spikeAt); }
     function rates(rq) { if (typeof rq === "number") S.rate = rq; else if (rq && rq.length > S.region) S.rate = rq[S.region]; }
     function onFrame(m) {
       if (!m || m.type !== "spiking" || !m.n3 || m.live === false) return;
@@ -768,8 +930,9 @@
       if (m.n3.rq) { const q = unb64(m.n3.rq); if (q.length > S.region) S.rate = q[S.region]; }
       else if (o.groupRate) { const hz = o.groupRate(m); if (hz != null) S.rate = rateByte(hz) || S.rate; }
       const b = unb64(m.n3.sq), play = Math.min(600, S.gap) / 1000, t = clock(now);
-      for (let i = 0; i + 2 < b.length; i += 3) { if (b[i] !== S.region) continue;
-        spikeCell(Math.min(cells.length - 1, Math.floor(b[i + 1] * cells.length / 256)), t + (b[i + 2] / 255) * play); }
+      const n = spikable().length;
+      for (let i = 0; i + 2 < b.length; i += 3) { if (b[i] !== S.region || !n) continue;
+        spikeCell(Math.min(n - 1, Math.floor(b[i + 1] * n / 256)), t + (b[i + 2] / 255) * play); }
     }
     function setLive(on) { if (on) { S.lastWall = performance.now(); S.forcedOffline = false; } else S.forcedOffline = true; }
     // test hook: freeze the renderer's clock at `seconds` after the last spike() (null: wall clock). Screenshots under
@@ -777,33 +940,53 @@
     function debugTime(seconds) { S.clock = seconds == null ? null : S.spikeAt + seconds; }
     function info() {
       const types = {}; for (const c of cells) types[c.type] = (types[c.type] || 0) + 1;
-      return { kind, region: S.region, label: S.label, style: S.style, lod: lodOf(), cells: cells.length, heroCells: counts.heroCells,
+      if (S.h01) {
+        const d = NR.h01.describe(S.h01), f = S.h01.cells.find(c => c.role === "focus");
+        return { kind, region: S.region, label: S.label, style: S.style, lod: lodOf(), source: "H01", cells: cells.length, heroCells: counts.heroCells,
+          triangles: counts.triangles, triangleCap: L.cap, lineSegments: counts.lines, spines: "real (in the meshes)", boutons: counts.boutons,
+          synapsesPre: d.synapsesPre, synapsesPost: d.synapsesPost, myelinatedUm: d.myelinatedUm, glia: d.glia, far: d.far, bytes: d.bytes,
+          ids: S.h01.cells.map(c => c.id), focusId: f ? f.id : null, focusClasses: f ? f.classes : null, em: { um: S.h01.em.um, nmPerPx: S.h01.em.nm_per_px },
+          drawCalls: counts.drawCalls, live: isLive(), spikes: S.spikes, fps: S.fps, jsMs: S.jsMs, offScreen: !S.onScreen, slowdown: SLOWDOWN,
+          halfFloat: halfOk, webgl2: isGL2, worldPos: S.worldPos, cite: H01_CITE, license: "CC BY 4.0",
+          types: Object.keys(types).map(t => ({ type: t, n: types[t], species: "human", id: "H01", dataset: /astro|oligo|glia/.test(t) ? "H01 c3 segmentation (automated)" : "H01 proofread cells" })) };
+      }
+      return { kind, region: S.region, label: S.label, style: S.style, lod: lodOf(), source: "NeuroMorpho", cells: cells.length, heroCells: counts.heroCells,
         triangles: counts.triangles - S.trimTri, triangleCap: L.cap, lineSegments: counts.lines, spines: counts.spines, spineUm: Math.round(counts.spineUm), dendUm: Math.round(counts.dendUm),
         boutons: counts.boutons, nodesOfRanvier: counts.nodes, drawCalls: counts.drawCalls, live: isLive(), spikes: S.spikes, fps: S.fps, jsMs: S.jsMs,
         offScreen: !S.onScreen, slowdown: SLOWDOWN, halfFloat: halfOk, webgl2: isGL2,
         types: Object.keys(types).map(t => ({ type: t, n: types[t], species: CELLS.cells[t].species, id: CELLS.cells[t].nmo_id, radii: CELLS.cells[t].radii, myelinated: !!TYPES[t].myelin, spines: TYPES[t].spines })) };
     }
     function caption() {
-      const i = info(), my = i.types.filter(t => t.myelinated).map(t => t.type);
-      return CAPTION + ` Pulses slowed ${SLOWDOWN}×` + (my.length ? ", hopping node to node on myelinated axons" : "") + "." +
+      const i = info();
+      if (S.h01) return CAPTION + ` This close-up: ${i.cells} real cells of human temporal cortex from H01 (${i.heroCells} proofread cells in full detail` +
+        (i.glia ? `, ${i.glia} glia from the automated segmentation` : "") + `), with their own spines, ${i.synapsesPre.toLocaleString("en-US")} presynaptic and ` +
+        `${i.synapsesPost.toLocaleString("en-US")} incoming synapses at their real positions, and ${i.myelinatedUm} µm of axon H01 labels as myelinated; a real EM slice behind. ` +
+        `Pulses slowed ${SLOWDOWN}× along the real axons.` + (i.live ? " Each cell stands for a sampled model neuron of this region; every flash is a recorded spike." : " No live network: static cells, no activity.");
+      const my = i.types.filter(t => t.myelinated).map(t => t.type);
+      return CAPTION_PROCEDURAL + ` Pulses slowed ${SLOWDOWN}×` + (my.length ? ", hopping node to node on myelinated axons" : "") + "." +
         (i.live ? " Each cell stands for a sampled model neuron of this region; every flash is a recorded spike." : " No live network: static cells, no activity.");
     }
     function close() {
       if (S.closed) return; S.closed = true;
       if (io) io.disconnect();
       for (const m of meshes) { scene.remove(m); m.geometry.dispose(); }
-      for (const m of [matCell, matNuc, matLine, matBg, matDown, matBlur, matBright, matComp]) m.dispose();
+      for (const m of [matCell, matNuc, matLine, matBg, matEm, matDown, matBlur, matBright, matComp]) m.dispose();
+      for (const sm of synMeshes) sm.pts.material.dispose();
+      if (uni.tEm.value) uni.tEm.value.dispose();
       quad.geometry.dispose();
       for (const rt of [rtScene, rtHalf, rtQ1, rtQ2, rtQ3, rtQ4]) if (rt) rt.dispose();
       renderer.dispose();
-      for (const el of [canvas, hud, stat]) if (el.parentNode) el.parentNode.removeChild(el);
+      for (const el of [canvas, hud, stat, bar]) if (el.parentNode) el.parentNode.removeChild(el);
     }
-    const nr = { onFrame, spike, rates, setLive, debugTime, setStyle, style: () => S.style, setLod: l => { if (LOD[l] || l === "auto") { S.lodName = l; } }, lod: lodOf,
+    const ready = new Promise(res => { S.readyResolve = res; });
+    const nr = { onFrame, spike, rates, setLive, debugTime, setStyle, style: () => S.style, setLod: l => { if (LOD[l] || l === "auto") { S.lodName = l; } }, lod: lodOf, ready,
                  focus: i => { if (cells[i]) { S.focus = i; focusPos = cells[i].pos; fit(); } }, resize, info, caption, close, scene, camera, renderer, cells };
     load(o.assetUrl).then(() => { if (!S.closed) build(); }).catch(e => { console.error("NeuronRender:", e); });
     return nr;
   }
 
-  const NR = { open, load, kindOf, plan, cellGeometry, lineGeometry, budget, rateByte, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, K, CELLS: null };
+  function openAt(container, o) { return open(container, o); }     // open() + worldPos / cameraDir (B's zoom end), see the API doc
+  const NR = { open, openAt, load, kindOf, plan, cellGeometry, lineGeometry, budget, rateByte, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, CAPTION_PROCEDURAL,
+               H01_SETS, H01_CITE, K, CELLS: null, h01: null };
   root.NeuronRender = NR;
 })(typeof window !== "undefined" ? window : globalThis);

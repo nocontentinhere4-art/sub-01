@@ -98,26 +98,36 @@ def main():
 
             def closeup(pg, kind, reg, style):
                 pg.evaluate(f"closeupOpen({json.dumps(kind)}, {json.dumps(reg)})")
-                pg.wait_for_function("n3close && n3close.info().cells > 0", timeout=120000)
+                pg.wait_for_function("n3close && n3close.info().cells > 0", timeout=180000)
                 pg.evaluate(f"n3close.setStyle({json.dumps(style)})")
                 pg.wait_for_timeout(2500)                      # a few frames rendered (software GL: slow)
                 return pg.evaluate("n3close.info()")
 
-            for w, h, mobile, tag in () if args.only_strip else ((1280, 800, False, "1280"), (390, 844, True, "390")):
+            widths = ((1920, 1080, False, "1920"), (1280, 800, False, "1280"), (390, 844, True, "390"))
+            for w, h, mobile, tag in () if args.only_strip else widths:
                 ctx, pg, errors = page(w, h, mobile)
                 info = closeup(pg, "cortex", region, "fluorescence")
                 shot(pg, f"cortex_{tag}_offline.png")
-                res[f"offline_{tag}"] = {"caption": pg.inner_text("#n3cap"), "live": info["live"], "spikes": info["spikes"]}
+                res[f"offline_{tag}"] = {"caption": pg.inner_text("#n3cap"), "live": info["live"], "spikes": info["spikes"], "source": info.get("source")}
                 pg.evaluate("f => window.__replay(f)", frames)
                 pg.wait_for_function("n3close.info().live", timeout=120000)
                 for kind in kinds:
-                    for style in ("fluorescence", "render"):
-                        info = closeup(pg, kind, REGION[kind], style)
-                        shot(pg, f"{kind}_{tag}_{style}.png")
-                        res[f"{kind}_{tag}_{style}"] = {k: info[k] for k in ("cells", "heroCells", "triangles", "triangleCap", "spines", "spineUm",
-                                                                             "dendUm", "boutons", "nodesOfRanvier", "drawCalls", "lineSegments", "live",
-                                                                             "spikes", "lod", "halfFloat", "webgl2")}
-                        res[f"{kind}_{tag}_{style}"]["caption"] = pg.inner_text("#n3cap")
+                    # #99: cortex draws the real H01 cells ("after"); the NeuroMorpho procedural cells are the "before"
+                    variants = [("h01", ("fluorescence", "em"))] if kind == "cortex" else [("", ("fluorescence", "render"))]
+                    if kind == "cortex" and not args.quick:
+                        variants.append(("before", ("fluorescence", "render")))
+                    for variant, styles in variants:
+                        pg.evaluate("v => { NeuronRender.H01_SETS.cortex = v === 'before' ? null : 'cortex'; }", variant)
+                        for style in styles:
+                            info = closeup(pg, kind, REGION[kind], style)
+                            name = f"{kind}_{tag}_{style}" + ("_before" if variant == "before" else "")
+                            shot(pg, name + ".png")
+                            keep = ("source", "cells", "heroCells", "triangles", "triangleCap", "spines", "spineUm", "dendUm", "boutons", "nodesOfRanvier",
+                                    "drawCalls", "lineSegments", "live", "spikes", "lod", "halfFloat", "webgl2", "synapsesPre", "synapsesPost", "myelinatedUm",
+                                    "glia", "far", "bytes", "focusId", "ids")
+                            res[name] = {k: info[k] for k in keep if k in info}
+                            res[name]["caption"] = pg.inner_text("#n3cap")
+                        pg.evaluate("NeuronRender.H01_SETS.cortex = 'cortex'")
                 res[f"errors_{tag}"] = errors
                 ctx.close()
 
@@ -138,7 +148,7 @@ def main():
             pg.evaluate("n3close.debugTime(null)")
             res["ap_strip_clock_s"] = times
             from PIL import Image
-            ims = [Image.open(out / n).crop((390, 230, 890, 730)) for n in strip]
+            ims = [Image.open(out / n).crop((390, 230, 890, 730)) for n in strip]   # 1280 px frames
             W = sum(i.width for i in ims) + 10 * (len(ims) - 1)
             im = Image.new("RGB", (W, ims[0].height))
             x = 0
@@ -153,7 +163,7 @@ def main():
             ref = ROOT / args.reference
             if ref.exists():
                 a = Image.open(ref).convert("RGB")
-                b = Image.open(out / "cortex_1280_fluorescence.png").convert("RGB").crop((140, 60, 1140, 760))
+                b = Image.open(out / "cortex_1920_fluorescence.png").convert("RGB").crop((300, 120, 1620, 1000))
                 hh = 520
                 a = a.resize((round(a.width * hh / a.height), hh))
                 b = b.resize((round(b.width * hh / b.height), hh))

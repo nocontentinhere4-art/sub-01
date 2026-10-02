@@ -8,7 +8,32 @@
 layer on, or a close-up button). API for the whole-brain view (part B): `docs/spiking/neuron_render_api.md`.
 Screenshots and numbers: `python tests/neuron_render_shots.py` → `docs/screens/neuron_render/`.
 
-## What is real, what is typical, what is drawn
+## #99: real H01 cells in the cortex close-up
+
+Since #99 the cortex close-up no longer draws procedural tubes: it draws **real electron-microscopy reconstructions**
+from **H01** (Shapson-Coe et al. 2024, Science 384:eadk4858; ~1 mm³ of human temporal cortex; CC BY 4.0), built once
+by `web/neuron_render/build/fetch_h01.py` into `web/neuron_render/h01/` and lazy-loaded by `neuron_render.js` through
+`h01.js` (gzip blobs decoded with `DecompressionStream`; browsers without it, or a failed fetch, fall back to the
+NeuroMorpho procedural cells below, and `info().source` says which). The other regions (striatum, thalamus,
+hippocampus, amygdala) keep the procedural NeuroMorpho cells: H01 is cortex only, and MICrONS (mouse) was not needed.
+
+| part | H01 close-up |
+|---|---|
+| shapes, spines, boutons | the proofread cells' own meshes (multi-LOD Draco from `proofread_104/mesh`, decimated with quadric simplification to the tier's triangle target: the spines are in the mesh, not drawn) |
+| axon / dendrite / soma / AIS / **myelin** | H01's subcompartment classes on the cells' SWC skeletons (sparse labels, propagated along the tree); the pulse runs on the nodes H01 labels axon / AIS, saltatory on the stretches it labels **myelinated axon** (an internode every ~100 µm inside a stretch, Rushton 1951: the labels say where myelin is, not where each node of Ranvier is) |
+| synapses | `synapse_locations.csv`: the cell's **presynaptic sites** (its boutons; they flash when the pulse arrives, timed along the real axon) and its **incoming synapses** (dots; the mid tier keeps a sample of 1 500) |
+| glia | astrocytes and oligodendrocytes from the automated c3 segmentation, chosen from the soma table, **not proofread** (said in the caption and the credits) |
+| tissue behind | a crop of the real SEM image through the focus cell's soma (64 nm mip, stored at 128 nm per pixel), drawn at the back of the slab in the EM look |
+| positions | the focus cell at its true place; every other cell keeps its orientation, cortical depth (y) and slab depth (z) and is moved sideways into the field (`shift_um` in the manifest): the 104 proofread cells lie over ~12 mm² |
+| scale | a real **scale bar** (µm) in the HUD, from the camera distance at the focus depth |
+| looks | **EM**: grey membrane-like shading, the SEM slice behind, no bloom; **fluorescence**: as before (sparse-label colours, a second fluorophore on interneurons, glia in a blue-white), depth of field, bloom |
+| budget | ≤ 3 MB per set (desktop and phone sets; sizes in `cortex.json`), phone set ≤ 250k triangles, desktop ≤ 1M; nothing loaded until the close-up opens |
+
+Sources and changes to the data: `docs/spiking/morphology_credits.md` (H01 section) and the build script's header.
+Honesty: the caption (`NeuronRender.CAPTION`) names the datasets and says the activity is simulated; `nr.caption()`
+adds the counts of this close-up (cells, synapses, myelinated µm) and that the glia are not proofread.
+
+## What is real, what is typical, what is drawn (the procedural cells: every region but cortex)
 
 | part | where it comes from |
 |---|---|

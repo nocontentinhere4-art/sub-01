@@ -15,6 +15,31 @@ not drawn while a close-up is open (the page's loop should `return` while `nr` e
 <script src="/neuron_render/neuron_render.js"></script>   <!-- after three.js; loads /neuron_render/cells.json itself -->
 ```
 
+## #99: real H01 cells, the seamless zoom, two looks (additions; everything above still holds)
+
+- The cortex close-up draws **real electron-microscopy reconstructions** (H01, Shapson-Coe et al. 2024, CC BY 4.0:
+  proofread human temporal-cortex cells with their spines, synapses and H01's own axon / dendrite / soma / AIS /
+  myelinated-axon labels; glia from the automated segmentation; a real EM image behind). Assets are lazy-loaded from
+  `web/neuron_render/h01/` (≤ 3 MB per region set, gzip; decoded with `DecompressionStream`). Regions H01 does not
+  cover (striatum, thalamus, hippocampus, amygdala) keep the NeuroMorpho.Org procedural cells; `info().source` says
+  which ("H01" or "NeuroMorpho"), and `nr.caption()` says it in words.
+- **Entry animation for B's zoom:** `open(container, {..., entry: {ms: 1200, from: 6}})`: the camera starts `from`×
+  farther than the default framing and flies in over `ms` while the canvas fades in. `nr.ready` is a Promise resolved
+  at the first drawn frame; `onEntryEnd()` fires when the fly-in ends.
+- **`NeuronRender.openAt(container, opts)`** = `open()` + `opts.worldPos` (the brain-space point B zoomed into; stored
+  in `info().worldPos` for B's bookkeeping) and `opts.cameraDir` (unit vector: B's view direction at the end of its
+  zoom): the entry camera looks along it, so the cut is continuous. Without them `openAt` behaves as `open`.
+- **Styles:** `setStyle("em" | "fluorescence")`: EM-grey tissue (membrane-like shading, the real SEM slice behind, a
+  dark grey field) and confocal fluorescence (sparse-label colours, depth of field). `"render"` is kept as an alias of
+  `"fluorescence"`. A real **scale bar** (µm) sits in the HUD, computed from the camera at the focus depth.
+- **Caption:** `NeuronRender.CAPTION` is now: "Shapes are real reconstructed neurons from public datasets (H01 human
+  cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a
+  point-neuron network and slowed down to be visible. A model, not a mind." It is true for every close-up;
+  `nr.caption()` adds which dataset this close-up draws.
+- Activity on H01 cells: the pulse runs along the cell's **real axon** (its skeleton, path distance from the soma),
+  saltatory on the stretches H01 labels as myelinated; the cell's **real presynaptic sites** flash when the pulse
+  reaches them; its incoming synapses are drawn as dots. Still only recorded spikes of sampled model neurons.
+
 ## Open / close
 
 ```js
