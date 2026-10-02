@@ -63,6 +63,8 @@ DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
 AMM_BUY = bytes.fromhex("67f4521f2cf57777")      # PumpSwap BuyEvent
 AMM_SELL = bytes.fromhex("3e2f370aa503dc2a")     # PumpSwap SellEvent
+WS_HIGH_WATER = 512 * 1024      # per-socket write buffer before asyncio pauses it (and a send would wait)
+WS_SLOW_MIN = 16 * 1024         # a socket counts as slow when it holds > 1 s of its feed, but never below this
 
 
 def decode_trades(logs):
@@ -88,20 +90,47 @@ def decode_trades(logs):
 
 
 LITE_DROP = ("act", "wave", "groups", "slow")     # per-region brain activity: only the brain page draws it
+ACT_LO, ACT_HI = 0.01, 10.0     # q=1: act on a log scale, one byte a region (~1.4 % steps), clipped to this range
+# q=1 keeps only what web/index.html draws (one source of truth for the brain page's fields)
+BRAIN_KEEP = ("type", "sync", "trades", "events", "sleep", "baseline", "slow", "life")
+BRAIN_SLEEP = ("stage", "burst", "clock", "tz", "gain", "debt", "woken_tonight")
+BRAIN_LIFE = ("doing", "walking")
+
+
+def quantise_act(act):
+    """Per-region activity -> base64 of one byte a region, log-spaced between ACT_LO and ACT_HI."""
+    a = np.clip(np.asarray(act, dtype=float), ACT_LO, ACT_HI)
+    q = np.rint(255 * np.log(a / ACT_LO) / math.log(ACT_HI / ACT_LO)).astype(np.uint8)
+    return base64.b64encode(q.tobytes()).decode()
+
+
+def dequantise_act(text):
+    """Inverse of quantise_act (what web/index.html does in JS)."""
+    q = np.frombuffer(base64.b64decode(text), dtype=np.uint8)
+    return (ACT_LO * (ACT_HI / ACT_LO) ** (q / 255.0)).tolist()
 
 
 class Feed:
-    """What one websocket client gets. Default (plain /ws): every tick, 20 a second, as before.
+    """What a websocket client gets. Default (plain /ws): every tick, 20 a second, as before.
     /ws?rate=5 sends ~5 ticks a second, carrying the trades and events of the skipped ticks;
-    &lite=1 leaves out the per-region activity (for pages that do not draw the brain, e.g. the room)."""
+    &lite=1 leaves out the per-region activity (for pages that do not draw the brain, e.g. the room);
+    &q=1 is the brain page's feed: `act` quantised to one byte a region (`aq`, see quantise_act) and only the
+    fields the brain page draws (well under 1.5 KB a tick).
+    Clients asking for the same (rate, lite, q) share one Feed (Live.feed_for), so a tick is serialised once per
+    variant, not once per client."""
 
     RATES = (1.0, 20.0)                                 # ticks a second a client may ask for
 
-    def __init__(self, rate=None, lite=False):
+    def __init__(self, rate=None, lite=False, q=False):
         if rate is not None:                            # clamped: a tiny rate would buffer trades/events without bound
             rate = min(max(rate, self.RATES[0]), self.RATES[1])
         self.every = max(1, round(1.0 / (TICK * rate))) if rate else 1
-        self.lite, self.n, self.trades, self.events = lite, 0, [], []
+        self.lite, self.q, self.n, self.trades, self.events = lite, q and not lite, 0, [], []
+        self.bps = 0.0                                  # bytes a second of this feed's ticks (slow-client check)
+
+    @property
+    def key(self):
+        return self.every, self.lite, self.q
 
     @classmethod
     def from_query(cls, query):
@@ -111,11 +140,15 @@ class Feed:
             rate = None
         if rate is not None and not (math.isfinite(rate) and rate > 0):
             rate = None                                 # unusable: every tick, as plain /ws
-        return cls(rate, query.get("lite") in ("1", "true"))
+        on = ("1", "true")
+        return cls(rate, query.get("lite") in on, query.get("q") in on)
 
     def take(self, msg, data):
         """The text to send for `msg` (already serialised as `data`), or None to skip this tick."""
-        if msg.get("type") != "tick" or (self.every == 1 and not self.lite):
+        if msg.get("type") != "tick":
+            return data
+        if self.every == 1 and not self.lite and not self.q:
+            self.bps = len(data) / TICK
             return data
         out = msg
         if self.every > 1:
@@ -128,7 +161,26 @@ class Feed:
             self.trades, self.events = [], []
         if self.lite:
             out = {k: v for k, v in out.items() if k not in LITE_DROP}
-        return json.dumps(out)
+        elif self.q:
+            out = self.brain_view(out)
+        text = json.dumps(out, separators=(",", ":"))
+        self.bps = len(text) / (TICK * self.every)
+        return text
+
+    @staticmethod
+    def brain_view(msg):
+        out = {k: msg[k] for k in BRAIN_KEEP if k in msg}
+        if "act" in msg:
+            out["aq"] = quantise_act(msg["act"])
+        if isinstance(out.get("sleep"), dict):
+            out["sleep"] = {k: out["sleep"][k] for k in BRAIN_SLEEP if k in out["sleep"]}
+        if isinstance(out.get("life"), dict):
+            out["life"] = {k: out["life"][k] for k in BRAIN_LIFE if k in out["life"]}
+        if isinstance(out.get("slow"), dict):
+            out["slow"] = {"label": out["slow"].get("label")}
+        if isinstance(out.get("baseline"), dict):
+            out["baseline"] = {"run": out["baseline"].get("run")}
+        return out
 
 
 class Live:
@@ -151,8 +203,7 @@ class Live:
             self.dedupe.recent.append(dedupe_key(m["text"]))
         self.burst = 0.0
         self.sol_usd = 150.0
-        self.clients = set()
-        self.feeds = {}             # websocket -> Feed (its tick rate and fields)
+        self.init_sockets()
         self.pending = []           # trades waiting to be played into the brain
         self.seen = set()
         self.pool_name = "demo" if demo else mint[:6]
@@ -330,18 +381,95 @@ class Live:
                     "n_replays": {"chat": len(n["replays"]) - reading, "reading": reading}}
         return {"type": "nights", "last": summary(self.engine.last_night), "tonight": summary(self.engine.night)}
 
+    def init_sockets(self):
+        """Websocket bookkeeping (also used alone by tests/test_feed.py)."""
+        self.clients = set()
+        self.feeds = {}             # websocket -> Feed (its tick rate and fields), shared per variant
+        self.variants = {}          # Feed.key -> the one Feed all clients of that variant share
+        self.transports = {}        # websocket -> its transport (write-buffer size for the slow-client check)
+        self.sockets = set()        # every accepted websocket, also while its hello is being sent
+        self.ws_per_ip = {}         # client address -> open websockets (only counts, kept in memory)
+        self.max_ws = int(os.environ.get("SUB01_MAX_WS", 400))
+        self.max_ws_ip = int(os.environ.get("SUB01_MAX_WS_PER_IP", 4))
+        self.ws_stats = {"lag": [], "skipped": 0, "refused": 0, "t0": None, "ticks": 0, "at": time.monotonic(),
+                         "every": float(os.environ.get("SUB01_WS_STATS_S", 300))}
+
     async def broadcast(self, msg):
+        """Send to every client: serialised once, then once per feed variant; a slow client skips ticks."""
         data = json.dumps(msg)
+        tick = msg.get("type") == "tick"
+        if tick:
+            self.note_tick()
+        outs = {}
         for ws in list(self.clients):
             feed = self.feeds.get(ws)
-            out = feed.take(msg, data) if feed else data
+            if feed is None:
+                out = data
+            else:
+                if feed.key not in outs:
+                    outs[feed.key] = feed.take(msg, data)
+                out = outs[feed.key]
             if out is None:
                 continue
+            if self.backlogged(ws, feed, tick):
+                self.ws_stats["skipped"] += 1
+                continue
             try:
-                await ws.send_str(out)
+                await ws.send_str(out)          # returns at once: the buffer never reaches WS_HIGH_WATER (backlogged)
             except Exception:
-                self.clients.discard(ws)
-                self.feeds.pop(ws, None)
+                self.drop_client(ws)
+
+    def backlogged(self, ws, feed, tick):
+        """True if this socket still holds more than ~1 s of its feed: skip the tick instead of queueing it.
+        Other messages (chat, eye, ...) are rare and small; they only wait out a socket that is half full."""
+        tr = self.transports.get(ws)
+        if tr is None:
+            return False
+        try:
+            held = tr.get_write_buffer_size()
+        except Exception:
+            return False
+        if not tick:
+            return held > WS_HIGH_WATER // 2
+        return held > min(max(feed.bps if feed else 0.0, WS_SLOW_MIN), WS_HIGH_WATER // 2)
+
+    def note_tick(self):
+        """Brain tick lag, as broadcast sees it: how late this tick is against the fastest one on the 50 ms grid.
+        Logged every SUB01_WS_STATS_S seconds (default 300) with the socket counts; tests/load_ws.py reads it."""
+        st, now = self.ws_stats, time.monotonic()
+        st["ticks"] += 1
+        due = (st["t0"] if st["t0"] is not None else now) + st["ticks"] * TICK
+        if now < due:
+            st["t0"], due = now - st["ticks"] * TICK, now
+        if len(st["lag"]) < 20000:                     # bounded even with a long SUB01_WS_STATS_S
+            st["lag"].append(now - due)
+        if now - st["at"] >= st["every"]:
+            lag = sorted(st["lag"])
+            pct = lambda p: 1000 * lag[min(len(lag) - 1, int(p * len(lag)))]
+            variants = " ".join(f"{e}{'L' if lite else ''}{'Q' if q else ''}:{sum(f.key == (e, lite, q) for f in self.feeds.values())}"
+                                for (e, lite, q) in sorted(self.variants))
+            print(f"ws stats: {len(self.sockets)} sockets ({variants or '-'}) · tick lag p50 {pct(0.5):.1f} "
+                  f"p95 {pct(0.95):.1f} max {1000 * lag[-1]:.1f} ms over {len(lag)} ticks · skipped "
+                  f"{st['skipped']} sends to slow clients · refused {st['refused']} (full)", flush=True)
+            st.update(lag=[], skipped=0, refused=0, at=now)
+
+    def feed_for(self, query):
+        """The shared Feed for this query's (rate, lite, q) variant."""
+        feed = Feed.from_query(query)
+        return self.variants.setdefault(feed.key, feed)
+
+    def drop_client(self, ws):
+        self.clients.discard(ws)
+        self.transports.pop(ws, None)
+        feed = self.feeds.pop(ws, None)
+        if feed is not None and feed not in self.feeds.values():
+            self.variants.pop(feed.key, None)            # last client of this variant: its buffers go with it
+
+    def client_ip(self, request):
+        key = request.remote
+        if self.trust_proxy and request.headers.get("X-Forwarded-For"):
+            key = request.headers["X-Forwarded-For"].split(",")[0].strip()
+        return key
 
     def sleep_tick(self):
         """Advance the sleep engine, apply its parameters to the model, run REM replays and bursts."""
@@ -656,18 +784,29 @@ class Live:
     async def ws_handler(self, request):
         ws = web.WebSocketResponse(heartbeat=20, max_msg_size=4096)
         await ws.prepare(request)
-        # rate-limit key; kept only in memory for this connection and the 10 s limiter window
-        key = request.remote
-        if self.trust_proxy and request.headers.get("X-Forwarded-For"):
-            key = request.headers["X-Forwarded-For"].split(",")[0].strip()
-        await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
-                            "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
-        await ws.send_json(self.nights())
-        if self.last_frame:
-            await ws.send_json({"type": "eye", **self.last_frame})
-        self.feeds[ws] = Feed.from_query(request.query)
-        self.clients.add(ws)
+        # rate-limit + per-address cap key; kept only in memory for this connection and the 10 s limiter window
+        key = self.client_ip(request)
+        if len(self.sockets) >= self.max_ws or self.ws_per_ip.get(key, 0) >= self.max_ws_ip:
+            self.ws_stats["refused"] += 1
+            try:
+                await ws.send_json({"type": "full"})
+                await ws.close(code=1013, message=b"full")       # 1013: try again later
+            except Exception:
+                pass
+            return ws
+        self.sockets.add(ws)
+        self.ws_per_ip[key] = self.ws_per_ip.get(key, 0) + 1
         try:
+            if request.transport is not None:                    # sends never wait: see backlogged()
+                request.transport.set_write_buffer_limits(high=WS_HIGH_WATER)
+                self.transports[ws] = request.transport
+            await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
+                                "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
+            await ws.send_json(self.nights())
+            if self.last_frame:
+                await ws.send_json({"type": "eye", **self.last_frame})
+            self.feeds[ws] = self.feed_for(request.query)
+            self.clients.add(ws)
             async for msg in ws:
                 if msg.type != aiohttp.WSMsgType.TEXT:
                     continue
@@ -678,8 +817,13 @@ class Live:
                 if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
                     await self.handle_chat(ws, key, d["text"])
         finally:                                       # also on errors / cancellation: never leak a client or its buffer
-            self.clients.discard(ws)
-            self.feeds.pop(ws, None)
+            self.drop_client(ws)
+            self.sockets.discard(ws)
+            n = self.ws_per_ip.get(key, 1) - 1
+            if n > 0:
+                self.ws_per_ip[key] = n
+            else:
+                self.ws_per_ip.pop(key, None)
         return ws
 
 
