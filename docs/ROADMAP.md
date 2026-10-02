@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 15:40 UTC** (pass 30b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 16:00 UTC** (pass 30c). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -147,7 +147,9 @@ cheap to run, with the password gate kept until launch day.
 | 18m | 1M spiking network on GPU through his waking hours (caps 17 h, $14/day, 120 h/week) | done; on with `SUB01_DAY_LIVE=1`; learning at 1M → #70 | #67 |
 | 18n | 20k spiking network on the server CPU votes and learns live (GPU fallback) | done | #65 |
 | 18o | Browse like a young guy (interests, Shorts/TikTok, finance read-only, logged-in view-only feeds) | done | #64, #66, #69 |
-| 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | PR #72 approved | #59 |
+| 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | done | #72 |
+| 18s | Room polish: no floating props, lamp out of the wall, a lived-in room, sharper phone screen | in progress | #75 |
+| 18t | A better character (fingers, face, clothes; same animations) | in progress | #76 |
 | 18p | Active neurons visible inside the 3D brain | in progress | #62 |
 | 18q | Music via Spotify's official embed, picked by the brain vote | done (server, /brain, /life); room after #63 | #71 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
@@ -300,6 +302,23 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 30c:** merged #72 (#59): daily clips for the official social accounts.
+- Up to 3 vertical clips a day (day, dream, his brain's choice), each frame labelled "AI · fictional character · simulated brain".
+- Rendered at nice 19 with a CPU cap; no tick cost.
+- Auto-post is off without tokens, and posts are private or drafts flagged as AI-made.
+- `/admin/clips` sits behind the admin token or the password cookie.
+- Image +300 MB (ffmpeg).
+- Coordinator run: 955 tests passed, tick 7.8 ms.
+
+#74 (#70) is approved and waits for its docs conflict fix.
+
+The owner asked for room work: fix the floating post-it and the lamp in the wall, the room looks empty, a better phone screen
+and graphics, and a better character. New tasks:
+- **#75 room polish:** `room_build/` and `room_clean.glb`, plus new files; `room.html` only after #63.
+- **#76 a better character:** a CC0 MakeHuman/MPFB2 route, finger bones, `boy2.glb` behind `?boy=new`; integration after #63.
+
+#63 now gates five pieces of room work (music headphones, #62's mini brain, #75, #76, its own food), so it merges first.
 
 **Pass 30b:** merged #71 (#68 server side): he listens to music.
 - His brain vote picks 3–5 candidate tracks by time of day, tastes, taught words and chat wishes.
