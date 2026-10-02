@@ -93,7 +93,5 @@ lying); the penetration sweeps are on the final code.
   cannot be measured headless: SwiftShader draws WebGL on the CPU, so both before and after run at ~0.1 FPS at
   390×844. That is a limit of this environment, not a result.
 
-## Not done here (part 2, and server side)
-- Real dishes matching `delivery.dish`; bread, courier and konbini bags; the dish emptying; the container into the bin;
-  labels naming the dish. That needs a small `life.py` change (LABEL and the dish field), so it is its own PR.
-- No server change is needed for part 1.
+## Part 2: food
+Real dishes, bags and the bin, and the `delivery.dish` field with labels that name the meal: see `food/README.md`.

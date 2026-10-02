@@ -101,7 +101,7 @@
   #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
-  #desk [hidden] { display:none !important; }
+  #desk [hidden], #cards [hidden] { display:none !important; }   /* .card's display:block beat [hidden] (#89) */
   #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
   #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
@@ -145,6 +145,17 @@
 </div>
 
 <div id="cards">
+  <div class="card" id="screens">
+    <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
+    <div class="m" id="sc-b"></div>
+    <div class="m" id="sc-share"></div>
+    <canvas id="da" width="300" height="64" style="width:100%;height:64px;margin:6px 0 2px"></canvas>
+    <div class="m" id="da-l">simulated dopamine-like reward signal in the model</div>
+    <div class="m" id="sc-src"></div>
+    <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
+    <div id="sc-tt"></div>
+    <ul id="sc-last"></ul>
+  </div>
   <div class="card" id="desk" hidden>
     <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
     <div id="desk-board" class="board" hidden></div>
@@ -610,6 +621,61 @@ const unq = s => { const bin = atob(s), a = new Array(bin.length); for (let i = 
 let sock = null, act = null, base = null, actFrom = null, actTo = null, actAt = 0, actDt = 1000 / RATE;
 let full = false, retry = 0;                       // the server sends {"type":"full"} when it has no room for us
 const FULL_TXT = "the room is full, try again in a minute";
+// ---------- #89: his screens (what the browser really shows) and the dopamine-like trace ----------
+const DA_N = 240, daTrace = [], daSpikes = [];
+let daLast = 0, daCount = 0;                       // daCount: samples pushed so far (spikes keep their sample number)
+function daLevel(v){
+  const now = performance.now(); if (now - daLast < 500) return; daLast = now;
+  daTrace.push(v); daCount++; if (daTrace.length > DA_N) daTrace.shift(); drawDA();
+}
+function daSpike(m){
+  daSpikes.push({at: daCount, size: m.size, kind: m.kind}); if (daSpikes.length > 60) daSpikes.shift();
+  $("da-l").textContent = `${m.label}: ${m.why} · burst ${(+m.size).toFixed(2)}`
+    + (m.n > 1 ? ` · clip ${m.n} of this scroll session (habituating)` : "");
+  tick(`dopamine-like burst <b>${(+m.size).toFixed(2)}</b> · ${esc(m.why)} (novelty ${m.novelty}, predicted interest ${m.interest}, expectation ${m.expect}) → reward regions`);
+  drawDA();
+}
+function drawDA(){
+  const c = $("da"); if (!c || MINI) return; const g = c.getContext("2d"), W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H); g.fillStyle = "rgba(255,255,255,.04)"; g.fillRect(0, 0, W, H);
+  const lo = 0.6, hi = 2.2, y = v => H - 4 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo) * (H - 8);
+  g.strokeStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.moveTo(0, y(1)); g.lineTo(W, y(1)); g.stroke();
+  const off = DA_N - daTrace.length, x = i => (i + off) / (DA_N - 1) * W;
+  g.strokeStyle = "#ff6a00"; g.lineWidth = 1.5; g.beginPath();
+  daTrace.forEach((v, i) => i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v))); g.stroke();
+  g.fillStyle = "#ffd27a";
+  for (const s of daSpikes) { const i = s.at - (daCount - daTrace.length) - 1; if (i < 0) continue;
+    g.fillRect(x(i) - 1, H - 4 - Math.min(1, s.size) * (H - 8), 2, Math.min(1, s.size) * (H - 8)); }
+  g.fillStyle = "rgba(236,236,242,.6)"; g.font = "10px sans-serif"; g.fillText("DA", 4, 11);
+}
+// an official embed player (Spotify, TikTok) in the screens card: replaced only when its source changes, never autoplayed
+function screenEmbed(el, src, h, label){
+  if ((el.dataset.src || "") === (src || "")) return;
+  el.dataset.src = src || "";
+  el.innerHTML = src ? `<div class="m">${esc(label)}</div><iframe src="${esc(src)}" title="${esc(label)}" style="width:100%;height:${+h || 80}px;border:0;border-radius:8px" allow="encrypted-media; fullscreen; picture-in-picture"></iframe>` : "";
+  const fr = el.querySelector("iframe"); if (!fr) return;
+  fr.onload = () => { fr.dataset.loaded = "1"; };
+  setTimeout(() => { if (el.dataset.src === src && !fr.dataset.loaded) el.innerHTML = `<div class="m">${esc(label)} — the player did not load</div>`; }, 8000);
+}
+function renderScreens(d){
+  if (!d || MINI) return;
+  const b = d.browser || {};
+  $("sc-k").textContent = b.state === "up" ? "browser up" : b.state === "off" ? "browser off" : `browser ${b.state || "?"}`;
+  $("sc-b").textContent = (b.why ? `${b.why} (since ${b.since})` : `since ${b.since}`) + ((d.notes || []).length ? ` · ${d.notes[d.notes.length - 1].text}` : "");
+  const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
+  const bl = (d.sources || {}).blocked || [];
+  $("sc-src").textContent = bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "";
+  const mu = d.music || {}, now = mu.now;
+  $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
+  screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");
+  const tt = (d.last || []).find(x => x.embed);
+  screenEmbed($("sc-tt"), tt && tt.embed.src, 340, tt ? `${tt.embed.label}: ${tt.title}` : "");
+  $("sc-last").innerHTML = (d.last || []).slice(0, 10).map(x => `<li><span class="m">${esc(x.t)}</span> <b>${esc(x.kind)}</b> · ${esc(x.host)} · ${esc(x.title)}</li>`).join("");
+}
+function pollScreens(){ if (MINI) return; fetch("/api/screens").then(r => r.ok ? r.json() : null).then(renderScreens).catch(() => {}); }
+if (!MINI) { pollScreens(); setInterval(pollScreens, 5000); } else { const sc = document.getElementById("screens"); if (sc) sc.hidden = true; }
+
 function connect(){
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=${RATE}&q=1`);
   ws.onopen = () => $("live").classList.add("on");
@@ -637,6 +703,7 @@ function connect(){
     if (m.type === "music") { if (m.playing) { musicNow = m; renderMusic(); } else if (musicNow && musicNow.id === m.id) { musicNow = null; renderMusic(); } return; }
     if (m.type === "chess") { deskChess = m; renderDesk(); if (m.finished) setTimeout(() => { if (deskChess === m) { deskChess = null; renderDesk(); } }, 60000); return; }
     if (m.type === "screen") { if (m.device === "desk") { deskVideo = m.video ? m : null; renderDesk(); } return; }
+    if (m.type === "dopamine") { daSpike(m); return; }
     if (m.type === "nights") { renderNights(m); return; }
     if (m.type === "teach_ack") {
       $("t-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
@@ -657,6 +724,7 @@ function connect(){
       sleepInfo = sl; setStage(sl.stage); burst = Math.max(burst, sl.burst || 0);
       if (!MINI) $("clock").textContent = `${sl.clock} ${sl.tz || "Tokyo"}`;
     }
+    if (m.neuro && typeof m.neuro.DA === "number") daLevel(m.neuro.DA);
     if (m.life) {
       doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
       if (deskVideo && (m.life.walking || !/computer/.test(m.life.doing))) { deskVideo = null; renderDesk(); }

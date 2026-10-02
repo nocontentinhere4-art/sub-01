@@ -85,6 +85,15 @@ procedural code in `web/room.html`, written for this project and released under 
 
 The standing pose is the first frame of `boy_door.glb`'s clip. GLB size change: none (0 bytes).
 
+## Food (#63, part 2): Kenney "Food Kit" 2.0, CC0 1.0
+`food.glb` packs these models from Kenney's Food Kit (https://kenney.nl/assets/food-kit, created by Kenney, www.kenney.nl;
+licence: Creative Commons Zero, as stated in the kit's `License.txt`): `bowl-broth` (ramen), `bowl-soup` (curry),
+`bowl`, `plate-rectangle`, `sushi-salmon`, `sushi-egg`, `maki-salmon`, `pizza-box`, `pizza`, `rice-ball` (onigiri),
+`croissant`, `bag`, `bag-flat`, `chopstick`. Unmodified apart from scale and, for the konbini's bag, a white material
+set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somewhere):
+
+    node build_food.mjs "<kit>/Models/GLB format" ../web/room/food.glb      # 84 KB
+
 ## Map card
 The map of his neighbourhood (room card and `/life`) is © OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`, one static extract made by

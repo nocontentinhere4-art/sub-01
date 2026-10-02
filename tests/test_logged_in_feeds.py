@@ -533,9 +533,14 @@ def test_sessions_reach_the_browser_process_but_not_chromium():
     assert not set(S.secret_env_names()) & set(browse.CHROMIUM_ENV)
 
 
-def test_api_browsing_lists_accounts():
-    src = (Path(__file__).resolve().parents[1] / "live_server.py").read_text()
-    assert '"accounts": getattr(live.browser, "accounts", None)' in src
+def test_api_browsing_lists_accounts(tmp_path):
+    from types import SimpleNamespace
+    from live_server import Live
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    acc = {"tiktok": {"state": "logged in", "reason": ""}}
+    live.browser = SimpleNamespace(log=[], searches={"per_source_today": {}}, accounts=acc)
+    v = live.browsing_view()                                    # GET /api/browsing
+    assert v["accounts"] == acc and v["synced"] is True
 
 
 def test_open_refuses_private_and_action_urls_without_loading_them():
