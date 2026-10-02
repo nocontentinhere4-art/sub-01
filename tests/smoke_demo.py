@@ -19,7 +19,7 @@ from pathlib import Path
 import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
-PATHS = ["/", "/brain", "/diary", "/tastes.html", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes"]
+PATHS = ["/", "/brain", "/diary", "/tastes.html", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes", "/api/taught"]
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
 TORN = {                 # state files read back at startup, each cut off mid-write
     "life.json": '{"activity": "research", "path": [], "hunger',

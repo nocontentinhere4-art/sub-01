@@ -27,6 +27,7 @@ from sleep import ROME, day_of
 from spiking import podpack
 from spiking.costs import CostLog
 from spiking.runpod_ops import RunPodOps
+from spiking.words import half_cue_ok
 from state_io import load_json, save_json
 
 DEFAULT_TZ = "Asia/Tokyo"
@@ -40,6 +41,7 @@ PHASES = ["recall_yesterday", "encode", "memory_test", "sleep", "memory_test", "
 PONG_PHASES = ["pong_train", "pong_exam"]                  # inserted after encode with SUB01_PONG=1
 CHOICE_PHASES = ["choice_train", "choice_exam"]            # inserted after encode (and Pong) with SUB01_CHOICE=1
 MAX_PER_SOURCE = 5
+SOURCES = ("chat", "reading", "taught")
 WINDOW = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
 
 
@@ -110,15 +112,22 @@ def top_messages(memory, t, n=5):
 
 
 def top_items(memory, t, n=MAX_PER_SOURCE):
-    """The day's items for the GPU session: top n chat messages and top n readings (title + keywords, hashed like
-    chat), as [{"text", "source", "item", "emotion"}]."""
+    """The day's items for the GPU session: top n chat messages, top n readings (title + keywords, hashed like
+    chat) and up to n words viewers taught it (those with two or more content words first, then the most replayed), as [{"text", "source", "item", "emotion"}]."""
     out = [{"text": m["text"], "source": "chat", "item": m["text"], "emotion": m["emotion"]}
            for m in _today(memory, t, "chat")[:n]]
     for m in _today(memory, t, "reading")[:n]:
         title = m.get("title") or m["text"]
         out.append({"text": " ".join([title] + list(m.get("keywords") or [])), "source": "reading", "item": title,
                     "emotion": m["emotion"]})
+    taught = sorted(_today(memory, t, "taught"), key=lambda m: (half_cue_ok(m["text"]), m.get("replays", 0)),
+                    reverse=True)           # testable from a half cue, then the most replayed; ties: Memory.weight
+    out += [{"text": m["text"], "source": "taught", "item": m["text"], "emotion": m["emotion"]} for m in taught[:n]]
     return out
+
+
+def item_source(src):
+    return src if src in SOURCES else "chat"
 
 
 def _utcnow():
@@ -260,7 +269,7 @@ class PodManager:
             raw = []
         items, n = [], {}
         for m in raw:
-            src = "reading" if m.get("source") == "reading" else "chat"
+            src = item_source(m.get("source"))
             if m.get("text") and n.get(src, 0) < MAX_PER_SOURCE:
                 n[src] = n.get(src, 0) + 1
                 items.append({"text": str(m["text"]), "source": src, "item": str(m.get("item") or m["text"]),

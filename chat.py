@@ -9,6 +9,8 @@ import time
 import unicodedata
 from collections import deque
 
+from state_io import load_json, save_json
+
 MAX_LEN = 280
 RATE_S = 10.0
 
@@ -197,3 +199,77 @@ def check(text, key, limiter, dedupe):
     if dedupe.seen(text):
         return False, "duplicate"
     return True, None
+
+
+# --- "teach him something" (#31) -------------------------------------------------------
+TEACH_MAX_WORDS = 6
+NICK_MAX = 16
+TEACH_PER_DAY = 30          # taught items per Tokyo day in total, first come
+
+
+def clean_nick(nick):
+    """-> (nickname or "", reason or None). Display only, never a stimulus; the same rules as a chat message."""
+    nick = re.sub(r"\s+", " ", (nick or "")).strip()
+    if not nick:
+        return "", None
+    if len(nick) > NICK_MAX:
+        return "", f"nickname: max {NICK_MAX} characters"
+    reason = blocked(nick)
+    return ("", "nickname: " + reason) if reason else (nick, None)
+
+
+class TeachLimits:
+    """One teach per viewer per day (keyed like the chat limiter: the client address, kept only in memory and only
+    for the current day) and at most `per_day` taught items per day in total. The day's total is also written to
+    `path` (state_io, atomic), so a restart cannot reopen the cap; viewer keys are never written to disk."""
+
+    def __init__(self, per_day=TEACH_PER_DAY, path=None):
+        self.per_day, self.path = per_day, path
+        self.day, self.keys, self.count = None, set(), 0
+        if path is not None:
+            d = load_json(path, {})
+            if isinstance(d.get("day"), str) and isinstance(d.get("count"), int):
+                self.day, self.count = d["day"], d["count"]
+
+    def _roll(self, day):
+        if day != self.day:
+            self.day, self.keys, self.count = day, set(), 0
+
+    def check(self, key, day, taught_today):
+        """`taught_today`: texts already taught that day. -> reason or None (does not record anything)."""
+        self._roll(day)
+        if key in self.keys:
+            return "one teach per viewer per day"
+        if max(self.count, len(taught_today)) >= self.per_day:
+            return f"he has been taught {self.per_day} things today; try again tomorrow"
+        return None
+
+    def note(self, key, taught_today=()):
+        self.keys.add(key)
+        self.count = max(self.count, len(taught_today)) + 1
+        if self.path is not None:
+            save_json(self.path, {"day": self.day, "count": self.count})
+
+
+def check_teach(text, nick, key, limits, day, taught_today):
+    """Full pipeline for one taught word or phrase -> (ok, reason, text, nick). Filter first, then limits."""
+    text = re.sub(r"\s+", " ", (text or "")).strip()
+    if not text:
+        return False, "empty", "", ""
+    reason = blocked(text)
+    if reason:
+        return False, reason, "", ""
+    if len(text.split()) > TEACH_MAX_WORDS:
+        return False, f"max {TEACH_MAX_WORDS} words", "", ""
+    if len(text) > 80:
+        return False, "too long", "", ""
+    nick, reason = clean_nick(nick)
+    if reason:
+        return False, reason, "", ""
+    if dedupe_key(text) in {dedupe_key(x) for x in taught_today}:
+        return False, "already taught today", "", ""
+    reason = limits.check(key, day, taught_today)
+    if reason:
+        return False, reason, "", ""
+    limits.note(key, taught_today)
+    return True, None, text, nick
