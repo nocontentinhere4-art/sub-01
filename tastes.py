@@ -161,7 +161,7 @@ class Tastes:
         return {"favoured": [fmt(kv) for kv in items[:n] if kv[1] > 0],
                 "avoided": [fmt(kv) for kv in items[::-1][:n] if kv[1] < 0], "topics": len(self.pref),
                 "rule": f"prediction error x {ALPHA}, decay {TAU_DAYS:g} days",
-                "note": "Learned from the brain model's simulated response to pages; not enjoyment or understanding.",
+                "note": "Learned from the brain model's simulated response to pages.",
                 "history": self.history()}
 
 
