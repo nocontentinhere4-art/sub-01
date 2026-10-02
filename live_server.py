@@ -1409,7 +1409,8 @@ async def main(args):
     async def browsing(request):                  # pages shown on his screens, newest last
         log = (live.browser.log or live.browsing_state.get("log", [])) if live.browser else []
         return web.json_response({"on": bool(live.browser), "log": log[-30:],
-                                  "searches": getattr(live.browser, "searches", None) if live.browser else None})
+                                  "searches": getattr(live.browser, "searches", None) if live.browser else None,
+                                  "accounts": getattr(live.browser, "accounts", None) if live.browser else None})
     app.router.add_get("/api/browsing", browsing)
 
     async def tastes(request):                    # what kinds of pages have paid off in the brain's response

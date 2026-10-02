@@ -312,37 +312,14 @@ def strip_tags(title):
     return t or str(title or "").strip()
 
 
-TIKTOK_VIDEO = re.compile(r"^https://www\.tiktok\.com/@([\w.]{2,30})/video/(\d{8,25})$")
+def _parse_tiktok(text, base="https://www.tiktok.com/"):
+    import short_videos                                     # TikTok lives in its own module (#60 plugs in there)
+    return short_videos.parse_tiktok(text, base)
 
 
-def parse_tiktok(text, base="https://www.tiktok.com/"):
-    """A TikTok tag page as Chromium renders it (logged out): its video links, the caption next to each, the
-    creator. Nothing when the page is only a login wall."""
-    out = []
-    for a in parse_html(text).find_all("a"):
-        url = urllib.parse.urljoin(base, a.attrs.get("href", "")).split("?")[0]
-        m = TIKTOK_VIDEO.match(url)
-        if not m:
-            continue
-        box = a.parent
-        cap = ""
-        for _ in range(3):                                   # the caption sits next to the link in the item
-            if box is None:
-                break
-            d = next((n for n in box.iter() if n.attrs.get("data-e2e") in ("video-desc", "challenge-item-desc")
-                      or "desc" in " ".join(n.cls()).lower()), None)
-            if d is not None and d.text():
-                cap = d.text()
-                break
-            box = box.parent
-        cap = cap or a.attrs.get("title") or a.text()
-        out.append(_result(url, strip_tags(cap) or f"a video by @{m.group(1)}", f"@{m.group(1)}", video=True,
-                           short=True, channel=f"@{m.group(1)}", hashtags=re.findall(r"#\w+", cap)[:6]))
-    return _dedup(out)
-
-
-def tiktok_tag(q):
-    return re.sub(r"[^a-z0-9]", "", (q or "").lower())[:40]
+def _tiktok_url(q):
+    import short_videos
+    return short_videos.tiktok_url(q)
 
 
 def parse_headlines(text, base):
@@ -412,8 +389,7 @@ SOURCES = {
     # (robots.txt disallows TikTok's /search; /tag is allowed)
     "shorts": {"label": "YouTube Shorts", "url": lambda q: "https://www.youtube.com/results?" + _q(
         {"search_query": f"{q} #shorts"}), "parse": parse_youtube, "feed": True},
-    "tiktok": {"label": "TikTok", "url": lambda q: f"https://www.tiktok.com/tag/{tiktok_tag(q)}", "parse": parse_tiktok,
-               "feed": True},
+    "tiktok": {"label": "TikTok", "url": _tiktok_url, "parse": _parse_tiktok, "feed": True},
     # sites searched through their own search box (site_search): the home page is opened, the query typed there
     "recipes": {"label": "RecipeTin Eats", "site": "https://www.recipetineats.com/", "parse": parse_headlines},
     "news": {"label": "Science News", "site": "https://www.sciencenews.org/", "parse": parse_headlines},

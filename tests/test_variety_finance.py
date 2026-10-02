@@ -24,6 +24,7 @@ import eyes as E  # noqa: E402
 import interests as I  # noqa: E402
 import research as R  # noqa: E402
 import search_sources as S  # noqa: E402
+import short_videos as SV  # noqa: E402
 from browse import Browser, url_ok  # noqa: E402
 
 DATA = Path(__file__).resolve().parent / "data" / "search"
@@ -168,12 +169,12 @@ def test_shorts_feed_queues_and_the_next_short_costs_no_call():
                     "host": "youtube.com", "why": why, "results": Browser.safe_results(shorts)}
         return name == "shorts"
     b._search_on = _search_on
-    b.TIKTOK_SHARE = 0.0
+    b.rng = SimpleNamespace(random=lambda: 0.9, choice=random.Random(0).choice)     # YouTube Shorts first
     assert run(b._shorts(sc, {"query": "ramen", "from": "video", "hour": 12.5}))
     assert len(sc.queue) == len(Browser.safe_results(shorts)) >= 5
     # a short is watched for at most SHORTS_MAX_S (muted), then the next shorts are the options
     run(b._start_watch(sc, 600))
-    assert sc.watch_s == browse.SHORTS_MAX_S
+    assert sc.watch_s == SV.SHORTS_MAX_S
     sc.info = dict(sc.info, url=shorts[0]["url"], video={"watching": True})
     sc.queue = sc.queue[1:]
     run(b._end_watch(sc))
@@ -199,7 +200,7 @@ def test_videos_stay_muted():
 
 
 def test_tiktok_logged_out_captions_guarded_walls_left():
-    res = S.parse_tiktok(fx("tiktok_tag.html"))
+    res = SV.parse_tiktok(fx("tiktok_tag.html"))
     assert [r["channel"] for r in res] == ["@ramenlover.tokyo", "@noodlecam", "@spam.example", "@x.example"]
     safe = Browser.safe_results(res)
     assert [r["title"] for r in safe] == ["Midnight tonkotsu in Kichijoji", "How to pull noodles by hand"]
@@ -209,7 +210,7 @@ def test_tiktok_logged_out_captions_guarded_walls_left():
                                        "Disallow: /auth\n")
     assert robots.allowed("https://www.tiktok.com/tag/ramen")
     assert not robots.allowed("https://www.tiktok.com/search/video?q=ramen")
-    assert "comment" in browse.HIDE_TIKTOK and "LoginModal" in browse.HIDE_TIKTOK
+    assert "comment" in SV.HIDE_TIKTOK and "LoginModal" in SV.HIDE_TIKTOK
     assert browse.LOGIN_WALL.search("Log in to TikTok") and browse.LOGIN_WALL.search("Sign in to watch")
     assert url_ok("https://www.tiktok.com/@noodlecam/video/7398765432109876543")
     assert browse.is_video_host("www.tiktok.com") and browse.is_video_host("m.youtube.com")
