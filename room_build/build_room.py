@@ -601,12 +601,12 @@ def world_box(objs):
 SWEEP = []
 # room.html's hard-coded places (#63) that no prop may enter: (x, y, z) ranges, glTF
 KEEP = {"his place at the window": ((-1.93, -1.30), (1.0, 1.95), (-0.24, 0.20)),       # he stands at (-1.56, -0.02), leaning on the sill
-        "the delivery bag's spot": ((-0.70, -0.46), (DTOP + 0.004, DTOP + 0.40), (-0.93, -0.80)),
+        "the delivery bag's spot": ((-0.70, -0.42), (DTOP + 0.004, DTOP + 0.40), (-0.93, -0.80)),  # BAG_AT (-0.56, -0.855)
         "the tea bottle's old spot": ((-1.43, -1.33), (DTOP + 0.004, DTOP + 0.30), (-0.95, -0.85)),
-        # #87 (food): the dish left of the mat (DISH_AT -1.34, -0.93), the tea bottle right of the keyboard, and where he
-        # crouches at the bin under the desk (-0.55, -1.22) to throw the empty dish away
-        "the dish's spot": ((-1.44, -1.26), (DTOP + 0.004, DTOP + 0.25), (-1.02, -0.84)),
-        "the tea bottle's spot right of the keyboard": ((-0.885, -0.795), (DTOP + 0.004, DTOP + 0.30), (-1.10, -0.86)),
+        # #87 (food): the dish left of the keyboard, the tea bottle in front of the mouse, and where he crouches at the bin
+        # under the desk (-0.55, -1.22) to throw the empty dish away
+        "the dish's spot": ((-1.48, -1.26), (DTOP + 0.004, DTOP + 0.25), (-1.02, -0.84)),       # DISH_AT, a pizza 4 cm further left
+        "the tea bottle's spot": ((-0.87, -0.79), (DTOP + 0.004, DTOP + 0.30), (-0.89, -0.81)),  # BOTTLE_AT (-0.83, -0.85) r 3.2 cm, in front of the mouse
         "his crouch at the bin": ((-0.85, -0.25), (FY + 0.02, DTOP - 0.04), (-1.08, -0.55))}      # (under the desk top)
 DOOR_SWING = (0.71, 0.9 + 0.15)                  # the leaf opens into the room (#82): 0.68 m plus 3 cm, up to 0.9 rad plus a margin
 # room.html's walking graph (#82: NODES, LINKS and the standing anchors): every prop up to his height keeps WALK_R off
