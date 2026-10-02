@@ -124,6 +124,30 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   music, science and video pages; Wikipedia's external sources and pagination / comment links keep a place among the
   40 links. Costs unchanged: 1 eyes call per page, 30/hour, $1.00/Tokyo day.
 
+## YouTube and chess at the desk (#17, PR `feature/youtube-chess`)
+- `life.py`: two more activities chosen by needs, `watch_video` (boredom, visual response, a chat wish; only with a
+  browser: `Life.can_watch`) and `play_chess` (attention, a chat wish; at most one game per simulated hour,
+  `CHESS_EVERY`, `last_chess` saved in life.json).
+- YouTube builds on #40's `play_video`: every browser context carries the Restricted Mode cookie (`PREF f2=8000000`);
+  in `watch_video` the desk opens a YouTube search for his interest (a URL through `eyes.query_ok`, nothing typed); the
+  brain vote picks among the options as for any page. A chosen video plays muted and locked muted (`VIDEO_JS`
+  overrides `muted`/`volume` on the element; Chromium also runs `--mute-audio`) for `brain_vote.watch_minutes`
+  (2–10 simulated min, longer for a strong vote value, shorter when bored; the browser clamps to 10 s..600 s real),
+  then the page goes back to the vote. While he watches, each screenshot (every 4 s) is compared with the previous one
+  (`browse.scene_change`, 64x36 grey thumbnails) and `Live.video_drive` stimulates the visual network with
+  `VIDEO_DRIVE` (6) x change x sleep gain. Titles and channel names pass `display_ok` and `chat.blocked`
+  (`browse.video_text_ok`); comments, live chat and the like/subscribe buttons are hidden; `ServiceLogin` links are
+  login links. No new paid calls (the eyes' existing cap covers the YouTube pages).
+- `chess_game.py` (python-chess, PyPI name `chess`, pure Python): a simple move scorer (material + centre, one ply)
+  ranks the legal moves; the top 5 are brain-vote options tagged with networks (capture → reward, check → attention +
+  salience, a piece left en prise → threat, castling → control). `Live.chess_step` (task `run_chess`) runs the scorer,
+  the vote and the opponent (depth-2 minimax, random tie-breaks) in worker threads on board copies, paces moves in
+  simulated time (≥ 0.7 s real), keeps him at the desk until the game ends (≤ 90 simulated min), then ends the
+  activity. One row per game in `/data/chess.jsonl`; `GET /api/chess`. Card wording (owner): "his brain model picks
+  among 5 candidate moves from a simple move scorer".
+- Shown on `/brain` ("At his desk" card: the board with the 5 candidates and the pick, or the muted video with its
+  options); the room view follows #46.
+
 ## Brain decides what he clicks (PR `feature/brain-decides`)
 - Eyes (`eyes.py`): after a page, an AI lists 3-5 options from the title, visible text and up to 40 numbered links
   (decision 2026-10-01: Claude Haiku 4.5 by default, hard cap $1.00 per Tokyo day). Claude `claude-haiku-4-5` if

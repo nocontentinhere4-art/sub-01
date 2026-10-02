@@ -81,6 +81,18 @@
   #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
+  #desk [hidden] { display:none !important; }
+  #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
+  #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
+    color:#111; background:#cdb999; }
+  #desk .board div.d { background:#8a6f4e; }
+  #desk .board div.l { box-shadow:inset 0 0 0 100px rgba(255,154,60,.38); }
+  #desk .board div.w { color:#fffaf0; text-shadow:0 0 2px #000, 0 0 1px #000; }
+  #desk ul { list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.55; }
+  #desk li { display:flex; justify-content:space-between; gap:8px; color:var(--dim); }
+  #desk li.c { color:var(--fg); }
+  #desk li.c span:first-child::before { content:"▸ "; color:var(--or); }
   #neurons { min-width:0; }
   #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
@@ -113,6 +125,14 @@
 </div>
 
 <div id="cards">
+  <div class="card" id="desk" hidden>
+    <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
+    <div id="desk-board" class="board" hidden></div>
+    <img id="desk-img" alt="" hidden>
+    <div class="t" id="desk-t"></div>
+    <ul id="desk-opts"></ul>
+    <div class="m" id="desk-m"></div>
+  </div>
   <a class="card" href="/diary" id="c-diary">
     <div class="k"><span>Last night</span><span>diary →</span></div>
     <img id="d-img" alt="" hidden>
@@ -393,6 +413,51 @@ $("t-form").addEventListener("submit", ev => {
   sock.send(JSON.stringify({type:"teach", text, nick}));
 });
 
+// ---------- at his desk: chess and muted videos (#17) ----------
+const PIECES = {K:"♚", Q:"♛", R:"♜", B:"♝", N:"♞", P:"♟"};
+let deskChess = null, deskVideo = null, deskShot = 0;
+function drawBoard(g){
+  const rows = g.fen.split(" ")[0].split("/"), sq = [];
+  for (const r of rows) for (const ch of r) { if (/\d/.test(ch)) for (let i = 0; i < +ch; i++) sq.push(""); else sq.push(ch); }
+  const lit = g.last ? [g.last.slice(0, 2), g.last.slice(2, 4)] : [];
+  const flip = g.color === "black", cells = [];
+  for (let i = 0; i < 64; i++) {
+    const k = flip ? 63 - i : i, file = k % 8, rank = 8 - Math.floor(k / 8), name = "abcdefgh"[file] + rank, p = sq[k];
+    const cls = [(file + rank) % 2 ? "" : "d", lit.includes(name) ? "l" : "", p && p === p.toUpperCase() ? "w" : ""].join(" ");
+    cells.push(`<div class="${cls}">${p ? PIECES[p.toUpperCase()] : ""}</div>`);
+  }
+  $("desk-board").innerHTML = cells.join("");
+}
+function optRows(opts, label){
+  return (opts || []).map(o => `<li class="${o.chosen ? "c" : ""}"><span>${esc(label(o))}</span><span>${Math.round((o.p || 0) * 100)}%</span></li>`).join("");
+}
+function renderDesk(){
+  const g = deskChess, v = deskVideo;
+  $("desk").hidden = !g && !v;
+  $("desk-board").hidden = !g; $("desk-img").hidden = !!g || !v;
+  if (g) {
+    drawBoard(g);
+    $("desk-k").textContent = g.result ? `game over · ${g.result}` : `chess · he plays ${g.color}`;
+    $("desk-t").textContent = g.result ? `${g.result === "unfinished" ? "left unfinished" : g.result} (${g.reason}) after ${g.plies} moves`
+      : (g.vote ? `last move ${g.vote.move}: ${g.vote.reason}` : "a new game");
+    $("desk-opts").innerHTML = g.vote ? optRows(g.vote.options, o => o.label) : "";
+    $("desk-m").textContent = g.card;
+  } else if (v) {
+    if (v.id !== deskShot) { deskShot = v.id; $("desk-img").src = `/api/screen/desk.jpg?id=${v.id}`; }
+    const w = v.video || {};
+    $("desk-k").textContent = w.watching ? "video · muted" : "videos";
+    $("desk-t").textContent = v.title + (v.channel ? ` — ${v.channel}` : "");
+    const d = v.decision;
+    $("desk-opts").innerHTML = d ? optRows(d.options, o => o.label) : "";
+    $("desk-m").textContent = (w.watching ? `watching for ${Math.round((d && d.watch_min) || w.seconds / 60)} min, then his brain model picks again`
+      + ` · picture change ${Math.round((w.scene || 0) * 100)}% drives the visual areas` : (v.why || ""))
+      + " · muted, read-only, Restricted Mode";
+  }
+}
+async function loadChess(){
+  try { const d = await (await fetch("/api/chess")).json(); if (d.playing) { deskChess = d.game; renderDesk(); } } catch (e) {}
+}
+
 // ---------- live ----------
 // q=1: the server's brain feed (act as one log-scaled byte a region, only the fields drawn here); 10 ticks/s,
 // 5 for the room's mini. Frames interpolate between ticks, so the drawing stays smooth.
@@ -419,6 +484,8 @@ function connect(){
       fire(m.text, m.networks); return;
     }
     if (m.type === "eye") { showEye(m); return; }
+    if (m.type === "chess") { deskChess = m; renderDesk(); if (m.finished) setTimeout(() => { if (deskChess === m) { deskChess = null; renderDesk(); } }, 60000); return; }
+    if (m.type === "screen") { if (m.device === "desk") { deskVideo = m.video ? m : null; renderDesk(); } return; }
     if (m.type === "nights") { renderNights(m); return; }
     if (m.type === "teach_ack") {
       $("t-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
@@ -441,6 +508,7 @@ function connect(){
     }
     if (m.life) {
       doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
+      if (deskVideo && (m.life.walking || !/computer/.test(m.life.doing))) { deskVideo = null; renderDesk(); }
       if (!MINI) $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
     }
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
@@ -487,7 +555,7 @@ document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
 });
 if (MINI && "IntersectionObserver" in window)    // the room's picture-in-picture: draw only while it is on screen
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
-if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000);
+if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000); loadChess();
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
 if (!MINI) setInterval(() => { if (full) $("story").textContent = FULL_TXT;
   else if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);

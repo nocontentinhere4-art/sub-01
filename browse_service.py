@@ -5,7 +5,8 @@
 
 HTTP API (every call needs the header X-Browse-Token = BROWSE_SERVICE_TOKEN when that is set):
   POST /init  {state}                   restore the browsing log (the brain's process keeps it on /data)
-  POST /step  {device, heard, interest} scroll / open the next page; or {"decide": page} when the brain should choose
+  POST /step  {device, heard, interest, mode} scroll / open the next page; or {"decide": page} when the brain should
+                                        choose. mode "video": he is watching videos (YouTube, muted, #17)
   POST /act   {device, action, why, interest}  carry out the brain's choice
   POST /close {device|null}             put a screen away (or everything)
   GET  /shot/{device}.jpg               latest screenshot        GET /health
@@ -90,7 +91,9 @@ def make_app(browser, token=None):
     async def step(request):
         d = await body(request)
         dev = device(d)
-        out = await limited(browser.step(dev, list(d.get("heard") or [])[-5:], d.get("interest")), STEP_LIMIT_S, dev)
+        mode = "video" if d.get("mode") == "video" else None
+        out = await limited(browser.step(dev, list(d.get("heard") or [])[-5:], d.get("interest"), mode), STEP_LIMIT_S,
+                            dev)
         if out and "decide" in out:
             return web.json_response({"decide": out["decide"]})
         return web.json_response({"status": out})
@@ -223,8 +226,8 @@ class BrowserClient:
     async def init(self, state):
         await self._post("/init", {"state": state}, timeout=10)
 
-    async def step(self, device, heard=(), interest=None):
-        d = await self._post("/step", {"device": device, "heard": list(heard), "interest": interest},
+    async def step(self, device, heard=(), interest=None, mode=None):
+        d = await self._post("/step", {"device": device, "heard": list(heard), "interest": interest, "mode": mode},
                              timeout=STEP_LIMIT_S + 20)
         self.restarting = False
         if d.get("status"):

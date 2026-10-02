@@ -307,7 +307,7 @@ class FakeBrowser:
                         "phone": SimpleNamespace(shot=None, shot_id=0, status=lambda: None)}
         self.log, self.used, self.browser, self.acts = [], set(), None, []
 
-    async def step(self, device, heard, interest):
+    async def step(self, device, heard, interest, mode=None):
         return {"decide": dict(PAGE, device=device)}
 
     async def act(self, device, action, why, interest):
@@ -530,7 +530,7 @@ def test_service_restores_the_log_only_once_and_gives_up_on_a_hung_page(monkeypa
     class Hung(FakeBrowser):
         closed = 0
 
-        async def step(self, device, heard, interest):
+        async def step(self, device, heard, interest, mode=None):
             await asyncio.sleep(10)
 
         async def close(self, device=None):

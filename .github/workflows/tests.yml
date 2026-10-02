@@ -57,3 +57,7 @@ jobs:
       - run: python tests/smoke_demo.py --port 8767 --data-dir "$RUNNER_TEMP/mind" --mind --measure 40
         env:
           BROWSE: "0"
+      # issue #17: a chess game at the desk is played to its end, the moves voted by a brain clone (60x clock)
+      - run: python tests/smoke_demo.py --port 8768 --data-dir "$RUNNER_TEMP/chess" --youtube-chess --measure 300
+        env:
+          BROWSE: "0"

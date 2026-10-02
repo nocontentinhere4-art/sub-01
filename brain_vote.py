@@ -33,6 +33,7 @@ LEAVE_BORED = 0.5            # leave bonus per unit boredom (0..1)
 LEAVE_CHAIN = 0.6            # leave bonus at the end of a long chain of pages (eyes.leave_pull, 0..1)
 VIDEO_ACTIONS = ("open_video", "play_video")
 T0 = 0.15                    # softmax temperature when rested and not bored
+WATCH_MIN, WATCH_MAX = 2.0, 10.0   # simulated minutes he watches a chosen video before the brain decides again (#17)
 NAMES = {"reward": "reward", "attention": "attention", "visual": "visual", "fear": "threat", "language": "language",
          "memory": "memory", "default": "default-mode", "salience": "salience", "somatomotor": "body-movement",
          "control": "control", "limbic": "limbic", "relay": "thalamic relay"}
@@ -42,6 +43,20 @@ def temperature(boredom=0.0, pressure=0.0, tired=0.0):
     """Softmax temperature: rises with boredom and with sleep pressure / sleep debt (choices get less decisive)."""
     sleepy = min(1.0, max(0.0, pressure)) + min(1.0, max(0.0, tired))
     return T0 * (1.0 + 1.5 * min(1.0, max(0.0, boredom))) * (1.0 + 1.5 * sleepy)
+
+
+def watch_minutes(boredom=0.0, value=0.0):
+    """How long he watches a chosen video (simulated minutes, WATCH_MIN..WATCH_MAX): longer when the brain's response
+    to it was strong (value: the vote's normalised value, -1..1) and when he is not bored; then the brain decides
+    again."""
+    def unit(x):
+        try:
+            x = float(x)
+        except (TypeError, ValueError):
+            return 0.0
+        return min(1.0, max(0.0, x)) if x == x else 0.0
+    x = 0.6 * unit(value) + 0.4 * (1.0 - unit(boredom))
+    return round(WATCH_MIN + (WATCH_MAX - WATCH_MIN) * x, 2)
 
 
 def stimulus_vector(brain, networks, gain):
