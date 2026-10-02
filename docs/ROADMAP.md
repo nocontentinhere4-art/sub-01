@@ -1,8 +1,13 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 09:05 UTC** (pass 23). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 10:20 UTC** (pass 24). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 24:** merged #52 (#46, the mind in the room). He sits at the desk to answer chat on the monitor; replies are
+tagged "his reply (AI-written)". The day plan shows "voted by his brain model", or "yesterday's, kept while the AI rests"
+when the AI is resting, plus the resting line. 531 tests; tick 8.1 ms. #17 continues: server PR first, then the room
+desk view (it will also look at the dark rectangle behind the status sub-line).
+
 **Pass 23:** merged #51 (#15): one view of every paid cost per Tokyo day, caps checked before each paid call (eye
 $1.00 — the eye's first cap —, diary $0.10, eyes $1.00, mind $1.00, total $3.10), `/healthz` (public), and `/api/costs`
 and `/api/health` (password cookie or admin token). Checked live by the coordinator with the gate on. 569 tests; tick
@@ -79,7 +84,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | merged as #40 (its 2 novelty hooks ride with #33 phase B) |
 | #31 teach him | `session_017R5d56EEZVdrsHDbvQuww9` | done: #41 (server, /brain) + #44 (room) |
 | #43 map without OSM tiles | `session_015XP5haU96uvbRUJf3p7Tam` | merged as #47 |
-| #46 the mind in the room | `session_01Ek5DZG7cEvc1v7TV8PrEkz` | started 07:37 (`feature/mind-room`) |
+| #46 the mind in the room | `session_01Ek5DZG7cEvc1v7TV8PrEkz` | merged as #52 |
 | #33 mind layer | `session_01KwLm3oYfsh8KhXjWTbrUPt` | done: #37 + #45 |
 | #19 brain loop 3× cheaper | `session_017zdDm1BDeRmdNJEEusasoA` | merged as #48 (6×) |
 | #18 Chromium non-root | `session_01Fbtw3qXpLr5WZAjU7jQiDT` | merged as #50 (found the #49 outage) |
@@ -90,7 +95,7 @@ Who is on what (cloud sessions, 2026-10-02):
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py` / Dockerfile: **#17** (in progress). Then only the launch checklist is left. `web/room.html`: #46 the mind in the room (in progress).
+Next on `live_server.py` / Dockerfile: **#17** (in progress). Then only the launch checklist is left. `web/room.html`: #17 room desk view (next).
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -133,7 +138,7 @@ cheap to run, with the password gate kept until launch day.
 | 18k | Room movement (walk around furniture, sit, lie down) | done (+ chair and bed follow-ups) | #28, #42 |
 | 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | done | #47 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
-| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done on the server (#37, #45); room view next | #46 |
+| 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
