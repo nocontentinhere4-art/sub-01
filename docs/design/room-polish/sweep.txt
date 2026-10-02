@@ -14,7 +14,7 @@ ok  hoodie               x +1.124..+1.536  y 1.125..1.735  z -1.368..-1.264  sup
 ok  backpack             x -0.192..+0.015  y 0.160..0.601  z +1.090..+1.390  support y=0.160    gap -0.0 mm   
 ok  cushion              x +0.976..+1.664  y 0.160..0.238  z +0.625..+1.335  support y=0.160    gap -0.0 mm   
 ok  fan                  x +1.582..+1.818  y 0.160..0.658  z +0.182..+0.418  support y=0.160    gap -0.0 mm   
-ok  slippers             x +1.811..+1.995  y 0.160..0.212  z -1.247..-0.973  support y=0.160    gap -0.0 mm   
+ok  slippers             x +0.673..+0.927  y 0.160..0.212  z +0.898..+1.111  support y=0.160    gap -0.0 mm   
 ok  laundry_hanger       x -1.906..-1.581  y 1.650..2.224  z +0.282..+0.618  support -          gap -         
 ok  cat_figure           x -1.897..-1.848  y 1.270..1.334  z +0.381..+0.417  support y=1.270    gap -0.0 mm   
 ok  socket               x -1.470..-1.390  y 0.340..0.460  z -1.450..-1.420  support back wall  gap -0.0 mm   

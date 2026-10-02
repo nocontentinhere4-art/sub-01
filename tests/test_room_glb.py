@@ -31,9 +31,10 @@ def test_size_budget():
 
 def test_nodes_the_page_reads():
     names = nodes()
-    for k in ("chair", "headphones", "SURF_monitor", "SURF_window", "SURF_lamp"):
+    for k in ("chair", "headphones", "hangers", "SURF_monitor", "SURF_window", "SURF_lamp"):
         assert k in names, k
-    assert names["chair"].get("children") and names["headphones"].get("children")   # pivots kept: mesh in a child node
+    for k in ("chair", "headphones", "hangers"):
+        assert names[k].get("children"), k                        # pivots kept: the mesh is in a child node
 
 
 def test_lamp_marker_over_the_desk_and_off_the_walls():
@@ -47,6 +48,16 @@ def test_lamp_marker_over_the_desk_and_off_the_walls():
 def test_headphones_hang_on_the_back_wall():
     t = nodes()["headphones"]["translation"]
     assert IZ < t[2] < IZ + 0.1 and 1.2 < t[1] < 1.7
+
+
+def test_door_hangers_turn_about_the_door_hinge():
+    t = nodes()["hangers"]["translation"]                         # room.html's opening leaf pivots at (1.11, F + 0.008, IZ)
+    assert abs(t[0] - 1.11) < 1e-3 and abs(t[1] - 0.168) < 1e-3 and abs(t[2] - IZ) < 1e-3, t
+
+
+def test_no_other_material_is_named_door():
+    names = [m.get("name", "") for m in gltf()["materials"]]
+    assert sum(n.lower().startswith("door") for n in names) == 1, names   # room.html takes the first "door*" material for its leaf
 
 
 def test_every_imported_asset_is_credited():

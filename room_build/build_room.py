@@ -603,13 +603,31 @@ SWEEP = []
 KEEP = {"his place at the window": ((-1.93, -1.30), (1.0, 1.95), (-0.24, 0.20)),       # he stands at (-1.56, -0.02), leaning on the sill
         "the delivery bag's spot": ((-0.70, -0.46), (DTOP + 0.004, DTOP + 0.40), (-0.93, -0.80)),
         "the tea bottle's spot": ((-1.43, -1.33), (DTOP + 0.004, DTOP + 0.30), (-0.95, -0.85))}
-DOOR_SWING = 0.71                                # the leaf (0.68 m, hinged at its left edge) plus 3 cm
-def check(name, objs, support, clear=0.0, minx=None, on_door=False):
+DOOR_SWING = (0.71, 0.9 + 0.15)                  # the leaf opens into the room (#82): 0.68 m plus 3 cm, up to 0.9 rad plus a margin
+# room.html's walking graph (#82: NODES, LINKS and the standing anchors): every prop up to his height keeps WALK_R off
+# each link (his shoulders and some air); flat things he walks over (rug, mats) and the plant (anchored by #63, its
+# leaves above the sill path's knees) are left out
+WALK_NODES = {"bs": (-0.36, -0.18), "ds": (-0.62, -0.35), "w": (0.15, -0.12), "c": (0.45, -0.35), "m": (0.35, 0.05), "d": (1.22, -0.92),
+              "f": (0.15, 0.75), "sl": (-1.10, -0.06), "g": (-0.62, -0.08),
+              "sill": (-1.56, -0.02), "doorway": (1.76, -0.98), "deskside": (-0.30, -0.40), "deskstand": (-0.68, -0.55)}
+WALK_LINKS = [("bs", "ds"), ("bs", "w"), ("ds", "w"), ("w", "m"), ("w", "c"), ("m", "c"), ("c", "d"), ("m", "d"), ("w", "f"), ("m", "f"),
+              ("bs", "g"), ("g", "sl"), ("w", "g"), ("sl", "sill"), ("d", "doorway"), ("ds", "deskstand"), ("bs", "deskside"), ("ds", "deskside")]
+WALK_R, WALK_H = 0.22, 1.9
+def walk_hit(lo, hi):
+    """the first walking link whose capsule (radius WALK_R) meets the box's floor plan, or None"""
+    for a, b in WALK_LINKS:
+        (ax, az), (bx, bz) = WALK_NODES[a], WALK_NODES[b]; n = max(1, int(math.hypot(bx - ax, bz - az) / 0.02))
+        for i in range(n + 1):
+            x, z = ax + (bx - ax) * i / n, az + (bz - az) * i / n
+            if math.hypot(x - min(max(x, lo[0]), hi[0]), z - min(max(z, lo[2]), hi[2])) < WALK_R: return f"{a}-{b}"
+    return None
+def check(name, objs, support, clear=0.0, minx=None, on_door=False, walk=True):
     """support: ("y", h) rests on a surface at height h (its lowest vertex within 2 mm of it); ("wall", None) hangs flat on
     the back wall (its rear within 2 mm of it); None: hangs from something (no support test). clear: the least distance
     from the window wall and the back wall. minx: the window wall's face where the prop stands (the sill reaches past it).
-    Every prop also stays out of KEEP and, unless on_door (it hangs on the leaf), out of the door's swing"""
-    SWEEP.append(dict(name=name, objs=[o for o in objs if o.type == 'MESH'], support=support, clear=clear, minx=IX if minx is None else minx, on_door=on_door))
+    Every prop also stays out of KEEP, off his walking graph (unless walk=False) and, unless on_door (it hangs on the
+    leaf and swings with it), out of the door's swing"""
+    SWEEP.append(dict(name=name, objs=[o for o in objs if o.type == 'MESH'], support=support, clear=clear, minx=IX if minx is None else minx, on_door=on_door, walk=walk))
 def settle(objs, y):
     """drop modelled parts as one, so that their lowest vertex rests on y"""
     bpy.context.view_layer.update(); lo, _ = world_box(objs)
@@ -633,9 +651,16 @@ def sweep():
                        else f"{'stands off' if gap > 0 else 'sinks into'} the wall by {abs(gap) * 1000:.1f} mm")
         for kn, (kx, ky, kz) in KEEP.items():                    # room.html's hard-coded spots (#63)
             if lo[0] < kx[1] and hi[0] > kx[0] and lo[1] < ky[1] and hi[1] > ky[0] and lo[2] < kz[1] and hi[2] > kz[0]: why.append(f"in {kn}")
-        if not e["on_door"] and hi[1] > FY + 0.015 and lo[1] < LY1 and hi[2] > IZ and hi[0] > LX0:   # the door leaf's swing (a quarter disc on the floor plan)
-            cx, cz = min(max(LX0, lo[0]), hi[0]), min(max(IZ, lo[2]), hi[2])
-            if math.hypot(cx - LX0, cz - IZ) < DOOR_SWING: why.append("in the door's swing")
+        if not e["on_door"] and hi[1] > FY + 0.015 and lo[1] < LY1 and hi[2] > IZ and hi[0] > LX0:   # the door leaf's swing (a sector on the floor plan)
+            for i in range(41):
+                for j in range(1, 36):
+                    a_ = DOOR_SWING[1] * i / 40; r_ = DOOR_SWING[0] * j / 35; x_, z_ = LX0 + r_ * math.cos(a_), IZ + r_ * math.sin(a_)
+                    if lo[0] <= x_ <= hi[0] and lo[2] <= z_ <= hi[2]: break
+                else: continue
+                why.append("in the door's swing"); break
+        if e["walk"] and hi[1] > FY + 0.02 and lo[1] < WALK_H:
+            hit = walk_hit(lo, hi)
+            if hit: why.append(f"on his way {hit}")
         sup = "-" if not s else f"y={s[1]:.3f}" if s[0] == "y" else "back wall"
         rows.append(f"{'ok ' if not why else 'BAD'} {e['name']:<20} x {lo[0]:+.3f}..{hi[0]:+.3f}  y {lo[1]:.3f}..{hi[1]:.3f}  z {lo[2]:+.3f}..{hi[2]:+.3f}"
                     f"  support {sup:<10} gap {'-' if gap is None else f'{gap * 1000:+.1f} mm':<9} {'; '.join(why)}")
@@ -693,7 +718,7 @@ check("desk_lamp", [lm], ("y", DTOP), clear=0.01)
 # which they reached 10 cm into at ry 0.8, and lean towards the desk, away from where he stands at the window)
 pr, po = import_asset("potted_plant_02", (-1.66, FY, -0.36), ry=3 * math.pi / 2, scale=0.85, drop=("dirt",))
 assert abs(pr.location.x + 1.66) < 1e-6 and abs(-pr.location.y + 0.36) < 1e-6, "the plant left its anchor"
-check("floor_plant", po, ("y", FY))
+check("floor_plant", po, ("y", FY), walk=False)
 PLANT = (pr.location.x, -pr.location.y)
 d = cyl("plant_soil", "painted", PLANT, 0.172, FY + 0.27, FY + 0.272, n=28); set_vcol(d, srgb("#2a2018"))
 check("desk_succulent", import_asset("potted_plant_04", (-0.48, DTOP, -1.14), ry=0.3, scale=0.9)[1], ("y", DTOP))
@@ -843,7 +868,7 @@ hood.data.transform(Matrix.Translation(B(HX, 1.62, IZ + 0.168)) @ Matrix.Rotatio
 for s in (-1, 1):                                                                # sleeves hanging at its sides
     rod("hoodie_sleeve", "hoodie", (HX + s * 0.17, 1.56, IZ + 0.14), (HX + s * 0.15, 1.16, IZ + 0.15), 0.036, n=12)
     blob("hoodie_cuff", "hoodie", (HX + s * 0.15, 1.15, IZ + 0.15), (0.03, 0.025, 0.03), n=12)
-check("hoodie", since(n0), None, on_door=True)              # (it hangs on the leaf: it swings with it)
+HOODIE = since(n0); check("hoodie", HOODIE, None, on_door=True)   # (it hangs on the leaf: it swings with it, see "hangers")
 
 # --- a backpack on the floor, leaning on the bed's foot end
 n0 = group()
@@ -879,7 +904,7 @@ parts = since(n0)
 for o in parts: transform(o, loc=(FAN[0], FY, FAN[1]), ry=FAN_RY)
 settle(parts, FY); [project_uv(o) for o in parts]; check("fan", parts, ("y", FY))
 
-# --- slippers right of the door (the doormat is in the door's swing)
+# --- slippers by the floor cushion (the door's side is his place at the doorway and the leaf's swing, #82)
 def slipper(x, z, ry):
     n0 = group(); L, W = 0.255, 0.095
     sole = cyl("slipper_sole", "painted", (0, 0), 1.0, 0.0, 0.016, n=24)
@@ -896,7 +921,7 @@ def slipper(x, z, ry):
     parts = since(n0)
     for o in parts: transform(o, loc=(x, 0, z), ry=ry)
     settle(parts, FY); [project_uv(o) for o in parts]; return parts
-check("slippers", slipper(1.862, -1.10, 0.04) + slipper(1.945, -1.12, -0.03), ("y", FY))   # beside the door, out of its swing
+check("slippers", slipper(0.80, 0.95, -math.pi / 2 + 0.05) + slipper(0.80, 1.06, -math.pi / 2 - 0.04), ("y", FY))   # toes towards the cushion
 
 # --- a laundry pinch hanger on the curtain rod (socks and a hand towel), in front of the glass, above the bed's head end
 n0 = group(); PH = (-1.745, 1.98, 0.45); PH_R = 0.15                # clear of his head at the window (#63)
@@ -963,6 +988,10 @@ for o in STATIC:
     bpy.context.view_layer.objects.active = o
     for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
 for o in STATIC: project_uv(o)
+# the things hanging on the door (hook rail, hooks, tote, hoodie) are one node of their own, "hangers", whose origin is
+# the door's hinge as room.html builds its opening leaf (#82): the page turns it with the leaf
+HANG = named("hook_rail", "hook", "hook_tip", "tote", "tote_strap") + [o for o in HOODIE if o.name in bpy.data.objects]
+for o in HANG: STATIC.remove(o)
 STATIC_OBJS = [o for o in STATIC if o.name in bpy.data.objects]
 # tiny parts (keycaps, pens, wheels...) get no AO texels: flag them, so the atlas spends its pixels on big surfaces
 for o in STATIC_OBJS:
@@ -977,6 +1006,11 @@ for o in hp:
 HPN = join(hp, "headphones"); HPN.data.name = "headphones"
 HP_M = Matrix.Translation(B(HP[0], HP[1] + 0.006, HB_C[2]))
 HPN.data.transform(HP_M.inverted()); HPN.matrix_world = HP_M
+HANGN = join(HANG, "hangers"); HANGN.data.name = "hangers"
+HANG_M = Matrix.Translation(B(LX0, FY + 0.008, IZ))
+HANGN.data.transform(HANG_M.inverted()); HANGN.matrix_world = HANG_M
+for i, m in enumerate(HANGN.data.materials):     # own copies (they move with the leaf); never named "door*": the page finds the leaf's by that
+    c = m.copy(); c.name = "hang_" + m.name; HANGN.data.materials[i] = c
 # lightmap UVs for the ambient occlusion bake
 uv2 = room.data.uv_layers.new(name="AO")
 room.data.uv_layers.active = uv2

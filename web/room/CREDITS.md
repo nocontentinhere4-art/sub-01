@@ -17,7 +17,8 @@ is its own node, `chair` (origin on the floor under the gas lift), so it can be 
 own AO (`chair_ao`, self-occlusion only), and the room's AO is baked without it.
 
 The headphones are their own node, `headphones` (origin where the band rests on the hook), left out of the room's AO,
-so that the page can take them off the hook.
+so that the page can take them off the hook. The things hanging on the door (hook rail, hooks, tote, hoodie) are the node
+`hangers`, whose origin is the door's hinge, so that they swing with the page's opening door leaf.
 
 The posters (`posters.png`, packed into the GLB) and the pinboard (`pinboard.png`: a calendar page, notes and doodles)
 are original graphics drawn by `room_build/tex_prep.py`. Their Japanese
@@ -57,7 +58,8 @@ Every prop is placed from its real bounding box (an imported file's origin can b
 anything is joined the build measures every prop: none may reach into the window wall or the back wall (the desk lamp
 keeps 1 cm off both), and each one's lowest vertex must lie within 2 mm of its support (desk, floor, sill, shelf; wall
 items within 2 mm of the wall). No prop may enter the places the page hard-codes (his place at the window, the delivery
-bag's and the tea bottle's spots on the desk) or the door's swing. The report lists every prop and every offender (`room_build/out/sweep.txt`); any
+bag's and the tea bottle's spots on the desk), his walking graph (the page's waypoints, links and standing places, 22 cm
+each side) or the door's swing. The report lists every prop and every offender (`room_build/out/sweep.txt`); any
 offender stops the build.
 
 ## Rebuilding

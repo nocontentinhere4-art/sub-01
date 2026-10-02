@@ -51,10 +51,11 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
   support, or enters room.html's spots (his place at the window, the delivery bag's and the tea bottle's desk spots, the door's
-  swing; `KEEP`/`DOOR_SWING`); `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
+  swing, his walking graph; `KEEP`/`DOOR_SWING`/`WALK_*`, mirror room.html when its paths change); `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
   modelled in the build (no new downloads), all off the walking graph; the headphones on the wall hook are their own
-  node `headphones` (no AO) so the page can take them off. `web/room_phone.js`: the phone screen drawn on a canvas
-  (status bar, rounded corners, off state, face glow).
+  node `headphones` (no AO): the page hides them while he wears #82's pair. The hook rail, tote and hoodie are the node
+  `hangers` (origin at the door hinge): `setDoor()` turns it with the opening leaf. `web/room_phone.js`: the phone screen drawn on a canvas
+  (status bar with his Tokyo time, rounded corners, off state, face glow); room.html routes the phone's `set`/`off` through it.
 - Phone grip: while he uses the phone his `RightHand` bone is collapsed into the sleeve and `web/room/hand_phone.glb`
   (a hand gripping a phone, Higgsfield GPT Image + Tripo H3.1, 129 KB) is attached at the wrist; the live screen sits on its glass.
 - Phone pose: one-handed grip; right arm/neck/head from `web/room/boy_text.glb` (Meshy `Texting_Walk_inplace` #676,
