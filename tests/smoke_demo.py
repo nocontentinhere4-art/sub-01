@@ -33,11 +33,11 @@ async def wait_ready(session, base, proc, timeout):
     while time.monotonic() - t0 < timeout:
         if proc.poll() is not None:
             raise RuntimeError(f"server exited with code {proc.returncode} before /api/config answered")
-        try:
-            async with session.get(base + "/api/config") as r:
+        try:                                        # a slow answer while starting up is retried like a refusal
+            async with session.get(base + "/api/config", timeout=aiohttp.ClientTimeout(total=5)) as r:
                 if r.status == 200:
                     return time.monotonic() - t0
-        except aiohttp.ClientError:
+        except (aiohttp.ClientError, asyncio.TimeoutError):
             pass
         await asyncio.sleep(0.5)
     raise RuntimeError(f"/api/config did not answer within {timeout:g} s")
