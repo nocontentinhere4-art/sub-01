@@ -461,9 +461,31 @@ load("room/boy.glb").then(g => {
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
   scene.add(phone); makeProps();
-  for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
-    load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
+  Promise.all(Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"})
+    .map(([name, file]) => load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {}))).then(loadMoves);
 }).catch(bootError);
+// ---------- better motion (#76): CC0 clips (Quaternius' Universal Animation Library) and keyed poses, retargeted onto
+// this rig (room_build/boy_post.mjs -> room/boy_moves.glb), take over walking, sitting at the desk, sleeping and lying
+// with the phone; ?moves=old keeps the first clips. Each new clip brings where its hips are (HIPS, its first frame: seated
+// 0.735 m up, the chair's seat anchor over its pivot, so his feet stay on the floor); on the bed his back is on the duvet
+const MOVES = new URLSearchParams(location.search).get("moves") !== "old";
+const MOVE = {walk:"walk", sit:"type", sleep:"sleep_breathing", phone_lie:"lie_phone"};
+const BED_ROOT = [-1.02, 0.135, 0.89];                // bedlie with the new lying clips: the duvet top (0.855 m, 2 cm of give) less the clip's mattress (0.70 m)
+let movesOn = false;
+function loadMoves(){
+  if (!MOVES) return;
+  load("room/boy_moves.glb").then(g => {
+    const by = Object.fromEntries(g.animations.map(c => [c.name, c]));
+    for (const [slot, name] of Object.entries(MOVE)) { const c = by[name]; if (!c) continue;
+      const h = c.tracks.find(t => t.name === "Hips.position"), h0 = h ? [...h.values.slice(0, 3)].map(v => v / 100) : null;
+      HIPS[name] = HIPS[slot] = h0;
+      for (const [k, v] of Object.entries(ALIAS)) if (v === slot && !actions[k]) HIPS[k] = HIPS[slot];   // dine (eating) sits like sit, listen lies like sleep (poses of the old clips keep theirs)
+      const was = actions[slot], a = actions[slot] = mixer.clipAction(c); clips[slot] = c;
+      if (was && current === was) { was.stop(); a.reset().play(); current = a; } }
+    STRIDE_V = 0.86;                                  // the new walk's feet move back at 0.86 m/s
+    movesOn = true; if (placed && goal) snap(goal.anchor, goal.clip);   // already placed for the old clips: again
+  }).catch(() => {});
+}
 const clips = {};
 // "hold" is a static upper-body pose (right arm, neck, head) taken from a texting animation on the same rig: it replaces
 // those bones of the sitting / standing idle clips; the left arm keeps the idle pose (resting on his knee / hanging)
@@ -1213,7 +1235,7 @@ let visible = true, lastLife = null;
 // consistent blend that stays out of the bed and the chair (debug: penetration()). He walks at y = F; the height of a
 // seat or the bed only comes in inside those steps. A new goal mid-walk re-plans from where he is.
 let at = null, goal = null, plan = [], step = null, holdW = 0, placed = false;
-const WALK_V = 0.9, STRIDE_V = 0.65;                  // m/s; the walk clip's feet move back at 0.65 m/s: it plays faster to match
+const WALK_V = 0.9; let STRIDE_V = 0.65;             // m/s; the walk clip's feet move back at 0.65 m/s: it plays faster to match
 const WALK_A = 1.4, TURN_V = 2.2, STEP_TS = 0.6, DINE_DX = -0.12;   // DINE_DX: the chair rolls left to the dish      // m/s² up and down; turning on the spot (rad/s) he steps round, the walk clip at 0.6x
 // where each clip has the hips, from the root (facing +z; measured): a move between two poses is planned for the hips
 const HIPS = {sit:[0.235, 0.655, -0.364], eat:[-0.014, 0.48, 0.018], idle:[-0.016, 0.994, 0.026], walk:[0.003, 0.977, 0.012], sleep:[-0.006, 1.123, 0.065]};
@@ -1254,7 +1276,7 @@ function chairSpots(){   // [where he pulls from (it comes round to face him); (
   return [S, S, [_cs.x + fo[0] * 0.70, _cs.z + fo[1] * 0.70], chairHeading(ro)];
 }
 function rootOf(name, clip, out){                     // where the root goes for an anchor and clip; returns the heading
-  const A = ANCHOR[name]; if (A.p) { out.set(...A.p); return A.r; }
+  const A = ANCHOR[name]; if (A.p) { out.set(...(name === "bedlie" && movesOn ? BED_ROOT : A.p)); return A.r; }
   let seat = A.seat, r = A.r;
   if (name === "desk" && chairNode()) { CHAIR.node.localToWorld(_cs.set(0, 0.735, 0.02)); seat = [_cs.x, _cs.y, _cs.z]; r = chairHeading(CHAIR.node.rotation.y); }
   const h = HIPS[clip] || HIPS.sit, c = Math.cos(r), sn = Math.sin(r);
@@ -2449,7 +2471,7 @@ function animate(dt){                                // one step of him: clips, 
 }
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
-  place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
+  place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); renderer.render(scene, camera); }, animate_: animate,
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top less 2 cm of give; rounded edge) and the chair

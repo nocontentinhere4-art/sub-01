@@ -74,68 +74,39 @@ From `room_build/`, with Blender 4.2 and Node 22:
     blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
 
-## The character, version 2 (`boy2*.glb`, #76; shown with `?boy=new`)
-A fictional young Japanese man of about 20, made with **MakeHuman / MPFB 2** (https://static.makehumancommunity.org,
-MPFB 2.0.17 for Blender 4.2, an add-on under GPL 3; models exported from it are CC0). He is MakeHuman's generic average
-body set to male, about 20, "Asian" macro, slim; no face sliders were moved to look like anyone, and he is not modelled
-on any real person. The parts come from the MakeHuman community asset packs
-(https://static.makehumancommunity.org/assets/assetpacks.html); all are CC0 except the hoodie and the slides, which are
-**CC-BY 4.0 by Elvaerwyn** (attribution below, changes listed in the table):
-
-| part | asset | pack | author | licence |
-|---|---|---|---|---|
-| body (base mesh, macro targets), game-engine rig with fingers, weights | MakeHuman base mesh, `game_engine` rig | MPFB 2 / makehuman_system_assets | MakeHuman team (Data Collection AB) | CC0 |
-| skin | `young_asian_male` (re-tinted) | makehuman_system_assets | MakeHuman team | CC0 |
-| eyes | `low-poly` eyes, `brown` material (hue shifted to dark brown) | makehuman_system_assets | MakeHuman team | CC0 |
-| eyebrows, eyelashes | `eyebrow008` (darkened), `eyelashes01` | makehuman_system_assets | MakeHuman team | CC0 |
-| face shape | MakeHuman targets: eye scale, chin and jaw, mouth corners (mild; not modelled on anyone) | MPFB 2 | MakeHuman team | CC0 |
-| hair | `culturalibre_hair_06` (re-dyed near-black brown, decimated; original by swift502, CC0, blendswap.com/blend/24099) | hair01 | culturalibre | CC0 |
-| hoodie | `elvs_hooded_sweat_jacket1` "Hooded sweat jacket" (re-dyed navy, fitted to a male chest, decimated; makehumancommunity.org/node/1450) | shirts02 | **Elvaerwyn** | **CC-BY** |
-| T-shirt under the hoodie | painted on the skin of the chest (original work) | | this project | CC0 |
-| joggers | `toigo_wool_pants` (re-dyed heather grey, loosened and tapered at the ankles) | pants01 | Margaret Toigo | CC0 |
-| socks | `joepal_crude_low_socks` (white) | underwear04 | Joel Palmius | CC0 |
-| slides | `elvs_male_flip_flop_sandals1` "Male flip flop sandals" (black, decimated; makehumancommunity.org/node/1453) | shoes02 | **Elvaerwyn** | **CC-BY** |
-| fabric weave (colour variation, roughness, relief) | `jersey_melange` (hoodie), `jogging_melange` (joggers), `cotton_jersey` (socks) | Poly Haven | colormass, Rico Cilliers | CC0 |
-| blink (eyelids and lashes) | `eyeBlinkLeft`, `eyeBlinkRight` face units | faceunits01 | Mika Suominen | CC0 |
-
-Hoodie and slides: © Elvaerwyn, CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/), from the MakeHuman community
-asset packs shirts02 and shoes02; modified as listed above.
-
-`room_build/build_boy.py` (headless Blender + MPFB) assembles him, poses him into the old rig's rest pose, deletes the
-skin under the clothes, bakes 2048² atlases for the skin, eyes and clothes (colour, normal map, and occlusion/roughness;
-the skin's pores and the fabrics' weave are baked in) and a 1024² one for the hair, brows and lashes (colour and
-alpha, alpha tested), and exports the bind pose. `room_build/boy_post.mjs` gives him the old skeleton's bone names and frames (so
-every clip of the old rig plays on him), plus finger, eye and socket bones, a `blink` morph, and writes `boy2.glb`, a
-`boy2_<clip>.glb` for every `boy_<clip>.glb`, and `boy2_hands.glb` (finger poses). The clips themselves are the old
-ones (below), retargeted; the finger poses are original work for this project (CC0).
-
-Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension, its user data folder holding the packs above):
-
-    python ph.py tex 1k jersey_melange jogging_melange cotton_jersey
-    node boy_ref.mjs                     # the old rig's rest pose and palms -> out/boy_ref.json
-    blender -b -P build_boy.py           # -> out/boy2_raw.glb, out/boy2_bind.json, out/boy2_*.png (about 2 minutes)
-    node boy_post.mjs                    # -> ../web/room/boy2*.glb
-    python boy_shots.py                  # screenshots of web/boy_test.html (old/new, frame strips) -> out/shots/
-
-`web/boy_test.html` plays every clip and finger pose (`?cmp` puts the old one next to him).
-
-### His motion (`boy2_motion.glb`)
+## His motion (`boy_moves.glb`, #76)
+New clips for the first character (`boy.glb`, its own 24-bone rig): in the room they take over walking, sitting at the
+desk (typing; also the base under eating), sleeping, and lying with the phone (`?moves=old` shows the first clips).
 - **Quaternius, Universal Animation Library (Standard), CC0 1.0** (https://quaternius.com/packs/universalanimationlibrary.html,
   itch.io download, March 2025 release): `Idle_Loop` → `stand_idle`, `Walk_Loop` → `walk`, `Sitting_Enter` / `Sitting_Exit`
   / `Sitting_Idle_Loop` → `sit_down_chair` / `stand_up_chair` / `sit_idle_upright` (and, raised to the mattress,
   `sit_down_bed_edge` / `stand_up_bed_edge` / `sit_edge_idle`), `PickUp_Table` → `take_item`, `Interact` → `door_open_pull`;
-  `Crouch_Idle_Loop` is a key pose of `crouch_drop`. Retargeted by `room_build/boy_post.mjs` (T-pose correspondence, feet
-  pinned by IK, hips raised to the room's seat).
+  `Crouch_Idle_Loop` is a key pose of `crouch_drop`.
 - **Keyed for this project (original work, CC0)**, from those poses: the bed set (`lie_back_idle`, `lie_side_left/right`,
   `roll_*`, `sleep_breathing*`, `lie_down_from_edge`, `get_up_to_edge`, `lie_phone`), `type`, `mouse`, `walk_start`,
   `walk_stop`, `turn_in_place_*`, `lean_on_sill`, `stretch_arms_up`, `scratch_head`, `look_around`, `crouch_drop`,
   `put_down`, `sit_lean_back`, `sit_eat_chopsticks`, `sit_drink`.
 
+They are made on an authoring body, not shipped: a MakeHuman / MPFB 2 body (CC0 base mesh and `game_engine` rig, given
+the first rig's bone names and rest frames) built by `room_build/build_boy.py`. The UAL clips are retargeted onto it
+(T-pose correspondence, feet pinned by IK) and the keyed poses are set on it by IK against its own skin (the mattress,
+the seat, the keys). `room_build/boy_post.mjs` then carries every clip onto the first rig: each bone turns in the world
+as on the authoring body from its rest; the hips are scaled by the leg ratio and set from his own lowest skin (the
+floor, or the mattress when lying); when seated his hips go up to his seat height and his legs reach down by IK. It
+also writes `docs/motion/deform_check.json`, a skin check of every clip on `boy.glb`.
+
+Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension and the MakeHuman system assets; UAL's glTF at
+`$UAL`):
+
+    node boy_ref.mjs                     # the first rig's rest pose and palms -> out/boy_ref.json
+    blender -b -P build_boy.py           # the authoring body -> out/boy2_raw.glb, out/boy2_bind.json
+    node boy_post.mjs                    # -> ../web/room/boy_moves.glb, ../docs/motion/deform_check.json
+
 ## The first character
 `boy.glb` and the clips `boy_*.glb` (shown by default) are the earlier AI-generated character (Meshy, via Higgsfield;
 generated content under those services' terms, not a Creative Commons licence), and `hand_phone.glb` the
 phone-gripping hand (GPT Image + Tripo, via Higgsfield); the clips are Meshy library animations re-rigged on its
-skeleton. The second character plays the same clips, retargeted.
+skeleton.
 
 ## His movement and the things he handles (#63)
 No animation clips were added. The clips are the ones already in `web/room/` (`boy_*.glb`, the same rig). Everything new is

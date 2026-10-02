@@ -1,18 +1,18 @@
-// node boy_post.mjs [out/boy2_raw.glb] [../web/room] : the new character (#76) for the web.
+// node boy_post.mjs [out/boy2_raw.glb] [../web/room] : better motion for the first character (#76).
+//
+// Ships: web/room/boy_moves.glb, the first character's 24-bone rig (boy.glb's) playing the new clips, and
+// docs/motion/deform_check.json, the skin check of every clip on boy.glb (see deformCheck at the end).
+//
+// How: the clips are made on an authoring body, boy2 (build_boy.py: MakeHuman CC0, a skeleton with the first rig's
+// bone names and rest frames plus fingers and eyes; kept in out/, not shipped): Quaternius' Universal Animation
+// Library (CC0) retargeted onto it, and keyed poses (the bed, the desk, eating, ...) posed on it by IK against its own
+// skin. Then toOld() carries each clip onto the first rig: every bone turns in the world as on boy2 from its rest, the
+// hips scaled by the leg ratio and set from his own lowest skin (the floor, or the mattress lying), seated frames
+// raised to his seat height with the legs reaching back down by IK.
 //
 // Input: build_boy.py's skinned mesh in its bind pose (out/boy2_raw.glb, MPFB bone names) and joints (out/boy2_bind.json),
-// boy_ref.mjs's old skeleton (out/boy_ref.json) and the old clips (web/room/boy.glb, boy_*.glb).
-// Output (web/room/): boy2.glb (mesh, skeleton, the "sit" clip like boy.glb, plus "blink"), boy2_<clip>.glb for every
-// boy_<clip>.glb (same clip names), and boy2_hands.glb (finger poses: hand_relaxed, hand_phone, hand_chopsticks,
-// hand_spoon, hand_type, hand_mouse).
-//
-// The new skeleton has the OLD bone names and the OLD bones' rest frames (orientations), placed at the new body's joints,
-// in the same units (an "Armature" node scaled 0.01 over bones in cm). So every old clip's rotations play unchanged and
-// room.html's code (bones.RightHand, head (0, 30, 30) = the face's direction, ...) keeps working. What the clips cannot
-// carry over: the bones' translations (the old skeleton's lengths) are dropped, except the hips', which is scaled by
-// the new leg length. New bones: 30 finger bones (<Side>Hand<Finger><1..3>), LeftEye/RightEye, and sockets (plain
-// nodes, not skinned) where a held object goes: RightHand > socket_phone (its centre, +y its top, +z out of the screen),
-// socket_chopsticks, socket_spoon.
+// boy_ref.mjs's old skeleton (out/boy_ref.json), the first character (web/room/boy.glb, boy_*.glb) and UAL (env UAL).
+// Also written to out/: boy2.glb, boy2_<clip>.glb, boy2_hands.glb, boy2_motion.glb (the authoring body and its clips).
 import fs from "node:fs";
 import path from "node:path";
 import { NodeIO } from "@gltf-transform/core";
@@ -24,6 +24,9 @@ import * as THREE from "three";
 import { palmOf } from "./palm.mjs";
 
 const [,, RAW = "out/boy2_raw.glb", WEB = "../web/room"] = process.argv;
+// what ships is web/room/boy_moves.glb (the motion on the first character's rig) and docs/motion/deform_check.json;
+// the authoring character (boy2*: the MakeHuman body the clips are keyed and retargeted on) stays in out/
+const OUT = "out", OLD_FILES = ["boy_door.glb", "boy_eat.glb", "boy_idle.glb", "boy_sleep.glb", "boy_text.glb", "boy_walk.glb"];
 await MeshoptEncoder.ready; await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({"meshopt.encoder": MeshoptEncoder, "meshopt.decoder": MeshoptDecoder});
 const REF = JSON.parse(fs.readFileSync("out/boy_ref.json", "utf8")).bones;
@@ -250,6 +253,77 @@ function retarget(clip) {
   return {name: clip.name, channels: out};
 }
 
+// our clip on the first character's rig (boy.glb): each of its bones turns in the world as ours does from our rest pose,
+// starting from its own rest pose; the hips move like ours scaled by the leg-length ratio, their height set so that the
+// lower ankle is as far above its rest height as ours (feet on the floor, the seat a seat, the back on the mattress)
+const OLD_CLIPS = [];
+const SEAT_DY = 0.235 - 0.139, KNEE_DROP = 0.12;                  // hip joint over the seat: his (room.html's chair anchor, 0.735 m over the
+                                                // pivot, the seat top at 0.505) less ours (0.639 over a 0.50 m seat)
+// the first character's skin (every 4th vertex), to set his height from his own lowest point
+const OLD_SKIN = await (async () => { const d = await io.read(path.join(WEB, "boy.glb")), sk = d.getRoot().listSkins()[0], out = [];
+  const js = sk.listJoints().map(j => j.getName()), ibm = sk.getInverseBindMatrices(), e = [];
+  const IB = js.map((_, i) => new THREE.Matrix4().fromArray(ibm.getElement(i, e)));
+  for (const prim of d.getRoot().listMeshes()[0].listPrimitives()) { const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), W = prim.getAttribute("WEIGHTS_0");
+    for (let i = 0; i < P.getCount(); i += 4) out.push([new THREE.Vector3(...P.getElement(i, [])), J.getElement(i, []), W.getElement(i, [])]); }
+  return {js, IB, verts: out}; })();
+const TRUNK = /^(Hips|Spine\d*|neck|Head)$/;
+function lowestOld(o, trunk = false) {           // his lowest skin (of the trunk and head only, with `trunk`)
+  const M = OLD_SKIN.js.map((n, i) => (o[n] ? o[n].matrixWorld : new THREE.Matrix4()).clone().multiply(OLD_SKIN.IB[i])), v = _v(), acc = _v(); let lo = Infinity;
+  for (const [p, j, w] of OLD_SKIN.verts) { if (trunk && !TRUNK.test(OLD_SKIN.js[j[w.indexOf(Math.max(...w))]])) continue;
+    acc.set(0, 0, 0); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.copy(p).applyMatrix4(M[j[k]]), w[k]); if (acc.y < lo) lo = acc.y; }
+  return lo;
+}
+const lowestOurs = (b, trunk) => skinLowest(b, () => true, trunk ? j => TRUNK.test(joints[j]) : null);
+// a bone's direction in each rest pose (to its child down the chain): the two rests differ a little (our arms rest 12
+// degrees closer in), so each bone also gets the turn that lines its rest direction up with the first character's
+const CHAIN = {Hips: "Spine02", Spine02: "Spine01", Spine01: "Spine", Spine: "neck", neck: "Head"};
+for (const S_ of ["Left", "Right"]) Object.assign(CHAIN, {[S_ + "Shoulder"]: S_ + "Arm", [S_ + "Arm"]: S_ + "ForeArm", [S_ + "ForeArm"]: S_ + "Hand",
+  [S_ + "UpLeg"]: S_ + "Leg", [S_ + "Leg"]: S_ + "Foot", [S_ + "Foot"]: S_ + "ToeBase"});
+function toOld(channels, dur) {
+  const nb = fk(NEW, channels, "to-old"), ob = fk(OLD, [], "old"), r0n = fk(NEW, [], "rest-n").at(0), r0o = fk(OLD, [], "rest-o").at(0);
+  const bones = Object.keys(OLD).filter(n => n !== "Armature"), wq = o => o.getWorldQuaternion(new THREE.Quaternion()), wp = o => o.getWorldPosition(_v());
+  const align = n => CHAIN[n] && r0n[CHAIN[n]] ? new THREE.Quaternion().setFromUnitVectors(wp(r0o[CHAIN[n]]).sub(wp(r0o[n])).normalize(), wp(r0n[CHAIN[n]]).sub(wp(r0n[n])).normalize()) : new THREE.Quaternion();
+  // old world = our world x our rest^-1 x (old rest direction turned onto ours) x old rest
+  const restN = Object.fromEntries(bones.filter(n => r0n[n]).map(n => [n, wq(r0n[n]).invert().multiply(align(n)).multiply(wq(r0o[n]))]));
+  const legN = SK.Hips.pos.y - newRestAnkle, legO = REF.Hips.pos[1] - oldRestAnkle, k = legO / legN;
+  const n = Math.max(2, Math.round(dur * 30) + 1), times = [...Array(n)].map((_, i) => i * dur / (n - 1));
+  const out = Object.fromEntries(bones.map(b => [b, []])), hips = [];
+  for (const t of times) {
+    const b = nb.at(t), o = ob.at(0), W = {};
+    for (const name of bones) if (restN[name]) W[name] = wq(b[name]).multiply(restN[name]);
+    for (const name of bones) if (W[name]) {
+      const par = OLD[name].parent; o[name].quaternion.copy((W[par] ? W[par].clone() : wq(o[name].parent)).invert().multiply(W[name])); }
+    // the hips: ours scaled by the leg ratio, then raised or lowered so his lowest point is where ours is (soles on
+    // the floor); lying (the trunk more level than upright), the lowest point of his trunk (his back on the mattress)
+    const h = wp(b.Hips).multiplyScalar(k);
+    o.Hips.position.set(h.x / 0.01, h.y / 0.01, h.z / 0.01); o.Hips.parent.updateMatrixWorld(true);
+    const trunkUp = wp(b.neck).sub(wp(b.Hips)).normalize().y, lying = Math.abs(trunkUp) < 0.6;
+    h.y += (lying ? lowestOurs(b, true) : Math.max(0, lowestOurs(b, false))) - lowestOld(o, lying);   // (never under the floor)
+    o.Hips.position.y = h.y / 0.01; o.Hips.parent.updateMatrixWorld(true);
+    // seated (thighs level, back upright): his hip joint sits SEAT_DY higher over the seat than ours, so his hips go up
+    // by that much and the legs reach back down by IK to where his feet were (flat, as they were)
+    const thigh = Math.max(...["Left", "Right"].map(S_ => Math.abs(wp(b[S_ + "Leg"]).sub(wp(b[S_ + "UpLeg"])).normalize().y)));
+    const sitW = trunkUp > 0.7 ? Math.min(1, Math.max(0, (0.75 - thigh) / 0.35)) : 0;
+    if (sitW > 0) {
+      const ft = ["Left", "Right"].map(S_ => wp(o[S_ + "Foot"]));
+      h.y = Math.max(h.y, wp(b.Hips).y + SEAT_DY * sitW + (h.y - wp(b.Hips).y) * (1 - sitW));
+      o.Hips.position.y = h.y / 0.01; o.Hips.parent.updateMatrixWorld(true);
+      // his shins are long for the room's chair: with his feet on the floor his knees would drop below the seat's front
+      // edge, so a foot rises (hovers, as with the first clips) until its knee is at most KNEE_DROP under the hip joint
+      ["Left", "Right"].forEach((S_, i) => { const knee = wp(o[S_ + "Leg"]), fwd = knee.clone().sub(wp(o[S_ + "UpLeg"])); fwd.y = 0;
+        const pole = knee.clone().add(fwd.normalize().multiplyScalar(0.3)).add(new THREE.Vector3(0, 0.1, 0));
+        for (let lift = 0; lift <= 0.12; lift += 0.005) {
+          reach(o[S_ + "UpLeg"], o[S_ + "Leg"], o[S_ + "Foot"], ft[i].clone().add(new THREE.Vector3(0, lift * sitW, 0)), pole);
+          if (wp(o[S_ + "Leg"]).y >= h.y - KNEE_DROP) break; }
+        o[S_ + "Foot"].quaternion.copy(wq(o[S_ + "Leg"]).invert().multiply(W[S_ + "Foot"])); o[S_ + "Foot"].updateMatrixWorld(true); });
+    }
+    for (const name of bones) if (W[name]) out[name].push(...o[name].quaternion.toArray());
+    hips.push(h.x / 0.01, h.y / 0.01, h.z / 0.01);
+  }
+  return [...bones.filter(b => restN[b]).map(b => ({node: b, path: "rotation", times, values: out[b]})), {node: "Hips", path: "translation", times, values: hips}];
+}
+
+
 // ------------------------------------------------------------------ Quaternius' Universal Animation Library (CC0)
 // Its rig (UE-mannequin style, T-pose, facing +z, every bone bending about its local +x) is mapped onto ours: our skeleton
 // is posed into its T-pose bone by bone (limb directions, then the elbow and knee hinges and the palms, like
@@ -470,10 +544,10 @@ const ALL_V = [];                               // every vertex, for the deforma
 for (const prim of mesh.listPrimitives()) { const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), W = prim.getAttribute("WEIGHTS_0");
   for (let i = 0; i < P.getCount(); i++) ALL_V.push([P.getElement(i, []), J.getElement(i, []), W.getElement(i, [])]); }
 const CHECKS = [];                              // [file, clip name, channels, duration]: every clip, for the deformation check
-function skinLowest(b, filter = () => true) {
+function skinLowest(b, filter = () => true, byJoint = null) {   // byJoint(dominant joint index): which vertices count
   const M = joints.map((n, i) => b[n].matrixWorld.clone().multiply(IBM[i])), v = _v(), acc = _v();
   let lo = Infinity;
-  for (const [p, j, w] of SKIN_V) { acc.set(0, 0, 0); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.copy(p).applyMatrix4(M[j[k]]), w[k]);
+  for (const [p, j, w] of SKIN_V) { if (byJoint && !byJoint(j[w.indexOf(Math.max(...w))])) continue; acc.set(0, 0, 0); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.copy(p).applyMatrix4(M[j[k]]), w[k]);
     if (filter(acc) && acc.y < lo) lo = acc.y; }
   return lo;
 }
@@ -674,21 +748,20 @@ for (const c of sit) { const r = retarget(c); addClip(doc, nodes, r.name, r.chan
 // a blink: 0.22 s, closing fast and opening a little slower (room.html fires it every few seconds)
 addClip(doc, {boy2: meshNode}, "blink", [{node: "boy2", path: "weights", times: [0, 0.07, 0.1, 0.22], values: [0, 1, 1, 0]}]);
 await doc.transform(weld());
-const kbMain = await finish(doc, path.join(WEB, "boy2.glb"));
+const kbMain = await finish(doc, path.join(OUT, "boy2.glb"));
 // every other clip file: the same skeleton (no mesh), the retargeted clip
-const clipFiles = fs.readdirSync(WEB).filter(f => /^boy_[a-z0-9_]+\.glb$/.test(f)).sort();
-for (const f of clipFiles) {
+for (const f of OLD_FILES) {
   const d = new (await import("@gltf-transform/core")).Document(); d.createBuffer(); const sc = d.createScene();
   const {nodes: ns} = buildSkeleton(d, sc);
   for (const c of await readClip(path.join(WEB, f))) { const r = retarget(c); addClip(d, ns, r.name, r.channels);
     CHECKS.push([f.replace(/^boy_/, "boy2_"), r.name, r.channels, Math.max(...r.channels.map(ch => ch.times[ch.times.length - 1]))]); }
-  await finish(d, path.join(WEB, f.replace(/^boy_/, "boy2_")));
+  await finish(d, path.join(OUT, f.replace(/^boy_/, "boy2_")));
 }
 {
   const d = new (await import("@gltf-transform/core")).Document(); d.createBuffer(); const sc = d.createScene();
   const {nodes: ns} = buildSkeleton(d, sc);
   for (const [name, spec] of Object.entries(POSES)) addClip(d, ns, name, poseChannels(spec));
-  await finish(d, path.join(WEB, "boy2_hands.glb"));
+  await finish(d, path.join(OUT, "boy2_hands.glb"));
 }
 if (process.env.ORIENT) {
   for (const f of ["boy_sleep.glb", "boy.glb", "boy_eat.glb"]) { const c = (await readClip(path.join(WEB, f)))[0], b = fk(OLD, c.channels, "x").at(0);
@@ -833,10 +906,25 @@ if (UAL) {
     1 / 6, {breathe: 1.0, period: 4});
   for (const [as, r] of Object.entries(BED)) { addClip(d, ns, as, bodyOnly(r.channels)); CHECKS.push(["boy2_motion.glb", as, bodyOnly(r.channels), r.duration]);
     rows.push(`  ${as} <- keyed: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m (mattress top ${MATTRESS} m)`); }
-  await finish(d, path.join(WEB, "boy2_motion.glb"));
+  await finish(d, path.join(OUT, "boy2_motion.glb"));
   console.log("boy2_motion.glb:\n" + rows.join("\n"));
+  // the same motion on the first character's rig (boy.glb, 24 bones): web/room/boy_moves.glb
+  console.log(`first character at rest: lowest point ${lowestOld(fk(OLD, [], "rest-o").at(0)).toFixed(3)} m`);
+  const o = await io.read(path.join(WEB, "boy_door.glb"));
+  for (const a of o.getRoot().listAnimations()) a.dispose();
+  const ons = Object.fromEntries(o.getRoot().listNodes().map(n => [n.getName(), n]));
+  for (const [file, name, channels, dur] of CHECKS) if (file === "boy2_motion.glb") { const r = toOld(channels, dur); addClip(o, ons, name, r); OLD_CLIPS.push([name, r, dur]); }
+  for (const [name, ch] of OLD_CLIPS) if (["walk", "type", "sleep_breathing", "lie_phone", "sit_idle_upright", "stand_idle"].includes(name)) {
+    const h = ch.find(c => c.node === "Hips" && c.path === "translation").values;
+    console.log(`  boy_moves ${name}: hips at frame 0 [${h.slice(0, 3).map(v => (v / 100).toFixed(3)).join(", ")}] m`); }
+  await finish(o, path.join(WEB, "boy_moves.glb"));
 }
-deformCheck();
+// the check on the first character (boy.glb's skin): the clips he plays today and the new ones (boy_moves.glb)
+{ const old = [];
+  for (const f of ["boy.glb", ...OLD_FILES]) for (const c of await readClip(path.join(WEB, f)))
+    old.push([f, c.name, c.channels, Math.max(...c.channels.map(ch => ch.times[ch.times.length - 1]))]);
+  deformCheck({locals: OLD, joints: OLD_SKIN.js, IB: OLD_SKIN.IB, verts: OLD_SKIN.verts, file: path.join(WEB, "..", "..", "docs", "motion", "deform_check.json"),
+    clips: [...old, ...OLD_CLIPS.map(([name, ch, dur]) => ["boy_moves.glb", name, ch, dur])]}); }
 const tris = mesh.listPrimitives().reduce((s, p) => s + p.getIndices().getCount() / 3, 0);
 console.log(`boy2: ${tris} triangles, ${mesh.listPrimitives().length} materials, ${joints.length} joints`);
 console.log(report.join(", "));
@@ -848,42 +936,41 @@ if (tris > 25000) throw new Error("over 25k triangles");
 //  bulge: how much further a vertex (skin or cloth) stands off its bones than in the bind pose: for each bone that
 //         mainly moves it (weight >= 0.25), its distance to that bone's segment posed minus bind; the least of these.
 //         A swelling at a bent joint (the "bloated joggers") moves vertices off every bone they hang on.
-//  torso: how deep a forearm, hand or finger vertex sinks into the torso's core: capsules along the spine
-//         (hips -> chest -> neck) whose radius is the torso's front-to-back half-depth there (the 10th percentile of
-//         the trunk's skin distance to them in the bind pose), so a hand resting on the belly is outside, through is in.
-function deformCheck() {
+//  torso: how deep a forearm or hand vertex sinks into the torso's core: capsules along the spine (hips -> chest ->
+//         neck) a little thinner than the torso's front-to-back half-depth there (in the bind pose), so a hand resting
+//         on the belly is outside, through is in.
+function deformCheck({locals, joints, IB, verts, clips, file: outFile}) {
   const SEG = {Hips: "Spine02", Spine02: "Spine01", Spine01: "Spine", Spine: "neck", neck: "Head", Head: "headfront"};
-  for (const S_ of ["Left", "Right"]) {
+  for (const S_ of ["Left", "Right"])
     Object.assign(SEG, {[S_ + "UpLeg"]: S_ + "Leg", [S_ + "Leg"]: S_ + "Foot", [S_ + "Foot"]: S_ + "ToeBase",
-      [S_ + "Shoulder"]: S_ + "Arm", [S_ + "Arm"]: S_ + "ForeArm", [S_ + "ForeArm"]: S_ + "Hand", [S_ + "Hand"]: S_ + "HandMiddle1"});
-    for (const f of ["Thumb", "Index", "Middle", "Ring", "Pinky"]) { SEG[`${S_}Hand${f}1`] = `${S_}Hand${f}2`; SEG[`${S_}Hand${f}2`] = `${S_}Hand${f}3`; }
-  }
+      [S_ + "Shoulder"]: S_ + "Arm", [S_ + "Arm"]: S_ + "ForeArm", [S_ + "ForeArm"]: S_ + "Hand"});
   const TORSO = ["Hips", "Spine02", "Spine01", "Spine"], LIMB = /(ForeArm|Hand)/;
   const jIndex = Object.fromEntries(joints.map((n, i) => [n, i]));
   // a segment per joint: to SEG's end, else on from the joint along its parent's direction (half the parent's length)
-  const ends = b => joints.map(n => { const p = b[n].getWorldPosition(_v());
+  const ends = b => joints.map(n => { if (!b[n]) return [_v(), _v()]; const p = b[n].getWorldPosition(_v());
     if (SEG[n] && b[SEG[n]]) return [p, b[SEG[n]].getWorldPosition(_v())];
-    const par = SK[n].parent && b[SK[n].parent] ? b[SK[n].parent].getWorldPosition(_v()) : p.clone();
+    const par = locals[n].parent && b[locals[n].parent] ? b[locals[n].parent].getWorldPosition(_v()) : p.clone();
     return [p, p.clone().add(p.clone().sub(par).multiplyScalar(0.5))]; });
   const segDist = (p, [a, c]) => { const ab = _v().subVectors(c, a), t = Math.max(0, Math.min(1, _v().subVectors(p, a).dot(ab) / Math.max(ab.lengthSq(), 1e-12)));
     return p.distanceTo(a.clone().addScaledVector(ab, t)); };
-  const skinAll = b => { const M = joints.map((n, i) => b[n].matrixWorld.clone().multiply(IBM[i])), v = _v();
-    return ALL_V.map(([p, j, w]) => { const acc = _v(); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.set(p[0], p[1], p[2]).applyMatrix4(M[j[k]]), w[k]); return acc; }); };
-  const infl = ALL_V.map(([, j, w]) => [0, 1, 2, 3].filter(k => w[k] >= 0.25).map(k => j[k]));
-  const dom = ALL_V.map(([, j, w]) => joints[j[w.indexOf(Math.max(...w))]]);
-  const rest = fk(NEW, [], "rest").at(0), E0 = ends(rest), P0 = skinAll(rest);
+  const skinAll = b => { const M = joints.map((n, i) => (b[n] ? b[n].matrixWorld : new THREE.Matrix4()).clone().multiply(IB[i])), v = _v();
+    return verts.map(([p, j, w]) => { const acc = _v(); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.set(p.x ?? p[0], p.y ?? p[1], p.z ?? p[2]).applyMatrix4(M[j[k]]), w[k]); return acc; }); };
+  const infl = verts.map(([, j, w]) => [0, 1, 2, 3].filter(k => w[k] >= 0.25).map(k => j[k]));
+  const dom = verts.map(([, j, w]) => joints[j[w.indexOf(Math.max(...w))]]);
+  const rest = fk(locals, [], "rest").at(0), E0 = ends(rest), P0 = skinAll(rest);
   const r0 = P0.map((p, i) => infl[i].map(j => segDist(p, E0[j])));
   // the bulge: the least a vertex moved off any of its main bones (moving off one bone towards another is no bulge)
   const off = (p, i, E) => Math.min(...infl[i].map((j, k) => segDist(p, E[j]) - r0[i][k]));
-  // the torso core: per spine segment, the 10th percentile of the trunk skin's distance to it
+  // the torso core: per spine segment, 0.7 of the 10th percentile of the trunk's distance to it (his hoodie is loose and
+  // one mesh with his body, so the outer 30% is cloth a resting forearm may press)
   const core = TORSO.map(n => { const ji = jIndex[n], d = P0.filter((p, i) => dom[i] === n).map(p => segDist(p, E0[ji])).sort((a, b) => a - b);
-    return d.length ? d[Math.floor(d.length * 0.1)] : 0; });
-  const limbs = ALL_V.map((_, i) => i).filter(i => LIMB.test(dom[i]));
+    return d.length ? 0.7 * d[Math.floor(d.length * 0.1)] : 0; });
+  const limbs = verts.map((_, i) => i).filter(i => LIMB.test(dom[i]));
   // bulges by region: the hips and legs (the joggers), the shoulders and arms (the hoodie's sleeves), the trunk and head
   const region = dom.map(n => /^Hips$|UpLeg|Leg|Foot|Toe/.test(n) ? "legs" : /Shoulder|Arm|Hand/.test(n) ? "arms" : "trunk");
   const out = [];
-  for (const [file, name, channels, dur] of CHECKS) {
-    const f = fk(NEW, channels, name), bulge = {legs: [0, "", 0], arms: [0, "", 0], trunk: [0, "", 0]};
+  for (const [file, name, channels, dur] of clips) {
+    const f = fk(locals, channels, name), bulge = {legs: [0, "", 0], arms: [0, "", 0], trunk: [0, "", 0]};
     let torso = 0, tWhere = "", tAt = 0;
     for (let t = 0; t <= dur + 1e-6; t += 0.2) {
       const b = f.at(Math.min(t, dur)), E = ends(b), P = skinAll(b);
@@ -894,9 +981,9 @@ function deformCheck() {
       bulge_at: Object.entries(bulge).map(([k, [d, w, t]]) => `${k}: ${w || "-"} ${t.toFixed(1)} s`).join("; "),
       torso_cm: +(torso * 100).toFixed(1), torso_at: tWhere ? `${tWhere} ${tAt.toFixed(1)} s` : ""});
   }
-  const report = {about: "boy_post.mjs deformCheck(): per clip (sampled at 5 fps), the worst bulge of skin or cloth off its bones by region (cm, posed minus bind) and the deepest forearm/hand vertex inside the torso core (cm)",
+  const report = {about: "boy_post.mjs deformCheck() on boy.glb's own skin: per clip (sampled at 5 fps), the worst bulge of skin or cloth off its bones by region (cm, posed minus bind) and the deepest forearm/hand vertex inside the torso core (cm)",
     torso_core_cm: Object.fromEntries(TORSO.map((n, k) => [n, +(core[k] * 100).toFixed(1)])), clips: out};
-  fs.writeFileSync(path.join(path.dirname(WEB), "..", "docs", "character", "deform_check.json"), JSON.stringify(report, null, 1) + "\n");
+  fs.mkdirSync(path.dirname(outFile), {recursive: true}); fs.writeFileSync(outFile, JSON.stringify(report, null, 1) + "\n");
   const worst = k => out.reduce((a, c) => c[k] > a[k] ? c : a), w = k => `${worst(k)[k]} cm (${worst(k).clip})`;
   console.log(`deform check: ${out.length} clips; worst bulge: legs ${w("bulge_legs_cm")}, arms ${w("bulge_arms_cm")}, trunk ${w("bulge_trunk_cm")}; ` +
     `deepest hand in the torso ${w("torso_cm")}`);
