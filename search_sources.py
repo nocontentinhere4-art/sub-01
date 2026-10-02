@@ -762,8 +762,8 @@ def live_interest(live, art=None, rng=None):
     except Exception:
         pass
     try:
-        if live.life.activity == "phone" and getattr(live.life, "phone_app", None) == "tiktok":
-            extra["feed"] = "shorts"                       # the phone's short-video app (#56: Shorts / TikTok)
+        if live.life.activity == "phone":
+            extra["feed"] = "shorts"                       # #89: on the phone he scrolls shorts (TikTok / Shorts)
     except Exception:
         pass
     return dict(it, **extra) if it else dict(extra, query="", **{"from": ""})

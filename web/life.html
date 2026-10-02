@@ -24,7 +24,8 @@
   #phone { position:absolute; left:16px; bottom:16px; width:210px; height:400px; border-radius:26px; background:#0b0b10;
     border:3px solid #26262f; box-shadow:0 10px 40px rgba(0,0,0,.6); padding:34px 10px 14px; display:none; }
   #phone .top { position:absolute; top:12px; left:0; right:0; text-align:center; font-size:10px; color:var(--dim); }
-  #phone canvas, #phone iframe { width:100%; height:100%; border:0; border-radius:10px; background:#000; display:block; }
+  #phone canvas, #phone img { width:100%; height:100%; border:0; border-radius:10px; background:#000; display:block; object-fit:cover; object-position:top; }
+  #screens div { font-size:12px; color:var(--dim); padding:2px 0; } #screens b { color:#ececf2; font-weight:500; }
   #foot { position:absolute; left:16px; right:16px; bottom:8px; color:#5a5a6a; font-size:10px; pointer-events:none; text-align:right; }
   #side { width:330px; border-left:1px solid #1c1c26; padding:14px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
   .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
@@ -78,7 +79,7 @@
       <div id="thought"></div>
     </div>
     <div id="tools"><button id="b-follow" class="on">follow</button><button id="b-lab">lab mode</button></div>
-    <div id="phone"><div class="top">SUB-01's phone · <span id="app"></span></div><canvas id="phonecv" width="360" height="620"></canvas><iframe id="tiktok" allow="encrypted-media" style="display:none"></iframe></div>
+    <div id="phone"><div class="top">SUB-01's phone · <span id="app"></span></div><canvas id="phonecv" width="360" height="620"></canvas><img id="phoneimg" alt="" style="display:none"></div>
     <div id="sv"></div>
     <div id="walk"><iframe id="walkvid" allow="autoplay; encrypted-media" title="real street footage"></iframe></div>
     <div id="map"></div>
@@ -104,6 +105,7 @@
       <div class="m" id="mu-why"></div>
     </div>
     <div><div class="lbl">Today</div><div id="log"></div></div>
+    <div><div class="lbl">His screens</div><div id="screens">…</div></div>
     <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
       <div id="chat"></div>
       <form id="f"><input id="in" maxlength="280" placeholder="e.g. go and buy some bread" autocomplete="off"><button>send</button></form>
@@ -259,8 +261,20 @@ function drawChat(cv){
 }
 
 // ---------------- live state ----------------
-let life = null, prev = null, poolName = "", stage = "AWAKE", clock = "--:--", lab = false, follow = true, feed = [];
-fetch("/phone_feed.json").then(r => r.ok ? r.json() : []).then(f => feed = Array.isArray(f) ? f : []).catch(() => {});
+let life = null, prev = null, poolName = "", stage = "AWAKE", clock = "--:--", lab = false, follow = true;
+// #89: what is really on his screens (the browser up or down, the last pages, today's share by kind)
+function renderScreens(d){
+  const el = document.getElementById("screens"); if (!d) return;
+  const b = d.browser || {}, esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+  const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${esc(k)} ${Math.round(v * 100)}%`).join(" · ");
+  el.innerHTML = `<div>browser <b>${esc(b.state || "?")}</b>${b.why ? ` — ${esc(b.why)}` : ""} (since ${esc(b.since || "")})</div>`
+    + (d.notes || []).map(n => `<div>${esc(n.t)} · ${esc(n.text)}</div>`).join("")
+    + `<div>today: ${share || "nothing yet"}</div>`
+    + (d.last || []).slice(0, 10).map(x => `<div>${esc(x.t)} · <b>${esc(x.kind)}</b> · ${esc(x.host)} · ${esc(x.title)}</div>`).join("");
+}
+function pollScreens(){ fetch("/api/screens").then(r => r.ok ? r.json() : null).then(renderScreens).catch(() => {}); }
+pollScreens(); setInterval(pollScreens, 5000);
 const shown = {x: 1.6, z: 1.3, h: 0};
 
 function connect(){
@@ -412,15 +426,21 @@ function onLife(L, S){
       const dt = new Date(e.t * 1000); s.textContent = dt.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tokyo"});
       d.appendChild(s); d.appendChild(document.createTextNode(e.what)); document.getElementById("log").appendChild(d); } }
   // phone overlay
-  const ph = document.getElementById("phone"), tk = document.getElementById("tiktok"), cv = document.getElementById("phonecv");
+  // phone overlay (#89): the real phone screen (a screenshot of what the browser shows), else his chart / chat
+  const ph = document.getElementById("phone"), im = document.getElementById("phoneimg"), cv = document.getElementById("phonecv");
+  const sc = L.screen && L.screen.device === "phone" ? L.screen : null;
   if (L.phone && !asleep) {
-    ph.style.display = "block"; let app = L.phone;
-    if (app === "tiktok" && !feed.length) app = "chart";
-    document.getElementById("app").textContent = app;
-    if (app === "tiktok") { const id = feed[Math.floor(Date.now() / 45000) % feed.length];
-      const src = `https://www.tiktok.com/embed/v2/${id}`; if (tk.src !== src) tk.src = src; tk.style.display = "block"; cv.style.display = "none"; }
-    else { tk.style.display = "none"; tk.removeAttribute("src"); cv.style.display = "block"; app === "chat" ? drawChat(cv) : drawChart(cv, true); }
-  } else { ph.style.display = "none"; tk.removeAttribute("src"); }
+    ph.style.display = "block";
+    if (sc && !sc.restarting && sc.id) {
+      document.getElementById("app").textContent = `${sc.host || "browser"} · real screen`;
+      const src = `/api/screen/phone.jpg?id=${sc.id}`; if (im.getAttribute("src") !== src) im.src = src;
+      im.style.display = "block"; cv.style.display = "none";
+    } else {
+      const app = sc && sc.restarting ? "browser restarting" : L.phone === "tiktok" ? "chart" : L.phone;
+      document.getElementById("app").textContent = app;
+      im.style.display = "none"; cv.style.display = "block"; L.phone === "chat" ? drawChat(cv) : drawChart(cv, true);
+    }
+  } else { ph.style.display = "none"; }
 }
 
 // ---------------- animation ----------------

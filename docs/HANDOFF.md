@@ -156,6 +156,31 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Fixtures: `tests/data/search/` (saved 2026-10-02); `tests/test_more_search.py`. A source's markup can change:
   a parser that finds nothing makes the search fall through to the next source (and `refused_today` says so).
 
+## What is really on his screens, shorts on the phone, dopamine-like bursts (#89, PR `feature/screens-live`)
+- Diagnosis (live still showed Wikipedia, no TikTok): (1) `room.html` draws `life.reading` as a hand-made Wikipedia
+  page whenever there is no desk screenshot, and since #81 that could be a browsed title; with no browser at all the
+  server ran the full Wikipedia reader. (2) TikTok logged out from a datacenter IP: the tag page has no video links
+  (client-rendered feed), so the TikTok feed was always empty. (3) YouTube `/watch` from a datacenter IP can hit
+  google.com/sorry (429). (4) Phone time was rarely shorts. (5) `/life`'s phone showed TikTok only from
+  `web/phone_feed.json`, which is empty: never TikTok, whatever the browser did.
+- `screens.py`: `ScreensStatus` (browser up/down/off + why + since, the last 10 pages with kind and host, today's share
+  by kind: tiktok, shorts, youtube, news, forum, finance, wikipedia, search, other; feed notes) → `GET /api/screens`,
+  the always-visible "His screens" card on `/brain` and the "His screens" block on `/life`.
+- `live_server.py`: `reading_now()` gives the room only Wikipedia readings; `run_research` with `--browse` asked for
+  but no browser running: at most one Wikipedia reading an hour (`WIKI_DOWN_EVERY_S`); browser outages logged once,
+  restarted with backoff 5-80 s; `on_screen()` per status.
+- Phone = shorts (`live_interest`: phone activity → feed "shorts"). TikTok first in half the feeds
+  (`short_videos.TIKTOK_SHARE`). Logged out (no working `SUB01_SESSION_TIKTOK`): public TikTok videos found by the
+  search engines (`site:tiktok.com`) are shown as embed cards from TikTok's public oEmbed (caption, creator,
+  thumbnail; the video is not played; robots.txt disallows `/embed/v2`), else "TikTok blocked from the server today →
+  YouTube Shorts" (`Browser.feed_note`, on the screens card). Cards are local pages: no links, no buttons.
+- Dopamine-like bursts (`screens.DopamineBursts`): a new short gives rpe = novelty (1 / 0.3 for a topic seen in the
+  last 30 min) + predicted interest (tastes, 0..1) − expectation (running mean, α 0.15), habituating over a scroll
+  session (clips < 5 min apart: × 1/(1 + 0.12 (n−1))); videos ½, pages ¼, nothing new 0. Applied as
+  `Neuromodulators.burst(0.5 × size)` (the DA level, the room's DA bar) and `reward` drive 8 × size × sleep gain;
+  broadcast `{"type": "dopamine", ...}` with "simulated dopamine-like reward signal in the model"; the DA trace with
+  spikes on `/brain`. `web/room.html` and `web/neurons3d.js` untouched.
+
 ## Readings from real browsing (#79, PR `feature/readings-from-browsing`)
 - Before: `run_research` read Wikipedia every 4 simulated min at the desk, whatever the browser showed, and those
   were all his readings (the reading stimulus, reading memory, REM replay, the memory test, the diary).

@@ -249,6 +249,17 @@ class Neuromodulators:
         self.last["rpe"] = rpe
         return {"rpe": rpe, "da": da, "ne": ne}
 
+    def burst(self, amount):
+        """A phasic dopamine-like burst from outside the market (#89: a new short starts). `amount` is the phasic
+        increment (>= 0), clipped like every kick; returns what was applied."""
+        try:
+            a = max(0.0, float(amount))
+        except (TypeError, ValueError):
+            return 0.0
+        before = self.phasic["DA"]
+        self._kick("DA", a)
+        return self.phasic["DA"] - before
+
     def update(self, dt, sleep_levels=None):
         """Advance dt seconds. sleep_levels: the sleep engine's modulators dict (missing keys -> 1.0)."""
         p = self.p

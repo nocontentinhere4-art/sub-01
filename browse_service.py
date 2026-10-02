@@ -135,7 +135,8 @@ def make_app(browser, token=None):
                                   "dismissed": getattr(browser, "dismissed", [])[-30:],
                                   "search_counts": dict(browser.limits.public(), variety=browser.variety.public())
                                   if hasattr(browser, "limits") else None,
-                                  "accounts": browser.accounts() if hasattr(browser, "accounts") else None})
+                                  "accounts": browser.accounts() if hasattr(browser, "accounts") else None,
+                                  "feed_note": getattr(browser, "feed_note", None)})
 
     async def health(request):
         return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(tree_rss_mb(os.getpid()), 1)})
@@ -198,6 +199,7 @@ class BrowserClient:
         self.screens = {}                                       # last status per device (for the tick message)
         self.log = []
         self.searches = None                                    # searches per source today (/api/browsing, #56)
+        self.feed_note = None                                   # what the short-video feed could not do (#89)
         self.accounts = None                                    # logged in / out per site (/api/browsing, #60)
         self.shots = {}                                         # device -> (shot id, jpeg bytes)
         self.restarting = False
@@ -268,6 +270,7 @@ class BrowserClient:
         d = json.loads(raw)
         self.log = d.get("log", [])
         self.searches = d.get("search_counts")
+        self.feed_note = d.get("feed_note")
         self.accounts = d.get("accounts")
         for dev, st in (d.get("screens") or {}).items():
             if st:

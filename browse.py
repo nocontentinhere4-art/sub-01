@@ -551,6 +551,7 @@ class Screen:
         self.chain = 0                                      # pages shown in a row since he last wandered off
         self.mode = None                                    # "video": YouTube at the desk; "shorts": the phone's
         self.queue = []                                     # short-video feed (#56); else browsing. queue: next shorts
+        self.cards = {}                                     # TikTok embed cards by video URL (#89)
         self.watch_until = 0.0                              # wall time the current video ends (0: not watching)
         self.watch_s = 0.0
         self.scene = 0.0                                    # change between the last two screenshots while watching
@@ -605,6 +606,7 @@ class Browser:
         self.failures = 0
         self.last_skip = None                               # why the last page was left unshown (guard, bot wall...)
         self.typed = []                                     # every text typed: [{t, device, host, field, query}]
+        self.feed_note = None                               # #89: what the short-video feed could not do, said plainly
         self.dismissed = []                                 # banners / modals pressed away: [{t, host, label, kind}]
         self.sandbox = None                                 # Chromium's own sandbox on? (None: not launched yet)
         self.no_sandbox = False                             # a sandboxed launch failed once: stay without it
@@ -806,7 +808,8 @@ class Browser:
                         sc.next_at = time.time() + 15
                         return None
                 elif (self.decide and sc.info and sc.info.get("kind") in ("page", "search") and sc.page is not None
-                      and sc.page.url.startswith("http") and not self._fresh_chat(heard) and not moved_on):
+                      and (sc.page.url.startswith("http") or sc.info.get("card"))
+                      and not self._fresh_chat(heard) and not moved_on):
                     page = await self.page_info(sc)
                     if page["links"] or page["can_back"]:
                         sc.awaiting, sc.awaiting_since = page, time.time()
@@ -843,6 +846,8 @@ class Browser:
         search = sc.info.get("kind") == "search"
         if search and sc.info.get("results"):                   # a results page: its parsed results, guarded again
             return self.result_page(sc, page.url)
+        if sc.info.get("card") and sc.queue:                    # a TikTok card: the next cards are the options
+            return self.result_page(sc, sc.info["url"], results=sc.queue)
         return self.pick_links(raw, page.url, text, sc, search)
 
     @staticmethod
@@ -868,10 +873,10 @@ class Browser:
             out.append(r)
         return out
 
-    def result_page(self, sc, url):
+    def result_page(self, sc, url, results=None):
         """A search results page for the eyes: its results (title, snippet, host), numbered, nothing else."""
         links = []
-        results = [r for r in self.safe_results(sc.info.get("results"))
+        results = [r for r in self.safe_results(sc.info.get("results") if results is None else results)
                    if not (sc.site or self._session(r["url"])) or VO.link_ok(r["url"], r["title"])]
         for i, r in enumerate(results[:PAGE_LINKS]):
             link = {"id": f"L{i + 1}", "href": r["url"], "text": r["title"][:100], "result": True,
@@ -957,7 +962,10 @@ class Browser:
                     href = link["href"] if link and (flag is None or link.get(flag)) else None
                     if href and (money_action(link.get("text", ""), href) or money_action(action.get("label", ""))):
                         href, self.last_skip = None, "never acts with money"     # buy / sell / swap / connect / sign
-                    ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
+                    if href and href in sc.cards:                   # a TikTok card: shown, never opened (#89)
+                        ok = await self._show_card(sc, sc.cards[href], f"{action.get('label', '')} — {why}")
+                    else:
+                        ok = bool(href) and await self._open(sc, href, f"{action.get('label', '')} — {why}", "page")
                     sc.queue = [r for r in sc.queue if r.get("url") != href]
                     if ok and kind in ("play_video", "open_video") and await self._play_muted(sc):
                         await self._start_watch(sc, action.get("watch_s"))
@@ -1070,12 +1078,77 @@ class Browser:
             return False
         names = SV.feed_order(self.rng)
         why = SS.ORIGINS.get(origin if origin in SS.ORIGINS else "interests")
+        sc.cards = {}
         for name in names:
+            if name == "tiktok" and not self._session("https://www.tiktok.com/"):
+                # logged out, the server gets an empty TikTok feed (#89): public videos as embed cards instead
+                if await self._tiktok_cards(sc, q, f"short videos — {why}"):
+                    self.feed_note = SV.NOTE_CARDS
+                    return True
+                self.feed_note = SV.NOTE_BLOCKED
+                continue
             if self.limits.source_ok(name) and await self._search_on(sc, name, q, f"short videos — {why}", origin):
                 sc.queue = [r for r in sc.info.get("results", []) if r.get("video")]
                 if sc.queue:
+                    if name == "tiktok":
+                        self.feed_note = None
                     return True
+            elif name == "tiktok":
+                self.feed_note = SV.NOTE_BLOCKED
         return False
+
+    async def _tiktok_cards(self, sc, q, why):
+        """Public TikTok videos for `q` found through the search engines (site:tiktok.com), described by TikTok's
+        public oEmbed API (caption, creator, thumbnail) and shown as cards; the video itself is not played. Every
+        request goes through robots.txt, the per-host limit and the guard; captions and creators through
+        video_text_ok."""
+        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
+        urls = []
+        for eng in ("ddg", "bing"):
+            src = SS.SOURCES[eng]
+            url = src["url"](f"site:tiktok.com {q}")
+            host = urllib.parse.urlsplit(url).hostname
+            if not self.limits.allow(host) or not await self.robots.check(url, fetch, self.limits):
+                continue
+            self.limits.note(host)
+            status, text = await fetch(url)
+            if status == 200:
+                urls = [u for u in (r["url"].split("?")[0] for r in src["parse"](text, url)) if SV.TIKTOK_VIDEO.match(u)]
+            if urls:
+                break
+        cards = []
+        for u in dict.fromkeys(urls).keys():
+            if len(cards) >= 4:
+                break
+            o = SV.oembed_url(u)
+            if not self.limits.allow("www.tiktok.com") or not await self.robots.check(o, fetch, self.limits):
+                break
+            self.limits.note("www.tiktok.com")
+            status, text = await fetch(o)
+            meta = SV.parse_oembed(text, u) if status == 200 else None
+            if (meta and video_text_ok(meta["title"]) and (not meta["author"] or video_text_ok(meta["author"]))
+                    and all(video_text_ok(h) for h in meta["hashtags"]) and (not meta["thumb"] or url_ok(meta["thumb"]))):
+                cards.append(meta)
+        if not cards:
+            return False
+        self.limits.count("tiktok", q, "")
+        sc.cards = {c["url"]: c for c in cards}
+        sc.queue = [{"url": c["url"], "title": c["title"], "snippet": c["author"], "video": True, "short": True,
+                     "channel": c["author"]} for c in cards]
+        return await self._show_card(sc, cards[0], why)
+
+    async def _show_card(self, sc, card, why):
+        """One TikTok embed card on the screen (a local page: caption, creator, thumbnail; no video, no actions)."""
+        if getattr(sc, "site", None) and getattr(sc, "public", None):   # cards are never shown in a logged-in context
+            sc.ctx, sc.page = sc.public
+            sc.site = None
+        await sc.page.set_content(SV.card_html(card), wait_until="domcontentloaded")
+        await sc.page.wait_for_timeout(1200)                    # the thumbnail
+        sc.info = {"title": card["title"][:140], "url": card["url"], "host": "tiktok.com", "kind": "page",
+                   "why": why, "t": time.time(), "card": True, "channel": card["author"][:80]}
+        sc.scrolls_left = 2
+        sc.queue = [r for r in sc.queue if r.get("url") != card["url"]]
+        return await self.show(sc)
 
     async def _site_search(self, sc, q, why):
         """Type `q` into the page's own search box and press Enter. The field is re-checked right before typing,
