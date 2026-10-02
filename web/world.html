@@ -59,7 +59,7 @@ function show(f){
   const w = f.why || {}, bits = [];
   if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${x.slice(0, 60)}”`).join(", "));
   if (w.replayed && w.replayed.length) bits.push("dreaming of: " + w.replayed.slice(-2).map(x => `“${x.slice(0, 60)}”`).join(", "));
-  if (w.mood && w.mood.outside) bits.push(`mood ${w.mood.outside}`);
+  if (w.mood) bits.push(`market ${w.mood.market}`);
   document.getElementById("why").textContent = bits.join(" · ");
 }
 async function refresh(){

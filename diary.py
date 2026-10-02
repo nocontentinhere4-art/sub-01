@@ -40,8 +40,7 @@ the titles of encyclopedia articles it read during the day and replayed, and whe
 
 BLOCK = re.compile(
     r"conscious|sentien|alive|self.?aware|\bsoul\b|\bhuman\b|\bperson\b|\bhe\b|\bshe\b|"
-    r"\bbuy|\bsell|\bprice|\btoken|\bcoin|\bmoney|\bpump|\bdump|\bmarket|\bcrypto|\bscam|\binvest|\bwallet|"
-    r"\btrad(?:e|er|ers|ing)\b|\bshopping|\$|https?://|www\.|@\w", re.I)
+    r"\bbuy|\bsell|\bprice|\btoken|\bcoin|\bmoney|\bpump|\bdump|\$|https?://|www\.|@\w", re.I)
 
 
 def clean_line(s, limit):
