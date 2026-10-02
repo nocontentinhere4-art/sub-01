@@ -13,18 +13,29 @@ trades, readings, its own slow activity): tastes are a slow, noisy average, not 
 The interface is three methods, kept small so the spiking brain (feature/spiking-brain) can replace the table with
 dopamine-modulated synapses later:  topics(option, title) -> [str],  predict(topics) -> float in [-1, 1],
 learn(topics, response) -> delta. Nothing here is enjoyment: it is a running average of simulated activity.
+
+History (for /tastes.html): on the first save of each Tokyo day the top HISTORY_TOP topics (by |preference|) are
+appended as one line to `tastes_history.jsonl` next to the state file; the file keeps the last HISTORY_DAYS lines.
+top() returns the last HISTORY_SHOWN of them as "history", so /api/tastes carries it with no server change.
 """
+import datetime as dt
+import json
 import math
+import os
 import time
 from pathlib import Path
 
 from research import keywords
-from state_io import load_json, save_json
+from sleep import TZ
+from state_io import append_jsonl, load_json, read_jsonl, save_json
 
 ALPHA = 0.2
 TAU_DAYS = 7.0
 CAP = 400                     # topics kept (the weakest are dropped)
 MIN_ABS = 0.01
+HISTORY_TOP = 20              # topics per daily snapshot
+HISTORY_DAYS = 120            # snapshots kept in tastes_history.jsonl
+HISTORY_SHOWN = 30            # snapshots returned by top()
 
 
 class Tastes:
@@ -37,6 +48,8 @@ class Tastes:
         except OSError:                                   # unreadable: start empty, as before
             d = {}
         self.pref, self.seen, self.last = d.get("pref", {}), d.get("seen", {}), d.get("last", self.last)
+        self.history_path = self.path.with_name("tastes_history.jsonl") if self.path else None
+        self._hist_day, self._hist_cache = None, (None, [])
 
     # --- the interface ---------------------------------------------------------------------------------------------
     @staticmethod
@@ -87,16 +100,69 @@ class Tastes:
         if not self.path:
             return
         save_json(self.path, {"pref": self.pref, "seen": self.seen, "last": self.last})
+        try:
+            self.snapshot()
+        except OSError as e:                              # history is a nice-to-have: never break learning
+            print(f"tastes: history not written ({e})", flush=True)
+
+    def day(self):
+        return dt.datetime.fromtimestamp(self.clock(), TZ).date().isoformat()
+
+    def snapshot(self):
+        """Append today's top topics to the history, at most once per Tokyo day. Returns True if a line was added."""
+        if not self.history_path:
+            return False
+        today = self.day()
+        if self._hist_day is None:
+            rows = read_jsonl(self.history_path, last=1)
+            self._hist_day = rows[-1].get("day") if rows and isinstance(rows[-1], dict) else ""
+        if self._hist_day == today:
+            return False
+        top = sorted(self.pref.items(), key=lambda kv: -abs(kv[1]))[:HISTORY_TOP]
+        append_jsonl(self.history_path, {"day": today, "t": round(self.clock()),
+                                         "top": {k: round(v, 3) for k, v in top}})
+        self._hist_day = today
+        rows = read_jsonl(self.history_path)
+        if len(rows) > HISTORY_DAYS:                      # cap: rewrite with the newest lines only (tmp + rename)
+            tmp = self.history_path.with_name(self.history_path.name + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write("".join(json.dumps(r) + "\n" for r in rows[-HISTORY_DAYS:]))
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self.history_path)
+        return True
+
+    def history(self, n=HISTORY_SHOWN):
+        """The last `n` daily snapshots as [{"day", "top": [{"topic", "kind", "pref"}]}], oldest first."""
+        if not self.history_path:
+            return []
+        try:
+            st = self.history_path.stat()
+            key = (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return []
+        if self._hist_cache[0] != key:
+            rows = [r for r in read_jsonl(self.history_path, last=n)
+                    if isinstance(r, dict) and isinstance(r.get("top"), dict)]
+            self._hist_cache = (key, [{"day": r.get("day", ""),
+                                       "top": [self._fmt((k, v)) for k, v in r["top"].items()
+                                               if isinstance(v, (int, float))]} for r in rows])
+        return self._hist_cache[1]
+
+    @staticmethod
+    def _fmt(kv):
+        return {"topic": kv[0].split(":", 1)[-1], "kind": "network" if kv[0].startswith("net:") else "word",
+                "pref": round(kv[1], 3)}
 
     def top(self, n=12):
         self.decay()
         items = sorted(self.pref.items(), key=lambda kv: -kv[1])
-        fmt = lambda kv: {"topic": kv[0].split(":", 1)[1], "kind": "network" if kv[0].startswith("net:") else "word",
-                          "pref": round(kv[1], 3)}
+        fmt = self._fmt
         return {"favoured": [fmt(kv) for kv in items[:n] if kv[1] > 0],
                 "avoided": [fmt(kv) for kv in items[::-1][:n] if kv[1] < 0], "topics": len(self.pref),
                 "rule": f"prediction error x {ALPHA}, decay {TAU_DAYS:g} days",
-                "note": "Learned from the brain model's simulated response to pages; not enjoyment or understanding."}
+                "note": "Learned from the brain model's simulated response to pages; not enjoyment or understanding.",
+                "history": self.history()}
 
 
 class PageWatch:
