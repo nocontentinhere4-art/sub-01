@@ -83,7 +83,11 @@ At sleep onset the manager reads these files together with #55's `/data/spiking/
   Labels that share a word share part of their cue.
 - **Pools.** For 2–6 options of any text, the striatal neurons are split among the offered labels by hashed
   affinity (as in #39).
-- **The race and the eligibility tag** are those of #39.
+- **The read-out** (#70) is `diff` by default: decide when the top pool leads the second by more than 3 sd of a
+  pool-rate difference, else the highest pool at 250 ms. The 1M benchmark and the reasons are in
+  `docs/spiking/choice.md` ("Read-outs at scale"). Session config `live_readout` (`race` / `scaled` / `diff` /
+  `window`) and `live_readout_kw` override it.
+- **The eligibility tag** is that of #39.
 - **Reward** applies `dw += η_label · δ · tag`, with `δ = value − V[label]`.
 - **Stability fix** (`docs/spiking/choice.md`: the learned preference drifted):
   - a slower value estimate, α = 0.05 instead of 0.1;
@@ -98,7 +102,8 @@ At sleep onset the manager reads these files together with #55's `/data/spiking/
 - **Reconnects.** After a websocket reconnect the pod says `hello` and `live_ready` again, so the hub uses it again.
 - **Night.** `choice_train` replays the day's real decisions: the option he really took is tagged as chosen and its
   real outcome is the dopamine. Before and after, frozen, it reports how often the network's own pick agrees with
-  the outcomes (`fit_before`, `fit_after`).
+  the outcomes (`fit_before`, `fit_after`). It also reports the same fit for the frozen twin, the network with every
+  learned change removed (`fit_frozen_twin`, #70), and the fraction of the day's decisions that paid off.
 
 ## Hard caps (all enforced by the server, each with a log line)
 
@@ -122,7 +127,9 @@ Other rules:
   - the stage and the pod's mode;
   - why the mode is blocked, if it is;
   - restarts today, today's hours and USD, and the caps;
-  - `decisions`: whether the pod answers, plus the asked, answered, timed-out and rewarded counts.
+  - `decisions`: whether the pod answers, plus the asked, answered, timed-out and rewarded counts;
+  - `learning` (#70): per Tokyo day, the fraction of real picks that later paid off (GPU and the other networks),
+    and the night replay's fit, learned vs frozen twin (`docs/spiking/choice.md`).
 
 ## Cheapest GPU that keeps up (measured 2026-10-02)
 
@@ -205,8 +212,9 @@ the 50 decisions, waited for the night phases, and deleted the pod.
   22 times; in the last 25, 18 of 25. Fifty rounds over 15 labels is far too few to see learning, and many offers
   contained several paying options. The night replay's frozen fit stayed at 0.88 before and after.
 - **The race at 1M.** As in #39, 41 of the 50 decisions were taken at the first allowed check (50 ms), because
-  large pools have very little rate noise (sd 0.4 Hz). The race is then mostly "which pool is highest at 50 ms". A
-  higher `thr_z` (config `live_thr_z`) is the next thing to try; not tuned here.
+  large pools have very little rate noise (sd 0.4 Hz). The race is then mostly "which pool is highest at 50 ms".
+  Measured in #70 (`docs/spiking/choice.md`): in a 240-trial benchmark the race still learned, and the live default
+  is now the `diff` read-out.
 - **The production network path.** The Railway → pod websocket path was not exercised; the pod's link pointed at a
   hub on the pod itself. The protocol code is the same and is round-trip tested in CI.
 
@@ -220,6 +228,12 @@ the 50 decisions, waited for the night phases, and deleted the pod.
 | jwmjydyd51km0r | RTX A4000, secure | validation | 6.9 | 0.115 | $0.029 |
 | **total** | | | | **0.334** | **$0.127** |
 
+- #70 learning benchmark (`run_live_pod.py learn`), three more pods, one at a time:
+  - knudfgxexrjmom, RTX A5000 secure, 9.0 min, $0.041;
+  - m9de4dv6duflno, RTX A4500 secure, 6.8 min, $0.028;
+  - ozepfxk1xeiw9m, RTX 4000 Ada secure, 7.8 min, $0.037.
+
+  Total 23.7 min, $0.106. A4000 secure had no capacity each time.
 - One pod at a time; each was deleted and confirmed gone.
 - Five create attempts were refused by RunPod for lack of capacity (no pod created): A4000 secure (twice),
   A4500 secure (twice), RTX 4090 community.

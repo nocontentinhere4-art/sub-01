@@ -145,3 +145,151 @@ Cost: one pod, 0.04 GPU-hours, $0.02. It was deleted at the end, and the "BRAIN"
 Next, before wiring this into his real choices (`brain_vote.py` / `tastes.py`, not touched here): variable offer
 sets with real labels, a stability fix for the drifting preference (for example a slower V, or a decaying η), and
 a higher race threshold at 1M neurons.
+
+## Read-outs at scale and the live learning benchmark (issue #70)
+
+**Question.** In the #67 validation, 41 of 50 races at 1M neurons ended at the first 50 ms check. Large pools have
+little rate noise, so the calibrated threshold is crossed at once and the pick is mostly the network's built-in
+pool bias. Does a read-out that scales make the live decisions learn, measured against the frozen twin and random?
+
+**Short answer.** At 1M neurons on GPU, every read-out tried, the merged race included, learned clearly above the
+frozen twin and the random chooser: 0.45–0.69 correct vs 0.24–0.38 (frozen) and 0.24–0.30 (random). The frozen twin
+and the random chooser never reached the criterion. No read-out was better than the others in every network. The
+first-check race did **not** stop learning in this benchmark. The "no learning" of the #67 validation came from too
+few rounds (50 over 15 labels), not from the race. The live default is now the `diff` read-out. It learned as
+well as the race, and it does not depend on the absolute pool rate, which drifted 2.4 → 5.3 Hz within minutes.
+These are three networks, one run each: small samples, reported as they are.
+
+Code: `spiking/choice.py` (`Readout`, `bandit_experiment`, `payoff_by_day`), phase `live_learn` in
+`spiking/session.py`, tests in `tests/test_spiking_readout.py`.
+
+### The read-outs (`choice.Readout`, shared by `ChoiceTask` and `LiveChooser`)
+
+All are calibrated on the network as it is: the pool rates at 100 ms in 12 presentations of one 4-label offer.
+Nothing is decided before 50 ms; at the 250 ms timeout the highest pool is taken.
+
+| read-out | rule | at 1M |
+|---|---|---|
+| `race` (#39, merged) | first pool above mean + 2 sd of the calibration rates | sd 0.12–0.18 Hz: decided at the first check in 72–100 % of trials |
+| `scaled` | the race with `thr_z` × √(pool size / 100), never below the race: the margin of a 100-neuron pool | threshold +1.5 to +3.1 Hz above the mean; whether it is crossed depends on the drifting rate (see below) |
+| `diff` | the top pool leads the second by more than 3 sd of a pool-rate difference. That sd is measured over presentations, so fixed pool biases are not counted as noise. It is scaled as Poisson noise to the time since onset (√(100 ms / t)) and to the offered pools' size | difference sd 0.09–0.13 Hz; mean decision 104–127 ms, 17–24 % timeouts |
+| `window` | the highest pool at a fixed 200 ms | always 200 ms |
+
+### The benchmark: #39's bandit with variable offers and real labels
+
+- Labels: 8 page-title-like labels, e.g. "Tea ceremony history" or "Stock market news". Their hidden reward
+  probabilities are 0.85, 0.75, …, 0.15. The cues and pools are those of the live decisions (`LiveChooser`).
+- Offers: every trial offers a random 2–6 of the 8 labels. "Correct" means picking the best offered label.
+- Reward and reversal: the outcome is Bernoulli and the dopamine value is +1 if it paid off, −1 if not. At trial
+  120 of 240 the probabilities are reversed.
+- Settings: the live learning rule (α 0.05, decaying η) and a 150 ms gap between trials.
+- Criterion: 14 of the last 20 correct.
+- Controls, for each read-out on the same network, the same offers and the same reward numbers:
+  - the frozen twin: the same network before learning, with plasticity frozen;
+  - the learned run;
+  - a random chooser. Chance is the mean of 1/K over the offers, ≈ 0.29.
+- Between read-outs every learned change is removed again, so each read-out starts from the same weights.
+
+Driver: `docs/spiking/live/run_live_pod.py learn`. Raw results:
+`docs/spiking/live/learn-1m.json`, `learn-1m-seed2.json`, `learn-1m-seed3.json`.
+
+### GPU, 1,000,000 neurons, three networks (seeds 1–3), 240 trials each
+
+Pools have ~3,890 neurons (4-label calibration). Decision: mean decision time in simulated ms, then the fraction
+decided at the first check / timed out.
+
+| seed (GPU) | read-out | calibration mean ± sd (Hz) | learned: trials to criterion / after reversal | **learned: fraction correct** | last 20 | decision | frozen twin: to criterion / after | frozen: fraction correct | random |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 (RTX A5000) | race | 2.40 ± 0.13 | 66 / 47 | **0.50** | 0.15 | 50 ms, 100 % / 0 % | never / never | 0.24 | 0.30 |
+| 1 | scaled | 5.32 ± 0.25 | 29 / 43 | **0.69** | 0.85 | 234 ms, 0 % / 87 % | never / never | 0.28 | 0.30 |
+| 1 | diff | 4.51 ± 0.32 | 87 / 47 | **0.51** | 0.65 | 127 ms, 31 % / 24 % | never / never | 0.32 | 0.30 |
+| 1 | window | 4.08 ± 0.12 | never / 47 | **0.49** | 0.55 | 200 ms | never / never | 0.35 | 0.30 |
+| 2 (RTX A4500) | scaled | 2.36 ± 0.12 | 44 / never | **0.45** | 0.20 | 52 ms, 93 % / 0 % | never / never | 0.32 | 0.30 |
+| 2 | race | 3.06 ± 0.18 | 57 / 54 | **0.64** | 0.80 | 52 ms, 98 % / 0 % | never / never | 0.28 | 0.30 |
+| 2 | window | 4.93 ± 0.14 | 72 / 70 | **0.54** | 0.65 | 200 ms | never / never | 0.30 | 0.30 |
+| 3 (RTX 4000 Ada) | diff | 2.42 ± 0.11 | 46 / 37 | **0.68** | 0.80 | 104 ms, 44 % / 17 % | never / never | 0.31 | 0.24 |
+| 3 | window | 3.10 ± 0.17 | 46 / 54 | **0.63** | 0.95 | 200 ms | never / never | 0.38 | 0.24 |
+| 3 | race | 4.43 ± 0.16 | 47 / 38 | **0.60** | 0.75 | 74 ms, 72 % / 8 % | never / never | 0.32 | 0.24 |
+
+Per read-out (mean of its runs, learned / frozen): race 0.58 / 0.28 (3 runs, criterion reached before and after the
+reversal in 3 of 3); scaled 0.57 / 0.30 (2 runs); diff 0.59 / 0.32 (2 runs, 2 of 2 before and after); window
+0.55 / 0.34 (3 runs, 2 of 3 before the reversal, 3 of 3 after).
+
+Learned curves (fraction correct per 20 trials; the reversal comes after block 6):
+
+| seed | read-out | curve |
+|---|---|---|
+| 1 | race | 0.15 0.60 0.55 0.45 0.70 0.65 · 0.15 0.60 0.80 0.70 0.50 0.15 |
+| 1 | scaled | 0.50 0.85 0.65 0.70 0.50 0.50 · 0.35 0.65 0.85 0.95 0.90 0.85 |
+| 1 | diff | 0.15 0.15 0.20 0.60 0.75 0.65 · 0.25 0.50 0.80 0.55 0.85 0.65 |
+| 1 | window | 0.10 0.35 0.40 0.45 0.35 0.40 · 0.40 0.40 0.85 0.70 0.90 0.55 |
+| 2 | scaled | 0.25 0.55 0.65 0.60 0.75 0.75 · 0.20 0.40 0.30 0.30 0.40 0.20 |
+| 2 | race | 0.40 0.40 0.80 0.75 0.60 0.65 · 0.45 0.60 0.60 0.80 0.80 0.80 |
+| 2 | window | 0.15 0.30 0.40 0.75 0.70 0.90 · 0.35 0.35 0.45 0.80 0.70 0.65 |
+| 3 | diff | 0.40 0.60 0.60 0.95 0.85 0.65 · 0.30 0.70 0.65 0.85 0.80 0.80 |
+| 3 | window | 0.25 0.60 0.60 0.95 0.80 0.50 · 0.25 0.55 0.70 0.70 0.75 0.95 |
+| 3 | race | 0.35 0.55 0.95 0.75 0.50 0.60 · 0.15 0.70 0.70 0.65 0.50 0.75 |
+
+Speed: one read-out (calibration, 240 frozen + 240 learned decisions) took ~2 min of pod time. Every decision fit
+within the 2 s deadline in simulated time (≤ 250 ms).
+
+Cost: three pods, one at a time, 23.7 min in total, **$0.106**. Each was deleted and confirmed gone; "BRAIN" was
+not touched. A4000 secure had no capacity, so the cheapest secure type in stock was taken: A5000 $0.27/h,
+A4500 $0.25/h, 4000 Ada $0.28/h. Cost log: `docs/spiking/live/costs.jsonl`.
+
+### CPU, 20k neurons, one network (seed 1), the same benchmark
+
+Raw results: `docs/spiking/cpu_learn/*.json`. Script: `docs/spiking/cpu_learn/run_cpu_learn.py`.
+The 20k `scaled` run used an earlier version without the "never below the race" floor. At 81-neuron pools its
+threshold was slightly *below* the race. With the floor it is the race at this size.
+
+| read-out | learned: to criterion / after reversal | learned: fraction correct | decision (ms) | frozen: to criterion / after | frozen | random |
+|---|---|---|---|---|---|---|
+| race | never / 90 | 0.44 | 102 | never / never | 0.30 | 0.30 |
+| scaled | never / 49 | 0.41 | 91 | never / never | 0.31 | 0.30 |
+| diff | 87 / 45 | 0.57 | 238 | never / never | 0.31 | 0.30 |
+| window | 103 / 36 | 0.44 | 200 | never / never | 0.30 | 0.30 |
+
+At 20k the pools are noisy (sd ~1 Hz) and learning with variable offers is weaker than at 1M.
+
+### Reading the numbers honestly
+
+- **Learning, at 1M, in this task.** All 10 learned runs beat their frozen twin, by +0.13 to +0.41 in fraction
+  correct. 9 of 10 reached the criterion before the reversal, 9 of 10 after it. None of the 10 frozen twins and
+  none of the random choosers reached it.
+- **The fast race was not what stopped learning.** With the race deciding at the first check in 72–100 % of trials,
+  the learned runs still reached the criterion in 47–66 trials. The built-in bias decides the first picks. Dopamine
+  then shifts the cue → pool weights until the bias is overcome. In the #67 validation, 50 rounds over 15 labels
+  were simply too few to see this.
+- **The baseline rate drifts.** The pools' calibrated mean rate moved between 2.4 and 5.3 Hz within minutes on the
+  same network: the recorded resting baseline drives the network. A threshold in Hz is fixed at calibration, so
+  `race` and `scaled` change behaviour as the rate moves. `scaled` decided like a 250 ms window in seed 1 (87 %
+  timeouts, the best run, 0.69). In seed 2 it decided like a first-check race (93 %, the worst run, 0.45). The
+  `scaled` numbers therefore say little about pool-size scaling itself.
+- **Why `diff` is the live default.** `diff` learned as well as the race (0.51 and 0.68 vs 0.50, 0.64 and 0.60). It
+  reached the criterion before and after the reversal in both runs. Its threshold is a lead between pools, so a
+  common rise or fall of all rates does not change it. Over a 16-hour waking day that matters more than in a
+  10-minute benchmark. It still decides early when one pool clearly leads (mean 104–127 ms). This is a reasoned
+  choice, not a measured win: with two runs, the difference from the race is within run-to-run spread.
+- **Preferences still drift.** Some learned runs fell back late in a phase: seed 1 race, last 20 = 0.15; seed 2
+  scaled after the reversal, 0.20. This is the drift already seen in #39.
+- **What this is not.** Eight labels with fixed hidden probabilities, a reversal, 240 trials, one run per network
+  and read-out. Real days have many more labels, few repeats per label and noisy outcomes. Whether the live
+  network learns from his real decisions is measured separately (below), not assumed from this benchmark.
+
+### On real decisions: `/api/spiking/status` → `learning`
+
+`learning.days` has one entry per Tokyo day for the last 14 days (`choice.payoff_by_day`).
+- **From the decision logs:** #55's `decisions-<day>.jsonl` and the hub's `gpu_decisions-<day>.jsonl` are merged
+  by id. For `gpu` (this network) and `other` (#55's CPU network or the rate model), each entry gives the number of
+  decisions, those with an outcome, and the fraction that **paid off** (a later reward > 0).
+- **From the night replay (`choice_replay`):** on the same day's real decisions, how often the network's own pick
+  agrees with the outcomes, for:
+  - `learned`: before the night's replay;
+  - `frozen_twin`: the same network with every learned change removed;
+  - `after_replay`.
+  The replay also reports `paid_off_frac`.
+
+The neurons card can draw "learning curve vs frozen" from `replay.learned` against `replay.frozen_twin`, day by
+day. Those two numbers come from the same decisions, so the comparison is fair. The payoff fraction depends on
+what was offered, so it is not on its own a sign of learning. Until days of data exist, nothing should be claimed.

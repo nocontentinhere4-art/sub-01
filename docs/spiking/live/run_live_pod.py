@@ -2,8 +2,11 @@
 
     python docs/spiking/live/run_live_pod.py bench --gpu "NVIDIA RTX A4000" --cloud SECURE
     python docs/spiking/live/run_live_pod.py validate --gpu "NVIDIA RTX A4000" --rounds 50
+    python docs/spiking/live/run_live_pod.py learn --gpu "NVIDIA RTX A4000" --trials 240
 
 bench:    phases bench + live_bench on the pod (no server); prints $/h, steps/s, decision wall times.
+learn:    the live_learn phase (#70): the bandit with variable offers and real labels for every read-out, the
+          learned run vs the frozen twin vs random (no server); results to docs/spiking/live/<name>.json.
 validate: live_pod_host.py on the pod runs the real SpikingHub next to the session; this script sends `rounds`
           decide/reward rounds through the RunPod proxy, waits for a periodic weight upload, sends the night
           message (the day's decisions), waits for the night phases and the final upload, then deletes the pod.
@@ -71,22 +74,32 @@ def outcome(label, rng):
 def main():
     import numpy as np
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=("bench", "validate"))
+    ap.add_argument("mode", choices=("bench", "validate", "learn"))
     ap.add_argument("--gpu", default="NVIDIA RTX A4000")
     ap.add_argument("--cloud", default="SECURE")
+    ap.add_argument("--fallback", default="", help="more GPU types to try in order when --gpu has no capacity, "
+                                                   "comma-separated, same cloud")
     ap.add_argument("--rounds", type=int, default=50)
+    ap.add_argument("--trials", type=int, default=240)
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--readouts", default="race,scaled,diff,window")
     ap.add_argument("--max-min", type=float, default=None)
     ap.add_argument("--upload-every-min", type=float, default=3.0)
     ap.add_argument("--name", default=None)
     a = ap.parse_args()
-    max_min = a.max_min or (20 if a.mode == "bench" else 44)
+    max_min = a.max_min or {"bench": 20, "learn": 28}.get(a.mode, 44)
     name = a.name or f"{a.mode}-{a.gpu.split()[-1].lower()}-{a.cloud.lower()}"
     out_path = HERE / f"{name}.json"
     costs = CostLog(HERE / "costs.jsonl")
     ops = RunPodOps(api=api_with_ports(["8001/http"] if a.mode == "validate" else []), log=costs, hours_cap=2.0)
     drive = secrets.token_hex(24)
     pod_secret = secrets.token_hex(24)
-    if a.mode == "bench":
+    if a.mode == "learn":
+        cfg = {"session_id": name, "n_neurons": 1_000_000, "seed": a.seed, "phases": ["live_learn"],
+               "max_minutes": max_min - 4, "bandit_trials": a.trials, "bandit_readouts": a.readouts.split(","),
+               "validate": False}
+        module, extra = "spiking.session", {}
+    elif a.mode == "bench":
         cfg = {"session_id": name, "n_neurons": 1_000_000, "seed": 1, "phases": ["bench", "live_bench"],
                "max_minutes": max_min - 6, "bench_ms": 5000, "live_bench_n": 40, "validate": True}
         module, extra = "spiking.session", {}
@@ -102,26 +115,30 @@ def main():
     token = secrets.token_hex(24)
     env = dict(podpack.boot_env(token, module), SUB01_SESSION=json.dumps(cfg), SUB01_POD_SECRET=pod_secret,
                SUB01_DRIVE_TOKEN=drive, SUB01_SESSION_ID=name)
-    if a.mode == "bench":
+    if a.mode in ("bench", "learn"):
         env.pop("SUB01_DRIVE_TOKEN")
     brain_before = [p.get("id") for p in ops.pods() if p.get("name") == "BRAIN"]
     t_create = time.time()
-    pod = ops.create(env, "live-" + a.mode, module, max_min, gpus=[(a.gpu, a.cloud)])
+    gpus = [(a.gpu, a.cloud)] + [(g.strip(), a.cloud) for g in a.fallback.split(",") if g.strip()]
+    pod = ops.create(env, "live-" + a.mode, module, max_min, gpus=gpus)
     pod_id = pod["id"]
-    rate = next((r["cost_per_hr"] for r in costs.open_pods() if r["pod_id"] == pod_id), None)
-    log("pod", pod_id, a.gpu, a.cloud, f"${rate}/h")
-    res = {"mode": a.mode, "gpu": a.gpu, "cloud": a.cloud, "pod_id": pod_id, "usd_per_hour": rate}
+    row = next((r for r in costs.open_pods() if r["pod_id"] == pod_id), {})
+    rate = row.get("cost_per_hr")
+    log("pod", pod_id, row.get("gpu") or a.gpu, a.cloud, f"${rate}/h")
+    res = {"mode": a.mode, "gpu": row.get("gpu") or a.gpu, "gpus_tried": gpus,
+           "cloud": a.cloud, "pod_id": pod_id, "usd_per_hour": rate}
     try:
         with ops.guard(pod_id):
             ops.upload(pod_id, data, token, timeout=900)
             res["boot_s"] = round(time.time() - t_create, 1)
             log("pack uploaded after", res["boot_s"], "s")
-            if a.mode == "bench":
+            if a.mode in ("bench", "learn"):
                 while True:
                     st = json.loads(ops.wait_http(pod_id, "status.json"))
+                    log("phase", st.get("phase"), "progress", st.get("progress"), "wall", st.get("wall_s"))
                     if st.get("done"):
                         break
-                    time.sleep(10)
+                    time.sleep(10 if a.mode == "bench" else 30)
                 res["results"] = json.loads(ops.fetch(pod_id, "results.json"))
             else:
                 validate(ops, pod_id, drive, a, res, np.random.default_rng(0))
