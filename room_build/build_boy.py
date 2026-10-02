@@ -39,6 +39,10 @@ def asset(*p): return os.path.join(DATA, *p)
 AGE = 0.1875 + (20 - 11) / (25 - 11) * 0.3125      # MakeHuman's age slider: 0.1875 = 11 years, 0.5 = 25 years
 MACRO = {"gender": 1.0, "age": AGE, "muscle": 0.45, "weight": 0.36, "proportions": 0.55, "height": 0.42,
          "cupsize": 0.5, "firmness": 0.5, "race": {"asian": 1.0, "caucasian": 0.0, "african": 0.0}}
+# a few mild face shapes on top of the average (MakeHuman's own CC0 targets): a little larger eyes, a narrower chin, the
+# mouth's corners a touch up (a relaxed neutral face, not an expression). Not modelled on anyone
+FACE = {"eyes/l-eye-scale-incr": 0.3, "eyes/r-eye-scale-incr": 0.3, "chin/chin-triangle": 0.35, "chin/chin-width-decr": 0.2,
+        "mouth/mouth-angles-up": 0.25}
 HEIGHT = 1.71                                       # metres, top of the head (the old one: 1.72)
 # the parts. color: tint (r, g, b) = texture x colour; grey (r, g, b) = the texture's luminance x colour (re-dyes a
 # garment); hsv (hue shift, saturation, value). Colours are linear. fabric: a Poly Haven CC0 cloth (room_build/tex/<id>,
@@ -50,7 +54,7 @@ PARTS = [
     dict(mhclo="eyes/low-poly/low-poly.mhclo", kind="eyes", mhmat="eyes/materials/brown.mhmat", color=("hsv", (0.035, 0.72, 0.62)), rough=0.04, texel=0.05),
     dict(mhclo="eyebrows/eyebrow001/eyebrow001.mhclo", kind="eyebrows", color=("tint", (0.09, 0.07, 0.06)), rough=0.7, texel=0.14),
     dict(mhclo="eyelashes/eyelashes01/eyelashes01.mhclo", kind="eyelashes", color=("tint", (0.25, 0.22, 0.2)), rough=0.7, texel=0.12),
-    dict(mhclo="hair/culturalibre_hair_05/culturalibre_hair_05.mhclo", kind="hair", color=("tint", (0.085, 0.068, 0.058)), rough=0.5, decimate=0.6, texel=1.0),
+    dict(mhclo="hair/culturalibre_hair_05/culturalibre_hair_05.mhclo", kind="hair", color=("tint", (0.085, 0.068, 0.058)), rough=0.78, decimate=0.6, texel=1.0),
     # a navy zip hoodie (hood down) over a dark T-shirt, heather-grey joggers, white socks, black slides
     dict(mhclo="clothes/elvs_hooded_sweat_jacket1/elvs_hooded_sweat_jacket1.mhclo", kind="clothes", role="top", color=("grey", (0.030, 0.040, 0.085)),
          fabric="jersey_melange", normal=0.45, decimate=0.22, texel=0.42),
@@ -61,7 +65,7 @@ PARTS = [
     dict(mhclo="clothes/elvs_male_flip_flop_sandals1/elvs_male_flip_flop_sandals1.mhclo", kind="clothes", role="feet", color=("grey", (0.03, 0.03, 0.032)),
          rough=0.45, decimate=0.04, texel=0.05),
 ]
-SKIN = dict(mhmat="skins/young_asian_male/young_asian_male.mhmat", kind="skin", color=("tint", (0.93, 0.76, 0.64)), rough=0.5, pores=True, texel=2.6)
+SKIN = dict(mhmat="skins/young_asian_male/young_asian_male.mhmat", kind="skin", color=("tint", (0.93, 0.76, 0.64)), rough=0.62, pores=True, texel=2.6)
 FABRIC_TILE = {"jersey_melange": 0.29, "jogging_melange": 0.27, "cotton_jersey": 0.26}    # metres per tile (Poly Haven)
 TEX = os.path.join(HERE, "tex")
 ALPHA_KINDS = {"hair", "eyebrows", "eyelashes"}
@@ -80,6 +84,8 @@ def build_human():
     base = HumanService.create_human(mask_helpers=True, detailed_helpers=True, extra_vertex_groups=True,
                                      feet_on_ground=True, scale=0.1, macro_detail_dict=MACRO)
     base.name = "body"
+    tdir = os.path.join(LocationService.get_mpfb_data("targets"))
+    for t, w in FACE.items(): TargetService.load_target(base, os.path.join(tdir, t + ".target.gz"), weight=w, name=t.split("/")[-1])
     rig = HumanService.add_builtin_rig(base, "game_engine", import_weights=True)
     parts = []
     for P in PARTS:
@@ -495,19 +501,29 @@ def fit_top(base, top, max_gap=0.025, zmin=1.0):
 
 
 def tshirt_under(base, rig, color=(0.022, 0.022, 0.025)):
-    """A dark crew-neck T-shirt under the open zip: the chest skin below the neck gets a cotton-jersey material."""
+    """A dark crew-neck T-shirt under the open zip, painted on the chest skin: below a smooth collar line (curving up
+    towards the shoulders) the skin's colour gives way to cotton; faces near the line get the blend."""
     neck = (rig.matrix_world @ rig.data.bones["neck_01"].head_local).z
     src = base.data.materials[0]; m = src.copy(); m.name = "src_tshirt"; nt = m.node_tree; N, L = nt.nodes, nt.links
-    rr = N["basecolor"]
+    rr = N["basecolor"]; skin = rr.inputs[0].links[0].from_socket
     for l in list(rr.inputs[0].links): L.remove(l)
-    rgb = N.new("ShaderNodeRGB"); rgb.outputs[0].default_value = (*color, 1.0); L.new(rgb.outputs[0], rr.inputs[0])
-    ro = N["rough"]
+    tc = N.new("ShaderNodeTexCoord"); sx = N.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sx.inputs[0])
+    x2 = N.new("ShaderNodeMath"); x2.operation = "MULTIPLY"; L.new(sx.outputs["X"], x2.inputs[0]); L.new(sx.outputs["X"], x2.inputs[1])
+    line = N.new("ShaderNodeMath"); line.operation = "MULTIPLY_ADD"; L.new(x2.outputs[0], line.inputs[0]); line.inputs[1].default_value = 1.4
+    line.inputs[2].default_value = neck - 0.045
+    d = N.new("ShaderNodeMath"); d.operation = "SUBTRACT"; L.new(sx.outputs["Z"], d.inputs[0]); L.new(line.outputs[0], d.inputs[1])
+    mask = N.new("ShaderNodeMapRange"); mask.inputs["From Min"].default_value = -0.003; mask.inputs["From Max"].default_value = 0.003
+    mask.inputs["To Min"].default_value = 1.0; mask.inputs["To Max"].default_value = 0.0; L.new(d.outputs[0], mask.inputs["Value"])
+    mx = N.new("ShaderNodeMix"); mx.data_type = "RGBA"; L.new(mask.outputs["Result"], mx.inputs[0]); L.new(skin, mx.inputs[6])
+    mx.inputs[7].default_value = (*color, 1.0); L.new(mx.outputs[2], rr.inputs[0])
+    ro = N["rough"]; rsk = ro.inputs[0].links[0].from_socket
     for l in list(ro.inputs[0].links): L.remove(l)
-    rv = N.new("ShaderNodeValue"); rv.outputs[0].default_value = 0.85; L.new(rv.outputs[0], ro.inputs[0])
+    rm = N.new("ShaderNodeMix"); rm.data_type = "FLOAT"; L.new(mask.outputs["Result"], rm.inputs[0]); L.new(rsk, rm.inputs[2])
+    rm.inputs[3].default_value = 0.88; L.new(rm.outputs[0], ro.inputs[0])
     base.data.materials.append(m); slot = len(base.data.materials) - 1; n = 0
     for p in base.data.polygons:
         c = base.matrix_world @ p.center
-        if c.z < neck - 0.035 and abs(c.x) < 0.2 and c.z > neck - 0.4: p.material_index = slot; n += 1
+        if c.z < neck + 0.02 and abs(c.x) < 0.22 and c.z > neck - 0.4: p.material_index = slot; n += 1
     log(f"t-shirt: {n} faces")
 
 
@@ -753,6 +769,7 @@ if __name__ == "__main__":
         render_preview("boy2_hand", [base] + parts, views=(("front", 0), ("out", 90), ("back", 180)), focus=hl, scale=0.35)
     apply_pose(rig, [base] + parts)
     add_eye_bones(rig, next(p for p in parts if p["kind"] == "eyes"))
+    scale_all(rig, [base] + parts, HEIGHT)          # metres from here on (the thresholds below are in final units)
     sweater = role(parts, "top"); pants = role(parts, "bottom")
     smooth_crotch(rig, pants); joggers(rig, pants); fit_top(base, sweater)
     delete_hidden_skin(base, [p for p in parts if p["kind"] == "clothes"], inset=0.02)
@@ -764,7 +781,6 @@ if __name__ == "__main__":
     for o in [base] + parts:
         for m in o.data.materials: m["alpha"] = o["kind"] in ALPHA_KINDS; m["kind"] = o["kind"]
     log("triangles:", {o.name: tris(o) for o in [base] + parts}, "total", sum(tris(o) for o in [base] + parts))
-    scale_all(rig, [base] + parts, HEIGHT)
     boy = join_parts(base, parts)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "boy2_joined.blend"))
     pack_atlas(boy)
