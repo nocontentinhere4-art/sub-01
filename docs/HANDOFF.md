@@ -63,6 +63,24 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   that night", eye dream prompts (replayed titles as images only). Wording: it does not understand the text.
 - Screens: bot checks (CAPTCHA / "unusual traffic") are recognised and left, never solved or clicked.
 
+## Teach him something (#31, PR `feature/teach-him`)
+- A viewer sends `{"type":"teach","text","nick"}` on `/ws`: a word or a phrase of at most 6 words plus an optional
+  nickname (max 16 characters). Both go through `chat.blocked` (no links, addresses, tickers, personal data, money
+  requests, slurs). Limits are in `chat.TeachLimits`: one teach per viewer per Tokyo day, keyed by the chat limiter's
+  key and kept in memory only, and at most 30 a day in total, counted from memory and from `teach.json`
+  (state_io; day + count only, never viewer keys), so a restart cannot reopen the cap; a teach also saves `state.json`. A phrase already taught that day
+  is refused.
+- The taught item becomes a stimulus (the chat rules) and a `sleep.Memory` item with `source="taught"`. It keeps
+  `nick` for display only (never a stimulus) and `replays`, which `sleep_tick` counts. In REM it weighs 1.5× a
+  chat message, and the taught pool is capped at 1.0× everything else, so it gets at most half the replays.
+- GPU session: `top_items` adds up to 5 of the day's taught items. Those with 2+ content words come first, because
+  a single word cannot be cued with half of itself (`spiking/words.py`); then the most replayed. They are tested the
+  next day like the others, and `memory_tests.jsonl` keeps `source: "taught"`.
+- `GET /api/taught`: today's and yesterday's items with nick and replay count. With the pod manager enabled it adds
+  `testable` and `result` (recalled, score, best lure, days_since) and the note "Recall by a simulated spiking
+  network from a partial cue; a model, not a mind.". Without it, only replay counts, with no recall claim.
+  Teach card on `/brain`.
+
 ## Free browsing (#29, PR `feature/free-browsing`)
 - New actions: `site_search` (types only into a search input — `browse.search_field_ok` refuses password, email,
   comment, message, login, payment fields, textareas, editable divs, POST forms and forms with a password field; the

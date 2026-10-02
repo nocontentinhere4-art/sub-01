@@ -29,7 +29,8 @@ import numpy as np
 from aiohttp import web
 
 from brain_sim import Brain
-from chat import RULES, Dedupe, RateLimiter, check as chat_check, dedupe_key, stimulus as chat_stimulus
+from chat import (RULES, TEACH_MAX_WORDS, TEACH_PER_DAY, NICK_MAX, Dedupe, RateLimiter, TeachLimits,
+                  check as chat_check, check_teach, dedupe_key, stimulus as chat_stimulus)
 from sleep import ROME, TZ, Clock, Memory, SleepEngine, Store, day_of, hhmm, next_bedtime, night_date
 from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
@@ -50,6 +51,7 @@ try:                                             # the GPU spiking brain is opti
 except Exception as _e:
     spiking_manager = spiking_server = None
     print("spiking routes unavailable:", type(_e).__name__, flush=True)
+from spiking.words import half_cue_ok              # torch-free, like pod_manager
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -59,6 +61,8 @@ NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always re
 NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
+RECALL_NOTE = "Recall by a simulated spiking network from a partial cue; a model, not a mind."
+REPLAY_NOTE = "Replayed in his sleep: the stored pattern is played back into the brain model during REM."
 RPC_WS = os.environ.get("SOLANA_WS", "wss://api.mainnet-beta.solana.com")   # e.g. a Helius wss URL (env, never logged)
 DEXS = "https://api.dexscreener.com/latest/dex/tokens/{}"
 PUMP_TRADE = bytes.fromhex("bddb7fd34ee661ee")   # pump.fun bonding curve TradeEvent
@@ -202,6 +206,8 @@ class Live:
         self.engine.t = min(self.engine.t, now)
         self.engine.update(now)
         self.limiter, self.dedupe = RateLimiter(), Dedupe()
+        self.teach_limits = TeachLimits(path=Path(data_dir) / "teach.json")   # 1 per viewer/day, TEACH_PER_DAY in total
+        self.gpu_test = False                      # main(): True when the spiking pod manager is enabled
         for m in self.memory.chat()[-200:]:
             self.dedupe.recent.append(dedupe_key(m["text"]))
         self.burst = 0.0
@@ -374,14 +380,62 @@ class Live:
         await ws.send_json({"type": "chat_ack", "ok": True})
         await self.broadcast({"type": "chat", "gain": round(gain, 2), **self.public(m)})
 
+    def taught_on(self, day):
+        return [m for m in self.memory.items if m.get("source") == "taught" and day_of(m["t"]) == day]
+
+    async def handle_teach(self, ws, key, text, nick):
+        """A viewer teaches him a word or a short phrase: the chat filter, then the limits; it becomes a stimulus (chat
+        rules) and a memory with source "taught" (stronger replay weight, capped). The nickname is display only."""
+        t = self.clock.now()
+        day = day_of(t)
+        ok, reason, text, nick = check_teach(text, nick, key, self.teach_limits, day,
+                                             [m["text"] for m in self.taught_on(day)])
+        if not ok:
+            await ws.send_json({"type": "teach_ack", "ok": False, "reason": reason})
+            return
+        stim, hits, emotion = chat_stimulus(text)
+        gain = self.engine.stimulus(t, "message")
+        for g, a in stim.items():
+            self.brain.stimulate(g, a * gain)
+        m = self.memory.add(t, text, self.engine.stage, stim, emotion, hits, source="taught", nick=nick, replays=0)
+        self.store.save(self.engine, self.memory)          # at most 30 a day: a restart never loses a taught item
+        await ws.send_json({"type": "teach_ack", "ok": True})
+        await self.broadcast({"type": "taught", "gain": round(gain, 2), **self.public(m), "nick": nick})
+
+    def taught(self):
+        """GET /api/taught: today's taught items and yesterday's, each with its nickname, how often it was replayed in
+        his sleep and, when the GPU test is on and has run, the next-day recall result."""
+        t = self.clock.now()
+        today = day_of(t)
+        yesterday = day_of(t - 86400)
+        results = self.spiking.taught_results() if self.gpu_test and self.spiking else {}
+
+        def row(m):
+            day = day_of(m["t"])
+            out = {"text": m["text"], "nick": m.get("nick", ""), "t": hhmm(m["t"]), "day": day,
+                   "replayed": m.get("replays", 0)}
+            if self.gpu_test:
+                r = results.get((day, m["text"]))
+                out["testable"] = half_cue_ok(m["text"])
+                out["result"] = None if r is None else {
+                    "recalled": bool(r.get("recalled")), "score": r.get("score"), "best_lure": r.get("threshold"),
+                    "days_since": r.get("days_since"), "test_day": r.get("test_day")}
+            return out
+        taught_today = self.taught_on(today)
+        return {"day": today, "gpu": self.gpu_test, "note": RECALL_NOTE if self.gpu_test else REPLAY_NOTE,
+                "max_words": TEACH_MAX_WORDS, "nick_max": NICK_MAX, "per_day": TEACH_PER_DAY,
+                "left": max(0, TEACH_PER_DAY - len(taught_today)),
+                "today": [row(m) for m in taught_today], "yesterday": [row(m) for m in self.taught_on(yesterday)]}
+
     def nights(self):
         def summary(n):
             if not n:
                 return None
             reading = sum(1 for r in n["replays"] if r.get("source") == "reading")
+            taught = sum(1 for r in n["replays"] if r.get("source") == "taught")
             return {"date": n["date"], "sleep_onset": n["sleep_onset"], "woke_up": n["woke_up"],
                     "wakeups": n["wakeups"], "replays": n["replays"][-20:], "sleep_debt": n["sleep_debt"],
-                    "n_replays": {"chat": len(n["replays"]) - reading, "reading": reading}}
+                    "n_replays": {"chat": len(n["replays"]) - reading - taught, "reading": reading, "taught": taught}}
         return {"type": "nights", "last": summary(self.engine.last_night), "tonight": summary(self.engine.night)}
 
     def init_sockets(self):
@@ -507,6 +561,8 @@ class Live:
                     b.stimulate(g, REPLAY_AMP * a)
                 e.record_replay(t, m)
                 src = m.get("source", "chat")
+                if src == "taught":
+                    m["replays"] = m.get("replays", 0) + 1                   # shown on the teach card
                 if src == "reading":
                     self.recent_read_replays = (self.recent_read_replays + [m["text"]])[-8:]
                 else:
@@ -849,6 +905,9 @@ class Live:
                     continue
                 if isinstance(d, dict) and d.get("type") == "chat" and isinstance(d.get("text"), str):
                     await self.handle_chat(ws, key, d["text"])
+                elif isinstance(d, dict) and d.get("type") == "teach" and isinstance(d.get("text"), str):
+                    nick = d.get("nick") if isinstance(d.get("nick"), str) else ""
+                    await self.handle_teach(ws, key, d["text"], nick)
         finally:                                       # also on errors / cancellation: never leak a client or its buffer
             self.drop_client(ws)
             self.sockets.discard(ws)
@@ -931,6 +990,7 @@ async def main(args):
         manager = spiking_manager.from_env(data_dir, get_items=lambda: spiking_manager.top_items(live.memory, live.clock.now()))
         if manager.enabled():
             hub.manager, manager.send_stop = manager, hub.forward_stop
+            live.gpu_test = True                  # /api/taught shows recall results only when the GPU test runs
         else:
             manager = None
 
@@ -974,6 +1034,10 @@ async def main(args):
     async def tastes(request):                    # what kinds of pages have paid off in the brain's response
         return web.json_response(live.tastes.top())
     app.router.add_get("/api/tastes", tastes)
+
+    async def taught(request):                    # words viewers taught him: replay counts, next-day recall (GPU on)
+        return web.json_response(live.taught())
+    app.router.add_get("/api/taught", taught)
 
     async def decisions(request):                 # the brain's last choices on the screens, with the options it saw
         return web.json_response({"decisions": live.decision_log[-20:],
