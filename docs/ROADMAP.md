@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 15:20 UTC** (pass 30). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 15:40 UTC** (pass 30b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -147,8 +147,9 @@ cheap to run, with the password gate kept until launch day.
 | 18m | 1M spiking network on GPU through his waking hours (caps 17 h, $14/day, 120 h/week) | done; on with `SUB01_DAY_LIVE=1`; learning at 1M → #70 | #67 |
 | 18n | 20k spiking network on the server CPU votes and learns live (GPU fallback) | done | #65 |
 | 18o | Browse like a young guy (interests, Shorts/TikTok, finance read-only, logged-in view-only feeds) | done | #64, #66, #69 |
+| 18r | Daily clips for the official social accounts (AI-labelled, private/draft by default) | PR #72 approved | #59 |
 | 18p | Active neurons visible inside the 3D brain | in progress | #62 |
-| 18q | Music via Spotify's official embed, picked by the brain vote | PR #71 | #68 |
+| 18q | Music via Spotify's official embed, picked by the brain vote | done (server, /brain, /life); room after #63 | #71 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
@@ -299,6 +300,19 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 30b:** merged #71 (#68 server side): he listens to music.
+- His brain vote picks 3–5 candidate tracks by time of day, tastes, taught words and chat wishes.
+- Playback is only through Spotify's official embed, started by each viewer on their own device. The server reads JSON only.
+- Without `SPOTIFY_CLIENT_ID`/`SECRET` it falls back to a curated list.
+- Coordinator run: 935 tests passed; `--music` smoke 9.4 ms with the spiking child running.
+- The room part (headphones, head nod) comes after #63.
+
+Also merged #73 (coordinator): `boot.py` now writes `exit_code` atomically. This fixes an intermittent end-to-end test
+seen while reviewing #72.
+
+#72 (#59 daily clips) is approved and waits only for its merge of main. Note: the image grows by +300 MB (ffmpeg),
+accepted.
 
 **Pass 30:** merged #69 (#56 part 2). He now browses like a young guy: interests rotate with the hour, there are
 Shorts/TikTok sessions, he looks up things he has seen, and finance is read-only with a "nothing here is financial
