@@ -29,14 +29,11 @@ way). Each stored item keeps its source, a display name (`item`: the message or 
   and the depressing branch of the Hebbian rule makes each new encoding take a little from synapses of older
   assemblies that share neurons with it (interference).
 """
-import hashlib
-
 import numpy as np
 import torch
 
+from spiking.wiring import INPUT_GROUPS, word_neurons  # torch-free, shared with live.py (the day network)
 from spiking.words import STOP, words  # noqa: F401  (torch-free: the server counts words too)
-
-INPUT_GROUPS = ("language", "visual", "default")
 
 
 class MemorySystem:
@@ -58,14 +55,7 @@ class MemorySystem:
     # --- patterns -----------------------------------------------------------------------------------------------
     def word_neurons(self, word):
         if word not in self._cache:
-            h = hashlib.sha256(("sub01-spiking:" + word).encode()).digest()
-            rng = np.random.default_rng(int.from_bytes(h[:8], "little"))
-            ids = []
-            for r in self.input_regions + self.net.reg.groups["memory"]:
-                ne = int(self.net.n_exc[r])
-                k = max(1, int(round((self.frac_hc if r in self.net.hc_regions else self.frac) * ne)))
-                ids.append(self.net.off[r] + rng.choice(ne, size=k, replace=False))
-            self._cache[word] = np.sort(np.concatenate(ids))
+            self._cache[word] = word_neurons(self.net, word, self.frac, self.frac_hc, self.input_regions)
         return self._cache[word]
 
     def pattern(self, ws):

@@ -31,7 +31,7 @@ import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
 PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes",
-         "/api/taught", "/api/mind", "/api/chess", "/api/music"]
+         "/api/taught", "/api/mind", "/api/chess", "/api/music", "/api/spiking/live"]
 ADMIN = {"X-Admin-Token": secrets.token_hex(16)}     # the server gets it as SUB01_ADMIN_TOKEN
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
 TORN = {                 # state files read back at startup, each cut off mid-write
@@ -67,6 +67,19 @@ def browser_mb(server_pid):
     from browse_service import descendants, tree_rss_mb
     return sum(tree_rss_mb(p) for p in descendants(server_pid) if p != server_pid
                and "browse_service" in Path(f"/proc/{p}/cmdline").read_bytes().decode(errors="replace"))
+
+
+def spiking_child(server_pid):
+    """Pid of the daytime spiking network's process (spiking/live.py, #55), or None."""
+    sys.path.insert(0, str(ROOT))
+    from browse_service import descendants
+    for p in descendants(server_pid):
+        try:
+            if b"spiking.live" in Path(f"/proc/{p}/cmdline").read_bytes():
+                return p
+        except OSError:
+            pass
+    return None
 
 
 def cpu_seconds(pid):
@@ -134,6 +147,8 @@ async def run(args, proc):
             # tick cost: server CPU seconds over a window of /ws, divided by the ticks received in it
             linux = Path(f"/proc/{proc.pid}/stat").exists()
             cpu0 = cpu_seconds(proc.pid) if linux else None
+            child = spiking_child(proc.pid) if linux else None
+            child0 = cpu_seconds(child) if child else None
             t0, ticks, seen, sent, next_chat = time.monotonic(), 0, {}, 0, time.monotonic()
             chatty = args.mind or args.youtube_chess or args.music
             games, videos, peak, tracks = [], [], 0.0, []
@@ -211,6 +226,14 @@ async def run(args, proc):
                 cpu = cpu_seconds(proc.pid) - cpu0
                 print(f"TICK COST: {1000 * cpu / ticks:.1f} ms CPU per {1000 * TICK_S:.0f} ms tick "
                       f"({100 * cpu / wall:.0f}% of one core, {cpu:.2f} CPU-s over {wall:.1f} s)")
+                if child:                                 # its start (build + calibration) falls in the window
+                    c = cpu_seconds(child) - child0
+                    c1 = cpu_seconds(child)
+                    await asyncio.sleep(5)
+                    idle = cpu_seconds(child) - c1
+                    print(f"SPIKING CHILD (#55): {c1:.2f} CPU-s since it started (build + calibration; {c:.2f} of them "
+                          f"in the window); between decisions {100 * idle / 5:.2f}% of one core (its idle pulse); "
+                          f"{seen.get('spiking', 0)} spiking frames on /ws")
             else:
                 print("TICK COST: not measured (/proc not available on this OS)")
             async with s.get(base + "/api/health", headers=ADMIN) as r:   # after the CPU reading
