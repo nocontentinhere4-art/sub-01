@@ -173,5 +173,15 @@
     return { object: points, onFrame, update, resize, setVisible, state, dispose, points: L.N };
   }
 
-  root.Neurons3D = { create, unb64, rateByte };
+  // the caption's spike clause (plain text) for state() -> {recorded, shown}. A frame can arrive with its rates but no
+  // spikes when the server's per-viewer budget (3 KB/s, spiking/frames.py) was used up: say so, never "0 of N".
+  function spikeLine(st) {
+    const rec = st && st.recorded > 0 ? Math.round(st.recorded) : 0, shown = st && st.shown > 0 ? Math.round(st.shown) : 0;
+    if (!rec) return "";
+    const n = rec.toLocaleString("en-US");
+    return shown ? `showing ${shown.toLocaleString("en-US")} of ${n} recorded spikes in the last frame`
+                 : `last frame: ${n} spikes recorded, none sent (the stream's 3 KB/s budget was used up)`;
+  }
+
+  root.Neurons3D = { create, unb64, rateByte, spikeLine };
 })(typeof window !== "undefined" ? window : globalThis);

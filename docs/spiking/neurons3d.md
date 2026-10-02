@@ -13,7 +13,8 @@
     was spread over the frame;
   - the region's spike rate tints its cloud (blue-grey → orange);
   - while a decision race runs, the striatum (caudate, putamen, accumbens: the action pools) is highlighted;
-  - the caption says which network is live, how many of the frame's recorded spikes are shown, and the sentence above.
+  - the caption says which network is live, how many of the frame's recorded spikes are shown (or, when the 3 KB/s
+    budget left a frame without spikes, "N spikes recorded, none sent"), and the sentence above.
 - With no live network the button reads **neurons offline** and the caption says "neurons offline — the 1M network runs
   while he is awake when the GPU is on". Nothing flashes: there is no demo or recorded stream on the server.
 - `/brain?mini&neurons=1` (the room's picture-in-picture iframe, 300 × 225): the same layer, 8 000 points, a one-line

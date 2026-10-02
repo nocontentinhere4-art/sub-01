@@ -341,3 +341,23 @@ def test_budget_survives_a_clock_set_back():
                         "spikes": [[i % 250, i % 200] for i in range(400)]}}, sample)
     out = b.fit(f)
     assert out["n3"]["sq"] and b.tokens >= 0
+
+
+def test_caption_spike_clause_never_says_zero_of():
+    """The live caption's spike clause (web/neurons3d.js spikeLine): a frame whose spikes the per-viewer budget left
+    out says so plainly instead of "0 of N"; no recorded spikes, no clause. Runs the page's own function in node."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    js = (ROOT / "web" / "neurons3d.js").read_text() + """
+const f = globalThis.Neurons3D.spikeLine;
+console.log(JSON.stringify([f({recorded: 5668, shown: 0}), f({recorded: 23543, shown: 170}), f({recorded: 0, shown: 0}),
+                            f(null), f({recorded: 12, shown: 12})]));"""
+    out = json.loads(subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout)
+    assert out[0] == "last frame: 5,668 spikes recorded, none sent (the stream's 3 KB/s budget was used up)"
+    assert out[1] == "showing 170 of 23,543 recorded spikes in the last frame"
+    assert out[2] == "" and out[3] == ""
+    assert out[4] == "showing 12 of 12 recorded spikes in the last frame"
+    assert not any(re.search(r"\b0 of\b", s) for s in out)

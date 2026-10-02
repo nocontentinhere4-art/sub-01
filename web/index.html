@@ -258,9 +258,9 @@ function neuronsText(){
   let html = "";
   if (n3want && !live) html = esc(N3_OFFLINE);
   else if (n3want) html = `<b>live · ${esc(N3_NET[n3net] || "spiking network")}</b>`
-    + (st && st.recorded ? ` · ${st.shown} of ${st.recorded.toLocaleString("en-US")} recorded spikes in the last frame` : "")
+    + (Neurons3D.spikeLine(st) ? ` · ${esc(Neurons3D.spikeLine(st))}` : "")
     + (st && st.race ? ` · <b>a choice is racing in the striatum</b>` : "")
-    + (st && st.tint === "groups" ? `<span class="s">colour: each region's network group rate (this network sends no per-region rates yet)</span>` : "")
+    + (st && st.tint === "groups" ? `<span class="s">colour: each region's network group rate (its frames carry no per-region rates)</span>` : "")
     + `<span class="s">${esc(N3_CAPTION)}</span>`;
   const cap = $("n3cap"); if (cap) { cap.hidden = !n3want; if (cap.dataset.h !== html) { cap.dataset.h = html; cap.innerHTML = html; } }
   const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, live · each dot a sampled model neuron · a model, not a mind" : N3_OFFLINE) : "";
