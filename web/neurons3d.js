@@ -170,7 +170,170 @@
     function setVisible(on) { S.on = !!on; }
     function state() { return { live: performance.now() - S.lastWall < LIVE_MS, net: S.net, tint: S.tint, race: S.raceOn, recorded: S.ns, shown: S.shown, points: L.N }; }
     function dispose() { o.scene.remove(points); g.dispose(); mat.dispose(); tex.dispose(); }
-    return { object: points, onFrame, update, resize, setVisible, state, dispose, points: L.N };
+    function rate(r) { return S.rates[r] || 0; }                    // smoothed rate byte of region r (0 = none yet)
+    return { object: points, onFrame, update, resize, setVisible, state, dispose, rate, points: L.N };
+  }
+
+  // ---------- close-up: real neuron shapes (#78) ----------
+  // A block of tissue with 100-300 reconstructed neurons (web/neurons_morph.json: NeuroMorpho.Org, CC BY 4.0,
+  // simplified), drawn as instanced line segments: one draw call per cell type, <= SEG_BUDGET segments in all. Each
+  // drawn cell stands for a sampled model neuron of the region: when that neuron's spike arrives (n3.sq), its soma
+  // flashes and a pulse runs from the soma along its axon at PULSE_UM_S (visibly slowed); its dendrites glow with the
+  // region's rate. The cerebellum is not in the simulated network: its close-up takes no frames (shapes only).
+  // Illustrative shapes: the simulated network uses point neurons.
+  const SEG_BUDGET = 60000, MAX_CELLS = 300, SOMA_SEGS = 3;
+  const PULSE_UM_S = 1000, PULSE_W_UM = 70;                        // 1 mm/s on screen vs ~0.5 m/s in thin axons
+  const SLOWDOWN = Math.round(0.5e6 / PULSE_UM_S);                 // ~500x slower than a thin unmyelinated axon
+  const KINDS = {                                                  // close-up kind -> cell types, shares, cells drawn
+    cortex: { types: [["pyramidal", 0.8], ["basket", 0.2]], cells: 120, simulated: true },
+    striatum: { types: [["medium_spiny", 1]], cells: 220, simulated: true },
+    thalamus: { types: [["relay", 1]], cells: 160, simulated: true },
+    cerebellum: { types: [["purkinje", 1]], cells: 120, simulated: false },
+  };
+  // which close-up a region gets (by its brain.json group / name); null: none
+  function kindOf(node) {
+    if (!node) return null;
+    const nm = node.name || "";
+    if (/^(LH|RH)_/.test(nm) || /Hippocampus|Amygdala/.test(nm)) return "cortex";
+    if (/Caudate|Putamen|Accumbens/.test(nm)) return "striatum";
+    if (/Thalamus/.test(nm)) return "thalamus";
+    return null;
+  }
+  // how many cells of each type fit: <= MAX_CELLS cells and <= budget segments (soma marks included)
+  function closeupPlan(kind, morph, budget) {
+    const k = KINDS[kind]; if (!k || !morph || !morph.cells) return null;
+    budget = Math.min(budget || SEG_BUDGET, SEG_BUDGET);
+    const per = k.types.reduce((a, [t, f]) => a + f * ((morph.cells[t] ? morph.cells[t].n_seg : 0) + SOMA_SEGS), 0);
+    const n = Math.max(0, Math.min(MAX_CELLS, k.cells, Math.floor(budget / Math.max(1, per))));
+    const plan = k.types.filter(([t]) => morph.cells[t]).map(([t, f]) => ({ type: t, n: Math.round(n * f) }));
+    let segs = plan.reduce((a, p) => a + p.n * (morph.cells[p.type].n_seg + SOMA_SEGS), 0);
+    while (segs > budget) { const p = plan[0]; p.n--; segs -= morph.cells[p.type].n_seg + SOMA_SEGS; }   // rounding
+    return { kind, simulated: k.simulated, cells: plan.reduce((a, p) => a + p.n, 0), segments: segs, drawCalls: plan.length, plan };
+  }
+  // soma position of cell i of n in the block (micrometres; y up, pia at the top for cortex)
+  function placeCell(kind, type, i, n, rnd) {
+    if (kind === "cerebellum") {                                   // fans in parallel planes, a row along z
+      const cols = 4, row = Math.floor(i / cols), col = i % cols;
+      return [(col - (cols - 1) / 2) * 470 + (rnd() - 0.5) * 60, (rnd() - 0.5) * 20, (row - n / cols / 2) * 22];
+    }
+    if (kind === "cortex") {                                       // L2/3 pyramids under the pia, basket cells around
+      const y = type === "pyramidal" ? -150 - 650 * rnd() : -100 - 900 * rnd();
+      return [(rnd() - 0.5) * 2200, y, (rnd() - 0.5) * 700];
+    }
+    const s = kind === "striatum" ? 520 : 760;                      // a cube of nucleus
+    return [(rnd() - 0.5) * s, (rnd() - 0.5) * s, (rnd() - 0.5) * s];
+  }
+  function closeup(o) {
+    const THREE = o.THREE, morph = o.morph, kind = o.kind, plan = closeupPlan(kind, morph, o.budget);
+    if (!plan || !plan.cells) return null;
+    const group = new THREE.Group(), rnd = rng(780 + Object.keys(KINDS).indexOf(kind));
+    const UM = o.unit || 0.12;                                      // scene units per micrometre
+    const uniforms = { uTime: { value: 0 }, uRate: { value: 0 }, uFade: { value: 0 }, uLive: { value: 0 },
+                       uSpeed: { value: PULSE_UM_S }, uWidth: { value: PULSE_W_UM }, uUnit: { value: UM } };
+    const cells = [], types = [];                                   // cells[k] -> {t: types index, j: instance}
+    for (const p of plan.plan) {
+      const c = morph.cells[p.type], ns = c.n_seg + SOMA_SEGS, pos = new Float32Array(ns * 6), dist = new Float32Array(ns * 2),
+            kd = new Float32Array(ns * 2), r = Math.max(4, c.soma_r);
+      pos.set(c.pos.slice(0, c.n_seg * 6));
+      for (let i = 0; i < c.n_seg; i++) { dist[2 * i] = c.dist[2 * i]; dist[2 * i + 1] = c.dist[2 * i + 1]; kd[2 * i] = kd[2 * i + 1] = c.kind[i]; }
+      for (let a = 0; a < SOMA_SEGS; a++) {                          // the soma: three crossed strokes of its diameter
+        const i = c.n_seg + a, o6 = 6 * i, ax = [0, 0, 0]; ax[a] = r;
+        pos.set([-ax[0], -ax[1], -ax[2], ax[0], ax[1], ax[2]], o6);
+        dist[2 * i] = dist[2 * i + 1] = 0; kd[2 * i] = kd[2 * i + 1] = 0;
+      }
+      const g = new THREE.InstancedBufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      g.setAttribute("aDist", new THREE.BufferAttribute(dist, 1));
+      g.setAttribute("aKind", new THREE.BufferAttribute(kd, 1));
+      const off = new Float32Array(p.n * 3), rot = new Float32Array(p.n * 2), sc = new Float32Array(p.n), spk = new Float32Array(p.n).fill(-1e4);
+      for (let j = 0; j < p.n; j++) {
+        off.set(placeCell(kind, p.type, j, p.n, rnd).map(v => v * UM), 3 * j);
+        const a = kind === "cerebellum" ? (rnd() - 0.5) * 0.2 : rnd() * 6.2832;
+        rot[2 * j] = Math.cos(a); rot[2 * j + 1] = Math.sin(a);
+        sc[j] = (0.85 + 0.3 * rnd()) * (rnd() < 0.5 && kind !== "cortex" ? -1 : 1);   // mirrored copies add variety
+        cells.push({ t: types.length, j });
+      }
+      g.setAttribute("iOff", new THREE.InstancedBufferAttribute(off, 3));
+      g.setAttribute("iRot", new THREE.InstancedBufferAttribute(rot, 2));
+      g.setAttribute("iScale", new THREE.InstancedBufferAttribute(sc, 1));
+      const sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute("iSpike", sa);
+      g.instanceCount = p.n;
+      const mat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        vertexShader: `
+          attribute float aDist; attribute float aKind; attribute vec3 iOff; attribute vec2 iRot; attribute float iScale; attribute float iSpike;
+          uniform float uTime; uniform float uRate; uniform float uLive; uniform float uSpeed; uniform float uWidth; uniform float uUnit;
+          varying vec3 vCol;
+          void main(){
+            vec3 p = position * abs(iScale);
+            p.x *= sign(iScale);                                          // a mirrored copy: x only, never upside down
+            p = vec3(iRot.x * p.x + iRot.y * p.z, p.y, -iRot.y * p.x + iRot.x * p.z);
+            vec3 w = p * uUnit + iOff;
+            float dt = uTime - iSpike;
+            float on = dt >= 0.0 ? 1.0 : 0.0;
+            float soma = on * exp(-dt / 0.25);
+            float front = dt * uSpeed;
+            float pulse = on * exp(-pow((aDist - front) / uWidth, 2.0)) * step(front, aDist + 3.0 * uWidth);
+            vec3 col;
+            if (aKind < 0.5) col = vec3(0.9, 0.85, 0.75) * (0.45 + 2.6 * soma);                       // soma
+            else if (aKind < 1.5) col = vec3(0.55, 0.32, 0.12) * 0.22 + vec3(1.0, 0.9, 0.6) * 4.0 * pulse; // axon
+            else {                                                                                   // dendrites
+              float glow = uLive * uRate;
+              col = mix(vec3(0.22, 0.32, 0.6), vec3(1.0, 0.5, 0.18), glow) * (0.9 + 0.9 * glow)
+                    + vec3(1.0, 0.8, 0.5) * 0.9 * soma * exp(-aDist / 40.0);
+            }
+            vCol = col;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(w, 1.0);
+          }`,
+        fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * 0.42 * uFade, 1.0); }` });
+      const lines = new THREE.LineSegments(g, mat);
+      lines.frustumCulled = false; lines.name = "closeup-" + p.type;
+      group.add(lines);
+      types.push({ type: p.type, n: p.n, spk, sa, geom: g, mat });
+    }
+    // block extent for framing (scene units)
+    const box = { min: [1e9, 1e9, 1e9], max: [-1e9, -1e9, -1e9] };
+    for (const T of types) { const off = T.geom.getAttribute("iOff").array, c = morph.cells[T.type];
+      for (let j = 0; j < T.n; j++) for (let a = 0; a < 3; a++) {
+        box.min[a] = Math.min(box.min[a], off[3 * j + a] + c.box[a] * UM); box.max[a] = Math.max(box.max[a], off[3 * j + a] + c.box[3 + a] * UM); } }
+    const S = { t0: performance.now(), lastWall: -1e9, gap: 200, prev: 0, rate: 0, region: o.region, fade: 0, on: true, spikes: 0 };
+    const clock = now => (now - S.t0) / 1000;
+    function onFrame(m) {                                           // a spiking frame: only the close-up region's spikes
+      if (!plan.simulated || !m || m.type !== "spiking" || !m.n3 || m.live === false) return;
+      const now = performance.now(), gap = now - S.prev; S.prev = now;
+      if (gap > 30 && gap < 2000) S.gap = 0.7 * S.gap + 0.3 * gap;
+      S.lastWall = now;
+      if (m.n3.rq) { const q = unb64(m.n3.rq); if (q.length > S.region) S.rate = q[S.region]; }
+      else if (o.groupRate) S.rate = rateByte(o.groupRate(m)) || S.rate;
+      const b = unb64(m.n3.sq), play = Math.min(600, S.gap) / 1000, t = clock(now), dirty = new Set();
+      for (let i = 0; i + 2 < b.length; i += 3) {
+        if (b[i] !== S.region) continue;
+        const c = cells[Math.min(cells.length - 1, Math.floor(b[i + 1] * cells.length / 256))], T = types[c.t];
+        T.spk[c.j] = t + (b[i + 2] / 255) * play; dirty.add(T); S.spikes++;
+      }
+      for (const T of dirty) T.sa.needsUpdate = true;
+    }
+    function update(now) {
+      const live = plan.simulated && now - S.lastWall < LIVE_MS;
+      uniforms.uTime.value = clock(now); uniforms.uLive.value = live ? 1 : 0;
+      const r = S.rate ? Math.max(0, Math.min(1, (S.rate / 255 - 0.42) / 0.44)) : 0;
+      uniforms.uRate.value += (r - uniforms.uRate.value) * 0.05;
+      S.fade += ((S.on ? 1 : 0) - S.fade) * 0.1; uniforms.uFade.value = S.fade;
+    }
+    function dispose() { for (const T of types) { T.geom.dispose(); T.mat.dispose(); } }
+    function info() { return { kind, region: S.region, simulated: plan.simulated, cells: plan.cells, segments: plan.segments,
+      drawCalls: plan.drawCalls, types: plan.plan.map(p => ({ type: p.type, n: p.n, species: morph.cells[p.type].species,
+      id: morph.cells[p.type].nmo_id })), live: plan.simulated && performance.now() - S.lastWall < LIVE_MS, spikes: S.spikes,
+      spiking: types.reduce((a, T) => a + T.spk.filter(x => x > -1e3).length, 0) }; }
+    return { group, onFrame, update, dispose, info, box, plan };
+  }
+
+  // level of detail: "brain" (points) or "closeup" (shapes), from the camera distance. Zooming in close on the brain
+  // (dist < brainIn) opens a close-up; zooming out of one (dist > its fit distance x OUT) returns to the whole brain.
+  const LOD_IN = 95, LOD_OUT = 2.6;
+  function lod(mode, dist, fit) {
+    if (mode === "closeup") return dist > (fit || 1) * LOD_OUT ? "brain" : "closeup";
+    return dist < LOD_IN ? "closeup" : "brain";
   }
 
   // the caption's spike clause (plain text) for state() -> {recorded, shown}. A frame can arrive with its rates but no
@@ -183,5 +346,6 @@
                  : `last frame: ${n} spikes recorded, none sent (the stream's 3 KB/s budget was used up)`;
   }
 
-  root.Neurons3D = { create, unb64, rateByte, spikeLine };
+  root.Neurons3D = { create, unb64, rateByte, spikeLine, closeup, closeupPlan, kindOf, lod, SEG_BUDGET, SLOWDOWN, PULSE_UM_S,
+                     LOD_IN, LOD_OUT };
 })(typeof window !== "undefined" ? window : globalThis);

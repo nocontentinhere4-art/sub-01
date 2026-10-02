@@ -90,3 +90,46 @@ Measured (`tests/test_neurons3d.py::test_stream_per_viewer_under_3_kb_s`, a real
   place: 12 000 points under 600 px, one draw call, no uploads while hidden, nothing drawn off screen.
 - Server: `python tests/smoke_demo.py --measure 30` tick 5.6 ms CPU per 50 ms tick on this branch and 5.6 ms on main;
   the CPU child between decisions 1.2 % of a core (main 1.6 %).
+
+## Real neuron shapes: close-ups (#78)
+> Shapes are real reconstructed neurons from public databases and are illustrative: the simulated network uses point
+> neurons (no dendrites are simulated). Pulses are slowed down to be visible.
+
+- **Cells** (`web/neurons_morph.json`, 61 KB, built by `analysis/build_morphologies.py`; credits in
+  `docs/spiking/morphology_credits.md` and on `/about`): five real reconstructions from NeuroMorpho.Org, CC BY 4.0,
+  each simplified to ≤ 300 segments (axon and dendrites get separate shares of the budget; shortest terminal branches
+  pruned first, then Ramer–Douglas–Peucker), soma at the origin, pyramidal apical dendrite turned up, Purkinje fan in
+  the x–y plane. Human where the database has a usable cell:
+  | drawn as | cell | species, region |
+  |---|---|---|
+  | pyramidal | NMO_107146 (Tamas; Molnár et al. 2016) | human neocortex L2/3, dendrites + axon complete |
+  | basket interneuron | NMO_107145 (Tamas; Molnár et al. 2016) | human neocortex L2/3, dendrites + axon complete |
+  | medium spiny | NMO_10032 (Spiga; Spiga et al. 2005) | rat nucleus accumbens shell (no human MSN in the database) |
+  | thalamic relay | NMO_115363 (Markram; Iavarone et al. 2019) | rat VPM (no human relay cell) |
+  | Purkinje | NMO_307495 (D'Angelo; Masoli et al. 2024) | human cerebellum (no axon reconstructed) |
+
+  None of them is from the scanned person; no data of that person exist at this scale. The Allen Cell Types archive
+  (its own terms) is not used. NeuroMorpho.Org was accessed only through its API and direct .swc links with a named user
+  agent, as its terms ask; the downloads are cached in `data/morph_cache/` (not in git).
+- **Levels of detail** (`web/neurons3d.js`): the whole brain keeps the #77 points. With neurons on, zooming in on the
+  brain (camera distance < `LOD_IN`) opens a close-up of the region nearest the camera; zooming out of a close-up
+  (beyond `LOD_OUT` × its framing distance) returns to the whole brain. The row "close-up: cortex · striatum ·
+  thalamus · cerebellum · whole brain" does the same by hand (cortex/striatum/thalamus: the most active region of
+  that kind; hippocampus and amygdala use the cortical shapes; the pallidum has no close-up shape).
+- **Close-up**: a block of tissue with 120 (cortex: 96 pyramidal + 24 basket), 220 (striatum), 160 (thalamus) or
+  120 (cerebellum) cells, ≤ 60 000 segments (34 920 – 44 660), drawn as instanced `LineSegments`: one draw call per
+  cell type (cortex 2, the others 1); each soma is three short crossed strokes in the same geometry. Nothing is drawn
+  while the brain is off screen or the tab hidden (as before).
+- **Spikes on the shape**: each drawn cell stands for a sampled model neuron of the close-up's region (the frame's
+  slot 0–255 picks the cell). When its spike arrives in `n3.sq`, the soma flashes and a pulse runs from the soma
+  along the axon at 1 mm/s on screen — about 500× slower than a thin unmyelinated cortical axon (~0.5 m/s) — and the
+  dendrites glow with the region's rate (`n3.rq`). Per-instance spike times and the pulse live in the shader: no
+  per-frame JS loop over segments. Axons stop where the reconstruction stops (the MSN's and relay cell's are short
+  stubs). The stream is unchanged: a close-up shows the few sampled spikes of one region (≲ 1–2 a frame).
+- **Cerebellum**: not one of the model's 214 regions. Its close-up shows the Purkinje shapes only, takes no frames,
+  and says "the cerebellum is not in the simulated network: shapes only, no activity". Offline (no live network),
+  every close-up is static and says "no live network: shapes only, no activity".
+- **Checks**: `tests/test_neurons_morph.py` (asset, credits, simplification budget, and via node
+  `tests/js/neurons_morph_check.js`: cells / segments / draw calls per close-up, no activity offline or from another
+  region, the cerebellum never active, the LOD switch); screenshots and timings: `python tests/neurons_morph_shots.py`
+  → `docs/screens/neurons_morph/`.
