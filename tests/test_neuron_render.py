@@ -184,3 +184,28 @@ def test_h01_renderer_caption_and_credits():
     build = (ROOT / "web" / "neuron_render" / "build" / "fetch_h01.py").read_text()
     assert "Creative Commons Attribution 4.0" in build and "gs://h01-release" in build
     assert "micrometre" in md.lower() or "mm" in md
+
+
+def test_h01_block_and_handoff_api():
+    """#99: B's zoom reads NeuronRender.BLOCK before open(); it must match the union of the cells' bounding boxes in the
+    manifest. openAt takes normal / cameraUp, prefetch() and setOpacity() exist, and index.html prints the module's lines."""
+    out = subprocess.run(["node", "-e", "require(process.argv[1]); console.log(JSON.stringify(globalThis.NeuronRender.BLOCK))", str(JS)],
+                         capture_output=True, text=True, check=True)
+    block = json.loads(out.stdout)
+    m = json.loads((H01 / "cortex.json").read_text())
+    cells = m["lods"]["desktop"]["cells"]
+    boxes = [c["bbox"] for c in cells if c.get("bbox")] + [c["sbbox"] for c in cells if c.get("sbbox")]
+    lo = [min(b[0][a] for b in boxes) for a in range(3)]
+    hi = [max(b[1][a] for b in boxes) for a in range(3)]
+    for a in range(3):
+        assert abs(block["min"][a] - lo[a]) <= 2 and abs(block["max"][a] - hi[a]) <= 2, (a, block, lo, hi)
+        assert abs(block["um"][a] - (hi[a] - lo[a])) <= 4
+    assert block["pia"] == "+y" == m["frame"]["pia"] and block["focusUm"] == [0, 0, 0] and block["dataset"] == "H01"
+    assert block["depthUm"][0] < block["focusDepthUm"] < block["depthUm"][1] and block["depthApprox"] is True
+    assert abs((block["focusDepthUm"] - block["depthUm"][0]) - hi[1]) <= 60 and abs((block["depthUm"][1] - block["focusDepthUm"]) - (-lo[1])) <= 60
+    src = JS.read_text()
+    for needle in ("function prefetch(", "setOpacity:", "S.normal", "o.cameraUp", "frameQ.setFromUnitVectors", "detailLine:", "sourceLine:"):
+        assert needle in src, needle
+    page = (ROOT / "web" / "index.html").read_text()
+    assert "i.detailLine" in page and "i.sourceLine" in page
+    assert "NeuroMorpho.Org reconstructions (${" not in page                            # the panel no longer hard-codes the source

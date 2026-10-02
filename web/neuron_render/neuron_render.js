@@ -537,7 +537,7 @@
     const styleOf = s => s === "em" ? "em" : (s === "render" ? "render" : "fluorescence");
     const S = { kind, region: o.region, label: o.label || "", style: styleOf(o.style), lodName: o.lod || "auto",
                 trimTri: 0, h01: null, entry: o.entry ? { ms: o.entry.ms || 1200, from: o.entry.from || 6, t0: 0, on: false } : null,
-                worldPos: o.worldPos || null, readyResolve: null,
+                worldPos: o.worldPos || null, normal: o.normal && o.normal.length === 3 ? o.normal.slice() : null, readyResolve: null, opacity: 1, entryFade: 1,
                 live: !!o.live, lastWall: o.live ? performance.now() : -1e9, forcedOffline: false, rate: 0, rateT: 0, spikes: 0, gap: 200, prev: 0,
                 onScreen: true, closed: false, fps: 0, jsMs: 0, frames: 0, jsSum: 0, fpsAt: performance.now(), focus: 0, t0: performance.now(),
                 userTouched: false, zoomedOut: false };
@@ -559,8 +559,10 @@
     const hud = root.document.createElement("div"); hud.className = "nr-hud";
     hud.innerHTML = '<button data-s="fluorescence">fluorescence</button><button data-s="render">3D render</button><button data-s="em">EM</button><button class="nr-x" title="back to the whole brain">✕</button>';
     const bar = root.document.createElement("div"); bar.className = "nr-bar"; bar.innerHTML = '<i></i><span></span>';
-    if (S.entry) canvas.style.opacity = "0";
     const stat = root.document.createElement("div"); stat.className = "nr-stat";
+    function applyOpacity() {                                      // nr.setOpacity() x the entry fade-in, on the canvas and the HUD alike
+      const a = Math.max(0, Math.min(1, S.opacity * S.entryFade)); for (const el of [canvas, hud, stat, bar]) el.style.opacity = String(a); }
+    S.entryFade = S.entry ? 0 : 1; applyOpacity();
     if (root.getComputedStyle && root.getComputedStyle(container).position === "static") container.style.position = "relative";
     container.appendChild(canvas); container.appendChild(hud); container.appendChild(stat); container.appendChild(bar);
     hud.querySelectorAll("button[data-s]").forEach(b => b.onclick = () => setStyle(b.dataset.s));
@@ -568,6 +570,13 @@
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: "high-performance" });
     renderer.autoClear = true;
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(32, 1, 2, 9000);
+    // B's zoom: the block's +y is "toward the pia"; o.normal (the outward cortical normal where B zoomed in, in B's world) turns the
+    // whole block so the two coincide, and o.cameraDir / o.cameraUp are then taken in that same world (see the API doc, openAt)
+    const frameQ = new THREE.Quaternion();
+    if (S.normal) { const n = new THREE.Vector3(S.normal[0], S.normal[1], S.normal[2]);
+      if (n.lengthSq() > 1e-12) { frameQ.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n.normalize()); scene.quaternion.copy(frameQ); } }
+    if (o.cameraUp && o.cameraUp.length === 3) camera.up.set(o.cameraUp[0], o.cameraUp[1], o.cameraUp[2]).normalize();
+    const toWorld = p => { const v = new THREE.Vector3(p[0], p[1], p[2]).applyQuaternion(frameQ); return [v.x, v.y, v.z]; };
     const isGL2 = !!(renderer.capabilities && renderer.capabilities.isWebGL2);
     const halfOk = isGL2 ? !!renderer.extensions.get("EXT_color_buffer_float") : !!(renderer.extensions.get("OES_texture_half_float") && renderer.extensions.get("EXT_color_buffer_half_float"));
     const rtType = halfOk ? THREE.HalfFloatType : THREE.UnsignedByteType;
@@ -632,15 +641,10 @@
       applyStyle(); fit(); if (o.onInfo) o.onInfo(info());
     }
     // the H01 path: real cells, lazily loaded (web/neuron_render/h01.js + h01/<set>_<lod>.bin.gz)
-    function loadH01Module() {
-      if (NR.h01) return Promise.resolve(NR.h01);
-      return new Promise((res, rej) => { const sc = root.document.createElement("script"); sc.src = (o.base || "neuron_render/") + "h01.js";
-        sc.onload = () => NR.h01 ? res(NR.h01) : rej(new Error("h01.js")); sc.onerror = () => rej(new Error("h01.js")); root.document.head.appendChild(sc); });
-    }
     function build() {
       const set = H01_SETS[kind];
       if (set && typeof root.DecompressionStream === "function" && o.h01 !== false) {
-        loadH01Module().then(h => h.load(set, lodOf(), o.base ? o.base + "h01/" : undefined)).then(data => { if (!S.closed) buildH01(data); })
+        loadH01Module(o.base).then(h => h.load(set, lodOf(), o.base ? o.base + "h01/" : undefined)).then(data => { if (!S.closed) buildH01(data); })
           .catch(e => { console.warn("NeuronRender: H01 set unavailable, drawing the NeuroMorpho cells:", e); if (!S.closed) buildProcedural(); });
       } else buildProcedural();
     }
@@ -793,7 +797,7 @@
     // camera: orbit around the focus cell; drag turns, wheel / pinch zooms; zooming out past the block closes
     const cam = { theta: 0.35, phi: 1.25, dist: 1000, dist0: 1000, target: [0, 0, 0] };
     function fit() {
-      cam.target = focusPos.slice();
+      cam.target = toWorld(focusPos);
       cam.dist = cam.dist0 = (L.field / 2) / Math.tan(camera.fov * Math.PI / 360);
       if (S.entry && !S.entry.on) { S.entry.on = true; S.entry.t0 = performance.now(); cam.dist = cam.dist0 * S.entry.from; }
       if (o.cameraDir && o.cameraDir.length === 3) { const d = o.cameraDir; cam.theta = Math.atan2(-d[0], -d[2]); cam.phi = Math.acos(Math.max(-1, Math.min(1, -d[1]))); }
@@ -865,8 +869,8 @@
       resize();
       if (S.entry && S.entry.on) {                                 // the fly-in from B's zoom: ease out, the canvas fades in
         const u = Math.min(1, (now - S.entry.t0) / S.entry.ms), e = 1 - Math.pow(1 - u, 3);
-        cam.dist = cam.dist0 * (S.entry.from + (1 - S.entry.from) * e); canvas.style.opacity = String(Math.min(1, u * 2.5));
-        if (u >= 1) { S.entry.on = false; cam.dist = cam.dist0; canvas.style.opacity = "1"; if (o.onEntryEnd) o.onEntryEnd(); }
+        cam.dist = cam.dist0 * (S.entry.from + (1 - S.entry.from) * e); S.entryFade = Math.min(1, u * 2.5); applyOpacity();
+        if (u >= 1) { S.entry.on = false; cam.dist = cam.dist0; S.entryFade = 1; applyOpacity(); if (o.onEntryEnd) o.onEntryEnd(); }
       }
       if (!S.userTouched && !(S.entry && S.entry.on)) cam.theta += 0.00004 * Math.min(50, now - (render.at || now));
       render.at = now;
@@ -939,6 +943,7 @@
     // test hook: freeze the renderer's clock at `seconds` after the last spike() (null: wall clock). Screenshots under
     // software WebGL take seconds each; the action-potential strip is taken at fixed clock times with it.
     function debugTime(seconds) { S.clock = seconds == null ? null : S.spikeAt + seconds; }
+    const nf = x => (x || 0).toLocaleString("en-US");
     function info() {
       const types = {}; for (const c of cells) types[c.type] = (types[c.type] || 0) + 1;
       if (S.h01) {
@@ -948,13 +953,23 @@
           synapsesPre: d.synapsesPre, synapsesPost: d.synapsesPost, myelinatedUm: d.myelinatedUm, glia: d.glia, far: d.far, bytes: d.bytes,
           ids: S.h01.cells.map(c => c.id), focusId: f ? f.id : null, focusClasses: f ? f.classes : null, em: { um: S.h01.em.um, nmPerPx: S.h01.em.nm_per_px },
           drawCalls: counts.drawCalls, live: isLive(), spikes: S.spikes, fps: S.fps, jsMs: S.jsMs, offScreen: !S.onScreen, slowdown: SLOWDOWN,
-          halfFloat: halfOk, webgl2: isGL2, worldPos: S.worldPos, cite: H01_CITE, license: "CC BY 4.0",
+          halfFloat: halfOk, webgl2: isGL2, worldPos: S.worldPos, normal: S.normal, cite: H01_CITE, license: "CC BY 4.0",
+          dendUm: Math.round(S.h01.cells.reduce((a, c) => a + (c.dendUm || 0), 0)),
+          // two ready-made lines for the page's panel (index.html prints them as they are): what is drawn, and where it comes from
+          detailLine: `${cells.length} real cells, ${counts.heroCells} proofread in full detail` + (d.glia ? ` and ${d.glia} glia` : "") +
+            `: spines as reconstructed, ${nf(d.synapsesPre)} presynaptic and ${nf(d.synapsesPost)} incoming synapses at their real positions, ` +
+            `${nf(d.myelinatedUm)} µm of axon H01 labels as myelinated · ${nf(Math.round(counts.triangles / 1000))}k of ${nf(Math.round(L.cap / 1000))}k triangles (${lodOf()}) · ${S.style}`,
+          sourceLine: `H01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells ${S.h01.cells.slice(0, 3).map(c => c.id).join(", ")}` +
+            (S.h01.cells.length > 3 ? ` + ${S.h01.cells.length - 3} more` : "") + `), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread · credits on /about`,
           types: Object.keys(types).map(t => ({ type: t, n: types[t], species: "human", id: "H01", dataset: /astro|oligo|glia/.test(t) ? "H01 c3 segmentation (automated)" : "H01 proofread cells" })) };
       }
       return { kind, region: S.region, label: S.label, style: S.style, lod: lodOf(), source: "NeuroMorpho", cells: cells.length, heroCells: counts.heroCells,
         triangles: counts.triangles - S.trimTri, triangleCap: L.cap, lineSegments: counts.lines, spines: counts.spines, spineUm: Math.round(counts.spineUm), dendUm: Math.round(counts.dendUm),
         boutons: counts.boutons, nodesOfRanvier: counts.nodes, drawCalls: counts.drawCalls, live: isLive(), spikes: S.spikes, fps: S.fps, jsMs: S.jsMs,
-        offScreen: !S.onScreen, slowdown: SLOWDOWN, halfFloat: halfOk, webgl2: isGL2,
+        offScreen: !S.onScreen, slowdown: SLOWDOWN, halfFloat: halfOk, webgl2: isGL2, worldPos: S.worldPos, normal: S.normal,
+        detailLine: `${cells.length} cells, ${counts.heroCells} in full detail: ${nf(counts.spines)} spines on ${nf(Math.round(counts.spineUm))} of ${nf(Math.round(counts.dendUm))} µm of dendrite, ` +
+          `${nf(counts.boutons)} boutons, ${nf(counts.nodes)} nodes of Ranvier · ${nf(Math.round((counts.triangles - S.trimTri) / 1000))}k of ${nf(Math.round(L.cap / 1000))}k triangles (${lodOf()}) · ${S.style}`,
+        sourceLine: `NeuroMorpho.Org reconstructions (${Object.keys(types).map(t => CELLS.cells[t].nmo_id).join(", ")}), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about`,
         types: Object.keys(types).map(t => ({ type: t, n: types[t], species: CELLS.cells[t].species, id: CELLS.cells[t].nmo_id, radii: CELLS.cells[t].radii, myelinated: !!TYPES[t].myelin, spines: TYPES[t].spines })) };
     }
     function caption() {
@@ -981,13 +996,38 @@
     }
     const ready = new Promise(res => { S.readyResolve = res; });
     const nr = { onFrame, spike, rates, setLive, debugTime, setStyle, style: () => S.style, setLod: l => { if (LOD[l] || l === "auto") { S.lodName = l; } }, lod: lodOf, ready,
+                 setOpacity: a => { S.opacity = Math.max(0, Math.min(1, Number(a) || 0)); applyOpacity(); }, opacity: () => S.opacity,
                  focus: i => { if (cells[i]) { S.focus = i; focusPos = cells[i].pos; fit(); } }, resize, info, caption, close, scene, camera, renderer, cells };
     load(o.assetUrl).then(() => { if (!S.closed) build(); }).catch(e => { console.error("NeuronRender:", e); });
     return nr;
   }
 
-  function openAt(container, o) { return open(container, o); }     // open() + worldPos / cameraDir (B's zoom end), see the API doc
-  const NR = { open, openAt, load, kindOf, plan, cellGeometry, lineGeometry, budget, rateByte, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, CAPTION_PROCEDURAL,
-               H01_SETS, H01_CITE, K, CELLS: null, h01: null };
+  // the H01 module (web/neuron_render/h01.js), loaded once, on demand
+  function loadH01Module(base) {
+    if (NR.h01) return Promise.resolve(NR.h01);
+    if (!loadH01Module.p) loadH01Module.p = new Promise((res, rej) => { const sc = root.document.createElement("script"); sc.src = (base || "neuron_render/") + "h01.js";
+        sc.onload = () => NR.h01 ? res(NR.h01) : rej(new Error("h01.js")); sc.onerror = () => rej(new Error("h01.js")); root.document.head.appendChild(sc); })
+      .catch(e => { loadH01Module.p = null; throw e; });
+    return loadH01Module.p;
+  }
+  // B's zoom: start fetching a region set (h01.js, the cells, the EM slice) while B's camera is still flying; the later open() finds it
+  // in the cache. Resolves to the decoded set, or null where there is no H01 set / no DecompressionStream (then open() draws NeuroMorpho).
+  function prefetch(o) {
+    o = o || {}; const set = H01_SETS[o.kind || "cortex"];
+    if (!set || typeof root.DecompressionStream !== "function") return Promise.resolve(null);
+    const lodName = o.lod === "phone" || o.lod === "desktop" ? o.lod : ((root.innerWidth || 1000) < 700 ? "phone" : "desktop");
+    return loadH01Module(o.base).then(h => h.load(set, lodName, o.base ? o.base + "h01/" : undefined))
+      .then(d => { if (root.Image) { const im = new root.Image(); im.src = d.em.url; } return d; });
+  }
+  // open() + B's zoom end: worldPos (bookkeeping), normal (the outward cortical normal: the block's +y, toward the pia, is turned onto it),
+  // cameraDir / cameraUp (B's camera at the cut, in B's world), entry {ms, from} (the fly-in). See the API doc.
+  function openAt(container, o) { return open(container, o); }
+  // the cortex block's extent, readable before open(): the union of the H01 cells' bounding boxes in the block frame (h01/cortex.json),
+  // µm; +y toward the pia; the focus soma (L2 pyramidal 1874244336) at the origin. depthUm: how deep below the pia the block's top and
+  // bottom lie, estimated from H01's soma table (the highest layer-1 somata of this column sit ~780 µm above the focus soma): ± ~100 µm.
+  const BLOCK = { set: "cortex", dataset: "H01", um: [2210, 846, 175], min: [-1086, -446, -101], max: [1124, 399, 74], pia: "+y", focusUm: [0, 0, 0],
+                  focusDepthUm: 800, depthUm: [400, 1250], depthApprox: true };
+  const NR = { open, openAt, prefetch, load, kindOf, plan, cellGeometry, lineGeometry, budget, rateByte, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, CAPTION_PROCEDURAL,
+               H01_SETS, H01_CITE, BLOCK, K, CELLS: null, h01: null };
   root.NeuronRender = NR;
 })(typeof window !== "undefined" ? window : globalThis);

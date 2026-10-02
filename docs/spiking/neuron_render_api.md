@@ -26,9 +26,30 @@ not drawn while a close-up is open (the page's loop should `return` while `nr` e
 - **Entry animation for B's zoom:** `open(container, {..., entry: {ms: 1200, from: 6}})`: the camera starts `from`×
   farther than the default framing and flies in over `ms` while the canvas fades in. `nr.ready` is a Promise resolved
   at the first drawn frame; `onEntryEnd()` fires when the fly-in ends.
-- **`NeuronRender.openAt(container, opts)`** = `open()` + `opts.worldPos` (the brain-space point B zoomed into; stored
-  in `info().worldPos` for B's bookkeeping) and `opts.cameraDir` (unit vector: B's view direction at the end of its
-  zoom): the entry camera looks along it, so the cut is continuous. Without them `openAt` behaves as `open`.
+- **`NeuronRender.openAt(container, opts)`** = `open()` + B's zoom end, all in B's world coordinates:
+  - `worldPos` (the brain-space point B zoomed into; stored in `info().worldPos` for B's bookkeeping);
+  - `normal` (the outward cortical normal there): the block's **+y is "toward the pia"**; the whole block is turned so
+    that +y lies along `normal` (shortest rotation; `info().normal` echoes it). Without it the block stands with +y up;
+  - `cameraDir` (unit vector: B's view direction at the cut) and optionally `cameraUp` (B's camera up, default
+    world +y): the entry camera looks along `cameraDir` with that up, so the cut is continuous;
+  - `entry: {ms, from}` (the fly-in, above). Without any of them `openAt` behaves as `open`.
+- **`NeuronRender.BLOCK`** (a static, readable before `open()`): the cortex block's extent in µm in the block frame,
+  the union of the H01 cells' bounding boxes (`h01/cortex.json`): `{um: [w, h, d], min, max, pia: "+y", focusUm:
+  [0, 0, 0], focusDepthUm, depthUm: [top, bottom], depthApprox: true}`. `depthUm` is how deep below the pia the
+  block's top and bottom lie, estimated from H01's soma table (the highest layer-1 somata of this column sit about
+  780 µm above the focus soma), good to roughly ± 100 µm; `focusDepthUm` is the focus soma's. B sizes and places
+  the zoom target from it; a test checks it against the manifest.
+- **`NeuronRender.prefetch({kind, lod, base})`** starts fetching the region's H01 set (`h01.js`, the cells, the EM
+  slice) while B's camera is still flying; a later `open()`/`openAt()` finds it in the module cache. Resolves to the
+  decoded set, or `null` where the kind has no H01 set or the browser lacks `DecompressionStream` (then `open()`
+  draws the NeuroMorpho cells as before). Safe to call more than once.
+- **`nr.setOpacity(a)`** (0..1) fades the whole close-up (canvas, HUD, scale bar) for B's cross-fade on the way out;
+  `nr.opacity()` reads it back. It multiplies the entry fade-in, which the module runs by itself (the canvas starts
+  at 0 and is fully in after 40 % of `entry.ms`), so B need not drive the fade-in.
+- **`info().detailLine` / `info().sourceLine`**: two ready-made sentences for the page's panel: what this close-up
+  draws (cells, proofread detail, synapses, myelin, triangles, style) and where the shapes come from (H01 cells with
+  their ids, or the NeuroMorpho.Org ids). `index.html` prints them as they are, so the panel never says NeuroMorpho
+  for H01 cells or the other way round.
 - **Styles:** `setStyle("em" | "fluorescence")`: EM-grey tissue (membrane-like shading, the real SEM slice behind, a
   dark grey field) and confocal fluorescence (sparse-label colours, depth of field). `"render"` is kept as an alias of
   `"fluorescence"`. A real **scale bar** (µm) sits in the HUD, computed from the camera at the focus depth.

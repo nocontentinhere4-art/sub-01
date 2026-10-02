@@ -136,9 +136,18 @@ Sources:
 `docs/screens/neuron_render/results.json`, by `tests/neuron_render_shots.py` (2026-10-02). No page errors at 1280 or
 390 px in any region or style.
 
+**Cortex since #99 (the real H01 cells):** desktop set 20 cells (1 focus L2 pyramidal, 1 L5 pyramidal and 1 L2
+interneuron as heroes, 7 mid, 6 far as skeleton lines, 2 astrocytes + 2 oligodendrocytes), **280 451 triangles** of
+1 000 000, 31 draw calls, 1 442 presynaptic and 15 593 incoming synapses, 1 105 µm of myelinated axon, 2.44 MB of
+cells + 0.53 MB EM slice (2.99 MB); phone set 17 cells, **150 995 triangles** of 250 000, 26 draw calls, 1.45 MB + EM
+(2.01 MB). Under the mid-phone profile (CPU ×4, 390 px) the main-thread time is **3.7 ms a frame** at 4.2 fps in the
+software rasteriser (0.9 ms unthrottled); the set decodes in ~0.1 s from the local server and `nr.ready` resolves
+~260 ms after `openAt()` when `prefetch()` ran first. The NeuroMorpho numbers below for cortex are now the
+`*_before.png` shots (`NeuronRender.H01_SETS.cortex = null`), kept as the fallback and for the before/after pair.
+
 | close-up | desktop LOD (1280 px): triangles / spines / boutons / nodes of Ranvier | phone LOD (390 px): triangles / spines / boutons / nodes |
 |---|---|---|
-| cortex (100 pyramidal + 25 basket; phone 60 + 15) | 925 569 of 1 000 000 · 44 173 on 37 951 of 62 944 µm · 1 867 · 84 | 183 179 of 250 000 · 7 370 on 9 003 of 33 256 µm · 1 147 · 52 |
+| cortex, NeuroMorpho fallback / before (100 pyramidal + 25 basket; phone 60 + 15) | 925 569 of 1 000 000 · 44 173 on 37 951 of 62 944 µm · 1 867 · 84 | 183 179 of 250 000 · 7 370 on 9 003 of 33 256 µm · 1 147 · 52 |
 | striatum (medium spiny) | 302 790 · 4 842 · 10 · 0 | 94 268 · 2 903 · 6 · 0 |
 | thalamus (relay) | 450 580 · 3 657 · 5 · 0 | 102 928 · 2 191 · 3 · 0 |
 | hippocampus (CA1 pyramidal) | 999 955 · 55 000 on 22 049 of 70 405 µm · 100 · 60 | 197 481 · 10 800 · 60 · 36 |
@@ -155,13 +164,23 @@ at most, quarter-resolution post passes, and nothing drawn off screen. The serve
 `python tests/smoke_demo.py --measure 30` → 6.7 ms CPU per 50 ms tick, 601 ticks in 30 s, SMOKE OK.
 
 Also checked: the module runs unchanged under three.js **r169** (ES module, the room's version): 125 cells,
-926k triangles, a spike drawn, no console errors, `close()` leaves no canvas (`scratch` page, not in the repo).
+926k triangles, a spike drawn, no console errors, `close()` leaves no canvas (`scratch` page, not in the repo). With the
+H01 set under r169: `prefetch()` then `openAt()` with `normal: [1, 0, 0]`, `cameraDir`, `entry {1500 ms, from 6}` →
+the block turned by the expected quaternion (−90° about z), `nr.ready` at 261 ms, `onEntryEnd` at 1 987 ms, the
+scale bar reading 50 µm = 75 px at 900 px wide, `setOpacity(0.5)` on canvas and HUD, `close()` leaves 0 canvases.
 
 ## Checks
-- `pytest tests/test_neuron_render.py`: the asset (same six credited cells, radii, node budget), the plan (monotone
+- `pytest tests/test_neuron_render.py` (#99 part): `tests/js/neuron_render_h01_check.js` decodes both H01 sets as the
+  page does and checks kinds, path distances, pulse times on ≥ 90 % of axon vertices and ≥ 60 % of presynaptic sites,
+  monotone skeletons, ≤ 3 MB and the triangle caps; the manifest's licence and citation; the caption in the module, the
+  credits on `/about` and in `morphology_credits.md`; `NeuronRender.BLOCK` against the manifest's bounding boxes; the
+  handoff API (`normal`, `cameraUp`, `prefetch`, `setOpacity`, `detailLine` / `sourceLine`) and that `index.html` prints
+  the module's lines instead of a hard-coded source.
+- `pytest tests/test_neuron_render.py` (#88 part): the asset (same six credited cells, radii, node budget), the plan (monotone
   arrival times, no pulse on dendrites, myelin only beyond the AIS and only on myelinated types, boutons on the
   unmyelinated axon, spines at the stated density), the triangle budget at both LODs (the focus cell keeps its spines),
   the caption word for word, the sources in this file, the call site on `/brain`.
-- `python tests/neuron_render_shots.py`: screenshots at 1280 and 390 px of every close-up region in both styles,
+- `python tests/neuron_render_shots.py`: screenshots at 1920, 1280 and 390 px of every close-up region in both styles
+  (cortex: fluorescence and EM with the H01 cells, and the NeuroMorpho `_before` pair),
   offline and live, an action-potential strip (frames at fixed clock times after the spike, through the `debugTime` test
   hook: a software-WebGL screenshot takes seconds), the side-by-side with the reference micrograph, counts and timings.
