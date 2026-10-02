@@ -20,11 +20,11 @@
   "drawCalls": 11,
   "lineSegments": 62028,
   "live": true,
-  "spikes": 30,
+  "spikes": 19,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · left Vis 13 · 100 pyramidal (human) + 25 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 44,173 spines on 37,951 of 62,944 µm of dendrite, 1,867 boutons, 84 nodes of Ranvier · 926k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · left Vis 13 · 100 pyramidal (human) + 25 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 44,173 spines on 37,951 of 62,944 µm of dendrite, 1,867 boutons, 84 nodes of Ranvier · 926k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "cortex_1280_render": {
   "cells": 125,
@@ -39,11 +39,11 @@
   "drawCalls": 11,
   "lineSegments": 62028,
   "live": true,
-  "spikes": 29,
+  "spikes": 23,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · left Vis 13 · 100 pyramidal (human) + 25 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 44,173 spines on 37,951 of 62,944 µm of dendrite, 1,867 boutons, 84 nodes of Ranvier · 926k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · left Vis 13 · 100 pyramidal (human) + 25 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 44,173 spines on 37,951 of 62,944 µm of dendrite, 1,867 boutons, 84 nodes of Ranvier · 926k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "striatum_1280_fluorescence": {
   "cells": 125,
@@ -58,11 +58,11 @@
   "drawCalls": 9,
   "lineSegments": 37710,
   "live": true,
-  "spikes": 3,
+  "spikes": 2,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Putamen · 125 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 4,842 spines on 3,178 of 3,876 µm of dendrite, 10 boutons, 0 nodes of Ranvier · 303k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Putamen · 125 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 4,842 spines on 3,178 of 3,876 µm of dendrite, 10 boutons, 0 nodes of Ranvier · 303k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "striatum_1280_render": {
   "cells": 125,
@@ -77,11 +77,11 @@
   "drawCalls": 9,
   "lineSegments": 37710,
   "live": true,
-  "spikes": 7,
+  "spikes": 4,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Putamen · 125 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 4,842 spines on 3,178 of 3,876 µm of dendrite, 10 boutons, 0 nodes of Ranvier · 303k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Putamen · 125 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 4,842 spines on 3,178 of 3,876 µm of dendrite, 10 boutons, 0 nodes of Ranvier · 303k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "thalamus_1280_fluorescence": {
   "cells": 125,
@@ -96,11 +96,11 @@
   "drawCalls": 9,
   "lineSegments": 50940,
   "live": true,
-  "spikes": 8,
+  "spikes": 4,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Thalamus · 125 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 3,657 spines on 36,371 of 37,527 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 451k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Thalamus · 125 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 3,657 spines on 36,371 of 37,527 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 451k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "thalamus_1280_render": {
   "cells": 125,
@@ -115,11 +115,11 @@
   "drawCalls": 9,
   "lineSegments": 50940,
   "live": true,
-  "spikes": 4,
+  "spikes": 1,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Thalamus · 125 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 3,657 spines on 36,371 of 37,527 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 451k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Thalamus · 125 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 3,657 spines on 36,371 of 37,527 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 451k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "hippocampus_1280_fluorescence": {
   "cells": 125,
@@ -134,11 +134,11 @@
   "drawCalls": 9,
   "lineSegments": 56700,
   "live": true,
-  "spikes": 4,
+  "spikes": 6,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Hippocampus · 125 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 55,000 spines on 22,049 of 70,405 µm of dendrite, 100 boutons, 60 nodes of Ranvier · 1,000k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Hippocampus · 125 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 55,000 spines on 22,049 of 70,405 µm of dendrite, 100 boutons, 60 nodes of Ranvier · 1,000k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "hippocampus_1280_render": {
   "cells": 125,
@@ -153,11 +153,11 @@
   "drawCalls": 9,
   "lineSegments": 56700,
   "live": true,
-  "spikes": 2,
+  "spikes": 4,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Hippocampus · 125 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 55,000 spines on 22,049 of 70,405 µm of dendrite, 100 boutons, 60 nodes of Ranvier · 1,000k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Hippocampus · 125 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 55,000 spines on 22,049 of 70,405 µm of dendrite, 100 boutons, 60 nodes of Ranvier · 1,000k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "amygdala_1280_fluorescence": {
   "cells": 125,
@@ -172,11 +172,11 @@
   "drawCalls": 9,
   "lineSegments": 52830,
   "live": true,
-  "spikes": 3,
+  "spikes": 5,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Right Amygdala · 125 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 27,903 spines on 23,209 of 24,430 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 713k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Right Amygdala · 125 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 27,903 spines on 23,209 of 24,430 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 713k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "amygdala_1280_render": {
   "cells": 125,
@@ -195,7 +195,7 @@
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Right Amygdala · 125 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n125 cells, 5 in full detail: 27,903 spines on 23,209 of 24,430 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 713k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Right Amygdala · 125 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 27,903 spines on 23,209 of 24,430 µm of dendrite, 5 boutons, 0 nodes of Ranvier · 713k of 1,000k triangles (desktop) · render\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "errors_1280": [],
  "offline_390": {
@@ -216,11 +216,11 @@
   "drawCalls": 9,
   "lineSegments": 41352,
   "live": true,
-  "spikes": 13,
+  "spikes": 3,
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · left Vis 13 · 60 pyramidal (human) + 15 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 7,370 spines on 9,003 of 33,256 µm of dendrite, 1,147 boutons, 52 nodes of Ranvier · 183k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · left Vis 13 · 60 pyramidal (human) + 15 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 7,370 spines on 9,003 of 33,256 µm of dendrite, 1,147 boutons, 52 nodes of Ranvier · 183k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "cortex_390_render": {
   "cells": 75,
@@ -235,11 +235,11 @@
   "drawCalls": 9,
   "lineSegments": 41352,
   "live": true,
-  "spikes": 17,
+  "spikes": 13,
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · left Vis 13 · 60 pyramidal (human) + 15 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 7,370 spines on 9,003 of 33,256 µm of dendrite, 1,147 boutons, 52 nodes of Ranvier · 183k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · left Vis 13 · 60 pyramidal (human) + 15 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 7,370 spines on 9,003 of 33,256 µm of dendrite, 1,147 boutons, 52 nodes of Ranvier · 183k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_107146, NMO_107145), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "striatum_390_fluorescence": {
   "cells": 75,
@@ -258,7 +258,7 @@
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Putamen · 75 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,903 spines on 1,907 of 2,326 µm of dendrite, 6 boutons, 0 nodes of Ranvier · 94k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Putamen · 75 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,903 spines on 1,907 of 2,326 µm of dendrite, 6 boutons, 0 nodes of Ranvier · 94k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "striatum_390_render": {
   "cells": 75,
@@ -277,7 +277,7 @@
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Putamen · 75 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,903 spines on 1,907 of 2,326 µm of dendrite, 6 boutons, 0 nodes of Ranvier · 94k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Putamen · 75 medium spiny (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,903 spines on 1,907 of 2,326 µm of dendrite, 6 boutons, 0 nodes of Ranvier · 94k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_10032), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "thalamus_390_fluorescence": {
   "cells": 75,
@@ -292,11 +292,11 @@
   "drawCalls": 7,
   "lineSegments": 33960,
   "live": true,
-  "spikes": 6,
+  "spikes": 0,
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Thalamus · 75 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,191 spines on 21,823 of 22,516 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 103k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Thalamus · 75 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,191 spines on 21,823 of 22,516 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 103k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "thalamus_390_render": {
   "cells": 75,
@@ -311,11 +311,11 @@
   "drawCalls": 7,
   "lineSegments": 33960,
   "live": true,
-  "spikes": 7,
+  "spikes": 1,
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Thalamus · 75 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,191 spines on 21,823 of 22,516 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 103k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Thalamus · 75 thalamic relay (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 2,191 spines on 21,823 of 22,516 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 103k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_115363), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "hippocampus_390_fluorescence": {
   "cells": 75,
@@ -334,7 +334,7 @@
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Hippocampus · 75 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 4,809 of 42,243 µm of dendrite, 60 boutons, 36 nodes of Ranvier · 197k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Hippocampus · 75 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 4,809 of 42,243 µm of dendrite, 60 boutons, 36 nodes of Ranvier · 197k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "hippocampus_390_render": {
   "cells": 75,
@@ -353,7 +353,7 @@
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Left Hippocampus · 75 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 4,809 of 42,243 µm of dendrite, 60 boutons, 36 nodes of Ranvier · 197k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Left Hippocampus · 75 CA1 pyramidal (rat) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 4,809 of 42,243 µm of dendrite, 60 boutons, 36 nodes of Ranvier · 197k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_00222), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "amygdala_390_fluorescence": {
   "cells": 75,
@@ -372,7 +372,7 @@
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Right Amygdala · 75 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 9,227 of 14,658 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 187k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Right Amygdala · 75 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 9,227 of 14,658 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 187k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "amygdala_390_render": {
   "cells": 75,
@@ -391,90 +391,91 @@
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
-  "caption": "close-up · Right Amygdala · 75 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 5,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 9,227 of 14,658 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 187k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
+  "caption": "close-up · Right Amygdala · 75 amygdala principal (mouse) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 10,800 spines on 9,227 of 14,658 µm of dendrite, 3 boutons, 0 nodes of Ranvier · 187k of 250k triangles (phone) · render\nNeuroMorpho.Org reconstructions (NMO_139102), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind."
  },
  "errors_390": [],
- "ap_strip_s": [
-  4.99,
-  8.63,
-  13.39,
-  18.7
+ "ap_strip_clock_s": [
+  0.1,
+  1.5,
+  1.7,
+  1.9,
+  2.1
  ],
  "ap_errors": [],
  "build_ms_x4": {
-  "cortex": 14676,
-  "striatum": 4551,
-  "thalamus": 3270,
-  "hippocampus": 5559,
-  "amygdala": 4894
+  "cortex": 14663,
+  "striatum": 3679,
+  "thalamus": 3785,
+  "hippocampus": 3922,
+  "amygdala": 4120
  },
  "phone_x4_cortex": {
-  "fps_software_gl": 1.7,
-  "js_ms_per_frame": 13.15,
+  "fps_software_gl": 2.3,
+  "js_ms_per_frame": 5.3,
   "triangles": 183179,
   "cells": 75,
   "lod": "phone"
  },
  "phone_x4_striatum": {
-  "fps_software_gl": 6.2,
-  "js_ms_per_frame": 0.99,
+  "fps_software_gl": 2.8,
+  "js_ms_per_frame": 5.5,
   "triangles": 94268,
   "cells": 75,
   "lod": "phone"
  },
  "phone_x4_thalamus": {
-  "fps_software_gl": 4.3,
-  "js_ms_per_frame": 2.24,
+  "fps_software_gl": 4.5,
+  "js_ms_per_frame": 1.42,
   "triangles": 102928,
   "cells": 75,
   "lod": "phone"
  },
  "phone_x4_hippocampus": {
-  "fps_software_gl": 3.0,
-  "js_ms_per_frame": 2.87,
+  "fps_software_gl": 2.7,
+  "js_ms_per_frame": 2.43,
   "triangles": 197481,
   "cells": 75,
   "lod": "phone"
  },
  "phone_x4_amygdala": {
-  "fps_software_gl": 2.8,
-  "js_ms_per_frame": 1.5,
+  "fps_software_gl": 3.7,
+  "js_ms_per_frame": 3.56,
   "triangles": 186552,
   "cells": 75,
   "lod": "phone"
  },
  "phone_x1_last": {
-  "fps_software_gl": 5.4,
-  "js_ms_per_frame": 1.08
+  "fps_software_gl": 6.5,
+  "js_ms_per_frame": 1.26
  },
  "geometry_ms_x4": {
   "pyramidal": {
-   "ms": 319,
+   "ms": 193,
    "triangles": 52328,
    "spines": 3600
   },
   "basket": {
-   "ms": 55,
+   "ms": 44,
    "triangles": 16749,
    "spines": 177
   },
   "medium_spiny": {
-   "ms": 69,
+   "ms": 66,
    "triangles": 16846,
    "spines": 984
   },
   "relay": {
-   "ms": 55,
+   "ms": 53,
    "triangles": 19010,
    "spines": 732
   },
   "ca1_pyramidal": {
-   "ms": 189,
+   "ms": 188,
    "triangles": 48895,
    "spines": 3600
   },
   "amygdala_principal": {
-   "ms": 146,
+   "ms": 199,
    "triangles": 47924,
    "spines": 3600
   }

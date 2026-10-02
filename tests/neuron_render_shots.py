@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--cdn-dir", default=None)
     ap.add_argument("--reference", default="docs/screens/neuron_render/reference_gfp_pyramidal.jpg")
     ap.add_argument("--quick", action="store_true", help="cortex only")
+    ap.add_argument("--only-strip", action="store_true", help="only the action-potential strip (results.json keeps the rest)")
     args = ap.parse_args()
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -63,6 +64,8 @@ def main():
     base = f"http://127.0.0.1:{args.port}"
     res = {"region": region, "software_webgl": True,
            "note": "headless Chromium with SwiftShader (software WebGL): FPS here is a CPU rasteriser's, not a phone GPU's"}
+    if args.only_strip and (out / "results.json").exists():
+        res = json.loads((out / "results.json").read_text())
     kinds = ["cortex"] if args.quick else KINDS
     try:
         N3.wait_ready(base, proc)
@@ -100,7 +103,7 @@ def main():
                 pg.wait_for_timeout(2500)                      # a few frames rendered (software GL: slow)
                 return pg.evaluate("n3close.info()")
 
-            for w, h, mobile, tag in ((1280, 800, False, "1280"), (390, 844, True, "390")):
+            for w, h, mobile, tag in () if args.only_strip else ((1280, 800, False, "1280"), (390, 844, True, "390")):
                 ctx, pg, errors = page(w, h, mobile)
                 info = closeup(pg, "cortex", region, "fluorescence")
                 shot(pg, f"cortex_{tag}_offline.png")
@@ -125,7 +128,7 @@ def main():
             # software WebGL takes seconds per screenshot, so the renderer's clock is frozen at fixed times after the spike
             # (nr.debugTime, a test hook): what a viewer sees at those moments on a device that keeps up
             pg.evaluate("n3close.spike(0, 0)")                  # slot 0 -> drawn cell 0, the cell in focus
-            strip, times = [], [0.08, 0.25, 0.5, 1.0, 2.0]
+            strip, times = [], [0.1, 1.5, 1.7, 1.9, 2.1]   # the initial segment (48 um) is crossed at the unmyelinated speed: ~1.6 s; then ~0.6 mm/s
             for i, t in enumerate(times):
                 pg.evaluate(f"n3close.debugTime({t})")
                 pg.wait_for_timeout(1200)
@@ -160,6 +163,13 @@ def main():
                 sb.save(out / "side_by_side.png")
             ctx.close()
 
+            if args.only_strip:
+                browser.close()
+                proc.terminate()
+                proc.wait(timeout=20)
+                (out / "results.json").write_text(json.dumps(res, indent=1, ensure_ascii=False) + "\n")
+                print("strip at", times)
+                return
             # a mid phone profile (CPU x4): the renderer's own JS per frame and FPS (software WebGL: CPU rasteriser)
             ctx, pg, errors = page(390, 844, True)
             cdp = ctx.new_cdp_session(pg)

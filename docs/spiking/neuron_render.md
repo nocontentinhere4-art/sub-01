@@ -105,10 +105,29 @@ Sources:
   canvas, every geometry, material and render target.
 
 ## Measured (this sandbox: headless Chromium, WebGL in software via SwiftShader, no GPU)
-See `docs/screens/neuron_render/results.json` (filled by `tests/neuron_render_shots.py`). The FPS numbers there are a
-CPU rasteriser's and say nothing about a phone GPU; what the sandbox can measure honestly is the renderer's own JS cost
-per frame (uniform updates and seven quarter-resolution post passes: ~1–3 ms under ×4 throttle) and the triangle counts
-under the caps. **The ≥ 30 FPS check on a mid phone still needs a real device.**
+`docs/screens/neuron_render/results.json`, by `tests/neuron_render_shots.py` (2026-10-02). No page errors at 1280 or
+390 px in any region or style.
+
+| close-up | desktop LOD (1280 px): triangles / spines / boutons / nodes of Ranvier | phone LOD (390 px): triangles / spines / boutons / nodes |
+|---|---|---|
+| cortex (100 pyramidal + 25 basket; phone 60 + 15) | 925 569 of 1 000 000 · 44 173 on 37 951 of 62 944 µm · 1 867 · 84 | 183 179 of 250 000 · 7 370 on 9 003 of 33 256 µm · 1 147 · 52 |
+| striatum (medium spiny) | 302 790 · 4 842 · 10 · 0 | 94 268 · 2 903 · 6 · 0 |
+| thalamus (relay) | 450 580 · 3 657 · 5 · 0 | 102 928 · 2 191 · 3 · 0 |
+| hippocampus (CA1 pyramidal) | 999 955 · 55 000 on 22 049 of 70 405 µm · 100 · 60 | 197 481 · 10 800 · 60 · 36 |
+| amygdala (principal) | 712 790 · 27 903 · 5 · 0 | 186 552 · 10 800 · 3 · 0 |
+
+Draw calls: 7–11 a frame plus 9 quarter-resolution post passes. Under a mid-phone profile (CPU ×4, 390 px, phone LOD)
+the renderer's main-thread time per frame (uniforms, the render calls' submission, the post passes) is **1.4–5.5 ms**;
+building a close-up (geometry in JS + first shader compile under SwiftShader) 3.7–4.1 s for one-type regions and
+14.7 s for cortex (two hero types), of which the pure geometry is 44–200 ms per hero cell at ×4. FPS here is
+**2.3–4.5 under ×4 and ~6.5 unthrottled**: the software rasteriser's numbers, which say nothing about a phone GPU —
+the sandbox does not reach 30 fps even for the page's existing fibres. **The ≥ 30 FPS check on a mid phone still
+needs a real device**; what this branch controls for it is the triangle cap (250k on phones), ~10 draw calls, 1.5× DPR
+at most, quarter-resolution post passes, and nothing drawn off screen. The server is untouched:
+`python tests/smoke_demo.py --measure 30` → 6.7 ms CPU per 50 ms tick, 601 ticks in 30 s, SMOKE OK.
+
+Also checked: the module runs unchanged under three.js **r169** (ES module, the room's version): 125 cells,
+926k triangles, a spike drawn, no console errors, `close()` leaves no canvas (`scratch` page, not in the repo).
 
 ## Checks
 - `pytest tests/test_neuron_render.py`: the asset (same six credited cells, radii, node budget), the plan (monotone
