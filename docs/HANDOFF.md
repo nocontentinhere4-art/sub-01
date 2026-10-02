@@ -321,6 +321,28 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Illustrative shapes, never the scanned person's; the network uses point neurons. Only regions the model simulates
   get a close-up (no cerebellum / Purkinje: not one of the 214 regions).
 
+## Neurons at microscopy scale: the close-up renderer (#88 A, `docs/spiking/neuron_render.md`)
+- `web/neuron_render/neuron_render.js` (classic script, `window.NeuronRender`; API in `docs/spiking/neuron_render_api.md`)
+  draws one region's neurons as tapered tubes from the SWC radii (`web/neuron_render/cells.json`, the same six
+  NeuroMorpho.Org cells as #78 rebuilt by `analysis/build_neuron_render.py`; radii measured for five, typical for the 1995
+  CA1 cell), a soma with hillocks and a translucent nucleus, spines at published densities, myelin internodes + nodes of
+  Ranvier on myelinated types, boutons, a tissue background, bloom and a mild depth of field; fluorescence (GFP green /
+  tdTomato orange on black) or 3D-render style; its own overlay canvas on the brain's host, nothing drawn off screen.
+- `/brain` close-ups (`closeupOpen` in `web/index.html`) now open it: `NeuronRender.open(host, {THREE, region, kind,
+  label, style, live, onClose, onInfo})`, every spiking frame goes to `nr.onFrame(m)`; `nr.info()` gives the counts
+  for the caption (cells, triangles vs cap, spines and the dendrite length they cover, boutons, nodes of Ranvier).
+- Activity, never faked: a recorded spike of a sampled neuron flashes the soma and runs an action potential down the
+  axon at the real speed / 5000 (saltatory where myelinated), boutons glow on arrival, dendrites glow with the region's
+  rate; no frames for 10 s → static cells, "no live network". The caption carries the #88 sentence word for word.
+- Budget: `LOD.phone` cap 250k triangles (3 hero + 12 mid + 60 line cells), `LOD.desktop` 1M; `budget()` trims mid
+  cells, then spines of the last hero cells. Measured only under software WebGL here (`docs/screens/neuron_render/
+  results.json`): the ≥ 30 FPS phone check needs a real device.
+- Published values and their sources: `docs/spiking/neuron_render.md` (Tomassy 2014, Stedehouder 2017, Megías 2001,
+  Hellwig 1994, Chomiak & Hu 2009, Hursh 1939, Benavides-Piccione 2002/2013, Wilson 1983, Rushton 1951). Reference
+  look: Lee et al. 2006 PLoS Biol (CC BY 2.5), only in `docs/screens/neuron_render/side_by_side.png`.
+- Checks: `pytest tests/test_neuron_render.py` (node check `tests/js/neuron_render_check.js`); screenshots and timings
+  `python tests/neuron_render_shots.py`.
+
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies
   / storage state) → only cookies of the site's own domain, expired ones dropped. Logged in while a login cookie is

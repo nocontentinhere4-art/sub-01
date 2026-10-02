@@ -211,6 +211,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="/neurons.js"></script>
 <script src="/neurons3d.js"></script>
+<script src="/neuron_render/neuron_render.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -244,11 +245,11 @@ addEventListener("resize", resize); resize();
 const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each dot stands for a sampled model neuron; a model, not a mind.";
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
 const N3_NET = {gpu: "1M-neuron network on GPU", cpu: "20k-neuron network on CPU"};
-// close-ups with real neuron shapes (#78, web/neurons_morph.json): zoom in with neurons on, or a close-up button
-const N3_SHAPES = "Shapes are real reconstructed neurons from public databases and are illustrative: the simulated network uses point neurons (no dendrites are simulated). Pulses are slowed down to be visible.";
+// close-ups with real neuron shapes at microscopy scale (#88 A, web/neuron_render/): zoom in with neurons on, or a close-up button
+const N3_SHAPES = NeuronRender.CAPTION;             // the honest caption, word for word from #88
 const N3_TYPE = {pyramidal: "pyramidal", basket: "basket", medium_spiny: "medium spiny", relay: "thalamic relay",
                  ca1_pyramidal: "CA1 pyramidal", amygdala_principal: "amygdala principal"};
-let n3morph = null, n3close = null, n3closeScene = null, n3saved = null, n3fit = 1, n3lodAt = 0;
+let n3close = null, n3style = "fluorescence", n3saved = null, n3fit = 1e9, n3lodAt = 0;   // n3fit: the overlay closes itself on zoom-out
 const regionLabel = n => !n ? "" : n.name.replace(/^LH_/, "left ").replace(/^RH_/, "right ").replace(/_/g, " ");
 function closeupRegion(kind){                       // the most active region of that kind (its rate byte), else the first
   let best = -1, bv = -1;
@@ -259,41 +260,36 @@ function closeupRegion(kind){                       // the most active region of
 function closeupOpen(kind, region){
   if (!kind) return closeupExit();
   if (!n3want) neuronsOn(true);
-  const go = () => {
-    closeupExit(true);
-    const r = region != null && region >= 0 ? region : closeupRegion(kind);
-    n3close = Neurons3D.closeup({THREE, morph: n3morph, kind, region: r,
-      groupRate: m => m.groups && nodes[r] ? m.groups[nodes[r].group] : null});
-    if (!n3close) return;
-    n3closeScene = n3closeScene || new THREE.Scene();
-    n3close.group.rotation.x = Math.PI / 2;                          // cells are y-up; this scene is z-up like the brain
-    n3closeScene.add(n3close.group);
-    const b = n3close.box, c = [(b.min[0] + b.max[0]) / 2, -(b.min[2] + b.max[2]) / 2, (b.min[1] + b.max[1]) / 2];
-    const rad = 0.5 * Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
-    n3fit = rad / Math.sin(camera.fov * Math.PI / 360) * 1.05;     // whole block in view, clear of the dock
-    n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
-    controls.target.set(...c);
-    const v = [0.22, -0.96, 0.17];                                  // along the block's thin side
-    camera.position.set(c[0] + n3fit * v[0], c[1] + n3fit * v[1], c[2] + n3fit * v[2]);
-    document.body.classList.add("closeup"); n3lodAt = performance.now();
-    document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
-    neuronsText();
-  };
-  if (n3morph) go();
-  else fetch("neurons_morph.json").then(r => r.json()).then(m => { n3morph = m; go(); }).catch(() => {});
+  closeupExit(true);
+  const r = region != null && region >= 0 ? region : closeupRegion(kind);
+  if (r < 0) return;
+  n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
+  n3close = NeuronRender.open(host, {THREE, region: r, kind, label: regionLabel(nodes[r]), style: n3style,
+    live: performance.now() - n3wall < 10000, onClose: () => closeupExit(), onInfo: () => neuronsText()});
+  document.body.classList.add("closeup"); n3lodAt = performance.now();
+  document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
+  neuronsText();
 }
 function closeupExit(keepCamera){
-  if (n3close) { n3closeScene.remove(n3close.group); n3close.dispose(); n3close = null; }
-  if (!keepCamera && n3saved) { camera.position.copy(n3saved.pos); controls.target.copy(n3saved.target); n3saved = null; n3lodAt = performance.now(); }
+  if (n3close) { n3style = n3close.style(); n3close.close(); n3close = null; }
+  if (!keepCamera && n3saved) {
+    camera.position.copy(n3saved.pos); controls.target.copy(n3saved.target); n3saved = null; n3lodAt = performance.now();
+    const d = camera.position.distanceTo(controls.target), min = Neurons3D.LOD_IN * 1.3;   // back outside the zoom-in distance, or the LOD reopens it
+    if (d < min) camera.position.sub(controls.target).multiplyScalar(min / Math.max(1e-6, d)).add(controls.target);
+  }
   if (!keepCamera) { document.body.classList.remove("closeup"); document.querySelectorAll("#n3close button").forEach(x => x.classList.remove("on")); }
   neuronsText();
 }
 function closeupLine(){
   const i = n3close.info(), t = i.types.map(x => `${x.n} ${N3_TYPE[x.type] || x.type} (${x.species})`).join(" + ");
+  const n = x => (x || 0).toLocaleString("en-US");
+  const detail = `${i.cells} cells, ${i.heroCells} in full detail: ${n(i.spines)} spines on ${n(i.spineUm)} of ${n(i.dendUm)} µm of dendrite, `
+    + `${n(i.boutons)} boutons, ${n(i.nodesOfRanvier)} nodes of Ranvier · ${n(Math.round(i.triangles / 1000))}k of ${n(Math.round(i.triangleCap / 1000))}k triangles (${i.lod}) · ${i.style}`;
   return `<b>close-up · ${esc(regionLabel(nodes[i.region]))}</b> · ${esc(t)}`
-    + (i.live ? ` · each cell stands for a sampled model neuron here; spikes run soma → axon, slowed ~${Neurons3D.SLOWDOWN}×`
-              : ` · no live network: shapes only, no activity`)
-    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified · credits on /about</span>`;
+    + (i.live ? ` · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed ${n(i.slowdown)}× (node to node where myelinated)`
+              : ` · no live network: static cells, no activity`)
+    + `<span class="s">${esc(detail)}</span>`
+    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about</span>`;
 }
 function neuronsOn(on){
   n3want = on;
@@ -768,7 +764,7 @@ function frame(now){
       }
     }
   }
-  if (n3close) { n3close.update(now); controls.update(); renderer.render(n3closeScene, camera); return; }
+  if (n3close) return;                                                            // the close-up overlay draws itself (NeuronRender)
   controls.update(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
