@@ -218,7 +218,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Eye: Replicate FLUX schnell + Llama, only while watched | cents | up to ~960 frames/day with no cap → cap at $1/day (#15) |
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
-| Brain-decides eyes (#20; Haiku 4.5 via OpenRouter, key already on Railway) | $0 (not merged) | ≤ $1.00/day hard cap (≈ $0.004 per page) |
+| Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
 
 ## Launch checklist (owner)
 - [ ] All milestones 7–15 merged; CI green; `/healthz` monitored (uptime alert to your phone/email).
