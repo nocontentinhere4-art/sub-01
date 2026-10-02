@@ -201,7 +201,7 @@
 
 <div id="dock">
   <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain">neurons</button></div>
-  <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="cerebellum">cerebellum</button><button data-k="" title="back to the whole brain">whole brain</button></div>
+  <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button></div>
   <div id="n3cap" hidden></div>
   <form id="chat"><input id="msg" placeholder="send a stimulus…" autocomplete="off" maxlength="200"><button>send</button></form>
   <div id="note">every message is a stimulus · max 200 characters · no links, addresses or tickers</div>
@@ -246,7 +246,8 @@ const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake wh
 const N3_NET = {gpu: "1M-neuron network on GPU", cpu: "20k-neuron network on CPU"};
 // close-ups with real neuron shapes (#78, web/neurons_morph.json): zoom in with neurons on, or a close-up button
 const N3_SHAPES = "Shapes are real reconstructed neurons from public databases and are illustrative: the simulated network uses point neurons (no dendrites are simulated). Pulses are slowed down to be visible.";
-const N3_TYPE = {pyramidal: "pyramidal", basket: "basket", medium_spiny: "medium spiny", relay: "thalamic relay", purkinje: "Purkinje"};
+const N3_TYPE = {pyramidal: "pyramidal", basket: "basket", medium_spiny: "medium spiny", relay: "thalamic relay",
+                 ca1_pyramidal: "CA1 pyramidal", amygdala_principal: "amygdala principal"};
 let n3morph = null, n3close = null, n3closeScene = null, n3saved = null, n3fit = 1, n3lodAt = 0;
 const regionLabel = n => !n ? "" : n.name.replace(/^LH_/, "left ").replace(/^RH_/, "right ").replace(/_/g, " ");
 function closeupRegion(kind){                       // the most active region of that kind (its rate byte), else the first
@@ -260,7 +261,7 @@ function closeupOpen(kind, region){
   if (!n3want) neuronsOn(true);
   const go = () => {
     closeupExit(true);
-    const r = kind === "cerebellum" ? -1 : region != null && region >= 0 ? region : closeupRegion(kind);
+    const r = region != null && region >= 0 ? region : closeupRegion(kind);
     n3close = Neurons3D.closeup({THREE, morph: n3morph, kind, region: r,
       groupRate: m => m.groups && nodes[r] ? m.groups[nodes[r].group] : null});
     if (!n3close) return;
@@ -269,10 +270,10 @@ function closeupOpen(kind, region){
     n3closeScene.add(n3close.group);
     const b = n3close.box, c = [(b.min[0] + b.max[0]) / 2, -(b.min[2] + b.max[2]) / 2, (b.min[1] + b.max[1]) / 2];
     const rad = 0.5 * Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
-    n3fit = rad / Math.sin(camera.fov * Math.PI / 360) * 0.8;
+    n3fit = rad / Math.sin(camera.fov * Math.PI / 360) * 1.05;     // whole block in view, clear of the dock
     n3saved = n3saved || {pos: camera.position.clone(), target: controls.target.clone()};
     controls.target.set(...c);
-    const v = kind === "cerebellum" ? [-0.62, -0.74, 0.26] : [0.22, -0.96, 0.17];   // along the block's thin side
+    const v = [0.22, -0.96, 0.17];                                  // along the block's thin side
     camera.position.set(c[0] + n3fit * v[0], c[1] + n3fit * v[1], c[2] + n3fit * v[2]);
     document.body.classList.add("closeup"); n3lodAt = performance.now();
     document.querySelectorAll("#n3close button").forEach(x => x.classList.toggle("on", x.dataset.k === kind));
@@ -289,11 +290,9 @@ function closeupExit(keepCamera){
 }
 function closeupLine(){
   const i = n3close.info(), t = i.types.map(x => `${x.n} ${N3_TYPE[x.type] || x.type} (${x.species})`).join(" + ");
-  const where = i.simulated ? esc(regionLabel(nodes[i.region])) : "cerebellum";
-  return `<b>close-up · ${where}</b> · ${esc(t)}`
-    + (i.simulated ? (i.live ? ` · each cell stands for a sampled model neuron here; spikes run soma → axon, slowed ~${Neurons3D.SLOWDOWN}×`
-                             : ` · no live network: shapes only, no activity`)
-                   : ` · <b>the cerebellum is not in the simulated network: shapes only, no activity</b>`)
+  return `<b>close-up · ${esc(regionLabel(nodes[i.region]))}</b> · ${esc(t)}`
+    + (i.live ? ` · each cell stands for a sampled model neuron here; spikes run soma → axon, slowed ~${Neurons3D.SLOWDOWN}×`
+              : ` · no live network: shapes only, no activity`)
     + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified · credits on /about</span>`;
 }
 function neuronsOn(on){
@@ -765,7 +764,7 @@ function frame(now){
       if (next === "brain") closeupExit();
       else if (nodes.length) {                                    // the region nearest the camera, by its kind
         let bi = 0, bd = 1e9; nodes.forEach((n, i) => { const q = n.q, dd = (q[0] - camera.position.x) ** 2 + (q[1] - camera.position.y) ** 2 + (q[2] - camera.position.z) ** 2; if (dd < bd) { bd = dd; bi = i; } });
-        closeupOpen(Neurons3D.kindOf(nodes[bi]) || "cortex", Neurons3D.kindOf(nodes[bi]) ? bi : -1);
+        closeupOpen(Neurons3D.kindOf(nodes[bi]) || "cortex", Neurons3D.kindOf(nodes[bi]) ? bi : -1);   // pallidum: cortex
       }
     }
   }

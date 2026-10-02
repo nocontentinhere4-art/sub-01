@@ -17,24 +17,24 @@ const b64 = bytes => Buffer.from(Uint8Array.from(bytes)).toString("base64");
 const frame = (region, n) => { const sq = []; for (let i = 0; i < n; i++) sq.push(region, (i * 37) % 256, (i * 11) % 256);
   const rq = new Array(214).fill(120); rq[region] = 220; return { type: "spiking", net: "cpu", n3: { sq: b64(sq), rq: b64(rq), span: 200, ns: n } }; };
 const out = {};
-for (const [kind, region] of [["cortex", 12], ["striatum", 202], ["thalamus", 200], ["cerebellum", -1]]) {
+for (const [kind, region] of [["cortex", 12], ["striatum", 202], ["thalamus", 200], ["hippocampus", 204], ["amygdala", 212]]) {
   const c = N.closeup({ THREE, morph, kind, region });
   const segs = c.group.children.reduce((a, l) => a + l.geometry.getAttribute("position").array.length / 6 * l.geometry.instanceCount, 0);
   const before = c.info();
   c.update(performance.now());
   const rateBefore = c.group.children[0].material.uniforms.uRate.value;
-  c.onFrame(frame(region < 0 ? 5 : region + 1, 50));             // another region's spikes: nothing here changes
+  c.onFrame(frame(region + 1, 50));                              // another region's spikes: nothing here changes
   const other = c.info().spiking;
-  c.onFrame(frame(region < 0 ? 5 : region, 50));
+  c.onFrame(frame(region, 50));
   for (let i = 0; i < 40; i++) c.update(performance.now());
   const after = c.info();
   out[kind] = { cells: before.cells, segments: before.segments, drawn_segments: segs, drawCalls: c.group.children.length,
-    simulated: before.simulated, spiking_offline: before.spiking, live_offline: before.live, rate_offline: rateBefore,
+    spiking_offline: before.spiking, live_offline: before.live, rate_offline: rateBefore,
     spiking_other_region: other, spiking_after: after.spiking, live_after: after.live,
     rate_after: c.group.children[0].material.uniforms.uRate.value, types: before.types };
   c.dispose();
 }
 out.lod = [N.lod("brain", 300), N.lod("brain", N.LOD_IN - 1), N.lod("closeup", 100, 100), N.lod("closeup", 100 * N.LOD_OUT + 1, 100)];
 out.slowdown = N.SLOWDOWN;
-out.kinds = ["LH_Vis_1", "Left Putamen", "Right Thalamus", "Left Pallidum", "Left Hippocampus"].map(name => N.kindOf({ name }));
+out.kinds = ["LH_Vis_1", "Left Putamen", "Right Thalamus", "Left Pallidum", "Left Hippocampus", "Right Amygdala"].map(name => N.kindOf({ name }));
 console.log(JSON.stringify(out));

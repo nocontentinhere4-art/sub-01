@@ -1,6 +1,7 @@
 """Neurons with their real shape (#78): the morphology asset (real NeuroMorpho.Org reconstructions, CC BY 4.0,
 simplified), its credits, the close-up renderer's caps (<= 300 cells, <= 60k segments, one draw call per cell type),
-the level-of-detail switch, and no activity without a live network (the cerebellum, not in the model, never moves).
+the level-of-detail switch, and no activity without a live network. Every close-up is a region the model simulates
+(no cerebellum: it is not one of the 214 regions, so no Purkinje cell).
 The renderer checks run web/neurons3d.js in node with a THREE stub (tests/js/neurons_morph_check.js)."""
 import json
 import re
@@ -19,6 +20,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 import build_morphologies as BM  # noqa: E402
 
 ASSET = ROOT / "web" / "neurons_morph.json"
+KINDS = ("cortex", "striatum", "thalamus", "hippocampus", "amygdala")
 SHAPES = ("Shapes are real reconstructed neurons from public databases and are illustrative: the simulated network uses "
           "point neurons (no dendrites are simulated). Pulses are slowed down to be visible.")
 
@@ -30,7 +32,8 @@ def morph():
 
 def test_asset_small_and_well_formed(morph):
     assert ASSET.stat().st_size <= 400 * 1024                                    # one small asset
-    assert set(morph["cells"]) == set(BM.CELLS) == {"pyramidal", "basket", "medium_spiny", "relay", "purkinje"}
+    assert set(morph["cells"]) == set(BM.CELLS) == {"pyramidal", "basket", "medium_spiny", "relay", "ca1_pyramidal",
+                                                    "amygdala_principal"}
     for kind, c in morph["cells"].items():
         nid, budget, _, _ = BM.CELLS[kind]
         assert c["neuron_id"] == nid and c["nmo_id"] == f"NMO_{nid:05d}" and c["license"] == "CC BY 4.0"
@@ -39,15 +42,14 @@ def test_asset_small_and_well_formed(morph):
         assert set(c["kind"]) <= {1, 2, 3} and min(c["dist"]) >= 0
         P = np.array(c["pos"]).reshape(-1, 6)
         assert np.abs(P).max() < 2000                                             # micrometres, soma at the origin
-        assert c["species"] in ("human", "rat") and c["archive"] != "Allen Cell Types"
+        assert c["species"] in ("human", "rat", "mouse") and c["archive"] != "Allen Cell Types"
     cells = morph["cells"]
-    assert cells["pyramidal"]["species"] == cells["basket"]["species"] == cells["purkinje"]["species"] == "human"
-    assert cells["pyramidal"]["axon_len"] > 500 and cells["purkinje"]["axon_len"] == 0   # Purkinje: no axon reconstructed
-    pyr = np.array(cells["pyramidal"]["pos"]).reshape(-1, 6)
-    k = np.array(cells["pyramidal"]["kind"])
-    assert pyr[k == 3][:, [1, 4]].mean() > 50 and pyr[k == 1][:, [1, 4]].min() < -300   # apical up, axon down
-    pk = np.array(cells["purkinje"]["pos"]).reshape(-1, 6)
-    assert np.ptp(pk[:, [2, 5]]) < 0.25 * np.ptp(pk[:, [0, 3]])                  # the fan lies in the x-y plane
+    assert cells["pyramidal"]["species"] == cells["basket"]["species"] == "human"
+    assert "purkinje" not in cells                                               # no cerebellum in the model
+    for name in ("pyramidal", "ca1_pyramidal"):                                  # apical dendrite up
+        P = np.array(cells[name]["pos"]).reshape(-1, 6)
+        k = np.array(cells[name]["kind"])
+        assert cells[name]["axon_len"] > 500 and P[k == 3][:, [1, 4]].mean() > 50
     assert "not from the scanned person" in morph["note"]
 
 
@@ -93,39 +95,39 @@ def _node_check():
 
 def test_closeups_cap_segments_and_draw_calls():
     d = _node_check()
-    for kind in ("cortex", "striatum", "thalamus", "cerebellum"):
+    for kind in KINDS:
         c = d[kind]
         assert 100 <= c["cells"] <= 300 and c["segments"] == c["drawn_segments"] <= 60_000
         assert c["drawCalls"] == len(c["types"]) <= 2                         # one draw call per cell type
     assert [t["type"] for t in d["cortex"]["types"]] == ["pyramidal", "basket"]
     assert d["striatum"]["types"][0]["type"] == "medium_spiny" and d["thalamus"]["types"][0]["type"] == "relay"
-    assert d["cerebellum"]["types"][0]["type"] == "purkinje"
+    assert d["hippocampus"]["types"][0]["type"] == "ca1_pyramidal"
+    assert d["amygdala"]["types"][0]["type"] == "amygdala_principal"
     assert d["slowdown"] == 500
 
 
 def test_no_activity_without_a_live_network():
     d = _node_check()
-    for kind in ("cortex", "striatum", "thalamus", "cerebellum"):
+    for kind in KINDS:
         c = d[kind]
         assert c["spiking_offline"] == 0 and c["live_offline"] is False and c["rate_offline"] == 0   # offline: still
         assert c["spiking_other_region"] == 0                                    # another region's spikes: not here
-    for kind in ("cortex", "striatum", "thalamus"):
+    for kind in KINDS:                                                           # every close-up is a simulated region
         assert d[kind]["spiking_after"] > 0 and d[kind]["live_after"] and d[kind]["rate_after"] > 0.5
-    cb = d["cerebellum"]                                                         # not in the model: never any activity
-    assert cb["simulated"] is False and cb["spiking_after"] == 0 and cb["live_after"] is False and cb["rate_after"] == 0
 
 
 def test_level_of_detail_switch():
     d = _node_check()
     assert d["lod"] == ["brain", "closeup", "closeup", "brain"]                  # zoom in: shapes; zoom out: points
-    assert d["kinds"] == ["cortex", "striatum", "thalamus", None, "cortex"]
+    assert d["kinds"] == ["cortex", "striatum", "thalamus", None, "hippocampus", "amygdala"]
 
 
 def test_brain_page_wording():
     html = (ROOT / "web" / "index.html").read_text()
     assert SHAPES in html                                                        # word for word (#78)
-    assert "the cerebellum is not in the simulated network: shapes only, no activity" in html
     assert "no live network: shapes only, no activity" in html
-    assert re.search(r'id="n3close".*data-k="cortex".*data-k="striatum".*data-k="thalamus".*data-k="cerebellum"', html)
+    assert re.search(r'id="n3close".*data-k="cortex".*data-k="striatum".*data-k="thalamus".*data-k="hippocampus"'
+                     r'.*data-k="amygdala"', html)
+    assert "cerebellum" not in html.lower() and "purkinje" not in html.lower()
     for text in (html.lower(), (ROOT / "web" / "neurons3d.js").read_text().lower()):
         assert "his real neurons" not in text and "scanned person's neurons" not in text

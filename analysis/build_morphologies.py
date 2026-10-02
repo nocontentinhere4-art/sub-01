@@ -1,6 +1,6 @@
 """Build web/neurons_morph.json: real reconstructed neuron shapes for the 3D close-ups (#78).
 
-Five cells from NeuroMorpho.Org (CC BY 4.0; terms: https://neuromorpho.org/useterm.jsp), one per cell type, human
+Six cells from NeuroMorpho.Org (CC BY 4.0; terms: https://neuromorpho.org/useterm.jsp), one per cell type, human
 where the database has one with the parts we draw. None of them is from the person whose MRI the brain model is
 built from: no data of that person exist at this scale. The simulated network itself uses point neurons; these shapes
 are illustrative (the page says so).
@@ -11,8 +11,8 @@ are illustrative (the page says so).
 Access follows NeuroMorpho.Org's terms: the API for metadata and the direct .swc links, with a named user agent.
 Each cell is simplified to at most its type's segment budget (<= 300): unbranched paths are reduced with
 Ramer-Douglas-Peucker, and when even one segment per path is too many, the shortest terminal branches are pruned
-first. Pyramidal cells are turned so the apical dendrite points up (+y, toward the pia); the Purkinje cell so its
-dendritic fan points up and lies in the x-y plane. Units: micrometres, soma at the origin.
+first. Pyramidal cells (cortex, CA1) are turned so the apical dendrite points up (+y, toward the pia / stratum
+radiatum). Units: micrometres, soma at the origin.
 Writes web/neurons_morph.json and docs/spiking/morphology_credits.md (every cell, its paper, the three citations
 NeuroMorpho.Org asks for).
 """
@@ -40,8 +40,10 @@ CELLS = {
     "basket": (107145, 240, 0.55, "none"),          # human neocortex L2/3 fast-spiking basket cell (Tamas)
     "medium_spiny": (10032, 200, 0.1, "none"),      # rat nucleus accumbens shell (no human MSN in the database)
     "relay": (115363, 220, 0.15, "none"),           # rat VPM thalamocortical relay cell (no human relay cell)
-    "purkinje": (307495, 300, 0.0, "fan"),          # human cerebellar Purkinje cell (dendrites; no axon reconstructed)
+    "ca1_pyramidal": (222, 300, 0.25, "apical"),    # rat hippocampus CA1 (no human CA1 cell with dendrites + axon)
+    "amygdala_principal": (139102, 240, 0.25, "none"),   # mouse basolateral amygdala principal cell (no human one)
 }
+# No Purkinje cell: the cerebellum is not one of the model's 214 regions, and every close-up shows a simulated region.
 PAPERS = {   # PubMed esummary, 2026-10-02
     "27536876": "Molnár G, Rózsa M, Baka J et al. (2016) Human pyramidal to interneuron synapses are mediated by "
                 "multi-vesicular release and multiple docked vesicles. eLife 5:e18167. doi:10.7554/eLife.18167",
@@ -49,9 +51,11 @@ PAPERS = {   # PubMed esummary, 2026-10-02
                 "nucleus accumbens. Eur J Neurosci 22:2332-40. doi:10.1111/j.1460-9568.2005.04416.x",
     "31095552": "Iavarone E, Yi J, Shi Y et al. (2019) Experimentally-constrained biophysical models of tonic and "
                 "burst firing modes in thalamocortical neurons. PLoS Comput Biol 15:e1006753. doi:10.1101/512269",
-    "38168772": "Masoli S, Sanchez-Ponce D, Vrieler N et al. (2024) Human Purkinje cells outperform mouse Purkinje "
-                "cells in dendritic complexity and computational capacity. Commun Biol 7:5. "
-                "doi:10.1038/s42003-023-05689-y",
+    "8576427": "Ishizuka N, Cowan WM, Amaral DG (1995) A quantitative analysis of the dendritic organization of "
+               "pyramidal cells in the rat hippocampus. J Comp Neurol 362:17-45. doi:10.1002/cne.903620103",
+    "32296306": "Hsu TT, Huang TN, Hsueh YP (2020) Anterior commissure regulates neuronal activity of amygdalae and "
+                "influences locomotor activity, social interaction and fear memory in mice. Front Mol Neurosci 13:47. "
+                "doi:10.3389/fnmol.2020.00047",
 }
 NMO_CITE = ("NeuroMorpho.Org (RRID:SCR_002145); Tecuatl C, Ljungquist B, Ascoli GA (2024) Accelerating the continuous "
             "community sharing of digital neuromorphology data. FASEB Bioadv 6(7):207-221. doi:10.1096/fba.2024-00048")

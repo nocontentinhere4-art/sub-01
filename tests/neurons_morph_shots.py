@@ -7,7 +7,7 @@ the real 20k CPU network's frames (recorded in this process, put through frames.
 by this script into the page's own websocket handler; the server never serves it. At 1280 and 390 px:
   - the whole brain with the neurons layer (points);
   - a close-up of cortex (the recorded stream's most active cortical region), with live spikes from the stream;
-  - a close-up of the cerebellum: Purkinje shapes only (the cerebellum is not in the simulated network);
+  - a close-up of the hippocampus (CA1 pyramidal cells), with live spikes from the stream;
   - a 3-frame strip of a spike pulse leaving a soma along its axon (cortex close-up, 1280 px);
   - the offline close-up (no stream): shapes only, no activity.
 Also: the layer's JS time per rendered frame and per message (CPU x4), and FPS in the close-up (software WebGL here).
@@ -101,9 +101,10 @@ def main():
                 pg.wait_for_timeout(3000)
                 shot(pg, f"cortex_{tag}_closeup.png")
                 res[f"cortex_{tag}"] = pg.inner_text("#n3cap")
-                closeup(pg, "cerebellum")
-                shot(pg, f"cerebellum_{tag}_purkinje.png")
-                res[f"cerebellum_{tag}"] = pg.inner_text("#n3cap")
+                closeup(pg, "hippocampus")
+                pg.wait_for_timeout(3000)
+                shot(pg, f"hippocampus_{tag}_closeup.png")
+                res[f"hippocampus_{tag}"] = pg.inner_text("#n3cap")
                 res[f"errors_{tag}"] = errors
                 ctx.close()
 
@@ -139,9 +140,9 @@ def main():
             cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
             res["js_x4"] = pg.evaluate("""async f => {
               const morph = await (await fetch('neurons_morph.json')).json(), out = {};
-              for (const kind of ['cortex', 'striatum', 'thalamus', 'cerebellum']) {
+              for (const kind of ['cortex', 'striatum', 'thalamus', 'hippocampus', 'amygdala']) {
                 let t = performance.now();
-                const c = Neurons3D.closeup({THREE, morph, kind, region: kind === 'cortex' ? 12 : kind === 'striatum' ? 202 : 200});
+                const c = Neurons3D.closeup({THREE, morph, kind, region: {cortex: 12, striatum: 202, thalamus: 200, hippocampus: 204, amygdala: 212}[kind]});
                 const build = performance.now() - t;
                 let tm = 0, tu = 0, k = 0;
                 for (const [, m] of f) { t = performance.now(); c.onFrame(m); tm += performance.now() - t;

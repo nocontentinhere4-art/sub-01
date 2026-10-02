@@ -179,24 +179,27 @@
   // simplified), drawn as instanced line segments: one draw call per cell type, <= SEG_BUDGET segments in all. Each
   // drawn cell stands for a sampled model neuron of the region: when that neuron's spike arrives (n3.sq), its soma
   // flashes and a pulse runs from the soma along its axon at PULSE_UM_S (visibly slowed); its dendrites glow with the
-  // region's rate. The cerebellum is not in the simulated network: its close-up takes no frames (shapes only).
+  // region's rate. Only regions the network simulates get a close-up (no cerebellum: it is not one of the 214).
   // Illustrative shapes: the simulated network uses point neurons.
   const SEG_BUDGET = 60000, MAX_CELLS = 300, SOMA_SEGS = 3;
   const PULSE_UM_S = 1000, PULSE_W_UM = 70;                        // 1 mm/s on screen vs ~0.5 m/s in thin axons
   const SLOWDOWN = Math.round(0.5e6 / PULSE_UM_S);                 // ~500x slower than a thin unmyelinated axon
   const KINDS = {                                                  // close-up kind -> cell types, shares, cells drawn
-    cortex: { types: [["pyramidal", 0.8], ["basket", 0.2]], cells: 120, simulated: true },
-    striatum: { types: [["medium_spiny", 1]], cells: 220, simulated: true },
-    thalamus: { types: [["relay", 1]], cells: 160, simulated: true },
-    cerebellum: { types: [["purkinje", 1]], cells: 120, simulated: false },
+    cortex: { types: [["pyramidal", 0.8], ["basket", 0.2]], cells: 120 },
+    striatum: { types: [["medium_spiny", 1]], cells: 220 },
+    thalamus: { types: [["relay", 1]], cells: 160 },
+    hippocampus: { types: [["ca1_pyramidal", 1]], cells: 150 },
+    amygdala: { types: [["amygdala_principal", 1]], cells: 150 },
   };
   // which close-up a region gets (by its brain.json group / name); null: none
   function kindOf(node) {
     if (!node) return null;
     const nm = node.name || "";
-    if (/^(LH|RH)_/.test(nm) || /Hippocampus|Amygdala/.test(nm)) return "cortex";
+    if (/^(LH|RH)_/.test(nm)) return "cortex";
     if (/Caudate|Putamen|Accumbens/.test(nm)) return "striatum";
     if (/Thalamus/.test(nm)) return "thalamus";
+    if (/Hippocampus/.test(nm)) return "hippocampus";
+    if (/Amygdala/.test(nm)) return "amygdala";
     return null;
   }
   // how many cells of each type fit: <= MAX_CELLS cells and <= budget segments (soma marks included)
@@ -208,14 +211,12 @@
     const plan = k.types.filter(([t]) => morph.cells[t]).map(([t, f]) => ({ type: t, n: Math.round(n * f) }));
     let segs = plan.reduce((a, p) => a + p.n * (morph.cells[p.type].n_seg + SOMA_SEGS), 0);
     while (segs > budget) { const p = plan[0]; p.n--; segs -= morph.cells[p.type].n_seg + SOMA_SEGS; }   // rounding
-    return { kind, simulated: k.simulated, cells: plan.reduce((a, p) => a + p.n, 0), segments: segs, drawCalls: plan.length, plan };
+    return { kind, cells: plan.reduce((a, p) => a + p.n, 0), segments: segs, drawCalls: plan.length, plan };
   }
   // soma position of cell i of n in the block (micrometres; y up, pia at the top for cortex)
   function placeCell(kind, type, i, n, rnd) {
-    if (kind === "cerebellum") {                                   // fans in parallel planes, a row along z
-      const cols = 4, row = Math.floor(i / cols), col = i % cols;
-      return [(col - (cols - 1) / 2) * 470 + (rnd() - 0.5) * 60, (rnd() - 0.5) * 20, (row - n / cols / 2) * 22];
-    }
+    if (kind === "hippocampus")                                    // CA1: somata packed in stratum pyramidale
+      return [(rnd() - 0.5) * 2000, (rnd() - 0.5) * 70, (rnd() - 0.5) * 500];
     if (kind === "cortex") {                                       // L2/3 pyramids under the pia, basket cells around
       const y = type === "pyramidal" ? -150 - 650 * rnd() : -100 - 900 * rnd();
       return [(rnd() - 0.5) * 2200, y, (rnd() - 0.5) * 700];
@@ -248,9 +249,9 @@
       const off = new Float32Array(p.n * 3), rot = new Float32Array(p.n * 2), sc = new Float32Array(p.n), spk = new Float32Array(p.n).fill(-1e4);
       for (let j = 0; j < p.n; j++) {
         off.set(placeCell(kind, p.type, j, p.n, rnd).map(v => v * UM), 3 * j);
-        const a = kind === "cerebellum" ? (rnd() - 0.5) * 0.2 : rnd() * 6.2832;
+        const a = rnd() * 6.2832;
         rot[2 * j] = Math.cos(a); rot[2 * j + 1] = Math.sin(a);
-        sc[j] = (0.85 + 0.3 * rnd()) * (rnd() < 0.5 && kind !== "cortex" ? -1 : 1);   // mirrored copies add variety
+        sc[j] = (0.85 + 0.3 * rnd()) * (rnd() < 0.5 ? -1 : 1);       // mirrored copies (x only) add variety
         cells.push({ t: types.length, j });
       }
       g.setAttribute("iOff", new THREE.InstancedBufferAttribute(off, 3));
@@ -299,7 +300,7 @@
     const S = { t0: performance.now(), lastWall: -1e9, gap: 200, prev: 0, rate: 0, region: o.region, fade: 0, on: true, spikes: 0 };
     const clock = now => (now - S.t0) / 1000;
     function onFrame(m) {                                           // a spiking frame: only the close-up region's spikes
-      if (!plan.simulated || !m || m.type !== "spiking" || !m.n3 || m.live === false) return;
+      if (!m || m.type !== "spiking" || !m.n3 || m.live === false) return;
       const now = performance.now(), gap = now - S.prev; S.prev = now;
       if (gap > 30 && gap < 2000) S.gap = 0.7 * S.gap + 0.3 * gap;
       S.lastWall = now;
@@ -314,16 +315,16 @@
       for (const T of dirty) T.sa.needsUpdate = true;
     }
     function update(now) {
-      const live = plan.simulated && now - S.lastWall < LIVE_MS;
+      const live = now - S.lastWall < LIVE_MS;
       uniforms.uTime.value = clock(now); uniforms.uLive.value = live ? 1 : 0;
       const r = S.rate ? Math.max(0, Math.min(1, (S.rate / 255 - 0.42) / 0.44)) : 0;
       uniforms.uRate.value += (r - uniforms.uRate.value) * 0.05;
       S.fade += ((S.on ? 1 : 0) - S.fade) * 0.1; uniforms.uFade.value = S.fade;
     }
     function dispose() { for (const T of types) { T.geom.dispose(); T.mat.dispose(); } }
-    function info() { return { kind, region: S.region, simulated: plan.simulated, cells: plan.cells, segments: plan.segments,
+    function info() { return { kind, region: S.region, cells: plan.cells, segments: plan.segments,
       drawCalls: plan.drawCalls, types: plan.plan.map(p => ({ type: p.type, n: p.n, species: morph.cells[p.type].species,
-      id: morph.cells[p.type].nmo_id })), live: plan.simulated && performance.now() - S.lastWall < LIVE_MS, spikes: S.spikes,
+      id: morph.cells[p.type].nmo_id })), live: performance.now() - S.lastWall < LIVE_MS, spikes: S.spikes,
       spiking: types.reduce((a, T) => a + T.spk.filter(x => x > -1e3).length, 0) }; }
     return { group, onFrame, update, dispose, info, box, plan };
   }
