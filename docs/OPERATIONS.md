@@ -93,3 +93,32 @@ Workspace → **Usage** → **Usage limits**:
 - optionally set a **hard limit**. Railway stops the services when it is reached, so set it above the alert.
 
 The Railway credit runs out separately from these caps. The services stop when it does; check the Usage page.
+
+## Logged-in TikTok and YouTube (#60): view-only, with a ban risk
+He watches TikTok and YouTube logged in to **SUB-01's own accounts**, so the For You and Home feeds learn from what he
+watches. He never likes, follows, comments, shares, messages, uploads, goes live or buys anything (`view_only.py`).
+He never opens settings, inbox, notifications, account, studio, history or billing pages (`view_only.private_url` /
+`private_dom`). His avatar and account name are hidden before every screenshot.
+
+**Risk:** TikTok's and YouTube's terms forbid automated use, so either account can be banned or locked at any time.
+A ban only costs the logged-in feed: he falls back to browsing that site logged out, as before #60.
+**Never use the owner's personal accounts**, or any account tied to a phone number, payments or a real person.
+
+### Setting the sessions
+1. In a normal desktop browser (a separate profile), log in to SUB-01's own account on `www.tiktok.com` or
+   `www.youtube.com`.
+2. With the [Cookie-Editor](https://cookie-editor.com) extension open on that site, choose **Export → JSON**. (A
+   Playwright cookie list or `storage_state` JSON works too.)
+3. In Railway → the service → **Variables**, paste it as `SUB01_SESSION_TIKTOK` or `SUB01_SESSION_YOUTUBE`. The service
+   restarts. Never paste it anywhere else (git, an issue, a chat).
+4. Close that browser profile **without logging out** (logging out ends the exported session too).
+
+Only cookies of the site's own domain are used (`tiktok.com` or `youtube.com`); the rest of the export is ignored. The
+cookies only live in the browser process's memory, in that site's own browser context. They are not in Chromium's
+environment, and no log or page ever shows them. YouTube stays in Restricted Mode when he is logged in.
+
+### When a session expires
+When the login cookie expires, or the site shows a sign-in button or a login wall, he goes back to browsing that site
+logged out until the next restart. The log says it once (`sessions: tiktok logged out (expired)`), and `/api/browsing`
+shows `logged out` with the reason. To refresh: repeat the steps above and replace the variable. Without the
+variables he browses logged out, as before.
