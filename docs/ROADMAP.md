@@ -1,9 +1,9 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 03:00 UTC** (pass 13). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 03:15 UTC** (pass 14). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
-**Merged on 2026-10-02:** #24 atomic state-file writes (owner-approved; CI green), #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
+**Merged on 2026-10-02:** #26 English-only output (owner-approved), #24 atomic state-file writes (owner-approved; CI green), #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
 
 **Merged on 2026-10-01 at the owner's request:** #7 reading memory, #11 sleep circuit, #9 spiking memory. The
 coordinator resolved their conflicts with merge commits and fixed the one cross-PR bug (`expected_replays()` still
@@ -107,6 +107,7 @@ findings "NOT verified", and its reviews are partial on large diffs.
   coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
   `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
   and the `?rate=` bug.
+- **2026-10-02: the site is English-only** (owner). Viewers may write in any language and Italian words still reach the brain as stimuli, but nothing shown or generated is in another language.
 - **2026-10-02: CI-only and docs-only merges do not count for the 60-minute spacing:** they don't change what runs on Railway.
 - **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
   I rendered both in headless Chromium. The new room is cleaner, and its provenance is documented as CC0 or made for
