@@ -165,7 +165,9 @@ code around it do.</p>
   <tr><td>GPU memory test (rented GPU, at most 1 hour a day)</td><td class="ph">placeholder</td></tr>
   <tr><td>Server</td><td class="ph">placeholder</td></tr>
 </table>
-<p class="src">The one-off GPU validation run cost about $0.01 (<code>docs/spiking/results.md</code>).</p>
+<p class="src">One-off GPU validation runs: the first cost about $0.01 (<code>docs/spiking/results.md</code>).
+The reading-memory run behind the 6/6 figure cost about $0.033, and that whole task about $0.036 (PR #9;
+results in <code>docs/spiking/gpu_reading/</code>).</p>
 </section>
 
 <section id="credits">
@@ -179,10 +181,14 @@ code around it do.</p>
   <li><strong>Maps and routes:</strong> © OpenStreetMap contributors, ODbL.</li>
   <li><strong>Articles:</strong> Wikipedia, CC BY-SA. Article titles and extracts shown on the site belong to their
     Wikipedia authors.</li>
-  <li><strong>3D room and character</strong> (<code>web/room/</code>): made for this project with Higgsfield
-    (image concepts turned into 3D with Meshy, then rigged and animated), per the commit that added them
-    (<code>d530f9b</code>). <span class="tag">placeholder</span>The commits state no licence for these files;
-    the terms they are used under are to be confirmed.</li>
+  <li><strong>3D room</strong> (<code>web/room/room_clean.glb</code>): modelled for this project and released under
+    CC0, with Poly Haven textures and props (CC0 1.0). The poster text is set in Noto Sans JP (SIL Open Font
+    License 1.1); only rendered pixels are used. Each asset and its authors are listed in
+    <span class="src"><code>web/room/CREDITS.md</code></span>.</li>
+  <li><strong>3D character</strong> (<code>web/room/boy*.glb</code>, <code>web/room/hand_phone.glb</code>): made for
+    this project with Higgsfield (image concepts turned into 3D with Meshy, then rigged and animated).
+    <span class="tag">placeholder</span>No licence is stated for these files; the terms they are used under are to
+    be confirmed.</li>
   <li><strong>3D engine:</strong> three.js, MIT licence.</li>
   <li><strong>Sleep model:</strong> Phillips &amp; Robinson (2007), J Biol Rhythms 22:167; constants cross-checked
     in the MIT-licensed R package sleepR.</li>
