@@ -43,6 +43,7 @@ from research import Reader, reading_stimulus
 from browse import Browser, display_ok
 import brain_vote
 import chess_game
+import music as music_mod
 import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from search_sources import live_interest
@@ -57,6 +58,7 @@ except Exception as _e:
     spiking_manager = spiking_server = None
     print("spiking routes unavailable:", type(_e).__name__, flush=True)
 from spiking.words import half_cue_ok              # torch-free, like pod_manager
+from spiking import live as spiking_live           # numpy only: his spiking neurons in the day, a child process (#55)
 
 HERE = Path(__file__).parent
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
@@ -86,6 +88,8 @@ CHESS_THINK_S = (15.0, 45.0)    # simulated seconds he takes per move (the vote 
 CHESS_REPLY_S = (5.0, 15.0)     # ...and the opponent
 CHESS_MIN_GAP_S = 0.7           # real seconds between moves at least (the accelerated demo clock)
 CHESS_MAX_S = 90 * 60           # a game keeps him at the desk up to this long (simulated), then he gets up
+MUSIC_BG_P = 0.4                # chance that an activity where music can play in the background gets some (#68)
+MUSIC_NEXT_P = 0.5              # ...and that another background track follows the one that ended
 
 
 # the novelty bonus (brain_vote.NOVELTY): a link or search not chosen in the last 7 days; with #40's new actions
@@ -289,6 +293,7 @@ class Live:
         self.last_rel = {}               # group activity / mean, guides what it reads next
         self.last_frame = None
         self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
+        self.decider = None              # brain_vote.Backend (main()): a spiking network votes too, GPU or CPU (#55)
         self.mind = None                 # mind.py (main()): an AI reads and remembers for him; his brain model chooses
         self.chat_inbox = []             # (sim t, text) of recent chat messages he may answer at the computer
         self.replies = []                # his recent replies (AI-written), for the hello and /api/mind
@@ -302,6 +307,14 @@ class Live:
         self.chess_path = Path(data_dir) / "chess.jsonl"
         self.chess_rng = random.Random(int(seed) + 2 if seed else None)
         self.chess_vote_rng = np.random.default_rng(int(seed) + 3 if seed else None)   # not shared across threads
+        # music (#68): his brain model picks tracks; pages show Spotify's official embed (no audio on the server)
+        self.music = music_mod.Music(data_dir, api=music_mod.SpotifyAPI.from_env(),
+                                     rng=random.Random(int(seed) + 4 if seed else None))
+        self.music_watch = PageWatch()     # the stay response while a track plays feeds the tastes
+        self.music_vote_rng = np.random.default_rng(int(seed) + 5 if seed else None)
+        self.music_rng = random.Random(int(seed) + 6 if seed else None)
+        self.music_bg = (None, False)      # (the activity start it was rolled for, background music wanted)
+        self.music_busy = False            # a pick is being made (worker threads)
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -419,6 +432,7 @@ class Live:
         if self.eye:
             self.eye.hear(text, t)
         self.life.hear(text, t)
+        self.music.hear(text, t)                           # "play …" / "metti …": a wish (filtered above)
         if getattr(self, "mind", None):                    # he may answer it later, at the computer
             self.chat_inbox = (self.chat_inbox + [(t, text)])[-10:]
         if self.spiking:                                   # no-op when no GPU pod is connected
@@ -688,7 +702,10 @@ class Live:
             tsim = self.clock.now()
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
                              self.engine.pressure(tsim))
+            self.life.music = self.music.tick_view()
             msg["life"] = self.life.snapshot()
+            if self.music.now:
+                self.music_watch.feed(rel, now, TICK)
             msg["neuro"] = {k: round(v, 2) for k, v in levels.items()}
             if self.life.activity == "research" and not self.life.path:
                 msg["life"]["reading"] = self.reading_now(tsim)
@@ -787,6 +804,8 @@ class Live:
                 if st and (st.get("video") or {}).get("watching"):
                     self.video_drive(st["video"])
                 if st:
+                    self.reader.saw(st, t)                      # #56: "on his mind" is what he is actually reading
+                if st:
                     await self.broadcast({"type": "screen", **self.screen_status(dev)})
                 if now - last_sync > 30:                        # the log shown on /api/browsing stays fresh
                     await self.sync_browsing()
@@ -824,8 +843,9 @@ class Live:
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
         res = self.pagewatch.finish()
-        if res:
-            self.tastes.learn(*res)
+        delta = self.tastes.learn(*res) if res else None
+        if getattr(self, "decider", None):                    # the stay's prediction error = its dopamine (#55)
+            self.decider.outcome(res[1] if res else None, delta)
 
     def novel(self, option):
         return option["action"] in NOVEL_ACTIONS and time.time() - self.targets.get(target_key(option), 0) > 7 * 86400
@@ -858,8 +878,10 @@ class Live:
         topics = [Tastes.topics(o, page.get("title", "")) for o in opts]
         tastes = [self.tastes.predict(tp) for tp in topics]
         clone = self.brain.clone()                            # snapshot on the event loop, simulated in a thread
+        decider = getattr(self, "decider", None)
+        sp = await decider.ask([o["label"] for o in opts], "browse") if decider else None   # GPU, else CPU, <= ~3.5 s
         dec = await loop.run_in_executor(None, lambda: brain_vote.vote(
-            clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng))
+            clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng, spiking=sp))
         chosen = opts[dec["chosen"]]
         brain_vote.apply(self.brain, chosen, gain)             # the live brain receives the chosen stimulus
         act = {k: chosen.get(k) for k in ("action", "target", "label", "href")}
@@ -869,6 +891,8 @@ class Live:
             dec["watch_min"] = mins
         self.end_page()
         self.pagewatch.start(topics[dec["chosen"]], time.time())
+        if decider:
+            decider.followed(sp, dec["chosen"], [o["label"] for o in opts], "browse")
         now = time.time()
         self.targets = {k: v for k, v in self.targets.items() if now - v < 7 * 86400}
         self.targets[target_key(chosen)] = now
@@ -974,6 +998,93 @@ class Live:
         if self.life.activity == "play_chess":
             self.life.end_activity(t)
         await self.broadcast({"type": "chess", **self.chess_last, "finished": True})
+
+    # --- music (#68): his brain model picks among 3-5 candidate tracks; the pages show Spotify's own embed ------------
+    def music_context(self, t):
+        """His tastes, words taught in the last 2 days and what he has been reading about: they tilt the genres."""
+        fav = [f["topic"] for f in self.tastes.top(8)["favoured"] if f["kind"] == "word"]
+        taught = [m["text"] for m in self.memory.items if m.get("source") == "taught" and t - m["t"] < 2 * 86400]
+        interests = [i.get("query", "") for i in (self.interest[1] or []) if isinstance(i, dict)]
+        return fav, taught[-10:], interests
+
+    async def run_music(self):
+        while True:
+            await asyncio.sleep(1.0)
+            await self.music_step()
+
+    async def music_step(self):
+        """Start, end or change his track: in the listen_music activity, or now and then in the background while he
+        reads, plays chess, sits in the park or walks outside."""
+        t = self.clock.now()
+        life, now = self.life, self.music.now
+        awake = self.engine.stage == "AWAKE"
+        listening = awake and life.activity == "listen_music" and not life.path
+        started = life.started[-1] if life.started else None
+        if self.music_bg[0] != started:                         # a new activity: is there music in the background?
+            self.music_bg = (started, self.music_rng.random() < MUSIC_BG_P)
+        bg = awake and self.music_bg[1] and life.music_bg_ok()
+        if now:
+            ends = self.music.ends()
+            if not awake:
+                return await self.music_stop(t, "fell asleep")
+            if now["mode"] == "activity" and not listening:
+                return await self.music_stop(t, "took the headphones off")
+            if now["mode"] == "background" and not bg and not listening:
+                return await self.music_stop(t, "stopped the music")
+            if t < ends:
+                return
+            await self.music_stop(t, "the track ended")
+            if not listening:
+                if self.music_rng.random() >= MUSIC_NEXT_P:
+                    self.music_bg = (started, False)
+                return
+        if listening:
+            await self.music_pick(t, "activity")
+        elif bg:
+            await self.music_pick(t, "background")
+
+    async def music_pick(self, t, mode):
+        if self.music_busy:
+            return
+        self.music_busy = True
+        try:
+            loop = asyncio.get_running_loop()
+            ctx = self.music_context(t)
+            tracks = await loop.run_in_executor(None, lambda: self.music.candidates(t, *ctx))
+            if not tracks or self.music.now:
+                return
+            opts = self.music.options(tracks)
+            topics = [self.music.topics(o, x) for o, x in zip(opts, tracks)]
+            tastes = [self.tastes.predict(tp) for tp in topics]
+            novel = [self.music.novel(x["id"]) for x in tracks]
+            gain, mood, clone = self.engine.gain, self.mood(t), self.brain.clone()
+            dec = await loop.run_in_executor(None, lambda: brain_vote.vote(clone, opts, gain, mood, tastes, novel,
+                                                                             rng=self.music_vote_rng))
+            if not dec or self.music.now:
+                return
+            k = dec["chosen"]
+            brain_vote.apply(self.brain, opts[k], gain)          # the live brain receives the chosen track's stimulus
+            pub = self.music.play(tracks[k], dec, self.clock.now(), mode)
+            self.music_watch.start(topics[k], time.time())
+            if getattr(self, "mind", None):                      # the mind's day notes (and so the diary) know it
+                try:
+                    self.mind.memory.add("music", summary=f"listened to “{pub['title']}” by {pub['artist']}"[:200],
+                                         topics=[pub["genre_label"]] if pub.get("genre_label") else [])
+                except Exception as e:
+                    print("music: mind note failed:", repr(e)[:120], flush=True)
+            await self.broadcast({"type": "music", "playing": True, **pub})
+        finally:
+            self.music_busy = False
+
+    async def music_stop(self, t, why):
+        res = self.music_watch.finish()
+        response = None
+        if res:
+            self.tastes.learn(*res)                              # the stay response: his music taste forms over days
+            response = res[1]
+        row = self.music.stop(t, why, response)
+        if row:
+            await self.broadcast({"type": "music", "playing": False, "ended": why, "id": row["id"]})
 
     # --- the mind: an AI reads and remembers for him; his brain model chooses (mind.py) ---------------
     def encoding(self):
@@ -1103,7 +1214,8 @@ class Live:
                         llm = None if why else costs.MeteredLLM(llm, self.ledger, "diary")
                     read = [{"title": m["text"], "url": m.get("url", "")} for m in self.memory.items
                             if m.get("source") == "reading" and day_of(m["t"]) == date]
-                    notes = self.mind.day_notes(date) if getattr(self, "mind", None) else None
+                    notes = dict(self.mind.day_notes(date)) if getattr(self, "mind", None) else {}
+                    notes["music"] = self.music.day(date)                       # what his brain model picked (#68)
                     await loop.run_in_executor(None, self.diary.close, self.engine.last_night, llm, read, notes)
                     print(f"diary: night of {date} written", flush=True)
                 except Exception as e:
@@ -1213,7 +1325,8 @@ class Live:
                         pass
             await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
                                 "replies": getattr(self, "replies", [])[-10:],
-                                "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
+                                "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD,
+                                "music": self.music.public(self.music.now) if getattr(self, "music", None) else None})
             await ws.send_json(self.nights())
             if self.last_frame:
                 await ws.send_json(self.eye_frame())
@@ -1367,6 +1480,14 @@ async def main(args):
         else:
             manager = None
 
+    cpu_net = None                                # his spiking neurons in the day (#55); SUB01_SPIKING_LIVE=0: no CPU net
+    if os.environ.get("SUB01_SPIKING_LIVE", "1") != "0":
+        cpu_net = spiking_live.LiveClient(data_dir, int(os.environ.get("SUB01_SPIKING_LIVE_NEURONS") or
+                                                        spiking_live.N_NEURONS))
+        cpu_net.on_frame = live.broadcast         # its frames feed the Neurons panel like the GPU session's
+    live.decider = brain_vote.Backend(cpu=cpu_net, gpu=spiking_manager, log=spiking_live.DecisionLog(data_dir))
+    spiking_live.attach(app, live.decider)
+
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
         ext = request.query.get("ext", "png") if request.query.get("ext") in ("png", "webm", "mp4") else "png"
@@ -1429,6 +1550,10 @@ async def main(args):
     async def chess_api(request):                 # the chess board at his desk, recent games, what the card says
         return web.json_response(live.chess_view())
     app.router.add_get("/api/chess", chess_api)
+
+    async def music_api(request):                 # now playing (Spotify embed URL), today's tracks and why each was picked
+        return web.json_response(live.music.view(live.clock.now()))
+    app.router.add_get("/api/music", music_api)
 
     async def mind_api(request):                  # the day plan, notes, replies and the shared AI budget
         return web.json_response(live.mind_view())
@@ -1499,7 +1624,7 @@ async def main(args):
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     live.life.can_watch = bool(live.browser)     # no browser: no videos at the desk
     tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades(),
-             supervised("chess", live.run_chess)]
+             supervised("chess", live.run_chess), supervised("music", live.run_music)]
     if live.eye:
         tasks.append(live.run_eye())
     if live.browser:
@@ -1508,12 +1633,16 @@ async def main(args):
         tasks.append(supervised("mind", live.run_mind))
     if manager:
         tasks.append(manager.run())
+    if cpu_net:
+        tasks.append(supervised("spiking live", cpu_net.run))
     try:
         await asyncio.gather(*tasks)
     finally:
         live.store.save(live.engine, live.memory)
         if manager:
             manager.shutdown()
+        if cpu_net:
+            await cpu_net.stop()
         if live.browser:
             try:
                 await asyncio.wait_for(live.sync_browsing(), 5)  # the newest log, if the browser still answers

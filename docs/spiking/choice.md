@@ -146,6 +146,9 @@ Next, before wiring this into his real choices (`brain_vote.py` / `tastes.py`, n
 sets with real labels, a stability fix for the drifting preference (for example a slower V, or a decaying η), and
 a higher race threshold at 1M neurons.
 
+**Update (#55):** variable offer sets with real labels, and the stability fix (a decaying learning rate), are now in
+`spiking/live.py`, where a small network uses them in the day. See `docs/spiking/live_cpu.md`. Read-outs for 1M (a higher threshold among them) are measured in #70, below.
+
 ## Read-outs at scale and the live learning benchmark (issue #70)
 
 **Question.** In the #67 validation, 41 of 50 races at 1M neurons ended at the first 50 ms check. Large pools have

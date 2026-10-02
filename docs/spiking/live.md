@@ -2,7 +2,7 @@
 
 Owner decision (2026-10-02): run the large network, 1M LIF neurons on a RunPod GPU, through his waking hours. It
 answers his real choices and learns from what follows. Hard daily caps apply. When the pod is down or over a cap,
-the small CPU network of #55 decides instead, and if that is down too, the rate model alone.
+the small CPU network of #55 decides instead (`docs/spiking/live_cpu.md`), and if that is down too, the rate model alone.
 
 **Off by default.** Nothing changes until `SUB01_DAY_LIVE=1` is set on Railway.
 

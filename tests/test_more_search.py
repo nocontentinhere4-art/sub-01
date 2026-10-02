@@ -102,7 +102,7 @@ def test_parsers_survive_junk_and_bot_checks():
 
 def test_every_source_is_free_safe_and_reachable_by_the_guard():
     assert set(S.SOURCES) == {"bing", "ddg", "wikipedia", "commons", "arxiv", "hn", "openlibrary", "youtube",
-                              "recipes", "news"}
+                              "recipes", "news", "shorts", "tiktok"}
     for name, src in S.SOURCES.items():
         urls = [src["site"]] if src.get("site") else [src["url"]("sleep spindles")] + (
             [src["api"]("sleep spindles")] if src.get("api") else [])
@@ -413,8 +413,9 @@ def test_live_interest_reads_the_live_server():
                                                              {"topic": "reward", "kind": "network"}]}))
     got = {S.live_interest(live, {"title": "Kichijoji"}, random.Random(i))["query"] for i in range(200)}
     assert got == {"sleep spindles dreams", "Kichijoji", "onigiri", "ramen"}
-    broken = SimpleNamespace(mind=None)                     # nothing to read: None, never an exception
-    assert S.live_interest(broken, None, random.Random(0)) is None
+    broken = SimpleNamespace(mind=None)                     # nothing to read: no query, never an exception
+    got = S.live_interest(broken, None, random.Random(0))
+    assert got["query"] == "" and 0 <= got["hour"] < 24 and "feed" in got
 
 
 @pytest.mark.parametrize("text, q", [
@@ -443,10 +444,11 @@ def test_next_searches_a_chat_wish_and_says_where_it_came_from():
     b.rng = SimpleNamespace(random=lambda: 0.5, choice=random.Random(0).choice)    # the search branch
     run(b._next(sc, [], {"query": "sleep spindles", "from": "mind"}))
     run(b._next(sc, [], "Kichijoji"))
-    run(b._next(sc, [], {"query": "x" * 200, "from": "mind"}))                        # refused: something familiar
+    run(b._next(sc, [], {"query": "x" * 200, "from": "mind", "hour": 20}))           # refused: one of his interests
     assert calls[2] == ("sleep spindles", "from his reading notes", "mind")
     assert calls[3] == ("Kichijoji", "curious about “Kichijoji”", "")
-    assert calls[4][2] == "familiar" and calls[4][0] in browse.FAMILIAR
+    assert calls[4][2] == "interests" and calls[4][1].startswith("one of his interests (")
+    assert calls[4][1].endswith(", evening)")
 
 
 def test_act_search_marks_follow_ups():

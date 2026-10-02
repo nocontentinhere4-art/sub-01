@@ -85,8 +85,10 @@ def make_app(browser, token=None):
             browser.log = list(st.get("log", []))[-60:]
             browser.used = set(st.get("used", []))
             if st.get("searches") and hasattr(browser, "limits"):   # rate limits and counts survive a restart
+                from interests import Variety
                 from search_sources import Limits
                 browser.limits = Limits(state=st["searches"])
+                browser.variety = Variety(state=st["searches"].get("variety"))
         return web.json_response({"ok": True, "applied": fresh})
 
     async def limited(coro, limit, dev):
@@ -131,7 +133,8 @@ def make_app(browser, token=None):
                                   "sandbox": getattr(browser, "sandbox", None), "uid": os.getuid(),
                                   "typed": getattr(browser, "typed", [])[-30:],
                                   "dismissed": getattr(browser, "dismissed", [])[-30:],
-                                  "search_counts": browser.limits.public() if hasattr(browser, "limits") else None,
+                                  "search_counts": dict(browser.limits.public(), variety=browser.variety.public())
+                                  if hasattr(browser, "limits") else None,
                                   "accounts": browser.accounts() if hasattr(browser, "accounts") else None})
 
     async def health(request):

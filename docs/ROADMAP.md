@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 14:55 UTC** (pass 29). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 15:20 UTC** (pass 30). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -144,6 +144,11 @@ cheap to run, with the password gate kept until launch day.
 | 18k | Room movement (walk around furniture, sit, lie down) | done (+ chair and bed follow-ups) | #28, #42 |
 | 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | done | #47 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
+| 18m | 1M spiking network on GPU through his waking hours (caps 17 h, $14/day, 120 h/week) | done; on with `SUB01_DAY_LIVE=1`; learning at 1M → #70 | #67 |
+| 18n | 20k spiking network on the server CPU votes and learns live (GPU fallback) | done | #65 |
+| 18o | Browse like a young guy (interests, Shorts/TikTok, finance read-only, logged-in view-only feeds) | done | #64, #66, #69 |
+| 18p | Active neurons visible inside the 3D brain | in progress | #62 |
+| 18q | Music via Spotify's official embed, picked by the brain vote | PR #71 | #68 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | done (#37, #45, #52) | #46 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
@@ -294,6 +299,21 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 30:** merged #69 (#56 part 2). He now browses like a young guy: interests rotate with the hour, there are
+Shorts/TikTok sessions, he looks up things he has seen, and finance is read-only with a "nothing here is financial
+advice" line. In the coordinator's day simulation, Wikipedia's share of pages fell from 28 % to 4 %, and topic entropy
+rose from 2.96 to 3.48 bits.
+
+Also merged #65 (#55): a 20k-neuron spiking network runs on the server CPU as a numpy-only child process.
+- It votes in browsing choices as one small term (0.3 × lean) and learns from the stay's response.
+- The 1M GPU network is asked first, through `day_live_decide`; the rate model is the last fallback.
+- Every decision goes to `/data/spiking/decisions-*.jsonl`. The card shows the learned curve against a frozen twin and chance.
+- Coordinator run: 901 tests passed. Smoke run with no torch: tick 7.9 ms; the child takes 2.9 CPU-s at start, idles
+  at 2 % of a core, and sent 26 frames to /ws.
+
+Started #62 (active neurons in the 3D brain), on /brain and /life only. The room's mini brain follows after #63, and
+`session.py`/`choice.py` stay with #70. #71 (music) is waiting for a merge of main (Dockerfile COPY conflict).
 
 **Pass 29:** merged #67 (#58), the 1M network live on GPU through his waking hours. It is off until
 `SUB01_DAY_LIVE=1`, with caps of 17 h/day, $14/day, 120 h/week and 6 restarts. Measured A4000 secure at $0.25/h ≈

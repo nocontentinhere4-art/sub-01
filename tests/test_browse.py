@@ -27,8 +27,7 @@ def test_open_web_allowed(url):
     "http://railway.internal/", "http://db.svc.local/",
     "https://example.com:8443/", "https://user:pw@example.com/",
     "https://www.pornhub.com/", "https://xhamster.com/x", "https://onlyfans.com/a", "https://www.bet365.com/",
-    "https://www.binance.com/en/trade", "https://pump.fun/coin/abc", "https://gmgn.ai/sol/token/x",
-    "https://dexscreener.com/solana/x", "https://www.coingecko.com/", "https://sub01-production.up.railway.app/",
+    "https://phantom.app/download", "https://metamask.io/", "https://sub01-production.up.railway.app/",
     "https://example.com/file.zip", "https://example.com/report.pdf", "https://example.com/setup.exe",
 ])
 def test_blocked(url):
@@ -44,7 +43,7 @@ def test_text_guard():
     assert text_ok("Ramen recipes", "Boil the noodles. " * 50)
     assert text_ok("Mental health in Japan", "A news story that mentions suicide prevention once. " + "x " * 500)
     assert not text_ok("Free porn videos", "")
-    assert not text_ok("Hot new memecoin presale", "")
+    assert text_ok("Hot new memecoin presale", "")       # finance pages are viewable since #56 (read-only)
     assert not text_ok("Gallery", "nude " * 3)
     assert not text_ok("Casino bonus", "")
 

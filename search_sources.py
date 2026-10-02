@@ -272,6 +272,8 @@ def parse_youtube(text, base=""):
         if isinstance(o, dict):
             if isinstance(o.get("videoRenderer"), dict):
                 found.append(o["videoRenderer"])
+            if isinstance(o.get("shortsLockupViewModel"), dict):
+                found.append({"short": o["shortsLockupViewModel"]})
             for v in o.values():
                 walk(v, depth + 1)
         elif isinstance(o, list):
@@ -283,6 +285,18 @@ def parse_youtube(text, base=""):
         return "".join(r.get("text", "") for r in (x or {}).get("runs", []) if isinstance(r, dict))
     out = []
     for v in found:
+        if "short" in v:                                    # a Short: /shorts/<id>, its overlay title
+            sh = v["short"]
+            vid = (((sh.get("onTap") or {}).get("innertubeCommand") or {}).get("reelWatchEndpoint") or {}).get(
+                "videoId")
+            meta = sh.get("overlayMetadata") or {}
+            title = (meta.get("primaryText") or {}).get("content") or re.sub(
+                r",[^,]*views - play Short$", "", sh.get("accessibilityText", ""))
+            if vid and re.fullmatch(r"[\w-]{6,20}", str(vid)):
+                out.append(_result(f"https://www.youtube.com/shorts/{vid}", strip_tags(title),
+                                   (meta.get("secondaryText") or {}).get("content", ""), video=True, short=True,
+                                   hashtags=re.findall(r"#\w+", title)[:6]))
+            continue
         vid = v.get("videoId")
         if not vid or not re.fullmatch(r"[\w-]{6,20}", str(vid)):
             continue
@@ -290,6 +304,22 @@ def parse_youtube(text, base=""):
         out.append(_result(f"https://www.youtube.com/watch?v={vid}", runs(v.get("title")),
                            " · ".join(x for x in meta if x), channel=runs(v.get("ownerText")), video=True))
     return _dedup(out)
+
+
+def strip_tags(title):
+    """A video caption without its trailing hashtags (they are kept apart and still pass the guard)."""
+    t = re.sub(r"(\s*#\w+)+\s*$", "", str(title or "")).strip()
+    return t or str(title or "").strip()
+
+
+def _parse_tiktok(text, base="https://www.tiktok.com/"):
+    import short_videos                                     # TikTok lives in its own module (#60 plugs in there)
+    return short_videos.parse_tiktok(text, base)
+
+
+def _tiktok_url(q):
+    import short_videos
+    return short_videos.tiktok_url(q)
 
 
 def parse_headlines(text, base):
@@ -355,6 +385,11 @@ SOURCES = {
                     "parse": parse_openlibrary},
     "youtube": {"label": "YouTube", "url": lambda q: "https://www.youtube.com/results?" + _q({"search_query": q}),
                 "parse": parse_youtube},
+    # short videos on the phone (#56 extension): YouTube Shorts (Restricted Mode cookie), TikTok tag pages logged out
+    # (robots.txt disallows TikTok's /search; /tag is allowed)
+    "shorts": {"label": "YouTube Shorts", "url": lambda q: "https://www.youtube.com/results?" + _q(
+        {"search_query": f"{q} #shorts"}), "parse": parse_youtube, "feed": True},
+    "tiktok": {"label": "TikTok", "url": _tiktok_url, "parse": _parse_tiktok, "feed": True},
     # sites searched through their own search box (site_search): the home page is opened, the query typed there
     "recipes": {"label": "RecipeTin Eats", "site": "https://www.recipetineats.com/", "parse": parse_headlines},
     "news": {"label": "Science News", "site": "https://www.sciencenews.org/", "parse": parse_headlines},
@@ -549,9 +584,11 @@ class Robots:
 
 
 # --- routing ---------------------------------------------------------------------------------------------------------
-def route(q, limits=None, rng=None, video=False):
+def route(q, limits=None, rng=None, video=False, wiki_share=0.0):
     """Sources to try for query `q`, best first: the topic's sources, then the general engines, the least used ones
-    first among sources that fit equally (rotation), sources over their per-host limit left out."""
+    first among sources that fit equally (rotation), sources over their per-host limit left out. Wikipedia weighs
+    less once it filled more than a tenth of today's pages (`wiki_share`; novelty, not a quota)."""
+    import math
     rng = rng or random.Random()
     score = {"youtube": 1.2} if video else {}
     for _, rx, srcs in TOPICS:
@@ -562,6 +599,10 @@ def route(q, limits=None, rng=None, video=False):
         score.setdefault(s, 0.35)
     if not ol_slug(q or ""):
         score.pop("openlibrary", None)
+    for s in [k for k in score if SOURCES.get(k, {}).get("feed")]:
+        score.pop(s)                                        # the short-video feeds are only used by the phone feed
+    if "wikipedia" in score:
+        score["wikipedia"] *= math.exp(-4.0 * max(0.0, float(wiki_share or 0.0) - 0.10))
     ranked = []
     for s, w in score.items():
         if limits is not None and not limits.source_ok(s):
@@ -594,7 +635,9 @@ def wish(text):
 ORIGINS = {"mind": "from his reading notes", "reading": "from what he was reading",
            "taught": "a word a viewer taught him", "tastes": "a topic his tastes favour",
            "chat": "a viewer's wish in chat", "follow_up": "a follow-up from the page",
-           "familiar": "something familiar", "page": "picked on the page"}
+           "familiar": "something familiar", "page": "picked on the page",
+           "interests": "one of his interests", "video": "saw it in a video", "walk": "passed it on a walk",
+           "eye": "something in his room's eye", "screen": "saw it on his screen"}
 
 
 def interest_text(interest):
@@ -608,9 +651,17 @@ def interest_origin(interest):
     return ORIGINS.get(interest.get("from"), "") if isinstance(interest, dict) else ""
 
 
-def interest_for(mind=(), reading=None, taught=(), tastes=(), rng=None, query_ok=None):
+SEEN_WEIGHT = {"video": 1.5, "walk": 1.2, "eye": 0.8, "screen": 1.0}
+# where a walk took him (life.py activities and places) -> what he might look up afterwards
+PLACE_QUERIES = {"park": "Inokashira Park", "bench": "Inokashira Park", "buy_bread": "Kichijoji bakery",
+                 "bakery": "Kichijoji bakery", "bakery_in": "Kichijoji bakery", "counter": "Kichijoji bakery",
+                 "shop": "Kichijoji shops", "window": "Kichijoji street view"}
+
+
+def interest_for(mind=(), reading=None, taught=(), tastes=(), rng=None, query_ok=None, seen=None):
     """One query for the browser, drawn from his sources: the mind's memory-linked searches (weight 3), what he was
-    reading (1), words viewers taught him (1.5), topics his tastes favour (1). -> {"query", "from"} or None."""
+    reading (1), words viewers taught him (1.5), topics his tastes favour (1), and things he saw (`seen`:
+    {"video": [...], "walk": [...], "eye": [...], "screen": [...]}, SEEN_WEIGHT). -> {"query", "from"} or None."""
     rng = rng or random.Random()
     ok = query_ok or (lambda q: " ".join(str(q or "").split()) or None)
     pools = []
@@ -625,6 +676,10 @@ def interest_for(mind=(), reading=None, taught=(), tastes=(), rng=None, query_ok
     f = [q for q in (ok(x) for x in (tastes or [])) if q]
     if f:
         pools.append((1.0, "tastes", f))
+    for origin, items in (seen or {}).items():
+        qs = [q for q in (ok(x) for x in (items or [])) if q]
+        if qs and origin in SEEN_WEIGHT:
+            pools.append((SEEN_WEIGHT[origin], origin, qs))
     if not pools:
         return None
     total = sum(w for w, _, _ in pools)
@@ -637,9 +692,46 @@ def interest_for(mind=(), reading=None, taught=(), tastes=(), rng=None, query_ok
             "from": origin}
 
 
+def video_query(title):
+    """A video title -> a short search about it (its first words, without the channel tail and hashtags)."""
+    t = re.sub(r"#\w+|\(.*?\)|\[.*?\]|[|｜\-–—:].*$", " ", str(title or ""))
+    words = [w for w in re.findall(r"[A-Za-z0-9'&]+", t) if len(w) > 1][:5]
+    return " ".join(words) or None
+
+
+def seen_things(live):
+    """What was on his screens and around him lately, as search queries per origin (read defensively)."""
+    seen = {"video": [], "walk": [], "eye": [], "screen": []}
+    try:
+        for st in (getattr(live.browser, "screens", None) or {}).values():
+            if not st:
+                continue
+            if st.get("video") or "youtube.com" in str(st.get("host", "")) or "tiktok.com" in str(st.get("host", "")):
+                seen["video"] += [video_query(st.get("title")), st.get("channel")]
+            elif st.get("kind") == "page" and st.get("title"):
+                seen["screen"].append(video_query(st.get("title")))
+    except Exception:
+        pass
+    try:
+        life = live.life
+        for k in (life.activity, life.place, (life.path or [None])[-1]):
+            if k in PLACE_QUERIES:
+                seen["walk"].append(PLACE_QUERIES[k])
+    except Exception:
+        pass
+    try:
+        if getattr(live, "eye", None):
+            seen["eye"] += [o["name"] for o in live.eye.world.top(live.clock.now(), 4)]
+    except Exception:
+        pass
+    return {k: [x for x in v if x] for k, v in seen.items()}
+
+
 def live_interest(live, art=None, rng=None):
-    """interest_for from the live server's state (a few attributes, read defensively)."""
+    """interest_for from the live server's state (a few attributes, read defensively), plus the Tokyo hour of the
+    simulated clock, the taste multipliers of the interest profile and the phone's feed for the browser."""
     from eyes import query_ok
+    import interests
     mind_q = []
     try:
         if getattr(live, "mind", None):
@@ -658,7 +750,23 @@ def live_interest(live, art=None, rng=None):
         liked = [f["topic"] for f in live.tastes.top(n=8)["favoured"] if f.get("kind") == "word"][:5]
     except Exception:
         pass
-    return interest_for(mind_q, art["title"] if art else None, taught[-10:], liked, rng=rng, query_ok=query_ok)
+    it = interest_for(mind_q, art["title"] if art else None, taught[-10:], liked, rng=rng, query_ok=query_ok,
+                      seen=seen_things(live))
+    try:
+        hour = interests.tokyo_hour(live.clock.now())
+    except Exception:
+        hour = interests.tokyo_hour()
+    extra = {"hour": round(hour, 2), "feed": interests.rhythm(hour)["feed"]}
+    try:
+        extra["tastes"] = interests.taste_multipliers(live.tastes.pref)
+    except Exception:
+        pass
+    try:
+        if live.life.activity == "phone" and getattr(live.life, "phone_app", None) == "tiktok":
+            extra["feed"] = "shorts"                       # the phone's short-video app (#56: Shorts / TikTok)
+    except Exception:
+        pass
+    return dict(it, **extra) if it else dict(extra, query="", **{"from": ""})
 
 
 # --- follow-up searches from a page's own words ----------------------------------------------------------------------
