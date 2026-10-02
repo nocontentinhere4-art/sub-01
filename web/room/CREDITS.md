@@ -55,6 +55,17 @@ From `room_build/`, with Blender 4.2 and Node 22:
     blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
 
+## His movement and the things he handles (#63)
+No animation clips were added. The clips are the ones already in `web/room/` (`boy_*.glb`, the same rig). Everything new is
+procedural code in `web/room.html`, written for this project and released under CC0:
+- additive layers on top of the clips (breathing, weight shifts with the feet planted, head and neck gaze, idle variants,
+  the lean on the window sill, eating, drinking, the door, carrying the bag);
+- small props modelled in code from three.js primitives: the delivery bag, a bento box (its top is drawn on a canvas),
+  chopsticks, a bread roll and the bakery's paper bag, a bottle of green tea, headphones, and the door leaf that opens
+  (it uses the room's own `door` material from `room_clean.glb`).
+
+The standing pose is the first frame of `boy_door.glb`'s clip. GLB size change: none (0 bytes).
+
 ## Map card
 The map of his neighbourhood (room card and `/life`) is © OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`, one static extract made by

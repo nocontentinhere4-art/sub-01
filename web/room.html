@@ -365,9 +365,10 @@ const ACT = {                                        // activity -> [anchor, cli
   chart:["desk","sit"], eat:["desk","dine"], window:["sill","lean"],   // dine: seated, the food in his hands (alive())
   get_delivery:["deskside","deliver"],               // to the door, open it, take the bag, close it, carry it to the desk (#63)
   chat:["desk","sit"],                               // answering chat at the computer (the mind layer, #33/#46)
+  listen_music:["bedlie","listen"],                  // on his back on the bed, headphones on (#68); alive() nods to it
 };
 // poses made here on top of a clip: the clip each one plays
-const ALIAS = {phone_sit:"sit", edge:"sit", phone_stand:"idle", phone_lie:"sleep", lean:"stand", deliver:"stand", dine:"sit"};
+const ALIAS = {phone_sit:"sit", edge:"sit", phone_stand:"idle", phone_lie:"sleep", lean:"stand", deliver:"stand", dine:"sit", listen:"sleep"};
 
 // ---------- loading (meshopt-compressed models, with progress and a retry) ----------
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -1169,7 +1170,7 @@ const WALK_V = 0.9, STRIDE_V = 0.65;                  // m/s; the walk clip's fe
 const WALK_A = 1.4, TURN_V = 2.2, STEP_TS = 0.6;      // m/s² up and down; turning on the spot (rad/s) he steps round, the walk clip at 0.6x
 // where each clip has the hips, from the root (facing +z; measured): a move between two poses is planned for the hips
 const HIPS = {sit:[0.235, 0.655, -0.364], eat:[-0.014, 0.48, 0.018], idle:[-0.016, 0.994, 0.026], walk:[0.003, 0.977, 0.012], sleep:[-0.006, 1.123, 0.065]};
-HIPS.edge = HIPS.phone_sit = HIPS.sit; HIPS.phone_lie = HIPS.sleep; HIPS.phone_stand = HIPS.idle; HIPS.dine = HIPS.sit; HIPS.stand = HIPS.lean = HIPS.deliver = [0.021, 0.919, -0.045];
+HIPS.edge = HIPS.phone_sit = HIPS.sit; HIPS.phone_lie = HIPS.sleep; HIPS.phone_stand = HIPS.idle; HIPS.dine = HIPS.sit; HIPS.listen = HIPS.sleep; HIPS.stand = HIPS.lean = HIPS.deliver = [0.021, 0.919, -0.045];
 const clipName = a => a ? a.getClip().name : "";
 const hipsOf = a => HIPS[a && (clipName(a).includes("Sleep") ? "sleep" : clipName(a).includes("Chair_Sit") ? "sit" : clipName(a).includes("Drink") ? "eat"
   : clipName(a).includes("Walk") ? "walk" : clipName(a))] || HIPS.idle;
@@ -1593,7 +1594,7 @@ const VARIANTS = {
   seat:  [["look", 3.5, 8], ["scratch", 3, 30], ["drink", 7, 45], ["lean", 7, 30], ["phone", 7, 45], ["legs", 7, 20], ["mouse", 6, 12]],
   edge:  [["look", 3, 6], ["legs", 6, 15], ["scratch", 3, 30], ["shift", 4, 15]],
   sill:  [["look", 4, 5], ["chin", 9, 25], ["shift", 4, 10], ["scratch", 3, 30], ["stretch", 4, 60]],
-  lie:   [["knee", 12, 20]],
+  lie:   [["knee", 12, 20], ["tap", 8, 6]],
 };
 const IV = {cur:null, next:3, last:"", cool:{}, ctx:""};
 function variants(c, dt){
@@ -1656,6 +1657,10 @@ function doVariant(V, c){
     B[s + "Leg"].getWorldPosition(_l2).addScaledVector(UP, 0.6);
     legTo(s, _l1, _l2, Math.min(1, e * 1.2)); return;
   }
+  if (V.n === "tap") {                                  // lying with music: a foot keeps the beat
+    if (!musicOn()) { V.t = V.d; return; }
+    bend(B[V.side + "Foot"], TL, -0.18 * e * Math.max(0, Math.sin(T * Math.PI * 2 * BEAT))); return;
+  }
   if (V.n === "mouse") {                                // his right hand on the mouse, small moves
     if (!MOUSE) return; _l1.copy(MOUSE).addScaledVector(UP, 0.035).add(_l3.set(0.012 * nz(V.t * 1.3, 7), 0, 0.01 * nz(V.t * 1.1, 8)));
     B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.4).addScaledVector(BR, 0.3);
@@ -1665,6 +1670,13 @@ function doVariant(V, c){
 }
 const MOUSE = new THREE.Vector3(-0.785, 0.985, -0.975);
 
+// ---- music (#68): headphones on while a track plays (life.music), and a small nod to it
+const BEAT = 1.7;                                      // Hz: the page does not know the track's tempo; an easy pace
+const musicOn = () => !!(lastLife && lastLife.music) && visible;
+function nod(c){
+  if (!musicOn() || !head || c === "sleep" || c === "walk") return;
+  bend(head, TL, (c === "lie" ? 0.03 : 0.045) * Math.max(0, Math.sin(T * Math.PI * 2 * BEAT)));
+}
 // ---- props he handles; all made here (CC0, part of this page)
 const PROP = {bag:null, bento:null, sticks:null, bread:null, breadbag:null, bottle:null, held:{}};
 const BOTTLE_AT = new THREE.Vector3(-1.38, 0.97, -0.90), BAG_AT = new THREE.Vector3(-0.58, 0.97, -0.855);   // on the desk mat, left; desk, right
@@ -1707,6 +1719,17 @@ function makeProps(){
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.031, 0.04, 18), M(0xa9d6b0, 0.15, {transparent:true, opacity:0.55}))).position.y = 0.10;
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, 0.022, 14), M(0xf2f2f2, 0.5))).position.y = 0.13;
   PROP.bottle = bo; bo.position.copy(BOTTLE_AT).add(_l1.set(0, 0.08, 0));
+  // headphones: a band over the top of his head and two cups, a child of the head bone (built in metres, its local frame:
+  // x across the ears, y up the crown, z where the face looks; the bone's frame is pitched 45 degrees and in cm)
+  const hp = new THREE.Group(), dark = M(0x26262c, 0.45), pad = M(0x111114, 0.9), acc = M(0xff6a00, 0.5);
+  const band = add(hp, new THREE.Mesh(new THREE.TorusGeometry(0.092, 0.009, 6, 24, Math.PI), dark)); band.scale.set(1, 1.08, 1.5);
+  for (const sx of [-1, 1]) { const cup = add(hp, new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.03, 18), dark));
+    cup.rotation.z = Math.PI / 2; cup.position.set(sx * 0.092, -0.01, 0.005);
+    const cu = add(hp, new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.012, 18), pad)); cu.rotation.z = Math.PI / 2; cu.position.set(sx * 0.075, -0.01, 0.005);
+    const dot = add(hp, new THREE.Mesh(new THREE.CircleGeometry(0.012, 14), acc)); dot.rotation.y = sx * Math.PI / 2; dot.position.set(sx * 0.1075, -0.01, 0.005); }
+  PROP.phones = hp; hp.visible = false;
+  if (head) { const s = 1 / head.getWorldScale(_l1).x, q = Math.SQRT1_2; head.add(hp); hp.scale.setScalar(s);
+    hp.rotation.x = -Math.PI / 4; hp.position.set(0, 0.085 * q * s, -0.085 * q * s).addScaledVector(_l2.set(0, q, q), 0.01 * s); }
   for (const k of ["bag", "bento", "sticks", "bread", "breadbag", "bottle"]) { scene.add(PROP[k]); PROP[k].visible = k === "bottle"; }
   PROP.breadbag.position.copy(BAG_AT); PROP.breadbag.rotation.y = 0.3;
 }
@@ -1803,7 +1826,7 @@ function doorAct(S){
   const hold = smooth(0.1, 0.7, s) * (1 - smooth(2.0, 2.4, s));          // left hand on the handle
   DOOR.handle.y -= 0.02 * smooth(0.7, 0.9, s) * (1 - smooth(1.0, 1.2, s));
   B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.35).addScaledVector(TF, -0.1);
-  if (hold > 0) armTo("Left", DOOR.handle, _l2, hold);
+  if (hold > 0 && DOOR.leaf) armTo("Left", DOOR.handle, _l2, hold);   // (the old room has no door leaf of its own)
   const push = smooth(3.9, 4.3, s) * (1 - smooth(4.8, 5.3, s));          // and on the leaf to push it shut
   if (push > 0 && DOOR.leaf) { DOOR.leaf.localToWorld(_l1.set(DOOR.W * 0.62, 1.12 - F, 0.07)); armTo("Left", _l1, _l2, push); }
   // the bag: held out in the doorway, then in his right hand
@@ -1813,7 +1836,7 @@ function doorAct(S){
   if (take > 0 && bag !== "hand") { B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.3);
     _l1.copy(PROP.bag.position).addScaledVector(UP, 0.04); armTo("Right", _l1, _l2, take);
     if (s >= 3.1) { bag = "hand"; } }
-  gazeAt(s < 1.6 ? DOOR.handle : s < 3.3 ? _l3.set(1.45, 1.25, -1.45) : s < 3.8 ? PROP.bag.position : _l3.set(1.4, 1.3, -1.3), 0.85, 0.2, "door");
+  gazeAt(s < 1.6 && DOOR.leaf ? DOOR.handle : s < 3.3 ? _l3.set(1.45, 1.25, -1.45) : s < 3.8 ? PROP.bag.position : _l3.set(1.4, 1.3, -1.3), 0.85, 0.2, "door");
 }
 function carry(dt){                                     // the bag in his right hand, at his side; it swings with his steps
   const B = bones, wk = actions.walk && actions.walk.getEffectiveWeight() > 0.1 ? actions.walk : null;
@@ -1861,7 +1884,7 @@ function context(){
   const c = current, S = step;
   if (S && S.k === "act") return "act";
   if (S) return S.k === "walk" ? "walk" : "move";
-  if (c === actions.sleep) return "sleep";
+  if (c === actions.sleep) return goal && goal.clip === "listen" ? "lie" : "sleep";
   if (c === actions.phone_lie) return "lie";
   if (at === "bedside") return "edge";
   if (at === "desk") return goal && goal.clip === "dine" ? "eat" : "seat";
@@ -1899,6 +1922,7 @@ function alive(dt){                                     // after the mixer and t
   }
   if (c && c !== "sleep") variants(c === "eat" || c === "act" || c === "walk" || c === "move" ? "" : c, dt);
   if (c === "eat") eating(dt);
+  if (PROP.phones) PROP.phones.visible = musicOn() && c !== "";
   if (PROP.bento) { const m = c === "eat" && EAT.kind === "meal"; PROP.bento.visible = PROP.sticks.visible = m; PROP.bread.visible = c === "eat" && EAT.kind === "bread"; }
   if (step && step.k === "act") { torso(); if (step.name === "door") doorAct(step); else if (step.name === "put") putAct(step); else if (step.name === "stretch") doVariant({n:"stretch", t:step.t * step.d, d:step.d}, "stand"); }
   if (c === "walk" || (c === "move" && step && step.k === "turn")) tuck();
@@ -1916,6 +1940,7 @@ function aliveHead(){                                   // after holdPhone: the 
   boy.updateMatrixWorld(true); torso();
   const lying = ctxNow === "lie" || ctxNow === "sleep";
   if (!lying && !OFF.head) aimHead(GZ.p, GZ.w);    // lying, his head stays on the pillow (holdPhone turns it to the phone)
+  nod(ctxNow);
   heldProps();
 }
 function props(){                                       // what is where, from the life state (each UI tick)
