@@ -99,7 +99,7 @@ const PROPS = {
   hand_phone: ["socket_phone", () => { const g = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.162, 0.008), new THREE.MeshStandardMaterial({color: 0x1b1c22, roughness: 0.35, metalness: 0.5}));
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.072, 0.156), new THREE.MeshBasicMaterial({color: 0x9fc3ff})); scr.position.z = 0.0042; g.add(body, scr); return g; }],
   hand_chopsticks: ["socket_chopsticks", () => { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({color: 0xb08050, roughness: 0.6});
-    for (const [x, a] of [[0, 0], [0.012, 0.06]]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0035, 0.23, 8), m); c.position.set(x, 0, 0); c.rotation.z = a; g.add(c); } return g; }],
+    for (const [x, a] of [[0, 0], [0.012, 0.06]]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0035, 0.23, 8), m); c.position.set(x, 0.08, 0); c.rotation.z = a; g.add(c); } return g; }],
   hand_spoon: ["socket_spoon", () => { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({color: 0xd8d8dc, roughness: 0.25, metalness: 0.9});
     const h = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.15, 0.003), m); const b = new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 8), m); b.scale.set(0.8, 1.2, 0.3); b.position.y = 0.09; g.add(h, b); return g; }],
 };

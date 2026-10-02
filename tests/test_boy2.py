@@ -114,7 +114,8 @@ def test_finger_poses():
 
 
 def test_motion_set():
-    """#63's clip list, in one file; every clip keys every bone and moves the hips."""
+    """#63's clip list, in one file; every clip keys every body bone (the fingers are left to the finger poses) and
+    moves the hips."""
     names = anim_names(ROOM / "boy2_motion.glb")
     for n in ["lie_back_idle", "lie_side_left", "lie_side_right", "roll_back_to_side_L", "roll_back_to_side_R",
               "sit_idle_upright", "type", "mouse", "stand_idle", "walk", "walk_start", "walk_stop", "sit_down_chair",
@@ -124,8 +125,31 @@ def test_motion_set():
               "sit_drink", "turn_in_place_L90", "turn_in_place_R90"]:
         assert n in names, n
     js, _ = glb(ROOM / "boy2_motion.glb")
-    bones = {n["name"] for n in js["nodes"]} - {"Armature", "socket_phone", "socket_chopsticks", "socket_spoon"}
+    fingers = {f"{s}Hand{f}{k}" for s in ("Left", "Right") for f in ("Thumb", "Index", "Middle", "Ring", "Pinky") for k in (1, 2, 3)}
+    bones = {n["name"] for n in js["nodes"]} - {"Armature", "socket_phone", "socket_chopsticks", "socket_spoon"} - fingers
     for a in js["animations"]:
         rot = {js["nodes"][c["target"]["node"]]["name"] for c in a["channels"] if c["target"]["path"] == "rotation"}
         assert rot == bones, a["name"]
         assert any(c["target"]["path"] == "translation" for c in a["channels"]), a["name"]
+
+
+DEFORM = ROOT / "docs" / "character" / "deform_check.json"
+# cm; the report is written by room_build/boy_post.mjs (deformCheck) from the same skinning the browser does
+LIMITS = {"bulge_legs_cm": 4.5, "bulge_arms_cm": 7.0, "bulge_trunk_cm": 4.5, "torso_cm": 1.0}
+
+
+def test_deform_check_covers_every_motion_clip():
+    report = json.loads(DEFORM.read_text())
+    checked = {c["clip"] for c in report["clips"] if c["file"] == "boy2_motion.glb"}
+    assert checked == set(anim_names(ROOM / "boy2_motion.glb"))
+
+
+def test_motion_keeps_cloth_on_the_body_and_hands_out_of_the_torso():
+    """No vertex of skin or cloth swells more than the limit off its bones (the joggers at a bent hip and knee, the
+    sleeves at the shoulder), and no forearm or hand passes through the torso, at any frame of any new clip."""
+    report = json.loads(DEFORM.read_text())
+    for c in report["clips"]:
+        if c["file"] != "boy2_motion.glb":
+            continue
+        for k, limit in LIMITS.items():
+            assert c[k] <= limit, (c["clip"], k, c[k], c.get("bulge_at"), c.get("torso_at"))

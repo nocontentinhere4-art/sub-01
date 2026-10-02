@@ -56,11 +56,11 @@ PARTS = [
     dict(mhclo="eyelashes/eyelashes01/eyelashes01.mhclo", kind="eyelashes", color=("tint", (0.25, 0.22, 0.2)), rough=0.7, texel=0.12),
     # messy, layered, voluminous on top (re-dyed near-black brown)
     dict(mhclo="hair/culturalibre_hair_06/culturalibre_hair_06.mhclo", kind="hair", color=("grey", (0.024, 0.019, 0.016)), rough=0.85, decimate=0.3, texel=1.0, roots=True),
-    # a navy zip hoodie (hood down) over a dark T-shirt, heather-grey joggers, white socks, black slides
+    # a navy zip hoodie (hood down) over a dark T-shirt, charcoal joggers, white socks, black slides
     dict(mhclo="clothes/elvs_hooded_sweat_jacket1/elvs_hooded_sweat_jacket1.mhclo", kind="clothes", role="top", color=("grey", (0.030, 0.040, 0.085)),
          fabric="jersey_melange", normal=0.45, decimate=0.22, texel=0.42),
-    dict(mhclo="clothes/toigo_wool_pants/toigo_wool_pants.mhclo", kind="clothes", role="bottom", color=("grey", (0.16, 0.16, 0.165)),
-         fabric="jogging_melange", loosen=0.008, decimate=0.62, texel=0.3),
+    dict(mhclo="clothes/toigo_wool_pants/toigo_wool_pants.mhclo", kind="clothes", role="bottom", color=("grey", (0.045, 0.045, 0.05)),
+         fabric="jogging_melange", loosen=0.003, decimate=0.62, texel=0.3),
     dict(mhclo="clothes/joepal_crude_low_socks/joepal_crude_low_socks.mhclo", kind="clothes", role="socks", color=("grey", (0.62, 0.62, 0.6)),
          fabric="cotton_jersey", texel=0.05),
     dict(mhclo="clothes/elvs_male_flip_flop_sandals1/elvs_male_flip_flop_sandals1.mhclo", kind="clothes", role="feet", color=("grey", (0.03, 0.03, 0.032)),
@@ -551,6 +551,25 @@ def delete_hidden_skin(base, covers, reach=0.035, inset=0.002):
     log(f"hidden skin: {len(dead)} faces deleted")
 
 
+def delete_leg_skin(base, rig, above_ankle=0.12):
+    """Delete the legs' skin under the joggers outright: faces whose corners all belong mostly to a thigh or calf bone,
+    from `above_ankle` over the ankle up. The ray test misses bits where the cloth stands off (the knee), and those poke
+    through when the knee bends."""
+    groups = {base.vertex_groups[n].index for n in ("thigh_l", "thigh_r", "calf_l", "calf_r") if n in base.vertex_groups}
+    ankle = max((rig.matrix_world @ rig.data.bones[n].head_local).z for n in ("foot_l", "foot_r"))
+    bones = {base.vertex_groups[b.name].index for b in rig.data.bones if b.name in base.vertex_groups}
+    leg = []
+    for v in base.data.vertices:
+        top = max((g for g in v.groups if g.group in bones), key=lambda g: g.weight, default=None)
+        leg.append(top is not None and top.group in groups and (base.matrix_world @ v.co).z > ankle + above_ankle)
+    bm = bmesh.new(); bm.from_mesh(base.data)
+    dead = [f for f in bm.faces if all(leg[v.index] for v in f.verts)]
+    bmesh.ops.delete(bm, geom=dead, context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(base.data); bm.free(); base.data.update()
+    log(f"leg skin under the joggers: {len(dead)} faces deleted")
+
+
 def delete_enclosed(base, others, above=1.3, reach=0.12, share=0.9):
     """Delete head faces nothing can see: the inside of the mouth and the eye sockets behind the eyeballs (at least
     `share` of the rays from them hit the head or an eye within `reach`; a few may slip out between the lips). Only
@@ -793,6 +812,7 @@ if __name__ == "__main__":
     smooth_crotch(rig, pants); joggers(rig, pants); fit_top(base, sweater)
     delete_hidden_skin(base, [p for p in parts if p["kind"] == "clothes"], inset=0.02)
     delete_hidden_skin(pants, [sweater], reach=0.07, inset=0.03)
+    delete_leg_skin(base, rig)
     delete_enclosed(base, [p for p in parts if p["kind"] == "eyes"])
     decimate(parts)
     darken_scalp(base); tshirt_under(base, rig)

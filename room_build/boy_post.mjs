@@ -184,6 +184,8 @@ primBody.setMaterial(matBody); primHair.setMaterial(matHair);
 for (const m of root.listMaterials()) if (m !== matBody && m !== matHair) m.dispose();
 
 // ------------------------------------------------------------------ clips
+// the motion clips leave the fingers to the finger poses (boy2_hands.glb), layered on top in the room
+const FINGER = /Hand(Thumb|Index|Middle|Ring|Pinky)\d$/, bodyOnly = channels => channels.filter(c => !FINGER.test(c.node));
 function addClip(target, nodesOf, name, channels) {  // channels: [{node, path, times, values}]
   const a = target.createAnimation(name), buf = target.getRoot().listBuffers()[0];
   for (const c of channels) {
@@ -433,6 +435,25 @@ function turnWorld(b, n, axis, deg) {           // turn bone n (and what hangs o
   const wq = b[n].getWorldQuaternion(new THREE.Quaternion()).premultiply(R), pq = b[n].parent.getWorldQuaternion(new THREE.Quaternion());
   b[n].quaternion.copy(pq.invert().multiply(wq)); b[n].updateMatrixWorld(true);
 }
+function turnWorldQ(b, n, R) {                  // turn bone n by a world rotation R about its joint
+  const wq = b[n].getWorldQuaternion(new THREE.Quaternion()).premultiply(R), pq = b[n].parent.getWorldQuaternion(new THREE.Quaternion());
+  b[n].quaternion.copy(pq.invert().multiply(wq)); b[n].updateMatrixWorld(true);
+}
+// the gaze: his face turned to a point, `neck` of the turn in the neck and the rest in the head. In the bind pose he
+// looks along +z; the gaze is that direction carried by the head's turn from its bind pose
+let HEAD0 = null;
+function headTurn(b) {                          // the head's world turn from its bind pose
+  HEAD0 ??= fk(NEW, [], "rest").at(0).Head.getWorldQuaternion(new THREE.Quaternion()).invert();
+  return b.Head.getWorldQuaternion(new THREE.Quaternion()).multiply(HEAD0);
+}
+function lookAt(b, target, neck = 0.4) {
+  for (const [n, share] of [["neck", neck], ["Head", 1]]) {
+    const eyes = wpos(b, "LeftEye").lerp(wpos(b, "RightEye"), 0.5);
+    const gaze = new THREE.Vector3(0, 0, 1).applyQuaternion(headTurn(b));
+    const R = new THREE.Quaternion().setFromUnitVectors(gaze, target.clone().sub(eyes).normalize());
+    turnWorldQ(b, n, new THREE.Quaternion().slerp(R, share));
+  }
+}
 function turnBody(b, axis, deg) {               // the whole body about the hips
   turnWorld(b, "Hips", axis, deg);
 }
@@ -445,6 +466,10 @@ const SKIN_V = [];
 for (const prim of mesh.listPrimitives()) { const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), W = prim.getAttribute("WEIGHTS_0");
   for (let i = 0; i < P.getCount(); i += 4) SKIN_V.push([V(P.getElement(i, [])), J.getElement(i, []), W.getElement(i, [])]); }
 const IBM = joints.map(n => world(n).invert());
+const ALL_V = [];                               // every vertex, for the deformation check at the end
+for (const prim of mesh.listPrimitives()) { const P = prim.getAttribute("POSITION"), J = prim.getAttribute("JOINTS_0"), W = prim.getAttribute("WEIGHTS_0");
+  for (let i = 0; i < P.getCount(); i++) ALL_V.push([P.getElement(i, []), J.getElement(i, []), W.getElement(i, [])]); }
+const CHECKS = [];                              // [file, clip name, channels, duration]: every clip, for the deformation check
 function skinLowest(b, filter = () => true) {
   const M = joints.map((n, i) => b[n].matrixWorld.clone().multiply(IBM[i])), v = _v(), acc = _v();
   let lo = Infinity;
@@ -489,21 +514,30 @@ function torsoOn(b, y) {                        // his back (or side) on the sur
   const lo = skinLowest(b, p => p.distanceTo(mid) < 0.42);
   placeHips(b, hips.add(new THREE.Vector3(0, y - lo, 0)));
 }
+const PILLOW = 0.09;                            // the pillow lifts the back of his head this much above the mattress
+function headOnPillow(b, up) {                  // tip the neck and head until the head's lowest skin is PILLOW above
+  for (let i = 0; i < 12; i++) {
+    const head = wpos(b, "Head"), lo = skinLowest(b, p => p.distanceTo(head) < 0.16);
+    if (lo >= MATTRESS + PILLOW - 0.005) break;
+    turnWorld(b, "neck", up, 3); turnWorld(b, "Head", up, 1.5);
+  }
+}
 function bedPoses(stand, sit) {
   // on his back: the standing idle laid down, legs straightened side by side (knees a touch bent, heels on the mattress),
   // one hand resting on the belly and the other beside the hip, the head raised a little by the pillow
   const back = bonesOf(stand);
   placeHips(back, new THREE.Vector3(0, 1, 0)); turnBody(back, X, -90);
-  turnWorld(back, "neck", X, -10); turnWorld(back, "Head", X, -6);
+  turnWorld(back, "neck", X, 6); turnWorld(back, "Head", X, 3);         // the head raised by the pillow (+x tips the chin to the chest)
   torsoOn(back, MATTRESS);
   { const {hips, L, Lat, F} = bodyFrame(back);
     for (const [S_, k] of [["Left", 1], ["Right", -1]]) {
       legTo(back, S_, at(hips, [L, -0.79], [Lat, k * 0.12], [F, -0.03]), at(hips, [L, -0.4], [F, 0.5], [Lat, k * 0.1]));
       turnWorld(back, S_ + "Foot", Lat, -15);
     }
-    armTo(back, "Left", at(wpos(back, "Spine02"), [F, 0.13], [Lat, 0.02], [L, -0.02]), at(wpos(back, "LeftArm"), [Lat, 0.35], [L, -0.25]));
-    armTo(back, "Right", at(hips, [Lat, -0.26], [F, -0.04], [L, -0.04]), at(wpos(back, "RightArm"), [Lat, -0.35], [L, -0.1], [F, 0.1]));
-    torsoOn(back, MATTRESS); }
+    // hands resting on the mattress beside the hips, palms down, elbows a little out (nothing crosses the body)
+    for (const [S_, k] of [["Left", 1], ["Right", -1]])
+      armTo(back, S_, at(hips, [Lat, k * 0.27], [F, -0.05], [L, 0.02]), at(wpos(back, S_ + "Arm"), [Lat, k * 0.35], [L, -0.15], [F, 0.05]));
+    torsoOn(back, MATTRESS); headOnPillow(back, X); }
   // on a side: the seated pose (hips and knees bent) eased towards standing, rolled onto that side; the lower arm under
   // the pillow (hand by the face), the upper hand on the mattress in front of the chest, the knees one over the other
   const side = S_ => {
@@ -523,6 +557,17 @@ function bedPoses(stand, sit) {
   return {back: poseOfBones(back), left: side("Left"), right: side("Right")};
 }
 
+// where a held thing's far end is: `len` m along the socket's +y (the chopsticks' tips; sockets are in the hand's cm)
+function toolTip(b, socket, len) {
+  const S = SOCKETS[socket], hq = b[S.parent].getWorldQuaternion(new THREE.Quaternion());
+  return new THREE.Vector3(...S.p).multiplyScalar(0.01).applyQuaternion(hq).add(wpos(b, S.parent))
+    .addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(...S.q)).applyQuaternion(hq), len);
+}
+// put a held thing's far end on `target`: place(wrist) poses the arm and hand; the wrist moves by the miss, a few times
+function toolTo(b, socket, len, target, wrist, place) {
+  for (let i = 0; i < 4; i++) { place(wrist); wrist = wrist.clone().add(target.clone().sub(toolTip(b, socket, len))); }
+  place(wrist);
+}
 // the hand turned so its fingers run along `fingers` and its palm faces `palm` (world directions)
 function handFacing(b, side, fingers, palm) {
   const F = HANDF[side], Yw = fingers.clone().normalize(), Zw = palm.clone().addScaledVector(Yw, -palm.dot(Yw)).normalize();
@@ -533,20 +578,21 @@ function handFacing(b, side, fingers, palm) {
   b[side + "Hand"].quaternion.copy(pq.invert().multiply(wq)); b[side + "Hand"].updateMatrixWorld(true);
 }
 // seated work at the desk (room heights: desk top DESK; keyboard 0.30 m in front of his chest, 5 cm above the desk,
-// i.e. z = +0.03 in the clip's frame; mouse 0.35 m to his right of it): the upright seated idle, the hands on the keys by IK, palms down, a small lean and the
-// gaze to the screen; `work(t)` gives each hand's small motion
-const DESK = 0.97, KEYS = new THREE.Vector3(0, DESK + 0.05, 0.03);
+// i.e. z = +0.03 in the clip's frame; mouse 0.35 m to his right of it): the upright seated idle, the hands on the keys by IK, palms down, the
+// back upright and the gaze on the screen (its centre 0.61 m in front of his hips, 1.16 m up); `work(t)` gives each hand's small motion
+const DESK = 0.97, KEYS = new THREE.Vector3(0, DESK + 0.05, 0.03), SCREEN = new THREE.Vector3(0, 1.16, 0.33);
 function deskClip(sitClip, dur, work) {
   const keys = [], step = 1 / 6;
   for (let t = 0; t <= dur + 1e-6; t += step) {
     const tt = t >= dur - 1e-6 ? 0 : t;                 // the loop closes on its first key
     const b = bonesOf(poseOfChannels(sitClip.channels, tt % sitClip.duration));
-    turnWorld(b, "Spine02", X, 3); turnWorld(b, "Spine01", X, 4); turnWorld(b, "Spine", X, 3); turnWorld(b, "neck", X, 4);
+    turnWorld(b, "Spine02", X, 2);
     for (const S_ of ["Left", "Right"]) {
       const w = work(S_, tt), sh = wpos(b, S_ + "Arm"), k = S_ === "Left" ? 1 : -1;
       armTo(b, S_, w.at, at(sh, [X, k * 0.22], [Y, -0.45], [Z, -0.1]));
       handFacing(b, S_, w.fingers || new THREE.Vector3(-k * 0.15, -0.25, 1), new THREE.Vector3(0, -1, 0));
     }
+    lookAt(b, at(SCREEN, [X, 0.08 * Math.sin(tt * 0.7)], [Y, 0.03 * Math.sin(tt * 1.1)]));   // reading across the screen
     keys.push([t, poseOfBones(b)]);
   }
   return keyed(keys);
@@ -634,7 +680,8 @@ const clipFiles = fs.readdirSync(WEB).filter(f => /^boy_[a-z0-9_]+\.glb$/.test(f
 for (const f of clipFiles) {
   const d = new (await import("@gltf-transform/core")).Document(); d.createBuffer(); const sc = d.createScene();
   const {nodes: ns} = buildSkeleton(d, sc);
-  for (const c of await readClip(path.join(WEB, f))) { const r = retarget(c); addClip(d, ns, r.name, r.channels); }
+  for (const c of await readClip(path.join(WEB, f))) { const r = retarget(c); addClip(d, ns, r.name, r.channels);
+    CHECKS.push([f.replace(/^boy_/, "boy2_"), r.name, r.channels, Math.max(...r.channels.map(ch => ch.times[ch.times.length - 1]))]); }
   await finish(d, path.join(WEB, f.replace(/^boy_/, "boy2_")));
 }
 {
@@ -657,7 +704,8 @@ if (UAL) {
   const {nodes: ns} = buildSkeleton(d, sc);
   for (const [as, [name, opt]] of Object.entries(UAL_CLIPS)) {
     if (!UAL.anims[name]) { console.warn("  UAL has no", name); continue; }
-    const r = fromUAL(UAL, off, name, as, opt); addClip(d, ns, r.name, r.channels);
+    const r = fromUAL(UAL, off, name, as, opt); addClip(d, ns, r.name, bodyOnly(r.channels));
+    CHECKS.push(["boy2_motion.glb", r.name, bodyOnly(r.channels), r.duration]);
     rows.push(`  ${as} <- UAL ${name}: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m, ` +
       `foot contact frames L ${r.contacts.Left.length}/R ${r.contacts.Right.length}` + (as === "walk" ? `, stance foot speed ${r.stanceSpeed.toFixed(2)} m/s` : ""));
   }
@@ -666,6 +714,11 @@ if (UAL) {
   const sit = poseOfChannels(fromUAL(UAL, off, "Sitting_Idle_Loop", "sit").channels, 0);
   const bed = bedPoses(stand, sit);
   const lift = (p, dy) => ({q: p.q, hips: p.hips.clone().add(new THREE.Vector3(0, dy, 0))});
+  // half-way through a roll: the body half turned, the arms held clear of it (beside the chest, a little in front),
+  // so neither forearm sweeps through the hips on the way
+  const midRoll = (a, c) => edit(lift(halfway(a, c), 0.04), b => { const {hips, L, Lat, F} = bodyFrame(b);
+    for (const [S_, k] of [["Left", 1], ["Right", -1]])
+      armTo(b, S_, at(hips, [Lat, k * 0.30], [F, 0.12], [L, 0.22]), at(wpos(b, S_ + "Arm"), [Lat, k * 0.4], [L, -0.1], [F, 0.1])); });
   const BED = {
     lie_back_idle: keyed([[0, bed.back], [8, bed.back]], {breathe: 1.2, period: 4}),
     lie_side_left: keyed([[0, bed.left], [8, bed.left]], {breathe: 1.0, period: 4}),
@@ -673,10 +726,10 @@ if (UAL) {
     sleep_breathing: keyed([[0, bed.back], [5, bed.back]], {breathe: 1.6, period: 5}),
     sleep_breathing_left: keyed([[0, bed.left], [5, bed.left]], {breathe: 1.4, period: 5}),
     sleep_breathing_right: keyed([[0, bed.right], [5, bed.right]], {breathe: 1.4, period: 5}),
-    roll_back_to_side_L: keyed([[0, bed.back], [1.4, lift(halfway(bed.back, bed.left), 0.04)], [3, bed.left]]),
-    roll_back_to_side_R: keyed([[0, bed.back], [1.4, lift(halfway(bed.back, bed.right), 0.04)], [3, bed.right]]),
-    roll_side_to_back_L: keyed([[0, bed.left], [1.6, lift(halfway(bed.left, bed.back), 0.04)], [3, bed.back]]),
-    roll_side_to_back_R: keyed([[0, bed.right], [1.6, lift(halfway(bed.right, bed.back), 0.04)], [3, bed.back]]),
+    roll_back_to_side_L: keyed([[0, bed.back], [1.4, midRoll(bed.back, bed.left)], [3, bed.left]]),
+    roll_back_to_side_R: keyed([[0, bed.back], [1.4, midRoll(bed.back, bed.right)], [3, bed.right]]),
+    roll_side_to_back_L: keyed([[0, bed.left], [1.6, midRoll(bed.left, bed.back)], [3, bed.back]]),
+    roll_side_to_back_R: keyed([[0, bed.right], [1.6, midRoll(bed.right, bed.back)], [3, bed.back]]),
   };
   // at the desk
   const sitUp = fromUAL(UAL, off, "Sitting_Idle_Loop", "sit", {seat: SEAT_LIFT});
@@ -706,11 +759,17 @@ if (UAL) {
   BED.stretch_arms_up = fromFn(3, t => { const u = t < 1.1 ? ease(t / 1.1) : t < 1.9 ? 1 : 1 - ease((t - 1.9) / 1.1);
     return edit(clipPose(idle, t), b => { turnWorld(b, "Spine01", X, -6 * u); turnWorld(b, "neck", X, -10 * u);
       for (const [S_, k] of [["Left", 1], ["Right", -1]]) { const rest = wpos(b, S_ + "Hand"), up = new THREE.Vector3(k * 0.16, 2.02, -0.02);
-        armTo(b, S_, rest.clone().lerp(up, u), at(wpos(b, S_ + "Arm"), [X, k * 0.5], [Y, -0.1 + 0.4 * u])); } }); }, 1 / 10);
+        const arc = Math.sin(Math.PI * u);         // the hands go up round the outside of the shoulders, a little forward
+        armTo(b, S_, at(rest.clone().lerp(up, u), [X, k * 0.18 * arc], [Z, 0.10 * arc]), at(wpos(b, S_ + "Arm"), [X, k * 0.5], [Y, -0.1 + 0.4 * u])); } }); }, 1 / 10);
   BED.scratch_head = fromFn(2.5, t => { const u = t < 0.6 ? ease(t / 0.6) : t < 1.9 ? 1 : 1 - ease((t - 1.9) / 0.6);
     return edit(clipPose(idle, t), b => { const head = wpos(b, "Head"), rest = wpos(b, "RightHand");
-      const spot = at(head, [X, -0.07], [Y, 0.13 + 0.012 * Math.sin(t * 25)], [Z, -0.02]);
-      armTo(b, "Right", rest.clone().lerp(spot, u), at(wpos(b, "RightArm"), [X, -0.4], [Y, 0.1 * u], [Z, 0.1]));
+      // the wrist by the right temple, the fingers over the crown, the palm on the head (scratching: small strokes)
+      const spot = at(head, [X, -0.12], [Y, 0.09 + 0.012 * Math.sin(t * 25)], [Z, -0.01]), crown = at(head, [Y, 0.13], [Z, -0.02]);
+      const arc = Math.sin(Math.PI * u);           // up and down round the outside of the shoulder, a little forward
+      armTo(b, "Right", at(rest.clone().lerp(spot, u), [X, -0.16 * arc], [Z, 0.12 * arc]), at(wpos(b, "RightArm"), [X, -0.4], [Y, 0.1 * u], [Z, 0.1]));
+      if (u > 0) { const hand = wpos(b, "RightHand"), q0 = b.RightHand.quaternion.clone();
+        handFacing(b, "Right", crown.clone().sub(hand).normalize(), at(head, [Y, 0.07]).sub(hand).normalize());
+        b.RightHand.quaternion.copy(q0.slerp(b.RightHand.quaternion, u)); b.RightHand.updateMatrixWorld(true); }
       turnWorld(b, "neck", Z, 6 * u); }); }, 1 / 15);
   BED.look_around = fromFn(4, t => edit(clipPose(idle, t), b => { const yaw = 35 * Math.sin(2 * Math.PI * t / 4) * Math.min(1, t, 4 - t);
     turnWorld(b, "Spine", Y, yaw * 0.25); turnWorld(b, "neck", Y, yaw * 0.35); turnWorld(b, "Head", Y, yaw * 0.4); }), 1 / 8);
@@ -722,19 +781,28 @@ if (UAL) {
     return edit(clipPose(idle, t), b => { turnWorld(b, "Spine01", X, 10 * u);
       armTo(b, "Right", wpos(b, "RightHand").lerp(new THREE.Vector3(-0.15, DESK + 0.12, 0.42), u), at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.2])); }); }, 1 / 10);
   // ---- seated: lean back, eat with chopsticks (bowl in the left hand), drink
-  const chestOf = b => wpos(b, "Spine"), mouthOf = b => at(wpos(b, "Head"), [Y, 0.06], [Z, 0.10]);
+  const chestOf = b => wpos(b, "Spine"), mouthOf = b => {   // the lips: below and in front of the eyes, the way his face points
+    const eyes = wpos(b, "LeftEye").lerp(wpos(b, "RightEye"), 0.5);
+    return eyes.add(new THREE.Vector3(0, -0.065, 0.025).applyQuaternion(headTurn(b))); };
   BED.sit_lean_back = fromFn(6, t => edit(clipPose(sitUp, t), b => { turnWorld(b, "Spine02", X, -10); turnWorld(b, "Spine01", X, -4); turnWorld(b, "neck", X, 8); }), 1 / 6, {breathe: 1.0, period: 4});
   BED.sit_eat_chopsticks = fromFn(5, t => edit(clipPose(sitUp, t), b => {
-    turnWorld(b, "Spine01", X, 6); turnWorld(b, "neck", X, 10);
-    const bowl = at(chestOf(b), [Z, 0.22], [Y, -0.22], [X, 0.04]);
+    turnWorld(b, "Spine01", X, 4);
+    const bowl = at(chestOf(b), [Z, 0.30], [Y, -0.20], [X, 0.04]);
     armTo(b, "Left", bowl, at(wpos(b, "LeftArm"), [X, 0.35], [Y, -0.35]));
     handFacing(b, "Left", new THREE.Vector3(-0.6, 0, 1), new THREE.Vector3(0, 1, 0));
     const ph = (t % 2.5) / 2.5, up = ph < 0.4 ? 0 : ph < 0.6 ? ease((ph - 0.4) / 0.2) : ph < 0.75 ? 1 : 1 - ease((ph - 0.75) / 0.25);   // pick, bite, back
-    const pick = at(bowl, [Y, 0.06], [X, -0.06]), bite = at(mouthOf(b), [Z, 0.05], [Y, -0.04]);
-    armTo(b, "Right", pick.lerp(bite, up), at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.3]));
-    handFacing(b, "Right", new THREE.Vector3(0.5, 0.1, 1), new THREE.Vector3(-0.3, -0.2, 0.1)); }), 1 / 10);
+    // the chopsticks' tips (0.28 m on from the wrist: the grip, then the sticks) go to the food in the bowl, then to the
+    // lips, coming in from in front, below and his right; the eyes go down towards the bowl to pick, up to the screen to eat
+    lookAt(b, at(bowl, [Y, 0.05]).lerp(SCREEN, 0.5 + 0.4 * up), 0.5);
+    const mouth = mouthOf(b), REACH = 0.28;
+    const dPick = new THREE.Vector3(0.75, -0.55, 0.35).normalize(), dBite = new THREE.Vector3(0.3, 0.4, -1).normalize();
+    const aim = dPick.clone().lerp(dBite, up).normalize(), tip = at(bowl, [Y, 0.03]).lerp(mouth, up);
+    toolTo(b, "socket_chopsticks", 0.195, tip, at(tip, [aim, -REACH]), wrist => {
+      armTo(b, "Right", wrist, at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.3]));
+      handFacing(b, "Right", aim, new THREE.Vector3(-0.4, -0.3, 0).addScaledVector(Y, 0.5 * up)); });
+  }), 1 / 10);
   BED.sit_drink = fromFn(4, t => { const u = t < 1.0 ? ease(t / 1.0) : t < 2.8 ? 1 : 1 - ease((t - 2.8) / 1.0), tip = t > 1.2 && t < 2.6 ? 1 : 0;
-    return edit(clipPose(sitUp, t), b => { const rest = at(chestOf(b), [Z, 0.25], [Y, -0.3], [X, -0.12]), lips = at(mouthOf(b), [Z, 0.04], [Y, -0.03]);
+    return edit(clipPose(sitUp, t), b => { const rest = at(chestOf(b), [Z, 0.25], [Y, -0.3], [X, -0.12]), lips = at(mouthOf(b), [Z, 0.07], [Y, -0.10], [X, -0.03]);
       armTo(b, "Right", rest.lerp(lips, u), at(wpos(b, "RightArm"), [X, -0.4], [Y, -0.35]));
       handFacing(b, "Right", new THREE.Vector3(0.2, 1, 0.2), new THREE.Vector3(1, 0, 0));
       turnWorld(b, "Head", X, -12 * tip * u); }); }, 1 / 10);
@@ -753,17 +821,83 @@ if (UAL) {
   const legsUp = mixPose(leanL, lieX, 0.6);
   BED.lie_down_from_edge = keyed([[0, sitEdge], [0.9, leanL], [1.7, legsUp], [2.5, lieX]]);
   BED.get_up_to_edge = keyed([[0, lieX], [0.8, legsUp], [1.6, leanL], [2.5, sitEdge]]);
-  // the phone held above his face in the right hand, on his back
-  BED.lie_phone = fromFn(6, t => edit(bed.back, b => { const face = at(wpos(b, "Head"), [Y, 0.32], [Z, 0.08 + 0.01 * Math.sin(t)]);
-    armTo(b, "Right", face, at(wpos(b, "RightArm"), [X, -0.3], [Z, 0.25]));
-    handFacing(b, "Right", new THREE.Vector3(0.3, 0, -1), new THREE.Vector3(0, -1, 0)); turnWorld(b, "neck", X, -6); }), 1 / 6, {breathe: 1.0, period: 4});
-  for (const [as, r] of Object.entries(BED)) { addClip(d, ns, as, r.channels);
+  // the phone held up over his chest in the right hand, on his back, the head raised by the pillow: the elbow resting
+  // on the mattress beside his ribs, the forearm up, the wrist straight, the screen turned to his eyes
+  BED.lie_phone = fromFn(6, t => edit(bed.back, b => { turnWorld(b, "neck", X, 4);
+    const eyes = wpos(b, "LeftEye").lerp(wpos(b, "RightEye"), 0.5), sh = wpos(b, "RightArm"), wob = 0.006 * Math.sin(t);
+    const elbow = at(sh, [X, -0.10], [Y, -0.04], [Z, 0.27]), wrist = at(elbow, [X, 0.08], [Y, 0.25], [Z, -0.03 + wob]);
+    armTo(b, "Right", wrist, at(elbow, [X, -0.1], [Y, -0.05]));
+    const fore = wpos(b, "RightHand").sub(wpos(b, "RightForeArm")).normalize();
+    handFacing(b, "Right", fore, eyes.clone().sub(at(wpos(b, "RightHand"), [fore, 0.09])).normalize());
+  }),
+    1 / 6, {breathe: 1.0, period: 4});
+  for (const [as, r] of Object.entries(BED)) { addClip(d, ns, as, bodyOnly(r.channels)); CHECKS.push(["boy2_motion.glb", as, bodyOnly(r.channels), r.duration]);
     rows.push(`  ${as} <- keyed: ${r.duration.toFixed(2)} s, hips at frame 0 [${r.hips0.map(v => v.toFixed(3)).join(", ")}] m (mattress top ${MATTRESS} m)`); }
   await finish(d, path.join(WEB, "boy2_motion.glb"));
   console.log("boy2_motion.glb:\n" + rows.join("\n"));
 }
+deformCheck();
 const tris = mesh.listPrimitives().reduce((s, p) => s + p.getIndices().getCount() / 3, 0);
 console.log(`boy2: ${tris} triangles, ${mesh.listPrimitives().length} materials, ${joints.length} joints`);
 console.log(report.join(", "));
 if (kbMain > 3 * 1024) throw new Error("boy2.glb is over 3 MB");
 if (tris > 25000) throw new Error("over 25k triangles");
+
+// ---------------------------------------------------------------- deformation check (docs/character/deform_check.json)
+// Every clip, sampled at 5 fps, skinned on the CPU like the GPU does it. Two measures, in cm:
+//  bulge: how much further a vertex (skin or cloth) stands off its bones than in the bind pose: for each bone that
+//         mainly moves it (weight >= 0.25), its distance to that bone's segment posed minus bind; the least of these.
+//         A swelling at a bent joint (the "bloated joggers") moves vertices off every bone they hang on.
+//  torso: how deep a forearm, hand or finger vertex sinks into the torso's core: capsules along the spine
+//         (hips -> chest -> neck) whose radius is the torso's front-to-back half-depth there (the 10th percentile of
+//         the trunk's skin distance to them in the bind pose), so a hand resting on the belly is outside, through is in.
+function deformCheck() {
+  const SEG = {Hips: "Spine02", Spine02: "Spine01", Spine01: "Spine", Spine: "neck", neck: "Head", Head: "headfront"};
+  for (const S_ of ["Left", "Right"]) {
+    Object.assign(SEG, {[S_ + "UpLeg"]: S_ + "Leg", [S_ + "Leg"]: S_ + "Foot", [S_ + "Foot"]: S_ + "ToeBase",
+      [S_ + "Shoulder"]: S_ + "Arm", [S_ + "Arm"]: S_ + "ForeArm", [S_ + "ForeArm"]: S_ + "Hand", [S_ + "Hand"]: S_ + "HandMiddle1"});
+    for (const f of ["Thumb", "Index", "Middle", "Ring", "Pinky"]) { SEG[`${S_}Hand${f}1`] = `${S_}Hand${f}2`; SEG[`${S_}Hand${f}2`] = `${S_}Hand${f}3`; }
+  }
+  const TORSO = ["Hips", "Spine02", "Spine01", "Spine"], LIMB = /(ForeArm|Hand)/;
+  const jIndex = Object.fromEntries(joints.map((n, i) => [n, i]));
+  // a segment per joint: to SEG's end, else on from the joint along its parent's direction (half the parent's length)
+  const ends = b => joints.map(n => { const p = b[n].getWorldPosition(_v());
+    if (SEG[n] && b[SEG[n]]) return [p, b[SEG[n]].getWorldPosition(_v())];
+    const par = SK[n].parent && b[SK[n].parent] ? b[SK[n].parent].getWorldPosition(_v()) : p.clone();
+    return [p, p.clone().add(p.clone().sub(par).multiplyScalar(0.5))]; });
+  const segDist = (p, [a, c]) => { const ab = _v().subVectors(c, a), t = Math.max(0, Math.min(1, _v().subVectors(p, a).dot(ab) / Math.max(ab.lengthSq(), 1e-12)));
+    return p.distanceTo(a.clone().addScaledVector(ab, t)); };
+  const skinAll = b => { const M = joints.map((n, i) => b[n].matrixWorld.clone().multiply(IBM[i])), v = _v();
+    return ALL_V.map(([p, j, w]) => { const acc = _v(); for (let k = 0; k < 4; k++) if (w[k] > 0) acc.addScaledVector(v.set(p[0], p[1], p[2]).applyMatrix4(M[j[k]]), w[k]); return acc; }); };
+  const infl = ALL_V.map(([, j, w]) => [0, 1, 2, 3].filter(k => w[k] >= 0.25).map(k => j[k]));
+  const dom = ALL_V.map(([, j, w]) => joints[j[w.indexOf(Math.max(...w))]]);
+  const rest = fk(NEW, [], "rest").at(0), E0 = ends(rest), P0 = skinAll(rest);
+  const r0 = P0.map((p, i) => infl[i].map(j => segDist(p, E0[j])));
+  // the bulge: the least a vertex moved off any of its main bones (moving off one bone towards another is no bulge)
+  const off = (p, i, E) => Math.min(...infl[i].map((j, k) => segDist(p, E[j]) - r0[i][k]));
+  // the torso core: per spine segment, the 10th percentile of the trunk skin's distance to it
+  const core = TORSO.map(n => { const ji = jIndex[n], d = P0.filter((p, i) => dom[i] === n).map(p => segDist(p, E0[ji])).sort((a, b) => a - b);
+    return d.length ? d[Math.floor(d.length * 0.1)] : 0; });
+  const limbs = ALL_V.map((_, i) => i).filter(i => LIMB.test(dom[i]));
+  // bulges by region: the hips and legs (the joggers), the shoulders and arms (the hoodie's sleeves), the trunk and head
+  const region = dom.map(n => /^Hips$|UpLeg|Leg|Foot|Toe/.test(n) ? "legs" : /Shoulder|Arm|Hand/.test(n) ? "arms" : "trunk");
+  const out = [];
+  for (const [file, name, channels, dur] of CHECKS) {
+    const f = fk(NEW, channels, name), bulge = {legs: [0, "", 0], arms: [0, "", 0], trunk: [0, "", 0]};
+    let torso = 0, tWhere = "", tAt = 0;
+    for (let t = 0; t <= dur + 1e-6; t += 0.2) {
+      const b = f.at(Math.min(t, dur)), E = ends(b), P = skinAll(b);
+      for (let i = 0; i < P.length; i++) { const d = off(P[i], i, E), r = bulge[region[i]]; if (d > r[0]) { r[0] = d; r[1] = dom[i]; r[2] = t; } }
+      for (const i of limbs) TORSO.forEach((n, k) => { const d = core[k] - segDist(P[i], E[jIndex[n]]); if (d > torso) { torso = d; tWhere = `${dom[i]} in ${n}`; tAt = t; } });
+    }
+    out.push({file, clip: name, ...Object.fromEntries(Object.entries(bulge).map(([k, [d, w, t]]) => [`bulge_${k}_cm`, +(d * 100).toFixed(1)])),
+      bulge_at: Object.entries(bulge).map(([k, [d, w, t]]) => `${k}: ${w || "-"} ${t.toFixed(1)} s`).join("; "),
+      torso_cm: +(torso * 100).toFixed(1), torso_at: tWhere ? `${tWhere} ${tAt.toFixed(1)} s` : ""});
+  }
+  const report = {about: "boy_post.mjs deformCheck(): per clip (sampled at 5 fps), the worst bulge of skin or cloth off its bones by region (cm, posed minus bind) and the deepest forearm/hand vertex inside the torso core (cm)",
+    torso_core_cm: Object.fromEntries(TORSO.map((n, k) => [n, +(core[k] * 100).toFixed(1)])), clips: out};
+  fs.writeFileSync(path.join(path.dirname(WEB), "..", "docs", "character", "deform_check.json"), JSON.stringify(report, null, 1) + "\n");
+  const worst = k => out.reduce((a, c) => c[k] > a[k] ? c : a), w = k => `${worst(k)[k]} cm (${worst(k).clip})`;
+  console.log(`deform check: ${out.length} clips; worst bulge: legs ${w("bulge_legs_cm")}, arms ${w("bulge_arms_cm")}, trunk ${w("bulge_trunk_cm")}; ` +
+    `deepest hand in the torso ${w("torso_cm")}`);
+}
