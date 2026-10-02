@@ -286,7 +286,8 @@ SEEDS = [                              # where he starts when nothing else pulls
     "https://www.esa.int/", "https://phys.org/",
     # museums and archives
     "https://www.metmuseum.org/art/collection", "https://www.archive.org/", "https://artsandculture.google.com/",
-    "https://www.britishmuseum.org/collection", "https://www.rijksmuseum.nl/en/rijksstudio", "https://www.tnm.jp/?lang=en",
+    "https://www.britishmuseum.org/collection", "https://www.rijksmuseum.nl/en/rijksstudio",
+    "https://www.tnm.jp/?lang=en",
     # maps and places
     "https://www.openstreetmap.org/#map=15/35.7030/139.5795", "https://www.timeout.com/tokyo",
     "https://www.japan-guide.com/", "https://www.spoon-tamago.com/",
@@ -313,7 +314,8 @@ def words(text):
 
 def host_ok(host):
     """Hostname is public and not on the block list (DNS is checked separately, see Guard.resolves_public)."""
-    if not host or BAD_HOST.search(HOST_FALSE_HITS.sub("", host)) or host.rstrip(".").lower() in ("localhost", "metadata", "metadata.google.internal"):
+    if (not host or BAD_HOST.search(HOST_FALSE_HITS.sub("", host))
+            or host.rstrip(".").lower() in ("localhost", "metadata", "metadata.google.internal")):
         return False
     try:                                                    # literal IPs: only public ones
         ip = ipaddress.ip_address(host.strip("[]"))
@@ -523,7 +525,8 @@ class Browser:
                 elif self.decide and sc.chain >= MAX_CHAIN and sc.info and not moved_on:
                     ok = await self._next(sc, list(heard), interest)    # a long chain ends: something new
                     if ok and sc.info:
-                        sc.info = dict(sc.info, why=f"after {MAX_CHAIN} pages in a row, wandered off; {sc.info.get('why', '')}")
+                        sc.info = dict(sc.info, why=f"after {MAX_CHAIN} pages in a row, wandered off; "
+                                                    f"{sc.info.get('why', '')}")
                     if not ok:
                         sc.next_at = time.time() + 15
                         return None
@@ -597,7 +600,8 @@ class Browser:
         links = []
         for i, c in enumerate(keep):
             link = {"id": f"L{i + 1}", "href": c["href"], "text": c["text"][:100],
-                    "host": c["host"].removeprefix("www."), "area": round(c["area"]), "video": bool(VIDEO_LINK.search(c["href"]))}
+                    "host": c["host"].removeprefix("www."), "area": round(c["area"]),
+                    "video": bool(VIDEO_LINK.search(c["href"]))}
             if c["kind"] == "next":
                 link["next"] = True
             elif c["kind"] == "comments":
@@ -636,7 +640,8 @@ class Browser:
                 elif kind == "site_search" and action.get("target"):
                     from eyes import query_ok                       # the query filter, again in this process
                     q = query_ok(action["target"])
-                    ok = bool(q) and await self._site_search(sc, q, f"searched {page.get('host', 'the site')} for “{q}” — {why}")
+                    ok = bool(q) and await self._site_search(
+                        sc, q, f"searched {page.get('host', 'the site')} for “{q}” — {why}")
                 elif kind == "back" and len(sc.history) >= 2:
                     saved = list(sc.history)
                     sc.history = saved[:-2]
@@ -706,7 +711,8 @@ class Browser:
             self.last_skip = "not a search box"
             return False
         host = urllib.parse.urlsplit(page.url).hostname or ""
-        field = " ".join(x for x in (again.get("type") or "text", again.get("name"), again.get("placeholder")) if x)[:60]
+        field = " ".join(x for x in (again.get("type") or "text", again.get("name"), again.get("placeholder"))
+                         if x)[:60]
         self.typed = (self.typed + [{"t": time.time(), "device": sc.name, "host": host.removeprefix("www."),
                                      "field": field, "query": q}])[-100:]
         print(f"browse: site_search on {host} (input {field!r}): {q!r}", flush=True)

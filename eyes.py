@@ -428,7 +428,7 @@ def local_options(page, interest=None, rng=None, n=MAX_OPTIONS):
         if l:
             items.append({"action": kind, "target": l["id"], "label": label})
     q = " ".join(words(interest or "")[:4]) or interest
-    if page.get("search_box"):                                    # the site's own box: on his interest, else the page's topic
+    if page.get("search_box"):                    # the site's own box: on his interest, else the page's topic
         sq = q or " ".join(words(page.get("title", ""))[:3])
         if sq:
             items.append({"action": "site_search", "target": sq, "label": f"search this site for {sq}"})
