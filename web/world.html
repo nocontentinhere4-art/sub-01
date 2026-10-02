@@ -54,7 +54,7 @@ function show(f){
   const back = front === "a" ? "b" : "a", img = document.getElementById(back);
   img.onload = () => { img.classList.add("on"); document.getElementById(front).classList.remove("on"); front = back; };
   img.src = f.img;
-  document.getElementById("stage").textContent = `${f.stage} ${f.t}`;
+  document.getElementById("stage").textContent = `${f.stage} ${f.t}${f.resting ? " · " + f.resting : ""}`;
   document.getElementById("thought").textContent = f.thought ? `“${f.thought}”` : "";
   const w = f.why || {}, bits = [];
   if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${x.slice(0, 60)}”`).join(", "));
@@ -69,7 +69,7 @@ async function refresh(){
     : `<div><span style="color:#55556a">empty — write something in the chat</span></div>`;
   document.getElementById("strip").innerHTML = d.frames.slice(0, -1).reverse().map(f =>
     `<figure><img src="${f.img}" loading="lazy"><figcaption>${f.t} ${f.stage} · ${(f.thought || "").replace(/</g, "").slice(0, 60)}</figcaption></figure>`).join("");
-  if (d.frames.length) show(d.frames[d.frames.length - 1]);
+  if (d.frames.length) show({...d.frames[d.frames.length - 1], resting: d.resting});
 }
 function connect(){
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);

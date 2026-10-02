@@ -157,11 +157,18 @@ class ReplicateLLM:
 
     def __init__(self, token):
         self.token = token
+        self.last_usage = None                           # (tokens in, tokens out) of the last call, for the ledger
 
     def ask(self, system, user):
-        out = replicate_post(self.URL, self.token, {"input": {
-            "system_prompt": system, "prompt": user, "max_tokens": 260, "temperature": 0.7}}).get("output") or ""
-        return "".join(out) if isinstance(out, list) else str(out)
+        self.last_usage = None
+        res = replicate_post(self.URL, self.token, {"input": {
+            "system_prompt": system, "prompt": user, "max_tokens": 260, "temperature": 0.7}})
+        out = res.get("output") or ""
+        out = "".join(out) if isinstance(out, list) else str(out)
+        m = res.get("metrics") or {}
+        self.last_usage = (int(m.get("input_token_count") or len(system + user) // 4),
+                           int(m.get("output_token_count") or len(out) // 4))
+        return out
 
 
 class Eye:
@@ -175,6 +182,7 @@ class Eye:
         self.absorbed = set()                            # messages already turned into world objects
         self.llm = self.tok = self.img = None
         self.log = self.out / "frames.jsonl"
+        self.ledger = None                               # costs.Ledger (live_server): caps + logs the Replicate calls
 
     # called from the server whenever a chat message is accepted
     def hear(self, text, t):
@@ -198,7 +206,7 @@ class Eye:
 
     def _ask(self, state):
         if isinstance(self.llm, ReplicateLLM):
-            raw = self.llm.ask(SYSTEM, json.dumps(state))
+            raw = self._paid_llm(SYSTEM, json.dumps(state))
         else:
             from mlx_lm import generate
             msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": json.dumps(state)}]
@@ -214,6 +222,22 @@ class Eye:
         if BAD.search(thought):
             thought = ""
         return out.get("new_objects") or [], scene, thought
+
+    def _check(self):
+        """Before every paid call: over the eye's or the total daily cap raises costs.Capped (the server keeps the
+        last frame)."""
+        if self.ledger is not None:
+            self.ledger.check("eye")
+
+    def _paid_llm(self, system, user):
+        import costs
+        self._check()
+        try:
+            return self.llm.ask(system, user)
+        finally:
+            if self.ledger is not None:
+                tin, tout = self.llm.last_usage or (len(system + user) // 4, 0)
+                self.ledger.record("eye", "meta/meta-llama-3-8b-instruct", tin + tout, costs.llm_usd(tin, tout), "thought")
 
     def step(self, t, stage, groups, market, replays, sim_hhmm, doing="", articles=()):
         """One frame. Blocking (runs in a worker thread): returns the frame record."""
@@ -238,8 +262,12 @@ class Eye:
         t0 = time.time()
         reused = False
         if isinstance(self.img, ReplicateImages):
+            self._check()                                # over a cap: no frame is written (the server keeps the last)
             try:
                 pil = self.img.generate(prompt, int(t) % 100000, *self.size)
+                if self.ledger is not None:
+                    import costs
+                    self.ledger.record("eye", "black-forest-labs/flux-schnell", 1, costs.FLUX_SCHNELL_USD, "frame")
             except Exception as e:                        # provider queue/outage: keep thinking, reuse last view
                 last = sorted(self.out.glob("*.jpg"))
                 if not last:

@@ -8,11 +8,14 @@ must still start, log one "is corrupt" line per file and keep each one aside as 
 With --mind (#33) the clock runs 60x from 09:00 Tokyo and a chat message ("are you a real person? n", answered by a
 rule, no AI key needed) is sent every 11 s during the measurement, so the day plan (voted by a brain clone) and the
 chat replies run while the tick cost is measured; the run fails if no plan arrives.
+After the first tick (#15): /healthz answers 200, /api/costs and /api/health answer 401 without the admin token and
+200 with it (a random SUB01_ADMIN_TOKEN is set for the server), and /api/health's tick time is printed.
 No `test_` prefix, so pytest does not collect it.
 """
 import argparse
 import asyncio
 import os
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -24,6 +27,7 @@ import aiohttp
 ROOT = Path(__file__).resolve().parent.parent
 PATHS = ["/", "/brain", "/diary", "/tastes.html", "/tokyo_area.json", "/api/diary", "/api/reading", "/api/frames", "/api/browsing", "/api/tastes",
          "/api/taught", "/api/mind"]
+ADMIN = {"X-Admin-Token": secrets.token_hex(16)}     # the server gets it as SUB01_ADMIN_TOKEN
 TICK_S = 0.05            # live_server.TICK: one broadcast per 50 ms
 TORN = {                 # state files read back at startup, each cut off mid-write
     "life.json": '{"activity": "research", "path": [], "hunger',
@@ -104,6 +108,15 @@ async def run(args, proc):
                 failures.append("/ws: no tick within 10 s")
                 return failures
             print(f"ok   /ws first tick after {first:.2f} s")
+            for path, headers, want in (("/healthz", None, 200), ("/api/costs", None, 401), ("/api/costs", ADMIN, 200),
+                                        ("/api/health", None, 401), ("/api/health", ADMIN, 200)):
+                async with s.get(base + path, headers=headers) as r:
+                    body = await r.read()
+                    ok = r.status == want
+                    print(f"{'ok  ' if ok else 'FAIL'} GET {path:<14} {r.status}  {len(body)} bytes"
+                          f"{' (admin token)' if headers else ''}")
+                    if not ok:
+                        failures.append(f"GET {path} -> {r.status}, expected {want}")
 
             # tick cost: server CPU seconds over a window of /ws, divided by the ticks received in it
             linux = Path(f"/proc/{proc.pid}/stat").exists()
@@ -132,6 +145,11 @@ async def run(args, proc):
                 failures.append("/ws: no ticks during the measurement window")
                 return failures
             print(f"ticks: {ticks} in {wall:.1f} s ({ticks / wall:.1f}/s, nominal {1 / TICK_S:.0f}/s)")
+            async with s.get(base + "/api/health", headers=ADMIN) as r:
+                h = await r.json() if r.status == 200 else {}
+            tm = h.get("tick_ms") or {}
+            print(f"/api/health: tick body p50 {tm.get('p50')} p95 {tm.get('p95')} ms over {tm.get('n')} ticks · "
+                  f"loop lag p95 {(h.get('loop_lag_ms') or {}).get('p95')} ms · RSS {h.get('rss_mb')} MB")
             if linux:
                 cpu = cpu_seconds(proc.pid) - cpu0
                 print(f"TICK COST: {1000 * cpu / ticks:.1f} ms CPU per {1000 * TICK_S:.0f} ms tick "
@@ -160,6 +178,7 @@ def main():
     env = dict(os.environ, BROWSE="0", PYTHONUNBUFFERED="1")
     env.setdefault("OPENBLAS_NUM_THREADS", "1")
     env.setdefault("OMP_NUM_THREADS", "1")
+    env["SUB01_ADMIN_TOKEN"] = ADMIN["X-Admin-Token"]
     env.pop("SITE_PASSWORD", None)                  # the gate would answer 401; it has its own tests
     log = tempfile.TemporaryFile(mode="w+")
     cmd = [sys.executable, str(ROOT / "live_server.py"), "--demo", "--port", str(args.port),

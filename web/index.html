@@ -347,7 +347,7 @@ async function loadDiary(){
 function showEye(f){
   if (!f || !f.img) return;
   $("c-eye").hidden = false; $("e-img").src = f.img;
-  $("e-t").textContent = `${f.stage} ${f.t}`; $("e-thought").textContent = f.thought ? `“${f.thought}”` : "";
+  $("e-t").textContent = `${f.stage} ${f.t}${f.resting ? " · " + f.resting : ""}`; $("e-thought").textContent = f.thought ? `“${f.thought}”` : "";
 }
 function renderNights(m){
   const n = m.tonight || m.last;

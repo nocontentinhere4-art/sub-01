@@ -46,8 +46,10 @@ from state_io import _write_replace, append_jsonl, load_json, read_jsonl, save_j
 MODEL = os.environ.get("MIND_CLAUDE_MODEL") or "claude-haiku-4-5"            # no effort / thinking fields for Haiku
 OPENROUTER_MODEL = os.environ.get("MIND_OPENROUTER_MODEL") or "anthropic/claude-haiku-4.5"
 SHARED_USD_PER_DAY = float(os.environ.get("BRAIN_DECIDES_MAX_USD_PER_DAY") or 2.00)
-EYES_USD_PER_DAY = float(os.environ.get("EYES_MAX_USD_PER_DAY") or E.MAX_USD_PER_DAY)   # the eyes keep their $1.00
-MIND_USD_PER_DAY = float(os.environ.get("MIND_MAX_USD_PER_DAY") or 1.00)              # the rest of the shared $2.00
+# the eyes keep their $1.00, the mind gets the rest of the shared $2.00; SUB01_CAP_* are the names in costs.py (#15)
+EYES_USD_PER_DAY = float(os.environ.get("SUB01_CAP_EYES_USD") or os.environ.get("EYES_MAX_USD_PER_DAY")
+                         or E.MAX_USD_PER_DAY)
+MIND_USD_PER_DAY = float(os.environ.get("SUB01_CAP_MIND_USD") or os.environ.get("MIND_MAX_USD_PER_DAY") or 1.00)
 LEDGER = "eyes_costs.jsonl"                                                   # the same file eyes.Eyes writes
 
 REPLY_EVERY_S = 120.0
@@ -96,12 +98,14 @@ def shared_budget(data_dir=None, max_usd_day=None, _cache={}):
 class Share:
     """One part's view (eyes or mind) of the shared ledger: the shared caps (calls per hour, dollars per Tokyo day in
     total) plus this part's own dollars per Tokyo day, so neither part can take more than it had before and the total
-    stays at the shared cap. record() writes one row to the shared ledger: every call is counted once."""
+    stays at the shared cap. record() writes one row to the shared ledger: every call is counted once.
+    `total` (set by live_server: costs.Ledger.total_why_not) adds SUB01_CAP_TOTAL_USD across every paid service."""
 
     def __init__(self, shared, part, max_usd_day):
         self.shared, self.part, self.max_usd_day = shared, part, float(max_usd_day)
         self.day, self.day_usd = None, 0.0
         self.lock = threading.Lock()
+        self.total = None                                         # () -> reason or None
 
     def mine(self, row):
         return str(row.get("provider", "")).startswith("mind/") == (self.part == "mind")
@@ -120,14 +124,15 @@ class Share:
         self._sync()
         if self.day_usd >= self.max_usd_day:
             return f"daily AI budget for the {self.part} (${self.max_usd_day:.2f}, Tokyo day) reached; resumes tomorrow"
-        return None
+        return self.total() if self.total else None
 
     def allow(self):
         return self.why_not() is None
 
     def over_day(self):
         self._sync()
-        return self.day_usd >= self.max_usd_day or self.shared.day_usd >= self.shared.max_usd_day
+        return (self.day_usd >= self.max_usd_day or self.shared.day_usd >= self.shared.max_usd_day
+                or bool(self.total and self.total()))
 
     def record(self, *a, **kw):
         with self.lock:

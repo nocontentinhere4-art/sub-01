@@ -21,6 +21,7 @@ import random
 import re
 import socket
 import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -41,6 +42,7 @@ from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
 from browse import Browser, display_ok
 import brain_vote
+import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from eyes import Eyes
 import mind as mind_mod
@@ -61,6 +63,11 @@ GOOD = re.compile(r"\bgood\b!?", re.I)    # chat 'good!' -> dopamine pulse on th
 NOCACHE = {"Cache-Control": "no-cache"}   # pages change with deploys: always revalidate
 NEURO_K = 3.0                   # excitability per unit of receptor-weighted gain change (gain stays in 0.5..1.5)
 SAVE_S = 60                     # persist sleep state + memory every minute (real time)
+TICK_RING = int(60 / TICK)      # tick durations kept for /api/health: the last minute
+HEALTHY_S = 5.0                 # /healthz: 200 while the brain loop ticked within this many seconds, else 503
+RESTING = "resting its eyes"    # what the pages say while the eye is over its daily cap
+GATED = web.AppKey("gated", bool)            # the app runs behind the password gate
+ADMIN_PATHS = ("/api/costs", "/api/health")   # private even after launch: SUB01_ADMIN_TOKEN (or the password cookie)
 REPLAY_AMP = 0.35               # replayed stimulus pattern, relative to the original message
 RECALL_NOTE = "Recall by a simulated spiking network from a partial cue; a model, not a mind."
 REPLAY_NOTE = "Replayed in his sleep: the stored pattern is played back into the brain model during REM."
@@ -233,6 +240,11 @@ class Live:
         self.stats = {"buys": 0, "sells": 0, "usd": 0.0}
         self.eye = None                  # set by main() with --eye
         self.diary = None                # dream diary, set by main() with --eye
+        self.data_dir = Path(data_dir)
+        self.ledger = costs.Ledger(data_dir)   # costs.py: every paid service per Tokyo day + the daily caps (#15)
+        self.eye_resting = None          # why the eye is resting (a daily cap), else None
+        self.tick_s = deque(maxlen=TICK_RING)  # run_brain body durations (s), the last minute: /api/health
+        self.last_tick = None            # time.monotonic() at the end of the last brain tick: /healthz
         life_path = Path(data_dir) / "life.json"
         self.life_path = life_path
         self.body_path = Path(data_dir) / "body.json"
@@ -619,6 +631,7 @@ class Live:
         gidx = {k: v for k, v in b.group_idx.items() if v}
         next_t = last_save = time.time()
         while True:
+            t0 = time.perf_counter()                                  # tick timing (#15): /healthz, /api/health
             now = time.time()
             self.tick_late = now - next_t                             # this tick's start vs its 50 ms slot (ws stats)
             events = self.sleep_tick()
@@ -678,6 +691,8 @@ class Live:
                 save_json(self.body_path, {"body": self.body.to_dict(), "neuro": self.neuro.to_dict()})
                 save_json(self.reading_path, self.reader.to_dict(), ensure_ascii=False)
                 last_save = now
+            self.tick_s.append(time.perf_counter() - t0)
+            self.last_tick = time.monotonic()
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
 
@@ -970,6 +985,11 @@ class Live:
                 try:
                     tok = os.environ.get("REPLICATE_API_TOKEN")
                     llm = self.eye.llm or (ReplicateLLM(tok) if tok else None)
+                    if isinstance(llm, ReplicateLLM):                 # paid: capped and logged as "diary"
+                        why = self.ledger.why_not("diary")
+                        if why:
+                            print(f"diary: {why}; template text", flush=True)
+                        llm = None if why else costs.MeteredLLM(llm, self.ledger, "diary")
                     read = [{"title": m["text"], "url": m.get("url", "")} for m in self.memory.items
                             if m.get("source") == "reading" and day_of(m["t"]) == date]
                     notes = self.mind.day_notes(date) if getattr(self, "mind", None) else None
@@ -985,14 +1005,22 @@ class Live:
             stage = self.engine.stage
             if stage == "AWAKE" and (self.recent_replays or self.recent_read_replays):
                 self.recent_replays, self.recent_read_replays = [], []   # dreams end when it wakes up
+            if os.environ.get("REPLICATE_API_TOKEN") and (why := self.ledger.why_not("eye")):
+                await self.rest_eye(why)                              # over a daily cap: keep the last frame
+                await asyncio.sleep(60)
+                continue
             try:
                 rec = await loop.run_in_executor(None, self.eye.step, t, stage, self.last_groups,
                                                  market_mood(self.recent_trades), list(self.recent_replays), hhmm(t),
                                                  self.life.snapshot()["doing"], list(self.recent_read_replays))
-                self.last_frame = rec
+                self.last_frame, self.eye_resting = rec, None
                 await self.broadcast({"type": "eye", **rec})
                 if self.diary and stage == "REM" and self.engine.night is not None:
                     self.diary.add(self.engine.night["date"], rec, t, attended)
+            except costs.Capped as e:                                 # a cap reached between two calls
+                await self.rest_eye(str(e))
+                await asyncio.sleep(60)
+                continue
             except Exception as e:                                    # never let the eye stop the brain
                 print("eye error:", repr(e), flush=True)
                 await asyncio.sleep(10)
@@ -1000,6 +1028,48 @@ class Live:
                 await asyncio.sleep(5)                                # unattended: the diary paces itself
                 continue
             await asyncio.sleep(self.eye_every * {"AWAKE": 1.0, "REM": 0.75}.get(stage, 3.0))
+
+    async def rest_eye(self, why):
+        """Over a daily cap the eye keeps its last frame and the pages say it is resting its eyes (never an error)."""
+        if self.eye_resting == why:
+            return
+        print(f"eye: {why}; resting its eyes", flush=True)
+        self.eye_resting = why
+        if self.last_frame:
+            await self.broadcast({"type": "eye", **self.last_frame, "resting": RESTING})
+
+    def eye_frame(self):
+        return {"type": "eye", **self.last_frame, **({"resting": RESTING} if self.eye_resting else {})}
+
+    # --- health (#15) ----------------------------------------------------------
+    def healthy(self):
+        """/healthz: the brain loop finished a tick in the last HEALTHY_S seconds."""
+        return self.last_tick is not None and time.monotonic() - self.last_tick < HEALTHY_S
+
+    def health(self):
+        """GET /api/health (admin): tick time, loop lag, memory, sockets, Chromium, last diary / memory test, spend."""
+        pct = lambda xs, p: round(1000 * xs[min(len(xs) - 1, int(p * len(xs)))], 2) if xs else None
+        ticks = sorted(self.tick_s)
+        late = sorted(max(0.0, x) for x in self.ws_stats["late"][-TICK_RING:])
+        b = self.browser
+        chromium = {"on": False}
+        if b is not None:
+            chromium = {"on": True, "separate_service": self.local_browser is None,
+                        "restarting": bool(getattr(b, "restarting", False)), "failures": getattr(b, "failures", 0)}
+            if self.local_browser is not None:
+                chromium.update(alive=self.local_browser.alive(), restarts=self.local_browser.restarts)
+        nights = self.diary.index(1) if self.diary else []
+        tests = read_jsonl(self.data_dir / "spiking" / "memory_tests.jsonl", last=1)
+        return {"ok": self.healthy(),
+                "last_tick_s_ago": round(time.monotonic() - self.last_tick, 3) if self.last_tick else None,
+                "tick_ms": {"p50": pct(ticks, 0.5), "p95": pct(ticks, 0.95), "max": round(1000 * ticks[-1], 2) if ticks
+                            else None, "n": len(ticks), "budget": 1000 * TICK},
+                "loop_lag_ms": {"p50": pct(late, 0.5), "p95": pct(late, 0.95), "n": len(late)},
+                "rss_mb": rss_mb(), "websockets": len(self.sockets), "chromium": chromium,
+                "eye": {"on": bool(self.eye), "resting": self.eye_resting},
+                "last_diary": nights[0]["date"] if nights else None,
+                "last_memory_test": tests[-1].get("test_day") if tests else None,
+                "spend_today": {k: round(v, 4) for k, v in self.ledger.by_day(1).popitem()[1].items()}}
 
     # --- http ----------------------------------------------------------------
     async def ws_handler(self, request):
@@ -1035,7 +1105,7 @@ class Live:
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD})
             await ws.send_json(self.nights())
             if self.last_frame:
-                await ws.send_json({"type": "eye", **self.last_frame})
+                await ws.send_json(self.eye_frame())
             self.feeds[ws] = self.feed_for(request.query)
             self.clients.add(ws)
             async for msg in ws:
@@ -1061,6 +1131,30 @@ class Live:
         return ws
 
 
+def rss_mb():
+    """Resident memory of this process in MB (Linux /proc; peak RSS elsewhere)."""
+    try:
+        for ln in open("/proc/self/status"):
+            if ln.startswith("VmRSS:"):
+                return round(int(ln.split()[1]) / 1024, 1)
+    except OSError:
+        pass
+    import resource
+    import sys
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return round(peak / (1024 ** 2 if sys.platform == "darwin" else 1024), 1)
+
+
+def admin_ok(request):
+    """True when the request carries SUB01_ADMIN_TOKEN (X-Admin-Token or Authorization: Bearer). No token set: False."""
+    import hmac
+    token = os.environ.get("SUB01_ADMIN_TOKEN", "")
+    if not token:
+        return False
+    got = request.headers.get("X-Admin-Token") or request.headers.get("Authorization", "").removeprefix("Bearer ")
+    return hmac.compare_digest(got.strip().encode(), token.encode())
+
+
 async def supervised(name, fn, backoff=5.0):
     """Run a background task forever: an unexpected error is logged and the task restarts, so a part such as the
     screens' browser can fail without stopping the brain loop (asyncio.gather would otherwise end the server)."""
@@ -1079,6 +1173,29 @@ def parse_start(hm):
     """'HH:MM' -> sim epoch of that local (Tokyo) time today."""
     h, m = map(int, hm.split(":"))
     return datetime.now(TZ).replace(hour=h, minute=m, second=0, microsecond=0).timestamp()
+
+
+def add_ops_routes(app, live, data_dir):
+    """#15: the total cap on the eyes and the mind, GET /healthz (public), /api/costs and /api/health (admin)."""
+    for share in (mind_mod.eyes_budget(data_dir), mind_mod.mind_budget(data_dir)):
+        share.total = live.ledger.total_why_not   # SUB01_CAP_TOTAL_USD also stops the eyes and the mind
+
+    async def healthz(request):                   # public, tiny, no data: Railway healthcheck + uptime monitor
+        ok = live.healthy()
+        return web.Response(text="ok" if ok else "stalled", status=200 if ok else 503,
+                            headers={"Cache-Control": "no-store"})
+    app.router.add_get("/healthz", healthz)
+
+    def admin(fn):
+        """/api/costs, /api/health: with SITE_PASSWORD the gate's cookie (or the token) let it through; without it the
+        SUB01_ADMIN_TOKEN header is required (no token configured: always 401)."""
+        async def handler(request):
+            if not (admin_ok(request) or request.app.get(GATED)):
+                raise web.HTTPUnauthorized(text="admin token required")
+            return web.json_response(fn(request), headers={"Cache-Control": "no-store"})
+        return handler
+    app.router.add_get("/api/costs", admin(lambda r: live.ledger.report()))
+    app.router.add_get("/api/health", admin(lambda r: live.health()))
 
 
 LOGIN_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -1111,6 +1228,8 @@ def password_gate(password):
             return web.Response(text=LOGIN_PAGE.format(msg=""), content_type="text/html")
         if spiking_server and request.path in spiking_server.POD_PATHS:
             return await handler(request)                  # the pod authenticates with its own secret in the handler
+        if request.path == "/healthz" or (request.path in ADMIN_PATHS and admin_ok(request)):
+            return await handler(request)                  # uptime monitors / Railway healthcheck; admin token
         if hmac.compare_digest(request.cookies.get("sub01", ""), token):
             return await handler(request)
         if request.path == "/ws" or request.path.startswith("/api/"):
@@ -1125,6 +1244,7 @@ async def main(args):
                 parse_start(args.start) if args.start else None, args.trust_proxy)
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
+    app[GATED] = bool(middlewares)                # behind the password gate: its cookie also opens the admin APIs
     app.router.add_get("/ws", live.ws_handler)
     manager = None
     if spiking_server:
@@ -1159,6 +1279,8 @@ async def main(args):
     if os.environ.get("MIND", "1") != "0":
         load_env(HERE / ".env")                   # ANTHROPIC_API_KEY / OPENROUTER_API_KEY (never logged)
         live.mind = mind_mod.Mind(data_dir, budget=mind_mod.mind_budget(data_dir), clock=live.clock.now)
+
+    add_ops_routes(app, live, data_dir)
 
     async def screen_shot(request):               # latest screenshot of the desk or phone screen
         dev = request.match_info["device"]
@@ -1198,6 +1320,7 @@ async def main(args):
         load_env(HERE / ".env")                   # REPLICATE_API_TOKEN -> images in the cloud, not on this Mac
         frames_dir = Path(args.frames_dir) if args.frames_dir else HERE / "out" / "eye" / "frames"
         live.eye = Eye(frames_dir, data_dir / "world.json", width=640, height=360, steps=6)
+        live.eye.ledger = live.ledger             # SUB01_CAP_EYE_USD + total, checked before every Replicate call
         live.eye_every = args.eye_every
         app.router.add_static("/eye", frames_dir)
         live.diary = Diary(data_dir, frames_dir)
@@ -1225,7 +1348,7 @@ async def main(args):
         log = live.eye.log if live.eye else HERE / "missing"
         rows = read_jsonl(log, last=int(request.query.get("n", "40")))         # a torn last line is skipped
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
-        return web.json_response({"frames": rows, "world": world})
+        return web.json_response({"frames": rows, "world": world, "resting": RESTING if live.eye_resting else None})
     app.router.add_get("/api/frames", frames)
 
     gmaps_ok = {}
