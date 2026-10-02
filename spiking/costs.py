@@ -100,5 +100,20 @@ class CostLog:
         d = date.isoformat() if hasattr(date, "isoformat") and not isinstance(date, str) else str(date)
         return sum(r["hours"] for r in self._records() if _parse(r["start"]).astimezone(ROME).date().isoformat() == d)
 
+    def usage_on(self, date):
+        """(GPU hours, USD) that fall on a local (Asia/Tokyo) date: each pod's running time is split at local
+        midnight, open pods counted up to now (the day-live caps, #58)."""
+        d = date if not isinstance(date, str) else datetime.fromisoformat(date).date()
+        lo = datetime(d.year, d.month, d.day, tzinfo=ROME)
+        hi = lo + timedelta(days=1)
+        hours = usd = 0.0
+        for r in self._records():
+            a = _parse(r["start"])
+            b = _parse(r["stop"]) if "stop" in r else self.clock()
+            h = max(0.0, (min(b, hi) - max(a, lo)).total_seconds() / 3600)
+            hours += h
+            usd += h * float(r.get("cost_per_hr") or 0.0)
+        return hours, usd
+
     def summary(self):
         return {"total_usd": round(self.total_usd(), 3), "hours": round(self.total_hours(), 3)}

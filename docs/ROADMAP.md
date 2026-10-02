@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 14:40 UTC** (pass 28b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 14:55 UTC** (pass 29). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -76,6 +76,7 @@ Owner actions now:
 - **RunPod:** the owner added the RunPod key on Railway (2026-10-02). The pod manager also needs **`SUB01_POD_SECRET`**
   (any long random string). Without it the log says `spiking pod manager disabled: SUB01_POD_SECRET is not set`. With
   both set, the first GPU session runs tonight at 21:00 Tokyo (12:00 UTC): ≤ 1 GPU-hour/day, ≈ $0.27–0.85/day.
+- **Turn the 1M network on (after #67):** `SUB01_POD_SECRET`, `SUB01_DAY_LIVE=1`, `SUB01_CHOICE=1` on Railway.
 - **`SUB01_CHOICE=1` on Railway** (optional): adds the choice training to the nightly GPU hour (~90 s, no extra cost).
 - **After #51, on Railway:** set the healthcheck path to `/healthz`, set a long random `SUB01_ADMIN_TOKEN`, add a free
   uptime monitor (e.g. UptimeRobot) on `/healthz`, and set a usage alert (see docs/OPERATIONS.md).
@@ -223,6 +224,10 @@ findings "NOT verified", and its reviews are partial on large diffs.
   Preferences = tastes learn faster (#36). Neurons = the spiking network learns choices from dopamine (#35), reported
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
+- **2026-10-02: music through Spotify's official embed only** (owner asked for Spotify). The server never streams,
+  downloads or relays audio. Visitors press play on their own device: a 30 s preview, or the full track if they are
+  logged in to Spotify. His brain model picks tracks among candidates (#68). Optional `SPOTIFY_CLIENT_ID/SECRET` (free
+  developer app); otherwise a curated list of playlists.
 - **2026-10-02: social accounts, both uses** (owner).
   - (a) Official SUB-01 accounts post daily AI-labelled clips (#59): manual, or the official APIs once approved.
   - (b) He browses logged in to his own TikTok/YouTube, view-only (#60, after #56). No likes, follows, comments or
@@ -289,6 +294,12 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 29:** merged #67 (#58), the 1M network live on GPU through his waking hours. It is off until
+`SUB01_DAY_LIVE=1`, with caps of 17 h/day, $14/day, 120 h/week and 6 restarts. Measured A4000 secure at $0.25/h ≈
+**$4.1/day**. 842 tests with torch and Chromium; RunPod validation cost $0.127; only "BRAIN" is left (EXITED). No learning is
+shown yet at 1M (41/50 races decided at the first check), so follow-up **#70** is started (a read-out that scales).
+#68 music (official Spotify embed) is started.
 
 **Pass 28b:** merged #66 (#60): logged-in, view-only TikTok and YouTube from the `SUB01_SESSION_*` secrets.
 Chromium's env is scrubbed, cookies are domain-scoped, actions and private pages are blocked, and the avatar is
