@@ -139,7 +139,7 @@ def main():
                 pg.wait_for_timeout(2500)
 
             for w in sizes:
-                h, mobile, tag = (800, False, "1280") if w >= 900 else (844, True, "390")
+                h, mobile, tag = (800 if w == 1280 else round(w * 0.625), False, str(w)) if w >= 640 else (844, True, str(w))
                 for hour in hours:
                     ctx, pg, errors = page_for(w, h, hour, mobile)
                     settle(pg, hour)

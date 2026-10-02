@@ -32,8 +32,9 @@ def check():
 def test_module_loads_and_tiers(check):
     assert check["tiers"] == ["low", "medium", "high"]
     C = check["chains"]
-    assert C["high"]["chain"] == ["ao", "bloom", "dof", "grade", "smaa"] and C["high"]["mode"] == "composer" and C["high"]["active"]
-    assert C["medium"]["chain"] == ["ao", "bloom", "grade", "fxaa"] and C["medium"]["halfRes"] and not C["high"]["halfRes"]
+    assert C["high"]["chain"] == ["ao", "dof", "grade", "smaa"] and C["high"]["mode"] == "composer" and C["high"]["active"]
+    assert C["medium"]["chain"] == ["ao", "grade", "fxaa"] and C["medium"]["halfRes"] and not C["high"]["halfRes"]
+    assert not C["high"]["bloom"] and not C["medium"]["bloom"]                                            # owner: no stylised bloom or glow
     assert C["low"]["chain"] == [] and C["low"]["mode"] == "direct" and not C["low"]["active"] and C["low"]["aa"] == "msaa"
     assert C["high"]["shadow"] == 2048 and C["medium"]["shadow"] == 1024 and C["low"]["shadow"] == 1024
     assert C["high"]["hdr"] and C["medium"]["hdr"] and not C["low"]["hdr"]
@@ -48,9 +49,12 @@ def test_module_loads_and_tiers(check):
 
 def test_fallbacks(check):
     F = check["fallbacks"]
-    assert F["no_ao"]["chain"] == ["render", "bloom", "dof", "grade", "smaa"] and F["no_ao"]["failed"] == ["ao"] and F["no_ao"]["mode"] == "composer"
+    assert F["no_ao"]["chain"] == ["render", "dof", "grade", "smaa"] and F["no_ao"]["failed"] == ["ao"] and F["no_ao"]["mode"] == "composer"
     assert F["no_ao"]["depth_from_rt"]                                     # without N8AO the depth comes from the composer's own target
-    assert F["no_aa"]["chain"] == ["ao", "bloom", "dof", "grade"] and F["no_aa"]["aa"] is None
+    assert F["no_aa"]["chain"] == ["ao", "dof", "grade"] and F["no_aa"]["aa"] is None
+    B = F["bloom_opt"]                                                     # opt-in only: a faint veil, threshold well above white
+    assert B["high"] == ["ao", "bloom", "dof", "grade", "smaa"] and B["medium"] == ["ao", "bloom", "grade", "fxaa"] and B["low"] == []
+    assert B["strength"] <= 0.15 and B["threshold"] >= 1.5
     assert not F["no_composer"]["active"] and F["no_composer"]["mode"] == "direct" and F["no_composer"]["direct"] == 1
     assert "EffectComposer" in F["no_composer"]["failed"] and F["no_composer"]["aa"] == "msaa"
     assert F["render_throws"] == {"first": "direct", "second": "direct", "direct": 2, "broken": True, "active": False}

@@ -17,9 +17,11 @@ export const TIERS = ["low", "medium", "high"];
 // what each tier draws; `ao` is N8AO's resolution, `aa` the anti-aliasing pass after the grade
 export const TIER_PASSES = {
   low:    {composer:false, ao:null,   aa:null,   bloom:false, dof:false, grain:false, shadow:1024, shafts:false, env:false},
-  medium: {composer:true,  ao:"half", aa:"fxaa", bloom:true,  dof:false, grain:false, shadow:1024, shafts:true,  env:true},
-  high:   {composer:true,  ao:"full", aa:"smaa", bloom:true,  dof:true,  grain:true,  shadow:2048, shafts:true,  env:true},
+  medium: {composer:true,  ao:"half", aa:"fxaa", bloom:false, dof:false, grain:false, shadow:1024, shafts:true,  env:true},
+  high:   {composer:true,  ao:"full", aa:"smaa", bloom:false, dof:true,  grain:true,  shadow:2048, shafts:true,  env:true},
 };
+// bloom is off on every tier (owner, 2026-10-02: "no stylised bloom or glow"); createPost(..., {bloom:true}) turns on a faint
+// lens veil (threshold well above white, low strength) on the medium and high tiers, for the bulb and the sun only
 export const SPECS = {                               // what each pass imports (the page's import map resolves them)
   composer:["three/addons/postprocessing/EffectComposer.js", "three/addons/postprocessing/RenderPass.js", "three/addons/postprocessing/ShaderPass.js"],
   ao:["n8ao"], smaa:["three/addons/postprocessing/SMAAPass.js"], fxaa:["three/addons/shaders/FXAAShader.js"],
@@ -79,17 +81,17 @@ export class Governor {
 // split toning (shadows / highlights tints), vignette strength. The lamp and the room light pull the evening towards the
 // warm-highlights / teal-shadows look; night without them is cool and desaturated with lifted blue blacks.
 const GRADES = [
-  // hour, balance,              sat,  con,  lift,  shadows tint,          highs tint,            vig
-  [ 0.0,  [0.93, 0.97, 1.09],   0.82, 1.12, 0.020, [0.85, 0.92, 1.12],   [0.98, 1.00, 1.04],    0.50],
-  [ 4.5,  [0.93, 0.97, 1.09],   0.82, 1.12, 0.020, [0.85, 0.92, 1.12],   [0.98, 1.00, 1.04],    0.50],
-  [ 6.0,  [1.04, 0.98, 0.95],   1.02, 1.04, 0.010, [0.92, 0.94, 1.08],   [1.06, 1.00, 0.94],    0.36],
-  [ 8.0,  [1.03, 1.00, 0.96],   1.08, 1.06, 0.004, [0.96, 0.97, 1.04],   [1.03, 1.00, 0.97],    0.30],
-  [12.0,  [0.99, 1.00, 1.03],   1.06, 1.08, 0.000, [0.97, 0.98, 1.03],   [1.00, 1.00, 1.00],    0.28],
-  [15.0,  [1.00, 1.00, 1.01],   1.07, 1.07, 0.000, [0.96, 0.97, 1.04],   [1.02, 1.00, 0.98],    0.30],
-  [17.3,  [1.08, 0.98, 0.90],   1.14, 1.05, 0.006, [0.88, 0.90, 1.10],   [1.08, 0.98, 0.90],    0.38],
-  [19.0,  [1.00, 0.98, 0.97],   1.00, 1.10, 0.012, [0.86, 0.94, 1.10],   [1.06, 1.00, 0.92],    0.45],
-  [22.0,  [0.98, 0.98, 1.00],   0.95, 1.11, 0.016, [0.86, 0.93, 1.11],   [1.04, 1.00, 0.95],    0.48],
-  [24.0,  [0.93, 0.97, 1.09],   0.82, 1.12, 0.020, [0.85, 0.92, 1.12],   [0.98, 1.00, 1.04],    0.50],
+  // hour, balance (linear gains),  sat,  con,  lift,  shadows tint,          highs tint,            vig
+  [ 0.0,  [0.96, 0.98, 1.05],   0.92, 1.06, 0.010, [0.94, 0.97, 1.05],   [1.00, 1.00, 1.01],    0.42],
+  [ 4.5,  [0.96, 0.98, 1.05],   0.92, 1.06, 0.010, [0.94, 0.97, 1.05],   [1.00, 1.00, 1.01],    0.42],
+  [ 6.0,  [1.02, 0.99, 0.97],   1.00, 1.03, 0.006, [0.97, 0.98, 1.03],   [1.02, 1.00, 0.98],    0.34],
+  [ 8.0,  [1.01, 1.00, 0.98],   1.03, 1.04, 0.003, [0.98, 0.99, 1.02],   [1.01, 1.00, 0.99],    0.30],
+  [12.0,  [0.995, 1.00, 1.01],  1.02, 1.05, 0.000, [0.99, 0.99, 1.01],   [1.00, 1.00, 1.00],    0.28],
+  [15.0,  [1.00, 1.00, 1.00],   1.03, 1.04, 0.000, [0.98, 0.99, 1.02],   [1.01, 1.00, 0.99],    0.30],
+  [17.3,  [1.04, 0.99, 0.95],   1.05, 1.03, 0.004, [0.95, 0.97, 1.04],   [1.03, 1.00, 0.96],    0.34],
+  [19.0,  [1.00, 0.99, 0.98],   0.98, 1.05, 0.008, [0.94, 0.97, 1.05],   [1.02, 1.00, 0.97],    0.38],
+  [22.0,  [0.98, 0.99, 1.01],   0.95, 1.06, 0.010, [0.94, 0.97, 1.05],   [1.01, 1.00, 0.99],    0.40],
+  [24.0,  [0.96, 0.98, 1.05],   0.92, 1.06, 0.010, [0.94, 0.97, 1.05],   [1.00, 1.00, 1.01],    0.42],
 ];
 const lerp = (a, b, t) => a + (b - a) * t, lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 export function gradeAt(hour, s = {}){
@@ -97,11 +99,11 @@ export function gradeAt(hour, s = {}){
   let i = 0; while (i < GRADES.length - 2 && GRADES[i + 1][0] <= h) i++;
   const A = GRADES[i], B = GRADES[i + 1], t = Math.min(1, Math.max(0, (h - A[0]) / (B[0] - A[0])));
   const g = {balance:lerp3(A[1], B[1], t), sat:lerp(A[2], B[2], t), contrast:lerp(A[3], B[3], t), lift:lerp(A[4], B[4], t),
-    shadows:lerp3(A[5], B[5], t), highs:lerp3(A[6], B[6], t), vignette:lerp(A[7], B[7], t), grain:0.028};
+    shadows:lerp3(A[5], B[5], t), highs:lerp3(A[6], B[6], t), vignette:lerp(A[7], B[7], t), grain:0.02};
   const lamp = s.lampOn || 0, room = s.roomOn || 0, day = s.day == null ? 1 : s.day;
-  const warm = (1 - day) * Math.max(lamp, 0.7 * room);          // practicals on at night: warm highlights, teal shadows, a bit more colour
-  g.highs = lerp3(g.highs, [1.10, 0.99, 0.88], 0.6 * warm); g.shadows = lerp3(g.shadows, [0.82, 0.94, 1.10], 0.5 * warm);
-  g.sat = lerp(g.sat, 1.02, 0.5 * warm); g.lift = lerp(g.lift, 0.008, 0.5 * warm);
+  const warm = (1 - day) * Math.max(lamp, 0.7 * room);          // practicals on at night: a touch warmer in the lights, cooler in the shadows (faint)
+  g.highs = lerp3(g.highs, [1.04, 1.00, 0.95], 0.5 * warm); g.shadows = lerp3(g.shadows, [0.93, 0.97, 1.05], 0.5 * warm);
+  g.sat = lerp(g.sat, 1.0, 0.5 * warm); g.lift = lerp(g.lift, 0.006, 0.5 * warm);
   return g;
 }
 
@@ -265,7 +267,7 @@ export const GRADE_SHADER = {
 
 // ---------- a light depth of field for the close camera modes (reads the scene depth already drawn; 12 taps) ----------
 export const DOF_SHADER = {
-  uniforms:{tDiffuse:{value:null}, tDepth:{value:null}, focus:{value:1.5}, aperture:{value:0}, maxBlur:{value:0.012}, near:{value:0.02}, far:{value:200}, aspect:{value:1.6}},
+  uniforms:{tDiffuse:{value:null}, tDepth:{value:null}, focus:{value:1.5}, aperture:{value:0}, maxBlur:{value:0.006}, near:{value:0.02}, far:{value:200}, aspect:{value:1.6}},
   vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader:`
     uniform sampler2D tDiffuse, tDepth; uniform float focus, aperture, maxBlur, near, far, aspect; varying vec2 vUv;
@@ -296,8 +298,9 @@ export class Post {
     this.governor = new Governor({tier:this.tier, ...(opts.governor || {})});
     this.mods = {}; this.failed = {}; this.passes = {}; this.composer = null; this.active = false; this.broken = null; this.chain = [];
     this.width = 1; this.height = 1; this.dpr = 1; this.time = 0; this._focus = {d:1.5, k:0};
-    this.onTier = opts.onTier || null; this.hdrScreens = 1.25;   // how much brighter a lit screen is drawn in HDR, so that it blooms
+    this.onTier = opts.onTier || null; this.hdrScreens = 0.5;    // a lit screen's radiance in the page's physical units (knit): a bright panel
     this.fixed = !!opts.fixed;                                    // ?post=<tier>: the governor never changes it
+    this.bloom = !!opts.bloom;                                    // off by default: realism, not glow
     this.ready = this._load();
   }
   tiers(){ return TIERS.slice(); }
@@ -328,7 +331,7 @@ export class Post {
       Object.assign(ao.configuration, {aoRadius:0.6, distanceFalloff:0.25, intensity:2.6, aoSamples:12, denoiseSamples:6, denoiseRadius:10, gammaCorrection:false,
         screenSpaceRadius:false, halfRes:false, transparencyAware:false});
       P.ao = ao; } catch (e) { this.failed.ao = "pass: " + String(e && e.message || e); } }
-    if (M.bloom) { try { P.bloom = new M.bloom.UnrealBloomPass(new T.Vector2(w, h), 0.32, 0.45, 0.92); } catch (e) { this.failed.bloom = String(e && e.message || e); } }
+    if (M.bloom) { try { P.bloom = new M.bloom.UnrealBloomPass(new T.Vector2(w, h), 0.12, 0.3, 1.6); } catch (e) { this.failed.bloom = String(e && e.message || e); } }
     P.dof = new M.composer.ShaderPass({uniforms:T.UniformsUtils.clone(DOF_SHADER.uniforms), vertexShader:DOF_SHADER.vertexShader, fragmentShader:DOF_SHADER.fragmentShader});
     P.grade = new M.composer.ShaderPass({uniforms:T.UniformsUtils.clone(GRADE_SHADER.uniforms), vertexShader:GRADE_SHADER.vertexShader, fragmentShader:GRADE_SHADER.fragmentShader});
     P.grade.material.toneMapped = false;
@@ -346,7 +349,7 @@ export class Post {
     if (P.ao && cfg.ao) { P.ao.configuration.halfRes = cfg.ao === "half"; P.ao.configuration.aoSamples = cfg.ao === "half" ? 8 : 12;
       P.ao.configuration.denoiseSamples = cfg.ao === "half" ? 4 : 6; chain.push(["ao", P.ao]); }
     else chain.push(["render", P.render]);
-    if (P.bloom && cfg.bloom) chain.push(["bloom", P.bloom]);
+    if (P.bloom && (cfg.bloom || (this.bloom && cfg.composer))) chain.push(["bloom", P.bloom]);
     if (P.dof && cfg.dof) chain.push(["dof", P.dof]);
     chain.push(["grade", P.grade]);
     if (cfg.aa === "smaa" && P.smaa) chain.push(["smaa", P.smaa]); else if (cfg.aa && P.fxaa) chain.push(["fxaa", P.fxaa]);
@@ -388,7 +391,7 @@ export class Post {
   }
   // depth of field: focus distance (view space, m) and strength 0..1 (0: the pass is skipped)
   focus(d, k){ this._focus = {d, k}; const P = this.passes; if (!P.dof) return;
-    P.dof.uniforms.focus.value = d; P.dof.uniforms.aperture.value = 0.045 * k; P.dof.uniforms.near.value = this.camera.near; P.dof.uniforms.far.value = this.camera.far;
+    P.dof.uniforms.focus.value = d; P.dof.uniforms.aperture.value = 0.02 * k; P.dof.uniforms.near.value = this.camera.near; P.dof.uniforms.far.value = this.camera.far;
     P.dof.enabled = k > 0.01 && !!P.dof.uniforms.tDepth.value; }
   render(dt = 0.016){
     this.time += dt;

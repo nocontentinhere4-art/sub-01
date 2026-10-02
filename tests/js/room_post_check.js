@@ -97,6 +97,10 @@ async function main() {
   out.fallbacks.no_webgl2 = {active: noGl2.active, mode: noGl2.render(), failed: noGl2.info().failed.composer};
   const r2 = renderer(); r2.extensions.has = () => false; const noHalf = P.createPost(THREE, r2, scene, camera, {tier: "high", load: mods()}); await noHalf.ready;
   out.fallbacks.no_half_float = {rtType: noHalf.info().rtType, active: noHalf.active};
+  // bloom only when asked for (a faint lens veil), on the tiers with a composer
+  const wb = P.createPost(THREE, renderer(), scene, camera, {tier: "high", load: mods(), bloom: true}); await wb.ready;
+  out.fallbacks.bloom_opt = {high: wb.info().chain, medium: (wb.setTier("medium"), wb.info().chain), low: (wb.setTier("low"), wb.info().chain),
+    strength: wb.passes.bloom.strength, threshold: wb.passes.bloom.threshold};
   // the governor through the Post: slow frames drop the tier (resolution first), fast ones raise it, a failed tier waits
   const g = P.createPost(THREE, renderer(), scene, camera, {tier: "high", load: mods(), governor: {windowMs: 1000}}); await g.ready;
   const run = (ms, n, canDropDpr = false) => { const changes = []; for (let i = 0; i < n; i++) { const t = g.frame(ms, canDropDpr); if (t) changes.push([i, t]); } return changes; };
