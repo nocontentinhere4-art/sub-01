@@ -1,13 +1,15 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 04:45 UTC** (pass 17). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 04:50 UTC** (pass 17b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 17:** merged #38 (tastes learn faster: Kalman gain per topic + overnight replay; simulated top 5 found ~2.5×
 sooner at noise 0.1; 346 tests, tick 32.5 ms) and #39 (spiking network learns to choose: 1M neurons on GPU reached
 criterion in 84 trials, re-learned after reversal in 22, exam 1.00 vs 0.275 with learning removed and 0.26 random;
 CPU learning test re-run by the coordinator with torch: 20 passed). RunPod checked read-only: only "BRAIN" (EXITED,
-untouched). #31 waits for #29 (`live_server.py`) and the room follow-up PR (`web/room.html`).
+untouched). Then #40 free browsing (#29): site search only into verified search boxes, comments, pagination, muted
+video, reject-only consent banners; 472 tests incl. Chromium, tick 33.5 ms. #31 started (server side first; the room
+card waits for the room follow-up PR).
 
 **Pass 16 (owner: "finish everything on your own, what's missing with the neurons and the rest, verify and proceed"):**
 merged #37 (mind layer phase A, new files only), #27 (MyConnectome attribution), #32 (/tastes page), #28 (room movement: walks around furniture, sits, lies
@@ -27,14 +29,15 @@ Owner actions now:
 Who is on what (cloud sessions, 2026-10-02):
 | work | session | state |
 |---|---|---|
-| #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | in progress |
+| #29 free browsing | `session_01MuUA9dxNCVBWAw6ez7R9Ju` | merged as #40 (its 2 novelty hooks ride with #33 phase B) |
+| #31 teach him | `session_017R5d56EEZVdrsHDbvQuww9` | started 04:45 (server first; `web/room.html` after the room PR) |
 | #33 mind layer, phase A (`mind.py`) | `session_01KwLm3oYfsh8KhXjWTbrUPt` | merged as #37 (338 tests, smoke 33.1 ms); phase B waits its turn |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
 | room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | asked for a new branch from `main` |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py`, one at a time: **#29** → **#31** teach him (also needs the room follow-up PR merged) → **#33 phase B** → #19 → #18 → #17 → #15.
+Next on `live_server.py`, one at a time: **#31** teach him (in progress) → **#33 phase B** → #19 → #18 → #17 → #15.
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -69,9 +72,9 @@ cheap to run, with the password gate kept until launch day.
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
-| 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | in progress | issue #29 |
+| 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | done | #40 |
 | 18e | Daily memory test on the GPU switched on | key added 2026-10-02; needs `SUB01_POD_SECRET` too | #9 |
-| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | todo, after #29 + room follow-ups | issue #31 |
+| 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | in progress | issue #31 |
 | 18i | Faster learning of tastes (adaptive rate, overnight replay of surprising pages) | done | #38 |
 | 18j | Spiking brain learns to choose (dopamine reward vs frozen and random controls) | done; nightly run needs `SUB01_CHOICE=1` on Railway (~90 s inside the 1 h) | #39 |
 | 18k | Room movement (walk around furniture, sit, lie down) | done; follow-ups in a new PR | #28 |
@@ -168,7 +171,8 @@ findings "NOT verified", and its reviews are partial on large diffs.
   crash-loops the server at the next start. Fix: #21.
 - **Vote load:** on one core with a vote every 5 s, brain ticks are up to 157 ms late (p95 69 ms). Fine at one vote
   per page; #19 adds headroom.
-- **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18.
+- **Chromium runs as root with `--no-sandbox`** on the open web. Fix: #18. Since #40 it browses more freely (median
+  ~450 MB, max 622 MB for the Chromium tree): part of the reason for Railway's paid plan.
 - **Merge conflicts:** five branches touch `live_server.py`, and four touch `sleep.py`. The strict order above
   limits the re-merges.
 - ~~No CI~~: CI runs on every PR since #22.
