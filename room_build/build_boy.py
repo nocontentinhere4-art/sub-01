@@ -42,7 +42,7 @@ MACRO = {"gender": 1.0, "age": AGE, "muscle": 0.45, "weight": 0.36, "proportions
 # a few face shapes on top of the average (MakeHuman's own CC0 targets): larger eyes, a defined jaw and chin, the mouth's
 # corners up a little (a relaxed face at rest, not an expression). Slightly stylised; not modelled on anyone
 FACE = {"eyes/l-eye-scale-incr": 0.5, "eyes/r-eye-scale-incr": 0.5, "chin/chin-triangle": 0.3, "chin/chin-width-decr": 0.15,
-        "chin/chin-bones-incr": 0.35, "chin/chin-prominent-incr": 0.2, "mouth/mouth-angles-up": 0.45}
+        "chin/chin-bones-incr": 0.35, "chin/chin-prominent-incr": 0.2, "mouth/mouth-angles-up": 0.65}
 HEIGHT = 1.71                                       # metres, top of the head (the old one: 1.72)
 # the parts. color: tint (r, g, b) = texture x colour; grey (r, g, b) = the texture's luminance x colour (re-dyes a
 # garment); hsv (hue shift, saturation, value). Colours are linear. fabric: a Poly Haven CC0 cloth (room_build/tex/<id>,
@@ -52,10 +52,10 @@ HEIGHT = 1.71                                       # metres, top of the head (t
 # the trousers become joggers)
 PARTS = [
     dict(mhclo="eyes/low-poly/low-poly.mhclo", kind="eyes", mhmat="eyes/materials/brown.mhmat", color=("hsv", (0.035, 0.72, 0.62)), rough=0.04, texel=0.05),
-    dict(mhclo="eyebrows/eyebrow012/eyebrow012.mhclo", kind="eyebrows", color=("tint", (0.06, 0.05, 0.045)), rough=0.7, texel=0.14),
+    dict(mhclo="eyebrows/eyebrow008/eyebrow008.mhclo", kind="eyebrows", color=("tint", (0.04, 0.033, 0.03)), rough=0.7, texel=0.14),
     dict(mhclo="eyelashes/eyelashes01/eyelashes01.mhclo", kind="eyelashes", color=("tint", (0.25, 0.22, 0.2)), rough=0.7, texel=0.12),
     # messy, layered, voluminous on top (re-dyed near-black brown)
-    dict(mhclo="hair/culturalibre_hair_06/culturalibre_hair_06.mhclo", kind="hair", color=("grey", (0.035, 0.028, 0.024)), rough=0.78, decimate=0.3, texel=1.0),
+    dict(mhclo="hair/culturalibre_hair_06/culturalibre_hair_06.mhclo", kind="hair", color=("grey", (0.024, 0.019, 0.016)), rough=0.85, decimate=0.3, texel=1.0, roots=True),
     # a navy zip hoodie (hood down) over a dark T-shirt, heather-grey joggers, white socks, black slides
     dict(mhclo="clothes/elvs_hooded_sweat_jacket1/elvs_hooded_sweat_jacket1.mhclo", kind="clothes", role="top", color=("grey", (0.030, 0.040, 0.085)),
          fabric="jersey_melange", normal=0.45, decimate=0.22, texel=0.42),
@@ -66,7 +66,7 @@ PARTS = [
     dict(mhclo="clothes/elvs_male_flip_flop_sandals1/elvs_male_flip_flop_sandals1.mhclo", kind="clothes", role="feet", color=("grey", (0.03, 0.03, 0.032)),
          rough=0.45, decimate=0.04, texel=0.05),
 ]
-SKIN = dict(mhmat="skins/young_asian_male/young_asian_male.mhmat", kind="skin", color=("tint", (0.93, 0.76, 0.64)), rough=0.62, pores=True, texel=2.6)
+SKIN = dict(mhmat="skins/young_asian_male/young_asian_male.mhmat", kind="skin", color=("tint", (0.95, 0.74, 0.60)), rough=0.62, pores=True, texel=2.6)
 FABRIC_TILE = {"jersey_melange": 0.29, "jogging_melange": 0.27, "cotton_jersey": 0.26}    # metres per tile (Poly Haven)
 TEX = os.path.join(HERE, "tex")
 ALPHA_KINDS = {"hair", "eyebrows", "eyelashes"}
@@ -604,6 +604,24 @@ def decimate_body(base, rig, ratio=0.8):
     base.vertex_groups.remove(base.vertex_groups["decimate"])
 
 
+def hair_roots(base, hair, near=0.012, far=0.06):
+    """Hair darker at the roots: each vertex's distance to the head, 0 at the scalp .. 1 from `far` out, kept as a vertex
+    attribute that the hair's material reads (and the bake keeps)."""
+    dg = bpy.context.evaluated_depsgraph_get(); bm = bmesh.new(); bm.from_object(base, dg); bm.transform(base.matrix_world)
+    tree = BVHTree.FromBMesh(bm); bm.free()
+    a = hair.data.attributes.new("roots", "FLOAT", "POINT")
+    for v in hair.data.vertices:
+        hit = tree.find_nearest(hair.matrix_world @ v.co)
+        d = hit[3] if hit[0] is not None else far
+        a.data[v.index].value = min(1.0, max(0.0, (d - near) / (far - near)))
+    m = hair.data.materials[0]; nt = m.node_tree; N, L = nt.nodes, nt.links; rr = N["basecolor"]; src = rr.inputs[0].links[0].from_socket
+    at = N.new("ShaderNodeAttribute"); at.attribute_name = "roots"
+    mr = N.new("ShaderNodeMapRange"); mr.inputs["To Min"].default_value = 0.45; L.new(at.outputs["Fac"], mr.inputs["Value"])
+    mx = N.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = "MULTIPLY"; mx.inputs[0].default_value = 1.0
+    L.new(src, mx.inputs[6]); cc = N.new("ShaderNodeCombineColor"); [L.new(mr.outputs["Result"], cc.inputs[i]) for i in range(3)]
+    L.new(cc.outputs["Color"], mx.inputs[7]); L.new(mx.outputs[2], rr.inputs[0])
+
+
 def darken_scalp(base, color=(0.11, 0.085, 0.075), amount=0.85):
     """The skin under the hair gets the hair's colour, so the gaps of the alpha-tested hair do not show a pale scalp."""
     g = base.vertex_groups.get("scalp")
@@ -778,6 +796,8 @@ if __name__ == "__main__":
     delete_enclosed(base, [p for p in parts if p["kind"] == "eyes"])
     decimate(parts)
     darken_scalp(base); tshirt_under(base, rig)
+    for p in parts:
+        if part(p).get("roots"): hair_roots(base, p)
     decimate_body(base, rig)
     for o in [base] + parts:
         for m in o.data.materials: m["alpha"] = o["kind"] in ALPHA_KINDS; m["kind"] = o["kind"]

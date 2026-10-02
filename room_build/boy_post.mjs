@@ -177,6 +177,9 @@ const matBody = doc.createMaterial("boy2_body").setBaseColorTexture(texMain).set
   .setOcclusionTexture(texOrm).setMetallicRoughnessTexture(texOrm).setRoughnessFactor(1).setMetallicFactor(1);
 const matHair = doc.createMaterial("boy2_hair").setBaseColorTexture(texHair).setRoughnessFactor(0.85).setMetallicFactor(0)
   .setAlphaMode("MASK").setAlphaCutoff(0.3).setDoubleSided(true);
+// hair: a weak specular, so direct sun does not turn its top grey
+const specExt = doc.createExtension(ALL_EXTENSIONS.find(e => e.EXTENSION_NAME === "KHR_materials_specular"));
+matHair.setExtension("KHR_materials_specular", specExt.createSpecular().setSpecularFactor(0.25));
 primBody.setMaterial(matBody); primHair.setMaterial(matHair);
 for (const m of root.listMaterials()) if (m !== matBody && m !== matHair) m.dispose();
 

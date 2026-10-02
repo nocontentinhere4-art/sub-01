@@ -68,7 +68,7 @@ on any real person. The parts come from the MakeHuman community asset packs
 | body (base mesh, macro targets), game-engine rig with fingers, weights | MakeHuman base mesh, `game_engine` rig | MPFB 2 / makehuman_system_assets | MakeHuman team (Data Collection AB) | CC0 |
 | skin | `young_asian_male` (re-tinted) | makehuman_system_assets | MakeHuman team | CC0 |
 | eyes | `low-poly` eyes, `brown` material (hue shifted to dark brown) | makehuman_system_assets | MakeHuman team | CC0 |
-| eyebrows, eyelashes | `eyebrow012` (darkened), `eyelashes01` | makehuman_system_assets | MakeHuman team | CC0 |
+| eyebrows, eyelashes | `eyebrow008` (darkened), `eyelashes01` | makehuman_system_assets | MakeHuman team | CC0 |
 | face shape | MakeHuman targets: eye scale, chin and jaw, mouth corners (mild; not modelled on anyone) | MPFB 2 | MakeHuman team | CC0 |
 | hair | `culturalibre_hair_06` (re-dyed near-black brown, decimated; original by swift502, CC0, blendswap.com/blend/24099) | hair01 | culturalibre | CC0 |
 | hoodie | `elvs_hooded_sweat_jacket1` "Hooded sweat jacket" (re-dyed navy, fitted to a male chest, decimated; makehumancommunity.org/node/1450) | shirts02 | **Elvaerwyn** | **CC-BY** |
