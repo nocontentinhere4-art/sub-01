@@ -1,0 +1,5 @@
+{
+  "_note": "hard limits of the visual QA suite (tests/visual/harness.py); everything else is reported, not failed",
+  "bed_vertices": 0,
+  "chair_vertices": 0
+}
