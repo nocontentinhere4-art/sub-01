@@ -320,7 +320,7 @@ def test_brain_page_wording_and_toggle():
                      r'<button data-l="regions">regions</button>.*<button data-l="neurons"[^>]*>neurons</button>', html)
     assert '<script src="/neurons3d.js"></script>' in html
     js = (ROOT / "web" / "neurons3d.js").read_text()
-    assert "maxCells || 3000" in js and "InstancedBufferGeometry" in js   # the forest (#88): instanced cells, capped
+    assert "maxCells || 600" in js and "InstancedBufferGeometry" in js   # the forest (#88): instanced cells, capped
     for page in ("index.html", "neurons3d.js", "neurons.js"):
         text = (ROOT / "web" / page).read_text().lower()
         for word in ("conscious", "understands", "he feels", "alive"):
