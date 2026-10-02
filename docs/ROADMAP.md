@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 03:15 UTC** (pass 14). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 03:10 UTC** (pass 15). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Merged on 2026-10-02:** #26 English-only output (owner-approved), #24 atomic state-file writes (owner-approved; CI green), #25 about-page credits/cost fix, #22 CI (tests + demo smoke on every PR) and #23 `/about.html` (numbers checked against repo docs; not linked from the pages yet). #8 room (new clean room, lag fix, light feed with the `?rate=` clamp), merged early at the owner's request; 251 tests and smoke OK on `main`. #20 brain decides what he clicks, after its author added the $1.00/Tokyo-day cap, the Haiku 4.5 default, per-model request fields and fixes (a)–(c). The coordinator verified it: 274 tests (241 + 10 skipped without torch), smoke 200 on every route, and the cap stopping calls against a fake OpenRouter.
@@ -67,6 +67,8 @@ cheap to run, with the password gate kept until launch day.
 | 16 | YouTube (muted) + chess, chosen by the brain vote | todo, after brain-decides | issue #17 |
 | 17 | Chromium as non-root (sandbox on) | todo, after brain-decides | issue #18 |
 | 18 | Brain loop 3× cheaper | todo, after #20 | issue #19 |
+| 18c | Free browsing (on-site search, forums, news, video, comments; guard kept for public screens) | in progress | issue #29 |
+| 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
 | 18b | Atomic state-file writes (a torn JSON file crash-loops the server) | done | #24 |
 | 19 | Launch | todo | owner |
 
@@ -107,6 +109,19 @@ findings "NOT verified", and its reviews are partial on large diffs.
   coordinator did the merge-only work: conflicts, the torch skip, the sleep wording, the rollback note, and the
   `expected_replays()` fix. #20 and #8 were held: #20 has no spending cap yet, and #8 has an unreviewed room rebuild
   and the `?rate=` bug.
+- **2026-10-02: much more freedom on the internet** (the owner wants "no limits"). The coordinator builds everything
+  that makes him freer:
+  - free browsing (#29): on-site search, forums, news, video, comments, long chains;
+  - his own email, on an account the owner creates by hand: read first, then limited, filtered replies signed as an
+    AI character;
+  - logins only with owner-created accounts on sites that allow bots.
+
+  Not built, because they are harmful in themselves:
+  - automatic account creation or CAPTCHA solving (against every provider's terms; the accounts get banned and the
+    owner is liable);
+  - any money: purchases, wallets, crypto;
+  - adult or gore content on the public screens;
+  - the character mentioning or promoting the coin, or pretending to be human.
 - **2026-10-02: the site is English-only** (owner). Viewers may write in any language and Italian words still reach the brain as stimuli, but nothing shown or generated is in another language.
 - **2026-10-02: CI-only and docs-only merges do not count for the 60-minute spacing:** they don't change what runs on Railway.
 - **2026-10-02: the room's default is the new clean room** (`room_clean.glb`, #8), and `?room=old` stays for one week.
