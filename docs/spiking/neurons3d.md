@@ -18,8 +18,8 @@
 - With no live network the button reads **neurons offline** and the caption says "neurons offline — the 1M network runs
   while he is awake when the GPU is on". Nothing flashes: there is no demo or recorded stream on the server.
 - `/brain?mini&neurons=1` (the room's picture-in-picture iframe, 300 × 225): the same layer, 8 000 points, a one-line
-  caption at the top. The room's PiP (`web/room.html`) loads `/brain?mini&neurons=1` (#78 follow-up), points only, no
-  close-ups. A room that draws its own brain can instead call
+  caption at the top. **Room follow-up (after #63):** change the iframe's `src` in `web/room.html` from `/brain?mini` to
+  `/brain?mini&neurons=1`; nothing else is needed. A room that draws its own brain can instead call
   `Neurons3D.create({THREE, scene, nodes, cortex, sizes})` (`web/neurons3d.js`, works with r128 and r169).
 - `/life` (`web/life.html`) and `/brain`: the Neurons panel (`web/neurons.js`) reads the compact frames; its raster now
   has one row a region (214) and shows the sampled spikes. It also lists the real decisions per Tokyo day from
