@@ -26,6 +26,7 @@ from brain_sim import GROUPS
 from browse import BAD_HOST, BAD_WORDS, LOGIN_HREF, LOGIN_LINK, display_ok, url_ok, words
 from chat import blocked as chat_blocked, networks_for
 from research import BLOCK as TOPIC_BLOCK
+from state_io import append_jsonl
 
 ACTIONS = ("click", "search", "back", "open_video", "scroll", "leave")
 NETWORKS = tuple(GROUPS) + ("language",)
@@ -127,8 +128,7 @@ class Budget:
         self._sync_day(row["t"])
         self.day_usd += row["usd"]
         if self.path:
-            with open(self.path, "a") as f:
-                f.write(json.dumps(row) + "\n")
+            append_jsonl(self.path, row)              # a torn last line is closed first, so no cost row is lost
         return row
 
     def rows(self):

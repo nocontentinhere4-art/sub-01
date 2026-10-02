@@ -18,6 +18,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from state_io import append_jsonl, load_json, save_json
+
 WORLD_HALF_LIFE_H = 6.0            # simulated hours for an object's strength to halve
 FORGET_BELOW = 0.15
 MAX_OBJECTS = 40
@@ -167,7 +169,7 @@ class Eye:
         self.out = Path(out_dir)
         self.out.mkdir(parents=True, exist_ok=True)
         self.world_path = Path(world_path)
-        self.world = World(json.loads(self.world_path.read_text()) if self.world_path.exists() else None)
+        self.world = World(load_json(self.world_path))
         self.size, self.steps, self.quantize = (width, height), steps, quantize
         self.heard = []                                  # recent accepted messages (text, t)
         self.absorbed = set()                            # messages already turned into world objects
@@ -262,9 +264,8 @@ class Eye:
         jpgs = sorted(self.out.glob("*.jpg"))
         for old in jpgs[:-KEEP_FRAMES]:                    # bounded disk use on a server volume
             old.unlink(missing_ok=True)
-        with self.log.open("a") as f:
-            f.write(json.dumps(rec) + "\n")
-        self.world_path.write_text(json.dumps(self.world.to_dict()))
+        append_jsonl(self.log, rec)
+        save_json(self.world_path, self.world.to_dict())
         return rec
 
 

@@ -28,7 +28,6 @@ live_server.py applies `engine.params` (Stuart-Landau stage parameters, gliding)
 `engine.modulators` gives tonic neuromodulator levels. No language model and no generated text: replay
 re-applies stored stimulus patterns, nothing more.
 """
-import json
 import math
 import os
 import random
@@ -36,6 +35,8 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from state_io import load_json, save_json
 
 TZ_NAME = os.environ.get("SUB01_TZ", "Asia/Tokyo")        # where SUB-01 lives
 TZ = ZoneInfo(TZ_NAME)
@@ -680,10 +681,9 @@ class Store:
         (self.root / "nights").mkdir(parents=True, exist_ok=True)
 
     def load(self):
-        f = self.root / "state.json"
-        if not f.exists():
+        d = load_json(self.root / "state.json")       # missing or torn (kept aside): start fresh, never crash
+        if not d or "engine" not in d or "memory" not in d:
             return None, None
-        d = json.loads(f.read_text())
         return d["engine"], d["memory"]
 
     def save(self, engine, memory):
@@ -694,6 +694,4 @@ class Store:
 
     @staticmethod
     def _write(path, obj):
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(obj, indent=1, ensure_ascii=False))
-        tmp.replace(path)
+        save_json(path, obj, indent=1, ensure_ascii=False)
