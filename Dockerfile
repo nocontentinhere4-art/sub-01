@@ -18,7 +18,7 @@ RUN chmod 755 /usr/local/bin/sub01-entrypoint \
  && mkdir -p /data/frames && chown -R 1000:1000 /data
 COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py \
      runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py costs.py chess_game.py \
-     search_sources.py sessions.py view_only.py interests.py short_videos.py ./
+     search_sources.py sessions.py view_only.py interests.py short_videos.py music.py music_curated.json ./
 COPY twin ./twin
 COPY spiking ./spiking
 COPY web ./web
