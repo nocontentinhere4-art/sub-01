@@ -1,8 +1,13 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 05:40 UTC** (pass 18). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 06:00 UTC** (pass 18b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
+**Pass 18b:** merged #42 room follow-ups (chair node pulled out and ridden in, bed sit/lie with 0 bed penetration,
+one-line disclaimer with the owner's text). Found in its screenshots: OSM blocks the map tiles ("Access blocked – tile
+usage policy") → new task #43 (static vector map, no tile server). #31 room card started (also rewords "it does not
+understand the text").
+
 **Pass 18:** merged #41 teach him (server side + /brain card; 522 tests with torch and Chromium, 0 skipped; tick
 32.6 ms). The room teach card follows in a small PR after the room follow-up PR (still in progress). #33 phase B
 (mind wired into the live server, shared $2/day ledger) started on `feature/mind-live`.
@@ -38,10 +43,10 @@ Who is on what (cloud sessions, 2026-10-02):
 | #33 mind layer | `session_01KwLm3oYfsh8KhXjWTbrUPt` | phase A merged as #37; phase B started 05:35 (`feature/mind-live`) |
 | #35 spiking brain learns to choose | `session_01M78bGx6tpR1jKqBUG5wCPQ` | merged as #39 |
 | #36 tastes learn faster | `session_013dKUqHWjLfTXWhGQLBVqcc` | merged as #38 |
-| room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | asked for a new branch from `main` |
+| room follow-ups (bed clip, chair, one-line disclaimer) | `session_01Xrq53UQH9EHy4bgPj9B2yL` | merged as #42 |
 | `fix/eyes-docstring` | `session_01881q1gcHZBtokE8qi8QjxC` | asked to open the PR |
 
-Next on `live_server.py`, one at a time: **#33 phase B** (in progress) → #19 → #18 → #17 → #15. `web/room.html`: room follow-ups → #31 room card → any #33 room change.
+Next on `live_server.py`, one at a time: **#33 phase B** (in progress) → #19 → #18 → #17 → #15. `web/room.html`: #31 room card (in progress) → #43 map → any #33 room change.
 
 ## Final goal
 A public site where a brain model built from one real person's open MRI data lives as a fictional young man in a
@@ -81,7 +86,8 @@ cheap to run, with the password gate kept until launch day.
 | 18f | "Teach him something" (viewer word → studied, dreamt, tested next day) | done on /brain (#41); room card next | issue #31 |
 | 18i | Faster learning of tastes (adaptive rate, overnight replay of surprising pages) | done | #38 |
 | 18j | Spiking brain learns to choose (dopamine reward vs frozen and random controls) | done; nightly run needs `SUB01_CHOICE=1` on Railway (~90 s inside the 1 h) | #39 |
-| 18k | Room movement (walk around furniture, sit, lie down) | done; follow-ups in a new PR | #28 |
+| 18k | Room movement (walk around furniture, sit, lie down) | done (+ chair and bed follow-ups) | #28, #42 |
+| 18l | Map cards without tile.openstreetmap.org (OSM blocks them) | todo, after the #31 room card | issue #43 |
 | 18g | /tastes page (what he leans towards, over days) | done | #32 |
 | 18h | Mind layer: reads and remembers meaning, plans his day (brain votes), answers chat from his computer; $2/day shared AI cap | phase A done (#37); phase B in progress | issue #33 |
 | 18d | His own email (owner-created account: read first, then limited replies) | waiting on the owner (account) | — |
@@ -164,6 +170,8 @@ findings "NOT verified", and its reviews are partial on large diffs.
   against frozen and random controls whatever the result. No claim of IQ, understanding or consciousness.
 
 ## Known risks
+- **Map tiles:** `room.html` and `life.html` load `tile.openstreetmap.org` directly; OSM already shows "Access blocked".
+  Must be fixed before launch: #43.
 - **CPU:** the brain loop alone uses ~63 % of one core (~31 ms per 50 ms tick, `main`, `--demo`, no Chromium).
   Chromium shares the CPU, so ticks can run late. Fix: #19.
 - **Bandwidth at launch:** after #34, 7.3 KB/s per brain-page viewer and 4.0 KB/s per room viewer. 300 steady viewers ≈
