@@ -922,9 +922,15 @@ function chatTex(){                  // redraw on new lines; ~12x a second while
 // ---------- the mind layer: today's plan, resting, the caption (/api/mind and `plan` messages) ----------
 let mindPlan = null, mindResting = false;
 function renderPlan(){
-  const p = mindPlan, steps = p && p.steps || [];
+  const p = mindPlan, steps = [];
+  for (const s of p && p.steps || []) {          // one entry per step label; done once every repeat of it is done
+    const o = steps.find(x => x.label === s.label);
+    if (o) o.done = o.done && s.done; else steps.push({label:s.label, done:!!s.done});
+  }
+  // a plan kept from yesterday while the AI rests was not voted today: say so
+  const head = p && p.source === "yesterday" ? "Today's plan (yesterday's, kept while the AI rests):" : "Today's plan (voted by his brain model):";
   put("plan", "hidden", !steps.length && !mindResting);
-  put("p-text", "innerHTML", steps.length ? `<span class="h">Today's plan (voted by his brain model):</span> `
+  put("p-text", "innerHTML", steps.length ? `<span class="h">${head}</span> `
     + steps.map(s => s.done ? `<s>${esc(s.label)}</s>` : esc(s.label)).join(", ") : "");
   put("p-reason", "textContent", steps.length && p.reason ? p.reason : "");
   put("p-reason", "hidden", !(steps.length && p.reason));
