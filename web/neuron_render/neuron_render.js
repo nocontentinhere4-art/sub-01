@@ -550,9 +550,9 @@
         ".nr-hud{position:absolute;top:8px;right:8px;display:flex;gap:6px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;z-index:4}" +
         ".nr-hud button{background:rgba(0,0,0,.55);color:#ddd;border:1px solid #555;border-radius:4px;padding:3px 8px;cursor:pointer}" +
         ".nr-hud button.on{color:#ffb070;border-color:#ffb070}.nr-hud .nr-x{margin-left:4px}" +
-        ".nr-stat{position:absolute;left:8px;bottom:6px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9a9a;z-index:4;pointer-events:none;text-shadow:0 0 4px #000}" +
-        ".nr-bar{position:absolute;left:8px;bottom:24px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#ddd;z-index:4;pointer-events:none;text-shadow:0 0 4px #000}" +
-        ".nr-bar i{display:block;height:3px;background:#eee;margin:0 0 3px 0;box-shadow:0 0 3px #000}";
+        ".nr-stat{position:absolute;left:50%;transform:translateX(-50%);bottom:6px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9a9a;z-index:4;pointer-events:none;text-shadow:0 0 4px #000;white-space:nowrap}" +
+        ".nr-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:24px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#ddd;z-index:4;pointer-events:none;text-shadow:0 0 4px #000;text-align:center}" +
+        ".nr-bar i{display:block;height:3px;background:#eee;margin:0 auto 3px auto;box-shadow:0 0 3px #000}";
       root.document.head.appendChild(st);
     }
     const canvas = root.document.createElement("canvas"); canvas.className = "nr-canvas";
