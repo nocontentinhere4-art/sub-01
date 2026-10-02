@@ -84,6 +84,15 @@ ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "play_chess": ("desk", "sitting_desk", (30, 60)),     # ends earlier when the game ends (live_server)
     "listen_music": ("bed", "lying_headphones", (8, 25)),  # tracks his brain model picks, shown as Spotify embeds (#68)
 }
+# what he eats (#63): a delivery is one dish, picked when he orders (a viewer's wish heard in the last sim hour, else at
+# random); the konbini sells onigiri and bentos. The room shows the dish; the labels name it
+DISHES = ("ramen", "sushi", "pizza", "curry", "bento")
+KONBINI = ("onigiri", "konbini_bento")
+DISH_RE = re.compile(r"\b(ramen|sushi|pizza|curry|bento)\b")
+EAT_LABEL = {"bread": "eating bread at the table", "ramen": "eating ramen from the delivery",
+             "sushi": "eating sushi from the delivery", "pizza": "eating pizza from the delivery",
+             "curry": "eating curry from the delivery", "bento": "eating a bento from the delivery",
+             "onigiri": "eating an onigiri from the konbini", "konbini_bento": "eating a bento from the konbini"}
 CHESS_EVERY = 3600          # at most one chess game per simulated hour (#17)
 PLAN_BONUS = 0.35           # the day plan (mind.py) tilts the choice toward its next step; needs still come first
 COOK_MIN = (8, 15)          # simulated minutes before the courier leaves the shop
@@ -166,7 +175,11 @@ class Life:
         self.time_scale = 1.0
         self.geo = None                        # real position in Tokyo while outside
         self.food = s.get("food", 0)           # delivered meals waiting to be eaten
-        self.delivery = s.get("delivery")      # {"ordered", "leaves", "arrives"} sim times, while one is on its way
+        self.delivery = s.get("delivery")      # {"ordered", "leaves", "arrives", "dish"} sim times, while one is on its way
+        self.food_items = s.get("food_items", [])   # what the waiting meals are (oldest first), e.g. ["ramen"] (#63)
+        self.eating = s.get("eating")          # what he eats in the current "eat" (#63)
+        self.order_dish = s.get("order_dish")  # the dish he is ordering on the phone
+        self.wish = s.get("wish")              # [dish, sim time] a viewer asked for
         self._t = 0.0
         self.plan_hint = None                  # life activity of the day plan's next step (live_server, mind.py)
         self.chat_waiting = 0                  # chat messages he may answer at the computer (live_server)
@@ -190,6 +203,9 @@ class Life:
     # --- inputs ---------------------------------------------------------------------------------
     def hear(self, text, t):
         low = text.lower()
+        m = DISH_RE.search(low)
+        if m:
+            self.wish = [m.group(1), t]
         for pat, act in DESIRES:
             if re.search(pat, low):
                 w = self.desires.get(act, [0, t])[0]
@@ -280,6 +296,11 @@ class Life:
             self.path = route(self.place, place)[1:]
         if act == "phone":
             self.phone_app = self.rng.choice(["chart", "chat", "tiktok", "chart"])
+        if act == "order_food":                          # its own random stream: the needs logic's draws stay as they were
+            w = self.wish
+            self.order_dish = w[0] if w and t - w[1] < 3600 else random.Random(int(t)).choice(DISHES)
+        if act == "eat":
+            self.eating = self.food_items[0] if self.food and self.food_items else "bento" if self.food else "bread"
         self.desires.pop(act, None)
         if act in FOOD_ACTS:
             self.desires.pop("buy_bread", None)         # "go eat" is answered by any way to food
@@ -289,17 +310,17 @@ class Life:
 
     # --- per tick -----------------------------------------------------------------------------------
     def courier(self, t):
-        """Where the delivery is: {"status", "eta_min", "geo"} or None."""
+        """Where the delivery is: {"status", "eta_min", "geo", "dish"} or None."""
         d = self.delivery
         if not d:
             return None
         if t < d["leaves"]:
-            return {"status": "being prepared", "eta_min": round((d["arrives"] - t) / 60), "geo": None}
+            return {"status": "being prepared", "eta_min": round((d["arrives"] - t) / 60), "geo": None, "dish": d.get("dish")}
         route = TOKYO["routes"]["shop-home"]
         f = min(1.0, (t - d["leaves"]) / max(1.0, d["arrives"] - d["leaves"]))
         lat, lng, hd = along(route["latlng"], f)
         return {"status": "at the door" if f >= 1 else "on the way", "eta_min": max(0, round((d["arrives"] - t) / 60)),
-                "geo": {"lat": round(lat, 6), "lng": round(lng, 6), "heading": round(hd)}}
+                "geo": {"lat": round(lat, 6), "lng": round(lng, 6), "heading": round(hd)}, "dish": d.get("dish")}
 
     def update(self, t, dt_real, dt_sim, stage, rel, market_hot, pressure, levels=None, amygdala=0.0):
         self._t = t
@@ -344,8 +365,11 @@ class Life:
                 self.bread += 2
             if self.activity == "buy_konbini" and self.place == "counter":
                 self.food += 1                            # one meal (a bento), eaten like a delivered one
+                self.food_items.append(random.Random(int(t)).choice(KONBINI))
             if self.activity == "eat" and self.food:
                 self.food -= 1
+                if self.food_items:
+                    self.food_items.pop(0)
                 self.body.eat(CARBS_PER_MEAL_G)
             elif self.activity == "eat" and self.bread:
                 self.bread -= 1
@@ -353,8 +377,9 @@ class Life:
             if self.activity == "order_food" and not self.delivery:
                 leaves = t + 60 * self.rng.uniform(*COOK_MIN)
                 ride = TOKYO["routes"]["shop-home"]["meters"] / COURIER_SPEED
-                self.delivery = {"ordered": t, "leaves": leaves, "arrives": leaves + ride}
+                self.delivery = {"ordered": t, "leaves": leaves, "arrives": leaves + ride, "dish": self.order_dish or "bento"}
             if self.activity == "get_delivery" and self.delivery and t >= self.delivery["arrives"]:
+                self.food_items.append(self.delivery.get("dish", "bento"))
                 self.delivery = None
                 self.food += 1
             nxt = self.choose(t, stage, rel, market_hot, pressure)
@@ -375,7 +400,7 @@ class Life:
             if nxt == self.plan_hint and nxt != "sleep":
                 why += "; it is in today's plan"
             if nxt == "eat" and self.food:
-                why = "hungry: eats the meal at the table"
+                why = f"hungry: eats the {(self.food_items[0] if self.food_items else 'meal').replace('konbini_', '')} at the table"
             if woke:
                 why = "wakes up"
             self.start(nxt, t, why)
@@ -420,15 +445,25 @@ class Life:
 
     def snapshot(self):
         return {"x": round(self.x, 2), "z": round(self.z, 2), "heading": round(self.heading, 2),
-                "walking": bool(self.path), "activity": self.activity, "doing": LABEL[self.activity],
+                "walking": bool(self.path), "activity": self.activity, "doing": self.label(),
                 "pose": "walking" if self.path else ACTIVITIES[self.activity][1], "place": self.place,
                 "hunger": round(self.hunger, 2), "vitals": self.body.vitals(), "boredom": round(self.boredom, 2), "bread": self.bread,
                 "phone": self.phone_app if self.activity == "phone" and not self.path else None,
-                "geo": self.geo, "say": self.say, "music": self.music, "food": self.food, "courier": self.courier(self._t), "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
+                "geo": self.geo, "say": self.say, "music": self.music, "food": self.food, "food_items": list(self.food_items),
+                "eating": self.eating if self.activity == "eat" else None,
+                "order": self.order_dish if self.activity == "order_food" else None, "courier": self.courier(self._t), "log": [{"t": e["t"], "what": e["what"]} for e in self.log[-8:]]}
+
+    def label(self):
+        if self.activity == "eat" and self.eating in EAT_LABEL:
+            return EAT_LABEL[self.eating]
+        if self.activity == "order_food" and self.order_dish:
+            return f"ordering {self.order_dish} on the phone"
+        return LABEL[self.activity]
 
     def to_dict(self):
         return {"place": self.place, "activity": self.activity, "until": self.until, "hunger": self.hunger,
-                "food": self.food, "delivery": self.delivery,
+                "food": self.food, "delivery": self.delivery, "food_items": self.food_items, "eating": self.eating,
+                "order_dish": self.order_dish, "wish": self.wish,
                 "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log,
                 "last_chess": self.last_chess,
                 **({"body": self.body.to_dict()} if self.own_body else {})}

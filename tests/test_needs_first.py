@@ -111,7 +111,8 @@ def test_night_konbini():
             break
     assert seen_geo                                # he is out: the room shows the map, like buy_bread
     assert lf.activity == "eat" and lf.food == 1   # the konbini meal is waiting on the table
-    assert lf.snapshot()["doing"] == L.LABEL["eat"]
+    # #63: the label names what he eats (it used to say "eating bread at the table" for the konbini meal too)
+    assert lf.eating in L.KONBINI and lf.snapshot()["doing"] == L.EAT_LABEL[lf.eating]
 
 
 def test_konbini_only_when_bakery_closed():
@@ -133,3 +134,30 @@ def test_go_eat_chat_still_works():
     assert lf.scores(at(23, 50), {}, 0.0, 0.0)["buy_konbini"] >= 0.5
     lf.start("buy_konbini", at(23, 50), "test")
     assert "buy_bread" not in lf.desires           # the wish is answered by the konbini trip
+
+
+def test_dish_follows_the_order():
+    """#63: a viewer's wish picks the dish; it rides with the courier, waits as a food item and names the meal."""
+    lf = L.Life(rng=random.Random(3))
+    lf.time_scale = 1.0
+    t = at(19)
+    lf.hear("could you order some sushi?", t)
+    lf.start("order_food", t, "hungry: orders food on the phone")
+    assert lf.order_dish == "sushi" and lf.snapshot()["order"] == "sushi"
+    assert lf.snapshot()["doing"] == "ordering sushi on the phone"
+    lf.path, lf.until = [], t                                # (already on the bed) the order is done: the courier sets off
+    lf.update(t + 1, 1, 1, "AWAKE", {}, 0.0, 0.0)
+    assert lf.delivery and lf.delivery["dish"] == "sushi" and lf.courier(t + 1)["dish"] == "sushi"
+    t2 = lf.delivery["arrives"] + 1
+    lf.start("get_delivery", t2, "the courier rings: goes to the door")
+    lf.path, lf.until = [], t2
+    lf.update(t2 + 1, 1, 1, "AWAKE", {}, 0.0, 0.0)
+    assert lf.food == 1 and lf.food_items == ["sushi"]
+    lf.start("eat", t2 + 2, "hungry: eats the sushi at the table")
+    assert lf.eating == "sushi" and lf.snapshot()["doing"] == "eating sushi from the delivery"
+
+
+def test_dish_without_a_wish():
+    lf = L.Life(rng=random.Random(4))
+    lf.start("order_food", at(20), "hungry")
+    assert lf.order_dish in L.DISHES

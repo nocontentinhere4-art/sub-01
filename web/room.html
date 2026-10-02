@@ -350,6 +350,7 @@ const ANCHOR = {
   sill:    {p:[-1.56, F, -0.02], r:-Math.PI / 2},
   doorway: {p:[1.76, F, -0.98], r:-3.05},
   deskside:{p:[-0.30, F, -0.40], r:Math.PI},
+  bin:     {p:[-0.24, F, -0.98], r:-2.23},           // between the desk's end and the bookshelf, facing the bin under the desk
 };
 // surfaces that get live content: centre, size (w x h), rotation about y (facing direction); `off`: how far in front of
 // the given centre the screen plane goes. These are the old model's (measured by ray casting); the clean room carries
@@ -903,7 +904,7 @@ function chartTex(){                 // redraw when trades arrive, else twice a 
   return cvTex;
 }
 function foodTex(c){                 // redraw only when the order changes
-  const k = c ? `${c.status}|${c.eta_min}` : "";
+  const k = c ? `${c.status}|${c.eta_min}|${c.dish}` : `|${lastLife && lastLife.order}`;
   if (!pvTex || k !== foodKey) { foodKey = k; drawFood(c); }
   return pvTex;
 }
@@ -935,7 +936,8 @@ function drawFood(c){
   // a delivery app's tracking screen: header, big ETA, a map-like panel with the courier's route, order steps
   px.fillStyle = "#f6f4ef"; px.fillRect(0, 0, 390, 844);
   px.fillStyle = "#06c167"; px.fillRect(0, 0, 390, 112);
-  px.fillStyle = "#fff"; px.font = "bold 20px sans-serif"; px.fillText("Your order", 24, 72); px.font = "13px sans-serif"; px.fillText("Kichijōji · simulated delivery", 24, 96);
+  const dish = (c && c.dish) || (lastLife && lastLife.order) || "";
+  px.fillStyle = "#fff"; px.font = "bold 20px sans-serif"; px.fillText(dish ? `Your order: 1 × ${dish}` : "Your order", 24, 72); px.font = "13px sans-serif"; px.fillText("Kichijōji · simulated delivery", 24, 96);
   px.fillStyle = "#111"; px.font = "bold 58px sans-serif";
   px.fillText(c && c.eta_min ? `${c.eta_min} min` : "…", 24, 192);
   px.font = "15px sans-serif"; px.fillStyle = "#555"; px.fillText(c ? c.status : "choosing what to eat…", 24, 222);
@@ -1168,7 +1170,7 @@ let visible = true, lastLife = null;
 // seat or the bed only comes in inside those steps. A new goal mid-walk re-plans from where he is.
 let at = null, goal = null, plan = [], step = null, holdW = 0, placed = false;
 const WALK_V = 0.9, STRIDE_V = 0.65;                  // m/s; the walk clip's feet move back at 0.65 m/s: it plays faster to match
-const WALK_A = 1.4, TURN_V = 2.2, STEP_TS = 0.6;      // m/s² up and down; turning on the spot (rad/s) he steps round, the walk clip at 0.6x
+const WALK_A = 1.4, TURN_V = 2.2, STEP_TS = 0.6, DINE_DX = -0.12;   // DINE_DX: the chair rolls left to the dish      // m/s² up and down; turning on the spot (rad/s) he steps round, the walk clip at 0.6x
 // where each clip has the hips, from the root (facing +z; measured): a move between two poses is planned for the hips
 const HIPS = {sit:[0.235, 0.655, -0.364], eat:[-0.014, 0.48, 0.018], idle:[-0.016, 0.994, 0.026], walk:[0.003, 0.977, 0.012], sleep:[-0.006, 1.123, 0.065]};
 HIPS.edge = HIPS.phone_sit = HIPS.sit; HIPS.phone_lie = HIPS.sleep; HIPS.phone_stand = HIPS.idle; HIPS.dine = HIPS.sit; HIPS.listen = HIPS.sleep; HIPS.stand = HIPS.lean = HIPS.deliver = [0.021, 0.919, -0.045];
@@ -1180,7 +1182,7 @@ const _w = new THREE.Vector3();
 // its -z): standing behind its right side he pulls it 0.4 m back from the desk and swivels the seat a quarter turn to face
 // him, sits down from the front, then rides it back in, turning to the desk (and the reverse to get up). Without the
 // node he sits down from the chair's side, as before.
-const CHAIR = {node:undefined, home:new THREE.Vector3(), ry:0, out:0.40, turn:-Math.PI / 2, k:0, seat:0.375};   // seat: k where he sits (#63)
+const CHAIR = {node:undefined, home:new THREE.Vector3(), ry:0, out:0.40, turn:-Math.PI / 2, k:0, seat:0.375, dx:0};   // seat: k where he sits (#63)
 const _cs = new THREE.Vector3();
 function chairNode(){
   if (CHAIR.node !== undefined || !room) return CHAIR.node || null;
@@ -1199,7 +1201,7 @@ function chairAt(k, out){                             // the chair's position (p
   return ry + CHAIR.turn * clamp((k - CHAIR.seat) / (1 - CHAIR.seat), 0, 1);
 }
 function placeChair(k){
-  const n = CHAIR.node; CHAIR.k = k; n.rotation.y = chairAt(k, n.position); n.updateMatrixWorld(true);
+  const n = CHAIR.node; CHAIR.k = k; n.rotation.y = chairAt(k, n.position); n.position.x += CHAIR.dx; n.updateMatrixWorld(true);
   BLOCK[2] = [n.position.x - 0.40, n.position.x + 0.40, n.position.z - 0.40, n.position.z + 0.40];   // the route keeps clear of it (arms, backrest)
 }
 function chairSpots(){   // [where he pulls from (it comes round to face him); (the same); in front of the turned seat; heading there]
@@ -1231,11 +1233,14 @@ function chairVox(){                                  // ?debug: the chair as co
 }
 const toWorld = (h, r, base, out) => out.set(base.x + h[0] * Math.cos(r) + h[2] * Math.sin(r), base.y + h[1], base.z - h[0] * Math.sin(r) + h[2] * Math.cos(r));
 const standOf = name => { const A = ANCHOR[name === "bedlie" ? "bedside" : name]; return A.stand || [A.p[0], A.p[2]]; };
-let actNow = null, actAt = 0, lieAfter = 0;          // the activity, when it started (T), when he lies down with the phone
+let actNow = null, actAt = 0, lieAfter = 0, outAct = null;          // the activity, when it started (T), when he lies down with the phone
 function place(life){
   const outside = !!life.geo || ["street_home","street_bakery","street_park","bakery_door","bakery_in","counter","park_gate","bench"].includes(life.place);
   if (outside && visible && boy) { if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"});
     boy.rotation.y = rootOf("door", "stand", boy.position); at = "door"; plan = []; step = null; goal = {anchor:"door", clip:"stand"}; play("stand"); }
+  if (outside) outAct = life.activity;
+  if (!outside && !visible && ["buy_bread", "buy_konbini"].includes(outAct) && bag !== "hand") {   // home with the shop's bag in his hand
+    setBag(outAct === "buy_bread" ? "bakery" : "konbini"); bag = "hand"; carryW = 1; outAct = null; }
   visible = !outside;
   props();
   if (outside) return;                                // gone: he comes back in at the door
@@ -1250,6 +1255,7 @@ function place(life){
   if (!goal || goal.anchor !== an || goal.clip !== clip) { goal = {anchor:an, clip}; if (!step || !["pose", "act"].includes(step.k)) replan(); else step.replan = true; }
 }
 function snap(name, clip){                           // just be there (the first tick): no blend from whatever ran before
+  CHAIR.dx = name === "desk" && clip === "dine" ? DINE_DX : 0;
   if (chairNode()) placeChair(name === "desk" ? CHAIR.seat : 0);
   boy.rotation.y = rootOf(name, clip, boy.position); at = name; plan = []; step = null;
   const a = actions[clip] || actions[ALIAS[clip]] || actions.idle;
@@ -1259,17 +1265,20 @@ function replan(){                                    // the steps from where he
   if (step && (step.turn0 != null || step.stepping)) halfSteps(false);
   const g = goal, P = []; let cur = at; step = null;
   const stay = () => ANCHOR[g.anchor].seat ? {k:"pose", to:g.anchor, clip:g.clip, d:0.8} : {k:"clip", clip:g.clip};   // a seat's root depends on the clip
+  const roll = g.anchor === "desk" && cur === "desk" && CHAIR.node && CHAIR.dx !== (g.clip === "dine" ? DINE_DX : 0)
+    ? [{k:"chair", to:CHAIR.seat, d:0.7, ride:true, dx:g.clip === "dine" ? DINE_DX : 0}] : [];   // to the dish, or back to the keyboard
   const fetch = g.clip === "deliver" && bag !== "desk";                     // the delivery: the door first
-  if (cur === g.anchor && !fetch) { plan = [stay()]; return; }
+  if (cur === g.anchor && !fetch) { plan = [...roll, stay()]; return; }
   if (cur === "bedside" && g.anchor === "bedlie") { plan = [{k:"pose", to:"bedlie", clip:g.clip}]; return; }   // from the edge he just lies back
   if (cur === "bedlie") { P.push({k:"pose", to:"bedside", clip:"edge"}); cur = "bedside"; }
   if (cur === g.anchor && !fetch) { plan = [...P, stay()]; return; }
   const C = chairNode() && chairSpots();             // the chair is its own node: pull it out, sit, ride it in (and the reverse)
   const stiff = cur === "desk" && sitAt != null && T - sitAt > 240;           // up after sitting for a while: a stretch
-  if (cur === "desk" && C) P.push({k:"chair", to:1, d:0.9, ride:true}, {k:"pose", stand:C[2], clip:"stand"}, {k:"walk", to:C[1], direct:true},
+  if (cur === "desk" && C) P.push(...(trash ? [{k:"act", name:"take", d:1.3, keep:true}] : []), {k:"chair", to:1, d:0.9, ride:true, dx:0}, {k:"pose", stand:C[2], clip:"stand"}, {k:"walk", to:C[1], direct:true},
     {k:"turn", r:Math.atan2(CHAIR.home.x - C[0][0], CHAIR.home.z - C[0][1])}, {k:"chair", to:0, d:0.9, hand:true, step:C[0]});
   else if (cur && ANCHOR[cur].seat) P.push({k:"pose", stand:standOf(cur), clip:"stand"});   // stand up where he would sit down
   if (stiff) P.push({k:"act", name:"stretch", d:3.6});
+  if (trash && (trash.held || cur === "desk")) P.push({k:"walk", to:standOf("bin")}, {k:"turn", r:ANCHOR.bin.r}, {k:"act", name:"bin", d:2.4});   // the empty dish into the bin
   const toDesk = [{k:"walk", to:standOf("deskside")}, {k:"turn", r:ANCHOR.deskside.r}, {k:"act", name:"put", d:1.6}];
   if (g.clip === "deliver") {                         // to the door, open it, take the bag, shut it, the bag onto the desk
     if (fetch && bag !== "hand") P.push({k:"walk", to:standOf("doorway")}, {k:"turn", r:ANCHOR.doorway.r}, {k:"act", name:"door", d:5.6});
@@ -1280,7 +1289,7 @@ function replan(){                                    // the steps from where he
   const A = ANCHOR[g.anchor];
   if (g.anchor === "desk" && C) {
     P.push({k:"walk", to:C[0]}, {k:"turn", r:Math.atan2(CHAIR.home.x - C[0][0], CHAIR.home.z - C[0][1])}, {k:"chair", to:1, d:0.9, hand:true, step:C[1]},
-      {k:"walk", to:C[2], direct:true}, {k:"turn", r:C[3]}, {k:"pose", to:"desk", clip:g.clip}, {k:"chair", to:CHAIR.seat, d:0.8, ride:true});
+      {k:"walk", to:C[2], direct:true}, {k:"turn", r:C[3]}, {k:"pose", to:"desk", clip:g.clip}, {k:"chair", to:CHAIR.seat, d:0.8, ride:true, dx:g.clip === "dine" ? DINE_DX : 0});
     plan = P; return;
   }
   P.push({k:"walk", to:standOf(g.anchor)}, {k:"turn", r:ANCHOR[g.anchor === "bedlie" ? "bedside" : g.anchor].r});
@@ -1291,8 +1300,8 @@ function replan(){                                    // the steps from where he
 }
 // the free floor: hand-placed waypoints between the furniture (room_build/build_room.py) and the walkable links
 const NODES = {bs:[-0.36, -0.18], ds:[-0.62, -0.35], w:[0.15, -0.12], c:[0.45, -0.35], m:[0.35, 0.05], d:[1.22, -0.92], f:[0.15, 0.75],
-  sl:[-1.10, -0.06], g:[-0.62, -0.08]};                 // g, sl: through the gap between the chair and the bed, to the window sill
-const LINKS = [["bs","ds"], ["bs","w"], ["ds","w"], ["w","m"], ["w","c"], ["m","c"], ["c","d"], ["m","d"], ["w","f"], ["m","f"], ["bs","g"], ["g","sl"], ["w","g"]];
+  sl:[-1.10, -0.06], g:[-0.62, -0.08], bn:[-0.17, -0.66]};   // bn: by the desk's end, towards the bin                 // g, sl: through the gap between the chair and the bed, to the window sill
+const LINKS = [["bs","ds"], ["bs","w"], ["ds","w"], ["w","m"], ["w","c"], ["m","c"], ["c","d"], ["m","d"], ["w","f"], ["m","f"], ["bs","g"], ["g","sl"], ["w","g"], ["bs","bn"], ["ds","bn"], ["c","bn"]];
 const BLOCK = [[-1.90, -0.20, 0.25, 1.50], [-1.86, -0.36, -1.45, -0.80], [-1.42, -0.84, -0.88, -0.30], [-0.12, 0.32, -1.45, -1.17],
   [0.45, 0.93, -1.45, -0.97], [-1.90, -1.42, -0.60, -0.12]];          // bed, desk, chair, shelf, fridge, plant (x0, x1, z0, z1)
 function free(a, b, pad = 0.12){                      // is the straight line a -> b clear of the furniture
@@ -1419,7 +1428,7 @@ function drive(dt){                                   // one frame of the plan; 
   if (!placed) { placed = true; snap(goal.anchor, goal.clip); return false; }    // the first tick: just be there
   if (!step) { if (!plan.length) return false; step = plan.shift(); step.t = 0;
     if (step.k === "pose") startPose(step);
-    else if (step.k === "chair") { step.k0 = CHAIR.k; step.p0 = boy.position.clone();
+    else if (step.k === "chair") { step.k0 = CHAIR.k; step.p0 = boy.position.clone(); step.dx0 = CHAIR.dx;
       if (step.ride) { step.rel = CHAIR.node.worldToLocal(boy.position.clone()); step.rr = boy.rotation.y - CHAIR.node.rotation.y; } else play("stand", 0.3); }
     else if (step.k === "walk") { at = null; step.pts = step.direct ? [step.to] : route([boy.position.x, boy.position.z], step.to); boy.position.y = F; step.v = 0;
       const q = step.pts[0], h = Math.atan2(q[0] - boy.position.x, q[1] - boy.position.z);
@@ -1427,7 +1436,7 @@ function drive(dt){                                   // one frame of the plan; 
       play("walk", 0.4); if (actions.walk) actions.walk.timeScale = step.turn0 != null ? STEP_TS : 0.3; }
     else if (step.k === "turn") { step.stepping = Math.abs(wrapA(step.r - boy.rotation.y)) > 0.35; play(step.stepping ? "walk" : "stand", 0.4);
       if (step.stepping && actions.walk) actions.walk.timeScale = STEP_TS; }
-    else if (step.k === "act") { at = null; play("stand", 0.5); }
+    else if (step.k === "act") { if (!step.keep) { at = null; play("stand", 0.5); } }   // keep: seated, he stays as he is
     else if (step.k === "clip") { play(step.clip, 0.5); at = goal.anchor; step = null; return false; } }
   const S = step;
   if (S.k === "pose") { S.t = Math.min(1, S.t + dt / S.d); posePose(S); mixer.update(0);   // this frame's weights, now (not next frame)
@@ -1449,6 +1458,7 @@ function drive(dt){                                   // one frame of the plan; 
       if (d <= left) { boy.position.x = q[0]; boy.position.z = q[1]; left -= d; S.pts.shift(); } else { boy.position.addScaledVector(_w.normalize(), left); left = 0; } }
     if (!S.pts.length) step = null; return true; }
   if (S.k === "chair") { S.t = Math.min(1, S.t + dt / S.d); const e = S.t * S.t * (3 - 2 * S.t);
+    if (S.dx != null) CHAIR.dx = S.dx0 + (S.dx - S.dx0) * e;
     placeChair(S.k0 + (S.to - S.k0) * e);
     if (S.ride) { boy.position.copy(S.rel); CHAIR.node.localToWorld(boy.position); boy.rotation.y = CHAIR.node.rotation.y + S.rr; }
     else if (S.step) { boy.position.x = S.p0.x + (S.step[0] - S.p0.x) * e; boy.position.z = S.p0.z + (S.step[1] - S.p0.z) * e; }   // gives way as it comes
@@ -1528,11 +1538,11 @@ function breathe(dt, c){
 
 // ---- weight shift, feet planted
 const FP = [new THREE.Vector3(), new THREE.Vector3()], FQ = [new THREE.Quaternion(), new THREE.Quaternion()], _hp = new THREE.Vector3();
-function shiftHips(side, fwd){                        // move the hips (m, along his right and forward), feet stay put
-  const B = bones; if (!B.Hips || (!side && !fwd)) return;
+function shiftHips(side, fwd, down = 0){              // move the hips (m, along his right, forward, down), feet stay put
+  const B = bones; if (!B.Hips || (!side && !fwd && !down)) return;
   boy.updateMatrixWorld(true);
   ["Left", "Right"].forEach((s, i) => { B[s + "Foot"].getWorldPosition(FP[i]); B[s + "Foot"].getWorldQuaternion(FQ[i]); });
-  touch(B.Hips); B.Hips.getWorldPosition(_hp).addScaledVector(BR, side).addScaledVector(BFw, fwd);
+  touch(B.Hips); B.Hips.getWorldPosition(_hp).addScaledVector(BR, side).addScaledVector(BFw, fwd).addScaledVector(UP, -down);
   B.Hips.parent.worldToLocal(_hp); B.Hips.position.copy(_hp); B.Hips.updateMatrixWorld(true);
   ["Left", "Right"].forEach((s, i) => {
     const up = B[s + "UpLeg"], lo = B[s + "Leg"], ft = B[s + "Foot"]; touch(up, lo, ft);
@@ -1604,7 +1614,7 @@ function variants(c, dt){
   if (IV.cur) { IV.cur.t += dt; if (IV.cur.t >= IV.cur.d) { endVariant(IV.cur); IV.cur = null; IV.next = T + 2.5 + rnd() * 5; } }
   else if (L && T >= IV.next) {
     const ok = L.filter(([n]) => n !== IV.last && T >= (IV.cool[n] || 0) && (n !== "drink" || (at === "desk" && PROP.bottle))
-      && (n !== "phone" || !phoneWanted) && (n !== "mouse" || at === "desk"));
+      && (n !== "phone" || !phoneWanted) && (n !== "mouse" || at === "desk") && (n !== "drink" || !phoneWanted));
     if (ok.length) { const [n, d, cd] = ok[Math.floor(rnd() * ok.length)];
       IV.cur = {n, d:d * (0.85 + rnd() * 0.3), t:0, side:rnd() < 0.5 ? "Left" : "Right", s:rnd()}; IV.last = n; IV.cool[n] = T + cd + d; }
     else IV.next = T + 1;
@@ -1680,7 +1690,7 @@ function nod(c){
 }
 // ---- props he handles; all made here (CC0, part of this page)
 const PROP = {bag:null, bento:null, sticks:null, bread:null, breadbag:null, bottle:null, held:{}};
-const BOTTLE_AT = new THREE.Vector3(-1.38, 0.97, -0.90), BAG_AT = new THREE.Vector3(-0.58, 0.97, -0.855);   // on the desk mat, left; desk, right
+const BOTTLE_AT = new THREE.Vector3(-0.83, 0.97, -0.85), BAG_AT = new THREE.Vector3(-0.56, 0.97, -0.855);   // in front of the mouse; desk, right
 let bag = "none";                                     // the delivery bag: none | door (held out by the courier) | hand | desk
 function makeProps(){
   const M = (c, r = 0.75, x = {}) => new THREE.MeshStandardMaterial({color:c, roughness:r, ...x}), add = (g, m) => { m.castShadow = true; g.add(m); return m; };
@@ -1734,6 +1744,23 @@ function makeProps(){
   for (const k of ["bag", "bento", "sticks", "bread", "breadbag", "bottle"]) { scene.add(PROP[k]); PROP[k].visible = k === "bottle"; }
   PROP.breadbag.position.copy(BAG_AT); PROP.breadbag.rotation.y = 0.3;
 }
+// the bag he carries or that stands on the desk: the courier's paper bag (a pizza comes in its own box), the bakery's
+// paper bag, the konbini's white bag. PROP.bag's origin is where his hand holds it; on the desk it stands on BAG_AT
+let bagKind = "paper";
+const BAG_H = {paper:0.30, bakery:0.30, konbini:0.30, pizza:0.0};
+function setBag(kind){
+  bagKind = kind; const g = PROP.bag; if (!FOOD.models) return;              // (procedural bag until the models load)
+  while (g.children.length) g.remove(g.children[0]);
+  const m = foodModel(kind === "pizza" ? "pizza-box" : "bag"); if (!m) return;
+  if (kind === "konbini") m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.map = null; o.material.color.set(0xeeeeea); o.material.roughness = 0.3; } });
+  g.add(m); bagPose("hand");
+}
+function bagPose(where){                                // the model inside PROP.bag, for the hand or the desk
+  const m = PROP.bag.children[0]; if (!m || !FOOD.models) return;
+  if (bagKind === "pizza") { if (where === "hand") { m.rotation.set(0, 0, Math.PI / 2); m.position.set(0.17, -0.17, 0); } else { m.rotation.set(0, 0, 0); m.position.set(0, 0, 0); } }
+  else { m.rotation.set(0, Math.PI / 2, 0); m.position.set(0, where === "hand" ? -0.30 : 0, 0); }
+}
+function bagOnDesk(){ bag = "desk"; carryW = 0; PROP.bag.position.copy(BAG_AT); if (!FOOD.models) PROP.bag.position.addScaledVector(UP, 0.31); PROP.bag.rotation.set(0, 0.25, 0); bagPose("desk"); }
 // a prop in a hand keeps where it was relative to the hand bone when he took it
 const _pm = new THREE.Matrix4();
 function grab(k, side){ const o = PROP[k], h = bones[side + "Hand"]; boy.updateMatrixWorld(true); o.updateMatrixWorld(true);
@@ -1744,56 +1771,142 @@ function heldProps(){
   for (const [k, H] of Object.entries(PROP.held)) { const o = PROP[k], h = bones[H.side + "Hand"];
     _pm.multiplyMatrices(h.matrixWorld, H.rel); _pm.decompose(o.position, o.quaternion, _l1); }
 }
-function drinkFrom(V, u){                              // reach for the bottle (left hand), drink, put it back
+function drinkFrom(V, u){                              // reach for the bottle (right hand), drink, put it back
   const B = bones, o = PROP.bottle, w = smooth(0, 0.14, u) * (1 - smooth(0.88, 1, u));
-  if (u < 0.25) { _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, 0.03); }
-  else if (u < 0.8) { mouth(_l3).addScaledVector(UP, -0.11).addScaledVector(BFw, 0.05).addScaledVector(TL, 0.03);
-    _l4.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, 0.03);
+  if (u < 0.25) { _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03); }
+  else if (u < 0.8) { mouth(_l3).addScaledVector(UP, -0.11).addScaledVector(BFw, 0.05).addScaledVector(TL, -0.03);
+    _l4.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03);
     const k = u < 0.4 ? smooth(0.25, 0.4, u) : u < 0.68 ? 1 : 1 - smooth(0.68, 0.8, u); mix3(_l1, _l4, _l3, k); }
-  else _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, 0.03);
-  B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.3);
-  armTo("Left", _l1, _l2, w);
-  if (u >= 0.4 && u < 0.68) { const k = smooth(0.4, 0.48, u) * (1 - smooth(0.6, 0.68, u)); bend(B.LeftHand, TL, 0.8 * k);   // tips it up
+  else _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03);
+  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.3);
+  armTo("Right", _l1, _l2, w);
+  if (u >= 0.4 && u < 0.68) { const k = smooth(0.4, 0.48, u) * (1 - smooth(0.6, 0.68, u)); bend(B.RightHand, TL, 0.8 * k);   // tips it up
     gazeAt(head.getWorldPosition(_l3).addScaledVector(TF, 1).addScaledVector(TU, 0.5), 0.5 * k, 0.2, "drink"); }
   else if (u < 0.3) gazeAt(BOTTLE_AT, 0.6, 0.2, "bottle");
   boy.updateMatrixWorld(true);
-  if (!PROP.held.bottle && u >= 0.25 && u < 0.8) grab("bottle", "Left");
+  if (!PROP.held.bottle && u >= 0.25 && u < 0.8) grab("bottle", "Right");
   if (PROP.held.bottle && u >= 0.8) drop("bottle");
 }
 
-// ---- eating at the desk: the bento in his left hand and chopsticks, or a bread roll; bites, chewing
+// ---- eating at the desk
 const EAT = {kind:"", bites:0, ph:0};
+// ---- food (#63 part 2): real dishes from Kenney's Food Kit (CC0, web/room/food.glb), matching what he eats
+// (life.eating; the order is life.order / courier.dish). A dish stands on the desk in front of him and empties with the
+// bites: sushi pieces and pizza slices go one by one, the ramen and curry sink and leave an empty bowl, the bento's
+// compartments empty. Bread and onigiri are eaten from the hand. Bags: the courier's paper bag (a pizza comes in its
+// own box), the bakery's paper bag, the konbini's white bag
+const FOOD = {models:null, dish:null, kind:"", held:null};
+const DISH_AT = new THREE.Vector3(-1.34, 0.97, -0.93);   // on the desk mat, left of the keyboard (he sits 12 cm to the left)
+const KS = {"bowl-broth":0.30, bowl:0.30, "bowl-soup":0.30, "plate-rectangle":0.30, "sushi-salmon":0.45, "sushi-egg":0.45,
+  "maki-salmon":0.45, "pizza-box":0.31, pizza:0.31, "rice-ball":0.62, croissant:0.36, bag:0.36, "bag-flat":0.36, chopstick:0.5};
+function foodModel(name){                              // a scaled copy of one Kenney model (origin: its base centre)
+  const m = FOOD.models && FOOD.models[name]; if (!m) return null;
+  const c = m.clone(true); c.position.set(0, 0, 0); c.scale.setScalar(KS[name] || 0.3);
+  c.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  const g = new THREE.Group(); g.add(c); return g;
+}
+load("room/food.glb").then(g => {
+  FOOD.models = {}; for (const c of g.scene.children) FOOD.models[c.name.replace(/^F_/, "")] = c;   // (the build names each model F_<file>)
+  FOOD.roll = foodModel("croissant"); FOOD.onigiri = foodModel("rice-ball");
+  for (const o of [FOOD.roll, FOOD.onigiri]) { o.visible = false; scene.add(o); }
+  const bb = foodModel("bag"); if (bb) { bb.rotation.y = Math.PI / 2; PROP.breadbag.clear(); PROP.breadbag.add(bb); }
+  setBag(bagKind); if (bag === "desk") bagPose("desk");
+  g.scene.traverse(o => { if (o.isMesh) Object.assign(o.material, {roughness:0.65, metalness:0, envMapIntensity:0.5}); });
+}).catch(() => {});
+// a dish: {g (on the desk), items (eaten one by one), stage(p) (how much is left, 0..1), bites (for the whole meal),
+// morsel (what goes to his mouth: "sticks" with a bit of food, or the item itself)}
+function makeDish(kind){
+  const d = {kind, g:new THREE.Group(), items:[], bites:20, hand:"sticks"};
+  const put = (name, x, y, z, ry = 0) => { const m = foodModel(name); if (!m) return null; m.position.set(x, y, z); m.rotation.y = ry; d.g.add(m); return m; };
+  if (kind === "ramen" || kind === "curry") {
+    d.full = put(kind === "ramen" ? "bowl-broth" : "bowl-soup", 0, 0, 0); d.empty = put("bowl", 0, 0, 0); if (d.empty) d.empty.visible = false;
+    d.stage = p => { if (d.full) d.full.visible = p < 0.92; if (d.empty) d.empty.visible = p >= 0.92;
+      if (d.full) { d.full.scale.y = 1 - 0.35 * p; } };                       // the broth sinks
+  } else if (kind === "sushi") {
+    put("plate-rectangle", 0, 0, 0);
+    [["sushi-salmon", -0.055, -0.032], ["sushi-salmon", 0, -0.032], ["sushi-egg", 0.055, -0.032], ["sushi-salmon", -0.055, 0.032], ["maki-salmon", 0, 0.032], ["maki-salmon", 0.055, 0.032]]
+      .forEach(([n, x, z]) => { const m = put(n, x, 0.012, z, Math.PI / 2); if (m) d.items.push(m); });
+    d.bites = d.items.length; d.hand = "item"; d.stage = p => {};
+  } else if (kind === "pizza") {
+    const box = put("pizza-box", 0, 0, 0); const pz = put("pizza", 0, 0.008, 0);
+    if (box) box.traverse(o => { if (o.name === "lid") { o.rotation.z = 1.9; } });          // opened
+    if (pz) pz.traverse(o => { if (/^slice/.test(o.name)) d.items.push(o); });
+    d.bites = d.items.length * 3; d.hand = "slice"; d.per = 3; d.stage = p => {};
+  } else {                                            // bento (delivery or konbini): the procedural box, compartments empty
+    const b = PROP.bento.clone(); b.position.set(0, 0, 0); b.rotation.set(0, 0, 0); b.visible = true; d.g.add(b); d.bento = b;
+    d.stage = p => { const n = Math.min(4, Math.floor(p * 5)); if (n !== d.drawn) { d.drawn = n; b.children[0].material[2].map = bentoTop(n); b.children[0].material[2].needsUpdate = true; } };
+  }
+  d.g.position.copy(DISH_AT); if (kind === "pizza") d.g.position.x -= 0.04;   // (clear of the keyboard)
+  d.g.rotation.y = 0.15; scene.add(d.g); d.stage(0);
+  return d;
+}
+const bentoTops = [];
+function bentoTop(n){                                  // the bento's top with n of its 4 compartments eaten (n = 4: empty)
+  if (bentoTops[n]) return bentoTops[n];
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 180; const g = cv.getContext("2d");
+  g.fillStyle = "#141414"; g.fillRect(0, 0, 256, 180);
+  const cells = [[10, 10, 140, 160, "#f4f1ea"], [158, 10, 88, 62, "#f08a5d"], [158, 78, 88, 40, "#f6c945"], [158, 124, 88, 46, "#4f8a3a"]];
+  cells.forEach(([x, y, w, h, c], i) => { g.fillStyle = i < 4 - n ? c : "#262626"; g.fillRect(x, y, w, h); });
+  if (n < 4) { g.fillStyle = "#c0262b"; g.beginPath(); g.arc(80, 90, 12, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return bentoTops[n] = t;
+}
+// something lifted off the dish (a sushi piece, a pizza slice): a copy centred on its own middle, so a hand can hold it
+function heldCopy(obj){
+  obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj), c = bb.getCenter(new THREE.Vector3());
+  const copy = obj.clone(true); obj.parent.updateMatrixWorld(true);
+  copy.matrix.copy(obj.matrixWorld); copy.matrix.decompose(copy.position, copy.quaternion, copy.scale); copy.position.sub(c);
+  const g = new THREE.Group(); g.add(copy); scene.add(g); return g;
+}
+const MORSEL = {ramen:0xf1d79a, curry:0xc9852b, bento:0xf4f1ea, konbini_bento:0xf4f1ea};
 function eating(dt){
-  const B = bones, meal = EAT.kind === "meal", P = meal ? 7 : 6.5; EAT.ph += dt / P;
-  const u = EAT.ph % 1, cyc = Math.floor(EAT.ph);
-  if (cyc !== EAT.cyc) { EAT.cyc = cyc; EAT.bit = false; }
-  // the left hand holds the box up in front of his chest (meal); with bread it rests
-  const c = (B.neck || head).getWorldPosition(_l4).addScaledVector(BFw, 0.27).addScaledVector(UP, -0.28).addScaledVector(TL, 0.05);
-  if (meal) { B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.3); armTo("Left", c, _l2, 1); }
-  // bites: rest -> up to the mouth -> bite -> down -> chew
-  const rest = _l5.copy(c).addScaledVector(TL, meal ? -0.12 : -0.15).addScaledVector(UP, meal ? 0.07 : -0.02).addScaledVector(BFw, meal ? -0.02 : 0);
-  if (meal) rest.addScaledVector(BFw, 0.02 * Math.sin(T * 9) * (u < 0.35 ? 1 : 0));         // picking food with the chopsticks
-  const m = mouth(_l3).addScaledVector(UP, meal ? -0.12 : -0.07).addScaledVector(BFw, meal ? 0.06 : 0.05).addScaledVector(TL, -0.03);
-  const a = meal ? [0.35, 0.47, 0.6, 0.72] : [0.42, 0.54, 0.66, 0.78], k = u < a[0] ? 0 : u < a[1] ? smooth(a[0], a[1], u) : u < a[2] ? 1 : u < a[3] ? 1 - smooth(a[2], a[3], u) : 0;
+  const B = bones, kind = EAT.kind, d = FOOD.dish, fromHand = !d, P = 6.5;
+  EAT.ph += dt / P; const u = EAT.ph % 1, cyc = Math.floor(EAT.ph);
+  if (cyc !== EAT.cyc) { EAT.cyc = cyc; EAT.bit = false; EAT.took = false; }
+  const done = d && EAT.bites >= d.bites, w = done ? Math.max(0, 1 - (EAT.ph - EAT.doneAt) * 0.7) : 1;
+  if (done && EAT.doneAt == null) EAT.doneAt = EAT.ph;
+  // the left hand: beside the dish on the desk (it steadies a bowl); eating from the hand it stays on the armrest
+  if (d) { _l1.copy(DISH_AT).addScaledVector(TL, 0.12).addScaledVector(UP, kind === "ramen" || kind === "curry" ? 0.07 : 0.03).addScaledVector(BFw, 0.03);
+    B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.35); armTo("Left", _l1, _l2, 0.9 * w); }
+  // bites: over the dish (or the hand food in front of his chest) -> up to the mouth -> bite -> down -> chew
+  const rest = d ? _l5.copy(DISH_AT).addScaledVector(UP, 0.14).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03)
+    : (B.neck || head).getWorldPosition(_l5).addScaledVector(BFw, 0.27).addScaledVector(UP, -0.30).addScaledVector(TL, -0.10);
+  if (d && u < 0.33) rest.addScaledVector(BFw, 0.015 * Math.sin(T * 9)).addScaledVector(UP, -0.03 * Math.max(0, Math.sin(T * 4.5)));   // picking
+  const m = mouth(_l3).addScaledVector(UP, fromHand ? -0.07 : -0.11).addScaledVector(BFw, fromHand ? 0.05 : 0.06).addScaledVector(TL, -0.03);
+  const a = [0.36, 0.48, 0.6, 0.72], k = done ? 0 : u < a[0] ? 0 : u < a[1] ? smooth(a[0], a[1], u) : u < a[2] ? 1 : u < a[3] ? 1 - smooth(a[2], a[3], u) : 0;
   mix3(_l1, rest, m, k);
   B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.25).addScaledVector(TF, -0.1);
-  armTo("Right", _l1, _l2, 1);
-  if (u > a[1] && !EAT.bit) { EAT.bit = true; EAT.bites++; }
+  armTo("Right", _l1, _l2, w);
+  // take a piece off the dish as the hand lifts; it is gone at the bite
+  if (d && !done && u >= a[0] && !EAT.took) { EAT.took = true;
+    if (d.hand === "item" && d.items.length) { const it = d.items.shift(); FOOD.held = heldCopy(it); it.visible = false; }
+    else if (d.hand === "slice" && (!FOOD.held || EAT.bites % d.per === 0) && d.items.length) { if (FOOD.held) scene.remove(FOOD.held);
+      const it = d.items.shift(); FOOD.held = heldCopy(it); it.visible = false; }
+    else if (d.hand === "sticks") { if (!FOOD.held) { FOOD.held = new THREE.Group(); const mo = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), new THREE.MeshStandardMaterial({color:MORSEL[kind] || 0xeeeeee, roughness:0.7}));
+      mo.scale.set(1.6, 0.8, 1); FOOD.held.add(mo); scene.add(FOOD.held); } FOOD.held.visible = true; } }
+  if (!done && u > a[1] && !EAT.bit) { EAT.bit = true; EAT.bites++;
+    if (d) { d.stage(Math.min(1, EAT.bites / d.bites));
+      if (FOOD.held && (d.hand !== "slice" || EAT.bites % d.per === 0)) { if (d.hand === "sticks") FOOD.held.visible = false; else { scene.remove(FOOD.held); FOOD.held = null; } } } }
+  if (FOOD.held && d && d.hand === "slice") FOOD.held.scale.setScalar(1 - 0.28 * (EAT.bites % d.per));
   // the head: down to the food when picking, forward into the bite, chewing nods after
-  if (u < a[0]) gazeAt(meal ? PROP.bento.position : _l1, 0.55, 0.2, "food");
-  else if (u < a[2]) gazeAt(_l4.copy(m).addScaledVector(BFw, 0.6).addScaledVector(UP, -0.15), 0.5, 0.2, "bite");
-  else if (GZ.why === "bite" || GZ.why === "food") GZ.next = 0;                            // back to the screen
-  if (u > a[2] && u < 1) bend(head, TL, 0.035 * Math.max(0, Math.sin(T * 13)) * (1 - smooth(0.9, 1, u)));   // chewing
+  if (!done) {
+    if (u < a[0]) gazeAt(d ? DISH_AT : _l1, 0.6, 0.2, "food");
+    else if (u < a[2]) gazeAt(_l4.copy(m).addScaledVector(BFw, 0.6).addScaledVector(UP, -0.15), 0.5, 0.2, "bite");
+    else if (GZ.why === "bite" || GZ.why === "food") GZ.next = 0;
+    if (u > a[2]) bend(head, TL, 0.035 * Math.max(0, Math.sin(T * 13)) * (1 - smooth(0.9, 1, u)));   // chewing
+  }
   boy.updateMatrixWorld(true);
-  // what is in his hands
-  if (meal) { const h = B.LeftHand; h.getWorldPosition(PROP.bento.position).addScaledVector(BFw, 0.04).addScaledVector(TL, -0.07).addScaledVector(UP, 0.02);
-    PROP.bento.rotation.set(0, boy.rotation.y, 0); }
+  // what is in his right hand: chopsticks (with the piece at their tips), a slice, the bread or the onigiri
   const hr = B.RightHand; hr.getWorldQuaternion(_lq); hr.getWorldPosition(_l1);
   const y = _l2.set(0, 1, 0).applyQuaternion(_lq), z = _l3.set(0, 0, 1).applyQuaternion(_lq);   // along the fingers; the palm
-  if (meal) { PROP.sticks.position.copy(_l1).addScaledVector(y, 0.06).addScaledVector(z, 0.02);
-    PROP.sticks.quaternion.setFromUnitVectors(UP, _l4.copy(y).addScaledVector(z, 0.5).addScaledVector(_l5.crossVectors(y, z), 0.6).normalize()); }
-  else { PROP.bread.position.copy(_l1).addScaledVector(y, 0.07).addScaledVector(z, 0.045); PROP.bread.quaternion.copy(_lq);
-    const s = Math.max(0.35, 1 - 0.06 * EAT.bites); PROP.bread.scale.set(1.25 * s, 0.8, 1); }
+  const sticks = d && d.hand !== "slice";
+  PROP.sticks.visible = !!sticks && w > 0.3;
+  if (sticks) { PROP.sticks.position.copy(_l1).addScaledVector(y, 0.06).addScaledVector(z, 0.02);
+    PROP.sticks.quaternion.setFromUnitVectors(UP, _l4.copy(y).addScaledVector(z, 0.5).addScaledVector(_l5.crossVectors(y, z), 0.6).normalize());
+    if (FOOD.held) { PROP.sticks.updateMatrixWorld(true); PROP.sticks.localToWorld(FOOD.held.position.set(0, 0.205, 0)); } }
+  else if (FOOD.held) { FOOD.held.position.copy(_l1).addScaledVector(y, 0.08).addScaledVector(z, 0.03); FOOD.held.quaternion.copy(_lq); }
+  if (fromHand) { const o = kind === "onigiri" ? FOOD.onigiri : FOOD.roll; if (o) { o.visible = true;
+    o.position.copy(_l1).addScaledVector(y, 0.07).addScaledVector(z, 0.045); o.quaternion.copy(_lq);
+    const s = Math.max(0.3, 1 - 0.07 * EAT.bites); o.scale.set(s, 1, s); } }
 }
 
 // ---- the door: a leaf that opens into the room (hinges on its left, x 1.11), the dark hallway behind it
@@ -1831,7 +1944,8 @@ function doorAct(S){
   const push = smooth(3.9, 4.3, s) * (1 - smooth(4.8, 5.3, s));          // and on the leaf to push it shut
   if (push > 0 && DOOR.leaf) { DOOR.leaf.localToWorld(_l1.set(DOOR.W * 0.62, 1.12 - F, 0.07)); armTo("Left", _l1, _l2, push); }
   // the bag: held out in the doorway, then in his right hand
-  if (s >= 2.0 && bag === "none") { bag = "door"; PROP.bag.visible = true; PROP.bag.rotation.set(0, 0, 0); }
+  if (s >= 2.0 && bag === "none") { bag = "door"; setBag(lastLife && lastLife.courier && lastLife.courier.dish === "pizza" ? "pizza" : "paper");
+    PROP.bag.visible = true; PROP.bag.rotation.set(0, 0, 0); }
   if (bag === "door") PROP.bag.position.set(1.47, 1.30 - 0.05 * smooth(2.0, 2.6, s), -1.42 + 0.12 * smooth(2.0, 2.6, s));
   const take = smooth(2.3, 3.0, s);
   if (take > 0 && bag !== "hand") { B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.3);
@@ -1852,16 +1966,43 @@ let carryW = 0;
 function putAct(S){                                     // the bag onto the desk (right hand), a little bend
   const s = S.t * S.d, B = bones, k = smooth(0.1, 0.8, s) * (1 - smooth(1.0, 1.6, s));
   bend(B.Spine01, TL, 0.12 * k); torso();
-  _l1.copy(BAG_AT).addScaledVector(UP, 0.31);
+  _l1.copy(BAG_AT).addScaledVector(UP, FOOD.models ? BAG_H[bagKind] + 0.02 : 0.31);
   if (bag === "hand") { carry(0); B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.4).addScaledVector(BR, 0.4);
     armTo("Right", _l1, _l2, smooth(0.1, 0.8, s)); boy.updateMatrixWorld(true); B.RightHand.getWorldPosition(PROP.bag.position).addScaledVector(UP, -0.06);
-    if (s >= 0.85) { bag = "desk"; carryW = 0; PROP.bag.position.copy(BAG_AT).addScaledVector(UP, 0.31); PROP.bag.rotation.set(0, 0.25, 0); } }
+    if (s >= 0.85) bagOnDesk(); }
   else { B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.4).addScaledVector(BR, 0.4); armTo("Right", _l1, _l2, k); }
   gazeAt(BAG_AT, 0.7, 0.2, "bag");
 }
+const BIN_TOP = new THREE.Vector3(-0.55, 0.62, -1.22);   // above the bin under the desk
+function takeAct(S){                                    // seated: his right hand takes the empty dish off the desk
+  const s = S.t * S.d, k = smooth(0, 0.5, s) * (1 - smooth(0.8, 1.3, s)), B = bones;
+  if (!trash) return;
+  _l1.copy(DISH_AT).addScaledVector(UP, 0.08).addScaledVector(BFw, -0.05);
+  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.25);
+  armTo("Right", _l1, _l2, k); gazeAt(DISH_AT, 0.6, 0.2, "dish");
+  if (s >= 0.5) trash.held = true;
+}
+function binAct(S){                                     // crouches (the bin is under the desk) and drops the dish in
+  const s = S.t * S.d, k = smooth(0.1, 0.8, s) * (1 - smooth(1.4, 2.2, s)), B = bones;
+  torso(); shiftHips(0, -0.08 * k, 0.38 * k); bend(B.Spine01, TL, 0.45 * k); bend(B.Spine02, TL, 0.25 * k); torso();
+  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.4).addScaledVector(BR, 0.3);
+  armTo("Right", BIN_TOP, _l2, k); gazeAt(BIN_TOP, 0.7, 0.2, "bin");
+  if (s >= 1.0 && trash) { scene.remove(trash.g); trash = null; }
+}
+function carryTrash(){                                  // the empty dish, level, in his right hand
+  const B = bones; if (!trash || !trash.held) return;
+  if (!(step && step.k === "act") && at !== "desk" && !(step && (step.k === "chair" || step.k === "pose"))) {
+    B.RightArm.getWorldPosition(_l1).addScaledVector(UP, -0.45).addScaledVector(BR, 0.08).addScaledVector(BFw, 0.12);
+    B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.3).addScaledVector(BR, 0.3).addScaledVector(BFw, -0.2);
+    armTo("Right", _l1, _l2, 1); boy.updateMatrixWorld(true); }
+  B.RightHand.getWorldPosition(trash.g.position).addScaledVector(UP, -0.03).addScaledVector(BFw, 0.04);
+  trash.g.rotation.set(0, boy.rotation.y, 0);
+}
 function endAct(S){                                     // a step ended (or was cut short): leave the world consistent
+  if (S.name === "take" && trash) trash.held = true;
+  if (S.name === "bin" && trash) { scene.remove(trash.g); trash = null; }
   if (S.name === "door") { setDoor(0); if (bag === "door" || bag === "none") bag = "hand"; PROP.bag.visible = true; carryW = 1; }
-  if (S.name === "put" && bag === "hand") { bag = "desk"; carryW = 0; PROP.bag.position.copy(BAG_AT).addScaledVector(UP, 0.31); PROP.bag.rotation.set(0, 0.25, 0); }
+  if (S.name === "put" && bag === "hand") bagOnDesk();
 }
 
 // ---- walking or turning close to the chair or the bed (the gap to the window is 50 cm) his arms stay in at his sides
@@ -1896,7 +2037,7 @@ let ctxNow = "", sitAt = null, lean = 0;
 const OFF = DEBUG ? (window.OFF = {}) : {};             // ?debug: switch layers off by name
 function alive(dt){                                     // after the mixer and the seat / walk IK, before holdPhone
   if (!boy || !boy.visible || !bones.Hips || !bones.LeftArm) return;
-  const c = context(); ctxNow = c;
+  const c = context(); ctxNow = c; props();
   torso(); if (!OFF.breathe) breathe(dt, c); torso();
   if ((c === "stand" || c === "sill") && !OFF.shift) {                 // weight from foot to foot: slow drift plus the "shift" variant
     const v = IV.cur && IV.cur.n === "shift" ? IV.cur.k || 0 : 0;
@@ -1924,11 +2065,13 @@ function alive(dt){                                     // after the mixer and t
   if (c && c !== "sleep") variants(c === "eat" || c === "act" || c === "walk" || c === "move" ? "" : c, dt);
   if (c === "eat") eating(dt);
   if (PROP.phones) PROP.phones.visible = musicOn() && c !== "";
-  if (PROP.bento) { const m = c === "eat" && EAT.kind === "meal"; PROP.bento.visible = PROP.sticks.visible = m; PROP.bread.visible = c === "eat" && EAT.kind === "bread"; }
-  if (step && step.k === "act") { torso(); if (step.name === "door") doorAct(step); else if (step.name === "put") putAct(step); else if (step.name === "stretch") doVariant({n:"stretch", t:step.t * step.d, d:step.d}, "stand"); }
+  if (PROP.bento) { PROP.bento.visible = PROP.bread.visible = false; if (c !== "eat") PROP.sticks.visible = false; }   // (templates; eating() shows what he holds)
+  if (step && step.k === "act") { torso(); if (step.name === "door") doorAct(step); else if (step.name === "put") putAct(step);
+    else if (step.name === "take") takeAct(step); else if (step.name === "bin") binAct(step); else if (step.name === "stretch") doVariant({n:"stretch", t:step.t * step.d, d:step.d}, "stand"); }
   if (c === "walk" || (c === "move" && step && step.k === "turn")) tuck();
   carryW = bag === "hand" && !(step && step.k === "act") ? Math.min(1, carryW + dt / 0.4) : bag === "hand" ? carryW : 0;
   if (bag === "hand" && !(step && step.k === "act")) carry(dt);
+  carryTrash();
   // gaze: the director picks, the spring follows; walking he looks where he goes
   if (c === "walk" && step && step.pts && step.pts.length) { const q = step.pts[0]; gazeAt(_l5.set(q[0], 1.15, q[1]), 0.35, 0.1, "path"); }
   else if (c === "move") GZ.wGoal = 0;
@@ -1946,13 +2089,27 @@ function aliveHead(){                                   // after holdPhone: the 
 }
 function props(){                                       // what is where, from the life state (each UI tick)
   const life = lastLife; if (!PROP.bag || !life) return;
-  const eatingNow = life.activity === "eat" && !life.path;
-  if (bag === "desk" && !life.food && !eatingNow && life.activity !== "get_delivery") bag = "none";
-  PROP.bag.visible = bag !== "none" && visible;
-  if (eatingNow && !EAT.kind) { EAT.kind = bag === "desk" || life.food ? "meal" : "bread"; EAT.bites = 0; EAT.ph = 0; }
-  if (!eatingNow) EAT.kind = "";
-  PROP.breadbag.visible = visible && !!life.bread && bag !== "desk";
+  const eatingNow = life.activity === "eat" && !life.path && at === "desk";
+  // a bag on the desk stays while what it brought is there: bread for the bakery's, a meal for the others
+  const keep = bagKind === "bakery" ? life.bread > 0 : life.food > 0 || life.activity === "get_delivery";
+  if (bag === "desk" && !keep && !(eatingNow && FOOD.dish)) bag = "none";
+  if (eatingNow && !EAT.kind) startMeal(life.eating || (life.food ? "bento" : "bread"));
+  if (!eatingNow && EAT.kind && life.activity !== "eat") endMeal();
+  PROP.bag.visible = bag !== "none" && visible && !(bag === "desk" && FOOD.dish && bagKind !== "bakery");   // opened: the dish is out
+  PROP.breadbag.visible = visible && life.bread > 0 && bag === "none";
+  PROP.breadbag.scale.y = life.bread >= 2 ? 1 : 0.8;                         // emptier as the bread goes
 }
+function startMeal(kind){
+  EAT.kind = kind; EAT.bites = 0; EAT.ph = 0; EAT.doneAt = null; EAT.cyc = -1;
+  if (["ramen", "sushi", "pizza", "curry", "bento", "konbini_bento"].includes(kind)) { if (FOOD.dish) scene.remove(FOOD.dish.g); FOOD.dish = makeDish(kind); }
+}
+function endMeal(){                                     // the empty container stays on the desk until he takes it to the bin
+  if (FOOD.dish) { trash = FOOD.dish; FOOD.dish = null; }
+  if (FOOD.held) { scene.remove(FOOD.held); FOOD.held = null; }
+  for (const o of [FOOD.roll, FOOD.onigiri]) if (o) o.visible = false;
+  PROP.sticks.visible = false; EAT.kind = "";
+}
+let trash = null;                                       // the empty dish he will put in the bin
 
 function screens(life, st){
   const atDesk = !life.path && ["research","chart","watch_video","play_chess"].includes(life.activity) && st === "AWAKE";
@@ -2241,7 +2398,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     return detail ? {bed, chair, by} : {bed, chair, of:Math.ceil(P.count / every)}; },
   live: (a, x = {}) => { const l = {activity:a, place:"room", ...x}; lastLife = l; place(l); screens(l, "AWAKE"); },
   act: (a, x = {}) => { untouch(); if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"}); if (chairNode()) placeChair(0); const l = {activity:a, place:"room", ...x}; lastLife = l; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = phoneWanted ? 1 : 0; mixer.update(1); },
-  setLife: x => { lastLife = {...lastLife, ...x}; }, gz: () => ({p:GZ.p.toArray().map(v => +v.toFixed(2)), w:+GZ.w.toFixed(2), why:GZ.why, iv:IV.cur && IV.cur.n, ctx:ctxNow, bag, eat:EAT.kind}),
+  setLife: x => { lastLife = {...lastLife, ...x}; }, gz: () => ({p:GZ.p.toArray().map(v => +v.toFixed(2)), w:+GZ.w.toFixed(2), why:GZ.why, iv:IV.cur && IV.cur.n, ctx:ctxNow, bag, eat:EAT.kind, trash:trash && (trash.held ? "held" : "desk"), tpos:trash && trash.g.position.toArray().map(v => +v.toFixed(2))}),
   setSeed: v => { seed = v; }, dbg: () => ({lean, T, clr:clearance(), TL:TL.toArray(), TU:TU.toArray(), TF:TF.toArray()}), armTo, torso, reach, bend, TL, shiftHips, variant: (n, d = 4) => { IV.cur = {n, d, t:0, side:"Left", s:0.3}; IV.last = n; }, setDoor,
   pose: () => ({at, step:step && {k:step.k, t:step.t && +step.t.toFixed(2), to:step.to}, plan:plan.map(p => p.k + (p.to ? ":" + p.to : "")), goal, clip:current && current.getClip().name,
     root:boy.position.toArray().map(x => +x.toFixed(3)), ry:+boy.rotation.y.toFixed(2)}) });
