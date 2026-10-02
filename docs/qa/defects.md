@@ -1,8 +1,12 @@
 # Visible defects on `main`, routed (issue #98, G8)
 
-From the core and full runs of `tests/visual/` on `main` 5f12ea9 (2026-10-02), sent to the coordinator the same evening.
+From the core and full runs of `tests/visual/` on `main` 5f12ea9 / 00af116 (2026-10-02), sent to the coordinator the
+same evening and routed by them (G2: 1–6; G3: 7–8; #63: 9; G6: 10, 15–18, 21, 22; G4: 11–13; G5: 14; G7: 19–20).
+The bar is photorealism (owner's brief): the "what reads as CG" list in `scorecard.md` adds the general tells
+(plastic materials, uniform textures, no contact shadows, knife edges, flat light) that no single item below carries.
 Measured numbers come from `tests/visual/out/results.json`; the shots named are in the run's output directory.
-Status: open unless marked.
+Status: open unless marked. Items 7 and 8 become hard CI checks (budgets.json `desk_vertices`, `below_floor_vertices`
+→ 0) once G3's fix lands.
 
 ## G2 · character asset (`web/room/boy.glb`)
 1. **Faceted face.** Flat triangles on cheeks, jaw, neck and collarbones at the 0.5 m close-up (`closeup_face_14.png`);

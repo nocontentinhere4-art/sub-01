@@ -182,8 +182,10 @@ class Harness:
             pg.evaluate("__qa.followCam()")
             r["body"] = pg.evaluate("__qa.body(2)")
             b = r["body"]
-            if b["bed"] > BUDGETS["bed_vertices"] or b["chair"] > BUDGETS["chair_vertices"]:
-                self.res["hard_failures"].append(f"{key}: penetration bed={b['bed']} chair={b['chair']} (budget {BUDGETS['bed_vertices']}/{BUDGETS['chair_vertices']})")
+            for what, field in (("bed", "bed"), ("chair", "chair"), ("desk", "desk"), ("below_floor", "below_floor")):
+                lim = BUDGETS.get(f"{what}_vertices")                   # null: reported, not failed
+                if lim is not None and b[field] > lim:
+                    self.res["hard_failures"].append(f"{key}: {what} penetration {b[field]} sampled vertices (budget {lim})")
             if name in ("desk", "eating", "sleeping", "window") and hour in (14, 23):
                 self.res["props"][key] = pg.evaluate("__qa.props()")
         r["seconds"] = round(time.time() - t0, 1)
