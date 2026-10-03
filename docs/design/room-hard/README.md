@@ -6,7 +6,7 @@ view at 1280×800 and 390×844, day (13:00) and night (21:30, room light and des
 desk in the overview only; the close-ups show the room alone.
 
 Views: `overview`, `desk`, `keyboard`, `keycaps`, `chair`, `shelf`, `bed`, `fridge_door`, `door`, `window`, `floor`,
-`fan_ac`, `headphones`.
+`fan_ac`, `headphones` (`keycaps` and `door` were added after the before set was shot: after only).
 
 ## What changed (room_build/props_hard.py, tex_hard.py, hard_layout.py)
 - **Floor:** Poly Haven `wooden_floor_01` (CC0, Charlotte Baglioni / Rico Cilliers) graded warm, the gaps darkened from
