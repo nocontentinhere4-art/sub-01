@@ -465,7 +465,8 @@ class Life:
 
     def snapshot(self):
         return {"x": round(self.x, 2), "z": round(self.z, 2), "heading": round(self.heading, 2),
-                "walking": bool(self.path), "activity": self.activity, "doing": self.label(),
+                "walking": bool(self.path), "path": list(self.path) or None, "path_to": self.path[-1] if self.path else None,
+                "activity": self.activity, "doing": self.label(),
                 "pose": "walking" if self.path else ACTIVITIES[self.activity][1], "place": self.place,
                 "hunger": round(self.hunger, 2), "vitals": self.body.vitals(), "boredom": round(self.boredom, 2), "bread": self.bread,
                 "phone": self.phone_app if self.activity == "phone" and not self.path else None,

@@ -161,3 +161,16 @@ def test_dish_without_a_wish():
     lf = L.Life(rng=random.Random(4))
     lf.start("order_food", at(20), "hungry")
     assert lf.order_dish in L.DISHES
+
+
+def test_snapshot_sends_the_walk_path():
+    """room.html keys on life.path / life.path_to (screens, props, follow camera, door anchor): while he walks the
+    snapshot must carry them, and both are null once he has arrived: the page tests `!life.path`, and an empty JS array
+    is truthy (#98 G8 defect #21)."""
+    lf = L.Life(rng=random.Random(0))
+    lf.path = ["hall", "desk"]
+    s = lf.snapshot()
+    assert s["walking"] and s["path"] == ["hall", "desk"] and s["path_to"] == "desk"
+    lf.path = []
+    s = lf.snapshot()
+    assert not s["walking"] and s["path"] is None and s["path_to"] is None
