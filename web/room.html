@@ -2725,7 +2725,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       if (v.y > 0.6 && v.z > 0.2 && v.z < 1.6) { minx = Math.min(minx, v.x); if (v.x < -1.775) wall++; } }
     out.wall = {n:wall, minx:+minx.toFixed(3)};
     const hd = bones.Head.getWorldPosition(v);                      // and his head belongs on the pillow
-    out.pillow = {d:+Math.hypot(hd.x + 1.545, hd.z - 0.871).toFixed(3)};
+    out.pillow = {d:+Math.hypot(hd.x + 1.571, hd.z - 0.867).toFixed(3)};   // (the pillow's centre, measured on the model)
     return out; },
   live: (a, x = {}) => { const l = {activity:a, place:"room", ...x}; lastLife = l; place(l); screens(l, "AWAKE"); },
   act: (a, x = {}) => { untouch(); if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"}); if (chairNode()) placeChair(0); const l = {activity:a, place:"room", ...x}; lastLife = l; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = phoneWanted ? 1 : 0; mixer.update(1); },
