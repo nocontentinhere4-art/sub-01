@@ -4,7 +4,7 @@
     python web/neuron_render/build/fetch_h01.py --quick      # the focus cell only (a smoke run)
     python web/neuron_render/build/fetch_h01.py --offline    # from the cache only
 
-Source: H01 (Shapson-Coe A, Mohar M, Meirovitch Y et al. (2024) A petavoxel fragment of human cerebral cortex
+Source: H01 (Shapson-Coe A, Januszewski M, Berger DR et al. (2024) A petavoxel fragment of human cerebral cortex
 reconstructed at nanoscale resolution. Science 384:eadk4858, doi:10.1126/science.adk4858), Google Cloud bucket
 gs://h01-release, "All released datasets are licensed under a Creative Commons Attribution 4.0 License"
 (https://h01-release.storage.googleapis.com/data.html, read 2026-10-02). Read through cloud-volume over HTTPS, once,
@@ -64,7 +64,7 @@ H01_CLASS = {0: "axon", 1: "dendrite", 2: "astrocyte", 3: "soma", 4: "cilium", 5
 # -> renderer kinds: 0 soma, 1 axon (unmyelinated), 2 dendrite, 4 myelinated axon, 5 AIS
 KIND = {3: 0, 0: 1, 1: 2, 2: 2, 4: 2, 5: 5, 1000: 4, 1001: 4, 1002: 4, 1003: 4, 1004: 4, 1005: 4}
 
-CITE = ("Shapson-Coe A, Mohar M, Meirovitch Y, Berger DR et al. (2024) A petavoxel fragment of human cerebral cortex "
+CITE = ("Shapson-Coe A, Januszewski M, Berger DR et al. (2024) A petavoxel fragment of human cerebral cortex "
         "reconstructed at nanoscale resolution. Science 384:eadk4858. doi:10.1126/science.adk4858")
 LICENSE = "CC BY 4.0 (https://h01-release.storage.googleapis.com/data.html: all released datasets are licensed under a Creative Commons Attribution 4.0 License)"
 

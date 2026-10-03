@@ -2,7 +2,7 @@
    kind has an H01 set (cortex); decodes web/neuron_render/h01/<set>.json + <set>_<lod>.bin.gz (gzip, through
    DecompressionStream) into typed arrays the renderer turns into geometry.
 
-   H01: Shapson-Coe A, Mohar M, Meirovitch Y et al. (2024) A petavoxel fragment of human cerebral cortex reconstructed
+   H01: Shapson-Coe A, Januszewski M, Berger DR et al. (2024) A petavoxel fragment of human cerebral cortex reconstructed
    at nanoscale resolution. Science 384:eadk4858. CC BY 4.0 (gs://h01-release). The build script
    (web/neuron_render/build/fetch_h01.py) says exactly what was taken and how it was decimated. */
 (function (root) {

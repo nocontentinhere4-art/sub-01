@@ -29,7 +29,7 @@ NeuroMorpho.Org (RRID:SCR_002145); Tecuatl C, Ljungquist B, Ascoli GA (2024) Acc
 The cortex close-up on `/brain` draws real cells from **H01**, a 1.4-petabyte electron-microscopy reconstruction of
 about one cubic millimetre of human temporal cortex (a surgical sample), released by Google and the Lichtman lab:
 
-> Shapson-Coe A, Mohar M, Meirovitch Y, Berger DR, Ludwig N, Shapson-Coe A, Schalek R, ... Jain V, Lichtman JW (2024)
+> Shapson-Coe A, Januszewski M, Berger DR, ... Jain V, Lichtman JW (2024)
 > A petavoxel fragment of human cerebral cortex reconstructed at nanoscale resolution. Science 384:eadk4858.
 > doi:10.1126/science.adk4858
 

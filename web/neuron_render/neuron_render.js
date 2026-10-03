@@ -31,7 +31,7 @@
     "from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells " +
     "are enlarged and pulses slowed to be visible. A model, not a mind.";
   const H01_SETS = { cortex: "cortex" };                          // close-up kinds with a real H01 set (web/neuron_render/h01/)
-  const H01_CITE = "Shapson-Coe A, Mohar M, Meirovitch Y et al. (2024) A petavoxel fragment of human cerebral cortex reconstructed at nanoscale resolution. Science 384:eadk4858";
+  const H01_CITE = "Shapson-Coe A, Januszewski M, Berger DR et al. (2024) A petavoxel fragment of human cerebral cortex reconstructed at nanoscale resolution. Science 384:eadk4858";
   // published typical values per cell type (sources: docs/spiking/neuron_render.md). spines: per um of dendrite beyond
   // spineFree um from the soma; myelin: ais = premyelin axon initial segment (um), internode length (um), g-ratio,
   // node gap as drawn (um; real ~1 um), maxOrder = axon branch orders that are myelinated; boutonEvery (um) on the
