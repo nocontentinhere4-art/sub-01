@@ -45,8 +45,12 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Live feed: plain `/ws` = 20 ticks/s with per-region activity (brain page); the room connects with `/ws?rate=5&lite=1`
   (5/s, no `act`, trades/events of skipped ticks kept). Room: shadow maps updated by hand (~30/s), DPR capped at 1.5
   with adaptive resolution, nothing rendered while the tab is hidden; brain `?mini` draws 1/6 of the fibres at ≤30 fps.
-- Room model: `web/room/room_clean.glb` (4.0 MB) is a clean rebuild — modelled in Blender by `room_build/build_room.py`
-  (headless Blender 4.2), Poly Haven CC0 props/textures, AO baked into a second UV set; credits in `web/room/CREDITS.md`.
+- Room model: `web/room/room_clean.glb` (see the ROADMAP for the current size; the budget is 7 MB) is a clean rebuild — modelled in Blender by
+  `room_build/build_room.py` (headless Blender 4.2), Poly Haven CC0 props/textures, AO baked into a second UV set; credits in
+  `web/room/CREDITS.md`. The soft goods (#98 G4: socks, towel, duvet, pillow, mattress, curtains, rug, cushion, hoodie, tote,
+  backpack, jeans, T-shirt) are `room_build/props_soft.py` (two cloth simulations; fixed-camera renders by
+  `room_build/shots_soft.py`, before/after in `docs/design/room-soft/`). Thin parts set `ao_small` so the AO bake gives them
+  the white corner (thin UV islands get no texel and render black otherwise); thin sheets carry no rim faces for the same reason.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
@@ -54,7 +58,15 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   swing, his walking graph; `KEEP`/`DOOR_SWING`/`WALK_*`, mirror room.html when its paths change); `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
   modelled in the build (no new downloads), all off the walking graph; the headphones on the wall hook are their own
   node `headphones` (no AO): the page hides them while he wears #82's pair. The hook rail, tote and hoodie are the node
-  `hangers` (origin at the door hinge): `setDoor()` turns it with the opening leaf. `web/room_phone.js`: the phone screen drawn on a canvas
+  `hangers` (origin at the door hinge): `setDoor()` turns it with the opening leaf.
+  #98 G5 (game-quality hard surfaces): `room_build/props_hard.py` builds the furniture, desk things, window, door, fridge,
+  air conditioner, fan, headphones and controller (build_room.py calls it block by block and reads its constants back),
+  `room_build/tex_hard.py` (run by tex_prep.py) draws the plank floor (Poly Haven `wooden_floor_01`), the roughness
+  micro-variation maps and three atlases laid out in `room_build/hard_layout.py`: keycap legends, book spines, decals.
+  Edge wear = tinted vertex colours on the bevels (post.mjs drops all-white COLOR_0); decals are one alpha-blended node
+  `decals`, left out of the AO bake. Materials flagged `nouv` keep their own UVs through the final projection pass
+  (that pass used to overwrite the posters' and pinboard's UVs). Screenshots: `python room_build/shots.py --out <dir>`
+  (fixed cameras, `--glb` to shoot another file, `--cdn-dir` for a local three.js when the sandbox has no CDN). `web/room_phone.js`: the phone screen drawn on a canvas
   (status bar with his Tokyo time, rounded corners, off state, face glow); room.html routes the phone's `set`/`off` through it.
 - Phone grip: while he uses the phone his `RightHand` bone is collapsed into the sleeve and `web/room/hand_phone.glb`
   (a hand gripping a phone, Higgsfield GPT Image + Tripo H3.1, 129 KB) is attached at the wrist; the live screen sits on its glass.
@@ -90,6 +102,43 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `GET /healthz`: public, 200 if the brain loop ticked within 5 s, else 503. Set it as Railway's healthcheck path.
   `GET /api/costs` and `/api/health` are admin-only (the password cookie, or the `SUB01_ADMIN_TOKEN` header). Tick
   times sit in a 1200-entry ring buffer (`Live.tick_s`).
+
+## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
+- Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia
+  loop, 27 Chromium restarts. Root causes:
+  - youtube.com/robots.txt disallows `/results` for every crawler: our robots check refused the YouTube and Shorts
+    sources all day (they could never work). The desk's "watching videos" mode even opened /results without the check.
+  - DuckDuckGo answers datacenter IPs with its bot check ("anomaly", HTTP 202): no `site:tiktok.com` result, so no
+    TikTok card ("no videos reachable"). TikTok's tag and discover pages carry no server-rendered video.
+  - Bursts ~0 on shorts: every short without a profile topic shared the topic "youtube.com" (novelty 0.3 after the
+    first), and the expectation never relaxed between sessions.
+  - HN loop: the same query (e.g. "news wikipedia") searched again and again; most other sources blocked.
+  - "no search box": Science News and RecipeTin's boxes were not found.
+- Fixes:
+  - `youtube_api.py`: the official Data API v3 (`search.list`, `videoDuration=short` + "#shorts" for the phone,
+    `safeSearch=strict`, `videoEmbeddable=true`), only with **`YOUTUBE_API_KEY`** (Railway variable), sent in the
+    `X-Goog-Api-Key` header, never in a URL, a log line, the state or a public view. Free quota: 100 units a search,
+    stops at 9,000 of the 10,000 a Pacific day (`YOUTUBE_DAILY_UNITS` can lower it), each query cached 6 h. Videos
+    play in the official embed player (`youtube-nocookie.com/embed/<id>`, allowed by its robots.txt), opened with our
+    site as referrer (`SUB01_SITE_URL`, default the Railway URL), muted, for at most `SHORTS_MAX_S`. Without the key
+    nothing is asked and the screens panel says "YouTube API key not set". The desk's video mode uses it too.
+  - TikTok: logged in, the account's tag page as before, and when it shows no video `Browser._diag` records why
+    (bot wall / captcha / login prompt / no video links) → `/api/screens` `feeds.tiktok`, plus a screenshot with the
+    header, avatars and names hidden and the top band blacked out at **`/api/diag/tiktok.jpg` (admin only)**.
+    Public videos found by search play in TikTok's official player (`tiktok.com/player/v1/<id>`; robots.txt
+    disallows `/embed/v2` and `/embed/@`, not `/player`), captions from oEmbed through `video_text_ok`; a refused
+    player falls back to the card. DuckDuckGo's bot check is recognised and the engine set aside.
+  - A short's burst topic is its own title when it has no profile topic; the expectation relaxes to 0.6 over 5 min
+    while nothing new plays (`screens.EXPECT0`, `RELAX_S`): a new scroll session surprises again.
+  - The same query is not searched twice a day (a viewer's request excepted); `news` / `recipes` use their own
+    `/?s=` results pages; a robots.txt refusal sets a source aside for the day; the tail of `route()` is only the
+    any-query sources (`TAIL`: hn, news); `Limits` state v2 drops the pre-fix blocks.
+  - Chromium: each restart records why (`/api/health` → `chromium.restart_log`: exit code / signal ("out of
+    memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory.
+  - Viewers: YouTube shorts also get the official embed in the screens panel and on /life's phone.
+- `analysis/novelty_replay.py --youtube-key` (stubbed network as Railway answered on 2026-10-03; not a browser):
+  shorts 34/h on the phone, mean burst 0.18 vs news 0.09 / pages ~0.03, 6,000 API units in 3 h (the 9,000 cap is
+  ~90 searches ≈ 150 shorts a day); without the key: no shorts (TikTok needs a search engine that answers).
 
 ## Reading memory (PR `feature/reading-memory`)
 - What he reads is a stimulus: up to 8 keywords (title + extract) through chat.py's rules at 0.5x a chat message,
@@ -436,6 +485,57 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   look: Lee et al. 2006 PLoS Biol (CC BY 2.5), only in `docs/screens/neuron_render/side_by_side.png`.
 - Checks: `pytest tests/test_neuron_render.py` (node check `tests/js/neuron_render_check.js`); screenshots and timings
   `python tests/neuron_render_shots.py`.
+
+## The brain as a real specimen (#99 G9, PR `feature/brain-anatomy`, `docs/research/real_brain_sources.md`)
+- `/brain` dock row **view: glow · fresh brain · dissected · bundles** + layers **vessels**, **nerves**
+  (`web/brain_anatomy.js`; assets `web/anatomy/`, 1.9 MB, each fetched once when needed; `?view=glow` /
+  `?view=fresh&layers=vessels,nerves` opens one). **"fresh brain" is the default** (coordinator, 2026-10-03); "glow" is
+  the page's own additive look, kept as an option (the mini keeps it). The module swaps the cortex and fibre objects'
+  `material` while a realistic view is on and restores the originals on "glow" (the page's own uniform updates keep
+  pointing at them). "bundles" shares the page's fibre uniforms by reference (stage mix, region activity, the travelling
+  stimulus), so a message still runs along its route and sleep cools the tint, with normal blending and no glow.
+  Every material fades with `window.zoomBrain` (B's zoom, #111). Captions (`#anatcap`) say, part by part, what is HIS
+  and what is an ATLAS, and what is not drawn. The pia's wet patches and the reddish runs in the sulci are shading cues
+  (value noise; the caption says the vessels are a cue, not drawn vessels).
+- **His** (same MRI as the fibres): the cortex (sulcal shading computed in the browser from his own mesh), his
+  cerebellum (folia) and brainstem as their own surfaces (`analysis/build_anatomy.py`: ICBM 2009c's segmentation warped
+  onto his T1 with dipy only to say which of his voxels they are; marching cubes on his tissue above a local Otsu
+  threshold), and the cut plane of the dissected view: his T1 at 2 mm as a tile-atlas texture (`t1_atlas.png`, grey + a soft brain
+  mask in the alpha so the cut's edge has no voxel steps), coloured grey / white / CSF from the peaks of his own
+  histogram (`anatomy.json` → `volume.tissue`). Cut: coronal,
+  sagittal or axial, a slider for the position; the removed side is clipped in the shaders (no renderer clipping).
+- **Atlas, fitted to his brain** (one similarity transform, trimmed ICP of the atlas brain onto `cortex.bin`, RMS
+  ≈ 2.6 mm, in `anatomy.json` → `parts.fit`): BodyParts3D (NBDC archive, **CC BY 4.0** since 2025-02-27; credit line
+  verbatim in `web/anatomy/CREDITS.md` and `/about`) arteries (circle of Willis, carotid, vertebral, basilar,
+  ACA / MCA / PCA and cortical branches, cerebellar arteries; branches just under his surface pressed onto it),
+  nerves II (optic nerve, chiasm, tract), III (orbital branches), IV, V1, the pituitary, a spinal cord stub; VENAT
+  (Huck 2019, **CC BY 4.0**) dural sinuses and large veins (`analysis/venat_veins.py`, through the template affine).
+  **Not drawn, said in the caption:** cranial nerves I, VI–XII, the trunks of III and V, the small bridging veins:
+  no openly licensed model exists (BigBrain, Julich-Brain, Allen, SUIT, Umeå arteries are all non-commercial).
+- Colours: approximate, read off CC0 photographs (Häggström) — `PALETTE` in the module; no photo is shipped.
+- Performance: the fibres stay the page's main cost; the module adds ≤ 36k atlas triangles + 67k for his cerebellum and
+  brainstem. A frame-rate tier: below 28 FPS for 3 s with a realistic view on, the pixel ratio is capped at 1.25 and the
+  cut samples the nearest slice (once; restored on "glow"). Measured only under software WebGL here
+  (`docs/screens/brain_anatomy/results.json`): the ≥ 30 FPS phone check needs a real device.
+- Rebuild: `python analysis/build_anatomy.py` (fetches the template, BodyParts3D 143 MB and VENAT 77 MB into
+  `out/anatomy_work/`, git-ignored; registration ≈ 15 min). Checks: `pytest tests/test_brain_anatomy.py` (node check
+  `tests/js/brain_anatomy_check.js`); screenshots `python tests/brain_anatomy_shots.py [--cdn-dir …]`.
+## Neurons at maximum realism: real H01 cells in the close-ups (#99 A, `docs/spiking/neuron_render.md` § #99)
+- `web/neuron_render/build/fetch_h01.py` builds `web/neuron_render/h01/` once from H01 (Shapson-Coe et al. 2024, human
+  temporal cortex EM, CC BY 4.0, `gs://h01-release`, cached in `data/h01_cache/`): proofread cells' decimated meshes,
+  their SWC skeletons with H01's axon/dendrite/soma/AIS/myelin classes, their synapses, glia from the automated
+  segmentation (labelled not proofread), a crop of the SEM image. Sets: desktop 2.99 MB / 280k triangles, phone 2.01 MB
+  / 151k; lazy-loaded (`h01.js`, gzip + `DecompressionStream`). Re-run the script to change the cell choice (`SETS`).
+- The cortex close-up draws them (`info().source === "H01"`): pulses along the real axon, boutons at real synapse
+  positions, an EM look and the fluorescence look, a µm scale bar. The other regions keep the NeuroMorpho procedural
+  cells, and any failure falls back to them.
+- B's seamless zoom (agreed with B, `docs/spiking/neuron_render_api.md` § #99): `NeuronRender.BLOCK` (the block's µm
+  extent and depth below the pia, readable before open), `NeuronRender.prefetch()`, `openAt(..., {worldPos, normal,
+  cameraDir, cameraUp, entry})` (the block's +y = toward the pia is turned onto B's cortical normal), `nr.ready`,
+  `onEntryEnd`, `nr.setOpacity()`, `onClose("zoomout")`. `info().detailLine` / `sourceLine` are the panel's two detail
+  sentences; `index.html`'s `closeupLine` prints them (two lines changed) so the panel never calls H01 cells NeuroMorpho.
+- Caption (`NeuronRender.CAPTION`) names the datasets and says the activity is simulated; credits on `/about` and in
+  `docs/spiking/morphology_credits.md`.
 
 ## Logged-in TikTok and YouTube, view-only (#60)
 - `sessions.py`: `SUB01_SESSION_TIKTOK` / `SUB01_SESSION_YOUTUBE` (Railway; Cookie-Editor JSON export or Playwright cookies

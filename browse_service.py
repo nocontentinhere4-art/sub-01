@@ -42,7 +42,9 @@ ENV_KEEP = ("PATH", "HOME", "LANG", "TZ", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH", 
             "BROWSE_PROXY", "BROWSE_IGNORE_TLS", "BROWSE_CHROMIUM", "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS",
             # #60: the logged-in sessions reach this process only; browse.py adds them to their site's own browser
             # context and Chromium's environment never carries them (browse.CHROMIUM_ENV)
-            "SUB01_SESSION_TIKTOK", "SUB01_SESSION_YOUTUBE")
+            "SUB01_SESSION_TIKTOK", "SUB01_SESSION_YOUTUBE",
+            # #89: YouTube's Data API key (sent in a header only, never logged) and the site URL embeds see as referrer
+            "YOUTUBE_API_KEY", "YOUTUBE_DAILY_UNITS", "SUB01_SITE_URL")
 
 
 class BrowserDown(Exception):
@@ -92,6 +94,9 @@ def make_app(browser, token=None):
             if st.get("visited") and hasattr(browser, "visited"):  # #89: pages opened this week stay unopened
                 from novelty import Visited
                 browser.visited = Visited(state=st["visited"])
+            if st.get("youtube") and hasattr(browser, "yt"):      # the Data API units spent today
+                from youtube_api import Quota
+                browser.yt = Quota(state=st["youtube"])
         return web.json_response({"ok": True, "applied": fresh})
 
     async def limited(coro, limit, dev):
@@ -139,7 +144,16 @@ def make_app(browser, token=None):
                                   "search_counts": dict(browser.limits.public(), variety=browser.variety.public())
                                   if hasattr(browser, "limits") else None,
                                   "accounts": browser.accounts() if hasattr(browser, "accounts") else None,
-                                  "feed_note": getattr(browser, "feed_note", None)})
+                                  "feed_note": getattr(browser, "feed_note", None),
+                                  "youtube": browser.yt.public() if hasattr(browser, "yt") else None,
+                                  "diag": dict(getattr(browser, "diag", {}))})
+
+    async def diag_shot(request):
+        """The masked screenshot of a logged-in page that showed no video (the live server serves it admin-only)."""
+        shot = getattr(browser, "diag_shot", {}).get(request.match_info["site"])
+        if not shot:
+            raise web.HTTPNotFound()
+        return web.Response(body=shot, content_type="image/jpeg")
 
     async def health(request):
         return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(tree_rss_mb(os.getpid()), 1)})
@@ -149,6 +163,7 @@ def make_app(browser, token=None):
     app.router.add_get("/shot/{device}.jpg", shot)
     app.router.add_get("/state", state)
     app.router.add_get("/health", health)
+    app.router.add_get("/diag/{site}.jpg", diag_shot)
 
     async def shutdown(app):
         await browser.close()
@@ -203,6 +218,8 @@ class BrowserClient:
         self.log = []
         self.searches = None                                    # searches per source today (/api/browsing, #56)
         self.feed_note = None                                   # what the short-video feed could not do (#89)
+        self.youtube = None                                     # Data API key set? units used today (never the key)
+        self.diag = {}                                          # site -> why its logged-in feed showed no video
         self.accounts = None                                    # logged in / out per site (/api/browsing, #60)
         self.shots = {}                                         # device -> (shot id, jpeg bytes)
         self.restarting = False
@@ -274,6 +291,8 @@ class BrowserClient:
         self.log = d.get("log", [])
         self.searches = d.get("search_counts")
         self.feed_note = d.get("feed_note")
+        self.youtube = d.get("youtube")
+        self.diag = d.get("diag") or {}
         self.accounts = d.get("accounts")
         for dev, st in (d.get("screens") or {}).items():
             if st:
@@ -291,6 +310,10 @@ class BrowserClient:
             return have[1] if have else None
         self.shots[device] = (int(headers.get("X-Shot-Id", want or 0)), raw)
         return raw
+
+    async def diag_shot(self, site):
+        status, raw, _ = await self._get(f"/diag/{site}.jpg")
+        return raw if status == 200 else None
 
     async def health(self):
         status, raw, _ = await self._get("/health", timeout=5.0)
@@ -312,6 +335,7 @@ class LocalBrowser:
         self.token = secrets.token_hex(16)
         self.proc = None
         self.restarts = 0
+        self.restart_log = []                                   # [{t, why, rss_mb}]: why each restart happened (#89)
         self.client = BrowserClient(f"http://127.0.0.1:{self.port}", self.token)
 
     async def spawn(self):
@@ -364,7 +388,14 @@ class LocalBrowser:
             why = f"{self.client.failures} calls failed (hung?)"
         elif self.alive():
             return "ok"
+        elif self.proc is not None:                             # it exited by itself: its exit code says how
+            code = self.proc.returncode
+            why = (f"exited, killed by signal {-code}" + (" (out of memory?)" if code == -9 else "")
+                   if code is not None and code < 0 else f"exited with code {code}")
         restarting = self.proc is not None
+        if restarting:
+            rss = round(tree_rss_mb(self.proc.pid), 1) if self.alive() else None
+            self.restart_log = (self.restart_log + [{"t": round(time.time()), "why": why, "rss_mb": rss}])[-20:]
         if why:
             print(f"browse service {why}: restarting", flush=True)
         await self.kill()

@@ -11,8 +11,12 @@ rug, doormat and poster frames are all built from code in `room_build/build_room
 #75: the hoodie on the door hook, the backpack, the floor cushion, the electric fan, the slippers, the laundry pinch
 hanger with socks and a towel, the manga stack, the game controller (a generic shape, no maker's design), the
 headphones and their wall hook, the cat figure on the window sill, the cork pinboard, the wall socket, the power strip
-and the cables. The duvet's drape comes from a
-Blender cloth simulation. The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
+and the cables. The soft goods (#98) are built by `room_build/props_soft.py`: the socks (heel, toe, ribbed cuff) and
+the terry hand towel on the pinch hanger, the mattress with its fitted sheet, the pillow in its case, the duvet (a
+Blender cloth simulation, turned back over itself at the head end, then box-quilted), the curtains with their pencil
+pleats and hems, the rug with its bound edge, the tufted floor cushion, the hoodie and the canvas tote on the door
+hooks, the backpack, and two clothes: jeans in a heap by the bed's foot and a T-shirt thrown on the bed (a second cloth
+simulation). The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
 is its own node, `chair` (origin on the floor under the gas lift), so it can be moved: it has its own materials and its
 own AO (`chair_ao`, self-occlusion only), and the room's AO is baked without it.
 
@@ -25,19 +29,38 @@ are original graphics drawn by `room_build/tex_prep.py`. Their Japanese
 text is set in **Noto Sans JP** (© Adobe, SIL Open Font License 1.1). Only rendered pixels are used; the font file is not
 shipped.
 
+## The hard surfaces at game quality (#98 G5, CC0)
+`room_build/props_hard.py` rebuilds the hard surfaces with more detail and `room_build/tex_hard.py` draws their textures
+(both original work for this project, CC0): the desk and its steel frame, the monitor, the tenkeyless keyboard with real
+keycaps, the mouse, the speakers, the mug, the pen cup, the office chair, the storage bed frame, the bookshelf and its
+books, the fridge, the door with its handle and hinges, the window frame and aluminium sashes, the air conditioner, the
+fan, the headphones and the controller. Edge wear sits in the vertex colours of every bevel, roughness micro-variation in
+small generated maps (plastic, painted metal, brushed steel, plaster, oak) and the decals (dust, scuffs, scratches, a
+coffee ring, stickers: a cat, a mountain, a 東京 badge, a star, a record, a smile, waves, an onigiri; no brands) are
+alpha-blended quads from `decals.png`. The keycap legends (`keycaps.png`) and the book spines (`spines.png`: generic
+titles, no real books) are original drawings; their Latin text is set in **DejaVu Sans** (Bitstream Vera licence, free
+to use and redistribute), the Japanese text in Noto Sans JP as above. Only rendered pixels are shipped.
+
 ## Poly Haven (https://polyhaven.com), CC0 1.0
 Textures (each recoloured or regraded in `tex_prep.py`):
 
 | use | asset | authors |
 |---|---|---|
-| floor | `wood_floor` | Dimitrios Savva |
+| floor (#98 G5) | `wooden_floor_01` (graded, worn patches and scratches added in `tex_hard.py`) | Charlotte Baglioni, Rico Cilliers |
+| floor (until #98) | `wood_floor` | Dimitrios Savva |
 | wall plaster | `white_stucco` | Amal Kumar |
 | desk, shelf, bed, door wood | `oak_veneer_01` | Jenelle van Heerden |
-| bed sheet, pillow | `cotton_jersey` | colormass, Rico Cilliers |
+| bed sheet, mattress cover, pillow; the floor cushion and the T-shirt (recoloured) | `cotton_jersey` | colormass, Rico Cilliers |
 | duvet | `waffle_pique_cotton` | colormass, Rico Cilliers |
-| curtains | `rough_linen` | colormass, Rico Cilliers |
+| curtains; the tote's canvas (recoloured) | `rough_linen` | colormass, Rico Cilliers |
 | rug | `poly_wool_herringbone` | colormass, Rico Cilliers |
 | chair fabric, desk mat (normal map) | `jersey_melange` | colormass, Rico Cilliers |
+| socks (normal map) | `knitted_fleece` | colormass, Rico Cilliers |
+| hand towel | `terry_cloth` | colormass, Rico Cilliers |
+| hoodie | `jogging_melange` | colormass, Rico Cilliers |
+| the hoodie's ribbed hem and cuffs (normal map) | `ribbed_corduroy` | colormass, Rico Cilliers |
+| backpack (normal map) | `bi_stretch` | colormass, Rico Cilliers |
+| jeans | `denim_fabric_05` | colormass, Rico Cilliers |
 
 Models:
 
@@ -65,14 +88,58 @@ offender stops the build.
 ## Rebuilding
 From `room_build/`, with Blender 4.2 and Node 22:
 
-    python ph.py tex 2k wood_floor
+    python ph.py tex 2k wooden_floor_01
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
+    python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
-    python tex_prep.py
-    blender -b -P build_room.py -- --sweep   # 20 s: only the prop sweep (out/sweep.txt), no bake, no export
-    blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
+    python tex_prep.py                       # (runs tex_hard.py too: the hard surfaces' textures and atlases)
+    blender -b -P build_room.py -- --sweep   # a few minutes (the two cloth simulations): only the prop sweep (out/sweep.txt), no bake, no export
+    blender -b -P build_room.py          # the cloth simulations plus the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
+    python shots_soft.py --glb ../web/room/room_clean.glb --tag after   # fixed-camera renders (docs/design/room-soft)
+    python shots.py --out ../docs/design/room-hard/after      # fixed-camera screenshots of the hard surfaces (from the repository root: python room_build/shots.py)
+
+## His motion (`boy_moves.glb`, #76)
+New clips for the first character (`boy.glb`, its own 24-bone rig): in the room they take over walking, sitting at the
+desk (typing) and lying with the phone (`?moves=old` shows the first clips); the other clips are in the file for later.
+- **Quaternius, Universal Animation Library (Standard)** (https://quaternius.com/packs/universalanimationlibrary.html),
+  obtained 2026-10-02. Licence, recorded on that date: the archive's own `License.txt` reads "CC0 1.0 Universal (CC0 1.0)
+  Public Domain Dedication, https://creativecommons.org/publicdomain/zero/1.0/ / Models by @Quaternius", and the pack
+  page says "CC0 License"; the site-wide Quaternius Asset License v1.0 (https://quaternius.com/license.html, last
+  updated 2026-08-28; its § 7: the version in effect when the assets were obtained governs) allows incorporating the
+  assets, original or modified, into a product and distributing that product without attribution, and forbids
+  redistributing them as a standalone asset or pack. The clips here are retargeted onto this project's rig inside the
+  site's own file (`boy_moves.glb`), not offered as a pack; credit to Quaternius is given anyway. Clips used:
+  `Idle_Loop` → `stand_idle`, `Walk_Loop` → `walk`, `Sitting_Enter` / `Sitting_Exit` / `Sitting_Idle_Loop` → `sit_down_chair` / `stand_up_chair` / `sit_idle_upright` (and, raised to the mattress,
+  `sit_down_bed_edge` / `stand_up_bed_edge` / `sit_edge_idle`), `PickUp_Table` → `take_item`, `Interact` → `door_open_pull`;
+  `Crouch_Idle_Loop` is a key pose of `crouch_drop`.
+- **Keyed for this project** (original keyframes and IK; the standing and seated poses they start from are UAL's,
+  under the terms above): the bed set (`lie_back_idle`, `lie_side_left/right`,
+  `roll_*`, `sleep_breathing*`, `lie_down_from_edge`, `get_up_to_edge`, `lie_phone`), `type`, `mouse`, `walk_start`,
+  `walk_stop`, `turn_in_place_*`, `lean_on_sill`, `stretch_arms_up`, `scratch_head`, `look_around`, `crouch_drop`,
+  `put_down`, `sit_lean_back`, `sit_eat_chopsticks`, `sit_drink`.
+
+They are made on an authoring body, not shipped: a MakeHuman / MPFB 2 body (CC0 base mesh and `game_engine` rig, given
+the first rig's bone names and rest frames) built by `room_build/build_boy.py`. The UAL clips are retargeted onto it
+(T-pose correspondence, feet pinned by IK) and the keyed poses are set on it by IK against its own skin (the mattress,
+the seat, the keys). `room_build/boy_post.mjs` then carries every clip onto the first rig: each bone turns in the world
+as on the authoring body from its rest; the hips are scaled by the leg ratio and set from his own lowest skin (the
+floor, or the mattress when lying); when seated his hips go up to his seat height and his legs reach down by IK. It
+also writes `docs/motion/deform_check.json`, a skin check of every clip on `boy.glb`.
+
+Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension and the MakeHuman system assets; UAL's glTF at
+`$UAL`):
+
+    node boy_ref.mjs                     # the first rig's rest pose and palms -> out/boy_ref.json
+    blender -b -P build_boy.py           # the authoring body -> out/boy2_raw.glb, out/boy2_bind.json
+    node boy_post.mjs                    # -> ../web/room/boy_moves.glb, ../docs/motion/deform_check.json
+
+## The first character
+`boy.glb` and the clips `boy_*.glb` (shown by default) are the earlier AI-generated character (Meshy, via Higgsfield;
+generated content under those services' terms, not a Creative Commons licence), and `hand_phone.glb` the
+phone-gripping hand (GPT Image + Tripo, via Higgsfield); the clips are Meshy library animations re-rigged on its
+skeleton.
 
 ## His movement and the things he handles (#63)
 No animation clips were added. The clips are the ones already in `web/room/` (`boy_*.glb`, the same rig). Everything new is
@@ -101,6 +168,39 @@ https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`
 
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).
+
+## The view out of the window (#98 G7)
+`web/room/window_view.js` draws the outside on the glass marker (`SURF_window`): a parallax shader that casts each view
+ray from the room's camera through the glass onto photographic plates behind it (the neighbourhood by day and at night,
+the far skyline, a utility pole, a real sky), so the view has true depth from every camera. The plates in
+`web/room/window/` are cut out and prepared by `room_build/window_cards.py` from these sources (all free for any use;
+each licence was read from the Commons API's `extmetadata` / Poly Haven's `/info` at fetch time and is recorded with the
+source's URL and checksum in `web/room/window/plates.json`):
+
+| plate | source | author | licence |
+|---|---|---|---|
+| `mid.webp`: the neighbourhood by day (an elevated view over the ward next to Kichijōji) | [Suginami City 2024-05-06.jpg](https://commons.wikimedia.org/wiki/File:Suginami_City_2024-05-06.jpg) | ウィキ太郎 | Public domain |
+| `mid_n.webp`: the neighbourhood at night, with its real lit windows (`mid_l.webp` marks them) | [Blue illuminated buildings in Tokyo.jpg](https://commons.wikimedia.org/wiki/File:Blue_illuminated_buildings_in_Tokyo.jpg) | Syced | CC0 |
+| `far.webp`: the far skyline at twilight (the water and the expressway cropped away) | [Illuminated buildings at twilight in Minato-ku, Tokyo, view from Rainbow Bridge (2016-12-10 by xegxef @Pixabay 2086645).jpg](https://commons.wikimedia.org/wiki/File:Illuminated_buildings_at_twilight_in_Minato-ku,_Tokyo,_view_from_Rainbow_Bridge_(2016-12-10_by_xegxef_@Pixabay_2086645).jpg) | xegxef | CC0 |
+| `sky.webp` row 0: clear day | [Kloofendal 43d Clear (Pure Sky)](https://polyhaven.com/a/kloofendal_43d_clear_puresky) | Greg Zaal (All) | CC0 |
+| `sky.webp` row 1: partly cloudy day | [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal (Original), Jarod Guest (Sky edits) | CC0 |
+| `sky.webp` row 2: overcast | [Kloofendal Overcast (Pure Sky)](https://polyhaven.com/a/kloofendal_overcast_puresky) | Greg Zaal (All) | CC0 |
+| `sky.webp` row 3: sunset | [Belfast Sunset (Pure Sky)](https://polyhaven.com/a/belfast_sunset_puresky) | Greg Zaal (Processing), Dimitrios Savva (Photography), Jarod Guest (Sky edits) | CC0 |
+| `sky.webp` row 4: dusk (blue hour) | [Qwantani Dusk 2 (Pure Sky)](https://polyhaven.com/a/qwantani_dusk_2_puresky) | Greg Zaal (Photography), Jarod Guest (Processing) | CC0 |
+| `sky.webp` row 5: night | [Kloppenheim 02 (Pure Sky)](https://polyhaven.com/a/kloppenheim_02_puresky) | Greg Zaal (Original), Jarod Guest (Sky edits) | CC0 |
+
+Wikimedia Commons CC0: https://creativecommons.org/publicdomain/zero/1.0/ · the Suginami photograph was released into the
+public domain by its author (Commons `{{PD-self}}`). The Rainbow Bridge photograph is a Pixabay picture from 2016, when
+Pixabay's licence was CC0; the Commons copy carries that licence. Poly Haven assets are CC0: https://polyhaven.com/license.
+Only the skies' upper hemispheres are used (±70° of azimuth, -2..50° of elevation, with the sun or the moon kept out of
+the crop; the shader draws its own). The photographs contain no readable signage; the skyline's landmark tower appears as
+photographed. The utility pole and its cables (`near.webp`) and the rain's noise texture are drawn from code, original work
+for this project, CC0. The sources themselves (~120 MB) are not committed: `python room_build/window_cards.py --fetch`
+re-downloads them (Wikimedia rate-limits shared addresses; the script waits and retries).
+
+The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
+pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented
+as a forecast or an observation.
 
 ## The character (#98, G2): `boy.glb` rebuilt in place
 `boy.glb` is still the project's own AI-generated character (Meshy, via Higgsfield; the owner's choice), with the same

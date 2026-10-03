@@ -5,10 +5,7 @@
 .nx summary::-webkit-details-summary { display:none; }
 .nx summary::marker { content:""; }
 .nx summary b { font-weight:normal; color:#ececf2; }
-.nx summary .nx-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#2a2a36; vertical-align:middle; flex:none; }
-.nx[data-live="1"] summary .nx-dot { background:#ff6a00; box-shadow:0 0 6px #ff6a00; animation:nxpulse 1.2s infinite; }
 .nx[data-live="1"] summary b { color:#ff6a00; }
-@keyframes nxpulse { 50% { opacity:.25; } }
 .nx-body { margin-top:8px; display:flex; flex-direction:column; gap:6px; min-width:0; }
 .nx-count { color:#ececf2; font-size:12px; }
 .nx-row { line-height:1.5; overflow-wrap:anywhere; }

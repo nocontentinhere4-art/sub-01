@@ -15,6 +15,52 @@ not drawn while a close-up is open (the page's loop should `return` while `nr` e
 <script src="/neuron_render/neuron_render.js"></script>   <!-- after three.js; loads /neuron_render/cells.json itself -->
 ```
 
+## #99: real H01 cells, the seamless zoom, two looks (additions; everything above still holds)
+
+- The cortex close-up draws **real electron-microscopy reconstructions** (H01, Shapson-Coe et al. 2024, CC BY 4.0:
+  proofread human temporal-cortex cells with their spines, synapses and H01's own axon / dendrite / soma / AIS /
+  myelinated-axon labels; glia from the automated segmentation; a real EM image behind). Assets are lazy-loaded from
+  `web/neuron_render/h01/` (≤ 3 MB per region set, gzip; decoded with `DecompressionStream`). Regions H01 does not
+  cover (striatum, thalamus, hippocampus, amygdala) keep the NeuroMorpho.Org procedural cells; `info().source` says
+  which ("H01" or "NeuroMorpho"), and `nr.caption()` says it in words.
+- **Entry animation for B's zoom:** `open(container, {..., entry: {ms: 1200, from: 6}})`: the camera starts `from`×
+  farther than the default framing and flies in over `ms` while the canvas fades in. `nr.ready` is a Promise resolved
+  at the first drawn frame; `onEntryEnd()` fires when the fly-in ends.
+- **`NeuronRender.openAt(container, opts)`** = `open()` + B's zoom end, all in B's world coordinates:
+  - `worldPos` (the brain-space point B zoomed into; stored in `info().worldPos` for B's bookkeeping);
+  - `normal` (the outward cortical normal there): the block's **+y is "toward the pia"**; the whole block is turned so
+    that +y lies along `normal` (shortest rotation; `info().normal` echoes it). Without it the block stands with +y up;
+  - `cameraDir` (unit vector: B's view direction at the cut) and optionally `cameraUp` (B's camera up, default
+    world +y): the entry camera looks along `cameraDir` with that up, so the cut is continuous;
+  - `entry: {ms, from}` (the fly-in, above). Without any of them `openAt` behaves as `open`.
+- **`NeuronRender.BLOCK`** (a static, readable before `open()`): the cortex block's extent in µm in the block frame,
+  the union of the H01 cells' bounding boxes (`h01/cortex.json`): `{um: [w, h, d], min, max, pia: "+y", focusUm:
+  [0, 0, 0], focusDepthUm, depthUm: [top, bottom], depthApprox: true}`. `depthUm` is how deep below the pia the
+  block's top and bottom lie, estimated from H01's soma table (the highest layer-1 somata of this column sit about
+  780 µm above the focus soma), good to roughly ± 100 µm; `focusDepthUm` is the focus soma's. B sizes and places
+  the zoom target from it; a test checks it against the manifest.
+- **`NeuronRender.prefetch({kind, lod, base})`** starts fetching the region's H01 set (`h01.js`, the cells, the EM
+  slice) while B's camera is still flying; a later `open()`/`openAt()` finds it in the module cache. Resolves to the
+  decoded set, or `null` where the kind has no H01 set or the browser lacks `DecompressionStream` (then `open()`
+  draws the NeuroMorpho cells as before). Safe to call more than once.
+- **`nr.setOpacity(a)`** (0..1) fades the whole close-up (canvas, HUD, scale bar) for B's cross-fade on the way out;
+  `nr.opacity()` reads it back. It multiplies the entry fade-in, which the module runs by itself (the canvas starts
+  at 0 and is fully in after 40 % of `entry.ms`), so B need not drive the fade-in.
+- **`info().detailLine` / `info().sourceLine`**: two ready-made sentences for the page's panel: what this close-up
+  draws (cells, proofread detail, synapses, myelin, triangles, style) and where the shapes come from (H01 cells with
+  their ids, or the NeuroMorpho.Org ids). `index.html` prints them as they are, so the panel never says NeuroMorpho
+  for H01 cells or the other way round.
+- **Styles:** `setStyle("em" | "fluorescence")`: EM-grey tissue (membrane-like shading, the real SEM slice behind, a
+  dark grey field) and confocal fluorescence (sparse-label colours, depth of field). `"render"` is kept as an alias of
+  `"fluorescence"`. A real **scale bar** (µm) sits in the HUD, computed from the camera at the focus depth.
+- **Caption:** `NeuronRender.CAPTION` is now: "Shapes are real reconstructed neurons from public datasets (H01 human
+  cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a
+  point-neuron network and slowed down to be visible. A model, not a mind." It is true for every close-up;
+  `nr.caption()` adds which dataset this close-up draws.
+- Activity on H01 cells: the pulse runs along the cell's **real axon** (its skeleton, path distance from the soma),
+  saltatory on the stretches H01 labels as myelinated; the cell's **real presynaptic sites** flash when the pulse
+  reaches them; its incoming synapses are drawn as dots. Still only recorded spikes of sampled model neurons.
+
 ## Open / close
 
 ```js
@@ -49,7 +95,7 @@ nr.onFrame(msg)                // every {"type":"spiking"} websocket frame, as r
 nr.spike(slot, delayMs = 0)    // alternative to onFrame: one recorded spike of this region (slot 0-255), to play after delayMs
 nr.rates(rq)                   // alternative to onFrame: Uint8Array(214) of rate bytes (quantise_rates) or a number for this region
 nr.setLive(false)              // force offline (e.g. the socket closed): static cells, caption "no live network"
-nr.debugTime(s | null)         // test hook: freeze the clock s seconds after the last spike() (screenshots under software GL)
+nr.debugTime(s | null)         // test hook: freeze the clock s seconds after the last spike(); frames bring no new spikes while held
 ```
 
 What a spike does: the cell's soma flashes; an action potential runs from the soma along the axon at the real

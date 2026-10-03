@@ -54,6 +54,13 @@ for (const e of root.listExtensionsUsed()) if (e.extensionName === "KHR_material
 for (const t of root.listTextures()) if (!t.getName()) t.setName((t.getURI() || "tex").replace(/\.[a-z]+$/, ""));
 const isProp = t => /desk_lamp|potted|wall_clock|alarm|cardboard|notepad/i.test(t.getName() + t.getURI());
 console.log("textures:", root.listTextures().map(t => `${t.getName()} ${t.getImage().byteLength >> 10}K`).join(", "));
+// vertex colours carry the edge wear (#98 G5); a primitive whose colours are all white has none: drop the attribute
+for (const m of root.listMeshes()) for (const p of m.listPrimitives()) {
+  const c = p.getAttribute("COLOR_0"); if (!c) continue;
+  const v = []; let white = true;
+  for (let i = 0; i < c.getCount() && white; i++) { c.getElement(i, v); for (let k = 0; k < 3; k++) if (v[k] < 0.998) { white = false; break; } }
+  if (white) p.setAttribute("COLOR_0", null);
+}
 
 await doc.transform(
   dedup(), flatten(), join({keepNamed: false}), weld(), resample(),
