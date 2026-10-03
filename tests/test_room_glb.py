@@ -138,7 +138,8 @@ def test_movable_nodes_do_not_share_the_rooms_ao():
     for p in g["meshes"][child["mesh"]]["primitives"]:
         occ = mats[p["material"]].get("occlusionTexture")
         if occ and room_ao:
-            assert g["textures"][occ["index"]]["source"] != room_ao[0]
+            t = g["textures"][occ["index"]]                                # WebP textures name their image in the extension
+            assert t.get("source", t.get("extensions", {}).get("EXT_texture_webp", {}).get("source")) != room_ao[0]
 
 
 def test_markers_and_pivots_stay_where_the_page_expects():
