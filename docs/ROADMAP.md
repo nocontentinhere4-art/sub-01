@@ -325,12 +325,15 @@ findings "NOT verified", and its reviews are partial on large diffs.
     - #116: the room's mini brain shows only real fibres, no cell dots.
     - #118: illustrated README; the technical sections moved to `docs/TECHNICAL.md`.
     - The H01 author list was corrected (9eb0afd).
+    - #121: G8's visual suite now checks the room's mini brain (no neurons=1, no forest, fibres present).
+    - #120: G7's window glass at grazing angles (G8 #26): the view stays, the reflection is capped, cables are strands.
 - **Bed regression (owner, confirmed live at 06:11 Tokyo):**
   - What happens: he lies on top of the duvet, diagonally, with his head into the wall. Then #107's duvet under
     #108's lift becomes a tent with a black hole, and the slides poke out at the foot end (G8 defect #25).
   - Assigned to the #63 worker on `fix/bed-duvet` (the room.html sleep block), with G4 on `props_soft.py` (pillow loft,
     duvet thickness or back faces, seams, sock cuffs = #23, #24).
-- **Other G8 defects:** #26 (glass Fresnel, wires) → G7 on `fix/window-glass`; #27 (typing hands) → G3.
+- **Other G8 defects:** #26 fixed by #120; #27 (typing hands) → G3. G4's mesh half of the bed fix is #119 (draft), which
+  ships inside the #63 worker's PR. At 22:36 that worker was still rendering poses and tuning head drift.
 - **Open PRs:**
   - #114 (G3, ARDY plus the procedural layer, `?motion=` table): the motion sheet is pending.
   - #103 (G6): fixed exposure per state; boy.glb was rendering fully metallic. The final push is pending.
