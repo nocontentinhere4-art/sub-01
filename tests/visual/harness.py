@@ -111,8 +111,14 @@ class Harness:
         lf, stage, before, settle_s, at, clip = S.SCENES[name]
         self.server.set_scene(name, hour)
         pg.evaluate(f"setHour({hour})")
-        pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
-                             f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000)
+        try:
+            pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
+                                 f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000)
+        except Exception as e:                                     # say where he was and what the page threw, not just "timeout"
+            st = next((v[2] for v in self.pages.values() if v[1] is pg), {})
+            state = pg.evaluate("JSON.stringify({pose: pose(), clock: document.getElementById('clock').textContent})")
+            raise AssertionError(f"scene {name}@{hour}: page never took the scene ({e.__class__.__name__}); {state}; "
+                                 f"page errors {st.get('errors', [])[:5]}") from e
         pg.evaluate(f"act({json.dumps(lf['activity'])}, {json.dumps(lf)}); __qa.clearFood()")
         pg.wait_for_timeout(250)                                   # a tick and the UI timer (screens(): monitor, phone, stage)
 
