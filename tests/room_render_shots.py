@@ -27,7 +27,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-HOURS = {8: "research", 14: "window", 19: "research", 23: "phone"}
+# scene per shot: hour -> (activity, sleep stage, screen); "23s" is 23:00 asleep with the lights off (G8's #15)
+HOURS = {8: ("research", "AWAKE", "desk", "face"), 14: ("window", "AWAKE", None, "medium"), 19: ("research", "AWAKE", "desk", "face"),
+         23: ("phone", "AWAKE", "phone", "over"), "23s": ("sleep", "NREM", None, "medium")}   # the 4th item: the camera shot pinned (after this branch)
 INJECT = """
 (() => {
   window.__fps = (ms) => new Promise(res => { let n = 0; const t0 = performance.now();
@@ -87,7 +89,7 @@ def main():
     ap.add_argument("--out", default="docs/design/room-render")
     ap.add_argument("--tag", default="after")
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
-    ap.add_argument("--hours", default="8,14,19,23")
+    ap.add_argument("--hours", default="8,14,19,23,23s")
     ap.add_argument("--fps-s", type=float, default=6.0)
     ap.add_argument("--no-fps", action="store_true")
     ap.add_argument("--sizes", default="1280,390")
@@ -96,7 +98,7 @@ def main():
     args = ap.parse_args()
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
-    hours = [int(h) for h in args.hours.split(",")]
+    hours = [int(h) if h.isdigit() else h for h in args.hours.split(",")]
     sizes = [int(s) for s in args.sizes.split(",")]
 
     tmp = tempfile.mkdtemp(prefix="roomshots-")
@@ -133,8 +135,14 @@ def main():
                 return ctx, pg, errors
 
             def settle(pg, hour):
-                pg.evaluate(f"""() => {{ setHour({hour}); setScreen({json.dumps('desk' if HOURS[hour] == 'research' else 'phone' if HOURS[hour] == 'phone' else None)});
-                  act({json.dumps(HOURS[hour])}); settle(); for (let i = 0; i < 40; i++) sim(0.05); updateCameraGoal();
+                act, stage, screen, shot = HOURS[hour]
+                h = int(str(hour).rstrip("s"))
+                pg.evaluate(f"""() => {{ setHour({h}); setStage({json.dumps(stage)}); setScreen({json.dumps(screen)}); if (window.setShot) setShot({json.dumps(shot)});
+                  scene.traverse(o => {{ if (o.isMesh && o.geometry.type === "SphereGeometry" && o.material.color && o.material.color.getHex() === 0xff00ff) o.visible = false; }});   // ?debug's marker balls
+                  act({json.dumps(act)}); settle(); for (let i = 0; i < 40; i++) sim(0.05);
+                  if ({json.dumps(screen)} === "desk" && monitor) monitor.set(drawReading({{title: "Inokashira Park", host: "en.wikipedia.org", kind: "wiki",
+                    extract: "Inokashira Park is a park in Musashino and Mitaka, western Tokyo. It straddles the border between the two cities, and was opened in 1917. The park has a pond, a zoo, a shrine to Benzaiten, a boating area and many cherry trees."}}));
+                  settle(); updateCameraGoal();
                   camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); }}""")
                 pg.wait_for_timeout(2500)
 
@@ -143,11 +151,11 @@ def main():
                 for hour in hours:
                     ctx, pg, errors = page_for(w, h, hour, mobile)
                     settle(pg, hour)
-                    name = f"{args.tag}_{tag}_h{hour:02d}.jpg"
+                    name = f"{args.tag}_{tag}_h{str(hour).zfill(2)}.jpg"
                     pg.evaluate("window.FREEZE = true")            # ?debug: the loop stops; the screenshot takes the last frame (software GL is slow)
                     pg.screenshot(timeout=240000, path=str(out / name), type="jpeg", quality=88)
                     pg.evaluate("window.FREEZE = false")
-                    info = pg.evaluate("() => ({dpr: window.dpr, post: window.post ? window.post.info() : null, gl: renderer.capabilities.isWebGL2})")
+                    info = pg.evaluate("() => ({dpr: window.dpr, post: window.post ? window.post.info() : null, gl: renderer.capabilities.isWebGL2, shot: window.CAM ? window.CAM.kind : null, cam: camera.position.toArray().map(v => +v.toFixed(2))})")
                     results[name] = {"errors": errors[:5], **info}
                     print("shot", name, json.dumps(info)[:300], flush=True)
                     ctx.close()

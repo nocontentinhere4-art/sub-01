@@ -35,7 +35,7 @@ class Obj { constructor() { this.children = []; this.visible = true; this.positi
   add(...o) { this.children.push(...o); return this; } }
 class Geom { constructor(w = 1, h = 1) { this.attributes = {position: {count: 4}}; this.w = w; this.h = h; } setAttribute(k, a) { this.attributes[k] = a; } dispose() {} }
 class Mat { constructor(p = {}) { Object.assign(this, p); this.uniforms = p.uniforms || {}; } dispose() {} }
-class RT { constructor(w, h, o = {}) { this.width = w; this.height = h; this.texture = {name: ""}; this.depthTexture = o.depthTexture || null; } dispose() {} }
+class RT { constructor(w, h, o = {}) { this.width = w; this.height = h; this.texture = {name: ""}; this.depthTexture = o.depthTexture || null; this.samples = o.samples || 0; } dispose() {} }
 const THREE = {
   Vector2: class V2 { constructor(x = 0, y = 0) { this.x = x; this.y = y; } set(x, y) { this.x = x; this.y = y; return this; } clone() { return new V2(this.x, this.y); } },
   Vector3: V3, Matrix4: M4, Color, Group: Obj, Mesh: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; this.renderOrder = 0; } },
@@ -51,7 +51,7 @@ const THREE = {
 // ---- stub passes, as the page's import map would give them ----
 function mods(fail = new Set()) {
   class Pass { constructor() { this.enabled = true; this.renderToScreen = false; this.sized = null; } setSize(w, h) { this.sized = [w, h]; } dispose() {} }
-  class EffectComposer { constructor(r, rt) { this.renderer = r; this.rt = rt; this.passes = []; this.renders = 0; this.size = null; this.pr = 1; }
+  class EffectComposer { constructor(r, rt) { this.renderer = r; this.rt = rt; this.passes = []; this.renders = 0; this.size = null; this.pr = 1; this.writeBuffer = rt; }
     addPass(p) { this.passes.push(p); p.setSize(1, 1); } setSize(w, h) { this.size = [w, h]; } setPixelRatio(p) { this.pr = p; }
     render() { this.renders++; if (this.renderer.throwOnComposer) throw new Error("composer boom"); } }
   class RenderPass extends Pass { constructor(s, c) { super(); this.kind = "render"; } }
@@ -81,6 +81,7 @@ async function main() {
   post.setSize(1280, 800, 1.5);
   await post.ready;
   for (const t of P.TIERS) { post.setTier(t); const info = post.info(); out.chains[t] = {chain: info.chain, active: info.active, mode: post.render(0.016), halfRes: post.passes.ao.configuration.halfRes,
+    msaa: post.composer === post.composers.msaa,
     dof: info.dof, aa: info.aa, bloom: info.bloom, grain: info.grain, shadow: info.shadow, env: info.env, shafts: info.shafts, hdr: info.hdr}; }
   post.setTier("high"); post.focus(1.2, 1); out.chains.high.dof_on = post.info().dof; out.chains.high.depth_from = post.passes.dof.uniforms.tDepth.value && post.passes.dof.uniforms.tDepth.value.tag;
   post.focus(1.2, 0); out.chains.high.dof_off = post.info().dof;

@@ -17,9 +17,12 @@ export const TIERS = ["low", "medium", "high"];
 // what each tier draws; `ao` is N8AO's resolution, `aa` the anti-aliasing pass after the grade
 export const TIER_PASSES = {
   low:    {composer:false, ao:null,   aa:null,   bloom:false, dof:false, grain:false, shadow:1024, shafts:false, env:false},
-  medium: {composer:true,  ao:"half", aa:"fxaa", bloom:false, dof:false, grain:false, shadow:1024, shafts:true,  env:true},
+  medium: {composer:true,  ao:null,   aa:"msaa", bloom:false, dof:false, grain:false, shadow:1024, shafts:true,  env:true},
   high:   {composer:true,  ao:"full", aa:"smaa", bloom:false, dof:true,  grain:true,  shadow:2048, shafts:true,  env:true},
 };
+// medium (phones): ONE post pass, the grade, over a 4x MSAA render target (the research note, game_look.md § 6.6: at most one
+// full-screen pass on a mid-range phone; the room's static AO is baked into the model, the contact blob grounds him).
+// high (desktop): N8AO draws the scene itself (no MSAA), then the depth of field, the grade and SMAA.
 // bloom is off on every tier (owner, 2026-10-02: "no stylised bloom or glow"); createPost(..., {bloom:true}) turns on a faint
 // lens veil (threshold well above white, low strength) on the medium and high tiers, for the bulb and the sun only
 export const SPECS = {                               // what each pass imports (the page's import map resolves them)
@@ -242,16 +245,27 @@ export const GRADE_SHADER = {
   fragmentShader:`
     uniform sampler2D tDiffuse; uniform float exposure, sat, contrast, lift, vignette, grain, time, aspect; uniform vec3 balance, shadows, highs;
     varying vec2 vUv;
-    vec3 RRTAndODTFit(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
-    vec3 aces(vec3 c){   // three.js's ACESFilmicToneMapping (Stephen Hill's fit), exposure folded in
-      const mat3 IN = mat3(0.59719, 0.07600, 0.02840, 0.35458, 0.90834, 0.13383, 0.04823, 0.01566, 0.83777);
-      const mat3 OUT = mat3(1.60475, -0.10208, -0.00327, -0.53108, 1.10813, -0.07276, -0.07367, -0.00605, 1.07602);
-      c *= exposure / 0.6; c = IN * c; c = RRTAndODTFit(c); c = OUT * c; return clamp(c, 0.0, 1.0); }
+    // AgX tone mapping as in three.js r169 (tonemapping_pars_fragment.glsl.js; Filament's port of Blender's AgX, rec 2020
+    // working space): highlights desaturate like film, the lamp does not skew orange, nothing clips to flat white
+    const mat3 REC2020_TO_SRGB = mat3(vec3(1.6605, -0.1246, -0.0182), vec3(-0.5876, 1.1329, -0.1006), vec3(-0.0728, -0.0083, 1.1187));
+    const mat3 SRGB_TO_REC2020 = mat3(vec3(0.6274, 0.0691, 0.0164), vec3(0.3293, 0.9195, 0.0880), vec3(0.0433, 0.0113, 0.8956));
+    vec3 agxContrast(vec3 x){ vec3 x2 = x * x, x4 = x2 * x2;
+      return + 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232; }
+    vec3 agx(vec3 c){
+      const mat3 INSET = mat3(vec3(0.856627153315983, 0.137318972929847, 0.11189821299995), vec3(0.0951212405381588, 0.761241990602591, 0.0767994186031903),
+        vec3(0.0482516061458583, 0.101439036467562, 0.811302368396859));
+      const mat3 OUTSET = mat3(vec3(1.1271005818144368, -0.1413297634984383, -0.14132976349843826), vec3(-0.11060664309660323, 1.157823702216272, -0.11060664309660294),
+        vec3(-0.016493938717834573, -0.016493938717834257, 1.2519364065950405));
+      const float MIN_EV = -12.47393, MAX_EV = 4.026069;
+      c *= exposure; c = SRGB_TO_REC2020 * c; c = INSET * c;
+      c = max(c, 1e-10); c = log2(c); c = (c - MIN_EV) / (MAX_EV - MIN_EV); c = clamp(c, 0.0, 1.0);
+      c = agxContrast(c); c = OUTSET * c; c = pow(max(vec3(0.0), c), vec3(2.2)); c = REC2020_TO_SRGB * c;
+      return clamp(c, 0.0, 1.0); }
     vec3 toSRGB(vec3 c){ return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
       vec3 c = texture2D(tDiffuse, vUv).rgb * balance;              // white balance in linear light
-      c = aces(c);
+      c = agx(c);
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c *= mix(shadows, highs, smoothstep(0.12, 0.75, l));           // split toning
       c = (c - 0.5) * contrast + 0.5;
@@ -323,8 +337,11 @@ export class Post {
     const T = this.THREE, M = this.mods, R = this.renderer, w = Math.max(1, Math.round(this.width * this.dpr)), h = Math.max(1, Math.round(this.height * this.dpr));
     const rt = new T.WebGLRenderTarget(w, h, {type:this.rtType, depthTexture:new T.DepthTexture(w, h, T.UnsignedIntType)});
     rt.texture.name = "room_post.rt";
-    this.composer = new M.composer.EffectComposer(R, rt);
-    this.composer.setPixelRatio(this.dpr);
+    const rtMsaa = new T.WebGLRenderTarget(w, h, {type:this.rtType, samples:4});   // the phone tier's target: AA resolved in tile memory
+    rtMsaa.texture.name = "room_post.rt_msaa";
+    this.composers = {plain:new M.composer.EffectComposer(R, rt), msaa:new M.composer.EffectComposer(R, rtMsaa)};
+    for (const c of Object.values(this.composers)) c.setPixelRatio(this.dpr);
+    this.composer = this.composers.plain; this.rtMsaa = rtMsaa;
     const P = this.passes;
     P.render = new M.composer.RenderPass(this.scene, this.camera);
     if (M.ao) { try { const ao = new M.ao.N8AOPass(this.scene, this.camera, w, h);
@@ -341,7 +358,9 @@ export class Post {
   }
   // the pass list of the current tier; a pass that is missing is just left out
   _apply(){
-    const C = this.composer, cfg = TIER_PASSES[this.tier], P = this.passes;
+    const cfg = TIER_PASSES[this.tier], P = this.passes;
+    if (this.composers) this.composer = cfg.ao && P.ao ? this.composers.plain : this.composers.msaa;   // N8AO draws its own beauty: no MSAA then
+    const C = this.composer;
     this.active = !!(C && cfg.composer && !this.broken);
     if (!this.active) { this.chain = []; if (this.onTier) this.onTier(this.tier, this.info()); return this; }
     C.passes.length = 0;
@@ -352,7 +371,7 @@ export class Post {
     if (P.bloom && (cfg.bloom || (this.bloom && cfg.composer))) chain.push(["bloom", P.bloom]);
     if (P.dof && cfg.dof) chain.push(["dof", P.dof]);
     chain.push(["grade", P.grade]);
-    if (cfg.aa === "smaa" && P.smaa) chain.push(["smaa", P.smaa]); else if (cfg.aa && P.fxaa) chain.push(["fxaa", P.fxaa]);
+    if (cfg.aa === "smaa" && P.smaa) chain.push(["smaa", P.smaa]); else if (cfg.aa === "fxaa" && P.fxaa) chain.push(["fxaa", P.fxaa]);
     for (const [, p] of chain) { p.renderToScreen = false; C.addPass(p); }
     chain[chain.length - 1][1].renderToScreen = true;
     this.chain = chain.map(c => c[0]);
@@ -372,8 +391,8 @@ export class Post {
   frame(ms, canDropDpr = false){ if (this.fixed) return null; const t = this.governor.frame(ms, {canDropDpr}); if (t) this.setTier(t); return t; }
   setSize(w, h, dpr = this.dpr){
     this.width = w; this.height = h; this.dpr = dpr; const W = Math.max(1, Math.round(w * dpr)), H = Math.max(1, Math.round(h * dpr));
-    if (!this.composer) return;
-    this.composer.setPixelRatio(dpr); this.composer.setSize(w, h);
+    if (!this.composers) return;
+    for (const c of Object.values(this.composers)) { c.setPixelRatio(dpr); c.setSize(w, h); }
     const P = this.passes;
     if (P.fxaa) P.fxaa.material.uniforms.resolution.value.set(1 / W, 1 / H);
     if (P.grade) P.grade.uniforms.aspect.value = W / H;
@@ -406,10 +425,10 @@ export class Post {
   }
   info(){
     const cfg = TIER_PASSES[this.tier];
-    return {tier:this.tier, active:this.active, chain:this.chain || [], ao:!!(this.active && this.chain.includes("ao")), aa:this.active ? (this.chain.includes("smaa") ? "smaa" : this.chain.includes("fxaa") ? "fxaa" : null) : "msaa",
+    return {tier:this.tier, active:this.active, chain:this.chain || [], ao:!!(this.active && this.chain.includes("ao")), aa:this.active ? (this.chain.includes("smaa") ? "smaa" : this.chain.includes("fxaa") ? "fxaa" : this.composer === (this.composers || {}).msaa ? "msaa" : null) : "msaa",
       bloom:!!(this.active && this.chain.includes("bloom")), dof:!!(this.active && this.chain.includes("dof") && this.passes.dof && this.passes.dof.enabled), grain:!!(this.active && cfg.grain),
       shadow:cfg.shadow, shafts:cfg.shafts, env:cfg.env, hdr:this.hdr, rtType:this.rtType === this.THREE.HalfFloatType ? "half" : "byte",
       failed:{...this.failed}, broken:this.broken, width:this.width, height:this.height, dpr:this.dpr};
   }
-  dispose(){ for (const p of Object.values(this.passes)) if (p && p.dispose) try { p.dispose(); } catch {} if (this.rt) this.rt.dispose(); this.composer = null; this.active = false; }
+  dispose(){ for (const p of Object.values(this.passes)) if (p && p.dispose) try { p.dispose(); } catch {} if (this.rt) this.rt.dispose(); if (this.rtMsaa) this.rtMsaa.dispose(); this.composer = this.composers = null; this.active = false; }
 }

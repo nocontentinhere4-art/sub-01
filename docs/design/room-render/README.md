@@ -1,7 +1,9 @@
 # Room rendering pass (#98 G6): before / after
 
 Screenshots of `/` at 1280 × 800 (desktop) and 390 × 844 (phone), hours 8, 14, 19 and 23 Tokyo, him placed the same way
-in both sets (desk in the morning, the window sill at 14, the desk with the lamp at 19, the phone on the bed at 23):
+in both sets (reading at the desk in the morning, the window sill at 14, reading at the desk with the lamp at 19, the phone
+on the bed at 23; `h23s` is 23:00 asleep with the lights off, G8's night scene). The camera is the page's own first
+shot for the scene (`before`: the old follow camera; `after`: the new shots, pinned with `setShot`):
 
     python tests/room_render_shots.py --tag before   # on main, before this branch
     python tests/room_render_shots.py --tag after --post high
@@ -38,6 +40,16 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   0.35, walls 0.2, fabric 0.1). On the medium and high tiers the environment map is the room itself: a 128 px cube
   render from the room's centre (him and the effects left out), re-taken when the quantised light state changes, so the
   monitor, the floor and the metal reflect the real window and lamp at their real radiance.
+- Camera (G8 #10, #18; the camera block in room.html is G6's now): shots like a game's on a slow cycle, with a cut at
+  each new shot and a dolly inside one. At a screen: **face** (a medium close-up from the desk's end, the monitor
+  lighting him), **screen** (over his shoulder onto the page), **medium**; on the phone: **over** the shoulder, **face**;
+  elsewhere: **medium** (2.4 m, 50° off his facing), **face**, and the **overview** (which stays in the cycle). A
+  candidate position that would sit in a wall or a piece of furniture is turned round him (the mirror angle, a profile,
+  the front, a rear three-quarter) until it fits. `?debug` → `setShot("face")` pins one.
+- Night (G8 #15): a city's night sky through the window (0.12 knit), a little moon and streetlight, and the exposure
+  adapting to it; nothing is painted brighter than its light. Monitor (G8 #16): the page is drawn at 0.3 knit, slightly
+  blue-white, no longer a light source. Lamp on the hoodie (G8 #22): AgX in place of ACES (highlights roll off instead
+  of clipping), the lamp 0.2 kcd, the exposure keyed to it.
 - Known gap for G7 (the window): the sky plane's shader emits ≈ 1 unit by day, which in the physical scale reads as a
   dim window (a real overcast sky is ≈ 5 knit). Multiplying its output by ≈ 5 by day and ≈ 0.05 at night when the post
   chain is active (`post.hdr`) would make the window the brightest thing in the room, as it is in a photo.

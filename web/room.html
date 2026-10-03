@@ -310,7 +310,7 @@ const DPR_MAX = Math.min(1.5, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, dev
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;      // the direct path (low tier); the post chain tone-maps in its grade pass
+renderer.toneMapping = THREE.AgXToneMapping;             // the direct path (low tier); the post chain tone-maps (AgX too) in its grade pass
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;          // shadow maps are redrawn only when needed, see shadows()
@@ -1126,29 +1126,68 @@ let storyWas = "";
 new MutationObserver(() => { const s = $("story"), t = s.textContent; if (t === storyWas) return; storyWas = t;
   s.classList.remove("in"); void s.offsetWidth; s.classList.add("in"); }).observe($("story"), {childList:true});
 
-// ---------- camera: overview, or close to what he is looking at ----------
+// ---------- camera: shots like a game's, on a slow cycle; the overview stays one of them ----------
+// At a screen: his face lit by it (three-quarter front, from the desk's end), the screen over his shoulder, a medium shot.
+// Elsewhere in the room: a medium shot, his face, the overview. A new shot is a cut; inside a shot the camera dollies
+// after him (the loop's lerp). Every candidate position is kept inside the room's open box (the model has no ceiling,
+// front or right wall) and off the walls: a shot that would sit in a wall is turned round him until it fits.
 let follow = true, userMovedAt = 0;
 $("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", follow); $("cam").textContent = follow ? "camera: follows him" : "camera: free"; };
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
-const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
+const CAM = {kind:null, since:0, cut:false, force:null};
+const SHOT_S = {face:16, screen:14, medium:22, over:14, overview:12};   // seconds a shot holds before the cycle moves on
+const CAM_BOX = {x:[-1.72, 7], y:[0.45, 6.5], z:[-1.28, 8]};             // the camera stays off the window wall and the back wall
+const CAM_SOLIDS = [[[-1.92, -0.18], [0, 0.95], [0.22, 1.52]], [[-1.88, -0.34], [0, 1.0], [-1.46, -0.82]], [[0.1, 1.05], [0, 2.1], [-1.46, -0.85]]];   // bed, desk, shelf + fridge
+function camClamp(p){ const d = p.clone(); p.x = clamp(p.x, ...CAM_BOX.x); p.y = clamp(p.y, ...CAM_BOX.y); p.z = clamp(p.z, ...CAM_BOX.z); return d.distanceTo(p); }
+const camInside = p => CAM_SOLIDS.some(([[x0, x1], [y0, y1], [z0, z1]]) => p.x > x0 - 0.3 && p.x < x1 + 0.3 && p.y > y0 && p.y < y1 + 0.3 && p.z > z0 - 0.3 && p.z < z1 + 0.3);
+// a position `dist` from `c` at `h` above it, `ang` degrees round his facing (0 = in front of him), or the mirror angle, a
+// profile, the front, a rear three-quarter, the back: the first that clears the walls and the furniture
+function camAround(out, c, facing, dist, h, ang){
+  let best = null, bestD = 1e9;
+  for (const a of [ang, -ang, 90, -90, 0, 135, -135, 180]) {
+    out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h);
+    const d = camClamp(out) + (camInside(out) ? 1 : 0);
+    if (d < 0.12) return out;
+    if (d < bestD) { bestD = d; best = out.clone(); }
+  }
+  return out.copy(best);
+}
 function updateCameraGoal(){
-  if ((screenOn === "desk" || chatting) && monitor) {
-    const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
-    camGoal.target.set(...m.c);
-    camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
-  } else if (screenOn === "phone" && phone.visible && head) {
-    // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
-    phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
-    const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
-    if (current === actions.phone_lie) {             // lying: from the open side of the bed, low: his face and the phone above it
-      camGoal.target.copy(v1).lerp(v2, 0.3);
-      camGoal.pos.copy(v2).addScaledVector(UP, 0.5).addScaledVector(v4, -1.0).addScaledVector(v3, 0.35);
-    } else {
-      camGoal.target.copy(v1).lerp(v2, 0.3);
-      camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
-    }
-  } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
+  const nowS = performance.now() / 1000, home = boy && boy.visible && head;
+  const atDesk = (screenOn === "desk" || chatting) && monitor && home;
+  const onPhone = screenOn === "phone" && phone.visible && home;
+  const list = atDesk ? ["face", "screen", "medium"] : onPhone ? ["over", "face"] : home ? ["medium", "face", "overview"] : ["overview"];
+  if (CAM.force && list.includes(CAM.force)) { if (CAM.kind !== CAM.force) { CAM.kind = CAM.force; CAM.since = nowS; CAM.cut = true; } }
+  else if (!list.includes(CAM.kind) || nowS - CAM.since > SHOT_S[CAM.kind]) {
+    CAM.kind = list[(list.indexOf(CAM.kind) + 1) % list.length]; CAM.since = nowS; CAM.cut = true; }
+  if (CAM.kind === "overview" || !home) { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); return; }
+  (bones.headfront || head).getWorldPosition(v2);                           // his face
+  const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
+  v1.copy(v2).addScaledVector(UP, -0.28);                                   // his chest
+  if (CAM.kind === "face") {
+    // a medium close-up of his face: from the front-left (at the desk: from the desk's end, the monitor lighting him)
+    camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0);
+    camGoal.target.copy(v2).addScaledVector(UP, -0.06);
+    if (atDesk) camGoal.target.lerp(v5.set(...SURF.monitor.c), 0.12);
+  } else if (CAM.kind === "medium") {
+    const lying = current === actions.sleep || current === actions.phone_lie || current === actions.listen;
+    camAround(camGoal.pos, v1, v3, 2.4, lying ? 1.0 : 0.5, 50);
+    camGoal.target.copy(v1).addScaledVector(UP, 0.05);
+  } else if (CAM.kind === "screen") {
+    // over his shoulder onto the monitor: the page he reads, his head and hands in the frame
+    const m = SURF.monitor;
+    camGoal.pos.copy(v2).addScaledVector(v3, -0.62).addScaledVector(v4, 0.42).addScaledVector(UP, 0.30); camClamp(camGoal.pos);
+    camGoal.target.set(...m.c).lerp(v2, 0.25);
+  } else if (CAM.kind === "over") {
+    // above his right shoulder, looking down past his cheek onto the phone: phone, hands and face in frame
+    phone.getWorldPosition(v1);
+    camGoal.target.copy(v1).lerp(v2, 0.3);
+    if (current === actions.phone_lie) camGoal.pos.copy(v2).addScaledVector(UP, 0.5).addScaledVector(v4, -1.0).addScaledVector(v3, 0.35);   // lying: from the open side of the bed, low
+    else camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
+    camClamp(camGoal.pos);
+  }
 }
 
 // ---------- day and night (from his Tokyo clock) ----------
@@ -1220,15 +1259,15 @@ function lighting(dt){
     // day, a blue moonlit window at night; the ceiling light and the desk lamp warm the room in the evening. Reflections
     // follow the overall light level, and each material class reflects its own share (metal and glass most, fabric least).
     skyLight.color.copy(cMoon).lerp(cSkyDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSkyDay, day);
-    skyLight.intensity = 0.08 + 6.0 * day + 1.5 * dusk;                 // knit: a bright sky, a city's night sky
-    sun.intensity = 0.004 + 14 * day + 3.0 * dusk;                      // klx: a low autumn sun through the glass; the moon and streetlight at night
-    hemi.intensity = 0.01 + 1.0 * day + 0.05 * roomOn + 0.03 * lampOn;  // klx: the bounce off the walls (one indirect bounce)
+    skyLight.intensity = 0.12 + 6.0 * day + 1.5 * dusk;                 // knit: a bright sky, a city's night sky (Tokyo: never black)
+    sun.intensity = 0.006 + 14 * day + 3.0 * dusk;                      // klx: a low autumn sun through the glass; the moon and streetlight at night
+    hemi.intensity = 0.015 + 1.0 * day + 0.05 * roomOn + 0.03 * lampOn; // klx: the bounce off the walls (one indirect bounce); the city's glow at night
     hemi.color.lerp(cNight, 1 - Math.max(day, roomOn, 0.6 * lampOn));   // with the lights off at night: dim and blue
     ceiling.intensity = 0.2 * roomOn;                                   // kcd: ~2500 lm, a bright ceiling light
-    lamp.intensity = 0.28 * lampOn; bulb.intensity = 0.04 * lampOn;     // kcd: ~800 lm into the cone, the rest as spill
+    lamp.intensity = 0.2 * lampOn; bulb.intensity = 0.035 * lampOn;     // kcd: ~600 lm into the cone, the rest as spill
     if (lampMat) lampMat.emissiveIntensity = 0.02 + 6.0 * lampOn;       // the bulb through the shade's opening: brighter than the desk it lights
     // the exposure adapts to the light in the room (a key of its sources): ~2.3 by day, ~12 with the lamps on, ~70 at night
-    renderer.toneMappingExposure = 0.85 / (0.012 + 0.35 * day + 0.18 * dusk + 0.03 * roomOn + 0.02 * lampOn + 0.008 * (mOn ? 1 : 0));
+    renderer.toneMappingExposure = 0.85 / (0.010 + 0.35 * day + 0.18 * dusk + 0.03 * roomOn + 0.035 * lampOn + 0.008 * (mOn ? 1 : 0));
     // reflections: the captured room is the room's own radiance (1.0 times the material class); the studio map (low tier,
     // before the first capture) follows the light level
     const captured = roomEnv.texture && scene.environment === roomEnv.texture;
@@ -1258,10 +1297,11 @@ function lighting(dt){
   phoneGlow.intensity = phone.visible ? phoneGlowLevel(day, pOn) * (OLD_ROOM ? 1 : 0.0035) : 0;
   phoneGlow.color.copy(pOn ? PS.glass.glow : cScreen);
   if (phone.visible) { phone.getWorldPosition(phoneGlow.position); phoneTick(performance.now()); }
-  // the screens' own brightness in the clean room's units (knit): a bright panel ~0.5; in the old room's baked scale, 1
+  // the screens' own brightness in the clean room's units (knit): the monitor a little dim and off-white (a white page is
+  // not a light source: G8 #16), the phone a bright panel; in the old room's baked scale, 1
   const sk = OLD_ROOM ? 1 : post.hdrScreens;
-  if (monitor && monitor.on.color.r !== sk) monitor.on.color.setScalar(sk);
-  const ps = phone.userData.screen; if (ps.on.color.r !== sk) ps.on.color.setScalar(sk);
+  if (monitor && monitor.on.color.b !== sk) monitor.on.color.setRGB(0.93 * sk, 0.96 * sk, sk);
+  const ps = phone.userData.screen, pk = OLD_ROOM ? 1 : 0.45; if (ps.on.color.r !== pk) ps.on.color.setScalar(pk);
   // the contact shadow under his feet (fades as they leave the floor: on the bed, lying down)
   if (!blob) { blob = new ContactBlob(THREE, {floorY:F, strength:0.55}); scene.add(blob.mesh); }
   if (boy && boy.visible && bones.Hips && bones.LeftFoot && bones.RightFoot) {
@@ -2498,8 +2538,8 @@ function frame(now){
   lighting(dt);
   if (follow && performance.now() - userMovedAt > 20000) {
     updateCameraGoal();
-    const k = 1 - Math.exp(-dt * 1.2);
-    camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
+    if (CAM.cut) { camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); CAM.cut = false; }   // a new shot: a cut
+    else { const k = 1 - Math.exp(-dt * 1.2); camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k); }   // inside a shot: a dolly
   }
   shadows(now, moving);
   controls.update(); post.render(dt);
@@ -2524,7 +2564,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   setHour: h => { hour = h; }, setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
-  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); post.render(0.1); }, animate_: animate, post, gradeAt,
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; },
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
     const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 + 0.035 - 0.02, ch = chairNode(), V = ch && chairVox();
