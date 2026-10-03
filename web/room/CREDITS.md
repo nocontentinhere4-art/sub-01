@@ -104,14 +104,32 @@ https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`
 
 ## The view out of the window (#98 G7)
 `web/room/window_view.js` draws the outside on the glass marker (`SURF_window`): a parallax shader that casts each view
-ray from the room's camera through the glass onto cards behind it (the house across the lane, a row of apartment blocks,
-the far skyline, the street plane, the sky at infinity), so the view has true depth from every camera. The cards in
-`web/room/window/` (`near`, `mid`, `far`, `ground`, their lights masks `*_l` and `noise`, WebP, under 200 KB together) are
-drawn entirely from code by `room_build/window_cards.py` (Pillow + numpy, one fixed seed): no photographs, no downloaded
-assets, no fonts, no text, no brands, no signage, no real landmark copied (the towers are generic shapes). Everything in
-this section is original work made for this project and released under **CC0 1.0**. Rebuild:
+ray from the room's camera through the glass onto photographic plates behind it (the neighbourhood by day and at night,
+the far skyline, a utility pole, a real sky), so the view has true depth from every camera. The plates in
+`web/room/window/` are cut out and prepared by `room_build/window_cards.py` from these sources (all free for any use;
+each licence was read from the Commons API's `extmetadata` / Poly Haven's `/info` at fetch time and is recorded with the
+source's URL and checksum in `web/room/window/plates.json`):
 
-    python room_build/window_cards.py --preview     # ~30 s; writes web/room/window/*.webp and room_build/out/window_cards.png
+| plate | source | author | licence |
+|---|---|---|---|
+| `mid.webp`: the neighbourhood by day (an elevated view over the ward next to Kichijōji) | [Suginami City 2024-05-06.jpg](https://commons.wikimedia.org/wiki/File:Suginami_City_2024-05-06.jpg) | ウィキ太郎 | Public domain |
+| `mid_n.webp`: the neighbourhood at night, with its real lit windows (`mid_l.webp` marks them) | [Blue illuminated buildings in Tokyo.jpg](https://commons.wikimedia.org/wiki/File:Blue_illuminated_buildings_in_Tokyo.jpg) | Syced | CC0 |
+| `far.webp`: the far skyline at twilight (the water and the expressway cropped away) | [Illuminated buildings at twilight in Minato-ku, Tokyo, view from Rainbow Bridge (2016-12-10 by xegxef @Pixabay 2086645).jpg](https://commons.wikimedia.org/wiki/File:Illuminated_buildings_at_twilight_in_Minato-ku,_Tokyo,_view_from_Rainbow_Bridge_(2016-12-10_by_xegxef_@Pixabay_2086645).jpg) | xegxef | CC0 |
+| `sky.webp` row 0: clear day | [Kloofendal 43d Clear (Pure Sky)](https://polyhaven.com/a/kloofendal_43d_clear_puresky) | Greg Zaal (All) | CC0 |
+| `sky.webp` row 1: partly cloudy day | [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal (Original), Jarod Guest (Sky edits) | CC0 |
+| `sky.webp` row 2: overcast | [Kloofendal Overcast (Pure Sky)](https://polyhaven.com/a/kloofendal_overcast_puresky) | Greg Zaal (All) | CC0 |
+| `sky.webp` row 3: sunset | [Belfast Sunset (Pure Sky)](https://polyhaven.com/a/belfast_sunset_puresky) | Greg Zaal (Processing), Dimitrios Savva (Photography), Jarod Guest (Sky edits) | CC0 |
+| `sky.webp` row 4: dusk (blue hour) | [Qwantani Dusk 2 (Pure Sky)](https://polyhaven.com/a/qwantani_dusk_2_puresky) | Greg Zaal (Photography), Jarod Guest (Processing) | CC0 |
+| `sky.webp` row 5: night | [Kloppenheim 02 (Pure Sky)](https://polyhaven.com/a/kloppenheim_02_puresky) | Greg Zaal (Original), Jarod Guest (Sky edits) | CC0 |
+
+Wikimedia Commons CC0: https://creativecommons.org/publicdomain/zero/1.0/ · the Suginami photograph was released into the
+public domain by its author (Commons `{{PD-self}}`). The Rainbow Bridge photograph is a Pixabay picture from 2016, when
+Pixabay's licence was CC0; the Commons copy carries that licence. Poly Haven assets are CC0: https://polyhaven.com/license.
+Only the skies' upper hemispheres are used (±70° of azimuth, -2..50° of elevation, with the sun or the moon kept out of
+the crop; the shader draws its own). The photographs contain no readable signage; the skyline's landmark tower appears as
+photographed. The utility pole and its cables (`near.webp`) and the rain's noise texture are drawn from code, original work
+for this project, CC0. The sources themselves (~120 MB) are not committed: `python room_build/window_cards.py --fetch`
+re-downloads them (Wikimedia rate-limits shared addresses; the script waits and retries).
 
 The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
 pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented

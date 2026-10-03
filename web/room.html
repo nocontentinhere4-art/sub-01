@@ -524,7 +524,7 @@ function buildSurfaces(){
   monitor.mesh.position.add(new THREE.Vector3(0, 0, m.off ?? 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
   monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
   const w = SURF.window;
-  sky = windowView.build(w, scene);                  // the view out of the window, on the glass marker (#98 G7)
+  sky = windowView.build(w, scene, renderer);        // the view out of the window, on the glass marker (#98 G7)
   if (skyLight) {                    // just inside the glass, shining into the room
     skyLight.width = w.w; skyLight.height = w.h;
     skyLight.position.set(...w.c).add(new THREE.Vector3(0, 0, 0.12).applyAxisAngle(UP, w.ry));
@@ -688,10 +688,12 @@ function holdPhone(w){
   _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look * w); aimBone(head, _E, _T);
 }
 
-// window: the view over Tokyo follows his clock and a daily weather pattern (web/room/window_view.js, #98 G7): parallax
-// cards behind the glass (the lane, the blocks, the skyline, the street), a sky by phase of day, lit windows that switch on
-// and off, a train on the viaduct, rain on the glass. ?debug&weather=rain|overcast|clear previews the weather.
-const windowView = createWindowView(THREE, {base:"room/window/", weather:DEBUG ? new URLSearchParams(location.search).get("weather") : null});
+// window: the view over Tokyo follows his clock and a daily weather pattern (web/room/window_view.js, #98 G7): photographic
+// plates behind the glass with true parallax (Kichijōji's buildings, the skyline, a real sky), relit by the hour, lit windows
+// that switch on and off, a train at night, rain on the glass, the room reflected in the glass. ?debug&weather=rain|overcast|clear
+// previews the weather. With G6's HDR light units (`post.hdr`) the window emits 5 by day and 0.05 at night.
+const windowView = createWindowView(THREE, {base:"room/window/", weather:DEBUG ? new URLSearchParams(location.search).get("weather") : null,
+  hdr:() => typeof post !== "undefined" && !!(post && post.hdr)});
 
 // ---------- what is on the screens ----------
 let screenOn = null;               // "desk" | "phone" | null (from the server)

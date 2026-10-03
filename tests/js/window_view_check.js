@@ -1,7 +1,9 @@
 // The pure parts of web/room/window_view.js, run in node by tests/test_window_view.py (no WebGL here): the weather
 // pattern's shares over a year of Tokyo hours, its smoothness, the lit-window probability by hour, the sun's elevation,
-// and that the shader source compiles the view's contract (the layers, the uniforms, no brand words). Prints one JSON line.
-import { weatherAt, litProbability, sunElevation, tokyoDayKey, createWindowView, LAYERS, GAIN, TRAIN, GROUND } from "../../web/room/window_view.js";
+// the shader's contract (every sampler has a texture, every uniform is declared, the layers match plates.json), the
+// reflection probe's cadence, the HDR emission hook, and that nothing names a brand. Prints one JSON line.
+import { readFileSync } from "fs";
+import { weatherAt, litProbability, sunElevation, tokyoDayKey, createWindowView, LAYERS, GAIN, TRAIN, GROUND, SKY, PROBE } from "../../web/room/window_view.js";
 
 const out = {};
 // a year of hours, every 10 minutes
@@ -16,48 +18,63 @@ for (let d = 0; d < 365; d++) for (let h = 0; h < 24; h += 1 / 6) {
 }
 out.weather = {rain: +(rain / n).toFixed(3), overcast: +(overcast / n).toFixed(3), clear: +(clear / n).toFixed(3),
   max_step_per_10min: +maxStep.toFixed(3), changes_per_day: +(switches / 365).toFixed(2)};
-// the same clock gives the same weather (deterministic), the override values are in range
 const a = weatherAt(20000, 13.5), b = weatherAt(20000, 13.5);
 out.deterministic = a.kind === b.kind && a.cloud === b.cloud && a.rain === b.rain;
 out.range_ok = [0, 3, 7.9, 12, 18.25, 23.9].every(h => { const w = weatherAt(20001, h); return w.cloud >= 0 && w.cloud <= 1 && w.rain >= 0 && w.rain <= 1 && w.cloud >= w.rain; });
-// lights: evening high, small hours low, continuous
 out.lit = {h20: +litProbability(20).toFixed(2), h3: +litProbability(3).toFixed(2), h12: +litProbability(12).toFixed(2), h24_eq_h0: Math.abs(litProbability(24) - litProbability(0)) < 1e-9};
 let litJump = 0; for (let h = 0; h < 24; h += 0.05) litJump = Math.max(litJump, Math.abs(litProbability(h + 0.05) - litProbability(h)));
 out.lit.max_jump_per_3min = +litJump.toFixed(3);
 out.sun = {noon: +sunElevation(11.7).toFixed(3), midnight: +sunElevation(23.7).toFixed(3), rise: +sunElevation(5.6).toFixed(3)};
-// the module builds its material with a THREE stub: the shader declares every texture and layer uniform it samples
+
+// the module builds its material with a THREE stub
 class V2 { constructor(x = 0, y = 0){ this.x = x; this.y = y; } set(x, y){ this.x = x; this.y = y; return this; } }
-class V3 extends V2 { constructor(x = 0, y = 0, z = 0){ super(x, y); this.z = z; } set(x, y, z){ this.x = x; this.y = y; this.z = z; return this; } }
+class V3 extends V2 { constructor(x = 0, y = 0, z = 0){ super(x, y); this.z = z; } set(x, y, z){ this.x = x; this.y = y; this.z = z; return this; }
+  add(v){ this.x += v.x; this.y += v.y; this.z += v.z; return this; } applyAxisAngle(){ return this; } }
 class V4 extends V3 { constructor(x, y, z, w){ super(x, y, z); this.w = w; } }
-const loads = [];
-const THREE = {Vector2: V2, Vector3: V3, Vector4: V4, RepeatWrapping: 1, ClampToEdgeWrapping: 2, SRGBColorSpace: "srgb", NoColorSpace: "",
+const loads = [], probes = [];
+const THREE = {Vector2: V2, Vector3: V3, Vector4: V4, RepeatWrapping: 1, ClampToEdgeWrapping: 2, SRGBColorSpace: "srgb", NoColorSpace: "", LinearMipmapLinearFilter: 3,
   TextureLoader: class { load(u){ loads.push(u); return {}; } },
   ShaderMaterial: class { constructor(o){ Object.assign(this, o); } },
-  Mesh: class { constructor(g, m){ this.geometry = g; this.material = m; this.position = new V3(); this.rotation = new V3(); } },
+  WebGLCubeRenderTarget: class { constructor(size, o){ this.size = size; this.texture = {cube: size, ...o}; } },
+  CubeCamera: class { constructor(near, far, rt){ this.near = near; this.far = far; this.rt = rt; this.position = new V3(); } update(r, s){ probes.push([r, s]); } },
+  Mesh: class { constructor(g, m){ this.geometry = g; this.material = m; this.position = new V3(); this.rotation = new V3(); this.visible = true; } },
   PlaneGeometry: class { constructor(w, h){ this.w = w; this.h = h; } }};
-const view = createWindowView(THREE, {base: "room/window/"});
+let hdr = false;
+const view = createWindowView(THREE, {base: "room/window/", hdr: () => hdr});
 const frag = view.material.fragmentShader, vert = view.material.vertexShader, U = view.material.uniforms;
-const samplers = [...frag.matchAll(/uniform sampler2D (t\w+)/g)].map(m => m[1]);
+const samplers = [...frag.matchAll(/uniform sampler(?:2D|Cube) (t\w+)/g)].map(m => m[1]);
 out.textures = {declared: samplers, loaded: loads.map(u => u.split("/").pop()), every_sampler_has_a_uniform: samplers.every(s => s in U && U[s].value)};
 out.uniforms_declared = Object.keys(U).every(k => frag.includes(k) || vert.includes(k));
-out.layers = {near: U.uNear.value.x === LAYERS.near.d, mid: U.uMid.value.x === LAYERS.mid.d, far: U.uFar.value.x === LAYERS.far.d, ground_y: U.uGroundY.value === GROUND,
-  train: U.uTrainP.value.x === TRAIN.d, order_ok: LAYERS.near.d < LAYERS.mid.d && LAYERS.mid.d < TRAIN.d && TRAIN.d < LAYERS.far.d};
+// the layers the shader uses are the ones the plates were cut for
+const plates = JSON.parse(readFileSync(new URL("../../web/room/window/plates.json", import.meta.url), "utf8"));
+const same = (a, b) => ["d", "xm", "y0", "y1", "cx"].every(k => Math.abs(a[k] - b[k]) < 1e-6);
+out.layers = {near: same(LAYERS.near, plates.layers.near), mid: same(LAYERS.mid, plates.layers.mid), far: same(LAYERS.far, plates.layers.far),
+  uniforms: U.uNear.value.x === LAYERS.near.d && U.uMid.value.x === LAYERS.mid.d && U.uFar.value.x === LAYERS.far.d,
+  order_ok: LAYERS.near.d < TRAIN.d && TRAIN.d < LAYERS.mid.d && LAYERS.mid.d < LAYERS.far.d,
+  sky: plates.sky.rows.length === SKY.rows && plates.sky.az === SKY.az && plates.sky.el0 === SKY.el0 && plates.sky.el1 === SKY.el1, ground: GROUND};
 out.gain = GAIN;
 out.colorspace_included = frag.includes("#include <colorspace_fragment>");
-// a simulated day of updates: the sun crosses left to right, the lights follow the hour, weather eases towards the override
-const added = []; const scene = {add: m => added.push(m)};
-view.build({c: [-2.012, 1.685, 0.14], w: 1.58, h: 0.89, ry: Math.PI / 2}, scene);
-out.built = added.length === 1 && Math.abs(U.uSize.value.x - 1.58) < 1e-9;
+// a simulated day of updates
+const added = []; const scene = {add: m => added.push(m)}, renderer = {};
+view.build({c: [-2.012, 1.685, 0.14], w: 1.58, h: 0.89, ry: Math.PI / 2}, scene, renderer);
+out.built = added.length === 2 && Math.abs(U.uSize.value.x - 1.58) < 1e-9;      // the plane and the probe camera
 view.update(0.016, 8); const sx8 = U.uSunDir.value.x; view.update(0.016, 16); const sx16 = U.uSunDir.value.x;
 out.sun_crosses = sx8 < 0 && sx16 > 0;
 view.update(0.016, 21); out.lit_uniform_follows_hour = Math.abs(U.uLitP.value - litProbability(21)) < 1e-9;
 view.setWeather("rain"); for (let i = 0; i < 400; i++) view.update(0.05, 21);
 out.rain_override = {rain: +U.uRain.value.toFixed(3), cloud: +U.uCloud.value.toFixed(3), sun_factor: +view.light.sun.toFixed(3)};
 view.setWeather(null); out.state_kind_after_reset = view.state().weather.kind;
-// a train passes: within one cycle uTrain becomes >= 0 for a while and the direction alternates between cycles
-let seen = 0; let dirs = new Set(); for (let t = 0; t < TRAIN.every * 2; t += 0.5) { view.update(0.5, 21); if (U.uTrain.value >= -TRAIN.len) { seen++; dirs.add(U.uTrainDir.value); } }
+// the probe: once after the first seconds, then every PROBE.every s; the plane hidden while it renders
+const p0 = probes.length; for (let t = 0; t < PROBE.every * 2.5; t += 0.5) view.update(0.5, 12);
+out.probe = {renders: probes.length - p0, expected_about: Math.round(2.5), plane_visible_after: view.mesh.visible};
+// the HDR hook: emission follows post.hdr (5 by day, 0.05 at night) until setEmission says otherwise
+view.update(0.016, 12); const e1 = U.uEmit.value; hdr = true; view.update(0.016, 12); const e2 = U.uEmit.value; view.update(0.016, 1); const e3 = U.uEmit.value;
+view.setEmission(2, 0.5); view.update(0.016, 12); const e4 = U.uEmit.value;
+out.emission = {plain_day: +e1.toFixed(3), hdr_day: +e2.toFixed(3), hdr_night: +e3.toFixed(3), explicit_day: +e4.toFixed(3)};
+// a train passes at night: within one cycle uTrain is in range for a while and the direction alternates between cycles
+let seen = 0; const dirs = new Set(); for (let t = 0; t < TRAIN.every * 2; t += 0.5) { view.update(0.5, 21); if (U.uTrain.value > -TRAIN.len) { seen++; dirs.add(U.uTrainDir.value); } }
 out.train = {steps_visible: seen, directions: [...dirs].sort()};
-// words that must not appear in the shader or the module (no brands, no real signage)
-const src = (await import("fs")).readFileSync(new URL("../../web/room/window_view.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../../web/room/window_view.js", import.meta.url), "utf8");
 out.brand_free = !/\b(Sony|Toshiba|Hitachi|Coca|Suntory|Asahi|Kirin|7-?Eleven|Lawson|FamilyMart|Skytree|Tokyo Tower|JR\b|Chuo|Chūō)/i.test(src);
+out.honest_weather = /no weather feed/.test(src.replace(/\n\/\/ /g, " ")) && /never presented as real/.test(src.replace(/\n\/\/ /g, " "));
 console.log(JSON.stringify(out));
