@@ -443,8 +443,10 @@ function zoomFrame(now){                             // once per drawn frame whi
     zoom.prefetched = true; try { NeuronRender.prefetch({kind: "cortex"}); } catch (e) {}
   }
   n3d.setZoomFade(zoomBrain); n3d.setFocus(d);
-  // the column fades in, and stays dim while it is small on screen (its cells would pile up into a white blob)
-  zoom.col.setOpacity((1 - smooth(ZOOM.colIn[0], ZOOM.colIn[1], d)) * Math.min(1, Math.pow(ZOOM.colView / d, 1.5)));
+  // the column fades in, and stays dim while it is small on screen: its cells would pile up into a white blob. The
+  // dimming follows the column's height in screen pixels (a phone packs the same cells into fewer pixels than a desktop)
+  const colPx = zoom.col.plan.thickness / 1000 / (2 * d * Math.tan(camera.fov * Math.PI / 360) / host.clientHeight);
+  zoom.col.setOpacity((1 - smooth(ZOOM.colIn[0], ZOOM.colIn[1], d)) * Math.max(0.08, Math.min(1, Math.pow(colPx / 1100, 1.6))));
   // the pia at the top of the screen, like a slice under a microscope: the camera's up turns to the column's normal
   const up = new THREE.Vector3(0, 0, 1).lerp(zoom.N, 1 - zoomBrain).normalize();
   if (up.lengthSq() > 0.5) camera.up.copy(up);

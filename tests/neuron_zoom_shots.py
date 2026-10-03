@@ -25,7 +25,7 @@ from neuron_forest_look import HIDE, luminance  # noqa: E402
 from neurons3d_shots import INJECT, record, wait_ready  # noqa: E402
 
 STEPS = [0.0, 0.3, 0.45, 0.55, 0.62, 0.7, 0.8, 0.9, 1.0]
-STEP_JS = """u => { zoom.anim.at = u; for (let k = 0; k < 40; k++) { const t = performance.now(); if (zoom) zoomFrame(t); n3d.update(t); }
+STEP_JS = """u => { if (!zoom) return; zoom.anim = zoom.anim || {t0: performance.now(), dur: 11000}; zoom.anim.at = u; for (let k = 0; k < 40; k++) { const t = performance.now(); if (zoom) zoomFrame(t); n3d.update(t); }
   zoomOverlay(); neuronsText(); controls.update(); renderer.render(scene, camera); }"""
 
 
@@ -106,7 +106,7 @@ def main():
                 if w == 390:                                 # frame time at column scale, CPU x4 (software WebGL here)
                     pg.evaluate("document.querySelector('#n3close button[data-k=\"\"]').click()")
                     pg.wait_for_timeout(1500)
-                    pg.evaluate("zoomStart(true); zoom && (zoom.anim.at = 0)")
+                    pg.evaluate("if (zoom) zoomEnd(); zoomStart(true)")
                     pg.wait_for_function("zoom && zoom.anim", timeout=60000)
                     pg.evaluate(STEP_JS, 0.7)
                     cdp = ctx.new_cdp_session(pg)
