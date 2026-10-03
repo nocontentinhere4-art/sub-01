@@ -196,7 +196,10 @@ def equirect_crop(img, center_az, half_az=SKY_AZ, el0=SKY_EL0, el1=SKY_EL1, size
 
 # --- the drawn plate: the utility pole and its cables ---------------------------------------------------------------
 def card_near(rng):
-    W = H = 1024; ss = 2
+    """the utility pole and its cables, 14 m out: real cables are 1-2 cm thick, so at 4x supersampling they are drawn
+    as hairlines of varied sag and height that downsample to soft, anti-aliased strands (G8 defect 26: they read as
+    drawn lines when they were 3 cm thick, identical and aliased)"""
+    W = H = 1024; ss = 4
     img = Image.new("RGBA", (W * ss, H * ss), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
     L = LAYERS["near"]; sx = W * ss / L["xm"]; sy = H * ss / (L["y1"] - L["y0"])
     px = lambda x: x * sx; py = lambda y: (L["y1"] - y) * sy
@@ -205,22 +208,26 @@ def card_near(rng):
             b = [px(x0 + dx), py(y1), px(x1 + dx), py(y0)]
             if b[2] < 0 or b[0] > W * ss: continue
             d.rectangle([round(b[0]), round(b[1]), max(round(b[0]), round(b[2]) - 1), max(round(b[1]), round(b[3]) - 1)], fill=(*c, a))
-    def line(pts, c, w_m):
+    def line(pts, c, w_m, a=255):
         for dx in (0, -L["xm"], L["xm"]):
-            d.line([(px(x + dx), py(y)) for x, y in pts], fill=(*c, 255), width=max(1, round(w_m * sx)))
+            d.line([(px(x + dx), py(y)) for x, y in pts], fill=(*c, a), width=max(1, round(w_m * sx)))
     x, base, top = 12.3, L["y0"], GROUND + 10.4
-    pole = (118, 116, 112); dark = (74, 72, 70)
-    rect(x - 0.17, base, x + 0.17, top, pole); rect(x + 0.08, base, x + 0.17, top, dark)
+    pole = (112, 110, 106); dark = (70, 68, 66)
+    rect(x - 0.15, base, x + 0.15, top, pole); rect(x + 0.07, base, x + 0.15, top, dark)
     for yy in (top - 0.5, top - 1.4):                            # cross-arms with insulators
-        rect(x - 1.1, yy, x + 1.1, yy + 0.1, dark)
+        rect(x - 1.0, yy, x + 1.0, yy + 0.08, dark)
         for i in range(5):
-            xx = x - 1.0 + 0.5 * i
-            rect(xx - 0.06, yy + 0.1, xx + 0.06, yy + 0.32, (150, 150, 148))
-    rect(x + 0.2, top - 2.8, x + 1.05, top - 1.9, (104, 104, 102)); rect(x + 0.25, top - 1.9, x + 1.0, top - 1.75, dark)   # transformers
-    rect(x - 0.9, top - 2.5, x - 0.2, top - 1.6, (104, 104, 102))
-    for y, sag, n, w in ((GROUND + 9.0, 0.45, 1, 0.03), (GROUND + 9.35, 0.45, 1, 0.03), (GROUND + 9.7, 0.45, 1, 0.03), (GROUND + 8.3, 0.3, 2, 0.022)):
-        pts = [(L["xm"] * t / 96, y - sag * math.sin(math.pi * t / 96 * n) ** 2) for t in range(97)]
-        line(pts, (24, 24, 26), w)
+            xx = x - 0.9 + 0.45 * i
+            rect(xx - 0.05, yy + 0.08, xx + 0.05, yy + 0.28, (140, 140, 138))
+    rect(x + 0.2, top - 2.8, x + 0.95, top - 1.95, (98, 98, 96)); rect(x + 0.25, top - 1.95, x + 0.9, top - 1.8, dark)   # transformers
+    rect(x - 0.85, top - 2.5, x - 0.2, top - 1.65, (98, 98, 96))
+    # the cables: a bundle of five from the upper arm, two from the lower, each with its own sag and a slight slant
+    r2 = random.Random(SEED + 7)
+    for y0, sag, w in ((GROUND + 9.9, 0.52, 0.016), (GROUND + 9.72, 0.46, 0.014), (GROUND + 9.55, 0.58, 0.012), (GROUND + 9.3, 0.41, 0.014),
+                       (GROUND + 9.0, 0.49, 0.012), (GROUND + 8.35, 0.33, 0.011), (GROUND + 8.1, 0.38, 0.010)):
+        slant = r2.uniform(-0.12, 0.12)
+        pts = [(L["xm"] * t / 128, y0 + slant * (t / 128 - 0.5) - sag * math.sin(math.pi * t / 128) ** 2) for t in range(129)]
+        line(pts, (22, 22, 24), w, a=235)
     # a little grain so the silhouettes do not read as vector art
     a = np.asarray(img).astype(np.float32)
     g = np.random.default_rng(rng.randrange(1 << 30)).random((H * ss, W * ss, 1)).astype(np.float32)
