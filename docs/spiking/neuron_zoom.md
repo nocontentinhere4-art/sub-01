@@ -82,21 +82,21 @@ Zooming back out reverses it. The tissue view's `onClose("zoomout")` returns to 
   - The tissue view's caption is A's (`NeuronRender.CAPTION`, `info().detailLine` / `sourceLine`).
 
 ## Measured
-These are from `python tests/neuron_zoom_shots.py`, on 2026-10-03, in this sandbox: headless Chromium with software WebGL
+These are from `python tests/neuron_zoom_shots.py`, on 2026-10-03 after merging #101, in this sandbox: headless Chromium with software WebGL
 (SwiftShader), and the recorded 20k CPU stream replayed into the page. Frames, contact sheets (`zoom_{1920,390}_sheet.jpg`),
 GIFs (`zoom_{1920,390}.gif`) and `results.json` are in `docs/screens/neuron_zoom/`.
 
 | dive | distance | stage | scale bar (1920) | % > 0.8 (1920 / 390) | mean (1920 / 390) |
 |---|---|---|---|---|---|
-| 0.00 | 361 mm | brain | 20 mm · cells drawn ~6× | 0.03 / 0.19 | 0.13 / 0.10 |
-| 0.30 | 70 mm | brain | 5 mm | 0.00 / 0.01 | 0.11 / 0.08 |
-| 0.45 | 19 mm | column fading in | 1 mm · true scale | 0.00 / 0.00 | 0.06 / 0.06 |
-| 0.55 | 9 mm | column | 500 µm | 0.00 / 0.00 | 0.12 / 0.11 |
-| 0.62 | 6.4 mm | column | 500 µm | 0.00 / 0.00 | 0.16 / 0.12 |
-| 0.70 | 5.5 mm | the whole column | 200 µm | 0.01 / 0.00 | 0.18 / 0.12 |
-| 0.80 | 3.3 mm | column, closer | 200 µm | 0.40 / 0.00 | 0.23 / 0.18 |
-| 0.90 | 1.3 mm | toward the block's depth | 50 µm | 0.00 / 0.04 | 0.12 / 0.23 |
-| 1.00 | 0.81 mm | tissue (NeuronRender) | — | 0.00 / 0.02 | 0.25 / 0.29 |
+| 0.00 | 361 mm | brain | 20 mm · cells drawn ~6× | 0.14 / 0.10 | 0.10 / 0.13 |
+| 0.30 | 70 mm | brain | 5 mm | 0.00 / 0.01 | 0.08 / 0.12 |
+| 0.45 | 19 mm | column fading in | 1 mm · true scale | 0.00 / 0.00 | 0.05 / 0.07 |
+| 0.55 | 9 mm | column | 500 µm | 0.00 / 0.00 | 0.09 / 0.08 |
+| 0.62 | 6.4 mm | column | 500 µm | 0.00 / 0.00 | 0.16 / 0.13 |
+| 0.70 | 5.5 mm | the whole column | 200 µm | 0.01 / 0.00 | 0.18 / 0.14 |
+| 0.80 | 3.3 mm | column, closer | 200 µm | 0.67 / 0.01 | 0.23 / 0.18 |
+| 0.90 | 1.3 mm | toward the block's depth | 50 µm | 0.00 / 0.06 | 0.13 / 0.23 |
+| 1.00 | 0.81 mm | tissue: A's real H01 cells (`openAt`) | 50 µm | 0.05 / 0.15 | 0.13 / 0.21 |
 
 - **Luminance:** every frame is under the #97 gate (≤ 2 % of pixels above 0.8). A first run without the pixel-density
   dimming had 12–20 % at 390 in the column; the column now dims by its height on screen in pixels, not by distance.
@@ -111,8 +111,10 @@ GIFs (`zoom_{1920,390}.gif`) and `results.json` are in `docs/screens/neuron_zoom
   Before the faded-out fibres and cortex were taken out of the draw it was 0.2 FPS: inside the column the camera sits
   within the fibres, and drawing them at zero opacity still cost every one of their pixels. **≥ 30 FPS on a phone
   still needs a real device.** The layer's own JS is a few ms.
-- **The hand-over:** on main today (before #101) the hand-over is the plain close-up. With #101 it becomes
-  `NeuronRender.openAt` at the same spot and direction; A measured `nr.ready` at ~260 ms after a prefetch.
+- **The hand-over:** with #101 merged, the dive ends in `NeuronRender.openAt` at the same spot and direction: A's real
+  H01 electron-microscopy cells (20 cells, 318k triangles on desktop), with A's caption and source line. A measured
+  `nr.ready` at ~260 ms after a prefetch; the zoom prefetches below 10 mm.
+- **Re-check after #101 (390 px, ×4 CPU, the whole column):** 4.5 FPS, 2.9 ms JS per frame.
 
 ## Where it can't look real, and the cut
 - **The brain scale** cannot show cells you can study. A real neuron is 0.5–1.5 mm across, and the brain is ~150 mm.

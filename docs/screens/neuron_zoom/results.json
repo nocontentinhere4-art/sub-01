@@ -12,262 +12,262 @@
  ],
  "frames": {
   "zoom_1920_000": {
-   "d": 361.3364083509967,
+   "d": 361.3364083509977,
    "brain": 1,
    "stage": "brain",
    "scale": "20 mm · cells drawn ~6×",
-   "caption": "live · 20k-neuron network on CPU · showing 170 of 44,075 recorded spikes in the last frame · a choice is racing in the striatum\ncells enlarged ~6× for visibility · 504 cells (pyramidal, basket, thalamic relay, medium spiny, CA1 pyramidal, amygdala principal; ≤ 40 segments each) · a spike lights the axon from the soma, slowed ~250×; region rates tint the dendrites · NeuroMorpho.Org, CC BY 4.0 · cre",
+   "caption": "live · 20k-neuron network on CPU · last frame: 5,809 spikes recorded, none sent (the stream's 3 KB/s budget was used up)\ncells enlarged ~6× for visibility · 504 cells (pyramidal, basket, thalamic relay, medium spiny, CA1 pyramidal, amygdala principal; ≤ 40 segments each) · a spike lights the axon from the soma, slowed ~250×; region rates tint the dendrites · NeuroMorpho.Org, CC BY 4.0 · credits on",
    "luminance": {
-    "brain_px": 373981,
-    "above_0_8_pct": 0.03,
-    "above_0_5_pct": 0.95,
-    "mean": 0.127,
-    "p99": 0.493
+    "brain_px": 327751,
+    "above_0_8_pct": 0.14,
+    "above_0_5_pct": 0.91,
+    "mean": 0.102,
+    "p99": 0.483
    }
   },
   "zoom_1920_030": {
-   "d": 69.59048427719736,
+   "d": 69.5904842771975,
    "brain": 1,
    "stage": "brain",
    "scale": "5 mm · cells drawn ~6×",
    "caption": "live · 20k-neuron network on CPU · last frame: 5,739 spikes recorded, none sent (the stream's 3 KB/s budget was used up)\ncells enlarged ~6× for visibility · 504 cells (pyramidal, basket, thalamic relay, medium spiny, CA1 pyramidal, amygdala principal; ≤ 40 segments each) · a spike lights the axon from the soma, slowed ~250×; region rates tint the dendrites · NeuroMorpho.Org, CC BY 4.0 · credits on",
    "luminance": {
-    "brain_px": 1586814,
+    "brain_px": 1271698,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.27,
-    "mean": 0.114,
-    "p99": 0.398
+    "above_0_5_pct": 0.03,
+    "mean": 0.076,
+    "p99": 0.228
    }
   },
   "zoom_1920_045": {
-   "d": 18.63203824656345,
-   "brain": 0.31153642859019315,
+   "d": 18.632038246563464,
+   "brain": 0.31153642859019415,
    "stage": "column",
    "scale": "1 mm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 886609,
+    "brain_px": 487268,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.04,
-    "mean": 0.06,
-    "p99": 0.18
+    "above_0_5_pct": 0.06,
+    "mean": 0.046,
+    "p99": 0.157
    }
   },
   "zoom_1920_055": {
    "d": 9.015114538819944,
-   "brain": 0.022197565018714466,
+   "brain": 0.02219756501871445,
    "stage": "column",
    "scale": "500 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 97166,
+    "brain_px": 183107,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.36,
-    "mean": 0.123,
-    "p99": 0.408
+    "above_0_5_pct": 0.2,
+    "mean": 0.085,
+    "p99": 0.37
    }
   },
   "zoom_1920_062": {
-   "d": 6.399628814176943,
-   "brain": 0.0004112070348593301,
+   "d": 6.399628814176949,
+   "brain": 0.0004112070348593355,
    "stage": "column",
    "scale": "500 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 166213,
+    "brain_px": 158747,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.91,
+    "above_0_5_pct": 0.73,
     "mean": 0.155,
-    "p99": 0.494
+    "p99": 0.479
    }
   },
   "zoom_1920_070": {
-   "d": 5.499999999999994,
+   "d": 5.500000000000001,
    "brain": 0,
    "stage": "column",
    "scale": "200 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 214962,
+    "brain_px": 209266,
     "above_0_8_pct": 0.01,
-    "above_0_5_pct": 2.14,
-    "mean": 0.177,
-    "p99": 0.557
+    "above_0_5_pct": 2.35,
+    "mean": 0.182,
+    "p99": 0.563
    }
   },
   "zoom_1920_080": {
-   "d": 3.3472696582442847,
+   "d": 3.347269658244292,
    "brain": 0,
    "stage": "column",
    "scale": "200 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 476666,
-    "above_0_8_pct": 0.4,
-    "above_0_5_pct": 7.61,
-    "mean": 0.225,
-    "p99": 0.72
+    "brain_px": 431584,
+    "above_0_8_pct": 0.67,
+    "above_0_5_pct": 8.77,
+    "mean": 0.233,
+    "p99": 0.759
    }
   },
   "zoom_1920_090": {
-   "d": 1.3309354951512156,
+   "d": 1.330935495151215,
    "brain": 0,
    "stage": "column",
    "scale": "50 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 956852,
+    "brain_px": 1000278,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.09,
-    "mean": 0.119,
-    "p99": 0.366
+    "above_0_5_pct": 0.24,
+    "mean": 0.128,
+    "p99": 0.408
    }
   },
   "zoom_1920_100": {
-   "d": 0.8100000000000003,
+   "d": 0.8100000000000004,
    "brain": 0,
    "stage": "tissue (NeuronRender)",
    "scale": "50 µm · true scale",
-   "caption": "close-up · left DorsAttn PrCv 1 · 100 pyramidal (human) + 25 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n125 cells, 5 in full detail: 44,173 spines on 37,951 of 62,944 µm of dendrite, 1,867 boutons, 84 nodes of Ranvier · 926k of 1,000k triangles (desktop) · fluorescence\nNeuroMorpho.Org reconstructions (",
+   "caption": "close-up · left DorsAttn PrCv 1 · 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as",
    "luminance": {
-    "brain_px": 2073600,
-    "above_0_8_pct": 0.0,
-    "above_0_5_pct": 1.23,
-    "mean": 0.25,
-    "p99": 0.516
+    "brain_px": 2070933,
+    "above_0_8_pct": 0.05,
+    "above_0_5_pct": 2.54,
+    "mean": 0.134,
+    "p99": 0.609
    }
   },
   "zoom_390_000": {
-   "d": 361.33640835099703,
+   "d": 361.3364083509967,
    "brain": 1,
    "stage": "brain",
    "scale": "50 mm · cells drawn ~6×",
    "caption": "live · 20k-neuron network on CPU · last frame: 5,956 spikes recorded, none sent (the stream's 3 KB/s budget was used up)\ncells enlarged ~6× for visibility · 246 cells (pyramidal, basket, thalamic relay, medium spiny, CA1 pyramidal, amygdala principal; ≤ 40 segments each) · a spike lights the axon from the soma, slowed ~250×; region rates tint the dendrites · NeuroMorpho.Org, CC BY 4.0 · credits on",
    "luminance": {
-    "brain_px": 91304,
-    "above_0_8_pct": 0.19,
-    "above_0_5_pct": 1.41,
-    "mean": 0.1,
-    "p99": 0.591
+    "brain_px": 106013,
+    "above_0_8_pct": 0.1,
+    "above_0_5_pct": 1.33,
+    "mean": 0.128,
+    "p99": 0.546
    }
   },
   "zoom_390_030": {
-   "d": 69.59048427719749,
+   "d": 69.59048427719736,
    "brain": 1,
    "stage": "brain",
    "scale": "5 mm · cells drawn ~6×",
    "caption": "live · 20k-neuron network on CPU · last frame: 5,739 spikes recorded, none sent (the stream's 3 KB/s budget was used up)\ncells enlarged ~6× for visibility · 246 cells (pyramidal, basket, thalamic relay, medium spiny, CA1 pyramidal, amygdala principal; ≤ 40 segments each) · a spike lights the axon from the soma, slowed ~250×; region rates tint the dendrites · NeuroMorpho.Org, CC BY 4.0 · credits on",
    "luminance": {
-    "brain_px": 161195,
+    "brain_px": 199550,
     "above_0_8_pct": 0.01,
-    "above_0_5_pct": 0.16,
-    "mean": 0.077,
-    "p99": 0.244
+    "above_0_5_pct": 0.33,
+    "mean": 0.118,
+    "p99": 0.403
    }
   },
   "zoom_390_045": {
-   "d": 18.632038246563457,
-   "brain": 0.31153642859019376,
+   "d": 18.632038246563443,
+   "brain": 0.31153642859019315,
    "stage": "column",
    "scale": "2 mm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 54211,
+    "brain_px": 95685,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.6,
-    "mean": 0.063,
-    "p99": 0.4
+    "above_0_5_pct": 0.36,
+    "mean": 0.07,
+    "p99": 0.344
    }
   },
   "zoom_390_055": {
    "d": 9.015114538819944,
-   "brain": 0.022197565018714525,
+   "brain": 0.022197565018714466,
    "stage": "column",
    "scale": "1 mm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 29158,
+    "brain_px": 54699,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 1.13,
-    "mean": 0.106,
-    "p99": 0.531
+    "above_0_5_pct": 0.61,
+    "mean": 0.082,
+    "p99": 0.375
    }
   },
   "zoom_390_062": {
-   "d": 6.399628814176936,
-   "brain": 0.00041120703485932465,
+   "d": 6.399628814176944,
+   "brain": 0.0004112070348593301,
    "stage": "column",
    "scale": "500 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 46641,
+    "brain_px": 46741,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.57,
-    "mean": 0.119,
-    "p99": 0.411
+    "above_0_5_pct": 0.58,
+    "mean": 0.134,
+    "p99": 0.417
    }
   },
   "zoom_390_070": {
-   "d": 5.499999999999994,
+   "d": 5.4999999999999964,
    "brain": 0,
    "stage": "column",
    "scale": "500 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 77727,
+    "brain_px": 65562,
     "above_0_8_pct": 0.0,
-    "above_0_5_pct": 0.39,
-    "mean": 0.123,
-    "p99": 0.394
+    "above_0_5_pct": 0.46,
+    "mean": 0.136,
+    "p99": 0.411
    }
   },
   "zoom_390_080": {
-   "d": 3.3472696582442873,
+   "d": 3.3472696582442834,
    "brain": 0,
    "stage": "column",
    "scale": "200 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 162631,
-    "above_0_8_pct": 0.0,
-    "above_0_5_pct": 1.46,
-    "mean": 0.181,
-    "p99": 0.524
+    "brain_px": 152526,
+    "above_0_8_pct": 0.01,
+    "above_0_5_pct": 1.87,
+    "mean": 0.183,
+    "p99": 0.544
    }
   },
   "zoom_390_090": {
-   "d": 1.3309354951512105,
+   "d": 1.330935495151216,
    "brain": 0,
    "stage": "column",
    "scale": "100 µm · true scale",
    "caption": "cortical column · left DorsAttn PrCv 1 · 0.5 mm wide, 2.15 mm deep; layers L1–L6 as measured in H01 · sparse label: 213 of ~7,093 neurons drawn (3 %, like a Golgi stain) · each drawn cell stands for a sampled model neuron of this region; a spike runs soma → axon\n50 basket (NMO_107145), 121 pyramidal (NMO_107146), 42 L5 pyramidal (NMO_159993) · true size · 19,049 segments, 5 draw calls · zoom in fu",
    "luminance": {
-    "brain_px": 230085,
-    "above_0_8_pct": 0.04,
-    "above_0_5_pct": 3.46,
-    "mean": 0.232,
-    "p99": 0.602
+    "brain_px": 230493,
+    "above_0_8_pct": 0.06,
+    "above_0_5_pct": 3.67,
+    "mean": 0.234,
+    "p99": 0.612
    }
   },
   "zoom_390_100": {
-   "d": 0.8100000000000018,
+   "d": 0.8100000000000003,
    "brain": 0,
    "stage": "tissue (NeuronRender)",
    "scale": "100 µm · true scale",
-   "caption": "close-up · left DorsAttn PrCv 1 · 60 pyramidal (human) + 15 basket (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n75 cells, 3 in full detail: 7,370 spines on 9,003 of 33,256 µm of dendrite, 1,147 boutons, 52 nodes of Ranvier · 183k of 250k triangles (phone) · fluorescence\nNeuroMorpho.Org reconstructions (NMO_1071",
+   "caption": "close-up · left DorsAttn PrCv 1 · 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed 10,000× (node to node where myelinated)\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 pre",
    "luminance": {
-    "brain_px": 237120,
-    "above_0_8_pct": 0.02,
-    "above_0_5_pct": 3.38,
-    "mean": 0.285,
-    "p99": 0.587
+    "brain_px": 234463,
+    "above_0_8_pct": 0.15,
+    "above_0_5_pct": 6.24,
+    "mean": 0.208,
+    "p99": 0.664
    }
   }
  },
  "errors_1920": [],
  "column_390_x4": {
-  "fps": 0.0,
-  "js_ms_per_frame": null,
+  "fps": 4.5,
+  "js_ms_per_frame": 2.91,
   "info": {
    "region": 42,
    "widthUm": 500,
@@ -342,8 +342,8 @@
     }
    ],
    "live": true,
-   "spikes": 6,
-   "spiking": 4
+   "spikes": 5,
+   "spiking": 5
   }
  },
  "errors_390": []
