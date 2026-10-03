@@ -152,7 +152,7 @@ def main():
                         life = {"activity": activity, "place": "room", "vitals": {"resp_per_min": 14}, **extra}
                         if key == "walk":                          # from standing at the door: the research tick sends him to the desk
                             pg.evaluate("(l) => { act('idle_home', {...l, activity: 'idle_home', place: 'door_in'}); sim(1 / 30, 60); }", life)
-                            pg.evaluate("(l) => { act(l.activity, l); " + args.prep + " for (let i = 0; i < 400; i++) { sim(0.1, 1); "
+                            pg.evaluate("(l) => { act(l.activity, l); " + args.prep + " for (let i = 0; i < 400; i++) { animate_(0.1); "   # steps without a render
                                         "const p = pose(); if (p.step && p.step.k === 'walk') break; } sim(1 / 30, 24); }", life)
                         else:
                             pg.evaluate("(l) => { act(l.activity, l); " + args.prep + f" sim(1 / 30, {args.settle}); }}", life)
