@@ -306,13 +306,12 @@ function closeupExit(keepCamera){
 function closeupLine(){
   const i = n3close.info(), t = i.types.map(x => `${x.n} ${N3_TYPE[x.type] || x.type} (${x.species})`).join(" + ");
   const n = x => (x || 0).toLocaleString("en-US");
-  const detail = `${i.cells} cells, ${i.heroCells} in full detail: ${n(i.spines)} spines on ${n(i.spineUm)} of ${n(i.dendUm)} µm of dendrite, `
-    + `${n(i.boutons)} boutons, ${n(i.nodesOfRanvier)} nodes of Ranvier · ${n(Math.round(i.triangles / 1000))}k of ${n(Math.round(i.triangleCap / 1000))}k triangles (${i.lod}) · ${i.style}`;
+  const detail = i.detailLine;                     // #99: the module says what is drawn (real H01 cells, or the NeuroMorpho ones)
   return `<b>close-up · ${esc(regionLabel(nodes[i.region]))}</b> · ${esc(t)}`
     + (i.live ? ` · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed ${n(i.slowdown)}× (node to node where myelinated)`
               : ` · no live network: static cells, no activity`)
     + `<span class="s">${esc(detail)}</span>`
-    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about</span>`;
+    + `<span class="s">${esc(i.sourceLine)}</span>`;   // #99: and where the shapes come from (H01 or NeuroMorpho.Org), from the module
 }
 function neuronsOn(on){
   n3want = on;
@@ -693,7 +692,9 @@ function renderScreens(d){
   const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
   const bl = (d.sources || {}).blocked || [];
-  $("sc-src").textContent = bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "";
+  const yt = d.youtube, fd = Object.entries(d.feeds || {}).map(([k, v]) => `${k} logged in, no video: ${v.reason}${v.captcha ? " (captcha)" : ""}`);
+  $("sc-src").textContent = [bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "",
+    yt ? (yt.key_set ? `YouTube API: ${yt.units_used}/${yt.units_cap} units today` : "YouTube API key not set") : "", ...fd].filter(Boolean).join(" · ");
   const mu = d.music || {}, now = mu.now;
   $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
   screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");

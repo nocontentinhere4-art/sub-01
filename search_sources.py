@@ -31,6 +31,8 @@ MAX_RESULTS = 10
 BLOCK_AFTER = 2                      # consecutive failures before a source is set aside (#89: rotate, never loop)
 BLOCK_S = 3600.0                     # first block; doubles on each new block, at most BLOCK_MAX_S
 BLOCK_MAX_S = 6 * 3600.0
+ROBOTS_BLOCK_S = 86400.0             # a robots.txt refusal holds for the day robots.txt is cached
+STATE_V = 2                          # #89 live follow-up: sources changed, older failure counts and blocks are dropped
 NOT_BROKEN = ("rate limit", "opened in the last 7 days")     # refusals that do not mean the source is broken
 ROBOTS_TTL_S = 86400.0
 ROBOTS_RETRY_S = 600.0              # a robots.txt that could not be read refuses the host for 10 min only
@@ -387,18 +389,24 @@ SOURCES = {
     "openlibrary": {"label": "Open Library", "url": lambda q: f"https://openlibrary.org/subjects/{ol_slug(q)}",
                     "api": lambda q: f"https://openlibrary.org/subjects/{ol_slug(q)}.json?limit=12",
                     "parse": parse_openlibrary},
+    # youtube.com/robots.txt disallows /results: these two are never asked by route(); YouTube is searched through
+    # the official Data API instead (youtube_api.py, with YOUTUBE_API_KEY) and played in its official embed player
     "youtube": {"label": "YouTube", "url": lambda q: "https://www.youtube.com/results?" + _q({"search_query": q}),
-                "parse": parse_youtube},
+                "parse": parse_youtube, "feed": True},
     # short videos on the phone (#56 extension): YouTube Shorts (Restricted Mode cookie), TikTok tag pages logged out
     # (robots.txt disallows TikTok's /search; /tag is allowed)
     "shorts": {"label": "YouTube Shorts", "url": lambda q: "https://www.youtube.com/results?" + _q(
         {"search_query": f"{q} #shorts"}), "parse": parse_youtube, "feed": True},
     "tiktok": {"label": "TikTok", "url": _tiktok_url, "parse": _parse_tiktok, "feed": True},
-    # sites searched through their own search box (site_search): the home page is opened, the query typed there
-    "recipes": {"label": "RecipeTin Eats", "site": "https://www.recipetineats.com/", "parse": parse_headlines},
-    "news": {"label": "Science News", "site": "https://www.sciencenews.org/", "parse": parse_headlines},
+    # sites with a WordPress search: their own results page (/?s=...), the page their search box loads (#89: the box
+    # itself was often not found, "no search box"); robots.txt is checked like every source
+    "recipes": {"label": "RecipeTin Eats", "url": lambda q: "https://www.recipetineats.com/?" + _q({"s": q}),
+                "parse": parse_headlines},
+    "news": {"label": "Science News", "url": lambda q: "https://www.sciencenews.org/?" + _q({"s": q}),
+             "parse": parse_headlines},
 }
 GENERAL = ("ddg", "bing", "wikipedia")      # any query; the topic sources come first when they fit
+TAIL = ("hn", "news")                       # also any query, after the fitting ones (#89: rotation without the loop)
 
 # topic -> the sources that fit it, best first (a query can match several topics)
 TOPICS = [
@@ -470,9 +478,10 @@ class Limits:
         self.today = {k: int(v) for k, v in (s.get("today") or {}).items() if isinstance(v, int)}
         self.refused = {k: int(v) for k, v in (s.get("refused") or {}).items() if isinstance(v, int)}
         self.last = list(s.get("last") or [])[-20:]          # recent searches: [{t, source, query, from}]
-        self.fails = {k: int(v) for k, v in (s.get("fails") or {}).items() if isinstance(v, int)}
+        same = s.get("v") == STATE_V
+        self.fails = {k: int(v) for k, v in (s.get("fails") or {}).items() if isinstance(v, int)} if same else {}
         self.blocked = {k: dict(v) for k, v in (s.get("blocked") or {}).items()
-                        if isinstance(v, dict) and isinstance(v.get("until"), (int, float))}
+                        if isinstance(v, dict) and isinstance(v.get("until"), (int, float))} if same else {}
         self._roll()
 
     def _roll(self):
@@ -521,6 +530,10 @@ class Limits:
         if why in NOT_BROKEN:
             return
         self.fails[name] = self.fails.get(name, 0) + 1
+        if why == "robots.txt":                             # robots.txt does not change by asking again
+            self.blocked[name] = {"until": round(self.clock() + ROBOTS_BLOCK_S), "why": why, "n": 1}
+            self.fails[name] = 0
+            return
         if self.fails[name] >= BLOCK_AFTER:                 # set aside for a while: the next sources get their turn
             n = int((self.blocked.get(name) or {}).get("n", 0)) + 1
             secs = min(BLOCK_MAX_S, BLOCK_S * 2 ** (n - 1))
@@ -537,7 +550,7 @@ class Limits:
         self._roll()
         return {"day": self.day, "today": dict(self.today), "refused": dict(self.refused),
                 "hits": {h: [round(t, 1) for t in ts] for h, ts in self.hits.items()}, "last": self.last[-20:],
-                "fails": dict(self.fails), "blocked": dict(self.blocked)}
+                "fails": dict(self.fails), "blocked": dict(self.blocked), "v": STATE_V}
 
     def blocked_now(self):
         """Sources set aside right now: {name: {label, why, until (epoch s)}}."""
@@ -626,9 +639,8 @@ def route(q, limits=None, rng=None, video=False, wiki_share=0.0):
                 score[s] = max(score.get(s, 0.0), 1.0 if i == 0 else 0.6)
     for s in GENERAL:
         score.setdefault(s, 0.35)
-    for s in SOURCES:                                       # #89: every other working source, last (rotation)
-        if s != "youtube":                                  # videos only for a video query or watching videos
-            score.setdefault(s, 0.15)
+    for s in TAIL:                                          # #89: the other any-query sources, last (rotation)
+        score.setdefault(s, 0.15)
     if video:
         score.pop("wikipedia", None)                        # a video search never ends on Wikipedia
     if not ol_slug(q or ""):
