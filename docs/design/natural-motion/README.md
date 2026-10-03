@@ -95,3 +95,6 @@ lying); the penetration sweeps are on the final code.
 
 ## Part 2: food
 Real dishes, bags and the bin, and the `delivery.dish` field with labels that name the meal: see `food/README.md`.
+
+## Asleep
+Under the duvet, slides parked by the bed, aligned on the pillow, on his side now and then: see `sleep/README.md`.

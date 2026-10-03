@@ -8,7 +8,32 @@
 layer on, or a close-up button). API for the whole-brain view (part B): `docs/spiking/neuron_render_api.md`.
 Screenshots and numbers: `python tests/neuron_render_shots.py` → `docs/screens/neuron_render/`.
 
-## What is real, what is typical, what is drawn
+## #99: real H01 cells in the cortex close-up
+
+Since #99 the cortex close-up no longer draws procedural tubes: it draws **real electron-microscopy reconstructions**
+from **H01** (Shapson-Coe et al. 2024, Science 384:eadk4858; ~1 mm³ of human temporal cortex; CC BY 4.0), built once
+by `web/neuron_render/build/fetch_h01.py` into `web/neuron_render/h01/` and lazy-loaded by `neuron_render.js` through
+`h01.js` (gzip blobs decoded with `DecompressionStream`; browsers without it, or a failed fetch, fall back to the
+NeuroMorpho procedural cells below, and `info().source` says which). The other regions (striatum, thalamus,
+hippocampus, amygdala) keep the procedural NeuroMorpho cells: H01 is cortex only, and MICrONS (mouse) was not needed.
+
+| part | H01 close-up |
+|---|---|
+| shapes, spines, boutons | the proofread cells' own meshes (multi-LOD Draco from `proofread_104/mesh`, decimated with quadric simplification to the tier's triangle target; the thin axon is decimated on its own share of the budget (`decimate_split`, ≤ 30 %) so it stays a continuous tube instead of collapsing first: the spines are in the mesh, not drawn) |
+| axon / dendrite / soma / AIS / **myelin** | H01's subcompartment classes on the cells' SWC skeletons (sparse labels, propagated along the tree); the pulse runs on the nodes H01 labels axon / AIS, saltatory on the stretches it labels **myelinated axon** (an internode every ~100 µm inside a stretch, Rushton 1951: the labels say where myelin is, not where each node of Ranvier is) |
+| synapses | `synapse_locations.csv`: the cell's **presynaptic sites** (its boutons; they flash when the pulse arrives, timed along the real axon) and its **incoming synapses** (dots; the mid tier keeps a sample of 1 500) |
+| glia | astrocytes and oligodendrocytes from the automated c3 segmentation, chosen from the soma table, **not proofread** (said in the caption and the credits) |
+| tissue behind | a crop of the real SEM image through the focus cell's soma (64 nm mip, stored at 128 nm per pixel), drawn at the back of the slab in the EM look |
+| positions | the focus cell at its true place; every other cell keeps its orientation, cortical depth (y) and slab depth (z) and is moved sideways into the field (`shift_um` in the manifest): the 104 proofread cells lie over ~12 mm² |
+| scale | a real **scale bar** (µm) in the HUD, from the camera distance at the focus depth |
+| looks | **EM**: grey membrane-like shading, the SEM slice behind, no bloom; **fluorescence**: as before (sparse-label colours, a second fluorophore on interneurons, glia in a blue-white), depth of field, bloom |
+| budget | ≤ 3 MB per set (desktop and phone sets; sizes in `cortex.json`), phone set ≤ 250k triangles, desktop ≤ 1M; nothing loaded until the close-up opens |
+
+Sources and changes to the data: `docs/spiking/morphology_credits.md` (H01 section) and the build script's header.
+Honesty: the caption (`NeuronRender.CAPTION`) names the datasets and says the activity is simulated; `nr.caption()`
+adds the counts of this close-up (cells, synapses, myelinated µm) and that the glia are not proofread.
+
+## What is real, what is typical, what is drawn (the procedural cells: every region but cortex)
 
 | part | where it comes from |
 |---|---|
@@ -18,7 +43,7 @@ Screenshots and numbers: `python tests/neuron_render_shots.py` → `docs/screens
 | **spines** | procedural, at a published density per µm of dendrite beyond a spine-free proximal zone, on the cells in full detail (the "hero" tier), nearest the soma first within a triangle budget; the caption says on how many µm of dendrite they are drawn |
 | **myelin, nodes of Ranvier** | procedural, on the types whose axons are myelinated: internodes start after the axon initial segment, on the axon's main trunk and its first branch orders; sheath outer radius = axon radius / g-ratio; node gaps drawn 2 µm wide (real ~1 µm) so they stay visible |
 | **boutons** | procedural: en passant boutons every few µm on the unmyelinated axon beyond the initial segment, a terminal bouton at every axon tip |
-| the tissue around | the far tier of cells as thin lines, and sprites of out-of-focus neurites and counterstain-like somata (as the red NeuN-like channel of the reference micrograph): decoration, not data |
+| the tissue around | the far tier of cells as thin lines, and oriented sprites of out-of-focus neurite streaks (no counterstain blobs since #99: they read as meaningless dots): decoration, not data |
 | activity | only recorded spikes of sampled model neurons and measured region rates (`n3.sq`, `n3.rq`); no frames → nothing moves |
 
 None of the cells is from the person whose MRI the brain model is built from (not from the scanned person): no data of that person exist at this
@@ -88,6 +113,20 @@ Sources:
   activity". There is no demo mode and no recorded stream on the server.
 - A real action potential is ~1 ms long: at 0.3 m/s that is ~300 µm of axon, longer than most of these arbors. It is
   drawn as a short bright front (~90 ms at the slowed clock): a visual convention, said in the caption's "pulses slowed".
+- On the H01 cells (#99) the axon is its real ~0.5 µm (a pixel) and the focus cell's 4.1 mm of axon take ~34 s at the
+  slowed clock, so the **axon tube itself lights** from the front back toward the soma (~45 µm, fading), swells by
+  ~0.6 µm where lit, and the cell's **axon skeleton** (H01's own nodes, ~2 000 for the focus and hero cells, drawn as
+  a thin 3-sided tube along the decimated mesh's axon, never thinner than a pixel, so the axon stays continuous) lights
+  node to node with it. H01's SWC skeletons come in fragments (the focus cell's axon in ~20, the first starting ~28 µm
+  from the soma, unlabelled pieces in between): the build adopts an unlabelled piece into the axon when it touches
+  axon-labelled nodes (`adopt_axon_fragments`), roots the soma's fragment at the soma, and links each axon piece's
+  root to the nearest soma or axon node of another piece within 32 µm, taken from the soma outward
+  (`bridge_axon_fragments`, `BRIDGE_UM`), so path distance and pulse time run continuously from the soma along the
+  whole axon (the focus cell keeps 4 unlinked pieces). The links are straight chords, not H01 geometry; the front is ~3× wider (~9 µm) and the pulse fades over 20 s instead of 8 (`uPulseW`, `uPulseTail`,
+  `uPulseFade`, `uPulseSwell`, set in `buildH01`): the same visual convention, so a viewer can follow the pulse along
+  the real axon. Nothing separate travels along it (no sprites, no dots). The timing is the real conduction speed /
+  10 000 along the real path (`ap_front_um` in `results.json`: the front's path distance from the soma at each strip
+  frame).
 
 ## Look
 - **Fluorescence:** GFP-like green (a few cells tdTomato-like orange: the basket cells in cortex, ~15 % of the mid tier
@@ -95,7 +134,7 @@ Sources:
   bluish myelin channel; bloom. **3D render:** soft wrap lighting, a reddish translucent edge, pale cream myelin, a
   lavender nucleus; dim cooler tissue around. Toggle in the HUD (top right of the brain) or `nr.setStyle()`. In cortex the
   render style draws 3 hero cells and half the mid tier (five full arbors overlapped into a ball of yarn); `info().triangles`
-  follows. The bottom-left overlay shows cells, triangles and live/offline; fps only with `?debug` in the page's URL (or
+  follows. The bottom-centre overlay (with the µm scale bar above it) shows cells, triangles and live/offline; fps only with `?debug` in the page's URL (or
   `debug: true`). While a close-up is open the page's right-hand panel gets a dark translucent scrim (`body.closeup #dock`).
 - **Depth of field:** every material writes linear depth into the alpha channel of the scene target; the composite
   mixes the sharp image with a quarter-resolution blur by the distance from the focus cell's depth (sharp within ±8 %
@@ -111,9 +150,21 @@ Sources:
 `docs/screens/neuron_render/results.json`, by `tests/neuron_render_shots.py` (2026-10-02). No page errors at 1280 or
 390 px in any region or style.
 
+**Cortex since #99 (the real H01 cells):** desktop set 20 cells (1 focus L2 pyramidal, 1 L5 pyramidal and 1 L2
+interneuron as heroes, 7 mid, 6 far as skeleton lines, 2 astrocytes + 2 oligodendrocytes), **317 760 triangles** of
+1 000 000 (280 452 in the meshes + the three axon tubes), 34 draw calls, 1 442 presynaptic and 13 268 incoming
+synapses, 1 108 µm of myelinated axon, 2.53 MB of cells + 0.43 MB EM slice (2.99 MB); phone set 17 cells,
+**185 501 triangles** of 250 000, 29 draw calls, 1.54 MB + EM (2.00 MB). Under the mid-phone profile (CPU ×4, 390 px)
+the main-thread time is **3.1 ms a frame** (2.8 fps in the software rasteriser; 1.7 ms unthrottled); the set decodes
+in ~0.2 s from the local server and `nr.ready` resolves ~350 ms after `openAt()` when `prefetch()` ran first. The
+action-potential strip (`ap_strip.png`, frames at 0.3 / 1 / 2 / 4 / 8 s after the spike, each cropped around the
+front) has the front at 28 / 58 / 118 / 238 µm of real axon path (`ap_front_um`). The NeuroMorpho numbers below for
+cortex are now the `*_before.png` shots (`NeuronRender.H01_SETS.cortex = null`), kept as the fallback and for the
+before/after pair.
+
 | close-up | desktop LOD (1280 px): triangles / spines / boutons / nodes of Ranvier | phone LOD (390 px): triangles / spines / boutons / nodes |
 |---|---|---|
-| cortex (100 pyramidal + 25 basket; phone 60 + 15) | 925 569 of 1 000 000 · 44 173 on 37 951 of 62 944 µm · 1 867 · 84 | 183 179 of 250 000 · 7 370 on 9 003 of 33 256 µm · 1 147 · 52 |
+| cortex, NeuroMorpho fallback / before (100 pyramidal + 25 basket; phone 60 + 15) | 925 569 of 1 000 000 · 44 173 on 37 951 of 62 944 µm · 1 867 · 84 | 183 179 of 250 000 · 7 370 on 9 003 of 33 256 µm · 1 147 · 52 |
 | striatum (medium spiny) | 302 790 · 4 842 · 10 · 0 | 94 268 · 2 903 · 6 · 0 |
 | thalamus (relay) | 450 580 · 3 657 · 5 · 0 | 102 928 · 2 191 · 3 · 0 |
 | hippocampus (CA1 pyramidal) | 999 955 · 55 000 on 22 049 of 70 405 µm · 100 · 60 | 197 481 · 10 800 · 60 · 36 |
@@ -130,13 +181,23 @@ at most, quarter-resolution post passes, and nothing drawn off screen. The serve
 `python tests/smoke_demo.py --measure 30` → 6.7 ms CPU per 50 ms tick, 601 ticks in 30 s, SMOKE OK.
 
 Also checked: the module runs unchanged under three.js **r169** (ES module, the room's version): 125 cells,
-926k triangles, a spike drawn, no console errors, `close()` leaves no canvas (`scratch` page, not in the repo).
+926k triangles, a spike drawn, no console errors, `close()` leaves no canvas (`scratch` page, not in the repo). With the
+H01 set under r169: `prefetch()` then `openAt()` with `normal: [1, 0, 0]`, `cameraDir`, `entry {1500 ms, from 6}` →
+the block turned by the expected quaternion (−90° about z), `nr.ready` at ~350 ms, `onEntryEnd` at ~2.4 s, the
+scale bar reading 50 µm = 75 px at 900 px wide, `setOpacity(0.5)` on canvas and HUD, `close()` leaves 0 canvases.
 
 ## Checks
-- `pytest tests/test_neuron_render.py`: the asset (same six credited cells, radii, node budget), the plan (monotone
+- `pytest tests/test_neuron_render.py` (#99 part): `tests/js/neuron_render_h01_check.js` decodes both H01 sets as the
+  page does and checks kinds, path distances, pulse times on ≥ 90 % of axon vertices and ≥ 60 % of presynaptic sites,
+  monotone skeletons, ≤ 3 MB and the triangle caps; the manifest's licence and citation; the caption in the module, the
+  credits on `/about` and in `morphology_credits.md`; `NeuronRender.BLOCK` against the manifest's bounding boxes; the
+  handoff API (`normal`, `cameraUp`, `prefetch`, `setOpacity`, `detailLine` / `sourceLine`) and that `index.html` prints
+  the module's lines instead of a hard-coded source.
+- `pytest tests/test_neuron_render.py` (#88 part): the asset (same six credited cells, radii, node budget), the plan (monotone
   arrival times, no pulse on dendrites, myelin only beyond the AIS and only on myelinated types, boutons on the
   unmyelinated axon, spines at the stated density), the triangle budget at both LODs (the focus cell keeps its spines),
   the caption word for word, the sources in this file, the call site on `/brain`.
-- `python tests/neuron_render_shots.py`: screenshots at 1280 and 390 px of every close-up region in both styles,
+- `python tests/neuron_render_shots.py`: screenshots at 1920, 1280 and 390 px of every close-up region in both styles
+  (cortex: fluorescence and EM with the H01 cells, and the NeuroMorpho `_before` pair),
   offline and live, an action-potential strip (frames at fixed clock times after the spike, through the `debugTime` test
   hook: a software-WebGL screenshot takes seconds), the side-by-side with the reference micrograph, counts and timings.

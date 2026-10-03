@@ -60,11 +60,24 @@ save(tint(f"{T}/cotton_jersey/Diffuse.jpg", 512, "#ece7de", keep=0.5, cavity=0.6
 save(nor(f"{T}/cotton_jersey/nor_gl.jpg", 512, 0.8), "sheet_nor.jpg")
 save(tint(f"{T}/waffle_pique_cotton/Diffuse.jpg", 512, "#4a5670", keep=0.6, cavity=0.6), "duvet_diff.jpg")
 save(nor(f"{T}/waffle_pique_cotton/nor_gl.jpg", 512, 1.0), "duvet_nor.jpg")
-save(tint(f"{T}/rough_linen/Diffuse.jpg", 512, "#b8ad99", keep=0.6, cavity=0.6), "curtain_diff.jpg")
+save(tint(f"{T}/rough_linen/Diffuse.jpg", 512, "#cfc5b0", keep=0.6, cavity=0.6), "curtain_diff.jpg")   # lighter: the panels read as lit through
 save(nor(f"{T}/rough_linen/nor_gl.jpg", 512, 0.9), "curtain_nor.jpg")
 save(tint(f"{T}/poly_wool_herringbone/Diffuse.jpg", 512, "#8d8478", keep=0.9, cavity=0.6), "rug_diff.jpg")
 save(nor(f"{T}/poly_wool_herringbone/nor_gl.jpg", 512, 1.0), "rug_nor.jpg")
 save(nor(f"{T}/jersey_melange/nor_gl.jpg", 512, 1.0), "fabric_nor.jpg")
+# the soft goods of #98 (props_soft.py): socks (knit), the towel (terry), the hoodie (sweatshirt fleece) with ribbed
+# cuffs (corduroy ribs), the backpack's weave, the floor cushion, the tote's canvas, the jeans
+save(nor(f"{T}/knitted_fleece/nor_gl.jpg", 512, 1.0), "knit_nor.jpg")
+save(nor(f"{T}/ribbed_corduroy/nor_gl.jpg", 512, 1.0), "rib_nor.jpg")
+save(tint(f"{T}/terry_cloth/Diffuse.jpg", 512, "#e0a35a", keep=0.55, cavity=0.5), "terry_diff.jpg")
+save(nor(f"{T}/terry_cloth/nor_gl.jpg", 512, 1.0), "terry_nor.jpg")
+save(tint(f"{T}/jogging_melange/Diffuse.jpg", 512, "#5c6372", keep=1.0, cavity=0.6), "hoodie_diff.jpg")
+save(nor(f"{T}/jogging_melange/nor_gl.jpg", 512, 1.0), "hoodie_nor.jpg")
+save(nor(f"{T}/bi_stretch/nor_gl.jpg", 512, 1.0), "bag_nor.jpg")
+save(tint(f"{T}/cotton_jersey/Diffuse.jpg", 512, "#b4903f", keep=0.9, cavity=0.8), "cushion_diff.jpg")
+save(tint(f"{T}/rough_linen/Diffuse.jpg", 512, "#d6cbb3", keep=0.6, cavity=0.6), "canvas_diff.jpg")
+save(tint(f"{T}/denim_fabric_05/Diffuse.jpg", 512, "#3a4763", keep=1.2, cavity=0.7), "denim_diff.jpg")
+save(nor(f"{T}/denim_fabric_05/nor_gl.jpg", 512, 1.0), "denim_nor.jpg")
 
 # ---------- posters (one atlas, 1024 x 512): A 2:3 | B 2:3 | C square + D 2:1 ----------
 JP = f"{R}/fonts/NotoSansJP.ttf"; SANS = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -211,3 +224,6 @@ g.ellipse((22 * S, 18 * S, 42 * S, 34 * S), outline="#2e4a2b", width=3 * S); g.e
 cx_, cy_ = stick(n6, 410 * S, 400 * S, -4); pin(cork, cx_, cy_, "#f0b429")
 cork = cork.resize((512, 512), Image.LANCZOS)
 save(cork, "pinboard.png")
+
+# ---------- the hard surfaces (#98 G5): the plank floor, plaster, roughness micro-variation, the keycap / spine / decal atlases ----------
+import tex_hard; tex_hard.build()

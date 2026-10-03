@@ -5,7 +5,9 @@
      - Neurons.onMessage(msg) from the page's existing websocket: frames {"type":"spiking", ...state}
        (t_sim, phase, n_neurons, spikes_per_s, mean_rate_hz, realtime_x, groups, raster, pong, dopamine).
        Since #62 the server sends them compact (spiking/frames.py): the numbers at most once a second, and the
-       raster as n3.sq (3 bytes a recorded spike: region, slot, time); the raster then has one row a region.
+       raster as n3.sq (3 bytes a recorded spike: region, slot, time) and the measured rates as n3.rq (1 byte a region).
+       Since #88 the panel draws no spike dots: its map is the measured spike rate of every region over the last
+       frames (n3.rq, one row a region, a column a frame), a heatmap like a calcium-imaging kymograph.
      - GET /api/spiking/status on load and every 60 s:
        {live, session, next_session, last:{exam, memory_test, pong_curve, bench}, spend}.
      - GET /api/spiking/live on load and every 60 s (#55): the small daytime network that votes in his choices
@@ -23,13 +25,15 @@ window.Neurons = (() => {
   const CONTROL_NAMES = { random: "random paddle", random_paddle: "random paddle", no_plasticity: "no plasticity",
     frozen: "no plasticity", no_learning: "no plasticity" };
   const GROUP_LABEL = { somatomotor: "motor", relay: "thalamus" };
-  const LIVE_MS = 10000, WINDOW_MS = 2000, RECENT_MS = 20, CAP = 24000;
+  const LIVE_MS = 10000, HEAT_N = 60;
+  const RATE_LO = 0.1, RATE_HI = 100;
+  const rateByte = hz => !(hz >= RATE_LO) ? 0 : Math.max(1, Math.min(255, Math.round(1 + 254 * Math.log(Math.min(hz, RATE_HI) / RATE_LO) / Math.log(RATE_HI / RATE_LO))));
   const NUMBERS = ["n_neurons", "t_sim", "spikes_per_s", "mean_rate_hz", "realtime_x", "groups", "dopamine"];   // once a second
 
   const S = { inited: false, open: true, live: false, lastWall: -1e9, st: null, status: null, raf: 0, timers: [],
-    el: {}, tHead: 0, tDraw: 0, rx: 1, rate: 0, prevWall: 0, rows: 1, prevPhase: null, refetch: 0, sized: false,
-    // raster ring buffer (sim ms, row); fixed size, no per-frame allocation
-    rt: new Float64Array(CAP), rr: new Uint8Array(CAP), head: 0, count: 0,
+    el: {}, rx: 1, prevPhase: null, refetch: 0, sized: false,
+    // rate map: the last HEAT_N frames' per-region rate bytes (log 0.1-100 Hz), fixed size, no per-frame allocation
+    heat: new Uint8Array(HEAT_N * 255), hHead: 0, hCount: 0, hRows: 214, hDirty: false,
     text: Object.create(null) };
 
   // ---------- helpers ----------
@@ -55,7 +59,7 @@ window.Neurons = (() => {
   // ---------- DOM ----------
   function build(mount, open) {
     const det = h("details", "nx"); det.open = open;
-    const sum = h("summary"); sum.append(h("span", "nx-dot"), document.createTextNode("Neurons · "), S.el.state = h("b", null, "offline"));
+    const sum = h("summary"); sum.append(document.createTextNode("Neurons · "), S.el.state = h("b", null, "offline"));
     const body = h("div", "nx-body");
     S.el.count = h("div", "nx-count");
     S.el.liverow = h("div", "nx-row");
@@ -93,36 +97,21 @@ window.Neurons = (() => {
     }
     S.st = m; S.lastWall = performance.now();
     if (num(m.realtime_x) && m.realtime_x > 0) S.rx = Math.min(m.realtime_x, 50);
-    const r = m.raster, n3 = m.n3;
-    if (r && n3 && typeof n3.sq === "string" && !Array.isArray(r.spikes)) {   // compact: one row a region
-      const t0 = num(r.t0) ? r.t0 : S.tHead, t1 = num(r.t1) ? r.t1 : t0 + 250, span = Math.max(1, t1 - t0);
-      S.rows = 214;
-      setText("rastercap", `spike raster · sampled spikes, one row a region (${S.rows}) · last ${WINDOW_MS / 1000} s · orange = newest ${RECENT_MS} ms`);
-      if (t1 < S.tHead - 5000) { S.count = 0; S.head = 0; S.tDraw = 0; }
-      const b = unb64(n3.sq);
-      for (let i = 0; i + 2 < b.length; i += 3) {
-        S.rt[S.head] = t0 + b[i + 2] * span / 255; S.rr[S.head] = b[i];
-        S.head = (S.head + 1) % CAP; if (S.count < CAP) S.count++; }
-      if (t1 > S.tHead) {
-        const dw = S.lastWall - S.prevWall;
-        if (S.prevWall > 0 && dw > 20 && dw < 5000) { const q = Math.max(0, Math.min(50, (t1 - S.tHead) / dw)); S.rate = S.rate > 0 ? S.rate * 0.7 + q * 0.3 : q; }
-        S.tHead = t1; S.prevWall = S.lastWall;
-      }
-    } else if (r && Array.isArray(r.spikes)) {
-      const t0 = num(r.t0) ? r.t0 : (num(m.t_sim) ? m.t_sim * 1000 - 250 : S.tHead);
-      const t1 = num(r.t1) ? r.t1 : t0 + 250;
-      if (num(r.n) && r.n > 0) S.rows = Math.min(255, r.n);
-      setText("rastercap", `spike raster · ${S.rows} sampled neurons · last ${WINDOW_MS / 1000} s · orange = newest ${RECENT_MS} ms`);
-      if (t1 < S.tHead - 5000) { S.count = 0; S.head = 0; S.tDraw = 0; }   // a new session: reset the trace
-      const sp = r.spikes, n = sp.length;
-      for (let i = 0; i < n; i++) { const s = sp[i]; if (!s || s.length < 2) continue;
-        S.rt[S.head] = t0 + s[0]; S.rr[S.head] = Math.max(0, Math.min(255, s[1] | 0));
-        S.head = (S.head + 1) % CAP; if (S.count < CAP) S.count++; }
-      if (t1 > S.tHead) {                                  // scroll speed = measured sim-ms per wall-ms (smoothed)
-        const dw = S.lastWall - S.prevWall;
-        if (S.prevWall > 0 && dw > 20 && dw < 5000) { const r = Math.max(0, Math.min(50, (t1 - S.tHead) / dw)); S.rate = S.rate > 0 ? S.rate * 0.7 + r * 0.3 : r; }
-        S.tHead = t1; S.prevWall = S.lastWall;
-      }
+    const r = m.raster, n3 = m.n3, span = r && num(r.t0) && num(r.t1) ? Math.max(0, r.t1 - r.t0) : 0;
+    let col = null, rows = 214;
+    if (n3 && typeof n3.rq === "string") {               // measured: each region's spike rate in this frame
+      col = unb64(n3.rq); rows = col.length;
+      setText("rastercap", `measured spike rate of each region (rows: ${rows} regions) over the last ${HEAT_N} frames; dark = slow, orange = fast (log scale, 0.1–100 Hz)`);
+    } else if (r && Array.isArray(r.spikes) && num(r.n) && r.n > 0 && span > 0) {   // an older pod: rate of each sampled neuron
+      rows = Math.min(255, r.n); const cnt = new Float32Array(rows);
+      for (const sp of r.spikes) if (sp && sp.length > 1 && sp[1] < rows) cnt[sp[1] | 0]++;
+      col = new Uint8Array(rows); for (let i = 0; i < rows; i++) col[i] = rateByte(cnt[i] * 1000 / span);
+      setText("rastercap", `spike rate of each of ${rows} sampled neurons over the last ${HEAT_N} frames; dark = slow, orange = fast (log scale, 0.1–100 Hz)`);
+    }
+    if (col && rows > 0 && rows <= 255) {
+      if (rows !== S.hRows) { S.hRows = rows; S.hCount = 0; S.hHead = 0; }
+      S.heat.set(col.subarray(0, rows), S.hHead * 255); S.hHead = (S.hHead + 1) % HEAT_N; S.hCount = Math.min(HEAT_N, S.hCount + 1);
+      S.hDirty = true;
     }
     if (!S.live) setLive(true);
     if (m.phase !== S.prevPhase) {                       // a phase ended: results may have landed on the server
@@ -164,22 +153,21 @@ window.Neurons = (() => {
   }
   function size(cv) { const d = Math.min(2, devicePixelRatio || 1), w = Math.max(1, Math.round(cv.clientWidth * d)), hh = Math.max(1, Math.round(cv.clientHeight * d));
     if (cv.width !== w || cv.height !== hh) { cv.width = w; cv.height = hh; } return d; }
-  function drawRaster() {
-    const cv = S.el.raster, ctx = cv.getContext("2d"); if (!ctx) return;
-    const d = size(cv), w = cv.width, hh = cv.height;
-    const target = S.tHead + Math.min(300, (performance.now() - S.lastWall) * (S.rate > 0 ? S.rate : S.rx));
-    S.tDraw = target < S.tDraw - 1000 ? target : Math.max(S.tDraw, target);
-    ctx.fillStyle = "#07070b"; ctx.fillRect(0, 0, w, hh);
-    const tNow = S.tDraw, tMin = tNow - WINDOW_MS, recent = S.tHead - RECENT_MS, sx = w / WINDOW_MS, sy = hh / S.rows, dot = Math.max(1, d);
-    const start = (S.head - S.count + CAP) % CAP;
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.fillStyle = pass ? "#ff6a00" : "#ececf2";
-      for (let k = 0, i = start; k < S.count; k++, i = (i + 1) % CAP) {
-        const t = S.rt[i]; if (t < tMin || t > tNow) continue;
-        if ((t >= recent) !== (pass === 1)) continue;
-        ctx.fillRect((t - tMin) * sx, S.rr[i] * sy, dot, dot);
+  function drawRaster() {                             // the rate map: a pixel per region and frame, oldest left
+    const cv = S.el.raster; if (!S.hDirty && cv.width > 1) return;
+    const ctx = cv.getContext("2d"); if (!ctx) return;
+    size(cv); S.hDirty = false;
+    const rows = S.hRows, img = ctx.createImageData(HEAT_N, rows), px = img.data;
+    for (let c = 0; c < HEAT_N; c++) {
+      const age = HEAT_N - 1 - c, slot = (S.hHead - 1 - age + 2 * HEAT_N) % HEAT_N, has = age < S.hCount;
+      for (let y = 0; y < rows; y++) {
+        const v = has ? S.heat[slot * 255 + y] / 255 : 0, o = 4 * (y * HEAT_N + c);
+        px[o] = 7 + 248 * Math.pow(v, 1.3); px[o + 1] = 7 + 110 * Math.pow(v, 1.8); px[o + 2] = 11 + 10 * v; px[o + 3] = 255;
       }
     }
+    const tmp = drawRaster.tmp || (drawRaster.tmp = document.createElement("canvas"));
+    tmp.width = HEAT_N; tmp.height = rows; tmp.getContext("2d").putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, 0, 0, cv.width, cv.height);
   }
   function drawPong() {
     const p = S.st && S.st.pong, cv = S.el.pong; if (!p || !cv) return;
@@ -190,6 +178,7 @@ window.Neurons = (() => {
     const ph = num(p.paddle_h) ? p.paddle_h : 0.2, py = num(p.paddle) ? p.paddle : 0.5;
     ctx.fillStyle = "#ff6a00"; ctx.fillRect(0, (py - ph / 2) * hh, 3 * d, ph * hh);
     if (Array.isArray(p.ball) && num(p.ball[0]) && num(p.ball[1])) {
+      // dot-ok: the Pong ball, the game's real ball at its position in the game the network plays
       ctx.fillStyle = "#ececf2"; ctx.beginPath(); ctx.arc(p.ball[0] * w, p.ball[1] * hh, 2.2 * d, 0, 6.2832); ctx.fill(); }
   }
 
@@ -344,8 +333,7 @@ window.Neurons = (() => {
       capBits.push(`${name} ${s.flat != null ? pct(s.flat) : pct(s.ys[s.ys.length - 1])} (dashed)`);
     }
     line(pts.map((p, i) => `${i ? "L" : "M"}${X(i)} ${Y(p.hit_rate)}`).join(" "), "#ff6a00", null, 1.5);
-    const last = pts[n - 1], c = document.createElementNS(NS, "circle");
-    c.setAttribute("cx", X(n - 1)); c.setAttribute("cy", Y(last.hit_rate)); c.setAttribute("r", 2.5); c.setAttribute("fill", "#ff6a00"); svg.append(c);
+    const last = pts[n - 1];
     box.append(svg);
     capBits.push(`last block ${pct(last.hit_rate)}${num(last.rallies) ? " of " + int(last.rallies) + " rallies" : ""}`);
     cap.textContent = capBits.join(" · ");
