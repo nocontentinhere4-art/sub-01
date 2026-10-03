@@ -6,3 +6,4 @@ photorealism scale of `scorecard.md` (1 obviously CG … 5 passes as a photo in 
 | date (UTC) | main / branch | face | body | motion | soft | hard | light | window | overall | notes |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-10-02 | main 00af116 | 1 | 1 | 2 | 2 | 3 | 2 | 1 | 1.7 | baseline; 22 defects routed (`defects.md`); scale re-based to photorealism on the owner's brief (first draft of the day used a "game look" scale: 2/2/3/2/4/3/2) |
+| 2026-10-03 | main 9353bda | 1 | 1 | 3 | 2 | 3 | 2 | 1 | 1.9 | after #104 (path/path_to: camera waits for him), #105, #108 (asleep under the duvet, side poses), #109; defects 9 and 21 fixed; no regressions; 58 shots, 0 hard failures |

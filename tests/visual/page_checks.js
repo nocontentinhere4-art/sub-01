@@ -29,6 +29,12 @@
     scene.traverse(o => { if (o.isLight) out.lights.push({type: o.type, intensity: +o.intensity.toFixed(3), color: "#" + o.color.getHexString()}); });
     return out;
   };
+  qa.screenState = () => {                                          // what the page shows on the monitor and where its camera goes
+    const m = window.monitor, on = !!(m && m.mesh.material.map);
+    window.updateCameraGoal(); const p = camGoal.pos, over = p.distanceTo(new THREE.Vector3(5.2, 5.0, 6.0)) < 0.01;
+    return {monitor_on: on, camera: over ? "overview" : p.x < -0.5 && p.z < -0.3 ? "monitor" : "him", goal: p.toArray().map(x => +x.toFixed(2)),
+            phone: !!(window.phone && phone.visible), duvet_w: window.DUV ? +DUV.w.toFixed(2) : null, roll: window.ROLL ? +ROLL.a.toFixed(2) : null};
+  };
   qa.followCam = () => { window.updateCameraGoal(); camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); };
   qa.lookFrom = (pos, target) => { camera.position.set(...pos); controls.target.set(...target); controls.update(); };
   // a medium shot of him: candidate positions on a 1.5 m ring at chest height, the first one from his front-right round
@@ -160,6 +166,7 @@
       let col = null, n = 0; o.traverse(m => { if (m.isMesh) { n++; col = col || (m.material && m.material.color && "#" + m.material.color.getHexString()); } });
       if (n) cands.push([`scene#${i}(${col})`, o]); } });
     const ray = new THREE.Raycaster(), box = new THREE.Box3(), c = V(), out = [];
+    boy.updateMatrixWorld(true); const boyBox = new THREE.Box3().setFromObject(boy).expandByScalar(0.05);
     for (const [name, o] of cands) {
       if (MARKERS.has(o)) continue;
       let skip = false, mat = null; o.traverse(m => { if (m.isMesh && !skip) { const mm = [].concat(m.material)[0]; mat = mat || mm;
@@ -168,6 +175,9 @@
       o.updateMatrixWorld(true); box.setFromObject(o); if (box.isEmpty()) continue; box.getCenter(c);
       const sz = [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z];
       if (Math.min(...sz) < 0.006) continue;                           // a plane (a screen, the window's sky): nothing to rest
+      let plane = true, n = 0; o.traverse(m => { if (m.isMesh) { n++; if (!(m.geometry && m.geometry.type === "PlaneGeometry")) plane = false; } });
+      if (n && plane) continue;                                        // a turned screen plane (its box is thick): still a plane
+      if (boyBox.containsPoint(c)) continue;                           // in his hands (chopsticks, the phone, a bag): not resting on anything
       const mine = new Set(); o.traverse(m => mine.add(m));
       const others = all.filter(m => !mine.has(m));
       const sides = others.map(m => m.material.side); others.forEach(m => { m.material.side = THREE.DoubleSide; });

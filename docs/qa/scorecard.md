@@ -13,22 +13,23 @@ Scale: 1 obviously CG at a glance · 2 CG at a glance, some real-looking parts �
 CG on a second look · 4 passes as a photo at the page's camera distances, CG only in close-ups · 5 passes as a photo
 in the close-ups too.
 
-## Scores on `main` (00af116, 2026-10-02)
+## Scores on `main` (9353bda, 2026-10-03; baseline 00af116 in brackets where changed)
 
 | area | score | one line |
 |---|---|---|
 | character face | 1 | a photo projected on a faceted low-poly head; painted eyes, shard hair; CG at any distance where the face is readable |
 | character body (clothes, hands, feet) | 1 | glossy black hoodie and trousers (PVC), faceted sleeves and socks, mitten hands, no cloth motion; the phone-grip mesh alone looks real |
-| character motion | 2 | he sits, lies, walks, eats, breathes and glances, but stiffly: no secondary motion, no weight in the cloth, forearms through the desk, toes under the floor, asleep on the duvet in his slides |
-| soft goods (duvet, pillow, curtains, hanger socks, towel, cushion, hoodie on the door) | 2 | real fabric textures on hard, un-sculpted shapes: box pillow, tube socks, slab towel, ruler-straight curtain folds |
+| character motion | 3 (2) | he sits, lies, walks, eats, breathes and glances; asleep he is under the duvet with his head in the pillow and turns onto his side (#108), and the camera waits until he reaches the desk (#104); still stiff: no secondary motion, forearms through the desk, toes under the floor |
+| soft goods (duvet, pillow, curtains, hanger socks, towel, cushion, hoodie on the door) | 2 | real fabric textures on hard, un-sculpted shapes: tube socks, slab towel, ruler-straight curtain folds; the duvet now lifts over him and the pillow dents (#108), but the lumps are smooth bumps without creases |
 | hard surfaces (furniture, desk items, shelf, fridge, door) | 3 | the Poly Haven props and the desk set pass as a render; the modelled furniture has razor edges, no wear, uniform wood and plaster, no skirting |
 | lighting (day, dusk, night, lamp, screens) | 2 | day and dusk are pleasant renders: flat fill, no bounce colour, no contact shadows; night is black; the lamp blows the hood out; the monitor is pure white |
 | window and outside | 1 | a gradient sky with a sun; the city is flat grey cuboids on one plane, no haze, no depth, no glass |
-| **overall** | **1.7** | a clean, well-propped render; nothing in it would be mistaken for a photo |
+| **overall** | **1.9 (1.7)** | a clean, well-propped render; nothing in it would be mistaken for a photo |
 
-Measured on the same run (`tests/visual/out/full/results.json`): bed/chair penetration 0 in all 56 shots; 13–50
-skinned vertices (of ~17,700 sampled) inside the desk top in the sitting pose, left forearm mostly; left toes 1.2 cm
-below the floor when standing; night (23:00, lights off) mean luminance 10/255 with 12 % pure-black pixels at 1280 and
+Measured on the same run (`tests/visual/out/full2/results.json`, 58 shots): bed/chair penetration 0 in every shot, the
+duvet's weight counted; 12–42 skinned vertices (of ~17,700 sampled) inside the desk top in the sitting pose, left
+forearm mostly; left toes 1.2 cm below the floor when standing; while he walks to the desk the monitor is off and the
+camera stays on the overview; night (23:00, lights off) mean luminance 10/255 with 12 % pure-black pixels at 1280 and
 18 % at 390; the only blown-out pixels are the monitor's white page (4 % at 1280, 9 % at 390); animate() 0.16–0.27
 ms/frame; 55 draw calls, 171k triangles; no z-fighting flagged; no JS errors; the character's 2048² texture has
 anisotropy 1 (room textures 8). Every separate prop rests on its support (gap ≤ 4 mm) or hangs on a wall.
@@ -80,17 +81,19 @@ secondary motion: hair, hood and sleeves settle after a move; (f) the camera sho
 Reference: video of a person at a desk: typing hands, a slouch that changes, feet flat on the floor, a head turn to the
 window; asleep: under the duvet, on his side, slow breathing, the duvet moving with the breath.
 On main: breathing, glances and idle variants exist; bed/chair penetration 0; forearms through the desk top and toes
-through the floor (measured); sleeps on top of the duvet, arms stiff, slides on (`closeup_bed_14.png`); no secondary
-motion; the follow camera at the desk looks at the back of his head (`desk_14_1280.png`) and jumps to the monitor
-while he is still walking there (the server never sends `path`; `walking_8_1280_clean.png`). **2**.
+through the floor (measured); since #108 he sleeps under the duvet, head in the pillow, slides parked, a side pose now
+and then (`closeup_bed_14.png`, `closeup_side_14.png`); since #104 the camera waits on the overview until he reaches the
+desk; no secondary motion; the follow camera at the desk still looks at the back of his head (`desk_14_1280.png`). **3**
+(was 2 on 00af116).
 
 ### Soft goods
 Criteria: (a) sculpted forms: a pillow with a dent, a duvet with folds and a soft edge over the frame, socks and a towel
 that hang and bend; (b) fabric normal maps at ≥ 300 texels/m with variation (creases, a worn patch); (c) no box or
 cylinder silhouettes on cloth; (d) curtains with irregular folds, a hem and a slight sway.
 Reference: a photo of an unmade single bed in a Tokyo flat: a crumpled duvet, a dented pillow, a towel over a hanger.
-On main: duvet and sheet textures are good (374 and 311 texels/m) but the pillow is a hard rounded box
-(`closeup_duvet_14.png`); the hanger socks are 10-sided straight cylinders with flat-cut ends and a second cylinder
+On main: duvet and sheet textures are good (374 and 311 texels/m); since #108 the duvet lifts over him and the pillow
+dents under his head when he lies down, but the empty bed's pillow is still a hard rounded box and the lifted duvet
+has smooth bumps without creases (`closeup_duvet_14.png`, `closeup_bed_14.png`); the hanger socks are 10-sided straight cylinders with flat-cut ends and a second cylinder
 for the foot, the towel a flat box, the pegs boxes (`closeup_socks_14.png`); the hoodie and tote on the door are slabs;
 the curtains are equal ribbed cylinders. **2**.
 

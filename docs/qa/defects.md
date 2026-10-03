@@ -5,7 +5,8 @@ same evening and routed by them (G2: 1–6; G3: 7–8; #63: 9; G6: 10, 15–18, 
 The bar is photorealism (owner's brief): the "what reads as CG" list in `scorecard.md` adds the general tells
 (plastic materials, uniform textures, no contact shadows, knife edges, flat light) that no single item below carries.
 Measured numbers come from `tests/visual/out/results.json`; the shots named are in the run's output directory.
-Status: open unless marked. Items 7 and 8 become hard CI checks (budgets.json `desk_vertices`, `below_floor_vertices`
+Status: open unless marked. Re-checked on `main` 9353bda (2026-10-03, full matrix, 0 hard failures): items 9 and 21
+are **fixed**; the rest unchanged. Items 7 and 8 become hard CI checks (budgets.json `desk_vertices`, `below_floor_vertices`
 → 0) once G3's fix lands.
 
 ## G2 · character asset (`web/room/boy.glb`)
@@ -19,18 +20,20 @@ Status: open unless marked. Items 7 and 8 become hard CI checks (budgets.json `d
 6. **Texture anisotropy 1** on the character's map (room textures use 8): blur at grazing angles.
 
 ## G3 · motion (`web/room/boy_motion.js`, the room's hook block)
-7. **Forearms through the desk top** in the sitting pose: 50 of ~17,700 sampled vertices inside the desk slab
-   (left forearm 36, right forearm 10, right upper arm 4) in `desk_14_1280`.
-8. **Toes under the floor** when standing at the door and the sill: left toes/foot 1.2 cm below (3 sampled vertices).
-9. **Sleeping on top of the duvet**, fully dressed, slides on, arms stiff, a hand on the belly (`closeup_bed_14.png`).
+7. **Forearms through the desk top** in the sitting pose: 12–50 of ~17,700 sampled vertices inside the desk slab
+   (left forearm mostly) in `desk_*_1280`; still 12–42 on 9353bda.
+8. **Toes under the floor** when standing at the door and the sill: left toes/foot 1.2 cm below (3 sampled vertices);
+   still 3 on 9353bda.
+9. ~~**Sleeping on top of the duvet**, fully dressed, slides on, arms stiff, a hand on the belly.~~ **Fixed by #108**
+   (9353bda): under the duvet, head denting the pillow, slides parked by the bed, a side pose now and then; the duvet
+   lifts over his limbs and breathes (`closeup_bed_14.png`, `closeup_side_14.png`, `sleeping_14_1280_char.png`); bed
+   penetration 0 with the duvet's weight counted. Left: the duvet's lumps read as smooth bumps (no fold creases).
 10. **The follow camera at the desk** looks at the back of his head over the monitor (`desk_14_1280.png`); his face is
     never seen in the most common activity.
-21. **The camera jumps to the monitor before he reaches the desk.** The server's `life` snapshot (life.py `snapshot()`)
-    has no `path` or `path_to` field, so the page's `!life.path` guards in `screens()` and `props()` are always true:
-    while he walks to the desk with activity `research` (`walking: true`), `screenOn` is already `"desk"` and the
-    follow camera frames the monitor, with him walking in from the side or out of frame (`walking_*_1280_clean.png`
-    shows the monitor, `walking_*_1280_char.png` shows him). Also `PLACE2ANCHOR[life.path_to]` never resolves. Either
-    the server sends `path`/`path_to`, or the page keys on `life.walking`. Server side: coordinator's call.
+21. ~~**The camera jumps to the monitor before he reaches the desk.**~~ **Fixed by #104** (9353bda): the snapshot now
+    sends `path` and `path_to` while he walks; in `walking_*` the monitor is off and the follow camera stays on the
+    overview until he arrives (the harness records `screen.monitor_on` and `screen.camera` per shot). Was: the page's
+    `!life.path` guards were always true because the server never sent `path`.
 
 ## G4 · soft goods (`room_build/props_soft.py`)
 11. **Hanger socks are tubes**: straight 10-sided cylinders with flat-cut open ends and a second cylinder for the foot;
