@@ -35,9 +35,27 @@ PROBE = """() => {
     if (v.x > -1.9 && v.x < -0.32 && v.z > -1.44 && v.z < -0.74) armLow = Math.min(armLow, v.y - 0.97); }   // over the desk: height above its top
   const legs = {}; for (const n of ["Hips", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightFoot", "RightToeBase"]) if (bones[n]) { bones[n].getWorldPosition(v); legs[n] = +v.y.toFixed(3); }
   const rest = window.motion && window.motion.rest ? {ankle: window.motion.rest.ankle, toe: window.motion.rest.toe, p: Object.fromEntries(Object.entries(window.motion.rest.p || {}).map(([k, v]) => [k, v.toArray().map(x => +x.toFixed(3))]))} : null;
+  // which desk-zone geometry the hand and foot vertices sit inside (the visual QA's column test, re-done here)
+  let deskHits = null;
+  try {
+    const st = window.room.getObjectByName("room_static"); const meshes = []; st.traverse(m => { if (m.isMesh) meshes.push(m); });
+    const sides = meshes.map(m => m.material.side); meshes.forEach(m => { m.material.side = THREE.DoubleSide; });
+    const ray = new THREE.Raycaster(); let sm; b.traverse(o => { if (o.isSkinnedMesh) sm = o; });
+    const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, hits = {}, lows = {};
+    for (let i = 0; i < P.count; i += 2) { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
+      let bi = 0, bw = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); bi = I.getComponent(i, k); }
+      const bn = sm.skeleton.bones[bi].name; if (!/Hand|Foot|ToeBase/.test(bn)) continue;
+      if (!lows[bn] || v.y < lows[bn][1]) lows[bn] = v.toArray().map(x => +x.toFixed(3));
+      if (v.x < -1.92 || v.x > -0.30 || v.z < -1.47 || v.z > -0.72) continue;
+      ray.set(new THREE.Vector3(v.x, -0.5, v.z), new THREE.Vector3(0, 1, 0)); const ys = [];
+      for (const h of ray.intersectObjects(meshes, false)) if (!ys.length || h.point.y - ys[ys.length - 1] > 0.002) ys.push(+h.point.y.toFixed(3));
+      for (let j = 0; j + 1 < ys.length; j += 2) if (v.y > ys[j] + 0.01 && v.y < ys[j + 1] - 0.01) { const key = bn + " in " + ys[j] + ".." + ys[j + 1]; hits[key] = (hits[key] || 0) + 1; }
+    }
+    meshes.forEach((m, i) => { m.material.side = sides[i]; }); deskHits = {hits, lows};
+  } catch (e) { deskHits = String(e); }
   const tv = {}; for (const n of ['Hips','Spine02','Spine','neck','Head','LeftArm','RightArm','LeftUpLeg','LeftLeg']) if (bones[n]) { bones[n].getWorldPosition(v); tv[n] = v.toArray().map(x => +x.toFixed(2)); }
   const torsoVec = tv; let pen = null; try { pen = window.penetration(2, true); } catch (e) { pen = String(e); }
-  return {torsoVec, ry: +b.rotation.y.toFixed(2), pen, lowest_sole: +(low - 0.16).toFixed(3), arm_over_desk: armLow === 9 ? null : +armLow.toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
+  return {deskHits, torsoVec, ry: +b.rotation.y.toFixed(2), pen, lowest_sole: +(low - 0.16).toFixed(3), arm_over_desk: armLow === 9 ? null : +armLow.toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
     swapped: window.motion ? Object.keys(window.motion.swapped) : [], log: window.motion ? window.motion.log : []};
 }"""
 
@@ -79,6 +97,7 @@ def main():
     ap.add_argument("--modes", default="old,new")
     ap.add_argument("--only", default="", help="comma-separated situations")
     ap.add_argument("--prep", default="", help="JavaScript run in the page after each act() (debug)")
+    ap.add_argument("--settle", type=int, default=120, help="frames (30 fps) after act() before the first shot")
     args = ap.parse_args()
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -123,11 +142,12 @@ def main():
                         if args.only and key not in args.only.split(","):
                             continue
                         life = {"activity": activity, "place": "room", "vitals": {"resp_per_min": 14}, **extra}
-                        pg.evaluate("(l) => { act(l.activity, l); " + args.prep + " sim(1 / 30, 120); }", life)
+                        pg.evaluate("(l) => { act(l.activity, l); " + args.prep + f" sim(1 / 30, {args.settle}); }}", life)
                         if key == "phone_bed":
                             pg.evaluate("() => { sim(1 / 30, 1500); }")   # time to lie back
                         for k in range(args.frames):
-                            pg.evaluate("() => { sim(1 / 30, 36); }")
+                            if k:
+                                pg.evaluate("() => { sim(1 / 30, 36); }")
                             if not pg.evaluate("() => { const b = window.boy; return b && b.visible; }"):
                                 continue
                             pg.evaluate(FRAME)

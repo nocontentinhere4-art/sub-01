@@ -150,16 +150,20 @@ export function createMotion(env){
   // ---------- on the desk chair the back never reclines (its backrest is 32 cm behind the hip anchor: a reclined back sinks
   // into it): whatever the clip does, the torso is bent forward at the lower spine until it leans a touch forward of vertical
   function sitUp(ctx, st){
-    if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk" || !B.Spine02) return;
+    if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk" || !B.Spine02 || !B.Spine01) return;
     torso();
-    const back = -TU.dot(FW);                           // > 0: the spine's top is behind the hips
-    if (back <= -0.1) return;                          // target: a touch forward of vertical (the lumbar curve clears the backrest)
-    const a = Math.asin(Math.min(1, back)) + 0.1;
-    bendWorld(B.Spine02, TL, a * 0.7); bendWorld(B.Spine01, TL, a * 0.3); torso();   // (+ about his left axis = forward)
+    // the lower back first: the lumbar segment (Hips -> Spine01) a touch forward of vertical, whatever the clip or an
+    // idle variant (the page's "lean" reclines him) did; then the whole torso (Hips -> neck) the same
+    B.Hips.getWorldPosition(_a); B.Spine01.getWorldPosition(_b); _b.sub(_a).normalize();
+    let back = -_b.dot(FW);
+    if (back > -0.16) { bendWorld(B.Spine02, TL, Math.asin(Math.min(1, back)) + 0.16); torso(); }
+    back = -TU.dot(FW);
+    if (back > -0.12) { const a = Math.asin(Math.min(1, back)) + 0.12; bendWorld(B.Spine01, TL, a * 0.6); bendWorld(B.Spine, TL, a * 0.4); torso(); }   // (+ about his left axis = forward)
   }
   // ---------- feet: no foot below the floor; in the walk a foot that bears weight stays where it landed
   // the feet's rest pose: heights above the floor and world rotations, read off a clip file's rig (the same nodes as
   // boy.glb, unanimated; the skin's bind pose is hips-centred and of no use here). Until one has loaded: boy.glb's numbers
+  const TIP = 0.09, HEEL = 0.05;                         // m from the toe joint to the toe tip, and from the ankle back to the heel
   const REST = {q: {}, p: {}, ankle: 0.120, toe: 0.034, fromScene: false};
   function restFromScene(scene){
     if (REST.fromScene) return;
@@ -170,6 +174,13 @@ export function createMotion(env){
     }
     REST.ankle = Math.min(REST.p.LeftFoot.y, REST.p.RightFoot.y);          // the sole on the floor: joints at their rest heights
     REST.toe = Math.min(REST.p.LeftToeBase.y, REST.p.RightToeBase.y);
+    // the sole's two ends as points in the bones' own frames: the heel's bottom (on the floor, 5 cm behind the ankle) in
+    // the Foot bone's frame, the toe tip (on the floor, 9 cm past the toe joint) in the ToeBase bone's frame
+    for (const side of ["Left", "Right"]) {
+      const a = REST.p[side + "Foot"], t = REST.p[side + "ToeBase"];
+      REST[side + "heel"] = V().set(a.x, 0, a.z - HEEL).sub(a).applyQuaternion(REST.q[side + "Foot"].clone().invert());
+      REST[side + "tip"] = V().set(t.x, 0, t.z + TIP).sub(t).applyQuaternion(REST.q[side + "ToeBase"].clone().invert());
+    }
     REST.fromScene = true;
   }
   function restHeights(){}
@@ -208,7 +219,11 @@ export function createMotion(env){
       const up = B[side + "UpLeg"], lo = B[side + "Leg"], ft = B[side + "Foot"], toe = B[side + "ToeBase"];
       if (!up || !ft) continue;
       ft.getWorldPosition(_a); if (toe) toe.getWorldPosition(_b); else _b.copy(_a);
-      const soleA = _a.y - REST.ankle, soleT = _b.y - REST.toe, low = Math.min(soleA, soleT);
+      let low = Math.min(_a.y - REST.ankle, _b.y - REST.toe);
+      if (REST[side + "heel"]) {                       // the sole's ends, wherever the foot pitches: the heel's bottom and the toe tip
+        ft.getWorldQuaternion(_q); low = Math.min(low, _c.copy(REST[side + "heel"]).applyQuaternion(_q).add(_a).y);
+        if (toe) { toe.getWorldQuaternion(_q); low = Math.min(low, _c.copy(REST[side + "tip"]).applyQuaternion(_q).add(_b).y); }
+      }
       let target = null;
       // locking: when the sole is on the floor and the foot moves slowly it is planted: keep it there (within 12 cm)
       const L = LOCK[side];
@@ -237,7 +252,7 @@ export function createMotion(env){
     const life = st.life || {}, act = life.activity, iv = st.iv;
     const atDesk = ctx === "seat" && !st.holdW && !["scratch", "drink", "stretch", "phone", "lean", "mouse", "look"].includes(iv);
     const want = atDesk && ["research", "chat", "chart", "watch_video", "play_chess"].includes(act) ? 1 : 0;
-    HS.w += (want - HS.w) * (1 - Math.exp(-dt * (want ? 2.5 : 5)));
+    HS.w += (want - HS.w) * (1 - Math.exp(-dt * (want ? 6 : 5)));     // in within ~0.5 s of sitting down
     if (HS.w < 0.01) return;
     const t = M.T;
     if (t >= HS.until) {                              // what next: typing (research, chat), the mouse, or a rest on the desk
@@ -246,23 +261,23 @@ export function createMotion(env){
       HS.until = t + (HS.mode === "type" ? 4 + rnd() * 9 : HS.mode === "mouse" ? 2.5 + rnd() * 5 : 2 + rnd() * 4); HS.k = 0;
     }
     HS.k = Math.min(1, HS.k + dt / 0.45);
-    const e = smooth(0, 1, HS.k) * HS.w;
+    const e = smooth(0, 1, HS.k) * HS.w, rise = (1 - HS.w) * 0.08;    // on the way in the hands come over the desk from above
     torso();
     for (const [side, sx] of [["Left", -1], ["Right", 1]]) {
       const typing = HS.mode === "type" || (HS.mode === "rest" && side === "Left");
       if (typing) {                                   // hovering over its half of the keys, a key press every ~0.15 s
         const press = HS.mode === "type" ? Math.max(0, Math.sin(t * 2 * Math.PI * (side === "Left" ? 6.3 : 5.7) + sx)) : 0;
         kbPoint(sx * 0.42 + 0.06 * nz(t * 0.9, 5 + sx), 0.1 + 0.3 * nz(t * 0.7, 7 + sx), _t);
-        _t.y += 0.055 - 0.007 * press * press + (HS.mode === "rest" ? 0.012 : 0); _t.addScaledVector(FW, -0.02);
+        _t.y += 0.105 + rise - 0.006 * press * press + (HS.mode === "rest" ? 0.012 : 0); _t.addScaledVector(FW, -0.02);   // the wrist 10 cm over the keys: the fingers hover, never inside the caps
       } else if (side === "Right") {                   // the mouse: small moves on the mat, the hand cupped on it
-        _t.set(...MOUSE).addScaledVector(UP, 0.04).add(_a.set(0.015 * nz(t * 1.1, 8), 0, 0.012 * nz(t * 0.9, 9)));
+        _t.set(...MOUSE).addScaledVector(UP, 0.075 + rise).add(_a.set(0.015 * nz(t * 1.1, 8), 0, 0.012 * nz(t * 0.9, 9)));
         if (Math.sin(t * 7.3) > 0.97) _t.y -= 0.004;                                       // a click
-      } else { kbPoint(-0.5, -0.9, _t); _t.y += 0.05; }                                     // the left hand rests by the keyboard
+      } else { kbPoint(-0.5, -0.9, _t); _t.y += 0.06 + rise; }                              // the left hand rests by the keyboard
       B[side + "Arm"].getWorldPosition(_p).addScaledVector(UP, -0.36).addScaledVector(RT, sx * 0.28).addScaledVector(FW, -0.02);   // elbow out, forearm level with the desk
       ik(B[side + "Arm"], B[side + "ForeArm"], B[side + "Hand"], _t, _p, e, false);
       // the wrist: palm down over the keys (the hand's +z is the palm, +y along the fingers)
       env.touch(B[side + "Hand"]);
-      _b.copy(FW).addScaledVector(UP, -0.25).normalize();                                   // fingers forward, a little down
+      _b.copy(FW).addScaledVector(UP, -0.06).normalize();                                   // fingers forward, nearly level
       _c.copy(UP).negate();                                                                 // palm down
       _c.addScaledVector(_b, -_b.dot(_c)).normalize(); _d.crossVectors(_b, _c);
       const m = hands.m || (hands.m = new THREE.Matrix4()); m.makeBasis(_d, _b, _c); _q.setFromRotationMatrix(m);
@@ -276,12 +291,12 @@ export function createMotion(env){
   function deskGuard(ctx, st){
     if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk") return;
     env.boy.updateMatrixWorld(true);
-    const over = p => p.x > DESK.x0 - 0.04 && p.x < DESK.x1 + 0.04 && p.z > DESK.z0 && p.z < DESK.z1 + 0.06;
+    const over = p => p.x > DESK.x0 - 0.08 && p.x < DESK.x1 + 0.08 && p.z > DESK.z0 - 0.04 && p.z < DESK.z1 + 0.10;
     for (const [side, sx] of [["Left", -1], ["Right", 1]]) {
       if (side === "Right" && (st.holdW > 0 || st.held)) continue;
       const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up) continue;
-      lo.getWorldPosition(_a); h.getWorldPosition(_b);
-      const lift = Math.max(over(_a) ? DESK.top + 0.045 - _a.y : 0, over(_b) ? DESK.top + 0.035 - _b.y : 0);
+      lo.getWorldPosition(_a); h.getWorldPosition(_b); h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.11).add(_b);   // the fingertips
+      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.05 - _b.y : 0, over(_c) ? DESK.top + 0.05 - _c.y : 0);
       if (lift <= 0) continue;
       _t.copy(_b); _t.y += lift;
       up.getWorldPosition(_p).addScaledVector(RT, sx * 0.3); _p.y = DESK.top + 0.12;      // the elbow out and over the slab
@@ -360,7 +375,9 @@ export function createMotion(env){
     }
   }
 
-  // ---------- the pop killer: a bone that jumps between two frames gets a decaying offset that bridges the jump
+  // ---------- the pop killer: a bone that jumps between two frames gets a decaying offset that bridges the jump. It runs
+  // before the IK layers, on the clip-driven bones (the torso, the shoulders, the head, the legs' tops): a hand or a
+  // foot that an IK layer places lands on its target whatever happened the frame before
   const SM = new Map();                               // bone -> {q: last output, off: offset, k: how much of it is left}
   let lastRoot = null;
   const JUMP = 0.22, DECAY = 0.28;
@@ -372,7 +389,8 @@ export function createMotion(env){
     for (const name in B) {
       const b = B[name]; if (!b || !b.isBone) continue;
       let s = SM.get(b); if (!s) SM.set(b, s = {q: b.quaternion.clone(), off: Q(), k: 0});
-      const skip = teleport || dt > 0.25 || (skipR && /^Right(Arm|ForeArm|Hand)$/.test(name)) || (st.holdW > 0 && (name === "Head" || name === "neck"));
+      const skip = teleport || dt > 0.25 || !/^(Hips|Spine02|Spine01|Spine|neck|Head|LeftShoulder|RightShoulder|LeftUpLeg|RightUpLeg)$/.test(name)
+        || (skipR && /^Right(Arm|ForeArm|Hand)$/.test(name)) || (st.holdW > 0 && (name === "Head" || name === "neck"));
       if (skip) { s.q.copy(b.quaternion); s.k = 0; continue; }
       const ang = 2 * Math.acos(Math.min(1, Math.abs(b.quaternion.dot(s.q))));
       if (ang > JUMP) {                               // offset = last output * current^-1 (so offset * current = last output)
@@ -392,12 +410,12 @@ export function createMotion(env){
     M.T += dt;
     const st = env.state(), ctx = st.ctx;
     torso();
+    if (M.layers.smooth) smoothBones(dt);               // first: the IK layers below then land on their targets exactly
     if (M.layers.breathe) breathe(dt, ctx);
     if (M.layers.shift && !(st.step && st.step.k !== "act")) weightShift(dt, ctx);
     if (M.layers.feet) { sitUp(ctx, st); feet(dt, ctx, st); }
     if (M.layers.hands) { hands(dt, ctx, st); bowl(dt, ctx, st); deskGuard(ctx, st); }
     if (M.layers.eyes) eyes(dt, ctx, st);
-    if (M.layers.smooth) smoothBones(dt);
     env.boy.updateMatrixWorld(true);
   }
   // console: motion.play("sit_down") plays a shipped clip once over the current one; motion.layers.x = false switches a layer off
