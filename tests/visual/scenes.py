@@ -27,6 +27,9 @@ def life(activity, place, doing, **extra):
 # Walking, the desk and the phone in bed play room/boy_moves.glb's clips (#76: walk, type, lie_phone); eating keeps the
 # first seated clip (Chair_Sit_Idle) under its own layer, sleep the first sleep clip (`?moves=old`: all the first clips)
 SCENES = {
+    # (#98 G3: web/room/boy_motion.js's CHOICE table says which clip each activity plays, after boy_moves.glb: #80's
+    # typing clip at the desk (desk: ual), the first seated clip under the eating layer (eating: ual), and the ARDY clips
+    # m_idle standing, m_walk walking, m_window at the sill; the phone in bed keeps #80's lie_phone)
     "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
     # (the seated clip under the eating layer: the sit idle, or #80's typing clip for a tick after a desk scene; the
@@ -39,11 +42,11 @@ SCENES = {
     # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie: the lie_phone clip)
     "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "lie_phone"),
     # standing just inside the door (an activity the page does not know, at the door place: it stands him there)
-    "door":     (life("home", "door_in", "just in at the door"), "AWAKE", None, 1.0, "door", "stand"),
+    "door":     (life("home", "door_in", "just in at the door"), "AWAKE", None, 1.0, "door", "m_idle"),
     # walking: from the door to the desk; the harness stops mid-walk (see harness.walk_until). As the server sends it
     # since #104: `walking` true with `path` and `path_to` (before that the page treated him as already at the desk)
-    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "walk"),
-    "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "stand"),
+    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "m_walk"),
+    "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "m_window"),
 }
 # the hour each scene is shot at in the core set, and the full matrix
 NATURAL_HOUR = {"desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
