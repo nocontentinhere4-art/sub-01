@@ -43,7 +43,7 @@ adds the counts of this close-up (cells, synapses, myelinated µm) and that the 
 | **spines** | procedural, at a published density per µm of dendrite beyond a spine-free proximal zone, on the cells in full detail (the "hero" tier), nearest the soma first within a triangle budget; the caption says on how many µm of dendrite they are drawn |
 | **myelin, nodes of Ranvier** | procedural, on the types whose axons are myelinated: internodes start after the axon initial segment, on the axon's main trunk and its first branch orders; sheath outer radius = axon radius / g-ratio; node gaps drawn 2 µm wide (real ~1 µm) so they stay visible |
 | **boutons** | procedural: en passant boutons every few µm on the unmyelinated axon beyond the initial segment, a terminal bouton at every axon tip |
-| the tissue around | the far tier of cells as thin lines, and sprites of out-of-focus neurites and counterstain-like somata (as the red NeuN-like channel of the reference micrograph): decoration, not data |
+| the tissue around | the far tier of cells as thin lines, and oriented sprites of out-of-focus neurite streaks (no counterstain blobs since #99: they read as meaningless dots): decoration, not data |
 | activity | only recorded spikes of sampled model neurons and measured region rates (`n3.sq`, `n3.rq`); no frames → nothing moves |
 
 None of the cells is from the person whose MRI the brain model is built from (not from the scanned person): no data of that person exist at this
@@ -114,11 +114,13 @@ Sources:
 - A real action potential is ~1 ms long: at 0.3 m/s that is ~300 µm of axon, longer than most of these arbors. It is
   drawn as a short bright front (~90 ms at the slowed clock): a visual convention, said in the caption's "pulses slowed".
 - On the H01 cells (#99) the axon is its real ~0.5 µm (a pixel) and the focus cell's 4.1 mm of axon take ~34 s at the
-  slowed clock, so the front is drawn ~3× wider (~9 µm) with a ~35 µm tail behind it, fades over 20 s instead of 8,
-  and a train of ~6 µm glow sprites rides the axon's own vertices under it (`pulsePoints`; `uPulseW`, `uPulseTail`,
-  `uPulseFade` set in `buildH01`; the mesh itself is never deformed): the same visual convention, so a viewer can follow
-  the pulse along the real axon. The timing is the real conduction speed / 10 000 along the real path (`ap_front_um`
-  in `results.json`: the front's path distance from the soma at each strip frame).
+  slowed clock, so the **axon tube itself lights** from the front back toward the soma (~45 µm, fading), swells by
+  up to 2 µm where lit, and the cell's **axon skeleton** (H01's own nodes, thinned to ~3 000 for the focus and hero
+  cells, drawn as a faint line under the decimated mesh so the thin axon stays continuous) lights node to node with it; the front is ~3× wider (~9 µm) and the pulse fades over 20 s instead of 8 (`uPulseW`, `uPulseTail`,
+  `uPulseFade`, `uPulseSwell`, set in `buildH01`): the same visual convention, so a viewer can follow the pulse along
+  the real axon. Nothing separate travels along it (no sprites, no dots). The timing is the real conduction speed /
+  10 000 along the real path (`ap_front_um` in `results.json`: the front's path distance from the soma at each strip
+  frame).
 
 ## Look
 - **Fluorescence:** GFP-like green (a few cells tdTomato-like orange: the basket cells in cortex, ~15 % of the mid tier

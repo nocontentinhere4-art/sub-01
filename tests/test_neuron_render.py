@@ -161,6 +161,7 @@ def test_h01_manifest_licence_and_budget(h01check):
         assert r["roles"].get("glia", 0) >= 2                                          # astrocytes / oligodendrocytes
         d = r["describe"]
         assert d["synapsesPre"] > 100 and d["synapsesPost"] > 1000 and d["myelinatedUm"] > 20
+        assert r.get("axonSkelNodes", 0) >= 3000                                       # the focus / hero cells' real axon skeletons (the pulse's line)
         assert all(k in r["kinds"] for k in ("4", "1", "2", "0", "9"))              # myelinated axon, axon, dendrite, soma, glia vertices
     cells = m["lods"]["desktop"]["cells"]
     focus = [c for c in cells if c["role"] == "focus"][0]

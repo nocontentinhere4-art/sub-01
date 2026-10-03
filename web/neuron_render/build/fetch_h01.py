@@ -26,7 +26,8 @@ position; the other cells keep their true orientation, cortical depth (y) and z,
 within the field, because the 104 proofread cells are spread over ~12 mm2 of tissue. The manifest records both.
 
 Output: web/neuron_render/h01/<set>.json (manifest with credits, every cell's id, type, layer, offsets) and
-<set>.bin.gz (one gzip blob: quantised meshes with per-vertex class / path distance / pulse arrival time, skeletons,
+<set>.bin.gz (one gzip blob: quantised meshes with per-vertex class / path distance / pulse arrival time, skeletons (the far
+tier whole, the focus and hero cells' axons),
 synapses), plus <set>_em.jpg. Budget: <= 3 MB per set (checked and printed).
 """
 import argparse
@@ -82,7 +83,9 @@ SETS = {
 TRI = {"desktop": {"focus": 70000, "hero": 50000, "mid": 12000, "glia": 8000}, "phone": {"focus": 40000, "hero": 28000, "mid": 8000, "glia": 5000}}
 COUNTS = {"desktop": {"hero": 2, "mid": 7, "far": 6, "glia": 4}, "phone": {"hero": 2, "mid": 5, "far": 6, "glia": 3}}
 FAR_STRIDE = {"desktop": 6, "phone": 8}
-POST_MAX = {"focus": 100000, "hero": 100000, "mid": 1500}       # incoming synapses kept per cell (the mid tier: a sample)
+POST_MAX = {"focus": 100000, "hero": 100000, "mid": 1200}       # incoming synapses kept per cell (the mid tier: a sample)
+AXON_SKEL_NODES = {"desktop": 3000, "phone": 2000}             # the focus / hero cells also carry their axon's skeleton (thinned to about this
+                                                               # many nodes): drawn as a line under the mesh, lit node to node by the pulse
 
 
 def log(*a):
@@ -427,9 +430,7 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
             entry["myelinated_um"] = round(float(seglen[kinds_all == 4].sum()), 1)
             entry["axon_um"] = round(float(seglen[np.isin(kinds_all, (1, 4, 5))].sum()), 1)
             entry["dend_um"] = round(float(seglen[kinds_all == 2].sum()), 1)
-            if role == "far":                                   # drawn as lines: the skeleton, every 4th-5th node
-                stride = FAR_STRIDE[lodname]
-                keep = np.zeros(len(Pb), bool); keep[::stride] = True; keep[cell["PAR"] < 0] = True
+            def thin_skel(keep):                                # the skeleton thinned to the kept nodes; each kept node's parent = its nearest kept ancestor
                 par = cell["PAR"]; newidx = -np.ones(len(Pb), int); newidx[keep] = np.arange(keep.sum())
                 anc = np.empty(len(Pb), int)
                 for i in range(len(Pb)):
@@ -439,13 +440,28 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
                     anc[i] = p
                 kp = np.where(keep)[0]
                 lo, hi = Pb[kp].min(0), Pb[kp].max(0)
-                entry["sbbox"] = [[round(float(x), 2) for x in lo], [round(float(x), 2) for x in hi]]
-                entry["skel"] = {"n": int(len(kp)), "pos": blob.add(quant(Pb[kp], lo, hi)),
-                                 "kind": blob.add(kinds_all[kp]),
-                                 "parent": blob.add(np.array([newidx[anc[i]] if anc[i] >= 0 else -1 for i in kp], np.int32)),
-                                 "dist": blob.add(np.clip(cell["D"][kp] * 10, 0, 65535).astype(np.uint16)),
-                                 "arrive": blob.add(np.where(cell["T"][kp] < 0, 65535, np.clip(cell["T"][kp] * 1000, 0, 65534)).astype(np.uint16))}
-            else:                                               # the real synapses: this cell's boutons (pre) and inputs (post)
+                box = [[round(float(x), 2) for x in lo], [round(float(x), 2) for x in hi]]
+                return box, {"n": int(len(kp)), "pos": blob.add(quant(Pb[kp], lo, hi)),
+                             "kind": blob.add(kinds_all[kp]),
+                             "parent": blob.add(np.array([newidx[anc[i]] if anc[i] >= 0 else -1 for i in kp], np.int32)),
+                             "dist": blob.add(np.clip(cell["D"][kp] * 10, 0, 65535).astype(np.uint16)),
+                             "arrive": blob.add(np.where(cell["T"][kp] < 0, 65535, np.clip(cell["T"][kp] * 1000, 0, 65534)).astype(np.uint16))}
+            if role == "far":                                   # drawn as lines: the skeleton, every 4th-5th node
+                stride = FAR_STRIDE[lodname]
+                keep = np.zeros(len(Pb), bool); keep[::stride] = True; keep[cell["PAR"] < 0] = True
+                entry["sbbox"], entry["skel"] = thin_skel(keep)
+            if role in ("focus", "hero"):                       # the axon's skeleton as well (axon, AIS, myelinated nodes; the soma node as the root)
+                ax = np.isin(kinds_all, (1, 4, 5))
+                n_ax = int(ax.sum())
+                if n_ax:
+                    stride = max(1, int(round(n_ax / AXON_SKEL_NODES[lodname])))
+                    idx_ax = np.where(ax)[0]
+                    keep = np.zeros(len(Pb), bool); keep[idx_ax[::stride]] = True; keep[cell["PAR"] < 0] = True
+                    # branch points and tips of the axon stay, so no branch is lost to the stride
+                    nchild = np.bincount(cell["PAR"][cell["PAR"] >= 0], minlength=len(Pb))
+                    keep[ax & ((nchild != 1))] = True
+                    entry["abbox"], entry["askel"] = thin_skel(keep)
+            if role != "far":                                   # the real synapses: this cell's boutons (pre) and inputs (post)
                 pre, post = synapses_for(h, sid)
                 n_all_post = len(post)
                 if len(post) > POST_MAX[role]:
@@ -540,7 +556,7 @@ def main():
         img = img.transpose(Image.Transpose.ROTATE_90)
     if sign > 0 and axis == 1:
         img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    img.save(OUT / f"{args.set}_em.jpg", quality=58)
+    img.save(OUT / f"{args.set}_em.jpg", quality=52)
     em_entry = {"file": f"{args.set}_em.jpg", "nm_per_px": mip[0] * 2, "px": px // 2, "um": round(px * mip[0] / 1000.0, 1),
                 "centre": [round(float(x), 1) for x in em_centre_block], "note": "a real SEM image of the same tissue (the 4 nm volume at its 64 nm mip) through the focus cell's soma"}
     sizes = {}

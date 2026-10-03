@@ -43,8 +43,11 @@ const H = globalThis.NeuronRender.h01;
         let ok = 0; for (let i = 0; i < c.syn.npre; i++) if (c.syn.preArrive[i] >= 0) ok++;
         if (c.syn.npre && ok / c.syn.npre < 0.6) r.bad.push(c.id + " presynaptic sites without a pulse time " + (ok / c.syn.npre).toFixed(2));
       }
-      if (c.skel) {
-        const k = c.skel; let back = 0;
+      if (c.askel) { r.axonSkelNodes = (r.axonSkelNodes || 0) + c.askel.n; let ax = 0; for (let i = 0; i < c.askel.n; i++) if (c.askel.kind[i] === 1 || c.askel.kind[i] === 4 || c.askel.kind[i] === 5) ax++;
+        if (ax < 0.9 * c.askel.n) r.bad.push(c.id + " axon skeleton with non-axon nodes " + (ax / c.askel.n).toFixed(2)); }
+      if (c.role === "focus" && !c.askel) r.bad.push(c.id + " focus cell without an axon skeleton");
+      for (const k of [c.skel, c.askel]) if (k) {
+        let back = 0;
         for (let i = 0; i < k.n; i++) { const p = k.parent[i]; if (p < 0) continue;
           if (p >= k.n) { r.bad.push(c.id + " parent out of range"); break; }
           if (k.dist[i] + 1e-6 < k.dist[p]) back++;

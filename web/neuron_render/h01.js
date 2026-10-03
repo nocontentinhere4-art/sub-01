@@ -24,7 +24,7 @@
     if (typeof root.DecompressionStream !== "function") throw new Error("no DecompressionStream");
     return new Response(r.body.pipeThrough(new root.DecompressionStream("gzip"))).arrayBuffer();
   }
-  // -> {manifest, lod, cells: [{id, role, type, layer, soma, mesh:{pos,idx,kind,dist,arrive,nv,nf}, syn:{pos,npre,npost,preArrive}, skel:{...}}], em}
+  // -> {manifest, lod, cells: [{id, role, type, layer, soma, mesh:{pos,idx,kind,dist,arrive,nv,nf}, syn:{pos,npre,npost,preArrive}, skel:{...}, askel:{...}}], em}
   async function load(set, lodName, base) {
     const key = set + "/" + lodName;
     if (cache[key]) return cache[key];
@@ -49,12 +49,11 @@
           out.syn = { npre: s.npre, npost: s.npost, pos: dq(u16(buf, s.pos, n * 3), c.sbbox[0], c.sbbox[1]),
                       preArrive: secs(u16(buf, s.pre_arrive, s.npre), new Float32Array(s.npre)) };
         }
-        if (c.skel) {
-          const k = c.skel, n = k.n;
-          out.skel = { n, pos: dq(u16(buf, k.pos, n * 3), c.sbbox[0], c.sbbox[1]),
-                       kind: new Uint8Array(buf, k.kind, n), parent: new Int32Array(buf.slice(k.parent, k.parent + 4 * n)),
-                       dist: Float32Array.from(u16(buf, k.dist, n), x => x / 10), arrive: secs(u16(buf, k.arrive, n), new Float32Array(n)) };
-        }
+        const skel = (k, box) => { const n = k.n; return { n, pos: dq(u16(buf, k.pos, n * 3), box[0], box[1]),
+          kind: new Uint8Array(buf, k.kind, n), parent: new Int32Array(buf.slice(k.parent, k.parent + 4 * n)),
+          dist: Float32Array.from(u16(buf, k.dist, n), x => x / 10), arrive: secs(u16(buf, k.arrive, n), new Float32Array(n)) }; };
+        if (c.skel) out.skel = skel(c.skel, c.sbbox);               // the far tier: the whole skeleton (drawn as lines)
+        if (c.askel) out.askel = skel(c.askel, c.abbox);            // focus / hero cells: the axon's skeleton (a line under the mesh, lit by the pulse)
         return out;
       });
       return { manifest, lod: lodName, cells, em: Object.assign({ url: base + manifest.em.file }, manifest.em), bytes: L.bytes, triangles: L.triangles };

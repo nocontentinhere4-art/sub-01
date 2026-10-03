@@ -325,7 +325,7 @@
   const VS_CELL = `
     attribute vec3 aOff; attribute vec3 aNrm; attribute float aR; attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uPixK, uFloorPx, uDepthK, uPulseW, uPulseTail, uPulseFade;
+    uniform float uTime, uPixK, uFloorPx, uDepthK, uPulseW, uPulseTail, uPulseFade, uPulseSwell;
     varying vec3 vN, vV; varying float vDepth, vKind, vCol, vSoma, vPulse, vR, vDist, vBright;
     ${ROT}
     void main(){
@@ -339,13 +339,14 @@
       float pulse = 0.0;
       if (aArrive >= 0.0) {
         if (abs(aKind - 6.0) < 0.5) pulse = on * step(aArrive, dt) * exp(-(dt - aArrive) / 0.9);                 // bouton: glows after arrival
-        else { float x = dt - aArrive;                                                                           // the travelling front (+ a tail on the real axons)
-          pulse = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 0.6)) * exp(-aArrive / uPulseFade); }
+        else { float x = dt - aArrive;                             // the travelling front; on the real axons the tube stays lit behind it, fading
+          pulse = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 1.5)) * exp(-aArrive / uPulseFade); }
       }
-      vec3 w = c + off * rr;
+      vec3 nrm = rotq(iQuat, aNrm);
+      vec3 w = c + off * rr + nrm * (uPulseSwell * min(1.0, pulse));                                             // the lit stretch of a real (thin) axon swells a little
       vec4 mv = modelViewMatrix * vec4(w, 1.0);
       gl_Position = projectionMatrix * mv;
-      vN = normalize(normalMatrix * rotq(iQuat, aNrm)); vV = -mv.xyz;
+      vN = normalize(normalMatrix * nrm); vV = -mv.xyz;
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       vPulse = pulse; vKind = aKind; vCol = iCol; vR = rr; vDist = aDist; vBright = iBright;
     }`;
@@ -405,7 +406,7 @@
   const VS_LINE = `
     attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uDepthK, uPulseW, uPulseFade;
+    uniform float uTime, uDepthK, uPulseW, uPulseTail, uPulseFade;
     varying float vKind, vCol, vSoma, vPulse, vDist, vDepth;
     ${ROT}
     void main(){
@@ -413,9 +414,9 @@
       vec4 mv = modelViewMatrix * vec4(w, 1.0);
       gl_Position = projectionMatrix * mv;
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
-      float dt = uTime - iSpike, on = step(0.0, dt);
+      float dt = uTime - iSpike, on = step(0.0, dt), x = dt - aArrive;
       vSoma = on * exp(-dt / 0.3);
-      vPulse = aArrive >= 0.0 ? on * exp(-pow((dt - aArrive) / uPulseW, 2.0)) * exp(-aArrive / uPulseFade) : 0.0;
+      vPulse = aArrive >= 0.0 ? on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 1.5)) * exp(-aArrive / uPulseFade) : 0.0;
       vKind = aKind; vCol = iCol; vDist = aDist;
     }`;
   const FS_LINE = `
@@ -423,7 +424,8 @@
     uniform float uStyle, uRate, uLive, uDim; uniform vec3 uColA, uColB, uColAct;
     varying float vKind, vCol, vSoma, vPulse, vDist, vDepth;
     void main(){
-      float kSoma = step(abs(vKind), 0.5), kAxon = step(abs(vKind - 1.0), 0.5), kDend = step(1.5, vKind);
+      float kSoma = step(abs(vKind), 0.5), kAxon = step(abs(vKind - 1.0), 0.5) + step(abs(vKind - 4.0), 0.5) + step(abs(vKind - 5.0), 0.5);
+      float kDend = step(1.5, vKind) * (1.0 - step(abs(vKind - 4.0), 0.5)) * (1.0 - step(abs(vKind - 5.0), 0.5));
       vec3 base = uStyle < 0.5 ? mix(uColA, uColB, vCol) : (uStyle > 1.5 ? vec3(0.62, 0.62, 0.6) : vec3(0.5, 0.48, 0.55));
       float glow = uLive * uRate;
       vec3 col = base * uDim * (0.5 + 0.5 * kSoma + 0.5 * glow * kDend) * mix(1.0, 1.5, vDepth);
@@ -457,21 +459,6 @@
       vKind = aKind;
       float um = aKind < 10.5 ? 0.9 : 0.6;                          // a bouton ~0.9 um, a PSD ~0.6 um
       gl_PointSize = max(2.0, um * uScale / -mv.z + 1.5 * vFlash * uScale / -mv.z); }`;
-  const VS_PULSE = `
-    attribute float aArrive;
-    uniform float uTime, uSpike, uScale, uPulseW, uPulseTail, uPulseFade;
-    varying float vP;
-    void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      float dt = uTime - uSpike, on = step(0.0, dt), x = dt - aArrive;
-      vP = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 1.2)) * exp(-aArrive / uPulseFade);
-      gl_Position = vP < 0.01 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv;                          // nothing drawn away from the front
-      gl_PointSize = clamp(6.0 * uScale / -mv.z, 3.0, 48.0) * (0.6 + 0.4 * min(1.0, vP)); }`;           // ~6 um of glow: the decimated axon has a vertex every few um
-  const FS_PULSE = `
-    precision highp float;
-    uniform vec3 uColAct;
-    varying float vP;
-    void main(){ vec2 c = gl_PointCoord - 0.5; float d2 = dot(c, c); if (d2 > 0.25) discard;
-      gl_FragColor = vec4(uColAct * 1.6 * min(1.5, vP) * exp(-d2 * 10.0), 1.0); }`;
   const FS_SYN = `
     precision highp float;
     uniform float uStyle, uLive, uRate; uniform vec3 uColAct;
@@ -606,7 +593,7 @@
       uDofMax: { value: 0.7 }, uBloom: { value: 0.9 }, uExposure: { value: 1.0 }, uStyle: { value: 0 }, uBg: { value: new THREE.Vector3() } },
       vertexShader: VS_QUAD, fragmentShader: FS_COMP, depthTest: false, depthWrite: false });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), matDown); quad.frustumCulled = false; quadScene.add(quad);
-    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 },
+    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 },
                   uStyle: { value: 0 }, uRate: { value: 0 }, uLive: { value: 0 }, uNucAlpha: { value: 0.45 }, uDim: { value: 0.3 },
                   uColA: { value: new THREE.Vector3(0.25, 1.0, 0.35) }, uColB: { value: new THREE.Vector3(1.0, 0.42, 0.15) },
                   uColMy: { value: new THREE.Vector3(0.6, 0.75, 1.0) }, uColAct: { value: new THREE.Vector3(1.0, 0.95, 0.7) },
@@ -670,39 +657,43 @@
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(s.pos, 3)); g.setAttribute("aKind", new THREE.BufferAttribute(kd, 1)); g.setAttribute("aArrive", new THREE.BufferAttribute(ar, 1));
       const m = additive(new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uSpike: { value: -1e4 } }), vertexShader: VS_SYN, fragmentShader: FS_SYN }));
+      // dot-ok: this cell's real synapse positions from H01 (presynaptic sites flash when the pulse arrives; incoming ones are dim)
       const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 1; pts.name = "nr-syn-" + c.id;
       return pts;
     }
-    function pulsePoints(c) {                                   // #99: the pulse's glow along the real axon's own vertices (sprites, additive)
-      const m = c.mesh, idx = [];
-      for (let i = 0; i < m.nv; i++) { const k = m.kind[i]; if ((k === 1 || k === 4 || k === 5) && m.arrive[i] >= 0) idx.push(i); }
-      if (!idx.length) return null;
-      const pos = new Float32Array(idx.length * 3), ar = new Float32Array(idx.length);
-      idx.forEach((i, j) => { pos[3 * j] = m.pos[3 * i]; pos[3 * j + 1] = m.pos[3 * i + 1]; pos[3 * j + 2] = m.pos[3 * i + 2]; ar[j] = m.arrive[i]; });
-      const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("aArrive", new THREE.BufferAttribute(ar, 1));
-      const mat = additive(new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uSpike: { value: -1e4 } }), vertexShader: VS_PULSE, fragmentShader: FS_PULSE }));
-      const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.renderOrder = 2; pts.name = "nr-pulse-" + c.id;
-      return pts;
+    const ident = new Float32Array([0, 0, 0, 1]);
+    const oneInstance = (g, bright, col) => {
+      g.setAttribute("iOff", new THREE.InstancedBufferAttribute(new Float32Array(3), 3));
+      g.setAttribute("iQuat", new THREE.InstancedBufferAttribute(ident.slice(), 4));
+      g.setAttribute("iScale", new THREE.InstancedBufferAttribute(new Float32Array([1]), 1));
+      const spk = new Float32Array([-1e4]), sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute("iSpike", sa);
+      g.setAttribute("iCol", new THREE.InstancedBufferAttribute(new Float32Array([col]), 1));
+      g.setAttribute("iBright", new THREE.InstancedBufferAttribute(new Float32Array([bright]), 1));
+      g.instanceCount = 1;
+      return { off: new Float32Array(3), quat: ident, sc: new Float32Array([1]), spk, sa, col: new Float32Array([col]), br: new Float32Array([bright]) };
+    };
+    function skelLines(k, bright, col, name) {                    // a skeleton (parent links) as one LineSegments draw, with its own spike slot
+      const pos = [], kd = [], di = [], ar = [];
+      for (let i = 0; i < k.n; i++) { const p = k.parent[i]; if (p < 0) continue;
+        pos.push(k.pos[3 * p], k.pos[3 * p + 1], k.pos[3 * p + 2], k.pos[3 * i], k.pos[3 * i + 1], k.pos[3 * i + 2]);
+        kd.push(k.kind[p], k.kind[i]); di.push(k.dist[p], k.dist[i]); ar.push(k.arrive[p], k.arrive[i]); }
+      const g = new THREE.InstancedBufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+      g.setAttribute("aKind", new THREE.BufferAttribute(new Float32Array(kd), 1));
+      g.setAttribute("aDist", new THREE.BufferAttribute(new Float32Array(di), 1));
+      g.setAttribute("aArrive", new THREE.BufferAttribute(new Float32Array(ar), 1));
+      const A = oneInstance(g, bright, col);
+      const lines = new THREE.LineSegments(g, matLine); lines.frustumCulled = false; lines.renderOrder = 1; lines.name = name;
+      scene.add(lines); meshes.push(lines); counts.lines += pos.length / 6; counts.drawCalls++;
+      return { A, geom: g };
     }
     function buildH01(data) {
       S.h01 = data;
-      // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the front is drawn
-      // 2.5× wider with a ~35 µm tail, fades over 20 s instead of 8, and a train of glow sprites (pulsePoints) rides the axon's own
-      // vertices under it, so the mesh is never deformed: a visual convention, said in the docs
-      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 0.8; uni.uPulseFade.value = 20;
-      const ident = new Float32Array([0, 0, 0, 1]);
-      const oneInstance = (g, bright, col) => {
-        g.setAttribute("iOff", new THREE.InstancedBufferAttribute(new Float32Array(3), 3));
-        g.setAttribute("iQuat", new THREE.InstancedBufferAttribute(ident.slice(), 4));
-        g.setAttribute("iScale", new THREE.InstancedBufferAttribute(new Float32Array([1]), 1));
-        const spk = new Float32Array([-1e4]), sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
-        g.setAttribute("iSpike", sa);
-        g.setAttribute("iCol", new THREE.InstancedBufferAttribute(new Float32Array([col]), 1));
-        g.setAttribute("iBright", new THREE.InstancedBufferAttribute(new Float32Array([bright]), 1));
-        g.instanceCount = 1;
-        return { off: new Float32Array(3), quat: ident, sc: new Float32Array([1]), spk, sa, col: new Float32Array([col]), br: new Float32Array([bright]) };
-      };
+      // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the axon tube itself
+      // and the axon's skeleton line light from the front back toward the soma (~45 µm, fading), the tube swells by up to 2 µm where
+      // lit, and the pulse fades over 20 s instead of 8: a visual convention, said in the docs. Nothing separate travels along the axon.
+      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 1.0; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 2.0;
       const tags = c => (c.tags || []);
       for (const c of data.cells) {
         const tg = tags(c).join(" "), isGlia = c.role === "glia", isInter = /interneuron/.test(tg);
@@ -726,22 +717,13 @@
           cells.push({ tier, type, A, j: 0, geom: g, pos: c.soma.slice(), tri: m.nf, triNoSpines: m.nf, spines: 0, h01: c, glia: isGlia });
           counts.triangles += m.nf; counts.drawCalls++; if (tier === "hero") counts.heroCells++;
           if (c.syn && !isGlia) { const pts = synPoints(c); scene.add(pts); meshes.push(pts); synMeshes.push({ pts, cell: cells[cells.length - 1] }); counts.boutons += c.syn.npre; counts.drawCalls++; }
-          if (!isGlia) { const pp = pulsePoints(c); if (pp) { scene.add(pp); meshes.push(pp); synMeshes.push({ pts: pp, cell: cells[cells.length - 1] }); counts.drawCalls++; } }
         } else if (c.skel) {                                       // the far tier: the real skeleton as lines
-          const k = c.skel, pos = [], kd = [], di = [], ar = [];
-          for (let i = 0; i < k.n; i++) { const p = k.parent[i]; if (p < 0) continue;
-            pos.push(k.pos[3 * p], k.pos[3 * p + 1], k.pos[3 * p + 2], k.pos[3 * i], k.pos[3 * i + 1], k.pos[3 * i + 2]);
-            kd.push(k.kind[p], k.kind[i]); di.push(k.dist[p], k.dist[i]); ar.push(k.arrive[p], k.arrive[i]); }
-          const g = new THREE.InstancedBufferGeometry();
-          g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
-          g.setAttribute("aKind", new THREE.BufferAttribute(new Float32Array(kd), 1));
-          g.setAttribute("aDist", new THREE.BufferAttribute(new Float32Array(di), 1));
-          g.setAttribute("aArrive", new THREE.BufferAttribute(new Float32Array(ar), 1));
-          const A = oneInstance(g, 0.4, isInter ? 1 : 0);
-          const lines = new THREE.LineSegments(g, matLine); lines.frustumCulled = false; lines.renderOrder = 1; lines.name = "nr-h01-far-" + c.id;
-          scene.add(lines); meshes.push(lines);
-          cells.push({ tier: "far", type, A, j: 0, geom: g, pos: c.soma.slice(), h01: c });
-          counts.lines += pos.length / 6; counts.drawCalls++;
+          const Lk = skelLines(c.skel, 0.4, isInter ? 1 : 0, "nr-h01-far-" + c.id);
+          cells.push({ tier: "far", type, A: Lk.A, j: 0, geom: Lk.geom, pos: c.soma.slice(), h01: c });
+        }
+        if (c.mesh && c.askel && !isGlia) {                        // focus / hero: the axon's skeleton as a line under the mesh (the mesh's axon is a
+          const Lk = skelLines(c.askel, 0.55, isInter ? 1 : 0, "nr-h01-axon-" + c.id);   // pixel wide and decimated): the pulse lights it node to node
+          const rec = cells[cells.length - 1]; rec.extra = (rec.extra || []).concat([Lk.A]);
         }
         counts.dendUm += c.dendUm || 0;
       }
@@ -760,7 +742,7 @@
       finish();
     }
     function buildProcedural() {
-      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8;
+      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0;
       const rnd = mulberry(880 + Object.keys(KINDS).indexOf(kind) + (L === LOD.phone ? 7 : 0));
       const split = n => Kd.types.map(([t, f]) => [t, Math.max(0, Math.round(n * f))]);
       const want = { hero: split(L.hero), mid: split(L.mid), far: split(L.far) };
@@ -810,14 +792,15 @@
         for (let j = 0; j < n; j++) cells.push({ tier: "far", type, A, j, geom: G.geom, pos: Array.from(A.off.slice(3 * j, 3 * j + 3)) });
         counts.lines += G.segments * n; counts.drawCalls++;
       }
-      // the out-of-focus tissue: neurite streaks and counterstain-like somata, far behind and around
+      // the out-of-focus tissue: faint neurite streaks far behind and around (no counterstain blobs since #99: they read as dots)
       { const n = L.bg, pos = new Float32Array(n * 3), size = new Float32Array(n), ang = new Float32Array(n), kd = new Float32Array(n);
-        for (let i = 0; i < n; i++) { const blob = rnd() < 0.22;
+        for (let i = 0; i < n; i++) {
           pos[3 * i] = (rnd() - 0.5) * 2600; pos[3 * i + 1] = kind === "cortex" ? -1000 + 1100 * rnd() : (rnd() - 0.5) * 1200; pos[3 * i + 2] = -150 - 1100 * rnd();
-          size[i] = blob ? 12 + 8 * rnd() : 30 + 70 * rnd(); ang[i] = rnd() * 3.1416; kd[i] = blob ? 1 : 0; }
+          size[i] = 30 + 70 * rnd(); ang[i] = rnd() * 3.1416; kd[i] = 0; }
         const g = new THREE.BufferGeometry();
         g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("aSize", new THREE.BufferAttribute(size, 1));
         g.setAttribute("aAngle", new THREE.BufferAttribute(ang, 1)); g.setAttribute("aKind", new THREE.BufferAttribute(kd, 1));
+        // dot-ok: elongated out-of-focus neurite streaks (an oriented sprite each, never a round dot), the blurred tissue behind the cells
         bgPoints = new THREE.Points(g, matBg); bgPoints.frustumCulled = false; bgPoints.renderOrder = 0; bgPoints.name = "nr-tissue";
         scene.add(bgPoints); meshes.push(bgPoints); counts.drawCalls++; }
       // the triangle cap: fewer mid cells, then fewer spines on the last hero cells (the focus cell keeps its own)
@@ -957,6 +940,7 @@
     function spikeCell(k, t) {
       const c = spikable()[k]; if (!c) return;
       c.A.spk[c.j] = t; c.A.sa.needsUpdate = true; S.spikes++;
+      for (const a of c.extra || []) { a.spk[0] = t; a.sa.needsUpdate = true; }   // the cell's axon skeleton line (H01 focus / hero cells)
       for (const sm of synMeshes) if (sm.cell === c) sm.pts.material.uniforms.uSpike.value = t;
     }
     function spike(slot, delayMs) { const n = spikable().length; if (!n) return; const k = Math.min(n - 1, Math.floor((slot || 0) * n / 256)); S.spikeAt = clock(performance.now()) + (delayMs || 0) / 1000; spikeCell(k, S.spikeAt); }
