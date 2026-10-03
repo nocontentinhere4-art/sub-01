@@ -679,7 +679,7 @@ def main():
         img = img.transpose(Image.Transpose.ROTATE_90)
     if sign > 0 and axis == 1:
         img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    img.save(OUT / f"{args.set}_em.jpg", quality=44)
+    img.save(OUT / f"{args.set}_em.jpg", quality=40)
     em_entry = {"file": f"{args.set}_em.jpg", "nm_per_px": mip[0] * 2, "px": px // 2, "um": round(px * mip[0] / 1000.0, 1),
                 "centre": [round(float(x), 1) for x in em_centre_block], "note": "a real SEM image of the same tissue (the 4 nm volume at its 64 nm mip) through the focus cell's soma"}
     sizes = {}
