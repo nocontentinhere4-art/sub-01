@@ -419,39 +419,34 @@ UNBLOCK_JS = """() => {
   for (const el of [document.documentElement, document.body]) if (el) { el.style.setProperty('overflow', 'auto', 'important'); }
 }"""
 EMBED_REFERER = os.environ.get("SUB01_SITE_URL") or "https://sub01-production.up.railway.app/"   # embeds want a page
-SEEDS = [                              # where he starts when nothing else pulls him (no search engine needed)
-    # encyclopaedia, forums (read-only), Q&A
-    "https://en.wikipedia.org/wiki/Special:Random", "https://news.ycombinator.com/", "https://news.ycombinator.com/ask",
-    "https://old.reddit.com/r/askscience/", "https://old.reddit.com/r/AskHistorians/", "https://old.reddit.com/r/Cooking/",
-    "https://old.reddit.com/r/japanpics/", "https://old.reddit.com/r/space/", "https://old.reddit.com/r/Breadit/",
-    "https://old.reddit.com/r/todayilearned/", "https://cooking.stackexchange.com/questions?tab=Votes",
-    "https://japanese.stackexchange.com/", "https://astronomy.stackexchange.com/", "https://lobste.rs/",
-    "https://www.metafilter.com/",
-    # news and magazines
-    "https://www.bbc.com/news", "https://www3.nhk.or.jp/nhkworld/", "https://www.japantimes.co.jp/",
-    "https://www.theguardian.com/international", "https://apnews.com/", "https://www.npr.org/",
-    "https://arstechnica.com/", "https://www.theverge.com/", "https://www.quantamagazine.org/",
-    "https://www.atlasobscura.com/", "https://www.openculture.com/", "https://www.nationalgeographic.com/",
-    "https://www.smithsonianmag.com/", "https://www.newscientist.com/", "https://www.sciencenews.org/",
-    # science and space
-    "https://apod.nasa.gov/apod/astropix.html", "https://www.nasa.gov/", "https://earthobservatory.nasa.gov/",
-    "https://www.esa.int/", "https://phys.org/",
-    # museums and archives
-    "https://www.metmuseum.org/art/collection", "https://www.archive.org/", "https://artsandculture.google.com/",
-    "https://www.britishmuseum.org/collection", "https://www.rijksmuseum.nl/en/rijksstudio",
-    "https://www.tnm.jp/?lang=en",
-    # maps and places
-    "https://www.openstreetmap.org/#map=15/35.7030/139.5795", "https://www.timeout.com/tokyo",
-    "https://www.japan-guide.com/", "https://www.spoon-tamago.com/",
-    # recipes and food
-    "https://www.justonecookbook.com/", "https://www.seriouseats.com/", "https://www.allrecipes.com/",
-    "https://www.kingarthurbaking.com/recipes",
-    # music and video pages
-    "https://bandcamp.com/", "https://www.npr.org/series/tiny-desk-concerts/", "https://pitchfork.com/",
-    "https://www.youtube.com/@NHKWORLDJAPAN", "https://vimeo.com/channels/staffpicks",
-    # blogs and tech
-    "https://github.com/trending", "https://xkcd.com/", "https://waitbutwhy.com/", "https://www.kottke.org/",
-]
+# #89 teen re-seed: front pages of sites people his age read, per interest topic (docs/research/teen_online.md);
+# every front page was allowed by its robots.txt on 2026-10-04, and robots.txt is checked again before each page.
+# Cooking sites only while he is hungry or ordering food.
+SEED_TOPICS = {
+    "cars": ["https://www.topgear.com/", "https://www.carscoops.com/", "https://www.autoblog.com/",
+             "https://www.formula1.com/en/latest", "https://www.thedrive.com/"],
+    "games": ["https://www.ign.com/", "https://www.pcgamer.com/", "https://www.polygon.com/",
+              "https://www.gamesradar.com/", "https://www.nintendolife.com/"],
+    "football": ["https://www.bbc.com/sport/football", "https://www.skysports.com/football", "https://www.90min.com/",
+                 "https://www.espn.com/soccer/", "https://www.theguardian.com/football"],
+    "anime": ["https://myanimelist.net/", "https://www.crunchyroll.com/news", "https://www.cbr.com/category/anime-news/"],
+    "music": ["https://www.nme.com/", "https://www.billboard.com/", "https://www.rollingstone.com/music/"],
+    "tech": ["https://www.theverge.com/", "https://9to5mac.com/", "https://www.gsmarena.com/", "https://arstechnica.com/"],
+    "sneakers": ["https://www.highsnobiety.com/", "https://www.complex.com/sneakers"],
+    "memes": ["https://knowyourmeme.com/", "https://www.boredpanda.com/"],
+    "creators": ["https://www.tubefilter.com/"],
+    "movies": ["https://www.themoviedb.org/", "https://editorial.rottentomatoes.com/", "https://www.empireonline.com/"],
+    "tokyo": ["https://www.timeout.com/tokyo", "https://www.japan-guide.com/", "https://www.tokyocheapo.com/"],
+    "science": ["https://apod.nasa.gov/apod/astropix.html", "https://www.sciencenews.org/"],
+    "food": ["https://www.justonecookbook.com/", "https://www.seriouseats.com/"],
+}
+SEEDS = [u for t, us in SEED_TOPICS.items() if t != "food" for u in us]
+HOST_STREAK_MAX = 3                    # #89 teen: at most this many pages in a row on one site, then elsewhere
+HOST_DAY_CAP = 20                      # pages a day on one site (the video players excepted)
+RECIPE_HOST = re.compile(r"(^|\.)(kingarthurbaking|justonecookbook|seriouseats|allrecipes|recipetineats|bbcgoodfood|"
+                         r"foodnetwork|delish|tasty|bonappetit|epicurious|food52|thekitchn|simplyrecipes)\.(com|co|co\.uk)$",
+                         re.I)                 # cooking sites: only while he is hungry or ordering (#89 teen)
+HOST_CAP_FREE = ("youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com", "tiktok.com", "www.tiktok.com")
 VIDEO_TOPICS = ["bread baking", "Tokyo night walk", "how the brain works", "Inokashira Park", "ramen making",
                 "train window Japan", "lo-fi music", "space documentary", "cat videos", "Studio Ghibli"]
 FAMILIAR = ["Kichijoji", "Inokashira Park", "Tokyo bakery", "how dreams work", "sleep science", "ramen", "Ghibli Museum",
@@ -623,6 +618,8 @@ class Browser:
         self.visited = NV.Visited(state=s.get("visited"))   # #89: no page, video or near-same title twice in 7 days
         self.seed_t = {}                                    # seed site -> last opened (rotation, SEED_GAP_S)
         self.yt = YT.Quota(state=s.get("youtube"))          # YouTube Data API units today (only with the key)
+        self.yt_used = {}                                   # channel handle -> last used (keyless rotation)
+        self.hungry = False                                 # #89 teen: food and cooking sites only while hungry
         self.diag = {}                                      # site -> why its logged-in feed showed no video
         self.diag_shot = {}                                 # site -> masked screenshot of that page (admin only)
 
@@ -630,6 +627,19 @@ class Browser:
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
                 "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict()),
                 "visited": self.visited.to_dict(), "youtube": self.yt.to_dict()}
+
+    def host_ok(self, host, current=None):
+        """#89 teen variety guard: under HOST_DAY_CAP pages today on this site, not a 4th page in a row on the site he
+        is on (`current`), and no cooking site unless he is hungry."""
+        h = (host or "").lower().removeprefix("www.")
+        if RECIPE_HOST.search(h) and not getattr(self, "hungry", False):
+            return False                                        # no recipe loops outside meals
+        if any(h == f.removeprefix("www.") for f in HOST_CAP_FREE):
+            return True
+        if self.variety.host_count(h) >= HOST_DAY_CAP:
+            return False
+        cur = (current or "").lower().removeprefix("www.")
+        return not (cur and h == cur and self.variety.host_streak >= HOST_STREAK_MAX)
 
     def fresh(self, url, title=None):
         """Not opened in the last 7 days (the URL / video id, or a near-duplicate title)."""
@@ -786,8 +796,11 @@ class Browser:
         sc = self.screens[device]
         if time.time() < sc.next_at:
             return None
+        self.hungry = bool(isinstance(interest, dict) and interest.get("hungry"))
         if mode is None and device == "phone" and isinstance(interest, dict) and interest.get("feed") == "shorts":
             mode = "shorts"                                     # the rhythm / his phone app: a short-video feed
+        if mode is None and device == "desk" and isinstance(interest, dict) and interest.get("feed") == "video":
+            mode = "video"                                      # #89 teen: a good share of desk time is YouTube
         async with self.lock:
             try:
                 sc = await self._ensure(device)
@@ -928,7 +941,7 @@ class Browser:
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
                     or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)
                     or (kind not in ("next", "comments") and NV.footer_link(label, href, url))
-                    or not self.fresh(href, label)):
+                    or not self.fresh(href, label) or not self.host_ok(u.hostname, cur.hostname)):
                 continue                                        # #89: no footer links, nothing opened this week
             if (sc.site or self._session(href)) and not VO.link_ok(href, label, aria or ""):
                 continue                                        # #60: logged in, an action or a private page
@@ -1072,7 +1085,8 @@ class Browser:
             why = None
             if not topic or self.rng.random() < self.profile_share():    # the interest profile, by the hour
                 d = interest if isinstance(interest, dict) else {}
-                p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"))
+                p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
+                           hungry=self.hungry)
                 if query_ok(p["query"]):
                     topic, origin = p["query"], "interests"
                     why = f"{SS.ORIGINS['interests']} ({p['topic']}, {p['rhythm']})"
@@ -1080,17 +1094,19 @@ class Browser:
                 topic, origin = self.rng.choice(FAMILIAR), "familiar"
             why = why or (SS.ORIGINS[origin] if origin not in ("", "familiar") else f"curious about “{topic[:50]}”")
             return await self._search(sc, topic, why, origin)
-        return await self._seed(sc, "opened a site he likes")
+        return await self._seed(sc, "opened a site he likes", hungry=self.hungry)
 
     SEED_GAP_S = 6 * 3600                                      # a seed site's front page at most every 6 hours
 
-    async def _seed(self, sc, why):
+    async def _seed(self, sc, why, topic=None, hungry=False):
         """A seed site's front page (a feed that changes, so not held to the 7-day rule), rotating: the ones opened in
-        the last SEED_GAP_S are left out; Wikipedia's random article only while Wikipedia stays under a tenth."""
+        the last SEED_GAP_S are left out; the topic's own sites first; cooking sites only when he is hungry."""
         now = time.time()
-        pool = [u for u in SEEDS if now - self.seed_t.get(u, 0) > self.SEED_GAP_S
-                and ("wikipedia.org" not in u or self.variety.wiki_share() < 0.10)]
+        pool = [u for u in SEEDS + (SEED_TOPICS["food"] if hungry else [])
+                if now - self.seed_t.get(u, 0) > self.SEED_GAP_S and self.host_ok(urllib.parse.urlsplit(u).hostname)]
         self.rng.shuffle(pool)
+        mine = SEED_TOPICS.get(topic or "", [])
+        pool.sort(key=lambda u: u not in mine)
         for u in pool[:3]:
             self.seed_t[u] = now
             if await self._open(sc, u, why, "page", revisit=True):
@@ -1117,7 +1133,7 @@ class Browser:
         if not q or (not force and self.rng.random() < 1 - I.FOLLOW_SHORTS):
             # #89: most shorts come from topics he has not seen lately (discovery / trending), not his notes
             p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
-                       discover=True)
+                       discover=True, hungry=self.hungry)
             q, origin = query_ok(p["query"]), "interests"
             topic, new = p["topic"], p["new"]
         else:
@@ -1154,8 +1170,9 @@ class Browser:
         if kind == "shorts" or kind == "youtube":
             if YT.key():
                 cands = await self._yt_search(sc, q, short)
-            else:
-                self.feed_note = YT.NOTE_NO_KEY
+            if not cands:                                       # no key (or no quota): known channels' uploads
+                cands = await self._yt_channel(sc, q, short)
+                self.feed_note = YT.NOTE_CHANNELS if cands else YT.NOTE_NO_KEY
         elif kind == "tiktok":
             cands = await self._tiktok_found(sc, q)
         if not cands:
@@ -1192,6 +1209,45 @@ class Browser:
                   "embed": r["embed"], "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
                   "how": "YouTube's official embed player"} for r in self.safe_results(results)]
         return [c for c in cards if self._card_ok(c)][:6]
+
+    async def _yt_channel(self, sc, q, short=True):
+        """#89 teen: without the API, the public uploads of a well-known channel of the query's topic, from the
+        channel's own Shorts / Videos page (robots.txt allows /@handle/..., it disallows the RSS feeds), the channel
+        used longest ago first, each page cached CHANNEL_CACHE_S. -> cards in the official embed player."""
+        topic = I.topic_of(q or "")
+        handles = sorted(YT.channels_for(topic), key=lambda h: (self.yt_used.get(h, 0), self.rng.random()))
+        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
+        for h in handles[:2]:
+            url = YT.channel_url(h, short)
+            ck = f"c:{url}"
+            hit = self.yt.cache.get(ck)
+            if hit and time.time() - hit["t"] < YT.CHANNEL_CACHE_S:
+                results = hit["r"]
+            else:
+                if not self.limits.allow("www.youtube.com") or not await self.robots.check(url, fetch, self.limits):
+                    continue
+                self.limits.note("www.youtube.com")
+                status, text = await fetch(url)
+                if status != 200 or BODY_WALL.search(text[:20000]):
+                    self.limits.refuse("youtube", f"channel page HTTP {status}")
+                    continue
+                results = [r for r in SS.parse_youtube(text, url) if bool(r.get("short")) == short or not short]
+                self.yt.cache[ck] = {"t": time.time(), "r": results[:30]}
+            self.yt_used[h] = time.time()
+            cards = []
+            for r in self.safe_results(results):
+                m = re.search(r"(?:shorts/|v=)([\w-]{11})", r["url"])
+                if m:
+                    cards.append({"url": r["url"], "title": r["title"], "author": h, "hashtags": r.get("hashtags") or [],
+                                  "thumb": f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg",
+                                  "embed": YT.embed_url(m.group(1)), "host": "youtube.com",
+                                  "site": "YouTube Shorts" if short else "YouTube",
+                                  "how": "YouTube's official embed player"})
+            cards = [c for c in cards if self._card_ok(c)]
+            self.rng.shuffle(cards)
+            if cards:
+                return cards[:6]
+        return []
 
     async def _tiktok_found(self, sc, q):
         """Public TikTok videos for `q` found through the search engines (site:tiktok.com), described by TikTok's
@@ -1450,7 +1506,7 @@ class Browser:
         `why` ends the card's line ("searched arXiv for “sleep spindles” — from his reading notes")."""
         again = origin not in ("chat", "interests") and self.variety.query_used(q)    # #89: the same search twice a day (the HN loop)
         if again or (origin in NV.SEEN_ORIGINS and not self.visited.follow_ok()):
-            p = I.pick(self.variety, hour=I.tokyo_hour(), rng=self.rng, discover=True)
+            p = I.pick(self.variety, hour=I.tokyo_hour(), rng=self.rng, discover=True, hungry=self.hungry)
             if p.get("query"):
                 q, origin = p["query"], "interests"
                 why = f"{SS.ORIGINS['interests']} ({p['topic']}, something new)"
@@ -1460,8 +1516,8 @@ class Browser:
         vq = NV.video_query(q)
         if vq is not None:
             return await self._video_search(sc, vq, q, why, origin)
-        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video",
-                             wiki_share=self.variety.wiki_share())[:self.TRIES]:
+        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video", wiki_share=self.variety.wiki_share(),
+                             hungry=self.hungry)[:self.TRIES]:
             if await self._search_on(sc, name, q, why, origin):
                 if not self.decide and sc.info.get("results"):  # brain decides: it picks among the results itself
                     res = [r for r in sc.info["results"] if self.fresh(r["url"], r["title"])]
@@ -1469,7 +1525,12 @@ class Browser:
                         r = res[min(len(res) - 1, int(self.rng.random() ** 2 * 4))]    # mostly the top results
                         sc.pending_link = (r["url"], f"searched “{q[:40]}”, opened “{r['title'][:50]}”")
                 return True
-        return await self._seed(sc, f"no search worked for “{q[:40]}”, opened a site he likes instead")
+        topic = I.topic_of(q or "")
+        if sc.name == "phone" or topic in ("football", "creators", "memes", "sneakers"):
+            # no site search for these (or he is on the phone): their videos (the API, or the topic's channels)
+            if await self._public_videos(sc, "shorts", q, why, origin):
+                return True
+        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry)
 
     async def _video_search(self, sc, vq, q, why, origin):
         """A search asking for videos: the phone's short-video feed, or a video source at the desk."""
@@ -1561,7 +1622,8 @@ class Browser:
         cand = []
         for href, text, area in links:
             if (len(text) < 12 or not url_ok(href) or LOGIN_LINK.search(text) or BAD_WORDS.search(text)
-                    or NV.footer_link(text, href, sc.page.url) or not self.fresh(href, text)):
+                    or NV.footer_link(text, href, sc.page.url) or not self.fresh(href, text)
+                    or not self.host_ok(urllib.parse.urlsplit(href).hostname, cur.hostname)):
                 continue
             u = urllib.parse.urlsplit(href)
             if (u.netloc, u.path) == (cur.netloc, cur.path):
@@ -1579,6 +1641,12 @@ class Browser:
             return False
         if not revisit and kind != "search" and not self.fresh(url):
             self.last_skip = "opened in the last 7 days"
+            return False
+        if kind != "search" and not self.host_ok(urllib.parse.urlsplit(url).hostname):
+            self.last_skip = "enough of this site today"            # #89 teen: per-site daily cap
+            return False
+        if getattr(sc, "public", None) and not await self.robots.check(url, lambda u: self._fetch(sc, u), self.limits):
+            self.last_skip = "robots.txt"                               # every page, not only searches
             return False
         if self._session(url) and not VO.link_ok(url):          # #60: re-checked just before it is opened
             self.last_skip = "action"

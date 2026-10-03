@@ -32,6 +32,36 @@ NOTE_NO_KEY = "YouTube: YOUTUBE_API_KEY not set (YouTube's search pages are clos
 OEMBED = "https://www.youtube.com/oembed?"
 
 
+# #89 teen interests: without a key, the public uploads of well-known channels per topic, read from the channel's own
+# Shorts / Videos page (youtube.com/@handle/shorts: allowed by robots.txt, which disallows /feeds/videos.xml, the RSS).
+# Each handle was checked to exist and to list public videos on 2026-10-04.
+CHANNELS = {
+    "cars": ["TopGear", "carwow", "DougDeMuro", "Formula1"],
+    "games": ["IGN", "PlayStation", "Markiplier"],
+    "football": ["PremierLeague", "433", "FIFA", "UEFA"],
+    "music": ["Genius", "COLORSxSTUDIOS", "NPRMusic", "The_FirstTake"],
+    "anime": ["Crunchyroll", "TOHOanimation", "AniplexUSA"],
+    "tech": ["mkbhd", "LinusTechTips", "UnboxTherapy", "Mrwhosetheboss"],
+    "sneakers": ["Complex", "highsnobiety", "hypebeast"],
+    "creators": ["MrBeast", "DudePerfect", "MarkRober"],
+    "memes": ["DailyDoseOfInternet", "MrBeast", "DudePerfect"],
+    "movies": ["Netflix", "A24"],
+    "tokyo": ["abroadinjapan", "ParisInTokyo"],
+    "science": ["veritasium", "kurzgesagt"],
+}
+CHANNEL_CACHE_S = 3 * 3600
+NOTE_CHANNELS = "YouTube: no API key, so public uploads of known channels (their own Shorts / Videos pages)"
+
+
+def channel_url(handle, short=True):
+    return f"https://www.youtube.com/@{handle}/{'shorts' if short else 'videos'}"
+
+
+def channels_for(topic):
+    """The topic's channels; a topic without any (or none given) gets the creators'."""
+    return CHANNELS.get(topic or "") or CHANNELS["creators"]
+
+
 def key():
     return (os.environ.get(KEY_ENV) or "").strip() or None
 

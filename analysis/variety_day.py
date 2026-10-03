@@ -26,7 +26,7 @@ import interests as I  # noqa: E402
 
 PAGES_PER_HOUR = 60
 TOPICS = [t for t in I.PROFILE if t != "wikipedia"]
-SEED_TOPICS = ["memes", "science", "tech", "tokyo", "food", "music", "markets", "anime", "games", "science"]
+SEED_TOPICS = ["memes", "science", "tech", "tokyo", "food", "music", "sneakers", "anime", "games", "science"]
 
 
 class Clock:

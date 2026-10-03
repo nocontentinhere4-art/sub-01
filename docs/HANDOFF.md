@@ -103,6 +103,36 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   `GET /api/costs` and `/api/health` are admin-only (the password cookie, or the `SUB01_ADMIN_TOKEN` header). Tick
   times sit in a 1200-entry ring buffer (`Live.tick_s`).
 
+## A young guy's internet (#89 teen interests, PR `feature/more-search`)
+- Owner (2026-10-04): "why is he looking at recipes… he's a young guy like us: YouTube, TikTok, really interesting
+  things, cars". Live at 08:24 Tokyo: 7 King Arthur Baking pages in a row, "One Piece latest chapter" searched on
+  Science News, short video 0 % (no YouTube key yet).
+- Research with citations: `docs/research/teen_online.md` (Pew 2024, Ofcom 2025, Common Sense 2021, PARTY USA 2024,
+  admeira 2024, YPulse 2025, MakerSights).
+- `interests.PROFILE` re-seeded: games, cars, anime, music, creators, football, tech, sneakers, memes, movies, then
+  Tokyo, science, a little Wikipedia. Food weighs 0 unless he is hungry or ordering (`pick(hungry=True)`; the live
+  server's `live_interest` sets `hungry` from life's hunger ≥ 0.5 or a food activity). No crypto or markets topics.
+- Searches land on sites that fit (`search_sources.TOPICS`): MyAnimeList, Carscoops, PC Gamer, TMDB, NME, 9to5Mac, HN;
+  their search paths are allowed by robots.txt (checked 2026-10-04); results read by `parse_links` /
+  `parse_headlines`. No unrelated fallback (`TAIL` empty): a query with no fitting site goes to its videos or to a
+  front page of its topic (`SEED_TOPICS`). The cause of "One Piece → Science News": "latest" matched the old "news"
+  topic, whose source was Science News. Recipes only while hungry (`MEAL_ONLY`, `RECIPE_HOST`).
+- Video without a YouTube key: the public uploads of known channels per topic (`youtube_api.CHANNELS`), read from
+  the channel's own Shorts / Videos page (robots.txt allows `/@handle/...`; it disallows the RSS `/feeds/videos.xml`,
+  so the RSS idea was not used), played in the youtube-nocookie embed. `parse_youtube` reads the 2025
+  `lockupViewModel` of a videos tab. About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+- Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
+  players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
+  robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,
+  StackExchange and others refuse robots).
+- TikTok: no compliant source of current popular video ids was found (its tag/discover pages render no video on the
+  server, its /search and /embed/v2 are robots-disallowed, DuckDuckGo challenges datacenter IPs); the logged-in feed's
+  diagnosis (#109) will tell whether the account's feed works from Railway.
+- `analysis/teen_day.py` (a simulated waking day on the real choice path, network stubbed as answered live; not a
+  browser), 3 days: before (main) short video + YouTube 0 %, Science News 70 % of pages, recipes outside meals 7.4 %,
+  longest run on one site 18; after, no key: 54 % (shorts 36 %, YouTube 19 %), Wikipedia 0 %, recipes outside meals
+  0 %, longest run 3; with the key: 61 %.
+
 ## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
 - Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia
   loop, 27 Chromium restarts. Root causes:

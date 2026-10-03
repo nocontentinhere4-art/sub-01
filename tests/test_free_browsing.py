@@ -215,7 +215,7 @@ def test_page_links_keep_pagination_comments_and_wikipedia_sources():
     sc.chain = 7
     raw = [[f"https://en.wikipedia.org/wiki/Article_{i}", f"Article number {i}", 5000 - i, True, "", False, ""]
            for i in range(60)]
-    raw += [["https://www.kingarthurbaking.com/history", "History of bread baking", 10, False, "nofollow", True, ""],
+    raw += [["https://www.breadhistory.example.org/history", "History of bread baking", 10, False, "nofollow", True, ""],
             ["https://doi.org/10.1/x", "A study of yeast fermentation", 10, False, "", True, ""],
             ["https://en.wikipedia.org/w/index.php?title=Bread&page=2", "next page", 10, False, "next", False, ""],
             ["https://en.wikipedia.org/wiki/Talk:Bread", "Join the discussion", 10, False, "", False, ""],
@@ -224,7 +224,7 @@ def test_page_links_keep_pagination_comments_and_wikipedia_sources():
     links = page["links"]
     assert len(links) == browse.PAGE_LINKS
     by_href = {l["href"]: l for l in links}
-    assert by_href["https://www.kingarthurbaking.com/history"]["external"]
+    assert by_href["https://www.breadhistory.example.org/history"]["external"]
     assert by_href["https://doi.org/10.1/x"]["external"]
     assert by_href["https://en.wikipedia.org/w/index.php?title=Bread&page=2"]["next"]
     assert by_href["https://en.wikipedia.org/wiki/Talk:Bread"]["comments"]
@@ -398,11 +398,13 @@ def test_act_needs_the_link_flag_in_the_browser_process():
 
 
 def test_seeds_cover_the_open_web_and_pass_the_guard():
+    # #89 teen re-seed: the sites people his age read, per interest; cooking sites only when he is hungry
+    assert all(url_ok(u) for u in browse.SEEDS) and len(browse.SEEDS) >= 30
+    for topic in ("cars", "games", "football", "anime", "music", "tech", "sneakers", "memes", "movies"):
+        assert browse.SEED_TOPICS[topic]
     hosts = {browse.urllib.parse.urlsplit(u).hostname for u in browse.SEEDS}
-    assert all(url_ok(u) for u in browse.SEEDS) and len(browse.SEEDS) >= 40
-    for want in ("old.reddit.com", "news.ycombinator.com", "cooking.stackexchange.com", "www.metmuseum.org",
-                 "www.openstreetmap.org", "www.justonecookbook.com", "bandcamp.com", "www.youtube.com"):
-        assert want in hosts
+    assert not hosts & {browse.urllib.parse.urlsplit(u).hostname for u in browse.SEED_TOPICS["food"]}
+    assert "old.reddit.com" not in hosts                       # robots.txt disallows everything there
 
 
 # --- 6. in a real Chromium (local HTML only) --------------------------------------------------------------------------
