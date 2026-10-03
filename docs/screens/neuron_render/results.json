@@ -3,7 +3,7 @@
  "software_webgl": true,
  "note": "headless Chromium with SwiftShader (software WebGL): FPS here is a CPU rasteriser's, not a phone GPU's",
  "offline_1920": {
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 no live network: static cells, no activity\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 15,593 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 280k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nneurons offline \u2014 the 1M network runs while he is awake when the GPU is on\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind.",
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 no live network: static cells, no activity\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 13,268 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 318k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nneurons offline \u2014 the 1M network runs while he is awake when the GPU is on\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind.",
   "live": false,
   "spikes": 0,
   "source": "H01"
@@ -12,24 +12,24 @@
   "source": "H01",
   "cells": 20,
   "heroCells": 3,
-  "triangles": 280451,
+  "triangles": 317760,
   "triangleCap": 1000000,
   "spines": "real (in the meshes)",
-  "dendUm": 124613,
+  "dendUm": 124583,
   "boutons": 1442,
-  "drawCalls": 31,
-  "lineSegments": 34862,
+  "drawCalls": 34,
+  "lineSegments": 34867,
   "live": true,
-  "spikes": 19,
+  "spikes": 27,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
   "synapsesPre": 1442,
-  "synapsesPost": 15593,
-  "myelinatedUm": 1105,
+  "synapsesPost": 13268,
+  "myelinatedUm": 1108,
   "glia": 4,
   "far": 6,
-  "bytes": 2440044,
+  "bytes": 2533069,
   "focusId": "1874244336",
   "ids": [
    "1874244336",
@@ -53,30 +53,30 @@
    "73520825702",
    "59390780784"
   ],
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 15,593 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 280k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 13,268 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 318k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
  },
  "cortex_1920_em": {
   "source": "H01",
   "cells": 20,
   "heroCells": 3,
-  "triangles": 280451,
+  "triangles": 317760,
   "triangleCap": 1000000,
   "spines": "real (in the meshes)",
-  "dendUm": 124613,
+  "dendUm": 124583,
   "boutons": 1442,
-  "drawCalls": 31,
-  "lineSegments": 34862,
+  "drawCalls": 34,
+  "lineSegments": 34867,
   "live": true,
-  "spikes": 19,
+  "spikes": 20,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
   "synapsesPre": 1442,
-  "synapsesPost": 15593,
-  "myelinatedUm": 1105,
+  "synapsesPost": 13268,
+  "myelinatedUm": 1108,
   "glia": 4,
   "far": 6,
-  "bytes": 2440044,
+  "bytes": 2533069,
   "focusId": "1874244336",
   "ids": [
    "1874244336",
@@ -100,7 +100,7 @@
    "73520825702",
    "59390780784"
   ],
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 15,593 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 280k of 1,000k triangles (desktop) \u00b7 em\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 13,268 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 318k of 1,000k triangles (desktop) \u00b7 em\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
  },
  "cortex_1920_fluorescence_before": {
   "source": "NeuroMorpho",
@@ -304,7 +304,7 @@
  },
  "errors_1920": [],
  "offline_1280": {
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 no live network: static cells, no activity\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 15,593 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 280k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nneurons offline \u2014 the 1M network runs while he is awake when the GPU is on\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind.",
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 no live network: static cells, no activity\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 13,268 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 318k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nneurons offline \u2014 the 1M network runs while he is awake when the GPU is on\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind.",
   "live": false,
   "spikes": 0,
   "source": "H01"
@@ -313,24 +313,24 @@
   "source": "H01",
   "cells": 20,
   "heroCells": 3,
-  "triangles": 280451,
+  "triangles": 317760,
   "triangleCap": 1000000,
   "spines": "real (in the meshes)",
-  "dendUm": 124613,
+  "dendUm": 124583,
   "boutons": 1442,
-  "drawCalls": 31,
-  "lineSegments": 34862,
+  "drawCalls": 34,
+  "lineSegments": 34867,
   "live": true,
-  "spikes": 14,
+  "spikes": 26,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
   "synapsesPre": 1442,
-  "synapsesPost": 15593,
-  "myelinatedUm": 1105,
+  "synapsesPost": 13268,
+  "myelinatedUm": 1108,
   "glia": 4,
   "far": 6,
-  "bytes": 2440044,
+  "bytes": 2533069,
   "focusId": "1874244336",
   "ids": [
    "1874244336",
@@ -354,30 +354,30 @@
    "73520825702",
    "59390780784"
   ],
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 15,593 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 280k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 13,268 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 318k of 1,000k triangles (desktop) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
  },
  "cortex_1280_em": {
   "source": "H01",
   "cells": 20,
   "heroCells": 3,
-  "triangles": 280451,
+  "triangles": 317760,
   "triangleCap": 1000000,
   "spines": "real (in the meshes)",
-  "dendUm": 124613,
+  "dendUm": 124583,
   "boutons": 1442,
-  "drawCalls": 31,
-  "lineSegments": 34862,
+  "drawCalls": 34,
+  "lineSegments": 34867,
   "live": true,
-  "spikes": 33,
+  "spikes": 23,
   "lod": "desktop",
   "halfFloat": true,
   "webgl2": true,
   "synapsesPre": 1442,
-  "synapsesPost": 15593,
-  "myelinatedUm": 1105,
+  "synapsesPost": 13268,
+  "myelinatedUm": 1108,
   "glia": 4,
   "far": 6,
-  "bytes": 2440044,
+  "bytes": 2533069,
   "focusId": "1874244336",
   "ids": [
    "1874244336",
@@ -401,7 +401,7 @@
    "73520825702",
    "59390780784"
   ],
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 15,593 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 280k of 1,000k triangles (desktop) \u00b7 em\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 L4 pyramidal (human) + 2 astrocyte (human) + 2 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n20 real cells, 3 proofread in full detail and 4 glia: spines as reconstructed, 1,442 presynaptic and 13,268 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 318k of 1,000k triangles (desktop) \u00b7 em\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 17 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
  },
  "cortex_1280_fluorescence_before": {
   "source": "NeuroMorpho",
@@ -605,7 +605,7 @@
  },
  "errors_1280": [],
  "offline_390": {
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) \u00b7 no live network: static cells, no activity\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 presynaptic and 13,275 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 151k of 250k triangles (phone) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 14 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nneurons offline \u2014 the 1M network runs while he is awake when the GPU is on\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind.",
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) \u00b7 no live network: static cells, no activity\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 presynaptic and 11,275 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 186k of 250k triangles (phone) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 14 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nneurons offline \u2014 the 1M network runs while he is awake when the GPU is on\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind.",
   "live": false,
   "spikes": 0,
   "source": "H01"
@@ -614,24 +614,24 @@
   "source": "H01",
   "cells": 17,
   "heroCells": 3,
-  "triangles": 150995,
+  "triangles": 185501,
   "triangleCap": 250000,
   "spines": "real (in the meshes)",
-  "dendUm": 113129,
+  "dendUm": 113098,
   "boutons": 1294,
-  "drawCalls": 26,
-  "lineSegments": 26142,
+  "drawCalls": 29,
+  "lineSegments": 26148,
   "live": true,
-  "spikes": 14,
+  "spikes": 11,
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
   "synapsesPre": 1294,
-  "synapsesPost": 13275,
-  "myelinatedUm": 1105,
+  "synapsesPost": 11275,
+  "myelinatedUm": 1108,
   "glia": 3,
   "far": 6,
-  "bytes": 1452618,
+  "bytes": 1536561,
   "focusId": "1874244336",
   "ids": [
    "1874244336",
@@ -652,30 +652,30 @@
    "2920420348",
    "73520825702"
   ],
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 presynaptic and 13,275 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 151k of 250k triangles (phone) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 14 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 presynaptic and 11,275 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 186k of 250k triangles (phone) \u00b7 fluorescence\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 14 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
  },
  "cortex_390_em": {
   "source": "H01",
   "cells": 17,
   "heroCells": 3,
-  "triangles": 150995,
+  "triangles": 185501,
   "triangleCap": 250000,
   "spines": "real (in the meshes)",
-  "dendUm": 113129,
+  "dendUm": 113098,
   "boutons": 1294,
-  "drawCalls": 26,
-  "lineSegments": 26142,
+  "drawCalls": 29,
+  "lineSegments": 26148,
   "live": true,
-  "spikes": 12,
+  "spikes": 21,
   "lod": "phone",
   "halfFloat": true,
   "webgl2": true,
   "synapsesPre": 1294,
-  "synapsesPost": 13275,
-  "myelinatedUm": 1105,
+  "synapsesPost": 11275,
+  "myelinatedUm": 1108,
   "glia": 3,
   "far": 6,
-  "bytes": 1452618,
+  "bytes": 1536561,
   "focusId": "1874244336",
   "ids": [
    "1874244336",
@@ -696,7 +696,7 @@
    "2920420348",
    "73520825702"
   ],
-  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 presynaptic and 13,275 incoming synapses at their real positions, 1,105 \u00b5m of axon H01 labels as myelinated \u00b7 151k of 250k triangles (phone) \u00b7 em\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 14 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
+  "caption": "close-up \u00b7 left Vis 13 \u00b7 10 L2 pyramidal (human) + 1 L5 pyramidal (human) + 1 L2 interneuron (human) + 2 L3 interneuron (human) + 2 astrocyte (human) + 1 oligodendrocyte (human) \u00b7 each cell stands for a sampled model neuron here; a spike runs soma \u2192 axon, slowed 10,000\u00d7 (node to node where myelinated)\n17 real cells, 3 proofread in full detail and 3 glia: spines as reconstructed, 1,294 presynaptic and 11,275 incoming synapses at their real positions, 1,108 \u00b5m of axon H01 labels as myelinated \u00b7 186k of 250k triangles (phone) \u00b7 em\nH01 electron-microscopy reconstructions of human temporal cortex (Shapson-Coe et al. 2024; cells 1874244336, 3178243558, 678539249 + 14 more), CC BY 4.0, decimated and moved closer together; glia from the automated segmentation, not proofread \u00b7 credits on /about\nSimulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.\nShapes are real reconstructed neurons from public datasets (H01 human cortex electron microscopy, Shapson-Coe et al. 2024; NeuroMorpho.Org), CC BY 4.0. The activity is simulated by a point-neuron network and slowed down to be visible. A model, not a mind."
  },
  "cortex_390_fluorescence_before": {
   "source": "NeuroMorpho",
@@ -900,11 +900,11 @@
  },
  "errors_390": [],
  "ap_strip_clock_s": [
-  0.1,
-  1.5,
-  1.7,
-  1.9,
-  2.1
+  0.3,
+  1.0,
+  2.0,
+  4.0,
+  8.0
  ],
  "ap_errors": [],
  "build_ms_x4": {
@@ -915,9 +915,9 @@
   "amygdala": 4094
  },
  "phone_x4_cortex": {
-  "fps_software_gl": 2.9,
-  "js_ms_per_frame": 1.93,
-  "triangles": 150995,
+  "fps_software_gl": 2.8,
+  "js_ms_per_frame": 3.13,
+  "triangles": 185501,
   "cells": 17,
   "lod": "phone"
  },
@@ -950,8 +950,8 @@
   "lod": "phone"
  },
  "phone_x1_last": {
-  "fps_software_gl": 6.4,
-  "js_ms_per_frame": 1.87
+  "fps_software_gl": 4.9,
+  "js_ms_per_frame": 1.74
  },
  "geometry_ms_x4": {
   "pyramidal": {
@@ -985,5 +985,12 @@
    "spines": 3600
   }
  },
- "timing_errors": []
+ "timing_errors": [],
+ "ap_front_um": [
+  null,
+  28.1,
+  58.0,
+  118.0,
+  238.1
+ ]
 }

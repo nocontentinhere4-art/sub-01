@@ -151,13 +151,16 @@ Sources:
 390 px in any region or style.
 
 **Cortex since #99 (the real H01 cells):** desktop set 20 cells (1 focus L2 pyramidal, 1 L5 pyramidal and 1 L2
-interneuron as heroes, 7 mid, 6 far as skeleton lines, 2 astrocytes + 2 oligodendrocytes), **280 451 triangles** of
-1 000 000, 31 draw calls, 1 442 presynaptic and 15 593 incoming synapses, 1 105 µm of myelinated axon, 2.44 MB of
-cells + 0.53 MB EM slice (2.99 MB); phone set 17 cells, **150 995 triangles** of 250 000, 26 draw calls, 1.45 MB + EM
-(2.01 MB). Under the mid-phone profile (CPU ×4, 390 px) the main-thread time is **1.9–3.7 ms a frame** (two runs, at
-2.9–4.2 fps in the software rasteriser; 0.9 ms unthrottled); the set decodes in ~0.1 s from the local server and `nr.ready` resolves
-~260 ms after `openAt()` when `prefetch()` ran first. The NeuroMorpho numbers below for cortex are now the
-`*_before.png` shots (`NeuronRender.H01_SETS.cortex = null`), kept as the fallback and for the before/after pair.
+interneuron as heroes, 7 mid, 6 far as skeleton lines, 2 astrocytes + 2 oligodendrocytes), **317 760 triangles** of
+1 000 000 (280 452 in the meshes + the three axon tubes), 34 draw calls, 1 442 presynaptic and 13 268 incoming
+synapses, 1 108 µm of myelinated axon, 2.53 MB of cells + 0.43 MB EM slice (2.99 MB); phone set 17 cells,
+**185 501 triangles** of 250 000, 29 draw calls, 1.54 MB + EM (2.00 MB). Under the mid-phone profile (CPU ×4, 390 px)
+the main-thread time is **3.1 ms a frame** (2.8 fps in the software rasteriser; 1.7 ms unthrottled); the set decodes
+in ~0.2 s from the local server and `nr.ready` resolves ~350 ms after `openAt()` when `prefetch()` ran first. The
+action-potential strip (`ap_strip.png`, frames at 0.3 / 1 / 2 / 4 / 8 s after the spike, each cropped around the
+front) has the front at 28 / 58 / 118 / 238 µm of real axon path (`ap_front_um`). The NeuroMorpho numbers below for
+cortex are now the `*_before.png` shots (`NeuronRender.H01_SETS.cortex = null`), kept as the fallback and for the
+before/after pair.
 
 | close-up | desktop LOD (1280 px): triangles / spines / boutons / nodes of Ranvier | phone LOD (390 px): triangles / spines / boutons / nodes |
 |---|---|---|
@@ -180,7 +183,7 @@ at most, quarter-resolution post passes, and nothing drawn off screen. The serve
 Also checked: the module runs unchanged under three.js **r169** (ES module, the room's version): 125 cells,
 926k triangles, a spike drawn, no console errors, `close()` leaves no canvas (`scratch` page, not in the repo). With the
 H01 set under r169: `prefetch()` then `openAt()` with `normal: [1, 0, 0]`, `cameraDir`, `entry {1500 ms, from 6}` →
-the block turned by the expected quaternion (−90° about z), `nr.ready` at 261 ms, `onEntryEnd` at 1 987 ms, the
+the block turned by the expected quaternion (−90° about z), `nr.ready` at ~350 ms, `onEntryEnd` at ~2.4 s, the
 scale bar reading 50 µm = 75 px at 900 px wide, `setOpacity(0.5)` on canvas and HUD, `close()` leaves 0 canvases.
 
 ## Checks
