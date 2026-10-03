@@ -377,7 +377,7 @@ const ANCHOR = {
   // standing ones give the root (`p`). The clean room: chair at (-1.13, -0.585), seat top 0.665; the bed's mattress top
   // y 0.82, frame x -1.90..-0.20 (headboard at -1.90), z 0.25..1.50 (open side at 0.25)
   desk:    {seat:[-1.12, 0.87, -0.56], r:-2.85, stand:[-0.68, -0.55]},   // on the desk chair, facing the monitor; he sits down from its side
-  bedlie:  {p:[-1.07, -0.095, 0.89], r:Math.PI / 2}, // on his back on the duvet, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
+  bedlie:  {p:[-1.18, -0.095, 0.89], r:Math.PI / 2}, // on his back on the duvet, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
   bedside: {seat:[-0.40, 1.06, 0.36], r:Math.PI, stand:[-0.36, -0.18]},      // sitting on the edge, on the duvet (0.7 m up: his feet hang)
   door:    {p:[1.22, F, -0.92], r:2.2},              // in front of the door
   window:  {p:[0.18, F, -0.15], r:-Math.PI / 2},     // standing, looking out of the window over the foot of the bed
@@ -486,6 +486,8 @@ load("room/boy.glb").then(g => {
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
   scene.add(phone); makeProps();
+  if (slidesInit()) { SLIDES.parked.visible = true;                 // its shader is built now, not when he first goes to bed
+    renderer.compileAsync(SLIDES.parked, camera, scene).catch(() => {}).finally(() => { SLIDES.parked.visible = SLIDES.off; }); }
   for (const [name, file] of Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"}))
     load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {});
 }).catch(bootError);
@@ -1579,6 +1581,7 @@ function halfSteps(on){
 function drive(dt){                                   // one frame of the plan; returns whether he moves
   if (!goal || !boy) return false;
   if (!placed) { placed = true; snap(goal.anchor, goal.clip); return false; }    // the first tick: just be there
+  if (!step && at === "bedlie" && Math.abs(ROLL.a) > 0.02) return false;        // on his side: onto his back first, then up
   if (!step) { if (!plan.length) return false; step = plan.shift(); step.t = 0;
     if (step.k === "pose") startPose(step);
     else if (step.k === "chair") { step.k0 = CHAIR.k; step.p0 = boy.position.clone(); step.dx0 = CHAIR.dx;
@@ -2195,6 +2198,218 @@ function tuck(){
     bones[side + "Arm"].getWorldPosition(_l2).addScaledVector(UP, -0.25).addScaledVector(BR, -sx * 0.3).addScaledVector(BFw, -0.3);
     armTo(side, _l1, _l2, w); }
 }
+// ---- in bed: asleep he is under the duvet (it is pulled up from the foot of the bed and follows his body and his
+// breathing) and his slides are parked by the bed; whenever he lies on the bed his head and shoulders dent the pillow
+const DUV = {src:null, mesh:null, base:null, lift:null, segs:null, w:0, acc:0, x0:0, x1:0};
+const PIL = {src:null, mesh:null, base:null, idx:null, on:false};
+const BODY_SEGS = [["Hips", "Spine02"], ["Spine02", "Spine01"], ["Spine01", "Spine"], ["Spine", "neck"],
+  ["LeftUpLeg", "LeftLeg"], ["LeftLeg", "LeftFoot"], ["LeftFoot", "LeftToeBase"], ["RightUpLeg", "RightLeg"], ["RightLeg", "RightFoot"], ["RightFoot", "RightToeBase"],
+  ["LeftShoulder", "LeftArm"], ["LeftArm", "LeftForeArm"], ["LeftForeArm", "LeftHand"], ["LeftHand", "LeftHand"],
+  ["RightShoulder", "RightArm"], ["RightArm", "RightForeArm"], ["RightForeArm", "RightHand"], ["RightHand", "RightHand"],
+  ["neck", "Head", 1], ["Head", "head_end", 1]];                      // (the head dents the pillow; the duvet stays below it)
+const skinMesh = () => { let sm = null; boy && boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); return sm; };
+const domBone = (g, i) => { const I = g.attributes.skinIndex, W = g.attributes.skinWeight; let b = 0, bw = -1;
+  for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); } return b; };
+const shapeable = (src, name) => {                      // a world-space copy of a room mesh, to reshape, shown instead of it
+  src.updateMatrixWorld(true);
+  const g = src.geometry.clone();
+  for (const k of ["position", "normal"]) { const A = g.attributes[k]; if (!A) continue;   // (quantized in the file: floats, to write to)
+    const f = new Float32Array(A.count * 3); for (let i = 0; i < A.count; i++) f.set([A.getX(i), A.getY(i), A.getZ(i)], 3 * i);
+    g.setAttribute(k, new THREE.BufferAttribute(f, 3)); }
+  g.applyMatrix4(src.matrixWorld); const m = new THREE.Mesh(g, src.material);
+  m.name = name; m.visible = false; m.castShadow = src.castShadow; m.receiveShadow = true; scene.add(m);
+  return [m, Float32Array.from(g.attributes.position.array)];
+};
+function bedInit(){                                    // the duvet and the pillow, and how thick he is around each bone
+  if (DUV.mesh || !room) return !!DUV.mesh;
+  room.traverse(o => { if (o.isMesh && o.material && o.material.name === "duvet") DUV.src = o;
+    if (o.isMesh && o.material && o.material.name === "sheet") PIL.src = o; });
+  const sm = skinMesh(); if (!DUV.src || !PIL.src || !sm) return false;
+  [DUV.mesh, DUV.base] = shapeable(DUV.src, "duvet_over"); [PIL.mesh, PIL.base] = shapeable(PIL.src, "pillow_dent");
+  const g = DUV.mesh.geometry; DUV.lift = new Float32Array(g.attributes.position.count); DUV.nbase = Float32Array.from(g.attributes.normal.array);
+  g.computeBoundingBox(); DUV.x0 = g.boundingBox.min.x; DUV.x1 = g.boundingBox.max.x; DUV.mesh.frustumCulled = false;
+  PIL.idx = []; for (let i = 0; i < PIL.base.length / 3; i++) if (PIL.base[3 * i] < -1.3 && PIL.base[3 * i + 1] > 0.83) PIL.idx.push(i);   // the pillow's vertices
+  // how thick he is around each bone segment: the 90th percentile of his vertices' distance from it, in his bind pose
+  // (no skinning needed), at his scale
+  const names = sm.skeleton.bones.map(b => b.name), segOf = {}; BODY_SEGS.forEach(([a], k) => { if (!(a in segOf)) segOf[a] = k; });
+  const P = sm.geometry.attributes.position, v = new THREE.Vector3(), d = BODY_SEGS.map(() => []);
+  const bp = n => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert());
+  const seg = BODY_SEGS.map(([a, b]) => new THREE.Line3(bp(a), bp(b)));
+  const sc = bones.LeftUpLeg.getWorldPosition(_l1).distanceTo(bones.LeftLeg.getWorldPosition(_l2)) / seg[segOf.LeftUpLeg].distance();
+  for (let i = 0; i < P.count; i += 2) { const k = segOf[names[domBone(sm.geometry, i)]]; if (k === undefined) continue;
+    v.fromBufferAttribute(P, i).applyMatrix4(sm.bindMatrix); d[k].push((seg[k].distance() > 1e-6 ? seg[k].closestPointToPoint(v, true, _l4) : seg[k].start).distanceTo(v) * sc); }
+  DUV.segs = BODY_SEGS.map(([a, b], k) => { const s = d[k].sort((x, y) => x - y);
+    return {a:bones[a], b:bones[b], head:!!BODY_SEGS[k][2], r:clamp(s.length ? s[Math.floor(s.length * 0.9)] : 0.05, 0.03, a === b ? 0.09 : 0.2), A:new THREE.Vector3(), B:new THREE.Vector3()}; });
+  return true;
+}
+function pillowDent(k){                                // the pillow gives under his head and shoulders
+  const g = PIL.mesh.geometry, pos = g.attributes.position.array, base = PIL.base, RIM = 0.05;
+  const near = [];
+  for (const s of DUV.segs) { s.a.getWorldPosition(s.A); s.b.getWorldPosition(s.B); if (Math.min(s.A.x, s.B.x) - s.r - RIM < -1.3) near.push(s); }
+  for (const i of PIL.idx) {
+    const x = base[3 * i], y0 = base[3 * i + 1], z = base[3 * i + 2]; let y = y0;
+    for (const s of near) {
+      const ax = s.A.x, az = s.A.z, dx = s.B.x - ax, dz = s.B.z - az, L = dx * dx + dz * dz;
+      const t = L > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / L, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
+      const dd = Math.sqrt(px * px + pz * pz), R = s.r + RIM; if (dd >= R) continue;
+      const under = s.A.y + (s.B.y - s.A.y) * t - Math.sqrt(Math.max(0, s.r * s.r - dd * dd)) - 0.004;   // his underside here
+      if (under < y0) y = Math.min(y, y0 - (y0 - under) * (1 - smooth(0.7, 1, dd / R)));
+    }
+    pos[3 * i + 1] = y0 + (Math.max(y, 0.83) - y0) * k;
+  }
+  g.attributes.position.needsUpdate = true; g.computeVertexNormals();
+}
+const DG = {x0:0, z0:0, c:0.025, nx:0, nz:0, lift:null, cell:null, wt:null, act:null, cov:null, front:0};   // the lift is worked out on a 2.5 cm grid, then read per vertex
+function duvetGrid(){
+  const g = DUV.mesh.geometry, bb = g.boundingBox, n = DUV.lift.length;
+  DG.x0 = bb.min.x - 0.05; DG.z0 = bb.min.z - 0.05; DG.nx = Math.ceil((bb.max.x - DG.x0 + 0.05) / DG.c) + 1; DG.nz = Math.ceil((bb.max.z - DG.z0 + 0.05) / DG.c) + 1;
+  DG.lift = new Float32Array(DG.nx * DG.nz); DG.cell = new Int32Array(n); DG.wt = new Float32Array(2 * n);
+  for (let i = 0; i < n; i++) { const fx = (DUV.base[3 * i] - DG.x0) / DG.c, fz = (DUV.base[3 * i + 2] - DG.z0) / DG.c, ix = Math.floor(fx), iz = Math.floor(fz);
+    DG.cell[i] = ix * DG.nz + iz; DG.wt[2 * i] = fx - ix; DG.wt[2 * i + 1] = fz - iz; }
+}
+function duvetShape(){                                 // lift the duvet over him: the highest of his limbs under each point
+  if (!DG.lift) duvetGrid();
+  const g = DUV.mesh.geometry, pos = g.attributes.position.array, nor = g.attributes.normal.array, base = DUV.base, nb = DUV.nbase, TH = 0.03, DR = 0.2, REF = 0.866;
+  const L = DG.lift, c = DG.c, nz = DG.nz; L.fill(0);
+  for (const s of DUV.segs) { if (s.head) continue; s.a.getWorldPosition(s.A); s.b.getWorldPosition(s.B);
+    const R = s.r + DR, ax = s.A.x, az = s.A.z, dx = s.B.x - ax, dz = s.B.z - az, Lq = dx * dx + dz * dz;
+    const i0 = Math.max(0, Math.floor((Math.min(ax, s.B.x) - R - DG.x0) / c)), i1 = Math.min(DG.nx - 1, Math.ceil((Math.max(ax, s.B.x) + R - DG.x0) / c));
+    const k0 = Math.max(0, Math.floor((Math.min(az, s.B.z) - R - DG.z0) / c)), k1 = Math.min(nz - 1, Math.ceil((Math.max(az, s.B.z) + R - DG.z0) / c));
+    for (let i = i0; i <= i1; i++) { const x = DG.x0 + i * c;
+      for (let k = k0; k <= k1; k++) { const z = DG.z0 + k * c;
+        const t = Lq > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / Lq, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
+        const dd = Math.sqrt(px * px + pz * pz); if (dd >= R) continue;
+        const h = s.A.y + (s.B.y - s.A.y) * t + s.r + TH;           // the top of this limb, with the duvet's thickness
+        const l = (h - REF) * (1 - smooth(0.25, 1, dd / R)); if (l > L[i * nz + k]) L[i * nz + k] = l; } } }
+  // pulled up from the foot of the bed (x1) to just below his shoulders: the duvet ahead of the hem stays flat, under him
+  // (on his side, off his raised shoulder). Which vertices can move, and how much, only changes with the hem.
+  const front = DUV.x1 + (bones.neck.getWorldPosition(_l1).x + 0.21 + 0.12 * Math.abs(ROLL.a) / ROLL.ang - 0.12 - DUV.x1) * DUV.w;
+  if (!DG.act || Math.abs(front - DG.front) > 0.002) {
+    pos.set(base); nor.set(nb); DG.front = front; const act = [], cov = [];
+    for (let i = 0; i < base.length / 3; i++) { const x = base[3 * i], y0 = base[3 * i + 1];
+      // the whole thickness lifts by the same amount (from the flat duvet's top, REF); past the end of the mattress it
+      // falls over his toes and hangs down again
+      const cv = smooth(front, front + 0.12, x) * (1 - smooth(-0.2, -0.155, x)) * smooth(0.80, 0.84, y0);
+      if (cv > 0 || x > -0.34) { act.push(i); cov.push(cv); } }
+    DG.act = Int32Array.from(act); DG.cov = Float32Array.from(cov); }
+  // he is longer than the mattress (his toes end ~7 cm past their bones, past its end): there the duvet's end is pushed out over them
+  const t0 = bones.LeftToeBase.getWorldPosition(_l2), t1 = bones.RightToeBase.getWorldPosition(_l3);
+  const act = DG.act, cov = DG.cov;
+  for (let j = 0; j < act.length; j++) {
+    const i = act[j], x = base[3 * i], z = base[3 * i + 2], cv = cov[j];
+    if (cv > 0) { const q = DG.cell[i], u = DG.wt[2 * i], v = DG.wt[2 * i + 1], a = L[q], b = L[q + 1], e = L[q + nz], f = L[q + nz + 1];
+      pos[3 * i + 1] = base[3 * i + 1] + ((a * (1 - v) + b * v) * (1 - u) + (e * (1 - v) + f * v) * u) * cv;
+      // the normal tilts with the slope of the lift (read off the grid): no need to recompute them all
+      const sx = ((e - a) * (1 - v) + (f - b) * v) / c * cv, sz = ((b - a) * (1 - u) + (f - e) * u) / c * cv, ny = nb[3 * i + 1];
+      let nx = nb[3 * i] - sx * ny, nzz = nb[3 * i + 2] - sz * ny; const m = 1 / Math.sqrt(nx * nx + ny * ny + nzz * nzz);
+      nor[3 * i] = nx * m; nor[3 * i + 1] = ny * m; nor[3 * i + 2] = nzz * m; }
+    if (x > -0.34) { let push = 0;
+      for (const q of [t0, t1]) push = Math.max(push, (q.x + 0.105 - DUV.x1) * (1 - smooth(0.07, 0.17, Math.abs(z - q.z))));
+      pos[3 * i] = x + Math.max(0, push) * smooth(-0.34, -0.2, x) * DUV.w; }
+  }
+  g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true;
+}
+const SLIDES = {full:null, bare:null, parked:null, off:false};
+function slidesInit(){                                 // which of his vertices are the slides (dark, on the feet, below the ankle)
+  const sm = skinMesh(); if (!sm || !sm.material.map || !sm.material.map.image) return false;
+  const g = sm.geometry, P = g.attributes.position, UV = g.attributes.uv, img = sm.material.map.image, names = sm.skeleton.bones.map(b => b.name);
+  const W = Math.min(512, img.width), H = Math.min(512, img.height), cv = document.createElement("canvas"); cv.width = W; cv.height = H;   // (colour only: a small copy)
+  const cx = cv.getContext("2d", {willReadFrequently:true}); cx.drawImage(img, 0, 0, W, H); const D = cx.getImageData(0, 0, W, H).data;
+  let ymin = Infinity; for (let i = 0; i < P.count; i++) ymin = Math.min(ymin, P.getY(i));
+  const slide = [];
+  for (let i = 0; i < P.count; i++) { if (!/Foot|Toe/.test(names[domBone(g, i)]) || P.getY(i) > ymin + 0.11) continue;
+    const u = UV.getX(i) % 1, w = UV.getY(i) % 1, px = Math.min(W - 1, Math.floor(u * W)),
+      py = Math.min(H - 1, Math.floor((sm.material.map.flipY ? 1 - w : w) * H)), k = (py * W + px) * 4;
+    if (D[k] + D[k + 1] + D[k + 2] < 0.3 * 765) slide.push(i); }
+  if (!slide.length || !g.index) return false;
+  // his mesh without them (the socks are open underneath: only ever shown under the duvet)
+  const isSlide = new Uint8Array(P.count); for (const i of slide) isSlide[i] = 1;
+  const idx = g.index.array, keep = [], tri = [];
+  for (let t = 0; t < idx.length; t += 3) (isSlide[idx[t]] && isSlide[idx[t + 1]] && isSlide[idx[t + 2]] ? tri : keep).push(idx[t], idx[t + 1], idx[t + 2]);
+  SLIDES.full = g.index; SLIDES.bare = new THREE.BufferAttribute(new Uint32Array(keep), 1);
+  // the parked pair: the slides' own triangles as they are in his bind pose (standing, feet flat), at his scale, by the bed
+  const inv = n => new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert(), bp = n => new THREE.Vector3().setFromMatrixPosition(inv(n));
+  const sc = bones.LeftFoot.getWorldPosition(_l1).distanceTo(bones.LeftToeBase.getWorldPosition(_l2)) / bp("LeftFoot").distanceTo(bp("LeftToeBase"));
+  SLIDES.parkedIdx = new Set(tri);
+  const used = [...SLIDES.parkedIdx], map = new Map(used.map((i, k) => [i, k])), pp = new Float32Array(used.length * 3), pu = new Float32Array(used.length * 2);
+  const c = new THREE.Vector3(); used.forEach(i => c.add(_l1.set(P.getX(i), P.getY(i), P.getZ(i)))); c.divideScalar(used.length || 1);
+  used.forEach((i, k) => { pp.set([(P.getX(i) - c.x) * sc, (P.getY(i) - ymin) * sc, (P.getZ(i) - c.z) * sc], 3 * k); pu.set([UV.getX(i), UV.getY(i)], 2 * k); });
+  const pg = new THREE.BufferGeometry(); pg.setAttribute("position", new THREE.BufferAttribute(pp, 3)); pg.setAttribute("uv", new THREE.BufferAttribute(pu, 2));
+  pg.setIndex(tri.map(i => map.get(i))); pg.computeVertexNormals();
+  const m = new THREE.MeshStandardMaterial({map:sm.material.map, roughness:0.7, envMapIntensity:0.5});
+  SLIDES.parked = new THREE.Mesh(pg, m); SLIDES.parked.castShadow = SLIDES.parked.receiveShadow = true; SLIDES.parked.visible = false;
+  SLIDES.parked.position.set(-0.66, F + 0.002, 0.10); SLIDES.parked.rotation.y = Math.PI + 0.25;   // side by side at the bed's edge, toes out
+  scene.add(SLIDES.parked);
+  return true;
+}
+function setSlides(off){
+  if (off === SLIDES.off || (!SLIDES.full && !slidesInit())) return;
+  SLIDES.off = off; skinMesh().geometry.setIndex(off ? SLIDES.bare : SLIDES.full); SLIDES.parked.visible = off;
+}
+// lying on the bed the clip has his legs raised and his head sunk into the pillow: tip him back level (about his hips)
+// and down onto the bed: onto the sheet under the duvet, onto the duvet when he lies on top of it
+const LIE = {pitch:0.155, dy:0.03, spine:0.10, legs:0, knee:-0.185, foot:0.2};
+// asleep he turns onto his side now and then (every 3-8 min, for 1-4 min; slowly, ~2.5 s), towards the room or the wall
+const ROLL = {a:0, goal:0, next:90, ang:1.15, lift:0.055, hip:0.065, knee:-0.5, neck:0, side:[0.2, 0], stack:0.13, fwd:0.08, arm:[0.12, 0.025, 0.265, 0.16], force:null};
+const _X = new THREE.Vector3(1, 0, 0), _Z = new THREE.Vector3(0, 0, 1);   // along the bed; across it (turning about it lowers his head)
+function rollStep(dt, asleep){
+  if (ROLL.force != null) ROLL.goal = ROLL.force;
+  else if (!asleep) { ROLL.goal = 0; ROLL.next = T + 60 + 120 * rnd(); }
+  else if (T > ROLL.next) {
+    ROLL.goal = ROLL.goal ? 0 : (rnd() < 0.5 ? 1 : -1) * ROLL.ang * (0.85 + 0.15 * rnd());
+    ROLL.next = T + (ROLL.goal ? 60 + 180 * rnd() : 180 + 300 * rnd()); }
+  const d = ROLL.goal - ROLL.a, v = Math.sign(d) * Math.min(Math.abs(d), dt * 0.6 * (0.3 + Math.sin(Math.PI * clamp(Math.abs(d) / ROLL.ang, 0, 1))));
+  ROLL.a = ROLL.force != null && Math.abs(d) < 1e-3 ? ROLL.goal : ROLL.a + v;
+}
+const lieW = () => at === "bedlie" ? 1 : step && step.k === "pose" ? (step.to === "bedlie" ? step.w || 0 : step.from === "bedlie" ? 1 - (step.w || 0) : 0) : 0;
+function lieFit(){
+  const k = lieW();
+  if (k <= 0 || OFF.lie) return;
+  const r = boy.rotation.y, B = bones.Hips; _l3.set(Math.cos(r), 0, -Math.sin(r));        // his left to right
+  bend(B, _l3, LIE.pitch * k);
+  B.getWorldPosition(_l1); _l1.y -= (LIE.dy - 0.046 * (1 - DUV.w)) * k; B.parent.worldToLocal(_l1); B.position.copy(_l1); B.updateMatrixWorld(true);
+  bend(bones.Spine02, _l3, LIE.spine * k);                                   // the small of his back down, the chest stays on the pillow
+  bend(bones.LeftUpLeg, _l3, LIE.legs * k); bend(bones.RightUpLeg, _l3, LIE.legs * k);   // the legs flat on the bed
+  bend(bones.LeftLeg, _l3, LIE.knee * k); bend(bones.RightLeg, _l3, LIE.knee * k);
+  bend(bones.LeftFoot, _l3, LIE.foot * k); bend(bones.RightFoot, _l3, LIE.foot * k);   // the feet fall forward (relaxed)
+  const a = ROLL.a * k, u = Math.abs(a) / ROLL.ang; if (!a) return;
+  // on his side: the whole body turns about the bed's long axis, up off his shoulder, the hips and knees bend a little
+  B.getWorldPosition(_l1); bend(B, _X, a); _l1.y += ROLL.lift * Math.pow(Math.sin(Math.abs(a)) / Math.sin(ROLL.ang), 0.6);
+  B.parent.worldToLocal(_l1); B.position.copy(_l1); B.updateMatrixWorld(true);
+  _l4.copy(_l3).applyAxisAngle(_X, a);
+  for (const s of ["Left", "Right"]) { bend(bones[s + "UpLeg"], _l4, ROLL.hip * u); bend(bones[s + "Leg"], _l4, ROLL.knee * u); }
+  bend(bones.Spine01, _Z, ROLL.side[a > 0 ? 0 : 1] * u);                      // his head and shoulder down onto the pillow
+  bend(bones.neck, _Z, ROLL.neck * u);
+  // the arms come off his belly: the lower one forward onto the pillow by his face, the upper one onto the mattress before his chest
+  boy.updateMatrixWorld(true);
+  const lower = bones.LeftArm.getWorldPosition(_l1).y < bones.RightArm.getWorldPosition(_l2).y ? "Left" : "Right", upper = lower === "Left" ? "Right" : "Left";
+  head.getWorldPosition(_l5); bones.Spine.getWorldPosition(_l2); const fz = Math.sign(_l5.z - bones[lower + "Arm"].getWorldPosition(_l1).z) || 1;
+  // the upper leg rests on the lower one, its knee a little forward (it would stand up off the bed by his hip's width)
+  const top = bones.LeftUpLeg.getWorldPosition(_l1).y > bones.RightUpLeg.getWorldPosition(_l3).y ? "Left" : "Right", bot = top === "Left" ? "Right" : "Left";
+  const hipT = bones[top + "UpLeg"].getWorldPosition(new THREE.Vector3()), kT = bones[top + "Leg"].getWorldPosition(new THREE.Vector3());
+  const kB = bones[bot + "Leg"].getWorldPosition(new THREE.Vector3()).add(_hm.set(0, ROLL.stack, fz * ROLL.fwd));
+  const va = kT.sub(hipT).normalize(), vb = kB.sub(hipT).normalize(), ang = Math.acos(clamp(va.dot(vb), -1, 1));
+  if (ang > 1e-3) bend(bones[top + "UpLeg"], va.cross(vb).normalize(), ang * u);
+  const [hf, hy, cf, cy] = ROLL.arm;
+  _l1.set(_l5.x + 0.05, 0.93 + hy, _l5.z + fz * hf); bones[lower + "Arm"].getWorldPosition(_l3).add(_hm.set(0.15, -0.05, fz * 0.25));
+  armTo(lower, _l1, _l3, u);
+  _l1.set(_l2.x + 0.12, 0.82 + cy, _l2.z + fz * cf); bones[upper + "Arm"].getWorldPosition(_l3).add(_hm.set(0.2, 0.15, fz * 0.1));
+  armTo(upper, _l1, _l3, u);
+}
+function inBed(dt){                                    // after the last pose layer of the frame
+  if (!boy || !bones.Hips) return;
+  setSlides(boy.visible && DUV.w > 0.3);                  // once the duvet is over his feet
+  const asleep = boy.visible && goal && goal.clip === "sleep" && goal.anchor === "bedlie" && (at === "bedlie" || (step && step.k === "pose" && step.to === "bedlie"));
+  rollStep(dt, asleep && at === "bedlie" && DUV.w >= 1);
+  const w = clamp(DUV.w + (asleep ? dt / 2.2 : -dt / 1.2), 0, 1), k = boy.visible ? lieW() : 0;
+  if (w === 0 && DUV.w === 0 && k === 0) { if (DUV.mesh) { DUV.mesh.visible = PIL.mesh.visible = false; DUV.src.visible = PIL.src.visible = true; } return; }
+  if (!bedInit()) return;
+  DUV.w = w; DUV.acc += dt;
+  const still = Math.abs(ROLL.goal - ROLL.a) < 1e-3;
+  if (DUV.acc >= (still ? 0.1 : 1 / 30) || (w > 0 && w < 1 && DUV.acc >= 1 / 30) || (k > 0 && k < 1)) {   // 10 Hz once he lies still (breathing), 30 while he moves
+    DUV.acc = 0; boy.updateMatrixWorld(true); if (w > 0) duvetShape(); if (k > 0) pillowDent(k); }
+  DUV.mesh.visible = w > 0; DUV.src.visible = !DUV.mesh.visible; PIL.mesh.visible = k > 0; PIL.src.visible = !PIL.mesh.visible;
+}
 // ---- which situation he is in
 function context(){
   if (!boy.visible) return "";
@@ -2213,7 +2428,7 @@ const OFF = DEBUG ? (window.OFF = {}) : {};             // ?debug: switch layers
 function alive(dt){                                     // after the mixer and the seat / walk IK, before holdPhone
   if (!boy || !boy.visible || !bones.Hips || !bones.LeftArm) return;
   const c = context(); ctxNow = c; props();
-  torso(); if (!OFF.breathe) breathe(dt, c); torso();
+  lieFit(); torso(); if (!OFF.breathe) breathe(dt, c); torso();
   if ((c === "stand" || c === "sill") && !OFF.shift) {                 // weight from foot to foot: slow drift plus the "shift" variant
     const v = IV.cur && IV.cur.n === "shift" ? IV.cur.k || 0 : 0;
     shiftHips(0.018 * nz(T * 0.11, 1) + v, (c === "sill" ? -0.035 * lean : 0) + 0.006 * nz(T * 0.07, 2));
@@ -2557,27 +2772,51 @@ function animate(dt){                                // one step of him: clips, 
   holdW = out ? Math.min(1, holdW + dt / 0.7) : Math.max(0, holdW - dt / 0.5);
   phone.visible = holdW > 0.25 && boy.visible && !!hand;
   if (holdW > 0) holdPhone(holdW);
-  aliveHead();
+  aliveHead(); inBed(dt);
   return moving;
 }
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
-  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; },
-  penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top less 2 cm of give; rounded edge) and the chair
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; },
+  penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top, or the sheet as the duvet comes over him, less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
-    const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 + 0.035 - 0.02, ch = chairNode(), V = ch && chairVox();
+    const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 + 0.035 * (1 - DUV.w) - 0.02, ch = chairNode(), V = ch && chairVox();
     let bed = 0, chair = 0; const u = new THREE.Vector3(), by = {}, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
     const note = (i, what) => { if (!detail) return; let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
-    for (let i = 0; i < P.count; i += every) { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
+    const hid = SLIDES.off ? SLIDES.parkedIdx : null;                     // (the slides parked by the bed are not on him)
+    for (let i = 0; i < P.count; i += every) { if (hid && hid.has(i)) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
       const e = Math.min(v.x + 1.90, -0.20 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
       if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0)) { bed++; note(i, "bed"); }
       if (V) { ch.worldToLocal(u.copy(v)); const ci = Math.floor((u.x - V.x0) / V.c), ck = Math.floor((u.z - V.z0) / V.c);
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } }
     return detail ? {bed, chair, by} : {bed, chair, of:Math.ceil(P.count / every)}; },
+  LIE, DUV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
+    if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), duvet:new Float32Array(NX * NZ).fill(-1)};
+      room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
+        o.updateMatrixWorld(true); const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();
+        for (let t = 0; t < (ix ? ix.count : P.count); t += 3) { const id = k => ix ? ix.getX(t + k) : t + k;
+          a.fromBufferAttribute(P, id(0)).applyMatrix4(o.matrixWorld); b.fromBufferAttribute(P, id(1)).applyMatrix4(o.matrixWorld); c.fromBufferAttribute(P, id(2)).applyMatrix4(o.matrixWorld);
+          const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x, c.x) - X0) / N)), i1 = Math.min(NX - 1, Math.ceil((Math.max(a.x, b.x, c.x) - X0) / N)),
+            k0 = Math.max(0, Math.floor((Math.min(a.z, b.z, c.z) - Z0) / N)), k1 = Math.min(NZ - 1, Math.ceil((Math.max(a.z, b.z, c.z) - Z0) / N));
+          const d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z); if (Math.abs(d) < 1e-12) continue;
+          for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) { const x = X0 + i * N, z = Z0 + k * N;
+            const l1 = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d, l2 = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / d, l3 = 1 - l1 - l2;
+            if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue; const y = l1 * a.y + l2 * b.y + l3 * c.y; if (y > H[i * NZ + k]) H[i * NZ + k] = y; } } });
+      window._HM = {X0, Z0, N, NX, NZ, hm}; }
+    const {X0, Z0, N, NX, NZ, hm} = window._HM, under = DUV.w >= 1;
+    const surf = (x, z) => { const i = Math.round((x - X0) / N), k = Math.round((z - Z0) / N); if (i < 0 || k < 0 || i >= NX || k >= NZ) return -1;
+      return under ? hm.sheet[i * NZ + k] : Math.max(hm.sheet[i * NZ + k], hm.duvet[i * NZ + k]); };
+    const sm = skinMesh(), P = sm.geometry.attributes.position, names = sm.skeleton.bones.map(b => b.name), v = new THREE.Vector3(), out = {};
+    boy.updateMatrixWorld(true);
+    const part = n => /Head|head|neck/.test(n) ? "head" : /Spine/.test(n) ? "back" : n === "Hips" ? "pelvis" : /UpLeg/.test(n) ? "thighs" : /Leg$/.test(n) ? "shins" : /Foot|Toe/.test(n) ? "feet" : "arms";
+    for (let i = 0; i < P.count; i += every) { sm.getVertexPosition(i, v).applyMatrix4(sm.matrixWorld); const h = surf(v.x, v.z); if (h < 0) continue;
+      const g = part(names[domBone(sm.geometry, i)]), o = out[g] = out[g] || {gap:9, near:0}; o.gap = Math.min(o.gap, v.y - h); if (v.y - h < 0.015) o.near++; }
+    for (const o of Object.values(out)) o.gap = +o.gap.toFixed(3);
+    return out; },
   live: (a, x = {}) => { const l = {activity:a, place:"room", ...x}; lastLife = l; place(l); screens(l, "AWAKE"); },
   act: (a, x = {}) => { untouch(); if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"}); if (chairNode()) placeChair(0); const l = {activity:a, place:"room", ...x}; lastLife = l; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = phoneWanted ? 1 : 0; mixer.update(1); },
   setLife: x => { lastLife = {...lastLife, ...x}; }, gz: () => ({p:GZ.p.toArray().map(v => +v.toFixed(2)), w:+GZ.w.toFixed(2), why:GZ.why, iv:IV.cur && IV.cur.n, ctx:ctxNow, bag, eat:EAT.kind, trash:trash && (trash.held ? "held" : "desk"), tpos:trash && trash.g.position.toArray().map(v => +v.toFixed(2))}),

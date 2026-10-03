@@ -23,3 +23,7 @@ out/rest/*.part.npz
 
 # secrets (API keys) never go to git
 .env
+
+# visual QA harness (tests/visual): screenshots and the CDN cache are never committed
+tests/visual/out/
+tests/visual/.cdn_cache/
