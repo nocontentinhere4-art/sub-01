@@ -376,13 +376,19 @@ function zoomPick(){                                 // the cortex point under t
 }
 function zoomStart(animate){
   if (zoom || !n3d || !n3morph || MINI) return;
+  if (!zoomStart.cells) {                            // the column's own cells (column_morph.json), loaded the first time
+    if (zoomStart.loading) return; zoomStart.loading = true;
+    fetch("column_morph.json").then(r => r.json()).catch(() => ({cells: {}}))
+      .then(m => { zoomStart.cells = Object.assign({}, n3morph.cells, m.cells || {}); zoomStart.loading = false; zoomStart(animate); });
+    return;
+  }
   const p = zoomPick(); if (!p) return;
   const N = new THREE.Vector3(...p.normal), P = new THREE.Vector3(...p.pos);
   const v = camera.position.clone().sub(P), side = v.clone().sub(N.clone().multiplyScalar(v.dot(N)));   // look across the column
   if (side.lengthSq() < 1e-6) side.crossVectors(N, new THREE.Vector3(0, 0, 1));
   side.normalize();
   const block = window.NeuronRender && NeuronRender.BLOCK;
-  const col = Neurons3D.column({THREE, scene, morph: n3morph, pos: p.pos, normal: p.normal, region: p.region, block});
+  const col = Neurons3D.column({THREE, scene, morph: {cells: zoomStart.cells}, pos: p.pos, normal: p.normal, region: p.region, block});
   const look = new THREE.Vector3(...col.at(col.plan.thickness / 2)), deep = new THREE.Vector3(...col.at(block && block.depthUm ? (block.depthUm[0] + block.depthUm[1]) / 2 : ZOOM.blockUm));
   zoom = Object.assign(p, { N, P, side, col, look, deep, from: { pos: camera.position.clone(), target: controls.target.clone() },
     t0: performance.now(), anim: animate ? { t0: performance.now(), dur: 11000 } : null, handed: false, backAt: 0,

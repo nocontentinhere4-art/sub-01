@@ -42,10 +42,14 @@ CELLS = {
     "relay": (115363, 220, 0.15, "none"),           # rat VPM thalamocortical relay cell (no human relay cell)
     "ca1_pyramidal": (222, 300, 0.25, "apical"),    # rat hippocampus CA1 (no human CA1 cell with dendrites + axon)
     "amygdala_principal": (139102, 240, 0.25, "none"),   # mouse basolateral amygdala principal cell (no human one)
+}
+# the cortical column of the zoom (#99) only: its own small asset, loaded when the zoom starts
+COLUMN_CELLS = {
     # human anterior temporal cortex L5 pyramid, dendrites complete, no axon reconstructed (Valiante): the deep
-    # pyramids of the cortical column (#99), whose apical dendrite really reaches toward L1
+    # pyramids of the column, whose apical dendrite really reaches toward L1 (~1.5 mm)
     "l5_pyramidal": (159993, 300, 0.0, "apical"),
 }
+COLUMN_OUT = HERE / "web" / "column_morph.json"
 # No Purkinje cell: the cerebellum is not one of the model's 214 regions, and every close-up shows a simulated region.
 PAPERS = {   # PubMed esummary, 2026-10-02
     "27536876": "Molnár G, Rózsa M, Baka J et al. (2016) Human pyramidal to interneuron synapses are mediated by "
@@ -306,7 +310,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true")
     args = ap.parse_args()
-    cells = {}
+    cells, column = {}, {}
+    for kind, (nid, budget, axon_share, how) in COLUMN_CELLS.items():
+        meta, text = fetch(nid, args.offline)
+        column[kind] = build_cell(meta, text, budget, axon_share, how)
     for kind, (nid, budget, axon_share, how) in CELLS.items():
         meta, text = fetch(nid, args.offline)
         cells[kind] = build_cell(meta, text, budget, axon_share, how)
@@ -318,7 +325,8 @@ def main():
                    "scanned person; the simulated network uses point neurons.",
            "cite": NMO_CITE, "cells": cells}
     OUT.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
-    CREDITS.write_text(credits_md(cells))
+    COLUMN_OUT.write_text(json.dumps(dict(out, cells=column), separators=(",", ":"), ensure_ascii=False))
+    CREDITS.write_text(credits_md({**cells, **column}))
     print(f"wrote {OUT.relative_to(HERE)} ({OUT.stat().st_size / 1024:.0f} KB) and {CREDITS.relative_to(HERE)}")
 
 
