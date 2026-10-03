@@ -158,25 +158,31 @@ def test_the_phone_switches_to_the_shorts_feed():
     assert seen == ["shorts", None]                         # the feed is the phone's only
 
 
-def test_shorts_feed_queues_and_the_next_short_costs_no_call():
+def test_shorts_feed_queues_and_the_next_short_costs_no_call(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
     b = Browser(decide=True, rng=random.Random(1))
     sc = b.screens["phone"]
-    sc.mode, sc.page = "shorts", SimpleNamespace(url="https://www.youtube.com/results?x")
-    shorts = S.parse_youtube(fx("youtube_shorts.html"))
+    sc.mode, sc.page = "shorts", SimpleNamespace(url="about:blank")
+    shorts = [r for r in Browser.safe_results(S.parse_youtube(fx("youtube_shorts.html"))) if r.get("video")]
+    cards = [{"url": r["url"], "title": r["title"], "author": r.get("channel", ""), "hashtags": [], "thumb": "",
+              "embed": "https://www.youtube-nocookie.com/embed/x", "host": "youtube.com"} for r in shorts]
 
-    async def _search_on(sc_, name, q, why, origin):
-        sc_.info = {"title": f"{q} — {S.SOURCES[name]['label']}", "kind": "search", "url": sc_.page.url,
-                    "host": "youtube.com", "why": why, "results": Browser.safe_results(shorts)}
-        return name == "shorts"
-    b._search_on = _search_on
+    async def _yt_search(sc_, q, short=True):
+        return cards
+
+    async def _show_card(sc_, card, why):                       # the official embed player, stubbed
+        sc_.queue = [r for r in sc_.queue if r.get("url") != card["url"]]
+        sc_.info = {"title": card["title"], "url": card["url"], "host": "youtube.com", "kind": "page", "why": why,
+                    "t": 0, "embed": card["embed"]}
+        return True
+    b._yt_search, b._show_card = _yt_search, _show_card
     b.rng = SimpleNamespace(random=lambda: 0.9, choice=random.Random(0).choice)     # YouTube Shorts first
     assert run(b._shorts(sc, {"query": "ramen", "from": "video", "hour": 12.5}))
-    assert len(sc.queue) == len(Browser.safe_results(shorts)) >= 5
+    assert len(sc.queue) == len(cards) - 1 >= 4
     # a short is watched for at most SHORTS_MAX_S (muted), then the next shorts are the options
     run(b._start_watch(sc, 600))
     assert sc.watch_s == SV.SHORTS_MAX_S
-    sc.info = dict(sc.info, url=shorts[0]["url"], video={"watching": True})
-    sc.queue = sc.queue[1:]
+    sc.feed_fresh = True                                        # the queue stays (the >= 60 % new-topic rule allows it)
     run(b._end_watch(sc))
     assert sc.info["kind"] == "search" and sc.info["results"] == sc.queue and "next one" in sc.info["why"]
     sc.history = ["a", "b"]

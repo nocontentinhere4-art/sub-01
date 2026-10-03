@@ -66,3 +66,31 @@ jobs:
       - run: python tests/smoke_demo.py --port 8769 --data-dir "$RUNNER_TEMP/music" --music --measure 150
         env:
           BROWSE: "0"
+
+  # issue #98 (G8): the room's visual QA core set (tests/visual): headless Chromium with software WebGL puts the
+  # character in each activity and shoots fixed cameras; only hard errors fail (page load, JS errors, missing poses,
+  # bed/chair penetration); the rest is in the report, kept as an artifact. The heavy set is opt-in (SUB01_VISUAL_FULL=1).
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-server.txt
+      - run: pip install -r requirements-server.txt pytest
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest -q tests/visual
+        env:
+          SUB01_VISUAL: "1"            # a skip (no browser) is an error here
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-qa
+          path: |
+            tests/visual/out/*.png
+            tests/visual/out/report.md
+            tests/visual/out/results.json
+          retention-days: 14
