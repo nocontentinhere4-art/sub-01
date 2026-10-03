@@ -1165,7 +1165,7 @@ function lighting(dt){
   // on all of them): 2.5 knit by day (bright, the view still readable at the day stop; 5 would clip to white), 0.03 at
   // night (0.36 at the night stop); its weather says how much direct sun gets through
   windowView.setEmission(OLD_ROOM ? 1 : 2.5, OLD_ROOM ? 1 : 0.03);
-  const sunK = windowView.light ? windowView.light.sun : 1;
+  const sunK = windowView.light && Number.isFinite(windowView.light.sun) ? windowView.light.sun : 1;   // NaN before the weather's first update: a NaN sun blacks out every frame
   sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
   sun.intensity = 0.3 + 2.3 * day + 0.7 * dusk;                       // the old room (baked textures) keeps its own scale
   const w = SURF.window; sun.position.set(w.c[0] - 3.5, w.c[1] + 1.2 + 2.5 * Math.max(0, sunEl), w.c[2] + 1.0); sun.target.position.set(0.2, 0.3, 0.1);
@@ -2729,7 +2729,7 @@ function animate(dt){                                // one step of him: clips, 
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
-  addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
+  addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) { windowView.update(0.1, hour); lighting(0.1); } },   // the window follows the hour too (QA freezes the loop)
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, studioEnv, roomEnv, setEnv,
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top, or the sheet as the duvet comes over him, less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);

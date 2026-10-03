@@ -129,7 +129,7 @@ def main():
                 errors = []
                 pg.on("pageerror", lambda e: errors.append(str(e)))
                 pg.on("console", lambda m: errors.append("console.error: " + m.text) if m.type == "error" else None)
-                pg.goto(f"{base}/?debug&nolive&hour={hour}" + (f"&post={args.post}" if args.post else ""), wait_until="load")
+                pg.goto(f"{base}/?debug&nolive&hour={hour}" + (f"&post={args.post}" if args.post else ""), wait_until="load", timeout=120000)
                 pg.wait_for_function("() => !!(window.room && window.boy && window.actions && window.actions.idle && window.actions.sleep)", timeout=240000, polling=1000)
                 pg.wait_for_function("() => !window.post || window.post.active || Object.keys(window.post.info().failed).length > 0 || window.post.info().tier === 'low'", timeout=120000, polling=1000)
                 pg.wait_for_timeout(1500)

@@ -33,7 +33,8 @@ def test_module_loads_and_tiers(check):
     assert check["tiers"] == ["low", "medium", "high"]
     C = check["chains"]
     assert C["high"]["chain"] == ["ao", "dof", "grade", "smaa"] and C["high"]["mode"] == "composer" and C["high"]["active"]
-    assert C["medium"]["chain"] == ["ao", "grade", "fxaa"] and C["medium"]["halfRes"] and not C["high"]["halfRes"]
+    assert C["medium"]["chain"] == ["render", "grade"] and C["medium"]["aa"] == "msaa"                 # phones: one post pass over a 4x MSAA target
+    assert C["medium"]["msaa"] and not C["high"]["msaa"] and not C["high"]["halfRes"]
     assert not C["high"]["bloom"] and not C["medium"]["bloom"]                                            # owner: no stylised bloom or glow
     assert C["low"]["chain"] == [] and C["low"]["mode"] == "direct" and not C["low"]["active"] and C["low"]["aa"] == "msaa"
     assert C["high"]["shadow"] == 2048 and C["medium"]["shadow"] == 1024 and C["low"]["shadow"] == 1024
@@ -53,7 +54,7 @@ def test_fallbacks(check):
     assert F["no_ao"]["depth_from_rt"]                                     # without N8AO the depth comes from the composer's own target
     assert F["no_aa"]["chain"] == ["ao", "dof", "grade"] and F["no_aa"]["aa"] is None
     B = F["bloom_opt"]                                                     # opt-in only: a faint veil, threshold well above white
-    assert B["high"] == ["ao", "bloom", "dof", "grade", "smaa"] and B["medium"] == ["ao", "bloom", "grade", "fxaa"] and B["low"] == []
+    assert B["high"] == ["ao", "bloom", "dof", "grade", "smaa"] and B["medium"] == ["render", "bloom", "grade"] and B["low"] == []
     assert B["strength"] <= 0.15 and B["threshold"] >= 1.5
     assert not F["no_composer"]["active"] and F["no_composer"]["mode"] == "direct" and F["no_composer"]["direct"] == 1
     assert "EffectComposer" in F["no_composer"]["failed"] and F["no_composer"]["aa"] == "msaa"
@@ -113,8 +114,9 @@ def test_shadow_snapping_shafts_blob_env(check):
     assert B["on"] == 1 and abs(B["on_opacity"] - 0.5) < 1e-6 and 0.5 < B["lifted"] < 0.7 and B["hanging"] == 0 and B["hidden"] == 0
     assert abs(B["y"] - 0.164) < 1e-6 and not B["visible_hanging"]
     R = check["roomenv"]
-    assert R["first"] and not R["again"] and R["changed"] and R["captures"] == 2 and R["updates"] == 2
+    assert R["first"] and not R["again"] and R["changed"] and R["captures"] == 3 and R["updates"] == 4   # 4 cube renders, 3 kept (one NaN capture dropped)
     assert R["hidden_during"] == [False, True] and R["restored"] and R["has_texture"]
+    assert R["nan_rejected"] and R["key_kept"] and R["rejected"] == 1 and R["retried"] and R["env_off_during"] and R["env_restored"]   # a NaN capture is dropped and retried; no feedback through the environment
 
 
 def test_page_wires_the_module():
@@ -130,6 +132,10 @@ def test_page_wires_the_module():
     assert "post.frame(now - frameAt" in html and "post.setSize(w, h, dpr)" in html
     assert "gradeAt(hour" in html and "snapShadow(THREE, sun" in html and "new SunShafts(" in html and "new ContactBlob(" in html and "roomEnv.update(" in html
     assert "new THREE.SpotLight(" in html                                       # the desk lamp: one shadow map instead of six
+    assert "THREE.AgXToneMapping" in html and "vec3 agx(" in JS.read_text()        # the same film-like curve on both paths
+    for kind in ('"face"', '"screen"', '"medium"', '"over"', '"overview"'):       # the camera shots (G8 #10, #18)
+        assert kind in html.split("function updateCameraGoal")[1].split("// ---------- day and night")[0], kind
+    assert "CAM.cut" in html.split("function frame(now)")[1]
     assert JS.stat().st_size < 60 * 1024
 
 
@@ -139,6 +145,6 @@ def test_credits_and_docs():
     doc = ROOT / "docs" / "design" / "room-render"
     assert (doc / "README.md").exists()
     for size in ("1280", "390"):
-        for h in HOURS:
+        for h in [f"{h:02d}" for h in HOURS] + ["23s"]:                    # 23s: asleep at 23:00 with the lights off (G8 #15)
             for tag in ("before", "after"):
-                assert (doc / f"{tag}_{size}_h{h:02d}.jpg").exists(), f"{tag}_{size}_h{h:02d}.jpg"
+                assert (doc / f"{tag}_{size}_h{h}.jpg").exists(), f"{tag}_{size}_h{h}.jpg"
