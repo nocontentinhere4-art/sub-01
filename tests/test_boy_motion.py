@@ -177,7 +177,9 @@ def test_module_and_its_single_hook():
         assert name in js, name
     # the per-activity clip choice is one explicit table, overridable with ?motion=ardy|ual|old (per slot too)
     table = js[js.index("export const CHOICE = {"):js.index("}", js.index("export const CHOICE = {"))]
-    assert all(f"{slot}: \"ardy\"" in table for slot in ("desk", "eating", "standing", "walk", "window")), table
+    # the defaults the coordinator picked from docs/screens/motion/sheet_1280.jpg (#114 review)
+    for slot, src in {"desk": "ual", "eating": "ual", "standing": "ardy", "walk": "ardy", "window": "ardy"}.items():
+        assert f"{slot}: \"{src}\"" in table, (slot, table)
     assert "export function choices(" in js and "?motion=ardy|ual|old" in js
     assert "env.touch(" in js                                                    # every bone it moves is registered
     for word in ("he feels", "he understands", "conscious"):

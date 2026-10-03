@@ -34,7 +34,9 @@ const SWAP = {                                   // manifest clip -> the page's 
 // keyed, loadMoves() in room.html), which has one for the desk (type) and the walk; for eating, standing and the window
 // it has none wired, so "ual" there means the first clip. "old": the first (Meshy) clip the page shipped with.
 // ?motion=ardy|ual|old sets every slot; ?motion=desk:ual,walk:old,... sets slots (the rest keep this table).
-export const CHOICE = {desk: "ardy", eating: "ardy", standing: "ardy", walk: "ardy", window: "ardy"};
+// Defaults picked from docs/screens/motion/sheet_1280.jpg (coordinator review of #114): #80's typing clip sits upright
+// where ARDY's desk and eating hunch towards the monitor; ARDY's stance, walk and window read better than the first clips.
+export const CHOICE = {desk: "ual", eating: "ual", standing: "ardy", walk: "ardy", window: "ardy"};
 export function choices(search){
   const out = {...CHOICE}, q = new URLSearchParams(search || "").get("motion"); if (!q) return out;
   for (const part of q.split(",")) { const [a, b] = part.split(":"); const src = (b || a).trim(), slot = b ? a.trim() : null;
@@ -313,7 +315,7 @@ export function createMotion(env){
         const press = HS.mode === "type" ? Math.max(0, Math.sin(t * 2 * Math.PI * (side === "Left" ? 6.3 : 5.7) + sx)) : 0;
         // the wrist 3 cm before the near edge of the keys and 7 cm up, the fingers (17 cm) angled down onto the rows (G8 #27)
         kbPoint(sx * 0.42 + 0.06 * nz(t * 0.9, 5 + sx), -1.5 + 0.3 * nz(t * 0.7, 7 + sx), _t);
-        _t.y += 0.07 + rise - 0.008 * press * press + (HS.mode === "rest" ? 0.012 : 0);
+        _t.y += 0.085 + rise - 0.006 * press * press + (HS.mode === "rest" ? 0.012 : 0);   // the tips land ~2 cm over the caps
       } else if (side === "Right") {                   // the mouse: small moves on the mat, the hand cupped on it
         _t.set(...MOUSE).addScaledVector(UP, 0.03 + rise).addScaledVector(FW, -0.10).add(_a.set(0.015 * nz(t * 1.1, 8), 0, 0.012 * nz(t * 0.9, 9)));   // the wrist behind the mouse, the palm cupped on its back
         if (Math.sin(t * 7.3) > 0.97) _t.y -= 0.004;                                       // a click
@@ -344,7 +346,8 @@ export function createMotion(env){
       // the fingertips may come down onto the key caps (their tops: KEYBOARD.c[1]) and the mouse's back, not into the slab
       const onKeys = Math.abs(_c.x - KEYBOARD.c[0]) < KEYBOARD.w / 2 + 0.03 && Math.abs(_c.z - KEYBOARD.c[2]) < KEYBOARD.d / 2 + 0.03;
       const onMouse = Math.abs(_c.x - MOUSE[0]) < 0.07 && Math.abs(_c.z - MOUSE[2]) < 0.08;
-      const tipFloor = onKeys ? KEYBOARD.c[1] + 0.004 : onMouse ? MOUSE[1] + 0.03 : DESK.top + 0.06;
+      // (2 cm over the caps: the finger pads are a centimetre thick below the bone, and the QA counts skin inside the keys)
+      const tipFloor = onKeys ? KEYBOARD.c[1] + 0.02 : onMouse ? MOUSE[1] + 0.045 : DESK.top + 0.06;
       const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.06 - _b.y : 0, over(_c) ? tipFloor - _c.y : 0);
       if (lift <= 0) continue;
       _t.copy(_b); _t.y += lift;
