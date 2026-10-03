@@ -29,7 +29,9 @@ def life(activity, place, doing, **extra):
 SCENES = {
     "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
-    "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "Chair_Sit"),
+    # (the seated clip under the eating layer: the sit idle, or #80's typing clip for a tick after a desk scene; the
+    # eating itself is the dish and the arm IK, checked by eye in the shots)
+    "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", None),
     # asleep the duvet comes up over him in ~2.2 s (room.html DUV.w): settle 4 s so the shot shows him covered
     "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 4.0, "bedlie", "Sleep"),
     # the side pose he turns into now and then (every 3-8 min): forced through the page's ROLL hook (debug)

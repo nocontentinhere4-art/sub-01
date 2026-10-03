@@ -7,6 +7,7 @@ is `docs/qa/scorecard.md`.
 ```
 python -m tests.visual.harness --out tests/visual/out          # the core set CI runs (~3 min on 4 cores)
 python -m tests.visual.harness --full --out tests/visual/out   # every scene x hour x size (~10 min)
+python -m tests.visual.harness --full --only phone,eating --out tests/visual/out   # re-run some scenes into an existing run
 python -m pytest tests/visual -q                               # the CI entry (skips without Playwright + Chromium)
 python -m tests.visual.fake_server --port 8797                 # look at a scene in your own browser (see below)
 ```
