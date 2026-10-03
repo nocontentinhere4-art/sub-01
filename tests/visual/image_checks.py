@@ -57,6 +57,29 @@ def flicker(paths, crop=None, delta=40, min_flips=2, flat=18):
     return {"frames": len(frames), "flicker_frac": round(frac, 5), "flagged_pixels": int(mask.sum()), "regions": regions, "mask": mask}
 
 
+def specks(path, crop=None, thresh=150, max_area=40, max_box=9, min_fill=0.45):
+    """Small bright isolated blobs: pixels brighter than `thresh` (max over RGB), labelled into 8-connected components;
+    a component is a speck when it covers at most `max_area` pixels, fits in a `max_box` square and fills at least
+    `min_fill` of its bounding box (a disc or a bead, not a thin line). A long thin fibre is not counted, but its bright
+    beads and crossings are (the mini brain: ~140 on main), so this is a texture figure rather than a dots detector.
+    Returns the count, the centres of the largest 20, the mask and the bright fraction of the frame."""
+    from scipy import ndimage
+    a = load_rgb(path, crop)
+    bright = a.max(axis=2) > thresh
+    lab, n = ndimage.label(bright, structure=np.ones((3, 3)))
+    out, mask = [], np.zeros(bright.shape, bool)
+    if n:
+        objs = ndimage.find_objects(lab)
+        areas = ndimage.sum(bright, lab, index=np.arange(1, n + 1))
+        for i, (sl, area) in enumerate(zip(objs, areas), start=1):
+            h, w = sl[0].stop - sl[0].start, sl[1].stop - sl[1].start
+            if area <= max_area and h <= max_box and w <= max_box and area / (h * w) >= min_fill:
+                out.append({"x": int((sl[1].start + sl[1].stop) / 2), "y": int((sl[0].start + sl[0].stop) / 2), "area": int(area)})
+                mask[lab == i] = True
+    out.sort(key=lambda d: -d["area"])
+    return {"specks": len(out), "largest": out[:20], "mask": mask, "bright_frac": round(float(bright.mean()), 4)}
+
+
 def save_mask(mask, base_path, out_path, crop=None):
     """The first frame with the flagged pixels painted magenta: where the flicker is."""
     im = Image.open(base_path).convert("RGB")
