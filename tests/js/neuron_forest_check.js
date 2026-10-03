@@ -10,7 +10,7 @@ class Attr { constructor(a, n) { this.array = a; this.itemSize = n; this.needsUp
 class Geom { constructor() { this.attributes = {}; this.instanceCount = 0; } setAttribute(k, a) { this.attributes[k] = a; return this; }
   getAttribute(k) { return this.attributes[k]; } dispose() {} }
 class Obj { constructor(g, m) { this.geometry = g; this.material = m; this.children = []; this.visible = true; } add(c) { this.children.push(c); } remove() {} }
-const THREE = { Group: Obj, Scene: Obj, LineSegments: Obj, Points: Obj, InstancedBufferGeometry: Geom, BufferGeometry: Geom, BufferAttribute: Attr,
+const THREE = { Group: Obj, Scene: Obj, LineSegments: Obj, Points: Obj, Mesh: Obj, InstancedBufferGeometry: Geom, BufferGeometry: Geom, BufferAttribute: Attr,
   InstancedBufferAttribute: Attr, DataTexture: class { constructor(d) { this.image = { data: d }; } dispose() {} }, RGBAFormat: 1023,
   ShaderMaterial: class { constructor(o) { Object.assign(this, o); } dispose() {} }, AdditiveBlending: 2, DynamicDrawUsage: 35048,
   Vector3: class { constructor(x, y, z) { this.x = x; this.y = y; this.z = z; } } };
