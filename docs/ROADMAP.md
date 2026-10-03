@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 21:00 UTC** (pass 35b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-03 15:10 UTC** (pass 38). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -305,6 +305,25 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 38 (2026-10-03 15:10 UTC).** Overnight, most workers stopped on the weekly usage limit, which reset at 11:00
+UTC. The owner said "procedi" and all were restarted at 14:20 UTC.
+- **Merged:** #100 (G1 research catalogue), #102 (G8 visual-QA harness + `visual` CI job; photoreal scorecard
+  baseline 1.7/5), #105 (B: every meaningless dot gone, plus the `test_no_dots.py` guard) and #108 (#63: he sleeps
+  under the duvet, head on the pillow, slides parked by the bed, side poses; 0 bed and 0 chair penetration).
+- **Open:**
+  - #104 (coordinator: `life.path` and `path_to` in the snapshot, G8 defect #21) and #109 (#89: YouTube Shorts through
+    the official Data API v3 and the official embed; TikTok through its official player; real bursts on shorts; the
+    HN repeat loop) are being tested together. The **owner must add `YOUTUBE_API_KEY` on Railway** (step-by-step
+    sent).
+  - #80 (motion for the original boy.glb): eating hand to fix; merge main and leave the sleep slot to #108.
+  - #103 (G6 rendering): night auto-exposure overshoots (night floor RGB 10 → 136); fix requested.
+  - #106 (G9 anatomical brain): fresh, dissected, tract bundles, arteries and nerves; must merge main.
+  - #101 (A, H01 close-ups): draft.
+- **Live, day 2026-10-03 (Tokyo):** 390 pages; TikTok, Shorts and YouTube 0 % (the root causes are fixed in #109);
+  Wikipedia 4.6 %. The night of 10-02 was dreamed and the diary written ("Whispers in the Night", 28 frames).
+  Day-live GPU about $8, within the caps; the pod stops at sleep; BRAIN untouched.
+- **Permissions:** G8 is blocked on a permission prompt (the owner must approve it or switch it to Auto).
 
 **Pass 35b (21:00 UTC): #97 merged; #99 opened (neurons and brain at maximum realism).**
 - **#97 merged:** no more white-out (pixels above 0.8: 12–31 % → ≤ 0.04 % at rest); about 500 cells at ~6×.

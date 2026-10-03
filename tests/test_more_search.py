@@ -118,7 +118,7 @@ def test_every_source_is_free_safe_and_reachable_by_the_guard():
 # --- 2. routing by topic, rotation ----------------------------------------------------------------------------------
 @pytest.mark.parametrize("q, first", [
     ("sleep spindles", "arxiv"), ("neural network memory", "arxiv"), ("haruki murakami novels", "openlibrary"),
-    ("Inokashira Park photos", "commons"), ("python compiler", "hn"), ("lo-fi music", "youtube"),
+    ("Inokashira Park photos", "commons"), ("python compiler", "hn"), ("lo-fi music", "ddg"),
     ("history of Kichijoji", "wikipedia"), ("melon pan recipe", "recipes"), ("latest news scientists", "news"),
 ])
 def test_routing_by_topic(q, first):
@@ -131,7 +131,8 @@ def test_how_to_goes_to_a_general_engine_and_unknown_topics_rotate():
     assert S.route("how to fix a bike chain", rng=random.Random(0))[0] in ("ddg", "bing")
     firsts = {S.route("quiet afternoon", rng=random.Random(i))[0] for i in range(30)}
     assert firsts == set(S.GENERAL)                         # no single engine gets all the plain queries
-    assert "youtube" not in S.route("quiet afternoon") and S.route("quiet afternoon", video=True)[0] == "youtube"
+    # youtube.com/robots.txt disallows /results: YouTube is never a routed source (its Data API is, with the key)
+    assert "youtube" not in S.route("quiet afternoon") and "youtube" not in S.route("quiet afternoon", video=True)
     assert "openlibrary" not in S.route("books")            # nothing left to look up by subject
 
 

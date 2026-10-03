@@ -43,6 +43,13 @@ CELLS = {
     "ca1_pyramidal": (222, 300, 0.25, "apical"),    # rat hippocampus CA1 (no human CA1 cell with dendrites + axon)
     "amygdala_principal": (139102, 240, 0.25, "none"),   # mouse basolateral amygdala principal cell (no human one)
 }
+# the cortical column of the zoom (#99) only: its own small asset, loaded when the zoom starts
+COLUMN_CELLS = {
+    # human anterior temporal cortex L5 pyramid, dendrites complete, no axon reconstructed (Valiante): the deep
+    # pyramids of the column, whose apical dendrite really reaches toward L1 (~1.5 mm)
+    "l5_pyramidal": (159993, 300, 0.0, "apical"),
+}
+COLUMN_OUT = HERE / "web" / "column_morph.json"
 # No Purkinje cell: the cerebellum is not one of the model's 214 regions, and every close-up shows a simulated region.
 PAPERS = {   # PubMed esummary, 2026-10-02
     "27536876": "Molnár G, Rózsa M, Baka J et al. (2016) Human pyramidal to interneuron synapses are mediated by "
@@ -53,6 +60,9 @@ PAPERS = {   # PubMed esummary, 2026-10-02
                 "burst firing modes in thalamocortical neurons. PLoS Comput Biol 15:e1006753. doi:10.1101/512269",
     "8576427": "Ishizuka N, Cowan WM, Amaral DG (1995) A quantitative analysis of the dendritic organization of "
                "pyramidal cells in the rat hippocampus. J Comp Neurol 362:17-45. doi:10.1002/cne.903620103",
+    "33941783": "Moradi Chameh H, Rich S, Wang L et al. (2021) Diversity amongst human cortical pyramidal neurons "
+                "revealed via their sag currents and frequency preferences. Nat Commun 12:2497. "
+                "doi:10.1038/s41467-021-22741-9",
     "32296306": "Hsu TT, Huang TN, Hsueh YP (2020) Anterior commissure regulates neuronal activity of amygdalae and "
                 "influences locomotor activity, social interaction and fear memory in mice. Front Mol Neurosci 13:47. "
                 "doi:10.3389/fnmol.2020.00047",
@@ -277,7 +287,9 @@ def build_cell(meta, text, budget, axon_share, how):
 
 def credits_md(cells):
     lines = ["# Neuron shapes: credits (#78)", "",
-             "The close-up neurons on `/brain` are real reconstructions from **NeuroMorpho.Org**, licensed under the",
+             "The neurons on `/brain` (the close-ups, the whole-brain view's small cells, simplified further to at most",
+             "40 segments and drawn ~6× enlarged, and the cortical column of the zoom, #99, at true size) are real",
+             "reconstructions from **NeuroMorpho.Org**, licensed under the",
              "[Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/)",
              "([terms](https://neuromorpho.org/useterm.jsp)). They are simplified (at most 300 segments a cell),",
              "rotated and drawn as lines; these are changes to the original data. They are **illustrative**: the",
@@ -298,7 +310,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true")
     args = ap.parse_args()
-    cells = {}
+    cells, column = {}, {}
+    for kind, (nid, budget, axon_share, how) in COLUMN_CELLS.items():
+        meta, text = fetch(nid, args.offline)
+        column[kind] = build_cell(meta, text, budget, axon_share, how)
     for kind, (nid, budget, axon_share, how) in CELLS.items():
         meta, text = fetch(nid, args.offline)
         cells[kind] = build_cell(meta, text, budget, axon_share, how)
@@ -310,7 +325,8 @@ def main():
                    "scanned person; the simulated network uses point neurons.",
            "cite": NMO_CITE, "cells": cells}
     OUT.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
-    CREDITS.write_text(credits_md(cells))
+    COLUMN_OUT.write_text(json.dumps(dict(out, cells=column), separators=(",", ":"), ensure_ascii=False))
+    CREDITS.write_text(credits_md({**cells, **column}))
     print(f"wrote {OUT.relative_to(HERE)} ({OUT.stat().st_size / 1024:.0f} KB) and {CREDITS.relative_to(HERE)}")
 
 

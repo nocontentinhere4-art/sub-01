@@ -11,8 +11,12 @@ rug, doormat and poster frames are all built from code in `room_build/build_room
 #75: the hoodie on the door hook, the backpack, the floor cushion, the electric fan, the slippers, the laundry pinch
 hanger with socks and a towel, the manga stack, the game controller (a generic shape, no maker's design), the
 headphones and their wall hook, the cat figure on the window sill, the cork pinboard, the wall socket, the power strip
-and the cables. The duvet's drape comes from a
-Blender cloth simulation. The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
+and the cables. The soft goods (#98) are built by `room_build/props_soft.py`: the socks (heel, toe, ribbed cuff) and
+the terry hand towel on the pinch hanger, the mattress with its fitted sheet, the pillow in its case, the duvet (a
+Blender cloth simulation, turned back over itself at the head end, then box-quilted), the curtains with their pencil
+pleats and hems, the rug with its bound edge, the tufted floor cushion, the hoodie and the canvas tote on the door
+hooks, the backpack, and two clothes: jeans in a heap by the bed's foot and a T-shirt thrown on the bed (a second cloth
+simulation). The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
 is its own node, `chair` (origin on the floor under the gas lift), so it can be moved: it has its own materials and its
 own AO (`chair_ao`, self-occlusion only), and the room's AO is baked without it.
 
@@ -33,11 +37,17 @@ Textures (each recoloured or regraded in `tex_prep.py`):
 | floor | `wood_floor` | Dimitrios Savva |
 | wall plaster | `white_stucco` | Amal Kumar |
 | desk, shelf, bed, door wood | `oak_veneer_01` | Jenelle van Heerden |
-| bed sheet, pillow | `cotton_jersey` | colormass, Rico Cilliers |
+| bed sheet, mattress cover, pillow; the floor cushion and the T-shirt (recoloured) | `cotton_jersey` | colormass, Rico Cilliers |
 | duvet | `waffle_pique_cotton` | colormass, Rico Cilliers |
-| curtains | `rough_linen` | colormass, Rico Cilliers |
+| curtains; the tote's canvas (recoloured) | `rough_linen` | colormass, Rico Cilliers |
 | rug | `poly_wool_herringbone` | colormass, Rico Cilliers |
 | chair fabric, desk mat (normal map) | `jersey_melange` | colormass, Rico Cilliers |
+| socks (normal map) | `knitted_fleece` | colormass, Rico Cilliers |
+| hand towel | `terry_cloth` | colormass, Rico Cilliers |
+| hoodie | `jogging_melange` | colormass, Rico Cilliers |
+| the hoodie's ribbed hem and cuffs (normal map) | `ribbed_corduroy` | colormass, Rico Cilliers |
+| backpack (normal map) | `bi_stretch` | colormass, Rico Cilliers |
+| jeans | `denim_fabric_05` | colormass, Rico Cilliers |
 
 Models:
 
@@ -67,12 +77,14 @@ From `room_build/`, with Blender 4.2 and Node 22:
 
     python ph.py tex 2k wood_floor
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
+    python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
     python tex_prep.py
-    blender -b -P build_room.py -- --sweep   # 20 s: only the prop sweep (out/sweep.txt), no bake, no export
-    blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
+    blender -b -P build_room.py -- --sweep   # a few minutes (the two cloth simulations): only the prop sweep (out/sweep.txt), no bake, no export
+    blender -b -P build_room.py          # the cloth simulations plus the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
+    python shots_soft.py --glb ../web/room/room_clean.glb --tag after   # fixed-camera renders (docs/design/room-soft)
 
 ## His movement and the things he handles (#63)
 No animation clips were added. The clips are the ones already in `web/room/` (`boy_*.glb`, the same rig). Everything new is
@@ -101,3 +113,36 @@ https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`
 
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).
+
+## The view out of the window (#98 G7)
+`web/room/window_view.js` draws the outside on the glass marker (`SURF_window`): a parallax shader that casts each view
+ray from the room's camera through the glass onto photographic plates behind it (the neighbourhood by day and at night,
+the far skyline, a utility pole, a real sky), so the view has true depth from every camera. The plates in
+`web/room/window/` are cut out and prepared by `room_build/window_cards.py` from these sources (all free for any use;
+each licence was read from the Commons API's `extmetadata` / Poly Haven's `/info` at fetch time and is recorded with the
+source's URL and checksum in `web/room/window/plates.json`):
+
+| plate | source | author | licence |
+|---|---|---|---|
+| `mid.webp`: the neighbourhood by day (an elevated view over the ward next to Kichijōji) | [Suginami City 2024-05-06.jpg](https://commons.wikimedia.org/wiki/File:Suginami_City_2024-05-06.jpg) | ウィキ太郎 | Public domain |
+| `mid_n.webp`: the neighbourhood at night, with its real lit windows (`mid_l.webp` marks them) | [Blue illuminated buildings in Tokyo.jpg](https://commons.wikimedia.org/wiki/File:Blue_illuminated_buildings_in_Tokyo.jpg) | Syced | CC0 |
+| `far.webp`: the far skyline at twilight (the water and the expressway cropped away) | [Illuminated buildings at twilight in Minato-ku, Tokyo, view from Rainbow Bridge (2016-12-10 by xegxef @Pixabay 2086645).jpg](https://commons.wikimedia.org/wiki/File:Illuminated_buildings_at_twilight_in_Minato-ku,_Tokyo,_view_from_Rainbow_Bridge_(2016-12-10_by_xegxef_@Pixabay_2086645).jpg) | xegxef | CC0 |
+| `sky.webp` row 0: clear day | [Kloofendal 43d Clear (Pure Sky)](https://polyhaven.com/a/kloofendal_43d_clear_puresky) | Greg Zaal (All) | CC0 |
+| `sky.webp` row 1: partly cloudy day | [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal (Original), Jarod Guest (Sky edits) | CC0 |
+| `sky.webp` row 2: overcast | [Kloofendal Overcast (Pure Sky)](https://polyhaven.com/a/kloofendal_overcast_puresky) | Greg Zaal (All) | CC0 |
+| `sky.webp` row 3: sunset | [Belfast Sunset (Pure Sky)](https://polyhaven.com/a/belfast_sunset_puresky) | Greg Zaal (Processing), Dimitrios Savva (Photography), Jarod Guest (Sky edits) | CC0 |
+| `sky.webp` row 4: dusk (blue hour) | [Qwantani Dusk 2 (Pure Sky)](https://polyhaven.com/a/qwantani_dusk_2_puresky) | Greg Zaal (Photography), Jarod Guest (Processing) | CC0 |
+| `sky.webp` row 5: night | [Kloppenheim 02 (Pure Sky)](https://polyhaven.com/a/kloppenheim_02_puresky) | Greg Zaal (Original), Jarod Guest (Sky edits) | CC0 |
+
+Wikimedia Commons CC0: https://creativecommons.org/publicdomain/zero/1.0/ · the Suginami photograph was released into the
+public domain by its author (Commons `{{PD-self}}`). The Rainbow Bridge photograph is a Pixabay picture from 2016, when
+Pixabay's licence was CC0; the Commons copy carries that licence. Poly Haven assets are CC0: https://polyhaven.com/license.
+Only the skies' upper hemispheres are used (±70° of azimuth, -2..50° of elevation, with the sun or the moon kept out of
+the crop; the shader draws its own). The photographs contain no readable signage; the skyline's landmark tower appears as
+photographed. The utility pole and its cables (`near.webp`) and the rain's noise texture are drawn from code, original work
+for this project, CC0. The sources themselves (~120 MB) are not committed: `python room_build/window_cards.py --fetch`
+re-downloads them (Wikimedia rate-limits shared addresses; the script waits and retries).
+
+The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
+pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented
+as a forecast or an observation.

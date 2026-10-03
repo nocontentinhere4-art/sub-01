@@ -49,6 +49,7 @@ import costs
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from search_sources import live_interest
 import interests
+import novelty
 import screens
 import search_sources
 from readings import BrowseReadings
@@ -896,6 +897,9 @@ class Live:
         elif st and (m := screens.TIKTOK_ID.search(str(st.get("url") or ""))):   # #89: viewers may play it in
             st = dict(st, embed={"src": screens.TIKTOK_EMBED.format(m.group(1)),     # TikTok's official player
                                  "label": "TikTok (official embed)"})
+        elif st and (m := screens.YT_ID.search(str(st.get("url") or ""))):        # ... or YouTube's
+            import youtube_api
+            st = dict(st, embed={"src": youtube_api.viewer_embed(m.group(1)), "label": "YouTube (official embed)"})
         # the options belong to the page they were considered on and to the page the choice led to, no later one
         if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")
                            or (st.get("video") and st.get("url") == dec.get("led_to"))):   # a chosen video playing
@@ -994,7 +998,8 @@ class Live:
             return None
         import interests
         title = str(st.get("title") or "")
-        topic = interests.topic_of(title, st.get("host", "")) or st.get("host")
+        topic = interests.topic_of(title, st.get("host", "")) or (
+            "video:" + novelty.title_key(title) if kind in ("shorts", "tiktok", "youtube") else st.get("host"))
         try:
             interest = self.tastes.predict(Tastes.topics({"label": title, "networks": {}}, ""))
         except Exception:
@@ -1022,6 +1027,9 @@ class Live:
                                                          "n": b["n"]} for b in self.da_bursts.trace[-60:]],
                            "da": round(self.neuro.levels["DA"], 3)}
         out["sources"] = self.browsing_sources()
+        out["youtube"] = getattr(self.browser, "youtube", None) if self.browser else None     # key set? units today
+        out["feeds"] = {site: {k: d.get(k) for k in ("t", "reason", "video_links", "captcha", "login_prompt")}
+                        for site, d in (getattr(self.browser, "diag", None) or {}).items()} if self.browser else {}
         out["music"] = self.music_line()
         return out
 
@@ -1526,7 +1534,9 @@ class Live:
             chromium = {"on": True, "separate_service": self.local_browser is None,
                         "restarting": bool(getattr(b, "restarting", False)), "failures": getattr(b, "failures", 0)}
             if self.local_browser is not None:
-                chromium.update(alive=self.local_browser.alive(), restarts=self.local_browser.restarts)
+                chromium.update(alive=self.local_browser.alive(), restarts=self.local_browser.restarts,
+                                restart_log=list(getattr(self.local_browser, "restart_log", []))[-10:],
+                                mem_limit_mb=getattr(self.local_browser, "mem_mb", None))
         nights = self.diary.index(1) if self.diary else []
         tests = read_jsonl(self.data_dir / "spiking" / "memory_tests.jsonl", last=1)
         return {"ok": self.healthy(),
@@ -1666,6 +1676,21 @@ def add_ops_routes(app, live, data_dir):
         return handler
     app.router.add_get("/api/costs", admin(lambda r: live.ledger.report()))
     app.router.add_get("/api/health", admin(lambda r: live.health()))
+
+    async def diag_shot(request):
+        """#89: the masked screenshot of a logged-in feed that showed the server no video (admin only)."""
+        if not (admin_ok(request) or request.app.get(GATED)):
+            raise web.HTTPUnauthorized(text="admin token required")
+        site = request.match_info["site"]
+        get = getattr(live.browser, "diag_shot", None) if live.browser else None
+        try:
+            shot = await get(site) if get and site in ("tiktok", "youtube") else None
+        except BrowserDown:
+            shot = None
+        if not shot:
+            raise web.HTTPNotFound()
+        return web.Response(body=shot, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    app.router.add_get("/api/diag/{site}.jpg", diag_shot)
 
 
 LOGIN_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">

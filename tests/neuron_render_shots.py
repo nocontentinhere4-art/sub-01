@@ -98,26 +98,36 @@ def main():
 
             def closeup(pg, kind, reg, style):
                 pg.evaluate(f"closeupOpen({json.dumps(kind)}, {json.dumps(reg)})")
-                pg.wait_for_function("n3close && n3close.info().cells > 0", timeout=120000)
+                pg.wait_for_function("n3close && n3close.info().cells > 0", timeout=180000)
                 pg.evaluate(f"n3close.setStyle({json.dumps(style)})")
                 pg.wait_for_timeout(2500)                      # a few frames rendered (software GL: slow)
                 return pg.evaluate("n3close.info()")
 
-            for w, h, mobile, tag in () if args.only_strip else ((1280, 800, False, "1280"), (390, 844, True, "390")):
+            widths = ((1920, 1080, False, "1920"), (1280, 800, False, "1280"), (390, 844, True, "390"))
+            for w, h, mobile, tag in () if args.only_strip else widths:
                 ctx, pg, errors = page(w, h, mobile)
                 info = closeup(pg, "cortex", region, "fluorescence")
                 shot(pg, f"cortex_{tag}_offline.png")
-                res[f"offline_{tag}"] = {"caption": pg.inner_text("#n3cap"), "live": info["live"], "spikes": info["spikes"]}
+                res[f"offline_{tag}"] = {"caption": pg.inner_text("#n3cap"), "live": info["live"], "spikes": info["spikes"], "source": info.get("source")}
                 pg.evaluate("f => window.__replay(f)", frames)
                 pg.wait_for_function("n3close.info().live", timeout=120000)
                 for kind in kinds:
-                    for style in ("fluorescence", "render"):
-                        info = closeup(pg, kind, REGION[kind], style)
-                        shot(pg, f"{kind}_{tag}_{style}.png")
-                        res[f"{kind}_{tag}_{style}"] = {k: info[k] for k in ("cells", "heroCells", "triangles", "triangleCap", "spines", "spineUm",
-                                                                             "dendUm", "boutons", "nodesOfRanvier", "drawCalls", "lineSegments", "live",
-                                                                             "spikes", "lod", "halfFloat", "webgl2")}
-                        res[f"{kind}_{tag}_{style}"]["caption"] = pg.inner_text("#n3cap")
+                    # #99: cortex draws the real H01 cells ("after"); the NeuroMorpho procedural cells are the "before"
+                    variants = [("h01", ("fluorescence", "em"))] if kind == "cortex" else [("", ("fluorescence", "render"))]
+                    if kind == "cortex" and not args.quick:
+                        variants.append(("before", ("fluorescence", "render")))
+                    for variant, styles in variants:
+                        pg.evaluate("v => { NeuronRender.H01_SETS.cortex = v === 'before' ? null : 'cortex'; }", variant)
+                        for style in styles:
+                            info = closeup(pg, kind, REGION[kind], style)
+                            name = f"{kind}_{tag}_{style}" + ("_before" if variant == "before" else "")
+                            shot(pg, name + ".png")
+                            keep = ("source", "cells", "heroCells", "triangles", "triangleCap", "spines", "spineUm", "dendUm", "boutons", "nodesOfRanvier",
+                                    "drawCalls", "lineSegments", "live", "spikes", "lod", "halfFloat", "webgl2", "synapsesPre", "synapsesPost", "myelinatedUm",
+                                    "glia", "far", "bytes", "focusId", "ids")
+                            res[name] = {k: info[k] for k in keep if k in info}
+                            res[name]["caption"] = pg.inner_text("#n3cap")
+                        pg.evaluate("NeuronRender.H01_SETS.cortex = 'cortex'")
                 res[f"errors_{tag}"] = errors
                 ctx.close()
 
@@ -128,17 +138,35 @@ def main():
             # software WebGL takes seconds per screenshot, so the renderer's clock is frozen at fixed times after the spike
             # (nr.debugTime, a test hook): what a viewer sees at those moments on a device that keeps up
             pg.evaluate("n3close.spike(0, 0)")                  # slot 0 -> drawn cell 0, the cell in focus
-            strip, times = [], [0.1, 1.5, 1.7, 1.9, 2.1]   # the initial segment (48 um) is crossed at the unmyelinated speed: ~1.6 s; then ~0.6 mm/s
+            h01 = pg.evaluate("n3close.info().source") == "H01"
+            # #99, H01: the real axon is ~0.5 um thick and 4 mm long, so each frame is cropped around the front, projected to the screen
+            # from the vertices whose arrival time is just before the frozen clock (the cell's own aArrive), and enlarged 2.5x
+            FRONT = """t => { const c = n3close.cells[0], m = c.h01.mesh, cam = n3close.camera; let n = 0, x = 0, y = 0, d = 0;
+              for (let i = 0; i < m.nv; i++) { const a = m.arrive[i], k = m.kind[i]; if (a < 0 || a > t || a < t - 0.12 || !(k === 1 || k === 4 || k === 5)) continue;
+                const v = new THREE.Vector3(m.pos[3 * i], m.pos[3 * i + 1], m.pos[3 * i + 2]).applyQuaternion(n3close.scene.quaternion).project(cam);
+                x += (v.x + 1) / 2 * innerWidth; y += (1 - v.y) / 2 * innerHeight; d += m.dist[i]; n++; }
+              return n ? {x: x / n, y: y / n, dist: d / n, n} : null; }"""
+            pg.mouse.click(640, 300)                            # stops the slow auto-rotation, so the frames line up
+            pg.evaluate("document.getElementById('dock').style.visibility = 'hidden'")   # the page's panel would cover the axon's path
+            strip, fronts = [], []
+            times = [0.3, 1.0, 2.0, 4.0, 8.0] if h01 else [0.1, 1.5, 1.7, 1.9, 2.1]   # procedural: the initial segment (48 um) at the unmyelinated speed ~1.6 s, then ~0.6 mm/s
             for i, t in enumerate(times):
                 pg.evaluate(f"n3close.debugTime({t})")
                 pg.wait_for_timeout(1200)
                 name = f"ap_{i + 1}.png"
                 shot(pg, name)
                 strip.append(name)
-            pg.evaluate("n3close.debugTime(null)")
+                fronts.append(pg.evaluate(FRONT, t) if h01 else None)
+            pg.evaluate("n3close.debugTime(null); document.getElementById('dock').style.visibility = ''")
             res["ap_strip_clock_s"] = times
+            res["ap_front_um"] = [round(f["dist"], 1) if f else None for f in fronts]
             from PIL import Image
-            ims = [Image.open(out / n).crop((390, 230, 890, 730)) for n in strip]
+            ims = []
+            for n, f in zip(strip, fronts):
+                im = Image.open(out / n)
+                if f: x, y = int(f["x"]), int(f["y"]); im = im.crop((x - 100, y - 100, x + 100, y + 100)).resize((500, 500), Image.LANCZOS)
+                else: im = im.crop((390, 230, 890, 730))                             # 1280 px frames
+                ims.append(im)
             W = sum(i.width for i in ims) + 10 * (len(ims) - 1)
             im = Image.new("RGB", (W, ims[0].height))
             x = 0
@@ -153,7 +181,7 @@ def main():
             ref = ROOT / args.reference
             if ref.exists():
                 a = Image.open(ref).convert("RGB")
-                b = Image.open(out / "cortex_1280_fluorescence.png").convert("RGB").crop((140, 60, 1140, 760))
+                b = Image.open(out / "cortex_1920_fluorescence.png").convert("RGB").crop((300, 120, 1620, 1000))
                 hh = 520
                 a = a.resize((round(a.width * hh / a.height), hh))
                 b = b.resize((round(b.width * hh / b.height), hh))

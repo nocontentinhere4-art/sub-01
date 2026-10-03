@@ -18,7 +18,7 @@
      n3.setVisible(on)     the toggle; n3.state() -> {live, net, tint, cells, segments, drawCalls, enlarge, types} for the caption
    Data: one byte a region of spike rate (log scale 0.1-100 Hz, byte 0 = below), 3 bytes a spike (region, slot 0-255,
    time 0-255 of the frame's span). Every glow is a recorded spike of a model neuron; with no frames the cells stand
-   still (offline). Drawing: one instanced LineSegments per cell type (<= 6) + one THREE.Points for the somata; <= 40
+   still (offline). Drawing: one instanced LineSegments per cell type (<= 6) + one instanced soma mesh (no points); <= 40
    segments a cell, maxCells cells (600 desktop, 300 phone, 240 mini); nothing is uploaded while it is hidden. */
 (function (root) {
   "use strict";
@@ -166,16 +166,38 @@
     return { n, pos, dist: dst, kind: kd, axon };
   }
 
+  // a unit icosahedron, flat-shaded (non-indexed): positions and normals for a soma body
+  function somaGeometry(THREE) {
+    const t = (1 + Math.sqrt(5)) / 2, V = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+      [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map(v => { const l = Math.hypot(...v); return v.map(x => x / l); });
+    const F = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+      [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+    const pos = new Float32Array(F.length * 9), nrm = new Float32Array(F.length * 9);
+    F.forEach((f, k) => f.forEach((vi, m) => { pos.set(V[vi], 9 * k + 3 * m); nrm.set(V[vi], 9 * k + 3 * m); }));
+    return { position: new THREE.BufferAttribute(pos, 3), normal: new THREE.BufferAttribute(nrm, 3) };
+  }
+
   // ---------- the whole-brain forest (#88): every sampled model neuron drawn as a small real cell ----------
   // Cell types by region: what the close-ups use. The pallidum has no reconstruction in the set: its cells are somata.
   const FOREST_SEG = 40, ENLARGE = 6, FOREST_AXON_UM = 400;         // <= 40 segments a cell, drawn 6x their size; axon to 400 um
-  const FOREST_SPEED = 2000, FOREST_W = 90;                         // the spike's glow: 2 mm/s along the (unenlarged) axon
+  const FOREST_SPEED = 2000, FOREST_TRAIL = 250;                    // a spike lights the axon soma -> front (2 mm/s), fading behind
   const FOREST_SLOWDOWN = Math.round(0.5e6 / FOREST_SPEED);         // ~250x slower than a thin unmyelinated axon
   // The look (#88 follow-up: the first version saturated to white). Like a sparse stain under a dark-field microscope:
   // one muted hue a cell type, a dim base (<= FOREST_BASE before additive blending, so a few overlapping cells stay
   // grey), the region's rate only warms the hue a little; only a recorded spike brightens a cell, briefly, from the
   // soma along its axon.
   const FOREST_BASE = 0.12, FOREST_SPIKE = 0.7;
+  // Microscope optics (#99), in the vertex shader (no post-processing pass, so it costs a phone nothing): a light
+  // sheet / shallow depth of field keeps cells near the focal plane (the depth of what the camera looks at) at full
+  // strength and dims the rest to 35 %, and the out-of-focus light drifts toward the slight blue-green of a
+  // fluorescence image (scatter). It only ever dims or re-tints: never brighter than the cell itself.
+  const LIGHT_SHEET = `
+    vec3 lightSheet(vec3 c, float depth, float focus){
+      float dz = (depth - focus) / max(1e-4, 0.35 * focus);
+      float inFocus = 1.0 / (1.0 + dz * dz);
+      vec3 tint = vec3(dot(c, vec3(0.3, 0.45, 0.25))) * vec3(0.72, 1.0, 0.95);   // grey -> faint cyan-green
+      return mix(tint, c, 0.55 + 0.45 * inFocus) * (0.35 + 0.65 * inFocus);
+    }`;
   const FOREST_HUE = { pyramidal: [0.62, 0.8, 0.66], basket: [0.85, 0.7, 0.55], medium_spiny: [0.78, 0.66, 0.84],
                        relay: [0.62, 0.74, 0.9], ca1_pyramidal: [0.62, 0.82, 0.72], amygdala_principal: [0.88, 0.68, 0.62] };
   const SOMA_HUE = [0.75, 0.75, 0.78];                              // a soma of no shaped type (pallidum)
@@ -214,12 +236,14 @@
     tex.needsUpdate = true;
     const striatum = nodes.map(n => n.group === "reward");
     const uniforms = { uTime: { value: 0 }, uRates: { value: tex }, uFade: { value: 0 }, uLive: { value: 0 },
-                       uUnit: { value: ENLARGE / 1000 }, uSpeed: { value: FOREST_SPEED }, uWidth: { value: FOREST_W },
+                       uUnit: { value: ENLARGE / 1000 }, uSpeed: { value: FOREST_SPEED }, uTrail: { value: FOREST_TRAIL },
                        uSize: { value: o.somaSize || 1.0 }, uScale: { value: 1000 },
-                       uBase: { value: FOREST_BASE }, uSpikeI: { value: FOREST_SPIKE } };
+                       uBase: { value: FOREST_BASE }, uSpikeI: { value: FOREST_SPIKE },
+                       uFocus: { value: 350 }, uZoom: { value: 1 } };
     // which cell type each sampled neuron is drawn as
     const shapes = {}, cellType = new Int16Array(L.N).fill(-1), cellInst = new Int32Array(L.N), types = [];
     const regAxis = nodes.map(() => randDir(rnd));
+    const cellQ = new Float32Array(4 * L.N), cellS = new Float32Array(L.N).fill(1);   // each cell's turn and size (its soma follows)
     for (let r = 0; r < R; r++) {
       const tt = morph && morph.cells ? (FOREST_TYPES[kindOf(nodes[r])] || []).filter(([t]) => morph.cells[t]) : [];
       for (let j = L.start[r]; j < L.start[r + 1]; j++) {
@@ -248,6 +272,7 @@
         else up = randDir(rnd);
         quat.set(quatMul(quatFromTo([0, 1, 0], up), yawQ(rnd() * 6.2832)), 4 * i);
         sc[i] = (0.85 + 0.3 * rnd()) * (rnd() < 0.5 ? -1 : 1);       // +-15 % size; half mirrored
+        cellQ.set(quat.subarray(4 * i, 4 * i + 4), 4 * j); cellS[j] = Math.abs(sc[i]);
       });
       g.setAttribute("iOff", new THREE.InstancedBufferAttribute(off, 3));
       g.setAttribute("iQuat", new THREE.InstancedBufferAttribute(quat, 4));
@@ -262,8 +287,9 @@
         vertexShader: `
           attribute float aDist; attribute float aKind; attribute vec3 iOff; attribute vec4 iQuat; attribute float iScale;
           attribute float iReg; attribute float iSpike;
-          uniform float uTime; uniform sampler2D uRates; uniform float uLive; uniform float uUnit; uniform float uSpeed; uniform float uWidth;
-          uniform vec3 uHue; uniform float uBase; uniform float uSpikeI;
+          uniform float uTime; uniform sampler2D uRates; uniform float uLive; uniform float uUnit; uniform float uSpeed; uniform float uTrail;
+          uniform vec3 uHue; uniform float uBase; uniform float uSpikeI; uniform float uFocus; uniform float uZoom;
+          ${LIGHT_SHEET}
           varying vec3 vCol;
           void main(){
             vec3 p = position * abs(iScale); p.x *= sign(iScale);
@@ -272,12 +298,14 @@
             float rate = uLive * smoothstep(0.42, 0.86, t.r);              // ~2-40 Hz on the log byte scale
             float dt = uTime - iSpike, on = dt >= 0.0 ? 1.0 : 0.0;
             float soma = on * exp(-dt / 0.3) * exp(-aDist / 60.0);
-            float front = dt * uSpeed;
-            float pulse = on * exp(-pow((aDist - front) / uWidth, 2.0)) * step(front, aDist + 3.0 * uWidth);
+            float front = dt * uSpeed;                      // the axon lights from the soma up to the front, then fades
+            float pulse = on * step(aDist, front) * exp(-(front - aDist) / uTrail) * exp(-dt / 0.5);
             vec3 tint = mix(uHue, vec3(0.95, 0.72, 0.55), 0.25 * rate + 0.3 * t.g * uLive);   // rate: a little warmer
             vec3 col = aKind < 1.5 ? uHue * uBase * 0.6 : tint * uBase * (1.0 + 0.5 * rate);     // axon dimmer than dendrites
-            vCol = col + uHue * uSpikeI * (pulse * (aKind < 1.5 ? 1.0 : 0.0) + soma);       // only a spike brightens
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(iOff + p * uUnit, 1.0);
+            col += uHue * uSpikeI * (pulse * (aKind < 1.5 ? 1.0 : 0.0) + soma);       // only a spike brightens
+            vec4 mv = modelViewMatrix * vec4(iOff + p * uUnit, 1.0);
+            vCol = lightSheet(col, -mv.z, uFocus) * uZoom;
+            gl_Position = projectionMatrix * mv;
           }`,
         fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * uFade, 1.0); }` });
       const lines = new THREE.LineSegments(g, mat);
@@ -285,42 +313,53 @@
       group.add(lines);
       Object.assign(T, { spk, sa, geom: g, mat });
     }
-    // the somata: one point a cell (every sampled neuron, pallidum included), flashing on its spikes
-    const flash = new Float32Array(L.N).fill(-1e4), live = new Float32Array(L.N);
-    const sg = new THREE.BufferGeometry();
-    sg.setAttribute("position", new THREE.BufferAttribute(L.pos, 3));
-    sg.setAttribute("aReg", new THREE.BufferAttribute(L.reg, 1));
-    const fa = new THREE.BufferAttribute(flash, 1); if (fa.setUsage) fa.setUsage(THREE.DynamicDrawUsage);
-    sg.setAttribute("aFlash", fa);
-    const somaR = new Float32Array(L.N);
-    for (let j = 0; j < L.N; j++) somaR[j] = cellType[j] >= 0 ? morph.cells[types[cellType[j]].type].soma_r : 8;
-    sg.setAttribute("aSomaR", new THREE.BufferAttribute(somaR, 1));
-    const somaHue = new Float32Array(3 * L.N);
-    for (let j = 0; j < L.N; j++) somaHue.set(cellType[j] >= 0 ? FOREST_HUE[types[cellType[j]].type] || SOMA_HUE : SOMA_HUE, 3 * j);
-    sg.setAttribute("aHue", new THREE.BufferAttribute(somaHue, 3));
+    // the somata (#88 follow-up: "no dots"): every cell's body is a small solid at the base of its own tree, turned with
+    // it and sized from the reconstruction's soma radius: an ellipsoid for multipolar cells, a pyramid-like teardrop
+    // (apex up the apical dendrite) for pyramidal ones; the pallidum's cells, which have no reconstruction here, are
+    // the ellipsoid alone. At whole-brain scale a soma is below a pixel; it flashes with its cell's spikes.
+    const flash = new Float32Array(L.N).fill(-1e4);
+    const sgeo = somaGeometry(THREE), sg = new THREE.InstancedBufferGeometry();
+    sg.setAttribute("position", sgeo.position); sg.setAttribute("normal", sgeo.normal);
+    const somaR = new Float32Array(L.N), somaHue = new Float32Array(3 * L.N), somaShape = new Float32Array(L.N);
+    for (let j = 0; j < L.N; j++) {
+      const t = cellType[j] >= 0 ? types[cellType[j]].type : null;
+      somaR[j] = (t ? morph.cells[t].soma_r : 8) * cellS[j];
+      somaHue.set(t ? FOREST_HUE[t] || SOMA_HUE : SOMA_HUE, 3 * j);
+      somaShape[j] = t && /pyramidal/.test(t) ? 1 : 0;
+      if (!t) cellQ.set(quatFromTo([0, 1, 0], randDir(rnd)), 4 * j);
+    }
+    sg.setAttribute("iOff", new THREE.InstancedBufferAttribute(L.pos, 3));
+    sg.setAttribute("iQuat", new THREE.InstancedBufferAttribute(cellQ, 4));
+    sg.setAttribute("iR", new THREE.InstancedBufferAttribute(somaR, 1));
+    sg.setAttribute("iShape", new THREE.InstancedBufferAttribute(somaShape, 1));
+    sg.setAttribute("iHue", new THREE.InstancedBufferAttribute(somaHue, 3));
+    sg.setAttribute("iReg", new THREE.InstancedBufferAttribute(L.reg, 1));
+    const fa = new THREE.InstancedBufferAttribute(flash, 1); if (fa.setUsage) fa.setUsage(THREE.DynamicDrawUsage);
+    sg.setAttribute("iSpike", fa);
+    sg.instanceCount = L.N;
     const smat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
       vertexShader: `
-        attribute float aReg; attribute float aFlash; attribute float aSomaR; attribute vec3 aHue;
-        uniform float uTime; uniform sampler2D uRates; uniform float uLive; uniform float uUnit; uniform float uSize; uniform float uScale;
-        uniform float uBase; uniform float uSpikeI;
+        attribute vec3 iOff; attribute vec4 iQuat; attribute float iR; attribute float iShape; attribute vec3 iHue;
+        attribute float iReg; attribute float iSpike;
+        uniform float uTime; uniform sampler2D uRates; uniform float uLive; uniform float uUnit; uniform float uBase; uniform float uSpikeI;
+        uniform float uFocus; uniform float uZoom;
         varying vec3 vCol;
+        vec3 turn(vec3 v){ return v + 2.0 * cross(iQuat.xyz, cross(iQuat.xyz, v) + iQuat.w * v); }
+        ${LIGHT_SHEET}
         void main(){
-          vec4 t = texture2D(uRates, vec2((aReg + 0.5) / 256.0, 0.5));
+          vec3 p = position, nn = normal;
+          if (iShape > 0.5) { float up = max(p.y, 0.0); p.y *= 1.0 + 0.9 * up; p.xz *= 1.0 - 0.5 * up; }   // a pyramid's soma
+          vec4 t = texture2D(uRates, vec2((iReg + 0.5) / 256.0, 0.5));
           float rate = uLive * smoothstep(0.42, 0.86, t.r);
-          float dt = uTime - aFlash, f = dt < 0.0 ? 0.0 : exp(-dt / 0.35);
-          vCol = aHue * (1.6 * uBase * (1.0 + 0.4 * rate) + 1.3 * uSpikeI * f);        // a soma: a little brighter than its tree
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = max(1.5, uSize * (1.0 + 0.6 * f) * 2.0 * aSomaR * uUnit * uScale / -mv.z);
+          float dt = uTime - iSpike, f = dt < 0.0 ? 0.0 : exp(-dt / 0.35);
+          vec3 n = normalize(normalMatrix * turn(nn));
+          float rim = 0.55 + 0.45 * (1.0 - abs(n.z));                 // a solid body: brighter at its rim, like a stained soma
+          vec4 mv = modelViewMatrix * vec4(iOff + turn(p * iR) * uUnit, 1.0);
+          vCol = lightSheet(iHue * (1.6 * uBase * (1.0 + 0.4 * rate) * rim + 1.3 * uSpikeI * f), -mv.z, uFocus) * uZoom;
           gl_Position = projectionMatrix * mv;
         }`,
-      fragmentShader: `
-        uniform float uFade; varying vec3 vCol;
-        void main(){
-          vec2 c = gl_PointCoord - 0.5; float d = dot(c, c);
-          if (d > 0.25) discard;
-          gl_FragColor = vec4(vCol * uFade * (1.0 - 3.0 * d), 1.0);
-        }` });
-    const somata = new THREE.Points(sg, smat);
+      fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * uFade, 1.0); }` });
+    const somata = new THREE.Mesh(sg, smat);
     somata.name = "forest-somata"; somata.frustumCulled = false;
     group.add(somata);
     o.scene.add(group);
@@ -363,7 +402,7 @@
       const isLive = now - S.lastWall < LIVE_MS;
       const target = S.on ? 1 : 0;                                    // offline: the cells stand still, never flash
       S.fade += (target - S.fade) * 0.08; if (Math.abs(S.fade - target) < 0.004) S.fade = target;
-      group.visible = S.fade > 0;
+      group.visible = S.fade > 0 && uniforms.uZoom.value > 0.003;    // faded out by the zoom (#99): not drawn at all
       if (!group.visible) return;
       uniforms.uTime.value = clockS(now); uniforms.uFade.value = S.fade;
       uniforms.uLive.value += ((isLive ? 1 : 0) - uniforms.uLive.value) * 0.05;
@@ -379,6 +418,10 @@
     // drawing-buffer height (px) and vertical fov: a soma of r um is drawn ENLARGE x r at its depth
     function resize(h, fov) { uniforms.uScale.value = h / (2 * Math.tan((fov || 32) * Math.PI / 360)); }
     function setVisible(on) { S.on = !!on; }
+    // the zoom (#99): focal distance (mm, the camera's distance to what it looks at) and the forest's fade as the
+    // view dives into a cortical column
+    function setFocus(mm) { uniforms.uFocus.value = Math.max(1e-3, mm); }
+    function setZoomFade(f) { uniforms.uZoom.value = Math.max(0, Math.min(1, f)); }
     function state() { return { live: performance.now() - S.lastWall < LIVE_MS, net: S.net, tint: S.tint, race: S.raceOn, recorded: S.ns,
       shown: S.shown, points: L.N, cells: L.N, shaped: types.reduce((a, T) => a + T.cells.length, 0), segments,
       drawCalls: types.length + 1, enlarge: ENLARGE, spikes: S.spikes,
@@ -392,7 +435,219 @@
       const up = [v[0] + 2 * (q[1] * c[2] - q[2] * c[1]), v[1] + 2 * (q[2] * c[0] - q[0] * c[2]), v[2] + 2 * (q[0] * c[1] - q[1] * c[0])];
       return { type: T.type, up, pos: [...L.pos.subarray(3 * j, 3 * j + 3)], vert: L.vert[j], normal: normals && L.vert[j] >= 0 ? [...normals.subarray(3 * L.vert[j], 3 * L.vert[j] + 3)] : null,
                spike: T.spk[i] }; }
-    return { object: group, onFrame, update, resize, setVisible, state, dispose, rate, cell, points: L.N, cells: L.N };
+    return { object: group, onFrame, update, resize, setVisible, setFocus, setZoomFade, state, dispose, rate, cell, points: L.N,
+             cells: L.N, normals, vert: L.vert, pos: L.pos, start: L.start };
+  }
+
+  // ---------- the cortical column (#99): the zoom from the whole brain down to tissue ----------
+  // A 0.5 mm-wide column of cortex under one point of the real cortex mesh, at TRUE size, its local +y along the
+  // outward surface normal (pia at y = 0, white matter below). Layers L1-L6: thicknesses measured from the H01 layer
+  // annotation (Shapson-Coe et al. 2024, human temporal cortex, CC BY 4.0; tests/../analysis/h01_layers.py: median
+  // boundary-to-boundary distance in 3 sections of the 8 um segmentation). Neurons: H01's ~16 000 per mm3 (the
+  // paper's count over its sample), L1 assumed 10 % of that (it is cell-sparse). Like a Golgi stain, only a few
+  // percent are drawn ("sparse label"), each a real NeuroMorpho.Org reconstruction of its layer's type: human L2/3
+  // pyramids in L2-L4 and L6, the human L5 pyramid (NMO_159993, apical tuft ~1.5 mm) in L5, human basket cells as the
+  // interneurons. Every drawn cell stands for a sampled model neuron of the column's region (its spikes, its rate).
+  const H01_LAYERS_UM = [["L1", 413], ["L2", 303], ["L3", 447], ["L4", 272], ["L5", 449], ["L6", 261]];
+  const H01_NEURONS_MM3 = 16000, L1_REL_DENSITY = 0.1, COL_W_UM = 500, COL_LABEL = 0.03, COL_SEG = 90, COL_AXON_UM = 600;
+  const COL_TYPES = { L1: [["basket", 1]], L2: [["pyramidal", 0.8], ["basket", 0.2]], L3: [["pyramidal", 0.8], ["basket", 0.2]],
+                      L4: [["pyramidal", 0.7], ["basket", 0.3]], L5: [["l5_pyramidal", 0.8], ["basket", 0.2]],
+                      L6: [["pyramidal", 0.8], ["basket", 0.2]] };
+  const COL_HUE = Object.assign({ l5_pyramidal: [0.6, 0.8, 0.68] }, FOREST_HUE);
+  function columnPlan(morph, label) {
+    label = label || COL_LABEL;
+    let top = 0, neurons = 0, drawn = 0;
+    const area = (COL_W_UM / 1000) ** 2;
+    const layers = H01_LAYERS_UM.map(([name, um]) => {
+      const n = Math.round(H01_NEURONS_MM3 * (name === "L1" ? L1_REL_DENSITY : 1) * area * um / 1000);
+      const types = COL_TYPES[name].filter(([t]) => morph && morph.cells && morph.cells[t]);
+      const d = Math.max(name === "L1" ? 1 : 3, Math.round(n * label));
+      const L = { name, top, bottom: top + um, neurons: n, drawn: types.length ? d : 0, types };
+      top += um; neurons += n; drawn += L.drawn;
+      return L;
+    });
+    return { layers, thickness: top, neurons, drawn, widthUm: COL_W_UM, label };
+  }
+  function column(o) {
+    const THREE = o.THREE, morph = o.morph, plan = columnPlan(morph, o.label);
+    const rnd = mulberry(990 + (o.region || 0)), group = new THREE.Group(); group.name = "column";
+    // local frame: +y = outward normal, origin at the pia point, 1 unit = 1 um
+    const n = new THREE.Vector3(...o.normal).normalize();
+    group.position.set(...o.pos);
+    group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+    group.scale.setScalar(0.001);
+    group.updateMatrixWorld(true);                                   // at() / anchors() are asked before the first render
+    const uniforms = { uTime: { value: 0 }, uFade: { value: 0 }, uLive: { value: 0 }, uRate: { value: 0 },
+                       uBase: { value: FOREST_BASE }, uSpikeI: { value: FOREST_SPIKE }, uFocus: { value: 5 },
+                       uSpeed: { value: FOREST_SPEED }, uTrail: { value: FOREST_TRAIL }, uScale: { value: 1000 } };
+    const shapes = {}, cells = [];
+    for (const L of plan.layers) {
+      for (let i = 0; i < L.drawn; i++) {
+        let u = rnd(), t = L.types[0][0];
+        for (const [name, f] of L.types) { if (u < f) { t = name; break; } u -= f; }
+        if (!shapes[t]) shapes[t] = { type: t, shape: simplify(morph.cells[t], COL_SEG, COL_AXON_UM), list: [] };
+        const depth = L.top + (0.08 + 0.84 * rnd()) * (L.bottom - L.top);
+        const c = morph.cells[t], reach = Math.max(1, c.box[4]);          // apical / upward reach (um)
+        let sc = 0.88 + 0.24 * rnd();
+        // a deep pyramid's tuft ends in L1, as real tufts do: scale (0.8-1.15) so its top lands 40-300 um below the pia
+        if (t === "l5_pyramidal") sc = Math.max(0.8, Math.min(1.15, (depth - (40 + 260 * rnd())) / reach));
+        // nothing pokes out of the brain: shallow cells whose tree would cross the pia sit a little deeper
+        const y = -Math.max(depth, reach * sc + 15);
+        const x = (rnd() - 0.5) * COL_W_UM, z = (rnd() - 0.5) * COL_W_UM;
+        const lean = 8 * Math.PI / 180, a = rnd() * 6.2832;
+        let q = quatMul(quatFromTo([0, 1, 0], [Math.sin(lean * (rnd() - 0.5) * 2), 1, Math.sin(lean * (rnd() - 0.5) * 2)].map((v, k, arr) => v / Math.hypot(...arr))), yawQ(a));
+        if (t === "basket") q = quatFromTo([0, 1, 0], randDir(rnd));         // interneurons: any orientation
+        shapes[t].list.push({ x, y, z, q, sc: sc * (rnd() < 0.5 ? -1 : 1), layer: L.name });
+        cells.push({ t, i: shapes[t].list.length - 1, layer: L.name, depth: -y });
+      }
+    }
+    const types = [];
+    for (const T of Object.values(shapes)) {
+      const s = T.shape, m = T.list.length, g = new THREE.InstancedBufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(s.pos, 3));
+      g.setAttribute("aDist", new THREE.BufferAttribute(s.dist, 1));
+      g.setAttribute("aKind", new THREE.BufferAttribute(s.kind, 1));
+      const off = new Float32Array(3 * m), quat = new Float32Array(4 * m), sc = new Float32Array(m), spk = new Float32Array(m).fill(-1e4);
+      T.list.forEach((c, i) => { off.set([c.x, c.y, c.z], 3 * i); quat.set(c.q, 4 * i); sc[i] = c.sc; });
+      g.setAttribute("iOff", new THREE.InstancedBufferAttribute(off, 3));
+      g.setAttribute("iQuat", new THREE.InstancedBufferAttribute(quat, 4));
+      g.setAttribute("iScale", new THREE.InstancedBufferAttribute(sc, 1));
+      const sa = new THREE.InstancedBufferAttribute(spk, 1); if (sa.setUsage) sa.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute("iSpike", sa);
+      g.instanceCount = m;
+      const hue = COL_HUE[T.type] || SOMA_HUE;
+      const mat = new THREE.ShaderMaterial({ uniforms: Object.assign({ uHue: { value: new THREE.Vector3(...hue) } }, uniforms),
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        vertexShader: `
+          attribute float aDist; attribute float aKind; attribute vec3 iOff; attribute vec4 iQuat; attribute float iScale; attribute float iSpike;
+          uniform float uTime; uniform float uLive; uniform float uRate; uniform float uBase; uniform float uSpikeI; uniform float uFocus;
+          uniform float uSpeed; uniform float uTrail; uniform vec3 uHue;
+          varying vec3 vCol;
+          ${LIGHT_SHEET}
+          void main(){
+            vec3 p = position * abs(iScale); p.x *= sign(iScale);
+            p += 2.0 * cross(iQuat.xyz, cross(iQuat.xyz, p) + iQuat.w * p);
+            float rate = uLive * uRate;
+            float dt = uTime - iSpike, on = dt >= 0.0 ? 1.0 : 0.0;
+            float soma = on * exp(-dt / 0.3) * exp(-aDist / 60.0);
+            float front = dt * uSpeed;
+            float pulse = on * step(aDist, front) * exp(-(front - aDist) / uTrail) * exp(-dt / 0.5);   // lit soma -> front
+            vec3 tint = mix(uHue, vec3(0.95, 0.72, 0.55), 0.25 * rate);
+            vec3 col = aKind < 1.5 ? uHue * uBase * 0.6 : tint * uBase * (1.0 + 0.5 * rate);
+            col += uHue * uSpikeI * (pulse * (aKind < 1.5 ? 1.0 : 0.0) + soma);
+            vec4 mv = modelViewMatrix * vec4(iOff + p, 1.0);
+            vCol = lightSheet(col, -mv.z, uFocus);
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * uFade, 1.0); }` });
+      const lines = new THREE.LineSegments(g, mat); lines.frustumCulled = false; lines.name = "column-" + T.type;
+      group.add(lines);
+      types.push(Object.assign(T, { spk, sa, geom: g, mat }));
+    }
+    // somata: a solid body each (as the forest's, #88 follow-up: no dots), turned with its cell, at its real size
+    const N = cells.length, sgeo = somaGeometry(THREE), sg = new THREE.InstancedBufferGeometry();
+    sg.setAttribute("position", sgeo.position); sg.setAttribute("normal", sgeo.normal);
+    const so = new Float32Array(3 * N), sq = new Float32Array(4 * N), sr = new Float32Array(N), ss = new Float32Array(N), sh = new Float32Array(3 * N),
+          sf = new Float32Array(N).fill(-1e4);
+    cells.forEach((c, k) => { const L = shapes[c.t].list[c.i]; so.set([L.x, L.y, L.z], 3 * k); sq.set(L.q, 4 * k);
+      sr[k] = morph.cells[c.t].soma_r * Math.abs(L.sc); ss[k] = /pyramidal/.test(c.t) ? 1 : 0; sh.set(COL_HUE[c.t] || SOMA_HUE, 3 * k); });
+    sg.setAttribute("iOff", new THREE.InstancedBufferAttribute(so, 3)); sg.setAttribute("iQuat", new THREE.InstancedBufferAttribute(sq, 4));
+    sg.setAttribute("iR", new THREE.InstancedBufferAttribute(sr, 1)); sg.setAttribute("iShape", new THREE.InstancedBufferAttribute(ss, 1));
+    sg.setAttribute("iHue", new THREE.InstancedBufferAttribute(sh, 3));
+    const sfa = new THREE.InstancedBufferAttribute(sf, 1); if (sfa.setUsage) sfa.setUsage(THREE.DynamicDrawUsage);
+    sg.setAttribute("iSpike", sfa); sg.instanceCount = N;
+    const smat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+      vertexShader: `
+        attribute vec3 iOff; attribute vec4 iQuat; attribute float iR; attribute float iShape; attribute vec3 iHue; attribute float iSpike;
+        uniform float uTime; uniform float uLive; uniform float uRate; uniform float uBase; uniform float uSpikeI; uniform float uFocus;
+        varying vec3 vCol;
+        vec3 turn(vec3 v){ return v + 2.0 * cross(iQuat.xyz, cross(iQuat.xyz, v) + iQuat.w * v); }
+        ${LIGHT_SHEET}
+        void main(){
+          vec3 p = position, nn = normal;
+          if (iShape > 0.5) { float up = max(p.y, 0.0); p.y *= 1.0 + 0.9 * up; p.xz *= 1.0 - 0.5 * up; }
+          float dt = uTime - iSpike, f = dt < 0.0 ? 0.0 : exp(-dt / 0.35);
+          vec3 n = normalize(normalMatrix * turn(nn));
+          float rim = 0.55 + 0.45 * (1.0 - abs(n.z));
+          vec4 mv = modelViewMatrix * vec4(iOff + turn(p * iR), 1.0);
+          vCol = lightSheet(iHue * (1.6 * uBase * (1.0 + 0.4 * uLive * uRate) * rim + 1.3 * uSpikeI * f), -mv.z, uFocus);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * uFade, 1.0); }` });
+    const somata = new THREE.Mesh(sg, smat); somata.frustumCulled = false; somata.name = "column-somata";
+    group.add(somata);
+    // the layer boundaries: a faint square outline of the column at the pia, at each boundary, and at the white matter
+    const W = COL_W_UM / 2, edges = [];
+    const ring = y => [[-W, y, -W], [W, y, -W], [W, y, -W], [W, y, W], [W, y, W], [-W, y, W], [-W, y, W], [-W, y, -W]];
+    edges.push(...ring(0));
+    for (const L of plan.layers) edges.push(...ring(-L.bottom));
+    for (const [x, z] of [[-W, -W], [W, -W], [W, W], [-W, W]]) edges.push([x, 0, z], [x, -plan.thickness, z]);   // the column's corners
+    const block = o.block;                                            // NeuronRender's tissue block, outlined where it sits
+    if (block && block.um && block.depthUm) {
+      // its depth band, within the column's width (H01's block is wider than this 0.5 mm column)
+      const bw = Math.min(block.um[0], COL_W_UM), bd = Math.min(block.um[2], COL_W_UM), y0 = -block.depthUm[0], y1 = -block.depthUm[1], bx = bw / 2, bz = bd / 2;
+      for (const y of [y0, y1]) edges.push([-bx, y, -bz], [bx, y, -bz], [bx, y, -bz], [bx, y, bz], [bx, y, bz], [-bx, y, bz], [-bx, y, bz], [-bx, y, -bz]);
+      for (const [x, z] of [[-bx, -bz], [bx, -bz], [bx, bz], [-bx, bz]]) edges.push([x, y0, z], [x, y1, z]);
+    }
+    const eg = new THREE.BufferGeometry(); eg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(edges.flat()), 3));
+    const emat = new THREE.ShaderMaterial({ uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+      vertexShader: `uniform float uFocus; varying vec3 vCol; ${LIGHT_SHEET}
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vCol = lightSheet(vec3(0.07, 0.085, 0.09), -mv.z, uFocus);
+          gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform float uFade; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * uFade, 1.0); }` });
+    const outline = new THREE.LineSegments(eg, emat); outline.frustumCulled = false; outline.name = "column-layers";
+    group.add(outline);
+    o.scene.add(group);
+
+    const segments = types.reduce((a, T) => a + T.shape.n * T.list.length, 0);
+    const S = { t0: performance.now(), lastWall: -1e9, gap: 200, prev: 0, rate: 0, spikes: 0, fade: 0, target: 0 };
+    const clock = now => (now - S.t0) / 1000;
+    function onFrame(m) {                                            // only the column's region's spikes and rate
+      if (!m || m.type !== "spiking" || !m.n3 || m.live === false) return;
+      const now = performance.now(), gap = now - S.prev; S.prev = now;
+      if (gap > 30 && gap < 2000) S.gap = 0.7 * S.gap + 0.3 * gap;
+      S.lastWall = now;
+      if (m.n3.rq) { const q = unb64(m.n3.rq); if (q.length > o.region) S.rate = q[o.region]; }
+      const b = unb64(m.n3.sq), play = Math.min(600, S.gap) / 1000, t = clock(now), dirty = new Set();
+      for (let i = 0; i + 2 < b.length; i += 3) {
+        if (b[i] !== o.region || !cells.length) continue;
+        const k = Math.min(cells.length - 1, Math.floor(b[i + 1] * cells.length / 256)), c = cells[k], T = shapes[c.t], at = t + (b[i + 2] / 255) * play;
+        T.spk[c.i] = at; sf[k] = at; dirty.add(T); S.spikes++;
+      }
+      for (const T of dirty) T.sa.needsUpdate = true;
+      if (dirty.size) sfa.needsUpdate = true;
+    }
+    function update(now, focusMm, scalePx) {
+      const live = now - S.lastWall < LIVE_MS;
+      uniforms.uTime.value = clock(now); uniforms.uLive.value = live ? 1 : 0;
+      const r = S.rate ? Math.max(0, Math.min(1, (S.rate / 255 - 0.42) / 0.44)) : 0;
+      uniforms.uRate.value += (r - uniforms.uRate.value) * 0.05;
+      if (focusMm) uniforms.uFocus.value = focusMm;
+      if (scalePx) uniforms.uScale.value = scalePx;
+      S.fade += (S.target - S.fade) * 0.15; if (Math.abs(S.fade - S.target) < 0.003) S.fade = S.target;
+      uniforms.uFade.value = S.fade; group.visible = S.fade > 0.003;
+    }
+    function setOpacity(f) { S.target = Math.max(0, Math.min(1, f)); }
+    // world positions (mm) for the page's labels: each layer's middle, on one vertical edge of the column
+    function anchors() {
+      const out = [], v = new THREE.Vector3();
+      for (const L of plan.layers) { v.set(-W * 1.08, -(L.top + L.bottom) / 2, -W); group.localToWorld(v); out.push({ name: L.name, pos: v.toArray() }); }
+      v.set(-W * 1.08, -plan.thickness - 60, -W); group.localToWorld(v); out.push({ name: "white matter", pos: v.toArray() });
+      return out;
+    }
+    // the world point (mm) at a depth below the pia, on the column's axis
+    function at(depthUm) { const v = new THREE.Vector3(0, -depthUm, 0); group.localToWorld(v); return v.toArray(); }
+    function info() {
+      const byType = {};
+      for (const c of cells) byType[c.t] = (byType[c.t] || 0) + 1;
+      return { region: o.region, widthUm: COL_W_UM, thicknessUm: plan.thickness, neurons: plan.neurons, drawn: cells.length,
+        label: plan.label, segments, drawCalls: types.length + 2, layers: plan.layers.map(L => ({ name: L.name, top: L.top, bottom: L.bottom, neurons: L.neurons, drawn: L.drawn })),
+        types: Object.entries(byType).map(([t, k]) => ({ type: t, n: k, id: morph.cells[t].nmo_id, species: morph.cells[t].species })),
+        live: performance.now() - S.lastWall < LIVE_MS, spikes: S.spikes,
+        spiking: types.reduce((a, T) => a + T.spk.filter(x => x > -1e3).length, 0) };
+    }
+    function dispose() { o.scene.remove(group); for (const T of types) { T.geom.dispose(); T.mat.dispose(); } sg.dispose(); smat.dispose(); eg.dispose(); emat.dispose(); }
+    return { group, onFrame, update, setOpacity, anchors, at, info, dispose, plan, cells };
   }
 
   // ---------- close-up: real neuron shapes (#78) ----------
@@ -579,6 +834,6 @@
                  : `last frame: ${n} spikes recorded, none sent (the stream's 3 KB/s budget was used up)`;
   }
 
-  root.Neurons3D = { create, simplify, cortexNormals, FOREST_SEG, ENLARGE, FOREST_SLOWDOWN, unb64, rateByte, spikeLine, closeup, closeupPlan, kindOf, lod, SEG_BUDGET, SLOWDOWN, PULSE_UM_S,
+  root.Neurons3D = { create, simplify, cortexNormals, column, columnPlan, H01_LAYERS_UM, H01_NEURONS_MM3, COL_W_UM, COL_LABEL, FOREST_SEG, ENLARGE, FOREST_SLOWDOWN, unb64, rateByte, spikeLine, closeup, closeupPlan, kindOf, lod, SEG_BUDGET, SLOWDOWN, PULSE_UM_S,
                      LOD_IN, LOD_OUT };
 })(typeof window !== "undefined" ? window : globalThis);

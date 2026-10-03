@@ -275,6 +275,8 @@ function renderScreens(d){
     + (d.notes || []).map(n => `<div>${esc(n.t)} · ${esc(n.text)}</div>`).join("")
     + `<div>today: ${share || "nothing yet"}</div>`
     + ((d.sources || {}).blocked || []).map(x => `<div>set aside: ${esc(x.label)} (${esc(x.why)}, until ${esc(x.until)})</div>`).join("")
+    + (d.youtube ? `<div>${d.youtube.key_set ? `YouTube API: ${esc(d.youtube.units_used)}/${esc(d.youtube.units_cap)} units today` : "YouTube API key not set"}</div>` : "")
+    + Object.entries(d.feeds || {}).map(([k, v]) => `<div>${esc(k)} logged in, no video: ${esc(v.reason)}${v.captcha ? " (captcha)" : ""}</div>`).join("")
     + (d.music ? `<div>${d.music.now ? `now playing: <b>${esc(d.music.now.title)}</b> — ${esc(d.music.now.artist)} · ` : "no music playing · "}${esc(d.music.source)}</div>` : "")
     + (d.last || []).slice(0, 10).map(x => `<div>${esc(x.t)} · <b>${esc(x.kind)}</b> · ${esc(x.host)} · ${esc(x.title)}</div>`).join("");
   const mu = (d.music || {}).now, tt = (d.last || []).find(x => x.embed);
