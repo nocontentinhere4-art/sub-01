@@ -43,11 +43,10 @@ Views: `overview`, `desk`, `keyboard`, `keycaps`, `chair`, `shelf`, `bed`, `frid
 - **Decals** (one alpha-blended node `decals`, no AO): dust, scuffs, scratches, a coffee ring by the mug, a wall rub, a
   note and stickers on the fridge (cat, waves), stickers on the bin (東京, onigiri) and the bed (a record).
 
-## Budget (final build, AO baked)
-| | main 5f12ea9 | this branch |
-|---|---|---|
-| `room_clean.glb` | 4.17 MB | 5.02 MB (budget 7 MB with G4's soft goods) |
-| triangles | 135k | 153k |
-| draw calls (primitives) | 42 | see the PR (new materials: alu, rubber, keycap, book, decal + the chair's steel and rubber; grey plastic is the black plastic tinted by its vertex colour) |
-| textures on the wire | 2.43 MB | 3.06 MB (floor 2048², the three 1024² atlases, 512² and 256² micro maps) |
-| prop sweep | 44 props, 0 offenders | 44 props, 0 offenders (`sweep.txt`) |
+## Budget (final build, AO baked, merged with G4's soft goods)
+| | main 5f12ea9 (before both) | main 0885950 (G4 merged) | this branch (G4 + G5) |
+|---|---|---|---|
+| `room_clean.glb` | 4.17 MB | 5.33 MB | 6.07 MB (budget 7 MB) |
+| triangles | 135k | 178k | 193k (budget 200k) |
+| draw calls (primitives) | 42 | 48 | 54 (budget 60; new: alu, rubber, keycap, book, decal + the chair's steel and rubber; grey plastic is the black plastic tinted by its vertex colour) |
+| prop sweep | 44 props, 0 offenders | 46, 0 | 46 props, 0 offenders (`sweep.txt`) |
