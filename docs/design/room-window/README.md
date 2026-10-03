@@ -47,3 +47,15 @@ anti-aliasing and the texture filtering are coarser than on a phone or a laptop.
   the 2412 px original (the script prefers it) and `window_cards.py` rebuilds the plate.
 - Day and night are two different neighbourhoods of the same kind; the swap happens inside the blue hour, when both are
   dark, and reads as the lights coming on.
+
+## Fix: the glass at grazing angles (G8 defect #26, `fix/window-glass`)
+`glass/sill_{08,19,23}_before_after.jpg`: G8's harness camera from the sill (`window_<hour>_1280_char`), main vs the fix.
+- Before, seen along the glass the left pane was a pale wash: the view ray's slope grows without bound towards 90°, so the
+  finite plates ran out and only sky and haze were left, and the Fresnel term reached 1.0, so the lit wall's reflection
+  covered what remained.
+- Now the slope is soft-clamped (asymptotes 0.55 m/m sideways, 0.9 m/m up), so a grazing look lands on the
+  neighbourhood, compressed, as the eye expects; the Fresnel term is capped at 0.25 and the reflection's colour at 1.0,
+  the view keeps at least 79 % of its light, and the reflection's weight follows the hour (0.32 at night, 0.10 by day),
+  so the room shows faintly in the glass at night and hardly at all by day. The frontal views are unchanged.
+- The cables are drawn at 4× supersampling as 1–1.6 cm strands with their own sag and slant (seven of them), so they
+  downsample to soft anti-aliased lines instead of identical 3 cm bars.
