@@ -813,7 +813,7 @@ function anatLoad(){
   if (anatP) return anatP;
   return anatP = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "/brain_anatomy.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); })
     .then(() => { anat = BrainAnatomy.create({THREE, scene, renderer, camera, controls, cortex: scene.getObjectByName("cortex"), fibres: scene.getObjectByName("fibres"),
-                    nodes, base: "/anatomy/", caption: html => { const c = $("anatcap"); c.hidden = !html || anat.state().view === "glow" && !anat.state().layers.vessels && !anat.state().layers.nerves;
+                    base: "/anatomy/", caption: html => { const c = $("anatcap"); c.hidden = !html || anat.state().view === "glow" && !anat.state().layers.vessels && !anat.state().layers.nerves;
                     if (c.dataset.h !== html) { c.dataset.h = html; c.innerHTML = html; } }}); return anat; });
 }
 function anatView(v){

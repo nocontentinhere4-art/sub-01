@@ -14,6 +14,9 @@
    "fixed" (formalin-grey, matte, cut open on a plane: his T1 as grey / white matter), "bundles" (the cortex a ghost, the
    real fibres as muted white-matter bundles coloured by direction, not glowing). Layers: vessels, nerves.
 
+   No dots, sprites or point markers anywhere (owner's rule): every part is a lit mesh. `window.zoomBrain` (the page's
+   zoom into a cortical column, 1 = whole brain) fades every material of ours like the page's own.
+
    Usage (classic script; THREE r128 or r169):
      const anat = BrainAnatomy.create({THREE, scene, renderer, camera, cortex, fibres, base: "/anatomy/", caption});
        cortex  : the page's cortex THREE.Mesh (cortex.bin geometry with normals); its material is swapped while a
@@ -154,7 +157,7 @@
       vec3 c = a * (wrap * 1.15 + fill + sky) * cav + scat * cav + (spec + fres * 0.10) * (1.0 - 0.9 * ao);
       return pow(max(c, 0.0), vec3(1.0 / 2.2));
     }`;
-  const CLIP = `uniform vec4 uClip; uniform float uClipOn; uniform float uFlip; varying vec3 vW;
+  const CLIP = `uniform vec4 uClip; uniform float uClipOn; uniform float uFlip; uniform float uAlpha; varying vec3 vW;
     void clipIt() { if (uClipOn > 0.5 && dot(vW, uClip.xyz) > uClip.w) discard; }`;
   const TISSUE_V = `
     attribute float part; attribute float depth;
@@ -177,9 +180,9 @@
       if (uHide > 0.5 && vPart > 1.5) discard;                 // (off) his cerebellum / brainstem come as their own finer meshes
       vec3 N = normalize(vN) * uFlip;                           // computed normals follow the winding; uFlip makes them outward
       bool outside = gl_FrontFacing == (uFlip > 0.0);
-      if (!outside) { gl_FragColor = vec4(pow(pow(uWhite, vec3(2.2)) * 0.55, vec3(1.0 / 2.2)), 1.0); return; }   // the inside of the shell at a cut
+      if (!outside) { gl_FragColor = vec4(pow(pow(uWhite, vec3(2.2)) * 0.55, vec3(1.0 / 2.2)), uAlpha); return; }   // the inside of the shell at a cut
       vec3 base = vPart < 1.5 ? uCerebrum : (vPart < 2.5 ? uCerebellum : uBrainstem);
-      gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth), 1.0);
+      gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth), uAlpha);
     }`;
   const PART_V = `
     varying vec3 vN; varying vec3 vV; varying vec3 vW;
@@ -193,7 +196,7 @@
     varying vec3 vN; varying vec3 vV;
     ${CLIP}
     ${LIGHT}
-    void main() { clipIt(); vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N; gl_FragColor = vec4(lit(uBase, N, normalize(vV), 0.0), 1.0); }`;
+    void main() { clipIt(); vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N; gl_FragColor = vec4(lit(uBase, N, normalize(vV), 0.0), uAlpha); }`;
   const CAP_V = `
     varying vec3 vW; varying vec3 vV;
     void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vW = (modelMatrix * vec4(position, 1.0)).xyz; vV = normalize(-mv.xyz);
@@ -201,7 +204,7 @@
   const CAP_F = `
     precision highp float;
     uniform sampler2D uAtlas; uniform mat4 uWebToVox; uniform vec3 uShape; uniform vec2 uGrid; uniform vec2 uAtlasPx;
-    uniform vec3 uCsf; uniform vec3 uGrey; uniform vec3 uWhite; uniform vec3 uTissue; uniform vec3 uN; uniform float uQuality;
+    uniform vec3 uCsf; uniform vec3 uGrey; uniform vec3 uWhite; uniform vec3 uTissue; uniform vec3 uN; uniform float uQuality; uniform float uAlpha;
     varying vec3 vW; varying vec3 vV;
     float slice(vec3 v, float k) {                                 // one tile of the atlas, bilinear inside the tile
       float c = mod(k, uGrid.x), r = floor(k / uGrid.x);
@@ -220,21 +223,21 @@
       col *= 0.92 + 0.16 * (t - uTissue.y);                       // a little of the scan's own texture
       vec3 N = gl_FrontFacing ? uN : -uN; vec3 L = normalize(vec3(-0.45, 0.55, 0.70));
       float sh = 0.55 + 0.55 * clamp(dot(N, L), 0.0, 1.0);
-      gl_FragColor = vec4(pow(pow(col, vec3(2.2)) * sh, vec3(1.0 / 2.2)), 1.0);
+      gl_FragColor = vec4(pow(pow(col, vec3(2.2)) * sh, vec3(1.0 / 2.2)), uAlpha);
     }`;
   const BUNDLE_V = `
     attribute vec3 dcol; varying vec3 vCol; varying vec3 vW;
     void main() { vCol = dcol; vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
   const BUNDLE_F = `
     precision highp float;
-    uniform float uOpacity; uniform float uMute; varying vec3 vCol; varying vec3 vW;
+    uniform float uOpacity; uniform float uMute; uniform float uAlpha; varying vec3 vCol; varying vec3 vW;
     uniform vec4 uClip; uniform float uClipOn;
     void main() { if (uClipOn > 0.5 && dot(vW, uClip.xyz) > uClip.w) discard;
-      vec3 c = mix(vec3(0.84, 0.80, 0.74), vCol, uMute); gl_FragColor = vec4(c, uOpacity); }`;
+      vec3 c = mix(vec3(0.84, 0.80, 0.74), vCol, uMute); gl_FragColor = vec4(c, uOpacity * uAlpha); }`;
   const GHOST_V = `varying vec3 vN; varying vec3 vV;
     void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`;
-  const GHOST_F = `precision highp float; varying vec3 vN; varying vec3 vV;
-    void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.5); gl_FragColor = vec4(vec3(0.75, 0.72, 0.70) * f, f * 0.55); }`;
+  const GHOST_F = `precision highp float; varying vec3 vN; varying vec3 vV; uniform float uAlpha;
+    void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.5); gl_FragColor = vec4(vec3(0.75, 0.72, 0.70) * f, f * 0.55 * uAlpha); }`;
 
   function create(o) {
     const THREE = o.THREE, scene = o.scene, renderer = o.renderer, base = o.base || "/anatomy/";
@@ -246,7 +249,7 @@
     const origCortexMat = cortex ? cortex.material : null, origFibreMat = fibres ? fibres.material : null;
     const origDpr = renderer && renderer.getPixelRatio ? renderer.getPixelRatio() : 1;
     const v3 = a => new THREE.Vector3(a[0], a[1], a[2]);
-    const uClip = { value: new THREE.Vector4(0, 1, 0, 0) }, uClipOn = { value: 0 }, uFlip = { value: 1 };
+    const uClip = { value: new THREE.Vector4(0, 1, 0, 0) }, uClipOn = { value: 0 }, uFlip = { value: 1 }, uAlpha = { value: 1 };
     let winding = 0;                                                              // +1 CCW / -1 CW of the cortex mesh, from its signed volume
     const palU = pal => ({ uSpec: { value: pal.spec }, uShine: { value: pal.shine }, uWrap: { value: pal.wrap }, uScatter: { value: pal.scatter } });
     const bbox = { min: [1e9, 1e9, 1e9], max: [-1e9, -1e9, -1e9] };
@@ -258,14 +261,14 @@
     // --- materials ---
     const tissueMat = pal => new THREE.ShaderMaterial({
       uniforms: Object.assign({ uCerebrum: { value: v3(pal.cerebrum) }, uCerebellum: { value: v3(pal.cerebellum) }, uBrainstem: { value: v3(pal.brainstem) },
-        uWhite: { value: v3(pal.white) }, uHide: { value: 0 }, uClip, uClipOn, uFlip, uBase: { value: v3(pal.cerebrum) } }, palU(pal)),
+        uWhite: { value: v3(pal.white) }, uHide: { value: 0 }, uClip, uClipOn, uFlip, uAlpha, uBase: { value: v3(pal.cerebrum) } }, palU(pal)),
       vertexShader: TISSUE_V, fragmentShader: TISSUE_F, side: THREE.DoubleSide });
     const partMat = (pal, kind) => new THREE.ShaderMaterial({
-      uniforms: Object.assign({ uBase: { value: v3(pal[kind]) }, uClip, uClipOn, uFlip }, palU(pal), { uSpec: { value: kind === "artery" ? pal.spec * 1.3 : pal.spec * 0.6 } }),
+      uniforms: Object.assign({ uBase: { value: v3(pal[kind]) }, uClip, uClipOn, uFlip, uAlpha }, palU(pal), { uSpec: { value: kind === "artery" ? pal.spec * 1.3 : pal.spec * 0.6 } }),
       vertexShader: PART_V, fragmentShader: PART_F, side: THREE.DoubleSide });
-    const bundleMat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0.55 }, uMute: { value: 0.45 }, uClip, uClipOn },
+    const bundleMat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0.55 }, uMute: { value: 0.45 }, uClip, uClipOn, uAlpha },
       vertexShader: BUNDLE_V, fragmentShader: BUNDLE_F, transparent: true, depthWrite: false });
-    const ghostMat = new THREE.ShaderMaterial({ vertexShader: GHOST_V, fragmentShader: GHOST_F, transparent: true, depthWrite: false, side: THREE.FrontSide });
+    const ghostMat = new THREE.ShaderMaterial({ uniforms: { uAlpha }, vertexShader: GHOST_V, fragmentShader: GHOST_F, transparent: true, depthWrite: false, side: THREE.FrontSide });
     const mats = { fresh: tissueMat(PALETTE.fresh), fixed: tissueMat(PALETTE.fixed) };
     let capMat = null, cap = null;
     const partMeshes = [], hisMeshes = [];
@@ -343,7 +346,7 @@
         capMat = new THREE.ShaderMaterial({ uniforms: { uAtlas: { value: atlasTex }, uWebToVox: { value: M }, uShape: { value: v3(vol.shape) },
           uGrid: { value: new THREE.Vector2(vol.cols, vol.rows) }, uAtlasPx: { value: new THREE.Vector2(vol.cols * vol.shape[0], vol.rows * vol.shape[1]) },
           uCsf: { value: v3(PALETTE.fixed.csf) }, uGrey: { value: v3(PALETTE.fixed.grey) }, uWhite: { value: v3(PALETTE.fixed.white) },
-          uTissue: { value: v3([vol.tissue.csf, vol.tissue.grey, vol.tissue.white]) }, uN: { value: new THREE.Vector3(0, 1, 0) }, uQuality: { value: st.tier === "low" ? 0 : 1 } },
+          uTissue: { value: v3([vol.tissue.csf, vol.tissue.grey, vol.tissue.white]) }, uN: { value: new THREE.Vector3(0, 1, 0) }, uQuality: { value: st.tier === "low" ? 0 : 1 }, uAlpha },
           vertexShader: CAP_V, fragmentShader: CAP_F, side: THREE.DoubleSide });
         cap = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), capMat); cap.name = "cut_cap"; cap.frustumCulled = false; cap.visible = false;
         group.add(cap); st.atlas = true; st.loading--; apply();
@@ -415,6 +418,12 @@
     // frame-time tier: below LIVE_FPS for 3 s with a realistic view on -> pixel ratio 1.25 and nearest-slice cuts (once; no flapping)
     let lastT = 0, acc = 0, n = 0, lowSince = 0;
     function update(now) {
+      const z = typeof root.zoomBrain === "number" ? Math.min(1, Math.max(0, root.zoomBrain)) : 1;   // the page's zoom into a column fades the brain
+      if (z !== uAlpha.value) {
+        uAlpha.value = z;
+        const fading = z < 1;                                                    // opaque materials turn transparent only while fading
+        for (const m of [mats.fresh, mats.fixed, capMat].concat(partMeshes.map(p => p.material))) if (m) { m.transparent = fading; m.depthWrite = !fading; }
+      }
       if (lastT) { const dt = now - lastT; if (dt < 500) { acc += dt; n++; } }
       lastT = now;
       if (acc >= 1000 && n) {
@@ -432,7 +441,7 @@
     function state() {
       return { view: st.view, layers: Object.assign({}, st.layers), cut: Object.assign({}, st.cut, cutPlane(st.cut.axis, st.cut.t, bbox)), meshes: st.meshes, parts: st.parts,
                atlas: st.atlas, tier: st.tier, fps: st.fps, loading: st.loading, drawn: group.children.filter(c => c.visible).map(c => c.name),
-               bbox, winding, fibresDrawn: !fibres || fibres.material !== bundleMat || bundleMat.visible,
+               bbox, winding, alpha: uAlpha.value, fibresDrawn: !fibres || fibres.material !== bundleMat || bundleMat.visible,
                cortexSwapped: !!cortex && cortex.material !== origCortexMat, fibresSwapped: !!fibres && fibres.material !== origFibreMat };
     }
     function dispose() {

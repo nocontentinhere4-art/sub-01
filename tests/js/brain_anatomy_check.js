@@ -88,6 +88,10 @@ const tick = () => new Promise(r => setTimeout(r, 5));
   // the frame-time tier: 20 fps for 4 s with a realistic view on -> the low tier, pixel ratio capped
   let now = 1000; for (let i = 0; i < 90; i++) { now += 50; anat.update(now); }
   views.tier = { tier: anat.state().tier, fps: anat.state().fps, dpr: renderer.dpr, caption_has_low: /low-detail/.test(caption) };
+  globalThis.zoomBrain = 0.4; anat.update(now + 50);
+  views.fade = { alpha: anat.state().alpha, transparent: cortexMesh.material.transparent, depthWrite: cortexMesh.material.depthWrite };
+  globalThis.zoomBrain = 1; anat.update(now + 100);
+  views.fade.back = { alpha: anat.state().alpha, transparent: cortexMesh.material.transparent };
   anat.setView("glow"); for (let i = 0; i < 20; i++) await tick();
   views.back = { cortexMat: cortexMesh.material.name === "orig-cortex" ? "orig" : "swapped", fibresMat: fibres.material.name === "orig-fibres" ? "orig" : "swapped", drawn: anat.state().drawn };
   anat.dispose();

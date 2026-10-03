@@ -164,6 +164,15 @@ def test_low_tier_on_a_slow_frame_rate(check):
     assert t["tier"] == "low" and t["fps"] == 20 and t["dpr"] == 1.25 and t["caption_has_low"]
 
 
+def test_page_zoom_fades_our_materials_and_nothing_is_a_dot(check):
+    f = check["views"]["fade"]
+    assert f["alpha"] == 0.4 and f["transparent"] is True and f["depthWrite"] is False      # window.zoomBrain (B's zoom) fades the specimen
+    assert f["back"] == {"alpha": 1, "transparent": False}
+    js = (WEB / "brain_anatomy.js").read_text()
+    for marker in ("THREE.Points", "Sprite", "gl_PointSize", ".arc("):                     # the owner's rule: no dots or sprites
+        assert marker not in js, marker
+
+
 def test_captions_say_what_is_his_and_what_is_atlas(check):
     v = check["views"]
     for name in ("fresh", "fixed", "bundles"):
