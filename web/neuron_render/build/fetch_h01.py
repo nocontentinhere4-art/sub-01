@@ -637,7 +637,7 @@ def main():
     focus = best[0]; used.add(focus)
     log("focus cell", focus)
     P, R, C, PAR, FR = load_swc(h, focus)
-    CL = propagate(C, PAR, len(P)); soma_nm = P[CL == 3].mean(0)
+    CL = propagate(C, PAR, len(P)); soma_nm = soma_centre(P, R, np.where(CL == 3)[0])   # the block frame's origin: the focus soma
     # block frame: +y toward the pia along the layer axis, x along the slab, z through the slab
     Rm = np.zeros((3, 3))
     up = np.zeros(3); up[axis] = sign
