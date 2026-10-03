@@ -34,7 +34,7 @@ from tests.visual.fake_server import Server               # noqa: E402
 from tests.visual.cdn_cache import CdnCache                # noqa: E402
 
 CHROMIUM = os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
-GLB_FILES = 10                                            # room_clean, boy, 6 clips, hand_phone, food
+GLB_FILES = 11                                            # room_clean, boy, 6 clips, hand_phone, food, boy_moves (#76: last)
 BUDGETS = json.loads((HERE / "budgets.json").read_text())
 
 
