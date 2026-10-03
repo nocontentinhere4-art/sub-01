@@ -403,7 +403,7 @@ function zoomEnd(){
   zoom.col.dispose();
   controls.minDistance = zoom.saved.min; controls.zoomSpeed = zoom.saved.zs; controls.autoRotate = zoom.saved.rot;
   zoomBack = { t0: performance.now(), from: controls.target.clone(), to: zoom.from.target.clone() };
-  zoom = null; zoomBrain = window.zoomBrain = 1; camera.up.set(0, 0, 1);
+  zoom = null; zoomBrain = window.zoomBrain = 1; camera.up.set(0, 0, 1); zoomLayers();
   if (n3d) { n3d.setZoomFade(1); }
   camera.near = 1; camera.updateProjectionMatrix();
   document.body.classList.remove("zooming"); $("n3labels").innerHTML = ""; neuronsText();
@@ -423,6 +423,14 @@ function zoomHandoff(){                              // the tissue block: Neuron
   document.body.classList.add("closeup"); n3lodAt = performance.now();
   neuronsText();
 }
+// faded-out brain layers are not drawn at all: inside the column the camera sits within the fibres, and drawing them at
+// zero opacity would still cost a phone's GPU (or a CPU rasteriser) every one of their pixels
+function zoomLayers(){
+  for (const l of ["fibres", "cortex"]) {
+    const o = scene.getObjectByName(l), b = document.querySelector(`#layers button[data-l="${l}"]`);
+    if (o && b) o.visible = b.classList.contains("on") && zoomBrain > 0.003;
+  }
+}
 function zoomFrame(now){                             // once per drawn frame while zooming
   const d = camera.position.distanceTo(controls.target);
   if (zoom.anim) {                                   // the dive: aim, approach along log distance, turn to look across
@@ -439,6 +447,7 @@ function zoomFrame(now){                             // once per drawn frame whi
     controls.target.lerp(zoom.look, 0.08);
   }
   zoomBrain = window.zoomBrain = smooth(ZOOM.brainOut[0], ZOOM.brainOut[1], d);   // window.zoomBrain: brain_anatomy.js fades with it
+  zoomLayers();
   if (d < 10 && !zoom.prefetched && typeof NeuronRender.prefetch === "function") {   // the tissue block's assets, early
     zoom.prefetched = true; try { NeuronRender.prefetch({kind: "cortex"}); } catch (e) {}
   }

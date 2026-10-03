@@ -402,7 +402,7 @@
       const isLive = now - S.lastWall < LIVE_MS;
       const target = S.on ? 1 : 0;                                    // offline: the cells stand still, never flash
       S.fade += (target - S.fade) * 0.08; if (Math.abs(S.fade - target) < 0.004) S.fade = target;
-      group.visible = S.fade > 0;
+      group.visible = S.fade > 0 && uniforms.uZoom.value > 0.003;    // faded out by the zoom (#99): not drawn at all
       if (!group.visible) return;
       uniforms.uTime.value = clockS(now); uniforms.uFade.value = S.fade;
       uniforms.uLive.value += ((isLive ? 1 : 0) - uniforms.uLive.value) * 0.05;

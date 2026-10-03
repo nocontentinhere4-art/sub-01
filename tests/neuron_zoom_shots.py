@@ -100,8 +100,8 @@ def main():
                 for i, t in enumerate(thumbs):
                     sheet.paste(t, (i * tw, 0))
                 sheet.save(out / f"zoom_{w}_sheet.jpg", quality=85)
-                gw = 960 if w > 600 else 390
-                gif = [im.resize((gw, int(im.height * gw / im.width))) for im in ims]
+                gw = 640 if w > 600 else 300
+                gif = [im.resize((gw, int(im.height * gw / im.width))).quantize(colors=96, method=Image.Quantize.MEDIANCUT) for im in ims]
                 gif[0].save(out / f"zoom_{w}.gif", save_all=True, append_images=gif[1:], duration=900, loop=0, optimize=True)
                 if w == 390:                                 # frame time at column scale, CPU x4 (software WebGL here)
                     pg.evaluate("document.querySelector('#n3close button[data-k=\"\"]').click()")
@@ -111,6 +111,7 @@ def main():
                     pg.evaluate(STEP_JS, 0.7)
                     cdp = ctx.new_cdp_session(pg)
                     cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
+                    pg.evaluate("window.__frameMs(3000)")                 # the first window warms up; the second counts
                     m = pg.evaluate("window.__frameMs(6000)")
                     cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
                     res["column_390_x4"] = {"fps": round(m["frames"] / 6, 1), "js_ms_per_frame": m["js_ms_per_frame"],
