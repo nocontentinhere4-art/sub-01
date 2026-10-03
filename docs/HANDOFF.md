@@ -478,6 +478,40 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Checks: `pytest tests/test_neuron_render.py` (node check `tests/js/neuron_render_check.js`); screenshots and timings
   `python tests/neuron_render_shots.py`.
 
+## The brain as a real specimen (#99 G9, PR `feature/brain-anatomy`, `docs/research/real_brain_sources.md`)
+- `/brain` dock row **view: glow · fresh brain · dissected · bundles** + layers **vessels**, **nerves**
+  (`web/brain_anatomy.js`; assets `web/anatomy/`, 1.9 MB, each fetched once when needed; `?view=glow` /
+  `?view=fresh&layers=vessels,nerves` opens one). **"fresh brain" is the default** (coordinator, 2026-10-03); "glow" is
+  the page's own additive look, kept as an option (the mini keeps it). The module swaps the cortex and fibre objects'
+  `material` while a realistic view is on and restores the originals on "glow" (the page's own uniform updates keep
+  pointing at them). "bundles" shares the page's fibre uniforms by reference (stage mix, region activity, the travelling
+  stimulus), so a message still runs along its route and sleep cools the tint, with normal blending and no glow.
+  Every material fades with `window.zoomBrain` (B's zoom, #111). Captions (`#anatcap`) say, part by part, what is HIS
+  and what is an ATLAS, and what is not drawn. The pia's wet patches and the reddish runs in the sulci are shading cues
+  (value noise; the caption says the vessels are a cue, not drawn vessels).
+- **His** (same MRI as the fibres): the cortex (sulcal shading computed in the browser from his own mesh), his
+  cerebellum (folia) and brainstem as their own surfaces (`analysis/build_anatomy.py`: ICBM 2009c's segmentation warped
+  onto his T1 with dipy only to say which of his voxels they are; marching cubes on his tissue above a local Otsu
+  threshold), and the cut plane of the dissected view: his T1 at 2 mm as a tile-atlas texture (`t1_atlas.png`, grey + a soft brain
+  mask in the alpha so the cut's edge has no voxel steps), coloured grey / white / CSF from the peaks of his own
+  histogram (`anatomy.json` → `volume.tissue`). Cut: coronal,
+  sagittal or axial, a slider for the position; the removed side is clipped in the shaders (no renderer clipping).
+- **Atlas, fitted to his brain** (one similarity transform, trimmed ICP of the atlas brain onto `cortex.bin`, RMS
+  ≈ 2.6 mm, in `anatomy.json` → `parts.fit`): BodyParts3D (NBDC archive, **CC BY 4.0** since 2025-02-27; credit line
+  verbatim in `web/anatomy/CREDITS.md` and `/about`) arteries (circle of Willis, carotid, vertebral, basilar,
+  ACA / MCA / PCA and cortical branches, cerebellar arteries; branches just under his surface pressed onto it),
+  nerves II (optic nerve, chiasm, tract), III (orbital branches), IV, V1, the pituitary, a spinal cord stub; VENAT
+  (Huck 2019, **CC BY 4.0**) dural sinuses and large veins (`analysis/venat_veins.py`, through the template affine).
+  **Not drawn, said in the caption:** cranial nerves I, VI–XII, the trunks of III and V, the small bridging veins:
+  no openly licensed model exists (BigBrain, Julich-Brain, Allen, SUIT, Umeå arteries are all non-commercial).
+- Colours: approximate, read off CC0 photographs (Häggström) — `PALETTE` in the module; no photo is shipped.
+- Performance: the fibres stay the page's main cost; the module adds ≤ 36k atlas triangles + 67k for his cerebellum and
+  brainstem. A frame-rate tier: below 28 FPS for 3 s with a realistic view on, the pixel ratio is capped at 1.25 and the
+  cut samples the nearest slice (once; restored on "glow"). Measured only under software WebGL here
+  (`docs/screens/brain_anatomy/results.json`): the ≥ 30 FPS phone check needs a real device.
+- Rebuild: `python analysis/build_anatomy.py` (fetches the template, BodyParts3D 143 MB and VENAT 77 MB into
+  `out/anatomy_work/`, git-ignored; registration ≈ 15 min). Checks: `pytest tests/test_brain_anatomy.py` (node check
+  `tests/js/brain_anatomy_check.js`); screenshots `python tests/brain_anatomy_shots.py [--cdn-dir …]`.
 ## Neurons at maximum realism: real H01 cells in the close-ups (#99 A, `docs/spiking/neuron_render.md` § #99)
 - `web/neuron_render/build/fetch_h01.py` builds `web/neuron_render/h01/` once from H01 (Shapson-Coe et al. 2024, human
   temporal cortex EM, CC BY 4.0, `gs://h01-release`, cached in `data/h01_cache/`): proofread cells' decimated meshes,
