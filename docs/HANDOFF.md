@@ -45,8 +45,12 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Live feed: plain `/ws` = 20 ticks/s with per-region activity (brain page); the room connects with `/ws?rate=5&lite=1`
   (5/s, no `act`, trades/events of skipped ticks kept). Room: shadow maps updated by hand (~30/s), DPR capped at 1.5
   with adaptive resolution, nothing rendered while the tab is hidden; brain `?mini` draws 1/6 of the fibres at ≤30 fps.
-- Room model: `web/room/room_clean.glb` (4.0 MB) is a clean rebuild — modelled in Blender by `room_build/build_room.py`
-  (headless Blender 4.2), Poly Haven CC0 props/textures, AO baked into a second UV set; credits in `web/room/CREDITS.md`.
+- Room model: `web/room/room_clean.glb` (5.1 MB, 178k triangles, 48 draw calls) is a clean rebuild — modelled in Blender by
+  `room_build/build_room.py` (headless Blender 4.2), Poly Haven CC0 props/textures, AO baked into a second UV set; credits in
+  `web/room/CREDITS.md`. The soft goods (#98 G4: socks, towel, duvet, pillow, mattress, curtains, rug, cushion, hoodie, tote,
+  backpack, jeans, T-shirt) are `room_build/props_soft.py` (two cloth simulations; fixed-camera renders by
+  `room_build/shots_soft.py`, before/after in `docs/design/room-soft/`). Thin parts set `ao_small` so the AO bake gives them
+  the white corner (thin UV islands get no texel and render black otherwise); thin sheets carry no rim faces for the same reason.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its

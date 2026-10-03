@@ -108,9 +108,9 @@ class Harness:
     def snap(self, pg, name, hour):
         """The fake server sends this scene; once the page has its tick, snap him into it the way the page's first
         tick does (the debug act()), so the ticks that follow find him where they want him and plan nothing."""
-        lf, stage, before, settle_s, at, clip = S.SCENES[name]
+        lf, stage, before, settle_s, at, clip, prep = S.scene(name)
         self.server.set_scene(name, hour)
-        pg.evaluate(f"setHour({hour})")
+        pg.evaluate(f"setHour({hour}); if (window.ROLL) ROLL.force = null;")
         try:
             pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
                                  f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000)
@@ -125,8 +125,10 @@ class Harness:
     def goto_scene(self, pg, name, hour):
         """Put him into a scene. Most scenes snap straight in; the phone in bed starts lying asleep and the fake
         server's phone tick brings the phone up; walking starts at the door and the research tick sends him off."""
-        lf, stage, before, settle_s, at, clip = S.SCENES[name]
+        lf, stage, before, settle_s, at, clip, prep = S.scene(name)
         self.snap(pg, before or name, hour)
+        if prep:
+            pg.evaluate(prep)
         if before:                                                 # the next tick must change his goal (anchor or clip)
             was = pg.evaluate("JSON.stringify(pose().goal)")
             self.server.set_scene(name, hour)
@@ -156,7 +158,7 @@ class Harness:
             pg.evaluate("__qa.hud(true)")
 
     def check_pose(self, key, name, pose):
-        _, _, _, _, at, clip = S.SCENES[name]
+        _, _, _, _, at, clip, _ = S.scene(name)
         ok_at = at is None or pose.get("at") == at
         ok_clip = clip is None or clip in (pose.get("clip") or "")
         if name == "walking":
@@ -180,6 +182,7 @@ class Harness:
         if r["exposure"]["black_frac"] > 0.97:
             self.res["hard_failures"].append(f"{key}: the 3D canvas is blank ({r['exposure']['black_frac']:.0%} black)")
         r["lights"] = pg.evaluate("__qa.lights()")
+        r["screen"] = pg.evaluate("__qa.screenState()")               # the monitor and the follow camera: on only at the desk
         r["render"] = pg.evaluate("__qa.info()")
         if size == "1280":                                        # a medium shot of him too, from his front-right
             r["character_cam"] = pg.evaluate("__qa.characterCam()")
@@ -196,7 +199,7 @@ class Harness:
                 self.res["props"][key] = pg.evaluate("__qa.props()")
         r["seconds"] = round(time.time() - t0, 1)
         self.res["shots"][key] = r
-        self.log(f"  {key}: pose {pose.get('at')}/{pose.get('clip')} black {r['exposure']['black_frac']:.1%} "
+        self.log(f"  {key}: pose {pose.get('at')}/{pose.get('clip')} monitor {'on' if r['screen']['monitor_on'] else 'off'} cam {r['screen']['camera']} black {r['exposure']['black_frac']:.1%} "
                  f"body bed {r.get('body', {}).get('bed', '-')} chair {r.get('body', {}).get('chair', '-')} {r['seconds']}s")
         return r
 

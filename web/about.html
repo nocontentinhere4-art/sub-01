@@ -213,9 +213,18 @@ results in <code>docs/spiking/gpu_reading/</code>).</p>
       <li>medium spiny neuron, rat nucleus accumbens (NMO_10032): Spiga S et al. (2005), Eur J Neurosci 22:2332;</li>
       <li>thalamic relay cell, rat VPM (NMO_115363): Iavarone E et al. (2019), PLoS Comput Biol 15:e1006753;</li>
       <li>CA1 pyramidal cell, rat hippocampus (NMO_00222): Ishizuka N, Cowan WM, Amaral DG (1995), J Comp Neurol 362:17;</li>
-      <li>principal cell, mouse basolateral amygdala (NMO_139102): Hsu TT, Huang TN, Hsueh YP (2020), Front Mol Neurosci 13:47.</li>
+      <li>principal cell, mouse basolateral amygdala (NMO_139102): Hsu TT, Huang TN, Hsueh YP (2020), Front Mol Neurosci 13:47;</li>
+      <li>layer-5 pyramidal cell, human anterior temporal cortex, dendrites only (NMO_159993; the deep pyramids of the zoom's
+        cortical column, <code>web/column_morph.json</code>): Moradi Chameh H et al. (2021), Nat Commun 12:2497.</li>
     </ul>
     <span class="src">(<code>docs/spiking/morphology_credits.md</code>, <code>analysis/build_morphologies.py</code>)</span></li>
+  <li><strong>Cortical layers of the zoom's column</strong> (/brain, zoom in with neurons on): the layer thicknesses L1–L6
+    are measured from the public layer annotation of <strong>H01</strong>, a nanoscale reconstruction of about 1 mm³ of
+    human temporal cortex: Shapson-Coe A et al. (2024), <em>A petavoxel fragment of human
+    cerebral cortex reconstructed at nanoscale resolution</em>, Science 384:eadk4858 (Google and Harvard), released under
+    <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; its neuron count (~16 000 per mm³) sets how many
+    neurons the column stands for. Not from the scanned person.
+    <span class="src">(<code>analysis/h01_layers.py</code>, <code>docs/spiking/h01_layers.json</code>)</span></li>
   <li><strong>Real electron-microscopy neurons</strong> (the cortex close-up on /brain, <code>web/neuron_render/h01/</code>): cells, synapses,
     axon labels and an EM image from <a href="https://h01-release.storage.googleapis.com">H01</a>, a reconstruction of about one cubic
     millimetre of human temporal cortex by Google and Harvard: Shapson-Coe A, Mohar M, Meirovitch Y et al. (2024), A petavoxel fragment
