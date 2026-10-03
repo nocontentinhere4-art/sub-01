@@ -1192,7 +1192,7 @@ function lighting(dt){
   // on all of them): 2.5 knit by day (bright, the view still readable at the day stop; 5 would clip to white), 0.03 at
   // night (0.36 at the night stop); its weather says how much direct sun gets through
   windowView.setEmission(OLD_ROOM ? 1 : 2.5, OLD_ROOM ? 1 : 0.03);
-  const sunK = windowView.light && Number.isFinite(windowView.light.sun) ? windowView.light.sun : 1;   // NaN before the weather's first update: a NaN sun blacks out every frame
+  const wl = windowView.light, sunK = wl && Number.isFinite(wl.sun) ? wl.sun : 1;   // NaN before the weather's first update: a NaN sun blacks out every frame
   sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
   sun.intensity = 0.3 + 2.3 * day + 0.7 * dusk;                       // the old room (baked textures) keeps its own scale
   const w = SURF.window; sun.position.set(w.c[0] - 3.5, w.c[1] + 1.2 + 2.5 * Math.max(0, sunEl), w.c[2] + 1.0); sun.target.position.set(0.2, 0.3, 0.1);
