@@ -306,6 +306,44 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
 
+**Pass 39 (2026-10-03 22:00 UTC).**
+- **Merged since pass 38:**
+  - Live behaviour and content:
+    - #109: Shorts through the YouTube Data API v3 and the official embed; TikTok through its official player.
+    - #104: the snapshot now sends the walk path.
+    - #101: real H01 close-ups.
+    - #111: continuous zoom from brain to column to H01.
+    - #106: the anatomical brain.
+  - Room:
+    - #107: G4 soft goods (socks, towel, duvet).
+    - #110: G5 hard surfaces.
+    - #113: G7 photographic window.
+  - Character and QA:
+    - #80: boy_moves.glb, 39 clips on the original boy.glb.
+    - #112 and #115: G8 QA re-score, 1.7 → 1.9 → 2.4.
+  - Fixes and docs:
+    - #116: the room's mini brain shows only real fibres, no cell dots.
+    - #118: illustrated README; the technical sections moved to `docs/TECHNICAL.md`.
+    - The H01 author list was corrected (9eb0afd).
+- **Bed regression (owner, confirmed live at 06:11 Tokyo):**
+  - What happens: he lies on top of the duvet, diagonally, with his head into the wall. Then #107's duvet under
+    #108's lift becomes a tent with a black hole, and the slides poke out at the foot end (G8 defect #25).
+  - Assigned to the #63 worker on `fix/bed-duvet` (the room.html sleep block), with G4 on `props_soft.py` (pillow loft,
+    duvet thickness or back faces, seams, sock cuffs = #23, #24).
+- **Other G8 defects:** #26 (glass Fresnel, wires) → G7 on `fix/window-glass`; #27 (typing hands) → G3.
+- **Open PRs:**
+  - #114 (G3, ARDY plus the procedural layer, `?motion=` table): the motion sheet is pending.
+  - #103 (G6): fixed exposure per state; boy.glb was rendering fully metallic. The final push is pending.
+  - #117 (G2, boy.glb rebuilt in place): changes requested. Doll-like eyes with gaps, a black streak at the collar,
+    bake blotches on the slides and socks, noisier side hair, paler skin.
+- **GitHub Actions has been down since 19:05 UTC.** Every job ends in seconds with no runner and no logs: an
+  account-level billing or spending limit. The owner must check Settings → Billing. Until then, PRs merge on local
+  evidence (pytest, smoke, tests/visual).
+- **Repo cleanup:**
+  - Closed the finished issues #99, #88, #76, #75 and #68.
+  - The session cannot delete branches. Still to do by the owner: 61 branches of closed PRs, 19 old unmerged `rw-*` and
+    `twin-*` branches, and the repo description (still "wired to live Solana trades").
+
 **Pass 38 (2026-10-03 15:10 UTC).** Overnight, most workers stopped on the weekly usage limit, which reset at 11:00
 UTC. The owner said "procedi" and all were restarted at 14:20 UTC.
 - **Merged:** #100 (G1 research catalogue), #102 (G8 visual-QA harness + `visual` CI job; photoreal scorecard
