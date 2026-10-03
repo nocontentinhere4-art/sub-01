@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 NM = ROOT / "room_build" / "node_modules"
 SITUATIONS = [("desk", "research", {}), ("eat", "eat", {"eating": "ramen", "food": 1}), ("stand", "idle_home", {"place": "room"}),
-              ("window", "window", {}), ("phone_bed", "phone", {}), ("sleep", "sleep", {})]
+              ("window", "window", {}), ("door", "idle_home", {"place": "door_in"}), ("phone_bed", "phone", {}), ("sleep", "sleep", {})]
 # measured in the page: the lowest sole, NaN, the frame time of animate()
 PROBE = """() => {
   const b = window.boy, bones = window.bones; if (!b) return null; b.updateMatrixWorld(true);
@@ -31,20 +31,24 @@ PROBE = """() => {
   for (const n of ["LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"]) { const o = bones[n]; if (!o) continue; o.getWorldPosition(v);
     low = Math.min(low, v.y - (n.endsWith("Foot") ? 0.125 : 0.037)); }
   for (const n in bones) { const q = bones[n].quaternion; if (![q.x, q.y, q.z, q.w].every(Number.isFinite)) nan++; }
+  let armLow = 9; for (const n of ["LeftForeArm", "LeftHand", "RightForeArm", "RightHand"]) { const o = bones[n]; if (!o) continue; o.getWorldPosition(v);
+    if (v.x > -1.9 && v.x < -0.32 && v.z > -1.44 && v.z < -0.74) armLow = Math.min(armLow, v.y - 0.97); }   // over the desk: height above its top
   const legs = {}; for (const n of ["Hips", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightFoot", "RightToeBase"]) if (bones[n]) { bones[n].getWorldPosition(v); legs[n] = +v.y.toFixed(3); }
   const rest = window.motion && window.motion.rest ? {ankle: window.motion.rest.ankle, toe: window.motion.rest.toe, p: Object.fromEntries(Object.entries(window.motion.rest.p || {}).map(([k, v]) => [k, v.toArray().map(x => +x.toFixed(3))]))} : null;
-  return {lowest_sole: +(low - 0.16).toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
+  return {lowest_sole: +(low - 0.16).toFixed(3), arm_over_desk: armLow === 9 ? null : +armLow.toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
     swapped: window.motion ? Object.keys(window.motion.swapped) : [], log: window.motion ? window.motion.log : []};
 }"""
 
 
 # the camera close to him: a three-quarter view from his front-left, the whole body in frame
 FRAME = """() => { const b = window.boy; if (!b) return; const t = new THREE.Vector3(); b.getWorldPosition(t); t.y += 0.8;
+  const tall = [[-0.12, 0.32, -1.45, -1.17], [0.45, 0.93, -1.45, -0.97], [-1.9, -1.84, -0.62, 0.9]];   // shelf, fridge, the window wall: never inside them
+  const inTall = p => tall.some(([x0, x1, z0, z1]) => p.x > x0 - 0.15 && p.x < x1 + 0.15 && p.z > z0 - 0.15 && p.z < z1 + 0.15);
   const r = b.rotation.y, box = p => { p.x = Math.min(1.85, Math.max(-1.75, p.x)); p.z = Math.min(1.5, Math.max(-1.3, p.z)); p.y = Math.min(2.3, p.y); return p; };
   // the whole body in frame: of eight directions around him (his front half first), the one with most room inside the walls
   let best = null;
   for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8]) { const d = new THREE.Vector3(Math.sin(r + a), 0, Math.cos(r + a));
-    const c = box(t.clone().addScaledVector(d, 3.2).add(new THREE.Vector3(0, 0.8, 0))), dist = c.distanceTo(t) - (Math.abs(a) > 1.5 ? 0.6 : 0);
+    const c = box(t.clone().addScaledVector(d, 3.2).add(new THREE.Vector3(0, 0.8, 0))), dist = c.distanceTo(t) - (Math.abs(a) > 1.5 ? 0.6 : 0) - (inTall(c) ? 5 : 0);
     if (!best || dist > best.dist) best = {c, dist}; }
   camera.fov = 46; camera.updateProjectionMatrix(); camera.position.copy(best.c); controls.target.copy(t); controls.update(); renderer.render(scene, camera); }"""
 
@@ -147,7 +151,7 @@ def sheet(out, results, widths):
         print("no PIL: no sheet")
         return
     for w in widths:
-        cols = [k for k, _, _ in SITUATIONS]
+        cols = [k for k, _, _ in SITUATIONS if any((out / f"{k}_{m}_{w}_0.jpg").exists() for m in ("old", "new"))]
         rows = [("old", 0), ("new", 0), ("old", 2), ("new", 2)]
         tw = 320 if w > 900 else 160
         imgs = {}

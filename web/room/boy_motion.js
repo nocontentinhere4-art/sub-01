@@ -158,8 +158,8 @@ export function createMotion(env){
       const n = scene.getObjectByName(name); if (!n) return;
       REST.q[name] = n.getWorldQuaternion(Q()); REST.p[name] = n.getWorldPosition(V());
     }
-    REST.ankle = Math.min(REST.p.LeftFoot.y, REST.p.RightFoot.y) - 0.005;   // a little give, as a sole gives on the floor
-    REST.toe = Math.min(REST.p.LeftToeBase.y, REST.p.RightToeBase.y) - 0.003;
+    REST.ankle = Math.min(REST.p.LeftFoot.y, REST.p.RightFoot.y);          // the sole on the floor: joints at their rest heights
+    REST.toe = Math.min(REST.p.LeftToeBase.y, REST.p.RightToeBase.y);
     REST.fromScene = true;
   }
   function restHeights(){}
@@ -204,7 +204,7 @@ export function createMotion(env){
           else { target = _t.copy(K.p).lerp(_a, 1 - K.w); target.y = Math.max(target.y, F + REST.ankle); }
         }
       } else LOCK[side] = null;
-      if (!target && low < F - 0.002) { target = _t.copy(_a); target.y += F - low; }   // below the floor: lift straight up
+      if (!target && low < F + 0.004) { target = _t.copy(_a); target.y += F + 0.004 - low; }   // at or below the floor: lift straight up (G8 #8)
       if (!target) continue;
       lo.getWorldPosition(_e); _e.addScaledVector(FW, 0.5).addScaledVector(UP, 0.3);   // the knee forward
       ik(up, lo, ft, target, _e, 1, true);
@@ -239,7 +239,7 @@ export function createMotion(env){
         _t.set(...MOUSE).addScaledVector(UP, 0.04).add(_a.set(0.015 * nz(t * 1.1, 8), 0, 0.012 * nz(t * 0.9, 9)));
         if (Math.sin(t * 7.3) > 0.97) _t.y -= 0.004;                                       // a click
       } else { kbPoint(-0.5, -0.9, _t); _t.y += 0.05; }                                     // the left hand rests by the keyboard
-      B[side + "Arm"].getWorldPosition(_p).addScaledVector(UP, -0.45).addScaledVector(RT, sx * 0.28).addScaledVector(FW, -0.05);   // elbow low and out
+      B[side + "Arm"].getWorldPosition(_p).addScaledVector(UP, -0.36).addScaledVector(RT, sx * 0.28).addScaledVector(FW, -0.02);   // elbow out, forearm level with the desk
       ik(B[side + "Arm"], B[side + "ForeArm"], B[side + "Hand"], _t, _p, e, false);
       // the wrist: palm down over the keys (the hand's +z is the palm, +y along the fingers)
       env.touch(B[side + "Hand"]);
@@ -249,6 +249,24 @@ export function createMotion(env){
       const m = hands.m || (hands.m = new THREE.Matrix4()); m.makeBasis(_d, _b, _c); _q.setFromRotationMatrix(m);
       if (!typing && side === "Right") _q.multiply(_q2.setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.25));
       B[side + "Hand"].getWorldQuaternion(_q2); _q2.slerp(_q, e); env.setWorldQuat(B[side + "Hand"], _q2);
+    }
+  }
+  // the desk top is solid (G8 #7): over its footprint no elbow or wrist goes below its surface; a forearm that would rest
+  // on the slab is lifted onto it (the hand IK'd to the same place a little higher, the elbow raised with it)
+  const DESK = {x0: -1.86, x1: -0.36, z0: -1.44, z1: -0.80, top: 0.97};
+  function deskGuard(ctx, st){
+    if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk") return;
+    env.boy.updateMatrixWorld(true);
+    const over = p => p.x > DESK.x0 - 0.04 && p.x < DESK.x1 + 0.04 && p.z > DESK.z0 && p.z < DESK.z1 + 0.06;
+    for (const [side, sx] of [["Left", -1], ["Right", 1]]) {
+      if (side === "Right" && (st.holdW > 0 || st.held)) continue;
+      const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up) continue;
+      lo.getWorldPosition(_a); h.getWorldPosition(_b);
+      const lift = Math.max(over(_a) ? DESK.top + 0.045 - _a.y : 0, over(_b) ? DESK.top + 0.035 - _b.y : 0);
+      if (lift <= 0) continue;
+      _t.copy(_b); _t.y += lift;
+      up.getWorldPosition(_p).addScaledVector(RT, sx * 0.3); _p.y = DESK.top + 0.12;      // the elbow out and over the slab
+      ik(up, lo, h, _t, _p, 1, true);
     }
   }
   const DISH0 = V(); let dishMoved = false;
@@ -358,7 +376,7 @@ export function createMotion(env){
     if (M.layers.breathe) breathe(dt, ctx);
     if (M.layers.shift && !(st.step && st.step.k !== "act")) weightShift(dt, ctx);
     if (M.layers.feet) feet(dt, ctx, st);
-    if (M.layers.hands) { hands(dt, ctx, st); bowl(dt, ctx, st); }
+    if (M.layers.hands) { hands(dt, ctx, st); bowl(dt, ctx, st); deskGuard(ctx, st); }
     if (M.layers.eyes) eyes(dt, ctx, st);
     if (M.layers.smooth) smoothBones(dt);
     env.boy.updateMatrixWorld(true);
