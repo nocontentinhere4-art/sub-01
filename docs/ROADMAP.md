@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-02 20:55 UTC** (pass 35). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-02 21:00 UTC** (pass 35b). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -305,6 +305,19 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Pass 35b (21:00 UTC): #97 merged; #99 opened (neurons and brain at maximum realism).**
+- **#97 merged:** no more white-out (pixels above 0.8: 12–31 % → ≤ 0.04 % at rest); about 500 cells at ~6×.
+- **The owner wants more:** "realismo massimo", plus "si vedono ancora pallini che non capisco perché esistano"
+  (he still sees dots and doesn't know why), plus real brains, neurons and nerves.
+  - **B:** first removes every meaningless dot (soma sprites, spike beads, fibre ends, the raster panel), with a test
+    that stops them coming back. Then a seamless zoom from the MRI brain → cortical layers → column → real tissue.
+  - **A:** close-ups with REAL H01 human electron-microscopy neurons (CC-BY 4.0, to verify; MICrONS as fallback):
+    spines, myelin and real synapse positions, with simulated activity on the real axons.
+  - **G9 (new, Fable 5.1, `session_01LMGGwqUaFhqqz1Ly4zPgPi`, `web/brain_anatomy.js`):** a real-specimen brain:
+    fresh and dissected views, surface vessels, cerebellum, brainstem, circle of Willis, cranial nerves I–XII. The
+    caption says which parts are this person's MRI and which come from an atlas or template. Every licence is checked
+    (BodyParts3D, Z-Anatomy, ICBM152, BigBrain, Allen, Julich).
 
 **Pass 35 (20:55 UTC): the game-quality pass, #98.** The owner asked for "fino a 10 agenti Fable 5.1 high effort":
 the original character and the room should look like a game ("come gta 6"); the socks look like cones today.
