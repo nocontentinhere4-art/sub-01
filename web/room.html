@@ -465,12 +465,14 @@ load("room/boy.glb").then(g => {
     .map(([name, file]) => load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {}))).then(loadMoves);
 }).catch(bootError);
 // ---------- better motion (#76): CC0 clips (Quaternius' Universal Animation Library) and keyed poses, retargeted onto
-// this rig (room_build/boy_post.mjs -> room/boy_moves.glb), take over walking, sitting at the desk, sleeping and lying
-// with the phone; ?moves=old keeps the first clips. Each new clip brings where its hips are (HIPS, its first frame: seated
+// this rig (room_build/boy_post.mjs -> room/boy_moves.glb), take over walking, sitting at the desk (typing) and lying
+// with the phone; eating keeps the first seated clip under its own layer (DINE), sleep stays with #63's bed work;
+// ?moves=old keeps the first clips. Each new clip brings where its hips are (HIPS, its first frame: seated
 // 0.735 m up, the chair's seat anchor over its pivot, so his feet stay on the floor); on the bed his back is on the duvet
 const MOVES = new URLSearchParams(location.search).get("moves") !== "old";
-const MOVE = {walk:"walk", sit:"type", sleep:"sleep_breathing", phone_lie:"lie_phone"};
-const BED_ROOT = [-1.02, 0.135, 0.89];                // bedlie with the new lying clips: the duvet top (0.855 m, 2 cm of give) less the clip's mattress (0.70 m)
+const MOVE = {walk:"walk", sit:"type", phone_lie:"lie_phone"};
+const KEEP = {sit:["dine"]};                          // aliases that keep the first clip (and its hips) when their slot's clip is replaced
+const BED_ROOT = [-1.02, 0.135, 0.89];                // bedlie with a new lying clip: the duvet top (0.855 m, 2 cm of give) less the clip's mattress (0.70 m)
 let movesOn = false;
 function loadMoves(){
   if (!MOVES) return;
@@ -478,6 +480,7 @@ function loadMoves(){
     const by = Object.fromEntries(g.animations.map(c => [c.name, c]));
     for (const [slot, name] of Object.entries(MOVE)) { const c = by[name]; if (!c) continue;
       const h = c.tracks.find(t => t.name === "Hips.position"), h0 = h ? [...h.values.slice(0, 3)].map(v => v / 100) : null;
+      for (const k of KEEP[slot] || []) if (actions[slot] && !actions[k]) { actions[k] = actions[slot]; HIPS[k] = HIPS[slot]; }
       HIPS[name] = HIPS[slot] = h0;
       for (const [k, v] of Object.entries(ALIAS)) if (v === slot && !actions[k]) HIPS[k] = HIPS[slot];   // dine (eating) sits like sit, listen lies like sleep (poses of the old clips keep theirs)
       const was = actions[slot], a = actions[slot] = mixer.clipAction(c); clips[slot] = c;
@@ -1241,7 +1244,7 @@ const WALK_A = 1.4, TURN_V = 2.2, STEP_TS = 0.6, DINE_DX = -0.12;   // DINE_DX: 
 const HIPS = {sit:[0.235, 0.655, -0.364], eat:[-0.014, 0.48, 0.018], idle:[-0.016, 0.994, 0.026], walk:[0.003, 0.977, 0.012], sleep:[-0.006, 1.123, 0.065]};
 HIPS.edge = HIPS.phone_sit = HIPS.sit; HIPS.phone_lie = HIPS.sleep; HIPS.phone_stand = HIPS.idle; HIPS.dine = HIPS.sit; HIPS.listen = HIPS.sleep; HIPS.stand = HIPS.lean = HIPS.deliver = [0.021, 0.919, -0.045];
 const clipName = a => a ? a.getClip().name : "";
-const hipsOf = a => HIPS[a && (clipName(a).includes("Sleep") ? "sleep" : clipName(a).includes("Chair_Sit") ? "sit" : clipName(a).includes("Drink") ? "eat"
+const hipsOf = a => HIPS[a && (clipName(a).includes("Sleep") ? "sleep" : clipName(a).includes("Chair_Sit") ? "dine" : clipName(a).includes("Drink") ? "eat"
   : clipName(a).includes("Walk") ? "walk" : clipName(a))] || HIPS.idle;
 const _w = new THREE.Vector3();
 // the desk chair, when the room carries it as its own node "chair" (pivot on the floor under the gas lift, front along
@@ -1276,7 +1279,7 @@ function chairSpots(){   // [where he pulls from (it comes round to face him); (
   return [S, S, [_cs.x + fo[0] * 0.70, _cs.z + fo[1] * 0.70], chairHeading(ro)];
 }
 function rootOf(name, clip, out){                     // where the root goes for an anchor and clip; returns the heading
-  const A = ANCHOR[name]; if (A.p) { out.set(...(name === "bedlie" && movesOn ? BED_ROOT : A.p)); return A.r; }
+  const A = ANCHOR[name]; if (A.p) { out.set(...(name === "bedlie" && movesOn && MOVE[clip] ? BED_ROOT : A.p)); return A.r; }
   let seat = A.seat, r = A.r;
   if (name === "desk" && chairNode()) { CHAIR.node.localToWorld(_cs.set(0, 0.735, 0.02)); seat = [_cs.x, _cs.y, _cs.z]; r = chairHeading(CHAIR.node.rotation.y); }
   const h = HIPS[clip] || HIPS.sit, c = Math.cos(r), sn = Math.sin(r);

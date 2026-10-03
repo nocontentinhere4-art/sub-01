@@ -23,13 +23,13 @@ def life(activity, place, doing, **extra):
 
 
 # name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring).
-# The clip names are room/boy_moves.glb's (#76), which take over walking, the desk, sleep and the phone in bed
-# (`?moves=old` brings back the first clips: Chair_Sit_Idle, Sleep_Normally, Casual_Walk)
+# Walking, the desk and the phone in bed play room/boy_moves.glb's clips (#76: walk, type, lie_phone); eating keeps the
+# first seated clip (Chair_Sit_Idle) under its own layer, sleep the first sleep clip (`?moves=old`: all the first clips)
 SCENES = {
     "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
-    "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "type"),
-    "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 1.0, "bedlie", "sleep_breathing"),
+    "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "Chair_Sit"),
+    "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 1.0, "bedlie", "Sleep"),
     # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie: the lie_phone clip)
     "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "lie_phone"),
     # standing just inside the door (an activity the page does not know, at the door place: it stands him there)

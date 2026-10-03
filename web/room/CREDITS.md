@@ -76,7 +76,7 @@ From `room_build/`, with Blender 4.2 and Node 22:
 
 ## His motion (`boy_moves.glb`, #76)
 New clips for the first character (`boy.glb`, its own 24-bone rig): in the room they take over walking, sitting at the
-desk (typing; also the base under eating), sleeping, and lying with the phone (`?moves=old` shows the first clips).
+desk (typing) and lying with the phone (`?moves=old` shows the first clips); the other clips are in the file for later.
 - **Quaternius, Universal Animation Library (Standard)** (https://quaternius.com/packs/universalanimationlibrary.html),
   obtained 2026-10-02. Licence, recorded on that date: the archive's own `License.txt` reads "CC0 1.0 Universal (CC0 1.0)
   Public Domain Dedication, https://creativecommons.org/publicdomain/zero/1.0/ / Models by @Quaternius", and the pack

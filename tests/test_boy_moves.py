@@ -69,7 +69,7 @@ def test_moves_has_the_clip_list():
 
 def test_room_takes_its_clips_from_moves():
     moves = room_moves()
-    assert set(moves) == {"walk", "sit", "sleep", "phone_lie"}
+    assert set(moves) == {"walk", "sit", "phone_lie"}             # sleep stays with #63's bed work; eating keeps the first sit
     assert set(moves.values()) <= set(anim_names(MOVES))
     html = (ROOT / "web" / "room.html").read_text()
     assert 'load("room/boy_moves.glb")' in html and 'get("moves") !== "old"' in html
