@@ -121,6 +121,7 @@
    "duration": 1.884,
    "fps": 20,
    "loop": true,
+   "stride": 0.65,
    "hips": [
     -0.005,
     0.887,

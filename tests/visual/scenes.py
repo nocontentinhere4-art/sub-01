@@ -24,9 +24,12 @@ def life(activity, place, doing, **extra):
 
 # name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring[, prep JS])
 # prep: JavaScript run in the page after the snap and before the settle (debug hooks only; reset by the next snap)
+# Walking, the desk and the phone in bed play room/boy_moves.glb's clips (#76: walk, type, lie_phone); eating keeps the
+# first seated clip (Chair_Sit_Idle) under its own layer, sleep the first sleep clip (`?moves=old`: all the first clips)
 SCENES = {
-    # (#98 G3: the ARDY clips in web/room/boy_motion.js take the place of the Meshy ones for these poses: m_type at the desk,
-    # m_eat eating, m_idle standing, m_walk walking, m_window at the sill; the old names would mean the layer did not load)
+    # (#98 G3: the ARDY clips in web/room/boy_motion.js go in after boy_moves.glb and take these poses: m_type at the desk,
+    # m_eat eating, m_idle standing, m_walk walking, m_window at the sill; the phone in bed keeps #76's lie_phone. The
+    # old names here would mean the layer did not load)
     "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "m_type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
     "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "m_eat"),
@@ -34,8 +37,8 @@ SCENES = {
     "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 4.0, "bedlie", "Sleep"),
     # the side pose he turns into now and then (every 3-8 min): forced through the page's ROLL hook (debug)
     "sleeping_side": (life("sleep", "bed", "sleeping"), "NREM", None, 7.0, "bedlie", "Sleep", "if (window.ROLL) ROLL.force = ROLL.ang;"),
-    # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie)
-    "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "phone_lie"),
+    # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie: the lie_phone clip)
+    "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "lie_phone"),
     # standing just inside the door (an activity the page does not know, at the door place: it stands him there)
     "door":     (life("home", "door_in", "just in at the door"), "AWAKE", None, 1.0, "door", "m_idle"),
     # walking: from the door to the desk; the harness stops mid-walk (see harness.walk_until). As the server sends it

@@ -205,6 +205,7 @@ async function convert(name){
   const info = {file: path.basename(outFile), frames: seq.length, duration: +((seq.length - 1) / fps * timeScale).toFixed(3), fps, loop: !!O.loop,
     hips: hipsAvg.toArray().map(v => +v.toFixed(3)), hips0: seq[0].hips.clone().multiplyScalar(0.01).toArray().map(v => +v.toFixed(3)),
     floorFix: +maxPen.toFixed(3), lowestFoot: +lowest.toFixed(3), bytes: size, prompt: C.prompt, seed: C.seed, score: C.score};
+  if (O.inplace && name === "walk") info.stride = STRIDE_V;      // the page's STRIDE_V while this walk plays (its feet move back at this speed)
   console.log(`${name}: ${seq.length} frames, ${info.duration} s, hips ${info.hips}, floor fix ${info.floorFix} m, lowest ${info.lowestFoot} m, ${(size / 1024).toFixed(0)} KB`);
   return info;
 }

@@ -49,7 +49,7 @@ export function createMotion(env){
   // ---------- the clips
   async function loadClips(){
     let man;
-    try { man = await (await fetch("room/boy_m_manifest.json", {cache: "no-cache"})).json(); } catch { return; }
+    try { man = await (await fetch("room/boy_m_manifest.json", {cache: "no-cache"})).json(); } catch { M.ready = true; return; }
     M.manifest = man;
     for (const [name, info] of Object.entries(man.clips)) {
       try {
@@ -65,10 +65,12 @@ export function createMotion(env){
   }
   let waited = 0;
   function installClips(){
-    // after the page's own clips (they arrive one file at a time and would overwrite a swapped action)
-    const ready = env.mixer && ["sit", "walk", "idle", "door", "stand", "eat", "sleep"].every(k => env.actions[k]);
+    // after the page's own clips (they arrive one file at a time and would overwrite a swapped action) and after #76's
+    // room/boy_moves.glb (loadMoves(): walk, type, lie_phone), which takes the same slots: these clips go in last and win
+    // walking, the desk, standing and the sill; the phone in bed stays with lie_phone
+    const ready = env.mixer && ["sit", "walk", "idle", "door", "stand", "eat", "sleep"].every(k => env.actions[k]) && (!env.movesDone || env.movesDone());
     if (!ready && (waited += 200) < 20000) { setTimeout(installClips, 200); return; }
-    if (!env.mixer) return;
+    if (!env.mixer) { M.ready = true; return; }
     for (const [name, {clip, info}] of Object.entries(M.clips)) {
       const sw = SWAP[name]; if (!sw || !info.loop && name !== "window") continue;
       const a = env.mixer.clipAction(clip);
@@ -76,6 +78,7 @@ export function createMotion(env){
       env.actions[sw.action] = a;
       for (const k of sw.hips) env.HIPS[k] = info.hips.slice();
       if (sw.edge) env.EDGE.add(clip.name);
+      if (info.stride && env.setStride) env.setStride(info.stride);   // the page's walk time scale is speed / stride
       M.swapped[sw.action] = {from: old, to: a};
       // the page is on the old action right now: hand over with a crossfade and tell the page which one it plays
       const st = env.state();
@@ -83,6 +86,7 @@ export function createMotion(env){
     }
     // the page's own layers that this module replaces
     env.OFF.breathe = M.layers.breathe; env.OFF.shift = M.layers.shift; env.OFF.head = M.layers.eyes;
+    M.ready = true;
   }
   loadClips();
 
@@ -423,5 +427,7 @@ export function createMotion(env){
     const c = M.clips[name]; if (!c || !env.mixer) return null;
     const a = env.mixer.clipAction(c.clip); a.reset().setLoop(THREE.LoopOnce, 1).fadeIn(fade).play(); return a;
   }
-  return {update, play, layers: M.layers, clips: M.clips, rest: REST, get manifest(){ return M.manifest; }, swapped: M.swapped, log: M.log, set on(v){ M.on = v; }, get on(){ return M.on; }};
+  return {update, play, layers: M.layers, clips: M.clips, rest: REST, get manifest(){ return M.manifest; }, swapped: M.swapped, log: M.log,
+    get ready(){ return !!M.ready; },            // the clips are in (or given up on): tests wait for this before a scene
+    set on(v){ M.on = v; }, get on(){ return M.on; }};
 }
