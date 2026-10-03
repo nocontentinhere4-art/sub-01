@@ -406,12 +406,13 @@
   const VS_LINE = `
     attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uDepthK, uPulseW, uPulseTail, uPulseFade;
+    uniform float uTime, uDepthK, uPulseW, uPulseTail, uPulseFade, uLift;
     varying float vKind, vCol, vSoma, vPulse, vDist, vDepth;
     ${ROT}
     void main(){
       vec3 w = rotq(iQuat, position * iScale) + iOff;
       vec4 mv = modelViewMatrix * vec4(w, 1.0);
+      mv.z += uLift;                                               // H01: the axon line runs inside its own thin mesh tube; lift it toward the camera
       gl_Position = projectionMatrix * mv;
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       float dt = uTime - iSpike, on = step(0.0, dt), x = dt - aArrive;
@@ -429,7 +430,7 @@
       vec3 base = uStyle < 0.5 ? mix(uColA, uColB, vCol) : (uStyle > 1.5 ? vec3(0.62, 0.62, 0.6) : vec3(0.5, 0.48, 0.55));
       float glow = uLive * uRate;
       vec3 col = base * uDim * (0.5 + 0.5 * kSoma + 0.5 * glow * kDend) * mix(1.0, 1.5, vDepth);
-      col += base * 1.2 * vSoma * (kSoma + kDend * exp(-vDist / 40.0)) + uColAct * 2.0 * vPulse * kAxon;
+      col += base * 1.2 * vSoma * (kSoma + kDend * exp(-vDist / 40.0)) + uColAct * 3.0 * vPulse * kAxon;
       gl_FragColor = vec4(col, 1.0);
     }`;
   const VS_BG = `
@@ -593,7 +594,7 @@
       uDofMax: { value: 0.7 }, uBloom: { value: 0.9 }, uExposure: { value: 1.0 }, uStyle: { value: 0 }, uBg: { value: new THREE.Vector3() } },
       vertexShader: VS_QUAD, fragmentShader: FS_COMP, depthTest: false, depthWrite: false });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), matDown); quad.frustumCulled = false; quadScene.add(quad);
-    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 },
+    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 }, uLift: { value: 0 },
                   uStyle: { value: 0 }, uRate: { value: 0 }, uLive: { value: 0 }, uNucAlpha: { value: 0.45 }, uDim: { value: 0.3 },
                   uColA: { value: new THREE.Vector3(0.25, 1.0, 0.35) }, uColB: { value: new THREE.Vector3(1.0, 0.42, 0.15) },
                   uColMy: { value: new THREE.Vector3(0.6, 0.75, 1.0) }, uColAct: { value: new THREE.Vector3(1.0, 0.95, 0.7) },
@@ -693,7 +694,7 @@
       // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the axon tube itself
       // and the axon's skeleton line light from the front back toward the soma (~45 µm, fading), the tube swells by up to 2 µm where
       // lit, and the pulse fades over 20 s instead of 8: a visual convention, said in the docs. Nothing separate travels along the axon.
-      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 1.0; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 2.0;
+      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 1.0; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 2.0; uni.uLift.value = 1.5;
       const tags = c => (c.tags || []);
       for (const c of data.cells) {
         const tg = tags(c).join(" "), isGlia = c.role === "glia", isInter = /interneuron/.test(tg);
@@ -742,7 +743,7 @@
       finish();
     }
     function buildProcedural() {
-      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0;
+      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0; uni.uLift.value = 0;
       const rnd = mulberry(880 + Object.keys(KINDS).indexOf(kind) + (L === LOD.phone ? 7 : 0));
       const split = n => Kd.types.map(([t, f]) => [t, Math.max(0, Math.round(n * f))]);
       const want = { hero: split(L.hero), mid: split(L.mid), far: split(L.far) };

@@ -275,6 +275,34 @@ def decimate(V, F, target):
     return V2, F2
 
 
+AXON_SHARE = 0.3                                            # of a cell's triangle budget, at most this much goes to its axon
+
+
+def decimate_split(V, F, tris, P, CL):
+    """The axon is thin, so quadric decimation of the whole cell collapses it first and the tube ends up fragmentary;
+    the faces whose vertices bind to axon / AIS / myelinated-axon skeleton nodes are decimated on their own budget
+    (up to AXON_SHARE of the cell's), the rest of the cell on the remainder, and the two are joined again."""
+    kinds = np.array([KIND.get(int(c), 2) for c in CL], np.uint8)[nearest_nodes(P, V)]
+    is_ax = np.isin(kinds, (1, 4, 5))
+    fax = is_ax[F].sum(1) >= 2                                   # a face is axon when two of its corners are
+    parts = []
+    for mask, budget in ((fax, min(int(fax.sum()), int(tris * AXON_SHARE))), (~fax, None)):
+        Fp = F[mask]
+        if not len(Fp):
+            continue
+        used, inv = np.unique(Fp.ravel(), return_inverse=True)
+        Vp, Fp = V[used], inv.reshape(-1, 3)
+        if budget is None:
+            budget = max(1000, tris - sum(len(f) for _, f in parts))
+        if len(Fp) > budget:
+            Vp, Fp = decimate(Vp, Fp, budget)
+        parts.append((np.asarray(Vp, np.float32), np.asarray(Fp, np.int64)))
+    off, Vs, Fs = 0, [], []
+    for Vp, Fp in parts:
+        Vs.append(Vp); Fs.append(Fp + off); off += len(Vp)
+    return np.vstack(Vs), np.vstack(Fs)
+
+
 def quant(V, lo, hi):
     return np.round((V - lo) / np.maximum(hi - lo, 1e-6) * 65535).clip(0, 65535).astype(np.uint16)
 
@@ -338,7 +366,10 @@ def build_cell(h, sid, role, tris, soma_table_row=None, source="pr", em_frame=No
         V, F = h.mesh("c3", sid, lod)
         soma_nm = np.array([float(soma_table_row["x"]), float(soma_table_row["y"]), float(soma_table_row["z"])]) * SYN_NM
         P = R = CL = PAR = D = T = None
-    V2, F2 = decimate(V, F, tris) if tris else (V.astype(np.float32), F.astype(np.int64))
+    if tris and P is not None:
+        V2, F2 = decimate_split(V, F, tris, P, CL)
+    else:
+        V2, F2 = decimate(V, F, tris) if tris else (V.astype(np.float32), F.astype(np.int64))
     # per-vertex binding to the skeleton
     if P is not None:
         j = nearest_nodes(P, V2)

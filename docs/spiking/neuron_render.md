@@ -19,7 +19,7 @@ hippocampus, amygdala) keep the procedural NeuroMorpho cells: H01 is cortex only
 
 | part | H01 close-up |
 |---|---|
-| shapes, spines, boutons | the proofread cells' own meshes (multi-LOD Draco from `proofread_104/mesh`, decimated with quadric simplification to the tier's triangle target: the spines are in the mesh, not drawn) |
+| shapes, spines, boutons | the proofread cells' own meshes (multi-LOD Draco from `proofread_104/mesh`, decimated with quadric simplification to the tier's triangle target; the thin axon is decimated on its own share of the budget (`decimate_split`, ≤ 30 %) so it stays a continuous tube instead of collapsing first: the spines are in the mesh, not drawn) |
 | axon / dendrite / soma / AIS / **myelin** | H01's subcompartment classes on the cells' SWC skeletons (sparse labels, propagated along the tree); the pulse runs on the nodes H01 labels axon / AIS, saltatory on the stretches it labels **myelinated axon** (an internode every ~100 µm inside a stretch, Rushton 1951: the labels say where myelin is, not where each node of Ranvier is) |
 | synapses | `synapse_locations.csv`: the cell's **presynaptic sites** (its boutons; they flash when the pulse arrives, timed along the real axon) and its **incoming synapses** (dots; the mid tier keeps a sample of 1 500) |
 | glia | astrocytes and oligodendrocytes from the automated c3 segmentation, chosen from the soma table, **not proofread** (said in the caption and the credits) |
