@@ -2652,6 +2652,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       held:Object.keys(PROP.held).length > 0 || bag === "hand" || !!(trash && trash.held)}),
     setCurrent: a => { current = a; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
   animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====
 </script>

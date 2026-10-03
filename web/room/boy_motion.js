@@ -295,8 +295,8 @@ export function createMotion(env){
     for (const [side, sx] of [["Left", -1], ["Right", 1]]) {
       if (side === "Right" && (st.holdW > 0 || st.held)) continue;
       const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up) continue;
-      lo.getWorldPosition(_a); h.getWorldPosition(_b); h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.11).add(_b);   // the fingertips
-      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.05 - _b.y : 0, over(_c) ? DESK.top + 0.05 - _c.y : 0);
+      lo.getWorldPosition(_a); h.getWorldPosition(_b); h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.17).add(_b);   // the fingertips (the hand is ~17 cm long from the wrist)
+      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.06 - _b.y : 0, over(_c) ? DESK.top + 0.06 - _c.y : 0);
       if (lift <= 0) continue;
       _t.copy(_b); _t.y += lift;
       up.getWorldPosition(_p).addScaledVector(RT, sx * 0.3); _p.y = DESK.top + 0.12;      // the elbow out and over the slab
