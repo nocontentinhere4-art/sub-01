@@ -480,15 +480,21 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 
 ## The brain as a real specimen (#99 G9, PR `feature/brain-anatomy`, `docs/research/real_brain_sources.md`)
 - `/brain` dock row **view: glow · fresh brain · dissected · bundles** + layers **vessels**, **nerves**
-  (`web/brain_anatomy.js`, loaded on the first click; assets `web/anatomy/`, 1.5 MB, each fetched once when needed;
-  `?view=fresh&layers=vessels,nerves` opens one). "glow" is the page as before: the module swaps the cortex and fibre
-  objects' `material` only while a realistic view is on and restores the originals (the page's own uniform updates keep
-  pointing at them). Captions (`#anatcap`) say, part by part, what is HIS and what is an ATLAS, and what is not drawn.
+  (`web/brain_anatomy.js`; assets `web/anatomy/`, 1.9 MB, each fetched once when needed; `?view=glow` /
+  `?view=fresh&layers=vessels,nerves` opens one). **"fresh brain" is the default** (coordinator, 2026-10-03); "glow" is
+  the page's own additive look, kept as an option (the mini keeps it). The module swaps the cortex and fibre objects'
+  `material` while a realistic view is on and restores the originals on "glow" (the page's own uniform updates keep
+  pointing at them). "bundles" shares the page's fibre uniforms by reference (stage mix, region activity, the travelling
+  stimulus), so a message still runs along its route and sleep cools the tint, with normal blending and no glow.
+  Every material fades with `window.zoomBrain` (B's zoom, #111). Captions (`#anatcap`) say, part by part, what is HIS
+  and what is an ATLAS, and what is not drawn. The pia's wet patches and the reddish runs in the sulci are shading cues
+  (value noise; the caption says the vessels are a cue, not drawn vessels).
 - **His** (same MRI as the fibres): the cortex (sulcal shading computed in the browser from his own mesh), his
   cerebellum (folia) and brainstem as their own surfaces (`analysis/build_anatomy.py`: ICBM 2009c's segmentation warped
   onto his T1 with dipy only to say which of his voxels they are; marching cubes on his tissue above a local Otsu
-  threshold), and the cut plane of the dissected view: his T1 at 2 mm as a tile-atlas texture (`t1_atlas.png`),
-  coloured grey / white / CSF from the peaks of his own histogram (`anatomy.json` → `volume.tissue`). Cut: coronal,
+  threshold), and the cut plane of the dissected view: his T1 at 2 mm as a tile-atlas texture (`t1_atlas.png`, grey + a soft brain
+  mask in the alpha so the cut's edge has no voxel steps), coloured grey / white / CSF from the peaks of his own
+  histogram (`anatomy.json` → `volume.tissue`). Cut: coronal,
   sagittal or axial, a slider for the position; the removed side is clipped in the shaders (no renderer clipping).
 - **Atlas, fitted to his brain** (one similarity transform, trimmed ICP of the atlas brain onto `cortex.bin`, RMS
   ≈ 2.6 mm, in `anatomy.json` → `parts.fit`): BodyParts3D (NBDC archive, **CC BY 4.0** since 2025-02-27; credit line
