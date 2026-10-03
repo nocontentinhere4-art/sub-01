@@ -149,6 +149,24 @@ def displace(o, fn):
         if d: v.co += v.normal * d
 
 
+def unspike(o, tol=0.05, rounds=4):
+    """after a cloth simulation: a vertex the solver shot away (pinched between colliders) is put back among its
+    neighbours; repeated, so a stray cluster collapses onto the cloth"""
+    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table(); total = 0
+    for _ in range(rounds):
+        moves = []
+        for v in bm.verts:
+            nb = [e.other_vert(v).co for e in v.link_edges]
+            if not nb: continue
+            mean = sum(nb, Vector()) / len(nb)
+            if (v.co - mean).length > tol: moves.append((v, mean))
+        for v, mean in moves: v.co = mean
+        total += len(moves)
+        if not moves: break
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+    if total: print(o.name + ": put back", total, "stray vertices")
+
+
 def smooth_mesh(o, factor=0.4, repeat=1):
     bm = bmesh.new(); bm.from_mesh(o.data)
     for _ in range(repeat): bmesh.ops.smooth_vert(bm, verts=bm.verts[:], factor=factor, use_axis_x=True, use_axis_y=True, use_axis_z=True)
@@ -198,7 +216,7 @@ def curtain(nm, za, zb, side):
             s = i / nz_; z = za + W * s; ph = 2 * math.pi * 8 * s
             f_top = math.sin(ph) + 0.10 * math.sin(3 * ph)                                       # pencil pleats (soft enough for the shell)
             f_low = math.sin(2 * math.pi * 4.0 * s + 0.6 + 0.5 * side) + 0.3 * math.sin(2 * math.pi * 1.5 * s + 2.0)
-            x = x0 + (1 - k) * 0.013 * f_top + k * 0.030 * f_low + 0.004 * nz(Vector((s * 5, t * 3, side)))
+            x = x0 + (1 - k) * 0.017 * f_top + k * 0.036 * f_low + 0.004 * nz(Vector((s * 5, t * 3, side)))
             zz = z + side * 0.03 * t * t * (s - 0.5) + 0.003 * math.sin(ph) * (1 - k)            # flare; the pleats gather z too
             yy = y + (0.004 * (0.5 + 0.5 * math.sin(2 * math.pi * 4.0 * s + 0.6 + 0.5 * side + 1.0)) if j == ny else 0)
             row.append(Vector((x, yy, zz)))
@@ -263,12 +281,13 @@ def pillow():
     random.seed(32)
     def d(p, n):
         out = 0.0
-        if n.y > 0.3:
-            out -= 0.034 * math.exp(-(p.x * p.x * 0.8 + (p.z + 0.06) ** 2) / 0.03)   # where his head rests
-            out += 0.002 * smooth01(0.17, 0.21, p.z)                              # the envelope flap of the case (a soft step)
+        if n.y > 0.3: out += 0.002 * smooth01(0.17, 0.21, p.z)                   # the envelope flap of the case (a soft step)
         if abs(n.y) < 0.6: out += 0.003 * bump(abs(p.x), PW / 2, 0.03)            # the side seam's piping
         return out + 0.0035 * nz(p, 9.0, 3) + 0.0015 * nz(p, 24.0, 4)
     displace(o, d)
+    for v in o.data.vertices:                                                     # the dent where his head rests: straight down, so the top never crosses itself
+        p = gl(v.co)
+        if p.y > 0.005: v.co.z -= 0.022 * math.exp(-(p.x * p.x * 0.7 + (p.z + 0.06) ** 2) / 0.05) * smooth01(0.0, 0.02, p.y)
     o.data.transform(Matrix.Translation(B(-1.58, MAT_Y + 0.006 + 0.62 * PT / 2 + 0.004, 0.87)) @ Matrix.Rotation(0.06, 4, 'Z') @ Matrix.Rotation(-0.05, 4, 'Y'))
     o.data.update(); return o
 
@@ -295,7 +314,7 @@ def duvet(mattress_o, pillow_o):
         o.modifiers.new("col", "COLLISION"); o.collision.thickness_outer = 0.004; o.collision.cloth_friction = 10
     cl = d.modifiers.new("cloth", "CLOTH"); s = cl.settings
     s.quality = 8; s.mass = 0.4; s.tension_stiffness = 20; s.compression_stiffness = 20; s.shear_stiffness = 8; s.bending_stiffness = 1.0
-    s.air_damping = 2.0; cl.collision_settings.distance_min = 0.012; cl.collision_settings.use_self_collision = False
+    s.air_damping = 2.0; cl.collision_settings.distance_min = 0.008; cl.collision_settings.use_self_collision = False
     cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 60
     for f in range(1, 48): SC.frame_set(f)
     bpy.context.view_layer.objects.active = d; bpy.ops.object.modifier_apply(modifier="cloth")
@@ -303,19 +322,26 @@ def duvet(mattress_o, pillow_o):
         for m in list(o.modifiers):
             if m.type == 'COLLISION': o.modifiers.remove(m)
     SC.frame_set(1)
-    smooth_mesh(d, 0.35, 1)
-    me = d.data
-    # the turn-back: each flap vertex goes round the fold (radius R) and back over the main part, above the column it lands on
-    dx = L / (nc - 1); pos = [v.co.copy() for v in me.vertices]
+    unspike(d, 0.06); smooth_mesh(d, 0.35, 1); me = d.data
+    # the turn-back: each flap vertex goes round the fold (radius R) and back over the main part, following its own
+    # simulated row (arc length along the row and the row's normal), so rows that slid or hang over the bed's side fold too
+    dx = L / (nc - 1); pos = [v.co.copy() for v in me.vertices]; nrm = [v.normal.copy() for v in me.vertices]
+    rows = {}
+    for j in range(nr):
+        P = [pos[at[(i, j)]] for i in range(i_f, nc)]; N = [nrm[at[(i, j)]] for i in range(i_f, nc)]
+        S = [0.0]
+        for a, b in zip(P, P[1:]): S.append(S[-1] + (b - a).length)
+        rows[j] = (P, N, S)
     for n, ((i, j), fl) in enumerate(zip(ij, flap)):
         if not fl: continue
-        dist = (i_f - i) * dx; anchor = pos[at[(i_f, j)]]
+        P, N, S = rows[j]; dist = (i_f - i) * dx
         if dist < math.pi * R:
-            th = dist / R; p = anchor + Vector((R * math.sin(th), 0, R * (1 - math.cos(th))))
+            th = dist / R; T = (P[1] - P[0]).normalized()
+            p = P[0] + T * (R * math.sin(th)) + N[0] * (R * (1 - math.cos(th)))
         else:
-            land = (i_f + round((dist - math.pi * R) / dx), j)
-            k = min(nc - 1, land[0]); base = pos[at[(k, j)]]
-            p = Vector((base.x + (land[0] - k) * dx, base.y, base.z + 2 * R + 0.003 * nz(gl(base), 5.0, 6)))
+            s = dist - math.pi * R; m = max(0, min(len(S) - 2, next((k for k in range(len(S) - 1) if S[k + 1] > s), len(S) - 2)))
+            t = (s - S[m]) / max(1e-6, S[m + 1] - S[m]); base = P[m].lerp(P[m + 1], t); nn = N[m].lerp(N[m + 1], t).normalized()
+            p = base + nn * (2 * R + 0.003 * nz(gl(base), 5.0, 6))
         me.vertices[n].co = p
     me.update()
     cu, cw = L / 5, W / 6
@@ -568,7 +594,7 @@ def tote(xc):
             x = math.copysign(abs(ct) ** (2 / 3.6), ct); z = math.copysign(abs(st) ** (2 / 3.6), st)
             r = 1 + 0.07 * math.sin(3 * th + 5 * t) * (1 - t) ** 0.5 * (1 - abs(z)) + 0.025 * nz(Vector((th, t * 3, 0)), 2.0, 12)   # creases
             p = c + Vector((a * x * r, 0, b * z * r))
-            if k == 0: p.y = 1.60 + 0.022 * math.exp(-((abs(p.x - xc) - 0.09) / 0.035) ** 2)          # peaks at the handles
+            if k == 0: p.y = 1.60 + 0.016 * math.exp(-((abs(p.x - xc) - 0.09) / 0.05) ** 2)           # peaks at the handles
             pts.append(p)
         rings.append(pts)
     body = tube_obj("tote", "canvas", rings, cap=(False, True)); sheet(body, 0.004)
@@ -652,7 +678,7 @@ def tee(duvet_o, pillow_o, mattress_o):
     """a T-shirt thrown on the bed's far foot corner: a flat tee cut from a grid (body, sleeves, a round neck), dropped
     as cloth onto the duvet and the mattress edge, where it crumples and hangs over the side"""
     MAT_Y = G["MAT_Y"]; random.seed(45)
-    nx, nzz = 30, 30; hw, hl, sw = 0.22, 0.28, 0.29
+    nx, nzz = 40, 40; hw, hl, sw = 0.22, 0.28, 0.29
     def inside(x, z):
         if x * x + (z - hl) ** 2 < 0.07 ** 2: return False                                  # the neck
         if abs(x) <= hw and -hl <= z <= hl: return True
@@ -666,14 +692,17 @@ def tee(duvet_o, pillow_o, mattress_o):
             c = sum((gl(V[(j + dj, i + di)].co) for dj in (0, 1) for di in (0, 1)), Vector()) / 4
             if inside(c.x, c.z): bm.faces.new([V[(j, i)], V[(j, i + 1)], V[(j + 1, i + 1)], V[(j + 1, i)]]).smooth = True
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    edge = [v for v in bm.verts if v.is_boundary]
+    for _ in range(4): bmesh.ops.smooth_vert(bm, verts=edge, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)   # a smooth outline, not grid steps
+    for v in bm.verts: v.co.z += 0.03 * nz(gl(v.co), 6.0, 17)                                # dropped crumpled, not flat
     o = new_obj("tee", bm, "jersey")
-    o.data.transform(Matrix.Translation(B(-0.58, MAT_Y + 0.17, 1.30)) @ Matrix.Rotation(0.15, 4, 'Z')); o.data.update()
+    o.data.transform(Matrix.Translation(B(-0.58, MAT_Y + 0.20, 1.30)) @ Matrix.Rotation(0.15, 4, 'Z') @ Matrix.Rotation(0.12, 4, 'X')); o.data.update()
     colliders = [duvet_o, pillow_o, mattress_o, bpy.data.objects["bed_base"], bpy.data.objects["floor"]]
     for c in colliders:
         c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = 12
     cl = o.modifiers.new("cloth", "CLOTH"); s = cl.settings
-    s.quality = 6; s.mass = 0.15; s.tension_stiffness = 12; s.compression_stiffness = 12; s.shear_stiffness = 4; s.bending_stiffness = 0.15
-    s.air_damping = 1.5; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = True; cl.collision_settings.self_distance_min = 0.008
+    s.quality = 8; s.mass = 0.2; s.tension_stiffness = 12; s.compression_stiffness = 12; s.shear_stiffness = 4; s.bending_stiffness = 0.2
+    s.air_damping = 1.0; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = False   # (self-collision blew it up)
     cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 60
     for f in range(1, 46): SC.frame_set(f)
     bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="cloth")
@@ -681,7 +710,7 @@ def tee(duvet_o, pillow_o, mattress_o):
         for m in list(c.modifiers):
             if m.type == 'COLLISION': c.modifiers.remove(m)
     SC.frame_set(1)
-    smooth_mesh(o, 0.3, 1)
+    unspike(o, 0.04); smooth_mesh(o, 0.3, 1)
     paint(o, lambda p: srgb("#7d93a6"))
     sheet(o, 0.005)
     return o

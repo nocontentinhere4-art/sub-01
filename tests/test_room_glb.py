@@ -108,11 +108,12 @@ def test_fabrics_have_their_normal_maps_and_sheen():
 
 
 def test_triangle_and_draw_call_budget():
-    """the room page must stay >= 30 FPS on a mid-range phone: the whole model stays under 230k triangles and 60 draw calls"""
+    """the room page must stay >= 30 FPS on a mid-range phone: the whole model stays under 200k triangles and 60 draw
+    calls (docs/research/game_look.md section 4: whole room <= 200k, <= ~80 draw calls; today 178k and 48)"""
     g = gltf()
     prims = sum(len(m["primitives"]) for m in g["meshes"])
     assert prims <= 60, prims
-    assert 120_000 <= triangles(g) <= 230_000, triangles(g)
+    assert 120_000 <= triangles(g) <= 200_000, triangles(g)
 
 
 def test_phone_screen_module_has_no_brand_ui():
