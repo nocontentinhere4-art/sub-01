@@ -63,11 +63,14 @@ def make_app(state=None):
         sock = web.WebSocketResponse(heartbeat=20)
         await sock.prepare(request)
         st.clients.add(sock)
+        brain = request.query.get("lite") is None            # the brain page (and the room's mini brain) asks for the full feed
         try:
             await sock.send_json({"type": "hello", "chat": [], "replies": [], "music": None})
             seen = -1
             while not sock.closed:
                 msg = S.tick(st.scene, st.hour)
+                if brain:
+                    msg = dict(msg, act=S.ACT_FLAT, sync=0.4, groups={})
                 await sock.send_json(msg)
                 seen = st.version
                 try:
@@ -93,6 +96,9 @@ def make_app(state=None):
     async def brain(request):
         return web.Response(text=BRAIN_STUB, content_type="text/html")
 
+    async def mini_brain(request):                             # what /brain?mini serves live: web/index.html (its data files are static)
+        return web.Response(text=(WEB / "index.html").read_text(), content_type="text/html")
+
     async def api(request):
         return web.json_response(API_EMPTY[request.path])
 
@@ -101,7 +107,8 @@ def make_app(state=None):
 
     app.router.add_get("/ws", ws)
     app.router.add_get("/__qa/scene", set_scene)
-    app.router.add_get("/brain", brain)
+    app.router.add_get("/brain", brain)                       # the room's PiP iframe: a stub (software GL budget)
+    app.router.add_get("/mini-brain", mini_brain)              # the real /brain?mini page, for the harness's own PiP check
     for p in API_EMPTY:
         app.router.add_get(p, api)
     app.router.add_get("/", room)

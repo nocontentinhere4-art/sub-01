@@ -20,8 +20,10 @@ Checks, per shot or once per run (hard = fails CI; the rest is reported in resul
 import argparse
 import json
 import os
+import re
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -36,7 +38,8 @@ from tests.visual.cdn_cache import CdnCache                # noqa: E402
 CHROMIUM = os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
 # the waits below poll on a timer (polling=100), not on requestAnimationFrame: the 390 page is a second, background page
 # whose frames Chromium may not schedule, so a rAF-polled predicate could stay unevaluated though already true
-GLB_FILES = 11                                            # room_clean, boy, 6 clips, hand_phone, food, boy_moves (#76: last)
+GLB_FILES = 11                                              # room_clean, boy, 6 clips, hand_phone, food, boy_moves (#76: last)
+PIP_URL = "/mini-brain?mini"                                # the room's embed (#116), served as web/index.html; "&neurons=1" is the regression
 BUDGETS = json.loads((HERE / "budgets.json").read_text())
 
 
@@ -70,7 +73,7 @@ class Harness:
                     "note": "headless Chromium with SwiftShader: FPS is a CPU rasteriser's, not a phone GPU's; DPR 1"}
         if self.only and (self.out / "results.json").exists():      # an incremental run: the other scenes' results stay
             self.res = json.loads((self.out / "results.json").read_text())
-            self.res["hard_failures"] = [h for h in self.res["hard_failures"] if not any(h.startswith(f"{sc}_") for sc in self.only)]
+            self.res["hard_failures"] = [h for h in self.res["hard_failures"] if not any(h.startswith((f"{sc}_", f"{sc}:")) for sc in self.only)]
             self.res["partial_rerun"] = sorted(self.only)
         self.pages = {}
         self.t0 = time.time()
@@ -264,6 +267,73 @@ class Harness:
         self.log(f"  perf: animate {self.res['animate_ms_per_frame_1280']} ms/frame (1280), {ams} ms/frame (390, CPU x4); "
                  f"software-GL fps {fps['fps']} at 390 CPU x4")
 
+    # ---- the room's mini brain (the PiP iframe loads /brain?mini since #116): a rendered no-dots check
+    def pip(self):
+        ctx = self.browser.new_context(viewport={"width": 300, "height": 225}, device_scale_factor=1)
+        pg = ctx.new_page()
+        errors, failed = [], []
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.on("requestfailed", lambda r: failed.append(f"{r.url} ({r.failure})"))
+        pg.on("response", lambda r: failed.append(f"{r.url} -> {r.status}") if r.status >= 400 and r.url.startswith(self.base) and not r.url.endswith("/favicon.ico") else None)
+        if self.cdn:
+            self.cdn.install(pg)
+        t0 = time.time()
+        # the room's own embed: what URL it loads (#116: /brain?mini, without neurons=1)
+        with urllib.request.urlopen(self.base + "/room.html", timeout=30) as resp:
+            room_html = resp.read().decode("utf-8", "replace")
+        m = re.search(r'<a id="brainpip"[^>]*>\s*<iframe[^>]*\ssrc="([^"]*)"', room_html)
+        embed_src = m.group(1) if m else None
+        pg.goto(self.base + PIP_URL, wait_until="load")
+        try:
+            pg.wait_for_function("renderer.info.render.calls > 0 && renderer.info.render.lines + renderer.info.render.triangles > 1000", timeout=120000)
+        except Exception as e:                                      # noqa: BLE001  (also a ReferenceError: the page's script died before its renderer)
+            self.res["pip"] = {"url": "/brain?mini", "embed_src": embed_src, "errors": errors, "failed": failed, "started": False}
+            self.res["hard_failures"].append(f"pip: the mini brain did not start rendering ({type(e).__name__}; errors {errors[:3]}; failed {failed[:3]})")
+            ctx.close()
+            return
+        pg.wait_for_timeout(6000)                                   # a few more frames: the fibres and the live feed
+        pg.add_style_tag(content="#n3mini{display:none!important}")
+        pg.wait_for_timeout(1500)
+        path = self.out / "pip_mini_brain.png"
+        pg.screenshot(path=str(path), timeout=240000, animations="disabled")
+        info = pg.evaluate("""({calls: renderer.info.render.calls, points: renderer.info.render.points, lines: renderer.info.render.lines,
+            triangles: renderer.info.render.triangles, neurons_wanted: typeof n3want !== 'undefined' ? !!n3want : null,
+            forest: typeof n3d !== 'undefined' ? !!n3d : null, n3_class: document.body.classList.contains('n3'),
+            text: (document.getElementById('n3mini') || {}).innerText || ''})""")
+        sp = IC.specks(path)
+        mask = sp.pop("mask")
+        if sp["specks"]:
+            IC.save_mask(mask, path, self.out / "pip_mini_brain_specks.png")
+        exp = IC.exposure(path)
+        r = {"url": "/brain?mini (served as web/index.html)", "embed_src": embed_src, "size": [300, 225], "render": info, "exposure": exp,
+             "specks": sp["specks"], "largest": sp["largest"], "bright_frac": sp["bright_frac"], "errors": errors, "failed": failed,
+             "started": True, "seconds": round(time.time() - t0, 1)}
+        self.res["pip"] = r
+        for e in errors:
+            self.res["hard_failures"].append(f"pip: JS error: {e}")
+        for f in failed:
+            self.res["hard_failures"].append(f"pip: request failed: {f}")
+        if embed_src is None or not embed_src.startswith("/brain?mini") or "neurons=1" in embed_src:
+            self.res["hard_failures"].append(f"pip: the room embeds {embed_src!r}; expected /brain?mini without neurons=1 (#116)")
+        if exp["black_frac"] > 0.97:
+            self.res["hard_failures"].append("pip: the mini brain rendered blank")
+        if info["points"] > 0:
+            self.res["hard_failures"].append(f"pip: {info['points']} points drawn (a THREE.Points layer: dots)")
+        if info["neurons_wanted"] or info["forest"] or info["n3_class"]:
+            self.res["hard_failures"].append("pip: the neuron forest is on in the mini brain (its cells read as dots at 300 px; #116)")
+        if sp["bright_frac"] < 0.05:
+            self.res["hard_failures"].append(f"pip: the fibres are dim or missing ({sp['bright_frac']:.1%} of the frame bright; 20% on main; "
+                                             "they step back to <1% when the forest is on)")
+        lim = BUDGETS.get("pip_draw_calls")
+        if lim is not None and info["calls"] > lim:
+            self.res["hard_failures"].append(f"pip: {info['calls']} draw calls in the mini brain (budget {lim}; 2 on main, 9 with the forest)")
+        lim = BUDGETS.get("pip_specks")
+        if lim is not None and sp["specks"] > lim:
+            self.res["hard_failures"].append(f"pip: {sp['specks']} bright specks in the mini brain (budget {lim})")
+        self.log(f"  pip /brain?mini: embed {embed_src}, forest {info['forest']}, calls {info['calls']}, points {info['points']}, lines {info['lines']}, "
+                 f"tris {info['triangles']}, specks {sp['specks']}, bright {sp['bright_frac']:.1%}, black {exp['black_frac']:.1%}, {r['seconds']}s")
+        ctx.close()
+
     # ---- the run
     def run(self):
         from playwright.sync_api import sync_playwright
@@ -284,6 +354,8 @@ class Harness:
                 for scene, hour in ([("desk", 14), ("window", 19), ("sleeping", 23), ("door", 8)] if self.full else [("desk", 14)]):
                     if pick(scene):
                         self.flicker(scene, hour)
+                if pick("pip"):
+                    self.pip()
                 if not self.only:
                     self.perf()
             finally:
@@ -336,6 +408,17 @@ class Harness:
         L += ["", "## Textures (texels per metre of the object's longest side)", ""]
         for t in sorted(R.get("textures", []), key=lambda t: (t["texels_per_m"] is None, t["texels_per_m"] or 0))[:16]:
             L.append(f"- {t['material'] or '?'} {t['kind']} {t['size'][0]}x{t['size'][1]} on {', '.join(t['objects'])} ({t['max_dim_m']} m): {t['texels_per_m']} texels/m, anisotropy {t['aniso']}")
+        if R.get("pip"):
+            p = R["pip"]
+            L += ["", "## The room's mini brain (/brain?mini, 300x225)", "", f"- the room embeds `{p.get('embed_src')}` (#116: /brain?mini without neurons=1)"]
+            if p.get("started"):
+                L.append(f"- [pip_mini_brain.png](pip_mini_brain.png): neuron forest {p['render']['forest']}, draw calls {p['render']['calls']}, THREE.Points drawn "
+                         f"{p['render']['points']}, lines {p['render']['lines']}, triangles {p['render']['triangles']}, bright {p['bright_frac']:.1%} of the frame, "
+                         f"black {p['exposure']['black_frac']:.1%}, errors {len(p['errors'])}; {p['specks']} small bright blobs (the fibres' beads count too: "
+                         f"140 on main, 189 with the forest, so a texture figure, not the dots test)"
+                         + (f" — [blobs]({'pip_mini_brain_specks.png'})" if p['specks'] else ""))
+            else:
+                L.append(f"- the mini brain did not start rendering: errors {p['errors'][:3]}, failed requests {p['failed'][:3]}")
         L += ["", "## Performance", "",
               f"- character logic (animate) at 1280: {R.get('animate_ms_per_frame_1280')} ms/frame; at 390 under CPU x4: {R.get('animate_ms_per_frame_390_cpu_x4')} ms/frame",
               f"- software-GL frames at 390, CPU x4, 4 s: {R.get('fps_390_cpu_x4_software_gl')} (a CPU rasteriser: not a phone number)"]
