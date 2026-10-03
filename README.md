@@ -24,10 +24,10 @@ The live site is private (password-gated) for now. Everything here runs locally 
 |---|---|
 | <img src="docs/readme/room_desk.jpg" alt="Over-the-shoulder view of the character at his desk in daylight: a web page on the monitor, a water bottle, keyboard, plant and coffee mug on the desk"> | <img src="docs/readme/room_window.jpg" alt="Close view of the room's window at dusk: a laundry hanger with socks and a towel in front of the glass, and a photographic Tokyo skyline with lit towers behind it"> |
 | **The room** (`/`): his day in 3D on the Tokyo clock. He works at the desk, eats, uses his phone, looks out of the window and sleeps; the monitor and phone show the pages he is on. (Here at 14:00; the page on the monitor is a test fixture.) | **The window:** photographic Tokyo plates with real parallax, sky and weather that follow the hour (here 18:00). |
-| <img src="docs/readme/room_evening.jpg" alt="The same room cutaway in warm evening lamp light, the character standing at the window looking out"> | <img src="docs/readme/brain_fibres.jpg" alt="Side view of a brain made of thousands of thin coloured fibre bundles traced from diffusion MRI, coloured by direction"> |
-| Evening: the desk lamp is on and he stands at the window. | **His brain** (`/brain`): the real nerve-fibre bundles traced from the diffusion MRI. Chat messages travel along them as stimuli. |
-| <img src="docs/readme/brain_specimen.jpg" alt="Side view of a pink-grey brain surface with folded gyri and the cerebellum below, rendered as a fresh specimen"> | <img src="docs/readme/brain_neurons.jpg" alt="A translucent violet brain outline filled with hundreds of small glowing neuron shapes"> |
-| The same brain as a specimen: cortex, cerebellum and brainstem from his own T1 scan (there is also a dissected view with the scan on the cut). Vessels and some nerves come from an atlas and are labelled as such. | The simulated spiking neurons, drawn inside the brain with real reconstructed neuron shapes (enlarged ~6× to be visible). |
+| <img src="docs/readme/room_window_standing.jpg" alt="The same room cutaway, the character standing at the window looking out"> | <img src="docs/readme/brain_fibres.jpg" alt="Side view of a brain made of thousands of thin coloured fibre bundles traced from diffusion MRI, coloured by direction"> |
+| He gets up from the desk and looks out of the window. | **His brain** (`/brain`): the real nerve-fibre bundles traced from the diffusion MRI. Chat messages travel along them as stimuli. |
+| <img src="docs/readme/brain_specimen.jpg" alt="Side view of a pink-grey brain surface with folded gyri and the cerebellum below, rendered as a fresh specimen"> | <img src="docs/readme/brain_dissected.jpg" alt="The brain cut open on a coronal plane: his own T1 scan shows grey and white matter on the cut, the folded cortex and the cerebellum beside it"> |
+| The same brain as a specimen: cortex, cerebellum and brainstem from his own T1 scan. Vessels and some nerves come from an atlas and are labelled as such. | Dissected: a coronal cut through the same brain, showing his own T1 scan (grey and white matter) on the cut face. |
 | <img src="docs/readme/brain_column.jpg" alt="A tall column of thousands of thin pale neuron branches on black, with cortical layer labels L2 to L5 on the left"> | <img src="docs/readme/neuron_h01.jpg" alt="Close-up of green and orange neuron branches with small spines and cell bodies, and grey-blue glia, on a dark background"> |
 | One continuous zoom: whole brain → a cortical column at true size, with layers L1–L6 measured in H01 … | … → real human neurons from the H01 electron-microscopy reconstruction, with simulated activity on them. None of these cells is from the scanned person. |
 
@@ -45,8 +45,8 @@ and credit. Diary lines and dream images are AI-generated and labelled as such.
   a guard blocks unsafe sites. The brain model votes among the options on each page. What it reads becomes a stimulus
   and dream material.
 - **Short videos and a dopamine model.** Phone time goes to short videos (YouTube Shorts, TikTok) through their official
-  players; each new video gives a simulated, habituating dopamine-like burst. On the live site this is still being
-  fixed (see [docs/HANDOFF.md](docs/HANDOFF.md)).
+  players; each new video gives a simulated, habituating dopamine-like burst. The fix (official YouTube Data API,
+  TikTok's official player) is merged and is being verified on the live site (see [docs/HANDOFF.md](docs/HANDOFF.md)).
 - **Chat and "teach him something".** Messages are filtered (no links, addresses or tickers), then turned into input to
   the brain networks their words relate to. A taught word is studied, replayed at night and tested the next day.
 - **An AI reads and remembers for him; his brain model chooses.** A language model writes short notes on pages, proposes
@@ -111,7 +111,7 @@ Each number comes from a file in this repository; negative results stay.
 | 1M spiking neurons learning to choose | exam 1.00 vs 0.275 with learning removed (0.26 random) | [docs/spiking/choice.md](docs/spiking/choice.md) |
 | Live decisions at 1M neurons | 0.45–0.69 correct vs 0.24–0.38 frozen twin (3 networks, small samples) | [docs/spiking/choice.md](docs/spiking/choice.md) |
 | Reading memory on the GPU | 6/6 items recalled a simulated day later, one validation run | [docs/spiking/gpu_reading/](docs/spiking/gpu_reading/) |
-| Room realism (visual QA scorecard, 2026-10-03) | 1.9 / 5 overall ("nothing in it would be mistaken for a photo") | [docs/qa/scorecard.md](docs/qa/scorecard.md) |
+| Room realism (visual QA scorecard, 2026-10-03) | 2.4 / 5 overall (was 1.9 before the soft-goods, hard-surface and window passes) | [docs/qa/scorecard.md](docs/qa/scorecard.md) |
 
 ## Run it locally
 
