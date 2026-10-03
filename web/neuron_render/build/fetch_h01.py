@@ -207,6 +207,78 @@ def propagate(C, PAR, n):
     return out
 
 
+def reroot(PAR, new_root):
+    """The fragment that holds new_root re-rooted there (the parent links on the path to its old root are reversed)."""
+    PAR = PAR.copy(); chain = []; i = new_root
+    while i >= 0:
+        chain.append(i); i = PAR[i]
+    for a, b in zip(chain, chain[1:]):
+        PAR[b] = a
+    PAR[new_root] = -1
+    return PAR
+
+
+ADOPT_NM, ADOPT_MAX_NODES = 4000.0, 400
+
+
+def adopt_axon_fragments(P, C, CL, FR):
+    """H01's SWC fragments: a small fragment with no label at all defaults to dendrite in propagate(); when one of its
+    nodes lies within ADOPT_NM of an axon-labelled node of another fragment it is a piece of that axon (the axon's
+    skeleton is cut into many such pieces) and takes the axon class, so the pulse runs through it. Two passes, so a
+    chain of pieces is adopted."""
+    CL = CL.copy()
+    from scipy.spatial import cKDTree
+    frag_ids = np.unique(FR)
+    unl = {f for f in frag_ids if not (C[FR == f] != -1).any() and (FR == f).sum() <= ADOPT_MAX_NODES}
+    for _ in range(2):
+        ax = np.isin(np.array([KIND.get(int(c), 2) for c in CL]), (1, 4, 5))
+        if not ax.any():
+            break
+        tree = cKDTree(P[ax]); axfr = FR[ax]
+        adopted = set()
+        for f in unl:
+            idx = np.where(FR == f)[0]
+            dd, jj = tree.query(P[idx], workers=-1)
+            if ((dd <= ADOPT_NM) & (axfr[jj] != f)).any():
+                CL[idx] = 0; adopted.add(f)
+        unl -= adopted
+        if not adopted:
+            break
+    return CL
+
+
+def bridge_axon_fragments(P, CL, PAR, FR, soma_nm):
+    """The axon's skeleton comes in pieces (the focus cell's in ~20, the first starting tens of µm from the soma). Each
+    piece's root is linked to the nearest soma or axon node of another piece within BRIDGE_UM (pieces are taken from
+    the soma outward, and a link never closes a loop), so the path distances and pulse times run continuously from
+    the soma along the whole axon. The links are straight chords, not H01 geometry; the docs say so."""
+    PAR = PAR.copy()
+    kinds = np.array([KIND.get(int(c), 2) for c in CL])
+    ax = np.isin(kinds, (1, 4, 5))
+    cand = np.where(ax | (kinds == 0))[0]
+    if not len(cand):
+        return PAR
+    from scipy.spatial import cKDTree
+    tree = cKDTree(P[cand])
+    comp = {f: f for f in np.unique(FR)}                   # union-find over fragments
+
+    def find(f):
+        while comp[f] != f:
+            comp[f] = comp[comp[f]]; f = comp[f]
+        return f
+    roots = [r for r in np.where(ax & (PAR < 0))[0]]
+    roots.sort(key=lambda r: np.linalg.norm(P[r] - soma_nm))
+    for r in roots:
+        dd, jj = tree.query(P[r], k=min(48, len(cand)))
+        for d_, j_ in zip(np.atleast_1d(dd), np.atleast_1d(jj)):
+            if d_ > BRIDGE_UM * 1000.0:
+                break
+            j = cand[j_]
+            if find(FR[j]) != find(FR[r]):
+                PAR[r] = j; comp[find(FR[r])] = find(FR[j]); break
+    return PAR
+
+
 def time_pulse(P, R, CL, PAR, soma_nm):
     """Path distance (um) from the soma and the pulse's arrival time (s) at every node. The pulse starts at the soma,
     runs the AIS and unmyelinated axon at V_UNMYELINATED / SLOWDOWN, and myelinated stretches at Hursh's speed for
@@ -357,8 +429,12 @@ def build_cell(h, sid, role, tris, soma_table_row=None, source="pr", em_frame=No
                     if d_ <= 1500.0 and C[j_] == -1:
                         C[j_] = cls
         CL = propagate(C, PAR, len(P))
+        CL = adopt_axon_fragments(P, C, CL, FR)
         soma_nodes = np.where(CL == 3)[0]
         soma_nm = P[soma_nodes].mean(0) if len(soma_nodes) else P[np.argmax(R)]
+        if len(soma_nodes):                                   # the soma's fragment is rooted at the soma, so path distances start there
+            PAR = reroot(PAR, int(soma_nodes[np.argmin(np.linalg.norm(P[soma_nodes] - soma_nm, axis=1))]))
+        PAR = bridge_axon_fragments(P, CL, PAR, FR, soma_nm)
         D, T = time_pulse(P, R, CL, PAR, soma_nm)
         lod = 2 if role in ("focus", "hero") else 3
         V, F = h.mesh("pr", sid, lod)
@@ -496,21 +572,8 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
                     # branch points and tips of the axon stay, so no branch is lost to the stride
                     nchild = np.bincount(cell["PAR"][cell["PAR"] >= 0], minlength=len(Pb))
                     keep[ax & ((nchild != 1))] = True
-                    # H01's SWC comes in fragments and the axon's often starts tens of µm from the soma with gaps along it; a fragment
-                    # root is bridged straight to the nearest soma / axon node closer to the soma within BRIDGE_UM, so the drawn axon
-                    # (and the pulse on it) is continuous from the soma; the bridges are said in the docs
-                    par2 = cell["PAR"].copy(); D = cell["D"]; soma_or_ax = ax | (kinds_all == 0)
-                    cand = np.where(soma_or_ax)[0]
-                    if len(cand):
-                        from scipy.spatial import cKDTree
-                        ctree = cKDTree(Pb[cand])
-                        for r in np.where(ax & (cell["PAR"] < 0))[0]:
-                            dd, jj = ctree.query(Pb[r], k=min(24, len(cand)))
-                            for d_, j_ in zip(np.atleast_1d(dd), np.atleast_1d(jj)):
-                                j = cand[j_]
-                                if j != r and d_ <= BRIDGE_UM and D[j] < D[r]:
-                                    par2[r] = j; keep[j] = True; break
-                    entry["abbox"], entry["askel"] = thin_skel(keep, within=soma_or_ax, max_um=BRIDGE_UM, par=par2)
+                    soma_or_ax = ax | (kinds_all == 0)                 # the bridges to the soma were made in build_cell
+                    entry["abbox"], entry["askel"] = thin_skel(keep, within=soma_or_ax, max_um=BRIDGE_UM)
             if role != "far":                                   # the real synapses: this cell's boutons (pre) and inputs (post)
                 pre, post = synapses_for(h, sid)
                 n_all_post = len(post)

@@ -117,10 +117,12 @@ Sources:
   slowed clock, so the **axon tube itself lights** from the front back toward the soma (~45 µm, fading), swells by
   ~0.6 µm where lit, and the cell's **axon skeleton** (H01's own nodes, ~2 000 for the focus and hero cells, drawn as
   a thin 3-sided tube along the decimated mesh's axon, never thinner than a pixel, so the axon stays continuous) lights
-  node to node with it. H01's SWC skeletons come in fragments: the focus cell's axon skeleton starts ~28 µm from the
-  soma and has gaps of 5–10 µm along it, so each axon fragment's root is bridged straight to the nearest soma or axon
-  node closer to the soma within 32 µm (`BRIDGE_UM` in the build script; the bridges are straight chords, not H01
-  geometry, and the pulse timing on them is H01's path distance); the front is ~3× wider (~9 µm) and the pulse fades over 20 s instead of 8 (`uPulseW`, `uPulseTail`,
+  node to node with it. H01's SWC skeletons come in fragments (the focus cell's axon in ~20, the first starting ~28 µm
+  from the soma, unlabelled pieces in between): the build adopts an unlabelled piece into the axon when it touches
+  axon-labelled nodes (`adopt_axon_fragments`), roots the soma's fragment at the soma, and links each axon piece's
+  root to the nearest soma or axon node of another piece within 32 µm, taken from the soma outward
+  (`bridge_axon_fragments`, `BRIDGE_UM`), so path distance and pulse time run continuously from the soma along the
+  whole axon (the focus cell keeps 4 unlinked pieces). The links are straight chords, not H01 geometry; the front is ~3× wider (~9 µm) and the pulse fades over 20 s instead of 8 (`uPulseW`, `uPulseTail`,
   `uPulseFade`, `uPulseSwell`, set in `buildH01`): the same visual convention, so a viewer can follow the pulse along
   the real axon. Nothing separate travels along it (no sprites, no dots). The timing is the real conduction speed /
   10 000 along the real path (`ap_front_um` in `results.json`: the front's path distance from the soma at each strip
