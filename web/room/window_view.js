@@ -122,7 +122,7 @@ const FRAG = /* glsl */`
   // the sky in a direction: the photographs cross-faded by the phase of the day and the cloud cover (rows: clear, partly
   // cloudy, overcast, sunset, dusk, night), the city's glow at night
   vec3 skyColor(vec3 dir, float day, float golden, float blue, float night){
-    vec2 ae = vec2(atan(dir.x, dir.z) + uTime * 0.00012, asin(clamp(dir.y, -1.0, 1.0)));   // a very slow drift
+    vec2 ae = vec2(atan(dir.x, dir.z) + uTime * 0.00003, asin(clamp(dir.y, -1.0, 1.0)));   // a very slow drift (6° an hour)
     float ov = smoothstep(0.45, 0.9, uCloud), partly = smoothstep(0.05, 0.45, uCloud);
     vec3 s = vec3(0.0);
     if (day > 0.005) s += day * mix(skyRow(0.0, ae), skyRow(1.0, ae), partly);
