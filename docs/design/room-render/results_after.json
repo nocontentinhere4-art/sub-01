@@ -17,7 +17,7 @@
    "ao": true,
    "aa": "smaa",
    "bloom": false,
-   "dof": false,
+   "dof": true,
    "grain": true,
    "shadow": 2048,
    "shafts": true,
@@ -30,7 +30,13 @@
    "height": 800,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "face",
+  "cam": [
+   -0.12,
+   1.67,
+   0.15
+  ]
  },
  "after_1280_h14.jpg": {
   "errors": [],
@@ -60,7 +66,13 @@
    "height": 800,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "medium",
+  "cam": [
+   -1.52,
+   1.92,
+   2.47
+  ]
  },
  "after_1280_h19.jpg": {
   "errors": [],
@@ -90,7 +102,13 @@
    "height": 800,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "face",
+  "cam": [
+   -0.12,
+   1.67,
+   0.15
+  ]
  },
  "after_1280_h23.jpg": {
   "errors": [],
@@ -120,7 +138,49 @@
    "height": 800,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "over",
+  "cam": [
+   0.18,
+   1.95,
+   0.58
+  ]
+ },
+ "after_1280_h23s.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": {
+   "tier": "high",
+   "active": true,
+   "chain": [
+    "ao",
+    "dof",
+    "grade",
+    "smaa"
+   ],
+   "ao": true,
+   "aa": "smaa",
+   "bloom": false,
+   "dof": false,
+   "grain": true,
+   "shadow": 2048,
+   "shafts": true,
+   "env": true,
+   "hdr": true,
+   "rtType": "half",
+   "failed": {},
+   "broken": null,
+   "width": 1280,
+   "height": 800,
+   "dpr": 1
+  },
+  "gl": true,
+  "shot": "overview",
+  "cam": [
+   5.2,
+   5,
+   6
+  ]
  },
  "after_390_h08.jpg": {
   "errors": [],
@@ -150,7 +210,13 @@
    "height": 523,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "face",
+  "cam": [
+   -0.12,
+   1.67,
+   0.15
+  ]
  },
  "after_390_h14.jpg": {
   "errors": [],
@@ -180,15 +246,16 @@
    "height": 523,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "medium",
+  "cam": [
+   -1.52,
+   1.92,
+   2.47
+  ]
  },
  "after_390_h19.jpg": {
-  "errors": [
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
-  ],
+  "errors": [],
   "dpr": 1,
   "post": {
    "tier": "high",
@@ -215,16 +282,16 @@
    "height": 523,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "face",
+  "cam": [
+   -0.12,
+   1.66,
+   0.14
+  ]
  },
  "after_390_h23.jpg": {
-  "errors": [
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
-  ],
+  "errors": [],
   "dpr": 1,
   "post": {
    "tier": "high",
@@ -251,22 +318,58 @@
    "height": 523,
    "dpr": 1
   },
-  "gl": true
+  "gl": true,
+  "shot": "over",
+  "cam": [
+   0.18,
+   1.95,
+   0.58
+  ]
+ },
+ "after_390_h23s.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": {
+   "tier": "high",
+   "active": true,
+   "chain": [
+    "ao",
+    "dof",
+    "grade",
+    "smaa"
+   ],
+   "ao": true,
+   "aa": "smaa",
+   "bloom": false,
+   "dof": false,
+   "grain": true,
+   "shadow": 2048,
+   "shafts": true,
+   "env": true,
+   "hdr": true,
+   "rtType": "half",
+   "failed": {},
+   "broken": null,
+   "width": 390,
+   "height": 523,
+   "dpr": 1
+  },
+  "gl": true,
+  "shot": "overview",
+  "cam": [
+   5.2,
+   5,
+   6
+  ]
  },
  "fps_1280": {
   "cpu_throttle": 1,
-  "errors": [
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
-  ],
+  "errors": [],
   "low": {
    "fps": 0.1,
    "js": {
-    "frames": 2,
-    "js_ms_per_frame": 9.5
+    "frames": 1,
+    "js_ms_per_frame": 10.5
    },
    "dpr": 1,
    "post": {
@@ -291,22 +394,21 @@
    }
   },
   "medium": {
-   "fps": 0.7,
+   "fps": 0.4,
    "js": {
     "frames": 1,
-    "js_ms_per_frame": 10.1
+    "js_ms_per_frame": 7.3
    },
    "dpr": 1,
    "post": {
     "tier": "medium",
     "active": true,
     "chain": [
-     "ao",
-     "grade",
-     "fxaa"
+     "render",
+     "grade"
     ],
-    "ao": true,
-    "aa": "fxaa",
+    "ao": false,
+    "aa": "msaa",
     "bloom": false,
     "dof": false,
     "grain": false,
@@ -323,10 +425,10 @@
    }
   },
   "high": {
-   "fps": 0.7,
+   "fps": 0.1,
    "js": {
-    "frames": 1,
-    "js_ms_per_frame": 7.4
+    "frames": 3,
+    "js_ms_per_frame": 23.43
    },
    "dpr": 1,
    "post": {
@@ -360,12 +462,12 @@
   "cpu_throttle": 1,
   "errors": [],
   "low": {
-   "fps": 0.5,
+   "fps": 0.8,
    "js": {
-    "frames": 6,
-    "js_ms_per_frame": 313.85
+    "frames": 2,
+    "js_ms_per_frame": 14.35
    },
-   "dpr": 0.75,
+   "dpr": 1,
    "post": {
     "tier": "low",
     "active": false,
@@ -384,26 +486,25 @@
     "broken": null,
     "width": 390,
     "height": 523,
-    "dpr": 0.75
+    "dpr": 1
    }
   },
   "medium": {
-   "fps": 2.2,
+   "fps": 0.6,
    "js": {
-    "frames": 9,
-    "js_ms_per_frame": 8.82
+    "frames": 3,
+    "js_ms_per_frame": 18.57
    },
-   "dpr": 0.75,
+   "dpr": 1,
    "post": {
     "tier": "medium",
     "active": true,
     "chain": [
-     "ao",
-     "grade",
-     "fxaa"
+     "render",
+     "grade"
     ],
-    "ao": true,
-    "aa": "fxaa",
+    "ao": false,
+    "aa": "msaa",
     "bloom": false,
     "dof": false,
     "grain": false,
@@ -416,16 +517,16 @@
     "broken": null,
     "width": 390,
     "height": 523,
-    "dpr": 0.75
+    "dpr": 1
    }
   },
   "high": {
-   "fps": 1.9,
+   "fps": 0.9,
    "js": {
-    "frames": 8,
-    "js_ms_per_frame": 11.71
+    "frames": 3,
+    "js_ms_per_frame": 12.2
    },
-   "dpr": 0.75,
+   "dpr": 1,
    "post": {
     "tier": "high",
     "active": true,
@@ -449,7 +550,7 @@
     "broken": null,
     "width": 390,
     "height": 523,
-    "dpr": 0.75
+    "dpr": 1
    }
   }
  },
@@ -457,10 +558,10 @@
   "cpu_throttle": 4,
   "errors": [],
   "low": {
-   "fps": 0.2,
+   "fps": 0.6,
    "js": {
-    "frames": 5,
-    "js_ms_per_frame": 17.42
+    "frames": 2,
+    "js_ms_per_frame": 19.85
    },
    "dpr": 1,
    "post": {
@@ -485,22 +586,21 @@
    }
   },
   "medium": {
-   "fps": 1.4,
+   "fps": 0.4,
    "js": {
-    "frames": 5,
-    "js_ms_per_frame": 27.02
+    "frames": 3,
+    "js_ms_per_frame": 31.57
    },
    "dpr": 1,
    "post": {
     "tier": "medium",
     "active": true,
     "chain": [
-     "ao",
-     "grade",
-     "fxaa"
+     "render",
+     "grade"
     ],
-    "ao": true,
-    "aa": "fxaa",
+    "ao": false,
+    "aa": "msaa",
     "bloom": false,
     "dof": false,
     "grain": false,
@@ -517,10 +617,10 @@
    }
   },
   "high": {
-   "fps": 1.2,
+   "fps": 0.8,
    "js": {
-    "frames": 4,
-    "js_ms_per_frame": 23.17
+    "frames": 2,
+    "js_ms_per_frame": 40.1
    },
    "dpr": 1,
    "post": {

@@ -239,12 +239,14 @@ export class RoomEnv {
     if (this._env) this._env.dispose(); this._env = env; this.texture = env.texture; this.key = key; this.captures++;
     return true;
   }
-  // a 16 x 16 block at the centre of the floor face (-y): every texel finite
+  // every texel of all six faces finite (a NaN anywhere spreads through the prefiltered map, and through the AO blur)
   clean(){
     const R = this.renderer; if (!R.readRenderTargetPixels) return true;
-    const n = 16, w = this.rt.width, x = Math.max(0, (w - n) >> 1), buf = new Uint16Array(n * n * 4);
-    try { R.readRenderTargetPixels(this.rt, x, x, n, n, buf, 3); } catch { return true; }
-    for (let i = 0; i < buf.length; i++) { if ((i & 3) === 3) continue; const h = buf[i]; if (((h >> 10) & 0x1f) === 31) return false; }   // half float: exponent all ones = Inf / NaN
+    const w = this.rt.width, buf = new Uint16Array(w * w * 4);
+    for (let f = 0; f < 6; f++) {
+      try { R.readRenderTargetPixels(this.rt, 0, 0, w, w, buf, f); } catch { return true; }
+      for (let i = 0; i < buf.length; i++) { if ((i & 3) === 3) continue; if (((buf[i] >> 10) & 0x1f) === 31) return false; }   // half float: exponent all ones = Inf / NaN
+    }
     return true;
   }
   dispose(){ this.rt.dispose(); if (this._env) this._env.dispose(); }
