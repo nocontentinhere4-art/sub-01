@@ -120,3 +120,86 @@ def test_phone_screen_module_has_no_brand_ui():
     code = "\n".join(l for l in (ROOT / "web" / "room_phone.js").read_text().splitlines() if not l.strip().startswith("//"))
     for w in ("iOS", "Android", "Apple", "iPhone", "Google", "Samsung", "Galaxy", "Pixel"):
         assert w not in code, w
+
+
+# ---------------------------------------------------------------- the hard surfaces (#98 G5, room_build/props_hard.py)
+def materials():
+    return {m.get("name"): m for m in gltf()["materials"]}
+
+
+def prims_by_material():
+    g = gltf(); names = [m.get("name") for m in g["materials"]]
+    out = {}
+    for m in g["meshes"]:
+        for p in m["primitives"]:
+            out.setdefault(names[p["material"]], []).append(p)
+    return out
+
+
+def test_hard_surfaces_are_built_by_props_hard():
+    src = (ROOT / "room_build" / "build_room.py").read_text()
+    for fn in ("materials", "window", "desk", "chair", "bed_frame", "bookshelf", "fridge", "door", "aircon", "headphones", "fan", "decals", "finish"):
+        assert f"props_hard.{fn}(globals())" in src, fn
+    assert 'm.get("nouv")' in src                                   # the atlases keep their own UVs through the final projection pass
+
+
+def test_atlases_and_pbr_textures_are_in_the_glb():
+    images = {i.get("name") for i in gltf()["images"]}
+    for k in ("keycaps", "spines", "decals", "floor_diff", "floor_nor", "floor_mr", "oak_mr", "plastic_mr", "metal_mr", "white_mr", "wall_mr"):
+        assert k in images, k
+
+
+def test_hard_materials_carry_roughness_variation():
+    mats = materials()
+    for k in ("floor", "wall", "oak", "door", "white", "plastic_black", "metal_dark", "steel", "alu"):
+        assert "metallicRoughnessTexture" in mats[k]["pbrMetallicRoughness"], k
+    assert mats["decal"].get("alphaMode") == "BLEND"                 # dust, scuffs and stickers are blended over the surfaces
+    for k in ("keycap", "book", "decal"):
+        assert "baseColorTexture" in mats[k]["pbrMetallicRoughness"], k
+
+
+def test_edge_wear_lives_in_the_vertex_colours():
+    prims = prims_by_material()
+    for k in ("oak", "door", "plastic_black", "white"):               # worn edges: tinted vertex colours on the bevels
+        assert any("COLOR_0" in p["attributes"] for p in prims[k]), k
+    for k in ("floor", "wall", "cut"):                                # untinted surfaces carry no colour attribute (post.mjs drops all-white ones)
+        assert all("COLOR_0" not in p["attributes"] for p in prims[k]), k
+
+
+def test_keycaps_and_books_have_their_own_uvs():
+    prims = prims_by_material()
+    for k in ("keycap", "book", "decal", "posters", "pinboard"):
+        assert all("TEXCOORD_0" in p["attributes"] for p in prims[k]), k
+
+
+def test_movable_nodes_do_not_share_the_rooms_ao():
+    g = gltf(); names = {n.get("name"): n for n in g["nodes"]}; mats = g["materials"]
+    for k in ("headphones", "hangers"):
+        child = g["nodes"][names[k]["children"][0]]
+        for p in g["meshes"][child["mesh"]]["primitives"]:
+            m = mats[p["material"]]
+            assert "occlusionTexture" not in m, (k, m.get("name"))  # the room's AO is baked without them: they must not read it
+    # the chair reads its own (self-occlusion) map, never the room's
+    child = g["nodes"][names["chair"]["children"][0]]
+    room_ao = [i for i, im in enumerate(g["images"]) if im.get("name") == "room_ao"]
+    for p in g["meshes"][child["mesh"]]["primitives"]:
+        occ = mats[p["material"]].get("occlusionTexture")
+        if occ and room_ao:
+            t = g["textures"][occ["index"]]                                # WebP textures name their image in the extension
+            assert t.get("source", t.get("extensions", {}).get("EXT_texture_webp", {}).get("source")) != room_ao[0]
+
+
+def test_markers_and_pivots_stay_where_the_page_expects():
+    n = nodes()
+    m = n["SURF_monitor"]; x, y, z = m["translation"]
+    assert abs(x + 1.06) < 0.01 and abs(y - 1.33) < 0.005 and abs(z + 1.19) < 0.01, (x, y, z)
+    assert abs(m["extras"]["w"] - 0.64) < 1e-6 and abs(m["extras"]["h"] - 0.37) < 1e-6
+    w = n["SURF_window"]; assert abs(w["translation"][0] + 2.012) < 1e-3 and abs(w["extras"]["w"] - 1.58) < 1e-3
+    c = n["chair"]["translation"]
+    assert abs(c[0] + 1.13) < 1e-3 and abs(c[1] - 0.16) < 1e-3 and abs(c[2] + 0.585) < 1e-3, c
+
+
+def test_floor_texture_is_credited():
+    credits = (ROOT / "web" / "room" / "CREDITS.md").read_text()
+    for k in ("`wooden_floor_01`", "props_hard.py", "keycap", "spines", "decals", "DejaVu"):
+        assert k in credits, k
