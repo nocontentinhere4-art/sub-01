@@ -223,15 +223,28 @@ export class RoomEnv {
     this.cam = new THREE.CubeCamera(0.05, 40, this.rt); this.cam.position.set(...position);
     this.key = null; this.texture = null; this._env = null; this.captures = 0;
   }
-  // key: a short string of the quantised light state; hide: objects left out of the capture (him, the shafts, the blob)
+  // key: a short string of the quantised light state; hide: objects left out of the capture (him, the shafts, the blob).
+  // The caller zeroes the environment on its materials first: a capture must never reflect the previous capture (the
+  // floor reflects the map; one bad texel in a capture would feed back into every later one). A capture whose floor
+  // face holds a NaN is dropped (the previous map stays, the key is not taken, so it is retried after the rate limit).
   update(key, hide = []){
     if (key === this.key) return false;
     const was = hide.filter(o => o).map(o => [o, o.visible]); for (const [o] of was) o.visible = false;
-    const target = this.renderer.getRenderTarget();
+    const target = this.renderer.getRenderTarget(), envI = this.scene.environmentIntensity;
+    this.scene.environmentIntensity = 0;
     try { this.cam.update(this.renderer, this.scene); }                 // linear light: no tone mapping on a render target
-    finally { this.renderer.setRenderTarget(target); for (const [o, v] of was) o.visible = v; }
+    finally { this.renderer.setRenderTarget(target); this.scene.environmentIntensity = envI; for (const [o, v] of was) o.visible = v; }
+    if (!this.clean()) { this.rejected = (this.rejected || 0) + 1; return false; }
     const env = this.pmrem.fromCubemap(this.rt.texture);
     if (this._env) this._env.dispose(); this._env = env; this.texture = env.texture; this.key = key; this.captures++;
+    return true;
+  }
+  // a 16 x 16 block at the centre of the floor face (-y): every texel finite
+  clean(){
+    const R = this.renderer; if (!R.readRenderTargetPixels) return true;
+    const n = 16, w = this.rt.width, x = Math.max(0, (w - n) >> 1), buf = new Uint16Array(n * n * 4);
+    try { R.readRenderTargetPixels(this.rt, x, x, n, n, buf, 3); } catch { return true; }
+    for (let i = 0; i < buf.length; i++) { if ((i & 3) === 3) continue; const h = buf[i]; if (((h >> 10) & 0x1f) === 31) return false; }   // half float: exponent all ones = Inf / NaN
     return true;
   }
   dispose(){ this.rt.dispose(); if (this._env) this._env.dispose(); }

@@ -368,7 +368,7 @@ if (!OLD_ROOM) { RectAreaLightUniformsLib.init(); skyLight = new THREE.RectAreaL
 // changes; the sun's shafts through the window; the contact shadow under his feet. Built in lighting() once the window is known.
 const roomEnv = new RoomEnv(THREE, renderer, scene, {size:128, position:[0.1, 1.25, 0.1], pmrem});
 let shafts = null, blob = null, envAt = 0;
-function setEnv(tex){ scene.environment = tex; scene.environmentIntensity = tex === studioEnv ? 0.35 : 1.0; for (const m of roomMats) if (m.envMap) m.envMap = tex; }
+function setEnv(tex){ scene.environment = tex; for (const m of roomMats) if (m.envMap) m.envMap = tex; }   // lighting() sets the intensity
 
 // ---------- places measured on the room model (after fit(room, 4); floor at y = 0.16; ~1 unit = 1 m) ----------
 const F = 0.16;
@@ -1157,7 +1157,7 @@ function camAround(out, c, facing, dist, h, ang){
   return out.copy(best);
 }
 function updateCameraGoal(){
-  const nowS = performance.now() / 1000, home = boy && boy.visible && head;
+  const nowS = T, home = boy && boy.visible && head;                      // the simulation's clock: a frozen page (QA) holds its shot
   const atDesk = (screenOn === "desk" || chatting) && monitor && home;
   const onPhone = screenOn === "phone" && phone.visible && home;
   const list = atDesk ? ["face", "screen", "medium"] : onPhone ? ["over", "face"] : home ? ["medium", "face", "overview"] : ["overview"];
@@ -1168,13 +1168,14 @@ function updateCameraGoal(){
   (bones.headfront || head).getWorldPosition(v2);                           // his face
   const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
   v1.copy(v2).addScaledVector(UP, -0.28);                                   // his chest
+  const lying = current === actions.sleep || current === actions.phone_lie || current === actions.listen;
   if (CAM.kind === "face") {
-    // a medium close-up of his face: from the front-left (at the desk: from the desk's end, the monitor lighting him)
-    camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0);
+    // a medium close-up of his face: from the front-left (at the desk: from the desk's end, the monitor lighting him);
+    // lying down: from the side of the bed, looking down at him
+    if (lying) camAround(camGoal.pos, v2, v3, 1.1, 0.6, 90); else camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0);
     camGoal.target.copy(v2).addScaledVector(UP, -0.06);
     if (atDesk) camGoal.target.lerp(v5.set(...SURF.monitor.c), 0.12);
   } else if (CAM.kind === "medium") {
-    const lying = current === actions.sleep || current === actions.phone_lie || current === actions.listen;
     camAround(camGoal.pos, v1, v3, 2.4, lying ? 1.0 : 0.5, 50);
     camGoal.target.copy(v1).addScaledVector(UP, 0.05);
   } else if (CAM.kind === "screen") {
@@ -1196,7 +1197,7 @@ function updateCameraGoal(){
 let hour = FIXED_HOUR ? +FIXED_HOUR : 12, stage = "AWAKE", lampOn = 0, roomOn = 0;
 const roomTint = new THREE.Color(), WHITE = new THREE.Color(1, 1, 1);
 const cSunDay = new THREE.Color(0xfff0dc), cSunDusk = new THREE.Color(0xff9a5c), cMoon = new THREE.Color(0x7d93d8);
-const cNight = new THREE.Color(0.22, 0.27, 0.50), cWarm = new THREE.Color(1.0, 0.86, 0.68), cScreen = new THREE.Color(0xbcd4ff);
+const cNight = new THREE.Color(0.22, 0.27, 0.50), cGlow = new THREE.Color(0.50, 0.52, 0.66), cWarm = new THREE.Color(1.0, 0.86, 0.68), cScreen = new THREE.Color(0xbcd4ff);
 const cSkyDay = new THREE.Color(0xe4ecff), cSkyDusk = new THREE.Color(0xffb27a);
 // the patch of light the window throws on the floor: a soft two-pane rectangle, additive, no extra light or shadow pass
 const pool = (() => {
@@ -1232,7 +1233,7 @@ function lighting(dt){
   // light units (three.js physical lights): 1 unit = 1000 SI -- klx for the sun and the hemisphere fill, knit (kcd/m²) for the
   // sky seen through the window, kcd for the lamp, the bulb, the ceiling light and the screens. Real ratios: a low sun
   // through glass ~14 klx, a bright sky ~6 knit, a desk lamp ~0.28 kcd, a ceiling light ~0.13 kcd, a monitor ~0.012 kcd.
-  // The exposure then adapts like an eye or a camera (below): ~2.3 by day, ~12 with the lamps on, ~70 at night.
+  // The exposure is a fixed stop per state (below): 2.2 by day, 12 at night with the lights off, 7 with a lamp on.
   sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
   sun.intensity = 0.3 + 2.3 * day + 0.7 * dusk;                       // the old room (baked textures) keeps its own scale
   const w = SURF.window; sun.position.set(w.c[0] - 3.5, w.c[1] + 1.2 + 2.5 * Math.max(0, sunEl), w.c[2] + 1.0); sun.target.position.set(0.2, 0.3, 0.1);
@@ -1261,27 +1262,39 @@ function lighting(dt){
     // day, a blue moonlit window at night; the ceiling light and the desk lamp warm the room in the evening. Reflections
     // follow the overall light level, and each material class reflects its own share (metal and glass most, fabric least).
     skyLight.color.copy(cMoon).lerp(cSkyDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSkyDay, day);
-    skyLight.intensity = 0.12 + 6.0 * day + 1.5 * dusk;                 // knit: a bright sky, a city's night sky (Tokyo: never black)
-    sun.intensity = 0.006 + 14 * day + 3.0 * dusk;                      // klx: a low autumn sun through the glass; the moon and streetlight at night
-    hemi.intensity = 0.015 + 1.0 * day + 0.05 * roomOn + 0.03 * lampOn; // klx: the bounce off the walls (one indirect bounce); the city's glow at night
-    hemi.color.lerp(cNight, 1 - Math.max(day, roomOn, 0.6 * lampOn));   // with the lights off at night: dim and blue
+    skyLight.intensity = 0.12 + 6.0 * day + 1.5 * dusk;                 // knit: a bright sky by day; at night the city's glow and the lit street
+    sun.intensity = 0.004 + 14 * day + 3.0 * dusk;                      // klx: a low autumn sun through the glass; the moon and a streetlight at night
+    hemi.intensity = 0.10 + 1.0 * day + 0.05 * roomOn + 0.03 * lampOn;  // klx: the bounce off the walls (one indirect bounce); at night the city's glow (the floor reads RGB 30-45 at the 12 stop)
+    hemi.color.lerp(cGlow, 1 - Math.max(day, roomOn, 0.6 * lampOn));    // with the lights off at night: the city's grey-blue glow
     ceiling.intensity = 0.2 * roomOn;                                   // kcd: ~2500 lm, a bright ceiling light
     lamp.intensity = 0.2 * lampOn; bulb.intensity = 0.035 * lampOn;     // kcd: ~600 lm into the cone, the rest as spill
     if (lampMat) lampMat.emissiveIntensity = 0.02 + 6.0 * lampOn;       // the bulb through the shade's opening: brighter than the desk it lights
-    // the exposure adapts to the light in the room (a key of its sources): ~2.3 by day, ~12 with the lamps on, ~70 at night
-    renderer.toneMappingExposure = 0.85 / (0.010 + 0.35 * day + 0.18 * dusk + 0.03 * roomOn + 0.035 * lampOn + 0.008 * (mOn ? 1 : 0));
+    // the exposure: a fixed stop per state, never a key that equalises every scene (G8: a dark room must read dark, black
+    // cloth stays black): 2.2 by day, 12 at night with the lights off (5.5x day; the moon and the city's glow are the only
+    // key: the floor reads RGB 30-45), 7 with the lamp or the ceiling light on (their pools bright, the rest of the room
+    // dark); dusk in between
+    renderer.toneMappingExposure = 2.2 * day + (1 - day) * (12 - 5 * Math.max(roomOn, lampOn)) + 0.6 * dusk;
     // reflections: the captured room is the room's own radiance (1.0 times the material class); the studio map (low tier,
     // before the first capture) follows the light level
-    const captured = roomEnv.texture && scene.environment === roomEnv.texture;
-    const env = captured ? 1.0 : 0.05 + 0.6 * day + 0.16 * roomOn + 0.08 * lampOn;
-    for (const m of roomMats) m.envMapIntensity = env * (m.userData.envK ?? (m.userData.envK = envClassOf(m.name)));
-    pool.visible = false;
     // the room as its own environment map (medium and high tiers): the reflections show the real window, walls and lamp;
-    // re-captured when the quantised light state changes, at most every 1.5 s, with him and the effects left out
-    if (info.env && room && sky && performance.now() - envAt > 1500) {
+    // re-captured when the quantised light state changes, at most every 1.5 s, with him and the effects left out and the
+    // environment off on every material (direct light only: a capture never reflects the previous capture)
+    if (info.env && room && sky && boy && performance.now() - envAt > 1500) {
       const key = `${Math.round(day * 6)}.${Math.round(dusk * 3)}.${Math.round(roomOn * 2)}.${Math.round(lampOn * 2)}.${monitor && monitor.mesh.material !== offMat ? 1 : 0}`;
-      if (roomEnv.update(key, [boy, phone, shafts && shafts.group, blob && blob.mesh])) { envAt = performance.now(); setEnv(roomEnv.texture); }
+      if (key !== roomEnv.key) {
+        for (const m of roomMats) m.envMapIntensity = 0; if (boy.userData.mats) for (const m of boy.userData.mats) m.envMapIntensity = 0;
+        if (roomEnv.update(key, [boy, phone, shafts && shafts.group, blob && blob.mesh])) setEnv(roomEnv.texture);
+        envAt = performance.now();
+      }
     }
+    // the studio map is a lit studio (radiance ~1, not physical): on the low tier and before the first capture it is scaled
+    // to the room's own level in these units (~0.4 by day, ~0.0006 at night with the lights off), else a night room glows
+    const captured = roomEnv.texture && scene.environment === roomEnv.texture;
+    const env = captured ? 1.0 : 0.0006 + 0.4 * day + 0.03 * roomOn + 0.015 * lampOn;
+    scene.environmentIntensity = env;                                   // him, the props and the phone use the scene's map
+    for (const m of roomMats) m.envMapIntensity = env * (m.userData.envK ?? (m.userData.envK = envClassOf(m.name)));
+    if (boy && boy.userData.mats) for (const m of boy.userData.mats) m.envMapIntensity = 0.15 * env;   // his cloth and skin: a fabric's share (the studio map, on the low tier, follows the light level too)
+    pool.visible = false;
     // the sun's shafts through the window: by day, longest when the sun is low; a warm trace at dusk
     if (!shafts && sky) { shafts = new SunShafts(THREE, SURF.window); scene.add(shafts.group); }
     if (shafts) { const low = clamp(1 - sunEl, 0.25, 1);
@@ -1304,6 +1317,11 @@ function lighting(dt){
   const sk = OLD_ROOM ? 1 : post.hdrScreens;
   if (monitor && monitor.on.color.b !== sk) monitor.on.color.setRGB(0.93 * sk, 0.96 * sk, sk);
   const ps = phone.userData.screen, pk = OLD_ROOM ? 1 : 0.45; if (ps.on.color.r !== pk) ps.on.color.setScalar(pk);
+  // his material response: boy.glb's one material has no metallicFactor, so glTF makes it fully metallic (a statue that
+  // only reflects the environment: black cloth went grey at night, the hood went white under the lamp). Cloth and skin:
+  // dielectric, a fabric's share of the environment (as envClassOf gives fabric), once per material
+  if (boy && !boy.userData.mats) { const mats = boy.userData.mats = [];
+    boy.traverse(o => { if (o.isMesh && o.material && !mats.includes(o.material)) { o.material.metalness = 0; o.material.envMapIntensity = 0.15; o.material.needsUpdate = true; mats.push(o.material); } }); }
   // the contact shadow under his feet (fades as they leave the floor: on the bed, lying down)
   if (!blob) { blob = new ContactBlob(THREE, {floorY:F, strength:0.55}); scene.add(blob.mesh); }
   if (boy && boy.visible && bones.Hips && bones.LeftFoot && bones.RightFoot) {
@@ -2779,7 +2797,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   setHour: h => { hour = h; }, setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
-  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; },
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, studioEnv, roomEnv, setEnv,
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top, or the sheet as the duvet comes over him, less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
     const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 + 0.035 * (1 - DUV.w) - 0.02, ch = chairNode(), V = ch && chairVox();

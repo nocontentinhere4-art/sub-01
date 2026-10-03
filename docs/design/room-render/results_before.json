@@ -6,7 +6,13 @@
   "errors": [],
   "dpr": 1,
   "post": null,
-  "gl": true
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
  },
  "before_1280_h14.jpg": {
   "errors": [],
@@ -18,7 +24,13 @@
   "errors": [],
   "dpr": 1,
   "post": null,
-  "gl": true
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
  },
  "before_1280_h23.jpg": {
   "errors": [],
@@ -30,7 +42,13 @@
   "errors": [],
   "dpr": 1,
   "post": null,
-  "gl": true
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
  },
  "before_390_h14.jpg": {
   "errors": [],
@@ -42,7 +60,13 @@
   "errors": [],
   "dpr": 1,
   "post": null,
-  "gl": true
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
  },
  "before_390_h23.jpg": {
   "errors": [],

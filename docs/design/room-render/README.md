@@ -30,8 +30,10 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
 - Physical light units (three.js's physical lights; 1 unit = 1000 SI): the sun 14 klx through the glass, the sky seen
   through the window 6 knit, the bounce 1 klx, the desk lamp 0.28 kcd (a spot with one 1024 px shadow map, was a point
   light with six 512 px faces) plus a 0.04 kcd bulb for the spill, the ceiling light 0.2 kcd, a monitor 0.012 kcd and a
-  phone 0.003 kcd on his face, the screens themselves 0.5 knit. The exposure adapts to the light in the room like an eye
-  or a camera: ≈ 2.3 by day, ≈ 12 with the lamps on, ≈ 70 at night (`lighting()` in room.html).
+  phone 0.003 kcd on his face, the monitor 0.3 knit and the phone 0.45 knit. The exposure is a fixed stop per state, never
+  a key that equalises the scenes (G8's review of the first cut: an adapting exposure lifted the lights-off night room to
+  noon brightness): 2.2 by day, 4 at night with the lights off (the moon and the city's glow are the only key), 5.5 with
+  the lamp or the ceiling light on, so their pools are bright and the rest of the room stays dark (`lighting()`).
 - Shadows: the sun's shadow frustum moves in whole texels (no swimming edges), a higher normal bias against acne. A
   contact shadow under his feet that fades as they leave the floor; N8AO gives the contact darkening on everything else.
 - Sun shafts: slices of the window's light along the sun's direction, depth-tested so furniture cuts them, by day and at
@@ -46,13 +48,40 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   elsewhere: **medium** (2.4 m, 50° off his facing), **face**, and the **overview** (which stays in the cycle). A
   candidate position that would sit in a wall or a piece of furniture is turned round him (the mirror angle, a profile,
   the front, a rear three-quarter) until it fits. `?debug` → `setShot("face")` pins one.
-- Night (G8 #15): a city's night sky through the window (0.12 knit), a little moon and streetlight, and the exposure
-  adapting to it; nothing is painted brighter than its light. Monitor (G8 #16): the page is drawn at 0.3 knit, slightly
+- Night (G8 #15): a city's night sky through the window (0.12 knit), a little moon and streetlight, at a fixed night
+  stop; nothing is painted brighter than its light, and black cloth stays black. Monitor (G8 #16): the page is drawn at 0.3 knit, slightly
   blue-white, no longer a light source. Lamp on the hoodie (G8 #22): AgX in place of ACES (highlights roll off instead
   of clipping), the lamp 0.2 kcd, the exposure keyed to it.
 - Known gap for G7 (the window): the sky plane's shader emits ≈ 1 unit by day, which in the physical scale reads as a
   dim window (a real overcast sky is ≈ 5 knit). Multiplying its output by ≈ 5 by day and ≈ 0.05 at night when the post
   chain is active (`post.hdr`) would make the window the brightest thing in the room, as it is in a photo.
+
+## G8's harness, main vs this branch (`python -m tests.visual.harness`, software WebGL, 0 hard failures on both)
+`exposure()` of the 3D canvas (`tests/visual/image_checks.py`): mean luminance 0–255, pure-black and blown-out pixel
+fractions. The page shots frame him differently on this branch (the new camera shots instead of the old follow camera),
+so compare the black and blown fractions there rather than the means; the close-ups use the harness's own fixed cameras.
+
+| shot | mean lum | pure black | blown |
+|---|---|---|---|
+| sleeping_23_1280 | 10.5 → 47.8 | 12.2 % → 15.8 % | 0.00 % → 0.00 % |
+| sleeping_23_390 | 11.8 → 55.5 | 18.1 % → 2.5 % | 0.00 % → 0.00 % |
+| phone_23_1280 | 36.5 → 47.8 | 7.3 % → 2.4 % | 0.00 % → 0.00 % |
+| window_19_1280 | 45.0 → 80.9 | 2.2 % → 8.6 % | 0.23 % → 0.00 % |
+| eating_19_1280 | 50.9 → 101.3 | 1.8 % → 6.9 % | 0.20 % → 0.00 % |
+| desk_14_1280 | 163.4 → 126.5 | 1.1 % → 3.2 % | 3.96 % → 0.00 % |
+| desk_14_390 | 150.4 → 146.7 | 1.9 % → 0.0 % | 9.20 % → 0.00 % |
+| door_8_1280 | 69.4 → 121.3 | 0.5 % → 0.6 % | 0.23 % → 0.00 % |
+| walking_8_1280 | 175.5 → 118.8 | 0.1 % → 0.9 % | 7.40 % → 0.00 % |
+
+Close-ups (mean luminance, the harness's fixed cameras): night 7.2 → 42.2 · face 99.9 → 146.2 · hands 51.5 → 98.6 · desk 103.7 → 97.2 · bed 103.6 → 121.7. The night close-up of the bed with the lights off goes
+from 7 to 42 (the coordinator's target for the floor: RGB 30–45); the monitor's page no longer blows out (desk 14: 4 %
+→ 0 % of the canvas at 1280, 9 % → 0 % at 390); the hood under the lamp no longer clips (eating 19: 0 % blown).
+The night stop is 12 against 2.2 by day (5.5×, inside the 4–6× cap); with a lamp or the ceiling light on, 7.
+
+A note on the environment capture found on the way: the floor reflects the environment map, so a capture fed back
+into the next one, and an early capture with a few NaN texels (software WebGL) blacked out every later frame. Captures
+are now taken with the environment off on every material (direct light only) and a capture whose floor face holds a
+NaN or an infinity is dropped and retried after the rate limit.
 
 ## Numbers
 Measured 2026-10-02 in this sandbox: headless Chromium with **software WebGL** (SwiftShader) on 4 CPU cores. A software

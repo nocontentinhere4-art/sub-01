@@ -42,7 +42,7 @@ const THREE = {
   PlaneGeometry: Geom, Float32BufferAttribute: class { constructor(a, n) { this.array = a; this.itemSize = n; } },
   ShaderMaterial: Mat, MeshBasicMaterial: Mat, CanvasTexture: class { constructor(c) { this.image = c; } }, DepthTexture: class { constructor(w, h, t) { this.w = w; this.h = h; this.type = t; } },
   WebGLRenderTarget: RT, WebGLCubeRenderTarget: class extends RT { constructor(s) { super(s, s); } },
-  CubeCamera: class extends Obj { constructor(n, f, rt) { super(); this.rt = rt; this.updates = 0; this.seen = []; } update(r, scene) { this.updates++; this.seen.push(scene.children.map(o => o.visible)); } },
+  CubeCamera: class extends Obj { constructor(n, f, rt) { super(); this.rt = rt; this.updates = 0; this.seen = []; } update(r, scene) { this.updates++; this.seen.push(scene.children.map(o => o.visible)); scene.envDuring = scene.environmentIntensity; } },
   PMREMGenerator: class { constructor() { this.n = 0; } fromCubemap(t) { this.n++; return {texture: {from: t, n: this.n}, dispose() {}}; } },
   UniformsUtils: {clone: u => { const o = {}; for (const [k, v] of Object.entries(u)) o[k] = {value: v.value && v.value.clone ? v.value.clone() : Array.isArray(v.value) ? v.value.slice() : v.value}; return o; }},
   HalfFloatType: "half", UnsignedByteType: "byte", UnsignedIntType: "uint", AdditiveBlending: 2, DoubleSide: 2,
@@ -171,9 +171,13 @@ async function main() {
   // the captured room environment: the same key is not re-taken, hidden objects are hidden during the capture and restored after
   {
     const sc = new Obj(); const a = new Obj(), b = new Obj(); sc.add(a, b);
-    const E = new P.RoomEnv(THREE, renderer(), sc, {size: 64});
+    const rr = renderer(); rr.nan = false; rr.readRenderTargetPixels = (rt, x, y, w, h, buf, face) => { buf.fill(rr.nan ? 0x7e00 : 0x3c00); };   // half floats: NaN or 1.0
+    sc.environmentIntensity = 0.7;
+    const E = new P.RoomEnv(THREE, rr, sc, {size: 64});
     const first = E.update("d1.0_r0_l0", [a]), again = E.update("d1.0_r0_l0", [a]), changed = E.update("d0.5_r1_l1", [a, null]);
-    out.roomenv = {first, again, changed, captures: E.captures, updates: E.cam.updates, hidden_during: E.cam.seen[0], restored: a.visible && b.visible, has_texture: !!E.texture};
+    rr.nan = true; const bad = E.update("night", [a]); const keyAfterBad = E.key; rr.nan = false; const retried = E.update("night", [a]);
+    out.roomenv = {first, again, changed, captures: E.captures, updates: E.cam.updates, hidden_during: E.cam.seen[0], restored: a.visible && b.visible, has_texture: !!E.texture,
+      nan_rejected: bad === false, key_kept: keyAfterBad === "d0.5_r1_l1", rejected: E.rejected, retried, env_off_during: sc.envDuring === 0, env_restored: sc.environmentIntensity === 0.7};
   }
   console.log(JSON.stringify(out));
 }
