@@ -1,0 +1,10712 @@
+{
+ "desk_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.941,
+     0.986,
+     -1.052
+    ],
+    "RightToeBase": [
+     -0.857,
+     0.336,
+     -1.128
+    ],
+    "RightFoot": [
+     -0.971,
+     0.311,
+     -0.996
+    ],
+    "LeftFoot": [
+     -1.292,
+     0.286,
+     -0.986
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.347,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.202,
+     0.775,
+     -0.958
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.12,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.07,
+    1.22,
+    -0.78
+   ],
+   "neck": [
+    -1.04,
+    1.29,
+    -0.86
+   ],
+   "Head": [
+    -1.02,
+    1.34,
+    -0.91
+   ],
+   "LeftArm": [
+    -1.21,
+    1.24,
+    -0.82
+   ],
+   "RightArm": [
+    -0.92,
+    1.16,
+    -0.81
+   ],
+   "LeftUpLeg": [
+    -1.21,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.31,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.14,
+  "arm_over_desk": -0.074,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.901,
+   "LeftUpLeg": 0.818,
+   "LeftLeg": 0.774,
+   "LeftFoot": 0.425,
+   "LeftToeBase": 0.381,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "desk_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.943,
+     0.992,
+     -1.041
+    ],
+    "RightToeBase": [
+     -0.862,
+     0.336,
+     -1.131
+    ],
+    "RightFoot": [
+     -0.976,
+     0.311,
+     -0.999
+    ],
+    "LeftFoot": [
+     -1.292,
+     0.287,
+     -0.987
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.348,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.204,
+     0.783,
+     -0.966
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.12,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.07,
+    1.23,
+    -0.78
+   ],
+   "neck": [
+    -1.05,
+    1.3,
+    -0.86
+   ],
+   "Head": [
+    -1.02,
+    1.35,
+    -0.9
+   ],
+   "LeftArm": [
+    -1.22,
+    1.25,
+    -0.82
+   ],
+   "RightArm": [
+    -0.92,
+    1.17,
+    -0.81
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.31,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.141,
+  "arm_over_desk": -0.068,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.899,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.775,
+   "LeftFoot": 0.426,
+   "LeftToeBase": 0.382,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.378
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "desk_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.946,
+     0.985,
+     -1.047
+    ],
+    "RightToeBase": [
+     -0.864,
+     0.336,
+     -1.129
+    ],
+    "RightFoot": [
+     -0.978,
+     0.311,
+     -0.997
+    ],
+    "LeftFoot": [
+     -1.301,
+     0.285,
+     -0.983
+    ],
+    "LeftToeBase": [
+     -1.426,
+     0.347,
+     -1.13
+    ],
+    "LeftHand": [
+     -1.21,
+     0.775,
+     -0.958
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.12,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.07,
+    1.22,
+    -0.79
+   ],
+   "neck": [
+    -1.05,
+    1.29,
+    -0.87
+   ],
+   "Head": [
+    -1.03,
+    1.34,
+    -0.91
+   ],
+   "LeftArm": [
+    -1.22,
+    1.24,
+    -0.83
+   ],
+   "RightArm": [
+    -0.92,
+    1.17,
+    -0.81
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.31,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.139,
+  "arm_over_desk": -0.075,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.898,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.773,
+   "LeftFoot": 0.424,
+   "LeftToeBase": 0.38,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "eat_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.145,
+     1.223,
+     -1.043
+    ],
+    "RightToeBase": [
+     -0.977,
+     0.336,
+     -1.128
+    ],
+    "RightFoot": [
+     -1.091,
+     0.311,
+     -0.996
+    ],
+    "LeftFoot": [
+     -1.412,
+     0.286,
+     -0.986
+    ],
+    "LeftToeBase": [
+     -1.537,
+     0.347,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.383,
+     1.013,
+     -1.087
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.24,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.24,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.18,
+    1.27,
+    -0.72
+   ],
+   "neck": [
+    -1.15,
+    1.36,
+    -0.76
+   ],
+   "Head": [
+    -1.12,
+    1.42,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.32,
+    1.3,
+    -0.76
+   ],
+   "RightArm": [
+    -1.03,
+    1.22,
+    -0.75
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.43,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.14,
+  "arm_over_desk": 0.093,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.901,
+   "LeftUpLeg": 0.818,
+   "LeftLeg": 0.774,
+   "LeftFoot": 0.425,
+   "LeftToeBase": 0.381,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "eat_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.353,
+     1.075,
+     -0.843
+    ],
+    "RightToeBase": [
+     -0.982,
+     0.336,
+     -1.131
+    ],
+    "RightFoot": [
+     -1.096,
+     0.311,
+     -0.999
+    ],
+    "LeftFoot": [
+     -1.412,
+     0.287,
+     -0.987
+    ],
+    "LeftToeBase": [
+     -1.537,
+     0.348,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.382,
+     1.014,
+     -1.088
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.24,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.24,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.18,
+    1.27,
+    -0.72
+   ],
+   "neck": [
+    -1.15,
+    1.36,
+    -0.77
+   ],
+   "Head": [
+    -1.12,
+    1.42,
+    -0.8
+   ],
+   "LeftArm": [
+    -1.32,
+    1.3,
+    -0.76
+   ],
+   "RightArm": [
+    -1.03,
+    1.22,
+    -0.75
+   ],
+   "LeftUpLeg": [
+    -1.34,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.43,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.141,
+  "arm_over_desk": 0.028,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.899,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.775,
+   "LeftFoot": 0.426,
+   "LeftToeBase": 0.382,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.378
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "eat_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.353,
+     1.075,
+     -0.844
+    ],
+    "RightToeBase": [
+     -0.984,
+     0.336,
+     -1.129
+    ],
+    "RightFoot": [
+     -1.098,
+     0.311,
+     -0.997
+    ],
+    "LeftFoot": [
+     -1.421,
+     0.285,
+     -0.983
+    ],
+    "LeftToeBase": [
+     -1.546,
+     0.347,
+     -1.13
+    ],
+    "LeftHand": [
+     -1.378,
+     1.015,
+     -1.086
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.24,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.18,
+    1.27,
+    -0.72
+   ],
+   "neck": [
+    -1.16,
+    1.36,
+    -0.76
+   ],
+   "Head": [
+    -1.13,
+    1.42,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.33,
+    1.3,
+    -0.77
+   ],
+   "RightArm": [
+    -1.03,
+    1.23,
+    -0.75
+   ],
+   "LeftUpLeg": [
+    -1.34,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.43,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.139,
+  "arm_over_desk": 0.031,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.898,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.773,
+   "LeftFoot": 0.424,
+   "LeftToeBase": 0.38,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "stand_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.106,
+     0.924,
+     0.075
+    ],
+    "RightToeBase": [
+     0.266,
+     0.151,
+     0.112
+    ],
+    "RightFoot": [
+     0.269,
+     0.15,
+     0.076
+    ],
+    "LeftFoot": [
+     0.428,
+     0.148,
+     -0.114
+    ],
+    "LeftToeBase": [
+     0.442,
+     0.147,
+     -0.106
+    ],
+    "LeftHand": [
+     0.4,
+     0.932,
+     -0.227
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.33,
+    1.08,
+    0.01
+   ],
+   "Spine02": [
+    0.33,
+    1.21,
+    -0.01
+   ],
+   "Spine": [
+    0.32,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    0.31,
+    1.58,
+    -0.05
+   ],
+   "Head": [
+    0.31,
+    1.65,
+    -0.04
+   ],
+   "LeftArm": [
+    0.43,
+    1.57,
+    -0.13
+   ],
+   "RightArm": [
+    0.19,
+    1.57,
+    0.06
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    -0.04
+   ],
+   "LeftLeg": [
+    0.4,
+    0.64,
+    -0.04
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "stand_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.112,
+     0.925,
+     0.083
+    ],
+    "RightToeBase": [
+     0.266,
+     0.151,
+     0.112
+    ],
+    "RightFoot": [
+     0.269,
+     0.15,
+     0.076
+    ],
+    "LeftFoot": [
+     0.428,
+     0.148,
+     -0.114
+    ],
+    "LeftToeBase": [
+     0.442,
+     0.147,
+     -0.106
+    ],
+    "LeftHand": [
+     0.42,
+     0.931,
+     -0.229
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.34,
+    1.08,
+    0
+   ],
+   "Spine02": [
+    0.34,
+    1.21,
+    -0.01
+   ],
+   "Spine": [
+    0.32,
+    1.48,
+    -0.04
+   ],
+   "neck": [
+    0.31,
+    1.58,
+    -0.06
+   ],
+   "Head": [
+    0.31,
+    1.65,
+    -0.06
+   ],
+   "LeftArm": [
+    0.44,
+    1.57,
+    -0.14
+   ],
+   "RightArm": [
+    0.19,
+    1.57,
+    0.04
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    -0.04
+   ],
+   "LeftLeg": [
+    0.4,
+    0.64,
+    -0.04
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "stand_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.131,
+     0.924,
+     0.059
+    ],
+    "RightToeBase": [
+     0.266,
+     0.151,
+     0.112
+    ],
+    "RightFoot": [
+     0.269,
+     0.15,
+     0.076
+    ],
+    "LeftFoot": [
+     0.428,
+     0.148,
+     -0.114
+    ],
+    "LeftToeBase": [
+     0.442,
+     0.147,
+     -0.106
+    ],
+    "LeftHand": [
+     0.425,
+     0.932,
+     -0.243
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.36,
+    1.08,
+    -0.01
+   ],
+   "Spine02": [
+    0.35,
+    1.21,
+    -0.03
+   ],
+   "Spine": [
+    0.34,
+    1.48,
+    -0.05
+   ],
+   "neck": [
+    0.33,
+    1.58,
+    -0.06
+   ],
+   "Head": [
+    0.33,
+    1.65,
+    -0.06
+   ],
+   "LeftArm": [
+    0.46,
+    1.57,
+    -0.14
+   ],
+   "RightArm": [
+    0.22,
+    1.57,
+    0.04
+   ],
+   "LeftUpLeg": [
+    0.43,
+    0.99,
+    -0.05
+   ],
+   "LeftLeg": [
+    0.41,
+    0.64,
+    -0.05
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "window_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.858,
+     1.828,
+     -0.117
+    ],
+    "RightToeBase": [
+     -1.564,
+     0.151,
+     -0.124
+    ],
+    "RightFoot": [
+     -1.536,
+     0.15,
+     -0.101
+    ],
+    "LeftFoot": [
+     -1.469,
+     0.148,
+     0.137
+    ],
+    "LeftToeBase": [
+     -1.483,
+     0.147,
+     0.144
+    ],
+    "LeftHand": [
+     -1.865,
+     1.826,
+     0.143
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.48,
+    1.08,
+    -0.01
+   ],
+   "Spine02": [
+    -1.47,
+    1.21,
+    -0.0
+   ],
+   "Spine": [
+    -1.45,
+    1.48,
+    0
+   ],
+   "neck": [
+    -1.44,
+    1.58,
+    0
+   ],
+   "Head": [
+    -1.44,
+    1.65,
+    0
+   ],
+   "LeftArm": [
+    -1.44,
+    1.57,
+    0.15
+   ],
+   "RightArm": [
+    -1.46,
+    1.57,
+    -0.15
+   ],
+   "LeftUpLeg": [
+    -1.49,
+    0.99,
+    0.08
+   ],
+   "LeftLeg": [
+    -1.51,
+    0.64,
+    0.07
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "window_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.546,
+     2.015,
+     -0.077
+    ],
+    "RightToeBase": [
+     -1.564,
+     0.151,
+     -0.124
+    ],
+    "RightFoot": [
+     -1.536,
+     0.15,
+     -0.101
+    ],
+    "LeftFoot": [
+     -1.469,
+     0.148,
+     0.137
+    ],
+    "LeftToeBase": [
+     -1.483,
+     0.147,
+     0.144
+    ],
+    "LeftHand": [
+     -1.592,
+     2.021,
+     0.117
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.48,
+    1.08,
+    -0.01
+   ],
+   "Spine02": [
+    -1.47,
+    1.21,
+    -0.0
+   ],
+   "Spine": [
+    -1.44,
+    1.48,
+    0
+   ],
+   "neck": [
+    -1.43,
+    1.58,
+    0
+   ],
+   "Head": [
+    -1.42,
+    1.65,
+    0.01
+   ],
+   "LeftArm": [
+    -1.43,
+    1.57,
+    0.15
+   ],
+   "RightArm": [
+    -1.45,
+    1.57,
+    -0.15
+   ],
+   "LeftUpLeg": [
+    -1.49,
+    0.99,
+    0.08
+   ],
+   "LeftLeg": [
+    -1.51,
+    0.64,
+    0.07
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "window_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.528,
+     2.019,
+     -0.077
+    ],
+    "RightToeBase": [
+     -1.564,
+     0.151,
+     -0.124
+    ],
+    "RightFoot": [
+     -1.536,
+     0.15,
+     -0.101
+    ],
+    "LeftFoot": [
+     -1.469,
+     0.148,
+     0.137
+    ],
+    "LeftToeBase": [
+     -1.483,
+     0.147,
+     0.144
+    ],
+    "LeftHand": [
+     -1.574,
+     2.025,
+     0.112
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.48,
+    1.08,
+    -0.0
+   ],
+   "Spine02": [
+    -1.47,
+    1.21,
+    -0.0
+   ],
+   "Spine": [
+    -1.43,
+    1.48,
+    0
+   ],
+   "neck": [
+    -1.42,
+    1.58,
+    0
+   ],
+   "Head": [
+    -1.41,
+    1.65,
+    0.01
+   ],
+   "LeftArm": [
+    -1.42,
+    1.57,
+    0.15
+   ],
+   "RightArm": [
+    -1.44,
+    1.57,
+    -0.15
+   ],
+   "LeftUpLeg": [
+    -1.49,
+    0.99,
+    0.08
+   ],
+   "LeftLeg": [
+    -1.51,
+    0.64,
+    0.07
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "door_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.251,
+     0.926,
+     -0.668
+    ],
+    "RightToeBase": [
+     1.284,
+     0.15,
+     -0.838
+    ],
+    "RightFoot": [
+     1.249,
+     0.15,
+     -0.84
+    ],
+    "LeftFoot": [
+     1.054,
+     0.148,
+     -0.993
+    ],
+    "LeftToeBase": [
+     1.062,
+     0.147,
+     -1.008
+    ],
+    "LeftHand": [
+     0.942,
+     0.933,
+     -0.967
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.18,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.16,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.14,
+    1.48,
+    -0.89
+   ],
+   "neck": [
+    1.13,
+    1.58,
+    -0.88
+   ],
+   "Head": [
+    1.12,
+    1.65,
+    -0.88
+   ],
+   "LeftArm": [
+    1.04,
+    1.57,
+    -1.01
+   ],
+   "RightArm": [
+    1.23,
+    1.57,
+    -0.77
+   ],
+   "LeftUpLeg": [
+    1.13,
+    0.99,
+    -0.98
+   ],
+   "LeftLeg": [
+    1.13,
+    0.64,
+    -0.97
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "door_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.115,
+     1.789,
+     -0.752
+    ],
+    "RightToeBase": [
+     1.284,
+     0.15,
+     -0.838
+    ],
+    "RightFoot": [
+     1.249,
+     0.15,
+     -0.84
+    ],
+    "LeftFoot": [
+     1.054,
+     0.148,
+     -0.993
+    ],
+    "LeftToeBase": [
+     1.062,
+     0.147,
+     -1.008
+    ],
+    "LeftHand": [
+     0.945,
+     0.931,
+     -0.979
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.18,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.16,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.13,
+    1.48,
+    -0.88
+   ],
+   "neck": [
+    1.12,
+    1.58,
+    -0.87
+   ],
+   "Head": [
+    1.13,
+    1.65,
+    -0.88
+   ],
+   "LeftArm": [
+    1.04,
+    1.57,
+    -1
+   ],
+   "RightArm": [
+    1.23,
+    1.57,
+    -0.76
+   ],
+   "LeftUpLeg": [
+    1.13,
+    0.99,
+    -0.98
+   ],
+   "LeftLeg": [
+    1.13,
+    0.64,
+    -0.97
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "door_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.119,
+     1.786,
+     -0.749
+    ],
+    "RightToeBase": [
+     1.284,
+     0.15,
+     -0.838
+    ],
+    "RightFoot": [
+     1.249,
+     0.15,
+     -0.84
+    ],
+    "LeftFoot": [
+     1.054,
+     0.148,
+     -0.993
+    ],
+    "LeftToeBase": [
+     1.062,
+     0.147,
+     -1.008
+    ],
+    "LeftHand": [
+     0.943,
+     0.932,
+     -0.967
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.18,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.16,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.14,
+    1.48,
+    -0.89
+   ],
+   "neck": [
+    1.13,
+    1.58,
+    -0.88
+   ],
+   "Head": [
+    1.13,
+    1.65,
+    -0.89
+   ],
+   "LeftArm": [
+    1.04,
+    1.57,
+    -1
+   ],
+   "RightArm": [
+    1.23,
+    1.57,
+    -0.76
+   ],
+   "LeftUpLeg": [
+    1.13,
+    0.99,
+    -0.98
+   ],
+   "LeftLeg": [
+    1.13,
+    0.64,
+    -0.97
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.31,
+     1.207,
+     0.021
+    ],
+    "RightToeBase": [
+     -0.113,
+     0.437,
+     -0.094
+    ],
+    "RightFoot": [
+     -0.222,
+     0.422,
+     0.044
+    ],
+    "LeftFoot": [
+     -0.58,
+     0.382,
+     0.067
+    ],
+    "LeftToeBase": [
+     -0.707,
+     0.411,
+     -0.088
+    ],
+    "LeftHand": [
+     -0.555,
+     0.858,
+     0.106
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.23
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.229,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.514,
+   "LeftToeBase": 0.444,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.473
+  },
+  "rest": null,
+  "root": 0.405,
+  "ctx": "off",
+  "clip": "phone_sit",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.307,
+     1.21,
+     0.022
+    ],
+    "RightToeBase": [
+     -0.113,
+     0.437,
+     -0.094
+    ],
+    "RightFoot": [
+     -0.222,
+     0.422,
+     0.044
+    ],
+    "LeftFoot": [
+     -0.58,
+     0.382,
+     0.067
+    ],
+    "LeftToeBase": [
+     -0.707,
+     0.411,
+     -0.088
+    ],
+    "LeftHand": [
+     -0.555,
+     0.858,
+     0.102
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.23
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.229,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.514,
+   "LeftToeBase": 0.444,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.473
+  },
+  "rest": null,
+  "root": 0.405,
+  "ctx": "off",
+  "clip": "phone_sit",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.304,
+     1.207,
+     0.011
+    ],
+    "RightToeBase": [
+     -0.113,
+     0.437,
+     -0.094
+    ],
+    "RightFoot": [
+     -0.222,
+     0.422,
+     0.044
+    ],
+    "LeftFoot": [
+     -0.58,
+     0.382,
+     0.067
+    ],
+    "LeftToeBase": [
+     -0.707,
+     0.411,
+     -0.088
+    ],
+    "LeftHand": [
+     -0.543,
+     0.846,
+     0.12
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.54,
+    0.23
+   ],
+   "Head": [
+    -0.38,
+    1.61,
+    0.22
+   ],
+   "LeftArm": [
+    -0.54,
+    1.45,
+    0.24
+   ],
+   "RightArm": [
+    -0.23,
+    1.47,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.229,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.514,
+   "LeftToeBase": 0.444,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.473
+  },
+  "rest": null,
+  "root": 0.405,
+  "ctx": "off",
+  "clip": "phone_sit",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "sleep_old_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.241,
+     1.089,
+     1.061
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.2,
+     0.817,
+     1.075
+    ],
+    "LeftFoot": [
+     -0.271,
+     0.794,
+     0.783
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.08,
+     0.996,
+     0.755
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.06,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.08,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.08,
+    0.88
+   ],
+   "LeftArm": [
+    -1.59,
+    1.09,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.08,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.88
+  },
+  "rest": null,
+  "root": -0.095,
+  "ctx": "off",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "sleep_old_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.235,
+     1.08,
+     1.057
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.817,
+     1.108
+    ],
+    "RightFoot": [
+     -0.209,
+     0.818,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.27,
+     0.796,
+     0.785
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.818,
+     0.678
+    ],
+    "LeftHand": [
+     -1.077,
+     0.985,
+     0.757
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.51,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.1,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.1,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.605,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.997,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.89,
+   "LeftToeBase": 0.877,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.881
+  },
+  "rest": null,
+  "root": -0.095,
+  "ctx": "off",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "sleep_old_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.237,
+     1.086,
+     1.056
+    ],
+    "RightToeBase": [
+     -0.185,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.21,
+     0.816,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.281,
+     0.794,
+     0.795
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.078,
+     0.987,
+     0.759
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.09,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.09,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.905,
+   "RightToeBase": 0.879
+  },
+  "rest": null,
+  "root": -0.095,
+  "ctx": "off",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Unexpected end of JSON input"
+  ]
+ },
+ "desk_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.805,
+     0.988,
+     -1.096
+    ],
+    "RightToeBase": [
+     -0.976,
+     0.193,
+     -1.093
+    ],
+    "RightFoot": [
+     -1.017,
+     0.27,
+     -1.018
+    ],
+    "LeftFoot": [
+     -1.341,
+     0.264,
+     -0.991
+    ],
+    "LeftToeBase": [
+     -1.279,
+     0.187,
+     -1.086
+    ],
+    "LeftHand": [
+     -1.148,
+     0.984,
+     -1.03
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.9,
+    -0.56
+   ],
+   "Spine02": [
+    -1.13,
+    1.01,
+    -0.48
+   ],
+   "Spine": [
+    -1.13,
+    1.25,
+    -0.6
+   ],
+   "neck": [
+    -1.13,
+    1.31,
+    -0.69
+   ],
+   "Head": [
+    -1.13,
+    1.34,
+    -0.75
+   ],
+   "LeftArm": [
+    -1.28,
+    1.26,
+    -0.63
+   ],
+   "RightArm": [
+    -0.96,
+    1.26,
+    -0.62
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.61
+   ],
+   "LeftLeg": [
+    -1.23,
+    0.78,
+    -0.96
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.084,
+  "arm_over_desk": 0.082,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.897,
+   "LeftUpLeg": 0.822,
+   "LeftLeg": 0.779,
+   "LeftFoot": 0.422,
+   "LeftToeBase": 0.281,
+   "RightFoot": 0.431,
+   "RightToeBase": 0.288
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.36,
+  "ctx": "on",
+  "clip": "m_type",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.14,
+     1.458,
+     -0.842
+    ],
+    "RightToeBase": [
+     -0.977,
+     0.192,
+     -1.093
+    ],
+    "RightFoot": [
+     -1.018,
+     0.269,
+     -1.018
+    ],
+    "LeftFoot": [
+     -1.342,
+     0.262,
+     -0.99
+    ],
+    "LeftToeBase": [
+     -1.291,
+     0.186,
+     -1.085
+    ],
+    "LeftHand": [
+     -1.212,
+     0.703,
+     -0.665
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.9,
+    -0.56
+   ],
+   "Spine02": [
+    -1.13,
+    1,
+    -0.48
+   ],
+   "Spine": [
+    -1.13,
+    1.25,
+    -0.59
+   ],
+   "neck": [
+    -1.13,
+    1.31,
+    -0.69
+   ],
+   "Head": [
+    -1.13,
+    1.34,
+    -0.75
+   ],
+   "LeftArm": [
+    -1.29,
+    1.27,
+    -0.63
+   ],
+   "RightArm": [
+    -0.97,
+    1.26,
+    -0.63
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.61
+   ],
+   "LeftLeg": [
+    -1.23,
+    0.78,
+    -0.96
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.083,
+  "arm_over_desk": 0.533,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.895,
+   "LeftUpLeg": 0.821,
+   "LeftLeg": 0.778,
+   "LeftFoot": 0.421,
+   "LeftToeBase": 0.28,
+   "RightFoot": 0.43,
+   "RightToeBase": 0.287
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.36,
+  "ctx": "on",
+  "clip": "m_type",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.131,
+     1.453,
+     -0.833
+    ],
+    "RightToeBase": [
+     -0.976,
+     0.191,
+     -1.093
+    ],
+    "RightFoot": [
+     -1.018,
+     0.268,
+     -1.017
+    ],
+    "LeftFoot": [
+     -1.342,
+     0.261,
+     -0.991
+    ],
+    "LeftToeBase": [
+     -1.291,
+     0.185,
+     -1.085
+    ],
+    "LeftHand": [
+     -1.202,
+     0.702,
+     -0.656
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.89,
+    -0.56
+   ],
+   "Spine02": [
+    -1.13,
+    1,
+    -0.48
+   ],
+   "Spine": [
+    -1.13,
+    1.25,
+    -0.6
+   ],
+   "neck": [
+    -1.13,
+    1.3,
+    -0.69
+   ],
+   "Head": [
+    -1.13,
+    1.33,
+    -0.75
+   ],
+   "LeftArm": [
+    -1.29,
+    1.26,
+    -0.63
+   ],
+   "RightArm": [
+    -0.97,
+    1.25,
+    -0.63
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.61
+   ],
+   "LeftLeg": [
+    -1.23,
+    0.78,
+    -0.96
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.082,
+  "arm_over_desk": 0.526,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.894,
+   "LeftUpLeg": 0.82,
+   "LeftLeg": 0.776,
+   "LeftFoot": 0.419,
+   "LeftToeBase": 0.279,
+   "RightFoot": 0.429,
+   "RightToeBase": 0.286
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.36,
+  "ctx": "on",
+  "clip": "m_type",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.355,
+     0.967,
+     -0.936
+    ],
+    "RightToeBase": [
+     -1.081,
+     0.186,
+     -1.066
+    ],
+    "RightFoot": [
+     -1.121,
+     0.266,
+     -0.993
+    ],
+    "LeftFoot": [
+     -1.369,
+     0.249,
+     -0.959
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.171,
+     -1.063
+    ],
+    "LeftHand": [
+     -1.367,
+     1.129,
+     -0.912
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.89,
+    -0.57
+   ],
+   "Spine02": [
+    -1.26,
+    1.02,
+    -0.51
+   ],
+   "Spine": [
+    -1.28,
+    1.27,
+    -0.63
+   ],
+   "neck": [
+    -1.28,
+    1.32,
+    -0.72
+   ],
+   "Head": [
+    -1.28,
+    1.34,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.43,
+    1.25,
+    -0.68
+   ],
+   "RightArm": [
+    -1.12,
+    1.3,
+    -0.66
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.8,
+    -0.59
+   ],
+   "LeftLeg": [
+    -1.34,
+    0.76,
+    -0.94
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.068,
+  "arm_over_desk": 0.079,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.895,
+   "LeftUpLeg": 0.805,
+   "LeftLeg": 0.761,
+   "LeftFoot": 0.404,
+   "LeftToeBase": 0.265,
+   "RightFoot": 0.427,
+   "RightToeBase": 0.283
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.354,
+  "ctx": "on",
+  "clip": "m_eat",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.398,
+     1.044,
+     -0.985
+    ],
+    "RightToeBase": [
+     -1.081,
+     0.187,
+     -1.07
+    ],
+    "RightFoot": [
+     -1.121,
+     0.267,
+     -0.997
+    ],
+    "LeftFoot": [
+     -1.369,
+     0.249,
+     -0.96
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.171,
+     -1.065
+    ],
+    "LeftHand": [
+     -1.373,
+     1.121,
+     -0.914
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.89,
+    -0.57
+   ],
+   "Spine02": [
+    -1.26,
+    1.02,
+    -0.51
+   ],
+   "Spine": [
+    -1.29,
+    1.26,
+    -0.63
+   ],
+   "neck": [
+    -1.29,
+    1.31,
+    -0.73
+   ],
+   "Head": [
+    -1.3,
+    1.33,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.44,
+    1.24,
+    -0.67
+   ],
+   "RightArm": [
+    -1.12,
+    1.3,
+    -0.67
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.8,
+    -0.59
+   ],
+   "LeftLeg": [
+    -1.34,
+    0.76,
+    -0.94
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.068,
+  "arm_over_desk": 0.072,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.894,
+   "LeftUpLeg": 0.804,
+   "LeftLeg": 0.76,
+   "LeftFoot": 0.404,
+   "LeftToeBase": 0.265,
+   "RightFoot": 0.428,
+   "RightToeBase": 0.284
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.354,
+  "ctx": "on",
+  "clip": "m_eat",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.341,
+     1.089,
+     -0.933
+    ],
+    "RightToeBase": [
+     -1.081,
+     0.186,
+     -1.064
+    ],
+    "RightFoot": [
+     -1.121,
+     0.266,
+     -0.991
+    ],
+    "LeftFoot": [
+     -1.368,
+     0.249,
+     -0.958
+    ],
+    "LeftToeBase": [
+     -1.416,
+     0.17,
+     -1.062
+    ],
+    "LeftHand": [
+     -1.37,
+     1.129,
+     -0.912
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.89,
+    -0.56
+   ],
+   "Spine02": [
+    -1.26,
+    1.02,
+    -0.51
+   ],
+   "Spine": [
+    -1.28,
+    1.27,
+    -0.63
+   ],
+   "neck": [
+    -1.29,
+    1.32,
+    -0.72
+   ],
+   "Head": [
+    -1.28,
+    1.35,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.44,
+    1.25,
+    -0.68
+   ],
+   "RightArm": [
+    -1.12,
+    1.31,
+    -0.66
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.8,
+    -0.59
+   ],
+   "LeftLeg": [
+    -1.34,
+    0.76,
+    -0.94
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.068,
+  "arm_over_desk": 0.081,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.895,
+   "LeftUpLeg": 0.804,
+   "LeftLeg": 0.761,
+   "LeftFoot": 0.404,
+   "LeftToeBase": 0.265,
+   "RightFoot": 0.427,
+   "RightToeBase": 0.283
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.354,
+  "ctx": "on",
+  "clip": "m_eat",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.348,
+     1.259,
+     0.212
+    ],
+    "RightToeBase": [
+     0.132,
+     0.214,
+     0.301
+    ],
+    "RightFoot": [
+     0.166,
+     0.161,
+     0.105
+    ],
+    "LeftFoot": [
+     0.455,
+     0.16,
+     -0.095
+    ],
+    "LeftToeBase": [
+     0.635,
+     0.207,
+     -0.023
+    ],
+    "LeftHand": [
+     0.494,
+     0.867,
+     -0.102
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.35,
+    1.07,
+    0.06
+   ],
+   "Spine02": [
+    0.33,
+    1.21,
+    0.04
+   ],
+   "Spine": [
+    0.3,
+    1.48,
+    -0.01
+   ],
+   "neck": [
+    0.32,
+    1.58,
+    0.01
+   ],
+   "Head": [
+    0.33,
+    1.65,
+    0.03
+   ],
+   "LeftArm": [
+    0.43,
+    1.49,
+    -0.1
+   ],
+   "RightArm": [
+    0.17,
+    1.5,
+    0.08
+   ],
+   "LeftUpLeg": [
+    0.42,
+    0.99,
+    0.01
+   ],
+   "LeftLeg": [
+    0.5,
+    0.64,
+    0.02
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.303,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.339,
+     1.267,
+     0.212
+    ],
+    "RightToeBase": [
+     0.128,
+     0.214,
+     0.3
+    ],
+    "RightFoot": [
+     0.164,
+     0.161,
+     0.104
+    ],
+    "LeftFoot": [
+     0.451,
+     0.16,
+     -0.095
+    ],
+    "LeftToeBase": [
+     0.63,
+     0.207,
+     -0.022
+    ],
+    "LeftHand": [
+     0.491,
+     0.869,
+     -0.096
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.34,
+    1.08,
+    0.06
+   ],
+   "Spine02": [
+    0.32,
+    1.21,
+    0.04
+   ],
+   "Spine": [
+    0.29,
+    1.48,
+    -0.02
+   ],
+   "neck": [
+    0.3,
+    1.58,
+    0
+   ],
+   "Head": [
+    0.32,
+    1.65,
+    0.01
+   ],
+   "LeftArm": [
+    0.42,
+    1.49,
+    -0.11
+   ],
+   "RightArm": [
+    0.15,
+    1.5,
+    0.07
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    0.01
+   ],
+   "LeftLeg": [
+    0.49,
+    0.64,
+    0.02
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.076,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.349,
+     1.257,
+     0.226
+    ],
+    "RightToeBase": [
+     0.131,
+     0.214,
+     0.302
+    ],
+    "RightFoot": [
+     0.165,
+     0.161,
+     0.106
+    ],
+    "LeftFoot": [
+     0.454,
+     0.16,
+     -0.095
+    ],
+    "LeftToeBase": [
+     0.633,
+     0.207,
+     -0.023
+    ],
+    "LeftHand": [
+     0.484,
+     0.868,
+     -0.093
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.34,
+    1.08,
+    0.06
+   ],
+   "Spine02": [
+    0.32,
+    1.21,
+    0.04
+   ],
+   "Spine": [
+    0.3,
+    1.48,
+    -0.0
+   ],
+   "neck": [
+    0.31,
+    1.58,
+    0.02
+   ],
+   "Head": [
+    0.33,
+    1.65,
+    0.03
+   ],
+   "LeftArm": [
+    0.42,
+    1.49,
+    -0.09
+   ],
+   "RightArm": [
+    0.16,
+    1.5,
+    0.09
+   ],
+   "LeftUpLeg": [
+    0.42,
+    0.99,
+    0.02
+   ],
+   "LeftLeg": [
+    0.49,
+    0.64,
+    0.02
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.25
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.975,
+     1.221,
+     -0.15
+    ],
+    "RightToeBase": [
+     -1.677,
+     0.219,
+     -0.205
+    ],
+    "RightFoot": [
+     -1.512,
+     0.162,
+     -0.094
+    ],
+    "LeftFoot": [
+     -1.514,
+     0.16,
+     0.049
+    ],
+    "LeftToeBase": [
+     -1.678,
+     0.214,
+     0.148
+    ],
+    "LeftHand": [
+     -1.981,
+     1.236,
+     0.067
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.56,
+    1.07,
+    -0.04
+   ],
+   "Spine02": [
+    -1.53,
+    1.21,
+    -0.04
+   ],
+   "Spine": [
+    -1.51,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    -1.55,
+    1.58,
+    -0.03
+   ],
+   "Head": [
+    -1.57,
+    1.65,
+    -0.03
+   ],
+   "LeftArm": [
+    -1.53,
+    1.48,
+    0.12
+   ],
+   "RightArm": [
+    -1.51,
+    1.5,
+    -0.19
+   ],
+   "LeftUpLeg": [
+    -1.57,
+    0.98,
+    0.04
+   ],
+   "LeftLeg": [
+    -1.65,
+    0.64,
+    0.05
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.014,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.074,
+   "LeftUpLeg": 0.984,
+   "LeftLeg": 0.641,
+   "LeftFoot": 0.299,
+   "LeftToeBase": 0.25,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.255
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_window",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.973,
+     1.209,
+     -0.135
+    ],
+    "RightToeBase": [
+     -1.678,
+     0.218,
+     -0.204
+    ],
+    "RightFoot": [
+     -1.512,
+     0.162,
+     -0.093
+    ],
+    "LeftFoot": [
+     -1.514,
+     0.16,
+     0.05
+    ],
+    "LeftToeBase": [
+     -1.676,
+     0.213,
+     0.15
+    ],
+    "LeftHand": [
+     -1.979,
+     1.223,
+     0.071
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.56,
+    1.07,
+    -0.04
+   ],
+   "Spine02": [
+    -1.53,
+    1.21,
+    -0.03
+   ],
+   "Spine": [
+    -1.53,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    -1.57,
+    1.58,
+    -0.02
+   ],
+   "Head": [
+    -1.59,
+    1.65,
+    -0.02
+   ],
+   "LeftArm": [
+    -1.54,
+    1.48,
+    0.13
+   ],
+   "RightArm": [
+    -1.52,
+    1.5,
+    -0.19
+   ],
+   "LeftUpLeg": [
+    -1.57,
+    0.98,
+    0.05
+   ],
+   "LeftLeg": [
+    -1.65,
+    0.64,
+    0.05
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.014,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.074,
+   "LeftUpLeg": 0.984,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.299,
+   "LeftToeBase": 0.25,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.254
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_window",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.978,
+     1.223,
+     -0.152
+    ],
+    "RightToeBase": [
+     -1.677,
+     0.219,
+     -0.204
+    ],
+    "RightFoot": [
+     -1.511,
+     0.162,
+     -0.094
+    ],
+    "LeftFoot": [
+     -1.515,
+     0.16,
+     0.049
+    ],
+    "LeftToeBase": [
+     -1.677,
+     0.214,
+     0.149
+    ],
+    "LeftHand": [
+     -1.985,
+     1.239,
+     0.075
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.55,
+    1.07,
+    -0.04
+   ],
+   "Spine02": [
+    -1.53,
+    1.21,
+    -0.04
+   ],
+   "Spine": [
+    -1.51,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    -1.55,
+    1.58,
+    -0.03
+   ],
+   "Head": [
+    -1.57,
+    1.65,
+    -0.03
+   ],
+   "LeftArm": [
+    -1.53,
+    1.48,
+    0.12
+   ],
+   "RightArm": [
+    -1.51,
+    1.5,
+    -0.19
+   ],
+   "LeftUpLeg": [
+    -1.57,
+    0.98,
+    0.04
+   ],
+   "LeftLeg": [
+    -1.65,
+    0.64,
+    0.05
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.014,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.074,
+   "LeftUpLeg": 0.985,
+   "LeftLeg": 0.641,
+   "LeftFoot": 0.299,
+   "LeftToeBase": 0.251,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.255
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_window",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.309,
+     0.878,
+     -0.727
+    ],
+    "RightToeBase": [
+     1.477,
+     0.214,
+     -0.709
+    ],
+    "RightFoot": [
+     1.28,
+     0.161,
+     -0.738
+    ],
+    "LeftFoot": [
+     1.072,
+     0.16,
+     -1.021
+    ],
+    "LeftToeBase": [
+     1.139,
+     0.207,
+     -1.202
+    ],
+    "LeftHand": [
+     1.07,
+     0.867,
+     -1.054
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.23,
+    1.07,
+    -0.92
+   ],
+   "Spine02": [
+    1.21,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.17,
+    1.48,
+    -0.87
+   ],
+   "neck": [
+    1.19,
+    1.58,
+    -0.89
+   ],
+   "Head": [
+    1.2,
+    1.65,
+    -0.9
+   ],
+   "LeftArm": [
+    1.08,
+    1.49,
+    -0.99
+   ],
+   "RightArm": [
+    1.26,
+    1.5,
+    -0.74
+   ],
+   "LeftUpLeg": [
+    1.19,
+    0.99,
+    -0.99
+   ],
+   "LeftLeg": [
+    1.19,
+    0.64,
+    -1.06
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.642,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.303,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.571,
+     1.798,
+     -0.548
+    ],
+    "RightToeBase": [
+     1.476,
+     0.214,
+     -0.706
+    ],
+    "RightFoot": [
+     1.28,
+     0.161,
+     -0.736
+    ],
+    "LeftFoot": [
+     1.072,
+     0.16,
+     -1.017
+    ],
+    "LeftToeBase": [
+     1.139,
+     0.207,
+     -1.198
+    ],
+    "LeftHand": [
+     0.941,
+     1.791,
+     -1.342
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.23,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.21,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.13,
+    1.47,
+    -0.85
+   ],
+   "neck": [
+    1.14,
+    1.58,
+    -0.85
+   ],
+   "Head": [
+    1.14,
+    1.65,
+    -0.86
+   ],
+   "LeftArm": [
+    1.04,
+    1.48,
+    -0.97
+   ],
+   "RightArm": [
+    1.22,
+    1.49,
+    -0.71
+   ],
+   "LeftUpLeg": [
+    1.18,
+    0.99,
+    -0.99
+   ],
+   "LeftLeg": [
+    1.18,
+    0.64,
+    -1.06
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.076,
+   "LeftUpLeg": 0.989,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.313,
+     1.95,
+     -0.765
+    ],
+    "RightToeBase": [
+     1.478,
+     0.214,
+     -0.709
+    ],
+    "RightFoot": [
+     1.281,
+     0.161,
+     -0.737
+    ],
+    "LeftFoot": [
+     1.072,
+     0.16,
+     -1.02
+    ],
+    "LeftToeBase": [
+     1.138,
+     0.207,
+     -1.201
+    ],
+    "LeftHand": [
+     1.094,
+     1.951,
+     -1.055
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.23,
+    1.08,
+    -0.92
+   ],
+   "Spine02": [
+    1.21,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.13,
+    1.47,
+    -0.85
+   ],
+   "neck": [
+    1.13,
+    1.58,
+    -0.85
+   ],
+   "Head": [
+    1.13,
+    1.65,
+    -0.86
+   ],
+   "LeftArm": [
+    1.04,
+    1.48,
+    -0.97
+   ],
+   "RightArm": [
+    1.22,
+    1.49,
+    -0.72
+   ],
+   "LeftUpLeg": [
+    1.18,
+    0.99,
+    -1
+   ],
+   "LeftLeg": [
+    1.18,
+    0.64,
+    -1.07
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.989,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.25
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.308,
+     1.213,
+     0.02
+    ],
+    "RightToeBase": [
+     -0.113,
+     0.438,
+     -0.1
+    ],
+    "RightFoot": [
+     -0.258,
+     0.422,
+     0.046
+    ],
+    "LeftFoot": [
+     -0.586,
+     0.383,
+     -0.035
+    ],
+    "LeftToeBase": [
+     -0.714,
+     0.445,
+     -0.179
+    ],
+    "LeftHand": [
+     -0.558,
+     0.859,
+     0.103
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.23
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.237,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.522,
+   "LeftToeBase": 0.477,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.475
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.405,
+  "ctx": "on",
+  "clip": "phone_sit",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.306,
+     1.213,
+     0.017
+    ],
+    "RightToeBase": [
+     -0.114,
+     0.44,
+     -0.108
+    ],
+    "RightFoot": [
+     -0.223,
+     0.421,
+     0.031
+    ],
+    "LeftFoot": [
+     -0.585,
+     0.382,
+     -0.027
+    ],
+    "LeftToeBase": [
+     -0.714,
+     0.441,
+     -0.172
+    ],
+    "LeftHand": [
+     -0.553,
+     0.857,
+     0.106
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.24
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.236,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.521,
+   "LeftToeBase": 0.474,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.476
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.405,
+  "ctx": "on",
+  "clip": "phone_sit",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.306,
+     1.202,
+     0.016
+    ],
+    "RightToeBase": [
+     -0.114,
+     0.442,
+     -0.118
+    ],
+    "RightFoot": [
+     -0.259,
+     0.421,
+     0.028
+    ],
+    "LeftFoot": [
+     -0.585,
+     0.382,
+     -0.017
+    ],
+    "LeftToeBase": [
+     -0.713,
+     0.437,
+     -0.163
+    ],
+    "LeftHand": [
+     -0.541,
+     0.846,
+     0.119
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.54,
+    0.23
+   ],
+   "Head": [
+    -0.38,
+    1.61,
+    0.22
+   ],
+   "LeftArm": [
+    -0.54,
+    1.45,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.47,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.235,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.52,
+   "LeftToeBase": 0.47,
+   "RightFoot": 0.559,
+   "RightToeBase": 0.479
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.405,
+  "ctx": "on",
+  "clip": "phone_sit",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_new_1280_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.241,
+     1.088,
+     1.061
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.2,
+     0.817,
+     1.075
+    ],
+    "LeftFoot": [
+     -0.271,
+     0.794,
+     0.783
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.078,
+     0.996,
+     0.753
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.06,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.08,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.08,
+    0.88
+   ],
+   "LeftArm": [
+    -1.59,
+    1.09,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.08,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.88
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": -0.095,
+  "ctx": "on",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_new_1280_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.234,
+     1.078,
+     1.054
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.817,
+     1.108
+    ],
+    "RightFoot": [
+     -0.209,
+     0.818,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.27,
+     0.796,
+     0.785
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.818,
+     0.678
+    ],
+    "LeftHand": [
+     -1.077,
+     0.981,
+     0.761
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.51,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.1,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.1,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.605,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.997,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.89,
+   "LeftToeBase": 0.877,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.881
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": -0.095,
+  "ctx": "on",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_new_1280_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.237,
+     1.085,
+     1.056
+    ],
+    "RightToeBase": [
+     -0.185,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.21,
+     0.816,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.281,
+     0.794,
+     0.795
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.078,
+     0.986,
+     0.759
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.09,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.09,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.905,
+   "RightToeBase": 0.879
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": -0.095,
+  "ctx": "on",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.053,
+     1.09,
+     -1.052
+    ],
+    "RightToeBase": [
+     -0.857,
+     0.336,
+     -1.128
+    ],
+    "RightFoot": [
+     -0.971,
+     0.311,
+     -0.996
+    ],
+    "LeftFoot": [
+     -1.292,
+     0.286,
+     -0.986
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.347,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.203,
+     0.777,
+     -0.959
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.12,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.07,
+    1.22,
+    -0.78
+   ],
+   "neck": [
+    -1.04,
+    1.29,
+    -0.86
+   ],
+   "Head": [
+    -1.03,
+    1.34,
+    -0.91
+   ],
+   "LeftArm": [
+    -1.21,
+    1.24,
+    -0.82
+   ],
+   "RightArm": [
+    -0.92,
+    1.16,
+    -0.81
+   ],
+   "LeftUpLeg": [
+    -1.21,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.31,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.14,
+  "arm_over_desk": -0.072,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.901,
+   "LeftUpLeg": 0.818,
+   "LeftLeg": 0.774,
+   "LeftFoot": 0.425,
+   "LeftToeBase": 0.381,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.882,
+     1.438,
+     -0.96
+    ],
+    "RightToeBase": [
+     -0.862,
+     0.336,
+     -1.131
+    ],
+    "RightFoot": [
+     -0.976,
+     0.311,
+     -0.999
+    ],
+    "LeftFoot": [
+     -1.292,
+     0.287,
+     -0.987
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.348,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.204,
+     0.783,
+     -0.965
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.12,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.07,
+    1.23,
+    -0.78
+   ],
+   "neck": [
+    -1.05,
+    1.3,
+    -0.86
+   ],
+   "Head": [
+    -1.02,
+    1.33,
+    -0.91
+   ],
+   "LeftArm": [
+    -1.22,
+    1.25,
+    -0.82
+   ],
+   "RightArm": [
+    -0.92,
+    1.17,
+    -0.81
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.31,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.141,
+  "arm_over_desk": -0.069,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.899,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.775,
+   "LeftFoot": 0.426,
+   "LeftToeBase": 0.382,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.378
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.884,
+     1.445,
+     -0.959
+    ],
+    "RightToeBase": [
+     -0.864,
+     0.336,
+     -1.129
+    ],
+    "RightFoot": [
+     -0.978,
+     0.311,
+     -0.997
+    ],
+    "LeftFoot": [
+     -1.301,
+     0.285,
+     -0.983
+    ],
+    "LeftToeBase": [
+     -1.426,
+     0.347,
+     -1.13
+    ],
+    "LeftHand": [
+     -1.209,
+     0.774,
+     -0.956
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.12,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.07,
+    1.22,
+    -0.79
+   ],
+   "neck": [
+    -1.05,
+    1.29,
+    -0.87
+   ],
+   "Head": [
+    -1.02,
+    1.33,
+    -0.92
+   ],
+   "LeftArm": [
+    -1.22,
+    1.24,
+    -0.83
+   ],
+   "RightArm": [
+    -0.92,
+    1.17,
+    -0.81
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.31,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.139,
+  "arm_over_desk": -0.076,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.898,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.773,
+   "LeftFoot": 0.424,
+   "LeftToeBase": 0.38,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.146,
+     1.222,
+     -1.045
+    ],
+    "RightToeBase": [
+     -0.977,
+     0.336,
+     -1.128
+    ],
+    "RightFoot": [
+     -1.091,
+     0.311,
+     -0.996
+    ],
+    "LeftFoot": [
+     -1.412,
+     0.286,
+     -0.986
+    ],
+    "LeftToeBase": [
+     -1.537,
+     0.347,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.382,
+     1.013,
+     -1.087
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.24,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.24,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.18,
+    1.27,
+    -0.72
+   ],
+   "neck": [
+    -1.15,
+    1.36,
+    -0.76
+   ],
+   "Head": [
+    -1.12,
+    1.42,
+    -0.8
+   ],
+   "LeftArm": [
+    -1.32,
+    1.3,
+    -0.76
+   ],
+   "RightArm": [
+    -1.03,
+    1.22,
+    -0.75
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.43,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.14,
+  "arm_over_desk": 0.093,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.901,
+   "LeftUpLeg": 0.818,
+   "LeftLeg": 0.774,
+   "LeftFoot": 0.425,
+   "LeftToeBase": 0.381,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.353,
+     1.075,
+     -0.843
+    ],
+    "RightToeBase": [
+     -0.982,
+     0.336,
+     -1.131
+    ],
+    "RightFoot": [
+     -1.096,
+     0.311,
+     -0.999
+    ],
+    "LeftFoot": [
+     -1.412,
+     0.287,
+     -0.987
+    ],
+    "LeftToeBase": [
+     -1.537,
+     0.348,
+     -1.134
+    ],
+    "LeftHand": [
+     -1.382,
+     1.014,
+     -1.088
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.24,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.24,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.18,
+    1.27,
+    -0.72
+   ],
+   "neck": [
+    -1.15,
+    1.36,
+    -0.77
+   ],
+   "Head": [
+    -1.12,
+    1.42,
+    -0.8
+   ],
+   "LeftArm": [
+    -1.32,
+    1.3,
+    -0.76
+   ],
+   "RightArm": [
+    -1.03,
+    1.22,
+    -0.75
+   ],
+   "LeftUpLeg": [
+    -1.34,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.43,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.141,
+  "arm_over_desk": 0.028,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.899,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.775,
+   "LeftFoot": 0.426,
+   "LeftToeBase": 0.382,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.378
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.353,
+     1.075,
+     -0.844
+    ],
+    "RightToeBase": [
+     -0.984,
+     0.336,
+     -1.129
+    ],
+    "RightFoot": [
+     -1.098,
+     0.311,
+     -0.997
+    ],
+    "LeftFoot": [
+     -1.421,
+     0.285,
+     -0.983
+    ],
+    "LeftToeBase": [
+     -1.546,
+     0.347,
+     -1.13
+    ],
+    "LeftHand": [
+     -1.378,
+     1.015,
+     -1.086
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.9,
+    -0.59
+   ],
+   "Spine02": [
+    -1.24,
+    1.04,
+    -0.59
+   ],
+   "Spine": [
+    -1.18,
+    1.27,
+    -0.72
+   ],
+   "neck": [
+    -1.16,
+    1.36,
+    -0.76
+   ],
+   "Head": [
+    -1.13,
+    1.42,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.33,
+    1.3,
+    -0.77
+   ],
+   "RightArm": [
+    -1.03,
+    1.23,
+    -0.75
+   ],
+   "LeftUpLeg": [
+    -1.34,
+    0.82,
+    -0.57
+   ],
+   "LeftLeg": [
+    -1.43,
+    0.77,
+    -0.91
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.139,
+  "arm_over_desk": 0.032,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.898,
+   "LeftUpLeg": 0.817,
+   "LeftLeg": 0.773,
+   "LeftFoot": 0.424,
+   "LeftToeBase": 0.38,
+   "RightFoot": 0.451,
+   "RightToeBase": 0.377
+  },
+  "rest": null,
+  "root": 0.24,
+  "ctx": "off",
+  "clip": "Armature|Chair_Sit_Idle_M|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.378,
+     1.3,
+     0.199
+    ],
+    "RightToeBase": [
+     0.266,
+     0.151,
+     0.112
+    ],
+    "RightFoot": [
+     0.269,
+     0.15,
+     0.076
+    ],
+    "LeftFoot": [
+     0.428,
+     0.148,
+     -0.114
+    ],
+    "LeftToeBase": [
+     0.442,
+     0.147,
+     -0.106
+    ],
+    "LeftHand": [
+     0.403,
+     0.932,
+     -0.226
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.33,
+    1.08,
+    0.01
+   ],
+   "Spine02": [
+    0.33,
+    1.21,
+    -0.01
+   ],
+   "Spine": [
+    0.31,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    0.31,
+    1.58,
+    -0.05
+   ],
+   "Head": [
+    0.32,
+    1.65,
+    -0.05
+   ],
+   "LeftArm": [
+    0.43,
+    1.57,
+    -0.13
+   ],
+   "RightArm": [
+    0.19,
+    1.57,
+    0.06
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    -0.04
+   ],
+   "LeftLeg": [
+    0.4,
+    0.64,
+    -0.04
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.374,
+     1.301,
+     0.196
+    ],
+    "RightToeBase": [
+     0.266,
+     0.151,
+     0.112
+    ],
+    "RightFoot": [
+     0.269,
+     0.15,
+     0.076
+    ],
+    "LeftFoot": [
+     0.428,
+     0.148,
+     -0.114
+    ],
+    "LeftToeBase": [
+     0.442,
+     0.147,
+     -0.106
+    ],
+    "LeftHand": [
+     0.412,
+     0.931,
+     -0.224
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.33,
+    1.08,
+    0.01
+   ],
+   "Spine02": [
+    0.33,
+    1.21,
+    -0.01
+   ],
+   "Spine": [
+    0.31,
+    1.48,
+    -0.04
+   ],
+   "neck": [
+    0.3,
+    1.58,
+    -0.05
+   ],
+   "Head": [
+    0.31,
+    1.65,
+    -0.06
+   ],
+   "LeftArm": [
+    0.43,
+    1.57,
+    -0.13
+   ],
+   "RightArm": [
+    0.19,
+    1.57,
+    0.05
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    -0.04
+   ],
+   "LeftLeg": [
+    0.4,
+    0.64,
+    -0.04
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.386,
+     1.299,
+     0.212
+    ],
+    "RightToeBase": [
+     0.266,
+     0.151,
+     0.112
+    ],
+    "RightFoot": [
+     0.269,
+     0.15,
+     0.076
+    ],
+    "LeftFoot": [
+     0.428,
+     0.148,
+     -0.114
+    ],
+    "LeftToeBase": [
+     0.442,
+     0.147,
+     -0.106
+    ],
+    "LeftHand": [
+     0.398,
+     0.933,
+     -0.227
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.33,
+    1.08,
+    0.01
+   ],
+   "Spine02": [
+    0.33,
+    1.21,
+    -0.01
+   ],
+   "Spine": [
+    0.32,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    0.31,
+    1.58,
+    -0.04
+   ],
+   "Head": [
+    0.32,
+    1.65,
+    -0.05
+   ],
+   "LeftArm": [
+    0.44,
+    1.57,
+    -0.12
+   ],
+   "RightArm": [
+    0.19,
+    1.57,
+    0.06
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    -0.04
+   ],
+   "LeftLeg": [
+    0.4,
+    0.64,
+    -0.04
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.985,
+     1.192,
+     -0.123
+    ],
+    "RightToeBase": [
+     -1.564,
+     0.151,
+     -0.124
+    ],
+    "RightFoot": [
+     -1.536,
+     0.15,
+     -0.101
+    ],
+    "LeftFoot": [
+     -1.469,
+     0.148,
+     0.137
+    ],
+    "LeftToeBase": [
+     -1.483,
+     0.147,
+     0.144
+    ],
+    "LeftHand": [
+     -1.943,
+     1.146,
+     0.086
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.48,
+    1.08,
+    -0.01
+   ],
+   "Spine02": [
+    -1.47,
+    1.21,
+    -0.0
+   ],
+   "Spine": [
+    -1.47,
+    1.48,
+    0
+   ],
+   "neck": [
+    -1.48,
+    1.59,
+    0.01
+   ],
+   "Head": [
+    -1.49,
+    1.65,
+    0.01
+   ],
+   "LeftArm": [
+    -1.48,
+    1.57,
+    0.16
+   ],
+   "RightArm": [
+    -1.5,
+    1.57,
+    -0.15
+   ],
+   "LeftUpLeg": [
+    -1.49,
+    0.99,
+    0.08
+   ],
+   "LeftLeg": [
+    -1.51,
+    0.64,
+    0.07
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.966,
+     1.197,
+     -0.117
+    ],
+    "RightToeBase": [
+     -1.564,
+     0.151,
+     -0.124
+    ],
+    "RightFoot": [
+     -1.536,
+     0.15,
+     -0.101
+    ],
+    "LeftFoot": [
+     -1.469,
+     0.148,
+     0.137
+    ],
+    "LeftToeBase": [
+     -1.483,
+     0.147,
+     0.144
+    ],
+    "LeftHand": [
+     -1.947,
+     1.151,
+     0.104
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.48,
+    1.08,
+    0.01
+   ],
+   "Spine02": [
+    -1.47,
+    1.21,
+    0.02
+   ],
+   "Spine": [
+    -1.48,
+    1.48,
+    0.02
+   ],
+   "neck": [
+    -1.49,
+    1.58,
+    0.03
+   ],
+   "Head": [
+    -1.49,
+    1.65,
+    0.03
+   ],
+   "LeftArm": [
+    -1.49,
+    1.57,
+    0.18
+   ],
+   "RightArm": [
+    -1.5,
+    1.57,
+    -0.13
+   ],
+   "LeftUpLeg": [
+    -1.49,
+    0.99,
+    0.1
+   ],
+   "LeftLeg": [
+    -1.51,
+    0.64,
+    0.08
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.984,
+     1.19,
+     -0.095
+    ],
+    "RightToeBase": [
+     -1.564,
+     0.151,
+     -0.124
+    ],
+    "RightFoot": [
+     -1.536,
+     0.15,
+     -0.101
+    ],
+    "LeftFoot": [
+     -1.469,
+     0.148,
+     0.137
+    ],
+    "LeftToeBase": [
+     -1.483,
+     0.147,
+     0.144
+    ],
+    "LeftHand": [
+     -1.94,
+     1.142,
+     0.123
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.48,
+    1.08,
+    0.03
+   ],
+   "Spine02": [
+    -1.47,
+    1.21,
+    0.03
+   ],
+   "Spine": [
+    -1.47,
+    1.48,
+    0.04
+   ],
+   "neck": [
+    -1.48,
+    1.59,
+    0.04
+   ],
+   "Head": [
+    -1.49,
+    1.65,
+    0.04
+   ],
+   "LeftArm": [
+    -1.48,
+    1.57,
+    0.19
+   ],
+   "RightArm": [
+    -1.49,
+    1.57,
+    -0.12
+   ],
+   "LeftUpLeg": [
+    -1.49,
+    0.99,
+    0.11
+   ],
+   "LeftLeg": [
+    -1.51,
+    0.64,
+    0.08
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.254,
+     0.924,
+     -0.682
+    ],
+    "RightToeBase": [
+     1.284,
+     0.15,
+     -0.838
+    ],
+    "RightFoot": [
+     1.249,
+     0.15,
+     -0.84
+    ],
+    "LeftFoot": [
+     1.054,
+     0.148,
+     -0.993
+    ],
+    "LeftToeBase": [
+     1.062,
+     0.147,
+     -1.008
+    ],
+    "LeftHand": [
+     0.942,
+     0.932,
+     -0.969
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.18,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.16,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.14,
+    1.48,
+    -0.89
+   ],
+   "neck": [
+    1.12,
+    1.58,
+    -0.88
+   ],
+   "Head": [
+    1.12,
+    1.65,
+    -0.88
+   ],
+   "LeftArm": [
+    1.04,
+    1.57,
+    -1
+   ],
+   "RightArm": [
+    1.23,
+    1.57,
+    -0.77
+   ],
+   "LeftUpLeg": [
+    1.13,
+    0.99,
+    -0.98
+   ],
+   "LeftLeg": [
+    1.13,
+    0.64,
+    -0.97
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.571,
+     1.845,
+     -0.828
+    ],
+    "RightToeBase": [
+     1.284,
+     0.15,
+     -0.838
+    ],
+    "RightFoot": [
+     1.249,
+     0.15,
+     -0.84
+    ],
+    "LeftFoot": [
+     1.054,
+     0.148,
+     -0.993
+    ],
+    "LeftToeBase": [
+     1.062,
+     0.147,
+     -1.008
+    ],
+    "LeftHand": [
+     1.143,
+     1.837,
+     -1.358
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.18,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.16,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.11,
+    1.47,
+    -0.87
+   ],
+   "neck": [
+    1.08,
+    1.57,
+    -0.85
+   ],
+   "Head": [
+    1.07,
+    1.64,
+    -0.83
+   ],
+   "LeftArm": [
+    1,
+    1.56,
+    -0.97
+   ],
+   "RightArm": [
+    1.19,
+    1.56,
+    -0.73
+   ],
+   "LeftUpLeg": [
+    1.13,
+    0.99,
+    -0.98
+   ],
+   "LeftLeg": [
+    1.13,
+    0.64,
+    -0.97
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.22,
+     2.015,
+     -0.819
+    ],
+    "RightToeBase": [
+     1.284,
+     0.15,
+     -0.838
+    ],
+    "RightFoot": [
+     1.249,
+     0.15,
+     -0.84
+    ],
+    "LeftFoot": [
+     1.054,
+     0.148,
+     -0.993
+    ],
+    "LeftToeBase": [
+     1.062,
+     0.147,
+     -1.008
+    ],
+    "LeftHand": [
+     1.095,
+     2.026,
+     -1.046
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.18,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.16,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.11,
+    1.47,
+    -0.86
+   ],
+   "neck": [
+    1.08,
+    1.57,
+    -0.84
+   ],
+   "Head": [
+    1.07,
+    1.64,
+    -0.83
+   ],
+   "LeftArm": [
+    1,
+    1.56,
+    -0.97
+   ],
+   "RightArm": [
+    1.19,
+    1.56,
+    -0.73
+   ],
+   "LeftUpLeg": [
+    1.13,
+    0.99,
+    -0.98
+   ],
+   "LeftLeg": [
+    1.13,
+    0.64,
+    -0.97
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": -0.002,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.079,
+   "LeftUpLeg": 0.99,
+   "LeftLeg": 0.639,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.195,
+   "RightFoot": 0.299,
+   "RightToeBase": 0.198
+  },
+  "rest": null,
+  "root": 0.16,
+  "ctx": "off",
+  "clip": "stand",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.309,
+     1.211,
+     0.026
+    ],
+    "RightToeBase": [
+     -0.113,
+     0.438,
+     -0.1
+    ],
+    "RightFoot": [
+     -0.258,
+     0.422,
+     0.046
+    ],
+    "LeftFoot": [
+     -0.586,
+     0.383,
+     -0.035
+    ],
+    "LeftToeBase": [
+     -0.714,
+     0.445,
+     -0.179
+    ],
+    "LeftHand": [
+     -0.557,
+     0.86,
+     0.1
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.23
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.24
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.237,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.522,
+   "LeftToeBase": 0.477,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.475
+  },
+  "rest": null,
+  "root": 0.405,
+  "ctx": "off",
+  "clip": "phone_sit",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.306,
+     1.21,
+     0.02
+    ],
+    "RightToeBase": [
+     -0.114,
+     0.44,
+     -0.108
+    ],
+    "RightFoot": [
+     -0.223,
+     0.421,
+     0.031
+    ],
+    "LeftFoot": [
+     -0.585,
+     0.382,
+     -0.027
+    ],
+    "LeftToeBase": [
+     -0.714,
+     0.441,
+     -0.172
+    ],
+    "LeftHand": [
+     -0.553,
+     0.856,
+     0.105
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.23
+   ],
+   "Head": [
+    -0.39,
+    1.62,
+    0.24
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.236,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.521,
+   "LeftToeBase": 0.474,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.476
+  },
+  "rest": null,
+  "root": 0.405,
+  "ctx": "off",
+  "clip": "phone_sit",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.303,
+     1.207,
+     0.008
+    ],
+    "RightToeBase": [
+     -0.114,
+     0.442,
+     -0.118
+    ],
+    "RightFoot": [
+     -0.259,
+     0.421,
+     0.028
+    ],
+    "LeftFoot": [
+     -0.585,
+     0.382,
+     -0.017
+    ],
+    "LeftToeBase": [
+     -0.713,
+     0.437,
+     -0.163
+    ],
+    "LeftHand": [
+     -0.545,
+     0.845,
+     0.118
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.54,
+    0.22
+   ],
+   "Head": [
+    -0.38,
+    1.61,
+    0.22
+   ],
+   "LeftArm": [
+    -0.54,
+    1.45,
+    0.24
+   ],
+   "RightArm": [
+    -0.23,
+    1.47,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.235,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.52,
+   "LeftToeBase": 0.47,
+   "RightFoot": 0.559,
+   "RightToeBase": 0.479
+  },
+  "rest": null,
+  "root": 0.405,
+  "ctx": "off",
+  "clip": "phone_sit",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_old_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.24,
+     1.088,
+     1.06
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.2,
+     0.817,
+     1.075
+    ],
+    "LeftFoot": [
+     -0.271,
+     0.794,
+     0.783
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.078,
+     0.994,
+     0.754
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.08,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.08,
+    0.88
+   ],
+   "LeftArm": [
+    -1.59,
+    1.09,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.88
+  },
+  "rest": null,
+  "root": -0.095,
+  "ctx": "off",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_old_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.235,
+     1.08,
+     1.056
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.817,
+     1.108
+    ],
+    "RightFoot": [
+     -0.209,
+     0.818,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.27,
+     0.796,
+     0.785
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.818,
+     0.678
+    ],
+    "LeftHand": [
+     -1.057,
+     0.984,
+     0.777
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.51,
+    1.08,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.1,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.1,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.1,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.605,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.997,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.89,
+   "LeftToeBase": 0.877,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.881
+  },
+  "rest": null,
+  "root": -0.095,
+  "ctx": "off",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_old_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.238,
+     1.086,
+     1.057
+    ],
+    "RightToeBase": [
+     -0.185,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.21,
+     0.816,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.281,
+     0.794,
+     0.795
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.058,
+     0.989,
+     0.777
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.09,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.09,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.905,
+   "RightToeBase": 0.879
+  },
+  "rest": null,
+  "root": -0.095,
+  "ctx": "off",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [],
+  "log": [],
+  "errors": [
+   "Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.805,
+     0.988,
+     -1.096
+    ],
+    "RightToeBase": [
+     -0.976,
+     0.193,
+     -1.093
+    ],
+    "RightFoot": [
+     -1.017,
+     0.27,
+     -1.018
+    ],
+    "LeftFoot": [
+     -1.341,
+     0.264,
+     -0.991
+    ],
+    "LeftToeBase": [
+     -1.279,
+     0.187,
+     -1.086
+    ],
+    "LeftHand": [
+     -1.148,
+     0.984,
+     -1.03
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.9,
+    -0.56
+   ],
+   "Spine02": [
+    -1.13,
+    1.01,
+    -0.48
+   ],
+   "Spine": [
+    -1.13,
+    1.25,
+    -0.6
+   ],
+   "neck": [
+    -1.13,
+    1.31,
+    -0.69
+   ],
+   "Head": [
+    -1.13,
+    1.34,
+    -0.75
+   ],
+   "LeftArm": [
+    -1.28,
+    1.26,
+    -0.63
+   ],
+   "RightArm": [
+    -0.96,
+    1.26,
+    -0.62
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.61
+   ],
+   "LeftLeg": [
+    -1.23,
+    0.78,
+    -0.96
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.084,
+  "arm_over_desk": 0.082,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.897,
+   "LeftUpLeg": 0.822,
+   "LeftLeg": 0.779,
+   "LeftFoot": 0.422,
+   "LeftToeBase": 0.281,
+   "RightFoot": 0.431,
+   "RightToeBase": 0.288
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.36,
+  "ctx": "on",
+  "clip": "m_type",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.14,
+     1.458,
+     -0.842
+    ],
+    "RightToeBase": [
+     -0.977,
+     0.192,
+     -1.093
+    ],
+    "RightFoot": [
+     -1.018,
+     0.269,
+     -1.018
+    ],
+    "LeftFoot": [
+     -1.342,
+     0.262,
+     -0.99
+    ],
+    "LeftToeBase": [
+     -1.291,
+     0.186,
+     -1.085
+    ],
+    "LeftHand": [
+     -1.212,
+     0.703,
+     -0.665
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.9,
+    -0.56
+   ],
+   "Spine02": [
+    -1.13,
+    1,
+    -0.48
+   ],
+   "Spine": [
+    -1.13,
+    1.25,
+    -0.59
+   ],
+   "neck": [
+    -1.13,
+    1.31,
+    -0.69
+   ],
+   "Head": [
+    -1.13,
+    1.34,
+    -0.75
+   ],
+   "LeftArm": [
+    -1.29,
+    1.27,
+    -0.63
+   ],
+   "RightArm": [
+    -0.97,
+    1.26,
+    -0.63
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.61
+   ],
+   "LeftLeg": [
+    -1.23,
+    0.78,
+    -0.96
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.083,
+  "arm_over_desk": 0.533,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.895,
+   "LeftUpLeg": 0.821,
+   "LeftLeg": 0.778,
+   "LeftFoot": 0.421,
+   "LeftToeBase": 0.28,
+   "RightFoot": 0.43,
+   "RightToeBase": 0.287
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.36,
+  "ctx": "on",
+  "clip": "m_type",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "desk_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.131,
+     1.453,
+     -0.833
+    ],
+    "RightToeBase": [
+     -0.976,
+     0.191,
+     -1.093
+    ],
+    "RightFoot": [
+     -1.018,
+     0.268,
+     -1.017
+    ],
+    "LeftFoot": [
+     -1.342,
+     0.261,
+     -0.991
+    ],
+    "LeftToeBase": [
+     -1.291,
+     0.185,
+     -1.085
+    ],
+    "LeftHand": [
+     -1.202,
+     0.702,
+     -0.656
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.13,
+    0.89,
+    -0.56
+   ],
+   "Spine02": [
+    -1.13,
+    1,
+    -0.48
+   ],
+   "Spine": [
+    -1.13,
+    1.25,
+    -0.6
+   ],
+   "neck": [
+    -1.13,
+    1.3,
+    -0.69
+   ],
+   "Head": [
+    -1.13,
+    1.33,
+    -0.75
+   ],
+   "LeftArm": [
+    -1.29,
+    1.26,
+    -0.63
+   ],
+   "RightArm": [
+    -0.97,
+    1.25,
+    -0.63
+   ],
+   "LeftUpLeg": [
+    -1.22,
+    0.82,
+    -0.61
+   ],
+   "LeftLeg": [
+    -1.23,
+    0.78,
+    -0.96
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.082,
+  "arm_over_desk": 0.526,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.894,
+   "LeftUpLeg": 0.82,
+   "LeftLeg": 0.776,
+   "LeftFoot": 0.419,
+   "LeftToeBase": 0.279,
+   "RightFoot": 0.429,
+   "RightToeBase": 0.286
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.36,
+  "ctx": "on",
+  "clip": "m_type",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.355,
+     0.967,
+     -0.936
+    ],
+    "RightToeBase": [
+     -1.081,
+     0.186,
+     -1.066
+    ],
+    "RightFoot": [
+     -1.121,
+     0.266,
+     -0.993
+    ],
+    "LeftFoot": [
+     -1.369,
+     0.249,
+     -0.959
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.171,
+     -1.063
+    ],
+    "LeftHand": [
+     -1.367,
+     1.129,
+     -0.912
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.89,
+    -0.57
+   ],
+   "Spine02": [
+    -1.26,
+    1.02,
+    -0.51
+   ],
+   "Spine": [
+    -1.28,
+    1.27,
+    -0.63
+   ],
+   "neck": [
+    -1.28,
+    1.32,
+    -0.72
+   ],
+   "Head": [
+    -1.28,
+    1.34,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.43,
+    1.25,
+    -0.68
+   ],
+   "RightArm": [
+    -1.12,
+    1.3,
+    -0.66
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.8,
+    -0.59
+   ],
+   "LeftLeg": [
+    -1.34,
+    0.76,
+    -0.94
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.068,
+  "arm_over_desk": 0.079,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.895,
+   "LeftUpLeg": 0.805,
+   "LeftLeg": 0.761,
+   "LeftFoot": 0.404,
+   "LeftToeBase": 0.265,
+   "RightFoot": 0.427,
+   "RightToeBase": 0.283
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.354,
+  "ctx": "on",
+  "clip": "m_eat",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.398,
+     1.044,
+     -0.985
+    ],
+    "RightToeBase": [
+     -1.081,
+     0.187,
+     -1.07
+    ],
+    "RightFoot": [
+     -1.121,
+     0.267,
+     -0.997
+    ],
+    "LeftFoot": [
+     -1.369,
+     0.249,
+     -0.96
+    ],
+    "LeftToeBase": [
+     -1.417,
+     0.171,
+     -1.065
+    ],
+    "LeftHand": [
+     -1.373,
+     1.121,
+     -0.914
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.89,
+    -0.57
+   ],
+   "Spine02": [
+    -1.26,
+    1.02,
+    -0.51
+   ],
+   "Spine": [
+    -1.29,
+    1.26,
+    -0.63
+   ],
+   "neck": [
+    -1.29,
+    1.31,
+    -0.73
+   ],
+   "Head": [
+    -1.3,
+    1.33,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.44,
+    1.24,
+    -0.67
+   ],
+   "RightArm": [
+    -1.12,
+    1.3,
+    -0.67
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.8,
+    -0.59
+   ],
+   "LeftLeg": [
+    -1.34,
+    0.76,
+    -0.94
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.068,
+  "arm_over_desk": 0.072,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.894,
+   "LeftUpLeg": 0.804,
+   "LeftLeg": 0.76,
+   "LeftFoot": 0.404,
+   "LeftToeBase": 0.265,
+   "RightFoot": 0.428,
+   "RightToeBase": 0.284
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.354,
+  "ctx": "on",
+  "clip": "m_eat",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "eat_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.341,
+     1.089,
+     -0.933
+    ],
+    "RightToeBase": [
+     -1.081,
+     0.186,
+     -1.064
+    ],
+    "RightFoot": [
+     -1.121,
+     0.266,
+     -0.991
+    ],
+    "LeftFoot": [
+     -1.368,
+     0.249,
+     -0.958
+    ],
+    "LeftToeBase": [
+     -1.416,
+     0.17,
+     -1.062
+    ],
+    "LeftHand": [
+     -1.37,
+     1.129,
+     -0.912
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.25,
+    0.89,
+    -0.56
+   ],
+   "Spine02": [
+    -1.26,
+    1.02,
+    -0.51
+   ],
+   "Spine": [
+    -1.28,
+    1.27,
+    -0.63
+   ],
+   "neck": [
+    -1.29,
+    1.32,
+    -0.72
+   ],
+   "Head": [
+    -1.28,
+    1.35,
+    -0.79
+   ],
+   "LeftArm": [
+    -1.44,
+    1.25,
+    -0.68
+   ],
+   "RightArm": [
+    -1.12,
+    1.31,
+    -0.66
+   ],
+   "LeftUpLeg": [
+    -1.33,
+    0.8,
+    -0.59
+   ],
+   "LeftLeg": [
+    -1.34,
+    0.76,
+    -0.94
+   ]
+  },
+  "ry": -3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.068,
+  "arm_over_desk": 0.081,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.895,
+   "LeftUpLeg": 0.804,
+   "LeftLeg": 0.761,
+   "LeftFoot": 0.404,
+   "LeftToeBase": 0.265,
+   "RightFoot": 0.427,
+   "RightToeBase": 0.283
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.354,
+  "ctx": "on",
+  "clip": "m_eat",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.348,
+     1.259,
+     0.212
+    ],
+    "RightToeBase": [
+     0.132,
+     0.214,
+     0.301
+    ],
+    "RightFoot": [
+     0.166,
+     0.161,
+     0.105
+    ],
+    "LeftFoot": [
+     0.455,
+     0.16,
+     -0.095
+    ],
+    "LeftToeBase": [
+     0.635,
+     0.207,
+     -0.023
+    ],
+    "LeftHand": [
+     0.494,
+     0.867,
+     -0.102
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.35,
+    1.07,
+    0.06
+   ],
+   "Spine02": [
+    0.33,
+    1.21,
+    0.04
+   ],
+   "Spine": [
+    0.3,
+    1.48,
+    -0.01
+   ],
+   "neck": [
+    0.32,
+    1.58,
+    0.01
+   ],
+   "Head": [
+    0.33,
+    1.65,
+    0.03
+   ],
+   "LeftArm": [
+    0.43,
+    1.49,
+    -0.1
+   ],
+   "RightArm": [
+    0.17,
+    1.5,
+    0.08
+   ],
+   "LeftUpLeg": [
+    0.42,
+    0.99,
+    0.01
+   ],
+   "LeftLeg": [
+    0.5,
+    0.64,
+    0.02
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.303,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.339,
+     1.266,
+     0.212
+    ],
+    "RightToeBase": [
+     0.128,
+     0.214,
+     0.3
+    ],
+    "RightFoot": [
+     0.164,
+     0.161,
+     0.104
+    ],
+    "LeftFoot": [
+     0.451,
+     0.16,
+     -0.095
+    ],
+    "LeftToeBase": [
+     0.63,
+     0.207,
+     -0.022
+    ],
+    "LeftHand": [
+     0.491,
+     0.869,
+     -0.096
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.34,
+    1.08,
+    0.06
+   ],
+   "Spine02": [
+    0.32,
+    1.21,
+    0.04
+   ],
+   "Spine": [
+    0.29,
+    1.48,
+    -0.02
+   ],
+   "neck": [
+    0.3,
+    1.58,
+    0
+   ],
+   "Head": [
+    0.32,
+    1.65,
+    0.01
+   ],
+   "LeftArm": [
+    0.42,
+    1.49,
+    -0.11
+   ],
+   "RightArm": [
+    0.15,
+    1.5,
+    0.07
+   ],
+   "LeftUpLeg": [
+    0.41,
+    0.99,
+    0.01
+   ],
+   "LeftLeg": [
+    0.49,
+    0.64,
+    0.02
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.076,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "stand_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     0.349,
+     1.257,
+     0.226
+    ],
+    "RightToeBase": [
+     0.131,
+     0.214,
+     0.302
+    ],
+    "RightFoot": [
+     0.165,
+     0.161,
+     0.106
+    ],
+    "LeftFoot": [
+     0.454,
+     0.16,
+     -0.095
+    ],
+    "LeftToeBase": [
+     0.633,
+     0.207,
+     -0.023
+    ],
+    "LeftHand": [
+     0.484,
+     0.868,
+     -0.093
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    0.34,
+    1.08,
+    0.06
+   ],
+   "Spine02": [
+    0.32,
+    1.21,
+    0.04
+   ],
+   "Spine": [
+    0.3,
+    1.48,
+    -0.0
+   ],
+   "neck": [
+    0.31,
+    1.58,
+    0.02
+   ],
+   "Head": [
+    0.33,
+    1.65,
+    0.03
+   ],
+   "LeftArm": [
+    0.42,
+    1.49,
+    -0.09
+   ],
+   "RightArm": [
+    0.16,
+    1.5,
+    0.09
+   ],
+   "LeftUpLeg": [
+    0.42,
+    0.99,
+    0.02
+   ],
+   "LeftLeg": [
+    0.49,
+    0.64,
+    0.02
+   ]
+  },
+  "ry": 0.6,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.25
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.975,
+     1.221,
+     -0.15
+    ],
+    "RightToeBase": [
+     -1.677,
+     0.219,
+     -0.205
+    ],
+    "RightFoot": [
+     -1.512,
+     0.162,
+     -0.094
+    ],
+    "LeftFoot": [
+     -1.514,
+     0.16,
+     0.049
+    ],
+    "LeftToeBase": [
+     -1.678,
+     0.214,
+     0.148
+    ],
+    "LeftHand": [
+     -1.981,
+     1.236,
+     0.067
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.56,
+    1.07,
+    -0.04
+   ],
+   "Spine02": [
+    -1.53,
+    1.21,
+    -0.04
+   ],
+   "Spine": [
+    -1.51,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    -1.55,
+    1.58,
+    -0.03
+   ],
+   "Head": [
+    -1.57,
+    1.65,
+    -0.03
+   ],
+   "LeftArm": [
+    -1.53,
+    1.48,
+    0.12
+   ],
+   "RightArm": [
+    -1.51,
+    1.5,
+    -0.19
+   ],
+   "LeftUpLeg": [
+    -1.57,
+    0.98,
+    0.04
+   ],
+   "LeftLeg": [
+    -1.65,
+    0.64,
+    0.05
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.014,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.074,
+   "LeftUpLeg": 0.984,
+   "LeftLeg": 0.641,
+   "LeftFoot": 0.299,
+   "LeftToeBase": 0.25,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.255
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_window",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.973,
+     1.209,
+     -0.135
+    ],
+    "RightToeBase": [
+     -1.678,
+     0.218,
+     -0.204
+    ],
+    "RightFoot": [
+     -1.512,
+     0.162,
+     -0.093
+    ],
+    "LeftFoot": [
+     -1.514,
+     0.16,
+     0.05
+    ],
+    "LeftToeBase": [
+     -1.676,
+     0.213,
+     0.15
+    ],
+    "LeftHand": [
+     -1.979,
+     1.223,
+     0.071
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.56,
+    1.07,
+    -0.04
+   ],
+   "Spine02": [
+    -1.53,
+    1.21,
+    -0.03
+   ],
+   "Spine": [
+    -1.53,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    -1.57,
+    1.58,
+    -0.02
+   ],
+   "Head": [
+    -1.59,
+    1.65,
+    -0.02
+   ],
+   "LeftArm": [
+    -1.54,
+    1.48,
+    0.13
+   ],
+   "RightArm": [
+    -1.52,
+    1.5,
+    -0.19
+   ],
+   "LeftUpLeg": [
+    -1.57,
+    0.98,
+    0.05
+   ],
+   "LeftLeg": [
+    -1.65,
+    0.64,
+    0.05
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.014,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.074,
+   "LeftUpLeg": 0.984,
+   "LeftLeg": 0.64,
+   "LeftFoot": 0.299,
+   "LeftToeBase": 0.25,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.254
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_window",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "window_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.978,
+     1.223,
+     -0.153
+    ],
+    "RightToeBase": [
+     -1.677,
+     0.219,
+     -0.204
+    ],
+    "RightFoot": [
+     -1.511,
+     0.162,
+     -0.094
+    ],
+    "LeftFoot": [
+     -1.515,
+     0.16,
+     0.049
+    ],
+    "LeftToeBase": [
+     -1.677,
+     0.214,
+     0.149
+    ],
+    "LeftHand": [
+     -1.981,
+     1.24,
+     0.078
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.55,
+    1.07,
+    -0.04
+   ],
+   "Spine02": [
+    -1.53,
+    1.21,
+    -0.04
+   ],
+   "Spine": [
+    -1.51,
+    1.48,
+    -0.03
+   ],
+   "neck": [
+    -1.55,
+    1.58,
+    -0.03
+   ],
+   "Head": [
+    -1.57,
+    1.65,
+    -0.03
+   ],
+   "LeftArm": [
+    -1.53,
+    1.48,
+    0.12
+   ],
+   "RightArm": [
+    -1.51,
+    1.5,
+    -0.19
+   ],
+   "LeftUpLeg": [
+    -1.57,
+    0.98,
+    0.04
+   ],
+   "LeftLeg": [
+    -1.65,
+    0.64,
+    0.05
+   ]
+  },
+  "ry": -1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.014,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.074,
+   "LeftUpLeg": 0.985,
+   "LeftLeg": 0.641,
+   "LeftFoot": 0.299,
+   "LeftToeBase": 0.251,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.255
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_window",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.309,
+     0.878,
+     -0.727
+    ],
+    "RightToeBase": [
+     1.477,
+     0.214,
+     -0.709
+    ],
+    "RightFoot": [
+     1.28,
+     0.161,
+     -0.738
+    ],
+    "LeftFoot": [
+     1.072,
+     0.16,
+     -1.021
+    ],
+    "LeftToeBase": [
+     1.139,
+     0.207,
+     -1.202
+    ],
+    "LeftHand": [
+     1.07,
+     0.867,
+     -1.054
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.23,
+    1.07,
+    -0.92
+   ],
+   "Spine02": [
+    1.21,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.17,
+    1.48,
+    -0.87
+   ],
+   "neck": [
+    1.19,
+    1.58,
+    -0.89
+   ],
+   "Head": [
+    1.2,
+    1.65,
+    -0.9
+   ],
+   "LeftArm": [
+    1.08,
+    1.49,
+    -0.99
+   ],
+   "RightArm": [
+    1.26,
+    1.5,
+    -0.74
+   ],
+   "LeftUpLeg": [
+    1.19,
+    0.99,
+    -0.99
+   ],
+   "LeftLeg": [
+    1.19,
+    0.64,
+    -1.06
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.988,
+   "LeftLeg": 0.642,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.303,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.571,
+     1.798,
+     -0.548
+    ],
+    "RightToeBase": [
+     1.476,
+     0.214,
+     -0.706
+    ],
+    "RightFoot": [
+     1.28,
+     0.161,
+     -0.736
+    ],
+    "LeftFoot": [
+     1.072,
+     0.16,
+     -1.017
+    ],
+    "LeftToeBase": [
+     1.139,
+     0.207,
+     -1.198
+    ],
+    "LeftHand": [
+     0.941,
+     1.791,
+     -1.342
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.23,
+    1.08,
+    -0.91
+   ],
+   "Spine02": [
+    1.21,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.13,
+    1.47,
+    -0.85
+   ],
+   "neck": [
+    1.14,
+    1.58,
+    -0.85
+   ],
+   "Head": [
+    1.14,
+    1.65,
+    -0.86
+   ],
+   "LeftArm": [
+    1.04,
+    1.48,
+    -0.97
+   ],
+   "RightArm": [
+    1.22,
+    1.49,
+    -0.71
+   ],
+   "LeftUpLeg": [
+    1.18,
+    0.99,
+    -0.99
+   ],
+   "LeftLeg": [
+    1.18,
+    0.64,
+    -1.06
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.076,
+   "LeftUpLeg": 0.989,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.249
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "door_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     1.313,
+     1.95,
+     -0.765
+    ],
+    "RightToeBase": [
+     1.478,
+     0.214,
+     -0.709
+    ],
+    "RightFoot": [
+     1.281,
+     0.161,
+     -0.737
+    ],
+    "LeftFoot": [
+     1.072,
+     0.16,
+     -1.02
+    ],
+    "LeftToeBase": [
+     1.138,
+     0.207,
+     -1.201
+    ],
+    "LeftHand": [
+     1.094,
+     1.951,
+     -1.055
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    1.23,
+    1.08,
+    -0.92
+   ],
+   "Spine02": [
+    1.21,
+    1.21,
+    -0.9
+   ],
+   "Spine": [
+    1.13,
+    1.47,
+    -0.85
+   ],
+   "neck": [
+    1.13,
+    1.58,
+    -0.85
+   ],
+   "Head": [
+    1.13,
+    1.65,
+    -0.86
+   ],
+   "LeftArm": [
+    1.04,
+    1.48,
+    -0.97
+   ],
+   "RightArm": [
+    1.22,
+    1.49,
+    -0.72
+   ],
+   "LeftUpLeg": [
+    1.18,
+    0.99,
+    -1
+   ],
+   "LeftLeg": [
+    1.18,
+    0.64,
+    -1.07
+   ]
+  },
+  "ry": 2.2,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.013,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.075,
+   "LeftUpLeg": 0.989,
+   "LeftLeg": 0.643,
+   "LeftFoot": 0.298,
+   "LeftToeBase": 0.247,
+   "RightFoot": 0.304,
+   "RightToeBase": 0.25
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.16,
+  "ctx": "on",
+  "clip": "m_idle",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.307,
+     1.213,
+     0.02
+    ],
+    "RightToeBase": [
+     -0.113,
+     0.438,
+     -0.1
+    ],
+    "RightFoot": [
+     -0.258,
+     0.422,
+     0.046
+    ],
+    "LeftFoot": [
+     -0.586,
+     0.383,
+     -0.035
+    ],
+    "LeftToeBase": [
+     -0.714,
+     0.445,
+     -0.179
+    ],
+    "LeftHand": [
+     -0.558,
+     0.859,
+     0.103
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.23
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.237,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.522,
+   "LeftToeBase": 0.477,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.475
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.405,
+  "ctx": "on",
+  "clip": "phone_sit",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.305,
+     1.213,
+     0.017
+    ],
+    "RightToeBase": [
+     -0.114,
+     0.44,
+     -0.108
+    ],
+    "RightFoot": [
+     -0.223,
+     0.421,
+     0.031
+    ],
+    "LeftFoot": [
+     -0.585,
+     0.382,
+     -0.027
+    ],
+    "LeftToeBase": [
+     -0.714,
+     0.441,
+     -0.172
+    ],
+    "LeftHand": [
+     -0.553,
+     0.857,
+     0.106
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.55,
+    0.24
+   ],
+   "Head": [
+    -0.38,
+    1.62,
+    0.24
+   ],
+   "LeftArm": [
+    -0.54,
+    1.46,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.48,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.236,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.521,
+   "LeftToeBase": 0.474,
+   "RightFoot": 0.558,
+   "RightToeBase": 0.476
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.405,
+  "ctx": "on",
+  "clip": "phone_sit",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "phone_bed_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -0.305,
+     1.202,
+     0.016
+    ],
+    "RightToeBase": [
+     -0.114,
+     0.442,
+     -0.118
+    ],
+    "RightFoot": [
+     -0.259,
+     0.421,
+     0.028
+    ],
+    "LeftFoot": [
+     -0.585,
+     0.382,
+     -0.017
+    ],
+    "LeftToeBase": [
+     -0.713,
+     0.437,
+     -0.163
+    ],
+    "LeftHand": [
+     -0.541,
+     0.846,
+     0.119
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -0.4,
+    1.06,
+    0.35
+   ],
+   "Spine02": [
+    -0.4,
+    1.2,
+    0.38
+   ],
+   "Spine": [
+    -0.39,
+    1.45,
+    0.28
+   ],
+   "neck": [
+    -0.38,
+    1.54,
+    0.23
+   ],
+   "Head": [
+    -0.38,
+    1.61,
+    0.22
+   ],
+   "LeftArm": [
+    -0.54,
+    1.45,
+    0.25
+   ],
+   "RightArm": [
+    -0.23,
+    1.47,
+    0.23
+   ],
+   "LeftUpLeg": [
+    -0.49,
+    0.98,
+    0.34
+   ],
+   "LeftLeg": [
+    -0.59,
+    0.87,
+    0.02
+   ]
+  },
+  "ry": 3.14,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.235,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 1.061,
+   "LeftUpLeg": 0.976,
+   "LeftLeg": 0.875,
+   "LeftFoot": 0.52,
+   "LeftToeBase": 0.47,
+   "RightFoot": 0.559,
+   "RightToeBase": 0.479
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": 0.405,
+  "ctx": "on",
+  "clip": "phone_sit",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_new_390_0.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.241,
+     1.088,
+     1.061
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.2,
+     0.817,
+     1.075
+    ],
+    "LeftFoot": [
+     -0.271,
+     0.794,
+     0.783
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.078,
+     0.996,
+     0.753
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.06,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.08,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.08,
+    0.88
+   ],
+   "LeftArm": [
+    -1.59,
+    1.09,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.08,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.88
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": -0.095,
+  "ctx": "on",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_new_390_1.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.234,
+     1.078,
+     1.054
+    ],
+    "RightToeBase": [
+     -0.184,
+     0.817,
+     1.108
+    ],
+    "RightFoot": [
+     -0.209,
+     0.818,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.27,
+     0.796,
+     0.785
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.818,
+     0.678
+    ],
+    "LeftHand": [
+     -1.077,
+     0.981,
+     0.761
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.51,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.1,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.1,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.605,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.997,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.89,
+   "LeftToeBase": 0.877,
+   "RightFoot": 0.906,
+   "RightToeBase": 0.881
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": -0.095,
+  "ctx": "on",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ },
+ "sleep_new_390_2.jpg": {
+  "deskHits": {
+   "hits": {},
+   "lows": {
+    "RightHand": [
+     -1.237,
+     1.085,
+     1.056
+    ],
+    "RightToeBase": [
+     -0.185,
+     0.816,
+     1.108
+    ],
+    "RightFoot": [
+     -0.21,
+     0.816,
+     1.067
+    ],
+    "LeftFoot": [
+     -0.281,
+     0.794,
+     0.795
+    ],
+    "LeftToeBase": [
+     -0.177,
+     0.816,
+     0.677
+    ],
+    "LeftHand": [
+     -1.078,
+     0.986,
+     0.759
+    ]
+   }
+  },
+  "torsoVec": {
+   "Hips": [
+    -1.12,
+    1,
+    0.9
+   ],
+   "Spine02": [
+    -1.25,
+    1.01,
+    0.9
+   ],
+   "Spine": [
+    -1.52,
+    1.07,
+    0.89
+   ],
+   "neck": [
+    -1.62,
+    1.09,
+    0.88
+   ],
+   "Head": [
+    -1.69,
+    1.09,
+    0.88
+   ],
+   "LeftArm": [
+    -1.58,
+    1.1,
+    0.73
+   ],
+   "RightArm": [
+    -1.58,
+    1.09,
+    1.04
+   ],
+   "LeftUpLeg": [
+    -1.03,
+    1,
+    0.81
+   ],
+   "LeftLeg": [
+    -0.69,
+    0.94,
+    0.75
+   ]
+  },
+  "ry": 1.57,
+  "pen": {
+   "bed": 0,
+   "chair": 0,
+   "by": {}
+  },
+  "lowest_sole": 0.604,
+  "arm_over_desk": null,
+  "nan": 0,
+  "legs": {
+   "Hips": 0.999,
+   "LeftUpLeg": 0.998,
+   "LeftLeg": 0.941,
+   "LeftFoot": 0.889,
+   "LeftToeBase": 0.875,
+   "RightFoot": 0.905,
+   "RightToeBase": 0.879
+  },
+  "rest": {
+   "ankle": 0.1251993330183468,
+   "toe": 0.037359490403601106,
+   "p": {
+    "LeftFoot": [
+     0.138,
+     0.125,
+     -0.042
+    ],
+    "RightFoot": [
+     -0.141,
+     0.131,
+     -0.043
+    ],
+    "LeftToeBase": [
+     0.165,
+     0.037,
+     0.071
+    ],
+    "RightToeBase": [
+     -0.166,
+     0.037,
+     0.071
+    ]
+   }
+  },
+  "root": -0.095,
+  "ctx": "on",
+  "clip": "Armature|Sleep_Normally|baselayer",
+  "swapped": [
+   "sit",
+   "dine",
+   "stand",
+   "walk",
+   "lean"
+  ],
+  "log": [],
+  "errors": [
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input",
+   "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+  ]
+ }
+}
