@@ -72,9 +72,16 @@ FRAME = """() => { const b = window.boy; if (!b) return; const t = new THREE.Vec
   const inTall = p => tall.some(([x0, x1, z0, z1]) => p.x > x0 - 0.15 && p.x < x1 + 0.15 && p.z > z0 - 0.15 && p.z < z1 + 0.15);
   const r = b.rotation.y, box = p => { p.x = Math.min(1.85, Math.max(-1.75, p.x)); p.z = Math.min(1.5, Math.max(-1.3, p.z)); p.y = Math.min(2.3, p.y); return p; };
   // the whole body in frame: of eight directions around him (his front half first), the one with most room inside the walls
+  // and nothing solid between the camera and his head or hips (a ray against the room; his own meshes and glass ignored)
+  const ray = new THREE.Raycaster(), ofBoy = o => { for (; o; o = o.parent) if (o === b) return true; return false; };
+  const clear = (c, p) => { const d = p.clone().sub(c), len = d.length(); ray.set(c, d.normalize()); ray.far = len - 0.35;
+    const h = ray.intersectObjects(scene.children, true).find(h => h.object.visible && !ofBoy(h.object) && !(h.object.material && h.object.material.transparent && h.object.material.opacity < 0.6));
+    return h ? h.distance / len : 1; };
   let best = null;
   for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8]) { const d = new THREE.Vector3(Math.sin(r + a), 0, Math.cos(r + a));
-    const c = box(t.clone().addScaledVector(d, 3.2).add(new THREE.Vector3(0, 0.8, 0))), dist = c.distanceTo(t) - (Math.abs(a) > 1.5 ? 0.6 : 0) - (inTall(c) ? 5 : 0);
+    const c = box(t.clone().addScaledVector(d, 2.7).add(new THREE.Vector3(0, 0.6, 0)));
+    const open = Math.min(clear(c, t), clear(c, t.clone().add(new THREE.Vector3(0, -0.6, 0))), clear(c, t.clone().add(new THREE.Vector3(0, -1.1, 0))));
+    const dist = c.distanceTo(t) - (Math.abs(a) > 1.5 ? 0.6 : 0) - (inTall(c) ? 5 : 0) - (1 - open) * 6;
     if (!best || dist > best.dist) best = {c, dist}; }
   camera.fov = 46; camera.updateProjectionMatrix(); camera.position.copy(best.c); controls.target.copy(t); controls.update(); renderer.render(scene, camera); }"""
 
@@ -150,9 +157,9 @@ def main():
                         if args.only and key not in args.only.split(","):
                             continue
                         life = {"activity": activity, "place": "room", "vitals": {"resp_per_min": 14}, **extra}
-                        if key == "walk":                          # from standing at the door: the research tick sends him to the desk
+                        if key == "walk":                          # snapped to the door; a research tick (live(), not act()) plans the walk to the desk
                             pg.evaluate("(l) => { act('idle_home', {...l, activity: 'idle_home', place: 'door_in'}); sim(1 / 30, 60); }", life)
-                            pg.evaluate("(l) => { act(l.activity, l); " + args.prep + " for (let i = 0; i < 400; i++) { animate_(0.1); "   # steps without a render
+                            pg.evaluate("(l) => { live(l.activity, l); " + args.prep + " for (let i = 0; i < 400; i++) { animate_(0.1); "   # steps without a render
                                         "const p = pose(); if (p.step && p.step.k === 'walk') break; } sim(1 / 30, 24); }", life)
                         else:
                             pg.evaluate("(l) => { act(l.activity, l); " + args.prep + f" sim(1 / 30, {args.settle}); }}", life)
