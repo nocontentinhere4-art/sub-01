@@ -77,8 +77,8 @@ for side, sign in (("left", 1), ("right", -1)):                     # glTF/Blend
     ys, xs = np.nonzero(grown)
     print("%s eye: %d px, centre %s cm, forward %s, opening extent %s cm, uv px %d..%d x %d..%d" % (side, grown.sum(), centre.round(2), fwd.round(2), ext.round(2), xs.min(), xs.max(), ys.min(), ys.max()))
     eyes[side] = {"mask": grown, "surface": centre, "forward": fwd, "width": float(np.hypot(ext[0], ext[1]))}
-RADIUS = 1.4                                                           # cm; a little over the real 1.2 so the ball fills the opening's corners
-INSET = 0.3                                                            # the cornea apex sits this far behind the painted surface
+RADIUS = 1.5                                                           # cm; over the real 1.2 so the ball fills the opening's corners
+INSET = 0.12                                                           # the cornea apex sits this far behind the painted surface
 def to_gltf(v):   # Blender z up (x, y, z) cm -> glTF y up metres (x, z, -y)
     return [float(v[0]) / 100, float(v[2]) / 100, float(-v[1]) / 100]
 spec_eyes = {"radius": RADIUS / 100}
@@ -91,7 +91,8 @@ hole = np.zeros((S, S), bool)
 for e in eyes.values():
     c = e["surface"] - e["forward"] * (RADIUS + INSET); d = pos - c
     lateral = np.linalg.norm(d - (d @ e["forward"])[:, :, None] * e["forward"], axis=2)
-    hole |= ndi.binary_erosion(e["mask"], iterations=2) & (lateral < RADIUS * 0.9)
+    inner = np.abs(X) > abs(e["surface"][0]) - 0.32 * e["width"]       # the inner corner (towards the nose) stays painted: the ball sits deeper there
+    hole |= ndi.binary_erosion(e["mask"], iterations=4) & (lateral < RADIUS * 0.8) & inner
 alpha = 1 - blur(hole.astype(np.float32), 1.0)
 alpha = np.where(hole, np.minimum(alpha, 0.3), np.maximum(alpha, 0.7))      # keep the blurred edge inside the cutoff band
 
@@ -164,9 +165,17 @@ print("skin chroma equalised; lips px", int(lips.sum()))
 face_f = ndi.binary_dilation(face, iterations=8).astype(np.float32)
 sharp = np.clip(skin_clean + 0.2 * (skin_clean - np.stack([blur(skin_clean[:, :, k], 2.5) for k in range(3)], 2)), 0, 1)
 skin_out = skin_clean * (1 - face_f[:, :, None]) + sharp * face_f[:, :, None]
-lm = skin_out.mean(2, keepdims=True); warm = np.array([1.0, 0.955, 0.925], np.float32)
-graded = np.clip((lm + (skin_out - lm) * 1.25) * warm, 0, 1)
-hm = blur(head.astype(np.float32), 3)[:, :, None]; skin_out = skin_out * (1 - hm) + graded * hm
+# the old painted face's warmth and contrast are the reference (the owner knows this face): per-channel means and the
+# luminance spread over the face island are matched to the old bake's, so the equalised skin is neither paler nor flatter
+fm = face_isl & (skin.mean(2) > 0.3)
+old_mean = skin[fm].mean(0); new_mean = skin_out[fm].mean(0)
+old_sd = skin[fm].mean(1).std(); new_sd = skin_out[fm].mean(1).std()
+gain = old_mean / np.maximum(new_mean, 1e-3); k_sd = float(np.clip(old_sd / max(new_sd, 1e-3), 0.9, 1.4))
+lm = skin_out.mean(2, keepdims=True); lm_mean = float(lm[fm].mean())
+graded = np.clip((lm_mean + (skin_out - lm_mean) * k_sd) * gain, 0, 1)
+gl = graded.mean(2, keepdims=True); graded = np.clip(gl + (graded - gl) * 1.12, 0, 1)                 # a little more colour than the flat bake
+print("face match: old mean %s new mean %s gain %s, spread x%.2f" % (old_mean.round(3), new_mean.round(3), gain.round(3), k_sd))
+hm = blur(face_isl.astype(np.float32), 3)[:, :, None]; skin_out = skin_out * (1 - hm) + graded * hm
 rgba = np.concatenate([skin_out, alpha[:, :, None]], 2)
 Image.fromarray(np.clip(rgba * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_skin.png")); print("wrote tex_skin.png (RGBA)")
 save("tex_skin_n.png", sanitize_normal(load("nrm_skin.png")))
@@ -212,6 +221,13 @@ if os.path.exists(REG):
     flat = np.where(pl > base_tone, base_tone + (pl - base_tone) * 0.3, pl)
     gain = np.where(pants & ~stripe, flat / np.maximum(pl, 1e-4), 1.0)
     cloth_g = np.clip(cloth_g * gain[:, :, None], 0, 1); print("pants de-lit: base tone %.3f, %d px" % (base_tone, int((pants & ~stripe).sum())))
+# socks: dark texels inside the sock region (slide / pants bleed from the old atlas: the smear on the toe) become sock
+if os.path.exists(REG):
+    socks = ndi.binary_erosion(reg == 5, iterations=1); sl_ = cloth_g.mean(2)
+    bad_s = socks & (sl_ < 0.5); good_s = socks & (sl_ >= 0.55)
+    if bad_s.any() and good_s.any():
+        wg = blur(good_s.astype(np.float32), 5); fl = np.stack([blur(cloth_g[:, :, k] * good_s, 5) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
+        cloth_g = np.where(bad_s[:, :, None], fl, cloth_g); print("socks: %d dark px filled" % int(bad_s.sum()))
 # alpha: 1 everywhere, 0 in the reserved band (u, v < 0.015: both corners of the v axis, as the UV packing starts at 0 and glTF
 # flips v): the invisible full-body proxy that assemble.mjs appends to the slides primitive points there (white, so that
 # room.html's slidesInit never takes the proxy's feet for slides)
@@ -227,20 +243,24 @@ save("tex_cloth_orm.png", orm(np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 
 E = 512
 yy, xx = np.mgrid[0:E, 0:E]; u = (xx + 0.5) / E - 0.5; v = (yy + 0.5) / E - 0.5; rr = np.hypot(u, v); ang = np.arctan2(v, u)
 rng = np.random.default_rng(7)
-IRIS, PUPIL, LIMBUS = 0.145, 0.052, 0.13                               # uv radii (see assemble.mjs: r = 0.5 * polar / (pi * 0.55))
+IRIS, PUPIL, LIMBUS = 0.123, 0.042, 0.108                              # uv radii (see assemble.mjs: r = 0.5 * polar / (pi * 0.55)): iris 1.15 cm, pupil 0.4 cm
 eye = np.zeros((E, E, 3), np.float32)
 sclera_col = np.array([0.88, 0.85, 0.83]); veins = blur(rng.random((E, E)).astype(np.float32), 1.2)
 eye[:] = sclera_col * (1 - 0.06 * np.clip((rr - 0.2) / 0.3, 0, 1))[:, :, None]           # a little darker towards the back
 eye *= (1 - 0.3 * np.clip((v - 0.06) / 0.16, 0, 1))[:, :, None]                            # the upper lid's shadow (v > 0.5 is up)
 eye[:, :, 0] += 0.06 * np.clip((rr - 0.17) / 0.12, 0, 1) * (veins > 0.62)                 # faint red veins
 fib = 0.5 + 0.5 * np.sin(ang * 70 + 3 * np.sin(ang * 11)) * np.clip((rr - PUPIL) / (IRIS - PUPIL), 0, 1)
-iris_in = np.array([0.36, 0.20, 0.10]); iris_out = np.array([0.17, 0.09, 0.05])
+iris_in = np.array([0.30, 0.16, 0.08]); iris_out = np.array([0.11, 0.06, 0.035])                 # dark brown, as painted
 t = np.clip((rr - PUPIL) / (IRIS - PUPIL), 0, 1)[:, :, None]
 iris = iris_in * (1 - t) + iris_out * t; iris = iris * (0.75 + 0.5 * fib[:, :, None]) + 0.03 * blur(rng.random((E, E)).astype(np.float32), 0.8)[:, :, None]
 iris *= (1 - 0.6 * np.clip((rr - LIMBUS) / (IRIS - LIMBUS), 0, 1))[:, :, None]            # limbal ring
 in_iris = rr < IRIS; soft = np.clip((IRIS - rr) / 0.006, 0, 1)[:, :, None]
 eye = eye * (1 - soft) + iris * soft
 pupil = np.clip((PUPIL - rr) / 0.005, 0, 1)[:, :, None]; eye = eye * (1 - pupil) + np.array([0.02, 0.015, 0.012]) * pupil
+# a painted catch-light (the window's reflection), upper-left of the pupil, as the old painted eyes had: the real
+# specular from the cornea comes on top of it in the room
+cl = np.exp(-((u + 0.045) ** 2 + (v - 0.05) ** 2) / (2 * 0.016 ** 2))[:, :, None]; eye = eye * (1 - cl) + np.array([0.95, 0.95, 0.97]) * cl
+cl2 = np.exp(-((u - 0.03) ** 2 + (v + 0.04) ** 2) / (2 * 0.008 ** 2))[:, :, None] * 0.5; eye = eye * (1 - cl2) + np.array([0.9, 0.9, 0.95]) * cl2
 save("tex_eye.png", eye)
 L = 128; yy, xx = np.mgrid[0:L, 0:L]; rl = np.hypot((xx + 0.5) / L - 0.5, (yy + 0.5) / L - 0.5)
 lid = np.ones((L, L, 3), np.float32) * lid_col; edge = np.clip((rl - 0.34) / 0.11, 0, 1)[:, :, None]
@@ -251,12 +271,12 @@ spec = {
     "lid": {"openAngle": 1.45, "capAngle": 1.3, "closedAngle": 0.55},
     "sizes": {"skin_n": 1024, "skin_orm": 1024, "hair_n": 512, "hair_orm": 512, "cloth_n": 1024, "cloth_orm": 1024},
     "materials": {
-        "skin":   {"base": "skin", "baseQ": 90, "normal": "skin_n", "normalScale": 0.5, "orm": "skin_orm", "alphaMask": True, "sheen": [0.55, 0.4, 0.35], "sheenRoughness": 0.8},
-        "hair":   {"base": "hair", "baseQ": 82, "normal": "hair_n", "normalScale": 0.7, "orm": "hair_orm", "doubleSided": True},
-        "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8},
-        "pants":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.7, "orm": "cloth_orm"},
-        "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.5, 0.5, 0.5], "sheenRoughness": 0.9},
-        "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "alphaMask": True},   # MASK: the proxy's texels are alpha 0
+        "skin":   {"base": "skin", "baseQ": 90, "normal": "skin_n", "normalScale": 0.5, "orm": "skin_orm", "alphaMask": True, "sheen": [0.35, 0.25, 0.22], "sheenRoughness": 0.8, "doubleSided": True},
+        "hair":   {"base": "hair", "baseQ": 82, "normal": "hair_n", "normalScale": 0.3, "orm": "hair_orm", "doubleSided": True},
+        "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8, "doubleSided": True},   # the hood's inside shows at the open collar
+        "pants":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.7, "orm": "cloth_orm", "doubleSided": True},
+        "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.5, 0.5, 0.5], "sheenRoughness": 0.9, "doubleSided": True},
+        "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "alphaMask": True, "doubleSided": True},   # MASK: the proxy's texels are alpha 0
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},

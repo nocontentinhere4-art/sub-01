@@ -85,7 +85,7 @@ col = np.zeros((len(m.vertices), 3)); cnt = np.zeros(len(m.vertices))
 for p in m.polygons:
     for li in p.loop_indices:
         u, v = uv_old.data[li].uv; x = min(W - 1, max(0, int(u * W))); y = min(H - 1, max(0, int(v * H)))
-        vi = m.loops[li].vertex_index; col[vi] += old[y, x]; cnt[vi] += 1
+        vi = m.loops[li].vertex_index; col[vi] += tex[y, x]; cnt[vi] += 1          # the padded atlas: a texel on a seam is never black
 col /= np.maximum(cnt, 1)[:, None]
 co = np.array([v.co[:] for v in m.vertices])
 gname = [g.name for g in me.vertex_groups]
@@ -217,36 +217,45 @@ bpy.ops.object.select_all(action="DESELECT"); me.select_set(True); bpy.context.v
 def face_bone_w(p, w): return all(w[v] > 0.3 for v in p.vertices)
 hand_w_v = W_("LeftHand", "RightHand", "LeftForeArm", "RightForeArm")
 masks = {
-    "head skin": np.array([flab[p.index] == "skin" and all(head_w[v] > 0.3 or neck_w[v] > 0.3 for v in p.vertices) for p in m.polygons]),
-    "hands": np.array([flab[p.index] == "skin" and face_bone_w(p, hand_w_v) for p in m.polygons]),
+    "skin": np.array([flab[p.index] == "skin" for p in m.polygons]),            # head, neck, throat and collarbones, hands
     "socks": np.array([flab[p.index] == "socks" for p in m.polygons]),
     "slides": np.array([flab[p.index] == "slides" for p in m.polygons]),
 }
-# hair: the sculpted shards get their tips rounded a little (a jagged silhouette reads as "shards"); mild, so the scalp stays covered
-select_faces(lambda p: flab[p.index] == "hair"); bpy.ops.mesh.vertices_smooth(factor=0.3, repeat=2); bpy.ops.object.mode_set(mode="OBJECT")
 region = np.zeros(len(m.polygons), bool)
 for k, v in masks.items(): log(k, "faces", int(v.sum())); region |= v
 bm = bmesh.new(); bm.from_mesh(m); bm.faces.ensure_lookup_table(); bm.edges.ensure_lookup_table()
 crease = bm.edges.layers.float.get("crease_edge") or bm.edges.layers.float.new("crease_edge")
 selset = set(int(i) for i in np.nonzero(region)[0])
-# boundary edges of the selection are creased so that the unsubdivided neighbours still meet the new vertices exactly
+# boundary edges of the selection are creased, and remembered: after the subdivision the part's border vertices are
+# snapped back onto these original edges (Catmull-Clark moves them even when creased, which left hairline cracks
+# against the unsubdivided neighbours: the dark line at the collar). The new edge midpoints then lie exactly on the
+# neighbours' straight edges, so there is no gap.
+border_segs = []
 for e in bm.edges:
     fs = [f.index in selset for f in e.link_faces]
-    if any(fs) and not all(fs): e[crease] = 1.0
-    if any(fs) and len(e.link_faces) == 1: e[crease] = 1.0
+    if any(fs) and (not all(fs) or len(e.link_faces) == 1):
+        e[crease] = 1.0; border_segs.append((e.verts[0].co.copy(), e.verts[1].co.copy()))
 bm.to_mesh(m); bm.free()
-# split the regions into their own object, subdivide (vertex groups and UVs interpolate), join back, weld the seam
+A = np.array([[*a_] for a_, b_ in border_segs]); B_ = np.array([[*b_] for a_, b_ in border_segs]); AB = B_ - A; L2 = np.maximum((AB * AB).sum(1), 1e-12)
+log("border segments:", len(border_segs))
+# split the regions into their own object, subdivide (vertex groups and UVs interpolate), snap the border, join back
 select_faces(lambda p: bool(region[p.index])); bpy.ops.mesh.separate(type="SELECTED"); bpy.ops.object.mode_set(mode="OBJECT")
 part = [o for o in bpy.data.objects if o.type == "MESH" and o is not me and o.name != "proxy"][0]; part.name = "smooth_regions"
 bpy.ops.object.select_all(action="DESELECT"); part.select_set(True); bpy.context.view_layer.objects.active = part
 mod = part.modifiers.new("subd", "SUBSURF"); mod.levels = 1; mod.use_creases = True; mod.boundary_smooth = "PRESERVE_CORNERS"; mod.uv_smooth = "PRESERVE_BOUNDARIES"
 bpy.ops.object.modifier_apply(modifier="subd")
-log("regions subdivided:", len(part.data.polygons), "faces")
+pm = part.data; bmp = bmesh.new(); bmp.from_mesh(pm); bmp.verts.ensure_lookup_table()
+border_v = [v.index for v in bmp.verts if any(len(e.link_faces) == 1 for e in v.link_edges)]
+bmp.free()
+P = np.array([pm.vertices[i].co[:] for i in border_v]); snapped = 0
+for k, i in enumerate(border_v):
+    p_ = P[k]; t = np.clip(((p_ - A) * AB).sum(1) / L2, 0, 1); Q = A + AB * t[:, None]; d2 = ((Q - p_) ** 2).sum(1); j = int(np.argmin(d2))
+    if d2[j] < 1.0: pm.vertices[i].co = Q[j]; snapped += 1                      # within 1 cm: it is this border
+log("regions subdivided:", len(pm.polygons), "faces; border vertices snapped", snapped, "of", len(border_v))
 bpy.ops.object.select_all(action="DESELECT"); part.select_set(True); me.select_set(True); bpy.context.view_layer.objects.active = me
 bpy.ops.object.join()
 bm = bmesh.new(); bm.from_mesh(m); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.01); bm.to_mesh(m); bm.free()
-# T-junctions along the creased boundary: the hood / hair faces next to a subdivided edge get the new midpoint vertex
-bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.mesh.remove_doubles(threshold=0.01); bpy.ops.object.mode_set(mode="OBJECT")
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.mesh.remove_doubles(threshold=0.01); bpy.ops.mesh.normals_make_consistent(inside=False); bpy.ops.object.mode_set(mode="OBJECT")
 for p in m.polygons: p.use_smooth = True
 m.update()
 log("after join:", len(m.vertices), "verts", len(m.polygons), "faces", "tris ~", sum(len(p.vertices) - 2 for p in m.polygons))
@@ -507,6 +516,16 @@ if os.environ.get("BOY_AO", "1") != "0":
     ao_imgs = new_imgs("ao_", {"skin": 1024, "hair": 512, "cloth": 1024}); bake_to(ao_imgs, "AO", margin=8); save_imgs(ao_imgs, "ao_"); log("ao baked")
     scene.cycles.samples = 1
 
+# the hair keeps crisp shard edges (smooth normals over the jagged shards read as blobs): edges between hair faces
+# that meet at more than 40 degrees are marked sharp; the skin and the clothes stay fully smooth
+hair_slot = REGIONS.index("hair"); hair_faces = set(p.index for p in m.polygons if p.material_index == hair_slot)
+bm = bmesh.new(); bm.from_mesh(m); bm.faces.ensure_lookup_table(); bm.edges.ensure_lookup_table(); n_sharp = 0
+for e in bm.edges:
+    if len(e.link_faces) == 2 and all(f.index in hair_faces for f in e.link_faces) and e.calc_face_angle(0) > np.radians(40):
+        e.smooth = False; n_sharp += 1
+bm.to_mesh(m); bm.free(); m.update()
+log("hair sharp edges:", n_sharp)
+
 # ---------------------------------------------------------------- export the mesh (with the armature, for the joints)
 m.uv_layers.remove(m.uv_layers["uv_old"]); m.uv_layers.remove(m.uv_layers["hand_uv"])
 for i, name in enumerate(REGIONS):
@@ -515,6 +534,7 @@ for i, name in enumerate(REGIONS):
     t = nt.nodes.new("ShaderNodeTexImage"); t.image = bake_imgs[ATLAS[name][0]]
     nt.links.new(t.outputs[0], bsdf.inputs["Base Color"]); nt.links.new(bsdf.outputs[0], out.inputs[0])
 proxy.hide_render = False; proxy.hide_viewport = False
+m.validate(verbose=False); m.update()                                    # (the sharp-edge pass leaves the mesh flagged; validate before the exporter)
 bpy.ops.object.select_all(action="DESELECT"); arm.select_set(True); me.select_set(True); proxy.select_set(True)
 bpy.ops.export_scene.gltf(filepath=os.path.join(WORK, "boy_mesh.glb"), use_selection=True, export_format="GLB", export_animations=False,
                           export_skins=True, export_yup=True, export_image_format="NONE", export_materials="EXPORT", export_normals=True)
