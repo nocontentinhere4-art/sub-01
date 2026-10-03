@@ -372,10 +372,11 @@ def desk(g):
         M = Matrix.Translation(B(*MON_C)) @ Matrix.Rotation(MON_RY, 4, 'Z') @ Matrix.Rotation(MON_RX, 4, 'X')
         o.data.transform(M); o.data.update(); project_uv_keep(o); return o
     bz = 0.007                                                                                            # the bezel
-    mon_part(hbox("mon_body", "plastic_black", (-SW / 2 - bz, SW / 2 + bz), (-SH / 2 - 0.018, SH / 2 + bz), (-0.018, 0.0), bevel=0.003, seg=2, wear=0.4))
+    mon_part(hbox("mon_body", "plastic_black", (-SW / 2 - bz, SW / 2 + bz), (-SH / 2 - 0.001, SH / 2 + bz), (-0.018, 0.0), bevel=0.003, seg=2, wear=0.4))
     mon_part(box("mon_screen", "screen", (-SW / 2, SW / 2), (-SH / 2, SH / 2), (0.0, 0.0008)))
-    # the chin stands 3.5 mm proud of the glass: the page's screen plane (SURF_monitor + 1 mm) rests on it for the QA harness's prop check
-    mon_part(hbox("mon_chin", "plastic_grey", (-SW / 2 - bz, SW / 2 + bz), (-SH / 2 - 0.018, -SH / 2 - 0.001), (0.0, 0.0035), bevel=0.001, seg=1))
+    # the chin: a grey band under the glass over the body's full depth, 3.5 mm proud of the glass. Its top is 1 mm under the
+    # glass's bottom edge, so the page's screen plane (SURF_monitor + 1 mm, tilted) rests on it for the QA harness's prop check
+    mon_part(hbox("mon_chin", "plastic_grey", (-SW / 2 - bz, SW / 2 + bz), (-SH / 2 - 0.018, -SH / 2 - 0.001), (-0.018, 0.0035), bevel=0.001, seg=1))
     mon_part(box("mon_led", "led_white", (SW / 2 - 0.028, SW / 2 - 0.022), (-SH / 2 - 0.012, -SH / 2 - 0.009), (0.0012, 0.0022)))
     mon_part(hbox("mon_back", "plastic_black", (-0.17, 0.17), (-0.13, 0.11), (-0.052, -0.018), bevel=0.014, seg=3, wear=0.3))
     mon_part(hbox("mon_ports", "rubber", (-0.08, 0.06), (-0.11, -0.085), (-0.055, -0.045), bevel=0.002, seg=1))
