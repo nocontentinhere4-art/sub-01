@@ -91,6 +91,43 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   `GET /api/costs` and `/api/health` are admin-only (the password cookie, or the `SUB01_ADMIN_TOKEN` header). Tick
   times sit in a 1200-entry ring buffer (`Live.tick_s`).
 
+## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
+- Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia
+  loop, 27 Chromium restarts. Root causes:
+  - youtube.com/robots.txt disallows `/results` for every crawler: our robots check refused the YouTube and Shorts
+    sources all day (they could never work). The desk's "watching videos" mode even opened /results without the check.
+  - DuckDuckGo answers datacenter IPs with its bot check ("anomaly", HTTP 202): no `site:tiktok.com` result, so no
+    TikTok card ("no videos reachable"). TikTok's tag and discover pages carry no server-rendered video.
+  - Bursts ~0 on shorts: every short without a profile topic shared the topic "youtube.com" (novelty 0.3 after the
+    first), and the expectation never relaxed between sessions.
+  - HN loop: the same query (e.g. "news wikipedia") searched again and again; most other sources blocked.
+  - "no search box": Science News and RecipeTin's boxes were not found.
+- Fixes:
+  - `youtube_api.py`: the official Data API v3 (`search.list`, `videoDuration=short` + "#shorts" for the phone,
+    `safeSearch=strict`, `videoEmbeddable=true`), only with **`YOUTUBE_API_KEY`** (Railway variable), sent in the
+    `X-Goog-Api-Key` header, never in a URL, a log line, the state or a public view. Free quota: 100 units a search,
+    stops at 9,000 of the 10,000 a Pacific day (`YOUTUBE_DAILY_UNITS` can lower it), each query cached 6 h. Videos
+    play in the official embed player (`youtube-nocookie.com/embed/<id>`, allowed by its robots.txt), opened with our
+    site as referrer (`SUB01_SITE_URL`, default the Railway URL), muted, for at most `SHORTS_MAX_S`. Without the key
+    nothing is asked and the screens panel says "YouTube API key not set". The desk's video mode uses it too.
+  - TikTok: logged in, the account's tag page as before, and when it shows no video `Browser._diag` records why
+    (bot wall / captcha / login prompt / no video links) → `/api/screens` `feeds.tiktok`, plus a screenshot with the
+    header, avatars and names hidden and the top band blacked out at **`/api/diag/tiktok.jpg` (admin only)**.
+    Public videos found by search play in TikTok's official player (`tiktok.com/player/v1/<id>`; robots.txt
+    disallows `/embed/v2` and `/embed/@`, not `/player`), captions from oEmbed through `video_text_ok`; a refused
+    player falls back to the card. DuckDuckGo's bot check is recognised and the engine set aside.
+  - A short's burst topic is its own title when it has no profile topic; the expectation relaxes to 0.6 over 5 min
+    while nothing new plays (`screens.EXPECT0`, `RELAX_S`): a new scroll session surprises again.
+  - The same query is not searched twice a day (a viewer's request excepted); `news` / `recipes` use their own
+    `/?s=` results pages; a robots.txt refusal sets a source aside for the day; the tail of `route()` is only the
+    any-query sources (`TAIL`: hn, news); `Limits` state v2 drops the pre-fix blocks.
+  - Chromium: each restart records why (`/api/health` → `chromium.restart_log`: exit code / signal ("out of
+    memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory.
+  - Viewers: YouTube shorts also get the official embed in the screens panel and on /life's phone.
+- `analysis/novelty_replay.py --youtube-key` (stubbed network as Railway answered on 2026-10-03; not a browser):
+  shorts 34/h on the phone, mean burst 0.18 vs news 0.09 / pages ~0.03, 6,000 API units in 3 h (the 9,000 cap is
+  ~90 searches ≈ 150 shorts a day); without the key: no shorts (TikTok needs a search engine that answers).
+
 ## Reading memory (PR `feature/reading-memory`)
 - What he reads is a stimulus: up to 8 keywords (title + extract) through chat.py's rules at 0.5x a chat message,
   + language/attention 1.5, times the sleep gain. Stored in `sleep.Memory` with `source="reading"`; REM replay

@@ -851,7 +851,9 @@ function renderScreens(d){
   const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
   const bl = (d.sources || {}).blocked || [];
-  $("sc-src").textContent = bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "";
+  const yt = d.youtube, fd = Object.entries(d.feeds || {}).map(([k, v]) => `${k} logged in, no video: ${v.reason}${v.captcha ? " (captcha)" : ""}`);
+  $("sc-src").textContent = [bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "",
+    yt ? (yt.key_set ? `YouTube API: ${yt.units_used}/${yt.units_cap} units today` : "YouTube API key not set") : "", ...fd].filter(Boolean).join(" · ");
   const mu = d.music || {}, now = mu.now;
   $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
   screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");

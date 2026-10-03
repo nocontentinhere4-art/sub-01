@@ -26,8 +26,8 @@ FOLLOW_WINDOW = 20
 SEEN_ORIGINS = ("video", "walk", "eye", "screen", "follow_up")
 
 ID_QUERY = ("v", "id", "p", "q", "search", "search_query", "query", "s", "list")
-YT_ID = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/)|youtu\.be/)([\w-]{6,20})", re.I)
-TT_ID = re.compile(r"tiktok\.com/@[\w.]+/video/(\d{8,25})", re.I)
+YT_ID = re.compile(r"(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/)|youtu\.be/)([\w-]{6,20})", re.I)
+TT_ID = re.compile(r"tiktok\.com/(?:@[\w.]+/video/|player/v1/)(\d{8,25})", re.I)
 SUFFIX = re.compile(r"\s*[-—–|·:]\s*(wikipedia|wikimedia commons|youtube|tiktok|reddit|hacker news|the free encyclopedia|"
                     r"bbc news|npr|abc news|the guardian|ap news|bandcamp|metafilter|science news|recipetin eats)\s*$",
                     re.I)
