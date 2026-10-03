@@ -1,0 +1,7 @@
+{
+  "_note": "hard limits of the visual QA suite (tests/visual/harness.py), counted in sampled skinned vertices (every 2nd); null = report only. Promote desk_vertices and below_floor_vertices to 0 once G3's fixes for defects 7 and 8 (docs/qa/defects.md) land.",
+  "bed_vertices": 0,
+  "chair_vertices": 0,
+  "desk_vertices": null,
+  "below_floor_vertices": null
+}
