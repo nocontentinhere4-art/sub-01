@@ -38,7 +38,10 @@ const SRC_CHILD = {Hips: "Spine", Spine: "Spine1", Spine1: "Spine2", Spine3: "Ne
   RightUpLeg: "RightLeg", RightLeg: "RightFoot", RightFoot: "RightToeBase", RightToeBase: null};
 // per clip: loop (cyclic, seam blended), inplace (root xz removed, timed to STRIDE_V), deyaw (root yaw removed), minLoop/maxLoop (s)
 const OPTS = {
-  type: {loop: true, minLoop: 3, maxLoop: 7.5}, stretch: {loop: true, minLoop: 4, maxLoop: 6.8}, eat: {loop: true, minLoop: 3, maxLoop: 7.5},
+  // lean: a constant forward bend of the torso (rad) for the seated clips: ARDY sits reclined as in a lounge chair, and the
+  // room's desk chair has its backrest 32 cm behind the hip anchor, so a reclined back sinks into it (the visual QA's chair
+  // budget is 0 vertices)
+  type: {loop: true, minLoop: 3, maxLoop: 7.5, lean: 0.36}, stretch: {loop: true, minLoop: 4, maxLoop: 6.8, lean: 0.36}, eat: {loop: true, minLoop: 3, maxLoop: 7.5, lean: 0.36},
   idle: {loop: true, minLoop: 3, maxLoop: 7.5}, walk: {loop: true, inplace: true, minLoop: 0.8, maxLoop: 1.7},
   turn: {deyaw: true, inplace: true}, window: {loop: true, minLoop: 3, maxLoop: 7.5}, door: {},
   lie_back: {loop: true, minLoop: 3, maxLoop: 7.5}, lie_side: {loop: true, minLoop: 3, maxLoop: 7.5}, turn_over: {}, sleep: {loop: true, minLoop: 3, maxLoop: 7.5},
@@ -133,11 +136,14 @@ async function convert(name){
     console.log(`${name}: root speed ${v.toFixed(2)} m/s -> time x${timeScale.toFixed(2)}`);
   }
   // target local rotations per frame
+  const TORSO = new Set(order.filter(b => { let n = bone(b); while (n) { if (n.getName() === "Spine02") return true; n = parentOf.get(n); } return false; }));
   const out = frames.map(f => {
     const W = {}, L = {};
+    const leanQ = O.lean ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0).applyQuaternion(yaw(headingOf(f.P))), O.lean) : null;
     for (const b of order) {
       const [src] = MAP[b], n = bone(b), p = parentOf.get(n);
       W[b] = f.G[JI[src]].clone().multiply(ALIGN[b].clone().invert()).multiply(restW.get(n));
+      if (leanQ && TORSO.has(b)) W[b].premultiply(leanQ);      // the torso and everything on it bent forward about his hips
       const pw = p && W[p.getName()] ? W[p.getName()] : (p ? restW.get(p) : new THREE.Quaternion());
       L[b] = pw.clone().invert().multiply(W[b]);
     }

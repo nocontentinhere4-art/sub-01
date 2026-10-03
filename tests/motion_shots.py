@@ -35,7 +35,9 @@ PROBE = """() => {
     if (v.x > -1.9 && v.x < -0.32 && v.z > -1.44 && v.z < -0.74) armLow = Math.min(armLow, v.y - 0.97); }   // over the desk: height above its top
   const legs = {}; for (const n of ["Hips", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightFoot", "RightToeBase"]) if (bones[n]) { bones[n].getWorldPosition(v); legs[n] = +v.y.toFixed(3); }
   const rest = window.motion && window.motion.rest ? {ankle: window.motion.rest.ankle, toe: window.motion.rest.toe, p: Object.fromEntries(Object.entries(window.motion.rest.p || {}).map(([k, v]) => [k, v.toArray().map(x => +x.toFixed(3))]))} : null;
-  return {lowest_sole: +(low - 0.16).toFixed(3), arm_over_desk: armLow === 9 ? null : +armLow.toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
+  const tv = {}; for (const n of ['Hips','Spine02','Spine','neck','Head','LeftArm','RightArm','LeftUpLeg','LeftLeg']) if (bones[n]) { bones[n].getWorldPosition(v); tv[n] = v.toArray().map(x => +x.toFixed(2)); }
+  const torsoVec = tv; let pen = null; try { pen = window.penetration(2, true); } catch (e) { pen = String(e); }
+  return {torsoVec, ry: +b.rotation.y.toFixed(2), pen, lowest_sole: +(low - 0.16).toFixed(3), arm_over_desk: armLow === 9 ? null : +armLow.toFixed(3), nan, legs, rest, root: +b.position.y.toFixed(3), ctx: window.motion ? "on" : "off", clip: window.current && window.current.getClip().name,
     swapped: window.motion ? Object.keys(window.motion.swapped) : [], log: window.motion ? window.motion.log : []};
 }"""
 
@@ -76,6 +78,7 @@ def main():
     ap.add_argument("--frames", type=int, default=3, help="frames per situation, 1.2 s apart")
     ap.add_argument("--modes", default="old,new")
     ap.add_argument("--only", default="", help="comma-separated situations")
+    ap.add_argument("--prep", default="", help="JavaScript run in the page after each act() (debug)")
     args = ap.parse_args()
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -120,7 +123,7 @@ def main():
                         if args.only and key not in args.only.split(","):
                             continue
                         life = {"activity": activity, "place": "room", "vitals": {"resp_per_min": 14}, **extra}
-                        pg.evaluate("(l) => { act(l.activity, l); sim(1 / 30, 120); }", life)
+                        pg.evaluate("(l) => { act(l.activity, l); " + args.prep + " sim(1 / 30, 120); }", life)
                         if key == "phone_bed":
                             pg.evaluate("() => { sim(1 / 30, 1500); }")   # time to lie back
                         for k in range(args.frames):

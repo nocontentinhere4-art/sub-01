@@ -147,6 +147,16 @@ export function createMotion(env){
     shiftHips(side * shiftK, fwd * shiftK, 0.004 * Math.max(0, nz(t * 0.1, 4)) * shiftK);
   }
 
+  // ---------- on the desk chair the back never reclines (its backrest is 32 cm behind the hip anchor: a reclined back sinks
+  // into it): whatever the clip does, the torso is bent forward at the lower spine until it leans a touch forward of vertical
+  function sitUp(ctx, st){
+    if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk" || !B.Spine02) return;
+    torso();
+    const back = -TU.dot(FW);                           // > 0: the spine's top is behind the hips
+    if (back <= -0.1) return;                          // target: a touch forward of vertical (the lumbar curve clears the backrest)
+    const a = Math.asin(Math.min(1, back)) + 0.1;
+    bendWorld(B.Spine02, TL, a * 0.7); bendWorld(B.Spine01, TL, a * 0.3); torso();   // (+ about his left axis = forward)
+  }
   // ---------- feet: no foot below the floor; in the walk a foot that bears weight stays where it landed
   // the feet's rest pose: heights above the floor and world rotations, read off a clip file's rig (the same nodes as
   // boy.glb, unanimated; the skin's bind pose is hips-centred and of no use here). Until one has loaded: boy.glb's numbers
@@ -170,16 +180,25 @@ export function createMotion(env){
     const seated = (ctx === "seat" || ctx === "eat") && st.at === "desk" && !(st.step);
     if (!standing && !seated) { LOCK.Left = LOCK.Right = null; return; }
     env.boy.updateMatrixWorld(true);
-    if (seated) {                                      // on the desk chair: both feet flat on the floor, knees forward
+    if (seated) {                                      // on the desk chair: the knees level (a tilted thigh sinks into the
+      // cushion: the QA budget is 0 vertices in the chair), the shins hanging; the feet reach the floor as far as his
+      // legs allow and the toes point down to it where they do not (he is short for this chair)
       for (const side of ["Left", "Right"]) {
         const up = B[side + "UpLeg"], lo = B[side + "Leg"], ft = B[side + "Foot"]; if (!up || !ft) continue;
-        ft.getWorldPosition(_a); up.getWorldPosition(_b);
-        _t.copy(_b).addScaledVector(FW, 0.30).addScaledVector(RT, side === "Left" ? -0.02 : 0.02); _t.y = F + REST.ankle;   // under the knee, a step forward of the hip
-        _t.lerp(_a, 0.4); _t.y = F + REST.ankle;                                                                       // keeping some of the clip's own stance
-        _e.copy(_b).addScaledVector(FW, 0.7).addScaledVector(UP, -0.1);
+        up.getWorldPosition(_b); lo.getWorldPosition(_c); ft.getWorldPosition(_a);
+        const thigh = _b.distanceTo(_c), shin = _c.distanceTo(_a);
+        const kneeY = _b.y - 0.04, ankleY = Math.max(F + REST.ankle, kneeY - shin);           // the knee a touch below the hip
+        _t.copy(_b).addScaledVector(FW, Math.sqrt(Math.max(0.01, thigh * thigh - 0.04 * 0.04)) + 0.02).addScaledVector(RT, side === "Left" ? -0.02 : 0.02);
+        _t.lerp(_a, 0.25); _t.y = ankleY;
+        _e.copy(_b).addScaledVector(FW, 0.8).addScaledVector(UP, 0.1);
         ik(up, lo, ft, _t, _e, 1, false);
-        env.touch(ft); ft.getWorldQuaternion(_q);                                                                       // the sole flat: the rest pose's foot, turned with the root
-        if (REST.q[side + "Foot"]) { _q2.setFromAxisAngle(UP, env.boy.rotation.y).multiply(REST.q[side + "Foot"]); _q.slerp(_q2, 0.85); }
+        env.touch(ft); ft.getWorldQuaternion(_q);
+        if (REST.q[side + "Foot"]) {
+          const gap = ankleY - (F + REST.ankle), pitch = Math.min(0.9, Math.asin(Math.min(1, gap / 0.14)));   // toes down to the floor
+          _q2.setFromAxisAngle(UP, env.boy.rotation.y).multiply(REST.q[side + "Foot"]);
+          if (pitch > 0) _q2.premultiply(new THREE.Quaternion().setFromAxisAngle(RT, -pitch));
+          _q.slerp(_q2, 0.85);
+        }
         env.setWorldQuat(ft, _q);
       }
       LOCK.Left = LOCK.Right = null; return;
@@ -375,7 +394,7 @@ export function createMotion(env){
     torso();
     if (M.layers.breathe) breathe(dt, ctx);
     if (M.layers.shift && !(st.step && st.step.k !== "act")) weightShift(dt, ctx);
-    if (M.layers.feet) feet(dt, ctx, st);
+    if (M.layers.feet) { sitUp(ctx, st); feet(dt, ctx, st); }
     if (M.layers.hands) { hands(dt, ctx, st); bowl(dt, ctx, st); deskGuard(ctx, st); }
     if (M.layers.eyes) eyes(dt, ctx, st);
     if (M.layers.smooth) smoothBones(dt);
