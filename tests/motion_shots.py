@@ -80,12 +80,12 @@ FRAME = """() => { const b = window.boy; if (!b) return; const t = new THREE.Vec
   // eight directions at four distances: the longest clear line of sight wins (the clear part of the way to him), his
   // front half preferred; near a wall (the door, the window) that means a closer camera rather than one behind furniture
   let best = null; const tried = [];
-  for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8]) for (const s of [2.7, 2.1, 1.6, 1.2]) {
+  for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8, 2.5, -2.5, 3.1]) for (const s of [2.7, 2.1, 1.6, 1.2]) for (const h of [0.6, 0.1]) {   // the last three: from behind (facing a wall)
     const d = new THREE.Vector3(Math.sin(r + a), 0, Math.cos(r + a));
-    const c = box(t.clone().addScaledVector(d, s).add(new THREE.Vector3(0, 0.6 * s / 2.7, 0)));
+    const c = box(t.clone().addScaledVector(d, s).add(new THREE.Vector3(0, h * s / 2.7, 0)));
     const far = c.distanceTo(t), open = Math.min(clear(c, t), clear(c, t.clone().add(new THREE.Vector3(0, -0.6, 0))));   // head and hips (a knee ray trips on low props: the plant at the sill)
     const dist = far * open - (Math.abs(a) > 1.5 ? 0.4 : 0) - (inTall(c) ? 5 : 0);
-    tried.push({a, s, far: +far.toFixed(2), open: +open.toFixed(2), score: +dist.toFixed(2)});
+    tried.push({a, s, h, far: +far.toFixed(2), open: +open.toFixed(2), score: +dist.toFixed(2)});
     if (!best || dist > best.dist) best = {c, dist, a}; }
   camera.fov = 46; camera.updateProjectionMatrix(); camera.position.copy(best.c); controls.target.copy(t); controls.update(); renderer.render(scene, camera);
   return {a: best.a, ry: +r.toFixed(2), at: t.toArray().map(v => +v.toFixed(2)), tried}; }"""
