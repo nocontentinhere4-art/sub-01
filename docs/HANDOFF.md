@@ -54,7 +54,15 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   swing, his walking graph; `KEEP`/`DOOR_SWING`/`WALK_*`, mirror room.html when its paths change); `tests/test_room_glb.py` checks the GLB's size (≤ 7 MB), its nodes and the lamp marker. Lived-in props are
   modelled in the build (no new downloads), all off the walking graph; the headphones on the wall hook are their own
   node `headphones` (no AO): the page hides them while he wears #82's pair. The hook rail, tote and hoodie are the node
-  `hangers` (origin at the door hinge): `setDoor()` turns it with the opening leaf. `web/room_phone.js`: the phone screen drawn on a canvas
+  `hangers` (origin at the door hinge): `setDoor()` turns it with the opening leaf.
+  #98 G5 (game-quality hard surfaces): `room_build/props_hard.py` builds the furniture, desk things, window, door, fridge,
+  air conditioner, fan, headphones and controller (build_room.py calls it block by block and reads its constants back),
+  `room_build/tex_hard.py` (run by tex_prep.py) draws the plank floor (Poly Haven `wooden_floor_01`), the roughness
+  micro-variation maps and three atlases laid out in `room_build/hard_layout.py`: keycap legends, book spines, decals.
+  Edge wear = tinted vertex colours on the bevels (post.mjs drops all-white COLOR_0); decals are one alpha-blended node
+  `decals`, left out of the AO bake. Materials flagged `nouv` keep their own UVs through the final projection pass
+  (that pass used to overwrite the posters' and pinboard's UVs). Screenshots: `python room_build/shots.py --out <dir>`
+  (fixed cameras, `--glb` to shoot another file, `--cdn-dir` for a local three.js when the sandbox has no CDN). `web/room_phone.js`: the phone screen drawn on a canvas
   (status bar with his Tokyo time, rounded corners, off state, face glow); room.html routes the phone's `set`/`off` through it.
 - Phone grip: while he uses the phone his `RightHand` bone is collapsed into the sleeve and `web/room/hand_phone.glb`
   (a hand gripping a phone, Higgsfield GPT Image + Tripo H3.1, 129 KB) is attached at the wrist; the live screen sits on its glass.

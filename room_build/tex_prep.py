@@ -211,3 +211,6 @@ g.ellipse((22 * S, 18 * S, 42 * S, 34 * S), outline="#2e4a2b", width=3 * S); g.e
 cx_, cy_ = stick(n6, 410 * S, 400 * S, -4); pin(cork, cx_, cy_, "#f0b429")
 cork = cork.resize((512, 512), Image.LANCZOS)
 save(cork, "pinboard.png")
+
+# ---------- the hard surfaces (#98 G5): the plank floor, plaster, roughness micro-variation, the keycap / spine / decal atlases ----------
+import tex_hard; tex_hard.build()
