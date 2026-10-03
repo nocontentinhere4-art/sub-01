@@ -1337,7 +1337,8 @@ function snap(name, clip){                           // just be there (the first
 function replan(){                                    // the steps from where he is now to the goal
   if (step && (step.turn0 != null || step.stepping)) halfSteps(false);
   const g = goal, P = []; let cur = at; step = null;
-  const stay = () => ANCHOR[g.anchor].seat ? {k:"pose", to:g.anchor, clip:g.clip, d:0.8} : {k:"clip", clip:g.clip};   // a seat's root depends on the clip
+  // a seat's root depends on the clip, and so does the bed's once a new lying clip (#76, own root) meets the first ones
+  const stay = () => ANCHOR[g.anchor].seat || (g.anchor === "bedlie" && movesOn) ? {k:"pose", to:g.anchor, clip:g.clip, d:0.8} : {k:"clip", clip:g.clip};
   const roll = g.anchor === "desk" && cur === "desk" && CHAIR.node && CHAIR.dx !== (g.clip === "dine" ? DINE_DX : 0)
     ? [{k:"chair", to:CHAIR.seat, d:0.7, ride:true, dx:g.clip === "dine" ? DINE_DX : 0}] : [];   // to the dish, or back to the keyboard
   const fetch = g.clip === "deliver" && bag !== "desk";                     // the delivery: the door first
