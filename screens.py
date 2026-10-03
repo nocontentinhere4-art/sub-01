@@ -11,7 +11,8 @@ DopamineBursts: when a new short starts, a phasic dopamine-like burst whose size
     rpe = novelty + predicted interest - expectation,
 - novelty: 1 for a topic not seen in the last NOVEL_S, else 0.3;
 - predicted interest: his tastes' prediction for the title's words (tastes.py, -1..1) mapped to 0..1;
-- expectation: a running mean of (novelty + interest) over recent clips (a Rescorla-Wagner value);
+- expectation: a running mean of (novelty + interest) over recent clips (a Rescorla-Wagner value), relaxing back to
+  EXPECT0 over RELAX_S while nothing new plays (a new scroll session surprises again);
 habituating over a scroll session (clips less than SESSION_GAP_S apart): x 1 / (1 + HABITUATION x (n - 1)), the
 "doomscrolling" curve. Other videos give half the burst, pages a quarter; nothing new playing gives nothing. It is a
 simulated dopamine-like reward signal in the model (it drives the reward regions and the DA level), not a feeling.
@@ -29,10 +30,13 @@ NOVEL_S = 30 * 60
 SESSION_GAP_S = 5 * 60
 HABITUATION = 0.12
 ALPHA = 0.15
+EXPECT0 = 0.6                       # the expectation at rest; it relaxes back to this between clips (RELAX_S)
+RELAX_S = 300.0
 SCALE = {"tiktok": 1.0, "shorts": 1.0, "youtube": 0.5, "video": 0.5}
 PAGE_SCALE = 0.25
 TIKTOK_ID = re.compile(r"^https://www\.tiktok\.com/@[\w.]{2,30}/video/(\d{8,25})(?:[?#]|$)")
 TIKTOK_EMBED = "https://www.tiktok.com/player/v1/{}?autoplay=0&muted=1&rel=0"
+YT_ID = re.compile(r"^https://www\.youtube\.com/(?:shorts/|watch\?v=)([\w-]{11})(?:[?&#]|$)")
 DA_LABEL = "simulated dopamine-like reward signal in the model"
 
 
@@ -130,6 +134,8 @@ class ScreensStatus:
         item = {"t": self.clock(), "kind": kind, "host": host, "device": dev, "title": str(st.get("title") or host)[:90]}
         if kind == "tiktok" and (m := TIKTOK_ID.search(str(st.get("url")))):
             item["tiktok_id"] = m.group(1)   # viewers may play it in TikTok's official embed player (#89)
+        elif kind in ("shorts", "youtube") and (m := YT_ID.search(str(st.get("url")))):
+            item["youtube_id"] = m.group(1)  # ... or YouTube's (youtube-nocookie), muted, no autoplay
         self.last = (self.last + [item])[-LAST_N:]
         return kind
 
@@ -150,9 +156,12 @@ class ScreensStatus:
 
 def _row_impl(x, ok):
     r = dict(x, t=hhmm(x["t"]), title=x["title"] if ok(x["title"]) else x["host"])
-    vid = r.pop("tiktok_id", None)
+    vid, yid = r.pop("tiktok_id", None), r.pop("youtube_id", None)
     if vid and ok(x["title"]):                 # a caption that fails the filter: no player either
         r["embed"] = {"src": TIKTOK_EMBED.format(vid), "label": "TikTok (official embed)"}
+    elif yid and ok(x["title"]):
+        import youtube_api
+        r["embed"] = {"src": youtube_api.viewer_embed(yid), "label": "YouTube (official embed)"}
     return r
 
 
@@ -161,8 +170,8 @@ class DopamineBursts:
 
     def __init__(self, clock=time.time):
         self.clock = clock
-        self.expect = 0.6
-        self.n, self.last_t = 0, None
+        self.expect = EXPECT0
+        self.n, self.last_t, self.last_any = 0, None, None
         self.topics = {}                     # topic -> last time seen
         self.trace = []                      # [{t, size, ...}] newest last
 
@@ -172,6 +181,9 @@ class DopamineBursts:
         if kind is None or kind == "search":
             return None
         t = self.clock()
+        if self.last_any is not None:                       # the expectation relaxes while nothing new plays
+            self.expect += (EXPECT0 - self.expect) * (1 - math.exp(-max(0.0, t - self.last_any) / RELAX_S))
+        self.last_any = t
         novelty = 0.3 if topic and t - self.topics.get(topic, -1e18) < NOVEL_S else 1.0
         if topic:
             self.topics[topic] = t

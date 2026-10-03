@@ -22,23 +22,27 @@ def life(activity, place, doing, **extra):
     return d
 
 
-# name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring)
+# name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring[, prep JS])
+# prep: JavaScript run in the page after the snap and before the settle (debug hooks only; reset by the next snap)
 SCENES = {
     "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "Chair_Sit"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
     "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "Chair_Sit"),
-    "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 1.0, "bedlie", "Sleep"),
+    # asleep the duvet comes up over him in ~2.2 s (room.html DUV.w): settle 4 s so the shot shows him covered
+    "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 4.0, "bedlie", "Sleep"),
+    # the side pose he turns into now and then (every 3-8 min): forced through the page's ROLL hook (debug)
+    "sleeping_side": (life("sleep", "bed", "sleeping"), "NREM", None, 7.0, "bedlie", "Sleep", "if (window.ROLL) ROLL.force = ROLL.ang;"),
     # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie)
     "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "phone_lie"),
     # standing just inside the door (an activity the page does not know, at the door place: it stands him there)
     "door":     (life("home", "door_in", "just in at the door"), "AWAKE", None, 1.0, "door", "stand"),
-    # walking: from the door to the desk; the harness stops mid-walk (see harness.walk_until). As the server sends it:
-    # `walking` true and no `path` (life.py's snapshot has no path field), so the page treats him as already at the desk
-    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True), "AWAKE", "door", None, None, "Walk"),
+    # walking: from the door to the desk; the harness stops mid-walk (see harness.walk_until). As the server sends it
+    # since #104: `walking` true with `path` and `path_to` (before that the page treated him as already at the desk)
+    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "Walk"),
     "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "stand"),
 }
 # the hour each scene is shot at in the core set, and the full matrix
-NATURAL_HOUR = {"desk": 14, "eating": 19, "sleeping": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
+NATURAL_HOUR = {"desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
 HOURS = (8, 14, 19, 23)
 SIZES = {"1280": (1280, 800, False), "390": (390, 844, True)}
 
@@ -53,14 +57,22 @@ CLOSEUPS = {
     "bed":   ("sleeping", 14, "bed"),       # him on the bed by day (the pose and the duvet's drape)
     "duvet": ("window", 14, "duvet"),       # the empty bed: duvet, pillow, sheet
     "night": ("sleeping", 23, "bed"),       # the same bed at night: what the dark room shows
+    "side":  ("sleeping_side", 14, "bed"),  # asleep on his side under the duvet (#108)
 }
-CORE_SHOTS = [(s, NATURAL_HOUR[s], "1280") for s in SCENES] + [("desk", 14, "390"), ("sleeping", 23, "390")]
-FULL_SHOTS = [(s, h, z) for s in SCENES for h in HOURS for z in SIZES]
+CORE_SCENES = [s for s in SCENES if s != "sleeping_side"]          # the side pose is covered by its close-up
+CORE_SHOTS = [(s, NATURAL_HOUR[s], "1280") for s in CORE_SCENES] + [("desk", 14, "390"), ("sleeping", 23, "390")]
+FULL_SHOTS = [(s, h, z) for s in CORE_SCENES for h in HOURS for z in SIZES] + [("sleeping_side", 23, "1280"), ("sleeping_side", 14, "390")]
 
 
 def clock(hour):
     h = int(hour) % 24
     return f"{h:02d}:{int(round((hour - int(hour)) * 60)) % 60:02d}"
+
+
+def scene(name):
+    """(life, stage, before, settle_s, at, clip, prep) with prep "" when absent."""
+    t = SCENES[name]
+    return tuple(t) + ("",) * (7 - len(t))
 
 
 def tick(name, hour):

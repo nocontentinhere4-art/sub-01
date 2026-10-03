@@ -126,6 +126,17 @@ def card_html(card):
             + f"{h.escape(card.get('how', 'its embed card (TikTok oEmbed)'))}; the video is not played</div></div>")
 
 
+NOTE_EMBEDS = "TikTok: public videos in TikTok's official embed player (the logged-in feed showed none to the server)"
+TIKTOK_PLAYER = "https://www.tiktok.com/player/v1/{id}?autoplay=1&muted=1&loop=1&rel=0&description=1"
+
+
+def tiktok_player(video_url):
+    """TikTok's official embed player for a public video (tiktok.com/player/v1/<id>; robots.txt disallows /embed/v2
+    and /embed/@ for crawlers, not /player)."""
+    m = TIKTOK_VIDEO.match(str(video_url).split("?")[0])
+    return TIKTOK_PLAYER.format(id=m.group(2)) if m else None
+
+
 NOTE_SHORTS_CARDS = "YouTube Shorts pages blocked from the server: shorts shown as cards (thumbnail, title; not played)"
 YT_SHORT = re.compile(r"^https://(?:www\.|m\.)?youtube\.com/shorts/([\w-]{6,20})(?:[?#]|$)")
 

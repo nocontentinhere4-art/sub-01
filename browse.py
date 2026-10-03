@@ -59,6 +59,7 @@ import urllib.parse
 
 import interests as I
 import novelty as NV
+import youtube_api as YT
 import search_sources as SS
 import short_videos as SV
 import sessions as SE
@@ -163,7 +164,9 @@ WALL_MAX_CHARS = 2000
 BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you are (a )?human|"
                        r"checking (if the site connection is secure|your browser)|"
                        r"complete the security check|please solve (this|the) (captcha|puzzle)|"
-                       r"bots use duckduckgo too|confirm this search was made by a human", re.I)
+                       r"bots use duckduckgo too|confirm this search was made by a human|"
+                       r"sign in to confirm (you|that you)['’ ]?re not a bot|error 153|video player configuration error|"
+                       r"playback on other websites has been disabled|drag the slider|verify to continue", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -415,6 +418,7 @@ UNBLOCK_JS = """() => {
   }
   for (const el of [document.documentElement, document.body]) if (el) { el.style.setProperty('overflow', 'auto', 'important'); }
 }"""
+EMBED_REFERER = os.environ.get("SUB01_SITE_URL") or "https://sub01-production.up.railway.app/"   # embeds want a page
 SEEDS = [                              # where he starts when nothing else pulls him (no search engine needed)
     # encyclopaedia, forums (read-only), Q&A
     "https://en.wikipedia.org/wiki/Special:Random", "https://news.ycombinator.com/", "https://news.ycombinator.com/ask",
@@ -618,11 +622,14 @@ class Browser:
         self.robots = SS.Robots()
         self.visited = NV.Visited(state=s.get("visited"))   # #89: no page, video or near-same title twice in 7 days
         self.seed_t = {}                                    # seed site -> last opened (rotation, SEED_GAP_S)
+        self.yt = YT.Quota(state=s.get("youtube"))          # YouTube Data API units today (only with the key)
+        self.diag = {}                                      # site -> why its logged-in feed showed no video
+        self.diag_shot = {}                                 # site -> masked screenshot of that page (admin only)
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
                 "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict()),
-                "visited": self.visited.to_dict()}
+                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict()}
 
     def fresh(self, url, title=None):
         """Not opened in the last 7 days (the URL / video id, or a near-duplicate title)."""
@@ -1032,11 +1039,9 @@ class Browser:
         sc.chain = 0
         if sc.mode == "shorts" and await self._shorts(sc, interest):
             return True
-        if sc.mode == "video":                                  # watching videos: a YouTube search (no typing)
-            q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)
-            if await self._open(sc, youtube_search_url(q), f"looked for videos about “{q}”", "page",
-                                title=f"{q} — YouTube", revisit=True):
-                sc.scrolls_left = 0
+        if sc.mode == "video":                                  # watching videos: YouTube's Data API + embed player
+            q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)   # (/results is robots-closed)
+            if await self._public_videos(sc, "youtube", q, f"looked for videos about “{q}”", "", short=False):
                 return True
         if sc.pending_link:
             url, why = sc.pending_link
@@ -1127,70 +1132,151 @@ class Browser:
         why = SS.ORIGINS.get(origin if origin in SS.ORIGINS else "interests")
         sc.cards = {}
         for name in names:
-            if name == "tiktok" and not self._session("https://www.tiktok.com/"):
-                # logged out, the server gets an empty TikTok feed (#89): public videos as embed cards instead
-                if self.limits.source_ok("tiktok") and await self._tiktok_cards(sc, q, f"short videos — {why}"):
-                    self.feed_note = SV.NOTE_CARDS
-                    return True
-                if self.limits.source_ok("tiktok"):
-                    self.limits.refuse("tiktok", "no videos reachable from the server")
-                self.feed_note = SV.NOTE_BLOCKED
-                continue
-            if self.limits.source_ok(name) and await self._search_on(sc, name, q, f"short videos — {why}", origin):
-                sc.queue = [r for r in sc.info.get("results", [])
-                            if r.get("video") and self.fresh(r["url"], r["title"])]
-                if sc.queue:
-                    if name == "tiktok":
+            if name == "tiktok" and self._session("https://www.tiktok.com/") and self.limits.source_ok("tiktok"):
+                # logged in: the account's own TikTok (a tag page in its context); _diag records why when it is empty
+                if await self._search_on(sc, "tiktok", q, f"short videos — {why}", origin):
+                    sc.queue = [r for r in sc.info.get("results", [])
+                                if r.get("video") and self.fresh(r["url"], r["title"])]
+                    if sc.queue:
                         self.feed_note = None
-                    return True
-            elif name == "tiktok":
-                self.feed_note = SV.NOTE_BLOCKED
+                        return True
+            if await self._public_videos(sc, name, q, f"short videos — {why}", origin):
+                return True
         return False
 
-    async def _tiktok_cards(self, sc, q, why):
+    # --- short videos the compliant way (#89 live follow-up) -------------------------------------------------------
+    async def _public_videos(self, sc, kind, q, why, origin="", short=True):
+        """Public videos played in their site's official embed player: YouTube through the Data API (with
+        YOUTUBE_API_KEY), TikTok found through the search engines. Captions
+        come from the official oEmbed APIs and pass video_text_ok. The first one is shown and played muted; the rest
+        are the next options."""
+        cands = []
+        if kind == "shorts" or kind == "youtube":
+            if YT.key():
+                cands = await self._yt_search(sc, q, short)
+            else:
+                self.feed_note = YT.NOTE_NO_KEY
+        elif kind == "tiktok":
+            cands = await self._tiktok_found(sc, q)
+        if not cands:
+            return False
+        self.limits.count("tiktok" if kind == "tiktok" else "shorts" if short else "youtube", q, origin)
+        sc.cards = {c["url"]: c for c in cands}
+        sc.queue = [{"url": c["url"], "title": c["title"], "snippet": c["author"], "video": True, "short": short,
+                     "channel": c["author"]} for c in cands]
+        if kind == "tiktok":
+            self.feed_note = SV.NOTE_EMBEDS
+        return await self._show_card(sc, cands[0], why)
+
+    def _card_ok(self, c):
+        return (c and self.fresh(c["url"], c["title"]) and video_text_ok(c["title"])
+                and (not c.get("author") or video_text_ok(c["author"]))
+                and all(video_text_ok(h) for h in c.get("hashtags") or []) and (not c.get("thumb") or url_ok(c["thumb"])))
+
+    async def _yt_search(self, sc, q, short=True):
+        """YouTube Data API search.list (the key in a header, never in a URL), cached per query, within the day's
+        free quota. -> cards."""
+        results = self.yt.cached(q, short)
+        if results is None:
+            if not self.yt.allow() or not self.limits.allow("www.googleapis.com"):
+                return []
+            self.limits.note("www.googleapis.com")
+            status, text = await self._fetch(sc, YT.search_url(q, short), headers=YT.headers())
+            if status != 200:
+                self.yt.error(f"search: HTTP {status}")
+                self.limits.refuse("shorts" if short else "youtube", f"YouTube API HTTP {status}")
+                return []
+            results = YT.parse_search(text, short)
+            self.yt.spend(q, short, results)
+        cards = [{"url": r["url"], "title": r["title"], "author": r["channel"], "thumb": r["thumb"], "hashtags": [],
+                  "embed": r["embed"], "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
+                  "how": "YouTube's official embed player"} for r in self.safe_results(results)]
+        return [c for c in cards if self._card_ok(c)][:6]
+
+    async def _tiktok_found(self, sc, q):
         """Public TikTok videos for `q` found through the search engines (site:tiktok.com), described by TikTok's
-        public oEmbed API (caption, creator, thumbnail) and shown as cards; the video itself is not played. Every
-        request goes through robots.txt, the per-host limit and the guard; captions and creators through
-        video_text_ok."""
+        oEmbed. Every request goes through robots.txt, the per-host limit and the guard."""
         fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
         urls = []
         for eng in ("ddg", "bing"):
             src = SS.SOURCES[eng]
             url = src["url"](f"site:tiktok.com {q}")
             host = urllib.parse.urlsplit(url).hostname
-            if not self.limits.allow(host) or not await self.robots.check(url, fetch, self.limits):
+            if not self.limits.source_ok(eng) or not await self.robots.check(url, fetch, self.limits):
                 continue
             self.limits.note(host)
             status, text = await fetch(url)
+            if status == 200 and BODY_WALL.search(text[:20000] or ""):
+                self.limits.refuse(eng, "bot check")               # DuckDuckGo's "anomaly" page on datacenter IPs
+                continue
             if status == 200:
                 urls = [u for u in (r["url"].split("?")[0] for r in src["parse"](text, url)) if SV.TIKTOK_VIDEO.match(u)]
             if urls:
                 break
+        return await self._oembed_cards(sc, "tiktok", [u for u in dict.fromkeys(urls) if self.fresh(u)])
+
+    async def _oembed_cards(self, sc, kind, urls):
+        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
         cards = []
-        for u in [u for u in dict.fromkeys(urls) if self.fresh(u)]:
+        for u in urls:
             if len(cards) >= 4:
                 break
-            o = SV.oembed_url(u)
-            if not self.limits.allow("www.tiktok.com") or not await self.robots.check(o, fetch, self.limits):
+            o = SV.oembed_url(u) if kind == "tiktok" else YT.oembed_url(u)
+            host = urllib.parse.urlsplit(o).hostname
+            if not self.limits.allow(host) or not await self.robots.check(o, fetch, self.limits):
                 break
-            self.limits.note("www.tiktok.com")
+            self.limits.note(host)
             status, text = await fetch(o)
-            meta = SV.parse_oembed(text, u) if status == 200 else None
-            if (meta and self.fresh(u, meta["title"]) and video_text_ok(meta["title"])
-                    and (not meta["author"] or video_text_ok(meta["author"]))
-                    and all(video_text_ok(h) for h in meta["hashtags"]) and (not meta["thumb"] or url_ok(meta["thumb"]))):
-                cards.append(meta)
-        if not cards:
+            if status != 200:
+                continue
+            if kind == "tiktok":
+                c = SV.parse_oembed(text, u)
+                if c:
+                    c = dict(c, embed=SV.tiktok_player(u), host="tiktok.com", site="TikTok",
+                             how="TikTok's official embed player")
+            else:
+                m, vid = YT.parse_oembed(text, u), SV.YT_SHORT.match(u)
+                c = m and vid and {"url": u, "title": m["title"], "author": m["channel"], "hashtags": [],
+                                   "thumb": f"https://i.ytimg.com/vi/{vid.group(1)}/hqdefault.jpg",
+                                   "embed": YT.embed_url(vid.group(1)), "host": "youtube.com", "site": "YouTube Shorts",
+                                   "how": "YouTube's official embed player"}
+            if self._card_ok(c):
+                cards.append(c)
+        return cards
+
+    async def _open_embed(self, sc, card, why):
+        """The video in its site's official embed player (youtube-nocookie.com/embed, tiktok.com/player: both
+        allowed by their robots.txt), opened as a page with our site as the referrer, played muted."""
+        emb = card.get("embed") or ""
+        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
+        host = urllib.parse.urlsplit(emb).hostname or ""
+        if not emb or not await self.robots.check(emb, fetch, self.limits):
+            self.last_skip = "robots.txt"
             return False
-        self.limits.count("tiktok", q, "")
-        sc.cards = {c["url"]: c for c in cards}
-        sc.queue = [{"url": c["url"], "title": c["title"], "snippet": c["author"], "video": True, "short": True,
-                     "channel": c["author"]} for c in cards]
-        return await self._show_card(sc, cards[0], why)
+        # opening a video is opening a page (pages are not rate-limited; searches and API calls are)
+        if getattr(sc, "site", None) and getattr(sc, "public", None):   # never in a logged-in context
+            sc.ctx, sc.page = sc.public
+            sc.site = None
+        if not await self._open(sc, emb, why, "page", title=card["title"], min_text=0, shoot=False,
+                                referer=EMBED_REFERER):
+            return False
+        sc.info = dict(sc.info, url=card["url"], host=card.get("host", host), embed=emb, card=False,
+                       channel=(card.get("author") or "")[:80], search_box=False)
+        sc.scrolls_left = 0
+        await self._play_muted(sc)
+        if not await self.show(sc):
+            return False
+        await self._start_watch(sc)
+        return True
 
     async def _show_card(self, sc, card, why):
-        """One embed card on the screen: TikTok, or a YouTube Short whose page is blocked for the server (a local page:
-        caption, creator, thumbnail; no video, no actions)."""
+        """One video on the screen: in its official embed player when it has one (played muted), else (or when the
+        player is refused) a card: caption, creator, thumbnail on a local page, no video, no actions."""
+        sc.queue = [r for r in sc.queue if r.get("url") != card["url"]]
+        if card.get("embed"):
+            if await self._open_embed(sc, card, why):
+                return True
+            print(f"browse: embed refused ({self.last_skip}), showing a card instead", flush=True)
         if getattr(sc, "site", None) and getattr(sc, "public", None):   # cards are never shown in a logged-in context
             sc.ctx, sc.page = sc.public
             sc.site = None
@@ -1199,8 +1285,36 @@ class Browser:
         sc.info = {"title": card["title"][:140], "url": card["url"], "host": card.get("host", "tiktok.com"), "kind": "page",
                    "why": why, "t": time.time(), "card": True, "channel": card["author"][:80]}
         sc.scrolls_left = 2
-        sc.queue = [r for r in sc.queue if r.get("url") != card["url"]]
         return await self.show(sc)
+
+    # --- why a logged-in feed showed nothing ------------------------------------------------------------------------
+    DIAG_MASK = """header,nav,[data-e2e*="avatar"],[data-e2e*="profile"],[data-e2e*="nav"],[class*="Avatar"],
+    [class*="avatar"],[class*="Header"],[class*="UserName"],[class*="Profile"]{visibility:hidden !important}"""
+
+    async def _diag(self, sc, reason, title, body):
+        """A logged-in page with no video: what it showed (reason, captcha / login / empty signs, video links), and a
+        screenshot with the header, avatars and names hidden and the top band blacked out (admin only, never public;
+        no cookie or account name is kept)."""
+        site, page = sc.site, sc.page
+        try:
+            n = await page.evaluate("() => document.querySelectorAll('a[href*=\"/video/\"]').length")
+        except Exception:
+            n = None
+        b = (body or "").lower()
+        self.diag[site] = {"t": round(time.time()), "reason": reason, "path": urllib.parse.urlsplit(page.url).path[:80],
+                           "title": title[:80] if display_ok(title) else "", "video_links": n,
+                           "captcha": bool(re.search(r"captcha|verify|slider|puzzle|not a robot", b)),
+                           "login_prompt": bool(re.search(r"log in|sign up|continue with", b)),
+                           "chars": len(body or "")}
+        try:
+            await page.add_style_tag(content=self.DIAG_MASK)
+            await page.evaluate("""() => { const d = document.createElement('div');
+                d.style.cssText = 'position:fixed;left:0;top:0;right:0;height:72px;background:#000;z-index:2147483647';
+                document.body.appendChild(d); }""")
+            self.diag_shot[site] = await page.screenshot(type="jpeg", quality=60)
+        except Exception:
+            pass
+        print(f"browse: {site} logged in but no video ({reason}; video links {n})", flush=True)
 
     async def _site_search(self, sc, q, why):
         """Type `q` into the page's own search box and press Enter. The field is re-checked right before typing,
@@ -1246,7 +1360,7 @@ class Browser:
         query = urllib.parse.urlencode({f["name"]: q}) if f.get("name") else u.query
         return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path or "/", query, ""))
 
-    async def _fetch(self, sc, url, hops=3):
+    async def _fetch(self, sc, url, hops=3, headers=None):
         """GET outside the page (robots.txt, a search source's JSON API), with the browser's guard: public http(s)
         hosts only, every redirect checked again. -> (status, text); (0, "") when refused or failed."""
         for _ in range(hops + 1):
@@ -1255,7 +1369,8 @@ class Browser:
                 return 0, ""
             ctx = sc.public[0] if getattr(sc, "public", None) else sc.ctx    # never a logged-in context (#60)
             try:
-                r = await ctx.request.get(url, timeout=NAV_TIMEOUT_MS, max_redirects=0, fail_on_status_code=False)
+                r = await ctx.request.get(url, timeout=NAV_TIMEOUT_MS, max_redirects=0, fail_on_status_code=False,
+                                          headers=headers or None)
             except Exception as e:
                 print(f"browse: could not fetch {url[:80]}: {repr(e)[:100]}", flush=True)
                 return 0, ""
@@ -1333,11 +1448,14 @@ class Browser:
         - a search with a video word (tiktok, shorts, videos...) goes to the short-video feed on the phone and to the
           video sources at the desk, never to Wikipedia.
         `why` ends the card's line ("searched arXiv for “sleep spindles” — from his reading notes")."""
-        if origin in NV.SEEN_ORIGINS and not self.visited.follow_ok():
+        again = origin not in ("chat", "interests") and self.variety.query_used(q)    # #89: the same search twice a day (the HN loop)
+        if again or (origin in NV.SEEN_ORIGINS and not self.visited.follow_ok()):
             p = I.pick(self.variety, hour=I.tokyo_hour(), rng=self.rng, discover=True)
             if p.get("query"):
                 q, origin = p["query"], "interests"
                 why = f"{SS.ORIGINS['interests']} ({p['topic']}, something new)"
+        else:
+            self.variety.mark(None, q)
         self.visited.search(origin)
         vq = NV.video_query(q)
         if vq is not None:
@@ -1358,7 +1476,7 @@ class Browser:
         topic = vq or None
         if sc.name == "phone":
             return await self._shorts(sc, {"query": topic, "from": origin}, force=True)
-        return self.limits.source_ok("youtube") and await self._search_on(sc, "youtube", topic or q, why, origin)
+        return await self._public_videos(sc, "youtube", topic or q, why, origin, short=False)
 
     async def _search_on(self, sc, name, q, why, origin):
         """One search on one source: robots.txt and the per-host limit first, then its results page (or its JSON API
@@ -1411,6 +1529,9 @@ class Browser:
             if not api:
                 results = src["parse"](await sc.page.content(), sc.page.url)
         safe = self.safe_results(results)
+        if not safe and sc.site:                                # logged in and still no video: say what it showed
+            body = await sc.page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+            await self._diag(sc, "no video links", await sc.page.title(), body)
         if not safe:
             self.limits.refuse(name, "no results")
             self.last_skip = "no results"
@@ -1450,7 +1571,7 @@ class Browser:
         cand.sort(reverse=True)
         return (cand[0][1], cand[0][2]) if cand else None
 
-    async def _open(self, sc, url, why, kind, title=None, min_text=80, shoot=True, revisit=False):
+    async def _open(self, sc, url, why, kind, title=None, min_text=80, shoot=True, revisit=False, referer=None):
         """Load a page; if the guard rejects it, leave it (blank) so nothing of it is shown, scrolled or followed.
         A page (not a results page) opened in the last 7 days is not opened again (#89) unless `revisit` (a seed
         site's front page, a YouTube results page, going back)."""
@@ -1466,7 +1587,7 @@ class Browser:
         page = sc.page
         self.login_redirect = None
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+            await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS, referer=referer)
         except Exception as e:
             if sc.site and self.login_redirect == sc.site:
                 await self._logout(sc, "sent to log in")
@@ -1503,6 +1624,8 @@ class Browser:
                   else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
                   or await self._login_walled(page, body) else None)
+        if reason and sc.site:                                         # why a logged-in feed shows nothing
+            await self._diag(sc, reason, page_title, body)
         if reason == "sign-in wall" and sc.site:                       # #60: the session no longer works
             await self._logout(sc, "login wall")
         if not reason and sc.site and not video_text_ok(re.sub(r"\s*[-|]\s*(YouTube|TikTok)$", "", page_title)):

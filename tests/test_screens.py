@@ -21,6 +21,8 @@ import live_server  # noqa: E402
 import screens as SC  # noqa: E402
 import search_sources as S  # noqa: E402
 import short_videos as SV  # noqa: E402
+import youtube_api as YT  # noqa: E402
+import browse  # noqa: E402
 from browse import Browser  # noqa: E402
 from live_server import Live  # noqa: E402
 from twin.neurochem import Neuromodulators  # noqa: E402
@@ -260,29 +262,87 @@ def _card_browser(fetch_map):
     return b, sc
 
 
-def test_tiktok_cards_from_search_and_oembed():
+def _embed_opens(b, ok=True):
+    opened = []
+
+    async def _open(sc_, url, why, kind, title=None, min_text=80, shoot=True, revisit=False, referer=None):
+        opened.append((url, referer))
+        if not ok:
+            b.last_skip = "bot wall"
+            return False
+        sc_.info = {"title": title, "url": url, "host": browse.urllib.parse.urlsplit(url).hostname, "why": why,
+                    "t": 0, "kind": kind}
+        return True
+
+    async def _play_muted(sc_):
+        return {"muted": True, "paused": False}
+    b._open, b._play_muted = _open, _play_muted
+    return opened
+
+
+def test_tiktok_found_by_search_plays_in_tiktoks_official_player():
     oembed = (DATA / "tiktok_oembed.json").read_text()
     b, sc = _card_browser({"https://html.duckduckgo.com/": DDG_TIKTOK, "https://www.tiktok.com/oembed": oembed})
-    assert run(b._tiktok_cards(sc, "cute pets", "short videos — one of his interests"))
-    assert sc.info["card"] and sc.info["host"] == "tiktok.com" and "6718335390845095173" in sc.info["url"]
-    assert "Scramble up ur name" in sc.page.html[-1] and SC.screen_kind(dict(sc.info, device="phone")) == "tiktok"
-    assert list(sc.cards) == ["https://www.tiktok.com/@scout2015/video/6718335390845095173"] and sc.queue == []
-    assert b.limits.public()["per_source_today"].get("tiktok") == 1
+    opened = _embed_opens(b)
+    assert run(b._public_videos(sc, "tiktok", "cute pets", "short videos — one of his interests"))
+    assert opened == [("https://www.tiktok.com/player/v1/6718335390845095173?autoplay=1&muted=1&loop=1&rel=0"
+                       "&description=1", browse.EMBED_REFERER)]
+    assert sc.info["url"] == "https://www.tiktok.com/@scout2015/video/6718335390845095173" and sc.info["embed"]
+    assert SC.screen_kind(dict(sc.info, device="phone")) == "tiktok" and sc.watch_until > 0   # played, muted
+    assert b.feed_note == SV.NOTE_EMBEDS and b.limits.public()["per_source_today"].get("tiktok") == 1
 
 
-def test_no_cards_says_tiktok_is_blocked_and_falls_back_to_shorts():
-    b, sc = _card_browser({})                                                     # nothing comes back
-    tried = []
+def test_a_refused_player_falls_back_to_the_card():
+    oembed = (DATA / "tiktok_oembed.json").read_text()
+    b, sc = _card_browser({"https://html.duckduckgo.com/": DDG_TIKTOK, "https://www.tiktok.com/oembed": oembed})
+    _embed_opens(b, ok=False)
+    assert run(b._public_videos(sc, "tiktok", "cute pets", "short videos"))
+    assert sc.info["card"] and "Scramble up ur name" in sc.page.html[-1]
 
-    async def _search_on(sc_, name, q, why, origin):
-        tried.append(name)
-        sc_.info = {"results": [{"url": "https://www.youtube.com/shorts/abcdefgh", "title": "t", "video": True}],
-                    "kind": "search", "url": "https://www.youtube.com/results?x", "title": "t"}
-        return True
-    b._search_on = _search_on
-    b.rng = SimpleNamespace(random=lambda: 0.1, choice=random.Random(0).choice)     # TikTok first
-    assert run(b._shorts(sc, {"query": "ramen", "from": "video", "hour": 12.5}))
-    assert tried == ["shorts"] and b.feed_note == SV.NOTE_BLOCKED and len(sc.queue) == 1
+
+def test_duckduckgos_bot_check_sets_it_aside_and_nothing_is_shown():
+    b, sc = _card_browser({"https://html.duckduckgo.com/": "<html><body>Unfortunately, bots use DuckDuckGo too."
+                                                            "</body></html>"})
+    assert not run(b._public_videos(sc, "tiktok", "ramen", "short videos"))
+    assert "ddg: bot check" in b.limits.public()["refused_today"]
+
+
+def test_no_youtube_key_no_youtube_search_and_the_panel_says_so(monkeypatch):
+    monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
+    b, sc = _card_browser({})
+    asked = []
+
+    async def _fetch(sc_, url, hops=3, headers=None):
+        asked.append(url)
+        return 404, ""
+    b._fetch = _fetch
+    assert not run(b._public_videos(sc, "shorts", "ramen", "short videos"))
+    assert b.feed_note == YT.NOTE_NO_KEY and not [u for u in asked if "googleapis" in u]
+
+
+def test_youtube_api_shorts_play_in_the_official_embed_and_the_key_stays_in_a_header(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
+    b, sc = _card_browser({})
+    calls = []
+    api = (DATA / "youtube_api_search.json").read_text()
+
+    async def _fetch(sc_, url, hops=3, headers=None):
+        calls.append((url, headers))
+        if url.startswith(YT.SEARCH):
+            return 200, api
+        return (404, "") if url.endswith("/robots.txt") else (404, "")
+    b._fetch = _fetch
+    opened = _embed_opens(b)
+    assert run(b._public_videos(sc, "shorts", "ramen", "short videos — lunch"))
+    url, headers = next(c for c in calls if c[0].startswith(YT.SEARCH))
+    assert "test-key-not-real" not in url and headers == {"X-Goog-Api-Key": "test-key-not-real"}
+    assert "videoDuration=short" in url and "safeSearch=strict" in url
+    assert opened[0][0].startswith("https://www.youtube-nocookie.com/embed/") and "mute=1" in opened[0][0]
+    assert sc.info["url"].startswith("https://www.youtube.com/shorts/") and sc.watch_until > 0
+    assert SC.screen_kind(dict(sc.info, device="phone")) == "shorts" and len(sc.queue) >= 1
+    assert b.yt.public()["units_used"] == YT.SEARCH_UNITS and "test-key" not in json.dumps(b.yt.public())
+    run(b._public_videos(sc, "shorts", "ramen", "again"))            # cached: the query is not searched again
+    assert b.yt.public()["units_used"] == YT.SEARCH_UNITS
 
 
 def test_choosing_a_card_shows_it_and_never_opens_tiktok():
