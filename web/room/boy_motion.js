@@ -311,17 +311,18 @@ export function createMotion(env){
       const typing = HS.mode === "type" || (HS.mode === "rest" && side === "Left");
       if (typing) {                                   // hovering over its half of the keys, a key press every ~0.15 s
         const press = HS.mode === "type" ? Math.max(0, Math.sin(t * 2 * Math.PI * (side === "Left" ? 6.3 : 5.7) + sx)) : 0;
-        kbPoint(sx * 0.42 + 0.06 * nz(t * 0.9, 5 + sx), 0.1 + 0.3 * nz(t * 0.7, 7 + sx), _t);
-        _t.y += 0.105 + rise - 0.006 * press * press + (HS.mode === "rest" ? 0.012 : 0); _t.addScaledVector(FW, -0.02);   // the wrist 10 cm over the keys: the fingers hover, never inside the caps
+        // the wrist 3 cm before the near edge of the keys and 7 cm up, the fingers (17 cm) angled down onto the rows (G8 #27)
+        kbPoint(sx * 0.42 + 0.06 * nz(t * 0.9, 5 + sx), -1.5 + 0.3 * nz(t * 0.7, 7 + sx), _t);
+        _t.y += 0.07 + rise - 0.008 * press * press + (HS.mode === "rest" ? 0.012 : 0);
       } else if (side === "Right") {                   // the mouse: small moves on the mat, the hand cupped on it
-        _t.set(...MOUSE).addScaledVector(UP, 0.075 + rise).add(_a.set(0.015 * nz(t * 1.1, 8), 0, 0.012 * nz(t * 0.9, 9)));
+        _t.set(...MOUSE).addScaledVector(UP, 0.03 + rise).addScaledVector(FW, -0.10).add(_a.set(0.015 * nz(t * 1.1, 8), 0, 0.012 * nz(t * 0.9, 9)));   // the wrist behind the mouse, the palm cupped on its back
         if (Math.sin(t * 7.3) > 0.97) _t.y -= 0.004;                                       // a click
-      } else { kbPoint(-0.5, -0.9, _t); _t.y += 0.06 + rise; }                              // the left hand rests by the keyboard
+      } else { kbPoint(-0.5, -1.9, _t); _t.y += 0.035 + rise; }                             // the left hand rests on the mat before the keys
       B[side + "Arm"].getWorldPosition(_p).addScaledVector(UP, -0.36).addScaledVector(RT, sx * 0.28).addScaledVector(FW, -0.02);   // elbow out, forearm level with the desk
       ik(B[side + "Arm"], B[side + "ForeArm"], B[side + "Hand"], _t, _p, e, false);
       // the wrist: palm down over the keys (the hand's +z is the palm, +y along the fingers)
       env.touch(B[side + "Hand"]);
-      _b.copy(FW).addScaledVector(UP, -0.06).normalize();                                   // fingers forward, nearly level
+      _b.copy(FW).addScaledVector(UP, typing ? -0.4 : side === "Right" ? -0.3 : -0.06).normalize();   // fingers forward and down onto the caps / the mouse's back
       _c.copy(UP).negate();                                                                 // palm down
       _c.addScaledVector(_b, -_b.dot(_c)).normalize(); _d.crossVectors(_b, _c);
       const m = hands.m || (hands.m = new THREE.Matrix4()); m.makeBasis(_d, _b, _c); _q.setFromRotationMatrix(m);
@@ -340,7 +341,11 @@ export function createMotion(env){
       if (side === "Right" && (st.holdW > 0 || st.held)) continue;
       const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up) continue;
       lo.getWorldPosition(_a); h.getWorldPosition(_b); h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.17).add(_b);   // the fingertips (the hand is ~17 cm long from the wrist)
-      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.06 - _b.y : 0, over(_c) ? DESK.top + 0.06 - _c.y : 0);
+      // the fingertips may come down onto the key caps (their tops: KEYBOARD.c[1]) and the mouse's back, not into the slab
+      const onKeys = Math.abs(_c.x - KEYBOARD.c[0]) < KEYBOARD.w / 2 + 0.03 && Math.abs(_c.z - KEYBOARD.c[2]) < KEYBOARD.d / 2 + 0.03;
+      const onMouse = Math.abs(_c.x - MOUSE[0]) < 0.07 && Math.abs(_c.z - MOUSE[2]) < 0.08;
+      const tipFloor = onKeys ? KEYBOARD.c[1] + 0.004 : onMouse ? MOUSE[1] + 0.03 : DESK.top + 0.06;
+      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.06 - _b.y : 0, over(_c) ? tipFloor - _c.y : 0);
       if (lift <= 0) continue;
       _t.copy(_b); _t.y += lift;
       up.getWorldPosition(_p).addScaledVector(RT, sx * 0.3); _p.y = DESK.top + 0.12;      // the elbow out and over the slab

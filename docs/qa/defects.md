@@ -6,7 +6,8 @@ The bar is photorealism (owner's brief): the "what reads as CG" list in `scoreca
 (plastic materials, uniform textures, no contact shadows, knife edges, flat light) that no single item below carries.
 Measured numbers come from `tests/visual/out/results.json`; the shots named are in the run's output directory.
 Status: open unless marked. Re-checked on `main` 9353bda (2026-10-03, full matrix, 0 hard failures): items 9 and 21
-are **fixed**; the rest unchanged. Items 7 and 8 become hard CI checks (budgets.json `desk_vertices`, `below_floor_vertices`
+are **fixed**. Re-checked on `main` 5d9a934 (2026-10-03 evening, after #107 soft goods, #113 window, #110 hard
+surfaces, #80 motion): items 7, 11, 12, 13, 14, 19 and 20 **fixed or largely fixed**; new items 23–26 below. Items 7 and 8 become hard CI checks (budgets.json `desk_vertices`, `below_floor_vertices`
 → 0) once G3's fix lands.
 
 ## G2 · character asset (`web/room/boy.glb`)
@@ -20,10 +21,14 @@ are **fixed**; the rest unchanged. Items 7 and 8 become hard CI checks (budgets.
 6. **Texture anisotropy 1** on the character's map (room textures use 8): blur at grazing angles.
 
 ## G3 · motion (`web/room/boy_motion.js`, the room's hook block)
-7. **Forearms through the desk top** in the sitting pose: 12–50 of ~17,700 sampled vertices inside the desk slab
-   (left forearm mostly) in `desk_*_1280`; still 12–42 on 9353bda.
+7. ~~**Forearms through the desk top** in the sitting pose: 12–50 of ~17,700 sampled vertices inside the desk slab
+   (left forearm mostly).~~ **Fixed by #80** (5d9a934): the typing clip keeps the forearms above the desk, 0 vertices
+   inside it in every desk shot; `desk_vertices` is now a hard budget (0) in `tests/visual/budgets.json`.
 8. **Toes under the floor** when standing at the door and the sill: left toes/foot 1.2 cm below (3 sampled vertices);
-   still 3 on 9353bda.
+   still 3 on 5d9a934.
+27. **Typing hands hover** (`closeup_hands_14.png`, #80's `type` clip): both hands float 3–5 cm above the keys with
+    splayed mitten fingers; the right hand never reaches the mouse. Better than the forearms through the desk (7),
+    but a contact pose (fingertips on the keys, wrists on the desk) is what reads as real.
 9. ~~**Sleeping on top of the duvet**, fully dressed, slides on, arms stiff, a hand on the belly.~~ **Fixed by #108**
    (9353bda): under the duvet, head denting the pillow, slides parked by the bed, a side pose now and then; the duvet
    lifts over his limbs and breathes (`closeup_bed_14.png`, `closeup_side_14.png`, `sleeping_14_1280_char.png`); bed
@@ -36,15 +41,30 @@ are **fixed**; the rest unchanged. Items 7 and 8 become hard CI checks (budgets.
     `!life.path` guards were always true because the server never sent `path`.
 
 ## G4 · soft goods (`room_build/props_soft.py`)
-11. **Hanger socks are tubes**: straight 10-sided cylinders with flat-cut open ends and a second cylinder for the foot;
-    the towel is a flat box; the pegs are boxes (`closeup_socks_14.png`). This is the owner's "socks like cones".
-12. **Pillow** is a hard rounded box with no dent; the **duvet** has one fold and a sharp straight edge along the frame;
-    the sheet is plain (`closeup_duvet_14.png`).
-13. **Hoodie and tote on the door** are slabs; curtains are uniform ribbed cylinders (acceptable from the overview).
+11. ~~**Hanger socks are tubes**.~~ **Fixed by #107** (5d9a934): swept socks with heel, toe and ribbed cuff, a terry
+    towel with drape (`closeup_socks_14.png`). Left (see 23): the dark pair's cuffs render pale grey / translucent and
+    the hanger ring draws doubled.
+12. ~~**Pillow** is a hard rounded box; the **duvet** has one fold.~~ **Largely fixed by #107**: box-quilted duvet
+    with a turned-back fold, mattress with a fitted sheet, pillow in its case. Left (see 24): the empty pillow is a
+    flat oval slab with no loft, and the fold's edge is a sawtooth.
+13. ~~**Hoodie and tote on the door** are slabs; curtains are uniform ribbed cylinders.~~ **Fixed by #107**: sculpted
+    hoodie with pocket and cuffs, canvas tote, pencil-pleat curtains with hems, jeans and a T-shirt added.
+23. **Sock cuffs read translucent, hanger ring doubled** (`closeup_socks_14.png`): the dark socks' cuffs render pale
+    grey as if the inside faces showed through (back faces or a missing thickness), and the hanger's ring appears as
+    two concentric rings (a duplicated or offset mesh).
+24. **Flat pillow and sawtooth fold** (`closeup_duvet_14.png`): the empty pillow is a 4–5 cm oval slab (a pillow in
+    a case has loft and a crease at the opening); the duvet's turned-back fold has a jagged zigzag edge where the
+    fold meets the top sheet.
+25. **Duvet over him: quilt seams as hard ribs, a body part poking through** (`closeup_bed_14.png`, sleeping@14): when
+    the page lifts the new duvet over him, the quilting seams render as thick dark bevelled channels following his
+    body, and a dark shape (his foot or the parked slides) shows through the lifted cloth at the foot end. The
+    page's lift (#108) and the new 89k-triangle duvet (#107) need tuning together (G4 + #63).
 
 ## G5 · hard surfaces (`room_build/props_hard.py`)
-14. The desk set is the strongest area (4/5). Nits: the mouse is a smooth blob, the books are coloured blocks, the bin a
-    plain cylinder, no skirting board or trim along the walls (`closeup_desk_19.png`, overview shots).
+14. ~~Nits: the mouse is a smooth blob, the books are coloured blocks, the bin a plain cylinder, no skirting board.~~
+    **Largely fixed by #110** (5d9a934): keycaps, book spines, a monitor chin, a mug with coffee and a ring decal,
+    edge wear, a real bin (`closeup_desk_19.png`). Left: no skirting board or trim along the walls; wall plaster still
+    one uniform texture (128 texels/m).
 
 ## G6 · rendering (`web/room_post.js`, the renderer/lighting block)
 15. **Night is black**: at 23:00 with the lights off the canvas has mean luminance 10/255, 12 % pure-black pixels at
@@ -62,9 +82,13 @@ are **fixed**; the rest unchanged. Items 7 and 8 become hard CI checks (budgets.
     (the harness's `_char.png` shots show what one would look like).
 
 ## G7 · window (`web/room/window_view.*`)
-19. **Flat city**: grey cuboids and two grey towers on one plane by day, no haze or parallax (`closeup_grip_14.png`);
-    at night lit dots and a tower only. The sky gradient, sun, moon and stars are fine; the sun glare is oversized.
-20. **No glass**: the window has no reflection or sheen.
+19. ~~**Flat city**: grey cuboids on one plane.~~ **Fixed by #113** (5d9a934): photographic CC0 plates with true
+    parallax, real skies by the sun's elevation, lit windows at night, haze (`closeup_socks_14.png`, `closeup_grip_14.png`).
+20. ~~**No glass**.~~ **Fixed by #113**: the glass reflects the room from a cube probe by Fresnel. See 26.
+26. **Glass reflection washes the view out at grazing angles** (`window_8_1280_char.png`): seen along the glass from
+    the sill, the left half of the window is a pale grey wash (the lit wall's reflection) and the view only reads on the
+    right; a real window at that angle shows a faint reflection over a still-visible view. Also the wires across the
+    view read as drawn lines (no thickness, no sag variation).
 
 ## Not a defect, noted
 - Z-fighting: none flagged by the flicker test (desk at 14:00, 5 frames, camera creeping 0.7 mm a frame).

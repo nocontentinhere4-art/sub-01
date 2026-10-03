@@ -32,6 +32,8 @@ SCENES = {
     # old names here would mean the layer did not load)
     "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "m_type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
+    # (the seated clip under the eating layer: with #98 G3's layer the ARDY eating clip m_eat; the eating itself is the dish
+    # and the arm IK, checked by eye in the shots)
     "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "m_eat"),
     # asleep the duvet comes up over him in ~2.2 s (room.html DUV.w): settle 4 s so the shot shows him covered
     "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 4.0, "bedlie", "Sleep"),
