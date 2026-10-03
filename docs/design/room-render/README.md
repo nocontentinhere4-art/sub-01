@@ -84,34 +84,36 @@ lamp or the ceiling light on, 7.
 
 Two things found on the way, both fixed: (1) the room's environment capture fed back into the next capture through the
 floor's reflection, and an early capture with a few NaN texels (software WebGL) blacked out every later frame; captures
-are now taken with the environment off on every material and a capture whose floor face holds a NaN or an infinity is
-dropped and retried. (2) `boy.glb`'s one material has no `metallicFactor`, which glTF reads as fully metallic: he was a
+are now taken with the environment off on every material and a capture with a NaN or an infinity on any of its six
+faces is dropped and retried (the window's material emits NaN texels at night under software WebGL, G7's to look at:
+with the capture dropped the night room reflects the scaled studio map instead). (2) `boy.glb`'s one material has no `metallicFactor`, which glTF reads as fully metallic: he was a
 statue that only reflected the environment (black cloth went grey at night, the hood went white under the lamp). He is
 dielectric now, with a fabric's share of the environment.
 
 ## Numbers
-Measured 2026-10-02 in this sandbox: headless Chromium with **software WebGL** (SwiftShader) on 4 CPU cores. A software
-rasteriser draws the room at 0–2 frames per second whatever the tier, before and after, so the FPS column says nothing
-about a GPU; it is kept for the record. The page's own JS main-thread cost per frame (`__frameMs` under `?debug`) is
-the number that transfers to a phone: the post chain is GPU work and adds nothing measurable to it.
+Measured 2026-10-03 in this sandbox (the final run, `results_after.json`): headless Chromium with **software WebGL**
+(SwiftShader) on 4 CPU cores. A software rasteriser draws the room at about one frame per second whatever the tier,
+before and after, so the FPS column says nothing about a GPU; it is kept for the record, and with 1–3 frames in each
+30 s sample the JS column is noise around 10–20 ms. The page's own JS main-thread cost per frame (`__frameMs` under
+`?debug`) is the number that transfers to a phone: the post chain is GPU work and adds nothing measurable to it.
 
-| page | tier | fps (software GL) | JS ms / frame | note |
+| page | tier | fps (software GL) | JS ms / frame (frames sampled) | note |
 |---|---|---|---|---|
 | 1280 × 800, before | direct | 0.0 | – | main, no post chain |
-| 1280 × 800, after | low (direct) | 0.1 | 9.5 | the canvas's 4× MSAA is what a CPU rasteriser pays most for |
-| 1280 × 800, after | medium | 0.7 | 10.1 | |
-| 1280 × 800, after | high | 0.7 | 7.4 | |
+| 1280 × 800, after | low (direct) | 0.1 | 10.5 (1) | the canvas's 4× MSAA is what a CPU rasteriser pays most for |
+| 1280 × 800, after | medium | 0.4 | 7.3 (1) | |
+| 1280 × 800, after | high | 0.1 | 23.4 (3) | |
 | 390 × 844, before | direct | 0.9 | – | |
-| 390 × 844, after | low | 0.5 | (6 frames) | |
-| 390 × 844, after | medium | 2.2 | 8.8 | |
-| 390 × 844, after | high | 1.9 | 11.7 | |
+| 390 × 844, after | low | 0.8 | 14.4 (2) | |
+| 390 × 844, after | medium | 0.6 | 18.6 (3) | |
+| 390 × 844, after | high | 0.9 | 12.2 (3) | |
 | 390 × 844, CPU ×4, before | direct | 0.8 | – | mid-phone profile |
-| 390 × 844, CPU ×4, after | low | 0.2 | 17.4 | |
-| 390 × 844, CPU ×4, after | medium | 1.4 | 27.0 | 5 frames sampled: noisy |
-| 390 × 844, CPU ×4, after | high | 1.2 | 23.2 | 4 frames sampled: noisy |
+| 390 × 844, CPU ×4, after | low | 0.6 | 19.9 (2) | |
+| 390 × 844, CPU ×4, after | medium | 0.4 | 31.6 (3) | |
+| 390 × 844, CPU ×4, after | high | 0.8 | 40.1 (2) | |
 
 What this supports: the post chain costs no main-thread time (the JS ms per frame is the same with and without it,
-within noise), so on a phone the budget is GPU fill rate only. Expected GPU cost of the medium tier at 390 × 844 and
+within this noise), so on a phone the budget is GPU fill rate only. Expected GPU cost of the medium tier at 390 × 844 and
 DPR 1.5 (0.74 Mpx) from the passes' own published numbers, not measured here: N8AO at half resolution with 8 samples
 and 4 denoise samples ≈ 1.5–2.5 ms on a 2020 mid-range phone GPU, FXAA ≈ 0.3 ms, the grade ≈ 0.2 ms, the spot
 shadow map once per lit frame ≈ 0.5 ms: ≈ 3–4 ms over the plain render, inside a 33 ms frame. If a phone still falls
