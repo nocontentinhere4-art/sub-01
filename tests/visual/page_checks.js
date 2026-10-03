@@ -24,6 +24,8 @@
     window.sim(0, 1);
     return renderer.info.render.calls;
   };
+  // the window view (#98 G7) advances from the page's frame(), which is frozen here: step it to the hour by hand
+  qa.settleWindow = h => { if (!window.windowView) return false; for (let i = 0; i < 10; i++) windowView.update(0.1, h); return true; };
   qa.lights = () => {
     const out = {exposure: +renderer.toneMappingExposure.toFixed(3), lights: []};
     scene.traverse(o => { if (o.isLight) out.lights.push({type: o.type, intensity: +o.intensity.toFixed(3), color: "#" + o.color.getHexString()}); });
