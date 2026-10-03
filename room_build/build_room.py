@@ -52,10 +52,6 @@ mat("fabric_black", color=srgb("#151517"), rough=0.92, nor="fabric_nor.jpg", nst
 mat("metal_dark", color=srgb("#2a2a2d"), rough=0.38, metal=1.0)
 mat("steel", color=srgb("#c3c5c8"), rough=0.28, metal=1.0)
 mat("screen", color=srgb("#060708"), rough=0.12)
-mat("sheet", diff="sheet_diff.jpg", nor="sheet_nor.jpg", nstr=0.7, rough=0.9, uv=0.26)
-mat("duvet", diff="duvet_diff.jpg", nor="duvet_nor.jpg", nstr=0.9, rough=0.95, uv=0.28)
-mat("curtain", diff="curtain_diff.jpg", nor="curtain_nor.jpg", nstr=0.8, rough=0.95, uv=0.27)
-mat("rug", diff="rug_diff.jpg", nor="rug_nor.jpg", rough=1.0, uv=0.32)
 mat("painted", color=(1, 1, 1), rough=0.65, vcol=True)
 mat("posters", diff="posters.png", rough=0.55)
 sys.path.insert(0, R); import props_hard; props_hard.materials(globals())   # #98 G5: the hard surfaces (room_build/props_hard.py) take over floor, wall, oak, door, white, plastic, metal, screen
@@ -168,6 +164,9 @@ def marker(name, pos, rot=(0, 0, 0), **props):
     for k, v in props.items(): e[k] = v
     return e
 
+# the soft goods (#98 G4: fabrics, cloth simulations, the clothes) live in props_soft.py and use these helpers
+sys.path.insert(0, R); import props_soft as PS; PS.bind(globals())
+
 # ================================================================ the room shell
 X0, X1, Z0, Z1 = -2.0, 2.0, -1.6, 1.6
 WALL_T, H = 0.15, 2.39
@@ -206,27 +205,7 @@ cyl("curtain_rod", "metal_dark", (ROD_Y, IX + 0.07), 0.009, WZ0 - 0.32, WZ1 + 0.
 for zc in (WZ0 - 0.32, WZ1 + 0.36):
     cyl("rod_end", "metal_dark", (ROD_Y, IX + 0.07), 0.016, zc - 0.012, zc + 0.012, n=12, axis="z")
     box("rod_bracket", "metal_dark", (IX, IX + 0.075), (ROD_Y - 0.006, ROD_Y + 0.006), (zc + (0.04 if zc < 0 else -0.04) - 0.006, zc + (0.04 if zc < 0 else -0.04) + 0.006), bevel=0.002, seg=1)
-def curtain(nm, za, zb, side):
-    """a gathered panel between za..zb (z), hanging from the rod to the sill; side: which way the folds open"""
-    bm = bmesh.new(); nz, ny = 40, 26; top = ROD_Y - 0.01; bot = WY0 + 0.0015; folds = 6.5   # the hem just clears the sill (it ran through its ends)
-    grid = []
-    for j in range(ny + 1):
-        t = j / ny; y = top + (bot - top) * t; row = []
-        for i in range(nz + 1):
-            s = i / nz; z = za + (zb - za) * s
-            amp = 0.022 + 0.018 * t                                  # deeper folds lower down
-            x = IX + 0.07 + amp * math.sin(2 * math.pi * folds * s + 0.4 * t * side) + 0.006 * math.sin(7.3 * s + 3 * t)
-            z += side * 0.035 * t * t * (s - 0.5)                    # a slight flare at the hem
-            row.append(bm.verts.new(B(x, y, z)))
-        grid.append(row)
-    for j in range(ny):
-        for i in range(nz):
-            f = bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]]); f.smooth = True
-    o = new_obj(nm, bm, "curtain")
-    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.006; md.offset = 0
-    project_uv(o); return o
-curtain("curtain_a", WZ0 - 0.30, WZ0 + 0.05, -1)
-curtain("curtain_b", WZ1 - 0.05, WZ1 + 0.34, 1)
+PS.curtains()                                    # two linen panels with pencil pleats and hems (props_soft.py)
 
 # ================================================================ desk
 props_hard.desk(globals())
@@ -236,61 +215,9 @@ props_hard.chair(globals())
 
 # ================================================================ bed (storage bed, mattress, sheet, pillow, duvet)
 props_hard.bed_frame(globals())
-mattress = box("mattress", "sheet", (BX0 + 0.045, BX1 - 0.01), (BASE_Y, MAT_Y), (BZ0 + 0.01, BZ1 - 0.01), bevel=0.05, seg=5)
-# pillow: a box puffed up in the middle (thickness ~ (1-u^4)(1-v^4)), resting at the head end
-bm = bmesh.new(); nu, nv = 18, 22; PW, PL, PT = 0.42, 0.64, 0.12
-top, bot = [], []
-for j in range(nv + 1):
-    rt, rb = [], []
-    for i in range(nu + 1):
-        u = i / nu * 2 - 1; v = j / nv * 2 - 1
-        h = PT / 2 * ((1 - u ** 4) * (1 - v ** 4)) ** 0.6 + 0.004
-        x = u * PW / 2 * (1 - 0.04 * (1 - v * v)); z = v * PL / 2 * (1 - 0.05 * (1 - u * u))
-        rt.append(bm.verts.new(Vector((x, -z, h)))); rb.append(bm.verts.new(Vector((x, -z, -h * 0.55))))
-    top.append(rt); bot.append(rb)
-for j in range(nv):
-    for i in range(nu):
-        bm.faces.new([top[j][i], top[j][i + 1], top[j + 1][i + 1], top[j + 1][i]])
-        bm.faces.new([bot[j][i], bot[j + 1][i], bot[j + 1][i + 1], bot[j][i + 1]])
-edge = [(0, i) for i in range(nu)] + [(j, nu) for j in range(nv)] + [(nv, i) for i in range(nu, 0, -1)] + [(j, 0) for j in range(nv, 0, -1)]
-for k in range(len(edge)):
-    (j0, i0), (j1, i1) = edge[k], edge[(k + 1) % len(edge)]
-    try: bm.faces.new([top[j0][i0], bot[j0][i0], bot[j1][i1], top[j1][i1]])
-    except ValueError: pass
-bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5); bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-bm.transform(Matrix.Translation(B(-1.58, MAT_Y + 0.045, 0.87)) @ Matrix.Rotation(0.06, 4, 'Z') @ Matrix.Rotation(-0.05, 4, 'Y'))
-pillow = new_obj("pillow", bm, "sheet"); [setattr(p, "use_smooth", True) for p in pillow.data.polygons]; project_uv(pillow)
-
-# duvet: cloth simulation draped over the mattress (applied, then thickened)
-def duvet():
-    bpy.ops.mesh.primitive_grid_add(x_subdivisions=56, y_subdivisions=60, size=1.0, location=(0, 0, 0))
-    d = bpy.context.active_object; d.name = "duvet"
-    L, W = 1.30, 1.62                                          # along x, along z
-    d.scale = (L, W, 1); bpy.ops.object.transform_apply(scale=True)
-    d.location = B(-0.85, MAT_Y + 0.12, (BZ0 + BZ1) / 2 + 0.01)
-    # a soft fold where it is turned back at the head end
-    for v in d.data.vertices:
-        gx = v.co.x
-        if gx < -L / 2 + 0.16: v.co.z += 0.03
-    bpy.ops.object.transform_apply(location=True)
-    for o in (mattress, pillow, bpy.data.objects["bed_base"], bpy.data.objects["bed_head"], bpy.data.objects["floor"]):
-        c = o.modifiers.new("col", "COLLISION"); o.collision.thickness_outer = 0.006; o.collision.cloth_friction = 8
-    cl = d.modifiers.new("cloth", "CLOTH"); s = cl.settings
-    s.quality = 8; s.mass = 0.35; s.tension_stiffness = 20; s.compression_stiffness = 20; s.shear_stiffness = 8; s.bending_stiffness = 0.6
-    s.air_damping = 2.0; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = False
-    cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 60
-    for f in range(1, 46): SC.frame_set(f)
-    bpy.context.view_layer.objects.active = d; bpy.ops.object.modifier_apply(modifier="cloth")
-    for o in (mattress, pillow, bpy.data.objects["bed_base"], bpy.data.objects["bed_head"], bpy.data.objects["floor"]):
-        for m in list(o.modifiers):
-            if m.type == 'COLLISION': o.modifiers.remove(m)
-    SC.frame_set(1)
-    d.data.materials.append(MATS["duvet"])
-    md = d.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.035; md.offset = 1.0; md.use_even_offset = True
-    for p in d.data.polygons: p.use_smooth = True
-    STATIC.append(d); project_uv(d)
-    return d
-DUVET = duvet()
+# the mattress with its fitted sheet, the pillow in its case and the duvet (a cloth simulation, turned back at the head
+# end, box-quilted): props_soft.py
+mattress = PS.mattress(); pillow = PS.pillow(); DUVET = PS.duvet(mattress, pillow)
 
 # ================================================================ bookshelf with books
 props_hard.bookshelf(globals())
@@ -313,32 +240,14 @@ box("hook_rail", "oak", (LX0 + 0.16, LX0 + 0.52), (1.70, 1.76), (IZ + 0.041, IZ 
 for hx in (LX0 + 0.22, LX0 + 0.34, LX0 + 0.46):
     hk = cyl("hook", "metal_dark", (hx, 1.735), 0.006, IZ + 0.056, IZ + 0.10, n=10, axis="z")
     cyl("hook_tip", "metal_dark", (hx, IZ + 0.10), 0.006, 1.735, 1.765, n=10)
-def tote(xc):
-    """a canvas tote hanging from a hook: a slightly bulged bag + two straps"""
-    bm = bmesh.new(); nx, ny = 10, 14; grid = []
-    for j in range(ny + 1):
-        t = j / ny; row = []
-        for i in range(nx + 1):
-            s = i / nx * 2 - 1; x = xc + s * (0.17 + 0.015 * t)
-            y = 1.62 - 0.40 * t
-            z = IZ + 0.06 + 0.035 * (1 - s * s) * math.sin(math.pi * min(1, t * 1.1)) + 0.02 * t
-            row.append(bm.verts.new(B(x, y, z)))
-        grid.append(row)
-    for j in range(ny):
-        for i in range(nx): bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
-    o = new_obj("tote", bm, "painted"); md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.03; md.offset = -1
-    [setattr(p, "use_smooth", True) for p in o.data.polygons]; set_vcol(o, srgb("#d9cfb8")); project_uv(o)
-    for s in (-1, 1):                                          # straps up to the hook
-        st = box("tote_strap", "painted", (-0.012, 0.012), (0, 0.17), (-0.003, 0.003)); set_vcol(st, srgb("#cdbf9f"))
-        st.data.transform(Matrix.Translation(B(xc + s * 0.09, 1.60, IZ + 0.065)) @ Matrix.Rotation(-s * 0.48, 4, 'Y')); project_uv(st)
-tote(LX0 + 0.46)                                   # (the hoodie hangs on the left hook)
+PS.tote(LX0 + 0.46)                                # a canvas tote by its handles on the right hook (the hoodie hangs on the left one)
 # light switch by the door, doormat in front of it
 box("switch_plate", "white", (0.93, 1.00), (1.17, 1.29), (IZ, IZ + 0.008), bevel=0.003, seg=2)
 box("switch_rocker", "white", (0.945, 0.985), (1.19, 1.27), (IZ + 0.008, IZ + 0.013), bevel=0.002, seg=1)
 dm = box("doormat", "painted", (1.08, 1.82), (FY, FY + 0.012), (-1.40, -0.98), bevel=0.004, seg=2); set_vcol(dm, srgb("#45403a"))
 
 # ================================================================ rug, posters, air conditioner
-rug = box("rug", "rug", (-0.50, 0.95), (FY, FY + 0.012), (-0.62, 0.85), bevel=0.006, seg=2)
+rug = PS.rug()                                      # a wool pile with a bound edge
 def framed(nm, xc, yc, w, h, uv0, uv1):
     F_ = 0.016
     box(nm + "_frame", "plastic_black", (xc - w / 2 - F_, xc + w / 2 + F_), (yc - h / 2 - F_, yc + h / 2 + F_), (IZ, IZ + 0.018), bevel=0.002, seg=1)
@@ -502,9 +411,6 @@ check("sticky_notes", import_asset("office_notepads", (-1.52, SPK_TOP, -1.30), r
 # ================================================================ lived-in things (#75): all modelled here (CC0), off his routes
 # The free floor (room.html NODES/LINKS) runs from the desk and the bed edge to the window, the middle and the door; these
 # stand in the corners it never reaches: the gap between desk and shelf, the bed's foot end, the front right, the doormat.
-mat("hoodie", color=srgb("#5d6470"), rough=0.95, nor="fabric_nor.jpg", nstr=0.9, uv=0.14)
-mat("bag", color=srgb("#2b3440"), rough=0.75, nor="fabric_nor.jpg", nstr=0.5, uv=0.10)
-mat("cushion", color=srgb("#9a8350"), rough=0.95, nor="fabric_nor.jpg", nstr=0.8, uv=0.12)
 mat("pinboard", diff="pinboard.png", rough=0.8)
 mat("cable", color=srgb("#1d1d20"), rough=0.5)
 
@@ -590,43 +496,13 @@ props_hard.headphones(globals())
 
 # --- a hoodie on the door's left hook (the tote moved to the right one), hanging in front of the tote
 HX = LX0 + 0.22
-n0 = group(); bm = bmesh.new(); nx, ny = 12, 18; grid = []
-for j in range(ny + 1):
-    t = j / ny; row = []
-    hw = 0.03 + 0.15 * min(1, t / 0.22) ** 0.7                     # gathered at the hook, out to the shoulders
-    for i in range(nx + 1):
-        s = i / nx * 2 - 1; x = HX + s * hw
-        z = IZ + 0.10 + 0.032 * min(1, t / 0.15) + 0.028 * (1 - s * s) * math.sin(math.pi * min(1, t * 1.15)) + 0.008 * math.sin(9 * s + 4 * t) * t
-        row.append(bm.verts.new(B(x, 1.735 - 0.60 * t, z)))
-    grid.append(row)
-for j in range(ny):
-    for i in range(nx): bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
-hd = new_obj("hoodie", bm, "hoodie"); md = hd.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.02; md.offset = 1.0
-for p in hd.data.polygons: p.use_smooth = True
-project_uv(hd)
-hood = puffy("hoodie_hood", "hoodie", 0.19, 0.20, 0.026, nu=10, nv=10)           # the hood: a flat, soft panel over the shoulders
-for v in hood.data.vertices: v.co.x *= 1 - 0.35 * max(0.0, v.co.y) / 0.10       # narrower at its top
-hood.data.transform(Matrix.Translation(B(HX, 1.62, IZ + 0.168)) @ Matrix.Rotation(math.pi / 2, 4, 'X')); hood.data.update(); project_uv(hood)
-for s in (-1, 1):                                                                # sleeves hanging at its sides
-    rod("hoodie_sleeve", "hoodie", (HX + s * 0.17, 1.56, IZ + 0.14), (HX + s * 0.15, 1.16, IZ + 0.15), 0.036, n=12)
-    blob("hoodie_cuff", "hoodie", (HX + s * 0.15, 1.15, IZ + 0.15), (0.03, 0.025, 0.03), n=12)
-HOODIE = since(n0); check("hoodie", HOODIE, None, on_door=True)   # (it hangs on the leaf: it swings with it, see "hangers")
+HOODIE = PS.hoodie(HX); check("hoodie", HOODIE, None, on_door=True)   # (it hangs on the leaf: it swings with it, see "hangers")
 
 # --- a backpack on the floor, leaning on the bed's foot end
-n0 = group()
-bb = box("bag_body", "bag", (0, 0.13), (0, 0.42), (-0.15, 0.15), bevel=0.045, seg=4)
-for v in bb.data.vertices:                                      # a fuller front, a softer top
-    g = Vector((v.co.x, v.co.z, -v.co.y)); g.x += 0.03 * (1 - (g.z / 0.15) ** 2) * math.sin(math.pi * min(1, g.y / 0.42)) * (g.x / 0.13); v.co = B(*g)
-box("bag_pocket", "bag", (0.13, 0.175), (0.05, 0.23), (-0.11, 0.11), bevel=0.02, seg=3)
-cyl("bag_loop", "bag", (0.06, 0.435), 0.007, -0.035, 0.035, n=8, axis="z")
-box("bag_zip", "plastic_black", (0.172, 0.18), (0.20, 0.215), (-0.08, 0.08), bevel=0.002, seg=1)
-parts = since(n0)
-for o in parts: o.data.transform(Matrix.Translation(B(BX1 + 0.049, 0, 1.24)) @ Matrix.Rotation(-0.11, 4, 'Y')); o.data.update()
-settle(parts, FY); [project_uv(o) for o in parts]; check("backpack", parts, ("y", FY))
+check("backpack", PS.backpack(), ("y", FY))
 
 # --- the front right: a floor cushion (zabuton) and a small fan
-cu_ = puffy("cushion", "cushion", 0.55, 0.58, 0.09); transform(cu_, loc=(1.32, 0, 0.98), ry=0.28); settle([cu_], FY); project_uv(cu_)
-check("cushion", [cu_], ("y", FY))
+check("cushion", PS.cushion(), ("y", FY))
 props_hard.fan(globals())
 
 # --- slippers by the floor cushion (the door's side is his place at the doorway and the leaf's swing, #82)
@@ -658,13 +534,11 @@ clips = []
 for k in range(8):
     a = k * math.pi / 4 + 0.2; cx, cz = PH[0] + PH_R * math.cos(a), PH[2] + PH_R * math.sin(a)
     clips.append((cx, cz)); c = box("hanger_clip", "painted", (cx - 0.006, cx + 0.006), (PH[1] - 0.045, PH[1] - 0.002), (cz - 0.004, cz + 0.004)); set_vcol(c, srgb("#7fb8d9"))
-for k, col in ((1, "#2d2f36"), (2, "#2d2f36"), (5, "#c9c2b4"), (6, "#c9c2b4")):  # two pairs of socks
-    cx, cz = clips[k]; s_ = rod("sock", "painted", (cx, PH[1] - 0.045, cz), (cx, PH[1] - 0.24, cz), 0.022, n=10); set_vcol(s_, srgb(col))
-    f_ = rod("sock_foot", "painted", (cx, PH[1] - 0.225, cz), (cx + 0.07, PH[1] - 0.27, cz), 0.021, n=10); set_vcol(f_, srgb(col))
-(c0x, c0z), (c1x, c1z) = clips[3], clips[4]                      # a hand towel between two clips
-tw = box("towel", "painted", (-0.004, 0.004), (PH[1] - 0.33, PH[1] - 0.045), (-0.11, 0.11), bevel=0.002, seg=1); set_vcol(tw, srgb("#e9a65a"))
-transform(tw, loc=((c0x + c1x) / 2, 0, (c0z + c1z) / 2), ry=math.atan2(c1x - c0x, c1z - c0z)); project_uv(tw)
+PS.socks_and_towel(clips, PH)                                    # two pairs of knitted socks and a terry hand towel on the clips
 check("laundry_hanger", since(n0), None, minx=SILL_X)
+
+# --- clothes (#98): jeans in a heap by the bed's foot, a T-shirt thrown on the bed (a cloth simulation)
+PS.clothes(DUVET, pillow, mattress)
 
 # --- a small cat figure on the window sill
 n0 = group(); CAT = (-1.872, 0.40)                            # away from his hands on the sill (#63)
@@ -725,7 +599,7 @@ STATIC_OBJS = [o for o in STATIC if o.name in bpy.data.objects]
 for o in STATIC_OBJS:
     area = sum(p.area for p in o.data.polygons) * (o.matrix_world.to_scale()[0] ** 2)
     a = o.data.attributes.new("small", 'INT', 'FACE')
-    for d in a.data: d.value = 1 if area < 0.006 else 0
+    for d in a.data: d.value = 1 if (area < 0.006 or o.get("ao_small")) else 0   # ao_small: thin things (piping, cords, straps) whose islands get no texel
 room = join(STATIC_OBJS, "room_static"); room.data.name = "room_static"
 # the headphones: one node of their own (origin where the band rests on the hook), like the chair
 for o in hp:

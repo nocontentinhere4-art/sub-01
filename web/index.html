@@ -27,9 +27,10 @@
   #brand nav a.on::after { content:""; display:block; height:1px; margin-top:2px; background:var(--or); }
   #state { margin-top:22px; display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--dim); flex-wrap:wrap; text-shadow:0 1px 8px #000; }
   #chip { color:#0a0a0a; background:var(--st); padding:3px 9px 2px; letter-spacing:.14em; font-size:11px; border-radius:2px; transition:background 1.5s; }
-  #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; }
-  #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; animation:breathe 2.6s ease-in-out infinite; }
-  @keyframes breathe { 50% { box-shadow:0 0 3px #39f5a0; } }
+  /* the connection's state, as a word (#88 follow-up: no unexplained dots) */
+  #live { font-size:11px; letter-spacing:.08em; color:var(--faint); }
+  #live::after { content:"offline"; }
+  #live.on { color:#39f5a0; } #live.on::after { content:"live"; }
   #story { margin-top:12px; font-size:28px; line-height:1.3; letter-spacing:-.01em; text-shadow:0 2px 24px #000; min-height:1.3em; }
   #story em { font-style:normal; color:var(--st); transition:color 1.5s; }
   #sub { margin-top:8px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; }
@@ -305,13 +306,12 @@ function closeupExit(keepCamera){
 function closeupLine(){
   const i = n3close.info(), t = i.types.map(x => `${x.n} ${N3_TYPE[x.type] || x.type} (${x.species})`).join(" + ");
   const n = x => (x || 0).toLocaleString("en-US");
-  const detail = `${i.cells} cells, ${i.heroCells} in full detail: ${n(i.spines)} spines on ${n(i.spineUm)} of ${n(i.dendUm)} µm of dendrite, `
-    + `${n(i.boutons)} boutons, ${n(i.nodesOfRanvier)} nodes of Ranvier · ${n(Math.round(i.triangles / 1000))}k of ${n(Math.round(i.triangleCap / 1000))}k triangles (${i.lod}) · ${i.style}`;
+  const detail = i.detailLine;                     // #99: the module says what is drawn (real H01 cells, or the NeuroMorpho ones)
   return `<b>close-up · ${esc(regionLabel(nodes[i.region]))}</b> · ${esc(t)}`
     + (i.live ? ` · each cell stands for a sampled model neuron here; a spike runs soma → axon, slowed ${n(i.slowdown)}× (node to node where myelinated)`
               : ` · no live network: static cells, no activity`)
     + `<span class="s">${esc(detail)}</span>`
-    + `<span class="s">NeuroMorpho.Org reconstructions (${esc(i.types.map(x => x.id).join(", "))}), CC BY 4.0, simplified; thickness from their radii, spines, myelin and boutons from published values · credits on /about</span>`;
+    + `<span class="s">${esc(i.sourceLine)}</span>`;   // #99: and where the shapes come from (H01 or NeuroMorpho.Org), from the module
 }
 function neuronsOn(on){
   n3want = on;
@@ -335,7 +335,7 @@ function forestLine(st){                            // what the forest draws, an
   if (!st || !st.types) return "";
   const t = st.types.map(x => N3_TYPE[x.type] || x.type).join(", ");
   return `<span class="s">cells enlarged ~${st.enlarge}× for visibility · ${st.cells.toLocaleString("en-US")} cells (${esc(t)}; ≤ ${Neurons3D.FOREST_SEG} segments each)`
-    + `${st.live ? ` · a spike glows soma → axon, slowed ~${Neurons3D.FOREST_SLOWDOWN}×; region rates tint the dendrites` : ""} · NeuroMorpho.Org, CC BY 4.0 · credits on /about</span>`
+    + `${st.live ? ` · a spike lights the axon from the soma, slowed ~${Neurons3D.FOREST_SLOWDOWN}×; region rates tint the dendrites` : ""} · NeuroMorpho.Org, CC BY 4.0 · credits on /about</span>`
     + `<span class="s">${esc(N3_HONEST)}</span>`;
 }
 function neuronsText(){
@@ -361,7 +361,7 @@ const CHIP = {AWAKE:"#ff9a3c", NREM:"#4d7cff", REM:"#c26bff"};
 const CHIPTXT = {AWAKE:"AWAKE", NREM:"DEEP SLEEP", REM:"REM"};
 const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
 let stage = null, target = [1,0,0], mix = null, burst = 0, boost = 0, sci = 0, sciT = 0;
-let fibreMat, cortexMat, glows = [], nodes = [], showRegions = false, n3dim = 0;
+let fibreMat, cortexMat, nodes = [], showRegions = false, n3dim = 0;
 let pulse = {t:-1, start:0};
 const OPACITY = MINI ? 0.021 : 0.0105;     // the mini keeps 1 fibre in 6: each drawn twice as bright
 let actNew = false, onScreen = true, drawnAt = 0;
@@ -415,7 +415,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
         float tp = info.x, tgt = info.y, fid = info.z, raw = info.w;
         float drive = clamp((max(actAt(nodes.x), actAt(nodes.y)) - 1.1) / 0.9, 0.0, 1.0);   // above its own baseline
         vec3 warm = mix(vec3(1.0, 0.46, 0.12), vec3(1.0, 0.82, 0.55), dcol.z) * 0.8 + dcol * 0.25;
-        float shimmer = 0.7 + 0.3 * pow(0.5 + 0.5 * sin(raw * 18.0 - time * 3.0 + fid * 40.0), 6.0) + 0.45 * drive;
+        float shimmer = 0.68 + 0.12 * pow(0.5 + 0.5 * sin(raw * 6.0 - time * 1.5 + fid * 40.0), 2.0) + 0.45 * drive;   // a slow, broad wave (same mean as before)
         vec3 cool = mix(vec3(0.12, 0.25, 0.95), vec3(0.35, 0.6, 1.0), dcol.x);
         float sweep = 0.25 + 1.4 * pow(0.5 + 0.5 * sin(position.y * 0.045 - time * 1.1), 10.0);
         vec3 violet = mix(vec3(0.62, 0.22, 1.0), vec3(1.0, 0.3, 0.62), dcol.y);
@@ -425,11 +425,11 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
         col *= 1.0 + 0.5 * boost;
         float route = 0.0;
         for (int i = 0; i < 12; i++) { if (abs(tgt - float(i)) < 0.5) route = tgOn[i]; }
-        float pk = route * exp(-pow((tp - pulseT) * 9.0, 2.0)) * step(-0.5, pulseT);
-        float trail = route * step(0.0, pulseT) * step(tp, pulseT) * 0.35 * exp(-(pulseT - tp) * 3.0);
+        float pk = route * exp(-pow((tp - pulseT) * 3.5, 2.0)) * step(-0.5, pulseT);       // a broad front, not a bead
+        float trail = route * step(0.0, pulseT) * step(tp, pulseT) * exp(-(pulseT - tp) * 1.5);
         float busy = step(0.0, pulseT) * (1.0 - smoothstep(1.2, 1.6, pulseT));
         col *= 1.0 - 0.55 * busy * (1.0 - route);
-        col += vec3(0.55, 0.92, 1.0) * (pk * 30.0 + trail * 5.0);
+        col *= 1.0 + 2.5 * pk + 1.5 * trail;          // the fibre itself brightens where the stimulus travels
         vCol = col;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
@@ -444,25 +444,34 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
     cg.setAttribute("position", new THREE.BufferAttribute(cortexPos, 3));
     cg.setIndex(new THREE.BufferAttribute(cortexIdx, 1));
     cg.computeVertexNormals();
+    // each vertex's parcel (the nearest cortical region centroid, as the forest places its cells): an active region
+    // lights its own patch of the real cortex surface (#88 follow-up: no glowing balls at the region centres)
+    const nv = cortexPos.length / 3, vReg = new Float32Array(nv).fill(-1), vGrp = new Float32Array(nv).fill(-1);
+    const cort = []; nodes.forEach((n, i) => { if (/^(LH|RH)_/.test(n.name)) cort.push(i); });
+    for (let v = 0; v < nv; v++) {
+      const x = cortexPos[3 * v], y = cortexPos[3 * v + 1], z = cortexPos[3 * v + 2]; let best = -1, bd = 30 * 30;
+      for (const i of cort) { const q = nodes[i].q, d = (x - q[0]) ** 2 + (y - q[1]) ** 2 + (z - q[2]) ** 2; if (d < bd) { bd = d; best = i; } }
+      if (best >= 0) { vReg[v] = best; vGrp[v] = GROUPS.indexOf(nodes[best].group); }
+    }
+    cg.setAttribute("aReg", new THREE.BufferAttribute(vReg, 1)); cg.setAttribute("aGrp", new THREE.BufferAttribute(vGrp, 1));
     cortexMat = new THREE.ShaderMaterial({
-      uniforms: { tint:{value:new THREE.Color(CHIP[stage || "AWAKE"])}, strength:{value:0.5} },
-      vertexShader: `varying vec3 vN; varying vec3 vV;
+      uniforms: { tint:{value:new THREE.Color(CHIP[stage || "AWAKE"])}, strength:{value:0.5}, act:{value:actTex}, tgOn:{value:tgOn},
+                  uRegOn:{value:0}, uArrive:{value:0} },
+      vertexShader: `attribute float aReg; attribute float aGrp; uniform sampler2D act; uniform float tgOn[12]; uniform float uRegOn; uniform float uArrive;
+        varying vec3 vN; varying vec3 vV; varying float vPatch;
         void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+          float rel = aReg < 0.0 ? 0.0 : texture2D(act, vec2((aReg + 0.5) / 256.0, 0.5)).r * 3.0;      // activity vs its own baseline
+          float route = 0.0; for (int i = 0; i < 12; i++) { if (abs(aGrp - float(i)) < 0.5) route = tgOn[i]; }
+          vPatch = step(0.0, aReg) * max(uRegOn * 0.12 + clamp((rel - 1.3) * 0.3, 0.0, 0.3) * mix(0.4, 1.0, uRegOn), 0.5 * uArrive * route);
           gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV;
-        void main(){ float rim = pow(1.0 - abs(dot(vN, vV)), 3.0); gl_FragColor = vec4(tint * rim * strength, 1.0); }`,
+      fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV; varying float vPatch;
+        void main(){ float rim = pow(1.0 - abs(dot(vN, vV)), 3.0);
+          gl_FragColor = vec4(tint * rim * strength + vec3(1.0, 0.78, 0.56) * vPatch * 0.6 * rim, 1.0); }`,   // rim-lit like the surface itself: the folds don't stack into a blob
       transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide,
     });
     const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m);
     if (n3want) neuronsOn(true);
   });
-  const glowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
-    const gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,"rgba(255,255,255,1)"); gr.addColorStop(1,"rgba(255,255,255,0)");
-    x.fillStyle = gr; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
-  for (const nd of nodes) {
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffc890, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
-    sp.position.set(...nd.q); sp.scale.setScalar(9); sp.visible = false; scene.add(sp); glows.push(sp);
-  }
   connect();
 });
 
@@ -683,7 +692,9 @@ function renderScreens(d){
   const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
   const bl = (d.sources || {}).blocked || [];
-  $("sc-src").textContent = bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "";
+  const yt = d.youtube, fd = Object.entries(d.feeds || {}).map(([k, v]) => `${k} logged in, no video: ${v.reason}${v.captcha ? " (captcha)" : ""}`);
+  $("sc-src").textContent = [bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "",
+    yt ? (yt.key_set ? `YouTube API: ${yt.units_used}/${yt.units_cap} units today` : "YouTube API key not set") : "", ...fd].filter(Boolean).join(" · ");
   const mu = d.music || {}, now = mu.now;
   $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
   screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");
@@ -826,8 +837,6 @@ function frame(now){
     const gm = Math.max(1e-3, raw.reduce((x, y) => x + y, 0) / raw.length);
     raw.forEach((r, i) => { actData[i*4] = Math.min(255, Math.round(r / gm / 3 * 255)); });
     actTex.needsUpdate = true;
-    glows.forEach((g, i) => { const rel = raw[i] / gm;
-      g.material.opacity = (showRegions ? 0.12 : 0) + Math.max(0, Math.min(0.3, (rel - 1.3) * 0.3)) * (showRegions ? 1 : 0.4); });
   }
   if (fibreMat) {
     const u = fibreMat.uniforms;
@@ -837,11 +846,10 @@ function frame(now){
     u.pulseT.value = pulse.t;
   }
   if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci) * (1 - 0.7 * n3dim);   // a faint outline behind the cells
-  if (pulse.t > 0.85 && pulse.t < 1.6) {
-    const arrive = Math.max(0, 1 - (pulse.t - 0.85) / 0.75);
-    glows.forEach((g, i) => { if (tgOn[GROUPS.indexOf(nodes[i].group)]) g.material.opacity = Math.max(g.material.opacity, 0.5 * arrive); });
+  if (cortexMat) {                                   // regions: the cortex's own patches (the "regions" toggle, a stimulus arriving)
+    cortexMat.uniforms.uRegOn.value = showRegions ? 1 : 0;
+    cortexMat.uniforms.uArrive.value = pulse.t > 0.85 && pulse.t < 1.6 ? Math.max(0, 1 - (pulse.t - 0.85) / 0.75) : 0;
   }
-  for (const g of glows) g.visible = g.material.opacity > 0.002;
   if (n3d) n3d.update(now);
   if (n3want && !MINI && now - n3lodAt > 800) {                    // level of detail: points <-> shapes by zoom
     const d = camera.position.distanceTo(controls.target), mode = n3close ? "closeup" : "brain", next = Neurons3D.lod(mode, d, n3fit);

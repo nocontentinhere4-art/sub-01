@@ -80,19 +80,15 @@ def materials(g):
     hmat("door", diff="door_diff_hard.jpg", nor="oak_nor.jpg", nstr=0.5, mr="oak_mr.jpg", uv=1.2, grain=1, wear=(L.GAIN["door"], 1.16, 1.06))
     hmat("white", color=srgb("#ece9e2"), nor="white_nor.jpg", nstr=0.3, mr="white_mr.jpg", uv=0.45, wear=(0.86, 0.85, 0.83))
     hmat("plastic_black", color=srgb("#19191b"), nor="plastic_nor.jpg", nstr=0.12, mr="plastic_mr.jpg", uv=0.30, wear=(2.6, 2.6, 2.7))
-    hmat("plastic_grey", color=srgb("#3b3c41"), nor="plastic_nor.jpg", nstr=0.12, mr="plastic_mr.jpg", uv=0.30, wear=(1.8, 1.8, 1.85))
     hmat("metal_dark", color=srgb("#2a2a2d"), metal=1.0, nor="metal_nor.jpg", nstr=0.4, mr="metal_mr.jpg", uv=0.22, wear=(2.2, 2.2, 2.2))
     hmat("steel", color=srgb("#c3c5c8"), metal=1.0, nor="metal_nor.jpg", nstr=0.5, mr="metal_mr.jpg", uv=0.22)
     hmat("alu", color=srgb("#b9bcc0"), metal=1.0, nor="metal_nor.jpg", nstr=0.4, mr="metal_mr.jpg", uv=0.3, wear=(0.8, 0.8, 0.8))
-    hmat("chrome", color=srgb("#d9dbde"), rough=0.12, metal=1.0)
     hmat("screen", color=srgb("#060708"), rough=0.12)
-    hmat("rubber", color=srgb("#141416"), rough=0.88)
-    hmat("tea", color=srgb("#3a2410"), rough=0.08)
+    hmat("rubber", color=srgb("#141416"), rough=0.88)                          # (gaskets, feet, tyres, the mouse's wheel: also used for cables)
     hmat("keycap", diff="keycaps.png", rough=0.58, nouv=True)
     hmat("book", diff="spines.png", rough=0.72, nouv=True)
     hmat("decal", diff="decals.png", rough=0.7, blend=True, nouv=True)
     hmat("led", color=(0.1, 0.6, 0.3), rough=0.4, emit=((0.2, 1.0, 0.5), 2.0))
-    hmat("led_white", color=(0.8, 0.8, 0.8), rough=0.4, emit=((1.0, 0.95, 0.9), 2.5))
     # the posters, the pinboard and the photo strip carry their own UVs: the final projection pass must leave them alone
     for k in ("posters", "pinboard"):
         if k in MATS: MATS[k]["nouv"] = 1
@@ -146,8 +142,21 @@ def edge_wear(o, bounds, bevel, amount=1.0, tint=None):
     set_col_fn(o, fn)
 
 
+GREY = 2.3            # "plastic_grey": black plastic with its vertex colour lifted (the material carries a gain of 2.7)
+
+
+def grey(o):
+    """a lighter grey plastic part: the black plastic's vertex colour lifted (one material, one draw call)"""
+    m = o.data.materials[0]; d0 = (m.get("col_default") or 1.0) * GREY
+    a = o.data.color_attributes.get("Col") or o.data.color_attributes.new("Col", 'FLOAT_COLOR', 'CORNER')
+    for d in a.data: d.color = (min(1.0, d0), min(1.0, d0), min(1.0, d0 * 1.03), 1)
+    return o
+
+
 def hbox(name, material, x, y, z, bevel=0.0, seg=2, wear=0.0, static=True, smooth=True, taper=None, mat_by_face=None):
     """build_room's box with worn edges (`wear` 0..1) and an optional taper: top face scaled by `taper` about its centre"""
+    if material == "plastic_grey":
+        return grey(hbox(name, "plastic_black", x, y, z, bevel=bevel, seg=seg, wear=0.0, static=static, smooth=smooth, taper=taper, mat_by_face=mat_by_face))
     o = box(name, material, x, y, z, bevel=bevel, seg=seg, static=static, mat_by_face=mat_by_face, smooth=smooth)
     if taper:
         cx, cz = (x[0] + x[1]) / 2, (z[0] + z[1]) / 2; h = y[1] - y[0]
@@ -160,6 +169,8 @@ def hbox(name, material, x, y, z, bevel=0.0, seg=2, wear=0.0, static=True, smoot
 
 
 def hcyl(name, material, c, r, y0, y1, n=24, r1=None, axis="y", static=True, cap=True, smooth=True):
+    if material == "plastic_grey":
+        return grey(cyl(name, "plastic_black", c, r, y0, y1, n=n, r1=r1, axis=axis, static=static, cap=cap, smooth=smooth))
     return cyl(name, material, c, r, y0, y1, n=n, r1=r1, axis=axis, static=static, cap=cap, smooth=smooth)
 
 
@@ -211,6 +222,8 @@ def htorus(name, material, c, R, r, axis="y", half=None, nmaj=28, nmin=8, static
 
 
 def hlathe(name, material, prof, c, y0, n=32, static=True):
+    if material == "plastic_grey":
+        return grey(lathe(name, "plastic_black", prof, c, y0, n=n, static=static))
     return lathe(name, material, prof, c, y0, n=n, static=static)
 
 
@@ -377,7 +390,7 @@ def desk(g):
     # the chin: a grey band under the glass over the body's full depth, 3.5 mm proud of the glass. Its top is 1 mm under the
     # glass's bottom edge, so the page's screen plane (SURF_monitor + 1 mm, tilted) rests on it for the QA harness's prop check
     mon_part(hbox("mon_chin", "plastic_grey", (-SW / 2 - bz, SW / 2 + bz), (-SH / 2 - 0.018, -SH / 2 - 0.001), (-0.018, 0.0035), bevel=0.001, seg=1))
-    mon_part(box("mon_led", "led_white", (SW / 2 - 0.028, SW / 2 - 0.022), (-SH / 2 - 0.012, -SH / 2 - 0.009), (0.0012, 0.0022)))
+    mon_part(box("mon_led", "led", (SW / 2 - 0.028, SW / 2 - 0.022), (-SH / 2 - 0.012, -SH / 2 - 0.009), (0.0012, 0.0022)))
     mon_part(hbox("mon_back", "plastic_black", (-0.17, 0.17), (-0.13, 0.11), (-0.052, -0.018), bevel=0.014, seg=3, wear=0.3))
     mon_part(hbox("mon_ports", "rubber", (-0.08, 0.06), (-0.11, -0.085), (-0.055, -0.045), bevel=0.002, seg=1))
     mon_part(hbox("mon_vesa", "plastic_grey", (-0.05, 0.05), (-0.05, 0.05), (-0.056, -0.052), bevel=0.002, seg=1))
@@ -402,7 +415,7 @@ def desk(g):
     for s in (-1, 1):                                                                            # rubber feet (seen from the side)
         ft = hbox("kb_foot", "rubber", (s * 0.16 - 0.012, s * 0.16 + 0.012), (DTOP + 0.003, DTOP + 0.0045), (-0.06, -0.05))
         transform(ft, loc=(KB_C[0], 0, KB_C[1]), ry=KB_RY)
-    kled = box("kb_led", "led_white", (0.130, 0.134), (DTOP + 0.0225, DTOP + 0.0235), (-0.0675, -0.0655))
+    kled = box("kb_led", "led", (0.130, 0.134), (DTOP + 0.0225, DTOP + 0.0235), (-0.0675, -0.0655))
     transform(kled, loc=(KB_C[0], 0, KB_C[1]), ry=KB_RY)
     cells, sides = L.keycap_cells(); P = L.U; x_left = -18.5 * P / 2
     CAP_H = 0.0085; GAP = 0.0011
@@ -460,10 +473,10 @@ def desk(g):
     # ---- mug with tea in it, a ribbed pen cup with capped pens
     MUG = (-0.50, -0.98)
     hlathe("mug", "white", [(0.0, 0.0), (0.034, 0.0), (0.038, 0.003), (0.040, 0.010), (0.041, 0.090), (0.0415, 0.096), (0.0395, 0.097), (0.037, 0.094), (0.036, 0.016), (0.0, 0.016)], MUG, DTOP, n=32)
-    hcyl("mug_tea", "tea", MUG, 0.0365, DTOP + 0.074, DTOP + 0.075, n=28)
+    hcyl("mug_tea", "screen", MUG, 0.0365, DTOP + 0.074, DTOP + 0.075, n=28)
     htorus("mug_handle", "white", (MUG[0] + 0.046, DTOP + 0.052, MUG[1]), 0.027, 0.0065, axis="z", arc=(-math.pi / 2, math.pi / 2), nmaj=16, nmin=8)
     PC = (-0.47, -1.33)
-    ribbed("pencup", "plastic_black", PC, 0.033, 12, 0.0015, DTOP, DTOP + 0.10, n=48)
+    ribbed("pencup", "plastic_black", PC, 0.033, 12, 0.0015, DTOP, DTOP + 0.10, n=36)
     hcyl("pencup_rim", "plastic_black", PC, 0.0355, DTOP + 0.098, DTOP + 0.102, n=32)
     hcyl("pencup_floor", "plastic_black", PC, 0.031, DTOP + 0.006, DTOP + 0.007, n=24)
     for i, (col, cap, tilt) in enumerate([("#2f6fd6", "#1b3f80", 0.10), ("#d63b2f", "#8c241b", -0.12), ("#f2c12e", "#2a2a2e", 0.05), ("#222222", "#9a9a9e", -0.04), ("#3aa860", "#1d6a3a", 0.14), ("#f4f0e8", "#d63b2f", 0.08)]):
@@ -504,14 +517,14 @@ def chair(g):
         cpart(hbox("ch_fork", "plastic_black", (cx - 0.012, cx + 0.012), (0.03, 0.068), (cz - 0.017, cz + 0.017), bevel=0.004, seg=2, wear=0.4))
         cpart(hcyl("ch_axle", "steel", (0.03, cz), 0.004, cx - 0.026, cx + 0.026, n=8, axis="x"))
         for s in (-1, 1):
-            cpart(hcyl("ch_wheel", "rubber", (0.03, cz + s * 0.015), 0.027, cx - 0.0075, cx + 0.0075, n=20, axis="x"))
-            cpart(hcyl("ch_hubcap", "plastic_grey", (0.03, cz + s * 0.0225), 0.012, cx - 0.003, cx + 0.003, n=12, axis="x"))
+            cpart(hcyl("ch_wheel", "rubber", (0.03, cz + s * 0.015), 0.027, cx - 0.0075, cx + 0.0075, n=16, axis="x"))
+            cpart(hcyl("ch_hubcap", "plastic_grey", (0.03, cz + s * 0.0225), 0.012, cx - 0.003, cx + 0.003, n=8, axis="x"))
     cpart(hcyl("ch_hub", "plastic_black", (0, 0), 0.052, 0.03, 0.095, n=28, r1=0.040))
     cpart(hcyl("ch_gas_sleeve", "plastic_black", (0, 0), 0.034, 0.08, 0.26, n=24, r1=0.031))
-    for k in range(3): cpart(htorus("ch_sleeve_ring", "plastic_black", (0, 0.13 + 0.05 * k, 0), 0.031, 0.004, axis="y", nmaj=24, nmin=6))
-    cpart(hcyl("ch_gas", "chrome", (0, 0), 0.021, 0.25, 0.37, n=20))
+    for k in range(3): cpart(htorus("ch_sleeve_ring", "plastic_black", (0, 0.13 + 0.05 * k, 0), 0.031, 0.004, axis="y", nmaj=18, nmin=4))
+    cpart(hcyl("ch_gas", "steel", (0, 0), 0.021, 0.25, 0.37, n=20))
     cpart(hbox("ch_mech", "plastic_black", (-0.12, 0.12), (0.35, 0.41), (-0.13, 0.12), bevel=0.01, seg=2, wear=0.3))
-    cpart(hbox("ch_lever", "chrome", (0.12, 0.21), (0.375, 0.385), (-0.06, -0.05), bevel=0.003, seg=1))
+    cpart(hbox("ch_lever", "steel", (0.12, 0.21), (0.375, 0.385), (-0.06, -0.05), bevel=0.003, seg=1))
     cpart(hsphere("ch_lever_tip", "plastic_black", (0.215, 0.38, -0.055), (0.009, 0.009, 0.009), n=10))
     cpart(hcyl("ch_tilt_knob", "plastic_black", (0.38, -0.10), 0.016, -0.09, -0.05, n=14, axis="x"))
     # seat cushion: a soft rounded slab (dished top, rolled front edge), as before
@@ -658,9 +671,9 @@ def fridge(g):
         mg = hcyl("fridge_magnet", "painted", (mx, 1.042), 0.011, FZ1 + 0.001, FZ1 + 0.006, n=16, axis="z"); set_vcol(mg, srgb(col))
     # cup noodles stacked on top + a tissue box, as before (vertex coloured)
     for i in range(2):
-        cn = hlathe("cupnoodle", "painted", [(0.0, 0.0), (0.038, 0.0), (0.047, 0.10), (0.050, 0.103), (0.048, 0.106), (0.0, 0.106)], (0.58, -1.18), FTOP + i * 0.105, n=28)
+        cn = hlathe("cupnoodle", "painted", [(0.0, 0.0), (0.038, 0.0), (0.047, 0.10), (0.050, 0.103), (0.048, 0.106), (0.0, 0.106)], (0.58, -1.18), FTOP + i * 0.105, n=20)
         set_vcol(cn, srgb("#f2efe8" if i else "#d9442f"))
-        band = hcyl("cupnoodle_band", "painted", (0.58, -1.18), 0.0445, FTOP + i * 0.105 + 0.06, FTOP + i * 0.105 + 0.075, n=28, r1=0.0460); set_vcol(band, srgb("#d9442f" if i else "#f2efe8"))
+        band = hcyl("cupnoodle_band", "painted", (0.58, -1.18), 0.0445, FTOP + i * 0.105 + 0.06, FTOP + i * 0.105 + 0.075, n=20, r1=0.0460); set_vcol(band, srgb("#d9442f" if i else "#f2efe8"))
     tb = hbox("tissues", "painted", (0.70, 0.88), (FTOP, FTOP + 0.075), (-1.33, -1.22), bevel=0.003, seg=1); set_vcol(tb, srgb("#9fc2c9"))
     hbox("tissue_top", "white", (0.76, 0.82), (FTOP + 0.075, FTOP + 0.095), (-1.29, -1.26), bevel=0.008, seg=2)
 
@@ -700,7 +713,7 @@ def door(g):
 # ================================================================ air conditioner on the back wall
 def aircon(g):
     bind(g)
-    hbox("ac_body", "white", (0.36, 1.00), (2.02, 2.29), (IZ, IZ + 0.21), bevel=0.03, seg=5, wear=0.25)
+    hbox("ac_body", "white", (0.36, 1.00), (2.02, 2.29), (IZ, IZ + 0.21), bevel=0.03, seg=3, wear=0.25)
     box("ac_seam", "cut", (0.385, 0.975), (2.195, 2.197), (IZ + 0.205, IZ + 0.212))
     hbox("ac_vent", "rubber", (0.40, 0.96), (2.030, 2.064), (IZ + 0.165, IZ + 0.205), bevel=0.004, seg=2)
     for k, (yy, tilt) in enumerate(((2.036, 0.0), (2.052, 0.0))):
@@ -744,7 +757,6 @@ def headphones(g):
     bind(g)
     hmat("hp_shell", color=srgb("#26272c"), rough=0.4, nor="plastic_nor.jpg", nstr=0.12, mr="plastic_mr.jpg", uv=0.20)
     hmat("hp_pad", color=srgb("#141416"), rough=0.9, nor="fabric_nor.jpg", nstr=0.8, uv=0.10)
-    hmat("hp_steel", color=srgb("#c3c5c8"), metal=1.0, nor="metal_nor.jpg", nstr=0.5, mr="metal_mr.jpg", uv=0.22)   # (its own: the room's steel carries the baked AO)
     HB_R = 0.078; HB_C = (HP[0], HP[1] + 0.006 - HB_R + 0.008, IZ + 0.05)
     export(HB_R=HB_R, HB_C=HB_C)
     hp = [htorus("hp_band", "hp_shell", HB_C, HB_R, 0.0075, axis="z", half="up", nmaj=36, nmin=10, static=False),
@@ -752,10 +764,10 @@ def headphones(g):
     for s in (-1, 1):
         cx = HB_C[0] + s * HB_R; cy = HB_C[1] - 0.04
         hp.append(hbox("hp_yoke", "hp_shell", (cx - 0.004, cx + 0.004), (cy + 0.02, HB_C[1] + 0.004), (HB_C[2] - 0.009, HB_C[2] + 0.009), bevel=0.002, seg=2, static=False))
-        hp.append(hcyl("hp_hinge", "hp_steel", (cy + 0.025, HB_C[2]), 0.005, cx - 0.008, cx + 0.008, n=10, axis="x", static=False))
+        hp.append(hcyl("hp_hinge", "hp_shell", (cy + 0.025, HB_C[2]), 0.005, cx - 0.008, cx + 0.008, n=10, axis="x", static=False))
         # the cup: a shell with a rounded back, a slim steel rim, the pad; built around the vertical axis then laid along x
         shell = hlathe("hp_cup", "hp_shell", [(0.0, 0.0), (0.026, 0.0), (0.034, 0.004), (0.038, 0.012), (0.039, 0.022), (0.038, 0.026), (0.0, 0.026)], (0, 0), 0, n=28, static=False)
-        rim = hlathe("hp_rim", "hp_steel", [(0.0375, 0.024), (0.0395, 0.026), (0.0375, 0.028), (0.0355, 0.027)], (0, 0), 0, n=28, static=False)
+        rim = hlathe("hp_rim", "hp_shell", [(0.0375, 0.024), (0.0395, 0.026), (0.0375, 0.028), (0.0355, 0.027)], (0, 0), 0, n=28, static=False)
         pad = hlathe("hp_pad", "hp_pad", [(0.021, 0.026), (0.034, 0.027), (0.037, 0.034), (0.034, 0.041), (0.025, 0.043), (0.021, 0.040)], (0, 0), 0, n=28, static=False)
         for o in (shell, rim, pad):
             # local up (y) -> towards the band's centre (-s x): lay the cup along x, the pad inwards
@@ -778,14 +790,14 @@ def fan(g):
     hcyl("fan_motor_back", "plastic_grey", (0, 0.36), 0.030, -0.10, -0.09, n=18, axis="z")
     hcyl("fan_tilt", "plastic_grey", (0.36, -0.05), 0.012, -0.05, 0.05, n=12, axis="x")
     FC = (0, 0.36, -0.005)
-    htorus("fan_rim", "white", FC, 0.13, 0.007, axis="z", nmaj=40, nmin=8)
-    for rr, dz in ((0.105, 0.028), (0.075, 0.042), (0.045, 0.050), (0.02, 0.054)): htorus("fan_ring", "white", (0, FC[1], FC[2] + dz), rr, 0.002, axis="z", nmaj=32, nmin=5)
+    htorus("fan_rim", "white", FC, 0.13, 0.007, axis="z", nmaj=36, nmin=6)
+    for rr, dz in ((0.105, 0.028), (0.075, 0.042), (0.045, 0.050), (0.02, 0.054)): htorus("fan_ring", "white", (0, FC[1], FC[2] + dz), rr, 0.002, axis="z", nmaj=24, nmin=4)
     for k in range(12):
-        a = k * math.pi / 6; hrod("fan_spoke", "white", (0, FC[1], FC[2] + 0.055), (0.128 * math.cos(a), FC[1] + 0.128 * math.sin(a), FC[2] + 0.004), 0.0018, n=5)
+        a = k * math.pi / 6; hrod("fan_spoke", "white", (0, FC[1], FC[2] + 0.055), (0.128 * math.cos(a), FC[1] + 0.128 * math.sin(a), FC[2] + 0.004), 0.0018, n=4)
     hcyl("fan_badge", "white", (0, FC[1]), 0.024, FC[2] + 0.052, FC[2] + 0.062, n=18, axis="z")
     fb = hlathe("fan_back", "white", [(0.0, 0.0), (0.06, 0.004), (0.12, 0.03), (0.13, 0.05)], (0, 0), 0, n=36)
     fb.data.transform(Matrix.Translation(B(0, 0.36, -0.055)) @ Matrix.Rotation(math.pi / 2, 4, 'X')); fb.data.update()
-    for rr in (0.09, 0.05): htorus("fan_back_ring", "white", (0, FC[1], FC[2] - 0.04), rr, 0.002, axis="z", nmaj=28, nmin=5)
+    for rr in (0.09, 0.05): htorus("fan_back_ring", "white", (0, FC[1], FC[2] - 0.04), rr, 0.002, axis="z", nmaj=20, nmin=4)
     hcyl("fan_hub", "plastic_grey", (0, FC[1]), 0.02, FC[2] - 0.01, FC[2] + 0.012, n=16, axis="z")
     for i in range(3):
         bl = blob("fan_blade", "painted", (0.062, 0, 0), (0.055, 0.026, 0.004), n=12); set_vcol(bl, srgb("#c9d3dc"))

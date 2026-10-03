@@ -48,6 +48,6 @@ Views: `overview`, `desk`, `keyboard`, `keycaps`, `chair`, `shelf`, `bed`, `frid
 |---|---|---|
 | `room_clean.glb` | 4.17 MB | 5.02 MB (budget 7 MB with G4's soft goods) |
 | triangles | 135k | 153k |
-| draw calls (primitives) | 42 | 54 (6 new materials: alu, rubber, plastic_grey, keycap, book, decal + the chair's steel/rubber/grey/chrome) |
+| draw calls (primitives) | 42 | see the PR (new materials: alu, rubber, keycap, book, decal + the chair's steel and rubber; grey plastic is the black plastic tinted by its vertex colour) |
 | textures on the wire | 2.43 MB | 3.06 MB (floor 2048², the three 1024² atlases, 512² and 256² micro maps) |
 | prop sweep | 44 props, 0 offenders | 44 props, 0 offenders (`sweep.txt`) |

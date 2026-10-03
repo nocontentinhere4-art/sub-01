@@ -12,7 +12,7 @@ class Geom { constructor() { this.attributes = {}; this.instanceCount = 0; } set
   setIndex(a) { this.index = a; } setDrawRange(a, b) { this.drawRange = [a, b]; } dispose() {} }
 const THREE = { InstancedBufferGeometry: Geom, BufferGeometry: Geom, BufferAttribute: Attr, InstancedBufferAttribute: Attr };
 const cells = JSON.parse(fs.readFileSync(path.join(root, "web", "neuron_render", "cells.json"), "utf8"));
-const out = { types: {}, lod: {}, constants: { slowdown: NR.SLOWDOWN, caption: NR.CAPTION, kinds: Object.keys(NR.KINDS), lods: Object.keys(NR.LOD) },
+const out = { types: {}, lod: {}, constants: { slowdown: NR.SLOWDOWN, caption: NR.CAPTION, caption_procedural: NR.CAPTION_PROCEDURAL, kinds: Object.keys(NR.KINDS), lods: Object.keys(NR.LOD) },
   kindOf: ["LH_Vis_1", "Left Putamen", "Right Thalamus", "Left Pallidum", "Left Hippocampus", "Right Amygdala"].map(n => NR.kindOf({ name: n })) };
 for (const [t, c] of Object.entries(cells.cells)) {
   const T = NR.TYPES[t], P = NR.plan(c, T);

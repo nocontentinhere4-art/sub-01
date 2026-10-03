@@ -297,3 +297,29 @@ Screenshots (`docs/screens/neuron_forest/`, JPEG):
 - `brain_{1920,1280,390}_neurons.jpg`: live, from the recorded stream replayed into the page;
 - `forest_{1920,1280,390}_live_zoom.jpg`: the forest alone at half the camera distance;
 - `mini_{offline,neurons}.jpg`.
+
+## No meaningless dots (#88 follow-up: "Si vedono ancora pallini che non capisco perché esistano")
+Every disc, sprite and point layer on /brain, in the room's mini brain (/brain?mini) and in the Neurons panel, and what
+became of it. The guard is `tests/test_no_dots.py`: a new points/sprite/disc layer on these pages fails it until it is
+removed or listed there with its reason.
+
+| was | where | now |
+|---|---|---|
+| forest somata: `THREE.Points` discs, ≥ 1.5 px | `web/neurons3d.js` (`forest-somata`) | a solid soma body at the base of each cell's own tree, turned with the cell, sized from the reconstruction's soma radius: an ellipsoid, or a pyramid-like teardrop for pyramidal cells. Below a pixel at whole-brain scale |
+| an axon's spike: a bead running along it | `web/neurons3d.js` forest shader | the axon lights from the soma up to the front and fades (≤ 0.5 s) |
+| a stimulus on the fibres: a white bead (×30) running along them | `web/index.html` fibre shader | the fibre itself brightens along its length: a broad front and a fading trail, in its own colour |
+| AWAKE fibre shimmer: sharp travelling dashes (`pow(…, 6)`) | `web/index.html` fibre shader | a slow, broad wave with the same mean brightness |
+| region markers: glow sprites at the 214 region centroids | `web/index.html` | the region's own patch of the real cortex surface lights, rim-lit like the surface (the "regions" toggle, activity, a stimulus arriving). Subcortical nuclei have no surface: no marker |
+| Neurons panel: spike raster (a dot per sampled spike) | `web/neurons.js` | a rate map: the measured spike rate of each of the 214 regions (`n3.rq`) over the last 60 frames, like a calcium-imaging kymograph |
+| Neurons panel: live LED; learning curve's end marker | `web/neurons.js`, `web/neurons.css` | removed (the panel says "LIVE"; the caption gives the last value) |
+| page header: connection LED | `web/index.html` `#live` | the word "live" / "offline" |
+| fibre end points | `web/fibres_ends.bin` | never drawn: the file only says which two regions each fibre joins |
+
+Left, with their reason (in the test): the Pong ball in the Neurons panel (the game's real ball), and the close-up's
+out-of-focus tissue layer (`web/neuron_render/`, #88/#99 A; its "counterstain" blobs are flagged to A).
+
+Luminance (`tests/neuron_forest_look.py`, neurons on, default layers, text hidden; % of brain pixels above 0.8): 1920
+offline 0.00 → 0.00, live 0.04 → 0.13; 390 offline 0.00 → 0.00, live 0.10 → 0.19; the forest alone live 0.21 → 0.69
+(1920) and 0.24 → 1.06 (390): a spike now lights a stretch of axon instead of a bead. All under the 2 % gate. With the
+regions toggle on (neurons off) the patches add +0.036 mean luminance to the brain, the old sprites +0.03.
+Screenshots: `docs/screens/no_dots/{before,after}_*`.

@@ -174,7 +174,8 @@ def test_the_real_open_refuses_a_seen_url_before_loading_anything():
     assert b.last_skip == "opened in the last 7 days"
 
 
-def test_a_tiktok_search_goes_to_the_shorts_feed_never_wikipedia():
+def test_a_tiktok_search_goes_to_the_shorts_feed_never_wikipedia(monkeypatch):
+    monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
     b = Browser(decide=True, rng=random.Random(0))
     sc, opened, searched = _stub(b)
     fed = []
@@ -188,8 +189,8 @@ def test_a_tiktok_search_goes_to_the_shorts_feed_never_wikipedia():
     assert fed[0][1]["query"] is None                       # nothing left but video words: a discovery pick
     assert run(b._search(sc, "funny cat shorts", "", "chat")) and fed[-1][1]["query"] == "funny cat"
     desk = b.screens["desk"]
-    assert not run(b._search(desk, "ramen videos", "", "chat"))   # YouTube failed: nothing, not Wikipedia
-    assert searched == [("youtube", "ramen")]
+    assert not run(b._search(desk, "ramen videos", "", "chat"))   # no YouTube key: nothing, not Wikipedia
+    assert searched == []
 
 
 def test_failing_sources_are_set_aside_and_the_rest_rotate():
@@ -230,9 +231,9 @@ def test_rate_limits_never_set_a_source_aside():
 
 def test_route_never_sends_a_video_search_to_wikipedia_and_keeps_every_source():
     order = S.route("ghibli videos", video=True, rng=random.Random(0))
-    assert order[0] == "youtube" and "wikipedia" not in order
+    assert "youtube" not in order and "wikipedia" not in order       # YouTube: its Data API, never /results
     plain = S.route("quiet afternoon", rng=random.Random(0))
-    assert {"hn", "arxiv", "commons", "news", "recipes"} <= set(plain) and "youtube" not in plain
+    assert set(S.TAIL) <= set(plain) and "youtube" not in plain and "openlibrary" not in plain   # any-query only
     assert not set(plain) & {"shorts", "tiktok"}
 
 
@@ -305,18 +306,11 @@ def test_shorts_session_measurement():
     queries = []
     n = [0]
 
-    async def _search_on(sc_, name, q, why, origin):
+    async def _public_videos(sc_, kind, q, why, origin="", short=True):     # the API / embed path, stubbed
         queries.append(q)
         n[0] += 1
-        sc_.info = {"title": q, "url": f"https://www.youtube.com/results?search_query={n[0]}", "host": "youtube.com",
-                    "why": why, "t": 0, "kind": "search",
-                    "results": [{"url": f"https://www.youtube.com/shorts/v{n[0]:09d}", "title": f"{q} short",
-                                 "video": True}]}
         return True
-
-    async def _tiktok_cards(sc_, q, why):
-        return False
-    b._search_on, b._tiktok_cards = _search_on, _tiktok_cards
+    b._public_videos = _public_videos
     sc = b.screens["phone"]
     interest = {"query": "studio ghibli", "from": "screen", "feed": "shorts"}   # what he saw: a follow-up
     for _ in range(60):

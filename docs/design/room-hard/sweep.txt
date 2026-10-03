@@ -10,12 +10,14 @@ ok  game_pad             x -0.877..-0.733  y 0.970..1.007  z -1.247..-1.143  sup
 ok  manga_stack          x -0.341..-0.140  y 0.160..0.308  z -1.392..-1.248  support y=0.160    gap -0.0 mm   
 ok  headphone_hook       x -0.256..-0.224  y 1.414..1.455  z -1.450..-1.374  support back wall  gap -0.0 mm   
 ok  headphones           x -0.339..-0.141  y 1.286..1.452  z -1.439..-1.360  support -          gap -         
-ok  hoodie               x +1.124..+1.536  y 1.125..1.735  z -1.368..-1.264  support -          gap -         
-ok  backpack             x -0.192..+0.015  y 0.160..0.601  z +1.090..+1.390  support y=0.160    gap -0.0 mm   
-ok  cushion              x +0.976..+1.664  y 0.160..0.238  z +0.625..+1.335  support y=0.160    gap -0.0 mm   
+ok  hoodie               x +1.096..+1.565  y 1.090..1.766  z -1.381..-1.259  support -          gap -         
+ok  backpack             x -0.193..+0.012  y 0.160..0.621  z +1.084..+1.478  support y=0.160    gap -0.0 mm   
+ok  cushion              x +0.971..+1.668  y 0.160..0.239  z +0.621..+1.339  support y=0.160    gap +0.0 mm   
 ok  fan                  x +1.581..+1.819  y 0.160..0.657  z +0.181..+0.419  support y=0.160    gap -0.0 mm   
 ok  slippers             x +0.673..+0.927  y 0.160..0.212  z +0.898..+1.111  support y=0.160    gap -0.0 mm   
-ok  laundry_hanger       x -1.906..-1.581  y 1.650..2.224  z +0.282..+0.618  support -          gap -         
+ok  laundry_hanger       x -1.910..-1.591  y 1.551..2.224  z +0.228..+0.645  support -          gap -         
+ok  jeans                x +0.243..+0.707  y 0.160..0.279  z +1.149..+1.596  support y=0.160    gap -0.0 mm   
+ok  tee                  x -0.839..-0.269  y 0.671..0.874  z +1.068..+1.544  support -          gap -         
 ok  cat_figure           x -1.897..-1.848  y 1.270..1.334  z +0.381..+0.417  support y=1.270    gap -0.0 mm   
 ok  socket               x -1.470..-1.390  y 0.340..0.460  z -1.450..-1.420  support back wall  gap -0.0 mm   
 ok  power_strip          x -1.320..-1.020  y 0.160..0.220  z -1.438..-1.388  support y=0.160    gap -0.0 mm   
@@ -34,12 +36,12 @@ ok  cupnoodle            x +0.530..+0.630  y 1.270..1.481  z -1.230..-1.130  sup
 ok  tissues              x +0.700..+0.880  y 1.270..1.345  z -1.330..-1.220  support y=1.270    gap -0.0 mm   
 ok  shelf_box            x +0.142..+0.297  y 0.238..0.438  z -1.420..-1.180  support y=0.238    gap +0.0 mm   
 ok  doormat              x +1.080..+1.820  y 0.160..0.172  z -1.400..-0.980  support y=0.160    gap -0.0 mm   
-ok  rug                  x -0.500..+0.950  y 0.160..0.172  z -0.620..+0.850  support y=0.160    gap -0.0 mm   
-ok  curtain_a            x -1.878..-1.786  y 1.271..2.200  z -0.923..-0.567  support y=1.270    gap +1.4 mm   
-ok  curtain_b            x -1.876..-1.782  y 1.271..2.200  z +0.830..+1.260  support y=1.270    gap +1.4 mm   
+ok  rug                  x -0.500..+0.950  y 0.160..0.175  z -0.620..+0.850  support y=0.160    gap -0.0 mm   
+ok  curtain_a            x -1.883..-1.779  y 1.271..2.199  z -0.924..-0.566  support y=1.270    gap +1.1 mm   
+ok  curtain_b            x -1.882..-1.778  y 1.271..2.199  z +0.833..+1.259  support y=1.270    gap +1.1 mm   
 ok  poster_a_frame       x -1.236..-0.884  y 1.714..2.226  z -1.450..-1.432  support back wall  gap -0.0 mm   
 ok  poster_b_frame       x -0.706..-0.414  y 1.649..2.071  z -1.450..-1.432  support back wall  gap -0.0 mm   
 ok  poster_c_frame       x -1.736..-1.464  y 1.834..2.106  z -1.450..-1.432  support back wall  gap -0.0 mm   
 ok  switch_plate         x +0.930..+1.000  y 1.170..1.290  z -1.450..-1.442  support back wall  gap -0.0 mm   
 ok  ac_body              x +0.360..+1.000  y 2.020..2.290  z -1.450..-1.240  support back wall  gap -0.0 mm   
-SWEEP 44 props, 0 offenders
+SWEEP 46 props, 0 offenders

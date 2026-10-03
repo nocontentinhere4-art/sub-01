@@ -11,8 +11,12 @@ rug, doormat and poster frames are all built from code in `room_build/build_room
 #75: the hoodie on the door hook, the backpack, the floor cushion, the electric fan, the slippers, the laundry pinch
 hanger with socks and a towel, the manga stack, the game controller (a generic shape, no maker's design), the
 headphones and their wall hook, the cat figure on the window sill, the cork pinboard, the wall socket, the power strip
-and the cables. The duvet's drape comes from a
-Blender cloth simulation. The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
+and the cables. The soft goods (#98) are built by `room_build/props_soft.py`: the socks (heel, toe, ribbed cuff) and
+the terry hand towel on the pinch hanger, the mattress with its fitted sheet, the pillow in its case, the duvet (a
+Blender cloth simulation, turned back over itself at the head end, then box-quilted), the curtains with their pencil
+pleats and hems, the rug with its bound edge, the tufted floor cushion, the hoodie and the canvas tote on the door
+hooks, the backpack, and two clothes: jeans in a heap by the bed's foot and a T-shirt thrown on the bed (a second cloth
+simulation). The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
 is its own node, `chair` (origin on the floor under the gas lift), so it can be moved: it has its own materials and its
 own AO (`chair_ao`, self-occlusion only), and the room's AO is baked without it.
 
@@ -46,11 +50,17 @@ Textures (each recoloured or regraded in `tex_prep.py`):
 | floor (until #98) | `wood_floor` | Dimitrios Savva |
 | wall plaster | `white_stucco` | Amal Kumar |
 | desk, shelf, bed, door wood | `oak_veneer_01` | Jenelle van Heerden |
-| bed sheet, pillow | `cotton_jersey` | colormass, Rico Cilliers |
+| bed sheet, mattress cover, pillow; the floor cushion and the T-shirt (recoloured) | `cotton_jersey` | colormass, Rico Cilliers |
 | duvet | `waffle_pique_cotton` | colormass, Rico Cilliers |
-| curtains | `rough_linen` | colormass, Rico Cilliers |
+| curtains; the tote's canvas (recoloured) | `rough_linen` | colormass, Rico Cilliers |
 | rug | `poly_wool_herringbone` | colormass, Rico Cilliers |
 | chair fabric, desk mat (normal map) | `jersey_melange` | colormass, Rico Cilliers |
+| socks (normal map) | `knitted_fleece` | colormass, Rico Cilliers |
+| hand towel | `terry_cloth` | colormass, Rico Cilliers |
+| hoodie | `jogging_melange` | colormass, Rico Cilliers |
+| the hoodie's ribbed hem and cuffs (normal map) | `ribbed_corduroy` | colormass, Rico Cilliers |
+| backpack (normal map) | `bi_stretch` | colormass, Rico Cilliers |
+| jeans | `denim_fabric_05` | colormass, Rico Cilliers |
 
 Models:
 
@@ -80,13 +90,15 @@ From `room_build/`, with Blender 4.2 and Node 22:
 
     python ph.py tex 2k wooden_floor_01
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
+    python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
     python tex_prep.py                       # (runs tex_hard.py too: the hard surfaces' textures and atlases)
-    blender -b -P build_room.py -- --sweep   # 20 s: only the prop sweep (out/sweep.txt), no bake, no export
-    blender -b -P build_room.py          # about 9 minutes: most of it is the two AO bakes
+    blender -b -P build_room.py -- --sweep   # a few minutes (the two cloth simulations): only the prop sweep (out/sweep.txt), no bake, no export
+    blender -b -P build_room.py          # the cloth simulations plus the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
-    python shots.py --out ../docs/design/room-hard/after      # fixed-camera screenshots (from the repository root: python room_build/shots.py)
+    python shots_soft.py --glb ../web/room/room_clean.glb --tag after   # fixed-camera renders (docs/design/room-soft)
+    python shots.py --out ../docs/design/room-hard/after      # fixed-camera screenshots of the hard surfaces (from the repository root: python room_build/shots.py)
 
 ## His movement and the things he handles (#63)
 No animation clips were added. The clips are the ones already in `web/room/` (`boy_*.glb`, the same rig). Everything new is
