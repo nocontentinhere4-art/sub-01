@@ -406,13 +406,12 @@
   const VS_LINE = `
     attribute float aKind; attribute float aDist; attribute float aArrive;
     ${INST}
-    uniform float uTime, uDepthK, uPulseW, uPulseTail, uPulseFade, uLift;
+    uniform float uTime, uDepthK, uPulseW, uPulseTail, uPulseFade;
     varying float vKind, vCol, vSoma, vPulse, vDist, vDepth;
     ${ROT}
     void main(){
       vec3 w = rotq(iQuat, position * iScale) + iOff;
       vec4 mv = modelViewMatrix * vec4(w, 1.0);
-      mv.z += uLift;                                               // H01: the axon line runs inside its own thin mesh tube; lift it toward the camera
       gl_Position = projectionMatrix * mv;
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       float dt = uTime - iSpike, on = step(0.0, dt), x = dt - aArrive;
@@ -594,7 +593,7 @@
       uDofMax: { value: 0.7 }, uBloom: { value: 0.9 }, uExposure: { value: 1.0 }, uStyle: { value: 0 }, uBg: { value: new THREE.Vector3() } },
       vertexShader: VS_QUAD, fragmentShader: FS_COMP, depthTest: false, depthWrite: false });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), matDown); quad.frustumCulled = false; quadScene.add(quad);
-    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 }, uLift: { value: 0 },
+    const uni = { uTime: { value: 0 }, uPixK: { value: 0.001 }, uFloorPx: { value: L.floorPx }, uDepthK: { value: 1 / 2000 }, uPulseW: { value: 0.09 }, uPulseTail: { value: 0 }, uPulseFade: { value: 8 }, uPulseSwell: { value: 0 },
                   uStyle: { value: 0 }, uRate: { value: 0 }, uLive: { value: 0 }, uNucAlpha: { value: 0.45 }, uDim: { value: 0.3 },
                   uColA: { value: new THREE.Vector3(0.25, 1.0, 0.35) }, uColB: { value: new THREE.Vector3(1.0, 0.42, 0.15) },
                   uColMy: { value: new THREE.Vector3(0.6, 0.75, 1.0) }, uColAct: { value: new THREE.Vector3(1.0, 0.95, 0.7) },
@@ -689,12 +688,29 @@
       scene.add(lines); meshes.push(lines); counts.lines += pos.length / 6; counts.drawCalls++;
       return { A, geom: g };
     }
+    function skelTubes(k, bright, col, name, rUm) {               // a skeleton as thin 3-sided tubes through the cell shader: the pixel floor keeps
+      const children = Array.from({ length: k.n }, () => []);      // them a pixel wide at least, and the pulse lights them node to node (no sprites)
+      for (let i = 0; i < k.n; i++) if (k.parent[i] >= 0) children[k.parent[i]].push(i);
+      const B = new Builder(), node = i => ({ p: [k.pos[3 * i], k.pos[3 * i + 1], k.pos[3 * i + 2]], r: rUm, d: k.dist[i], t: k.arrive[i] });
+      for (let s = 0; s < k.n; s++) {                                // a chain starts at a root, after a branch point or where the class changes
+        const p = k.parent[s];
+        if (!(p < 0 || children[p].length > 1 || k.kind[s] !== k.kind[p])) continue;
+        const chain = p >= 0 ? [p] : []; let i = s;
+        for (;;) { chain.push(i); if (children[i].length !== 1 || k.kind[children[i][0]] !== k.kind[i]) break; i = children[i][0]; }
+        if (chain.length >= 2) B.tube(chain.map(node), 3, k.kind[s], 1, false);
+      }
+      if (!B.n) return null;
+      const g = B.geometry(THREE), A = oneInstance(g, bright, col);
+      const mesh = new THREE.Mesh(g, matCell); mesh.frustumCulled = false; mesh.name = name;
+      scene.add(mesh); meshes.push(mesh); counts.triangles += B.idx.length / 3; counts.drawCalls++;
+      return { A, geom: g, tri: B.idx.length / 3 };
+    }
     function buildH01(data) {
       S.h01 = data;
-      // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the axon tube itself
-      // and the axon's skeleton line light from the front back toward the soma (~45 µm, fading), the tube swells by up to 2 µm where
-      // lit, and the pulse fades over 20 s instead of 8: a visual convention, said in the docs. Nothing separate travels along the axon.
-      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 1.0; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 2.0; uni.uLift.value = 1.5;
+      // the real axons are thin (~0.5 µm, a pixel) and long (the focus cell's 4 mm take ~34 s at the slowed clock): the axon (the mesh's
+      // tube and the thin tube along the cell's own axon skeleton) lights from the front back toward the soma (~45 µm, fading), swells by
+      // ~0.6 µm where lit, and the pulse fades over 20 s instead of 8: a visual convention, said in the docs. Nothing separate travels.
+      uni.uPulseW.value = 0.3; uni.uPulseTail.value = 1.0; uni.uPulseFade.value = 20; uni.uPulseSwell.value = 0.6;
       const tags = c => (c.tags || []);
       for (const c of data.cells) {
         const tg = tags(c).join(" "), isGlia = c.role === "glia", isInter = /interneuron/.test(tg);
@@ -722,9 +738,9 @@
           const Lk = skelLines(c.skel, 0.4, isInter ? 1 : 0, "nr-h01-far-" + c.id);
           cells.push({ tier: "far", type, A: Lk.A, j: 0, geom: Lk.geom, pos: c.soma.slice(), h01: c });
         }
-        if (c.mesh && c.askel && !isGlia) {                        // focus / hero: the axon's skeleton as a line under the mesh (the mesh's axon is a
-          const Lk = skelLines(c.askel, 0.55, isInter ? 1 : 0, "nr-h01-axon-" + c.id);   // pixel wide and decimated): the pulse lights it node to node
-          const rec = cells[cells.length - 1]; rec.extra = (rec.extra || []).concat([Lk.A]);
+        if (c.mesh && c.askel && !isGlia) {                        // focus / hero: the axon's own skeleton as a thin tube along the mesh's axon (which is a
+          const Tk = skelTubes(c.askel, c.role === "focus" ? 0.9 : 0.7, isInter ? 1 : 0, "nr-h01-axon-" + c.id, 0.35);   // pixel wide and decimated):
+          if (Tk) { const rec = cells[cells.length - 1]; rec.extra = (rec.extra || []).concat([Tk.A]); rec.tri += Tk.tri; }   // the pulse lights it node to node
         }
         counts.dendUm += c.dendUm || 0;
       }
@@ -743,7 +759,7 @@
       finish();
     }
     function buildProcedural() {
-      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0; uni.uLift.value = 0;
+      uni.uPulseW.value = 0.09; uni.uPulseTail.value = 0; uni.uPulseFade.value = 8; uni.uPulseSwell.value = 0;
       const rnd = mulberry(880 + Object.keys(KINDS).indexOf(kind) + (L === LOD.phone ? 7 : 0));
       const split = n => Kd.types.map(([t, f]) => [t, Math.max(0, Math.round(n * f))]);
       const want = { hero: split(L.hero), mid: split(L.mid), far: split(L.far) };

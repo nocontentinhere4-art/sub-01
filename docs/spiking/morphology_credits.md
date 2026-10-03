@@ -47,7 +47,7 @@ What is used (`web/neuron_render/build/fetch_h01.py`, the list of cell ids in `w
 - a crop of the **EM image** (`4nm_raw` at its 64 nm mip, downsampled to 128 nm per pixel) through the focus cell's
   soma, drawn behind the block in the EM look.
 
-Changes to the original data: decimation, quantisation to 16 bits in each cell's box, lateral shifts, the choice of
+Changes to the original data: decimation (the axon on its own share of the triangle budget), quantisation to 16 bits in each cell's box, lateral shifts, straight bridges (≤ 32 µm) across the gaps between the fragments of a cell's axon skeleton, the choice of
 cells and levels of detail. None of these cells is from the person whose MRI the brain model is built from; the
 activity drawn on them is simulated.
 

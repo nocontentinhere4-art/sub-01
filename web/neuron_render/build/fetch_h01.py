@@ -83,8 +83,9 @@ SETS = {
 TRI = {"desktop": {"focus": 70000, "hero": 50000, "mid": 12000, "glia": 8000}, "phone": {"focus": 40000, "hero": 28000, "mid": 8000, "glia": 5000}}
 COUNTS = {"desktop": {"hero": 2, "mid": 7, "far": 6, "glia": 4}, "phone": {"hero": 2, "mid": 5, "far": 6, "glia": 3}}
 FAR_STRIDE = {"desktop": 6, "phone": 8}
-POST_MAX = {"focus": 100000, "hero": 100000, "mid": 1200}       # incoming synapses kept per cell (the mid tier: a sample)
-AXON_SKEL_NODES = {"desktop": 2500, "phone": 2000}             # the focus / hero cells also carry their axon's skeleton (thinned to about this
+POST_MAX = {"focus": 100000, "hero": 100000, "mid": 1000}       # incoming synapses kept per cell (the mid tier: a sample)
+AXON_SKEL_NODES = {"desktop": 2200, "phone": 1800}
+BRIDGE_UM = 32.0                                              # an axon skeleton fragment is bridged straight to a closer node within this             # the focus / hero cells also carry their axon's skeleton (thinned to about this
                                                                # many nodes): drawn as a line under the mesh, lit node to node by the pulse
 
 
@@ -461,8 +462,8 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
             entry["myelinated_um"] = round(float(seglen[kinds_all == 4].sum()), 1)
             entry["axon_um"] = round(float(seglen[np.isin(kinds_all, (1, 4, 5))].sum()), 1)
             entry["dend_um"] = round(float(seglen[kinds_all == 2].sum()), 1)
-            def thin_skel(keep, within=None, max_um=None):      # the skeleton thinned to the kept nodes; each kept node's parent = its nearest kept ancestor
-                par = cell["PAR"]; newidx = -np.ones(len(Pb), int); newidx[keep] = np.arange(keep.sum())
+            def thin_skel(keep, within=None, max_um=None, par=None):   # the skeleton thinned to the kept nodes; each kept node's parent = its nearest kept ancestor
+                par = cell["PAR"] if par is None else par; newidx = -np.ones(len(Pb), int); newidx[keep] = np.arange(keep.sum())
                 anc = np.empty(len(Pb), int)
                 for i in range(len(Pb)):
                     p = par[i]
@@ -495,7 +496,21 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
                     # branch points and tips of the axon stay, so no branch is lost to the stride
                     nchild = np.bincount(cell["PAR"][cell["PAR"] >= 0], minlength=len(Pb))
                     keep[ax & ((nchild != 1))] = True
-                    entry["abbox"], entry["askel"] = thin_skel(keep, within=ax, max_um=25.0)
+                    # H01's SWC comes in fragments and the axon's often starts tens of µm from the soma with gaps along it; a fragment
+                    # root is bridged straight to the nearest soma / axon node closer to the soma within BRIDGE_UM, so the drawn axon
+                    # (and the pulse on it) is continuous from the soma; the bridges are said in the docs
+                    par2 = cell["PAR"].copy(); D = cell["D"]; soma_or_ax = ax | (kinds_all == 0)
+                    cand = np.where(soma_or_ax)[0]
+                    if len(cand):
+                        from scipy.spatial import cKDTree
+                        ctree = cKDTree(Pb[cand])
+                        for r in np.where(ax & (cell["PAR"] < 0))[0]:
+                            dd, jj = ctree.query(Pb[r], k=min(24, len(cand)))
+                            for d_, j_ in zip(np.atleast_1d(dd), np.atleast_1d(jj)):
+                                j = cand[j_]
+                                if j != r and d_ <= BRIDGE_UM and D[j] < D[r]:
+                                    par2[r] = j; keep[j] = True; break
+                    entry["abbox"], entry["askel"] = thin_skel(keep, within=soma_or_ax, max_um=BRIDGE_UM, par=par2)
             if role != "far":                                   # the real synapses: this cell's boutons (pre) and inputs (post)
                 pre, post = synapses_for(h, sid)
                 n_all_post = len(post)
@@ -591,7 +606,7 @@ def main():
         img = img.transpose(Image.Transpose.ROTATE_90)
     if sign > 0 and axis == 1:
         img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    img.save(OUT / f"{args.set}_em.jpg", quality=48)
+    img.save(OUT / f"{args.set}_em.jpg", quality=44)
     em_entry = {"file": f"{args.set}_em.jpg", "nm_per_px": mip[0] * 2, "px": px // 2, "um": round(px * mip[0] / 1000.0, 1),
                 "centre": [round(float(x), 1) for x in em_centre_block], "note": "a real SEM image of the same tissue (the 4 nm volume at its 64 nm mip) through the focus cell's soma"}
     sizes = {}
