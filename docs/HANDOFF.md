@@ -404,9 +404,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   while the GPU streams. The room's lite feed gets none (it never drew them).
 - `/brain`: a **neurons** layer button (`web/neurons3d.js` + `web/neurons3d.json`). Since #88 B a **forest of small
   real cells**, not dots: each sampled neuron is a NeuroMorpho.Org cell of its region's type simplified to ≤ 40
-  segments, enlarged ~14× (labelled), pyramidal cells along the cortical surface normal; 3000 cells desktop, 1500
-  phone, 800 mini; one instanced draw call per type + the somata. Offline it reads "neurons offline", the cells stand
-  still and nothing glows. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
+  segments, enlarged ~6× (labelled), pyramidal cells along the cortical surface normal; ≤ 600 cells desktop, ≤ 300
+  phone, ≤ 240 mini (≥ 1 a region); one instanced draw call per type + the somata. Dim like a sparse stain (one muted
+  hue a type, base ≤ 0.12; the first version saturated to white): only a recorded spike brightens a cell; fibres and
+  cortex step back while neurons are on. Offline it reads "neurons offline", the cells stand still and nothing glows. `/brain?mini&neurons=1` for the room's PiP: the room follow-up
   only changes the iframe `src`. The Neurons panel (`/brain`, `/life`) reads the compact raster (one row a region).
 - GPU frames carry per-region rates (`session.py` `frame()`: `"rq": quantise_rates(rr)`); a pod without it is tinted
   by network group rates, labelled. The panel also lists #70's real decisions per day (learned vs frozen twin).

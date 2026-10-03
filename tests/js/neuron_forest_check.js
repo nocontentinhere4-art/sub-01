@@ -12,7 +12,8 @@ class Geom { constructor() { this.attributes = {}; this.instanceCount = 0; } set
 class Obj { constructor(g, m) { this.geometry = g; this.material = m; this.children = []; this.visible = true; } add(c) { this.children.push(c); } remove() {} }
 const THREE = { Group: Obj, Scene: Obj, LineSegments: Obj, Points: Obj, InstancedBufferGeometry: Geom, BufferGeometry: Geom, BufferAttribute: Attr,
   InstancedBufferAttribute: Attr, DataTexture: class { constructor(d) { this.image = { data: d }; } dispose() {} }, RGBAFormat: 1023,
-  ShaderMaterial: class { constructor(o) { Object.assign(this, o); } dispose() {} }, AdditiveBlending: 2, DynamicDrawUsage: 35048 };
+  ShaderMaterial: class { constructor(o) { Object.assign(this, o); } dispose() {} }, AdditiveBlending: 2, DynamicDrawUsage: 35048,
+  Vector3: class { constructor(x, y, z) { this.x = x; this.y = y; this.z = z; } } };
 const web = f => path.join(root, "web", f);
 const morph = JSON.parse(fs.readFileSync(web("neurons_morph.json"), "utf8"));
 const nodes = JSON.parse(fs.readFileSync(web("brain.json"), "utf8")).nodes;
@@ -34,7 +35,7 @@ for (const h of ctr) for (let a = 0; a < 3; a++) h[a] /= h[3];
 for (let v = 0; v < nv; v++) { const h = ctr[cortex[3 * v] < 0 ? 0 : 1]; let d = 0; for (let a = 0; a < 3; a++) d += nrm[3 * v + a] * (cortex[3 * v + a] - h[a]); if (d > 0) outward++; }
 out.normals_outward_frac = outward / nv;
 out.normals_sample = []; for (let v = 0; v < nv; v += 25) out.normals_sample.push(v, +nrm[3 * v].toFixed(4), +nrm[3 * v + 1].toFixed(4), +nrm[3 * v + 2].toFixed(4));
-for (const [tag, maxCells] of [["desktop", 3000], ["phone", 1500], ["mini", 800]]) {
+for (const [tag, maxCells] of [["desktop", 600], ["phone", 300], ["mini", 240]]) {
   const scene = new Obj(), t0 = performance.now();
   const n3 = N.create({ THREE, scene, nodes, cortex, cortexIdx, morph, sizes, maxCells });
   const build = performance.now() - t0, st = n3.state();

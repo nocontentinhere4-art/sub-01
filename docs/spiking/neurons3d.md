@@ -158,7 +158,7 @@ sampled model neuron as a small real cell instead of a dot.
 
   Result: pyramidal 14 axon + 26 dendrite segments; basket 11 + 29; medium spiny, relay and amygdala 2 + 37–38;
   CA1 8 + 32.
-- **Enlarged ~14×** (the caption says "cells enlarged ~14× for visibility"). Relative sizes are kept: a medium spiny
+- **Enlarged ~6×** (the caption says "cells enlarged ~6× for visibility"; ~14× in the first version, see below). Relative sizes are kept: a medium spiny
   cell stays much smaller than a pyramidal cell. Each soma is a round point of its real radius × 14, at least 2.5 px.
 - **Orientation:**
   - Cortical pyramidal cells point their apical dendrite (+y in the asset) along the **local surface normal** of
@@ -177,9 +177,10 @@ sampled model neuron as a small real cell instead of a dot.
   - **Offline**, the cells stand still in a neutral colour: no glow, no tint. The caption reads "neurons offline … ·
     static cells, no activity". Nothing is faked; the cells are shown so the view is not empty.
 - **Level of detail and cost:**
-  - 3000 cells on desktop, 1500 on screens < 600 px, and 800 in the room's mini. Each region gets cells in
-    proportion to its 20k-network population, at least 3.
-  - Desktop: 2 901 cells and 115 511 segments; phone: 1 407 cells and 56 016 segments.
+  - ≤ 600 cells on desktop, ≤ 300 on screens < 600 px, and ≤ 240 in the room's mini. Each region gets cells in
+    proportion to its 20k-network population, at least 1 (every region keeps its spikes); over the cap the largest
+    regions are trimmed.
+  - Desktop: 504 cells and 20 071 segments; phone: 246 cells and 9 756 segments; mini: 224 cells.
   - 7 draw calls: one instanced `LineSegments` per cell type (6) and one `THREE.Points` for the somata.
   - Per-instance spike times are uploaded only when spikes arrive and the layer is drawn.
   - The page draws nothing while the brain is off screen or the tab is hidden (unchanged).
@@ -202,7 +203,54 @@ sampled model neuron as a small real cell instead of a dot.
   - `python tests/neurons3d_shots.py --out docs/screens/neuron_forest`: screenshots at 1920, 1280 and 390 px, live
     and offline, and the forest zoomed; the panel's boxes; counts; JS cost and FPS (`results.json`).
 
-### Measured (2026-10-02, this sandbox: headless Chromium, WebGL in software via SwiftShader, no GPU)
+### The look, after the owner's "it looks like a Christmas tree" (#88 B follow-up)
+The first version drew ~2 900 cells at ~14× with bright additive colours (dendrite base 0.8–1.5, ×0.75): they
+overlapped and saturated to white. Now, like a sparse stain under a dark-field microscope:
+- **Fewer, smaller cells:** ≤ 600 / 300 / 240 (desktop / phone / mini), enlarged ~6×.
+- **Dim, muted colour:** one hue per cell type, low saturation, base 0.12 before additive blending:
+  - pyramidal and CA1: grey-green;
+  - basket: grey-amber;
+  - medium spiny: grey-mauve;
+  - relay: grey-blue;
+  - amygdala: grey-rose.
+  The axon is drawn at 0.6 of that, and a soma point at 1.6× (≥ 1.5 px).
+- **Rates:** a region's rate warms the hue by ≤ 25 % and lifts the brightness by ≤ 50 % of the base. The race
+  highlight stays as dim.
+- **Spikes:** only a recorded spike brightens a cell (+0.7 × hue), briefly, from the soma along its axon.
+- **Behind the cells:** while neurons are on, the fibres step back to 15 % and the cortex rim to 30 %, so the brain's
+  shape stays a faint outline.
+- **Measured** by `python tests/neuron_forest_look.py --tag before|after` (`docs/screens/neuron_forest_look/`):
+  - default layers, text and panels hidden for the measurement;
+  - "brain pixels" are those with luma > 0.03;
+  - target: ≤ 2 % of them above 0.8 at rest.
+
+  | view | before: > 0.8 | before: mean | after: > 0.8 | after: mean |
+  |---|---|---|---|---|
+  | 1920 offline | 14.3 % | 0.47 | 0.00 % | 0.10 |
+  | 1920 live | 29.5 % | 0.57 | 0.01 % | 0.09 |
+  | 390 offline | 12.5 % | 0.43 | 0.00 % | 0.09 |
+  | 390 live | 30.9 % | 0.58 | 0.20 % | 0.09 |
+  | forest alone, 1920 live | 31.5 % | 0.58 | 0.10 % | 0.11 |
+  | forest alone, 390 live | 30.2 % | 0.56 | 2.01 % | 0.16 |
+
+  The last "after" row is just over 2 %. It is live, not at rest: the replayed spikes brighten cells, and on a
+  phone-size canvas the few lit pixels weigh more.
+- **FPS:** fewer segments, faster. Measured at 390 px with fibres and cortex hidden, software WebGL (SwiftShader) in
+  the sandbox:
+
+  | cells (segments) | FPS ×1 | FPS ×4 |
+  |---|---|---|
+  | none | 19.2 | 13.0 |
+  | 246, phone default (9 756) | 13.0 | 10.8 |
+  | 504 (20 071) | 13.2 | 8.2 |
+
+  The first version, 1 407 cells and 56 016 segments, ran at 3.6 and 2.0–2.4. **A real device is still the only test
+  of ≥ 30 FPS.**
+- **Honest limit:** at whole-brain scale a real cell at ~6× is small, about 10–25 px at 1920 and a few px at 390. The
+  view now reads as dim, separate cells inside a faint brain, not as cells you can study. For the shapes themselves,
+  the close-ups (NeuronRender, #88 A) are the place.
+
+### Measured for the first version (2026-10-02; superseded above: ~14×, 2 901 / 1 407 cells)
 - **Counts:**
   - desktop: 2 901 cells and 115 511 segments;
   - phone (< 600 px): 1 407 cells and 56 016 segments;
