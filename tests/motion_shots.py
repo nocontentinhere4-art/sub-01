@@ -77,13 +77,18 @@ FRAME = """() => { const b = window.boy; if (!b) return; const t = new THREE.Vec
   const clear = (c, p) => { const d = p.clone().sub(c), len = d.length(); ray.set(c, d.normalize()); ray.far = len - 0.35;
     const h = ray.intersectObjects(scene.children, true).find(h => h.object.visible && !ofBoy(h.object) && !(h.object.material && h.object.material.transparent && h.object.material.opacity < 0.6));
     return h ? h.distance / len : 1; };
-  let best = null;
-  for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8]) { const d = new THREE.Vector3(Math.sin(r + a), 0, Math.cos(r + a));
-    const c = box(t.clone().addScaledVector(d, 2.7).add(new THREE.Vector3(0, 0.6, 0)));
-    const open = Math.min(clear(c, t), clear(c, t.clone().add(new THREE.Vector3(0, -0.6, 0))), clear(c, t.clone().add(new THREE.Vector3(0, -1.1, 0))));
-    const dist = c.distanceTo(t) - (Math.abs(a) > 1.5 ? 0.6 : 0) - (inTall(c) ? 5 : 0) - (1 - open) * 6;
-    if (!best || dist > best.dist) best = {c, dist}; }
-  camera.fov = 46; camera.updateProjectionMatrix(); camera.position.copy(best.c); controls.target.copy(t); controls.update(); renderer.render(scene, camera); }"""
+  // eight directions at four distances: the longest clear line of sight wins (the clear part of the way to him), his
+  // front half preferred; near a wall (the door, the window) that means a closer camera rather than one behind furniture
+  let best = null; const tried = [];
+  for (const a of [0.7, -0.7, 1.2, -1.2, 0.2, -0.2, 1.8, -1.8]) for (const s of [2.7, 2.1, 1.6, 1.2]) {
+    const d = new THREE.Vector3(Math.sin(r + a), 0, Math.cos(r + a));
+    const c = box(t.clone().addScaledVector(d, s).add(new THREE.Vector3(0, 0.6 * s / 2.7, 0)));
+    const far = c.distanceTo(t), open = Math.min(clear(c, t), clear(c, t.clone().add(new THREE.Vector3(0, -0.6, 0))));   // head and hips (a knee ray trips on low props: the plant at the sill)
+    const dist = far * open - (Math.abs(a) > 1.5 ? 0.4 : 0) - (inTall(c) ? 5 : 0);
+    tried.push({a, s, far: +far.toFixed(2), open: +open.toFixed(2), score: +dist.toFixed(2)});
+    if (!best || dist > best.dist) best = {c, dist, a}; }
+  camera.fov = 46; camera.updateProjectionMatrix(); camera.position.copy(best.c); controls.target.copy(t); controls.update(); renderer.render(scene, camera);
+  return {a: best.a, ry: +r.toFixed(2), at: t.toArray().map(v => +v.toFixed(2)), tried}; }"""
 
 
 def serve(port):
@@ -170,8 +175,10 @@ def main():
                                 pg.evaluate("() => { sim(1 / 30, 36); }")
                             if not pg.evaluate("() => { const b = window.boy; return b && b.visible; }"):
                                 continue
-                            pg.evaluate(FRAME)
+                            cam = pg.evaluate(FRAME)
                             probe = pg.evaluate(PROBE)
+                            if probe is not None:
+                                probe["camera"] = cam
                             name = f"{key}_{mode}_{w}_{k}.jpg"
                             try:
                                 pg.screenshot(path=str(out / name), type="jpeg", quality=80, timeout=90000)
