@@ -1061,8 +1061,8 @@
   // the cortex block's extent, readable before open(): the union of the H01 cells' bounding boxes in the block frame (h01/cortex.json),
   // µm; +y toward the pia; the focus soma (L2 pyramidal 1874244336) at the origin. depthUm: how deep below the pia the block's top and
   // bottom lie, estimated from H01's soma table (the highest layer-1 somata of this column sit ~780 µm above the focus soma): ± ~100 µm.
-  const BLOCK = { set: "cortex", dataset: "H01", um: [2210, 846, 175], min: [-1086, -446, -101], max: [1124, 399, 74], pia: "+y", focusUm: [0, 0, 0],
-                  focusDepthUm: 800, depthUm: [400, 1250], depthApprox: true };
+  const BLOCK = { set: "cortex", dataset: "H01", um: [2202, 827, 174], min: [-1084, -431, -145], max: [1118, 396, 29], pia: "+y", focusUm: [0, 0, 0],
+                  focusDepthUm: 800, depthUm: [400, 1230], depthApprox: true };
   const NR = { open, openAt, prefetch, load, kindOf, plan, cellGeometry, lineGeometry, budget, rateByte, Builder, TYPES, KINDS, LOD, SLOWDOWN, CAPTION, CAPTION_PROCEDURAL,
                H01_SETS, H01_CITE, BLOCK, K, CELLS: null, h01: null };
   root.NeuronRender = NR;
