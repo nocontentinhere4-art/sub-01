@@ -171,8 +171,14 @@ def test_module_and_its_single_hook():
     assert html.count("#98 G3") == 2 and html.count('import("./room/boy_motion.js")') == 1   # one marked block, one import
     block = html[html.index("// ===== #98 G3"):html.index("// ===== end #98 G3")]
     assert "animate = dt =>" in block and "setCurrent" in block and "touch" in block
+    for name in ("movesDone", "HIPS0", "stride0", "setStride"):      # #76's clips go in first; ?motion=old gets the first ones back
+        assert name in block, name
     for name in ("createMotion", "breathe(", "weightShift(", "feet(", "hands(", "bowl(", "eyes(", "smoothBones("):
         assert name in js, name
+    # the per-activity clip choice is one explicit table, overridable with ?motion=ardy|ual|old (per slot too)
+    table = js[js.index("export const CHOICE = {"):js.index("}", js.index("export const CHOICE = {"))]
+    assert all(f"{slot}: \"ardy\"" in table for slot in ("desk", "eating", "standing", "walk", "window")), table
+    assert "export function choices(" in js and "?motion=ardy|ual|old" in js
     assert "env.touch(" in js                                                    # every bone it moves is registered
     for word in ("he feels", "he understands", "conscious"):
         assert word not in js.lower()

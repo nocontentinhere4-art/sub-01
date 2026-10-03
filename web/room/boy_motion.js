@@ -4,10 +4,12 @@
 //
 // 1. Motion clips generated with NVIDIA ARDY (text-to-motion, Apache-2.0 code, checkpoints under the NVIDIA Open Model
 //    License; see web/room/CREDITS.md) and retargeted onto this rig by room_build/ardy_to_boy.mjs: boy_m_*.glb, listed
-//    in boy_m_manifest.json. Where a clip is better than the page's Meshy one it takes its place under the same action
-//    name (typing at the desk, eating, a standing idle, the walk, the window), with the HIPS table updated so the page's
-//    planner puts the root where the hips must go. The clips the planner has no slot for yet (sitting down, standing
-//    up, the door, the turn, lying on the bed) ship in the manifest and can be played from the console (motion.play).
+//    in boy_m_manifest.json. Per activity (the CHOICE table below; ?motion= overrides it) a clip takes the place of the
+//    page's one under the same action name (typing at the desk, eating, a standing idle, the walk, the window), with
+//    the HIPS table updated so the page's planner puts the root where the hips must go. The clips go in after #76's
+//    boy_moves.glb (room.html's loadMoves(), which takes the desk and the walk first). The clips the planner has no slot
+//    for yet (sitting down, standing up, the door, the turn, lying on the bed) ship in the manifest and can be played
+//    from the console (motion.play).
 // 2. A procedural layer on top of whatever clip plays: breathing (chest, belly, shoulders, from his body model's rate),
 //    weight shifts with the feet planted, foot IK on the floor (no foot below it; feet locked while they bear weight
 //    in the walk), hand IK to the keyboard and the mouse (typing bursts, mouse moves) and to the bowl held in the left
@@ -22,12 +24,26 @@ const BOWL_KINDS = new Set(["ramen", "curry"]);
 const KEYBOARD = {c: [-1.07, 1.0, -0.97], ry: 0.06, w: 0.36, d: 0.13};   // room_build/build_room.py: KB_C, KB_RY, kb_body (keys top at DTOP + 0.03)
 const MOUSE = [-0.785, 0.985, -0.975];
 const SWAP = {                                   // manifest clip -> the page's action it replaces, and the HIPS keys it owns
-  type: {action: "sit", hips: ["sit", "m_type"], edge: true},
-  eat: {action: "dine", hips: ["dine", "m_eat"], edge: true},
-  idle: {action: "stand", hips: ["stand", "lean", "deliver", "m_idle"]},
-  walk: {action: "walk", hips: ["walk", "m_walk"]},
-  window: {action: "lean", hips: ["lean", "m_window"]},
+  type: {slot: "desk", action: "sit", hips: ["sit", "m_type"], edge: true},
+  eat: {slot: "eating", action: "dine", hips: ["dine", "m_eat"], edge: true},
+  idle: {slot: "standing", action: "stand", hips: ["stand", "lean", "deliver", "m_idle"]},
+  walk: {slot: "walk", action: "walk", hips: ["walk", "m_walk"]},
+  window: {slot: "window", action: "lean", hips: ["lean", "m_window"]},
 };
+// Which clip each activity plays. "ardy": the clip above (boy_m_*.glb). "ual": #76's room/boy_moves.glb (Quaternius UAL /
+// keyed, loadMoves() in room.html), which has one for the desk (type) and the walk; for eating, standing and the window
+// it has none wired, so "ual" there means the first clip. "old": the first (Meshy) clip the page shipped with.
+// ?motion=ardy|ual|old sets every slot; ?motion=desk:ual,walk:old,... sets slots (the rest keep this table).
+export const CHOICE = {desk: "ardy", eating: "ardy", standing: "ardy", walk: "ardy", window: "ardy"};
+export function choices(search){
+  const out = {...CHOICE}, q = new URLSearchParams(search || "").get("motion"); if (!q) return out;
+  for (const part of q.split(",")) { const [a, b] = part.split(":"); const src = (b || a).trim(), slot = b ? a.trim() : null;
+    if (!["ardy", "ual", "old"].includes(src)) continue;
+    if (slot) { if (slot in out) out[slot] = src; } else for (const k in out) out[k] = src; }
+  return out;
+}
+const UAL = {desk: "type", walk: "walk"};        // the boy_moves.glb clip names in the slots #76 takes (its MOVE table)
+const OLD_FILE = {walk: "room/boy_walk.glb"};    // the first clip's file for a slot #76 takes; the desk's first clip is dine's (KEEP)
 
 export function createMotion(env){
   const {THREE} = env;
@@ -43,7 +59,7 @@ export function createMotion(env){
   const B = env.bones, F = env.F;
   const M = {
     on: true, clips: {}, manifest: null, layers: {breathe: true, shift: true, feet: true, hands: true, eyes: true, smooth: true},
-    T: 0, swapped: {}, log: [],
+    T: 0, swapped: {}, log: [], choice: choices(env.search ?? (typeof location !== "undefined" ? location.search : "")),
   };
 
   // ---------- the clips
@@ -71,8 +87,12 @@ export function createMotion(env){
     const ready = env.mixer && ["sit", "walk", "idle", "door", "stand", "eat", "sleep"].every(k => env.actions[k]) && (!env.movesDone || env.movesDone());
     if (!ready && (waited += 200) < 20000) { setTimeout(installClips, 200); return; }
     if (!env.mixer) { M.ready = true; return; }
+    const pending = [];
     for (const [name, {clip, info}] of Object.entries(M.clips)) {
       const sw = SWAP[name]; if (!sw || !info.loop && name !== "window") continue;
+      const src = M.choice[sw.slot];
+      if (src === "old" && UAL[sw.slot] && clipNameOf(env.actions[sw.action]) === UAL[sw.slot]) pending.push(restoreOld(sw));
+      if (src !== "ardy") continue;             // "ual" / "old": the slot keeps what the page has (#76's clip or the first one)
       const a = env.mixer.clipAction(clip);
       const old = env.actions[sw.action];
       env.actions[sw.action] = a;
@@ -80,13 +100,33 @@ export function createMotion(env){
       if (sw.edge) env.EDGE.add(clip.name);
       if (info.stride && env.setStride) env.setStride(info.stride);   // the page's walk time scale is speed / stride
       M.swapped[sw.action] = {from: old, to: a};
-      // the page is on the old action right now: hand over with a crossfade and tell the page which one it plays
-      const st = env.state();
-      if (old && st.current === old && !st.step) { a.reset().setEffectiveWeight(1).fadeIn(0.8).play(); old.fadeOut(0.8); env.setCurrent(a); }
+      handOver(old, a);
     }
     // the page's own layers that this module replaces
     env.OFF.breathe = M.layers.breathe; env.OFF.shift = M.layers.shift; env.OFF.head = M.layers.eyes;
-    M.ready = true;
+    Promise.all(pending).finally(() => { M.ready = true; });
+  }
+  const clipNameOf = a => a ? a.getClip().name : "";
+  // the page is on the old action right now: hand over with a crossfade and tell the page which one it plays
+  function handOver(old, a){
+    const st = env.state();
+    if (old && st.current === old && !st.step) { a.reset().setEffectiveWeight(1).fadeIn(0.8).play(); old.fadeOut(0.8); env.setCurrent(a); }
+  }
+  // ?motion=old on a slot #76's boy_moves.glb took: the first clip comes back (the desk's is kept under dine by the page's
+  // KEEP; the walk's file is loaded again, from the browser's cache), with the HIPS the page started with (env.HIPS0)
+  async function restoreOld(sw){
+    try {
+      let clip = null;
+      if (sw.slot === "desk") { const d = env.actions.dine; if (d && clipNameOf(d).includes("Chair_Sit")) clip = d.getClip(); }
+      else if (OLD_FILE[sw.slot]) { const g = await env.load(OLD_FILE[sw.slot]); clip = g.animations[0]; }
+      if (!clip) return;
+      const old = env.actions[sw.action], a = env.mixer.clipAction(clip);
+      env.actions[sw.action] = a;
+      if (env.HIPS0 && env.HIPS0[sw.action]) env.HIPS[sw.action] = env.HIPS0[sw.action].slice();
+      if (sw.slot === "walk" && env.setStride && env.stride0) env.setStride(env.stride0);   // room.html's STRIDE_V for the first walk clip
+      M.swapped[sw.action] = {from: old, to: a, old: true};
+      handOver(old, a);
+    } catch (e) { M.log.push(`old ${sw.slot}: ${e.message}`); }
   }
   loadClips();
 
@@ -429,5 +469,6 @@ export function createMotion(env){
   }
   return {update, play, layers: M.layers, clips: M.clips, rest: REST, get manifest(){ return M.manifest; }, swapped: M.swapped, log: M.log,
     get ready(){ return !!M.ready; },            // the clips are in (or given up on): tests wait for this before a scene
+    choice: M.choice,                            // which clip each activity plays (CHOICE, ?motion=)
     set on(v){ M.on = v; }, get on(){ return M.on; }};
 }

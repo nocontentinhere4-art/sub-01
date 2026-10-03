@@ -3,12 +3,15 @@
     python tests/motion_shots.py --out docs/screens/motion
 
 Serves web/ statically (no live server: the page runs with ?debug&nolive and is driven through its debug API), opens
-room.html in headless Chromium at 1280 and 390 px, and for each situation (at the desk, eating, standing, walking,
-at the window, on the phone in bed) takes frames with the motion layer OFF (the page as before: web/room/boy_motion.js
-is blocked, so the hook's import fails and nothing changes) and ON. Each frame is checked in the page: the lowest foot
-or toe sole against the floor, NaN in any bone. Writes <out>/sheet_1280.jpg, sheet_390.jpg (old row over new row per
-situation), the single frames, and results.json. The CDN scripts (three.js, leaflet) are served from room_build's
-node_modules (the sandbox may have no route to the CDNs); Chromium renders WebGL in software.
+room.html in headless Chromium at 1280 and 390 px, and for each situation (at the desk, eating, standing, at the
+window, walking, at the door, on the phone in bed, asleep) takes frames per clip source (--modes): `old` (the first
+Meshy clips: ?moves=old&motion=old), `ual` (#76's boy_moves.glb where it has a clip, the desk and the walk: ?motion=ual)
+and `ardy` (the ARDY clips, the default), the procedural layer of web/room/boy_motion.js on top of each; `before` is
+the page with the layer blocked (the hook's import fails) and the first clips: as it was before #80 and #98. Each frame
+is checked in the page: the lowest foot or toe sole against the floor, NaN in any bone. Writes <out>/sheet_1280.jpg,
+sheet_390.jpg (one row per mode and frame, a column per situation), the single frames, and results.json. The CDN
+scripts (three.js, leaflet) are served from room_build's node_modules (the sandbox may have no route to the CDNs);
+Chromium renders WebGL in software.
 """
 import argparse
 import http.server
@@ -23,7 +26,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 NM = ROOT / "room_build" / "node_modules"
 SITUATIONS = [("desk", "research", {}), ("eat", "eat", {"eating": "ramen", "food": 1}), ("stand", "idle_home", {"place": "room"}),
-              ("window", "window", {}), ("door", "idle_home", {"place": "door_in"}), ("phone_bed", "phone", {}), ("sleep", "sleep", {})]
+              ("window", "window", {}), ("walk", "research", {}),           # walk: from the door to the desk, shot mid-stride
+              ("door", "idle_home", {"place": "door_in"}), ("phone_bed", "phone", {}), ("sleep", "sleep", {})]
+# the page URL per clip source (see the docstring); None blocks the motion layer's module
+MODES = {"before": ("moves=old", False), "old": ("moves=old&motion=old", True), "ual": ("motion=ual", True), "ardy": ("", True)}
 # measured in the page: the lowest sole, NaN, the frame time of animate()
 PROBE = """() => {
   const b = window.boy, bones = window.bones; if (!b) return null; b.updateMatrixWorld(true);
@@ -94,7 +100,7 @@ def main():
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
     ap.add_argument("--widths", default="1280,390")
     ap.add_argument("--frames", type=int, default=3, help="frames per situation, 1.2 s apart")
-    ap.add_argument("--modes", default="old,new")
+    ap.add_argument("--modes", default="old,ual,ardy", help=f"clip sources, of {', '.join(MODES)}")
     ap.add_argument("--only", default="", help="comma-separated situations")
     ap.add_argument("--prep", default="", help="JavaScript run in the page after each act() (debug)")
     ap.add_argument("--settle", type=int, default=120, help="frames (30 fps) after act() before the first shot")
@@ -130,19 +136,26 @@ def main():
                     pg.route("**/unpkg.com/**", cdn)
                     pg.route("**/api/**", lambda r: r.fulfill(status=404, body=""))
                     pg.route("**/tokyo_*.json", lambda r: r.fulfill(status=404, body=""))
-                    if mode == "old":
+                    query, layer = MODES[mode]
+                    if not layer:
                         pg.route("**/room/boy_motion.js", lambda r: r.abort())
-                    pg.goto(f"{base}/room.html?debug&nolive&hour=14", wait_until="load")
+                    pg.goto(f"{base}/room.html?debug&nolive&hour=14" + (f"&{query}" if query else ""), wait_until="load")
                     pg.wait_for_function("window.boy && window.room && window.actions && window.actions.walk && window.actions.sleep", timeout=120000)
                     pg.wait_for_timeout(1500)
-                    if mode == "new":
-                        pg.wait_for_function("window.motion && window.motion.manifest && Object.keys(window.motion.swapped).length > 0", timeout=60000)
+                    if layer:                                      # the layer's clips are in (after boy_moves.glb)
+                        pg.wait_for_function("window.motion && window.motion.ready", timeout=60000)
+                    print(mode, w, "clips:", pg.evaluate("Object.fromEntries(Object.entries(actions).map(([k, a]) => [k, a.getClip().name]))"), flush=True)
                     pg.evaluate("() => { window.FREEZE = true; settle(); for (const id of ['top', 'side', 'dock', 'corner', 'vignette']) document.getElementById(id).style.display = 'none'; }")
                     for key, activity, extra in SITUATIONS:
                         if args.only and key not in args.only.split(","):
                             continue
                         life = {"activity": activity, "place": "room", "vitals": {"resp_per_min": 14}, **extra}
-                        pg.evaluate("(l) => { act(l.activity, l); " + args.prep + f" sim(1 / 30, {args.settle}); }}", life)
+                        if key == "walk":                          # from standing at the door: the research tick sends him to the desk
+                            pg.evaluate("(l) => { act('idle_home', {...l, activity: 'idle_home', place: 'door_in'}); sim(1 / 30, 60); }", life)
+                            pg.evaluate("(l) => { act(l.activity, l); " + args.prep + " for (let i = 0; i < 400; i++) { sim(0.1, 1); "
+                                        "const p = pose(); if (p.step && p.step.k === 'walk') break; } sim(1 / 30, 24); }", life)
+                        else:
+                            pg.evaluate("(l) => { act(l.activity, l); " + args.prep + f" sim(1 / 30, {args.settle}); }}", life)
                         if key == "phone_bed":
                             pg.evaluate("() => { sim(1 / 30, 1500); }")   # time to lie back
                         for k in range(args.frames):
@@ -164,18 +177,18 @@ def main():
     finally:
         srv.shutdown()
     (out / "results.json").write_text(json.dumps(results, indent=1))
-    sheet(out, results, [int(x) for x in args.widths.split(",")])
+    sheet(out, results, [int(x) for x in args.widths.split(",")], args.modes.split(","))
 
 
-def sheet(out, results, widths):
+def sheet(out, results, widths, modes=("old", "ual", "ardy")):
     try:
         from PIL import Image, ImageDraw
     except ImportError:
         print("no PIL: no sheet")
         return
     for w in widths:
-        cols = [k for k, _, _ in SITUATIONS if any((out / f"{k}_{m}_{w}_0.jpg").exists() for m in ("old", "new"))]
-        rows = [("old", 0), ("new", 0), ("old", 2), ("new", 2)]
+        cols = [k for k, _, _ in SITUATIONS if any((out / f"{k}_{m}_{w}_0.jpg").exists() for m in modes)]
+        rows = [(m, k) for k in (0, 2) for m in modes]              # the modes side by side per frame
         tw = 320 if w > 900 else 160
         imgs = {}
         for (mode, k) in rows:
@@ -193,7 +206,7 @@ def sheet(out, results, widths):
             d.text((j * tw + 6, 4), c, fill=(220, 220, 230))
         for i, (mode, k) in enumerate(rows):
             y = 20 + i * (th + 18)
-            d.text((6, y + 2), f"{mode} (frame {k})", fill=(255, 154, 60) if mode == "new" else (160, 160, 175))
+            d.text((6, y + 2), f"{mode} (frame {k})", fill=(255, 154, 60) if mode == "ardy" else (160, 160, 175))
             for j, c in enumerate(cols):
                 im = imgs.get((mode, k, c))
                 if im:

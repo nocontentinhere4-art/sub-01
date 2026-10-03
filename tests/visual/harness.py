@@ -61,6 +61,22 @@ def _pw_chromium():
         return None
 
 
+def wait_js(pg, predicate, timeout=15000, every=100):
+    """Poll a page predicate from here (pg.evaluate every `every` ms) until it is true or `timeout` ms pass.
+
+    Playwright's wait_for_function polls inside the page (requestAnimationFrame, or a setTimeout chain with polling=N);
+    on the second, background page Chromium may schedule neither for seconds at a time, so a true predicate went
+    unseen (CI, desk@14 on the 390 page: the diagnostic evaluate right after the timeout showed the scene taken). An
+    evaluate from here runs as soon as the page's main thread is free, whatever its timer throttling."""
+    t0 = time.time()
+    while True:
+        if pg.evaluate(predicate):
+            return True
+        if (time.time() - t0) * 1000 > timeout:
+            raise TimeoutError(f"wait_js: {timeout} ms exceeded")
+        pg.wait_for_timeout(every)
+
+
 class Harness:
     def __init__(self, out, full=False, log=print, cdn_cache=HERE / ".cdn_cache"):
         self.out = Path(out); self.out.mkdir(parents=True, exist_ok=True)
@@ -92,12 +108,12 @@ class Harness:
         if self.cdn:
             self.cdn.install(pg)
         pg.goto(self.base + "/room.html?debug&hour=14", wait_until="load")
-        pg.wait_for_function("window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9", timeout=180000, polling=100)
+        wait_js(pg, "() => !!(window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9)", timeout=180000)
         t0 = time.time()
         while st["glb"] < GLB_FILES and time.time() - t0 < 60:
             pg.wait_for_timeout(200)
         # #98 G3's motion layer (room/boy_motion.js) swaps its clips in after boy_moves.glb: wait for it too (a no-op without it)
-        pg.wait_for_function("!window.motion || window.motion.ready", timeout=60000, polling=100)
+        wait_js(pg, "() => !window.motion || !!window.motion.ready", timeout=60000)
         pg.evaluate("window.FREEZE = true")
         pg.add_script_tag(content=(HERE / "page_checks.js").read_text())
         pg.wait_for_timeout(300)                                   # the last tick's UI timer
@@ -116,8 +132,8 @@ class Harness:
         self.server.set_scene(name, hour)
         pg.evaluate(f"setHour({hour}); if (window.ROLL) ROLL.force = null;")
         try:
-            pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
-                                 f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000, polling=100)
+            wait_js(pg, f"() => {{ const p = pose(); return !!(p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
+                        f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))})); }}", timeout=15000)
         except Exception as e:                                     # say where he was and what the page threw, not just "timeout"
             st = next((v[2] for v in self.pages.values() if v[1] is pg), {})
             state = pg.evaluate("JSON.stringify({pose: pose(), clock: document.getElementById('clock').textContent})")
@@ -136,8 +152,8 @@ class Harness:
         if before:                                                 # the next tick must change his goal (anchor or clip)
             was = pg.evaluate("JSON.stringify(pose().goal)")
             self.server.set_scene(name, hour)
-            pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && JSON.stringify(p.goal) !== {json.dumps(was)} "
-                                 f"&& p.goal.anchor === {json.dumps(at or 'desk')}; }}", timeout=15000, polling=100)
+            wait_js(pg, f"() => {{ const p = pose(); return !!(p.goal && JSON.stringify(p.goal) !== {json.dumps(was)} "
+                        f"&& p.goal.anchor === {json.dumps(at or 'desk')}); }}", timeout=15000)
             pg.wait_for_timeout(250)
         if name == "walking":
             pose = self.walk_until(pg)

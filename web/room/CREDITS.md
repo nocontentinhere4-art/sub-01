@@ -174,8 +174,8 @@ set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somew
   redistributed here. Attribution, as the licence asks for distributed models (kept here for clarity): "Licensed by NVIDIA
   Corporation under the NVIDIA Open Model License".
 - ARDY's text encoder is LLM2Vec (McGill-NLP, MIT) on top of Meta Llama 3 8B Instruct (**Llama 3 Community License**,
-  https://llama.meta.com/llama3/license). Only the text prompts went through it, offline, on the pod; nothing of it is
-  shipped. The weights were taken from the public `NousResearch/Meta-Llama-3-8B-Instruct` re-upload, whose four
+  https://llama.meta.com/llama3/license): used offline as ARDY's text encoder, on the pod; not distributed; nothing of
+  it is shipped (only the text prompts went through it). The weights were taken from the public `NousResearch/Meta-Llama-3-8B-Instruct` re-upload, whose four
   safetensors shards have the same SHA-256 as `meta-llama/Meta-Llama-3-8B-Instruct`'s (verified on the pod, `job.sh`);
   no Hugging Face token was used. "Built with Meta Llama 3."
 - The clips' retargeting, `boy_motion.js` (the procedural layer: breathing, weight shifts, foot and hand IK, eyes, the pop
