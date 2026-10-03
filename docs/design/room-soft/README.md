@@ -22,7 +22,7 @@ draws in software, so the look is the page's, not its speed). Each image is `bef
 | the door hooks (hoodie and tote) | `door_day.jpg`, `door_night.jpg`, `hoodie_day.jpg`, `tote_day.jpg` |
 | the backpack | `backpack_day.jpg` |
 | the jeans on the floor (new) | `jeans_day.jpg` |
-| the T-shirt on the bed (new) | `tee_day.jpg` |
+| the T-shirt on the floor cushion (new) | `tee_day.jpg`, `cushion_day.jpg` |
 
 ## What changed (all in `room_build/props_soft.py`)
 - **Socks**: no longer two cylinders. Each sock is a swept tube pinched at the clip, its cuff edges drooping below the
@@ -31,9 +31,14 @@ draws in software, so the look is the page's, not its speed). Each image is `bef
   normal map, roughness 0.95, sheen. Their feet point away from the ring's centre, clear of the window wall.
 - **Towel**: terry cloth (Poly Haven `terry_cloth`, recoloured), pinched by two clips: it sags between them, the corners
   outside the clips droop and fold forward, soft vertical folds grow to a wavy hem, a dobby border near the hem.
-- **Duvet**: the cloth simulation now folds the head end back over itself (a real fold, self-collision), then the
-  surface is box-quilted (6 × 5 channels, stitch lines sunk, puffs raised, a flat piped border), wrinkled a little,
-  thickened to 3 cm with a rounded rim. The page's lying pose expects the top at about 0.86 m: unchanged.
+- **Duvet**: a cloth simulation dropped flat on the bed gives the lower face; the slab is then built explicitly (lower
+  face, upper face 3 cm above it, rim) with the head end turned back over itself: the lower face continues round the
+  outside of the fold (4 cm radius) and becomes the flap's top, the upper face round the inside (1 cm) and becomes its
+  underside, laid 2 cm over the main part. Subtle box quilting (5 × 6 channels, stitch lines 2 mm down, puffs 6 mm up)
+  and small wrinkles. `web/room.html` reshapes this duvet over him when he sleeps (#108) by vertex height: on the
+  mattress the lower face lies at 0.835 m and the upper at 0.865 m (its REF), the flap at 0.885–0.92 m, the parts
+  hanging over the bed's sides below 0.83 m. (The first version used a solidified sheet with a 6 mm-deep quilt: under
+  the lift its two layers tore apart and the inside showed; a self-colliding simulation of the folded sheet blew up.)
 - **Pillow**: a superellipse body in its case, flatter underneath, the side seam's piping, the case's envelope flap,
   a dent where his head rests, small wrinkles.
 - **Mattress**: a soft rounded slab; the fitted sheet covers the top and the sides down to its elastic hem (a 3 mm
@@ -52,8 +57,9 @@ draws in software, so the look is the page's, not its speed). Each image is `bef
 - **Backpack**: a polyester-weave normal map, a fuller front and rounded top, the lid's and the pocket's zips with
   pulls, a stretch bottle pocket on the side, a grab handle, a shoulder strap's end with its buckle on the floor.
 - **Clothes (new)**: a pair of jeans in a heap by the bed's foot (the seat with its waistband, one leg folded back,
-  the other crossing over it; Poly Haven `denim_fabric_05`), and a T-shirt thrown on the bed's far foot corner (a flat
-  tee cut from a grid, dropped as cloth onto the duvet; it hangs over the far side). Both are registered with the prop
-  sweep (on the floor, off his walking graph and the places the page uses).
+  the other crossing over it; Poly Haven `denim_fabric_05`), and a T-shirt dropped on the floor cushion (a flat tee
+  cut from a grid, dropped as cloth onto the cushion, hanging over its sides; it was on the bed first, where the page's
+  sleeping duvet would bury it). Both are registered with the prop sweep (on the floor, off his walking graph and the
+  places the page uses).
 
 Textures: Poly Haven, CC0 (`web/room/CREDITS.md`). No Higgsfield credits were spent.

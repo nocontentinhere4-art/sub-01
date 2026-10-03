@@ -502,7 +502,7 @@ HOODIE = PS.hoodie(HX); check("hoodie", HOODIE, None, on_door=True)   # (it hang
 check("backpack", PS.backpack(), ("y", FY))
 
 # --- the front right: a floor cushion (zabuton) and a small fan
-check("cushion", PS.cushion(), ("y", FY))
+CUSHION = PS.cushion(); check("cushion", CUSHION, ("y", FY))
 props_hard.fan(globals())
 
 # --- slippers by the floor cushion (the door's side is his place at the doorway and the leaf's swing, #82)
@@ -537,8 +537,8 @@ for k in range(8):
 PS.socks_and_towel(clips, PH)                                    # two pairs of knitted socks and a terry hand towel on the clips
 check("laundry_hanger", since(n0), None, minx=SILL_X)
 
-# --- clothes (#98): jeans in a heap by the bed's foot, a T-shirt thrown on the bed (a cloth simulation)
-PS.clothes(DUVET, pillow, mattress)
+# --- clothes (#98): jeans in a heap by the bed's foot, a T-shirt dropped on the floor cushion (a cloth simulation)
+PS.clothes(CUSHION)
 
 # --- a small cat figure on the window sill
 n0 = group(); CAT = (-1.872, 0.40)                            # away from his hands on the sill (#63)
