@@ -29,12 +29,25 @@ are original graphics drawn by `room_build/tex_prep.py`. Their Japanese
 text is set in **Noto Sans JP** (© Adobe, SIL Open Font License 1.1). Only rendered pixels are used; the font file is not
 shipped.
 
+## The hard surfaces at game quality (#98 G5, CC0)
+`room_build/props_hard.py` rebuilds the hard surfaces with more detail and `room_build/tex_hard.py` draws their textures
+(both original work for this project, CC0): the desk and its steel frame, the monitor, the tenkeyless keyboard with real
+keycaps, the mouse, the speakers, the mug, the pen cup, the office chair, the storage bed frame, the bookshelf and its
+books, the fridge, the door with its handle and hinges, the window frame and aluminium sashes, the air conditioner, the
+fan, the headphones and the controller. Edge wear sits in the vertex colours of every bevel, roughness micro-variation in
+small generated maps (plastic, painted metal, brushed steel, plaster, oak) and the decals (dust, scuffs, scratches, a
+coffee ring, stickers: a cat, a mountain, a 東京 badge, a star, a record, a smile, waves, an onigiri; no brands) are
+alpha-blended quads from `decals.png`. The keycap legends (`keycaps.png`) and the book spines (`spines.png`: generic
+titles, no real books) are original drawings; their Latin text is set in **DejaVu Sans** (Bitstream Vera licence, free
+to use and redistribute), the Japanese text in Noto Sans JP as above. Only rendered pixels are shipped.
+
 ## Poly Haven (https://polyhaven.com), CC0 1.0
 Textures (each recoloured or regraded in `tex_prep.py`):
 
 | use | asset | authors |
 |---|---|---|
-| floor | `wood_floor` | Dimitrios Savva |
+| floor (#98 G5) | `wooden_floor_01` (graded, worn patches and scratches added in `tex_hard.py`) | Charlotte Baglioni, Rico Cilliers |
+| floor (until #98) | `wood_floor` | Dimitrios Savva |
 | wall plaster | `white_stucco` | Amal Kumar |
 | desk, shelf, bed, door wood | `oak_veneer_01` | Jenelle van Heerden |
 | bed sheet, mattress cover, pillow; the floor cushion and the T-shirt (recoloured) | `cotton_jersey` | colormass, Rico Cilliers |
@@ -75,16 +88,58 @@ offender stops the build.
 ## Rebuilding
 From `room_build/`, with Blender 4.2 and Node 22:
 
-    python ph.py tex 2k wood_floor
+    python ph.py tex 2k wooden_floor_01
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
     python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
-    python tex_prep.py
+    python tex_prep.py                       # (runs tex_hard.py too: the hard surfaces' textures and atlases)
     blender -b -P build_room.py -- --sweep   # a few minutes (the two cloth simulations): only the prop sweep (out/sweep.txt), no bake, no export
     blender -b -P build_room.py          # the cloth simulations plus the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
     python shots_soft.py --glb ../web/room/room_clean.glb --tag after   # fixed-camera renders (docs/design/room-soft)
+    python shots.py --out ../docs/design/room-hard/after      # fixed-camera screenshots of the hard surfaces (from the repository root: python room_build/shots.py)
+
+## His motion (`boy_moves.glb`, #76)
+New clips for the first character (`boy.glb`, its own 24-bone rig): in the room they take over walking, sitting at the
+desk (typing) and lying with the phone (`?moves=old` shows the first clips); the other clips are in the file for later.
+- **Quaternius, Universal Animation Library (Standard)** (https://quaternius.com/packs/universalanimationlibrary.html),
+  obtained 2026-10-02. Licence, recorded on that date: the archive's own `License.txt` reads "CC0 1.0 Universal (CC0 1.0)
+  Public Domain Dedication, https://creativecommons.org/publicdomain/zero/1.0/ / Models by @Quaternius", and the pack
+  page says "CC0 License"; the site-wide Quaternius Asset License v1.0 (https://quaternius.com/license.html, last
+  updated 2026-08-28; its § 7: the version in effect when the assets were obtained governs) allows incorporating the
+  assets, original or modified, into a product and distributing that product without attribution, and forbids
+  redistributing them as a standalone asset or pack. The clips here are retargeted onto this project's rig inside the
+  site's own file (`boy_moves.glb`), not offered as a pack; credit to Quaternius is given anyway. Clips used:
+  `Idle_Loop` → `stand_idle`, `Walk_Loop` → `walk`, `Sitting_Enter` / `Sitting_Exit` / `Sitting_Idle_Loop` → `sit_down_chair` / `stand_up_chair` / `sit_idle_upright` (and, raised to the mattress,
+  `sit_down_bed_edge` / `stand_up_bed_edge` / `sit_edge_idle`), `PickUp_Table` → `take_item`, `Interact` → `door_open_pull`;
+  `Crouch_Idle_Loop` is a key pose of `crouch_drop`.
+- **Keyed for this project** (original keyframes and IK; the standing and seated poses they start from are UAL's,
+  under the terms above): the bed set (`lie_back_idle`, `lie_side_left/right`,
+  `roll_*`, `sleep_breathing*`, `lie_down_from_edge`, `get_up_to_edge`, `lie_phone`), `type`, `mouse`, `walk_start`,
+  `walk_stop`, `turn_in_place_*`, `lean_on_sill`, `stretch_arms_up`, `scratch_head`, `look_around`, `crouch_drop`,
+  `put_down`, `sit_lean_back`, `sit_eat_chopsticks`, `sit_drink`.
+
+They are made on an authoring body, not shipped: a MakeHuman / MPFB 2 body (CC0 base mesh and `game_engine` rig, given
+the first rig's bone names and rest frames) built by `room_build/build_boy.py`. The UAL clips are retargeted onto it
+(T-pose correspondence, feet pinned by IK) and the keyed poses are set on it by IK against its own skin (the mattress,
+the seat, the keys). `room_build/boy_post.mjs` then carries every clip onto the first rig: each bone turns in the world
+as on the authoring body from its rest; the hips are scaled by the leg ratio and set from his own lowest skin (the
+floor, or the mattress when lying); when seated his hips go up to his seat height and his legs reach down by IK. It
+also writes `docs/motion/deform_check.json`, a skin check of every clip on `boy.glb`.
+
+Rebuild, from `room_build/` (Blender 4.2 with the MPFB extension and the MakeHuman system assets; UAL's glTF at
+`$UAL`):
+
+    node boy_ref.mjs                     # the first rig's rest pose and palms -> out/boy_ref.json
+    blender -b -P build_boy.py           # the authoring body -> out/boy2_raw.glb, out/boy2_bind.json
+    node boy_post.mjs                    # -> ../web/room/boy_moves.glb, ../docs/motion/deform_check.json
+
+## The first character
+`boy.glb` and the clips `boy_*.glb` (shown by default) are the earlier AI-generated character (Meshy, via Higgsfield;
+generated content under those services' terms, not a Creative Commons licence), and `hand_phone.glb` the
+phone-gripping hand (GPT Image + Tripo, via Higgsfield); the clips are Meshy library animations re-rigged on its
+skeleton.
 
 ## His movement and the things he handles (#63)
 No animation clips were added. The clips are the ones already in `web/room/` (`boy_*.glb`, the same rig). Everything new is

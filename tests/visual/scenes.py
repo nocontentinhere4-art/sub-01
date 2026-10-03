@@ -24,21 +24,23 @@ def life(activity, place, doing, **extra):
 
 # name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring[, prep JS])
 # prep: JavaScript run in the page after the snap and before the settle (debug hooks only; reset by the next snap)
+# Walking, the desk and the phone in bed play room/boy_moves.glb's clips (#76: walk, type, lie_phone); eating keeps the
+# first seated clip (Chair_Sit_Idle) under its own layer, sleep the first sleep clip (`?moves=old`: all the first clips)
 SCENES = {
-    "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "Chair_Sit"),
+    "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
     "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "Chair_Sit"),
     # asleep the duvet comes up over him in ~2.2 s (room.html DUV.w): settle 4 s so the shot shows him covered
     "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 4.0, "bedlie", "Sleep"),
     # the side pose he turns into now and then (every 3-8 min): forced through the page's ROLL hook (debug)
     "sleeping_side": (life("sleep", "bed", "sleeping"), "NREM", None, 7.0, "bedlie", "Sleep", "if (window.ROLL) ROLL.force = ROLL.ang;"),
-    # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie)
-    "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "phone_lie"),
+    # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie: the lie_phone clip)
+    "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "lie_phone"),
     # standing just inside the door (an activity the page does not know, at the door place: it stands him there)
     "door":     (life("home", "door_in", "just in at the door"), "AWAKE", None, 1.0, "door", "stand"),
     # walking: from the door to the desk; the harness stops mid-walk (see harness.walk_until). As the server sends it
     # since #104: `walking` true with `path` and `path_to` (before that the page treated him as already at the desk)
-    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "Walk"),
+    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "walk"),
     "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "stand"),
 }
 # the hour each scene is shot at in the core set, and the full matrix

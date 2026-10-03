@@ -54,6 +54,7 @@ mat("steel", color=srgb("#c3c5c8"), rough=0.28, metal=1.0)
 mat("screen", color=srgb("#060708"), rough=0.12)
 mat("painted", color=(1, 1, 1), rough=0.65, vcol=True)
 mat("posters", diff="posters.png", rough=0.55)
+sys.path.insert(0, R); import props_hard; props_hard.materials(globals())   # #98 G5: the hard surfaces (room_build/props_hard.py) take over floor, wall, oak, door, white, plastic, metal, screen
 
 # ---------------------------------------------------------------- mesh helpers
 STATIC = []          # objects joined into the one static mesh (baked AO)
@@ -72,6 +73,7 @@ def project_uv(o, layer="UVMap"):
     M = o.matrix_world; N = M.to_3x3().inverted_safe().transposed()
     for p in me.polygons:
         m = me.materials[p.material_index] if me.materials else None
+        if m and m.get("nouv"): continue           # atlases (keycaps, spines, decals, posters) keep their own UVs (#98 G5)
         s = m.get("uv", 1.0) if m else 1.0; g = m.get("grain", 0) if m else 0
         n = (N @ p.normal); ax = max(range(3), key=lambda i: abs(n[i]))
         for li in p.loop_indices:
@@ -193,29 +195,10 @@ for o in [bpy.data.objects[n] for n in ("wall_l_below", "wall_l_above", "wall_l_
     project_uv(o)
 # skirting boards
 DOOR_X0, DOOR_X1 = 1.05, 1.85                 # door casing span on the back wall
-box("skirt_back_a", "white", (IX, DOOR_X0), (FY, FY + 0.065), (IZ, IZ + 0.012), bevel=0.003, seg=1)
-box("skirt_back_b", "white", (DOOR_X1, X1), (FY, FY + 0.065), (IZ, IZ + 0.012), bevel=0.003, seg=1)
-box("skirt_left", "white", (IX, IX + 0.012), (FY, FY + 0.065), (IZ + 0.012, Z1), bevel=0.003, seg=1)
+props_hard.skirting(globals())
 
 # ================================================================ window
-for nm, x, y, z in [("win_casing_t", (IX, IX + 0.014), (WY1, WY1 + 0.05), (WZ0 - 0.05, WZ1 + 0.05)),
-                    ("win_casing_a", (IX, IX + 0.014), (WY0, WY1), (WZ0 - 0.05, WZ0)),
-                    ("win_casing_b", (IX, IX + 0.014), (WY0, WY1), (WZ1, WZ1 + 0.05)),
-                    ("win_sill", (IX - 0.03, IX + 0.06), (WY0 - 0.025, WY0), (WZ0 - 0.07, WZ1 + 0.07))]:
-    box(nm, "oak", x, y, z, bevel=0.003, seg=1)
-# aluminium sliding sashes, recessed in the opening; two panes overlapping in the middle
-SASH = 0.03
-def sash(nm, x, z0, z1):
-    box(nm + "_t", "steel", x, (WY1 - SASH, WY1), (z0, z1), bevel=0.002, seg=1)
-    box(nm + "_b", "steel", x, (WY0, WY0 + SASH), (z0, z1), bevel=0.002, seg=1)
-    box(nm + "_l", "steel", x, (WY0, WY1), (z0, z0 + SASH), bevel=0.002, seg=1)
-    box(nm + "_r", "steel", x, (WY0, WY1), (z1 - SASH, z1), bevel=0.002, seg=1)
-sash("sash_a", (-1.975, -1.95), WZ0, 0.17)
-sash("sash_b", (-1.945, -1.92), 0.11, WZ1)
-box("sash_track", "steel", (-1.985, -1.915), (WY0 - 0.004, WY0 + 0.006), (WZ0, WZ1))
-box("sash_latch", "steel", (-1.918, -1.905), (1.66, 1.70), (0.13, 0.145), bevel=0.002, seg=1)
-# the sky behind the window: a marker; the page puts its sky shader plane here
-marker("SURF_window", (-2.012, (WY0 + WY1) / 2, (WZ0 + WZ1) / 2), (0, math.pi / 2, 0), w=WZ1 - WZ0 + 0.06, h=WY1 - WY0 + 0.06, mullion=-1.0)
+props_hard.window(globals())
 # curtain rod and two gathered linen curtains (pleats from a sine, wider at the hem)
 ROD_Y = WY1 + 0.11
 cyl("curtain_rod", "metal_dark", (ROD_Y, IX + 0.07), 0.009, WZ0 - 0.32, WZ1 + 0.36, n=12, axis="z")
@@ -225,227 +208,22 @@ for zc in (WZ0 - 0.32, WZ1 + 0.36):
 PS.curtains()                                    # two linen panels with pencil pleats and hems (props_soft.py)
 
 # ================================================================ desk
-DX0, DX1, DZ0, DZ1, DTOP = -1.86, -0.36, IZ + 0.01, -0.80, 0.97
-box("desk_top", "oak", (DX0, DX1), (DTOP - 0.03, DTOP), (DZ0, DZ1), bevel=0.004, seg=2)
-for lx in (DX0 + 0.04, DX1 - 0.04):           # black steel side frames: two legs, a foot and a top rail
-    for lz in (DZ0 + 0.05, DZ1 - 0.05):
-        box("desk_leg", "metal_dark", (lx - 0.02, lx + 0.02), (FY + 0.02, DTOP - 0.03), (lz - 0.012, lz + 0.012), bevel=0.003, seg=1)
-    box("desk_foot", "metal_dark", (lx - 0.02, lx + 0.02), (FY, FY + 0.025), (DZ0 + 0.02, DZ1 - 0.02), bevel=0.003, seg=1)
-    box("desk_rail", "metal_dark", (lx - 0.02, lx + 0.02), (DTOP - 0.06, DTOP - 0.03), (DZ0 + 0.03, DZ1 - 0.03), bevel=0.002, seg=1)
-box("desk_back_rail", "metal_dark", (DX0 + 0.06, DX1 - 0.06), (DTOP - 0.09, DTOP - 0.03), (DZ0 + 0.04, DZ0 + 0.055), bevel=0.002, seg=1)
-
-# monitor: thin bezel on a stand, slightly turned towards the chair
-MON_C = (-1.06, 1.33, -1.19); MON_RY = 0.10; MON_RX = -0.06; SW, SH = 0.64, 0.37
-def mon_part(o):
-    """parts are built facing +z at the origin (screen centre = 0), then tilted and turned into place"""
-    M = Matrix.Translation(B(*MON_C)) @ Matrix.Rotation(MON_RY, 4, 'Z') @ Matrix.Rotation(MON_RX, 4, 'X')
-    o.data.transform(M); o.data.update(); project_uv(o); return o
-mon_part(box("mon_body", "plastic_black", (-SW / 2 - 0.012, SW / 2 + 0.012), (-SH / 2 - 0.014, SH / 2 + 0.012), (-0.022, 0.0), bevel=0.004, seg=2))
-mon_part(box("mon_screen", "screen", (-SW / 2, SW / 2), (-SH / 2, SH / 2), (0.0, 0.0015)))
-mon_part(box("mon_back", "plastic_black", (-0.16, 0.16), (-0.12, 0.10), (-0.05, -0.022), bevel=0.012, seg=3))
-mon_part(box("mon_chin_logo", "steel", (-0.012, 0.012), (-SH / 2 - 0.0095, -SH / 2 - 0.006), (0.0, 0.0012)))
-# stand: neck down to an oval-ish base plate (not tilted)
-nb = box("mon_neck", "plastic_black", (MON_C[0] - 0.025, MON_C[0] + 0.025), (DTOP + 0.01, MON_C[1] - 0.02), (MON_C[2] - 0.075, MON_C[2] - 0.055), bevel=0.006, seg=2)
-transform(nb, ry=MON_RY, pivot=(MON_C[0], 0, MON_C[2]))
-bp = cyl("mon_base", "plastic_black", (MON_C[0], MON_C[2] - 0.035), 0.11, DTOP, DTOP + 0.012, n=32)
-bp.data.transform(Matrix.Translation(B(MON_C[0], 0, MON_C[2] - 0.035)) @ Matrix.Diagonal((1.0, 0.62, 1.0, 1.0)) @ Matrix.Translation(-B(MON_C[0], 0, MON_C[2] - 0.035)))
-transform(bp, ry=MON_RY, pivot=(MON_C[0], 0, MON_C[2])); project_uv(bp)
-# the screen's exact place for the page (centre of the glass, Euler YXZ), slightly in front of the glass
-marker("SURF_monitor", tuple(Vector(MON_C) + Vector((math.sin(MON_RY) * 0.002, 0, math.cos(MON_RY) * 0.002))), (MON_RX, MON_RY, 0), w=SW, h=SH)
-
-# keyboard (tenkeyless): body + keycaps (vertex coloured), on a felt desk mat with a mouse
-KB_C = (-1.07, -0.97); KB_RY = 0.06
-mat_o = box("deskmat", "fabric_black", (-1.47, -0.67), (DTOP, DTOP + 0.003), (-1.12, -0.84), bevel=0.0015, seg=1)
-kb = box("kb_body", "plastic_black", (-0.18, 0.18), (DTOP + 0.003, DTOP + 0.022), (-0.065, 0.065), bevel=0.004, seg=2)
-transform(kb, loc=(KB_C[0], 0, KB_C[1]), ry=KB_RY); project_uv(kb)
-caps = []
-P = 0.0188
-rows = [[1] * 13, [1] * 13 + [2], [1.5] + [1] * 12 + [1.5], [1.75] + [1] * 11 + [2.25], [2.25] + [1] * 10 + [2.75], [1.25] * 3 + [6.25] + [1.25] * 4]
-for ri, row in enumerate(rows):
-    x = -0.168; zc = -0.054 if ri == 0 else -0.034 + (ri - 1) * P
-    for ki, wu in enumerate(row):
-        wdt = wu * P
-        if x + wdt > 0.17: break
-        k = box("key", "painted", (x + 0.0012, x + wdt - 0.0012), (DTOP + 0.022, DTOP + 0.030), (zc - P / 2 + 0.0012, zc + P / 2 - 0.0012), bevel=0.0018, seg=1)
-        accent = (ri == 0 and ki == 0) or (ri == 3 and ki == len(row) - 1)
-        set_vcol(k, srgb("#e2621b") if accent else srgb("#2c2d31") if ri else srgb("#3a3b40"))
-        transform(k, loc=(KB_C[0], 0, KB_C[1]), ry=KB_RY); caps.append(k); x += wdt
-bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14, radius=1.0)
-for v in bm.verts:
-    v.co = Vector((v.co.x * 0.031, v.co.y * 0.058, max(v.co.z, -0.2) * 0.02))
-    if v.co.y < 0: v.co.z *= 0.92
-bm.transform(Matrix.Translation(B(-0.76, DTOP + 0.004 + 0.004, -0.95)))
-mouse = new_obj("mouse", bm, "plastic_black"); [setattr(p, "use_smooth", True) for p in mouse.data.polygons]; project_uv(mouse)
-# speakers: small wooden boxes with a black front, a woofer and a tweeter
-def speaker(nm, x, z, ry):
-    parts = [box(nm + "_box", "oak", (-0.065, 0.065), (0, 0.20), (-0.075, 0.075), bevel=0.006, seg=2),
-             box(nm + "_front", "plastic_black", (-0.058, 0.058), (0.007, 0.193), (0.075, 0.079), bevel=0.003, seg=1)]
-    w = lathe(nm + "_woofer", "plastic_black", [(0.046, 0), (0.044, 0.004), (0.03, 0.002), (0.012, -0.006), (0.0, -0.004)], (0, 0), 0, n=28)
-    w.data.transform(Matrix.Translation(B(0, 0.075, 0.079)) @ Matrix.Rotation(-math.pi / 2, 4, 'X')); parts.append(w)
-    t = lathe(nm + "_tweet", "steel", [(0.016, 0), (0.014, 0.003), (0.006, 0.006), (0.0, 0.007)], (0, 0), 0, n=20)
-    t.data.transform(Matrix.Translation(B(0, 0.158, 0.079)) @ Matrix.Rotation(-math.pi / 2, 4, 'X')); parts.append(t)
-    for o in parts: transform(o, loc=(x, DTOP, z), ry=ry); project_uv(o)
-speaker("spk_l", -1.52, -1.30, 0.22)
-speaker("spk_r", -0.58, -1.30, -0.18)
-# mug and pen cup
-lathe("mug", "white", [(0.0, 0.0), (0.036, 0.0), (0.040, 0.004), (0.041, 0.095), (0.037, 0.096), (0.036, 0.012), (0.0, 0.012)], (-0.50, -0.98), DTOP, n=28)
-bpy.ops.mesh.primitive_torus_add(major_radius=0.026, minor_radius=0.0065, major_segments=20, minor_segments=8, location=B(-0.50 + 0.045, DTOP + 0.05, -0.98), rotation=(math.pi / 2, 0, 0))
-th = bpy.context.active_object; th.data.materials.append(MATS["white"]); bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-for p in th.data.polygons: p.use_smooth = True
-bm = bmesh.new(); bm.from_mesh(th.data)
-bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.x < -0.50 + 0.045 - 0.012], context='VERTS'); bm.to_mesh(th.data); bm.free()
-STATIC.append(th); project_uv(th)
-lathe("pencup", "plastic_black", [(0.0, 0.0), (0.034, 0.0), (0.034, 0.10), (0.031, 0.10), (0.031, 0.006), (0.0, 0.006)], (-0.47, -1.33), DTOP, n=24)
-for i, (col, tilt) in enumerate([("#2f6fd6", 0.10), ("#d63b2f", -0.12), ("#f2c12e", 0.05), ("#222222", -0.04), ("#3aa860", 0.14)]):
-    pen = cyl("pen", "painted", (0, 0), 0.0045, 0.0, 0.15 if i != 2 else 0.17, n=8)
-    set_vcol(pen, srgb(col)); a = 2 * math.pi * i / 5
-    pen.data.transform(Matrix.Translation(B(-0.47 + 0.012 * math.cos(a), DTOP + 0.012, -1.33 + 0.012 * math.sin(a))) @ Matrix.Rotation(tilt, 4, 'X') @ Matrix.Rotation(tilt * 0.7, 4, 'Y'))
-# a couple of books lying on the desk
-for i, (w, d, h, col) in enumerate([(0.21, 0.28, 0.028, "#2d4a6b"), (0.19, 0.25, 0.022, "#c9a86a"), (0.17, 0.23, 0.018, "#8c3b32")]):
-    y = DTOP + sum(b[2] for b in [(0, 0, 0.028), (0, 0, 0.022), (0, 0, 0.018)][:i])
-    bk = box("desk_book", "painted", (-w / 2, w / 2), (y, y + h), (-d / 2, d / 2), bevel=0.0015, seg=1); set_vcol(bk, srgb(col))
-    transform(bk, loc=(-1.70, 0, -1.02), ry=0.25 + 0.12 * i)
-# trash bin under the desk
-lathe("bin", "plastic_black", [(0, 0), (0.105, 0), (0.12, 0.30), (0.114, 0.30), (0.10, 0.008), (0, 0.008)], (-0.55, -1.22), FY, n=28)
+props_hard.desk(globals())
 
 # ================================================================ office chair (black fabric + black plastic)
-CH_C = (-1.13, -0.585); CH_RY = 0.54; SEAT_TOP = 0.665
-chair = []
-def cpart(o): chair.append(o); return o
-# five-star base with casters
-for i in range(5):
-    a = 2 * math.pi * i / 5
-    bm = bmesh.new(); faces = cuboid(bm, 0.0, 0.29, -0.022, 0.012, -0.022, 0.022)
-    for v in bm.verts:
-        g = Vector((v.co.x, v.co.z, -v.co.y)); t = g.x / 0.29
-        g.y += 0.05 - 0.03 * t                    # rises towards the hub
-        g.z *= (1.0 - 0.35 * t); v.co = B(g.x, g.y, g.z)
-    bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.006, segments=2, affect='EDGES', clamp_overlap=True)
-    leg = new_obj("ch_leg", bm, "plastic_black"); [setattr(p, "use_smooth", True) for p in leg.data.polygons]
-    leg.data.transform(Matrix.Rotation(a, 4, 'Z')); cpart(leg)
-    cx, cz = 0.29 * math.cos(a), -0.29 * math.sin(a)
-    cpart(box("ch_fork", "plastic_black", (cx - 0.012, cx + 0.012), (0.03, 0.065), (cz - 0.016, cz + 0.016), bevel=0.004, seg=1))
-    for s in (-1, 1):
-        w = cyl("ch_wheel", "plastic_black", (0.03, cz + s * 0.014), 0.027, cx - 0.008, cx + 0.008, n=16, axis="x")
-        cpart(w)
-cpart(cyl("ch_hub", "plastic_black", (0, 0), 0.05, 0.03, 0.09, n=24, r1=0.04))
-cpart(cyl("ch_gas_sleeve", "plastic_black", (0, 0), 0.032, 0.08, 0.30, n=20, r1=0.03))
-cpart(cyl("ch_gas", "metal_dark", (0, 0), 0.022, 0.28, 0.37, n=16))
-cpart(box("ch_mech", "plastic_black", (-0.12, 0.12), (0.35, 0.41), (-0.13, 0.12), bevel=0.01, seg=2))
-cpart(box("ch_lever", "metal_dark", (0.12, 0.2), (0.375, 0.385), (-0.06, -0.05), bevel=0.003, seg=1))
-# seat cushion: a soft rounded slab (subdivided, edges rounded)
-seat = box("ch_seat", "fabric_black", (-0.25, 0.25), (0.41, 0.505), (-0.25, 0.23), bevel=0.035, seg=4)
-for v in seat.data.vertices:                                   # dished top, rolled front edge
-    g = Vector((v.co.x, v.co.z, -v.co.y))
-    if g.y > 0.47: g.y -= 0.012 * (1 - (g.x / 0.25) ** 2) * (1 - ((g.z + 0.01) / 0.24) ** 2)
-    v.co = B(*g)
-cpart(seat)
-# backrest: a curved, padded panel on a plastic spine
-bm = bmesh.new(); nx, ny = 14, 16; grid = []
-for j in range(ny + 1):
-    t = j / ny; y = 0.60 + 0.56 * t; row = []
-    hw = 0.215 + 0.03 * math.sin(math.pi * min(1, t * 1.2)) - 0.04 * max(0, t - 0.8) / 0.2
-    for i in range(nx + 1):
-        s = i / nx * 2 - 1; x = s * hw
-        z = 0.26 + 0.06 * s * s - 0.025 * math.sin(math.pi * t) * (1 - s * s) + 0.03 * t   # curved around the back, lumbar bulge, reclined
-        row.append(bm.verts.new(B(x, y, z)))
-    grid.append(row)
-for j in range(ny):
-    for i in range(nx): bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
-back = new_obj("ch_back", bm, "fabric_black")
-for p in back.data.polygons: p.use_smooth = True
-md = back.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.045; md.offset = 1.0
-md2 = back.modifiers.new("bev", "BEVEL"); md2.width = 0.012; md2.segments = 3; md2.limit_method = 'ANGLE'
-cpart(back)
-spine = box("ch_spine", "plastic_black", (-0.035, 0.035), (0.38, 0.84), (0.24, 0.27), bevel=0.01, seg=2)
-for v in spine.data.vertices:
-    g = Vector((v.co.x, v.co.z, -v.co.y)); t = (g.y - 0.38) / 0.46
-    g.z += 0.08 * t * t + 0.05 * t + (0.0 if g.y > 0.5 else -0.15 * (0.5 - g.y) / 0.04 * 0)
-    v.co = B(*g)
-cpart(spine)
-cpart(box("ch_spine_foot", "plastic_black", (-0.04, 0.04), (0.37, 0.41), (0.08, 0.27), bevel=0.01, seg=2))
-# armrests: posts + pads
-for s in (-1, 1):
-    cpart(box("ch_arm_post", "plastic_black", (s * 0.255 - 0.018, s * 0.255 + 0.018), (0.38, 0.68), (-0.02, 0.06), bevel=0.008, seg=2))
-    cpart(box("ch_arm_bar", "plastic_black", (s * 0.15 - 0.02, s * 0.27), (0.375, 0.41), (0.0, 0.05), bevel=0.008, seg=2))
-    cpart(box("ch_arm_pad", "plastic_black", (s * 0.255 - 0.04, s * 0.255 + 0.04), (0.68, 0.71), (-0.13, 0.11), bevel=0.012, seg=3))
-# the chair moves (he pulls it out and pushes it back): it is NOT part of the static mesh but one object of its own,
-# "chair", whose origin is the pivot on the floor under the gas lift. Its parts are placed in the room for the UV
-# projection, then joined and moved back into the object's own space; it gets its own materials and AO (self-occlusion)
-CH_M = Matrix.Translation(B(CH_C[0], FY, CH_C[1])) @ Matrix.Rotation(CH_RY, 4, 'Z')
-for o in chair:
-    o.data.transform(CH_M); o.data.update(); project_uv(o)
-    STATIC.remove(o)
-    bpy.context.view_layer.objects.active = o
-    for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
-CHAIR = join(chair, "chair"); CHAIR.data.name = "chair"
-CHAIR.data.transform(CH_M.inverted()); CHAIR.matrix_world = CH_M
-for i, m in enumerate(CHAIR.data.materials):    # own copies: glTF keeps occlusion per material, and the chair has its own
-    c = m.copy(); c.name = "chair_" + m.name; CHAIR.data.materials[i] = c
+props_hard.chair(globals())
 
 # ================================================================ bed (storage bed, mattress, sheet, pillow, duvet)
-BX0, BX1, BZ0, BZ1 = -1.90, -0.20, 0.25, 1.50
-BASE_Y, MAT_Y = 0.55, 0.82
-box("bed_base", "oak", (BX0 + 0.04, BX1), (FY + 0.03, BASE_Y), (BZ0, BZ1), bevel=0.006, seg=2)
-box("bed_plinth", "plastic_black", (BX0 + 0.08, BX1 - 0.04), (FY, FY + 0.035), (BZ0 + 0.04, BZ1 - 0.04))
-for (x0, x1) in ((-1.80, -1.04), (-1.00, -0.25)):            # drawers facing the room (-z)
-    box("bed_drawer", "oak", (x0, x1), (FY + 0.06, BASE_Y - 0.05), (BZ0 - 0.012, BZ0), bevel=0.004, seg=2)
-    box("bed_drawer_grip", "metal_dark", ((x0 + x1) / 2 - 0.08, (x0 + x1) / 2 + 0.08), (BASE_Y - 0.10, BASE_Y - 0.088), (BZ0 - 0.02, BZ0 - 0.012), bevel=0.002, seg=1)
-box("bed_head", "oak", (BX0, BX0 + 0.04), (FY + 0.03, 1.13), (BZ0, BZ1), bevel=0.008, seg=2)
+props_hard.bed_frame(globals())
 # the mattress with its fitted sheet, the pillow in its case and the duvet (a cloth simulation, turned back at the head
 # end, box-quilted): props_soft.py
 mattress = PS.mattress(); pillow = PS.pillow(); DUVET = PS.duvet(mattress, pillow)
 
 # ================================================================ bookshelf with books
-SX0, SX1, SZ0, SZ1, STOP = -0.12, 0.32, IZ + 0.005, -1.17, 2.12
-T = 0.018
-box("shelf_side_l", "oak", (SX0, SX0 + T), (FY, STOP), (SZ0, SZ1), bevel=0.002, seg=1)
-box("shelf_side_r", "oak", (SX1 - T, SX1), (FY, STOP), (SZ0, SZ1), bevel=0.002, seg=1)
-box("shelf_top", "oak", (SX0, SX1), (STOP - T, STOP), (SZ0, SZ1), bevel=0.002, seg=1)
-box("shelf_back", "oak", (SX0 + T, SX1 - T), (FY + 0.05, STOP - T), (SZ0, SZ0 + 0.006))
-box("shelf_plinth", "oak", (SX0 + T, SX1 - T), (FY, FY + 0.06), (SZ1 - 0.03, SZ1 - 0.012))
-LEVELS = [FY + 0.06, 0.56, 0.94, 1.32, 1.70]
-for y in LEVELS: box("shelf_board", "oak", (SX0 + T, SX1 - T), (y, y + T), (SZ0 + 0.006, SZ1), bevel=0.0015, seg=1)
-PAL = ["#2d3e57", "#a33b2e", "#d8c9a7", "#3f5b45", "#c58b3a", "#1f1f24", "#6c5a7a", "#e9e4d8", "#8a4b2f", "#46708c", "#b9a27a", "#59302c"]
-def books_row(x0, x1, y, depth_max=0.21, lean_end=True, fill=0.9):
-    x = x0 + 0.004; n = 0
-    while x < x1 - 0.03 and (x - x0) / (x1 - x0) < fill:
-        th = random.uniform(0.016, 0.042); hh = random.uniform(0.17, 0.27); dd = random.uniform(0.15, depth_max)
-        if y + hh > y + 0.33: hh = 0.3
-        b = box("book", "painted", (x, x + th), (y + T, y + T + hh), (SZ1 - 0.012 - dd, SZ1 - 0.012), bevel=0.0012, seg=1)
-        set_vcol(b, srgb(random.choice(PAL))); x += th + 0.0015; n += 1
-    if lean_end and x < x1 - 0.06:                     # one book leaning on the row
-        th, hh, dd = 0.024, 0.22, 0.17
-        b = box("book", "painted", (0, th), (0, hh), (-dd, 0), bevel=0.0012, seg=1); set_vcol(b, srgb(random.choice(PAL)))
-        b.data.transform(Matrix.Translation(B(x + 0.003, y + T, SZ1 - 0.012)) @ Matrix.Rotation(-0.42, 4, 'Y')); project_uv(b)
-def books_stack(xc, y, n):
-    yy = y + T
-    for i in range(n):
-        w, d, h = random.uniform(0.17, 0.22), random.uniform(0.13, 0.18), random.uniform(0.02, 0.04)
-        b = box("book", "painted", (-w / 2, w / 2), (yy, yy + h), (-d / 2, d / 2), bevel=0.0012, seg=1); set_vcol(b, srgb(random.choice(PAL)))
-        transform(b, loc=(xc, 0, SZ1 - 0.11), ry=random.uniform(-0.15, 0.15)); yy += h
-books_row(SX0 + T, SX1 - T, LEVELS[1], fill=0.95)
-books_row(SX0 + T, SX1 - T - 0.13, LEVELS[2], fill=0.9); books_stack(SX1 - T - 0.085, LEVELS[2], 3)
-books_row(SX0 + T + 0.12, SX1 - T, LEVELS[3], fill=1.0, lean_end=False); books_stack(SX0 + T + 0.07, LEVELS[3], 2)
-books_row(SX0 + T, SX1 - T, LEVELS[0], depth_max=0.24, fill=0.6)
-# a storage box on the bottom right
-b = box("shelf_box", "painted", (SX1 - T - 0.16, SX1 - T - 0.005), (LEVELS[0] + T, LEVELS[0] + T + 0.2), (SZ1 - 0.25, SZ1 - 0.01), bevel=0.003, seg=1); set_vcol(b, srgb("#cfc4ae"))
+props_hard.bookshelf(globals())
 
 # ================================================================ small fridge (two doors) with things on top
-FX0, FX1, FZ0, FZ1, FTOP = 0.45, 0.93, IZ + 0.02, -0.97, 1.27
-box("fridge_body", "white", (FX0, FX1), (FY + 0.012, FTOP), (FZ0, FZ1 - 0.03), bevel=0.012, seg=3)
-box("fridge_door_lo", "white", (FX0 + 0.004, FX1 - 0.004), (FY + 0.02, 0.905), (FZ1 - 0.031, FZ1), bevel=0.01, seg=3)
-box("fridge_door_hi", "white", (FX0 + 0.004, FX1 - 0.004), (0.915, FTOP - 0.008), (FZ1 - 0.031, FZ1), bevel=0.01, seg=3)
-box("fridge_grip_lo", "steel", (FX0 + 0.03, FX0 + 0.045), (0.62, 0.86), (FZ1, FZ1 + 0.022), bevel=0.004, seg=2)
-box("fridge_grip_hi", "steel", (FX0 + 0.03, FX0 + 0.045), (0.95, 1.10), (FZ1, FZ1 + 0.022), bevel=0.004, seg=2)
-for fx in (FX0 + 0.04, FX1 - 0.04):
-    for fz in (FZ0 + 0.05, FZ1 - 0.06): cyl("fridge_foot", "plastic_black", (fx, fz), 0.015, FY, FY + 0.013, n=10)
-# cup noodles stacked on top + a tissue box
-for i in range(2):
-    cn = lathe("cupnoodle", "painted", [(0.0, 0.0), (0.038, 0.0), (0.047, 0.10), (0.049, 0.103), (0.0, 0.103)], (0.58, -1.18), FTOP + i * 0.103, n=24)
-    set_vcol(cn, srgb("#f2efe8" if i else "#d9442f"))
-tb = box("tissues", "painted", (0.70, 0.88), (FTOP, FTOP + 0.075), (-1.33, -1.22), bevel=0.003, seg=1); set_vcol(tb, srgb("#9fc2c9"))
-tt = box("tissue_top", "white", (0.76, 0.82), (FTOP + 0.075, FTOP + 0.095), (-1.29, -1.26), bevel=0.008, seg=2)
+props_hard.fridge(globals())
 # a photo strip stuck on the freezer door (poster atlas, region D)
 def poster_quad(nm, x0, x1, y0, y1, zf, uv0, uv1, ry=0.0, pivot=None):
     bm = bmesh.new(); vs = [bm.verts.new(B(x, y, zf)) for (x, y) in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
@@ -456,18 +234,7 @@ def poster_quad(nm, x0, x1, y0, y1, zf, uv0, uv1, ry=0.0, pivot=None):
 poster_quad("photostrip", 0.60, 0.80, 1.06, 1.16, FZ1 + 0.0015, (683 / 1024, 1 - 512 / 512), (1.0, 1 - 341 / 512))
 
 # ================================================================ door, casing, handle, hooks, switch, mat
-LX0, LX1, LY1 = 1.11, 1.79, 2.10
-box("door_leaf", "door", (LX0, LX1), (FY + 0.008, LY1), (IZ, IZ + 0.035), bevel=0.004, seg=2)
-for (y0, y1) in ((0.30, 1.05), (1.20, 1.96)):                # two raised panels
-    box("door_panel", "door", (LX0 + 0.09, LX1 - 0.09), (y0, y1), (IZ + 0.035, IZ + 0.041), bevel=0.005, seg=2)
-for nm, x, y in (("door_casing_l", (DOOR_X0, LX0), (FY, LY1 + 0.06)), ("door_casing_r", (LX1, DOOR_X1), (FY, LY1 + 0.06)),
-                 ("door_casing_t", (DOOR_X0, DOOR_X1), (LY1, LY1 + 0.06))):
-    box(nm, "white", x, y, (IZ, IZ + 0.022), bevel=0.003, seg=1)
-cyl("door_rose", "steel", (LX1 - 0.07, 1.02), 0.026, IZ + 0.035, IZ + 0.045, n=24, axis="z")
-lever = box("door_lever", "steel", (LX1 - 0.19, LX1 - 0.065), (1.008, 1.03), (IZ + 0.055, IZ + 0.072), bevel=0.006, seg=2)
-cyl("door_lever_neck", "steel", (LX1 - 0.07, 1.02), 0.009, IZ + 0.04, IZ + 0.07, n=12, axis="z")
-for hy in (0.45, 1.85):
-    box("door_hinge", "steel", (LX0 - 0.006, LX0 + 0.006), (hy, hy + 0.09), (IZ + 0.01, IZ + 0.03), bevel=0.002, seg=1)
+props_hard.door(globals())
 # hook rail on the door with a tote bag and a cap
 box("hook_rail", "oak", (LX0 + 0.16, LX0 + 0.52), (1.70, 1.76), (IZ + 0.041, IZ + 0.056), bevel=0.003, seg=1)
 for hx in (LX0 + 0.22, LX0 + 0.34, LX0 + 0.46):
@@ -488,11 +255,7 @@ def framed(nm, xc, yc, w, h, uv0, uv1):
 framed("poster_a", -1.06, 1.97, 0.32, 0.48, (0, 0), (341 / 1024, 1))
 framed("poster_b", -0.56, 1.86, 0.26, 0.39, (341 / 1024, 0), (682 / 1024, 1))
 framed("poster_c", -1.60, 1.97, 0.24, 0.24, (683 / 1024, 1 - 341 / 512), (1.0, 1.0))
-box("ac_body", "white", (0.36, 1.00), (2.02, 2.29), (IZ, IZ + 0.21), bevel=0.03, seg=4)
-box("ac_vent", "plastic_black", (0.40, 0.96), (2.035, 2.06), (IZ + 0.17, IZ + 0.205), bevel=0.006, seg=2)
-box("ac_flap", "white", (0.40, 0.96), (2.03, 2.05), (IZ + 0.185, IZ + 0.215), bevel=0.006, seg=2)
-mat("led", color=(0.1, 0.6, 0.3), rough=0.4, emit=((0.2, 1.0, 0.5), 2.0))
-box("ac_led", "led", (0.93, 0.94), (2.08, 2.09), (IZ + 0.209, IZ + 0.212))
+props_hard.aircon(globals())
 
 # ================================================================ the prop sweep (#75): nothing inside a wall, nothing floating
 # Every prop is registered with check(); sweep() measures its real (evaluated) vertices and reports each offender.
@@ -717,27 +480,10 @@ check("pinboard", since(n0), None)
 assert PB_Y1 < WY1 + 0.05 or PB_Z1 < WZ0 - 0.06, "the pinboard runs into the window casing"
 
 # --- a game controller behind the keyboard, between the monitor's foot and the right speaker
-n0 = group(); pad = []
-pad.append(box("pad_body", "painted", (-0.052, 0.052), (0.0, 0.024), (-0.028, 0.02), bevel=0.01, seg=3))
-for s in (-1, 1):
-    g = blob("pad_grip", "painted", (s * 0.046, 0.011, 0.022), (0.022, 0.012, 0.036), n=14); g.data.transform(Matrix.Rotation(s * 0.35, 4, 'Z')); pad.append(g)
-vc(pad, "#e4e2dc")
-sticks = [cyl("pad_stick", "painted", c, 0.0085, 0.024, 0.034, n=12) for c in ((-0.022, 0.006), (0.016, 0.006))]
-dpad = [box("pad_dpad", "painted", (-0.042, -0.026), (0.024, 0.027), (-0.012, -0.006)), box("pad_dpad", "painted", (-0.037, -0.031), (0.024, 0.027), (-0.017, -0.001))]
-vc(sticks + dpad, "#2a2a2e")
-btn = [cyl("pad_btn", "painted", (0.034 + dx, -0.009 + dz), 0.0042, 0.023, 0.027, n=10) for dx, dz in ((0.009, 0), (-0.009, 0), (0, 0.009), (0, -0.009))]
-vc(btn, "#8c8f99")
-parts = since(n0)
-for o in parts: transform(o, loc=(-0.80, DTOP, -1.20), ry=-0.35)
-settle(parts, DTOP); [project_uv(o) for o in parts]; check("game_pad", parts, ("y", DTOP))
+props_hard.controller(globals())
 
 # --- manga on the floor in the gap between the desk and the bookshelf
-n0 = group(); random.seed(5); yy = FY
-for i in range(9):
-    h = random.uniform(0.014, 0.019); b = box("manga", "painted", (-0.057, 0.057), (yy, yy + h), (-0.088, 0.088), bevel=0.0015, seg=1)
-    set_vcol(b, srgb(random.choice(["#e9e4d8", "#d8433a", "#2d4a6b", "#f2c12e", "#3f5b45", "#e9e4d8", "#1f1f24"])))
-    transform(b, loc=(-0.24 + random.uniform(-0.006, 0.006), 0, -1.32), ry=random.uniform(-0.18, 0.18)); yy += h
-check("manga_stack", since(n0), ("y", FY))
+props_hard.manga(globals())
 
 # --- a wall hook above them; the headphones on it are their own node ("headphones", not in the static mesh or its AO),
 # so a later change can take them off the hook and put them on his head (#68)
@@ -746,16 +492,7 @@ n0 = group()
 cyl("hp_hook", "metal_dark", HP, 0.006, IZ, IZ + 0.07, n=10, axis="z"); cyl("hp_hook_tip", "metal_dark", (HP[0], IZ + 0.07), 0.006, HP[1], HP[1] + 0.025, n=10)
 cyl("hp_hook_plate", "metal_dark", HP, 0.016, IZ, IZ + 0.004, n=16, axis="z")
 check("headphone_hook", since(n0), ("wall", None))
-mat("hp_shell", color=srgb("#26272c"), rough=0.4)
-mat("hp_pad", color=srgb("#141416"), rough=0.9, nor="fabric_nor.jpg", nstr=0.8, uv=0.10)
-HB_R = 0.078; HB_C = (HP[0], HP[1] + 0.006 - HB_R + 0.008, IZ + 0.05)             # the band's inner top rests on the hook
-hp = [torus("hp_band", "hp_shell", HB_C, HB_R, 0.008, axis="z", half="up", static=False)]
-for s in (-1, 1):
-    cx = HB_C[0] + s * HB_R; cy = HB_C[1] - 0.04
-    hp.append(rod("hp_yoke", "hp_shell", (cx, HB_C[1], HB_C[2]), (cx, cy + 0.03, HB_C[2]), 0.004, static=False))
-    hp.append(cyl("hp_cup", "hp_shell", (cy, HB_C[2]), 0.037, cx - s * 0.002, cx + s * 0.018, n=24, axis="x", static=False))
-    hp.append(cyl("hp_pad", "hp_pad", (cy, HB_C[2]), 0.033, cx - s * 0.016, cx - s * 0.002, n=24, axis="x", static=False))
-check("headphones", hp, None)
+props_hard.headphones(globals())
 
 # --- a hoodie on the door's left hook (the tote moved to the right one), hanging in front of the tote
 HX = LX0 + 0.22
@@ -766,24 +503,7 @@ check("backpack", PS.backpack(), ("y", FY))
 
 # --- the front right: a floor cushion (zabuton) and a small fan
 check("cushion", PS.cushion(), ("y", FY))
-n0 = group(); FAN = (1.70, 0.30); FAN_RY = -2.2                    # facing the bed
-lathe("fan_base", "white", [(0, 0), (0.115, 0), (0.118, 0.012), (0.10, 0.03), (0.02, 0.034), (0, 0.034)], (0, 0), 0, n=28)
-cyl("fan_stem", "white", (0, 0), 0.014, 0.03, 0.36, n=12)
-cyl("fan_motor", "white", (0, 0.36), 0.045, -0.09, -0.01, n=20, axis="z")
-FC = (0, 0.36, -0.005)                                           # the grille: a rim, rings and spokes (the blades show through)
-torus("fan_rim", "white", FC, 0.13, 0.008, axis="z", nmaj=36)
-for k, (rr, dz) in enumerate(((0.10, 0.03), (0.065, 0.045), (0.03, 0.052))): torus("fan_ring", "white", (0, FC[1], FC[2] + dz), rr, 0.0025, axis="z", nmaj=28, nmin=5)
-for k in range(8):
-    a = k * math.pi / 4; rod("fan_spoke", "white", (0, FC[1], FC[2] + 0.054), (0.128 * math.cos(a), FC[1] + 0.128 * math.sin(a), FC[2] + 0.004), 0.0022, n=5)
-cyl("fan_badge", "white", (0, FC[1]), 0.022, FC[2] + 0.05, FC[2] + 0.06, n=16, axis="z")
-lathe("fan_back", "white", [(0.0, 0.0), (0.06, 0.004), (0.12, 0.03), (0.13, 0.05)], (0, 0), 0, n=32)
-for o in since(n0)[-1:]: o.data.transform(Matrix.Translation(B(0, 0.36, -0.055)) @ Matrix.Rotation(math.pi / 2, 4, 'X')); o.data.update()
-for i in range(3):                                               # blades seen through the cage
-    bl = blob("fan_blade", "painted", (0.055, 0, 0), (0.05, 0.022, 0.004), n=12); set_vcol(bl, srgb("#c9d3dc"))
-    bl.data.transform(Matrix.Translation(B(0, 0.36, -0.005)) @ Matrix.Rotation(i * 2 * math.pi / 3, 4, 'Y')); bl.data.update()
-parts = since(n0)
-for o in parts: transform(o, loc=(FAN[0], FY, FAN[1]), ry=FAN_RY)
-settle(parts, FY); [project_uv(o) for o in parts]; check("fan", parts, ("y", FY))
+props_hard.fan(globals())
 
 # --- slippers by the floor cushion (the door's side is his place at the doorway and the leaf's swing, #82)
 def slipper(x, z, ry):
@@ -847,6 +567,8 @@ LB = (lamp_root.location.x, DTOP + 0.004, -lamp_root.location.y)
 cable("cable_lamp", [(-1.13, FY + 0.06, IZ + 0.037), (-1.30, 0.42, IZ + 0.006), (-1.55, DTOP - 0.07, IZ + 0.005), (-1.60, DTOP + 0.004, IZ + 0.012), (LB[0] + 0.02, LB[1], LB[2] - 0.03)])
 check("cables", since(n0), None)
 
+props_hard.decals(globals())                       # #98 G5: dust, scuffs, scratches, stickers (their own node, no AO)
+
 # ================================================================ the sweep (before anything is joined; `-- --sweep` stops here)
 for nm, sup in (("mug", DTOP), ("pencup", DTOP), ("desk_book", DTOP), ("deskmat", DTOP), ("kb_body", DTOP + 0.003), ("mouse", DTOP + 0.003),
                 ("mon_base", DTOP), ("spk_l_box", DTOP), ("spk_r_box", DTOP), ("bin", FY), ("cupnoodle", FTOP), ("tissues", FTOP),
@@ -867,6 +589,7 @@ for o in STATIC:
     bpy.context.view_layer.objects.active = o
     for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
 for o in STATIC: project_uv(o)
+props_hard.finish(globals())                       # #98 G5: every joined mesh carries the vertex-colour layer (edge wear)
 # the things hanging on the door (hook rail, hooks, tote, hoodie) are one node of their own, "hangers", whose origin is
 # the door's hinge as room.html builds its opening leaf (#82): the page turns it with the leaf
 HANG = named("hook_rail", "hook", "hook_tip", "tote", "tote_strap") + [o for o in HOODIE if o.name in bpy.data.objects]
