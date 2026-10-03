@@ -84,7 +84,7 @@ TRI = {"desktop": {"focus": 70000, "hero": 50000, "mid": 12000, "glia": 8000}, "
 COUNTS = {"desktop": {"hero": 2, "mid": 7, "far": 6, "glia": 4}, "phone": {"hero": 2, "mid": 5, "far": 6, "glia": 3}}
 FAR_STRIDE = {"desktop": 6, "phone": 8}
 POST_MAX = {"focus": 100000, "hero": 100000, "mid": 1200}       # incoming synapses kept per cell (the mid tier: a sample)
-AXON_SKEL_NODES = {"desktop": 3000, "phone": 2000}             # the focus / hero cells also carry their axon's skeleton (thinned to about this
+AXON_SKEL_NODES = {"desktop": 2500, "phone": 2000}             # the focus / hero cells also carry their axon's skeleton (thinned to about this
                                                                # many nodes): drawn as a line under the mesh, lit node to node by the pulse
 
 
@@ -430,13 +430,17 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
             entry["myelinated_um"] = round(float(seglen[kinds_all == 4].sum()), 1)
             entry["axon_um"] = round(float(seglen[np.isin(kinds_all, (1, 4, 5))].sum()), 1)
             entry["dend_um"] = round(float(seglen[kinds_all == 2].sum()), 1)
-            def thin_skel(keep):                                # the skeleton thinned to the kept nodes; each kept node's parent = its nearest kept ancestor
+            def thin_skel(keep, within=None, max_um=None):      # the skeleton thinned to the kept nodes; each kept node's parent = its nearest kept ancestor
                 par = cell["PAR"]; newidx = -np.ones(len(Pb), int); newidx[keep] = np.arange(keep.sum())
                 anc = np.empty(len(Pb), int)
                 for i in range(len(Pb)):
                     p = par[i]
-                    while p >= 0 and not keep[p]:
-                        p = par[p]
+                    while p >= 0 and not keep[p] and (within is None or within[p]):   # the walk may not leave `within` (the axon): no chords
+                        p = par[p]                                                     # from an axon branch to a far node of another class
+                    if p >= 0 and (not keep[p] or (within is not None and not within[p])):
+                        p = -1
+                    if p >= 0 and max_um is not None and np.linalg.norm(Pb[i] - Pb[p]) > max_um:
+                        p = -1                                                         # a link longer than this would be a straight chord
                     anc[i] = p
                 kp = np.where(keep)[0]
                 lo, hi = Pb[kp].min(0), Pb[kp].max(0)
@@ -460,7 +464,7 @@ def pack_set(name, spec, lodname, h, props, somas, frame, cells_desc, out_dir):
                     # branch points and tips of the axon stay, so no branch is lost to the stride
                     nchild = np.bincount(cell["PAR"][cell["PAR"] >= 0], minlength=len(Pb))
                     keep[ax & ((nchild != 1))] = True
-                    entry["abbox"], entry["askel"] = thin_skel(keep)
+                    entry["abbox"], entry["askel"] = thin_skel(keep, within=ax, max_um=25.0)
             if role != "far":                                   # the real synapses: this cell's boutons (pre) and inputs (post)
                 pre, post = synapses_for(h, sid)
                 n_all_post = len(post)
@@ -556,7 +560,7 @@ def main():
         img = img.transpose(Image.Transpose.ROTATE_90)
     if sign > 0 and axis == 1:
         img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    img.save(OUT / f"{args.set}_em.jpg", quality=52)
+    img.save(OUT / f"{args.set}_em.jpg", quality=48)
     em_entry = {"file": f"{args.set}_em.jpg", "nm_per_px": mip[0] * 2, "px": px // 2, "um": round(px * mip[0] / 1000.0, 1),
                 "centre": [round(float(x), 1) for x in em_centre_block], "note": "a real SEM image of the same tissue (the 4 nm volume at its 64 nm mip) through the focus cell's soma"}
     sizes = {}
