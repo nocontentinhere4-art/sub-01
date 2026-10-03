@@ -207,6 +207,16 @@ def propagate(C, PAR, n):
     return out
 
 
+def soma_centre(P, R, soma_nodes):
+    """The soma's centre: H01's soma class also sits on a few far-away nodes, so the plain mean of soma nodes can land
+    tens of µm off the cell body. The soma is the cluster (within 30 µm) around the thickest soma node."""
+    if not len(soma_nodes):
+        return P[np.argmax(R)]
+    core = soma_nodes[np.argmax(R[soma_nodes])]
+    near = soma_nodes[np.linalg.norm(P[soma_nodes] - P[core], axis=1) <= 30000.0]
+    return P[near].mean(0)
+
+
 def reroot(PAR, new_root):
     """The fragment that holds new_root re-rooted there (the parent links on the path to its old root are reversed)."""
     PAR = PAR.copy(); chain = []; i = new_root
@@ -431,7 +441,7 @@ def build_cell(h, sid, role, tris, soma_table_row=None, source="pr", em_frame=No
         CL = propagate(C, PAR, len(P))
         CL = adopt_axon_fragments(P, C, CL, FR)
         soma_nodes = np.where(CL == 3)[0]
-        soma_nm = P[soma_nodes].mean(0) if len(soma_nodes) else P[np.argmax(R)]
+        soma_nm = soma_centre(P, R, soma_nodes)
         if len(soma_nodes):                                   # the soma's fragment is rooted at the soma, so path distances start there
             PAR = reroot(PAR, int(soma_nodes[np.argmin(np.linalg.norm(P[soma_nodes] - soma_nm, axis=1))]))
         PAR = bridge_axon_fragments(P, CL, PAR, FR, soma_nm)
