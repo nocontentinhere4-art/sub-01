@@ -34,6 +34,8 @@ from tests.visual.fake_server import Server               # noqa: E402
 from tests.visual.cdn_cache import CdnCache                # noqa: E402
 
 CHROMIUM = os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
+# the waits below poll on a timer (polling=100), not on requestAnimationFrame: the 390 page is a second, background page
+# whose frames Chromium may not schedule, so a rAF-polled predicate could stay unevaluated though already true
 GLB_FILES = 11                                            # room_clean, boy, 6 clips, hand_phone, food, boy_moves (#76: last)
 BUDGETS = json.loads((HERE / "budgets.json").read_text())
 
@@ -90,7 +92,7 @@ class Harness:
         if self.cdn:
             self.cdn.install(pg)
         pg.goto(self.base + "/room.html?debug&hour=14", wait_until="load")
-        pg.wait_for_function("window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9", timeout=180000)
+        pg.wait_for_function("window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9", timeout=180000, polling=100)
         t0 = time.time()
         while st["glb"] < GLB_FILES and time.time() - t0 < 60:
             pg.wait_for_timeout(200)
@@ -113,7 +115,7 @@ class Harness:
         pg.evaluate(f"setHour({hour}); if (window.ROLL) ROLL.force = null;")
         try:
             pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
-                                 f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000)
+                                 f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000, polling=100)
         except Exception as e:                                     # say where he was and what the page threw, not just "timeout"
             st = next((v[2] for v in self.pages.values() if v[1] is pg), {})
             state = pg.evaluate("JSON.stringify({pose: pose(), clock: document.getElementById('clock').textContent})")
@@ -133,7 +135,7 @@ class Harness:
             was = pg.evaluate("JSON.stringify(pose().goal)")
             self.server.set_scene(name, hour)
             pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && JSON.stringify(p.goal) !== {json.dumps(was)} "
-                                 f"&& p.goal.anchor === {json.dumps(at or 'desk')}; }}", timeout=15000)
+                                 f"&& p.goal.anchor === {json.dumps(at or 'desk')}; }}", timeout=15000, polling=100)
             pg.wait_for_timeout(250)
         if name == "walking":
             pose = self.walk_until(pg)
