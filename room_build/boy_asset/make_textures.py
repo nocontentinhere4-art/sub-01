@@ -141,6 +141,25 @@ else:
 good = face & ~bad & (r - b > 0.1) & (lum > 0.35)
 w = blur(good.astype(np.float32), 6); col = np.stack([blur(skin_src[:, :, k] * good, 6) for k in range(3)], 2) / np.maximum(w, 1e-4)[:, :, None]
 skin_clean = skin_src.copy(); skin_clean[bad] = col[bad]
+# the painted skin has pink / rose blotches (AI bake artefacts; the upscaler sharpened them). Keep every pixel's
+# luminance (the painted shading: nose, cheeks, jaw) but replace its low-frequency chroma (sigma 10 px) by the broad
+# skin tone (sigma 70 px) over the skin, leaving the features alone: eyes and lashes, brows, nostrils (dark), lips.
+def chroma_equalise(img, region, feat, s_lo=10, s_hi=70):
+    out = img.copy(); w = (region & ~feat).astype(np.float32)
+    wl = blur(w, s_lo); wh = blur(w, s_hi)
+    lo = np.stack([blur(img[:, :, k] * w, s_lo) for k in range(3)], 2) / np.maximum(wl, 1e-3)[:, :, None]
+    hi = np.stack([blur(img[:, :, k] * w, s_hi) for k in range(3)], 2) / np.maximum(wh, 1e-3)[:, :, None]
+    lo_c = lo / np.maximum(lo.mean(2, keepdims=True), 1e-3); hi_c = hi / np.maximum(hi.mean(2, keepdims=True), 1e-3)
+    gain = np.clip(hi_c / np.maximum(lo_c, 1e-3), 0.7, 1.4)
+    m_ = blur((region & ~feat).astype(np.float32), 2)[:, :, None]
+    out = np.clip(img * (gain * m_ + (1 - m_)), 0, 1); return out
+lum_c = skin_clean.mean(2); rr_, gg_, bb_ = skin_clean[:, :, 0], skin_clean[:, :, 1], skin_clean[:, :, 2]
+mouth_z = eye_z - 7.2
+lips = (rr_ - gg_ > 0.16) & (lum_c < 0.78) & (np.abs(X) < 2.9) & (np.abs(Z - mouth_z) < 1.3) & (Y < -6)
+features = (lum_c < 0.42) | lips | ndi.binary_dilation(hole, iterations=10)
+features = ndi.binary_dilation(features, iterations=3)
+skin_clean = chroma_equalise(skin_clean, head, features)
+print("skin chroma equalised; lips px", int(lips.sum()))
 # a touch of local contrast on the face (the old bake is soft): unsharp mask, light
 face_f = ndi.binary_dilation(face, iterations=8).astype(np.float32)
 sharp = np.clip(skin_clean + 0.2 * (skin_clean - np.stack([blur(skin_clean[:, :, k], 2.5) for k in range(3)], 2)), 0, 1)
@@ -165,6 +184,12 @@ hair = load("bake_hair.png"); H = hair.shape[0]
 rh = load("rough_hair.png")[:, :, 0]
 var = (blur(rh, 1.0) - 0.5) * 0.08
 hair_out = np.clip(hair * (1 + var[:, :, None]), 0, 1)
+hr, hg, hb = hair_out[:, :, 0], hair_out[:, :, 1], hair_out[:, :, 2]; hl = hair_out.mean(2)
+skinny = ((hr - hb > 0.07) & (hl > 0.22)) | (hl > 0.45)                       # pink scalp / skin bleed, or grey-white glints
+skinny = ndi.binary_dilation(skinny, iterations=2)
+good_h = ~skinny & (hl > 0.01)
+wgt = blur(good_h.astype(np.float32), 6); fill = np.stack([blur(hair_out[:, :, k] * good_h, 6) for k in range(3)], 2) / np.maximum(wgt, 1e-3)[:, :, None]
+hair_out = np.where(skinny[:, :, None], fill, hair_out); print("hair: %d skin-coloured px replaced" % int(skinny.sum()))
 save("tex_hair.png", hair_out)
 save("tex_hair_n.png", sanitize_normal(np.asarray(Image.open(os.path.join(WORK, "nrm_hair.png")).convert("RGB").resize((H, H), Image.LANCZOS)).astype(np.float32) / 255))
 save("tex_hair_orm.png", orm(np.clip(load("ao_hair.png", H)[:, :, 0] * 0.8 + 0.2, 0, 1), rh))
@@ -187,7 +212,14 @@ if os.path.exists(REG):
     flat = np.where(pl > base_tone, base_tone + (pl - base_tone) * 0.3, pl)
     gain = np.where(pants & ~stripe, flat / np.maximum(pl, 1e-4), 1.0)
     cloth_g = np.clip(cloth_g * gain[:, :, None], 0, 1); print("pants de-lit: base tone %.3f, %d px" % (base_tone, int((pants & ~stripe).sum())))
-save("tex_cloth.png", cloth_g)
+# alpha: 1 everywhere, 0 in the reserved band (u, v < 0.015: both corners of the v axis, as the UV packing starts at 0 and glTF
+# flips v): the invisible full-body proxy that assemble.mjs appends to the slides primitive points there (white, so that
+# room.html's slidesInit never takes the proxy's feet for slides)
+band = int(C * 0.015) + 2
+alpha_c = np.ones((C, C), np.float32); cloth_g = cloth_g.copy()
+for sl in (np.s_[:band, :band], np.s_[C - band:, :band]):
+    alpha_c[sl] = 0; cloth_g[sl] = 1.0
+Image.fromarray(np.clip(np.concatenate([cloth_g, alpha_c[:, :, None]], 2) * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_cloth.png")); print("wrote tex_cloth.png (RGBA)")
 save("tex_cloth_n.png", sanitize_normal(load("nrm_cloth.png")))
 save("tex_cloth_orm.png", orm(np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1), load("rough_cloth.png")[:, :, 0]))
 
@@ -224,7 +256,7 @@ spec = {
         "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8},
         "pants":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.7, "orm": "cloth_orm"},
         "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.5, 0.5, 0.5], "sheenRoughness": 0.9},
-        "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm"},
+        "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "alphaMask": True},   # MASK: the proxy's texels are alpha 0
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},

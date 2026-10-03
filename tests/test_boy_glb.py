@@ -55,6 +55,11 @@ def test_triangle_budget_and_primitive_order():
     assert tris <= 80_000
     for p in body["primitives"]:
         assert {"POSITION", "NORMAL", "TEXCOORD_0", "JOINTS_0", "WEIGHTS_0"} <= set(p["attributes"])
+    # the LAST skinned mesh is his whole body to room.html's bed code (bedInit, slidesInit): the slides primitive carries
+    # an invisible low-poly proxy of the body (alpha-masked texels), so it has far more vertices than the slides alone
+    last = body["primitives"][-1]
+    assert g["accessors"][last["attributes"]["POSITION"]]["count"] > 5000
+    assert g["materials"][last["material"]].get("alphaMode") == "MASK"
 
 
 def test_eye_nodes_under_the_head():

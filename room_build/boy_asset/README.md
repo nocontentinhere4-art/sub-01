@@ -54,9 +54,15 @@ Under the `Head` joint, four plain nodes (not skin joints: clips without tracks 
   52°) is fully closed (`spec.lid.openAngle − closedAngle`); a relaxed half-lid is `+0.3`. A blink is ~60 ms down, 120 ms up.
 - The openings are cut out of the face texture (alpha MASK); there are no blendshapes. The painted lash lines stay on the
   skin, so the lid cap only has to cover the opening.
-- `room.html` finds the body's skinned meshes by `isSkinnedMesh`; the eye meshes are plain meshes, so the phone-grip
-  hand cloud (`handVertices`) and everything else keep seeing the first body primitive (skin) as before. The page's
-  `?debug` `penetration()` helper takes the *last* skinned mesh, which is now the slides primitive: a debug-only change.
+- `room.html` finds the body's skinned meshes by `isSkinnedMesh`; the eye meshes are plain meshes. The phone-grip hand
+  cloud (`handVertices`) takes the **first** skinned mesh (the skin primitive, as before). The bed code from #107
+  (`bedInit`: how thick he is around each bone, for the duvet and the pillow; `slidesInit` / `setSlides`: the slide
+  triangles, dark texels on the feet, hidden on him and parked by the bed; the `?debug` helpers) takes the **last**
+  skinned mesh as his whole body. So the last primitive is the slides **plus an invisible low-poly proxy of the whole
+  welded body** (decimated to ~3k triangles, same skin weights, every texel pointing at a white, alpha 0 band of the
+  cloth atlas; the slides material is alpha-masked, so the proxy is never drawn and casts no shadow). `slidesInit` then
+  finds exactly the real slide triangles (dark), as it did on the old single mesh, and `bedInit` sees every bone's
+  vertices.
 
 ## Checks and sheets
     node render/compare.mjs work/boy_old.glb out/boy.glb out/compare    # every clip at the same frames, old vs new, + close-ups

@@ -30,7 +30,7 @@ rig, its rest pose, the inverse bind matrices and the embedded sit clip are the 
 |---|---|---|---|
 | file | 960 KB | 1.75 MB | ≤ 3 MB |
 | triangles | 31k | 55k body + 2 × 1.1k eyes | ≤ 80k |
-| draw calls | 1 | 6 body + 6 eye parts (two shared meshes) | |
+| draw calls | 1 | 6 body (the last one also carries an invisible ~3k-triangle body proxy for the bed code) + 6 eye parts (two shared meshes) | |
 | textures (VRAM) | one 2048² | skin 2048² + 2 × 1024², hair 1024² + 2 × 512², cloth 2048² + 2 × 1024², eye 512², lid 128² | |
 
 Not measured here: FPS on a real mid-range phone (headless Chromium renders in software; the extra draw calls and the

@@ -14,6 +14,7 @@ The rig is not exported from here: assemble.mjs puts this mesh back into the ori
 """
 import bpy, bmesh, os, sys, math, time
 import numpy as np
+from mathutils import Vector
 from collections import Counter, deque
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -200,6 +201,18 @@ def select_faces(pred):
     bme.select_flush_mode(); bmesh.update_edit_mesh(m)
     n = sum(1 for f in bme.faces if f.select); assert n == sum(sel), (n, sum(sel))
 
+# ---------------------------------------------------------------- a low-poly copy of the whole welded body: the invisible proxy
+# room.html's bed code (bedInit, slidesInit, the debug helpers) takes the LAST skinned mesh as his whole body; with the
+# body split into one primitive per material that would be the slides alone, so assemble.mjs appends this proxy (alpha-
+# masked, never drawn) to the slides primitive. Decimated: ~3k triangles are enough for "how thick he is around a bone".
+bpy.ops.object.select_all(action="DESELECT"); me.select_set(True); bpy.context.view_layer.objects.active = me
+bpy.ops.object.duplicate(); proxy = bpy.context.active_object; proxy.name = "proxy"
+dec = proxy.modifiers.new("dec", "DECIMATE"); dec.ratio = 0.1; dec.use_collapse_triangulate = True
+bpy.ops.object.modifier_apply(modifier="dec")
+proxy.hide_render = True; proxy.hide_viewport = True                 # never part of the bakes (it would shadow the body's AO)
+log("proxy:", len(proxy.data.polygons), "faces")
+bpy.ops.object.select_all(action="DESELECT"); me.select_set(True); bpy.context.view_layer.objects.active = me
+
 # ---------------------------------------------------------------- subdivide the smooth regions once: head skin, hands, socks, slides
 def face_bone_w(p, w): return all(w[v] > 0.3 for v in p.vertices)
 hand_w_v = W_("LeftHand", "RightHand", "LeftForeArm", "RightForeArm")
@@ -224,7 +237,7 @@ for e in bm.edges:
 bm.to_mesh(m); bm.free()
 # split the regions into their own object, subdivide (vertex groups and UVs interpolate), join back, weld the seam
 select_faces(lambda p: bool(region[p.index])); bpy.ops.mesh.separate(type="SELECTED"); bpy.ops.object.mode_set(mode="OBJECT")
-part = [o for o in bpy.data.objects if o.type == "MESH" and o is not me][0]; part.name = "smooth_regions"
+part = [o for o in bpy.data.objects if o.type == "MESH" and o is not me and o.name != "proxy"][0]; part.name = "smooth_regions"
 bpy.ops.object.select_all(action="DESELECT"); part.select_set(True); bpy.context.view_layer.objects.active = part
 mod = part.modifiers.new("subd", "SUBSURF"); mod.levels = 1; mod.use_creases = True; mod.boundary_smooth = "PRESERVE_CORNERS"; mod.uv_smooth = "PRESERVE_BOUNDARIES"
 bpy.ops.object.modifier_apply(modifier="subd")
@@ -310,6 +323,10 @@ for atlas in ("skin", "hair", "cloth"):
     bpy.ops.uv.select_all(action="SELECT")
     bpy.ops.uv.pack_islands(rotate=True, margin=0.004, margin_method="FRACTION", shape_method="CONCAVE")
     bpy.ops.object.mode_set(mode="OBJECT")
+    if atlas == "cloth":                                                 # a free band at u, v < 0.015: the proxy's transparent texel lives there
+        for p in m.polygons:
+            if in_atlas(p):
+                for li in p.loop_indices: uv_new.data[li].uv = uv_new.data[li].uv * 0.984 + Vector((0.015, 0.015))
     log("uv:", atlas, "faces", sum(1 for p in m.polygons if in_atlas(p)), "islands", uv_islands(in_atlas))
 
 # ---------------------------------------------------------------- bake the old colour into the new atlases
@@ -497,7 +514,8 @@ for i, name in enumerate(REGIONS):
     out = nt.nodes.new("ShaderNodeOutputMaterial"); bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
     t = nt.nodes.new("ShaderNodeTexImage"); t.image = bake_imgs[ATLAS[name][0]]
     nt.links.new(t.outputs[0], bsdf.inputs["Base Color"]); nt.links.new(bsdf.outputs[0], out.inputs[0])
-bpy.ops.object.select_all(action="DESELECT"); arm.select_set(True); me.select_set(True)
+proxy.hide_render = False; proxy.hide_viewport = False
+bpy.ops.object.select_all(action="DESELECT"); arm.select_set(True); me.select_set(True); proxy.select_set(True)
 bpy.ops.export_scene.gltf(filepath=os.path.join(WORK, "boy_mesh.glb"), use_selection=True, export_format="GLB", export_animations=False,
                           export_skins=True, export_yup=True, export_image_format="NONE", export_materials="EXPORT", export_normals=True)
 # labels per face for the eye search in the next stage

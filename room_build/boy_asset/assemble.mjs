@@ -58,33 +58,50 @@ async function material(name, spec) {
   return m;
 }
 
-// ---- the body primitives, in the built file's (= material slot) order: skin first, which room.html relies on
+// ---- the body primitives, in the built file's (= material slot) order: skin first, which room.html's handVertices relies
+// on; the slides last, with the invisible full-body proxy appended to it (room.html's bedInit / slidesInit / debug helpers
+// take the LAST skinned mesh as his whole body: they need every bone's vertices there, and slidesInit must find exactly
+// the slide triangles, dark texels on the feet; the proxy's texels are white with alpha 0 in the cloth atlas, MASK)
 const mesh = charNode.getMesh(); for (const p of mesh.listPrimitives()) { p.dispose(); }
 const buf = root.listBuffers()[0];
 const tmp = vec4.create();
-for (const pb of built.getRoot().listMeshes()[0].listPrimitives()) {
-  const name = pb.getMaterial().getName().replace(/^boy_/, "");
+function convert(pb, uvOverride) {
   const pos = pb.getAttribute("POSITION"), nrm = pb.getAttribute("NORMAL"), uv = pb.getAttribute("TEXCOORD_0"), jt = pb.getAttribute("JOINTS_0"), wt = pb.getAttribute("WEIGHTS_0"), idx = pb.getIndices();
-  const n = pos.getCount(), P = new Int16Array(n * 3), N = new Float32Array(n * 3), J = new Uint8Array(n * 4), Wt = new Float32Array(n * 4);
-  const pmin = [Infinity, Infinity, Infinity], pmax = [-Infinity, -Infinity, -Infinity];
+  const n = pos.getCount(), P = new Int16Array(n * 3), N = new Float32Array(n * 3), J = new Uint8Array(n * 4), Wt = new Float32Array(n * 4), UV = new Float32Array(n * 2);
   for (let i = 0; i < n; i++) {
     pos.getElement(i, tmp); tmp[3] = 1; vec4.transformMat4(tmp, tmp, X);
-    for (let k = 0; k < 3; k++) { const v = Math.round(tmp[k] * 32767); if (v < -32767 || v > 32767) throw new Error("vertex out of the quantised range: " + tmp); P[i * 3 + k] = v; pmin[k] = Math.min(pmin[k], v); pmax[k] = Math.max(pmax[k], v); }
+    for (let k = 0; k < 3; k++) { let v = Math.round(tmp[k] * 32767); if (Math.abs(v) > 33000) throw new Error("vertex out of the quantised range: " + tmp); P[i * 3 + k] = Math.max(-32767, Math.min(32767, v)); }   // (the decimated proxy may overshoot the body's box by a fraction of a mm)
     nrm.getElement(i, tmp); for (let k = 0; k < 3; k++) N[i * 3 + k] = tmp[k];
     jt.getElement(i, tmp); for (let k = 0; k < 4; k++) J[i * 4 + k] = remap[tmp[k]];
     wt.getElement(i, tmp); let s = tmp[0] + tmp[1] + tmp[2] + tmp[3]; for (let k = 0; k < 4; k++) Wt[i * 4 + k] = s > 0 ? tmp[k] / s : (k === 0 ? 1 : 0);
+    if (uvOverride) { UV[i * 2] = uvOverride[0]; UV[i * 2 + 1] = uvOverride[1]; } else { uv.getElement(i, tmp); UV[i * 2] = tmp[0]; UV[i * 2 + 1] = tmp[1]; }
   }
-  const acc = (arr, type, normalized = false) => orig.createAccessor().setType(type).setArray(arr).setNormalized(normalized).setBuffer(buf);
+  return {n, P, N, J, Wt, UV, I: new Uint32Array(idx.getArray())};
+}
+function concat(a, b) {
+  const cat = (x, y) => { const o = new x.constructor(x.length + y.length); o.set(x); o.set(y, x.length); return o; };
+  const I = new Uint32Array(a.I.length + b.I.length); I.set(a.I); for (let i = 0; i < b.I.length; i++) I[a.I.length + i] = b.I[i] + a.n;
+  return {n: a.n + b.n, P: cat(a.P, b.P), N: cat(a.N, b.N), J: cat(a.J, b.J), Wt: cat(a.Wt, b.Wt), UV: cat(a.UV, b.UV), I};
+}
+const acc = (arr, type, normalized = false) => orig.createAccessor().setType(type).setArray(arr).setNormalized(normalized).setBuffer(buf);
+const nodeMesh = name => built.getRoot().listNodes().find(n => n.getName() === name && n.getMesh())?.getMesh();   // Blender names the mesh data "char1.001"; the nodes keep their names
+const bodyMesh = nodeMesh("char1"), proxyMesh = nodeMesh("proxy");
+if (!proxyMesh) throw new Error("work/boy_mesh.glb has no proxy mesh (build_mesh.py exports one)");
+const PROXY_UV = [0.005, 0.995];                                   // inside the cloth atlas's transparent band (u, v < 0.015; v flipped for the image)
+for (const pb of bodyMesh.listPrimitives()) {
+  const name = pb.getMaterial().getName().replace(/^boy_/, "");
+  let d = convert(pb);
+  if (name === "slides") { let px = null; for (const pp of proxyMesh.listPrimitives()) { const c = convert(pp, PROXY_UV); px = px ? concat(px, c) : c; } d = concat(d, px); console.log("proxy appended to the slides:", px.n, "vertices", px.I.length / 3, "triangles"); }
   const prim = orig.createPrimitive().setMode(Primitive.Mode.TRIANGLES)
-    .setAttribute("POSITION", acc(P, Accessor.Type.VEC3, true))
-    .setAttribute("NORMAL", acc(N, Accessor.Type.VEC3))
-    .setAttribute("TEXCOORD_0", acc(new Float32Array(uv.getArray()), Accessor.Type.VEC2))
-    .setAttribute("JOINTS_0", acc(J, Accessor.Type.VEC4))
-    .setAttribute("WEIGHTS_0", acc(Wt, Accessor.Type.VEC4))
-    .setIndices(acc(new Uint32Array(idx.getArray()), Accessor.Type.SCALAR))
+    .setAttribute("POSITION", acc(d.P, Accessor.Type.VEC3, true))
+    .setAttribute("NORMAL", acc(d.N, Accessor.Type.VEC3))
+    .setAttribute("TEXCOORD_0", acc(d.UV, Accessor.Type.VEC2))
+    .setAttribute("JOINTS_0", acc(d.J, Accessor.Type.VEC4))
+    .setAttribute("WEIGHTS_0", acc(d.Wt, Accessor.Type.VEC4))
+    .setIndices(acc(d.I, Accessor.Type.SCALAR))
     .setMaterial(await material(name, SPEC.materials[name]));
   mesh.addPrimitive(prim);
-  console.log("primitive", name, n, "vertices", idx.getCount() / 3, "triangles");
+  console.log("primitive", name, d.n, "vertices", d.I.length / 3, "triangles");
 }
 oldMat.dispose();
 
@@ -104,7 +121,6 @@ function sphere(nameSuffix, radius, segsU, segsV, capAngle, matr, uvFn) {
     const x = Math.sin(th) * Math.cos(ph), y = Math.sin(th) * Math.sin(ph), z = Math.cos(th);
     P.push(x * radius, y * radius, z * radius); N.push(x, y, z); const t = uvFn(th, ph, u / segsU, v / segsV); UV.push(t[0], t[1]); } }
   for (let v = 0; v < segsV; v++) for (let u = 0; u < segsU; u++) { const a = v * (segsU + 1) + u, b = a + segsU + 1; I.push(a, b, a + 1, a + 1, b, b + 1); }
-  const acc = (arr, type) => orig.createAccessor().setType(type).setArray(arr).setBuffer(buf);
   return orig.createPrimitive().setAttribute("POSITION", acc(new Float32Array(P), Accessor.Type.VEC3)).setAttribute("NORMAL", acc(new Float32Array(N), Accessor.Type.VEC3))
     .setAttribute("TEXCOORD_0", acc(new Float32Array(UV), Accessor.Type.VEC2)).setIndices(acc(new Uint16Array(I), Accessor.Type.SCALAR)).setMaterial(matr);
 }
