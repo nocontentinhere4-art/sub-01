@@ -62,12 +62,16 @@ def _pw_chromium():
 
 
 class Harness:
-    def __init__(self, out, full=False, log=print, cdn_cache=HERE / ".cdn_cache"):
+    def __init__(self, out, full=False, log=print, cdn_cache=HERE / ".cdn_cache", only=None):
         self.out = Path(out); self.out.mkdir(parents=True, exist_ok=True)
-        self.full = full; self.log = log
+        self.full = full; self.log = log; self.only = set(only or [])
         self.cdn = CdnCache(cdn_cache) if cdn_cache else None
         self.res = {"software_webgl": True, "full": full, "shots": {}, "closeups": {}, "flicker": {}, "props": {}, "hard_failures": [],
                     "note": "headless Chromium with SwiftShader: FPS is a CPU rasteriser's, not a phone GPU's; DPR 1"}
+        if self.only and (self.out / "results.json").exists():      # an incremental run: the other scenes' results stay
+            self.res = json.loads((self.out / "results.json").read_text())
+            self.res["hard_failures"] = [h for h in self.res["hard_failures"] if not any(h.startswith(f"{sc}_") for sc in self.only)]
+            self.res["partial_rerun"] = sorted(self.only)
         self.pages = {}
         self.t0 = time.time()
 
@@ -112,7 +116,8 @@ class Harness:
         tick does (the debug act()), so the ticks that follow find him where they want him and plan nothing."""
         lf, stage, before, settle_s, at, clip, prep = S.scene(name)
         self.server.set_scene(name, hour)
-        pg.evaluate(f"setHour({hour}); if (window.ROLL) ROLL.force = null;")
+        # (the side-pose scene leaves the page's ROLL state turned: put it back, or the next lie-down pose restarts)
+        pg.evaluate(f"setHour({hour}); if (window.ROLL) {{ ROLL.force = null; ROLL.a = 0; ROLL.goal = 0; }}")
         try:
             pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
                                  f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000, polling=100)
@@ -141,7 +146,7 @@ class Harness:
             pose = self.walk_until(pg)
         else:
             pose = pg.evaluate(f"__qa.step(1/30, {int(round(settle_s * 30))})")
-        pg.evaluate("settle()")
+        pg.evaluate(f"settle(); __qa.settleWindow({hour})")
         pg.evaluate("__qa.followCam()")
         return pose
 
@@ -268,14 +273,19 @@ class Harness:
             self.browser = p.chromium.launch(executable_path=exe, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
             try:
                 shots = S.FULL_SHOTS if self.full else S.CORE_SHOTS
+                pick = lambda sc: not self.only or sc in self.only            # noqa: E731  (--only: a subset of scenes)
                 # one page per size; scenes in a stable order so the before-scenes (sleeping before phone) cost little
                 for name, hour, size in sorted(shots, key=lambda t: (t[2], t[1], list(S.SCENES).index(t[0]))):
-                    self.shot(name, hour, size)
+                    if pick(name):
+                        self.shot(name, hour, size)
                 for cname, (scene, hour, recipe) in S.CLOSEUPS.items():
-                    self.closeup(cname, scene, hour, recipe)
+                    if pick(scene):
+                        self.closeup(cname, scene, hour, recipe)
                 for scene, hour in ([("desk", 14), ("window", 19), ("sleeping", 23), ("door", 8)] if self.full else [("desk", 14)]):
-                    self.flicker(scene, hour)
-                self.perf()
+                    if pick(scene):
+                        self.flicker(scene, hour)
+                if not self.only:
+                    self.perf()
             finally:
                 for size, (ctx, pg, st) in self.pages.items():
                     self.res[f"page_{size}"] = {k: st[k] for k in ("errors", "failed", "glb_loaded", "ready")}
@@ -340,8 +350,10 @@ def main():
     ap.add_argument("--out", default="tests/visual/out")
     ap.add_argument("--full", action="store_true", help="every scene x hour x size (the heavy set); default: the core set CI runs")
     ap.add_argument("--no-cdn-cache", action="store_true", help="let the browser fetch three.js and leaflet itself (default: cached through Python)")
+    ap.add_argument("--only", default=None, help="comma-separated scenes to (re)run; with an existing results.json in --out the rest is kept")
     args = ap.parse_args()
-    res = Harness(ROOT / args.out, full=args.full, cdn_cache=None if args.no_cdn_cache else HERE / ".cdn_cache").run()
+    res = Harness(ROOT / args.out, full=args.full, cdn_cache=None if args.no_cdn_cache else HERE / ".cdn_cache",
+                  only=[x for x in (args.only or "").split(",") if x]).run()
     sys.exit(1 if res["hard_failures"] else 0)
 
 
