@@ -43,5 +43,11 @@ Views: `overview`, `desk`, `keyboard`, `keycaps`, `chair`, `shelf`, `bed`, `frid
 - **Decals** (one alpha-blended node `decals`, no AO): dust, scuffs, scratches, a coffee ring by the mug, a wall rub, a
   note and stickers on the fridge (cat, waves), stickers on the bin (東京, onigiri) and the bed (a record).
 
-## Budget
-See the PR for the measured file size, triangles and draw calls of the final build.
+## Budget (final build, AO baked)
+| | main 5f12ea9 | this branch |
+|---|---|---|
+| `room_clean.glb` | 4.17 MB | 5.02 MB (budget 7 MB with G4's soft goods) |
+| triangles | 135k | 153k |
+| draw calls (primitives) | 42 | 54 (6 new materials: alu, rubber, plastic_grey, keycap, book, decal + the chair's steel/rubber/grey/chrome) |
+| textures on the wire | 2.43 MB | 3.06 MB (floor 2048², the three 1024² atlases, 512² and 256² micro maps) |
+| prop sweep | 44 props, 0 offenders | 44 props, 0 offenders (`sweep.txt`) |
