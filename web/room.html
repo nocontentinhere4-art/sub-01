@@ -1161,9 +1161,10 @@ function lighting(dt){
   // sky seen through the window, kcd for the lamp, the bulb, the ceiling light and the screens. Real ratios: a low sun
   // through glass ~14 klx, a bright sky ~6 knit, a desk lamp ~0.28 kcd, a ceiling light ~0.13 kcd, a monitor ~0.012 kcd.
   // The exposure is a fixed stop per state (below): 2.2 by day, 12 at night with the lights off, 7 with a lamp on.
-  // the window (G7, window_view.js): its glass emits at the room's physical level when the post chain is on (5 knit by
-  // day, 0.05 at night; it checks post.hdr itself), and its weather says how much direct sun gets through
-  windowView.setEmission(5, 0.05);
+  // the window (G7, window_view.js): its glass emits at the room's physical level on every tier (the lighting is physical
+  // on all of them): 2.5 knit by day (bright, the view still readable at the day stop; 5 would clip to white), 0.03 at
+  // night (0.36 at the night stop); its weather says how much direct sun gets through
+  windowView.setEmission(OLD_ROOM ? 1 : 2.5, OLD_ROOM ? 1 : 0.03);
   const sunK = windowView.light ? windowView.light.sun : 1;
   sun.color.copy(cMoon).lerp(cSunDusk, smooth(-0.15, 0.05, sunEl)).lerp(cSunDay, day);
   sun.intensity = 0.3 + 2.3 * day + 0.7 * dusk;                       // the old room (baked textures) keeps its own scale
@@ -1245,9 +1246,10 @@ function lighting(dt){
   if (phone.visible) { phone.getWorldPosition(phoneGlow.position); phoneTick(performance.now()); }
   // the screens' own brightness in the clean room's units (knit): the monitor a little dim and off-white (a white page is
   // not a light source: G8 #16), the phone a bright panel; in the old room's baked scale, 1
-  const sk = OLD_ROOM ? 1 : post.hdrScreens;
-  if (monitor && monitor.on.color.b !== sk) monitor.on.color.setRGB(0.93 * sk, 0.96 * sk, sk);
-  const ps = phone.userData.screen, pk = OLD_ROOM ? 1 : 0.45; if (ps.on.color.r !== pk) ps.on.color.setScalar(pk);
+  // ... and both dim at night as real panels do (auto-brightness): the monitor 0.3 -> 0.12 knit, the phone 0.45 -> 0.05
+  const sk = OLD_ROOM ? 1 : post.hdrScreens * (0.4 + 0.6 * day);
+  if (monitor && Math.abs(monitor.on.color.b - sk) > 1e-3) monitor.on.color.setRGB(0.93 * sk, 0.96 * sk, sk);
+  const ps = phone.userData.screen, pk = OLD_ROOM ? 1 : 0.05 + 0.40 * day; if (Math.abs(ps.on.color.r - pk) > 1e-3) ps.on.color.setScalar(pk);
   // his material response: boy.glb's one material has no metallicFactor, so glTF makes it fully metallic (a statue that
   // only reflects the environment: black cloth went grey at night, the hood went white under the lamp). Cloth and skin:
   // dielectric, a fabric's share of the environment (as envClassOf gives fabric), once per material

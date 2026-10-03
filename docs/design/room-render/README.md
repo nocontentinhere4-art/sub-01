@@ -52,9 +52,11 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   stop; nothing is painted brighter than its light, and black cloth stays black. Monitor (G8 #16): the page is drawn at 0.3 knit, slightly
   blue-white, no longer a light source. Lamp on the hoodie (G8 #22): AgX in place of ACES (highlights roll off instead
   of clipping), the lamp 0.2 kcd, the exposure keyed to it.
-- Known gap for G7 (the window): the sky plane's shader emits ≈ 1 unit by day, which in the physical scale reads as a
-  dim window (a real overcast sky is ≈ 5 knit). Multiplying its output by ≈ 5 by day and ≈ 0.05 at night when the post
-  chain is active (`post.hdr`) would make the window the brightest thing in the room, as it is in a photo.
+- The window (G7's `window_view.js`, merged): `lighting()` sets its emission to 2.5 knit by day and 0.03 at night on
+  every tier (the lighting is physical on all of them): the brightest thing in the room, the view still readable (5
+  clipped it to white: 6.6 % blown pixels in the desk shot); its weather's sun factor scales the sun and the shafts.
+  The screens dim at night as real panels do (the monitor 0.3 → 0.12 knit, the phone 0.45 → 0.05), so a page is bright
+  in a dark room without clipping.
 
 ## G8's harness, main vs this branch (`python -m tests.visual.harness`, software WebGL, 0 hard failures on both)
 `exposure()` of the 3D canvas (`tests/visual/image_checks.py`): mean luminance 0–255, pure-black and blown-out pixel
