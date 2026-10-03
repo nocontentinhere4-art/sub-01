@@ -257,7 +257,8 @@ function retarget(clip) {
 // starting from its own rest pose; the hips move like ours scaled by the leg-length ratio, their height set so that the
 // lower ankle is as far above its rest height as ours (feet on the floor, the seat a seat, the back on the mattress)
 const OLD_CLIPS = [];
-const SEAT_DY = 0.235 - 0.139, KNEE_DROP = 0.12;                  // hip joint over the seat: his (room.html's chair anchor, 0.735 m over the
+const SEAT_DY = 0.235 - 0.139, KNEE_DROP = 0.12, FOOT_FWD = 0.08;   // FOOT_FWD: seated, the feet a little forward so the
+                                                // calves clear the seat's front edge                  // hip joint over the seat: his (room.html's chair anchor, 0.735 m over the
                                                 // pivot, the seat top at 0.505) less ours (0.639 over a 0.50 m seat)
 // the first character's skin (every 4th vertex), to set his height from his own lowest point
 const OLD_SKIN = await (async () => { const d = await io.read(path.join(WEB, "boy.glb")), sk = d.getRoot().listSkins()[0], out = [];
@@ -309,11 +310,12 @@ function toOld(channels, dur) {
       h.y = Math.max(h.y, wp(b.Hips).y + SEAT_DY * sitW + (h.y - wp(b.Hips).y) * (1 - sitW));
       o.Hips.position.y = h.y / 0.01; o.Hips.parent.updateMatrixWorld(true);
       // his shins are long for the room's chair: with his feet on the floor his knees would drop below the seat's front
-      // edge, so a foot rises (hovers, as with the first clips) until its knee is at most KNEE_DROP under the hip joint
+      // edge, so a foot rises (hovers, as with the first clips) until its knee is at most KNEE_DROP under the hip joint;
+      // it also goes FOOT_FWD forward (he faces +z), so the calf clears the seat's front edge
       ["Left", "Right"].forEach((S_, i) => { const knee = wp(o[S_ + "Leg"]), fwd = knee.clone().sub(wp(o[S_ + "UpLeg"])); fwd.y = 0;
         const pole = knee.clone().add(fwd.normalize().multiplyScalar(0.3)).add(new THREE.Vector3(0, 0.1, 0));
         for (let lift = 0; lift <= 0.12; lift += 0.005) {
-          reach(o[S_ + "UpLeg"], o[S_ + "Leg"], o[S_ + "Foot"], ft[i].clone().add(new THREE.Vector3(0, lift * sitW, 0)), pole);
+          reach(o[S_ + "UpLeg"], o[S_ + "Leg"], o[S_ + "Foot"], ft[i].clone().add(new THREE.Vector3(0, lift * sitW, FOOT_FWD * sitW)), pole);
           if (wp(o[S_ + "Leg"]).y >= h.y - KNEE_DROP) break; }
         o[S_ + "Foot"].quaternion.copy(wq(o[S_ + "Leg"]).invert().multiply(W[S_ + "Foot"])); o[S_ + "Foot"].updateMatrixWorld(true); });
     }

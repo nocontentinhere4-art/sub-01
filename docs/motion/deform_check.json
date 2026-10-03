@@ -263,7 +263,7 @@
    "bulge_legs_cm": 1.1,
    "bulge_arms_cm": 7.2,
    "bulge_trunk_cm": 0.7,
-   "bulge_at": "legs: Hips 3.0 s; arms: LeftHand 1.0 s; trunk: neck 3.4 s",
+   "bulge_at": "legs: Hips 0.0 s; arms: LeftHand 1.0 s; trunk: neck 3.4 s",
    "torso_cm": 0,
    "torso_at": ""
   },

@@ -22,19 +22,21 @@ def life(activity, place, doing, **extra):
     return d
 
 
-# name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring)
+# name -> (life, sleep stage, before-scene or None, settle seconds, expected pose() at, expected clip substring).
+# The clip names are room/boy_moves.glb's (#76), which take over walking, the desk, sleep and the phone in bed
+# (`?moves=old` brings back the first clips: Chair_Sit_Idle, Sleep_Normally, Casual_Walk)
 SCENES = {
-    "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "Chair_Sit"),
+    "desk":     (life("research", "desk", "reading at the computer", reading=READING), "AWAKE", None, 1.0, "desk", "type"),
     # (the page eats on top of the seated clip: arm IK, chopsticks, the dish; the eat clip itself is not played)
-    "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "Chair_Sit"),
-    "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 1.0, "bedlie", "Sleep"),
-    # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie)
-    "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "phone_lie"),
+    "eating":   (life("eat", "table", "eating ramen from the delivery", eating="ramen", food=1, hunger=0.7), "AWAKE", None, 3.6, "desk", "type"),
+    "sleeping": (life("sleep", "bed", "sleeping"), "NREM", None, 1.0, "bedlie", "sleep_breathing"),
+    # the phone in bed: from lying asleep the page keeps him lying and brings the phone up (phone_lie: the lie_phone clip)
+    "phone":    (life("phone", "bed", "in bed scrolling the phone", phone="shorts", boredom=0.6), "AWAKE", "sleeping", 2.5, "bedlie", "lie_phone"),
     # standing just inside the door (an activity the page does not know, at the door place: it stands him there)
     "door":     (life("home", "door_in", "just in at the door"), "AWAKE", None, 1.0, "door", "stand"),
     # walking: from the door to the desk; the harness stops mid-walk (see harness.walk_until). As the server sends it:
     # `walking` true and no `path` (life.py's snapshot has no path field), so the page treats him as already at the desk
-    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True), "AWAKE", "door", None, None, "Walk"),
+    "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True), "AWAKE", "door", None, None, "walk"),
     "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "stand"),
 }
 # the hour each scene is shot at in the core set, and the full matrix
