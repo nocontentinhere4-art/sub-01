@@ -4,8 +4,9 @@ prefix: pytest does not collect it):
     python tests/brain_anatomy_shots.py --out docs/screens/brain_anatomy
 
 Starts `live_server.py --demo` (BROWSE=0, no live spiking network), then in headless Chromium takes, at 1920 and 390 px:
-  before (the page's own glow look), fresh brain, dissected (coronal cut through the middle), fresh brain with vessels
-  and nerves, bundles; plus the sagittal and axial cuts at 1920. Writes results.json with each view's caption, the
+  before (the page's own glow look) awake with a stimulus travelling and asleep (NREM), the bundles view in the same two
+  states, fresh brain, dissected (coronal cut through the middle), fresh brain with vessels and nerves; plus the sagittal
+  and axial cuts and a view from below at 1920. The sleep stage is pinned in the page (the server's ticks would reset it). Writes results.json with each view's caption, the
   anatomy module's state (meshes, parts, atlas loaded; tier) and page errors, and an FPS reading per view at 390 px with
   the CPU throttled x4. Headless Chromium draws WebGL in software (SwiftShader): the FPS numbers here are a floor and
   the >= 30 FPS phone check needs a real device (docs/HANDOFF.md says the same for the neuron forest).
@@ -84,7 +85,12 @@ def main():
                 pg.wait_for_timeout(1500)
                 return ctx, pg, errors
 
-            def view(pg, v, layers=(), cut=None, settle=3000):
+            def hold(pg, stage):                      # pin the sleep stage (the server's ticks would reset it) and send a stimulus
+                pg.evaluate(f"""() => {{ if (!window.__setStage) window.__setStage = setStage; window.__setStage({json.dumps(stage)});
+                    setStage = () => {{}}; mix = [...target]; if ({json.dumps(stage)} === 'AWAKE') fire('a stimulus travelling', ['default', 'attention']); }}""")
+                pg.wait_for_timeout(900 if stage == "AWAKE" else 2500)
+
+            def view(pg, v, layers=(), cut=None, settle=3000, stage=None):
                 pg.evaluate(f"anatView({json.dumps(v)})")
                 for a in ("vessels", "nerves"):
                     pg.evaluate(f"""() => {{ const b = document.querySelector('#anat button[data-a="{a}"]'); if (b.classList.contains('on') !== {json.dumps(a in layers)}) b.click(); }}""")
@@ -95,17 +101,22 @@ def main():
                     if cut:
                         pg.evaluate(f"() => {{ const b = document.getElementById('anat-axis'); b.textContent = {json.dumps(cut[0])}; const r = document.getElementById('anat-cut'); r.value = {cut[1]}; anat.setCut({json.dumps(cut[0])}, {cut[1]}); }}")
                         pg.wait_for_function("anat.state().atlas", timeout=120000)
+                if stage:
+                    hold(pg, stage)
+                    settle = 600
                 pg.wait_for_timeout(settle)
                 st = pg.evaluate("anat ? anat.state() : null") if v != "glow" else None
                 return {"caption": pg.inner_text("#anatcap") if v != "glow" else "", "state": st}
 
-            shots = [("before", "glow", (), None), ("fresh", "fresh", (), None), ("dissected", "fixed", (), ("coronal", 0.5)),
-                     ("nerves", "fresh", ("vessels", "nerves"), None), ("bundles", "bundles", (), None)]
+            shots = [("before_awake", "glow", (), None, "AWAKE"), ("before_asleep", "glow", (), None, "NREM"),
+                     ("bundles_awake", "bundles", (), None, "AWAKE"), ("bundles_asleep", "bundles", (), None, "NREM"),
+                     ("fresh", "fresh", (), None, "AWAKE"), ("dissected", "fixed", (), ("coronal", 0.5), None),
+                     ("nerves", "fresh", ("vessels", "nerves"), None, None)]
             for size in [int(x) for x in args.sizes.split(",")]:
                 w, h, mobile = (size, 844, True) if size < 600 else (size, 1080, False)
                 ctx, pg, errors = page_for(w, h, mobile)
-                for tag, v, layers, cut in shots:
-                    r = view(pg, v, layers, cut)
+                for tag, v, layers, cut, stage in shots:
+                    r = view(pg, v, layers, cut, stage=stage)
                     pg.screenshot(timeout=180000, path=str(out / f"{tag}_{size}.jpg"), type="jpeg", quality=88)
                     results[f"{tag}_{size}"] = r
                 if size >= 600:
@@ -123,7 +134,7 @@ def main():
                     cdp = ctx.new_cdp_session(pg)
                     cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
                     fps = {}
-                    for tag, v, layers, cut in shots:
+                    for tag, v, layers, cut, stage in shots:
                         view(pg, v, layers, cut, settle=1500)
                         fps[tag] = pg.evaluate(f"({FPS})({int(args.fps_s * 1000)})")
                     results["fps_390_cpu_x4_software_gl"] = fps

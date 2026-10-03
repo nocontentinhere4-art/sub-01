@@ -235,7 +235,7 @@
 <div id="dock">
   <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div>
   <!-- brain_anatomy hook (G9, #99): the brain as a real specimen (web/brain_anatomy.js, loaded on the first click) -->
-  <div id="anat"><span>view:</span><button data-v="glow" class="on" title="the page's own look">glow</button><button data-v="fresh" title="a fresh specimen: pinkish-grey cortex, glistening pia, red arteries">fresh brain</button><button data-v="fixed" title="fixed and cut open: his own T1 scan on the cut, grey and white matter">dissected</button><button data-v="bundles" title="his real fibres as muted white-matter bundles, coloured by direction">bundles</button><button data-a="vessels" title="cerebral arteries (atlas, fitted to his brain)">vessels</button><button data-a="nerves" title="the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button><button id="anat-axis" title="which way the cut runs" hidden>coronal</button><input id="anat-cut" type="range" min="0" max="1" step="0.005" value="0.5" title="where the cut is" hidden></div>
+  <div id="anat"><span>view:</span><button data-v="glow" class="on" title="the page's own look: additive fibres and a rim-lit cortex (the look before #99)">glow</button><button data-v="fresh" title="a fresh specimen: pinkish-grey cortex, glistening pia, red arteries">fresh brain</button><button data-v="fixed" title="fixed and cut open: his own T1 scan on the cut, grey and white matter">dissected</button><button data-v="bundles" title="his real fibres as muted white-matter bundles, coloured by direction">bundles</button><button data-a="vessels" title="cerebral arteries (atlas, fitted to his brain)">vessels</button><button data-a="nerves" title="the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button><button id="anat-axis" title="which way the cut runs" hidden>coronal</button><input id="anat-cut" type="range" min="0" max="1" step="0.005" value="0.5" title="where the cut is" hidden></div>
   <div id="anatcap" hidden></div>
   <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button><button id="n3dive" title="one continuous zoom: the brain, a cortical column at true size, the tissue">dive ↓</button></div>
   <div id="n3cap" hidden></div>
@@ -985,8 +985,9 @@ let anat = null, anatP = null;
 const ANAT_AXES = ["coronal", "sagittal", "axial"];
 function anatLoad(){
   if (anatP) return anatP;
+  const ready = () => new Promise(res => { const t = () => scene.getObjectByName("cortex") && scene.getObjectByName("fibres") ? res() : setTimeout(t, 100); t(); });   // the page's meshes load first
   return anatP = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "/brain_anatomy.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); })
-    .then(() => { anat = BrainAnatomy.create({THREE, scene, renderer, camera, controls, cortex: scene.getObjectByName("cortex"), fibres: scene.getObjectByName("fibres"),
+    .then(ready).then(() => { anat = BrainAnatomy.create({THREE, scene, renderer, camera, controls, cortex: scene.getObjectByName("cortex"), fibres: scene.getObjectByName("fibres"),
                     base: "/anatomy/", caption: html => { const c = $("anatcap"); c.hidden = !html || anat.state().view === "glow" && !anat.state().layers.vessels && !anat.state().layers.nerves;
                     if (c.dataset.h !== html) { c.dataset.h = html; c.innerHTML = html; } }}); return anat; });
 }
@@ -1001,8 +1002,10 @@ document.querySelectorAll("#anat button[data-a]").forEach(b => b.onclick = () =>
   anatLoad().then(a => a.setLayer(b.dataset.a, on)).catch(() => {}); });
 $("anat-axis").onclick = () => { const b = $("anat-axis"); b.textContent = ANAT_AXES[(ANAT_AXES.indexOf(b.textContent) + 1) % 3]; if (anat) anat.setCut(b.textContent, +$("anat-cut").value); };
 $("anat-cut").oninput = () => { if (anat) anat.setCut(null, +$("anat-cut").value); };
-{ const q = new URLSearchParams(location.search).get("view"); if (q && !MINI && ["fresh", "fixed", "bundles"].includes(q)) { anatView(q);
-    for (const a of (new URLSearchParams(location.search).get("layers") || "").split(",")) { const b = document.querySelector(`#anat button[data-a="${a}"]`); if (b) b.click(); } } }
+{ const qs = new URLSearchParams(location.search), q = qs.get("view");                   // the default view: fresh brain (?view=glow: the page's own look)
+  const v0 = ["glow", "fresh", "fixed", "bundles"].includes(q) ? q : (MINI ? "glow" : "fresh");
+  if (v0 !== "glow") anatView(v0);
+  for (const a of (qs.get("layers") || "").split(",")) { const b = document.querySelector(`#anat button[data-a="${a}"]`); if (b) b.click(); } }
 // ---------- end of the brain_anatomy hook ----------
 if ("IntersectionObserver" in window)            // draw only while the brain is on screen (the room's PiP, a phone's scroll)
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);

@@ -217,18 +217,24 @@ def stage_volume(work, labels_path, step=2.0):
     mk = ndimage.zoom(mask.astype(np.float32), z, order=1) > 0.5
     vol = np.clip(vol, 0, 1.2) / 1.2
     vol[~mk] = 0
+    # outside the brain the intensity is filled with the nearest inside value (no dark fringe where the cut's edge is
+    # interpolated), and the edge itself is a soft mask in the PNG's alpha: the shader cuts at its half-way contour
+    near = ndimage.distance_transform_edt(~mk, return_distances=False, return_indices=True)
+    vol = vol[tuple(near)]
     vol8 = np.clip(np.rint(vol * 255), 0, 255).astype(np.uint8)
-    # keep 0 for "outside": tissue never gets byte 0
     vol8[mk & (vol8 == 0)] = 1
+    soft = ndimage.gaussian_filter(mk.astype(np.float32), 0.8)
+    mask8 = np.clip(np.rint(soft * 255), 0, 255).astype(np.uint8)
     nx, ny, nz = vol8.shape
     cols = int(np.ceil(np.sqrt(nz)))
     rows = int(np.ceil(nz / cols))
-    atlas = np.zeros((rows * ny, cols * nx), np.uint8)
+    atlas = np.zeros((rows * ny, cols * nx, 2), np.uint8)
     for k in range(nz):
         r, c = divmod(k, cols)
-        atlas[r * ny:(r + 1) * ny, c * nx:(c + 1) * nx] = vol8[:, :, k].T   # tile (u = x, v = y)
+        atlas[r * ny:(r + 1) * ny, c * nx:(c + 1) * nx, 0] = vol8[:, :, k].T   # tile (u = x, v = y): his T1
+        atlas[r * ny:(r + 1) * ny, c * nx:(c + 1) * nx, 1] = mask8[:, :, k].T  # the soft brain mask
     WEB.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(atlas).save(WEB / "t1_atlas.png", optimize=True)
+    Image.fromarray(atlas, mode="LA").save(WEB / "t1_atlas.png", optimize=True)
     # voxel (i,j,k) of the resampled grid -> T1 world: the zoom keeps the corner alignment of scipy.ndimage.zoom
     # (output index i maps to input index i * (in-1)/(out-1))
     scale = np.array([(s - 1) / (o - 1) for s, o in zip(t1.shape, vol8.shape)])
@@ -241,8 +247,8 @@ def stage_volume(work, labels_path, step=2.0):
             "web_to_vox": [round(float(x), 6) for x in web_to_vox.ravel()],
             "tissue": {"csf": round(csf / 1.2, 4), "grey": round(float(gm) / 1.2, 4), "white": round(float(wm) / 1.2, 4)},
             "bytes": size, "source": "his MRI",
-            "note": "his 2022 T1 (skull-stripped, no face) resampled to 2 mm, 8-bit, one tile a slice; intensities as "
-                    "fractions of the 99.5th percentile over 1.2"}
+            "note": "his 2022 T1 (skull-stripped, no face) resampled to 2 mm, 8-bit, one tile a slice (grey) with a soft brain "
+                    "mask in the alpha; intensities as fractions of the 99.5th percentile over 1.2, filled outward past the mask"}
 
 
 # ---------------------------------------------------------------- BodyParts3D

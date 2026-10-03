@@ -65,7 +65,7 @@ def test_cut_volume_is_his_t1_in_the_page_frame(meta):
     from PIL import Image
     vol = meta["volume"]
     img = Image.open(ANAT / "t1_atlas.png")
-    assert img.mode == "L" and img.size == (vol["cols"] * vol["shape"][0], vol["rows"] * vol["shape"][1])
+    assert img.mode == "LA" and img.size == (vol["cols"] * vol["shape"][0], vol["rows"] * vol["shape"][1])   # grey: his T1; alpha: a soft brain mask
     assert vol["cols"] * vol["rows"] >= vol["shape"][2] and vol["step_mm"] == 2.0 and vol["source"] == "his MRI"
     t = vol["tissue"]
     assert 0 < t["csf"] < t["grey"] < t["white"] < 1                                  # his own landmarks, in byte units
@@ -78,8 +78,9 @@ def test_cut_volume_is_his_t1_in_the_page_frame(meta):
     nx, ny = vol["shape"][:2]
     k = int(round(vox[2]))
     tile = a[(k // vol["cols"]) * ny:(k // vol["cols"] + 1) * ny, (k % vol["cols"]) * nx:(k % vol["cols"] + 1) * nx]
-    assert tile[int(round(vox[1])), int(round(vox[0]))] > 0                            # tissue there, not outside the mask
-    assert (a > 0).mean() > 0.08                                                       # the tiles hold brain, not padding
+    assert tile[int(round(vox[1])), int(round(vox[0])), 1] > 200                       # inside his brain mask there
+    assert 0.08 < (a[..., 1] > 127).mean() < 0.5                                       # the tiles hold brain, not padding
+    assert len(np.unique(a[..., 1])) > 20                                              # the mask is soft (no 2 mm steps on the cut's edge)
 
 
 def test_atlas_parts_are_labelled_fitted_and_credited(meta):
@@ -141,6 +142,7 @@ def test_views_swap_and_restore_the_pages_materials(check):
     assert sorted(v["fresh"]["cortexPart"]) == [0, 1, 2, 3]                             # his cortex vertices carry their part (0: a crumb, not drawn)
     assert v["fresh"]["winding"] == -1 and v["fresh"]["fibresDrawn"] is False             # cortex.bin is wound clockwise: handled; no fibre ends poking through
     assert v["bundles"]["fibresDrawn"] is True and v["glow"]["fibresDrawn"] is True
+    assert v["bundles"]["bundleShared"] is True                                          # the page's own stage / activity / pulse uniforms drive the bundles
     assert v["fixed"]["cut"] is True and "cut_cap" in v["fixed"]["drawn"]
     assert v["bundles"]["cortexMat"] == "swapped" and v["bundles"]["fibresMat"] == "swapped" and v["bundles"]["cut"] is False
     assert "his_cerebellum" not in v["bundles"]["drawn"]
@@ -191,6 +193,7 @@ def test_captions_say_what_is_his_and_what_is_atlas(check):
 def test_hook_credits_and_about():
     html = (WEB / "index.html").read_text()
     assert html.count("brain_anatomy hook (G9") >= 3 and 'data-v="fresh"' in html and 'data-v="fixed"' in html and 'data-a="nerves"' in html
+    assert '(MINI ? "glow" : "fresh")' in html and "glows" not in html                     # fresh is the default view; the mini keeps the page's look
     js = (WEB / "brain_anatomy.js").read_text()
     assert "A model, not a mind" in js and "nothing is invented" in js
     credits = (ANAT / "CREDITS.md").read_text()

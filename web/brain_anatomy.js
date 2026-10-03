@@ -36,11 +36,11 @@
     fresh: { cerebrum: [0.74, 0.60, 0.56], cerebellum: [0.66, 0.50, 0.47], brainstem: [0.80, 0.70, 0.66],
              grey: [0.68, 0.56, 0.54], white: [0.92, 0.88, 0.85], csf: [0.30, 0.17, 0.17],
              artery: [0.72, 0.10, 0.10], vein: [0.36, 0.12, 0.20], nerve: [0.93, 0.88, 0.75], gland: [0.72, 0.42, 0.42], cord: [0.80, 0.70, 0.66],
-             spec: 0.55, shine: 56, wrap: 0.32, scatter: 0.22 },
+             spec: 0.55, shine: 56, wrap: 0.32, scatter: 0.22, vessel: 1.0, wet: 1.0 },
     fixed: { cerebrum: [0.62, 0.57, 0.53], cerebellum: [0.57, 0.52, 0.48], brainstem: [0.70, 0.65, 0.60],
              grey: [0.60, 0.56, 0.52], white: [0.90, 0.87, 0.82], csf: [0.16, 0.15, 0.14],
              artery: [0.42, 0.20, 0.17], vein: [0.30, 0.20, 0.24], nerve: [0.86, 0.82, 0.72], gland: [0.60, 0.50, 0.45], cord: [0.70, 0.65, 0.60],
-             spec: 0.10, shine: 12, wrap: 0.22, scatter: 0.0 },
+             spec: 0.10, shine: 12, wrap: 0.22, scatter: 0.0, vessel: 0.35, wet: 0.3 },
   };
   PALETTE.bundles = PALETTE.fixed;
   const PART = { cerebrum: 1, cerebellum: 2, brainstem: 3 };
@@ -128,9 +128,9 @@
     const specimen = st.view === "fresh" || st.view === "fixed";                     // the views that draw his cerebellum and brainstem
     const his = ["cortex (gyri and sulci)"].concat(st.meshes && specimen ? ["cerebellum (folia)", "brainstem"] : []);
     const lines = [];
-    if (st.view === "fresh") lines.push("<b>fresh specimen</b>: pinkish-grey cortex under a glistening pia; colours are approximate, from open photographs");
+    if (st.view === "fresh") lines.push("<b>fresh specimen</b>: pinkish-grey cortex under a glistening pia; colours are approximate, from open photographs; the reddish runs in the sulci are a shading cue for pial vessels, not drawn vessels");
     else if (st.view === "fixed") lines.push(`<b>fixed and dissected</b>: formalin-grey; the ${st.cut.axis} cut shows HIS T1 scan as grey and white matter (ventricles dark)`);
-    else if (st.view === "bundles") lines.push("<b>white-matter bundles</b>: his real diffusion fibres, muted colours by direction (red left-right, green front-back, blue up-down); the cortex a ghost");
+    else if (st.view === "bundles") lines.push("<b>white-matter bundles</b>: his real diffusion fibres, muted colours by direction (red left-right, green front-back, blue up-down), no glow; a stimulus still travels along its route and sleep cools the tint; the cortex a ghost");
     lines.push(`from HIS MRI: ${his.join(", ")}${st.view === "fixed" ? ", the cut (his T1, 2 mm)" : ""}; the fibres are his real tractography.`);
     const shown = [].concat(st.layers.vessels ? names(["artery"]) : [], st.layers.nerves ? names(["nerve", "gland"]) : [], st.parts && specimen ? names(["cord"]) : []);
     if (shown.length) lines.push(`from an ATLAS (BodyParts3D, another adult; © DBCLS, CC BY 4.0${rms}): ${shown.join(", ")}.`);
@@ -145,13 +145,20 @@
   // ---------- shaders (GLSL 1, WebGL1 and 2) ----------
   const LIGHT = `
     uniform vec3 uBase; uniform float uSpec; uniform float uShine; uniform float uWrap; uniform float uScatter;
-    vec3 lit(vec3 albedo, vec3 N, vec3 V, float ao) {
+    float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+    float vnoise(vec3 p) {                                           // value noise: wet patches, roughness, vessel runs
+      vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      float a = h3(i), b = h3(i + vec3(1.0, 0.0, 0.0)), c = h3(i + vec3(0.0, 1.0, 0.0)), d = h3(i + vec3(1.0, 1.0, 0.0));
+      float e = h3(i + vec3(0.0, 0.0, 1.0)), g = h3(i + vec3(1.0, 0.0, 1.0)), hh = h3(i + vec3(0.0, 1.0, 1.0)), k = h3(i + vec3(1.0, 1.0, 1.0));
+      return mix(mix(mix(a, b, f.x), mix(c, d, f.x), f.y), mix(mix(e, g, f.x), mix(hh, k, f.x), f.y), f.z);
+    }
+    vec3 lit(vec3 albedo, vec3 N, vec3 V, float ao, float specMul, float shineMul) {
       vec3 L = normalize(vec3(-0.45, 0.55, 0.70)), L2 = normalize(vec3(0.6, -0.2, 0.4));
       vec3 a = pow(albedo, vec3(2.2));
       float nl = dot(N, L), wrap = clamp((nl + uWrap) / (1.0 + uWrap), 0.0, 1.0);
       float fill = 0.14 * clamp(dot(N, L2), 0.0, 1.0), sky = 0.08 + 0.07 * N.y;
-      vec3 H = normalize(L + V), spec = vec3(1.0) * uSpec * pow(max(dot(N, H), 0.0), uShine);
-      float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
+      vec3 H = normalize(L + V), spec = vec3(1.0) * uSpec * specMul * pow(max(dot(N, H), 0.0), uShine * shineMul);
+      float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0) * specMul;
       vec3 scat = a * vec3(1.0, 0.72, 0.68) * uScatter * pow(clamp((nl + 0.7) / 1.7, 0.0, 1.0), 1.5);
       float cav = 1.0 - 0.75 * pow(ao, 0.7);
       vec3 c = a * (wrap * 1.15 + fill + sky) * cav + scat * cav + (spec + fres * 0.10) * (1.0 - 0.9 * ao);
@@ -170,7 +177,7 @@
     }`;
   const TISSUE_F = `
     precision highp float;
-    uniform vec3 uCerebrum; uniform vec3 uCerebellum; uniform vec3 uBrainstem; uniform vec3 uWhite; uniform float uHide;
+    uniform vec3 uCerebrum; uniform vec3 uCerebellum; uniform vec3 uBrainstem; uniform vec3 uWhite; uniform float uHide; uniform float uVessel; uniform float uWet;
     varying vec3 vN; varying vec3 vV; varying float vPart; varying float vDepth;
     ${CLIP}
     ${LIGHT}
@@ -182,7 +189,12 @@
       bool outside = gl_FrontFacing == (uFlip > 0.0);
       if (!outside) { gl_FragColor = vec4(pow(pow(uWhite, vec3(2.2)) * 0.55, vec3(1.0 / 2.2)), uAlpha); return; }   // the inside of the shell at a cut
       vec3 base = vPart < 1.5 ? uCerebrum : (vPart < 2.5 ? uCerebellum : uBrainstem);
-      gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth), uAlpha);
+      // the pia: wet patches (a translucent film, wetter here and there) and finer roughness; pial vessels run along the
+      // sulci: a reddish tint where the surface dips, broken up along its length (a shading cue, not drawn vessels)
+      float wet = mix(0.45, 1.6, vnoise(vW * 0.11)), rough = mix(0.55, 1.4, vnoise(vW * 0.45 + 3.0));
+      float ves = smoothstep(0.30, 0.85, vDepth) * smoothstep(0.42, 0.72, vnoise(vW * 0.9 + 7.0));
+      base = mix(base, vec3(0.50, 0.14, 0.16), uVessel * 0.55 * ves);
+      gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth, mix(1.0, wet, uWet), rough), uAlpha);
     }`;
   const PART_V = `
     varying vec3 vN; varying vec3 vV; varying vec3 vW;
@@ -196,7 +208,7 @@
     varying vec3 vN; varying vec3 vV;
     ${CLIP}
     ${LIGHT}
-    void main() { clipIt(); vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N; gl_FragColor = vec4(lit(uBase, N, normalize(vV), 0.0), uAlpha); }`;
+    void main() { clipIt(); vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N; gl_FragColor = vec4(lit(uBase, N, normalize(vV), 0.0, 1.0, 1.0), uAlpha); }`;
   const CAP_V = `
     varying vec3 vW; varying vec3 vV;
     void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vW = (modelMatrix * vec4(position, 1.0)).xyz; vV = normalize(-mv.xyz);
@@ -206,18 +218,20 @@
     uniform sampler2D uAtlas; uniform mat4 uWebToVox; uniform vec3 uShape; uniform vec2 uGrid; uniform vec2 uAtlasPx;
     uniform vec3 uCsf; uniform vec3 uGrey; uniform vec3 uWhite; uniform vec3 uTissue; uniform vec3 uN; uniform float uQuality; uniform float uAlpha;
     varying vec3 vW; varying vec3 vV;
-    float slice(vec3 v, float k) {                                 // one tile of the atlas, bilinear inside the tile
+    vec2 slice(vec3 v, float k) {                                  // one tile of the atlas, bilinear inside the tile: (T1, soft mask)
       float c = mod(k, uGrid.x), r = floor(k / uGrid.x);
       vec2 ij = clamp(v.xy, vec2(0.5), uShape.xy - 0.5);
       vec2 uv = (vec2(c, r) * uShape.xy + ij) / uAtlasPx;
-      return texture2D(uAtlas, uv).r;
+      vec4 s = texture2D(uAtlas, uv);
+      return vec2(s.r, s.a);
     }
     void main() {
       vec3 v = (uWebToVox * vec4(vW, 1.0)).xyz;                     // continuous voxel coordinates (i, j, k)
       if (any(lessThan(v, vec3(0.0))) || any(greaterThan(v, uShape - 1.0))) discard;
-      float k0 = floor(v.z), f = v.z - k0, t;
-      if (uQuality > 0.5) t = mix(slice(v, k0), slice(v, min(k0 + 1.0, uShape.z - 1.0)), f); else t = slice(v, floor(v.z + 0.5));
-      if (t < 0.002) discard;                                      // outside his brain mask
+      float k0 = floor(v.z), f = v.z - k0; vec2 s;
+      if (uQuality > 0.5) s = mix(slice(v, k0), slice(v, min(k0 + 1.0, uShape.z - 1.0)), f); else s = slice(v, floor(v.z + 0.5));
+      if (s.y < 0.5) discard;                                      // outside his brain: the soft mask's half-way contour, no voxel steps
+      float t = s.x;
       float g = smoothstep(uTissue.x, uTissue.y, t), w = smoothstep(uTissue.y, uTissue.z, t);
       vec3 col = mix(mix(uCsf, uGrey, g), uWhite, w);
       col *= 0.92 + 0.16 * (t - uTissue.y);                       // a little of the scan's own texture
@@ -225,15 +239,41 @@
       float sh = 0.55 + 0.55 * clamp(dot(N, L), 0.0, 1.0);
       gl_FragColor = vec4(pow(pow(col, vec3(2.2)) * sh, vec3(1.0 / 2.2)), uAlpha);
     }`;
+  // the fibres as white-matter bundles: the page's own uniforms drive it (the sleep-stage mix, each region's activity,
+  // a stimulus travelling along its route), but the look is a tractography figure: cream fibres tinted by direction,
+  // normal blending, no additive glow; a pulse brightens the fibre to white where it travels, sleep cools the tint
   const BUNDLE_V = `
-    attribute vec3 dcol; varying vec3 vCol; varying vec3 vW;
-    void main() { vCol = dcol; vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+    attribute vec3 dcol; attribute vec4 info; attribute vec2 nodes;
+    uniform float time; uniform vec3 mixw; uniform float pulseT; uniform sampler2D act; uniform float tgOn[12];
+    uniform float burst; uniform float boost; uniform float sci; uniform float uMute;
+    varying vec3 vCol; varying float vA; varying vec3 vW;
+    float actAt(float i){ return i < 0.0 ? 1.0 : texture2D(act, vec2((i + 0.5) / 256.0, 0.5)).r * 3.0; }
+    void main() {
+      float tp = info.x, tgt = info.y, raw = info.w;
+      float drive = clamp((max(actAt(nodes.x), actAt(nodes.y)) - 1.1) / 0.9, 0.0, 1.0);        // above its own baseline
+      vec3 dir = mix(vec3(0.84, 0.80, 0.74), dcol, uMute);                                      // cream, tinted by direction
+      vec3 stage = mixw.x * vec3(1.0, 0.97, 0.94) + mixw.y * vec3(0.86, 0.91, 1.0) + mixw.z * vec3(0.96, 0.90, 1.0);
+      float slow = mixw.y * 0.25 * pow(0.5 + 0.5 * sin(position.y * 0.045 - time * 1.1), 6.0);  // a slow wave, front to back, in deep sleep
+      float rem = mixw.z * 0.15 * burst;
+      vec3 col = dir * stage * (0.80 + 0.30 * drive + slow + rem) * (1.0 + 0.25 * boost);
+      col = mix(col, dcol * (0.75 + 0.5 * drive), sci);                                          // standard tractography colours
+      float route = 0.0;
+      for (int i = 0; i < 12; i++) { if (abs(tgt - float(i)) < 0.5) route = tgOn[i]; }
+      float pk = route * exp(-pow((tp - pulseT) * 3.5, 2.0)) * step(-0.5, pulseT);
+      float trail = route * step(0.0, pulseT) * step(tp, pulseT) * exp(-(pulseT - tp) * 1.5);
+      float busy = step(0.0, pulseT) * (1.0 - smoothstep(1.2, 1.6, pulseT));
+      col *= 1.0 - 0.35 * busy * (1.0 - route);
+      col = mix(col, vec3(1.0, 0.98, 0.95), clamp(0.9 * pk + 0.45 * trail, 0.0, 1.0));            // the fibre itself brightens where the stimulus travels
+      vCol = col; vA = (1.0 + 0.8 * pk + 0.4 * trail) * (1.0 - 0.3 * busy * (1.0 - route));
+      vW = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`;
   const BUNDLE_F = `
     precision highp float;
-    uniform float uOpacity; uniform float uMute; uniform float uAlpha; varying vec3 vCol; varying vec3 vW;
+    uniform float uOpacity; uniform float uAlpha; varying vec3 vCol; varying float vA; varying vec3 vW;
     uniform vec4 uClip; uniform float uClipOn;
     void main() { if (uClipOn > 0.5 && dot(vW, uClip.xyz) > uClip.w) discard;
-      vec3 c = mix(vec3(0.84, 0.80, 0.74), vCol, uMute); gl_FragColor = vec4(c, uOpacity * uAlpha); }`;
+      gl_FragColor = vec4(clamp(vCol, 0.0, 1.0), clamp(uOpacity * vA, 0.0, 1.0) * uAlpha); }`;
   const GHOST_V = `varying vec3 vN; varying vec3 vV;
     void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`;
   const GHOST_F = `precision highp float; varying vec3 vN; varying vec3 vV; uniform float uAlpha;
@@ -261,12 +301,19 @@
     // --- materials ---
     const tissueMat = pal => new THREE.ShaderMaterial({
       uniforms: Object.assign({ uCerebrum: { value: v3(pal.cerebrum) }, uCerebellum: { value: v3(pal.cerebellum) }, uBrainstem: { value: v3(pal.brainstem) },
-        uWhite: { value: v3(pal.white) }, uHide: { value: 0 }, uClip, uClipOn, uFlip, uAlpha, uBase: { value: v3(pal.cerebrum) } }, palU(pal)),
+        uWhite: { value: v3(pal.white) }, uHide: { value: 0 }, uVessel: { value: pal.vessel }, uWet: { value: pal.wet }, uClip, uClipOn, uFlip, uAlpha,
+        uBase: { value: v3(pal.cerebrum) } }, palU(pal)),
       vertexShader: TISSUE_V, fragmentShader: TISSUE_F, side: THREE.DoubleSide });
     const partMat = (pal, kind) => new THREE.ShaderMaterial({
       uniforms: Object.assign({ uBase: { value: v3(pal[kind]) }, uClip, uClipOn, uFlip, uAlpha }, palU(pal), { uSpec: { value: kind === "artery" ? pal.spec * 1.3 : pal.spec * 0.6 } }),
       vertexShader: PART_V, fragmentShader: PART_F, side: THREE.DoubleSide });
-    const bundleMat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0.55 }, uMute: { value: 0.45 }, uClip, uClipOn, uAlpha },
+    // the page's fibre uniforms (stage mix, activity texture, the travelling stimulus) are shared by reference, so the
+    // page keeps driving them; a page without them (tests) gets quiet defaults
+    const fu = (origFibreMat && origFibreMat.uniforms) || {};
+    const shared = (k, v) => fu[k] || { value: v };
+    const bundleMat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0.55 }, uMute: { value: 0.45 }, uClip, uClipOn, uAlpha,
+        time: shared("time", 0), mixw: shared("mixw", new THREE.Vector3(1, 0, 0)), pulseT: shared("pulseT", -1), act: shared("act", null),
+        tgOn: shared("tgOn", new Array(12).fill(0)), burst: shared("burst", 0), boost: shared("boost", 0), sci: shared("sci", 0) },
       vertexShader: BUNDLE_V, fragmentShader: BUNDLE_F, transparent: true, depthWrite: false });
     const ghostMat = new THREE.ShaderMaterial({ uniforms: { uAlpha }, vertexShader: GHOST_V, fragmentShader: GHOST_F, transparent: true, depthWrite: false, side: THREE.FrontSide });
     const mats = { fresh: tissueMat(PALETTE.fresh), fixed: tissueMat(PALETTE.fixed) };
@@ -442,6 +489,7 @@
       return { view: st.view, layers: Object.assign({}, st.layers), cut: Object.assign({}, st.cut, cutPlane(st.cut.axis, st.cut.t, bbox)), meshes: st.meshes, parts: st.parts,
                atlas: st.atlas, tier: st.tier, fps: st.fps, loading: st.loading, drawn: group.children.filter(c => c.visible).map(c => c.name),
                bbox, winding, alpha: uAlpha.value, fibresDrawn: !fibres || fibres.material !== bundleMat || bundleMat.visible,
+               bundleSharesPageUniforms: !!(fu.time && bundleMat.uniforms.time === fu.time),
                cortexSwapped: !!cortex && cortex.material !== origCortexMat, fibresSwapped: !!fibres && fibres.material !== origFibreMat };
     }
     function dispose() {

@@ -56,7 +56,9 @@ out.volume = meta.volume;
 // --- the scene driver: views swap materials, layers show atlas parts, captions carry the provenance ---
 const scene = new Obj();
 const cortexMesh = new Obj(cg, { name: "orig-cortex" }); cortexMesh.name = "cortex";
-const fibres = new Obj(new Geom(), { name: "orig-fibres" }); fibres.name = "fibres";
+const pageFibreUniforms = { time: { value: 0 }, mixw: { value: new V3(1, 0, 0) }, pulseT: { value: -1 }, act: { value: null }, tgOn: { value: new Array(12).fill(0) },
+                            burst: { value: 0 }, boost: { value: 0 }, sci: { value: 0 } };
+const fibres = new Obj(new Geom(), { name: "orig-fibres", uniforms: pageFibreUniforms }); fibres.name = "fibres";
 let caption = "";
 const fetchMap = {
   "/anatomy/anatomy.json": () => ({ ok: true, json: async () => meta }),
@@ -76,7 +78,7 @@ const tick = () => new Promise(r => setTimeout(r, 5));
     const st = anat.state();
     views[v] = { cortexMat: cortexMesh.material === cortexMesh.material && cortexMesh.material.name === "orig-cortex" ? "orig" : "swapped",
                  fibresMat: fibres.material.name === "orig-fibres" ? "orig" : "swapped", drawn: st.drawn, meshes: st.meshes, cut: st.cut.on, caption,
-                 winding: st.winding, fibresDrawn: st.fibresDrawn,
+                 winding: st.winding, fibresDrawn: st.fibresDrawn, bundleShared: st.bundleSharesPageUniforms,
                  cortexPart: cg.attributes.part ? Array.from(new Set(cg.attributes.part.array)).sort() : null };
   }
   anat.setView("fresh"); anat.setLayer("vessels", true); anat.setLayer("nerves", true);

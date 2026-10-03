@@ -63,9 +63,9 @@
    "grey": 0.3458,
    "white": 0.4542
   },
-  "bytes": 175555,
+  "bytes": 562947,
   "source": "his MRI",
-  "note": "his 2022 T1 (skull-stripped, no face) resampled to 2 mm, 8-bit, one tile a slice; intensities as fractions of the 99.5th percentile over 1.2"
+  "note": "his 2022 T1 (skull-stripped, no face) resampled to 2 mm, 8-bit, one tile a slice (grey) with a soft brain mask in the alpha; intensities as fractions of the 99.5th percentile over 1.2, filled outward past the mask"
  },
  "parts": {
   "file": "parts.bin",
