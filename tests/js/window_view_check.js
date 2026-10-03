@@ -54,19 +54,31 @@ out.layers = {near: same(LAYERS.near, plates.layers.near), mid: same(LAYERS.mid,
   sky: plates.sky.rows.length === SKY.rows && plates.sky.az === SKY.az && plates.sky.el0 === SKY.el0 && plates.sky.el1 === SKY.el1, ground: GROUND};
 out.gain = GAIN;
 out.colorspace_included = frag.includes("#include <colorspace_fragment>");
-// a simulated day of updates
-const added = []; const scene = {add: m => added.push(m)}, renderer = {};
+// a simulated day of updates. The renderer stub records what build() does to the probe's render target: the six faces
+// must be cleared and the first probe taken right away (a frozen loop never updates; undefined texels are NaN, #G6)
+const added = []; const scene = {add: m => added.push(m)};
+const rt = {sets: [], clears: 0, current: "screen"};
+const renderer = {getRenderTarget: () => rt.current, setRenderTarget: (t, face) => { rt.current = t; if (t) rt.sets.push(face); }, clear: () => { rt.clears++; }};
+const p0 = probes.length;
 view.build({c: [-2.012, 1.685, 0.14], w: 1.58, h: 0.89, ry: Math.PI / 2}, scene, renderer);
 out.built = added.length === 2 && Math.abs(U.uSize.value.x - 1.58) < 1e-9;      // the plane and the probe camera
+out.probe_init = {faces_cleared: rt.sets.filter(f => f !== undefined).length, clears: rt.clears, target_restored: rt.current === "screen", probed_at_build: probes.length - p0};
+// NaN never reaches the uniforms or light.sun: a NaN hour or dt keeps the last good values
+view.update(0.016, 12); view.update(NaN, NaN); view.update(Number.NaN, 12); view.update(0.016, undefined);
+const finite = v => Number.isFinite(v);
+out.nan_guard = {light_sun: finite(view.light.sun), uSun: finite(U.uSun.value), uCloud: finite(U.uCloud.value), uEmit: finite(U.uEmit.value), uReflect: finite(U.uReflect.value),
+  sunDir: [U.uSunDir.value.x, U.uSunDir.value.y, U.uSunDir.value.z].every(finite), time: finite(view.state().time), hour: view.state().hour};
+out.shader_scrubs_nan = /isnan\(env\)/.test(frag) && /isnan\(col\)/.test(frag) && frag.indexOf("isnan(col)") > frag.indexOf("uReflect;");
+out.light_sun_initial = Number.isFinite(createWindowView(THREE, {}).light.sun);
 view.update(0.016, 8); const sx8 = U.uSunDir.value.x; view.update(0.016, 16); const sx16 = U.uSunDir.value.x;
 out.sun_crosses = sx8 < 0 && sx16 > 0;
 view.update(0.016, 21); out.lit_uniform_follows_hour = Math.abs(U.uLitP.value - litProbability(21)) < 1e-9;
 view.setWeather("rain"); for (let i = 0; i < 400; i++) view.update(0.05, 21);
 out.rain_override = {rain: +U.uRain.value.toFixed(3), cloud: +U.uCloud.value.toFixed(3), sun_factor: +view.light.sun.toFixed(3)};
 view.setWeather(null); out.state_kind_after_reset = view.state().weather.kind;
-// the probe: once after the first seconds, then every PROBE.every s; the plane hidden while it renders
-const p0 = probes.length; for (let t = 0; t < PROBE.every * 2.5; t += 0.5) view.update(0.5, 12);
-out.probe = {renders: probes.length - p0, expected_about: Math.round(2.5), plane_visible_after: view.mesh.visible};
+// the probe: once at build, then every PROBE.every s; the plane hidden while it renders
+const p1 = probes.length; for (let t = 0; t < PROBE.every * 2.5; t += 0.5) view.update(0.5, 12);
+out.probe = {renders: probes.length - p1, expected_about: Math.round(2.5), plane_visible_after: view.mesh.visible};
 // the HDR hook: emission follows post.hdr (5 by day, 0.05 at night) until setEmission says otherwise
 view.update(0.016, 12); const e1 = U.uEmit.value; hdr = true; view.update(0.016, 12); const e2 = U.uEmit.value; view.update(0.016, 1); const e3 = U.uEmit.value;
 view.setEmission(2, 0.5); view.update(0.016, 12); const e4 = U.uEmit.value;
