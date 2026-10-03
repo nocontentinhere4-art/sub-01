@@ -101,3 +101,12 @@ https://www.openstreetmap.org/copyright). It is drawn from `web/tokyo_area.json`
 
 ## The earlier room
 `room.glb` (shown with `?room=old`) is the earlier AI-generated single mesh (Meshy, via Higgsfield).
+
+## The character (#98, G2): `boy.glb` rebuilt in place
+`boy.glb` is still the project's own AI-generated character (Meshy, via Higgsfield; the owner's choice), with the same
+24-bone rig, rest pose and embedded sit clip as before, so the clips `boy_*.glb` and the page keep working unchanged.
+Everything added by the rebuild in `room_build/boy_asset/` is original work for this project, released under CC0: the
+welded and subdivided mesh, the new UV layout, the procedural materials and the baked normal / roughness / occlusion
+maps (Blender 4.2 Cycles), the eyeball, cornea and eyelid meshes and the drawn iris. The face part of the colour atlas
+was upscaled with Higgsfield's image upscaler (ByteDance 4K, 6 credits over three runs) from this project's own texture; no outside
+image, photo or asset was used. The character does not depict any real person.

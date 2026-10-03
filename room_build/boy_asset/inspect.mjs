@@ -1,0 +1,12 @@
+import { NodeIO } from "@gltf-transform/core";
+import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
+import fs from "fs";
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+const doc = await io.read(process.argv[2]);
+const root = doc.getRoot();
+root.listTextures().forEach((t, i) => { fs.writeFileSync(`${process.argv[3]}/tex${i}.${t.getMimeType().split("/")[1]}`, t.getImage()); console.log("tex", i, t.getMimeType(), t.getSize()); });
+for (const n of root.listNodes()) if (n.getMesh() || n.getSkin()) console.log("node", n.getName(), "T", n.getTranslation(), "S", n.getScale(), "skin", !!n.getSkin(), "mesh", !!n.getMesh());
+const m = root.listMaterials()[0];
+console.log("mat", m.getName(), "base", m.getBaseColorFactor(), "metal", m.getMetallicFactor(), "rough", m.getRoughnessFactor(), "emis", m.getEmissiveFactor(), "ds", m.getDoubleSided());
+const sk = root.listSkins()[0]; console.log("joints", sk.listJoints().map(j => j.getName()).join(","));
+for (const j of sk.listJoints()) console.log(j.getName(), "parent", j.getParentNode()?.getName(), "T", j.getTranslation().map(x=>+x.toFixed(4)), "R", j.getRotation().map(x=>+x.toFixed(4)), "S", j.getScale().map(x=>+x.toFixed(4)));
