@@ -51,6 +51,14 @@ def test_every_core_scene_was_shot(run):
     assert set(run["closeups"]) >= {"face", "hands", "feet", "socks", "desk", "bed"}
 
 
+def test_mini_brain_was_checked(run):
+    """The room's PiP brain (#116: /brain?mini without neurons=1) rendered its fibres, with no neuron forest and no dots."""
+    p = run["pip"]
+    assert p["started"] and (OUT / "pip_mini_brain.png").exists()
+    assert p["render"]["forest"] is False and p["render"]["points"] == 0
+    assert p["embed_src"].startswith("/brain?mini") and "neurons=1" not in p["embed_src"]
+
+
 def test_report_written(run):
     assert (OUT / "report.md").exists() and (OUT / "results.json").exists()
 

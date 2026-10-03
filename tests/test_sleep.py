@@ -56,9 +56,11 @@ def asleep_engine(day=1, at="00:05"):
 # --- sleep engine ------------------------------------------------------------------------------
 def test_stage_cycling_on_accelerated_clock():
     """Real run: clock at --time-scale from 23:50; expect AWAKE -> NREM -> REM -> NREM within ~4 sim hours."""
-    clock = Clock(TIME_SCALE, loc(1, "23:50"))
     e = SleepEngine(loc(1, "08:00"), rng=random.Random(0))
     e.update(loc(1, "23:40"))
+    # start the clock only now: building the engine (Reference.get() on first use) can take long enough on a slow or
+    # busy machine that, at 3600x, the sim clock is already past his ~23:56 sleep onset when the loop starts
+    clock = Clock(TIME_SCALE, loc(1, "23:50"))
     seq, prev = [], time.time()
     while clock.now() < loc(2, "04:00"):
         time.sleep(0.01)

@@ -71,6 +71,10 @@ CORE_SHOTS = [(s, NATURAL_HOUR[s], "1280") for s in CORE_SCENES] + [("desk", 14,
 FULL_SHOTS = [(s, h, z) for s in CORE_SCENES for h in HOURS for z in SIZES] + [("sleeping_side", 23, "1280"), ("sleeping_side", 14, "390")]
 
 
+# the brain page's per-region activity (214 regions of web/brain.json): a flat resting level, enough to colour the fibres
+ACT_FLAT = [0.3] * 214
+
+
 def clock(hour):
     h = int(hour) % 24
     return f"{h:02d}:{int(round((hour - int(hour)) * 60)) % 60:02d}"
