@@ -1,0 +1,13 @@
+# CC0 1.0, made for SUB-01 by room_build/clothes_mh/build_clothes.py
+name slides_black
+diffuseColor 0.1689 0.1689 0.1764
+specularColor 0.03 0.03 0.03
+shininess 0.380
+opacity 1.0
+translucency 0.0
+backfaceCull False
+normalmapTexture slides_black_normal.jpg
+normalmapIntensity 1.00
+shaderConfig normal True
+shaderConfig diffuse True
+# per-group materials of the .obj (g lines): eva

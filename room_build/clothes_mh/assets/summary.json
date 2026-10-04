@@ -1,0 +1,22 @@
+{
+ "hoodie_black": {
+  "verts": 7458,
+  "faces": 7336,
+  "hides": 2704
+ },
+ "track_trousers": {
+  "verts": 3773,
+  "faces": 3612,
+  "hides": 1350
+ },
+ "socks_white": {
+  "verts": 2286,
+  "faces": 2264,
+  "hides": 2286
+ },
+ "slides_black": {
+  "verts": 2604,
+  "faces": 2604,
+  "hides": 0
+ }
+}

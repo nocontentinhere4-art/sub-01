@@ -1,0 +1,13 @@
+# CC0 1.0, made for SUB-01 by room_build/clothes_mh/build_clothes.py
+name socks_white
+diffuseColor 0.9035 0.9035 0.8932
+specularColor 0.03 0.03 0.03
+shininess 0.030
+opacity 1.0
+translucency 0.0
+backfaceCull False
+normalmapTexture socks_white_normal.jpg
+normalmapIntensity 1.00
+shaderConfig normal True
+shaderConfig diffuse True
+# per-group materials of the .obj (g lines): sock
