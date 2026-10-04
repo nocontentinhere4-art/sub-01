@@ -1117,7 +1117,8 @@ class Live:
             self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches"),
                                    "visited": s.get("visited") or self.browsing_state.get("visited"),
                                    "youtube": s.get("youtube_state") or self.browsing_state.get("youtube"),
-                                   "heavy": s.get("heavy") or self.browsing_state.get("heavy")}
+                                   "heavy": s.get("heavy") or self.browsing_state.get("heavy"),
+                                   "walled": s.get("walled") or self.browsing_state.get("walled")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
