@@ -1,10 +1,11 @@
 {
  "scenes": [
   "walk from the window past the bed",
-  "stretch beside the desk"
+  "stretch beside the desk",
+  "hands at the desk"
  ],
- "frames": 240,
+ "frames": 390,
  "fps": 30,
- "bytes": 570773,
+ "bytes": 1049144,
  "seed": 63
 }
