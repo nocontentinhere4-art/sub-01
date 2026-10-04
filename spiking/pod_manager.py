@@ -37,7 +37,7 @@ from zoneinfo import ZoneInfo
 from sleep import ROME, day_of
 from spiking import podpack
 from spiking.costs import CostLog
-from spiking.runpod_ops import RunPodOps
+from spiking.runpod_ops import Busy, CreateFailed, RunPodOps, describe, scrub
 from spiking.words import half_cue_ok
 from state_io import load_json, save_json
 
@@ -66,7 +66,11 @@ WAKE_CONFIRM_S = 5 * 60             # awake this long before a day pod starts (a
 SLEEP_CONFIRM_S = 10 * 60           # asleep this long before the night phases start
 NIGHT_MAX_MIN = 45                  # the night phases on the pod (a night-only pod gets the same)
 MIN_DAY_MIN = 30                    # a day pod with less time allowed than this is not started
-BACKOFF_S = (60, 300, 600, 1200, 2400, 3600)    # wait before the next pod after the n-th failure of the day
+BACKOFF_S = (120, 300, 600, 1200, 2400, 3600)   # wait before the next pod after the n-th failure of the day
+CREATE_RETRY_S = 300                # no pod could be created (no capacity, API refusal): try again, not a restart
+BUSY_RETRY_S = 120                  # another SUB-01 pod exists: wait for it, not a restart
+RESTART_LOG_KEEP = 10
+MANAGED = ("day-", "night-", "session-")   # name purposes this manager creates (the orphan sweep deletes only these)
 ORPHAN_EVERY_S = 600
 UPLOAD_EVERY_MIN = 30
 DECISION_FILES = ("decisions-{day}.jsonl", "gpu_decisions-{day}.jsonl")   # #55's log, the hub's own log
@@ -190,6 +194,7 @@ class PodManager:
         self.send_night = None                 # async callable set by the hub: forwards the night message
         self.stage, self.stage_since = None, None
         self.dl = {}                           # day-live state (per Tokyo day; saved in manager.json)
+        self._foreign_seen = set()             # pods with our prefix that this manager did not make (said once)
         # RunPod credentials: the Railway env var, or a proxy that injects them (sandbox), or an injected client
         self.has_key = bool(env.get("RUNPOD_API_KEY") or env.get("SUB01_RUNPOD_PROXY_AUTH") == "1"
                             or api is not None or ops is not None)
@@ -266,6 +271,9 @@ class PodManager:
             hours, usd = self.log.usage_on(self.clock().astimezone(ROME).date())
             out["day_live"] = {"stage": self.stage, "pod": c.get("mode") if c else None,
                                "blocked": self.dl.get("blocked"), "restarts_today": self.dl.get("restarts", 0),
+                               "next_try": self.dl.get("next_try"),
+                               "restart_log": list(self.dl.get("restart_log") or [])[-RESTART_LOG_KEEP:],
+                               "gpu_failures_today": dict(self.dl.get("gpu_fail") or {}),
                                "today_hours": round(hours, 3), "today_usd": round(usd, 3),
                                "caps": {"hours_per_day": self.day_max_hours, "usd_per_day": self.usd_per_day,
                                         "hours_per_week": self.ops.hours_cap, "restarts_per_day": self.max_restarts}}
@@ -489,7 +497,8 @@ class PodManager:
             if self.dl.get("day"):
                 print(f"spiking: Tokyo day {today}: day-live caps and restart count reset", flush=True)
             self.dl = {"day": today, "restarts": 0, "blocked": None, "next_try": None,
-                       "nights": list(self.dl.get("nights") or [])[-7:]}
+                       "nights": list(self.dl.get("nights") or [])[-7:],
+                       "restart_log": list(self.dl.get("restart_log") or [])[-RESTART_LOG_KEEP:]}
             self._dl_save()
 
     def _stage_for(self, now):
@@ -602,11 +611,21 @@ class PodManager:
             return []
         cur = self.current["pod_id"] if self.current else None
         gone = []
+        known = {r.get("pod_id") for r in self.log.open_pods()}
         for pod in pods:
-            if pod.get("id") and pod["id"] != cur:
-                print(f"spiking: deleting orphan pod {pod['id']} (ours, not tracked)", flush=True)
-                await self._delete(pod["id"], "orphan")
-                gone.append(pod["id"])
+            if not pod.get("id") or pod["id"] == cur:
+                continue
+            if not str(pod.get("name", ""))[len(self.ops.prefix):].startswith(MANAGED):
+                if pod["id"] not in self._foreign_seen:          # e.g. a validation pod from a work session
+                    self._foreign_seen.add(pod["id"])
+                    print(f"spiking: pod {pod['id']} ({str(pod.get('name'))[:60]}) is not one this manager makes: "
+                          "left alone; no new pod until it is gone", flush=True)
+                continue
+            print(f"spiking: deleting orphan pod {pod['id']} (ours, not tracked)", flush=True)
+            await self._delete(pod["id"], "orphan")
+            if pod["id"] not in known:                           # never logged: book its cost now
+                self.log.orphan(pod, self.clock())
+            gone.append(pod["id"])
         return gone
 
     async def _start_pod(self, mode, now, key):
@@ -622,27 +641,40 @@ class PodManager:
         env = dict(podpack.boot_env(token), SUB01_SESSION=json.dumps(cfg), SUB01_SERVER_URL=self.server_url,
                    SUB01_POD_SECRET=self.secret, SUB01_SESSION_ID=cfg["session_id"])
         minutes = min(allowed, 20 * 60 if mode == "day" else NIGHT_MAX_MIN)
+        gpus = self.gpu_order()
         try:
-            pod = await loop.run_in_executor(None, lambda: self.ops.create(env, mode, "spiking.session", minutes,
-                                                                          self.gpus))
+            pod = await loop.run_in_executor(None, lambda: self.ops.create(env, mode, "spiking.session", minutes, gpus))
         except Exception as e:
             if type(e).__name__ == "CapExceeded":
                 self._block(f"weekly GPU-hour cap ({e})")
                 return None
-            self._failed(now, f"create failed: {type(e).__name__}")
+            if isinstance(e, Busy):                              # an orphan of ours is deleted now; anything else waits
+                gone = await self._sweep_orphans()
+                self._not_started(now, "another SUB-01 pod exists" + (" (orphan deleted)" if gone else ""),
+                                  scrub(e), 0 if gone else BUSY_RETRY_S)
+                return None
+            errs = "; ".join(e.errors) if isinstance(e, CreateFailed) else describe(e)
+            self._not_started(now, "no pod created", errs, CREATE_RETRY_S)
             return None
-        pod_id = pod["id"]
+        pod_id, gpu = pod["id"], pod.get("_gpu")
+        t_create = self.clock()
         try:
             await loop.run_in_executor(None, self.ops.upload, pod_id, data, token)
         except BaseException as e:
-            await self._delete(pod_id, "pack upload failed")
+            err = describe(e) if not isinstance(e, asyncio.CancelledError) else "cancelled"
             if isinstance(e, asyncio.CancelledError):
+                await self._delete(pod_id, "pack upload failed")
                 raise
-            self._failed(now, "pack upload failed")
+            pod_said = await self._pod_said(pod_id)
+            await self._delete(pod_id, "pack upload failed")
+            self._failed(now, "pack upload failed", pod_id=pod_id, gpu=gpu,
+                         secs_alive=(self.clock() - t_create).total_seconds(),
+                         last_error="; ".join(x for x in (err, pod_said) if x))
             return None
         rate = next((r.get("cost_per_hr") for r in self.log.open_pods() if r.get("pod_id") == pod_id), None)
         t0 = self.clock()
         self.current = {"session_id": cfg["session_id"], "pod_id": pod_id, "started": t0, "hello": False,
+                        "gpu": gpu, "created": t_create,
                         "last_seen": t0, "disconnected_at": None, "done": None, "mode": mode, "key": key,
                         "rate": rate, "deadline": t0 + timedelta(minutes=minutes), "stop_sent": None,
                         "stop_reason": None,
@@ -652,7 +684,57 @@ class PodManager:
         print(f"spiking: {mode} pod {pod_id} started ({cfg['session_id']}, ${rate or 0:.3f}/h)", flush=True)
         return self.current
 
-    def _failed(self, now, reason):
+    def gpu_order(self):
+        """The GPU list with the types whose pods failed today moved back (stable: cheapest first among equals)."""
+        fails = self.dl.get("gpu_fail") or {}
+        return sorted(list(self.gpus or DAY_GPUS), key=lambda g: fails.get(g[0], 0))
+
+    def _log_restart(self, now, why, counted, pod_id=None, gpu=None, secs_alive=None, last_error=""):
+        entry = {"t": now.isoformat(timespec="seconds"), "why": str(why)[:120], "pod_id": pod_id, "gpu": gpu,
+                 "secs_alive": round(secs_alive) if secs_alive is not None else None,
+                 "last_error": scrub(last_error, 300), "counted": bool(counted)}
+        log = self.dl.setdefault("restart_log", [])
+        log.append(entry)
+        del log[:-RESTART_LOG_KEEP]
+        return entry
+
+    def _not_started(self, now, why, err, wait):
+        """No pod was made (nothing billed): retry after `wait`, without counting a restart."""
+        self._log_restart(now, why, False, last_error=err)
+        self.dl["next_try"] = (now + timedelta(seconds=wait)).isoformat() if wait else None
+        self._dl_save()
+        print(f"spiking: {why}: {scrub(err, 300)}; next try in {wait} s (not counted as a restart)", flush=True)
+
+    async def _pod_said(self, pod_id):
+        """The pod's own last word (status.json phase / error, last line of session.log), credential-free and short,
+        so the restart log says why it died. '' when it cannot be read in time."""
+        loop = asyncio.get_running_loop()
+
+        def fetch():
+            try:
+                st = json.loads(self.ops.fetch(pod_id, "status.json", timeout=10))
+            except Exception as e:
+                return f"pod status not readable ({describe(e)})"
+            out = f"pod phase {st.get('phase')}" + (f", error {st['error']}" if st.get("error") else "")
+            try:
+                tail = [ln for ln in self.ops.fetch(pod_id, "session.log", timeout=10).decode(errors="replace")
+                        .splitlines() if ln.strip()]
+                if tail:
+                    out += "; log: " + tail[-1]
+            except Exception:
+                pass
+            return out
+        try:
+            return scrub(await asyncio.wait_for(loop.run_in_executor(None, fetch), 25), 300)
+        except Exception:
+            return ""
+
+    def _failed(self, now, reason, pod_id=None, gpu=None, secs_alive=None, last_error=""):
+        """A pod was made and died: a counted restart with backoff; its GPU type goes to the back of the list."""
+        self._log_restart(now, reason, True, pod_id, gpu, secs_alive, last_error)
+        if gpu:
+            fails = self.dl.setdefault("gpu_fail", {})
+            fails[gpu] = fails.get(gpu, 0) + 1
         n = self.dl["restarts"] = self.dl.get("restarts", 0) + 1
         wait = BACKOFF_S[min(n, len(BACKOFF_S)) - 1]
         self.dl["next_try"] = (now + timedelta(seconds=wait)).isoformat()
@@ -660,10 +742,13 @@ class PodManager:
         if n > self.max_restarts:
             self._block(f"restart cap ({n - 1} restarts of SUB01_DAY_MAX_RESTARTS={self.max_restarts})")
         else:
-            print(f"spiking: pod failed ({reason}); restart {n} of {self.max_restarts} in {wait} s", flush=True)
+            print(f"spiking: pod failed ({reason}{'; ' + scrub(last_error, 200) if last_error else ''}); "
+                  f"restart {n} of {self.max_restarts} in {wait} s", flush=True)
 
-    async def _end(self, reason, failure=False):
+    async def _end(self, reason, failure=False, last_error=""):
         c = self.current
+        if failure and not last_error:
+            last_error = await self._pod_said(c["pod_id"])
         try:
             await self._delete(c["pod_id"], reason)
         finally:
@@ -671,7 +756,9 @@ class PodManager:
             self._save(last_session_end=self.clock().isoformat())
         print(f"spiking: {c['mode']} pod {c['pod_id']} deleted ({reason})", flush=True)
         if failure:
-            self._failed(self.clock(), reason)
+            now = self.clock()
+            self._failed(now, reason, pod_id=c["pod_id"], gpu=c.get("gpu"),
+                         secs_alive=(now - c.get("created", c["started"])).total_seconds(), last_error=last_error)
         return reason
 
     async def _request_stop(self, c, reason, now):
@@ -709,8 +796,8 @@ class PodManager:
                 return await self._end(c["stop_reason"])
             if c["mode"] == "night":
                 return await self._end("night done" if ok else f"night done with error: {str(c['done'].get('error'))[:120]}")
-            return await self._end("done" if ok else f"done with error: {str(c['done'].get('error'))[:120]}",
-                                   failure=not ok)
+            return await self._end("done" if ok else "done with error", failure=not ok,
+                                   last_error="" if ok else f"pod: {str(c['done'].get('error'))[:200]}")
         if not c["hello"] and (now - c["started"]).total_seconds() > HELLO_TIMEOUT_S:
             return await self._end("no hello within 15 min", failure=True)
         if c["hello"] and (now - (c["disconnected_at"] or c["last_seen"])).total_seconds() > LOST_S:
