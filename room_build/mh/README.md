@@ -41,6 +41,11 @@
     fingertips on the buttons.
   - `room_bedtime_up` (14 s, NEW, awaiting the owner): late at night, seated: stretches, rubs his eyes, stands up
     pushing on his thighs, walks off (ends ~1.9 m from the chair, walking). Chain: bedtime_up -> walk -> `room_bed_lie`.
+  - Candidates awaiting the owner (crude, no props yet; seat contact measured 0.505-0.51, feet on the floor):
+    `room_eat` (23 s, seated: reaches to the table, brings food/drink to the mouth), `room_read` (17.5 s, seated, a
+    book held in both hands, DY +0.022), `room_phone` (21.5 s, seated texting), `room_drink` (16.5 s, standing: fills a
+    glass, drinks), `room_window` (11.3 s, opens a window), `room_door` (12.6 s, opens and closes a door). Props
+    (book, phone, plate, glass) attach to the hand bones in the page.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`, `unrename_mh.mjs` (room names back to MakeHuman's, so boy_g2.glb can be the retarget target).
   The source FBX files are not in the repo.
 
