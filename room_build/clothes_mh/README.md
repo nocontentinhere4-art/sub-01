@@ -59,6 +59,15 @@ sheen as `KHR_materials_sheen`.
 `g2_clip_check.py` plays three of G2's clips (typing at the desk, walking, sitting down) on the dressed GLB in three.js,
 bound by node name as the room page does: `docs/design/clothes-mh/g2_clips.jpg`.
 
+**Fit in motion** (`g2_pose_check.py`, `docs/design/clothes-mh/g2_poses.jpg`, numbers in `out/pose_check.json`): the
+dressed GLB posed by G2's clips at COORD A's three moments (seated typing `desk_type_ik` at 3 s, `room_walk` at 0.3 s,
+lying `room_bed_lie` at 12 s), skinned exactly as three.js does, with the chair seat (top 0.505 m, G2's measured contact)
+and the mattress (top 0.66 m) in place; any offending garment vertex is drawn red. It measures cloth inside the body
+(an odd number of skin crossings on two of three rays), separately where that skin is shown (hands, neck, face), and
+cloth below the seat or mattress top or the floor. To sit on the chair, the trousers lie 4.5 mm off the skin under the
+buttocks, the backs and insides of the thighs and the crotch (the source suit's crotch hung up to 5 cm low); the hoodie
+lies close under the arms; the cuffs sit 2 mm outside the wrists.
+
 ## Next to real clothes (preview only)
 The owner's rule: every item next to a real one. `build_clothes.py` shoots each comparison render at its photo's
 angle under a similar soft overcast daylight (the photos are outdoors); `compare_real.py` sets crops of them beside
@@ -83,7 +92,7 @@ slide are compared on separate photos. A photo of grey slides was rejected for a
 ## Rebuild
 From `room_build/clothes_mh/`, with Blender 4.2:
 
-    mkdir -p g2 && for f in boy_g2.glb boy_g2_rest.json clips_g2/desk_type.glb clips_g2/room_walk.glb clips_g2/room_sit_down.glb; do
+    mkdir -p g2 && for f in boy_g2.glb boy_g2_rest.json clips_g2/desk_type.glb clips_g2/desk_type_ik.glb clips_g2/room_walk.glb clips_g2/room_sit_down.glb clips_g2/room_bed_lie.glb; do
       git show origin/preview/mh-motion:room_build/mh/glb/$f > g2/$(basename $f); done   # G2's body and three clips (not committed here)
 
     git clone --depth 1 https://github.com/makehumancommunity/makehuman   # the base mesh, targets, skeleton (CC0 assets)
@@ -98,6 +107,7 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     python compose_feet.py         # docs/design/clothes-mh/feet_sheet.jpg: 3/4 close-up, side, from above, seated at 5 m
     python compare_real.py         # docs/design/clothes-mh/real_feet.jpg, real_clothes.jpg: next to real photos (CC0)
     python g2_clip_check.py        # docs/design/clothes-mh/g2_clips.jpg: G2's clips on the dressed body (three.js)
+    blender -b -P g2_pose_check.py # docs/design/clothes-mh/g2_poses.jpg + out/pose_check.json: the fit in three clip poses
     python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 
 The build verifies every written `.mhclo`: read back and refitted on the body with MakeHuman's rule, it must give the

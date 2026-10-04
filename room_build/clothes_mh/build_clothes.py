@@ -221,6 +221,19 @@ def join(objs, name):
     bpy.ops.object.join(); objs[0].name = name; objs[0].data.name = name; return objs[0]
 
 
+def inside_body(p):
+    """p inside the (rest) body: an odd number of skin crossings along at least two of three rays"""
+    odd = 0
+    for d in (Vector((0.31, 0.83, 0.46)), Vector((-0.71, -0.2, 0.67)), Vector((0.12, -0.6, -0.79))):
+        n, q = 0, Vector(p)
+        while True:
+            h = BODY_BVH.ray_cast(q, d, 30.0)
+            if h[0] is None: break
+            n += 1; q = h[0] + d * 1e-4
+        odd += n % 2
+    return odd >= 2
+
+
 def push_out(o, gap=0.025, iters=2):
     """no garment vertex inside the (rest) body: any vertex closer than `gap` to the skin, or behind it, goes out along
     the skin's normal to `gap`"""
@@ -391,7 +404,10 @@ def hoodie():
             r = (p - q); r = r - ax * r.dot(ax)
             front = Vector((0, -1, 0)); front = (front - ax * front.dot(ax)).normalized()
             phi = math.atan2(r.normalized().cross(front).dot(ax), r.normalized().dot(front)) if r.length > 1e-6 else 0.0
-            d = 1.45 * CM + 0.6 * CM * max(0.0, -r.normalized().z)                # the sleeve's weight sags under the arm
+            d = 1.45 * CM + 0.6 * CM * max(0.0, -r.normalized().z) * smooth01(1.2, 2.0, s)   # the sleeve's weight sags under the forearm
+            # the armpit: where the arm comes down against the body the sleeve's inner side lies close (not 2 cm out)
+            inner = max(0.0, -r.normalized().x * (1 if side == "L" else -1)) * (1 - smooth01(0.9, 1.7, s))
+            d -= inner * 1.1 * CM
             # elbow: diagonal wrinkles on the inner side, fanning out from the crease
             e = math.exp(-((s - elbow_s) / (0.55)) ** 2) * max(0.0, math.cos(phi)) ** 1.5
             d += e * (0.5 * CM - 1.4 * CM * crease(s - elbow_s + 0.11 * phi, 0.4, 0.09))   # sharp valleys, round crests
@@ -401,10 +417,12 @@ def hoodie():
             w = smooth01(0.45, 0.7, from_wrist) * (1 - smooth01(1.4, 1.9, from_wrist))
             d += w * 0.7 * CM * math.sin(2 * math.pi * from_wrist / 0.3 + 0.9 * math.sin(2 * phi + s))
             if from_wrist < 0.55:                                                  # the ribbed cuff hugs the wrist
-                cuffzone[i] = True; d = -0.25 * CM
+                cuffzone[i] = True; d = 0.2 * CM
         else:
             th = math.atan2(p.x, -p.y)                                             # around the body, 0 at the front
             hz = p.z - hem_z
+            # the sides under the arms: close to the body there, so the lowered arm does not cut into the hoodie
+            d -= 1.2 * CM * abs(math.sin(th)) ** 3 * smooth01(chest_z - 2.4, chest_z - 1.2, p.z) * (1 - smooth01(chest_z + 0.4, chest_z + 1.0, p.z))
             drape = 1 - smooth01(0.7, 3.2, hz)
             d += drape * 0.6 * CM * math.sin(5 * th + 0.8 + 0.6 * math.sin(3 * th))    # vertical folds falling to the hem
             # the belly: the loose fleece sags into soft, slightly curved folds across the front above the hem
@@ -419,7 +437,7 @@ def hoodie():
     for i in np.nonzero(hemzone)[0]:
         p = out[i]; c = np.array([0, J("spine05")[1], p[2]]); out[i] = c + (p - c) * np.array([0.93, 0.93, 1.0])
     for i in np.nonzero(cuffzone)[0]:
-        p = Vector(out[i]); _, s, _, q, ax = sleeve_param(p); r = p - q; r -= ax * r.dot(ax); out[i] = np.array(p - r * 0.12)
+        p = Vector(out[i]); _, s, _, q, ax = sleeve_param(p); r = p - q; r -= ax * r.dot(ax); out[i] = np.array(p - r * 0.03)
     set_verts(o, out)
     for poly in o.data.polygons:
         vs = list(poly.vertices); poly.material_index = 1 if all(hemzone[v] or cuffzone[v] for v in vs) else 0
@@ -522,8 +540,12 @@ def trousers(hem_z):
         ease = 0.75 + 0.75 * t + 0.9 * smooth01(knee_z, knee_z + 1.6, p.z)              # cm: 0.75 cuff, 1.5 knee, 2.4 thigh
         inner = max(0.0, -math.sin(phi)) if above else 0.0
         ease *= 1 - 0.45 * inner
-        seat = smooth01(crotch_z - 0.6, crotch_z + 0.6, p.z) * max(0.0, n.y) ** 2          # the seat (the back) hangs looser
-        d = (ease + 0.7 * seat) * CM
+        # under the buttocks and the backs of the thighs, where he sits, the cloth lies close (pressed on the chair seat:
+        # 3 mm); at the front of the hip, where the thigh folds up when he sits, less room
+        under = max(0.0, n.y) * smooth01(knee_z + 0.2, knee_z + 0.8, p.z) * (1 - smooth01(crotch_z + 1.2, crotch_z + 1.8, p.z))
+        crease_f = max(0.0, -n.y) * smooth01(crotch_z - 0.3, crotch_z + 0.6, p.z) * (1 - smooth01(crotch_z + 1.4, crotch_z + 2.0, p.z))
+        ease = ease * (1 - 0.85 * min(1.0, 2.0 * under)) * (1 - 0.5 * crease_f)
+        d = ease * CM
         d += 0.25 * CM * math.sin(4 * phi + 0.7) * (1 - smooth01(0.0, 2.5, abs(p.z - knee_z)))   # soft knee folds
         # the weight of the fabric: long soft folds falling down the front of the thigh, and drag lines from the crotch
         thigh = smooth01(knee_z + 0.3, knee_z + 1.2, p.z) * (1 - smooth01(crotch_z, crotch_z + 0.8, p.z))
@@ -544,6 +566,16 @@ def trousers(hem_z):
         if k <= 0: continue
         loc, nor, _, _ = BODY_BVH.find_nearest(Vector(p))
         out[i] = p * (1 - k) + np.array(loc + nor * 0.25 * CM) * k
+    # where he sits (the crotch, the buttocks' undersides and the backs and insides of the thighs) the cloth lies 4.5 mm
+    # off the skin, as trousers pressed on a chair seat do; the source suit's crotch hung up to 5 cm below the body there
+    # and went through the seat when he sat
+    for i, p in enumerate(out):
+        nn = Vector(N[i]); x, y, z = p
+        zone = smooth01(knee_z + 0.4, knee_z + 1.0, z) * (1 - smooth01(crotch_z + 0.5, crotch_z + 1.1, z))
+        k = zone * max(min(1.0, 1.6 * max(0.0, nn.y)), 1 - smooth01(0.35, 0.9, abs(x)), min(1.0, 1.6 * max(0.0, -nn.z)))
+        if k <= 0: continue
+        loc, nor, _, d = BODY_BVH.find_nearest(Vector(p))
+        if d > 0.45 * CM: out[i] = p * (1 - k) + np.array(loc + nor * 0.45 * CM) * k
     set_verts(o, out)
     for poly in o.data.polygons: poly.material_index = 1 if all(cuff[v] for v in poly.vertices) else 0
     push_out(o, 0.35 * CM)
@@ -605,6 +637,14 @@ def socks():
     push_out(o, 0.25 * CM, iters=2)                              # the rest of the sock (the front stays on its closure)
     for i, c in keep_front.items(): o.data.vertices[i].co = c
     o.data.update()
+    # a toe-box vertex the closure's rays missed stays where the smoothing shrank it, inside the foot: those go out
+    # to 2.5 mm off the nearest skin (a vertex is inside if an odd number of skin crossings lie on 2 of 3 rays)
+    stuck = 0
+    for i in fs:
+        p = o.data.vertices[i].co
+        if inside_body(p):
+            loc, nor, _, _ = BODY_BVH.find_nearest(p); o.data.vertices[i].co = loc + nor * 0.25 * CM; stuck += 1
+    o.data.update(); print("SOCK toe-box vertices put back outside the skin:", stuck)
     # slight folds at the ankle: a few soft rings, each wavering in height and fading round the leg, 1.5 mm proud
     P = verts_np(o); N = normals_np(o); rng = random.Random(11)
     for sgn, s in ((1, "L"), (-1, "R")):
@@ -846,10 +886,15 @@ for name, o in GARMENTS.items():
     DELETE[name] = close_gaps(covered(o, 5 * CM)) if name != "slides_black" else []
     if name == "socks_white": DELETE[name] = sorted(set(DELETE[name]) | set(SOCK_IDS))
     print(name, "verts", len(o.data.vertices), "faces", len(o.data.polygons), "hides", len(DELETE[name]), "body vertices")
-for name, o in GARMENTS.items():
+def garment_weights(name, o):
+    """skin weights: the mix of the three body vertices' weights (MakeHuman's rule)"""
     b = BIND[name]
     wm = (WMAT[b["ref"][:, 0]] * b["w"][:, 0, None] + WMAT[b["ref"][:, 1]] * b["w"][:, 1, None] + WMAT[b["ref"][:, 2]] * b["w"][:, 2, None])
-    skin(o, wm)
+    return wm
+
+
+for name, o in GARMENTS.items():
+    skin(o, garment_weights(name, o))
 
 
 # ================================================================ write the MakeHuman clothes: .obj (box-projected UVs, metres of fabric per tile), .mhclo, .mhmat
@@ -926,8 +971,7 @@ def export_g2(path):
             js.setdefault("extensionsUsed", []); "KHR_materials_sheen" in js["extensionsUsed"] or js["extensionsUsed"].append("KHR_materials_sheen")
         js["materials"].append(mat); mats[name] = len(js["materials"]) - 1; return mats[name]
     for gname, o in GARMENTS.items():
-        b = BIND[gname]; me = o.data; me.update()
-        wm = WMAT[b["ref"][:, 0]] * b["w"][:, 0, None] + WMAT[b["ref"][:, 1]] * b["w"][:, 1, None] + WMAT[b["ref"][:, 2]] * b["w"][:, 2, None]
+        me = o.data; me.update(); wm = garment_weights(gname, o)
         top = np.argsort(-wm, 1)[:, :4]; tw = np.take_along_axis(wm, top, 1); tw /= np.maximum(tw.sum(1, keepdims=True), 1e-9)
         P = to_g2(np.array([MHv(v.co) for v in me.vertices])); Nn = np.array([MHv(v.normal) for v in me.vertices])
         uvl = me.uv_layers["UVMap"].data; prims = []
