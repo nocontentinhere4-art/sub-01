@@ -109,6 +109,18 @@ RENDER_ONLY_JS = """([dt, full]) => { if (full) { scene.traverse(o => { if (o.is
   controls.update(); if (window.post && post.render) post.render(dt); else renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.92); }"""
 
 
+def textures_ready(pg):
+    """On a GPU the page is ready seconds before the window's photographs (room/window/*.webp) have arrived, and the frozen
+    page never recomposes them later: wait for those responses, then a few warm-up renders upload every texture."""
+    try:
+        pg.wait_for_function("performance.getEntriesByType('resource').filter(e => /room\\/window\\/[^/]+\\.webp/.test(e.name) && e.responseEnd > 0).length >= 6", timeout=120000)
+    except Exception as e:                            # (a page without the window view: carry on)
+        print("window textures: not all seen,", str(e)[:80], flush=True)
+    pg.wait_for_timeout(1500)
+    for _ in range(3):
+        pg.evaluate(RENDER_ONLY_JS, [1 / 30, True])
+
+
 def shots_file(path):
     """A shot list: {"hour": 14, "scene": "<js>" | {"life": {...}}, "query_old": "", "query_new": "", "shots": [
     {"label", "seconds", "cam": {"pos", "target", "to"?: dolly end, "fov"?} | "closeup": "<page_checks recipe>" | "follow"}]}"""
@@ -149,12 +161,14 @@ def render(a):
                         pg.add_style_tag(content=HUD_OFF)
                         pg.add_script_tag(content=(ROOT / "tests" / "visual" / "page_checks.js").read_text())
                         pg.evaluate("s => { window.FREEZE = true; settle(); if (window.setSeed) setSeed(s); __qa.hideMarkers(); }", a.seed)
+                        textures_ready(pg)
                         hour = h
                     if isinstance(sc, dict):
                         pg.evaluate("(l) => { act(l.activity, l); }", sc["life"])
                     elif sc:
                         pg.evaluate(sc)
                     pg.evaluate("(n) => { for (let i = 0; i < n; i++) animate_(1/30); }", int(round(settle_s * 30)))
+                    print("  window view:", pg.evaluate("() => window.windowView && windowView.state ? JSON.stringify(windowView.state()) : 'n/a'")[:200], flush=True)
                 load(int(sh.get("hour", 14)), sh.get("scene", ""))
                 for shot in sh["shots"]:
                     if "hour" in shot or "scene" in shot:                   # a shot with its own hour and/or scene (life state or JS), settled for shot.settle seconds
@@ -192,6 +206,7 @@ def render(a):
                 pg.add_style_tag(content=HUD_OFF)
                 pg.add_script_tag(content=(ROOT / "tests" / "visual" / "page_checks.js").read_text())
                 pg.evaluate("s => { window.FREEZE = true; settle(); if (window.setSeed) setSeed(s); __qa.hideMarkers(); }", a.seed)   # (?debug's magenta markers off)
+                textures_ready(pg)
                 pg.evaluate(SCENE.get(hour, SCENE[14]))
                 pg.evaluate("() => { for (let i = 0; i < 30; i++) animate_(1/30); if (typeof updateCameraGoal === 'function') { updateCameraGoal(); camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); } }")
                 n = int(round(secs * a.fps)); seg0 = k
