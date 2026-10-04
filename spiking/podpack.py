@@ -24,6 +24,7 @@ GPUS = ("NVIDIA RTX A5000", "NVIDIA RTX 4000 Ada Generation",   # validated
         "NVIDIA A40", "NVIDIA RTX A4500", "NVIDIA GeForce RTX 4090", "NVIDIA L40",   # fallbacks: >= 20 GB, < $0.85/h
         "NVIDIA RTX A4000", "NVIDIA L4")                        # 1M neurons use 5.7 GB (day-live list, #58)
 CLOUDS = ("SECURE", "COMMUNITY")
+CUDA_VERSIONS = ("12.8", "12.9", "13.0")                       # the image is cu128: a host with an older driver cannot run it
 MAX_CHARS = 900_000
 REST_PREFIX = "out/rest/"
 STATIC_FILES = ["spiking/region_volumes.json", "real_baseline.py", "out/connectome.npz", "out/atlas_names.json"]
@@ -206,7 +207,7 @@ def create_body(env, name, gpu="NVIDIA RTX A5000", module="spiking.session", clo
     assert gpu in GPUS, f"GPU type not allowed: {gpu}"
     assert cloud in CLOUDS, f"cloud type not allowed: {cloud}"
     body = {"name": name, "imageName": IMAGE, "gpuTypeIds": [gpu], "gpuCount": 1, "interruptible": False,
-            "cloudType": cloud, "containerDiskInGb": 30, "volumeInGb": 0, "ports": ["8000/http"],
+            "cloudType": cloud, "allowedCudaVersions": list(CUDA_VERSIONS), "containerDiskInGb": 30, "volumeInGb": 0, "ports": ["8000/http"],
             "env": dict(env), "dockerStartCmd": boot_cmd() if "SUB01_BOOT" in env else start_cmd(module)}
     assert len(json.dumps(body)) < 90_000, "create request too large for RunPod (~100 KB limit)"
     return body

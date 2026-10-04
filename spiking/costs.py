@@ -72,6 +72,32 @@ class CostLog:
         self._append(rec)
         return rec
 
+    def orphan(self, pod, now=None):
+        """Book a pod that ran without a start line (created by a request that failed on our side, found and
+        deleted by the orphan sweep): from RunPod's createdAt to now at its costPerHr."""
+        end = now or self.clock()
+        start = end
+        raw = str(pod.get("createdAt") or "")
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f %z UTC", "%Y-%m-%d %H:%M:%S %z UTC"):
+            try:
+                start = datetime.strptime(raw, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            try:
+                start = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+        start = min(start, end)
+        hours = (end - start).total_seconds() / 3600
+        rate = float(pod.get("costPerHr") or pod.get("adjustedCostPerHr") or 0.0)
+        rec = {"pod_id": pod.get("id"), "name": str(pod.get("name", "")), "gpu": "?", "cost_per_hr": rate,
+               "start": start.isoformat(), "stop": end.isoformat(), "hours": round(hours, 4),
+               "cost_usd": round(hours * rate, 4), "reason": "orphan", "purpose": "orphan"}
+        self._append(rec)
+        return rec
+
     def open_pods(self):
         return list(self._split()[0].values())
 
