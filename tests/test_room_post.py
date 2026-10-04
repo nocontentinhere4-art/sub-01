@@ -119,6 +119,18 @@ def test_shadow_snapping_shafts_blob_env(check):
     assert R["nan_rejected"] and R["key_kept"] and R["rejected"] == 1 and R["retried"] and R["env_off_during"] and R["env_restored"]   # a NaN capture is dropped and retried; no feedback through the environment
 
 
+def test_page_module_parses(tmp_path):
+    """The page's module script is valid JavaScript (a duplicate `const` or a stray brace loads nothing at all)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    src = re.search(r'<script type="module">(.*?)</script>', PAGE.read_text(), re.S).group(1)
+    f = tmp_path / "room_module.mjs"
+    f.write_text(src)
+    r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr[-1500:]
+
+
 def test_page_wires_the_module():
     html = PAGE.read_text()
     assert 'from "./room_post.js"' in html

@@ -1121,20 +1121,29 @@ function occluded(pos, aim){
   }
   return false;
 }
+// On a cut and every 2 s every angle is scored (the rays through the room's meshes cost milliseconds): of the positions
+// that clear the walls, the furniture and the line of sight, the one that sees most of his face (where his head
+// points, not his body: at the sill he looks out of the window, at the desk he turns to the screen). Between those
+// frames the angle the shot settled on is kept, so the dolly never flaps.
+const _cfd = new THREE.Vector3(), _cfp = new THREE.Vector3();
 function camAround(out, c, facing, dist, h, ang){
   const angs = [ang, -ang, 90, -90, 0, 135, -135, 180];
-  if (CAM.pick !== null && angs.includes(CAM.pick)) { angs.splice(angs.indexOf(CAM.pick), 1); angs.unshift(CAM.pick); }   // the angle this shot settled on, first: no flapping between frames
-  const check = CAM.cut || T - CAM.losAt > 2;                              // the line of sight is cast on a cut and every 2 s (a ray through the room's meshes costs milliseconds)
-  let best = null, bestD = 1e9, bestA = 0;
+  const check = CAM.cut || CAM.pick === null || T - CAM.losAt > 2;
+  if (!check) { out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(CAM.pick)), dist).addScaledVector(UP, h); camClamp(out); CAM.ang = CAM.pick; return out; }
+  head.getWorldPosition(_cfp); (bones.headfront || head).getWorldPosition(_cfd); _cfd.sub(_cfp).setY(0);
+  if (_cfd.lengthSq() < 1e-6) _cfd.copy(facing); _cfd.normalize();
+  let best = null, bestS = -1e9, bestA = 0, fallback = null, fallD = 1e9, fallA = 0;
   for (const a of angs) {
     out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h);
-    let d = camClamp(out) + (camInside(out) ? 1 : 0);
-    if (d < 0.12 && check && occluded(out, c)) d += 0.5;                  // he would be seen through something: the next angle round him
-    if (d < 0.12) { CAM.ang = CAM.pick = a; if (check) CAM.losAt = T; return out; }
-    if (d < bestD) { bestD = d; best = out.clone(); bestA = a; }
+    const d = camClamp(out) + (camInside(out) ? 1 : 0);
+    if (d < fallD) { fallD = d; fallback = out.clone(); fallA = a; }
+    if (d >= 0.12 || occluded(out, c)) continue;
+    const s = _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd);          // 1: straight at his face, -1: the back of his head
+    if (s > bestS + 1e-6) { bestS = s; best = out.clone(); bestA = a; }
   }
-  CAM.ang = CAM.pick = bestA; if (check) CAM.losAt = T;                    // how far round him the shot ended up (0 = his front)
-  return out.copy(best);
+  CAM.losAt = T;
+  if (best) { CAM.ang = CAM.pick = bestA; return out.copy(best); }
+  CAM.ang = CAM.pick = fallA; return out.copy(fallback);                   // nothing clear: the least blocked (how far round him, 0 = his front)
 }
 // the overview; on a tall frame from further back (the whole width of the room instead of its middle; the orbit's 12 m
 // limit allows it) and aimed higher, so the room sits under the overlays
