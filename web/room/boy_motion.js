@@ -21,6 +21,7 @@
 // clip's own values come back before the next mixer update.
 
 const BOWL_KINDS = new Set(["ramen", "curry"]);
+const BOWL_RIM = 0.09;                                   // the held bowl's rim over its base (the Tripo ramen bowl, #131)
 const KEYBOARD = {c: [-1.07, 1.0, -0.97], ry: 0.06, w: 0.36, d: 0.13};   // room_build/build_room.py: KB_C, KB_RY, kb_body (keys top at DTOP + 0.03)
 const MOUSE = [-0.785, 0.985, -0.975];
 const SWAP = {                                   // manifest clip -> the page's action it replaces, and the HIPS keys it owns
@@ -365,18 +366,20 @@ export function createMotion(env){
     if (!bowlNow) { if (dishMoved) { env.DISH_AT.copy(DISH0); if (d) d.g.position.copy(DISH0); dishMoved = false; } return; }
     if (!dishMoved) { DISH0.copy(env.DISH_AT); dishMoved = true; }
     torso();
-    // the bowl in front of the chest, held in the left hand: a bit left, a hand's height off the desk, tipped towards him
-    B.Spine.getWorldPosition(_t).addScaledVector(FW, 0.30).addScaledVector(RT, -0.08).addScaledVector(UP, -0.14 + 0.004 * Math.sin(M.T * 0.9));
-    _t.y = Math.max(_t.y, 1.06);                                                            // clear of the desk top (0.97)
+    // the bowl in front of the chest, held in the left hand: a bit left, a hand's height off the desk. The hand is under
+    // it, palm up, fingers forward and a little inwards; the bowl stands on the middle of the palm, so no finger is inside it
+    B.Spine.getWorldPosition(_t).addScaledVector(FW, 0.27).addScaledVector(RT, -0.13).addScaledVector(UP, -0.20 + 0.004 * Math.sin(M.T * 0.9));
+    _t.y = Math.max(_t.y, 1.02);                                                            // the wrist clear of the desk top (0.97)
     B.LeftArm.getWorldPosition(_p).addScaledVector(UP, -0.4).addScaledVector(RT, -0.35);
     ik(B.LeftArm, B.LeftForeArm, B.LeftHand, _t, _p, 1, false);
-    env.touch(B.LeftHand); _b.copy(UP); _c.copy(FW).negate().addScaledVector(RT, -0.3).normalize();   // fingers up, palm towards him
-    _c.addScaledVector(_b, -_b.dot(_c)).normalize(); _d.crossVectors(_b, _c);
+    env.touch(B.LeftHand); _b.copy(FW).addScaledVector(RT, 0.35).normalize();                // fingers forward, a little inwards
+    _c.copy(UP); _c.addScaledVector(_b, -_b.dot(_c)).normalize(); _d.crossVectors(_b, _c);   // palm up
     const m = bowl.m || (bowl.m = new THREE.Matrix4()); m.makeBasis(_d, _b, _c); _q.setFromRotationMatrix(m); env.setWorldQuat(B.LeftHand, _q);
     env.boy.updateMatrixWorld(true);
-    B.LeftHand.getWorldPosition(_a).addScaledVector(UP, -0.045).addScaledVector(FW, -0.03);  // the bowl sits in the palm
-    d.g.position.copy(_a); d.g.rotation.set(0.18, 0.15 + env.boy.rotation.y, 0, "YXZ");
-    env.DISH_AT.copy(_a);                                                                    // the page's chopsticks follow the bowl
+    B.LeftHand.getWorldPosition(_a).addScaledVector(_b, 0.09).addScaledVector(UP, 0.065);    // on the middle of the palm, over the fingers
+    d.g.position.copy(_a); d.g.rotation.set(0, 0.15 + env.boy.rotation.y, 0, "YXZ");
+    env.DISH_AT.copy(_a).addScaledVector(UP, BOWL_RIM - 0.064 + 0.09);                              // the page's chopsticks follow the bowl (aimed for
+                                                                                             // a 6.4 cm Kenney bowl: lifted by the taller one's rim)
   }
 
   // ---------- head and eyes: the eyes lead, the head follows late; blinks; small saccades

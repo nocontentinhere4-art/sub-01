@@ -24,7 +24,7 @@ SHOTS = {
     "mug": ((-0.30, 1.22, -0.62), (-0.50, 1.02, -0.98)),
     "headphones": ((-0.20, 1.45, -0.80), (-0.24, 1.36, -1.40)),
     "sneakers": ((1.05, 0.80, 0.75), (1.70, 0.22, 1.32)),
-    "ramen": "hands",
+    "ramen": ((-1.78, 1.62, -0.70), (-1.32, 1.10, -1.00)),   # over his left shoulder, onto the bowl
 }
 FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
 

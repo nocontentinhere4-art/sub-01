@@ -10,5 +10,7 @@ Four props made with Tripo (paid API) take the place of earlier ones in the room
 - The preview video is rendered on a GPU pod by `tools/gpu_preview.py` (branch `tools/gpu-preview`), not here.
 
 Known: the ramen bowl comes with its own chopsticks resting across the rim (the brief asked for them), so while he eats
-there are two pairs, his and the bowl's. When he finishes, the empty bowl is still Kenney's `bowl`. His left hand
-reaching into the dish is the page's eating pose and happens with the earlier dishes too.
+there are two pairs, his and the bowl's. When he finishes, the empty bowl is still Kenney's `bowl`. He holds the bowl
+on his upturned left palm (web/room/boy_motion.js, `bowl()`). A probe over 16 moments of the meal measured his skin
+inside the bowl: the palm touches the base (≤ 7 mm), and the chopstick forearm can still graze the rim as a bite goes
+to his mouth. That path is the page's eating arm (#63), not this PR's.
