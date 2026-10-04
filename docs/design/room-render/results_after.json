@@ -33,13 +33,16 @@
   "gl": true,
   "shot": "face",
   "cam": [
-   -0.13,
-   1.64,
-   0.07
+   -0.12,
+   1.55,
+   0.08
   ]
  },
  "after_1280_h14.jpg": {
-  "errors": [],
+  "errors": [
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
+  ],
   "dpr": 1,
   "post": {
    "tier": "high",
@@ -69,13 +72,18 @@
   "gl": true,
   "shot": "medium",
   "cam": [
-   -1.69,
-   2.03,
-   3.01
+   0.43,
+   1.59,
+   2.2
   ]
  },
  "after_1280_h19.jpg": {
-  "errors": [],
+  "errors": [
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
+  ],
   "dpr": 1,
   "post": {
    "tier": "high",
@@ -105,9 +113,9 @@
   "gl": true,
   "shot": "face",
   "cam": [
-   -0.13,
-   1.64,
-   0.07
+   -0.14,
+   1.53,
+   0.06
   ]
  },
  "after_1280_h23.jpg": {
@@ -213,9 +221,9 @@
   "gl": true,
   "shot": "face",
   "cam": [
-   0.16,
-   1.94,
-   0.38
+   0.19,
+   1.69,
+   0.4
   ]
  },
  "after_390_h14.jpg": {
@@ -255,11 +263,8 @@
   ]
  },
  "after_390_h19.jpg": {
-  "errors": [
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
-   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
-  ],
-  "dpr": 1,
+  "errors": [],
+  "dpr": 0.75,
   "post": {
    "tier": "high",
    "active": true,
@@ -283,14 +288,14 @@
    "broken": null,
    "width": 390,
    "height": 523,
-   "dpr": 1
+   "dpr": 0.75
   },
   "gl": true,
   "shot": "face",
   "cam": [
-   0.15,
-   1.93,
-   0.36
+   0.19,
+   1.68,
+   0.4
   ]
  },
  "after_390_h23.jpg": {

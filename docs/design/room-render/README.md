@@ -81,36 +81,41 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   in a dark room without clipping.
 
 ## G8's harness, main vs this branch (`python -m tests.visual.harness`, software WebGL, 0 hard failures on both)
-Main at 5d9a934 (#80, #107, #110, #113 in) against this branch merged on it, 2026-10-03. `exposure()` of the 3D canvas
-(`tests/visual/image_checks.py`): mean luminance 0–255, pure-black and blown-out pixel fractions. The page shots frame
-him differently on this branch (the new camera shots instead of the old follow camera), so compare the black and blown
-fractions there rather than the means; the close-ups use the harness's own fixed cameras.
+Main at 5d9a934 (#80, #107, #110, #113 in) against this branch at b3032f4 (main c88eade merged), 2026-10-04.
+`exposure()` of the 3D canvas (`tests/visual/image_checks.py`): mean luminance 0–255, pure-black and blown-out pixel
+fractions. The page shots frame him differently on this branch (the new camera shots instead of the old follow camera:
+a close face shot fills the frame with his black hoodie or the white duvet), so compare the black and blown fractions
+there rather than the means; the close-ups use the harness's own fixed cameras.
 
 | shot | mean lum | pure black | blown |
 |---|---|---|---|
-| sleeping_23_1280 | 12.9 → 43.2 | 11.2 % → 11.7 % | 0.00 % → 0.00 % |
-| sleeping_23_390 | 16.1 → 56.1 | 17.7 % → 3.0 % | 0.00 % → 0.00 % |
-| phone_23_1280 | 52.6 → 58.7 | 4.1 % → 1.1 % | 0.00 % → 0.00 % |
-| window_19_1280 | 50.1 → 77.4 | 2.2 % → 8.8 % | 0.23 % → 0.00 % |
-| eating_19_1280 | 56.5 → 115.0 | 1.8 % → 0.7 % | 0.20 % → 0.00 % |
-| desk_14_1280 | 161.5 → 157.5 | 1.3 % → 0.0 % | 7.31 % → 0.00 % |
-| desk_14_390 | 150.5 → 145.4 | 2.5 % → 0.0 % | 13.76 % → 0.00 % |
-| door_8_1280 | 72.5 → 125.0 | 0.5 % → 0.2 % | 0.23 % → 0.00 % |
-| walking_8_1280 | 72.2 → 148.3 | 0.7 % → 0.1 % | 0.23 % → 0.00 % |
+| sleeping_23_1280 | 12.9 → 60.7 | 11.2 % → 7.5 % | 0.00 % → 0.00 % |
+| sleeping_23_390 | 16.1 → 101.7 | 17.7 % → 11.0 % | 0.00 % → 0.17 % |
+| phone_23_1280 | 52.6 → 42.0 | 4.1 % → 3.3 % | 0.00 % → 0.00 % |
+| window_19_1280 | 50.1 → 28.3 | 2.2 % → 13.5 % | 0.23 % → 0.00 % |
+| eating_19_1280 | 56.5 → 95.9 | 1.8 % → 2.6 % | 0.20 % → 0.00 % |
+| desk_14_1280 | 161.5 → 127.3 | 1.3 % → 0.0 % | 7.31 % → 0.00 % |
+| desk_14_390 | 150.5 → 129.6 | 2.5 % → 0.0 % | 13.76 % → 0.00 % |
+| door_8_1280 | 72.5 → 111.1 | 0.5 % → 0.1 % | 0.23 % → 0.00 % |
+| walking_8_1280 | 72.2 → 34.0 | 0.7 % → 0.0 % | 0.23 % → 0.00 % |
 
-Close-ups (mean luminance, the harness's fixed cameras): night 7.3 → 37.7 · face 104.2 → 145.2 · hands 87.2 → 139.9 · desk 116.7 → 93.4 · bed 119.3 → 105.7 · side 132.3 → 114.9. The night close-up of the bed with the lights off goes
-from 7 to 38 (the coordinator's target for the floor: RGB 30–45, black cloth black); the monitor's page no longer blows
-out (desk 14: 7.3 % → 0 % of the canvas at 1280, 13.8 % → 0 % at 390); the hood under the lamp no longer clips (eating
-19: 0 % blown); not one shot clips at all. The night stop is 12 against 2.2 by day (5.5×, inside the 4–6× cap); with a
-lamp or the ceiling light on, 7.
+Close-ups (mean luminance, the harness's fixed cameras): night 7.3 → 51.7 · face 104.2 → 116.7 · hands 87.2 → 80.2 ·
+desk 116.7 → 73.9 · bed 119.3 → 100.5 · side 132.3 → 108.2. The night close-up of the bed with the lights off goes from
+7 to 52 (the coordinator's target for the floor: RGB 30–45, black cloth black; the display-referred grade no longer
+crushes the shadows, which lifted it from the 38 of the first cut); the monitor's page no longer blows out (desk 14:
+7.3 % → 0 % of the canvas at 1280, 13.8 % → 0 % at 390); the hood under the lamp no longer clips (eating 19: 0 % blown);
+nothing clips but 0.17 % of the duvet filling the phone's bed close-up. The night stop is 12 against 2.2 by day (5.5×,
+inside the 4–6× cap); with a lamp or the ceiling light on, 7. The black-cloth metric (`tests/visual/test_black_cloth.py`):
+his dark texels in the page's face / medium shots read 31 / 18 of 255 at 08:00 and 56 / 39 at 14:00 (budget 70), with
+at most 7 % of them over 120.
 
 Two things found on the way, both fixed: (1) the room's environment capture fed back into the next capture through the
 floor's reflection, and an early capture with a few NaN texels (software WebGL) blacked out every later frame; captures
 are now taken with the environment off on every material and a capture with a NaN or an infinity on any of its six
-faces is dropped and retried (the window's material emits NaN texels at night under software WebGL, G7's to look at:
-with the capture dropped the night room reflects the scaled studio map instead). (2) `boy.glb`'s one material has no `metallicFactor`, which glTF reads as fully metallic: he was a
-statue that only reflected the environment (black cloth went grey at night, the hood went white under the lamp). He is
-dielectric now, with a fabric's share of the environment.
+faces is dropped and retried (the window's material emitted NaN texels at night under software WebGL; fixed by G7 in
+#123). (2) `boy.glb`'s one material has no `metallicFactor`, which glTF reads as fully metallic: he was a statue that
+only reflected the environment (black cloth went grey at night, the hood went white under the lamp). He is dielectric
+now, with a fabric's share of the environment.
 
 ## Numbers
 Measured 2026-10-03 in this sandbox (the final run, `results_after.json`): headless Chromium with **software WebGL**
