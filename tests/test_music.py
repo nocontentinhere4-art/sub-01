@@ -359,3 +359,21 @@ def test_live_listens_votes_logs_and_learns(tmp_path, monkeypatch):
     assert row["ended"] == "took the headphones off" and "response" in row
     assert sent[-1] == {"type": "music", "playing": False, "ended": "took the headphones off", "id": now["id"]}
     assert not any(AUDIO.search(u) for u in fake.urls())
+
+
+def test_a_track_found_through_its_album_name_is_not_labelled_with_that_genre(tmp_path):
+    """#89 live (2026-10-04 12:05 UTC): Queen's "Don't Stop Me Now" (album "Jazz", 1978) showed genre "jazz"."""
+    queen = {"id": "7hQJA50XrCWABAu5v6QZ4i", "title": "Don't Stop Me Now - Remastered 2011", "artist": "Queen",
+             "album": "Jazz (2011 Remaster)", "art": None, "ms": 210000}
+    real = {"id": "1YQWosTIljIvxAgHWTp7KP", "title": "Take Five", "artist": "The Dave Brubeck Quartet",
+            "album": "Time Out", "art": None, "ms": 324000}
+    assert M.album_only_match(queen, "jazz") and not M.album_only_match(real, "jazz")
+    assert not M.album_only_match({"title": "Jazz Night", "artist": "x", "album": "Jazz"}, "jazz")   # in the title
+
+    class Api:
+        def search(self, q):
+            return [queen, real] if q == "jazz" else []
+    m = M.Music(tmp_path, api=Api(), fetch=lambda *a, **k: None, rng=random.Random(0), clock=lambda: 1000.0)
+    m.queries = lambda *a, **k: [{"genre": "jazz", "query": "jazz", "why": "evening"}]
+    got = [c for c in m.candidates(1000.0, k=1) if c.get("source") == "api"]
+    assert [c["id"] for c in got] == [real["id"]] and got[0]["genre"] == "jazz"

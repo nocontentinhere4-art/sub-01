@@ -211,6 +211,18 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     deploy): `ScreensStatus.to_dict()` (day, counts, last, notes, url) is saved to `screens.json` in the data dir at
     most every `SCREENS_SAVE_S` (60 s) when a new page is counted, and at shutdown; restored at start (a new Tokyo
     day still starts afresh).
+  - Desk video mix (evening 2026-10-04 19:46-21:10 Tokyo: 10 desk videos in a row, three "w/ Casey Muratori"
+    talks in a row, three coffee-gear "best of 2026" lists): at most `CHANNEL_STREAK_MAX` (2) videos in a row from one
+    channel or with one guest (`video_keys`, `Browser._streak` in `_card_ok`); after `VIDEO_RUN_MAX` (4) desk videos
+    in a row, `VIDEO_BREAK_S` (5 min) of pages / searches (`_video_break`); shopping lists (`SHOPPING_LIST`: "best /
+    top N ... 2026 / to buy / you need", buying guides) go to the back of the candidates, not away.
+  - Walls (live 2026-10-04 18:49-18:51 Tokyo: a WhatsApp channel page; three myanimelist.net pages titled only
+    "myanimelist.net", one counted as finance). Messaging and open-in-app pages (`APP_WALL_HOST` / `APP_WALL_PATH`,
+    `app_wall`: whatsapp, t.me, discord invites, messenger, app stores, onelink...) are never link targets nor opened.
+    A bot check (`challenge_title`: a title that is only the bare host, or Cloudflare / DataDome / PerimeterX / Imperva
+    titles and bodies in `BOT_WALL` / `BODY_WALL`) is left at once, never shown or counted, and its site is left alone
+    for `WALL_COOLDOWN_S` (6 h; `Browser.walled`, kept in the browsing state; the video players keep their own pause).
+    `is_finance` counts distinct finance words and needs one in the title unless the text has five.
   - Chromium memory (live 2026-10-04 04:02-04:53 UTC: 12 restarts "over 1200 MB", some 7-21 s apart, loop lag p95
     3.5 s). `Guard.route` loads nothing from ad / tracking / outstream-video networks (`memory_guard.AD_HOST`) and no
     cross-site iframe (`cross_site_frame`). The browser reads its own memory every `MEM_CHECK_S` (in a thread) and at
