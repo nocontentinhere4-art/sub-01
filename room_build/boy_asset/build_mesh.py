@@ -45,6 +45,15 @@ ankle_geom = [f for f in bm.faces if min(v.co.z for v in f.verts) < HEM_Z < max(
 ankle_geom = list({e for f in ankle_geom for e in f.edges} | set(ankle_geom) | {v for f in ankle_geom for v in f.verts})
 res_cut = bmesh.ops.bisect_plane(bm, geom=ankle_geom, plane_co=(0, 0, HEM_Z), plane_no=(0, 0, 1), dist=0.001)
 print("hem cut at z = %.1f: %d new vertices" % (HEM_Z, sum(1 for g in res_cut["geom_cut"] if isinstance(g, bmesh.types.BMVert))), flush=True)
+# the slide, as a real slide is built: a footbed with a rim up to RIM_Z and one strap across the instep (STRAP_Y0..Y1,
+# up to STRAP_TOP). The shell is cut along those planes too, so the slide / sock boundary is clean edge loops, not the old
+# paint's blotches (the "cow print"). Measured on the mesh: the strap bulge spans y -13..-4.5 cm, tops at 8 cm.
+RIM_Z, STRAP_Y0, STRAP_Y1, STRAP_TOP = 3.5, -13.0, -4.5, 8.0
+for plane_co, plane_no, zlo, zhi in (((0, 0, RIM_Z), (0, 0, 1), 0.0, 6.0), ((0, STRAP_Y0, 0), (0, 1, 0), RIM_Z - 0.5, STRAP_TOP + 0.5), ((0, STRAP_Y1, 0), (0, 1, 0), RIM_Z - 0.5, STRAP_TOP + 0.5)):
+    bm.faces.ensure_lookup_table()
+    gf = [f for f in bm.faces if abs(f.calc_center_median().x) > 5 and zlo <= f.calc_center_median().z <= zhi]
+    geom_ = list({e for f in gf for e in f.edges} | set(gf) | {v for f in gf for v in f.verts})
+    bmesh.ops.bisect_plane(bm, geom=geom_, plane_co=plane_co, plane_no=plane_no, dist=0.001)
 bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])     # the cut leaves quads along the loop; everything below assumes triangles
 bm.to_mesh(m); bm.free(); m.update()
 bpy.context.view_layer.objects.active = me; me.select_set(True)
@@ -294,9 +303,14 @@ for comp in islands(flab):                                                      
     if flab[comp[0]] == "slides" and min(co[list(m.polygons[i].vertices), 2].mean() for i in comp) > 5.5:
         for i in comp: flab[i] = "socks"
         foot_changed += len(comp)
-for i, p in enumerate(m.polygons):                                             # last word: nothing of the slide above 7 cm (the votes above can bring one back)
+n_geo = 0
+for i, p in enumerate(m.polygons):                                             # last word: the slide is the footbed and the strap, by geometry; the rest of the foot below the hem is sock
+    if flab[i] not in ("socks", "slides"): continue
     cc_ = co[list(p.vertices)].mean(0)
-    if flab[i] == "slides" and cc_[2] > 7.0 and cc_[1] > -5.5: flab[i] = "socks"; foot_changed += 1        # (the strap's arch over the instep, y < -5.5, may top 7 cm; the shin side never)
+    if abs(cc_[0]) < 5 or cc_[2] > HEM_Z: continue
+    new_ = "slides" if (cc_[2] < RIM_Z or (STRAP_Y0 <= cc_[1] <= STRAP_Y1 and cc_[2] < STRAP_TOP)) else "socks"
+    if new_ != flab[i]: flab[i] = new_; n_geo += 1
+log("feet by geometry (footbed < %.1f cm, strap y %.1f..%.1f): %d faces relabelled" % (RIM_Z, STRAP_Y0, STRAP_Y1, n_geo)); foot_changed += n_geo
 log("foot faces re-read from their own old texels: %d, relabelled %d" % (foot_f, foot_changed))
 log("face labels:", Counter(flab), "islands:", Counter(flab[c[0]] for c in islands(flab)))
 

@@ -151,6 +151,19 @@ Every detail below is modelled or painted by the build; nothing is upscaled or r
 - **Slides.** Uniform black foam, matte with a slight sheen; a tread groove around the sole's edge at 9 mm; the strap's
   end takes no white (sock-labelled specks of old padding there are absorbed into the slide).
 
+## The owner's "no real person has these errors" pass
+Three defects came from building on top of the old paint, so they are now built from geometry instead:
+- **Feet.** The slide is what a real slide is: a footbed with a rim up to 3.5 cm and one strap across the instep
+  (y −13 to −4.5 cm, up to 8 cm). The foot shell is cut along those planes (like the hem), and every foot face is
+  labelled by them: below the rim or inside the strap is slide, the rest below the hem is sock. No old paint decides
+  it, so the black and white blotches are gone; the sock's toes show in front of the strap, as on a real slide.
+- **Eyes.** The opening is drawn, not taken from the old paint: an almond on the eye's own axes, 2.2 cm wide, the
+  upper lid 4.3 mm above the centre and the lower one 3.7 mm below (a relaxed eye: the lids cover the iris's top and
+  bottom), the inner corner a little lower. The whole opening shows one real eyeball; a dark socket ring sits around
+  it, so the corners never show the inside of the head. The lash line is painted round the opening, the lashes are
+  drawn hair by hair in clumps, and the eyelid caps open higher (they had shown over the iris) and still close with +0.9 rad.
+- **Ears.** Repainted with one clean skin tone from the skin around the ear, then the relief's shading; no old paint.
+
 ## The owner's preview video
 `render/preview_video.py` renders `docs/design/character/preview/boy_old_vs_new.mp4` in `/room` itself (the visual
 harness's fake server, headless Chromium in software GL, the page's loop frozen and stepped by hand at 1/30 s): a slow

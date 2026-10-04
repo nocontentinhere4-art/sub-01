@@ -191,7 +191,8 @@ for (const side of ["Left", "Right"]) {
         const root = onEllipse(t, -0.0002, -0.0002, 0.0002);
         const tg = vec3.sub(vec3.create(), onEllipse(t + 0.02), onEllipse(t - 0.02)); vec3.normalize(tg, tg);        // the margin's tangent
         const dir = vec3.create(); vec3.scale(dir, F, 0.8); vec3.scaleAndAdd(dir, dir, B, lower ? -0.55 : 0.5); vec3.scaleAndAdd(dir, dir, out, 0.08 * s); vec3.normalize(dir, dir);
-        const len = cfg.length * (0.75 + 0.5 * Math.sin(Math.PI * s)), half = vec3.scale(vec3.create(), tg, cfg.width / 2);
+        const jit = Math.sin(k * 12.9898 + (lower ? 7.1 : 0) + (side === "Left" ? 0 : 3.3)) * 0.5 + 0.5;   // per card: its own length
+        const len = cfg.length * (0.7 + 0.45 * Math.sin(Math.PI * s)) * (0.85 + 0.3 * jit), half = vec3.scale(vec3.create(), tg, cfg.width / 2);
         const b0 = vec3.sub(vec3.create(), root, half), b1 = vec3.add(vec3.create(), root, half);
         const t0 = vec3.scaleAndAdd(vec3.create(), b0, dir, len), t1 = vec3.scaleAndAdd(vec3.create(), b1, dir, len);
         const nrm = vec3.cross(vec3.create(), tg, dir); vec3.normalize(nrm, nrm);
@@ -200,6 +201,17 @@ for (const side of ["Left", "Right"]) {
       }
     }
     finish.addPrimitive(quads("lashes", P, N, UV, I, lashMat));
+  }
+  if (SPEC.materials.socket) { // the socket: an inside-facing cap behind the eyeball, fixed to the head (the corners of the opening show dark flesh, never the inside of the head)
+    const sockNode = orig.createNode(side + "EyeSocket").setTranslation(local).setRotation(invRot).setScale([1 / gs[0], 1 / gs[1], 1 / gs[2]]);
+    const sockInner = orig.createNode(side + "EyeSocketCap").setRotation(q); sockNode.addChild(sockInner);
+    const prim = sphere("socket", E.radius * 1.04, 32, 12, 1.5, await material("socket", SPEC.materials.socket), () => [0.5, 0.5]);
+    const nrm = prim.getAttribute("NORMAL"), na = nrm.getArray().slice(); for (let i = 0; i < na.length; i++) na[i] = -na[i]; nrm.setArray(na);
+    { // only the ring AROUND the ball (polar angle > 1.05 rad from forward): its front would cover the eye
+      const pa = prim.getAttribute("POSITION").getArray(), ia = prim.getIndices().getArray(), keep = [], rr = E.radius * 1.04, cmax = Math.cos(1.05);
+      for (let i = 0; i < ia.length; i += 3) { if ([ia[i], ia[i + 1], ia[i + 2]].every(j => pa[3 * j + 2] / rr < cmax)) keep.push(ia[i], ia[i + 1], ia[i + 2]); }
+      prim.getIndices().setArray(new Uint16Array(keep)); }
+    const sm = orig.createMesh(side + "EyeSocket"); sm.addPrimitive(prim); sockInner.setMesh(sm); headJoint.addChild(sockNode);
   }
   headJoint.addChild(node); headJoint.addChild(lidNode);
 }
