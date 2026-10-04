@@ -518,27 +518,54 @@ if (TRIPO) Promise.all([load("room/props_tripo2.glb"),
   if (props.includes("lamp2") && g.scene.userData.lampLight) lamp.position.set(...g.scene.userData.lampLight);   // in the new shade
   scene.add(g.scene);
 }).catch(e => console.warn("props_tripo2.glb", e));
-// the full-size keyboard and the mouse on its pad, modelled in code (room_build/build_keyboard.mjs, build_mouse.mjs): nodes
-// named "keyboard" and "mouse" (G3's integration finds them by name, pins the hands to them and parents the mouse to the
-// palm), each with its contact shadow as a child. The keyboard's origin is the middle of F and J at desk level: its home row
-// goes where the modelled tenkeyless one had it, turned like it (props_hard.py KB_C, KB_RY), its home-row key tops 3.2 cm
-// over the mat. The mouse sits 4 cm right of the keyboard's right end, turned -0.15 (its front towards his right). The
-// modelled keyboard and mouse are cut out of the static room. (The pad's underside sinks into the desk mat it overlaps)
-// ?debug&kb=tripo: the Tripo-made pair instead (keyboard_tripo.glb, mouse_tripo.glb), for comparison
-const KB_HOME = [-1.115, 0.9723, -0.967, 0.06], MOUSE_AT = [-0.736, 0.9745, -0.985, -0.15], PAD_AT = [-0.700, 0.9715, -0.980, -0.15];
+// the keyboard: the modelled tenkeyless one (props_hard.py KB_C, KB_RY: its body, keycaps with legends, feet, LED and the
+// cable's first stretch) taken out of the static room as it is, same geometry and materials, into a top-level node named
+// "keyboard" (G3's integration finds it by name and pins the hands to it), its origin the middle of F and J on the desk top
+// (KB_HOME: that point, and the keyboard's turn). In every mode: it is the room's own keyboard, only split off
+const KB_HOME = [-1.1173, 0.97, -0.9631, 0.06];
+function splitBox(root, box, name){                         // a merged mesh's triangles wholly inside a world box -> own node
+  const g = new THREE.Group(); g.name = name; g.position.set(KB_HOME[0], KB_HOME[1], KB_HOME[2]); g.rotation.y = KB_HOME[3];
+  scene.add(g); g.updateMatrixWorld(true);
+  const v = new THREE.Vector3(), parts = [];
+  root.traverse(o => { if (!o.isMesh || !o.geometry.index) return;
+    o.updateMatrixWorld(true); const pos = o.geometry.attributes.position, idx = o.geometry.index, keep = [], out = [];
+    const inside = i => box.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+    for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+      (inside(a) && inside(b) && inside(c) ? out : keep).push(a, b, c); }
+    if (!out.length) return;
+    o.geometry.setIndex(keep);
+    const remap = new Map(), used = []; for (const i of out) if (!remap.has(i)) { remap.set(i, used.length); used.push(i); }
+    const ng = new THREE.BufferGeometry();                  // its own compact vertices, so its bounds are the keyboard's
+    for (const k in o.geometry.attributes) { const src = o.geometry.attributes[k], n = src.itemSize, arr = new Float32Array(used.length * n);
+      const get = [src.getX, src.getY, src.getZ, src.getW];  // (these undo quantisation and interleaving)
+      used.forEach((i, j) => { for (let c = 0; c < n; c++) arr[j * n + c] = get[c].call(src, i); });
+      ng.setAttribute(k, new THREE.BufferAttribute(arr, n)); }
+    ng.setIndex(out.map(i => remap.get(i)));
+    const m = new THREE.Mesh(ng, o.material); m.name = name + "_" + (o.material.name || "part");
+    m.castShadow = o.castShadow; m.receiveShadow = o.receiveShadow; o.matrixWorld.decompose(m.position, m.quaternion, m.scale);
+    parts.push(m); });
+  for (const m of parts) { scene.add(m); g.attach(m); }
+  return g;
+}
+new Promise(ok => { const wait = () => room && room.getObjectByName("room_static") ? ok() : setTimeout(wait, 100); wait(); }).then(() => {
+  splitBox(room.getObjectByName("room_static"), new THREE.Box3(new THREE.Vector3(-1.26, 0.9725, -1.055), new THREE.Vector3(-0.88, 1.012, -0.885)), "keyboard");
+});
+// the mouse on its pad, modelled in code (room_build/build_mouse.mjs): a node named "mouse" (G3 parents it to the palm), its
+// contact shadow a child; 4 cm right of the keyboard's right end, turned -0.15 (its front towards his right). The modelled
+// mouse is cut out of the static room. (The pad's underside sinks into the desk mat it overlaps.) ?debug&kb=tripo: the
+// Tripo-made mouse instead (mouse_tripo.glb), for comparison
+const MOUSE_AT = [-0.736, 0.9745, -0.985, -0.15], PAD_AT = [-0.700, 0.9715, -0.980, -0.15];
 const KB_SET = DEBUG && new URLSearchParams(location.search).get("kb") === "tripo" ? "_tripo" : "";
-if (TRIPO) Promise.all([load(`room/keyboard${KB_SET}.glb`), load(`room/mouse${KB_SET}.glb`),
-  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g, mg]) => {
+if (TRIPO) Promise.all([load(`room/mouse${KB_SET}.glb`),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([mg]) => {
   const st = room.getObjectByName("room_static");
-  if (st) { cutBox(st, new THREE.Box3(new THREE.Vector3(-1.26, 0.9725, -1.055), new THREE.Vector3(-0.88, 1.012, -0.885)));   // the keyboard
-    cutBox(st, new THREE.Box3(new THREE.Vector3(-0.80, 0.972, -1.02), new THREE.Vector3(-0.71, 1.01, -0.88))); }           // the mouse (MC)
-  for (const s of [g.scene, mg.scene]) s.traverse(m => { if (!m.isMesh) return;
+  if (st) cutBox(st, new THREE.Box3(new THREE.Vector3(-0.80, 0.972, -1.02), new THREE.Vector3(-0.71, 1.01, -0.88)));   // the mouse (MC)
+  mg.scene.traverse(m => { if (!m.isMesh) return;
     if (/_contact$/.test(m.name)) { m.castShadow = m.receiveShadow = false; m.material.depthWrite = false; m.renderOrder = 1; return; }
     m.castShadow = true; m.receiveShadow = true; m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; });
   const put = (o, [x, y, z, ry]) => { if (!o) return; o.position.set(x, y, z); o.rotation.set(0, ry, 0); scene.add(o); };
-  put(g.scene.getObjectByName("keyboard"), KB_HOME);
   put(mg.scene.getObjectByName("mouse"), MOUSE_AT); put(mg.scene.getObjectByName("mousepad"), PAD_AT);
-}).catch(e => console.warn("keyboard / mouse", e));
+}).catch(e => console.warn("mouse", e));
 // the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C
 // (tex_prep.py: x 683..1024 of 1024, y 0..341 of 512)
 if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"),

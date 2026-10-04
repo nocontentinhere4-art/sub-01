@@ -80,17 +80,13 @@ def test_car_poster():
     assert '"room/poster_car.webp"' in (ROOT / "web" / "room.html").read_text()
 
 
-def test_keyboard_is_light_and_placed_by_its_home_row():
-    kb = ROOT / "web" / "room" / "keyboard.glb"
-    data = kb.read_bytes()
-    assert len(data) <= 1024 * 1024
-    n = struct.unpack_from("<I", data, 12)[0]
-    j = json.loads(data[20:20 + n])
-    tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
-    assert 0 < tris <= 20000
+def test_keyboard_is_the_original_split_into_its_own_node():
+    # the tenkeyless keyboard modelled in room_clean.glb stays; the page cuts it out of room_static into a group "keyboard"
+    # (G3's hand pinning finds it by name), its origin at the middle of F and J on the desk top
     html = (ROOT / "web" / "room.html").read_text()
-    assert "load(`room/keyboard${KB_SET}.glb`)" in html and "const KB_HOME = [" in html
-    assert any(nd.get("name") == "keyboard" for nd in j["nodes"])                  # (G3's integration finds it by name)
+    assert "function splitBox(" in html and '), "keyboard");' in html and "const KB_HOME = [" in html
+    assert not (ROOT / "web" / "room" / "keyboard.glb").exists() and not (ROOT / "web" / "room" / "keyboard_tripo.glb").exists()
+    assert "room/keyboard" not in html
 
 
 def test_mouse_is_light_and_by_the_keyboard():
@@ -106,12 +102,11 @@ def test_mouse_is_light_and_by_the_keyboard():
     assert "mouse" not in props()                                                  # (the Tripo mouse is left out)
 
 
-def test_tripo_keyboard_and_mouse_for_comparison():
-    for f, limit in (("keyboard_tripo.glb", 20000), ("mouse_tripo.glb", 5000 + 100)):        # (the mouse file carries the pad too)
-        data = (ROOT / "web" / "room" / f).read_bytes()
-        assert len(data) <= 1024 * 1024
-        n = struct.unpack_from("<I", data, 12)[0]
-        j = json.loads(data[20:20 + n])
-        tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
-        assert 0 < tris <= limit, (f, tris)
-        assert ("keyboard" if f.startswith("keyboard") else "mouse") in {nd.get("name") for nd in j["nodes"]}
+def test_tripo_mouse_for_comparison():
+    data = (ROOT / "web" / "room" / "mouse_tripo.glb").read_bytes()                   # (the file carries the pad too)
+    assert len(data) <= 1024 * 1024
+    n = struct.unpack_from("<I", data, 12)[0]
+    j = json.loads(data[20:20 + n])
+    tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
+    assert 0 < tris <= 5000 + 100, tris
+    assert "mouse" in {nd.get("name") for nd in j["nodes"]}

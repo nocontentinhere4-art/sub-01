@@ -25,8 +25,8 @@ shadow map draws all of it. The atlases are 2560 px (5 × 5 tiles of 512 px, one
 normal atlases are at half that, for GPU memory (about 52 MB for the three).
 
 Known: the skateboard lies wheels up (Tripo put a stray third truck on its grip tape; it is underneath). The desk lamp's
-lower arm is filled in like a sheet. The chair and the phone stay as they were; the keyboard and the mouse are modelled in
-code (the Tripo pair is kept for comparison, `?debug&kb=tripo`; see CREDITS.md).
+lower arm is filled in like a sheet. The chair and the phone stay as they were. The keyboard is the original tenkeyless one,
+split from the static room into its own node `keyboard`; the mouse is modelled in code (see CREDITS.md).
 
 ## Tripo credits (G10d)
 Generation: `room_build/tripo_gen.py` (one guarded task per run; the proxy supplies the key, nothing is stored). Tally:
