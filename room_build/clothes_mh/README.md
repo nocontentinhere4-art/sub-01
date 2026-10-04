@@ -60,6 +60,21 @@ sheen as `KHR_materials_sheen`.
 `docs/design/clothes-mh/g2_clips.jpg`, three rows: walking and standing (the trousers' front); on the bed's edge (4 s)
 and lying (12 s) on the bed; sitting down onto the chair and typing on a chair.
 
+**Corrective shapes** (`g2_correctives.py`, after the build): pose-driven morph targets on the hoodie and the trousers in
+`boy_g2_dressed.glb` (no cloth simulation). Each is made in its pose (the garments skinned as three.js does, put right
+there, and the fix carried back to the rest pose through the inverse of each vertex's skinning, so morph-then-skin
+gives the fixed pose), then a last pass in that pose puts any vertex still inside the body 3 mm outside.
+
+| shape | made in | what it does | driver (from joint world positions) | weight |
+|---|---|---|---|---|
+| `seated` | `desk_type_ik` 3 s | the hoodie's front below the chest lies on the body and the lap as a soft shell with horizontal folds (crests 12 mm, valleys 4 mm off the body or the trousers), the hem on the thighs; the trousers out of the body at the hip, the crotch and the knees | hip bend: angle between the thigh (`UpLeg`->`Leg`) and the trunk downwards (`neck`->`Hips`), both legs averaged | smoothstep(40°, 80°) |
+| `elbow_L`, `elbow_R` | `desk_type_ik` 3 s | the sleeve round a bent elbow out of the arm, its bunching held within 1.5 cm | elbow bend: angle between `Arm`->`ForeArm` and `ForeArm`->`Hand` | smoothstep(55°, 95°) |
+| `lying` | `room_bed_lie` 12 s | the hoodie's back on the mattress (not below 5 mm under its top), the upper back, shoulders and lowered hood pressed onto the body (6 mm, the hood 4 mm, under the neck) | chest up: y of normalise((`LeftArm`-`RightArm`) x (`neck`-`Hips`)) | smoothstep(0.6, 0.92) |
+
+The drivers are also in the file (`extras.correctives`); the room page sets `mesh.morphTargetInfluences` on
+`hoodie_black` and `track_trousers` each frame after the animation, as `g2_clip_check.py` does (about 20 lines of
+JavaScript there). Rest pose, walking and standing: all weights 0.
+
 **Fit in motion** (`g2_pose_check.py`, `docs/design/clothes-mh/g2_poses.jpg`, numbers in `out/pose_check.json`): the
 dressed GLB posed by G2's clips at COORD A's moments (seated typing `desk_type_ik` at 3 s, `room_walk` at 0.3 s,
 on the bed's edge and lying, `room_bed_lie` at 4 s and 12 s, and `room_sit_down` at its end), skinned exactly as three.js does, with the chair seat (top 0.505 m, G2's measured contact; for `room_sit_down`
@@ -108,6 +123,7 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     python compose_feet.py         # docs/design/clothes-mh/feet_sheet.jpg: 3/4 close-up, side, from above, seated at 5 m
     python compare_real.py         # docs/design/clothes-mh/real_feet.jpg, real_clothes.jpg: next to real photos (CC0)
     python g2_clip_check.py        # docs/design/clothes-mh/g2_clips.jpg: G2's clips on the dressed body (three.js)
+    blender -b -P g2_correctives.py   # the corrective shapes into assets/g2/boy_g2_dressed.glb (after build_clothes.py)
     blender -b -P g2_pose_check.py # docs/design/clothes-mh/g2_poses.jpg + out/pose_check.json: the fit in three clip poses
     python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 

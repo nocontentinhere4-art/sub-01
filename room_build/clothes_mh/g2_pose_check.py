@@ -14,7 +14,7 @@ from mathutils import Vector, Matrix, Quaternion
 from mathutils.bvhtree import BVHTree
 
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
-import glb_io as G
+import glb_io as G, g2_pose as GP
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 QUICK = "--quick" in argv
@@ -139,22 +139,24 @@ lo.rotation_euler = (math.radians(45), 0, math.radians(-35)); SC.collection.obje
 MAT_SKIN = material("skin", (0.62, 0.45, 0.36), 0.5); MAT_PROP = material("prop", (0.35, 0.33, 0.3), 0.7)
 GM = {k: material(k, c, 0.8, red=True) for k, c in COL.items()}
 
+DP = GP.Dressed(DRESSED, NAKED)                                    # the garments' corrective shapes and their drivers
+for g in COL: MESHES[g] = DP.meshes[g]
 for clip, t, contact in POSES:
     for o in list(SC.objects):
         if o.type == 'MESH': bpy.data.objects.remove(o)
-    M = pose_matrices(clip, t)
+    WORLD = DP.world(None if clip == "rest" else clip, t); M = DP.skin_mats(WORLD); WTS = DP.weights(WORLD)
     body = skinned(MESHES["body"][0], M)
     bvh = BVHTree.FromPolygons([Vector(p) for p in body], [tuple(int(x) for x in f) for f in FULL_BODY_I])
     hips = (M[joints.index(name_ix["Hips"])] @ np.linalg.inv(IBM[joints.index(name_ix["Hips"])]))[:3, 3]
     knees = [(M[joints.index(name_ix[k])] @ np.linalg.inv(IBM[joints.index(name_ix[k])]))[:3, 3] for k in ("LeftLeg", "RightLeg")]
     fwd = np.mean(knees, 0) - hips; fwd[1] = 0; fwd /= max(np.linalg.norm(fwd), 1e-6)
-    rep = {"clip": clip, "t": t, "garments": {}}
+    rep = {"clip": clip, "t": t, "garments": {}, "shapes": {k: round(v, 3) for k, v in WTS.items()}}
     allP = [body]
     mesh("body", B(body), MESHES["body"][0]["I"], MAT_SKIN)
     for g in COL:
         rows = []
         for pr in MESHES[g]:
-            P = skinned(pr, M); bad = np.zeros(len(P), bool); depth = np.zeros(len(P)); vis = np.zeros(len(P), bool)
+            P = DP.skinned(pr, M, WTS); bad = np.zeros(len(P), bool); depth = np.zeros(len(P)); vis = np.zeros(len(P), bool)
             for i, p in enumerate(P):
                 loc, nor, fi, d = bvh.find_nearest(Vector(p))
                 if loc is None or d < INSIDE or d > 0.06: continue
@@ -197,7 +199,7 @@ for clip, t, contact in POSES:
                               ("below_seat_top_mm" if contact in ("seat", "chair") else "below_mattress_top_mm" if contact else "below_floor_mm"):
                               round(1000 * max(float(r[4].max()) for r in rows), 1) if contact else round(1000 * max(0.0, -min(float(r[0][:, 1].min()) for r in rows)), 1)}
     rep["body_lowest_m"] = round(float(body[:, 1].min()), 4)
-    rep["garments_below_floor_mm"] = {g: round(1000 * max(0.0, -float(skinned(MESHES[g][0], M)[:, 1].min())), 1) for g in COL}
+    rep["garments_below_floor_mm"] = {g: round(1000 * max(0.0, -float(DP.skinned(MESHES[g][0], M, WTS)[:, 1].min())), 1) for g in COL}
     if contact == "seat":
         c = hips + fwd * 0.05; side = np.array([-fwd[2], 0, fwd[0]])
         m = (np.abs((body - c) @ fwd) < 0.16) & (np.abs((body - c) @ side) < 0.2) & (body[:, 1] > SEAT_Y - SEAT_T)

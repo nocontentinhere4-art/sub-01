@@ -46,12 +46,30 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStan
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const camera = new THREE.PerspectiveCamera(32, W / H, 0.02, 50);
 const loader = new GLTFLoader(); let root, mixer; const clips = {};
-loader.load("dressed.glb", g => { root = g.scene; root.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; } });
+let CORR = null;
+// the clothes' corrective shapes (morph targets), weighted from the skeleton each frame after the animation: exactly what
+// the room page must do (the drivers are in the file: extras.correctives; README.md, g2_pose.py)
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+window.applyCorrectives = () => {
+  if (!CORR) return {};
+  const p = n => { const v = new THREE.Vector3(); root.getObjectByName(n).getWorldPosition(v); return v; };
+  const down = p("Hips").sub(p("neck")).normalize(), deg = (a, b) => THREE.MathUtils.radToDeg(a.angleTo(b)), w = {};
+  for (const [name, d] of Object.entries(CORR.drivers)) {
+    let v = 0;
+    if (d.type === "hip_bend") v = (deg(p("LeftLeg").sub(p("LeftUpLeg")), down) + deg(p("RightLeg").sub(p("RightUpLeg")), down)) / 2;
+    else if (d.type === "elbow_bend") v = deg(p(d.side + "ForeArm").sub(p(d.side + "Arm")), p(d.side + "Hand").sub(p(d.side + "ForeArm")));
+    else if (d.type === "chest_up") { const f = new THREE.Vector3().crossVectors(p("LeftArm").sub(p("RightArm")), down.clone().negate()).normalize(); v = f.y; }
+    w[name] = smooth(d.from, d.to, v);
+  }
+  root.traverse(o => { if (o.isMesh && o.morphTargetDictionary) for (const [nm, i] of Object.entries(o.morphTargetDictionary)) o.morphTargetInfluences[i] = w[nm] || 0; });
+  return w;
+};
+loader.load("dressed.glb", g => { root = g.scene; CORR = (g.parser.json.extras || {}).correctives || null; root.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; } });
   scene.add(root); mixer = new THREE.AnimationMixer(root); window.ready = true; });
 window.loadClip = (name) => new Promise(res => loader.load(name + ".glb", g => { clips[name] = g.animations[0]; res(g.animations[0].duration); }));
 window.shoot = (name, time, view, props) => {
   mixer.stopAllAction(); const clip = clips[name], act = mixer.clipAction(clip); act.play(); mixer.setTime(time < 0 ? clip.duration + time : time);
-  root.updateMatrixWorld(true);
+  root.updateMatrixWorld(true); window.lastWeights = applyCorrectives();
   const box = new THREE.Box3(); root.traverse(o => { if (o.isSkinnedMesh) { o.skeleton.update(); } });
   const hips = root.getObjectByName("Hips"); const c = new THREE.Vector3(); hips.getWorldPosition(c);
   scene.remove(bed); scene.remove(chair);
@@ -94,7 +112,8 @@ def main():
         for name in sorted({s[0] for s in SHOTS}): print(name, "duration", pg.evaluate(f"loadClip('{name}')"))
         for name, f, view, props in SHOTS:
             n = pg.evaluate(f"shoot('{name}', {f}, '{view}', '{props}')"); pg.wait_for_timeout(200)
-            out = tmp / f"{name}_{f}_{view}.png"; pg.screenshot(path=str(out)); shots.append(out); print("shot", out.name, "tracks", n)
+            out = tmp / f"{name}_{f}_{view}.png"; pg.screenshot(path=str(out)); shots.append(out)
+            print("shot", out.name, "tracks", n, "shapes", {k: round(v, 2) for k, v in (pg.evaluate("window.lastWeights") or {}).items()})
         br.close()
     ims = [Image.open(f).convert("RGB") for f in shots]; w, h = ims[0].size; g = 6; cols = 3
     rows_ = (len(ims) + cols - 1) // cols
