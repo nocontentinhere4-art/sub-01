@@ -240,7 +240,6 @@ box("hook_rail", "oak", (LX0 + 0.16, LX0 + 0.52), (1.70, 1.76), (IZ + 0.041, IZ 
 for hx in (LX0 + 0.22, LX0 + 0.34, LX0 + 0.46):
     hk = cyl("hook", "metal_dark", (hx, 1.735), 0.006, IZ + 0.056, IZ + 0.10, n=10, axis="z")
     cyl("hook_tip", "metal_dark", (hx, IZ + 0.10), 0.006, 1.735, 1.765, n=10)
-PS.tote(LX0 + 0.46)                                # a canvas tote by its handles on the right hook (the hoodie hangs on the left one)
 # light switch by the door, doormat in front of it
 box("switch_plate", "white", (0.93, 1.00), (1.17, 1.29), (IZ, IZ + 0.008), bevel=0.003, seg=2)
 box("switch_rocker", "white", (0.945, 0.985), (1.19, 1.27), (IZ + 0.008, IZ + 0.013), bevel=0.002, seg=1)
@@ -497,6 +496,7 @@ props_hard.headphones(globals())
 # --- a hoodie on the door's left hook (the tote moved to the right one), hanging in front of the tote
 HX = LX0 + 0.22
 HOODIE = PS.hoodie(HX); check("hoodie", HOODIE, None, on_door=True)   # (it hangs on the leaf: it swings with it, see "hangers")
+PS.tote(LX0 + 0.46, [o for o in HOODIE if o.name.split(".")[0] == "hoodie"])   # a canvas tote by its handles on the right hook (cloth-simulated, behind the hoodie)
 
 # --- a backpack on the floor, leaning on the bed's foot end
 check("backpack", PS.backpack(), ("y", FY))
@@ -505,24 +505,9 @@ check("backpack", PS.backpack(), ("y", FY))
 CUSHION = PS.cushion(); check("cushion", CUSHION, ("y", FY))
 props_hard.fan(globals())
 
-# --- slippers by the floor cushion (the door's side is his place at the doorway and the leaf's swing, #82)
-def slipper(x, z, ry):
-    n0 = group(); L, W = 0.255, 0.095
-    sole = cyl("slipper_sole", "painted", (0, 0), 1.0, 0.0, 0.016, n=24)
-    sole.data.transform(Matrix.Diagonal((W / 2, L / 2, 1, 1))); sole.data.update()
-    bm = bmesh.new(); na, nl = 10, 6; grid = []                  # the upper: a half tube over the front
-    for j in range(nl + 1):
-        t = j / nl; zz = -L * 0.48 + t * L * 0.42; ww = W / 2 * (0.62 + 0.38 * math.sin(math.pi * min(1, 0.25 + t * 0.75)))
-        grid.append([bm.verts.new(B(ww * math.cos(math.pi * i / na), 0.012 + 0.04 * math.sin(math.pi * i / na) * (0.6 + 0.4 * t), zz)) for i in range(na + 1)])
-    for j in range(nl):
-        for i in range(na): bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
-    up = new_obj("slipper_upper", bm, "painted"); m = up.modifiers.new("solid", "SOLIDIFY"); m.thickness = 0.006
-    for p in up.data.polygons: p.use_smooth = True
-    set_vcol(sole, srgb("#3c3c40")); set_vcol(up, srgb("#8d98a6"))
-    parts = since(n0)
-    for o in parts: transform(o, loc=(x, 0, z), ry=ry)
-    settle(parts, FY); [project_uv(o) for o in parts]; return parts
-check("slippers", slipper(0.80, 0.95, -math.pi / 2 + 0.05) + slipper(0.80, 1.06, -math.pi / 2 - 0.04), ("y", FY))   # toes towards the cushion
+# --- worn sneakers by the door: in the strip between the fridge and the hinge-side casing, outside the leaf's swing and
+# his way to the door (props_soft.py; they replace #75's slippers)
+SNK_R, SNK_L = PS.sneakers(); check("sneaker_r", SNK_R, ("y", FY)); check("sneaker_l", SNK_L, ("y", FY))
 
 # --- a laundry pinch hanger on the curtain rod (socks and a hand towel), in front of the glass, above the bed's head end
 n0 = group(); PH = (-1.745, 1.98, 0.45); PH_R = 0.15                # clear of his head at the window (#63)
@@ -537,7 +522,8 @@ for k in range(8):
 PS.socks_and_towel(clips, PH)                                    # two pairs of knitted socks and a terry hand towel on the clips
 check("laundry_hanger", since(n0), None, minx=SILL_X)
 
-# --- clothes (#98): jeans in a heap by the bed's foot, a T-shirt dropped on the floor cushion (a cloth simulation)
+# --- clothes (#98): jeans in a heap by the bed's foot, a fleece throw left rumpled on the floor cushion and a T-shirt
+# over the desk chair's back (cloth simulations; the T-shirt joins the chair's node)
 PS.clothes(CUSHION)
 
 # --- a small cat figure on the window sill

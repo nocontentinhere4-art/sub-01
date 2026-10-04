@@ -78,6 +78,8 @@ save(tint(f"{T}/cotton_jersey/Diffuse.jpg", 512, "#b4903f", keep=0.9, cavity=0.8
 save(tint(f"{T}/rough_linen/Diffuse.jpg", 512, "#d6cbb3", keep=0.6, cavity=0.6), "canvas_diff.jpg")
 save(tint(f"{T}/denim_fabric_05/Diffuse.jpg", 512, "#3a4763", keep=1.2, cavity=0.7), "denim_diff.jpg")
 save(nor(f"{T}/denim_fabric_05/nor_gl.jpg", 512, 1.0), "denim_nor.jpg")
+save(tint(f"{T}/polar_fleece/Diffuse.jpg", 512, "#5b6650", keep=0.8, cavity=0.7), "fleece_diff.jpg")       # the throw blanket (moss green)
+save(nor(f"{T}/polar_fleece/nor_gl.jpg", 512, 1.0), "fleece_nor.jpg")
 
 # ---------- posters (one atlas, 1024 x 512): A 2:3 | B 2:3 | C square + D 2:1 ----------
 JP = f"{R}/fonts/NotoSansJP.ttf"; SANS = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"

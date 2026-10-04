@@ -46,6 +46,10 @@ SHOTS = [
     ("backpack_day", (0.7, 0.75, 1.95), (-0.07, 0.22, 1.24), 26, "day", (1280, 720)),
     ("jeans_day", (1.1, 0.9, 1.95), (0.45, 0.2, 1.38), 26, "day", (1280, 720)),
     ("tee_day", (0.1, 1.5, 2.1), (-0.58, 0.9, 1.3), 26, "day", (1280, 720)),
+    # the soft props' second pass: the sneakers by the door, the throw on the cushion, the T-shirt over the chair's back
+    ("sneakers_day", (1.32, 0.72, -0.82), (1.02, 0.20, -1.28), 32, "day", (1280, 720)),
+    ("blanket_day", (2.2, 1.25, 2.1), (1.30, 0.22, 0.98), 34, "day", (1280, 720)),
+    ("chair_tee_day", (-0.55, 1.65, 0.75), (-1.13, 1.05, -0.45), 36, "day", (1280, 720)),
 ]
 
 VIEWER = r"""<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>

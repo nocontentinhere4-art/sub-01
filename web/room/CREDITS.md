@@ -16,7 +16,13 @@ the terry hand towel on the pinch hanger, the mattress with its fitted sheet, th
 Blender cloth simulation, turned back over itself at the head end, then box-quilted), the curtains with their pencil
 pleats and hems, the rug with its bound edge, the tufted floor cushion, the hoodie and the canvas tote on the door
 hooks, the backpack, and two clothes: jeans in a heap by the bed's foot and a T-shirt thrown on the bed (a second cloth
-simulation). The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
+simulation). A second pass on the soft props (also `props_soft.py`, all built from code, CC0) rebuilt the backpack as a
+real day pack (45 x 30 x 14 cm: sewn front and back panels and a gusset with piped seams, the weight settling it, the
+main zip and a zipped front pocket with sliders and pulls, a stretch side pocket, a grab handle, padded shoulder straps
+spilling onto the floor with webbing and buckles), made the tote a cloth simulation hanging from its handles, added a
+fleece throw left rumpled on the floor cushion (a cloth simulation), moved the T-shirt over the desk chair's back (a
+cloth simulation, part of the `chair` node), and replaced the slippers with a pair of worn canvas sneakers by the door
+(no brand). The ambient occlusion is baked with Cycles into `room_ao` (second UV set). The office chair
 is its own node, `chair` (origin on the floor under the gas lift), so it can be moved: it has its own materials and its
 own AO (`chair_ao`, self-occlusion only), and the room's AO is baked without it.
 
@@ -61,6 +67,7 @@ Textures (each recoloured or regraded in `tex_prep.py`):
 | the hoodie's ribbed hem and cuffs (normal map) | `ribbed_corduroy` | colormass, Rico Cilliers |
 | backpack (normal map) | `bi_stretch` | colormass, Rico Cilliers |
 | jeans | `denim_fabric_05` | colormass, Rico Cilliers |
+| throw blanket | `polar_fleece` (recoloured) | colormass, Rico Cilliers |
 
 Models:
 
@@ -90,7 +97,8 @@ From `room_build/`, with Blender 4.2 and Node 22:
 
     python ph.py tex 2k wooden_floor_01
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
-    python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
+    python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05 polar_fleece
+    python ph.py tex 2k wood_floor
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
     python tex_prep.py                       # (runs tex_hard.py too: the hard surfaces' textures and atlases)

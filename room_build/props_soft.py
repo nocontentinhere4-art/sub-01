@@ -48,13 +48,14 @@ def materials():
     fab("rug", diff="rug_diff.jpg", nor="rug_nor.jpg", rough=1.0, uv=0.32, sheen=0.3)                           # wool herringbone
     fab("hoodie", diff="hoodie_diff.jpg", nor="hoodie_nor.jpg", nstr=0.9, rough=0.95, uv=0.27, sheen=0.3)       # jogging melange
     fab("rib", color=srgb("#4f5560"), rough=0.95, nor="rib_nor.jpg", nstr=1.0, uv=0.045, sheen=0.3)             # ribbed cuffs and hem
-    fab("bag", color=srgb("#2b3440"), rough=0.7, nor="bag_nor.jpg", nstr=0.8, uv=0.09)                          # polyester weave
+    fab("bag", vcol=True, rough=0.78, nor="bag_nor.jpg", nstr=0.8, uv=0.09, sheen=0.15)                          # polyester weave (colour per vertex: body, piping, webbing)
     fab("cushion", diff="cushion_diff.jpg", nor="sheet_nor.jpg", nstr=0.8, rough=0.95, uv=0.26, sheen=0.25)     # cotton, mustard
     fab("knit", vcol=True, rough=0.95, nor="knit_nor.jpg", nstr=1.0, uv=0.075, sheen=0.4)                       # socks (colour per vertex)
     fab("terry", diff="terry_diff.jpg", nor="terry_nor.jpg", nstr=1.0, rough=1.0, uv=0.18, sheen=0.5)           # the towel
     fab("canvas", diff="canvas_diff.jpg", nor="curtain_nor.jpg", nstr=0.7, rough=0.9, uv=0.27)                  # the tote
     fab("denim", diff="denim_diff.jpg", nor="denim_nor.jpg", nstr=0.9, rough=0.9, uv=0.27)                      # jeans
-    fab("jersey", vcol=True, rough=0.92, nor="sheet_nor.jpg", nstr=0.7, uv=0.26, sheen=0.25)                    # T-shirt, mattress ticking
+    fab("jersey", vcol=True, rough=0.92, nor="sheet_nor.jpg", nstr=0.7, uv=0.26, sheen=0.25)                    # T-shirt, mattress ticking, sneakers' canvas
+    fab("fleece", diff="fleece_diff.jpg", nor="fleece_nor.jpg", nstr=1.0, rough=1.0, uv=0.27, sheen=0.55)      # the throw blanket
 
 
 # ---------------------------------------------------------------- builders (glTF coordinates in, Blender meshes out)
@@ -178,9 +179,10 @@ def thin(o):
     o["ao_small"] = 1; return o
 
 
-def sheet(o, thickness):
-    """a thin cloth sheet: thickened symmetrically, without rim faces (their islands get no AO texel and render black)"""
-    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = thickness; md.offset = 0; md.use_even_offset = True; md.use_rim = False
+def sheet(o, thickness, even=True):
+    """a thin cloth sheet: thickened symmetrically, without rim faces (their islands get no AO texel and render black);
+    even=False for a simulated cloth with sharp folds (an even thickness shoots out at a fold)"""
+    md = o.modifiers.new("solid", "SOLIDIFY"); md.thickness = thickness; md.offset = 0; md.use_even_offset = even; md.use_rim = False
     return md
 
 
@@ -208,7 +210,7 @@ def curtain(nm, za, zb, side):
     into ten pencil pleats that merge into four soft folds towards the hem; the hem, the heading and the side hems are
     double (thicker), the hem edge waves a little with the folds, and the panel flares slightly at the bottom."""
     ROD_Y, IX, WY0 = G["ROD_Y"], G["IX"], G["WY0"]
-    nz_, ny = 64, 26; top = ROD_Y - 0.012; bot = WY0 + 0.0012; W = zb - za; x0 = IX + 0.07; grid = []
+    nz_, ny = 48, 26; top = ROD_Y - 0.012; bot = WY0 + 0.0012; W = zb - za; x0 = IX + 0.07; grid = []
     for j in range(ny + 1):
         t = j / ny; y = top + (bot - top) * t; row = []
         k = min(1.0, t / 0.75) ** 0.8                                   # 0 at the heading (pleats) -> 1 lower down (folds)
@@ -444,7 +446,7 @@ def sock(nm, clip, y_top, ry, colour, heel, stripes=()):
     """a sock pinched at the cuff by a clip at (x, z) = clip, hanging from y_top: the cuff gathers to the clip and its
     edges droop, ribbing round the cuff, a flat leg, the heel bulging at the bend, the foot dangling forward (+x, turned
     by ry) and a rounded toe. heel: the heel-and-toe colour; stripes: (from, to, colour) along the length (m)."""
-    n = 32; L_leg, R_b, phi, L_foot = 0.150, 0.03, 0.55, 0.095
+    n = 24; L_leg, R_b, phi, L_foot = 0.150, 0.03, 0.55, 0.095
     L_bend = R_b * phi; Ltot = L_leg + L_bend + L_foot
     def centre(dist):
         if dist < L_leg: return Vector((0, -dist, 0))
@@ -452,7 +454,7 @@ def sock(nm, clip, y_top, ry, colour, heel, stripes=()):
             a = (dist - L_leg) / R_b; return Vector((R_b * (1 - math.cos(a)), -L_leg - R_b * math.sin(a), 0))
         e = dist - L_leg - L_bend
         return Vector((R_b * (1 - math.cos(phi)), -L_leg - R_b * math.sin(phi), 0)) + Vector((math.sin(phi), -math.cos(phi), 0)) * e
-    N = 30; dists = [Ltot * (k / N) ** 0.85 for k in range(N + 1)]                   # denser rings near the cuff
+    N = 22; dists = [Ltot * (k / N) ** 0.85 for k in range(N + 1)]                   # denser rings near the cuff
     path = [centre(dd) for dd in dists]
     F = frames(path, Vector((1, 0, 0)))
     rings = []; ring_col = []
@@ -593,73 +595,308 @@ def hoodie(HX):
     return parts
 
 
-def tote(xc):
-    """a canvas tote on the right hook: the bag hangs by its two handles looped over the hook's tip, the top edge
-    peaks at the handles and droops between them, the sides crease where the bag is nearly empty, the bottom gusset
-    gives it depth. Parts are named "tote" / "tote_strap" (they join the "hangers" node)."""
-    IZ = G["IZ"]; zd = IZ + 0.06; random.seed(42)
-    rings = []; n = 36; nr = 22
-    for k in range(nr + 1):
-        t = k / nr; y = 1.62 - 0.38 * t
-        a = 0.17 - 0.012 * (1 - t) ** 2; b = 0.012 + 0.04 * t ** 1.3
-        c = Vector((xc, y, zd + b + 0.002))
-        pts = []
+def tote(xc, extra_colliders=()):
+    """a canvas tote (38 x 38 cm, an 8 cm bottom gusset) on the right hook, a Blender cloth simulation: the bag is pinned
+    only where its handles are sewn on, so between them the opening sags, the top corners outside them fold over and
+    down, the nearly empty body falls into soft folds that run down from the handles, and it rests against the door
+    (and the hoodie beside it). The handles, cotton webbing, go up from their seams and over the hook's tip. Parts are
+    named "tote" / "tote_strap" (they join the "hangers" node)."""
+    IZ = G["IZ"]; random.seed(42)
+    W, Hh, Dg = 0.38, 0.38, 0.055; TOP = 1.50; Z0 = IZ + 0.049                       # (the door leaf's panels reach IZ + 0.043)
+    def depth(y): return 0.014 + (Dg - 0.014) * smooth01(TOP - 0.20, TOP - Hh, y)       # the gusset folds in at the top when it hangs
+    NW, ND, NV = 16, 4, 17
+    per = []                                                                       # the bag's girth: front (+z) left to right, side, back right to left, side
+    for i in range(NW): per.append((-W / 2 + W * i / NW, 1.0, "f"))
+    for i in range(ND): per.append((W / 2, 1.0 - i / ND, "s"))
+    for i in range(NW): per.append((W / 2 - W * i / NW, 0.0, "b"))
+    for i in range(ND): per.append((-W / 2, i / ND, "s"))
+    bm = bmesh.new(); R = []
+    for j in range(NV + 1):
+        y = TOP - Hh * j / NV
+        R.append([bm.verts.new(Bv(Vector((xc + x + 0.002 * nz(Vector((x, y, z)), 30.0, 50), y, Z0 + z * depth(y))))) for (x, z, _) in per])
+    n = len(per)
+    for j in range(NV):
         for i in range(n):
-            th = 2 * math.pi * i / n; ct, st = math.cos(th), math.sin(th)
-            x = math.copysign(abs(ct) ** (2 / 3.6), ct); z = math.copysign(abs(st) ** (2 / 3.6), st)
-            r = 1 + 0.07 * math.sin(3 * th + 5 * t) * (1 - t) ** 0.5 * (1 - abs(z)) + 0.025 * nz(Vector((th, t * 3, 0)), 2.0, 12)   # creases
-            p = c + Vector((a * x * r, 0, b * z * r))
-            if k == 0: p.y = 1.60 + 0.016 * math.exp(-((abs(p.x - xc) - 0.09) / 0.05) ** 2)           # peaks at the handles
-            pts.append(p)
-        rings.append(pts)
-    body = tube_obj("tote", "canvas", rings, cap=(False, True)); sheet(body, 0.004)
-    for zz in (zd + 0.004, zd + 0.004 + 0.026):                                   # the two handles, over the hook's tip
+            k = (i + 1) % n; bm.faces.new([R[j][i], R[j][k], R[j + 1][k], R[j + 1][i]]).smooth = True
+    be = [e for e in bm.edges if e.is_boundary and all(v in set(R[-1]) for v in e.verts)]   # the bottom: a grid of quads
+    bmesh.ops.grid_fill(bm, edges=be, use_interp_simple=True)
+    for f in bm.faces: f.smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.verts.index_update()
+    pin_ids = [R[0][i].index for i, (x, z, sd) in enumerate(per) if sd in "fb" and abs(abs(x) - 0.085) < 0.016]
+    top_ids = [v.index for v in R[0]]
+    o = new_obj("tote", bm, "canvas")
+    vg = o.vertex_groups.new(name="pin"); vg.add(pin_ids, 1.0, 'REPLACE')
+    colliders = [bpy.data.objects["door_leaf"]]
+    for c in colliders:
+        c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = 8
+    cl = o.modifiers.new("cloth", "CLOTH"); s_ = cl.settings
+    s_.quality = 8; s_.mass = 0.2; s_.tension_stiffness = 55; s_.compression_stiffness = 55; s_.shear_stiffness = 15; s_.bending_stiffness = 4.0
+    s_.air_damping = 4.0; s_.vertex_group_mass = "pin"
+    cl.collision_settings.distance_min = 0.005; cl.collision_settings.use_self_collision = True; cl.collision_settings.self_distance_min = 0.003
+    cl.collision_settings.self_friction = 5; s_.quality = 12
+    cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 80
+    for fr in range(1, 61): SC.frame_set(fr)
+    bpy.context.view_layer.objects.active = o; o.select_set(True); bpy.ops.object.modifier_apply(modifier="cloth")
+    for c in colliders:
+        for m in list(c.modifiers):
+            if m.type == 'COLLISION': c.modifiers.remove(m)
+    SC.frame_set(1); o.vertex_groups.clear()
+    unspike(o, 0.02, rounds=8)
+    me = o.data
+    hood_x = [max(gl(o_.matrix_world @ v.co).x for v in o_.data.vertices) + 0.01 for o_ in extra_colliders[:1]] if extra_colliders else []
+    for v in me.vertices:                                                          # never into the door leaf
+        g = gl(v.co)
+        if g.z < IZ + 0.047: g.z = IZ + 0.047
+        if hood_x and g.x < hood_x[0] and g.z > IZ + 0.098: g.z = IZ + 0.098              # behind the hoodie on the next hook
+        v.co = Bv(g)
+    me.update(); sheet(o, 0.003)
+    # the handles: from their seams (the pinned spots, front and back) up over the hook's tip
+    hook = Vector((xc, 1.762, IZ + 0.098))
+    for sd, zz in (("f", Z0 + 0.014), ("b", Z0)):
+        a_, b_ = Vector((xc - 0.085, TOP - 0.01, zz)), Vector((xc + 0.085, TOP - 0.01, zz))
         pts = []
-        for k in range(13):
-            u = k / 12; ang = math.pi * u
-            x = xc - 0.088 * math.cos(ang) * (0.55 + 0.45 * abs(math.cos(ang)) ** 0.6)
-            y = 1.60 + 0.165 * math.sin(ang) ** 0.7
-            z = zz + (IZ + 0.102 - zz) * math.sin(ang) ** 2
-            pts.append(Vector((x, y, z)))
-        thin(tube_along("tote_strap", "canvas", pts, 0.0017, 0.013, n=8, ref=Vector((0, 0, 1)), cap=(True, True)))
-    return body
+        for k in range(15):
+            u = k / 14; e = math.sin(math.pi * u)
+            p = a_.lerp(b_, u); p = p.lerp(Vector((xc + (u - 0.5) * 0.03, hook.y + 0.004 * e, hook.z + (0.006 if sd == "f" else -0.006))), e ** 0.55)
+            pts.append(p)
+        pts[0].y -= 0.02; pts[-1].y -= 0.02                                         # sewn onto the inside of the hem
+        thin(tube_along("tote_strap", "canvas", pts, 0.0018, 0.0125, n=8, ref=Vector((0, 0, 1)), cap=(True, True)))
+    return o
 
 
-# ================================================================ the backpack by the bed's foot
+# ================================================================ the backpack by the bed's foot (#98 soft props, second pass)
+def tube_framed(nm, material, path, wdir, ndir, a, b, n=8, cap=(False, False), p=2.0, static=True, taper=None):
+    """a tube along a glTF polyline with explicit frames: per point a width axis wdir[k] (half-size a) and a height
+    axis ndir[k] (half-size b); p > 2 squares the section (a padded strap, a zip's coil); taper(u) -> (sa, sb)"""
+    rings = []
+    for k, c in enumerate(path):
+        sa, sb = taper(k / max(1, len(path) - 1)) if taper else (1.0, 1.0)
+        rings.append(ring(c, wdir[k], ndir[k], a * sa, b * sb, n, p=p))
+    return tube_obj(nm, material, rings, static=static, cap=cap)
+
+
+def strip_framed(nm, material, path, wdir, ndir, w, t, static=True):
+    """a flat strap (webbing, a zip's tape) of width w and thickness t along a polyline with explicit frames: a closed
+    four-sided section, so it shows from both sides without a solidify"""
+    return tube_framed(nm, material, path, wdir, ndir, w / 2, t / 2, n=4, cap=(True, True), p=12.0, static=static)
+
+
+def polyline_frames(path, up):
+    """per point (tangent, width axis = up x tangent, height axis): up[k] is the surface normal under the point"""
+    out = []
+    for k in range(len(path)):
+        t = (path[min(k + 1, len(path) - 1)] - path[max(k - 1, 0)]).normalized()
+        w = up[k].cross(t); w = w.normalized() if w.length > 1e-6 else t.orthogonal().normalized()
+        out.append((t, w, t.cross(w).normalized()))
+    return out
+
+
+def resample(pts, n):
+    """n points evenly spaced by arc length along a polyline (open)"""
+    S = [0.0]
+    for a_, b_ in zip(pts, pts[1:]): S.append(S[-1] + (b_ - a_).length)
+    out = []
+    for k in range(n):
+        s = S[-1] * k / (n - 1); m = max(0, min(len(S) - 2, next((j for j in range(len(S) - 1) if S[j + 1] >= s), len(S) - 2)))
+        t = (s - S[m]) / max(1e-9, S[m + 1] - S[m]); out.append(pts[m].lerp(pts[m + 1], t))
+    return out
+
+
+def pack_outline(W, H, rt, rb, n):
+    """the front panel's outline (z, y): a "tombstone", top corners of radius rt, bottom ones rb; n points evenly by
+    arc length, starting at the bottom's middle and going towards +z (up the +z side, over the top, down the -z side)"""
+    d = []; hw = W / 2
+    def arc(cz, cy, r, a0, a1, k=24):
+        for j in range(k): a = math.radians(a0 + (a1 - a0) * j / k); d.append(Vector((cz + r * math.cos(a), cy + r * math.sin(a))))
+    def line(p0, p1, k=24):
+        for j in range(k): d.append(Vector(p0).lerp(Vector(p1), j / k))
+    line((0, 0), (hw - rb, 0)); arc(hw - rb, rb, rb, -90, 0); line((hw, rb), (hw, H - rt)); arc(hw - rt, H - rt, rt, 0, 90)
+    line((hw - rt, H), (-(hw - rt), H)); arc(-(hw - rt), H - rt, rt, 90, 180); line((-hw, H - rt), (-hw, rb)); arc(-(hw - rb), rb, rb, 180, 270)
+    line((-(hw - rb), 0), (0, 0)); d.append(Vector((0, 0)))
+    return resample(d, n + 1)[:-1]
+
+
 def backpack():
-    """a day pack leaning on the bed's foot end: a soft body with a rounded top, a zipped lid, a front zip pocket, a
-    stretch bottle pocket on its side, a grab handle, and a shoulder strap's end lying on the floor beside it"""
+    """an everyday day pack (~18 L: 45 cm tall, 30 cm wide, 14 cm deep), no brand: standing on the floor by the bed's
+    foot end, its back panel towards the bed. Sewn like a real one: a front and a back panel ("tombstone" outlines) and
+    a gusset running round the sides and over the top, piped seams where they meet. The body is a Blender cloth
+    simulation with a little air pressure and the weight of what is inside, so it settles: the bottom spreads on the
+    floor, the half-empty top slumps and creases. On it: the main zip along the gusset over the top (tape, coil, two
+    sliders with pulls), a zipped front pocket, a webbing grab handle, and two padded shoulder straps that hang down
+    behind it and spill out onto the floor (webbing, ladder-lock buckles, loose tails)."""
     FY, BX1 = G["FY"], G["BX1"]; n0 = len(STATIC); random.seed(43)
-    bb = box("bag_body", "bag", (0, 0.13), (0, 0.42), (-0.15, 0.15), bevel=0.045, seg=5)
-    for v in bb.data.vertices:
-        g = gl(v.co); u = g.z / 0.15; h = min(1.0, g.y / 0.42)
-        g.x += 0.035 * (1 - u * u) * math.sin(math.pi * h) ** 0.8 * (g.x / 0.13)               # a fuller front
-        g.y += 0.01 * (1 - u * u) * (g.y > 0.3)                                                  # a rounded top
-        v.co = B(*g)
-    displace(bb, lambda p, nrm: 0.002 * nz(p, 16.0, 13))
-    box("bag_pocket", "bag", (0.13, 0.172), (0.05, 0.23), (-0.11, 0.11), bevel=0.02, seg=3)
-    # zips: the lid's round the top, the pocket's across it; a pull on each
-    for (nm, x, y, z) in (("bag_zip", (0.125, 0.14), (0.325, 0.332), (-0.14, 0.14)), ("bag_zip", (0.168, 0.176), (0.21, 0.217), (-0.09, 0.09))):
-        box(nm, "plastic_black", x, y, z, bevel=0.0015, seg=1)
-    for (x, z) in ((0.138, 0.14), (0.172, 0.08)):
-        box("bag_zip", "plastic_black", (x - 0.012, x + 0.012), (0.302, 0.33) if z > 0.1 else (0.195, 0.222), (z - 0.004, z + 0.004), bevel=0.002, seg=1)
-    for (nm, x, y, z) in (("bag_zip", (0.0, 0.13), (0.325, 0.332), (0.148, 0.156)), ("bag_zip", (0.0, 0.13), (0.325, 0.332), (-0.156, -0.148))):
-        box(nm, "plastic_black", x, y, z, bevel=0.0015, seg=1)
-    # a stretch pocket on the side (a half tube, closed at the bottom)
+    W, H, D, NO = 0.30, 0.45, 0.14, 40
+    OUT = pack_outline(W, H, 0.115, 0.05, NO); CY = 0.20
+    # rings from the back panel's middle (a pole) out to its seam, across the gusset, in from the front seam to the
+    # front panel's middle: (scale of the outline about its centre, depth x, tag)
+    PANEL = (0.0, 0.13, 0.26, 0.39, 0.51, 0.62, 0.72, 0.81, 0.88, 0.94)
+    spec = [(s, -0.010 * (1 - s * s), "back") for s in PANEL]
+    spec += [(0.975, -0.003, "back"), (0.995, 0.006, "seam_b")]
+    spec += [(1.0, x, "gusset") for x in (0.026, 0.049, 0.072, 0.095, 0.116)]
+    spec += [(0.995, D - 0.006, "seam_f"), (0.975, D + 0.004, "front")]
+    spec += [(s, D + 0.026 * (1 - s * s), "front") for s in reversed(PANEL)]
+    KB = next(k for k, r in enumerate(spec) if r[2] == "seam_b"); KF = next(k for k, r in enumerate(spec) if r[2] == "seam_f")
+    KZ = KB + 3                                                                   # the gusset's middle ring: the main zip
+    # the pack's place: back panel 5 cm off the bed's foot end, turned a little towards the room, leaning back 2 degrees
+    RY = -0.22; ORG = Vector((BX1 + 0.055, FY, 1.255))
+    Mrot = Matrix.Rotation(RY, 3, 'Y') @ Matrix.Rotation(0.035, 3, 'Z')
+    def L2W(p): return ORG + Mrot @ p                                             # pack-local glTF -> world glTF
+    def settle_shape(x, y, z):
+        """what its weight does: the bottom spreads on the floor, the half-empty top sinks and tips a little forward"""
+        lo = 1 - smooth01(0.0, 0.13, y)
+        z *= 1 + 0.07 * lo; x = D / 2 + (x - D / 2) * (1 + 0.12 * lo)
+        t = smooth01(0.22, H, y)
+        u = z / (W / 2)
+        y -= 0.034 * t ** 1.4 + 0.018 * t ** 3 * max(0.0, 1 - u * u)            # (the top's middle dips most: nothing under it)
+        x += 0.026 * t * t - 0.008 * t * (1 - abs(u))
+        return Vector((x, max(0.0, y), z))
+    bm = bmesh.new(); idx = {}
+    for k, (s, x, _) in enumerate(spec):
+        if s == 0.0:
+            v = bm.verts.new(Bv(L2W(settle_shape(x, CY, 0)))); idx.update({(k, i): v for i in range(NO)})
+        else:
+            for i, q in enumerate(OUT): idx[(k, i)] = bm.verts.new(Bv(L2W(settle_shape(x, CY + (q.y - CY) * s, q.x * s))))
+    for k in range(len(spec) - 1):
+        for i in range(NO):
+            j = (i + 1) % NO; q = [idx[(k, i)], idx[(k, j)], idx[(k + 1, j)], idx[(k + 1, i)]]
+            q = list(dict.fromkeys(q))                                           # (at a pole: a triangle)
+            bm.faces.new(q).smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.verts.index_update()
+    vid = {key: v.index for key, v in idx.items()}
+    body = new_obj("bag_body", bm, "bag")
+    Minv = Mrot.inverted()
+    def creases(p, n):
+        """slump folds across the upper front and the gusset over the top, pinches at the top corners, the padding's
+        give on the back panel, and the weave's small irregularity"""
+        lp = Minv @ (p - ORG); t = smooth01(0.20, 0.42, lp.y); u = lp.z / (W / 2); ln = Minv @ n
+        d = 0.0065 * t * math.sin(2 * math.pi * lp.y / 0.07 + 1.8 * u + 2.2 * nz(p, 5.0, 34)) * (1 - 0.5 * abs(u))
+        d += 0.004 * t * bump(abs(u), 0.75, 0.3) * math.sin(2 * math.pi * (lp.x / 0.05 + lp.y / 0.06))
+        if ln.x < -0.6: d += -0.002 * (math.sin(math.pi * lp.y / 0.11) ** 2)                 # the back's padded channels
+        return d + 0.0015 * nz(p, 14.0, 35) + 0.0007 * nz(p, 40.0, 36)
+    displace(body, creases)
+    me = body.data; me.update()
+    P = lambda k, i: gl(me.vertices[vid[(k, i % NO)]].co)
+    Nn = lambda k, i: gl(me.vertices[vid[(k, i % NO)]].normal).normalized()
+    Mw = Mrot                                                                      # pack-local directions in the world
+    XL, YL, ZL = Mw @ Vector((1, 0, 0)), Vector((0, 1, 0)), Mw @ Vector((0, 0, 1))
+    from mathutils.bvhtree import BVHTree
+    bvh = BVHTree.FromObject(body, bpy.context.evaluated_depsgraph_get())
+    def hit(y, z, side):                                                          # the body's surface seen from the front (+1) or the back (-1)
+        o = L2W(Vector((0.5 * side + D / 2, y, z))); r = bvh.ray_cast(Bv(o), Bv(-XL * side))
+        return (gl(r[0]), gl(r[1]).normalized()) if r[0] is not None else (L2W(Vector((D / 2 + side * D / 2, y, z))), XL * side)
+    # body colour: slate, a little lighter and dustier at the bottom, a shade darker in the creases
+    def body_col(p):
+        lp = Mrot.inverted() @ (p - ORG)
+        if lp.y < 0.045: return tuple(c * (1 + 0.05 * nz(p, 9.0, 31)) for c in srgb("#23272d"))   # the base: a heavier, darker fabric
+        return tuple(c * (1 + 0.06 * nz(p, 9.0, 31)) * (1 + 0.12 * smooth01(0.30, 0.45, lp.y)) for c in srgb("#46536a"))
+    paint(body, body_col)
+    # piping round both panels
+    for k in (KB, KF):
+        path = [P(k, i) + Nn(k, i) * 0.0012 for i in range(NO)]
+        o = thin(tube_along("bag_piping", "bag", path + path[:1], 0.0032, 0.0032, n=5, ref="h")); paint(o, lambda p: srgb("#262a30"))
+    # the main zip: along the gusset's middle, from the +z side 16 cm up, over the top, down to the same height on -z
+    top = [i for i in range(NO) if OUT[i].y > 0.16]
+    zi = list(range(top[0], top[-1] + 1))
+    path = [P(KZ, i) + Nn(KZ, i) * 0.0010 for i in zi]; up = [Nn(KZ, i) for i in zi]
+    F = polyline_frames(path, up); wd = [f[1] for f in F]; nd = [f[2] for f in F]
+    strip_framed("bag_zip_tape", "bag", path, wd, nd, 0.022, 0.0016); paint(STATIC[-1], lambda p: srgb("#2c3442"))
+    tube_framed("bag_zip", "plastic_black", [p + n * 0.0012 for p, n in zip(path, nd)], wd, nd, 0.0035, 0.0012, n=6, p=3.0)
+    def slider(c, t, w, n, flip):
+        """a zip slider on the coil and its pull: a rubber-coated tab lying along the zip"""
+        Mx = Matrix((t, w, n)).transposed()
+        bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
+        for v in bm.verts:
+            q = Vector((v.co.x * 0.026, v.co.y * 0.011, v.co.z * 0.007 + 0.0045))
+            if q.x * flip > 0.0: q.y *= 0.7                                      # tapers to the pull's end
+            v.co = Bv(c + Mx @ q)
+        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.0018, segments=1, affect='EDGES', clamp_overlap=True)
+        new_obj("bag_slider", bm, "metal_dark")
+        pull = [c + t * (flip * (0.012 + 0.045 * u)) for u in (0.0, 0.33, 0.66, 1.0)]
+        pn = []
+        for k, q in enumerate(pull):                                          # lying on the bag, wherever it curves
+            loc, nn = bvh.find_nearest(Bv(q))[:2]; nn = gl(nn).normalized(); pull[k] = gl(loc) + nn * (0.0085 - 0.005 * k / 3); pn.append(nn)
+        Fp = polyline_frames(pull, pn)
+        strip_framed("bag_pull", "bag", pull, [f[1] for f in Fp], [f[2] for f in Fp], 0.011, 0.003); paint(STATIC[-1], lambda p: srgb("#17191c"))
+    mid = len(path) // 2
+    for kk, fl in ((mid - 3, 1), (mid + 3, -1)):                                 # the two sliders meet a little off the top
+        slider(path[kk], F[kk][0], F[kk][1], F[kk][2], fl)
+    # the front pocket: a shallow pouch on the front panel's lower half, piped, zipped across its top
+    nu, nv = 12, 10; PU, PV0, PV1 = 0.115, 0.045, 0.245
+    def pocket_pt(u, v, lift=0.0):
+        a2, b2 = u, 2 * v - 1; m = max(abs(a2), abs(b2))                       # the square onto a superellipse: rounded corners
+        if m > 1e-6:
+            dx, dy = a2 / m, b2 / m; f = (abs(dx) ** 5 + abs(dy) ** 5) ** (-1 / 5); u, v = a2 * f, (b2 * f + 1) / 2
+        p, n = hit(PV0 + (PV1 - PV0) * v, u * PU, 1)
+        h = 0.0015 + 0.030 * max(0.0, 1 - abs(u) ** 2.5) ** 0.6 * max(0.0, 1 - abs(2 * v - 1) ** 2.5) ** 0.6
+        h += 0.0018 * nz(p, 18.0, 33) * (1 - abs(u)) * (1 - abs(2 * v - 1))
+        return p + n * (h + lift), n
+    grid = [[pocket_pt(-1 + 2 * i / nu, j / nv)[0] for i in range(nu + 1)] for j in range(nv + 1)]
+    pk = grid_obj("bag_pocket", "bag", grid, flip=True); sheet(pk, 0.002); paint(pk, body_col)
+    rim = [(-1 + 2 * i / nu, 0.0) for i in range(nu)] + [(1.0, j / nv) for j in range(nv)] + [(1 - 2 * i / nu, 1.0) for i in range(nu)] + [(-1.0, 1 - j / nv) for j in range(nv)]
+    path = [pocket_pt(u, v, 0.0005)[0] for (u, v) in rim]
+    o = thin(tube_along("bag_piping", "bag", path + path[:1], 0.003, 0.003, n=5, ref="h")); paint(o, lambda p: srgb("#262a30"))
+    zp = [pocket_pt(-0.82 + 1.64 * i / 16, 0.84) for i in range(17)]
+    path = [p + n * 0.0008 for p, n in zp]; F = polyline_frames(path, [n for _, n in zp]); wd = [f[1] for f in F]; nd = [f[2] for f in F]
+    strip_framed("bag_zip_tape", "bag", path, wd, nd, 0.020, 0.0016); paint(STATIC[-1], lambda p: srgb("#2c3442"))
+    tube_framed("bag_zip", "plastic_black", [p + n * 0.0012 for p, n in zip(path, nd)], wd, nd, 0.003, 0.0011, n=6, p=3.0)
+    slider(path[13], F[13][0], F[13][1], F[13][2], -1)
+    # a stretch mesh bottle pocket low on the +z side: elastic band at its top, gathered, bulging a little
+    def side_hit(y, x):
+        o = L2W(Vector((x, y, 0.6))); r = bvh.ray_cast(Bv(o), Bv(-ZL))
+        return (gl(r[0]), gl(r[1]).normalized()) if r[0] is not None else (L2W(Vector((x, y, W / 2))), ZL)
     grid = []
     for j in range(9):
-        t = j / 8; y = 0.045 + 0.17 * t; rr = (0.3 + 0.7 * smooth01(0.0, 0.3, t)) * (1 - 0.25 * smooth01(0.7, 1.0, t)); row = []
-        for i in range(11):
-            th = math.pi * i / 10; row.append(Vector((0.065 + 0.058 * math.cos(th) * rr ** 0.3, y, 0.15 + 0.034 * math.sin(th) * rr)))
+        t = j / 8; y = 0.05 + 0.15 * t; row = []
+        for i in range(9):
+            u = i / 8; x = 0.012 + (D - 0.024) * u; p, n = side_hit(y, x)
+            h = 0.003 + 0.022 * math.sin(math.pi * u) ** 0.7 * smooth01(0.0, 0.25, t) * (1 - 0.35 * smooth01(0.75, 1.0, t))
+            h += 0.002 * math.sin(2 * math.pi * 3.5 * u) * smooth01(0.7, 1.0, t)            # gathered by the elastic
+            row.append(p + n * h)
         grid.append(row)
-    sp = grid_obj("bag_side_pocket", "bag", grid); sheet(sp, 0.004)
-    # a grab handle, and a strap's end on the floor
-    thin(tube_along("bag_loop", "bag", tube_pts([Vector((0.045, 0.42, -0.04)), Vector((0.055, 0.455, 0)), Vector((0.045, 0.42, 0.04))], 6), 0.0065, 0.0065, n=8))
-    thin(tube_along("bag_strap", "bag", tube_pts([Vector((0.02, 0.012, 0.16)), Vector((0.06, 0.012, 0.205)), Vector((0.11, 0.013, 0.225)), Vector((0.15, 0.014, 0.215))], 6),
-                    0.013, 0.0025, n=8, ref="h", cap=(False, True)))
-    box("bag_buckle", "plastic_black", (0.12, 0.155), (0.008, 0.02), (0.20, 0.232), bevel=0.003, seg=1)
+    sp = grid_obj("bag_side_pocket", "bag", grid, flip=True); sheet(sp, 0.002); paint(sp, lambda p: srgb("#2a313c"))
+    band = [grid[-1][i] for i in range(9)]; Fb = polyline_frames(band, [side_hit(0.2, 0.012 + (D - 0.024) * i / 8)[1] for i in range(9)])
+    strip_framed("bag_band", "bag", band, [f[1] for f in Fb], [f[2] for f in Fb], 0.012, 0.003); paint(STATIC[-1], lambda p: srgb("#1d2026"))
+    # the grab handle: a webbing loop over the top, at the back seam
+    it = max(range(NO), key=lambda i: OUT[i].y)
+    a_, b_ = P(KB + 1, it - 2), P(KB + 1, it + 2); na = (Nn(KB + 1, it - 2) + Nn(KB + 1, it + 2)).normalized()
+    hp = [a_.lerp(b_, u) + na * (0.004 + 0.026 * math.sin(math.pi * u) ** 0.8) for u in [j / 10 for j in range(11)]]
+    F = polyline_frames(hp, [na] * len(hp))
+    strip_framed("bag_handle", "bag", hp, [f[1] for f in F], [f[2] for f in F], 0.025, 0.0025); paint(STATIC[-1], lambda p: srgb("#1d1f22"))
+    # the shoulder straps: padded from the top of the back panel down behind the pack, onto the floor and out to the
+    # side in a loose loop; then the webbing from a ladder-lock buckle back to the panel's bottom corner, its tail loose
+    for sg in (-1, 1):
+        ta, tn = hit(0.355, sg * 0.04, -1); ba, bn = hit(0.035, sg * 0.125, -1)
+        back = -XL; T_ = FY + 0.007                                            # a strap lying on the floor: its middle 7 mm up
+        ctrl = [ta + tn * 0.008, ta + tn * 0.012 - YL * 0.06 + ZL * sg * 0.02,
+                L2W(Vector((-0.035, 0.17, sg * 0.10))), L2W(Vector((-0.05, 0.05, sg * 0.14)))]
+        ctrl = [Vector((c.x, max(c.y, T_), c.z)) for c in ctrl]
+        floor_pts = [L2W(Vector((-0.06 + 0.10 * u, 0, sg * (0.19 + 0.06 * math.sin(math.pi * u) + 0.02 * u)))) for u in (0.0, 0.45, 0.9)]
+        ctrl += [Vector((q.x, T_, q.z)) for q in floor_pts]
+        pad = resample(tube_pts(ctrl, 8), 28)
+        ups = []
+        for k, q in enumerate(pad):                                           # its flat side: against the pack up high, on the floor down low
+            fl = smooth01(FY + 0.04, FY + 0.12, q.y)
+            ups.append((tn * fl + YL * (1 - fl)).normalized())
+        F = polyline_frames(pad, ups)
+        o = tube_framed("bag_strap", "bag", pad, [f[1] for f in F], [f[2] for f in F], 0.032, 0.0065, n=8, p=3.2, cap=(True, True),
+                        taper=lambda u: (0.75 + 0.25 * smooth01(0.0, 0.15, u) - 0.2 * smooth01(0.75, 1.0, u), 1 - 0.45 * smooth01(0.8, 1.0, u)))
+        paint(o, lambda p: srgb("#2f353d"))
+        e = pad[-1]; te = F[-1][0]; we = F[-1][1]
+        # the buckle at the padded part's end
+        bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0); Mx = Matrix((te, we, YL)).transposed()
+        for v in bm.verts: v.co = Bv(e + te * 0.014 + Mx @ Vector((v.co.x * 0.018, v.co.y * 0.03, v.co.z * 0.006)))
+        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.002, segments=1, affect='EDGES', clamp_overlap=True)
+        new_obj("bag_buckle", bm, "plastic_black")
+        # webbing: from the buckle back along the floor to the bottom corner anchor (rising onto the panel there)
+        w0 = e + te * 0.03; w1 = Vector((ba.x, T_ - 0.004, ba.z)) + bn * 0.03
+        wctrl = [w0, w0.lerp(w1, 0.5) + we * sg * 0.03, w1, ba + bn * 0.004 + YL * 0.004]
+        wctrl = [Vector((c.x, max(c.y, FY + 0.0015), c.z)) for c in wctrl]
+        web = resample(tube_pts(wctrl, 6), 16); F = polyline_frames(web, [YL] * len(web))
+        strip_framed("bag_web", "bag", web, [f[1] for f in F], [f[2] for f in F], 0.025, 0.0018); paint(STATIC[-1], lambda p: srgb("#1b1d20"))
+        tail = [w0 + te * 0.01, w0 + te * 0.06 - we * sg * 0.015, w0 + te * 0.10 - we * sg * 0.035]
+        tail = [Vector((c.x, FY + 0.0012, c.z)) for c in tail]
+        strip_framed("bag_web", "bag", tail, [we] * 3, [YL] * 3, 0.025, 0.0018); paint(STATIC[-1], lambda p: srgb("#1b1d20"))
     parts = [o for o in STATIC[n0:]]
-    for o in parts: o.data.transform(Matrix.Translation(B(BX1 + 0.049, 0, 1.24)) @ Matrix.Rotation(-0.11, 4, 'Y')); o.data.update()
     G["settle"](parts, FY); [project_uv(o) for o in parts]
     return parts
 
@@ -689,12 +926,11 @@ def jeans():
     return parts
 
 
-def tee(cushion_parts):
-    """a T-shirt dropped on the floor cushion: a flat tee cut from a grid (body, sleeves, a round neck), dropped as
-    cloth onto the cushion, where it crumples and hangs over its sides (off the bed: web/room.html reshapes the duvet
-    over him when he sleeps, #108, and a tee lying on it would be buried)"""
-    FY = G["FY"]; random.seed(45)
-    nx, nzz = 40, 40; hw, hl, sw = 0.22, 0.28, 0.29
+def tee_flat():
+    """a flat T-shirt cut from a grid (body, sleeves, a round neck), at the origin in the xz plane (its length along z,
+    the neck towards +z), a little crumpled"""
+    random.seed(45)
+    nx, nzz = 32, 32; hw, hl, sw = 0.22, 0.28, 0.29
     def inside(x, z):
         if x * x + (z - hl) ** 2 < 0.07 ** 2: return False                                  # the neck
         if abs(x) <= hw and -hl <= z <= hl: return True
@@ -710,34 +946,219 @@ def tee(cushion_parts):
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
     edge = [v for v in bm.verts if v.is_boundary]
     for _ in range(4): bmesh.ops.smooth_vert(bm, verts=edge, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)   # a smooth outline, not grid steps
-    for v in bm.verts: v.co.z += 0.03 * nz(gl(v.co), 6.0, 17)                                # dropped crumpled, not flat
-    o = new_obj("tee", bm, "jersey")
-    o.data.transform(Matrix.Translation(B(1.30, FY + 0.20, 0.98)) @ Matrix.Rotation(0.75, 4, 'Z') @ Matrix.Rotation(0.12, 4, 'X')); o.data.update()
-    colliders = [cushion_parts[0], bpy.data.objects["floor"]]                   # the cushion's body (not its thin piping: the solver snags on it)
+    return bm
+
+
+def unstretch(o, max_edge, rounds=10):
+    """after a cloth simulation: a vertex dragged off by a collider (a sleeve snagged on an armrest) leaves an
+    over-stretched edge; such a vertex goes back to the mean of the neighbours it is still close to"""
+    bm = bmesh.new(); bm.from_mesh(o.data); total = 0
+    for _ in range(rounds):
+        moves = []
+        for v in bm.verts:
+            long_ = [e for e in v.link_edges if e.calc_length() > max_edge]
+            if not long_: continue
+            near = [e.other_vert(v).co for e in v.link_edges if e not in long_]
+            if near: moves.append((v, sum(near, Vector()) / len(near)))
+        for v, m in moves: v.co = m
+        total += len(moves)
+        if not moves: break
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+    if total: print(o.name + ": pulled back", total, "over-stretched vertices")
+
+
+def drop_cloth(o, colliders, frames=46, mass=0.2, tension=12, bending=0.2, self_col=False, friction=12, floor_y=None):
+    """a cloth simulation of `o` falling onto the colliders, applied; strays put back and nothing under the floor"""
     for c in colliders:
-        c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = 12
+        c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = friction
     cl = o.modifiers.new("cloth", "CLOTH"); s = cl.settings
-    s.quality = 8; s.mass = 0.2; s.tension_stiffness = 12; s.compression_stiffness = 12; s.shear_stiffness = 4; s.bending_stiffness = 0.2
-    s.air_damping = 1.0; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = False   # (self-collision blew it up)
-    cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 60
-    for f in range(1, 46): SC.frame_set(f)
+    s.quality = 8; s.mass = mass; s.tension_stiffness = tension; s.compression_stiffness = tension; s.shear_stiffness = tension / 3; s.bending_stiffness = bending
+    s.air_damping = 1.0; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = self_col
+    if self_col: cl.collision_settings.self_distance_min = 0.004; cl.collision_settings.self_friction = 8
+    cl.point_cache.frame_start = 1; cl.point_cache.frame_end = frames + 10
+    for f in range(1, frames): SC.frame_set(f)
     bpy.context.view_layer.objects.active = o; o.select_set(True); bpy.ops.object.modifier_apply(modifier="cloth")
-    assert not any(m.type == 'CLOTH' for m in o.modifiers), "the tee's cloth simulation was not applied"
+    assert not any(m.type == 'CLOTH' for m in o.modifiers), o.name + ": the cloth simulation was not applied"
     for c in colliders:
         for m in list(c.modifiers):
             if m.type == 'COLLISION': c.modifiers.remove(m)
     SC.frame_set(1)
-    unspike(o, 0.04); smooth_mesh(o, 0.3, 1)
-    for v in o.data.vertices:                                                      # nothing through the floor (the solver lets a fast corner slip)
-        if v.co.z < FY + 0.004: v.co.z = FY + 0.004
+    unspike(o, 0.025, rounds=8)
+    if floor_y is not None:
+        for v in o.data.vertices:                                                  # nothing through the floor (the solver lets a fast corner slip)
+            if v.co.z < floor_y: v.co.z = floor_y
     o.data.update()
+
+
+def tee_on_chair():
+    """the T-shirt thrown over the desk chair's backrest (a cloth simulation against the chair): most of it hangs down
+    behind, a hand's width over the front of the top edge, a sleeve sliding off to one side. It is joined into the
+    chair's own node ("chair"), so it moves with the chair when he pulls it out; its material is "chair_jersey"."""
+    CHAIR, CH_M = G["CHAIR"], G["CH_M"]
+    bm = tee_flat()
+    for v in bm.verts: v.co.z += 0.02 * nz(gl(v.co), 6.0, 17)
+    o = new_obj("tee", bm, "jersey", static=False)
+    # chair-local: the backrest's top edge at y ~1.16, its rear face at z ~0.30; the tee across it, its neck to the back
+    Mt = Matrix.Translation(B(-0.03, 1.16 + 0.07, 0.40)) @ Matrix.Rotation(0.06, 4, 'Z')
+    o.data.transform(CH_M @ Mt); o.data.update()
+    drop_cloth(o, [CHAIR], frames=50, mass=0.2, tension=12, bending=0.15, friction=20)
+    unstretch(o, 0.045)                                                             # (its grid: 1.8 cm)
+    smooth_mesh(o, 0.3, 1)
     paint(o, lambda p: srgb("#7d93a6"))
-    sheet(o, 0.005)
+    sheet(o, 0.004)
+    bpy.context.view_layer.objects.active = o
+    for m in list(o.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
+    project_uv(o)
+    m = MATS["jersey"].copy(); m.name = "chair_jersey"; o.data.materials[0] = m       # (joining carries it into the chair's own frame)
+    bpy.ops.object.select_all(action='DESELECT'); o.select_set(True); CHAIR.select_set(True)
+    bpy.context.view_layer.objects.active = CHAIR; bpy.ops.object.join()
+    return CHAIR
+
+
+def blanket(cushion_parts):
+    """a fleece throw (100 x 125 cm, 4 mm) left where he sat on the floor cushion: a cloth simulation (with self-
+    collision) of the throw dropped in loose pleats, so it lies rumpled half on the cushion and half on the floor,
+    in real folds"""
+    FY = G["FY"]; random.seed(47)
+    W, Lb, nu, nv = 1.00, 1.25, 25, 31
+    bm = bmesh.new(); V = []
+    for j in range(nv + 1):
+        row = []
+        for i in range(nu + 1):
+            u, v = i / nu, j / nv; x = (u - 0.5) * W; z = (v - 0.5) * Lb
+            # dropped bunched: pleated along its length, the pleats squeezing it to ~60 %, one end lifted
+            zz = z * 0.42 + 0.04 * math.sin(2 * math.pi * 2.6 * v); y = 0.13 * abs(math.sin(math.pi * 2.6 * v)) + 0.22 * v + 0.05 * nz(Vector((x, 0, z)), 3.0, 48)
+            xx = x * (0.55 + 0.25 * v) + 0.06 * math.sin(2 * math.pi * 1.3 * u + 2 * v) + 0.05 * math.sin(2 * math.pi * 2.1 * v + 1.0)
+            row.append(bm.verts.new(Bv(Vector((xx, y, zz)))))
+        V.append(row)
+    for j in range(nv):
+        for i in range(nu): bm.faces.new([V[j][i], V[j][i + 1], V[j + 1][i + 1], V[j + 1][i]]).smooth = True
+    o = new_obj("blanket", bm, "fleece")
+    o.data.transform(Matrix.Translation(B(1.33, FY + 0.12, 0.97)) @ Matrix.Rotation(-0.35, 4, 'Z')); o.data.update()
+    drop_cloth(o, [cushion_parts[0], bpy.data.objects["floor"]], frames=70, mass=0.3, tension=10, bending=0.5, self_col=True, friction=14, floor_y=FY + 0.0025)
+    smooth_mesh(o, 0.25, 1)
+    sheet(o, 0.004, even=False); project_uv(o)
     return o
 
 
 def clothes(cushion_parts):
-    """jeans on the floor by the bed's foot and a T-shirt on the floor cushion, each registered with the prop sweep"""
+    """jeans on the floor by the bed's foot, the throw on the floor cushion (each registered with the prop sweep), and
+    the T-shirt over the desk chair's back (part of the chair's node)"""
     FY = G["FY"]
     G["check"]("jeans", jeans(), ("y", FY))
-    G["check"]("tee", [tee(cushion_parts)], None)
+    G["check"]("blanket", [blanket(cushion_parts)], None)
+    tee_on_chair()
+
+
+# ================================================================ worn canvas sneakers by the door (#98 soft props, second pass)
+def sneaker(nm, right=True, seed=0, loose=True):
+    """a worn low-top canvas sneaker (a men's 26 cm foot: 27.5 cm long, 9.2 cm wide at the ball), no brand: a
+    vulcanised rubber sole with a foxing stripe and a toe cap, the canvas upper with its heel counter, a padded collar
+    round the opening (the lining and the insole show inside), the tongue under five crossed laces through dark
+    eyelets, loose untied ends (loose), creases across the toe where it flexes, a heel collar a little trodden down,
+    dirt on the sole. Built at the origin, heel at z = 0, toe towards +z; returns its parts."""
+    random.seed(70 + seed); n0 = len(STATIC)
+    L = 0.275; side = 1 if right else -1
+    def wid(t):                                                                     # half-width of the outsole
+        keys = [(0.0, 0.0), (0.02, 0.022), (0.08, 0.031), (0.22, 0.034), (0.42, 0.032), (0.62, 0.043), (0.74, 0.046), (0.87, 0.041), (0.95, 0.030), (1.0, 0.0)]
+        w = 0.0
+        for (a, wa), (b, wb) in zip(keys, keys[1:]):
+            if t <= b: u = (t - a) / (b - a); u = u * u * (3 - 2 * u); w = wa + (wb - wa) * u; break
+        if t < 0.02: w = 0.022 * math.sqrt(max(0.0, t / 0.02))
+        if t > 0.95: w = 0.030 * math.sqrt(max(0.0, (1 - t) / 0.05))
+        return w
+    def top_h(t):                                                                   # the upper's height at its middle
+        keys = [(0.0, 0.070), (0.12, 0.072), (0.22, 0.066), (0.46, 0.071), (0.60, 0.064), (0.74, 0.052), (0.88, 0.043), (0.97, 0.032), (1.0, 0.024)]
+        for (a, ha), (b, hb) in zip(keys, keys[1:]):
+            if t <= b: u = (t - a) / (b - a); u = u * u * (3 - 2 * u); return ha + (hb - ha) * u
+        return 0.024
+    def opening(t): return 0.026 * math.sqrt(max(0.0, 1 - ((t - 0.25) / 0.20) ** 2))   # the foot's opening (half-width)
+    SOLE = 0.022; INS = 0.028
+    ts = [0.0, 0.012, 0.03] + [0.03 + 0.47 * k / 13 for k in range(1, 14)] + [0.5 + 0.47 * k / 9 for k in range(1, 10)] + [0.985, 1.0]   # denser round the opening
+    rings = []; cols = []
+    for t in ts:
+        w = max(wid(t), 1e-4); h = top_h(t); cx = side * 0.005 * math.sin(math.pi * t)       # a banana shape: the medial side straighter
+        if t < 0.12: h -= 0.008 * (1 - t / 0.12)                                    # the heel collar, trodden down a little
+        op = opening(t); sec = []; col = []
+        half = [(0.0, 0.0, "sole"), (0.86, 0.0, "sole"), (0.97, 0.002, "sole"), (1.0, 0.0125, "sole"),
+                (1.0, 0.0145, "fox"), (1.0, 0.0165, "fox"), (1.0, 0.0185, "sole"), (0.99, SOLE, "sole"), (0.965, SOLE + 0.002, "up")]
+        for f in (0.3, 0.6, 0.85):
+            half.append((0.965 - 0.17 * f * f, SOLE + 0.002 + f * (h - 0.006 - SOLE), "up"))
+        for xf in (0.84, 0.64, 0.44, 0.22, 0.0):
+            half.append((xf * 0.80, h - 0.006 + 0.006 * (1 - xf * xf), "top"))
+        # one loop: the bottom's middle -> up the +x side -> over the top -> down the -x side
+        loop = half + [(-xf, y, tg) for (xf, y, tg) in reversed(half[1:-1])]
+        for (xf, y, tag) in loop:
+            x = xf * w; yy = y
+            if tag == "top" and 0.40 < t < 0.52: yy += 0.008 * math.sin(math.pi * (t - 0.40) / 0.12) * (1 - (x / (0.8 * w)) ** 2)   # the tongue's top edge
+            if tag == "top" and t < 0.45 and op > 0 and abs(x) < op * 1.05:             # inside the opening: down to the insole
+                k_ = 1 - smooth01(op * 0.70, op * 1.05, abs(x)); yy = yy + (INS - yy) * k_
+                if k_ > 0.5: tag = "in"
+            if tag == "top" and t < 0.5 and abs(x) < op + 0.006: yy += 0.004            # the padded collar's roll
+            if tag == "top" and 0.47 <= t <= 0.76: yy += 0.004 * (1 - (x / (0.8 * w)) ** 2)   # the tongue
+            if tag in ("top", "up") and 0.62 < t < 0.80:                                # creases across the toe where it flexes
+                yy -= 0.0022 * max(0.0, math.sin(2 * math.pi * (t - 0.62) / 0.06)) * (1 - abs(xf))
+            if t > 0.86 and tag == "up" and y < 0.036: tag = "cap"                     # the rubber toe cap
+            sec.append(Vector((cx + x, yy, t * L))); col.append(tag)
+        rings.append(sec); cols.append(col)
+    bm = bmesh.new(); V = [[bm.verts.new(Bv(p)) for p in r] for r in rings]; n = len(rings[0])
+    for k in range(len(V) - 1):
+        for i in range(n):
+            j = (i + 1) % n; f = bm.faces.new([V[k][i], V[k][j], V[k + 1][j], V[k + 1][i]]); f.smooth = True
+            tg = {cols[k][i], cols[k][j], cols[k + 1][j], cols[k + 1][i]}
+            f.material_index = 1 if (tg <= {"sole", "fox"} or "cap" in tg and not ("up" in tg or "top" in tg)) else 0
+    bm.faces.new(list(reversed(V[0]))).material_index = 1; bm.faces.new(V[-1]).material_index = 1
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=2e-4); bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    o = new_obj(nm, bm, ["jersey", "painted"])
+    up_c, ins_c, sole_c, fox_c = srgb("#4b4e56"), srgb("#a3998b"), srgb("#d6d0c2"), srgb("#2b2b2c")
+    def colour(p):
+        y = p.y; t = p.z / L; c = up_c
+        if y < SOLE + 0.0005:
+            c = fox_c if 0.0135 < y < 0.0175 else tuple(a * (0.78 + 0.22 * smooth01(0.0, 0.012, y)) for a in sole_c)   # dirt low on the sole
+        elif t > 0.86 and y < 0.036: c = tuple(a * 0.93 for a in sole_c)
+        elif t < 0.47 and opening(t) > 0.004:                                       # the lining and the insole inside, blended in
+            k = (1 - smooth01(opening(t) * 0.78, opening(t) * 1.08, abs(p.x))) * smooth01(0.003, 0.010, top_h(t) - y)
+            c = tuple(a + (b_ - a) * k for a, b_ in zip(up_c, ins_c))
+        elif t > 0.6: c = tuple(a * (1 + 0.35 * smooth01(0.6, 1.0, t) * max(0.0, nz(p, 30.0, 71))) for a in up_c)   # the canvas worn paler at the toe
+        return tuple(a * (1 + 0.05 * nz(p, 25.0, 72)) for a in c)
+    paint(o, colour)
+    lace_c = srgb("#cfcac0")
+    from mathutils.bvhtree import BVHTree
+    bvh = BVHTree.FromObject(o, bpy.context.evaluated_depsgraph_get())
+    def on_top(x, t, lift):                                                         # the upper's surface above (x, t), lifted along its normal
+        r = bvh.ray_cast(Bv(Vector((x, 0.2, t * L))), Bv(Vector((0, -1, 0))))
+        return gl(r[0]) + gl(r[1]).normalized() * lift if r[0] is not None else Vector((x, top_h(t), t * L))
+    eye = [0.51 + 0.052 * k for k in range(5)]
+    for k, t in enumerate(eye):
+        pts = [on_top(-0.019 + 0.038 * u, t + 0.024 * u, 0.0016 + 0.0012 * math.sin(math.pi * u)) for u in (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)]
+        thin(tube_along("lace", "painted", pts, 0.0024, 0.0012, n=5, ref=Vector((0, 1, 0)))); paint(STATIC[-1], lambda p: lace_c)
+        for x in (-0.019, 0.019):                                                   # the eyelets: dark rings in the canvas
+            c = on_top(x, t + (0.024 if x > 0 else 0.0), 0.0008)
+            thin(tube_along("eyelet", "painted", [c - Vector((0, 0.0004, 0)), c + Vector((0, 0.0006, 0))], 0.0028, 0.0028, n=5, cap=(False, True))); paint(STATIC[-1], lambda p: srgb("#1c1c1e"))
+    if loose:
+        for sg in (-1, 1):                                                          # the untied ends: back along the top, over the heel, onto the floor
+            t0 = eye[0] - 0.012
+            ctrl = [on_top(sg * 0.019, t0, 0.002), on_top(sg * (0.45 + 0.1 * sg) * wid(0.38), 0.38, 0.0025), on_top(sg * 0.7 * wid(0.12), 0.12 + 0.03 * sg, 0.0025),
+                    Vector((sg * 0.012, 0.045 + 0.01 * sg, -0.004)), Vector((sg * 0.016, 0.0013, -0.016)), Vector((sg * (0.022 + 0.01 * random.random()), 0.0013, -0.024))]
+            thin(tube_along("lace", "painted", tube_pts(ctrl, 5), 0.0022, 0.0012, n=5, ref=Vector((0, 1, 0)), cap=(False, True))); paint(STATIC[-1], lambda p: lace_c)
+    return [o for o in STATIC[n0:]]
+
+
+def sneakers():
+    """the pair by the door, in the strip between the fridge and the door's hinge-side casing (the leaf's swing and his
+    way to the door leave 17 cm there): the right one standing, toes to the wall; the left one kicked over onto its
+    side beside it, its sole towards the door. Each is placed from its measured bounds."""
+    FY, IZ, wb = G["FY"], G["IZ"], G["world_box"]
+    def put(parts, x_lo=None, x_hi=None, z_lo=None):
+        lo, hi = wb(parts); dx = (x_lo - lo[0]) if x_lo is not None else (x_hi - hi[0]); dz = z_lo - lo[2]
+        for o in parts: o.data.transform(Matrix.Translation(B(dx, 0, dz))); o.data.update()
+    a = sneaker("sneaker", True, 0)
+    for o in a: o.data.transform(Matrix.Scale(0.96, 4)); o.data.update(); transform(o, ry=math.pi)
+    G["settle"](a, FY); put(a, x_lo=G["FX1"] + 0.006, z_lo=IZ + 0.032)
+    b = sneaker("sneaker", False, 1, loose=False)
+    for o in b:                                                                     # rolled onto its outer side (about its length)
+        o.data.transform(Matrix.Scale(0.96, 4)); o.data.transform(Matrix.Rotation(-math.pi / 2 + 0.10, 4, 'Y')); o.data.update()
+        transform(o, ry=math.pi - 0.03)
+    G["settle"](b, FY); put(b, x_hi=G["LX0"] - 0.004, z_lo=IZ + 0.045)
+    [project_uv(o) for o in a + b]
+    return a, b
