@@ -166,7 +166,7 @@ for (const side of ["Left", "Right"]) {
       .setAttribute("TEXCOORD_0", acc(new Float32Array(UV), Accessor.Type.VEC2)).setIndices(acc(new Uint16Array(I), Accessor.Type.SCALAR)).setMaterial(matr);
   }
   const finish = orig.createMesh(side + "EyeFinish"); const finishNode = orig.createNode(side + "EyeFinish"); finishNode.setMesh(finish); node.addChild(finishNode);
-  { // rim
+  if (SPEC.materials.rim) { // rim (off: it read as a pink line round the iris; the lids' shadow is baked on the sclera instead)
     const SEG = 48, depth = LS.rimDepth ?? 0.002, P = [], N = [], UV = [], I = [];
     for (let k = 0; k <= SEG; k++) { const t = 2 * Math.PI * k / SEG;
       const po = onEllipse(t, -0.0006, -0.0006, -0.0006), pi = onEllipse(t, -0.0010, -0.0010, -depth);   // a 0.4 mm band   // from inside the skin's edge, back towards the ball: a dark line of lid thickness, never in front of the skin

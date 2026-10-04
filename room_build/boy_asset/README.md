@@ -127,11 +127,11 @@ vertices, so `visible = false` on it is safe); the socks are **`boy_socks`** (`c
 
 ## The finish (the owner's "rifinito, non upscale")
 Every detail below is modelled or painted by the build; nothing is upscaled or repainted by a model.
-- **Eyes.** The opening's own ellipse (PCA of the hole's texels: across, up, half-lengths) drives three new parts under
-  each `Eye` node (`assemble.mjs`, mesh `<Side>EyeFinish`): a **lid rim**, a band from the skin's edge back towards the
-  eyeball (the eyelid's thickness, moist: roughness 0.22); **lashes**, alpha cards rooted on the upper (20) and lower (5)
+- **Eyes.** The opening's own outline (measured from the hole's texels, 48 directions) drives the parts under each
+  `Eye` node (`assemble.mjs`, mesh `<Side>EyeFinish`): **lashes**, alpha cards rooted on the upper (20) and lower (5)
   margins fanning forward and out, from a drawn card texture (`tex_lash.png`, tapered hairs; the lower ones short and
-  sparse); a **caruncle** in the inner corner; the opening's hole is closed at both corners so no sclera shows past the lids. The eyeball texture is 1024² with finer radial fibres, Fuchs' crypts, a collarette and a limbal ring; the
+  sparse); a **caruncle** in the inner corner; the opening's hole is closed at both corners so no sclera shows past the lids. A lid rim (a band for the eyelid's thickness) was tried and dropped: a flat band round the iris read as a pink line;
+  the lids' shadows are baked on the sclera instead. The eyeball texture is 1024² with finer radial fibres, Fuchs' crypts, a collarette and a limbal ring; the
   sclera carries the upper and lower lids' shadows; the alpha cut of the opening is a 3-texel ramp (a smooth edge under
   the MASK cutoff, not texel stairs). The cornea's clearcoat gives the sharp catch-light.
 - **Brows.** ~2,500 individual strokes per build over the painted brow: rooted on its dark texels, each follows the growth
@@ -140,14 +140,14 @@ Every detail below is modelled or painted by the build; nothing is upscaled or r
   buffer's gradients, so the strokes are right whatever the UV layout does. Drawn at 2x and brought down (anti-aliased).
 - **Ears.** A sculpted relief on the once-subdivided ear in `build_mesh.py`: helix rim, scapha groove, antihelix,
   concha bowl, tragus, soft lobe, as a height field in the ear's own frame, fading where the ear joins the head; the same
-  field in the skin's normal map for the fine edges; occlusion re-baked; the hair shards that overlapped the ear are clamped behind its base plane. The ear keeps the evened skin (the face
+  field in the skin's normal map for the fine edges; occlusion re-baked; the hair shards that overlapped the ear are clamped 1.2 cm behind its base plane; the ear's colour is smoothed under the relief (the old atlas's tiny ear islands had left pale cell outlines). The ear keeps the evened skin (the face
   projection is unreliable there) with a warm tint on the thin rim and lobe (light through them) and a darker concha.
 - **Hairline.** The forehead and temples under the bangs are skin (non-skin texels filled from the skin around), with
   ~200 fine baby hairs painted along the hair's edge (texels 1.5-13 mm from the nearest hair vertex, falling off with
   distance). Pale strands the votes had absorbed into the face are found by the ray test and labelled hair.
 - **Socks.** Flat white cotton albedo (no variation: the knit lives in the normal map alone, subtle). The sock's colour and its occlusion floor extend into the UV islands' margins (the region map is baked without margin; without that every sock seam drew a dark crack); a rib knit at the cuff only (above 6 cm); a toe seam across
   the front and a heel seam up the back (a thread's shadow in both colour and normal); the closed sole (above); the
-  sock tucks 3 mm under the cuff's hem (above 9.6 cm only: lower, the dents showed as creases) and the hem is a label line at 10 cm.
+  foot shell is cut by the plane z = 10 cm around both ankles (`bisect_plane`, then triangulated) so the sock / cuff label boundary is one clean edge loop, not a sawtooth of triangle edges; above the cut the sock tucks 3 mm inside the cuff.
 - **Slides.** Uniform black foam, matte with a slight sheen; a tread groove around the sole's edge at 9 mm; the strap's
   end takes no white (sock-labelled specks of old padding there are absorbed into the slide).
 

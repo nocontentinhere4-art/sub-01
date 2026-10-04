@@ -113,9 +113,9 @@ hole = np.zeros((S, S), bool)
 for e in eyes.values():
     c = e["surface"] - e["forward"] * (RADIUS + INSET); d = pos - c
     lateral = np.linalg.norm(d - (d @ e["forward"])[:, :, None] * e["forward"], axis=2)
-    inner = np.abs(X) > abs(e["surface"][0]) - 0.32 * e["width"]       # the inner corner (towards the nose) stays painted: the ball sits deeper there
-    outer = np.abs(X) < abs(e["surface"][0]) + 0.22 * e["width"]       # and the outer corner: the lid closes over the ball there too (no sclera wedge past the lashes)
-    hole |= ndi.binary_erosion(e["mask"], iterations=4) & (lateral < RADIUS * 0.8) & inner & outer
+    inner = np.abs(X) > abs(e["surface"][0]) - 0.24 * e["width"]       # the inner corner (towards the nose) stays painted: the ball sits deeper there
+    outer = np.abs(X) < abs(e["surface"][0]) + 0.18 * e["width"]       # and the outer corner: the lid closes over the ball there too (no sclera wedge past the lashes)
+    hole |= ndi.binary_erosion(e["mask"], iterations=6) & (lateral < RADIUS * 0.75) & inner & outer
 hole = blur(hole.astype(np.float32), 2.5) > 0.5                              # the morphology's square corners rounded off
 lab_hh, n_hh = ndi.label(hole)
 if n_hh > 2:                                                                  # one hole per eye: no stray specks
@@ -350,6 +350,9 @@ if os.path.exists(EARJ):                                                   # the
     rcE = np.hypot(uE - 0.15, vE + 0.1) / 0.40; conchaE = np.maximum(0.0, 1 - rcE * rcE)
     warm = np.clip(0.55 * rimE + 0.6 * lobeE, 0, 1) * on_ear; dark_e = conchaE * on_ear
     skin_out[:, :, 0] = np.clip(skin_out[:, :, 0] * (1 + 0.07 * warm), 0, 1); skin_out[:, :, 1] = np.clip(skin_out[:, :, 1] * (1 - 0.02 * warm), 0, 1); skin_out[:, :, 2] = np.clip(skin_out[:, :, 2] * (1 - 0.06 * warm), 0, 1)
+    sm_e = np.stack([blur(skin_out[:, :, k] * on_ear, 5) for k in range(3)], 2) / np.maximum(blur(on_ear.astype(np.float32), 5), 1e-3)[:, :, None]
+    m_e = blur(ndi.binary_erosion(on_ear, iterations=3).astype(np.float32), 3)[:, :, None]
+    skin_out = skin_out * (1 - m_e) + sm_e * m_e                           # the old atlas's tiny ear islands left pale cell outlines: smoothed away
     skin_out = np.clip(skin_out * (1 - 0.10 * dark_e)[:, :, None], 0, 1); print("ear tint: %d texels" % int(on_ear.sum()))
     # the old paint smeared hair shadows over the ears: non-skin texels there are filled from the ear's own skin
     sl_e = skin_out.mean(2); pink_e = skin_out[:, :, 0] - skin_out[:, :, 2] > 0.06
@@ -506,7 +509,8 @@ if os.path.exists(REG):
         if ref_h.sum() > 1000: print("  reference: the repaint's hoodie median %s (lit), ours %s (albedo)" % (np.median(cp[ref_h], 0).round(3), hood_med.round(3)))
 save("tex_cloth.png", cloth_g)
 save("tex_cloth_n.png", sanitize_normal(load("nrm_cloth.png")))
-ao_c = np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1)
+ao_c = load("ao_cloth.png", C)[:, :, 0]
+ao_c = np.clip(np.where(reg == 3, ao_c ** 1.3, ao_c * 0.85 + 0.15), 0, 1) if os.path.exists(REG) else np.clip(ao_c * 0.85 + 0.15, 0, 1)   # the hoodie's folds read through its occlusion (the old atlas had them baked into the colour)
 if os.path.exists(REG):                                                       # the socks' own sole is baked INSIDE the slides (black AO): the page shows it with the slides hidden;
     sock_d = ndi.binary_dilation(reg == 5, iterations=10) & ((reg == 5) | (reg == 0))   # the islands' margins too (reg is baked without margin): dark gutters there drew cracks along every sock seam
     ao_c = np.where(sock_d, np.maximum(ao_c, 0.92), ao_c)
@@ -564,14 +568,13 @@ spec = {
     "materials": {
         "skin":   {"base": "skin", "baseQ": 90, "normal": "skin_n", "normalScale": 0.5, "orm": "skin_orm", "alphaMask": True, "sheen": [0.35, 0.25, 0.22], "sheenRoughness": 0.8, "doubleSided": True},
         "hair":   {"base": "hair", "baseQ": 82, "normal": "hair_n", "normalScale": 0.15, "orm": "hair_orm", "doubleSided": True},
-        "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8, "doubleSided": True},   # the hood's inside shows at the open collar
+        "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.4, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8, "doubleSided": True},   # the hood's inside shows at the open collar
         "pants":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.7, "orm": "cloth_orm", "doubleSided": True},
         "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "sheen": [0.35, 0.35, 0.35], "sheenRoughness": 0.9, "doubleSided": True},
         "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "doubleSided": True},
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},
-        "rim":    {"color": [0.45, 0.26, 0.25, 1], "roughness": 0.45, "doubleSided": True},   # the lid margin: shadowed skin, a little moist   # the eyelid's thickness: moist flesh, in the lid's shadow
         "caruncle": {"color": [0.6, 0.27, 0.3, 1], "roughness": 0.3},
         "lash":   {"base": "lash", "baseQ": 92, "blend": True, "roughness": 0.55, "doubleSided": True, "color": [0.55, 0.5, 0.5, 1]},
     },

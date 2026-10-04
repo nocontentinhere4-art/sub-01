@@ -37,6 +37,15 @@ for o in list(bpy.data.objects):
 m = me.data
 bm = bmesh.new(); bm.from_mesh(m)
 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.05)          # units are cm (armature scale 0.01): 0.5 mm
+# the trouser hem: the feet are one shell, so the sock / cuff boundary could only follow triangle edges (a sawtooth).
+# The shell is cut by the plane z = 10 cm around both ankles; the labels below then meet on that edge loop.
+HEM_Z = 10.0
+bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table()
+ankle_geom = [f for f in bm.faces if min(v.co.z for v in f.verts) < HEM_Z < max(v.co.z for v in f.verts) and abs(f.calc_center_median().x) > 5 and f.calc_center_median().z < 14]
+ankle_geom = list({e for f in ankle_geom for e in f.edges} | set(ankle_geom) | {v for f in ankle_geom for v in f.verts})
+res_cut = bmesh.ops.bisect_plane(bm, geom=ankle_geom, plane_co=(0, 0, HEM_Z), plane_no=(0, 0, 1), dist=0.001)
+print("hem cut at z = %.1f: %d new vertices" % (HEM_Z, sum(1 for g in res_cut["geom_cut"] if isinstance(g, bmesh.types.BMVert))), flush=True)
+bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])     # the cut leaves quads along the loop; everything below assumes triangles
 bm.to_mesh(m); bm.free(); m.update()
 bpy.context.view_layer.objects.active = me; me.select_set(True)
 if m.has_custom_normals: bpy.ops.mesh.customdata_custom_splitnormals_clear()
@@ -244,7 +253,9 @@ for p in m.polygons:
     if covered < 3: continue
     foot_f += 1
     new_lab = "socks" if whites / covered > 0.5 else ("pants" if co[vs, 2].mean() > 11.0 else "slides")
-    if new_lab == "socks" and co[vs, 2].mean() > 10.0: new_lab = "pants"       # the hem: a clean line at 10 cm (the one shell has no real edge there)
+    if new_lab == "slides" and co[vs, 2].mean() > 7.5: new_lab = "socks"          # the slide never reaches above the ankle (the strap tops out near 6.5 cm; see the island rule below for 5.5-7.5)
+    if new_lab == "socks" and co[vs, 2].mean() > HEM_Z: new_lab = "pants"       # the hem: the cut edge loop at 10 cm
+    if new_lab == "pants" and co[vs, 2].max() < HEM_Z + 0.01: new_lab = "socks"   # below the hem's cut there is no cuff: the dark notch under the hem was a black-painted face here
     cxm = co[vs].mean(0)
     if new_lab == "socks" and cxm[2] < 4.5 and abs(cxm[0] - FOOT_XMID["left" if cxm[0] > 0 else "right"]) > 4.3: new_lab = "slides"   # the strap's ends and the sole's sides, whatever the old paint
     if new_lab != flab[p.index]: flab[p.index] = new_lab; foot_changed += 1
@@ -274,6 +285,13 @@ for side, sgn in (("left", 1), ("right", -1)) if USE_STRAP_BAND else ():
     for i, p in enumerate(m.polygons):
         if flab[i] == "socks" and cs[i, 0] * sgn > 0 and 1.5 < cs[i, 2] < 5.5 and y0 <= cs[i, 1] <= y1 and abs(cs[i, 0] - FOOT_XMID[side]) < 5.0: flab[i] = "slides"; n_s += 1
     log("%s strap band y %.1f..%.1f: %d sock faces inside it relabelled slides" % (side, y0, y1, n_s)); foot_changed += n_s
+for comp in islands(flab):                                                      # a slide patch that floats above 5.5 cm is not the slide (the strap rises from the sole; a dark notch under the hem did not)
+    if flab[comp[0]] == "slides" and min(co[list(m.polygons[i].vertices), 2].mean() for i in comp) > 5.5:
+        for i in comp: flab[i] = "socks"
+        foot_changed += len(comp)
+for i, p in enumerate(m.polygons):                                             # last word: nothing of the slide above 7 cm (the votes above can bring one back)
+    cc_ = co[list(p.vertices)].mean(0)
+    if flab[i] == "slides" and cc_[2] > 7.0 and cc_[1] > -5.5: flab[i] = "socks"; foot_changed += 1        # (the strap's arch over the instep, y < -5.5, may top 7 cm; the shin side never)
 log("foot faces re-read from their own old texels: %d, relabelled %d" % (foot_f, foot_changed))
 log("face labels:", Counter(flab), "islands:", Counter(flab[c[0]] for c in islands(flab)))
 
@@ -426,7 +444,7 @@ m.update(); log("slides grown outward:", len(sv), "vertices")
 socks_slot = REGIONS.index("socks"); sock_vv = set(v for p in m.polygons if p.material_index == socks_slot for v in p.vertices); tucked = 0
 for vi in sock_vv:
     v = m.vertices[vi]
-    if 9.6 < v.co.z < 11.5: v.co = v.co - v.normal * (0.3 * min(1.0, (v.co.z - 9.6) / 0.8)); tucked += 1      # only under the hem (10 cm): lower, the dents showed as creases on the visible sock
+    if HEM_Z + 0.01 < v.co.z < 11.5: v.co = v.co - v.normal * (0.3 * min(1.0, (v.co.z - HEM_Z) / 0.6)); tucked += 1   # only above the hem's cut (hidden inside the cuff); the cut loop itself stays
 m.update(); log("sock vertices tucked under the hem:", tucked)
 
 # ---------------------------------------------------------------- the ears: a sculpted relief on the subdivided ear
@@ -473,8 +491,8 @@ hair_slot = REGIONS.index("hair"); co2 = np.array([v.co[:] for v in m.vertices])
 rel_h = co2 - np.array([HB.x, HB.y, 0.0]); f_h = rel_h @ np.array(fwd_h[:]); l_h = rel_h @ np.array(right_h[:])
 hv_set = set(v for p in m.polygons if p.material_index == hair_slot for v in p.vertices); tucked_h = 0
 for i in hv_set:
-    if EAR["f_lo"] - 0.3 < f_h[i] < EAR["f_hi"] and EAR["z_c"] - 1.3 * EAR["hh"] < co2[i, 2] < EAR["z_c"] + 1.6 * EAR["hh"] and abs(l_h[i]) > EAR["lat_min"] - 0.6:
-        excess = abs(l_h[i]) - (EAR["lat_min"] - 0.6); m.vertices[i].co = m.vertices[i].co - right_h * (np.sign(l_h[i]) * excess); tucked_h += 1
+    if EAR["f_lo"] - 1.0 < f_h[i] < EAR["f_hi"] + 0.5 and EAR["z_c"] - 1.4 * EAR["hh"] < co2[i, 2] < EAR["z_c"] + 2.0 * EAR["hh"] and abs(l_h[i]) > EAR["lat_min"] - 1.2:
+        excess = abs(l_h[i]) - (EAR["lat_min"] - 1.2); m.vertices[i].co = m.vertices[i].co - right_h * (np.sign(l_h[i]) * excess); tucked_h += 1
 m.update(); log("hair vertices tucked behind the ears:", tucked_h)
 EAR.update({"fwd": list(fwd_h[:]), "right": list(right_h[:]), "head": [HB.x, HB.y, 0.0]})
 json.dump(EAR, open(os.path.join(WORK, "ears.json"), "w"))
@@ -630,9 +648,9 @@ def emit_region():
         nt = m.materials[i].node_tree; nt.nodes.clear()
         em = nt.nodes.new("ShaderNodeEmission"); out = nt.nodes.new("ShaderNodeOutputMaterial"); em.inputs[0].default_value = ((i + 1) / 8, (i + 1) / 8, (i + 1) / 8, 1)
         nt.links.new(em.outputs[0], out.inputs[0]); nt.nodes.new("ShaderNodeTexImage").name = "target"
-reg_imgs = new_imgs("region_", {"skin": 8, "hair": 8, "cloth": 1024}, float_=True)
+reg_imgs = new_imgs("region_", {"skin": 8, "hair": 8, "cloth": 2048}, float_=True)      # at the atlas's own resolution: the hem's small triangles were mislabelled at 1024
 emit_region(); bake_to(reg_imgs, "EMIT", margin=0)
-np.save(os.path.join(WORK, "region_cloth.npy"), np.round(np.array(reg_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, 0] * 8).astype(np.uint8))
+np.save(os.path.join(WORK, "region_cloth.npy"), np.round(np.array(reg_imgs["cloth"].pixels[:], dtype=np.float32).reshape(2048, 2048, 4)[:, :, 0] * 8).astype(np.uint8))
 emit_geometry("pos"); bake_to(pos_imgs, "EMIT", margin=4)
 np.save(os.path.join(WORK, "pos_skin.npy"), (np.array(pos_imgs["skin"].pixels[:], dtype=np.float32).reshape(2048, 2048, 4)[:, :, :3] - 0.5) * 400)
 np.save(os.path.join(WORK, "pos_cloth.npy"), (np.array(pos_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, :3] - 0.5) * 400)   # position per cloth texel (cm): make_textures.py draws the socks' edge, seams and the slides' tread from it
