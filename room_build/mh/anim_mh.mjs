@@ -199,10 +199,11 @@ function solveSide(Wq, L, rootPos, s, dy) {
 // wrist, the palm's middle or the middle knuckle is inside (+1.2 cm of skin), the arm (two bones) moves the wrist out
 // along the capsule's normal, and the hand keeps its world rotation.
 function wlq(L, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b); let W = new THREE.Quaternion(); for (const b of path) W = W.clone().multiply(L[b]); return W; }
-function handsOut(L, rootPos, r) {
+function handsOut(L, rootPos, r) { for (const s of ["L", "R"]) handsOutSide(L, rootPos, r, s); }
+function handsOutSide(L, rootPos, r, s1) {
   const caps = ["L", "R"].map(sd => [bonePos(L, rootPos, `upperleg01.${sd}`), bonePos(L, rootPos, `lowerleg01.${sd}`)]);
   const seg = new THREE.Line3(), q = new THREE.Vector3();
-  for (const s of ["L", "R"]) {
+  for (const s of [s1]) {
     const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
     for (let it = 0; it < 12; it++) {
       const W0 = bonePos(L, rootPos, wr), K0 = bonePos(L, rootPos, `finger3-1.${s}`), E0 = bonePos(L, rootPos, lo);
@@ -228,6 +229,22 @@ function handsOut(L, rootPos, r) {
       L[wr] = wlq(L, par[wr]).invert().multiply(Hw);
     }
   }
+}
+// move a wrist to T with the two arm bones (elbow kept on its side), the hand keeping its world rotation
+function moveWrist(L, rootPos, s, T) {
+  const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
+  const Hw = wlq(L, wr), A = bonePos(L, rootPos, up), Kc = bonePos(L, rootPos, lo), W0 = bonePos(L, rootPos, wr);
+  const a = A.distanceTo(Kc), b = Kc.distanceTo(W0);
+  let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
+  const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const pole = Kc.clone().sub(A).sub(d.clone().multiplyScalar(Kc.clone().sub(A).dot(d))).normalize();
+  const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), Cn = A.clone().addScaledVector(d, dl);
+  const R1 = new THREE.Quaternion().setFromUnitVectors(Kc.clone().sub(A).normalize(), E.clone().sub(A).normalize()).multiply(wlq(L, up));
+  L[up] = wlq(L, par[up]).invert().multiply(R1);
+  const Kn = bonePos(L, rootPos, lo), Cc = bonePos(L, rootPos, wr);
+  const R2 = new THREE.Quaternion().setFromUnitVectors(Cc.clone().sub(Kn).normalize(), Cn.clone().sub(Kn).normalize()).multiply(wlq(L, lo));
+  L[lo] = wlq(L, par[lo]).invert().multiply(R2);
+  L[wr] = wlq(L, par[wr]).invert().multiply(Hw);
 }
 function legDown(Wq, L, rootPos, sd, w) {
   const up = `upperleg01.${sd}`, lo = `lowerleg01.${sd}`, ft = `foot.${sd}`;
@@ -271,10 +288,19 @@ for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 
     const w = Math.max(0, Math.min(1, (h - hl) / (hs - hl))) * Math.max(0, Math.min(1, (0.85 - h) / 0.1));
     if (w > 0) { const rp = [ (hp.x - (p0 ? p0.x : hp.x)) * k + rest.head.root[0], hp.y * k + lift, (hp.z - (p0 ? p0.z : hp.z)) * k + rest.head.root[2] ];
       for (const sd of ["L", "R"]) legDown(Wq, L, rp, sd, w); } }
-  if (process.env.HANDSOUT) { const rp = [ (hp.x - (p0 ? p0.x : hp.x)) * k + rest.head.root[0], hp.y * k + +(process.env.DY || 0) + lift, (hp.z - (p0 ? p0.z : hp.z)) * k + rest.head.root[2] ];
-    handsOut(L, rp, +process.env.HANDSOUT); }
   frames.push({ L, root: [ (hp.x - p0.x) * k + rest.head.root[0], hp.y * k + +(process.env.DY || 0) + lift, (hp.z - p0.z) * k + rest.head.root[2] ] });
 }
+// HANDSOUT post pass: solve each frame's wrist correction on a copy, then spread it in time (a max over +-5 frames so
+// the hand moves out BEFORE contact, then a Gaussian, sigma 4 frames) and apply the smoothed corrections, so the hands
+// glide instead of jumping when the collision switches on and off
+if (process.env.HANDSOUT) { const r = +process.env.HANDSOUT;
+  for (const sd of ["L", "R"]) {
+    const corr = frames.map(f => { const Lc = Object.fromEntries(Object.entries(f.L).map(([n, q]) => [n, q.clone()]));
+      const w0 = bonePos(Lc, f.root, `wrist.${sd}`); handsOutSide(Lc, f.root, r, sd); return bonePos(Lc, f.root, `wrist.${sd}`).sub(w0); });
+    const n = corr.length, dil = corr.map((_, i) => { let best = corr[i]; for (let j = Math.max(0, i - 5); j <= Math.min(n - 1, i + 5); j++) if (corr[j].length() > best.length()) best = corr[j]; return best; });
+    const sm = dil.map((_, i) => { const acc = new THREE.Vector3(); let ws = 0; for (let j = Math.max(0, i - 12); j <= Math.min(n - 1, i + 12); j++) { const w = Math.exp(-((j - i) ** 2) / 32); acc.addScaledVector(dil[j], w); ws += w; } return acc.multiplyScalar(1 / ws); });
+    frames.forEach((f, i) => { if (sm[i].length() > 1e-4) moveWrist(f.L, f.root, sd, bonePos(f.L, f.root, `wrist.${sd}`).add(sm[i])); });
+  } }
 // INPLACE: remove the travel (straight line from the first to the last frame) so the clip loops on the spot; the page
 // moves the root along his path at the reported speed
 if (process.env.INPLACE) { const n = frames.length - 1, a0 = frames[0].root, a1 = frames[n].root;
