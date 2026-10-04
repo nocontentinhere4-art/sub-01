@@ -42,6 +42,21 @@ sky fill, hemisphere) and the evening desk lamp (0xffb468, distance 2.2, decay 1
 
 No brand, logo or maker's design is used.
 
+## Next to real clothes (preview only)
+The owner's rule: every item next to a real one. `compare_real.py` sets crops of the renders beside real photos of
+the same kind of clothes, cropped to the clothes (no faces, no logos): `docs/design/clothes-mh/real_feet.jpg` (the
+socks in the 3/4 close-up beside white ankle socks in sandals; the slide from above beside a black one-strap slide)
+and `real_clothes.jpg` (the hoodie seated beside a seated hoodie; the trousers beside black track trousers with a
+side stripe). These sheets stay on the preview branch, never in `web/`. The photos are downloaded by the script and
+not committed.
+
+| photo | source | licence |
+|---|---|---|
+| white ankle socks in sandals | [Wikimedia Commons](https://commons.wikimedia.org/w/index.php?curid=41275340) ([file](https://upload.wikimedia.org/wikipedia/commons/e/ee/Sandals_Worn_wth_White_Ankle_Socks.jpg)), Oddman47 | CC0 1.0 |
+| a black one-strap slide, from above | [WordPress Photo Directory](https://wordpress.org/photos/photo/30768afec3/) ([file](https://pd.w.org/2025/08/30768afec383f9f51.48963621-2048x1536.jpg)), Alina Kakshapati | CC0 1.0 |
+| a hoodie, seated | [WordPress Photo Directory](https://wordpress.org/photos/photo/83465bb8b2/) ([file](https://pd.w.org/2024/02/83465bb8b29634fb2.56218161-1536x2048.jpeg)), Midhun P | CC0 1.0 |
+| black track trousers with a side stripe | [StockSnap](https://stocksnap.io/photo/active-male-LY5QEUV2DY) ([file](https://cdn.stocksnap.io/img-thumbs/960w/LY5QEUV2DY.jpg)) | CC0 1.0 |
+
 ## Rebuild
 From `room_build/clothes_mh/`, with Blender 4.2:
 
@@ -55,6 +70,7 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     blender -b -P build_clothes.py -- --mh makehuman/makehuman/data --sys mh_sys --tex ../tex [--quick] [--feet]
     python compose_sheet.py        # docs/design/clothes-mh/clothes_sheet.jpg from out/*.png
     python compose_feet.py         # docs/design/clothes-mh/feet_sheet.jpg: 3/4 close-up, side, from above, seated at 5 m
+    python compare_real.py         # docs/design/clothes-mh/real_feet.jpg, real_clothes.jpg: next to real photos (CC0)
     python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 
 The build verifies every written `.mhclo`: read back and refitted on the body with MakeHuman's rule, it must give the
