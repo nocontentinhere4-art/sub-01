@@ -226,7 +226,8 @@ prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces
 The keyboard is the tenkeyless one modelled in `room_clean.glb` (above); the page cuts its triangles out of the joined
 static mesh into a group of its own named `keyboard` (origin: the middle of F and J on the desk top), so nothing about its
 look changes. The mouse on its pad (`mouse.glb`, `room_build/build_mouse.mjs`) is modelled in code for this project, CC0,
-to real sizes: a generic mouse, 11.8 × 6.2 × 3.6 cm, no logo. Its micro-texture is ambientCG's **Plastic 016 A**
+to real sizes: a generic mouse, 11.8 × 6.2 × 3.6 cm, no logo, with a sharp split between its buttons, the wheel in a
+slot, a parting seam all round over an upright skirt and a chamfered base. Its micro-texture is ambientCG's **Plastic 016 A**
 (https://ambientcg.com/a/Plastic016A, CC0 1.0), its roughness and normal maps (`room_build/desk_pbr.mjs`). Tried and not
 installed: a full-size keyboard modelled in code (`room_build/build_keyboard.mjs`), and a keyboard and mouse made with
 Tripo (paid API, image-to-model from renders of the code-made ones; keyboard task `0c5caa4a-9169-4ed7-bbfc-f90cd06883be`,
