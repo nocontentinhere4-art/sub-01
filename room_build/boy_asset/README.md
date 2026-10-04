@@ -59,8 +59,8 @@ Under the `Head` joint, four plain nodes (not skin joints: clips without tracks 
   (`bedInit`: how thick he is around each bone, for the duvet and the pillow; `slidesInit` / `setSlides`: the slide
   triangles, dark texels on the feet, hidden on him and parked by the bed; the `?debug` helpers) takes the **last**
   skinned mesh as his whole body. So the last primitive is the slides **plus an invisible low-poly proxy of the whole
-  welded body** (decimated to ~3k triangles, same skin weights, every texel pointing at a white, alpha 0 band of the
-  cloth atlas; the slides material is alpha-masked, so the proxy is never drawn and casts no shadow). `slidesInit` then
+  welded body** (decimated to ~3k triangles, same skin weights, its triangles written degenerate (a, a, a) so the rasteriser
+  never draws them at any mip level; the page only reads its vertices). `slidesInit` then
   finds exactly the real slide triangles (dark), as it did on the old single mesh, and `bedInit` sees every bone's
   vertices.
 
@@ -84,6 +84,36 @@ Credits: 3 generations (about 4.5 credits) + the upscale tests; see `web/room/CR
     blender -b -P bl_views.py -- project       # wpos/wnrm bakes + depth maps
     python project_paint.py                    # work/skin_projected.png + mask, read by make_textures.py
 
+The forehead under the bangs is skin: the repaint's fuller hair had painted it grey-brown there, and the mesh showed
+that between its hair spikes as grey "strands"; above the brow line every texel that is not skin-coloured is filled from
+the skin around it (the real strands are the hair primitive, black). Strands the label votes had absorbed into the face
+(thin spikes whose old paint was scalp-pink) are found in `build_mesh.py` by a ray test (a ray cast inward leaves a
+spike through its back within 1 cm; from the forehead, the nose or an ear it does not) and labelled hair.
+
+## The clothes (the owner's "anche i vestiti")
+The same repaint was tried on the whole body: `bl_body_views.py render` (four unlit views, front / back / left / right,
+1536 px), four repaints (Higgsfield, GPT Image 2.5, about 6 credits), `align_body.py` (silhouette fit + dense optical
+flow, since there are no landmarks on cloth) and `project_paint.py --body` (the cloth atlas and the skin atlas, depth
+test 8 mm, facing > 0.25). The tools stay here and work, the result does not ship: a repaint of a lit body bakes its
+lighting and its folds into the albedo, and those folds are the picture's, not the mesh's, so under the room's lights
+and in motion the clothes looked printed; at 1536 px for 1.8 m the hands are 80 px, and the repaint's hair shadows
+landed on the throat. Game clothes are not photographed, they are authored: `make_textures.py` now builds the cloth
+albedo as fabric **materials**, a flat dyed base per garment with fibre-scale variation only (heathered jersey for the
+hoodie at the old render's tone, lum 0.13; black polyester for the pants with the white stripe taken from the old atlas,
+cleaned; white cotton socks; black EVA slides), and leaves the shading to the lights, the baked occlusion and the knit /
+weave / rib normal maps. The projected repaint is read only as a tone reference (printed by the script).
+
+The feet are one shell in Meshy's remesh (the slide's strap and the pants' cuff are bulges of the sock), so a label per
+triangle draws the sock's edge as a zigzag of triangle edges. `build_mesh.py` re-reads every foot face from the covered
+texels inside its own old UV triangle (the padded atlas had painted the strap's sliver islands white), and
+`make_textures.py` paints the sock whole inside the sock faces and, inside the slide's and the cuff's faces, only where
+the old paint has a solid white patch (the sock's edge crossing a triangle); the atlas texels' height for that comes
+from the build (`work/posz_cloth.npy`).
+
+    blender -b -P bl_body_views.py -- render   # work/body/{front,back,left,right}.png + cameras.json
+    # repaint each view -> work/body/<view>_gen.png;  python align_body.py <view>  (x4)
+    blender -b -P bl_body_views.py -- project; python project_paint.py --body     # work/cloth_projected.png (reference)
+
 ## Checks and sheets
     node render/compare.mjs work/boy_old.glb out/boy.glb out/compare    # every clip at the same frames, old vs new, + close-ups
     node render/room_shots.mjs out/room new out/boy.glb                 # /room at 1280 and 390, day and night (software WebGL)
@@ -93,7 +123,8 @@ Credits: 3 generations (about 4.5 credits) + the upscale tests; see `web/room/CR
 ## Licences and credits
 Everything here is original work for this project (CC0), derived from the project's own AI-generated character. No
 outside asset was downloaded. The face crop was upscaled with Higgsfield's image upscaler (three runs, 6 credits: one
-test, one failed at full atlas size, one kept); see `web/room/CREDITS.md`.
+test, one failed at full atlas size, one kept); the face repaint took 3 generations (about 4.5 credits) and the body
+repaint trial 4 (about 6 credits, reference only); see `web/room/CREDITS.md`.
 
 ## Texture anisotropy (for the coordinator / G6)
 Texture anisotropy is a three.js texture property, not something a glTF file can carry. The room's own loader sets it

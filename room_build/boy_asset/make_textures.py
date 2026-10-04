@@ -34,8 +34,16 @@ def orm(ao, rough):
 def blur(a, r):
     return np.asarray(Image.fromarray(np.clip(a * 255, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(r))).astype(np.float32) / 255
 
+def pad_full(img, covered):
+    """every uncovered texel takes the nearest covered texel's value: no black gutters, so mip levels and bilinear
+    filtering at island borders never pull black into the surface (the torn strip at the wrist, the grey sock seams)"""
+    idx = ndi.distance_transform_edt(~covered, return_distances=False, return_indices=True)
+    return img[idx[0], idx[1]]
+def covered_of(bake): return bake.max(2) > 0.002                       # Blender bakes with use_clear: black outside the islands + margin
+
 # ------------------------------------------------------------------ skin
 skin = load("bake_skin.png"); S = skin.shape[0]
+cov_skin = covered_of(skin); skin = pad_full(skin, cov_skin)
 pos = np.load(os.path.join(WORK, "pos_skin.npy"))[::-1]           # Blender images are bottom-up; PIL arrays top-down
 nrm = np.load(os.path.join(WORK, "nrm_skin.npy"))[::-1]
 cov = np.abs(np.linalg.norm(nrm, axis=2) - 1) < 0.15                # baked texels
@@ -196,7 +204,8 @@ if os.path.exists(PROJ) and os.path.exists(PROJM):
     painted = pm > 0.85
     # the repaint's hair is fuller than the mesh hair: where it lands on skin that was skin-coloured (not a brow, lash
     # line or nostril, which were dark before too) the old skin stays
-    old_l = skin_out.mean(2); hair_bleed = (proj.mean(2) < 0.3) & (old_l > 0.45) & ~ndi.binary_dilation(hole, iterations=12)
+    old_l = skin_out.mean(2); old_pink = (skin_out[:, :, 0] - skin_out[:, :, 2] > 0.1) & ((skin_out.max(2) - skin_out.min(2)) / np.maximum(skin_out.max(2), 1e-3) > 0.15)
+    hair_bleed = (proj.mean(2) < 0.3) & (old_l > 0.45) & old_pink & ~ndi.binary_dilation(hole, iterations=12) & (Z < eye_z + 2.5)   # above the brows the repaint's hair wins: the old atlas painted the bangs' roots scalp-pink
     hair_bleed = ndi.binary_dilation(hair_bleed, iterations=3)
     m_soft = blur((sure & painted & ~hair_bleed).astype(np.float32), 4)
     # colour-match the old skin to the repaint (medians over the painted face, chroma and level)
@@ -207,7 +216,28 @@ if os.path.exists(PROJ) and os.path.exists(PROJM):
     # the hole inside the face (never seen by a camera: under the chin / behind the collar) takes the matched old skin
     skin_out = skin_out * (1 - m_soft[:, :, None]) + proj * m_soft[:, :, None]
     print("photoreal face projected: %.1f%% of the atlas" % (100 * (m_soft > 0.5).mean()))
-# the hands: the old bake has a lighter wedge on the back of each wrist (baked light); flatten the low-frequency luminance
+    # above the brows the skin is the forehead under the bangs. The repaint's fuller hair painted it grey-brown, and the
+    # mesh shows it between the hair spikes as grey "strands" (the real strands are the hair primitive, black). The
+    # forehead is skin: every texel up there that is not skin-coloured is filled from the skin around it
+    fore = face_isl & (Z > eye_z + 4.0)
+    sl_f = skin_out.mean(2); pink_f = skin_out[:, :, 0] - skin_out[:, :, 2] > 0.06
+    bad_f = fore & ((sl_f < 0.6) | ~pink_f)                                      # dark: the repaint's hair shadow, tan: its hair edge
+    good_f = face_isl & (Z > eye_z + 1.0) & ~ndi.binary_dilation(bad_f, iterations=2) & (sl_f > 0.5) & pink_f
+    if bad_f.any() and good_f.sum() > 500:
+        wg = blur(good_f.astype(np.float32), 10); fl = np.stack([blur(skin_out[:, :, k] * good_f, 10) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
+        fl = np.where((wg > 0.02)[:, :, None], fl, np.median(skin_out[good_f], 0)[None, None, :])
+        skin_out = np.where(ndi.binary_dilation(bad_f, iterations=1)[:, :, None], fl, skin_out); print("forehead: %d non-skin px filled" % int(bad_f.sum()))
+# (the full-body repaint views were tried on the skin too, work/skin_body_projected.png: at 1536 px for 1.8 m the hands are
+#  80 px and the repaint's hair shadows landed on the throat; the hands and the neck keep the evened old skin below)
+# the hands: texels that are not skin (dark grey from the cuff, white from the socks: the old atlas's padding next to the
+# hand island) are filled from the skin around them
+hands_all = cov & (Z < 125)
+hs = skin_out[:, :, 0] - skin_out[:, :, 2]; hl0 = skin_out.mean(2)
+bad_h = hands_all & ((hl0 < 0.45) | (hs < 0.06) | (hl0 > 0.93)); good_h = hands_all & ~ndi.binary_dilation(bad_h, iterations=2)
+if bad_h.any() and good_h.any():
+    wg = blur(good_h.astype(np.float32), 6); fl = np.stack([blur(skin_out[:, :, k] * good_h, 6) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
+    skin_out = np.where(ndi.binary_dilation(bad_h, iterations=1)[:, :, None], fl, skin_out); print("hands: %d non-skin px filled" % int(bad_h.sum()))
+# the old bake has a lighter wedge on the back of each wrist (baked light); flatten the low-frequency luminance
 hands = cov & (Z < 125) & (skin_out.mean(2) > 0.3)
 if hands.any():
     hl = skin_out.mean(2); w_h = blur(hands.astype(np.float32), 12); lo_h = blur(hl * hands, 12) / np.maximum(w_h, 1e-3)
@@ -216,7 +246,7 @@ if hands.any():
 rgba = np.concatenate([skin_out, alpha[:, :, None]], 2)
 Image.fromarray(np.clip(rgba * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_skin.png")); print("wrote tex_skin.png (RGBA)")
 save("tex_skin_n.png", sanitize_normal(load("nrm_skin.png")))
-save("tex_skin_orm.png", orm(np.clip(blur(load("ao_skin.png", S)[:, :, 0], 1.5) * 0.5 + 0.5, 0, 1), load("rough_skin.png")[:, :, 0]))   # AO softened: skin is translucent
+save("tex_skin_orm.png", orm(pad_full(np.clip(blur(load("ao_skin.png", S)[:, :, 0], 1.5) * 0.5 + 0.5, 0, 1), cov_skin), pad_full(load("rough_skin.png")[:, :, 0], cov_skin)))   # AO softened: skin is translucent
 
 # --- eyelid colour: the skin around the eyes, a little darker
 ring = np.zeros((S, S), bool)
@@ -226,6 +256,7 @@ lid_col = skin[ring].mean(0) if ring.any() else np.array([0.85, 0.65, 0.58]); pr
 
 # ------------------------------------------------------------------ hair
 hair = load("bake_hair.png"); H = hair.shape[0]
+cov_hair = covered_of(hair); hair = pad_full(hair, cov_hair)
 # the baked hair colour is near-black and flat: keep it, with a little variation from the roughness noise so strands read
 rh = load("rough_hair.png")[:, :, 0]
 var = (blur(rh, 1.0) - 0.5) * 0.08
@@ -236,55 +267,89 @@ skinny = ndi.binary_dilation(skinny, iterations=2)
 good_h = ~skinny & (hl > 0.01)
 wgt = blur(good_h.astype(np.float32), 6); fill = np.stack([blur(hair_out[:, :, k] * good_h, 6) for k in range(3)], 2) / np.maximum(wgt, 1e-3)[:, :, None]
 hair_out = np.where(skinny[:, :, None], fill, hair_out); print("hair: %d skin-coloured px replaced" % int(skinny.sum()))
+# near-black, as the old metallic-black hair read: any texel over 0.2 (pale streaks from the old atlas) is pulled down,
+# the whole atlas darkened; the sheen goes through the roughness (see the ORM below)
+hl2 = hair_out.mean(2, keepdims=True); hair_out = np.where(hl2 > 0.2, hair_out * (0.2 / np.maximum(hl2, 1e-3)), hair_out)
+hair_out = np.clip(hair_out * 0.6, 0, 1)
 save("tex_hair.png", hair_out)
 save("tex_hair_n.png", sanitize_normal(np.asarray(Image.open(os.path.join(WORK, "nrm_hair.png")).convert("RGB").resize((H, H), Image.LANCZOS)).astype(np.float32) / 255))
-save("tex_hair_orm.png", orm(np.clip(load("ao_hair.png", H)[:, :, 0] * 0.8 + 0.2, 0, 1), rh))
+save("tex_hair_orm.png", orm(pad_full(np.clip(load("ao_hair.png", H)[:, :, 0] * 0.8 + 0.2, 0, 1), cov_hair), pad_full(np.clip(rh + 0.42, 0, 1), cov_hair)))   # matte: ~0.75 after the page's 0.78
 
 # ------------------------------------------------------------------ cloth (hoodie, pants, socks, slides)
 cloth = load("bake_cloth.png"); C = cloth.shape[0]
+cov_cloth = covered_of(cloth); cloth = pad_full(cloth, cov_cloth)
 # the old material was metallic (metallicFactor 1, no map), which rendered the clothes much darker than their painted
 # colour; the new dielectric materials are graded to the look the owner knows: blacks stay black, the hoodie's grey
 # stays mid-grey, the socks and the stripe stay white (measured on the same frame, render/compare.mjs)
-cl = cloth.mean(2); k = np.interp(cl, [0.0, 0.12, 0.3, 0.5, 0.75, 1.0], [0.18, 0.22, 0.58, 0.66, 1.0, 1.0])
+cl = cloth.mean(2); k = np.interp(cl, [0.0, 0.12, 0.3, 0.5, 0.75, 1.0], [0.18, 0.22, 0.41, 0.47, 1.0, 1.0])   # the hoodie as dark as the old render (lum 0.36 on the door frame)
 cloth_g = np.clip(cloth * k[:, :, None], 0, 1)
-# the pants: Meshy painted glossy highlights into the albedo (the "PVC" look); flatten them towards the cloth's dark
-# base tone, keeping the white stripe. The region map comes from the build (material index + 1, baked per texel).
+# The clothes' albedo is rebuilt as fabric MATERIALS, the way game clothes are authored: a flat dyed base per garment
+# with the fibre-scale variation of the cloth, and nothing else. Shading belongs to the lights, the baked AO and the
+# knit / weave normal maps. The old atlas (Meshy) had the light baked in (the "PVC" highlights on the pants, the lighter
+# wedges on the cuffs), its island padding bled skin into the cuffs, socks into the slides, the striped flap inside the
+# cuff; a photoreal repaint of the whole body projected back (work/cloth_projected.png, kept for reference) baked the
+# repaint's folds and lighting in just the same way and they did not sit on the mesh's folds. The old atlas keeps two
+# jobs: the garment regions (through the build's region map) and the white stripe of the pants.
 REG = os.path.join(WORK, "region_cloth.npy")
 if os.path.exists(REG):
     reg = np.asarray(Image.fromarray(np.load(REG)[::-1]).resize((C, C), Image.NEAREST))     # Blender images are bottom-up
-    pants = ndi.binary_erosion(reg == 4, iterations=1)
-    pl = cloth_g.mean(2); stripe = pl > 0.55
-    base_tone = np.percentile(pl[pants & ~stripe], 25) if (pants & ~stripe).any() else 0.05
-    flat = np.where(pl > base_tone, base_tone + (pl - base_tone) * 0.3, pl)
-    gain = np.where(pants & ~stripe, flat / np.maximum(pl, 1e-4), 1.0)
-    cloth_g = np.clip(cloth_g * gain[:, :, None], 0, 1); print("pants de-lit: base tone %.3f, %d px" % (base_tone, int((pants & ~stripe).sum())))
-# hoodie and pants: skin-coloured texels (the old atlas's padding pulled skin into cloth islands next to the hands and
-# the ankles: the cream wedge on the inner cuff) are filled from the cloth around
-if os.path.exists(REG):
-    rr_c, gg_c, bb_c = cloth_g[:, :, 0], cloth_g[:, :, 1], cloth_g[:, :, 2]; lc = cloth_g.mean(2)
-    for rid, nm in ((3, "hoodie"), (4, "pants")):
-        regm = ndi.binary_erosion(reg == rid, iterations=1)
-        bad_c = regm & (rr_c - bb_c > 0.06) & (lc > 0.3); good_c = regm & ~ndi.binary_dilation(bad_c, iterations=2)
-        if bad_c.any() and good_c.any():
-            wg = blur(good_c.astype(np.float32), 6); fl = np.stack([blur(cloth_g[:, :, k] * good_c, 6) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
-            cloth_g = np.where(bad_c[:, :, None], fl, cloth_g); print("%s: %d skin-coloured px filled" % (nm, int(bad_c.sum())))
-# socks: dark texels inside the sock region (slide / pants bleed from the old atlas: the smear on the toe) become sock
-if os.path.exists(REG):
-    socks = ndi.binary_erosion(reg == 5, iterations=1); sl_ = cloth_g.mean(2)
-    bad_s = socks & (sl_ < 0.5); good_s = socks & (sl_ >= 0.55)
-    if bad_s.any() and good_s.any():
-        wg = blur(good_s.astype(np.float32), 5); fl = np.stack([blur(cloth_g[:, :, k] * good_s, 5) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
-        cloth_g = np.where(bad_s[:, :, None], fl, cloth_g); print("socks: %d dark px filled" % int(bad_s.sum()))
-# alpha: 1 everywhere, 0 in the reserved band (u, v < 0.015: both corners of the v axis, as the UV packing starts at 0 and glTF
-# flips v): the invisible full-body proxy that assemble.mjs appends to the slides primitive points there (white, so that
-# room.html's slidesInit never takes the proxy's feet for slides)
-band = int(C * 0.015) + 2
-alpha_c = np.ones((C, C), np.float32); cloth_g = cloth_g.copy()
-for sl in (np.s_[:band, :band], np.s_[C - band:, :band]):
-    alpha_c[sl] = 0; cloth_g[sl] = 1.0
-Image.fromarray(np.clip(np.concatenate([cloth_g, alpha_c[:, :, None]], 2) * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_cloth.png")); print("wrote tex_cloth.png (RGBA)")
+    rng_c = np.random.default_rng(3)
+    def fbm(sig):                                                                # a blurred noise field, zero mean, unit spread
+        n = blur(rng_c.random((C, C)).astype(np.float32), sig); return (n - n.mean()) / max(n.std(), 1e-6)
+    hoodie_r = reg == 3; pants_r = reg == 4; socks_r = reg == 5; slides_r = reg == 6
+    lc = cloth_g.mean(2)
+    # the hoodie's tone: the graded old hoodie's median (lum 0.36 on the door frame in the old render), kept slightly cool
+    hood_ref = hoodie_r & cov_cloth & (lc > 0.12) & (lc < 0.6) & (np.abs(cloth_g[:, :, 0] - cloth_g[:, :, 2]) < 0.05)
+    hood_med = np.median(cloth_g[hood_ref], 0) if hood_ref.sum() > 1000 else np.array([0.128, 0.129, 0.135])
+    hood_med = hood_med * 0.92 * np.array([0.985, 1.0, 1.02])              # measured ~0.13, a notch darker: the review asked for a hoodie no lighter than the old one (old 0.40 / new 0.38 sRGB on the chest at the room camera, after this)
+    heather = 1 + 0.07 * fbm(18) + 0.035 * fbm(5) + 0.03 * fbm(0.8)              # heathered jersey: slubs, fibres
+    hoodie_col = np.clip(hood_med[None, None, :] * heather[:, :, None], 0, 1)
+    # the pants: black polyester, the white side stripe where the old atlas is white inside the pants region
+    stripe = pants_r & (cl > 0.5) & (np.abs(cloth[:, :, 0] - cloth[:, :, 2]) < 0.12)
+    stripe = ndi.binary_opening(stripe, iterations=1); stripe = ndi.binary_closing(stripe, iterations=1)
+    lab_s, n_s = ndi.label(stripe)
+    if n_s:
+        sz = ndi.sum(stripe, lab_s, range(1, n_s + 1)); stripe &= np.isin(lab_s, np.nonzero(sz >= 40)[0] + 1)   # specks of padding are not the stripe
+    stripe_soft = blur(stripe.astype(np.float32), 0.8)
+    pants_col = np.array([0.026, 0.026, 0.030])[None, None, :] * (1 + 0.10 * fbm(2.5) + 0.05 * fbm(16))[:, :, None]
+    stripe_col = np.array([0.88, 0.88, 0.87])[None, None, :] * (1 + 0.03 * fbm(2.5))[:, :, None]
+    pants_col = np.clip(pants_col * (1 - stripe_soft[:, :, None]) + stripe_col * stripe_soft[:, :, None], 0, 1)
+    # the socks: white ribbed cotton (the ribs are in the normal map), the slides: black EVA foam
+    socks_col = np.clip(np.array([0.92, 0.915, 0.90])[None, None, :] * (1 + 0.035 * fbm(4) + 0.03 * fbm(1.0))[:, :, None], 0, 1)
+    slides_col = np.clip(np.array([0.05, 0.05, 0.053])[None, None, :] * (1 + 0.12 * fbm(1.5) + 0.05 * fbm(10))[:, :, None], 0, 1)
+    cloth_g = np.where(hoodie_r[:, :, None], hoodie_col, np.where(pants_r[:, :, None], pants_col, np.where(socks_r[:, :, None], socks_col, np.where(slides_r[:, :, None], slides_col, cloth_g))))
+    # the feet: the mesh is one shell there (the slide's strap and the pants' cuff are bulges of the sock, Meshy's remesh),
+    # so a label per triangle draws the sock's edge as a zigzag of triangle edges. The old atlas drew it inside the
+    # triangles: its texels are bimodal at the feet (0.1-0.3 the slide and the cuff, 0.9+ the sock), so the sock is
+    # painted where the old atlas is white, the cuff above 8.5 cm and the slide below elsewhere, whatever the triangle's label
+    PZ = os.path.join(WORK, "posz_cloth.npy")
+    if os.path.exists(PZ):
+        zc = np.asarray(Image.fromarray(np.load(PZ)[::-1].astype(np.float32), "F").resize((C, C), Image.BILINEAR))
+        feet = (reg > 0) & (zc < 14.0)
+        # inside the sock-labelled faces (the build re-reads every foot face from its own old texels) the sock is whole:
+        # the old paint's grey seams and padding do not cut it; inside the slide's and the cuff's faces only a solid white
+        # patch of the old paint (the sock's edge crossing the triangle) is sock, never a sliver of padding
+        white_t = feet & (cl > 0.9) & (np.abs(cloth[:, :, 0] - cloth[:, :, 2]) < 0.12) & ~socks_r
+        white_t = ndi.binary_closing(ndi.binary_opening(white_t, iterations=2), iterations=1)
+        lab_k, n_k = ndi.label(white_t)
+        if n_k:
+            sz = ndi.sum(white_t, lab_k, range(1, n_k + 1)); white_t &= np.isin(lab_k, np.nonzero(sz >= 150)[0] + 1)
+        sock_tex = (socks_r & feet) | white_t
+        sock_soft = blur(sock_tex.astype(np.float32), 1.0)[:, :, None]
+        foot_dark = np.where((zc > 8.5)[:, :, None], pants_col, slides_col)
+        cloth_g = np.where(feet[:, :, None], foot_dark * (1 - sock_soft) + socks_col * sock_soft, cloth_g)
+        print("feet: %d sock texels drawn from the old atlas (of %d foot texels)" % (int(sock_tex.sum()), int(feet.sum())))
+    cloth_g = pad_full(cloth_g, reg > 0)                                        # between the islands: the nearest garment, so the mips never pull in a foreign colour
+    print("cloth materials: hoodie %s, stripe %d px, regions hoodie %d pants %d socks %d slides %d" % (hood_med.round(3), int(stripe.sum()), hoodie_r.sum(), pants_r.sum(), socks_r.sum(), slides_r.sum()))
+    CPROJ = os.path.join(WORK, "cloth_projected.png"); CPROJM = os.path.join(WORK, "cloth_projected_mask.png")
+    if os.path.exists(CPROJ) and os.path.exists(CPROJM):                        # the repaint as a tone reference only
+        cp = np.asarray(Image.open(CPROJ).convert("RGB").resize((C, C), Image.LANCZOS)).astype(np.float32) / 255
+        cpm = np.asarray(Image.open(CPROJM).convert("L").resize((C, C), Image.LANCZOS)).astype(np.float32) / 255
+        ref_h = hoodie_r & (cpm > 0.8)
+        if ref_h.sum() > 1000: print("  reference: the repaint's hoodie median %s (lit), ours %s (albedo)" % (np.median(cp[ref_h], 0).round(3), hood_med.round(3)))
+save("tex_cloth.png", cloth_g)
 save("tex_cloth_n.png", sanitize_normal(load("nrm_cloth.png")))
-save("tex_cloth_orm.png", orm(np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1), load("rough_cloth.png")[:, :, 0]))
+save("tex_cloth_orm.png", orm(pad_full(np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1), cov_cloth), pad_full(load("rough_cloth.png")[:, :, 0], cov_cloth)))
 
 # ------------------------------------------------------------------ the eyeball and the lid
 E = 512
@@ -319,11 +384,11 @@ spec = {
     "sizes": {"skin_n": 1024, "skin_orm": 1024, "hair_n": 512, "hair_orm": 512, "cloth_n": 1024, "cloth_orm": 1024},
     "materials": {
         "skin":   {"base": "skin", "baseQ": 90, "normal": "skin_n", "normalScale": 0.5, "orm": "skin_orm", "alphaMask": True, "sheen": [0.35, 0.25, 0.22], "sheenRoughness": 0.8, "doubleSided": True},
-        "hair":   {"base": "hair", "baseQ": 82, "normal": "hair_n", "normalScale": 0.3, "orm": "hair_orm", "doubleSided": True},
+        "hair":   {"base": "hair", "baseQ": 82, "normal": "hair_n", "normalScale": 0.15, "orm": "hair_orm", "doubleSided": True},
         "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8, "doubleSided": True},   # the hood's inside shows at the open collar
         "pants":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.7, "orm": "cloth_orm", "doubleSided": True},
         "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.5, 0.5, 0.5], "sheenRoughness": 0.9, "doubleSided": True},
-        "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "alphaMask": True, "doubleSided": True},   # MASK: the proxy's texels are alpha 0
+        "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "doubleSided": True},
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},

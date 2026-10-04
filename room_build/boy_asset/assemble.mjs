@@ -87,11 +87,16 @@ const acc = (arr, type, normalized = false) => orig.createAccessor().setType(typ
 const nodeMesh = name => built.getRoot().listNodes().find(n => n.getName() === name && n.getMesh())?.getMesh();   // Blender names the mesh data "char1.001"; the nodes keep their names
 const bodyMesh = nodeMesh("char1"), proxyMesh = nodeMesh("proxy");
 if (!proxyMesh) throw new Error("work/boy_mesh.glb has no proxy mesh (build_mesh.py exports one)");
-const PROXY_UV = [0.005, 0.995];                                   // inside the cloth atlas's transparent band (u, v < 0.015; v flipped for the image)
+const PROXY_UV = [0.5, 0.5];                                       // (never drawn: its triangles are degenerate)
 for (const pb of bodyMesh.listPrimitives()) {
   const name = pb.getMaterial().getName().replace(/^boy_/, "");
   let d = convert(pb);
-  if (name === "slides") { let px = null; for (const pp of proxyMesh.listPrimitives()) { const c = convert(pp, PROXY_UV); px = px ? concat(px, c) : c; } d = concat(d, px); console.log("proxy appended to the slides:", px.n, "vertices", px.I.length / 3, "triangles"); }
+  if (name === "slides") { let px = null; for (const pp of proxyMesh.listPrimitives()) { const c = convert(pp, PROXY_UV); px = px ? concat(px, c) : c; }
+    // the proxy's triangles are made degenerate (a, a, a): zero area, so the rasteriser never draws them at any distance or
+    // mip level (an alpha-masked texel leaked through the mips as white/black slivers at the wrist and the slide strap);
+    // room.html's bedInit / slidesInit only read the vertices (positions, skin indices, uvs) and the triangle list
+    for (let i = 0; i < px.I.length; i += 3) { px.I[i + 1] = px.I[i]; px.I[i + 2] = px.I[i]; }
+    d = concat(d, px); console.log("proxy appended to the slides:", px.n, "vertices", px.I.length / 3, "degenerate triangles"); }
   const prim = orig.createPrimitive().setMode(Primitive.Mode.TRIANGLES)
     .setAttribute("POSITION", acc(d.P, Accessor.Type.VEC3, true))
     .setAttribute("NORMAL", acc(d.N, Accessor.Type.VEC3))

@@ -111,14 +111,14 @@ vlab[is_neck] = np.where(skin_c[is_neck], "skin", "hoodie")
 vlab[is_neck & dark_c & (z > 152)] = "hair"
 # hands: skin unless grey (cuff)
 is_hand = hand_w > 0.5
-vlab[is_hand] = np.where(skin_c[is_hand], "skin", "hoodie")
+vlab[is_hand] = np.where(lum[is_hand] < 0.45, "hoodie", "skin")      # the cuff is dark grey (0.2-0.4); everything lighter on the hand is skin (the old atlas's padding is pale)
 vlab[(arm_w > 0.5) & skin_c] = "skin"                                # wrist skin weighted to the forearm
 # hips: hoodie if grey, pants if dark
 is_hips = hips_w > 0.5
 vlab[is_hips] = np.where(dark_c[is_hips] | (lum[is_hips] < 0.2), "pants", "hoodie")
 vlab[leg_w > 0.5] = "pants"
 is_foot = foot_w > 0.5
-vlab[is_foot] = np.where(white_c[is_foot] | (lum[is_foot] > 0.45), "socks", "slides")
+vlab[is_foot] = np.where(lum[is_foot] > 0.85, "socks", "slides")             # the old atlas is bimodal at the feet (0.1-0.3 slides and cuff, 0.9+ socks); the grey smear on the strap (0.5-0.8) is the slide
 vlab[is_foot & (z < 1.2)] = "slides"                                 # the sole
 vlab[is_foot & ~white_c & (lum < 0.45) & (z > 9)] = "pants"          # the pants cuff is weighted to the foot
 log("vertex labels:", Counter(vlab))
@@ -162,6 +162,70 @@ for pass_ in range(3):
             for i in comp: flab[i] = c.most_common(1)[0][0]
             changed += 1
     if not changed: break
+# skin islands that are not the face (the biggest) and sit on the head are hair strands the old atlas painted scalp-pink
+skin_isl = sorted([c for c in islands(flab) if flab[c[0]] == "skin"], key=len, reverse=True)
+for comp in skin_isl[1:]:
+    if np.mean([head_w[v] for i in comp for v in m.polygons[i].vertices]) > 0.5:
+        for i in comp: flab[i] = "hair"
+# hair strands the votes absorbed into the face (the bangs' roots touch the forehead; the atlas painted them pale): a strand
+# is a THIN spike, the face is not. A ray cast inward from a face centroid leaves a spike through its back within 1 cm;
+# from the forehead, the nose or the lips it travels into the head. Only dark-ish faces (lum < 0.65: the ears and the
+# nose wings stay skin) above the eye line or behind the head (the nape).
+from mathutils.bvhtree import BVHTree
+bvh = BVHTree.FromPolygons([v.co[:] for v in m.vertices], [tuple(p.vertices) for p in m.polygons])
+HB = arm.data.bones["Head"].head_local; HF = arm.data.bones["headfront"].head_local
+fwd_h = Vector((HF.x - HB.x, HF.y - HB.y, HF.z - HB.z)); fwd_h.z = 0; fwd_h.normalize(); right_h = fwd_h.cross(Vector((0, 0, 1)))
+zmax = float(co[:, 2].max()); flum = np.array([lum[list(p.vertices)].mean() for p in m.polygons])
+log("head bone z %.1f, mesh top z %.1f (same space if the top is ~20 cm above)" % (HB.z, zmax))
+# zones: the top of the head (above the eye line, zmax - 10) and the nape take every thin face; the band of the eyes
+# and the ears (down to zmax - 14) only lateral ones in front of the ears (the sideburns), never the nose (central) nor
+# the ears themselves (beside the head centre); pale ones too (the old atlas painted many strands scalp-pink)
+thin = 0; thin_pale = 0
+for p in m.polygons:
+    if flab[p.index] != "skin": continue
+    if not (head_w[list(p.vertices)].mean() > 0.3 or neck_w[list(p.vertices)].mean() > 0.3): continue
+    c = p.center; d = c - Vector((HB.x, HB.y, c.z)); f = d.dot(fwd_h); lat = abs(d.dot(right_h))
+    top = c.z > zmax - 10; mid = zmax - 14 < c.z <= zmax - 10; behind = f < -2.0; side = -2.0 <= f <= 3.0
+    if not (top or behind or (mid and f > 3.0 and lat > 4.0)): continue
+    if side and flum[p.index] >= 0.65: continue                                  # the ears' pale rims stay skin
+    n = p.normal
+    hit = bvh.ray_cast(c - n * 0.02, -n, 1.0)
+    if hit[0] is not None and hit[1].dot(-n) > 0:
+        flab[p.index] = "hair"; thin += 1; thin_pale += flum[p.index] >= 0.65
+log("thin skin faces on the head relabelled hair:", thin, "of them pale:", int(thin_pale))
+for comp in islands(flab):                                                      # specks the ray test left behind
+    if flab[comp[0]] == "hair" and len(comp) < 4:
+        c = Counter(flab[j] for i in comp for j in adj[i] if flab[j] != "hair")
+        if c:
+            for i in comp: flab[i] = c.most_common(1)[0][0]
+# the feet: one shell (the slide's strap and the pants' cuff are bulges of the sock in Meshy's remesh), so the labels can
+# only come from the old paint. The vertex colours above were sampled from the PADDED atlas, which paints the sliver
+# islands of the strap and the cuff's hem white from the sock next door. Here every foot face is re-read from the
+# covered texels inside its own old UV triangle (no padding): mostly white -> sock, else the cuff above 9 cm, the slide below
+foot_f = 0; foot_changed = 0
+for p in m.polygons:
+    vs = list(p.vertices)
+    if foot_w[vs].mean() < 0.5 and co[vs, 2].max() > 14: continue
+    if co[vs, 2].mean() > 14: continue
+    uvs = [uv_old.data[li].uv for li in p.loop_indices]
+    if len(uvs) != 3: continue
+    whites = 0; covered = 0
+    for (a_, b_, c_) in ((0.6, 0.2, 0.2), (0.2, 0.6, 0.2), (0.2, 0.2, 0.6), (1 / 3, 1 / 3, 1 / 3), (0.45, 0.45, 0.1), (0.45, 0.1, 0.45), (0.1, 0.45, 0.45), (0.8, 0.1, 0.1), (0.1, 0.8, 0.1), (0.1, 0.1, 0.8)):
+        u = a_ * uvs[0][0] + b_ * uvs[1][0] + c_ * uvs[2][0]; v = a_ * uvs[0][1] + b_ * uvs[1][1] + c_ * uvs[2][1]
+        x = min(W - 1, max(0, int(u * W))); y = min(H - 1, max(0, int(v * H)))
+        if cov[y, x]: covered += 1; whites += old[y, x].mean() > 0.85
+    if covered < 3: continue
+    foot_f += 1
+    new_lab = "socks" if whites / covered > 0.5 else ("pants" if co[vs, 2].mean() > 9 and flab[p.index] == "pants" else ("pants" if co[vs, 2].mean() > 10 else "slides"))
+    if new_lab != flab[p.index]: flab[p.index] = new_lab; foot_changed += 1
+for it in range(2):                                                               # a vote among the foot faces against specks
+    new = flab.copy()
+    for i, p in enumerate(m.polygons):
+        if flab[i] not in ("socks", "slides") : continue
+        c = Counter(flab[j] for j in adj[i] if flab[j] in ("socks", "slides", "pants")); c[flab[i]] += 1
+        new[i] = c.most_common(1)[0][0]
+    flab = new
+log("foot faces re-read from their own old texels: %d, relabelled %d" % (foot_f, foot_changed))
 log("face labels:", Counter(flab), "islands:", Counter(flab[c[0]] for c in islands(flab)))
 
 # ---------------------------------------------------------------- material slots
@@ -259,6 +323,12 @@ bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); 
 for p in m.polygons: p.use_smooth = True
 m.update()
 log("after join:", len(m.vertices), "verts", len(m.polygons), "faces", "tris ~", sum(len(p.vertices) - 2 for p in m.polygons))
+# the slides' straps and sides grow 1.5 mm outward (the smoothed socks poked through them); the soles stay
+slides_slot = REGIONS.index("slides"); sv = set(v for p in m.polygons if p.material_index == slides_slot for v in p.vertices)
+for vi in sv:
+    v = m.vertices[vi]
+    if v.co.z > 1.5: v.co = v.co + v.normal * 0.15
+m.update(); log("slides grown outward:", len(sv), "vertices")
 
 # ---------------------------------------------------------------- hand frames for the finger grooves (a second UV map carries them)
 # per hand: PCA of its vertices gives the axis along the fingers (longest), across the palm, and the thickness; the
@@ -321,9 +391,11 @@ for atlas in ("skin", "hair", "cloth"):
         bpy.ops.uv.smart_project(angle_limit=math.radians(70), island_margin=0.004, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
         bpy.ops.object.mode_set(mode="OBJECT")
         print("  head island(s):", uv_islands(lambda p: in_atlas(p) and is_head_face(p)))
+        uvl = m.uv_layers["uv_new"]                                        # (a fresh reference: the mode toggles above make the old one stale, and writes to it are lost)
         for p in m.polygons:                                                 # the face gets most of the skin atlas
             if is_head_face(p) and in_atlas(p):
-                for li in p.loop_indices: uv_new.data[li].uv = uv_new.data[li].uv * 2.0
+                for li in p.loop_indices: uvl.data[li].uv = uvl.data[li].uv * 2.0
+        m.update()
     else:
         select_faces(in_atlas)
         bpy.ops.uv.smart_project(angle_limit=math.radians(70), island_margin=0.004, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
@@ -332,10 +404,12 @@ for atlas in ("skin", "hair", "cloth"):
     bpy.ops.uv.select_all(action="SELECT")
     bpy.ops.uv.pack_islands(rotate=True, margin=0.004, margin_method="FRACTION", shape_method="CONCAVE")
     bpy.ops.object.mode_set(mode="OBJECT")
-    if atlas == "cloth":                                                 # a free band at u, v < 0.015: the proxy's transparent texel lives there
+    if atlas == "cloth":                                                 # a margin all round (the pack puts islands right at the edge; filtering wraps)
+        uvl = m.uv_layers["uv_new"]
         for p in m.polygons:
             if in_atlas(p):
-                for li in p.loop_indices: uv_new.data[li].uv = uv_new.data[li].uv * 0.984 + Vector((0.015, 0.015))
+                for li in p.loop_indices: uvl.data[li].uv = uvl.data[li].uv * 0.98 + Vector((0.01, 0.01))
+        m.update()
     log("uv:", atlas, "faces", sum(1 for p in m.polygons if in_atlas(p)), "islands", uv_islands(in_atlas))
 
 # ---------------------------------------------------------------- bake the old colour into the new atlases
@@ -376,7 +450,7 @@ def save_imgs(imgs, prefix):
     for atlas, im in imgs.items():
         im.filepath_raw = os.path.join(WORK, "%s%s.png" % (prefix, atlas)); im.file_format = "PNG"; im.save()
 SIZES = {"skin": 2048, "hair": 1024, "cloth": 2048}
-pos_imgs = new_imgs("pos_", {"skin": 2048, "hair": 8, "cloth": 8}, float_=True)   # only the skin atlas is read
+pos_imgs = new_imgs("pos_", {"skin": 2048, "hair": 8, "cloth": 1024}, float_=True)   # the skin atlas (full) and the cloth atlas's height (feet) are read
 def emit_geometry(which):
     """every material emits its object-space position (cm, scaled into 0..1) or normal, baked with EMIT"""
     for i, name in enumerate(REGIONS):
@@ -398,6 +472,7 @@ emit_region(); bake_to(reg_imgs, "EMIT", margin=0)
 np.save(os.path.join(WORK, "region_cloth.npy"), np.round(np.array(reg_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, 0] * 8).astype(np.uint8))
 emit_geometry("pos"); bake_to(pos_imgs, "EMIT", margin=4)
 np.save(os.path.join(WORK, "pos_skin.npy"), (np.array(pos_imgs["skin"].pixels[:], dtype=np.float32).reshape(2048, 2048, 4)[:, :, :3] - 0.5) * 400)
+np.save(os.path.join(WORK, "posz_cloth.npy"), (np.array(pos_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, 2] - 0.5) * 400)   # height per cloth texel (cm): make_textures.py draws the socks' edge from the old atlas at the feet
 emit_geometry("nrm"); bake_to(pos_imgs, "EMIT", margin=4)
 np.save(os.path.join(WORK, "nrm_skin.npy"), np.array(pos_imgs["skin"].pixels[:], dtype=np.float32).reshape(2048, 2048, 4)[:, :, :3] * 2 - 1)
 log("position / normal buffers saved")
