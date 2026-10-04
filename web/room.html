@@ -2736,6 +2736,7 @@ function applyTick(m){
     const short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
     put("story", "innerHTML", sc && sc.restarting && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"} (browser restarting).`
       : sc && !life.path ? `is ${sc.device === "phone" ? "on his phone" : "at the computer"}: <em>${esc(short(sc.title))}</em>.`
+      : outside && life.walking ? `is <em>walking</em> · next: ${esc(life.doing)}.`   // a walk home takes minutes: don't say he's already there
       : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`);
     put("why", "textContent", life.say || "");
     if (r && !sc) { put("readcard", "hidden", false); put("r-title", "textContent", r.title); put("r-text", "textContent", r.extract);
