@@ -22,11 +22,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 NM = ROOT / "room_build" / "node_modules"
 HERE = Path(__file__).resolve().parent
-# name -> (setup JS run after the page is ready and seeded, frames recorded after it, the frame the close shot is set at)
+# name -> (setup JS run after the page is ready and seeded, frames recorded after it, the close shot: the frame it is
+# picked at (CLOSE below), or a fixed [position, target])
 SCENES = {
-    "walk from the window past the bed": ("act('window', {activity:'window', place:'room'}); __qa.step(1/30, 30); live('order_food', {activity:'order_food', place:'room'});", 105, 12),
+    "walk from the window past the bed": ("act('window', {activity:'window', place:'room'}); __qa.step(1/30, 30); live('order_food', {activity:'order_food', place:'room'});", 105,
+                                          [[0.35, 1.25, -0.75], [-1.25, 0.55, 0.15]]),       # from the room's middle: the bed's side and his legs
     "stretch beside the desk": ("act('research', {activity:'research', place:'room'}); live('get_delivery', {activity:'get_delivery', place:'room'}); __qa.step(1/30, 950); variant('stretch');", 135, 20),
 }
+# one render of the current state: lights and shadows refreshed, no animate() call (the page's sim(0, 1) would step its
+# interludes with dt 0 twice a frame and lose the stretch)
+RENDER_JS = "() => { scene.traverse(o => { if (o.isLight && o.shadow) o.shadow.needsUpdate = true; }); if (typeof lighting === 'function') lighting(0); controls.update(); renderer.render(scene, camera); }"
 # the close shot: of eight directions round him at four distances, the longest clear line of sight to his head and hips
 # (rays against the room; his own meshes and glass ignored), set once per scene and held
 CLOSE = """() => { const b = window.boy; const t = new THREE.Vector3(); b.getWorldPosition(t); t.y += 0.7;
@@ -60,7 +65,7 @@ def serve(web, port):
     return srv
 
 
-def record(web, port, frames_dir, tag, chromium, seed, log):
+def record(web, port, frames_dir, tag, chromium, seed, log, only=None):
     """Render every scene of one version: <frames_dir>/<tag>_<scene index>_<cam>_<frame>.png; returns the frame counts."""
     from playwright.sync_api import sync_playwright
     srv = serve(web, port)
@@ -90,11 +95,14 @@ def record(web, port, frames_dir, tag, chromium, seed, log):
             pg.add_script_tag(content=(HERE / "visual" / "page_checks.js").read_text())
             pg.evaluate("s => { settle(); setSeed(s); __qa.hideMarkers(); __qa.hud(false); }", seed)
             for si, (name, (setup, n, close_at)) in enumerate(SCENES.items()):
+                if only is not None and si not in only:
+                    counts[si] = n
+                    continue
                 pg.evaluate(setup)
-                close = None
+                close = {"pos": close_at[0], "target": close_at[1]} if isinstance(close_at, list) else None
                 for f in range(n):
                     pg.evaluate("__qa.step(1/30, 1)")
-                    if f == close_at or (close is None and f == n - 1):
+                    if close is None and (f == close_at or f == n - 1):
                         close = pg.evaluate(CLOSE)
                     for cam in ("default", "close"):
                         if cam == "default":
@@ -103,7 +111,7 @@ def record(web, port, frames_dir, tag, chromium, seed, log):
                             pg.evaluate(SET_CAM, [close["pos"], close["target"], 46])
                         else:
                             continue
-                        pg.evaluate("__qa.render()")
+                        pg.evaluate(RENDER_JS)
                         pg.screenshot(path=str(frames_dir / f"{tag}_{si}_{cam}_{f:04d}.png"), timeout=120000)
                     if f % 30 == 0:
                         log(f"  {tag} {name}: frame {f}/{n}")
@@ -148,17 +156,20 @@ def main():
     ap.add_argument("--seed", type=int, default=63)
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
     ap.add_argument("--ffmpeg", default="/usr/bin/ffmpeg")
+    ap.add_argument("--only", default="", help="scene indices to re-render (the other scenes' frames in --work are kept)")
     args = ap.parse_args()
+    only = [int(x) for x in args.only.split(",") if x] or None
     out = ROOT / args.out
     out.parent.mkdir(parents=True, exist_ok=True)
     work = Path(args.work) if args.work else out.parent / ".frames"
     frames, comp = work / "frames", work / "composed"
     for d in (frames, comp):
-        shutil.rmtree(d, ignore_errors=True)
-        d.mkdir(parents=True)
+        if only is None or d is comp:
+            shutil.rmtree(d, ignore_errors=True)
+        d.mkdir(parents=True, exist_ok=True)
     log = lambda *a: print(*a, flush=True)  # noqa: E731
-    counts = record(Path(args.old).resolve(), args.port, frames, "old", args.chromium, args.seed, log)
-    counts2 = record(Path(args.new).resolve(), args.port + 1, frames, "new", args.chromium, args.seed, log)
+    counts = record(Path(args.old).resolve(), args.port, frames, "old", args.chromium, args.seed, log, only)
+    counts2 = record(Path(args.new).resolve(), args.port + 1, frames, "new", args.chromium, args.seed, log, only)
     assert counts == counts2, (counts, counts2)
     n = compose(frames, comp, counts, log)
     subprocess.run([args.ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-framerate", "30", "-i", str(comp / "c_%05d.png"),
@@ -166,7 +177,8 @@ def main():
     size = out.stat().st_size
     log(f"wrote {out} ({n} frames, {n / 30:.1f} s, {size / 1e6:.1f} MB)")
     (out.parent / (out.stem + ".json")).write_text(json.dumps({"scenes": list(SCENES), "frames": n, "fps": 30, "bytes": size, "seed": args.seed}, indent=1))
-    shutil.rmtree(work, ignore_errors=True)
+    if only is None:
+        shutil.rmtree(work, ignore_errors=True)
     return 0 if size <= 25e6 else 1
 
 
