@@ -50,7 +50,16 @@ def main():
                 server.set_scene("desk", HOUR)    # a fresh page must start the meal after the harness has cleared the desk
                 ctx, pg, st = h.open(size)
                 h.goto_scene(pg, "eating", HOUR)
+                # the harness's snap clears the desk right after act() has set the dish out: end the meal with a desk
+                # tick and start it again with an eating one, so the bowl is on the table for the shots
+                for sc in ("desk", "eating"):
+                    server.set_scene(sc, HOUR); pg.wait_for_timeout(1500); pg.evaluate("__qa.step(1/30, 15)")
+                    if sc == "desk":
+                        pg.evaluate("__qa.clearFood()")   # the ended meal's bowl stays on the desk until he bins it
                 pg.evaluate("__qa.step(1/30, 60); __qa.hud(false)")
+                dish = pg.evaluate("(() => { let v = false; scene.traverse(o => { if (o.name === 'F_bowl-broth') { let s = true; "
+                                   "o.traverseAncestors(a => { if (!a.visible) s = false; }); if (s && o.visible) v = true; } }); return v; })()")
+                print(f"{size} {tag}: ramen on the table: {dish}")
                 for name, cam in SHOTS.items():
                     if cam == "hands":
                         pg.evaluate("__qa.closeup('hands')")

@@ -169,13 +169,13 @@ licence. Each prop and its Tripo task id:
 
 | prop | where | task |
 |---|---|---|
-| ramen bowl with chopsticks, matte ceramic | the ramen he eats at the desk (it replaces Kenney's `bowl-broth`; the empty bowl is still Kenney's `bowl`) | `5872260f-8308-4f71-b461-da00a9bdd2bf` |
+| ramen bowl with chopsticks: tonkotsu, chashu, ajitama egg, nori, in a matte stoneware bowl | the ramen he eats at the desk (it replaces Kenney's `bowl-broth`; the empty bowl is still Kenney's `bowl`) | `4a044baf-40b1-4c6f-a5f6-e290acc4c5b2` |
 | ceramic mug | the mug on the desk (the modelled one is cut out of the static room by the page) | `277633c0-2bfe-4b38-ae60-0bcaa9445a0f` |
 | over-ear headphones | the pair on the wall hook (inside the room's `headphones` node; the pair he wears is still procedural) | `6a2cac63-a839-4d0c-8e0f-53c67e641321` |
 | white sneakers | a pair on the floor in the front right corner | `62e8af56-3302-4a6a-9fe4-d4af8bd5d821` |
 
 `room_build/build_tripo.mjs` scales each to real size (origin at the centre of its base), turns it, cuts its textures
-to 1024 px WebP and meshopt-compresses the lot (3.8k–4k triangles a prop). The page puts them in place
+to 1024 px WebP and meshopt-compresses the lot (3.8k–4.6k triangles a prop). The page puts them in place
 (`web/room.html`, "Tripo props"); `?props=old` shows the earlier ones. The raw downloads are not committed. Rebuild
 (from `room_build/`, with the four raw GLBs in a folder named as in the script):
 

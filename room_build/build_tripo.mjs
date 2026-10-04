@@ -11,7 +11,7 @@ import sharp from "sharp";
 
 // file, the size it gets (its longest horizontal side, or its height), the turn about the vertical (radians, applied first)
 const PROPS = [
-  {name:"ramen", file:"ramen.glb", horiz:0.18, ry:Math.PI},           // the bowl ~15 cm like the Kenney one; its chopsticks to -x
+  {name:"ramen", file:"ramen2.glb", horiz:0.18, ry:Math.PI},          // the bowl ~15 cm like the Kenney one; its chopsticks to -x
   {name:"mug", file:"mug_b.glb", height:0.097, ry:-Math.PI / 2},      // the desk mug's height; its handle turned to +x as before
   {name:"headphones", file:"headphones_b.glb", height:0.20, ry:Math.PI / 2},   // cups left and right (x), band on top
   {name:"sneakers", file:"sneakers_b.glb", horiz:0.29, ry:0},         // a pair side by side, toes to +z
