@@ -167,18 +167,21 @@
   const CLIP = `uniform vec4 uClip; uniform float uClipOn; uniform float uFlip; uniform float uAlpha; varying vec3 vW;
     void clipIt() { if (uClipOn > 0.5 && dot(vW, uClip.xyz) > uClip.w) discard; }`;
   const TISSUE_V = `
-    attribute float part; attribute float depth;
-    varying vec3 vN; varying vec3 vV; varying vec3 vW; varying float vPart; varying float vDepth;
+    attribute float part; attribute float depth; attribute float aReg;
+    uniform sampler2D act; uniform float uSenseOn;
+    varying vec3 vN; varying vec3 vV; varying vec3 vW; varying float vPart; varying float vDepth; varying float vSense;
     void main() {
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
       vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vW = (modelMatrix * vec4(position, 1.0)).xyz;
       vPart = part; vDepth = depth;
+      // sensory.py's predicted top regions (the page's activity texture, green channel): his cortex only (part 1)
+      vSense = (uSenseOn > 0.5 && part > 0.5 && part < 1.5 && aReg >= 0.0) ? texture2D(act, vec2((aReg + 0.5) / 256.0, 0.5)).g : 0.0;
       gl_Position = projectionMatrix * mv;
     }`;
   const TISSUE_F = `
     precision highp float;
     uniform vec3 uCerebrum; uniform vec3 uCerebellum; uniform vec3 uBrainstem; uniform vec3 uWhite; uniform float uHide; uniform float uVessel; uniform float uWet;
-    varying vec3 vN; varying vec3 vV; varying float vPart; varying float vDepth;
+    varying vec3 vN; varying vec3 vV; varying float vPart; varying float vDepth; varying float vSense;
     ${CLIP}
     ${LIGHT}
     void main() {
@@ -194,7 +197,7 @@
       float wet = mix(0.45, 1.6, vnoise(vW * 0.11)), rough = mix(0.55, 1.4, vnoise(vW * 0.45 + 3.0));
       float ves = smoothstep(0.30, 0.85, vDepth) * smoothstep(0.42, 0.72, vnoise(vW * 0.9 + 7.0));
       base = mix(base, vec3(0.50, 0.14, 0.16), uVessel * 0.55 * ves);
-      gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth, mix(1.0, wet, uWet), rough), uAlpha);
+      gl_FragColor = vec4(mix(lit(base, N, normalize(vV), vDepth, mix(1.0, wet, uWet), rough), vec3(0.22, 0.82, 1.0), 0.75 * vSense), uAlpha);
     }`;
   const PART_V = `
     varying vec3 vN; varying vec3 vV; varying vec3 vW;
@@ -317,6 +320,9 @@
       vertexShader: BUNDLE_V, fragmentShader: BUNDLE_F, transparent: true, depthWrite: false });
     const ghostMat = new THREE.ShaderMaterial({ uniforms: { uAlpha }, vertexShader: GHOST_V, fragmentShader: GHOST_F, transparent: true, depthWrite: false, side: THREE.FrontSide });
     const mats = { fresh: tissueMat(PALETTE.fresh), fixed: tissueMat(PALETTE.fixed) };
+    for (const m of Object.values(mats)) {             // the sensory highlight (index.html's onSense): shared activity texture
+      m.uniforms.act = shared("act", null); m.uniforms.uSenseOn = { value: fu.act ? 1 : 0 };
+    }
     let capMat = null, cap = null;
     const partMeshes = [], hisMeshes = [];
 
