@@ -447,7 +447,7 @@ RECIPE_HOST = re.compile(r"(^|\.)(kingarthurbaking|justonecookbook|seriouseats|a
                          r"foodnetwork|delish|tasty|bonappetit|epicurious|food52|thekitchn|simplyrecipes)\.(com|co|co\.uk)$",
                          re.I)                 # cooking sites: only while he is hungry or ordering (#89 teen)
 HOST_CAP_FREE = ("youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com", "tiktok.com", "www.tiktok.com")
-VIDEO_TOPICS = ["bread baking", "Tokyo night walk", "how the brain works", "Inokashira Park", "ramen making",
+VIDEO_TOPICS = ["Toyota GR Supra", "Tokyo night walk", "Elden Ring", "Premier League highlights", "One Piece",
                 "train window Japan", "lo-fi music", "space documentary", "cat videos", "Studio Ghibli"]
 FAMILIAR = ["Kichijoji", "Inokashira Park", "Tokyo bakery", "how dreams work", "sleep science", "ramen", "Ghibli Museum",
             "night city photography", "lo-fi music", "how the brain works", "Japanese convenience store", "Tokyo trains"]
@@ -1053,7 +1053,12 @@ class Browser:
         if sc.mode == "shorts" and await self._shorts(sc, interest):
             return True
         if sc.mode == "video":                                  # watching videos: YouTube's Data API + embed player
-            q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)   # (/results is robots-closed)
+            d = interest if isinstance(interest, dict) else {}
+            q = query_ok(SS.interest_text(interest)) if d.get("from") not in ("", None, "interests") else None
+            if not q:                                           # #89 teen: his profile's topics, not old defaults
+                q = query_ok(I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng,
+                                    mult=d.get("tastes"), discover=True, hungry=self.hungry)["query"])
+            q = q or self.rng.choice(VIDEO_TOPICS)              # (/results is robots-closed)
             if await self._public_videos(sc, "youtube", q, f"looked for videos about “{q}”", "", short=False):
                 return True
         if sc.pending_link:
@@ -1205,6 +1210,8 @@ class Browser:
                 return []
             results = YT.parse_search(text, short)
             self.yt.spend(q, short, results)
+            print(f"browse: YouTube API search ({'shorts' if short else 'videos'}), {len(results)} results, "
+                  f"{self.yt.used} units today", flush=True)
         cards = [{"url": r["url"], "title": r["title"], "author": r["channel"], "thumb": r["thumb"], "hashtags": [],
                   "embed": r["embed"], "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
                   "how": "YouTube's official embed player"} for r in self.safe_results(results)]
@@ -1494,6 +1501,7 @@ class Browser:
             sc.info = dict(sc.info, kind="search", results=sc.queue[:SS.MAX_RESULTS],
                            why=f"watched a short for {round(sc.watch_s)} s (muted); the next one?")
 
+    YT_SEARCH_SHARE = 0.45                                     # searches that go to YouTube when the key is set
     TRIES = 4                                                  # sources tried per search (#89: no Wikipedia fallback)
 
     async def _search(self, sc, q, why="", origin=""):
@@ -1516,6 +1524,12 @@ class Browser:
         vq = NV.video_query(q)
         if vq is not None:
             return await self._video_search(sc, vq, q, why, origin)
+        if YT.key() and self.rng.random() < self.YT_SEARCH_SHARE:
+            # #89 live 2026-10-04: with the key, YouTube is a real search engine for him (its official API): a good
+            # share of his searches are YouTube searches, played in the official embed
+            if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
+                                         short=sc.name == "phone"):
+                return True
         for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video", wiki_share=self.variety.wiki_share(),
                              hungry=self.hungry)[:self.TRIES]:
             if await self._search_on(sc, name, q, why, origin):
@@ -1526,10 +1540,11 @@ class Browser:
                         sc.pending_link = (r["url"], f"searched “{q[:40]}”, opened “{r['title'][:50]}”")
                 return True
         topic = I.topic_of(q or "")
-        if sc.name == "phone" or topic in ("football", "creators", "memes", "sneakers"):
-            # no site search for these (or he is on the phone): their videos (the API, or the topic's channels)
-            if await self._public_videos(sc, "shorts", q, why, origin):
-                return True
+        # no fitting site answered: the query becomes a YouTube search (the API with the key, else the topic's
+        # channels), never a news site's search page
+        if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
+                                     short=sc.name == "phone"):
+            return True
         return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry)
 
     async def _video_search(self, sc, vq, q, why, origin):

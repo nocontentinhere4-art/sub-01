@@ -132,6 +132,12 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   browser), 3 days: before (main) short video + YouTube 0 %, Science News 70 % of pages, recipes outside meals 7.4 %,
   longest run on one site 18; after, no key: 54 % (shorts 36 %, YouTube 19 %), Wikipedia 0 %, recipes outside meals
   0 %, longest run 3; with the key: 61 %.
+- With the key (added live 2026-10-04 ~23:57 UTC; main still showed no YouTube, all searches on HN / Science News):
+  `YT_SEARCH_SHARE` (45 %) of searches go to YouTube's API first, a query with no fitting site becomes a YouTube
+  search (never a news site's search page), and desk video slots pick from his profile. `teen_day.py --youtube-key`:
+  short video + YouTube 75 % of the simulated day (no key: 56 %). Each API search logs "browse: YouTube API search
+  (…), n results, units today" and counts in `/api/screens` → `youtube.searches` / `units_used` / `errors`. The
+  9,000-unit cap is ~90 searches a day; after it, the channels' pages take over.
 
 ## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
 - Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia

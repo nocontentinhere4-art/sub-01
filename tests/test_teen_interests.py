@@ -184,3 +184,27 @@ def test_live_interest_says_hungry_and_desk_video(monkeypatch):
     monkeypatch.setattr(S, "desk_video", lambda t, tilt=0.5: True)
     d = S.live_interest(live, None, random.Random(0))
     assert d["hungry"] is False and d["feed"] == "video"
+
+
+def test_with_the_key_a_search_with_no_fitting_site_becomes_a_youtube_search(monkeypatch):
+    """Live 2026-10-04 08:50-08:58 Tokyo, key set: "tardigrades — Hacker News", "capybara onsen — Science News".
+    Now such a query is a YouTube search (the API), never a news site's search page."""
+    monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
+    b = Browser(decide=True, rng=random.Random(0))
+    b.YT_SEARCH_SHARE = 0.0                                  # only the no-fitting-site path here
+    sc = b.screens["desk"]
+    searched, videos = [], []
+
+    async def _search_on(sc_, name, q, why, origin):
+        searched.append(name)
+        return False
+
+    async def _public_videos(sc_, kind, q, why, origin="", short=True):
+        videos.append((kind, q, short))
+        return True
+    b._search_on, b._public_videos = _search_on, _public_videos
+    assert run(b._search(sc, "capybara onsen", "", "interests"))
+    assert videos == [("youtube", "capybara onsen", False)] and "news" not in searched and "hn" not in searched
+    b.YT_SEARCH_SHARE = 1.0                                  # and a share of all searches go to YouTube first
+    run(b._search(sc, "Toyota GR Supra", "", "interests"))
+    assert videos[-1][1] == "Toyota GR Supra" and searched.count("carscoops") == 0
