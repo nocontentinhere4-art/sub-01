@@ -110,6 +110,16 @@ function armIK(Wq, L, rootPos) {
       // fingers together (the rest pose fans them): ring and little finger toward the index, about the palm normal
       [[3, 3], [4, 7], [5, 12]].forEach(([f, deg]) => { const n = `finger${f}-1.${s}`;
         L[n] = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (s === "R" ? 1 : -1) * deg * D2R * +(process.env["ADDUCT_" + s] || 0)).multiply(L[n]); }); }
+    // THUMBTAP=rate: texting — the thumbs tap the screen in bursts (2-5 s of ~rate taps/s, alternating hands, then
+    // 1-3 s still while reading), each tap bending the thumb's two joints ~22 deg down and back in 0.18 s
+    if (process.env.THUMBTAP) { const t = frames.length / fps, rate = +process.env.THUMBTAP;
+      if (!IKT._tt) { let x = 4242, tt = 0.4; const out = []; const rnd = () => (x = (x * 48271) % 2147483647) / 2147483647;
+        while (tt < 600) { const burst = 2 + 3 * rnd(), end = tt + burst; let side = rnd() < 0.5 ? "L" : "R";
+          while (tt < end) { out.push([tt, side]); side = rnd() < 0.75 ? (side === "L" ? "R" : "L") : side; tt += (0.6 + 0.8 * rnd()) / rate; }
+          tt += 1 + 2 * rnd(); }
+        IKT._tt = out; }
+      let pulse = 0; for (const [t0, sd] of IKT._tt) { if (t0 > t) break; if (sd !== s) continue; const u = t - t0; if (u < 0.18) pulse = Math.max(pulse, Math.sin(Math.PI * u / 0.18)); }
+      for (const n of [`finger1-2.${s}`, `finger1-3.${s}`]) L[n] = curlQ(n, 22 * pulse).multiply(L[n]); }
     const keep = { up: L[up].clone(), lo: L[lo].clone() };
     let dy = 0;
     for (let it = 0; it < 4; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dy);
@@ -203,6 +213,12 @@ function solveSide(Wq, L, rootPos, s, dy) {
   // the recorded wrist's drift (relative to its first frame) moves the pin, so the hands wander over the keys
   const Wm = fk(Wq, rootPos, wr); if (!IKT["_w0" + s]) IKT["_w0" + s] = Wm.clone();
   const T = V3(IKT[s]).addScaledVector(Wm.clone().sub(IKT["_w0" + s]), +(process.env.DRIFT || 0.7)); T.y += dy;
+  // path<s>=[[t, dx, dy, dz], ...]: keyed offsets of the pin (smoothstep between keys), e.g. a page turn
+  if (IKT["path" + s]) { const P = IKT["path" + s], tt = frames.length / fps; let o = [0, 0, 0];
+    if (tt <= P[0][0]) o = P[0].slice(1); else if (tt >= P[P.length - 1][0]) o = P[P.length - 1].slice(1);
+    else for (let i = 0; i < P.length - 1; i++) if (tt >= P[i][0] && tt <= P[i + 1][0]) { const u = (tt - P[i][0]) / (P[i + 1][0] - P[i][0]), w = u * u * (3 - 2 * u);
+      o = [1, 2, 3].map(k => P[i][k] + (P[i + 1][k] - P[i][k]) * w); break; }
+    T.x += o[0]; T.y += o[1]; T.z += o[2]; }
   // WANDER=a (m): the hands slowly travel over the keys like a real typist's (two slow sines per axis, per hand), so
   // the forearms and elbows move instead of staying locked
   if (process.env.WANDER) { const a = +process.env.WANDER, tt = frames.length / fps, ph = s === "L" ? 0 : 1.7;
@@ -223,9 +239,9 @@ function solveSide(Wq, L, rootPos, s, dy) {
   L[lo] = R1.clone().multiply(u2).invert().multiply(R2);
   // the hand points forward, a little inward, palm down; it keeps part of the recorded hand's turn since frame 0
   const yaw = IKT["yaw" + s] !== undefined ? IKT["yaw" + s] : (s === "L" ? -0.25 : 0.25);
-  const fwd = new THREE.Vector3(yaw, IKT["pitch" + s] !== undefined ? IKT["pitch" + s] : -0.04, 1).normalize();
+  const fwd = IKT["fwd" + s] ? V3(IKT["fwd" + s]).normalize() : new THREE.Vector3(yaw, IKT["pitch" + s] !== undefined ? IKT["pitch" + s] : -0.04, 1).normalize();
   const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
-  const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, -(IKT["roll" + s] || 0), 0.2);   // roll: little-finger side down
+  const tAcr = IKT["acr" + s] ? V3(IKT["acr" + s]) : new THREE.Vector3(s === "L" ? 1 : -1, -(IKT["roll" + s] || 0), 0.2);   // roll: little-finger side down; fwd<s>/acr<s>: explicit finger and index->little directions
   const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
   const Hrec = Wq[wr].clone(); if (!IKT["_h0" + s]) IKT["_h0" + s] = Hrec.clone();
   const Hlive = Hrec.multiply(IKT["_h0" + s].clone().invert());
@@ -302,7 +318,13 @@ function legDown(Wq, L, rootPos, sd, w) {
   L[lo] = Wl(par[lo]).clone().invert().multiply(R2);
 }
 const frames = []; let p0 = null;
-for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 1 / fps) {
+// WARP=[[outT, srcT], ...] (seconds from start): sample the recording on a piecewise-linear time map, to slow a
+// moment down (a 1 s pour held for 3 s) without touching the rest
+const srcTimes = []; if (process.env.WARP) { const P = JSON.parse(process.env.WARP), end = P[P.length - 1][0];
+  for (let u = 0; u < end; u += 1 / fps) { let sT = P[P.length - 1][1]; for (let i = 0; i < P.length - 1; i++) if (u >= P[i][0] && u <= P[i + 1][0]) { sT = P[i][1] + (u - P[i][0]) / (P[i + 1][0] - P[i][0]) * (P[i + 1][1] - P[i][1]); break; }
+    srcTimes.push(start + sT); } }
+else for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 1 / fps) srcTimes.push(t);
+for (const t of srcTimes) {
   mixer.setTime(t); obj.updateMatrixWorld(true);
   const Wq = {}, L = {};
   for (const n of T) {
@@ -319,9 +341,14 @@ for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 
   let lift = 0; if (process.env.LIFT) { const P = JSON.parse(process.env.LIFT), h = sp("Hips").y;
     if (h >= P[0][0]) lift = P[0][1]; else if (h <= P[P.length - 1][0]) lift = P[P.length - 1][1];
     else for (let i = 0; i < P.length - 1; i++) if (h <= P[i][0] && h >= P[i + 1][0]) { const u = (P[i][0] - h) / (P[i][0] - P[i + 1][0]); lift = P[i][1] + u * (P[i + 1][1] - P[i][1]); } }
+  // LIFTT=[[t, dy], ...]: extra lift by clip time (piecewise linear), for contacts the hips' height alone can't tell apart
+  if (process.env.LIFTT) { const P = JSON.parse(process.env.LIFTT), tt = frames.length / fps;
+    if (tt <= P[0][0]) lift += P[0][1]; else if (tt >= P[P.length - 1][0]) lift += P[P.length - 1][1];
+    else for (let i = 0; i < P.length - 1; i++) if (tt >= P[i][0] && tt <= P[i + 1][0]) { lift += P[i][1] + (tt - P[i][0]) / (P[i + 1][0] - P[i][0]) * (P[i + 1][1] - P[i][1]); break; } }
   // FEETDOWN=[lyingH, seatedH]: when the lift raises him while seated (source hips between those heights), the legs
   // reach down so the feet hang toward the floor instead of riding up with the hips (two-bone IK, knee kept forward)
-  if (process.env.FEETDOWN && lift > 0) { const [hl, hs] = JSON.parse(process.env.FEETDOWN), h = sp("Hips").y;
+  if (process.env.FEETDOWN && lift > 0 && (!process.env.FEETDOWN_T || (t => t >= JSON.parse(process.env.FEETDOWN_T)[0] && t <= JSON.parse(process.env.FEETDOWN_T)[1])(frames.length / fps))) {   // FEETDOWN_T=[t0,t1]: only then
+    const [hl, hs] = JSON.parse(process.env.FEETDOWN), h = sp("Hips").y;
     const w = Math.max(0, Math.min(1, (h - hl) / (hs - hl))) * Math.max(0, Math.min(1, (0.85 - h) / 0.1));
     if (w > 0) { const rp = [ (hp.x - (p0 ? p0.x : hp.x)) * k + rest.head.root[0], hp.y * k + lift, (hp.z - (p0 ? p0.z : hp.z)) * k + rest.head.root[2] ];
       for (const sd of ["L", "R"]) legDown(Wq, L, rp, sd, w); } }
@@ -338,12 +365,38 @@ if (process.env.HANDSOUT) { const r = +process.env.HANDSOUT;
     const sm = dil.map((_, i) => { const acc = new THREE.Vector3(); let ws = 0; for (let j = Math.max(0, i - 12); j <= Math.min(n - 1, i + 12); j++) { const w = Math.exp(-((j - i) ** 2) / 32); acc.addScaledVector(dil[j], w); ws += w; } return acc.multiplyScalar(1 / ws); });
     frames.forEach((f, i) => { if (sm[i].length() > 1e-4) moveWrist(f.L, f.root, sd, bonePos(f.L, f.root, `wrist.${sd}`).add(sm[i])); });
   } }
+// MATTRESS=[x0,x1,z0,z1,top]: a hand pressing on the bed stays on the mattress (palm skin 1.2 cm over its top); the
+// wrist moves up by the deepest point's depth, spread in time like HANDSOUT so it glides
+if (process.env.MATTRESS) { const [x0, x1, z0, z1, top] = JSON.parse(process.env.MATTRESS);
+  for (const sd of ["L", "R"]) {
+    const pts = ["wrist", "finger3-1", "finger2-3", "finger3-3", "finger4-3", "finger5-3", "finger1-3"].map(b => `${b}.${sd}`);
+    const corr = frames.map(f => { let dy = 0; for (const b of pts) for (const tl of [false, true]) { const q = bonePos(f.L, f.root, b, tl);
+      if (q.x > x0 && q.x < x1 && q.z > z0 && q.z < z1) dy = Math.max(dy, top + 0.012 - q.y); } return new THREE.Vector3(0, dy, 0); });
+    const n = corr.length, dil = corr.map((_, i) => { let best = corr[i]; for (let j = Math.max(0, i - 5); j <= Math.min(n - 1, i + 5); j++) if (corr[j].y > best.y) best = corr[j]; return best; });
+    const sm = dil.map((_, i) => { let acc = 0, ws = 0; for (let j = Math.max(0, i - 12); j <= Math.min(n - 1, i + 12); j++) { const w = Math.exp(-((j - i) ** 2) / 32); acc += dil[j].y * w; ws += w; } return acc / ws; });
+    frames.forEach((f, i) => { if (sm[i] > 1e-4) moveWrist(f.L, f.root, sd, bonePos(f.L, f.root, `wrist.${sd}`).add(new THREE.Vector3(0, sm[i], 0))); });
+  } }
+// MOUTH=side (R, L or RL): when the hand comes up to the face, the point between thumb and index tips is pulled onto
+// the mouth (G2: lips 4 cm below and 11.8 cm in front of the head joint; MOUTH_OFF overrides), so food and cups reach
+// the lips on our body's proportions instead of the recorded actor's; the pull fades in over 25 cm and is smoothed
+if (process.env.MOUTH) { const off = V3(JSON.parse(process.env.MOUTH_OFF || "[0,-0.04,0.118]")), R = +(process.env.MOUTH_R || 0.25), gap = +(process.env.MOUTH_GAP || 0.02);
+  for (const sd of process.env.MOUTH.split("")) {
+    const corr = frames.map(f => { const hq = wlq(f.L, "head"), m = bonePos(f.L, f.root, "head").add(off.clone().applyQuaternion(hq));
+      const fp = bonePos(f.L, f.root, `finger1-3.${sd}`, true).add(bonePos(f.L, f.root, `finger2-3.${sd}`, true)).multiplyScalar(0.5);
+      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(hq), tgt = m.clone().addScaledVector(fwd, gap), d = fp.distanceTo(tgt);
+      const w = d >= R ? 0 : d <= R * 0.5 ? 1 : (u => u * u * (3 - 2 * u))((R - d) / (R * 0.5)); return tgt.sub(fp).multiplyScalar(w); });
+    const n = corr.length, sm = corr.map((_, i) => { const acc = new THREE.Vector3(); let ws = 0; for (let j = Math.max(0, i - 8); j <= Math.min(n - 1, i + 8); j++) { const w = Math.exp(-((j - i) ** 2) / 18); acc.addScaledVector(corr[j], w); ws += w; } return acc.multiplyScalar(1 / ws); });
+    frames.forEach((f, i) => { if (sm[i].length() > 1e-4) moveWrist(f.L, f.root, sd, bonePos(f.L, f.root, `wrist.${sd}`).add(sm[i])); });
+  } }
 // INPLACE: remove the travel (straight line from the first to the last frame) so the clip loops on the spot; the page
 // moves the root along his path at the reported speed
 if (process.env.INPLACE) { const n = frames.length - 1, a0 = frames[0].root, a1 = frames[n].root;
   const sp_ = Math.hypot(a1[0] - a0[0], a1[2] - a0[2]) / (n / fps);
   frames.forEach((f, i) => { f.root[0] -= (a1[0] - a0[0]) * i / n; f.root[2] -= (a1[2] - a0[2]) * i / n; });
   console.log("in place: travel speed", sp_.toFixed(3), "m/s"); }
+// DUMP=bone,bone:file.json — per-frame world positions (bone heads; "name~" = tail), for props that follow the hands
+if (process.env.DUMP) { const [list, file] = process.env.DUMP.split(":"), names = list.split(",");
+  fs.writeFileSync(file, JSON.stringify({ fps, frames: frames.map(f => Object.fromEntries(names.map(n => [n, bonePos(f.L, f.root, n.replace("~", ""), n.endsWith("~")).toArray().map(x => +x.toFixed(4))]))) })); }
 const io = new NodeIO(), doc = await io.read(GLB), root = doc.getRoot(), b0 = root.listBuffers()[0];
 const byName = new Map(root.listNodes().map(n => [n.getName(), n]));
 const anim = doc.createAnimation("clip");

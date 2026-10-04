@@ -55,6 +55,13 @@
     book held in both hands, DY +0.022), `room_phone` (21.5 s, seated texting), `room_drink` (16.5 s, standing: fills a
     glass, drinks), `room_window` (11.3 s, opens a window), `room_door` (12.6 s, opens and closes a door). Props
     (book, phone, plate, glass) attach to the hand bones in the page.
+  - Owner round 2 (real-video references, Mixkit free clips, notes in the session): reworked against real footage —
+    `room_eat` food reaches the lips (MOUTH IK, the hand used to stop at the eye on G2's proportions); `room_read` an
+    open paperback held in both hands with page turns; `room_phone` two-hand grip, thumbs tapping in bursts;
+    `room_drink` glass in the left hand, pours from a bottle held ~3 s (WARP time map), drinks with the glass on the
+    lips; `room_door` / `room_window` with the door swing / sash slide derived from the hand on the handle. NEW
+    `room_bedtime` (29 s, approved with "no body in chair/bed"): one continuous clip, gait-matched cross-fade.
+    Props, sizes, offsets and door/window keyframes for the page: `glb/clips_g2/props_g2.json`.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`, `unrename_mh.mjs` (room names back to MakeHuman's, so boy_g2.glb can be the retarget target).
   The source FBX files are not in the repo.
 
