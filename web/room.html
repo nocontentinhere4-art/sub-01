@@ -2349,14 +2349,35 @@ function slidesInit(){                                 // which of his vertices 
       py = Math.min(H - 1, Math.floor((sm.material.map.flipY ? 1 - w : w) * H)), k = (py * W + px) * 4;
     if (D[k] + D[k + 1] + D[k + 2] < 0.3 * 765) slide.push(i); }
   if (!slide.length || !g.index) return false;
-  const isSlide = new Uint8Array(P.count); for (const i of slide) isSlide[i] = 1;
-  const idx = g.index.array, tri = [];
+  const isSlide = new Uint8Array(P.count), idx = g.index.array, tri = [];
+  // the dark texels find only the slides' black parts; the slides are islands of their own (straps, footbed, sole), so
+  // every island (vertices welded by position) with a dark slide vertex in it, lying wholly on his feet below the ankle,
+  // is a slide, white parts too. (If an island also reaches up his leg, it is not one: then only the dark vertices count)
+  const par = new Int32Array(P.count); for (let i = 0; i < P.count; i++) par[i] = i;
+  const find = i => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; }, join = (a, b) => { a = find(a); b = find(b); if (a !== b) par[b] = a; };
+  for (let t = 0; t < idx.length; t += 3) { join(idx[t], idx[t + 1]); join(idx[t], idx[t + 2]); }
+  const weld = new Map(); for (let i = 0; i < P.count; i++) { const key = `${P.getX(i).toFixed(4)},${P.getY(i).toFixed(4)},${P.getZ(i).toFixed(4)}`;
+    if (weld.has(key)) join(weld.get(key), i); else weld.set(key, i); }
+  const low = i => /Foot|Toe/.test(names[domBone(g, i)]) && P.getY(i) <= ymin + 0.11, out = new Set(), hit = new Set();
+  for (let i = 0; i < P.count; i++) if (!low(i)) out.add(find(i));
+  for (const i of slide) hit.add(find(i));
+  for (let i = 0; i < P.count; i++) { const r = find(i); if (hit.has(r) && !out.has(r)) isSlide[i] = 1; }
+  for (const i of slide) isSlide[i] = 1;
   for (let t = 0; t < idx.length; t += 3) if (isSlide[idx[t]] && isSlide[idx[t + 1]] && isSlide[idx[t + 2]]) tri.push(idx[t], idx[t + 1], idx[t + 2]);
   // his mesh without them. Under the duvet their triangles are left out. Lying on top of it (the phone, music) his feet
-  // show, and the model's socks have no sole of their own (the slide is it): there the slides keep their shape and take
-  // the sock's white instead, so the sock stays closed.
-  const keep = []; for (let t = 0; t < idx.length; t += 3) if (!(isSlide[idx[t]] && isSlide[idx[t + 1]] && isSlide[idx[t + 2]])) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+  // show, and the model's socks have no sole of their own (the slide is it): there only the flat underside of each slide
+  // stays, in the sock's white and moved up into the sock's opening (below), so the sock is closed and no slide is seen
+  const keep = [], sole = []; for (let t = 0; t < idx.length; t += 3) { const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    if (!(isSlide[a] || isSlide[b] || isSlide[c])) keep.push(a, b, c);              // (a triangle with any slide vertex goes too)
+    else if (Math.max(P.getY(a), P.getY(b), P.getY(c)) <= ymin + 0.006) sole.push(a, b, c); }   // (its flat underside only)
   SLIDES.full = g.index; SLIDES.bare = new THREE.BufferAttribute(new Uint32Array(keep), 1);
+  SLIDES.sole = new THREE.BufferAttribute(new Uint32Array(keep.concat(sole)), 1);
+  // that underside up into the sock, as its own sole would be: 2 cm up (the slide's sole is 2.5 cm thick), 10 % in
+  // towards each foot's middle (in his bind pose; his mesh takes these positions only while it shows)
+  SLIDES.pos = P; SLIDES.solePos = P.clone(); const mid = {}, n = {};
+  for (let i = 0; i < P.count; i++) if (isSlide[i]) { const f = P.getX(i) > 0 ? "a" : "b"; (mid[f] = mid[f] || new THREE.Vector3()).add(_l1.set(P.getX(i), 0, P.getZ(i))); n[f] = (n[f] || 0) + 1; }
+  for (let i = 0; i < P.count; i++) if (isSlide[i]) { const f = P.getX(i) > 0 ? "a" : "b", cx = mid[f].x / n[f], cz = mid[f].z / n[f];
+    SLIDES.solePos.setXYZ(i, cx + (P.getX(i) - cx) * 0.9, P.getY(i) + 0.02, cz + (P.getZ(i) - cz) * 0.9); }
   let bu = 0, bv = 0, bscore = -1;                      // the flattest bright patch of the texture: the sock's own white
   for (let py = 4; py < H - 4; py += 4) for (let px = 4; px < W - 4; px += 4) {
     let sum = 0, sq = 0; for (let dy = -3; dy <= 3; dy += 2) for (let dx = -3; dx <= 3; dx += 2) {
@@ -2365,7 +2386,7 @@ function slidesInit(){                                 // which of his vertices 
     if (m > 0.72 && sc > bscore) { bscore = sc; bu = (px + 0.5) / W; bv = (py + 0.5) / H; } }
   SLIDES.uv = UV; SLIDES.sockUV = new THREE.Float32BufferAttribute(UV.count * 2, 2);
   for (let i = 0; i < UV.count; i++) SLIDES.sockUV.setXY(i, UV.getX(i), UV.getY(i));
-  if (bscore >= 0) for (const i of slide) SLIDES.sockUV.setXY(i, bu, sm.material.map.flipY ? 1 - bv : bv);
+  if (bscore >= 0) for (let i = 0; i < P.count; i++) if (isSlide[i]) SLIDES.sockUV.setXY(i, bu, sm.material.map.flipY ? 1 - bv : bv);
   // the parked pair: the slides' own triangles as they are in his bind pose (standing, feet flat), at his scale, by the bed
   const inv = n => new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert(), bp = n => new THREE.Vector3().setFromMatrixPosition(inv(n));
   const sc = bones.LeftFoot.getWorldPosition(_l1).distanceTo(bones.LeftToeBase.getWorldPosition(_l2)) / bp("LeftFoot").distanceTo(bp("LeftToeBase"));
@@ -2384,7 +2405,8 @@ function slidesInit(){                                 // which of his vertices 
 function setSlides(state){                            // 0 on his feet; 1 off, his socks seen (lying on the duvet); 2 off, under it
   if (state === SLIDES.state || (!SLIDES.full && !slidesInit())) return;
   SLIDES.state = state; SLIDES.off = state > 0; const g = skinMesh().geometry;
-  g.setIndex(state === 2 ? SLIDES.bare : SLIDES.full);
+  g.setIndex(state === 2 ? SLIDES.bare : state === 1 ? SLIDES.sole : SLIDES.full);
+  g.setAttribute("position", state === 1 ? SLIDES.solePos : SLIDES.pos); g.attributes.position.needsUpdate = true;
   g.setAttribute("uv", state === 1 ? SLIDES.sockUV : SLIDES.uv); g.attributes.uv.needsUpdate = true;
   SLIDES.parked.visible = state > 0;
 }
@@ -2404,7 +2426,7 @@ function rollStep(dt, asleep){
   ROLL.a = ROLL.force != null && Math.abs(d) < 1e-3 ? ROLL.goal : ROLL.a + v;
 }
 const lieW = () => at === "bedlie" ? 1 : step && step.k === "pose" ? (step.to === "bedlie" ? step.w || 0 : step.from === "bedlie" ? 1 - (step.w || 0) : 0) : 0;
-const LIE_CLIP = {phone_lie:{dy:0.09, spine:-0.08}, listen:{dy:0.05, spine:0}};
+const LIE_CLIP = {phone_lie:{dy:0.10, spine:-0.27, neck:-0.2, hip:-0.45, bend:0.9}, listen:{dy:0.05, spine:0}};
 function lieFit(){
   const k = lieW();
   if (k <= 0 || OFF.lie) return;
@@ -2416,11 +2438,13 @@ function lieFit(){
   const fit = goal && LIE_CLIP[goal.clip];
   if (fit) { B.getWorldPosition(_l1); _l1.y -= fit.dy * k; B.parent.worldToLocal(_l1); B.position.copy(_l1); B.updateMatrixWorld(true); }
   bend(bones.Spine02, _l3, (LIE.spine + (fit ? fit.spine : 0)) * k);       // the small of his back down, the chest stays on the pillow
+  if (fit && fit.neck) bend(bones.neck, _l3, fit.neck * k);                 // (and his head back up, onto the pillow)
   bend(bones.LeftUpLeg, _l3, LIE.legs * k); bend(bones.RightUpLeg, _l3, LIE.legs * k);   // the legs flat on the bed
   bend(bones.LeftLeg, _l3, LIE.knee * k); bend(bones.RightLeg, _l3, LIE.knee * k);
   // asleep he is 1.72 m long in a 1.65 m bed: his knees stay a little bent, as they would in a bed this size. The phone
   // and music clips lie with their own bent legs, so this is only for the sleeping one.
-  if (goal && goal.clip === "sleep") for (const sd of ["Left", "Right"]) { bend(bones[sd + "UpLeg"], _l3, LIE.hip * k); bend(bones[sd + "Leg"], _l3, LIE.bend * k); }
+  const kn = goal && goal.clip === "sleep" ? LIE : fit && fit.bend ? fit : null;   // (the phone pose too: not a plank)
+  if (kn) for (const sd of ["Left", "Right"]) { bend(bones[sd + "UpLeg"], _l3, kn.hip * k); bend(bones[sd + "Leg"], _l3, kn.bend * k); }
   bend(bones.LeftFoot, _l3, LIE.foot * k); bend(bones.RightFoot, _l3, LIE.foot * k);   // the feet fall forward (relaxed)
   const a = ROLL.a * k, u = Math.abs(a) / ROLL.ang; if (!a) return;
   // on his side: the whole body turns about the bed's long axis, up off his shoulder, the hips and knees bend a little
@@ -2450,7 +2474,7 @@ function lieFit(){
 function inBed(dt){                                    // after the last pose layer of the frame
   if (!boy || !bones.Hips) return;
   const k = boy.visible ? lieW() : 0;
-  setSlides(k > 0 ? (DUV.w > 0.3 ? 2 : 1) : 0);           // off before he lies down, and back on when he is up
+  setSlides(k > 0 ? (DUV.w > 0.3 ? 2 : 1) : 0);           // off before he lies down (by the bed, on the floor), back on when he is up
   const asleep = boy.visible && goal && goal.clip === "sleep" && goal.anchor === "bedlie" && (at === "bedlie" || (step && step.k === "pose" && step.to === "bedlie"));
   rollStep(dt, asleep && at === "bedlie" && DUV.w >= 1);
   // the page may open while he is already asleep: he is under it from the first frame, not on top of it
