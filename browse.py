@@ -430,6 +430,7 @@ EMBED_ERROR = re.compile(r"video unavailable|this video is unavailable|video cur
                          r"an error occurred|this video is private|video has been removed|something went wrong|"
                          r"advertisement playing", re.I)      # an ad is never skipped by us: the next video instead
 EMBED_CHECK_MS = 3000
+PLAYER_REFUSALS = ("bot wall", "sign-in wall", "did not load")   # the player page itself refused, whatever the video
 EMBED_ERROR_JS = """() => { const e = document.querySelector('.ytp-error, .ytp-error-content-wrap');
   const ad = document.querySelector('.ad-showing, .ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text, .ytp-ad-skip-button');
   const t = (document.body && document.body.innerText || '').slice(0, 2000);
@@ -1201,6 +1202,9 @@ class Browser:
         come from the official oEmbed APIs and pass video_text_ok. The first one is shown and played muted; the rest
         are the next options."""
         cands = []
+        if (kind == "shorts" or kind == "youtube") and not self.yt.player_up():
+            self.feed_note = self.yt.player_note()              # #89 live: YouTube refuses the player: other things
+            return False
         if kind == "shorts" or kind == "youtube":
             if YT.key():
                 # the topic's channels' latest uploads (3 units), else a search (100 units); all through the API
@@ -1211,7 +1215,8 @@ class Browser:
                     cands = await self._yt_search(sc, q, short)
             if not cands:                                       # no key or no quota: nothing new is looked up
                 cands = self._yt_replay(short)
-                self.feed_note = YT.NOTE_REPLAY if cands else YT.NOTE_NO_KEY
+                self.feed_note = (YT.NOTE_REPLAY_KEY if YT.key() else YT.NOTE_REPLAY) if cands else (
+                    self.feed_note if YT.key() else YT.NOTE_NO_KEY)
         elif kind == "tiktok":
             cands = await self._tiktok_found(sc, q)
         if not cands:
@@ -1392,6 +1397,10 @@ class Browser:
             sc.site = None
         if not await self._open(sc, emb, why, "page", title=card["title"], min_text=0, shoot=False,
                                 referer=EMBED_REFERER):
+            if self.last_skip in PLAYER_REFUSALS and YOUTUBE_HOST.search(host):
+                # #89 live: YouTube's bot check / sign-in screen in the player itself, not this video's fault
+                print(f"browse: YouTube's player refused ({self.last_skip})", flush=True)
+                self.yt.player_failed(self.last_skip)
             return False
         sc.info = dict(sc.info, url=card["url"], host=card.get("host", host), embed=emb, card=False,
                        channel=(card.get("author") or "")[:80], search_box=False)
@@ -1404,6 +1413,8 @@ class Browser:
             self.last_skip = "embed refused"
             await self._leave(sc)
             return False
+        if YOUTUBE_HOST.search(host):
+            self.yt.player_ok()
         if not await self.show(sc):
             return False
         await self._start_watch(sc)
@@ -1416,6 +1427,9 @@ class Browser:
         url = YT.video_url(vid, short)
         if not YT.key():
             self.last_skip = "a YouTube video link (no API key to check it)"
+            return False
+        if not self.yt.player_up():
+            self.last_skip = "YouTube's player is paused (it refused this browser)"
             return False
         if self.yt.is_bad(url) or not self.fresh(url):
             self.last_skip = "video refused or seen"
@@ -1462,10 +1476,17 @@ class Browser:
             # #89 live: a refused player is skipped for the next video in the queue within seconds
             for r in list(sc.queue)[:3]:
                 nxt = sc.cards.get(r.get("url"))
+                if not self.yt.player_up():
+                    break
                 if nxt and nxt.get("embed") and self._card_ok(nxt):
                     sc.queue = [x for x in sc.queue if x.get("url") != nxt["url"]]
                     if await self._open_embed(sc, nxt, why):
                         return True
+            if YOUTUBE_HOST.search(urllib.parse.urlsplit(card["embed"]).hostname or ""):
+                print(f"browse: YouTube embed refused ({self.last_skip}); no card, something else", flush=True)
+                if not self.yt.player_up():
+                    self.feed_note = self.yt.player_note()
+                return False                                    # #89 live: a card is not a video
             print(f"browse: embed refused ({self.last_skip}), showing a card instead", flush=True)
         if getattr(sc, "site", None) and getattr(sc, "public", None):   # cards are never shown in a logged-in context
             sc.ctx, sc.page = sc.public

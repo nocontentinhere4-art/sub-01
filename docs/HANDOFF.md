@@ -145,6 +145,13 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   (a redirect or a click on "Watch on YouTube"). An ad or YouTube's error in the embed (`EMBED_ERROR`, including
   "advertisement playing" and "something went wrong") moves on to the next video; we never press "Skip". An ad does
   not count against the channel. About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+- When YouTube refuses the player itself (live 2026-10-04 11:54: every video became a card, "the video is not
+  played"): the embed page caught by `_settle` as a bot wall ("Sign in to confirm you're not a bot", error 153), a
+  sign-in wall or not loading is a player-level refusal (`PLAYER_REFUSALS`), not the video's fault.
+  `PLAYER_FAILS` (2) in a row pause YouTube for `PLAYER_PAUSE_S` (30 min, kept in the state). During the pause
+  there are no YouTube videos, no API units are spent and the panel says why; he does other things. A YouTube
+  video is never shown as a card. `/api/screens` youtube has `player`, `player_paused_until` and
+  `last_player_refusal`. With a key set, the replay note says "API budget or hourly limit", not "no API key".
 - Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
   players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
   robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,

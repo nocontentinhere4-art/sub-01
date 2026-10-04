@@ -57,6 +57,12 @@ LIST_UNITS = 1                       # channels.list, playlistItems.list, videos
 SHORT_MAX_S = 180                    # a Short is at most 3 minutes (YouTube, since Oct 2024)
 API = "https://www.googleapis.com/youtube/v3/"
 NOTE_UPLOADS = "YouTube: latest uploads of channels he likes (official API)"
+NOTE_REPLAY_KEY = ("YouTube: today's API budget or the hourly API limit is reached: no new videos found; replaying "
+                   "today's already-found videos")
+NOTE_PLAYER_DOWN = ("YouTube: its embed player refuses this browser right now ({why}); no videos until {until} UTC, "
+                    "other things meanwhile")
+PLAYER_FAILS = 2                                        # player-level refusals in a row before YouTube is paused
+PLAYER_PAUSE_S = 1800
 NOTE_REPLAY = ("YouTube: no API key or no quota left: no new videos found; replaying today's already-found videos")
 
 
@@ -276,6 +282,9 @@ class Quota:
         self.today = [c for c in (s.get("today") or []) if isinstance(c, dict) and isinstance(c.get("url"), str)]
         self.bad = [x for x in (s.get("bad") or []) if isinstance(x, str)][-500:]      # ids the embed refused today
         self.bad_by = {k: int(v) for k, v in (s.get("bad_by") or {}).items() if isinstance(v, int)}   # channel -> n
+        p = s.get("player") if isinstance(s.get("player"), dict) else {}
+        self.player = {"until": float(p["until"]) if isinstance(p.get("until"), (int, float)) else 0.0,
+                       "why": str(p.get("why") or "")[:60], "fails": int(p["fails"]) if isinstance(p.get("fails"), int) else 0}
         self._roll()
 
     def _roll(self):
@@ -336,6 +345,25 @@ class Quota:
         self._roll()
         return self.bad_by.get(channel, 0) < BAD_CHANNEL
 
+    def player_failed(self, why):
+        """The embed player itself was refused (YouTube's bot check / sign-in screen, or it did not load), whatever the
+        video: after PLAYER_FAILS in a row YouTube is paused PLAYER_PAUSE_S (no cards, no API units meanwhile)."""
+        self.player["fails"] += 1
+        self.player["why"] = str(why)[:60]
+        if self.player["fails"] >= PLAYER_FAILS:
+            self.player["until"], self.player["fails"] = self.clock() + PLAYER_PAUSE_S, 0
+
+    def player_ok(self):
+        self.player["fails"] = 0
+
+    def player_up(self):
+        return self.clock() >= self.player["until"]
+
+    def player_note(self):
+        import datetime
+        until = datetime.datetime.fromtimestamp(self.player["until"], datetime.timezone.utc).strftime("%H:%M")
+        return NOTE_PLAYER_DOWN.format(why=self.player["why"] or "refused", until=until)
+
     def error(self, why):
         self._roll()
         self.errors = (self.errors + [str(why)[:80]])[-5:]
@@ -344,7 +372,7 @@ class Quota:
         self._roll()
         return {"day": self.day, "used": self.used, "searches": self.searches, "errors": self.errors,
                 "cache": dict(list(self.cache.items())[-100:]), "uploads": dict(self.uploads),
-                "today": self.today[-200:], "bad": self.bad[-500:], "bad_by": dict(self.bad_by)}
+                "today": self.today[-200:], "bad": self.bad[-500:], "bad_by": dict(self.bad_by), "player": dict(self.player)}
 
     def public(self):
         """For /api/screens and /api/browsing: the key set or not, units used today; never the key."""
@@ -352,4 +380,6 @@ class Quota:
         return {"key_set": bool(key()), "pacific_day": self.day, "units_used": self.used, "units_cap": daily_units(),
                 "free_units": FREE_UNITS, "searches": self.searches, "errors": list(self.errors),
                 "found_today": len(self.today), "refused_by_embed_today": len(self.bad),
-                "channels_set_aside": sorted(k for k, v in self.bad_by.items() if v >= BAD_CHANNEL)}
+                "channels_set_aside": sorted(k for k, v in self.bad_by.items() if v >= BAD_CHANNEL),
+                "player": "ok" if self.player_up() else "paused", "player_paused_until": self.player["until"] or None,
+                "last_player_refusal": self.player["why"] or None}
