@@ -275,3 +275,44 @@ def test_the_first_thing_at_the_desk_is_a_video():
     b.rng = SimpleNamespace(random=lambda: 0.5, choice=random.Random(0).choice)
     run(b._next(sc, [], {"query": "", "from": "", "hour": 9}))
     assert asked[-1][0] == "search"                          # after that, the usual mix
+
+
+def test_youtube_state_is_reported_while_idle_and_survives_a_restart(tmp_path, monkeypatch):
+    """Live 2026-10-04 00:31 UTC: "youtube": null in /api/screens while the browser idled."""
+    import json as _json
+    from live_server import Live
+    monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    live.browser = SimpleNamespace(log=[], searches=None, accounts=None, feed_note=None, youtube=None, diag={})
+    v = live.screens_view()["youtube"]
+    assert v["key_set"] is True and v["units_used"] == 0 and "test-key" not in _json.dumps(v)
+    q = YT.Quota()
+    q.spend_units(3)
+    live.browsing_state = {"youtube": q.to_dict()}
+    assert live.screens_view()["youtube"]["units_used"] == 3            # the saved quota, before the browser reports
+    from aiohttp.test_utils import TestClient, TestServer
+    from browse_service import make_app
+    b = Browser(decide=True)
+    b.yt.spend_units(7)
+
+    async def main():
+        client = TestClient(TestServer(make_app(b, token="t")))
+        await client.start_server()
+        try:
+            return await (await client.get("/state", headers={"X-Browse-Token": "t"})).json()
+        finally:
+            await client.close()
+    st = run(main())
+    assert st["youtube"]["units_used"] == 7 and st["youtube_state"]["used"] == 7     # public view + raw state
+    fresh = Browser(decide=True)
+
+    async def init():
+        client = TestClient(TestServer(make_app(fresh, token="t")))
+        await client.start_server()
+        try:
+            await client.post("/init", json={"state": {"log": [], "used": [], "youtube": st["youtube_state"]}},
+                              headers={"X-Browse-Token": "t"})
+        finally:
+            await client.close()
+    run(init())
+    assert fresh.yt.public()["units_used"] == 7                          # a restarted browser keeps today's units

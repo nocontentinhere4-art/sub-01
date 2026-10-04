@@ -306,6 +306,12 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
 
+**Owner decision (2026-10-04 01:20 UTC): visual approval.** Nothing that changes how he moves or looks (animations,
+the character, the camera, lighting) merges without the owner's OK on a preview video. Each such PR ships an MP4
+(30 fps, rendered frame by frame by stepping the page clock, old vs new, ≤ 25 MB) under its docs/ preview folder; the
+coordinator sends it to the owner and merges on his OK. AI4Animation was asked about and declined: research/education
+only, its mocap is CC BY-NC 4.0.
+
 **Pass 39 (2026-10-03 22:00 UTC).**
 - **Merged since pass 38:**
   - Live behaviour and content:

@@ -203,6 +203,8 @@ def test_live_like_a_short_from_the_api_drives_the_reward_regions(tmp_path, monk
     sc.mode, sc.page, sc.ctx = "shorts", SimpleNamespace(url="about:blank"), object()
 
     async def _fetch(sc_, url, hops=3, headers=None):
+        if "/youtube/v3/videos?" in url:                    # the playability check (1 unit)
+            return 200, (DATA / "youtube_api_videos.json").read_text()
         return (200, (DATA / "youtube_api_search.json").read_text()) if url.startswith(YT.SEARCH) else (404, "")
 
     async def _open(sc_, url, why, kind, title=None, min_text=80, shoot=True, revisit=False, referer=None):

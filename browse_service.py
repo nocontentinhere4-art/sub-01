@@ -146,6 +146,9 @@ def make_app(browser, token=None):
                                   "accounts": browser.accounts() if hasattr(browser, "accounts") else None,
                                   "feed_note": getattr(browser, "feed_note", None),
                                   "youtube": browser.yt.public() if hasattr(browser, "yt") else None,
+                                  # the raw quota state, saved by the live server and restored by /init (the
+                                  # public view above takes the "youtube" key of to_dict())
+                                  "youtube_state": browser.yt.to_dict() if hasattr(browser, "yt") else None,
                                   "diag": dict(getattr(browser, "diag", {}))})
 
     async def diag_shot(request):

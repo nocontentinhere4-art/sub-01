@@ -167,7 +167,7 @@ def run_day(seed, youtube_key):
                 return 200, '{"items":[%s]}' % items
             if "/videos" in u.path:
                 ids = urllib.parse.parse_qs(u.query)["id"][0].split(",")
-                items = ",".join('{"id":"%s","contentDetails":{"duration":"%s"},"status":{"embeddable":true}}'
+                items = ",".join('{"id":"%s","contentDetails":{"duration":"%s"},"status":{"embeddable":true,"privacyStatus":"public"}}'
                                  % (v, "PT40S" if int(v[-1]) % 2 else "PT9M") for v in ids)
                 return 200, '{"items":[%s]}' % items
             items = ",".join('{"id":{"videoId":"%s"},"snippet":{"title":"api short %d","channelTitle":"c"}}'
