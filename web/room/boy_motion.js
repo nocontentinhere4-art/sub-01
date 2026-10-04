@@ -376,7 +376,7 @@ export function createMotion(env){
     _c.copy(UP); _c.addScaledVector(_b, -_b.dot(_c)).normalize(); _d.crossVectors(_b, _c);   // palm up
     const m = bowl.m || (bowl.m = new THREE.Matrix4()); m.makeBasis(_d, _b, _c); _q.setFromRotationMatrix(m); env.setWorldQuat(B.LeftHand, _q);
     env.boy.updateMatrixWorld(true);
-    B.LeftHand.getWorldPosition(_a).addScaledVector(_b, 0.09).addScaledVector(UP, 0.065);    // on the middle of the palm, over the fingers
+    B.LeftHand.getWorldPosition(_a).addScaledVector(_b, 0.09).addScaledVector(UP, 0.069);    // on the middle of the palm, over the fingers (4 mm more: the palm skin stayed 3-4 mm inside the base at 0.065)
     d.g.position.copy(_a); d.g.rotation.set(0, 0.15 + env.boy.rotation.y, 0, "YXZ");
     env.DISH_AT.copy(_a).addScaledVector(UP, BOWL_RIM - 0.064 + 0.09);                              // the page's chopsticks follow the bowl (aimed for
                                                                                              // a 6.4 cm Kenney bowl: lifted by the taller one's rim)
