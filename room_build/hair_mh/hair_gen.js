@@ -90,9 +90,11 @@ export function buildHair(THREE, head, opt = {}){
   function flow(p, n, card){
     const top = smooth(0.792, 0.838, p.y), az = Math.abs(azimuth(p)), front = 1 - smooth(25, 60, az);
     const away = p.clone().sub(whorl); away.addScaledVector(n, -away.dot(n));
-    const d = away.normalize().multiplyScalar(top * (0.6 + 0.4 * front) + 0.15);
+    const dw = away.length(); away.normalize();
+    if (dw < 0.012) away.lerp(new V(0, -0.3, -1).addScaledVector(n, -n.z), 1 - dw / 0.012).normalize();   // round the whorl
+    const d = away.multiplyScalar(top * (0.6 + 0.4 * front) + 0.15);
     d.y -= (1 - top) * 1.0 + front * (1 - top) * 0.6;                               // gravity below the crown
-    if (az > 55 && az < 130) d.z -= 0.35 * (1 - top);                                 // the sides go a little back
+    if (az > 55 && az < 120) d.z -= 0.3 * (1 - top);                                 // the sides go a little back
     d.x -= 0.28 * front * smooth(0.77, 0.80, p.y);                                    // the fringe's sweep
     d.addScaledVector(n, -d.dot(n));
     d.applyAxisAngle(n, card.turn);
@@ -102,17 +104,18 @@ export function buildHair(THREE, head, opt = {}){
     const a = Math.abs(az), top = smooth(0.786, 0.826, p.y);
     let L = lerp(lerp(0.026, 0.017, smooth(115, 165, a)), 0.060, top);
     if (a < 42 && p.y > 0.79) L = lerp(0.060, 0.074, smooth(0.79, 0.81, p.y));       // the fringe
+    if (a > 62) L = Math.min(L, 0.004 + inside(p) * 1.1);                             // sides and nape taper into the skin
     return L;
   }
 
   // Layers: cover (wide, dense, on the skin), mid, outer (narrow, messy, lifted tips), an extra fringe so the forehead
   // never shows through in a hole, and hairline wisps.
   const LAYERS = [
-    {name: "cover", gap: 0.0125, width: [0.022, 0.028], off: 0.0012, vol: 0.0,  turn: 0.12, cols: [0, 1, 2], ao: 0.62, lift: 0.0005, lenK: 0.95},
-    {name: "mid",   gap: 0.0125, width: [0.016, 0.022], off: 0.0030, vol: 0.004, turn: 0.2, cols: [0, 2, 3, 4], ao: 0.8,  lift: 0.002, lenK: 1.0},
-    {name: "outer", gap: 0.0135, width: [0.010, 0.016], off: 0.0050, vol: 0.0065, turn: 0.28, cols: [3, 4, 5], ao: 0.95, lift: 0.0028, lenK: 1.08},
-    {name: "fringe", gap: 0.0062, width: [0.014, 0.020], off: 0.0042, vol: 0.003, turn: 0.2, cols: [0, 2, 3, 4], ao: 0.92, lift: 0.002, lenK: 1.06, fringe: true},
-    {name: "wisp",  gap: 0.0075, width: [0.007, 0.011], off: 0.0009, vol: 0.0,  turn: 0.25, cols: [6, 7], ao: 0.85, lift: 0.0015, lenK: 0.45, edge: 0.012},
+    {name: "cover", gap: 0.0115, width: [0.013, 0.017], off: 0.0012, vol: 0.0,   turn: 0.10, cols: [0, 1, 2], ao: 0.72, lift: 0.0005, lenK: 0.95},
+    {name: "mid",   gap: 0.0100, width: [0.010, 0.013], off: 0.0030, vol: 0.004, turn: 0.16, cols: [0, 1, 2, 3], ao: 0.85, lift: 0.0018, lenK: 1.0},
+    {name: "outer", gap: 0.0105, width: [0.006, 0.009], off: 0.0048, vol: 0.006, turn: 0.22, cols: [3, 4, 5], ao: 1.0,  lift: 0.0025, lenK: 1.06},
+    {name: "fringe", gap: 0.0060, width: [0.008, 0.012], off: 0.0040, vol: 0.003, turn: 0.16, cols: [1, 2, 3, 4], ao: 0.95, lift: 0.002, lenK: 1.05, fringe: true},
+    {name: "wisp",  gap: 0.0060, width: [0.004, 0.007], off: 0.0009, vol: 0.0,   turn: 0.2, cols: [6, 7], ao: 0.9, lift: 0.001, lenK: 0.45, edge: 0.010},
   ];
   const P = [], UV = [], COL = [], NRM = [], IDX = [];
   let cards = 0;
@@ -124,15 +127,15 @@ export function buildHair(THREE, head, opt = {}){
     }
     for (const r of roots){
       const card = {turn: (R() - 0.5) * 2 * L.turn};
-      const vol = L.vol * smooth(0.74, 0.83, r.p.y) * (0.6 + 0.6 * R());              // more volume on top
-      const len = lengthAt(r.p, r.az) * L.lenK * (0.82 + R() * 0.36);
-      const w = Math.min(lerp(L.width[0], L.width[1], R()) * (0.75 + 0.25 * smooth(0.74, 0.8, r.p.y)), len * 0.42);   // short hair, narrow cards
+      const vol = L.vol * smooth(0.74, 0.83, r.p.y) * (0.6 + 0.6 * R()) * smooth(0.006, 0.02, r.p.distanceTo(whorl));   // more volume on top, none at the whorl
+      const len = Math.max(0.005, lengthAt(r.p, r.az) * L.lenK * (0.82 + R() * 0.36));
+      const w = Math.min(lerp(L.width[0], L.width[1], R()) * (0.75 + 0.25 * smooth(0.74, 0.8, r.p.y)), len * 0.4);    // short hair, narrow cards
       const cols = len < 0.032 && !L.edge ? [3, 4, 5, 6] : L.cols;                     // short sides and nape: finer, see-through
       const col = cols[Math.floor(R() * cols.length)], flip = R() < 0.5;
       const u0 = (col + (flip ? 1 : 0)) / ATLAS_COLS, u1 = (col + (flip ? 0 : 1)) / ATLAS_COLS;
       const tw = (R() - 0.5) * (L.name === "outer" ? 0.6 : 0.2);                      // the card's tilt about its strand
       // Grow the guide along the scalp, then hang the strip on it (short cards need fewer segments).
-      const SEG = len < 0.032 ? 3 : 4;
+      const SEG = len < 0.012 ? 1 : len < 0.035 ? 2 : len < 0.05 ? 3 : 4;
       let cur = r, rows = [];
       for (let k = 0; k <= SEG; k++){
         const t = k / SEG, offset = L.off + vol + t * L.lift * (0.4 + R());
@@ -147,7 +150,8 @@ export function buildHair(THREE, head, opt = {}){
         }
       }
       if (rows.length < SEG + 1) continue;
-      const v0 = P.length / 3;
+      const v0 = P.length / 3, hue = R() < 0.3 ? 0.5 + R() * 0.7 : (R() - 0.5) * 0.3;   // a few browner cards
+      const tint = [1 + 0.22 * hue, 1 + 0.12 * hue, 1 - 0.02 * hue], bright = 0.9 + R() * 0.2;
       for (const row of rows){
         const side = new V().crossVectors(row.n, row.dir).normalize();
         const hw = w * 0.5 * (1 - 0.35 * row.t);
@@ -157,7 +161,7 @@ export function buildHair(THREE, head, opt = {}){
           P.push(p.x, p.y, p.z); NRM.push(row.n.x, row.n.y, row.n.z);
           UV.push(s < 0 ? u0 : u1, row.t * 0.995);
           const occ = L.ao * lerp(0.62, 1.0, smooth(0, 0.7, row.t));
-          COL.push(occ, occ, occ);
+          COL.push(occ * tint[0] * bright, occ * tint[1] * bright, occ * tint[2] * bright);
         }
       }
       for (let k = 0; k < SEG; k++){ const a = v0 + k * 2; IDX.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }

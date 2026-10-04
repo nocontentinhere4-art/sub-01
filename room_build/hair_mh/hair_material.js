@@ -8,9 +8,9 @@
 export function hairCardMaterial(THREE, map){
   const m = new THREE.MeshPhysicalMaterial({
     name: "hair_cards", map, vertexColors: true, side: THREE.DoubleSide,
-    color: 0xffffff, roughness: 0.46, metalness: 0, specularIntensity: 0.4, specularColor: new THREE.Color(0xd8ccc0),
-    anisotropy: 0.85, anisotropyRotation: Math.PI / 2,
-    sheen: 0.2, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x5a3a26),
+    color: 0xffffff, roughness: 0.42, metalness: 0, specularIntensity: 0.45, specularColor: new THREE.Color(0xd8ccc0),
+    anisotropy: 0.92, anisotropyRotation: Math.PI / 2,
+    sheen: 0.15, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x5a3a26),
     alphaTest: 0.5, alphaToCoverage: false,
   });
   return m;
@@ -27,8 +27,8 @@ export function setupHair(THREE, root){
         sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", `#include <map_fragment>
           #ifdef USE_MAP
             vec2 hdx = dFdx(vMapUv * vec2(textureSize(map, 0))), hdy = dFdy(vMapUv * vec2(textureSize(map, 0)));
-            float hmip = max(0.0, 0.5 * log2(max(dot(hdx, hdx), dot(hdy, hdy))));
-            diffuseColor.a = clamp(diffuseColor.a * (1.0 + 0.32 * hmip), 0.0, 1.0);
+            float hmip = max(0.0, 0.5 * log2(max(dot(hdx, hdx), dot(hdy, hdy))) - 3.0);   // only once strands are sub-pixel
+            diffuseColor.a = clamp(diffuseColor.a * (1.0 + 0.25 * hmip), 0.0, 1.0);
           #endif`);
       };
       m.customProgramCacheKey = () => "hair_cards_a2c";

@@ -15,7 +15,7 @@ import { makeHairAtlas } from "./hair_tex.js";
 import { hairCardMaterial, setupHair } from "./hair_material.js";
 
 const head = await (await fetch("./head.json")).json();
-const atlasCanvas = makeHairAtlas(1024);
+const atlasCanvas = makeHairAtlas(2048);
 const atlas = new THREE.CanvasTexture(atlasCanvas);
 atlas.flipY = false; atlas.colorSpace = THREE.SRGBColorSpace; atlas.name = "hair_atlas";
 
