@@ -79,11 +79,14 @@ function handPose(L, t) {
 const IKT = process.env.IK ? JSON.parse(process.env.IK) : null;
 const fk = (Wq, rootPos, n) => { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
   const p = V3(rootPos); for (let i = 1; i < path.length; i++) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(Wq[path[i - 1]])); return p; };
+const fdir2 = n => V3(rest.tail[n]).sub(V3(rest.head[n])).normalize();
 function armIK(Wq, L, rootPos) {
   for (const s of ["L", "R"]) { if (!IKT[s]) continue;
     const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
     const A = fk(Wq, rootPos, up), a = V3(rest.head[lo]).distanceTo(V3(rest.head[up])), b = V3(rest.head[wr]).distanceTo(V3(rest.head[lo]));
-    const T = V3(IKT[s]); let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
+    // the recorded wrist's drift (relative to its first frame) moves the pin, so the hands wander over the keys
+    const Wm = fk(Wq, rootPos, wr); if (!IKT["_w0" + s]) IKT["_w0" + s] = Wm.clone();
+    const T = V3(IKT[s]).addScaledVector(Wm.clone().sub(IKT["_w0" + s]), +(process.env.DRIFT || 0.7)); let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
     const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
     const pole = new THREE.Vector3(s === "L" ? 0.35 : -0.35, -1, -0.15); pole.sub(d.clone().multiplyScalar(pole.dot(d))).normalize();
     const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), C = A.clone().addScaledVector(d, dl);
@@ -99,7 +102,12 @@ function armIK(Wq, L, rootPos) {
     const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
     const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, 0, 0.2);
     const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
-    L[wr] = R2.clone().multiply(L[`lowerarm02.${s}`] || new THREE.Quaternion()).invert().multiply(Hw);
+    const Hrec = Wq[wr].clone(); if (!IKT["_h0" + s]) IKT["_h0" + s] = Hrec.clone();
+    const Hlive = Hrec.multiply(IKT["_h0" + s].clone().invert());                     // the recorded hand's turn since frame 0
+    const Hw2 = new THREE.Quaternion().slerp(Hlive, +(process.env.HANDK || 0.5)).multiply(Hw);
+    L[wr] = R2.clone().multiply(L[`lowerarm02.${s}`] || new THREE.Quaternion()).invert().multiply(Hw2);
+    // thumbs: swung under the palm toward the space bar
+    const th = `finger1-1.${s}`; L[th] = new THREE.Quaternion().setFromAxisAngle(fdir2(th).cross(new THREE.Vector3(0, -1, 0)).normalize(), 0.35).multiply(L[th]);
     const fk_ = +(process.env.FINGERK || 1);
     if (fk_ !== 1) for (const n of rest.order) if (n.endsWith("." + s) && /finger|metacarpal/.test(n)) L[n] = new THREE.Quaternion().slerp(L[n], fk_);
   }
