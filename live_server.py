@@ -936,7 +936,8 @@ class Live:
                         ready, open_dev = False, None
                         self.end_page()
                 if not ready:
-                    await self.browser.init(self.browsing_state)
+                    await self.browser.init(self.local_browser.init_state(self.browsing_state) if self.local_browser
+                                            else self.browsing_state)   # #89: with the pages that blew the cap
                     ready = True
                     await self.sync_browsing()                  # #89: searches / accounts known right away
                 if open_dev and open_dev != dev:
@@ -1099,7 +1100,8 @@ class Live:
         if s.get("log") or not self.browsing_state.get("log"):
             self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches"),
                                    "visited": s.get("visited") or self.browsing_state.get("visited"),
-                                   "youtube": s.get("youtube_state") or self.browsing_state.get("youtube")}
+                                   "youtube": s.get("youtube_state") or self.browsing_state.get("youtube"),
+                                   "heavy": s.get("heavy") or self.browsing_state.get("heavy")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
@@ -1546,7 +1548,8 @@ class Live:
             if self.local_browser is not None:
                 chromium.update(alive=self.local_browser.alive(), restarts=self.local_browser.restarts,
                                 restart_log=list(getattr(self.local_browser, "restart_log", []))[-10:],
-                                mem_limit_mb=getattr(self.local_browser, "mem_mb", None))
+                                mem_limit_mb=getattr(self.local_browser, "mem_mb", None),
+                                heavy=self.local_browser.heavy.public() if hasattr(self.local_browser, "heavy") else None)
         nights = self.diary.index(1) if self.diary else []
         tests = read_jsonl(self.data_dir / "spiking" / "memory_tests.jsonl", last=1)
         return {"ok": self.healthy(),
