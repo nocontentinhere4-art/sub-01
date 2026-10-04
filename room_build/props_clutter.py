@@ -279,12 +279,30 @@ BOTTLE = bottle
 # cover; the earbuds in the strip behind the keyboard's left end, in front of the left speaker. The dish's and the
 # bottle's spots, the keyboard, the mouse and the monitor's foot stay clear
 nb = import_scan("binder_notebook", keep=("binder_notebook_closed",)); decimate(nb, 6000)
+# the scan's cover carries a round stamped emblem (a logo-like mark): leather from just above it is cloned over it, with
+# a feathered edge, in its colour, normal and ARM maps
+import numpy as np
+def clone_out(prefix, rects, off, feather=10):
+    """rects (x0, y0, x1, y1) in 1k maps, from the top; each filled from the same-sized patch off (dx, dy) away"""
+    for im in {n.image for m in bpy.data.materials if m.name.startswith(prefix) and m.node_tree for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image}:
+        W_, H_ = im.size; ch = im.channels; a = np.empty(W_ * H_ * ch, np.float32); im.pixels.foreach_get(a); a = a.reshape(H_, W_, ch)[::-1].copy()
+        k_ = W_ / 1024
+        for (x0, y0, x1, y1) in rects:
+            x0, y0, x1, y1 = [int(round(v * k_)) for v in (x0, y0, x1, y1)]; dx, dy = int(off[0] * k_), int(off[1] * k_); f = max(1, int(feather * k_))
+            yy, xx = np.mgrid[y0 - f:y1 + f, x0 - f:x1 + f]
+            w = np.clip(np.minimum.reduce([xx - (x0 - f), (x1 + f - 1) - xx, yy - (y0 - f), (y1 + f - 1) - yy]) / f, 0, 1)[..., None]
+            a[y0 - f:y1 + f, x0 - f:x1 + f] = a[y0 - f:y1 + f, x0 - f:x1 + f] * (1 - w) + a[y0 - f + dy:y1 + f + dy, x0 - f + dx:x1 + f + dx] * w
+        im.pixels.foreach_set(a[::-1].ravel()); im.pack(); print("CLONED over", im.name)
+clone_out("binder_notebook", [(186, 274, 272, 352)], (0, -100))
 place(nb, (-1.742, -1.312), DTOP, ry=0.12)
 NB_LO, NB_HI = box_of(nb)
 prop("notebook", nb, DTOP)
 pen = import_scan("stationery_supplies", keep=("stationery_supplies_pen_blue",))
 place(pen, (-1.735, -1.300), NB_HI[1] - 0.0015, ry=0.62)        # lying on the cover (its lowest point just into the cover's curve)
 pencil = import_scan("stationery_supplies", keep=("stationery_supplies_pencil_used",))
+# (after both imports: a second import of the file reloads its images) the scan prints a maker's name along the barrels: plain barrel cloned over it (the pen's two printings, the pencil's)
+for r_, o_ in (((196, 360, 340, 390), (-168, 0)), ((988, 403, 1016, 507), (-42, 0)), ((520, 312, 606, 338), (122, 0))):
+    clone_out("stationery_supplies", [r_], o_, feather=4)
 place(pencil, (-1.760, -1.345), NB_HI[1] - 0.0010, ry=-0.35)
 prop("pen_pencil", pen + pencil, None)
 

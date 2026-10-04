@@ -9,7 +9,7 @@ for the preview). The page's `?debug` surface markers (magenta dots) are hidden 
 | prop | where | source | size | triangles |
 |---|---|---|---|---|
 | water bottle (the one he drinks from) | the page's bottle spot (`BOTTLE_AT`) | modelled: powder-coated steel, bare steel foot, knurled cap with a loop, two small dents | 500 ml, 65 x 222 mm | 5.5k |
-| notebook, pen and pencil | the desk's back left corner | Poly Haven scans `binder_notebook`, `stationery_supplies` | A5 binder 171 x 200 mm | 7.0k |
+| notebook, pen and pencil | the desk's back left corner | Poly Haven scans `binder_notebook`, `stationery_supplies`; the cover's stamped round emblem and the maker's name printed on the pen and the pencil are cloned out of their maps by the build | A5 binder 171 x 200 mm | 7.0k |
 | wired earbuds | behind the keyboard's left end, off the mat | modelled; the lead laid as a loose cable (its bend eases between random curves, it turns back at the strip's edges, rides over itself where it crosses), 3 mm thick; the buds' wires are soft curves into the split | buds 17 mm | 4.0k |
 | phone charger and cable | brick in the power strip; cable along the skirting, up through the desk's grommet, along the right edge | modelled | USB-C brick 30 mm | 2.3k |
 | glass of water | the window sill, by the cat | modelled: transmissive glass (IOR 1.5, a volume tinting the thick base and the rounded rim faintly green), 2 mm walls; alpha-blended water with a meniscus | 250 ml tumbler, 68 x 96 mm | 1.6k |
@@ -75,7 +75,8 @@ keys, and every magazine photo was a cover with people or text. Through Openvers
 
 What it shows: the mug, the phone, the laptop and the boots read close to the photos.
 
-`weak_spots_before_after.jpg` (before left, after right, the same cameras) fixes the three weak spots it showed: the
+`weak_spots_before_after.jpg` (before left, after right, the same cameras): the notebook's cover without its stamped
+emblem (and the pen and pencil without their printed maker's name), then the three weak spots the room sheet showed: the
 paperbacks have rounded spines and a visible page block (they were plain blocks); the key bowl is a shallow 4 cm bowl
 with a key over its rim (it read as a ball); the hamper's weave is at real scale (the scaled scan had 13 mm strips).
 What still falls short: the hamper's drawn weave is flatter than the scan was up close (no baked shadow between the

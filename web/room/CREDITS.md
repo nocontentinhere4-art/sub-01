@@ -83,8 +83,8 @@ Models:
 | desk lamp | `desk_lamp_arm_01` | Yann Kervran, Kuutti Siitonen |
 | floor plant | `potted_plant_02` (soil replaced by a simple disc) | Rico Cilliers |
 | desk succulent; the bookshelf's succulent | `potted_plant_04` | James Ray Cock |
-| notebook on the desk | `binder_notebook` (the closed one) | DaDrood |
-| pen and pencil on the notebook | `stationery_supplies` (`pen_blue`, `pencil_used`) | Mateusz Sadek |
+| notebook on the desk | `binder_notebook` (the closed one; the stamped emblem on its cover cloned out) | DaDrood |
+| pen and pencil on the notebook | `stationery_supplies` (`pen_blue`, `pencil_used`; the printed maker's name cloned out) | Mateusz Sadek |
 | apple on the fridge | `food_apple_01` | Oliver Harries |
 | key bowl by the door (its height x 0.55) | `wooden_bowl_02` | Kuutti Siitonen |
 | rubber boots (the clean pair, label painted out) | `rubber_boots` | L |
