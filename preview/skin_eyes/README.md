@@ -47,10 +47,23 @@ an eye, a cheek patch, the back of the right hand, the fingertips and nails.
 - `body.html` shoots the four panels; `render_body.py` serves the glb straight from G2's branch (`git show`, no copy
   committed here), renders them and puts each beside its crop in `refs/`.
 
-Where it still differs from the photos: no fine body hair (the arm patch and the back of the hand in the photos
-have it); the hand is paler and less red than the photo's (an older man's hand; G2's boy is lighter-skinned, the
-tone is the one kept from the head passes); the photo's eye is a macro with a mirror-like cornea and a big room
-reflection, the render's cornea carries only a small highlight under the lamp.
+Fourth pass (the coordinator's read of the first body sheet: "still plastic"):
+- colour: a warmer base; a blotchy redness a few cm across (stronger where the regions are already red); a wider,
+  redder wrap past the terminator; the fingers are marked thin, so light behind them comes through red;
+- the back of the hand: bowed crease lines over each finger joint, deeper; the tendons over the metacarpals and a few
+  veins as relief; fine dark hairs on the back of the hands and the forearms (short strands drawn per pixel along
+  the arm, sparse; a faint tint once they are thinner than a pixel); the knuckles, fingertips and the pad side of the
+  fingers redder;
+- the eye: upper and lower lash strands (curved ribbons, longest toward the outer corner) rooted on the visible lid
+  edge, found where the lids' triangles cross the ball; the cornea reflects the room's environment map, not only the
+  lights; a wetter, pinker line on the lower lid; a pinker inner corner and a larger caruncle;
+- the nails: the bed is the finger's own skin a little pinker (less contrast), a paler lunula, an off-white, uneven
+  free edge, a soft shadow where the cuticle fold meets the plate.
+
+Where it still differs from the photos: the hand is still paler than the photo's (an older man's hand; the agreed
+tone is kept, only the zones are redder); the photo's eye is a macro with a big room reflection on the cornea; there
+is no hair on the face. The head-only sheet (`sheet.jpg`, a mesh closed over the eyes) has no lash strands: its lids
+have no edge to root them on.
 
 Real references (`refs/`, cropped and scaled to 900x675; no face is shown), all under the Pexels licence (free to use,
 modify and share, no attribution required; https://www.pexels.com/license/):

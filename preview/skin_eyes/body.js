@@ -21,13 +21,13 @@ function bindPositions(THREE, mesh){
   return out;
 }
 
-function eyeCentres(THREE, eyesMesh){
+function eyeCentres(THREE, eyesMesh, posed = false){
   // G2's eye primitive: two balls (each with its cornea and iris parts); the centre and radius from each side's box
   // (the radius is half the box's width and height; the box holds only the ball's front, so the centre sits a radius
   // and the cornea's bulge behind its front)
   const P = eyesMesh.geometry.attributes.position, idx = eyesMesh.geometry.index.array, v = new THREE.Vector3();
   const box = {l: new THREE.Box3(), r: new THREE.Box3()};
-  for (const i of idx) { v.fromBufferAttribute(P, i); box[v.x > 0 ? "l" : "r"].expandByPoint(v); }
+  for (const i of idx) { v.fromBufferAttribute(P, i); if (posed) eyesMesh.applyBoneTransform(i, v); box[v.x > 0 ? "l" : "r"].expandByPoint(v); }
   const out = {};
   for (const k of ["l", "r"]) {
     const b = box[k], sz = b.getSize(new THREE.Vector3()), r = (sz.x + sz.y) / 4;
@@ -64,11 +64,13 @@ function buildHandData(THREE, mesh, bind){
     // each finger bone: its axis (head to the next joint, the last one to the tip), its radius (median distance of its
     // vertices from the axis) and its place along the finger (-2 the first phalanx, -1 the middle, 0 the last)
     const seg = {};
-    for (let k = 1; k <= 5; k++) for (let p = 1; p <= 3; p++) {
-      const nm = `finger${k}-${p}.${side}`, bi = bones.indexOf(BN(nm)); if (bi < 0) continue;
+    // (and the metacarpals of the four fingers, -3..-2: the back of the hand, for its tendons)
+    for (let k = 1; k <= 5; k++) for (let p = (k > 1 ? 0 : 1); p <= 3; p++) {
+      const nm = p === 0 ? `metacarpal${k - 1}.${side}` : `finger${k}-${p}.${side}`, bi = bones.indexOf(BN(nm)); if (bi < 0) continue;
       const head = bind.get(BN(nm)), mine = [];
       for (let i = 0; i < n; i++) for (let c = 0; c < 4; c++) if (J.getComponent(i, c) === bi && W.getComponent(i, c) > 0.5) mine.push(i);
       let ax, len;
+      // (p = 0: the metacarpal, to its finger's knuckle)
       if (p < 3) { const nx = bind.get(BN(`finger${k}-${p + 1}.${side}`)); ax = nx.clone().sub(head); len = ax.length(); ax.normalize(); }
       else { ax = head.clone().sub(bind.get(BN(`finger${k}-2.${side}`))).normalize(); len = 0; mine.forEach(i => len = Math.max(len, v.fromBufferAttribute(P, i).sub(head).dot(ax))); }
       // the axis through the middle of the finger's section (the joint may sit off its centre)
@@ -76,7 +78,7 @@ function buildHandData(THREE, mesh, bind){
       if (mine.length) off.divideScalar(mine.length);
       const ds = mine.map(i => { v.fromBufferAttribute(P, i).sub(head).sub(off); return v.addScaledVector(ax, -v.dot(ax)).length(); }).sort((a, b) => a - b);
       const lat = dorsal.clone().cross(ax).normalize(), up = ax.clone().cross(lat).normalize();   // up: the back, square to the axis
-      seg[bi] = {head: head.clone().add(off), ax, len, rad: ds[ds.length >> 1] || 0.007, k: p - 3, lat, up};
+      seg[bi] = {head: head.clone().add(off), ax, len, rad: p === 0 ? 0.011 : (ds[ds.length >> 1] || 0.007), k: p - 3, lat, up};
       if (p === 3) info[side].tips[k] = head.clone().add(off).addScaledVector(ax, len);
     }
     for (let i = 0; i < n; i++) {
@@ -93,6 +95,32 @@ function buildHandData(THREE, mesh, bind){
   }
   g.setAttribute("handData", new THREE.BufferAttribute(hd, 4));
   return info;
+}
+
+// fine body hair: on the forearms (all round, denser on the outer side) and the back of the hands (not the fingers'
+// last two phalanges), lying from the elbow toward the hand; hairData = (direction, 1 - density)
+function buildHairData(THREE, mesh, bind){
+  const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, J = g.attributes.skinIndex, W = g.attributes.skinWeight;
+  const hd = g.attributes.handData, n = P.count, bones = mesh.skeleton.bones.map(b => b.name);
+  const out = new Float32Array(n * 4); for (let i = 0; i < n; i++) out[4 * i + 3] = 1;
+  for (const [side, Fa, Ha] of [["L", "LeftForeArm", "LeftHand"], ["R", "RightForeArm", "RightHand"]]) {
+    const arm = new Set([Fa, BN(`lowerarm02.${side}`)].map(b => bones.indexOf(b)).filter(i => i >= 0));
+    const hand = bones.indexOf(Ha);
+    const dir = bind.get(Ha).clone().sub(bind.get(Fa)).normalize();
+    const outer = new THREE.Vector3(side === "L" ? 1 : -1, 0.3, 0).normalize(), v = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      let wa = 0, wh = 0;
+      for (let c = 0; c < 4; c++) { const b = J.getComponent(i, c), w = W.getComponent(i, c); if (arm.has(b)) wa += w; if (b === hand) wh += w; }
+      const s = hd.getX(i), fg = 1 - hd.getW(i), dz = hd.getZ(i);
+      // the back of the hand: the hand bone or a metacarpal, on top; thinning out over the first phalanx
+      const back = (wh + (fg > 0 && s < -1.4 ? fg : 0)) * Math.min(1, Math.max(0, (dz - 0.2) / 0.4)) * (fg > 0 ? Math.min(1, Math.max(0, (-1.3 - s) / 0.7)) : 1);
+      const side_ = 0.55 + 0.45 * Math.max(0, v.fromBufferAttribute(N, i).dot(outer));
+      const d = Math.min(1, wa * side_ + 0.8 * back);
+      if (d < 0.02) continue;
+      out.set([dir.x, dir.y, dir.z, 1 - d], 4 * i);
+    }
+  }
+  g.setAttribute("hairData", new THREE.BufferAttribute(out, 4));
 }
 
 function smallestEigen(A){
@@ -127,17 +155,30 @@ export function dressBody(THREE, root, {iris = [0.24, 0.13, 0.06]} = {}){
   skin.geometry.setAttribute("color", tmp.attributes.color);
   skin.geometry.setAttribute("skinData", tmp.attributes.skinData);
   const hands = buildHandData(THREE, skin, bind);
+  // the fingers are thin: light behind them glows red through (skinData.x, the translucency mask)
+  { const sd = skin.geometry.attributes.skinData, hd = skin.geometry.attributes.handData;
+    for (let i = 0; i < n; i++) { const fg = 1 - hd.getW(i), s = hd.getX(i);
+      if (fg > 0 && s > -2.2) sd.setX(i, Math.max(sd.getX(i), 0.55 * fg * Math.min(1, (s + 2.2) / 0.6))); } }
+  buildHairData(THREE, skin, bind);
   skin.material = makeSkinMaterial(THREE);
   { const u = skin.material.userData.uniforms;
     u.uEyeL.value.set(...E.l.center.toArray(), E.l.radius); u.uEyeR.value.set(...E.r.center.toArray(), E.r.radius); }
   // my eyes in place of G2's, built in the skin's bind frame and then moved under the Head bone
   eyes.visible = false;
   const group = new THREE.Group(); group.name = "g6_eyes";
-  const eyesBind = {}; for (const k of ["l", "r"]) eyesBind[k] = {center: E[k].center.toArray(), radius: E[k].radius / EYE_K};
-  const loops = addEyes(THREE, group, P, eyesBind, {iris});
+  // the eyes, lashes and tear lines go where the lids are in the rest pose (G2's rest pose moves the lid bones, so
+  // the bind-pose lids are not where they render): margins and eye centres from the skinned positions, then moved
+  // under the Head bone. Only the skin's own vertices: the eye primitive shares the vertex buffer.
+  root.updateMatrixWorld(true); skin.skeleton.update();
+  const Ep = eyeCentres(THREE, eyes, true), eyesPosed = {};
+  for (const k of ["l", "r"]) eyesPosed[k] = {center: Ep[k].center.toArray(), radius: Ep[k].radius / EYE_K};
+  const used = [...new Set(skin.geometry.index.array)], skinP = new Float32Array(used.length * 3), pv = new THREE.Vector3();
+  used.forEach((i, j) => { pv.fromBufferAttribute(P, i); skin.applyBoneTransform(i, pv); skinP.set([pv.x, pv.y, pv.z], 3 * j); });
+  const remap = new Map(used.map((i, j) => [i, j])), sIdx = Array.from(skin.geometry.index.array, i => remap.get(i));
+  const loops = addEyes(THREE, group, new THREE.BufferAttribute(skinP, 3), eyesPosed, {iris, index: sIdx});
   skin.add(group);
   root.updateMatrixWorld(true);
   const headBone = skin.skeleton.bones.find(b => b.name === "Head");
   for (const c of [...group.children]) headBone.attach(c);
-  return {skin, eyes: E, landmarks: L, hands, lidLoops: loops, headOrigin: O};
+  return {skin, eyes: Ep, eyesBind: E, landmarks: L, hands, lidLoops: loops, headOrigin: O, cornea: group.userData.cornea, tear: group.userData.tear};
 }

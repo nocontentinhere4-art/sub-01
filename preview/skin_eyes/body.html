@@ -30,6 +30,9 @@ window.__stage = "dress";
 scene.add(gltf.scene);
 const info = dressBody(THREE, gltf.scene);
 window.__stage = "shots";
+// the wet surfaces reflect the room itself (its environment map, at full strength), not only the lights
+info.cornea.envMap = scene.environment; info.cornea.envMapIntensity = 1.0;
+info.tear.envMap = scene.environment; info.tear.envMapIntensity = 0.8;
 scene.updateMatrixWorld(true);
 const M = info.skin.matrixWorld, wp = p => p.clone().applyMatrix4(M), wd = d => d.clone().transformDirection(M);
 

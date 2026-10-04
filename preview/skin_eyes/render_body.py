@@ -90,7 +90,10 @@ def main():
                 for i, im in enumerate(panels):
                     im.save(Path(os.environ["SUB01_PANELS"]) / f"panel{i}.jpg", quality=92)
             compose(panels, args.out)
-            print(json.dumps({"out": args.out, "info": pg.evaluate("window.__info"), "errors": errors[:5]}, default=str)[:3000])
+            info = pg.evaluate("window.__info")
+            if os.environ.get("SUB01_INFO"):
+                Path(os.environ["SUB01_INFO"]).write_text(json.dumps(info, default=str))
+            print(json.dumps({"out": args.out, "info": info, "errors": errors[:5]}, default=str)[:3000])
             b.close()
     finally:
         httpd.shutdown()
