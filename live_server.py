@@ -103,6 +103,7 @@ DA_BURST_K = 0.5                # phasic DA per unit burst (a strong buy's RPE g
 DA_REWARD = 8.0                 # reward-region drive per unit burst (a buy drives reward with 6-12)
 WIKI_FALLBACK_S = 300           # the browser down this long (real seconds): Wikipedia feeds the readings (#79)
 VIDEO_DRIVE = 6.0               # visual drive of a full scene change while he watches a video (a chat rule is 6-8)
+SCREENS_SAVE_S = 60.0           # #89: /api/screens state saved at most this often (and at shutdown)
 CHESS_THINK_S = (15.0, 45.0)    # simulated seconds he takes per move (the vote itself takes ~0.3 s of CPU)
 CHESS_REPLY_S = (5.0, 15.0)     # ...and the opponent
 CHESS_MIN_GAP_S = 0.7           # real seconds between moves at least (the accelerated demo clock)
@@ -350,7 +351,9 @@ class Live:
         self.reading_path = Path(data_dir) / "reading.json"
         self.reader = Reader(load_json(self.reading_path))
         self.browse_readings = BrowseReadings()   # #79: readings come from the pages he stays on
-        self.screens = ScreensStatus()   # #89: what is really on his screens (/api/screens)
+        self.screens_path = Path(data_dir) / "screens.json"   # #89: /api/screens' today and last survive a deploy
+        self.screens = ScreensStatus(state=load_json(self.screens_path, {}))   # #89: what is really on his screens
+        self.screens_saved = 0.0
         self.da_bursts = DopamineBursts()  # #89: a simulated dopamine-like burst when something new plays
         self.browse_wanted = False       # main(): --browse was asked for (then Wikipedia is capped while it is down)
         self.last_wiki_read = 0.0
@@ -1000,6 +1003,8 @@ class Live:
         note = getattr(self.browser, "feed_note", None)
         if note:
             sc.note(note)
+        if kind and time.time() - getattr(self, "screens_saved", 0.0) > SCREENS_SAVE_S:
+            self.save_screens()
         da = getattr(self, "da_bursts", None)
         if not kind or da is None:
             return None
@@ -1051,6 +1056,17 @@ class Live:
             return {"ok": False}
         print(f"viewer's player could not play {vid} on the {dev} (error {code})", flush=True)
         return {"ok": ok}
+
+    def save_screens(self):
+        """#89: /api/screens' counts, last pages and notes, kept across deploys (a small file, at most every minute)."""
+        sc, path = getattr(self, "screens", None), getattr(self, "screens_path", None)
+        if sc is None or path is None:
+            return
+        try:
+            save_json(path, sc.to_dict(), ensure_ascii=False)
+            self.screens_saved = time.time()
+        except OSError as e:
+            print("screens: could not save:", repr(e)[:120], flush=True)
 
     def screens_view(self):
         """GET /api/screens: the browser up/down and why, the last 10 pages with kind and host, today's share by kind,
@@ -1136,7 +1152,8 @@ class Live:
             self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches"),
                                    "visited": s.get("visited") or self.browsing_state.get("visited"),
                                    "youtube": s.get("youtube_state") or self.browsing_state.get("youtube"),
-                                   "heavy": s.get("heavy") or self.browsing_state.get("heavy")}
+                                   "heavy": s.get("heavy") or self.browsing_state.get("heavy"),
+                                   "walled": s.get("walled") or self.browsing_state.get("walled")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
@@ -1989,6 +2006,7 @@ async def main(args):
             manager.shutdown()
         if cpu_net:
             await cpu_net.stop()
+        live.save_screens()                               # #89: today's screens survive the deploy
         if live.browser:
             try:
                 await asyncio.wait_for(live.sync_browsing(), 5)  # the newest log, if the browser still answers

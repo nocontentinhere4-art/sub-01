@@ -77,7 +77,7 @@ def hhmm(t):
 
 
 class ScreensStatus:
-    def __init__(self, clock=time.time):
+    def __init__(self, clock=time.time, state=None):
         self.clock = clock
         self.state, self.why, self.since = "starting", "", clock()
         self.last = []                       # [{t, kind, host, title, device}]
@@ -85,6 +85,26 @@ class ScreensStatus:
         self.url = {}                        # device -> url shown last (a page counts once)
         self.notes = []                      # [{t, text}]
         self.restarts = 0
+        self._restore(state)
+
+    def _restore(self, s):
+        """#89: today's counts, the last pages and the notes survive a deploy (saved with the live server's state)."""
+        if not isinstance(s, dict):
+            return
+        if isinstance(s.get("day"), str):
+            self.day = s["day"]
+        self.counts = {k: int(v) for k, v in (s.get("counts") or {}).items()
+                       if k in KINDS and isinstance(v, (int, float)) and v >= 0}
+        ok = lambda x: isinstance(x, dict) and isinstance(x.get("t"), (int, float)) and isinstance(x.get("kind"), str)  # noqa: E731
+        self.last = [dict(x) for x in (s.get("last") or []) if ok(x)][-LAST_N:]
+        self.notes = [{"t": float(n["t"]), "text": str(n.get("text") or "")[:140]} for n in (s.get("notes") or [])
+                      if isinstance(n, dict) and isinstance(n.get("t"), (int, float))][-5:]
+        self.url = {k: v for k, v in (s.get("url") or {}).items() if isinstance(k, str) and isinstance(v, str)}
+
+    def to_dict(self):
+        self._roll()
+        return {"day": self.day, "counts": dict(self.counts), "last": list(self.last), "notes": list(self.notes),
+                "url": dict(self.url)}
 
     def _roll(self):
         d = tokyo_day(self.clock())

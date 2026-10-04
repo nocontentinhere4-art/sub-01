@@ -101,6 +101,9 @@ def make_app(browser, token=None):
             if st.get("youtube") and hasattr(browser, "yt"):      # the Data API units spent today
                 from youtube_api import Quota
                 browser.yt = Quota(state=st["youtube"])
+        if isinstance(st.get("walled"), dict) and hasattr(browser, "walled"):   # #89: sites that showed a bot check
+            browser.walled.update({h: float(t) for h, t in st["walled"].items()
+                                   if isinstance(h, str) and isinstance(t, (int, float))})
         if st.get("heavy") and hasattr(browser, "heavy"):         # #89: pages that blew the memory cap, always merged
             browser.heavy.merge(st["heavy"])
         return web.json_response({"ok": True, "applied": fresh})

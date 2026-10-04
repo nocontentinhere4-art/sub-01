@@ -109,6 +109,18 @@ RENDER_ONLY_JS = """([dt, full]) => { if (full) { scene.traverse(o => { if (o.is
   controls.update(); if (window.post && post.render) post.render(dt); else renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.92); }"""
 
 
+def textures_ready(pg):
+    """On a GPU the page is ready seconds before the window's photographs (room/window/*.webp) have arrived, and the frozen
+    page never recomposes them later: wait for those responses, then a few warm-up renders upload every texture."""
+    try:
+        pg.wait_for_function("performance.getEntriesByType('resource').filter(e => /room\\/window\\/[^/]+\\.webp/.test(e.name) && e.responseEnd > 0).length >= 6", timeout=120000)
+    except Exception as e:                            # (a page without the window view: carry on)
+        print("window textures: not all seen,", str(e)[:80], flush=True)
+    pg.wait_for_timeout(1500)
+    for _ in range(3):
+        pg.evaluate(RENDER_ONLY_JS, [1 / 30, True])
+
+
 def shots_file(path):
     """A shot list: {"hour": 14, "scene": "<js>" | {"life": {...}}, "query_old": "", "query_new": "", "shots": [
     {"label", "seconds", "cam": {"pos", "target", "to"?: dolly end, "fov"?} | "closeup": "<page_checks recipe>" | "follow"}]}"""
@@ -132,24 +144,35 @@ def render(a):
             pg.on("pageerror", lambda e: print("pageerror", str(e)[:160], flush=True))
             k = 0
             if a.shots:
-                sh = shots_file(a.shots); hour = int(sh.get("hour", 14))
+                sh = shots_file(a.shots); hour = None
                 query = sh.get("query_" + a.side, "") or a.query
-                pg.goto(f"http://127.0.0.1:{a.port}/room.html?debug&nolive&hour={hour}" + (f"&{query}" if query else ""), wait_until="load")
-                pg.wait_for_function("window.boy && window.room && window.actions && ['walk','idle','door','eat','sleep','stand'].every(k => window.actions[k]) && (!window.motion || window.motion.ready)", timeout=600000)
-                meta["renderer"] = pg.evaluate(RENDERER_JS)
-                print("WebGL:", meta["renderer"], flush=True)
-                if a.require_gpu and "NVIDIA" not in meta["renderer"]:
-                    raise SystemExit(f"not on the GPU: {meta['renderer']}")
-                pg.add_style_tag(content=HUD_OFF)
-                pg.add_script_tag(content=(ROOT / "tests" / "visual" / "page_checks.js").read_text())
-                pg.evaluate("s => { window.FREEZE = true; settle(); if (window.setSeed) setSeed(s); __qa.hideMarkers(); }", a.seed)
-                sc = sh.get("scene", "")
-                if isinstance(sc, dict):
-                    pg.evaluate("(l) => { act(l.activity, l); }", sc["life"])
-                elif sc:
-                    pg.evaluate(sc)
-                pg.evaluate("() => { for (let i = 0; i < 30; i++) animate_(1/30); }")
+
+                def load(h, sc, settle_s=1.0):
+                    """The page at hour h (reloaded when it changes), the scene sc applied (a life state or JS), settle_s seconds run."""
+                    nonlocal hour
+                    if h != hour:
+                        pg.goto(f"http://127.0.0.1:{a.port}/room.html?debug&nolive&hour={h}" + (f"&{query}" if query else ""), wait_until="load")
+                        pg.wait_for_function("window.boy && window.room && window.actions && ['walk','idle','door','eat','sleep','stand'].every(k => window.actions[k]) && (!window.motion || window.motion.ready)", timeout=600000)
+                        if meta["renderer"] is None:
+                            meta["renderer"] = pg.evaluate(RENDERER_JS)
+                            print("WebGL:", meta["renderer"], flush=True)
+                            if a.require_gpu and "NVIDIA" not in meta["renderer"]:
+                                raise SystemExit(f"not on the GPU: {meta['renderer']}")
+                        pg.add_style_tag(content=HUD_OFF)
+                        pg.add_script_tag(content=(ROOT / "tests" / "visual" / "page_checks.js").read_text())
+                        pg.evaluate("s => { window.FREEZE = true; settle(); if (window.setSeed) setSeed(s); __qa.hideMarkers(); }", a.seed)
+                        textures_ready(pg)
+                        hour = h
+                    if isinstance(sc, dict):
+                        pg.evaluate("(l) => { act(l.activity, l); }", sc["life"])
+                    elif sc:
+                        pg.evaluate(sc)
+                    pg.evaluate("(n) => { for (let i = 0; i < n; i++) animate_(1/30); }", int(round(settle_s * 30)))
+                    print("  window view:", pg.evaluate("() => window.windowView && windowView.state ? JSON.stringify(windowView.state()) : 'n/a'")[:200], flush=True)
+                load(int(sh.get("hour", 14)), sh.get("scene", ""))
                 for shot in sh["shots"]:
+                    if "hour" in shot or "scene" in shot:                   # a shot with its own hour and/or scene (life state or JS), settled for shot.settle seconds
+                        load(int(shot.get("hour", hour)), shot.get("scene", ""), float(shot.get("settle", 1.0)))
                     n = int(round(float(shot["seconds"]) * a.fps)); seg0 = k
                     cam = shot.get("cam")
                     for f in range(n):
@@ -183,6 +206,7 @@ def render(a):
                 pg.add_style_tag(content=HUD_OFF)
                 pg.add_script_tag(content=(ROOT / "tests" / "visual" / "page_checks.js").read_text())
                 pg.evaluate("s => { window.FREEZE = true; settle(); if (window.setSeed) setSeed(s); __qa.hideMarkers(); }", a.seed)   # (?debug's magenta markers off)
+                textures_ready(pg)
                 pg.evaluate(SCENE.get(hour, SCENE[14]))
                 pg.evaluate("() => { for (let i = 0; i < 30; i++) animate_(1/30); if (typeof updateCameraGoal === 'function') { updateCameraGoal(); camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); } }")
                 n = int(round(secs * a.fps)); seg0 = k
@@ -215,15 +239,18 @@ def encode(a):
     first = Image.open(frames / f"{sides[0]}_00000.jpg")
     w, h = first.size
     labels = {"old": a.label_old, "new": a.label_new}
+    narrow = w * len(sides) < 1100                      # (the phone pair: the caption goes on a second line under the side labels)
+    bar = 52 if narrow else 28
     for k in range(n):
-        S = Image.new("RGB", (w * len(sides), h + 28), (8, 8, 10))
+        S = Image.new("RGB", (w * len(sides), h + bar), (8, 8, 10))
         d = ImageDraw.Draw(S)
         for i, s in enumerate(sides):
-            S.paste(Image.open(frames / f"{s}_{k:05d}.jpg"), (i * w, 28))
+            S.paste(Image.open(frames / f"{s}_{k:05d}.jpg"), (i * w, bar))
             d.text((i * w + 8, 5), labels[s], font=font, fill=(255, 220, 120) if s == "new" else (210, 210, 220))
         seg = next((sg for sg in metas[sides[0]]["segments"] if sg["first"] <= k < sg["first"] + sg["frames"]), None)
         if seg:
-            d.text((w * len(sides) - 420, 5), f"{seg.get('label', '')} {seg['hour']:02d}:00  {(k - seg['first']) / metas[sides[0]]['fps']:5.1f} s  {metas[sides[0]]['renderer'].split('|')[0].strip()[:28]}", font=font, fill=(200, 200, 210))
+            cap = f"{seg.get('label', '')} {seg['hour']:02d}:00  {(k - seg['first']) / metas[sides[0]]['fps']:5.1f} s  {metas[sides[0]]['renderer'].split('|')[0].strip()[:28]}"
+            d.text((8, 29) if narrow else (w * len(sides) - 420, 5), cap, font=font, fill=(200, 200, 210))
         S.save(comp / f"c_{k:05d}.jpg", quality=92)
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
     fps = metas[sides[0]]["fps"]

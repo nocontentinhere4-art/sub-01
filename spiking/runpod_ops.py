@@ -6,7 +6,9 @@ touched); the RunPod key is only ever sent to rest.runpod.io (pod pages are fetc
 """
 import atexit
 import contextlib
+import json
 import os
+import re
 import signal
 import sys
 import threading
@@ -18,6 +20,8 @@ import runpod_api
 from spiking import podpack
 
 PREFIX = "sub01-spiking-"
+CREATE_TIMEOUT_S = 150              # RunPod can take more than a minute to place a pod when stock is low
+ADOPT_TRIES, ADOPT_EVERY_S = 6, 10  # after an ambiguous create error: look for the pod by name for ~1 min
 
 
 class NotOurs(RuntimeError):
@@ -26,6 +30,43 @@ class NotOurs(RuntimeError):
 
 class CapExceeded(RuntimeError):
     pass
+
+
+class Busy(RuntimeError):
+    """A pod with our prefix already exists (ours, an orphan, or another session's validation pod)."""
+
+
+class CreateFailed(RuntimeError):
+    """No pod was created: every GPU type was refused (`errors`: one short line per attempt)."""
+
+    def __init__(self, errors):
+        self.errors = list(errors)
+        super().__init__("could not create a pod: " + "; ".join(self.errors))
+
+
+_SECRETISH = re.compile(r"(?i)(bearer\s+\S+|[0-9a-f]{32,}|rpa_[0-9a-z]+|(?:key|token|secret)[\"'=: ]+\S+)")
+
+
+def scrub(text, n=200):
+    """One short line for a log or the status page: no newlines, nothing that looks like a key or a token."""
+    return _SECRETISH.sub("[redacted]", " ".join(str(text or "").split()))[:n]
+
+
+def describe(e):
+    """What an API error says, for a log line: the HTTP code and RunPod's own message when there is one."""
+    code = getattr(e, "code", None)
+    msg = ""
+    if code is not None:
+        try:
+            body = e.read()
+            try:
+                msg = json.loads(body).get("error") or ""
+            except (ValueError, AttributeError):
+                msg = body.decode(errors="replace")
+        except Exception:
+            pass
+        return scrub(f"HTTP {code}: {msg}" if msg else f"HTTP {code}", 160)
+    return scrub(f"{type(e).__name__}: {e}", 160)
 
 
 class DeadlineExceeded(RuntimeError):
@@ -73,25 +114,38 @@ class RunPodOps:
         """Create the one allowed pod, log its start, remember its deadline. `gpus`: [(gpu type, cloud)] tried in
         order (default: podpack.GPUS on the secure cloud: A5000, else 4000 Ada, ...)."""
         with self._lock:
-            if self.ours():
-                raise RuntimeError("a pod of ours already exists; at most one at a time")
+            mine = self.ours()
+            if mine:
+                raise Busy("a pod of ours already exists (" + ", ".join(str(p.get("name"))[:60] for p in mine)
+                           + "); at most one at a time")
             used = (self.log.hours_since(self.cap_days) if self.cap_days else self.log.total_hours()) if self.log else 0.0
             if used + max_minutes / 60 > self.hours_cap + 1e-9:
                 raise CapExceeded(f"GPU-hour cap: {used:.2f} h used + {max_minutes / 60:.2f} h > {self.hours_cap:.2f} h")
             name = f"{self.prefix}{purpose}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-            pod, gpu, cloud, last = None, None, "SECURE", None
+            pod, gpu, cloud, errors = None, None, "SECURE", []
+            self.last_create_errors = errors
             for gpu, cloud in (gpus or [(g, "SECURE") for g in podpack.GPUS]):
                 try:
-                    pod = self.api("/pods", "POST", podpack.create_body(env, name, gpu, module, cloud))
+                    pod = self.api("/pods", "POST", podpack.create_body(env, name, gpu, module, cloud),
+                                   timeout=CREATE_TIMEOUT_S)
                     break
                 except Exception as e:                                    # no capacity / refused: try the next type
-                    last = e
-                    pod = next((p for p in self.ours() if p.get("name") == name), None)   # created despite the error
+                    errors.append(f"{gpu} ({cloud.lower()}): {describe(e)}")
+                    # a refusal with an HTTP answer created nothing; a timeout or a dropped connection may have:
+                    # look for it by name for a while, so it is tracked and logged, never left running as an orphan
+                    tries = 1 if getattr(e, "code", None) is not None else ADOPT_TRIES
+                    for i in range(tries):
+                        pod = next((p for p in self.ours() if p.get("name") == name), None)
+                        if pod or i == tries - 1:
+                            break
+                        self.sleep(ADOPT_EVERY_S)
                     if pod:
+                        errors.append(f"{gpu}: created despite the error (adopted)")
                         break
             if not pod or not pod.get("id"):
-                raise RuntimeError(f"could not create a pod: {type(last).__name__ if last else 'no id returned'}")
+                raise CreateFailed(errors or ["no id returned"])
             pod_id = pod["id"]
+            pod = dict(pod, _gpu=gpu, _cloud=cloud)
             self.created.add(pod_id)
             self._install_hooks()
             try:

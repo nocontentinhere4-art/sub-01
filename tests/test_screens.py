@@ -465,3 +465,32 @@ def test_the_life_phone_shows_only_a_real_screen_and_tiktok_gets_its_embed(tmp_p
     assert st["embed"]["label"] == "TikTok (official embed)" and "autoplay=0" in st["embed"]["src"]
     css = (ROOT / "web" / "index.html").read_text()
     assert "#cards [hidden]" in css                                          # empty cards are really hidden
+
+
+def test_todays_screens_survive_a_deploy(tmp_path):
+    """#89 live (2026-10-04): /api/screens had 44 pages today at 05:26; after the next deploy counts {} and last []."""
+    clock = Clock()
+    s = SC.ScreensStatus(clock=clock)
+    for i in range(3):
+        s.seen(st(f"https://www.youtube.com/shorts/clip{i:04d}", f"clip {i}"))
+    s.seen(st("https://www.theverge.com/x", "a story", device="desk"))
+    s.note("YouTube: uploads of a channel")
+    again = SC.ScreensStatus(clock=clock, state=json.loads(json.dumps(s.to_dict())))   # through the saved JSON
+    p, q = s.public(), again.public()
+    assert q["today"] == p["today"] and q["last"] == p["last"] and q["notes"] == p["notes"]
+    again.seen(st("https://www.theverge.com/x", "a story", device="desk"))           # the same page: not counted twice
+    assert again.public()["today"]["total"] == 4
+    clock.t += 86400                                                                  # the next Tokyo day starts afresh
+    assert SC.ScreensStatus(clock=clock, state=s.to_dict()).public()["today"]["total"] == 0
+    assert SC.ScreensStatus(state={"counts": {"evil": 5, "shorts": "x"}, "last": [1, {"t": "x"}]}).public()["last"] == []
+
+
+def test_the_live_server_saves_and_restores_the_screens(tmp_path):
+    from live_server import Live
+    live = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    live.screens.seen(st("https://www.youtube.com/shorts/clip0001", "clip 1"))
+    live.save_screens()
+    assert (tmp_path / "screens.json").exists()
+    live2 = Live("m", True, time_scale=1e6, data_dir=tmp_path)
+    assert live2.screens_view()["today"]["counts"] == {"shorts": 1}
+    assert live2.screens_view()["last"][0]["title"] == "clip 1"
