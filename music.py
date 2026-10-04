@@ -199,6 +199,15 @@ def track_from_api(x):
             "art": art, "ms": int(x.get("duration_ms") or 0)}
 
 
+def album_only_match(track, query):
+    """A search hit that matches a genre query only through its album's name (Queen's "Don't Stop Me Now" is on the
+    album "Jazz": not a jazz track). Such a hit is dropped instead of being labelled with that genre."""
+    words = [w for w in str(query or "").lower().split() if len(w) > 2]
+    album = str(track.get("album") or "").lower()
+    text = f"{track.get('title', '')} {track.get('artist', '')}".lower()
+    return bool(words) and any(w in album for w in words) and not any(w in text for w in words)
+
+
 def load_curated(path=CURATED):
     d = json.loads(Path(path).read_text())
     out = {}
@@ -316,7 +325,8 @@ class Music:
         if self.api:
             try:
                 for q in qs[:3]:
-                    got = [x for x in self.api.search(q["query"]) if x["id"] not in avoid]
+                    got = [x for x in self.api.search(q["query"]) if x["id"] not in avoid
+                           and (q["genre"] is None or not album_only_match(x, q["query"]))]
                     self.rng.shuffle(got)
                     for x in got[:2 if q["genre"] is None else 1]:
                         out.append(dict(x, genre=q["genre"] or self.guess_genre(x), why=q["why"], source="api"))
