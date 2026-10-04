@@ -42,6 +42,9 @@ CM = 0.1                                                       # one centimetre 
 
 def B(p): return Vector((p[0], -p[2], p[1]))                   # MakeHuman -> Blender
 def MHv(v): return np.array([v[0], v[2], -v[1]])               # Blender -> MakeHuman
+def crease(x, period, width):
+    """1 in the narrow valley of a fold, 0 on its broad rounded crest: folds repeating every `period` along x"""
+    u = ((x / period) % 1.0 - 0.5) * period; return math.exp(-(u / width) ** 2)
 def smooth01(a, b, x):
     t = min(1.0, max(0.0, (x - a) / (b - a))) if b != a else float(x >= b); return t * t * (3 - 2 * t)
 
@@ -359,18 +362,19 @@ def hoodie():
     for i, (p, n) in enumerate(zip(P, N)):
         p = Vector(p); n = Vector(n)
         sp = sleeve_param(p); is_sleeve = abs(p.x) > shoulder_x - 0.15 and sp[1] > 0.4
-        d = 1.3 * CM                                                             # fleece is roomier than a tee
+        d = 1.9 * CM                                                             # a relaxed fleece: roomier than a tee
         if is_sleeve:
             sleeve[i] = True; side, s, dist, q, ax = sp
             from_wrist = arm_len - s
             r = (p - q); r = r - ax * r.dot(ax)
             front = Vector((0, -1, 0)); front = (front - ax * front.dot(ax)).normalized()
             phi = math.atan2(r.normalized().cross(front).dot(ax), r.normalized().dot(front)) if r.length > 1e-6 else 0.0
-            d = 1.1 * CM + 0.5 * CM * max(0.0, -r.normalized().z)                 # the sleeve's weight sags under the arm
+            d = 1.45 * CM + 0.6 * CM * max(0.0, -r.normalized().z)                # the sleeve's weight sags under the arm
             # elbow: diagonal wrinkles on the inner side, fanning out from the crease
             e = math.exp(-((s - elbow_s) / (0.55)) ** 2) * max(0.0, math.cos(phi)) ** 1.5
-            d += e * 0.85 * CM * math.sin(2 * math.pi * (s - elbow_s) / 0.26 + 2.2 * phi)
-            d += 0.4 * CM * math.exp(-((s - elbow_s) / 0.8) ** 2) * max(0.0, -math.cos(phi)) * math.sin(3 * phi + 6 * s)   # bunching at the back of the elbow
+            d += e * (0.5 * CM - 1.4 * CM * crease(s - elbow_s + 0.11 * phi, 0.4, 0.09))   # sharp valleys, round crests
+            d += 0.55 * CM * math.exp(-((s - elbow_s) / 0.8) ** 2) * max(0.0, -math.cos(phi)) * math.sin(3 * phi + 6 * s)   # bunching at the back of the elbow
+            d += 0.3 * CM * smooth01(0.8, 1.6, s) * (1 - smooth01(elbow_s - 0.6, elbow_s - 0.2, s)) * math.sin(2 * math.pi * s / 0.55 + 1.7 * phi)   # soft folds down the upper arm
             # stacking above the cuff: the sleeve is longer than the arm and bunches on the forearm
             w = smooth01(0.45, 0.7, from_wrist) * (1 - smooth01(1.4, 1.9, from_wrist))
             d += w * 0.7 * CM * math.sin(2 * math.pi * from_wrist / 0.3 + 0.9 * math.sin(2 * phi + s))
@@ -381,6 +385,9 @@ def hoodie():
             hz = p.z - hem_z
             drape = 1 - smooth01(0.7, 3.2, hz)
             d += drape * 0.6 * CM * math.sin(5 * th + 0.8 + 0.6 * math.sin(3 * th))    # vertical folds falling to the hem
+            # the belly: the loose fleece sags into soft, slightly curved folds across the front above the hem
+            belly = smooth01(0.8, 1.3, hz) * (1 - smooth01(2.8, 3.8, hz)) * max(0.0, math.cos(th)) ** 1.5
+            d += belly * (0.4 * CM - 1.15 * CM * crease(hz + 0.12 * math.sin(1.6 * th) + 0.06 * th * th, 1.0, 0.14))
             if hz < 0.6:                                                           # the ribbed hem band, gathered
                 hemzone[i] = True; d = 0.4 * CM
             elif hz < 1.4:
@@ -414,7 +421,7 @@ def hood_and_cords(shell):
         # the neckline point in this direction
         start = max((Vector(P[i]) for i in neck), key=lambda q: (q - c).normalized().dot(dirn))
         back = 0.5 - 0.5 * math.cos(th)                                               # 0 front, 1 back
-        L = 0.3 + 2.7 * back ** 2.2
+        L = 0.3 + 1.9 * smooth01(0.12, 0.8, back)                                     # a broad round U down the back, as a lowered hood lies
         def lift(s, back=back, L=L):
             return (0.5 + 1.6 * math.sin(math.pi * min(1.0, s / L)) * back) * CM + 0.35 * CM
         go = (dirn * 0.35 + Vector((0, 1, 0)) * (0.65 + 0.35 * back)).normalized()      # back, not out over the shoulders
@@ -438,6 +445,7 @@ def hood_and_cords(shell):
     return hood, cords
 
 
+POCKET_SEWING = []
 def pocket(shell, hem_z):
     """the kangaroo pocket: a patch on the belly from the hem band up, its sides sloping in to the openings"""
     bvh = bvh_of(shell); rows = []
@@ -455,7 +463,21 @@ def pocket(shell, hem_z):
             row.append(loc + nor * (0.5 * CM + 0.25 * CM * opening - 0.35 * CM * tuck))
         rows.append(row)
     pk = grid_obj("pocket", rows, MAT["fleece"], flip=True)
-    sm = pk.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.25 * CM; sm.offset = -1; sm.use_rim = True
+    sm = pk.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.3 * CM; sm.offset = -1; sm.use_rim = True
+    # the sewing, as on a real kangaroo pocket: a twin-needle topstitch along the top, a stitch line down each side
+    # (6 mm in from the edge, the thread a raised line on the fleece) and a rolled hem along each opening; the rows are
+    # the pocket's outer surface, so the thread sits just on it
+    nrm = lambda q: bvh.find_nearest(q)[1]
+    def lift(pts, h): return [q + nrm(q) * h for q in pts]
+    def mix(a, b, f): return [p * (1 - f) + q * f for p, q in zip(a, b)]
+    for f in (0.38, 0.62):                                             # inset across the top edge
+        top = mix(rows[-1], rows[-2], f)[1:-1]
+        POCKET_SEWING.append(tube("stitch", lift(top, 0.02 * CM), 0.06 * CM, MAT["fleece"], n=6))
+    for i0, i1 in ((0, 1), (-1, -2)):
+        side = [r[i0] * 0.62 + r[i1] * 0.38 for r in rows[1:-1]]
+        POCKET_SEWING.append(tube("stitch", lift(side, 0.02 * CM), 0.06 * CM, MAT["fleece"], n=6))
+        opening = [r[i0] for r in rows[4:12]]                           # the opening's folded edge
+        POCKET_SEWING.append(tube("hem", lift(opening, -0.1 * CM), 0.17 * CM, MAT["fleece"], n=8))
     return pk
 
 
@@ -463,14 +485,29 @@ def pocket(shell, hem_z):
 def trousers(hem_z):
     o = part(JEANS_SRC, "trousers", [MAT["track"], MAT["rib"]]); subdivide(o, 1)
     P = verts_np(o); N = normals_np(o); out = P.copy(); cuff = np.zeros(len(P), bool)
-    ankle_z = J("foot.L")[2]; knee_z = J("lowerleg01.L")[2]
+    ankle_z = J("foot.L")[2]; knee_z = J("lowerleg01.L")[2]; crotch_z = J("upperleg01.L")[2] - 0.9
     for i, (p, n) in enumerate(zip(P, N)):
-        p = Vector(p); n = Vector(n); side = "L" if p.x > 0 else "R"
-        a = J(f"lowerleg01.{side}"); b2 = J(f"lowerleg02.{side}", "tail"); ax = (b2 - a).normalized()
-        r = p - a; r = r - ax * r.dot(ax); phi = math.atan2(r.x * (1 if side == "L" else -1), -r.y)
+        p = Vector(p); n = Vector(n); side = "L" if p.x > 0 else "R"; sg = 1 if side == "L" else -1
+        above = p.z > knee_z
+        a = J(f"upperleg01.{side}") if above else J(f"lowerleg01.{side}")
+        b2 = J(f"upperleg02.{side}", "tail") if above else J(f"lowerleg02.{side}", "tail"); ax = (b2 - a).normalized()
+        r = p - a; r = r - ax * r.dot(ax); phi = math.atan2(r.x * sg, -r.y)        # round the leg: 0 front, + outside
         h = p.z - ankle_z
-        d = 0.9 * CM                                                                  # a relaxed fit
+        # real track trousers: roomy at the seat and the thigh (about 2.4 cm off the body there, 9-10 cm more round the
+        # thigh), easing over the knee and tapering down the shin to the elastic cuff; less ease on the inside of the
+        # thigh, where the legs nearly meet
+        t = smooth01(ankle_z + 0.4, knee_z, p.z)                                       # 0 at the cuff, 1 at the knee
+        ease = 0.75 + 0.75 * t + 0.9 * smooth01(knee_z, knee_z + 1.6, p.z)              # cm: 0.75 cuff, 1.5 knee, 2.4 thigh
+        inner = max(0.0, -math.sin(phi)) if above else 0.0
+        ease *= 1 - 0.45 * inner
+        seat = smooth01(crotch_z - 0.6, crotch_z + 0.6, p.z) * max(0.0, n.y) ** 2          # the seat (the back) hangs looser
+        d = (ease + 0.7 * seat) * CM
         d += 0.25 * CM * math.sin(4 * phi + 0.7) * (1 - smooth01(0.0, 2.5, abs(p.z - knee_z)))   # soft knee folds
+        # the weight of the fabric: long soft folds falling down the front of the thigh, and drag lines from the crotch
+        thigh = smooth01(knee_z + 0.3, knee_z + 1.2, p.z) * (1 - smooth01(crotch_z, crotch_z + 0.8, p.z))
+        d += thigh * (0.35 * CM - 0.95 * CM * crease(p.z + 0.22 * phi, 0.9, 0.12)) * max(0.0, math.cos(phi)) ** 0.5
+        drag = smooth01(crotch_z - 1.6, crotch_z - 0.2, p.z) * (1 - smooth01(crotch_z - 0.2, crotch_z + 0.3, p.z)) * inner
+        d += drag * 0.35 * CM * math.sin(2 * math.pi * (p.z * 1.6 + 0.9 * phi))
         w = smooth01(0.35, 0.6, h) * (1 - smooth01(1.2, 1.7, h))                             # stacking above the cuffs
         d += w * 0.35 * CM * math.sin(2 * math.pi * h / 0.3 + 1.2 * math.sin(2 * phi))
         if h < 0.4: cuff[i] = True; d = 0.35 * CM
@@ -558,6 +595,23 @@ def socks():
                 d += amp * math.exp(-((p[2] - zz) / 0.045) ** 2) * (0.5 + 0.5 * math.cos(th - ph)) ** 0.7
             fade = smooth01(c.z - 0.15, c.z - 0.02, p[2]) * (1 - smooth01(top - 0.6, top - 0.42, p[2]))
             P[i] = P[i] + N[i] * 0.15 * CM * min(d, 1.2) * fade
+    set_verts(o, P)
+    # natural creases where a worn sock bunches: soft transverse grooves across the toe box (where the toes bend) and
+    # just behind the strap, each a 1 mm groove with a slight ridge either side, fading out along its length
+    P = verts_np(o); N = normals_np(o); rng = random.Random(5)
+    for sgn, s_ in ((1, "L"), (-1, "R")):
+        F = P[P[:, 0] * sgn > 0.3]; ymin, ymax = F[:, 1].min(), F[:, 1].max(); L = ymax - ymin
+        xc = (F[:, 0].min() + F[:, 0].max()) / 2
+        lines = [(ymin + L * f + rng.uniform(-0.04, 0.04), rng.uniform(-0.35, 0.35), rng.uniform(0.7, 1.0), rng.uniform(-0.25, 0.25))
+                 for f in (0.08, 0.13, 0.18, 0.54, 0.6)]
+        for i, p in enumerate(P):
+            if p[0] * sgn <= 0.3 or N[i][2] < 0.15 or p[1] > ymin + 0.68 * L: continue
+            d = 0.0
+            for y0, ang, amp, off in lines:                             # a line across the foot, a little skewed
+                u = (p[0] - xc) * sgn - off; dist = (p[1] - y0) - math.tan(ang) * u
+                fade = math.exp(-(u / 0.32) ** 2) * amp
+                d += fade * (-0.1 * math.exp(-(dist / 0.02) ** 2) + 0.045 * math.exp(-((abs(dist) - 0.04) / 0.02) ** 2))   # cm
+            P[i] = P[i] + N[i] * d * CM
     set_verts(o, P)
     for poly in o.data.polygons:
         poly.material_index = 1 if min(o.data.vertices[v].co.z for v in poly.vertices) > top - 0.35 else 0
@@ -707,7 +761,7 @@ sl = slides(sock); print("STRAP ray misses", MISSES[0])
 for o in (hood, pk): bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="solid")
 for o in sl:
     if o.modifiers: bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="solid")
-HOODIE = join([shell, hood, pk] + cords, "hoodie_black")
+HOODIE = join([shell, hood, pk] + cords + POCKET_SEWING, "hoodie_black")
 TROUSERS = join([pants] + stripes, "track_trousers")
 SLIDES = join(sl, "slides_black")
 GARMENTS = {"hoodie_black": HOODIE, "track_trousers": TROUSERS, "socks_white": sock, "slides_black": SLIDES}
@@ -900,6 +954,37 @@ def render(cam, w, h, path):
     SC.render.filepath = path; bpy.ops.render.render(write_still=True); print("rendered", path)
 
 
+def overcast(on):
+    """the comparison photos are outdoors under a soft grey sky: the studio lamps off, a bright even sky instead"""
+    bg = SC.world.node_tree.nodes["Background"]
+    for nm in ("key", "fill", "rim"): bpy.data.objects[nm].hide_render = on
+    bg.inputs[0].default_value = (0.78, 0.8, 0.84, 1) if on else (0.26, 0.27, 0.29, 1)
+    bg.inputs[1].default_value = 2.2 if on else 0.6
+    if "sky" not in bpy.data.objects:
+        ld = bpy.data.lights.new("sky", 'AREA'); ld.energy = 14000; ld.size = 40; lo = bpy.data.objects.new("sky", ld)
+        lo.location = (4, 6, 30); SC.collection.objects.link(lo)
+    bpy.data.objects["sky"].hide_render = not on
+
+
+def compare_shots():
+    """build_clothes.py's half of compare_real.py: each render matches its real photo's angle and light"""
+    W_ = 520 if QUICK else 800; fl = J("foot.L"); fy = fl.y - 0.75
+    overcast(True)
+    # white socks: the photo looks at a foot from the front, a little from the outside, at shin height
+    render(camera("k_sock", (fl.x + 1.3, fy - 4.6, FLOOR + 2.8), (fl.x, fy + 0.2, FLOOR + 0.9), 55), W_, W_, f"{SHEET_DIR}/cmp_sock.png")
+    # the slide, as its wearer sees it: from above the knees, looking down the shins at the feet
+    # (his belly would fill the frame: the hoodie and the body are left out of this one shot; the photo shows only a hem)
+    for o in (HOODIE, body): o.hide_render = True
+    render(camera("k_slide", (0.15, -3.4, FLOOR + 12.5), (0.0, fy - 0.7, FLOOR + 0.2), 60), W_, W_, f"{SHEET_DIR}/cmp_slide.png")
+    for o in (HOODIE, body): o.hide_render = False
+    # the trousers: a low camera in front, about knee height, looking a little up
+    render(camera("k_trousers", (-3.0, -24, FLOOR + 5.0), (0, -0.2, FLOOR + 6.5), 50), W_, 2 * W_, f"{SHEET_DIR}/cmp_trousers.png")
+    # the hoodie from behind, his right arm raised (as in the photo), the camera at chest height
+    aim("upperarm01.R", (-0.62, -0.25, 0.75), "upperarm02.R"); aim("lowerarm01.R", (-0.12, -0.35, 1), "lowerarm02.R")
+    render(camera("k_hoodie", (2.2, 15.5, 4.2), (-0.4, 0, 3.6), 50), W_, W_, f"{SHEET_DIR}/cmp_hoodie.png")
+    overcast(False); pose_standing()
+
+
 def seat_props(on):
     for nm in ("stool", "desk"):
         if nm in bpy.data.objects: bpy.data.objects.remove(bpy.data.objects[nm])
@@ -925,6 +1010,7 @@ if RENDER:
     render(camera("c_fside", (fl.x + 12.0, fy, FLOOR + 0.9), (fl.x, fy, FLOOR + 0.75), 85), FW, FW, f"{SHEET_DIR}/feet_side.png")
     render(camera("c_ftop", (fl.x + 0.2, fy - 4.2, FLOOR + 10.5), (fl.x, fy - 0.4, FLOOR), 60), FW, FW, f"{SHEET_DIR}/feet_top.png")
     if not FEET_ONLY:
+        compare_shots()
         render(camera("c_stand", (-7.5, -24, 2.4), (0, 0, -0.6), 50), W, Hh, f"{SHEET_DIR}/standing.png")
         render(camera("c_hood", (-3.6, -9.5, 6.2), (0.2, 0.0, 3.4), 60), W, W, f"{SHEET_DIR}/close_hood.png")
     if os.environ.get("POSE_DEBUG"):

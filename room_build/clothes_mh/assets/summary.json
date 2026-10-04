@@ -1,13 +1,13 @@
 {
  "hoodie_black": {
-  "verts": 7458,
-  "faces": 7336,
-  "hides": 2704
+  "verts": 7946,
+  "faces": 7796,
+  "hides": 2673
  },
  "track_trousers": {
   "verts": 3773,
   "faces": 3612,
-  "hides": 1352
+  "hides": 1342
  },
  "socks_white": {
   "verts": 9098,

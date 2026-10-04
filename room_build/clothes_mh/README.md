@@ -10,9 +10,9 @@ the knees or anywhere else under the cloth.
 
 | garment | folder | what it is |
 |---|---|---|
-| black cotton hoodie | `assets/hoodie_black/` | hood down (a soft double layer rolled behind the neck and falling down the back), two drawstrings with aglets, kangaroo pocket with sloped openings, ribbed cuffs and hem (gathered), weight folds: diagonal creases at the inner elbows, stacking above the cuffs, folds falling to the hem, the fleece blousing over the band |
-| dark track trousers | `assets/track_trousers/` | relaxed fit, one off-white side stripe per leg (one plain stripe: no maker's design), elastic ribbed ankle cuffs with stacking above them, soft knee folds |
-| white crew socks | `assets/socks_white/` | smooth white cotton, the feet and lower shins 2 mm out; over the toes one soft rounded toe box with no toes of its own (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 16 mm disk of rays, smoothed again and closed once more so nothing enters the skin); slight compression folds at the ankle (1.5 mm); a ribbed cuff under the trouser hem |
+| black cotton hoodie | `assets/hoodie_black/` | a relaxed fit (1.9 cm off the body, the sleeves 1.5 cm and sagging under the arm); hood down (a soft double layer rolled behind the neck and falling down the back), two drawstrings with aglets, kangaroo pocket with sloped openings, a twin-needle topstitch along its top, a stitch line down each side and rolled hems at the openings; ribbed cuffs and hem (gathered); folds shaped as real ones (narrow valleys, round crests): diagonal creases at the inner elbows, soft folds down the upper arms, sagging folds across the belly, stacking above the cuffs, folds falling to the hem, the fleece blousing over the band |
+| dark track trousers | `assets/track_trousers/` | roomy at the seat and the thigh (2.4 cm off the body, less on the inner thigh), easing over the knee and tapering down the shin to the elastic ribbed ankle cuffs, with stacking above them; long soft folds down the front of the thigh, drag lines from the crotch, soft knee folds; one off-white side stripe per leg (one plain stripe: no maker's design) |
+| white crew socks | `assets/socks_white/` | smooth white cotton, the feet and lower shins 2 mm out; over the toes one soft rounded toe box with no toes of its own (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 16 mm disk of rays, smoothed again and closed once more so nothing enters the skin); slight compression folds at the ankle (1.5 mm); soft creases across the toe box and just behind the strap, where a worn sock bunches; a ribbed cuff under the trouser hem |
 | black slides | `assets/slides_black/` | generic pool slides in matte black rubber: a contoured footbed 2.3 cm under the heel and 1.5 cm at the toe (flat to the ball, then a toe spring), shaped to the sock's underside so the foot sits 1 mm into it, a heel cup and side rims, a 6 mm rounded top edge and a 3 mm bottom edge, about 1 cm wider than the foot and 1.2 cm longer at the toe; faint moulded nubs 3 mm apart on the footbed; one padded strap 7.5 cm front to back from just behind the toes over the forefoot (9 mm thick on top, rounded front and back edges, 2 mm off the sock), moulded into the footbed's sides |
 
 `assets/summary.json` gives each garment's vertex and face counts and how many body vertices it hides.
@@ -43,18 +43,24 @@ sky fill, hemisphere) and the evening desk lamp (0xffb468, distance 2.2, decay 1
 No brand, logo or maker's design is used.
 
 ## Next to real clothes (preview only)
-The owner's rule: every item next to a real one. `compare_real.py` sets crops of the renders beside real photos of
-the same kind of clothes, cropped to the clothes (no faces, no logos): `docs/design/clothes-mh/real_feet.jpg` (the
-socks in the 3/4 close-up beside white ankle socks in sandals; the slide from above beside a black one-strap slide)
-and `real_clothes.jpg` (the hoodie seated beside a seated hoodie; the trousers beside black track trousers with a
-side stripe). These sheets stay on the preview branch, never in `web/`. The photos are downloaded by the script and
-not committed.
+The owner's rule: every item next to a real one. `build_clothes.py` shoots each comparison render at its photo's
+angle under a similar soft overcast daylight (the photos are outdoors); `compare_real.py` sets crops of them beside
+the photos, cropped to the clothes (no faces, no logos): `docs/design/clothes-mh/real_feet.jpg` (the sock seen from
+the front at shin height beside white ankle socks; the slides as their wearer sees them, looking down the shins,
+beside a black one-strap slide seen the same way; the hoodie and the body are left out of that one render, where the
+photo shows only a hem) and `real_clothes.jpg` (the hoodie from behind with the right arm raised beside a black
+hoodie the same way; the trousers from a low camera in front beside black track trousers with a side stripe). These
+sheets stay on the preview branch, never in `web/`. The script downloads the photos; they are not committed.
+
+No CC0 or public-domain photo of black slides worn with white socks was found (Wikimedia Commons' slide-sandal
+category has none under CC0; Pexels, Unsplash and StockSnap search pages refuse scripted access), so the socks and the
+slide are compared on separate photos. A photo of grey slides was rejected for a visible brand logo.
 
 | photo | source | licence |
 |---|---|---|
 | white ankle socks in sandals | [Wikimedia Commons](https://commons.wikimedia.org/w/index.php?curid=41275340) ([file](https://upload.wikimedia.org/wikipedia/commons/e/ee/Sandals_Worn_wth_White_Ankle_Socks.jpg)), Oddman47 | CC0 1.0 |
 | a black one-strap slide, from above | [WordPress Photo Directory](https://wordpress.org/photos/photo/30768afec3/) ([file](https://pd.w.org/2025/08/30768afec383f9f51.48963621-2048x1536.jpg)), Alina Kakshapati | CC0 1.0 |
-| a hoodie, seated | [WordPress Photo Directory](https://wordpress.org/photos/photo/83465bb8b2/) ([file](https://pd.w.org/2024/02/83465bb8b29634fb2.56218161-1536x2048.jpeg)), Midhun P | CC0 1.0 |
+| a black hoodie from behind, an arm raised | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Man_taking_a_selfie_(Unsplash).jpg) ([file](https://upload.wikimedia.org/wikipedia/commons/4/48/Man_taking_a_selfie_%28Unsplash%29.jpg)), from Unsplash | CC0 1.0 |
 | black track trousers with a side stripe | [StockSnap](https://stocksnap.io/photo/active-male-LY5QEUV2DY) ([file](https://cdn.stocksnap.io/img-thumbs/960w/LY5QEUV2DY.jpg)) | CC0 1.0 |
 
 ## Rebuild

@@ -14,16 +14,17 @@ REFS = {  # id: (image URL, landing page, licence)
               "https://commons.wikimedia.org/w/index.php?curid=41275340", "CC0 1.0 (Oddman47, Wikimedia Commons)"),
     "slide": ("https://pd.w.org/2025/08/30768afec383f9f51.48963621-2048x1536.jpg",
               "https://wordpress.org/photos/photo/30768afec3/", "CC0 1.0 (Alina Kakshapati, WordPress Photo Directory)"),
-    "hoodie": ("https://pd.w.org/2024/02/83465bb8b29634fb2.56218161-1536x2048.jpeg",
-               "https://wordpress.org/photos/photo/83465bb8b2/", "CC0 1.0 (Midhun P, WordPress Photo Directory)"),
+    "hoodie": ("https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Man_taking_a_selfie_%28Unsplash%29.jpg/960px-Man_taking_a_selfie_%28Unsplash%29.jpg",
+               "https://commons.wikimedia.org/wiki/File:Man_taking_a_selfie_(Unsplash).jpg", "CC0 1.0 (Unsplash, via Wikimedia Commons)"),
     "joggers": ("https://cdn.stocksnap.io/img-thumbs/960w/LY5QEUV2DY.jpg",
                 "https://stocksnap.io/photo/active-male-LY5QEUV2DY", "CC0 1.0 (StockSnap)"),
 }
-# (render, its crop, photo, its crop): crops as fractions (left, top, right, bottom); the photos' crops keep only clothes
-FEET = [("feet_34.png", (0.18, 0.22, 0.82, 0.72), "socks", (0.56, 0.0, 1.0, 1.0)),
-        ("feet_top.png", (0.25, 0.25, 0.80, 0.80), "slide", (0.20, 0.0, 0.54, 0.34))]
-CLOTHES = [("seated.png", (0.12, 0.19, 0.82, 0.45), "hoodie", (0.38, 0.60, 1.0, 0.80)),
-           ("standing.png", (0.22, 0.48, 0.78, 0.86), "joggers", (0.20, 0.40, 0.80, 0.82))]
+# (render, its crop, photo, its crop): crops as fractions (left, top, right, bottom); the photos' crops keep only clothes.
+# Each render (build_clothes.py's compare_shots) is shot at its photo's angle under a similar soft daylight.
+FEET = [("cmp_sock.png", (0.15, 0.10, 0.85, 0.95), "socks", (0.56, 0.0, 1.0, 1.0)),
+        ("cmp_slide.png", (0.12, 0.12, 0.90, 0.62), "slide", (0.20, 0.0, 0.54, 0.34))]
+CLOTHES = [("cmp_hoodie.png", (0.05, 0.05, 0.95, 0.95), "hoodie", (0.31, 0.13, 0.60, 0.66)),
+           ("cmp_trousers.png", (0.15, 0.30, 0.85, 0.95), "joggers", (0.20, 0.40, 0.80, 0.82))]
 H = 640; G = 6
 
 
