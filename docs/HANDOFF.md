@@ -128,7 +128,15 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   (`Quota.today`). `/api/screens` → `youtube` (key set, units used today, errors) is reported even while the
   browser idles (`Live.youtube_view`, from the saved state and the server's environment); the raw quota now rides
   `/state` as `youtube_state`, is saved in `browsing.json` and restored by `/init`, so a browser restart keeps
-  today's units (before, the public view overwrote it and every restart reset the count). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+  today's units (before, the public view overwrote it and every restart reset the count).
+- Embed guard (live bug 2026-10-04 10:46 Tokyo: Formula1's "FP3 Highlights" embed said "Video unavailable … blocked it
+  from display on this website", a black screen). `videos.list` (part contentDetails,snippet,status; also checked for
+  search results, 1 unit) keeps only `youtube_api.playable()` videos: embeddable, public, not age-restricted, not
+  region-blocked for JP. At run time `Browser._embed_error` reads the player 3 s after it opens and at each watch
+  screenshot (`EMBED_ERROR`: "video unavailable", "blocked it from display", …, or no video element): such a video is
+  left before it is ever shown, the next queued video plays instead, the id is refused for the day
+  (`Quota.refused`), and a channel with `BAD_CHANNEL` (2) refusals in a day is set aside (`channels_set_aside` in
+  /api/screens). Formula1 is out of `CHANNELS` (its videos are blocked from embedding on other sites). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
 - Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
   players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
   robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,
