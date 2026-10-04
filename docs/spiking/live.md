@@ -113,7 +113,7 @@ At sleep onset the manager reads these files together with #55's `/data/spiking/
 | `SUB01_DAY_MAX_HOURS` | 17 | GPU hours on the Tokyo day (a pod's time is split at midnight). The pod is asked to stop 90 s before the cap (it uploads the weights) and is deleted at the cap at the latest. No pod until the next Tokyo day |
 | `SUB01_GPU_USD_PER_DAY` | 14.00 | RunPod's reported $/h for the pod (`costPerHr` at creation) × uptime. Same stop/delete; #55's network decides until tomorrow |
 | `SUB01_GPU_HOURS_CAP` | 120 in this mode (8 otherwise) | rolling 7 days; same stop/delete |
-| `SUB01_DAY_MAX_RESTARTS` | 6 | a lost pod (no hello in 15 min, stream lost for 3 min, create or upload failure, done with an error) is a failure. The next pod waits 1, 5, 10, 20, 40, 60 min; after 6 restarts no pod until the next Tokyo day |
+| `SUB01_DAY_MAX_RESTARTS` | 6 | a pod that was made and died (no hello in 15 min, stream lost for 3 min, pack upload failure, done with an error) is a restart. The next pod waits 2, 5, 10, 20, 40, 60 min; after 6 restarts no pod until the next Tokyo day. No pod made (no capacity, an API refusal, another SUB-01 pod running) is **not** a restart: the manager tries again every 5 min (2 min while another pod runs) |
 | `SUB01_GPU_TYPES` | see below | `"type:CLOUD,type:CLOUD"`, tried in order |
 
 Other rules:
@@ -130,6 +130,44 @@ Other rules:
   - `decisions`: whether the pod answers, plus the asked, answered, timed-out and rewarded counts;
   - `learning` (#70): per Tokyo day, the fraction of real picks that later paid off (GPU and the other networks),
     and the night replay's fit, learned vs frozen twin (`docs/spiking/choice.md`).
+
+## Why a pod died: the restart log (fix of 2026-10-04)
+
+On 2026-10-04 the mode hit its restart cap by 06:20 UTC: 7 restarts, while the cost log showed only 0.063 GPU-h.
+RunPod's own billing (`GET /v1/billing/pods`) showed 7 pods that day, alive 98–876 s, about 0.93 GPU-h and $0.25.
+The status said nothing about why each one ended.
+
+**What the code allowed.**
+- `RunPodOps.create` gave the create request a 60 s timeout. When it failed without an HTTP answer (a timeout or
+  a dropped connection) it looked for the pod once and moved on to the next GPU type.
+- A pod that RunPod created anyway then ran **untracked and unlogged**, until the orphan sweep deleted it within
+  about 10 min. That fits the 14.5-min pods, and the cost log being 15× below billing.
+- The next try found "a pod of ours already exists", and that, like "no capacity on any type", counted as a restart.
+  So the cap could burn with almost no logged cost.
+- The same day the hosts themselves worked: a 4000 Ada secure pod ran the 1M benchmark normally (1.25× real time),
+  and yesterday's weights and the night replay also run locally on a day-2 sequence.
+
+**Changes.**
+- **Restart log.** `/api/spiking/status` → `day_live.restart_log` keeps the last 10 entries, each
+  `{t, why, pod_id, gpu, secs_alive, last_error, counted}`:
+  - `last_error` is RunPod's own message for a create (for example "HTTP 500: create pod: There are no instances
+    currently available"), the upload error, the pod's `status.json` phase and error with the last line of its
+    `session.log`, or the error the pod reported with done;
+  - everything is cut to one short line, with anything that looks like a key or a token redacted;
+  - `day_live.gpu_failures_today` and `day_live.next_try` are shown too.
+- **Create.** The create request may take 150 s. After an ambiguous error the manager looks for the pod by name for
+  about a minute. If it finds it, the pod is adopted: tracked and logged.
+- **No pod made is not a restart.** No capacity on any type, an API refusal, or another SUB-01 pod running: a
+  restart-log entry with `counted: false`, and the manager tries again in 5 min (2 min while another pod runs).
+- **Orphans.** The sweep deletes only pods this manager makes (`sub01-spiking-day-`, `-night-`, `-session-`) and
+  books the cost of one that was never logged, from RunPod's `createdAt` at its `costPerHr`. Another session's
+  validation pod is left alone; the manager waits for it to go.
+- **GPU fallback.** A type whose pod died today moves to the back of the list for the rest of the day; the list
+  keeps its price order otherwise.
+- **Backoff.** The first restart waits 2 min instead of 1.
+- **CUDA filter.** Create requests ask for a host with CUDA 12.8 or newer (`allowedCudaVersions`), since the image
+  is built for CUDA 12.8. A pod on an older driver would never start. Checked live: a 4000 Ada secure pod was created
+  with the filter and ran (0.03 GPU-h, $0.009).
 
 ## Cheapest GPU that keeps up (measured 2026-10-02)
 

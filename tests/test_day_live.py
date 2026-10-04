@@ -550,3 +550,133 @@ def test_day_live_api_for_brain_vote(tmp_path):
         await ws.close()
         pod_manager.register_hub(None)
     asyncio.run(with_client(tmp_path, go))
+
+
+# --- why pods die, and not burning the restart cap (2026-10-04) ---------------------------------------------------
+import io  # noqa: E402
+import urllib.error  # noqa: E402
+
+from spiking import podpack  # noqa: E402
+from spiking.runpod_ops import scrub  # noqa: E402
+
+
+class SlowCreateApi(FakeApi):
+    """RunPod creates the pod but the create request fails on our side (a timeout): the pod runs untracked unless
+    it is found by name. The listing shows it only after `lag` list calls."""
+
+    def __init__(self, lag=2, **kw):
+        super().__init__(**kw)
+        self.lag, self.hidden = lag, []
+
+    def __call__(self, path, method="GET", body=None, timeout=60):
+        if method == "POST" and path == "/pods":
+            self.calls.append((method, path, body))
+            self.n += 1
+            self.hidden.append({"id": f"pod{self.n}", "name": body["name"], "costPerHr": 0.28,
+                                "createdAt": "2026-10-02 08:05:00.000 +0000 UTC"})
+            raise TimeoutError("timed out")
+        if method == "GET" and path == "/pods" and self.hidden:
+            self.lag -= 1
+            if self.lag <= 0:
+                self.pods += self.hidden
+                self.hidden = []
+        return super().__call__(path, method, body, timeout)
+
+
+def no_capacity(*a, **k):
+    return urllib.error.HTTPError("https://rest.runpod.io/v1/pods", 500, "err", {},
+                                  io.BytesIO(b'{"error":"create pod: There are no instances currently available"}'))
+
+
+class NoCapacityApi(FakeApi):
+    def __call__(self, path, method="GET", body=None, timeout=60):
+        if method == "POST" and path == "/pods":
+            self.calls.append((method, path, body))
+            raise no_capacity()
+        return super().__call__(path, method, body, timeout)
+
+
+def test_create_that_times_out_is_adopted_not_orphaned(tmp_path, capsys):
+    d = Day(tmp_path, tk(2, 8), api=SlowCreateApi(lag=3))
+    d.stage("AWAKE")
+    d.until(tk(2, 8, 10))
+    assert len(d.creates()) == 1 and d.mgr.current is not None and d.mgr.current["pod_id"] == "pod1"
+    assert d.log.open_pods()[0]["pod_id"] == "pod1"                          # logged: its cost counts
+    assert d.mgr.dl.get("restarts", 0) == 0
+
+
+def test_no_capacity_retries_without_burning_restarts(tmp_path, capsys):
+    d = Day(tmp_path, tk(2, 8), api=NoCapacityApi())
+    d.stage("AWAKE")
+    d.until(tk(2, 12))
+    st = d.mgr.status()["day_live"]
+    assert st["restarts_today"] == 0 and st["blocked"] is None and d.ours() == []
+    tries = len(d.creates()) // len(pod_manager.DAY_GPUS)
+    assert 40 <= tries <= 50                                                   # every 5 min, every type each time
+    last = st["restart_log"][-1]
+    assert last["why"] == "no pod created" and last["counted"] is False and last["pod_id"] is None
+    assert "HTTP 500: create pod: There are no instances currently available" in last["last_error"]
+    assert len(st["restart_log"]) == 10 and "not counted as a restart" in capsys.readouterr().out
+
+
+def test_foreign_pod_waits_and_managed_orphan_is_deleted_and_booked(tmp_path, capsys):
+    api = FakeApi(pods=[{"id": "val", "name": "sub01-spiking-live-validate-20261002", "costPerHr": 0.25}])
+    d = Day(tmp_path, tk(2, 8), api=api)
+    d.stage("AWAKE")
+    d.until(tk(2, 8, 30))
+    assert len(d.creates()) == 0 and ("DELETE", "/pods/val") not in api.mutating()      # a session's pod: left alone
+    st = d.mgr.status()["day_live"]
+    assert st["restarts_today"] == 0 and st["restart_log"][-1]["why"] == "another SUB-01 pod exists"
+    assert "left alone" in capsys.readouterr().out
+    api.pods = [p for p in api.pods if p["id"] != "val"]                     # its owner deletes it
+    api.pods.append({"id": "orph", "name": "sub01-spiking-day-20261002-0700", "costPerHr": 0.28,
+                     "createdAt": "2026-10-01 22:50:00.000 +0000 UTC"})       # one of ours, never logged
+    d.until(tk(2, 8, 40))
+    assert ("DELETE", "/pods/orph") in api.mutating() and d.mgr.current is not None
+    booked = [r for r in d.log.rows() if r.get("pod_id") == "orph"]
+    assert booked[0]["reason"] == "orphan" and booked[0]["cost_per_hr"] == 0.28 and booked[0]["hours"] > 0.2
+
+
+def test_restart_log_says_why_and_rotates_gpu(tmp_path):
+    d = Day(tmp_path, tk(2, 8))
+    d.mgr.ops.opener = FakePodHttp()
+    d.alive = False                                                          # no hello: the pod dies after 15 min
+    d.stage("AWAKE")
+    d.until(tk(2, 8, 30))
+    st = d.mgr.status()["day_live"]
+    e = st["restart_log"][-1]
+    assert e["why"] == "no hello within 15 min" and e["counted"] and e["pod_id"] == "pod1"
+    assert e["gpu"] == pod_manager.DAY_GPUS[0][0] and 15 * 60 <= e["secs_alive"] <= 17 * 60
+    assert "pod phase waiting_upload" in e["last_error"]                     # the pod's own status.json
+    assert st["gpu_failures_today"] == {pod_manager.DAY_GPUS[0][0]: 1}
+    d.until(tk(2, 8, 40))
+    second = d.creates()[1]["gpuTypeIds"][0]
+    assert second == pod_manager.DAY_GPUS[1][0]                              # the failed type moved to the back
+    assert [g[0] for g in d.mgr.gpu_order()[-2:]] == [pod_manager.DAY_GPUS[0][0], pod_manager.DAY_GPUS[1][0]]
+
+
+def test_done_with_error_is_logged_with_the_pods_error(tmp_path):
+    d = Day(tmp_path, tk(2, 8))
+    d.stage("AWAKE")
+    d.until(tk(2, 8, 7))
+    d.mgr.on_done({"ok": False, "error": "OutOfMemoryError: CUDA out of memory"})
+    d.step()
+    e = d.mgr.status()["day_live"]["restart_log"][-1]
+    assert e["why"] == "done with error" and "CUDA out of memory" in e["last_error"] and e["counted"]
+
+
+def test_restart_log_has_no_secrets(tmp_path):
+    assert "[redacted]" in scrub("Authorization: Bearer abc.def") and "abc.def" not in scrub("Bearer abc.def")
+    assert "0123456789abcdef0123456789abcdef" not in scrub("token 0123456789abcdef0123456789abcdef!")
+    d = Day(tmp_path, tk(2, 8))
+    d.alive = False
+    d.stage("AWAKE")
+    d.until(tk(2, 9))
+    env = d.creates()[0]["env"]
+    dump = json.dumps(d.mgr.status())
+    assert env["SUB01_POD_SECRET"] not in dump and env["SUB01_UPLOAD_TOKEN"] not in dump
+
+
+def test_create_body_requires_a_driver_for_the_image():
+    body = podpack.create_body({"SUB01_PACK_0": "x"}, "sub01-spiking-x", "NVIDIA RTX A4000", cloud="SECURE")
+    assert body["allowedCudaVersions"] == ["12.8", "12.9", "13.0"]

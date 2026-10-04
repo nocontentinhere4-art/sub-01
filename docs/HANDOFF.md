@@ -207,6 +207,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     any-query sources (`TAIL`: hn, news); `Limits` state v2 drops the pre-fix blocks.
   - Chromium: each restart records why (`/api/health` → `chromium.restart_log`: exit code / signal ("out of
     memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory, and for a memory restart the hosts on screen.
+  - `/api/screens` survives a deploy (live 2026-10-04: 44 pages today at 05:26, then counts {} and last [] after a
+    deploy): `ScreensStatus.to_dict()` (day, counts, last, notes, url) is saved to `screens.json` in the data dir at
+    most every `SCREENS_SAVE_S` (60 s) when a new page is counted, and at shutdown; restored at start (a new Tokyo
+    day still starts afresh).
   - Chromium memory (live 2026-10-04 04:02-04:53 UTC: 12 restarts "over 1200 MB", some 7-21 s apart, loop lag p95
     3.5 s). `Guard.route` loads nothing from ad / tracking / outstream-video networks (`memory_guard.AD_HOST`) and no
     cross-site iframe (`cross_site_frame`). The browser reads its own memory every `MEM_CHECK_S` (in a thread) and at
