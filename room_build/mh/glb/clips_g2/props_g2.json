@@ -140,86 +140,183 @@
  "room_phone": {
   "world": [
    {
-    "what": "phone",
     "shape": "box",
     "size": [
      0.072,
      0.152,
      0.008
     ],
-    "pos": [
-     0.0,
-     0.975,
-     0.192
-    ],
     "rot": [
      38.5,
      0,
      0
+    ],
+    "color": "0x1d1d1f",
+    "what": "phone",
+    "pos": [
+     0.0,
+     0.98244,
+     0.18264
     ]
    },
    {
-    "what": "screen (emissive)",
     "shape": "box",
     "size": [
      0.064,
      0.138,
      0.002
     ],
-    "pos": [
-     0.0,
-     0.9775,
-     0.1889
-    ],
     "rot": [
      38.5,
      0,
      0
+    ],
+    "color": "0x9ec9f0",
+    "what": "screen (emissive)",
+    "pos": [
+     0.0,
+     0.9849399999999999,
+     0.17954
     ]
    }
   ],
-  "notes": "two-hand grip, thumbs tap in bursts (THUMBTAP 3/s)"
+  "notes": "Two-hand grip from real photos/footage: hands cradle the lower half, fingers together behind (the right hand's fingers rest on the left's, no interpenetration), thumbs over the keyboard tapping ~1.6/s in bursts. Approved by the owner."
  },
  "room_drink": {
   "held": [
    {
-    "bone": "finger3-1.L",
-    "what": "glass",
+    "bone": "wrist.L",
     "shape": "cyl",
     "size": [
-     0.036,
-     0.11,
-     0.031
+     0.031,
+     0.12,
+     0.036
     ],
     "off": [
-     0.035,
-     -0.02,
-     -0.015
+     -0.0196,
+     -0.056,
+     0.0655
     ],
     "rot": [
-     90,
-     0,
-     0
-    ]
+     -102.22,
+     34.13,
+     -27.81
+    ],
+    "color": "0xcfe6f2",
+    "opacity": 0.45,
+    "rough": 0.1,
+    "what": "glass"
    },
    {
-    "bone": "finger3-1.R",
-    "what": "water bottle",
+    "bone": "wrist.L",
+    "shape": "cyl",
+    "size": [
+     0.033,
+     0.065,
+     0.03
+    ],
+    "off": [
+     -0.0099,
+     -0.0671,
+     0.0453
+    ],
+    "rot": [
+     -102.22,
+     34.13,
+     -27.81
+    ],
+    "color": "0x9ccfe8",
+    "opacity": 0.6,
+    "rough": 0.1,
+    "what": "water in the glass"
+   },
+   {
+    "bone": "wrist.R",
     "shape": "cyl",
     "size": [
      0.036,
-     0.24
+     0.17
     ],
     "off": [
-     -0.035,
-     -0.02,
-     -0.03
+     0.0041,
+     -0.0737,
+     0.0332
     ],
     "rot": [
-     90,
-     0,
-     0
-    ]
+     -102.22,
+     -34.13,
+     27.81
+    ],
+    "color": "0xbfe0ee",
+    "opacity": 0.55,
+    "rough": 0.1,
+    "what": "water bottle body"
+   },
+   {
+    "bone": "wrist.R",
+    "shape": "cyl",
+    "size": [
+     0.036,
+     0.035,
+     0.014
+    ],
+    "off": [
+     0.0437,
+     -0.0282,
+     0.1161
+    ],
+    "rot": [
+     -102.22,
+     -34.13,
+     27.81
+    ],
+    "color": "0xbfe0ee",
+    "opacity": 0.55,
+    "rough": 0.1,
+    "what": "bottle shoulder"
+   },
+   {
+    "bone": "wrist.R",
+    "shape": "cyl",
+    "size": [
+     0.014,
+     0.03
+    ],
+    "off": [
+     0.0562,
+     -0.0138,
+     0.1424
+    ],
+    "rot": [
+     -102.22,
+     -34.13,
+     27.81
+    ],
+    "color": "0xbfe0ee",
+    "opacity": 0.6,
+    "rough": 0.1,
+    "what": "bottle neck"
+   },
+   {
+    "bone": "wrist.R",
+    "shape": "cyl",
+    "size": [
+     0.016,
+     0.014
+    ],
+    "off": [
+     0.0647,
+     -0.0041,
+     0.1602
+    ],
+    "rot": [
+     -102.22,
+     -34.13,
+     27.81
+    ],
+    "color": "0x2a5fb0",
+    "rough": 0.4,
+    "what": "bottle cap"
    }
   ],
   "world": [
@@ -238,7 +335,7 @@
     ]
    }
   ],
-  "notes": "pour held 2.6-5.0 s, drinks ~11-14 s with the glass on the lips (MOUTH IK)"
+  "notes": "cyl size = [radiusTop, height, radiusBottom], off/rot (deg, XYZ) in the bone's frame. All five fingers close on glass and bottle (contact solve, fingers side by side). Bottle upright, cap above the thumb; pours thumb-down 2.8-4.9 s with the cap over the glass rim; drinks ~12-14 s with the rim on the lips. Approved by the owner."
  },
  "room_door": {
   "anim": [
@@ -3881,5 +3978,50 @@
    "mattress_top": 0.66
   },
   "notes": "one continuous clip (stretch -> stand -> walk -> sit on bed edge -> lie), 29 s; contacts measured: seat 0.515-0.533 on a 0.52 seat, lying >= 0.65 on a 0.66 mattress, legs within 1.2 cm of the bed front at the edge"
+ },
+ "room_phone_scroll": {
+  "world": [
+   {
+    "shape": "box",
+    "size": [
+     0.072,
+     0.152,
+     0.008
+    ],
+    "rot": [
+     38.5,
+     0,
+     0
+    ],
+    "color": "0x1d1d1f",
+    "what": "phone",
+    "pos": [
+     0.0,
+     0.98244,
+     0.18264
+    ]
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.064,
+     0.138,
+     0.002
+    ],
+    "rot": [
+     38.5,
+     0,
+     0
+    ],
+    "color": "0x9ec9f0",
+    "what": "screen (emissive)",
+    "pos": [
+     0.0,
+     0.9849399999999999,
+     0.17954
+    ]
+   }
+  ],
+  "notes": "Same grip, watching a short-video feed: every 2.5-6 s the right thumb comes down off the glass, slides ~4 cm up the screen and returns (a feed scroll). Approved by the owner."
  }
 }

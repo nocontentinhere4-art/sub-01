@@ -82,3 +82,16 @@ is the default default.mhskel (163 bones) with default_weights.mhw, at identity 
     - side view: https://commons.wikimedia.org/wiki/File:Nude_man_walking_(rbm-QP301M8-1887-553a~3).jpg
     - back view: https://commons.wikimedia.org/wiki/File:Nude_man_walking_(rbm-QP301M8-1887-010c~6).jpg
   - Open palm, CC0 (Unsplash, via Commons): https://commons.wikimedia.org/wiki/File:Man_in_hood_stretching_hand_(Unsplash).jpg
+
+## Owner round 3: hands really hold things (drink, phone)
+
+- New post passes in `anim_mh.mjs`: `GRASP` (contact finger curl against a box/cylinder in a bone or world frame;
+  `fromRest` + `together` put the fingers and palm bones in a real grip, `oppose`/`swing` place the thumb, `avoid`
+  makes one hand's fingers rest on the other's, `thumbTap`/`swipe` for texting and feed scrolling, `off` windows to
+  let go), `HROT` (wrist roll), `MOVEW` (keyed wrist offsets), `WDEV` (wrist deviation), `ELBOWSW` (elbow swing about
+  the shoulder-wrist line), `MOUTH_PT` (a point in the wrist frame, e.g. a glass rim, pulled to the lips), `TAP_DUR`.
+- `room_drink` (approved): glass in the left hand, bottle in the right with the cap above the thumb, pours thumb-down
+  over the rim, drinks with the rim on the lips; all fingers in contact, side by side; no hand or elbow inside the body.
+- `room_phone` (approved): two-hand grip from Pexels/Mixkit references, typing slowed to ~1.6 taps/s;
+  `room_phone_scroll` (approved): same grip, the right thumb scrolls a short-video feed every 2.5-6 s.
+- Props for all three are in `props_g2.json` (drink: held parts with bone offsets; phone: world).

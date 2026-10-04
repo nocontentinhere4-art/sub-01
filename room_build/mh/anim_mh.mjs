@@ -118,7 +118,7 @@ function armIK(Wq, L, rootPos) {
           while (tt < end) { out.push([tt, side]); side = rnd() < 0.75 ? (side === "L" ? "R" : "L") : side; tt += (0.6 + 0.8 * rnd()) / rate; }
           tt += 1 + 2 * rnd(); }
         IKT._tt = out; }
-      let pulse = 0; for (const [t0, sd] of IKT._tt) { if (t0 > t) break; if (sd !== s) continue; const u = t - t0; if (u < 0.18) pulse = Math.max(pulse, Math.sin(Math.PI * u / 0.18)); }
+      let pulse = 0; for (const [t0, sd] of IKT._tt) { if (t0 > t) break; if (sd !== s) continue; const u = t - t0; const TD = +(process.env.TAP_DUR || 0.18); if (u < TD) pulse = Math.max(pulse, Math.sin(Math.PI * u / TD)); }
       for (const n of [`finger1-2.${s}`, `finger1-3.${s}`]) L[n] = curlQ(n, 22 * pulse).multiply(L[n]); }
     const keep = { up: L[up].clone(), lo: L[lo].clone() };
     let dy = 0;
@@ -379,15 +379,126 @@ if (process.env.MATTRESS) { const [x0, x1, z0, z1, top] = JSON.parse(process.env
 // MOUTH=side (R, L or RL): when the hand comes up to the face, the point between thumb and index tips is pulled onto
 // the mouth (G2: lips 4 cm below and 11.8 cm in front of the head joint; MOUTH_OFF overrides), so food and cups reach
 // the lips on our body's proportions instead of the recorded actor's; the pull fades in over 25 cm and is smoothed
-if (process.env.MOUTH) { const off = V3(JSON.parse(process.env.MOUTH_OFF || "[0,-0.04,0.118]")), R = +(process.env.MOUTH_R || 0.25), gap = +(process.env.MOUTH_GAP || 0.02);
+// MOUTH_PT={"L":[x,y,z]}: pull this point (in the wrist's frame, e.g. a held glass's rim) to the mouth instead
+if (process.env.MOUTH) { const MPT = JSON.parse(process.env.MOUTH_PT || "{}"), off = V3(JSON.parse(process.env.MOUTH_OFF || "[0,-0.04,0.118]")), R = +(process.env.MOUTH_R || 0.25), gap = +(process.env.MOUTH_GAP || 0.02);
   for (const sd of process.env.MOUTH.split("")) {
     const corr = frames.map(f => { const hq = wlq(f.L, "head"), m = bonePos(f.L, f.root, "head").add(off.clone().applyQuaternion(hq));
-      const fp = bonePos(f.L, f.root, `finger1-3.${sd}`, true).add(bonePos(f.L, f.root, `finger2-3.${sd}`, true)).multiplyScalar(0.5);
+      const fp = MPT[sd] ? bonePos(f.L, f.root, `wrist.${sd}`).add(V3(MPT[sd]).applyQuaternion(wlq(f.L, `wrist.${sd}`)))
+        : bonePos(f.L, f.root, `finger1-3.${sd}`, true).add(bonePos(f.L, f.root, `finger2-3.${sd}`, true)).multiplyScalar(0.5);
       const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(hq), tgt = m.clone().addScaledVector(fwd, gap), d = fp.distanceTo(tgt);
       const w = d >= R ? 0 : d <= R * 0.5 ? 1 : (u => u * u * (3 - 2 * u))((R - d) / (R * 0.5)); return tgt.sub(fp).multiplyScalar(w); });
     const n = corr.length, sm = corr.map((_, i) => { const acc = new THREE.Vector3(); let ws = 0; for (let j = Math.max(0, i - 8); j <= Math.min(n - 1, i + 8); j++) { const w = Math.exp(-((j - i) ** 2) / 18); acc.addScaledVector(corr[j], w); ws += w; } return acc.multiplyScalar(1 / ws); });
     frames.forEach((f, i) => { if (sm[i].length() > 1e-4) moveWrist(f.L, f.root, sd, bonePos(f.L, f.root, `wrist.${sd}`).add(sm[i])); });
   } }
+// MOVEW={"R":[[t, dx, dy, dz], ...]}: keyed world offsets of a wrist (two-bone arm IK, the hand keeps its rotation),
+// e.g. bringing the bottle's mouth over the glass
+if (process.env.MOVEW) { const MW = JSON.parse(process.env.MOVEW);
+  for (const sd of Object.keys(MW)) { const P = MW[sd];
+    frames.forEach((f, i) => { const tt = i / fps; let o = P[P.length - 1].slice(1);
+      if (tt <= P[0][0]) o = P[0].slice(1); else for (let j = 0; j < P.length - 1; j++) if (tt >= P[j][0] && tt <= P[j + 1][0]) { const u = (tt - P[j][0]) / (P[j + 1][0] - P[j][0]), w = u * u * (3 - 2 * u); o = [1, 2, 3].map(k => P[j][k] + (P[j + 1][k] - P[j][k]) * w); break; }
+      if (Math.hypot(...o) < 1e-4) return; moveWrist(f.L, f.root, sd, bonePos(f.L, f.root, `wrist.${sd}`).add(V3(o))); }); } }
+// HROT={"R":[[t, deg], ...]}: extra roll of the hand about the forearm (keyed, smoothstep), e.g. tilting a bottle to pour
+if (process.env.HROT) { const HR = JSON.parse(process.env.HROT);
+  for (const sd of Object.keys(HR)) { const P = HR[sd];
+    frames.forEach((f, i) => { const tt = i / fps; let a = P[P.length - 1][1];
+      if (tt <= P[0][0]) a = P[0][1]; else for (let j = 0; j < P.length - 1; j++) if (tt >= P[j][0] && tt <= P[j + 1][0]) { const u = (tt - P[j][0]) / (P[j + 1][0] - P[j][0]); a = P[j][1] + (P[j + 1][1] - P[j][1]) * u * u * (3 - 2 * u); break; }
+      if (Math.abs(a) < 1e-3) return; const wr = `wrist.${sd}`, ax = bonePos(f.L, f.root, wr).sub(bonePos(f.L, f.root, `lowerarm01.${sd}`)).normalize();
+      const Wn = new THREE.Quaternion().setFromAxisAngle(ax, a * D2R).multiply(wlq(f.L, wr)); f.L[wr] = wlq(f.L, par[wr]).invert().multiply(Wn); }); } }
+// WDEV={"R":[[t, deg], ...]}: bend the hand within its own plane at the wrist (about the palm normal; radial/ulnar
+// deviation, keyed, smoothstep), e.g. a carried bottle's neck tipped up
+if (process.env.WDEV) { const WD = JSON.parse(process.env.WDEV);
+  for (const sd of Object.keys(WD)) { const P = WD[sd];
+    frames.forEach((f, i) => { const tt = i / fps; let a = P[P.length - 1][1];
+      if (tt <= P[0][0]) a = P[0][1]; else for (let j = 0; j < P.length - 1; j++) if (tt >= P[j][0] && tt <= P[j + 1][0]) { const u = (tt - P[j][0]) / (P[j + 1][0] - P[j][0]); a = P[j][1] + (P[j + 1][1] - P[j][1]) * u * u * (3 - 2 * u); break; }
+      if (Math.abs(a) < 1e-3) return; const wr = `wrist.${sd}`, Wn = wlq(f.L, wr), ax = PALM[sd].clone().applyQuaternion(Wn).normalize();
+      f.L[wr] = wlq(f.L, par[wr]).invert().multiply(new THREE.Quaternion().setFromAxisAngle(ax, a * D2R).multiply(Wn)); }); } }
+// ELBOWSW={"L":[[t, deg], ...]}: swing the elbow about the shoulder -> wrist line (keyed, smoothstep), the wrist staying
+// where it is with its world rotation, e.g. lifting an elbow that the recorded actor tucked into a slimmer chest
+if (process.env.ELBOWSW) { const ES = JSON.parse(process.env.ELBOWSW);
+  for (const sd of Object.keys(ES)) { const P = ES[sd];
+    frames.forEach((f, i) => { const tt = i / fps; let a = P[P.length - 1][1];
+      if (tt <= P[0][0]) a = P[0][1]; else for (let j = 0; j < P.length - 1; j++) if (tt >= P[j][0] && tt <= P[j + 1][0]) { const u = (tt - P[j][0]) / (P[j + 1][0] - P[j][0]); a = P[j][1] + (P[j + 1][1] - P[j][1]) * u * u * (3 - 2 * u); break; }
+      if (Math.abs(a) < 1e-3) return; const up = `upperarm01.${sd}`, wr = `wrist.${sd}`, Hw = wlq(f.L, wr);
+      const ax = bonePos(f.L, f.root, wr).sub(bonePos(f.L, f.root, up)).normalize();
+      f.L[up] = wlq(f.L, par[up]).invert().multiply(new THREE.Quaternion().setFromAxisAngle(ax, a * D2R).multiply(wlq(f.L, up)));
+      f.L[wr] = wlq(f.L, par[wr]).invert().multiply(Hw); }); } }
+// GRASP={"L":obj,"R":obj}: the hand closes on a real object. obj = {shape: cyl (axis = its y) | box, size, frame:
+// "world" (the clip's frame) or a bone (e.g. "wrist.L": the object rides on the hand), pos, rot (deg, XYZ)} or, for a
+// cylinder in a power grip, auto: "palm" (centred on the palm, touching it, axis along index -> little; shift slides it
+// along that axis, e.g. so a glass's rim stands above the thumb). Each finger
+// (and the thumb) curls from open until its pads touch the surface (signed distance, 9-10 mm pad), smoothed in time.
+// The object's final local pose is printed (GRASP_OUT) so the page can attach the same prop to the same bone.
+// together: the rest pose fans the fingers apart; swing each proximal phalanx (about the palm normal) by this fraction of
+// its angle to the middle finger so they lie side by side as in a real grip
+const togetherQ = (sd, fi, k) => { const N = PALM[sd], pr = v => v.clone().sub(N.clone().multiplyScalar(v.dot(N))).normalize();
+  const a = pr(fdir(`finger${fi}-1.${sd}`)), m = pr(fdir(`finger3-1.${sd}`)), ang = Math.atan2(a.clone().cross(m).dot(N), a.dot(m));
+  return new THREE.Quaternion().setFromAxisAngle(N, ang * k); };
+if (process.env.GRASP) { const G = JSON.parse(process.env.GRASP), out = {};
+  const sdfOf = (o, q) => { if (o.shape === "cyl") { const r = o.size[0], h = o.size[1] / 2, dr = Math.hypot(q.x, q.z) - r, dy = Math.abs(q.y) - h;
+      return Math.min(Math.max(dr, dy), 0) + Math.hypot(Math.max(dr, 0), Math.max(dy, 0)); }
+    const d = [Math.abs(q.x) - o.size[0] / 2, Math.abs(q.y) - o.size[1] / 2, Math.abs(q.z) - o.size[2] / 2];
+    return Math.min(Math.max(...d), 0) + Math.hypot(...d.map(v => Math.max(v, 0))); };
+  for (const sd of Object.keys(G)) { const o = G[sd];
+    let lpos = V3(o.pos || [0, 0, 0]), lq = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(o.rot || [0, 0, 0]).map(d => d * D2R)));
+    if (o.auto === "palm") { const w = V3(rest.head[`wrist.${sd}`]), kn = V3(rest.head[`finger3-1.${sd}`]);
+      const across = V3(rest.head[`finger5-1.${sd}`]).sub(V3(rest.head[`finger2-1.${sd}`])).normalize();
+      lpos = kn.clone().sub(w).multiplyScalar(o.along ?? 0.55).addScaledVector(PALM[sd], o.size[0] + (o.gap ?? 0.016));
+      lq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), across); lpos.addScaledVector(across, o.shift ?? 0); }
+    out[sd] = { frame: o.frame || "world", pos: lpos.toArray().map(x => +x.toFixed(4)), rot: new THREE.Euler().setFromQuaternion(lq).toArray().slice(0, 3).map(r => +(r / D2R).toFixed(2)), shape: o.shape, size: o.size };
+    const prev = {};
+    for (const f of frames) {
+      const M = new THREE.Matrix4().compose(lpos, lq, new THREE.Vector3(1, 1, 1));
+      if (o.frame && o.frame !== "world") M.premultiply(new THREE.Matrix4().compose(bonePos(f.L, f.root, o.frame), wlq(f.L, o.frame), new THREE.Vector3(1, 1, 1)));
+      // avoid="L": the other hand's finger bones (already solved this frame) are obstacles too (capsules, r 8 mm), so
+      // the fingers of the two hands rest on each other instead of passing through
+      const caps = [];
+      if (o.avoid) for (let ff = 1; ff <= 5; ff++) for (const nn of (ff === 1 ? [2, 3] : [1, 2, 3])) { const bn = `finger${ff}-${nn}.${o.avoid}`;
+        caps.push([bonePos(f.L, f.root, bn), bonePos(f.L, f.root, bn, true)]); }
+      const capD = p => { let d = 1e9; for (const [a, b] of caps) { const ab = b.clone().sub(a), t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq()));
+        d = Math.min(d, p.distanceTo(a.clone().addScaledVector(ab, t)) - 0.008); } return d; };
+      const Minv = M.clone().invert(), sdf = p => Math.min(sdfOf(o, p.clone().applyMatrix4(Minv)), caps.length ? capD(p) : 1e9);
+      // fromRest: the palm's own bones (metacarpals) go back to rest too, or the recorded spread keeps the knuckles apart
+      if (o.fromRest) for (let m = 1; m <= 4; m++) f.L[`metacarpal${m}.${sd}`] = new THREE.Quaternion();
+      if (o.oppose !== undefined) { const t1 = `finger1-1.${sd}`; f.L[t1] = new THREE.Quaternion().setFromAxisAngle(PALM[sd], (sd === "L" ? -1 : 1) * (o.swing ?? 0) * D2R).multiply(new THREE.Quaternion().setFromAxisAngle(fdir(`finger2-1.${sd}`), (sd === "L" ? -1 : 1) * o.oppose * D2R)).multiply(o.fromRest ? new THREE.Quaternion() : f.L[t1]); }
+      for (let fi = 1; fi <= 5; fi++) { if (o.fingers && !o.fingers.includes(fi)) continue;
+        const names = fi === 1 ? [`finger1-2.${sd}`, `finger1-3.${sd}`] : [`finger${fi}-1.${sd}`, `finger${fi}-2.${sd}`, `finger${fi}-3.${sd}`];
+        const ratio = fi === 1 ? [1, 0.8] : [0.75, 1, 0.7], base = names.map(n => o.fromRest ? new THREE.Quaternion() : f.L[n].clone()),
+          _tg = fi > 1 && o.together ? (base[0] = togetherQ(sd, fi, o.together).multiply(base[0])) : null, pad = fi === 1 ? 0.010 + (o.thumbHover ?? 0) : 0.009;
+        const set = e => names.forEach((n, j) => { f.L[n] = _tg && j === 0 ? base[0].clone().multiply(curlQ(n, e * ratio[j])) : curlQ(n, e * ratio[j]).multiply(base[j]); });
+        const dist = e => { set(e); const ps = (o.tipOnly && fi > 1 ? names.slice(-1) : names.slice(1)).map(n => bonePos(f.L, f.root, n)); ps.push(bonePos(f.L, f.root, names[names.length - 1], true));
+          // keepSide=+1/-1: this hand's fingers stay on their own side of the object's middle (local x), so the two
+          // hands' fingers meet behind a phone instead of passing through each other
+          const side = o.keepSide ? Math.min(...ps.map(p => o.keepSide * p.clone().applyMatrix4(Minv).x)) - pad : 1e9;
+          return Math.min(Math.min(...ps.map(sdf)) - pad, side); };
+        // off=[[t0, t1], ...]: windows where this hand lets go (e.g. turning a page): fingers ease to a relaxed curl
+        const tNow = frames.indexOf(f) / fps;
+        if (o.off && o.off.some(([a, b]) => tNow >= a && tNow <= b)) { let e = o.relax ?? 20; const key = "k" + fi;
+          if (prev[key] !== undefined) e = prev[key] + (e - prev[key]) * 0.2; prev[key] = e; set(e); continue; }
+        const mc = fi === 1 ? (o.thumbMinCurl ?? o.minCurl ?? -10) : (o.minCurl ?? -10); let best = mc, bestD = 1e9, hit = null, pe = mc;
+        for (let e = mc; e <= (o.maxCurl ?? 95); e += 5) { const d = dist(e); if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = e; } if (d <= 0) { hit = [pe, e]; break; } pe = e; }
+        let e = best; if (hit) { let a = hit[0], b = hit[1]; if (a === b) e = a; else { for (let j = 0; j < 14; j++) { const m = (a + b) / 2; if (dist(m) > 0) a = m; else b = m; } e = a; } }
+        const key = "k" + fi; if (prev[key] !== undefined) e = prev[key] + (e - prev[key]) * 0.35; prev[key] = e; set(e);
+        // thumbHover + thumbTap: the thumb rests just above the screen and taps it (THUMBTAP's bursts) after the solve
+        if (fi === 1 && o.thumbTap && IKT && IKT._tt) { const t = frames.indexOf(f) / fps; let pulse = 0;
+          for (const [t0, s2] of IKT._tt) { if (t0 > t) break; if (s2 !== sd) continue; const uu = t - t0; const TD = +(process.env.TAP_DUR || 0.18); if (uu < TD) pulse = Math.max(pulse, Math.sin(Math.PI * uu / TD)); }
+          if (pulse > 0) names.forEach((n, j) => { f.L[n] = curlQ(n, o.thumbTap * pulse * ratio[j]).multiply(f.L[n]); }); }
+        // swipe={every:[a, b], dur, amp, lift}: scrolling a feed — every a-b s the thumb slides up the screen (swinging
+        // about the palm normal, in contact) and comes back lifted off the glass
+        if (fi === 1 && o.swipe) { const S = o.swipe, t = frames.indexOf(f) / fps;
+          if (!S._t) { let x = 977 + (sd === "R" ? 1 : 0), tt = 0.8; S._t = []; const rnd = () => (x = (x * 48271) % 2147483647) / 2147483647;
+            while (tt < 600) { S._t.push(tt); tt += S.every[0] + (S.every[1] - S.every[0]) * rnd(); } }
+          let ang = 0, lift = 0; for (const t0 of S._t) { const u = (t - t0) / S.dur; if (u < 0 || u > 1) continue;
+            const ss = w => w * w * (3 - 2 * w);
+            if (u < 0.25) { const w = u / 0.25; ang = -S.amp / 2 * ss(w); lift = Math.sin(Math.PI * w); }          // down, off the glass
+            else if (u < 0.7) { const w = (u - 0.25) / 0.45; ang = -S.amp / 2 + S.amp * ss(w); }                  // slides up on it
+            else { const w = (u - 0.7) / 0.3; ang = S.amp / 2 * (1 - ss(w)); lift = Math.sin(Math.PI * w) * 0.6; } } // back to rest
+          const th1 = `finger1-1.${sd}`;
+          if (ang || lift) { const nW = new THREE.Vector3(0, 0, 1).transformDirection(M), nL = nW.applyQuaternion(wlq(f.L, par[th1]).invert()).normalize();
+            f.L[th1] = new THREE.Quaternion().setFromAxisAngle(nL, ang * D2R).multiply(f.L[th1]);
+            names.forEach((n, j) => { f.L[n] = curlQ(n, (S.lift ?? 12) * lift * ratio[j]).multiply(f.L[n]); }); } }
+        if (process.env.GRASP_DBG && frames.indexOf(f) % 30 === 0) (out.dbg ||= []).push([sd, frames.indexOf(f) / fps, fi, +e.toFixed(0), +(dist(e) * 1000).toFixed(1), bonePos(f.L, f.root, names[names.length - 1], true).applyMatrix4(Minv).toArray().map(v => +(v * 1000).toFixed(0)).join(",")]); } } }
+  if (out.dbg) { for (const r of out.dbg) console.log("GRASP_DBG", ...r); delete out.dbg; }
+  console.log("GRASP_OUT " + JSON.stringify(out)); }
 // INPLACE: remove the travel (straight line from the first to the last frame) so the clip loops on the spot; the page
 // moves the root along his path at the reported speed
 if (process.env.INPLACE) { const n = frames.length - 1, a0 = frames[0].root, a1 = frames[n].root;
