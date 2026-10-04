@@ -35,7 +35,7 @@ def main():
     try:
         with sync_playwright() as p:
             b = p.chromium.launch(executable_path=args.chromium, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
-            pg = b.new_page(viewport={"width": 2000, "height": 1000}, ignore_https_errors=True)
+            pg = b.new_page(viewport={"width": 2000, "height": 2000}, ignore_https_errors=True)
             for h in CDN_HOSTS:
                 pg.route(f"https://{h}/**", cdn_router(os.environ.get("SUB01_CDN_CACHE", "/tmp/sub01-cdn-cache")))
             errors = []

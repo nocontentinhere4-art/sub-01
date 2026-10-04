@@ -22,7 +22,8 @@
 //     environment, so the highlight sits on the cornea, not on the iris;
 //   - the tear line: a thin wet tube along the lower lid margin, and the pink caruncle in the inner corner.
 
-const SKIN_SRGB = [0.82, 0.64, 0.54];             // base albedo (sRGB); linear ~0.65 / 0.37 / 0.26
+const EYE_K = 0.85;                                 // the eyeball's radius, as a share of MakeHuman's eye helper sphere
+const SKIN_SRGB = [0.80, 0.65, 0.57];             // base albedo (sRGB): less peach, a touch greyer for room light
 
 // ---------- landmarks and per-vertex skin data ----------
 function smoothNormals(THREE, geo){
@@ -59,25 +60,33 @@ function skinData(THREE, geo, data){
   const col = new Float32Array(n * 3), sd = new Float32Array(n * 4);   // sd: thin, oily (T-zone), cavity AO, lips
   const g = (d, s) => Math.exp(-(d * d) / (2 * s * s));
   const lin = c => Math.pow(c, 2.2);
-  const base = SKIN_SRGB.map(lin), red = [0.78, 0.30, 0.24].map(lin), lip = [0.62, 0.27, 0.28].map(lin), brow = [0.30, 0.22, 0.18].map(lin);
+  const base = SKIN_SRGB.map(lin), red = [0.74, 0.36, 0.32].map(lin), lip = [0.62, 0.27, 0.28].map(lin), brow = [0.30, 0.22, 0.18].map(lin);
   const eyes = [data.eyes.l, data.eyes.r];
   for (let i = 0; i < n; i++) {
     const x = P.getX(i), y = P.getY(i), z = P.getZ(i), ax = Math.abs(x);
     // redness: nose tip and wings, cheeks, ears, a little on the chin and forehead
-    const nose = g(Math.hypot(x, y - L.nose[1] + 0.004, z - L.nose[2]), 0.016);
-    const cheek = g(Math.hypot(ax - 0.042, y - (L.eyeY - 0.03), z - (L.eyeZ - 0.01)), 0.02);
-    const ear = ax > L.earX - 0.018 && z < 0.05 ? Math.min(1, (ax - (L.earX - 0.018)) / 0.012) * g(y - 0.02, 0.04) : 0;
+    const nose = g(Math.hypot(x, y - L.nose[1] + 0.004, z - L.nose[2]), 0.011);
+    const cheek = g(Math.hypot(ax - 0.044, y - (L.eyeY - 0.034), z - (L.eyeZ - 0.008)), 0.013);
+    const ear = ax > L.earX - 0.012 && z < 0.05 ? Math.min(1, (ax - (L.earX - 0.012)) / 0.01) * g(y - 0.02, 0.035) : 0;   // the rim
     const chin = g(Math.hypot(x, y - (L.lip[1] - 0.045), z - (L.lip[2] - 0.01)), 0.014);
-    let redK = 0.7 * nose + 0.6 * cheek + 0.75 * ear + 0.22 * chin;
+    let redK = 0.6 * nose + 0.32 * cheek + 0.7 * ear + 0.12 * chin;
     // lips: a band under the nose, centred, on the front of the face
     const lips = Math.min(1, 1.6 * g(y - (L.lip[1] - 0.005), 0.0062) * g(x, 0.02) * (z > L.lip[2] - 0.03 ? 1 : 0));
     // eye socket ring (cavity) and the under-eye; the brow line above
     let cav = 0, browK = 0;
     for (const e of eyes) {
       const d = Math.hypot(x - e.center[0], (y - e.center[1]) * 1.25, z - e.center[2]);
-      cav = Math.max(cav, g(d - e.radius * 1.12, 0.0045) * 0.9 + g(d - e.radius * 1.55, 0.009) * 0.35);
+      cav = Math.max(cav, g(d - e.radius * EYE_K * 1.1, 0.004) * 0.7 + g(d - e.radius * 1.45, 0.009) * 0.35);
       browK = Math.max(browK, g(y - (e.center[1] + 0.024 + 0.006 * Math.cos((x - e.center[0]) * 60)), 0.0042) * g(x - e.center[0] * 1.15, 0.019) * (z > e.center[2] - 0.02 ? 1 : 0));
     }
+    // the lash line: the upper lid's margin, dark (lashes and their shadow) and narrow; a softer shadow just above it
+    let lash = 0;
+    for (const e of eyes) {
+      const d = Math.hypot(x - e.center[0], y - e.center[1], z - e.center[2]);
+      if (y > e.center[1] + e.radius * 0.12 && z > e.center[2] + e.radius * 0.3 && Math.abs(x - e.center[0]) < e.radius * 1.05)
+        lash = Math.max(lash, 0.4 * g(d - e.radius * EYE_K * 1.1, 0.0025));   // a soft lid shadow (the line itself is per pixel)
+    }
+    lash = Math.min(1, lash);
     // the fold under the nose, the corners of the mouth, behind the ears: small cavities
     cav = Math.max(cav, 0.4 * g(Math.hypot(ax - 0.026, y - (L.nose[1] - 0.05)), 0.006));
     const c = [0, 1, 2].map(k => {
@@ -85,13 +94,14 @@ function skinData(THREE, geo, data){
       v = v * (1 - 0.35 * redK) + red[k] * 0.35 * redK;
       v = v * (1 - 0.9 * lips) + lip[k] * 0.9 * lips;
       v = v * (1 - 0.35 * browK) + brow[k] * 0.35 * browK;
-      return v * (1 - 0.30 * cav);
+      v = v * (1 - 0.30 * cav);
+      return v * (1 - 0.82 * lash) + 0.012 * 0.82 * lash;
     });
     col.set(c, 3 * i);
     const thin = Math.max(ear, 0.8 * g(Math.hypot(ax - 0.012, y - L.nose[1] + 0.012, z - L.nose[2] + 0.012), 0.008));
     const oily = Math.max(0.9 * g(Math.hypot(x, y - L.nose[1] + 0.002, z - L.nose[2]), 0.022),
                           0.7 * g(x, 0.035) * (y > L.eyeY + 0.03 && y < L.eyeY + 0.085 && z > 0.06 ? 1 : 0), 0.5 * g(Math.hypot(x, y - (L.nose[1] - 0.085)), 0.015));
-    sd.set([thin, oily, cav, lips], 4 * i);
+    sd.set([thin, oily, Math.max(cav, 0.8 * lash), lips], 4 * i);
   }
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
   geo.setAttribute("skinData", new THREE.BufferAttribute(sd, 4));
@@ -111,12 +121,24 @@ const NOISE = /* glsl */`
     return sqrt(d); }
 `;
 
+// the lash line: on the upper lid, the skin within ~1.5 mm of where it meets the ball is dark (lashes and their
+// shadow), with a soft 3 mm shadow above it and darker toward the outer corner; per pixel, the lids are coarse
+const LASH = /* glsl */`
+  float sk_lashAt(vec3 p, vec4 e){
+    if (e.w <= 0.0) return 0.0;
+    vec3 q = p - e.xyz; float d = length(q) - e.w;
+    float up = smoothstep(-0.05, 0.22, q.y / e.w), front = smoothstep(0.1, 0.4, q.z / e.w), side = 1.0 - smoothstep(0.85, 1.1, abs(q.x) / e.w);
+    float outer = 1.0 + 0.4 * smoothstep(0.0, 0.9, q.x * sign(e.x) / e.w);
+    float line = (1.0 - smoothstep(0.0016, 0.0032, d)) * smoothstep(-0.004, -0.002, d), shade = 0.4 * (1.0 - smoothstep(0.0032, 0.0065, d)) * step(-0.002, d);
+    return clamp((line + shade) * up * front * side * outer, 0.0, 0.92);
+  }
+`;
 export function makeSkinMaterial(THREE, {envMapIntensity = 0.6} = {}){
   const m = new THREE.MeshPhysicalMaterial({
     vertexColors: true, color: 0xffffff, roughness: 0.52, metalness: 0, ior: 1.4, specularIntensity: 0.55,
     sheen: 0.25, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.55, 0.45, 0.42), envMapIntensity,
   });
-  m.userData.uniforms = {uPore: {value: 1.0}, uWrap: {value: new THREE.Vector3(0.38, 0.16, 0.10)}, uTrans: {value: 0.7}};
+  m.userData.uniforms = {uEyeL: {value: new THREE.Vector4(0, 0, 0, 0)}, uEyeR: {value: new THREE.Vector4(0, 0, 0, 0)}, uPore: {value: 1.0}, uWrap: {value: new THREE.Vector3(0.30, 0.21, 0.16)}, uTrans: {value: 0.7}};
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, m.userData.uniforms);
     sh.vertexShader = sh.vertexShader
@@ -130,16 +152,18 @@ export function makeSkinMaterial(THREE, {envMapIntensity = 0.6} = {}){
       reflectedLight.directDiffuse += sk_wrapNL * directLight.color * BRDF_Lambert( material.diffuseColor );
       // translucency where the skin is thin: light from behind, seen through (red, it has crossed the blood)
       float sk_back = pow( saturate( dot( geometryViewDir, -normalize( directLight.direction + 0.35 * geometryNormal ) ) ), 3.0 );
-      reflectedLight.directDiffuse += uTrans * vSkin.x * sk_back * directLight.color * vec3( 0.9, 0.25, 0.12 ) * material.diffuseColor;
+      reflectedLight.directDiffuse += uTrans * vSkin.x * sk_back * directLight.color * vec3( 0.85, 0.28, 0.16 ) * material.diffuseColor;
 }
 void RE_IndirectDiffuse_Physical`);
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", `#include <common>\nvarying vec4 vSkin; varying vec3 vObj; uniform float uPore; uniform vec3 uWrap; uniform float uTrans;\n${NOISE}`)
+      .replace("#include <common>", `#include <common>\nvarying vec4 vSkin; varying vec3 vObj; uniform float uPore; uniform vec3 uWrap; uniform float uTrans; uniform vec4 uEyeL, uEyeR;\n${NOISE}\n${LASH}`)
       .replace("#include <lights_physical_pars_fragment>", direct)
       // colour: a faint mottle (freckle-scale and blotch-scale), the vertex colours already carry the regions
       .replace("#include <color_fragment>", `#include <color_fragment>
         float sk_m = sk_noise(vObj * 90.0) * 0.6 + sk_noise(vObj * 340.0) * 0.4;
-        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 0.97, 0.96), smoothstep(0.35, 0.75, sk_m)) * (0.97 + 0.06 * sk_noise(vObj * 25.0));`)
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 0.97, 0.96), smoothstep(0.35, 0.75, sk_m)) * (0.97 + 0.06 * sk_noise(vObj * 25.0));
+        float sk_lash = max(sk_lashAt(vObj, uEyeL), sk_lashAt(vObj, uEyeR));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.013, 0.011), sk_lash);`)
       // the T-zone: tighter and stronger specular; cavities: less specular
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, 0.36, vSkin.y);
@@ -168,7 +192,7 @@ void RE_IndirectDiffuse_Physical`);
         reflectedLight.indirectDiffuse *= 1.0 - 0.45 * vSkin.z;
         reflectedLight.indirectSpecular *= 1.0 - 0.6 * vSkin.z;`);
   };
-  m.customProgramCacheKey = () => "skin-v1";
+  m.customProgramCacheKey = () => "skin-v2";
   return m;
 }
 
@@ -199,7 +223,7 @@ export function irisTexture(THREE, {w = 1024, h = 512, iris = [0.24, 0.13, 0.06]
         const t = Math.min(1, (th - irisDeg) / 70);
         const vein = Math.max(0, Math.sin(x * 0.11 + Math.sin(th * 0.3) * 3) * Math.sin(x * 0.023 + th * 0.07)) ;
         const v = t > 0.35 ? Math.pow(vein, 18) * (t - 0.35) : 0;
-        [r, gg, b] = [0.86 - 0.08 * t + 0.5 * v, 0.83 - 0.12 * t - 0.25 * v, 0.80 - 0.12 * t - 0.25 * v];
+        [r, gg, b] = [0.78 - 0.08 * t + 0.45 * v, 0.74 - 0.12 * t - 0.22 * v, 0.70 - 0.12 * t - 0.22 * v];
         if (th < irisDeg + 1.2) { const s = (th - irisDeg) / 1.2; [r, gg, b] = [r * (0.35 + 0.65 * s), gg * (0.35 + 0.65 * s), b * (0.35 + 0.65 * s)]; }
       }
       const o = 4 * (y * w + x);
@@ -220,7 +244,7 @@ function eyeballMaterial(THREE, map){
     // not rotated with the ball's own turn), a soft socket ring that does not depend on shadow maps
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vEyeN;")
       .replace("#include <aomap_fragment>", `#include <aomap_fragment>
-        float eo = 1.0 - 0.75 * smoothstep(0.05, 0.42, vEyeN.y) - 0.45 * smoothstep(0.42, 0.85, abs(vEyeN.x)) - 0.35 * smoothstep(0.25, 0.6, -vEyeN.y);
+        float eo = 1.0 - 0.85 * smoothstep(0.0, 0.34, vEyeN.y) - 0.45 * smoothstep(0.42, 0.85, abs(vEyeN.x)) - 0.35 * smoothstep(0.25, 0.6, -vEyeN.y);
         eo = clamp(eo, 0.12, 1.0);
         reflectedLight.directDiffuse *= eo; reflectedLight.indirectDiffuse *= eo;
         reflectedLight.directSpecular *= eo; reflectedLight.indirectSpecular *= eo;`);
@@ -244,16 +268,21 @@ export function buildHead(THREE, data, {iris = [0.24, 0.13, 0.06]} = {}){
   const ids = smoothNormals(THREE, geo);
   const L = skinData(THREE, geo, data);
   const skin = new THREE.Mesh(geo, makeSkinMaterial(THREE));
+  { const u = skin.material.userData.uniforms, E = data.eyes;
+    u.uEyeL.value.set(...E.l.center, E.l.radius * EYE_K); u.uEyeR.value.set(...E.r.center, E.r.radius * EYE_K); }
   skin.name = "skin"; group.add(skin);
 
   const map = irisTexture(THREE, {iris});
   const ballMat = eyeballMaterial(THREE, map), corneaMat = corneaMaterial(THREE);
   const loopsN = {};
+  const lashMat = new THREE.MeshStandardMaterial({color: new THREE.Color(0.02, 0.016, 0.014), roughness: 0.6});
   const tearMat = new THREE.MeshPhysicalMaterial({color: new THREE.Color(0.86, 0.70, 0.66), roughness: 0.04, metalness: 0, clearcoat: 1,
     clearcoatRoughness: 0.02, transparent: true, opacity: 0.4, envMapIntensity: 1.4});
   const carMat = new THREE.MeshPhysicalMaterial({color: new THREE.Color(0.80, 0.50, 0.48), roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.08});
   for (const [side, e] of Object.entries(data.eyes)) {
-    const C = new THREE.Vector3(...e.center), r = e.radius * 0.97;
+    // the ball: 0.85 of the helper sphere (12.7 mm; MakeHuman's lid margins sit at 0.81-0.91 of it, so a full-size
+    // ball would poke through the lids)
+    const C = new THREE.Vector3(...e.center), r = e.radius * EYE_K;
     const eye = new THREE.Group(); eye.position.copy(C); eye.name = "eye_" + side;
     // the ball looks ahead and very slightly out (a relaxed gaze converges a little at the room distance)
     const fwd = new THREE.Vector3(Math.sign(C.x) * 0.03, -0.02, 1).normalize();
@@ -269,15 +298,23 @@ export function buildHead(THREE, data, {iris = [0.24, 0.13, 0.06]} = {}){
     // the tear line: the lower lid margin is where the skin meets the ball (this mesh is closed over the eye: the
     // ball shows through where the lids part, so the margin is the ring of skin vertices just outside the ball's
     // radius, in front of its centre)
-    const P = geo.attributes.position, ring = [], v = new THREE.Vector3();
-    for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const d = v.distanceTo(C);
-      if (d > r * 0.98 && d < r * 1.12 && v.z > C.z + r * 0.45 && v.y < C.y - r * 0.18 && Math.abs(v.x - C.x) < r * 0.95) ring.push(v.clone()); }
-    // one point per 1.5 mm across, the one nearest the ball (the margin itself, not the skin below it)
-    const bins = new Map();
-    for (const p of ring) { const k = Math.round((p.x - C.x) / 0.0015); const o = bins.get(k); if (!o || p.distanceTo(C) < o.distanceTo(C)) bins.set(k, p); }
-    const lower = [...bins.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]).slice(1, -1);   // not into the corners
+    // the lid margins: in each 1.5 mm slice across the eye, the skin vertex nearest the ball, above (upper lid) and
+    // below (lower lid) the centre, in front of it
+    const P = geo.attributes.position, v = new THREE.Vector3();
+    const margin = up => { const bins = new Map();
+      for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const q = v.clone().sub(C);
+        if (q.z < r * 0.35 || Math.abs(q.x) > r * 0.95 || (up ? q.y < r * 0.05 : q.y > -r * 0.12) || q.length() > r * 1.4) continue;
+        const k = Math.round(q.x / 0.0015), o = bins.get(k); if (!o || q.length() < o.distanceTo(C)) bins.set(k, v.clone()); }
+      return [...bins.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]); };
+    const lower = margin(false).slice(1, -1), upper = margin(true);
+    if (upper.length > 3) {
+      // the lash line: a dark tube on the upper margin (lashes and their shadow), thicker toward the outer corner
+      const pts = upper.map(p => p.clone().add(p.clone().sub(C).normalize().multiplyScalar(0.0003)));
+      const lash = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.00075, 6, false), lashMat);
+      lash.name = "lash_" + side; group.add(lash);
+    }
     if (lower.length > 4) {
-      const pts = lower.map(p => C.clone().addScaledVector(p.clone().sub(C).normalize(), r * 1.012));
+      const pts = lower.map(p => p.clone().lerp(C, 0.03));
       const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.00030, 6, false), tearMat);
       tube.name = "tear_" + side; tube.renderOrder = 3; group.add(tube);
       // the caruncle: the pink corner on the nose side
@@ -286,7 +323,7 @@ export function buildHead(THREE, data, {iris = [0.24, 0.13, 0.06]} = {}){
       car.position.copy(C).addScaledVector(inner.clone().sub(C).normalize(), r * 1.0).add(new THREE.Vector3(0, r * 0.12, 0));
       car.scale.set(0.9, 1.3, 0.8); group.add(car);
     }
-    loopsN[side] = lower.length;
+    loopsN[side] = [upper.length, lower.length];
   }
   group.userData.landmarks = L;
   group.userData.lidLoops = loopsN;

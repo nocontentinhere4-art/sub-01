@@ -24,11 +24,16 @@ const pm = new THREE.PMREMGenerator(renderer);
 scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.16;
 
-// the window: a cool key from the camera's right, high; the lamp: warm, behind his right ear (the ear on the camera's
-// side, so its translucency shows); the room's bounce, low (a lamp-lit room at night has little of it)
-const key = new THREE.DirectionalLight(0xdfe8ff, 3.2); key.position.set(1.3, 0.8, 0.9); scene.add(key);
-const lamp = new THREE.PointLight(0xffb47a, 0.7, 0, 2); lamp.position.set(-0.32, 0.06, -0.28); scene.add(lamp);
-const fill = new THREE.HemisphereLight(0xcfd6e0, 0x4a3a2e, 0.22); scene.add(fill);
+// the room's own light colours (web/room.html): by day the sun 0xfff0dc through the window and the sky 0xe4ecff as a
+// soft fill from the same side, the walls' bounce; in the evening the desk lamp 0xffb468 (a spot from the desk, low
+// and to the side), its bulb 0xffc98a behind his ear, a dim room
+const sun = new THREE.DirectionalLight(0xfff0dc, 3.0); sun.position.set(1.3, 0.8, 0.9); scene.add(sun);
+const sky = new THREE.DirectionalLight(0xe4ecff, 1.1); sky.position.set(1.4, 0.2, -0.2); scene.add(sky);
+const lamp = new THREE.SpotLight(0xffb468, 0, 0, 0.9, 0.6, 2); lamp.position.set(0.6, 0.12, 0.45); lamp.target.position.set(0, 0, 0.05); scene.add(lamp, lamp.target);
+const bulb = new THREE.PointLight(0xffc98a, 0, 0, 2); bulb.position.set(-0.32, 0.06, -0.28); scene.add(bulb);
+const fill = new THREE.HemisphereLight(0xfff1dd, 0x3a3028, 0.22); scene.add(fill);
+const DAY = () => { sun.intensity = 3.0; sky.intensity = 1.1; lamp.intensity = 0; bulb.intensity = 0.25; fill.intensity = 0.22; scene.environmentIntensity = 0.16; renderer.toneMappingExposure = 1.05; };
+const EVE = () => { sun.intensity = 0; sky.intensity = 0.06; lamp.intensity = 1.3; bulb.intensity = 0.45; fill.intensity = 0.06; scene.environmentIntensity = 0.03; renderer.toneMappingExposure = 1.45; };
 // a stand-in for his black hoodie under the neck (the head is cut there), charcoal fabric
 const cloth = new THREE.MeshStandardMaterial({color: 0x161618, roughness: 0.9});
 const prof = [[0.0, -0.09], [0.06, -0.09], [0.07, -0.13], [0.12, -0.17], [0.19, -0.21], [0.215, -0.27], [0.22, -0.45], [0.2, -0.75], [0.0, -0.75]]
@@ -46,16 +51,16 @@ scene.add(head);
 window.__info = {lids: head.userData.lidLoops, landmarks: head.userData.landmarks};
 
 const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 50);
-const sheet = document.getElementById("sheet"); sheet.width = 2 * W; sheet.height = H;
+const sheet = document.getElementById("sheet"); sheet.width = 2 * W; sheet.height = 2 * H;
 const ctx = sheet.getContext("2d");
-function shot(pos, target, fov, x){
+function shot(pos, target, fov, x, y = 0){
   cam.fov = fov; cam.position.set(...pos); cam.lookAt(...target); cam.updateProjectionMatrix();
-  renderer.render(scene, cam); ctx.drawImage(renderer.domElement, x, 0);
+  renderer.render(scene, cam); ctx.drawImage(renderer.domElement, x, y);
 }
-// close-up: the face fills the frame (0.24 m tall at 0.45 m)
-shot([-0.17, 0.035, 0.43], [0.005, 0.0, 0.05], 30, 0);
-// the room distance: 2.2 m, the page's 30° lens: the head is about a fifth of the frame's height
-shot([-0.55, 0.25, 2.13], [0.0, -0.12, 0.05], 30, W);
+// top row by day, bottom row in the evening; left the close-up (0.45 m), right the room distance (2.2 m, 30° lens)
+const CLOSE = [[-0.17, 0.035, 0.43], [0.005, 0.0, 0.05]], ROOM = [[-0.55, 0.25, 2.13], [0.0, -0.12, 0.05]];
+DAY(); shot(...CLOSE, 30, 0, 0); shot(...ROOM, 30, W, 0);
+EVE(); shot(...CLOSE, 30, 0, H); shot(...ROOM, 30, W, H);
 window.__done = true;
 window.__sheet = () => sheet.toDataURL("image/jpeg", 0.92);
 </script></body></html>
