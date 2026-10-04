@@ -84,14 +84,14 @@ function armIK(Wq, L, rootPos) {
   for (const s of ["L", "R"]) { if (!IKT[s]) continue;
     const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
     // fingers: the recorded curl at FINGERK strength, thumbs swung toward the space bar
-    const fk_ = +(process.env.FINGERK || 1);
+    const fk_ = +(process.env["FINGERK_" + s] || process.env.FINGERK || 1);
     if (fk_ !== 1) for (const n of rest.order) if (n.endsWith("." + s) && /finger|metacarpal/.test(n)) L[n] = new THREE.Quaternion().slerp(L[n], fk_);
     const th = `finger1-1.${s}`; L[th] = new THREE.Quaternion().setFromAxisAngle(fdir2(th).cross(new THREE.Vector3(0, -1, 0)).normalize(), 0.35).multiply(L[th]);
     const keep = { up: L[up].clone(), lo: L[lo].clone() };
     let dy = 0;
     for (let it = 0; it < 4; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dy);
       // KEYTOP: no fingertip below the keycaps' top (+3 mm): lift the pin by the deepest tip's depth
-      const top = +(process.env.KEYTOP || -1); if (top < 0) break;
+      const top = +(process.env["KEYTOP_" + s] || process.env.KEYTOP || -1); if (top < 0) break;
       let low = 1e9; for (let f = 1; f <= 5; f++) low = Math.min(low, tipY(L, rootPos, `finger${f}-3.${s}`));
       if (low >= top + 0.002) break; dy += top + 0.003 - low; }
   }
@@ -120,7 +120,8 @@ function solveSide(Wq, L, rootPos, s, dy) {
   L[up] = Wq[par[up]].clone().invert().multiply(R1);
   L[lo] = R1.clone().multiply(u2).invert().multiply(R2);
   // the hand points forward, a little inward, palm down; it keeps part of the recorded hand's turn since frame 0
-  const fwd = new THREE.Vector3(s === "L" ? -0.25 : 0.25, -0.04, 1).normalize();
+  const yaw = IKT["yaw" + s] !== undefined ? IKT["yaw" + s] : (s === "L" ? -0.25 : 0.25);
+  const fwd = new THREE.Vector3(yaw, IKT["pitch" + s] !== undefined ? IKT["pitch" + s] : -0.04, 1).normalize();
   const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
   const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, 0, 0.2);
   const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
