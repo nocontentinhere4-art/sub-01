@@ -78,6 +78,24 @@ MAX_CHAIN = 30                         # pages in a row before he wanders off to
 # YouTube (#17): Restricted Mode for every context, bounded muted watching, scene changes as visual drive
 YOUTUBE_COOKIES = [{"name": "PREF", "value": "f2=8000000", "domain": ".youtube.com", "path": "/", "secure": True}]
 YOUTUBE_HOST = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$", re.I)
+# #89 evening (2026-10-04 19:46-21:10 Tokyo): 10 desk videos in a row, three with the same guest, three coffee-gear
+# "best of 2026" lists. At most CHANNEL_STREAK_MAX videos in a row from one channel or with one guest; after
+# VIDEO_RUN_MAX videos in a row at the desk, VIDEO_BREAK_S of pages / searches; shopping lists go to the back.
+CHANNEL_STREAK_MAX = 2
+VIDEO_RUN_MAX = 4
+VIDEO_BREAK_S = 300.0
+GUEST = re.compile(r"\b(?:w/|with|ft\.?|feat\.?|featuring)\s+([A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+)?)")
+SHOPPING_LIST = re.compile(r"\b(best|top \d+)\b.{0,60}\b(20\d\d|to buy|you need|money can buy|on amazon|deals?)\b|"
+                           r"\bbuying guide\b|\bwhich (one )?should you buy\b", re.I)
+
+
+def video_keys(title, channel):
+    """A video's channel and guests (lower case), for the streak cap."""
+    keys = {str(channel or "").strip().lower()} - {""}
+    keys |= {g.strip().lower() for g in GUEST.findall(str(title or ""))}
+    return keys
+
+
 MEM_CHECK_S = 10.0                     # #89: how often the browser reads its own memory
 SOFT_MEM_MB = float(os.environ.get("BROWSE_SOFT_MEM_MB") or 0.75 * float(os.environ.get("BROWSE_MEM_MB") or 1200))
 MAX_WATCH_S = 600.0                    # a watch never lasts longer than this (real seconds), whatever is asked
@@ -159,6 +177,8 @@ BAD_WORDS = re.compile(
     r"cocaine|heroin|meth|fentanyl|"
     r"casino\w*|sportsbook|gambling)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
+                      r"checking your browser|pardon our interruption|access to this page has been denied|"
+                      r"ddos-guard|please wait while we verify|"
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
                       r"before you continue|consent", re.I)
 # bot checks recognised in the page text or by their challenge frames: he leaves these pages, never solves them
@@ -169,7 +189,10 @@ BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you
                        r"complete the security check|please solve (this|the) (captcha|puzzle)|"
                        r"bots use duckduckgo too|confirm this search was made by a human|"
                        r"sign in to confirm (you|that you)['’ ]?re not a bot|error 153|video player configuration error|"
-                       r"playback on other websites has been disabled|drag the slider|verify to continue", re.I)
+                       r"playback on other websites has been disabled|drag the slider|verify to continue|"
+                       r"please enable js and disable any ad blocker|press (&|and) hold to confirm you are|"
+                       r"access to this page has been denied|pardon our interruption|ray id: [0-9a-f]{8}|"
+                       r"performance & security by cloudflare|request unsuccessful\. incapsula", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -190,6 +213,21 @@ LOGIN_WALL = re.compile(r"(log|sign) ?in to (continue|view|see|read|keep reading
 # never opens them (TikTok and YouTube are reached through their official players instead)
 WALLED_SOCIAL = re.compile(r"(^|\.)(instagram\.com|facebook\.com|fb\.com|x\.com|twitter\.com|threads\.(net|com)|"
                            r"linkedin\.com|pinterest\.[a-z.]+|snapchat\.com)$", re.I)
+# #89 live (2026-10-04 18:49 Tokyo: "90min | PSG - WhatsApp channel"): messaging apps and "open in the app" pages are
+# a login or install wall for him: never a link target
+APP_WALL_HOST = re.compile(r"(^|\.)(whatsapp\.com|wa\.me|t\.me|telegram\.(me|org|dog)|discord\.gg|messenger\.com|m\.me|"
+                           r"line\.me|signal\.me|kakao\.com|viber\.com|apps\.apple\.com|itunes\.apple\.com|"
+                           r"onelink\.me|app\.link|page\.link|appsflyer\.com|adj\.st)$", re.I)
+APP_WALL_PATH = re.compile(r"^https?://([\w-]+\.)*(discord\.com/invite/|discordapp\.com/invite/|play\.google\.com/store/|"
+                           r"facebook\.com/messages/|apps\.microsoft\.com/)", re.I)
+
+
+def app_wall(url):
+    """A messaging app or app-store / open-in-app page: a wall, not something to read."""
+    u = str(url or "")
+    return bool(APP_WALL_HOST.search(urllib.parse.urlsplit(u).hostname or "") or APP_WALL_PATH.match(u))
+
+
 LOGIN_WALL_MAX_CHARS = 3000
 
 # --- the only typing: a site's own search box (#29) ------------------------------------------------------------------
@@ -363,7 +401,11 @@ def is_finance(url, title="", text=""):
     host = (u.hostname or "").lower()
     if FINANCE_HOST.search(host) and (not host.split(".")[-2:-1] == ["google"] or u.path.startswith("/finance")):
         return True
-    return len(FINANCE_WORDS.findall(f"{title} {title} {(text or '')[:1500]}")) >= 3
+    # #89 live: an anime page counted as finance (in-game "tokens", "trading" cards): distinct words, and one of them
+    # in the title unless the text is full of them
+    in_title = {w.lower() for w in FINANCE_WORDS.findall(title or "")}
+    in_text = {w.lower() for w in FINANCE_WORDS.findall((text or "")[:1500])}
+    return bool(in_title) and len(in_title | in_text) >= 3 or len(in_text) >= 5
 
 
 def finance_note(info, url, title="", body=""):
@@ -508,6 +550,17 @@ def text_ok(title, body):
     if BAD_WORDS.search(title or ""):
         return False
     return len(BAD_WORDS.findall((body or "")[:6000])) < 3
+
+
+WALL_COOLDOWN_S = 6 * 3600              # #89: a site that showed him a bot check is left alone this long
+
+
+def challenge_title(title, url):
+    """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
+    or a title that is only the bare host name (an interstitial, not content)."""
+    t = " ".join(str(title or "").split()).lower().rstrip(".")
+    host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
+    return bool(BOT_WALL.search(t)) or bool(t) and t in (host, host.removeprefix("www."), "www." + host)
 
 
 def cross_site_frame(req, host):
@@ -656,7 +709,11 @@ class Browser:
         self.seed_t = {}                                    # seed site -> last opened (rotation, SEED_GAP_S)
         self.yt = YT.Quota(state=s.get("youtube"))          # YouTube Data API units today (only with the key)
         self.heavy = MG.HeavyPages(s.get("heavy"))          # #89: pages / hosts that pushed Chromium over its cap
+        self.walled = {h: float(t) for h, t in (s.get("walled") or {}).items()     # #89: host -> left alone until
+                       if isinstance(h, str) and isinstance(t, (int, float))}
         self.mem_checked = 0.0
+        self.desk_videos = []                               # #89: keys of the last desk videos (streak cap)
+        self.video_run, self.video_break_until = 0, 0.0     # #89: desk videos in a row; a break of pages after it
         self.yt_used = {}                                   # channel handle -> last used (keyless rotation)
         self.hungry = False                                 # #89 teen: food and cooking sites only while hungry
         self.watched = False                                # a video has been on a screen since the browser started
@@ -666,7 +723,8 @@ class Browser:
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
                 "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict()),
-                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict(), "heavy": self.heavy.to_dict()}
+                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict(), "heavy": self.heavy.to_dict(),
+                "walled": {h: t for h, t in self.walled.items() if t > time.time()}}
 
     def host_ok(self, host, current=None):
         """#89 teen variety guard: under HOST_DAY_CAP pages today on this site, not a 4th page in a row on the site he
@@ -674,8 +732,8 @@ class Browser:
         h = (host or "").lower().removeprefix("www.")
         if RECIPE_HOST.search(h) and not getattr(self, "hungry", False):
             return False                                        # no recipe loops outside meals
-        if WALLED_SOCIAL.search(h):
-            return False                                        # a login wall for him: never opened
+        if WALLED_SOCIAL.search(h) or APP_WALL_HOST.search(h):
+            return False                                        # a login / app wall for him: never opened
         if any(h == f.removeprefix("www.") for f in HOST_CAP_FREE):
             return True
         if self.variety.host_count(h) >= HOST_DAY_CAP:
@@ -865,6 +923,7 @@ class Browser:
             mode = "shorts"                                     # the rhythm / his phone app: a short-video feed
         if mode is None and device == "desk" and isinstance(interest, dict) and interest.get("feed") == "video":
             mode = "video"                                      # #89 teen: a good share of desk time is YouTube
+        mode = self._video_break(device, mode)
         async with self.lock:
             try:
                 if await self._over_soft_cap():                 # #89: recycle Chromium before the watchdog kills it
@@ -1007,7 +1066,7 @@ class Browser:
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
                     or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)
                     or (kind not in ("next", "comments") and NV.footer_link(label, href, url))
-                    or not self.fresh(href, label) or not self.host_ok(u.hostname, cur.hostname)):
+                    or not self.fresh(href, label) or not self.host_ok(u.hostname, cur.hostname) or app_wall(href)):
                 continue                                        # #89: no footer links, nothing opened this week
             if (sc.site or self._session(href)) and not VO.link_ok(href, label, aria or ""):
                 continue                                        # #60: logged in, an action or a private page
@@ -1264,6 +1323,7 @@ class Browser:
             cands = await self._tiktok_found(sc, q)
         if not cands:
             return False
+        cands = sorted(cands, key=lambda c: bool(SHOPPING_LIST.search(c.get("title") or "")))   # #89: lists last
         self.limits.count("tiktok" if kind == "tiktok" else "shorts" if short else "youtube", q, origin)
         sc.cards = {c["url"]: c for c in cands}
         sc.queue = [{"url": c["url"], "title": c["title"], "snippet": c["author"], "video": True, "short": short,
@@ -1272,8 +1332,15 @@ class Browser:
             self.feed_note = SV.NOTE_EMBEDS
         return await self._show_card(sc, cands[0], why)
 
+    def _streak(self, c):
+        """#89: the last CHANNEL_STREAK_MAX desk videos all share a channel or guest with this one."""
+        last = self.desk_videos[-CHANNEL_STREAK_MAX:]
+        keys = video_keys(c.get("title"), c.get("author"))
+        return len(last) >= CHANNEL_STREAK_MAX and any(all(k in v for v in last) for k in keys)
+
     def _card_ok(self, c):
-        return (c and self.fresh(c["url"], c["title"]) and not self.yt.is_bad(c["url"]) and video_text_ok(c["title"])
+        return (c and self.fresh(c["url"], c["title"]) and not self.yt.is_bad(c["url"]) and not self._streak(c)
+                and video_text_ok(c["title"])
                 and (not c.get("author") or video_text_ok(c["author"]))
                 and all(video_text_ok(h) for h in c.get("hashtags") or []) and (not c.get("thumb") or url_ok(c["thumb"])))
 
@@ -1834,7 +1901,7 @@ class Browser:
         for href, text, area in links:
             if (len(text) < 12 or not url_ok(href) or LOGIN_LINK.search(text) or BAD_WORDS.search(text)
                     or NV.footer_link(text, href, sc.page.url) or not self.fresh(href, text)
-                    or not self.host_ok(urllib.parse.urlsplit(href).hostname, cur.hostname)):
+                    or not self.host_ok(urllib.parse.urlsplit(href).hostname, cur.hostname) or app_wall(href)):
                 continue
             u = urllib.parse.urlsplit(href)
             if (u.netloc, u.path) == (cur.netloc, cur.path):
@@ -1861,6 +1928,13 @@ class Browser:
             return False
         if self.heavy.heavy_url(url) or self.heavy.cooling(urllib.parse.urlsplit(url).hostname):
             self.last_skip = "too heavy on memory (left alone for a while)"   # #89: it blew Chromium's cap before
+            return False
+        if app_wall(url):
+            self.last_skip = "a messaging or app page (a wall, not a page)"
+            return False
+        host_now = (urllib.parse.urlsplit(url).hostname or "").lower().removeprefix("www.")
+        if self.walled.get(host_now, 0) > time.time():
+            self.last_skip = "bot check on this site (left alone for a while)"   # #89: never solved or waited out
             return False
         if kind != "search" and not self.host_ok(urllib.parse.urlsplit(url).hostname):
             self.last_skip = "enough of this site today"            # #89 teen: per-site daily cap
@@ -1909,7 +1983,7 @@ class Browser:
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
-                  else "bot wall" if BOT_WALL.search(page_title) or await self._walled(page, body)
+                  else "bot wall" if challenge_title(page_title, page.url) or await self._walled(page, body)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
                   or await self._login_walled(page, body) else None)
         if reason and sc.site:                                         # why a logged-in feed shows nothing
@@ -1923,6 +1997,11 @@ class Browser:
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             self.last_skip = reason
+            if reason == "bot wall" and kind != "search":           # #89: the site's bot check: left alone a while
+                h = (urllib.parse.urlsplit(page.url).hostname or "").lower().removeprefix("www.")
+                if h and not YOUTUBE_HOST.search(h) and not SV.is_tiktok(h):   # the players have their own pause
+                    self.walled[h] = time.time() + WALL_COOLDOWN_S
+                    self.walled = dict(sorted(self.walled.items(), key=lambda kv: kv[1])[-200:])
             return await self._leave(sc)
         host = urllib.parse.urlsplit(page.url).hostname or ""
         channel = ""
@@ -2027,6 +2106,8 @@ class Browser:
                 self._clip(sc)
             if i.get("embed") or VIDEO_LINK.search(i["url"]):
                 self.watched = True
+            if sc.name == "desk":
+                self._desk_run(i)
         if not sc.history or sc.history[-1] != i["url"]:
             sc.history = (sc.history + [i["url"]])[-20:]
             sc.chain += 1
@@ -2034,6 +2115,20 @@ class Browser:
             sc.info = dict(i, topic=topic)
             self.log[-1]["topic"] = topic
         return True
+
+    def _video_break(self, device, mode):
+        """#89: during the break after VIDEO_RUN_MAX desk videos the desk browses (a page or a search) instead."""
+        return None if mode == "video" and device == "desk" and time.time() < self.video_break_until else mode
+
+    def _desk_run(self, i):
+        """#89: count the desk's videos in a row (and their channels / guests); a page resets the run."""
+        if i.get("embed") or VIDEO_LINK.search(i["url"]):
+            self.desk_videos = (self.desk_videos + [video_keys(i.get("title"), i.get("channel"))])[-10:]
+            self.video_run += 1
+            if self.video_run >= VIDEO_RUN_MAX:
+                self.video_run, self.video_break_until = 0, time.time() + VIDEO_BREAK_S
+        else:
+            self.video_run = 0
 
     NEW_MIN = 0.6                                              # #89: new topics per scroll session, at least
     SESSION_GAP_S = 300                                        # clips further apart start a new scroll session
