@@ -105,8 +105,57 @@ def probe(a):
 
 CAM_JS = "([p, t, fov]) => { if (fov) { camera.fov = fov; camera.updateProjectionMatrix(); } camera.position.set(...p); controls.target.set(...t); controls.update(); }"
 STEP_ONLY_JS = "([dt, hour]) => { animate_(dt); if (window.windowView && windowView.update) windowView.update(dt, hour); }"
+# one frame: lights and shadows refreshed every `full` frame, then rendered twice and the second kept: on the GPU a
+# material seen for the first time (a sheen fabric, a poster) could come out black or missing for one frame while its
+# program links or its texture uploads (#138: the mattress gone at 8 s, the cushion black at 4 s)
 RENDER_ONLY_JS = """([dt, full]) => { if (full) { scene.traverse(o => { if (o.isLight && o.shadow) o.shadow.needsUpdate = true; }); if (typeof lighting === 'function') lighting(dt); }
-  controls.update(); if (window.post && post.render) post.render(dt); else renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.92); }"""
+  controls.update(); const draw = d => { if (window.post && post.render) post.render(d); else renderer.render(scene, camera); };
+  draw(dt); draw(0); renderer.getContext().finish(); return renderer.domElement.toDataURL('image/jpeg', 0.92); }"""
+# before a shot: every program compiled for this camera and every texture in the scene uploaded
+WARM_JS = """() => { let n = 0; try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e); }
+  const seen = new Set(); scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const m of ms) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); try { renderer.initTexture(t); n++; } catch (e) {} } } });
+  return n; }"""
+
+
+def screen_stub_jpeg(w=1280, h=800):
+    """A neutral desk-monitor picture for the preview page's stubbed screens feed: a plain dark code editor drawn here
+    (bars for lines of code, a side bar, a tab strip), no text, no brand, no real site."""
+    import io
+    from PIL import Image, ImageDraw
+    import random
+    rnd = random.Random(7)
+    im = Image.new("RGB", (w, h), (30, 32, 38))
+    d = ImageDraw.Draw(im)
+    d.rectangle((0, 0, w, 34), fill=(22, 24, 29))
+    for i, x in enumerate(range(12, 520, 170)):
+        d.rounded_rectangle((x, 6, x + 150, 34), 6, fill=(30, 32, 38) if i == 0 else (26, 28, 33))
+        d.rectangle((x + 16, 16, x + 16 + 70 + 30 * (i % 2), 22), fill=(120, 126, 140))
+    d.rectangle((0, 34, 210, h), fill=(25, 27, 32))
+    for y in range(56, h - 30, 26):
+        ind = rnd.choice((0, 0, 14, 28))
+        d.rectangle((20 + ind, y, 20 + ind + rnd.randint(60, 140), y + 7), fill=(92, 98, 112))
+    cols = [(198, 120, 221), (97, 175, 239), (152, 195, 121), (229, 192, 123), (171, 178, 191), (224, 108, 117)]
+    y, indent = 52, 0
+    while y < h - 40:
+        d.rectangle((222, y, 252, y + 9), fill=(70, 75, 88))           # the line number
+        if rnd.random() < 0.12:
+            y += 22; continue
+        indent = max(0, min(4, indent + rnd.choice((-1, 0, 0, 0, 1))))
+        x = 276 + indent * 34
+        for _ in range(rnd.randint(1, 5)):
+            ln = rnd.randint(24, 120)
+            if x + ln > w - 40:
+                break
+            d.rectangle((x, y, x + ln, y + 9), fill=rnd.choice(cols))
+            x += ln + 12
+        y += 22
+    d.rectangle((0, h - 22, w, h), fill=(40, 90, 160))
+    buf = io.BytesIO(); im.save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+SCREEN_STATUS = {"device": "desk", "id": "preview-stub"}     # (the life state's `screen`: the page then loads /api/screen/desk.jpg)
 
 
 def textures_ready(pg):
@@ -117,6 +166,9 @@ def textures_ready(pg):
     except Exception as e:                            # (a page without the window view: carry on)
         print("window textures: not all seen,", str(e)[:80], flush=True)
     pg.wait_for_timeout(1500)
+    # the page's adapt() may have lowered its pixel ratio during the load (slow frames while textures decode), leaving a
+    # smaller canvas: back to the full viewport at ratio 1 (the frozen page's adapt() never runs again)
+    pg.evaluate("() => { try { renderer.setPixelRatio(1); renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); } catch (e) { console.warn('resize', e); } }")
     for _ in range(3):
         pg.evaluate(RENDER_ONLY_JS, [1 / 30, True])
 
@@ -146,6 +198,9 @@ def render(a):
             if a.shots:
                 sh = shots_file(a.shots); hour = None
                 query = sh.get("query_" + a.side, "") or a.query
+                if sh.get("screen_stub"):                    # a lit desk monitor: the screens feed answered with a neutral picture
+                    stub = screen_stub_jpeg()
+                    pg.route("**/api/screen/desk.jpg*", lambda r: r.fulfill(status=200, body=stub, content_type="image/jpeg"))
 
                 def load(h, sc, settle_s=1.0):
                     """The page at hour h (reloaded when it changes), the scene sc applied (a life state or JS), settle_s seconds run."""
@@ -164,7 +219,16 @@ def render(a):
                         textures_ready(pg)
                         hour = h
                     if isinstance(sc, dict):
-                        pg.evaluate("(l) => { act(l.activity, l); }", sc["life"])
+                        life = dict(sc["life"])
+                        if sh.get("screen_stub"):
+                            life["screen"] = SCREEN_STATUS
+                        pg.evaluate("(l) => { act(l.activity, l); }", life)
+                        if sh.get("screen_stub"):            # the picture arrives asynchronously; then act() again switches the monitor on
+                            try:
+                                pg.wait_for_function("() => window.monitor && monitor.id === 'preview-stub' && !!monitor.tex", timeout=30000)
+                                pg.evaluate("(l) => { act(l.activity, l); }", life)
+                            except Exception as e:
+                                print("screen stub: not shown,", str(e)[:80], flush=True)
                     elif sc:
                         pg.evaluate(sc)
                     pg.evaluate("(n) => { for (let i = 0; i < n; i++) animate_(1/30); }", int(round(settle_s * 30)))
@@ -175,6 +239,11 @@ def render(a):
                         load(int(shot.get("hour", hour)), shot.get("scene", ""), float(shot.get("settle", 1.0)))
                     n = int(round(float(shot["seconds"]) * a.fps)); seg0 = k
                     cam = shot.get("cam")
+                    if cam:                                    # every program and texture ready from this shot's camera before the first frame
+                        pg.evaluate(CAM_JS, [cam["pos"], cam["target"], cam.get("fov")])
+                    print(f"  warm-up: {pg.evaluate(WARM_JS)} textures", flush=True)
+                    for _ in range(2):
+                        pg.evaluate(RENDER_ONLY_JS, [0, True])
                     for f in range(n):
                         pg.evaluate(STEP_ONLY_JS, [1 / a.fps, hour])
                         if shot.get("closeup"):
@@ -209,6 +278,9 @@ def render(a):
                 textures_ready(pg)
                 pg.evaluate(SCENE.get(hour, SCENE[14]))
                 pg.evaluate("() => { for (let i = 0; i < 30; i++) animate_(1/30); if (typeof updateCameraGoal === 'function') { updateCameraGoal(); camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); } }")
+                print(f"  warm-up: {pg.evaluate(WARM_JS)} textures", flush=True)
+                for _ in range(2):
+                    pg.evaluate(RENDER_ONLY_JS, [0, True])
                 n = int(round(secs * a.fps)); seg0 = k
                 for f in range(n):
                     data = pg.evaluate(STEP_JS, [1 / a.fps, hour, f % a.shadow_every == 0])
@@ -227,13 +299,60 @@ def render(a):
     print(f"{a.side}: {k} frames in {meta['seconds_render']} s on {meta['renderer']}", flush=True)
 
 
+def dropouts(frames, side, segments, grid=8, jump=0.30, spread=0.10, floor=18.0, reach=3, min_cells=2):
+    """Short dropouts (a material black or missing for a frame or two): each frame is cut into grid x grid cells and a
+    cell is compared with the median of the same cell in the `reach` frames on either side (within the segment). A
+    cell more than `jump` away from that median, while the neighbours' middle half stays within `spread` of it (a still
+    region, not motion) and the median is brighter than `floor`, is a hit; `min_cells` hits flag the frame.
+    Returns {frame index: [cells]}."""
+    from PIL import Image
+    from statistics import median
+    lum = {}
+
+    def cells(k):
+        if k not in lum:
+            im = Image.open(frames / f"{side}_{k:05d}.jpg").convert("L").resize((grid, grid), Image.BOX)
+            lum[k] = list(im.getdata())
+        return lum[k]
+    bad = {}
+    for sg in segments:
+        a, z = sg["first"], sg["first"] + sg["frames"]
+        for k in range(a, z):
+            nb = [j for j in range(k - reach, k + reach + 1) if j != k and a <= j < z]
+            if len(nb) < reach:
+                continue
+            c, ns = cells(k), [cells(j) for j in nb]
+            hit = []
+            for i in range(grid * grid):
+                v = sorted(n[i] for n in ns); m = median(v)
+                q1, q3 = v[len(v) // 4], v[(3 * len(v)) // 4]
+                if m > floor and (q3 - q1) <= spread * m and abs(c[i] - m) > jump * m:
+                    hit.append(i)
+            if len(hit) >= min_cells:
+                bad[k] = hit
+    return bad
+
+
 def encode(a):
-    """old | new side by side with labels (PIL), then ffmpeg H.264; the CRF rises until the file fits."""
+    """old | new side by side with labels (PIL), then ffmpeg H.264; the CRF rises until the file fits. Single-frame
+    dropouts (dropouts()) are logged and the frame replaced by the one before it; the list goes into the JSON."""
     from PIL import Image, ImageDraw, ImageFont
+    import shutil as _sh
     frames = Path(a.frames)
     metas = {s: json.loads((frames / f"{s}_meta.json").read_text()) for s in ("old", "new") if (frames / f"{s}_meta.json").exists()}
     sides = list(metas)
     n = min(sum(sg["frames"] for sg in metas[s]["segments"]) for s in sides)
+    repaired = {}
+    for s in sides:
+        bad = dropouts(frames, s, metas[s]["segments"])
+        for k in sorted(bad):
+            seg = next(sg for sg in metas[s]["segments"] if sg["first"] <= k < sg["first"] + sg["frames"])
+            near = sorted((j for j in range(seg["first"], seg["first"] + seg["frames"]) if j not in bad), key=lambda j: (abs(j - k), j))
+            if not near:
+                continue
+            print(f"dropout: {s} frame {k} ({k / metas[s]['fps']:.2f} s), {len(bad[k])} cells: replaced by frame {near[0]}", flush=True)
+            _sh.copy(frames / f"{s}_{near[0]:05d}.jpg", frames / f"{s}_{k:05d}.jpg")
+        repaired[s] = [{"frame": k, "t": round(k / metas[s]["fps"], 2), "cells": bad[k]} for k in sorted(bad)]
     comp = frames / "composed"; comp.mkdir(exist_ok=True)
     font = ImageFont.truetype(FONT, 20) if Path(FONT).exists() else ImageFont.load_default()
     first = Image.open(frames / f"{sides[0]}_00000.jpg")
@@ -245,7 +364,10 @@ def encode(a):
         S = Image.new("RGB", (w * len(sides), h + bar), (8, 8, 10))
         d = ImageDraw.Draw(S)
         for i, s in enumerate(sides):
-            S.paste(Image.open(frames / f"{s}_{k:05d}.jpg"), (i * w, bar))
+            im = Image.open(frames / f"{s}_{k:05d}.jpg")
+            if im.size != (w, h):                      # (a side whose canvas came out smaller: scaled to the pane)
+                im = im.resize((w, h), Image.LANCZOS)
+            S.paste(im, (i * w, bar))
             d.text((i * w + 8, 5), labels[s], font=font, fill=(255, 220, 120) if s == "new" else (210, 210, 220))
         seg = next((sg for sg in metas[sides[0]]["segments"] if sg["first"] <= k < sg["first"] + sg["frames"]), None)
         if seg:
@@ -260,7 +382,8 @@ def encode(a):
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", str(crf), "-preset", "medium", "-movflags", "+faststart", str(out)], check=True)
         if out.stat().st_size <= a.max_mb * 1e6:
             break
-    info = {"frames": n, "fps": fps, "seconds": n / fps, "bytes": out.stat().st_size, "crf": crf, "sides": {s: metas[s] for s in sides}}
+    info = {"frames": n, "fps": fps, "seconds": n / fps, "bytes": out.stat().st_size, "crf": crf, "sides": {s: metas[s] for s in sides},
+            "dropouts_replaced": repaired}
     out.with_suffix(".json").write_text(json.dumps(info, indent=1))
     print(f"wrote {out}: {n} frames, {n / fps:.1f} s, {out.stat().st_size / 1e6:.1f} MB (crf {crf})", flush=True)
 
