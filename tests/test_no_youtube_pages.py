@@ -179,3 +179,106 @@ def test_banner_closer_never_presses_anything_in_the_youtube_player():
     b = browse.Browser(decide=False)
     asyncio.run(b._dismiss(SimpleNamespace(page=page, site=None), rounds=1))
     assert any("click" in c for c in main.calls)
+
+
+# --- #89 live regression (2026-10-04 11:54 Tokyo): every video showed as a card, "the video is not played" -----------
+
+class RealishPlayer:
+    """The youtube-nocookie page as the real _open / _settle / _open_embed path sees it (no _open stub)."""
+
+    def __init__(self, body):
+        self.body, self.url, self.frames, self.main_frame, self.cards = body, "about:blank", [], None, 0
+
+    async def goto(self, url, **k):
+        self.url = url
+
+    async def wait_for_timeout(self, ms):
+        pass
+
+    async def add_style_tag(self, **k):
+        pass
+
+    async def title(self):
+        return "Grandmaster blunders - YouTube"
+
+    async def screenshot(self, **k):
+        return b"jpeg"
+
+    async def set_content(self, html, **k):
+        self.cards += 1
+        self.url = "about:blank"
+
+    async def evaluate(self, js, *a):
+        import browse
+        if js == browse.VIDEO_JS:
+            return None if "not a bot" in self.body else {"muted": True, "paused": False}
+        if "innerText" in js or "ytp-error" in js:
+            return self.body
+        return None
+
+
+def _realish(body, monkeypatch):
+    import random
+    import browse
+    monkeypatch.setenv("YOUTUBE_API_KEY", "test-not-real")
+    b = browse.Browser(decide=False, rng=random.Random(0))
+    sc = b.screens["desk"]
+    sc.page, sc.ctx, sc.public = RealishPlayer(body), object(), None
+    api = []
+
+    async def _fetch(sc_, url, hops=3, headers=None):
+        api.append(url)
+        return 404, ""                                          # robots.txt: none
+
+    async def _use(sc_, url):
+        pass
+    b._fetch, b._use = _fetch, _use
+    return b, sc, api
+
+
+def _card(vid):
+    import youtube_api as YT
+    return {"url": YT.video_url(vid, False), "title": f"Grandmaster blunders {vid}", "author": "chess channel",
+            "hashtags": [], "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
+            "host": "youtube.com", "site": "YouTube", "how": "YouTube's official embed player"}
+
+
+def test_a_normal_embeddable_video_ends_up_playing_not_as_a_card(monkeypatch):
+    import asyncio
+    b, sc, _ = _realish("Grandmaster blunders\nchess channel\nWatch on YouTube", monkeypatch)
+    c = _card("D_E5UB9hMZg")
+    sc.queue, sc.cards = [], {c["url"]: c}
+    assert asyncio.run(b._show_card(sc, c, "test"))
+    assert sc.page.cards == 0 and "youtube-nocookie.com/embed/D_E5UB9hMZg" in sc.page.url
+    assert sc.info.get("card") is False and sc.info.get("embed") and sc.watch_until > 0
+    assert b.yt.player_up() and b.yt.public()["player"] == "ok"
+
+
+def test_youtube_refusing_the_player_shows_no_card_and_pauses_youtube(monkeypatch):
+    import asyncio
+    import youtube_api as YT
+    b, sc, api = _realish("Sign in to confirm you’re not a bot\nThis helps protect our community. Learn more",
+                          monkeypatch)
+    cards = [_card(v) for v in ("aaaaaaaaaa1", "aaaaaaaaaa2", "aaaaaaaaaa3")]
+    sc.cards = {c["url"]: c for c in cards}
+    sc.queue = [{"url": c["url"]} for c in cards[1:]]
+    assert not asyncio.run(b._show_card(sc, cards[0], "test"))
+    assert sc.page.cards == 0                                   # never "the video is not played" for YouTube
+    assert not b.yt.player_up() and b.yt.public()["player"] == "paused"
+    assert b.yt.public()["last_player_refusal"] == "bot wall"
+    assert b.yt.public()["refused_by_embed_today"] == 0         # not the videos' fault: they are not set aside
+    api.clear()
+    assert not asyncio.run(b._public_videos(sc, "youtube", "chess", "test", short=False))
+    assert api == [] and b.feed_note.startswith("YouTube: its embed player refuses this browser")   # no units spent
+    assert not asyncio.run(b._open(sc, "https://www.youtube.com/watch?v=aaaaaaaaaa9", "link", "page"))
+    assert api == [] and "paused" in b.last_skip
+    # after the pause it tries again; the pause survives a restart (state)
+    q = YT.Quota(b.yt.to_dict(), clock=lambda: b.yt.player["until"] - 1)
+    assert not q.player_up()
+    q.clock = lambda: b.yt.player["until"] + 1
+    assert q.player_up()
+
+
+def test_with_a_key_the_replay_note_does_not_claim_there_is_no_key(monkeypatch):
+    import youtube_api as YT
+    assert "no API key" not in YT.NOTE_REPLAY_KEY and "API" in YT.NOTE_REPLAY_KEY
