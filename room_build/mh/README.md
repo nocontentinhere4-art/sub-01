@@ -15,6 +15,6 @@
 - `glb/clips/desk_mouse_ik.glb`: the mouse held as in the owner's photos: palm resting on the mouse's back, fingers
   down its front (GRIP_R [22,32,18] deg over 25% of the recorded fingers), thumb on its inner side, an index click now and
   then. Mouse: a dome 6.4 x 7.6 x 11.6 cm, centre (-0.36, 0.807, 0.40) for hips at the origin (next to the keyboard's
-  right end); wrist pin (-0.322, 0.828, 0.305), hand pitched up 0.3. Left hand resting on the keyboard.
+  right end); wrist pin (-0.345, 0.828, 0.305), hand pointing straight (yaw 0.12 in, no recorded hand turn), pitched up 0.3; index and middle on the buttons, ring and little finger down the right side, thumb out on the left side. Left hand resting on the keyboard.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.

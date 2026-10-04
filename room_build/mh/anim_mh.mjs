@@ -92,7 +92,11 @@ function armIK(Wq, L, rootPos) {
     if (process.env["GRIP_" + s]) { const g = JSON.parse(process.env["GRIP_" + s]); const t = frames.length / fps;
       for (let f = 2; f <= 5; f++) { const click = f === 2 ? Math.max(0, Math.sin(t * 1.7)) ** 40 * 8 : 0;
         [`finger${f}-1.${s}`, `finger${f}-2.${s}`, `finger${f}-3.${s}`].forEach((n, k) => { L[n] = curlQ(n, g[k] + (f - 2) * 4 * (k === 0) + (k ? click : 0)).multiply(L[n]); }); }
-      L[`finger1-2.${s}`] = curlQ(`finger1-2.${s}`, 15).multiply(L[`finger1-2.${s}`]); }
+      L[`finger1-2.${s}`] = curlQ(`finger1-2.${s}`, 15).multiply(L[`finger1-2.${s}`]);
+      L[`finger1-1.${s}`] = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (s === "R" ? -1 : 1) * +(process.env["THUMBOUT_" + s] || 0)).multiply(L[`finger1-1.${s}`]);
+      // fingers together (the rest pose fans them): ring and little finger toward the index, about the palm normal
+      [[3, 3], [4, 7], [5, 12]].forEach(([f, deg]) => { const n = `finger${f}-1.${s}`;
+        L[n] = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (s === "R" ? 1 : -1) * deg * D2R * +(process.env["ADDUCT_" + s] || 0)).multiply(L[n]); }); }
     const keep = { up: L[up].clone(), lo: L[lo].clone() };
     let dy = 0;
     for (let it = 0; it < 4; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dy);
@@ -133,7 +137,7 @@ function solveSide(Wq, L, rootPos, s, dy) {
   const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
   const Hrec = Wq[wr].clone(); if (!IKT["_h0" + s]) IKT["_h0" + s] = Hrec.clone();
   const Hlive = Hrec.multiply(IKT["_h0" + s].clone().invert());
-  const Hw2 = new THREE.Quaternion().slerp(Hlive, +(process.env.HANDK || 0.5)).multiply(Hw);
+  const Hw2 = new THREE.Quaternion().slerp(Hlive, +(process.env["HANDK_" + s] || process.env.HANDK || 0.5)).multiply(Hw);
   L[wr] = R2.clone().multiply(l2).invert().multiply(Hw2);
 }
 const frames = []; let p0 = null;
