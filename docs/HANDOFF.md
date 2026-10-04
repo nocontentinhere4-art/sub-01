@@ -51,6 +51,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   backpack, jeans, T-shirt) are `room_build/props_soft.py` (two cloth simulations; fixed-camera renders by
   `room_build/shots_soft.py`, before/after in `docs/design/room-soft/`). Thin parts set `ao_small` so the AO bake gives them
   the white corner (thin UV islands get no texel and render black otherwise); thin sheets carry no rim faces for the same reason.
+  The duvet is an explicit closed slab (lower face from a flat cloth sim, upper face 3 cm above, a rolled fold at the head end):
+  `room.html`'s sleep lift (#108) reads vertex heights, so on the mattress its lower face lies at 0.835 m and its upper at 0.865 m
+  (REF), the flap at 0.885-0.92 m, the hanging sides below 0.83 m; keep those bands when changing it.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
@@ -103,6 +106,75 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   `GET /api/costs` and `/api/health` are admin-only (the password cookie, or the `SUB01_ADMIN_TOKEN` header). Tick
   times sit in a 1200-entry ring buffer (`Live.tick_s`).
 
+## A young guy's internet (#89 teen interests, PR `feature/more-search`)
+- Owner (2026-10-04): "why is he looking at recipes… he's a young guy like us: YouTube, TikTok, really interesting
+  things, cars". Live at 08:24 Tokyo: 7 King Arthur Baking pages in a row, "One Piece latest chapter" searched on
+  Science News, short video 0 % (no YouTube key yet).
+- Research with citations: `docs/research/teen_online.md` (Pew 2024, Ofcom 2025, Common Sense 2021, PARTY USA 2024,
+  admeira 2024, YPulse 2025, MakerSights).
+- `interests.PROFILE` re-seeded: games, cars, anime, music, creators, football, tech, sneakers, memes, movies, then
+  Tokyo, science, a little Wikipedia. Food weighs 0 unless he is hungry or ordering (`pick(hungry=True)`; the live
+  server's `live_interest` sets `hungry` from life's hunger ≥ 0.5 or a food activity). No crypto or markets topics.
+- Searches land on sites that fit (`search_sources.TOPICS`): MyAnimeList, Carscoops, PC Gamer, TMDB, NME, 9to5Mac, HN;
+  their search paths are allowed by robots.txt (checked 2026-10-04); results read by `parse_links` /
+  `parse_headlines`. No unrelated fallback (`TAIL` empty): a query with no fitting site goes to its videos or to a
+  front page of its topic (`SEED_TOPICS`). The cause of "One Piece → Science News": "latest" matched the old "news"
+  topic, whose source was Science News. Recipes only while hungry (`MEAL_ONLY`, `RECIPE_HOST`).
+- YouTube discovery only through the official Data API (`YOUTUBE_API_KEY`; YouTube's Terms forbid automated access
+  to its pages, so no channel page or RSS is ever read): the latest uploads of well-known channels per topic
+  (`youtube_api.CHANNELS`; `channels.list` forHandle → uploads playlist (kept), `playlistItems.list`, `videos.list`
+  for durations, Shorts ≤ 180 s: 3 units, each list cached 3 h), else `search.list` (100 units). Without a key or
+  quota: no discovery, the note "no API key or no quota left…", and a replay of the videos already found today
+  (`Quota.today`). `/api/screens` → `youtube` (key set, units used today, errors) is reported even while the
+  browser idles (`Live.youtube_view`, from the saved state and the server's environment); the raw quota now rides
+  `/state` as `youtube_state`, is saved in `browsing.json` and restored by `/init`, so a browser restart keeps
+  today's units (before, the public view overwrote it and every restart reset the count).
+- Embed guard (live bug 2026-10-04 10:46 Tokyo: Formula1's "FP3 Highlights" embed said "Video unavailable … blocked it
+  from display on this website", a black screen). `videos.list` (part contentDetails,snippet,status; also checked for
+  search results, 1 unit) keeps only `youtube_api.playable()` videos: embeddable, public, not age-restricted, not
+  region-blocked for JP. At run time `Browser._embed_error` reads the player 3 s after it opens and at each watch
+  screenshot (`EMBED_ERROR`: "video unavailable", "blocked it from display", …, or no video element): such a video is
+  left before it is ever shown, the next queued video plays instead, the id is refused for the day
+  (`Quota.refused`), and a channel with `BAD_CHANNEL` (2) refusals in a day is set aside (`channels_set_aside` in
+  /api/screens). Formula1 is out of `CHANNELS` (its videos are blocked from embedding on other sites).
+- No YouTube pages, ever (live bug 2026-10-04 10:58: a link chain loaded youtube.com/watch with ads, "Skip" and
+  "Something went wrong"; YouTube's Terms forbid automated access to its pages). `Browser._open` turns any
+  youtube.com/watch, /shorts, /live, youtu.be link (`youtube_api.page_video`) into "play this video":
+  `_play_video_id` checks it with videos.list (1 unit, `playable()`) and opens the youtube-nocookie embed; without a
+  key it is not played. Any other youtube.com page is refused, and `Guard.route` aborts a top-level navigation to one
+  (a redirect or a click on "Watch on YouTube"). An ad or YouTube's error in the embed (`EMBED_ERROR`, including
+  "advertisement playing" and "something went wrong") moves on to the next video; we never press "Skip". An ad does
+  not count against the channel. About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+- When YouTube refuses the player itself (live 2026-10-04 11:54: every video became a card, "the video is not
+  played"): the embed page caught by `_settle` as a bot wall ("Sign in to confirm you're not a bot", error 153), a
+  sign-in wall or not loading is a player-level refusal (`PLAYER_REFUSALS`), not the video's fault.
+  `PLAYER_FAILS` (2) in a row pause YouTube for `PLAYER_PAUSE_S` (30 min, kept in the state). During the pause
+  there are no YouTube videos, no API units are spent and the panel says why; he does other things. A YouTube
+  video is never shown as a card. `/api/screens` youtube has `player`, `player_paused_until` and
+  `last_player_refusal`. With a key set, the replay note says "API budget or hourly limit", not "no API key".
+- Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
+  players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
+  robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,
+  StackExchange and others refuse robots).
+- TikTok: no compliant source of current popular video ids was found (its tag/discover pages render no video on the
+  server, its /search and /embed/v2 are robots-disallowed, DuckDuckGo challenges datacenter IPs); the logged-in feed's
+  diagnosis (#109) will tell whether the account's feed works from Railway.
+- `analysis/teen_day.py` (a simulated waking day on the real choice path, network stubbed as answered live; not a
+  browser), 3 days: before (main) short video + YouTube 0 %, Science News 70 % of pages, recipes outside meals 7.4 %,
+  longest run on one site 18; after, no key: 54 % (shorts 36 %, YouTube 19 %), Wikipedia 0 %, recipes outside meals
+  0 %, longest run 3; with the key: 61 %.
+- With the key (added live 2026-10-04 ~23:57 UTC; main still showed no YouTube, all searches on HN / Science News):
+  `YT_SEARCH_SHARE` (45 %) of searches go to YouTube's API first, a query with no fitting site becomes a YouTube
+  search (never a news site's search page), and desk video slots pick from his profile. `teen_day.py --youtube-key`:
+  short video + YouTube 75 % of the simulated day (no key: 56 %). Each API search logs "browse: YouTube API search
+  (…), n results, units today" and counts in `/api/screens` → `youtube.searches` / `units_used` / `errors`. The
+  9,000-unit cap is ~90 searches a day; after it, the channels' pages take over.
+- Live 09:00–09:10 Tokyo: an Instagram login modal on his monitor, Serious Eats again. Social sites whose public pages
+  are login walls for a logged-out visitor (`WALLED_SOCIAL`: Instagram, Facebook, X/Twitter, Threads, LinkedIn,
+  Pinterest, Snapchat) are never offered or opened, and `LOGIN_WALL` also recognises their "see photos, videos and
+  more… sign up / log in" modal. The first thing he does at the desk after the browser starts is a video
+  (`Browser.watched`).
+
 ## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
 - Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia
   loop, 27 Chromium restarts. Root causes:
@@ -134,7 +206,16 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     `/?s=` results pages; a robots.txt refusal sets a source aside for the day; the tail of `route()` is only the
     any-query sources (`TAIL`: hn, news); `Limits` state v2 drops the pre-fix blocks.
   - Chromium: each restart records why (`/api/health` → `chromium.restart_log`: exit code / signal ("out of
-    memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory.
+    memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory, and for a memory restart the hosts on screen.
+  - Chromium memory (live 2026-10-04 04:02-04:53 UTC: 12 restarts "over 1200 MB", some 7-21 s apart, loop lag p95
+    3.5 s). `Guard.route` loads nothing from ad / tracking / outstream-video networks (`memory_guard.AD_HOST`) and no
+    cross-site iframe (`cross_site_frame`). The browser reads its own memory every `MEM_CHECK_S` (in a thread) and at
+    `SOFT_MEM_MB` (0.75 x `BROWSE_MEM_MB`) records the pages on screen as heavy and closes Chromium itself (the next
+    step starts afresh). `memory_guard.HeavyPages`: a page that blew the cap is never opened again; a host that did
+    it twice within an hour is left alone for 30 min. The watchdog (`LocalBrowser`) records the pages on screen at a
+    memory restart, waits 30 s, 60 s... (`backoff_s`) before restarting again within 10 min, hands the heavy pages
+    to the new process with /init (`init_state`), reads /proc in a thread, and runs the service under
+    `nice -n BROWSE_NICE` (10) so the brain's ticks come first. `/api/health` chromium has `heavy` {pages, cooling}.
   - Viewers: YouTube shorts also get the official embed in the screens panel and on /life's phone.
 - `analysis/novelty_replay.py --youtube-key` (stubbed network as Railway answered on 2026-10-03; not a browser):
   shorts 34/h on the phone, mean burst 0.18 vs news 0.09 / pages ~0.03, 6,000 API units in 3 h (the 9,000 cap is

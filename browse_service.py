@@ -25,6 +25,7 @@ import asyncio
 import json
 import os
 import secrets
+import shutil
 import signal
 import sys
 import time
@@ -37,6 +38,9 @@ HERE = Path(__file__).parent
 TOKEN_HEADER = "X-Browse-Token"
 MEM_MB = float(os.environ.get("BROWSE_MEM_MB") or 1200)
 STEP_LIMIT_S, ACT_LIMIT_S = 70.0, 110.0                         # a hung page (endless script) is abandoned
+BACKOFF_WINDOW_S = 600                                          # #89: memory restarts this close together ...
+BACKOFF_S, BACKOFF_MAX_S = 30.0, 120.0                          # ... wait 30 s, 60 s, ... before the next start
+NICE = int(os.environ.get("BROWSE_NICE") or 10)                 # the browser runs at a lower CPU priority
 HUNG_AFTER = 3                                                  # consecutive failed calls: restart the child
 ENV_KEEP = ("PATH", "HOME", "LANG", "TZ", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH", "FONTCONFIG_PATH", "PYTHONPATH",
             "BROWSE_PROXY", "BROWSE_IGNORE_TLS", "BROWSE_CHROMIUM", "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS",
@@ -97,6 +101,8 @@ def make_app(browser, token=None):
             if st.get("youtube") and hasattr(browser, "yt"):      # the Data API units spent today
                 from youtube_api import Quota
                 browser.yt = Quota(state=st["youtube"])
+        if st.get("heavy") and hasattr(browser, "heavy"):         # #89: pages that blew the memory cap, always merged
+            browser.heavy.merge(st["heavy"])
         return web.json_response({"ok": True, "applied": fresh})
 
     async def limited(coro, limit, dev):
@@ -146,7 +152,12 @@ def make_app(browser, token=None):
                                   "accounts": browser.accounts() if hasattr(browser, "accounts") else None,
                                   "feed_note": getattr(browser, "feed_note", None),
                                   "youtube": browser.yt.public() if hasattr(browser, "yt") else None,
-                                  "diag": dict(getattr(browser, "diag", {}))})
+                                  # the raw quota state, saved by the live server and restored by /init (the
+                                  # public view above takes the "youtube" key of to_dict())
+                                  "youtube_state": browser.yt.to_dict() if hasattr(browser, "yt") else None,
+                                  "diag": dict(getattr(browser, "diag", {})),
+                                  "heavy_public": browser.heavy.public() if hasattr(browser, "heavy") else None,
+                                  "recycles": getattr(browser, "recycles", 0)})
 
     async def diag_shot(request):
         """The masked screenshot of a logged-in page that showed no video (the live server serves it admin-only)."""
@@ -156,7 +167,8 @@ def make_app(browser, token=None):
         return web.Response(body=shot, content_type="image/jpeg")
 
     async def health(request):
-        return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(tree_rss_mb(os.getpid()), 1)})
+        mb = await asyncio.to_thread(tree_rss_mb, os.getpid())     # /proc reads off the event loop (#89)
+        return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(mb, 1)})
 
     for path, fn in (("/init", init), ("/step", step), ("/act", act), ("/close", close)):
         app.router.add_post(path, fn)
@@ -336,6 +348,9 @@ class LocalBrowser:
         self.proc = None
         self.restarts = 0
         self.restart_log = []                                   # [{t, why, rss_mb}]: why each restart happened (#89)
+        from memory_guard import HeavyPages
+        self.heavy = HeavyPages()                               # the pages on screen at each memory restart (#89)
+        self.mem_restarts = []                                  # times of the memory restarts: the backoff
         self.client = BrowserClient(f"http://127.0.0.1:{self.port}", self.token)
 
     async def spawn(self):
@@ -348,8 +363,9 @@ class LocalBrowser:
         env = {k: v for k, v in os.environ.items() if k in ENV_KEEP}
         env["BROWSE_SERVICE_TOKEN"] = self.token
         env["BROWSE_PARENT_PID"] = str(os.getpid())             # it exits by itself if the brain's process dies
+        nice = ["nice", "-n", str(NICE)] if NICE and shutil.which("nice") else []   # the brain's ticks come first
         self.proc = await asyncio.create_subprocess_exec(
-            self.python, str(HERE / "browse_service.py"), "--host", "127.0.0.1", "--port", str(self.port),
+            *nice, self.python, str(HERE / "browse_service.py"), "--host", "127.0.0.1", "--port", str(self.port),
             env=env, cwd=str(HERE), start_new_session=True)
         for _ in range(60):                                     # up to ~15 s to come up
             await asyncio.sleep(0.25)
@@ -367,7 +383,7 @@ class LocalBrowser:
 
     async def kill(self):
         if self.proc is not None and self.proc.returncode is None:
-            tree = descendants(self.proc.pid)                   # Chromium may run in its own process group
+            tree = await asyncio.to_thread(descendants, self.proc.pid)   # Chromium may run in its own process group
             try:
                 os.killpg(self.proc.pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
@@ -381,9 +397,14 @@ class LocalBrowser:
 
     async def ensure(self):
         """-> "ok" (running), "started" / "restarted" (a new process: re-send the saved state) or "down"."""
-        why = None
-        if self.alive() and tree_rss_mb(self.proc.pid) > self.mem_mb:
+        why, rss = None, None
+        if self.alive():                                        # /proc reads in a thread: the ticks go on (#89)
+            rss = round(await asyncio.to_thread(tree_rss_mb, self.proc.pid), 1)
+        if self.alive() and rss is not None and rss > self.mem_mb:
             why = f"over {self.mem_mb:.0f} MB"
+            # the pages on screen made it: never opened again, and their host left alone after HEAVY_STRIKES
+            self.heavy.strike([(st.get("url"), st.get("host")) for st in self.client.screens.values() if st])
+            self.mem_restarts = [t for t in self.mem_restarts if time.time() - t < BACKOFF_WINDOW_S] + [time.time()]
         elif self.alive() and self.client.failures >= HUNG_AFTER:
             why = f"{self.client.failures} calls failed (hung?)"
         elif self.alive():
@@ -394,18 +415,37 @@ class LocalBrowser:
                    if code is not None and code < 0 else f"exited with code {code}")
         restarting = self.proc is not None
         if restarting:
-            rss = round(tree_rss_mb(self.proc.pid), 1) if self.alive() else None
-            self.restart_log = (self.restart_log + [{"t": round(time.time()), "why": why, "rss_mb": rss}])[-20:]
+            entry = {"t": round(time.time()), "why": why, "rss_mb": rss if self.alive() else None}
+            if why and why.startswith("over"):
+                entry["pages"] = [st.get("host") for st in self.client.screens.values() if st]
+            self.restart_log = (self.restart_log + [entry])[-20:]
         if why:
             print(f"browse service {why}: restarting", flush=True)
         await self.kill()
         if restarting:
             self.restarts += 1
             self.client.reset()                                 # the screen says "browser restarting" meanwhile
+            wait = self.backoff_s()
+            if wait:
+                print(f"browse service: {len(self.mem_restarts)} memory restarts in {BACKOFF_WINDOW_S // 60} min, "
+                      f"waiting {wait:.0f} s", flush=True)
+                await asyncio.sleep(wait)                       # asleep, not blocking: the brain's loop goes on
         ok = await self.spawn()
         print("browse service " + ("restarted" if restarting and ok else "started" if ok else "did not start"),
               flush=True)
         return ("restarted" if restarting else "started") if ok else "down"
+
+    def backoff_s(self):
+        """#89: a second memory restart within BACKOFF_WINDOW_S waits before the new process starts (30 s, 60 s, ...)."""
+        n = len([t for t in self.mem_restarts if time.time() - t < BACKOFF_WINDOW_S])
+        return min(BACKOFF_MAX_S, BACKOFF_S * (n - 1)) if n >= 2 else 0.0
+
+    def init_state(self, state):
+        """The state for /init with the pages that blew the memory cap merged in (they survive the restart)."""
+        from memory_guard import HeavyPages
+        st = dict(state or {})
+        st["heavy"] = HeavyPages(st.get("heavy")).merge(self.heavy).to_dict()
+        return st
 
     async def aclose(self):
         await self.client.aclose()

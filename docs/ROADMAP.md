@@ -1,6 +1,6 @@
 # SUB-01 — roadmap (coordinator)
 
-Last pass: **2026-10-03 15:10 UTC** (pass 38). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
+Last pass: **2026-10-04 05:30 UTC** (pass 40). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
 **Pass 25:** merged #53 (#17, server side + /brain): YouTube muted, locked muted and in Restricted Mode, with a
@@ -305,6 +305,51 @@ findings "NOT verified", and its reviews are partial on large diffs.
 | Diary: 18 unattended frames/night | ~$0.05 | same |
 | Spiking memory test (RunPod, 1 h/day) | $0 (not on) | $0.27–0.85/day, 8 GPU-h/week cap |
 | Eyes + mind (#20, #45; Haiku 4.5 via OpenRouter, one ledger) | ≤ $2.00/day (eyes $1.00 + mind $1.00) | same hard cap |
+
+**Owner decision (2026-10-04 01:20 UTC): visual approval.** Nothing that changes how he moves or looks (animations,
+the character, the camera, lighting) merges without the owner's OK on a preview video. Each such PR ships an MP4
+(30 fps, rendered frame by frame by stepping the page clock, old vs new, ≤ 25 MB) under its docs/ preview folder; the
+coordinator sends it to the owner and merges on his OK. AI4Animation was asked about and declined: research/education
+only, its mocap is CC BY-NC 4.0.
+
+**Pass 40 (2026-10-04 05:30 UTC).**
+- **Merged since pass 39:**
+  - Tests and fixes:
+    - #122: the sleep test's clock starts after the engine is built (the flake).
+    - #123: the window pane never emits NaN texels.
+  - Bed:
+    - #124: a generated duvet over him, head on the pillow, slides off.
+    - #126: follow-up (G4's mesh, foot-end curtain, the motion layer off the bed).
+  - Motion: #114, ARDY clips on the original rig plus a procedural motion layer (G3).
+  - His internet:
+    - #125: teen-interest profile.
+    - #127: /api/screens reports the YouTube API state.
+    - #128, #130, #132: YouTube's own pages are never opened, refused embeds never stay on screen, and YouTube
+      pauses 30 min on a bot wall.
+  - GPU previews:
+    - #133: `tools/gpu_preview.py` renders old-vs-new MP4s on one RunPod A5000 pod per run. Outputs go to the
+      unmerged `previews` branch. About $0.065 and 14 min per run.
+    - #136: follow-up.
+- **YouTube bot wall:**
+  - YouTube refuses its embed player to the Railway IP, so the server shows no videos. #132 pauses it and says why.
+  - #135, the fix: playback moves to the viewer's own browser. It waits for the owner's OK.
+- **Chromium memory (05:26 live check):**
+  - 10 restarts for "over 1200 MB" between 04:02 and 04:54, some 7–21 s apart. Loop lag p95 3.6 s.
+  - Assigned to the #89 worker as a technical PR: host cooldown, no re-open after a restart, relaunch off the event
+    loop.
+- **Waiting for the owner's visual OK** (previews on the `previews` branch or in the PR):
+  - #103 (G6 lighting and camera; final f342ce7, v3 render queued);
+  - #117 (G2 character refinement: eyes, brows, ears, socks, slides);
+  - #131 (Tripo props: mug, headphones, sneakers, ramen);
+  - #134 (living idles);
+  - #135 (client-side YouTube/TikTok player);
+  - #137 (G3 clearance fix);
+  - #138 (18 more Tripo props).
+- **Tripo:** API credits used about 900/920 for props 1+2. Single guarded tasks only, after one accidental batch re-run.
+- **Follow-ups queued:**
+  - the drink-interlude hand dip into the desk (main);
+  - the typing → eating blend through the desk edge (main; #63 worker);
+  - the held-bowl offset 0.065 → 0.069 on #131 (G3).
 
 **Pass 39 (2026-10-03 22:00 UTC).**
 - **Merged since pass 38:**

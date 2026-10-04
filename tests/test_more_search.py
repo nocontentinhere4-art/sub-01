@@ -102,7 +102,8 @@ def test_parsers_survive_junk_and_bot_checks():
 
 def test_every_source_is_free_safe_and_reachable_by_the_guard():
     assert set(S.SOURCES) == {"bing", "ddg", "wikipedia", "commons", "arxiv", "hn", "openlibrary", "youtube",
-                              "recipes", "news", "shorts", "tiktok"}
+                              "recipes", "news", "shorts", "tiktok",
+                              "carscoops", "pcgamer", "mal", "tmdb", "nme", "9to5mac"}     # #89 teen interests
     for name, src in S.SOURCES.items():
         urls = [src["site"]] if src.get("site") else [src["url"]("sleep spindles")] + (
             [src["api"]("sleep spindles")] if src.get("api") else [])
@@ -118,8 +119,10 @@ def test_every_source_is_free_safe_and_reachable_by_the_guard():
 # --- 2. routing by topic, rotation ----------------------------------------------------------------------------------
 @pytest.mark.parametrize("q, first", [
     ("sleep spindles", "arxiv"), ("neural network memory", "arxiv"), ("haruki murakami novels", "openlibrary"),
-    ("Inokashira Park photos", "commons"), ("python compiler", "hn"), ("lo-fi music", "ddg"),
-    ("history of Kichijoji", "wikipedia"), ("melon pan recipe", "recipes"), ("latest news scientists", "news"),
+    ("Inokashira Park photos", "commons"), ("python compiler", "hn"), ("lo-fi music", "nme"),
+    ("history of Kichijoji", "wikipedia"), ("melon pan recipe", "ddg"), ("latest news scientists", "arxiv"),
+    ("One Piece latest chapter", "mal"), ("Toyota GR Supra", "carscoops"), ("Elden Ring", "pcgamer"),
+    ("iPhone 17", "9to5mac"), ("Netflix series", "tmdb"),
 ])
 def test_routing_by_topic(q, first):
     order = S.route(q, S.Limits(clock=Clock()), random.Random(0))

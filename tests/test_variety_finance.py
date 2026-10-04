@@ -48,16 +48,19 @@ class Clock:
 
 # --- A. interest profile, rhythm, variety ----------------------------------------------------------------------------
 def test_profile_covers_a_young_guys_interests():
-    for want in ("music", "anime", "games", "sports", "food", "fashion", "tech", "memes", "crypto", "markets",
-                 "tokyo", "science", "wikipedia"):
+    # #89 teen re-seed (docs/research/teen_online.md); no money or crypto topics; food only while hungry
+    for want in ("games", "music", "creators", "football", "cars", "anime", "tech", "sneakers", "memes", "movies",
+                 "tokyo", "science", "food", "wikipedia"):
         assert want in I.PROFILE
-    assert I.PROFILE["wikipedia"][0] < min(w for k, (w, _, _) in I.PROFILE.items() if k != "wikipedia")
+    assert not {"crypto", "markets"} & set(I.PROFILE)
+    assert I.PROFILE["wikipedia"][0] < min(w for k, (w, _, _) in I.PROFILE.items() if k not in ("wikipedia", "food"))
+    assert I.weights(hour=12.5)["food"] == 0 and I.weights(hour=12.5, hungry=True)["food"] > 1
     assert all(E.query_ok(q) for _, qs, _ in I.PROFILE.values() for q in qs)        # every seed query is typeable
 
 
 @pytest.mark.parametrize("hour, name, top, feed", [
-    (8, "morning", ("tokyo", "markets"), None), (12.5, "lunch", ("food", "memes"), "shorts"),
-    (15, "afternoon", ("tech", "science", "fashion"), None), (20, "evening", ("games",), None),
+    (8, "morning", ("football", "tech", "music"), None), (12.5, "lunch", ("memes", "creators"), "shorts"),
+    (15, "afternoon", ("games", "cars"), None), (20, "evening", ("games",), None),
     (1, "late night", ("memes", "music"), "shorts"),
 ])
 def test_rhythm_tilts_by_tokyo_hour(hour, name, top, feed):
@@ -84,9 +87,9 @@ def test_saturation_and_streak_push_him_to_something_else():
     clock = Clock()
     v = I.Variety(clock=clock)
     for _ in range(4):
-        v.note("Bitcoin price and solana memecoins", "", "www.coingecko.com")
-    assert v.last == "crypto" and v.streak == 4 and I.streak_pull(v) == 0.55
-    assert I.weights(v, hour=15)["crypto"] < 0.25 * I.weights(None, hour=15)["crypto"]
+        v.note("Toyota Supra and Nissan GT-R drift", "", "www.carscoops.com")
+    assert v.last == "cars" and v.streak == 4 and v.host_streak == 4 and I.streak_pull(v) == 0.55
+    assert I.weights(v, hour=15)["cars"] < 0.25 * I.weights(None, hour=15)["cars"]
     page = {"chain": 3, "max_chain": 30, "streak_pull": I.streak_pull(v)}
     assert E.leave_pull(page) == 0.55                       # the leave option pulls harder (brain_vote's LEAVE_CHAIN)
     v.note("Ramen ranking Tokyo", "", "example.org")

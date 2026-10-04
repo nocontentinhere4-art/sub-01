@@ -330,6 +330,8 @@ def test_youtube_api_shorts_play_in_the_official_embed_and_the_key_stays_in_a_he
         calls.append((url, headers))
         if url.startswith(YT.SEARCH):
             return 200, api
+        if "/youtube/v3/videos?" in url:                    # the playability check (1 unit)
+            return 200, (DATA / "youtube_api_videos.json").read_text()
         return (404, "") if url.endswith("/robots.txt") else (404, "")
     b._fetch = _fetch
     opened = _embed_opens(b)
@@ -340,9 +342,10 @@ def test_youtube_api_shorts_play_in_the_official_embed_and_the_key_stays_in_a_he
     assert opened[0][0].startswith("https://www.youtube-nocookie.com/embed/") and "mute=1" in opened[0][0]
     assert sc.info["url"].startswith("https://www.youtube.com/shorts/") and sc.watch_until > 0
     assert SC.screen_kind(dict(sc.info, device="phone")) == "shorts" and len(sc.queue) >= 1
-    assert b.yt.public()["units_used"] == YT.SEARCH_UNITS and "test-key" not in json.dumps(b.yt.public())
+    units = YT.SEARCH_UNITS + YT.LIST_UNITS                     # the search + the playability check
+    assert b.yt.public()["units_used"] == units and "test-key" not in json.dumps(b.yt.public())
     run(b._public_videos(sc, "shorts", "ramen", "again"))            # cached: the query is not searched again
-    assert b.yt.public()["units_used"] == YT.SEARCH_UNITS
+    assert b.yt.public()["units_used"] == units
 
 
 def test_choosing_a_card_shows_it_and_never_opens_tiktok():

@@ -58,6 +58,7 @@ import time
 import urllib.parse
 
 import interests as I
+import memory_guard as MG
 import novelty as NV
 import youtube_api as YT
 import search_sources as SS
@@ -77,6 +78,8 @@ MAX_CHAIN = 30                         # pages in a row before he wanders off to
 # YouTube (#17): Restricted Mode for every context, bounded muted watching, scene changes as visual drive
 YOUTUBE_COOKIES = [{"name": "PREF", "value": "f2=8000000", "domain": ".youtube.com", "path": "/", "secure": True}]
 YOUTUBE_HOST = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$", re.I)
+MEM_CHECK_S = 10.0                     # #89: how often the browser reads its own memory
+SOFT_MEM_MB = float(os.environ.get("BROWSE_SOFT_MEM_MB") or 0.75 * float(os.environ.get("BROWSE_MEM_MB") or 1200))
 MAX_WATCH_S = 600.0                    # a watch never lasts longer than this (real seconds), whatever is asked
 MIN_WATCH_S = 10.0                     # ...nor shorter (the accelerated demo clock: a few screenshots at least)
 VIDEO_SHOT_S = 4.0                     # a screenshot (and a scene-change measure) every few seconds while watching
@@ -181,7 +184,12 @@ HOST_FALSE_HITS = re.compile(r"sussex|essex|middlesex|wessex", re.I)
 # a sign-in wall: the page is mostly a login / sign-up prompt (he leaves; he never signs in to get past it)
 LOGIN_WALL = re.compile(r"(log|sign) ?in to (continue|view|see|read|keep reading|tiktok|watch)|sign up to (continue|read|see|view)|"
                         r"create (a free |an )?account to (continue|read|view)|you must be (logged|signed) in|"
-                        r"please (log|sign) in", re.I)
+                        r"please (log|sign) in|see (photos|posts), videos and more|log in or sign up|"
+                        r"sign up to see|join [\w ]{1,30} to see|new to (x|instagram|facebook)\?", re.I)
+# #89 live (2026-10-04): social sites whose public pages are a login / sign-up modal for a logged-out visitor; he
+# never opens them (TikTok and YouTube are reached through their official players instead)
+WALLED_SOCIAL = re.compile(r"(^|\.)(instagram\.com|facebook\.com|fb\.com|x\.com|twitter\.com|threads\.(net|com)|"
+                           r"linkedin\.com|pinterest\.[a-z.]+|snapchat\.com)$", re.I)
 LOGIN_WALL_MAX_CHARS = 3000
 
 # --- the only typing: a site's own search box (#29) ------------------------------------------------------------------
@@ -418,41 +426,49 @@ UNBLOCK_JS = """() => {
   }
   for (const el of [document.documentElement, document.body]) if (el) { el.style.setProperty('overflow', 'auto', 'important'); }
 }"""
+# #89 live (2026-10-04): an F1 video's embed said "Video unavailable … blocked it from display on this website". The
+# player's own error text, checked a few seconds after it opens and during the watch: such a video is never shown.
+EMBED_ERROR = re.compile(r"video unavailable|this video is unavailable|video currently unavailable|blocked it from "
+                         r"display|playback on other websites has been disabled|sign in to confirm|"
+                         r"an error occurred|this video is private|video has been removed|something went wrong|"
+                         r"advertisement playing", re.I)      # an ad is never skipped by us: the next video instead
+EMBED_CHECK_MS = 3000
+PLAYER_REFUSALS = ("bot wall", "sign-in wall", "did not load")   # the player page itself refused, whatever the video
+EMBED_ERROR_JS = """() => { const e = document.querySelector('.ytp-error, .ytp-error-content-wrap');
+  const ad = document.querySelector('.ad-showing, .ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text, .ytp-ad-skip-button');
+  const t = (document.body && document.body.innerText || '').slice(0, 2000);
+  return (ad ? 'advertisement playing ' : '') +
+         (e && getComputedStyle(e).display !== 'none' ? (e.innerText || 'player error') + ' ' : '') + t; }"""
 EMBED_REFERER = os.environ.get("SUB01_SITE_URL") or "https://sub01-production.up.railway.app/"   # embeds want a page
-SEEDS = [                              # where he starts when nothing else pulls him (no search engine needed)
-    # encyclopaedia, forums (read-only), Q&A
-    "https://en.wikipedia.org/wiki/Special:Random", "https://news.ycombinator.com/", "https://news.ycombinator.com/ask",
-    "https://old.reddit.com/r/askscience/", "https://old.reddit.com/r/AskHistorians/", "https://old.reddit.com/r/Cooking/",
-    "https://old.reddit.com/r/japanpics/", "https://old.reddit.com/r/space/", "https://old.reddit.com/r/Breadit/",
-    "https://old.reddit.com/r/todayilearned/", "https://cooking.stackexchange.com/questions?tab=Votes",
-    "https://japanese.stackexchange.com/", "https://astronomy.stackexchange.com/", "https://lobste.rs/",
-    "https://www.metafilter.com/",
-    # news and magazines
-    "https://www.bbc.com/news", "https://www3.nhk.or.jp/nhkworld/", "https://www.japantimes.co.jp/",
-    "https://www.theguardian.com/international", "https://apnews.com/", "https://www.npr.org/",
-    "https://arstechnica.com/", "https://www.theverge.com/", "https://www.quantamagazine.org/",
-    "https://www.atlasobscura.com/", "https://www.openculture.com/", "https://www.nationalgeographic.com/",
-    "https://www.smithsonianmag.com/", "https://www.newscientist.com/", "https://www.sciencenews.org/",
-    # science and space
-    "https://apod.nasa.gov/apod/astropix.html", "https://www.nasa.gov/", "https://earthobservatory.nasa.gov/",
-    "https://www.esa.int/", "https://phys.org/",
-    # museums and archives
-    "https://www.metmuseum.org/art/collection", "https://www.archive.org/", "https://artsandculture.google.com/",
-    "https://www.britishmuseum.org/collection", "https://www.rijksmuseum.nl/en/rijksstudio",
-    "https://www.tnm.jp/?lang=en",
-    # maps and places
-    "https://www.openstreetmap.org/#map=15/35.7030/139.5795", "https://www.timeout.com/tokyo",
-    "https://www.japan-guide.com/", "https://www.spoon-tamago.com/",
-    # recipes and food
-    "https://www.justonecookbook.com/", "https://www.seriouseats.com/", "https://www.allrecipes.com/",
-    "https://www.kingarthurbaking.com/recipes",
-    # music and video pages
-    "https://bandcamp.com/", "https://www.npr.org/series/tiny-desk-concerts/", "https://pitchfork.com/",
-    "https://www.youtube.com/@NHKWORLDJAPAN", "https://vimeo.com/channels/staffpicks",
-    # blogs and tech
-    "https://github.com/trending", "https://xkcd.com/", "https://waitbutwhy.com/", "https://www.kottke.org/",
-]
-VIDEO_TOPICS = ["bread baking", "Tokyo night walk", "how the brain works", "Inokashira Park", "ramen making",
+# #89 teen re-seed: front pages of sites people his age read, per interest topic (docs/research/teen_online.md);
+# every front page was allowed by its robots.txt on 2026-10-04, and robots.txt is checked again before each page.
+# Cooking sites only while he is hungry or ordering food.
+SEED_TOPICS = {
+    "cars": ["https://www.topgear.com/", "https://www.carscoops.com/", "https://www.autoblog.com/",
+             "https://www.formula1.com/en/latest", "https://www.thedrive.com/"],
+    "games": ["https://www.ign.com/", "https://www.pcgamer.com/", "https://www.polygon.com/",
+              "https://www.gamesradar.com/", "https://www.nintendolife.com/"],
+    "football": ["https://www.bbc.com/sport/football", "https://www.skysports.com/football", "https://www.90min.com/",
+                 "https://www.espn.com/soccer/", "https://www.theguardian.com/football"],
+    "anime": ["https://myanimelist.net/", "https://www.crunchyroll.com/news", "https://www.cbr.com/category/anime-news/"],
+    "music": ["https://www.nme.com/", "https://www.billboard.com/", "https://www.rollingstone.com/music/"],
+    "tech": ["https://www.theverge.com/", "https://9to5mac.com/", "https://www.gsmarena.com/", "https://arstechnica.com/"],
+    "sneakers": ["https://www.highsnobiety.com/", "https://www.complex.com/sneakers"],
+    "memes": ["https://knowyourmeme.com/", "https://www.boredpanda.com/"],
+    "creators": ["https://www.tubefilter.com/"],
+    "movies": ["https://www.themoviedb.org/", "https://editorial.rottentomatoes.com/", "https://www.empireonline.com/"],
+    "tokyo": ["https://www.timeout.com/tokyo", "https://www.japan-guide.com/", "https://www.tokyocheapo.com/"],
+    "science": ["https://apod.nasa.gov/apod/astropix.html", "https://www.sciencenews.org/"],
+    "food": ["https://www.justonecookbook.com/", "https://www.seriouseats.com/"],
+}
+SEEDS = [u for t, us in SEED_TOPICS.items() if t != "food" for u in us]
+HOST_STREAK_MAX = 3                    # #89 teen: at most this many pages in a row on one site, then elsewhere
+HOST_DAY_CAP = 20                      # pages a day on one site (the video players excepted)
+RECIPE_HOST = re.compile(r"(^|\.)(kingarthurbaking|justonecookbook|seriouseats|allrecipes|recipetineats|bbcgoodfood|"
+                         r"foodnetwork|delish|tasty|bonappetit|epicurious|food52|thekitchn|simplyrecipes)\.(com|co|co\.uk)$",
+                         re.I)                 # cooking sites: only while he is hungry or ordering (#89 teen)
+HOST_CAP_FREE = ("youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com", "tiktok.com", "www.tiktok.com")
+VIDEO_TOPICS = ["Toyota GR Supra", "Tokyo night walk", "Elden Ring", "Premier League highlights", "One Piece",
                 "train window Japan", "lo-fi music", "space documentary", "cat videos", "Studio Ghibli"]
 FAMILIAR = ["Kichijoji", "Inokashira Park", "Tokyo bakery", "how dreams work", "sleep science", "ramen", "Ghibli Museum",
             "night city photography", "lo-fi music", "how the brain works", "Japanese convenience store", "Tokyo trains"]
@@ -492,6 +508,18 @@ def text_ok(title, body):
     if BAD_WORDS.search(title or ""):
         return False
     return len(BAD_WORDS.findall((body or "")[:6000])) < 3
+
+
+def cross_site_frame(req, host):
+    """#89 memory: an iframe from another site than the page it is in (ads, video players, social embeds)."""
+    try:
+        frame = req.frame
+        if frame.parent_frame is None:
+            return False
+        top = urllib.parse.urlsplit(frame.page.main_frame.url).hostname or ""
+    except Exception:                                       # no frame (a service worker) or a detached one
+        return False
+    return bool(top) and not MG.frame_allowed(top, host)
 
 
 class Guard:
@@ -534,6 +562,10 @@ class Guard:
             return await route.abort()
         if req.method not in ("GET", "HEAD") and req.is_navigation_request():
             return await route.abort()                      # never submits anything
+        if MG.ad_host(u.hostname) or (req.is_navigation_request() and cross_site_frame(req, u.hostname)):
+            return await route.abort()                      # #89: ads and cross-site iframes were most of the memory
+        if req.is_navigation_request() and req.frame.parent_frame is None and YT.page_video(url)[1]:
+            return await route.abort()                      # #89 live: never YouTube's own pages (a redirect, a click)
         await route.continue_()
 
 
@@ -623,13 +655,33 @@ class Browser:
         self.visited = NV.Visited(state=s.get("visited"))   # #89: no page, video or near-same title twice in 7 days
         self.seed_t = {}                                    # seed site -> last opened (rotation, SEED_GAP_S)
         self.yt = YT.Quota(state=s.get("youtube"))          # YouTube Data API units today (only with the key)
+        self.heavy = MG.HeavyPages(s.get("heavy"))          # #89: pages / hosts that pushed Chromium over its cap
+        self.mem_checked = 0.0
+        self.yt_used = {}                                   # channel handle -> last used (keyless rotation)
+        self.hungry = False                                 # #89 teen: food and cooking sites only while hungry
+        self.watched = False                                # a video has been on a screen since the browser started
         self.diag = {}                                      # site -> why its logged-in feed showed no video
         self.diag_shot = {}                                 # site -> masked screenshot of that page (admin only)
 
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
                 "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict()),
-                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict()}
+                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict(), "heavy": self.heavy.to_dict()}
+
+    def host_ok(self, host, current=None):
+        """#89 teen variety guard: under HOST_DAY_CAP pages today on this site, not a 4th page in a row on the site he
+        is on (`current`), and no cooking site unless he is hungry."""
+        h = (host or "").lower().removeprefix("www.")
+        if RECIPE_HOST.search(h) and not getattr(self, "hungry", False):
+            return False                                        # no recipe loops outside meals
+        if WALLED_SOCIAL.search(h):
+            return False                                        # a login wall for him: never opened
+        if any(h == f.removeprefix("www.") for f in HOST_CAP_FREE):
+            return True
+        if self.variety.host_count(h) >= HOST_DAY_CAP:
+            return False
+        cur = (current or "").lower().removeprefix("www.")
+        return not (cur and h == cur and self.variety.host_streak >= HOST_STREAK_MAX)
 
     def fresh(self, url, title=None):
         """Not opened in the last 7 days (the URL / video id, or a near-duplicate title)."""
@@ -779,6 +831,28 @@ class Browser:
                 pass
             self.pw = None
 
+    async def _over_soft_cap(self):
+        """#89 memory: at most every MEM_CHECK_S, this process tree's memory (Chromium's renderers included, read in a
+        thread). Over SOFT_MEM_MB the pages on screen are recorded as heavy (HeavyPages) and Chromium is closed: the
+        next step starts it afresh on another page, before the watchdog's hard limit kills the whole service."""
+        now = time.time()
+        if now - self.mem_checked < MEM_CHECK_S or self.browser is None:
+            return False
+        self.mem_checked = now
+        try:
+            from browse_service import tree_rss_mb
+            mb = await asyncio.to_thread(tree_rss_mb, os.getpid())
+        except Exception:
+            return False
+        if mb <= SOFT_MEM_MB:
+            return False
+        pages = [(sc.info.get("url"), sc.info.get("host")) for sc in self.screens.values() if sc.info]
+        self.heavy.strike(pages)
+        print(f"browse: {mb:.0f} MB > {SOFT_MEM_MB:.0f} MB with {[h for _, h in pages]}: Chromium recycled", flush=True)
+        self.recycles = getattr(self, "recycles", 0) + 1
+        await self.close()
+        return True
+
     # --- one step ------------------------------------------------------------------------------------------------
     async def step(self, device, heard=(), interest=None, mode=None):
         """Scroll the current page or open the next one; returns the new screen status when a screenshot was taken.
@@ -786,10 +860,15 @@ class Browser:
         sc = self.screens[device]
         if time.time() < sc.next_at:
             return None
+        self.hungry = bool(isinstance(interest, dict) and interest.get("hungry"))
         if mode is None and device == "phone" and isinstance(interest, dict) and interest.get("feed") == "shorts":
             mode = "shorts"                                     # the rhythm / his phone app: a short-video feed
+        if mode is None and device == "desk" and isinstance(interest, dict) and interest.get("feed") == "video":
+            mode = "video"                                      # #89 teen: a good share of desk time is YouTube
         async with self.lock:
             try:
+                if await self._over_soft_cap():                 # #89: recycle Chromium before the watchdog kills it
+                    return None
                 sc = await self._ensure(device)
                 moved_on = False
                 if mode != sc.mode:                             # switched between browsing, videos and shorts
@@ -928,7 +1007,7 @@ class Browser:
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
                     or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)
                     or (kind not in ("next", "comments") and NV.footer_link(label, href, url))
-                    or not self.fresh(href, label)):
+                    or not self.fresh(href, label) or not self.host_ok(u.hostname, cur.hostname)):
                 continue                                        # #89: no footer links, nothing opened this week
             if (sc.site or self._session(href)) and not VO.link_ok(href, label, aria or ""):
                 continue                                        # #60: logged in, an action or a private page
@@ -1039,8 +1118,20 @@ class Browser:
         sc.chain = 0
         if sc.mode == "shorts" and await self._shorts(sc, interest):
             return True
+        if not self.watched and sc.mode != "shorts":            # #89 live: the first watch as early as possible
+            d = interest if isinstance(interest, dict) else {}
+            p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
+                       discover=True, hungry=self.hungry)
+            if query_ok(p["query"]) and await self._public_videos(
+                    sc, "youtube", p["query"], f"watched a video on {p['topic']}", "interests", short=False):
+                return True
         if sc.mode == "video":                                  # watching videos: YouTube's Data API + embed player
-            q = query_ok(SS.interest_text(interest)) or self.rng.choice(VIDEO_TOPICS)   # (/results is robots-closed)
+            d = interest if isinstance(interest, dict) else {}
+            q = query_ok(SS.interest_text(interest)) if d.get("from") not in ("", None, "interests") else None
+            if not q:                                           # #89 teen: his profile's topics, not old defaults
+                q = query_ok(I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng,
+                                    mult=d.get("tastes"), discover=True, hungry=self.hungry)["query"])
+            q = q or self.rng.choice(VIDEO_TOPICS)              # (/results is robots-closed)
             if await self._public_videos(sc, "youtube", q, f"looked for videos about “{q}”", "", short=False):
                 return True
         if sc.pending_link:
@@ -1072,7 +1163,8 @@ class Browser:
             why = None
             if not topic or self.rng.random() < self.profile_share():    # the interest profile, by the hour
                 d = interest if isinstance(interest, dict) else {}
-                p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"))
+                p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
+                           hungry=self.hungry)
                 if query_ok(p["query"]):
                     topic, origin = p["query"], "interests"
                     why = f"{SS.ORIGINS['interests']} ({p['topic']}, {p['rhythm']})"
@@ -1080,17 +1172,19 @@ class Browser:
                 topic, origin = self.rng.choice(FAMILIAR), "familiar"
             why = why or (SS.ORIGINS[origin] if origin not in ("", "familiar") else f"curious about “{topic[:50]}”")
             return await self._search(sc, topic, why, origin)
-        return await self._seed(sc, "opened a site he likes")
+        return await self._seed(sc, "opened a site he likes", hungry=self.hungry)
 
     SEED_GAP_S = 6 * 3600                                      # a seed site's front page at most every 6 hours
 
-    async def _seed(self, sc, why):
+    async def _seed(self, sc, why, topic=None, hungry=False):
         """A seed site's front page (a feed that changes, so not held to the 7-day rule), rotating: the ones opened in
-        the last SEED_GAP_S are left out; Wikipedia's random article only while Wikipedia stays under a tenth."""
+        the last SEED_GAP_S are left out; the topic's own sites first; cooking sites only when he is hungry."""
         now = time.time()
-        pool = [u for u in SEEDS if now - self.seed_t.get(u, 0) > self.SEED_GAP_S
-                and ("wikipedia.org" not in u or self.variety.wiki_share() < 0.10)]
+        pool = [u for u in SEEDS + (SEED_TOPICS["food"] if hungry else [])
+                if now - self.seed_t.get(u, 0) > self.SEED_GAP_S and self.host_ok(urllib.parse.urlsplit(u).hostname)]
         self.rng.shuffle(pool)
+        mine = SEED_TOPICS.get(topic or "", [])
+        pool.sort(key=lambda u: u not in mine)
         for u in pool[:3]:
             self.seed_t[u] = now
             if await self._open(sc, u, why, "page", revisit=True):
@@ -1117,7 +1211,7 @@ class Browser:
         if not q or (not force and self.rng.random() < 1 - I.FOLLOW_SHORTS):
             # #89: most shorts come from topics he has not seen lately (discovery / trending), not his notes
             p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
-                       discover=True)
+                       discover=True, hungry=self.hungry)
             q, origin = query_ok(p["query"]), "interests"
             topic, new = p["topic"], p["new"]
         else:
@@ -1151,11 +1245,21 @@ class Browser:
         come from the official oEmbed APIs and pass video_text_ok. The first one is shown and played muted; the rest
         are the next options."""
         cands = []
+        if (kind == "shorts" or kind == "youtube") and not self.yt.player_up():
+            self.feed_note = self.yt.player_note()              # #89 live: YouTube refuses the player: other things
+            return False
         if kind == "shorts" or kind == "youtube":
             if YT.key():
-                cands = await self._yt_search(sc, q, short)
-            else:
-                self.feed_note = YT.NOTE_NO_KEY
+                # the topic's channels' latest uploads (3 units), else a search (100 units); all through the API
+                if I.topic_of(q or "") in YT.CHANNELS or I.topic_of(q or "") is None and self.rng.random() < 0.5:
+                    cands = await self._yt_uploads(sc, q, short)
+                    self.feed_note = YT.NOTE_UPLOADS if cands else self.feed_note
+                if not cands:
+                    cands = await self._yt_search(sc, q, short)
+            if not cands:                                       # no key or no quota: nothing new is looked up
+                cands = self._yt_replay(short)
+                self.feed_note = (YT.NOTE_REPLAY_KEY if YT.key() else YT.NOTE_REPLAY) if cands else (
+                    self.feed_note if YT.key() else YT.NOTE_NO_KEY)
         elif kind == "tiktok":
             cands = await self._tiktok_found(sc, q)
         if not cands:
@@ -1169,7 +1273,7 @@ class Browser:
         return await self._show_card(sc, cands[0], why)
 
     def _card_ok(self, c):
-        return (c and self.fresh(c["url"], c["title"]) and video_text_ok(c["title"])
+        return (c and self.fresh(c["url"], c["title"]) and not self.yt.is_bad(c["url"]) and video_text_ok(c["title"])
                 and (not c.get("author") or video_text_ok(c["author"]))
                 and all(video_text_ok(h) for h in c.get("hashtags") or []) and (not c.get("thumb") or url_ok(c["thumb"])))
 
@@ -1188,10 +1292,87 @@ class Browser:
                 return []
             results = YT.parse_search(text, short)
             self.yt.spend(q, short, results)
+            if results:                                         # only what the embed will play (1 unit)
+                vt = await self._yt_api(sc, YT.videos_url([r["id"] for r in results]))
+                ok = YT.parse_durations(vt) if vt else {}
+                results = [r for r in results if r["id"] in ok]
+                self.yt.cache[self.yt._k(q, short)] = {"t": time.time(), "r": results[:10], "v": 2}
+            print(f"browse: YouTube API search ({'shorts' if short else 'videos'}), {len(results)} results, "
+                  f"{self.yt.used} units today", flush=True)
         cards = [{"url": r["url"], "title": r["title"], "author": r["channel"], "thumb": r["thumb"], "hashtags": [],
                   "embed": r["embed"], "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
                   "how": "YouTube's official embed player"} for r in self.safe_results(results)]
-        return [c for c in cards if self._card_ok(c)][:6]
+        cards = [c for c in cards if self._card_ok(c)][:6]
+        self.yt.found(cards)
+        return cards
+
+    def _yt_cards(self, items, short, author=None):
+        cards = []
+        for r in self.safe_results([{"url": YT.video_url(it["id"], short), "title": it["title"], "video": True,
+                                     "channel": it.get("channel", "")} for it in items]):
+            vid = r["url"].rsplit("/", 1)[-1].split("=")[-1]
+            cards.append({"url": r["url"], "title": r["title"], "author": author or r.get("channel", ""),
+                          "hashtags": re.findall(r"#\w+", r["title"])[:6],
+                          "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
+                          "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
+                          "how": "YouTube's official embed player"})
+        return [c for c in cards if self._card_ok(c)]
+
+    async def _yt_api(self, sc, url):
+        """One cheap Data API call (the key in a header, never in a URL). -> text or None."""
+        if not self.yt.allow(YT.LIST_UNITS) or not self.limits.allow("www.googleapis.com"):
+            return None
+        self.limits.note("www.googleapis.com")
+        status, text = await self._fetch(sc, url, headers=YT.headers())
+        self.yt.spend_units(YT.LIST_UNITS)
+        if status != 200:
+            self.yt.error(f"{url.split('/v3/')[1].split('?')[0]}: HTTP {status}")
+            return None
+        return text
+
+    async def _yt_uploads(self, sc, q, short=True):
+        """#89 teen: the latest uploads of a well-known channel of the query's topic, through the official API
+        (YouTube's Terms forbid automated access to its pages): channels.list forHandle -> uploads playlist (kept),
+        playlistItems.list -> latest uploads, videos.list -> durations (Shorts: at most SHORT_MAX_S). 3 units, each
+        channel's list cached CHANNEL_CACHE_S. -> cards in the official embed player."""
+        handles = sorted((h for h in YT.channels_for(I.topic_of(q or "")) if self.yt.channel_ok(h)),
+                         key=lambda h: (self.yt_used.get(h, 0), self.rng.random()))
+        for h in handles[:2]:
+            pid = self.yt.uploads.get(h)
+            if not pid:
+                text = await self._yt_api(sc, YT.channels_url(h))
+                pid = YT.parse_uploads_id(text) if text else None
+                if not pid:
+                    continue
+                self.yt.uploads[h] = pid
+            ck = f"p:{pid}"
+            hit = self.yt.cache.get(ck)
+            if hit and hit.get("v") == 2 and time.time() - hit["t"] < YT.CHANNEL_CACHE_S:
+                items = hit["r"]
+            else:
+                text = await self._yt_api(sc, YT.playlist_url(pid))
+                items = YT.parse_playlist(text) if text else []
+                if not items:
+                    continue
+                text = await self._yt_api(sc, YT.videos_url([it["id"] for it in items]))
+                secs = YT.parse_durations(text) if text else {}
+                items = [dict(it, sec=secs[it["id"]]) for it in items if it["id"] in secs]
+                self.yt.cache[ck] = {"t": time.time(), "r": items, "v": 2}     # v2: playable() filtered
+                print(f"browse: YouTube API uploads of @{h}: {len(items)} videos, {self.yt.used} units today",
+                      flush=True)
+            self.yt_used[h] = time.time()
+            pick = [it for it in items if (it["sec"] <= YT.SHORT_MAX_S) == bool(short)]
+            cards = self._yt_cards(pick, short, author=h)
+            self.rng.shuffle(cards)
+            if cards:
+                self.yt.found(cards)
+                return cards[:6]
+        return []
+
+    def _yt_replay(self, short=True):
+        """No key or no quota: no discovery; the videos already found today and not yet shown."""
+        kind = "/shorts/" if short else "watch?v="
+        return [c for c in reversed(self.yt.today) if kind in c["url"] and self._card_ok(c)][:6]
 
     async def _tiktok_found(self, sc, q):
         """Public TikTok videos for `q` found through the search engines (site:tiktok.com), described by TikTok's
@@ -1259,15 +1440,74 @@ class Browser:
             sc.site = None
         if not await self._open(sc, emb, why, "page", title=card["title"], min_text=0, shoot=False,
                                 referer=EMBED_REFERER):
+            if self.last_skip in PLAYER_REFUSALS and YOUTUBE_HOST.search(host):
+                # #89 live: YouTube's bot check / sign-in screen in the player itself, not this video's fault
+                print(f"browse: YouTube's player refused ({self.last_skip})", flush=True)
+                self.yt.player_failed(self.last_skip)
             return False
         sc.info = dict(sc.info, url=card["url"], host=card.get("host", host), embed=emb, card=False,
                        channel=(card.get("author") or "")[:80], search_box=False)
         sc.scrolls_left = 0
-        await self._play_muted(sc)
+        state = await self._play_muted(sc)
+        why_not = await self._embed_error(sc, state)
+        if why_not:                                             # never left on screen: the next video instead
+            print(f"browse: embed refused {card['url']} ({why_not[:60]})", flush=True)
+            self.yt.refused(card["url"], None if "advertisement" in why_not else card.get("author"))
+            self.last_skip = "embed refused"
+            await self._leave(sc)
+            return False
+        if YOUTUBE_HOST.search(host):
+            self.yt.player_ok()
         if not await self.show(sc):
             return False
         await self._start_watch(sc)
         return True
+
+    async def _play_video_id(self, sc, vid, why, title=None, short=False):
+        """A link to a YouTube video, played as "play this video": checked with videos.list (1 unit: embeddable,
+        public, not age-restricted, plays in JP), then opened in the official youtube-nocookie embed. Without a key
+        it cannot be checked, so it is not played."""
+        url = YT.video_url(vid, short)
+        if not YT.key():
+            self.last_skip = "a YouTube video link (no API key to check it)"
+            return False
+        if not self.yt.player_up():
+            self.last_skip = "YouTube's player is paused (it refused this browser)"
+            return False
+        if self.yt.is_bad(url) or not self.fresh(url):
+            self.last_skip = "video refused or seen"
+            return False
+        text = await self._yt_api(sc, YT.videos_url([vid]))
+        info = (YT.parse_videos(text) if text else {}).get(vid)
+        if not info:
+            self.yt.refused(url)
+            self.last_skip = "video not playable in the embed"
+            return False
+        short = short or info["sec"] <= YT.SHORT_MAX_S
+        card = {"url": YT.video_url(vid, short), "title": info["title"] or title or "a video", "author": info["channel"],
+                "hashtags": [], "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
+                "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
+                "how": "YouTube's official embed player"}
+        if not self._card_ok(card):
+            self.last_skip = "guard"
+            return False
+        return await self._open_embed(sc, card, why)
+
+    async def _embed_error(self, sc, state=None, wait=True):
+        """The player's own error, a few seconds after it opened: its error text, or no video element at all."""
+        try:
+            if wait:
+                await sc.page.wait_for_timeout(EMBED_CHECK_MS)
+            text = await sc.page.evaluate(EMBED_ERROR_JS) or ""
+        except Exception:
+            return None
+        if EMBED_ERROR.search(text):
+            return EMBED_ERROR.search(text).group(0)
+        if wait and state is None:
+            again = await self._play_muted(sc)
+            if again is None:
+                return "no video in the player"
+        return None
 
     async def _show_card(self, sc, card, why):
         """One video on the screen: in its official embed player when it has one (played muted), else (or when the
@@ -1276,6 +1516,20 @@ class Browser:
         if card.get("embed"):
             if await self._open_embed(sc, card, why):
                 return True
+            # #89 live: a refused player is skipped for the next video in the queue within seconds
+            for r in list(sc.queue)[:3]:
+                nxt = sc.cards.get(r.get("url"))
+                if not self.yt.player_up():
+                    break
+                if nxt and nxt.get("embed") and self._card_ok(nxt):
+                    sc.queue = [x for x in sc.queue if x.get("url") != nxt["url"]]
+                    if await self._open_embed(sc, nxt, why):
+                        return True
+            if YOUTUBE_HOST.search(urllib.parse.urlsplit(card["embed"]).hostname or ""):
+                print(f"browse: YouTube embed refused ({self.last_skip}); no card, something else", flush=True)
+                if not self.yt.player_up():
+                    self.feed_note = self.yt.player_note()
+                return False                                    # #89 live: a card is not a video
             print(f"browse: embed refused ({self.last_skip}), showing a card instead", flush=True)
         if getattr(sc, "site", None) and getattr(sc, "public", None):   # cards are never shown in a logged-in context
             sc.ctx, sc.page = sc.public
@@ -1406,8 +1660,13 @@ class Browser:
 
     async def _watch(self, sc):
         """One screenshot while watching: the video is muted again, the scene change measured. False if the page
-        turned into a bot check (then it is left)."""
+        turned into a bot check, or the embed player into an error (then it is left)."""
         state = await sc.page.evaluate(VIDEO_JS, None)
+        if sc.info and sc.info.get("embed") and await self._embed_error(sc, state, wait=False):
+            self.yt.refused(sc.info["url"], sc.info.get("channel"))
+            sc.watch_until = 0.0
+            await self._leave(sc)
+            return False
         prev = sc.shot
         if not await self._shoot(sc):
             sc.watch_until = 0.0
@@ -1438,6 +1697,7 @@ class Browser:
             sc.info = dict(sc.info, kind="search", results=sc.queue[:SS.MAX_RESULTS],
                            why=f"watched a short for {round(sc.watch_s)} s (muted); the next one?")
 
+    YT_SEARCH_SHARE = 0.45                                     # searches that go to YouTube when the key is set
     TRIES = 4                                                  # sources tried per search (#89: no Wikipedia fallback)
 
     async def _search(self, sc, q, why="", origin=""):
@@ -1450,7 +1710,7 @@ class Browser:
         `why` ends the card's line ("searched arXiv for “sleep spindles” — from his reading notes")."""
         again = origin not in ("chat", "interests") and self.variety.query_used(q)    # #89: the same search twice a day (the HN loop)
         if again or (origin in NV.SEEN_ORIGINS and not self.visited.follow_ok()):
-            p = I.pick(self.variety, hour=I.tokyo_hour(), rng=self.rng, discover=True)
+            p = I.pick(self.variety, hour=I.tokyo_hour(), rng=self.rng, discover=True, hungry=self.hungry)
             if p.get("query"):
                 q, origin = p["query"], "interests"
                 why = f"{SS.ORIGINS['interests']} ({p['topic']}, something new)"
@@ -1460,8 +1720,14 @@ class Browser:
         vq = NV.video_query(q)
         if vq is not None:
             return await self._video_search(sc, vq, q, why, origin)
-        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video",
-                             wiki_share=self.variety.wiki_share())[:self.TRIES]:
+        if YT.key() and self.rng.random() < self.YT_SEARCH_SHARE:
+            # #89 live 2026-10-04: with the key, YouTube is a real search engine for him (its official API): a good
+            # share of his searches are YouTube searches, played in the official embed
+            if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
+                                         short=sc.name == "phone"):
+                return True
+        for name in SS.route(q, self.limits, self.rng, video=sc.mode == "video", wiki_share=self.variety.wiki_share(),
+                             hungry=self.hungry)[:self.TRIES]:
             if await self._search_on(sc, name, q, why, origin):
                 if not self.decide and sc.info.get("results"):  # brain decides: it picks among the results itself
                     res = [r for r in sc.info["results"] if self.fresh(r["url"], r["title"])]
@@ -1469,7 +1735,13 @@ class Browser:
                         r = res[min(len(res) - 1, int(self.rng.random() ** 2 * 4))]    # mostly the top results
                         sc.pending_link = (r["url"], f"searched “{q[:40]}”, opened “{r['title'][:50]}”")
                 return True
-        return await self._seed(sc, f"no search worked for “{q[:40]}”, opened a site he likes instead")
+        topic = I.topic_of(q or "")
+        # no fitting site answered: the query becomes a YouTube search (the API with the key, else the topic's
+        # channels), never a news site's search page
+        if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
+                                     short=sc.name == "phone"):
+            return True
+        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry)
 
     async def _video_search(self, sc, vq, q, why, origin):
         """A search asking for videos: the phone's short-video feed, or a video source at the desk."""
@@ -1561,7 +1833,8 @@ class Browser:
         cand = []
         for href, text, area in links:
             if (len(text) < 12 or not url_ok(href) or LOGIN_LINK.search(text) or BAD_WORDS.search(text)
-                    or NV.footer_link(text, href, sc.page.url) or not self.fresh(href, text)):
+                    or NV.footer_link(text, href, sc.page.url) or not self.fresh(href, text)
+                    or not self.host_ok(urllib.parse.urlsplit(href).hostname, cur.hostname)):
                 continue
             u = urllib.parse.urlsplit(href)
             if (u.netloc, u.path) == (cur.netloc, cur.path):
@@ -1577,8 +1850,23 @@ class Browser:
         site's front page, a YouTube results page, going back)."""
         if not url_ok(url) or VO.private_url(url):
             return False
+        vid, yt_page = YT.page_video(url)
+        if yt_page:                                             # #89 live: YouTube's own pages are never opened
+            if vid:
+                return await self._play_video_id(sc, vid, why, title, short="/shorts/" in url)
+            self.last_skip = "a YouTube page (never opened; only its embed player)"
+            return False
         if not revisit and kind != "search" and not self.fresh(url):
             self.last_skip = "opened in the last 7 days"
+            return False
+        if self.heavy.heavy_url(url) or self.heavy.cooling(urllib.parse.urlsplit(url).hostname):
+            self.last_skip = "too heavy on memory (left alone for a while)"   # #89: it blew Chromium's cap before
+            return False
+        if kind != "search" and not self.host_ok(urllib.parse.urlsplit(url).hostname):
+            self.last_skip = "enough of this site today"            # #89 teen: per-site daily cap
+            return False
+        if getattr(sc, "public", None) and not await self.robots.check(url, lambda u: self._fetch(sc, u), self.limits):
+            self.last_skip = "robots.txt"                               # every page, not only searches
             return False
         if self._session(url) and not VO.link_ok(url):          # #60: re-checked just before it is opened
             self.last_skip = "action"
@@ -1689,6 +1977,8 @@ class Browser:
             for frame in list(page.frames):
                 if frame != page.main_frame and not url_ok(frame.url):
                     continue
+                if YOUTUBE_HOST.search(urllib.parse.urlsplit(frame.url).hostname or ""):
+                    continue                                    # #89: never press anything in YouTube's player (its ad "Skip")
                 try:
                     buttons = await frame.evaluate(BUTTONS_JS)
                     k = choose_dismiss(buttons)
@@ -1735,6 +2025,8 @@ class Browser:
             self.visited.add(i["url"], i["title"])                     # #89: not opened again for 7 days
             if getattr(sc, "mode", None) == "shorts" and (i.get("card") or VIDEO_LINK.search(i["url"])):
                 self._clip(sc)
+            if i.get("embed") or VIDEO_LINK.search(i["url"]):
+                self.watched = True
         if not sc.history or sc.history[-1] != i["url"]:
             sc.history = (sc.history + [i["url"]])[-20:]
             sc.chain += 1
