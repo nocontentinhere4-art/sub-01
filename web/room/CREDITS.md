@@ -181,6 +181,51 @@ to 1024 px WebP and meshopt-compresses the lot (3.8k–4.6k triangles a prop). T
 
     node build_tripo.mjs <folder> ../web/room/props_tripo.glb
 
+## The Tripo props, second batch: made with Tripo (paid API)
+`props_tripo2.glb` holds eighteen props **made with Tripo (paid API)** (https://www.tripo3d.ai), model `P1-20260311`, PBR,
+standard textures, generated on 2026-10-04 (AI-generated content under Tripo's terms of service, not a Creative Commons
+licence). Most came from text prompts asking for plain, unbranded objects. The desk lamp and the floor plant came from
+images (image-to-model): Poly Haven's own renders of the CC0 models they replace, `desk_lamp_arm_01` (Yann Kervran,
+Kuutti Siitonen) and `potted_plant_02` (Rico Cilliers), CC0 1.0. The figure is an original character and the
+skateboard's graphic an original pattern; no brands, logos or characters of others.
+
+| prop | where (it replaces) | task |
+|---|---|---|
+| clamp desk lamp | the desk's back left (the Poly Haven desk lamp, hidden) | `ff1d73a1-cbf7-47fe-8017-214e00df5bf1` |
+| potted plant | the floor by the window (the Poly Haven plant, hidden) | `35c33d17-2985-4143-a53e-1b2eff7cd136` |
+| taped cardboard box | on top of the bookshelf (the Poly Haven box, hidden) | `c7eb9d15-e87c-42b1-9420-fa48cd38006e` |
+| twin-bell alarm clock | the window sill (the Poly Haven alarm clock, hidden) | `b683843e-2e74-4474-808b-5a8c6d7b415f` |
+| aloe in a terracotta pot | the desk (the Poly Haven succulent, hidden; its saucer, which came out floating, is left out) | `37835eed-7fb1-472b-a2de-bbb6b152ca68` |
+| black canvas backpack | by the bed (the modelled one, cut out) | `b7b15962-24d0-4d99-85c7-05d09cf4748b` |
+| floor fan | by the door (the modelled one, cut out) | `5b704311-1409-4b14-ba67-a71988047dc1` |
+| waste bin with a liner | under the desk (the modelled one and its stickers, cut out) | `b52a9f88-6d94-4244-a2f1-19f37250e268` |
+| game controller (generic) | the desk (the modelled one, cut out) | `39586f31-cc3e-488b-8454-533df47ffed9` |
+| computer monitor | the desk; fitted around the page's live screen, which stays the page's own quad (the modelled one, cut out) | `40a67c5e-c2f0-4b5f-8a05-b6cba29fc020` |
+| mouse | the desk mat (the modelled one, cut out) | `7f6dd270-5668-4826-82ed-090af0124e8b` |
+| bookshelf speaker, used for the pair | the desk (the modelled pair, cut out) | `ae7531ac-6f5e-4ca1-bc85-3fc761223e7b` |
+| skateboard | new, on the floor by the door, wheels up | `fd5e06a2-38c1-402c-bbe1-78bb7deb0d2e` |
+| game console (generic) | new, the desk's back | `b08f7166-7a2e-4538-86e6-e3a05838fb38` |
+| anime-style figure (original) | new, the window sill | `2bb87361-92e0-48a7-a780-10c7a7455ad9` |
+| three energy drink cans (unbranded) | new, on the fridge | `4a5e3826-fca8-42a4-bcae-251189326032` |
+| stack of sneaker boxes | new, by the door | `827927f2-220e-4563-bd36-3a1680d02a34` |
+| 35mm film camera (no brand) | new, on the desk's books | `0f650a9e-edaa-4828-94f2-b9f959671e75` |
+
+Generated and not used (paid for, left out): a first desk lamp, whose shade floated off its arm
+(`21b4442f-4fc2-408b-81a5-d911bb16337a`); a first plant, with purple leaves (`2df53e11-6008-4f00-9d52-2b3452078f93`); a
+keyboard, built on a wedge with letters on its keys (`64db3634-167d-498a-8589-9140e01b7782`; the modelled keyboard stays,
+his typing is aimed at it); an office chair (`5af3f609-8dc7-4815-996f-6c9cd2f27247`; the modelled chair stays, his sitting
+poses and resting hands are fitted to it). His phone stays too: the one he holds is the hand-and-phone mesh above.
+
+`room_build/build_tripo2.mjs` scales and turns each, puts it in its place in the room and joins them all into one mesh
+(the lamp kept apart, out of its own light's shadow map) with one material, its maps packed in atlases (a 512 px tile per
+prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces (`web/room.html`, "Tripo props");
+`?props=old` shows the earlier room. Rebuild, from `room_build/`, with the raw GLBs in a folder:
+
+    node build_tripo2.mjs <folder> ../web/room/props_tripo2.glb
+
+The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
+page paints it over the record sleeve in the posters atlas.
+
 ## His motion: clips generated with NVIDIA ARDY (#98 G3)
 `boy_m_*.glb` (listed in `boy_m_manifest.json`) are motions generated from text prompts with **ARDY**
 (https://github.com/nv-tlabs/ardy, NVIDIA; the paper's authors are credited there), checkpoint

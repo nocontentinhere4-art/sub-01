@@ -514,6 +514,9 @@ if (TRIPO) Promise.all([load("room/props_tripo2.glb"),
     for (const n of r.hide || []) { const o = room.getObjectByName(n); if (o) o.visible = false; }
     if (r.cut) { const b = new THREE.Box3(new THREE.Vector3(...r.cut[0]), new THREE.Vector3(...r.cut[1]));
       if (st) cutBox(st, b); if (dec) cutBox(dec, b); } }
+  const props = g.scene.userData.props || [], notes = room.getObjectByName("office_notepads_sticky_stack");
+  if (props.includes("speaker_l") && notes) notes.position.x += 0.10;   // on the left speaker, moved 10 cm right with it
+  if (props.includes("lamp2") && g.scene.userData.lampLight) lamp.position.set(...g.scene.userData.lampLight);   // in the new shade
   scene.add(g.scene);
 }).catch(e => console.warn("props_tripo2.glb", e));
 // the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C

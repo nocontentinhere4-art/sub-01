@@ -1,8 +1,9 @@
 // node build_tripo2.mjs <folder with the raw Tripo GLBs> ../web/room/props_tripo2.glb [skip,these]
 // The second batch of props made with Tripo's paid API (text-to-model, P1-20260311, PBR): each scaled to real size, turned,
 // and put in its place in the room (world metres, the floor's top at y = 0.16), then all joined into ONE mesh with ONE
-// material: base colour, metal/roughness and normal maps packed in 2048 px atlases (a 512 px tile per prop, 8 px of edge
-// padding), WebP, meshopt. One draw call for the lot. The page (web/room.html, "Tripo props") adds it and hides or cuts
+// material: base colour, metal/roughness and normal maps packed in atlases (a 512 px tile per prop, 8 px of edge padding,
+// a square grid; metal/roughness and normals at half that), WebP, meshopt. Two draw calls: the lot, and the desk lamp kept
+// apart (out of its own light's shadow map). The page (web/room.html, "Tripo props") adds it and hides or cuts
 // out the props it replaces. The raw files are not committed; their task ids are in ../web/room/CREDITS.md.
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
@@ -33,7 +34,8 @@ export const PROPS2 = [
   {name:"monitor", fit:"monitor"},                                                       // around the page's live screen
   {name:"mouse", size:{h:0.032}, turn:[0, 0], at:[-0.755, DTOP + 0.003, -0.95, Math.PI]},  // props_hard.py MC, on the mat (its buttons +z: turned);
                                                       // its back at DTOP + 0.035, the old one's height
-  {name:"speaker_l", file:"speaker", size:{h:0.20}, turn:[0, 0], at:[-1.52, DTOP, -1.30, 0.22 - Math.PI / 2]},   // the pair's places and turns
+  {name:"speaker_l", file:"speaker", size:{h:0.20}, turn:[0, 0], at:[-1.42, DTOP, -1.30, 0.22 - Math.PI / 2]},   // the pair's turns; the left one
+                                                      // 10 cm right of its old place, clear of the lamp's clamp (the page moves the sticky notes along)
   {name:"speaker_r", file:"speaker", size:{h:0.20}, turn:[0, 0], at:[-0.59, DTOP, -1.30, -0.18 - Math.PI / 2]},  // (the front faces +x; the right one 1 cm left, clear of the pen cup); 20 cm
                                                                                          // tall: the sticky notes stay on the left one
   {name:"camera", size:{w:0.12}, turn:[0, 0], at:[-1.70, DTOP + 0.068, -1.02, 0.6]},   // on the desk's book stack
@@ -164,7 +166,7 @@ await MeshoptEncoder.ready; await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS)
   .registerDependencies({"meshopt.encoder": MeshoptEncoder, "meshopt.decoder": MeshoptDecoder});
 const tiles = {base:[], mr:[], normal:[]}, slot = new Map();          // one tile per file (the two speakers share one)
-let doc = null, uvOut = 0;
+let doc = null, uvOut = 0, lampLight = null;
 for (const pr of USE) {
   const file = pr.file || pr.name, d = await io.read(`${dir}/${file}.glb`);
   await d.transform(flatten());
@@ -192,6 +194,13 @@ for (const pr of USE) {
   eachVertex(d, p => { scaleMove(p, k, [-(lo[0] + hi[0]) / 2, -lo[1], -(lo[2] + hi[2]) / 2]); rotate(p, 0, pr.at[3]); translate(p, [pr.at[0], pr.at[1], pr.at[2]]); });
   }
   [lo, hi] = bounds(d);
+  if (pr.name === "lamp2") {                                    // its light: in the middle of the shade (the top quarter)
+    const top = lo[1] + 0.75 * (hi[1] - lo[1]), a = [1e9, 1e9, 1e9], b = [-1e9, -1e9, -1e9], v = [0, 0, 0];
+    eachVertex(d, p => { const P = p.getAttribute("POSITION"); for (const i of p.getIndices().getArray()) { P.getElement(i, v);
+      if (v[1] > top) for (let k = 0; k < 3; k++) { a[k] = Math.min(a[k], v[k]); b[k] = Math.max(b[k], v[k]); } } });
+    lampLight = [(a[0] + b[0]) / 2, a[1] + 0.25 * (b[1] - a[1]), (a[2] + b[2]) / 2].map(x => +x.toFixed(3));
+    console.log("  its light at", lampLight.join(", "));
+  }
   console.log(pr.name.padEnd(11), "size", hi.map((h, a) => (h - lo[a]).toFixed(3)).join(" x "), "box", lo.map(x => x.toFixed(2)).join(","), "..", hi.map(x => x.toFixed(2)).join(","));
   // everything joins into one mesh except the lamp, kept apart so it can stay out of its own light's shadow map
   const own = pr.name === "lamp2" ? "T2_lamp" : "";
@@ -203,15 +212,18 @@ for (const pr of USE) {
 }
 if (uvOut) console.log(`note: ${uvOut} UVs outside 0..1 were clamped`);
 // the atlases, one material for every prop
-const atlas = async list => sharp({create:{width:ATLAS, height:ATLAS, channels:3, background:{r:128, g:128, b:128}}})
-  .composite(list.map((b, i) => ({input:b, left:(i % N) * TILE, top:Math.floor(i / N) * TILE}))).png().toBuffer();
+const atlas = async (list, scale = 1) => {                // (metal/roughness and normals at half size: GPU memory)
+  const full = await sharp({create:{width:ATLAS, height:ATLAS, channels:3, background:{r:128, g:128, b:128}}})
+    .composite(list.map((b, i) => ({input:b, left:(i % N) * TILE, top:Math.floor(i / N) * TILE}))).png().toBuffer();
+  return scale === 1 ? full : sharp(full).resize(ATLAS * scale, ATLAS * scale).png().toBuffer();
+};
 const root = doc.getRoot(), M = doc.createMaterial("tripo_props2").setDoubleSided(true).setMetallicFactor(1).setRoughnessFactor(1);
 M.setBaseColorTexture(doc.createTexture("atlas_base").setImage(await atlas(tiles.base)).setMimeType("image/png"));
-M.setMetallicRoughnessTexture(doc.createTexture("atlas_mr").setImage(await atlas(tiles.mr)).setMimeType("image/png"));
-M.setNormalTexture(doc.createTexture("atlas_normal").setImage(await atlas(tiles.normal)).setMimeType("image/png"));
+M.setMetallicRoughnessTexture(doc.createTexture("atlas_mr").setImage(await atlas(tiles.mr, 0.5)).setMimeType("image/png"));
+M.setNormalTexture(doc.createTexture("atlas_normal").setImage(await atlas(tiles.normal, 0.5)).setMimeType("image/png"));
 for (const m of root.listMeshes()) for (const p of m.listPrimitives()) p.setMaterial(M);
 for (const m of root.listMaterials()) if (m !== M) m.dispose();
-root.listScenes()[0].setExtras({props: USE.map(p => p.name)});      // the page reads which ones are in (gltf.scene.userData)
+root.listScenes()[0].setExtras({props: USE.map(p => p.name), lampLight});   // the page reads these (gltf.scene.userData)
 await doc.transform(prune(), dedup(), flatten(), join({keepNamed:true}), weld(),
   textureCompress({encoder:sharp, targetFormat:"webp", quality:85}), unpartition(), prune(), reorder({encoder:MeshoptEncoder}), quantize());
 doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({method:EXTMeshoptCompression.EncoderMethod.QUANTIZE});
