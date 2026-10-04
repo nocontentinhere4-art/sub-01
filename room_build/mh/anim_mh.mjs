@@ -83,34 +83,51 @@ const fdir2 = n => V3(rest.tail[n]).sub(V3(rest.head[n])).normalize();
 function armIK(Wq, L, rootPos) {
   for (const s of ["L", "R"]) { if (!IKT[s]) continue;
     const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
-    const A = fk(Wq, rootPos, up), a = V3(rest.head[lo]).distanceTo(V3(rest.head[up])), b = V3(rest.head[wr]).distanceTo(V3(rest.head[lo]));
-    // the recorded wrist's drift (relative to its first frame) moves the pin, so the hands wander over the keys
-    const Wm = fk(Wq, rootPos, wr); if (!IKT["_w0" + s]) IKT["_w0" + s] = Wm.clone();
-    const T = V3(IKT[s]).addScaledVector(Wm.clone().sub(IKT["_w0" + s]), +(process.env.DRIFT || 0.7)); let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
-    const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
-    const pole = new THREE.Vector3(s === "L" ? 0.35 : -0.35, -1, -0.15); pole.sub(d.clone().multiplyScalar(pole.dot(d))).normalize();
-    const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), C = A.clone().addScaledVector(d, dl);
-    const restU = V3(rest.head[lo]).sub(V3(rest.head[up])).normalize(), restF = V3(rest.head[wr]).sub(V3(rest.head[lo])).normalize();
-    const curU = restU.clone().applyQuaternion(Wq[up]), R1 = new THREE.Quaternion().setFromUnitVectors(curU, E.clone().sub(A).normalize()).multiply(Wq[up]);
-    const curF = restF.clone().applyQuaternion(R1.clone().multiply(L[`upperarm02.${s}`] || new THREE.Quaternion()).multiply(L[lo]));
-    const W2old = R1.clone().multiply(L[`upperarm02.${s}`] || new THREE.Quaternion()).multiply(L[lo]);
-    const R2 = new THREE.Quaternion().setFromUnitVectors(curF, C.clone().sub(E).normalize()).multiply(W2old);
-    L[up] = Wq[par[up]].clone().invert().multiply(R1);
-    L[lo] = R1.clone().multiply(L[`upperarm02.${s}`] || new THREE.Quaternion()).invert().multiply(R2);
-    // the hand points forward, a little inward, palm down (yaw only from its rest); fingers keep their recorded motion
-    const fwd = new THREE.Vector3(s === "L" ? -0.25 : 0.25, -0.04, 1).normalize();
-    const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
-    const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, 0, 0.2);
-    const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
-    const Hrec = Wq[wr].clone(); if (!IKT["_h0" + s]) IKT["_h0" + s] = Hrec.clone();
-    const Hlive = Hrec.multiply(IKT["_h0" + s].clone().invert());                     // the recorded hand's turn since frame 0
-    const Hw2 = new THREE.Quaternion().slerp(Hlive, +(process.env.HANDK || 0.5)).multiply(Hw);
-    L[wr] = R2.clone().multiply(L[`lowerarm02.${s}`] || new THREE.Quaternion()).invert().multiply(Hw2);
-    // thumbs: swung under the palm toward the space bar
-    const th = `finger1-1.${s}`; L[th] = new THREE.Quaternion().setFromAxisAngle(fdir2(th).cross(new THREE.Vector3(0, -1, 0)).normalize(), 0.35).multiply(L[th]);
+    // fingers: the recorded curl at FINGERK strength, thumbs swung toward the space bar
     const fk_ = +(process.env.FINGERK || 1);
     if (fk_ !== 1) for (const n of rest.order) if (n.endsWith("." + s) && /finger|metacarpal/.test(n)) L[n] = new THREE.Quaternion().slerp(L[n], fk_);
+    const th = `finger1-1.${s}`; L[th] = new THREE.Quaternion().setFromAxisAngle(fdir2(th).cross(new THREE.Vector3(0, -1, 0)).normalize(), 0.35).multiply(L[th]);
+    const keep = { up: L[up].clone(), lo: L[lo].clone() };
+    let dy = 0;
+    for (let it = 0; it < 4; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dy);
+      // KEYTOP: no fingertip below the keycaps' top (+3 mm): lift the pin by the deepest tip's depth
+      const top = +(process.env.KEYTOP || -1); if (top < 0) break;
+      let low = 1e9; for (let f = 1; f <= 5; f++) low = Math.min(low, tipY(L, rootPos, `finger${f}-3.${s}`));
+      if (low >= top + 0.002) break; dy += top + 0.003 - low; }
   }
+}
+// world position of a bone's tail from the local rotations (rest is world-aligned, so offsets are rest differences)
+function tipY(L, rootPos, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
+  const p = V3(rootPos); let W = new THREE.Quaternion();
+  for (let i = 0; i < path.length; i++) { if (i) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(W)); W = W.clone().multiply(L[path[i]]); }
+  return p.add(V3(rest.tail[n]).sub(V3(rest.head[n])).applyQuaternion(W)).y; }
+function solveSide(Wq, L, rootPos, s, dy) {
+  const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
+  const A = fk(Wq, rootPos, up), a = V3(rest.head[lo]).distanceTo(V3(rest.head[up])), b = V3(rest.head[wr]).distanceTo(V3(rest.head[lo]));
+  // the recorded wrist's drift (relative to its first frame) moves the pin, so the hands wander over the keys
+  const Wm = fk(Wq, rootPos, wr); if (!IKT["_w0" + s]) IKT["_w0" + s] = Wm.clone();
+  const T = V3(IKT[s]).addScaledVector(Wm.clone().sub(IKT["_w0" + s]), +(process.env.DRIFT || 0.7)); T.y += dy;
+  let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
+  const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const pole = new THREE.Vector3(s === "L" ? 0.35 : -0.35, -1, -0.15); pole.sub(d.clone().multiplyScalar(pole.dot(d))).normalize();
+  const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), C = A.clone().addScaledVector(d, dl);
+  const restU = V3(rest.head[lo]).sub(V3(rest.head[up])).normalize(), restF = V3(rest.head[wr]).sub(V3(rest.head[lo])).normalize();
+  const u2 = L[`upperarm02.${s}`] || new THREE.Quaternion(), l2 = L[`lowerarm02.${s}`] || new THREE.Quaternion();
+  const curU = restU.clone().applyQuaternion(Wq[up]), R1 = new THREE.Quaternion().setFromUnitVectors(curU, E.clone().sub(A).normalize()).multiply(Wq[up]);
+  const W2old = R1.clone().multiply(u2).multiply(L[lo]);
+  const curF = restF.clone().applyQuaternion(W2old);
+  const R2 = new THREE.Quaternion().setFromUnitVectors(curF, C.clone().sub(E).normalize()).multiply(W2old);
+  L[up] = Wq[par[up]].clone().invert().multiply(R1);
+  L[lo] = R1.clone().multiply(u2).invert().multiply(R2);
+  // the hand points forward, a little inward, palm down; it keeps part of the recorded hand's turn since frame 0
+  const fwd = new THREE.Vector3(s === "L" ? -0.25 : 0.25, -0.04, 1).normalize();
+  const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
+  const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, 0, 0.2);
+  const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
+  const Hrec = Wq[wr].clone(); if (!IKT["_h0" + s]) IKT["_h0" + s] = Hrec.clone();
+  const Hlive = Hrec.multiply(IKT["_h0" + s].clone().invert());
+  const Hw2 = new THREE.Quaternion().slerp(Hlive, +(process.env.HANDK || 0.5)).multiply(Hw);
+  L[wr] = R2.clone().multiply(l2).invert().multiply(Hw2);
 }
 const frames = []; let p0 = null;
 for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 1 / fps) {
