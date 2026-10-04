@@ -46,6 +46,10 @@
     trousers' 4.5 mm), watch 0.108, read 0.030, eat/phone 0.008; sit down / stand up / bedtime_up lift +1.5 cm only while
     standing (LIFT [[0.80,0.015],[0.62,0]]); bed clips +1.5 cm standing, lying 1.5 cm higher (body ~0.5 cm into the
     mattress, the hoodie back ~3 cm: a soft mattress). For the bare body these clips float 1.5 cm.
+  - Seated height unified for the slides (bare soles >= 3.4 cm when seated): every seated clip puts the buttocks at
+    0.523-0.525 m (measured on the skin), so the CHAIR SEAT TOP goes to 0.52 m (+1.5 cm on the gas lift). Desk clips DY
+    0.032, watch 0.117, read 0.039, eat/phone 0.017; sit down / stand up / bedtime_up LIFT [[0.80,0.015],[0.62,0.015]]
+    (stand up/bedtime 0.014). This supersedes the seated numbers above.
   - Candidates awaiting the owner (crude, no props yet; seat contact measured 0.505-0.51, feet on the floor):
     `room_eat` (23 s, seated: reaches to the table, brings food/drink to the mouth), `room_read` (17.5 s, seated, a
     book held in both hands, DY +0.022), `room_phone` (21.5 s, seated texting), `room_drink` (16.5 s, standing: fills a
