@@ -42,6 +42,23 @@ sky fill, hemisphere) and the evening desk lamp (0xffb468, distance 2.2, decay 1
 
 No brand, logo or maker's design is used.
 
+## On G2's body, for the room's clips
+The clothes are built on G2's final body (`room_build/mh/build_g2.mjs` on `preview/mh-motion`): the same MakeHuman
+macro targets with the same weights (male, 20 years, muscle 0.5, weight 0.4, proportions 0.75, ethnicity 1/3 each, the
+hand targets), so `build_clothes.py`'s body is G2's vertex for vertex (checked against `boy_g2.glb`: < 0.0001 mm after
+G2's uniform scale to 1.75 m and feet at y = 0).
+
+`assets/g2/boy_g2_dressed.glb` is G2's own `boy_g2.glb` with the four garments added to it, skinned to its skin: the
+same 163 joints, rest pose, node names and inverse bind matrices (unchanged; the build checks the joint order against
+`boy_g2_rest.json`). Each garment vertex takes the four strongest of its weights (the mix of its three body vertices'
+`default_weights`, as MakeHuman does), so G2's clips (`clips_g2`) drive the clothes as they drive the body. The body's
+triangles under the clothes are dropped (MakeHuman's delete_verts; their base-mesh vertex numbers are in
+`assets/g2/hidden_body_vertices.json`); nothing else in G2's file changes. Materials: the baked colour and normal maps,
+sheen as `KHR_materials_sheen`.
+
+`g2_clip_check.py` plays three of G2's clips (typing at the desk, walking, sitting down) on the dressed GLB in three.js,
+bound by node name as the room page does: `docs/design/clothes-mh/g2_clips.jpg`.
+
 ## Next to real clothes (preview only)
 The owner's rule: every item next to a real one. `build_clothes.py` shoots each comparison render at its photo's
 angle under a similar soft overcast daylight (the photos are outdoors); `compare_real.py` sets crops of them beside
@@ -66,6 +83,9 @@ slide are compared on separate photos. A photo of grey slides was rejected for a
 ## Rebuild
 From `room_build/clothes_mh/`, with Blender 4.2:
 
+    mkdir -p g2 && for f in boy_g2.glb boy_g2_rest.json clips_g2/desk_type.glb clips_g2/room_walk.glb clips_g2/room_sit_down.glb; do
+      git show origin/preview/mh-motion:room_build/mh/glb/$f > g2/$(basename $f); done   # G2's body and three clips (not committed here)
+
     git clone --depth 1 https://github.com/makehumancommunity/makehuman   # the base mesh, targets, skeleton (CC0 assets)
     curl -O https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip
     unzip makehuman_system_assets_cc0.zip -d mh_sys
@@ -77,9 +97,10 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     python compose_sheet.py        # docs/design/clothes-mh/clothes_sheet.jpg from out/*.png
     python compose_feet.py         # docs/design/clothes-mh/feet_sheet.jpg: 3/4 close-up, side, from above, seated at 5 m
     python compare_real.py         # docs/design/clothes-mh/real_feet.jpg, real_clothes.jpg: next to real photos (CC0)
+    python g2_clip_check.py        # docs/design/clothes-mh/g2_clips.jpg: G2's clips on the dressed body (three.js)
     python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 
 The build verifies every written `.mhclo`: read back and refitted on the body with MakeHuman's rule, it must give the
-garment back (it does to < 0.01 mm). The sheet's body is the plain base mesh with the young-male target, a neutral
+garment back (it does to < 0.01 mm). The sheet's body is G2's body (above), shown as a neutral
 clay mannequin (no face, hair or skin detail: G2's, G6's and the hair session's work); the desk and the stool are grey
 boxes.

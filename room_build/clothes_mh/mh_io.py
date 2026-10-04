@@ -45,7 +45,7 @@ def read_target(path):
             continue
         p = line.split()
         idx.append(int(p[0])); d.append([float(p[1]), float(p[2]), float(p[3])])
-    return np.array(idx, int), np.array(d, float)
+    return np.array(idx, int), np.array(d, float).reshape(-1, 3)        # (some targets are empty)
 
 
 def apply_targets(coords, targets):

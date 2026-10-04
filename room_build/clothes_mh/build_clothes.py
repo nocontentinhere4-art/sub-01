@@ -51,9 +51,31 @@ def smooth01(a, b, x):
 
 # ================================================================ the body
 base, BODY_F, _, _ = M.read_obj(f"{MH}/3dobjs/base.obj", groups={"body"})
-REST = M.apply_targets(base, [(f"{MH}/targets/macrodetails/asian-male-young.target", 1.0)])   # a young man
+# G2's body (room_build/mh/build_g2.mjs on preview/mh-motion): MakeHuman's macro modifiers evaluated as MakeHuman does,
+# male, 20 years (a blend of the "child" and "young" targets), muscle 0.5, weight 0.4, proportions 0.75, ethnicity 1/3
+# each, and the hand targets; then (on export only) a uniform scale to 1.75 m with the feet at y = 0
+def g2_targets():
+    age_val = 0.1875 + (20 - 11) / (25 - 11) * (0.5 - 0.1875)
+    ages = {"child": (0.5 - age_val) / (0.5 - 0.1875), "young": (age_val - 0.1875) / (0.5 - 0.1875)}
+    tri = lambda v: {"min": 1 - v / 0.5, "average": v / 0.5} if v < 0.5 else {"average": (1 - v) / 0.5, "max": (v - 0.5) / 0.5}
+    muscles = {k + "muscle": w for k, w in tri(0.5).items()}; weights = {k + "weight": w for k, w in tri(0.4).items()}
+    T = []
+    for eth in ("african", "asian", "caucasian"):
+        for age, aw in ages.items(): T.append((f"macrodetails/{eth}-male-{age}.target", aw / 3))
+    for age, aw in ages.items():
+        for mu, mw in muscles.items():
+            for we, ww in weights.items():
+                T.append((f"macrodetails/universal-male-{age}-{mu}-{we}.target", aw * mw * ww))
+                T.append((f"macrodetails/proportions/male-{age}-{mu}-{we}-idealproportions.target", aw * mw * ww * 0.5))
+    for sd in ("l", "r"):
+        for k, w in (("fingers-diameter-incr", 0.55), ("fingers-length-decr", 1.0), ("scale-incr", 0.15)):
+            T.append((f"armslegs/{sd}-hand-{k}.target", w))
+    return [(f"{MH}/targets/{rel}", w) for rel, w in T if w > 1e-6]
+REST = M.apply_targets(base, g2_targets())
 NV = len(REST)
 BODY_IDS = sorted({i for f in BODY_F for i in f})                 # the skin's vertices (the rest are helpers)
+G2_Y0 = REST[BODY_IDS, 1].min(); G2_S = 1.75 / (REST[BODY_IDS, 1].max() - G2_Y0)   # MakeHuman units -> G2's metres
+def to_g2(p): return np.stack([p[..., 0] * G2_S, (p[..., 1] - G2_Y0) * G2_S, p[..., 2] * G2_S], -1)
 BODY_TRIS = []
 for f in BODY_F:
     for k in range(1, len(f) - 1): BODY_TRIS.append((f[0], f[k], f[k + 1]))
@@ -722,7 +744,7 @@ def slides(sock_obj):
                 a = math.pi * ju / (NU - 1); d = Vector((math.cos(a), 0, math.sin(a)))
                 hit = bvh.ray_cast(o_ + d * 3, -d, 6.0)
                 if hit[0] is None: MISSES[0] += 1
-                row.append((hit[0] if hit[0] is not None else o_ + d * 0.5) + d * 0.2 * CM)
+                row.append((hit[0] if hit[0] is not None else bvh.find_nearest(o_ + d * 0.6)[0]) + d * 0.2 * CM)   # (a miss: the nearest sock point)
             # each end goes down over the bed's rounded edge into its side wall
             for side, end in ((1, 0), (-1, -1)):
                 p0 = row[end]; xe = edge_x(y, side) - side * 0.45 * CM; ze = rim_at(xe, y) - 0.8 * CM
@@ -861,6 +883,87 @@ for name, o in GARMENTS.items():
     print("REFIT", name, "max error", round(float(err) * 100, 3), "mm"); assert err < 0.002, (name, err)
 json.dump({k: {"verts": len(o.data.vertices), "faces": len(o.data.polygons), "hides": len(DELETE[k])} for k, o in GARMENTS.items()},
           open(os.path.join(OUT, "summary.json"), "w"), indent=1)
+
+# ================================================================ G2's body, dressed: the clothes added to boy_g2.glb itself
+# (preview/mh-motion, room_build/mh/glb), skinned to ITS skin: the same 163 joints, rest pose and names, so its clips
+# (clips_g2) drive the clothes too. Each garment vertex takes the four strongest of its weights (the mix of its three
+# body vertices' default_weights, as MakeHuman does), the body's triangles under the clothes are dropped (MakeHuman's
+# delete_verts), and nothing else in the file changes. Positions in G2's metres: to_g2().
+import glb_io
+G2_GLB = arg("--g2", os.path.join(HERE, "g2", "boy_g2.glb"))
+def export_g2(path):
+    js, bn = glb_io.read(G2_GLB); W = glb_io.Writer(js, bn)
+    rest = json.load(open(os.path.join(os.path.dirname(G2_GLB), "boy_g2_rest.json")))
+    jidx = {n: k for k, n in enumerate(rest["order"])}; bone_j = np.array([jidx[n] for n in BONES])
+    ibm = glb_io.accessor(js, bn, js["skins"][0]["inverseBindMatrices"]).reshape(-1, 4, 4)
+    for n, k in jidx.items():                                   # the skin's joint k is rest["order"][k]: its bind sits at its head
+        assert np.allclose(-ibm[k, 3, :3], to_g2(np.array(SKEL[n]["head"])), atol=1e-5), ("joint order", n)
+    nbody = len(BODY_IDS); gl = {v: k for k, v in enumerate(BODY_IDS)}
+    prim = js["meshes"][0]["primitives"][0]
+    def tris(faces):
+        out = []
+        for f in faces:
+            q = [gl[v] for v in f]; out += q[:3] + ([q[0], q[2], q[3]] if len(q) == 4 else [])
+        return np.array(out, np.uint32)
+    old = glb_io.accessor(js, bn, prim["indices"])
+    assert np.array_equal(old.astype(np.uint32), tris(BODY_F)), "G2's body triangles are not the base mesh's"
+    hide = set()
+    for v in DELETE.values(): hide |= set(v)
+    kept = tris([f for f in BODY_F if not all(v in hide for v in f)])
+    prim["indices"] = W.acc(kept, "SCALAR", 34963)
+    mats = {}
+    def material(name):
+        if name in mats: return mats[name]
+        m = MAT[name]; f = FABRICS.get(name, {})
+        pbr = {"metallicFactor": 0.0, "roughnessFactor": float(m["rough"])}
+        mat = {"name": name, "pbrMetallicRoughness": pbr}
+        if m.get("color_map"):
+            pbr["baseColorTexture"] = {"index": W.image(m["color_map"])}
+            mat["normalTexture"] = {"index": W.image(m["normal_map"])}
+        else: pbr["baseColorFactor"] = list(m["rgb"]) + [1.0]
+        if f.get("sheen", (0, 0))[0]:
+            mat["extensions"] = {"KHR_materials_sheen": {"sheenColorFactor": [f["sheen"][1]] * 3, "sheenRoughnessFactor": 0.45}}
+            js.setdefault("extensionsUsed", []); "KHR_materials_sheen" in js["extensionsUsed"] or js["extensionsUsed"].append("KHR_materials_sheen")
+        js["materials"].append(mat); mats[name] = len(js["materials"]) - 1; return mats[name]
+    for gname, o in GARMENTS.items():
+        b = BIND[gname]; me = o.data; me.update()
+        wm = WMAT[b["ref"][:, 0]] * b["w"][:, 0, None] + WMAT[b["ref"][:, 1]] * b["w"][:, 1, None] + WMAT[b["ref"][:, 2]] * b["w"][:, 2, None]
+        top = np.argsort(-wm, 1)[:, :4]; tw = np.take_along_axis(wm, top, 1); tw /= np.maximum(tw.sum(1, keepdims=True), 1e-9)
+        P = to_g2(np.array([MHv(v.co) for v in me.vertices])); Nn = np.array([MHv(v.normal) for v in me.vertices])
+        uvl = me.uv_layers["UVMap"].data; prims = []
+        for mi in range(len(me.materials)):
+            key, vp, vuv, idx = {}, [], [], []
+            for p in me.polygons:
+                if p.material_index != mi: continue
+                corner = []
+                for li in p.loop_indices:
+                    vi = me.loops[li].vertex_index; uv = tuple(round(c, 6) for c in uvl[li].uv)
+                    k = key.setdefault((vi, uv), len(key))
+                    if k == len(vp): vp.append(vi); vuv.append((uv[0], 1 - uv[1]))
+                    corner.append(k)
+                for t in range(1, len(corner) - 1): idx += [corner[0], corner[t], corner[t + 1]]
+            if not idx: continue
+            vp = np.array(vp)
+            prims.append({"attributes": {
+                "POSITION": W.acc(P[vp].astype(np.float32), "VEC3", 34962, minmax=True),
+                "NORMAL": W.acc(Nn[vp].astype(np.float32), "VEC3", 34962),
+                "TEXCOORD_0": W.acc(np.array(vuv, np.float32), "VEC2", 34962),
+                "JOINTS_0": W.acc(bone_j[top[vp]].astype(np.uint16), "VEC4", 34962),
+                "WEIGHTS_0": W.acc(tw[vp].astype(np.float32), "VEC4", 34962)},
+                "indices": W.acc(np.array(idx, np.uint32), "SCALAR", 34963), "material": material(me.materials[mi].name)})
+        js["meshes"].append({"name": gname, "primitives": prims})
+        js["nodes"].append({"name": gname, "mesh": len(js["meshes"]) - 1, "skin": 0})
+        js["scenes"][js.get("scene", 0)]["nodes"].append(len(js["nodes"]) - 1)
+    js.setdefault("asset", {})["generator"] = "SUB-01 clothes_mh/build_clothes.py (G2's body + G4's clothes)"
+    W.write(path); print("wrote", path, round(os.path.getsize(path) / 1e6, 2), "MB; body triangles hidden:", (len(old) - len(kept)) // 3)
+    json.dump({"hidden_body_vertices_mh": sorted(int(v) for v in hide),
+               "note": "MakeHuman base-mesh vertex indices under the clothes (the union of the garments' delete_verts)"},
+              open(os.path.join(os.path.dirname(path), "hidden_body_vertices.json"), "w"))
+
+
+if os.path.exists(G2_GLB):
+    os.makedirs(os.path.join(OUT, "g2"), exist_ok=True); export_g2(os.path.join(OUT, "g2", "boy_g2_dressed.glb"))
+else: print("no", G2_GLB, ": the dressed G2 glb is not written")
 
 # the body as the sheet shows it: the skin under the clothes removed (MakeHuman's delete_verts)
 ALL_DEL = set()
