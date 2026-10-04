@@ -1,9 +1,17 @@
-// Short, slightly messy black hair as layered cards grown on the MakeHuman default head (head.json from
-// extract_head.py, metres, the base mesh's own frame: face toward +z, crown at y = 0.849).
-//   buildHair(THREE, head) -> {cards, scalp, stats}
-// cards: alpha-textured strips (uv.x picks an atlas column of hair_tex.js, uv.y runs root -> tip), with vertex colours
-//        as baked occlusion (inner layers and roots darker). Normals are the scalp's, so the cards shade as one volume.
-// scalp: a thin shell 0.6 mm off the skin where the hair grows, dark, its vertex alpha fading out across the hairline.
+// A short textured fringe cut as layered hair cards grown on the MakeHuman default head (head.json from
+// extract_head.py, metres, the base mesh's own frame: face toward +z, crown at y = 0.849). The cut: about 5 cm on
+// top with choppy texture, a fringe brought forward in small separate pieces that stops just above the brows with the
+// forehead showing between them, and the sides and back tapered short (1-2 cm, tight to the head, shortest at the
+// hairline so the temples and nape show scalp shadow); nothing over the ears.
+//   buildHair(THREE, head) -> {cards, scalp, scalpStrokes, stats}
+// cards: alpha-textured strips, narrow (0.5-1.5 cm), grown from the crown's whorl along the growth direction, layered
+//        from opaque cards hugging the scalp through more transparent mid layers to a few flyaways. uv.x picks an atlas
+//        column of hair_tex.js, uv.y runs root -> tip; tangent = the strand direction (for the Kajiya-Kay highlights);
+//        vertex colours = baked occlusion (inner layers and roots darker) times a slight per-card brown-black tint.
+//        Normals are the scalp's, so the cards shade as one volume.
+// scalp: the painted base layer, a shell 0.6 mm off the skin where hair grows, with an equirectangular uv round the
+//        skull (paintScalp() draws its strokes along the growth direction) and vertex alpha feathering across the
+//        hairline.
 import { ATLAS_COLS } from "./hair_tex.js";
 
 function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
@@ -72,11 +80,11 @@ export function buildHair(THREE, head, opt = {}){
     return {p: hit.point.clone(), n};
   }
 
-  // The ears stay clear: no roots on them, and hair ending over them stays short.
+  // The ears stay clear: no roots on them.
   const ear = p => Math.abs(p.x) > 0.064 && p.y > 0.695 && p.y < 0.758 && p.z > -0.006 && p.z < 0.058;
 
   // Root candidates: an even spread of directions, kept where hair grows.
-  const cand = [], N = 9000, ga = Math.PI * (3 - Math.sqrt(5));
+  const cand = [], N = 12000, ga = Math.PI * (3 - Math.sqrt(5));
   for (let i = 0; i < N; i++){
     const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = ga * i;
     const s = surf(new V(Math.cos(th) * r, y, Math.sin(th) * r));
@@ -84,83 +92,88 @@ export function buildHair(THREE, head, opt = {}){
     const ins = inside(s.p); if (ins > 0.0005) cand.push({...s, ins, az: azimuth(s.p)});
   }
 
-  // The combing: away from the crown's whorl, gravity taking over down the sides and back; the top's front comes
-  // forward into a fringe that falls over the forehead, swept a little to his right (-x).
+  // How far up the head a point is in the cut: 0 in the tapered sides and back, 1 on top (the "weight line" sits a
+  // little above the temples and runs back round the head, lower behind).
+  const topness = (p, az) => smooth(lerp(0.792, 0.808, smooth(60, 150, Math.abs(az))), lerp(0.806, 0.826, smooth(60, 150, Math.abs(az))), p.y);
+
+  // The growth direction: away from the crown's whorl (a little behind the top), forward over the top into the fringe
+  // with a slight sweep to his right (-x), straight down the tapered sides and back.
   const whorl = surf(new V(0.0, 0.85, -0.02).sub(C)).p;
   function flow(p, n, card){
-    const top = smooth(0.792, 0.838, p.y), az = Math.abs(azimuth(p)), front = 1 - smooth(25, 60, az);
+    const az = azimuth(p), top = topness(p, az), front = 1 - smooth(25, 60, Math.abs(az));
     const away = p.clone().sub(whorl); away.addScaledVector(n, -away.dot(n));
     const dw = away.length(); away.normalize();
     if (dw < 0.012) away.lerp(new V(0, -0.3, -1).addScaledVector(n, -n.z), 1 - dw / 0.012).normalize();   // round the whorl
-    const d = away.multiplyScalar(top * (0.6 + 0.4 * front) + 0.15);
-    d.y -= (1 - top) * 1.0 + front * (1 - top) * 0.6;                               // gravity below the crown
-    if (az > 55 && az < 120) d.z -= 0.3 * (1 - top);                                 // the sides go a little back
-    d.x -= 0.28 * front * smooth(0.77, 0.80, p.y);                                    // the fringe's sweep
+    const d = away.multiplyScalar(0.25 + 0.75 * top);
+    d.y -= (1 - top) * 1.2;                                                           // the taper combs down
+    d.x -= 0.25 * front * smooth(0.79, 0.81, p.y);                                    // the fringe's sweep
     d.addScaledVector(n, -d.dot(n));
-    d.applyAxisAngle(n, card.turn);
+    if (card) d.applyAxisAngle(n, card.turn);
     return d.normalize();
   }
+  // Hair length at a root: about 5 cm on top, the fringe long enough to reach just above the brows (~0.758),
+  // tapering from ~2 cm at the weight line to under 1 cm at the hairline on the sides and nape.
   function lengthAt(p, az){
-    const a = Math.abs(az), top = smooth(0.786, 0.826, p.y);
-    let L = lerp(lerp(0.026, 0.017, smooth(115, 165, a)), 0.060, top);
-    if (a < 42 && p.y > 0.79) L = lerp(0.060, 0.074, smooth(0.79, 0.81, p.y));       // the fringe
-    if (a > 62) L = Math.min(L, 0.004 + inside(p) * 1.1);                             // sides and nape taper into the skin
+    const a = Math.abs(az), top = topness(p, az), ins = inside(p);
+    const taper = lerp(0.006, 0.019, smooth(0.0, 0.05, ins));
+    let L = lerp(taper, a > 120 ? 0.042 : 0.05, top);
+    if (a < 40 && p.y > 0.79) L = Math.max(L, (p.y - 0.758) * 1.2);                   // the fringe: tips above the brows
     return L;
   }
 
-  // Layers: cover (wide, dense, on the skin), mid, outer (narrow, messy, lifted tips), an extra fringe so the forehead
-  // never shows through in a hole, and hairline wisps.
+  // Layers, from the scalp out: base (opaque, hugging the scalp), mid (more transparent, some lift on top), the
+  // fringe's separate pieces, flyaways (a few single hairs breaking the silhouette on top), and the short taper.
   const LAYERS = [
-    {name: "cover", gap: 0.0115, width: [0.013, 0.017], off: 0.0012, vol: 0.0,   turn: 0.10, cols: [0, 1, 2], ao: 0.72, lift: 0.0005, lenK: 0.95},
-    {name: "mid",   gap: 0.0100, width: [0.010, 0.013], off: 0.0030, vol: 0.004, turn: 0.16, cols: [0, 1, 2, 3], ao: 0.85, lift: 0.0018, lenK: 1.0},
-    {name: "outer", gap: 0.0105, width: [0.006, 0.009], off: 0.0048, vol: 0.006, turn: 0.22, cols: [3, 4, 5], ao: 1.0,  lift: 0.0025, lenK: 1.06},
-    {name: "fringe", gap: 0.0060, width: [0.008, 0.012], off: 0.0040, vol: 0.003, turn: 0.16, cols: [1, 2, 3, 4], ao: 0.95, lift: 0.002, lenK: 1.05, fringe: true},
-    {name: "wisp",  gap: 0.0060, width: [0.004, 0.007], off: 0.0009, vol: 0.0,   turn: 0.2, cols: [6, 7], ao: 0.9, lift: 0.001, lenK: 0.45, edge: 0.010},
+    {name: "base",  gap: 0.0100, width: [0.010, 0.014], off: 0.0010, vol: 0.0,    turn: 0.10, cols: [0, 1], ao: 0.62, lift: 0.0005, lenK: 0.9, top: true},
+    {name: "mid",   gap: 0.0095, width: [0.008, 0.012], off: 0.0028, vol: 0.0045, turn: 0.18, cols: [1, 2, 3], ao: 0.85, lift: 0.0030, lenK: 1.0, top: true},
+    {name: "piece", gap: 0.0110, width: [0.006, 0.009], off: 0.0045, vol: 0.0065, turn: 0.26, cols: [3, 4, 5], ao: 1.0, lift: 0.0032, lenK: 1.05, top: true},
+    {name: "fringe", gap: 0.0080, width: [0.006, 0.010], off: 0.0035, vol: 0.002, turn: 0.18, cols: [3, 4, 5], ao: 0.95, lift: 0.0015, lenK: 1.0, fringe: true},
+    {name: "fly",   gap: 0.0340, width: [0.004, 0.006], off: 0.0055, vol: 0.005,  turn: 0.5, cols: [6, 7], ao: 1.0, lift: 0.005, lenK: 0.85, top: true},
+    {name: "taper", gap: 0.0045, width: [0.005, 0.008], off: 0.0007, vol: 0.0,    turn: 0.12, cols: [6, 7], ao: 1.0, lift: 0.0003, lenK: 1.0, side: true, thin: 0.7},
   ];
-  const P = [], UV = [], COL = [], NRM = [], IDX = [];
+  const P = [], UV = [], COL = [], NRM = [], TAN = [], IDX = [];
   let cards = 0;
   for (const L of LAYERS){
-    const pool = cand.filter(c => (L.edge ? c.ins < L.edge : true) && (L.fringe ? Math.abs(c.az) < 40 && c.p.y > 0.792 && c.p.y < 0.832 : true)).sort(() => R() - 0.5), roots = [];
-    for (const c of pool){                                                           // closer where the hair is short
-      const gap = L.gap * lerp(0.72, 1, smooth(0.74, 0.8, c.p.y));
-      if (roots.every(r => r.p.distanceToSquared(c.p) > gap * gap)) roots.push(c);
-    }
+    const pool = cand.filter(c => {
+      const t = topness(c.p, c.az);
+      if (L.fringe) return Math.abs(c.az) < 40 && c.p.y > 0.792 && c.p.y < 0.83;
+      if (L.side) return t < 0.85;
+      return t > 0.05;
+    }).sort(() => R() - 0.5), roots = [];
+    for (const c of pool) if (roots.every(r => r.p.distanceToSquared(c.p) > L.gap * L.gap)) roots.push(c);
     for (const r of roots){
-      const card = {turn: (R() - 0.5) * 2 * L.turn};
-      const vol = L.vol * smooth(0.74, 0.83, r.p.y) * (0.6 + 0.6 * R()) * smooth(0.006, 0.02, r.p.distanceTo(whorl));   // more volume on top, none at the whorl
-      const len = Math.max(0.005, lengthAt(r.p, r.az) * L.lenK * (0.82 + R() * 0.36));
-      const w = Math.min(lerp(L.width[0], L.width[1], R()) * (0.75 + 0.25 * smooth(0.74, 0.8, r.p.y)), len * 0.4);    // short hair, narrow cards
-      const cols = len < 0.032 && !L.edge ? [3, 4, 5, 6] : L.cols;                     // short sides and nape: finer, see-through
-      const col = cols[Math.floor(R() * cols.length)], flip = R() < 0.5;
+      const card = {turn: (R() - 0.5) * 2 * L.turn}, top = topness(r.p, r.az);
+      const vol = L.vol * top * (0.5 + 0.8 * R()) * smooth(0.006, 0.02, r.p.distanceTo(whorl));
+      const len = Math.max(0.004, lengthAt(r.p, r.az) * L.lenK * (0.75 + R() * 0.5));   // choppy: lengths vary
+      const w = Math.min(lerp(L.width[0], L.width[1], R()), len * (L.thin || 0.45));
+      const col = L.cols[Math.floor(R() * L.cols.length)], flip = R() < 0.5;
       const u0 = (col + (flip ? 1 : 0)) / ATLAS_COLS, u1 = (col + (flip ? 0 : 1)) / ATLAS_COLS;
-      const tw = (R() - 0.5) * (L.name === "outer" ? 0.6 : 0.2);                      // the card's tilt about its strand
-      // Grow the guide along the scalp, then hang the strip on it (short cards need fewer segments).
-      const SEG = len < 0.012 ? 1 : len < 0.035 ? 2 : len < 0.05 ? 3 : 4;
+      const tw = (R() - 0.5) * (L.name === "piece" ? 0.6 : 0.2);                      // the card's tilt about its strand
+      const SEG = len < 0.012 ? 1 : len < 0.025 ? 2 : len < 0.045 ? 3 : 4;
       let cur = r, rows = [];
       for (let k = 0; k <= SEG; k++){
-        const t = k / SEG, offset = L.off + vol + t * L.lift * (0.4 + R());
+        const t = k / SEG, offset = L.off + vol + t * L.lift * (0.4 + R()) * (L.side ? 1 : 0.4 + top);
         const dir = flow(cur.p, cur.n, card);
-        const base = cur.p.clone().addScaledVector(cur.n, offset);
-        rows.push({base, n: cur.n.clone(), dir, offset, t});
+        rows.push({base: cur.p.clone().addScaledVector(cur.n, offset), n: cur.n.clone(), dir, offset, t});
         if (k < SEG){
-          card.turn += (R() - 0.5) * 0.15;
+          card.turn += (R() - 0.5) * 0.12;
           const nx = surf(cur.p.clone().addScaledVector(dir, len / SEG).sub(C));
           if (!nx) break;
           cur = nx;
         }
       }
       if (rows.length < SEG + 1) continue;
-      const v0 = P.length / 3, hue = R() < 0.3 ? 0.5 + R() * 0.7 : (R() - 0.5) * 0.3;   // a few browner cards
-      const tint = [1 + 0.22 * hue, 1 + 0.12 * hue, 1 - 0.02 * hue], bright = 0.9 + R() * 0.2;
+      const v0 = P.length / 3, hue = R() < 0.3 ? 0.4 + R() * 0.6 : (R() - 0.5) * 0.25;   // a few browner cards
+      const tint = [1 + 0.2 * hue, 1 + 0.1 * hue, 1 - 0.02 * hue], bright = 0.9 + R() * 0.2;
       for (const row of rows){
         const side = new V().crossVectors(row.n, row.dir).normalize();
-        const hw = w * 0.5 * (1 - 0.35 * row.t);
+        const hw = w * 0.5 * (1 - 0.3 * row.t);
         for (const s of [-1, 1]){
           const q = surf(row.base.clone().addScaledVector(side, s * hw).sub(C));       // wrap the strip round the skull
           const p = q ? q.p.addScaledVector(q.n, row.offset + s * tw * hw) : row.base.clone().addScaledVector(side, s * hw);
-          P.push(p.x, p.y, p.z); NRM.push(row.n.x, row.n.y, row.n.z);
+          P.push(p.x, p.y, p.z); NRM.push(row.n.x, row.n.y, row.n.z); TAN.push(row.dir.x, row.dir.y, row.dir.z, 1);
           UV.push(s < 0 ? u0 : u1, row.t * 0.995);
-          const occ = L.ao * lerp(0.62, 1.0, smooth(0, 0.7, row.t));
+          const occ = L.ao * lerp(0.6, 1.0, smooth(0, 0.7, row.t));
           COL.push(occ * tint[0] * bright, occ * tint[1] * bright, occ * tint[2] * bright);
         }
       }
@@ -171,32 +184,44 @@ export function buildHair(THREE, head, opt = {}){
   const cardsGeo = new THREE.BufferGeometry();
   cardsGeo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
   cardsGeo.setAttribute("normal", new THREE.Float32BufferAttribute(NRM, 3));
+  cardsGeo.setAttribute("tangent", new THREE.Float32BufferAttribute(TAN, 4));
   cardsGeo.setAttribute("uv", new THREE.Float32BufferAttribute(UV, 2));
   cardsGeo.setAttribute("color", new THREE.Float32BufferAttribute(COL, 3));
   cardsGeo.setIndex(IDX);
 
-  // The scalp tint: the head's own triangles near and inside the hair, pushed 0.6 mm out, alpha feathering out over
-  // ~1.4 cm across the hairline so the skin darkens gradually into the hair, with a little noise so it isn't a line.
-  const sp = [], sn = [], sc = [], si = [], map = new Map(), hv = new V(), hn = new V();
+  // The painted base: the head's triangles near and inside the hair, 0.6 mm out, unindexed so the equirectangular
+  // uv can be mended where a triangle crosses the seam at the back. Alpha feathers over ~1.4 cm across the hairline
+  // and stays lower on the taper, so skin shows through as scalp shadow.
+  const sp = [], sn = [], sc = [], suv = [], hv = new V(), hn = new V();
+  const uvOf = v => { tv.copy(v).sub(C); return [0.5 + Math.atan2(tv.x, tv.z) / (2 * Math.PI), 0.5 - Math.atan2(tv.y, Math.hypot(tv.x, tv.z)) / Math.PI]; };
   for (let f = 0; f < head.i.length; f += 3){
-    const ids = [head.i[f], head.i[f + 1], head.i[f + 2]];
-    const al = ids.map(i => { hv.fromBufferAttribute(pos, i); return ear(hv) ? 0 : smooth(-0.006, 0.008, inside(hv)); });
-    if (Math.max(...al) <= 0) continue;
+    const ids = [head.i[f], head.i[f + 1], head.i[f + 2]], al = [], uvs = [];
     for (const i of ids){
-      if (!map.has(i)){
-        hv.fromBufferAttribute(pos, i); hn.fromBufferAttribute(nrm, i);
-        const a = ear(hv) ? 0 : smooth(-0.006, 0.008, inside(hv)) * (0.86 + 0.1 * R());
-        map.set(i, sp.length / 3);
-        sp.push(hv.x + hn.x * 0.0006, hv.y + hn.y * 0.0006, hv.z + hn.z * 0.0006); sn.push(hn.x, hn.y, hn.z);
-        sc.push(0.020, 0.016, 0.014, a);
-      }
-      si.push(map.get(i));
+      hv.fromBufferAttribute(pos, i);
+      al.push(ear(hv) ? 0 : smooth(-0.006, 0.008, inside(hv)) * lerp(0.78, 0.95, topness(hv, azimuth(hv))));
+      uvs.push(uvOf(hv));
     }
+    if (Math.max(...al) <= 0) continue;
+    if (Math.max(...uvs.map(u => u[0])) - Math.min(...uvs.map(u => u[0])) > 0.5) uvs.forEach(u => { if (u[0] < 0.5) u[0] += 1; });
+    ids.forEach((i, k) => {
+      hv.fromBufferAttribute(pos, i); hn.fromBufferAttribute(nrm, i);
+      sp.push(hv.x + hn.x * 0.0006, hv.y + hn.y * 0.0006, hv.z + hn.z * 0.0006); sn.push(hn.x, hn.y, hn.z);
+      sc.push(1, 1, 1, al[k] * (0.92 + 0.08 * R())); suv.push(uvs[k][0], uvs[k][1]);
+    });
   }
   const scalp = new THREE.BufferGeometry();
   scalp.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
   scalp.setAttribute("normal", new THREE.Float32BufferAttribute(sn, 3));
   scalp.setAttribute("color", new THREE.Float32BufferAttribute(sc, 4));
-  scalp.setIndex(si);
-  return {cards: cardsGeo, scalp, stats: {cards, cardTris: IDX.length / 3, scalpTris: si.length / 3, roots: cand.length}};
+  scalp.setAttribute("uv", new THREE.Float32BufferAttribute(suv, 2));
+
+  // Strokes for the painted base: at every root candidate, a short dash along the growth direction, in the map's uv.
+  const scalpStrokes = [];
+  for (const c of cand){
+    const d = flow(c.p, c.n, null), a = uvOf(c.p), b = uvOf(c.p.clone().addScaledVector(d, 0.003));
+    let du = b[0] - a[0]; if (du > 0.5) du -= 1; if (du < -0.5) du += 1;
+    const len = Math.min(1, lengthAt(c.p, c.az) / 0.012);
+    for (let k = 0; k < 6; k++) scalpStrokes.push({u: a[0] + (R() - 0.5) * 0.004, v: a[1] + (R() - 0.5) * 0.004, du, dv: b[1] - a[1], len: 1.5 + 2 * len});
+  }
+  return {cards: cardsGeo, scalp, scalpStrokes, stats: {cards, cardTris: IDX.length / 3, scalpTris: sp.length / 9, roots: cand.length}};
 }

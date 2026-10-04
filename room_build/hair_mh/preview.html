@@ -6,27 +6,29 @@
 <script type="module">
 // Grows the hair on the MakeHuman head, renders the still sheet (front, 3/4, side, back close-ups; the head 2.2 m away
 // through room.html's 30-degree lens, at 1:1 pixels and as the whole frame) and exports hair_mh.glb.
-// Driven by render.mjs; window.OUT gets {sheet, glb, atlas, stats} as base64.
+// Driven by render.mjs; window.OUT gets {sheet, glb, atlas, data, scalp, stats} as base64.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { buildHair, CENTER } from "./hair_gen.js";
-import { makeHairAtlas } from "./hair_tex.js";
-import { hairCardMaterial, setupHair } from "./hair_material.js";
+import { makeHairAtlas, paintScalp } from "./hair_tex.js";
+import { hairCardMaterial, scalpMaterial, setupHair } from "./hair_material.js";
 
 const head = await (await fetch("./head.json")).json();
 const atlasCanvas = makeHairAtlas(2048);
-const atlas = new THREE.CanvasTexture(atlasCanvas);
-atlas.flipY = false; atlas.colorSpace = THREE.SRGBColorSpace; atlas.name = "hair_atlas";
+const tex = (cv, name, srgb) => { const t = new THREE.CanvasTexture(cv); t.flipY = false; t.name = name;
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t; };
+const atlas = tex(atlasCanvas.color, "hair_atlas", true), data = tex(atlasCanvas.data, "hair_data", false);
 
 const t0 = performance.now();
 const hair = buildHair(THREE, head.head);
 hair.stats.ms = Math.round(performance.now() - t0);
+const scalpCanvas = paintScalp(hair.scalpStrokes);
+const scalpTex = tex(scalpCanvas, "hair_scalp", true); scalpTex.wrapS = THREE.RepeatWrapping;
 
 const group = new THREE.Group(); group.name = "hair_mh";
-const cards = new THREE.Mesh(hair.cards, hairCardMaterial(THREE, atlas)); cards.name = "hair_cards";
-const scalpMat = new THREE.MeshStandardMaterial({name: "hair_scalp", vertexColors: true, transparent: true, roughness: 0.8, depthWrite: false});
-const scalp = new THREE.Mesh(hair.scalp, scalpMat); scalp.name = "hair_scalp"; scalp.renderOrder = 1;
+const cards = new THREE.Mesh(hair.cards, hairCardMaterial(THREE, atlas, data)); cards.name = "hair_cards";
+const scalp = new THREE.Mesh(hair.scalp, scalpMaterial(THREE, scalpTex)); scalp.name = "hair_scalp"; scalp.renderOrder = 1;
 group.add(scalp, cards);
 
 // Export before the runtime-only tweaks.
@@ -70,5 +72,5 @@ g.drawImage(far, 640 - 200, 400 - 200, 400, 400, S + 120, S + 120, 400, 400);   
 g.drawImage(far, 0, 0, 1280, 800, 2 * S, S + 120, 640, 400);                    // the whole frame, half size
 
 const b64 = buf => { let s = ""; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
-window.OUT = {sheet: sheet.toDataURL("image/png").split(",")[1], glb: b64(glb), atlas: atlasCanvas.toDataURL("image/png").split(",")[1], stats: hair.stats};
+window.OUT = {sheet: sheet.toDataURL("image/png").split(",")[1], glb: b64(glb), atlas: atlasCanvas.color.toDataURL("image/png").split(",")[1], data: atlasCanvas.data.toDataURL("image/png").split(",")[1], scalp: scalpCanvas.toDataURL("image/png").split(",")[1], stats: hair.stats};
 </script></body></html>

@@ -1,4 +1,5 @@
-// Renders preview.html headless (software GL is enough) and writes hair_sheet.png, hair_mh.glb and hair_atlas.png.
+// Renders preview.html headless (software GL is enough) and writes hair_sheet.png, hair_mh.glb and the textures
+// (hair_atlas.png, hair_data.png, hair_scalp.png; all also embedded in the GLB).
 //   (cd dir-with-playwright-core && node .../render.mjs <head.json> <three package dir> <out dir> [chromium executable])
 // head.json comes from extract_head.py; three must be 0.169.0, as room.html uses.
 import http from "node:http";
@@ -28,5 +29,7 @@ fs.mkdirSync(outDir, {recursive: true});
 fs.writeFileSync(path.join(outDir, "hair_sheet.png"), Buffer.from(out.sheet, "base64"));
 fs.writeFileSync(path.join(outDir, "hair_mh.glb"), Buffer.from(out.glb, "base64"));
 fs.writeFileSync(path.join(outDir, "hair_atlas.png"), Buffer.from(out.atlas, "base64"));
+fs.writeFileSync(path.join(outDir, "hair_data.png"), Buffer.from(out.data, "base64"));
+fs.writeFileSync(path.join(outDir, "hair_scalp.png"), Buffer.from(out.scalp, "base64"));
 console.log(JSON.stringify(out.stats));
 await browser.close(); server.close();

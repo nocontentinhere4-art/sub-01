@@ -1,48 +1,75 @@
-// The hair strand atlas, drawn from scratch (no source images): 8 vertical columns, each one hair-card texture with
-// the roots at the top row (glTF v = 0) and the tips at the bottom. Columns 0-2 are dense cover clumps, 3-5 medium
-// clumps, 6-7 sparse wisps for the hairline and flyaways. Strands are 1-2.5 px of 2048, brown-black with a little per-strand
-// colour variation, darker at the root and fading in there (so a card's root edge never shows on the one below),
-// many thin, long, half-transparent hairs per card that clump loosely and thin to see-through tips.
+// The hair textures, drawn from scratch (no source images).
+// makeHairAtlas(): two 2048 px atlases with the same 8 vertical columns, each a hair-card texture with the roots at the
+//   top row (glTF v = 0) and the tips at the bottom, running from dense clumps (0-2) through looser clumps (3-5) to
+//   sparse strands and single hairs (6-7):
+//   - color: brown-black strands on #1b1512 with a little per-strand variation, alpha thinning to see-through tips,
+//     the hairs packed toward each column's middle so a card has no hard side edge;
+//   - data (the card material's occlusion slot): R = depth/occlusion (strands deeper in a clump darker), G = a per-strand
+//     ID (shifts the highlights strand by strand), B = the root-to-tip gradient.
+// paintScalp(): the base layer under the cards, an equirectangular map round the skull of short dark strokes laid
+//   along the hair's growth direction (from buildHair's scalpStrokes).
 export const ATLAS_COLS = 8;
+export const BASE = [27, 21, 18];   // #1b1512, natural black-brown, never pure black
 
 function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 const KINDS = [   // strands per column, clumps, clump pull, how far down the strands reach, strand alpha
-  {n: 220, clumps: 7, pull: 0.3, end: [0.75, 1.0], a: 0.7}, {n: 200, clumps: 6, pull: 0.3, end: [0.72, 1.0], a: 0.7},
-  {n: 185, clumps: 8, pull: 0.35, end: [0.68, 1.0], a: 0.7},
-  {n: 130, clumps: 5, pull: 0.4, end: [0.62, 1.0], a: 0.7}, {n: 120, clumps: 6, pull: 0.35, end: [0.58, 1.0], a: 0.7},
-  {n: 105, clumps: 4, pull: 0.45, end: [0.60, 1.0], a: 0.7},
-  {n: 40,  clumps: 4, pull: 0.3, end: [0.40, 1.0], a: 0.65}, {n: 26, clumps: 3, pull: 0.3, end: [0.35, 1.0], a: 0.6},
+  {n: 230, clumps: 6, pull: 0.35, end: [0.75, 1.0], a: 0.75}, {n: 200, clumps: 5, pull: 0.45, end: [0.70, 1.0], a: 0.72},
+  {n: 180, clumps: 4, pull: 0.55, end: [0.65, 1.0], a: 0.7},
+  {n: 120, clumps: 3, pull: 0.6,  end: [0.60, 1.0], a: 0.68}, {n: 100, clumps: 2, pull: 0.7, end: [0.55, 1.0], a: 0.66},
+  {n: 80,  clumps: 2, pull: 0.75, end: [0.55, 1.0], a: 0.64},
+  {n: 26,  clumps: 3, pull: 0.25, end: [0.45, 1.0], a: 0.6},  {n: 9, clumps: 9, pull: 0.0, end: [0.6, 1.0], a: 0.6},
 ];
 
 export function makeHairAtlas(size = 2048, seed = 7){
-  const cv = document.createElement("canvas"); cv.width = cv.height = size;
-  const g = cv.getContext("2d"), R = rng(seed), W = size / ATLAS_COLS, H = size, px = size / 2048;
-  g.lineCap = "round";
+  const color = document.createElement("canvas"), data = document.createElement("canvas");
+  color.width = color.height = data.width = data.height = size;
+  const g = color.getContext("2d"), d = data.getContext("2d"), R = rng(seed), W = size / ATLAS_COLS, H = size, px = size / 2048;
+  d.fillStyle = "rgb(150,128,0)"; d.fillRect(0, 0, size, size);
+  for (let y = 0; y < size; y += 4){ d.fillStyle = `rgb(150,128,${Math.round(255 * y / size)})`; d.fillRect(0, y, size, 4); }
+  g.lineCap = d.lineCap = "round";
   KINDS.forEach((k, col) => {
-    const x0 = col * W, clumps = Array.from({length: k.clumps}, (_, i) => 0.15 + 0.7 * (i + 0.5 + (R() - 0.5) * 0.5) / k.clumps);
+    const x0 = col * W, clumps = Array.from({length: k.clumps}, (_, i) => 0.18 + 0.64 * (i + 0.5 + (R() - 0.5) * 0.5) / k.clumps);
     for (let s = 0; s < k.n; s++){
       const cx = clumps[Math.floor(R() * clumps.length)];                     // the clump this strand joins at its tip
-      const u0 = 0.04 + (R() + R() + R()) / 3 * 0.92, y0 = R() * 0.04,   // centre-weighted: sparse card sides
-      y1 = k.end[0] + R() * (k.end[1] - k.end[0]);
+      const u0 = 0.05 + (R() + R() + R()) / 3 * 0.9, y0 = R() * 0.04;         // centre-weighted: sparse card sides
+      const y1 = k.end[0] + R() * (k.end[1] - k.end[0]);
       const pull = k.pull * (0.6 + R() * 0.8), wave = (R() - 0.5) * 0.03, ph = R() * 6.28;
-      const lum = 0.7 + R() * 0.6, warm = R() < 0.22 ? 1.4 + R() * 0.5 : 1.0;  // a few browner strands
-      const r = Math.min(255, 30 * lum * warm), gg = Math.min(255, 23 * lum * (warm > 1 ? 1.25 : 1)), b = 19 * lum;
+      const lum = 0.8 + R() * 0.45, warm = R() < 0.2 ? 1.2 + R() * 0.35 : 1.0;  // a few browner strands
+      const r = Math.min(255, BASE[0] * lum * warm), gg = Math.min(255, BASE[1] * lum * (1 + (warm - 1) * 0.7)), b = BASE[2] * lum;
+      const depth = Math.round(255 * (0.55 + 0.45 * R())), id = Math.round(255 * R());
       const w0 = (1.3 + R() * 1.1) * px, steps = 32;
-      let pxp = null, pyp = null;
+      let xp = null, yp = null;
       for (let i = 0; i <= steps; i++){
         const t = i / steps, y = y0 + (y1 - y0) * t;
         const u = u0 + (cx - u0) * pull * Math.pow(t, 1.6) + wave * Math.sin(ph + t * 5);
         const X = x0 + Math.min(0.97, Math.max(0.03, u)) * W, Y = y * H;
-        if (pxp !== null){
-          const taper = 1 - Math.pow(t, 1.8) * 0.8, fade = (t > 0.55 ? 1 - Math.pow((t - 0.55) / 0.45, 1.3) : 1) * Math.min(1, 0.25 + y / 0.12), root = 0.55 + 0.45 * Math.min(1, t / 0.15);
+        if (xp !== null){
+          const taper = 1 - Math.pow(t, 1.8) * 0.8, root = 0.6 + 0.4 * Math.min(1, t / 0.15);
+          const fade = (t > 0.55 ? 1 - Math.pow((t - 0.55) / 0.45, 1.3) : 1) * Math.min(1, 0.25 + y / 0.12);
           g.strokeStyle = `rgba(${(r * root) | 0},${(gg * root) | 0},${(b * root) | 0},${(k.a * fade).toFixed(3)})`;
-          g.lineWidth = w0 * taper; g.beginPath(); g.moveTo(pxp, pyp); g.lineTo(X, Y); g.stroke();
+          g.lineWidth = w0 * taper; g.beginPath(); g.moveTo(xp, yp); g.lineTo(X, Y); g.stroke();
+          d.strokeStyle = `rgb(${depth},${id},${Math.round(255 * y)})`;
+          d.lineWidth = w0 * taper; d.beginPath(); d.moveTo(xp, yp); d.lineTo(X, Y); d.stroke();
         }
-        pxp = X; pyp = Y;
+        xp = X; yp = Y;
       }
     }
   });
+  return {color, data};
+}
+
+export function paintScalp(strokes, w = 1024, h = 512, seed = 5){
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const g = cv.getContext("2d"), R = rng(seed);
+  g.fillStyle = "rgb(50,40,35)"; g.fillRect(0, 0, w, h);   // skin and hair mixed: the shadow a short taper leaves
+  g.lineCap = "round";
+  for (const s of strokes){
+    const l = s.len * (0.6 + R() * 0.8), x = s.u * w, y = s.v * h, lum = 0.75 + R() * 0.5;
+    g.strokeStyle = `rgba(${(BASE[0] * lum) | 0},${(BASE[1] * lum) | 0},${(BASE[2] * lum) | 0},${(0.6 + R() * 0.35).toFixed(2)})`;
+    g.lineWidth = 0.8 + R() * 0.8;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + s.du * w * l, y + s.dv * h * l); g.stroke();
+  }
   return cv;
 }
