@@ -61,9 +61,13 @@ def mat(name, color=(0.8, 0.8, 0.8), rough=0.5, metal=0.0, nor=None, nstr=1.0, m
 mat("bottle_coat", srgb("#8a9684"), rough=0.62, nor="white_nor.jpg", nstr=0.35, mr="plastic_mr.jpg", uv=0.05)
 mat("bottle_steel", srgb("#c6c8ca"), rough=0.3, metal=1.0, nor="metal_nor.jpg", nstr=0.5, mr="metal_mr.jpg", uv=0.06)
 mat("cap_black", srgb("#1b1b1d"), rough=0.55, nor="plastic_nor.jpg", nstr=0.2, mr="plastic_mr.jpg", uv=0.08)
-# the glass and the water in it (alpha blended: three.js transmission costs a whole extra pass)
-mat("glass", srgb("#f2f6f6"), rough=0.04, alpha=0.14)
-mat("water", srgb("#d6e6ea"), rough=0.02, alpha=0.30)
+# the glass: transmissive (KHR_materials_transmission, IOR 1.5; post_clutter.mjs adds its volume: a faint green in the
+# thick base and the rim). The water stays alpha blended: three.js draws a transmissive surface from the opaque scene
+# only, so a transmissive water inside a transmissive glass would vanish; the page draws the glass without depth writes
+# so the water shows through it
+m_ = mat("glass", srgb("#ffffff"), rough=0.03); P_ = m_.node_tree.nodes["Principled BSDF"]
+P_.inputs["Transmission Weight"].default_value = 1.0; P_.inputs["IOR"].default_value = 1.5
+mat("water", srgb("#cfe3ea"), rough=0.02, alpha=0.42)
 # earbuds, the charger and its cable: white plastic and a slightly greyer cable sheath
 mat("white_plastic", srgb("#eceae6"), rough=0.34, nor="plastic_nor.jpg", nstr=0.15, mr="plastic_mr.jpg", uv=0.05)
 mat("cable_white", srgb("#dcdad5"), rough=0.5)
@@ -126,9 +130,9 @@ def disc(name, r, y=0.0006):
     return o
 
 
-def tube(name, material, pts, r, n=8):
+def tube(name, material, pts, r, n=8, res=10):
     """a cable through glTF points: a NURBS curve (it stays inside its points' hull) turned into a mesh"""
-    cu = bpy.data.curves.new(name, 'CURVE'); cu.dimensions = '3D'; cu.bevel_depth = r; cu.bevel_resolution = max(1, n // 4 - 1); cu.resolution_u = 10
+    cu = bpy.data.curves.new(name, 'CURVE'); cu.dimensions = '3D'; cu.bevel_depth = r; cu.bevel_resolution = max(1, n // 4 - 1); cu.resolution_u = res
     sp = cu.splines.new('NURBS'); sp.points.add(len(pts) - 1); sp.order_u = 3; sp.use_endpoint_u = True
     for pt, p in zip(sp.points, pts): pt.co = (*B(*p), 1.0)
     co = bpy.data.objects.new(name + "_c", cu); SC.collection.objects.link(co); bpy.context.view_layer.update()
@@ -292,22 +296,53 @@ def bud(nm, at, ry):
     xf([sh, st], loc=(at[0], DTOP, at[1]), ry=ry); return [sh, st]
 E0 = (-1.290, -1.198)                                          # (off the desk mat, whose top is 3 mm over the desk)
 buds = bud("bud_l", (E0[0] - 0.022, E0[1] - 0.006), 0.4) + bud("bud_r", (E0[0] + 0.004, E0[1] - 0.020), -0.9)
-y_ = DTOP + 0.0013
-pts = [(E0[0] - 0.022 + 0.008, y_, E0[1] + 0.012), (E0[0] - 0.01, y_, E0[1] + 0.030), (E0[0] + 0.006, y_, E0[1] + 0.034)]
-pts2 = [(E0[0] + 0.004 + 0.013, y_, E0[1] - 0.004), (E0[0] + 0.020, y_, E0[1] + 0.016), (E0[0] + 0.008, y_, E0[1] + 0.032), (E0[0] + 0.006, y_, E0[1] + 0.034)]
-ear_cable = [tube("bud_cable_l", "cable_white", pts, 0.0012, n=6), tube("bud_cable_r", "cable_white", pts2, 0.0012, n=6)]
-coil = []                                                       # the main lead: loose loops ending in the jack
-for k in range(46):
-    t = k / 45; a = 0.3 + t * 2.6 * 2 * math.pi; rr = 0.020 + 0.010 * math.sin(3.1 * t) + 0.004 * random.random()
-    coil.append((E0[0] + 0.020 + rr * math.cos(a) * 1.15, y_, E0[1] + 0.047 + rr * math.sin(a) * 0.8))
-coil = [(E0[0] + 0.006, y_, E0[1] + 0.034)] + coil
-ear_cable.append(tube("bud_cable", "cable_white", coil, 0.0013, n=6))
+RC = 0.0015                                                    # the cable: 3 mm across (it reads at the page's distance)
+def bezier(p0, d0, p1, d1, n=24):
+    """a cubic curve from p0 (leaving along d0) to p1 (arriving along d1), in the desk's plane (x, z)"""
+    c0 = (p0[0] + d0[0], p0[1] + d0[1]); c1 = (p1[0] - d1[0], p1[1] - d1[1]); out = []
+    for i in range(n + 1):
+        t = i / n; u = 1 - t
+        out.append((u ** 3 * p0[0] + 3 * u * u * t * c0[0] + 3 * u * t * t * c1[0] + t ** 3 * p1[0], u ** 3 * p0[1] + 3 * u * u * t * c0[1] + 3 * u * t * t * c1[1] + t ** 3 * p1[1]))
+    return out
+def lay(start, heading, length, box, seed, ds=0.003):
+    """a cable dropped loosely: its curvature eases toward a new random bend every few centimetres, and it turns back
+    inside box (x0, x1, z0, z1) as it nears an edge; returns (x, z) points and the last heading"""
+    rnd = random.Random(seed); (x, z), th, k, goal = start, heading, 0.0, 0.0; out = [start]
+    cx, cz = (box[0] + box[1]) / 2, (box[2] + box[3]) / 2
+    for i in range(int(length / ds)):
+        if i % 12 == 0: goal = rnd.choice((-1, 1)) * rnd.uniform(12, 40)
+        edge = min(x - box[0], box[1] - x, z - box[2], box[3] - z)
+        if edge < 0.018:                                         # near an edge: bend towards the middle
+            to_c = math.atan2(cz - z, cx - x); turn = (to_c - th + math.pi) % (2 * math.pi) - math.pi
+            goal = math.copysign(110, turn)
+        k += (goal - k) * 0.18; th += k * ds; x += ds * math.cos(th); z += ds * math.sin(th); out.append((x, z))
+    return out, th
+def lift(path, base_y, r):
+    """heights along a path lying on the desk: where it crosses a stretch laid before, it rides over it"""
+    ys = [base_y] * len(path)
+    for i, (x, z) in enumerate(path):
+        for j in range(0, i - 12):
+            d = math.hypot(x - path[j][0], z - path[j][1])
+            if d < 2.6 * r: ys[i] = max(ys[i], base_y + 2 * r * (1 - d / (2.6 * r)) ** 0.5)
+    sm = [sum(ys[max(0, i - 3):i + 4]) / len(ys[max(0, i - 3):i + 4]) for i in range(len(ys))]   # a cable sags into a bump, never a step
+    return [max(a, b) if b > base_y else a for a, b in zip(sm, ys)]
+SPL = (E0[0] + 0.006, E0[1] + 0.036)                            # the Y split's two ends: the buds' wires in, the lead out (+z)
+ear_cable = []
+for nm, (bx, bz), ry in (("bud_cable_l", (E0[0] - 0.022, E0[1] - 0.006), 0.4), ("bud_cable_r", (E0[0] + 0.004, E0[1] - 0.020), -0.9)):
+    tip = (bx + 0.0225 * math.sin(ry), bz + 0.0225 * math.cos(ry)); d = (math.sin(ry), math.cos(ry))
+    path = bezier(tip, (d[0] * 0.03, d[1] * 0.03), (SPL[0], SPL[1]), (0.0, 0.022))
+    ear_cable.append(tube(nm, "cable_white", [(x, DTOP + 0.0012, z) for (x, z) in path[::2]], 0.0012, n=8, res=4))
+lead, th_end = lay((SPL[0], SPL[1] + 0.0104), math.pi / 2, 0.40, (-1.343, -1.200, -1.188, -1.140), 7)
+lead = [(SPL[0], SPL[1] + 0.0104)] + lead
+ys = lift(lead, DTOP + RC, RC)
+ear_cable.append(tube("bud_cable", "cable_white", [(x, y, z) for (x, z), y in list(zip(lead, ys))[::3] + [(lead[-1], ys[-1])]], RC, n=8, res=4))
 split = lathe("bud_split", "white_plastic", [(0.0, 0.0), (0.0024, 0.0), (0.0028, 0.006), (0.0020, 0.010), (0.0, 0.0104)], n=10)
-xf([split], rx=math.pi / 2); xf([split], loc=(E0[0] + 0.006, DTOP + 0.0028, E0[1] + 0.036))
-jx, jz = coil[-1][0], coil[-1][2]
+xf([split], rx=math.pi / 2); xf([split], loc=(SPL[0], DTOP + 0.0028, SPL[1]))
 jack = lathe("bud_jack", "white_plastic", [(0.0, 0.0), (0.0034, 0.0), (0.0034, 0.016), (0.0018, 0.019), (0.0, 0.019)], n=12)
 pin = lathe("bud_jack_pin", "connector", [(0.0, 0.0), (0.0018, 0.0), (0.0018, 0.012), (0.0012, 0.0135), (0.0, 0.0138)], n=10)
-xf([pin], loc=(0, 0.019, 0)); xf([jack, pin], rx=math.pi / 2); xf([jack, pin], loc=(jx, DTOP + 0.0034, jz), ry=-0.7)
+jx, jz = lead[-1]
+xf([pin], loc=(0, 0.019, 0)); xf([jack, pin], rx=math.pi / 2)        # (along +z, then turned to the cable's last heading)
+xf([jack, pin], loc=(jx, DTOP + 0.0034, jz), ry=-(th_end - math.pi / 2))
 earbuds = buds + ear_cable + [split, jack, pin]
 prop("earbuds", earbuds, DTOP)
 
@@ -336,9 +371,11 @@ prop("charger_cable", [ch_cable, end, usbc], None)
 # a glass of water on the window sill (a plain 250 ml tumbler: 68 mm across the rim, 95 mm tall, a thick base), between
 # the cat figure and his place at the sill
 GL = (-1.868, 0.300)
-glass = lathe("glass", "glass", [(0.0, 0.0), (0.0285, 0.0), (0.0298, 0.002), (0.0340, 0.095), (0.0332, 0.0955), (0.0318, 0.094),
-                                 (0.0272, 0.0135), (0.0, 0.0125)], n=40)
-water = lathe("water", "water", [(0.0, 0.0128), (0.0273, 0.0132), (0.0300, 0.062), (0.0, 0.062)], n=40)
+glass = lathe("glass", "glass", [(0.0, 0.0), (0.0270, 0.0), (0.0292, 0.0012), (0.0300, 0.004), (0.0338, 0.090), (0.0342, 0.0935),   # a thick base,
+                                 (0.0338, 0.0952), (0.0329, 0.0958), (0.0320, 0.0950), (0.0316, 0.0930),                          # a rounded rim
+                                 (0.0275, 0.0150), (0.0255, 0.0128), (0.0, 0.0120)], n=48)                                       # 2 mm walls
+water = lathe("water", "water", [(0.0, 0.0124), (0.0258, 0.0130), (0.0276, 0.0160), (0.0296, 0.0600), (0.0299, 0.0612),        # the meniscus climbs
+                                 (0.0290, 0.0608), (0.0, 0.0604)], n=48)                                                          # the wall a little
 gc = disc("glass_contact", 0.045)
 xf([glass, water, gc], loc=(GL[0], WY0, GL[1]))
 prop("glass", [glass, water, gc], WY0)
@@ -357,19 +394,26 @@ prop("succulent_shelf", pl + [plc], STACK2_TOP)
 
 # two balls of crumpled paper that missed the bin, on the floor by the desk's end (clear of its foot rail, the manga
 # stack and the place where he crouches at the bin)
-mat("paper", srgb("#efece4"), rough=0.85, nor="white_nor.jpg", nstr=1.2, uv=0.04)
+mat("paper", srgb("#e4e0d6"), rough=0.85, nor="white_nor.jpg", nstr=0.5, uv=0.04)
+def crumple(nm, r, seed, cells=46, sub=5):
+    """a sheet crushed into a ball: the inside of 46 randomly tilted planes (flat facets meeting at crisp ridges), cut by
+    eleven V-shaped valleys where it was folded; coplanar triangles dissolved, so the facets stay flat and cheap"""
+    rnd = random.Random(seed); bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=1.0); C = []
+    for _ in range(cells):
+        c = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
+        C.append(((c + Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))) * 0.30).normalized(), rnd.uniform(0.86, 1.0)))
+    folds = [(Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized(), rnd.uniform(-0.5, 0.5), rnd.uniform(0.06, 0.14), rnd.uniform(0.06, 0.15)) for _ in range(11)]
+    for v in bm.verts:
+        d = v.co.normalized()
+        t = min(h / dn for (n, h) in C for dn in (d.dot(n),) if dn > 0.25)
+        t -= sum(a * max(0.0, 1 - abs(d.dot(fc) - off) / w) for (fc, off, a, w) in folds)
+        v.co = d * r * max(0.55, t)
+    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(4), verts=bm.verts[:], edges=bm.edges[:]); bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    for f in bm.faces: f.smooth = False
+    return new_obj(nm, bm, "paper")
 balls = []
 for k, (bx, bz, r) in enumerate(((-0.315, -1.165, 0.029), (-0.236, -1.128, 0.024))):
-    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0)
-    rnd = random.Random(40 + k)
-    folds = [(Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized(), rnd.uniform(-0.25, 0.25), rnd.uniform(0.10, 0.22)) for _ in range(11)]
-    depth = []                                                                  # a sheet pressed into a ball: sharp ridges and valleys
-    for v in bm.verts:                                                          # where crossing folds meet, flat facets between them
-        n = v.co.normalized(); depth.append(sum(a * abs(math.sin(3.2 * (n.dot(c) - off))) for (c, off, a) in folds) + 0.06 * rnd.uniform(-1, 1))
-    lo_, hi_ = min(depth), max(depth)
-    for v, dp in zip(bm.verts, depth): v.co = v.co.normalized() * r * (1 - 0.32 * (dp - lo_) / (hi_ - lo_))
-    for f in bm.faces: f.smooth = False
-    o = new_obj(f"paper_ball{k}", bm, "paper"); xf([o], loc=(bx, 0, bz), ry=rnd.uniform(0, 6.28))
+    o = crumple(f"paper_ball{k}", r, 40 + k); xf([o], loc=(bx, 0, bz), ry=random.Random(9 + k).uniform(0, 6.28))
     lo, hi = box_of([o]); xf([o], loc=(0, FY - lo[1], 0)); balls.append(o)
 prop("paper_balls", balls, FY)
 

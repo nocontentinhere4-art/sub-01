@@ -3,7 +3,7 @@
 // reads only "bottle" by name, which keeps its own node; each prop's triangles are in out/clutter_sweep.txt). Prints a report.
 import fs from "node:fs";
 import { NodeIO } from "@gltf-transform/core";
-import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
+import { ALL_EXTENSIONS, KHRMaterialsVolume } from "@gltf-transform/extensions";
 import { dedup, prune, weld, meshopt, textureCompress, join } from "@gltf-transform/functions";
 import { MeshoptEncoder, MeshoptDecoder } from "meshoptimizer";
 import sharp from "sharp";
@@ -18,6 +18,10 @@ await doc.transform(
   textureCompress({encoder: sharp, targetFormat: "webp", formats: /png|jpeg/, resize: [512, 512], quality: 84}),
   prune({keepLeaves: true}),
 );
+// the glass: a volume, so three.js refracts a little through it and tints its thick base and rim
+const glassMat = root.listMaterials().find(m => m.getName() === "glass");
+if (glassMat) { const ext = doc.createExtension(KHRMaterialsVolume);
+  glassMat.setExtension("KHR_materials_volume", ext.createVolume().setThicknessFactor(0.004).setAttenuationColor([0.86, 0.95, 0.91]).setAttenuationDistance(0.06)); }
 // quantisation folds a scale into each mesh node: so that "bottle" keeps its origin (the base centre the page sets at
 // PROP.bottle's y -0.08), its mesh goes into a child node
 const b = root.listNodes().find(n => n.getName() === "bottle");

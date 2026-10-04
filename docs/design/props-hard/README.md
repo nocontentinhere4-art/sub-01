@@ -5,17 +5,17 @@
 branch with `props_clutter.glb` blocked, so it shows main plus G10d's Tripo props (`feature/tripo-props-2`, merged here
 for the preview). The page's `?debug` surface markers (magenta dots) are hidden by `shots.py` before each shot.
 
-## What is new (`room_build/props_clutter.py` -> `web/room/props_clutter.glb`, 1.6 MB, 70k triangles, 26 draw calls)
+## What is new (`room_build/props_clutter.py` -> `web/room/props_clutter.glb`, 2.0 MB, 77k triangles, 26 draw calls)
 | prop | where | source | size | triangles |
 |---|---|---|---|---|
 | water bottle (the one he drinks from) | the page's bottle spot (`BOTTLE_AT`) | modelled: powder-coated steel, bare steel foot, knurled cap with a loop, two small dents | 500 ml, 65 x 222 mm | 5.5k |
 | notebook, pen and pencil | the desk's back left corner | Poly Haven scans `binder_notebook`, `stationery_supplies` | A5 binder 171 x 200 mm | 7.0k |
-| wired earbuds | behind the keyboard's left end, off the mat | modelled | buds 17 mm | 6.8k |
+| wired earbuds | behind the keyboard's left end, off the mat | modelled; the lead laid as a loose cable (its bend eases between random curves, it turns back at the strip's edges, rides over itself where it crosses), 3 mm thick; the buds' wires are soft curves into the split | buds 17 mm | 4.0k |
 | phone charger and cable | brick in the power strip; cable along the skirting, up through the desk's grommet, along the right edge | modelled | USB-C brick 30 mm | 2.3k |
-| glass of water | the window sill, by the cat | modelled (alpha-blended glass and water) | 250 ml tumbler, 68 x 95 mm | 0.7k |
+| glass of water | the window sill, by the cat | modelled: transmissive glass (IOR 1.5, a volume tinting the thick base and the rounded rim faintly green), 2 mm walls; alpha-blended water with a meniscus | 250 ml tumbler, 68 x 96 mm | 1.6k |
 | apple | the fridge's top | Poly Haven scan `food_apple_01` | 98 mm | 6.0k |
 | small succulent | the bookshelf's middle level, on the stack of books lying flat | Poly Haven scan `potted_plant_04` at 86 % (the gap is 15.7 cm) | 14 cm pot, 23 cm tall | 8.9k |
-| crumpled paper | the floor by the desk's end, near the bin | modelled | 50-60 mm balls | 0.6k |
+| crumpled paper | the floor by the desk's end, near the bin | modelled: a sheet crushed into a ball, the inside of 46 tilted planes (flat facets, crisp ridges) cut by eleven V folds | 50-60 mm balls | 9.6k |
 | mug of tea | the sill over the bed's head, between the cat and the alarm clock (the bedside: the bed's head is against the window wall, so the sill and the headboard are his night stand; the glass and the clock were there already) | modelled, glazed stoneware | 77 x 89 mm | 1.6k |
 | phone, charging | face down on the headboard's cap, past the window; its cable down the bed's side to a new wall socket by the floor | modelled (no logo; a generic two-lens camera) | 69 x 140 x 8 mm | 0.9k + 1.1k cable + 0.6k socket |
 | three paperbacks and a magazine | the floor at the bed's foot, by the backpack; the magazine leans on the bed base | modelled; plain covers and an abstract cover drawn in code (no text) | bunko 105 x 148 mm, B5 182 x 257 mm | 0.2k |
@@ -50,10 +50,12 @@ Public Domain Mark (Wikimedia Commons rate-limited this container); no brands vi
 | crumpled paper | [Free crumpled paper ball photo](https://www.rawpixel.com/image/5913876/image-paper-public-domain-note) | rawpixel | CC0 1.0 |
 
 What the comparison caught and fixed: the notebook, apple and plant scans had their UVs overwritten by the box
-projection (scrambled textures); they now keep their own. What still falls short of the photos: the paper balls read
-as lumps rather than crisp crumpled sheets; the glass on the sill is faint against the bright window (alpha-blended,
-no refraction); the earbuds' cable is thinner than it reads in a photo; the charger brick sits under the desk, out of
-this close-up.
+projection (scrambled textures); they now keep their own. Then, after the owner's review of the first sheet: the paper
+balls were lumps, now crisp crumpled facets; the glass was a faint alpha shape, now transmissive with a visible rim and a
+water line (the page draws it without depth writes, so the water shows through, and it casts no shadow); the earbuds'
+cable was thin and coiled like a spring, now 3 mm and lying in loose, uneven loops. What still falls short: the paper is
+a little too even in tone (no grey creases where light cannot reach); the glass shows no caustic on the sill; the
+charger brick sits under the desk, out of this close-up.
 
 ## Real reference, the room (`real_reference_room.jpg`)
 The same rule for this round: the bottle and seven of the new props, render (left) and a real photo (right), photos on
@@ -78,7 +80,8 @@ camera; from above the keys show.
 
 ## The page (`web/room.html`)
 One block after G10d's: it adds the GLB and moves its `bottle` node into `PROP.bottle` at y -0.08, so the bottle keeps
-its place, its origin and his drinking animation; `?props=old` shows the old props.
+its place, its origin and his drinking animation; `?props=old` shows the old props. See-through materials (alpha or
+transmission) write no depth and cast no shadow; the glass takes the full environment reflection.
 
 ## Tripo
 0 credits used. This container has no Tripo API key; Poly Haven scans or modelled parts covered every item, so G10d's pipeline was not needed.
