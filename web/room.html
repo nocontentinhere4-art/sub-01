@@ -1125,8 +1125,20 @@ function occluded(pos, aim){
 // that clear the walls, the furniture and the line of sight, the one that sees most of his face (where his head
 // points, not his body: at the sill he looks out of the window, at the desk he turns to the screen). Between those
 // frames the angle the shot settled on is kept, so the dolly never flaps.
+// his own phone or hands between the camera and his eyes (in bed the phone is held over his face: a shot from the
+// foot of the bed sees the phone, a side shot sees him): the phone's meshes on the ray, or a hand within 9 cm of it
+const _fh = new THREE.Vector3(), _fv = new THREE.Vector3(), phoneMeshes = [];
+function faceHidden(pos, aim){
+  _fv.subVectors(aim, pos); const d = _fv.length(); if (d < 0.3) return false; _fv.normalize();
+  if (phone.visible) { if (!phoneMeshes.length) phone.traverse(m => { if (m.isMesh) phoneMeshes.push(m); });
+    _ray.set(pos, _fv); _ray.near = 0.05; _ray.far = d - 0.04; if (_ray.intersectObjects(phoneMeshes, false).length) return true; }
+  for (const b of [bones.RightHand, bones.LeftHand]) { if (!b) continue;
+    b.getWorldPosition(_fh).sub(pos); const t = _fh.dot(_fv);
+    if (t > 0.1 && t < d - 0.08 && _fh.addScaledVector(_fv, -t).length() < 0.09) return true; }
+  return false;
+}
 const _cfd = new THREE.Vector3(), _cfp = new THREE.Vector3();
-function camAround(out, c, facing, dist, h, ang){
+function camAround(out, c, facing, dist, h, ang, eyes = false){
   const angs = [ang, -ang, 90, -90, 0, 135, -135, 180];
   // the settled angle is kept while nothing changed: no cut, under 2 s since the rays, he has not moved 40 cm, and its
   // position still clears the walls and the furniture (the rays are cast again otherwise)
@@ -1142,7 +1154,7 @@ function camAround(out, c, facing, dist, h, ang){
     out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h);
     const d = camClamp(out) + (camInside(out) ? 1 : 0);
     if (d < fallD) { fallD = d; fallback = out.clone(); fallA = a; }
-    const occ = d < 0.12 && occluded(out, c);
+    const occ = d < 0.12 && (occluded(out, c) || (eyes && faceHidden(out, c)));
     const s = d < 0.12 && !occ ? _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd) : null;   // 1: straight at his face, -1: the back of his head
     if (DEBUG) { (CAM.trace = CAM.trace || []).push([a, +d.toFixed(2), occ, s === null ? null : +s.toFixed(2)]); if (CAM.trace.length > 64) CAM.trace.shift(); }
     if (s === null) continue;
@@ -1178,7 +1190,7 @@ function updateCameraGoal(){
   if (CAM.kind === "face") {
     // a medium close-up of his face: from the front-left (at the desk: from the desk's end, the monitor lighting him);
     // lying down: from the side of the bed, looking down at him
-    if (lying) camAround(camGoal.pos, v2, v3, 1.1, 0.6, 90); else camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0);
+    if (lying) camAround(camGoal.pos, v2, v3, 1.1, 0.6, 90, true); else camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0, true);   // eyes: his phone or hands must not hide his face
     camGoal.target.copy(v2).addScaledVector(UP, -0.06);
     if (atDesk) camGoal.target.lerp(v5.set(...SURF.monitor.c), 0.12);
   } else if (CAM.kind === "medium") {
@@ -2914,7 +2926,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) { windowView.update(0.1, hour); lighting(0.1); } },   // the window follows the hour too (QA freezes the loop)
-  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, camClamp, camInside, occluded, camAround, studioEnv, roomEnv, setEnv,
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, camClamp, camInside, occluded, faceHidden, camAround, studioEnv, roomEnv, setEnv,
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
     const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
