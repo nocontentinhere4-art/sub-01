@@ -47,6 +47,7 @@ def main():
             for tag, q in (("old", "&props=old"), ("new", "")):
                 h = Harness(tmp / tag, log=lambda *a: None, cdn_cache=ROOT / "tests/visual/.cdn_cache")
                 h.query = q; h.server = server; h.base = server.base; h.browser = browser
+                server.set_scene("desk", HOUR)    # a fresh page must start the meal after the harness has cleared the desk
                 ctx, pg, st = h.open(size)
                 h.goto_scene(pg, "eating", HOUR)
                 pg.evaluate("__qa.step(1/30, 60); __qa.hud(false)")

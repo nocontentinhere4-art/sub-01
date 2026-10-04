@@ -473,6 +473,9 @@ if (TRIPO) Promise.all([load("room/props_tripo.glb"),
   const st = room.getObjectByName("room_static");
   if (st) cutBox(st, new THREE.Box3(new THREE.Vector3(MUG_AT.x - 0.045, MUG_AT.y - 0.002, MUG_AT.z - 0.045),
     new THREE.Vector3(MUG_AT.x + 0.085, MUG_AT.y + 0.1, MUG_AT.z + 0.045)));
+  const coffee = new THREE.Mesh(new THREE.CircleGeometry(0.0335, 28).rotateX(-Math.PI / 2),   // coffee in it, as the old one had
+    new THREE.MeshStandardMaterial({color:0x24140a, roughness:0.12, metalness:0, envMap:scene.environment, envMapIntensity:0.5}));
+  coffee.position.set(-0.0158, 0.082, 0); coffee.receiveShadow = true; T.mug.add(coffee);   // (the body's centre; the handle is at +x)
   T.mug.position.copy(MUG_AT); scene.add(T.mug);
   // the headphones on the hook: the new pair fills the old one's box inside its node, so taking them off still works
   const hp = room.getObjectByName("headphones"), old = room.getObjectByName("headphones_mesh");
