@@ -16,7 +16,9 @@
   mouse's back (the wrist pin moves until a point 60% from the wrist to the middle knuckle touches the dome + 1.6 cm),
   and each finger curls until its tip meets the dome (+8 mm), fingers together (ADDUCT_R 2.5), the hand flat and straight
   (pitch 0, yaw 0.08 in), thumb on the inner side, an index click now and then. Mouse: a low dome with its hump at the back (radii x 3.1,
-  y 3.6, z front 8 / back 4 cm), hump at (-0.36, 0.807, 0.385) for hips at the origin; fingers 2-5 scan from straight to
-  curled for the first touch. In the room, pass the real mouse's centre and size as MOUSE.
+  y 3.6, z front 8 / back 4 cm), hump at (-0.36, 0.807, 0.385) for hips at the origin; index and middle scan from straight to
+  curled for the first touch (smoothed over time); ring and little finger tucked along the right flank
+  (CURL_R_4 [28,48,28], CURL_R_5 [34,55,30]). Finger curls turn about the true rest palm normal (MakeHuman's A-pose
+  palms face the thighs). In the room, pass the real mouse's centre and size as MOUSE.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.

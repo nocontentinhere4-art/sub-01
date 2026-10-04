@@ -58,7 +58,13 @@ const H = new THREE.Quaternion().setFromUnitVectors(sideNow, tSide).premultiply(
 // (type) or index clicks on the right hand (mouse). Flexion axis per bone = its rest direction x the palm normal (-y).
 const HP = process.env.HANDPOSE, D2R = Math.PI / 180;
 const fdir = n => V3(rest.tail[n]).sub(V3(rest.head[n])).normalize();
-const curlQ = (n, deg) => new THREE.Quaternion().setFromAxisAngle(fdir(n).cross(new THREE.Vector3(0, -1, 0)).normalize(), deg * D2R);
+// the rest palm normal per side (MakeHuman's A-pose hands face the thighs, not the floor): dir x across (right),
+// across x dir (left), with dir = wrist -> middle knuckle and across = index -> little knuckle
+const palmN = sd => { const d = V3(rest.head[`finger3-1.${sd}`]).sub(V3(rest.head[`wrist.${sd}`])).normalize(),
+  a = V3(rest.head[`finger5-1.${sd}`]).sub(V3(rest.head[`finger2-1.${sd}`])).normalize();
+  return (sd === "R" ? d.clone().cross(a) : a.clone().cross(d)).normalize(); };
+const PALM = { L: palmN("L"), R: palmN("R") };
+const curlQ = (n, deg) => new THREE.Quaternion().setFromAxisAngle(fdir(n).cross(PALM[n.slice(-1)]).normalize(), deg * D2R);
 const rnd = (i) => { const x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); };
 function handPose(L, t) {
   for (const s of ["L", "R"]) {
@@ -115,14 +121,22 @@ function armIK(Wq, L, rootPos) {
       // each finger curls (middle and end joints) until its tip meets the dome's skin (8 mm pad); ring and little
       // finger may wrap further down the side
       const base = {}; for (const n of rest.order) if (/finger[2-5]-[23]\.R$/.test(n)) base[n] = L[n].clone();
+      const SOLVE = (process.env.SOLVE_R || "2,3,4,5").split(",").map(Number);
       for (let f = 2; f <= 5; f++) { const pip = `finger${f}-2.R`, dip = `finger${f}-3.R`;
+        // CURL_R_<f>=[mcp,pip,dip]: a set pose instead of the contact solve (ring and little finger tucked along the side)
+        if (process.env["CURL_R_" + f]) { const c = JSON.parse(process.env["CURL_R_" + f]);
+          [`finger${f}-1.R`, pip, dip].forEach((n, k) => { L[n] = curlQ(n, c[k]).multiply(k ? base[n] : L[n]); }); continue; }
+        if (!SOLVE.includes(f)) continue;
         const at = e => { L[pip] = curlQ(pip, e).multiply(base[pip]); L[dip] = curlQ(dip, e * 0.6).multiply(base[dip]); return dome(bonePos(L, rootPos, dip, true), 0.008); };
         // scan from straight to curled for the first touch; if none, the closest pass
         let prev = -20, best = -20, bestD = 1e9, hit = null;
         for (let e = -20; e <= 70; e += 5) { const d = at(e); if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = e; }
           if (d <= 0) { hit = [prev, e]; break; } prev = e; }
-        if (!hit) { at(best); continue; } if (hit[0] === hit[1]) { at(hit[0]); continue; }
-        let a = hit[0], b = hit[1]; for (let j = 0; j < 16; j++) { const m = (a + b) / 2; if (at(m) > 0) a = m; else b = m; } at(a); }
+        let e;
+        if (!hit) e = best; else if (hit[0] === hit[1]) e = hit[0];
+        else { let a = hit[0], b = hit[1]; for (let j = 0; j < 16; j++) { const m = (a + b) / 2; if (at(m) > 0) a = m; else b = m; } e = a; }
+        // smooth over time so the solve doesn't flick between contact points frame to frame
+        const key = "_e" + f; e = IKT[key] === undefined ? e : IKT[key] + (e - IKT[key]) * +(process.env.SMOOTH || 0.25); IKT[key] = e; at(e); }
     }
   }
 }
