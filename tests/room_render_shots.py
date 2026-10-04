@@ -195,9 +195,9 @@ def cloth_metric(pg, out, name):
     pg.add_style_tag(content=HUD_OFF)
     pg.evaluate("window.FREEZE = true; post.render(0.1)")
     lit_p, mask_p = out / f"{name}_lit.png", out / f"{name}_mask.png"
-    pg.screenshot(timeout=240000, path=str(lit_p), type="png")
+    pg.screenshot(timeout=480000, path=str(lit_p), type="png", animations="disabled")   # software GL: a 1280 frame of the high tier takes seconds
     x, y, w, h = pg.evaluate(MASK_JS)
-    pg.screenshot(timeout=240000, path=str(mask_p), type="png")
+    pg.screenshot(timeout=480000, path=str(mask_p), type="png", animations="disabled")
     pg.evaluate("post.render(0.1); window.FREEZE = false")
     lit = np.asarray(Image.open(lit_p).convert("RGB")).astype(np.float32)[y:y + h, x:x + w]
     msk = np.asarray(Image.open(mask_p).convert("RGB")).astype(np.int32)[y:y + h, x:x + w]
