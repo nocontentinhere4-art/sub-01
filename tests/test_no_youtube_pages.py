@@ -147,3 +147,35 @@ def test_the_guard_aborts_a_top_level_navigation_to_youtube(monkeypatch):
     run(g.route(Route("https://www.youtube-nocookie.com/embed/qpkTV1VolHU")))
     assert seen == [("abort", "https://www.youtube.com/watch?v=qpkTV1VolHU"),
                     ("go", "https://www.youtube-nocookie.com/embed/qpkTV1VolHU")]
+
+
+def test_banner_closer_never_presses_anything_in_the_youtube_player():
+    """CLOSE_BUTTON matches "Skip": the ad's Skip button in the embed must never be pressed by _dismiss."""
+    import asyncio
+    from types import SimpleNamespace
+    import browse
+
+    class Frame:
+        def __init__(self, url):
+            self.url, self.calls = url, []
+
+        async def evaluate(self, js, *a):
+            self.calls.append(js)
+            return [{"i": 0, "label": "Skip", "consent": False}] if "consentRe" in js else None
+
+    for url in ("https://www.youtube-nocookie.com/embed/abcdefghijk", "https://www.youtube.com/embed/abcdefghijk"):
+        main = Frame(url)
+        page = SimpleNamespace(url=url, frames=[main], main_frame=main)
+
+        async def wait(ms):
+            pass
+        page.wait_for_timeout = wait
+        b = browse.Browser(decide=False)
+        asyncio.run(b._dismiss(SimpleNamespace(page=page, site=None), rounds=1))
+        assert main.calls == [] and not b.dismissed
+    # an ordinary page's "Skip" modal button is still closed as before
+    main = Frame("https://example.org/a")
+    page = SimpleNamespace(url=main.url, frames=[main], main_frame=main, wait_for_timeout=wait)
+    b = browse.Browser(decide=False)
+    asyncio.run(b._dismiss(SimpleNamespace(page=page, site=None), rounds=1))
+    assert any("click" in c for c in main.calls)

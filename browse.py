@@ -1910,6 +1910,8 @@ class Browser:
             for frame in list(page.frames):
                 if frame != page.main_frame and not url_ok(frame.url):
                     continue
+                if YOUTUBE_HOST.search(urllib.parse.urlsplit(frame.url).hostname or ""):
+                    continue                                    # #89: never press anything in YouTube's player (its ad "Skip")
                 try:
                     buttons = await frame.evaluate(BUTTONS_JS)
                     k = choose_dismiss(buttons)
