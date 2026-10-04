@@ -58,6 +58,7 @@ import time
 import urllib.parse
 
 import interests as I
+import memory_guard as MG
 import novelty as NV
 import youtube_api as YT
 import search_sources as SS
@@ -77,6 +78,8 @@ MAX_CHAIN = 30                         # pages in a row before he wanders off to
 # YouTube (#17): Restricted Mode for every context, bounded muted watching, scene changes as visual drive
 YOUTUBE_COOKIES = [{"name": "PREF", "value": "f2=8000000", "domain": ".youtube.com", "path": "/", "secure": True}]
 YOUTUBE_HOST = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$", re.I)
+MEM_CHECK_S = 10.0                     # #89: how often the browser reads its own memory
+SOFT_MEM_MB = float(os.environ.get("BROWSE_SOFT_MEM_MB") or 0.75 * float(os.environ.get("BROWSE_MEM_MB") or 1200))
 MAX_WATCH_S = 600.0                    # a watch never lasts longer than this (real seconds), whatever is asked
 MIN_WATCH_S = 10.0                     # ...nor shorter (the accelerated demo clock: a few screenshots at least)
 VIDEO_SHOT_S = 4.0                     # a screenshot (and a scene-change measure) every few seconds while watching
@@ -507,6 +510,18 @@ def text_ok(title, body):
     return len(BAD_WORDS.findall((body or "")[:6000])) < 3
 
 
+def cross_site_frame(req, host):
+    """#89 memory: an iframe from another site than the page it is in (ads, video players, social embeds)."""
+    try:
+        frame = req.frame
+        if frame.parent_frame is None:
+            return False
+        top = urllib.parse.urlsplit(frame.page.main_frame.url).hostname or ""
+    except Exception:                                       # no frame (a service worker) or a detached one
+        return False
+    return bool(top) and not MG.frame_allowed(top, host)
+
+
 class Guard:
     """Blocks requests to private/internal addresses (SSRF) for every resource the browser loads."""
 
@@ -547,6 +562,8 @@ class Guard:
             return await route.abort()
         if req.method not in ("GET", "HEAD") and req.is_navigation_request():
             return await route.abort()                      # never submits anything
+        if MG.ad_host(u.hostname) or (req.is_navigation_request() and cross_site_frame(req, u.hostname)):
+            return await route.abort()                      # #89: ads and cross-site iframes were most of the memory
         if req.is_navigation_request() and req.frame.parent_frame is None and YT.page_video(url)[1]:
             return await route.abort()                      # #89 live: never YouTube's own pages (a redirect, a click)
         await route.continue_()
@@ -638,6 +655,8 @@ class Browser:
         self.visited = NV.Visited(state=s.get("visited"))   # #89: no page, video or near-same title twice in 7 days
         self.seed_t = {}                                    # seed site -> last opened (rotation, SEED_GAP_S)
         self.yt = YT.Quota(state=s.get("youtube"))          # YouTube Data API units today (only with the key)
+        self.heavy = MG.HeavyPages(s.get("heavy"))          # #89: pages / hosts that pushed Chromium over its cap
+        self.mem_checked = 0.0
         self.yt_used = {}                                   # channel handle -> last used (keyless rotation)
         self.hungry = False                                 # #89 teen: food and cooking sites only while hungry
         self.watched = False                                # a video has been on a screen since the browser started
@@ -647,7 +666,7 @@ class Browser:
     def to_dict(self):
         return {"log": self.log[-KEEP:], "used": list(self.used)[-200:],
                 "searches": dict(self.limits.to_dict(), variety=self.variety.to_dict()),
-                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict()}
+                "visited": self.visited.to_dict(), "youtube": self.yt.to_dict(), "heavy": self.heavy.to_dict()}
 
     def host_ok(self, host, current=None):
         """#89 teen variety guard: under HOST_DAY_CAP pages today on this site, not a 4th page in a row on the site he
@@ -812,6 +831,28 @@ class Browser:
                 pass
             self.pw = None
 
+    async def _over_soft_cap(self):
+        """#89 memory: at most every MEM_CHECK_S, this process tree's memory (Chromium's renderers included, read in a
+        thread). Over SOFT_MEM_MB the pages on screen are recorded as heavy (HeavyPages) and Chromium is closed: the
+        next step starts it afresh on another page, before the watchdog's hard limit kills the whole service."""
+        now = time.time()
+        if now - self.mem_checked < MEM_CHECK_S or self.browser is None:
+            return False
+        self.mem_checked = now
+        try:
+            from browse_service import tree_rss_mb
+            mb = await asyncio.to_thread(tree_rss_mb, os.getpid())
+        except Exception:
+            return False
+        if mb <= SOFT_MEM_MB:
+            return False
+        pages = [(sc.info.get("url"), sc.info.get("host")) for sc in self.screens.values() if sc.info]
+        self.heavy.strike(pages)
+        print(f"browse: {mb:.0f} MB > {SOFT_MEM_MB:.0f} MB with {[h for _, h in pages]}: Chromium recycled", flush=True)
+        self.recycles = getattr(self, "recycles", 0) + 1
+        await self.close()
+        return True
+
     # --- one step ------------------------------------------------------------------------------------------------
     async def step(self, device, heard=(), interest=None, mode=None):
         """Scroll the current page or open the next one; returns the new screen status when a screenshot was taken.
@@ -826,6 +867,8 @@ class Browser:
             mode = "video"                                      # #89 teen: a good share of desk time is YouTube
         async with self.lock:
             try:
+                if await self._over_soft_cap():                 # #89: recycle Chromium before the watchdog kills it
+                    return None
                 sc = await self._ensure(device)
                 moved_on = False
                 if mode != sc.mode:                             # switched between browsing, videos and shorts
@@ -1815,6 +1858,9 @@ class Browser:
             return False
         if not revisit and kind != "search" and not self.fresh(url):
             self.last_skip = "opened in the last 7 days"
+            return False
+        if self.heavy.heavy_url(url) or self.heavy.cooling(urllib.parse.urlsplit(url).hostname):
+            self.last_skip = "too heavy on memory (left alone for a while)"   # #89: it blew Chromium's cap before
             return False
         if kind != "search" and not self.host_ok(urllib.parse.urlsplit(url).hostname):
             self.last_skip = "enough of this site today"            # #89 teen: per-site daily cap

@@ -155,7 +155,7 @@ def main():
     usd2, runs2 = spent()
     log(f"done in {(time.time() - t0) / 60:.1f} min; this run ${usd2 - usd:.3f}; tool total ${usd2:.2f} over {runs2} runs")
     for d in got:
-        log(f"  {d.relative_to(ROOT)} ({d.stat().st_size / 1e6:.1f} MB)")
+        log(f"  {d.relative_to(ROOT) if d.is_relative_to(ROOT) else d} ({d.stat().st_size / 1e6:.1f} MB)")   # (--out may lie outside the tree)
     shutil.rmtree(work, ignore_errors=True)
     if got and a.publish:
         publish(got + [d.with_suffix(".json") for d in got if d.with_suffix(".json").exists()] + [out / f"{a.name}_pod_log.txt"], a.publish, log)
