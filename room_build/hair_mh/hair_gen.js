@@ -117,7 +117,7 @@ export function buildHair(THREE, head, opt = {}){
     const a = Math.abs(az), top = topness(p, az), ins = inside(p);
     const taper = lerp(0.006, 0.019, smooth(0.0, 0.05, ins));
     let L = lerp(taper, a > 120 ? 0.042 : 0.05, top);
-    if (a < 40 && p.y > 0.79) L = Math.max(L, (p.y - 0.758) * 1.2);                   // the fringe: tips above the brows
+    if (a < 40 && p.y > 0.79) L = Math.max(L, (p.y - 0.768) * 1.15);                  // the fringe: tips ~1 cm above the brows
     return L;
   }
 
@@ -226,5 +226,6 @@ export function buildHair(THREE, head, opt = {}){
   }
   // The growth direction (unit vector along the scalp) under any point near the head, for other hair meshes.
   const flowAt = q => { const s = surf(q.clone().sub(C)); return s ? flow(s.p, s.n, null) : new V(0, -1, 0); };
-  return {cards: cardsGeo, scalp, scalpStrokes, flowAt, surfAt: q => surf(q.clone().sub(C)), topness: q => topness(q, azimuth(q)), stats: {cards, cardTris: IDX.length / 3, scalpTris: sp.length / 9, roots: cand.length}};
+  return {cards: cardsGeo, scalp, scalpStrokes, flowAt, surfAt: q => surf(q.clone().sub(C)), topness: q => topness(q, azimuth(q)),
+          lengthAt: q => lengthAt(q, azimuth(q)), ear, whorl, flow, stats: {cards, cardTris: IDX.length / 3, scalpTris: sp.length / 9, roots: cand.length}};
 }
