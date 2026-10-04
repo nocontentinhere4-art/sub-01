@@ -114,7 +114,8 @@ for e in eyes.values():
     c = e["surface"] - e["forward"] * (RADIUS + INSET); d = pos - c
     lateral = np.linalg.norm(d - (d @ e["forward"])[:, :, None] * e["forward"], axis=2)
     inner = np.abs(X) > abs(e["surface"][0]) - 0.32 * e["width"]       # the inner corner (towards the nose) stays painted: the ball sits deeper there
-    hole |= ndi.binary_erosion(e["mask"], iterations=4) & (lateral < RADIUS * 0.8) & inner
+    outer = np.abs(X) < abs(e["surface"][0]) + 0.22 * e["width"]       # and the outer corner: the lid closes over the ball there too (no sclera wedge past the lashes)
+    hole |= ndi.binary_erosion(e["mask"], iterations=4) & (lateral < RADIUS * 0.8) & inner & outer
 hole = blur(hole.astype(np.float32), 2.5) > 0.5                              # the morphology's square corners rounded off
 lab_hh, n_hh = ndi.label(hole)
 if n_hh > 2:                                                                  # one hole per eye: no stray specks
@@ -445,7 +446,7 @@ if os.path.exists(REG):
     stripe_col = np.array([0.88, 0.88, 0.87])[None, None, :] * (1 + 0.03 * fbm(2.5))[:, :, None]
     pants_col = np.clip(pants_col * (1 - stripe_soft[:, :, None]) + stripe_col * stripe_soft[:, :, None], 0, 1)
     # the socks: white ribbed cotton (the ribs are in the normal map), the slides: black EVA foam
-    socks_col = np.clip(np.array([0.92, 0.915, 0.90])[None, None, :] * (1 + 0.035 * fbm(4) + 0.03 * fbm(1.0))[:, :, None], 0, 1)
+    socks_col = np.ones((C, C, 3), np.float32) * np.array([0.93, 0.925, 0.91])[None, None, :]      # flat white cotton: the knit lives in the normal map alone
     slides_col = np.clip(np.array([0.05, 0.05, 0.053])[None, None, :] * (1 + 0.12 * fbm(1.5) + 0.05 * fbm(10))[:, :, None], 0, 1)
     cloth_g = np.where(hoodie_r[:, :, None], hoodie_col, np.where(pants_r[:, :, None], pants_col, np.where(socks_r[:, :, None], socks_col, np.where(slides_r[:, :, None], slides_col, cloth_g))))
     # the feet: the mesh is one shell there (the slide's strap and the pants' cuff are bulges of the sock, Meshy's remesh),
@@ -479,9 +480,10 @@ if os.path.exists(REG):
                 seam += onside * (zc < 4.5) * np.exp(-((pc[:, :, 1] - (ft["y_toe"] + 1.0)) / 0.10) ** 2)
                 seam += onside * (zc < 9.0) * (pc[:, :, 1] > ft["y_heel"] - 2.5) * np.exp(-((pc[:, :, 0] - ft["x_mid"]) / 0.10) ** 2)
             socks_col = np.clip(socks_col * (1 - 0.18 * np.clip(seam, 0, 1))[:, :, None], 0, 1)
+        sock_tex = ndi.binary_dilation(sock_tex, iterations=3) & ~(pants_r | slides_r)      # into the islands' margins (reg is baked without margin): else every sock seam drew a dark crack
         sock_soft = blur(sock_tex.astype(np.float32), 1.0)[:, :, None]
         foot_dark = np.where((zc > 8.5)[:, :, None], pants_col, slides_col)
-        hem = np.zeros((C, C), np.float32)                                   # the cuff by geometry (build_mesh.py's ankle table): outside the sock's radius at 7.5-12.5 cm
+        hem = np.zeros((C, C), np.float32)                                   # (a per-texel hem showed as dark cracks along the sock's UV island edges: the hem is a label line, build_mesh.py, 10 cm)
         if False and os.path.exists(FJ) and "ankle" in json.load(open(FJ)):     # (off, see build_mesh.py: the ankle is not round)
             ANK = json.load(open(FJ))["ankle"]
             for side, sgn in (("left", 1), ("right", -1)):
@@ -491,7 +493,8 @@ if os.path.exists(REG):
                 rad = np.hypot(pc[:, :, 0] - A_["cx"], pc[:, :, 1] - A_["cy"]); rs = np.array(A_["r_sock"])[b_]
                 hem = np.maximum(hem, (onside & (rad > rs + 0.45)).astype(np.float32))
         hem = blur(hem, 0.8)[:, :, None]; sock_soft = sock_soft * (1 - hem)
-        cloth_g = np.where(feet[:, :, None], foot_dark * (1 - sock_soft) + socks_col * sock_soft, cloth_g)
+        feet_d = ndi.binary_dilation(feet, iterations=3)
+        cloth_g = np.where(feet_d[:, :, None], foot_dark * (1 - sock_soft) + socks_col * sock_soft, cloth_g)
         print("feet: %d sock texels drawn from the old atlas (of %d foot texels)" % (int(sock_tex.sum()), int(feet.sum())))
     cloth_g = pad_full(cloth_g, reg > 0)                                        # between the islands: the nearest garment, so the mips never pull in a foreign colour
     print("cloth materials: hoodie %s, stripe %d px, regions hoodie %d pants %d socks %d slides %d" % (hood_med.round(3), int(stripe.sum()), hoodie_r.sum(), pants_r.sum(), socks_r.sum(), slides_r.sum()))
@@ -504,7 +507,9 @@ if os.path.exists(REG):
 save("tex_cloth.png", cloth_g)
 save("tex_cloth_n.png", sanitize_normal(load("nrm_cloth.png")))
 ao_c = np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1)
-if os.path.exists(REG): ao_c = np.where(reg == 5, np.maximum(ao_c, 0.7), ao_c)   # the socks' own sole is baked INSIDE the slides (black AO): the page shows it with the slides hidden
+if os.path.exists(REG):                                                       # the socks' own sole is baked INSIDE the slides (black AO): the page shows it with the slides hidden;
+    sock_d = ndi.binary_dilation(reg == 5, iterations=10) & ((reg == 5) | (reg == 0))   # the islands' margins too (reg is baked without margin): dark gutters there drew cracks along every sock seam
+    ao_c = np.where(sock_d, np.maximum(ao_c, 0.92), ao_c)
 save("tex_cloth_orm.png", orm(pad_full(ao_c, cov_cloth), pad_full(load("rough_cloth.png")[:, :, 0], cov_cloth)))
 
 # ------------------------------------------------------------------ the eyeball and the lid
@@ -561,16 +566,16 @@ spec = {
         "hair":   {"base": "hair", "baseQ": 82, "normal": "hair_n", "normalScale": 0.15, "orm": "hair_orm", "doubleSided": True},
         "hoodie": {"base": "cloth", "baseQ": 86, "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.2, 0.2, 0.2], "sheenRoughness": 0.8, "doubleSided": True},   # the hood's inside shows at the open collar
         "pants":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.7, "orm": "cloth_orm", "doubleSided": True},
-        "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 1.0, "orm": "cloth_orm", "sheen": [0.5, 0.5, 0.5], "sheenRoughness": 0.9, "doubleSided": True},
+        "socks":  {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "sheen": [0.35, 0.35, 0.35], "sheenRoughness": 0.9, "doubleSided": True},
         "slides": {"base": "cloth", "normal": "cloth_n", "normalScale": 0.5, "orm": "cloth_orm", "doubleSided": True},
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},
-        "rim":    {"color": [0.1, 0.045, 0.045, 1], "roughness": 0.5, "doubleSided": True},   # reads as the dark line of the lid margin under the lashes   # the eyelid's thickness: moist flesh, in the lid's shadow
+        "rim":    {"color": [0.45, 0.26, 0.25, 1], "roughness": 0.45, "doubleSided": True},   # the lid margin: shadowed skin, a little moist   # the eyelid's thickness: moist flesh, in the lid's shadow
         "caruncle": {"color": [0.6, 0.27, 0.3, 1], "roughness": 0.3},
-        "lash":   {"base": "lash", "baseQ": 92, "blend": True, "roughness": 0.55, "doubleSided": True, "color": [0.9, 0.9, 0.9, 1]},
+        "lash":   {"base": "lash", "baseQ": 92, "blend": True, "roughness": 0.55, "doubleSided": True, "color": [0.55, 0.5, 0.5, 1]},
     },
-    "lashes": {"upper": {"n": 20, "length": 0.0065, "width": 0.0026}, "lower": {"n": 10, "length": 0.0033, "width": 0.0022}, "rimDepth": 0.0013, "caruncle": 0.0008},
+    "lashes": {"upper": {"n": 20, "length": 0.0065, "width": 0.0026}, "lower": {"n": 5, "length": 0.0018, "width": 0.0016}, "rimDepth": 0.0010, "caruncle": 0.0008},
 }
 json.dump(spec, open(os.path.join(OUT, "spec.json"), "w"), indent=1)
 print("wrote spec.json", json.dumps(spec["eyes"]))

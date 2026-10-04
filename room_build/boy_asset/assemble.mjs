@@ -169,7 +169,7 @@ for (const side of ["Left", "Right"]) {
   { // rim
     const SEG = 48, depth = LS.rimDepth ?? 0.002, P = [], N = [], UV = [], I = [];
     for (let k = 0; k <= SEG; k++) { const t = 2 * Math.PI * k / SEG;
-      const po = onEllipse(t, -0.0005, -0.0005, -0.0006), pi = onEllipse(t, -0.0011, -0.0011, -depth);   // from inside the skin's edge, back towards the ball: a dark line of lid thickness, never in front of the skin
+      const po = onEllipse(t, -0.0006, -0.0006, -0.0006), pi = onEllipse(t, -0.0010, -0.0010, -depth);   // a 0.4 mm band   // from inside the skin's edge, back towards the ball: a dark line of lid thickness, never in front of the skin
       const nrm = vec3.create(); vec3.sub(nrm, C0, po); vec3.normalize(nrm, nrm);          // facing the opening's centre (the inside of the lid)
       P.push(...po, ...pi); N.push(...nrm, ...nrm); UV.push(k / SEG, 0, k / SEG, 1); }
     for (let k = 0; k < SEG; k++) { const a0 = 2 * k; I.push(a0, a0 + 1, a0 + 2, a0 + 2, a0 + 1, a0 + 3); }

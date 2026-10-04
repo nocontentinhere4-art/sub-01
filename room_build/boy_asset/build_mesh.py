@@ -244,6 +244,7 @@ for p in m.polygons:
     if covered < 3: continue
     foot_f += 1
     new_lab = "socks" if whites / covered > 0.5 else ("pants" if co[vs, 2].mean() > 11.0 else "slides")
+    if new_lab == "socks" and co[vs, 2].mean() > 10.0: new_lab = "pants"       # the hem: a clean line at 10 cm (the one shell has no real edge there)
     cxm = co[vs].mean(0)
     if new_lab == "socks" and cxm[2] < 4.5 and abs(cxm[0] - FOOT_XMID["left" if cxm[0] > 0 else "right"]) > 4.3: new_lab = "slides"   # the strap's ends and the sole's sides, whatever the old paint
     if new_lab != flab[p.index]: flab[p.index] = new_lab; foot_changed += 1
@@ -425,7 +426,7 @@ m.update(); log("slides grown outward:", len(sv), "vertices")
 socks_slot = REGIONS.index("socks"); sock_vv = set(v for p in m.polygons if p.material_index == socks_slot for v in p.vertices); tucked = 0
 for vi in sock_vv:
     v = m.vertices[vi]
-    if 7.0 < v.co.z < 11.0: v.co = v.co - v.normal * (0.15 * min(1.0, (v.co.z - 7.0) / 1.5)); tucked += 1
+    if 9.6 < v.co.z < 11.5: v.co = v.co - v.normal * (0.3 * min(1.0, (v.co.z - 9.6) / 0.8)); tucked += 1      # only under the hem (10 cm): lower, the dents showed as creases on the visible sock
 m.update(); log("sock vertices tucked under the hem:", tucked)
 
 # ---------------------------------------------------------------- the ears: a sculpted relief on the subdivided ear
@@ -467,6 +468,14 @@ for i in ear_idx:
     h = float(ear_height(np.array(u), np.array(v)))
     if abs(h) > 1e-4: m.vertices[i].co = m.vertices[i].co + right_h * (np.sign(lat_all[i]) * h); moved += 1
 m.update(); log("ear relief: %d ear vertices, %d moved" % (len(ear_idx), moved))
+# hair shards that overlap the ear (their jagged edges cut across its top): clamped to the ear's base plane, behind it
+hair_slot = REGIONS.index("hair"); co2 = np.array([v.co[:] for v in m.vertices])
+rel_h = co2 - np.array([HB.x, HB.y, 0.0]); f_h = rel_h @ np.array(fwd_h[:]); l_h = rel_h @ np.array(right_h[:])
+hv_set = set(v for p in m.polygons if p.material_index == hair_slot for v in p.vertices); tucked_h = 0
+for i in hv_set:
+    if EAR["f_lo"] - 0.3 < f_h[i] < EAR["f_hi"] and EAR["z_c"] - 1.3 * EAR["hh"] < co2[i, 2] < EAR["z_c"] + 1.6 * EAR["hh"] and abs(l_h[i]) > EAR["lat_min"] - 0.6:
+        excess = abs(l_h[i]) - (EAR["lat_min"] - 0.6); m.vertices[i].co = m.vertices[i].co - right_h * (np.sign(l_h[i]) * excess); tucked_h += 1
+m.update(); log("hair vertices tucked behind the ears:", tucked_h)
 EAR.update({"fwd": list(fwd_h[:]), "right": list(right_h[:]), "head": [HB.x, HB.y, 0.0]})
 json.dump(EAR, open(os.path.join(WORK, "ears.json"), "w"))
 # buffers for make_textures.py: the hair's vertices (the hairline's baby hairs), the socks' own vertices (not the sole
@@ -743,14 +752,14 @@ def detail_material(name, nt):
         cuff = math(nt, "MINIMUM", 1.0, math(nt, "MAXIMUM", 0.0, math(nt, "DIVIDE", math(nt, "SUBTRACT", z, 6.0), 1.2)))
         knit = math(nt, "MULTIPLY", wave(nt, P, 5.0, "X", 0.6, 0.0), wave(nt, P, 5.0, "Z", 0.6, 0.0))        # ~2 mm jersey loops
         fuzz = noise(nt, P, 12.0, 2.0, 0.6)
-        h = math(nt, "ADD", math(nt, "MULTIPLY", math(nt, "MULTIPLY", math(nt, "ADD", ribs, 1.0), 0.35), cuff), math(nt, "ADD", math(nt, "MULTIPLY", knit, math(nt, "MULTIPLY", 0.3, math(nt, "SUBTRACT", 1.0, cuff))), math(nt, "MULTIPLY", fuzz, 0.2)))
+        h = math(nt, "ADD", math(nt, "MULTIPLY", math(nt, "MULTIPLY", math(nt, "ADD", ribs, 1.0), 0.35), cuff), math(nt, "ADD", math(nt, "MULTIPLY", knit, math(nt, "MULTIPLY", 0.08, math(nt, "SUBTRACT", 1.0, cuff))), math(nt, "MULTIPLY", fuzz, 0.03)))   # a subtle knit: the socks read as clean cotton, not fur
         lowfoot = math(nt, "LESS_THAN", z, 4.5); onleft = math(nt, "GREATER_THAN", x, 0.0)
         y_toe = mix(nt, FEET["right"]["y_toe"], FEET["left"]["y_toe"], onleft); x_mid = mix(nt, FEET["right"]["x_mid"], FEET["left"]["x_mid"], onleft); y_heel = mix(nt, FEET["right"]["y_heel"], FEET["left"]["y_heel"], onleft)
         dt_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", y, math(nt, "ADD", y_toe, 1.0)), 0.12); toe = math(nt, "MULTIPLY", math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "MULTIPLY", dt_, dt_), -1.0)), lowfoot)
         dh_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", x, x_mid), 0.12); heel = math(nt, "MULTIPLY", math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "MULTIPLY", dh_, dh_), -1.0)), math(nt, "MULTIPLY", math(nt, "GREATER_THAN", y, math(nt, "SUBTRACT", y_heel, 2.5)), math(nt, "LESS_THAN", z, 9.0)))
         h = math(nt, "SUBTRACT", h, math(nt, "MULTIPLY", math(nt, "ADD", toe, heel), 0.8))
         rough = math(nt, "ADD", R(0.95), 0.0)
-        return h, rough, 0.3, 0.06
+        return h, rough, 0.2, 0.05
     if name == "slides":                                                      # EVA foam: smooth with faint cells, a tread groove around the sole's edge
         cells = voronoi(nt, P, 3.0, "SMOOTH_F1")
         _, _, zs = separate(nt, P); dz_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", zs, 0.9), 0.15)
