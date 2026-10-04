@@ -12,8 +12,8 @@ the knees or anywhere else under the cloth.
 |---|---|---|
 | black cotton hoodie | `assets/hoodie_black/` | hood down (a soft double layer rolled behind the neck and falling down the back), two drawstrings with aglets, kangaroo pocket with sloped openings, ribbed cuffs and hem (gathered), weight folds: diagonal creases at the inner elbows, stacking above the cuffs, folds falling to the hem, the fleece blousing over the band |
 | dark track trousers | `assets/track_trousers/` | relaxed fit, one off-white side stripe per leg (one plain stripe: no maker's design), elastic ribbed ankle cuffs with stacking above them, soft knee folds |
-| white crew socks | `assets/socks_white/` | the feet and lower shins 2 mm out; over the toes one smooth sock shape (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 5 mm disk of rays), only a hint of the toe line; a ribbed top |
-| black slides | `assets/slides_black/` | a 1.8 cm EVA footbed (flat edge, 2 mm radius) from the foot's footprint and a wide padded strap over the instep |
+| white crew socks | `assets/socks_white/` | smooth white cotton, the feet and lower shins 2 mm out; over the toes one soft rounded toe box with no toes of its own (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 16 mm disk of rays, smoothed again and closed once more so nothing enters the skin); slight compression folds at the ankle (1.5 mm); a ribbed cuff under the trouser hem |
+| black slides | `assets/slides_black/` | generic pool slides in matte black rubber: a contoured footbed 2.3 cm under the heel and 1.5 cm at the toe (flat to the ball, then a toe spring), shaped to the sock's underside so the foot sits 1 mm into it, a heel cup and side rims, a 6 mm rounded top edge and a 3 mm bottom edge, about 1 cm wider than the foot and 1.2 cm longer at the toe; faint moulded nubs 3 mm apart on the footbed; one padded strap 7.5 cm front to back from just behind the toes over the forefoot (9 mm thick on top, rounded front and back edges, 2 mm off the sock), moulded into the footbed's sides |
 
 `assets/summary.json` gives each garment's vertex and face counts and how many body vertices it hides.
 
@@ -22,7 +22,7 @@ made by `fabric_bake.py`: Poly Haven's photo-scanned fabric normal, combined wit
 knits (columns of V stitches, a whole number per tile: 41 on the hoodie's 9 cm tile, about 2.2 mm apart, plus fuzz),
 and a colour toned by a photo-scanned melange and darkened in the stitch grooves so the knit still reads where the
 normal map is mip-mapped away. The `.obj` UVs are a box projection in fabric units (one UV tile = the material's tile),
-one `g` group per material (fleece, rib, cord, aglet; track, stripe; sock, sockrib; eva); each garment folder holds
+one `g` group per material (fleece, rib, cord, aglet; track, stripe; sock, sockrib; rubber, footbed, strap); each garment folder holds
 its groups' `<group>_color.jpg` and `<group>_normal.jpg`, and `assets/textures/` all of them. The sheet renders with
 exactly these maps.
 
@@ -36,7 +36,8 @@ sky fill, hemisphere) and the evening desk lamp (0xffb468, distance 2.2, decay 1
 |---|---|---|
 | base mesh `hm08` (`3dobjs/base.obj`), the `asian-male-young` macro target, the default skeleton `rigs/default.mhskel` and its weights `default_weights.mhw` | [makehumancommunity/makehuman](https://github.com/makehumancommunity/makehuman), `makehuman/data/` | CC0 1.0 (`LICENSE.ASSETS.md`: "explicitly released as CC0 in september 2020") |
 | the starting shapes of the hoodie's body and sleeves and of the trousers' legs | MakeHuman system asset `clothes/male_casualsuit02` (in `makehuman_system_assets_cc0.zip`, files.makehumancommunity.org/asset_packs) | CC0 1.0 (stated in the `.mhclo` header: released as CC0 in September 2020 by Data Collection AB, Joel Palmius, Jonas Hauquier) |
-| fabric normal maps and tones: `jersey_melange`, `jogging_melange` (hoodie), `ribbed_corduroy` (cuffs, hem, sock tops), `bi_stretch` (trousers), `knitted_fleece` (socks), `hessian_380` (the slides' footbed grain) | [Poly Haven](https://polyhaven.com) (colormass, Rico Cilliers) | CC0 1.0 |
+| fabric normal maps and tones: `jersey_melange`, `jogging_melange` (hoodie), `ribbed_corduroy` (cuffs, hem, sock tops), `bi_stretch` (trousers), `knitted_fleece` (socks) | [Poly Haven](https://polyhaven.com) (colormass, Rico Cilliers) | CC0 1.0 |
+| the slides' rubber grain and tone: `Rubber004` (1K, normal and colour) | [ambientCG](https://ambientcg.com/view?id=Rubber004) | CC0 1.0 |
 | everything else (the hood, pocket, cords, cuffs, folds, socks, slides, the bindings) | made by `build_clothes.py` | CC0 1.0 |
 
 No brand, logo or maker's design is used.
@@ -47,9 +48,13 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     git clone --depth 1 https://github.com/makehumancommunity/makehuman   # the base mesh, targets, skeleton (CC0 assets)
     curl -O https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip
     unzip makehuman_system_assets_cc0.zip -d mh_sys
-    python ../ph.py tex 1k jersey_melange jogging_melange ribbed_corduroy bi_stretch knitted_fleece hessian_380
-    blender -b -P build_clothes.py -- --mh makehuman/makehuman/data --sys mh_sys --tex ../tex [--quick]
+    python ../ph.py tex 1k jersey_melange jogging_melange ribbed_corduroy bi_stretch knitted_fleece
+    curl -L -o rubber.zip "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip" && unzip rubber.zip -d rubber004 \
+      && mkdir -p ../tex/rubber004 && cp rubber004/Rubber004_1K-JPG_NormalGL.jpg ../tex/rubber004/nor_gl.jpg \
+      && cp rubber004/Rubber004_1K-JPG_Color.jpg ../tex/rubber004/Diffuse.jpg
+    blender -b -P build_clothes.py -- --mh makehuman/makehuman/data --sys mh_sys --tex ../tex [--quick] [--feet]
     python compose_sheet.py        # docs/design/clothes-mh/clothes_sheet.jpg from out/*.png
+    python compose_feet.py         # docs/design/clothes-mh/feet_sheet.jpg: 3/4 close-up, side, from above, seated at 5 m
     python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 
 The build verifies every written `.mhclo`: read back and refitted on the body with MakeHuman's rule, it must give the

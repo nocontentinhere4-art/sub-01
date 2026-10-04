@@ -6,9 +6,9 @@ shininess 0.380
 opacity 1.0
 translucency 0.0
 backfaceCull False
-normalmapTexture eva_normal.jpg
+normalmapTexture strap_normal.jpg
 normalmapIntensity 1.00
 shaderConfig normal True
 shaderConfig diffuse True
-diffuseTexture eva_color.jpg
-# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: eva
+diffuseTexture strap_color.jpg
+# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: footbed, rubber, strap

@@ -7,7 +7,7 @@ a whole number of them per tile so the map tiles) plus a little periodic fuzz no
 colour, toned by a photo-scanned melange where it is heathered and darkened a little in the stitches' grooves, so
 the knit still reads at a distance where the normal map has been mip-mapped away.
 """
-import math
+import math, zlib
 import numpy as np
 import bpy
 
@@ -68,7 +68,8 @@ def lin2srgb(c):
 
 def bake(name, spec, tex_dir, out_dir):
     """spec: tile (dm), rgb (linear), normal (Poly Haven id), nstr, melange (id or None), mel_amt, cols (stitches per
-    tile, 0: none), rows, kstr (knit normal strength), size (px). Returns (colour path, normal path)."""
+    tile, 0: none), rows, kstr (knit normal strength), dots ((nubs per tile, strength) or None), size (px).
+    Returns (colour path, normal path)."""
     n = spec["size"]; rgb = np.array(spec["rgb"], np.float32)
     nm = resize(load(f"{tex_dir}/{spec['normal']}/nor_gl.jpg"), n) * 2 - 1
     nm[..., :2] *= spec["nstr"]; nm /= np.linalg.norm(nm, axis=-1, keepdims=True)
@@ -77,9 +78,18 @@ def bake(name, spec, tex_dir, out_dir):
         lum = resize(load(f"{tex_dir}/{spec['melange']}/Diffuse.jpg"), n).mean(-1)
         tone *= 1 + spec["mel_amt"] * (lum / lum.mean() - 1)
     if spec.get("cols"):
-        h = knit_height(n, spec["cols"], spec["rows"], seed=hash(name) % 1000)
+        h = knit_height(n, spec["cols"], spec["rows"], seed=zlib.crc32(name.encode()) % 1000)
         nm = whiteout(nm, height_normal(h, spec["kstr"]))
         tone *= 1 - 0.18 * (1 - (h - h.min()) / (h.max() - h.min()))          # the grooves are a little darker
+    if spec.get("dots"):
+        # a footbed's moulded nubs: low round bumps on a staggered grid, a whole number per tile (it tiles)
+        k, amp = spec["dots"]; v, u = np.meshgrid((np.arange(n) + 0.5) / n, (np.arange(n) + 0.5) / n, indexing="ij")
+        h = np.zeros((n, n), np.float32)
+        for dv, du in ((0.0, 0.0), (0.5, 0.5)):
+            fu = (u * k + du) % 1.0 - 0.5; fv = (v * k + dv) % 1.0 - 0.5
+            h = np.maximum(h, np.clip(1 - (fu * fu + fv * fv) / 0.09, 0, 1) ** 1.5)
+        nm = whiteout(nm, height_normal(h, amp))
+        tone *= 1 + 0.06 * (h - 0.5)                                          # the tops catch a little more wear
     col = lin2srgb(rgb[None, None, :] * tone[..., None])
     cp, npth = f"{out_dir}/{name}_color.jpg", f"{out_dir}/{name}_normal.jpg"
     save(col, cp, True); save(nm * 0.5 + 0.5, npth, False)

@@ -8,7 +8,8 @@
 # Sources (all CC0, see README.md): the hm08 base mesh, the asian-male-young macro target, the default skeleton and its
 # weights (makehumancommunity/makehuman, LICENSE.ASSETS.md: CC0); the shapes of the hoodie's body and sleeves and of
 # the trousers start from MakeHuman's system asset male_casualsuit02 (CC0 since 2020), reworked here; the fabric normal
-# maps are Poly Haven's (CC0). Everything this script makes is released under CC0.
+# maps are Poly Haven's (CC0), the slides' rubber grain ambientCG's Rubber004 (CC0). Everything this script makes is
+# released under CC0.
 #
 # Coordinates: MakeHuman files are in decimetres, y up, the body facing +z. In Blender the same numbers are used
 # (1 unit = 1 dm) with z up and the body facing -y: B(x, y, z) = (x, -z, y).
@@ -30,6 +31,7 @@ OUT = arg("--out", os.path.join(HERE, "assets"))
 SHEET_DIR = arg("--shots", os.path.join(HERE, "out"))
 QUICK = "--quick" in argv
 RENDER = "--no-render" not in argv
+FEET_ONLY = "--feet" in argv                                   # only the feet sheet's four shots
 os.makedirs(OUT, exist_ok=True); os.makedirs(SHEET_DIR, exist_ok=True)
 random.seed(7)
 
@@ -276,7 +278,10 @@ FABRICS = {   # tile dm, linear rgb, rough, sheen (weight, tint), Poly Haven nor
     "stripe":  dict(tile=0.8, rgb=(0.6, 0.6, 0.58), rough=0.65, sheen=(0.0, 0.0), normal="bi_stretch", nstr=0.8, size=256),
     "sock":    dict(tile=0.5, rgb=(0.8, 0.8, 0.78), rough=0.97, sheen=(0.7, 0.5), normal="knitted_fleece", nstr=1.2, cols=20, rows=20, kstr=1.0, size=512),
     "sockrib": dict(tile=0.25, rgb=(0.78, 0.78, 0.76), rough=0.97, sheen=(0.7, 0.5), normal="ribbed_corduroy", nstr=1.6, cols=8, rows=8, kstr=1.2, size=256),
-    "eva":     dict(tile=1.2, rgb=(0.02, 0.02, 0.022), rough=0.62, sheen=(0.0, 0.0), normal="hessian_380", nstr=0.25, size=256),
+    # the slides: matte black moulded rubber (ambientCG Rubber004's grain), the footbed with faint moulded nubs 3 mm apart
+    "rubber":  dict(tile=0.6, rgb=(0.016, 0.016, 0.017), rough=0.74, sheen=(0.0, 0.0), normal="rubber004", nstr=0.7, melange="rubber004", mel_amt=0.12, size=512),
+    "footbed": dict(tile=0.6, rgb=(0.016, 0.016, 0.017), rough=0.78, sheen=(0.0, 0.0), normal="rubber004", nstr=0.7, melange="rubber004", mel_amt=0.12, dots=(20, 1.6), size=1024),
+    "strap":   dict(tile=0.6, rgb=(0.017, 0.017, 0.018), rough=0.62, sheen=(0.0, 0.0), normal="rubber004", nstr=0.4, melange="rubber004", mel_amt=0.08, size=512),
 }
 
 
@@ -502,97 +507,192 @@ def trousers(hem_z):
 
 # ================================================================ socks and slides
 def socks():
-    """white crew socks: the body's feet and lower shins, 2 mm out, the toes smoothed into one envelope, a ribbed top"""
+    """white crew socks: the body's feet and lower shins, 2 mm out; over the toes one soft toe box (no toes of their
+    own), slight compression folds at the ankle, a ribbed cuff"""
     top = J("foot.L")[2] + 0.95
     keep = [f for f in BODY_F if all(B(REST[i]).z < top for i in f)]
     ids = sorted({i for f in keep for i in f}); remap = {v: k for k, v in enumerate(ids)}
     o = mesh_obj("socks", [B(REST[i]) for i in ids], [[remap[i] for i in f] for f in keep], [MAT["sock"], MAT["sockrib"]])
-    # the toes become one envelope: smooth the front of the foot, then out of the skin
-    bm = bmesh.new(); bm.from_mesh(o.data)
-    bm.free()
+    subdivide(o, 1)                                             # fine enough for the folds and a round toe box
     P = verts_np(o); N = normals_np(o); P += N * 0.2 * CM; set_verts(o, P)
     push_out(o, 0.25 * CM, iters=2)
-    # a sock does not go between the toes: concave places fill outward only (towards their neighbours, along the normal)
-    # until the front of the foot is one smooth envelope; nothing ever moves inward, so it never enters the skin
-    nb = {}
-    for poly in o.data.polygons:
-        vs = list(poly.vertices)
-        for a, b2 in zip(vs, vs[1:] + vs[:1]): nb.setdefault(a, set()).add(b2); nb.setdefault(b2, set()).add(a)
-    front = [v.index for v in o.data.vertices if v.co.y < J("foot.L", "tail").y + 0.75 and v.co.z < J("foot.L")[2] + 0.35]
-    # a sock is one smooth shape over the toes (a morphological closing of the skin): the front of the foot is smoothed
-    # well inside the skin, then every front vertex goes out along the smoothed normal to just past the OUTERMOST skin
-    # hit of a small disk of rays (5 mm across), so the knit bridges the gaps between the toes and never enters the skin
+    # the toe box (a morphological closing of the skin): the front of the foot is smoothed well inside the skin, then
+    # every front vertex goes out along the smoothed normal to just past the OUTERMOST skin hit of a disk of rays 16 mm
+    # across, so the knit bridges the toes as one soft shape (as a sock does) and never enters the skin
+    ty = J("foot.L", "tail").y + 0.9
+    front = [v.index for v in o.data.vertices if v.co.y < ty and v.co.z < J("foot.L")[2] + 0.45]
     bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
-    for _ in range(25): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front], factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    for _ in range(40): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front], factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bm.to_mesh(o.data); bm.free(); o.data.update()
-    S = verts_np(o); NS = normals_np(o); P = S.copy(); r = 0.25 * CM
-    for i in front:
-        base, n = Vector(S[i]), Vector(NS[i]).normalized(); t1 = n.orthogonal().normalized(); t2 = n.cross(t1)
-        best = None
-        for k in range(7):
-            off = Vector((0, 0, 0)) if k == 0 else (t1 * math.cos(k * math.pi / 3) + t2 * math.sin(k * math.pi / 3)) * r
-            hit = BODY_BVH.ray_cast(base + n * 1.2 + off, -n, 2.5)
-            if hit[0] is not None:
-                t = (hit[0] - base).dot(n); best = t if best is None else max(best, t)
-        if best is not None: P[i] = np.array(base + n * (best + 0.25 * CM))
+    def close(gap, only_out):
+        S = verts_np(o); NS = normals_np(o); P = S.copy(); r = 0.8 * CM
+        for i in front:
+            base, n = Vector(S[i]), Vector(NS[i]).normalized(); t1 = n.orthogonal().normalized(); t2 = n.cross(t1)
+            best = None
+            offs = [Vector((0, 0, 0))] + [(t1 * math.cos(k * math.pi / 4) + t2 * math.sin(k * math.pi / 4)) * rr for rr in (r * 0.5, r) for k in range(8)]
+            for off in offs:
+                hit = BODY_BVH.ray_cast(base + n * 1.2 + off, -n, 2.5)
+                if hit[0] is not None:
+                    t = (hit[0] - base).dot(n); best = t if best is None else max(best, t)
+            if best is not None and (not only_out or best + gap > 0): P[i] = np.array(base + n * (best + gap))
+        set_verts(o, P)
+    def relax(passes, fac):
+        bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
+        for _ in range(passes): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front], factor=fac, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+        bm.to_mesh(o.data); bm.free(); o.data.update()
+    close(0.3 * CM, False); relax(10, 0.5)                       # no creases left from the closure ...
+    close(0.25 * CM, True); relax(2, 0.3)                        # ... and nothing let back into the skin
+    fs = set(front); keep_front = {i: o.data.vertices[i].co.copy() for i in fs}
+    push_out(o, 0.25 * CM, iters=2)                              # the rest of the sock (the front stays on its closure)
+    for i, c in keep_front.items(): o.data.vertices[i].co = c
+    o.data.update()
+    # slight folds at the ankle: a few soft rings, each wavering in height and fading round the leg, 1.5 mm proud
+    P = verts_np(o); N = normals_np(o); rng = random.Random(11)
+    for sgn, s in ((1, "L"), (-1, "R")):
+        c = J(f"foot.{s}"); rings = [(c.z + dz * CM, rng.uniform(0, 2 * math.pi), rng.uniform(0.6, 1.0)) for dz in (-0.6, 0.6, 1.8, 3.0, 4.1)]
+        for i, p in enumerate(P):
+            if p[0] * sgn <= 0 or p[2] < c.z - 0.15 or p[2] > top - 0.4: continue
+            th = math.atan2(p[1] - c.y, (p[0] - c.x) * sgn); d = 0.0
+            for zk, ph, amp in rings:
+                zz = zk + 0.04 * math.sin(th + ph) + 0.02 * math.sin(2 * th + 1.7 * ph)
+                d += amp * math.exp(-((p[2] - zz) / 0.045) ** 2) * (0.5 + 0.5 * math.cos(th - ph)) ** 0.7
+            fade = smooth01(c.z - 0.15, c.z - 0.02, p[2]) * (1 - smooth01(top - 0.6, top - 0.42, p[2]))
+            P[i] = P[i] + N[i] * 0.15 * CM * min(d, 1.2) * fade
     set_verts(o, P)
-    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
-    for _ in range(2): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front], factor=0.35, use_axis_x=True, use_axis_y=True, use_axis_z=True)
-    bm.to_mesh(o.data); bm.free(); o.data.update()
-    push_out(o, 0.2 * CM, iters=1)
     for poly in o.data.polygons:
         poly.material_index = 1 if min(o.data.vertices[v].co.z for v in poly.vertices) > top - 0.35 else 0
     return o, ids
 
 
 MISSES = [0]
+SLIDE_FLOOR = [None]
 def slides(sock_obj):
-    """black slides: a 2.4 cm EVA footbed under each foot (its outline the foot's footprint, 8 mm out) and a wide
-    padded strap over the instep"""
-    bvh = bvh_of(sock_obj); parts = []
-    floor = min(B(REST[i]).z for i in BODY_IDS)
+    """black rubber slides, from photos of generic pool slides: a contoured footbed (2.3 cm under the heel, 1.5 cm at
+    the toe, a toe spring, the heel cup and side rims, soft rounded edges) about 1 cm wider than the foot, the foot
+    sitting in it; one wide padded strap (7.5 cm front to back) over the forefoot to just before the toes, moulded
+    into the footbed's sides"""
+    bvh = bvh_of(sock_obj); parts = []; S = verts_np(sock_obj); K = 64
     for sgn in (1, -1):
-        side = "L" if sgn > 0 else "R"
-        foot = np.array([B(REST[i]) for i in BODY_IDS if B(REST[i]).z < floor + 0.55 and B(REST[i]).x * sgn > 0.3])   # the sole: heel to toes
-        cx, cy = (foot[:, 0].min() + foot[:, 0].max()) / 2, (foot[:, 1].min() + foot[:, 1].max()) / 2   # (the toes are dense: not the mean)
-        # the outline: the footprint's extent in each direction, smoothed, 8 mm out
-        outline = []
-        for k in range(48):
-            a = 2 * math.pi * k / 48; d = np.array([math.cos(a), math.sin(a)])
-            rel = foot[:, :2] - [cx, cy]; proj = rel @ d
-            outline.append(max(proj.max(), 0.3) + 0.8 * CM)
-        sm_ = [sum(outline[(k + j) % 48] for j in (-2, -1, 0, 1, 2)) / 5 for k in range(48)]
-        bm = bmesh.new(); bot, topv = [], []
-        z0, z1 = floor - 1.6 * CM, floor + 0.2 * CM                                      # an 1.8 cm sole
-        for k in range(48):
-            a = 2 * math.pi * k / 48; x, y = cx + sm_[k] * math.cos(a), cy + sm_[k] * math.sin(a)
-            bot.append(bm.verts.new((x, y, z0))); topv.append(bm.verts.new((x, y, z1)))
-        bm.faces.new(list(reversed(bot))); bm.faces.new(topv)
-        for k in range(48): bm.faces.new([bot[k], bot[(k + 1) % 48], topv[(k + 1) % 48], topv[k]])
+        F = S[S[:, 0] * sgn > 0.3]; zb = F[:, 2].min()
+        foot = F[F[:, 2] < zb + 2.5 * CM]                                   # the plan-view silhouette of the foot
+        cx, cy = (foot[:, 0].min() + foot[:, 0].max()) / 2, (foot[:, 1].min() + foot[:, 1].max()) / 2
+        ymin, ymax = foot[:, 1].min(), foot[:, 1].max(); L = ymax - ymin  # toe tip (front is -y), heel
+        rel = foot[:, :2] - [cx, cy]; ang = np.arctan2(rel[:, 1], rel[:, 0]); dist = np.hypot(rel[:, 0], rel[:, 1])
+        R = []
+        for k in range(K):
+            a = 2 * math.pi * k / K; da = np.abs((ang - a + math.pi) % (2 * math.pi) - math.pi)
+            sel = dist[da < math.radians(9)]; R.append(sel.max() if len(sel) else 0.5)
+        for _ in range(3): R = [(R[k - 1] + 2 * R[k] + R[(k + 1) % K]) / 4 for k in range(K)]
+        DIR = [(math.cos(2 * math.pi * k / K), math.sin(2 * math.pi * k / K)) for k in range(K)]
+        fr = [max(0.0, -d[1]) for d in DIR]; bk = [max(0.0, d[1]) for d in DIR]
+        R = [R[k] + (0.55 + 0.65 * fr[k] ** 2 + 0.1 * bk[k] ** 2) * CM for k in range(K)]   # 5.5 mm at the sides, 12 at the toe
+        heel_bot = zb - 2.3 * CM; SLIDE_FLOOR[0] = heel_bot if SLIDE_FLOOR[0] is None else min(SLIDE_FLOOR[0], heel_bot)
+        def bottom(y):                                                      # flat to the ball, then the toe spring
+            s = (ymax - y) / L; return heel_bot + 0.8 * CM * smooth01(0.6, 1.08, s) ** 1.4
+        def contact(x, y):                                                  # the sock's underside here (or None)
+            h = bvh.ray_cast(Vector((x, y, zb - 0.5)), Vector((0, 0, 1)), 1.0)
+            return h[0].z if h[0] is not None else None
+        def pt(k, inset): r = max(R[k] - inset * CM, 0.0); return cx + r * DIR[k][0], cy + r * DIR[k][1]
+        # the footbed's top: the sock's underside 1 mm up into it (the foot sits in the bed), never more than 9 mm
+        # above the sole's lowest point (the arch), smoothed; outside the foot the bed carries on from the inside
+        top_fr = [0.0, 0.16, 0.30, 0.44, 0.58, 0.72, 0.86, 1.0]           # of the radius inside the 1.5 cm inset
+        Hraw = np.full((len(top_fr), K), np.nan)
+        for j, f in enumerate(top_fr):
+            for k in range(K):
+                x, y = cx + (R[k] - 1.5 * CM) * f * DIR[k][0], cy + (R[k] - 1.5 * CM) * f * DIR[k][1]
+                z = contact(x, y)
+                if z is not None and z < zb + 0.9 * CM: Hraw[j, k] = z - 0.1 * CM
+        for j in range(len(top_fr)):
+            for k in range(K):
+                if np.isnan(Hraw[j, k]): Hraw[j, k] = Hraw[j - 1, k] if j else np.nanmin(Hraw)
+        H = Hraw.copy()
+        for _ in range(4):
+            Hs = H.copy()
+            for j in range(len(top_fr)):
+                for k in range(K):
+                    nb = [H[j, k - 1], H[j, (k + 1) % K]] + ([H[j - 1, k]] if j else []) + ([H[j + 1, k]] if j + 1 < len(top_fr) else [])
+                    Hs[j, k] = 0.5 * H[j, k] + 0.5 * sum(nb) / len(nb)
+            H = np.minimum(Hs, Hraw + 0.05 * CM)                            # smoothing never lifts it into the sock
+        H[0, :] = H[0, :].mean()
+        rim = [H[-1, k] + (0.25 + 0.22 * bk[k] - 0.1 * fr[k]) * CM for k in range(K)]   # the heel cup, side rims, toe lip
+        rings = []                                                          # (points, material) from the top centre out and round under
+        for j, f in enumerate(top_fr):
+            rings.append([(cx + (R[k] - 1.5 * CM) * f * DIR[k][0], cy + (R[k] - 1.5 * CM) * f * DIR[k][1], H[j, k]) for k in range(K)])
+        for inset, zf in ((1.15, lambda k: H[-1, k] + 0.4 * (rim[k] - H[-1, k])), (0.85, lambda k: rim[k] - 0.04 * CM), (0.6, lambda k: rim[k])):
+            rings.append([(*pt(k, inset), zf(k)) for k in range(K)])
+        r_t = 0.6                                                           # the rounded top edge, 6 mm
+        for deg in (45, 90):
+            rings.append([(*pt(k, r_t * (1 - math.sin(math.radians(deg)))), rim[k] - r_t * CM * (1 - math.cos(math.radians(deg)))) for k in range(K)])
+        rings.append([(*pt(k, 0.0), (rim[k] - r_t * CM + bottom(pt(k, 0)[1]) + 0.3 * CM) / 2) for k in range(K)])   # the side wall
+        r_b = 0.3                                                           # the rounded bottom edge, 3 mm
+        for deg in (0, 45, 90):
+            rings.append([(*pt(k, r_b * (1 - math.cos(math.radians(deg)))), bottom(pt(k, 0)[1]) + r_b * CM * (1 - math.sin(math.radians(deg)))) for k in range(K)])
+        for f in (0.66, 0.33, 0.0):
+            rings.append([(cx + (R[k] - r_b * CM) * f * DIR[k][0], cy + (R[k] - r_b * CM) * f * DIR[k][1], bottom(cy + (R[k] - r_b * CM) * f * DIR[k][1])) for k in range(K)])
+        bm = bmesh.new(); V = [[bm.verts.new(p) for p in ring] for ring in rings]
+        n_top = len(top_fr) + 1                                             # footbed: the top up to the 1.15 cm inset
+        for j in range(len(V) - 1):
+            for k in range(K):
+                q = [V[j][k], V[j][(k + 1) % K], V[j + 1][(k + 1) % K], V[j + 1][k]]
+                if j == 0 or j == len(V) - 2:                               # the centres: collapse into triangles
+                    q = [V[j][k], V[j + 1][(k + 1) % K], V[j + 1][k]] if j == 0 else [V[j][k], V[j][(k + 1) % K], V[j + 1][k]]
+                try:
+                    fc = bm.faces.new(q); fc.material_index = 1 if j < n_top - 1 else 0; fc.smooth = True
+                except ValueError: pass
+        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.18 * CM, segments=2, affect='EDGES', clamp_overlap=True)   # a flatter edge
         me = bpy.data.meshes.new("slide_sole"); bm.to_mesh(me); bm.free()
-        so = bpy.data.objects.new("slide_sole", me); SC.collection.objects.link(so); me.materials.append(MAT["eva"]); parts.append(so)
-        # the strap: arcs over the instep, from one edge of the footbed to the other
-        ys = [cy + (foot[:, 1].min() - cy) * f for f in (0.0, 0.11, 0.22, 0.33, 0.44, 0.55, 0.64)]   # a wide strap over the instep
-        rows = []
-        for y in ys:
-            row = []
-            for j in range(15):
-                u = j / 14; a = math.pi * u
-                dirv = Vector((math.cos(a), 0, math.sin(a)))
-                o_ = Vector((cx, y, floor + 0.3))
-                hit = bvh.ray_cast(o_ + dirv * 3, -dirv, 6.0)
+        so = bpy.data.objects.new("slide_sole", me); SC.collection.objects.link(so)
+        me.materials.append(MAT["rubber"]); me.materials.append(MAT["footbed"]); me.materials.append(MAT["strap"]); parts.append(so)
+        for p in me.polygons: p.use_smooth = True
+        # the strap: 7.5 cm from just behind the toes back over the forefoot; inside it 2 mm off the sock, padded (9 mm
+        # thick over the top of the foot, 4.5 mm where it goes into the sole), its front and back edges rounded
+        def edge_x(y, side):                                                # the bed's outline at this y, on this side
+            best = None
+            for k in range(K):
+                if DIR[k][0] * side <= 0: continue
+                x, yy = pt(k, 0.0); x2, yy2 = pt((k + 1) % K, 0.0)
+                if (yy - y) * (yy2 - y) <= 0 and yy != yy2:
+                    xx = x + (x2 - x) * (y - yy) / (yy2 - yy)
+                    if best is None or (xx - cx) * side > (best - cx) * side: best = xx
+            return best
+        def rim_at(x, y):
+            k = min(range(K), key=lambda k: (pt(k, 0.0)[0] - x) ** 2 + (pt(k, 0.0)[1] - y) ** 2); return rim[k]
+        y_front = ymin + 0.215 * L; NV_, NU = 13, 25
+        inner = []
+        for jv in range(NV_):
+            y = y_front + 7.5 * CM * (0.5 - 0.5 * math.cos(math.pi * jv / (NV_ - 1)))   # rows closer at the edges
+            band = foot[np.abs(foot[:, 1] - y) < 0.6 * CM]; xc = (band[:, 0].min() + band[:, 0].max()) / 2
+            o_ = Vector((xc, y, zb + 0.6 * CM)); row = []
+            for ju in range(NU):
+                a = math.pi * ju / (NU - 1); d = Vector((math.cos(a), 0, math.sin(a)))
+                hit = bvh.ray_cast(o_ + d * 3, -d, 6.0)
                 if hit[0] is None: MISSES[0] += 1
-                p = hit[0] + (dirv * 0.35 * CM) if hit[0] is not None else o_ + dirv * 0.5
-                if p.z < z1: p.z = z1
-                row.append(p)
-            rows.append(row)
-        if os.environ.get("POSE_DEBUG"):
-            sp = np.array([[q.x, q.y, q.z] for r in rows for q in r]); so_ = verts_np(sock_obj); so_ = so_[so_[:, 0] * sgn > 0.3]
-            print("STRAPDBG", side, "cx cy", round(cx, 2), round(cy, 2), "foot y", round(foot[:, 1].min(), 2), round(foot[:, 1].max(), 2), "strap min", sp.min(0).round(2), "max", sp.max(0).round(2), "sock min", so_.min(0).round(2), "max", so_.max(0).round(2))
-        st = grid_obj("slide_strap", rows, MAT["eva"])
-        sm = st.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.55 * CM; sm.offset = 1; sm.use_rim = True
+                row.append((hit[0] if hit[0] is not None else o_ + d * 0.5) + d * 0.2 * CM)
+            # each end goes down over the bed's rounded edge into its side wall
+            for side, end in ((1, 0), (-1, -1)):
+                p0 = row[end]; xe = edge_x(y, side) - side * 0.45 * CM; ze = rim_at(xe, y) - 0.8 * CM
+                ext = [Vector((p0.x + (xe - p0.x) * smooth01(0, 1, t), y, p0.z + (ze - p0.z) * t)) for t in (0.35, 0.7, 1.0)]
+                row = (ext[::-1] + row) if end == 0 else (row + ext)
+            inner.append(row)
+        nu = len(inner[0]); o_c = [Vector((sum(p.x for p in r) / nu, r[0].y, zb)) for r in inner]
+        def thick(ju, v):
+            u = ju / (nu - 1); mid = math.sin(math.pi * min(max((u * nu - 3) / (nu - 6), 0), 1)) ** 0.6
+            return (0.45 + 0.45 * mid) * CM * max(0.0, 1 - abs(2 * v - 1) ** 5) ** 0.35
+        outer = []
+        for jv in range(NV_):
+            v = 0.5 - 0.5 * math.cos(math.pi * jv / (NV_ - 1)); row = []
+            for ju in range(nu):
+                tu = inner[jv][min(ju + 1, nu - 1)] - inner[jv][max(ju - 1, 0)]
+                tv = inner[min(jv + 1, NV_ - 1)][ju] - inner[max(jv - 1, 0)][ju]
+                n = tu.cross(tv).normalized()
+                if n.dot(inner[jv][ju] - o_c[jv]) < 0: n = -n
+                row.append(inner[jv][ju] + n * thick(ju, v))
+            outer.append(row)
+        loop = inner + outer[::-1]                                          # round the strap's section: inside front to back, outside back to front
+        st = grid_obj("slide_strap", [[p for p in r] for r in loop] + [loop[0]], MAT["strap"])
+        bm = bmesh.new(); bm.from_mesh(st.data); bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.to_mesh(st.data); bm.free()
         parts.append(st)
     return parts
 
@@ -775,7 +875,7 @@ def lights():
                                    ("rim", (6, 16, 16), (-60, 0, 160), 5200, 7)):
         ld = bpy.data.lights.new(nm, 'AREA'); ld.energy = en; ld.size = size
         lo = bpy.data.objects.new(nm, ld); lo.location = loc; lo.rotation_euler = [math.radians(a) for a in rot]; SC.collection.objects.link(lo)
-    floor = min(B(REST[i]).z for i in BODY_IDS) - 1.6 * CM
+    floor = SLIDE_FLOOR[0]                                     # the slides' soles stand on it
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, floor)); bpy.context.active_object.data.materials.append(MAT["studio"])
     return floor
 
@@ -819,8 +919,14 @@ def seat_props(on):
 if RENDER:
     W = 560 if QUICK else 800; Hh = 2 * W
     pose_standing(); seat_props(False)
-    render(camera("c_stand", (-7.5, -24, 2.4), (0, 0, -0.6), 50), W, Hh, f"{SHEET_DIR}/standing.png")
-    render(camera("c_hood", (-3.6, -9.5, 6.2), (0.2, 0.0, 3.4), 60), W, W, f"{SHEET_DIR}/close_hood.png")
+    # the feet: a 3/4 close-up, the side, from above (a little in front, past the trouser leg), the left foot
+    bpy.context.view_layer.update(); fl = J("foot.L"); fy = fl.y - 0.75; FW = 520 if QUICK else 800
+    render(camera("c_f34", (fl.x + 3.3, fy - 4.6, FLOOR + 2.7), (fl.x + 0.05, fy - 0.2, FLOOR + 0.45), 50), FW, FW, f"{SHEET_DIR}/feet_34.png")
+    render(camera("c_fside", (fl.x + 12.0, fy, FLOOR + 0.9), (fl.x, fy, FLOOR + 0.75), 85), FW, FW, f"{SHEET_DIR}/feet_side.png")
+    render(camera("c_ftop", (fl.x + 0.2, fy - 4.2, FLOOR + 10.5), (fl.x, fy - 0.4, FLOOR), 60), FW, FW, f"{SHEET_DIR}/feet_top.png")
+    if not FEET_ONLY:
+        render(camera("c_stand", (-7.5, -24, 2.4), (0, 0, -0.6), 50), W, Hh, f"{SHEET_DIR}/standing.png")
+        render(camera("c_hood", (-3.6, -9.5, 6.2), (0.2, 0.0, 3.4), 60), W, W, f"{SHEET_DIR}/close_hood.png")
     if os.environ.get("POSE_DEBUG"):
         render(camera("c_knit", (0.6, -3.2, 2.2), (0.3, 0, 2.0), 50), 500, 500, f"{SHEET_DIR}/debug_knit.png")
         render(camera("c_hem", (3.2, -5.5, 0.6), (1.2, 0, 0.2), 50), 500, 500, f"{SHEET_DIR}/debug_hem.png")
@@ -837,6 +943,10 @@ if RENDER:
         cs = camera("c_side", (-30, -1.5, -2.0), (0, -1.5, -2.0), 50); cs.data.type = 'ORTHO'; cs.data.ortho_scale = 22
         render(cs, 600, 600, f"{SHEET_DIR}/debug_side.png")
     bpy.context.view_layer.update(); el = RIG.matrix_world @ RIG.pose.bones["lowerarm01.R"].head
+    # seated at the room's distance (5 m), the same direction as the seated shot
+    tg = Vector((0, -1.6, -3.4)); dv = (Vector((-21, -15, 3.0)) - tg).normalized()
+    render(camera("c_seat5", tg + dv * 50, tg, 50), FW, FW, f"{SHEET_DIR}/feet_room.png")
+    if FEET_ONLY: print("DONE"); sys.exit(0)
     render(camera("c_seat", (-21, -15, 3.0), (0, -1.6, -3.4), 50), W, Hh, f"{SHEET_DIR}/seated.png")
     bpy.ops.object.select_all(action='DESELECT'); dg = bpy.context.evaluated_depsgraph_get(); posed = []
     for o in [body, bpy.data.objects["stool"], bpy.data.objects["desk"]] + list(GARMENTS.values()):   # posed copies (the glTF

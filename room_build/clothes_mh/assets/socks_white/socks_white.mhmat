@@ -11,4 +11,4 @@ normalmapIntensity 1.00
 shaderConfig normal True
 shaderConfig diffuse True
 diffuseTexture sock_color.jpg
-# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: sock
+# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: sock, sockrib

@@ -10,13 +10,13 @@
   "hides": 1352
  },
  "socks_white": {
-  "verts": 2286,
-  "faces": 2264,
+  "verts": 9098,
+  "faces": 9056,
   "hides": 2286
  },
  "slides_black": {
-  "verts": 1764,
-  "faces": 1668,
+  "verts": 3796,
+  "faces": 3872,
   "hides": 0
  }
 }
