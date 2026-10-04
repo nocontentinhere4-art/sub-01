@@ -74,6 +74,36 @@ function handPose(L, t) {
     }
   }
 }
+// IK={"L":[x,y,z],"R":[x,y,z]}: pin each wrist on a world target (the keyboard's home row), elbows bent down and in,
+// like the owner's reference photo; the recorded wrist/finger rotations stay (only the arm's two bones turn).
+const IKT = process.env.IK ? JSON.parse(process.env.IK) : null;
+const fk = (Wq, rootPos, n) => { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
+  const p = V3(rootPos); for (let i = 1; i < path.length; i++) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(Wq[path[i - 1]])); return p; };
+function armIK(Wq, L, rootPos) {
+  for (const s of ["L", "R"]) { if (!IKT[s]) continue;
+    const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
+    const A = fk(Wq, rootPos, up), a = V3(rest.head[lo]).distanceTo(V3(rest.head[up])), b = V3(rest.head[wr]).distanceTo(V3(rest.head[lo]));
+    const T = V3(IKT[s]); let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
+    const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
+    const pole = new THREE.Vector3(s === "L" ? 0.35 : -0.35, -1, -0.15); pole.sub(d.clone().multiplyScalar(pole.dot(d))).normalize();
+    const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), C = A.clone().addScaledVector(d, dl);
+    const restU = V3(rest.head[lo]).sub(V3(rest.head[up])).normalize(), restF = V3(rest.head[wr]).sub(V3(rest.head[lo])).normalize();
+    const curU = restU.clone().applyQuaternion(Wq[up]), R1 = new THREE.Quaternion().setFromUnitVectors(curU, E.clone().sub(A).normalize()).multiply(Wq[up]);
+    const curF = restF.clone().applyQuaternion(R1.clone().multiply(L[`upperarm02.${s}`] || new THREE.Quaternion()).multiply(L[lo]));
+    const W2old = R1.clone().multiply(L[`upperarm02.${s}`] || new THREE.Quaternion()).multiply(L[lo]);
+    const R2 = new THREE.Quaternion().setFromUnitVectors(curF, C.clone().sub(E).normalize()).multiply(W2old);
+    L[up] = Wq[par[up]].clone().invert().multiply(R1);
+    L[lo] = R1.clone().multiply(L[`upperarm02.${s}`] || new THREE.Quaternion()).invert().multiply(R2);
+    // the hand points forward, a little inward, palm down (yaw only from its rest); fingers keep their recorded motion
+    const fwd = new THREE.Vector3(s === "L" ? -0.25 : 0.25, -0.04, 1).normalize();
+    const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
+    const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, 0, 0.2);
+    const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
+    L[wr] = R2.clone().multiply(L[`lowerarm02.${s}`] || new THREE.Quaternion()).invert().multiply(Hw);
+    const fk_ = +(process.env.FINGERK || 1);
+    if (fk_ !== 1) for (const n of rest.order) if (n.endsWith("." + s) && /finger|metacarpal/.test(n)) L[n] = new THREE.Quaternion().slerp(L[n], fk_);
+  }
+}
 const frames = []; let p0 = null;
 for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 1 / fps) {
   mixer.setTime(t); obj.updateMatrixWorld(true);
@@ -84,6 +114,8 @@ for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 
     L[n] = par[n] ? Wq[par[n]].clone().invert().multiply(Wq[n]) : Wq[n].clone();
   }
   if (HP) handPose(L, frames.length / fps);
+  if (IKT) armIK(Wq, L, [ (sp("Hips").applyQuaternion(Y0).applyQuaternion(H).x - (p0 ? p0.x : sp("Hips").applyQuaternion(Y0).applyQuaternion(H).x)) * k + rest.head.root[0],
+    sp("Hips").applyQuaternion(Y0).applyQuaternion(H).y * k + +(process.env.DY || 0), (sp("Hips").applyQuaternion(Y0).applyQuaternion(H).z - (p0 ? p0.z : sp("Hips").applyQuaternion(Y0).applyQuaternion(H).z)) * k + rest.head.root[2] ]);
   const hp = sp("Hips").applyQuaternion(Y0).applyQuaternion(H); if (!p0) p0 = hp.clone();
   frames.push({ L, root: [ (hp.x - p0.x) * k + rest.head.root[0], hp.y * k + +(process.env.DY || 0), (hp.z - p0.z) * k + rest.head.root[2] ] });
 }
