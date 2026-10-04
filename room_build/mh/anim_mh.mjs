@@ -117,8 +117,12 @@ function armIK(Wq, L, rootPos) {
       const base = {}; for (const n of rest.order) if (/finger[2-5]-[23]\.R$/.test(n)) base[n] = L[n].clone();
       for (let f = 2; f <= 5; f++) { const pip = `finger${f}-2.R`, dip = `finger${f}-3.R`;
         const at = e => { L[pip] = curlQ(pip, e).multiply(base[pip]); L[dip] = curlQ(dip, e * 0.6).multiply(base[dip]); return dome(bonePos(L, rootPos, dip, true), 0.008); };
-        let a = -25, b = 70; if (at(a) < 0) { at(a); continue; } if (at(b) > 0) { at(b); continue; }
-        for (let j = 0; j < 22; j++) { const m = (a + b) / 2; if (at(m) > 0) a = m; else b = m; } at(a); }
+        // scan from straight to curled for the first touch; if none, the closest pass
+        let prev = -20, best = -20, bestD = 1e9, hit = null;
+        for (let e = -20; e <= 70; e += 5) { const d = at(e); if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = e; }
+          if (d <= 0) { hit = [prev, e]; break; } prev = e; }
+        if (!hit) { at(best); continue; } if (hit[0] === hit[1]) { at(hit[0]); continue; }
+        let a = hit[0], b = hit[1]; for (let j = 0; j < 16; j++) { const m = (a + b) / 2; if (at(m) > 0) a = m; else b = m; } at(a); }
     }
   }
 }
@@ -129,7 +133,8 @@ function bonePos(L, rootPos, n, tail) { const path = []; for (let b = n; b; b = 
   return tail ? p.add(V3(rest.tail[n]).sub(V3(rest.head[n])).applyQuaternion(W)) : p; }
 // MOUSE={"c":[x,y,z],"r":[rx,ry,rz]}: an ellipsoid dome; >0 outside, <0 inside (radii inflated by the skin's thickness)
 const MOUSE = process.env.MOUSE ? JSON.parse(process.env.MOUSE) : null;
-const dome = (p, pad) => { const [cx, cy, cz] = MOUSE.c, [rx, ry, rz] = MOUSE.r;
+// r = [rx, ry, rz front, rz back]: the hump sits toward the back, the buttons slope gently to the front
+const dome = (p, pad) => { const [cx, cy, cz] = MOUSE.c, [rx, ry, rzf, rzb] = MOUSE.r, rz = p.z >= cz ? rzf : (rzb || rzf);
   return Math.hypot((p.x - cx) / (rx + pad), (Math.max(p.y, cy) - cy) / (ry + pad), (p.z - cz) / (rz + pad)) - 1; };
 function tipY(L, rootPos, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
   const p = V3(rootPos); let W = new THREE.Quaternion();
