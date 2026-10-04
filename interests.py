@@ -23,55 +23,63 @@ import random
 import re
 import time
 
-# topic: seed weight, searches he might type, words that mark a page as being about the topic
+# topic: seed weight, searches he might type, words that mark a page as being about the topic.
+# #89 teen re-seed (owner: "he's a young guy like us: YouTube, TikTok, cars, really interesting things"), from
+# docs/research/teen_online.md (Pew 2024, Ofcom 2025, Common Sense, PARTY USA 2024): gaming, music, creators /
+# YouTubers, football, cars, anime, tech and phones, sneakers / streetwear, memes, movies and series. Cooking is not a
+# browsing topic: food only while he is hungry or ordering (pick(hungry=True)). No money or crypto topics.
 PROFILE = {
-    "music": (1.0, ["new japanese indie songs", "city pop playlist", "lo-fi hip hop", "Tokyo live house tonight",
-                    "best albums this year", "vaporwave"],
-              r"music|songs?|album|playlist|band|concert|live house|lo-?fi|city pop|singer|rapper|spotify|bandcamp"),
-    "anime": (1.0, ["new anime this season", "Chainsaw Man", "One Piece latest chapter", "Studio Ghibli",
-                    "manga recommendations", "Frieren"],
-              r"anime|manga|ghibli|one piece|crunchyroll|otaku|cosplay|frieren|chainsaw man|jujutsu"),
-    "games": (1.0, ["Nintendo Switch new games", "speedrun world record", "Elden Ring", "indie games",
-                    "retro games Akihabara", "Pokemon"],
-              r"games?|gaming|nintendo|playstation|xbox|steam|esports?|speedrun|pokemon|elden ring|gamer"),
-    "sports": (0.8, ["J League results", "Yomiuri Giants", "Shohei Ohtani", "Premier League highlights",
-                     "Japan national football team", "Tokyo marathon"],
-               r"football|soccer|baseball|j ?league|ohtani|giants|swallows|premier league|world cup|marathon|npb"),
-    "food": (1.1, ["best ramen in Kichijoji", "Tokyo ramen ranking", "melon pan recipe", "convenience store snacks",
-                   "Tokyo street food", "onigiri recipe"],
+    "games": (1.3, ["Elden Ring", "Minecraft builds", "Fortnite new season", "GTA 6 trailer", "Zelda", "Pokemon",
+                    "Valorant", "speedrun world record"],
+              r"games?|gaming|gamers?|nintendo|playstation|ps5|xbox|steam|esports?|speedrun|pokemon|elden ring|"
+              r"minecraft|fortnite|zelda|gta|valorant"),
+    "music": (1.1, ["new rap album", "Frank Ocean", "city pop playlist", "THE FIRST TAKE", "k-pop comeback",
+                    "lo-fi hip hop", "Tokyo live house tonight"],
+              r"music|songs?|albums?|playlist|band|concert|live house|lo-?fi|city pop|singer|rappers?|rap|k-?pop|"
+              r"j-?pop|first take"),
+    "creators": (1.1, ["MrBeast new video", "Dude Perfect trick shots", "Mark Rober", "YouTubers Japan",
+                       "streamer highlights"],
+                 r"youtubers?|creators?|streamers?|mrbeast|dude perfect|mark rober|twitch|vlog"),
+    "football": (1.0, ["Premier League highlights", "Champions League goals", "Kaoru Mitoma", "Takefusa Kubo",
+                       "J League goals", "Japan national football team"],
+                 r"football|soccer|premier league|champions league|j ?league|mitoma|kubo|world cup|goals?"),
+    "cars": (1.1, ["Toyota GR Supra", "Nissan GT-R", "Honda Civic Type R", "JDM cars", "drifting", "Formula 1",
+                   "Porsche 911 GT3"],
+             r"cars?|supra|gt-?r|skyline|jdm|drift\w*|civic|type r|porsche|ferrari|lamborghini|toyota|nissan|honda|"
+             r"mazda|formula ?1|f1|racing|supercar"),
+    "anime": (1.1, ["One Piece", "Jujutsu Kaisen", "Chainsaw Man", "Frieren", "Solo Leveling", "Demon Slayer",
+                    "Studio Ghibli"],
+              r"anime|manga|ghibli|one piece|crunchyroll|otaku|cosplay|frieren|chainsaw man|jujutsu|solo leveling|"
+              r"demon slayer"),
+    "tech": (1.0, ["iPhone 17", "best budget headphones", "mechanical keyboards", "AirPods", "Samsung Galaxy",
+                   "gaming PC build"],
+             r"iphone|android|gadgets?|headphones|keyboards?|laptops?|airpods|samsung|pixel|smartphones?|tech|pc build"),
+    "sneakers": (0.9, ["Nike Air Jordan release", "streetwear Harajuku", "new sneaker releases", "vintage clothes Koenji",
+                       "Supreme drop"],
+                 r"sneakers?|streetwear|harajuku|jordan|nike|adidas|supreme|outfit|fashion|koenji"),
+    "memes": (0.9, ["internet memes this week", "funny cat videos", "viral videos", "skits"],
+              r"memes?|viral|funny|skits?|internet culture"),
+    "movies": (0.8, ["new movie trailers", "Netflix series", "Dune", "anime movie", "A24"],
+               r"movies?|films?|trailers?|netflix|series|cinema|a24|dune"),
+    "tokyo": (0.4, ["events in Tokyo this weekend", "Shibuya", "Shimokitazawa", "Kichijoji"],
+              r"tokyo|kichijoji|shibuya|shinjuku|harajuku|akihabara|inokashira|festival|matsuri"),
+    "science": (0.3, ["space news", "how the brain works", "deep sea creatures"],
+                r"science|brain|space|nasa|physics|biology|research|planet|dinosaur"),
+    "food": (0.0, ["best ramen in Kichijoji", "konbini snacks", "Tokyo street food", "melon pan"],
              r"ramen|sushi|recipe|bakery|bread|food|restaurant|izakaya|onigiri|snack|konbini|curry|noodles?"),
-    "fashion": (0.7, ["streetwear Harajuku", "new sneaker releases", "Uniqlo collaboration", "vintage clothes Koenji",
-                      "Nike Air Max"],
-                r"streetwear|sneakers?|fashion|harajuku|uniqlo|outfit|nike|adidas|vintage clothes|koenji"),
-    "tech": (1.0, ["new iPhone", "best budget headphones", "mechanical keyboards", "Raspberry Pi projects",
-                   "AI news", "gadgets Akihabara"],
-             r"iphone|android|gadgets?|headphones|keyboard|laptop|raspberry pi|tech|ai news|smartphone|camera"),
-    "memes": (0.9, ["internet memes this week", "funny cat videos", "YouTube creators Japan", "viral videos",
-                    "reddit todayilearned"],
-              r"memes?|viral|funny|youtubers?|creators?|streamer|reddit|internet culture|tiktok"),
-    "crypto": (0.7, ["memecoin news", "bitcoin price", "solana memecoins", "crypto market today", "dogecoin news"],
-               r"crypto|bitcoin|ethereum|solana|memecoins?|dogecoin|token|blockchain|altcoin|dex|coin"),
-    "markets": (0.6, ["Nikkei 225 today", "stock market news", "Toyota stock", "yen dollar exchange rate",
-                      "Nasdaq today"],
-                r"stocks?|nikkei|nasdaq|dow jones|s&p 500|shares|markets?|earnings|yen|exchange rate|topix"),
-    "tokyo": (1.0, ["Tokyo weather today", "events in Tokyo this weekend", "Kichijoji", "Inokashira Park",
-                    "Tokyo travel tips", "Shimokitazawa"],
-              r"tokyo|kichijoji|shibuya|shinjuku|harajuku|akihabara|inokashira|weather|festival|matsuri|japan"),
-    "science": (0.7, ["how the brain works", "sleep science", "space news", "deep sea creatures",
-                      "why do cats purr"],
-                r"science|brain|sleep|space|nasa|physics|biology|research|study|planet|dinosaur"),
-    "wikipedia": (0.35, ["random article"], r"wikipedia"),
+    "wikipedia": (0.1, ["random article"], r"wikipedia"),
 }
+HUNGRY_FOOD = 1.2                  # food's weight while he is hungry or ordering (else 0: no recipe loops)
 WIKI_HOST = re.compile(r"(^|\.)wikipedia\.org$", re.I)
 _TOPIC_RX = {k: re.compile(r"\b(" + v[2] + r")\b", re.I) for k, v in PROFILE.items()}
 
 # Tokyo hour -> (name, tilt per topic, feed on the phone, how much video sources are favoured)
 RHYTHM = [
-    (6, 11, "morning", {"tokyo": 1.8, "markets": 1.5, "crypto": 1.3, "science": 1.2, "sports": 1.2}, None, 0.0),
-    (11, 14, "lunch", {"memes": 1.6, "food": 1.7, "music": 1.3, "anime": 1.2}, "shorts", 0.6),
-    (14, 18, "afternoon", {"tech": 1.3, "science": 1.2, "fashion": 1.2, "anime": 1.1, "games": 1.1}, None, 0.2),
-    (18, 23, "evening", {"games": 1.8, "music": 1.4, "anime": 1.4, "sports": 1.4, "memes": 1.2}, None, 0.7),
-    (23, 30, "late night", {"memes": 1.6, "music": 1.4, "anime": 1.3, "games": 1.2}, "shorts", 0.8),
+    (6, 11, "morning", {"football": 1.3, "tech": 1.2, "music": 1.2, "tokyo": 1.3}, None, 0.3),
+    (11, 14, "lunch", {"memes": 1.6, "creators": 1.4, "music": 1.3, "anime": 1.2}, "shorts", 0.7),
+    (14, 18, "afternoon", {"games": 1.3, "cars": 1.3, "tech": 1.2, "sneakers": 1.2, "anime": 1.1}, None, 0.5),
+    (18, 23, "evening", {"games": 1.6, "football": 1.4, "anime": 1.3, "creators": 1.3, "movies": 1.3}, None, 0.8),
+    (23, 30, "late night", {"memes": 1.6, "music": 1.4, "anime": 1.3, "games": 1.2}, "shorts", 0.9),
     (30, 30, "early", {}, None, 0.0),
 ]
 STREAK_FROM = 3                    # pages in a row on one topic before the leave option pulls harder
@@ -163,6 +171,9 @@ class Variety:
         self.seen_t = {k: float(v) for k, v in (s.get("seen_t") or {}).items() if isinstance(v, (int, float))}
         self.queries = {k: float(v) for k, v in (s.get("queries") or {}).items() if isinstance(v, (int, float))}
         self.trending = [x for x in (s.get("trending") or []) if isinstance(x, str)][-TRENDING_KEEP:]
+        self.hosts = {k: int(v) for k, v in (s.get("hosts") or {}).items() if isinstance(v, int)}
+        self.last_host = s.get("last_host")
+        self.host_streak = int(s.get("host_streak") or 0)
         self._roll()
 
     def recent(self, topic, within=RECENT_S):
@@ -195,12 +206,18 @@ class Variety:
         day = self._day_of(self.clock())
         if day != self.day:
             self.day, self.topics, self.pages, self.wiki, self.last, self.streak = day, {}, 0, 0, None, 0
+            self.hosts = {}
 
     def note(self, title, text="", host=""):
         """A page was shown: count its topic; returns the topic (None: no profile topic)."""
         self._roll()
         topic = topic_of(f"{title} {text[:1500]}", host)
         self.pages += 1
+        h = (host or "").lower().removeprefix("www.")
+        if h:
+            self.hosts[h] = self.hosts.get(h, 0) + 1
+            self.host_streak = self.host_streak + 1 if h == self.last_host else 1
+            self.last_host = h
         if WIKI_HOST.search((host or "").rstrip(".")):
             self.wiki += 1
         if topic:
@@ -211,6 +228,11 @@ class Variety:
         else:
             self.last, self.streak = topic, 1 if topic else 0
         return topic
+
+    def host_count(self, host):
+        """Pages on this site today."""
+        self._roll()
+        return self.hosts.get((host or "").lower().removeprefix("www."), 0)
 
     def share(self, topic):
         self._roll()
@@ -231,12 +253,14 @@ class Variety:
         self._roll()
         return {"day": self.day, "topics": dict(self.topics), "pages": self.pages, "wiki": self.wiki,
                 "last": self.last, "streak": self.streak, "seen_t": dict(self.seen_t), "queries": dict(self.queries),
-                "trending": list(self.trending)}
+                "trending": list(self.trending), "hosts": dict(self.hosts), "last_host": self.last_host,
+                "host_streak": self.host_streak}
 
     def public(self):
         d = self.to_dict()
-        for k in ("seen_t", "queries", "trending"):
+        for k in ("seen_t", "queries", "trending", "hosts"):
             d.pop(k, None)
+        d["top_hosts"] = dict(sorted(self.hosts.items(), key=lambda kv: -kv[1])[:5])
         d.update(recent_topics=sorted(k for k in self.seen_t if self.recent(k)), trending_n=len(self.trending),
                  top_share=round(max(self.topics.values()) / self.pages, 3) if self.pages and self.topics else 0.0,
                  wiki_share=round(self.wiki_share(), 3), entropy_bits=self.entropy())
@@ -253,13 +277,16 @@ def taste_multipliers(pref):
     return {t: round(taste_multiplier(t, pref or {}), 3) for t in PROFILE}
 
 
-def weights(variety=None, pref=None, hour=12.0, mult=None):
-    """Topic -> weight now: seed x tastes x the hour's tilt x saturation. `mult`: precomputed taste multipliers."""
+def weights(variety=None, pref=None, hour=12.0, mult=None, hungry=False):
+    """Topic -> weight now: seed x tastes x the hour's tilt x saturation. `mult`: precomputed taste multipliers.
+    Food weighs only while he is hungry (HUNGRY_FOOD)."""
     r = rhythm(hour)
     out = {}
     for topic, (seed, _, _) in PROFILE.items():
         m = (mult or {}).get(topic) if mult else taste_multiplier(topic, pref or {})
         m = max(0.5, min(1.6, float(m))) if isinstance(m, (int, float)) else 1.0
+        if topic == "food":
+            seed = HUNGRY_FOOD if hungry else 0.0
         w = seed * m * r["tilt"].get(topic, 1.0)
         if variety is not None:
             w *= saturation(variety.wiki_share(), WIKI_FREE) if topic == "wikipedia" else saturation(
@@ -276,14 +303,14 @@ def discovery_topic(q):
     return "discover:" + "-".join(re.findall(r"[a-z0-9]+", str(q).lower())[:6] or ["x"])
 
 
-def pick(variety=None, pref=None, hour=12.0, rng=None, mult=None, discover=False):
+def pick(variety=None, pref=None, hour=12.0, rng=None, mult=None, discover=False, hungry=False):
     """One search from the profile: {"query", "topic", "from": "interests", "rhythm"}. Queries typed in the last
     week are left out. discover=True: a topic not seen in the last 2 h, from the profile or from discovery (trending
     headlines he saw, the DISCOVERY pool); "new": True on the result."""
     rng = rng or random.Random()
-    w = weights(variety, pref, hour, mult)
+    w = weights(variety, pref, hour, mult, hungry)
     fresh = (lambda q: not variety.query_used(q)) if variety is not None else (lambda q: True)
-    topics = [k for k in w if k != "wikipedia" and any(fresh(q) for q in PROFILE[k][1])]
+    topics = [k for k in w if k != "wikipedia" and w[k] > 0 and any(fresh(q) for q in PROFILE[k][1])]
     if discover and variety is not None:
         topics = [k for k in topics if not variety.recent(k)]
     out = None
@@ -302,7 +329,7 @@ def pick(variety=None, pref=None, hour=12.0, rng=None, mult=None, discover=False
             q = rng.choice(pool)
             out = {"query": q, "topic": discovery_topic(q), "source": "discovery"}
     if out is None:
-        topics = topics or [k for k in w if k != "wikipedia"]
+        topics = topics or [k for k in w if k != "wikipedia" and w[k] > 0]
         total = sum(w[k] for k in topics)
         x = rng.random() * total
         for k in topics:
@@ -318,7 +345,11 @@ def pick(variety=None, pref=None, hour=12.0, rng=None, mult=None, discover=False
 
 
 def streak_pull(variety):
-    """Extra pull of the leave option after STREAK_FROM pages in a row on one topic (0..1)."""
-    if variety is None or not variety.last or variety.streak < STREAK_FROM:
+    """Extra pull of the leave option after STREAK_FROM pages in a row on one topic, or on one site (#89 teen: the
+    seven King Arthur Baking pages in a row) (0..1)."""
+    if variety is None:
         return 0.0
-    return round(min(1.0, 0.35 + 0.2 * (variety.streak - STREAK_FROM)), 3)
+    n = max(variety.streak if variety.last else 0, getattr(variety, "host_streak", 0))
+    if n < STREAK_FROM:
+        return 0.0
+    return round(min(1.0, 0.35 + 0.2 * (n - STREAK_FROM)), 3)

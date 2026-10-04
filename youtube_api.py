@@ -32,6 +32,103 @@ NOTE_NO_KEY = "YouTube: YOUTUBE_API_KEY not set (YouTube's search pages are clos
 OEMBED = "https://www.youtube.com/oembed?"
 
 
+# #89 teen interests: well-known channels per topic, whose latest uploads are read through the official API (YouTube's
+# Terms of Service forbid automated access to its pages, whatever robots.txt allows): channels.list forHandle ->
+# the uploads playlist (1 unit, kept), playlistItems.list -> the latest uploads (1 unit), videos.list -> durations,
+# to tell Shorts-length videos (1 unit). Three units instead of search.list's 100. Each handle existed on 2026-10-04.
+CHANNELS = {
+    "cars": ["TopGear", "carwow", "DougDeMuro", "Formula1"],
+    "games": ["IGN", "PlayStation", "Markiplier"],
+    "football": ["PremierLeague", "433", "FIFA", "UEFA"],
+    "music": ["Genius", "COLORSxSTUDIOS", "NPRMusic", "The_FirstTake"],
+    "anime": ["Crunchyroll", "TOHOanimation", "AniplexUSA"],
+    "tech": ["mkbhd", "LinusTechTips", "UnboxTherapy", "Mrwhosetheboss"],
+    "sneakers": ["Complex", "highsnobiety", "hypebeast"],
+    "creators": ["MrBeast", "DudePerfect", "MarkRober"],
+    "memes": ["DailyDoseOfInternet", "MrBeast", "DudePerfect"],
+    "movies": ["Netflix", "A24"],
+    "tokyo": ["abroadinjapan", "ParisInTokyo"],
+    "science": ["veritasium", "kurzgesagt"],
+}
+CHANNEL_CACHE_S = 3 * 3600
+LIST_UNITS = 1                       # channels.list, playlistItems.list, videos.list
+SHORT_MAX_S = 180                    # a Short is at most 3 minutes (YouTube, since Oct 2024)
+API = "https://www.googleapis.com/youtube/v3/"
+NOTE_UPLOADS = "YouTube: latest uploads of channels he likes (official API)"
+NOTE_REPLAY = ("YouTube: no API key or no quota left: no new videos found; replaying today's already-found videos")
+
+
+def channels_url(handle):
+    return API + "channels?" + urllib.parse.urlencode({"part": "contentDetails", "forHandle": f"@{handle}"})
+
+
+def playlist_url(playlist_id, n=25):
+    return API + "playlistItems?" + urllib.parse.urlencode({"part": "snippet,contentDetails", "maxResults": str(n),
+                                                             "playlistId": playlist_id})
+
+
+def videos_url(ids):
+    return API + "videos?" + urllib.parse.urlencode({"part": "contentDetails,status", "id": ",".join(ids)})
+
+
+def parse_uploads_id(text):
+    """channels.list -> the channel's uploads playlist id, or None."""
+    try:
+        d = json.loads(text or "")
+        pid = d["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None
+    return pid if isinstance(pid, str) and pid.replace("-", "").replace("_", "").isalnum() else None
+
+
+def parse_playlist(text):
+    """playlistItems.list -> [{id, title, channel}] (newest first)."""
+    try:
+        d = json.loads(text or "")
+    except ValueError:
+        return []
+    out = []
+    for it in (d.get("items") or []) if isinstance(d, dict) else []:
+        sn = (it or {}).get("snippet") or {}
+        vid = ((it or {}).get("contentDetails") or {}).get("videoId") or (sn.get("resourceId") or {}).get("videoId")
+        if isinstance(vid, str) and len(vid) == 11 and vid.replace("-", "").replace("_", "").isalnum():
+            out.append({"id": vid, "title": html.unescape(str(sn.get("title") or ""))[:140],
+                        "channel": html.unescape(str(sn.get("channelTitle") or ""))[:60]})
+    return out
+
+
+def iso_seconds(d):
+    """ISO 8601 duration ("PT1M5S") -> seconds, or None."""
+    import re
+    m = re.fullmatch(r"P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", str(d or ""))
+    if not m or not any(m.groups()):
+        return None
+    dd, h, mi, se = (int(x or 0) for x in m.groups())
+    return ((dd * 24 + h) * 60 + mi) * 60 + se
+
+
+def parse_durations(text):
+    """videos.list -> {id: seconds} for the embeddable, public ones."""
+    try:
+        d = json.loads(text or "")
+    except ValueError:
+        return {}
+    out = {}
+    for it in (d.get("items") or []) if isinstance(d, dict) else []:
+        st = (it or {}).get("status") or {}
+        if st.get("embeddable") is False or st.get("privacyStatus", "public") != "public":
+            continue
+        sec = iso_seconds(((it or {}).get("contentDetails") or {}).get("duration"))
+        if isinstance(it.get("id"), str) and sec:
+            out[it["id"]] = sec
+    return out
+
+
+def channels_for(topic):
+    """The topic's channels; a topic without any (or none given) gets the creators'."""
+    return CHANNELS.get(topic or "") or CHANNELS["creators"]
+
+
 def key():
     return (os.environ.get(KEY_ENV) or "").strip() or None
 
@@ -123,12 +220,15 @@ class Quota:
         self.errors = [str(e)[:80] for e in (s.get("errors") or [])][-5:]
         self.cache = {k: v for k, v in (s.get("cache") or {}).items()
                       if isinstance(v, dict) and isinstance(v.get("t"), (int, float)) and isinstance(v.get("r"), list)}
+        self.uploads = {k: v for k, v in (s.get("uploads") or {}).items() if isinstance(v, str)}   # handle -> playlist
+        self.today = [c for c in (s.get("today") or []) if isinstance(c, dict) and isinstance(c.get("url"), str)]
         self._roll()
 
     def _roll(self):
         d = pacific_day(self.clock())
         if d != self.day:
             self.day, self.used, self.searches, self.errors = d, 0, 0, []
+            self.today = []
         now = self.clock()
         for k in [k for k, v in self.cache.items() if now - v["t"] > CACHE_S]:
             del self.cache[k]
@@ -154,6 +254,16 @@ class Quota:
         while len(self.cache) > 200:
             self.cache.pop(next(iter(self.cache)))
 
+    def spend_units(self, n):
+        """A cheap call (channels / playlistItems / videos .list)."""
+        self._roll()
+        self.used += n
+
+    def found(self, cards):
+        """Videos found today (replayed when there is no key or no quota left)."""
+        self._roll()
+        self.today = ([c for c in self.today if c["url"] not in {x["url"] for x in cards}] + list(cards))[-200:]
+
     def error(self, why):
         self._roll()
         self.errors = (self.errors + [str(why)[:80]])[-5:]
@@ -161,10 +271,12 @@ class Quota:
     def to_dict(self):
         self._roll()
         return {"day": self.day, "used": self.used, "searches": self.searches, "errors": self.errors,
-                "cache": dict(list(self.cache.items())[-100:])}
+                "cache": dict(list(self.cache.items())[-100:]), "uploads": dict(self.uploads),
+                "today": self.today[-200:]}
 
     def public(self):
         """For /api/screens and /api/browsing: the key set or not, units used today; never the key."""
         self._roll()
         return {"key_set": bool(key()), "pacific_day": self.day, "units_used": self.used, "units_cap": daily_units(),
-                "free_units": FREE_UNITS, "searches": self.searches, "errors": list(self.errors)}
+                "free_units": FREE_UNITS, "searches": self.searches, "errors": list(self.errors),
+                "found_today": len(self.today)}
