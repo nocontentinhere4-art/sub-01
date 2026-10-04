@@ -150,6 +150,57 @@ for (const side of ["Left", "Right"]) {
   lidNode.addChild(lidPivot);
   const lid = orig.createMesh(side + "Eyelid"); lid.addPrimitive(sphere("lid", E.radius * 1.08, 24, 8, SPEC.lid.capAngle, lidMat, (th, ph) => [0.5 + 0.45 * th / SPEC.lid.capAngle * Math.cos(ph), 0.5 + 0.45 * th / SPEC.lid.capAngle * Math.sin(ph)]));
   lidPivot.setMesh(lid);
+  // ---- the eye's finish (the owner's "rifinito"): on the opening's ellipse from make_textures.py (A across, towards the
+  // nose; B up; a, b half-lengths; centre relative to the eyeball centre), all in the Eye node's frame (metres, world axes):
+  //   the lid rim: a band from the skin's edge back towards the eyeball (the eyelid's thickness, moist);
+  //   the lashes: alpha cards rooted on the upper and lower margins, fanning forward and out;
+  //   the caruncle: the small pink body in the inner corner.
+  const O = e.opening, LS = SPEC.lashes || {};
+  const F = f, A = vec3.normalize(vec3.create(), O.A), B = vec3.normalize(vec3.create(), O.B), C0 = O.center;
+  // the hole's radius towards angle t in the (A, B) plane: the measured outline (48 bins from -pi) when there is one, else the ellipse
+  const radiusAt = t => { if (!O.outline) { const c = Math.cos(t), s = Math.sin(t); return 1 / Math.sqrt((c * c) / (O.a * O.a) + (s * s) / (O.b * O.b)); }
+    const NB = O.outline.length; let u = ((t - (O.outline0 ?? -Math.PI)) / (2 * Math.PI)) * NB; u = ((u % NB) + NB) % NB; const i0 = Math.floor(u), f_ = u - i0; return O.outline[i0 % NB] * (1 - f_) + O.outline[(i0 + 1) % NB] * f_; };
+  const onEllipse = (t, da = 0, db = 0, dz = 0) => { const r = radiusAt(t) + (da + db) / 2, p = vec3.clone(C0); vec3.scaleAndAdd(p, p, A, r * Math.cos(t)); vec3.scaleAndAdd(p, p, B, r * Math.sin(t)); vec3.scaleAndAdd(p, p, F, dz); return p; };
+  function quads(name, P, N, UV, I, matr) {
+    return orig.createPrimitive().setAttribute("POSITION", acc(new Float32Array(P), Accessor.Type.VEC3)).setAttribute("NORMAL", acc(new Float32Array(N), Accessor.Type.VEC3))
+      .setAttribute("TEXCOORD_0", acc(new Float32Array(UV), Accessor.Type.VEC2)).setIndices(acc(new Uint16Array(I), Accessor.Type.SCALAR)).setMaterial(matr);
+  }
+  const finish = orig.createMesh(side + "EyeFinish"); const finishNode = orig.createNode(side + "EyeFinish"); finishNode.setMesh(finish); node.addChild(finishNode);
+  { // rim
+    const SEG = 48, depth = LS.rimDepth ?? 0.002, P = [], N = [], UV = [], I = [];
+    for (let k = 0; k <= SEG; k++) { const t = 2 * Math.PI * k / SEG;
+      const po = onEllipse(t, -0.0005, -0.0005, -0.0006), pi = onEllipse(t, -0.0011, -0.0011, -depth);   // from inside the skin's edge, back towards the ball: a dark line of lid thickness, never in front of the skin
+      const nrm = vec3.create(); vec3.sub(nrm, C0, po); vec3.normalize(nrm, nrm);          // facing the opening's centre (the inside of the lid)
+      P.push(...po, ...pi); N.push(...nrm, ...nrm); UV.push(k / SEG, 0, k / SEG, 1); }
+    for (let k = 0; k < SEG; k++) { const a0 = 2 * k; I.push(a0, a0 + 1, a0 + 2, a0 + 2, a0 + 1, a0 + 3); }
+    finish.addPrimitive(quads("rim", P, N, UV, I, await material("rim", SPEC.materials.rim)));
+  }
+  { // caruncle: a small sphere in the inner corner, a little behind the skin
+    const r = LS.caruncle ?? 0.0008, c = onEllipse(0, -0.0012, 0, -0.0022);                   // t = 0 is the +A end: the inner corner
+    const prim = sphere("caruncle", r, 12, 8, Math.PI, await material("caruncle", SPEC.materials.caruncle), () => [0.5, 0.5]);
+    const pos = prim.getAttribute("POSITION"), arr = pos.getArray().slice(); for (let i = 0; i < arr.length; i += 3) { arr[i] += c[0]; arr[i + 1] += c[1]; arr[i + 2] += c[2]; } pos.setArray(arr);
+    finish.addPrimitive(prim);
+  }
+  { // lashes
+    const lashMat = await material("lash", SPEC.materials.lash); const P = [], N = [], UV = [], I = [];
+    const out = vec3.scale(vec3.create(), A, -1);                                          // outwards (away from the nose)
+    for (const [which, lower] of [["upper", false], ["lower", true]]) {
+      const cfg = LS[which] || {n: lower ? 8 : 14, length: lower ? 0.0035 : 0.0065, width: lower ? 0.0022 : 0.0028};
+      for (let k = 0; k < cfg.n; k++) {
+        const s = (k + 0.5) / cfg.n, t = lower ? Math.PI + 0.25 + s * (Math.PI - 0.5) : 0.2 + s * (Math.PI - 0.4);   // along the margin, away from the inner corner
+        const root = onEllipse(t, -0.0002, -0.0002, 0.0002);
+        const tg = vec3.sub(vec3.create(), onEllipse(t + 0.02), onEllipse(t - 0.02)); vec3.normalize(tg, tg);        // the margin's tangent
+        const dir = vec3.create(); vec3.scale(dir, F, 0.8); vec3.scaleAndAdd(dir, dir, B, lower ? -0.55 : 0.5); vec3.scaleAndAdd(dir, dir, out, 0.25 * s); vec3.normalize(dir, dir);
+        const len = cfg.length * (0.75 + 0.5 * Math.sin(Math.PI * s)), half = vec3.scale(vec3.create(), tg, cfg.width / 2);
+        const b0 = vec3.sub(vec3.create(), root, half), b1 = vec3.add(vec3.create(), root, half);
+        const t0 = vec3.scaleAndAdd(vec3.create(), b0, dir, len), t1 = vec3.scaleAndAdd(vec3.create(), b1, dir, len);
+        const nrm = vec3.cross(vec3.create(), tg, dir); vec3.normalize(nrm, nrm);
+        const base = P.length / 3; P.push(...b0, ...b1, ...t0, ...t1); for (let q = 0; q < 4; q++) N.push(...nrm);
+        UV.push(0, 1, 1, 1, 0, 0, 1, 0); I.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+      }
+    }
+    finish.addPrimitive(quads("lashes", P, N, UV, I, lashMat));
+  }
   headJoint.addChild(node); headJoint.addChild(lidNode);
 }
 

@@ -51,6 +51,15 @@ else if (preset === "neck") { camera.fov = 16; camera.updateProjectionMatrix(); 
 else if (preset === "neck_low") { camera.fov = 16; camera.updateProjectionMatrix(); camera.position.copy(hp).addScaledVector(fwd, 0.6).addScaledVector(right, 0.3).add(new THREE.Vector3(0, -0.3, 0)); camera.lookAt(hp.x, hp.y - 0.12, hp.z); }
 else if (preset === "hands") { const h = boy.getObjectByName("RightHand"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 20; camera.updateProjectionMatrix(); camera.position.set(p.x + 0.1, p.y + 0.3, p.z + 0.6); camera.lookAt(p); }
 else if (preset === "feet") { const h = boy.getObjectByName("LeftFoot"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 25; camera.updateProjectionMatrix(); camera.position.set(p.x + 0.3, p.y + 0.35, p.z + 0.8); camera.lookAt(p.x, p.y - 0.05, p.z); }
+else if (preset === "eye" || preset === "brow") {                                   // macro: his left eye / brow, 1:1 detail
+  const n = boy.getObjectByName("LeftEye"), p = new THREE.Vector3(); if (n) n.getWorldPosition(p); else p.copy(hp).add(new THREE.Vector3(0, 0.07, 0)).addScaledVector(fwd, 0.08).addScaledVector(right, -0.03);
+  if (preset === "brow") p.add(new THREE.Vector3(0, 0.028, 0));
+  camera.fov = preset === "eye" ? 9 : 11; camera.updateProjectionMatrix(); camera.position.copy(p).addScaledVector(fwd, 0.2).addScaledVector(right, -0.04).add(new THREE.Vector3(0, 0.015, 0)); camera.lookAt(p); }
+else if (preset === "ear") {                                                       // macro: his left ear from the side
+  const p = hp.clone().add(new THREE.Vector3(0, 0.055, 0)).addScaledVector(fwd, 0.048).addScaledVector(right, -0.072);
+  camera.fov = 12; camera.updateProjectionMatrix(); camera.position.copy(p).addScaledVector(right, -0.32).addScaledVector(fwd, 0.06).add(new THREE.Vector3(0, 0.02, 0)); camera.lookAt(p); }
+else if (preset === "foot_macro") { const h = boy.getObjectByName("LeftFoot"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 16; camera.updateProjectionMatrix(); camera.position.set(p.x + 0.22, p.y + 0.16, p.z + 0.36); camera.lookAt(p.x, p.y - 0.03, p.z + 0.03); }
+else if (preset === "feet_room") { const h = boy.getObjectByName("LeftFoot"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 30; camera.updateProjectionMatrix(); camera.position.copy(p).add(new THREE.Vector3(0.6, 0.9, 0)).addScaledVector(fwd, 1.9); camera.lookAt(p.x - 0.1, p.y, p.z); }   // the feet at the room camera's distance
 else if (preset === "back") { camera.position.set(c.x, c.y + 0.1, c.z - 3.4); camera.lookAt(c.x, c.y, c.z); }
 else if (preset === "three_q") { camera.position.set(c.x + 2.2, c.y + 0.5, c.z + 2.6); camera.lookAt(c.x, c.y, c.z); }
 else { camera.position.set(c.x, c.y + 0.1, c.z + 3.4); camera.lookAt(c.x, c.y, c.z); }

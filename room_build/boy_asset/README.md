@@ -123,7 +123,33 @@ with the slides hidden, the foot is a closed white sock: sole, rim and instep. T
 (the copy is baked inside the slides). For the page: the slides are the primitive with material **`boy_slides`**
 (three.js name `char1_6`, the last skinned mesh: it still carries the invisible body proxy for `bedInit`, which reads
 vertices, so `visible = false` on it is safe); the socks are **`boy_socks`** (`char1_5`). Hiding `boy_slides` outright
-(and showing the parked pair) replaces the sock-white remap. Cost: +11.9k triangles after the socks' subdivision (75.3k in all, budget 80k).
+(and showing the parked pair) replaces the sock-white remap. Cost: +3.9k triangles (the copies stay out of the socks' subdivision); 69.6k in all with the eyes and the proxy, budget 70k.
+
+## The finish (the owner's "rifinito, non upscale")
+Every detail below is modelled or painted by the build; nothing is upscaled or repainted by a model.
+- **Eyes.** The opening's own ellipse (PCA of the hole's texels: across, up, half-lengths) drives three new parts under
+  each `Eye` node (`assemble.mjs`, mesh `<Side>EyeFinish`): a **lid rim**, a band from the skin's edge back towards the
+  eyeball (the eyelid's thickness, moist: roughness 0.22); **lashes**, alpha cards rooted on the upper (14) and lower (8)
+  margins fanning forward and out, from a drawn card texture (`tex_lash.png`, tapered hairs); a **caruncle** in the
+  inner corner. The eyeball texture is 1024² with finer radial fibres, Fuchs' crypts, a collarette and a limbal ring; the
+  sclera carries the upper and lower lids' shadows; the alpha cut of the opening is a 3-texel ramp (a smooth edge under
+  the MASK cutoff, not texel stairs). The cornea's clearcoat gives the sharp catch-light.
+- **Brows.** ~2,500 individual strokes per build over the painted brow: rooted on its dark texels, each follows the growth
+  direction (steeply up and out at the inner end, flatter and slightly down at the outer end), 4.5-8.5 mm long, gently
+  curved, in two shades, thinning out at both ends. A 3D direction becomes a UV direction through the position
+  buffer's gradients, so the strokes are right whatever the UV layout does. Drawn at 2x and brought down (anti-aliased).
+- **Ears.** A sculpted relief on the once-subdivided ear in `build_mesh.py`: helix rim, scapha groove, antihelix,
+  concha bowl, tragus, soft lobe, as a height field in the ear's own frame, fading where the ear joins the head; the same
+  field in the skin's normal map for the fine edges; occlusion re-baked. The ear keeps the evened skin (the face
+  projection is unreliable there) with a warm tint on the thin rim and lobe (light through them) and a darker concha.
+- **Hairline.** The forehead and temples under the bangs are skin (non-skin texels filled from the skin around), with
+  ~200 fine baby hairs painted along the hair's edge (texels 1.5-13 mm from the nearest hair vertex, falling off with
+  distance). Pale strands the votes had absorbed into the face are found by the ray test and labelled hair.
+- **Socks.** Uniform white cotton; a rib knit at the cuff only (above 6 cm), a fine jersey knit below; a toe seam across
+  the front and a heel seam up the back (a thread's shadow in both colour and normal); the closed sole (above); the
+  cuff hem is a clean line at 9.3 cm (every foot texel above it is the cuff, whatever the old paint).
+- **Slides.** Uniform black foam, matte with a slight sheen; a tread groove around the sole's edge at 9 mm; the strap's
+  end takes no white (sock-labelled specks of old padding there are absorbed into the slide).
 
 ## The owner's preview video
 `render/preview_video.py` renders `docs/design/character/preview/boy_old_vs_new.mp4` in `/room` itself (the visual

@@ -84,7 +84,19 @@ for side, sign in (("left", 1), ("right", -1)):                     # glTF/Blend
     ext = P.max(0) - P.min(0)
     ys, xs = np.nonzero(grown)
     print("%s eye: %d px, centre %s cm, forward %s, opening extent %s cm, uv px %d..%d x %d..%d" % (side, grown.sum(), centre.round(2), fwd.round(2), ext.round(2), xs.min(), xs.max(), ys.min(), ys.max()))
-    eyes[side] = {"mask": grown, "surface": centre, "forward": fwd, "width": float(np.hypot(ext[0], ext[1]))}
+    # the opening's frame on the skin: PCA of its texels in the plane across the forward axis -> the long axis (across the
+    # eye, towards the nose = "inner") and the short one (up), half-lengths; assemble.mjs builds the lid rim, the lashes
+    # and the caruncle on this ellipse
+    Pp = P - centre; Pp = Pp - np.outer(Pp @ fwd, fwd)
+    _, _, Vt_ = np.linalg.svd(Pp, full_matrices=False); A_ = Vt_[0]; B_ = Vt_[1]
+    if A_[0] * sign > 0: A_ = -A_                                      # A points inwards (towards the nose: X -> 0)
+    if B_[2] < 0: B_ = -B_                                             # B points up
+    B_ = np.cross(fwd, A_); B_ /= np.linalg.norm(B_)
+    if B_[2] < 0: B_ = -B_; A_ = np.cross(B_, fwd); A_ /= np.linalg.norm(A_)
+    if A_[0] * sign > 0: A_ = -A_
+    a_half = float(np.percentile(np.abs(Pp @ A_), 98)); b_half = float(np.percentile(np.abs(Pp @ B_), 98))
+    eyes[side] = {"mask": grown, "surface": centre, "forward": fwd, "width": float(np.hypot(ext[0], ext[1])), "A": A_, "B": B_, "a": a_half, "b": b_half}
+    print("  opening ellipse: a %.2f cm (across), b %.2f cm (up)" % (a_half, b_half))
 RADIUS = 1.5                                                           # cm; over the real 1.2 so the ball fills the opening's corners
 INSET = 0.12                                                           # the cornea apex sits this far behind the painted surface
 def to_gltf(v):   # Blender z up (x, y, z) cm -> glTF y up metres (x, z, -y)
@@ -92,7 +104,9 @@ def to_gltf(v):   # Blender z up (x, y, z) cm -> glTF y up metres (x, z, -y)
 spec_eyes = {"radius": RADIUS / 100}
 for side, e in eyes.items():
     c = e["surface"] - e["forward"] * (RADIUS + INSET)
-    spec_eyes[side] = {"center": to_gltf(c), "forward": [float(e["forward"][0]), float(e["forward"][2]), float(-e["forward"][1])]}
+    gdir = lambda v: [float(v[0]), float(v[2]), float(-v[1])]
+    spec_eyes[side] = {"center": to_gltf(c), "forward": gdir(e["forward"]),
+                       "opening": {"center": [float(x) for x in (np.array(to_gltf(e["surface"])) - np.array(to_gltf(c)))], "A": gdir(e["A"]), "B": gdir(e["B"]), "a": e["a"] / 100, "b": e["b"] / 100}}
 # the eye openings become holes in the skin (MASK alpha): one pixel of lid kept all round, and never wider than the
 # eyeball behind them (a hole past the ball's silhouette would show the inside of the head)
 hole = np.zeros((S, S), bool)
@@ -101,8 +115,26 @@ for e in eyes.values():
     lateral = np.linalg.norm(d - (d @ e["forward"])[:, :, None] * e["forward"], axis=2)
     inner = np.abs(X) > abs(e["surface"][0]) - 0.32 * e["width"]       # the inner corner (towards the nose) stays painted: the ball sits deeper there
     hole |= ndi.binary_erosion(e["mask"], iterations=4) & (lateral < RADIUS * 0.8) & inner
-alpha = 1 - blur(hole.astype(np.float32), 1.0)
-alpha = np.where(hole, np.minimum(alpha, 0.3), np.maximum(alpha, 0.7))      # keep the blurred edge inside the cutoff band
+hole = blur(hole.astype(np.float32), 2.5) > 0.5                              # the morphology's square corners rounded off
+lab_hh, n_hh = ndi.label(hole)
+if n_hh > 2:                                                                  # one hole per eye: no stray specks
+    sz_hh = ndi.sum(hole, lab_hh, range(1, n_hh + 1)); keep_hh = np.argsort(sz_hh)[-2:] + 1; hole = np.isin(lab_hh, keep_hh)
+alpha = 1 - blur(hole.astype(np.float32), 1.6)                                # a 3-texel ramp: the MASK cutoff at 0.5 cuts a smooth edge, not texel stairs
+for side, e in eyes.items():                                                  # the rim, the lashes and the caruncle follow the hole's own ellipse
+    eh = hole & ndi.binary_dilation(e["mask"], iterations=2)
+    if eh.sum() < 50: continue
+    Ph = pos[eh]; ch = Ph.mean(0); Pp = Ph - ch; Pp = Pp - np.outer(Pp @ e["forward"], e["forward"])
+    A_, B_ = e["A"], e["B"]
+    e["a"] = float(np.percentile(np.abs(Pp @ A_), 99)); e["b"] = float(np.percentile(np.abs(Pp @ B_), 99)); e["hole_centre"] = ch
+    print("  %s hole ellipse: a %.2f b %.2f cm, centre offset from the opening %.2f cm" % (side, e["a"], e["b"], float(np.linalg.norm(ch - e["surface"]))))
+    th_ = np.arctan2(Pp @ B_, Pp @ A_); rr_ = np.hypot(Pp @ A_, Pp @ B_); NB = 48
+    bins_ = ((th_ + np.pi) / (2 * np.pi) * NB).astype(int) % NB; outline = np.full(NB, np.nan)
+    for b_ in range(NB):
+        if (bins_ == b_).sum() >= 3: outline[b_] = np.percentile(rr_[bins_ == b_], 97)
+    ok_ = np.isfinite(outline); outline = np.interp(np.arange(NB), np.nonzero(ok_)[0], outline[ok_], period=NB) if ok_.sum() >= 8 else np.where(ok_, outline, (e["a"] + e["b"]) / 2)
+    outline = np.convolve(np.pad(outline, 2, mode="wrap"), np.ones(5) / 5, mode="valid")        # smoothed round the loop (bin 0 is the -pi direction: the outer corner side; bin NB/2 is +A, inner)
+    spec_eyes[side]["opening"] = {"center": [float(x) for x in (np.array(to_gltf(ch)) - np.array(spec_eyes[side]["center"]))], "A": gdir(A_), "B": gdir(B_), "a": e["a"] / 100, "b": e["b"] / 100,
+                                  "outline": [float(x) / 100 for x in outline], "outline0": -np.pi}
 
 # --- clean the painted defects on the face: thin dark lines (not the nostrils, brows or lashes, which are blobs) and green smears
 face = head & (Y < 0) & ~ndi.binary_dilation(hole, iterations=6)
@@ -207,6 +239,11 @@ if os.path.exists(PROJ) and os.path.exists(PROJM):
     old_l = skin_out.mean(2); old_pink = (skin_out[:, :, 0] - skin_out[:, :, 2] > 0.1) & ((skin_out.max(2) - skin_out.min(2)) / np.maximum(skin_out.max(2), 1e-3) > 0.15)
     hair_bleed = (proj.mean(2) < 0.3) & (old_l > 0.45) & old_pink & ~ndi.binary_dilation(hole, iterations=12) & (Z < eye_z + 2.5)   # above the brows the repaint's hair wins: the old atlas painted the bangs' roots scalp-pink
     hair_bleed = ndi.binary_dilation(hair_bleed, iterations=3)
+    EARJ0 = os.path.join(WORK, "ears.json")
+    if os.path.exists(EARJ0):
+        E0 = json.load(open(EARJ0)); rel0 = pos - np.array(E0["head"])[None, None, :]; f0 = rel0 @ np.array(E0["fwd"]); l0 = rel0 @ np.array(E0["right"])
+        ear_zone = (np.abs(l0) > E0["lat_min"] - 0.8) & (f0 > E0["f_lo"] - 1.0) & (f0 < E0["f_hi"] + 0.5) & (np.abs(Z - E0["z_c"]) < 1.4 * E0["hh"])
+        sure &= ~ear_zone
     m_soft = blur((sure & painted & ~hair_bleed).astype(np.float32), 4)
     # colour-match the old skin to the repaint (medians over the painted face, chroma and level)
     ref = (sure & painted & (proj.mean(2) > 0.25) & (proj.mean(2) < 0.9))
@@ -227,6 +264,99 @@ if os.path.exists(PROJ) and os.path.exists(PROJM):
         wg = blur(good_f.astype(np.float32), 10); fl = np.stack([blur(skin_out[:, :, k] * good_f, 10) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
         fl = np.where((wg > 0.02)[:, :, None], fl, np.median(skin_out[good_f], 0)[None, None, :])
         skin_out = np.where(ndi.binary_dilation(bad_f, iterations=1)[:, :, None], fl, skin_out); print("forehead: %d non-skin px filled" % int(bad_f.sum()))
+    # the temples (beside the brows, under the sideburns): the same smudges, the same fill
+    temple = face_isl & (Z > eye_z + 0.5) & (Z <= eye_z + 4.0) & (np.abs(X) > 5.0)
+    sl_f = skin_out.mean(2); pink_f = skin_out[:, :, 0] - skin_out[:, :, 2] > 0.06
+    bad_t = temple & ((sl_f < 0.55) | ~pink_f)
+    if bad_t.any() and good_f.sum() > 500:
+        wg = blur(good_f.astype(np.float32), 10); fl = np.stack([blur(skin_out[:, :, k] * good_f, 10) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
+        fl = np.where((wg > 0.02)[:, :, None], fl, np.median(skin_out[good_f], 0)[None, None, :])
+        skin_out = np.where(ndi.binary_dilation(bad_t, iterations=1)[:, :, None], fl, skin_out); print("temples: %d non-skin px filled" % int(bad_t.sum()))
+
+# ------------------------------------------------------------------ strokes on the skin: brows and the hairline's baby hairs
+# A 3D direction at a texel becomes a UV direction through the position buffer's gradients (least squares on the two
+# texel steps), so the strokes follow real growth directions on the face whatever the UV layout does.
+from PIL import ImageDraw
+Pu = np.zeros_like(pos); Pu[:, :-1] = pos[:, 1:] - pos[:, :-1]; Pv = np.zeros_like(pos); Pv[:-1] = pos[1:] - pos[:-1]
+def uv_dir(y, x, d3):
+    pu, pv = Pu[y, x], Pv[y, x]; m11, m12, m22 = pu @ pu, pu @ pv, pv @ pv; det = m11 * m22 - m12 * m12
+    if det < 1e-10: return None
+    r1, r2 = pu @ d3, pv @ d3; du = (m22 * r1 - m12 * r2) / det; dv = (m11 * r2 - m12 * r1) / det    # texels per cm
+    if not np.isfinite(du + dv) or np.hypot(du, dv) > 70 or np.hypot(du, dv) < 4: return None          # a degenerate step (an island edge) would throw a line across the atlas
+    return du, dv
+def strokes(img, pts, colour, alpha, width_px):
+    """pts: (y, x, dy, dx, length_texels, alpha_mul); drawn on an RGBA layer, composited"""
+    layer = Image.new("RGBA", (2 * S, 2 * S), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)              # drawn at 2x and brought down: anti-aliased hairs
+    for (y, x, dy, dx, ln, am) in pts:
+        n_ = np.hypot(dx, dy); ln = min(ln, 45)
+        if n_ < 1e-6: continue
+        ux, uy = dx / n_, dy / n_; px_, py_ = -uy, ux; bend = rng_s.uniform(-0.18, 0.18) * ln       # a gentle curve
+        poly = [(2 * (x + ux * ln * t_ + px_ * bend * (t_ * (1 - t_)) * 2), 2 * (y + uy * ln * t_ + py_ * bend * (t_ * (1 - t_)) * 2)) for t_ in (0, 0.25, 0.5, 0.75, 1.0)]
+        d.line(poly, fill=tuple(int(c * 255) for c in colour) + (int(255 * alpha * am),), width=2 * width_px)
+    layer = layer.resize((S, S), Image.LANCZOS)
+    lay = np.asarray(layer).astype(np.float32) / 255; a_ = lay[:, :, 3:4]
+    return img * (1 - a_) + lay[:, :, :3] * a_
+rng_s = np.random.default_rng(11)
+brow_col = np.array([0.17, 0.11, 0.08]); n_brow = 0; strokes_all = []
+for sgn in (1, -1):                                                        # +X is his left
+    zone = face_isl & (Z > eye_z + 0.8) & (Z < eye_z + 4.8) & (X * sgn > 0.6) & (X * sgn < 6.8) & (Y < -4)
+    dark_b = zone & (skin_out.mean(2) < 0.5)
+    dark_b = ndi.binary_opening(dark_b, iterations=1)
+    if dark_b.sum() < 200: print("no brow found on side", sgn); continue
+    lab_b, n_b = ndi.label(dark_b); dark_b = lab_b == (np.argmax(ndi.sum(dark_b, lab_b, range(1, n_b + 1))) + 1)   # the brow: the biggest dark blob
+    ys_b, xs_b = np.nonzero(dark_b); Xb, Zb = X[ys_b, xs_b] * sgn, Z[ys_b, xs_b]
+    x_in, x_out = np.percentile(Xb, 2), np.percentile(Xb, 98)
+    for k_ in range(int(len(ys_b) / 18)):                                  # strokes per brow ~ its texel count / 18
+        j = rng_s.integers(len(ys_b)); y, x = int(ys_b[j]), int(xs_b[j]); xb = Xb[j]
+        s_ = (xb - x_in) / max(x_out - x_in, 1e-3)                          # 0 inner end .. 1 outer end
+        dens = min(1.0, s_ / 0.12) * min(1.0, (1 - s_) / 0.18)              # the ends thin out
+        if rng_s.random() > 0.35 + 0.65 * dens: continue
+        theta = np.radians(68 - 95 * s_ ** 1.1 + rng_s.normal(0, 9))        # inner: steeply up and out; outer: slightly down and out
+        d3 = np.array([sgn * np.cos(theta), 0.0, np.sin(theta)])            # outward = +|X|, up = +Z
+        uvd = uv_dir(y, x, d3)
+        if uvd is None: continue
+        ln_cm = rng_s.uniform(0.45, 0.85) * (0.7 + 0.5 * dens); du, dv = uvd; scale = np.hypot(du, dv)
+        strokes_pts = [(y, x, dv, du, ln_cm * scale, 0.55 + 0.45 * dens * rng_s.random())]
+        strokes_all.append((strokes_pts[0], brow_col * rng_s.uniform(0.8, 1.15))); n_brow += 1
+print("brow strokes drawn:", n_brow)
+for shade in (0.85, 1.1):                                                   # two passes: darker and lighter hairs
+    skin_out = strokes(skin_out, [pt for pt, c_ in strokes_all if (c_.mean() < brow_col.mean()) == (shade < 1)], brow_col * shade, 0.55, 1)
+HAIRV = os.path.join(WORK, "hair_verts.npy")
+if os.path.exists(HAIRV):
+    from scipy.spatial import cKDTree
+    hv = np.load(HAIRV); tree = cKDTree(hv)
+    cand = face_isl & (Z > eye_z + 3.0) & (Y < 2)                          # the forehead and the temples, not the nape
+    ys_c, xs_c = np.nonzero(cand); dists, idx_h = tree.query(pos[ys_c, xs_c], k=1)
+    near = (dists > 0.15) & (dists < 1.3)
+    pick = np.nonzero(near)[0]; rng_s.shuffle(pick); pick = pick[:700]
+    pts = []
+    for j in pick:
+        y, x = int(ys_c[j]), int(xs_c[j]); away = pos[y, x] - hv[idx_h[j]]; away /= max(np.linalg.norm(away), 1e-6)
+        d3 = away * 0.7 + np.array([0, 0, -1.0]) * 0.5 + rng_s.normal(0, 0.25, 3); d3 /= np.linalg.norm(d3)
+        uvd = uv_dir(y, x, d3)
+        if uvd is None: continue
+        du, dv = uvd; scale = np.hypot(du, dv); fall = 1 - (dists[j] - 0.15) / 1.15
+        pts.append((y, x, dv, du, rng_s.uniform(0.25, 0.5) * scale, 0.25 + 0.5 * fall * rng_s.random()))
+    skin_out = strokes(skin_out, pts, np.array([0.14, 0.10, 0.08]), 0.7, 1); print("baby hairs along the hairline:", len(pts))
+EARJ = os.path.join(WORK, "ears.json")
+if os.path.exists(EARJ):                                                   # the ears: the relief's tone (occluded concha darker, the thin helix and lobe warmer: light through them)
+    EARS = json.load(open(EARJ)); relE = pos - np.array(EARS["head"])[None, None, :]
+    fE = relE @ np.array(EARS["fwd"]); lE = relE @ np.array(EARS["right"])
+    uE = (fE - EARS["f_c"]) / EARS["hw"]; vE = (Z - EARS["z_c"]) / EARS["hh"]; rE = np.hypot(uE, vE)
+    smE = lambda x, a, b: np.clip((x - a) / (b - a), 0, 1) ** 2 * (3 - 2 * np.clip((x - a) / (b - a), 0, 1))
+    on_ear = cov & (np.abs(lE) > EARS["lat_min"] - 0.4) & (fE > EARS["f_lo"] - 0.5) & (fE < EARS["f_hi"]) & (rE < 1.15)
+    rimE = np.exp(-((rE - 0.86) / 0.11) ** 2) * (1 - smE(uE, 0.3, 0.7)); lobeE = smE(-vE, 0.55, 0.9) * (1 - smE(rE, 0.9, 1.05))
+    rcE = np.hypot(uE - 0.15, vE + 0.1) / 0.40; conchaE = np.maximum(0.0, 1 - rcE * rcE)
+    warm = np.clip(0.55 * rimE + 0.6 * lobeE, 0, 1) * on_ear; dark_e = conchaE * on_ear
+    skin_out[:, :, 0] = np.clip(skin_out[:, :, 0] * (1 + 0.07 * warm), 0, 1); skin_out[:, :, 1] = np.clip(skin_out[:, :, 1] * (1 - 0.02 * warm), 0, 1); skin_out[:, :, 2] = np.clip(skin_out[:, :, 2] * (1 - 0.06 * warm), 0, 1)
+    skin_out = np.clip(skin_out * (1 - 0.10 * dark_e)[:, :, None], 0, 1); print("ear tint: %d texels" % int(on_ear.sum()))
+    # the old paint smeared hair shadows over the ears: non-skin texels there are filled from the ear's own skin
+    sl_e = skin_out.mean(2); pink_e = skin_out[:, :, 0] - skin_out[:, :, 2] > 0.06
+    bad_e = on_ear & ((sl_e < 0.55) | ~pink_e); good_e = on_ear & ~ndi.binary_dilation(bad_e, iterations=2) & (sl_e >= 0.55) & pink_e
+    if bad_e.any() and good_e.sum() > 300:
+        wg = blur(good_e.astype(np.float32), 8); fl = np.stack([blur(skin_out[:, :, k] * good_e, 8) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
+        fl = np.where((wg > 0.02)[:, :, None], fl, np.median(skin_out[good_e], 0)[None, None, :])
+        skin_out = np.where(ndi.binary_dilation(bad_e, iterations=1)[:, :, None], fl, skin_out); print("ears: %d smudged px filled" % int(bad_e.sum()))
 # (the full-body repaint views were tried on the skin too, work/skin_body_projected.png: at 1536 px for 1.8 m the hands are
 #  80 px and the repaint's hair shadows landed on the throat; the hands and the neck keep the evened old skin below)
 # the hands: texels that are not skin (dark grey from the cuff, white from the socks: the old atlas's padding next to the
@@ -322,9 +452,11 @@ if os.path.exists(REG):
     # so a label per triangle draws the sock's edge as a zigzag of triangle edges. The old atlas drew it inside the
     # triangles: its texels are bimodal at the feet (0.1-0.3 the slide and the cuff, 0.9+ the sock), so the sock is
     # painted where the old atlas is white, the cuff above 8.5 cm and the slide below elsewhere, whatever the triangle's label
-    PZ = os.path.join(WORK, "posz_cloth.npy")
+    PZ = os.path.join(WORK, "pos_cloth.npy")
     if os.path.exists(PZ):
-        zc = np.asarray(Image.fromarray(np.load(PZ)[::-1].astype(np.float32), "F").resize((C, C), Image.BILINEAR))
+        pc3 = np.load(PZ)[::-1].astype(np.float32)
+        pc = np.stack([np.asarray(Image.fromarray(pc3[:, :, k], "F").resize((C, C), Image.BILINEAR)) for k in range(3)], 2)
+        zc = pc[:, :, 2]
         feet = (reg > 0) & (zc < 14.0)
         # inside the sock-labelled faces (the build re-reads every foot face from its own old texels) the sock is whole:
         # the old paint's grey seams and padding do not cut it; inside the slide's and the cuff's faces only a solid white
@@ -334,9 +466,31 @@ if os.path.exists(REG):
         lab_k, n_k = ndi.label(white_t)
         if n_k:
             sz = ndi.sum(white_t, lab_k, range(1, n_k + 1)); white_t &= np.isin(lab_k, np.nonzero(sz >= 150)[0] + 1)
+        SV = os.path.join(WORK, "socks_verts.npy")
+        if os.path.exists(SV):                                               # only next to the sock proper: the sock's edge crossing a slide or cuff triangle, never a far patch
+            from scipy.spatial import cKDTree
+            dsock, _ = cKDTree(np.load(SV)).query(pc[white_t], k=1); keep = np.zeros_like(white_t); keep[white_t] = dsock < 0.35; white_t = keep
         sock_tex = (socks_r & feet) | white_t
+        FJ = os.path.join(WORK, "feet.json")
+        if os.path.exists(FJ):                                               # the toe seam across the front, the heel seam up the back: a thread's shadow
+            FEET_ = json.load(open(FJ)); seam = np.zeros((C, C), np.float32)
+            for side, sgn in (("left", 1), ("right", -1)):
+                ft = FEET_[side]; onside = (pc[:, :, 0] * sgn > 0)
+                seam += onside * (zc < 4.5) * np.exp(-((pc[:, :, 1] - (ft["y_toe"] + 1.0)) / 0.10) ** 2)
+                seam += onside * (zc < 9.0) * (pc[:, :, 1] > ft["y_heel"] - 2.5) * np.exp(-((pc[:, :, 0] - ft["x_mid"]) / 0.10) ** 2)
+            socks_col = np.clip(socks_col * (1 - 0.18 * np.clip(seam, 0, 1))[:, :, None], 0, 1)
         sock_soft = blur(sock_tex.astype(np.float32), 1.0)[:, :, None]
         foot_dark = np.where((zc > 8.5)[:, :, None], pants_col, slides_col)
+        hem = np.zeros((C, C), np.float32)                                   # the cuff by geometry (build_mesh.py's ankle table): outside the sock's radius at 7.5-12.5 cm
+        if False and os.path.exists(FJ) and "ankle" in json.load(open(FJ)):     # (off, see build_mesh.py: the ankle is not round)
+            ANK = json.load(open(FJ))["ankle"]
+            for side, sgn in (("left", 1), ("right", -1)):
+                if side not in ANK: continue
+                A_ = ANK[side]; onside = (pc[:, :, 0] * sgn > 0) & (zc > 7.5) & (zc < 12.5)
+                ang = np.arctan2(pc[:, :, 1] - A_["cy"], pc[:, :, 0] - A_["cx"]); b_ = (((ang + np.pi) / (2 * np.pi) * 16).astype(int)) % 16
+                rad = np.hypot(pc[:, :, 0] - A_["cx"], pc[:, :, 1] - A_["cy"]); rs = np.array(A_["r_sock"])[b_]
+                hem = np.maximum(hem, (onside & (rad > rs + 0.45)).astype(np.float32))
+        hem = blur(hem, 0.8)[:, :, None]; sock_soft = sock_soft * (1 - hem)
         cloth_g = np.where(feet[:, :, None], foot_dark * (1 - sock_soft) + socks_col * sock_soft, cloth_g)
         print("feet: %d sock texels drawn from the old atlas (of %d foot texels)" % (int(sock_tex.sum()), int(feet.sum())))
     cloth_g = pad_full(cloth_g, reg > 0)                                        # between the islands: the nearest garment, so the mips never pull in a foreign colour
@@ -354,19 +508,24 @@ if os.path.exists(REG): ao_c = np.where(reg == 5, np.maximum(ao_c, 0.7), ao_c)  
 save("tex_cloth_orm.png", orm(pad_full(ao_c, cov_cloth), pad_full(load("rough_cloth.png")[:, :, 0], cov_cloth)))
 
 # ------------------------------------------------------------------ the eyeball and the lid
-E = 512
+E = 1024
 yy, xx = np.mgrid[0:E, 0:E]; u = (xx + 0.5) / E - 0.5; v = (yy + 0.5) / E - 0.5; rr = np.hypot(u, v); ang = np.arctan2(v, u)
 rng = np.random.default_rng(7)
 IRIS, PUPIL, LIMBUS = 0.123, 0.042, 0.108                              # uv radii (see assemble.mjs: r = 0.5 * polar / (pi * 0.55)): iris 1.15 cm, pupil 0.4 cm
 eye = np.zeros((E, E, 3), np.float32)
 sclera_col = np.array([0.88, 0.85, 0.83]); veins = blur(rng.random((E, E)).astype(np.float32), 1.2)
 eye[:] = sclera_col * (1 - 0.06 * np.clip((rr - 0.2) / 0.3, 0, 1))[:, :, None]           # a little darker towards the back
-eye *= (1 - 0.3 * np.clip((v - 0.06) / 0.16, 0, 1))[:, :, None]                            # the upper lid's shadow (v > 0.5 is up)
+eye *= (1 - 0.42 * np.clip((v - 0.05) / 0.17, 0, 1))[:, :, None]                           # the upper lid's shadow (v > 0.5 is up)
+eye *= (1 - 0.12 * np.clip((-v - 0.16) / 0.1, 0, 1))[:, :, None]                            # and a lighter one from the lower lid
 eye[:, :, 0] += 0.06 * np.clip((rr - 0.17) / 0.12, 0, 1) * (veins > 0.62)                 # faint red veins
-fib = 0.5 + 0.5 * np.sin(ang * 70 + 3 * np.sin(ang * 11)) * np.clip((rr - PUPIL) / (IRIS - PUPIL), 0, 1)
+tr_ = np.clip((rr - PUPIL) / (IRIS - PUPIL), 0, 1)
+fib = 0.5 + 0.5 * np.sin(ang * 70 + 3 * np.sin(ang * 11)) * tr_                             # the radial fibres
+fib = 0.65 * fib + 0.35 * (0.5 + 0.5 * np.sin(ang * 190 + 2 * np.sin(ang * 23 + 1.0)) * tr_)   # finer fibres between them
+crypts = blur(rng.random((E, E)).astype(np.float32), 3.0); fib = fib * (0.8 + 0.4 * (crypts > 0.52))   # Fuchs' crypts: darker pits in a ring
+collar = np.exp(-((rr - (PUPIL + 0.35 * (IRIS - PUPIL))) / 0.012) ** 2) * 0.35                # the collarette: a brighter frill round the pupil
 iris_in = np.array([0.30, 0.16, 0.08]); iris_out = np.array([0.11, 0.06, 0.035])                 # dark brown, as painted
 t = np.clip((rr - PUPIL) / (IRIS - PUPIL), 0, 1)[:, :, None]
-iris = iris_in * (1 - t) + iris_out * t; iris = iris * (0.75 + 0.5 * fib[:, :, None]) + 0.03 * blur(rng.random((E, E)).astype(np.float32), 0.8)[:, :, None]
+iris = iris_in * (1 - t) + iris_out * t; iris = iris * (0.70 + 0.6 * fib[:, :, None] + collar[:, :, None]) + 0.03 * blur(rng.random((E, E)).astype(np.float32), 0.8)[:, :, None]
 iris *= (1 - 0.6 * np.clip((rr - LIMBUS) / (IRIS - LIMBUS), 0, 1))[:, :, None]            # limbal ring
 in_iris = rr < IRIS; soft = np.clip((IRIS - rr) / 0.006, 0, 1)[:, :, None]
 eye = eye * (1 - soft) + iris * soft
@@ -376,6 +535,19 @@ pupil = np.clip((PUPIL - rr) / 0.005, 0, 1)[:, :, None]; eye = eye * (1 - pupil)
 cl = np.exp(-((u + 0.045) ** 2 + (v - 0.05) ** 2) / (2 * 0.016 ** 2))[:, :, None]; eye = eye * (1 - cl) + np.array([0.95, 0.95, 0.97]) * cl
 cl2 = np.exp(-((u - 0.03) ** 2 + (v + 0.04) ** 2) / (2 * 0.008 ** 2))[:, :, None] * 0.5; eye = eye * (1 - cl2) + np.array([0.9, 0.9, 0.95]) * cl2
 save("tex_eye.png", eye)
+# the lashes: a card texture, 256 x 128, transparent, with tapered dark hairs rooted at the bottom edge and fanning up;
+# assemble.mjs puts ~14 cards along each upper lid and 8 shorter ones along the lower lid
+LW, LH = 256, 128; lash = np.zeros((LH, LW, 4), np.float32)
+from PIL import ImageDraw as _ID
+lim = Image.new("RGBA", (LW, LH), (0, 0, 0, 0)); ld = _ID.Draw(lim)
+for k in range(9):
+    x0 = 14 + k * 28 + rng.integers(-5, 6); tilt = rng.uniform(-0.25, 0.25); ln = rng.uniform(0.7, 1.0) * (LH - 8)
+    pts = [(x0 + tilt * ln * (t_ / 10) ** 1.6 * 2.5, LH - 1 - ln * t_ / 10) for t_ in range(11)]
+    for t_ in range(10):
+        w = max(1, int(round(5 * (1 - t_ / 10) ** 1.3))); al = int(255 * (0.95 - 0.5 * (t_ / 10) ** 2))
+        ld.line([pts[t_], pts[t_ + 1]], fill=(28, 18, 12, al), width=w)
+lash = np.asarray(lim).astype(np.float32) / 255
+Image.fromarray(np.clip(lash * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_lash.png")); print("wrote tex_lash.png")
 L = 128; yy, xx = np.mgrid[0:L, 0:L]; rl = np.hypot((xx + 0.5) / L - 0.5, (yy + 0.5) / L - 0.5)
 lid = np.ones((L, L, 3), np.float32) * lid_col; edge = np.clip((rl - 0.34) / 0.11, 0, 1)[:, :, None]
 lid = lid * (1 - 0.72 * edge) ; save("tex_lid.png", lid)
@@ -394,7 +566,11 @@ spec = {
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},
+        "rim":    {"color": [0.1, 0.045, 0.045, 1], "roughness": 0.5, "doubleSided": True},   # reads as the dark line of the lid margin under the lashes   # the eyelid's thickness: moist flesh, in the lid's shadow
+        "caruncle": {"color": [0.6, 0.27, 0.3, 1], "roughness": 0.3},
+        "lash":   {"base": "lash", "baseQ": 92, "blend": True, "roughness": 0.55, "doubleSided": True, "color": [0.9, 0.9, 0.9, 1]},
     },
+    "lashes": {"upper": {"n": 20, "length": 0.0065, "width": 0.0026}, "lower": {"n": 10, "length": 0.0033, "width": 0.0022}, "rimDepth": 0.0013, "caruncle": 0.0008},
 }
 json.dump(spec, open(os.path.join(OUT, "spec.json"), "w"), indent=1)
 print("wrote spec.json", json.dumps(spec["eyes"]))

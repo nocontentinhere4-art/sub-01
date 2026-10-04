@@ -12,7 +12,7 @@ and writes work/boy_mesh.glb + work/bake_*.png:
   6. bakes the old colour through the old UVs into the new atlases (Cycles, emit, CPU).
 The rig is not exported from here: assemble.mjs puts this mesh back into the original file's skin and nodes.
 """
-import bpy, bmesh, os, sys, math, time
+import bpy, bmesh, os, sys, math, time, json
 import numpy as np
 from mathutils import Vector
 from collections import Counter, deque
@@ -186,8 +186,8 @@ for p in m.polygons:
     if not (head_w[list(p.vertices)].mean() > 0.3 or neck_w[list(p.vertices)].mean() > 0.3): continue
     c = p.center; d = c - Vector((HB.x, HB.y, c.z)); f = d.dot(fwd_h); lat = abs(d.dot(right_h))
     top = c.z > zmax - 10; mid = zmax - 14 < c.z <= zmax - 10; behind = f < -2.0; side = -2.0 <= f <= 3.0
-    if not (top or behind or (mid and f > 3.0 and lat > 4.0)): continue
-    if side and flum[p.index] >= 0.65: continue                                  # the ears' pale rims stay skin
+    if not (top or behind or (mid and lat > 4.0)): continue
+    if 2.5 < f < 7.2 and lat > 6.0 and zmax - 19 < c.z < zmax - 11: continue        # the ears themselves (thin rims) stay skin
     n = p.normal
     hit = bvh.ray_cast(c - n * 0.02, -n, 1.0)
     if hit[0] is not None and hit[1].dot(-n) > 0:
@@ -203,10 +203,37 @@ for comp in islands(flab):                                                      
 # islands of the strap and the cuff's hem white from the sock next door. Here every foot face is re-read from the
 # covered texels inside its own old UV triangle (no padding): mostly white -> sock, else the cuff above 9 cm, the slide below
 foot_f = 0; foot_changed = 0
+FOOT_XMID = {side: float(co[(foot_w > 0.5) & (co[:, 0] * sgn > 0), 0].mean()) for side, sgn in (("left", 1), ("right", -1))}
+# the pants' cuff is a bulge round the ankle: at each angle round the leg its surface stands > 4.5 mm outside the sock's
+# radius below it. Per foot: the ankle's centre from the vertices at 5-8 cm, the sock's radius per angle (16 bins) as a
+# running minimum going up, and a face at 7.5-12.5 cm is the cuff when it stands out of that radius.
+ANKLE = {}
+for side, sgn in (("left", 1), ("right", -1)):
+    fv = np.nonzero((foot_w > 0.5) & (co[:, 0] * sgn > 0))[0]
+    low = fv[(co[fv, 2] > 5) & (co[fv, 2] < 8)]
+    if len(low) < 10: continue
+    cx_, cy_ = co[low, 0].mean(), co[low, 1].mean()
+    ang = np.arctan2(co[fv, 1] - cy_, co[fv, 0] - cx_); rad = np.hypot(co[fv, 0] - cx_, co[fv, 1] - cy_); zz = co[fv, 2]
+    bins = ((ang + np.pi) / (2 * np.pi) * 16).astype(int) % 16
+    r_sock = np.full(16, np.inf)
+    for b_ in range(16):
+        sel = (bins == b_) & (zz > 5) & (zz < 8.5)
+        if sel.any(): r_sock[b_] = np.percentile(rad[sel], 30)
+    r_sock = np.where(np.isfinite(r_sock), r_sock, np.nanmedian(np.where(np.isfinite(r_sock), r_sock, np.nan)))
+    ANKLE[side] = {"cx": float(cx_), "cy": float(cy_), "r_sock": [float(x) for x in r_sock]}
+USE_ANKLE_RULE = False
+def is_cuff(c_):
+    side = "left" if c_[0] > 0 else "right"
+    if side not in ANKLE or not (7.5 < c_[2] < 12.5): return False
+    A_ = ANKLE[side]; b_ = int(((np.arctan2(c_[1] - A_["cy"], c_[0] - A_["cx"]) + np.pi) / (2 * np.pi) * 16)) % 16
+    return np.hypot(c_[0] - A_["cx"], c_[1] - A_["cy"]) > A_["r_sock"][b_] + 0.45
 for p in m.polygons:
     vs = list(p.vertices)
     if foot_w[vs].mean() < 0.5 and co[vs, 2].max() > 14: continue
     if co[vs, 2].mean() > 14: continue
+    if USE_ANKLE_RULE and is_cuff(co[vs].mean(0)):                                 # (off: the ankle is not round; the sock's own bulges stood out of the 5-8 cm radius)
+        if flab[p.index] != "pants": flab[p.index] = "pants"; foot_changed += 1
+        continue
     uvs = [uv_old.data[li].uv for li in p.loop_indices]
     if len(uvs) != 3: continue
     whites = 0; covered = 0
@@ -216,7 +243,9 @@ for p in m.polygons:
         if cov[y, x]: covered += 1; whites += old[y, x].mean() > 0.85
     if covered < 3: continue
     foot_f += 1
-    new_lab = "socks" if whites / covered > 0.5 else ("pants" if co[vs, 2].mean() > 9 and flab[p.index] == "pants" else ("pants" if co[vs, 2].mean() > 10 else "slides"))
+    new_lab = "socks" if whites / covered > 0.5 else ("pants" if co[vs, 2].mean() > 11.0 else "slides")
+    cxm = co[vs].mean(0)
+    if new_lab == "socks" and cxm[2] < 4.5 and abs(cxm[0] - FOOT_XMID["left" if cxm[0] > 0 else "right"]) > 4.3: new_lab = "slides"   # the strap's ends and the sole's sides, whatever the old paint
     if new_lab != flab[p.index]: flab[p.index] = new_lab; foot_changed += 1
 for it in range(2):                                                               # a vote among the foot faces against specks
     new = flab.copy()
@@ -225,6 +254,25 @@ for it in range(2):                                                             
         c = Counter(flab[j] for j in adj[i] if flab[j] in ("socks", "slides", "pants")); c[flab[i]] += 1
         new[i] = c.most_common(1)[0][0]
     flab = new
+for comp in islands(flab):                                                      # a few white triangles of old padding at the strap's end: not a sock
+    if flab[comp[0]] == "socks" and len(comp) < 40:
+        c = Counter(flab[j] for i in comp for j in adj[i] if flab[j] != "socks")
+        if c and c.most_common(1)[0][0] == "slides":
+            for i in comp: flab[i] = "slides"
+            foot_changed += len(comp)
+# the strap: the slide faces over the instep (above 2.2 cm, within 4.5 cm of the foot's midline) span a band along the
+# foot; a sock face inside that band at strap height IS the strap's surface (the sock under it is not modelled), whatever
+# the old paint says: the white bits at the strap's end were these
+USE_STRAP_BAND = False                                                          # (off: the slide label runs up the foot's sides to the sock, so the "strap" band spanned the whole foot and took the sock's sides with it)
+for side, sgn in (("left", 1), ("right", -1)) if USE_STRAP_BAND else ():
+    cs = np.array([co[list(p.vertices)].mean(0) for p in m.polygons])
+    strap = [i for i, p in enumerate(m.polygons) if flab[i] == "slides" and cs[i, 0] * sgn > 0 and cs[i, 2] > 3.2 and abs(cs[i, 0] - FOOT_XMID[side]) < 4.5 and foot_w[list(p.vertices)].mean() > 0.3]   # above the sole's sides (~3 cm): the strap alone
+    if len(strap) < 10: continue
+    y0, y1 = np.percentile(cs[strap, 1], 5), np.percentile(cs[strap, 1], 95)
+    n_s = 0
+    for i, p in enumerate(m.polygons):
+        if flab[i] == "socks" and cs[i, 0] * sgn > 0 and 1.5 < cs[i, 2] < 5.5 and y0 <= cs[i, 1] <= y1 and abs(cs[i, 0] - FOOT_XMID[side]) < 5.0: flab[i] = "slides"; n_s += 1
+    log("%s strap band y %.1f..%.1f: %d sock faces inside it relabelled slides" % (side, y0, y1, n_s)); foot_changed += n_s
 log("foot faces re-read from their own old texels: %d, relabelled %d" % (foot_f, foot_changed))
 log("face labels:", Counter(flab), "islands:", Counter(flab[c[0]] for c in islands(flab)))
 
@@ -272,7 +320,9 @@ def select_faces(pred):
 # sock border so the two surfaces meet without a step). With the slides on, the copy is inside them, unseen; with the
 # slides hidden, the foot is a closed white sock: sole, rim and instep.
 SOLE_D, SOLE_TAPER = 0.6, 1.5
-bm = bmesh.new(); bm.from_mesh(m); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.normal_update()
+bm = bmesh.new(); bm.from_mesh(m)
+copy_layer = bm.faces.layers.int.new("sole_copy")                              # (made before any face reference: a new layer invalidates them) survives the separation / subdivision / join below
+bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.normal_update()
 slide_faces = [bm.faces[i] for i in range(len(m.polygons)) if flab[i] == "slides"]
 is_sock_v = np.zeros(len(bm.verts), bool); is_slide_v = np.zeros(len(bm.verts), bool)
 for i, p in enumerate(m.polygons):
@@ -294,6 +344,7 @@ for k_, v_ in dup["vert_map"].items():                                         #
     t = min(1.0, dist[src.index] / SOLE_TAPER) if np.isfinite(dist[src.index]) else 1.0
     dst.co = src.co - src.normal * (SOLE_D * t)
 new_faces = [g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)]
+for f_ in new_faces: f_[copy_layer] = 1
 n_before = len(m.polygons)
 bm.to_mesh(m); bm.free(); m.update()
 flab = np.concatenate([flab, np.array(["socks"] * (len(m.polygons) - n_before), dtype=object)])
@@ -320,9 +371,10 @@ bpy.ops.object.select_all(action="DESELECT"); me.select_set(True); bpy.context.v
 # ---------------------------------------------------------------- subdivide the smooth regions once: head skin, hands, socks, slides
 def face_bone_w(p, w): return all(w[v] > 0.3 for v in p.vertices)
 hand_w_v = W_("LeftHand", "RightHand", "LeftForeArm", "RightForeArm")
+sole_copy_f = np.array([m.attributes["sole_copy"].data[i].value for i in range(len(m.polygons))]) if "sole_copy" in m.attributes else np.zeros(len(m.polygons), int)
 masks = {
     "skin": np.array([flab[p.index] == "skin" for p in m.polygons]),            # head, neck, throat and collarbones, hands
-    "socks": np.array([flab[p.index] == "socks" for p in m.polygons]),
+    "socks": np.array([flab[p.index] == "socks" and not sole_copy_f[p.index] for p in m.polygons]),   # the sole copies stay coarse (budget)
     "slides": np.array([flab[p.index] == "slides" for p in m.polygons]),
 }
 region = np.zeros(len(m.polygons), bool)
@@ -369,6 +421,68 @@ for vi in sv:
     v = m.vertices[vi]
     if v.co.z > 1.5: v.co = v.co + v.normal * 0.15
 m.update(); log("slides grown outward:", len(sv), "vertices")
+# the socks tuck 1.5 mm under the cuff's hem (7-11 cm): the subdivided sock poked through it as white teeth
+socks_slot = REGIONS.index("socks"); sock_vv = set(v for p in m.polygons if p.material_index == socks_slot for v in p.vertices); tucked = 0
+for vi in sock_vv:
+    v = m.vertices[vi]
+    if 7.0 < v.co.z < 11.0: v.co = v.co - v.normal * (0.15 * min(1.0, (v.co.z - 7.0) / 1.5)); tucked += 1
+m.update(); log("sock vertices tucked under the hem:", tucked)
+
+# ---------------------------------------------------------------- the ears: a sculpted relief on the subdivided ear
+# Meshy's ear is a smooth blob. In the ear's own frame (u forward, v up, both -1..1 over the ear's half-size) a height
+# field along the outward normal draws the anatomy: the helix rim, the scapha groove inside it, the antihelix ridge,
+# the concha bowl, the tragus in front of it, a soft lobe; it fades where the ear joins the head (the front) and past
+# the rim. The detail material repeats the same field in the normal map for the fine edges.
+skin_slot = REGIONS.index("skin"); co2 = np.array([v.co[:] for v in m.vertices]); zmax2 = float(co2[:, 2].max())
+EAR = {"f_c": 4.8, "z_c": zmax2 - 15.3, "hw": 2.0, "hh": 2.7, "lat_min": 6.4, "f_lo": 2.5, "f_hi": 7.2}
+rel = co2 - np.array([HB.x, HB.y, 0.0]); f_all = rel @ np.array(fwd_h[:]); lat_all = rel @ np.array(right_h[:])
+def ear_height(u, v):
+    r = np.hypot(u, v); sm = lambda x, a, b: np.clip((x - a) / (b - a), 0, 1) ** 2 * (3 - 2 * np.clip((x - a) / (b - a), 0, 1))
+    helix = 0.22 * np.exp(-((r - 0.86) / 0.09) ** 2) * (1 - sm(u, 0.3, 0.7)) * (1 - sm(-v, 0.6, 0.9))
+    scapha = -0.12 * np.exp(-((r - 0.68) / 0.08) ** 2) * (1 - sm(u, 0.3, 0.7))
+    antihelix = 0.16 * np.exp(-((r - 0.50) / 0.08) ** 2) * (1 - sm(u, 0.1, 0.5))
+    rc = np.hypot(u - 0.15, v + 0.1) / 0.40; concha = -0.35 * np.maximum(0.0, 1 - rc * rc)
+    tragus = 0.18 * np.exp(-(((u - 0.55) / 0.18) ** 2 + ((v + 0.1) / 0.22) ** 2))
+    lobe = 0.08 * sm(-v, 0.55, 0.9) * (1 - sm(r, 0.9, 1.05))
+    w = (1 - sm(r, 0.95, 1.1)) * (1 - sm(u, 0.6, 0.85))
+    return (helix + scapha + antihelix + concha + tragus + lobe) * w * 1.4
+sv_skin = set(v for p in m.polygons if p.material_index == skin_slot for v in p.vertices)
+def ear_vertices():
+    co_ = np.array([v.co[:] for v in m.vertices]); rel_ = co_ - np.array([HB.x, HB.y, 0.0]); f_ = rel_ @ np.array(fwd_h[:]); l_ = rel_ @ np.array(right_h[:])
+    sk = set(v for p in m.polygons if p.material_index == skin_slot for v in p.vertices)
+    return co_, f_, l_, [i for i in sk if abs(l_[i]) > EAR["lat_min"] and EAR["f_lo"] < f_[i] < EAR["f_hi"] and EAR["z_c"] - 1.3 * EAR["hh"] < co_[i, 2] < EAR["z_c"] + 1.3 * EAR["hh"]]
+co2, f_all, lat_all, ear_idx = ear_vertices()
+# the ear's triangles are ~3 mm after the one subdivision, the relief's features 2-4 mm: one more cut on the ear alone
+ear_set = set(ear_idx)
+bm = bmesh.new(); bm.from_mesh(m); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table()
+ear_faces = [f_ for f_ in bm.faces if all(v.index in ear_set for v in f_.verts)]
+ear_edges = list({e_ for f_ in ear_faces for e_ in f_.edges})
+bmesh.ops.subdivide_edges(bm, edges=ear_edges, cuts=1, use_grid_fill=True)
+bm.to_mesh(m); bm.free(); m.update()
+log("ear subdivided once more: %d faces, %d edges cut" % (len(ear_faces), len(ear_edges)))
+co2, f_all, lat_all, ear_idx = ear_vertices()
+moved = 0
+for i in ear_idx:
+    u = (f_all[i] - EAR["f_c"]) / EAR["hw"]; v = (co2[i, 2] - EAR["z_c"]) / EAR["hh"]
+    h = float(ear_height(np.array(u), np.array(v)))
+    if abs(h) > 1e-4: m.vertices[i].co = m.vertices[i].co + right_h * (np.sign(lat_all[i]) * h); moved += 1
+m.update(); log("ear relief: %d ear vertices, %d moved" % (len(ear_idx), moved))
+EAR.update({"fwd": list(fwd_h[:]), "right": list(right_h[:]), "head": [HB.x, HB.y, 0.0]})
+json.dump(EAR, open(os.path.join(WORK, "ears.json"), "w"))
+# buffers for make_textures.py: the hair's vertices (the hairline's baby hairs), the socks' own vertices (not the sole
+# copies: the strap edge), the feet's extents (toe and heel seams)
+hair_slot = REGIONS.index("hair"); co2 = np.array([v.co[:] for v in m.vertices])
+np.save(os.path.join(WORK, "hair_verts.npy"), co2[sorted(set(v for p in m.polygons if p.material_index == hair_slot for v in p.vertices))].astype(np.float32))
+sole_copy_f2 = np.array([m.attributes["sole_copy"].data[i].value for i in range(len(m.polygons))]) if "sole_copy" in m.attributes else np.zeros(len(m.polygons), int)
+socks_slot = REGIONS.index("socks")
+sock_v = sorted(set(v for p in m.polygons if p.material_index == socks_slot and not sole_copy_f2[p.index] for v in p.vertices))
+np.save(os.path.join(WORK, "socks_verts.npy"), co2[sock_v].astype(np.float32))
+FEET = {}
+for side, sgn in (("left", 1), ("right", -1)):
+    fv = [i for i in sock_v if co2[i, 0] * sgn > 0] + [v for p in m.polygons if p.material_index == REGIONS.index("slides") for v in p.vertices if co2[v, 0] * sgn > 0]
+    P_ = co2[fv]; FEET[side] = {"y_toe": float(P_[:, 1].min()), "y_heel": float(P_[:, 1].max()), "x_mid": float(P_[:, 0].mean()), "x_lo": float(P_[:, 0].min()), "x_hi": float(P_[:, 0].max())}
+FEET["ankle"] = ANKLE
+json.dump(FEET, open(os.path.join(WORK, "feet.json"), "w")); log("feet:", FEET)
 
 # ---------------------------------------------------------------- hand frames for the finger grooves (a second UV map carries them)
 # per hand: PCA of its vertices gives the axis along the fingers (longest), across the palm, and the thickness; the
@@ -512,7 +626,7 @@ emit_region(); bake_to(reg_imgs, "EMIT", margin=0)
 np.save(os.path.join(WORK, "region_cloth.npy"), np.round(np.array(reg_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, 0] * 8).astype(np.uint8))
 emit_geometry("pos"); bake_to(pos_imgs, "EMIT", margin=4)
 np.save(os.path.join(WORK, "pos_skin.npy"), (np.array(pos_imgs["skin"].pixels[:], dtype=np.float32).reshape(2048, 2048, 4)[:, :, :3] - 0.5) * 400)
-np.save(os.path.join(WORK, "posz_cloth.npy"), (np.array(pos_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, 2] - 0.5) * 400)   # height per cloth texel (cm): make_textures.py draws the socks' edge from the old atlas at the feet
+np.save(os.path.join(WORK, "pos_cloth.npy"), (np.array(pos_imgs["cloth"].pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, :3] - 0.5) * 400)   # position per cloth texel (cm): make_textures.py draws the socks' edge, seams and the slides' tread from it
 emit_geometry("nrm"); bake_to(pos_imgs, "EMIT", margin=4)
 np.save(os.path.join(WORK, "nrm_skin.npy"), np.array(pos_imgs["skin"].pixels[:], dtype=np.float32).reshape(2048, 2048, 4)[:, :, :3] * 2 - 1)
 log("position / normal buffers saved")
@@ -579,6 +693,25 @@ def detail_material(name, nt):
         fingers = math(nt, "MULTIPLY", onhand, math(nt, "MINIMUM", 1.0, math(nt, "MAXIMUM", 0.0, math(nt, "DIVIDE", math(nt, "ADD", hy, 6.5), 1.5))))
         nearmid = math(nt, "LESS_THAN", math(nt, "ABSOLUTE", hx), 3.9)                               # only the four fingers, not the thumb side
         h = math(nt, "SUBTRACT", h, math(nt, "MULTIPLY", math(nt, "MULTIPLY", groove, fingers), math(nt, "MULTIPLY", nearmid, 6.0)))
+        # the ears' relief again, for the fine edges (same field as the geometry above, in height units: 0.006 cm each)
+        relp = vmath(nt, "SUBTRACT", P, tuple(EAR["head"])); fe = vmath(nt, "DOT_PRODUCT", relp, tuple(EAR["fwd"])); le = vmath(nt, "DOT_PRODUCT", relp, tuple(EAR["right"]))
+        _, _, ze = separate(nt, P)
+        ue = math(nt, "DIVIDE", math(nt, "SUBTRACT", fe, EAR["f_c"]), EAR["hw"]); ve = math(nt, "DIVIDE", math(nt, "SUBTRACT", ze, EAR["z_c"]), EAR["hh"])
+        re_ = math(nt, "SQRT", math(nt, "ADD", math(nt, "MULTIPLY", ue, ue), math(nt, "MULTIPLY", ve, ve)))
+        def gauss(x, c, w): d_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", x, c), w); return math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "MULTIPLY", d_, d_), -1.0))
+        def smst(x, a_, b_): t_ = math(nt, "MINIMUM", 1.0, math(nt, "MAXIMUM", 0.0, math(nt, "DIVIDE", math(nt, "SUBTRACT", x, a_), b_ - a_))); return math(nt, "MULTIPLY", math(nt, "MULTIPLY", t_, t_), math(nt, "SUBTRACT", 3.0, math(nt, "MULTIPLY", t_, 2.0)))
+        back = math(nt, "SUBTRACT", 1.0, smst(ue, 0.3, 0.7))
+        helix = math(nt, "MULTIPLY", math(nt, "MULTIPLY", gauss(re_, 0.86, 0.09), 0.22), back)
+        scapha = math(nt, "MULTIPLY", math(nt, "MULTIPLY", gauss(re_, 0.68, 0.08), -0.12), back)
+        antihelix = math(nt, "MULTIPLY", math(nt, "MULTIPLY", gauss(re_, 0.50, 0.08), 0.16), math(nt, "SUBTRACT", 1.0, smst(ue, 0.1, 0.5)))
+        ucx = math(nt, "DIVIDE", math(nt, "SUBTRACT", ue, 0.15), 0.40); vcx = math(nt, "DIVIDE", math(nt, "ADD", ve, 0.1), 0.40)
+        concha = math(nt, "MULTIPLY", math(nt, "MAXIMUM", 0.0, math(nt, "SUBTRACT", 1.0, math(nt, "ADD", math(nt, "MULTIPLY", ucx, ucx), math(nt, "MULTIPLY", vcx, vcx)))), -0.35)
+        tux = math(nt, "DIVIDE", math(nt, "SUBTRACT", ue, 0.55), 0.18); tvx = math(nt, "DIVIDE", math(nt, "ADD", ve, 0.1), 0.22)
+        tragus = math(nt, "MULTIPLY", math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "ADD", math(nt, "MULTIPLY", tux, tux), math(nt, "MULTIPLY", tvx, tvx)), -1.0)), 0.18)
+        win = math(nt, "MULTIPLY", math(nt, "SUBTRACT", 1.0, smst(re_, 0.95, 1.1)), math(nt, "SUBTRACT", 1.0, smst(ue, 0.6, 0.85)))
+        on_ear = math(nt, "GREATER_THAN", math(nt, "ABSOLUTE", le), EAR["lat_min"] - 0.3)
+        ear_h = math(nt, "MULTIPLY", math(nt, "ADD", math(nt, "ADD", helix, scapha), math(nt, "ADD", math(nt, "ADD", antihelix, concha), tragus)), math(nt, "MULTIPLY", win, on_ear))
+        EXTRA_BUMP["skin"] = ear_h                                            # its own bump node below: the pores' bump is weak by design
         rough = math(nt, "ADD", R(0.46), math(nt, "MULTIPLY", math(nt, "SUBTRACT", noise(nt, P, 1.5, 2.0), 0.5), 0.16))
         return h, rough, 0.05, 0.006
     if name == "hair":
@@ -604,23 +737,36 @@ def detail_material(name, nt):
         h = math(nt, "ADD", math(nt, "MULTIPLY", weave, 0.25), math(nt, "MULTIPLY", sheenv, 0.6))
         rough = math(nt, "ADD", R(0.72), math(nt, "MULTIPLY", math(nt, "SUBTRACT", sheenv, 0.5), 0.12))   # soft cotton-poly track pants, not PVC
         return h, rough, 0.08, 0.03
-    if name == "socks":                                                       # ribbed knit, ribs along the leg
+    if name == "socks":                                                       # cotton: a rib knit at the cuff, a fine jersey knit below, toe and heel seams
         rel = vmath(nt, "SUBTRACT", P, (0, 0, 0)); x, y, z = separate(nt, rel)
         ribs = math(nt, "SINE", math(nt, "MULTIPLY", math(nt, "ARCTAN2", y, math(nt, "SUBTRACT", math(nt, "ABSOLUTE", x), 14.0)), 90.0))
+        cuff = math(nt, "MINIMUM", 1.0, math(nt, "MAXIMUM", 0.0, math(nt, "DIVIDE", math(nt, "SUBTRACT", z, 6.0), 1.2)))
+        knit = math(nt, "MULTIPLY", wave(nt, P, 5.0, "X", 0.6, 0.0), wave(nt, P, 5.0, "Z", 0.6, 0.0))        # ~2 mm jersey loops
         fuzz = noise(nt, P, 12.0, 2.0, 0.6)
-        h = math(nt, "ADD", math(nt, "MULTIPLY", math(nt, "ADD", ribs, 1.0), 0.35), math(nt, "MULTIPLY", fuzz, 0.3))
+        h = math(nt, "ADD", math(nt, "MULTIPLY", math(nt, "MULTIPLY", math(nt, "ADD", ribs, 1.0), 0.35), cuff), math(nt, "ADD", math(nt, "MULTIPLY", knit, math(nt, "MULTIPLY", 0.3, math(nt, "SUBTRACT", 1.0, cuff))), math(nt, "MULTIPLY", fuzz, 0.2)))
+        lowfoot = math(nt, "LESS_THAN", z, 4.5); onleft = math(nt, "GREATER_THAN", x, 0.0)
+        y_toe = mix(nt, FEET["right"]["y_toe"], FEET["left"]["y_toe"], onleft); x_mid = mix(nt, FEET["right"]["x_mid"], FEET["left"]["x_mid"], onleft); y_heel = mix(nt, FEET["right"]["y_heel"], FEET["left"]["y_heel"], onleft)
+        dt_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", y, math(nt, "ADD", y_toe, 1.0)), 0.12); toe = math(nt, "MULTIPLY", math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "MULTIPLY", dt_, dt_), -1.0)), lowfoot)
+        dh_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", x, x_mid), 0.12); heel = math(nt, "MULTIPLY", math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "MULTIPLY", dh_, dh_), -1.0)), math(nt, "MULTIPLY", math(nt, "GREATER_THAN", y, math(nt, "SUBTRACT", y_heel, 2.5)), math(nt, "LESS_THAN", z, 9.0)))
+        h = math(nt, "SUBTRACT", h, math(nt, "MULTIPLY", math(nt, "ADD", toe, heel), 0.8))
         rough = math(nt, "ADD", R(0.95), 0.0)
         return h, rough, 0.3, 0.06
-    if name == "slides":                                                      # EVA foam: smooth with faint cells
+    if name == "slides":                                                      # EVA foam: smooth with faint cells, a tread groove around the sole's edge
         cells = voronoi(nt, P, 3.0, "SMOOTH_F1")
-        h = math(nt, "ADD", math(nt, "MULTIPLY", cells, 0.4), math(nt, "MULTIPLY", noise(nt, P, 8.0, 2.0), 0.2))
+        _, _, zs = separate(nt, P); dz_ = math(nt, "DIVIDE", math(nt, "SUBTRACT", zs, 0.9), 0.15)
+        tread = math(nt, "EXPONENT", math(nt, "MULTIPLY", math(nt, "MULTIPLY", dz_, dz_), -1.0))
+        h = math(nt, "SUBTRACT", math(nt, "ADD", math(nt, "MULTIPLY", cells, 0.4), math(nt, "MULTIPLY", noise(nt, P, 8.0, 2.0), 0.2)), math(nt, "MULTIPLY", tread, 2.5))
         rough = math(nt, "ADD", R(0.62), math(nt, "MULTIPLY", math(nt, "SUBTRACT", cells, 0.5), 0.1))
         return h, rough, 0.12, 0.02
+EXTRA_BUMP = {}
 for i, name in enumerate(REGIONS):
     nt = m.materials[i].node_tree
     h, rough, strength, dist = detail_material(name, nt)
     bump = node(nt, "ShaderNodeBump", inputs={"Strength": strength, "Distance": dist}); links(nt).new(h, bump.inputs["Height"])
-    bsdf = node(nt, "ShaderNodeBsdfPrincipled"); links(nt).new(bump.outputs[0], bsdf.inputs["Normal"]); links(nt).new(rough, bsdf.inputs["Roughness"])
+    last = bump.outputs[0]
+    if name in EXTRA_BUMP:                                                       # the ears' relief (cm) on top, at full strength
+        bump2 = node(nt, "ShaderNodeBump", inputs={"Strength": 0.8, "Distance": 0.3}); links(nt).new(EXTRA_BUMP[name], bump2.inputs["Height"]); links(nt).new(last, bump2.inputs["Normal"]); last = bump2.outputs[0]
+    bsdf = node(nt, "ShaderNodeBsdfPrincipled"); links(nt).new(last, bsdf.inputs["Normal"]); links(nt).new(rough, bsdf.inputs["Roughness"])
     out = node(nt, "ShaderNodeOutputMaterial"); links(nt).new(bsdf.outputs[0], out.inputs[0])
     node(nt, "ShaderNodeTexImage", name="target")
 scene.render.bake.normal_space = "TANGENT"
