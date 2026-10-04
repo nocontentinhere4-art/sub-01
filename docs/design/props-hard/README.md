@@ -18,11 +18,11 @@ for the preview). The page's `?debug` surface markers (magenta dots) are hidden 
 | crumpled paper | the floor by the desk's end, near the bin | modelled: a sheet crushed into a ball, the inside of 46 tilted planes (flat facets, crisp ridges) cut by eleven V folds | 50-60 mm balls | 9.6k |
 | mug of tea | the sill over the bed's head, between the cat and the alarm clock (the bedside: the bed's head is against the window wall, so the sill and the headboard are his night stand; the glass and the clock were there already) | modelled, glazed stoneware | 77 x 89 mm | 1.6k |
 | phone, charging | face down on the headboard's cap, past the window; its cable down the bed's side to a new wall socket by the floor | modelled (no logo; a generic two-lens camera) | 69 x 140 x 8 mm | 0.9k + 1.1k cable + 0.6k socket |
-| three paperbacks and a magazine | the floor at the bed's foot, by the backpack; the magazine leans on the bed base | modelled; plain covers and an abstract cover drawn in code (no text) | bunko 105 x 148 mm, B5 182 x 257 mm | 0.2k |
+| three paperbacks and a magazine | the floor at the bed's foot, by the backpack, spines to the room; the magazine leans on the bed base | modelled: soft covers round rounded spines, their front boards curling a little at the fore edge, cream page blocks showing at the head, tail and fore edge; plain covers and an abstract cover drawn in code (no text) | bunko 105 x 148 mm, B5 182 x 257 mm | 0.6k |
 | closed laptop | the bookshelf's top level (the succulent moved down) | modelled, bead-blasted aluminium, no logo | 13-inch, 298 x 208 x 16 mm | 0.9k |
-| keys and a wallet | on the shoeboxes by the door: the keys in a wooden bowl | Poly Haven scan `wooden_bowl_02`; keys, ring, fob and wallet modelled | bowl 13 cm, wallet 112 x 92 mm | 4.7k + 3.4k + 0.3k |
+| keys and a wallet | on the shoeboxes by the door: the keys in a shallow wooden bowl, the long key resting on its rim, its tip over the edge | Poly Haven scan `wooden_bowl_02` (its height x 0.55: a 4 cm catch-all); keys, ring, fob and wallet modelled | bowl 13 cm, wallet 112 x 92 mm | 4.7k + 3.4k + 0.3k |
 | rubber boots | the front right corner, past the sneakers (the strip by the door is the shoeboxes' and the skateboard's) | Poly Haven scan `rubber_boots`, the clean pair; the maker's word on each shaft painted out of its maps | 373 mm tall | 9.6k |
-| laundry hamper | in front of the bookshelf, its lid off and leaning on it | Poly Haven scan `wicker_basket_02` scaled x 1.7 to a hamper's size | 36 cm across, 34 cm tall | 9.1k |
+| laundry hamper | in front of the bookshelf, its lid off and leaning on it | Poly Haven scan `wicker_basket_02` scaled x 1.7 to a hamper's size; its weave redrawn at real scale (7 mm bamboo strips in a 2/2 twill, colour and normal maps generated in the build, wrapped round the basket), since scaling the scan scaled its strips | 36 cm across, 34 cm tall | 9.1k |
 
 Each prop is at most 10k triangles (the GLB joins them by material: each prop's count is in its scene extras), textures
 are WebP at 512 px, soft contact discs sit under the props. `clutter_sweep.txt` checks every prop against the page's
@@ -73,10 +73,13 @@ keys, and every magazine photo was a cover with people or text. Through Openvers
 | lidded woven basket | [oval tea basket lid; closed](https://www.rawpixel.com/image/7478334/photo-image-public-domain-blue-bag) | rawpixel | CC0 1.0 |
 | small succulent | [Original public domain image Wikimedia](https://www.rawpixel.com/image/3301215/free-photo-image-vase-jar-aloe) | rawpixel | CC0 1.0 |
 
-What it shows: the mug, the phone, the laptop and the boots read close to the photos. The hamper reads as a basket but
-its weave is coarse (the scan scaled 1.7 times) and the leaning lid looks like a second basket from some angles. The
-paperbacks are plain blocks without the photo's rounded spines and worn edges. The key bowl looks like a ball from a low
-camera; from above the keys show.
+What it shows: the mug, the phone, the laptop and the boots read close to the photos.
+
+`weak_spots_before_after.jpg` (before left, after right, the same cameras) fixes the three weak spots it showed: the
+paperbacks have rounded spines and a visible page block (they were plain blocks); the key bowl is a shallow 4 cm bowl
+with a key over its rim (it read as a ball); the hamper's weave is at real scale (the scaled scan had 13 mm strips).
+What still falls short: the hamper's drawn weave is flatter than the scan was up close (no baked shadow between the
+strips); the bowl's burl grain is busy for its size.
 
 ## The page (`web/room.html`)
 One block after G10d's: it adds the GLB and moves its `bottle` node into `PROP.bottle` at y -0.08, so the bottle keeps

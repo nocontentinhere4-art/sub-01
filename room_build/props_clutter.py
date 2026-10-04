@@ -549,18 +549,39 @@ prop("phone_cable", [cable2] + plug, None)
 
 # --- books by the bed: three bunko paperbacks (105 x 148 mm) stacked on the floor at the bed's foot, past the duvet's
 # overhang and off his way to the futon spot (x -0.07); a B5 magazine leaning on the bed base beside them
+def extrude_profile(nm, material, prof, d, zs=None):
+    """a closed cross-section [(x, y)] (glTF) swept along z from -d/2 to d/2 (zs: per-point z insets, for the page block's head and tail)"""
+    bm = bmesh.new(); n = len(prof)
+    a = [bm.verts.new(B(x, y, -d / 2 + (zs[k] if zs else 0.0))) for k, (x, y) in enumerate(prof)]
+    b = [bm.verts.new(B(x, y, d / 2 - (zs[k] if zs else 0.0))) for k, (x, y) in enumerate(prof)]
+    for k in range(n):
+        f = bm.faces.new([a[k], a[(k + 1) % n], b[(k + 1) % n], b[k]]); f.smooth = True
+    bm.faces.new(a); bm.faces.new(b[::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    o = new_obj(nm, bm, material)
+    for f in o.data.polygons: f.use_smooth = abs(G(f.normal)[2]) < 0.9
+    return o
 def bunko(nm, t, cell, ry, at, y):
-    cv = 0.0007; w, d = 0.105, 0.148
-    pages = cuboid(nm + "_pages", "paper", (-w / 2 + cv, w / 2 - 0.0006), (cv, t - cv), (-d / 2 + 0.0012, d / 2 - 0.0012))
-    cov = [cuboid(nm + "_cover", "print", (-w / 2, w / 2), (0.0, cv), (-d / 2, d / 2)), cuboid(nm + "_cover", "print", (-w / 2, w / 2), (t - cv, t), (-d / 2, d / 2)),
-           cuboid(nm + "_spine", "print", (-w / 2, -w / 2 + cv), (0.0, t), (-d / 2, d / 2))]
+    """a bunko paperback (105 x 148 mm): a soft cover round a rounded spine, its front board lifting a little at the fore
+    edge, and the cream page block showing at the head, the tail and the fore edge"""
+    cv = 0.0007; w, d = 0.105, 0.148; e = t * 0.32; sx = -w / 2 + e
+    lift = lambda x: 0.0011 * max(0.0, (x - (w / 2 - 0.03)) / 0.03) ** 2        # the cover's curl at the fore edge
+    arc = [(sx - e * math.sin(math.pi * k / 10), t / 2 - (t / 2) * math.cos(math.pi * k / 10)) for k in range(11)]   # the spine, bottom to top
+    arc_in = [(sx - (e - cv) * math.sin(math.pi * k / 10), t / 2 - (t / 2 - cv) * math.cos(math.pi * k / 10)) for k in range(11)]
+    xs = [sx + (w / 2 - sx) * k / 6 for k in range(1, 7)]
+    outer = [(x, 0.0) for x in xs[::-1]] + arc + [(x, t + lift(x)) for x in xs]
+    inner = [(x, t - cv + lift(x)) for x in xs[::-1]] + arc_in[::-1] + [(x, cv) for x in xs]
+    cover = extrude_profile(nm + "_cover", "print", outer + inner, d)
+    fx = w / 2 - 0.0007
+    pages_prof = [(sx, cv), (fx, cv), (fx - 0.0006, t / 2), (fx, t - cv), (sx, t - cv), (sx - (e - cv) * 0.9, t / 2)]
+    pages = extrude_profile(nm + "_pages", "paper", pages_prof, d, zs=[0.0008] * len(pages_prof))
     u0, v0 = 0.0, cell * 48 / 256; u1, v1 = 0.5, (cell * 48 + 48) / 256
-    for c in cov: cell_uv(c, u0 + 0.01, v0 + 0.01, u1 - 0.01, v1 - 0.01)
-    parts = [pages] + cov; xf(parts, ry=ry); xf(parts, loc=(at[0], y, at[1])); return parts
+    cell_uv(cover, u0 + 0.01, v0 + 0.01, u1 - 0.01, v1 - 0.01)
+    parts = [pages, cover]; xf(parts, ry=ry); xf(parts, loc=(at[0], y, at[1])); return parts
 BK = (-0.1265, 0.935); y0_ = support_at(BK[0], BK[1], 0.5)
 books = []
 for i, (t, cell, ry, dx, dz) in enumerate(((0.0165, 1, 0.025, 0.0, 0.0), (0.0120, 4, -0.020, 0.0012, -0.002), (0.0145, 0, 0.012, -0.0010, 0.003))):
-    yb = y0_ + sum((0.0165, 0.0120, 0.0145)[:i]); books += bunko(f"bunko{i}", t, cell, ry, (BK[0] + dx, BK[1] + dz), yb)
+    yb = y0_ + sum((0.0165, 0.0120, 0.0145)[:i]); books += bunko(f"bunko{i}", t, cell, ry + math.pi, (BK[0] + dx, BK[1] + dz), yb)   # spines to the room
 bkc = disc("books_contact", 0.10); xf([bkc], loc=(BK[0], y0_, BK[1]))
 for v in bkc.data.vertices: v.co.x = BK[0] + (v.co.x - BK[0]) * 0.62
 prop("books_floor", books + [bkc], y0_)
@@ -602,9 +623,15 @@ def flat_region(x0, x1, z0, z1, y, step=0.005):
 SB_Y = support_at(1.80, -0.58, 1.0); SB = flat_region(1.60, 2.00, -0.75, -0.40, SB_Y)
 print("SHOEBOX TOP", round(SB_Y, 4), [round(v, 3) for v in SB])
 bowl = import_scan("wooden_bowl_02"); BW = (SB[0] + 0.088, (SB[2] + SB[3]) / 2)
+for o in bowl: o.data.transform(Matrix.Diagonal((1.0, 1.0, 0.55, 1.0))); o.data.update()   # a shallow catch-all (4 cm): the keys show over its rim
 place(bowl, BW, SB_Y, ry=0.9); bwc = disc("bowl_contact", 0.085); xf([bwc], loc=(BW[0], SB_Y, BW[1]))
 prop("key_bowl", bowl + [bwc], SB_Y)
-inner = bvh_of(bowl).ray_cast(Vector((BW[0], SB_Y + 0.2, BW[1])), Vector((0, -1, 0)))[0].y
+KD = 0.7; KDIR = (math.cos(KD), -math.sin(KD))                  # the keys' heading (xf's ry turns +x to (cos, -sin))
+BB = bvh_of(bowl); DOWN = Vector((0, -1, 0))
+def bowl_top(r):
+    h = BB.ray_cast(Vector((BW[0] + KDIR[0] * r, SB_Y + 0.2, BW[1] + KDIR[1] * r)), DOWN)[0]; return h.y if h is not None else None
+KB = 0.020; inner = bowl_top(KB)                                  # where the bunch lies: 2 cm towards the rim
+RIM_R, RIM_Y = max(((r / 1000, bowl_top(r / 1000)) for r in range(40, 76) if bowl_top(r / 1000) is not None), key=lambda e: e[1])
 print("BOWL INNER", round(inner, 4))
 def key(nm, material, L):
     """a flat key, 2 mm thick: a round bow (its hole a dark dot), a shoulder and a blade with cuts; the bow at the origin, the blade along +x"""
@@ -617,12 +644,15 @@ def key(nm, material, L):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); o = new_obj(nm, bm, material)
     hole = lathe(nm + "_hole", "cap_black", [(0.0, 0.0), (0.0028, 0.0), (0.0028, 0.0021), (0.0, 0.0021)], n=10); xf([hole], loc=(-0.0045, -0.00005, 0.0))
     return [o, hole]
-k1 = key("key1", "brass", 0.052); k2 = key("key2", "connector", 0.046)
-xf(k1, ry=0.2); xf(k2, ry=2.0); xf(k2, loc=(0.004, 0.0021, 0.002))
+k1 = key("key1", "brass", 0.056); k2 = key("key2", "connector", 0.046)
+xf(k1, ry=0.2); xf(k2, ry=2.7); xf(k2, loc=(0.002, 0.0021, 0.003))
 ringp = [(0.012 * math.cos(2 * math.pi * i / 24) - 0.0045 - 0.012, 0.0012, 0.012 * math.sin(2 * math.pi * i / 24)) for i in range(25)]
 kring = tube("key_ring", "connector", ringp, 0.0009, n=6)
-fob = slab("key_fob", "leather", 0.022, 0.040, 0.004, 0.006, bev=0.0012); xf([fob], ry=0.6); xf([fob], loc=(-0.032, 0.0, 0.010))
-keys = k1 + k2 + [kring, fob]; xf(keys, ry=0.5); xf(keys, loc=(BW[0] + 0.006, inner + 0.0004, BW[1] - 0.004), rx=0.05)
+fob = slab("key_fob", "leather", 0.022, 0.040, 0.004, 0.006, bev=0.0012); xf([fob], ry=0.6); xf([fob], loc=(-0.026, 0.0, 0.006))
+TILT = math.atan2(RIM_Y + 0.0012 - inner, RIM_R - KB)              # the long key: its bow in the bunch, its blade on the rim, its tip over it
+xf(k1, rz=TILT)
+keys = k1 + k2 + [kring, fob]; xf(keys, ry=KD - 0.2); xf(keys, loc=(BW[0] + KDIR[0] * KB, inner + 0.0006, BW[1] + KDIR[1] * KB))
+print("KEYS rim", round(RIM_R, 3), round(RIM_Y, 4), "inner", round(inner, 4), "tilt", round(math.degrees(TILT), 1))
 prop("keys", keys, None)
 WL = (SB[1] - 0.075, (SB[2] + SB[3]) / 2)
 wallet = slab("wallet", "leather", 0.112, 0.092, 0.0165, 0.009, bev=0.0035); xf([wallet], ry=-0.25); xf([wallet], loc=(WL[0], SB_Y, WL[1]))
@@ -662,6 +692,52 @@ prop("boots", boots + btc, FY)
 # hamper's size (x 1.7: 36 cm across, 34 cm tall; the scan is a 21 cm storage basket)
 hamper = import_scan("wicker_basket_02"); decimate([o for o in hamper if "base" in o.name], 6500); decimate([o for o in hamper if "lid" in o.name], 2600)
 for o in hamper: o.data.transform(Matrix.Scale(1.7, 4)); o.data.update()
+# its weave at a real hamper's scale: scaling the scan 1.7 times scaled its strips too (13 mm), so it takes a woven
+# bamboo drawn here instead, 7 mm strips in a 2/2 twill, wrapped round the basket (and laid flat on the lid)
+import numpy as np
+TILE = 0.056                                                      # one tile: 8 strips of 7 mm
+def weave_maps(n=512, strips=8, seed=3):
+    rng = np.random.default_rng(seed); s = n // strips
+    v, u = np.mgrid[0:n, 0:n].astype(np.float32); i = (u // s).astype(int); j = (v // s).astype(int); fu = (u % s) / s; fv = (v % s) / s
+    horiz = ((i + j) % 4) < 2                                     # the weft over the stakes, two over, two under, stepping each row
+    across = np.where(horiz, fv, fu); along = np.where(horiz, u / s, v / s); k = np.where(horiz, j, i + strips)
+    prof = np.clip(np.sin(np.pi * across), 0, 1) ** 0.6           # a strip's rounded back, gaps at its edges
+    run = np.where(horiz, ((i + j) % 4) + fu, ((i + j) % 4 - 2) + fv)            # where along its two-cell run over the other
+    dip = 0.75 + 0.25 * np.sin(np.pi * np.clip(run / 2, 0, 1))  # it dips where it goes under
+    h = prof * dip
+    tint = (0.80 + 0.32 * rng.random(2 * strips))[k]                # each strip its own shade
+    fib = np.zeros((n, n), np.float32)                              # fibres along the strip
+    for f, a_ in ((37.0, 0.05), (91.0, 0.035), (173.0, 0.025)):
+        ph = rng.random(2 * strips) * 6.28; fib += a_ * np.sin(f * across * 6.28 / 6 + ph[k] + 0.6 * np.sin(along * 3.1 + ph[k]))
+    base = np.array(srgb("#c3a067"), np.float32); dark = np.array(srgb("#6e5230"), np.float32)
+    shade = (0.30 + 0.70 * h ** 0.8) * tint * (1 + fib)
+    col = np.clip(base[None, None, :] * shade[..., None] * np.where(horiz, 1.0, 0.92)[..., None] + dark * (1 - prof[..., None]) * 0.25, 0, 1)
+    gy, gx = np.gradient(h * 3.0)                                   # the normal map from the height (tangent space, OpenGL +y)
+    nor = np.stack([-gx, gy, np.ones_like(h)], -1); nor /= np.linalg.norm(nor, axis=-1, keepdims=True)
+    out = []
+    for nm, arr, colour in (("weave_diff", col ** (1 / 2.2), True), ("weave_nor", nor * 0.5 + 0.5, False)):   # (the colour map stored sRGB-encoded)
+        im = bpy.data.images.new(nm, n, n, alpha=False); rgba = np.concatenate([arr, np.ones((n, n, 1), np.float32)], -1)[::-1]
+        im.pixels.foreach_set(rgba.astype(np.float32).ravel())
+        if not colour: im.colorspace_settings.name = "Non-Color"
+        im.filepath_raw = f"{OUT}/{nm}.png"; im.file_format = 'PNG'; im.save(); out.append(im)
+    return out
+wd, wn = weave_maps()
+mw = mat("weave", (1, 1, 1), rough=0.78, diff_img=wd); mw["nouv"] = 1; nt = mw.node_tree
+t_ = nt.nodes.new("ShaderNodeTexImage"); t_.image = wn; nm_ = nt.nodes.new("ShaderNodeNormalMap"); nm_.inputs["Strength"].default_value = 1.0
+nt.links.new(t_.outputs["Color"], nm_.inputs["Color"]); nt.links.new(nm_.outputs["Normal"], nt.nodes["Principled BSDF"].inputs["Normal"])
+for o in hamper:
+    o.data.materials.clear(); o.data.materials.append(mw); me = o.data; uvl = me.uv_layers[0]
+    P = np.array([G(v.co) for v in me.vertices]); c = P.mean(0)
+    if "base" in o.name:                                           # round the basket: 20 tiles to the turn, so the seam meets
+        ang = np.arctan2(P[:, 2] - c[2], P[:, 0] - c[0]); U = ang / (2 * np.pi) * 20; V = P[:, 1] / TILE
+        for p_ in me.polygons:
+            us = [U[me.loops[li].vertex_index] for li in p_.loop_indices]; wrap = max(us) - min(us) > 10
+            for li in p_.loop_indices:
+                vi = me.loops[li].vertex_index; uu = U[vi] + (20 if wrap and U[vi] < 0 else 0); uvl.data[li].uv = (uu, V[vi])
+    else:                                                          # the lid: flat in its own plane
+        _, _, vt = np.linalg.svd(P - c, full_matrices=False); e0, e1 = vt[0], vt[1]
+        for li, l_ in enumerate(me.loops):
+            q = P[l_.vertex_index] - c; uvl.data[li].uv = (float(q @ e0) / TILE, float(q @ e1) / TILE)
 HM = (0.115, -0.975)
 place(hamper, (HM[0], HM[1]), FY, ry=-math.pi / 2, centre=False)
 lo, hi = box_of(hamper); base_o = [o for o in hamper if "base" in o.name]; blo, bhi = box_of(base_o)
