@@ -1,0 +1,97 @@
+{
+ "frames": 660,
+ "fps": 30,
+ "seconds": 22.0,
+ "bytes": 14258545,
+ "crf": 20,
+ "sides": {
+  "old": {
+   "side": "old",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "overview",
+     "seconds": 10.0,
+     "first": 0,
+     "frames": 300
+    },
+    {
+     "hour": 14,
+     "label": "mug",
+     "seconds": 3.0,
+     "first": 300,
+     "frames": 90
+    },
+    {
+     "hour": 14,
+     "label": "headphones",
+     "seconds": 3.0,
+     "first": 390,
+     "frames": 90
+    },
+    {
+     "hour": 14,
+     "label": "sneakers",
+     "seconds": 3.0,
+     "first": 480,
+     "frames": 90
+    },
+    {
+     "hour": 14,
+     "label": "ramen",
+     "seconds": 3.0,
+     "first": 570,
+     "frames": 90
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 65.4
+  },
+  "new": {
+   "side": "new",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "overview",
+     "seconds": 10.0,
+     "first": 0,
+     "frames": 300
+    },
+    {
+     "hour": 14,
+     "label": "mug",
+     "seconds": 3.0,
+     "first": 300,
+     "frames": 90
+    },
+    {
+     "hour": 14,
+     "label": "headphones",
+     "seconds": 3.0,
+     "first": 390,
+     "frames": 90
+    },
+    {
+     "hour": 14,
+     "label": "sneakers",
+     "seconds": 3.0,
+     "first": 480,
+     "frames": 90
+    },
+    {
+     "hour": 14,
+     "label": "ramen",
+     "seconds": 3.0,
+     "first": 570,
+     "frames": 90
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 45.8
+  }
+ }
+}
