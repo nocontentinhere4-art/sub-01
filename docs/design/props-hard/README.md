@@ -3,9 +3,9 @@
 `before_after.jpg`: the whole room (top) and the desk (bottom), before (left) and after (right). Locked cameras
 (`python room_build/shots.py --shots overview,desk_close`, the page's loop frozen), 13:00, 1280 px. "Before" is this
 branch with `props_clutter.glb` blocked, so it shows main plus G10d's Tripo props (`feature/tripo-props-2`, merged here
-for the preview). The magenta dots are the page's `?debug` markers.
+for the preview). The page's `?debug` surface markers (magenta dots) are hidden by `shots.py` before each shot.
 
-## What is new (`room_build/props_clutter.py` -> `web/room/props_clutter.glb`, 0.9 MB, 38k triangles, 22 draw calls)
+## What is new (`room_build/props_clutter.py` -> `web/room/props_clutter.glb`, 1.6 MB, 70k triangles, 26 draw calls)
 | prop | where | source | size | triangles |
 |---|---|---|---|---|
 | water bottle (the one he drinks from) | the page's bottle spot (`BOTTLE_AT`) | modelled: powder-coated steel, bare steel foot, knurled cap with a loop, two small dents | 500 ml, 65 x 222 mm | 5.5k |
@@ -14,13 +14,24 @@ for the preview). The magenta dots are the page's `?debug` markers.
 | phone charger and cable | brick in the power strip; cable along the skirting, up through the desk's grommet, along the right edge | modelled | USB-C brick 30 mm | 2.3k |
 | glass of water | the window sill, by the cat | modelled (alpha-blended glass and water) | 250 ml tumbler, 68 x 95 mm | 0.7k |
 | apple | the fridge's top | Poly Haven scan `food_apple_01` | 98 mm | 6.0k |
-| small succulent | the bookshelf's top level | Poly Haven scan `potted_plant_04` | 27 cm | 8.9k |
+| small succulent | the bookshelf's middle level, on the stack of books lying flat | Poly Haven scan `potted_plant_04` at 86 % (the gap is 15.7 cm) | 14 cm pot, 23 cm tall | 8.9k |
 | crumpled paper | the floor by the desk's end, near the bin | modelled | 50-60 mm balls | 0.6k |
+| mug of tea | the sill over the bed's head, between the cat and the alarm clock (the bedside: the bed's head is against the window wall, so the sill and the headboard are his night stand; the glass and the clock were there already) | modelled, glazed stoneware | 77 x 89 mm | 1.6k |
+| phone, charging | face down on the headboard's cap, past the window; its cable down the bed's side to a new wall socket by the floor | modelled (no logo; a generic two-lens camera) | 69 x 140 x 8 mm | 0.9k + 1.1k cable + 0.6k socket |
+| three paperbacks and a magazine | the floor at the bed's foot, by the backpack; the magazine leans on the bed base | modelled; plain covers and an abstract cover drawn in code (no text) | bunko 105 x 148 mm, B5 182 x 257 mm | 0.2k |
+| closed laptop | the bookshelf's top level (the succulent moved down) | modelled, bead-blasted aluminium, no logo | 13-inch, 298 x 208 x 16 mm | 0.9k |
+| keys and a wallet | on the shoeboxes by the door: the keys in a wooden bowl | Poly Haven scan `wooden_bowl_02`; keys, ring, fob and wallet modelled | bowl 13 cm, wallet 112 x 92 mm | 4.7k + 3.4k + 0.3k |
+| rubber boots | the front right corner, past the sneakers (the strip by the door is the shoeboxes' and the skateboard's) | Poly Haven scan `rubber_boots`, the clean pair; the maker's word on each shaft painted out of its maps | 373 mm tall | 9.6k |
+| laundry hamper | in front of the bookshelf, its lid off and leaning on it | Poly Haven scan `wicker_basket_02` scaled x 1.7 to a hamper's size | 36 cm across, 34 cm tall | 9.1k |
 
-Each prop is at most 10k triangles, textures are WebP at 512 px, soft contact discs sit under the bottle, the glass,
-the apple and the plant. Nothing blocks the keyboard, the mouse, the monitor or his paths: `clutter_sweep.txt` checks
-every prop against the page's hard-coded spots (bag, dish, bottle, his crouch at the bin), the keyboard, the mouse pad,
-the monitor's foot and his walking graph (cables point by point).
+Each prop is at most 10k triangles (the GLB joins them by material: each prop's count is in its scene extras), textures
+are WebP at 512 px, soft contact discs sit under the props. `clutter_sweep.txt` checks every prop against the page's
+hard-coded spots (bag, dish, bottle, his crouch at the bin), the keyboard, the mouse pad, the monitor's foot, his walking
+graph (cables point by point), the room door's and the fridge door's swings and the sneakers' spot; and now against the
+built room itself: each prop's triangles must not cut into `room_clean.glb` or `props_tripo2.glb` (decoded, less what
+the page hides or cuts away), and its foot must rest on its support with no edge over air. Not done, and why: no shoe
+rack (the shoeboxes already stand by the door and the strip there is full); the "nightstand" is the sill and the
+headboard (there is no floor beside the bed's head).
 
 ## Real reference (`real_reference.jpg`, the owner's rule: every item beside a real photo)
 Each pair: the render (left, a locked close-up camera, 13:00) and a real photo of the same kind of object (right). The
@@ -44,12 +55,33 @@ as lumps rather than crisp crumpled sheets; the glass on the sill is faint again
 no refraction); the earbuds' cable is thinner than it reads in a photo; the charger brick sits under the desk, out of
 this close-up.
 
+## Real reference, the room (`real_reference_room.jpg`)
+The same rule for this round: the bottle and seven of the new props, render (left) and a real photo (right), photos on
+this preview branch only. The keys, the wallet and the magazine have no pair: Openverse returned no usable CC0 photo of
+keys, and every magazine photo was a cover with people or text. Through Openverse, CC0 / Public Domain Mark:
+
+| item | photo | via | licence |
+|---|---|---|---|
+| water bottle | [Water Bottles](https://www.flickr.com/photos/144661696@N05/34776192110) | flickr | CC0 1.0 |
+| mug | [Mug](https://collection.cooperhewitt.org/view/objects/asitem/id/194999) | Cooper Hewitt, Smithsonian | CC0 1.0 |
+| phone | [Office Work](https://stocksnap.io/photo/office-work-QK8UF7C718) | StockSnap | CC0 1.0 |
+| closed laptop | [Free close laptop image](https://www.rawpixel.com/image/5916881/image-background-public-domain-technology) | rawpixel | CC0 1.0 |
+| paperbacks | [stack of paperbacks](https://www.rawpixel.com/image/5944049/free-public-domain-cc0-photo) | rawpixel | CC0 1.0 |
+| rubber boots | [Shiny rubber](https://www.flickr.com/photos/146224661@N05/48832055747) | flickr | Public Domain Mark 1.0 |
+| lidded woven basket | [oval tea basket lid; closed](https://www.rawpixel.com/image/7478334/photo-image-public-domain-blue-bag) | rawpixel | CC0 1.0 |
+| small succulent | [Original public domain image Wikimedia](https://www.rawpixel.com/image/3301215/free-photo-image-vase-jar-aloe) | rawpixel | CC0 1.0 |
+
+What it shows: the mug, the phone, the laptop and the boots read close to the photos. The hamper reads as a basket but
+its weave is coarse (the scan scaled 1.7 times) and the leaning lid looks like a second basket from some angles. The
+paperbacks are plain blocks without the photo's rounded spines and worn edges. The key bowl looks like a ball from a low
+camera; from above the keys show.
+
 ## The page (`web/room.html`)
 One block after G10d's: it adds the GLB and moves its `bottle` node into `PROP.bottle` at y -0.08, so the bottle keeps
 its place, its origin and his drinking animation; `?props=old` shows the old props.
 
 ## Tripo
-0 credits used. This container has no Tripo API key, and Poly Haven or a lathe-modelled part covered every item.
+0 credits used. This container has no Tripo API key; Poly Haven scans or modelled parts covered every item, so G10d's pipeline was not needed.
 
 ## Checks run
 `tests/test_props_clutter.py` (new), `tests/test_room_glb.py`, `tests/test_tripo_props*.py`, the full `pytest tests/`

@@ -43,10 +43,17 @@ to use and redistribute), the Japanese text in Noto Sans JP as above. Only rende
 
 ## Lived-in clutter (#98, `props_clutter.glb`)
 `room_build/props_clutter.py` (Blender) and `room_build/post_clutter.mjs` build `props_clutter.glb`: the water bottle he
-drinks from (a 500 ml powder-coated steel bottle, 65 x 222 mm), a glass of water on the sill, wired earbuds, a phone
-charger and its cable, and two balls of crumpled paper, all modelled for this project (CC0), plus four Poly Haven
-photoscans at their real sizes (CC0, listed below: `binder_notebook`, `stationery_supplies`, `food_apple_01`, and a second
-`potted_plant_04` on the bookshelf). No brands, logos or readable labels. No Tripo credits were used.
+drinks from (a 500 ml powder-coated steel bottle, 65 x 222 mm) and the things lying about the room. Modelled for this
+project (CC0): a glass of water and a mug of tea on the sill over the bed's head, a phone charging face down on the
+headboard (its cable to a wall socket by the floor), wired earbuds, a phone charger and its cable at the desk, three
+bunko paperbacks and a B5 magazine by the bed's foot (plain covers and an abstract cover drawn in code: no titles, no
+text), a closed laptop on the bookshelf (no logo), keys and a wallet by the door, two balls of crumpled paper. Poly Haven
+photoscans (CC0, listed below): `binder_notebook`, `stationery_supplies`, `food_apple_01`, `potted_plant_04` (at 86 %:
+a 14 cm pot, on the bookshelf), `wooden_bowl_02` (the key bowl), `rubber_boots` (the clean pair; the maker's word on
+each shaft is painted out of its colour, normal and ARM maps by the build) and `wicker_basket_02` (scaled to a laundry
+hamper's size, x 1.7, its lid leaning on it as scanned). No brands, logos or readable labels. No Tripo credits were used.
+The build places each prop on the built room (`room_clean.glb` and `props_tripo2.glb`, decoded) and stops if any prop
+cuts into it, hangs off its support, or enters the page's places, his routes, the doors' swings or the sneakers' spot.
 
 ## Poly Haven (https://polyhaven.com), CC0 1.0
 Textures (each recoloured or regraded in `tex_prep.py`):
@@ -79,6 +86,9 @@ Models:
 | notebook on the desk | `binder_notebook` (the closed one) | DaDrood |
 | pen and pencil on the notebook | `stationery_supplies` (`pen_blue`, `pencil_used`) | Mateusz Sadek |
 | apple on the fridge | `food_apple_01` | Oliver Harries |
+| key bowl by the door | `wooden_bowl_02` | Kuutti Siitonen |
+| rubber boots (the clean pair, label painted out) | `rubber_boots` | L |
+| laundry hamper (scaled x 1.7) | `wicker_basket_02` | Kuutti Siitonen |
 | wall clock | `wall_clock` | PierreB3D |
 | alarm clock (window sill) | `alarm_clock_01` | Yann Kervran, James Ray Cock |
 | box on the bookshelf | `cardboard_box_01` | Rahul Chaudhary |
@@ -102,11 +112,13 @@ From `room_build/`, with Blender 4.2 and Node 22:
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
     python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
     python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads binder_notebook stationery_supplies food_apple_01
+    python ph.py model 1k wooden_bowl_02 rubber_boots wicker_basket_02
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
     python tex_prep.py                       # (runs tex_hard.py too: the hard surfaces' textures and atlases)
     blender -b -P build_room.py -- --sweep   # a few minutes (the two cloth simulations): only the prop sweep (out/sweep.txt), no bake, no export
     blender -b -P build_room.py          # the cloth simulations plus the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
+    node decode.mjs ../web/room/room_clean.glb out/room_clean_dec.glb && node decode.mjs ../web/room/props_tripo2.glb out/tripo2_dec.glb   # the built room, for the clutter's supports and collisions
     blender -b -P props_clutter.py && node post_clutter.mjs out/props_clutter_raw.glb ../web/room/props_clutter.glb   # the clutter and the bottle
     python shots_soft.py --glb ../web/room/room_clean.glb --tag after   # fixed-camera renders (docs/design/room-soft)
     python shots.py --out ../docs/design/room-hard/after      # fixed-camera screenshots of the hard surfaces (from the repository root: python room_build/shots.py)

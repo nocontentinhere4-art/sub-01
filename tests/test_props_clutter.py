@@ -1,13 +1,17 @@
 """The lived-in clutter (#98): web/room/props_clutter.glb stays small, holds the bottle the page drinks from and the props
-it places, each within the web budget, its scans credited, and room.html loads it and moves the bottle into PROP.bottle.
-Reads only the GLB's JSON chunk (the meshes are meshopt-compressed; the placement sweep runs in room_build/props_clutter.py)."""
+it places about the room, each within the web budget (its triangles are in the scene's extras: the props are joined by
+material), its scans credited, and room.html loads it and moves the bottle into PROP.bottle. Reads only the GLB's JSON
+chunk (the meshes are meshopt-compressed; the placement sweep, with the collisions against the built room, runs in
+room_build/props_clutter.py)."""
 import json
 import struct
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 GLB = ROOT / "web" / "room" / "props_clutter.glb"
-PROPS = ["notebook", "pen_pencil", "earbuds", "charger", "charger_cable", "glass", "apple", "succulent_shelf", "paper_balls"]
+PROPS = ["notebook", "pen_pencil", "earbuds", "charger", "charger_cable", "glass", "apple", "succulent_shelf", "paper_balls",
+         "mug", "phone", "socket", "phone_cable", "books_floor", "magazine", "laptop", "key_bowl", "keys", "wallet", "boots", "hamper"]
+SCANS = ["binder_notebook", "stationery_supplies", "food_apple_01", "potted_plant_04", "wooden_bowl_02", "rubber_boots", "wicker_basket_02"]
 
 
 def gltf():
@@ -28,16 +32,17 @@ def triangles(g, mesh):
 
 
 def test_size_and_draw_calls():
-    assert GLB.stat().st_size <= 1.5 * 1024 * 1024
+    assert GLB.stat().st_size <= 2.5 * 1024 * 1024
     g = gltf()
-    assert sum(len(m["primitives"]) for m in g["meshes"]) <= 24
+    assert sum(len(m["primitives"]) for m in g["meshes"]) <= 30          # one per material: the props are joined
 
 
-def test_every_prop_is_a_node_within_the_web_budget():
+def test_every_prop_within_the_web_budget():
     g = gltf(); names = {n.get("name"): n for n in g["nodes"]}
-    for k in PROPS:
-        assert k in names and "mesh" in names[k], k
-        assert triangles(g, names[k]["mesh"]) <= 10_000, k
+    ex = g["scenes"][0]["extras"]; tris, boxes = json.loads(ex["tris"]), json.loads(ex["boxes"])
+    assert set(PROPS) <= set(boxes) and "props" not in ex             # (no other GLB's extras: the page reads those of props_tripo2)
+    for k in PROPS + ["bottle"]:
+        assert 0 < tris[k] <= 10_000, k
     b = names["bottle"]                                         # the bottle: a plain node (origin at its base) over its mesh
     assert "mesh" not in b and b.get("children"), b
     child = g["nodes"][b["children"][0]]
@@ -52,7 +57,7 @@ def test_textures_are_small():
 def test_scans_are_credited():
     credits = (ROOT / "web" / "room" / "CREDITS.md").read_text()
     src = (ROOT / "room_build" / "props_clutter.py").read_text()
-    for k in ("binder_notebook", "stationery_supplies", "food_apple_01", "potted_plant_04"):
+    for k in SCANS:
         assert f'import_scan("{k}"' in src and f"`{k}`" in credits, k
 
 

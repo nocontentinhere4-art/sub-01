@@ -45,8 +45,15 @@ VIEWS = {
     "ref_earbuds": [[-1.18, 1.22, -0.98], [-1.28, 0.975, -1.16]],
     "ref_charger": [[-0.28, 1.22, -0.72], [-0.40, 0.975, -1.08]],
     "ref_apple": [[0.42, 1.52, -0.72], [0.555, 1.31, -1.035]],
-    "ref_succulent": [[0.06, 1.90, -0.72], [0.03, 1.83, -1.305]],
+    "ref_succulent": [[0.60, 1.32, -0.78], [0.221, 1.13, -1.285]],
     "ref_paper": [[-0.06, 0.55, -0.82], [-0.28, 0.19, -1.15]],
+    "ref_mug": [[-1.47, 1.50, 0.66], [-1.86, 1.32, 0.486]],
+    "ref_phone": [[-1.56, 1.40, 1.78], [-1.864, 1.14, 1.40]],
+    "ref_books": [[0.34, 0.66, 1.25], [-0.14, 0.24, 0.84]],
+    "ref_laptop": [[0.46, 2.06, -0.72], [0.05, 1.74, -1.30]],
+    "ref_keys": [[1.55, 1.02, -0.30], [1.80, 0.50, -0.57]],
+    "ref_boots": [[1.18, 0.78, 1.36], [1.846, 0.33, 0.80]],
+    "ref_hamper": [[0.62, 0.88, -0.22], [0.12, 0.33, -0.90]],
 }
 WITH_HIM = {"overview"}                                  # he sits at the desk in the overview; the close-ups show the room alone
 SIZES = {"1280": (1280, 800), "390": (390, 844)}
@@ -129,6 +136,9 @@ def main():
                     time.sleep(3)
                     pg.evaluate("() => { for (const e of document.body.children) if (e.id !== 'scene' && e.tagName !== 'SCRIPT') e.style.visibility = 'hidden'; }")
                     pg.evaluate("() => { try { act('research'); } catch (e) {} settle(); }")
+                    # ?debug draws a magenta dot on every surface anchor (SURF): previews carry no debug marks
+                    pg.evaluate("() => scene.traverse(o => { if (o.isMesh && o.material && o.material.isMeshBasicMaterial && o.material.color.getHex() === 0xff00ff"
+                                " && o.geometry && o.geometry.type === 'SphereGeometry') o.visible = false; })")
                     for v in views:
                         pos, tgt = VIEWS[v]
                         pg.evaluate("(show) => boy.traverse(o => { if (o.isMesh || o.isSkinnedMesh) o.visible = show; })", v in WITH_HIM)

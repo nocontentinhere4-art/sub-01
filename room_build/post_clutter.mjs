@@ -1,9 +1,10 @@
 // node post_clutter.mjs out/props_clutter_raw.glb ../web/room/props_clutter.glb : WebP textures (512 px: these are small
-// things, a few centimetres on screen), meshopt; one node per prop (the page reads "bottle" by name). Prints a report.
+// things, a few centimetres on screen), meshopt; the props joined by material (one draw call per material: the page
+// reads only "bottle" by name, which keeps its own node; each prop's triangles are in out/clutter_sweep.txt). Prints a report.
 import fs from "node:fs";
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
-import { dedup, prune, weld, meshopt, textureCompress } from "@gltf-transform/functions";
+import { dedup, prune, weld, meshopt, textureCompress, join } from "@gltf-transform/functions";
 import { MeshoptEncoder, MeshoptDecoder } from "meshoptimizer";
 import sharp from "sharp";
 const [,, IN, OUT] = process.argv;
@@ -21,6 +22,10 @@ await doc.transform(
 // PROP.bottle's y -0.08), its mesh goes into a child node
 const b = root.listNodes().find(n => n.getName() === "bottle");
 if (b && b.getMesh()) { const m = b.getMesh(); b.setMesh(null); b.addChild(doc.createNode("bottle_mesh").setMesh(m)); }
+// the other props are siblings at the scene's root with identity transforms (Blender applied them): join them by material
+const per0 = root.listNodes().filter(n => n.getMesh()).map(n => n.getName());
+await doc.transform(join({keepNamed: false}), prune({keepLeaves: false}));
+console.log(`joined ${per0.length} prop nodes into`, root.listNodes().filter(n => n.getMesh()).map(n => n.getName()).join(", "));
 await doc.transform(meshopt({encoder: MeshoptEncoder, level: "medium"}));
 await io.write(OUT, doc);
 let prims = 0, tris = 0; const per = [];
