@@ -10,8 +10,8 @@ the knees or anywhere else under the cloth.
 
 | garment | folder | what it is |
 |---|---|---|
-| black cotton hoodie | `assets/hoodie_black/` | a relaxed fit (1.9 cm off the body, the sleeves 1.5 cm and sagging under the arm); hood down (a soft double layer rolled behind the neck and falling down the back), two drawstrings with aglets, kangaroo pocket with sloped openings, a twin-needle topstitch along its top, a stitch line down each side and rolled hems at the openings; ribbed cuffs and hem (gathered); folds shaped as real ones (narrow valleys, round crests): diagonal creases at the inner elbows, soft folds down the upper arms, sagging folds across the belly, stacking above the cuffs, folds falling to the hem, the fleece blousing over the band |
-| dark track trousers | `assets/track_trousers/` | roomy at the thigh (2.4 cm off the body, less on the inner thigh; 4.5 mm under the buttocks, the backs of the thighs and the crotch, where he sits), a smooth front drape over the crotch (a height field spanning the dip between the thighs, so it never copies the body's shape there), a short J-shaped fly of topstitching and the centre seam, two soft drag folds from the crotch down the inner thighs, easing over the knee and tapering down the shin to the elastic ribbed ankle cuffs, with stacking above them; long soft folds down the front of the thigh, drag lines from the crotch, soft knee folds; one off-white side stripe per leg (one plain stripe: no maker's design) |
+| black cotton hoodie | `assets/hoodie_black/` | a slim fit (the owner: "too puffed"): at most 1 cm off the body on the torso, 0.9 cm on the sleeves (a little more just above the hem band and the cuffs, where cloth stacks), no volume at the belly, chest or shoulders; a real lowered hood: two thin layers (about 1 cm in all) lying flat down the upper back in a soft U, its folded opening edge round the neck, no rolled collar, no point; two drawstrings with aglets; kangaroo pocket with sloped openings, a twin-needle topstitch along its top, a stitch line down each side and rolled hems at the openings; ribbed cuffs and hem (gathered); small folds at the inner elbows, above the cuffs and towards the hem |
+| dark track trousers | `assets/track_trousers/` | slim tapered joggers: at most 1.1 cm off the thigh, 0.8 cm at the knee, 0.6 cm down the calf (1 cm just above the cuff, where it stacks), 4.5 mm under the buttocks, the backs of the thighs and the crotch; a smooth front drape over the crotch (a height field spanning the dip between the thighs), a short J-shaped fly of topstitching and the centre seam, two soft drag folds from the crotch down the inner thighs; elastic ribbed ankle cuffs; one off-white side stripe per leg (one plain stripe: no maker's design) |
 | white crew socks | `assets/socks_white/` | smooth white cotton, the feet and lower shins 2 mm out; over the toes one soft rounded toe box with no toes of its own (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 16 mm disk of rays, smoothed again and closed once more so nothing enters the skin); slight compression folds at the ankle (1.5 mm); soft creases across the toe box and just behind the strap, where a worn sock bunches; a ribbed cuff under the trouser hem |
 | black slides | `assets/slides_black/` | generic pool slides in matte black rubber: a contoured footbed 2.3 cm under the heel and 1.5 cm at the toe (flat to the ball, then a toe spring), shaped to the sock's underside so the foot sits 1 mm into it, a heel cup and side rims, a 6 mm rounded top edge and a 3 mm bottom edge, about 1 cm wider than the foot and 1.2 cm longer at the toe; faint moulded nubs 3 mm apart on the footbed; one padded strap 7.5 cm front to back from just behind the toes over the forefoot (9 mm thick on top, rounded front and back edges, 2 mm off the sock), moulded into the footbed's sides |
 
@@ -67,8 +67,8 @@ gives the fixed pose), then a last pass in that pose puts any vertex still insid
 
 | shape | made in | what it does | driver (from joint world positions) | weight |
 |---|---|---|---|---|
-| `seated` | `desk_type_ik` 3 s | the hoodie's front below the chest lies on the body and the lap as a soft shell with 2-3 horizontal folds 6 cm apart (round crests 22 mm, narrow valleys 4 mm off the body or the trousers), the hem on the thighs; the trousers out of the body at the hip, the crotch and the knees | hip bend: angle between the thigh (`UpLeg`->`Leg`) and the trunk downwards (`neck`->`Hips`), both legs averaged | smoothstep(40°, 80°) |
-| `elbow_L`, `elbow_R` | `desk_type_ik` 3 s | the sleeve round a bent elbow out of the arm, its bunching held within 1.5 cm | elbow bend: angle between `Arm`->`ForeArm` and `ForeArm`->`Hand` | smoothstep(55°, 95°) |
+| `seated` | `desk_type_ik` 3 s | the hoodie's front below the chest lies on the body and the lap as a slim shell with 2-3 horizontal folds 6 cm apart (crests 8 mm, valleys 3 mm off the body or the trousers; no shape adds bulk), the hem on the thighs; the trousers out of the body at the hip, the crotch and the knees | hip bend: angle between the thigh (`UpLeg`->`Leg`) and the trunk downwards (`neck`->`Hips`), both legs averaged | smoothstep(40°, 80°) |
+| `elbow_L`, `elbow_R` | `desk_type_ik` 3 s | the sleeve round a bent elbow out of the arm, its bunching held within 1 cm | elbow bend: angle between `Arm`->`ForeArm` and `ForeArm`->`Hand` | smoothstep(55°, 95°) |
 | `lying` | `room_bed_lie` 12 s | the hoodie's back on the mattress (not below 5 mm under its top), the upper back, shoulders and lowered hood pressed onto the body (6 mm, the hood 4 mm, under the neck) | chest up: y of normalise((`LeftArm`-`RightArm`) x (`neck`-`Hips`)) | smoothstep(0.6, 0.92) |
 
 The drivers are also in the file (`extras.correctives`); the room page sets `mesh.morphTargetInfluences` on
@@ -83,6 +83,12 @@ at its chair, seat centre (-0.26, -0.13)) and the mattress (top 0.66 m; x -1.0..
 cloth below the seat or mattress top or the floor. To sit on the chair, the trousers lie 4.5 mm off the skin under the
 buttocks, the backs and insides of the thighs and the crotch (the source suit's crotch hung up to 5 cm low); the hoodie
 lies close under the arms; the cuffs sit 2 mm outside the wrists.
+
+**Silhouette** (`g2_silhouette.py` + `compose_silhouette.py`, `docs/design/clothes-mh/silhouette.jpg`): G2's body standing
+(the end of `room_stand_up`), front, side and back, in the version the owner liked before the loose change (3157f95), the
+loose one (b13af33) and the slim one: each version's `.mhclo` fitted to G2's body by MakeHuman's rule and skinned the same
+way; beside them the CC0 photos (front: black joggers, the face cropped off; back: a black hoodie); below, the slim
+clothes in the desk, walk and lying poses with the corrective shapes on.
 
 ## Next to real clothes (preview only)
 The owner's rule: every item next to a real one. `build_clothes.py` shoots each comparison render at its photo's
@@ -124,6 +130,7 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     python compare_real.py         # docs/design/clothes-mh/real_feet.jpg, real_clothes.jpg: next to real photos (CC0)
     python g2_clip_check.py        # docs/design/clothes-mh/g2_clips.jpg: G2's clips on the dressed body (three.js)
     blender -b -P g2_correctives.py   # the corrective shapes into assets/g2/boy_g2_dressed.glb (after build_clothes.py)
+    blender -b -P g2_silhouette.py && python compose_silhouette.py   # docs/design/clothes-mh/silhouette.jpg
     blender -b -P g2_pose_check.py # docs/design/clothes-mh/g2_poses.jpg + out/pose_check.json: the fit in three clip poses
     python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 

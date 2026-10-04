@@ -6,9 +6,9 @@
 # each shape is made in its pose - the garments skinned as three.js does, put right where they go wrong, and the fix
 # carried back to the rest pose through the inverse of each vertex's skinning (so morph-then-skin gives the fixed pose).
 #   seated   (desk_type_ik 3 s): the hoodie's front below the chest lies on the body and the lap as a soft shell with
-#            2-3 horizontal folds (crests 22 mm, valleys 4 mm off what is under it: the body, or the trousers on the thighs),
+#            2-3 horizontal folds (crests 8 mm, valleys 3 mm off what is under it: the body, or the trousers on the thighs),
 #            the hem resting on the thighs, instead of ballooning over the lap; the trousers out of the body at the hip
-#   elbow_L/R (desk_type_ik 3 s): the sleeve around a bent elbow out of the arm and its bunching held within 1.5 cm
+#   elbow_L/R (desk_type_ik 3 s): the sleeve around a bent elbow out of the arm and its bunching held within 1 cm
 #   lying    (room_bed_lie 12 s): the hoodie's upper back, shoulders and the lowered hood flattened onto the body and
 #            the mattress (not below 5 mm under its top: G2's soft-mattress contact), the hood pressed under the neck
 import sys, os, json, math
@@ -107,11 +107,11 @@ for i in np.nonzero(region > 0)[0]:
     p = Vector(Ppose["hoodie_black"][i]); q, n, _, d = under.find_nearest(p)
     if q is None: continue
     if (p - q).dot(n) < 0: n = -n if not GP.inside(bbvh, p) else n            # (the nearest face may face away)
-    # 2-3 soft horizontal folds across the front (6 cm apart, curving up a little at the sides): round crests 2.2 cm off,
-    # narrow valleys 4 mm off what is under
+    # 2-3 soft horizontal folds across the front (6 cm apart, curving up a little at the sides): round crests 8 mm off,
+    # narrow valleys 3 mm off what is under (slim: no shape adds bulk)
     band = hz[i] - 0.04 + 0.014 * (1 - math.cos(min(abs(R0[i, 0]) / 0.17, 1) * math.pi / 2))
     fold = (1 - crease(band, 0.06, 0.011)) * ss(0.02, 0.05, hz[i]) * (1 - ss(0.17, 0.24, hz[i]))
-    gap = 0.004 + 0.018 * fold
+    gap = 0.003 + 0.005 * fold                                            # slim: crests 8 mm, valleys 3 mm (no bulk)
     tgt[i] = np.array(q + n * gap)
 H.delta["seated"] = put("hoodie_black", M, region, tgt)
 # the trousers: out of the body at the front of the hip and the crotch (3 mm)
@@ -132,7 +132,7 @@ for side, sg in (("L", 1), ("R", -1)):
         p = Vector(tgt[i]); q, n, _, d = bbvh.find_nearest(p)
         if q is None: continue
         ins = GP.inside(bbvh, p); s = -d if ins else d
-        g_ = min(max(s, 0.005), 0.015)
+        g_ = min(max(s, 0.004), 0.010)                                     # slim: the bunching held within 1 cm
         if ins: n_in += 1
         if abs(g_ - s) > 1e-4: tgt[i] = np.array(q + n * g_ * (1 if (p - q).dot(n) >= 0 or ins else -1))
     H.delta["elbow_" + side] = put("hoodie_black", M, reg, tgt)

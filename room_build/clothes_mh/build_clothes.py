@@ -392,63 +392,78 @@ def hoodie():
     arm_len = (J("upperarm01.L") - J("lowerarm01.L")).length + (J("lowerarm01.L") - J("lowerarm02.L", "tail")).length
     elbow_s = (J("upperarm01.L") - J("lowerarm01.L")).length
     hem_z = P[:, 2].min(); chest_z = J("spine02")[2]
-    out = P.copy(); sleeve = np.zeros(len(P), bool); cuffzone = np.zeros(len(P), bool); hemzone = np.zeros(len(P), bool)
+    out = P.copy(); sleeve = np.zeros(len(P), bool); cuffzone = np.zeros(len(P), bool); hemzone = np.zeros(len(P), bool); fw = np.full(len(P), 99.0)
     torso_axis = Vector((0, J("spine03")[1], 0))
     for i, (p, n) in enumerate(zip(P, N)):
         p = Vector(p); n = Vector(n)
         sp = sleeve_param(p); is_sleeve = abs(p.x) > shoulder_x - 0.15 and sp[1] > 0.4
-        d = 1.9 * CM                                                             # a relaxed fleece: roomier than a tee
+        d = 0.6 * CM                                                             # a slim fit (the owner): close to the body
         if is_sleeve:
             sleeve[i] = True; side, s, dist, q, ax = sp
             from_wrist = arm_len - s
             r = (p - q); r = r - ax * r.dot(ax)
             front = Vector((0, -1, 0)); front = (front - ax * front.dot(ax)).normalized()
             phi = math.atan2(r.normalized().cross(front).dot(ax), r.normalized().dot(front)) if r.length > 1e-6 else 0.0
-            d = 1.45 * CM + 0.6 * CM * max(0.0, -r.normalized().z) * smooth01(1.2, 2.0, s)   # the sleeve's weight sags under the forearm
+            fw[i] = from_wrist
+            d = 0.55 * CM + 0.15 * CM * max(0.0, -r.normalized().z) * smooth01(1.2, 2.0, s)  # a slim sleeve, a little weight under the forearm
             # the armpit: where the arm comes down against the body the sleeve's inner side lies close (not 2 cm out)
             inner = max(0.0, -r.normalized().x * (1 if side == "L" else -1)) * (1 - smooth01(0.9, 1.7, s))
-            d -= inner * 1.1 * CM
+            d -= inner * 0.3 * CM
             # elbow: diagonal wrinkles on the inner side, fanning out from the crease
             e = math.exp(-((s - elbow_s) / (0.55)) ** 2) * max(0.0, math.cos(phi)) ** 1.5
-            d += e * (0.5 * CM - 1.4 * CM * crease(s - elbow_s + 0.11 * phi, 0.4, 0.09))   # sharp valleys, round crests
-            d += 0.55 * CM * math.exp(-((s - elbow_s) / 0.8) ** 2) * max(0.0, -math.cos(phi)) * math.sin(3 * phi + 6 * s)   # bunching at the back of the elbow
-            d += 0.3 * CM * smooth01(0.8, 1.6, s) * (1 - smooth01(elbow_s - 0.6, elbow_s - 0.2, s)) * math.sin(2 * math.pi * s / 0.55 + 1.7 * phi)   # soft folds down the upper arm
+            d += e * (0.2 * CM - 0.6 * CM * crease(s - elbow_s + 0.11 * phi, 0.4, 0.09))   # sharp valleys, round crests
+            d += 0.2 * CM * math.exp(-((s - elbow_s) / 0.8) ** 2) * max(0.0, -math.cos(phi)) * math.sin(3 * phi + 6 * s)   # bunching at the back of the elbow
+            d += 0.12 * CM * smooth01(0.8, 1.6, s) * (1 - smooth01(elbow_s - 0.6, elbow_s - 0.2, s)) * math.sin(2 * math.pi * s / 0.55 + 1.7 * phi)   # soft folds down the upper arm
             # stacking above the cuff: the sleeve is longer than the arm and bunches on the forearm
             w = smooth01(0.45, 0.7, from_wrist) * (1 - smooth01(1.4, 1.9, from_wrist))
-            d += w * 0.7 * CM * math.sin(2 * math.pi * from_wrist / 0.3 + 0.9 * math.sin(2 * phi + s))
+            d += w * 0.45 * CM * math.sin(2 * math.pi * from_wrist / 0.3 + 0.9 * math.sin(2 * phi + s))
             if from_wrist < 0.55:                                                  # the ribbed cuff hugs the wrist
                 cuffzone[i] = True; d = 0.2 * CM
         else:
             th = math.atan2(p.x, -p.y)                                             # around the body, 0 at the front
             hz = p.z - hem_z
             # the sides under the arms: close to the body there, so the lowered arm does not cut into the hoodie
-            d -= 1.2 * CM * abs(math.sin(th)) ** 3 * smooth01(chest_z - 2.4, chest_z - 1.2, p.z) * (1 - smooth01(chest_z + 0.4, chest_z + 1.0, p.z))
+            d -= 0.3 * CM * abs(math.sin(th)) ** 3 * smooth01(chest_z - 2.4, chest_z - 1.2, p.z) * (1 - smooth01(chest_z + 0.4, chest_z + 1.0, p.z))
             drape = 1 - smooth01(0.7, 3.2, hz)
-            d += drape * 0.6 * CM * math.sin(5 * th + 0.8 + 0.6 * math.sin(3 * th))    # vertical folds falling to the hem
+            d += drape * 0.3 * CM * math.sin(5 * th + 0.8 + 0.6 * math.sin(3 * th))    # soft vertical folds falling to the hem
             # the belly: the loose fleece sags into soft, slightly curved folds across the front above the hem
             belly = smooth01(0.8, 1.3, hz) * (1 - smooth01(2.8, 3.8, hz)) * max(0.0, math.cos(th)) ** 1.5
-            d += belly * (0.4 * CM - 1.15 * CM * crease(hz + 0.12 * math.sin(1.6 * th) + 0.06 * th * th, 1.0, 0.14))
+            # (no folds or volume over the belly standing: the seated corrective folds it when he sits)
             if hz < 0.6:                                                           # the ribbed hem band, gathered
                 hemzone[i] = True; d = 0.4 * CM
             elif hz < 1.4:
-                d += 0.7 * CM * math.sin(math.pi * (hz - 0.6) / 0.8)                 # the fleece blouses over the band
+                d += 0.3 * CM * math.sin(math.pi * (hz - 0.6) / 0.8)                 # the fleece blouses a little over the band
         out[i] = np.array(p + n * d)
     # the gathered bands: pulled towards their axis
     for i in np.nonzero(hemzone)[0]:
         p = out[i]; c = np.array([0, J("spine05")[1], p[2]]); out[i] = c + (p - c) * np.array([0.93, 0.93, 1.0])
     for i in np.nonzero(cuffzone)[0]:
         p = Vector(out[i]); _, s, _, q, ax = sleeve_param(p); r = p - q; r -= ax * r.dot(ax); out[i] = np.array(p - r * 0.03)
+    # SLIM (the owner: "too puffed"): the source suit stands off the body by itself, so the fleece is capped at a distance
+    # from the skin: 1 cm on the torso, 0.9 cm on the sleeves (a little more just above the hem band and the cuffs, where
+    # real cloth stacks); nothing at the belly, chest or shoulders stands further out
+    for i, p in enumerate(out):
+        if hemzone[i] or cuffzone[i]: continue
+        loc, nor, _, dd = BODY_BVH.find_nearest(Vector(p))
+        if loc is None or (Vector(p) - loc).dot(nor) < 0: continue
+        hz = p[2] - hem_z
+        cap = (0.9 * CM + 0.35 * CM * (1 - smooth01(0.5, 1.9, fw[i]))) if sleeve[i] else (1.0 * CM + 0.3 * CM * (1 - smooth01(0.6, 1.5, hz)))
+        if dd > cap: out[i] = np.array(loc + nor * cap)
     set_verts(o, out)
+    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()          # (the cap's creases at the armpits relaxed)
+    bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if not (hemzone[v.index] or cuffzone[v.index])], factor=0.3, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.to_mesh(o.data); bm.free(); o.data.update()
     for poly in o.data.polygons:
         vs = list(poly.vertices); poly.material_index = 1 if all(hemzone[v] or cuffzone[v] for v in vs) else 0
     push_out(o, 0.4 * CM)
     return o, hem_z
 
 
+HOOD_EDGE = []
 def hood_and_cords(shell):
-    """the hood lies down on the shoulders and the back: from the neckline's sides and back it runs over the shoulders
-    and down the upper back (longest at the back), a thick soft double layer with radial creases; two drawstrings hang
-    from eyelets either side of the neckline, with aglets"""
+    """a real lowered hood: from the neckline's sides and back it lies flat down the upper back in a soft U (longest at
+    the back), two thin fabric layers about 1 cm thick in all, its folded opening edge round the neck, no rolled collar;
+    two drawstrings hang from eyelets either side of the neckline, with aglets"""
     loops = boundary_loops(shell); P = verts_np(shell)
     neck = max(loops, key=lambda L: P[L, 2].mean()); NP = P[neck]; c = Vector(NP.mean(0))
     bvh = bvh_of(shell)
@@ -462,18 +477,20 @@ def hood_and_cords(shell):
         start = max((Vector(P[i]) for i in neck), key=lambda q: (q - c).normalized().dot(dirn))
         back = 0.5 - 0.5 * math.cos(th)                                               # 0 front, 1 back
         L = 0.3 + 1.9 * smooth01(0.12, 0.8, back)                                     # a broad round U down the back, as a lowered hood lies
-        def lift(s, back=back, L=L):
-            return (0.5 + 1.6 * math.sin(math.pi * min(1.0, s / L)) * back) * CM + 0.35 * CM
+        def lift(s, back=back, L=L):                                                   # flat on the back: 3 mm over the fleece
+            return 0.3 * CM + 0.15 * CM * math.sin(math.pi * min(1.0, s / L)) * back
         go = (dirn * 0.35 + Vector((0, 1, 0)) * (0.65 + 0.35 * back)).normalized()      # back, not out over the shoulders
-        pts = march(bvh, start + Vector((0, 0, 0.12)), go + Vector((0, 0, 0.25)), L, step=L / 16, down_from=0.15, lift=lift)
+        pts = march(bvh, start + Vector((0, 0, 0.02)), go + Vector((0, 0, 0.1)), L, step=L / 16, down_from=0.05, lift=lift)
         # creases: the collapsed hood folds in radial lines
         nn = [bvh.find_nearest(q)[1] for q in pts]
-        pts = [q + n * (0.35 * CM * math.sin(7 * th + 1.3) * math.sin(math.pi * j / (len(pts) - 1))) for j, (q, n) in enumerate(zip(pts, nn))]
-        # the collar stands up a little where it leaves the neckline
-        pts[0] = pts[0] + Vector((0, 0, 0.12 + 0.1 * back)) - dirn * 0.04
+        pts = [q + n * (0.08 * CM * math.sin(7 * th + 1.3) * math.sin(math.pi * j / (len(pts) - 1))) for j, (q, n) in enumerate(zip(pts, nn))]
+        # (no stand-up collar: the hood leaves the neckline lying down)
         rows.append(pts)
     hood = grid_obj("hood", rows, MAT["fleece"], flip=True)
-    sm = hood.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.5 * CM; sm.offset = -1; sm.use_rim = True
+    sm = hood.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.8 * CM; sm.offset = -1; sm.use_rim = True   # two thin layers, ~1 cm
+    # the hood's opening edge, folded over at the neck (its hem with the drawstring channel), lying round the neckline
+    edge = [r[1] * 0.6 + r[0] * 0.4 for r in rows]
+    HOOD_EDGE.append(tube("hood_edge", edge, 0.32 * CM, MAT["fleece"], n=8, cap=True))
     # drawstrings from eyelets either side of the neckline's front
     cords = []
     for sgn in (-1, 1):
@@ -537,7 +554,7 @@ def trousers(hem_z):
         # thigh), easing over the knee and tapering down the shin to the elastic cuff; less ease on the inside of the
         # thigh, where the legs nearly meet
         t = smooth01(ankle_z + 0.4, knee_z, p.z)                                       # 0 at the cuff, 1 at the knee
-        ease = 0.75 + 0.75 * t + 0.9 * smooth01(knee_z, knee_z + 1.6, p.z)              # cm: 0.75 cuff, 1.5 knee, 2.4 thigh
+        ease = 0.5 + 0.3 * t + 0.25 * smooth01(knee_z, knee_z + 1.6, p.z)               # cm, slim joggers: 0.5 cuff, 0.8 knee, 1.05 thigh
         inner = max(0.0, -math.sin(phi)) if above else 0.0
         ease *= 1 - 0.45 * inner
         # under the buttocks and the backs of the thighs, where he sits, the cloth lies close (pressed on the chair seat:
@@ -549,7 +566,7 @@ def trousers(hem_z):
         d += 0.25 * CM * math.sin(4 * phi + 0.7) * (1 - smooth01(0.0, 2.5, abs(p.z - knee_z)))   # soft knee folds
         # the weight of the fabric: long soft folds falling down the front of the thigh, and drag lines from the crotch
         thigh = smooth01(knee_z + 0.3, knee_z + 1.2, p.z) * (1 - smooth01(crotch_z - 0.9, crotch_z - 0.3, p.z))
-        d += thigh * (0.35 * CM - 0.95 * CM * crease(p.z + 0.22 * phi, 0.9, 0.12)) * max(0.0, math.cos(phi)) ** 0.5
+        d += thigh * (0.12 * CM - 0.35 * CM * crease(p.z + 0.22 * phi, 0.9, 0.12)) * max(0.0, math.cos(phi)) ** 0.5
         drag = smooth01(crotch_z - 1.6, crotch_z - 0.2, p.z) * (1 - smooth01(crotch_z - 0.2, crotch_z + 0.3, p.z)) * inner
         d += drag * 0.35 * CM * math.sin(2 * math.pi * (p.z * 1.6 + 0.9 * phi)) * smooth01(-0.2, 0.3, n.y)   # (not at the front)
         w = smooth01(0.35, 0.6, h) * (1 - smooth01(1.2, 1.7, h))                             # stacking above the cuffs
@@ -559,6 +576,16 @@ def trousers(hem_z):
     for i in np.nonzero(cuff)[0]:                                                       # elastic cuffs gather in
         p = Vector(out[i]); side = "L" if p.x > 0 else "R"; a = J(f"lowerleg02.{side}", "tail")
         r = p - a; r.z = 0; out[i] = np.array(p - r * 0.14)
+    # SLIM (the owner: "too puffed"): slim tapered joggers, capped at a distance from the skin: 1.1 cm at the thigh, 0.8 at
+    # the knee, 0.6 down the calf (1 cm just above the cuff, where it stacks); the seat and thighs never balloon
+    for i, p in enumerate(out):
+        if cuff[i]: continue
+        loc, nor, _, dd = BODY_BVH.find_nearest(Vector(p))
+        if loc is None or (Vector(p) - loc).dot(nor) < 0: continue
+        h = p[2] - ankle_z
+        cap = (0.6 + 0.2 * smooth01(knee_z - 1.2, knee_z, p[2]) + 0.3 * smooth01(knee_z, knee_z + 1.2, p[2])
+               + 0.4 * smooth01(0.3, 0.5, h) * (1 - smooth01(1.3, 1.8, h))) * CM
+        if dd > cap: out[i] = np.array(loc + nor * cap)
     # under the hoodie the waist is snug to the body (2.5 mm), blending back to the relaxed fit 7 cm below the hem, so the
     # gathered hem band always lies over it (it poked through the band at the hips)
     for i, p in enumerate(out):
@@ -899,7 +926,7 @@ sl = slides(sock); print("STRAP ray misses", MISSES[0])
 for o in (hood, pk): bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="solid")
 for o in sl:
     if o.modifiers: bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="solid")
-HOODIE = join([shell, hood, pk] + cords + POCKET_SEWING, "hoodie_black")
+HOODIE = join([shell, hood, pk] + cords + POCKET_SEWING + HOOD_EDGE, "hoodie_black")
 TROUSERS = join([pants] + stripes, "track_trousers")
 SLIDES = join(sl, "slides_black")
 GARMENTS = {"hoodie_black": HOODIE, "track_trousers": TROUSERS, "socks_white": sock, "slides_black": SLIDES}
