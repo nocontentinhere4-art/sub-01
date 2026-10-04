@@ -111,8 +111,9 @@ def wait_ready(base, proc, timeout=120):
 class Run:
     """The demo server and a headless Chromium (software WebGL), with the page opened at an hour and him placed."""
 
-    def __init__(self, port=8797, chromium=None, cdn_cache=None, post=None):
+    def __init__(self, port=8797, chromium=None, cdn_cache=None, post=None, root=None):
         self.port, self.post = port, post
+        self.root = Path(root) if root else ROOT                  # another checkout (main, for an old-vs-new preview)
         self.chromium = chromium or os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
         self.cdn_cache = cdn_cache or str(Path(tempfile.gettempdir()) / "sub01-cdn-cache")
 
@@ -121,8 +122,8 @@ class Run:
         env = dict(os.environ, BROWSE="0", SUB01_SPIKING_LIVE="0", SUB01_WS_STATS_S="3600",
                    OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")   # as in the Dockerfile: a spinning BLAS starves the browser
         self.log = open(Path(self.tmp) / "server.log", "w")
-        self.proc = subprocess.Popen([sys.executable, str(ROOT / "live_server.py"), "--demo", "--port", str(self.port),
-                                      "--host", "127.0.0.1", "--data-dir", self.tmp], cwd=ROOT, env=env, stdout=self.log, stderr=subprocess.STDOUT)
+        self.proc = subprocess.Popen([sys.executable, str(self.root / "live_server.py"), "--demo", "--port", str(self.port),
+                                      "--host", "127.0.0.1", "--data-dir", self.tmp], cwd=self.root, env=env, stdout=self.log, stderr=subprocess.STDOUT)
         self.base = f"http://127.0.0.1:{self.port}"
         try:
             wait_ready(self.base, self.proc)
@@ -271,7 +272,7 @@ def main():
                 pg.screenshot(timeout=240000, path=str(out / name), type="jpeg", quality=88)
                 pg.evaluate("window.FREEZE = false")
                 if os.environ.get("SHOTS_DEBUG"):
-                    print("dbg", pg.evaluate("() => { const L = {}; scene.traverse(o => { if (o.isLight) L[o.type] = +o.intensity.toFixed(4); }); return {L, exp: renderer.toneMappingExposure, captured: scene.environment !== studioEnv, envI: scene.environmentIntensity, kind: CAM.kind, cam: camera.position.toArray(), tgt: controls.target.toArray()}; }"), flush=True)
+                    print("dbg", pg.evaluate("() => { const L = {}; scene.traverse(o => { if (o.isLight) L[o.type] = +o.intensity.toFixed(4); }); return {L, exp: renderer.toneMappingExposure, captured: scene.environment !== studioEnv, envI: scene.environmentIntensity, kind: CAM.kind, ang: CAM.ang, aspect: +camera.aspect.toFixed(3), cam: camera.position.toArray(), tgt: controls.target.toArray()}; }"), flush=True)
                 info = pg.evaluate("() => ({dpr: window.dpr, post: window.post ? window.post.info() : null, gl: renderer.capabilities.isWebGL2, shot: window.CAM ? window.CAM.kind : null, cam: camera.position.toArray().map(v => +v.toFixed(2))})")
                 results[name] = {"errors": errors[:5], **info}
                 print("shot", name, json.dumps(info)[:300], flush=True)

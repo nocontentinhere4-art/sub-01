@@ -1147,6 +1147,7 @@ function updateCameraGoal(){
     if (atDesk) camGoal.target.lerp(v5.set(...SURF.monitor.c), 0.12);
   } else if (CAM.kind === "medium") {
     camAround(camGoal.pos, v1, v3, 2.4, lying ? 1.0 : 0.5, 50);
+    if (!lying && Math.abs(CAM.ang) >= 90) camAround(camGoal.pos, v1, v3, 3.0, 0.1, CAM.ang);   // a profile (at the sill he faces the wall): lower and further, so the hood does not hide his face
     camGoal.target.copy(v1).addScaledVector(UP, 0.05);
   } else if (CAM.kind === "screen") {
     // over his shoulder onto the monitor: the page he reads, his head and hands in the frame
@@ -1166,7 +1167,7 @@ function updateCameraGoal(){
     // the overview instead, never a hood that fills the frame; the same 30° vertical field of view holds less width,
     // so the camera stands a third further back, and the aim point is lifted by an eighth of the distance (a seventh
     // of the frame's height): his head sits below the top third, where the title, the plan and the chip are
-    if (CAM.kind !== "over" && Math.abs(CAM.ang) > 60) return overviewGoal();
+    if (CAM.kind !== "over" && !atDesk && Math.abs(CAM.ang) > 60) return overviewGoal();   // at the desk his head turns to the screen: the rear three-quarter from the desk's end shows his face
     camGoal.pos.sub(camGoal.target).multiplyScalar(1.35).add(camGoal.target); camClamp(camGoal.pos);
     camGoal.target.addScaledVector(UP, 0.12 * camGoal.pos.distanceTo(camGoal.target));
   }
