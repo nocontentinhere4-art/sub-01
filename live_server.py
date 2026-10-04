@@ -1027,7 +1027,7 @@ class Live:
                                                          "n": b["n"]} for b in self.da_bursts.trace[-60:]],
                            "da": round(self.neuro.levels["DA"], 3)}
         out["sources"] = self.browsing_sources()
-        out["youtube"] = getattr(self.browser, "youtube", None) if self.browser else None     # key set? units today
+        out["youtube"] = self.youtube_view()                  # key set? units today (also while the browser idles)
         out["feeds"] = {site: {k: d.get(k) for k in ("t", "reason", "video_links", "captcha", "login_prompt")}
                         for site, d in (getattr(self.browser, "diag", None) or {}).items()} if self.browser else {}
         out["music"] = self.music_line()
@@ -1051,6 +1051,15 @@ class Live:
         sc = getattr(self, "screens", None)
         return {"on": True, "log": log[-30:], "searches": searches, "accounts": accounts, "synced": synced,
                 "browser": sc.public()["browser"] if sc else None}
+
+    def youtube_view(self):
+        """The YouTube Data API's state for /api/screens: from the browser process when it has reported, else from the
+        saved browsing state and this process's environment (key set or not, units used today, errors)."""
+        v = getattr(self.browser, "youtube", None) if self.browser else None
+        if v:
+            return v
+        import youtube_api
+        return youtube_api.Quota(state=(getattr(self, "browsing_state", None) or {}).get("youtube")).public()
 
     def browsing_sources(self):
         """Search sources set aside after repeated failures (#89), from the browser or the saved state."""
@@ -1089,7 +1098,8 @@ class Live:
         s = await self.browser.state()
         if s.get("log") or not self.browsing_state.get("log"):
             self.browsing_state = {"log": s.get("log", []), "used": s.get("used", []), "searches": s.get("searches"),
-                                   "visited": s.get("visited") or self.browsing_state.get("visited")}
+                                   "visited": s.get("visited") or self.browsing_state.get("visited"),
+                                   "youtube": s.get("youtube_state") or self.browsing_state.get("youtube")}
 
     def end_page(self):
         """He leaves the page: its measured brain response updates his tastes."""
