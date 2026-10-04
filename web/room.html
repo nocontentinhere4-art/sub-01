@@ -1996,18 +1996,8 @@ function eating(dt){
   if (cyc !== EAT.cyc) { EAT.cyc = cyc; EAT.bit = false; EAT.took = false; }
   const done = d && EAT.bites >= d.bites, w = done ? Math.max(0, 1 - (EAT.ph - EAT.doneAt) * 0.7) : 1;
   if (done && EAT.doneAt == null) EAT.doneAt = EAT.ph;
-  // the left hand: beside the dish on the desk (it steadies a bowl); eating from the hand it stays on the armrest
-  if (d) { _l1.copy(DISH_AT).addScaledVector(TL, 0.12).addScaledVector(UP, kind === "ramen" || kind === "curry" ? 0.07 : 0.03).addScaledVector(BFw, 0.03);
-    B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.35); armTo("Left", _l1, _l2, 0.9 * w); }
-  // bites: over the dish (or the hand food in front of his chest) -> up to the mouth -> bite -> down -> chew
-  const rest = d ? _l5.copy(DISH_AT).addScaledVector(UP, 0.17).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03)   // (his forearm clear of the desk's edge)
-    : (B.neck || head).getWorldPosition(_l5).addScaledVector(BFw, 0.27).addScaledVector(UP, -0.30).addScaledVector(TL, -0.10);
-  if (d && u < 0.33) rest.addScaledVector(BFw, 0.015 * Math.sin(T * 9)).addScaledVector(UP, -0.03 * Math.max(0, Math.sin(T * 4.5)));   // picking
-  const m = mouth(_l3).addScaledVector(UP, fromHand ? -0.07 : -0.11).addScaledVector(BFw, fromHand ? 0.05 : 0.06).addScaledVector(TL, -0.03);
   const a = [0.36, 0.48, 0.6, 0.72], k = done ? 0 : u < a[0] ? 0 : u < a[1] ? smooth(a[0], a[1], u) : u < a[2] ? 1 : u < a[3] ? 1 - smooth(a[2], a[3], u) : 0;
-  mix3(_l1, rest, m, k);
-  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.35).addScaledVector(TF, -0.1);
-  armTo("Right", _l1, _l2, w);
+  Object.assign(EAT, {u, k, w}); eatArms();
   // take a piece off the dish as the hand lifts; it is gone at the bite
   if (d && !done && u >= a[0] && !EAT.took) { EAT.took = true;
     if (d.hand === "item" && d.items.length) { const it = d.items.shift(); FOOD.held = heldCopy(it); it.visible = false; }
@@ -2021,12 +2011,37 @@ function eating(dt){
   if (FOOD.held && d && d.hand === "slice") FOOD.held.scale.setScalar(1 - 0.28 * (EAT.bites % d.per));
   // the head: down to the food when picking, forward into the bite, chewing nods after
   if (!done) {
-    if (u < a[0]) gazeAt(d ? DISH_AT : _l1, 0.6, 0.2, "food");
-    else if (u < a[2]) gazeAt(_l4.copy(m).addScaledVector(BFw, 0.6).addScaledVector(UP, -0.15), 0.5, 0.2, "bite");
+    if (u < a[0]) gazeAt(d ? DISH_AT : bones.RightHand.getWorldPosition(_l4), 0.6, 0.2, "food");
+    else if (u < a[2]) gazeAt(lips(_l4).addScaledVector(BFw, 0.6).addScaledVector(UP, -0.15), 0.5, 0.2, "bite");
     else if (GZ.why === "bite" || GZ.why === "food") GZ.next = 0;
     if (u > a[2]) bend(head, TL, 0.035 * Math.max(0, Math.sin(T * 13)) * (1 - smooth(0.9, 1, u)));   // chewing
   }
-  boy.updateMatrixWorld(true);
+  boy.updateMatrixWorld(true); eatHand();
+}
+// his arms as he eats (eating() each frame, and again by afterMotion(), after #114's motion layer: its sitUp bends his
+// back forward after the page has placed his arms, which carried his hand 10-14 cm off its mark, into a held bowl, while
+// the bowl itself is placed after that, in his final pose)
+function eatArms(after = false){
+  const B = bones, kind = EAT.kind, d = FOOD.dish, fromHand = !d, {u, k, w} = EAT;
+  // the left hand: beside the dish on the desk; a bowl he holds up (ramen, curry) is #114's bowl()'s; eating from the
+  // hand it stays on the armrest
+  const held = kind === "ramen" || kind === "curry";
+  if (d && !after) { _l1.copy(DISH_AT).addScaledVector(TL, 0.12).addScaledVector(UP, held ? 0.07 : 0.03).addScaledVector(BFw, 0.03);
+    B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.35); armTo("Left", _l1, _l2, 0.9 * w); }
+  // bites: over the dish (or the hand food in front of his chest) -> up to the mouth -> bite -> down -> chew
+  const rest = d ? _l5.copy(DISH_AT).addScaledVector(UP, 0.17).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03)   // (his forearm clear of the desk's edge)
+    : (B.neck || head).getWorldPosition(_l5).addScaledVector(BFw, 0.27).addScaledVector(UP, -0.30).addScaledVector(TL, -0.10);
+  if (d && u < 0.33) rest.addScaledVector(BFw, 0.015 * Math.sin(T * 9)).addScaledVector(UP, -0.03 * Math.max(0, Math.sin(T * 4.5)));   // picking
+  // the bite: to his mouth (lips(): mouth() is at his throat, and with a bowl held up before his chest a bite aimed there
+  // went into it); the chopsticks reach up to it from a hand below and in front, bread and onigiri from nearer
+  const m = lips(_l3).addScaledVector(UP, fromHand ? -0.05 : -0.08).addScaledVector(BFw, fromHand ? 0.04 : 0.05).addScaledVector(TL, -0.03);
+  mix3(_l1, rest, m, k);
+  // the elbow down and out; from a bowl he holds up, further out, so the forearm clears its rim (a 9 cm bowl, #131)
+  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, held ? 0.45 : 0.35).addScaledVector(TF, -0.1);
+  armTo("Right", _l1, _l2, w);
+}
+function eatHand(){
+  const B = bones, kind = EAT.kind, d = FOOD.dish, fromHand = !d, w = EAT.w;
   // what is in his right hand: chopsticks (with the piece at their tips), a slice, the bread or the onigiri
   const hr = B.RightHand; hr.getWorldQuaternion(_lq); hr.getWorldPosition(_l1);
   const y = _l2.set(0, 1, 0).applyQuaternion(_lq), z = _l3.set(0, 0, 1).applyQuaternion(_lq);   // along the fingers; the palm
@@ -2039,6 +2054,11 @@ function eating(dt){
   if (fromHand) { const o = kind === "onigiri" ? FOOD.onigiri : FOOD.roll; if (o) { o.visible = true;
     o.position.copy(_l1).addScaledVector(y, 0.07).addScaledVector(z, 0.045); o.quaternion.copy(_lq);
     const s = Math.max(0.3, 1 - 0.07 * EAT.bites); o.scale.set(s, 1, s); } }
+}
+function afterMotion(){                                 // after #114's motion layer, each frame: eating from a bowl he holds
+  // up, the chopstick hand again, aimed at where the bowl now is (a dish on the desk is left as deskGuard leaves it)
+  if (!boy || !boy.visible || ctxNow !== "eat" || !(EAT.kind === "ramen" || EAT.kind === "curry") || !FOOD.dish || !(EAT.w > 0)) return;
+  torso(); eatArms(true); boy.updateMatrixWorld(true); eatHand();
 }
 
 // ---- the door: a leaf that opens into the room (hinges on its left, x 1.11), the dark hallway behind it
@@ -2384,13 +2404,18 @@ function rollStep(dt, asleep){
   ROLL.a = ROLL.force != null && Math.abs(d) < 1e-3 ? ROLL.goal : ROLL.a + v;
 }
 const lieW = () => at === "bedlie" ? 1 : step && step.k === "pose" ? (step.to === "bedlie" ? step.w || 0 : step.from === "bedlie" ? 1 - (step.w || 0) : 0) : 0;
+const LIE_CLIP = {phone_lie:{dy:0.09, spine:-0.08}, listen:{dy:0.05, spine:0}};
 function lieFit(){
   const k = lieW();
   if (k <= 0 || OFF.lie) return;
   const r = boy.rotation.y, B = bones.Hips; _l3.set(Math.cos(r), 0, -Math.sin(r));        // his left to right
   bend(B, _l3, LIE.pitch * k);
   B.getWorldPosition(_l1); _l1.y -= (LIE.dy - 0.046 * (1 - DUV.w)) * k; B.parent.worldToLocal(_l1); B.position.copy(_l1); B.updateMatrixWorld(true);
-  bend(bones.Spine02, _l3, LIE.spine * k);                                   // the small of his back down, the chest stays on the pillow
+  // the phone and music clips (#76's lie_phone; the sleeping clip for music) lie above the bed (the phone one 9-13 cm,
+  // propped up, the music one 4-7 cm, measured with contacts()): down onto it, his upper back onto the pillow
+  const fit = goal && LIE_CLIP[goal.clip];
+  if (fit) { B.getWorldPosition(_l1); _l1.y -= fit.dy * k; B.parent.worldToLocal(_l1); B.position.copy(_l1); B.updateMatrixWorld(true); }
+  bend(bones.Spine02, _l3, (LIE.spine + (fit ? fit.spine : 0)) * k);       // the small of his back down, the chest stays on the pillow
   bend(bones.LeftUpLeg, _l3, LIE.legs * k); bend(bones.RightUpLeg, _l3, LIE.legs * k);   // the legs flat on the bed
   bend(bones.LeftLeg, _l3, LIE.knee * k); bend(bones.RightLeg, _l3, LIE.knee * k);
   // asleep he is 1.72 m long in a 1.65 m bed: his knees stay a little bent, as they would in a bed this size. The phone
@@ -2478,9 +2503,10 @@ function alive(dt){                                     // after the mixer and t
       _lm.makeBasis(_l3, _l4, _l5); _lq.setFromRotationMatrix(_lm); h.getWorldQuaternion(_lq2); _lq2.slerp(_lq, lean); setWorldQuat(h, _lq2);
     }
   }
-  if (c === "eat" || c === "seat") {                   // he sits up (the seated clip hunches over): to eat, and at the screen
-    // too, his back a touch forward of vertical (as far as #114's sitUp lets the desk chair's back be), not hunched
-    const tilt = Math.asin(clamp(TU.dot(BFw), -1, 1)), a = c === "eat" ? tilt * 0.85 : Math.max(0, tilt - 0.15);
+  if (c === "eat" || c === "seat") {                   // he sits up (the seated clip hunches over), to eat and at the screen:
+    // his back a touch forward of vertical, as far as #114's sitUp lets the desk chair's back be (further, and sitUp bent
+    // him forward again after his arms were placed, which carried his hands 14 cm off their marks: into a bowl)
+    const tilt = Math.asin(clamp(TU.dot(BFw), -1, 1)), a = Math.max(0, tilt - 0.15);
     bend(bones.Spine01, TL, -a * 0.55); bend(bones.Spine02, TL, -a * 0.45); torso();
   }
   satT = c === "seat" ? satT + dt : c === "eat" ? satT : 0;   // how long he has sat at the screen (tiredness())
@@ -2515,7 +2541,9 @@ function aliveHead(){                                   // after holdPhone: the 
 }
 function props(){                                       // what is where, from the life state (each UI tick)
   const life = lastLife; if (!PROP.bag || !life) return;
-  const eatingNow = life.activity === "eat" && !life.path && at === "desk";
+  // (the meal comes out once he has settled into eating: changing from the typing pose to the eating one, his left hand
+  // swept through a bowl standing on the desk; #114's bowl() then takes it straight into his hand)
+  const eatingNow = life.activity === "eat" && !life.path && at === "desk" && !step && want === "dine";
   // a bag on the desk stays while what it brought is there: bread for the bakery's, a meal for the others
   const keep = bagKind === "bakery" ? life.bread > 0 : life.food > 0 || life.activity === "get_delivery";
   if (bag === "desk" && !keep && !(eatingNow && FOOD.dish)) bag = "none";
@@ -2829,7 +2857,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } }
     return detail ? {bed, chair, desk, wall, by} : {bed, chair, desk, wall, of:Math.ceil(P.count / every)}; },
-  IV, ACTS, FIDGETS, LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
+  IV, ACTS, FIDGETS, LIE, LIE_CLIP, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
     if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
       room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
         o.updateMatrixWorld(true); const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();
@@ -2882,7 +2910,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
     HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
     setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
-  animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); afterMotion(); return moving; };
   if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====

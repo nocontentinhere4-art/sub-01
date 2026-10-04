@@ -8,8 +8,9 @@ He did have idle variants (#63 part 1), and they did play — 57 in 10 minutes a
 the mouse or a lean of a few degrees doesn't read, and #114's motion layer keeps a reclined back out of the desk chair,
 so the "lean back" was undone. He also sat hunched: the typing clip leans him over the keyboard.
 
-Everything is in `web/room.html`, in the activity / pose block (the idle variants, `alive()`, `holdPhone()`, the drink),
-plus one name map passed to #114's motion layer (below). `web/room/boy_motion.js`, the camera and the lighting are
+Everything is in `web/room.html`, in the activity / pose block (the idle variants, `alive()`, `holdPhone()`, the drink,
+`lieFit()`, eating), plus two lines in #114's hookup block: the name map passed to the motion layer, and a call after it
+(`afterMotion()`, below). `web/room/boy_motion.js`, the camera and the lighting are
 untouched.
 
 ## 1. Audit: how static each activity reads (main, default camera, 1280)
@@ -72,6 +73,28 @@ knows by name. The new ones that need his hands are reported to it under one of 
   further back, the hands flat on it;
 - eating from a dish, his right forearm touched the desk's edge (3–5 vertices): the hand over the dish is 3 cm higher.
 
+**In bed with the phone or music he lay above the bed** (also on main): #76's `lie_phone` clip floated him 9–13 cm
+over it as a stiff plank, his feet up in the air; the music one 4–7 cm. `LIE_CLIP` lowers each onto the bed (phone 9 cm,
+his upper back down onto the pillow; music 5 cm): `contacts()` now gives −0.7 to +3 cm (pelvis −0.7, head +1.7, the
+arms −2.3 on the duvet), 0 bed vertices.
+
+**Eating, with the realistic ramen bowl** (G10d, #131 `feature/tripo-props`, its rim 9 cm against Kenney's 6.4 cm),
+measured as his vertices inside the bowl (a cone fitted to its bounds) through a whole meal, from the delivery and from
+the desk, 3 seeds each:
+- (b) the chopstick forearm went in over the rim (up to 106 vertices, 29 % of the frames). Two causes: the bite aimed
+  at `mouth()`, which is at his throat — level with a bowl held before his chest — and #114's `sitUp` bends his back
+  forward after the page has placed his arms, carrying the hand 10–14 cm off its mark, while the bowl itself is placed
+  after that. The bite now goes to his mouth (`lips()`, as the drink), and with a held bowl the chopstick hand is
+  placed once more after the motion layer (`afterMotion()`, the one other line in the hookup block), its elbow further
+  out;
+- (a) changing from the typing pose to the eating one, his left hand swept through the bowl standing on the desk (up
+  to 357 vertices): the meal now comes out once he has settled into eating, and #114's `bowl()` takes it straight into
+  his hand.
+
+Now: 3 vertices in every run — his left palm under the bowl, 3–4 mm into its base, which is #114's hold on that branch
+(`boy_motion.js`, G3's: the bowl stands on his palm at `UP 0.065`; 0.069 would clear it). Every dish on this branch
+(Kenney's, all eight kinds): 0 bed, 0 chair. The bites reach his mouth for every dish now (they stopped at his throat).
+
 ## 3. After: the same audit on this branch (`audit.txt`)
 
 | activity | still (main → now) | acts / min | away |
@@ -112,6 +135,9 @@ own `animate` (the motion layer included). "before" is main at e6dfcaa, "after" 
   (their inner faces, the window's opening excepted). Not in it: the two #114 hits G3 is fixing, his foot through the
   bed's corner as the walk passes it (445 vertices, identical on main) and — now gone — his hand in the desk chair's back
   in the standing stretch, which was this page's stretch: standing, his arms now go straight up.
+  Also not in it, and the same on main (whose `penetration()` has no desk count): going straight from reading to eating
+  at the desk, the clips' blend from the typing pose to the eating one takes his hands down through the desk's front
+  edge for about 0.6 s (up to ~240 vertices, fingers and palms).
 - **`perf.txt`**: `tools/perf_idles.mjs`, mid phone profile (390 × 844, DPR 2, CPU × 4): the script cost of a frame of
   him with each action playing: 0.7–1.6 ms (worst run 2.7 ms), as on main (0.75–1.5 ms), against 33 ms a frame at
   30 FPS. The real frame rate can't be measured headless (SwiftShader draws WebGL on the CPU).
