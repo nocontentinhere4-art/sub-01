@@ -17,5 +17,14 @@
   little-finger side down). Mouse: low dome with the hump at the back (radii x 3.1, y 3.6, z front 8 / back 4 cm), hump
   at (-0.36, 0.807, 0.39) for hips at the origin, turned -0.15 rad with the hand. Palm on the hump by contact solve;
   index/middle curl to touch (smoothed); ring/little set (CURL_R_4 [22,38,18], CURL_R_5 [26,42,20]), eased so their undersides stay on the pad (DESK_Y 0.809 + 1.1 cm).
+- Room clips (crude, from the owner's "serve il resto"; contacts measured against the room: chair seat 0.505 above
+  the floor, mattress top 0.66):
+  - `room_walk`: in-place walk loop (1.233 s), travel speed 0.67 m/s; the page moves the root along his path.
+  - `room_sit_down` (5.5 s): walks in, turns, sits; ends facing +z, hips at (-0.26, 0.62, -0.25) for a chair whose seat
+    centre is at (-0.26, -0.13). `room_stand_up` (3 s): from seated (hips at (0, 0.59, -0.12)) to standing.
+    Both keep the hands ON the thighs (HANDSOUT: thigh capsules r 7.5 cm + 1.2 cm skin; the arm moves out).
+  - `room_bed_lie` (17 s): sits on the bed edge (legs reach down, LIFT/FEETDOWN), lies back, settles; `room_bed_wake`
+    (15.5 s): lying -> sits up on the edge -> stands. Recorded on a ~34 cm bed, lifted by the source hips' height to a
+    66 cm mattress.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.

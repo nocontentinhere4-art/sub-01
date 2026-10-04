@@ -50,9 +50,14 @@ const hipH = sp("Hips").y, tHipH = rest.head.root[1], k = tHipH / hipH;
 const mixer = new THREE.AnimationMixer(obj); mixer.clipAction(obj.animations[0]).play();
 const T = rest.order, par = rest.parent, mapped = new Map(MAP.map(r => [r[0], r[1]]));
 // heading: the clip's facing at its start (hips' side axis) turned onto the target's, plus YAW (deg) from the env
-mixer.setTime(start); obj.updateMatrixWorld(true);
+mixer.setTime(process.env.FACE_AT ? +process.env.FACE_AT : start); obj.updateMatrixWorld(true);   // FACE_AT: face +z at that time
 const sideNow = sp("RightThigh").sub(sp("LeftThigh")).applyQuaternion(Y0).setY(0).normalize();
-const H = new THREE.Quaternion().setFromUnitVectors(sideNow, tSide).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), +(process.env.YAW || 0) * Math.PI / 180));
+let H0q = new THREE.Quaternion().setFromUnitVectors(sideNow, tSide);
+if (process.env.WALKDIR) {   // walks: face along the clip's travel (start -> end), not the hips' side axis at the start
+  const p0w = sp("Hips").applyQuaternion(Y0); mixer.setTime(Math.min(start + dur, obj.animations[0].duration)); obj.updateMatrixWorld(true);
+  const p1w = sp("Hips").applyQuaternion(Y0); mixer.setTime(start); obj.updateMatrixWorld(true);
+  H0q = new THREE.Quaternion().setFromUnitVectors(p1w.sub(p0w).setY(0).normalize(), new THREE.Vector3(0, 0, 1)); }
+const H = H0q.clone().premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), +(process.env.YAW || 0) * Math.PI / 180));
 // HANDPOSE=type|mouse|relax: the gloves' finger data is coarse (wrists flex, fingers claw), so for desk work the
 // wrist is set in line with the forearm and the fingers get a relaxed curl from reference photos, with small key presses
 // (type) or index clicks on the right hand (mouse). Flexion axis per bone = its rest direction x the palm normal (-y).
@@ -190,6 +195,54 @@ function solveSide(Wq, L, rootPos, s, dy) {
   const Hw2 = new THREE.Quaternion().slerp(Hlive, +(process.env["HANDK_" + s] || process.env.HANDK || 0.5)).multiply(Hw);
   L[wr] = R2.clone().multiply(l2).invert().multiply(Hw2);
 }
+// HANDSOUT=r: hands resting on the thighs stay ON them. Each thigh is a capsule (hip -> knee joint, radius r); if the
+// wrist, the palm's middle or the middle knuckle is inside (+1.2 cm of skin), the arm (two bones) moves the wrist out
+// along the capsule's normal, and the hand keeps its world rotation.
+function wlq(L, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b); let W = new THREE.Quaternion(); for (const b of path) W = W.clone().multiply(L[b]); return W; }
+function handsOut(L, rootPos, r) {
+  const caps = ["L", "R"].map(sd => [bonePos(L, rootPos, `upperleg01.${sd}`), bonePos(L, rootPos, `lowerleg01.${sd}`)]);
+  const seg = new THREE.Line3(), q = new THREE.Vector3();
+  for (const s of ["L", "R"]) {
+    const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
+    for (let it = 0; it < 8; it++) {
+      const W0 = bonePos(L, rootPos, wr), K0 = bonePos(L, rootPos, `finger3-1.${s}`), pts = [W0, W0.clone().lerp(K0, 0.5), K0];
+      let corr = new THREE.Vector3();
+      for (const [a, b] of caps) { seg.set(a, b); for (const p of pts) { seg.closestPointToPoint(p, true, q); const d = p.distanceTo(q), need = r + 0.012;
+        if (d < need) { const n = p.clone().sub(q); if (n.lengthSq() < 1e-8) n.set(0, 1, 0); n.normalize(); const c = n.multiplyScalar(need - d); if (c.length() > corr.length()) corr = c; } } }
+      if (corr.length() < 0.002) break;
+      const Hw = wlq(L, wr), A = bonePos(L, rootPos, up), T = W0.clone().add(corr);
+      const a = A.distanceTo(bonePos(L, rootPos, lo)), b = bonePos(L, rootPos, lo).distanceTo(W0);
+      let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
+      const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
+      const Kc = bonePos(L, rootPos, lo), pole = Kc.clone().sub(A).sub(d.clone().multiplyScalar(Kc.clone().sub(A).dot(d))).normalize();
+      const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), Cn = A.clone().addScaledVector(d, dl);
+      const R1 = new THREE.Quaternion().setFromUnitVectors(Kc.clone().sub(A).normalize(), E.clone().sub(A).normalize()).multiply(wlq(L, up));
+      L[up] = wlq(L, par[up]).invert().multiply(R1);
+      const Kn = bonePos(L, rootPos, lo), Cc = bonePos(L, rootPos, wr);
+      const R2 = new THREE.Quaternion().setFromUnitVectors(Cc.clone().sub(Kn).normalize(), Cn.clone().sub(Kn).normalize()).multiply(wlq(L, lo));
+      L[lo] = wlq(L, par[lo]).invert().multiply(R2);
+      L[wr] = wlq(L, par[wr]).invert().multiply(Hw);
+    }
+  }
+}
+function legDown(Wq, L, rootPos, sd, w) {
+  const up = `upperleg01.${sd}`, lo = `lowerleg01.${sd}`, ft = `foot.${sd}`;
+  const Wl = n => { const path = []; for (let b = n; b; b = par[b]) path.unshift(b); let W = new THREE.Quaternion(); for (const b of path) W = W.clone().multiply(L[b]); return W; };
+  const A = bonePos(L, rootPos, up), K = bonePos(L, rootPos, lo), C = bonePos(L, rootPos, ft);
+  const a = A.distanceTo(K), b = K.distanceTo(C);
+  const T = C.clone(); T.y = C.y + (Math.max(0.09, C.y - 0.0) === C.y ? 0 : 0) ; T.y = C.y * (1 - w) + 0.09 * w;
+  T.x = C.x; T.z = C.z + (K.z - C.z) * 0;               // straight down from where the foot was
+  let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
+  const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const pole = K.clone().sub(A).sub(d.clone().multiplyScalar(K.clone().sub(A).dot(d))).normalize();
+  const E = A.clone().addScaledVector(d, x).addScaledVector(pole, h), Cn = A.clone().addScaledVector(d, dl);
+  const Wup = Wl(up), Wlo = Wl(lo);
+  const R1 = new THREE.Quaternion().setFromUnitVectors(K.clone().sub(A).normalize(), E.clone().sub(A).normalize()).multiply(Wup);
+  const parUp = Wl(par[up]); L[up] = parUp.clone().invert().multiply(R1);
+  const Wlo1 = Wl(lo), Kn = bonePos(L, rootPos, lo), Cc = bonePos(L, rootPos, ft);
+  const R2 = new THREE.Quaternion().setFromUnitVectors(Cc.clone().sub(Kn).normalize(), Cn.clone().sub(Kn).normalize()).multiply(Wlo1);
+  L[lo] = Wl(par[lo]).clone().invert().multiply(R2);
+}
 const frames = []; let p0 = null;
 for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 1 / fps) {
   mixer.setTime(t); obj.updateMatrixWorld(true);
@@ -203,8 +256,27 @@ for (let t = start; t < Math.min(start + dur, obj.animations[0].duration); t += 
   if (IKT) armIK(Wq, L, [ (sp("Hips").applyQuaternion(Y0).applyQuaternion(H).x - (p0 ? p0.x : sp("Hips").applyQuaternion(Y0).applyQuaternion(H).x)) * k + rest.head.root[0],
     sp("Hips").applyQuaternion(Y0).applyQuaternion(H).y * k + +(process.env.DY || 0), (sp("Hips").applyQuaternion(Y0).applyQuaternion(H).z - (p0 ? p0.z : sp("Hips").applyQuaternion(Y0).applyQuaternion(H).z)) * k + rest.head.root[2] ]);
   const hp = sp("Hips").applyQuaternion(Y0).applyQuaternion(H); if (!p0) p0 = hp.clone();
-  frames.push({ L, root: [ (hp.x - p0.x) * k + rest.head.root[0], hp.y * k + +(process.env.DY || 0), (hp.z - p0.z) * k + rest.head.root[2] ] });
+  // LIFT=[[srcHipsY, dy], ...]: piecewise-linear lift by the source hips' height, so a clip recorded on a low bed puts
+  // him on a taller one (standing keeps 0, sitting on the edge and lying get raised)
+  let lift = 0; if (process.env.LIFT) { const P = JSON.parse(process.env.LIFT), h = sp("Hips").y;
+    if (h >= P[0][0]) lift = P[0][1]; else if (h <= P[P.length - 1][0]) lift = P[P.length - 1][1];
+    else for (let i = 0; i < P.length - 1; i++) if (h <= P[i][0] && h >= P[i + 1][0]) { const u = (P[i][0] - h) / (P[i][0] - P[i + 1][0]); lift = P[i][1] + u * (P[i + 1][1] - P[i][1]); } }
+  // FEETDOWN=[lyingH, seatedH]: when the lift raises him while seated (source hips between those heights), the legs
+  // reach down so the feet hang toward the floor instead of riding up with the hips (two-bone IK, knee kept forward)
+  if (process.env.FEETDOWN && lift > 0) { const [hl, hs] = JSON.parse(process.env.FEETDOWN), h = sp("Hips").y;
+    const w = Math.max(0, Math.min(1, (h - hl) / (hs - hl))) * Math.max(0, Math.min(1, (0.85 - h) / 0.1));
+    if (w > 0) { const rp = [ (hp.x - (p0 ? p0.x : hp.x)) * k + rest.head.root[0], hp.y * k + lift, (hp.z - (p0 ? p0.z : hp.z)) * k + rest.head.root[2] ];
+      for (const sd of ["L", "R"]) legDown(Wq, L, rp, sd, w); } }
+  if (process.env.HANDSOUT) { const rp = [ (hp.x - (p0 ? p0.x : hp.x)) * k + rest.head.root[0], hp.y * k + +(process.env.DY || 0) + lift, (hp.z - (p0 ? p0.z : hp.z)) * k + rest.head.root[2] ];
+    handsOut(L, rp, +process.env.HANDSOUT); }
+  frames.push({ L, root: [ (hp.x - p0.x) * k + rest.head.root[0], hp.y * k + +(process.env.DY || 0) + lift, (hp.z - p0.z) * k + rest.head.root[2] ] });
 }
+// INPLACE: remove the travel (straight line from the first to the last frame) so the clip loops on the spot; the page
+// moves the root along his path at the reported speed
+if (process.env.INPLACE) { const n = frames.length - 1, a0 = frames[0].root, a1 = frames[n].root;
+  const sp_ = Math.hypot(a1[0] - a0[0], a1[2] - a0[2]) / (n / fps);
+  frames.forEach((f, i) => { f.root[0] -= (a1[0] - a0[0]) * i / n; f.root[2] -= (a1[2] - a0[2]) * i / n; });
+  console.log("in place: travel speed", sp_.toFixed(3), "m/s"); }
 const io = new NodeIO(), doc = await io.read(GLB), root = doc.getRoot(), b0 = root.listBuffers()[0];
 const byName = new Map(root.listNodes().map(n => [n.getName(), n]));
 const anim = doc.createAnimation("clip");
