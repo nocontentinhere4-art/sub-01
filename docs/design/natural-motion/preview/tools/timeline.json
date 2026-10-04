@@ -1,0 +1,19 @@
+{"fps": 30,
+ "places": {
+  "desk":   {"setup": "act('research')", "settle": 3, "close": {"pos": [0.75, 1.5, -1.0], "target": [-1.15, 1.05, -0.55]}},
+  "window": {"setup": "act('window')", "settle": 3, "close": {"pos": [-1.45, 1.95, 2.2], "target": [-1.6, 1.3, -0.1]}},
+  "bed":    {"setup": "act('sleep'); live('phone')", "settle": 5, "close": {"pos": [0.5, 2.1, 2.4], "target": [-1.0, 0.95, 0.8]}}
+ },
+ "segments": [
+  ["desk", "at the desk: reading", null, 2],
+  ["desk", "sip from the bottle", "drink", 7], ["desk", "", null, 1],
+  ["desk", "lean back, hands behind his head", "lean", 8], ["desk", "", null, 1],
+  ["desk", "glance out of the window", "window", 5], ["desk", "", null, 1],
+  ["desk", "phone check", "phone", 7], ["desk", "", null, 1],
+  ["desk", "neck and shoulder roll", "neck", 5], ["desk", "", null, 1],
+  ["desk", "eye rub", "rub", 3.5], ["desk", "", null, 1],
+  ["desk", "head scratch", "scratch", 3], ["desk", "", null, 1],
+  ["desk", "shift in the chair", "shift", 4], ["desk", "", null, 1.5],
+  ["window", "at the window", null, 1], ["window", "chin on his hand", "chin", 9], ["window", "stretch", "stretch", 4], ["window", "at the window", null, 1],
+  ["bed", "in bed with the phone", null, 2], ["bed", "the phone down on his chest, a look away", "rest", 10], ["bed", "in bed with the phone", null, 3]
+ ]}

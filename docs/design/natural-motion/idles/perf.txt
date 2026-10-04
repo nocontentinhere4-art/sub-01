@@ -1,0 +1,23 @@
+# tools/perf_idles.mjs <port>: mid phone profile (390 x 844, DPR 2, CPU x4). Script cost of one frame of him (the page's animate(),
+# the motion layer included), with the idle variant after / made to play: median of 5 runs of 60 frames, and the worst.
+== this branch
+research             {"ms_per_frame":1.32,"worst_of_5":1.46}
+research/lean        {"ms_per_frame":1.01,"worst_of_5":1.7}
+research/rub         {"ms_per_frame":0.9,"worst_of_5":0.97}
+research/neck        {"ms_per_frame":0.7,"worst_of_5":0.87}
+research/window      {"ms_per_frame":0.78,"worst_of_5":0.85}
+research/drink       {"ms_per_frame":0.84,"worst_of_5":1.02}
+research/stretch     {"ms_per_frame":1.04,"worst_of_5":1.17}
+window               {"ms_per_frame":1.08,"worst_of_5":1.24}
+window/chin          {"ms_per_frame":0.83,"worst_of_5":1.06}
+phone                {"ms_per_frame":1.53,"worst_of_5":2.65}
+phone/rest           {"ms_per_frame":1.48,"worst_of_5":1.64}
+sleep+phone          {"ms_per_frame":1.52,"worst_of_5":1.55}
+sleep+phone/rest     {"ms_per_frame":1.64,"worst_of_5":1.85}
+listen_music/hands   {"ms_per_frame":1.52,"worst_of_5":1.79}
+
+== main e6dfcaa (no new variants)
+research             {"ms_per_frame":1.49,"worst_of_5":1.6}
+window               {"ms_per_frame":1.14,"worst_of_5":1.69}
+phone                {"ms_per_frame":0.75,"worst_of_5":1.03}
+sleep+phone          {"ms_per_frame":1.53,"worst_of_5":2.57}

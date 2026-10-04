@@ -98,3 +98,8 @@ Real dishes, bags and the bin, and the `delivery.dish` field with labels that na
 
 ## Asleep
 Under the duvet, slides parked by the bed, aligned on the pillow, on his side now and then: see `sleep/README.md`.
+
+## Living idles
+An action every 25–75 s that reads from across the room (a drink, leaning back, a look out of the window, rubbing his
+eyes, ...), biased by how tired and bored he is; he sits up at the desk. The audit of how static each activity was, and
+10 minutes at the desk before and after: see `idles/README.md`.
