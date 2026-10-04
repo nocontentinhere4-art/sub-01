@@ -4,8 +4,10 @@ About 50,000 individual hairs grown on the scalp of G2's head (`room_build/mh/gl
 the way game grooms do short hair. The cut is a short textured fringe:
 
 - about 5 cm on top, standing a little and lying forward;
-- the fringe falls forward in clumped pieces to about 1 cm above the brows;
-- the sides and nape taper to 0.6-1.9 cm;
+- the fringe falls forward in clumped pieces to about 1 cm above the brows, opaque and dark to the last ~2 mm;
+- the sides and nape taper to 0.6-1.9 cm, down to the ear's rim, with a soft, thinning hairline and a short
+  sideburn;
+- the hair spirals out from the crown whorl in separated clumps;
 - nothing over the ears.
 
 No hair cards: earlier passes used cards (e4339a6 to 9b64f5f) and a re-cut MakeHuman proxy (01fa2b8); the
@@ -21,7 +23,7 @@ The sheet has three rows.
   and as the whole frame.
 
 Each photo is cropped to the hair above the brows, with no identifiable face. The renders use a locked camera,
-neutral light and G2's head in plain skin, and there is no text on the sheet.
+neutral light and G2's head in plain skin with G2's own eyes, and there is no text on the sheet.
 
 | view | trait compared with the photo |
 |---|---|
@@ -53,15 +55,20 @@ Download each with `?w=1200&q=85&fm=jpg`. The crop boxes are `REFS` in `preview.
 - **Growth** (`strands.js`):
   - About 2,150 clump guides, about 4 mm apart, follow the growth direction out from the crown whorl: forward over
     the top into the fringe, down the taper.
+  - Near the whorl the direction gets a spiral component.
   - Each guide is re-projected onto the scalp at a height that rises and then lies over (6-16 mm on top).
   - Each guide carries about 25 hairs rooted in a disc round it. They leave it at the root and are pulled back
-    toward it along their length, giving soft clumps that stay mostly separate; the fringe's clumps are firmer.
+    toward it along their length, giving soft clumps that stay mostly separate.
+  - The clumps are firmer on top, at the back and in the fringe, which also gets 1.6 times the density. Hairs at a
+    clump's edge are darker, and clumps share part of their tint, so the texture reads.
+  - Near the hairline the hairs thin out over about 6 mm, and over about 13 mm at the temples. The taper's hairs
+    stand off the scalp a little.
   - Each hair has its own length (choppy ends), a slight curl and frizz, and 4-7 points.
   - About 2 % of the hairs on top are flyaways.
   - Hairs are shuffled, so the first half is a uniform half-density LOD.
 - **Rendering** (`hair_strands.js`):
-  - Each hair point becomes two vertices pushed apart across the view: about 0.08 mm wide, tapering to nothing at
-    the tip.
+  - Each hair point becomes two vertices pushed apart across the view: about 0.08 mm wide, full width and opacity
+    until the last ~2 mm, then tapering to the tip.
   - A hair is far thinner than a pixel, so the ribbon is drawn at least 0.7 px wide and its alpha carries the true
     coverage.
   - The ribbons are blended without depth writes, after the head and scalp, so thousands of overlapping hairs build
@@ -82,15 +89,15 @@ faster.
 
 | | |
 |---|---|
-| hairs | 49,521 (2,153 clumps) |
-| strand points | 277,388 (227,867 segments) |
-| ribbon vertices / triangles | 555k / 456k (the LOD: 228k triangles) |
+| hairs | 51,318 (2,249 clumps) |
+| strand points | 290,484 (239,166 segments) |
+| ribbon vertices / triangles | 581k / 478k (the LOD: 239k triangles) |
 | grow time | ~0.9 s (offline; the GLB carries the result) |
-| ribbons built from the GLB at load | 264 ms |
-| strand draw, close-up 480×480, full | ~1.1 s |
+| ribbons built from the GLB at load | 256 ms |
+| strand draw, close-up 480×480, full | ~1.2 s |
 | strand draw, 1280×800 at 2.2 m, full | ~0.65 s |
-| strand draw, 1280×800 at 2.2 m, LOD | ~0.27-0.35 s |
-| `hair_mh.glb` | 3.8 MB (quantized and meshopt-compressed; 13.5 MB raw) |
+| strand draw, 1280×800 at 2.2 m, LOD | ~0.33-0.38 s |
+| `hair_mh.glb` | 4.2 MB (quantized and meshopt-compressed) |
 
 ## Using it in three.js (r169)
 
@@ -107,7 +114,7 @@ const strands = useStrands(THREE, hair, {lod});     // from hair_strands.js
 The GLB holds:
 
 - `hair_strands`: line segments, NORMAL = the scalp normal, COLOR_0 = (t along the hair, per-hair random,
-  self-shadow).
+  self-shadow, distance to the tip in cm capped at 1).
 - `hair_scalp`: the painted base, with `hair_scalp.png` embedded.
 
 Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.052).
@@ -122,10 +129,11 @@ Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.05
 
 ## Known gaps against the photos
 
-- The fringe's tips thin out into a pale, see-through edge over the skin; the real cut is denser and darker there.
-- The back is brushed straight down; the photo shows a visible whorl and more strand separation.
-- The strand draw is heavy on software GL. On the room's GPU it should be fine, but it is not measured there yet.
-  The LOD halves it.
+- In the front view a thin dark edge still runs down each temple: the side hairs are seen edge-on there. It is
+  softer than before, but not gone.
+- The crown spiral is faint compared with the back photo's whorl.
+- The strand draw is heavy on software GL. On the room's GPU it should be fine, but it is not measured there yet
+  (a phone check is planned). The LOD halves it.
 
 ## Rebuild
 

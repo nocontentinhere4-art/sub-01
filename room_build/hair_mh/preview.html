@@ -46,11 +46,10 @@ const glb = await new GLTFExporter().parseAsync(exportGroup, {binary: true});
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8c8c8c);
 const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.Float32BufferAttribute(H.head.v, 3)); hg.setIndex(H.head.i); hg.computeVertexNormals();
 scene.add(new THREE.Mesh(hg, new THREE.MeshStandardMaterial({color: 0xc49a82, roughness: 0.58})));
-for (const e of H.eyes){
-  const r = e.r * 0.8, c = [e.c[0], e.c[1], e.c[2] - e.r * 0.3];
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 16), new THREE.MeshStandardMaterial({color: 0xb8b0a8, roughness: 0.25})); m.position.set(...c); scene.add(m);
-  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 0.48, 24, 12), new THREE.MeshStandardMaterial({color: 0x1a120d, roughness: 0.3}));
-  iris.position.set(c[0], c[1], c[2] + r * 0.62); iris.scale.z = 0.5; scene.add(iris);
+{ // G2's own eyeballs (MakeHuman's high-poly eyes, CC0) with their iris colours
+  const eg = new THREE.BufferGeometry(); eg.setAttribute("position", new THREE.Float32BufferAttribute(H.eyes.v, 3));
+  eg.setAttribute("color", new THREE.Float32BufferAttribute(H.eyes.c, 3)); eg.setIndex(H.eyes.i); eg.computeVertexNormals();
+  scene.add(new THREE.Mesh(eg, new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.15})));
 }
 setupHair(THREE, scalp); scene.add(scalp);
 const full = strandMesh(THREE, grown.lines), lod = strandMesh(THREE, grown.lines, {lod: true});

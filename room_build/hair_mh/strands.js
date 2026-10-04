@@ -4,7 +4,8 @@
 //   growStrands(THREE, hair, opt) -> {lines, stats}
 // lines: a LineSegments-ready BufferGeometry, one polyline per hair (its points contiguous, segments i -> i+1),
 //   position, normal (the scalp normal under the hair, for the lighting's wrap and self-shadow) and color = (t along
-//   the hair 0..1, a per-hair random, the self-shadow 0..1, 1). Hairs are shuffled, so the first half of the index
+//   the hair 0..1, a per-hair random shared in part by its clump, the self-shadow 0..1, the distance to the tip in cm
+//   capped at 1). Hairs are shuffled, so the first half of the index
 //   range is a uniform half-density LOD.
 // How: clump guides ~4 mm apart grow along the growth direction at a height over the scalp that rises with length
 // on top (the stack of a real cut); each guide carries ~25 hairs rooted in a disc round it that leave it at the
@@ -57,14 +58,19 @@ export function growStrands(THREE, hair, opt = {}){
     return [g.pts[i].clone().lerp(g.pts[i + 1], u), g.nrm[i].clone().lerp(g.nrm[i + 1], u).normalize(), g.offs[i] + (g.offs[i + 1] - g.offs[i]) * u]; };
   for (const g of guides){
     const n0 = g.nrm[0], t1 = new V().crossVectors(n0, new V(0.3, 1, 0.2)).normalize(), t2 = new V().crossVectors(n0, t1);
-    const count = Math.round(per * (0.7 + 0.6 * R()));
+    const front = Math.abs(Math.atan2(g.pts[0].x, g.pts[0].z - 0.052)) < 0.7 && g.pts[0].y > 0.785;   // the fringe: denser, firmer pieces
+    const count = Math.round(per * (0.7 + 0.6 * R()) * (front ? 1.6 : 1)), clumpRnd = R();
     for (let h = 0; h < count; h++){
       const a = R() * Math.PI * 2, rr = Math.sqrt(R()) * GAP * 0.8;
       const D = t1.clone().multiplyScalar(Math.cos(a) * rr).addScaledVector(t2, Math.sin(a) * rr);
-      const root = g.pts[0].clone().add(D); if (inside(root) < 0.0003) continue;
-      const front = Math.abs(Math.atan2(g.pts[0].x, g.pts[0].z - 0.052)) < 0.7 && g.pts[0].y > 0.785;   // the fringe: firmer pieces
-      const fly = g.top > 0.5 && R() < 0.02, lf = fly ? 0.9 + 0.3 * R() : 0.72 + 0.33 * R(), clump = front ? 0.7 + 0.25 * R() : 0.45 + 0.4 * R();
-      const lift = (R() - 0.3) * 0.0016 * g.top, ph = R() * 6.28, curl = (0.0002 + 0.0005 * R()) * (0.4 + g.top), rnd = R();
+      const root = g.pts[0].clone().add(D), ins = inside(root);
+      const az = Math.abs(Math.atan2(root.x, root.z - 0.052)) * 180 / Math.PI, temple = smooth(45, 60, az) * (1 - smooth(85, 100, az));
+      if (ins < 0.0003 || R() > 0.1 + 0.9 * smooth(0.0, 0.006 + 0.007 * temple, ins)) continue;   // a soft, thinning hairline (wider at the temples)
+      const fly = g.top > 0.5 && R() < 0.02, lf = fly ? 0.9 + 0.3 * R() : 0.72 + 0.33 * R();
+      const clump = front ? 0.7 + 0.25 * R() : g.top > 0.3 ? 0.6 + 0.35 * R() : 0.45 + 0.4 * R();   // separated clumps on top and back
+      const edge = rr / (GAP * 0.8), cshade = 1 - (g.top > 0.3 ? 0.5 : 0.3) * edge * edge;                    // darker between clumps
+      const lift = (R() - 0.3) * 0.0016 * g.top + R() * R() * 0.0014 * (1 - g.top), ph = R() * 6.28,   // the taper stands off a little (a soft silhouette)
+         curl = (0.0002 + 0.0005 * R()) * (0.4 + g.top), rnd = 0.6 * clumpRnd + 0.4 * R();
       const pts = [], col = [], nrm = [];
       for (let k = 0; k < g.P; k++){
         const t = k / (g.P - 1), [p, n, off] = at(g, t * lf);
@@ -74,7 +80,8 @@ export function growStrands(THREE, hair, opt = {}){
         p.add(new V(R() - 0.5, R() - 0.5, R() - 0.5).multiplyScalar(0.0003 * t));          // frizz
         if (fly) p.addScaledVector(n, 0.005 * Math.pow(t, 1.6)).addScaledVector(t1, (ph - 3) * 0.0012 * t * t);
         const shade = Math.min(1, 0.35 + 0.65 * smooth(0.0004, 0.0004 + 0.008 * g.top + 0.0012, off + lift * t)) ;
-        pts.push(p); nrm.push(n); col.push(t, rnd, Math.max(shade, g.top < 0.3 ? 0.55 : 0), 1);
+        const tip = Math.min(1, (1 - t) * g.L * lf / 0.01);                             // to the tip, in cm (1 = 1 cm or more)
+        pts.push(p); nrm.push(n); col.push(t, rnd, Math.max(shade, g.top < 0.3 ? 0.55 : 0) * cshade, tip);
       }
       hairs.push({pts, nrm, col});
     }

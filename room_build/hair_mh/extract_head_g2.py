@@ -39,12 +39,15 @@ R = json.load(open(rest))
 out = {"head": {"v": [c for g in gp for c in inv(g)], "i": tris},
        "map": {"s": s, "t": t, "note": "G2 metres = s * this frame + t"},
        "headBone": R["head"]["head"], "headBoneTail": R["tail"]["head"]}
-# the eyes (the GLB's second primitive's vertices are after the body's), for the stand-in render
-eye = G[len(used):]
-L = [p for p in eye if p[0] > 0]; Rr = [p for p in eye if p[0] <= 0]
-def eyeball(ps):
-    c = [sum(p[k] for p in ps) / len(ps) for k in range(3)]; r = max(sum((p[k] - c[k]) ** 2 for k in range(3)) ** 0.5 for p in ps)
-    return {"c": inv(c), "r": r / s}
-out["eyes"] = [eyeball(L), eyeball(Rr)] if L and Rr else []
+# the eyes: the GLB's second primitive (MakeHuman's high-poly eyeballs with their iris colours), for the stand-in render
+def read(ai):
+    a = j["accessors"][ai]; v = j["bufferViews"][a["bufferView"]]
+    comp = {5126: ("f", 4), 5125: ("I", 4), 5123: ("H", 2)}[a["componentType"]]; k = {"SCALAR": 1, "VEC3": 3, "VEC4": 4}[a["type"]]
+    st = v.get("byteStride", comp[1] * k); o = binstart + v.get("byteOffset", 0) + a.get("byteOffset", 0)
+    return [list(struct.unpack_from("<%d%s" % (k, comp[0]), b, o + i * st)) for i in range(a["count"])]
+ep = j["meshes"][0]["primitives"][1]
+EP, EC, EI = read(ep["attributes"]["POSITION"]), read(ep["attributes"]["COLOR_0"]), [i[0] for i in read(ep["indices"])]
+used_e = sorted(set(EI)); em = {v: k for k, v in enumerate(used_e)}
+out["eyes"] = {"v": [c for i in used_e for c in inv(EP[i])], "c": [round(c, 4) for i in used_e for c in EC[i]], "i": [em[i] for i in EI]}
 json.dump(out, open(dst, "w"))
 print("verts", len(ids), "scale", round(s, 5), "offset", [round(x, 4) for x in t], "max shape difference after the map (m, base frame)", round(err, 4))

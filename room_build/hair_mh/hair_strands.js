@@ -1,10 +1,11 @@
 // Runtime for the strand hair (three.js r169). hair_mh.glb carries the hairs as plain line segments (one polyline per
-// hair; NORMAL = the scalp normal under it; COLOR_0 = t along the hair, a per-hair random, the self-shadow); here
+// hair; NORMAL = the scalp normal under it; COLOR_0 = t along the hair, a per-hair random, the self-shadow, the
+// distance to the tip in cm capped at 1); here
 // they become camera-facing ribbons with a hair shader.
 //   const mesh = strandMesh(THREE, linesGeometry, {lod: false});   // lod: true draws the uniform half of the hairs
 //   mesh.material.uniforms.* : the lights (world directions and colours) and the base colour; set them from the room.
-// Ribbons: each hair point becomes two vertices pushed apart across the view in the vertex shader, ~0.08 mm wide and
-// tapering to nothing at the tip. A hair is far thinner than a pixel, so the ribbon is drawn at least ~0.7 px wide
+// Ribbons: each hair point becomes two vertices pushed apart across the view in the vertex shader, ~0.08 mm wide,
+// full width and opacity until the last ~2 mm, then tapering to the tip. A hair is far thinner than a pixel, so the ribbon is drawn at least ~0.7 px wide
 // and its alpha carries the true coverage; blended, thousands of overlapping hairs build up into soft fuzz, not
 // needles. Drawn after the head and the scalp base (renderOrder 3), without depth writes.
 // Shading: Kajiya-Kay along the strand with two lobes (a dim near-white primary shifted toward the root, a dimmer
@@ -45,10 +46,10 @@ void main(){
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec3 T = normalize(mat3(modelMatrix) * tangentDir), Vd = normalize(cameraPosition - wp.xyz);
   vec3 Sd = cross(T, Vd); float sl = length(Sd); Sd = sl > 1e-4 ? Sd / sl : vec3(1.0, 0.0, 0.0);
-  float w = width * (1.0 - 0.92 * strand.x);                    // tapers to (almost) nothing at the tip
+  float w = width * mix(0.12, 1.0, smoothstep(0.0, 0.2, strand.w));   // full width until the last 2 mm, then a taper
   float px = pxScale * length(cameraPosition - wp.xyz);          // a pixel's size at this distance
   float wd = max(w, 0.7 * px);
-  vCov = clamp(w / wd, 0.0, 1.0);                                // the true coverage
+  vCov = pow(clamp(w / wd, 0.0, 1.0), 0.8);                      // the coverage (eased a little: hairs shadow each other)
   wp.xyz += Sd * (0.5 * wd * side);
   vT = T; vN = normalize(mat3(modelMatrix) * normal); vW = wp.xyz; vS = strand;
   gl_Position = projectionMatrix * viewMatrix * wp;
@@ -71,7 +72,7 @@ void main(){
   vec3 alb = base * (0.8 + 0.45 * vS.y) * mix(vec3(1.0), vec3(1.25, 1.12, 1.0), t * t) * sh;   // tint, browner tips, self-shadow
   vec3 c = light(T, N, V, keyDir, keyCol, alb, id) + light(T, N, V, rimDir, rimCol, alb, id);
   c += alb * mix(ground, sky, N.y * 0.5 + 0.5);
-  gl_FragColor = vec4(c, vCov * (1.0 - smoothstep(0.8, 1.0, t) * 0.6));
+  gl_FragColor = vec4(c, vCov * smoothstep(0.0, 0.15, vS.w));   // opaque to the last ~1.5 mm
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

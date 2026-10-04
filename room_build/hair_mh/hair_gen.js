@@ -21,8 +21,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 // Where the hair grows: the hairline's height (m) against the azimuth round the head (degrees, 0 = the face's middle,
 // 90 = over the ear, 180 = the nape). A sideburn in front of the ear, a curve over it, the nape low at the back.
-const HAIRLINE = [[0, 0.806], [22, 0.804], [38, 0.796], [50, 0.779], [60, 0.752], [68, 0.734], [76, 0.726],
-                  [84, 0.752], [96, 0.770], [110, 0.764], [122, 0.722], [140, 0.690], [180, 0.672]];
+const HAIRLINE = [[0, 0.806], [22, 0.804], [38, 0.796], [50, 0.779], [60, 0.752], [68, 0.734], [76, 0.728],
+                  [84, 0.738], [96, 0.749], [110, 0.744], [122, 0.714], [140, 0.688], [180, 0.672]];   // down to the ear's rim
 export const CENTER = [0, 0.772, 0.052];          // the skull's middle, the rays are cast toward it
 
 function hairlineY(azDeg){
@@ -81,7 +81,7 @@ export function buildHair(THREE, head, opt = {}){
   }
 
   // The ears stay clear: no roots on them.
-  const ear = p => Math.abs(p.x) > 0.064 && p.y > 0.695 && p.y < 0.758 && p.z > -0.006 && p.z < 0.058;
+  const ear = p => Math.abs(p.x) > 0.066 && p.y > 0.695 && p.y < 0.750 && p.z > -0.004 && p.z < 0.056;
 
   // Root candidates: an even spread of directions, kept where hair grows.
   const cand = [], N = 12000, ga = Math.PI * (3 - Math.sqrt(5));
@@ -104,6 +104,7 @@ export function buildHair(THREE, head, opt = {}){
     const away = p.clone().sub(whorl); away.addScaledVector(n, -away.dot(n));
     const dw = away.length(); away.normalize();
     if (dw < 0.012) away.lerp(new V(0, -0.3, -1).addScaledVector(n, -n.z), 1 - dw / 0.012).normalize();   // round the whorl
+    away.addScaledVector(new V().crossVectors(n, away), 1.4 * (1 - smooth(0.0, 0.07, dw))).normalize();     // the whorl's spiral
     const d = away.multiplyScalar(0.25 + 0.75 * top);
     d.y -= (1 - top) * 1.2;                                                           // the taper combs down
     d.x -= 0.25 * front * smooth(0.79, 0.81, p.y);                                    // the fringe's sweep
@@ -199,7 +200,7 @@ export function buildHair(THREE, head, opt = {}){
     const ids = [head.i[f], head.i[f + 1], head.i[f + 2]], al = [], uvs = [];
     for (const i of ids){
       hv.fromBufferAttribute(pos, i);
-      al.push(ear(hv) ? 0 : smooth(-0.006, 0.008, inside(hv)) * lerp(0.78, 0.95, topness(hv, azimuth(hv))));
+      al.push(ear(hv) ? 0 : smooth(-0.004, 0.014, inside(hv)) * lerp(0.42, 0.9, topness(hv, azimuth(hv))));   // light on the taper
       uvs.push(uvOf(hv));
     }
     if (Math.max(...al) <= 0) continue;
