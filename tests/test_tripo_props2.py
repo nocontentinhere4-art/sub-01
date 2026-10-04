@@ -89,7 +89,8 @@ def test_keyboard_is_light_and_placed_by_its_home_row():
     tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
     assert 0 < tris <= 20000
     html = (ROOT / "web" / "room.html").read_text()
-    assert 'load("room/keyboard.glb")' in html and "const KB_HOME = [" in html
+    assert "load(`room/keyboard${KB_SET}.glb`)" in html and "const KB_HOME = [" in html
+    assert any(nd.get("name") == "keyboard" for nd in j["nodes"])                  # (G3's integration finds it by name)
 
 
 def test_mouse_is_light_and_by_the_keyboard():
@@ -97,9 +98,20 @@ def test_mouse_is_light_and_by_the_keyboard():
     assert len(data) <= 1024 * 1024
     n = struct.unpack_from("<I", data, 12)[0]
     j = json.loads(data[20:20 + n])
-    assert sorted(nd["name"] for nd in j["nodes"]) == ["mouse", "mousepad"]
+    assert {"mouse", "mousepad"} <= {nd["name"] for nd in j["nodes"]}
     tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
     assert 0 < tris <= 20000
     html = (ROOT / "web" / "room.html").read_text()
-    assert 'load("room/mouse.glb")' in html and "MOUSE_AT = [" in html
+    assert "load(`room/mouse${KB_SET}.glb`)" in html and "MOUSE_AT = [" in html
     assert "mouse" not in props()                                                  # (the Tripo mouse is left out)
+
+
+def test_tripo_keyboard_and_mouse_for_comparison():
+    for f, limit in (("keyboard_tripo.glb", 20000), ("mouse_tripo.glb", 5000 + 100)):        # (the mouse file carries the pad too)
+        data = (ROOT / "web" / "room" / f).read_bytes()
+        assert len(data) <= 1024 * 1024
+        n = struct.unpack_from("<I", data, 12)[0]
+        j = json.loads(data[20:20 + n])
+        tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
+        assert 0 < tris <= limit, (f, tris)
+        assert ("keyboard" if f.startswith("keyboard") else "mouse") in {nd.get("name") for nd in j["nodes"]}

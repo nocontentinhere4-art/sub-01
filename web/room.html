@@ -518,24 +518,27 @@ if (TRIPO) Promise.all([load("room/props_tripo2.glb"),
   if (props.includes("lamp2") && g.scene.userData.lampLight) lamp.position.set(...g.scene.userData.lampLight);   // in the new shade
   scene.add(g.scene);
 }).catch(e => console.warn("props_tripo2.glb", e));
-// the full-size keyboard modelled in code (room_build/build_keyboard.mjs; its origin the middle of F and J at desk level):
-// on the mat with its home row where the modelled tenkeyless one had it, turned like it (props_hard.py KB_C, KB_RY); the
-// old one (keycaps and body) is cut out of the static room. Its home-row key tops stand 3.2 cm over the mat
-// The mouse (room_build/build_mouse.mjs, likewise in code) on its pad, 4 cm right of the keyboard's right end; the modelled
-// mouse is cut out too. (The pad's underside sinks into the desk mat it overlaps, so its top lies flat over mat and desk)
-const KB_HOME = [-1.115, 0.9723, -0.967, 0.06], MOUSE_AT = [-0.736, 0.9745, -0.985, 0.06], PAD_AT = [-0.700, 0.9715, -0.980, 0.06];
-if (TRIPO) Promise.all([load("room/keyboard.glb"), load("room/mouse.glb"),
+// the full-size keyboard and the mouse on its pad, modelled in code (room_build/build_keyboard.mjs, build_mouse.mjs): nodes
+// named "keyboard" and "mouse" (G3's integration finds them by name, pins the hands to them and parents the mouse to the
+// palm), each with its contact shadow as a child. The keyboard's origin is the middle of F and J at desk level: its home row
+// goes where the modelled tenkeyless one had it, turned like it (props_hard.py KB_C, KB_RY), its home-row key tops 3.2 cm
+// over the mat. The mouse sits 4 cm right of the keyboard's right end, turned -0.15 (its front towards his right). The
+// modelled keyboard and mouse are cut out of the static room. (The pad's underside sinks into the desk mat it overlaps)
+// ?debug&kb=tripo: the Tripo-made pair instead (keyboard_tripo.glb, mouse_tripo.glb), for comparison
+const KB_HOME = [-1.115, 0.9723, -0.967, 0.06], MOUSE_AT = [-0.736, 0.9745, -0.985, -0.15], PAD_AT = [-0.700, 0.9715, -0.980, -0.15];
+const KB_SET = DEBUG && new URLSearchParams(location.search).get("kb") === "tripo" ? "_tripo" : "";
+if (TRIPO) Promise.all([load(`room/keyboard${KB_SET}.glb`), load(`room/mouse${KB_SET}.glb`),
   new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g, mg]) => {
   const st = room.getObjectByName("room_static");
   if (st) { cutBox(st, new THREE.Box3(new THREE.Vector3(-1.26, 0.9725, -1.055), new THREE.Vector3(-0.88, 1.012, -0.885)));   // the keyboard
     cutBox(st, new THREE.Box3(new THREE.Vector3(-0.80, 0.972, -1.02), new THREE.Vector3(-0.71, 1.01, -0.88))); }           // the mouse (MC)
-  for (const s of [g.scene, mg.scene]) s.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.vertexColors = true;
-    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; m.material.needsUpdate = true; } });
-  g.scene.position.set(KB_HOME[0], KB_HOME[1], KB_HOME[2]); g.scene.rotation.y = KB_HOME[3]; scene.add(g.scene);
-  const mouse = mg.scene.getObjectByName("mouse"), pad = mg.scene.getObjectByName("mousepad");
-  if (mouse) { mouse.position.set(MOUSE_AT[0], MOUSE_AT[1], MOUSE_AT[2]); mouse.rotation.y = MOUSE_AT[3]; scene.add(mouse); }
-  if (pad) { pad.position.set(PAD_AT[0], PAD_AT[1], PAD_AT[2]); pad.rotation.y = PAD_AT[3]; scene.add(pad); }
-}).catch(e => console.warn("keyboard.glb / mouse.glb", e));
+  for (const s of [g.scene, mg.scene]) s.traverse(m => { if (!m.isMesh) return;
+    if (/_contact$/.test(m.name)) { m.castShadow = m.receiveShadow = false; m.material.depthWrite = false; m.renderOrder = 1; return; }
+    m.castShadow = true; m.receiveShadow = true; m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; });
+  const put = (o, [x, y, z, ry]) => { if (!o) return; o.position.set(x, y, z); o.rotation.set(0, ry, 0); scene.add(o); };
+  put(g.scene.getObjectByName("keyboard"), KB_HOME);
+  put(mg.scene.getObjectByName("mouse"), MOUSE_AT); put(mg.scene.getObjectByName("mousepad"), PAD_AT);
+}).catch(e => console.warn("keyboard / mouse", e));
 // the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C
 // (tex_prep.py: x 683..1024 of 1024, y 0..341 of 512)
 if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"),

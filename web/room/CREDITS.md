@@ -223,10 +223,15 @@ prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces
 
     node build_tripo2.mjs <folder> ../web/room/props_tripo2.glb
 
-The keyboard (`keyboard.glb`, `room_build/build_keyboard.mjs`) is modelled in code for this project, CC0: a full-size
-104-key layout, plain keycaps with no legends, no maker's design; it takes the modelled tenkeyless one's place, its home
-row where that one's was. So is the mouse on its pad (`mouse.glb`, `room_build/build_mouse.mjs`, CC0): a generic shape,
-no logo, 4 cm right of the keyboard.
+The keyboard (`keyboard.glb`, `room_build/build_keyboard.mjs`) and the mouse on its pad (`mouse.glb`,
+`room_build/build_mouse.mjs`) are modelled in code for this project, CC0, to real sizes: a full-size 104-key layout on a
+19.05 mm pitch with plain bevelled keycaps (no legends, no maker's design) and a cable; a generic mouse, 11.8 × 6.2 × 3.6 cm,
+no logo. Their micro-texture is ambientCG's **Plastic 016 A** (https://ambientcg.com/a/Plastic016A, CC0 1.0), its roughness
+and normal maps (`room_build/desk_pbr.mjs`). The keyboard's home row is where the modelled tenkeyless one's was; the mouse
+lies 4 cm right of it. Made with Tripo (paid API) for comparison and not installed (`?debug&kb=tripo` shows them):
+`keyboard_tripo.glb` (image-to-model from a render of the code-made keyboard, task `0c5caa4a-9169-4ed7-bbfc-f90cd06883be`)
+and `mouse_tripo.glb` (likewise, task `926e444c-4a59-4b34-b318-db6d3f72f95a`), turned and scaled to the same sizes by
+`room_build/build_kbm_tripo.mjs`.
 
 The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
 page paints it over the record sleeve in the posters atlas.
