@@ -1,0 +1,10 @@
+takes/
+frames/
+camtest/
+cdn/
+data/
+*.wav
+*.mp4
+probe_*
+sheet.jpg
+bedsheet.jpg

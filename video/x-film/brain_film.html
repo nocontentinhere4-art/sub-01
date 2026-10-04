@@ -1,0 +1,116 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>brain film</title>
+<style>html,body{margin:0;background:#030305;overflow:hidden}canvas{display:block}</style>
+<script src="cdn/three.min.js"></script>
+</head><body>
+<script>
+// A deterministic render of the brain page's own look (web/index.html: the same fibre shader, the same stage colours,
+// the same rim-lit cortex), driven frame by frame with recorded activity of the live model. window.renderAt(spec).
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.setSize(W, H); renderer.setClearColor(0x030305);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, W / H, 1, 3000);
+camera.up.set(0, 0, 1);
+const KEEP = 3, OPACITY = 0.0105 * 6 / KEEP;
+const actData = new Uint8Array(256 * 4), actTex = new THREE.DataTexture(actData, 256, 1, THREE.RGBAFormat);
+let fibreMat = null, cortexMat = null;
+const tgOn = new Array(12).fill(0);
+const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
+const WEB = "../../web/";
+window.ready = Promise.all([fetch(WEB + "brain.json").then(r => r.json()), fetch(WEB + "fibres.json").then(r => r.json()),
+  fetch(WEB + "fibres.bin").then(r => r.arrayBuffer()), fetch(WEB + "fibres_ends.bin").then(r => r.arrayBuffer()),
+  fetch(WEB + "cortex.bin").then(r => r.arrayBuffer()), fetch(WEB + "cortex_idx.bin").then(r => r.arrayBuffer())])
+.then(([d, meta, fbuf, ebuf, vb, ib]) => {
+  const nodes = d.nodes;
+  const lab2node = new Int16Array(512).fill(-1); nodes.forEach((n, i) => lab2node[n.lab] = i);
+  const P = new Float32Array(fbuf), E = new Int16Array(ebuf), k = meta.pts, n = Math.floor(meta.n / KEEP), segs = n * (k - 1);
+  const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), info = new Float32Array(segs*8), nod = new Float32Array(segs*4);
+  let o = 0;
+  for (let s0 = 0; s0 < n; s0++) {
+    const s = s0 * KEEP, ia = lab2node[E[2*s]], ib = lab2node[E[2*s+1]], fid = (s * 0.61803) % 1;
+    for (let i = 0; i < k - 1; i++, o++) {
+      const a = (s*k + i) * 3, b = a + 3;
+      const dx = P[b]-P[a], dy = P[b+1]-P[a+1], dz = P[b+2]-P[a+2], L = Math.hypot(dx, dy, dz) || 1;
+      for (let j = 0; j < 3; j++) { pos[o*6+j] = P[a+j]; pos[o*6+3+j] = P[b+j]; }
+      const c = [Math.abs(dx)/L, Math.abs(dy)/L, Math.abs(dz)/L];
+      for (let j = 0; j < 3; j++) { dcol[o*6+j] = c[j]; dcol[o*6+3+j] = c[j]; }
+      for (let v = 0; v < 2; v++) { const tp = (i + v) / (k - 1); info.set([tp, -1, fid, tp], o*8 + v*4); }
+      nod[o*4] = nod[o*4+2] = ia; nod[o*4+1] = nod[o*4+3] = ib;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("dcol", new THREE.BufferAttribute(dcol, 3));
+  g.setAttribute("info", new THREE.BufferAttribute(info, 4)); g.setAttribute("nodes", new THREE.BufferAttribute(nod, 2));
+  fibreMat = new THREE.ShaderMaterial({
+    uniforms: { time:{value:0}, mixw:{value:new THREE.Vector3(1,0,0)}, opacity:{value:OPACITY}, act:{value:actTex}, burst:{value:0}, boost:{value:0} },
+    vertexShader: `
+      attribute vec3 dcol; attribute vec4 info; attribute vec2 nodes;
+      uniform float time; uniform vec3 mixw; uniform sampler2D act; uniform float burst; uniform float boost;
+      varying vec3 vCol;
+      float hash(float x){ return fract(sin(x * 91.17) * 43758.5453); }
+      float actAt(float i){ return i < 0.0 ? 1.0 : texture2D(act, vec2((i + 0.5) / 256.0, 0.5)).r * 3.0; }
+      void main(){
+        float fid = info.z, raw = info.w;
+        float drive = clamp((max(actAt(nodes.x), actAt(nodes.y)) - 1.1) / 0.9, 0.0, 1.0);
+        vec3 warm = mix(vec3(1.0, 0.46, 0.12), vec3(1.0, 0.82, 0.55), dcol.z) * 0.8 + dcol * 0.25;
+        float shimmer = 0.68 + 0.12 * pow(0.5 + 0.5 * sin(raw * 6.0 - time * 1.5 + fid * 40.0), 2.0) + 0.45 * drive;
+        vec3 cool = mix(vec3(0.12, 0.25, 0.95), vec3(0.35, 0.6, 1.0), dcol.x);
+        float sweep = 0.25 + 1.4 * pow(0.5 + 0.5 * sin(position.y * 0.045 - time * 1.1), 10.0);
+        vec3 violet = mix(vec3(0.62, 0.22, 1.0), vec3(1.0, 0.3, 0.62), dcol.y);
+        float flick = 0.35 + (1.4 + burst) * step(0.86 - 0.08 * burst, hash(fid * 977.0 + floor(time * 6.0))) + 0.3 * drive;
+        vec3 col = mixw.x * warm * shimmer + mixw.y * cool * sweep + mixw.z * violet * flick;
+        col *= 1.0 + 0.5 * boost;
+        vCol = col;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `uniform float opacity; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * opacity, 1.0); }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  scene.add(new THREE.LineSegments(g, fibreMat));
+
+  const cg = new THREE.BufferGeometry(), cp = new Float32Array(vb), ci = new Uint32Array(ib);
+  cg.setAttribute("position", new THREE.BufferAttribute(cp, 3)); cg.setIndex(new THREE.BufferAttribute(ci, 1)); cg.computeVertexNormals();
+  const nv = cp.length / 3, vReg = new Float32Array(nv).fill(-1);
+  const cort = []; nodes.forEach((nd, i) => { if (/^(LH|RH)_/.test(nd.name)) cort.push(i); });
+  for (let v = 0; v < nv; v++) {
+    const x = cp[3*v], y = cp[3*v+1], z = cp[3*v+2]; let best = -1, bd = 900;
+    for (const i of cort) { const q = nodes[i].q, dd = (x-q[0])**2 + (y-q[1])**2 + (z-q[2])**2; if (dd < bd) { bd = dd; best = i; } }
+    vReg[v] = best;
+  }
+  cg.setAttribute("aReg", new THREE.BufferAttribute(vReg, 1));
+  cortexMat = new THREE.ShaderMaterial({
+    uniforms: { tint:{value:new THREE.Color("#ff9a3c")}, strength:{value:0.5}, act:{value:actTex} },
+    vertexShader: `attribute float aReg; uniform sampler2D act; varying vec3 vN; varying vec3 vV; varying float vPatch;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+        float rel = aReg < 0.0 ? 0.0 : texture2D(act, vec2((aReg + 0.5) / 256.0, 0.5)).r * 3.0;
+        vPatch = step(0.0, aReg) * clamp((rel - 1.3) * 0.3, 0.0, 0.3) * 0.7;
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV; varying float vPatch;
+      void main(){ float rim = pow(1.0 - abs(dot(vN, vV)), 3.0);
+        gl_FragColor = vec4(tint * rim * strength + vec3(1.0, 0.78, 0.56) * vPatch * 0.6 * rim, 1.0); }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  });
+  scene.add(new THREE.Mesh(cg, cortexMat));
+  return {segs, nv};
+});
+
+const C_AWAKE = new THREE.Color("#ff9a3c"), C_NREM = new THREE.Color("#4d7cff"), C_REM = new THREE.Color("#c26bff");
+// spec: {t, mix:[a,n,r], act:[214 values 0..255 already normalised], az (rad), el (rad), dist, tx,ty,tz, burst, boost}
+window.renderAt = (s) => {
+  if (s.act) { s.act.forEach((v, i) => { actData[i*4] = v; }); actTex.needsUpdate = true; }
+  const m = s.mix;
+  fibreMat.uniforms.time.value = s.t; fibreMat.uniforms.mixw.value.set(m[0], m[1], m[2]);
+  fibreMat.uniforms.burst.value = s.burst || 0; fibreMat.uniforms.boost.value = s.boost || 0;
+  fibreMat.uniforms.opacity.value = OPACITY * (m[0] + 0.75 * m[1] + 0.9 * m[2]) * (s.gain || 1);
+  const tint = C_AWAKE.clone().multiplyScalar(m[0]).add(C_NREM.clone().multiplyScalar(m[1])).add(C_REM.clone().multiplyScalar(m[2]));
+  cortexMat.uniforms.tint.value.copy(tint);
+  const t = new THREE.Vector3(s.tx || 0, s.ty || -15, s.tz || 10);
+  camera.position.set(t.x + s.dist * Math.cos(s.el) * Math.cos(s.az), t.y + s.dist * Math.cos(s.el) * Math.sin(s.az), t.z + s.dist * Math.sin(s.el));
+  camera.lookAt(t);
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL("image/jpeg", 0.93);
+};
+</script>
+</body></html>

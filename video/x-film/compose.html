@@ -1,0 +1,73 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>compose</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --awake: #ff9a3c; --nrem: #4d7cff; --rem: #c26bff; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1350px; background: #000; overflow: hidden; }
+  #st { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: #000; }
+  img { position: absolute; display: block; }
+  #full { left: 0; top: 0; width: 1080px; height: 1350px; object-fit: cover; }
+  #full2 { left: 0; top: 0; width: 1080px; height: 1350px; object-fit: cover; opacity: 0; }
+  #top { left: 0; top: 0; width: 1080px; height: 810px; object-fit: cover; object-position: 50% 50%; }
+  #bot { left: 0; top: 810px; width: 1080px; height: 540px; object-fit: cover; }
+  #pip { width: 330px; height: 330px; border-radius: 50%; right: 36px; bottom: 150px; object-fit: cover;
+         border: 3px solid var(--awake); box-shadow: 0 0 40px rgba(0,0,0,.8); }
+  .layer { position: absolute; inset: 0; pointer-events: none; }
+  .t { position: absolute; left: 56px; right: 56px; font-family: Inter, sans-serif; color: #fff; font-weight: 900;
+       letter-spacing: -1.5px; line-height: 1.02; text-shadow: 0 3px 24px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.8); }
+  .hook { font-size: 84px; }
+  .sub { font-size: 44px; font-weight: 800; letter-spacing: -0.5px; }
+  .mono { font-family: "JetBrains Mono", monospace; }
+  #bar { position: absolute; left: 0; right: 0; top: 786px; height: 48px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .chip { font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 26px; letter-spacing: 3px; color: #0a0a0a;
+          background: var(--awake); padding: 6px 16px 5px; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,.6); }
+  .clock { font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 30px; color: #fff; background: rgba(0,0,0,.75);
+           padding: 5px 14px; border-radius: 4px; }
+  #cap { position: absolute; left: 40px; right: 40px; top: 690px; font-family: Inter, sans-serif; font-weight: 800; font-size: 40px;
+         color: #fff; text-shadow: 0 2px 16px rgba(0,0,0,1), 0 0 3px #000; letter-spacing: -0.5px; }
+  #brainlbl { position: absolute; left: 40px; top: 850px; font-family: "JetBrains Mono", monospace; font-size: 22px; color: rgba(255,255,255,.75); }
+  #label { position: absolute; left: 20px; top: 18px; font-family: "JetBrains Mono", monospace; font-size: 19px; color: rgba(255,255,255,.85);
+           background: rgba(0,0,0,.55); padding: 5px 10px; border-radius: 5px; z-index: 9; }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+  #shade { position: absolute; inset: 0; background: #000; opacity: 0; }
+  #bigclock { position: absolute; left: 0; right: 0; top: 150px; text-align: center; font-family: "JetBrains Mono", monospace;
+              font-weight: 800; font-size: 150px; color: #fff; letter-spacing: -4px; text-shadow: 0 4px 30px rgba(0,0,0,.8); }
+  .grad-top { position: absolute; left: 0; right: 0; top: 0; height: 480px; background: linear-gradient(180deg, rgba(0,0,0,.78), rgba(0,0,0,0)); }
+  .grad-bot { position: absolute; left: 0; right: 0; bottom: 0; height: 520px; background: linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,0)); }
+  .grad-cap { position: absolute; left: 0; right: 0; top: 560px; height: 250px; background: linear-gradient(0deg, rgba(0,0,0,.75), rgba(0,0,0,0)); }
+  #logo { position: absolute; left: 0; right: 0; bottom: 120px; text-align: center; }
+  #logo .n { font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 120px; color: #fff; letter-spacing: -2px; }
+  #logo .s { font-family: "JetBrains Mono", monospace; font-size: 34px; color: rgba(255,255,255,.85); margin-top: 6px; }
+  .acc { color: var(--awake); }
+</style></head>
+<body><div id="st">
+  <img id="full"><img id="full2">
+  <img id="top"><img id="bot"><img id="pip">
+  <div class="layer" id="L"></div>
+  <div id="shade"></div><div id="flash"></div>
+  <div id="label">AI · fictional character · simulated brain</div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const imgs = ['full', 'full2', 'top', 'bot', 'pip'];
+// spec: {full, full2, full2a, top, bot, pip, pipColor, flash, shade, html}
+window.frame = async (s) => {
+  const loads = [];
+  for (const k of imgs) {
+    const el = $(k);
+    if (s[k]) { el.style.display = 'block'; if (el.getAttribute('src') !== s[k]) { el.src = s[k]; loads.push(el.decode().catch(() => {})); } }
+    else el.style.display = 'none';
+  }
+  $('full2').style.opacity = s.full2a ?? 0;
+  $('full').style.transform = s.fullT || '';
+  $('pip').style.borderColor = s.pipColor || 'var(--awake)';
+  $('flash').style.opacity = s.flash || 0;
+  $('shade').style.opacity = s.shade || 0;
+  $('L').innerHTML = s.html || '';
+  await Promise.all(loads);
+  await document.fonts.ready;
+  return true;
+};
+</script>
+</body></html>

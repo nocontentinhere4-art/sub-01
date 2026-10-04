@@ -1,0 +1,399 @@
+{
+ "_": "SUB-01 X film: the room takes, rendered on a RunPod GPU by tools/gpu_preview_render.py at 1080x1350 (the 4:5 X frame). The split-screen part crops the middle 1080x810. Cameras in world metres; no cam = the page's own follow camera.",
+ "hour": 14,
+ "scene": {
+  "life": {
+   "activity": "research",
+   "place": "desk"
+  }
+ },
+ "shots": [
+  {
+   "label": "hook-desk",
+   "seconds": 3.0,
+   "hour": 14,
+   "settle": 2,
+   "scene": {
+    "life": {
+     "activity": "research",
+     "place": "desk",
+     "doing": "reading at the computer",
+     "reading": {
+      "title": "Inokashira Park",
+      "url": "https://en.wikipedia.org/wiki/Inokashira_Park",
+      "host": "en.wikipedia.org",
+      "kind": "wiki",
+      "why": "",
+      "extract": "Inokashira Park straddles Musashino and Mitaka in western Tokyo. The park's pond feeds the Kanda River; rowing boats, a small zoo and the Ghibli Museum sit at its edges, and in spring the cherry trees around the water draw crowds from Kichijoji station a few minutes' walk away."
+     }
+    }
+   },
+   "cam": {
+    "pos": [
+     1.9,
+     2.3,
+     1.9
+    ],
+    "to": [
+     0.9,
+     1.75,
+     0.8
+    ],
+    "target": [
+     -1.1,
+     1.0,
+     -0.9
+    ]
+   }
+  },
+  {
+   "label": "wake",
+   "seconds": 2.6,
+   "hour": 7,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed",
+     "doing": "sleeping"
+    }
+   },
+   "cam": {
+    "pos": [
+     -0.5,
+     2.45,
+     0.95
+    ],
+    "to": [
+     -0.6,
+     2.3,
+     0.9
+    ],
+    "target": [
+     -1.55,
+     1.0,
+     0.88
+    ]
+   }
+  },
+  {
+   "label": "desk",
+   "seconds": 3.0,
+   "hour": 13,
+   "settle": 2,
+   "scene": {
+    "life": {
+     "activity": "research",
+     "place": "desk",
+     "doing": "reading at the computer",
+     "reading": {
+      "title": "Inokashira Park",
+      "url": "https://en.wikipedia.org/wiki/Inokashira_Park",
+      "host": "en.wikipedia.org",
+      "kind": "wiki",
+      "why": "",
+      "extract": "Inokashira Park straddles Musashino and Mitaka in western Tokyo. The park's pond feeds the Kanda River; rowing boats, a small zoo and the Ghibli Museum sit at its edges, and in spring the cherry trees around the water draw crowds from Kichijoji station a few minutes' walk away."
+     }
+    }
+   }
+  },
+  {
+   "label": "eat",
+   "seconds": 2.6,
+   "hour": 19,
+   "settle": 4,
+   "scene": {
+    "life": {
+     "activity": "eat",
+     "place": "table",
+     "eating": "ramen",
+     "food": 1,
+     "doing": "eating ramen"
+    }
+   }
+  },
+  {
+   "label": "window",
+   "seconds": 2.6,
+   "hour": 18,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "window",
+     "place": "window",
+     "doing": "looking out of the window"
+    }
+   }
+  },
+  {
+   "label": "phone-night",
+   "seconds": 2.4,
+   "hour": 23,
+   "settle": 8,
+   "scene": {
+    "life": {
+     "activity": "phone",
+     "place": "bed",
+     "phone": "shorts",
+     "doing": "in bed scrolling the phone"
+    }
+   },
+   "closeup": "grip"
+  },
+  {
+   "label": "sleep",
+   "seconds": 4.0,
+   "hour": 0,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed",
+     "doing": "sleeping"
+    }
+   },
+   "cam": {
+    "pos": [
+     -0.75,
+     1.65,
+     1.3
+    ],
+    "to": [
+     -0.85,
+     1.55,
+     1.35
+    ],
+    "target": [
+     -1.54,
+     1.08,
+     0.88
+    ]
+   }
+  },
+  {
+   "label": "tl-06",
+   "seconds": 0.8,
+   "hour": 6,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-09",
+   "seconds": 0.8,
+   "hour": 9,
+   "settle": 3,
+   "scene": {
+    "life": {
+     "activity": "window",
+     "place": "window"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-12",
+   "seconds": 0.8,
+   "hour": 12,
+   "settle": 2,
+   "scene": {
+    "life": {
+     "activity": "research",
+     "place": "desk"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-15",
+   "seconds": 0.8,
+   "hour": 15,
+   "settle": 2,
+   "scene": {
+    "life": {
+     "activity": "research",
+     "place": "desk"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-18",
+   "seconds": 0.8,
+   "hour": 17,
+   "settle": 4,
+   "scene": {
+    "life": {
+     "activity": "eat",
+     "place": "table",
+     "eating": "ramen",
+     "food": 1
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-20",
+   "seconds": 0.8,
+   "hour": 20,
+   "settle": 4,
+   "scene": {
+    "life": {
+     "activity": "window",
+     "place": "window"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-22",
+   "seconds": 0.8,
+   "hour": 22,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "phone",
+     "place": "bed",
+     "phone": "shorts"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "tl-01",
+   "seconds": 1.6,
+   "hour": 1,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed"
+    }
+   },
+   "cam": {
+    "pos": [
+     4.2,
+     3.6,
+     4.4
+    ],
+    "target": [
+     0.4,
+     0.9,
+     0.2
+    ]
+   }
+  },
+  {
+   "label": "end-sleep",
+   "seconds": 5.0,
+   "hour": 2,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed"
+    }
+   },
+   "cam": {
+    "pos": [
+     0.4,
+     2.5,
+     1.6
+    ],
+    "to": [
+     -0.6,
+     2.3,
+     0.9
+    ],
+    "target": [
+     -1.5,
+     0.98,
+     0.88
+    ]
+   }
+  }
+ ],
+ "_hours": "every shot's hour differs from the one before it, so the page reloads and he is placed fresh (no walk between places)"
+}

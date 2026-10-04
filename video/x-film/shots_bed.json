@@ -1,0 +1,102 @@
+{
+ "_": "SUB-01 X film: the room takes, rendered on a RunPod GPU by tools/gpu_preview_render.py at 1080x1350 (the 4:5 X frame). The split-screen part crops the middle 1080x810. Cameras in world metres; no cam = the page's own follow camera.",
+ "hour": 7,
+ "scene": {
+  "life": {
+   "activity": "research",
+   "place": "desk"
+  }
+ },
+ "shots": [
+  {
+   "label": "wake",
+   "seconds": 2.6,
+   "hour": 7,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed",
+     "doing": "sleeping"
+    }
+   },
+   "cam": {
+    "pos": [
+     -0.5,
+     2.45,
+     0.95
+    ],
+    "to": [
+     -0.6,
+     2.3,
+     0.9
+    ],
+    "target": [
+     -1.55,
+     1.0,
+     0.88
+    ]
+   }
+  },
+  {
+   "label": "sleep",
+   "seconds": 4.0,
+   "hour": 0,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed",
+     "doing": "sleeping"
+    }
+   },
+   "cam": {
+    "pos": [
+     -0.75,
+     1.65,
+     1.3
+    ],
+    "to": [
+     -0.85,
+     1.55,
+     1.35
+    ],
+    "target": [
+     -1.54,
+     1.08,
+     0.88
+    ]
+   }
+  },
+  {
+   "label": "end-sleep",
+   "seconds": 5.0,
+   "hour": 2,
+   "settle": 6,
+   "scene": {
+    "life": {
+     "activity": "sleep",
+     "place": "bed"
+    }
+   },
+   "cam": {
+    "pos": [
+     0.4,
+     2.5,
+     1.6
+    ],
+    "to": [
+     -0.6,
+     2.3,
+     0.9
+    ],
+    "target": [
+     -1.5,
+     0.98,
+     0.88
+    ]
+   }
+  }
+ ],
+ "_hours": "every shot's hour differs from the one before it, so the page reloads and he is placed fresh (no walk between places)"
+}
