@@ -136,7 +136,15 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   screenshot (`EMBED_ERROR`: "video unavailable", "blocked it from display", …, or no video element): such a video is
   left before it is ever shown, the next queued video plays instead, the id is refused for the day
   (`Quota.refused`), and a channel with `BAD_CHANNEL` (2) refusals in a day is set aside (`channels_set_aside` in
-  /api/screens). Formula1 is out of `CHANNELS` (its videos are blocked from embedding on other sites). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+  /api/screens). Formula1 is out of `CHANNELS` (its videos are blocked from embedding on other sites).
+- No YouTube pages, ever (live bug 2026-10-04 10:58: a link chain loaded youtube.com/watch with ads, "Skip" and
+  "Something went wrong"; YouTube's Terms forbid automated access to its pages). `Browser._open` turns any
+  youtube.com/watch, /shorts, /live, youtu.be link (`youtube_api.page_video`) into "play this video":
+  `_play_video_id` checks it with videos.list (1 unit, `playable()`) and opens the youtube-nocookie embed; without a
+  key it is not played. Any other youtube.com page is refused, and `Guard.route` aborts a top-level navigation to one
+  (a redirect or a click on "Watch on YouTube"). An ad or YouTube's error in the embed (`EMBED_ERROR`, including
+  "advertisement playing" and "something went wrong") moves on to the next video; we never press "Skip". An ad does
+  not count against the channel. About half of desk time is YouTube, in 20-minute slots (`desk_video`).
 - Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
   players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
   robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,

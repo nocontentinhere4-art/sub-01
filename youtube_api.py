@@ -16,6 +16,7 @@ Results go through the browser's guard (safe_results, video_text_ok) like every 
 """
 import html
 import json
+import re
 import os
 import time
 import urllib.parse
@@ -124,6 +125,37 @@ def playable(item, region=REGION):
     if region in (rr.get("blocked") or []) or ("allowed" in rr and region not in (rr.get("allowed") or [])):
         return False
     return True
+
+
+YT_PAGE = re.compile(r"^https?://(?:(?:www|m|music)\.)?(?:youtube\.com|youtu\.be)(?:/|$)", re.I)
+YT_VIDEO = re.compile(r"^https?://(?:(?:www|m)\.)?(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|"
+                      r"youtu\.be/)([\w-]{11})", re.I)
+
+
+def page_video(url):
+    """#89 live: a youtube.com / youtu.be page URL -> (video id or None, is a YouTube page). The browser never opens
+    YouTube's own pages (its Terms forbid automated access); a video link is played in the official embed instead."""
+    u = str(url or "")
+    if not YT_PAGE.match(u):
+        return None, False
+    m = YT_VIDEO.match(u)
+    return (m.group(1) if m else None), True
+
+
+def parse_videos(text):
+    """videos.list -> {id: {sec, title, channel}} for the videos the embed will play (playable())."""
+    try:
+        d = json.loads(text or "")
+    except ValueError:
+        return {}
+    out = {}
+    for it in (d.get("items") or []) if isinstance(d, dict) else []:
+        sec = iso_seconds(((it or {}).get("contentDetails") or {}).get("duration"))
+        if playable(it) and isinstance(it.get("id"), str) and sec:
+            sn = it.get("snippet") or {}
+            out[it["id"]] = {"sec": sec, "title": html.unescape(str(sn.get("title") or ""))[:140],
+                             "channel": html.unescape(str(sn.get("channelTitle") or ""))[:60]}
+    return out
 
 
 def parse_durations(text):

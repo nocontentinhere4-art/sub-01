@@ -427,11 +427,14 @@ UNBLOCK_JS = """() => {
 # player's own error text, checked a few seconds after it opens and during the watch: such a video is never shown.
 EMBED_ERROR = re.compile(r"video unavailable|this video is unavailable|video currently unavailable|blocked it from "
                          r"display|playback on other websites has been disabled|sign in to confirm|"
-                         r"an error occurred|this video is private|video has been removed", re.I)
+                         r"an error occurred|this video is private|video has been removed|something went wrong|"
+                         r"advertisement playing", re.I)      # an ad is never skipped by us: the next video instead
 EMBED_CHECK_MS = 3000
 EMBED_ERROR_JS = """() => { const e = document.querySelector('.ytp-error, .ytp-error-content-wrap');
+  const ad = document.querySelector('.ad-showing, .ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text, .ytp-ad-skip-button');
   const t = (document.body && document.body.innerText || '').slice(0, 2000);
-  return (e && getComputedStyle(e).display !== 'none' ? (e.innerText || 'player error') + ' ' : '') + t; }"""
+  return (ad ? 'advertisement playing ' : '') +
+         (e && getComputedStyle(e).display !== 'none' ? (e.innerText || 'player error') + ' ' : '') + t; }"""
 EMBED_REFERER = os.environ.get("SUB01_SITE_URL") or "https://sub01-production.up.railway.app/"   # embeds want a page
 # #89 teen re-seed: front pages of sites people his age read, per interest topic (docs/research/teen_online.md);
 # every front page was allowed by its robots.txt on 2026-10-04, and robots.txt is checked again before each page.
@@ -543,6 +546,8 @@ class Guard:
             return await route.abort()
         if req.method not in ("GET", "HEAD") and req.is_navigation_request():
             return await route.abort()                      # never submits anything
+        if req.is_navigation_request() and req.frame.parent_frame is None and YT.page_video(url)[1]:
+            return await route.abort()                      # #89 live: never YouTube's own pages (a redirect, a click)
         await route.continue_()
 
 
@@ -1395,7 +1400,7 @@ class Browser:
         why_not = await self._embed_error(sc, state)
         if why_not:                                             # never left on screen: the next video instead
             print(f"browse: embed refused {card['url']} ({why_not[:60]})", flush=True)
-            self.yt.refused(card["url"], card.get("author"))
+            self.yt.refused(card["url"], None if "advertisement" in why_not else card.get("author"))
             self.last_skip = "embed refused"
             await self._leave(sc)
             return False
@@ -1403,6 +1408,33 @@ class Browser:
             return False
         await self._start_watch(sc)
         return True
+
+    async def _play_video_id(self, sc, vid, why, title=None, short=False):
+        """A link to a YouTube video, played as "play this video": checked with videos.list (1 unit: embeddable,
+        public, not age-restricted, plays in JP), then opened in the official youtube-nocookie embed. Without a key
+        it cannot be checked, so it is not played."""
+        url = YT.video_url(vid, short)
+        if not YT.key():
+            self.last_skip = "a YouTube video link (no API key to check it)"
+            return False
+        if self.yt.is_bad(url) or not self.fresh(url):
+            self.last_skip = "video refused or seen"
+            return False
+        text = await self._yt_api(sc, YT.videos_url([vid]))
+        info = (YT.parse_videos(text) if text else {}).get(vid)
+        if not info:
+            self.yt.refused(url)
+            self.last_skip = "video not playable in the embed"
+            return False
+        short = short or info["sec"] <= YT.SHORT_MAX_S
+        card = {"url": YT.video_url(vid, short), "title": info["title"] or title or "a video", "author": info["channel"],
+                "hashtags": [], "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
+                "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
+                "how": "YouTube's official embed player"}
+        if not self._card_ok(card):
+            self.last_skip = "guard"
+            return False
+        return await self._open_embed(sc, card, why)
 
     async def _embed_error(self, sc, state=None, wait=True):
         """The player's own error, a few seconds after it opened: its error text, or no video element at all."""
@@ -1753,6 +1785,12 @@ class Browser:
         A page (not a results page) opened in the last 7 days is not opened again (#89) unless `revisit` (a seed
         site's front page, a YouTube results page, going back)."""
         if not url_ok(url) or VO.private_url(url):
+            return False
+        vid, yt_page = YT.page_video(url)
+        if yt_page:                                             # #89 live: YouTube's own pages are never opened
+            if vid:
+                return await self._play_video_id(sc, vid, why, title, short="/shorts/" in url)
+            self.last_skip = "a YouTube page (never opened; only its embed player)"
             return False
         if not revisit and kind != "search" and not self.fresh(url):
             self.last_skip = "opened in the last 7 days"

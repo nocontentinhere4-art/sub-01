@@ -559,7 +559,7 @@ def test_open_refuses_private_and_action_urls_without_loading_them():
                 "https://studio.youtube.com/", "https://www.youtube.com/playlist?list=WL"]:
         assert asyncio.run(b._open(sc, url, "x", "page")) is False
     assert asyncio.run(b._open(sc, "https://www.youtube.com/@x?sub_confirmation=1", "x", "page")) is False
-    assert b.last_skip == "action"
+    assert b.last_skip.startswith("a YouTube page")            # #89 live: YouTube's pages are never opened at all
 
 
 async def _browser_screen(b, device="desk"):
