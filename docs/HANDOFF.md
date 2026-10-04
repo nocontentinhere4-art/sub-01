@@ -51,6 +51,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   backpack, jeans, T-shirt) are `room_build/props_soft.py` (two cloth simulations; fixed-camera renders by
   `room_build/shots_soft.py`, before/after in `docs/design/room-soft/`). Thin parts set `ao_small` so the AO bake gives them
   the white corner (thin UV islands get no texel and render black otherwise); thin sheets carry no rim faces for the same reason.
+  The duvet is an explicit closed slab (lower face from a flat cloth sim, upper face 3 cm above, a rolled fold at the head end):
+  `room.html`'s sleep lift (#108) reads vertex heights, so on the mattress its lower face lies at 0.835 m and its upper at 0.865 m
+  (REF), the flap at 0.885-0.92 m, the hanging sides below 0.83 m; keep those bands when changing it.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
