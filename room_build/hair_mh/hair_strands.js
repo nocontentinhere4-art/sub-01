@@ -85,7 +85,7 @@ export function strandMaterial(THREE){
     // hair hardly cares about the draw order
     uniforms: {
       width: {value: 0.00008}, pxScale: {value: 0.001},
-      base: {value: new THREE.Color(0x1b1512)},                  // sRGB in, linear in the shader
+      base: {value: new THREE.Color(0x14100e)},                  // near-black #14100e; sRGB in, linear in the shader
       keyDir: {value: new THREE.Vector3(0.4, 0.75, 0.55).normalize()}, keyCol: {value: new THREE.Color(1.7, 1.7, 1.7)},
       rimDir: {value: new THREE.Vector3(-0.5, 0.45, -0.7).normalize()}, rimCol: {value: new THREE.Color(0.5, 0.5, 0.5)},
       sky: {value: new THREE.Color(0.55, 0.55, 0.55)}, ground: {value: new THREE.Color(0.25, 0.23, 0.22)},

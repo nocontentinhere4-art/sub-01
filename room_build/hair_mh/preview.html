@@ -23,7 +23,7 @@ const tex = (cv, name) => { const t = new THREE.CanvasTexture(cv); t.flipY = fal
 
 const t0 = performance.now();
 const hair = buildHair(THREE, H.head, {layers: []});            // the head's helpers and the painted scalp base, no cards
-const grown = growStrands(THREE, hair, {count: 50000});
+const grown = growStrands(THREE, hair, {count: 45000});
 const msGrow = Math.round(performance.now() - t0);
 const scalpCanvas = paintScalp(hair.scalpStrokes);
 const scalp = new THREE.Mesh(hair.scalp, scalpMaterial(THREE, tex(scalpCanvas, "hair_scalp"))); scalp.name = "hair_scalp"; scalp.renderOrder = 1;
@@ -90,24 +90,27 @@ function timeDraw(cam, useLod, w, h){
 // ---- the comparison sheet: each close-up next to a real photo of short black hair at about the same angle
 // (ref/*.jpg, cropped to the hair above the brows; sources and licences in README.md), then the room distance.
 const loadImg = src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
-const REFS = {front: [320, 400, 560, 500], q34: [290, 20, 590, 270], side: [440, 190, 460, 270], back: [400, 60, 380, 400]};   // x, y, w, h
+const REFS = {front: [360, 640, 520, 300], q34: [470, 0, 680, 270], back: [330, 100, 540, 620]};   // x, y, w, h (side: no reference yet)
 const refs = {}; for (const k in REFS) refs[k] = await loadImg(`./ref/${k}.jpg`);
-const S = 480, sheet = document.createElement("canvas"); sheet.width = S * 4; sheet.height = S * 3;
+const ONLY = new URLSearchParams(location.search).get("views");   // e.g. ?views=front,q34 for a crude first look
+const S = 480, sheet = document.createElement("canvas"); sheet.width = S * 4; sheet.height = ONLY ? S : S * 3;
 const g = sheet.getContext("2d"); g.fillStyle = "#8c8c8c"; g.fillRect(0, 0, sheet.width, sheet.height);
 function photo(k, x, y){
   const im = refs[k]; if (!im) return;
   const [sx, sy, sw, sh] = REFS[k], f = Math.min(S / sw, S / sh), w = sw * f, h = sh * f;
   g.drawImage(im, sx, sy, sw, sh, x + (S - w) / 2, y + (S - h) / 2, w, h);
 }
-const views = [["front", 0, 6], ["q34", 38, 8], ["side", 90, 6], ["back", 180, 8]];
+const views = [["front", 0, 6], ["q34", 38, 8], ["side", 90, 6], ["back", 180, 8]].filter(v => !ONLY || ONLY.split(",").includes(v[0]));
 let closeCam = null;
 views.forEach(([k, az, el], i) => {
   const x = (i % 2) * 2 * S, y = Math.floor(i / 2) * S, r = shot(az, el, 0.5, 30, S, S, false);
   g.drawImage(r.c, x, y); photo(k, x + S, y); if (i === 1) closeCam = r.cam;
 });
 const far = shot(18, 4, 2.2, 30, 1280, 800, true);             // room.html's lens at 2.2 m, the LOD
-g.drawImage(far.c, 640 - 200, 400 - 200, 400, 400, 40, 2 * S + 40, 400, 400);    // the head at 1:1 pixels
-g.drawImage(far.c, 0, 0, 1280, 800, S + 120, 2 * S + 15, 720, 450);              // the whole frame
+if (!ONLY){
+  g.drawImage(far.c, 640 - 200, 400 - 200, 400, 400, 40, 2 * S + 40, 400, 400);    // the head at 1:1 pixels
+  g.drawImage(far.c, 0, 0, 1280, 800, S + 120, 2 * S + 15, 720, 450);              // the whole frame
+}
 
 const stats = {...grown.stats, ribbonVerts: full.geometry.attributes.position.count, ribbonTris: full.geometry.index.count / 3,
   lodTris: lod.geometry.drawRange.count / 3, msGrow,

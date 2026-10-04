@@ -1,50 +1,44 @@
-# Short black hair as real strands, for G2's body (preview)
+# Medium curtain cut as real strands, for G2's body (preview)
 
-About 50,000 individual hairs grown on the scalp of G2's head (`room_build/mh/glb/boy_g2.glb` on `preview/mh-motion`),
-the way game grooms do short hair. The cut is a short textured fringe:
+About 45,000 individual hairs grown on the scalp of G2's head (`room_build/mh/glb/boy_g2.glb` on `preview/mh-motion`),
+the way game grooms do it. The owner changed the style to a medium-length, soft, layered curtain cut on a ~20-year-old:
 
-- about 5 cm on top, standing a little and lying forward;
-- the fringe falls forward in clumped pieces to about 1 cm above the brows, opaque and dark to the last ~2 mm;
-- the sides and nape taper to 0.6-1.9 cm, down to the ear's rim, with a soft, thinning hairline and a short
-  sideburn;
-- the hair spirals out from the crown whorl in separated clumps;
-- nothing over the ears.
+- the top is 9-12 cm from a part near the centre (a little to his left), lifted at the roots by the part, with volume
+  at the crown;
+- the two halves of the fringe fall to the brows and outer eye corners and sweep out toward the temples, with a few
+  loose strands across the forehead;
+- the sides are 5-6 cm over the upper half of the ears and behind them;
+- the nape is 8-10 cm to the collar, with soft flicked-out ends;
+- loose waves, piece-y clumps of ~30 hairs that twist and split, and near-black colour (#14100e) with faint brown in
+  the light.
 
-No hair cards: earlier passes used cards (e4339a6 to 9b64f5f) and a re-cut MakeHuman proxy (01fa2b8); the
-owner rejected both.
+The short textured cut before it (e4339a6 to 96d389d) was dropped.
 
-## The comparison sheet (`hair_sheet.png`, preview branch only)
+## The sheet (`hair_sheet.png`, preview branch only)
 
-The sheet has three rows.
-
-- **Top row:** front render, then its real photo; 3/4 render, then its real photo.
-- **Middle row:** side render, then its real photo; back render, then its real photo.
-- **Bottom row:** the head 2.2 m away through room.html's 30-degree lens with the half-density LOD, at 1:1 pixels
-  and as the whole frame.
-
-Each photo is cropped to the hair above the brows, with no identifiable face. The renders use a locked camera,
-neutral light and G2's head in plain skin with G2's own eyes, and there is no text on the sheet.
+This round is a crude first look: front and 3/4 only, each next to a real photo of the cut cropped to the hair above
+the eyes (no face). Locked camera, neutral light, G2's head in plain skin with G2's own eyes, and no text on the sheet.
+`VIEWS=front,q34` gives this crude sheet; without it, `render.mjs` gives the full sheet (front, 3/4, side, back, and
+the room distance with the LOD).
 
 | view | trait compared with the photo |
 |---|---|
-| front | the hairline and the density of black hair over the forehead (ours: a fringe in pieces; theirs: a crop) |
-| 3/4 | the short side taper under the longer top, soft fuzzy edges, a matte black mass |
-| side | the side taper tight to the head, the ear clear, the top above the weight line |
-| back | the strands running down the back of the head into a short tapered nape |
+| front | the part near the centre, the two fringe halves sweeping out to the temples, volume at the top |
+| 3/4 | the curtain falling past the brow toward the temple, the length over the ear, the layered top |
+| back (full sheet) | the length down the back of the head to the collar, the soft ends |
 
 ### Reference photos
 
 All are under the Unsplash License (free to use, no permission needed); none is committed. The renderer reads them
-from `ref/` in its source folder.
+from `ref/` in its source folder. Each is cropped to the hair above the eyes (`REFS` in `preview.html`).
 
 | sheet file | photo page | photographer | image |
 |---|---|---|---|
-| `ref/front.jpg` | https://unsplash.com/photos/a-man-in-a-white-shirt-looking-at-the-camera-ntLkvt6OZvQ | Anky Lau | images.unsplash.com/photo-1681097561932-36d0df02b379 |
-| `ref/q34.jpg` | https://unsplash.com/photos/a-man-looking-at-something-Z9LaTWt2Xac | nguyen quan | images.unsplash.com/photo-1655495684052-e310039397fc |
-| `ref/side.jpg` | https://unsplash.com/photos/man-in-black-coat-standing-near-trees-C_JB2G5mSYQ | Jeff Tumale | images.unsplash.com/photo-1577965283636-1fab49aea713 |
-| `ref/back.jpg` | https://unsplash.com/photos/back-view-of-a-young-mans-shoulders-and-head-ENMjfGTcLHM | DIEGO SÁNCHEZ | images.unsplash.com/photo-1762106383160-24b6ef8f762d |
+| `ref/front.jpg` | https://unsplash.com/photos/man-in-black-crew-neck-shirt-near-brown-wall-khV4fTy6-D8 | Oliver Ragfelt | images.unsplash.com/photo-1513956589380-bad6acb9b9d4 |
+| `ref/q34.jpg` | https://unsplash.com/photos/a-close-up-of-a-person-wearing-a-blue-shirt-3wReHaYiL9k | Stuart Isaac Harrier | images.unsplash.com/photo-1688679446493-d22bad16b8ae |
+| `ref/back.jpg` | https://unsplash.com/photos/the-back-of-a-mans-head-in-a-blue-shirt-9mDU8BxZVkA | George Huffman | images.unsplash.com/photo-1731951039647-94f50eea1fd5 |
 
-Download each with `?w=1200&q=85&fm=jpg`. The crop boxes are `REFS` in `preview.html`.
+Download each with `?w=1200&q=85&fm=jpg`.
 
 ## How the hair is made
 
@@ -53,18 +47,18 @@ Download each with `?w=1200&q=85&fm=jpg`. The crop boxes are `REFS` in `preview.
   to 2.2 cm from the macro targets), where `hair_gen.js`'s hairline, ear and whorl settings live. Hairs are raycast
   onto the real G2 surface, then mapped back.
 - **Growth** (`strands.js`):
-  - About 2,150 clump guides, about 4 mm apart, follow the growth direction out from the crown whorl: forward over
-    the top into the fringe, down the taper.
-  - Near the whorl the direction gets a spiral component.
-  - Each guide is re-projected onto the scalp at a height that rises and then lies over (6-16 mm on top).
-  - Each guide carries about 25 hairs rooted in a disc round it. They leave it at the root and are pulled back
-    toward it along their length, giving soft clumps that stay mostly separate.
-  - The clumps are firmer on top, at the back and in the fringe, which also gets 1.6 times the density. Hairs at a
-    clump's edge are darker, and clumps share part of their tint, so the texture reads.
-  - Near the hairline the hairs thin out over about 6 mm, and over about 13 mm at the temples. The taper's hairs
-    stand off the scalp a little.
-  - Each hair has its own length (choppy ends), a slight curl and frizz, and 4-7 points.
-  - About 2 % of the hairs on top are flyaways.
+  - About 1,650 clump guides, about 5 mm apart, are grown along a combing field: away from the part, forward over the
+    forehead at the front and then out toward the temples, down over the sides and behind the ears, down the back.
+  - While the head is under the hair, a guide sits on it at a height that grows with the distance travelled, so
+    longer hair lies over shorter, with lifted roots by the part and volume at the crown. Once it leaves the skull,
+    it hangs under gravity.
+  - A slow wave (4-9 mm, 3.5-6 cm long) rides along each guide.
+  - Each guide carries about 30 hairs rooted round it. They twist round it along their length, and most are pulled
+    back into it toward the tips; about 18 % split away as loose pieces.
+  - The ends at the sides and nape flick out. Each hair gets a little frizz, and a few loose strands cross the
+    forehead.
+  - Near the hairline the hairs thin out over about 7 mm.
+  - Each hair has 5-14 points.
   - Hairs are shuffled, so the first half is a uniform half-density LOD.
 - **Rendering** (`hair_strands.js`):
   - Each hair point becomes two vertices pushed apart across the view: about 0.08 mm wide, full width and opacity
@@ -77,7 +71,7 @@ Download each with `?w=1200&q=85&fm=jpg`. The crop boxes are `REFS` in `preview.
 - **Shading:**
   - Kajiya-Kay along the strand with two lobes: a dim near-white primary toward the root and a dimmer warm secondary
     toward the tip. It is dry and matte.
-  - The base is a natural black-brown (#1b1512), with a per-hair tint and slightly browner tips.
+  - The base is near-black (#14100e), with a per-hair tint and slightly browner tips.
   - A wrap term over the scalp normal, plus self-shadow (darker deep in the hair and toward the roots).
   - Under the hairs is a painted scalp base: a dark layer with strokes along the growth direction, feathered at the
     hairline.
@@ -89,14 +83,13 @@ faster.
 
 | | |
 |---|---|
-| hairs | 51,318 (2,249 clumps) |
-| strand points | 290,484 (239,166 segments) |
-| ribbon vertices / triangles | 581k / 478k (the LOD: 239k triangles) |
-| grow time | ~0.9 s (offline; the GLB carries the result) |
-| ribbons built from the GLB at load | 256 ms |
-| strand draw, close-up 480×480, full | ~1.2 s |
-| strand draw, 1280×800 at 2.2 m, full | ~0.65 s |
-| strand draw, 1280×800 at 2.2 m, LOD | ~0.33-0.38 s |
+| hairs | 43,550 (1,653 clumps) |
+| strand points | 480,205 (436,655 segments) |
+| ribbon vertices / triangles | 960k / 873k (the LOD: 437k triangles) |
+| grow time | ~1-2.5 s (offline; the GLB carries the result) |
+| strand draw, close-up 480×480, full | ~2.7 s |
+| strand draw, 1280×800 at 2.2 m, full | ~1.6 s |
+| strand draw, 1280×800 at 2.2 m, LOD | ~0.7 s |
 | `hair_mh.glb` | 4.2 MB (quantized and meshopt-compressed) |
 
 ## Using it in three.js (r169)
@@ -127,13 +120,14 @@ Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.05
 | `extract_head_g2.py`, `extract_head.py`, `hair_gen.js`, `strands.js`, `hair_strands.js`, `hair_tex.js`, `hair_material.js`, `preview.html`, `render.mjs`, `compress.mjs` | the sources | made here, CC0 1.0 |
 | G2's body | the head the hair grows on | built from MakeHuman base.obj and targets (CC0 1.0, `LICENSE.ASSETS.md` in github.com/makehumancommunity/makehuman) |
 
-## Known gaps against the photos
+## Known gaps against the photos (crude round)
 
-- In the front view a thin dark edge still runs down each temple: the side hairs are seen edge-on there. It is
-  softer than before, but not gone.
-- The crown spiral is faint compared with the back photo's whorl.
-- The strand draw is heavy on software GL. On the room's GPU it should be fine, but it is not measured there yet
-  (a phone check is planned). The LOD halves it.
+- The real cut sweeps out from the part in smooth S-curves; ours hangs straighter and looks shaggier.
+- The middle of the forehead is open (the part), but the fringe halves don't yet reach the brows evenly.
+- A few long strays arc above the top.
+- There is no side reference photo yet.
+- The draw is about twice the short cut's (873k triangles at full density; the LOD halves it). On software GL it is
+  heavy; it has not been measured on a GPU or a phone.
 
 ## Rebuild
 
@@ -143,5 +137,5 @@ Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.05
     python3 extract_head_g2.py makehuman/makehuman/data/3dobjs/base.obj boy_g2.glb boy_g2_rest.json src/head_g2.json
     mkdir -p src/ref    # + the four photos above, named as in the table
     # in a folder with three@0.169.0, playwright-core, @gltf-transform/{core,extensions,functions}@4 and meshoptimizer:
-    node room_build/hair_mh/render.mjs src/head_g2.json src node_modules/three out/
+    node room_build/hair_mh/render.mjs src/head_g2.json src node_modules/three out/        # VIEWS=front,q34 for the crude sheet
     node room_build/hair_mh/compress.mjs out/hair_mh_raw.glb out/hair_mh.glb

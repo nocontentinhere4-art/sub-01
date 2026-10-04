@@ -24,7 +24,7 @@ const browser = await chromium.launch({executablePath: exe, args: ["--use-angle=
 const page = await browser.newPage();
 page.on("console", m => console.log("[page]", m.text()));
 page.on("pageerror", e => { console.log("[error]", e.message); process.exit(1); });
-await page.goto(`http://127.0.0.1:${port}/preview.html`, {waitUntil: "commit"});
+await page.goto(`http://127.0.0.1:${port}/preview.html${process.env.VIEWS ? "?views=" + process.env.VIEWS : ""}`, {waitUntil: "commit"});   // VIEWS=front,q34: a crude look
 await page.waitForFunction(() => window.OUT, null, {timeout: 600000, polling: 1000});
 const out = await page.evaluate(() => window.OUT);
 fs.mkdirSync(outDir, {recursive: true});
