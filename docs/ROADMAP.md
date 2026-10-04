@@ -337,6 +337,15 @@ only, its mocap is CC BY-NC 4.0.
   - 10 restarts for "over 1200 MB" between 04:02 and 04:54, some 7–21 s apart. Loop lag p95 3.6 s.
   - Assigned to the #89 worker as a technical PR: host cooldown, no re-open after a restart, relaunch off the event
     loop.
+- **06:00 live check:**
+  - Merged:
+    - #139: the headline says "walking · next: …" on a walk home.
+    - #140: the #89 Chromium memory fix, applied by the coordinator from the worker's patch.
+  - Day-live GPU mode is off for today: "restart cap (6 restarts…)", 7 pods died within ~30 s each. Yesterday it
+    ran 16.7 h for $8.00, within caps. Sent to the #58 worker: a restart log in the status, the root cause, and
+    a fallback GPU or backoff.
+  - /api/screens loses `today` and `last` on every deploy. Sent to #89 to persist them, after #135.
+  - At 390 px the chat feed and its input overlap the chess card. Layout, so it waits for the owner.
 - **Waiting for the owner's visual OK** (previews on the `previews` branch or in the PR):
   - #103 (G6 lighting and camera; final f342ce7, v3 render queued);
   - #117 (G2 character refinement: eyes, brows, ears, socks, slides);
