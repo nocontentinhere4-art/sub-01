@@ -6,8 +6,9 @@ stepped by hand with __qa.step(1/30)), 30 fps, H.264 (/usr/bin/ffmpeg), ~40 s:
     0-10 s   a slow 360 degree turn of his head, the OLD asset (standing just inside the door at 14:00, the camera
              fixed in front of him at head height; he turns on the spot, so the room stays behind him)
    10-20 s   the same turn, the NEW asset
-   20-30 s   at the desk (14:00), old (left) vs new (right), the same camera on both
-   30-40 s   walking from the door to the desk (08:00), old vs new, the page's own follow camera
+   20-30 s   the camera circles his feet, old (5 s) then new (5 s)
+   30-40 s   at the desk (14:00), old (left) vs new (right), the same camera on both
+   40-50 s   walking from the door to the desk (08:00), old vs new, the page's own follow camera
 The old asset is served in place of web/room/boy.glb by a Playwright route; nothing on disk changes. Each frame is the
 WebGL canvas itself (toDataURL right after the render), labelled with PIL; the frames go to a scratch directory and are
 deleted after the encode."""
@@ -91,6 +92,15 @@ def main():
                     emit(label(img, "OLD  (the shipped boy.glb)" if old else "NEW  (#117)"))
                 pg.evaluate(f"boy.rotation.y = {yaw0}")
                 print("turn", "old" if old else "new", "done", f"{time.time() - hv.t0:.0f}s", flush=True)
+            # ---- 2b: the feet, old then new: the camera circles his left foot (the same door scene)
+            for old in (True, False):
+                pg = hv.page(old); hv.goto_scene(pg, "door", 14)
+                foot = pg.evaluate("(() => { const b = boy.getObjectByName('LeftFoot'); const v = new THREE.Vector3(); b.getWorldPosition(v); return [v.x, v.y + 0.02, v.z]; })()")
+                for i in range(N // 2):
+                    ang = 2 * math.pi * i / (N // 2); cam2 = [foot[0] + 0.55 * math.sin(ang), foot[1] + 0.22, foot[2] + 0.55 * math.cos(ang)]
+                    img = grab(pg, f"__qa.step(1/{FPS}, 1); __qa.lookFrom({cam2}, {foot})")
+                    emit(label(img, "OLD  feet" if old else "NEW  feet"))
+                print("feet", "old" if old else "new", "done", f"{time.time() - hv.t0:.0f}s", flush=True)
             # ---- 3 + 4: the desk and the walk, old (left) vs new (right): both pages stepped frame by frame, centre crops
             for scene, hour, cam in (("desk", 14, "character"), ("walking", 8, "follow")):
                 pgs = {}
