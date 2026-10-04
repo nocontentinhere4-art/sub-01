@@ -29,8 +29,8 @@ const ROOM = {keys: {c: [-1.070, 1.001, -0.976], ry: 0.06, w: 0.356, d: 0.134}, 
 // the clips' frame (root at the feet, facing +z; measured in the page: the recorded wrists sit on the README's pins in
 // it): the keyboard the typing was pinned to (keycaps' centre at KEYTOP; the wrists' pins (0.03 / -0.13, 0.878, 0.32)
 // lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README; G2's clips (clips_g2)
-// sit the typing and the mouse 1.5 cm higher (DY +0.015, his buttocks on the 0.505 m seat), so their keyboard and mouse too
-const DY = 0.015;
+// sit the typing and the mouse 2.3 cm higher (DY +0.023: his slides and trousers on the 0.505 m seat), so their keyboard and mouse too
+const DY = 0.023;
 const CLIP = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], desk: 0.809 + DY,
   home: [-0.003, 0.83 + DY, 0.317]};                         // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
 // the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13) (boy_mh;
