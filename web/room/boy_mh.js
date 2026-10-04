@@ -28,9 +28,10 @@ const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watc
 const ROOM = {keys: {c: [-1.070, 1.001, -0.976], ry: 0.06, w: 0.356, d: 0.134}, mouse: [-0.755, 0.973, -0.950], pad: 0.973};
 // the clips' frame (root at the feet, facing +z; measured in the page: the recorded wrists sit on the README's pins in
 // it): the keyboard the typing was pinned to (keycaps' centre at KEYTOP; the wrists' pins (0.03 / -0.13, 0.878, 0.32)
-// lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README; G2's clips (clips_g2)
-// sit the typing and the mouse 2.3 cm higher (DY +0.023: his slides and trousers on the 0.505 m seat), so their keyboard and mouse too
-const DY = 0.023;
+// lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README. G2's clips (clips_g2)
+// sit the typing and the mouse higher (DY 0.023 at 52a1070, for the slides and trousers on the 0.505 m seat); measured
+// in the page, raising the clip's keyboard and mouse by 1.7 cm puts the pressing fingertips 2-5 mm over the keycaps
+const DY = 0.017;
 const CLIP = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], desk: 0.809 + DY,
   home: [-0.003, 0.83 + DY, 0.317]};                         // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
 // the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13) (boy_mh;
@@ -261,13 +262,15 @@ export function createMH(env) {
     }
   }
   // watching (or just sitting, eating): relaxed in the chair he leans back, a little further from the desk: he and the
-  // chair roll 0.12 m back, and in again for the keys and the mouse (to 1.5 cm back: G2's belly clears the desk's edge)
+  // chair roll 0.12 m back, and in again for the keys and the mouse (to 8.5 cm back for the keys, 6 for the mouse: the hoodie's front clears the desk's edge)
   function roll(dt) {
-    const want = M.mode === "desk_watch" || !M.mode ? 0.12 : 0.015, k = 1 - Math.exp(-dt / 0.35);
+    const want = M.mode === "desk_watch" || !M.mode ? 0.12 : M.mode === "desk_mouse" ? 0.06 : 0.085, k = 1 - Math.exp(-dt / 0.35);
+    const p = env.boy.position;
+    if (M.rollAt && (Math.abs(p.x - M.rollAt[0]) > 1e-6 || Math.abs(p.z - M.rollAt[1]) > 1e-6)) M.off = 0;   // (the page placed him anew)
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
-    if (Math.abs(d) < 1e-6) return;
     const ry = env.boy.rotation.y, bx = -Math.sin(ry) * d, bz = -Math.cos(ry) * d;      // back: against the way he faces
-    env.boy.position.x += bx; env.boy.position.z += bz;
+    p.x += bx; p.z += bz; M.rollAt = [p.x, p.z];
+    if (Math.abs(d) < 1e-6) return;
     const ch = env.chairNode && env.chairNode(); if (ch) { ch.position.x += bx; ch.position.z += bz; ch.updateMatrixWorld(true); }
   }
 
@@ -290,7 +293,7 @@ export function createMH(env) {
     if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up), back: true};
     if (to === "bedside" && from !== "bedlie") return {k: "bed_lie", a: G.lie.stand, b: G.lie.edge, at: () => G.lieEdge};
     const hips = (clip, a, b) => u => hipsAt(M.clips[clip], a + (b - a) * u);
-    if (to === "bedlie") { const h = hips("bed_lie", G.lie.edge, G.lie.end);
+    if (to === "bedlie" && from !== "bedlie") { const h = hips("bed_lie", G.lie.edge, G.lie.end);   // (lying already: no lie-down)
       return {k: "bed_lie", a: G.lie.edge, b: G.lie.end, at: u => mixPlace(G.lieEdge, G.bedLie, sstep(0.1, 0.7, u), h(u))}; }
     if (to === "bedside" && from === "bedlie") { const h = hips("bed_wake", 0, G.wake.sat);
       return {k: "bed_wake", a: 0, b: G.wake.sat, at: u => mixPlace(G.bedWake, G.wakeEdge, sstep(0.3, 0.9, u), h(u))}; }
@@ -317,6 +320,10 @@ export function createMH(env) {
   // the clips were recorded on another bed: while he sits on, lies down on or gets up from this one, any of his skin
   // that dips into the mattress lifts him by as much (eased back down when clear)
   let skin = null;
+  function baseY() {                                         // his height as the page has it, without the lifts below
+    const y = env.boy.position.y; if (M.lastY === undefined || Math.abs(y - M.lastY) > 1e-7) M.baseY = y;
+    env.boy.position.y = M.baseY; return M.baseY;
+  }
   function bedLift(st, dt) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
     if (!on && !M.lift) return;
@@ -337,6 +344,21 @@ export function createMH(env) {
     if (M.lift < 1e-4) M.lift = 0;
     b.position.y += M.lift;
   }
+  // the soles: no vertex of his feet (or of the slides on them) under the floor; a step that dips lifts him by as much,
+  // eased back down (the vertices whose main bone is a foot or a toe, gathered once over every skinned part)
+  let feet = null;
+  function floorLift(dt) {
+    const b = env.boy;
+    if (!feet) { feet = []; b.traverse(o => { if (!o.isSkinnedMesh) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, ids = [];
+      for (let i = 0; i < g.attributes.position.count; i++) { let k0 = 0, w0 = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w0) { w0 = W.getComponent(i, k); k0 = I.getComponent(i, k); }
+        if (/Foot|ToeBase|toe/.test(o.skeleton.bones[k0].name)) ids.push(i); }
+      if (ids.length) feet.push([o, ids.filter((_, j) => j % 2 === 0)]); }); }
+    b.updateMatrixWorld(true); let low = 9; const v = V();
+    for (const [o, ids] of feet) for (const i of ids) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld); if (v.y < low) low = v.y; }
+    const need = Math.max(0, env.F - 0.002 - low);
+    M.flift = Math.max(need, (M.flift || 0) - 0.1 * dt); if (M.flift < 1e-4) M.flift = 0;
+    b.position.y += M.flift;
+  }
   function onBed(st) {                                       // lying on, or sitting on the edge of, the bed: placed by the lie clip's pose
     if (st.step || (st.at !== "bedlie" && st.at !== "bedside")) return;
     const p = st.at === "bedlie" ? M.seg.bedLie : M.seg.lieEdge, b = env.boy; b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry;
@@ -354,8 +376,8 @@ export function createMH(env) {
       if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
-    bedLift(st, dt);
-    if (st.at === "desk" && !st.step) roll(dt); else M.off = 0;   // (off the desk the page places him and the chair)
+    baseY(); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
+    if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
     return moving;
   }
