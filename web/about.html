@@ -248,6 +248,18 @@ results in <code>docs/spiking/gpu_reading/</code>).</p>
     sideways into one field of view (the manifest says which). The glia come from H01's automated segmentation and are not proofread.
     The activity drawn on these cells is simulated; none of them is from the scanned person.
     <span class="src">(<code>docs/spiking/morphology_credits.md</code>, <code>web/neuron_render/build/fetch_h01.py</code>)</span></li>
+  <li><strong>What it's seeing → predicted cortex</strong> (the card on /brain): an encoding model fitted for this project
+    on other people's public fMRI, not on the scanned person. Images: the <strong>Emo-FilM</strong> dataset (Morgenroth E
+    et al. 2025, Scientific Data; OpenNeuro ds004892, CC0), 30 people watching <em>Big Buck Bunny</em> (© copyright 2008,
+    Blender Foundation / www.bigbuckbunny.org), <em>Sintel</em> (© copyright Blender Foundation / durian.blender.org) and
+    <em>Tears of Steel</em> ((CC) Blender Foundation / mango.blender.org), all
+    <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>. Text: <strong>the Alice dataset</strong>
+    (Bhattasali S, Brennan JR, Luh WM, Franzluebbers B, Hale JT 2020, LREC; OpenNeuro ds002322, CC0), 22 people
+    hearing chapter 1 of <em>Alice's Adventures in Wonderland</em> (public domain) read by Kristen McQuillin for LibriVox
+    (public domain). Features: OpenCLIP ViT-B-32 trained on LAION-2B (MIT) and all-MiniLM-L6-v2 (Apache-2.0). Regions:
+    Schaefer 2018 (MIT) and the Harvard-Oxford subcortical atlas (CC BY-SA 4.0). Inspired by the published idea of
+    Meta's TRIBE (d'Ascoli et al. 2025); none of its code, weights or outputs is used.
+    <span class="src">(<code>docs/encoding/REPORT.md</code>, <code>docs/encoding/LICENSES.md</code>)</span></li>
   <li><strong>3D engine:</strong> three.js, MIT licence.</li>
   <li><strong>Sleep model:</strong> Phillips &amp; Robinson (2007), J Biol Rhythms 22:167; constants cross-checked
     in the MIT-licensed R package sleepR.</li>

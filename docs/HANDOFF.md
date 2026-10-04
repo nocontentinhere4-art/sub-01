@@ -140,6 +140,34 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   shorts 34/h on the phone, mean burst 0.18 vs news 0.09 / pages ~0.03, 6,000 API units in 3 h (the 9,000 cap is
   ~90 searches ≈ 150 shorts a day); without the key: no shorts (TikTok needs a search engine that answers).
 
+## What his screens show → a predicted cortex response (PR `feature/encoding-model`, `docs/encoding/REPORT.md`)
+- `sensory.py`: a clean-room encoding model. Ridge regressions with HRF delays map image features (OpenCLIP ViT-B-32 /
+  LAION-2B, MIT) and text features (all-MiniLM-L6-v2, Apache-2.0) to the 214-region BOLD of public fMRI: Emo-FilM
+  ds004892 (CC0) on the three CC BY Blender films (30 people), and Alice ds002322 (CC0) on a public-domain story
+  (22 people). Cross-validated by participant half × held-out stimulus, with a split-half noise ceiling and
+  shuffled / time-shifted controls. Images: median held-out r 0.120, max 0.56, 127 regions significant. Text:
+  median 0.061, max 0.44, 33 regions (left temporal / default mode). Deep nuclei: not predicted.
+  **Meta's TRIBE (CC BY-NC) is not used in any form**; licences of everything in `docs/encoding/LICENSES.md` +
+  `out/encoding/MANIFEST.json` (tested).
+- Runtime: every `SENSE_EVERY_S` (4 s) while he is at a screen, `Live.sense` sends the latest screenshot + title to
+  `Sensory.see` in a worker thread (~65 ms CPU, one thread). The tick adds the drive `3 × weight × clip(z, ±2.5)`
+  (`b.stim += drive × TICK/2`: a sustained stimulus), × the sleep gain. It stops 12 s after the last frame or off
+  screen. Readings: `Sensory.read(title + extract)` replaces the keyword stimulus (memory keeps the rule networks).
+  Pictures far from the training films (most web pages; cosine to the nearest film frame < floor) get half the drive
+  and the card says "a rougher guess". Fallback = the old rules (`video_drive`, `reading_stimulus`) when the model is
+  off / missing (`/api/sensory` says why).
+- Files: weights `out/encoding/{vision,text}.npz` in git; encoders downloaded once into `SUB01_MODELS_DIR` (default
+  `/data/models`) from pinned Hugging Face commits + sha256 (~112 MB kept; the CLIP image tower is cut out in a child
+  process, peak ~0.8 GB once). Env: `SUB01_SENSORY=0` off, `SUB01_SENSORY_DOWNLOAD=0` never download,
+  `SUB01_SENSORY_GAIN` (3.0). New deps: onnxruntime, tokenizers, onnx.
+- `/brain`: card "What it's seeing → predicted cortex" (screenshot or text → top regions), its top 8 regions lit
+  cyan on the cortex for 10 s (green channel of the activity texture; `brain_anatomy.js`'s tissue shader reads it
+  too). Wording: "predicted response of a human cortex to this image, learned from public fMRI data; a model, not a
+  mind".
+- Rebuild: `analysis/encoding/{extract_emofilm,extract_alice,features_films,features_text,fit,figures}.py` (~75 GB
+  streamed, ~1.5 h on 4 CPUs, no GPU). `fit.py --check` re-scores from the committed `cv_data.npz`.
+  `bench_sensory.py` measures the tick: p95 9.3 ms with predictions vs 9.1 without.
+
 ## Reading memory (PR `feature/reading-memory`)
 - What he reads is a stimulus: up to 8 keywords (title + extract) through chat.py's rules at 0.5x a chat message,
   + language/attention 1.5, times the sleep gain. Stored in `sleep.Memory` with `source="reading"`; REM replay

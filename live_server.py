@@ -52,6 +52,7 @@ import interests
 import novelty
 import screens
 import search_sources
+import sensory as sensory_mod
 from readings import BrowseReadings
 from screens import DA_LABEL, DopamineBursts, ScreensStatus
 from eyes import Eyes
@@ -398,6 +399,9 @@ class Live:
         self.music_rng = random.Random(int(seed) + 6 if seed else None)
         self.music_bg = (None, False)      # (the activity start it was rolled for, background music wanted)
         self.music_busy = False            # a pick is being made (worker threads)
+        # the encoding model (sensory.py): what his screens show -> the predicted response of a human cortex; None
+        # or not ready: the keyword -> network rules (video_drive, reading_stimulus) drive the brain as before
+        self.sensory = None
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -505,13 +509,18 @@ class Live:
         """Recent chat texts (not readings), newest last."""
         return [m["text"] for m in self.memory.chat()[-5:] if t - m["t"] < 3 * 3600]
 
-    def absorb_reading(self, art):
-        """An article it opened becomes a stimulus (chat rules at half gain + language/attention) and a memory."""
+    def absorb_reading(self, art, predicted=None):
+        """An article it opened becomes a stimulus and a memory. With the sensory model (`predicted`: its (214,) drive
+        for the text) the predicted cortex response is the stimulus; without it, the chat rules at half gain +
+        language/attention. The memory keeps the rule-based networks either way (REM replay and the diary use them)."""
         t = self.clock.now()
         stim, hits, emotion = reading_stimulus(art["title"], art.get("keywords", []))
         gain = self.engine.gain                               # asleep = attenuated, as for chat
-        for g, a in stim.items():
-            self.brain.stimulate(g, a * gain)
+        if predicted is not None:
+            self.brain.stim += predicted[self.nm_idx] * gain
+        else:
+            for g, a in stim.items():
+                self.brain.stimulate(g, a * gain)
         m = self.memory.add(t, art["title"], self.engine.stage, stim, emotion, hits, source="reading",
                             title=art["title"], keywords=art.get("keywords", []), url=art.get("url", ""),
                             host=art.get("host", "en.wikipedia.org"), kind=art.get("kind", "wiki"),
@@ -811,6 +820,8 @@ class Live:
                              exertion=self.life.exertion())
             for grp, amt in self.body.intero_drive().items():
                 b.stimulate(grp, amt * TICK / 2.0)                    # settles at `amt` (stimuli decay with tau 2 s)
+            if (sd := self.sensory_drive()) is not None:              # what his screen shows, predicted per region
+                b.stim += sd * (TICK / 2.0)
             hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
             tsim = self.clock.now()
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
@@ -869,7 +880,19 @@ class Live:
         """A reading (a page he stayed on, or the Wikipedia fallback) becomes a stimulus and a memory, is estimated
         for tonight's replay and goes out on the feed with its host and kind."""
         loop = asyncio.get_running_loop()
-        m = self.absorb_reading(art)
+        predicted = None
+        sn = getattr(self, "sensory", None)
+        if sn is not None and sn.ready and sn.text is not None:
+            try:
+                predicted, view = await loop.run_in_executor(
+                    None, sn.read, f"{art['title']}. {art.get('extract', '')}".strip())
+                if view:
+                    art["sensory"] = {k: view[k] for k in ("top", "networks", "label")}
+                    await self.broadcast({"type": "sensory", **view, "title": art["title"], "host": art.get("host")})
+            except Exception as e:                         # the rules take over for this reading
+                print("sensory: reading failed:", repr(e)[:120], flush=True)
+                predicted = None
+        m = self.absorb_reading(art, predicted)
         if art.get("via") == "browser":
             self.reader.record(art)                        # "on his mind" and /api/reading show it
         print(f"reading ({art.get('via', 'wikipedia')}, {art.get('kind', 'wiki')}): {art['title'][:60]!r}", flush=True)
@@ -949,8 +972,12 @@ class Live:
                 mode = "video" if self.life.activity == "watch_video" else None
                 d = await self.browser.step(dev, self.heard(t), interest, mode)
                 st = await self.decide(dev, d["decide"], interest) if d.get("decide") else d.get("status")
-                if st and (st.get("video") or {}).get("watching"):
-                    self.video_drive(st["video"])
+                if st and (st.get("video") or {}).get("watching") and not self.sensory_sees():
+                    self.video_drive(st["video"])                       # the rule, when the sensory model is off
+                if st and self.sensory_sees() and self.sensory.due():
+                    task = asyncio.create_task(self.sense(dev, st))     # a worker thread; never blocks the loop
+                    self.bg.add(task)
+                    task.add_done_callback(self.bg.discard)
                 self.browser_down_since = None
                 fails = 0
                 if st:
@@ -1072,6 +1099,44 @@ class Live:
                f"Spotify search {api}: playing from the curated list" if api != "ok" else "Spotify")
         return {"now": {k: now.get(k) for k in ("title", "artist", "embed", "embed_height", "url", "why")} if now
                 else None, "source": src, "label": "Spotify (official embed)"}
+
+    def sensory_sees(self):
+        sn = getattr(self, "sensory", None)
+        return bool(sn is not None and sn.ready and sn.vision is not None)
+
+    def sensory_drive(self):
+        """The tick's sensory drive on the brain's regions: the last prediction while he looks at a screen, scaled by
+        the sleep engine's gain; None when the model is off, nothing was seen lately or he is not at a screen."""
+        sn = getattr(self, "sensory", None)
+        if sn is None or not sn.ready or self.screen_device() is None:
+            return None
+        d = sn.drive_now()
+        return None if d is None else d[self.nm_idx] * self.engine.gain
+
+    async def sense(self, dev, st):
+        """Screenshot -> the encoding model (worker thread) -> the drive the tick applies, and the /brain card."""
+        sn = self.sensory
+        sn.busy = True
+        try:
+            shot = await self.browser.shot(dev)
+            if not shot:
+                return None
+            title = str(st.get("title") or "")
+            title = title if display_ok(title) else ""
+            view = await asyncio.get_running_loop().run_in_executor(None, sn.see, shot, dev, title, None)
+            if view:
+                view = dict(view, title=title, host=st.get("host", ""), shot=f"/api/screen/{dev}.jpg?s={st.get('id', 0)}",
+                            gain=round(self.engine.gain, 2))
+                sn.last = view
+                await self.broadcast({"type": "sensory", **view})
+            return view
+        except BrowserDown:
+            return None
+        except Exception as e:                                  # a bad frame: the brain keeps its last drive
+            print("sensory: frame failed:", repr(e)[:160], flush=True)
+            return None
+        finally:
+            sn.busy = False
 
     def video_drive(self, video):
         """While he watches a video: the change between the last two screenshots drives the visual network (no
@@ -1546,6 +1611,7 @@ class Live:
                 "loop_lag_ms": {"p50": pct(late, 0.5), "p95": pct(late, 0.95), "n": len(late)},
                 "rss_mb": rss_mb(), "websockets": len(self.sockets), "chromium": chromium,
                 "eye": {"on": bool(self.eye), "resting": self.eye_resting},
+                "sensory": {k: v for k, v in self.sensory.status().items() if k != "last"} if self.sensory else None,
                 "last_diary": nights[0]["date"] if nights else None,
                 "last_memory_test": tests[-1].get("test_day") if tests else None,
                 "spend_today": {k: round(v, 4) for k, v in self.ledger.by_day(1).popitem()[1].items()}}
@@ -1809,6 +1875,8 @@ async def main(args):
         return web.json_response(live.browsing_view())
     app.router.add_get("/api/browsing", browsing)
     app.router.add_get("/api/screens", lambda r: web.json_response(live.screens_view()))   # #89: always visible
+    app.router.add_get("/api/sensory", lambda r: web.json_response(
+        live.sensory.status() if live.sensory else {"state": "off", "why": "not started"}))
 
     async def tastes(request):                    # what kinds of pages have paid off in the brain's response
         return web.json_response(live.tastes.top())
@@ -1901,6 +1969,7 @@ async def main(args):
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else (args.mint or 'no coin yet: trade feed off')}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
     live.life.can_watch = bool(live.browser)     # no browser: no videos at the desk
+    live.sensory = sensory_mod.Sensory.from_env(data_dir).start()   # loads (downloads once) in a thread
     tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades(),
              supervised("chess", live.run_chess), supervised("music", live.run_music)]
     if live.eye:

@@ -7,3 +7,6 @@ tzdata
 playwright==1.63.0   # the screens: headless Chromium on the open web (browse.py, BROWSE=1)
 anthropic>=1.11,<2   # optional eyes provider for brain-decides browsing (used only when ANTHROPIC_API_KEY is set)
 chess==1.11.2        # python-chess (its PyPI name since 1.0): rules + board for the desk game (chess_game.py, #17); pure Python, no engine
+onnxruntime==1.30.0  # sensory.py: the image (OpenCLIP ViT-B-32) and text (MiniLM) encoders, int8, one thread each
+tokenizers==0.23.2   # sensory.py: MiniLM's tokenizer (tokenizer.json)
+onnx==1.23.1         # sensory.py: cuts the image tower out of the CLIP graph once, in a child process

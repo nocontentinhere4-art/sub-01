@@ -20,11 +20,13 @@ RUN chmod 755 /usr/local/bin/sub01-entrypoint \
  && mkdir -p /data/frames && chown -R 1000:1000 /data
 COPY brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py \
      runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py costs.py chess_game.py \
-     search_sources.py sessions.py view_only.py interests.py short_videos.py music.py music_curated.json clips.py readings.py screens.py novelty.py youtube_api.py ./
+     search_sources.py sessions.py view_only.py interests.py short_videos.py music.py music_curated.json clips.py readings.py screens.py novelty.py youtube_api.py sensory.py ./
 COPY twin ./twin
 COPY spiking ./spiking
 COPY web ./web
 COPY out/connectome.npz out/atlas_names.json ./out/
+# the encoding model's fitted weights (sensory.py); its encoders are downloaded once into /data/models (pinned + sha256)
+COPY out/encoding/vision.npz out/encoding/text.npz ./out/encoding/
 COPY out/rest ./out/rest
 # /data is a persistent volume: sleep state, memory, nights, world, eye frames, browsing log
 # BROWSE=1: his computer and phone screens show real web pages (headless Chromium); set BROWSE=0 to turn it off.

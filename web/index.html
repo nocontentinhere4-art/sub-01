@@ -121,7 +121,16 @@
   #teach li .r { display:block; color:var(--dim); font-size:11px; }
   #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
   #t-note.err { color:#ff8a8a; }
-  #desk [hidden], #cards [hidden] { display:none !important; }   /* .card's display:block beat [hidden] (#89) */
+  #desk [hidden], #cards [hidden] { display:none !important; }
+  /* the encoding model (sensory.py): what his screen shows -> the predicted response of a human cortex */
+  #sense .row2 { display:flex; gap:10px; align-items:flex-start; }
+  #sense .row2 img { width:46%; margin:0; flex:0 0 46%; }
+  #sense .row2 .arrow { color:var(--dim); font-size:15px; padding-top:18px; }
+  #sense .txt { flex:0 0 46%; font-size:12px; line-height:1.4; color:var(--fg); max-height:7.2em; overflow:hidden; }
+  #sense ul { list-style:none; margin:0; padding:0; font-size:11.5px; line-height:1.35; flex:1; min-width:0; }
+  #sense li { display:flex; flex-direction:column; margin-bottom:4px; }
+  #sense li span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #sense li i { display:block; height:3px; border-radius:2px; background:#5fe3ff; margin-top:2px; }   /* .card's display:block beat [hidden] (#89) */
   #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
   #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
@@ -167,6 +176,12 @@
 </div>
 
 <div id="cards">
+  <div class="card" id="sense" hidden>
+    <div class="k"><span>What it's seeing → predicted cortex</span><span id="se-k"></span></div>
+    <div class="row2"><img id="se-img" alt="" hidden><div class="txt" id="se-txt" hidden></div><span class="arrow">→</span><ul id="se-top"></ul></div>
+    <div class="m" id="se-t"></div>
+    <div class="m" id="se-l"></div>
+  </div>
   <div class="card" id="screens">
     <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
     <div class="m" id="sc-b"></div>
@@ -630,15 +645,16 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
       uniforms: { tint:{value:new THREE.Color(CHIP[stage || "AWAKE"])}, strength:{value:0.5}, act:{value:actTex}, tgOn:{value:tgOn},
                   uRegOn:{value:0}, uArrive:{value:0} },
       vertexShader: `attribute float aReg; attribute float aGrp; uniform sampler2D act; uniform float tgOn[12]; uniform float uRegOn; uniform float uArrive;
-        varying vec3 vN; varying vec3 vV; varying float vPatch;
-        void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+        varying vec3 vN; varying vec3 vV; varying float vPatch; varying float vSense;
+        void main(){ vSense = aReg < 0.0 ? 0.0 : texture2D(act, vec2((aReg + 0.5) / 256.0, 0.5)).g; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
           float rel = aReg < 0.0 ? 0.0 : texture2D(act, vec2((aReg + 0.5) / 256.0, 0.5)).r * 3.0;      // activity vs its own baseline
           float route = 0.0; for (int i = 0; i < 12; i++) { if (abs(aGrp - float(i)) < 0.5) route = tgOn[i]; }
           vPatch = step(0.0, aReg) * max(uRegOn * 0.12 + clamp((rel - 1.3) * 0.3, 0.0, 0.3) * mix(0.4, 1.0, uRegOn), 0.5 * uArrive * route);
           gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV; varying float vPatch;
+      fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV; varying float vPatch; varying float vSense;
         void main(){ float rim = pow(1.0 - abs(dot(vN, vV)), 3.0);
-          gl_FragColor = vec4(tint * rim * strength + vec3(1.0, 0.78, 0.56) * vPatch * 0.6 * rim, 1.0); }`,   // rim-lit like the surface itself: the folds don't stack into a blob
+          gl_FragColor = vec4(tint * rim * strength + vec3(1.0, 0.78, 0.56) * vPatch * 0.6 * rim
+                              + vec3(0.37, 0.89, 1.0) * vSense * (0.25 + 0.55 * rim), 1.0); }`,   // sensory.py's top regions: cyan   // rim-lit like the surface itself: the folds don't stack into a blob
       transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide,
     });
     const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m);
@@ -789,6 +805,34 @@ function renderDesk(){
       + " · muted, read-only, Restricted Mode";
   }
 }
+// ---------- the encoding model (sensory.py): what his screen shows -> the predicted response of a human cortex ----------
+let sense = null, senseAt = 0, senseLit = false;
+const senseHi = new Float32Array(256);              // per region (atlas order = node order): lit while fresh, fades
+function onSense(m){
+  sense = m; senseAt = performance.now(); senseHi.fill(0); senseLit = true;
+  const top = m.top || [], mx = Math.max(1e-6, ...top.map(r => r.drive));
+  top.forEach(r => { senseHi[r.i] = r.drive / mx; });
+  renderSense();
+}
+function renderSense(){
+  const m = sense, fresh = m && performance.now() - senseAt < 60000;
+  $("sense").hidden = !fresh;
+  if (!fresh) return;
+  const img = m.kind === "image" && m.shot;
+  $("se-img").hidden = !img; $("se-txt").hidden = !!img;
+  if (img && $("se-img").dataset.src !== m.shot) { $("se-img").dataset.src = m.shot; $("se-img").src = m.shot; }
+  if (!img) $("se-txt").textContent = m.title || "";
+  $("se-k").textContent = m.kind === "image" ? (m.device === "phone" ? "his phone" : "his desk") : "what he read";
+  const top = (m.top || []).slice(0, 6), mx = Math.max(1e-6, ...top.map(r => r.drive));
+  $("se-top").innerHTML = top.length ? top.map(r => `<li><span>${esc(r.label)}</span><i style="width:${Math.round(100 * r.drive / mx)}%"></i></li>`).join("")
+    : `<li><span class="m">no region above its average</span></li>`;
+  $("se-t").textContent = (m.title && img ? `${m.title}${m.host ? " · " + m.host : ""}` : "") +
+    (m.gain != null && m.gain < 1 ? ` · sleep gain ${Math.round(m.gain * 100)}%` : "");
+  $("se-l").textContent = (m.note ? m.note + " · " : "") + m.label + " · top regions lit on the cortex in cyan";
+}
+function pollSense(){ if (MINI) return; fetch("/api/sensory").then(r => r.ok ? r.json() : null).then(s => {
+  if (s && s.last && (!sense || s.last.t > sense.t)) onSense(s.last); }).catch(() => {}); }
+if (!MINI) { pollSense(); setInterval(() => { renderSense(); }, 5000); }
 // ---------- music (#68): his brain model picks; Spotify's official embed, played on the visitor's own device ----------
 let musicNow = null, musicEmbed = "";
 const SPOTIFY_EMBED = /^https:\/\/open\.spotify\.com\/embed\/track\/[A-Za-z0-9]{22}(\?[\w=&]*)?$/;
@@ -906,6 +950,7 @@ function connect(){
     if (m.type === "chess") { deskChess = m; renderDesk(); if (m.finished) setTimeout(() => { if (deskChess === m) { deskChess = null; renderDesk(); } }, 60000); return; }
     if (m.type === "screen") { if (m.device === "desk") { deskVideo = m.video ? m : null; renderDesk(); } return; }
     if (m.type === "dopamine") { daSpike(m); return; }
+    if (m.type === "sensory") { onSense(m); return; }
     if (m.type === "nights") { renderNights(m); return; }
     if (m.type === "teach_ack") {
       $("t-note").textContent = m.ok ? "taught · he may replay it in his sleep tonight" : `not taught: ${m.reason}`;
@@ -1041,6 +1086,12 @@ function frame(now){
     const gm = Math.max(1e-3, raw.reduce((x, y) => x + y, 0) / raw.length);
     raw.forEach((r, i) => { actData[i*4] = Math.min(255, Math.round(r / gm / 3 * 255)); });
     actTex.needsUpdate = true;
+  }
+  if (senseLit) {                                    // the predicted top regions: their own patches, fading over 10 s
+    const f = Math.max(0, 1 - (now - senseAt) / 10000);
+    for (let i = 0; i < 214; i++) actData[i*4+1] = Math.round(255 * senseHi[i] * f);
+    actTex.needsUpdate = true;
+    if (f === 0) senseLit = false;
   }
   if (fibreMat) {
     const u = fibreMat.uniforms;

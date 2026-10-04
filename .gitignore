@@ -30,3 +30,6 @@ room_build/plates/
 # visual QA harness (tests/visual): screenshots and the CDN cache are never committed
 tests/visual/out/
 tests/visual/.cdn_cache/
+
+# encoding model (#SUB-01 sensory): downloaded fMRI, films, frames and features; scripts re-create them
+out/encoding_work/
