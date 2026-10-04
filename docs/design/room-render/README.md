@@ -52,6 +52,10 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   candidate position that would sit in a wall or a piece of furniture is turned round him (the mirror angle, a profile,
   the front, a rear three-quarter) until it fits. `?debug` → `setShot("face")` pins one. In the face and screen shots
   at the desk the depth of field is faint, so the page on the monitor stays readable (the monitor 0.35 knit by day).
+  On a phone held upright (the canvas taller than wide) the title, the plan and the chip cover the top third: every
+  shot stands a third further back and aims an eighth of its distance higher, so he sits in the lower middle of the
+  frame, and the desk cycle has no over-the-shoulder screen shot (his back and hood would fill a tall frame and hide
+  the monitor): face, medium, overview.
 - Black cloth stays black by day (the coordinator's review): `boy.glb` paints the hoodie a dark grey (sRGB ~77, a 7 %
   albedo: black only in the old dim light) and its `KHR_materials_specular` factor of 2 doubled the sheen, so by the
   window the hood read light grey to white. The dark texels of his texture (cloth and hair; the skin is untouched) are

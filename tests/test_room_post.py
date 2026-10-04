@@ -138,7 +138,8 @@ def test_page_wires_the_module():
     for kind in ('"face"', '"screen"', '"medium"', '"over"', '"overview"'):       # the camera shots (G8 #10, #18)
         assert kind in cam, kind
     lists = re.findall(r'\[((?:"\w+", )*"\w+")\]', cam.split("const list =")[1].split(";")[0])
-    assert len(lists) == 4 and all('"overview"' in l for l in lists)            # the overview is in every cycle ...
+    assert len(lists) >= 4 and all('"overview"' in l for l in lists)            # the overview is in every cycle (the phone's desk cycle has no screen shot) ...
+    assert 'narrow ? ["face", "medium", "overview"]' in cam and "0.12 * camGoal.pos.distanceTo(camGoal.target)" in cam   # a phone held upright: no back-of-head shot, him in the lower middle
     assert "holdOf(CAM.kind, list)" in cam and "0.75 * list.reduce" in html      # ... and holds >= 40 % of it (0.75 / 1.75)
     assert "CAM.cut" in html.split("function frame(now)")[1]
     assert 'CAM.force = pinned ? "overview" : null' in html                      # the chip: the cycle, or the overview pinned
