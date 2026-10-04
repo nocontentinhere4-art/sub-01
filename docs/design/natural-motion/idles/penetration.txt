@@ -1,0 +1,158 @@
+# tools/sweep_idles.mjs <port> <seed>, this branch: his skinned vertices (every 2nd) in the bed, the desk chair, the desk top and
+# the walls. Part 1: every action and fidget made to play, checked every 0.1 s. Part 2: each activity for minutes, every 0.25 s.
+
+## seed 63
+stand stretch: bed 0 chair 0 desk 0 wall 0 deskside
+stand phone: bed 0 chair 0 desk 0 wall 0 deskside
+stand rub: bed 0 chair 0 desk 0 wall 0 deskside
+stand neck: bed 0 chair 0 desk 0 wall 0 deskside
+stand look: bed 0 chair 0 desk 0 wall 0 deskside
+stand shift: bed 0 chair 0 desk 0 wall 0 deskside
+stand scratch: bed 0 chair 0 desk 0 wall 0 deskside
+seat drink: bed 0 chair 0 desk 0 wall 0 desk
+seat lean: bed 0 chair 0 desk 0 wall 0 desk
+seat window: bed 0 chair 0 desk 0 wall 0 desk
+seat phone: bed 0 chair 0 desk 0 wall 0 desk
+seat neck: bed 0 chair 0 desk 0 wall 0 desk
+seat rub: bed 0 chair 0 desk 0 wall 0 desk
+seat stretch: bed 0 chair 0 desk 0 wall 0 desk
+seat look: bed 0 chair 0 desk 0 wall 0 desk
+seat legs: bed 0 chair 0 desk 0 wall 0 desk
+seat shift: bed 0 chair 0 desk 0 wall 0 desk
+seat scratch: bed 0 chair 0 desk 0 wall 0 desk
+seat mouse: bed 0 chair 0 desk 0 wall 0 desk
+edge rest: bed 0 chair 0 desk 0 wall 0 bedlie
+edge rub: bed 0 chair 0 desk 0 wall 0 bedlie
+edge neck: bed 0 chair 0 desk 0 wall 0 bedlie
+edge look: bed 0 chair 0 desk 0 wall 0 bedlie
+edge legs: bed 0 chair 0 desk 0 wall 0 bedlie
+edge shift: bed 0 chair 0 desk 0 wall 0 bedlie
+edge scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+sill stretch: bed 0 chair 0 desk 0 wall 0 sill
+sill rub: bed 0 chair 0 desk 0 wall 0 sill
+sill neck: bed 0 chair 0 desk 0 wall 0 sill
+sill look: bed 0 chair 0 desk 0 wall 0 sill
+sill shift: bed 0 chair 0 desk 0 wall 0 sill
+sill scratch: bed 0 chair 0 desk 0 wall 0 sill
+sill chin: bed 0 chair 0 desk 0 wall 0 sill
+lie rest: bed 0 chair 0 desk 0 wall 0 bedlie
+lie rub: bed 0 chair 0 desk 0 wall 0 bedlie
+lie hands: bed 0 chair 0 desk 0 wall 0 bedlie
+lie knee: bed 0 chair 0 desk 0 wall 0 bedlie
+lie tap: bed 0 chair 0 desk 0 wall 0 bedlie
+lie scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music hands: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music rub: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+research 600 s: bed 0 chair 0 desk 17 wall 0 desk mouse,scratch,lean,legs,shift,neck,look,window,stretch,phone,rub
+chat 240 s: bed 0 chair 0 desk 17 wall 0 desk legs,scratch,shift,mouse,look,neck,drink,phone
+window 240 s: bed 0 chair 0 desk 0 wall 0 sill look,chin,neck,scratch,shift,stretch,rub
+phone 240 s: bed 0 chair 0 desk 0 wall 0 bedside legs,rest,shift,look,neck,scratch
+sleep+phone 240 s: bed 0 chair 0 desk 0 wall 0 bedlie knee,rest,rub,scratch,tap
+listen_music 240 s: bed 0 chair 0 desk 0 wall 0 bedlie knee,tap,scratch,hands,rub
+eat 120 s: bed 0 chair 0 desk 0 wall 0 desk 
+worst: bed 0 chair 0 desk 17 wall 0
+
+## seed 7
+stand stretch: bed 0 chair 0 desk 0 wall 0 deskside
+stand phone: bed 0 chair 0 desk 0 wall 0 deskside
+stand rub: bed 0 chair 0 desk 0 wall 0 deskside
+stand neck: bed 0 chair 0 desk 0 wall 0 deskside
+stand look: bed 0 chair 0 desk 0 wall 0 deskside
+stand shift: bed 0 chair 0 desk 0 wall 0 deskside
+stand scratch: bed 0 chair 0 desk 0 wall 0 deskside
+seat drink: bed 0 chair 0 desk 0 wall 0 desk
+seat lean: bed 0 chair 0 desk 0 wall 0 desk
+seat window: bed 0 chair 0 desk 0 wall 0 desk
+seat phone: bed 0 chair 0 desk 0 wall 0 desk
+seat neck: bed 0 chair 0 desk 0 wall 0 desk
+seat rub: bed 0 chair 0 desk 0 wall 0 desk
+seat stretch: bed 0 chair 0 desk 0 wall 0 desk
+seat look: bed 0 chair 0 desk 0 wall 0 desk
+seat legs: bed 0 chair 0 desk 0 wall 0 desk
+seat shift: bed 0 chair 0 desk 0 wall 0 desk
+seat scratch: bed 0 chair 0 desk 0 wall 0 desk
+seat mouse: bed 0 chair 0 desk 0 wall 0 desk
+edge rest: bed 0 chair 0 desk 0 wall 0 bedside
+edge rub: bed 0 chair 0 desk 0 wall 0 bedside
+edge neck: bed 0 chair 0 desk 0 wall 0 bedside
+edge look: bed 0 chair 0 desk 0 wall 0 bedside
+edge legs: bed 0 chair 0 desk 0 wall 0 bedside
+edge shift: bed 0 chair 0 desk 0 wall 0 bedside
+edge scratch: bed 0 chair 0 desk 0 wall 0 bedside
+sill stretch: bed 0 chair 0 desk 0 wall 0 sill
+sill rub: bed 0 chair 0 desk 0 wall 0 sill
+sill neck: bed 0 chair 0 desk 0 wall 0 sill
+sill look: bed 0 chair 0 desk 0 wall 0 sill
+sill shift: bed 0 chair 0 desk 0 wall 0 sill
+sill scratch: bed 0 chair 0 desk 0 wall 0 sill
+sill chin: bed 0 chair 0 desk 0 wall 0 sill
+lie rest: bed 0 chair 0 desk 0 wall 0 bedlie
+lie rub: bed 0 chair 0 desk 0 wall 0 bedlie
+lie hands: bed 0 chair 0 desk 0 wall 0 bedlie
+lie knee: bed 0 chair 0 desk 0 wall 0 bedlie
+lie tap: bed 0 chair 0 desk 0 wall 0 bedlie
+lie scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music hands: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music rub: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+research 600 s: bed 0 chair 0 desk 17 wall 0 desk mouse,scratch,shift,rub,look,legs,neck,window,stretch,lean,phone
+chat 240 s: bed 0 chair 0 desk 17 wall 0 desk look,shift,mouse,neck,scratch,legs,rub,phone,drink
+window 240 s: bed 0 chair 0 desk 0 wall 0 sill chin,shift,neck,scratch,look,stretch,rub
+phone 240 s: bed 0 chair 0 desk 0 wall 0 bedside scratch,shift,rest,legs,look,neck,rub
+sleep+phone 240 s: bed 0 chair 0 desk 0 wall 0 bedlie scratch,knee,rest,tap,rub
+listen_music 240 s: bed 0 chair 0 desk 0 wall 0 bedlie hands,scratch,knee,tap,rub
+eat 120 s: bed 0 chair 0 desk 0 wall 0 desk 
+worst: bed 0 chair 0 desk 17 wall 0
+
+## seed 1234
+stand stretch: bed 0 chair 0 desk 0 wall 0 deskside
+stand phone: bed 0 chair 0 desk 0 wall 0 deskside
+stand rub: bed 0 chair 0 desk 0 wall 0 deskside
+stand neck: bed 0 chair 0 desk 0 wall 0 deskside
+stand look: bed 0 chair 0 desk 0 wall 0 deskside
+stand shift: bed 0 chair 0 desk 0 wall 0 deskside
+stand scratch: bed 0 chair 0 desk 0 wall 0 deskside
+seat drink: bed 0 chair 0 desk 0 wall 0 desk
+seat lean: bed 0 chair 0 desk 0 wall 0 desk
+seat window: bed 0 chair 0 desk 0 wall 0 desk
+seat phone: bed 0 chair 0 desk 0 wall 0 desk
+seat neck: bed 0 chair 0 desk 0 wall 0 desk
+seat rub: bed 0 chair 0 desk 0 wall 0 desk
+seat stretch: bed 0 chair 0 desk 0 wall 0 desk
+seat look: bed 0 chair 0 desk 0 wall 0 desk
+seat legs: bed 0 chair 0 desk 0 wall 0 desk
+seat shift: bed 0 chair 0 desk 17 wall 0 desk
+seat scratch: bed 0 chair 0 desk 0 wall 0 desk
+seat mouse: bed 0 chair 0 desk 0 wall 0 desk
+edge rest: bed 0 chair 0 desk 0 wall 0 bedlie
+edge rub: bed 0 chair 0 desk 0 wall 0 bedlie
+edge neck: bed 0 chair 0 desk 0 wall 0 bedlie
+edge look: bed 0 chair 0 desk 0 wall 0 bedlie
+edge legs: bed 0 chair 0 desk 0 wall 0 bedlie
+edge shift: bed 0 chair 0 desk 0 wall 0 bedlie
+edge scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+sill stretch: bed 0 chair 0 desk 0 wall 0 sill
+sill rub: bed 0 chair 0 desk 0 wall 0 sill
+sill neck: bed 0 chair 0 desk 0 wall 0 sill
+sill look: bed 0 chair 0 desk 0 wall 0 sill
+sill shift: bed 0 chair 0 desk 0 wall 0 sill
+sill scratch: bed 0 chair 0 desk 0 wall 0 sill
+sill chin: bed 0 chair 0 desk 0 wall 0 sill
+lie rest: bed 0 chair 0 desk 0 wall 0 bedlie
+lie rub: bed 0 chair 0 desk 0 wall 0 bedlie
+lie hands: bed 0 chair 0 desk 0 wall 0 bedlie
+lie knee: bed 0 chair 0 desk 0 wall 0 bedlie
+lie tap: bed 0 chair 0 desk 0 wall 0 bedlie
+lie scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music hands: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music rub: bed 0 chair 0 desk 0 wall 0 bedlie
+lie_music scratch: bed 0 chair 0 desk 0 wall 0 bedlie
+research 600 s: bed 0 chair 0 desk 17 wall 0 desk look,legs,phone,mouse,drink,shift,scratch,neck,lean
+chat 240 s: bed 0 chair 0 desk 17 wall 0 desk neck,legs,mouse,look,scratch,stretch,shift,rub,phone,drink
+window 240 s: bed 0 chair 0 desk 0 wall 0 sill chin,stretch,look,shift,scratch,neck
+phone 240 s: bed 0 chair 0 desk 0 wall 0 bedside scratch,legs,shift,neck,look,rest,rub
+sleep+phone 240 s: bed 0 chair 0 desk 0 wall 0 bedlie scratch,knee,rub,rest,tap
+listen_music 240 s: bed 0 chair 0 desk 0 wall 0 bedlie tap,scratch,knee,hands,rub
+eat 120 s: bed 0 chair 0 desk 0 wall 0 desk 
+worst: bed 0 chair 0 desk 17 wall 0

@@ -696,6 +696,11 @@ function holdPhone(w){
       .addScaledVector(_r, G.side + 0.008 * nz(t * 0.17, 5));
     phone.up.copy(UP).addScaledVector(_r, 0.06 * nz(t * 0.13, 9)).normalize();   // the wrist rolls a little now and then
   }
+  // the "rest" variant: the phone goes down onto his chest (lying) or into his lap (sitting), still in his hand
+  const rk = IV.cur && IV.cur.n === "rest" ? env(IV.cur.t / IV.cur.d, 0.25) : 0;
+  if (rk > 0) { if (lying) B.Spine02.getWorldPosition(_c).addScaledVector(TF, 0.13).addScaledVector(TU, -0.05);
+    else B.Hips.getWorldPosition(_c).addScaledVector(_f, 0.26).addScaledVector(UP, 0.08).addScaledVector(_r, 0.05);
+    phone.position.lerp(_c, rk); }
   phone.lookAt(_eye); if (fl) phone.rotateX(-0.07 * fl); phone.updateMatrixWorld(true);
   _x.setFromMatrixColumn(phone.matrixWorld, 0); _y.setFromMatrixColumn(phone.matrixWorld, 1); _z.setFromMatrixColumn(phone.matrixWorld, 2);
   // hand frame (measured on the skinned mesh): +y runs along the fingers, +z is the palm (the fingers curl that way)
@@ -714,7 +719,7 @@ function holdPhone(w){
   B.RightHand.getWorldPosition(phone.position).sub(_T.copy(W).applyQuaternion(phone.quaternion)); phone.updateMatrixWorld(true);
   // look at the screen: the face looks along (0, 1, 1) of the head bone (its bind frame is pitched 45°; cm): turn it part of the way
   head.localToWorld(_E.set(0, 30, 30)); head.getWorldPosition(_S);
-  _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look * w); aimBone(head, _E, _T);
+  _T.subVectors(phone.position, _S).setLength(_E.distanceTo(_S)).add(_S).lerp(_E, 1 - G.look * w * (1 - rk)); aimBone(head, _E, _T);
 }
 
 // window: the view over Tokyo follows his clock and a daily weather pattern (web/room/window_view.js, #98 G7): photographic
@@ -1501,7 +1506,7 @@ const mix3 = (out, a, b, k) => out.copy(a).lerp(b, k);
 // the torso's frame this frame, from the bones (so it is right lying down too): his left, up the spine, forward
 const TL = new THREE.Vector3(), TU = new THREE.Vector3(), TF = new THREE.Vector3(), BR = new THREE.Vector3(), BFw = new THREE.Vector3();
 const _l1 = new THREE.Vector3(), _l2 = new THREE.Vector3(), _l3 = new THREE.Vector3(), _l4 = new THREE.Vector3(), _l5 = new THREE.Vector3();
-const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _aq = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()];
+const _lm = new THREE.Matrix4(), _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _aq = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()];
 function torso(){
   const B = bones; boy.updateMatrixWorld(true);
   B.LeftArm.getWorldPosition(TL); B.RightArm.getWorldPosition(_l1); TL.sub(_l1).normalize();
@@ -1527,6 +1532,10 @@ function legTo(side, target, pole, w){
   setWorldQuat(ft, _aq[2]);                            // the foot keeps its angle to the floor
 }
 const mouth = out => (bones.headfront || head).getWorldPosition(out).addScaledVector(UP, -0.07).addScaledVector(BFw, 0.03);
+// his mouth with his face level (as he drinks: the gaze lifts it after the arm is placed; the clip may have it pitched
+// down at the keys): 14 cm in front of the head bone, 1 cm below it (on the skinned mesh: the tip of his nose is 16 cm
+// along the face from the bone, 4 cm up)
+const lips = out => head.getWorldPosition(out).addScaledVector(BFw, 0.14).addScaledVector(UP, -0.01);
 
 // ---- breathing
 let breathPh = 0;
@@ -1601,54 +1610,151 @@ function director(c){                                  // what he looks at, per 
   else GZ.wGoal = 0;
 }
 
-// ---- idle variants: [name, seconds, cooldown], per context
-const VARIANTS = {
-  stand: [["look", 4, 6], ["scratch", 3, 25], ["stretch", 4, 50], ["phone", 7, 35], ["shift", 4, 10]],
-  seat:  [["look", 3.5, 8], ["scratch", 3, 30], ["drink", 7, 45], ["lean", 7, 30], ["phone", 7, 45], ["legs", 7, 20], ["mouse", 6, 12]],
-  edge:  [["look", 3, 6], ["legs", 6, 15], ["scratch", 3, 30], ["shift", 4, 15]],
-  sill:  [["look", 4, 5], ["chin", 9, 25], ["shift", 4, 10], ["scratch", 3, 30], ["stretch", 4, 60]],
-  lie:   [["knee", 12, 20], ["tap", 8, 6]],
+// ---- idle variants, per context, in two kinds. An action (ACTS: [name, seconds, weight]) every 25-75 s: something a
+// viewer sees from across the room (a drink, leaning back with his hands behind his head, a look out of the window, the
+// phone, rolling his neck, rubbing his eyes, a stretch), never the same as the last one. Between them, smaller ones
+// (FIDGETS: [name, seconds, cooldown]: a glance, a scratch, resettling, the mouse, chin on hand) every 4-11 s. How
+// tired and how bored he is weighs the actions (tiredness()).
+const FIDGETS = {
+  stand: [["look", 4, 6], ["shift", 4, 10], ["scratch", 3, 40]],
+  seat:  [["look", 3.5, 8], ["legs", 7, 20], ["shift", 4, 15], ["scratch", 3, 40], ["mouse", 6, 12]],
+  edge:  [["look", 3, 6], ["legs", 6, 15], ["shift", 4, 15], ["scratch", 3, 40]],
+  sill:  [["look", 4, 5], ["shift", 4, 10], ["scratch", 3, 40], ["chin", 9, 25]],
+  lie:   [["knee", 12, 20], ["tap", 8, 6], ["scratch", 3, 40]],
 };
-const IV = {cur:null, next:3, last:"", cool:{}, ctx:""};
+const ACTS = {
+  stand: [["stretch", 4, 1], ["phone", 7, 1], ["rub", 3.5, 1], ["neck", 5, 1]],
+  seat:  [["drink", 7, 1.2], ["lean", 9, 1.1], ["window", 5, 1], ["phone", 7, 1], ["neck", 5, 0.9], ["rub", 3.5, 0.8], ["stretch", 5, 0.7]],
+  edge:  [["rest", 9, 1.3], ["rub", 3.5, 1], ["neck", 5, 1]],
+  sill:  [["stretch", 4, 1], ["rub", 3.5, 1], ["neck", 5, 1]],
+  lie:   [["rest", 10, 1.3], ["rub", 3.5, 1], ["hands", 14, 1]],
+};
+// tired: late in his day (from 21:00, fully by midnight, and before 05:00) and the longer he has sat at the desk;
+// bored: the life model's boredom. Tired he rubs his eyes, stretches, rolls his neck; bored he looks away from the screen
+let satT = 0;
+const tiredness = () => clamp(Math.max(hour >= 21 ? (hour - 21) / 3 : hour < 5 ? 1 : 0, satT / 2400), 0, 1);
+const BIAS = {rub:t => 0.3 + 2.5 * t, stretch:t => 0.5 + 2 * t, neck:t => 0.6 + 1.5 * t, lean:(t, b) => 0.8 + 0.6 * t + b,
+  window:(t, b) => 0.6 + 1.6 * b, phone:(t, b) => 0.6 + 1.4 * b, rest:(t, b) => 0.8 + t + b};
+const IV = {cur:null, next:3, big:20, last:"", lastBig:"", cool:{}, ctx:""};
+function canDo(n){
+  if (n === "drink") return at === "desk" && !!PROP.bottle && !phoneWanted;
+  if (n === "phone") return !phoneWanted;
+  if (n === "rest") return phoneWanted && holdW > 0.9;      // the phone down on his chest / in his lap, a look away
+  if (n === "hands") return !phoneWanted;                   // lying with nothing in his hands: both behind his head
+  return true;
+}
 function variants(c, dt){
-  if (c !== IV.ctx) { IV.ctx = c; if (IV.cur) endVariant(IV.cur); IV.cur = null; IV.next = T + 2 + rnd() * 3; }
-  const L = VARIANTS[c];
+  if (c !== IV.ctx) { IV.ctx = c; if (IV.cur) endVariant(IV.cur); IV.cur = null; IV.next = T + 2 + rnd() * 3; IV.big = T + 8 + rnd() * 20; }
   if (IV.cur) { IV.cur.t += dt; if (IV.cur.t >= IV.cur.d) { endVariant(IV.cur); IV.cur = null; IV.next = T + 2.5 + rnd() * 5; } }
-  else if (L && T >= IV.next) {
-    const ok = L.filter(([n]) => n !== IV.last && T >= (IV.cool[n] || 0) && (n !== "drink" || (at === "desk" && PROP.bottle))
-      && (n !== "phone" || !phoneWanted) && (n !== "mouse" || at === "desk") && (n !== "drink" || !phoneWanted));
-    if (ok.length) { const [n, d, cd] = ok[Math.floor(rnd() * ok.length)];
-      IV.cur = {n, d:d * (0.85 + rnd() * 0.3), t:0, side:rnd() < 0.5 ? "Left" : "Right", s:rnd()}; IV.last = n; IV.cool[n] = T + cd + d; }
-    else IV.next = T + 1;
+  else if (T >= IV.next) {
+    const A = (ACTS[c] || []).filter(([n]) => n !== IV.lastBig && canDo(n));
+    if (T >= IV.big && A.length) {                      // an action: weighted by what it is and how he is
+      const t = tiredness(), b = clamp(lastLife && lastLife.boredom || 0, 0, 1);
+      const w = A.map(([n, , k]) => k * (BIAS[n] ? BIAS[n](t, b) : 1)), sum = w.reduce((s, x) => s + x, 0);
+      let r = rnd() * sum, i = 0; while (i < A.length - 1 && (r -= w[i]) > 0) i++;
+      const [n, d] = A[i];
+      IV.cur = {n, d:d * (0.85 + rnd() * 0.3), t:0, side:rnd() < 0.5 ? "Left" : "Right", s:rnd(), big:true}; IV.last = IV.lastBig = n;
+      IV.big = T + IV.cur.d + 18 + rnd() * 50;          // (the next fidget slot after that: 25-75 s apart)
+    } else {
+      const ok = (FIDGETS[c] || []).filter(([n]) => n !== IV.last && T >= (IV.cool[n] || 0) && canDo(n));
+      if (ok.length) { const [n, d, cd] = ok[Math.floor(rnd() * ok.length)];
+        IV.cur = {n, d:d * (0.85 + rnd() * 0.3), t:0, side:rnd() < 0.5 ? "Left" : "Right", s:rnd()}; IV.last = n; IV.cool[n] = T + cd + d;
+        IV.next = T + IV.cur.d + 4 + rnd() * 7; }
+      else IV.next = T + 1;
+    }
   }
   if (IV.cur) doVariant(IV.cur, c);
 }
+// what #114's motion layer (web/room/boy_motion.js) is told is playing: it takes his hands off the keys for the variants
+// it knows by name, so the new ones that need his hands are reported as one of those
+const IV_AS = {rub:"scratch", neck:"scratch", window:"look", hands:"lean"};
 function endVariant(V){ if (V.n === "phone") peek = false; if (V.n === "drink") drop("bottle"); }
 let peek = false;                                     // he takes the phone out for a look (the "phone" variant)
 function doVariant(V, c){
   const B = bones, u = V.t / V.d, e = env(u, 0.22);
   if (V.n === "look") { if (u < 0.5 ? !V.a : !V.b) { lookAround(0.9); GZ.next = T + V.d; V[u < 0.5 ? "a" : "b"] = 1; } return; }
-  if (V.n === "shift") { V.k = (V.s < 0.5 ? -1 : 1) * 0.03 * e; return; }
+  if (V.n === "shift") { V.k = (V.s < 0.5 ? -1 : 1) * 0.03 * e;           // standing: his weight onto one foot (alive())
+    if (c === "seat" || c === "edge") {                 // sitting: he resettles, leaning onto one hip and back, then upright
+      const sg = V.s < 0.5 ? -1 : 1, k = Math.sin(Math.PI * u) * e;
+      bend(B.Spine01, BFw, sg * 0.07 * k); bend(B.Spine02, BFw, -sg * 0.025 * k); bend(B.Spine01, TL, -0.05 * Math.sin(2 * Math.PI * u) * e); torso(); }
+    return; }
   if (V.n === "phone") { peek = u < 0.88; return; }
   if (V.n === "scratch") {                             // a hand to the back of his head, scratching
     const side = phoneWanted || (c === "sill" && V.side === "Left") ? "Left" : V.side, sx = side === "Right" ? -1 : 1;
-    head.getWorldPosition(_l1).addScaledVector(TU, 0.17).addScaledVector(TL, sx * 0.12).addScaledVector(TF, -0.06)
+    const lying = c === "lie";                         // lying: the side of his head over the ear, the elbow up (the back
+    // of his head is in the pillow, and past his crown is the headboard)
+    head.getWorldPosition(_l1).addScaledVector(TU, lying ? 0.06 : 0.17).addScaledVector(TL, sx * (lying ? 0.10 : 0.12)).addScaledVector(TF, lying ? 0.06 : -0.06)
       .addScaledVector(TF, 0.012 * Math.sin(V.t * 22)).addScaledVector(TU, 0.01 * Math.cos(V.t * 22));
-    B[side + "Arm"].getWorldPosition(_l2).addScaledVector(TL, sx * 0.5).addScaledVector(TU, 0.15).addScaledVector(TF, -0.15);
+    B[side + "Arm"].getWorldPosition(_l2).addScaledVector(TL, sx * (lying ? 0.4 : 0.5)).addScaledVector(TU, lying ? 0 : 0.15).addScaledVector(TF, lying ? 0.35 : -0.15);
     armTo(side, _l1, _l2, e); if (e > 0.5) gazeAt(_l3.copy(GZ.goal).addScaledVector(UP, -0.4), 0.5, 0.3, "down");
     return;
   }
   if (V.n === "stretch") {                             // both arms up, the back arches, a look up
     bend(B.Spine01, TL, -0.10 * e); bend(B.Spine02, TL, -0.10 * e); torso();
-    const sat = true;                                     // the arms go up in front (clear of armrests, the chair beside him)
+    const sat = c !== "sill" && c !== "stand";          // seated the arms go up in front (clear of the armrests); standing
+    // they go straight up (in front they came down into the back of the desk chair beside him), and leaning on the sill
+    // straight up too, not along his bent back into the wall over the window
     for (const [side, sx] of [["Left", 1], ["Right", -1]]) { if (side === "Right" && phoneWanted) continue;
-      B[side + "Arm"].getWorldPosition(_l1).addScaledVector(TU, 0.54).addScaledVector(TL, -sx * 0.05).addScaledVector(TF, sat ? 0.16 : 0.05);
+      B[side + "Arm"].getWorldPosition(_l1).addScaledVector(sat ? TU : UP, 0.54).addScaledVector(TL, -sx * 0.05).addScaledVector(TF, sat ? 0.16 : -0.05);
       B[side + "Arm"].getWorldPosition(_l2).addScaledVector(TL, sx * 0.4).addScaledVector(TF, sat ? 0.25 : -0.2);
       armTo(side, _l1, _l2, e * 0.95); }
     if (e > 0.4) gazeAt(head.getWorldPosition(_l3).addScaledVector(TU, 1.2).addScaledVector(TF, 1), 0.6, 0.3, "up");
     return;
   }
-  if (V.n === "lean") { bend(B.Spine01, TL, -0.09 * e); bend(B.Spine02, TL, -0.05 * e); return; }   // leans back in the chair
+  if (V.n === "lean" || V.n === "hands") {             // leans back, his hands behind his head (lying: under it, on the pillow);
+    // at the desk his back comes upright as far as the chair lets it (its backrest is 32 cm behind him: #114 keeps a
+    // reclined back out of it), and he looks at the screen
+    if (c === "seat") { const tilt = Math.asin(clamp(TU.dot(BFw), -1, 1)), a = Math.max(0, tilt - 0.13) * e;
+      bend(B.Spine01, TL, -a * 0.55); bend(B.Spine02, TL, -a * 0.45); torso(); }
+    const lying = c === "lie";
+    for (const [side, sx] of [["Left", 1], ["Right", -1]]) {
+      head.getWorldPosition(_l1).addScaledVector(TF, lying ? -0.05 : -0.09).addScaledVector(TU, lying ? 0.05 : 0.09).addScaledVector(TL, sx * 0.05);
+      B[side + "Arm"].getWorldPosition(_l2).addScaledVector(TL, sx * 0.6).addScaledVector(TU, 0.3).addScaledVector(TF, lying ? 0.1 : -0.05);
+      armTo(side, _l1, _l2, e);
+    }
+    if (c === "seat" && e > 0.3) { const m = SURF.monitor; gazeAt(_l3.set(m.c[0], m.c[1] + 0.05, m.c[2]), 0.7, 0.3, "screen"); }
+    return;
+  }
+  if (V.n === "window") {                               // at the desk: turns in the chair to look out of the window, over
+    // his left shoulder (the torso turns, the head the rest of the way), then back to the screen
+    _l3.copy(WIN_OUT(_l4, (V.s - 0.5) * 2, 0.2)).sub(B.Hips.getWorldPosition(_l1)).setY(0).normalize();
+    const turn = clamp(Math.atan2(_l3.x, _l3.z) - Math.atan2(BFw.x, BFw.z), -Math.PI, Math.PI), tw = clamp(wrapA(turn), -0.9, 0.9) * 0.4 * e;
+    bend(B.Spine01, UP, tw * 0.45); bend(B.Spine02, UP, tw * 0.55); torso();
+    if (u > 0.12 && u < 0.85) { if (!V.a) { gazeAt(_l4, 0.95, V.d * 0.7, "window"); V.a = 1; } }
+    return;
+  }
+  if (V.n === "neck") {                                 // rolls his neck (ear to a shoulder, chin down, the other shoulder)
+    // and his shoulders, one hand rubbing his nape
+    const ph = u * Math.PI * 3, roll = Math.sin(ph) * 0.3 * e, down = (0.5 - 0.5 * Math.cos(ph * 2)) * 0.18 * e, sh = Math.max(0, Math.sin(ph * 2)) * 0.12 * e;
+    if (B.neck) { bend(B.neck, TF, roll * 0.6); bend(B.neck, TL, down); } bend(head, TF, roll * 0.4);
+    bend(B.LeftShoulder, TF, sh); bend(B.RightShoulder, TF, -sh); torso();
+    const side = phoneWanted ? "Left" : V.side, sx = side === "Right" ? -1 : 1;
+    (B.neck || head).getWorldPosition(_l1).addScaledVector(TF, -0.08).addScaledVector(TL, sx * 0.03).addScaledVector(TU, 0.01 * Math.sin(V.t * 9));
+    B[side + "Arm"].getWorldPosition(_l2).addScaledVector(TL, sx * 0.5).addScaledVector(TU, 0.3).addScaledVector(TF, 0.1);
+    armTo(side, _l1, _l2, e * 0.9);
+    gazeAt(GZ.p, 0.15, 0.3, "neck"); return;
+  }
+  if (V.n === "rub") {                                  // rubs his eyes with his fists, head bowed into them (one hand
+    // with the phone in the other); tired, he does this more
+    if (B.neck) bend(B.neck, TL, (c === "lie" ? 0 : 0.2) * e); torso();
+    for (const [side, sx] of [["Left", 1], ["Right", -1]]) { if (side === "Right" && phoneWanted) continue;
+      const one = phoneWanted ? -0.03 : 0;            // one hand: in the middle, over both eyes
+      // his eye (the head bone sits at the skull's base), and the wrist below and in front of it, fingers up onto it
+      head.getWorldPosition(_l4).addScaledVector(TU, 0.035).addScaledVector(TF, 0.095).addScaledVector(TL, sx * (0.032 + one))
+        .addScaledVector(TL, 0.007 * Math.cos(V.t * 8 + sx)).addScaledVector(TU, 0.007 * Math.sin(V.t * 8 + sx));
+      _l1.copy(_l4).addScaledVector(TF, 0.05).addScaledVector(TU, -0.085).addScaledVector(TL, sx * 0.015);
+      B[side + "Arm"].getWorldPosition(_l2).addScaledVector(TU, -0.5).addScaledVector(TF, 0.3).addScaledVector(TL, sx * 0.2);
+      armTo(side, _l1, _l2, e);
+      const h = B[side + "Hand"]; h.getWorldPosition(_l3); _l4.sub(_l3).normalize();   // the hand: +y along the fingers, +z the palm
+      _l5.copy(TF).negate().addScaledVector(_l4, TF.dot(_l4)).normalize(); _l3.crossVectors(_l4, _l5);
+      _lm.makeBasis(_l3, _l4, _l5); _lq.setFromRotationMatrix(_lm); h.getWorldQuaternion(_lq2); _lq2.slerp(_lq, e); setWorldQuat(h, _lq2); }
+    gazeAt(GZ.p, 0, 0.3, "rub"); return;
+  }
+  if (V.n === "rest") {                                 // the phone down (on his chest lying, in his lap sitting: holdPhone()),
+    // and a look away: at the ceiling, or out of the window
+    if (c === "edge" && u > 0.15 && !V.a) { gazeAt(WIN_OUT(_l4, (V.s - 0.5) * 1.6, 0.1), 0.85, V.d * 0.7, "window"); V.a = 1; }
+    return;
+  }
   if (V.n === "legs") {                                 // seated: the shins swing (forward only: never back into the bed frame
     // or the chair base); at the desk one knee bounces
     const desk = c === "seat";
@@ -1793,16 +1899,20 @@ function heldProps(){
   for (const [k, H] of Object.entries(PROP.held)) { const o = PROP[k], h = bones[H.side + "Hand"];
     _pm.multiplyMatrices(h.matrixWorld, H.rel); _pm.decompose(o.position, o.quaternion, _l1); }
 }
-function drinkFrom(V, u){                              // reach for the bottle (right hand), drink, put it back
+function drinkFrom(V, u){                              // reach for the bottle (right hand), drink, put it back; the grip is
+  // on its upper half (11 cm up), so his fingers stay above the desk top as he sets it down
   const B = bones, o = PROP.bottle, w = smooth(0, 0.14, u) * (1 - smooth(0.88, 1, u));
-  if (u < 0.25) { _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03); }
-  else if (u < 0.8) { mouth(_l3).addScaledVector(UP, -0.11).addScaledVector(BFw, 0.05).addScaledVector(TL, -0.03);
-    _l4.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03);
+  if (u < 0.25) { _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.11).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03); }
+  else if (u < 0.8) { lips(_l3).addScaledVector(UP, -0.07).addScaledVector(BFw, 0.02).addScaledVector(TL, -0.03);
+    _l4.copy(BOTTLE_AT).addScaledVector(UP, 0.11).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03);
     const k = u < 0.4 ? smooth(0.25, 0.4, u) : u < 0.68 ? 1 : 1 - smooth(0.68, 0.8, u); mix3(_l1, _l4, _l3, k); }
-  else _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.07).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03);
+  else _l1.copy(BOTTLE_AT).addScaledVector(UP, 0.11).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03);
   B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.3);
   armTo("Right", _l1, _l2, w);
-  if (u >= 0.4 && u < 0.68) { const k = smooth(0.4, 0.48, u) * (1 - smooth(0.6, 0.68, u)); bend(B.RightHand, TL, 0.8 * k);   // tips it up
+  const gk = w * (1 - smooth(0.3, 0.42, u) + smooth(0.66, 0.78, u));   // at the bottle on the desk: the hand round it, level
+  if (gk > 0.01) { const h = B.RightHand; _l4.copy(BFw); _l5.copy(TL); _l3.crossVectors(_l4, _l5);   // fingers forward, palm to it
+    _lm.makeBasis(_l3, _l4, _l5); _lq.setFromRotationMatrix(_lm); h.getWorldQuaternion(_lq2); _lq2.slerp(_lq, Math.min(1, gk)); setWorldQuat(h, _lq2); }
+  if (u >= 0.4 && u < 0.68) { const k = smooth(0.4, 0.48, u) * (1 - smooth(0.6, 0.68, u)); bend(B.RightHand, TL, -1.1 * k);   // tips it up, its top back to his lips
     gazeAt(head.getWorldPosition(_l3).addScaledVector(TF, 1).addScaledVector(TU, 0.5), 0.5 * k, 0.2, "drink"); }
   else if (u < 0.3) gazeAt(BOTTLE_AT, 0.6, 0.2, "bottle");
   boy.updateMatrixWorld(true);
@@ -1890,13 +2000,13 @@ function eating(dt){
   if (d) { _l1.copy(DISH_AT).addScaledVector(TL, 0.12).addScaledVector(UP, kind === "ramen" || kind === "curry" ? 0.07 : 0.03).addScaledVector(BFw, 0.03);
     B.LeftArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, 0.35); armTo("Left", _l1, _l2, 0.9 * w); }
   // bites: over the dish (or the hand food in front of his chest) -> up to the mouth -> bite -> down -> chew
-  const rest = d ? _l5.copy(DISH_AT).addScaledVector(UP, 0.14).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03)
+  const rest = d ? _l5.copy(DISH_AT).addScaledVector(UP, 0.17).addScaledVector(BFw, -0.06).addScaledVector(TL, -0.03)   // (his forearm clear of the desk's edge)
     : (B.neck || head).getWorldPosition(_l5).addScaledVector(BFw, 0.27).addScaledVector(UP, -0.30).addScaledVector(TL, -0.10);
   if (d && u < 0.33) rest.addScaledVector(BFw, 0.015 * Math.sin(T * 9)).addScaledVector(UP, -0.03 * Math.max(0, Math.sin(T * 4.5)));   // picking
   const m = mouth(_l3).addScaledVector(UP, fromHand ? -0.07 : -0.11).addScaledVector(BFw, fromHand ? 0.05 : 0.06).addScaledVector(TL, -0.03);
   const a = [0.36, 0.48, 0.6, 0.72], k = done ? 0 : u < a[0] ? 0 : u < a[1] ? smooth(a[0], a[1], u) : u < a[2] ? 1 : u < a[3] ? 1 - smooth(a[2], a[3], u) : 0;
   mix3(_l1, rest, m, k);
-  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.25).addScaledVector(TF, -0.1);
+  B.RightArm.getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(BR, 0.35).addScaledVector(TF, -0.1);
   armTo("Right", _l1, _l2, w);
   // take a piece off the dish as the hand lifts; it is gone at the bite
   if (d && !done && u >= a[0] && !EAT.took) { EAT.took = true;
@@ -2358,16 +2468,22 @@ function alive(dt){                                     // after the mixer and t
     const chin = IV.cur && IV.cur.n === "chin" ? env(IV.cur.t / IV.cur.d, 0.22) : 0;
     bend(bones.Spine01, TL, 0.13 * lean + 0.06 * chin); bend(bones.Spine02, TL, 0.07 * lean); torso();
     const sx = bones.Hips.getWorldPosition(_l3).z;
-    for (const [side, sz] of [["Left", 1], ["Right", -1]]) {
-      _l1.set(-1.86, 1.29, sx + sz * 0.17 + 0.01 * nz(T * 0.2, side === "Left" ? 4 : 6));
+    for (const [side, sz] of [["Left", 1], ["Right", -1]]) {   // the wrists on the sill (top 1.27 at x -1.93..-1.84), the hands
+      // flat on it, fingers to the glass (17 cm): not down through it into the wall below
+      _l1.set(-1.70, 1.32, sx + sz * 0.17 + 0.01 * nz(T * 0.2, side === "Left" ? 4 : 6));
       bones[side + "Arm"].getWorldPosition(_l2).addScaledVector(UP, -0.5).addScaledVector(TL, sz * 0.25).addScaledVector(TF, 0.1);
       armTo(side, _l1, _l2, lean);
+      if (IV.cur && IV.cur.n === "chin" && side === "Left") continue;
+      const h = bones[side + "Hand"]; _l4.copy(BFw); _l5.set(0, -1, 0); _l3.crossVectors(_l4, _l5);
+      _lm.makeBasis(_l3, _l4, _l5); _lq.setFromRotationMatrix(_lm); h.getWorldQuaternion(_lq2); _lq2.slerp(_lq, lean); setWorldQuat(h, _lq2);
     }
   }
-  if (c === "eat" || c === "seat") {                   // he sits up (the seated clip hunches over): to eat, and a little at the screen
-    const tilt = Math.asin(clamp(TU.dot(BFw), -1, 1)), k = c === "eat" ? 0.85 : 0.3;
-    bend(bones.Spine01, TL, -tilt * k * 0.55); bend(bones.Spine02, TL, -tilt * k * 0.45); torso();
+  if (c === "eat" || c === "seat") {                   // he sits up (the seated clip hunches over): to eat, and at the screen
+    // too, his back a touch forward of vertical (as far as #114's sitUp lets the desk chair's back be), not hunched
+    const tilt = Math.asin(clamp(TU.dot(BFw), -1, 1)), a = c === "eat" ? tilt * 0.85 : Math.max(0, tilt - 0.15);
+    bend(bones.Spine01, TL, -a * 0.55); bend(bones.Spine02, TL, -a * 0.45); torso();
   }
+  satT = c === "seat" ? satT + dt : c === "eat" ? satT : 0;   // how long he has sat at the screen (tiredness())
   if (c === "seat" || c === "eat") {                   // seated: a slow sway of the back
     bend(bones.Spine01, TF, 0.015 * nz(T * 0.09, 11)); bend(bones.Spine02, TL, 0.012 * nz(T * 0.13, 12));
   }
@@ -2698,18 +2814,22 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
     const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
-    let bed = 0, chair = 0; const u = new THREE.Vector3(), by = {}, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
+    let bed = 0, chair = 0, desk = 0, wall = 0; const u = new THREE.Vector3(), by = {}, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
     const note = (i, what) => { if (!detail) return; let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
     const hid = SLIDES.state === 2 ? SLIDES.parkedIdx : null;                     // (the slides parked by the bed are not on him)
     for (let i = 0; i < P.count; i += every) { if (hid && hid.has(i)) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
+      // the desk top (room_build: x -1.86..-0.36, z -1.44..-0.80, 0.94..0.97 m) and the walls' inner faces (x -1.9 but the
+      // window's opening, z -1.45), 5 mm in
+      if (v.x > -1.855 && v.x < -0.365 && v.z > -1.435 && v.z < -0.805 && v.y > 0.945 && v.y < 0.965) { desk++; note(i, "desk"); }
+      if ((v.x < -1.905 && !(v.z > -0.62 && v.z < 0.90 && v.y > 1.27 && v.y < 2.1)) || v.z < -1.455) { wall++; note(i, "wall"); }
       const e = Math.min(v.x + 1.90, -0.20 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
       if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0)) { bed++; note(i, "bed"); }
       if (V) { ch.worldToLocal(u.copy(v)); const ci = Math.floor((u.x - V.x0) / V.c), ck = Math.floor((u.z - V.z0) / V.c);
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } }
-    return detail ? {bed, chair, by} : {bed, chair, of:Math.ceil(P.count / every)}; },
-  LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
+    return detail ? {bed, chair, desk, wall, by} : {bed, chair, desk, wall, of:Math.ceil(P.count / every)}; },
+  IV, ACTS, FIDGETS, LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
     if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
       room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
         o.updateMatrixWorld(true); const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();
@@ -2756,7 +2876,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   const animate0 = animate; let motion = null;
   import("./room/boy_motion.js").then(m => { motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
     get boy(){ return boy; }, get mixer(){ return mixer; }, touch, reach, aimBone, setWorldQuat,
-    state: () => ({ctx:ctxNow, at, step, goal, current, holdW, peek, phoneWanted, life:lastLife, T, iv:IV.cur && IV.cur.n,
+    state: () => ({ctx:ctxNow, at, step, goal, current, holdW, peek, phoneWanted, life:lastLife, T, iv:IV.cur && (IV_AS[IV.cur.n] || IV.cur.n),
       held:Object.keys(PROP.held).length > 0 || bag === "hand" || !!(trash && trash.held)}),
     setCurrent: a => { current = a; },
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
