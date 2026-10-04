@@ -41,7 +41,7 @@
     fingertips on the buttons.
   - `room_bedtime_up` (14 s, NEW, awaiting the owner): late at night, seated: stretches, rubs his eyes, stands up
     pushing on his thighs, walks off (ends ~1.9 m from the chair, walking). Chain: bedtime_up -> walk -> `room_bed_lie`.
-  - Slides (G4's clothes, heel sole 2.3 cm): all clips_g2 are raised for the dressed body. Standing and walking +1.5 cm
+  - Slides (G4's clothes, heel sole 2.3 cm): all clips_g2 are raised for the dressed body. Standing +1.5 cm, room_walk +2.6 cm (G4 measured the slides 9.6 mm under the floor at +1.5 cm in the walk's toe-off)
     (bare soles at 2.5 cm, measured); desk clips DY 0.023 (seated feet +0.8 cm, buttocks ~1 cm over the seat with the
     trousers' 4.5 mm), watch 0.108, read 0.030, eat/phone 0.008; sit down / stand up / bedtime_up lift +1.5 cm only while
     standing (LIFT [[0.80,0.015],[0.62,0]]); bed clips +1.5 cm standing, lying 1.5 cm higher (body ~0.5 cm into the
