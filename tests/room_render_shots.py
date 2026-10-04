@@ -184,7 +184,7 @@ class Run:
           settle(); updateCameraGoal();
           camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); sim(0.05); }}""")
         pg.wait_for_timeout(2500)
-        pg.evaluate("window.FREEZE = true; post.render(0.1)")   # the frame the screenshot takes is drawn from the placed camera (software GL may not have drawn one yet)
+        pg.evaluate("window.FREEZE = true; if (window.post) post.render(0.1); else renderer.render(scene, camera)")   # the frame the screenshot takes is drawn from the placed camera (software GL may not have drawn one yet); main's page has no post
         pg.evaluate("window.FREEZE = false")
 
 
