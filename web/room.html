@@ -1095,7 +1095,7 @@ $("cam").onclick = () => { pinned = !pinned; CAM.force = pinned ? "overview" : n
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
-const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9};
+const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, aim:new THREE.Vector3(0, -9, 0)};
 const SHOT_S = {face:14, screen:12, medium:16, over:12};                  // seconds a shot holds before the cycle moves on
 // the overview is in every cycle and holds three quarters of what the other shots hold together: >= 40 % of the time
 const holdOf = (kind, list) => kind === "overview" ? Math.max(12, 0.75 * list.reduce((s, k) => s + (SHOT_S[k] || 0), 0)) : SHOT_S[kind];
@@ -1128,8 +1128,13 @@ function occluded(pos, aim){
 const _cfd = new THREE.Vector3(), _cfp = new THREE.Vector3();
 function camAround(out, c, facing, dist, h, ang){
   const angs = [ang, -ang, 90, -90, 0, 135, -135, 180];
-  const check = CAM.cut || CAM.pick === null || T - CAM.losAt > 2;
-  if (!check) { out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(CAM.pick)), dist).addScaledVector(UP, h); camClamp(out); CAM.ang = CAM.pick; return out; }
+  // the settled angle is kept while nothing changed: no cut, under 2 s since the rays, he has not moved 40 cm, and its
+  // position still clears the walls and the furniture (the rays are cast again otherwise)
+  if (!(CAM.cut || CAM.pick === null || T - CAM.losAt > 2 || c.distanceTo(CAM.aim) > 0.4)) {
+    out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(CAM.pick)), dist).addScaledVector(UP, h);
+    if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12) { CAM.ang = CAM.pick; return out; }
+  }
+  CAM.aim.copy(c);
   head.getWorldPosition(_cfp); (bones.headfront || head).getWorldPosition(_cfd); _cfd.sub(_cfp).setY(0);
   if (_cfd.lengthSq() < 1e-6) _cfd.copy(facing); _cfd.normalize();
   let best = null, bestS = -1e9, bestA = 0, fallback = null, fallD = 1e9, fallA = 0;
@@ -1137,8 +1142,10 @@ function camAround(out, c, facing, dist, h, ang){
     out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h);
     const d = camClamp(out) + (camInside(out) ? 1 : 0);
     if (d < fallD) { fallD = d; fallback = out.clone(); fallA = a; }
-    if (d >= 0.12 || occluded(out, c)) continue;
-    const s = _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd);          // 1: straight at his face, -1: the back of his head
+    const occ = d < 0.12 && occluded(out, c);
+    const s = d < 0.12 && !occ ? _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd) : null;   // 1: straight at his face, -1: the back of his head
+    if (DEBUG) { (CAM.trace = CAM.trace || []).push([a, +d.toFixed(2), occ, s === null ? null : +s.toFixed(2)]); if (CAM.trace.length > 64) CAM.trace.shift(); }
+    if (s === null) continue;
     if (s > bestS + 1e-6) { bestS = s; best = out.clone(); bestA = a; }
   }
   CAM.losAt = T;
@@ -2894,7 +2901,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) { windowView.update(0.1, hour); lighting(0.1); } },   // the window follows the hour too (QA freezes the loop)
-  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, studioEnv, roomEnv, setEnv,
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, camClamp, camInside, occluded, camAround, studioEnv, roomEnv, setEnv,
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
     const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
