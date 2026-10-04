@@ -223,6 +223,10 @@ prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces
 
     node build_tripo2.mjs <folder> ../web/room/props_tripo2.glb
 
+The keyboard (`keyboard.glb`, `room_build/build_keyboard.mjs`) is modelled in code for this project, CC0: a full-size
+104-key layout, plain keycaps with no legends, no maker's design; it takes the modelled tenkeyless one's place, its home
+row where that one's was.
+
 The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
 page paints it over the record sleeve in the posters atlas.
 

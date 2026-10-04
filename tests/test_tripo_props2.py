@@ -78,3 +78,15 @@ def test_credited_with_task_ids():
 def test_car_poster():
     assert (ROOT / "web" / "room" / "poster_car.webp").read_bytes()[8:12] == b"WEBP"
     assert '"room/poster_car.webp"' in (ROOT / "web" / "room.html").read_text()
+
+
+def test_keyboard_is_light_and_placed_by_its_home_row():
+    kb = ROOT / "web" / "room" / "keyboard.glb"
+    data = kb.read_bytes()
+    assert len(data) <= 1024 * 1024
+    n = struct.unpack_from("<I", data, 12)[0]
+    j = json.loads(data[20:20 + n])
+    tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
+    assert 0 < tris <= 20000
+    html = (ROOT / "web" / "room.html").read_text()
+    assert 'load("room/keyboard.glb")' in html and "const KB_HOME = [" in html

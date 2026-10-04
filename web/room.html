@@ -519,6 +519,18 @@ if (TRIPO) Promise.all([load("room/props_tripo2.glb"),
   if (props.includes("lamp2") && g.scene.userData.lampLight) lamp.position.set(...g.scene.userData.lampLight);   // in the new shade
   scene.add(g.scene);
 }).catch(e => console.warn("props_tripo2.glb", e));
+// the full-size keyboard modelled in code (room_build/build_keyboard.mjs; its origin the middle of F and J at desk level):
+// on the mat with its home row where the modelled tenkeyless one had it, turned like it (props_hard.py KB_C, KB_RY); the
+// old one (keycaps and body) is cut out of the static room. Its home-row key tops stand 3.2 cm over the mat
+const KB_HOME = [-1.115, 0.9723, -0.967, 0.06];
+if (TRIPO) Promise.all([load("room/keyboard.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
+  const st = room.getObjectByName("room_static");
+  if (st) cutBox(st, new THREE.Box3(new THREE.Vector3(-1.26, 0.9725, -1.055), new THREE.Vector3(-0.88, 1.012, -0.885)));
+  g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.vertexColors = true;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; m.material.needsUpdate = true; } });
+  g.scene.position.set(KB_HOME[0], KB_HOME[1], KB_HOME[2]); g.scene.rotation.y = KB_HOME[3]; scene.add(g.scene);
+}).catch(e => console.warn("keyboard.glb", e));
 // the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C
 // (tex_prep.py: x 683..1024 of 1024, y 0..341 of 512)
 if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"),
