@@ -1095,7 +1095,7 @@ $("cam").onclick = () => { pinned = !pinned; CAM.force = pinned ? "overview" : n
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
-const CAM = {kind:null, since:0, cut:false, force:null, ang:0};
+const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9};
 const SHOT_S = {face:14, screen:12, medium:16, over:12};                  // seconds a shot holds before the cycle moves on
 // the overview is in every cycle and holds three quarters of what the other shots hold together: >= 40 % of the time
 const holdOf = (kind, list) => kind === "overview" ? Math.max(12, 0.75 * list.reduce((s, k) => s + (SHOT_S[k] || 0), 0)) : SHOT_S[kind];
@@ -1105,15 +1105,35 @@ function camClamp(p){ const d = p.clone(); p.x = clamp(p.x, ...CAM_BOX.x); p.y =
 const camInside = p => CAM_SOLIDS.some(([[x0, x1], [y0, y1], [z0, z1]]) => p.x > x0 - 0.3 && p.x < x1 + 0.3 && p.y > y0 && p.y < y1 + 0.3 && p.z > z0 - 0.3 && p.z < z1 + 0.3);
 // a position `dist` from `c` at `h` above it, `ang` degrees round his facing (0 = in front of him), or the mirror angle, a
 // profile, the front, a rear three-quarter, the back: the first that clears the walls and the furniture
+// something of the room between the camera and him (the laundry hanger's socks, a curtain, the shelf): five rays through
+// the room's meshes (not the screens' planes), to the aim point and to 25 cm above, 20 cm below and 20 cm either side
+// of it (the frame round his head), stopping short of him (the chair's back, the sill)
+const _ray = new THREE.Raycaster(), _rd = new THREE.Vector3(), _ra = new THREE.Vector3(), _rr = new THREE.Vector3(); let roomMeshes = null;
+function occluded(pos, aim){
+  if (!room) return false;
+  if (!roomMeshes) { roomMeshes = []; room.traverse(m => { if (m.isMesh && m.visible && !(m.geometry && m.geometry.type === "PlaneGeometry")) roomMeshes.push(m); }); }
+  _rd.subVectors(aim, pos); const d = _rd.length(); if (d < 0.5) return false;
+  _rr.crossVectors(_rd, UP).normalize();
+  for (const [u, r] of [[0, 0], [0.25, 0], [-0.2, 0], [0, 0.2], [0, -0.2]]) {
+    _ra.copy(aim).addScaledVector(UP, u).addScaledVector(_rr, r); _rd.subVectors(_ra, pos);
+    _ray.set(pos, _rd.normalize()); _ray.near = 0.05; _ray.far = d - Math.min(0.35, 0.2 * d);
+    if (_ray.intersectObjects(roomMeshes, false).length > 0) return true;
+  }
+  return false;
+}
 function camAround(out, c, facing, dist, h, ang){
+  const angs = [ang, -ang, 90, -90, 0, 135, -135, 180];
+  if (CAM.pick !== null && angs.includes(CAM.pick)) { angs.splice(angs.indexOf(CAM.pick), 1); angs.unshift(CAM.pick); }   // the angle this shot settled on, first: no flapping between frames
+  const check = CAM.cut || T - CAM.losAt > 2;                              // the line of sight is cast on a cut and every 2 s (a ray through the room's meshes costs milliseconds)
   let best = null, bestD = 1e9, bestA = 0;
-  for (const a of [ang, -ang, 90, -90, 0, 135, -135, 180]) {
+  for (const a of angs) {
     out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h);
-    const d = camClamp(out) + (camInside(out) ? 1 : 0);
-    if (d < 0.12) { CAM.ang = a; return out; }
+    let d = camClamp(out) + (camInside(out) ? 1 : 0);
+    if (d < 0.12 && check && occluded(out, c)) d += 0.5;                  // he would be seen through something: the next angle round him
+    if (d < 0.12) { CAM.ang = CAM.pick = a; if (check) CAM.losAt = T; return out; }
     if (d < bestD) { bestD = d; best = out.clone(); bestA = a; }
   }
-  CAM.ang = bestA;                                                         // how far round him the shot ended up (0 = his front)
+  CAM.ang = CAM.pick = bestA; if (check) CAM.losAt = T;                    // how far round him the shot ended up (0 = his front)
   return out.copy(best);
 }
 // the overview; on a tall frame from further back (the whole width of the room instead of its middle; the orbit's 12 m
@@ -1131,9 +1151,9 @@ function updateCameraGoal(){
   // hood would fill a tall frame and hide the monitor) is left out of the cycle
   const narrow = camera.aspect < 1;
   const list = atDesk ? (narrow ? ["face", "medium", "overview"] : ["face", "screen", "medium", "overview"]) : onPhone ? ["over", "face", "overview"] : home ? ["medium", "face", "overview"] : ["overview"];
-  if (CAM.force && list.includes(CAM.force)) { if (CAM.kind !== CAM.force) { CAM.kind = CAM.force; CAM.since = nowS; CAM.cut = true; } }
+  if (CAM.force && list.includes(CAM.force)) { if (CAM.kind !== CAM.force) { CAM.kind = CAM.force; CAM.since = nowS; CAM.cut = true; CAM.pick = null; } }
   else if (!list.includes(CAM.kind) || nowS - CAM.since > holdOf(CAM.kind, list)) {
-    CAM.kind = list[(list.indexOf(CAM.kind) + 1) % list.length]; CAM.since = nowS; CAM.cut = true; }
+    CAM.kind = list[(list.indexOf(CAM.kind) + 1) % list.length]; CAM.since = nowS; CAM.cut = true; CAM.pick = null; }
   if (CAM.kind === "overview" || !home) return overviewGoal();
   (bones.headfront || head).getWorldPosition(v2);                           // his face
   const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right

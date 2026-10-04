@@ -143,6 +143,7 @@ def test_page_wires_the_module():
     assert "holdOf(CAM.kind, list)" in cam and "0.75 * list.reduce" in html      # ... and holds >= 40 % of it (0.75 / 1.75)
     assert "CAM.cut" in html.split("function frame(now)")[1]
     assert 'CAM.force = pinned ? "overview" : null' in html                      # the chip: the cycle, or the overview pinned
+    assert "occluded(out, c)" in html and "_ray.intersectObjects(roomMeshes, false)" in html   # nothing of the room between the camera and him (the laundry hanger, a curtain)
     assert "post.focus(cd, smooth(2.4, 1.0, cd) * (atScreen ? 0.25 : 1))" in html   # the page on the monitor stays readable in the desk close-ups
     assert JS.stat().st_size < 60 * 1024
 
