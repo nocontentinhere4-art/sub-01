@@ -60,6 +60,16 @@ Fourth pass (the coordinator's read of the first body sheet: "still plastic"):
 - the nails: the bed is the finger's own skin a little pinker (less contrast), a paler lunula, an off-white, uneven
   free edge, a soft shadow where the cuticle fold meets the plate.
 
+Fifth pass (the coordinator: floating lashes, a pasted-in eye, a flat cheek):
+- the lashes grow from the lid's front rim: rooted where the lid meets the ball (the crossing nearest the opening),
+  brought forward by the lid's thickness, along the lid's curve; the uppers fan up and out, the lowers are shorter,
+  sparser and lie forward;
+- the eye sits in the lids: a soft occlusion band of the upper lid on the ball (the top of the iris and the sclera
+  darker), a thin wet waterline along the upper lid so it has a thickness, the gaze a little up so the iris tucks
+  under the upper lid;
+- the cheek up close: warm and cool mottling at 3-8 mm, a few tiny dark pores, sparse pale vellus hairs lying down
+  and back (on the cheeks and the jaw's sides only).
+
 Where it still differs from the photos: the hand is still paler than the photo's (an older man's hand; the agreed
 tone is kept, only the zones are redder); the photo's eye is a macro with a big room reflection on the cornea; there
 is no hair on the face. The head-only sheet (`sheet.jpg`, a mesh closed over the eyes) has no lash strands: its lids

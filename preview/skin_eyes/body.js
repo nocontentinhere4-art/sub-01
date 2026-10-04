@@ -160,6 +160,18 @@ export function dressBody(THREE, root, {iris = [0.24, 0.13, 0.06]} = {}){
     for (let i = 0; i < n; i++) { const fg = 1 - hd.getW(i), s = hd.getX(i);
       if (fg > 0 && s > -2.2) sd.setX(i, Math.max(sd.getX(i), 0.55 * fg * Math.min(1, (s + 2.2) / 0.6))); } }
   buildHairData(THREE, skin, bind);
+  // fine, pale vellus on the cheeks and the jaw's sides (lighter: |direction| 0.4 is the strands' darkness), lying
+  // down and back; none on the nose, the lips, round the eyes
+  { const hd = skin.geometry.attributes.hairData, g = (d, sg) => Math.exp(-(d * d) / (2 * sg * sg));
+    for (let i = 0; i < n; i++) {
+      const x = shifted[3 * i], y = shifted[3 * i + 1], z = shifted[3 * i + 2], ax = Math.abs(x);
+      if (z < L.eyeZ - 0.06 || y > L.eyeY - 0.012 || y < L.lip[1] - 0.06) continue;
+      const cheek = g(Math.hypot(ax - 0.05, y - (L.eyeY - 0.04)), 0.02) * Math.min(1, Math.max(0, (ax - 0.022) / 0.012));
+      if (cheek < 0.05) continue;
+      const d = 0.3 * cheek;
+      hd.setXYZW(i, -0.2 * Math.sign(x), -0.32, -0.1, 1 - d);
+    }
+    hd.needsUpdate = true; }
   skin.material = makeSkinMaterial(THREE);
   { const u = skin.material.userData.uniforms;
     u.uEyeL.value.set(...E.l.center.toArray(), E.l.radius); u.uEyeR.value.set(...E.r.center.toArray(), E.r.radius); }

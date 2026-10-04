@@ -271,12 +271,20 @@ void RE_IndirectDiffuse_Physical`);
         float sk_bl = sk_noise(vObj * 16.0 + 7.0) * 0.6 + sk_noise(vObj * 47.0) * 0.4;
         float sk_redz = clamp((vColor.r - vColor.g) * 4.0 - 0.5, 0.0, 1.0);
         diffuseColor.rgb *= mix(vec3(1.0), vec3(1.06, 0.88, 0.86), smoothstep(0.42, 0.8, sk_bl) * (0.55 + 0.6 * sk_redz));
+        // the mottling seen up close (3-8 mm): warm (capillaries) and cool (veins, paler spots) patches
+        float sk_wc = sk_noise(vObj * 210.0 + 1.7) - sk_noise(vObj * 330.0 + 9.1);
+        diffuseColor.rgb *= vec3(1.0) + sk_wc * vec3(0.12, -0.03, -0.06) * (1.0 - vSkin.w);
+        // a few tiny dark pores (most are only felt in the bump): sparse dots ~0.15 mm, faded out when sub-pixel
+        { float px0 = length(fwidth(vObj)), kd = 1.0 - smoothstep(0.00012, 0.0003, px0);
+          if (kd > 0.0) { float pc = sk_cell(vObj * 1150.0);
+            float dot0 = (1.0 - smoothstep(0.06, 0.16, pc)) * smoothstep(0.6, 0.72, sk_noise(vObj * 2600.0));
+            diffuseColor.rgb *= 1.0 - 0.3 * dot0 * kd * (1.0 - vSkin.w); } }
         float sk_lash = max(sk_lashAt(vObj, uEyeL), sk_lashAt(vObj, uEyeR));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.013, 0.011), sk_lash);
         float sk_nail = 0.0, sk_crease = 0.0;
         sk_hand(diffuseColor.rgb, sk_nail, sk_crease);
         float sk_hairC = sk_hair(vObj, normalize(vObjN), vHairD);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.032, 0.022), 0.8 * sk_hairC);`)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.032, 0.022), 0.8 * min(1.0, length(vHairD.xyz)) * sk_hairC);`)
       // the T-zone: tighter and stronger specular; cavities: less specular
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, 0.31, vSkin.y);
@@ -320,7 +328,7 @@ void RE_IndirectDiffuse_Physical`);
         reflectedLight.indirectDiffuse *= 1.0 - 0.45 * vSkin.z;
         reflectedLight.indirectSpecular *= 1.0 - 0.6 * vSkin.z;`);
   };
-  m.customProgramCacheKey = () => "skin-v9";
+  m.customProgramCacheKey = () => "skin-v10";
   return m;
 }
 
@@ -372,12 +380,12 @@ function eyeballMaterial(THREE, map){
     // not rotated with the ball's own turn), a soft socket ring that does not depend on shadow maps
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vEyeN;")
       .replace("#include <aomap_fragment>", `#include <aomap_fragment>
-        float eo = 1.0 - 0.85 * smoothstep(0.0, 0.34, vEyeN.y) - 0.45 * smoothstep(0.42, 0.85, abs(vEyeN.x)) - 0.35 * smoothstep(0.25, 0.6, -vEyeN.y);
+        float eo = 1.0 - 0.55 * smoothstep(-0.02, 0.2, vEyeN.y) - 0.35 * smoothstep(0.15, 0.34, vEyeN.y) - 0.45 * smoothstep(0.42, 0.85, abs(vEyeN.x)) - 0.35 * smoothstep(0.25, 0.6, -vEyeN.y);
         eo = clamp(eo, 0.12, 1.0);
         reflectedLight.directDiffuse *= eo; reflectedLight.indirectDiffuse *= eo;
         reflectedLight.directSpecular *= eo; reflectedLight.indirectSpecular *= eo;`);
   };
-  m.customProgramCacheKey = () => "eyeball-v1";
+  m.customProgramCacheKey = () => "eyeball-v2";
   return m;
 }
 
@@ -399,14 +407,15 @@ function lashStrands(THREE, pts, C, up, {count, len, width}){
   for (let n = 0; n < count; n++) {
     const t = Math.min(0.995, Math.max(0.005, (n + 0.5 + 0.6 * (rnd(n) - 0.5)) / count));
     const T = curve.getTangentAt(t), m = curve.getPointAt(t);
-    // the root on the lid's visible edge, just out of the skin
-    const p0 = m.clone().addScaledVector(m.clone().sub(C).normalize(), 0.0003);
+    // the root on the lid's visible edge (where it meets the ball), brought forward by the lid's thickness
+    const p0 = m.clone().addScaledVector(m.clone().sub(C).normalize(), 0.00015).addScaledVector(Z, 0.0012);   // the lid's thickness: the lashes grow from its front rim
     const tOut = outerSign > 0 ? t : 1 - t;                      // 0 at the inner corner, 1 at the outer
     const L = len * (0.45 + 0.55 * Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * tOut))) * (0.8 + 0.4 * rnd(n + 50));
     const out = p0.clone().sub(C).normalize();
-    const d0 = out.clone().multiplyScalar(0.3).addScaledVector(Z, 0.85).addScaledVector(Y, 0.22).normalize();
+    const d0 = out.clone().multiplyScalar(0.3).addScaledVector(Z, 0.9).addScaledVector(Y, 0.08).normalize();
     d0.applyAxisAngle(T, (rnd(n + 9) - 0.5) * 0.35);
-    const p1 = p0.clone().addScaledVector(d0, L * 0.6), p2 = p0.clone().addScaledVector(d0, L * 0.75).addScaledVector(Y, L * 0.5);
+    const curl = up > 0 ? 0.5 : 0.18;                              // the lower lashes lie forward, curling less
+    const p1 = p0.clone().addScaledVector(d0, L * 0.6), p2 = p0.clone().addScaledVector(d0, L * 0.75).addScaledVector(Y, L * curl);
     const base = pos.length / 3;
     for (let k = 0; k <= SEG; k++) {
       const u = k / SEG, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
@@ -436,7 +445,7 @@ export function addEyes(THREE, group, P, eyes, {iris = [0.24, 0.13, 0.06], index
     const C = new THREE.Vector3(...e.center), r = e.radius * EYE_K;   // e.radius: the helper sphere's
     const eye = new THREE.Group(); eye.position.copy(C); eye.name = "eye_" + side;
     // the ball looks ahead and very slightly out (a relaxed gaze converges a little at the room distance)
-    const fwd = new THREE.Vector3(Math.sign(C.x) * 0.03, -0.02, 1).normalize();
+    const fwd = new THREE.Vector3(Math.sign(C.x) * 0.03, 0.05, 1).normalize();
     const ball = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 48), ballMat);
     ball.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), fwd);   // the texture's top pole (the iris) forward
     eye.add(ball);
@@ -471,8 +480,9 @@ export function addEyes(THREE, group, P, eyes, {iris = [0.24, 0.13, 0.06], index
     const margin = up => { const bins = new Map();
       if (crossings.length) {
         for (const p of crossings) { const q = p.clone().sub(C);
-          if (Math.abs(q.x) > r * 1.0 || (up ? q.y < -r * 0.02 : q.y > r * 0.02)) continue;
-          const k = Math.round(q.x / 0.0015), o = bins.get(k); if (!o || p.z > o.z) bins.set(k, p.clone()); }
+          if (q.z < r * 0.45 || Math.abs(q.x) > r * 1.0 || (up ? q.y < -r * 0.02 : q.y > r * 0.02)) continue;
+          // the edge is the crossing nearest the opening: the lowest on the upper lid, the highest on the lower
+          const k = Math.round(q.x / 0.0015), o = bins.get(k); if (!o || (up ? p.y < o.y : p.y > o.y)) bins.set(k, p.clone()); }
       } else {
         for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const q = v.clone().sub(C);
           if (q.z < r * 0.35 || Math.abs(q.x) > r * 0.95 || (up ? q.y < r * 0.05 : q.y > -r * 0.3) || q.length() > r * 1.4) continue;
@@ -485,6 +495,11 @@ export function addEyes(THREE, group, P, eyes, {iris = [0.24, 0.13, 0.06], index
       const pts = upper.map(p => p.clone().add(p.clone().sub(C).normalize().multiplyScalar(0.0003)));
       const lash = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.00075, 6, false), lashMat);
       lash.name = "lash_" + side; group.add(lash);
+      // the upper lid's thickness: a thin wet pink rim (the waterline) just inside the lash line
+      if (crossings.length) {
+        const wl = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(upper.map(p => p.clone().lerp(C, 0.015))), 48, 0.0005, 6, false), tearMat);
+        wl.name = "waterline_" + side; wl.renderOrder = 3; group.add(wl);
+      }
       // the lash strands need the visible margin (the edge crossings: a mesh open at the lids, as G2's body)
       if (crossings.length) {
         const strands = new THREE.Mesh(lashStrands(THREE, upper, C, 1, {count: 90, len: 0.0082, width: 0.00012}), strandMat);
@@ -496,7 +511,7 @@ export function addEyes(THREE, group, P, eyes, {iris = [0.24, 0.13, 0.06], index
       const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.00045, 6, false), tearMat);
       // the lower lashes: fewer, shorter, from just outside the wet line
       if (crossings.length) {
-        const lows = new THREE.Mesh(lashStrands(THREE, lower, C, -1, {count: 40, len: 0.004, width: 0.00009}), strandMat);
+        const lows = new THREE.Mesh(lashStrands(THREE, lower, C, -1, {count: 26, len: 0.0032, width: 0.00008}), strandMat);
         lows.name = "lashes_low_" + side; group.add(lows);
       }
       tube.name = "tear_" + side; tube.renderOrder = 3; group.add(tube);
