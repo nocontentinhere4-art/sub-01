@@ -40,6 +40,9 @@ def test_moves_play_on_the_first_rig():
     assert MOVES.stat().st_size <= 1.5 * MB
     old = glb_json(ROOM / "boy.glb")
     bones = {old["nodes"][j]["name"] for j in old["skins"][0]["joints"]}
+    if "metacarpal1.L" in bones:                       # preview/room-mh: boy.glb is the MakeHuman rig, which room/boy_mh.js
+        import pytest                                  # drives with its own clips; these #76 clips are for the first rig
+        pytest.skip("boy.glb is the MakeHuman rig on this preview branch; #76's clips belong to the first rig")
     js = glb_json(MOVES)
     for a in js["animations"]:
         rot = set()

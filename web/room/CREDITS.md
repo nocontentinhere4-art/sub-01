@@ -222,3 +222,13 @@ re-downloads them (Wikimedia rate-limits shared addresses; the script waits and 
 The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
 pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented
 as a forecast or an observation.
+
+## The MakeHuman body and its mocap (preview/room-mh, a crude preview)
+
+| file | source | author | licence |
+|---|---|---|---|
+| `boy.glb` (on this preview branch only: the MakeHuman base body, 163 bones with fingers; a placeholder until the real body is built on the same skeleton) | [MakeHuman](https://github.com/makehumancommunity/makehuman): `base.obj`, `default.mhskel`, `default_weights.mhw`, built by `room_build/mh/build_mh.mjs` | the MakeHuman team | CC0 (MakeHuman's exported models and its base mesh are CC0) |
+| `mh/desk_type_ik.glb`, `mh/desk_mouse_ik.glb`, `mh/desk_watch.glb`, `mh/04_Open_Window.glb`, `mh/02_Lie_Down_01.glb` (animation only, 20 fps, with fingers) | Rokoko motion-capture packs "Everyday Actions" 1 and 7, retargeted by `room_build/mh/anim_mh.mjs` | Anderson Rohr | Commercial use allowed (the packs' licence); the source FBX files are not in the repository |
+
+The body is generic (MakeHuman's average base) and resembles no real person. In the room the watching mode takes its
+pelvis and legs from the mouse clip, so he sits in the chair with his feet on the floor (the recorded clip props them up).

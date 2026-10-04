@@ -2754,8 +2754,24 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
 // breathing, weight shifts, foot IK on the floor, hands on the keyboard / mouse / bowl, eye and head look-at and a pop
 // killer. It gets the page's internals here, and registers every bone it moves with touch(). ?debug: window.motion.
 {
-  const animate0 = animate; let motion = null;
-  import("./room/boy_motion.js").then(m => { motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
+  const animate0 = animate; let motion = null, mh = null, rig = null;
+  // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
+  // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
+  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, get boy(){ return boy; }, get mixer(){ return mixer; },
+    movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
+    resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
+    state: () => ({at, step, goal, current, want, T, life:lastLife}),
+    step0: dt => { untouch(); if (mixer) mixer.update(dt); T += dt; if (!boy) return false; boy.visible = visible; return drive(dt); }});
+  const pickRig = () => {
+    if (rig || !boy) return rig;
+    rig = bones["metacarpal1L"] || bones["metacarpal1.L"] ? "mh" : "old";   // (three.js drops the dot from node names)
+    if (rig === "mh") import("./room/boy_mh.js").then(async m => {
+      for (let i = 0; i < 600 && !(!MOVES || movesOn); i++) await new Promise(r => setTimeout(r, 100));   // after #76's loads
+      mh = m.createMH(mhEnv()); if (DEBUG) window.mh = mh; }).catch(e => console.warn("MakeHuman layer off:", e));
+    return rig;
+  };
+  (async () => { for (let i = 0; i < 1200 && !pickRig(); i++) await new Promise(r => setTimeout(r, 100)); })()   // the body decides the layer
+    .then(() => rig === "mh" ? null : import("./room/boy_motion.js")).then(m => { if (!m) return; motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
     get boy(){ return boy; }, get mixer(){ return mixer; }, touch, reach, aimBone, setWorldQuat,
     state: () => ({ctx:ctxNow, at, step, goal, current, holdW, peek, phoneWanted, life:lastLife, T, iv:IV.cur && IV.cur.n,
       held:Object.keys(PROP.held).length > 0 || bag === "hand" || !!(trash && trash.held)}),
@@ -2763,7 +2779,8 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
     HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
     setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
-  animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  animate = dt => { if (pickRig() === "mh") return mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
+    const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
   if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====
