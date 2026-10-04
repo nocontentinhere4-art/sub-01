@@ -100,6 +100,9 @@
     box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 14px 30px -12px #000, 0 0 36px -10px rgba(140,170,255,.28); }
   #screencard.phone .frame::before { content:""; position:absolute; left:50%; top:7px; width:48px; height:9px; margin-left:-24px; border-radius:6px; background:#0a0a0d; z-index:1; }
   #screencard.phone .frame img { aspect-ratio:390/844; object-fit:cover; object-position:top; }
+  #screencard .frame iframe.player { display:block; width:100%; aspect-ratio:16/9; border:0; background:#000; }
+  #screencard.phone .frame iframe.player { aspect-ratio:390/844; }
+  #screencard .frame.playing img { display:none; }
   #screencard .url { font-size:11px; color:var(--dim); margin-top:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #map { height:230px; border-radius:8px; overflow:hidden; background:#0d0e13; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
   .leaflet-container { background:#0d0e13 !important; font-family:inherit !important; }
@@ -289,6 +292,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { PhoneScreen, phoneGlow as phoneGlowLevel, batteryAt } from "./room_phone.js";
 import { createWindowView } from "./room/window_view.js";
+import { createScreenPlayer, nowWatching, playingCanvas } from "./room/screen_player.js";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -730,8 +734,14 @@ let phoneWanted = false;           // the activity has the phone in his hand (he
 let chatting = false;              // at the desk answering chat: the monitor shows the chat window
 let lastStatus = {};               // device -> status
 let trades = [];                   // recent trade flow, for the chart view
+// #89 client player: a video his brain picked plays in the viewer's browser (the side panel's official embed,
+// room/screen_player.js); the 3D screen shows the server's card with a "playing" frame and the progress
+const player = createScreenPlayer(document.querySelector("#screencard .frame"));
+const playing = {};                // device -> {pc, tex}: the "playing" canvas on a 3D screen, redrawn every second
+setInterval(() => { for (const k in playing) { playing[k].pc.update(); playing[k].tex.needsUpdate = true; } }, 1000);
 function showScreen(st){
   if (!st) return;
+  st._rx = st._rx || Date.now();
   if (st.restarting) { lastStatus[st.device] = st; if (screenOn === st.device) panel(st); return; }
   lastStatus[st.device] = st;
   const target = st.device === "desk" ? monitor : phone.userData.screen;
@@ -739,7 +749,14 @@ function showScreen(st){
   target.id = st.id;
   const url = `/api/screen/${st.device}.jpg?id=${st.id}`;
   const img = new Image(); img.decoding = "async";
-  img.onload = () => { const t = screenTexture(img); fitTop(t, target.aspect); target.set(t);
+  const nw = nowWatching(st);
+  img.onload = () => {
+    let t;
+    if (nw) {
+      const pc = st.device === "desk" ? playingCanvas(document, img, nw, 1024, 600) : playingCanvas(document, img, nw, 390, 844);
+      t = screenTexture(pc.canvas); playing[st.device] = {pc, tex:t};
+    } else { t = screenTexture(img); delete playing[st.device]; }
+    fitTop(t, target.aspect); target.set(t);
     if (screenOn === st.device) { $("s-img").src = url; } };
   img.src = url;
   if (screenOn === st.device) panel(st);
@@ -757,7 +774,7 @@ function optRows(opts){
 function chessPanel(g){             // chess at the desk (#17): the board is on the monitor, the vote is here
   const key = `chess|${g.plies}|${g.result}`;
   if (key === panelKey) return; panelKey = key;
-  const card = $("screencard"); card.hidden = false; card.classList.remove("phone");
+  const card = $("screencard"); card.hidden = false; card.classList.remove("phone"); player.hide();
   $("s-k").textContent = "Chess at his desk"; $("s-link").hidden = true;
   card.querySelector(".frame").hidden = false;
   $("s-img").src = chessCanvas().toDataURL("image/jpeg", 0.85);
@@ -779,12 +796,13 @@ function panel(st){
   const key = st ? `${st.device}|${st.id}|${st.title}|${st.url}|${st.why}|${st.restarting ? 1 : 0}|${JSON.stringify(st.decision || null)}` : "";
   if (key === panelKey) return; panelKey = key;
   const card = $("screencard");
-  if (!st) { card.hidden = true; return; }
+  if (!st) { card.hidden = true; player.hide(); return; }
   card.hidden = false; card.classList.toggle("phone", st.device === "phone");
   $("s-k").textContent = st.device === "phone" ? "On his phone" : "On his computer";
   $("s-link").hidden = false; $("s-foot").textContent = PAGE_FOOT;
   card.querySelector(".frame").hidden = !!st.restarting;
   if (st.restarting) {
+    player.hide();
     $("s-title").innerHTML = `<div class="restarting">browser restarting…</div>`; $("s-url").textContent = "";
     $("s-why").textContent = "the screen's browser runs apart from the brain; the brain model keeps running"; $("s-opts").hidden = true;
     return;
@@ -799,7 +817,10 @@ function panel(st){
   }
   $("s-title").textContent = (st.title || "") + (st.channel ? ` — ${st.channel}` : ""); $("s-url").textContent = st.url || "";
   const w = st.video;                 // a video (#17): muted, for a bounded time, then the brain picks again
-  $("s-why").textContent = w && w.watching
+  const inBrowser = player.show(st, st._rx);   // #89: the official embed plays it here, in your browser
+  $("s-why").textContent = w && w.watching && inBrowser
+    ? `playing here, in your browser (official ${st.now_watching.source === "youtube" ? "YouTube" : "TikTok"} player, muted) · his brain model picked it; he watches ${Math.max(1, Math.round(w.seconds / 60))} min, then picks again`
+    : w && w.watching
     ? `video, muted · watching ${Math.round((dec && dec.watch_min) || w.seconds / 60)} min, then his brain model picks again · picture change ${Math.round((w.scene || 0) * 100)}% drives the visual areas`
     : (st.why || "");
   $("s-link").href = st.url || "#";

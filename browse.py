@@ -80,6 +80,16 @@ YOUTUBE_HOST = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)
 MAX_WATCH_S = 600.0                    # a watch never lasts longer than this (real seconds), whatever is asked
 MIN_WATCH_S = 10.0                     # ...nor shorter (the accelerated demo clock: a few screenshots at least)
 VIDEO_SHOT_S = 4.0                     # a screenshot (and a scene-change measure) every few seconds while watching
+
+
+def video_player_url(u):
+    """#89 client player: a URL (urlsplit) the server's browser never loads: any YouTube host (its pages and the
+    youtube-nocookie embed) and TikTok's embed player; those videos play in the viewer's browser."""
+    host = (u.hostname or "").lower().rstrip(".")
+    return bool(YOUTUBE_HOST.search(host) or (re.search(r"(^|\.)tiktok\.com$", host)
+                                              and re.match(r"/(player|embed)(/|$)", u.path or "")))
+
+
 SCENE_FULL = 32.0                      # mean grey-level change (0..255) of the thumbnails that counts as a full cut
 HIDE_YOUTUBE = """ytd-comments,#comments,ytd-live-chat-frame,#chat,#chat-container,ytd-engagement-panel-section-list-renderer,
 #sponsor-button,#subscribe-button,ytd-subscribe-button-renderer,#actions,ytd-menu-renderer,tp-yt-paper-dialog,
@@ -423,20 +433,36 @@ UNBLOCK_JS = """() => {
   }
   for (const el of [document.documentElement, document.body]) if (el) { el.style.setProperty('overflow', 'auto', 'important'); }
 }"""
-# #89 live (2026-10-04): an F1 video's embed said "Video unavailable … blocked it from display on this website". The
-# player's own error text, checked a few seconds after it opens and during the watch: such a video is never shown.
-EMBED_ERROR = re.compile(r"video unavailable|this video is unavailable|video currently unavailable|blocked it from "
-                         r"display|playback on other websites has been disabled|sign in to confirm|"
-                         r"an error occurred|this video is private|video has been removed|something went wrong|"
-                         r"advertisement playing", re.I)      # an ad is never skipped by us: the next video instead
-EMBED_CHECK_MS = 3000
-PLAYER_REFUSALS = ("bot wall", "sign-in wall", "did not load")   # the player page itself refused, whatever the video
-EMBED_ERROR_JS = """() => { const e = document.querySelector('.ytp-error, .ytp-error-content-wrap');
-  const ad = document.querySelector('.ad-showing, .ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text, .ytp-ad-skip-button');
-  const t = (document.body && document.body.innerText || '').slice(0, 2000);
-  return (ad ? 'advertisement playing ' : '') +
-         (e && getComputedStyle(e).display !== 'none' ? (e.innerText || 'player error') + ' ' : '') + t; }"""
-EMBED_REFERER = os.environ.get("SUB01_SITE_URL") or "https://sub01-production.up.railway.app/"   # embeds want a page
+# #89 client player (2026-10-04): YouTube refuses playback to the server's IP, so videos play in the viewer's browser
+# (the official embed in the side panel); the server's screen shows a local card. The picture change of a video the
+# server does not see is an estimate (it drives the visual areas a little, as an average video does).
+CLIENT_HOW = "playing in the official embed player in your browser (muted); the server shows this card"
+CLIENT_SCENE = 0.25
+CLIENT_SOURCES = {"youtube": re.compile(r"^[\w-]{11}$"), "tiktok": re.compile(r"^\d{8,25}$")}
+
+
+def now_watching(card, device):
+    """A card -> what the viewer's page plays: {source, id, title, channel, duration_s, started_at, device, thumb}, or
+    None when it has no official player we use (only YouTube ids and TikTok video ids, both checked)."""
+    url = str((card or {}).get("url") or "")
+    m = YT.YT_VIDEO.match(url)
+    if m:
+        source, vid = "youtube", m.group(1)
+    elif (t := SV.TIKTOK_VIDEO.match(url.split("?")[0])):
+        source, vid = "tiktok", t.group(2)
+    else:
+        return None
+    if not CLIENT_SOURCES[source].match(vid):
+        return None
+    sec = card.get("sec")
+    thumb = str(card.get("thumb") or "")
+    return {"source": source, "id": vid, "title": str(card.get("title") or "")[:140],
+            "channel": str(card.get("author") or "")[:80], "duration_s": int(sec) if isinstance(sec, (int, float))
+            and sec > 0 else None, "started_at": round(time.time(), 1), "device": device,
+            "thumb": thumb if thumb.startswith(("https://i.ytimg.com/", "https://p16-", "https://p19-", "https://p77-"))
+            else (f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if source == "youtube" else "")}
+
+
 # #89 teen re-seed: front pages of sites people his age read, per interest topic (docs/research/teen_online.md);
 # every front page was allowed by its robots.txt on 2026-10-04, and robots.txt is checked again before each page.
 # Cooking sites only while he is hungry or ordering food.
@@ -547,8 +573,9 @@ class Guard:
             return await route.abort()
         if req.method not in ("GET", "HEAD") and req.is_navigation_request():
             return await route.abort()                      # never submits anything
-        if req.is_navigation_request() and req.frame.parent_frame is None and YT.page_video(url)[1]:
-            return await route.abort()                      # #89 live: never YouTube's own pages (a redirect, a click)
+        if req.is_navigation_request() and video_player_url(u):
+            return await route.abort()                      # #89: YouTube (pages, nocookie embed) and TikTok's player
+        #                                                     play only in the viewer's browser, never in this one
         await route.continue_()
 
 
@@ -1252,19 +1279,21 @@ class Browser:
             if results:                                         # only what the embed will play (1 unit)
                 vt = await self._yt_api(sc, YT.videos_url([r["id"] for r in results]))
                 ok = YT.parse_durations(vt) if vt else {}
-                results = [r for r in results if r["id"] in ok]
+                results = [dict(r, sec=ok[r["id"]]) for r in results if r["id"] in ok]
                 self.yt.cache[self.yt._k(q, short)] = {"t": time.time(), "r": results[:10], "v": 2}
             print(f"browse: YouTube API search ({'shorts' if short else 'videos'}), {len(results)} results, "
                   f"{self.yt.used} units today", flush=True)
+        secs = {r["url"]: r.get("sec") for r in results}
         cards = [{"url": r["url"], "title": r["title"], "author": r["channel"], "thumb": r["thumb"], "hashtags": [],
                   "embed": r["embed"], "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
-                  "how": "YouTube's official embed player"} for r in self.safe_results(results)]
+                  "how": "YouTube's official embed player", "sec": secs.get(r["url"])}
+                 for r in self.safe_results(results)]
         cards = [c for c in cards if self._card_ok(c)][:6]
         self.yt.found(cards)
         return cards
 
     def _yt_cards(self, items, short, author=None):
-        cards = []
+        cards, secs = [], {YT.video_url(it["id"], short): it.get("sec") for it in items}
         for r in self.safe_results([{"url": YT.video_url(it["id"], short), "title": it["title"], "video": True,
                                      "channel": it.get("channel", "")} for it in items]):
             vid = r["url"].rsplit("/", 1)[-1].split("=")[-1]
@@ -1272,7 +1301,7 @@ class Browser:
                           "hashtags": re.findall(r"#\w+", r["title"])[:6],
                           "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
                           "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
-                          "how": "YouTube's official embed player"})
+                          "how": "YouTube's official embed player", "sec": secs.get(r["url"])})
         return [c for c in cards if self._card_ok(c)]
 
     async def _yt_api(self, sc, url):
@@ -1383,41 +1412,53 @@ class Browser:
         return cards
 
     async def _open_embed(self, sc, card, why):
-        """The video in its site's official embed player (youtube-nocookie.com/embed, tiktok.com/player: both
-        allowed by their robots.txt), opened as a page with our site as the referrer, played muted."""
-        emb = card.get("embed") or ""
-        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
-        host = urllib.parse.urlsplit(emb).hostname or ""
-        if not emb or not await self.robots.check(emb, fetch, self.limits):
-            self.last_skip = "robots.txt"
+        """#89 client player: the video plays in the VIEWER's browser, in the official embed (youtube-nocookie.com /
+        tiktok.com/player) in the page's side panel, never in the server's Chromium (YouTube refuses playback to the
+        server's IP, live 2026-10-04). The server picks it exactly as before, shows a local card (thumbnail, title:
+        no player, no request to the video site) on its screen, publishes "now watching" (source, id, title, channel,
+        duration, start) in the screen status, and the watch runs on the clock and the API's duration."""
+        nw = now_watching(card, sc.name)
+        if not nw:
+            self.last_skip = "no official player for it"
             return False
-        # opening a video is opening a page (pages are not rate-limited; searches and API calls are)
+        # nothing is requested from the video site here (not even robots.txt): the server does not visit it
         if getattr(sc, "site", None) and getattr(sc, "public", None):   # never in a logged-in context
             sc.ctx, sc.page = sc.public
             sc.site = None
-        if not await self._open(sc, emb, why, "page", title=card["title"], min_text=0, shoot=False,
-                                referer=EMBED_REFERER):
-            if self.last_skip in PLAYER_REFUSALS and YOUTUBE_HOST.search(host):
-                # #89 live: YouTube's bot check / sign-in screen in the player itself, not this video's fault
-                print(f"browse: YouTube's player refused ({self.last_skip})", flush=True)
-                self.yt.player_failed(self.last_skip)
-            return False
-        sc.info = dict(sc.info, url=card["url"], host=card.get("host", host), embed=emb, card=False,
-                       channel=(card.get("author") or "")[:80], search_box=False)
+        await sc.page.set_content(SV.card_html(dict(card, how=CLIENT_HOW)), wait_until="domcontentloaded")
+        await sc.page.wait_for_timeout(1200)                    # the thumbnail
+        sc.info = {"title": card["title"][:140], "url": card["url"], "host": card.get("host", "youtube.com"),
+                   "kind": "page", "why": why, "t": time.time(), "card": True, "channel": (card.get("author") or "")[:80],
+                   "embed": card["embed"], "search_box": False, "now_watching": nw}
         sc.scrolls_left = 0
-        state = await self._play_muted(sc)
-        why_not = await self._embed_error(sc, state)
-        if why_not:                                             # never left on screen: the next video instead
-            print(f"browse: embed refused {card['url']} ({why_not[:60]})", flush=True)
-            self.yt.refused(card["url"], None if "advertisement" in why_not else card.get("author"))
-            self.last_skip = "embed refused"
-            await self._leave(sc)
-            return False
-        if YOUTUBE_HOST.search(host):
-            self.yt.player_ok()
         if not await self.show(sc):
             return False
-        await self._start_watch(sc)
+        await self._start_watch(sc, nw["duration_s"])
+        if sc.info.get("video"):
+            nw = dict(nw, watch_s=sc.info["video"]["seconds"])
+            sc.info = dict(sc.info, now_watching=nw)
+        return True
+
+    def video_error(self, device, vid, code):
+        """The viewer's embed player could not play the published video (its onError: 2 bad request, 5 HTML5 error,
+        100 removed / private, 101 / 150 not embeddable, 153 player configuration): not again today and the brain
+        moves on now. Only the video on screen can be reported. -> True when it was."""
+        sc = self.screens.get(device)
+        nw = (sc.info or {}).get("now_watching") if sc else None
+        if not nw or nw.get("id") != vid:
+            return False
+        try:
+            code = int(code)
+        except (TypeError, ValueError):
+            code = 0
+        if nw["source"] == "youtube":
+            if code in (2, 5, 153):                             # the player itself, not this video
+                self.yt.player_failed(f"viewer player error {code}")
+            self.yt.refused(sc.info["url"], sc.info.get("channel") if code in (100, 101, 150) else None)
+        sc.info = dict(sc.info, why=f"the player could not play it (error {code}); next")
+        sc.watch_until = time.time() - 1                        # the next step ends the watch: the brain picks again
+        sc.next_at = 0.0
+        print(f"browse: viewer's player refused {sc.info['url']} (error {code})", flush=True)
         return True
 
     async def _play_video_id(self, sc, vid, why, title=None, short=False):
@@ -1444,31 +1485,16 @@ class Browser:
         card = {"url": YT.video_url(vid, short), "title": info["title"] or title or "a video", "author": info["channel"],
                 "hashtags": [], "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
                 "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
-                "how": "YouTube's official embed player"}
+                "how": "YouTube's official embed player", "sec": info["sec"]}
         if not self._card_ok(card):
             self.last_skip = "guard"
             return False
         return await self._open_embed(sc, card, why)
 
-    async def _embed_error(self, sc, state=None, wait=True):
-        """The player's own error, a few seconds after it opened: its error text, or no video element at all."""
-        try:
-            if wait:
-                await sc.page.wait_for_timeout(EMBED_CHECK_MS)
-            text = await sc.page.evaluate(EMBED_ERROR_JS) or ""
-        except Exception:
-            return None
-        if EMBED_ERROR.search(text):
-            return EMBED_ERROR.search(text).group(0)
-        if wait and state is None:
-            again = await self._play_muted(sc)
-            if again is None:
-                return "no video in the player"
-        return None
-
     async def _show_card(self, sc, card, why):
-        """One video on the screen: in its official embed player when it has one (played muted), else (or when the
-        player is refused) a card: caption, creator, thumbnail on a local page, no video, no actions."""
+        """One video on the screen: published for the official embed player in the viewer's browser when it has one
+        (the server shows a local card meanwhile, _open_embed), else a card: caption, creator, thumbnail on a local
+        page, no video, no actions."""
         sc.queue = [r for r in sc.queue if r.get("url") != card["url"]]
         if card.get("embed"):
             if await self._open_embed(sc, card, why):
@@ -1617,13 +1643,16 @@ class Browser:
 
     async def _watch(self, sc):
         """One screenshot while watching: the video is muted again, the scene change measured. False if the page
-        turned into a bot check, or the embed player into an error (then it is left)."""
+        turned into a bot check (then it is left). A video playing in the viewer's browser (now_watching) runs on the
+        clock: no screenshot of a player, and the picture change is an estimate (CLIENT_SCENE), labelled as such."""
+        if sc.info and sc.info.get("now_watching"):
+            sc.scene = round(CLIENT_SCENE * (0.7 + 0.6 * self.rng.random()), 3)
+            v = dict(sc.info.get("video") or {})
+            v.update(watching=True, left_s=max(0, round(sc.watch_until - time.time())), scene=sc.scene,
+                     scene_estimated=True, muted=True, playing=True, client=True)
+            sc.info = dict(sc.info, video=v)
+            return True
         state = await sc.page.evaluate(VIDEO_JS, None)
-        if sc.info and sc.info.get("embed") and await self._embed_error(sc, state, wait=False):
-            self.yt.refused(sc.info["url"], sc.info.get("channel"))
-            sc.watch_until = 0.0
-            await self._leave(sc)
-            return False
         prev = sc.shot
         if not await self._shoot(sc):
             sc.watch_until = 0.0

@@ -1,8 +1,10 @@
-"""#89 live bug (2026-10-04 10:58 and 11:02 Tokyo): on a link chain his monitor showed the full
-youtube.com/watch?v=qpkTV1VolHU page (header, Sign in, sponsored cards, a pre-roll ad with "Skip", then "Something
-went wrong"). YouTube's Terms forbid automated access to its pages: the browser never navigates to youtube.com/watch,
-/shorts or youtu.be; a link to a video is played in the official youtube-nocookie embed after videos.list says it is
-playable; an ad or error in the embed moves on to the next video (no ad is ever skipped by us).
+"""#89 live bugs (2026-10-04): at 10:58 and 11:02 Tokyo his monitor showed the full youtube.com/watch page (Sign in,
+sponsored cards, a pre-roll ad with "Skip", "Something went wrong"); at 11:54 every video became a card because
+YouTube refuses playback to the server's IP ("bot wall" in the player). YouTube's Terms forbid automated access to its
+pages, and we never work around a refusal. So the server's browser never loads YouTube (pages or the nocookie embed)
+nor TikTok's player: the brain picks the video as before (Data API, videos.list playability), the server publishes
+"now watching" and the video plays in the VIEWER's browser in the official embed; the viewer's player reports a dead
+video and the brain moves on.
 
     python -m pytest tests/test_no_youtube_pages.py -q
 """
@@ -20,7 +22,8 @@ import browse  # noqa: E402
 import youtube_api as YT  # noqa: E402
 from browse import Browser  # noqa: E402
 
-YT_PAGE = re.compile(r"^https?://((www|m)\.)?(youtube\.com/(watch|shorts|@|channel|results|$)|youtu\.be/)", re.I)
+VIDEO_SITE = re.compile(r"^https?://([\w-]+\.)*(youtube\.com|youtu\.be|youtube-nocookie\.com)(/|$)|"
+                        r"^https?://(www\.)?tiktok\.com/(player|embed)/", re.I)
 
 
 def run(coro):
@@ -28,39 +31,41 @@ def run(coro):
 
 
 class Page:
-    """Records every navigation and answers like a playing embed."""
+    """The server screen's page: records every navigation and every local card set on it."""
 
-    def __init__(self, player_text=""):
-        self.url, self.visited, self.player_text = "about:blank", [], player_text
+    def __init__(self):
+        self.url, self.visited, self.cards = "about:blank", [], []
 
     async def goto(self, url, **k):
         self.visited.append(url)
         self.url = url
 
+    async def set_content(self, html, **k):
+        self.cards.append(html)
+        self.url = "about:blank"
+
     async def wait_for_timeout(self, ms):
         pass
 
     async def evaluate(self, js, *a):
-        if "ytp-error" in js:
-            return self.player_text
-        return {"muted": True, "paused": False}
+        return None
 
 
-def _browser(monkeypatch, player_text="", key=True, playable=True):
+def _browser(monkeypatch, key=True, playable=True, device="desk"):
     if key:
         monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
     else:
         monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
     b = Browser(decide=True, rng=random.Random(0))
-    sc = b.screens["desk"]
-    sc.page, sc.ctx = Page(player_text), object()
+    sc = b.screens[device]
+    sc.page, sc.ctx = Page(), object()
     api = []
 
     async def _fetch(sc_, url, hops=3, headers=None):
         api.append(url)
         if "/youtube/v3/videos?" in url:
             vid = url.split("id=")[1].split("&")[0]
-            return 200, json.dumps({"items": [{"id": vid, "snippet": {"title": "Colonial Pipeline ransomware",
+            return 200, json.dumps({"items": [{"id": vid, "snippet": {"title": f"Grandmaster blunders {vid}",
                                                                         "channelTitle": "Some Channel"},
                                                "contentDetails": {"duration": "PT12M"},
                                                "status": {"embeddable": playable, "privacyStatus": "public"}}]})
@@ -75,26 +80,24 @@ def _browser(monkeypatch, player_text="", key=True, playable=True):
 
     async def show(sc_):
         return True
-
-    async def _leave(sc_):
-        sc_.page.url = "about:blank"
-    b._fetch, b._use, b._settle, b.show, b._leave = _fetch, _use, _settle, show, _leave
+    b._fetch, b._use, b._settle, b.show = _fetch, _use, _settle, show
     return b, sc, api
 
 
-def test_a_watch_link_plays_in_the_embed_and_no_youtube_page_is_ever_requested(monkeypatch):
+def test_a_watch_link_is_published_for_the_viewer_and_the_server_loads_no_video_site(monkeypatch):
     b, sc, api = _browser(monkeypatch)
     assert run(b._open(sc, "https://www.youtube.com/watch?v=qpkTV1VolHU", "followed a link", "page"))
-    assert not [u for u in sc.page.visited if YT_PAGE.match(u)]
-    assert sc.page.visited == ["https://www.youtube-nocookie.com/embed/qpkTV1VolHU?autoplay=1&mute=1&playsinline=1"
-                               "&controls=0&rel=0&loop=1&playlist=qpkTV1VolHU"]
+    assert sc.page.visited == []                                # no navigation at all: a local card
     assert any("/youtube/v3/videos?" in u for u in api)                   # checked as playable first
-    assert sc.info["url"] == "https://www.youtube.com/watch?v=qpkTV1VolHU" and sc.info["embed"]
-    for link in ("https://youtu.be/abcDEF12345", "https://www.youtube.com/shorts/abcDEF12346",
-                 "https://m.youtube.com/watch?feature=share&v=abcDEF12347"):
-        run(b._open(sc, link, "a link", "page"))
-    assert not [u for u in sc.page.visited if YT_PAGE.match(u)]
-    assert all("youtube-nocookie.com/embed/" in u for u in sc.page.visited)
+    nw = sc.info["now_watching"]
+    assert (nw["source"], nw["id"], nw["duration_s"], nw["device"]) == ("youtube", "qpkTV1VolHU", 720, "desk")
+    assert nw["thumb"] == "https://i.ytimg.com/vi/qpkTV1VolHU/hqdefault.jpg" and sc.watch_until > 0
+    assert sc.info["url"] == "https://www.youtube.com/watch?v=qpkTV1VolHU" and "in your browser" in sc.page.cards[-1]
+    for link, vid in (("https://youtu.be/abcDEF12345", "abcDEF12345"),
+                      ("https://www.youtube.com/shorts/abcDEF12346", "abcDEF12346"),
+                      ("https://m.youtube.com/watch?feature=share&v=abcDEF12347", "abcDEF12347")):
+        assert run(b._open(sc, link, "a link", "page")) and sc.info["now_watching"]["id"] == vid
+    assert sc.page.visited == [] and not [u for u in api if VIDEO_SITE.match(u)]   # only the API and robots.txt
 
 
 def test_other_youtube_pages_are_never_opened(monkeypatch):
@@ -107,24 +110,56 @@ def test_other_youtube_pages_are_never_opened(monkeypatch):
 def test_without_a_key_or_when_not_playable_the_link_is_not_played(monkeypatch):
     b, sc, _ = _browser(monkeypatch, key=False)
     assert run(b._open(sc, "https://www.youtube.com/watch?v=qpkTV1VolHU", "x", "page")) is False
-    assert sc.page.visited == []
+    assert sc.page.visited == [] and sc.info is None
     b, sc, _ = _browser(monkeypatch, playable=False)
     assert run(b._open(sc, "https://www.youtube.com/watch?v=qpkTV1VolHU", "x", "page")) is False
-    assert sc.page.visited == [] and b.yt.is_bad("https://www.youtube.com/watch?v=qpkTV1VolHU")
+    assert sc.info is None and b.yt.is_bad("https://www.youtube.com/watch?v=qpkTV1VolHU")
 
 
-def test_an_ad_or_youtubes_error_in_the_embed_moves_on_and_is_never_skipped_by_us(monkeypatch):
-    for text in ("advertisement playing Skip", "Something went wrong. Refresh or try again later."):
-        b, sc, _ = _browser(monkeypatch, player_text=text)
-        assert run(b._open(sc, "https://www.youtube.com/watch?v=qpkTV1VolHU", "x", "page")) is False
-        assert b.last_skip == "embed refused"
-    q = YT.Quota()
-    q.refused("https://www.youtube.com/watch?v=adadadadad1", None)       # an ad: the channel is not blamed
-    assert q.channel_ok("Some Channel")
-    assert "click" not in browse.EMBED_ERROR_JS and ".click()" not in browse.EMBED_ERROR_JS
+def test_the_viewers_player_error_sets_the_video_aside_and_the_brain_moves_on(monkeypatch):
+    b, sc, _ = _browser(monkeypatch)
+    url = "https://www.youtube.com/watch?v=qpkTV1VolHU"
+    assert run(b._open(sc, url, "x", "page"))
+    assert not b.video_error("desk", "abcDEF12345", 150)        # not the video on screen: ignored
+    assert not b.video_error("phone", "qpkTV1VolHU", 150)       # nor another screen's
+    assert b.video_error("desk", "qpkTV1VolHU", 150)            # not embeddable after all
+    assert b.yt.is_bad(url) and b.yt.bad_by.get("Some Channel") == 1 and sc.watch_until < browse.time.time()
+    assert "could not play it (error 150)" in sc.info["why"] and b.yt.player_up()
+    st = run(b._open(sc, "https://www.youtube.com/watch?v=abcDEF12345", "x", "page"))
+    assert st and b.video_error("desk", "abcDEF12345", 5)       # the player itself (HTML5 error): not the channel's
+    assert b.yt.bad_by.get("Some Channel") == 1
+    assert not hasattr(browse, "EMBED_ERROR_JS") and not hasattr(Browser, "_embed_error")   # no player, no Skip
 
 
-def test_the_guard_aborts_a_top_level_navigation_to_youtube(monkeypatch):
+def test_two_player_level_errors_pause_youtube_and_nothing_is_looked_up_meanwhile(monkeypatch):
+    b, sc, api = _browser(monkeypatch)
+    for vid in ("aaaaaaaaaa1", "aaaaaaaaaa2"):
+        assert run(b._open(sc, f"https://www.youtube.com/watch?v={vid}", "x", "page"))
+        assert b.video_error("desk", vid, 153)                  # player configuration error in the viewer's page
+    assert not b.yt.player_up() and b.yt.public()["player"] == "paused"
+    api.clear()
+    assert not run(b._public_videos(sc, "youtube", "chess", "test", short=False))
+    assert api == [] and b.feed_note.startswith("YouTube: its embed player refuses")
+    assert not run(b._open(sc, "https://www.youtube.com/watch?v=aaaaaaaaaa9", "link", "page"))
+    assert api == [] and "paused" in b.last_skip
+
+
+def test_the_watch_runs_on_the_clock_without_screenshots_of_a_player(monkeypatch):
+    b, sc, _ = _browser(monkeypatch)
+    shots = []
+
+    async def _shoot(sc_):
+        shots.append(1)
+        return True
+    b._shoot = _shoot
+    assert run(b._open(sc, "https://www.youtube.com/watch?v=qpkTV1VolHU", "x", "page"))
+    assert run(b._watch(sc)) and shots == []
+    v = sc.info["video"]
+    assert v["watching"] and v["scene_estimated"] and v["client"] and 0 < v["scene"] < 1
+    assert sc.info["now_watching"]["watch_s"] == v["seconds"] <= 720
+
+
+def test_the_guard_aborts_every_navigation_to_a_video_site_player(monkeypatch):
     g = browse.Guard()
     seen = []
 
@@ -143,10 +178,14 @@ def test_the_guard_aborts_a_top_level_navigation_to_youtube(monkeypatch):
 
         async def continue_(self):
             seen.append(("go", self.request.url))
-    run(g.route(Route("https://www.youtube.com/watch?v=qpkTV1VolHU")))     # a redirect or a click to the watch page
-    run(g.route(Route("https://www.youtube-nocookie.com/embed/qpkTV1VolHU")))
-    assert seen == [("abort", "https://www.youtube.com/watch?v=qpkTV1VolHU"),
-                    ("go", "https://www.youtube-nocookie.com/embed/qpkTV1VolHU")]
+    for u, top in (("https://www.youtube.com/watch?v=qpkTV1VolHU", True),
+                   ("https://www.youtube-nocookie.com/embed/qpkTV1VolHU", True),
+                   ("https://www.youtube-nocookie.com/embed/qpkTV1VolHU", False),     # an iframe on a news page
+                   ("https://www.tiktok.com/player/v1/6718335390845095173", True),
+                   ("https://www.tiktok.com/@scout2015/video/6718335390845095173", True),
+                   ("https://example.org/story", True)):
+        run(g.route(Route(u, top)))
+    assert [a for a, _ in seen] == ["abort", "abort", "abort", "abort", "go", "go"]
 
 
 def test_banner_closer_never_presses_anything_in_the_youtube_player():
@@ -181,104 +220,17 @@ def test_banner_closer_never_presses_anything_in_the_youtube_player():
     assert any("click" in c for c in main.calls)
 
 
-# --- #89 live regression (2026-10-04 11:54 Tokyo): every video showed as a card, "the video is not played" -----------
-
-class RealishPlayer:
-    """The youtube-nocookie page as the real _open / _settle / _open_embed path sees it (no _open stub)."""
-
-    def __init__(self, body):
-        self.body, self.url, self.frames, self.main_frame, self.cards = body, "about:blank", [], None, 0
-
-    async def goto(self, url, **k):
-        self.url = url
-
-    async def wait_for_timeout(self, ms):
-        pass
-
-    async def add_style_tag(self, **k):
-        pass
-
-    async def title(self):
-        return "Grandmaster blunders - YouTube"
-
-    async def screenshot(self, **k):
-        return b"jpeg"
-
-    async def set_content(self, html, **k):
-        self.cards += 1
-        self.url = "about:blank"
-
-    async def evaluate(self, js, *a):
-        import browse
-        if js == browse.VIDEO_JS:
-            return None if "not a bot" in self.body else {"muted": True, "paused": False}
-        if "innerText" in js or "ytp-error" in js:
-            return self.body
-        return None
+def test_now_watching_carries_only_checked_ids_and_public_metadata():
+    nw = browse.now_watching({"url": "https://www.youtube.com/shorts/abcDEF12345", "title": "t", "author": "c",
+                              "sec": 41, "thumb": "https://evil.example/x.jpg"}, "phone")
+    assert nw["source"] == "youtube" and nw["duration_s"] == 41
+    assert nw["thumb"] == "https://i.ytimg.com/vi/abcDEF12345/hqdefault.jpg"     # never a foreign image URL
+    tt = browse.now_watching({"url": "https://www.tiktok.com/@scout2015/video/6718335390845095173", "title": "t",
+                              "author": "scout2015"}, "phone")
+    assert tt["source"] == "tiktok" and tt["id"] == "6718335390845095173" and tt["duration_s"] is None
+    assert browse.now_watching({"url": "https://example.org/v/1", "title": "t"}, "desk") is None
+    assert set(nw) == {"source", "id", "title", "channel", "duration_s", "started_at", "device", "thumb"}
 
 
-def _realish(body, monkeypatch):
-    import random
-    import browse
-    monkeypatch.setenv("YOUTUBE_API_KEY", "test-not-real")
-    b = browse.Browser(decide=False, rng=random.Random(0))
-    sc = b.screens["desk"]
-    sc.page, sc.ctx, sc.public = RealishPlayer(body), object(), None
-    api = []
-
-    async def _fetch(sc_, url, hops=3, headers=None):
-        api.append(url)
-        return 404, ""                                          # robots.txt: none
-
-    async def _use(sc_, url):
-        pass
-    b._fetch, b._use = _fetch, _use
-    return b, sc, api
-
-
-def _card(vid):
-    import youtube_api as YT
-    return {"url": YT.video_url(vid, False), "title": f"Grandmaster blunders {vid}", "author": "chess channel",
-            "hashtags": [], "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
-            "host": "youtube.com", "site": "YouTube", "how": "YouTube's official embed player"}
-
-
-def test_a_normal_embeddable_video_ends_up_playing_not_as_a_card(monkeypatch):
-    import asyncio
-    b, sc, _ = _realish("Grandmaster blunders\nchess channel\nWatch on YouTube", monkeypatch)
-    c = _card("D_E5UB9hMZg")
-    sc.queue, sc.cards = [], {c["url"]: c}
-    assert asyncio.run(b._show_card(sc, c, "test"))
-    assert sc.page.cards == 0 and "youtube-nocookie.com/embed/D_E5UB9hMZg" in sc.page.url
-    assert sc.info.get("card") is False and sc.info.get("embed") and sc.watch_until > 0
-    assert b.yt.player_up() and b.yt.public()["player"] == "ok"
-
-
-def test_youtube_refusing_the_player_shows_no_card_and_pauses_youtube(monkeypatch):
-    import asyncio
-    import youtube_api as YT
-    b, sc, api = _realish("Sign in to confirm you’re not a bot\nThis helps protect our community. Learn more",
-                          monkeypatch)
-    cards = [_card(v) for v in ("aaaaaaaaaa1", "aaaaaaaaaa2", "aaaaaaaaaa3")]
-    sc.cards = {c["url"]: c for c in cards}
-    sc.queue = [{"url": c["url"]} for c in cards[1:]]
-    assert not asyncio.run(b._show_card(sc, cards[0], "test"))
-    assert sc.page.cards == 0                                   # never "the video is not played" for YouTube
-    assert not b.yt.player_up() and b.yt.public()["player"] == "paused"
-    assert b.yt.public()["last_player_refusal"] == "bot wall"
-    assert b.yt.public()["refused_by_embed_today"] == 0         # not the videos' fault: they are not set aside
-    api.clear()
-    assert not asyncio.run(b._public_videos(sc, "youtube", "chess", "test", short=False))
-    assert api == [] and b.feed_note.startswith("YouTube: its embed player refuses this browser")   # no units spent
-    assert not asyncio.run(b._open(sc, "https://www.youtube.com/watch?v=aaaaaaaaaa9", "link", "page"))
-    assert api == [] and "paused" in b.last_skip
-    # after the pause it tries again; the pause survives a restart (state)
-    q = YT.Quota(b.yt.to_dict(), clock=lambda: b.yt.player["until"] - 1)
-    assert not q.player_up()
-    q.clock = lambda: b.yt.player["until"] + 1
-    assert q.player_up()
-
-
-def test_with_a_key_the_replay_note_does_not_claim_there_is_no_key(monkeypatch):
-    import youtube_api as YT
+def test_with_a_key_the_replay_note_does_not_claim_there_is_no_key():
     assert "no API key" not in YT.NOTE_REPLAY_KEY and "API" in YT.NOTE_REPLAY_KEY
