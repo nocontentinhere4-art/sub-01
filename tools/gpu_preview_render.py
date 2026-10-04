@@ -117,6 +117,9 @@ def textures_ready(pg):
     except Exception as e:                            # (a page without the window view: carry on)
         print("window textures: not all seen,", str(e)[:80], flush=True)
     pg.wait_for_timeout(1500)
+    # the page's adapt() may have lowered its pixel ratio during the load (slow frames while textures decode), leaving a
+    # smaller canvas: back to the full viewport at ratio 1 (the frozen page's adapt() never runs again)
+    pg.evaluate("() => { try { renderer.setPixelRatio(1); renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); } catch (e) { console.warn('resize', e); } }")
     for _ in range(3):
         pg.evaluate(RENDER_ONLY_JS, [1 / 30, True])
 
@@ -245,7 +248,10 @@ def encode(a):
         S = Image.new("RGB", (w * len(sides), h + bar), (8, 8, 10))
         d = ImageDraw.Draw(S)
         for i, s in enumerate(sides):
-            S.paste(Image.open(frames / f"{s}_{k:05d}.jpg"), (i * w, bar))
+            im = Image.open(frames / f"{s}_{k:05d}.jpg")
+            if im.size != (w, h):                      # (a side whose canvas came out smaller: scaled to the pane)
+                im = im.resize((w, h), Image.LANCZOS)
+            S.paste(im, (i * w, bar))
             d.text((i * w + 8, 5), labels[s], font=font, fill=(255, 220, 120) if s == "new" else (210, 210, 220))
         seg = next((sg for sg in metas[sides[0]]["segments"] if sg["first"] <= k < sg["first"] + sg["frames"]), None)
         if seg:
