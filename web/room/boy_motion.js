@@ -438,6 +438,10 @@ export function createMotion(env){
     const teleport = !lastRoot || lastRoot.distanceTo(root) > 0.35;   // a snap into place: nothing to bridge
     (lastRoot || (lastRoot = V())).copy(root);
     const st = env.state(), skipR = st.holdW > 0 || st.held;      // a prop hangs on the right hand: it was placed before this
+    // on the bed (lying or on its edge), and getting onto or off it, the page moves him continuously itself (room.html
+    // lieFit, the turn over, the sit-down keys): bridging those as jumps held his legs in the mattress as he lay back (#63)
+    const bed = a => a === "bedlie" || a === "bedside";
+    if (bed(st.at) || (st.step && st.step.k === "pose" && (bed(st.step.to) || bed(st.step.from)))) { SM.clear(); lastRoot = null; return; }
     for (const name in B) {
       const b = B[name]; if (!b || !b.isBone) continue;
       let s = SM.get(b); if (!s) SM.set(b, s = {q: b.quaternion.clone(), off: Q(), k: 0});
