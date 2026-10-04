@@ -6,7 +6,7 @@
 # each shape is made in its pose - the garments skinned as three.js does, put right where they go wrong, and the fix
 # carried back to the rest pose through the inverse of each vertex's skinning (so morph-then-skin gives the fixed pose).
 #   seated   (desk_type_ik 3 s): the hoodie's front below the chest lies on the body and the lap as a soft shell with
-#            horizontal folds (crests 12 mm, valleys 4 mm off what is under it: the body, or the trousers on the thighs),
+#            2-3 horizontal folds (crests 22 mm, valleys 4 mm off what is under it: the body, or the trousers on the thighs),
 #            the hem resting on the thighs, instead of ballooning over the lap; the trousers out of the body at the hip
 #   elbow_L/R (desk_type_ik 3 s): the sleeve around a bent elbow out of the arm and its bunching held within 1.5 cm
 #   lying    (room_bed_lie 12 s): the hoodie's upper back, shoulders and the lowered hood flattened onto the body and
@@ -107,7 +107,11 @@ for i in np.nonzero(region > 0)[0]:
     p = Vector(Ppose["hoodie_black"][i]); q, n, _, d = under.find_nearest(p)
     if q is None: continue
     if (p - q).dot(n) < 0: n = -n if not GP.inside(bbvh, p) else n            # (the nearest face may face away)
-    gap = 0.012 - 0.008 * crease(hz[i] + 0.01 * math.sin(9 * R0[i, 0]), 0.05, 0.009)
+    # 2-3 soft horizontal folds across the front (6 cm apart, curving up a little at the sides): round crests 2.2 cm off,
+    # narrow valleys 4 mm off what is under
+    band = hz[i] - 0.04 + 0.014 * (1 - math.cos(min(abs(R0[i, 0]) / 0.17, 1) * math.pi / 2))
+    fold = (1 - crease(band, 0.06, 0.011)) * ss(0.02, 0.05, hz[i]) * (1 - ss(0.17, 0.24, hz[i]))
+    gap = 0.004 + 0.018 * fold
     tgt[i] = np.array(q + n * gap)
 H.delta["seated"] = put("hoodie_black", M, region, tgt)
 # the trousers: out of the body at the front of the hip and the crotch (3 mm)

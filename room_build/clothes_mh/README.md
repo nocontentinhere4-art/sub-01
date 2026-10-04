@@ -67,7 +67,7 @@ gives the fixed pose), then a last pass in that pose puts any vertex still insid
 
 | shape | made in | what it does | driver (from joint world positions) | weight |
 |---|---|---|---|---|
-| `seated` | `desk_type_ik` 3 s | the hoodie's front below the chest lies on the body and the lap as a soft shell with horizontal folds (crests 12 mm, valleys 4 mm off the body or the trousers), the hem on the thighs; the trousers out of the body at the hip, the crotch and the knees | hip bend: angle between the thigh (`UpLeg`->`Leg`) and the trunk downwards (`neck`->`Hips`), both legs averaged | smoothstep(40°, 80°) |
+| `seated` | `desk_type_ik` 3 s | the hoodie's front below the chest lies on the body and the lap as a soft shell with 2-3 horizontal folds 6 cm apart (round crests 22 mm, narrow valleys 4 mm off the body or the trousers), the hem on the thighs; the trousers out of the body at the hip, the crotch and the knees | hip bend: angle between the thigh (`UpLeg`->`Leg`) and the trunk downwards (`neck`->`Hips`), both legs averaged | smoothstep(40°, 80°) |
 | `elbow_L`, `elbow_R` | `desk_type_ik` 3 s | the sleeve round a bent elbow out of the arm, its bunching held within 1.5 cm | elbow bend: angle between `Arm`->`ForeArm` and `ForeArm`->`Hand` | smoothstep(55°, 95°) |
 | `lying` | `room_bed_lie` 12 s | the hoodie's back on the mattress (not below 5 mm under its top), the upper back, shoulders and lowered hood pressed onto the body (6 mm, the hood 4 mm, under the neck) | chest up: y of normalise((`LeftArm`-`RightArm`) x (`neck`-`Hips`)) | smoothstep(0.6, 0.92) |
 
