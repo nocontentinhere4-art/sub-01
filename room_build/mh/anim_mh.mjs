@@ -16,7 +16,9 @@ obj.updateMatrixWorld(true);
 const sp = n => B[n].getWorldPosition(new THREE.Vector3()).multiplyScalar(0.01);
 const sq = n => B[n].getWorldQuaternion(new THREE.Quaternion());
 // [target, source, source child (direction), target direction end (bone name or 'tail')]
-const MAP = [["root", "Hips", "Spine1", "spine05"], ["spine05", "Spine1", "Spine2", "spine04"], ["spine04", "Spine2", "Spine3", "spine03"],
+// root: MakeHuman's root bone points forward (toward spine05), the source Hips up; aligning those turned the pelvis
+// ~80 deg and lifted the hip joints 9 cm (feet floating). so the hips align by the hips -> neck line (ROOTFIX=0: the old way)
+const MAP = [process.env.ROOTFIX !== "0" ? ["root", "Hips", "Neck", "neck01"] : ["root", "Hips", "Spine1", "spine05"], ["spine05", "Spine1", "Spine2", "spine04"], ["spine04", "Spine2", "Spine3", "spine03"],
   ["spine03", "Spine3", "Spine4", "spine02"], ["spine02", "Spine4", "Neck", "neck01"], ["neck01", "Neck", "Head", "head"], ["head", "Head", null, null]];
 for (const [s, m] of [["L", "Left"], ["R", "Right"]]) {
   MAP.push([`clavicle.${s}`, `${m}Shoulder`, `${m}Arm`, `upperarm01.${s}`], [`upperarm01.${s}`, `${m}Arm`, `${m}ForeArm`, `lowerarm01.${s}`],
@@ -113,8 +115,22 @@ function armIK(Wq, L, rootPos) {
     for (let it = 0; it < 4; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dy);
       // KEYTOP: no fingertip below the keycaps' top (+3 mm): lift the pin by the deepest tip's depth
       const top = +(process.env["KEYTOP_" + s] || process.env.KEYTOP || -1); if (top < 0) break;
-      let low = 1e9; for (let f = 1; f <= 5; f++) low = Math.min(low, tipY(L, rootPos, `finger${f}-3.${s}`));
-      if (low >= top + 0.002) break; dy += top + 0.003 - low; }
+      // the bones run through the finger's middle: SKIN (default 9 mm) of pad under every joint and tip
+      const sk = +(process.env.SKIN || 0.009); let low = 1e9;
+      for (let f = 1; f <= 5; f++) for (const j of [2, 3]) { const n = `finger${f}-${j}.${s}`; low = Math.min(low, bonePos(L, rootPos, n).y, bonePos(L, rootPos, n, true).y); }
+      low -= sk; if (low >= top + 0.002) break; dy += top + 0.003 - low; }
+    // TAPS: real key presses on top of the resting typing pose: each finger fires short pulses (down 50 ms, hold 30 ms,
+    // up 70 ms) at its own random rate; a press bends the knuckle and middle joint until the tip is 4 mm below the
+    // keycap top (the key's travel), never deeper
+    if (process.env.TAPS && process.env.KEYTOP) { const top = +(process.env["KEYTOP_" + s] || process.env.KEYTOP), t = frames.length / fps;
+      const rate = { 2: 2.0, 3: 1.6, 4: 1.0, 5: 0.7 };
+      for (let f = 2; f <= 5; f++) { const pulse = tapPulse(s + f, t); if (pulse <= 0) continue;
+        const mcp = `finger${f}-1.${s}`, pip = `finger${f}-2.${s}`, tip = `finger${f}-3.${s}`, m0 = L[mcp].clone(), p0 = L[pip].clone();
+        const at = a => { L[mcp] = curlQ(mcp, a * 0.6).multiply(m0); L[pip] = curlQ(pip, a).multiply(p0); return bonePos(L, rootPos, tip, true).y; };
+        const goal = top + +(process.env.SKIN || 0.009) - 0.004;   // the pad's skin goes 4 mm down: the key's travel
+        let lo_ = 0, hi_ = 40; if (at(hi_) > goal) { at(hi_ * pulse); continue; }
+        for (let j = 0; j < 14; j++) { const m = (lo_ + hi_) / 2; if (at(m) > goal) lo_ = m; else hi_ = m; }
+        at(lo_ * pulse); } }
     if (MOUSE && s === "R") {
       // the palm rests on the mouse's back: lower (or lift) the pin until a point 60% from the wrist to the middle
       // knuckle touches the dome (1.6 cm of palm under the bone)
@@ -162,6 +178,21 @@ const dome = (p, pad) => { const [cx, cy, cz] = MOUSE.c, [rx, ry, rzf, rzb] = MO
   const dx = p.x - cx, dz = p.z - cz, lx = dx * Math.cos(t) + dz * Math.sin(t), lz = -dx * Math.sin(t) + dz * Math.cos(t);
   const rz = lz >= 0 ? rzf : (rzb || rzf);
   return Math.hypot(lx / (rx + pad), (Math.max(p.y, cy) - cy) / (ry + pad), lz / (rz + pad)) - 1; };
+// tap pulses: deterministic random tap times per key (seeded by the finger), shape 0 -> 1 -> 0 over 150 ms
+const TAPS_CACHE = {};
+// one hand's key events: about TAP_RATE presses per second (default 1.5), each on ONE finger picked by weight
+// (index 0.4, middle 0.3, ring 0.2, little 0.1); a press goes down in 90 ms, holds 50 ms and comes back in 140 ms
+function tapPulse(key, t) {
+  const hand = key[0], f = +key.slice(1);
+  if (!TAPS_CACHE[hand]) { let x = (hand === "L" ? 9173 : 31337), tt = 0.3; const out = [];
+    const rnd = () => (x = (x * 48271) % 2147483647) / 2147483647, rate = +(process.env.TAP_RATE || 1.5);
+    while (tt < 600) { tt += Math.max(+(process.env.TAP_GAP || 0.3), -Math.log(1 - rnd()) / rate); const r = rnd(); out.push([tt, r < 0.4 ? 2 : r < 0.7 ? 3 : r < 0.9 ? 4 : 5]); }
+    TAPS_CACHE[hand] = out; }
+  for (const [t0, ff] of TAPS_CACHE[hand]) { const u = t - t0; if (u < 0) break; if (ff !== f) continue;
+    const [dn, hd, upt] = (process.env.TAP_MS || "90,50,140").split(",").map(x => +x / 1000);
+    if (u < dn) return 0.5 - 0.5 * Math.cos(Math.PI * u / dn); if (u < dn + hd) return 1; if (u < dn + hd + upt) return 0.5 + 0.5 * Math.cos(Math.PI * (u - dn - hd) / upt); }
+  return 0;
+}
 function tipY(L, rootPos, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
   const p = V3(rootPos); let W = new THREE.Quaternion();
   for (let i = 0; i < path.length; i++) { if (i) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(W)); W = W.clone().multiply(L[path[i]]); }
@@ -172,6 +203,12 @@ function solveSide(Wq, L, rootPos, s, dy) {
   // the recorded wrist's drift (relative to its first frame) moves the pin, so the hands wander over the keys
   const Wm = fk(Wq, rootPos, wr); if (!IKT["_w0" + s]) IKT["_w0" + s] = Wm.clone();
   const T = V3(IKT[s]).addScaledVector(Wm.clone().sub(IKT["_w0" + s]), +(process.env.DRIFT || 0.7)); T.y += dy;
+  // WANDER=a (m): the hands slowly travel over the keys like a real typist's (two slow sines per axis, per hand), so
+  // the forearms and elbows move instead of staying locked
+  if (process.env.WANDER) { const a = +process.env.WANDER, tt = frames.length / fps, ph = s === "L" ? 0 : 1.7;
+    T.x += a * (0.7 * Math.sin(2 * Math.PI * 0.11 * tt + ph) + 0.3 * Math.sin(2 * Math.PI * 0.37 * tt + 2 * ph));
+    T.z += a * 0.5 * (0.6 * Math.sin(2 * Math.PI * 0.07 * tt + 0.5 + ph) + 0.4 * Math.sin(2 * Math.PI * 0.23 * tt + ph));
+    T.y += a * 0.15 * Math.sin(2 * Math.PI * 0.19 * tt + ph); }
   let d = T.clone().sub(A); const dl = Math.min(d.length(), a + b - 1e-3); d.normalize();
   const x = (a * a - b * b + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, a * a - x * x));
   const pole = new THREE.Vector3(s === "L" ? 0.35 : -0.35, -1, -0.15); pole.sub(d.clone().multiplyScalar(pole.dot(d))).normalize();

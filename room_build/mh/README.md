@@ -26,7 +26,22 @@
   - `room_bed_lie` (17 s): sits on the bed edge (legs reach down, LIFT/FEETDOWN), lies back, settles; `room_bed_wake`
     (15.5 s): lying -> sits up on the edge -> stands. Recorded on a ~34 cm bed, lifted by the source hips' height to a
     66 cm mattress.
-- Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
+- `glb/clips_g2/*.glb`: the same clips retargeted onto G2's body (`boy_g2.glb`, its `boy_g2_rest.json`; 20 fps,
+  animation only, room bone names). Use these with boy_g2; `glb/clips/` stays for boy_mh.
+  - Root fix (all G2 clips): MakeHuman's root bone points forward, the mocap Hips up; aligning those turned the
+    pelvis ~80 deg and put the hip joints 9 cm high, so the feet floated 4-9 cm while standing. The hips now align
+    by the hips -> neck line (`ROOTFIX=0` restores the old way): feet on the floor (soles 1 cm, measured).
+  - Contacts measured on the skinned mesh (`lowY` in the viewer): seat top 0.505 -> buttocks at 0.505-0.51 for
+    typing/mouse (DY +0.015), sit down and stand up (no offset); watch DY +0.10 (slouched); mattress top 0.66 ->
+    lying at 0.64-0.65 (bed_lie LIFT [[0.90,0],[0.52,0.235],[0.43,0.255]], bed_wake [[0.90,0],[0.45,0.28],[0.36,0.35]]).
+  - `desk_type_ik` (approved): one key press at a time per hand (~1/s, down 140 ms, hold 80, back 200), the pad's
+    skin 4 mm into the key (the bones run through the finger's middle: SKIN 9 mm kept under every joint at rest),
+    hands slowly wandering over the keys (WANDER 3.5 cm) so the forearms move. Also re-exported in `glb/clips/`.
+  - `desk_mouse_ik`: G2's hand is bigger, so the wrist pin sits 1.8 cm further back (z 0.283) to keep the
+    fingertips on the buttons.
+  - `room_bedtime_up` (14 s, NEW, awaiting the owner): late at night, seated: stretches, rubs his eyes, stands up
+    pushing on his thighs, walks off (ends ~1.9 m from the chair, walking). Chain: bedtime_up -> walk -> `room_bed_lie`.
+- Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`, `unrename_mh.mjs` (room names back to MakeHuman's, so boy_g2.glb can be the retarget target).
   The source FBX files are not in the repo.
 
 ### G2 body (`glb/boy_g2.glb`, built by `build_g2.mjs`)
