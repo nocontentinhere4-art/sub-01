@@ -48,9 +48,14 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   lighting him), **screen** (over his shoulder onto the page), **medium**; on the phone: **over** the shoulder, **face**;
   elsewhere: **medium** (2.4 m, 50° off his facing), **face**. The **overview** is in every cycle and holds three
   quarters of what the other shots hold together (≥ 40 % of the time; 12 s at least). The `camera` chip toggles between
-  the cycle (`camera: shots`) and the overview held (`camera: overview`); a drag still looks round for 20 s. A
-  candidate position that would sit in a wall or a piece of furniture is turned round him (the mirror angle, a profile,
-  the front, a rear three-quarter) until it fits. `?debug` → `setShot("face")` pins one. In the face and screen shots
+  the cycle (`camera: shots`) and the overview held (`camera: overview`); a drag still looks round for 20 s. Every
+  candidate position round him (the asked angle, its mirror, a profile, the front, a rear three-quarter, the back) is
+  tested against the walls, the furniture and the line of sight (five rays through the room's meshes, to his face and
+  to the frame round it: the laundry hanger's socks used to hang over his face at the sill), and of the clear ones the
+  shot takes the one most in front of where his head points (at the sill he looks out of the window: a rear
+  three-quarter from the room shows his profile against the glass; at the desk, the one from the desk's end shows his
+  face turned to the screen). The rays are cast on a cut and every 2 s; between, the settled angle is kept.
+  `?debug` → `setShot("face")` pins one. In the face and screen shots
   at the desk the depth of field is faint, so the page on the monitor stays readable (the monitor 0.35 knit by day).
   On a phone held upright (the canvas taller than wide) the title, the plan and the chip cover the top third: every
   shot stands a third further back and aims an eighth of its distance higher, so he sits in the lower middle of the
