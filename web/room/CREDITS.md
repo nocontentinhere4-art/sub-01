@@ -161,6 +161,81 @@ set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somew
 
     node build_food.mjs "<kit>/Models/GLB format" ../web/room/food.glb      # 84 KB
 
+## The Tripo props: made with Tripo (paid API)
+`props_tripo.glb` holds four props **made with Tripo (paid API)** (https://www.tripo3d.ai): text-to-model, model
+`P1-20260311` (low-poly), PBR textures at standard quality, generated on 2026-10-04 from text prompts asking for plain
+objects with no logos or text. They are AI-generated content under Tripo's terms of service, not a Creative Commons
+licence. Each prop and its Tripo task id:
+
+| prop | where | task |
+|---|---|---|
+| ramen bowl with chopsticks: tonkotsu, chashu, ajitama egg, nori, in a matte stoneware bowl | the ramen he eats at the desk (it replaces Kenney's `bowl-broth`; the empty bowl is still Kenney's `bowl`) | `4a044baf-40b1-4c6f-a5f6-e290acc4c5b2` |
+| ceramic mug | the mug on the desk (the modelled one is cut out of the static room by the page) | `277633c0-2bfe-4b38-ae60-0bcaa9445a0f` |
+| over-ear headphones | the pair on the wall hook (inside the room's `headphones` node; the pair he wears is still procedural) | `6a2cac63-a839-4d0c-8e0f-53c67e641321` |
+| white sneakers | a pair on the floor in the front right corner | `62e8af56-3302-4a6a-9fe4-d4af8bd5d821` |
+
+`room_build/build_tripo.mjs` scales each to real size (origin at the centre of its base), turns it, cuts its textures
+to 1024 px WebP and meshopt-compresses the lot (3.8k–4.6k triangles a prop). The page puts them in place
+(`web/room.html`, "Tripo props"); `?props=old` shows the earlier ones. The raw downloads are not committed. Rebuild
+(from `room_build/`, with the four raw GLBs in a folder named as in the script):
+
+    node build_tripo.mjs <folder> ../web/room/props_tripo.glb
+
+## The Tripo props, second batch: made with Tripo (paid API)
+`props_tripo2.glb` holds eighteen props **made with Tripo (paid API)** (https://www.tripo3d.ai), model `P1-20260311`, PBR,
+standard textures, generated on 2026-10-04 (AI-generated content under Tripo's terms of service, not a Creative Commons
+licence). Most came from text prompts asking for plain, unbranded objects. The desk lamp and the floor plant came from
+images (image-to-model): Poly Haven's own renders of the CC0 models they replace, `desk_lamp_arm_01` (Yann Kervran,
+Kuutti Siitonen) and `potted_plant_02` (Rico Cilliers), CC0 1.0. The figure is an original character and the
+skateboard's graphic an original pattern; no brands, logos or characters of others.
+
+| prop | where (it replaces) | task |
+|---|---|---|
+| clamp desk lamp | the desk's back left (the Poly Haven desk lamp, hidden) | `ff1d73a1-cbf7-47fe-8017-214e00df5bf1` |
+| potted plant | the floor by the window (the Poly Haven plant, hidden) | `35c33d17-2985-4143-a53e-1b2eff7cd136` |
+| taped cardboard box | on top of the bookshelf (the Poly Haven box, hidden) | `c7eb9d15-e87c-42b1-9420-fa48cd38006e` |
+| twin-bell alarm clock | the window sill (the Poly Haven alarm clock, hidden) | `b683843e-2e74-4474-808b-5a8c6d7b415f` |
+| aloe in a terracotta pot | the desk (the Poly Haven succulent, hidden; its saucer, which came out floating, is left out) | `37835eed-7fb1-472b-a2de-bbb6b152ca68` |
+| black canvas backpack | by the bed (the modelled one, cut out) | `b7b15962-24d0-4d99-85c7-05d09cf4748b` |
+| floor fan | by the door (the modelled one, cut out) | `5b704311-1409-4b14-ba67-a71988047dc1` |
+| waste bin with a liner | under the desk (the modelled one and its stickers, cut out) | `b52a9f88-6d94-4244-a2f1-19f37250e268` |
+| game controller (generic) | the desk (the modelled one, cut out) | `39586f31-cc3e-488b-8454-533df47ffed9` |
+| computer monitor | the desk; fitted around the page's live screen, which stays the page's own quad (the modelled one, cut out) | `40a67c5e-c2f0-4b5f-8a05-b6cba29fc020` |
+| bookshelf speaker, used for the pair | the desk (the modelled pair, cut out) | `ae7531ac-6f5e-4ca1-bc85-3fc761223e7b` |
+| skateboard | new, on the floor by the door, wheels up | `fd5e06a2-38c1-402c-bbe1-78bb7deb0d2e` |
+| game console (generic) | new, the desk's back | `b08f7166-7a2e-4538-86e6-e3a05838fb38` |
+| anime-style figure (original) | new, the window sill | `2bb87361-92e0-48a7-a780-10c7a7455ad9` |
+| three energy drink cans (unbranded) | new, on the fridge | `4a5e3826-fca8-42a4-bcae-251189326032` |
+| stack of sneaker boxes | new, by the door | `827927f2-220e-4563-bd36-3a1680d02a34` |
+| 35mm film camera (no brand) | new, on the desk's books | `0f650a9e-edaa-4828-94f2-b9f959671e75` |
+
+Generated and not used (paid for, left out): a mouse (`7f6dd270-5668-4826-82ed-090af0124e8b`; the mouse modelled in code
+below took its place, built to the profile his hand is solved against); a first desk lamp, whose shade floated off its arm
+(`21b4442f-4fc2-408b-81a5-d911bb16337a`); a first plant, with purple leaves (`2df53e11-6008-4f00-9d52-2b3452078f93`); a
+keyboard, built on a wedge with letters on its keys (`64db3634-167d-498a-8589-9140e01b7782`; the modelled keyboard stays,
+his typing is aimed at it); an office chair (`5af3f609-8dc7-4815-996f-6c9cd2f27247`; the modelled chair stays, his sitting
+poses and resting hands are fitted to it). His phone stays too: the one he holds is the hand-and-phone mesh above.
+
+`room_build/build_tripo2.mjs` scales and turns each, puts it in its place in the room and joins them all into one mesh
+(the lamp kept apart, out of its own light's shadow map) with one material, its maps packed in atlases (a 512 px tile per
+prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces (`web/room.html`, "Tripo props");
+`?props=old` shows the earlier room. Rebuild, from `room_build/`, with the raw GLBs in a folder:
+
+    node build_tripo2.mjs <folder> ../web/room/props_tripo2.glb
+
+The keyboard is the tenkeyless one modelled in `room_clean.glb` (above); the page cuts its triangles out of the joined
+static mesh into a group of its own named `keyboard` (origin: the middle of F and J on the desk top), so nothing about its
+look changes. The mouse on its pad (`mouse.glb`, `room_build/build_mouse.mjs`) is modelled in code for this project, CC0,
+to real sizes: a generic mouse, 11.8 × 6.2 × 3.6 cm, no logo. Its micro-texture is ambientCG's **Plastic 016 A**
+(https://ambientcg.com/a/Plastic016A, CC0 1.0), its roughness and normal maps (`room_build/desk_pbr.mjs`). Tried and not
+installed: a full-size keyboard modelled in code (`room_build/build_keyboard.mjs`), and a keyboard and mouse made with
+Tripo (paid API, image-to-model from renders of the code-made ones; keyboard task `0c5caa4a-9169-4ed7-bbfc-f90cd06883be`,
+mouse task `926e444c-4a59-4b34-b318-db6d3f72f95a`, fitted by `room_build/build_kbm_tripo.mjs`); the Tripo mouse is kept
+as `mouse_tripo.glb` for comparison (`?debug&kb=tripo`).
+
+The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
+page paints it over the record sleeve in the posters atlas.
+
 ## His motion: clips generated with NVIDIA ARDY (#98 G3)
 `boy_m_*.glb` (listed in `boy_m_manifest.json`) are motions generated from text prompts with **ARDY**
 (https://github.com/nv-tlabs/ardy, NVIDIA; the paper's authors are credited there), checkpoint
