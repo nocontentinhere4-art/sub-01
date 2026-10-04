@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>skin and eyes: preview sheet</title>
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+</head><body>
+<canvas id="sheet"></canvas>
+<script type="module">
+// One still sheet (#98 G6, skin and eyes): the MakeHuman base head under the room's kind of light (a cool window key
+// from the front-left, a warm desk-lamp fill from the right, a little behind him so the ear shows its translucency,
+// the room's bounce). Left: a close-up; right: the room distance (2.2 m, the page's 30° lens). Locked cameras, no text.
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { buildHead } from "./skin_eyes.js";
+
+const W = 1000, H = 1000;
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1916);
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.16;
+
+// the window: a cool key from the camera's right, high; the lamp: warm, behind his right ear (the ear on the camera's
+// side, so its translucency shows); the room's bounce, low (a lamp-lit room at night has little of it)
+const key = new THREE.DirectionalLight(0xdfe8ff, 3.2); key.position.set(1.3, 0.8, 0.9); scene.add(key);
+const lamp = new THREE.PointLight(0xffb47a, 0.7, 0, 2); lamp.position.set(-0.32, 0.06, -0.28); scene.add(lamp);
+const fill = new THREE.HemisphereLight(0xcfd6e0, 0x4a3a2e, 0.22); scene.add(fill);
+// a stand-in for his black hoodie under the neck (the head is cut there), charcoal fabric
+const cloth = new THREE.MeshStandardMaterial({color: 0x161618, roughness: 0.9});
+const prof = [[0.0, -0.09], [0.06, -0.09], [0.07, -0.13], [0.12, -0.17], [0.19, -0.21], [0.215, -0.27], [0.22, -0.45], [0.2, -0.75], [0.0, -0.75]]
+  .map(([r, y]) => new THREE.Vector2(r, y));
+const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), cloth);
+body.scale.set(1, 1, 0.55); body.position.set(0, 0, -0.01); scene.add(body);
+// the hood's collar round the neck (the head mesh is cut just under it)
+const collar = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.024, 12, 40), cloth);
+collar.rotation.x = Math.PI / 2; collar.scale.set(1, 0.8, 1); collar.position.set(0, -0.098, 0.004); scene.add(collar);
+
+const data = await (await fetch("head.json")).json();
+const head = buildHead(THREE, data);
+head.rotation.y = 0.30;                                   // a three-quarter turn toward the window
+scene.add(head);
+window.__info = {lids: head.userData.lidLoops, landmarks: head.userData.landmarks};
+
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 50);
+const sheet = document.getElementById("sheet"); sheet.width = 2 * W; sheet.height = H;
+const ctx = sheet.getContext("2d");
+function shot(pos, target, fov, x){
+  cam.fov = fov; cam.position.set(...pos); cam.lookAt(...target); cam.updateProjectionMatrix();
+  renderer.render(scene, cam); ctx.drawImage(renderer.domElement, x, 0);
+}
+// close-up: the face fills the frame (0.24 m tall at 0.45 m)
+shot([-0.17, 0.035, 0.43], [0.005, 0.0, 0.05], 30, 0);
+// the room distance: 2.2 m, the page's 30° lens: the head is about a fifth of the frame's height
+shot([-0.55, 0.25, 2.13], [0.0, -0.12, 0.05], 30, W);
+window.__done = true;
+window.__sheet = () => sheet.toDataURL("image/jpeg", 0.92);
+</script></body></html>
