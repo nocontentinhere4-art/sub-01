@@ -26,7 +26,7 @@ def test_body_is_the_makehuman_rig():
 
 
 def test_desk_clips_animate_the_fingers():
-    for clip in ("desk_type_ik", "desk_mouse_ik", "desk_watch", "04_Open_Window", "room_walk", "room_sit_down",
+    for clip in ("desk_type_ik", "desk_mouse_ik", "desk_watch", "room_window", "room_walk", "room_sit_down",
                  "room_stand_up", "room_bed_lie", "room_bed_wake"):
         g = glb_json(WEB / "mh" / f"{clip}.glb")
         assert g.get("animations"), clip

@@ -1,6 +1,7 @@
 // The MakeHuman rig with real mocap (preview/room-mh, a crude first integration; #98). When room/boy.glb is the MakeHuman
-// body (163 bones with fingers, metres, feet at y = 0, bones world-aligned at rest; G2's boy_g2.glb on the same skeleton
-// drops in as room/boy.glb), the old rig's clips and procedural layers do not fit it: this module takes over.
+// body (163 bones with fingers, metres, feet at y = 0, bones world-aligned at rest; on this branch G2's boy_g2.glb with
+// preview/mh-motion's clips_g2 in room/mh/, which go together), the old rig's clips and procedural layers do not fit it:
+// this module takes over.
 //
 // The desk follows the owner's rule ("deve scrivere sulla tastiera quando cerca qualcosa, usare il mouse per cliccare e
 // selezionare cose, e quando guarda video sta semplicemente sulla sedia"):
@@ -13,23 +14,27 @@
 // clip's reference point and the room's, and no fingertip goes below the keycaps (+3 mm) or into the pad (+1.1 cm).
 //
 // Swappable parts: a room node named "keyboard" (G10d's Tripo keyboard) replaces the keycap numbers below by its bounds,
-// and a node named "mouse" is moved next to the keyboard's right end and follows the right palm while he uses it. In the
+// and a node named "mouse" follows the right palm while he uses it (within 6 cm of where it lies on the pad). In the
 // room on main both are part of the merged static mesh, so the numbers below are used and the mouse stays put.
 //
-// Everything else is crude on purpose: still poses from the source clips stand in for standing / walking (a stand that
-// glides) and for lying (the last frame of a lie-down); the old rig's interludes, breathing, look-at, foot IK and phone
-// hold are off.
+// The room's moves: the recorded walk loop (the page moves him along his path), sit down / stand up on the chair, lie
+// down / get up on the bed, each pose step lasting its clip's stretch and placed by the clip's own pose (the seat, the
+// bed's edge, lying on the duvet). Still frames stand in for standing (room_window's first) and for sitting on the bed's
+// edge and lying; the old rig's interludes, breathing, look-at, foot IK and phone hold are off.
 
-const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "04_Open_Window",
+const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
   walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake"};
 // the room (main): keycaps (G10d) centre, top y, turn about y, size; the mouse centre on the pad; the desk / pad top
 const ROOM = {keys: {c: [-1.070, 1.001, -0.976], ry: 0.06, w: 0.356, d: 0.134}, mouse: [-0.755, 0.973, -0.950], pad: 0.973};
 // the clips' frame (root at the feet, facing +z; measured in the page: the recorded wrists sit on the README's pins in
 // it): the keyboard the typing was pinned to (keycaps' centre at KEYTOP; the wrists' pins (0.03 / -0.13, 0.878, 0.32)
-// lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README
-const CLIP = {kb: [-0.05, 0.83, 0.33], mouse: [-0.36, 0.807, 0.39], desk: 0.809,
-  home: [-0.003, 0.83, 0.317]};                              // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
-// the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13);
+// lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README; G2's clips (clips_g2)
+// sit the typing and the mouse 1.5 cm higher (DY +0.015, his buttocks on the 0.505 m seat), so their keyboard and mouse too
+const DY = 0.015;
+const CLIP = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], desk: 0.809 + DY,
+  home: [-0.003, 0.83 + DY, 0.317]};                         // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
+// the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13) (boy_mh;
+// measured from the clips at load: G2's is at (-0.28, -0.15));
 // stand_up starts seated with it at (0, 0); the bed clips are lifted to the 0.66 m mattress (the room's: 0.82 - 0.16)
 const SEAT = {down: [-0.26, -0.13], up: [0, 0]};
 const BED = {hips: [-1.0, 0.89], head: -1,                 // where his hips lie on the duvet (x, z), the head toward -x (the headboard),
@@ -71,6 +76,9 @@ export function createMH(env) {
     // sit_down: the last moment the hips are still high (standing) before they drop onto the seat
     const sd = scan(got.sit_down); let i = sd.length - 1; while (i > 0 && sd[i].hips.y < 0.80) i--;
     S.sit = {from: Math.max(0, sd[i].t - 0.3), to: got.sit_down.duration};
+    // the chair's seat centre in sit_down's frame: where it leaves the hips, less where stand_up starts them (its seat at 0, 0)
+    const su = sampler(got.stand_up), h0 = su(0).hips; su.done();
+    S.seatDown = [sd[sd.length - 1].hips.x - h0.x, sd[sd.length - 1].hips.z - h0.z];
     // bed_lie: on the edge = hips low with the head up; lying = the head low
     const bl = scan(got.bed_lie);
     const e0 = bl.find(p => p.hips.y < 0.80 && p.head.y > 1.05) || bl[Math.floor(bl.length / 3)];
@@ -113,11 +121,14 @@ export function createMH(env) {
     const got = {};
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`room/mh/${f}.glb`).then(g => { got[k] = g.animations[0]; })));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
-    // watching "simply sits in the chair": the recorded clip slouches and props its feet up at the desk's height, so its
-    // pelvis and legs come from the mouse clip (seated upright, feet on the floor); the back, arms and head stay relaxed
-    const LEGS = /^(Left|Right)(UpLeg|Leg|Foot|ToeBase)\.|^Hips\.quaternion$/;
-    got.desk_watch = new THREE.AnimationClip("desk_watch", Math.max(got.desk_watch.duration, got.desk_mouse.duration),
+    // watching "simply sits in the chair": the recorded clip (boy_mh's and G2's alike) slouches and props its feet up at
+    // the desk's height, so its pelvis (turn and height) and legs come from the mouse clip (seated on the seat, feet on
+    // the floor); the back, arms and head stay relaxed. A watch clip with its feet already down plays as recorded.
+    const ws = sampler(got.desk_watch), feetUp = ws(0).foot > 0.12; ws.done();
+    const LEGS = /^(Left|Right)(UpLeg|Leg|Foot|ToeBase)\.|^Hips\.(quaternion|position)$/;
+    if (feetUp) got.desk_watch = new THREE.AnimationClip("desk_watch", Math.max(got.desk_watch.duration, got.desk_mouse.duration),
       [...got.desk_watch.tracks.filter(t => !LEGS.test(t.name)), ...got.desk_mouse.tracks.filter(t => LEGS.test(t.name))]);
+    M.watchLegs = feetUp ? "desk_mouse" : "recorded";
     const make = c => mixer.clipAction(c);
     M.clips = got;
     // the transitions' moments, from the clips' own poses: on the bed edge (hips low, head up), lying (head low)
@@ -241,17 +252,18 @@ export function createMH(env) {
     // a separate room mouse follows the right palm (60% from the wrist to the middle knuckle) while he holds it
     if (P.mouseNode) {
       const hand = env.bones.RightHand, kn = env.bones["finger3-1R"] || env.bones["finger3-1.R"];
-      if (hand && kn && M.w.mouse > 0.5) {
+      if (hand && kn && M.w.mouse > 0.97) {                     // (once the hand is on it: the pin puts the palm on the hump at home)
         hand.getWorldPosition(_hp).lerp(kn.getWorldPosition(_a), 0.6);
-        if (!M.grab) M.grab = P.mouseNode.position.clone().sub(_hp).setY(0);
-        P.mouseNode.position.set(_hp.x + M.grab.x, P.mouseHome.y, _hp.z + M.grab.z); P.mouseNode.updateMatrixWorld(true);
+        if (!M.grab) M.grab = P.mouseHome.clone().sub(_hp).setY(0);
+        const H0 = P.mouseHome, cl = v => Math.max(-0.06, Math.min(0.06, v));   // (it stays on the pad: within 6 cm of home)
+        P.mouseNode.position.set(H0.x + cl(_hp.x + M.grab.x - H0.x), H0.y, H0.z + cl(_hp.z + M.grab.z - H0.z)); P.mouseNode.updateMatrixWorld(true);
       } else M.grab = null;
     }
   }
-  // watching: relaxed in the chair he leans back, a little further from the desk: he and the chair roll 0.12 m back,
-  // and in again for the keys and the mouse
+  // watching (or just sitting, eating): relaxed in the chair he leans back, a little further from the desk: he and the
+  // chair roll 0.12 m back, and in again for the keys and the mouse (to 1.5 cm back: G2's belly clears the desk's edge)
   function roll(dt) {
-    const want = M.mode === "desk_watch" ? 0.12 : 0, k = 1 - Math.exp(-dt / 0.35);
+    const want = M.mode === "desk_watch" || !M.mode ? 0.12 : 0.015, k = 1 - Math.exp(-dt / 0.35);
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
     if (Math.abs(d) < 1e-6) return;
     const ry = env.boy.rotation.y, bx = -Math.sin(ry) * d, bz = -Math.cos(ry) * d;      // back: against the way he faces
@@ -274,7 +286,7 @@ export function createMH(env) {
   function transitionFor(S) {
     if (!S || S.k !== "pose" || S.t == null) return null;
     const G = M.seg, to = S.to, from = S.from;
-    if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(SEAT.down), back: true};
+    if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(G.seatDown || SEAT.down), back: true};
     if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up), back: true};
     if (to === "bedside" && from !== "bedlie") return {k: "bed_lie", a: G.lie.stand, b: G.lie.edge, at: () => G.lieEdge};
     const hips = (clip, a, b) => u => hipsAt(M.clips[clip], a + (b - a) * u);
@@ -337,13 +349,14 @@ export function createMH(env) {
     if (!P.kbNode || !P.mouseNode) { P.seen += dt; if (P.seen > 1) { P.seen = 0; props(); } }   // (G10d's nodes may arrive late)
     const st = env.state(), m = wanted(st);
     if (m) setMode(m); else if (M.mode) {                    // off the desk modes (eating, leaving): seated he just sits back
-      M.mode = null; M.w.type = M.w.mouse = 0; M.off = 0; const a = M.actions.desk_watch, cur = st.current;
+      M.mode = null; M.w.type = M.w.mouse = 0; const a = M.actions.desk_watch, cur = st.current;
       for (const k of ["sit", "dine", "type"]) env.actions[k] = a;
       if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
     bedLift(st, dt);
-    if (M.mode) { roll(dt); hands(dt); }
+    if (st.at === "desk" && !st.step) roll(dt); else M.off = 0;   // (off the desk the page places him and the chair)
+    if (M.mode) hands(dt);
     return moving;
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
@@ -351,7 +364,8 @@ export function createMH(env) {
     env.boy.updateMatrixWorld(true);
     const loc = b => { const p = env.bones[b].getWorldPosition(V()); return env.boy.worldToLocal(p).toArray().map(v => +v.toFixed(3)); };
     return {mode: M.mode, L: loc("LeftHand"), R: loc("RightHand"), tipsL: +lowestTip("Left").toFixed(3), tipsR: +lowestTip("Right").toFixed(3),
-      root: env.boy.position.toArray().map(v => +v.toFixed(3)), keys: P.keys, mouse: P.mouse};
+      root: env.boy.position.toArray().map(v => +v.toFixed(3)), keys: P.keys, mouse: P.mouse,
+      mouseAt: P.mouseNode ? P.mouseNode.position.toArray().map(v => +v.toFixed(3)) : null, grab: M.grab ? M.grab.toArray().map(v => +v.toFixed(3)) : null};
   }
   load().catch(e => console.warn("MakeHuman clips:", e));
   return {animate, dbg, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
