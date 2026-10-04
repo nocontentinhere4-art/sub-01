@@ -161,7 +161,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   process, peak ~0.8 GB once). Env: `SUB01_SENSORY=0` off, `SUB01_SENSORY_DOWNLOAD=0` never download,
   `SUB01_SENSORY_GAIN` (3.0). New deps: onnxruntime, tokenizers, onnx.
 - `/brain`: card "What it's seeing → predicted cortex" (screenshot or text → top regions), its top 8 regions lit
-  cyan on the cortex for 10 s (green channel of the activity texture; `brain_anatomy.js`'s tissue shader reads it
+  cyan on the cortex for 20 s (green channel of the activity texture; `brain_anatomy.js`'s tissue shader reads it
   too). Wording: "predicted response of a human cortex to this image, learned from public fMRI data; a model, not a
   mind".
 - Rebuild: `analysis/encoding/{extract_emofilm,extract_alice,features_films,features_text,fit,figures}.py` (~75 GB

@@ -129,8 +129,12 @@
   #sense .txt { flex:0 0 46%; font-size:12px; line-height:1.4; color:var(--fg); max-height:7.2em; overflow:hidden; }
   #sense ul { list-style:none; margin:0; padding:0; font-size:11.5px; line-height:1.35; flex:1; min-width:0; }
   #sense li { display:flex; flex-direction:column; margin-bottom:4px; }
-  #sense li span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #sense li i { display:block; height:3px; border-radius:2px; background:#5fe3ff; margin-top:2px; }   /* .card's display:block beat [hidden] (#89) */
+  #sense li span { overflow-wrap:anywhere; }
+  #sense li i { display:block; height:3px; border-radius:2px; background:#5fe3ff; margin-top:2px; }
+  @media (max-width: 900px) {                                   /* narrow cards: the picture above its regions */
+    #sense .row2 { flex-direction:column; } #sense .row2 img, #sense .txt { width:100%; flex:none; }
+    #sense .row2 .arrow { display:none; } #sense ul { width:100%; }
+  }   /* .card's display:block beat [hidden] (#89) */
   #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
   #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
@@ -826,8 +830,9 @@ function renderSense(){
   const top = (m.top || []).slice(0, 6), mx = Math.max(1e-6, ...top.map(r => r.drive));
   $("se-top").innerHTML = top.length ? top.map(r => `<li><span>${esc(r.label)}</span><i style="width:${Math.round(100 * r.drive / mx)}%"></i></li>`).join("")
     : `<li><span class="m">no region above its average</span></li>`;
-  $("se-t").textContent = (m.title && img ? `${m.title}${m.host ? " · " + m.host : ""}` : "") +
-    (m.gain != null && m.gain < 1 ? ` · sleep gain ${Math.round(m.gain * 100)}%` : "");
+  const ago = Math.round((performance.now() - senseAt) / 1000);
+  $("se-t").textContent = [img && m.title, img && m.host, m.gain != null && m.gain < 1 && `sleep gain ${Math.round(m.gain * 100)}%`,
+    ago >= 10 && `seen ${ago} s ago (the drive stops 12 s after the last picture)`].filter(Boolean).join(" · ");
   $("se-l").textContent = (m.note ? m.note + " · " : "") + m.label + " · top regions lit on the cortex in cyan";
 }
 function pollSense(){ if (MINI) return; fetch("/api/sensory").then(r => r.ok ? r.json() : null).then(s => {
@@ -1087,8 +1092,8 @@ function frame(now){
     raw.forEach((r, i) => { actData[i*4] = Math.min(255, Math.round(r / gm / 3 * 255)); });
     actTex.needsUpdate = true;
   }
-  if (senseLit) {                                    // the predicted top regions: their own patches, fading over 10 s
-    const f = Math.max(0, 1 - (now - senseAt) / 10000);
+  if (senseLit) {                                    // the predicted top regions: their own patches, fading over 20 s
+    const f = Math.max(0, 1 - (now - senseAt) / 20000);
     for (let i = 0; i < 214; i++) actData[i*4+1] = Math.round(255 * senseHi[i] * f);
     actTex.needsUpdate = true;
     if (f === 0) senseLit = false;

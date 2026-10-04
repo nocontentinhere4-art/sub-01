@@ -197,7 +197,7 @@
       float wet = mix(0.45, 1.6, vnoise(vW * 0.11)), rough = mix(0.55, 1.4, vnoise(vW * 0.45 + 3.0));
       float ves = smoothstep(0.30, 0.85, vDepth) * smoothstep(0.42, 0.72, vnoise(vW * 0.9 + 7.0));
       base = mix(base, vec3(0.50, 0.14, 0.16), uVessel * 0.55 * ves);
-      gl_FragColor = vec4(lit(base, N, normalize(vV), vDepth, mix(1.0, wet, uWet), rough) + vec3(0.10, 0.55, 0.70) * vSense, uAlpha);
+      gl_FragColor = vec4(mix(lit(base, N, normalize(vV), vDepth, mix(1.0, wet, uWet), rough), vec3(0.22, 0.82, 1.0), 0.75 * vSense), uAlpha);
     }`;
   const PART_V = `
     varying vec3 vN; varying vec3 vV; varying vec3 vW;

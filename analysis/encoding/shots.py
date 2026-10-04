@@ -44,18 +44,37 @@ def main():
         pg = b.new_page(viewport={"width": 1440, "height": 900})
         pg.goto(a.url + "/brain", timeout=60000)
         pg.wait_for_selector("#sense:not([hidden])", state="visible", timeout=60000)
-        pg.wait_for_timeout(2500)                          # the screenshot thumbnail and the cyan patches
+        # software WebGL loads the 3D brain slowly: once the cortex is there, show the same (real) prediction again so
+        # its regions are lit when the shot is taken (live, a new prediction arrives every 4 s)
+        pg.wait_for_function("scene.getObjectByName('cortex') && scene.getObjectByName('cortex').material !== cortexMat",
+                             timeout=120000)
+        pg.wait_for_timeout(1500)
+        pg.evaluate("onSense(sense)")
+        pg.wait_for_timeout(1500)
         pg.screenshot(path=str(OUT / "brain_desktop.png"))
+        # a second view facing the lit regions (the top regions' centroids, seen from outside, a little from above)
+        pg.evaluate("""(() => {
+          const qs = sense.top.slice(0, 4).map(r => nodes[r.i].q), t = controls.target, d = camera.position.distanceTo(t);
+          const v = new THREE.Vector3(...[0, 1, 2].map(k => qs.reduce((a, q) => a + q[k], 0) / qs.length))
+            .sub(t).normalize();
+          v.z = Math.max(v.z, 0.3); v.normalize();
+          controls.autoRotate = false; camera.position.copy(t).addScaledVector(v, d); controls.update(); onSense(sense);
+        })()""")
+        pg.wait_for_timeout(2000)
+        pg.screenshot(path=str(OUT / "brain_lit.png"))
         box = pg.locator("#sense").bounding_box()
         pg.screenshot(path=str(OUT / "card.png"), clip={k: box[k] + d for k, d in
                                                        (("x", -6), ("y", -6), ("width", 12), ("height", 12))})
+        pg.close()                                         # one software-WebGL page at a time
         ph = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
         ph.goto(a.url + "/brain", timeout=60000)
         ph.wait_for_selector("#sense:not([hidden])", state="visible", timeout=60000)
         ph.wait_for_timeout(2500)
-        ph.evaluate("document.getElementById('sense').scrollIntoView({block: 'center'})")
-        ph.wait_for_timeout(800)
-        ph.screenshot(path=str(OUT / "brain_phone.png"))
+        ph.evaluate("onSense(sense); document.getElementById('sense').scrollIntoView({block: 'start'})")
+        ph.wait_for_timeout(1500)
+        pb = ph.locator("#sense").bounding_box()          # cropped to the card's column: no third-party video beside it
+        ph.screenshot(path=str(OUT / "brain_phone.png"), timeout=120000,
+                      clip={"x": 0, "y": 0, "width": pb["x"] + pb["width"] + 12, "height": pb["y"] + pb["height"] + 12})
         b.close()
     print("saved", sorted(x.name for x in OUT.iterdir()))
 

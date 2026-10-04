@@ -151,6 +151,10 @@ By network: default mode 0.147 (20/46 significant), the left temporal language a
   brain's 2 s stimulus decay. It is scaled by the sleep engine's gain and stops 12 s after the last prediction or
   when he leaves the screen. A reading is an impulse, like the old reading stimulus. Memory items keep the
   rule-based networks (REM replay and the diary use them).
+- **Effect on the simulation** (10 s of ticks with vs without one sustained prediction): the driven regions' mean
+  amplitude rises **+4 %** for a Wikipedia page (29 regions with drive > 0.5) and **+7 %** for a Sintel frame
+  (8 regions); regions pushed below their average (drive < −0.5) drop by 3–6 %; undriven regions don't move.
+  That is gentler than a chat message's rules (6–8 per network). `SUB01_SENSORY_GAIN` (default 3) scales it.
 - **Familiarity**: web pages are far from any film frame. Their CLIP embedding's nearest cosine to the training frames
   is 0.31–0.41 against a floor of 0.50, the 5th percentile of held-out film frames to the other films. Such
   pictures get **half the drive** and the card says "far from the films the model learned from: a rougher guess".
@@ -162,7 +166,7 @@ By network: default mode 0.147 (20/46 significant), the left temporal language a
   out of the 153 MB CLIP graph in a child process (peak ~0.8 GB, once), the rest deleted; ~112 MB stay on the volume.
   New dependencies: `onnxruntime`, `tokenizers`, `onnx`.
 - **Pages**: `/brain` card "What it's seeing → predicted cortex" (the screenshot or the text → the top 6 regions with
-  bars), the label above, and the top 8 regions **lit on the cortex in cyan** for 10 s. `GET /api/sensory`;
+  bars), the label above, and the top 8 regions **lit on the cortex in cyan** for 20 s. `GET /api/sensory`;
   `/api/health` → `sensory` (CPU ms per prediction).
 
 ### Cost (measured here, 4-core sandbox, one thread for the encoders, `analysis/encoding/bench_sensory.py`)
@@ -174,8 +178,10 @@ By network: default mode 0.147 (20/46 significant), the left temporal language a
 | worst case: predictions back to back | 5.28 ms | 9.93 ms | 31.8 ms | 0 | 1.105 |
 
 One image prediction = **65 ms of CPU** (mean over real screenshots; a text ≈ 5 ms). At one every 4 s that is
-**~1.6 % of a core**, and the tick budget (50 ms) keeps > 5× headroom. The live server run here, with the
-sensory model on and Chromium browsing, showed the same: tick p50 6.4 ms, p95 11.3 ms.
+**~1.6 % of a core**, and the tick budget (50 ms) keeps > 5× headroom. The live server run here (sensory model on, Chromium
+browsing real pages and TikTok on the phone, ×20 clock, plus a software-WebGL browser taking these screenshots on the
+same 4 cores) stayed in budget: tick p50 7.1 ms, p95 12.3 ms, max 38 ms over the last minute; 28 predictions on real
+screens at 70.7 ms mean CPU (max 99.6 ms); readings went through the text model with no failure.
 Memory: loading both encoders adds ~190 MB RSS (57 → 246 MB in a bare process after 5 predictions).
 
 ### What it predicts for some screens (top regions, `bench_sensory.py`)
@@ -217,5 +223,21 @@ Memory: loading both encoders adds ~190 MB RSS (57 → 246 MB in a bare process 
 
 ## 8. Screenshots
 
-See `screens/` — `/brain` with the card and the cyan regions, desktop and phone width, taken from a real live
-run here (headless Chromium browsing through this sandbox's proxy, the sensory model on).
+All from a real live run here: the server with `BROWSE=1` (headless Chromium on the open web through this sandbox's
+proxy), the sensory model on, `/brain` opened in a second headless Chromium (software WebGL;
+`analysis/encoding/shots.py` waits for a real prediction, nothing is injected).
+
+**A recipe page at his desk** (onigiri, RecipeTin Eats): the card, flagged "far from the films … a rougher guess",
+and its top regions lit cyan on his cortex, left temporal / temporal pole:
+
+![/brain with the card and lit regions](screens/brain_desktop.png)
+
+The same prediction, the camera turned toward the lit regions:
+
+![lit regions](screens/brain_lit.png)
+
+The card alone, and at phone width (a minute later: a TikTok on his phone; cropped to the card):
+
+![card](screens/card.png)
+
+![phone](screens/brain_phone.png)
