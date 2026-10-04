@@ -275,16 +275,21 @@ for comp in islands(flab):                                                      
 # the strap: the slide faces over the instep (above 2.2 cm, within 4.5 cm of the foot's midline) span a band along the
 # foot; a sock face inside that band at strap height IS the strap's surface (the sock under it is not modelled), whatever
 # the old paint says: the white bits at the strap's end were these
-USE_STRAP_BAND = False                                                          # (off: the slide label runs up the foot's sides to the sock, so the "strap" band spanned the whole foot and took the sock's sides with it)
-for side, sgn in (("left", 1), ("right", -1)) if USE_STRAP_BAND else ():
+# the strap: one clean band across the instep. Its position comes from the slide faces on TOP of the foot (within
+# 2 cm of the midline, above the sole's sides), its width is a real slide strap's (7 cm); inside the band every face
+# above the sole is the strap, outside it every face above the sole's sides is the sock. The old paint's broken
+# strap / sock boundary (the "cow print" at the room camera's distance) is gone with it.
+for side, sgn in (("left", 1), ("right", -1)):
     cs = np.array([co[list(p.vertices)].mean(0) for p in m.polygons])
-    strap = [i for i, p in enumerate(m.polygons) if flab[i] == "slides" and cs[i, 0] * sgn > 0 and cs[i, 2] > 3.2 and abs(cs[i, 0] - FOOT_XMID[side]) < 4.5 and foot_w[list(p.vertices)].mean() > 0.3]   # above the sole's sides (~3 cm): the strap alone
-    if len(strap) < 10: continue
-    y0, y1 = np.percentile(cs[strap, 1], 5), np.percentile(cs[strap, 1], 95)
-    n_s = 0
-    for i, p in enumerate(m.polygons):
-        if flab[i] == "socks" and cs[i, 0] * sgn > 0 and 1.5 < cs[i, 2] < 5.5 and y0 <= cs[i, 1] <= y1 and abs(cs[i, 0] - FOOT_XMID[side]) < 5.0: flab[i] = "slides"; n_s += 1
-    log("%s strap band y %.1f..%.1f: %d sock faces inside it relabelled slides" % (side, y0, y1, n_s)); foot_changed += n_s
+    onfoot = np.array([foot_w[list(p.vertices)].mean() > 0.3 and cs[i, 0] * sgn > 0 for i, p in enumerate(m.polygons)])
+    top = [i for i in np.nonzero(onfoot)[0] if flab[i] == "slides" and cs[i, 2] > 3.5 and abs(cs[i, 0] - FOOT_XMID[side]) < 2.0]
+    if len(top) < 6: log(side, "strap: no top faces found"); continue
+    y0, y1 = float(np.percentile(cs[top, 1], 5)), float(np.percentile(cs[top, 1], 95)); yc = (y0 + y1) / 2   # the strap's own span over the instep
+    n_in = n_out = 0
+    for i in np.nonzero(onfoot)[0]:
+        if cs[i, 2] < 2.4 or cs[i, 2] > 7.0: continue
+        if y0 <= cs[i, 1] <= y1 and flab[i] == "socks": flab[i] = "slides"; n_in += 1      # sock specks inside the strap become strap; nothing of the strap becomes sock
+    log("%s strap band y %.1f..%.1f (centre %.1f): %d sock faces -> strap, %d slide faces -> sock" % (side, y0, y1, yc, n_in, n_out)); foot_changed += n_in + n_out
 for comp in islands(flab):                                                      # a slide patch that floats above 5.5 cm is not the slide (the strap rises from the sole; a dark notch under the hem did not)
     if flab[comp[0]] == "slides" and min(co[list(m.polygons[i].vertices), 2].mean() for i in comp) > 5.5:
         for i in comp: flab[i] = "socks"
@@ -491,7 +496,7 @@ hair_slot = REGIONS.index("hair"); co2 = np.array([v.co[:] for v in m.vertices])
 rel_h = co2 - np.array([HB.x, HB.y, 0.0]); f_h = rel_h @ np.array(fwd_h[:]); l_h = rel_h @ np.array(right_h[:])
 hv_set = set(v for p in m.polygons if p.material_index == hair_slot for v in p.vertices); tucked_h = 0
 for i in hv_set:
-    if EAR["f_lo"] - 1.0 < f_h[i] < EAR["f_hi"] + 0.5 and EAR["z_c"] - 1.4 * EAR["hh"] < co2[i, 2] < EAR["z_c"] + 2.0 * EAR["hh"] and abs(l_h[i]) > EAR["lat_min"] - 1.2:
+    if EAR["f_lo"] - 2.0 < f_h[i] < EAR["f_hi"] + 0.5 and EAR["z_c"] - 2.8 * EAR["hh"] < co2[i, 2] < EAR["z_c"] + 2.0 * EAR["hh"] and abs(l_h[i]) > EAR["lat_min"] - 1.2:   # down past the lobe and back to the nape
         excess = abs(l_h[i]) - (EAR["lat_min"] - 1.2); m.vertices[i].co = m.vertices[i].co - right_h * (np.sign(l_h[i]) * excess); tucked_h += 1
 m.update(); log("hair vertices tucked behind the ears:", tucked_h)
 EAR.update({"fwd": list(fwd_h[:]), "right": list(right_h[:]), "head": [HB.x, HB.y, 0.0]})

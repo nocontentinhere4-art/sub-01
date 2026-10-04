@@ -106,9 +106,9 @@ weave / rib normal maps. The projected repaint is read only as a tone reference 
 The feet are one shell in Meshy's remesh (the slide's strap and the pants' cuff are bulges of the sock), so a label per
 triangle draws the sock's edge as a zigzag of triangle edges. `build_mesh.py` re-reads every foot face from the covered
 texels inside its own old UV triangle (the padded atlas had painted the strap's sliver islands white), and
-`make_textures.py` paints the sock whole inside the sock faces and, inside the slide's and the cuff's faces, only where
-the old paint has a solid white patch (the sock's edge crossing a triangle); the atlas texels' height for that comes
-from the build (`work/posz_cloth.npy`).
+`make_textures.py` paints the sock whole inside the sock faces and nothing else white at the feet (white patches of
+old paint inside slide faces had broken the strap into "cow print" at the room camera's distance); the atlas texels'
+positions come from the build (`work/pos_cloth.npy`).
 
     blender -b -P bl_body_views.py -- render   # work/body/{front,back,left,right}.png + cameras.json
     # repaint each view -> work/body/<view>_gen.png;  python align_body.py <view>  (x4)
@@ -130,7 +130,7 @@ Every detail below is modelled or painted by the build; nothing is upscaled or r
 - **Eyes.** The opening's own outline (measured from the hole's texels, 48 directions) drives the parts under each
   `Eye` node (`assemble.mjs`, mesh `<Side>EyeFinish`): **lashes**, alpha cards rooted on the upper (20) and lower (5)
   margins fanning forward and out, from a drawn card texture (`tex_lash.png`, tapered hairs; the lower ones short and
-  sparse); a **caruncle** in the inner corner; the opening's hole is closed at both corners so no sclera shows past the lids. A lid rim (a band for the eyelid's thickness) was tried and dropped: a flat band round the iris read as a pink line;
+  sparse); the opening's hole is closed at both corners (the outer one rounded) so no sclera shows past the lids. A caruncle was tried and dropped: with the inner corner painted it read as a pink dot on the iris. A lid rim (a band for the eyelid's thickness) was tried and dropped: a flat band round the iris read as a pink line;
   the lids' shadows are baked on the sclera instead. The eyeball texture is 1024² with finer radial fibres, Fuchs' crypts, a collarette and a limbal ring; the
   sclera carries the upper and lower lids' shadows; the alpha cut of the opening is a 3-texel ramp (a smooth edge under
   the MASK cutoff, not texel stairs). The cornea's clearcoat gives the sharp catch-light.
@@ -140,7 +140,7 @@ Every detail below is modelled or painted by the build; nothing is upscaled or r
   buffer's gradients, so the strokes are right whatever the UV layout does. Drawn at 2x and brought down (anti-aliased).
 - **Ears.** A sculpted relief on the once-subdivided ear in `build_mesh.py`: helix rim, scapha groove, antihelix,
   concha bowl, tragus, soft lobe, as a height field in the ear's own frame, fading where the ear joins the head; the same
-  field in the skin's normal map for the fine edges; occlusion re-baked; the hair shards that overlapped the ear are clamped 1.2 cm behind its base plane; the ear's colour is smoothed under the relief (the old atlas's tiny ear islands had left pale cell outlines). The ear keeps the evened skin (the face
+  field in the skin's normal map for the fine edges; occlusion re-baked; the hair shards that overlapped the ear are clamped 1.2 cm behind its base plane; the ear's colour and its normal map are smoothed under the relief (the old atlas's tiny ear islands had left pale cell outlines; the extra subdivision gave per-triangle tangent seams); the relief's own bump stays. The ear keeps the evened skin (the face
   projection is unreliable there) with a warm tint on the thin rim and lobe (light through them) and a darker concha.
 - **Hairline.** The forehead and temples under the bangs are skin (non-skin texels filled from the skin around), with
   ~200 fine baby hairs painted along the hair's edge (texels 1.5-13 mm from the nearest hair vertex, falling off with

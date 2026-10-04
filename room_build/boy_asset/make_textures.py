@@ -114,7 +114,7 @@ for e in eyes.values():
     c = e["surface"] - e["forward"] * (RADIUS + INSET); d = pos - c
     lateral = np.linalg.norm(d - (d @ e["forward"])[:, :, None] * e["forward"], axis=2)
     inner = np.abs(X) > abs(e["surface"][0]) - 0.24 * e["width"]       # the inner corner (towards the nose) stays painted: the ball sits deeper there
-    outer = np.abs(X) < abs(e["surface"][0]) + 0.18 * e["width"]       # and the outer corner: the lid closes over the ball there too (no sclera wedge past the lashes)
+    outer = np.abs(X) < abs(e["surface"][0]) + 0.18 * e["width"] - 0.6 * np.abs(Z - e["surface"][2])   # a rounded outer corner (a plane cut left a straight vertical sclera edge)       # and the outer corner: the lid closes over the ball there too (no sclera wedge past the lashes)
     hole |= ndi.binary_erosion(e["mask"], iterations=6) & (lateral < RADIUS * 0.75) & inner & outer
 hole = blur(hole.astype(np.float32), 2.5) > 0.5                              # the morphology's square corners rounded off
 lab_hh, n_hh = ndi.label(hole)
@@ -350,9 +350,6 @@ if os.path.exists(EARJ):                                                   # the
     rcE = np.hypot(uE - 0.15, vE + 0.1) / 0.40; conchaE = np.maximum(0.0, 1 - rcE * rcE)
     warm = np.clip(0.55 * rimE + 0.6 * lobeE, 0, 1) * on_ear; dark_e = conchaE * on_ear
     skin_out[:, :, 0] = np.clip(skin_out[:, :, 0] * (1 + 0.07 * warm), 0, 1); skin_out[:, :, 1] = np.clip(skin_out[:, :, 1] * (1 - 0.02 * warm), 0, 1); skin_out[:, :, 2] = np.clip(skin_out[:, :, 2] * (1 - 0.06 * warm), 0, 1)
-    sm_e = np.stack([blur(skin_out[:, :, k] * on_ear, 5) for k in range(3)], 2) / np.maximum(blur(on_ear.astype(np.float32), 5), 1e-3)[:, :, None]
-    m_e = blur(ndi.binary_erosion(on_ear, iterations=3).astype(np.float32), 3)[:, :, None]
-    skin_out = skin_out * (1 - m_e) + sm_e * m_e                           # the old atlas's tiny ear islands left pale cell outlines: smoothed away
     skin_out = np.clip(skin_out * (1 - 0.10 * dark_e)[:, :, None], 0, 1); print("ear tint: %d texels" % int(on_ear.sum()))
     # the old paint smeared hair shadows over the ears: non-skin texels there are filled from the ear's own skin
     sl_e = skin_out.mean(2); pink_e = skin_out[:, :, 0] - skin_out[:, :, 2] > 0.06
@@ -361,6 +358,9 @@ if os.path.exists(EARJ):                                                   # the
         wg = blur(good_e.astype(np.float32), 8); fl = np.stack([blur(skin_out[:, :, k] * good_e, 8) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
         fl = np.where((wg > 0.02)[:, :, None], fl, np.median(skin_out[good_e], 0)[None, None, :])
         skin_out = np.where(ndi.binary_dilation(bad_e, iterations=1)[:, :, None], fl, skin_out); print("ears: %d smudged px filled" % int(bad_e.sum()))
+    sm_e = np.stack([blur(skin_out[:, :, k] * on_ear, 6) for k in range(3)], 2) / np.maximum(blur(on_ear.astype(np.float32), 6), 1e-3)[:, :, None]
+    m_e = blur(ndi.binary_erosion(on_ear, iterations=3).astype(np.float32), 3)[:, :, None]
+    skin_out = skin_out * (1 - m_e) + sm_e * m_e                           # smoothed AFTER the fill: the fill's patch edges and the old atlas's tiny ear islands both left pale outlines
 # (the full-body repaint views were tried on the skin too, work/skin_body_projected.png: at 1536 px for 1.8 m the hands are
 #  80 px and the repaint's hair shadows landed on the throat; the hands and the neck keep the evened old skin below)
 # the hands: texels that are not skin (dark grey from the cuff, white from the socks: the old atlas's padding next to the
@@ -379,7 +379,12 @@ if hands.any():
     hm_ = blur(hands.astype(np.float32), 3)[:, :, None]; skin_out = np.clip(skin_out * (gain_h[:, :, None] * hm_ + (1 - hm_)), 0, 1)
 rgba = np.concatenate([skin_out, alpha[:, :, None]], 2)
 Image.fromarray(np.clip(rgba * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_skin.png")); print("wrote tex_skin.png (RGBA)")
-save("tex_skin_n.png", sanitize_normal(load("nrm_skin.png")))
+skin_n = sanitize_normal(load("nrm_skin.png"))
+if os.path.exists(EARJ):                                                      # the ear's per-triangle tangent seams (the extra subdivision + the relief) showed as thin contour lines: the bake is smoothed there, the relief's own bump stays
+    ear_n = ndi.binary_erosion(on_ear, iterations=2); m_n = blur(ear_n.astype(np.float32), 2)[:, :, None]
+    sm_n = np.stack([blur(skin_n[:, :, k], 2.0) for k in range(3)], 2); skin_n = skin_n * (1 - m_n) + sm_n * m_n
+    v_ = skin_n * 2 - 1; v_ /= np.maximum(np.linalg.norm(v_, axis=2, keepdims=True), 1e-6); skin_n = (v_ + 1) / 2
+save("tex_skin_n.png", skin_n)
 save("tex_skin_orm.png", orm(pad_full(np.clip(blur(load("ao_skin.png", S)[:, :, 0], 1.5) * 0.5 + 0.5, 0, 1), cov_skin), pad_full(load("rough_skin.png")[:, :, 0], cov_skin)))   # AO softened: skin is translucent
 
 # --- eyelid colour: the skin around the eyes, a little darker
@@ -474,7 +479,7 @@ if os.path.exists(REG):
         if os.path.exists(SV):                                               # only next to the sock proper: the sock's edge crossing a slide or cuff triangle, never a far patch
             from scipy.spatial import cKDTree
             dsock, _ = cKDTree(np.load(SV)).query(pc[white_t], k=1); keep = np.zeros_like(white_t); keep[white_t] = dsock < 0.35; white_t = keep
-        sock_tex = (socks_r & feet) | white_t
+        sock_tex = socks_r & feet                                             # the sock faces alone: the old paint's white patches inside slide faces broke the strap into "cow print" 
         FJ = os.path.join(WORK, "feet.json")
         if os.path.exists(FJ):                                               # the toe seam across the front, the heel seam up the back: a thread's shadow
             FEET_ = json.load(open(FJ)); seam = np.zeros((C, C), np.float32)
@@ -575,7 +580,6 @@ spec = {
         "eye":    {"base": "eye", "baseQ": 90, "roughness": 0.35},
         "cornea": {"color": [1, 1, 1, 0.08], "roughness": 0.05, "clearcoat": 1.0, "clearcoatRoughness": 0.03, "blend": True},
         "lid":    {"base": "lid", "roughness": 0.75},
-        "caruncle": {"color": [0.6, 0.27, 0.3, 1], "roughness": 0.3},
         "lash":   {"base": "lash", "baseQ": 92, "blend": True, "roughness": 0.55, "doubleSided": True, "color": [0.55, 0.5, 0.5, 1]},
     },
     "lashes": {"upper": {"n": 20, "length": 0.0065, "width": 0.0026}, "lower": {"n": 5, "length": 0.0018, "width": 0.0016}, "rimDepth": 0.0010, "caruncle": 0.0008},

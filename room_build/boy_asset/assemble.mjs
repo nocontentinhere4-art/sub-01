@@ -175,7 +175,7 @@ for (const side of ["Left", "Right"]) {
     for (let k = 0; k < SEG; k++) { const a0 = 2 * k; I.push(a0, a0 + 1, a0 + 2, a0 + 2, a0 + 1, a0 + 3); }
     finish.addPrimitive(quads("rim", P, N, UV, I, await material("rim", SPEC.materials.rim)));
   }
-  { // caruncle: a small sphere in the inner corner, a little behind the skin
+  if (SPEC.materials.caruncle) { // caruncle (off: with the inner corner painted it read as a pink dot on the iris)
     const r = LS.caruncle ?? 0.0008, c = onEllipse(0, -0.0012, 0, -0.0022);                   // t = 0 is the +A end: the inner corner
     const prim = sphere("caruncle", r, 12, 8, Math.PI, await material("caruncle", SPEC.materials.caruncle), () => [0.5, 0.5]);
     const pos = prim.getAttribute("POSITION"), arr = pos.getArray().slice(); for (let i = 0; i < arr.length; i += 3) { arr[i] += c[0]; arr[i + 1] += c[1]; arr[i + 2] += c[2]; } pos.setArray(arr);
@@ -187,10 +187,10 @@ for (const side of ["Left", "Right"]) {
     for (const [which, lower] of [["upper", false], ["lower", true]]) {
       const cfg = LS[which] || {n: lower ? 8 : 14, length: lower ? 0.0035 : 0.0065, width: lower ? 0.0022 : 0.0028};
       for (let k = 0; k < cfg.n; k++) {
-        const s = (k + 0.5) / cfg.n, t = lower ? Math.PI + 0.25 + s * (Math.PI - 0.5) : 0.2 + s * (Math.PI - 0.4);   // along the margin, away from the inner corner
+        const s = (k + 0.5) / cfg.n, t = lower ? Math.PI + 0.25 + s * (Math.PI - 0.5) : 0.3 + s * (Math.PI - 0.8);   // the upper row stops short of the outer corner   // along the margin, away from the inner corner
         const root = onEllipse(t, -0.0002, -0.0002, 0.0002);
         const tg = vec3.sub(vec3.create(), onEllipse(t + 0.02), onEllipse(t - 0.02)); vec3.normalize(tg, tg);        // the margin's tangent
-        const dir = vec3.create(); vec3.scale(dir, F, 0.8); vec3.scaleAndAdd(dir, dir, B, lower ? -0.55 : 0.5); vec3.scaleAndAdd(dir, dir, out, 0.25 * s); vec3.normalize(dir, dir);
+        const dir = vec3.create(); vec3.scale(dir, F, 0.8); vec3.scaleAndAdd(dir, dir, B, lower ? -0.55 : 0.5); vec3.scaleAndAdd(dir, dir, out, 0.08 * s); vec3.normalize(dir, dir);
         const len = cfg.length * (0.75 + 0.5 * Math.sin(Math.PI * s)), half = vec3.scale(vec3.create(), tg, cfg.width / 2);
         const b0 = vec3.sub(vec3.create(), root, half), b1 = vec3.add(vec3.create(), root, half);
         const t0 = vec3.scaleAndAdd(vec3.create(), b0, dir, len), t1 = vec3.scaleAndAdd(vec3.create(), b1, dir, len);
