@@ -135,7 +135,7 @@
   };
   qa.body = (every = 2) => {
     // every skinned part of him (one body, or a dressed one: body, hoodie, trousers, socks, slides)
-    const parts = []; boy.traverse(o => { if (o.isSkinnedMesh) parts.push(o); }); boy.updateMatrixWorld(true);
+    const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) parts.push(o); }); boy.updateMatrixWorld(true);
     const v = V(), desk = qa.columns("desk", -1.92, -0.30, -1.47, -0.72);
     const out = {sampled: 0, below_floor: 0, desk: 0, min_y: 9, by: {}, foot_min_y: {Left: 9, Right: 9}, bed: 0, chair: 0};
     for (const sm of parts) {
@@ -152,15 +152,8 @@
           if (col) for (let j = 0; j < col.length; j += 2) if (v.y > col[j] + 0.01 && v.y < col[j + 1] - 0.01) { out.desk++; out.by["desk:" + bn] = (out.by["desk:" + bn] || 0) + 1; break; } }
       }
     }
-    // the page's penetration() reads the last skinned mesh it meets: each part in turn goes last (then the order is restored)
-    for (const sm of parts) {
-      const par = sm.parent, at = par.children.indexOf(sm);
-      par.children.splice(at, 1); par.children.push(sm);
-      const pen = window.penetration(every, true);
-      par.children.pop(); par.children.splice(at, 0, sm);
-      out.bed += pen.bed; out.chair += pen.chair;
-      for (const [k, n] of Object.entries(pen.by)) if (k !== "pts") out.by[k] = (out.by[k] || 0) + n;
-    }
+    const pen = window.penetration(every, true);                      // (the page's: every visible skinned part too)
+    out.bed = pen.bed; out.chair = pen.chair; Object.assign(out.by, Object.fromEntries(Object.entries(pen.by).filter(([k]) => k !== "pts")));
     for (const k of ["min_y"]) out[k] = +out[k].toFixed(3);
     out.foot_min_y = {Left: +out.foot_min_y.Left.toFixed(3), Right: +out.foot_min_y.Right.toFixed(3)};
     out.floor_y = F; out.desk_columns_ms = desk && desk.ms;

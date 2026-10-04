@@ -67,7 +67,8 @@ export function createMH(env) {
     const B = env.bones, out = t => { a.time = t; mx.update(0); env.boy.updateMatrixWorld(true);
       const loc = n => env.boy.worldToLocal(B[n].getWorldPosition(V()));
       return {t, hips: loc("Hips"), head: loc("Head"), knee: loc("LeftLeg").add(loc("RightLeg")).multiplyScalar(0.5),
-        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y)}; };
+        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y),
+        feet: loc("LeftFoot").add(loc("RightFoot")).add(loc("LeftToeBase")).add(loc("RightToeBase")).multiplyScalar(0.25)}; };
     out.done = () => { a.stop(); mx.uncacheRoot(env.boy); };
     return out;
   }
@@ -139,6 +140,11 @@ export function createMH(env) {
       edge = stillClip("mh_edge", got.bed_lie, seg.lie.edge);
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = hipsAt(got[k], 0); }
     M.actions.stand = make(stand); H.mh_stand = hipsAt(stand, 0);
+    // indoors the arms barely swing (a tenth) (the recorded swing takes a hand 40 cm out: into the chair by the bed)
+    const ARMS = /^(Left|Right)(Arm|ForeArm|Hand)\.quaternion$|^(upperarm|lowerarm)0[12](L|R)\.quaternion$/, q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion();
+    for (const tr of got.walk.tracks) { if (!ARMS.test(tr.name)) continue;
+      const st = got.stand.tracks.find(t => t.name === tr.name); if (!st) continue; q1.fromArray(st.values, 0);
+      for (let i = 0; i < tr.values.length; i += 4) { q0.fromArray(tr.values, i).slerp(q1, 0.9); q0.toArray(tr.values, i); } }
     M.actions.walk = make(got.walk); H.room_walk = hipsAt(got.walk, 0);
     M.actions.lie = make(lie); H.mh_lie = hipsAt(lie, 0);
     M.actions.edge = make(edge); H.mh_edge = hipsAt(edge, 0);
@@ -153,6 +159,7 @@ export function createMH(env) {
     A.walk = M.actions.walk; H.walk = H.room_walk.slice(); if (env.setStride) env.setStride(WALK_V);
     for (const k of lying) { A[k] = M.actions.lie; H[k] = H.mh_lie.slice(); }
     for (let i = 0; i < 600 && !(env.chairNode && env.chairNode()); i++) await new Promise(r => setTimeout(r, 100));   // (the room may still be loading)
+    { const sp = sampler(stand); M.standFeet = sp(0).feet; sp.done(); }     // (he turns on the spot about his feet, not the root)
     seatHeight(); props();
     for (const a of Object.values(M.actions)) a.stop();
     mixer.stopAllAction();
@@ -328,17 +335,17 @@ export function createMH(env) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
     if (!on && !M.lift) return;
     const b = env.boy; let need = 0, every = 3;
-    if (on && !st.step) {                                      // still on the bed: every vertex, once a second (cheap on a phone)
+    if (on && !st.step) {                                      // still on the bed: every other vertex, once a second (cheap on a phone)
       M.liftT = (M.liftT || 0) - dt; if (M.liftT > 0) { b.position.y += M.lift; return; }
-      M.liftT = 1; every = 1; M.lift = 0;
+      M.liftT = 1; every = 2; M.lift = 0;
     }
     if (on) {
-      if (!skin) b.traverse(o => { if (o.isSkinnedMesh && !skin) skin = o; });
-      b.updateMatrixWorld(true);
-      const P = skin.geometry.attributes.position, v = V();
-      for (let i = 0; i < P.count; i += every) { skin.getVertexPosition(i, v).applyMatrix4(skin.matrixWorld);
+      if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh) skin.push(o); }); }     // every part (dressed: his clothes too)
+      b.updateMatrixWorld(true); const v = V();
+      for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
+      for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
         const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
-        if (e > 0) need = Math.max(need, BED.top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); }   // (its edge is rounded, r 5 cm)
+        if (e > 0) need = Math.max(need, BED.top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
     }
     M.lift = Math.max(need, (M.lift || 0) - 0.1 * dt);
     if (M.lift < 1e-4) M.lift = 0;
@@ -359,6 +366,58 @@ export function createMH(env) {
     M.flift = Math.max(need, (M.flift || 0) - 0.1 * dt); if (M.flift < 1e-4) M.flift = 0;
     b.position.y += M.flift;
   }
+  // in bed: the slides come off before he sits on the bed's edge (a pair parked on the floor by it, toes toward the bed,
+  // their own geometry as in his bind pose: standing, feet flat) and go back on as he stands up; asleep at night the
+  // page's duvet is drawn up over him to his chest (a daytime rest stays on top of it)
+  const SL = {on: [], pair: null, off: false, duv: 0};
+  function slidesInit() {
+    env.boy.traverse(o => { if (o.isSkinnedMesh && /slide/i.test(o.name)) SL.on.push(o); });
+    if (!SL.on.length) return;
+    const pair = new THREE.Group(), box = new THREE.Box3(), c = V();
+    for (const o of SL.on) { const g = o.geometry.clone(); g.applyMatrix4(o.bindMatrix); for (const k of ["skinIndex", "skinWeight"]) g.deleteAttribute(k);
+      const m = new THREE.Mesh(g, o.material); m.castShadow = m.receiveShadow = true; pair.add(m); g.computeBoundingBox(); box.union(g.boundingBox); }
+    box.getCenter(c); for (const m of pair.children) m.geometry.translate(-c.x, -box.min.y, -c.z);
+    pair.position.set(-0.66, env.F + 0.002, 0.08); pair.rotation.y = 0.25; pair.visible = false; pair.name = "slides_parked";
+    env.scene.add(pair); SL.pair = pair;
+  }
+  function bedThings(st, dt) {
+    if (!SL.pair && !SL.tried) { SL.tried = true; slidesInit(); }
+    const S = st.step, u = S && S.t != null ? S.t : 1;
+    const off = st.at === "bedlie" || st.at === "bedside" || !!(S && S.k === "pose" && (S.to === "bedlie" || S.from === "bedlie" ||
+      (S.to === "bedside" && u > 0.6) || (S.from === "bedside" && !S.to && u < 0.25)));
+    if (SL.pair && off !== SL.off) { SL.off = off; SL.pair.visible = off; for (const o of SL.on) o.visible = !off; }
+    if (!env.cover) return;
+    const asleep = !!(st.goal && st.goal.clip === "sleep") && (st.at === "bedlie" || !!(S && S.k === "pose" && S.to === "bedlie" && u > 0.8));
+    SL.duv = SL.duv === 0 && asleep && st.at === "bedlie" && !S ? 1 : Math.min(1, Math.max(0, SL.duv + (asleep ? dt / 2.2 : -dt / 1.2)));
+    env.cover(SL.duv, dt);
+  }
+  // turning on the spot (a walk or turn step before he moves off): the walk loop's full stride would swing a foot 30 cm
+  // out (into the bed at the sill), so the stride shrinks with his speed: the walk blends toward the stand
+  const _lp = V();
+  function pivot(st, dt) {
+    const S = st.step, W = M.actions.walk, St = M.actions.stand, b = env.boy;
+    const speed = M.lpOk ? Math.hypot(b.position.x - _lp.x, b.position.z - _lp.z) / Math.max(dt, 1e-3) : 1;
+    _lp.copy(b.position); M.lpOk = true;
+    const walking = !!(S && (S.k === "walk" || S.k === "turn") && st.current === W);
+    const want = walking ? Math.min(1, Math.max(0.15, speed / 0.35)) : 1;
+    if (walking && !M.wasWalking) M.ww = 0.15;                  // (from standing: the first steps are short ones)
+    M.wasWalking = walking;
+    M.ww = (M.ww == null ? 1 : M.ww) + (want - (M.ww == null ? 1 : M.ww)) * (1 - Math.exp(-dt / 0.15));
+    if (!walking) { M.ry0 = null; if (M.pivoting) { M.pivoting = false; if (St !== st.current) { St.setEffectiveWeight(0); St.stop(); } } M.ww = 1; return; }
+    if (M.ry0 == null || M.ww > 0.99) M.ry0 = b.rotation.y;    // (where this turn on the spot started)
+    if (M.ww > 0.995 && !M.pivoting) return;
+    M.pivoting = M.ww <= 0.995;
+    if (!St.isRunning()) { St.reset(); St.play(); }
+    W.setEffectiveWeight(M.ww); St.setEffectiveWeight(1 - M.ww); env.mixer.update(0);
+    // and he turns about his feet, not the root (the stand's feet are ahead of it: at the sill his toes would reach the
+    // bed): his hips move by the turn of that offset (the mixer sets them anew each frame), fading out as he walks off
+    const H = env.bones.Hips, f = M.standFeet; if (!H || !f) return;
+    const rot = r => [f.x * Math.cos(r) + f.z * Math.sin(r), -f.x * Math.sin(r) + f.z * Math.cos(r)];
+    // (halfway to the feet: the hips' swing stays clear of the chair, the toes of the bed)
+    const a0 = rot(M.ry0), a1 = rot(b.rotation.y), k = 0.5 * Math.min(1, Math.max(0, (1 - M.ww) / 0.85));
+    b.updateMatrixWorld(true); const w0 = H.getWorldPosition(V()), w1 = w0.clone().add(V((a0[0] - a1[0]) * k, 0, (a0[1] - a1[1]) * k));
+    H.position.add(H.parent.worldToLocal(w1).sub(H.parent.worldToLocal(w0)));
+  }
   function onBed(st) {                                       // lying on, or sitting on the edge of, the bed: placed by the lie clip's pose
     if (st.step || (st.at !== "bedlie" && st.at !== "bedside")) return;
     const p = st.at === "bedlie" ? M.seg.bedLie : M.seg.lieEdge, b = env.boy; b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry;
@@ -376,7 +435,9 @@ export function createMH(env) {
       if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
+    pivot(st, dt);
     baseY(); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
+    bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
     return moving;
