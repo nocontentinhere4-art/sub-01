@@ -7,6 +7,9 @@ render is on the right: `/room` at 14:00, him at the window so the desk is clear
 | sheet | ours | real photo | source | licence |
 |---|---|---|---|---|
 | `real_keyboard.jpg` | the original tenkeyless keyboard (room_clean.glb, split into node `keyboard`, 39062ea) | a black keyboard on a wooden desk, from above | https://commons.wikimedia.org/wiki/File:Black_Computer_keyboard.jpg (Samiknoov) | CC0 |
+| `real_controller.jpg` | the controller modelled in code (1631de8), from low at the player's side | a plain dark gamepad on a table, from low at the front | https://commons.wikimedia.org/wiki/File:Controller_(Unsplash).jpg (Ugur Akdemir, via Unsplash) | CC0 |
+| `real_monitor.jpg` (top) | the monitor modelled in code (1631de8), screen off, from the front | a monitor switched off, from the front (cropped at the left to leave out a far-off person) | https://commons.wikimedia.org/wiki/File:Pantaila.jpg (Anartzzz) | CC0 |
+| `real_monitor.jpg` (bottom) | the same, screen off, three-quarter view | a slim monitor on a desk, three-quarter view | https://commons.wikimedia.org/wiki/File:Desk_Setup_(Unsplash).jpg (Luke Chesser, via Unsplash) | CC0 |
 | `real_mouse_v2.jpg` | the remodelled mouse (5f52f37): photo, the old mouse, the new one | the same photo | as below | CC0 |
 | `real_mouse.jpg` | the code-made mouse on its pad (`mouse.glb`) | a plain black wired mouse, three-quarter view | https://commons.wikimedia.org/wiki/File:ComputerMouseCloseup3.jpg (Raysonho @ Open Grid Scheduler / Grid Engine) | CC0 |
 
@@ -24,3 +27,13 @@ After the remodel (`real_mouse_v2.jpg`): the mouse now has a sharp split between
 dark parting seam runs all round a third of the way up over an upright skirt, the waist is pinched, the top is a satin
 gloss, and a crisp chamfered base sits on the pad. It holds up much better. What still differs: the real one is wired and
 has a red wheel, and its front is blunter; ours stays wireless and plain, keeping the same outline so the hand grip fits.
+
+Controller and monitor (1631de8):
+- Controller: holds up. It has the parts of a real modern pad in the right places (two grips, sticks with knurled caps on
+  boots, D-pad, face buttons, bumpers and triggers) and is matte dark with glossier buttons. What still differs: our grips are
+  rounder and softer than the photographed pad's, which has crisper edges and a light bar and touch pad, maker features we leave
+  out.
+- Monitor: holds up. Its thin bezels, chin, glossy rim, slim side profile and flat foot read like the slim monitor in the
+  three-quarter photo. When off, the screen shows a faint anti-glare sheen like the front photo. The front photo is an older
+  model with a thicker glossy bezel. Both monitor photos show a small maker's logo; I found no CC0 photo of a current slim
+  monitor without one.
