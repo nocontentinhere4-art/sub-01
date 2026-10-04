@@ -114,6 +114,27 @@ from the build (`work/posz_cloth.npy`).
     # repaint each view -> work/body/<view>_gen.png;  python align_body.py <view>  (x4)
     blender -b -P bl_body_views.py -- project; python project_paint.py --body     # work/cloth_projected.png (reference)
 
+## The socks' own sole (for #63 / the bed code)
+The mesh is one shell at the feet, so the sock had no sole or instep of its own: the slide was them, and when he lies
+on the duvet the page had to keep the slides' shape in sock-white (two big white ovals, #126). `build_mesh.py` now copies
+every slide face, labels the copy sock and pushes it into the foot along its normal (6 mm, tapering to 0 within 1.5 cm
+of the sock border, so the two surfaces meet without a step). With the slides on, the copy sits inside them, unseen;
+with the slides hidden, the foot is a closed white sock: sole, rim and instep. The sock texels' occlusion is clamped
+(the copy is baked inside the slides). For the page: the slides are the primitive with material **`boy_slides`**
+(three.js name `char1_6`, the last skinned mesh: it still carries the invisible body proxy for `bedInit`, which reads
+vertices, so `visible = false` on it is safe); the socks are **`boy_socks`** (`char1_5`). Hiding `boy_slides` outright
+(and showing the parked pair) replaces the sock-white remap. Cost: +11.9k triangles after the socks' subdivision (75.3k in all, budget 80k).
+
+## The owner's preview video
+`render/preview_video.py` renders `docs/design/character/preview/boy_old_vs_new.mp4` in `/room` itself (the visual
+harness's fake server, headless Chromium in software GL, the page's loop frozen and stepped by hand at 1/30 s): a slow
+360° turn of his head, old then new (standing just inside the door, the camera fixed in front of him, he turns on the
+spot), then the desk and the walk from the door, old (left) vs new (right) with the same camera. 30 fps, H.264,
+`/usr/bin/ffmpeg`. The old asset is served in place of `web/room/boy.glb` by a Playwright route; nothing on disk
+changes. Software GL draws about one frame every 4 s, so the 40 s video takes about two hours.
+
+    python room_build/boy_asset/render/preview_video.py --old room_build/boy_asset/work/boy_old.glb --out docs/design/character/preview/boy_old_vs_new.mp4
+
 ## Checks and sheets
     node render/compare.mjs work/boy_old.glb out/boy.glb out/compare    # every clip at the same frames, old vs new, + close-ups
     node render/room_shots.mjs out/room new out/boy.glb                 # /room at 1280 and 390, day and night (software WebGL)

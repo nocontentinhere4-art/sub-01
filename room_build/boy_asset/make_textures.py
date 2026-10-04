@@ -349,7 +349,9 @@ if os.path.exists(REG):
         if ref_h.sum() > 1000: print("  reference: the repaint's hoodie median %s (lit), ours %s (albedo)" % (np.median(cp[ref_h], 0).round(3), hood_med.round(3)))
 save("tex_cloth.png", cloth_g)
 save("tex_cloth_n.png", sanitize_normal(load("nrm_cloth.png")))
-save("tex_cloth_orm.png", orm(pad_full(np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1), cov_cloth), pad_full(load("rough_cloth.png")[:, :, 0], cov_cloth)))
+ao_c = np.clip(load("ao_cloth.png", C)[:, :, 0] * 0.85 + 0.15, 0, 1)
+if os.path.exists(REG): ao_c = np.where(reg == 5, np.maximum(ao_c, 0.7), ao_c)   # the socks' own sole is baked INSIDE the slides (black AO): the page shows it with the slides hidden
+save("tex_cloth_orm.png", orm(pad_full(ao_c, cov_cloth), pad_full(load("rough_cloth.png")[:, :, 0], cov_cloth)))
 
 # ------------------------------------------------------------------ the eyeball and the lid
 E = 512

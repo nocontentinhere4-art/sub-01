@@ -265,6 +265,46 @@ def select_faces(pred):
     bme.select_flush_mode(); bmesh.update_edit_mesh(m)
     n = sum(1 for f in bme.faces if f.select); assert n == sum(sel), (n, sum(sel))
 
+# ---------------------------------------------------------------- the socks' own sole (#126: the page hides the slides on the bed)
+# The mesh is one shell at the feet: the sock has no sole or instep of its own, the slide IS them. room.html therefore
+# had to keep the slides' shape in sock-white when he lies on the duvet (two big white ovals). Every slide face is
+# copied, labelled sock, and the copy is pushed INTO the foot along its normal (6 mm, tapering to 0 within 1.5 cm of the
+# sock border so the two surfaces meet without a step). With the slides on, the copy is inside them, unseen; with the
+# slides hidden, the foot is a closed white sock: sole, rim and instep.
+SOLE_D, SOLE_TAPER = 0.6, 1.5
+bm = bmesh.new(); bm.from_mesh(m); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.normal_update()
+slide_faces = [bm.faces[i] for i in range(len(m.polygons)) if flab[i] == "slides"]
+is_sock_v = np.zeros(len(bm.verts), bool); is_slide_v = np.zeros(len(bm.verts), bool)
+for i, p in enumerate(m.polygons):
+    if flab[i] == "socks": is_sock_v[list(p.vertices)] = True
+    if flab[i] == "slides": is_slide_v[list(p.vertices)] = True
+border0 = np.nonzero(is_sock_v & is_slide_v)[0]
+dist = np.full(len(bm.verts), np.inf); dist[border0] = 0.0; q = deque(border0.tolist())
+while q:                                                                        # edge-length Dijkstra-lite over the slide vertices
+    i = q.popleft()
+    for e in bm.verts[i].link_edges:
+        j = e.other_vert(bm.verts[i]).index
+        if not is_slide_v[j]: continue
+        d_ = dist[i] + e.calc_length()
+        if d_ < dist[j] - 1e-6: dist[j] = d_; q.append(j)
+dup = bmesh.ops.duplicate(bm, geom=slide_faces)
+n_old_v = len(dist)
+for k_, v_ in dup["vert_map"].items():                                         # BMVert pairs; which one is the copy is told by its index (new ones come after the old)
+    src, dst = (k_, v_) if k_.index < n_old_v else (v_, k_)
+    t = min(1.0, dist[src.index] / SOLE_TAPER) if np.isfinite(dist[src.index]) else 1.0
+    dst.co = src.co - src.normal * (SOLE_D * t)
+new_faces = [g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)]
+n_before = len(m.polygons)
+bm.to_mesh(m); bm.free(); m.update()
+flab = np.concatenate([flab, np.array(["socks"] * (len(m.polygons) - n_before), dtype=object)])
+for p in m.polygons: p.material_index = REGIONS.index(flab[p.index])
+# the copies keep the slides' old UVs (black): make_textures.py paints every sock-region texel white, so that is harmless
+log("sock sole: %d slide faces copied inward (border vertices %d)" % (len(m.polygons) - n_before, len(border0)))
+co = np.array([v.co[:] for v in m.vertices])
+wt = {n: np.zeros(len(m.vertices)) for n in gname}
+for v in m.vertices:
+    for g in v.groups: wt[gname[g.group]][v.index] = g.weight
+
 # ---------------------------------------------------------------- a low-poly copy of the whole welded body: the invisible proxy
 # room.html's bed code (bedInit, slidesInit, the debug helpers) takes the LAST skinned mesh as his whole body; with the
 # body split into one primitive per material that would be the slides alone, so assemble.mjs appends this proxy (alpha-

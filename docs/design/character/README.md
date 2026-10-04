@@ -31,12 +31,17 @@ rig, its rest pose, the inverse bind matrices and the embedded sit clip are the 
   wedge at the cuffs, no striped flap inside them, no smear on the slides' strap.
 - **Hands:** still mitten shapes, subdivided (smooth) with four finger grooves in the normal map; real finger bones are
   left for a later pass (see the build README).
+- **Socks with a sole of their own** (#126's bed code): the slides were the sock's sole and instep (one shell), so on
+  the duvet the page had to draw the slides' shape in white; now a sock-labelled copy of the slide sits 6 mm inside it,
+  and with the slides hidden (`boy_slides`, the last primitive) the foot is a closed white sock.
+- **Preview video:** `preview/boy_old_vs_new.mp4`, 40 s, 30 fps, rendered in `/room`: a turn of his head old then new,
+  the desk and the walk old vs new side by side (see the build README).
 
 ## Budgets
 | | old | new | budget |
 |---|---|---|---|
-| file | 960 KB | 1.45 MB | ≤ 3 MB |
-| triangles | 31k | 56k body + 3.1k invisible bed proxy + 2 × 1.1k eyes (63.4k) | ≤ 80k |
+| file | 960 KB | 1.65 MB | ≤ 3 MB |
+| triangles | 31k | 56k body + 11.9k sock sole + 3.3k invisible bed proxy + 2 × 1.1k eyes (75.3k) | ≤ 80k |
 | draw calls | 1 | 6 body (the last one also carries an invisible ~3k-triangle body proxy for the bed code) + 6 eye parts (two shared meshes) | |
 | textures (VRAM) | one 2048² | skin 2048² + 2 × 1024², hair 1024² + 2 × 512², cloth 2048² + 2 × 1024², eye 512², lid 128² | |
 
