@@ -36,6 +36,8 @@ VIEWS = {
     "headphones": [[0.35, 1.45, -0.45], [-0.24, 1.38, -1.42]],
     "keycaps": [[-0.98, 1.22, -0.72], [-1.09, 0.99, -0.99]],
     "door": [[1.05, 1.35, -0.55], [1.62, 1.05, -1.42]],
+    "desk_close": [[-1.17, 2.15, 0.15], [-1.19, 0.98, -1.12]],          # the props preview's desk close-up (the whole top, over the chair)
+    "desk_top": [[-1.10, 2.45, -0.95], [-1.10, 0.97, -1.12]],            # (planning only: the desk seen from above)
 }
 WITH_HIM = {"overview"}                                  # he sits at the desk in the overview; the close-ups show the room alone
 SIZES = {"1280": (1280, 800), "390": (390, 844)}
@@ -76,6 +78,7 @@ def main():
     ap.add_argument("--hours", default="day,night")
     ap.add_argument("--chromium", default=os.environ.get("CHROMIUM", "/opt/pw-browsers/chromium"))
     ap.add_argument("--quality", type=int, default=88)
+    ap.add_argument("--block", default=None, help="a glob of page requests to abort (e.g. **/props_clutter.glb: the state before a GLB)")
     ap.add_argument("--cdn-dir", default=os.environ.get("CDN_DIR"), help="a node_modules with three@0.169.0 and leaflet@1.9.4: served in place of the CDNs (no network)")
     args = ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -106,16 +109,21 @@ def main():
                     pg = ctx.new_page()
                     if args.glb:
                         pg.route("**/room/room_clean.glb", lambda r: r.fulfill(path=args.glb, content_type="model/gltf-binary"))
+                    if args.block:
+                        pg.route(args.block, lambda r: r.abort())
                     if args.cdn_dir:
                         pg.route("https://**", lambda r: cdn_route(r, Path(args.cdn_dir)))
                     pg.goto(f"http://127.0.0.1:{args.port}/?debug&nolive&hour={hour}", wait_until="load", timeout=240000)
                     pg.wait_for_function("() => window.room && window.boy && document.getElementById('boot') === null", timeout=240000)
+                    try: pg.wait_for_load_state("networkidle", timeout=60000)   # the props GLBs the page adds after the room
+                    except Exception: pass
+                    time.sleep(3)
                     pg.evaluate("() => { for (const e of document.body.children) if (e.id !== 'scene' && e.tagName !== 'SCRIPT') e.style.visibility = 'hidden'; }")
                     pg.evaluate("() => { try { act('research'); } catch (e) {} settle(); }")
                     for v in views:
                         pos, tgt = VIEWS[v]
                         pg.evaluate("(show) => boy.traverse(o => { if (o.isMesh || o.isSkinnedMesh) o.visible = show; })", v in WITH_HIM)
-                        pg.evaluate("([p, t]) => { camera.position.set(p[0], p[1], p[2]); controls.target.set(t[0], t[1], t[2]); controls.update(); settle(); sim(0.05, 3); }", [pos, tgt])
+                        pg.evaluate("([p, t]) => { window.FREEZE = true; camera.position.set(p[0], p[1], p[2]); controls.target.set(t[0], t[1], t[2]); controls.update(); settle(); sim(0.05, 3); }", [pos, tgt])
                         time.sleep(0.5)
                         pg.evaluate("() => sim(0.05, 2)")
                         name = f"{v}_{sk}_{hk}{'_' + args.tag if args.tag else ''}.jpg"

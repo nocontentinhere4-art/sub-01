@@ -41,6 +41,13 @@ alpha-blended quads from `decals.png`. The keycap legends (`keycaps.png`) and th
 titles, no real books) are original drawings; their Latin text is set in **DejaVu Sans** (Bitstream Vera licence, free
 to use and redistribute), the Japanese text in Noto Sans JP as above. Only rendered pixels are shipped.
 
+## Lived-in clutter (#98, `props_clutter.glb`)
+`room_build/props_clutter.py` (Blender) and `room_build/post_clutter.mjs` build `props_clutter.glb`: the water bottle he
+drinks from (a 500 ml powder-coated steel bottle, 65 x 222 mm), a glass of water on the sill, wired earbuds, a phone
+charger and its cable, and two balls of crumpled paper, all modelled for this project (CC0), plus four Poly Haven
+photoscans at their real sizes (CC0, listed below: `binder_notebook`, `stationery_supplies`, `food_apple_01`, and a second
+`potted_plant_04` on the bookshelf). No brands, logos or readable labels. No Tripo credits were used.
+
 ## Poly Haven (https://polyhaven.com), CC0 1.0
 Textures (each recoloured or regraded in `tex_prep.py`):
 
@@ -68,7 +75,10 @@ Models:
 |---|---|---|
 | desk lamp | `desk_lamp_arm_01` | Yann Kervran, Kuutti Siitonen |
 | floor plant | `potted_plant_02` (soil replaced by a simple disc) | Rico Cilliers |
-| desk succulent | `potted_plant_04` | James Ray Cock |
+| desk succulent; the bookshelf's succulent | `potted_plant_04` | James Ray Cock |
+| notebook on the desk | `binder_notebook` (the closed one) | DaDrood |
+| pen and pencil on the notebook | `stationery_supplies` (`pen_blue`, `pencil_used`) | Mateusz Sadek |
+| apple on the fridge | `food_apple_01` | Oliver Harries |
 | wall clock | `wall_clock` | PierreB3D |
 | alarm clock (window sill) | `alarm_clock_01` | Yann Kervran, James Ray Cock |
 | box on the bookshelf | `cardboard_box_01` | Rahul Chaudhary |
@@ -91,12 +101,13 @@ From `room_build/`, with Blender 4.2 and Node 22:
     python ph.py tex 2k wooden_floor_01
     python ph.py tex 1k white_stucco oak_veneer_01 cotton_jersey waffle_pique_cotton rough_linen poly_wool_herringbone jersey_melange
     python ph.py tex 1k knitted_fleece terry_cloth jogging_melange ribbed_corduroy bi_stretch denim_fabric_05
-    python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads
+    python ph.py model 1k desk_lamp_arm_01 potted_plant_02 potted_plant_04 wall_clock alarm_clock_01 cardboard_box_01 office_notepads binder_notebook stationery_supplies food_apple_01
     # fonts/NotoSansJP.ttf (from google/fonts, ofl/notosansjp) is needed for the poster text
     python tex_prep.py                       # (runs tex_hard.py too: the hard surfaces' textures and atlases)
     blender -b -P build_room.py -- --sweep   # a few minutes (the two cloth simulations): only the prop sweep (out/sweep.txt), no bake, no export
     blender -b -P build_room.py          # the cloth simulations plus the two AO bakes
     npm install && node post.mjs out/room_raw.glb out/ao_raw.png ../web/room/room_clean.glb out/ao_chair.png
+    blender -b -P props_clutter.py && node post_clutter.mjs out/props_clutter_raw.glb ../web/room/props_clutter.glb   # the clutter and the bottle
     python shots_soft.py --glb ../web/room/room_clean.glb --tag after   # fixed-camera renders (docs/design/room-soft)
     python shots.py --out ../docs/design/room-hard/after      # fixed-camera screenshots of the hard surfaces (from the repository root: python room_build/shots.py)
 

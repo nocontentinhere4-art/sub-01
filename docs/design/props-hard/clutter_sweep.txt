@@ -1,0 +1,11 @@
+ok  notebook         x -1.836..-1.648  y 0.970..0.995  z -1.420..-1.204    5999 tris  
+ok  pen_pencil       x -1.817..-1.669  y 0.994..1.004  z -1.367..-1.253    1027 tris  
+ok  earbuds          x -1.320..-1.233  y 0.970..0.982  z -1.226..-1.124    6820 tris  
+ok  charger          x -1.073..-1.051  y 0.198..0.228  z -1.424..-1.402      32 tris  
+ok  charger_cable    x -1.063..-0.385  y 0.161..0.979  z -1.429..-0.999    2260 tris  
+ok  glass            x -1.913..-1.823  y 1.270..1.365  z +0.255..+0.345     660 tris  
+ok  apple            x +0.500..+0.610  y 1.270..1.355  z -1.090..-0.980    6020 tris  
+ok  succulent_shelf  x -0.065..+0.125  y 1.718..1.985  z -1.400..-1.210    8949 tris  
+ok  paper_balls      x -0.339..-0.216  y 0.160..0.217  z -1.195..-1.104     640 tris  
+ok  bottle           (the page places it at BOTTLE_AT)  65 x 222 mm    5516 tris
+CLUTTER SWEEP 9 props, 0 offenders

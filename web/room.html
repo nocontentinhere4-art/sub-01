@@ -547,6 +547,21 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
   const t = new THREE.CanvasTexture(cv); t.flipY = old.flipY; t.colorSpace = old.colorSpace; t.wrapS = old.wrapS; t.wrapT = old.wrapT;
   t.anisotropy = old.anisotropy; mat.map = t; mat.needsUpdate = true;
 }).catch(e => console.warn("poster_car.webp", e));
+// lived-in clutter (room_build/props_clutter.py -> room/props_clutter.glb): a notebook with a pen and a pencil, wired
+// earbuds and a phone charger cable on the desk, a glass of water on the sill, an apple on the fridge, a succulent on the
+// bookshelf, already in place in world metres (Poly Haven scans and props modelled at real size). Its "bottle" (a 500 ml
+// steel bottle, its origin at the centre of its base) becomes the bottle he drinks from: PROP.bottle keeps its place
+// and origin (the old bottle's middle, 8 cm over the desk), only its geometry changes
+if (TRIPO) Promise.all([load("room/props_clutter.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
+  g.scene.traverse(m => { if (m.isMesh) { const blend = m.material.transparent; m.castShadow = !blend; m.receiveShadow = !blend;
+    if (blend) m.material.depthWrite = false;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; } });
+  const b = g.scene.getObjectByName("bottle");
+  if (b) { b.removeFromParent();
+    const put = () => { if (!PROP.bottle) return setTimeout(put, 200); PROP.bottle.clear(); b.position.set(0, -0.08, 0); PROP.bottle.add(b); }; put(); }
+  scene.add(g.scene);
+}).catch(e => console.warn("props_clutter.glb", e));
 
 load("room/boy.glb").then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
