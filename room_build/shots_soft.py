@@ -55,6 +55,11 @@ SHOTS = [
     ("ref_sneakers", (1.03, 0.80, -1.18), (1.03, 0.16, -1.29), 36, "day", (1280, 960)),
     ("ref_cloth", (0.55, 0.85, 1.95), (1.30, 0.22, 1.00), 42, "day", (1280, 853)),
     ("ref_tote", (1.95, 1.32, -0.80), (1.63, 1.30, -1.36), 30, "day", (1280, 855)),
+    ("ref_hoodie", (1.36, 1.32, -0.20), (1.33, 1.28, -1.35), 40, "day", (1280, 853)),
+    ("ref_jeans", (0.42, 1.30, 1.42), (0.42, 0.17, 1.26), 40, "day", (1280, 1280)),
+    # the decimated scans (the triangle budget): the desk lamp and the carton on the bookshelf, close
+    ("lamp_close", (-1.0, 1.55, -0.55), (-1.62, 1.25, -1.28), 34, "day", (1280, 720)),
+    ("carton_close", (0.55, 2.35, -0.55), (0.10, 2.22, -1.30), 30, "day", (1280, 720)),
 ]
 
 VIEWER = r"""<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>

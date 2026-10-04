@@ -366,8 +366,19 @@ def import_asset(k, loc, ry=0.0, scale=1.0, keep=None, drop=(), rest="bottom", c
     elif rest == "back": d[2] = loc[2] - lo[2]
     root.location = root.location + B(*d); bpy.context.view_layer.update()
     PROPS.extend(meshes); return root, new
+def decimate(meshes, target):
+    """a scanned prop lighter for the web (#98 budget: the room stays <= 200k triangles on phones): an edge-collapse
+    decimation down to `target` triangles in all, its UVs and materials kept (the silhouette and the textures stay;
+    the scans' normal maps carry the fine relief)"""
+    tri = lambda o: sum(len(p.vertices) - 2 for p in o.data.polygons)
+    total = sum(tri(o) for o in meshes); ratio = min(1.0, target / max(1, total))
+    for o in meshes:
+        md = o.modifiers.new("dec", "DECIMATE"); md.decimate_type = 'COLLAPSE'; md.ratio = ratio; md.use_collapse_triangulate = True
+        bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="dec")
+    print("DECIMATED", [o.name for o in meshes], total, "->", sum(tri(o) for o in meshes))
 # desk lamp: base at the back-left corner, its head reaching over towards the keyboard
 lamp_root, lamp_objs = import_asset("desk_lamp_arm_01", (-1.74, DTOP, -1.30), ry=0.0, scale=0.8)
+decimate([o for o in lamp_objs if o.type == 'MESH'], 6000)
 lm = [o for o in lamp_objs if o.type == 'MESH'][0]
 def head_centre():
     me = lm.data; idx = [i for i, m in enumerate(me.materials) if m and m.name.endswith("_light")]
@@ -401,7 +412,8 @@ check("desk_succulent", import_asset("potted_plant_04", (-0.48, DTOP, -1.14), ry
 check("wall_clock", import_asset("wall_clock", (0.68, 1.70, IZ), ry=0.0, scale=0.85, rest="back")[1], ("wall", None))
 SILL_X = -1.912                                  # the window sill, in front of the sash track
 check("alarm_clock", import_asset("alarm_clock_01", (-1.865, WY0, 0.62), ry=-math.pi / 2 + 0.35, scale=0.8)[1], ("y", WY0), minx=SILL_X)
-check("shelf_carton", import_asset("cardboard_box_01", (0.10, STOP, -1.30), ry=0.1, scale=0.62)[1], ("y", STOP))
+CARTON = import_asset("cardboard_box_01", (0.10, STOP, -1.30), ry=0.1, scale=0.62)[1]
+decimate([o for o in CARTON if o.type == 'MESH'], 3000); check("shelf_carton", CARTON, ("y", STOP))
 # the sticky notes: the file keeps them 0.45 m from its origin, so centre the stack itself; on top of the left speaker
 # (the desk's free spots near its front edge belong to room.html's delivery bag and tea bottle)
 SPK_TOP = DTOP + 0.20

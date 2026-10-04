@@ -543,54 +543,112 @@ def tube_pts(pts, n=10):
     out.append(P[-2]); return out
 
 
+def sim_cloth(o, colliders, pins=(), frames=60, mass=0.25, tension=25, bending=0.3, self_col=False, friction=10, damping=2.0, quality=8):
+    """a cloth simulation of `o` with the vertex indices `pins` held where they are, against the colliders; applied"""
+    if pins:
+        vg = o.vertex_groups.new(name="pin"); vg.add(list(pins), 1.0, 'REPLACE')
+    for c in colliders:
+        c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = friction
+    cl = o.modifiers.new("cloth", "CLOTH"); s = cl.settings
+    s.quality = quality; s.mass = mass; s.tension_stiffness = tension; s.compression_stiffness = tension; s.shear_stiffness = tension / 3
+    s.bending_stiffness = bending; s.air_damping = damping
+    if pins: s.vertex_group_mass = "pin"
+    cl.collision_settings.distance_min = 0.005; cl.collision_settings.use_self_collision = self_col
+    if self_col: cl.collision_settings.self_distance_min = 0.004; cl.collision_settings.self_friction = 5
+    cl.point_cache.frame_start = 1; cl.point_cache.frame_end = frames + 10
+    for f in range(1, frames): SC.frame_set(f)
+    bpy.context.view_layer.objects.active = o; o.select_set(True); bpy.ops.object.modifier_apply(modifier="cloth")
+    for c in colliders:
+        for m in list(c.modifiers):
+            if m.type == 'COLLISION': c.modifiers.remove(m)
+    SC.frame_set(1); o.vertex_groups.clear(); unspike(o, 0.025, rounds=8)
+
+
+def garment_tube(nm, material, rings, cap_end=False):
+    """a garment's tube (a body, a sleeve) from rings of glTF points; returns the object and the vertex index of each
+    (ring, point)"""
+    bm = bmesh.new(); V = [[bm.verts.new(Bv(p)) for p in r] for r in rings]; n = len(rings[0])
+    for k in range(len(V) - 1):
+        for i in range(n):
+            j = (i + 1) % n; bm.faces.new([V[k][i], V[k][j], V[k + 1][j], V[k + 1][i]]).smooth = True
+    if cap_end: bm.faces.new(V[-1]).smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.verts.index_update()
+    ids = [[v.index for v in r] for r in V]
+    return new_obj(nm, bm, material), ids
+
+
 def hoodie(HX):
-    """a hoodie hanging by its hood from the door's left hook (HX): the hood bunched round the hook, the shoulders
-    dropping into a body that hangs in soft vertical folds, a kangaroo pocket, ribbed hem, sleeves hanging at the sides
-    with ribbed cuffs, two drawstrings. Returns its parts (they join the "hangers" node)."""
+    """a men's hoodie (M: 70 cm long, 55 cm across the chest, 62 cm sleeves) hung on the door's left hook (HX) by
+    the back of its hood: Blender cloth simulations in turn. The body hangs from its neckline, its weight pulling the
+    shoulders into a slope and the fabric into folds that run down from the neck, resting on the door; the sleeves
+    hang from the shoulders down the sides, against the body, gathering at the ribbed cuffs; the hood, caught on the
+    hook a hand's width above the neck, folds over it and down; two drawstrings hang from the neck. The ribbed hem and
+    cuffs are "rib". Returns its parts (they join the "hangers" node)."""
     IZ = G["IZ"]; random.seed(41); parts = []
-    zb = IZ + 0.128                                                            # the body's mid plane (in front of the tote)
-    # the hood: a bunched bag with the hook's tip inside it
-    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=28, v_segments=16, radius=1.0)
-    for v in bm.verts:
-        p = Vector((v.co.x * 0.10, v.co.z * 0.066, -v.co.y * 0.055))
-        ang = math.atan2(p.z, p.x); up = (p.y + 0.066) / 0.132
-        g = 1 + 0.13 * nz(p, 16.0, 10) + 0.10 * math.sin(9 * ang + 2 * up) * (1 - up) ** 0.5 * 0.5   # gathered: the fabric bunches round the hook
-        p.x *= g; p.z *= g
-        if p.y < -0.02: p.x *= 1 + 1.6 * (-p.y - 0.02)                                 # opens out onto the shoulders
-        v.co = B(HX + p.x, 1.70 + p.y, IZ + 0.125 + p.z)
-    hood = new_obj("hoodie_hood", bm, "hoodie"); [setattr(f, "use_smooth", True) for f in hood.data.polygons]; parts.append(hood)
-    # the body
-    nx, ny = 24, 36; y_top, y_hem = 1.665, 1.09; grid = []
-    for j in range(ny + 1):
-        t = j / ny; y = y_top + (y_hem - y_top) * t; row = []
-        hw = 0.06 + 0.115 * smooth01(0.0, 0.16, t) - 0.012 * smooth01(0.5, 1.0, t)
-        if t > 0.92: hw *= 0.95                                                   # the ribbed hem hugs
-        for i in range(nx + 1):
-            s = i / nx * 2 - 1; x = HX + s * hw
-            z = (zb + 0.018 * (1 - s * s) * math.sin(math.pi * min(1.0, t * 1.1)) ** 0.7
-                 + 0.02 * (math.sin(2 * math.pi * 2.5 * s + 1.2 * t) + 0.5 * math.sin(2 * math.pi * 1.2 * s + 3.0)) * smooth01(0.1, 0.45, t)
-                 + 0.018 * smooth01(0.60, 0.66, t) * (1 - smooth01(0.86, 0.90, t)) * (1 - smooth01(0.62, 0.74, abs(s)))   # the pocket
-                 + 0.005 * nz(Vector((s, t, 0)), 6.0, 11))
-            row.append(Vector((x, y, z)))
-        grid.append(row)
-    body = grid_obj("hoodie", ["hoodie", "rib"], grid)
-    for pg in body.data.polygons: pg.material_index = 1 if gl(pg.center).y < y_hem + 0.045 else 0
-    sheet(body, 0.012)
+    door = [bpy.data.objects["door_leaf"]] + [o for o in STATIC if o.name.split(".")[0] in ("hook", "hook_tip", "hook_rail")]
+    HY, HZ = 1.765, IZ + 0.10                                                      # the hook's tip
+    NECK_Y = HY - 0.10; ZC = IZ + 0.103; L, HALF, DEP = 0.70, 0.275, 0.05
+    # --- the body: a flattened tube, the neckline gathered (pinned), out to the full chest below the shoulders
+    NR, NP = 26, 36; rings = []
+    for k in range(NR + 1):
+        t = k / NR; y = NECK_Y - L * t
+        hw = 0.085 + (HALF - 0.085) * smooth01(0.0, 0.16, t); dp = 0.032 + (DEP - 0.032) * smooth01(0.0, 0.12, t)
+        if t > 0.93: hw *= 0.94                                                    # the ribbed hem hugs
+        rings.append([Vector((HX + hw * math.cos(2 * math.pi * i / NP) * (1 + 0.01 * random.uniform(-1, 1)), y, ZC + dp * math.sin(2 * math.pi * i / NP))) for i in range(NP)])
+    body, bid = garment_tube("hoodie", ["hoodie", "rib"], rings)
+    sim_cloth(body, door, pins=bid[0], frames=55, mass=0.3, tension=30, bending=0.25, friction=12)
+    smooth_mesh(body, 0.4, 2)
+    for pg in body.data.polygons: pg.material_index = 1 if gl(pg.center).y < NECK_Y - L * 0.935 + 0.0 else 0
     parts.append(body)
-    # sleeves: hanging at the sides, flattened, a ribbed cuff
-    for sgn in (-1, 1):
-        path = tube_pts([Vector((HX + sgn * 0.13, 1.60, zb)), Vector((HX + sgn * 0.185, 1.50, zb + 0.022)), Vector((HX + sgn * 0.19, 1.36, zb + 0.03)),
-                         Vector((HX + sgn * 0.165, 1.24, zb + 0.024)), Vector((HX + sgn * 0.155, 1.19, zb + 0.02)), Vector((HX + sgn * 0.152, 1.145, zb + 0.018))], 6)
-        n_ = len(path)
-        def taper(u, n_=n_):
-            return (0.5 + 0.5 * smooth01(0.0, 0.12, u)) * (1 - 0.22 * smooth01(0.3, 0.84, u)) * (0.78 if u > 0.87 else 1.0)
-        sl = tube_along("hoodie_sleeve", ["hoodie", "rib"], path, 0.042, 0.018, n=16, ref=Vector((1, 0, 0)), taper=taper,
-                        fn=lambda th, u: 1 + 0.07 * math.sin(3 * th + 9 * u) * smooth01(0.15, 0.4, u) + 0.03 * nz(Vector((th, u * 4, 0)), 1.0, 15), cap=(False, True))
-        for pg in sl.data.polygons: pg.material_index = 1 if gl(pg.center).y < 1.19 else 0
+    me = body.data
+    BP = lambda k, i: gl(me.vertices[bid[k][i % NP]].co)
+    # --- the sleeves: sewn into upright armholes at the shoulders, hanging down the sides just outside the body
+    lo_, hi_ = None, None
+    for sg in (1, -1):
+        side = max if sg > 0 else min
+        sh = side((BP(k, i) for k in range(3, 7) for i in range(NP)), key=lambda q: q.x)   # the shoulder's outermost point
+        SL, NS, NQ = 0.60, 18, 14
+        zf = max(BP(k, NP // 4).z for k in range(4, 12)) + 0.012                     # just in front of the body's front
+        ctrl = [Vector((sh.x - sg * 0.05, sh.y - 0.02, zf - 0.035)), Vector((sh.x - sg * 0.03, sh.y - 0.12, zf + 0.004)),
+                Vector((sh.x - sg * 0.03, sh.y - 0.38, zf + 0.004)), Vector((sh.x - sg * 0.05, sh.y - 0.03 - SL * 0.97, zf + 0.01))]
+        path = resample(tube_pts(ctrl, 8), NS + 1)
+        F = frames(path, Vector((0, 0, 1)))
+        srings = []
+        for k, (c, (t_, w_, n_)) in enumerate(zip(path, F)):
+            u = k / NS; a_ = 0.07 - 0.028 * u - (0.006 if u > 0.9 else 0.0); b_ = (0.022 - 0.006 * u) * (0.25 + 0.75 * smooth01(0.0, 0.12, u))   # the top tucked flat into the shoulder
+            srings.append(ring(c, w_, n_, b_, a_, NQ))                              # flat: the wide axis across the arm, in the door's plane
+        sl, sid = garment_tube("hoodie_sleeve", ["hoodie", "rib"], srings)
+        sim_cloth(sl, door, pins=sid[0] + sid[1], frames=50, mass=0.25, tension=30, bending=0.25, friction=6, quality=10)
+        smooth_mesh(sl, 0.5, 3)
+        for pg in sl.data.polygons: pg.material_index = 1 if gl(pg.center).y < path[0].y - SL * 0.92 else 0
         parts.append(sl)
-    # drawstrings
-    for sgn in (-1, 1):
-        path = tube_pts([Vector((HX + sgn * 0.022, 1.655, IZ + 0.17)), Vector((HX + sgn * 0.03, 1.60, IZ + 0.168)), Vector((HX + sgn * 0.045, 1.52, IZ + 0.165))], 6)
+    # --- the hood: a shell standing up from the back of the neck, caught on the hook, folding over it
+    nu, nv = 18, 16; hood = bmesh.new(); HV = []
+    for j in range(nv + 1):
+        v = j / nv; row = []
+        for i in range(nu + 1):
+            u = i / nu; ang = math.pi * u                                           # round the back of the head
+            r = 0.115 * (0.55 + 0.45 * math.sin(math.pi * min(1.0, v * 1.1)))
+            x = HX - r * math.cos(ang); z = ZC + 0.015 + 0.09 * math.sin(ang) * (1 - 0.6 * v) * 0.5
+            y = NECK_Y + 0.33 * v
+            row.append(hood.verts.new(Bv(Vector((x, y, z)))))
+        HV.append(row)
+    for j in range(nv):
+        for i in range(nu): hood.faces.new([HV[j][i], HV[j][i + 1], HV[j + 1][i + 1], HV[j + 1][i]]).smooth = True
+    hood.verts.index_update()
+    rim = [HV[0][i].index for i in range(nu + 1)]
+    hk = [HV[j][i].index for j in range(nv + 1) for i in range(nu + 1) if (gl(HV[j][i].co) - Vector((HX, HY - 0.005, HZ))).length < 0.045]
+    ho = new_obj("hoodie_hood", hood, "hoodie")
+    for vi in hk:                                                                  # the hood's back seam rests on the hook's tip
+        v = ho.data.vertices[vi]; g = gl(v.co); v.co = Bv(Vector((g.x, max(g.y, HY - 0.002), HZ + 0.008)))
+    sim_cloth(ho, door + [body], pins=rim + hk, frames=55, mass=0.2, tension=25, bending=0.6, friction=12)
+    smooth_mesh(ho, 0.5, 2)
+    parts.append(ho)
+    for o in parts: sheet(o, 0.004, even=False)
+    # --- drawstrings from the neck's front, hanging over the body
+    for sg in (-1, 1):
+        p0 = BP(1, NP // 4) + Vector((sg * 0.03, 0, 0.006))
+        path = tube_pts([p0, p0 + Vector((sg * 0.006, -0.12, 0.004)), p0 + Vector((sg * 0.012, -0.26, 0.006)), p0 + Vector((sg * 0.010, -0.33, 0.007))], 6)
         st = thin(tube_along("hoodie_string", "painted", path, 0.0028, 0.0028, n=6, cap=(False, True))); set_vcol(st, srgb("#ece8e0")); parts.append(st)
     return parts
 
@@ -902,28 +960,93 @@ def backpack():
 
 
 # ================================================================ clothes: jeans dropped by the bed's foot, a T-shirt on the bed
+def pants_flat(waist=0.20, hip=0.245, thigh=0.125, hem=0.095, length=1.02, rise=0.27, cell=0.025):
+    """a pair of trousers laid flat (front over back, as one sheet) in the xz plane, the waist at z = 0 and the legs
+    towards -z: (half) widths of the waist, the hips, a leg at the thigh and at the hem; returns a bmesh"""
+    def hw(z): return waist + (hip - waist) * smooth01(0.0, 0.18, -z)
+    def lw(z): return thigh + (hem - thigh) * smooth01(rise + 0.03, length, -z)
+    def inside(x, z):
+        if z > 0 or z < -length: return False
+        if -z < rise: return abs(x) < hw(z)
+        xc = hip - lw(z) + 0.012 * smooth01(rise, length, -z)                     # the legs part a little below the crotch
+        return abs(abs(x) - xc) < lw(z)
+    nx, nz_ = int(2 * (hip + 0.03) / cell), int(length / cell)
+    bm = bmesh.new(); V = {}
+    for j in range(nz_ + 1):
+        for i in range(nx + 1): V[(j, i)] = bm.verts.new(Bv(Vector((-(hip + 0.03) + cell * i, 0, -cell * j))))
+    for j in range(nz_):
+        for i in range(nx):
+            c = sum((gl(V[(j + dj, i + di)].co) for dj in (0, 1) for di in (0, 1)), Vector()) / 4
+            if inside(c.x, c.z): bm.faces.new([V[(j, i)], V[(j, i + 1)], V[(j + 1, i + 1)], V[(j + 1, i)]]).smooth = True
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    edge = [v for v in bm.verts if v.is_boundary]
+    for _ in range(3): bmesh.ops.smooth_vert(bm, verts=edge, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    return bm
+
+
+def centre_xz(o):
+    """move a built mesh so its footprint is centred on the origin (before turning and placing it)"""
+    ps = [gl(v.co) for v in o.data.vertices]; c = sum(ps, Vector()) / len(ps)
+    o.data.transform(Matrix.Translation(B(-c.x, 0, -c.z))); o.data.update()
+
+
+def bunch(bm, length, pitch=0.17, squeeze=0.45, lift=0.09, seed=0.0):
+    """trousers stepped out of: concertinaed along the legs before the drop (they fall into a heap, not flat)"""
+    for v in bm.verts:
+        g = gl(v.co); t = -g.z / length
+        z = g.z * squeeze + 0.04 * math.sin(2 * math.pi * g.z / pitch + seed)
+        y = lift * abs(math.sin(math.pi * g.z / pitch + seed)) + 0.12 * t + 0.03 * nz(g, 4.0, 60 + seed)
+        x = g.x * (0.9 + 0.1 * math.cos(2 * math.pi * t)) + 0.03 * math.sin(2 * math.pi * 1.7 * t + seed)
+        v.co = Bv(Vector((x, y, z)))
+
+
 def jeans():
-    """a pair of jeans in a heap on the floor: the seat lying flat with the waistband, one leg folded back on itself,
-    the other crossing over it"""
-    FY = G["FY"]; n0 = len(STATIC); random.seed(44)
-    # the seat: a flat superellipse tube along x, its waist opening at -x with the waistband (a thin tube round it)
-    tube_along("jeans", "denim", [Vector((-0.14 + 0.16 * k / 7, 0.045, 0)) for k in range(8)], 0.17, 0.042, n=32, ref="h",
-               taper=lambda u: (1 - 0.06 * (1 - u), 1 - 0.2 * (1 - u) ** 2), fn=lambda th, u: 1 + 0.03 * math.sin(4 * th + 3 * u), cap=(True, True), p=2.8)
-    Z, Y = Vector((0, 0, 1)), Vector((0, 1, 0))
-    thin(tube_obj("jeans", "denim", [ring(c, Z, Y, 0.16 + dr, 0.034 + dr, 32, p=2.8) for c, dr in
-                                     ((Vector((-0.146, 0.045, 0)), 0.0), (Vector((-0.146, 0.045, 0)), 0.006), (Vector((-0.136, 0.045, 0)), 0.006), (Vector((-0.136, 0.045, 0)), 0.0))]))
-    # the legs: flat tubes (wide axis horizontal) along two curves, one folded back, the other crossing over it
-    for k, ctrl in enumerate(([(0.0, 0.03, -0.07), (0.12, 0.03, -0.10), (0.20, 0.034, -0.03), (0.16, 0.038, 0.07), (0.04, 0.042, 0.09)],
-                              [(0.0, 0.045, 0.06), (0.10, 0.085, 0.08), (0.19, 0.09, 0.0), (0.14, 0.08, -0.09), (0.02, 0.068, -0.11)])):
-        path = tube_pts([Vector(p) for p in ctrl], 5)
-        tube_along("jeans", "denim", path, 0.08, 0.027, n=20, ref="h",
-                   taper=lambda u: (1 + 0.06 * smooth01(0.85, 1.0, u), 1 - 0.1 * u), fn=lambda th, u, k=k: 1 + 0.035 * math.sin(3 * th + 7 * u + k), cap=(False, True))
-    parts = [o for o in STATIC[n0:]]
-    for o in parts:
-        displace(o, lambda p, nrm: 0.004 * nz(p, 14.0, 14) + 0.0015 * nz(p, 40.0, 16))
-        transform(o, loc=(0.45, 0, 1.38), ry=0.5)
-    G["settle"](parts, FY); [project_uv(o) for o in parts]
-    return parts
+    """a pair of jeans dropped where he stepped out of them, by the bed's foot: a flat jeans pattern (waist, seat, two
+    legs) concertinaed and dropped as cloth (self-collision), heavy denim, so it lies in a heap of real folds"""
+    FY = G["FY"]; random.seed(44)
+    bm = pants_flat(); bunch(bm, 1.02, pitch=0.17, squeeze=0.48, lift=0.10, seed=0.7)
+    o = new_obj("jeans", bm, "denim"); centre_xz(o)
+    o.data.transform(Matrix.Translation(B(0.47, FY + 0.10, 1.30)) @ Matrix.Rotation(1.75, 4, 'Z')); o.data.update()
+    drop_cloth(o, [bpy.data.objects["floor"]], frames=40, mass=0.45, tension=40, bending=4.0, self_col=True, friction=15, floor_y=FY + 0.003)
+    smooth_mesh(o, 0.35, 2)
+    centre_xz(o); o.data.transform(Matrix.Translation(B(0.44, 0, 1.30))); o.data.update()   # the heap where it fell (the solver lets it slide on the flat floor)
+    sheet(o, 0.006, even=False); G["settle"]([o], FY); project_uv(o)
+    return [o]
+
+
+def joggers(colliders):
+    """grey joggers left on the floor cushion: the same trouser pattern (elastic waist, tapered legs, ribbed cuffs),
+    concertinaed and dropped as cloth onto the cushion and the throw"""
+    FY = G["FY"]
+    bm = pants_flat(waist=0.19, hip=0.25, thigh=0.13, hem=0.06, length=0.98, cell=0.025)
+    for f in bm.faces:                                                             # the ribbed waistband and cuffs
+        z = gl(f.calc_center_median()).z; f.material_index = 1 if (z > -0.04 or z < -0.98 + 0.07) else 0
+    bunch(bm, 0.98, pitch=0.15, squeeze=0.5, seed=2.1)
+    o = new_obj("joggers", bm, "jersey"); centre_xz(o)                               # (cotton jersey, grey melange in the vertex colour: no extra draw call)
+    cuff = {pg.index for pg in o.data.polygons if pg.material_index == 1}
+    for pg in o.data.polygons: pg.material_index = 0
+    ca = o.data.color_attributes.new("Col", 'FLOAT_COLOR', 'CORNER')
+    for pg in o.data.polygons:
+        for li in pg.loop_indices:
+            g = gl(o.data.vertices[o.data.loops[li].vertex_index].co); k = 0.82 if pg.index in cuff else 1.0
+            ca.data[li].color = (*(c * k * (1 + 0.08 * nz(g, 30.0, 61)) for c in srgb("#8b8f96")), 1)
+    o.data.transform(Matrix.Translation(B(1.30, FY + 0.20, 0.98)) @ Matrix.Rotation(1.2, 4, 'Z')); o.data.update()
+    drop_cloth(o, colliders, frames=60, mass=0.3, tension=20, bending=0.6, self_col=True, friction=15, floor_y=FY + 0.003, gap=0.012)
+    smooth_mesh(o, 0.35, 2)
+    # nothing under what it lies on: a vertex the solver let sink into the throw or the cushion comes back up onto it
+    from mathutils.bvhtree import BVHTree
+    dg = bpy.context.evaluated_depsgraph_get()
+    trees = [BVHTree.FromObject(c, dg) for c in colliders[:2]]
+    for v in o.data.vertices:
+        g = gl(v.co); top = None
+        for tr in trees:
+            r = tr.ray_cast(Bv(Vector((g.x, 0.6, g.z))), Bv(Vector((0, -1, 0))))
+            if r[0] is not None: top = max(top or 0.0, gl(r[0]).y)
+        if top is not None and g.y < top + 0.004: v.co = Bv(Vector((g.x, top + 0.004, g.z)))
+    o.data.update(); smooth_mesh(o, 0.2, 1)
+    sheet(o, 0.004, even=False); project_uv(o)
+    return o
+
 
 
 def tee_flat():
@@ -967,13 +1090,13 @@ def unstretch(o, max_edge, rounds=10):
     if total: print(o.name + ": pulled back", total, "over-stretched vertices")
 
 
-def drop_cloth(o, colliders, frames=46, mass=0.2, tension=12, bending=0.2, self_col=False, friction=12, floor_y=None):
+def drop_cloth(o, colliders, frames=46, mass=0.2, tension=12, bending=0.2, self_col=False, friction=12, floor_y=None, gap=0.006):
     """a cloth simulation of `o` falling onto the colliders, applied; strays put back and nothing under the floor"""
     for c in colliders:
         c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = friction
     cl = o.modifiers.new("cloth", "CLOTH"); s = cl.settings
     s.quality = 8; s.mass = mass; s.tension_stiffness = tension; s.compression_stiffness = tension; s.shear_stiffness = tension / 3; s.bending_stiffness = bending
-    s.air_damping = 1.0; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = self_col
+    s.air_damping = 1.0; cl.collision_settings.distance_min = gap; cl.collision_settings.use_self_collision = self_col
     if self_col: cl.collision_settings.self_distance_min = 0.004; cl.collision_settings.self_friction = 8
     cl.point_cache.frame_start = 1; cl.point_cache.frame_end = frames + 10
     for f in range(1, frames): SC.frame_set(f)
@@ -1001,9 +1124,9 @@ def tee_on_chair():
     # chair-local: the backrest's top edge at y ~1.16, its rear face at z ~0.30; the tee across it, its neck to the back
     Mt = Matrix.Translation(B(-0.03, 1.16 + 0.07, 0.40)) @ Matrix.Rotation(0.06, 4, 'Z')
     o.data.transform(CH_M @ Mt); o.data.update()
-    drop_cloth(o, [CHAIR], frames=50, mass=0.2, tension=12, bending=0.15, friction=20)
+    drop_cloth(o, [CHAIR], frames=50, mass=0.2, tension=12, bending=0.10, friction=35)
     unstretch(o, 0.045)                                                             # (its grid: 1.8 cm)
-    smooth_mesh(o, 0.3, 1)
+    smooth_mesh(o, 0.45, 3)
     paint(o, lambda p: srgb("#7d93a6"))
     sheet(o, 0.004)
     bpy.context.view_layer.objects.active = o
@@ -1042,11 +1165,12 @@ def blanket(cushion_parts):
 
 
 def clothes(cushion_parts):
-    """jeans on the floor by the bed's foot, the throw on the floor cushion (each registered with the prop sweep), and
-    the T-shirt over the desk chair's back (part of the chair's node)"""
+    """jeans dropped by the bed's foot, the throw and grey joggers on the floor cushion (each registered with the prop
+    sweep), and the T-shirt over the desk chair's back (part of the chair's node)"""
     FY = G["FY"]
     G["check"]("jeans", jeans(), ("y", FY))
-    G["check"]("blanket", [blanket(cushion_parts)], None)
+    bl = blanket(cushion_parts); G["check"]("blanket", [bl], None)
+    G["check"]("joggers", [joggers([cushion_parts[0], bl, bpy.data.objects["floor"]])], None)
     tee_on_chair()
 
 
@@ -1074,7 +1198,7 @@ def sneaker(nm, right=True, seed=0, loose=True):
         return 0.024
     def opening(t): return 0.026 * math.sqrt(max(0.0, 1 - ((t - 0.25) / 0.20) ** 2))   # the foot's opening (half-width)
     SOLE = 0.022; INS = 0.028
-    ts = [0.0, 0.012, 0.03] + [0.03 + 0.47 * k / 13 for k in range(1, 14)] + [0.5 + 0.47 * k / 9 for k in range(1, 10)] + [0.985, 1.0]   # denser round the opening
+    ts = [0.0, 0.012, 0.03] + [0.03 + 0.47 * k / 18 for k in range(1, 19)] + [0.5 + 0.47 * k / 9 for k in range(1, 10)] + [0.985, 1.0]   # denser round the opening
     rings = []; cols = []
     for t in ts:
         w = max(wid(t), 1e-4); h = top_h(t); cx = side * 0.005 * math.sin(math.pi * t)       # a banana shape: the medial side straighter
@@ -1084,17 +1208,21 @@ def sneaker(nm, right=True, seed=0, loose=True):
                 (1.0, 0.0145, "fox"), (1.0, 0.0165, "fox"), (1.0, 0.0185, "sole"), (0.99, SOLE, "sole"), (0.965, SOLE + 0.002, "up")]
         for f in (0.3, 0.6, 0.85):
             half.append((0.965 - 0.17 * f * f, SOLE + 0.002 + f * (h - 0.006 - SOLE), "up"))
-        for xf in (0.84, 0.64, 0.44, 0.22, 0.0):
-            half.append((xf * 0.80, h - 0.006 + 0.006 * (1 - xf * xf), "top"))
+        # the top: seven points across each half. Round the opening they follow its edge (an outer point, the padded
+        # rim, the inner lip, then down to the insole), so the edge is one clean line along the rings
+        if t < 0.46 and op > 0.003:
+            xs = [min(op * 1.12, 0.9 * w - 0.001), op * 1.0, op * 0.9, op * 0.62, op * 0.4, op * 0.18, 0.0]
+            ys = [h - 0.006, h + 0.003, h - 0.010, INS + 0.002, INS + 0.001, INS, INS]
+            tg = ["top", "rim", "in", "in", "in", "in", "in"]
+        else:
+            xs = [f * 0.8 * w for f in (0.84, 0.70, 0.56, 0.42, 0.28, 0.14, 0.0)]
+            ys = [h - 0.006 + 0.006 * (1 - f * f) for f in (0.84, 0.70, 0.56, 0.42, 0.28, 0.14, 0.0)]; tg = ["top"] * 7
+        for x_, y_, t_ in zip(xs, ys, tg): half.append((x_ / w, y_, t_))
         # one loop: the bottom's middle -> up the +x side -> over the top -> down the -x side
-        loop = half + [(-xf, y, tg) for (xf, y, tg) in reversed(half[1:-1])]
+        loop = half + [(-xf, y, tg_) for (xf, y, tg_) in reversed(half[1:-1])]
         for (xf, y, tag) in loop:
             x = xf * w; yy = y
-            if tag == "top" and 0.40 < t < 0.52: yy += 0.008 * math.sin(math.pi * (t - 0.40) / 0.12) * (1 - (x / (0.8 * w)) ** 2)   # the tongue's top edge
-            if tag == "top" and t < 0.45 and op > 0 and abs(x) < op * 1.05:             # inside the opening: down to the insole
-                k_ = 1 - smooth01(op * 0.70, op * 1.05, abs(x)); yy = yy + (INS - yy) * k_
-                if k_ > 0.5: tag = "in"
-            if tag == "top" and t < 0.5 and abs(x) < op + 0.006: yy += 0.004            # the padded collar's roll
+            if tag == "top" and 0.44 < t < 0.54: yy += 0.008 * math.sin(math.pi * (t - 0.44) / 0.10) * (1 - (x / (0.8 * w)) ** 2)   # the tongue's top edge
             if tag == "top" and 0.47 <= t <= 0.76: yy += 0.004 * (1 - (x / (0.8 * w)) ** 2)   # the tongue
             if tag in ("top", "up") and 0.62 < t < 0.80:                                # creases across the toe where it flexes
                 yy -= 0.0022 * max(0.0, math.sin(2 * math.pi * (t - 0.62) / 0.06)) * (1 - abs(xf))
@@ -1109,25 +1237,29 @@ def sneaker(nm, right=True, seed=0, loose=True):
             f.material_index = 1 if (tg <= {"sole", "fox"} or "cap" in tg and not ("up" in tg or "top" in tg)) else 0
     bm.faces.new(list(reversed(V[0]))).material_index = 1; bm.faces.new(V[-1]).material_index = 1
     bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=2e-4); bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    vol = sum(f.verts[0].co.dot(f.verts[k].co.cross(f.verts[k + 1].co)) for f in bm.faces for k in range(1, len(f.verts) - 1))
+    if vol < 0: bmesh.ops.reverse_faces(bm, faces=bm.faces[:])                     # outward, whichever way the rings wound
     o = new_obj(nm, bm, ["jersey", "painted"])
-    up_c, ins_c, sole_c, fox_c = srgb("#4b4e56"), srgb("#a3998b"), srgb("#d6d0c2"), srgb("#2b2b2c")
+    up_c, ins_c, sole_c, fox_c = srgb("#6d727c"), srgb("#a3998b"), srgb("#d6d0c2"), srgb("#2b2b2c")
     def colour(p):
         y = p.y; t = p.z / L; c = up_c
         if y < SOLE + 0.0005:
             c = fox_c if 0.0135 < y < 0.0175 else tuple(a * (0.78 + 0.22 * smooth01(0.0, 0.012, y)) for a in sole_c)   # dirt low on the sole
         elif t > 0.86 and y < 0.036: c = tuple(a * 0.93 for a in sole_c)
         elif t < 0.47 and opening(t) > 0.004:                                       # the lining and the insole inside, blended in
-            k = (1 - smooth01(opening(t) * 0.78, opening(t) * 1.08, abs(p.x))) * smooth01(0.003, 0.010, top_h(t) - y)
+            k = (1 - smooth01(opening(t) * 0.86, opening(t) * 0.95, abs(p.x))) * smooth01(0.004, 0.012, top_h(t) - y)
             c = tuple(a + (b_ - a) * k for a, b_ in zip(up_c, ins_c))
         elif t > 0.6: c = tuple(a * (1 + 0.35 * smooth01(0.6, 1.0, t) * max(0.0, nz(p, 30.0, 71))) for a in up_c)   # the canvas worn paler at the toe
         return tuple(a * (1 + 0.05 * nz(p, 25.0, 72)) for a in c)
     paint(o, colour)
     lace_c = srgb("#cfcac0")
     from mathutils.bvhtree import BVHTree
-    bvh = BVHTree.FromObject(o, bpy.context.evaluated_depsgraph_get())
+    bvh = BVHTree.FromPolygons([v.co.copy() for v in o.data.vertices], [list(pg.vertices) for pg in o.data.polygons])   # (from the mesh itself: the depsgraph lags behind a new object)
     def on_top(x, t, lift):                                                         # the upper's surface above (x, t), lifted along its normal
         r = bvh.ray_cast(Bv(Vector((x, 0.2, t * L))), Bv(Vector((0, -1, 0))))
-        return gl(r[0]) + gl(r[1]).normalized() * lift if r[0] is not None else Vector((x, top_h(t), t * L))
+        if r[0] is None: return Vector((x, top_h(t), t * L))
+        n = gl(r[1]).normalized(); n = n if n.y > 0 else -n                       # (outward: up, whichever way the face winds)
+        return gl(r[0]) + n * lift
     eye = [0.51 + 0.052 * k for k in range(5)]
     for k, t in enumerate(eye):
         pts = [on_top(-0.019 + 0.038 * u, t + 0.024 * u, 0.0016 + 0.0012 * math.sin(math.pi * u)) for u in (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)]
@@ -1145,20 +1277,22 @@ def sneaker(nm, right=True, seed=0, loose=True):
 
 
 def sneakers():
-    """the pair by the door, in the strip between the fridge and the door's hinge-side casing (the leaf's swing and his
-    way to the door leave 17 cm there): the right one standing, toes to the wall; the left one kicked over onto its
-    side beside it, its sole towards the door. Each is placed from its measured bounds."""
+    """the pair by the door, standing side by side in the strip between the fridge and the door's hinge-side casing
+    (the leaf's swing and his way to the door leave 17 cm there): toes to the wall, the left one pulled out 5 cm and
+    turned a touch, as they are when kicked off. Each is placed from its measured bounds; they never touch."""
     FY, IZ, wb = G["FY"], G["IZ"], G["world_box"]
+    from mathutils.bvhtree import BVHTree
     def put(parts, x_lo=None, x_hi=None, z_lo=None):
         lo, hi = wb(parts); dx = (x_lo - lo[0]) if x_lo is not None else (x_hi - hi[0]); dz = z_lo - lo[2]
         for o in parts: o.data.transform(Matrix.Translation(B(dx, 0, dz))); o.data.update()
     a = sneaker("sneaker", True, 0)
-    for o in a: o.data.transform(Matrix.Scale(0.96, 4)); o.data.update(); transform(o, ry=math.pi)
-    G["settle"](a, FY); put(a, x_lo=G["FX1"] + 0.006, z_lo=IZ + 0.032)
+    for o in a: o.data.transform(Matrix.Scale(0.92, 4)); o.data.update(); transform(o, ry=math.pi + 0.02)
+    G["settle"](a, FY); put(a, x_lo=G["FX1"] + 0.004, z_lo=IZ + 0.032)
     b = sneaker("sneaker", False, 1, loose=False)
-    for o in b:                                                                     # rolled onto its outer side (about its length)
-        o.data.transform(Matrix.Scale(0.96, 4)); o.data.transform(Matrix.Rotation(-math.pi / 2 + 0.10, 4, 'Y')); o.data.update()
-        transform(o, ry=math.pi - 0.03)
-    G["settle"](b, FY); put(b, x_hi=G["LX0"] - 0.004, z_lo=IZ + 0.045)
+    for o in b: o.data.transform(Matrix.Scale(0.92, 4)); o.data.update(); transform(o, ry=math.pi - 0.03)
+    G["settle"](b, FY); put(b, x_hi=G["LX0"] - 0.003, z_lo=IZ + 0.082)
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+    ta, tb = BVHTree.FromObject(a[0], dg), BVHTree.FromObject(b[0], dg)
+    assert not ta.overlap(tb), "the sneakers run into each other"
     [project_uv(o) for o in a + b]
     return a, b
