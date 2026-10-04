@@ -148,8 +148,11 @@ function bonePos(L, rootPos, n, tail) { const path = []; for (let b = n; b; b = 
 // MOUSE={"c":[x,y,z],"r":[rx,ry,rz]}: an ellipsoid dome; >0 outside, <0 inside (radii inflated by the skin's thickness)
 const MOUSE = process.env.MOUSE ? JSON.parse(process.env.MOUSE) : null;
 // r = [rx, ry, rz front, rz back]: the hump sits toward the back, the buttons slope gently to the front
-const dome = (p, pad) => { const [cx, cy, cz] = MOUSE.c, [rx, ry, rzf, rzb] = MOUSE.r, rz = p.z >= cz ? rzf : (rzb || rzf);
-  return Math.hypot((p.x - cx) / (rx + pad), (Math.max(p.y, cy) - cy) / (ry + pad), (p.z - cz) / (rz + pad)) - 1; };
+// yaw (rad): the mouse turned about y like the hand on it (+z rotated toward +x)
+const dome = (p, pad) => { const [cx, cy, cz] = MOUSE.c, [rx, ry, rzf, rzb] = MOUSE.r, t = -(MOUSE.yaw || 0);
+  const dx = p.x - cx, dz = p.z - cz, lx = dx * Math.cos(t) + dz * Math.sin(t), lz = -dx * Math.sin(t) + dz * Math.cos(t);
+  const rz = lz >= 0 ? rzf : (rzb || rzf);
+  return Math.hypot(lx / (rx + pad), (Math.max(p.y, cy) - cy) / (ry + pad), lz / (rz + pad)) - 1; };
 function tipY(L, rootPos, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
   const p = V3(rootPos); let W = new THREE.Quaternion();
   for (let i = 0; i < path.length; i++) { if (i) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(W)); W = W.clone().multiply(L[path[i]]); }
@@ -176,7 +179,7 @@ function solveSide(Wq, L, rootPos, s, dy) {
   const yaw = IKT["yaw" + s] !== undefined ? IKT["yaw" + s] : (s === "L" ? -0.25 : 0.25);
   const fwd = new THREE.Vector3(yaw, IKT["pitch" + s] !== undefined ? IKT["pitch" + s] : -0.04, 1).normalize();
   const rDir = V3(rest.head[`finger3-1.${s}`]).sub(V3(rest.head[wr])), rAcr = side("t", s);
-  const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, 0, 0.2);
+  const tAcr = new THREE.Vector3(s === "L" ? 1 : -1, -(IKT["roll" + s] || 0), 0.2);   // roll: little-finger side down
   const Hw = new THREE.Quaternion().setFromRotationMatrix(basis(fwd, tAcr).multiply(basis(rDir, rAcr).transpose()));
   const Hrec = Wq[wr].clone(); if (!IKT["_h0" + s]) IKT["_h0" + s] = Hrec.clone();
   const Hlive = Hrec.multiply(IKT["_h0" + s].clone().invert());

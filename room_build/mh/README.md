@@ -12,13 +12,10 @@
 - `glb/clips/desk_type_ik.glb`: desk_type with a baked arm IK from the owner's typing photo (elbows bent and close,
   hands together on the home row, pointing forward; wrists pinned at world (0.03, 0.878, 0.32) / (-0.13, 0.878, 0.32), drifting with the recorded wrists (70%) for
   a body whose hips sit at the origin), fingers recorded at 80% strength, thumbs swung toward the space bar, fingertips kept above KEYTOP 0.83 (the pin lifts). Awaiting the owner's verdict.
-- `glb/clips/desk_mouse_ik.glb`: the mouse held as in the owner's photos, solved for contact: the palm rests on the
-  mouse's back (the wrist pin moves until a point 60% from the wrist to the middle knuckle touches the dome + 1.6 cm),
-  and each finger curls until its tip meets the dome (+8 mm), fingers together (ADDUCT_R 2.5), the hand flat and straight
-  (pitch 0, yaw 0.08 in), thumb on the inner side, an index click now and then. Mouse: a low dome with its hump at the back (radii x 3.1,
-  y 3.6, z front 8 / back 4 cm), hump at (-0.36, 0.807, 0.385) for hips at the origin; index and middle scan from straight to
-  curled for the first touch (smoothed over time); ring and little finger tucked along the right flank
-  (CURL_R_4 [28,48,28], CURL_R_5 [34,55,30]). Finger curls turn about the true rest palm normal (MakeHuman's A-pose
-  palms face the thighs). In the room, pass the real mouse's centre and size as MOUSE.
+- `glb/clips/desk_mouse_ik.glb`: a palm grip from ergonomic references (wrist extended ~20 deg, index and middle nearly
+  straight on the two buttons, ring and little finger on the right flank, thumb on the left flank, hand rolled ~10 deg
+  little-finger side down). Mouse: low dome with the hump at the back (radii x 3.1, y 3.6, z front 8 / back 4 cm), hump
+  at (-0.36, 0.807, 0.39) for hips at the origin, turned -0.15 rad with the hand. Palm on the hump by contact solve;
+  index/middle curl to touch (smoothed); ring/little set (CURL_R_4 [22,38,18], CURL_R_5 [26,42,20]).
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.
