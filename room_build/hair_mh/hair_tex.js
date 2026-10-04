@@ -23,12 +23,16 @@ const KINDS = [   // strands per column, clumps, clump pull, how far down the st
 ];
 
 export function makeHairAtlas(size = 2048, seed = 7){
-  const color = document.createElement("canvas"), data = document.createElement("canvas");
-  color.width = color.height = data.width = data.height = size;
-  const g = color.getContext("2d"), d = data.getContext("2d"), R = rng(seed), W = size / ATLAS_COLS, H = size, px = size / 2048;
+  // Colour and alpha are drawn apart: a canvas stores premultiplied colour, so a dark stroke at a few percent alpha
+  // reads back as light grey and shows as grey outlines round every strand. rgb gets the strands over an opaque
+  // dark ground, color only their alpha; the two are merged at the end.
+  const color = document.createElement("canvas"), rgb = document.createElement("canvas"), data = document.createElement("canvas");
+  color.width = color.height = rgb.width = rgb.height = data.width = data.height = size;
+  const g = color.getContext("2d"), c = rgb.getContext("2d"), d = data.getContext("2d"), R = rng(seed), W = size / ATLAS_COLS, H = size, px = size / 2048;
+  c.fillStyle = `rgb(${BASE[0] * 0.8},${BASE[1] * 0.8},${BASE[2] * 0.8})`; c.fillRect(0, 0, size, size);
   d.fillStyle = "rgb(150,128,0)"; d.fillRect(0, 0, size, size);
   for (let y = 0; y < size; y += 4){ d.fillStyle = `rgb(150,128,${Math.round(255 * y / size)})`; d.fillRect(0, y, size, 4); }
-  g.lineCap = d.lineCap = "round";
+  g.lineCap = c.lineCap = d.lineCap = "round";
   KINDS.forEach((k, col) => {
     const x0 = col * W, clumps = Array.from({length: k.clumps}, (_, i) => 0.18 + 0.64 * (i + 0.5 + (R() - 0.5) * 0.5) / k.clumps);
     for (let s = 0; s < k.n; s++){
@@ -36,8 +40,8 @@ export function makeHairAtlas(size = 2048, seed = 7){
       const u0 = 0.05 + (R() + R() + R()) / 3 * 0.9, y0 = R() * 0.04;         // centre-weighted: sparse card sides
       const y1 = k.end[0] + R() * (k.end[1] - k.end[0]);
       const pull = k.pull * (0.6 + R() * 0.8), wave = (R() - 0.5) * 0.03, ph = R() * 6.28;
-      const lum = 0.8 + R() * 0.45, warm = R() < 0.2 ? 1.2 + R() * 0.35 : 1.0;  // a few browner strands
-      const r = Math.min(255, BASE[0] * lum * warm), gg = Math.min(255, BASE[1] * lum * (1 + (warm - 1) * 0.7)), b = BASE[2] * lum;
+      const lum = 0.8 + R() * 0.4, warm = R() < 0.12 ? 1.15 + R() * 0.25 : 1.0;  // a few browner strands
+      const r = Math.min(255, BASE[0] * lum * warm), gg = Math.min(255, BASE[1] * lum * (1 + (warm - 1) * 0.7)), b = BASE[2] * lum * (warm > 1 ? 1 : 1.08);
       const depth = Math.round(255 * (0.55 + 0.45 * R())), id = Math.round(255 * R());
       const w0 = (1.3 + R() * 1.1) * px, steps = 32;
       let xp = null, yp = null;
@@ -49,7 +53,9 @@ export function makeHairAtlas(size = 2048, seed = 7){
           const taper = 1 - Math.pow(t, 1.8) * 0.8, root = 0.6 + 0.4 * Math.min(1, t / 0.15);
           const fade = (t > 0.55 ? 1 - Math.pow((t - 0.55) / 0.45, 1.3) : 1) * Math.min(1, 0.25 + y / 0.12);
           g.strokeStyle = `rgba(${(r * root) | 0},${(gg * root) | 0},${(b * root) | 0},${(k.a * fade).toFixed(3)})`;
-          g.lineWidth = w0 * taper; g.beginPath(); g.moveTo(xp, yp); g.lineTo(X, Y); g.stroke();
+          g.lineWidth = c.lineWidth = w0 * taper; g.beginPath(); g.moveTo(xp, yp); g.lineTo(X, Y); g.stroke();
+          c.strokeStyle = g.strokeStyle.replace(/,[^,]*\)$/, `,${Math.min(1, k.a * fade * 1.4).toFixed(3)})`);
+          c.beginPath(); c.moveTo(xp, yp); c.lineTo(X, Y); c.stroke();
           d.strokeStyle = `rgb(${depth},${id},${Math.round(255 * y)})`;
           d.lineWidth = w0 * taper; d.beginPath(); d.moveTo(xp, yp); d.lineTo(X, Y); d.stroke();
         }
@@ -57,6 +63,12 @@ export function makeHairAtlas(size = 2048, seed = 7){
       }
     }
   });
+  const A = g.getImageData(0, 0, size, size), C = c.getImageData(0, 0, size, size);
+  for (let i = 0; i < A.data.length; i += 4){                         // the faintest texels (< 8 %) are dropped: stored
+    A.data[i] = C.data[i]; A.data[i + 1] = C.data[i + 1]; A.data[i + 2] = C.data[i + 2];   // premultiplied, their colour
+    if (A.data[i + 3] < 20) A.data[i + 3] = 0;                         // can't survive the round trip
+  }
+  g.putImageData(A, 0, 0);
   return {color, data};
 }
 

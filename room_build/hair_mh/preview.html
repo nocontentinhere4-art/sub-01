@@ -4,32 +4,38 @@
 <script type="importmap">{ "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }</script>
 </head><body>
 <script type="module">
-// Grows the hair on the MakeHuman head, renders the still sheet (front, 3/4, side, back close-ups; the head 2.2 m away
+// Re-cuts MakeHuman's CC0 hair proxy short02 on the MakeHuman head, renders the still sheet (front, 3/4, side, back close-ups; the head 2.2 m away
 // through room.html's 30-degree lens, at 1:1 pixels and as the whole frame) and exports hair_mh.glb.
-// Driven by render.mjs; window.OUT gets {sheet, glb, atlas, data, scalp, stats} as base64.
+// Driven by render.mjs; window.OUT gets {sheet, glb, atlas (the shell colour), data (its data map), scalp, stats} as base64.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { buildHair, CENTER } from "./hair_gen.js";
-import { makeHairAtlas, paintScalp } from "./hair_tex.js";
+import { paintScalp, makeHairAtlas } from "./hair_tex.js";
+import { recolorHair, cutProxy, SHELL } from "./proxy_cut.js";
 import { hairCardMaterial, scalpMaterial, setupHair } from "./hair_material.js";
 
 const head = await (await fetch("./head.json")).json();
-const atlasCanvas = makeHairAtlas(2048);
+const proxy = await (await fetch("./proxy.json")).json();
+const img = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = "./short02_diffuse.png"; });
 const tex = (cv, name, srgb) => { const t = new THREE.CanvasTexture(cv); t.flipY = false; t.name = name;
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t; };
-const atlas = tex(atlasCanvas.color, "hair_atlas", true), data = tex(atlasCanvas.data, "hair_data", false);
 
 const t0 = performance.now();
-const hair = buildHair(THREE, head.head);
-hair.stats.ms = Math.round(performance.now() - t0);
+const hair = buildHair(THREE, head.head, {layers: ["mid", "piece", "fringe", "fly", "taper"], over: t => SHELL(t) * 0.8});   // scalp base, growth direction, the cards over the shell
+const re = recolorHair(img);
+const cardsGeo = cutProxy(THREE, proxy, hair);
+hair.stats = {shellTris: cardsGeo.index.count / 3, cards: hair.stats.cards, cardTris: hair.stats.cardTris, scalpTris: hair.stats.scalpTris, ms: Math.round(performance.now() - t0)};
 const scalpCanvas = paintScalp(hair.scalpStrokes);
 const scalpTex = tex(scalpCanvas, "hair_scalp", true); scalpTex.wrapS = THREE.RepeatWrapping;
 
 const group = new THREE.Group(); group.name = "hair_mh";
-const cards = new THREE.Mesh(hair.cards, hairCardMaterial(THREE, atlas, data)); cards.name = "hair_cards";
+const shellMat = hairCardMaterial(THREE, tex(re.color, "hair_shell_color", true), tex(re.data, "hair_shell_data", false)); shellMat.name = "hair_shell"; shellMat.transparent = true; shellMat.alphaTest = 0.02;
+const shell = new THREE.Mesh(cardsGeo, shellMat); shell.name = "hair_shell"; shell.renderOrder = 2;
+const atlasCanvas = makeHairAtlas(2048);
+const cards = new THREE.Mesh(hair.cards, hairCardMaterial(THREE, tex(atlasCanvas.color, "hair_atlas", true), tex(atlasCanvas.data, "hair_data", false))); cards.name = "hair_cards";
 const scalp = new THREE.Mesh(hair.scalp, scalpMaterial(THREE, scalpTex)); scalp.name = "hair_scalp"; scalp.renderOrder = 1;
-group.add(scalp, cards);
+group.add(scalp, shell, cards);
 
 // Export before the runtime-only tweaks.
 const glb = await new GLTFExporter().parseAsync(group, {binary: true});
@@ -61,16 +67,32 @@ function shot(az, el, dist, fov, w, h){
   const cam = new THREE.PerspectiveCamera(fov, w / h, 0.02, 50), a = az * Math.PI / 180, e = el * Math.PI / 180;
   cam.position.set(T.x + Math.sin(a) * Math.cos(e) * dist, T.y + Math.sin(e) * dist, T.z + Math.cos(a) * Math.cos(e) * dist);
   cam.lookAt(T); renderer.render(scene, cam);
+  // Alpha-to-coverage leaves the cards' alpha (< 1) in the drawing buffer; copied onto the sheet those pixels would let
+  // the sheet's grey through as outlines round every strand. The room draws to an opaque canvas; here alpha is reset.
+  { const gl = renderer.getContext(); gl.colorMask(false, false, false, true); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.colorMask(true, true, true, true); renderer.resetState(); }
   const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(renderer.domElement, 0, 0); return c;
 }
-const S = 640, sheet = document.createElement("canvas"); sheet.width = S * 3; sheet.height = S * 2;
+// The comparison sheet: each close-up next to a real photo of short black hair at about the same angle (ref/*.jpg,
+// cropped to the hair above the brows; sources and licences in README.md), then the room distance.
+const loadImg = src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
+const REFS = {front: [320, 400, 560, 500], q34: [290, 20, 590, 270], side: [440, 190, 460, 270], back: [400, 60, 380, 400]};   // x, y, w, h
+const refs = {}; for (const k in REFS) refs[k] = await loadImg(`./ref/${k}.jpg`);
+const S = 480, sheet = document.createElement("canvas"); sheet.width = S * 4; sheet.height = S * 3;
 const g = sheet.getContext("2d"); g.fillStyle = "#8c8c8c"; g.fillRect(0, 0, sheet.width, sheet.height);
-const views = [[0, 6], [38, 8], [90, 6], [180, 8]];
-views.forEach(([az, el], i) => g.drawImage(shot(az, el, 0.62, 30, S, S), (i % 3) * S, Math.floor(i / 3) * S));
+function photo(k, x, y){
+  const im = refs[k]; if (!im) return;
+  const [sx, sy, sw, sh] = REFS[k], f = Math.min(S / sw, S / sh), w = sw * f, h = sh * f;
+  g.drawImage(im, sx, sy, sw, sh, x + (S - w) / 2, y + (S - h) / 2, w, h);
+}
+const views = [["front", 0, 6], ["q34", 38, 8], ["side", 90, 6], ["back", 180, 8]];
+views.forEach(([k, az, el], i) => {
+  const x = (i % 2) * 2 * S, y = Math.floor(i / 2) * S;
+  g.drawImage(shot(az, el, 0.5, 30, S, S), x, y); photo(k, x + S, y);
+});
 const far = shot(18, 4, 2.2, 30, 1280, 800);                 // room.html's lens at 2.2 m
-g.drawImage(far, 640 - 200, 400 - 200, 400, 400, S + 120, S + 120, 400, 400);   // the head at 1:1 pixels
-g.drawImage(far, 0, 0, 1280, 800, 2 * S, S + 120, 640, 400);                    // the whole frame, half size
+g.drawImage(far, 640 - 200, 400 - 200, 400, 400, 40, 2 * S + 40, 400, 400);    // the head at 1:1 pixels
+g.drawImage(far, 0, 0, 1280, 800, S + 120, 2 * S + 15, 720, 450);              // the whole frame
 
 const b64 = buf => { let s = ""; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
-window.OUT = {sheet: sheet.toDataURL("image/png").split(",")[1], glb: b64(glb), atlas: atlasCanvas.color.toDataURL("image/png").split(",")[1], data: atlasCanvas.data.toDataURL("image/png").split(",")[1], scalp: scalpCanvas.toDataURL("image/png").split(",")[1], stats: hair.stats};
+window.OUT = {sheet: sheet.toDataURL("image/png").split(",")[1], glb: b64(glb), atlas: re.color.toDataURL("image/png").split(",")[1], data: re.data.toDataURL("image/png").split(",")[1], scalp: scalpCanvas.toDataURL("image/png").split(",")[1], stats: hair.stats};
 </script></body></html>

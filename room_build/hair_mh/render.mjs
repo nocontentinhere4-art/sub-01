@@ -1,7 +1,8 @@
 // Renders preview.html headless (software GL is enough) and writes hair_sheet.png, hair_mh.glb and the textures
-// (hair_atlas.png, hair_data.png, hair_scalp.png; all also embedded in the GLB).
-//   (cd dir-with-playwright-core && node .../render.mjs <head.json> <three package dir> <out dir> [chromium executable])
-// head.json comes from extract_head.py; three must be 0.169.0, as room.html uses.
+// (hair_shell.png, hair_shell_data.png, hair_scalp.png; these and the cards' strand atlas are embedded in the GLB).
+//   (cd dir-with-playwright-core && node .../render.mjs <head.json> <src dir> <three package dir> <out dir> [chromium executable])
+// head.json comes from extract_head.py; <src dir> holds proxy.json (fit_proxy.py) and short02_diffuse.png (the CC0
+// system asset) and, for the comparison sheet, ref/*.jpg; three must be 0.169.0, as room.html uses.
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,11 +10,12 @@ import { createRequire } from "node:module";
 
 const { chromium } = createRequire(path.join(process.cwd(), "x.js"))("playwright-core");   // installed where it is run from
 const here = path.dirname(new URL(import.meta.url).pathname);
-const [headJson, threeDir, outDir, exe = process.env.CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"] = process.argv.slice(2);
-const TYPES = {".html": "text/html", ".js": "text/javascript", ".json": "application/json"};
+const [headJson, srcDir, threeDir, outDir, exe = process.env.CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"] = process.argv.slice(2);
+const TYPES = {".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg"};
 const server = http.createServer((q, r) => {
   const u = decodeURIComponent(q.url.split("?")[0]);
-  const f = u === "/head.json" ? headJson : u.startsWith("/three/") ? path.join(threeDir, u.slice(7)) : path.join(here, u);
+  let f = u === "/head.json" ? headJson : u.startsWith("/three/") ? path.join(threeDir, u.slice(7)) : path.join(here, u);
+  if (!fs.existsSync(f)) f = path.join(srcDir, u);
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; }
     r.writeHead(200, {"content-type": TYPES[path.extname(f)] || "application/octet-stream"}); r.end(d); });
 }).listen(0);
@@ -28,8 +30,8 @@ const out = await page.evaluate(() => window.OUT);
 fs.mkdirSync(outDir, {recursive: true});
 fs.writeFileSync(path.join(outDir, "hair_sheet.png"), Buffer.from(out.sheet, "base64"));
 fs.writeFileSync(path.join(outDir, "hair_mh.glb"), Buffer.from(out.glb, "base64"));
-fs.writeFileSync(path.join(outDir, "hair_atlas.png"), Buffer.from(out.atlas, "base64"));
-fs.writeFileSync(path.join(outDir, "hair_data.png"), Buffer.from(out.data, "base64"));
+fs.writeFileSync(path.join(outDir, "hair_shell.png"), Buffer.from(out.atlas, "base64"));
+fs.writeFileSync(path.join(outDir, "hair_shell_data.png"), Buffer.from(out.data, "base64"));
 fs.writeFileSync(path.join(outDir, "hair_scalp.png"), Buffer.from(out.scalp, "base64"));
 console.log(JSON.stringify(out.stats));
 await browser.close(); server.close();

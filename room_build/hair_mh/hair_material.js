@@ -1,5 +1,6 @@
 // The hair's look in three.js (r169). glTF can carry neither alpha-to-coverage nor a hair shader, so hair_mh.glb holds
-// plain PBR materials (cards: alpha MASK, the strand atlas as base colour and the data atlas in the occlusion slot);
+// plain PBR materials (cards: alpha MASK, the strand atlas as base colour and the data atlas in the occlusion slot;
+// the re-cut shell: alpha BLEND, its re-coloured photo texture and its own data map);
 // call setupHair(THREE, gltf.scene) after loading to switch the cards to:
 //  - alpha-to-coverage (needs an antialiased renderer, as room.html's is): the strand alpha becomes MSAA coverage, so
 //    the cards need no sorting, write depth, and their tips stay soft and see-through;
@@ -10,7 +11,7 @@
 export function hairCardMaterial(THREE, map, data){
   return new THREE.MeshPhysicalMaterial({
     name: "hair_cards", map, aoMap: data, aoMapIntensity: 0.7, vertexColors: true, side: THREE.DoubleSide,
-    color: 0xffffff, roughness: 0.7, metalness: 0, specularIntensity: 0.15,
+    color: 0xffffff, roughness: 0.75, metalness: 0, specularIntensity: 0.06,
     anisotropy: 0.01,                                // only so three hands the shader the strand tangent
     alphaTest: 0.5, alphaToCoverage: false,
   });
@@ -34,7 +35,7 @@ const KK = `
     float a = dot( T1, H ), b = dot( T2, H );
     float s1 = pow( sqrt( max( 0.0, 1.0 - a * a ) ), 280.0 ) * smoothstep( -1.0, 0.0, a );
     float s2 = pow( sqrt( max( 0.0, 1.0 - b * b ) ), 60.0 ) * smoothstep( -1.0, 0.0, b );
-    vec3 kk = vec3( 0.07 ) * s1 + vec3( 0.045, 0.028, 0.017 ) * s2 * ( 0.6 + 0.8 * hd.g );
+    vec3 kk = vec3( 0.035 ) * s1 + vec3( 0.045, 0.028, 0.017 ) * s2 * ( 0.6 + 0.8 * hd.g );
     reflectedLight.directSpecular += directionalLights[ i ].color * wrap * kk * hd.r;
   }
 }
@@ -45,8 +46,15 @@ export function setupHair(THREE, root){
   root.traverse(o => {
     if (!o.isMesh || !o.material) return;
     const m = o.material;
-    if (/hair_cards/.test(m.name)){
-      m.alphaTest = 0; m.alphaToCoverage = true; m.transparent = false; m.depthWrite = true; m.side = THREE.DoubleSide;
+    if (/hair_cards|hair_shell/.test(m.name)){
+      // The cards: alpha-to-coverage, drawn last (after the head, the scalp base and the shell) so whatever their
+      // uncovered samples show is already there. They sit in the transparent list for that ordering, unblended.
+      // The re-cut shell under them is blended instead: two coverage-dithered layers on top of each other share
+      // their dither and let the background through.
+      const shell = /hair_shell/.test(m.name);
+      m.alphaTest = shell ? 0.02 : 0; m.alphaToCoverage = !shell; m.transparent = true; m.depthWrite = true; m.side = THREE.DoubleSide;
+      if (!shell) m.blending = THREE.NoBlending;
+      o.renderOrder = shell ? 2 : 3;
       if (m.anisotropy <= 0) m.anisotropy = 0.01;
       if (m.map) { m.map.anisotropy = 8; m.map.colorSpace = THREE.SRGBColorSpace; }
       if (m.aoMap) m.aoMap.colorSpace = THREE.NoColorSpace;
@@ -60,7 +68,7 @@ export function setupHair(THREE, root){
             #endif`)
           .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + KK);
       };
-      m.customProgramCacheKey = () => "hair_cards_kk";
+      m.customProgramCacheKey = () => "hair_kk";
       m.needsUpdate = true;
     }
     if (/hair_scalp/.test(m.name)){

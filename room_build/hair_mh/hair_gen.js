@@ -21,7 +21,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 // Where the hair grows: the hairline's height (m) against the azimuth round the head (degrees, 0 = the face's middle,
 // 90 = over the ear, 180 = the nape). A sideburn in front of the ear, a curve over it, the nape low at the back.
-const HAIRLINE = [[0, 0.806], [22, 0.804], [38, 0.797], [50, 0.785], [60, 0.762], [68, 0.736], [76, 0.726],
+const HAIRLINE = [[0, 0.806], [22, 0.804], [38, 0.796], [50, 0.779], [60, 0.752], [68, 0.734], [76, 0.726],
                   [84, 0.752], [96, 0.770], [110, 0.764], [122, 0.722], [140, 0.690], [180, 0.672]];
 export const CENTER = [0, 0.772, 0.052];          // the skull's middle, the rays are cast toward it
 
@@ -126,14 +126,15 @@ export function buildHair(THREE, head, opt = {}){
   const LAYERS = [
     {name: "base",  gap: 0.0100, width: [0.010, 0.014], off: 0.0010, vol: 0.0,    turn: 0.10, cols: [0, 1], ao: 0.62, lift: 0.0005, lenK: 0.9, top: true},
     {name: "mid",   gap: 0.0095, width: [0.008, 0.012], off: 0.0028, vol: 0.0045, turn: 0.18, cols: [1, 2, 3], ao: 0.85, lift: 0.0030, lenK: 1.0, top: true},
-    {name: "piece", gap: 0.0110, width: [0.006, 0.009], off: 0.0045, vol: 0.0065, turn: 0.26, cols: [3, 4, 5], ao: 1.0, lift: 0.0032, lenK: 1.05, top: true},
-    {name: "fringe", gap: 0.0080, width: [0.006, 0.010], off: 0.0035, vol: 0.002, turn: 0.18, cols: [3, 4, 5], ao: 0.95, lift: 0.0015, lenK: 1.0, fringe: true},
-    {name: "fly",   gap: 0.0340, width: [0.004, 0.006], off: 0.0055, vol: 0.005,  turn: 0.5, cols: [6, 7], ao: 1.0, lift: 0.005, lenK: 0.85, top: true},
+    {name: "piece", gap: 0.0110, width: [0.006, 0.009], off: 0.0045, vol: 0.0065, turn: 0.22, cols: [2, 3], ao: 0.78, lift: 0.0025, lenK: 1.0, top: true},
+    {name: "fringe", gap: 0.0050, width: [0.010, 0.014], off: 0.0035, vol: 0.002, turn: 0.12, cols: [0, 1], ao: 0.75, lift: 0.0015, lenK: 0.75, fringe: true},
+    {name: "fly",   gap: 0.0450, width: [0.004, 0.006], off: 0.0055, vol: 0.005,  turn: 0.5, cols: [6, 7], ao: 1.0, lift: 0.005, lenK: 0.85, top: true},
     {name: "taper", gap: 0.0045, width: [0.005, 0.008], off: 0.0007, vol: 0.0,    turn: 0.12, cols: [6, 7], ao: 1.0, lift: 0.0003, lenK: 1.0, side: true, thin: 0.7},
   ];
   const P = [], UV = [], COL = [], NRM = [], TAN = [], IDX = [];
   let cards = 0;
   for (const L of LAYERS){
+    if (opt.layers && !opt.layers.includes(L.name)) continue;
     const pool = cand.filter(c => {
       const t = topness(c.p, c.az);
       if (L.fringe) return Math.abs(c.az) < 40 && c.p.y > 0.792 && c.p.y < 0.83;
@@ -152,7 +153,7 @@ export function buildHair(THREE, head, opt = {}){
       const SEG = len < 0.012 ? 1 : len < 0.025 ? 2 : len < 0.045 ? 3 : 4;
       let cur = r, rows = [];
       for (let k = 0; k <= SEG; k++){
-        const t = k / SEG, offset = L.off + vol + t * L.lift * (0.4 + R()) * (L.side ? 1 : 0.4 + top);
+        const t = k / SEG, offset = L.off + vol + t * L.lift * (0.4 + R()) * (L.side ? 1 : 0.4 + top) + (opt.over ? opt.over(topness(cur.p, azimuth(cur.p))) : 0);
         const dir = flow(cur.p, cur.n, card);
         rows.push({base: cur.p.clone().addScaledVector(cur.n, offset), n: cur.n.clone(), dir, offset, t});
         if (k < SEG){
@@ -164,7 +165,7 @@ export function buildHair(THREE, head, opt = {}){
       }
       if (rows.length < SEG + 1) continue;
       const v0 = P.length / 3, hue = R() < 0.3 ? 0.4 + R() * 0.6 : (R() - 0.5) * 0.25;   // a few browner cards
-      const tint = [1 + 0.2 * hue, 1 + 0.1 * hue, 1 - 0.02 * hue], bright = 0.9 + R() * 0.2;
+      const tint = [1 + 0.2 * hue, 1 + 0.1 * hue, 1 - 0.02 * hue], bright = 0.5 + R() * 0.15;     // matched to the shell under them
       for (const row of rows){
         const side = new V().crossVectors(row.n, row.dir).normalize();
         const hw = w * 0.5 * (1 - 0.3 * row.t);
@@ -223,5 +224,7 @@ export function buildHair(THREE, head, opt = {}){
     const len = Math.min(1, lengthAt(c.p, c.az) / 0.012);
     for (let k = 0; k < 6; k++) scalpStrokes.push({u: a[0] + (R() - 0.5) * 0.004, v: a[1] + (R() - 0.5) * 0.004, du, dv: b[1] - a[1], len: 1.5 + 2 * len});
   }
-  return {cards: cardsGeo, scalp, scalpStrokes, stats: {cards, cardTris: IDX.length / 3, scalpTris: sp.length / 9, roots: cand.length}};
+  // The growth direction (unit vector along the scalp) under any point near the head, for other hair meshes.
+  const flowAt = q => { const s = surf(q.clone().sub(C)); return s ? flow(s.p, s.n, null) : new V(0, -1, 0); };
+  return {cards: cardsGeo, scalp, scalpStrokes, flowAt, surfAt: q => surf(q.clone().sub(C)), topness: q => topness(q, azimuth(q)), stats: {cards, cardTris: IDX.length / 3, scalpTris: sp.length / 9, roots: cand.length}};
 }
