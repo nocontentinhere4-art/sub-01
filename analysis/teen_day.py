@@ -5,10 +5,10 @@
 What runs for real: Browser.step / _next / _search / _search_on / _shorts / _public_videos / _open (its checks:
 7-day novelty, the per-site guard, robots.txt) / pick_links / show, interests.pick, search_sources.route and Limits.
 What is stubbed: the network and the page. The stub answers the way the live site was answered on 2026-10-03/04:
-DuckDuckGo gives its bot check, Bing and Wikipedia refuse searches in robots.txt, the YouTube Data API has no key
-(unless --youtube-key), the topic sites' own search pages answer, every page lists six same-site articles and two
-other sites (so link chains on one site can happen, as the seven King Arthur Baking pages did live), and a YouTube
-channel's Shorts page lists ten public shorts. Not a browser: it measures what he chooses to put on his screens.
+DuckDuckGo gives its bot check, Bing and Wikipedia refuse searches in robots.txt, the YouTube Data API answers only
+with --youtube-key (channels / playlistItems / videos / search), the topic sites' own search pages answer, and every
+page lists six same-site articles and two other sites (so link chains on one site can happen, as the seven King
+Arthur Baking pages did live). Not a browser: it measures what he chooses to put on his screens.
 
 The day: 07:00-23:00 Tokyo, a step every 40 s; 20-minute blocks on the phone (35 %), at the desk (45 %) or away;
 hungry around breakfast, lunch and dinner. Prints the share by kind over the day (screens.screen_kind), recipe pages
@@ -54,13 +54,6 @@ class Clock:
 
     def __call__(self):
         return self.t
-
-
-def shorts_page(handle, n0):
-    items = ",".join('{"shortsLockupViewModel":{"onTap":{"innertubeCommand":{"reelWatchEndpoint":{"videoId":"%s"}}},'
-                     '"overlayMetadata":{"primaryText":{"content":"%s short %d"}}}}'
-                     % (f"{handle[:4]}{n0 + i:07d}"[:11].ljust(11, "x"), handle, n0 + i) for i in range(10))
-    return '<script>var ytInitialData = {"contents":[%s]};</script>' % items
 
 
 class Page:
@@ -164,16 +157,19 @@ def run_day(seed, youtube_key):
             if host == "www.youtube.com":
                 return 200, "User-agent: *\nDisallow: /results\nDisallow: /feeds/videos.xml\n"
             return 404, ""
-        if host == "www.youtube.com" and u.path.startswith("/@"):
+        if host == "www.googleapis.com" and youtube_key:     # the official API (the only way videos are found)
             world.n += 10
-            if u.path.endswith("/videos"):                  # a channel's videos tab (2025 layout)
-                items = ",".join('{"lockupViewModel":{"contentId":"%s","contentType":"LOCKUP_CONTENT_TYPE_VIDEO",'
-                                 '"metadata":{"lockupMetadataViewModel":{"title":{"content":"video %d"}}}}}'
-                                 % (f"vid{world.n + i:08d}", world.n + i) for i in range(10))
-                return 200, '<script>var ytInitialData = {"contents":[%s]};</script>' % items
-            return 200, shorts_page(u.path.split("/")[1][1:], world.n)
-        if host == "www.googleapis.com" and youtube_key:
-            world.n += 10
+            if "/channels" in u.path:
+                return 200, '{"items":[{"contentDetails":{"relatedPlaylists":{"uploads":"UU%08d"}}}]}' % world.n
+            if "/playlistItems" in u.path:
+                items = ",".join('{"snippet":{"title":"upload %d"},"contentDetails":{"videoId":"%s"}}'
+                                 % (world.n + i, f"upl{world.n + i:08d}") for i in range(20))
+                return 200, '{"items":[%s]}' % items
+            if "/videos" in u.path:
+                ids = urllib.parse.parse_qs(u.query)["id"][0].split(",")
+                items = ",".join('{"id":"%s","contentDetails":{"duration":"%s"},"status":{"embeddable":true}}'
+                                 % (v, "PT40S" if int(v[-1]) % 2 else "PT9M") for v in ids)
+                return 200, '{"items":[%s]}' % items
             items = ",".join('{"id":{"videoId":"%s"},"snippet":{"title":"api short %d","channelTitle":"c"}}'
                              % (f"api{world.n + i:08d}", world.n + i) for i in range(10))
             return 200, '{"items":[%s]}' % items
@@ -185,8 +181,6 @@ def run_day(seed, youtube_key):
         return {"muted": True}
 
     b._ensure, b._use, b._settle, b._shoot, b._fetch, b._play_muted = _ensure, _use, _settle, _shoot, _fetch, _play_muted
-    if hasattr(b, "_tiktok_cards"):                         # older code: TikTok cards through the same bot check
-        pass
     end = t0 + 16 * 3600
     block, where = 0, None
     while clk() < end:
@@ -214,7 +208,11 @@ def run_day(seed, youtube_key):
                               "host": (urllib.parse.urlsplit(st["url"]).hostname or "").removeprefix("www."),
                               "hungry": hungry})
         clk.t += 40
+    UNITS.append(b.yt.used if hasattr(b, "yt") else 0)
     return shown
+
+
+UNITS = []
 
 
 def table(rows):
@@ -232,6 +230,7 @@ def table(rows):
     return {"pages": n, "short video + YouTube": round(video / n, 3),
             **{k: round(kinds[k] / n, 3) for k in SC.KINDS}, "recipes outside meals": round(recipe_out / n, 3),
             "longest run on one site": best,
+            "YouTube API units per day (cap 9,000)": round(sum(UNITS) / len(UNITS)) if UNITS else 0,
             "top hosts": dict(collections.Counter(r["host"] for r in rows).most_common(6))}
 
 

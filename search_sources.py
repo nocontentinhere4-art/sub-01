@@ -280,9 +280,6 @@ def parse_youtube(text, base=""):
                 found.append(o["videoRenderer"])
             if isinstance(o.get("shortsLockupViewModel"), dict):
                 found.append({"short": o["shortsLockupViewModel"]})
-            lk = o.get("lockupViewModel")                   # a channel's videos tab (2025 layout)
-            if isinstance(lk, dict) and lk.get("contentType") == "LOCKUP_CONTENT_TYPE_VIDEO":
-                found.append({"lockup": lk})
             for v in o.values():
                 walk(v, depth + 1)
         elif isinstance(o, list):
@@ -305,14 +302,6 @@ def parse_youtube(text, base=""):
                 out.append(_result(f"https://www.youtube.com/shorts/{vid}", strip_tags(title),
                                    (meta.get("secondaryText") or {}).get("content", ""), video=True, short=True,
                                    hashtags=re.findall(r"#\w+", title)[:6]))
-            continue
-        if "lockup" in v:
-            lk = v["lockup"]
-            vid = lk.get("contentId")
-            md = (lk.get("metadata") or {}).get("lockupMetadataViewModel") or {}
-            title = (md.get("title") or {}).get("content", "")
-            if vid and re.fullmatch(r"[\w-]{6,20}", str(vid)) and title:
-                out.append(_result(f"https://www.youtube.com/watch?v={vid}", strip_tags(title), "", video=True))
             continue
         vid = v.get("videoId")
         if not vid or not re.fullmatch(r"[\w-]{6,20}", str(vid)):

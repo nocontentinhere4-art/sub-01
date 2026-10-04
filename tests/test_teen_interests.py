@@ -70,34 +70,35 @@ def test_topic_sites_results_are_parsed():
     assert [r["url"] for r in rs] == ["https://www.carscoops.com/2026/09/final-toyota-gr-supra-auction/"]
 
 
-def test_a_channels_videos_tab_is_parsed():
-    page = ('<script>var ytInitialData = {"contents":[{"lockupViewModel":{"contentId":"ucWPA74zEbo",'
-            '"contentType":"LOCKUP_CONTENT_TYPE_VIDEO","metadata":{"lockupMetadataViewModel":{"title":{"content":'
-            '"New Audi A6 Allroad vs New Audi Q7! | 4K"}}}}},{"lockupViewModel":{"contentId":"PLx","contentType":'
-            '"LOCKUP_CONTENT_TYPE_PLAYLIST"}}]};</script>')
-    rs = S.parse_youtube(page, "https://www.youtube.com/@TopGear/videos")
-    assert [(r["url"], r["title"]) for r in rs] == [("https://www.youtube.com/watch?v=ucWPA74zEbo",
-                                                     "New Audi A6 Allroad vs New Audi Q7! | 4K")]
+# --- channels' latest uploads through the official API (YouTube's Terms forbid automated access to its pages) ------
+CHANNELS_JSON = '{"items":[{"id":"UCx","contentDetails":{"relatedPlaylists":{"uploads":"UUx0123456789"}}}]}'
+PLAYLIST_JSON = ('{"items":[' + ",".join(
+    '{"snippet":{"title":"GR86 track day %d","channelTitle":"Top Gear"},"contentDetails":{"videoId":"abcDEF1234%d"}}'
+    % (i, i) for i in range(6)) + ']}')
+VIDEOS_JSON = ('{"items":[' + ",".join(
+    '{"id":"abcDEF1234%d","contentDetails":{"duration":"%s"},"status":{"embeddable":true,"privacyStatus":"public"}}'
+    % (i, "PT45S" if i % 2 == 0 else "PT12M3S") for i in range(6)) + ']}')
 
 
-# --- short video without a key: known channels' public uploads -------------------------------------------------------
-SHORTS = ('<script>var ytInitialData = {"contents":[' + ",".join(
-    '{"shortsLockupViewModel":{"onTap":{"innertubeCommand":{"reelWatchEndpoint":{"videoId":"abcDEF1234%d"}}},'
-    '"overlayMetadata":{"primaryText":{"content":"GR86 track day %d"}}}}' % (i, i) for i in range(5)) + "]};</script>")
-
-
-def test_without_a_key_the_phone_plays_a_topic_channels_shorts(monkeypatch):
-    monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
+def _api_browser(monkeypatch, key=True):
+    if key:
+        monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
+    else:
+        monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
     b = Browser(decide=True, rng=random.Random(0))
     sc = b.screens["phone"]
     sc.mode, sc.page, sc.ctx = "shorts", SimpleNamespace(url="about:blank"), object()
-    fetched, opened = [], []
+    calls, opened = [], []
 
     async def _fetch(sc_, url, hops=3, headers=None):
-        fetched.append(url)
-        if url.endswith("/robots.txt"):
-            return 200, "User-agent: *\nDisallow: /results\nDisallow: /feeds/videos.xml\n"
-        return 200, SHORTS
+        calls.append((url, headers))
+        if "/channels?" in url:
+            return 200, CHANNELS_JSON
+        if "/playlistItems?" in url:
+            return 200, PLAYLIST_JSON
+        if "/videos?" in url:
+            return 200, VIDEOS_JSON
+        return 404, ""
 
     async def _open(sc_, url, why, kind, title=None, min_text=80, shoot=True, revisit=False, referer=None):
         opened.append(url)
@@ -107,22 +108,48 @@ def test_without_a_key_the_phone_plays_a_topic_channels_shorts(monkeypatch):
     async def _ok(*a, **k):
         return True
     b._fetch, b._open, b._play_muted, b._shoot = _fetch, _open, _ok, _ok
+    return b, sc, calls, opened
+
+
+def test_shorts_from_a_topic_channels_uploads_through_the_api_for_3_units(monkeypatch):
+    b, sc, calls, opened = _api_browser(monkeypatch)
     assert run(b._public_videos(sc, "shorts", "Toyota GR Supra", "short videos"))
-    channel = [u for u in fetched if "/@" in u][0]
-    assert channel.endswith("/shorts") and channel.split("/@")[1].split("/")[0] in YT.CHANNELS["cars"]
-    assert opened[0].startswith("https://www.youtube-nocookie.com/embed/abcDEF1234")
-    assert sc.info["url"].startswith("https://www.youtube.com/shorts/") and b.feed_note == YT.NOTE_CHANNELS
-    n = len([u for u in fetched if "/@" in u])
-    run(b._public_videos(sc, "shorts", "Toyota GR Supra", "again"))
-    assert len([u for u in fetched if "/@" in u]) <= n + 1                 # pages cached; the next channel at most
+    api = [(u, h) for u, h in calls if "googleapis" in u]
+    assert [u.split("/v3/")[1].split("?")[0] for u, _ in api] == ["channels", "playlistItems", "videos"]
+    assert b.yt.public()["units_used"] == 3
+    assert all(h == {"X-Goog-Api-Key": "test-key-not-real"} and "test-key" not in u for u, h in api)
+    assert api[0][0].split("forHandle=%40")[1] in YT.CHANNELS["cars"]
+    assert not [u for u, _ in calls if "youtube.com/@" in u or "/feeds/" in u]      # never YouTube's own pages
+    assert sc.info["url"] in {f"https://www.youtube.com/shorts/abcDEF1234{i}" for i in (0, 2, 4)}   # the 45 s ones
+    assert opened[0].startswith("https://www.youtube-nocookie.com/embed/") and b.feed_note == YT.NOTE_UPLOADS
+    run(b._public_videos(sc, "shorts", "Toyota GR Supra", "again"))                 # uploads id kept, list cached
+    assert b.yt.public()["units_used"] <= 6
 
 
-def test_the_rss_feed_is_not_used_because_robots_disallows_it():
-    rp = S.Robots()
-    rp.load("www.youtube.com", 200, "User-agent: *\nDisallow: /results\nDisallow: /feeds/videos.xml\n")
-    assert not rp.allowed("https://www.youtube.com/feeds/videos.xml?channel_id=UCx")
-    assert rp.allowed(YT.channel_url("TopGear")) and rp.allowed(YT.channel_url("TopGear", short=False))
-    assert all(YT.channels_for(t) for t in ("cars", "games", "football", "anime", "music", "tech", "memes"))
+def test_desk_videos_are_the_longer_uploads(monkeypatch):
+    b, _, calls, opened = _api_browser(monkeypatch)
+    sc = b.screens["desk"]
+    sc.page, sc.ctx = SimpleNamespace(url="about:blank"), object()
+    assert run(b._public_videos(sc, "youtube", "Toyota GR Supra", "videos", short=False))
+    assert sc.info["url"] in {f"https://www.youtube.com/watch?v=abcDEF1234{i}" for i in (1, 3, 5)}
+
+
+def test_without_a_key_nothing_is_looked_up_and_todays_finds_are_replayed(monkeypatch):
+    b, sc, calls, opened = _api_browser(monkeypatch, key=False)
+    assert not run(b._public_videos(sc, "shorts", "Toyota GR Supra", "short videos"))
+    assert calls == [] and b.feed_note == YT.NOTE_NO_KEY
+    b.yt.found([{"url": "https://www.youtube.com/shorts/abcDEF12340", "title": "GR86 track day 0", "author": "TopGear",
+                 "hashtags": [], "thumb": "", "embed": YT.embed_url("abcDEF12340"), "host": "youtube.com"}])
+    assert run(b._public_videos(sc, "shorts", "anything", "short videos"))
+    assert not [u for u, _ in calls if "googleapis" in u or "youtube.com/@" in u]   # only the player's robots.txt
+    assert b.feed_note == YT.NOTE_REPLAY and sc.info["url"] == "https://www.youtube.com/shorts/abcDEF12340"
+
+
+def test_durations_and_uploads_are_parsed():
+    assert YT.parse_uploads_id(CHANNELS_JSON) == "UUx0123456789" and YT.parse_uploads_id("{}") is None
+    assert [x["id"] for x in YT.parse_playlist(PLAYLIST_JSON)][:2] == ["abcDEF12340", "abcDEF12341"]
+    assert YT.parse_durations(VIDEOS_JSON)["abcDEF12340"] == 45 and YT.iso_seconds("PT1H2M3S") == 3723
+    assert not hasattr(YT, "channel_url")                                            # no page URLs at all
 
 
 def test_desk_time_has_youtube_slots_that_hold_for_twenty_minutes():

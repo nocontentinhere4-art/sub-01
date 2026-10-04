@@ -117,10 +117,12 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   `parse_headlines`. No unrelated fallback (`TAIL` empty): a query with no fitting site goes to its videos or to a
   front page of its topic (`SEED_TOPICS`). The cause of "One Piece → Science News": "latest" matched the old "news"
   topic, whose source was Science News. Recipes only while hungry (`MEAL_ONLY`, `RECIPE_HOST`).
-- Video without a YouTube key: the public uploads of known channels per topic (`youtube_api.CHANNELS`), read from
-  the channel's own Shorts / Videos page (robots.txt allows `/@handle/...`; it disallows the RSS `/feeds/videos.xml`,
-  so the RSS idea was not used), played in the youtube-nocookie embed. `parse_youtube` reads the 2025
-  `lockupViewModel` of a videos tab. About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+- YouTube discovery only through the official Data API (`YOUTUBE_API_KEY`; YouTube's Terms forbid automated access
+  to its pages, so no channel page or RSS is ever read): the latest uploads of well-known channels per topic
+  (`youtube_api.CHANNELS`; `channels.list` forHandle → uploads playlist (kept), `playlistItems.list`, `videos.list`
+  for durations, Shorts ≤ 180 s: 3 units, each list cached 3 h), else `search.list` (100 units). Without a key or
+  quota: no discovery, the note "no API key or no quota left…", and a replay of the videos already found today
+  (`Quota.today`). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
 - Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
   players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
   robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,

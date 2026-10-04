@@ -1189,10 +1189,15 @@ class Browser:
         cands = []
         if kind == "shorts" or kind == "youtube":
             if YT.key():
-                cands = await self._yt_search(sc, q, short)
-            if not cands:                                       # no key (or no quota): known channels' uploads
-                cands = await self._yt_channel(sc, q, short)
-                self.feed_note = YT.NOTE_CHANNELS if cands else YT.NOTE_NO_KEY
+                # the topic's channels' latest uploads (3 units), else a search (100 units); all through the API
+                if I.topic_of(q or "") in YT.CHANNELS or I.topic_of(q or "") is None and self.rng.random() < 0.5:
+                    cands = await self._yt_uploads(sc, q, short)
+                    self.feed_note = YT.NOTE_UPLOADS if cands else self.feed_note
+                if not cands:
+                    cands = await self._yt_search(sc, q, short)
+            if not cands:                                       # no key or no quota: nothing new is looked up
+                cands = self._yt_replay(short)
+                self.feed_note = YT.NOTE_REPLAY if cands else YT.NOTE_NO_KEY
         elif kind == "tiktok":
             cands = await self._tiktok_found(sc, q)
         if not cands:
@@ -1230,46 +1235,76 @@ class Browser:
         cards = [{"url": r["url"], "title": r["title"], "author": r["channel"], "thumb": r["thumb"], "hashtags": [],
                   "embed": r["embed"], "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
                   "how": "YouTube's official embed player"} for r in self.safe_results(results)]
-        return [c for c in cards if self._card_ok(c)][:6]
+        cards = [c for c in cards if self._card_ok(c)][:6]
+        self.yt.found(cards)
+        return cards
 
-    async def _yt_channel(self, sc, q, short=True):
-        """#89 teen: without the API, the public uploads of a well-known channel of the query's topic, from the
-        channel's own Shorts / Videos page (robots.txt allows /@handle/..., it disallows the RSS feeds), the channel
-        used longest ago first, each page cached CHANNEL_CACHE_S. -> cards in the official embed player."""
-        topic = I.topic_of(q or "")
-        handles = sorted(YT.channels_for(topic), key=lambda h: (self.yt_used.get(h, 0), self.rng.random()))
-        fetch = lambda u: self._fetch(sc, u)                       # noqa: E731
+    def _yt_cards(self, items, short, author=None):
+        cards = []
+        for r in self.safe_results([{"url": YT.video_url(it["id"], short), "title": it["title"], "video": True,
+                                     "channel": it.get("channel", "")} for it in items]):
+            vid = r["url"].rsplit("/", 1)[-1].split("=")[-1]
+            cards.append({"url": r["url"], "title": r["title"], "author": author or r.get("channel", ""),
+                          "hashtags": re.findall(r"#\w+", r["title"])[:6],
+                          "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg", "embed": YT.embed_url(vid),
+                          "host": "youtube.com", "site": "YouTube Shorts" if short else "YouTube",
+                          "how": "YouTube's official embed player"})
+        return [c for c in cards if self._card_ok(c)]
+
+    async def _yt_api(self, sc, url):
+        """One cheap Data API call (the key in a header, never in a URL). -> text or None."""
+        if not self.yt.allow(YT.LIST_UNITS) or not self.limits.allow("www.googleapis.com"):
+            return None
+        self.limits.note("www.googleapis.com")
+        status, text = await self._fetch(sc, url, headers=YT.headers())
+        self.yt.spend_units(YT.LIST_UNITS)
+        if status != 200:
+            self.yt.error(f"{url.split('/v3/')[1].split('?')[0]}: HTTP {status}")
+            return None
+        return text
+
+    async def _yt_uploads(self, sc, q, short=True):
+        """#89 teen: the latest uploads of a well-known channel of the query's topic, through the official API
+        (YouTube's Terms forbid automated access to its pages): channels.list forHandle -> uploads playlist (kept),
+        playlistItems.list -> latest uploads, videos.list -> durations (Shorts: at most SHORT_MAX_S). 3 units, each
+        channel's list cached CHANNEL_CACHE_S. -> cards in the official embed player."""
+        handles = sorted(YT.channels_for(I.topic_of(q or "")), key=lambda h: (self.yt_used.get(h, 0), self.rng.random()))
         for h in handles[:2]:
-            url = YT.channel_url(h, short)
-            ck = f"c:{url}"
+            pid = self.yt.uploads.get(h)
+            if not pid:
+                text = await self._yt_api(sc, YT.channels_url(h))
+                pid = YT.parse_uploads_id(text) if text else None
+                if not pid:
+                    continue
+                self.yt.uploads[h] = pid
+            ck = f"p:{pid}"
             hit = self.yt.cache.get(ck)
             if hit and time.time() - hit["t"] < YT.CHANNEL_CACHE_S:
-                results = hit["r"]
+                items = hit["r"]
             else:
-                if not self.limits.allow("www.youtube.com") or not await self.robots.check(url, fetch, self.limits):
+                text = await self._yt_api(sc, YT.playlist_url(pid))
+                items = YT.parse_playlist(text) if text else []
+                if not items:
                     continue
-                self.limits.note("www.youtube.com")
-                status, text = await fetch(url)
-                if status != 200 or BODY_WALL.search(text[:20000]):
-                    self.limits.refuse("youtube", f"channel page HTTP {status}")
-                    continue
-                results = [r for r in SS.parse_youtube(text, url) if bool(r.get("short")) == short or not short]
-                self.yt.cache[ck] = {"t": time.time(), "r": results[:30]}
+                text = await self._yt_api(sc, YT.videos_url([it["id"] for it in items]))
+                secs = YT.parse_durations(text) if text else {}
+                items = [dict(it, sec=secs[it["id"]]) for it in items if it["id"] in secs]
+                self.yt.cache[ck] = {"t": time.time(), "r": items}
+                print(f"browse: YouTube API uploads of @{h}: {len(items)} videos, {self.yt.used} units today",
+                      flush=True)
             self.yt_used[h] = time.time()
-            cards = []
-            for r in self.safe_results(results):
-                m = re.search(r"(?:shorts/|v=)([\w-]{11})", r["url"])
-                if m:
-                    cards.append({"url": r["url"], "title": r["title"], "author": h, "hashtags": r.get("hashtags") or [],
-                                  "thumb": f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg",
-                                  "embed": YT.embed_url(m.group(1)), "host": "youtube.com",
-                                  "site": "YouTube Shorts" if short else "YouTube",
-                                  "how": "YouTube's official embed player"})
-            cards = [c for c in cards if self._card_ok(c)]
+            pick = [it for it in items if (it["sec"] <= YT.SHORT_MAX_S) == bool(short)]
+            cards = self._yt_cards(pick, short, author=h)
             self.rng.shuffle(cards)
             if cards:
+                self.yt.found(cards)
                 return cards[:6]
         return []
+
+    def _yt_replay(self, short=True):
+        """No key or no quota: no discovery; the videos already found today and not yet shown."""
+        kind = "/shorts/" if short else "watch?v="
+        return [c for c in reversed(self.yt.today) if kind in c["url"] and self._card_ok(c)][:6]
 
     async def _tiktok_found(self, sc, q):
         """Public TikTok videos for `q` found through the search engines (site:tiktok.com), described by TikTok's

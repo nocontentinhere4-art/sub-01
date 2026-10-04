@@ -50,12 +50,15 @@ SUB-01 is a fictional man of about 20 in Tokyo, never presented as a minor. The 
   sneakers, memes, movies; then Tokyo and science; Wikipedia barely. Food has weight 0 unless he is hungry or ordering
   (`pick(hungry=True)`). There are no money or crypto topics.
 - **Where the time goes:** the phone is always the short-video feed. About half of desk time is YouTube, in 20-minute
-  sessions (`search_sources.desk_video`), more in the evening. Video is either YouTube's official embed player (Data
-  API with `YOUTUBE_API_KEY`; without the key, known channels' public uploads from their own Shorts / Videos pages,
-  which robots.txt allows) or TikTok's official player.
+  sessions (`search_sources.desk_video`), more in the evening. Video plays in YouTube's official embed player and is
+  found only through YouTube's official Data API (`YOUTUBE_API_KEY`): the latest uploads of well-known channels per
+  topic (channels.list → playlistItems.list → videos.list, 3 units) or a search (100 units). YouTube's Terms of
+  Service forbid automated access to its pages, so its pages and RSS are never read. Without a key or quota nothing
+  new is looked up, and the panel says so. TikTok plays in its official player.
 - **Searches land on sites that fit:** MyAnimeList for anime, Carscoops for cars, PC Gamer for games, TMDB for movies,
   NME for music, 9to5Mac / Hacker News for tech. Each robots.txt allows its search path (checked 2026-10-04).
   General engines (DuckDuckGo, Bing, Brave, Mojeek, Startpage, Qwant, Ecosia) all disallow their results pages, or
   challenge datacenter IPs.
-- **Not used, because robots.txt disallows them:** YouTube's RSS feeds (`/feeds/videos.xml`), old.reddit.com (all
-  paths), TikTok's `/embed/v2` and `/search`. TikTok's tag and discover pages render no video on the server.
+- **Not used:** YouTube's own pages and RSS (its Terms of Service forbid automated access; robots.txt also
+  disallows `/feeds/videos.xml`), old.reddit.com (robots.txt disallows all paths), and TikTok's `/embed/v2` and
+  `/search` (disallowed). TikTok's tag and discover pages render no video on the server.
