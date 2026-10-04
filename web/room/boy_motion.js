@@ -353,20 +353,50 @@ export function createMotion(env){
   // the desk top is solid (G8 #7): over its footprint no elbow or wrist goes below its surface; a forearm that would rest
   // on the slab is lifted onto it (the hand IK'd to the same place a little higher, the elbow raised with it)
   const DESK = {x0: -1.86, x1: -0.36, z0: -1.44, z1: -0.80, top: 0.97};
+  // the hand mesh is rigid on its one bone (no finger bones) and its relaxed fingers curl 5-8 cm below the wrist bone, so
+  // a straight finger line from the wrist misses where the skin really is: the guard tests the hand's farthest vertices
+  // (in the hand bone's space, the 26 directions of a cube, read once off the skinned mesh) instead
+  const HPTS = {};
+  function handPoints(){
+    HPTS.done = true;
+    let sm; env.boy.traverse(o => { if (o.isSkinnedMesh && o.skeleton) sm = o; }); if (!sm) return;
+    const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight; if (!P || !I || !Wt) return;
+    const dirs = []; for (const x of [-1, 0, 1]) for (const y of [-1, 0, 1]) for (const z of [-1, 0, 1]) if (x || y || z) dirs.push(new THREE.Vector3(x, y, z).normalize());
+    const v = new THREE.Vector3(), toLocal = new THREE.Matrix4();
+    for (const side of ["Left", "Right"]) {
+      const bi = sm.skeleton.bones.indexOf(B[side + "Hand"]); if (bi < 0) continue;
+      toLocal.multiplyMatrices(sm.skeleton.boneInverses[bi], sm.bindMatrix);
+      const best = dirs.map(() => null);
+      for (let k = 0; k < P.count; k++) {
+        let b = 0, bw = 0; for (let q = 0; q < 4; q++) if (Wt.getComponent(k, q) > bw) { bw = Wt.getComponent(k, q); b = I.getComponent(k, q); }
+        if (b !== bi) continue;
+        v.fromBufferAttribute(P, k).applyMatrix4(toLocal);
+        dirs.forEach((d, j) => { const s = v.dot(d); if (!best[j] || s > best[j].s) best[j] = {s, p: v.clone()}; });
+      }
+      const pts = []; best.forEach(b => { if (b && !pts.some(p => p.distanceToSquared(b.p) < 1e-6)) pts.push(b.p); });
+      if (pts.length) HPTS[side] = pts;
+    }
+  }
   function deskGuard(ctx, st){
     if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk") return;
+    if (!HPTS.done) { try { handPoints(); } catch (e) { HPTS.done = true; } }
     env.boy.updateMatrixWorld(true);
     const over = p => p.x > DESK.x0 - 0.08 && p.x < DESK.x1 + 0.08 && p.z > DESK.z0 - 0.04 && p.z < DESK.z1 + 0.10;
+    // the skin may come down onto the key caps (their tops: KEYBOARD.c[1]) and the mouse's back, never into the slab
+    const floorAt = (p, pad) => { const onKeys = Math.abs(p.x - KEYBOARD.c[0]) < KEYBOARD.w / 2 + 0.03 && Math.abs(p.z - KEYBOARD.c[2]) < KEYBOARD.d / 2 + 0.03;
+      const onMouse = Math.abs(p.x - MOUSE[0]) < 0.07 && Math.abs(p.z - MOUSE[2]) < 0.08;
+      return onKeys ? KEYBOARD.c[1] + pad : onMouse ? MOUSE[1] + 0.03 + pad : DESK.top + pad; };
     for (const [side, sx] of [["Left", -1], ["Right", 1]]) {
       if (side === "Right" && (st.holdW > 0 || st.held)) continue;
       const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up) continue;
-      lo.getWorldPosition(_a); h.getWorldPosition(_b); h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.17).add(_b);   // the fingertips (the hand is ~17 cm long from the wrist)
-      // the fingertips may come down onto the key caps (their tops: KEYBOARD.c[1]) and the mouse's back, not into the slab
-      const onKeys = Math.abs(_c.x - KEYBOARD.c[0]) < KEYBOARD.w / 2 + 0.03 && Math.abs(_c.z - KEYBOARD.c[2]) < KEYBOARD.d / 2 + 0.03;
-      const onMouse = Math.abs(_c.x - MOUSE[0]) < 0.07 && Math.abs(_c.z - MOUSE[2]) < 0.08;
-      // (2 cm over the caps: the finger pads are a centimetre thick below the bone, and the QA counts skin inside the keys)
-      const tipFloor = onKeys ? KEYBOARD.c[1] + 0.02 : onMouse ? MOUSE[1] + 0.045 : DESK.top + 0.06;
-      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.06 - _b.y : 0, over(_c) ? tipFloor - _c.y : 0);
+      lo.getWorldPosition(_a); h.getWorldPosition(_b);
+      let lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.03 - _b.y : 0);
+      if (HPTS[side]) {                                 // the hand's real extent: every far vertex 5 mm over what is under it
+        for (const p of HPTS[side]) { _c.copy(p).applyMatrix4(h.matrixWorld); if (over(_c)) lift = Math.max(lift, floorAt(_c, 0.005) - _c.y); }
+      } else {                                          // (no skinned mesh to read: a 17 cm finger line, 2 cm over the caps)
+        h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.17).add(_b);
+        const f = floorAt(_c, 0.02); if (over(_c)) lift = Math.max(lift, (f === DESK.top + 0.02 ? DESK.top + 0.06 : f) - _c.y);
+      }
       if (lift <= 0) continue;
       _t.copy(_b); _t.y += lift;
       up.getWorldPosition(_p).addScaledVector(RT, sx * 0.3); _p.y = DESK.top + 0.12;      // the elbow out and over the slab

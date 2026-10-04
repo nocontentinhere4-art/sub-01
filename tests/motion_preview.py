@@ -23,13 +23,13 @@ ROOT = Path(__file__).resolve().parent.parent
 NM = ROOT / "room_build" / "node_modules"
 HERE = Path(__file__).resolve().parent
 # name -> (setup JS run after the page is ready and seeded, frames recorded after it, the close shot: the frame it is
-# picked at (CLOSE below), or a fixed [position, target])
+# picked at (CLOSE below), a fixed [position, target], or the name of a page_checks close-up recipe)
 SCENES = {
     "walk from the window past the bed": ("act('window', {activity:'window', place:'room'}); __qa.step(1/30, 30); live('order_food', {activity:'order_food', place:'room'});", 105,
                                           [[0.35, 1.25, -0.75], [-1.25, 0.55, 0.15]]),       # from the room's middle: the bed's side and his legs
     "stretch beside the desk": ("act('research', {activity:'research', place:'room'}); live('get_delivery', {activity:'get_delivery', place:'room'}); __qa.step(1/30, 950); variant('stretch');", 135,
                                 [[0.95, 1.65, 0.55], [-0.5, 1.25, -0.45]]),               # from the door side: him, the raised arms and the chair at his left
-
+    "hands at the desk": ("act('research', {activity:'research', place:'room'});", 150, "hands"),   # the page's close-up of the hands: the keys, the mouse, the mat
 }
 # one render of the current state: lights and shadows refreshed, no animate() call (the page's sim(0, 1) would step its
 # interludes with dt 0 twice a frame and lose the stretch)
@@ -104,7 +104,9 @@ def record(web, port, frames_dir, tag, chromium, seed, log, only=None):
                 close = {"pos": close_at[0], "target": close_at[1]} if isinstance(close_at, list) else None
                 for f in range(n):
                     pg.evaluate("__qa.step(1/30, 1)")
-                    if close is None and (f == close_at or f == n - 1):
+                    if close is None and isinstance(close_at, str):          # a page_checks close-up recipe, picked at the first frame and held
+                        close = pg.evaluate("n => __qa.closeup(n)", close_at)
+                    elif close is None and (f == close_at or f == n - 1):
                         close = pg.evaluate(CLOSE)
                     for cam in ("default", "close"):
                         if cam == "default":
