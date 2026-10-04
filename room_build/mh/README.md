@@ -12,8 +12,9 @@
 - `glb/clips/desk_type_ik.glb`: desk_type with a baked arm IK from the owner's typing photo (elbows bent and close,
   hands together on the home row, pointing forward; wrists pinned at world (0.03, 0.878, 0.32) / (-0.13, 0.878, 0.32), drifting with the recorded wrists (70%) for
   a body whose hips sit at the origin), fingers recorded at 80% strength, thumbs swung toward the space bar, fingertips kept above KEYTOP 0.83 (the pin lifts). Awaiting the owner's verdict.
-- `glb/clips/desk_mouse_ik.glb`: the mouse from the owner's photos: right palm over the mouse (mouse centre
-  (-0.36, top 0.84, 0.40) for hips at the origin; wrist pin (-0.322, 0.862, 0.31), hand level, fingers at 45% of the
-  recorded curl, tips kept above 0.826), left hand resting on the keyboard as in desk_type_ik.
+- `glb/clips/desk_mouse_ik.glb`: the mouse held as in the owner's photos: palm resting on the mouse's back, fingers
+  down its front (GRIP_R [22,32,18] deg over 25% of the recorded fingers), thumb on its inner side, an index click now and
+  then. Mouse: a dome 6.4 x 7.6 x 11.6 cm, centre (-0.36, 0.807, 0.40) for hips at the origin (next to the keyboard's
+  right end); wrist pin (-0.322, 0.828, 0.305), hand pitched up 0.3. Left hand resting on the keyboard.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.

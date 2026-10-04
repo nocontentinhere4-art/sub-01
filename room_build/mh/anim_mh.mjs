@@ -86,7 +86,13 @@ function armIK(Wq, L, rootPos) {
     // fingers: the recorded curl at FINGERK strength, thumbs swung toward the space bar
     const fk_ = +(process.env["FINGERK_" + s] || process.env.FINGERK || 1);
     if (fk_ !== 1) for (const n of rest.order) if (n.endsWith("." + s) && /finger|metacarpal/.test(n)) L[n] = new THREE.Quaternion().slerp(L[n], fk_);
-    const th = `finger1-1.${s}`; L[th] = new THREE.Quaternion().setFromAxisAngle(fdir2(th).cross(new THREE.Vector3(0, -1, 0)).normalize(), 0.35).multiply(L[th]);
+    const th = `finger1-1.${s}`; L[th] = new THREE.Quaternion().setFromAxisAngle(fdir2(th).cross(new THREE.Vector3(0, -1, 0)).normalize(), +(process.env["THUMB_" + s] || 0.35)).multiply(L[th]);
+    // GRIP_<side>=[mcp,pip,dip] degrees: a grip that follows the mouse's dome (palm on its back, fingers down its front),
+    // over the reduced recorded motion; the index clicks now and then
+    if (process.env["GRIP_" + s]) { const g = JSON.parse(process.env["GRIP_" + s]); const t = frames.length / fps;
+      for (let f = 2; f <= 5; f++) { const click = f === 2 ? Math.max(0, Math.sin(t * 1.7)) ** 40 * 8 : 0;
+        [`finger${f}-1.${s}`, `finger${f}-2.${s}`, `finger${f}-3.${s}`].forEach((n, k) => { L[n] = curlQ(n, g[k] + (f - 2) * 4 * (k === 0) + (k ? click : 0)).multiply(L[n]); }); }
+      L[`finger1-2.${s}`] = curlQ(`finger1-2.${s}`, 15).multiply(L[`finger1-2.${s}`]); }
     const keep = { up: L[up].clone(), lo: L[lo].clone() };
     let dy = 0;
     for (let it = 0; it < 4; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dy);
