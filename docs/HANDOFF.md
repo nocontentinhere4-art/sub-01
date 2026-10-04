@@ -224,6 +224,11 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     deploy): `ScreensStatus.to_dict()` (day, counts, last, notes, url) is saved to `screens.json` in the data dir at
     most every `SCREENS_SAVE_S` (60 s) when a new page is counted, and at shutdown; restored at start (a new Tokyo
     day still starts afresh).
+  - Desk video mix (evening 2026-10-04 19:46-21:10 Tokyo: 10 desk videos in a row, three "w/ Casey Muratori"
+    talks in a row, three coffee-gear "best of 2026" lists): at most `CHANNEL_STREAK_MAX` (2) videos in a row from one
+    channel or with one guest (`video_keys`, `Browser._streak` in `_card_ok`); after `VIDEO_RUN_MAX` (4) desk videos
+    in a row, `VIDEO_BREAK_S` (5 min) of pages / searches (`_video_break`); shopping lists (`SHOPPING_LIST`: "best /
+    top N ... 2026 / to buy / you need", buying guides) go to the back of the candidates, not away.
   - Walls (live 2026-10-04 18:49-18:51 Tokyo: a WhatsApp channel page; three myanimelist.net pages titled only
     "myanimelist.net", one counted as finance). Messaging and open-in-app pages (`APP_WALL_HOST` / `APP_WALL_PATH`,
     `app_wall`: whatsapp, t.me, discord invites, messenger, app stores, onelink...) are never link targets nor opened.
