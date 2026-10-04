@@ -163,7 +163,10 @@ report["lying"] = {"pose": "room_bed_lie 12 s", "vertices": int((reg > 0).sum())
 # ---------------------------------------------------------------- clean-up: each shape's pose, all shapes on: no garment
 # vertex inside the body (where smoothing pulled one in, or the knee and the hip fold the cloth in), 3 mm out, added to
 # the shape that pose drives
-for clip, t, shape in (("desk_type_ik", 3.0, "seated"), ("room_bed_lie", 12.0, "lying")):
+# (the seated shape serves both seated poses: the desk and the end of sitting down, its knees and hips set differently; the
+# desk is put right again last)
+for clip, t, shape in (("desk_type_ik", 3.0, "seated"), ("room_sit_down", -0.01, "seated"), ("desk_type_ik", 3.0, "seated"),
+                       ("room_bed_lie", 12.0, "lying")):
     world, M, wts, body, bbvh, Ppose = posed(clip, t)
     for g in GARMENTS:
         w = WG[g]; tgt = Ppose[g].copy(); mask = np.zeros(len(tgt)); shaped = np.zeros(len(tgt), bool)
@@ -174,7 +177,7 @@ for clip, t, shape in (("desk_type_ik", 3.0, "seated"), ("room_bed_lie", 12.0, "
                 q, n, _, _ = bbvh.find_nearest(p); tgt[i] = outside(bbvh, q, n, 0.003); mask[i] = 1
         if mask.any():
             w.delta[shape] = w.delta[shape] + w.to_rest(M, (tgt - Ppose[g]) * mask[:, None]) / max(wts[shape], 1e-3)
-        report.setdefault("cleanup", {})[f"{g}@{clip}"] = int(mask.sum())
+        report.setdefault("cleanup", {})[f"{g}@{clip}{t}"] = report.get("cleanup", {}).get(f"{g}@{clip}{t}", 0) + int(mask.sum())
 
 # ---------------------------------------------------------------- write: morph targets on the garments' meshes
 js, bn = G.read(PATH); Wr = G.Writer(js, bn)

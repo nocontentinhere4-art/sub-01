@@ -63,7 +63,7 @@ and lying (12 s) on the bed; sitting down onto the chair and typing on a chair.
 **Corrective shapes** (`g2_correctives.py`, after the build): pose-driven morph targets on the hoodie and the trousers in
 `boy_g2_dressed.glb` (no cloth simulation). Each is made in its pose (the garments skinned as three.js does, put right
 there, and the fix carried back to the rest pose through the inverse of each vertex's skinning, so morph-then-skin
-gives the fixed pose), then a last pass in that pose puts any vertex still inside the body 3 mm outside.
+gives the fixed pose), then a last pass in that pose puts any vertex still inside the body 3 mm outside (the seated shape serves both seated poses: `desk_type_ik` 3 s and the end of `room_sit_down`).
 
 | shape | made in | what it does | driver (from joint world positions) | weight |
 |---|---|---|---|---|
