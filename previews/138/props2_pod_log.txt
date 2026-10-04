@@ -1,0 +1,114 @@
++ cd /work
+++ nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
++ echo 'gpu: NVIDIA RTX A5000, 595.91.07'
+gpu: NVIDIA RTX A5000, 595.91.07
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -qq
++ apt-get install -y -qq ffmpeg fonts-dejavu-core libegl1 libgles2 libgl1 libvulkan1 mesa-vulkan-drivers
++ tail -2
+Processing triggers for libc-bin (2.35-0ubuntu3.9) ...
+Processing triggers for libgdk-pixbuf-2.0-0:amd64 (2.42.8+dfsg-1ubuntu0.5) ...
++ pip install -q playwright pillow
++ tail -1
+[notice] To update, run: python -m pip install --upgrade pip
++ python3 -m playwright install --with-deps chromium
++ tail -2
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 114.3 MiB
+Chrome Headless Shell 153.0.8010.12 (playwright chromium-headless-shell v1243) downloaded to /root/.cache/ms-playwright/chromium_headless_shell-1243
++ ls /usr/lib/x86_64-linux-gnu/
++ grep -i 'nvidia-egl\|EGL_nvidia\|nvidia-glvkspirv\|GLX_nvidia'
++ head -5
+libEGL_nvidia.so.0
+libEGL_nvidia.so.595.91.07
+libGLX_nvidia.so.0
+libGLX_nvidia.so.595.91.07
+libnvidia-egl-gbm.so.1
++ ls /etc/vulkan/icd.d/ /usr/share/vulkan/icd.d/
++ head -5
+/etc/vulkan/icd.d/:
+nvidia_icd.json
+
+/usr/share/vulkan/icd.d/:
+intel_hasvk_icd.x86_64.json
++ mkdir -p /work/old /work/new /work/frames
++ tar -xzf /in/old.tar.gz -C /work/old
++ tar -xzf /in/new.tar.gz -C /work/new
++ R=/work/new/tools/gpu_preview_render.py
++ GPU_ARGS=
++ for cand in "channel=chromium,--use-gl=angle,--use-angle=gl-egl" "channel=chromium,--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" "channel=chromium,--use-gl=egl" "--use-gl=angle,--use-angle=gl-egl" "--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" "--use-gl=egl" "channel=chromium,--use-angle=gl,--use-gl=angle"
+++ python3 /work/new/tools/gpu_preview_render.py --probe --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl
+++ tail -1
++ r='ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)'
++ echo 'probe [channel=chromium,--use-gl=angle,--use-angle=gl-egl] -> ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)'
+probe [channel=chromium,--use-gl=angle,--use-angle=gl-egl] -> ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ case "$r" in
++ GPU_ARGS=channel=chromium,--use-gl=angle,--use-angle=gl-egl
++ break
++ '[' -z channel=chromium,--use-gl=angle,--use-angle=gl-egl ']'
++ echo channel=chromium,--use-gl=angle,--use-angle=gl-egl
++ for size in $SIZES
++ for side in old new
++ SHOTS_ARG=
++ '[' -n tripo_props2.json ']'
++ SHOTS_ARG='--shots /in/tripo_props2.json'
+++ '[' old = old ']'
+++ echo ''
++ Q=
+++ '[' old = old ']'
+++ echo 71
++ python3 /work/new/tools/gpu_preview_render.py --web /work/old/web --side old --size 1280x800 --fps 30 --segments 14:60,23:30 --shots /in/tripo_props2.json --query '' --frames /work/frames/1280x800 --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl --require-gpu --port 8871
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":{"x":-101.05540000081062,
+  old 1280x800 overview frame 0/450 (28 s)
+  old 1280x800 overview frame 150/450 (36 s)
+  old 1280x800 overview frame 300/450 (45 s)
+  old 1280x800 desk, monitor frame 0/300 (55 s)
+  old 1280x800 desk, monitor frame 150/300 (64 s)
+  old 1280x800 door corner: fan, skateboard, shoe boxes frame 0/300 (72 s)
+  old 1280x800 door corner: fan, skateboard, shoe boxes frame 150/300 (81 s)
+old: 1050 frames in 90.6 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ for side in old new
++ SHOTS_ARG=
++ '[' -n tripo_props2.json ']'
++ SHOTS_ARG='--shots /in/tripo_props2.json'
+++ '[' new = old ']'
+++ echo ''
++ Q=
+++ '[' new = old ']'
+++ echo 72
++ python3 /work/new/tools/gpu_preview_render.py --web /work/new/web --side new --size 1280x800 --fps 30 --segments 14:60,23:30 --shots /in/tripo_props2.json --query '' --frames /work/frames/1280x800 --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl --require-gpu --port 8872
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":{"x":-91.94679999959469,"
+  new 1280x800 overview frame 0/450 (8 s)
+  new 1280x800 overview frame 150/450 (18 s)
+  new 1280x800 overview frame 300/450 (28 s)
+  new 1280x800 desk, monitor frame 0/300 (38 s)
+  new 1280x800 desk, monitor frame 150/300 (47 s)
+  new 1280x800 door corner: fan, skateboard, shoe boxes frame 0/300 (56 s)
+  new 1280x800 door corner: fan, skateboard, shoe boxes frame 150/300 (65 s)
+new: 1050 frames in 75.6 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ python3 /work/new/tools/gpu_preview_render.py --encode --frames /work/frames/1280x800 --out /out/preview_1280x800.mp4 --max-mb 25 --label-old 'main (old)' --label-new 'Tripo props 2 (#138)'
+wrote /out/preview_1280x800.mp4: 1050 frames, 35.0 s, 19.3 MB (crf 20)
++ cp /work/frames/1280x800/new_meta.json /work/frames/1280x800/old_meta.json /out/
++ for s in old new
++ cp /work/frames/1280x800/old_meta.json /out/old_1280x800_meta.json
++ for s in old new
++ cp /work/frames/1280x800/new_meta.json /out/new_1280x800_meta.json
++ ls -la /out
+total 22952
+drwxr-xr-x 2 root root     4096 Oct  4 07:27 .
+drwxr-xr-x 1 root root      185 Oct  4 07:22 ..
+-rw-r--r-- 1 root root        3 Oct  4 07:22 UP
+-rw-r--r-- 1 root root       51 Oct  4 07:23 gpu_args.txt
+-rw-r--r-- 1 root root     6261 Oct  4 07:27 log.txt
+-rw-r--r-- 1 root root      556 Oct  4 07:27 new_1280x800_meta.json
+-rw-r--r-- 1 root root      556 Oct  4 07:27 new_meta.json
+-rw-r--r-- 1 root root      556 Oct  4 07:27 old_1280x800_meta.json
+-rw-r--r-- 1 root root      556 Oct  4 07:27 old_meta.json
+-rw-r--r-- 1 root root     1346 Oct  4 07:27 preview_1280x800.json
+-rw-r--r-- 1 root root 19279709 Oct  4 07:27 preview_1280x800.mp4

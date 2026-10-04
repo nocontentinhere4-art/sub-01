@@ -1,0 +1,69 @@
+{
+ "frames": 1050,
+ "fps": 30,
+ "seconds": 35.0,
+ "bytes": 19279709,
+ "crf": 20,
+ "sides": {
+  "old": {
+   "side": "old",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "overview",
+     "seconds": 15.0,
+     "first": 0,
+     "frames": 450
+    },
+    {
+     "hour": 14,
+     "label": "desk, monitor",
+     "seconds": 10.0,
+     "first": 450,
+     "frames": 300
+    },
+    {
+     "hour": 14,
+     "label": "door corner: fan, skateboard, shoe boxes",
+     "seconds": 10.0,
+     "first": 750,
+     "frames": 300
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 90.6
+  },
+  "new": {
+   "side": "new",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "overview",
+     "seconds": 15.0,
+     "first": 0,
+     "frames": 450
+    },
+    {
+     "hour": 14,
+     "label": "desk, monitor",
+     "seconds": 10.0,
+     "first": 450,
+     "frames": 300
+    },
+    {
+     "hour": 14,
+     "label": "door corner: fan, skateboard, shoe boxes",
+     "seconds": 10.0,
+     "first": 750,
+     "frames": 300
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 75.6
+  }
+ }
+}
