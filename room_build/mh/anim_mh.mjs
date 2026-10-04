@@ -204,10 +204,14 @@ function handsOut(L, rootPos, r) {
   const seg = new THREE.Line3(), q = new THREE.Vector3();
   for (const s of ["L", "R"]) {
     const up = `upperarm01.${s}`, lo = `lowerarm01.${s}`, wr = `wrist.${s}`;
-    for (let it = 0; it < 8; it++) {
-      const W0 = bonePos(L, rootPos, wr), K0 = bonePos(L, rootPos, `finger3-1.${s}`), pts = [W0, W0.clone().lerp(K0, 0.5), K0];
+    for (let it = 0; it < 12; it++) {
+      const W0 = bonePos(L, rootPos, wr), K0 = bonePos(L, rootPos, `finger3-1.${s}`), E0 = bonePos(L, rootPos, lo);
+      const pts = [W0, W0.clone().lerp(K0, 0.5), K0, bonePos(L, rootPos, `finger3-3.${s}`, true), bonePos(L, rootPos, `finger2-3.${s}`, true),
+        bonePos(L, rootPos, `finger5-3.${s}`, true), E0.clone().lerp(W0, 0.5), E0.clone().lerp(W0, 0.8)];
       let corr = new THREE.Vector3();
-      for (const [a, b] of caps) { seg.set(a, b); for (const p of pts) { seg.closestPointToPoint(p, true, q); const d = p.distanceTo(q), need = r + 0.012;
+      // the thigh tapers: radius r*1.3 at the hip joint down to r*0.8 at the knee
+      for (const [a, b] of caps) { seg.set(a, b); for (const p of pts) { const tt = seg.closestPointToPointParameter(p, true); seg.at(tt, q);
+        const d = p.distanceTo(q), need = r * (1.3 - 0.5 * tt) + 0.012;
         if (d < need) { const n = p.clone().sub(q); if (n.lengthSq() < 1e-8) n.set(0, 1, 0); n.normalize(); const c = n.multiplyScalar(need - d); if (c.length() > corr.length()) corr = c; } } }
       if (corr.length() < 0.002) break;
       const Hw = wlq(L, wr), A = bonePos(L, rootPos, up), T = W0.clone().add(corr);

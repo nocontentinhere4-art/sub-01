@@ -22,7 +22,7 @@
   - `room_walk`: in-place walk loop (1.233 s), travel speed 0.67 m/s; the page moves the root along his path.
   - `room_sit_down` (5.5 s): walks in, turns, sits; ends facing +z, hips at (-0.26, 0.62, -0.25) for a chair whose seat
     centre is at (-0.26, -0.13). `room_stand_up` (3 s): from seated (hips at (0, 0.59, -0.12)) to standing.
-    Both keep the hands ON the thighs (HANDSOUT: thigh capsules r 7.5 cm + 1.2 cm skin; the arm moves out).
+    Both keep the hands ON the thighs (HANDSOUT: tapered thigh capsules, r 9.75 cm at the hip to 6 cm at the knee + 1.2 cm skin, checked at the wrist, palm, knuckles, three fingertips and the forearm; the arm moves out).
   - `room_bed_lie` (17 s): sits on the bed edge (legs reach down, LIFT/FEETDOWN), lies back, settles; `room_bed_wake`
     (15.5 s): lying -> sits up on the edge -> stands. Recorded on a ~34 cm bed, lifted by the source hips' height to a
     66 cm mattress.
