@@ -233,6 +233,10 @@ export function createMotion(env){
   const LOCK = {Left: null, Right: null};
   function feet(dt, ctx, st){
     restHeights();
+    // a step other than the walk (onto the bed, off it, onto the chair) has the page's own keys: the floor clamp and the
+    // leg IK fought them and put his legs in the bed. Nor on the bed, lying or on its edge (G3's diagnosis, #63)
+    const onBed = st.goal && (st.goal.anchor === "bedlie" || st.goal.anchor === "bedside") && (st.at === st.goal.anchor || st.step);
+    if ((st.step && st.step.k !== "walk") || onBed) { LOCK.Left = LOCK.Right = null; return; }
     const standing = ["stand", "sill", "walk", "move", "act"].includes(ctx);
     const seated = (ctx === "seat" || ctx === "eat") && st.at === "desk" && !(st.step);
     if (!standing && !seated) { LOCK.Left = LOCK.Right = null; return; }
@@ -440,8 +444,10 @@ export function createMotion(env){
     const st = env.state(), skipR = st.holdW > 0 || st.held;      // a prop hangs on the right hand: it was placed before this
     // on the bed (lying or on its edge), and getting onto or off it, the page moves him continuously itself (room.html
     // lieFit, the turn over, the sit-down keys): bridging those as jumps held his legs in the mattress as he lay back (#63)
+    // and in any step but the walk (sitting down, standing up, the turn, an act) the page moves him on purpose and fast:
+    // bridging that dragged his hips and spine behind it into the desk chair (G3's diagnosis, #63)
     const bed = a => a === "bedlie" || a === "bedside";
-    if (bed(st.at) || (st.step && st.step.k === "pose" && (bed(st.step.to) || bed(st.step.from)))) { SM.clear(); lastRoot = null; return; }
+    if (bed(st.at) || (st.step && st.step.k !== "walk")) { SM.clear(); lastRoot = null; return; }
     for (const name in B) {
       const b = B[name]; if (!b || !b.isBone) continue;
       let s = SM.get(b); if (!s) SM.set(b, s = {q: b.quaternion.clone(), off: Q(), k: 0});

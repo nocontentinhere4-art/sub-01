@@ -44,10 +44,11 @@ Everything below is measured on that model, with #114's motion layer running.
   hidden outright (their triangles left out). Lying on top of it with the phone or music, his feet show, and the model's
   socks have no sole of their own (the slide *is* the sole), so there the slides keep their shape and take the sock's
   white: a closed sock rather than an open shell (`after_phone_feet_h14.jpg`).
-- **#114's motion layer kept his legs in the mattress as he lay down** (up to 1,908 vertices on main c88eade): its pop
-  killer bridges any bone that turns quickly, and lying back is exactly that. One guard in `web/room/boy_motion.js`
-  (`smoothBones`) skips it while he is on the bed, on its edge, or getting onto or off it; the page moves him
-  continuously there itself.
+- **#114's motion layer kept his legs in the mattress as he lay down** (up to 1,908 vertices on main c88eade) and
+  dragged him into the desk chair as he sat down (up to 228). Two guards in `web/room/boy_motion.js`, following G3's
+  diagnosis: the pop killer (`smoothBones`) skips any step but the walk, and while he is on the bed; the foot layer
+  (`feet`) skips any step but the walk, and while he is on the bed (lying or on its edge). The page's own keys move him
+  there. The standing scenes are unchanged (G8's harness: bed 0, chair 0, nothing below the floor).
 - **The page may open while he is already asleep:** then he is under the duvet from the first frame.
 - `penetration()` now measures against the mattress top (0.82, the hard surface) rather than the duvet's: the duvet is
   soft goods and is above him, not under him.
@@ -75,12 +76,12 @@ G8's own scenes, from `python -m tests.visual.harness`: `qa_closeup_bed_14.jpg`,
   music on top of it, back to sleep, getting up from his side), 3 seeds, every vertex every 0.25 s. His head's centre
   stays within 5.0 cm of the pillow's centre asleep, through both turns (7.7 cm is the phone-in-bed clip, which props
   his head up); on his side his head rests on the pillow (gaps −1.4 and +1.4 cm).
-  The chained sweep of every activity has no bed hit left from the bed itself. It still shows, exactly as on main
-  c88eade: his leg through the bed frame as #114's walk clip carries him from the window past the bed's corner (1,698
-  vertices for one frame), and 1–228 chair vertices sitting down at the desk or stretching beside it (#114's seated
-  clips). Those are #114's, reported to its owner.
+  In the chained sweep of every activity the bed and the desk transitions are clean (0–3 chair vertices, as before
+  #114). Two hits remain, exactly as on main c88eade: his leg through the bed frame as #114's walk clip carries him from
+  the window past the bed's corner (1,698 vertices for one frame), and his hand in the chair's back in the stretch
+  beside the desk (160–272). Those are #114's clips, reported to G3.
 - **`perf.txt`** — mid phone profile (390 × 844, DPR 2, CPU ×4): asleep 2.6–3.3 ms of script per frame against main's
   2.1 ms, within the 33 ms a 30 FPS frame has. The cover is reshaped at 10 Hz while he lies still.
-- **Tests** (local: GitHub Actions is down at the account level) — `pytest tests --ignore=tests/visual`: 1135 passed,
+- **Tests** (local: GitHub Actions is down at the account level) — `pytest tests --ignore=tests/visual`: 1156 passed,
   27 skipped (`tests/test_boy_motion.py` included). `pytest tests/visual`: 5 passed. `python -m tests.visual.harness`:
   0 hard failures (bed 0, chair 0 in every scene).
