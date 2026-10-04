@@ -11,7 +11,7 @@ the knees or anywhere else under the cloth.
 | garment | folder | what it is |
 |---|---|---|
 | black cotton hoodie | `assets/hoodie_black/` | a relaxed fit (1.9 cm off the body, the sleeves 1.5 cm and sagging under the arm); hood down (a soft double layer rolled behind the neck and falling down the back), two drawstrings with aglets, kangaroo pocket with sloped openings, a twin-needle topstitch along its top, a stitch line down each side and rolled hems at the openings; ribbed cuffs and hem (gathered); folds shaped as real ones (narrow valleys, round crests): diagonal creases at the inner elbows, soft folds down the upper arms, sagging folds across the belly, stacking above the cuffs, folds falling to the hem, the fleece blousing over the band |
-| dark track trousers | `assets/track_trousers/` | roomy at the seat and the thigh (2.4 cm off the body, less on the inner thigh), easing over the knee and tapering down the shin to the elastic ribbed ankle cuffs, with stacking above them; long soft folds down the front of the thigh, drag lines from the crotch, soft knee folds; one off-white side stripe per leg (one plain stripe: no maker's design) |
+| dark track trousers | `assets/track_trousers/` | roomy at the thigh (2.4 cm off the body, less on the inner thigh; 4.5 mm under the buttocks, the backs of the thighs and the crotch, where he sits), a smooth front drape over the crotch (a height field spanning the dip between the thighs, so it never copies the body's shape there), a short J-shaped fly of topstitching and the centre seam, two soft drag folds from the crotch down the inner thighs, easing over the knee and tapering down the shin to the elastic ribbed ankle cuffs, with stacking above them; long soft folds down the front of the thigh, drag lines from the crotch, soft knee folds; one off-white side stripe per leg (one plain stripe: no maker's design) |
 | white crew socks | `assets/socks_white/` | smooth white cotton, the feet and lower shins 2 mm out; over the toes one soft rounded toe box with no toes of its own (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 16 mm disk of rays, smoothed again and closed once more so nothing enters the skin); slight compression folds at the ankle (1.5 mm); soft creases across the toe box and just behind the strap, where a worn sock bunches; a ribbed cuff under the trouser hem |
 | black slides | `assets/slides_black/` | generic pool slides in matte black rubber: a contoured footbed 2.3 cm under the heel and 1.5 cm at the toe (flat to the ball, then a toe spring), shaped to the sock's underside so the foot sits 1 mm into it, a heel cup and side rims, a 6 mm rounded top edge and a 3 mm bottom edge, about 1 cm wider than the foot and 1.2 cm longer at the toe; faint moulded nubs 3 mm apart on the footbed; one padded strap 7.5 cm front to back from just behind the toes over the forefoot (9 mm thick on top, rounded front and back edges, 2 mm off the sock), moulded into the footbed's sides |
 
@@ -56,13 +56,14 @@ triangles under the clothes are dropped (MakeHuman's delete_verts; their base-me
 `assets/g2/hidden_body_vertices.json`); nothing else in G2's file changes. Materials: the baked colour and normal maps,
 sheen as `KHR_materials_sheen`.
 
-`g2_clip_check.py` plays three of G2's clips (typing at the desk, walking, sitting down) on the dressed GLB in three.js,
-bound by node name as the room page does: `docs/design/clothes-mh/g2_clips.jpg`.
+`g2_clip_check.py` plays G2's clips on the dressed GLB in three.js, bound by node name as the room page does:
+`docs/design/clothes-mh/g2_clips.jpg`, three rows: walking and standing (the trousers' front); on the bed's edge (4 s)
+and lying (12 s) on the bed; sitting down onto the chair and typing on a chair.
 
 **Fit in motion** (`g2_pose_check.py`, `docs/design/clothes-mh/g2_poses.jpg`, numbers in `out/pose_check.json`): the
-dressed GLB posed by G2's clips at COORD A's three moments (seated typing `desk_type_ik` at 3 s, `room_walk` at 0.3 s,
-lying `room_bed_lie` at 12 s), skinned exactly as three.js does, with the chair seat (top 0.505 m, G2's measured contact)
-and the mattress (top 0.66 m) in place; any offending garment vertex is drawn red. It measures cloth inside the body
+dressed GLB posed by G2's clips at COORD A's moments (seated typing `desk_type_ik` at 3 s, `room_walk` at 0.3 s,
+on the bed's edge and lying, `room_bed_lie` at 4 s and 12 s, and `room_sit_down` at its end), skinned exactly as three.js does, with the chair seat (top 0.505 m, G2's measured contact; for `room_sit_down`
+at its chair, seat centre (-0.26, -0.13)) and the mattress (top 0.66 m; x -1.0..0.75, z 0.74..1.99 in the clip's frame) in place; any offending garment vertex is drawn red. It measures cloth inside the body
 (an odd number of skin crossings on two of three rays), separately where that skin is shown (hands, neck, face), and
 cloth below the seat or mattress top or the floor. To sit on the chair, the trousers lie 4.5 mm off the skin under the
 buttocks, the backs and insides of the thighs and the crotch (the source suit's crotch hung up to 5 cm low); the hoodie
@@ -92,7 +93,7 @@ slide are compared on separate photos. A photo of grey slides was rejected for a
 ## Rebuild
 From `room_build/clothes_mh/`, with Blender 4.2:
 
-    mkdir -p g2 && for f in boy_g2.glb boy_g2_rest.json clips_g2/desk_type.glb clips_g2/desk_type_ik.glb clips_g2/room_walk.glb clips_g2/room_sit_down.glb clips_g2/room_bed_lie.glb; do
+    mkdir -p g2 && for f in boy_g2.glb boy_g2_rest.json clips_g2/desk_type.glb clips_g2/desk_type_ik.glb clips_g2/room_walk.glb clips_g2/room_sit_down.glb clips_g2/room_bed_lie.glb clips_g2/room_stand_up.glb; do
       git show origin/preview/mh-motion:room_build/mh/glb/$f > g2/$(basename $f); done   # G2's body and three clips (not committed here)
 
     git clone --depth 1 https://github.com/makehumancommunity/makehuman   # the base mesh, targets, skeleton (CC0 assets)

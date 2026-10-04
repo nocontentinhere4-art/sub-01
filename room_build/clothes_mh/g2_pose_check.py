@@ -23,7 +23,10 @@ NAKED = os.path.join(HERE, "g2", "boy_g2.glb")                     # the full bo
 OUTD = os.path.join(HERE, "out"); os.makedirs(OUTD, exist_ok=True)
 SHEET = os.path.join(HERE, "..", "..", "docs", "design", "clothes-mh", "g2_poses.jpg")
 SEAT_Y, MATTRESS_Y = 0.505, 0.66
-POSES = [("rest", 0.0, None), ("desk_type_ik", 3.0, "seat"), ("room_walk", 0.3, None), ("room_bed_lie", 12.0, "bed")]
+POSES = [("rest", 0.0, None), ("desk_type_ik", 3.0, "seat"), ("room_walk", 0.3, None), ("room_bed_lie", 4.0, "bed"),
+         ("room_bed_lie", 12.0, "bed"), ("room_sit_down", -0.01, "chair")]
+BED_X, BED_Z = (-1.0, 0.75), (0.74, 1.99)                            # the bed in room_bed_lie's frame (COORD A)
+CHAIR_C = np.array([-0.26, 0.0, -0.13])                             # room_sit_down's chair: seat centre (G2's README)
 SEAT_T = 0.05                                                        # the seat is a 5 cm slab (a chair: nothing under it)
 INSIDE = 0.002                                                       # more than 2 mm behind the skin counts
 
@@ -64,6 +67,7 @@ def pose_matrices(clip, t):
         nm = cj["nodes"][ch["target"]["node"]]["name"]; i = name_ix.get(nm)
         if i is None: continue
         sm = an["samplers"][ch["sampler"]]; x = G.accessor(cj, cb, sm["input"]); y = G.accessor(cj, cb, sm["output"])
+        if t < 0: t = float(x.max()) + t
         k = int(np.clip(np.searchsorted(x, t) - 1, 0, len(x) - 2)); f = float(np.clip((t - x[k]) / max(x[k + 1] - x[k], 1e-9), 0, 1))
         if ch["target"]["path"] == "rotation":
             a, b = Quaternion((y[k][3], *y[k][:3])), Quaternion((y[k + 1][3], *y[k + 1][:3]))
@@ -161,8 +165,12 @@ for clip, t, contact in POSES:
                 c = hips + fwd * 0.05; side = np.array([-fwd[2], 0, fwd[0]])
                 inbox = (np.abs((P - c) @ fwd) < 0.16) & (np.abs((P - c) @ side) < 0.2) & (P[:, 1] > SEAT_Y - SEAT_T)
                 seat = np.where(inbox, np.maximum(0, SEAT_Y - P[:, 1]), 0)
+            elif contact == "chair":
+                inbox = (np.abs(P[:, 0] - CHAIR_C[0]) < 0.22) & (np.abs(P[:, 2] - CHAIR_C[2]) < 0.22) & (P[:, 1] > SEAT_Y - SEAT_T)
+                seat = np.where(inbox, np.maximum(0, SEAT_Y - P[:, 1]), 0)
             elif contact == "bed":
-                seat = np.maximum(0, MATTRESS_Y - P[:, 1])
+                onbed = (P[:, 0] > BED_X[0]) & (P[:, 0] < BED_X[1]) & (P[:, 2] > BED_Z[0]) & (P[:, 2] < BED_Z[1]) & (P[:, 1] > MATTRESS_Y - 0.08)   # its top 8 cm
+                seat = np.where(onbed, np.maximum(0, MATTRESS_Y - P[:, 1]), 0)
             if os.environ.get("DIAG") and contact == "seat" and (seat > 0.002).any():
                 rb = MESHES["body"][0]["P"]; rbvh = BVHTree.FromPolygons([Vector(x) for x in rb], [tuple(int(x) for x in f) for f in FULL_BODY_I])
                 rd = [rbvh.find_nearest(Vector(x))[3] for x in pr["P"][seat > 0.002]]
@@ -171,7 +179,7 @@ for clip, t, contact in POSES:
                       "nearest body y", np.percentile(np.array([x[0][1] for x in pb]), [0, 50, 100]).round(3), "cloth y", np.percentile(P[seat > 0.002][:, 1], [0, 50, 100]).round(3))
                 q = P[seat > 0.002] - hips; print("DIAGS", g, pr["mat"], int((seat > 0.002).sum()), "fwd", np.percentile(q @ fwd, [0, 50, 100]).round(3),
                       "side", np.percentile(q @ np.array([-fwd[2], 0, fwd[0]]), [0, 50, 100]).round(3), "depth", np.percentile(seat[seat > 0.002], [50, 100]).round(4))
-            red = bad | (seat > 0.002 if contact == "seat" else np.zeros(len(P), bool))
+            red = bad | (seat > 0.002 if contact else np.zeros(len(P), bool))
             if os.environ.get("DIAG") and bad.any():
                 heads = np.array([(M[k] @ np.linalg.inv(IBM[k]))[:3, 3] for k in range(len(joints))])
                 near = np.argmin(((P[bad][:, None, :] - heads[None]) ** 2).sum(-1), 1)
@@ -186,7 +194,7 @@ for clip, t, contact in POSES:
         rep["garments"][g] = {"verts": tot, "inside_body_over_2mm": int(sum((r[3] > INSIDE).sum() for r in rows)),
                               "inside_where_skin_shows": int(sum(r[5].sum() for r in rows)),
                               "max_inside_mm": round(1000 * max(float(r[3].max()) for r in rows), 1),
-                              ("below_seat_top_mm" if contact == "seat" else "below_mattress_top_mm" if contact else "below_floor_mm"):
+                              ("below_seat_top_mm" if contact in ("seat", "chair") else "below_mattress_top_mm" if contact else "below_floor_mm"):
                               round(1000 * max(float(r[4].max()) for r in rows), 1) if contact else round(1000 * max(0.0, -min(float(r[0][:, 1].min()) for r in rows)), 1)}
     rep["body_lowest_m"] = round(float(body[:, 1].min()), 4)
     rep["garments_below_floor_mm"] = {g: round(1000 * max(0.0, -float(skinned(MESHES[g][0], M)[:, 1].min())), 1) for g in COL}
@@ -194,17 +202,27 @@ for clip, t, contact in POSES:
         c = hips + fwd * 0.05; side = np.array([-fwd[2], 0, fwd[0]])
         m = (np.abs((body - c) @ fwd) < 0.16) & (np.abs((body - c) @ side) < 0.2) & (body[:, 1] > SEAT_Y - SEAT_T)
         rep["body_below_seat_top_mm"] = round(1000 * max(0.0, SEAT_Y - float(body[m, 1].min())) if m.any() else 0.0, 1)
-    report[clip] = rep; print("POSE", json.dumps(rep))
+    if contact == "bed":
+        inb = (body[:, 0] > BED_X[0]) & (body[:, 0] < BED_X[1]) & (body[:, 2] > BED_Z[0]) & (body[:, 2] < BED_Z[1])
+        rep["body_inside_bed_box_below_8cm_mm"] = round(1000 * max(0.0, MATTRESS_Y - 0.08 - float(body[inb, 1].min())) if inb.any() else 0.0, 1)
+        onb = inb & (body[:, 1] > MATTRESS_Y - 0.08)
+        rep["body_below_mattress_top_mm"] = round(1000 * max(0.0, MATTRESS_Y - float(body[onb, 1].min())) if onb.any() else 0.0, 1)
+    if contact == "chair":
+        inb = (np.abs(body[:, 0] - CHAIR_C[0]) < 0.22) & (np.abs(body[:, 2] - CHAIR_C[2]) < 0.22) & (body[:, 1] > SEAT_Y - SEAT_T)
+        rep["body_below_seat_top_mm"] = round(1000 * max(0.0, SEAT_Y - float(body[inb, 1].min())) if inb.any() else 0.0, 1)
+    report[f"{clip}@{t}"] = rep; print("POSE", json.dumps(rep))
     # the props: floor, and the chair seat or the mattress
     bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 0, 0)); bpy.context.active_object.data.materials.append(MAT_PROP)
     if contact == "seat":
         c = hips + fwd * 0.08; bpy.ops.mesh.primitive_cube_add(size=1, location=(c[0], -c[2], SEAT_Y - SEAT_T / 2))
         o = bpy.context.active_object; o.scale = (0.42, 0.44, SEAT_T); o.rotation_euler[2] = math.atan2(-fwd[2], fwd[0])
         o.data.materials.append(MAT_PROP)
+    elif contact == "chair":
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(CHAIR_C[0], -CHAIR_C[2], SEAT_Y - SEAT_T / 2))
+        o = bpy.context.active_object; o.scale = (0.44, 0.44, SEAT_T); o.data.materials.append(MAT_PROP)
     elif contact == "bed":
-        A = np.concatenate(allP); lo_, hi_ = A.min(0) - 0.25, A.max(0) + 0.25
-        bpy.ops.mesh.primitive_cube_add(size=1, location=((lo_[0] + hi_[0]) / 2, -(lo_[2] + hi_[2]) / 2, MATTRESS_Y / 2))
-        o = bpy.context.active_object; o.scale = (hi_[0] - lo_[0], hi_[2] - lo_[2], MATTRESS_Y); o.data.materials.append(MAT_PROP)
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(sum(BED_X) / 2, -sum(BED_Z) / 2, MATTRESS_Y / 2))
+        o = bpy.context.active_object; o.scale = (BED_X[1] - BED_X[0], BED_Z[1] - BED_Z[0], MATTRESS_Y); o.data.materials.append(MAT_PROP)
     if clip == "rest": continue
     # two views: the whole figure, and close on the contact (the hips / the back on the mattress / the legs walking)
     A = B(np.concatenate(allP)); ctr = (A.min(0) + A.max(0)) / 2; ext = float(np.max(A.max(0) - A.min(0)))
@@ -214,7 +232,7 @@ for clip, t, contact in POSES:
         cd = bpy.data.cameras.new("c"); cd.lens = lens; co = bpy.data.objects.new("c", cd); SC.collection.objects.link(co)
         co.location = Vector(eye); co.rotation_euler = (Vector(tgt) - Vector(eye)).to_track_quat('-Z', 'Y').to_euler(); SC.camera = co
         S_ = 360 if QUICK else 560; SC.render.resolution_x = S_; SC.render.resolution_y = S_
-        f = os.path.join(OUTD, f"pose_{clip}_{view}.png"); SC.render.filepath = f; bpy.ops.render.render(write_still=True); shots.append(f)
+        f = os.path.join(OUTD, f"pose_{clip}_{t}_{view}.png"); SC.render.filepath = f; bpy.ops.render.render(write_still=True); shots.append(f)
         bpy.data.objects.remove(co)
 
 json.dump(report, open(os.path.join(OUTD, "pose_check.json"), "w"), indent=1)

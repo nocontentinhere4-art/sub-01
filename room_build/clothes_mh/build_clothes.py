@@ -548,10 +548,10 @@ def trousers(hem_z):
         d = ease * CM
         d += 0.25 * CM * math.sin(4 * phi + 0.7) * (1 - smooth01(0.0, 2.5, abs(p.z - knee_z)))   # soft knee folds
         # the weight of the fabric: long soft folds falling down the front of the thigh, and drag lines from the crotch
-        thigh = smooth01(knee_z + 0.3, knee_z + 1.2, p.z) * (1 - smooth01(crotch_z, crotch_z + 0.8, p.z))
+        thigh = smooth01(knee_z + 0.3, knee_z + 1.2, p.z) * (1 - smooth01(crotch_z - 0.9, crotch_z - 0.3, p.z))
         d += thigh * (0.35 * CM - 0.95 * CM * crease(p.z + 0.22 * phi, 0.9, 0.12)) * max(0.0, math.cos(phi)) ** 0.5
         drag = smooth01(crotch_z - 1.6, crotch_z - 0.2, p.z) * (1 - smooth01(crotch_z - 0.2, crotch_z + 0.3, p.z)) * inner
-        d += drag * 0.35 * CM * math.sin(2 * math.pi * (p.z * 1.6 + 0.9 * phi))
+        d += drag * 0.35 * CM * math.sin(2 * math.pi * (p.z * 1.6 + 0.9 * phi)) * smooth01(-0.2, 0.3, n.y)   # (not at the front)
         w = smooth01(0.35, 0.6, h) * (1 - smooth01(1.2, 1.7, h))                             # stacking above the cuffs
         d += w * 0.35 * CM * math.sin(2 * math.pi * h / 0.3 + 1.2 * math.sin(2 * phi))
         if h < 0.4: cuff[i] = True; d = 0.35 * CM
@@ -572,13 +572,76 @@ def trousers(hem_z):
     for i, p in enumerate(out):
         nn = Vector(N[i]); x, y, z = p
         zone = smooth01(knee_z + 0.4, knee_z + 1.0, z) * (1 - smooth01(crotch_z + 0.5, crotch_z + 1.1, z))
-        k = zone * max(min(1.0, 1.6 * max(0.0, nn.y)), 1 - smooth01(0.35, 0.9, abs(x)), min(1.0, 1.6 * max(0.0, -nn.z)))
+        k = zone * max(min(1.0, 1.6 * max(0.0, nn.y)), (1 - smooth01(0.35, 0.9, abs(x))) * smooth01(-0.45, -0.1, nn.y), min(1.0, 1.6 * max(0.0, -nn.z)))
         if k <= 0: continue
         loc, nor, _, d = BODY_BVH.find_nearest(Vector(p))
         if d > 0.45 * CM: out[i] = p * (1 - k) + np.array(loc + nor * 0.45 * CM) * k
     set_verts(o, out)
     for poly in o.data.polygons: poly.material_index = 1 if all(cuff[v] for v in poly.vertices) else 0
     push_out(o, 0.35 * CM)
+    # the front of the crotch and the tops of the thighs: a smooth drape, as real trousers fall over the body there (they
+    # never follow its shape). The front is a height field (how far forward, over x and height): the cloth goes to the
+    # further forward of the body's front widened (4 cm across) and smoothed (plus 7 mm), and the cloth's own front smoothed
+    # (2 cm); vertices move only forward or back, so nothing folds
+    P = verts_np(o); Nn = normals_np(o)
+    fz = [i for i, p in enumerate(P) if (Nn[i][1] < -0.1 or (abs(p[0]) < 0.4 and Nn[i][1] < 0.35)) and crotch_z - 0.8 < p[2] < hem_z + 0.4 and abs(p[0]) < 1.35]
+    gx = np.arange(-1.5, 1.5001, 0.1); gz = np.arange(crotch_z - 1.0, hem_z + 0.6, 0.1)
+    E = np.full((len(gz), len(gx)), np.nan)
+    for a, z in enumerate(gz):
+        for b, x in enumerate(gx):
+            h = BODY_BVH.ray_cast(Vector((x, -6, z)), Vector((0, 1, 0)), 8)
+            if h[0] is not None: E[a, b] = -h[0].y                     # how far forward the body is
+    def blur(F, sig, iters=1):
+        k = np.exp(-0.5 * (np.arange(-3, 4) / sig) ** 2); k /= k.sum(); F = F.copy()
+        for _ in range(iters):
+            F = np.apply_along_axis(lambda r: np.convolve(np.pad(r, 3, mode="edge"), k, "valid"), 1, F)
+            F = np.apply_along_axis(lambda c: np.convolve(np.pad(c, 3, mode="edge"), k, "valid"), 0, F)
+        return F
+    Ed = np.where(np.isnan(E), -9.0, E); D = Ed.copy()
+    for da in (-1, 0, 1):                                             # widen: 1 cm up and down, 4 cm across (the front panel
+        for db in range(-4, 5):                                       # spans the dip between the thighs at the crotch)
+            D = np.maximum(D, np.roll(np.roll(Ed, da, 0), db, 1) - 0.004 * abs(db))
+    D = np.where(D < -8, np.nan, D); Dn = np.where(np.isnan(D), np.nanmin(D), D); Ds = np.where(np.isnan(D), np.nan, blur(Dn, 1.2, 2))
+    C = np.zeros_like(E); W_ = np.zeros_like(E)                       # the cloth's own front, binned
+    for i in fz:
+        a = int(round((P[i][2] - gz[0]) / 0.1)); b = int(round((P[i][0] - gx[0]) / 0.1))
+        if 0 <= a < len(gz) and 0 <= b < len(gx): C[a, b] += -P[i][1]; W_[a, b] += 1
+    C = np.where(W_ > 0, C / np.maximum(W_, 1), np.nan)
+    for _ in range(6):                                                # fill the empty cells from their neighbours
+        F = np.where(np.isnan(C), 0, C); Wn = (~np.isnan(C)).astype(float)
+        S = sum(np.roll(np.roll(F, da, 0), db, 1) for da in (-1, 0, 1) for db in (-1, 0, 1))
+        N_ = sum(np.roll(np.roll(Wn, da, 0), db, 1) for da in (-1, 0, 1) for db in (-1, 0, 1))
+        C = np.where(np.isnan(C) & (N_ > 0), S / np.maximum(N_, 1), C)
+    Cs = blur(np.where(np.isnan(C), np.nanmean(C), C), 2.0, 2)
+    def sample(F, x, z):
+        fa = (z - gz[0]) / 0.1; fb = (x - gx[0]) / 0.1; a0_ = int(np.clip(np.floor(fa), 0, len(gz) - 2)); b0_ = int(np.clip(np.floor(fb), 0, len(gx) - 2))
+        ta, tb = min(max(fa - a0_, 0), 1), min(max(fb - b0_, 0), 1)
+        return (F[a0_, b0_] * (1 - ta) * (1 - tb) + F[a0_ + 1, b0_] * ta * (1 - tb) + F[a0_, b0_ + 1] * (1 - ta) * tb + F[a0_ + 1, b0_ + 1] * ta * tb)
+    for i in fz:
+        x, y, z = P[i]
+        w = (1 - smooth01(0.95, 1.35, abs(x))) * smooth01(crotch_z - 0.8, crotch_z - 0.45, z) * (1 - smooth01(hem_z, hem_z + 0.4, z)) * max(smooth01(-0.1, -0.4, Nn[i][1]), (1 - smooth01(0.25, 0.4, abs(x))) * smooth01(0.35, 0.1, Nn[i][1]))
+        env = sample(Ds, x, z); own = sample(Cs, x, z)
+        tgt = own if np.isnan(env) else max(own, env + 0.7 * CM)
+        P[i][1] = y * (1 - w) + (-tgt) * w
+    set_verts(o, P)
+    # where the legs meet (the crotch junction) the snug pull towards the nearest skin flips between the two legs and
+    # crumples a few faces: relaxed smooth there
+    P = verts_np(o); cj = [i for i, p in enumerate(P) if abs(p[0]) < 0.5 and crotch_z - 0.9 < p[2] < crotch_z + 0.35]
+    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
+    for _ in range(14): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in cj], factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+    P = verts_np(o); Nn = normals_np(o)
+    for i in fz:
+        x, z = P[i][0], P[i][2]; d = 0.0
+        for sg in (1, -1):                                              # from beside the crotch down the inner thigh
+            ax_, az_ = sg * 0.14, crotch_z + 0.05; bx_, bz_ = sg * 0.5, crotch_z - 0.95
+            vx, vz = bx_ - ax_, bz_ - az_; L2 = vx * vx + vz * vz; t = max(0.0, min(1.0, ((x - ax_) * vx + (z - az_) * vz) / L2))
+            dist = math.hypot(x - ax_ - t * vx, z - az_ - t * vz); fade = math.sin(math.pi * t) ** 0.6
+            d += fade * (-0.38 * math.exp(-(dist / 0.07) ** 2) + 0.16 * math.exp(-((dist - 0.13) / 0.07) ** 2))
+        P[i] = P[i] + Nn[i] * d * CM
+    set_verts(o, P)
+    push_out(o, 0.3 * CM, iters=1)
+    print("TROUSERS front drape vertices:", len(fz), "crotch junction relaxed:", len(cj))
     # the side stripe: one 1.4 cm band down the outside of each leg, on the fabric
     bvh = bvh_of(o); stripes = []
     for sgn in (1, -1):
@@ -593,6 +656,19 @@ def trousers(hem_z):
             across = Vector((0, 1, 0)); across = (across - nor * across.dot(nor)).normalized()
             rows.append([loc + nor * 0.12 * CM + across * (0.7 * CM * u) for u in (-1, 0, 1)])
         stripes.append(grid_obj("stripe", [list(r) for r in zip(*rows)], MAT["stripe"], flip=sgn < 0))
+    # a short fly: a J of topstitching on his left of the centre front, from under the hoodie's hem down and round to the
+    # crotch seam, and the centre seam below it; tonal thread, a raised line on the fabric
+    def on_front(xz):
+        out_ = []
+        for x, z in xz:
+            h = bvh.ray_cast(Vector((x, -6, z)), Vector((0, 1, 0)))
+            if h[0] is not None: out_.append(h[0] + h[1] * 0.03 * CM)
+        return out_
+    ztop, zturn, zbot = hem_z + 0.2, crotch_z + 0.55, crotch_z + 0.18
+    jx = [(0.3, ztop - (ztop - zturn) * k / 10) for k in range(11)] + \
+         [(0.3 * math.cos(math.pi / 2 * k / 8), zturn - (zturn - zbot) * math.sin(math.pi / 2 * k / 8)) for k in range(1, 9)]
+    stripes.append(tube("fly", on_front(jx), 0.05 * CM, MAT["cord"], n=6))
+    stripes.append(tube("seam", on_front([(0.0, ztop - (ztop - crotch_z + 0.1) * k / 14) for k in range(15)]), 0.045 * CM, MAT["cord"], n=6))
     return o, stripes
 
 
