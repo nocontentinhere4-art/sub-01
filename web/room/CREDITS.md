@@ -161,6 +161,26 @@ set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somew
 
     node build_food.mjs "<kit>/Models/GLB format" ../web/room/food.glb      # 84 KB
 
+## The Tripo props: made with Tripo (paid API)
+`props_tripo.glb` holds four props **made with Tripo (paid API)** (https://www.tripo3d.ai): text-to-model, model
+`P1-20260311` (low-poly), PBR textures at standard quality, generated on 2026-10-04 from text prompts asking for plain
+objects with no logos or text. They are AI-generated content under Tripo's terms of service, not a Creative Commons
+licence. Each prop and its Tripo task id:
+
+| prop | where | task |
+|---|---|---|
+| ramen bowl with chopsticks, matte ceramic | the ramen he eats at the desk (it replaces Kenney's `bowl-broth`; the empty bowl is still Kenney's `bowl`) | `5872260f-8308-4f71-b461-da00a9bdd2bf` |
+| ceramic mug | the mug on the desk (the modelled one is cut out of the static room by the page) | `277633c0-2bfe-4b38-ae60-0bcaa9445a0f` |
+| over-ear headphones | the pair on the wall hook (inside the room's `headphones` node; the pair he wears is still procedural) | `6a2cac63-a839-4d0c-8e0f-53c67e641321` |
+| white sneakers | a pair on the floor in the front right corner | `62e8af56-3302-4a6a-9fe4-d4af8bd5d821` |
+
+`room_build/build_tripo.mjs` scales each to real size (origin at the centre of its base), turns it, cuts its textures
+to 1024 px WebP and meshopt-compresses the lot (3.8k–4k triangles a prop). The page puts them in place
+(`web/room.html`, "Tripo props"); `?props=old` shows the earlier ones. The raw downloads are not committed. Rebuild
+(from `room_build/`, with the four raw GLBs in a folder named as in the script):
+
+    node build_tripo.mjs <folder> ../web/room/props_tripo.glb
+
 ## His motion: clips generated with NVIDIA ARDY (#98 G3)
 `boy_m_*.glb` (listed in `boy_m_manifest.json`) are motions generated from text prompts with **ARDY**
 (https://github.com/nv-tlabs/ardy, NVIDIA; the paper's authors are credited there), checkpoint

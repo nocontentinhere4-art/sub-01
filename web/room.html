@@ -449,6 +449,46 @@ function readMarkers(root){
   if (lmp) SURF.lamp = {c:lmp.getWorldPosition(p).toArray()};
 }
 
+// ---- Tripo props: four props made with Tripo's paid API (web/room/props_tripo.glb, room_build/build_tripo.mjs), each
+// in metres with its origin at its base centre. They take the place of the Kenney ramen bowl (food.glb), the desk mug and
+// the headphones on the wall hook (both in room_clean.glb), and add white sneakers on the floor. ?props=old: the old ones
+const TRIPO = !OLD_ROOM && new URLSearchParams(location.search).get("props") !== "old";
+const MUG_AT = new THREE.Vector3(-0.50, 0.97, -0.98);       // props_hard.py's MUG on the desk top (DTOP)
+const SNEAKERS_AT = [1.70, 0.16, 1.32, -2.6];               // x, floor, z, turn: the front right corner, off his routes
+function cutBox(root, box){                                 // drop a merged mesh's triangles lying wholly inside a world box
+  const v = new THREE.Vector3();
+  root.traverse(o => { if (!o.isMesh || !o.geometry.index) return;
+    o.updateMatrixWorld(true); const pos = o.geometry.attributes.position, idx = o.geometry.index, keep = [];
+    const inside = i => box.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+    for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+      if (!(inside(a) && inside(b) && inside(c))) keep.push(a, b, c); }
+    if (keep.length < idx.count) o.geometry.setIndex(keep); });
+}
+if (TRIPO) Promise.all([load("room/props_tripo.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
+  const T = {}; for (const c of g.scene.children) T[c.name.replace(/^T_/, "")] = c;
+  for (const o of Object.values(T)) o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; } });
+  // the mug: the modelled one (body, tea and handle) is cut out of the static room, the new one stands in its place
+  const st = room.getObjectByName("room_static");
+  if (st) cutBox(st, new THREE.Box3(new THREE.Vector3(MUG_AT.x - 0.045, MUG_AT.y - 0.002, MUG_AT.z - 0.045),
+    new THREE.Vector3(MUG_AT.x + 0.085, MUG_AT.y + 0.1, MUG_AT.z + 0.045)));
+  T.mug.position.copy(MUG_AT); scene.add(T.mug);
+  // the headphones on the hook: the new pair fills the old one's box inside its node, so taking them off still works
+  const hp = room.getObjectByName("headphones"), old = room.getObjectByName("headphones_mesh");
+  if (hp && old) { hp.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(old), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+    const w = new THREE.Group(); w.add(T.headphones); scene.add(w);
+    w.scale.setScalar(s.y / 0.20); w.position.set(c.x, b.min.y, c.z);       // (T_headphones is 20 cm tall)
+    hp.attach(w); old.visible = false; }
+  // the sneakers, a pair on the floor
+  T.sneakers.position.set(SNEAKERS_AT[0], SNEAKERS_AT[1], SNEAKERS_AT[2]); T.sneakers.rotation.y = SNEAKERS_AT[3]; scene.add(T.sneakers);
+  // the ramen: food.glb's models are scaled by KS (0.30 for a bowl); this one is already in metres. (Named like the
+  // Kenney model it replaces, F_bowl-broth: the visual QA hides the dishes of earlier scenes by that prefix)
+  const ramen = new THREE.Group(); ramen.name = "F_bowl-broth"; T.ramen.scale.setScalar(1 / 0.30); ramen.add(T.ramen);
+  const swap = () => { if (!FOOD.models) return setTimeout(swap, 200); FOOD.models["bowl-broth"] = ramen; }; swap();
+}).catch(e => console.warn("props_tripo.glb", e));
+
 load("room/boy.glb").then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
   boy.traverse(o => {
