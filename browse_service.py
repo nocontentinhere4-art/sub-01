@@ -48,7 +48,9 @@ ENV_KEEP = ("PATH", "HOME", "LANG", "TZ", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH", 
             # context and Chromium's environment never carries them (browse.CHROMIUM_ENV)
             "SUB01_SESSION_TIKTOK", "SUB01_SESSION_YOUTUBE",
             # #89: YouTube's Data API key (sent in a header only, never logged) and the site URL embeds see as referrer
-            "YOUTUBE_API_KEY", "YOUTUBE_DAILY_UNITS", "SUB01_SITE_URL")
+            "YOUTUBE_API_KEY", "YOUTUBE_DAILY_UNITS", "SUB01_SITE_URL",
+            # the open web only (browse.OPEN_WEB_ONLY, the browser on the owner's PC)
+            "BROWSE_OPEN_WEB_ONLY")
 
 
 class BrowserDown(Exception):
@@ -464,6 +466,9 @@ async def serve(host, port):
     await runner.setup()
     await web.TCPSite(runner, host, port).start()
     print(f"browse service on {host}:{port} (pid {os.getpid()})", flush=True)
+    import browse
+    if browse.OPEN_WEB_ONLY:
+        print(f"browse service: {browse.NOTE_OPEN_WEB} (BROWSE_OPEN_WEB_ONLY=1)", flush=True)
     stop = asyncio.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:

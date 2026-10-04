@@ -490,6 +490,12 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Chromium runs in `browse_service.py` (child process, memory watchdog `BROWSE_MEM_MB` 1200, exits if the parent
   dies), or as its own Railway service via `BROWSE_SERVICE_URL` + `BROWSE_SERVICE_TOKEN`. Down = "browser
   restarting" on the page; the brain loop does not stop (`supervised()` tasks). `/api/decisions` lists choices.
+- On the owner's own PC (2026-10-04): `Dockerfile.browse` builds the browser alone, with `BROWSE_OPEN_WEB_ONLY=1`
+  fixed: no request to YouTube or TikTok at all (`browse.VIDEO_SITE`, aborted in `Guard.route`), no logged-in
+  session, no video feed (`NOTE_OPEN_WEB` in `/api/screens`). The server reaches it through a tunnel
+  (`BROWSE_SERVICE_URL=https://…`, no trailing slash, + the same long `BROWSE_SERVICE_TOKEN`); removing
+  `BROWSE_SERVICE_URL` goes back to the child browser on Railway. While the PC is off the screens say "browser
+  restarting". The step-by-step guide for the owner is in the project's files (guides/browser-on-my-pc.md).
 
 ## Music on Spotify (#68, PR `feature/music`)
 - Legal frame: **Spotify's official embed player only** (`open.spotify.com/embed/track/<id>`, compact 80 px). Each

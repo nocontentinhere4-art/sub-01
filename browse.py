@@ -509,6 +509,21 @@ HOST_DAY_CAP = 20                      # pages a day on one site (the video play
 RECIPE_HOST = re.compile(r"(^|\.)(kingarthurbaking|justonecookbook|seriouseats|allrecipes|recipetineats|bbcgoodfood|"
                          r"foodnetwork|delish|tasty|bonappetit|epicurious|food52|thekitchn|simplyrecipes)\.(com|co|co\.uk)$",
                          re.I)                 # cooking sites: only while he is hungry or ordering (#89 teen)
+# The browser on the owner's own PC (Dockerfile.browse, BROWSE_SERVICE_URL): the open web only. No YouTube or TikTok
+# request at all (pages, embeds, thumbnails, video files), no logged-in session, no video feed: a home IP must not be
+# used to reach the sites whose Terms forbid automated access.
+OPEN_WEB_ONLY = os.environ.get("BROWSE_OPEN_WEB_ONLY") == "1"
+VIDEO_SITE = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|ytimg\.com|googlevideo\.com|"
+                        r"tiktok\.com|tiktokcdn\.com|tiktokcdn-us\.com|tiktokv\.com|ttwstatic\.com|ibytedtos\.com|"
+                        r"byteoversea\.com)$", re.I)
+NOTE_OPEN_WEB = "this browser runs on the open web only: no YouTube or TikTok"
+
+
+def video_site_off(host):
+    """OPEN_WEB_ONLY and `host` belongs to YouTube or TikTok."""
+    return OPEN_WEB_ONLY and bool(VIDEO_SITE.search((host or "").rstrip(".")))
+
+
 HOST_CAP_FREE = ("youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com", "tiktok.com", "www.tiktok.com")
 VIDEO_TOPICS = ["Toyota GR Supra", "Tokyo night walk", "Elden Ring", "Premier League highlights", "One Piece",
                 "train window Japan", "lo-fi music", "space documentary", "cat videos", "Studio Ghibli"]
@@ -610,6 +625,7 @@ class Guard:
         u = urllib.parse.urlsplit(url)
         if (u.scheme not in ("http", "https") or u.port not in (None, 80, 443) or not host_ok(u.hostname or "")
                 or req.resource_type in ("media", "websocket", "eventsource", "manifest")
+                or video_site_off(u.hostname)
                 or (req.is_navigation_request() and SKIP_EXT.search(u.path))
                 or not await self.resolves_public(u.hostname)):
             return await route.abort()
@@ -683,6 +699,8 @@ class Browser:
     def __init__(self, state=None, rng=None, proxy=None, ignore_tls=False, decide=False, sessions=None):
         s = state or {}
         self.sessions = SE.load_sessions() if sessions is None else sessions   # #60: logged out without the env vars
+        if OPEN_WEB_ONLY:
+            self.sessions = {}                              # never a logged-in YouTube / TikTok from the owner's PC
         self.login_redirect = None                          # a logged-in context was sent to a login page
         self.decide = decide                                # True: the brain picks the next action (act())
         self.log = s.get("log", [])                         # visits shown: [{t, device, title, url, host, why}]
@@ -1304,6 +1322,9 @@ class Browser:
         come from the official oEmbed APIs and pass video_text_ok. The first one is shown and played muted; the rest
         are the next options."""
         cands = []
+        if OPEN_WEB_ONLY:
+            self.feed_note = NOTE_OPEN_WEB
+            return False
         if (kind == "shorts" or kind == "youtube") and not self.yt.player_up():
             self.feed_note = self.yt.player_note()              # #89 live: YouTube refuses the player: other things
             return False
@@ -1535,6 +1556,9 @@ class Browser:
         public, not age-restricted, plays in JP), then opened in the official youtube-nocookie embed. Without a key
         it cannot be checked, so it is not played."""
         url = YT.video_url(vid, short)
+        if OPEN_WEB_ONLY:
+            self.last_skip = f"a YouTube video link ({NOTE_OPEN_WEB})"
+            return False
         if not YT.key():
             self.last_skip = "a YouTube video link (no API key to check it)"
             return False
