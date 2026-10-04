@@ -11,6 +11,6 @@
   {"label": "mug", "seconds": 3, "cam": {"pos": [-0.30, 1.22, -0.62], "target": [-0.50, 1.02, -0.98]}},
   {"label": "headphones", "seconds": 3, "cam": {"pos": [-0.20, 1.45, -0.80], "target": [-0.24, 1.36, -1.40]}},
   {"label": "sneakers", "seconds": 3, "cam": {"pos": [1.05, 0.80, 0.75], "target": [1.70, 0.22, 1.32]}},
-  {"label": "ramen", "seconds": 3, "closeup": "hands"}
+  {"label": "ramen", "seconds": 3, "cam": {"pos": [-0.75, 1.55, -0.45], "target": [-1.30, 1.05, -1.05]}}
  ]
 }
