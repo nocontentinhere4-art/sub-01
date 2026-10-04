@@ -369,7 +369,7 @@ export function createMotion(env){
     // the bowl in front of the chest, held in the left hand: a bit left, a hand's height off the desk. The hand is under
     // it, palm up, fingers forward and a little inwards; the bowl stands on the middle of the palm, so no finger is inside it
     B.Spine.getWorldPosition(_t).addScaledVector(FW, 0.27).addScaledVector(RT, -0.13).addScaledVector(UP, -0.20 + 0.004 * Math.sin(M.T * 0.9));
-    _t.y = Math.max(_t.y, 1.02);                                                            // the wrist clear of the desk top (0.97)
+    _t.y = Math.max(_t.y, 1.03);                                                            // the wrist clear of the desk top (0.97; deskGuard lifts below 1.03)
     B.LeftArm.getWorldPosition(_p).addScaledVector(UP, -0.4).addScaledVector(RT, -0.35);
     ik(B.LeftArm, B.LeftForeArm, B.LeftHand, _t, _p, 1, false);
     env.touch(B.LeftHand); _b.copy(FW).addScaledVector(RT, 0.35).normalize();                // fingers forward, a little inwards
