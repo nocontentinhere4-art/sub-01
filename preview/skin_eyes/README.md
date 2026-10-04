@@ -11,6 +11,11 @@ the redness is local (nose tip, ear rims, a small cheek patch); the base tone is
 MakeHuman's eye helper sphere (12.7 mm; the full sphere poked through the lids, which made the eyes look stuck on);
 a dark lash line runs along each upper lid margin, so the eyes sit in the head.
 
+Third pass ("as realistic as possible"): the pores are dense, soft pits sized by region (about 1.4 mm apart on the
+nose and inner cheeks, 0.9 mm on the forehead and temples), not sparse specks; the T-zone (forehead, nose, chin)
+carries a stronger, tighter specular, like sebum under a window; the tear line on the lower lid is wetter (a brighter
+clearcoat highlight) and stays on the lid margin.
+
 - `skin_eyes.js`: the materials (three.js r169) and `buildHead(THREE, data)`.
   - Skin: per-channel wrap lighting past the terminator (red wraps furthest), red translucency where the skin is
     thin (ears, the nose's rim), a procedural pore bump (about 1 mm cells) that fades out once a pixel is wider than a

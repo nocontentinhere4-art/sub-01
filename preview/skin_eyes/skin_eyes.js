@@ -166,7 +166,7 @@ void RE_IndirectDiffuse_Physical`);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.013, 0.011), sk_lash);`)
       // the T-zone: tighter and stronger specular; cavities: less specular
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, 0.36, vSkin.y);
+        roughnessFactor = mix(roughnessFactor, 0.31, vSkin.y);
         roughnessFactor = mix(roughnessFactor, 0.30, vSkin.w);`)
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
         {
@@ -176,8 +176,9 @@ void RE_IndirectDiffuse_Physical`);
           float k = uPore * (1.0 - smoothstep(0.00025, 0.0006, px));
           float h = 0.0;
           if (k > 0.0) {
-            float c = sk_cell(vObj * 900.0);
-            h = -smoothstep(0.32, 0.0, c) * 0.000042 * (1.0 - vSkin.w);
+            float pf = mix(1150.0, 700.0, vSkin.y);                     // pore spacing: ~0.9 mm, ~1.4 mm on the nose
+            float c = sk_cell(vObj * pf);
+            h = -smoothstep(0.5, 0.05, c) * mix(0.00002, 0.000036, vSkin.y) * (1.0 - vSkin.w);   // soft, dense pits, not specks
             h += (sk_noise(vObj * vec3(2400.0, 700.0, 2400.0)) - 0.5) * 0.000025;
             h *= k;
           }
@@ -188,11 +189,13 @@ void RE_IndirectDiffuse_Physical`);
           normal = normalize(abs(det) * normal - grad);
         }`)
       // the cavities hold less ambient light too (a baked AO that does not need shadows)
+      .replace("#include <lights_physical_fragment>", `#include <lights_physical_fragment>
+        material.specularColor *= 1.0 + 0.7 * vSkin.y;                    // more sheen where the skin is oily`)
       .replace("#include <aomap_fragment>", `#include <aomap_fragment>
         reflectedLight.indirectDiffuse *= 1.0 - 0.45 * vSkin.z;
         reflectedLight.indirectSpecular *= 1.0 - 0.6 * vSkin.z;`);
   };
-  m.customProgramCacheKey = () => "skin-v2";
+  m.customProgramCacheKey = () => "skin-v3";
   return m;
 }
 
@@ -276,8 +279,8 @@ export function buildHead(THREE, data, {iris = [0.24, 0.13, 0.06]} = {}){
   const ballMat = eyeballMaterial(THREE, map), corneaMat = corneaMaterial(THREE);
   const loopsN = {};
   const lashMat = new THREE.MeshStandardMaterial({color: new THREE.Color(0.02, 0.016, 0.014), roughness: 0.6});
-  const tearMat = new THREE.MeshPhysicalMaterial({color: new THREE.Color(0.86, 0.70, 0.66), roughness: 0.04, metalness: 0, clearcoat: 1,
-    clearcoatRoughness: 0.02, transparent: true, opacity: 0.4, envMapIntensity: 1.4});
+  const tearMat = new THREE.MeshPhysicalMaterial({color: new THREE.Color(0.9, 0.78, 0.75), roughness: 0.02, metalness: 0, clearcoat: 1,
+    clearcoatRoughness: 0.01, transparent: true, opacity: 0.6, envMapIntensity: 2.2, specularIntensity: 1});
   const carMat = new THREE.MeshPhysicalMaterial({color: new THREE.Color(0.80, 0.50, 0.48), roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.08});
   for (const [side, e] of Object.entries(data.eyes)) {
     // the ball: 0.85 of the helper sphere (12.7 mm; MakeHuman's lid margins sit at 0.81-0.91 of it, so a full-size
@@ -303,7 +306,7 @@ export function buildHead(THREE, data, {iris = [0.24, 0.13, 0.06]} = {}){
     const P = geo.attributes.position, v = new THREE.Vector3();
     const margin = up => { const bins = new Map();
       for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const q = v.clone().sub(C);
-        if (q.z < r * 0.35 || Math.abs(q.x) > r * 0.95 || (up ? q.y < r * 0.05 : q.y > -r * 0.12) || q.length() > r * 1.4) continue;
+        if (q.z < r * 0.35 || Math.abs(q.x) > r * 0.95 || (up ? q.y < r * 0.05 : q.y > -r * 0.3) || q.length() > r * 1.4) continue;
         const k = Math.round(q.x / 0.0015), o = bins.get(k); if (!o || q.length() < o.distanceTo(C)) bins.set(k, v.clone()); }
       return [...bins.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]); };
     const lower = margin(false).slice(1, -1), upper = margin(true);
@@ -315,7 +318,7 @@ export function buildHead(THREE, data, {iris = [0.24, 0.13, 0.06]} = {}){
     }
     if (lower.length > 4) {
       const pts = lower.map(p => p.clone().lerp(C, 0.03));
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.00030, 6, false), tearMat);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.00036, 6, false), tearMat);
       tube.name = "tear_" + side; tube.renderOrder = 3; group.add(tube);
       // the caruncle: the pink corner on the nose side
       const inner = (Math.sign(C.x) > 0 ? lower[0] : lower[lower.length - 1]);
