@@ -1,4 +1,4 @@
-"""The browser on the owner's own PC (BROWSE_OPEN_WEB_ONLY=1, Dockerfile.browse): the open web only. No
+"""BROWSE_OPEN_WEB_ONLY=1 (optional on the owner's PC, Dockerfile.browse): the open web only. No
 request to YouTube or TikTok at all (pages, embeds, thumbnails, video files), no logged-in session, no video feed.
 
     python -m pytest tests/test_open_web_only.py -q

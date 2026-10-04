@@ -509,9 +509,9 @@ HOST_DAY_CAP = 20                      # pages a day on one site (the video play
 RECIPE_HOST = re.compile(r"(^|\.)(kingarthurbaking|justonecookbook|seriouseats|allrecipes|recipetineats|bbcgoodfood|"
                          r"foodnetwork|delish|tasty|bonappetit|epicurious|food52|thekitchn|simplyrecipes)\.(com|co|co\.uk)$",
                          re.I)                 # cooking sites: only while he is hungry or ordering (#89 teen)
-# The browser on the owner's own PC (Dockerfile.browse, BROWSE_SERVICE_URL): the open web only. No YouTube or TikTok
-# request at all (pages, embeds, thumbnails, video files), no logged-in session, no video feed: a home IP must not be
-# used to reach the sites whose Terms forbid automated access.
+# Optional on the owner's own PC (Dockerfile.browse, BROWSE_SERVICE_URL): the open web only. No YouTube or TikTok
+# request at all (pages, embeds, thumbnails, video files), no logged-in session, no video feed. Off by default: the
+# owner allowed YouTube and TikTok from that PC (2026-10-04), the same way as on Railway.
 OPEN_WEB_ONLY = os.environ.get("BROWSE_OPEN_WEB_ONLY") == "1"
 VIDEO_SITE = re.compile(r"(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|ytimg\.com|googlevideo\.com|"
                         r"tiktok\.com|tiktokcdn\.com|tiktokcdn-us\.com|tiktokv\.com|ttwstatic\.com|ibytedtos\.com|"
