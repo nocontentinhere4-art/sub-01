@@ -20,9 +20,9 @@ for the preview). The page's `?debug` surface markers (magenta dots) are hidden 
 | phone, charging | face down on the headboard's cap, past the window; its cable down the bed's side to a new wall socket by the floor | modelled (no logo; a generic two-lens camera) | 69 x 140 x 8 mm | 0.9k + 1.1k cable + 0.6k socket |
 | three paperbacks and a magazine | the floor at the bed's foot, by the backpack, spines to the room; the magazine leans on the bed base | modelled: soft covers round rounded spines, their front boards curling a little at the fore edge, cream page blocks showing at the head, tail and fore edge; plain covers and an abstract cover drawn in code (no text) | bunko 105 x 148 mm, B5 182 x 257 mm | 0.6k |
 | closed laptop | the bookshelf's top level (the succulent moved down) | modelled, bead-blasted aluminium, no logo | 13-inch, 298 x 208 x 16 mm | 0.9k |
-| keys and a wallet | on the shoeboxes by the door: the keys in a shallow wooden bowl, the long key resting on its rim, its tip over the edge | Poly Haven scan `wooden_bowl_02` (its height x 0.55: a 4 cm catch-all); keys, ring, fob and wallet modelled | bowl 13 cm, wallet 112 x 92 mm | 4.7k + 3.4k + 0.3k |
+| keys and a wallet | on the shoeboxes by the door: the keys lying flat in a shallow wooden bowl | Poly Haven scan `wooden_bowl_02` (its height x 0.55: a 4 cm catch-all); keys, ring, fob and wallet modelled | bowl 13 cm, wallet 112 x 92 mm | 4.7k + 3.4k + 0.3k |
 | rubber boots | the front right corner, past the sneakers (the strip by the door is the shoeboxes' and the skateboard's) | Poly Haven scan `rubber_boots`, the clean pair; the maker's word on each shaft painted out of its maps | 373 mm tall | 9.6k |
-| laundry hamper | in front of the bookshelf, its lid off and leaning on it | Poly Haven scan `wicker_basket_02` scaled x 1.7 to a hamper's size; its weave redrawn at real scale (7 mm bamboo strips in a 2/2 twill, colour and normal maps generated in the build, wrapped round the basket), since scaling the scan scaled its strips | 36 cm across, 34 cm tall | 9.1k |
+| laundry hamper | in front of the bookshelf, its lid off and leaning on it | Poly Haven scan `wicker_basket_02` at 1.3 times its size (at 1.7 its strips read coarse); its own weave given depth: its AO and a cavity term from its normal map multiplied into the colour map, the normal map at double strength (a weave drawn in code read flat and printed: dropped) | 27 cm across, 26 cm tall | 9.1k |
 
 Each prop is at most 10k triangles (the GLB joins them by material: each prop's count is in its scene extras), textures
 are WebP at 512 px, soft contact discs sit under the props. `clutter_sweep.txt` checks every prop against the page's
@@ -79,8 +79,10 @@ What it shows: the mug, the phone, the laptop and the boots read close to the ph
 emblem (and the pen and pencil without their printed maker's name), then the three weak spots the room sheet showed: the
 paperbacks have rounded spines and a visible page block (they were plain blocks); the key bowl is a shallow 4 cm bowl
 with a key over its rim (it read as a ball); the hamper's weave is at real scale (the scaled scan had 13 mm strips).
-What still falls short: the hamper's drawn weave is flatter than the scan was up close (no baked shadow between the
-strips); the bowl's burl grain is busy for its size.
+`review3_before_after.jpg` (the owner's third read, before left, after right): the hamper back on its scanned weave,
+at 1.3 times, with depth baked in (the drawn twill read flat); the keys lying flat in the bowl (the long key had stood
+up out of it); the notebook's cover without its emblem. What still falls short: the bowl's burl grain is busy for its
+size; from a low camera the flat keys hide below its rim.
 
 ## The page (`web/room.html`)
 One block after G10d's: it adds the GLB and moves its `bottle` node into `PROP.bottle` at y -0.08, so the bottle keeps

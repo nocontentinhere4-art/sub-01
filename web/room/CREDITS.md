@@ -50,8 +50,8 @@ bunko paperbacks and a B5 magazine by the bed's foot (plain covers and an abstra
 text), a closed laptop on the bookshelf (no logo), keys and a wallet by the door, two balls of crumpled paper. Poly Haven
 photoscans (CC0, listed below): `binder_notebook`, `stationery_supplies`, `food_apple_01`, `potted_plant_04` (at 86 %:
 a 14 cm pot, on the bookshelf), `wooden_bowl_02` (the key bowl), `rubber_boots` (the clean pair; the maker's word on
-each shaft is painted out of its colour, normal and ARM maps by the build) and `wicker_basket_02` (scaled to a laundry
-hamper's size, x 1.7, its lid leaning on it as scanned; its weave redrawn at real scale by the build). No brands, logos or readable labels. No Tripo credits were used.
+each shaft is painted out of its colour, normal and ARM maps by the build) and `wicker_basket_02` (scaled to a small laundry
+hamper's size, x 1.3, its lid leaning on it as scanned; its AO and cavity baked into its colour by the build). No brands, logos or readable labels. No Tripo credits were used.
 The build places each prop on the built room (`room_clean.glb` and `props_tripo2.glb`, decoded) and stops if any prop
 cuts into it, hangs off its support, or enters the page's places, his routes, the doors' swings or the sneakers' spot.
 
@@ -88,7 +88,7 @@ Models:
 | apple on the fridge | `food_apple_01` | Oliver Harries |
 | key bowl by the door (its height x 0.55) | `wooden_bowl_02` | Kuutti Siitonen |
 | rubber boots (the clean pair, label painted out) | `rubber_boots` | L |
-| laundry hamper (scaled x 1.7, the weave redrawn) | `wicker_basket_02` (its mesh) | Kuutti Siitonen |
+| laundry hamper (scaled x 1.3) | `wicker_basket_02` | Kuutti Siitonen |
 | wall clock | `wall_clock` | PierreB3D |
 | alarm clock (window sill) | `alarm_clock_01` | Yann Kervran, James Ray Cock |
 | box on the bookshelf | `cardboard_box_01` | Rahul Chaudhary |

@@ -15,9 +15,9 @@ ok  books_floor      x -0.189..-0.064  y 0.160..0.204  z +0.835..+1.035     620 
 ok  magazine         x -0.199..-0.145  y 0.173..0.425  z +0.621..+0.803      12 tris  
 ok  laptop           x -0.119..+0.222  y 1.718..1.735  z -1.419..-1.181     872 tris  
 ok  key_bowl         x +1.663..+1.833  y 0.485..0.525  z -0.655..-0.485    4686 tris  
-ok  keys             x +1.721..+1.797  y 0.487..0.528  z -0.615..-0.548    3448 tris  
+ok  keys             x +1.702..+1.789  y 0.493..0.497  z -0.605..-0.533    3448 tris  
 ok  wallet           x +1.815..+1.965  y 0.485..0.502  z -0.645..-0.495     304 tris  
 ok  boots            x +1.706..+1.986  y 0.160..0.533  z +0.692..+0.908    9638 tris  
-ok  hamper           x -0.095..+0.364  y 0.160..0.501  z -1.191..-0.571    9119 tris  
+ok  hamper           x -0.055..+0.305  y 0.160..0.421  z -1.193..-0.710    9119 tris  
 ok  bottle           (the page places it at BOTTLE_AT)  65 x 222 mm    5516 tris
 CLUTTER SWEEP 21 props, 0 offenders

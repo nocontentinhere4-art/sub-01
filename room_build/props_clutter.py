@@ -648,7 +648,7 @@ KD = 0.7; KDIR = (math.cos(KD), -math.sin(KD))                  # the keys' head
 BB = bvh_of(bowl); DOWN = Vector((0, -1, 0))
 def bowl_top(r):
     h = BB.ray_cast(Vector((BW[0] + KDIR[0] * r, SB_Y + 0.2, BW[1] + KDIR[1] * r)), DOWN)[0]; return h.y if h is not None else None
-KB = 0.020; inner = bowl_top(KB)                                  # where the bunch lies: 2 cm towards the rim
+KB = -0.004; inner = bowl_top(KB)                                 # where the bunch lies, flat in the middle
 RIM_R, RIM_Y = max(((r / 1000, bowl_top(r / 1000)) for r in range(40, 76) if bowl_top(r / 1000) is not None), key=lambda e: e[1])
 print("BOWL INNER", round(inner, 4))
 def key(nm, material, L):
@@ -667,10 +667,8 @@ xf(k1, ry=0.2); xf(k2, ry=2.7); xf(k2, loc=(0.002, 0.0021, 0.003))
 ringp = [(0.012 * math.cos(2 * math.pi * i / 24) - 0.0045 - 0.012, 0.0012, 0.012 * math.sin(2 * math.pi * i / 24)) for i in range(25)]
 kring = tube("key_ring", "connector", ringp, 0.0009, n=6)
 fob = slab("key_fob", "leather", 0.022, 0.040, 0.004, 0.006, bev=0.0012); xf([fob], ry=0.6); xf([fob], loc=(-0.026, 0.0, 0.006))
-TILT = math.atan2(RIM_Y + 0.0012 - inner, RIM_R - KB)              # the long key: its bow in the bunch, its blade on the rim, its tip over it
-xf(k1, rz=TILT)
 keys = k1 + k2 + [kring, fob]; xf(keys, ry=KD - 0.2); xf(keys, loc=(BW[0] + KDIR[0] * KB, inner + 0.0006, BW[1] + KDIR[1] * KB))
-print("KEYS rim", round(RIM_R, 3), round(RIM_Y, 4), "inner", round(inner, 4), "tilt", round(math.degrees(TILT), 1))
+print("KEYS flat at", round(inner, 4), "rim", round(RIM_Y, 4))
 prop("keys", keys, None)
 WL = (SB[1] - 0.075, (SB[2] + SB[3]) / 2)
 wallet = slab("wallet", "leather", 0.112, 0.092, 0.0165, 0.009, bev=0.0035); xf([wallet], ry=-0.25); xf([wallet], loc=(WL[0], SB_Y, WL[1]))
@@ -709,58 +707,34 @@ prop("boots", boots + btc, FY)
 # --- a laundry hamper in front of the bookshelf: the bamboo basket, its lid off and leaning on it as scanned, at a
 # hamper's size (x 1.7: 36 cm across, 34 cm tall; the scan is a 21 cm storage basket)
 hamper = import_scan("wicker_basket_02"); decimate([o for o in hamper if "base" in o.name], 6500); decimate([o for o in hamper if "lid" in o.name], 2600)
-for o in hamper: o.data.transform(Matrix.Scale(1.7, 4)); o.data.update()
-# its weave at a real hamper's scale: scaling the scan 1.7 times scaled its strips too (13 mm), so it takes a woven
-# bamboo drawn here instead, 7 mm strips in a 2/2 twill, wrapped round the basket (and laid flat on the lid)
+for o in hamper: o.data.transform(Matrix.Scale(1.3, 4)); o.data.update()   # (a 27 cm hamper: at 1.7 its strips read coarse)
+# its own scanned weave, given depth: its ambient occlusion and a cavity term (where the normal map tilts, at the strips'
+# edges) multiplied into the colour map, and its normal map at double strength (the coordinator: the drawn twill read flat)
 import numpy as np
-TILE = 0.056                                                      # one tile: 8 strips of 7 mm
-def weave_maps(n=512, strips=8, seed=3):
-    rng = np.random.default_rng(seed); s = n // strips
-    v, u = np.mgrid[0:n, 0:n].astype(np.float32); i = (u // s).astype(int); j = (v // s).astype(int); fu = (u % s) / s; fv = (v % s) / s
-    horiz = ((i + j) % 4) < 2                                     # the weft over the stakes, two over, two under, stepping each row
-    across = np.where(horiz, fv, fu); along = np.where(horiz, u / s, v / s); k = np.where(horiz, j, i + strips)
-    prof = np.clip(np.sin(np.pi * across), 0, 1) ** 0.6           # a strip's rounded back, gaps at its edges
-    run = np.where(horiz, ((i + j) % 4) + fu, ((i + j) % 4 - 2) + fv)            # where along its two-cell run over the other
-    dip = 0.75 + 0.25 * np.sin(np.pi * np.clip(run / 2, 0, 1))  # it dips where it goes under
-    h = prof * dip
-    tint = (0.80 + 0.32 * rng.random(2 * strips))[k]                # each strip its own shade
-    fib = np.zeros((n, n), np.float32)                              # fibres along the strip
-    for f, a_ in ((37.0, 0.05), (91.0, 0.035), (173.0, 0.025)):
-        ph = rng.random(2 * strips) * 6.28; fib += a_ * np.sin(f * across * 6.28 / 6 + ph[k] + 0.6 * np.sin(along * 3.1 + ph[k]))
-    base = np.array(srgb("#c3a067"), np.float32); dark = np.array(srgb("#6e5230"), np.float32)
-    shade = (0.30 + 0.70 * h ** 0.8) * tint * (1 + fib)
-    col = np.clip(base[None, None, :] * shade[..., None] * np.where(horiz, 1.0, 0.92)[..., None] + dark * (1 - prof[..., None]) * 0.25, 0, 1)
-    gy, gx = np.gradient(h * 3.0)                                   # the normal map from the height (tangent space, OpenGL +y)
-    nor = np.stack([-gx, gy, np.ones_like(h)], -1); nor /= np.linalg.norm(nor, axis=-1, keepdims=True)
-    out = []
-    for nm, arr, colour in (("weave_diff", col ** (1 / 2.2), True), ("weave_nor", nor * 0.5 + 0.5, False)):   # (the colour map stored sRGB-encoded)
-        im = bpy.data.images.new(nm, n, n, alpha=False); rgba = np.concatenate([arr, np.ones((n, n, 1), np.float32)], -1)[::-1]
-        im.pixels.foreach_set(rgba.astype(np.float32).ravel())
-        if not colour: im.colorspace_settings.name = "Non-Color"
-        im.filepath_raw = f"{OUT}/{nm}.png"; im.file_format = 'PNG'; im.save(); out.append(im)
-    return out
-wd, wn = weave_maps()
-mw = mat("weave", (1, 1, 1), rough=0.78, diff_img=wd); mw["nouv"] = 1; nt = mw.node_tree
-t_ = nt.nodes.new("ShaderNodeTexImage"); t_.image = wn; nm_ = nt.nodes.new("ShaderNodeNormalMap"); nm_.inputs["Strength"].default_value = 1.0
-nt.links.new(t_.outputs["Color"], nm_.inputs["Color"]); nt.links.new(nm_.outputs["Normal"], nt.nodes["Principled BSDF"].inputs["Normal"])
-for o in hamper:
-    o.data.materials.clear(); o.data.materials.append(mw); me = o.data; uvl = me.uv_layers[0]
-    P = np.array([G(v.co) for v in me.vertices]); c = P.mean(0)
-    if "base" in o.name:                                           # round the basket: 20 tiles to the turn, so the seam meets
-        ang = np.arctan2(P[:, 2] - c[2], P[:, 0] - c[0]); U = ang / (2 * np.pi) * 20; V = P[:, 1] / TILE
-        for p_ in me.polygons:
-            us = [U[me.loops[li].vertex_index] for li in p_.loop_indices]; wrap = max(us) - min(us) > 10
-            for li in p_.loop_indices:
-                vi = me.loops[li].vertex_index; uu = U[vi] + (20 if wrap and U[vi] < 0 else 0); uvl.data[li].uv = (uu, V[vi])
-    else:                                                          # the lid: flat in its own plane
-        _, _, vt = np.linalg.svd(P - c, full_matrices=False); e0, e1 = vt[0], vt[1]
-        for li, l_ in enumerate(me.loops):
-            q = P[l_.vertex_index] - c; uvl.data[li].uv = (float(q @ e0) / TILE, float(q @ e1) / TILE)
+def maps_of(prefix):
+    return {n.image.name: n for m in bpy.data.materials if m.name.startswith(prefix) and m.node_tree for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image}
+def px_of(im):
+    a = np.empty(im.size[0] * im.size[1] * im.channels, np.float32); im.pixels.foreach_get(a); return a.reshape(im.size[1], im.size[0], im.channels)
+mx = maps_of("wicker_basket_02"); dif = next(n.image for k, n in mx.items() if "diff" in k); nor = next(n.image for k, n in mx.items() if "nor" in k)
+arm = bpy.data.images.load(f"{AS}/wicker_basket_02/textures/wicker_basket_02_arm_1k.jpg", check_existing=False); arm.colorspace_settings.name = "Non-Color"
+D_, N_ = px_of(dif), px_of(nor)
+cav = np.clip(N_[..., 2] * 2 - 1, 0, 1) ** 2.2                        # 1 where the surface faces out, darker at the strips' edges
+shade = 0.35 + 0.65 * cav
+if arm is not None:
+    A_ = px_of(arm)
+    if A_.shape[:2] == shade.shape: shade = shade * (0.25 + 0.75 * np.clip(A_[..., 0], 0, 1) ** 1.6)
+    bpy.data.images.remove(arm)
+D_[..., :3] *= shade[..., None]; dif.pixels.foreach_set(D_.ravel()); dif.pack()
+for m in bpy.data.materials:
+    if m.name.startswith("wicker_basket_02") and m.node_tree:
+        for n in m.node_tree.nodes:
+            if n.type == 'NORMAL_MAP': n.inputs["Strength"].default_value = 2.0
+print("HAMPER maps", dif.name, nor.name, "AO", A_.shape, D_.shape)
 HM = (0.115, -0.975)
 place(hamper, (HM[0], HM[1]), FY, ry=-math.pi / 2, centre=False)
 lo, hi = box_of(hamper); base_o = [o for o in hamper if "base" in o.name]; blo, bhi = box_of(base_o)
 xf(hamper, loc=(HM[0] - (blo[0] + bhi[0]) / 2, 0, (-1.165 + 0.004) - blo[2]))       # the basket's back 4 mm off the shelf's plinth
-blo, bhi = box_of(base_o); hmc = disc("hamper_contact", 0.21); xf([hmc], loc=((blo[0] + bhi[0]) / 2, FY, (blo[2] + bhi[2]) / 2))
+blo, bhi = box_of(base_o); hmc = disc("hamper_contact", 0.17); xf([hmc], loc=((blo[0] + bhi[0]) / 2, FY, (blo[2] + bhi[2]) / 2))
 prop("hamper", hamper + [hmc], FY)
 
 
