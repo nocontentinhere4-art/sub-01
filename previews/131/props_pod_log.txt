@@ -63,11 +63,11 @@ pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
 WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
   old 1280x800 overview frame 0/300 (27 s)
   old 1280x800 overview frame 150/300 (37 s)
-  old 1280x800 mug frame 0/90 (46 s)
-  old 1280x800 headphones frame 0/90 (52 s)
-  old 1280x800 sneakers frame 0/90 (56 s)
-  old 1280x800 ramen frame 0/90 (60 s)
-old: 660 frames in 65.4 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  old 1280x800 mug frame 0/90 (47 s)
+  old 1280x800 headphones frame 0/90 (53 s)
+  old 1280x800 sneakers frame 0/90 (58 s)
+  old 1280x800 ramen frame 0/90 (63 s)
+old: 660 frames in 69.0 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
 + for side in old new
 + SHOTS_ARG=
 + '[' -n tripo_props.json ']'
@@ -82,29 +82,29 @@ pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
 pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
 WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
   new 1280x800 overview frame 0/300 (6 s)
-  new 1280x800 overview frame 150/300 (15 s)
-  new 1280x800 mug frame 0/90 (25 s)
-  new 1280x800 headphones frame 0/90 (30 s)
+  new 1280x800 overview frame 150/300 (16 s)
+  new 1280x800 mug frame 0/90 (26 s)
+  new 1280x800 headphones frame 0/90 (31 s)
   new 1280x800 sneakers frame 0/90 (35 s)
   new 1280x800 ramen frame 0/90 (40 s)
-new: 660 frames in 45.8 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
-+ python3 /work/new/tools/gpu_preview_render.py --encode --frames /work/frames/1280x800 --out /out/preview_1280x800.mp4 --max-mb 25 --label-old 'feature/tripo-props ?props=old (before)' --label-new 'feature/tripo-props #131 (after)'
-wrote /out/preview_1280x800.mp4: 660 frames, 22.0 s, 14.3 MB (crf 20)
+new: 660 frames in 46.6 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ python3 /work/new/tools/gpu_preview_render.py --encode --frames /work/frames/1280x800 --out /out/preview_1280x800.mp4 --max-mb 25 --label-old 'before (?props=old)' --label-new 'Tripo props (#131)'
+wrote /out/preview_1280x800.mp4: 660 frames, 22.0 s, 12.9 MB (crf 20)
 + cp /work/frames/1280x800/new_meta.json /work/frames/1280x800/old_meta.json /out/
 + for s in old new
 + cp /work/frames/1280x800/old_meta.json /out/old_1280x800_meta.json
 + for s in old new
 + cp /work/frames/1280x800/new_meta.json /out/new_1280x800_meta.json
 + ls -la /out
-total 30312
-drwxr-xr-x 2 root root     4096 Oct  4 03:44 .
-drwxr-xr-x 1 root root      185 Oct  4 03:41 ..
--rw-r--r-- 1 root root        3 Oct  4 03:41 UP
--rw-r--r-- 1 root root       51 Oct  4 03:41 gpu_args.txt
--rw-r--r-- 1 root root     5622 Oct  4 03:44 log.txt
--rw-r--r-- 1 root root      709 Oct  4 03:44 new_1280x800_meta.json
--rw-r--r-- 1 root root      709 Oct  4 03:44 new_meta.json
--rw-r--r-- 1 root root      709 Oct  4 03:44 old_1280x800_meta.json
--rw-r--r-- 1 root root      709 Oct  4 03:44 old_meta.json
--rw-r--r-- 1 root root     1707 Oct  4 03:44 preview_1280x800.json
--rw-r--r-- 1 root root 14258545 Oct  4 03:44 preview_1280x800.mp4
+total 12616
+drwxr-xr-x 2 root root     4096 Oct  4 04:00 .
+drwxr-xr-x 1 root root      185 Oct  4 03:57 ..
+-rw-r--r-- 1 root root        3 Oct  4 03:57 UP
+-rw-r--r-- 1 root root       51 Oct  4 03:58 gpu_args.txt
+-rw-r--r-- 1 root root     5588 Oct  4 04:00 log.txt
+-rw-r--r-- 1 root root      709 Oct  4 04:00 new_1280x800_meta.json
+-rw-r--r-- 1 root root      709 Oct  4 04:00 new_meta.json
+-rw-r--r-- 1 root root      709 Oct  4 04:00 old_1280x800_meta.json
+-rw-r--r-- 1 root root      709 Oct  4 04:00 old_meta.json
+-rw-r--r-- 1 root root     1707 Oct  4 04:00 preview_1280x800.json
+-rw-r--r-- 1 root root 12877408 Oct  4 04:00 preview_1280x800.mp4

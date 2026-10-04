@@ -2,7 +2,7 @@
  "frames": 660,
  "fps": 30,
  "seconds": 22.0,
- "bytes": 14258545,
+ "bytes": 12877408,
  "crf": 20,
  "sides": {
   "old": {
@@ -47,7 +47,7 @@
     }
    ],
    "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
-   "seconds_render": 65.4
+   "seconds_render": 69.0
   },
   "new": {
    "side": "new",
@@ -91,7 +91,7 @@
     }
    ],
    "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
-   "seconds_render": 45.8
+   "seconds_render": 46.6
   }
  }
 }
