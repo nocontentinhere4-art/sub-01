@@ -13,23 +13,24 @@ Scale: 1 obviously CG at a glance · 2 CG at a glance, some real-looking parts �
 CG on a second look · 4 passes as a photo at the page's camera distances, CG only in close-ups · 5 passes as a photo
 in the close-ups too.
 
-## Scores on `main` (9353bda, 2026-10-03; baseline 00af116 in brackets where changed)
+## Scores on `main` (5d9a934, 2026-10-03 evening; the previous score in brackets where changed)
 
 | area | score | one line |
 |---|---|---|
 | character face | 1 | a photo projected on a faceted low-poly head; painted eyes, shard hair; CG at any distance where the face is readable |
 | character body (clothes, hands, feet) | 1 | glossy black hoodie and trousers (PVC), faceted sleeves and socks, mitten hands, no cloth motion; the phone-grip mesh alone looks real |
-| character motion | 3 (2) | he sits, lies, walks, eats, breathes and glances; asleep he is under the duvet with his head in the pillow and turns onto his side (#108), and the camera waits until he reaches the desk (#104); still stiff: no secondary motion, forearms through the desk, toes under the floor |
-| soft goods (duvet, pillow, curtains, hanger socks, towel, cushion, hoodie on the door) | 2 | real fabric textures on hard, un-sculpted shapes: tube socks, slab towel, ruler-straight curtain folds; the duvet now lifts over him and the pillow dents (#108), but the lumps are smooth bumps without creases |
-| hard surfaces (furniture, desk items, shelf, fridge, door) | 3 | the Poly Haven props and the desk set pass as a render; the modelled furniture has razor edges, no wear, uniform wood and plaster, no skirting |
+| character motion | 3 | he sits, types, lies, walks, eats, breathes and glances; asleep under the duvet with side turns (#108); #80's typing clip keeps the forearms off the desk; still stiff: no secondary motion, hands hover over the keys, toes under the floor |
+| soft goods (duvet, pillow, curtains, hanger socks, towel, cushion, hoodie on the door) | 3 (2) | #107: real socks with heel and ribbing, a terry towel, a box-quilted duvet with a turned-back fold, pleated curtains, a sculpted hoodie, tote, backpack, jeans and T-shirt; left: a flat oval pillow, a sawtooth fold edge, translucent sock cuffs, quilt seams as hard ribs when the duvet lies over him |
+| hard surfaces (furniture, desk items, shelf, fridge, door) | 4 (3) | #110: keycaps, book spines, a monitor chin, coffee in the mug with a ring decal, edge wear and decals; the desk set passes at the page's distances; left: uniform plaster, no skirting or trim |
 | lighting (day, dusk, night, lamp, screens) | 2 | day and dusk are pleasant renders: flat fill, no bounce colour, no contact shadows; night is black; the lamp blows the hood out; the monitor is pure white |
-| window and outside | 1 | a gradient sky with a sun; the city is flat grey cuboids on one plane, no haze, no depth, no glass |
-| **overall** | **1.9 (1.7)** | a clean, well-propped render; nothing in it would be mistaken for a photo |
+| window and outside | 3 (1) | #113: photographic CC0 plates with true parallax, real skies by the sun's elevation, lit windows at night, haze, the room reflected in the glass; left: the reflection washes the view out at grazing angles, the wires are drawn lines, and the plates' light does not follow the room's hour exactly |
+| **overall** | **2.4 (1.9)** | the room is getting there (a real view, real cloth, worn hard surfaces); the character and the light still give it away at a glance |
 
-Measured on the same run (`tests/visual/out/full2/results.json`, 58 shots): bed/chair penetration 0 in every shot, the
-duvet's weight counted; 12–42 skinned vertices (of ~17,700 sampled) inside the desk top in the sitting pose, left
-forearm mostly; left toes 1.2 cm below the floor when standing; while he walks to the desk the monitor is off and the
-camera stays on the overview; night (23:00, lights off) mean luminance 10/255 with 12 % pure-black pixels at 1280 and
+Measured on the same run (`tests/visual/out/full3b/results.json`, 58 shots): bed/chair/desk penetration 0 in every
+shot (the desk since #80's typing clip; now a hard check); left toes 1.2 cm below the floor when standing; while he
+walks to the desk the monitor is off and the camera stays on the overview; 64 draw calls and 226k triangles in the
+overview (was 52 and 168k before #107/#110; the room GLB is 6.4 MB, all room assets 9.3 MB without the old
+`room.glb`); night (23:00, lights off) mean luminance 10/255 with 12 % pure-black pixels at 1280 and
 18 % at 390; the only blown-out pixels are the monitor's white page (4 % at 1280, 9 % at 390); animate() 0.16–0.27
 ms/frame; 55 draw calls, 171k triangles; no z-fighting flagged; no JS errors; the character's 2048² texture has
 anisotropy 1 (room textures 8). Every separate prop rests on its support (gap ≤ 4 mm) or hangs on a wall.

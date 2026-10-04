@@ -266,15 +266,15 @@ def pillow():
     """a pillow in its case: a soft superellipse body (flatter underneath), the side seam as a thin piped ridge, the
     case's envelope flap at one end (a step), a head dent and small wrinkles"""
     MAT_Y = G["MAT_Y"]
-    PW, PL, PT = 0.42, 0.64, 0.105; nv, nth = 40, 44; rings = []
+    PW, PL, PT = 0.42, 0.64, 0.15; nv, nth = 40, 44; rings = []               # lofted: a filled pillow, 15 cm at the middle
     for j in range(nv + 1):
-        v = j / nv * 2 - 1; e = max(0.0, 1 - abs(v) ** 5)
-        a = PW / 2 * (0.06 + 0.94 * e ** 0.4); h = PT / 2 * (0.02 + 0.98 * e ** 0.6); zc = v * PL / 2 * (1 - 0.03 * e)
+        v = j / nv * 2 - 1; e = max(0.0, 1 - abs(v) ** 4)
+        a = PW / 2 * (0.06 + 0.94 * e ** 0.35); h = PT / 2 * (0.02 + 0.98 * e ** 0.5); zc = v * PL / 2 * (1 - 0.03 * e)
         pts = []
         for i in range(nth):
             th = 2 * math.pi * i / nth; c, s = math.cos(th), math.sin(th)
-            x = a * math.copysign(abs(c) ** (2 / 2.2), c); y = h * math.copysign(abs(s) ** (2 / 2.2), s)
-            if y < 0: y *= 0.6                                                   # flatter underneath
+            x = a * math.copysign(abs(c) ** (2 / 2.0), c); y = h * math.copysign(abs(s) ** (2 / 2.0), s)
+            if y < 0: y *= 0.7                                                   # a little flatter underneath
             pts.append(Vector((x, y, zc)))
         rings.append(pts)
     o = tube_obj("pillow", "sheet", rings, cap=(True, True))
@@ -287,27 +287,29 @@ def pillow():
     displace(o, d)
     for v in o.data.vertices:                                                     # the dent where his head rests: straight down, so the top never crosses itself
         p = gl(v.co)
-        if p.y > 0.005: v.co.z -= 0.022 * math.exp(-(p.x * p.x * 0.7 + (p.z + 0.06) ** 2) / 0.05) * smooth01(0.0, 0.02, p.y)
-    o.data.transform(Matrix.Translation(B(-1.58, MAT_Y + 0.006 + 0.62 * PT / 2 + 0.004, 0.87)) @ Matrix.Rotation(0.06, 4, 'Z') @ Matrix.Rotation(-0.05, 4, 'Y'))
+        if p.y > 0.005: v.co.z -= 0.018 * math.exp(-(p.x * p.x * 0.7 + (p.z + 0.06) ** 2) / 0.05) * smooth01(0.0, 0.03, p.y)
+    o.data.transform(Matrix.Translation(B(-1.58, MAT_Y + 0.006 + 0.7 * PT / 2 + 0.004, 0.87)) @ Matrix.Rotation(0.06, 4, 'Z') @ Matrix.Rotation(-0.05, 4, 'Y'))
     o.data.update(); return o
 
 
 def duvet(mattress_o, pillow_o):
-    """the duvet: a cloth simulation dropped flat onto the bed, then its head end turned back over itself (the first
-    24 cm wrapped round a 2 cm fold and laid on top, column by column of the simulated grid: a stable fold, where a
-    self-colliding simulation of the folded sheet blew up), then box-quilted: five by six channels, the stitch lines
-    sunk, the puffs raised, a flat piped border, small wrinkles; thickened to 3 cm"""
+    """the duvet: a cloth simulation dropped flat onto the bed gives its lower face; the slab is then built explicitly
+    (a lower face, an upper face 3 cm above it along the normal, a rim), with its head end turned back over itself:
+    the lower face continues round the outside of the fold (radius 4 cm) and becomes the flap's top, the upper face
+    round the inside (radius 1 cm) and becomes the flap's underside, laid back over the main part. Subtle box quilting
+    (5 x 6 channels, stitch lines 2 mm down, puffs 6 mm up) and small wrinkles on the faces that show.
+    web/room.html lifts this duvet over him (#108) by vertex height: on the mattress the lower face lies at ~0.838 m and
+    the upper at ~0.868 m (its REF); the parts hanging over the bed's sides are below 0.80 m."""
     BZ0, BZ1, MAT_Y = G["BZ0"], G["BZ1"], G["MAT_Y"]
-    NX, NY = 60, 70; L, W = 1.30, 1.54; R = 0.022
+    NX, NY = 68, 70; L, W = 1.30, 1.54; TH = 0.03; R_IN = 0.010; R_OUT = R_IN + TH; R_MID = R_IN + TH / 2
     bpy.ops.mesh.primitive_grid_add(x_subdivisions=NX, y_subdivisions=NY, size=1.0, location=(0, 0, 0))
-    d = bpy.context.active_object; d.name = "duvet"
+    d = bpy.context.active_object; d.name = "duvet_sim"
     d.scale = (L, W, 1); bpy.ops.object.transform_apply(scale=True)
     me = d.data
     uv0 = [(v.co.x / L + 0.5, v.co.y / W + 0.5) for v in me.vertices]          # the flat duvet's own coordinates
     nc = len({round(u, 5) for u, _ in uv0}); nr = len({round(w, 5) for _, w in uv0})
     ij = [(round(u * (nc - 1)), round(w * (nr - 1))) for u, w in uv0]; at = {k: n for n, k in enumerate(ij)}
-    xf = -L / 2 + 0.24; i_f = round((xf + L / 2) / L * (nc - 1)); xf = -L / 2 + L * i_f / (nc - 1)   # the fold line, on a grid column
-    flap = [i < i_f for (i, _) in ij]
+    xf = -L / 2 + 0.24; i_f = round((xf + L / 2) / L * (nc - 1))               # the fold line, on a grid column
     d.location = B(-0.85, MAT_Y + 0.13, (BZ0 + BZ1) / 2 + 0.01); bpy.ops.object.transform_apply(location=True)
     colliders = [mattress_o, pillow_o, bpy.data.objects["bed_base"], bpy.data.objects["bed_head"], bpy.data.objects["floor"]]
     for o in colliders:
@@ -323,39 +325,52 @@ def duvet(mattress_o, pillow_o):
             if m.type == 'COLLISION': o.modifiers.remove(m)
     SC.frame_set(1)
     unspike(d, 0.06); smooth_mesh(d, 0.35, 1); me = d.data
-    # the turn-back: each flap vertex goes round the fold (radius R) and back over the main part, following its own
-    # simulated row (arc length along the row and the row's normal), so rows that slid or hang over the bed's side fold too
-    dx = L / (nc - 1); pos = [v.co.copy() for v in me.vertices]; nrm = [v.normal.copy() for v in me.vertices]
+    pos = [v.co.copy() for v in me.vertices]; nrm = [v.normal.copy() for v in me.vertices]   # Blender coords; normals point up / outward
+    P = lambda i, j: pos[at[(i, j)]]; N = lambda i, j: nrm[at[(i, j)]]
+    def row_avg(fn, i, j, k=2):                                                     # smoothed along the rows: no sawtooth at the fold
+        js = range(max(0, j - k), min(nr - 1, j + k) + 1); return sum((fn(i, jj) for jj in js), Vector()) / len(js)
+    dx = L / (nc - 1); lower, upper = {}, {}                                        # the two faces of the slab, per grid point
     rows = {}
     for j in range(nr):
-        P = [pos[at[(i, j)]] for i in range(i_f, nc)]; N = [nrm[at[(i, j)]] for i in range(i_f, nc)]
-        S = [0.0]
-        for a, b in zip(P, P[1:]): S.append(S[-1] + (b - a).length)
-        rows[j] = (P, N, S)
-    for n, ((i, j), fl) in enumerate(zip(ij, flap)):
-        if not fl: continue
-        P, N, S = rows[j]; dist = (i_f - i) * dx
-        if dist < math.pi * R:
-            th = dist / R; T = (P[1] - P[0]).normalized()
-            p = P[0] + T * (R * math.sin(th)) + N[0] * (R * (1 - math.cos(th)))
-        else:
-            s = dist - math.pi * R; m = max(0, min(len(S) - 2, next((k for k in range(len(S) - 1) if S[k + 1] > s), len(S) - 2)))
-            t = (s - S[m]) / max(1e-6, S[m + 1] - S[m]); base = P[m].lerp(P[m + 1], t); nn = N[m].lerp(N[m + 1], t).normalized()
-            p = base + nn * (2 * R + 0.003 * nz(gl(base), 5.0, 6))
-        me.vertices[n].co = p
-    me.update()
-    cu, cw = L / 5, W / 6
-    for v, (u, w), fl in zip(me.vertices, uv0, flap):
-        fu, fw = (u * L / cu) % 1.0, (w * W / cw) % 1.0
-        puff = (math.sin(math.pi * fu) * math.sin(math.pi * fw)) ** 0.7
-        border = min(1.0, min(u, 1 - u) * L / 0.07, min(w, 1 - w) * W / 0.07)        # flat piped border
-        amount = border * (0.016 * puff - 0.006) + (1 - border) * 0.004 + 0.004 * nz(gl(v.co), 7.0, 4)
-        v.co += v.normal * (amount if not fl else -amount)                      # the flap's normals point down: its outside is -normal
-    me.update()
-    me.materials.append(MATS["duvet"])
-    md = d.modifiers.new("solid", "SOLIDIFY"); md.thickness = 0.03; md.offset = 0; md.use_even_offset = True
-    for p in me.polygons: p.use_smooth = True
-    STATIC.append(d); return d
+        Pm = [P(i, j) for i in range(i_f, nc)]; S = [0.0]
+        for a_, b_ in zip(Pm, Pm[1:]): S.append(S[-1] + (b_ - a_).length)
+        rows[j] = (Pm, S)
+    random.seed(46); cu, cw = L / 5, W / 6
+    def puff(u, w):
+        fu, fw = (u * L / cu) % 1.0, (w * W / cw) % 1.0; border = min(1.0, min(u, 1 - u) * L / 0.07, min(w, 1 - w) * W / 0.07)
+        return border * (0.008 * math.sin(math.pi * fu) * math.sin(math.pi * fw) - 0.002) + (1 - border) * 0.004
+    for n, (i, j) in enumerate(ij):
+        u, w = uv0[n]
+        if i >= i_f:                                                                 # the main part: lies on the bed
+            lo = P(i, j); nn = N(i, j)
+            lower[(i, j)] = lo; upper[(i, j)] = lo + nn * (TH + puff(u, w) + 0.003 * nz(gl(lo), 7.0, 4))
+        else:                                                                        # the flap: round the fold, then back over the top
+            P0 = row_avg(P, i_f, j); nn = row_avg(N, i_f, j).normalized(); T = (row_avg(P, i_f + 1, j) - P0).normalized()
+            dist = (i_f - i) * dx; C = P0 + nn * (TH + R_IN)                       # the fold's centre (above the upper face at the fold line)
+            if dist < math.pi * R_MID:
+                th = dist / R_MID
+                upper[(i, j)] = C - nn * (R_IN * math.cos(th)) + T * (R_IN * math.sin(th))      # inside of the fold
+                lower[(i, j)] = C - nn * (R_OUT * math.cos(th)) + T * (R_OUT * math.sin(th))    # outside of the fold (what shows)
+            else:
+                Pm, S = rows[j]; s_ = dist - math.pi * R_MID
+                m = max(0, min(len(S) - 2, next((k for k in range(len(S) - 1) if S[k + 1] > s_), len(S) - 2)))
+                t = (s_ - S[m]) / max(1e-6, S[m + 1] - S[m]); base = Pm[m].lerp(Pm[m + 1], t)
+                nb = (row_avg(N, i_f + m, j) * (1 - t) + row_avg(N, min(nc - 1, i_f + m + 1), j) * t).normalized()
+                upper[(i, j)] = base + nb * (TH + 2 * R_IN)                                       # the flap's underside, 2 cm over the main part
+                lower[(i, j)] = base + nb * (2 * TH + 2 * R_IN + puff(u, w) + 0.003 * nz(gl(base), 7.0, 5))   # the flap's top (the old lower face)
+    bpy.data.objects.remove(d)
+    bm = bmesh.new(); VL = {k: bm.verts.new(v) for k, v in lower.items()}; VU = {k: bm.verts.new(v) for k, v in upper.items()}
+    for i in range(nc - 1):
+        for j in range(nr - 1):
+            bm.faces.new([VL[(i, j)], VL[(i + 1, j)], VL[(i + 1, j + 1)], VL[(i, j + 1)]]).smooth = True
+            bm.faces.new([VU[(i, j)], VU[(i, j + 1)], VU[(i + 1, j + 1)], VU[(i + 1, j)]]).smooth = True
+    rim = [(0, j) for j in range(nr)] + [(i, nr - 1) for i in range(1, nc)] + [(nc - 1, j) for j in range(nr - 2, -1, -1)] + [(i, 0) for i in range(nc - 2, 0, -1)]
+    for k in range(len(rim)):
+        a_, b_ = rim[k], rim[(k + 1) % len(rim)]
+        bm.faces.new([VL[a_], VU[a_], VU[b_], VL[b_]]).smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    o = new_obj("duvet", bm, "duvet")
+    return o
 
 
 # ================================================================ rug: a thick pile with a bound edge, a little uneven
@@ -674,10 +689,11 @@ def jeans():
     return parts
 
 
-def tee(duvet_o, pillow_o, mattress_o):
-    """a T-shirt thrown on the bed's far foot corner: a flat tee cut from a grid (body, sleeves, a round neck), dropped
-    as cloth onto the duvet and the mattress edge, where it crumples and hangs over the side"""
-    MAT_Y = G["MAT_Y"]; random.seed(45)
+def tee(cushion_parts):
+    """a T-shirt dropped on the floor cushion: a flat tee cut from a grid (body, sleeves, a round neck), dropped as
+    cloth onto the cushion, where it crumples and hangs over its sides (off the bed: web/room.html reshapes the duvet
+    over him when he sleeps, #108, and a tee lying on it would be buried)"""
+    FY = G["FY"]; random.seed(45)
     nx, nzz = 40, 40; hw, hl, sw = 0.22, 0.28, 0.29
     def inside(x, z):
         if x * x + (z - hl) ** 2 < 0.07 ** 2: return False                                  # the neck
@@ -696,8 +712,8 @@ def tee(duvet_o, pillow_o, mattress_o):
     for _ in range(4): bmesh.ops.smooth_vert(bm, verts=edge, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)   # a smooth outline, not grid steps
     for v in bm.verts: v.co.z += 0.03 * nz(gl(v.co), 6.0, 17)                                # dropped crumpled, not flat
     o = new_obj("tee", bm, "jersey")
-    o.data.transform(Matrix.Translation(B(-0.58, MAT_Y + 0.20, 1.30)) @ Matrix.Rotation(0.15, 4, 'Z') @ Matrix.Rotation(0.12, 4, 'X')); o.data.update()
-    colliders = [duvet_o, pillow_o, mattress_o, bpy.data.objects["bed_base"], bpy.data.objects["floor"]]
+    o.data.transform(Matrix.Translation(B(1.30, FY + 0.20, 0.98)) @ Matrix.Rotation(0.75, 4, 'Z') @ Matrix.Rotation(0.12, 4, 'X')); o.data.update()
+    colliders = [cushion_parts[0], bpy.data.objects["floor"]]                   # the cushion's body (not its thin piping: the solver snags on it)
     for c in colliders:
         c.modifiers.new("col", "COLLISION"); c.collision.thickness_outer = 0.004; c.collision.cloth_friction = 12
     cl = o.modifiers.new("cloth", "CLOTH"); s = cl.settings
@@ -705,19 +721,23 @@ def tee(duvet_o, pillow_o, mattress_o):
     s.air_damping = 1.0; cl.collision_settings.distance_min = 0.006; cl.collision_settings.use_self_collision = False   # (self-collision blew it up)
     cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 60
     for f in range(1, 46): SC.frame_set(f)
-    bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="cloth")
+    bpy.context.view_layer.objects.active = o; o.select_set(True); bpy.ops.object.modifier_apply(modifier="cloth")
+    assert not any(m.type == 'CLOTH' for m in o.modifiers), "the tee's cloth simulation was not applied"
     for c in colliders:
         for m in list(c.modifiers):
             if m.type == 'COLLISION': c.modifiers.remove(m)
     SC.frame_set(1)
     unspike(o, 0.04); smooth_mesh(o, 0.3, 1)
+    for v in o.data.vertices:                                                      # nothing through the floor (the solver lets a fast corner slip)
+        if v.co.z < FY + 0.004: v.co.z = FY + 0.004
+    o.data.update()
     paint(o, lambda p: srgb("#7d93a6"))
     sheet(o, 0.005)
     return o
 
 
-def clothes(duvet_o, pillow_o, mattress_o):
-    """jeans on the floor by the bed's foot and a T-shirt on the bed, each registered with the prop sweep"""
+def clothes(cushion_parts):
+    """jeans on the floor by the bed's foot and a T-shirt on the floor cushion, each registered with the prop sweep"""
     FY = G["FY"]
     G["check"]("jeans", jeans(), ("y", FY))
-    G["check"]("tee", [tee(duvet_o, pillow_o, mattress_o)], None)
+    G["check"]("tee", [tee(cushion_parts)], None)

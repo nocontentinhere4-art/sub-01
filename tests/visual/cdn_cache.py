@@ -1,4 +1,5 @@
-"""The page's CDN files (three.js from jsdelivr, leaflet from unpkg), fetched once with Python and served to the
+"""The pages' CDN files (the room's three.js from jsdelivr, leaflet from unpkg, the brain page's three.js r128 from
+cdnjs), fetched once with Python and served to the
 headless browser from a local cache (issue #98, G8). Why: in a sandbox behind a TLS-inspecting proxy Chromium does not
 trust the proxy's CA while Python (SSL_CERT_FILE) does; in CI it only saves repeated downloads. The cache directory is
 not committed (tests/visual/.cdn_cache, see .gitignore)."""
@@ -8,7 +9,7 @@ import ssl
 import urllib.request
 from pathlib import Path
 
-HOSTS = re.compile(r"^https://(cdn\.jsdelivr\.net|unpkg\.com)/")
+HOSTS = re.compile(r"^https://(cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com)/")
 TYPES = {".js": "application/javascript", ".mjs": "application/javascript", ".css": "text/css", ".json": "application/json",
          ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2"}
 

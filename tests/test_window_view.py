@@ -141,6 +141,18 @@ def test_shader_contract(check):
     assert 0.5 <= g["h"] <= 1.0 and 0.3 <= g["v"] <= 1.0 and 0 <= g["pitch"] <= 0.2 and g["pitchMax"] <= 0.5
 
 
+def test_no_nan_reaches_the_glass(check):
+    """G6's environment capture read NaN texels off the pane at night: the probe's render target starts undefined (a
+    frozen loop never renders it), so build() clears its six faces and probes at once, the shader scrubs NaN from the
+    probe sample and from the final colour, and a NaN hour or dt never reaches a uniform or light.sun"""
+    pi = check["probe_init"]
+    assert pi["faces_cleared"] == 6 and pi["clears"] == 6 and pi["target_restored"] and pi["probed_at_build"] == 1
+    g = check["nan_guard"]
+    assert all(v is True for k, v in g.items() if k != "hour"), g
+    assert g["hour"] == 12                                                      # the last good hour is kept
+    assert check["shader_scrubs_nan"] and check["light_sun_initial"]
+
+
 def test_probe_emission_weather_and_train(check):
     p = check["probe"]
     assert 2 <= p["renders"] <= 4 and p["plane_visible_after"]                 # the glass's reflection, every ~20 s

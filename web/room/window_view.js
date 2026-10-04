@@ -160,7 +160,11 @@ const FRAG = /* glsl */`
       dropA = length(off);
       dx += off.x * 0.010 * uRain; dy += off.y * 0.010 * uRain;
     }
-    vec2 slope = vec2(dx, dy) / dz;                                 // metres sideways and up per metre of depth
+    // metres sideways and up per metre of depth. Seen along the glass the true slope explodes (30 m sideways per metre
+    // of depth at 88°) and the finite plates run out, leaving only sky: the slope is soft-clamped (an asymptote of
+    // 0.55 m/m sideways, 0.9 m/m up), so a grazing look still lands on the neighbourhood, compressed, as the eye expects
+    vec2 slope = vec2(dx, dy) / dz;
+    slope = slope / (1.0 + abs(slope) / vec2(0.55, 0.9));
     vec3 dir = normalize(vec3(dx, dy, dz));                        // the sky direction (x right, y up, z out)
 
     // --- the sky (a photograph), the sun and the moon on it
@@ -239,13 +243,17 @@ const FRAG = /* glsl */`
     col = mix(col, mix(nr.rgb * tint, horizonCol, haze * 0.05), nr.a);
 
     // --- the glass: transmission, the room's reflection (a cube probe) by Fresnel, the rain's highlights
-    float fres = 0.04 + 0.96 * pow(1.0 - dz, 5.0);
+    // Fresnel, capped: a real pane at 80° reflects ~35 %, never the whole room; by day the view outside is far brighter
+    // than the room, so its reflection barely shows (uReflect follows the hour); the view itself keeps ≥ 70 %
+    float fres = min(0.04 + 0.96 * pow(1.0 - dz, 5.0), 0.25);
     vec3 env = textureCube(tEnv, reflect(d, -vOut)).rgb;
-    col = col * vec3(0.93, 0.96, 0.95) * (1.0 - fres) + env * fres * uReflect;
+    env = min(mix(env, vec3(0.0), vec3(isnan(env))), vec3(1.0));   // a probe not yet rendered is black, a lit wall never blows out
+    col = col * vec3(0.93, 0.96, 0.95) * (1.0 - 0.85 * fres) + env * fres * uReflect;
     if (uRain > 0.002) {
       float s = texture2D(tNoise, vec2(vUv.x * 2.2, vUv.y * 0.5 + uTime * 0.22)).g;
       col += (smoothstep(0.6, 0.95, s) * 0.10 + dropA * dropA * 0.09) * uRain * (0.15 + 0.85 * day) * (sky * 0.5 + 0.2);
     }
+    col = max(mix(col, vec3(0.0), vec3(isnan(col))), vec3(0.0));   // never a NaN or a negative texel (an environment capture reads this pane)
     gl_FragColor = vec4(col * uEmit, 1.0);
     #include <colorspace_fragment>
   }`;
@@ -294,6 +302,12 @@ export function createWindowView(THREE, opts = {}){
       probeCam = new THREE.CubeCamera(0.05, 30, envRT);
       probeCam.position.set(...surf.c).add(new THREE.Vector3(0, 0, 0.25).applyAxisAngle(new THREE.Vector3(0, 1, 0), surf.ry));
       scene.add(probeCam);
+      // a render target starts with undefined texels (NaN under software GL, and a frozen loop never updates): clear the
+      // six faces to black now and take the first probe right away, so the glass never samples garbage
+      const was = renderer.getRenderTarget ? renderer.getRenderTarget() : null;
+      for (let face = 0; face < 6; face++) { renderer.setRenderTarget(envRT, face); renderer.clear(); }
+      renderer.setRenderTarget(was);
+      probe(); probeAt = state.time;
     }
     return mesh;
   }
@@ -308,6 +322,9 @@ export function createWindowView(THREE, opts = {}){
   }
   function setEmission(day, night){ state.emit = {day, night}; emitSet = true; }
   function update(dt, hour){
+    // a NaN hour or dt (a clock not yet read, a bad tick) would poison every uniform and light.sun: keep the last good ones
+    if (!Number.isFinite(hour)) hour = state.hour;
+    if (!Number.isFinite(dt) || dt < 0) dt = 0;
     state.time += dt; state.hour = hour;
     const sunEl = sunElevation(hour); state.sun = sunEl;
     U.uTime.value = state.time; U.uSun.value = sunEl;
@@ -329,6 +346,7 @@ export function createWindowView(THREE, opts = {}){
     if (opts.hdr && !emitSet) { const h = !!opts.hdr(); if (h !== state.hdr) { state.hdr = h; state.emit = h ? {day: 5, night: 0.05} : {day: 1, night: 1}; } }
     const dayK = sstep(-0.12, 0.2, sunEl);
     U.uEmit.value = state.emit.night + (state.emit.day - state.emit.night) * dayK;
+    U.uReflect.value = 0.32 - 0.22 * dayK;                      // the room shows faintly in the glass at night, hardly by day
     // the train: every TRAIN.every s one passes, alternating direction
     const cyc = Math.floor(state.time / TRAIN.every), ph = state.time - cyc * TRAIN.every, dir = cyc % 2 ? -1 : 1;
     const x = ph * TRAIN.speed - TRAIN.len - 40;                // its tail, from well off one side to well off the other

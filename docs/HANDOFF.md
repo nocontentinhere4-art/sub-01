@@ -51,6 +51,9 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   backpack, jeans, T-shirt) are `room_build/props_soft.py` (two cloth simulations; fixed-camera renders by
   `room_build/shots_soft.py`, before/after in `docs/design/room-soft/`). Thin parts set `ao_small` so the AO bake gives them
   the white corner (thin UV islands get no texel and render black otherwise); thin sheets carry no rim faces for the same reason.
+  The duvet is an explicit closed slab (lower face from a flat cloth sim, upper face 3 cm above, a rolled fold at the head end):
+  `room.html`'s sleep lift (#108) reads vertex heights, so on the mattress its lower face lies at 0.835 m and its upper at 0.865 m
+  (REF), the flap at 0.885-0.92 m, the hanging sides below 0.83 m; keep those bands when changing it.
   Monitor/window/lamp positions come from GLB nodes `SURF_monitor|window|lamp`. The old AI-baked room stays behind `?room=old`.
   #75: props are placed from their real bounding boxes, and a build-time sweep (`blender -b -P build_room.py -- --sweep`,
   report in `room_build/out/sweep.txt`) fails the build if any prop reaches into a wall or floats/sinks > 2 mm off its
@@ -102,6 +105,52 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - `GET /healthz`: public, 200 if the brain loop ticked within 5 s, else 503. Set it as Railway's healthcheck path.
   `GET /api/costs` and `/api/health` are admin-only (the password cookie, or the `SUB01_ADMIN_TOKEN` header). Tick
   times sit in a 1200-entry ring buffer (`Live.tick_s`).
+
+## A young guy's internet (#89 teen interests, PR `feature/more-search`)
+- Owner (2026-10-04): "why is he looking at recipes… he's a young guy like us: YouTube, TikTok, really interesting
+  things, cars". Live at 08:24 Tokyo: 7 King Arthur Baking pages in a row, "One Piece latest chapter" searched on
+  Science News, short video 0 % (no YouTube key yet).
+- Research with citations: `docs/research/teen_online.md` (Pew 2024, Ofcom 2025, Common Sense 2021, PARTY USA 2024,
+  admeira 2024, YPulse 2025, MakerSights).
+- `interests.PROFILE` re-seeded: games, cars, anime, music, creators, football, tech, sneakers, memes, movies, then
+  Tokyo, science, a little Wikipedia. Food weighs 0 unless he is hungry or ordering (`pick(hungry=True)`; the live
+  server's `live_interest` sets `hungry` from life's hunger ≥ 0.5 or a food activity). No crypto or markets topics.
+- Searches land on sites that fit (`search_sources.TOPICS`): MyAnimeList, Carscoops, PC Gamer, TMDB, NME, 9to5Mac, HN;
+  their search paths are allowed by robots.txt (checked 2026-10-04); results read by `parse_links` /
+  `parse_headlines`. No unrelated fallback (`TAIL` empty): a query with no fitting site goes to its videos or to a
+  front page of its topic (`SEED_TOPICS`). The cause of "One Piece → Science News": "latest" matched the old "news"
+  topic, whose source was Science News. Recipes only while hungry (`MEAL_ONLY`, `RECIPE_HOST`).
+- YouTube discovery only through the official Data API (`YOUTUBE_API_KEY`; YouTube's Terms forbid automated access
+  to its pages, so no channel page or RSS is ever read): the latest uploads of well-known channels per topic
+  (`youtube_api.CHANNELS`; `channels.list` forHandle → uploads playlist (kept), `playlistItems.list`, `videos.list`
+  for durations, Shorts ≤ 180 s: 3 units, each list cached 3 h), else `search.list` (100 units). Without a key or
+  quota: no discovery, the note "no API key or no quota left…", and a replay of the videos already found today
+  (`Quota.today`). `/api/screens` → `youtube` (key set, units used today, errors) is reported even while the
+  browser idles (`Live.youtube_view`, from the saved state and the server's environment); the raw quota now rides
+  `/state` as `youtube_state`, is saved in `browsing.json` and restored by `/init`, so a browser restart keeps
+  today's units (before, the public view overwrote it and every restart reset the count). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+- Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
+  players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
+  robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,
+  StackExchange and others refuse robots).
+- TikTok: no compliant source of current popular video ids was found (its tag/discover pages render no video on the
+  server, its /search and /embed/v2 are robots-disallowed, DuckDuckGo challenges datacenter IPs); the logged-in feed's
+  diagnosis (#109) will tell whether the account's feed works from Railway.
+- `analysis/teen_day.py` (a simulated waking day on the real choice path, network stubbed as answered live; not a
+  browser), 3 days: before (main) short video + YouTube 0 %, Science News 70 % of pages, recipes outside meals 7.4 %,
+  longest run on one site 18; after, no key: 54 % (shorts 36 %, YouTube 19 %), Wikipedia 0 %, recipes outside meals
+  0 %, longest run 3; with the key: 61 %.
+- With the key (added live 2026-10-04 ~23:57 UTC; main still showed no YouTube, all searches on HN / Science News):
+  `YT_SEARCH_SHARE` (45 %) of searches go to YouTube's API first, a query with no fitting site becomes a YouTube
+  search (never a news site's search page), and desk video slots pick from his profile. `teen_day.py --youtube-key`:
+  short video + YouTube 75 % of the simulated day (no key: 56 %). Each API search logs "browse: YouTube API search
+  (…), n results, units today" and counts in `/api/screens` → `youtube.searches` / `units_used` / `errors`. The
+  9,000-unit cap is ~90 searches a day; after it, the channels' pages take over.
+- Live 09:00–09:10 Tokyo: an Instagram login modal on his monitor, Serious Eats again. Social sites whose public pages
+  are login walls for a logged-out visitor (`WALLED_SOCIAL`: Instagram, Facebook, X/Twitter, Threads, LinkedIn,
+  Pinterest, Snapchat) are never offered or opened, and `LOGIN_WALL` also recognises their "see photos, videos and
+  more… sign up / log in" modal. The first thing he does at the desk after the browser starts is a video
+  (`Browser.watched`).
 
 ## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
 - Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia

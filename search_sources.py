@@ -356,6 +356,26 @@ def parse_headlines(text, base):
     return _dedup(out)
 
 
+def parse_links(text, base):
+    """A site's own search results page when its results are not in headings: same-site article links whose text
+    (at least 20 characters) has one of the query's words (the query is read from the page's own URL)."""
+    u0 = urllib.parse.urlsplit(base)
+    host = u0.hostname or ""
+    q = " ".join(v for k, v in urllib.parse.parse_qsl(u0.query) if k in ("s", "q", "query", "searchTerm", "term"))
+    words = [w for w in re.findall(r"\w+", q.lower()) if len(w) > 2]
+    out = []
+    for a in parse_html(text).find_all("a"):
+        url = urllib.parse.urljoin(base, a.attrs.get("href", ""))
+        u = urllib.parse.urlsplit(url)
+        t = " ".join(a.text().split())
+        if (u.hostname or "") != host or len(t) < 20 or u.path in ("", "/") or "search" in u.path.lower():
+            continue
+        if words and not any(w in t.lower() for w in words):
+            continue
+        out.append(_result(url.split("#")[0], t))
+    return _dedup(out)
+
+
 # --- sources ---------------------------------------------------------------------------------------------------------
 def _q(params):
     return urllib.parse.urlencode(params)
@@ -404,35 +424,55 @@ SOURCES = {
                 "parse": parse_headlines},
     "news": {"label": "Science News", "url": lambda q: "https://www.sciencenews.org/?" + _q({"s": q}),
              "parse": parse_headlines},
+    # #89 teen interests: sites people his age read, searched through their own results pages (robots.txt allows
+    # each of these paths, checked 2026-10-04; robots.txt is checked again at run time like every source)
+    "carscoops": {"label": "Carscoops", "url": lambda q: "https://www.carscoops.com/?" + _q({"s": q}),
+                  "parse": parse_links},
+    "pcgamer": {"label": "PC Gamer", "url": lambda q: "https://www.pcgamer.com/search/?" + _q({"searchTerm": q}),
+                "parse": parse_links},
+    "mal": {"label": "MyAnimeList", "url": lambda q: "https://myanimelist.net/search/all?" + _q({"q": q, "cat": "all"}),
+            "parse": parse_links},
+    "tmdb": {"label": "TMDB", "url": lambda q: "https://www.themoviedb.org/search?" + _q({"query": q}),
+             "parse": parse_links},
+    "nme": {"label": "NME", "url": lambda q: "https://www.nme.com/?" + _q({"s": q}), "parse": parse_headlines},
+    "9to5mac": {"label": "9to5Mac", "url": lambda q: "https://9to5mac.com/?" + _q({"s": q}), "parse": parse_headlines},
 }
 GENERAL = ("ddg", "bing", "wikipedia")      # any query; the topic sources come first when they fit
-TAIL = ("hn", "news")                       # also any query, after the fitting ones (#89: rotation without the loop)
+TAIL = ()                                   # #89 teen: no unrelated fallback ("One Piece" never lands on Science News)
+MEAL_ONLY = ("recipes",)                    # cooking sites only when he is hungry or ordering food
 
 # topic -> the sources that fit it, best first (a query can match several topics)
 TOPICS = [
-    ("science", re.compile(r"\b(brain|neuro\w*|neuron\w*|sleep|spindle\w*|dream\w*|memory|cortex|physics|quantum|"
-                           r"particle\w*|galax\w*|black holes?|cosmolog\w*|astro\w*|genom\w*|genes?|protein\w*|cells?|"
-                           r"evolution|climate|algorithm\w*|mathemat\w*|theorem|equation\w*|machine learning|"
-                           r"neural network\w*|robot\w*|chemistry|molecul\w*|biolog\w*|ecolog\w*|research|study|"
-                           r"studies|paper)\b", re.I), ("arxiv", "news", "wikipedia")),
-    ("news", re.compile(r"\b(news|today|latest|this week|discover\w*|found|new study|scientists?|announce\w*)\b",
-                        re.I), ("news", "ddg")),
-    ("book", re.compile(r"\b(books?|novels?|authors?|poetry|poems?|fiction|manga|murakami|literature|reading list|"
-                        r"haiku)\b", re.I), ("openlibrary", "wikipedia")),
-    ("howto", re.compile(r"\b(how to|how do|how does|why do|why does|tips?|guide|tutorial|diy|make|fix|learn)\b",
-                         re.I), ("ddg", "bing")),
-    ("recipe", re.compile(r"\b(recipes?|cook\w*|bak\w*|bread|ramen|noodles?|soup|curry|cake|pastry|sourdough|"
-                          r"onigiri|melon ?pan|dessert|dinner|lunch|breakfast|sauce|dumplings?|sushi|tempura|miso)\b",
-                          re.I), ("recipes", "ddg")),
-    ("images", re.compile(r"\b(photos?|pictures?|images?|paintings?|art|architecture|park|temple|shrine|map|maps|"
-                          r"view|landscape|skyline|station|bridge|garden|museum)\b", re.I), ("commons", "wikipedia")),
-    ("tech", re.compile(r"\b(programming|software|code|coding|python|rust|linux|computer\w*|startup\w*|internet|"
-                        r"web|keyboard\w*|hacker\w*|open source|database\w*|compiler\w*|gpu)\b", re.I),
-     ("hn", "ddg")),
-    ("video", re.compile(r"\b(videos?|watch|music|songs?|lo-?fi|concert|documentary|walk|vlog|trailer|anime|"
-                         r"ghibli)\b", re.I), ("youtube", "ddg")),
+    ("science", re.compile(r"\b(brain|neuro\w*|neuron\w*|sleep science|spindle\w*|dream\w*|physics|quantum|"
+                           r"particle\w*|galax\w*|black holes?|cosmolog\w*|astro\w*|genom\w*|protein\w*|"
+                           r"evolution|climate|mathemat\w*|theorem|equation\w*|neural network\w*|chemistry|"
+                           r"molecul\w*|biolog\w*|ecolog\w*|scientists?|new study|research paper)\b", re.I),
+     ("arxiv", "news", "wikipedia")),
+    ("cars", re.compile(r"\b(cars?|supra|gt-?r|skyline|jdm|drift\w*|civic|type r|porsche|ferrari|lamborghini|bmw|"
+                        r"toyota|nissan|honda|mazda|subaru|tesla|formula ?1|f1|race|racing|motor\w*|engine|tuning|"
+                        r"supercar\w*|hypercar\w*)\b", re.I), ("carscoops",)),
+    ("games", re.compile(r"\b(games?|gaming|gamer|nintendo|switch|playstation|ps5|xbox|steam|elden ring|minecraft|"
+                         r"fortnite|zelda|pokemon|gta|valorant|speedrun\w*|esports?|indie games?)\b", re.I),
+     ("pcgamer",)),
+    ("anime", re.compile(r"\b(anime|manga|one piece|naruto|jujutsu|kaisen|chainsaw man|frieren|demon slayer|"
+                         r"solo leveling|ghibli|dragon ball|attack on titan|spy x family|crunchyroll)\b", re.I),
+     ("mal",)),
+    ("movies", re.compile(r"\b(movies?|films?|series|trailer|netflix|marvel|dune|cinema|box office|season \d+)\b",
+                          re.I), ("tmdb",)),
+    ("music", re.compile(r"\b(music|songs?|albums?|rappers?|rap|hip hop|playlist|concert|tour|singer|band|"
+                         r"city pop|lo-?fi|k-?pop|j-?pop)\b", re.I), ("nme",)),
+    ("tech", re.compile(r"\b(iphone|apple|macbook|ipad|airpods|android|samsung|pixel|smartphones?|gadgets?|"
+                        r"headphones|keyboards?|laptops?)\b", re.I), ("9to5mac", "hn")),
+    ("code", re.compile(r"\b(programming|software|code|coding|python|rust|linux|computers?|compilers?|"
+                        r"open source|gpu|databases?|startups?)\b", re.I), ("hn",)),
+    ("book", re.compile(r"\b(books?|novels?|authors?|poetry|poems?|fiction|literature|reading list)\b", re.I),
+     ("openlibrary",)),
+    ("recipe", re.compile(r"\b(recipes?|cook\w*|bak\w*|bread|ramen recipe|soup|curry|cake|pastry|sourdough|"
+                          r"onigiri|melon ?pan|dessert|sauce|dumplings?)\b", re.I), ("recipes",)),
+    ("images", re.compile(r"\b(photos?|pictures?|paintings?|architecture|temple|shrine|landscape|skyline)\b",
+                          re.I), ("commons",)),
     ("encyclopedia", re.compile(r"\b(what is|who is|who was|history of|meaning of|definition|origin of|wiki)\b",
-                                re.I), ("wikipedia", "ddg")),
+                                re.I), ("wikipedia",)),
 ]
 
 
@@ -626,7 +666,7 @@ class Robots:
 
 
 # --- routing ---------------------------------------------------------------------------------------------------------
-def route(q, limits=None, rng=None, video=False, wiki_share=0.0):
+def route(q, limits=None, rng=None, video=False, wiki_share=0.0, hungry=False):
     """Sources to try for query `q`, best first: the topic's sources, then the general engines, the least used ones
     first among sources that fit equally (rotation), sources over their per-host limit left out. Wikipedia weighs
     less once it filled more than a tenth of today's pages (`wiki_share`; novelty, not a quota)."""
@@ -641,6 +681,9 @@ def route(q, limits=None, rng=None, video=False, wiki_share=0.0):
         score.setdefault(s, 0.35)
     for s in TAIL:                                          # #89: the other any-query sources, last (rotation)
         score.setdefault(s, 0.15)
+    if not hungry:
+        for s in MEAL_ONLY:                                 # #89 teen: no recipe loops outside meals
+            score.pop(s, None)
     if video:
         score.pop("wikipedia", None)                        # a video search never ends on Wikipedia
     if not ol_slug(q or ""):
@@ -773,6 +816,18 @@ def seen_things(live):
     return {k: [x for x in v if x] for k, v in seen.items()}
 
 
+HUNGRY_AT = 0.5                    # life's hunger (0.35 sated .. 0.55 meal time) from which food is on his mind
+DESK_VIDEO = 0.55                  # share of desk time slots that are YouTube, before the hour's video tilt
+DESK_SLOT_S = 20 * 60
+
+
+def desk_video(t, tilt=0.5):
+    """#89 teen: whether this 20-minute slot of desk time is a YouTube session (the same answer all slot long, so
+    the browser does not flip between modes); more in the evening and late at night (the rhythm's video tilt)."""
+    p = min(0.9, DESK_VIDEO * (0.6 + 0.8 * float(tilt or 0.0)))
+    return random.Random(int(t // DESK_SLOT_S)).random() < p
+
+
 def live_interest(live, art=None, rng=None):
     """interest_for from the live server's state (a few attributes, read defensively), plus the Tokyo hour of the
     simulated clock, the taste multipliers of the interest profile and the phone's feed for the browser."""
@@ -810,8 +865,15 @@ def live_interest(live, art=None, rng=None):
     try:
         if live.life.activity == "phone":
             extra["feed"] = "shorts"                       # #89: on the phone he scrolls shorts (TikTok / Shorts)
+        elif desk_video(live.clock.now(), interests.rhythm(hour)["video"]):
+            extra["feed"] = "video"                        # #89 teen: part of the desk time is YouTube
     except Exception:
         pass
+    try:                                                    # #89 teen: food and cooking only when he is hungry
+        from life import FOOD_ACTS
+        extra["hungry"] = bool(live.life.activity in FOOD_ACTS or live.life.hunger >= HUNGRY_AT)
+    except Exception:
+        extra["hungry"] = False
     return dict(it, **extra) if it else dict(extra, query="", **{"from": ""})
 
 

@@ -1,113 +1,189 @@
 # SUB-01
 
-A whole-brain model of one real human brain, built from public MRI data and wired to live Solana trades.
+**A computer model of brain activity, built from one person's public MRI scans, that drives an invented character
+living in a small room in Tokyo.**
 
-- **Data:** MyConnectome, OpenNeuro [ds000031](https://openneuro.org/datasets/ds000031) (public domain, PDDL). Raw scans are never stored here; the scripts download what they need.
-- **Real parts:** nerve-fibre tractography (diffusion MRI), cortical surface (T1), recorded resting-state activity (fMRI).
-- **Simulated part:** region-to-region dynamics in two layers on the subject's connectome: a slow (BOLD-band) Hopf layer
-  fitted on half of the subject's resting-state runs and tested on the other half, which modulates a fast ~10 Hz
-  delayed Stuart-Landau layer used for the live display. How much of the result comes from the wiring itself, compared
-  with randomised wiring, is reported in [docs/real_wiring_report.md](docs/real_wiring_report.md).
-- It is a model of brain activity, not a mind, and makes no claim of consciousness.
+The wiring between brain regions, the shape of the cortex and the resting-state recordings come from one open MRI
+dataset (the MyConnectome project, OpenNeuro [ds000031](https://openneuro.org/datasets/ds000031)). A model runs on that
+wiring around the clock, and its state decides when the character sleeps, what he clicks on, what he replays at night
+and how his simulated pulse moves. **It is a model, not a mind.** It does not understand, feel or think, it is not
+alive and it is not conscious; "he reads" or "he sleeps" is shorthand for what the simulation does. It is not the
+scanned person, and the character, his room and his life are fiction.
 
-CI: tests + demo smoke test on every PR (`.github/workflows/tests.yml`; locally `python tests/smoke_demo.py`).
+<p align="center">
+  <img src="docs/readme/room_overview.jpg" width="760"
+       alt="A 3D cutaway of a small Tokyo bedroom in daylight: a young man in a black hoodie sits at a desk with a monitor, next to a bed, bookshelf, fridge and door">
+</p>
 
-## Pipeline
+The live site is private (password-gated) for now. Everything here runs locally in demo mode, see
+[Run it locally](#run-it-locally).
 
-| Step | Script | Output |
+## What you see
+
+| | |
+|---|---|
+| <img src="docs/readme/room_desk.jpg" alt="Over-the-shoulder view of the character at his desk in daylight: a web page on the monitor, a water bottle, keyboard, plant and coffee mug on the desk"> | <img src="docs/readme/room_window.jpg" alt="Close view of the room's window at dusk: a laundry hanger with socks and a towel in front of the glass, and a photographic Tokyo skyline with lit towers behind it"> |
+| **The room** (`/`): his day in 3D on the Tokyo clock. He works at the desk, eats, uses his phone, looks out of the window and sleeps; the monitor and phone show the pages he is on. (Here at 14:00; the page on the monitor is a test fixture.) | **The window:** photographic Tokyo plates with real parallax, sky and weather that follow the hour (here 18:00). |
+| <img src="docs/readme/room_window_standing.jpg" alt="The same room cutaway, the character standing at the window looking out"> | <img src="docs/readme/brain_fibres.jpg" alt="Side view of a brain made of thousands of thin coloured fibre bundles traced from diffusion MRI, coloured by direction"> |
+| He gets up from the desk and looks out of the window. | **His brain** (`/brain`): the real nerve-fibre bundles traced from the diffusion MRI. Chat messages travel along them as stimuli. |
+| <img src="docs/readme/brain_specimen.jpg" alt="Side view of a pink-grey brain surface with folded gyri and the cerebellum below, rendered as a fresh specimen"> | <img src="docs/readme/brain_dissected.jpg" alt="The brain cut open on a coronal plane: his own T1 scan shows grey and white matter on the cut, the folded cortex and the cerebellum beside it"> |
+| The same brain as a specimen: cortex, cerebellum and brainstem from his own T1 scan. Vessels and some nerves come from an atlas and are labelled as such. | Dissected: a coronal cut through the same brain, showing his own T1 scan (grey and white matter) on the cut face. |
+| <img src="docs/readme/brain_column.jpg" alt="A tall column of thousands of thin pale neuron branches on black, with cortical layer labels L2 to L5 on the left"> | <img src="docs/readme/neuron_h01.jpg" alt="Close-up of green and orange neuron branches with small spines and cell bodies, and grey-blue glia, on a dark background"> |
+| One continuous zoom: whole brain → a cortical column at true size, with layers L1–L6 measured in H01 … | … → real human neurons from the H01 electron-microscopy reconstruction, with simulated activity on them. None of these cells is from the scanned person. |
+
+Also on the site: the **dream diary** (`/diary`), written each Tokyo morning from what was replayed in REM sleep; what
+the model "sees" (`/world.html`, labelled "sees": images generated from its state); and `/about.html`, with every number
+and credit. Diary lines and dream images are AI-generated and labelled as such.
+
+## What it does
+
+- **Sleeps.** A published sleep–wake circuit (Phillips & Robinson 2007) decides when the model is awake, in NREM or in
+  REM. Undisturbed it falls asleep around 23:56 and wakes around 07:54 Tokyo time. Chat messages heard during the day
+  are replayed during REM. ([docs/twin/sleep.md](docs/twin/sleep.md))
+- **Reads the web.** A headless browser follows links, searches and reads pages on the open web, read-only: the only
+  thing it types is a filtered query into a site's search box; it never posts, signs up, buys or connects a wallet, and
+  a guard blocks unsafe sites. The brain model votes among the options on each page. What it reads becomes a stimulus
+  and dream material.
+- **Short videos and a dopamine model.** Phone time goes to short videos (YouTube Shorts, TikTok) through their official
+  players; each new video gives a simulated, habituating dopamine-like burst. The fix (official YouTube Data API,
+  TikTok's official player) is merged and is being verified on the live site (see [docs/HANDOFF.md](docs/HANDOFF.md)).
+- **Chat and "teach him something".** Messages are filtered (no links, addresses or tickers), then turned into input to
+  the brain networks their words relate to. A taught word is studied, replayed at night and tested the next day.
+- **An AI reads and remembers for him; his brain model chooses.** A language model writes short notes on pages, proposes
+  day plans for the brain model to vote on, and can write chat replies tagged "his reply (AI-written)". Capped at
+  $2.00 per Tokyo day.
+- **Spiking neurons.** One million simulated spiking neurons inside his wiring run on rented GPUs (scheduled, capped),
+  with a 20,000-neuron network on the server CPU as a fallback. They vote in choices, learn from a dopamine signal, and
+  take a daily memory test. Also YouTube and chess at the desk, music picked by the brain vote, and food orders
+  (simulated).
+
+## How it works
+
+```mermaid
+flowchart LR
+  A["Public MRI<br/>(OpenNeuro ds000031)"] --> B["Connectome<br/>214 regions, real fibres"]
+  A --> C["Resting-state<br/>recordings"]
+  B --> D["Brain model<br/>slow Hopf layer + fast 10 Hz layer"]
+  C --> D
+  B --> E["Spiking network<br/>1M neurons (GPU) / 20k (CPU)"]
+  D --> F["Sleep circuit,<br/>neuromodulators, pulse"]
+  D --> G["Brain vote<br/>(what to click, play, plan)"]
+  E --> G
+  H["Chat, web pages,<br/>short videos"] --> D
+  F --> I["The character<br/>and his room"]
+  G --> I
+  I --> J["Diary and<br/>dreams"]
+```
+
+| Stage | What | Where |
 |---|---|---|
-| Connectome (tractography + Schaefer-200 / Harvard-Oxford atlas) | `build_connectome.py` | `out/connectome.npz`, `out/labels_dwi.nii.gz` |
-| Real fibres for the web | `export_fibres.py` | `web/fibres*.bin`, `web/fibres.json` |
-| Cortical surface | `build_cortex.py` | `web/cortex*.bin` |
-| Resting-state activity (streamed, raw deleted) | `process_rest.py N` | `out/rest/*.npz` |
-| Nodes / edges for the page | `export_web.py` | `web/brain.json` |
-| Live page + model + Solana log stream + chat + sleep | `live_server.py --mint <MINT>` or `--demo` | http://localhost:8765 |
-| Sleep/wake engine, memory replay | `sleep.py` (used by `live_server.py`) | `data/state.json`, `data/nights/YYYY-MM-DD.json` |
-| Chat filter + message -> stimulus rules | `chat.py` (used by `live_server.py`) | |
-| His computer and phone screens: real web pages (headless Chromium, read-only, guarded) | `browse.py` (`--browse` / `BROWSE=1`) | `/api/screen/{desk,phone}.jpg`, `data/browsing.json` |
+| MRI → connectome | tractography + Schaefer-200 / Harvard-Oxford atlas (214 regions); v2 with MRtrix3 + SIFT2 | `build_connectome.py`, `analysis/build_connectome_v2.py` |
+| Brain model | slow Hopf layer fitted on half of the recordings, tested on the other half; fast delayed Stuart-Landau layer for the live display | `twin/hopf.py`, `brain_sim.py` |
+| Spiking network | leaky integrate-and-fire populations per region, delays from fibre lengths, STDP × dopamine | `spiking/` |
+| Sleep, body, chemistry | Phillips–Robinson circuit, neuromodulators, pulse | `sleep.py`, `twin/neurochem.py`, `twin/body.py` |
+| Choices | the brain model votes among options from pages, videos, chess moves, tracks, day plans | `brain_vote.py`, `life.py`, `browse.py` |
+| Character and room | three.js room, character, phone and monitor screens, window | `web/room.html`, `web/room/`, `room_build/` |
+| Diary | REM replays → the morning's entry | `diary.py`, `web/diary.html` |
 
-```bash
-python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
-./fetch_data.sh   # ~900 MB from OpenNeuro into data/ (git-ignored)
-```
+The full pipeline, the real-wiring analysis, sleep/chat/memory and the spiking network's settings are in
+**[docs/TECHNICAL.md](docs/TECHNICAL.md)**.
 
-## Real wiring: connectome v2 and the slow layer
+## Real, simulated, fiction
 
-| Step | Script | Output |
+| | |
+|---|---|
+| **Real data from the scanned person** | nerve-fibre tractography (diffusion MRI), cortex, cerebellum and brainstem surfaces and the T1 cut, resting-state recordings (fMRI) |
+| **Real data from other people (atlas / reference)** | brain vessels and some nerves (BodyParts3D, VENAT), cortical layer thicknesses and EM neurons (H01), neuron shapes (NeuroMorpho.Org), receptor densities |
+| **Real, from the world** | the web pages he browses, the Tokyo street map (OpenStreetMap), the photographic window view |
+| **Simulated** | all brain activity, sleep stages, neuromodulators and pulse, spiking neurons, learning and memory recall, tastes |
+| **AI-generated (labelled)** | diary lines, dream and "eye" images, page notes, day plans, chat replies |
+| **Fiction** | the character, his room, his day and his life; his food orders |
+
+## Honest numbers
+
+Each number comes from a file in this repository; negative results stay.
+
+| Result | Number | Source |
 |---|---|---|
-| ACT tissue map from the T1 (tried, not used: it truncated streamlines) | `analysis/make_5tt.py` | (pod input) |
-| MRtrix3 tractography on a RunPod pod (gradient check, msmt-CSD, iFOD2, SIFT2) | `analysis/runpod_job.py` + `analysis/pod/tract.sh` | `data/analysis/connectome_v2_raw.tar.gz` |
-| Consistency threshold, lengths, centroids | `analysis/build_connectome_v2.py` | `out/connectome_v2.npz` (v1 `out/connectome.npz` kept) |
-| Hopf slow layer: fit on half of the runs, test on the other half, 100 + 100 nulls | `analysis/real_wiring.py prep / nulls / run / report / export` | `docs/real_wiring/`, `twin/data/slow_layer.npz` |
-| Old quick checks (originals; reconstructions with `--conn` for v1/v2) | `analysis/null_test.py`, `analysis/hopf_test.py` (`analysis/*_test_recon.py`) | |
+| Wiring-only model vs recorded activity, held-out sessions | FC r ≈ 0.21 (randomised wiring 0.16–0.17; geometry nulls only borderline, p = 0.059) | [docs/real_wiring_report.md](docs/real_wiring_report.md) |
+| Perturbational complexity (PCI) | 0.18 awake, 0.07 NREM, 0.17 REM, all below the 0.31 clinical cut-off | [docs/pci/README.md](docs/pci/README.md) |
+| 1M spiking neurons playing Pong | **not learned**: 17.5 % vs 25 % for the no-plasticity control | [docs/spiking_report.md](docs/spiking_report.md) |
+| 1M spiking neurons learning to choose | exam 1.00 vs 0.275 with learning removed (0.26 random) | [docs/spiking/choice.md](docs/spiking/choice.md) |
+| Live decisions at 1M neurons | 0.45–0.69 correct vs 0.24–0.38 frozen twin (3 networks, small samples) | [docs/spiking/choice.md](docs/spiking/choice.md) |
+| Reading memory on the GPU | 6/6 items recalled a simulated day later, one validation run | [docs/spiking/gpu_reading/](docs/spiking/gpu_reading/) |
+| Room realism (visual QA scorecard, 2026-10-03) | 2.4 / 5 overall (was 1.9 before the soft-goods, hard-surface and window passes) | [docs/qa/scorecard.md](docs/qa/scorecard.md) |
 
-Pods follow fixed rules (`analysis/runpod_job.py`): only CPU or RTX A5000 pods, one at a time, deleted on finish, error or
-60 min, 2 h in total, every pod logged in `data/analysis/costs.jsonl`; pods it did not create are never touched.
-`live_server.py` runs the fitted slow layer by default (`SUB01_SLOW=wiring` uses the wiring-only version);
-`--replay-real-session` replays a recorded session instead (the previous default).
-
-## Resting-state activity (real recorded brain activity)
-
-`process_rest.py N [--workers 6]` streams the first N of the 132 resting-state runs listed in `rest_runs.txt`
-from OpenNeuro in parallel worker processes (~1.9 GB RAM each), keeps a region x time series per run in
-`out/rest/` (~240 KB each) and deletes the raw file. Runs already in `out/rest/` are skipped. It only needs `out/labels_t1.nii.gz` and `out/t1_brain_1mm.nii.gz` (skull-stripped,
-committed), so it runs on a fresh clone: `pip install -r requirements.txt && python process_rest.py 132`.
-After processing (or with `--validate` alone) it runs a QC: mean homotopic (left/right, name-matched) correlation
-vs mean correlation over all pairs, per run, written to `out/rest/qc.json`. Runs with homotopic < 0.3 (likely bad
-registration or motion) are moved to `out/rest/rejected/` (not committed) and not re-downloaded on later runs.
-
-## Sleep, chat and memory (Phase A)
-
-No language model, no generated text. Sleep is a small published circuit model (`sleep.py`, details and numbers in
-`docs/twin/sleep.md`); chat and memory are rule tables.
-
-- **Clock:** Asia/Tokyo (`SUB01_TZ`). Undisturbed it sleeps ~23:56-07:54 with 5 NREM-REM cycles of ~90 min.
-  `--time-scale 60` runs one sim hour per real minute, `--start 23:55` starts the demo clock there.
-- **Sleep circuit:** sleep/wake is the Phillips & Robinson (2007) MA/VLPO flip-flop driven by a homeostatic
-  somnogen H and a circadian drive C; NREM/REM is a REM-on/REM-off flip-flop with a slow REM pressure (our
-  parameters), so REM episodes lengthen and NREM gets lighter across the night. The engine also exports tonic
-  neuromodulator levels `{DA, 5HT, NE, ACh}` per state (`engine.modulators`), which drive `twin/neurochem.py`.
-- **Stages** (Stuart-Landau parameters glide over ~1-2 min, never jump):
-  AWAKE 10 Hz, normal coupling, stimulus gain 1.0 · NREM 1-3 Hz, 2-3x coupling, high synchrony, gain ~0.15
-  (deepest in early cycles) · REM 6 Hz, 0.6x coupling, more noise, gain 0.4 (longer in later cycles).
-- **Arousal:** messages and large trades (>= $5k) are input to the MA population and decay over minutes; when it
-  flips the switch the brain wakes ("woken at 03:12 by 5 messages"); once the input fades it falls asleep again.
-- **Sleep debt:** H above the rested cycle, in hours of lost sleep. Lost sleep and wake-ups raise it, sleep repays it,
-  high debt sends it to bed earlier. A tired brain is less reactive (lower gain) and noisier the next day.
-- **Chat:** max 280 characters, 1 message / 10 s per client, duplicates dropped. The filter runs first and blocks links,
-  Solana/ETH addresses, $TICKERS, insults, requests for money and personal data (e-mail, phone): blocked messages are
-  never shown or stored. Accepted messages hit: language (left temporal + frontal operculum) + somatomotor always,
-  reward (positive words), fear + salience (threat words), attention + control (questions), default network
-  (mentions of SUB-01 / "you"). Asleep, the drive is scaled by the stage gain and the message is marked "heard while asleep".
-- **Memory + replay:** accepted messages are stored with time, stage, stimulus pattern and emotional tag. In REM the
-  hippocampus replays them at 35 % amplitude, picked by recency, emotion and "arrived tonight" (with habituation).
-  Each night is written to `data/nights/YYYY-MM-DD.json` (stage timeline, wake-ups + cause, sleep debt, replayed
-  messages = "dream ingredients"). State is saved every minute to `data/state.json`. IPs are only kept for the
-  10 s rate-limit window; nothing about who sent a message is stored.
+## Run it locally
 
 ```bash
-python live_server.py --demo --time-scale 60 --start 23:55   # accelerated night (state in data/demo/)
-python tests/test_sleep.py                                    # or: python -m pytest tests/
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-server.txt        # the live server (requirements.txt is the MRI pipeline)
+BROWSE=0 python live_server.py --demo         # http://localhost:8765 : room at /, brain at /brain, diary at /diary
+python live_server.py --demo --time-scale 60 --start 23:55   # an accelerated night
 ```
 
-## Spiking brain (v3, `spiking/`)
-
-One million simulated spiking neurons inside the real wiring of one person's brain; a model, not a mind; not the
-person. One leaky integrate-and-fire population per atlas region (size proportional to the region's volume),
-long-range synapses sampled from the streamline counts with delays from the fibre lengths (6 m/s), driven by the
-recorded resting-state activity. Three-factor plasticity (STDP eligibility x dopamine), fast hippocampal Hebbian
-memory with REM replay, and a Pong task after DishBrain (Kagan et al. 2022). It runs in scheduled GPU sessions on
-RunPod; the Railway server keeps the learned weights. Full description, equations, results and limits:
-[docs/spiking_report.md](docs/spiking_report.md).
+Tests:
 
 ```bash
-python -m pytest tests/test_spiking_model.py tests/test_spiking_ops.py -q   # CPU, small networks
-python -m spiking.validate --cpu --n 20000                                  # CPU validation
-python -m spiking.validate --gpu                                            # 1M neurons on one RunPod pod (deleted after)
+pip install pytest
+python -m pytest -q tests/                    # spiking tests skip without torch, browser tests without Chromium
+BROWSE=0 python tests/smoke_demo.py           # starts the demo server, checks pages, /ws and the tick cost
+python -m tests.visual.harness --out tests/visual/out   # room screenshots (needs Playwright + Chromium)
 ```
 
-Railway env: `SUB01_POD_SECRET` and `RUNPOD_API_KEY` turn the daily session on; `SUB01_SESSIONS` (default
-`daily 21:00-22:00 Asia/Tokyo`, `off` disables). Optional caps: `SUB01_MAX_SESSION_MIN` (60, counted from pod
-creation), `SUB01_MAX_HOURS_PER_DAY` (1), `SUB01_GPU_HOURS_CAP` (8) per `SUB01_GPU_CAP_DAYS` (7, rolling);
-`SUB01_PONG=1` adds Pong (it has not learned so far). Learned weights and results live in `/data/spiking/`
-(per-item recall rows in `memory_tests.jsonl`, shown by `GET /api/memory` and the room page's memory card).
+`--demo` uses fake inputs and keeps its state in `data/demo/` (or a temporary directory for the smoke test). Paid
+services (image generation, language model, GPUs) are optional and off without their keys. Rebuilding the brain from
+the raw MRI needs `requirements.txt` and `./fetch_data.sh` (~900 MB): see [docs/TECHNICAL.md](docs/TECHNICAL.md).
+
+## Repository map
+
+| Path | What |
+|---|---|
+| `live_server.py` | the server: brain loop, sleep, chat, life, browsing, APIs, `/ws` |
+| `brain_sim.py`, `twin/` | the fast brain layer; the fitted slow layer, neurochemistry and body |
+| `sleep.py`, `chat.py`, `diary.py` | sleep circuit and memory replay, chat filter, dream diary |
+| `life.py`, `brain_vote.py`, `mind.py` | his needs and day, the brain vote, the AI notes and plans |
+| `browse.py`, `browse_service.py`, `search_sources.py`, `short_videos.py` | the read-only browser and what it searches and watches |
+| `spiking/` | the spiking network: model, plasticity, memory, GPU sessions, caps |
+| `build_*.py`, `export_*.py`, `process_rest.py` | MRI pipeline: connectome, cortex, fibres, recordings |
+| `analysis/` | offline analyses: real wiring, PCI, anatomy, neuron morphologies, benchmarks |
+| `web/` | the pages: `room.html`, `index.html` (`/brain`), `diary.html`, `world.html`, `about.html`, and their assets |
+| `room_build/` | the Blender and Node scripts that build the room, props and character clips |
+| `tests/` | unit tests, the demo smoke test and the room's visual QA (`tests/visual/`) |
+| `docs/` | reports, design notes, screenshots and the project's working docs |
+
+## Documentation
+
+- [docs/TECHNICAL.md](docs/TECHNICAL.md): pipeline, real wiring, resting state, sleep/chat/memory, spiking settings
+- [docs/ROADMAP.md](docs/ROADMAP.md): milestones, decisions, known risks, launch checklist
+- [docs/HANDOFF.md](docs/HANDOFF.md): how every runtime piece works today
+- [docs/OPERATIONS.md](docs/OPERATIONS.md): costs, daily caps, health checks, monitoring
+- [docs/real_wiring_report.md](docs/real_wiring_report.md): how much of the fit comes from the wiring
+- [docs/spiking_report.md](docs/spiking_report.md) and [docs/spiking/](docs/spiking/): the spiking network, results and limits
+- [docs/pci/README.md](docs/pci/README.md): the perturbational complexity test
+- [docs/twin/sleep.md](docs/twin/sleep.md), [docs/twin/neurochem.md](docs/twin/neurochem.md), [docs/twin/body.md](docs/twin/body.md): sleep, chemistry, body
+- [docs/research/game_look.md](docs/research/game_look.md), [docs/research/real_brain_sources.md](docs/research/real_brain_sources.md): research notes
+- [docs/qa/scorecard.md](docs/qa/scorecard.md), [docs/qa/defects.md](docs/qa/defects.md): the room's visual QA
+
+## Credits and licences
+
+- **MRI data:** the MyConnectome project, Poldrack RA et al. (2015), *Long-term neural and physiological phenotyping
+  of a single human*, Nature Communications 6:8885. OpenNeuro ds000031, PDDL (public domain). With thanks to the project
+  for making these data public.
+- **Neurons:** NeuroMorpho.Org reconstructions (CC BY 4.0) and H01 (Shapson-Coe A, Januszewski M, Berger DR et al.,
+  Science 2024, CC BY 4.0): [docs/spiking/morphology_credits.md](docs/spiking/morphology_credits.md).
+- **Anatomy atlases:** BodyParts3D (CC BY 4.0), VENAT (CC BY 4.0), ICBM 152 (build time only):
+  [web/anatomy/CREDITS.md](web/anatomy/CREDITS.md).
+- **Room:** modelled for this project (CC0), Poly Haven and other CC0 assets, window plates and their licences:
+  [web/room/CREDITS.md](web/room/CREDITS.md). The character was made for this project; the terms of its files are still
+  to be confirmed.
+- **Maps:** © OpenStreetMap contributors (ODbL). **Articles:** Wikipedia (CC BY-SA). **3D engine:** three.js (MIT).
+- **Code:** no licence has been chosen yet. The full list is on [`web/about.html`](web/about.html).
+
+All images in this README are our own screenshots of the pages, rendered in headless Chromium.
+
+## Disclaimer
+
+SUB-01 is an art and science project: a model of large-scale brain activity, not a mind. It does not show the scanned
+person's thoughts, memories or dreams, which cannot be read from MRI data, and it never depicts or speaks as that
+person. The character and his life are fiction. Nothing in this project is medical or financial advice.

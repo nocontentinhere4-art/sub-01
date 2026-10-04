@@ -20,8 +20,10 @@ Checks, per shot or once per run (hard = fails CI; the rest is reported in resul
 import argparse
 import json
 import os
+import re
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -36,7 +38,8 @@ from tests.visual.cdn_cache import CdnCache                # noqa: E402
 CHROMIUM = os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
 # the waits below poll on a timer (polling=100), not on requestAnimationFrame: the 390 page is a second, background page
 # whose frames Chromium may not schedule, so a rAF-polled predicate could stay unevaluated though already true
-GLB_FILES = 11                                            # room_clean, boy, 6 clips, hand_phone, food, boy_moves (#76: last)
+GLB_FILES = 11                                              # room_clean, boy, 6 clips, hand_phone, food, boy_moves (#76: last)
+PIP_URL = "/mini-brain?mini"                                # the room's embed (#116), served as web/index.html; "&neurons=1" is the regression
 BUDGETS = json.loads((HERE / "budgets.json").read_text())
 
 
@@ -61,13 +64,33 @@ def _pw_chromium():
         return None
 
 
+def wait_js(pg, predicate, timeout=15000, every=100):
+    """Poll a page predicate from here (pg.evaluate every `every` ms) until it is true or `timeout` ms pass.
+
+    Playwright's wait_for_function polls inside the page (requestAnimationFrame, or a setTimeout chain with polling=N);
+    on the second, background page Chromium may schedule neither for seconds at a time, so a true predicate went
+    unseen (CI, desk@14 on the 390 page: the diagnostic evaluate right after the timeout showed the scene taken). An
+    evaluate from here runs as soon as the page's main thread is free, whatever its timer throttling."""
+    t0 = time.time()
+    while True:
+        if pg.evaluate(predicate):
+            return True
+        if (time.time() - t0) * 1000 > timeout:
+            raise TimeoutError(f"wait_js: {timeout} ms exceeded")
+        pg.wait_for_timeout(every)
+
+
 class Harness:
-    def __init__(self, out, full=False, log=print, cdn_cache=HERE / ".cdn_cache"):
+    def __init__(self, out, full=False, log=print, cdn_cache=HERE / ".cdn_cache", only=None):
         self.out = Path(out); self.out.mkdir(parents=True, exist_ok=True)
-        self.full = full; self.log = log
+        self.full = full; self.log = log; self.only = set(only or [])
         self.cdn = CdnCache(cdn_cache) if cdn_cache else None
         self.res = {"software_webgl": True, "full": full, "shots": {}, "closeups": {}, "flicker": {}, "props": {}, "hard_failures": [],
                     "note": "headless Chromium with SwiftShader: FPS is a CPU rasteriser's, not a phone GPU's; DPR 1"}
+        if self.only and (self.out / "results.json").exists():      # an incremental run: the other scenes' results stay
+            self.res = json.loads((self.out / "results.json").read_text())
+            self.res["hard_failures"] = [h for h in self.res["hard_failures"] if not any(h.startswith((f"{sc}_", f"{sc}:")) for sc in self.only)]
+            self.res["partial_rerun"] = sorted(self.only)
         self.pages = {}
         self.t0 = time.time()
 
@@ -92,10 +115,12 @@ class Harness:
         if self.cdn:
             self.cdn.install(pg)
         pg.goto(self.base + "/room.html?debug&hour=14", wait_until="load")
-        pg.wait_for_function("window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9", timeout=180000, polling=100)
+        wait_js(pg, "() => !!(window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9)", timeout=180000)
         t0 = time.time()
         while st["glb"] < GLB_FILES and time.time() - t0 < 60:
             pg.wait_for_timeout(200)
+        # #98 G3's motion layer (room/boy_motion.js) swaps its clips in after boy_moves.glb: wait for it too (a no-op without it)
+        wait_js(pg, "() => !window.motion || !!window.motion.ready", timeout=60000)
         pg.evaluate("window.FREEZE = true")
         pg.add_script_tag(content=(HERE / "page_checks.js").read_text())
         pg.wait_for_timeout(300)                                   # the last tick's UI timer
@@ -112,10 +137,11 @@ class Harness:
         tick does (the debug act()), so the ticks that follow find him where they want him and plan nothing."""
         lf, stage, before, settle_s, at, clip, prep = S.scene(name)
         self.server.set_scene(name, hour)
-        pg.evaluate(f"setHour({hour}); if (window.ROLL) ROLL.force = null;")
+        # (the side-pose scene leaves the page's ROLL state turned: put it back, or the next lie-down pose restarts)
+        pg.evaluate(f"setHour({hour}); if (window.ROLL) {{ ROLL.force = null; ROLL.a = 0; ROLL.goal = 0; }}")
         try:
-            pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
-                                 f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))}); }}", timeout=15000, polling=100)
+            wait_js(pg, f"() => {{ const p = pose(); return !!(p.goal && p.goal.anchor === {json.dumps(at or 'desk')} "
+                        f"&& document.getElementById('clock').textContent.includes({json.dumps(S.clock(hour))})); }}", timeout=15000)
         except Exception as e:                                     # say where he was and what the page threw, not just "timeout"
             st = next((v[2] for v in self.pages.values() if v[1] is pg), {})
             state = pg.evaluate("JSON.stringify({pose: pose(), clock: document.getElementById('clock').textContent})")
@@ -134,14 +160,14 @@ class Harness:
         if before:                                                 # the next tick must change his goal (anchor or clip)
             was = pg.evaluate("JSON.stringify(pose().goal)")
             self.server.set_scene(name, hour)
-            pg.wait_for_function(f"() => {{ const p = pose(); return p.goal && JSON.stringify(p.goal) !== {json.dumps(was)} "
-                                 f"&& p.goal.anchor === {json.dumps(at or 'desk')}; }}", timeout=15000, polling=100)
+            wait_js(pg, f"() => {{ const p = pose(); return !!(p.goal && JSON.stringify(p.goal) !== {json.dumps(was)} "
+                        f"&& p.goal.anchor === {json.dumps(at or 'desk')}); }}", timeout=15000)
             pg.wait_for_timeout(250)
         if name == "walking":
             pose = self.walk_until(pg)
         else:
             pose = pg.evaluate(f"__qa.step(1/30, {int(round(settle_s * 30))})")
-        pg.evaluate("settle()")
+        pg.evaluate(f"settle(); __qa.settleWindow({hour})")
         pg.evaluate("__qa.followCam()")
         return pose
 
@@ -259,6 +285,73 @@ class Harness:
         self.log(f"  perf: animate {self.res['animate_ms_per_frame_1280']} ms/frame (1280), {ams} ms/frame (390, CPU x4); "
                  f"software-GL fps {fps['fps']} at 390 CPU x4")
 
+    # ---- the room's mini brain (the PiP iframe loads /brain?mini since #116): a rendered no-dots check
+    def pip(self):
+        ctx = self.browser.new_context(viewport={"width": 300, "height": 225}, device_scale_factor=1)
+        pg = ctx.new_page()
+        errors, failed = [], []
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.on("requestfailed", lambda r: failed.append(f"{r.url} ({r.failure})"))
+        pg.on("response", lambda r: failed.append(f"{r.url} -> {r.status}") if r.status >= 400 and r.url.startswith(self.base) and not r.url.endswith("/favicon.ico") else None)
+        if self.cdn:
+            self.cdn.install(pg)
+        t0 = time.time()
+        # the room's own embed: what URL it loads (#116: /brain?mini, without neurons=1)
+        with urllib.request.urlopen(self.base + "/room.html", timeout=30) as resp:
+            room_html = resp.read().decode("utf-8", "replace")
+        m = re.search(r'<a id="brainpip"[^>]*>\s*<iframe[^>]*\ssrc="([^"]*)"', room_html)
+        embed_src = m.group(1) if m else None
+        pg.goto(self.base + PIP_URL, wait_until="load")
+        try:
+            pg.wait_for_function("renderer.info.render.calls > 0 && renderer.info.render.lines + renderer.info.render.triangles > 1000", timeout=120000)
+        except Exception as e:                                      # noqa: BLE001  (also a ReferenceError: the page's script died before its renderer)
+            self.res["pip"] = {"url": "/brain?mini", "embed_src": embed_src, "errors": errors, "failed": failed, "started": False}
+            self.res["hard_failures"].append(f"pip: the mini brain did not start rendering ({type(e).__name__}; errors {errors[:3]}; failed {failed[:3]})")
+            ctx.close()
+            return
+        pg.wait_for_timeout(6000)                                   # a few more frames: the fibres and the live feed
+        pg.add_style_tag(content="#n3mini{display:none!important}")
+        pg.wait_for_timeout(1500)
+        path = self.out / "pip_mini_brain.png"
+        pg.screenshot(path=str(path), timeout=240000, animations="disabled")
+        info = pg.evaluate("""({calls: renderer.info.render.calls, points: renderer.info.render.points, lines: renderer.info.render.lines,
+            triangles: renderer.info.render.triangles, neurons_wanted: typeof n3want !== 'undefined' ? !!n3want : null,
+            forest: typeof n3d !== 'undefined' ? !!n3d : null, n3_class: document.body.classList.contains('n3'),
+            text: (document.getElementById('n3mini') || {}).innerText || ''})""")
+        sp = IC.specks(path)
+        mask = sp.pop("mask")
+        if sp["specks"]:
+            IC.save_mask(mask, path, self.out / "pip_mini_brain_specks.png")
+        exp = IC.exposure(path)
+        r = {"url": "/brain?mini (served as web/index.html)", "embed_src": embed_src, "size": [300, 225], "render": info, "exposure": exp,
+             "specks": sp["specks"], "largest": sp["largest"], "bright_frac": sp["bright_frac"], "errors": errors, "failed": failed,
+             "started": True, "seconds": round(time.time() - t0, 1)}
+        self.res["pip"] = r
+        for e in errors:
+            self.res["hard_failures"].append(f"pip: JS error: {e}")
+        for f in failed:
+            self.res["hard_failures"].append(f"pip: request failed: {f}")
+        if embed_src is None or not embed_src.startswith("/brain?mini") or "neurons=1" in embed_src:
+            self.res["hard_failures"].append(f"pip: the room embeds {embed_src!r}; expected /brain?mini without neurons=1 (#116)")
+        if exp["black_frac"] > 0.97:
+            self.res["hard_failures"].append("pip: the mini brain rendered blank")
+        if info["points"] > 0:
+            self.res["hard_failures"].append(f"pip: {info['points']} points drawn (a THREE.Points layer: dots)")
+        if info["neurons_wanted"] or info["forest"] or info["n3_class"]:
+            self.res["hard_failures"].append("pip: the neuron forest is on in the mini brain (its cells read as dots at 300 px; #116)")
+        if sp["bright_frac"] < 0.05:
+            self.res["hard_failures"].append(f"pip: the fibres are dim or missing ({sp['bright_frac']:.1%} of the frame bright; 20% on main; "
+                                             "they step back to <1% when the forest is on)")
+        lim = BUDGETS.get("pip_draw_calls")
+        if lim is not None and info["calls"] > lim:
+            self.res["hard_failures"].append(f"pip: {info['calls']} draw calls in the mini brain (budget {lim}; 2 on main, 9 with the forest)")
+        lim = BUDGETS.get("pip_specks")
+        if lim is not None and sp["specks"] > lim:
+            self.res["hard_failures"].append(f"pip: {sp['specks']} bright specks in the mini brain (budget {lim})")
+        self.log(f"  pip /brain?mini: embed {embed_src}, forest {info['forest']}, calls {info['calls']}, points {info['points']}, lines {info['lines']}, "
+                 f"tris {info['triangles']}, specks {sp['specks']}, bright {sp['bright_frac']:.1%}, black {exp['black_frac']:.1%}, {r['seconds']}s")
+        ctx.close()
+
     # ---- the run
     def run(self):
         from playwright.sync_api import sync_playwright
@@ -268,14 +361,21 @@ class Harness:
             self.browser = p.chromium.launch(executable_path=exe, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
             try:
                 shots = S.FULL_SHOTS if self.full else S.CORE_SHOTS
+                pick = lambda sc: not self.only or sc in self.only            # noqa: E731  (--only: a subset of scenes)
                 # one page per size; scenes in a stable order so the before-scenes (sleeping before phone) cost little
                 for name, hour, size in sorted(shots, key=lambda t: (t[2], t[1], list(S.SCENES).index(t[0]))):
-                    self.shot(name, hour, size)
+                    if pick(name):
+                        self.shot(name, hour, size)
                 for cname, (scene, hour, recipe) in S.CLOSEUPS.items():
-                    self.closeup(cname, scene, hour, recipe)
+                    if pick(scene):
+                        self.closeup(cname, scene, hour, recipe)
                 for scene, hour in ([("desk", 14), ("window", 19), ("sleeping", 23), ("door", 8)] if self.full else [("desk", 14)]):
-                    self.flicker(scene, hour)
-                self.perf()
+                    if pick(scene):
+                        self.flicker(scene, hour)
+                if pick("pip"):
+                    self.pip()
+                if not self.only:
+                    self.perf()
             finally:
                 for size, (ctx, pg, st) in self.pages.items():
                     self.res[f"page_{size}"] = {k: st[k] for k in ("errors", "failed", "glb_loaded", "ready")}
@@ -326,6 +426,17 @@ class Harness:
         L += ["", "## Textures (texels per metre of the object's longest side)", ""]
         for t in sorted(R.get("textures", []), key=lambda t: (t["texels_per_m"] is None, t["texels_per_m"] or 0))[:16]:
             L.append(f"- {t['material'] or '?'} {t['kind']} {t['size'][0]}x{t['size'][1]} on {', '.join(t['objects'])} ({t['max_dim_m']} m): {t['texels_per_m']} texels/m, anisotropy {t['aniso']}")
+        if R.get("pip"):
+            p = R["pip"]
+            L += ["", "## The room's mini brain (/brain?mini, 300x225)", "", f"- the room embeds `{p.get('embed_src')}` (#116: /brain?mini without neurons=1)"]
+            if p.get("started"):
+                L.append(f"- [pip_mini_brain.png](pip_mini_brain.png): neuron forest {p['render']['forest']}, draw calls {p['render']['calls']}, THREE.Points drawn "
+                         f"{p['render']['points']}, lines {p['render']['lines']}, triangles {p['render']['triangles']}, bright {p['bright_frac']:.1%} of the frame, "
+                         f"black {p['exposure']['black_frac']:.1%}, errors {len(p['errors'])}; {p['specks']} small bright blobs (the fibres' beads count too: "
+                         f"140 on main, 189 with the forest, so a texture figure, not the dots test)"
+                         + (f" — [blobs]({'pip_mini_brain_specks.png'})" if p['specks'] else ""))
+            else:
+                L.append(f"- the mini brain did not start rendering: errors {p['errors'][:3]}, failed requests {p['failed'][:3]}")
         L += ["", "## Performance", "",
               f"- character logic (animate) at 1280: {R.get('animate_ms_per_frame_1280')} ms/frame; at 390 under CPU x4: {R.get('animate_ms_per_frame_390_cpu_x4')} ms/frame",
               f"- software-GL frames at 390, CPU x4, 4 s: {R.get('fps_390_cpu_x4_software_gl')} (a CPU rasteriser: not a phone number)"]
@@ -340,8 +451,10 @@ def main():
     ap.add_argument("--out", default="tests/visual/out")
     ap.add_argument("--full", action="store_true", help="every scene x hour x size (the heavy set); default: the core set CI runs")
     ap.add_argument("--no-cdn-cache", action="store_true", help="let the browser fetch three.js and leaflet itself (default: cached through Python)")
+    ap.add_argument("--only", default=None, help="comma-separated scenes to (re)run; with an existing results.json in --out the rest is kept")
     args = ap.parse_args()
-    res = Harness(ROOT / args.out, full=args.full, cdn_cache=None if args.no_cdn_cache else HERE / ".cdn_cache").run()
+    res = Harness(ROOT / args.out, full=args.full, cdn_cache=None if args.no_cdn_cache else HERE / ".cdn_cache",
+                  only=[x for x in (args.only or "").split(",") if x]).run()
     sys.exit(1 if res["hard_failures"] else 0)
 
 

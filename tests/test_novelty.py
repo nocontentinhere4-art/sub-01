@@ -200,7 +200,7 @@ def test_failing_sources_are_set_aside_and_the_rest_rotate():
     sc, opened, searched = _stub(b, {"hn": [{"url": "https://example.org/bread", "title": "Bread at home"}]})
     seeds = []
 
-    async def _seed(sc_, why):
+    async def _seed(sc_, why, *a):
         seeds.append(why)
         return True
     b._seed = _seed
