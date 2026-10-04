@@ -1,8 +1,9 @@
-"""Screenshots and frame timings of the room page (#98 G6, rendering). Run by hand (no `test_` prefix: pytest does not
-collect it):
+"""Screenshots, frame timings and the black-cloth metric of the room page (#98 G6, rendering). Run by hand (no `test_`
+prefix: pytest does not collect it); tests/visual/test_black_cloth.py runs the cloth metric in CI:
 
     python tests/room_render_shots.py --tag before --out docs/design/room-render
-    python tests/room_render_shots.py --tag after  --out docs/design/room-render
+    python tests/room_render_shots.py --tag after  --out docs/design/room-render --post high
+    python tests/room_render_shots.py --cloth --post high                 # the hoodie's brightness by day (face and medium shots at 08 and 14)
 
 Starts `live_server.py --demo` (BROWSE=0) and opens `/?debug&nolive&hour=H` in headless Chromium at 1280 x 800 and at
 390 x 844 (mobile), for the hours 8, 14, 19 and 23, with him placed in the same spot each time (desk in the morning,
@@ -13,6 +14,11 @@ screenshots it measures, on the 1280 and the 390 page:
   - with room_post.js present (the "after" build): each quality tier in turn (post.setTier), and the post module's info.
 Headless Chromium here draws WebGL in software (SwiftShader): the FPS numbers are those of a CPU rasteriser, not of a
 phone GPU, and results.json says so. The JS ms per frame under throttle is the number that transfers to a phone.
+
+The cloth metric (the owner keeps the original look: black cloth stays black or charcoal in daylight too): the lit frame
+of a shot, and the same frame with his mesh drawn unlit in its own texture against a blue background (nothing else
+drawn). A pixel whose texel is dark (luminance < 50 of 255: the hoodie, the hair, the trousers) is cloth; the metric is
+the mean luminance of the lit frame over those pixels. The budget is CLOTH_MAX.
 """
 import argparse
 import json
@@ -30,6 +36,9 @@ sys.path.insert(0, str(ROOT))
 # scene per shot: hour -> (activity, sleep stage, screen); "23s" is 23:00 asleep with the lights off (G8's #15)
 HOURS = {8: ("research", "AWAKE", "desk", "face"), 14: ("window", "AWAKE", None, "medium"), 19: ("research", "AWAKE", "desk", "face"),
          23: ("phone", "AWAKE", "phone", "over"), "23s": ("sleep", "NREM", None, "overview")}   # the 4th item: the camera shot pinned (after this branch); 23s keeps the overview for the night metric
+CLOTH_SHOTS = ((8, "face"), (8, "medium"), (14, "face"), (14, "medium"))   # daylight on his black hoodie: at the desk in the morning, at the sill at 14
+CLOTH_MAX = 70            # mean luminance (0-255) of the lit frame over his dark texels, at most (the coordinator's target)
+CLOTH_TEXEL = 110         # a texel darker than this is cloth (boy.glb's texture: the hoodie ~77 as painted, the hair ~27, skin > 150; the page darkens the cloth once)
 INJECT = """
 (() => {
   window.__fps = (ms) => new Promise(res => { let n = 0; const t0 = performance.now();
@@ -39,6 +48,22 @@ INJECT = """
   // cannot be read from outside a module script, so the page exposes __frameMs under ?debug (room.html, loop block)
 })();
 """
+# his mesh unlit in its own texture, everything else pure blue (the room still occludes him; translucent effects left out):
+# which pixels of the frame are his, and how dark their texel is
+MASK_JS = """() => {
+  const his = [], others = [], hidden = []; boy.traverse(o => { if (o.isMesh && o.material) his.push(o); });
+  scene.traverse(o => { if (o.isMesh && o.material && !his.includes(o)) {
+    const m = [].concat(o.material)[0];
+    if (m.transparent || m.blending !== THREE.NormalBlending || m.colorWrite === false || m.isShaderMaterial) { if (o.visible) { o.visible = false; hidden.push(o); } }
+    else others.push([o, o.material]); } });
+  const mat = new THREE.MeshBasicMaterial({map: his[0].material.map, toneMapped: false}), blue = new THREE.MeshBasicMaterial({color: 0x0000ff, toneMapped: false});
+  const saved = his.map(o => o.material); his.forEach(o => { o.material = mat; }); others.forEach(([o]) => { o.material = blue; });
+  const bg = scene.background, cc = new THREE.Color(); renderer.getClearColor(cc); const ca = renderer.getClearAlpha();
+  scene.background = null; renderer.setRenderTarget(null); renderer.setClearColor(0x0000ff, 1); renderer.clear(); renderer.render(scene, camera);
+  his.forEach((o, i) => { o.material = saved[i]; }); others.forEach(([o, m]) => { o.material = m; }); hidden.forEach(o => { o.visible = true; });
+  scene.background = bg; renderer.setClearColor(cc, ca); mat.dispose(); blue.dispose();
+  const r = renderer.domElement.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }"""
+HUD_OFF = "#top,#side,#corner,#dock,#vignette,#away{display:none!important}"
 
 
 CDN_HOSTS = ("cdn.jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com")
@@ -83,6 +108,129 @@ def wait_ready(base, proc, timeout=120):
     raise RuntimeError("server not ready")
 
 
+class Run:
+    """The demo server and a headless Chromium (software WebGL), with the page opened at an hour and him placed."""
+
+    def __init__(self, port=8797, chromium=None, cdn_cache=None, post=None):
+        self.port, self.post = port, post
+        self.chromium = chromium or os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
+        self.cdn_cache = cdn_cache or str(Path(tempfile.gettempdir()) / "sub01-cdn-cache")
+
+    def __enter__(self):
+        self.tmp = tempfile.mkdtemp(prefix="roomshots-")
+        env = dict(os.environ, BROWSE="0", SUB01_SPIKING_LIVE="0", SUB01_WS_STATS_S="3600",
+                   OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")   # as in the Dockerfile: a spinning BLAS starves the browser
+        self.log = open(Path(self.tmp) / "server.log", "w")
+        self.proc = subprocess.Popen([sys.executable, str(ROOT / "live_server.py"), "--demo", "--port", str(self.port),
+                                      "--host", "127.0.0.1", "--data-dir", self.tmp], cwd=ROOT, env=env, stdout=self.log, stderr=subprocess.STDOUT)
+        self.base = f"http://127.0.0.1:{self.port}"
+        try:
+            wait_ready(self.base, self.proc)
+            from playwright.sync_api import sync_playwright
+            self.pw = sync_playwright().start()
+            self.browser = self.pw.chromium.launch(executable_path=self.chromium, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        except Exception:
+            self.close()
+            raise
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+    def close(self):
+        for k in ("browser", "pw"):
+            try:
+                o = getattr(self, k, None)
+                if o:
+                    (o.close if k == "browser" else o.stop)()
+            except Exception:
+                pass
+        self.proc.terminate()
+        try:
+            self.proc.wait(10)
+        except Exception:
+            self.proc.kill()
+        self.log.close()
+
+    def page(self, w, h, hour, mobile):
+        # ignore_https_errors: in a sandbox behind a TLS-inspecting proxy Chromium does not trust the proxy's CA for the CDNs
+        ctx = self.browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile,
+                                       ignore_https_errors=True)
+        pg = ctx.new_page()
+        if not os.environ.get("NO_INJECT"):
+            pg.add_init_script(INJECT)
+        for host in CDN_HOSTS:
+            pg.route(f"https://{host}/**", cdn_router(self.cdn_cache))
+        errors = []
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.on("console", lambda m: errors.append("console.error: " + m.text) if m.type == "error" else None)
+        pg.goto(f"{self.base}/?debug&nolive&hour={hour}" + (f"&post={self.post}" if self.post else ""), wait_until="load", timeout=120000)
+        pg.wait_for_function("() => !!(window.room && window.boy && window.actions && window.actions.idle && window.actions.sleep)", timeout=240000, polling=1000)
+        pg.wait_for_function("() => !window.post || window.post.active || Object.keys(window.post.info().failed).length > 0 || window.post.info().tier === 'low'", timeout=120000, polling=1000)
+        pg.wait_for_timeout(1500)
+        return ctx, pg, errors
+
+    @staticmethod
+    def settle(pg, hour, shot=None):
+        act, stage, screen, shot0 = HOURS[hour]
+        shot = shot or shot0
+        h = int(str(hour).rstrip("s"))
+        pg.evaluate(f"""() => {{ setHour({h}); setStage({json.dumps(stage)}); setScreen({json.dumps(screen)}); if (window.setShot) setShot({json.dumps(shot)});
+          if (!{json.dumps(bool(os.environ.get("KEEP_MARKERS")))}) scene.traverse(o => {{ if (o.isMesh && o.geometry.type === "SphereGeometry" && o.material.color && o.material.color.getHex() === 0xff00ff) o.visible = false; }});   // ?debug's marker balls
+          act({json.dumps(act)}); settle(); for (let i = 0; i < 40; i++) sim(0.05);
+          if ({json.dumps(screen)} === "desk" && monitor) monitor.set(drawReading({{title: "Inokashira Park", host: "en.wikipedia.org", kind: "wiki",
+            extract: "Inokashira Park is a park in Musashino and Mitaka, western Tokyo. It straddles the border between the two cities, and was opened in 1917. The park has a pond, a zoo, a shrine to Benzaiten, a boating area and many cherry trees."}}));
+          settle(); updateCameraGoal();
+          camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); }}""")
+        pg.wait_for_timeout(2500)
+
+
+def cloth_metric(pg, out, name):
+    """The mean luminance of the lit frame over his dark texels (see the module docstring). Writes `name`_lit.png,
+    `name`_mask.png (the cloth pixels tinted) next to the numbers it returns."""
+    import numpy as np
+    from PIL import Image
+    pg.add_style_tag(content=HUD_OFF)
+    pg.evaluate("window.FREEZE = true; post.render(0.1)")
+    lit_p, mask_p = out / f"{name}_lit.png", out / f"{name}_mask.png"
+    pg.screenshot(timeout=240000, path=str(lit_p), type="png")
+    x, y, w, h = pg.evaluate(MASK_JS)
+    pg.screenshot(timeout=240000, path=str(mask_p), type="png")
+    pg.evaluate("post.render(0.1); window.FREEZE = false")
+    lit = np.asarray(Image.open(lit_p).convert("RGB")).astype(np.float32)[y:y + h, x:x + w]
+    msk = np.asarray(Image.open(mask_p).convert("RGB")).astype(np.int32)[y:y + h, x:x + w]
+    him = ~((msk[..., 0] < 8) & (msk[..., 1] < 8) & (msk[..., 2] > 247))
+    tex_lum = msk @ np.array([0.299, 0.587, 0.114])
+    cloth = him & (tex_lum < CLOTH_TEXEL)
+    lum = lit @ np.array([0.299, 0.587, 0.114])
+    r = {"him_px": int(him.sum()), "cloth_px": int(cloth.sum()), "cloth_mean": round(float(lum[cloth].mean()), 1) if cloth.any() else None,
+         "cloth_p90": round(float(np.percentile(lum[cloth], 90)), 1) if cloth.any() else None,
+         "cloth_over_120": round(float((lum[cloth] > 120).mean()), 4) if cloth.any() else None,
+         "skin_mean": round(float(lum[him & ~cloth].mean()), 1) if (him & ~cloth).any() else None}
+    tint = np.asarray(Image.open(lit_p).convert("RGB")).copy()
+    sub = tint[y:y + h, x:x + w]; sub[cloth] = (sub[cloth] * 0.4 + np.array([255, 0, 255]) * 0.6).astype(np.uint8); tint[y:y + h, x:x + w] = sub
+    Image.fromarray(tint).save(mask_p)
+    return r
+
+
+def cloth_means(run, out, shots=CLOTH_SHOTS, width=1280, tag="cloth"):
+    """The cloth metric of each (hour, shot) at `width` (desktop 1280 x 800, or the 390 phone): name -> numbers."""
+    out = Path(out); out.mkdir(parents=True, exist_ok=True)
+    res = {}
+    for hour, shot in shots:
+        mobile = width < 640
+        ctx, pg, errors = run.page(width, 844 if mobile else 800, hour, mobile)
+        run.settle(pg, hour, shot)
+        name = f"{tag}_{width}_h{hour:02d}_{shot}"
+        r = cloth_metric(pg, out, name)
+        r["errors"] = errors[:5]
+        r["post"] = pg.evaluate("window.post ? post.info().tier : null")
+        res[name] = r
+        print("cloth", name, json.dumps(r), flush=True)
+        ctx.close()
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8797)
@@ -95,117 +243,57 @@ def main():
     ap.add_argument("--sizes", default="1280,390")
     ap.add_argument("--cdn-cache", default=str(Path(tempfile.gettempdir()) / "sub01-cdn-cache"))
     ap.add_argument("--post", default=None, help="pin the quality tier (?post=): headless software GL would detect 'low' and draw no post chain")
+    ap.add_argument("--cloth", action="store_true", help="only the black-cloth metric (CLOTH_SHOTS at 1280) into --out/cloth")
     args = ap.parse_args()
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
     hours = [int(h) if h.isdigit() else h for h in args.hours.split(",")]
     sizes = [int(s) for s in args.sizes.split(",")]
 
-    tmp = tempfile.mkdtemp(prefix="roomshots-")
-    env = dict(os.environ, BROWSE="0", SUB01_SPIKING_LIVE="0", SUB01_WS_STATS_S="3600",
-               OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")   # as in the Dockerfile: a spinning BLAS starves the browser
-    log = open(Path(tmp) / "server.log", "w")
-    proc = subprocess.Popen([sys.executable, str(ROOT / "live_server.py"), "--demo", "--port", str(args.port),
-                             "--host", "127.0.0.1", "--data-dir", tmp], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
-    base = f"http://127.0.0.1:{args.port}"
     results = {"tag": args.tag, "software_webgl": True,
                "note": "headless Chromium with SwiftShader (software WebGL): FPS is a CPU rasteriser's, not a phone GPU's"}
-    try:
-        wait_ready(base, proc)
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(executable_path=args.chromium, args=["--use-gl=angle", "--use-angle=swiftshader",
-                                                                             "--enable-unsafe-swiftshader"])
+    with Run(port=args.port, chromium=args.chromium, cdn_cache=args.cdn_cache, post=args.post) as run:
+        if args.cloth:
+            res = cloth_means(run, out / "cloth", width=sizes[0], tag=args.tag)
+            (out / "cloth" / f"results_{args.tag}.json").write_text(json.dumps(res, indent=1))
+            worst = max(r["cloth_mean"] or 0 for r in res.values())
+            print(f"cloth: worst mean {worst} (budget {CLOTH_MAX})", "OK" if worst <= CLOTH_MAX else "OVER", flush=True)
+            return
+        for w in sizes:
+            h, mobile, tag = (800 if w == 1280 else round(w * 0.625), False, str(w)) if w >= 640 else (844, True, str(w))
+            for hour in hours:
+                ctx, pg, errors = run.page(w, h, hour, mobile)
+                run.settle(pg, hour)
+                name = f"{args.tag}_{tag}_h{str(hour).zfill(2)}.jpg"
+                pg.evaluate("window.FREEZE = true")            # ?debug: the loop stops; the screenshot takes the last frame (software GL is slow)
+                pg.screenshot(timeout=240000, path=str(out / name), type="jpeg", quality=88)
+                pg.evaluate("window.FREEZE = false")
+                if os.environ.get("SHOTS_DEBUG"):
+                    print("dbg", pg.evaluate("() => { const L = {}; scene.traverse(o => { if (o.isLight) L[o.type] = +o.intensity.toFixed(4); }); return {L, exp: renderer.toneMappingExposure, captured: scene.environment !== studioEnv, envI: scene.environmentIntensity, kind: CAM.kind, cam: camera.position.toArray(), tgt: controls.target.toArray()}; }"), flush=True)
+                info = pg.evaluate("() => ({dpr: window.dpr, post: window.post ? window.post.info() : null, gl: renderer.capabilities.isWebGL2, shot: window.CAM ? window.CAM.kind : null, cam: camera.position.toArray().map(v => +v.toFixed(2))})")
+                results[name] = {"errors": errors[:5], **info}
+                print("shot", name, json.dumps(info)[:300], flush=True)
+                ctx.close()
 
-            def page_for(w, h, hour, mobile):
-                # ignore_https_errors: in a sandbox behind a TLS-inspecting proxy Chromium does not trust the proxy's CA for the CDNs
-                ctx = browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile,
-                                          ignore_https_errors=True)
-                pg = ctx.new_page()
-                if not os.environ.get("NO_INJECT"):
-                    pg.add_init_script(INJECT)
-                for h in CDN_HOSTS:
-                    pg.route(f"https://{h}/**", cdn_router(args.cdn_cache))
-                errors = []
-                pg.on("pageerror", lambda e: errors.append(str(e)))
-                pg.on("console", lambda m: errors.append("console.error: " + m.text) if m.type == "error" else None)
-                pg.goto(f"{base}/?debug&nolive&hour={hour}" + (f"&post={args.post}" if args.post else ""), wait_until="load", timeout=120000)
-                pg.wait_for_function("() => !!(window.room && window.boy && window.actions && window.actions.idle && window.actions.sleep)", timeout=240000, polling=1000)
-                pg.wait_for_function("() => !window.post || window.post.active || Object.keys(window.post.info().failed).length > 0 || window.post.info().tier === 'low'", timeout=120000, polling=1000)
-                pg.wait_for_timeout(1500)
-                return ctx, pg, errors
-
-            def settle(pg, hour):
-                act, stage, screen, shot = HOURS[hour]
-                h = int(str(hour).rstrip("s"))
-                pg.evaluate(f"""() => {{ setHour({h}); setStage({json.dumps(stage)}); setScreen({json.dumps(screen)}); if (window.setShot) setShot({json.dumps(shot)});
-                  if (!{json.dumps(bool(os.environ.get("KEEP_MARKERS")))}) scene.traverse(o => {{ if (o.isMesh && o.geometry.type === "SphereGeometry" && o.material.color && o.material.color.getHex() === 0xff00ff) o.visible = false; }});   // ?debug's marker balls
-                  act({json.dumps(act)}); settle(); for (let i = 0; i < 40; i++) sim(0.05);
-                  if ({json.dumps(screen)} === "desk" && monitor) monitor.set(drawReading({{title: "Inokashira Park", host: "en.wikipedia.org", kind: "wiki",
-                    extract: "Inokashira Park is a park in Musashino and Mitaka, western Tokyo. It straddles the border between the two cities, and was opened in 1917. The park has a pond, a zoo, a shrine to Benzaiten, a boating area and many cherry trees."}}));
-                  settle(); updateCameraGoal();
-                  camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); }}""")
-                pg.wait_for_timeout(2500)
-
-            for w in sizes:
-                h, mobile, tag = (800 if w == 1280 else round(w * 0.625), False, str(w)) if w >= 640 else (844, True, str(w))
-                for hour in hours:
-                    ctx, pg, errors = page_for(w, h, hour, mobile)
-                    settle(pg, hour)
-                    name = f"{args.tag}_{tag}_h{str(hour).zfill(2)}.jpg"
-                    pg.evaluate("window.FREEZE = true")            # ?debug: the loop stops; the screenshot takes the last frame (software GL is slow)
-                    pg.screenshot(timeout=240000, path=str(out / name), type="jpeg", quality=88)
-                    pg.evaluate("window.FREEZE = false")
-                    if os.environ.get("SHOTS_DEBUG"):
-                        print("dbg", pg.evaluate("() => { const L = {}; scene.traverse(o => { if (o.isLight) L[o.type] = +o.intensity.toFixed(4); }); return {L, exp: renderer.toneMappingExposure, captured: scene.environment !== studioEnv, envI: scene.environmentIntensity, hour: typeof hour, stage: null, kind: CAM.kind, cam: camera.position.toArray(), tgt: controls.target.toArray()}; }"), flush=True)
-                        print("dbg_env", pg.evaluate("""() => { const f16 = h => { const s = (h & 0x8000) ? -1 : 1, e = (h >> 10) & 0x1f, m = h & 0x3ff; return e === 0 ? s * m * 2 ** -24 : e === 31 ? (m ? NaN : s * Infinity) : s * (1 + m / 1024) * 2 ** (e - 15); };
-                          const out = {captures: roomEnv.captures, key: roomEnv.key, envIsCapture: scene.environment === roomEnv.texture, envI: scene.environmentIntensity};
-                          const rt = roomEnv._env; if (rt) { const w = rt.width, h = rt.height, buf = new Uint16Array(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf);
-                            let nan = 0, inf = 0, max = 0, sum = 0, n = 0; for (let i = 0; i < buf.length; i++) { if ((i & 3) === 3) continue; const v = f16(buf[i]); if (Number.isNaN(v)) nan++; else if (!Number.isFinite(v)) inf++; else { max = Math.max(max, v); sum += v; n++; } }
-                            out.pmrem = {w, h, nan, inf, max, mean: sum / n}; }
-                          const cube = roomEnv.rt; out.faces = []; for (let f = 0; f < 6; f++) { const w = cube.width, buf = new Uint16Array(w * w * 4); renderer.readRenderTargetPixels(cube, 0, 0, w, w, buf, f);
-                            let nan = 0, max = 0, sum = 0, n = 0; for (let i = 0; i < buf.length; i++) { if ((i & 3) === 3) continue; const v = f16(buf[i]); if (Number.isNaN(v)) nan++; else { max = Math.max(max, v); sum += v; n++; } } out.faces.push({nan, max: +max.toFixed(4), mean: +(sum / n).toFixed(5)}); }
-                          return out; }"""), flush=True)
-                        for pre in ("setEnv(studioEnv); scene.environmentIntensity = 0.001; roomEnv.key = null; sim(0.05);", "roomEnv.key = null; sim(0.05);", "scene.traverse(o => { if (o.isRectAreaLight) o.intensity = 0; }); setEnv(studioEnv); roomEnv.key = null; roomEnv.update('x', [boy, phone]); setEnv(roomEnv.texture);"):
-                            print("dbg_env2", pre[:40], pg.evaluate("""(pre) => { eval(pre); const f16 = h => { const s = (h & 0x8000) ? -1 : 1, e = (h >> 10) & 0x1f, m = h & 0x3ff; return e === 0 ? s * m * 2 ** -24 : e === 31 ? (m ? NaN : s * Infinity) : s * (1 + m / 1024) * 2 ** (e - 15); };
-                              const cube = roomEnv.rt, faces = []; for (let f = 0; f < 6; f++) { const w = cube.width, buf = new Uint16Array(w * w * 4); renderer.readRenderTargetPixels(cube, 0, 0, w, w, buf, f);
-                                let nan = 0; for (let i = 0; i < buf.length; i++) { if ((i & 3) === 3) continue; if (Number.isNaN(f16(buf[i]))) nan++; } faces.push(nan); } return {captures: roomEnv.captures, faces}; }""", pre), flush=True)
-                        for tag2, js in (("low", "post.setTier('low', true)"), ("medium", "post.setTier('medium', true)"), ("noenv", "scene.environmentIntensity = 0; scene.traverse(o => { if (o.isMesh && o.material && o.material.envMapIntensity !== undefined) o.material.envMapIntensity = 0; })"),
-                                         ("nolights", "scene.traverse(o => { if (o.isLight) o.intensity = 0; })"), ("hemi1", "scene.traverse(o => { if (o.isHemisphereLight) o.intensity = 1; })")):
-                            pg.evaluate("window.FREEZE = true; " + js + "; controls.update(); post.render(0.1)"); pg.screenshot(timeout=240000, path=str(out / (f"dbg_{tag2}_" + name)), type="jpeg", quality=88)
-                            print("dbg2", tag2, pg.evaluate("() => { const L = {}; scene.traverse(o => { if (o.isLight) L[o.type] = +o.intensity.toFixed(4); }); return {L, chain: post.info().chain, rt: post.composer && [post.composer.renderTarget1.width, post.composer.renderTarget1.samples, post.composer.renderTarget1.texture.type]}; }"), flush=True)
-                        pg.evaluate("window.FREEZE = false")
-                    info = pg.evaluate("() => ({dpr: window.dpr, post: window.post ? window.post.info() : null, gl: renderer.capabilities.isWebGL2, shot: window.CAM ? window.CAM.kind : null, cam: camera.position.toArray().map(v => +v.toFixed(2))})")
-                    results[name] = {"errors": errors[:5], **info}
-                    print("shot", name, json.dumps(info)[:300], flush=True)
-                    ctx.close()
-
-            if not args.no_fps:
-                for w, h, mobile, tag, throttle in ((1280, 800, False, "1280", 1), (390, 844, True, "390", 1), (390, 844, True, "390x4", 4)):
-                    ctx, pg, errors = page_for(w, h, 19, mobile)
-                    settle(pg, 19)
-                    cdp = ctx.new_cdp_session(pg)
-                    cdp.send("Emulation.setCPUThrottlingRate", {"rate": throttle})
-                    tiers = pg.evaluate("() => window.post ? window.post.tiers() : [null]")
-                    fps = {}
-                    for tier in tiers:
-                        if tier:
-                            pg.evaluate(f"post.setTier({json.dumps(tier)}, true)")
-                            pg.wait_for_timeout(1500)
-                        f = pg.evaluate(f"__fps({int(args.fps_s * 1000)})")
-                        js = pg.evaluate(f"window.__frameMs ? __frameMs({int(args.fps_s * 1000)}) : null")
-                        fps[tier or "direct"] = {"fps": round(f, 1), "js": js, "dpr": pg.evaluate("window.dpr"),
-                                                 "post": pg.evaluate("window.post ? post.info() : null")}
-                        print(f"fps {tag} tier={tier}: {f:.1f} js={js}", flush=True)
-                    results[f"fps_{tag}"] = {"cpu_throttle": throttle, "errors": errors[:5], **fps}
-                    ctx.close()
-            browser.close()
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(10)
-        except Exception:
-            proc.kill()
+        if not args.no_fps:
+            for w, h, mobile, tag, throttle in ((1280, 800, False, "1280", 1), (390, 844, True, "390", 1), (390, 844, True, "390x4", 4)):
+                ctx, pg, errors = run.page(w, h, 19, mobile)
+                run.settle(pg, 19)
+                cdp = ctx.new_cdp_session(pg)
+                cdp.send("Emulation.setCPUThrottlingRate", {"rate": throttle})
+                tiers = pg.evaluate("() => window.post ? window.post.tiers() : [null]")
+                fps = {}
+                for tier in tiers:
+                    if tier:
+                        pg.evaluate(f"post.setTier({json.dumps(tier)}, true)")
+                        pg.wait_for_timeout(1500)
+                    f = pg.evaluate(f"__fps({int(args.fps_s * 1000)})")
+                    js = pg.evaluate(f"window.__frameMs ? __frameMs({int(args.fps_s * 1000)}) : null")
+                    fps[tier or "direct"] = {"fps": round(f, 1), "js": js, "dpr": pg.evaluate("window.dpr"),
+                                             "post": pg.evaluate("window.post ? post.info() : null")}
+                    print(f"fps {tag} tier={tier}: {f:.1f} js={js}", flush=True)
+                results[f"fps_{tag}"] = {"cpu_throttle": throttle, "errors": errors[:5], **fps}
+                ctx.close()
     (out / f"results_{args.tag}.json").write_text(json.dumps(results, indent=1))
     print("written", out / f"results_{args.tag}.json")
 

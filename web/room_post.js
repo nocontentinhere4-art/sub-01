@@ -283,14 +283,19 @@ export const GRADE_SHADER = {
       c = agx(c);
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c *= mix(shadows, highs, smoothstep(0.12, 0.75, l));           // split toning
-      c = (c - 0.5) * contrast + 0.5;
-      c = c * (1.0 - lift) + lift;                                   // the black level
+      // the rest of the grade works on the display-encoded value, like a LUT: a contrast pivot at middle grey (0.18 linear
+      // = 0.46 encoded) and the black level in encoded units (the lift is given in linear light). In linear light a
+      // contrast of 1.05 around 0.5 clipped everything under 0.02 (40 of 255) to black: his hoodie had no folds left.
+      c = toSRGB(clamp(c, 0.0, 1.0));
+      c = (c - 0.46) * contrast + 0.46;
+      float lf = toSRGB(vec3(max(lift, 0.0))).r;
+      c = c * (1.0 - lf) + lf;                                       // the black level
       c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, sat);
       vec2 d = (vUv - 0.5) * vec2(aspect, 1.0) / vec2(max(aspect, 1.0), 1.0);
       float v = 1.0 - vignette * smoothstep(0.45, 1.05, length(d) * 1.45);
-      c *= v;
+      c *= pow(v, 1.0 / 2.2);                                        // the same falloff as a vignette in linear light
       c += (hash(gl_FragCoord.xy + fract(time) * 100.0) - 0.5) * grain * (1.0 - 0.6 * l);
-      gl_FragColor = vec4(toSRGB(clamp(c, 0.0, 1.0)), 1.0);
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`,
 };
 

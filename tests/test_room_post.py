@@ -132,10 +132,17 @@ def test_page_wires_the_module():
     assert "post.frame(now - frameAt" in html and "post.setSize(w, h, dpr)" in html
     assert "gradeAt(hour" in html and "snapShadow(THREE, sun" in html and "new SunShafts(" in html and "new ContactBlob(" in html and "roomEnv.update(" in html
     assert "new THREE.SpotLight(" in html                                       # the desk lamp: one shadow map instead of six
+    assert "darken(m); m.needsUpdate = true" in html and "m.specularIntensity = 0.45" in html   # black cloth stays black by day (tests/visual/test_black_cloth.py measures it)
     assert "THREE.AgXToneMapping" in html and "vec3 agx(" in JS.read_text()        # the same film-like curve on both paths
+    cam = html.split("function updateCameraGoal")[1].split("// ---------- day and night")[0]
     for kind in ('"face"', '"screen"', '"medium"', '"over"', '"overview"'):       # the camera shots (G8 #10, #18)
-        assert kind in html.split("function updateCameraGoal")[1].split("// ---------- day and night")[0], kind
+        assert kind in cam, kind
+    lists = re.findall(r'\[((?:"\w+", )*"\w+")\]', cam.split("const list =")[1].split(";")[0])
+    assert len(lists) == 4 and all('"overview"' in l for l in lists)            # the overview is in every cycle ...
+    assert "holdOf(CAM.kind, list)" in cam and "0.75 * list.reduce" in html      # ... and holds >= 40 % of it (0.75 / 1.75)
     assert "CAM.cut" in html.split("function frame(now)")[1]
+    assert 'CAM.force = pinned ? "overview" : null' in html                      # the chip: the cycle, or the overview pinned
+    assert "post.focus(cd, smooth(2.4, 1.0, cd) * (atScreen ? 0.25 : 1))" in html   # the page on the monitor stays readable in the desk close-ups
     assert JS.stat().st_size < 60 * 1024
 
 

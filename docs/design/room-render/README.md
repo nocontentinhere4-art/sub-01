@@ -27,8 +27,9 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
   pixel ratio has already bottomed out, and raises it back after twelve seconds of fast ones (a failed tier is retried
   after 90 s). Every pass is imported on its own; one that fails to import, throws while building or throws while
   rendering is left out, and the room always draws (`tests/test_room_post.py`).
-- Physical light units (three.js's physical lights; 1 unit = 1000 SI): the sun 14 klx through the glass, the sky seen
-  through the window 6 knit, the bounce 1 klx, the desk lamp 0.28 kcd (a spot with one 1024 px shadow map, was a point
+- Physical light units (three.js's physical lights; 1 unit = 1000 SI): the sun 9 klx through the glass (a hazy autumn
+  sun; 14 lit black cloth in its patch to grey), the sky seen through the window 4 knit (6 lit black cloth at the sill
+  to grey), the bounce 1.3 klx, the desk lamp 0.28 kcd (a spot with one 1024 px shadow map, was a point
   light with six 512 px faces) plus a 0.04 kcd bulb for the spill, the ceiling light 0.2 kcd, a monitor 0.012 kcd and a
   phone 0.003 kcd on his face, the monitor 0.3 knit and the phone 0.45 knit. The exposure is a fixed stop per state, never
   a key that equalises the scenes (G8's review of the first cut: an adapting exposure lifted the lights-off night room to
@@ -45,9 +46,21 @@ shadows, a film-like tone curve, no stylised bloom or glow; phones stay ≥ 30 F
 - Camera (G8 #10, #18; the camera block in room.html is G6's now): shots like a game's on a slow cycle, with a cut at
   each new shot and a dolly inside one. At a screen: **face** (a medium close-up from the desk's end, the monitor
   lighting him), **screen** (over his shoulder onto the page), **medium**; on the phone: **over** the shoulder, **face**;
-  elsewhere: **medium** (2.4 m, 50° off his facing), **face**, and the **overview** (which stays in the cycle). A
+  elsewhere: **medium** (2.4 m, 50° off his facing), **face**. The **overview** is in every cycle and holds three
+  quarters of what the other shots hold together (≥ 40 % of the time; 12 s at least). The `camera` chip toggles between
+  the cycle (`camera: shots`) and the overview held (`camera: overview`); a drag still looks round for 20 s. A
   candidate position that would sit in a wall or a piece of furniture is turned round him (the mirror angle, a profile,
-  the front, a rear three-quarter) until it fits. `?debug` → `setShot("face")` pins one.
+  the front, a rear three-quarter) until it fits. `?debug` → `setShot("face")` pins one. In the face and screen shots
+  at the desk the depth of field is faint, so the page on the monitor stays readable (the monitor 0.35 knit by day).
+- Black cloth stays black by day (the coordinator's review): `boy.glb` paints the hoodie a dark grey (sRGB ~77, a 7 %
+  albedo: black only in the old dim light) and its `KHR_materials_specular` factor of 2 doubled the sheen, so by the
+  window the hood read light grey to white. The dark texels of his texture (cloth and hair; the skin is untouched) are
+  darkened once at load to a black fabric's ~1 %, the material is matte (roughness 0.88, specular 0.45 of a glossy
+  dielectric). `tests/visual/test_black_cloth.py` measures it: the mean luminance of the lit frame over his dark texels
+  in the page's face and medium shots at 08 and 14 must stay ≤ 70/255 (`tests/room_render_shots.py --cloth`). Found on
+  the way: the grade applied its contrast in linear light around 0.5, which clipped everything under 0.02 linear (40 of
+  255) to pure black, the hoodie's folds included; the contrast, black level, saturation and vignette now work on the
+  display-encoded value (pivot at middle grey), like a LUT, so shadows keep their detail at every hour.
 - Night (G8 #15): a city's night sky through the window (0.12 knit), a little moon and streetlight, at a fixed night
   stop; nothing is painted brighter than its light, and black cloth stays black. Monitor (G8 #16): the page is drawn at 0.3 knit, slightly
   blue-white, no longer a light source. Lamp on the hoodie (G8 #22): AgX in place of ACES (highlights roll off instead
