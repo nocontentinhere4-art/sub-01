@@ -153,4 +153,5 @@ const rep = {
 };
 const exL = [0, 1, 2].map(k => [Math.min(...eyeVL.map(p => p[k])), Math.max(...eyeVL.map(p => p[k]))]); rep_extra.eyeL_extent = exL.map(([a, b]) => +(b - a).toFixed(4)); rep_extra.eyeL_centre = ec.map(x => +x.toFixed(3)); rep_extra.headJ = head["head"].map(x => +x.toFixed(3));
 fs.writeFileSync(OUT.replace(/\.glb$/, "_report.json"), JSON.stringify(rep, null, 1));
+fs.writeFileSync(OUT.replace(/\.glb$/, "_rest.json"), JSON.stringify({ order, head, tail, parent: Object.fromEntries(order.map(n => [n, sk.bones[n].parent])) }));
 console.log(JSON.stringify({ ...rep, ...rep_extra, targets: applied.length }));
