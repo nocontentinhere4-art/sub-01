@@ -28,3 +28,21 @@
     66 cm mattress.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.
+
+### G2 body (`glb/boy_g2.glb`, built by `build_g2.mjs`)
+
+`node build_g2.mjs <makehuman/data dir> raw.glb && node rename_mh.mjs raw.glb glb/boy_g2.glb`. A fictional young man
+(not a real person), built from MakeHuman 1.x CC0 data only: base.obj, then the macro targets (male, age 20, weight 0.4,
+muscle 0.5, proportions 0.75, the three ethnic blends at 1/3 each), then the hand targets (finger diameter +0.55, finger
+length decrease 1.0, hand scale +0.15; env FD, FL, HS). It is scaled to 1.75 m, in metres, with the feet at y = 0. The rig
+is the default default.mhskel (163 bones) with default_weights.mhw, at identity rest, then renamed by `rename_mh.mjs`.
+
+- Eyes: MakeHuman high-poly eye proxy fitted via its .mhclo and scaled to a 24 mm eyeball. Iris, pupil and limbal ring
+  are vertex colours; each eye is skinned to eye.L / eye.R.
+- Measured on the mesh: 14,444 verts, 28,796 triangles; shoulders 40 cm, hand 19.4 cm, palm (index-to-little knuckle)
+  7.5 cm, middle finger 8.4 cm.
+- `glb/boy_g2_sheet.jpg` puts the renders next to real reference photos, with faces cropped out:
+  - Eadweard Muybridge, *Animal Locomotion* (1887), public domain:
+    - side view: https://commons.wikimedia.org/wiki/File:Nude_man_walking_(rbm-QP301M8-1887-553a~3).jpg
+    - back view: https://commons.wikimedia.org/wiki/File:Nude_man_walking_(rbm-QP301M8-1887-010c~6).jpg
+  - Open palm, CC0 (Unsplash, via Commons): https://commons.wikimedia.org/wiki/File:Man_in_hood_stretching_hand_(Unsplash).jpg
