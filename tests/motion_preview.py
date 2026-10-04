@@ -27,7 +27,9 @@ HERE = Path(__file__).resolve().parent
 SCENES = {
     "walk from the window past the bed": ("act('window', {activity:'window', place:'room'}); __qa.step(1/30, 30); live('order_food', {activity:'order_food', place:'room'});", 105,
                                           [[0.35, 1.25, -0.75], [-1.25, 0.55, 0.15]]),       # from the room's middle: the bed's side and his legs
-    "stretch beside the desk": ("act('research', {activity:'research', place:'room'}); live('get_delivery', {activity:'get_delivery', place:'room'}); __qa.step(1/30, 950); variant('stretch');", 135, 20),
+    "stretch beside the desk": ("act('research', {activity:'research', place:'room'}); live('get_delivery', {activity:'get_delivery', place:'room'}); __qa.step(1/30, 950); variant('stretch');", 135,
+                                [[0.95, 1.65, 0.55], [-0.5, 1.25, -0.45]]),               # from the door side: him, the raised arms and the chair at his left
+
 }
 # one render of the current state: lights and shadows refreshed, no animate() call (the page's sim(0, 1) would step its
 # interludes with dt 0 twice a frame and lose the stretch)
