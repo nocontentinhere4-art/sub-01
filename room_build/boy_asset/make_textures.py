@@ -167,7 +167,9 @@ sharp = np.clip(skin_clean + 0.2 * (skin_clean - np.stack([blur(skin_clean[:, :,
 skin_out = skin_clean * (1 - face_f[:, :, None]) + sharp * face_f[:, :, None]
 # the old painted face's warmth and contrast are the reference (the owner knows this face): per-channel means and the
 # luminance spread over the face island are matched to the old bake's, so the equalised skin is neither paler nor flatter
-fm = face_isl & (skin.mean(2) > 0.3)
+USE_PROJ = os.path.exists(os.path.join(WORK, "skin_projected.png"))
+fm = face_isl & (skin.mean(2) > 0.3) & (not USE_PROJ)
+if fm.sum() < 100: fm = face_isl & (skin.mean(2) > 0.3)                  # (statistics only; the blend below is weighted 0 with the repaint)
 old_mean = skin[fm].mean(0); new_mean = skin_out[fm].mean(0)
 old_sd = skin[fm].mean(1).std(); new_sd = skin_out[fm].mean(1).std()
 gain = old_mean / np.maximum(new_mean, 1e-3); k_sd = float(np.clip(old_sd / max(new_sd, 1e-3), 0.9, 1.4))
@@ -175,7 +177,42 @@ lm = skin_out.mean(2, keepdims=True); lm_mean = float(lm[fm].mean())
 graded = np.clip((lm_mean + (skin_out - lm_mean) * k_sd) * gain, 0, 1)
 gl = graded.mean(2, keepdims=True); graded = np.clip(gl + (graded - gl) * 1.12, 0, 1)                 # a little more colour than the flat bake
 print("face match: old mean %s new mean %s gain %s, spread x%.2f" % (old_mean.round(3), new_mean.round(3), gain.round(3), k_sd))
-hm = blur(face_isl.astype(np.float32), 3)[:, :, None]; skin_out = skin_out * (1 - hm) + graded * hm
+hm = blur(face_isl.astype(np.float32), 3)[:, :, None] * (0 if USE_PROJ else 1); skin_out = skin_out * (1 - hm) + graded * hm
+# --- the photoreal repaint (bl_views.py render -> three views repainted by the image model, aligned by face landmarks
+# (align_paint.py), projected back through the cameras with a depth test (project_paint.py)): it replaces the painted
+# face where the projection is confident; the rest of the skin (neck below the collar, ears' backs, hands) keeps the old
+# paint, colour-matched to the new face so there is no step at the border
+PROJ = os.path.join(WORK, "skin_projected.png"); PROJM = os.path.join(WORK, "skin_projected_mask.png")
+if os.path.exists(PROJ) and os.path.exists(PROJM):
+    proj = np.asarray(Image.open(PROJ).convert("RGB")).astype(np.float32) / 255
+    pm = np.asarray(Image.open(PROJM).convert("L")).astype(np.float32) / 255
+    sure = pm > 0.85
+    sure = ndi.binary_erosion(sure, iterations=3)                                    # off the projection's ragged edge (hair pixels)
+    sure = ndi.binary_opening(sure, iterations=2)
+    lab_p, n_p = ndi.label(sure)
+    if n_p > 1:                                                                      # the face island only: the biggest patch
+        sizes_p = ndi.sum(sure, lab_p, range(1, n_p + 1)); sure = lab_p == (np.argmax(sizes_p) + 1)
+    sure = ndi.binary_fill_holes(sure)                                               # the occluded hole under the chin: filled below from the old skin
+    painted = pm > 0.85
+    # the repaint's hair is fuller than the mesh hair: where it lands on skin that was skin-coloured (not a brow, lash
+    # line or nostril, which were dark before too) the old skin stays
+    old_l = skin_out.mean(2); hair_bleed = (proj.mean(2) < 0.3) & (old_l > 0.45) & ~ndi.binary_dilation(hole, iterations=12)
+    hair_bleed = ndi.binary_dilation(hair_bleed, iterations=3)
+    m_soft = blur((sure & painted & ~hair_bleed).astype(np.float32), 4)
+    # colour-match the old skin to the repaint (medians over the painted face, chroma and level)
+    ref = (sure & painted & (proj.mean(2) > 0.25) & (proj.mean(2) < 0.9))
+    if ref.sum() > 1000:
+        g_match = np.median(proj[ref], 0) / np.maximum(np.median(skin_out[ref], 0), 1e-3)
+        skin_out = np.clip(skin_out * g_match, 0, 1); print("old skin matched to the repaint: gain", g_match.round(3))
+    # the hole inside the face (never seen by a camera: under the chin / behind the collar) takes the matched old skin
+    skin_out = skin_out * (1 - m_soft[:, :, None]) + proj * m_soft[:, :, None]
+    print("photoreal face projected: %.1f%% of the atlas" % (100 * (m_soft > 0.5).mean()))
+# the hands: the old bake has a lighter wedge on the back of each wrist (baked light); flatten the low-frequency luminance
+hands = cov & (Z < 125) & (skin_out.mean(2) > 0.3)
+if hands.any():
+    hl = skin_out.mean(2); w_h = blur(hands.astype(np.float32), 12); lo_h = blur(hl * hands, 12) / np.maximum(w_h, 1e-3)
+    mean_h = float(np.median(hl[hands])); gain_h = np.clip(mean_h / np.maximum(lo_h, 1e-3), 0.8, 1.25)
+    hm_ = blur(hands.astype(np.float32), 3)[:, :, None]; skin_out = np.clip(skin_out * (gain_h[:, :, None] * hm_ + (1 - hm_)), 0, 1)
 rgba = np.concatenate([skin_out, alpha[:, :, None]], 2)
 Image.fromarray(np.clip(rgba * 255 + 0.5, 0, 255).astype(np.uint8), "RGBA").save(os.path.join(OUT, "tex_skin.png")); print("wrote tex_skin.png (RGBA)")
 save("tex_skin_n.png", sanitize_normal(load("nrm_skin.png")))
@@ -221,6 +258,16 @@ if os.path.exists(REG):
     flat = np.where(pl > base_tone, base_tone + (pl - base_tone) * 0.3, pl)
     gain = np.where(pants & ~stripe, flat / np.maximum(pl, 1e-4), 1.0)
     cloth_g = np.clip(cloth_g * gain[:, :, None], 0, 1); print("pants de-lit: base tone %.3f, %d px" % (base_tone, int((pants & ~stripe).sum())))
+# hoodie and pants: skin-coloured texels (the old atlas's padding pulled skin into cloth islands next to the hands and
+# the ankles: the cream wedge on the inner cuff) are filled from the cloth around
+if os.path.exists(REG):
+    rr_c, gg_c, bb_c = cloth_g[:, :, 0], cloth_g[:, :, 1], cloth_g[:, :, 2]; lc = cloth_g.mean(2)
+    for rid, nm in ((3, "hoodie"), (4, "pants")):
+        regm = ndi.binary_erosion(reg == rid, iterations=1)
+        bad_c = regm & (rr_c - bb_c > 0.06) & (lc > 0.3); good_c = regm & ~ndi.binary_dilation(bad_c, iterations=2)
+        if bad_c.any() and good_c.any():
+            wg = blur(good_c.astype(np.float32), 6); fl = np.stack([blur(cloth_g[:, :, k] * good_c, 6) for k in range(3)], 2) / np.maximum(wg, 1e-3)[:, :, None]
+            cloth_g = np.where(bad_c[:, :, None], fl, cloth_g); print("%s: %d skin-coloured px filled" % (nm, int(bad_c.sum())))
 # socks: dark texels inside the sock region (slide / pants bleed from the old atlas: the smear on the toe) become sock
 if os.path.exists(REG):
     socks = ndi.binary_erosion(reg == 5, iterations=1); sl_ = cloth_g.mean(2)

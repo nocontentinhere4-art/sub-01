@@ -64,6 +64,26 @@ Under the `Head` joint, four plain nodes (not skin joints: clips without tracks 
   finds exactly the real slide triangles (dark), as it did on the old single mesh, and `bedInit` sees every bone's
   vertices.
 
+## The photoreal face (the owner's "fallo bene")
+Upscaling the painted face kept its painted look. The face is now **repainted**: `bl_views.py render` renders the head
+unlit from three known cameras (front, left and right three-quarter); each view goes to an image model
+(Higgsfield, GPT Image 2.5, the frontal result as the identity reference for the other two) with the instruction to keep
+the same person, pose, framing and flat lighting and render real skin; `align_paint.py` finds 468 face landmarks on the
+render and on the repaint (MediaPipe Face Landmarker, Apache-2.0, build tool only, model file downloaded into `work/`)
+and warps the repaint onto the render (piecewise affine); `bl_views.py project` bakes the atlas texels' world position
+and normal and renders a depth map per camera; `project_paint.py` projects every texel into each camera, keeps it
+only where it is the surface the camera sees (depth within 4 mm), weights by facing², samples the aligned repaint and
+blends the views. `make_textures.py` uses that where it is confident (the face island), colour-matches the rest of the
+old skin (neck, ears, hands) to it, keeps the old skin where the repaint's fuller hair would land on skin, and cuts the
+eye openings as before. The result is the same character with real skin: pores, real brows and lashes, natural lips.
+Credits: 3 generations (about 4.5 credits) + the upscale tests; see `web/room/CREDITS.md`.
+
+    blender -b -P bl_views.py -- render        # work/views/{front,left,right}.png + cameras.json
+    # repaint each view with the image model -> work/views/<view>_gen.png (front first; pass it as the identity reference)
+    python align_paint.py front; python align_paint.py left; python align_paint.py right
+    blender -b -P bl_views.py -- project       # wpos/wnrm bakes + depth maps
+    python project_paint.py                    # work/skin_projected.png + mask, read by make_textures.py
+
 ## Checks and sheets
     node render/compare.mjs work/boy_old.glb out/boy.glb out/compare    # every clip at the same frames, old vs new, + close-ups
     node render/room_shots.mjs out/room new out/boy.glb                 # /room at 1280 and 390, day and night (software WebGL)
@@ -86,5 +106,5 @@ Texture anisotropy is a three.js texture property, not something a glTF file can
   skinned to 30 new joints, and the phone grip in `room.html` collapses the `RightHand` bone into the sleeve and attaches
   `hand_phone.glb` instead, so fingers would only show on the left hand and in the idle clips. Left for a later pass
   (the rig allows it: new joints can be appended as children of `LeftHand` / `RightHand` the way the eye nodes were added).
-- Hair cards: the hair is the original sculpted spike shell with smooth normals, strand normal map and a glossier,
-  clumpier roughness; a card-based haircut would change the silhouette the owner chose.
+- Hair cards: the hair is the original sculpted spike shell (silhouette untouched, shard edges kept sharp), strand normal
+  map and a clumpier roughness; a card-based haircut would change the silhouette the owner chose.

@@ -207,6 +207,8 @@ as a forecast or an observation.
 24-bone rig, rest pose and embedded sit clip as before, so the clips `boy_*.glb` and the page keep working unchanged.
 Everything added by the rebuild in `room_build/boy_asset/` is original work for this project, released under CC0: the
 welded and subdivided mesh, the new UV layout, the procedural materials and the baked normal / roughness / occlusion
-maps (Blender 4.2 Cycles), the eyeball, cornea and eyelid meshes and the drawn iris. The face part of the colour atlas
-was upscaled with Higgsfield's image upscaler (ByteDance 4K, 6 credits over three runs) from this project's own texture; no outside
-image, photo or asset was used. The character does not depict any real person.
+maps (Blender 4.2 Cycles), the eyeball, cornea and eyelid meshes and the drawn iris. The face's skin was repainted: three unlit renders of this
+character's own head were given to an image model (Higgsfield, GPT Image 2.5, about 4.5 credits; plus 10 credits of
+upscaler tests) with the instruction to keep the same face and render real skin, and the results were projected back
+onto the mesh (face landmarks from MediaPipe's Face Landmarker, Apache-2.0, used only at build time). No photo of any
+person was used; the character does not depict any real person.

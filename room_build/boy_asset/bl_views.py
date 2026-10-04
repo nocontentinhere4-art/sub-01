@@ -65,47 +65,41 @@ if mode == "render":
     json.dump(meta, open(os.path.join(VIEWS, "cameras.json"), "w"), indent=1)
 
 elif mode == "project":
-    # bake each repainted view into the skin atlas through its camera; weight = facing (N . view)^2, in front of the camera only
+    # per camera: a depth pass (Z, EXR through the compositor) and the atlas texels' world position + normal (EMIT bakes);
+    # the actual projection, depth test and blending happen in numpy (project_paint.py), where every step can be checked
     meta = json.load(open(os.path.join(VIEWS, "cameras.json")))
-    skin_slot = [i for i, mt in enumerate(m.materials) if mt.name == "boy_skin"][0]
     S = 2048
-    acc = np.zeros((S, S, 3), np.float64); wsum = np.zeros((S, S), np.float64)
-    for name in CAMS:
-        paint = os.path.join(VIEWS, name + "_paint.png")
-        if not os.path.exists(paint): print("no repaint for", name); continue
-        cam = place_camera(name + "_p", CAMS[name]); cam.matrix_world = Matrix(meta[name]["matrix_world"]); scene.camera = cam; bpy.context.view_layer.update()
-        img = bpy.data.images.load(paint); img.colorspace_settings.name = "sRGB"
-        # material: the repainted view projected from the camera (Window coordinates) -> emission; facing in the alpha
-        mat = m.materials[skin_slot]; nt = mat.node_tree; nt.nodes.clear()
-        out = nt.nodes.new("ShaderNodeOutputMaterial"); em = nt.nodes.new("ShaderNodeEmission")
-        tc = nt.nodes.new("ShaderNodeTexCoord"); t = nt.nodes.new("ShaderNodeTexImage"); t.image = img; t.extension = "CLIP"
-        nt.links.new(tc.outputs["Window"], t.inputs[0]); nt.links.new(t.outputs[0], em.inputs[0]); nt.links.new(em.outputs[0], out.inputs[0])
-        target = bpy.data.images.new("proj_" + name, S, S, alpha=False, float_buffer=True); target.colorspace_settings.name = "Non-Color"
-        tn = nt.nodes.new("ShaderNodeTexImage"); tn.image = target; nt.nodes.active = tn
+    def bake_emit(vec_socket_builder, name):
+        """bake an emission of a vector into a float atlas, skin slot only"""
+        skin_slot = [i for i, mt in enumerate(m.materials) if mt.name == "boy_skin"][0]
+        target = bpy.data.images.new(name, S, S, alpha=False, float_buffer=True); target.colorspace_settings.name = "Non-Color"
         for i, mt in enumerate(m.materials):
-            if i != skin_slot: mt.node_tree.nodes.active = None
+            nt = mt.node_tree; nt.nodes.clear()
+            out = nt.nodes.new("ShaderNodeOutputMaterial"); em = nt.nodes.new("ShaderNodeEmission")
+            nt.links.new(vec_socket_builder(nt), em.inputs[0]); nt.links.new(em.outputs[0], out.inputs[0])
+            tn = nt.nodes.new("ShaderNodeTexImage"); tn.image = target if i == skin_slot else bpy.data.images.new("junk_%d" % i, 8, 8); nt.nodes.active = tn
         bpy.ops.object.select_all(action="DESELECT"); me.select_set(True); bpy.context.view_layer.objects.active = me
-        # only the skin slot has an active image: bake writes only there
-        for p in m.polygons: p.select = p.material_index == skin_slot
-        scene.render.bake.use_selected_to_active = False
-        bpy.ops.object.bake(type="EMIT", use_clear=True, margin=4)
-        col = np.array(target.pixels[:], dtype=np.float32).reshape(S, S, 4)[:, :, :3]
-        # facing weight: bake the view-space normal z (Geometry > Incoming . Normal) the same way
-        nt.nodes.clear(); out = nt.nodes.new("ShaderNodeOutputMaterial"); em = nt.nodes.new("ShaderNodeEmission")
-        geo = nt.nodes.new("ShaderNodeNewGeometry"); dot = nt.nodes.new("ShaderNodeVectorMath"); dot.operation = "DOT_PRODUCT"
-        nt.links.new(geo.outputs["Normal"], dot.inputs[0]); nt.links.new(geo.outputs["Incoming"], dot.inputs[1])
-        nt.links.new(dot.outputs["Value"], em.inputs[0]); nt.links.new(em.outputs[0], out.inputs[0])
-        tn = nt.nodes.new("ShaderNodeTexImage"); tn.image = target; nt.nodes.active = tn
-        bpy.ops.object.bake(type="EMIT", use_clear=True, margin=4)
-        facing = np.clip(np.array(target.pixels[:], dtype=np.float32).reshape(S, S, 4)[:, :, 0], 0, 1)
-        # visibility: a texel is used only if the camera really sees it (its own depth = the depth the camera sees); approximated
-        # by the facing term and the paint's alpha (0 outside the view); occlusion by the hair / nose is handled by facing^3
-        w = facing ** 3 * (np.array(target.pixels[:], dtype=np.float32).reshape(S, S, 4)[:, :, 3] > 0)
-        a_img = np.array(img.pixels[:], dtype=np.float32).reshape(img.size[1], img.size[0], 4)[:, :, 3]
-        acc += col * w[:, :, None]; wsum += w; print("projected", name, "weight sum %.0f" % w.sum())
-    res = acc / np.maximum(wsum, 1e-6)[:, :, None]; mask = np.clip(wsum / max(wsum.max(), 1e-6), 0, 1)
-    o1 = bpy.data.images.new("skin_projected", S, S, alpha=False); o1.pixels = np.concatenate([np.clip(res, 0, 1), np.ones((S, S, 1))], 2).ravel()
-    o1.filepath_raw = os.path.join(WORK, "skin_projected.png"); o1.file_format = "PNG"; o1.save()
-    o2 = bpy.data.images.new("skin_projected_mask", S, S, alpha=False); o2.pixels = np.concatenate([np.repeat(mask[:, :, None], 3, 2), np.ones((S, S, 1))], 2).ravel()
-    o2.filepath_raw = os.path.join(WORK, "skin_projected_mask.png"); o2.file_format = "PNG"; o2.save()
-    print("wrote work/skin_projected.png and its mask")
+        scene.render.bake.use_selected_to_active = False; scene.cycles.samples = 1
+        bpy.ops.object.bake(type="EMIT", use_clear=True, margin=2)
+        return np.array(target.pixels[:], dtype=np.float32).reshape(S, S, 4)[:, :, :3]
+    def pos_builder(nt):
+        geo = nt.nodes.new("ShaderNodeNewGeometry"); vm = nt.nodes.new("ShaderNodeVectorMath"); vm.operation = "MULTIPLY_ADD"
+        nt.links.new(geo.outputs["Position"], vm.inputs[0]); vm.inputs[1].default_value = (0.25, 0.25, 0.25); vm.inputs[2].default_value = (0.5, 0.5, 0.5)   # metres: -2..2 -> 0..1
+        return vm.outputs[0]
+    def nrm_builder(nt):
+        geo = nt.nodes.new("ShaderNodeNewGeometry"); vm = nt.nodes.new("ShaderNodeVectorMath"); vm.operation = "MULTIPLY_ADD"
+        nt.links.new(geo.outputs["Normal"], vm.inputs[0]); vm.inputs[1].default_value = (0.5, 0.5, 0.5); vm.inputs[2].default_value = (0.5, 0.5, 0.5)
+        return vm.outputs[0]
+    P = (bake_emit(pos_builder, "wpos") - 0.5) * 4.0; N = bake_emit(nrm_builder, "wnrm") * 2 - 1
+    np.save(os.path.join(VIEWS, "wpos.npy"), P); np.save(os.path.join(VIEWS, "wnrm.npy"), N); print("baked world position / normal of the skin atlas")
+    # depth per camera: Z pass to an EXR through the compositor
+    scene.use_nodes = True; scene.view_layers[0].use_pass_z = True; scene.cycles.samples = 1
+    tree = scene.node_tree; tree.nodes.clear(); rl = tree.nodes.new("CompositorNodeRLayers"); fo = tree.nodes.new("CompositorNodeOutputFile")
+    fo.base_path = VIEWS; fo.format.file_format = "OPEN_EXR"; fo.format.color_depth = "32"; fo.file_slots[0].path = "depth_"
+    tree.links.new(rl.outputs["Depth"], fo.inputs[0])
+    for name, yaw in CAMS.items():
+        cam = place_camera(name + "_d", yaw); cam.matrix_world = Matrix(meta[name]["matrix_world"]); scene.camera = cam; bpy.context.view_layer.update()
+        fo.file_slots[0].path = "depth_" + name + "_"; scene.render.filepath = os.path.join(VIEWS, "junk_"); bpy.ops.render.render(write_still=False)
+        exr = [f for f in os.listdir(VIEWS) if f.startswith("depth_" + name + "_") and f.endswith(".exr")][0]
+        img = bpy.data.images.load(os.path.join(VIEWS, exr)); d = np.array(img.pixels[:], dtype=np.float32).reshape(RES, RES, 4)[:, :, 0]
+        np.save(os.path.join(VIEWS, "depth_" + name + ".npy"), d[::-1]); print("depth", name, "range %.2f..%.2f" % (d[d < 1e9].min(), d[d < 1e9].max()))
