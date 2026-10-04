@@ -16,6 +16,6 @@
   straight on the two buttons, ring and little finger on the right flank, thumb on the left flank, hand rolled ~10 deg
   little-finger side down). Mouse: low dome with the hump at the back (radii x 3.1, y 3.6, z front 8 / back 4 cm), hump
   at (-0.36, 0.807, 0.39) for hips at the origin, turned -0.15 rad with the hand. Palm on the hump by contact solve;
-  index/middle curl to touch (smoothed); ring/little set (CURL_R_4 [22,38,18], CURL_R_5 [26,42,20]).
+  index/middle curl to touch (smoothed); ring/little set (CURL_R_4 [22,38,18], CURL_R_5 [26,42,20]), eased so their undersides stay on the pad (DESK_Y 0.809 + 1.1 cm).
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.

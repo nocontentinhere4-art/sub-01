@@ -124,8 +124,12 @@ function armIK(Wq, L, rootPos) {
       const SOLVE = (process.env.SOLVE_R || "2,3,4,5").split(",").map(Number);
       for (let f = 2; f <= 5; f++) { const pip = `finger${f}-2.R`, dip = `finger${f}-3.R`;
         // CURL_R_<f>=[mcp,pip,dip]: a set pose instead of the contact solve (ring and little finger tucked along the side)
-        if (process.env["CURL_R_" + f]) { const c = JSON.parse(process.env["CURL_R_" + f]);
-          [`finger${f}-1.R`, pip, dip].forEach((n, k) => { L[n] = curlQ(n, c[k]).multiply(k ? base[n] : L[n]); }); continue; }
+        if (process.env["CURL_R_" + f]) { const c = JSON.parse(process.env["CURL_R_" + f]), mcp = `finger${f}-1.R`, m0 = L[mcp].clone();
+          const setK = k => [mcp, pip, dip].forEach((n, j) => { L[n] = curlQ(n, c[j] * k).multiply(j ? base[n] : m0); });
+          // DESK_Y: the finger's underside stays on the desk/pad (+1.1 cm for the finger's half thickness): ease the curl
+          const floor = +(process.env.DESK_Y || -1) + 0.011, low = () => Math.min(bonePos(L, rootPos, dip, true).y, bonePos(L, rootPos, dip).y, bonePos(L, rootPos, pip).y);
+          setK(1); if (floor > 0 && low() < floor) { let a = 0, b = 1; for (let j = 0; j < 14; j++) { const m = (a + b) / 2; setK(m); if (low() < floor) b = m; else a = m; } setK(a); }
+          continue; }
         if (!SOLVE.includes(f)) continue;
         const at = e => { L[pip] = curlQ(pip, e).multiply(base[pip]); L[dip] = curlQ(dip, e * 0.6).multiply(base[dip]); return dome(bonePos(L, rootPos, dip, true), 0.008); };
         // scan from straight to curled for the first touch; if none, the closest pass
