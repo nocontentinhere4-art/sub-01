@@ -17,11 +17,11 @@ export const PROPS2 = [
   {name:"lamp", size:{h:0.58}, turn:[0, 0], at:[-1.74, DTOP, -1.30, 0.6]},              // the desk lamp's place (build_room.py)
   {name:"plant", size:{h:0.75}, turn:[0, 0], at:[-1.66, F, -0.36, 0]},                  // the floor plant's
   {name:"box", size:{w:0.32}, turn:[0, 0], at:[0.10, STOP, -1.28, 0.1]},                // the carton on top of the bookshelf
-  {name:"alarm", size:{h:0.12}, turn:[0, 0], at:[-1.87, SILL, 0.62, Math.PI / 2 - 0.35]},   // the sill (the alarm clock's)
+  {name:"alarm", size:{h:0.12}, turn:[0, 0], at:[-1.87, SILL, 0.62, -0.35]},   // the sill (the alarm clock's); its dial (+x) to the room
   {name:"succulent", size:{h:0.17}, turn:[0, 0], at:[-0.48, DTOP, -1.13, 0.3], drop:0.1},   // the desk succulent's (its
                                                       // saucer came out floating 2 cm under the pot: dropped)
   {name:"backpack", size:{h:0.42}, turn:[0, 0], at:[-0.06, F, 1.24, 0]},               // against the bed's side, as before (pocket to +x)
-  {name:"fan", size:{h:0.55}, turn:[0, 0], at:[1.70, F, 0.30, -2.2]},                   // the fan's place and turn
+  {name:"fan", size:{h:0.80}, turn:[0, 0], at:[1.70, F, 0.30, 2.51]},                   // the fan's place, facing as before (it faces +x)
   {name:"bin", size:{h:0.30}, turn:[0, 0], at:[-0.55, F, -1.22, 0]},                    // under the desk
   {name:"controller", size:{w:0.15}, turn:[0, 0], at:[-0.80, DTOP, -1.20, -0.35]},      // on the desk, as before
   {name:"skateboard", size:{l:0.80}, turn:[0, 0], at:[1.58, F, -0.12, 0]},              // flat on the floor by the door, off his routes
