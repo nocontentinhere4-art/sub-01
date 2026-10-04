@@ -89,7 +89,7 @@ def new_obj(name, bm, material):
 def project_uv(o):
     """box projection in world space; 1 texture tile = material['uv'] metres (atlas materials keep their own UVs)"""
     me = o.data
-    if not me.materials or me.materials[0].get("nouv"): return
+    if not me.materials or me.materials[0].get("nouv") or me.materials[0].name not in MATS: return   # (the scans keep their own UVs)
     uvl = me.uv_layers.get("UVMap") or me.uv_layers.new(name="UVMap"); s = me.materials[0].get("uv", 0.1)
     for p in me.polygons:
         n = p.normal; ax = max(range(3), key=lambda i: abs(n[i]))
@@ -302,12 +302,13 @@ mat("paper", srgb("#efece4"), rough=0.85, nor="white_nor.jpg", nstr=1.2, uv=0.04
 balls = []
 for k, (bx, bz, r) in enumerate(((-0.315, -1.165, 0.029), (-0.236, -1.128, 0.024))):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0)
-    rnd = random.Random(40 + k); lobes = [(Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized(), rnd.uniform(0.08, 0.2)) for _ in range(14)]
-    for v in bm.verts:
-        n = v.co.normalized(); d = 1.0
-        for (c, a) in lobes: d -= a * max(0.0, n.dot(c) - 0.75) * 4                 # flat facets where the sheet was folded
-        d += 0.05 * math.sin(17 * n.x + 5 * n.y) * math.sin(13 * n.z + 3 * n.x)    # small creases
-        v.co = n * r * d
+    rnd = random.Random(40 + k)
+    folds = [(Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized(), rnd.uniform(-0.25, 0.25), rnd.uniform(0.10, 0.22)) for _ in range(11)]
+    depth = []                                                                  # a sheet pressed into a ball: sharp ridges and valleys
+    for v in bm.verts:                                                          # where crossing folds meet, flat facets between them
+        n = v.co.normalized(); depth.append(sum(a * abs(math.sin(3.2 * (n.dot(c) - off))) for (c, off, a) in folds) + 0.06 * rnd.uniform(-1, 1))
+    lo_, hi_ = min(depth), max(depth)
+    for v, dp in zip(bm.verts, depth): v.co = v.co.normalized() * r * (1 - 0.32 * (dp - lo_) / (hi_ - lo_))
     for f in bm.faces: f.smooth = False
     o = new_obj(f"paper_ball{k}", bm, "paper"); xf([o], loc=(bx, 0, bz), ry=rnd.uniform(0, 6.28))
     lo, hi = box_of([o]); xf([o], loc=(0, FY - lo[1], 0)); balls.append(o)

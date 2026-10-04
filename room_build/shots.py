@@ -38,6 +38,15 @@ VIEWS = {
     "door": [[1.05, 1.35, -0.55], [1.62, 1.05, -1.42]],
     "desk_close": [[-1.17, 2.15, 0.15], [-1.19, 0.98, -1.12]],          # the props preview's desk close-up (the whole top, over the chair)
     "desk_top": [[-1.10, 2.45, -0.95], [-1.10, 0.97, -1.12]],            # (planning only: the desk seen from above)
+    # close-ups of each clutter prop, for the side-by-side with a real photo (the props preview's reference sheet)
+    "ref_bottle": [[-0.70, 1.22, -0.42], [-0.83, 1.07, -0.85]],
+    "ref_glass": [[-1.47, 1.43, 0.33], [-1.868, 1.315, 0.30]],
+    "ref_notebook": [[-1.62, 1.42, -0.98], [-1.742, 0.99, -1.30]],
+    "ref_earbuds": [[-1.18, 1.22, -0.98], [-1.28, 0.975, -1.16]],
+    "ref_charger": [[-0.28, 1.22, -0.72], [-0.40, 0.975, -1.08]],
+    "ref_apple": [[0.42, 1.52, -0.72], [0.555, 1.31, -1.035]],
+    "ref_succulent": [[0.06, 1.90, -0.72], [0.03, 1.83, -1.305]],
+    "ref_paper": [[-0.06, 0.55, -0.82], [-0.28, 0.19, -1.15]],
 }
 WITH_HIM = {"overview"}                                  # he sits at the desk in the overview; the close-ups show the room alone
 SIZES = {"1280": (1280, 800), "390": (390, 844)}
