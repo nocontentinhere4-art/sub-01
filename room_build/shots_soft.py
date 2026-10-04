@@ -50,6 +50,11 @@ SHOTS = [
     ("sneakers_day", (1.32, 0.72, -0.82), (1.02, 0.20, -1.28), 32, "day", (1280, 720)),
     ("blanket_day", (2.2, 1.25, 2.1), (1.30, 0.22, 0.98), 34, "day", (1280, 720)),
     ("chair_tee_day", (-0.55, 1.65, 0.75), (-1.13, 1.05, -0.45), 36, "day", (1280, 720)),
+    # matched to the real reference photos of the comparison sheet (docs/design/room-soft-props/README.md)
+    ("ref_backpack", (0.12, 0.98, 1.50), (-0.13, 0.33, 1.25), 34, "day", (1280, 853)),
+    ("ref_sneakers", (1.03, 0.80, -1.18), (1.03, 0.16, -1.29), 36, "day", (1280, 960)),
+    ("ref_cloth", (0.55, 0.85, 1.95), (1.30, 0.22, 1.00), 42, "day", (1280, 853)),
+    ("ref_tote", (1.95, 1.32, -0.80), (1.63, 1.30, -1.36), 30, "day", (1280, 855)),
 ]
 
 VIEWER = r"""<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
