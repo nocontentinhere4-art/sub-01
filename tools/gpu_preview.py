@@ -14,6 +14,13 @@ tools/gpu_preview_job.sh checks that WebGL runs on the GPU (the renderer string 
 SwiftShader) before rendering; tools/gpu_preview_render.py does the frame-stepped rendering and the encoding (the same
 script runs in a sandbox on software WebGL for a check: see --local). RunPod auth is injected by the environment for
 rest.runpod.io; there is no key here and none is logged.
+
+Where the videos go: NOT into main. Each MP4 is 10-30 MB and would stay in the repository's history for good, so the
+previews live on the separate, never-merged branch `previews`, one folder per pull request (previews/<pr-number>/...);
+the coordinator fetches them from there. --out defaults to a folder outside the working tree (data/previews/<name>);
+publish with --publish <pr-number>, which commits the videos and their JSON to a checkout of that branch
+(data/previews_branch, created from main the first time) and pushes it. The small JSON and the pod log may be
+committed with a PR as a record; the MP4s never.
 """
 import argparse
 import json
@@ -71,7 +78,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--old", default="origin/main", help="git ref of the old side (main); '' for a single-side video")
     ap.add_argument("--new", default="HEAD", help="git ref of the new side")
-    ap.add_argument("--out", default="docs/design/room-render/preview")
+    ap.add_argument("--out", default="", help="where the MP4s land (default: data/previews/<name>, outside the tree)")
+    ap.add_argument("--publish", default="", help="pull request number: commit the videos to the `previews` branch (previews/<n>/) and push it")
     ap.add_argument("--name", default="preview")
     ap.add_argument("--sizes", default="1280x800,390x844")
     ap.add_argument("--fps", type=int, default=30)
@@ -101,7 +109,7 @@ def main():
         archive(ref, work / f"{side}.tar.gz", log)
     if not a.old:                                     # a single side still needs an old.tar.gz for the job: the same ref
         shutil.copy(work / "new.tar.gz", work / "old.tar.gz")
-    out = ROOT / a.out
+    out = (ROOT / a.out) if a.out else (ROOT / "data" / "previews" / a.name)
     out.mkdir(parents=True, exist_ok=True)
 
     if a.local:
@@ -149,7 +157,30 @@ def main():
     for d in got:
         log(f"  {d.relative_to(ROOT)} ({d.stat().st_size / 1e6:.1f} MB)")
     shutil.rmtree(work, ignore_errors=True)
+    if got and a.publish:
+        publish(got + [d.with_suffix(".json") for d in got if d.with_suffix(".json").exists()] + [out / f"{a.name}_pod_log.txt"], a.publish, log)
     return 0 if got else 1
+
+
+def publish(files, pr, log):
+    """Commit the preview files to the never-merged `previews` branch under previews/<pr>/ and push it."""
+    wt = ROOT / "data" / "previews_branch"
+    if not wt.exists():
+        subprocess.run(["git", "fetch", "-q", "origin", "main", "previews"], cwd=ROOT)
+        has = subprocess.run(["git", "rev-parse", "-q", "--verify", "origin/previews"], cwd=ROOT, capture_output=True).returncode == 0
+        subprocess.run(["git", "worktree", "add", "-q"] + (["-B", "previews", str(wt), "origin/previews"] if has else ["-b", "previews", str(wt), "origin/main"]), cwd=ROOT, check=True)
+    else:
+        subprocess.run(["git", "pull", "-q", "--ff-only", "origin", "previews"], cwd=wt)
+    dest = wt / "previews" / str(pr)
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in files:
+        if Path(f).exists():
+            shutil.copy(f, dest / Path(f).name)
+    subprocess.run(["git", "add", f"previews/{pr}"], cwd=wt, check=True)
+    msg = f"previews/{pr}: " + ", ".join(Path(f).name for f in files if Path(f).exists() and str(f).endswith(".mp4"))
+    subprocess.run(["git", "commit", "-q", "-m", msg], cwd=wt, check=True)
+    subprocess.run(["git", "push", "-u", "origin", "previews"], cwd=wt, check=True)
+    log(f"published to the previews branch: previews/{pr}/")
 
 
 if __name__ == "__main__":
