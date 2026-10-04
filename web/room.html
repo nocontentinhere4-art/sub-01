@@ -325,7 +325,7 @@ scene.environmentIntensity = 0.35;
 const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 200);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.enablePan = false;
-controls.minPolarAngle = 0.35; controls.maxPolarAngle = 1.35; controls.minDistance = 0.4; controls.maxDistance = 12;
+controls.minPolarAngle = 0.35; controls.maxPolarAngle = 1.50; controls.minDistance = 0.4; controls.maxDistance = 12;   // 1.50: a shot at his eye level (a profile at the sill) is not lifted to 13° above him
 const OVERVIEW = {pos:new THREE.Vector3(5.2, 5.0, 6.0), target:new THREE.Vector3(0, 0.6, 0)};
 camera.position.copy(OVERVIEW.pos); controls.target.copy(OVERVIEW.target);
 // post-processing and quality tiers (#98 G6, room_post.js): the tier comes from the GPU's name, memory and cores, or from

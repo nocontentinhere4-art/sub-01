@@ -34,14 +34,17 @@ if os.environ.get("PREVIEW_TEST"):                  # a 2 s + 1 s dry run at the
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 # one frame: his step, the window, the camera (a cut or a dolly, as the page's loop does it), the lights and the render.
 # The page's loop is frozen (?debug FREEZE); sim(0, 1) is the page's own lighting + shadow update + render
-STEP_JS = """([dt, hour]) => {
+STEP_JS = """([dt, hour, full]) => {
   animate_(dt); if (window.windowView) windowView.update(dt, hour);
   updateCameraGoal();
   if (window.CAM && CAM.cut) { camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); CAM.cut = false; }
   else { const k = 1 - Math.exp(-dt * 1.2); camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k); }
-  sim(0, 1);
+  // sim(0, 1) is the page's lighting + a shadow-map update + the render; the page itself redraws the shadow maps a few
+  // times a second, so between those frames only the render runs (software GL: the 2048 px sun map costs seconds)
+  if (full) sim(0, 1); else { controls.update(); if (window.post) post.render(dt); else renderer.render(scene, camera); }
   // the canvas's own pixels, read right after the render (a viewport screenshot waits on the compositor: 20 s a frame here)
   return [window.CAM ? CAM.kind : null, renderer.domElement.toDataURL("image/jpeg", 0.9)]; }"""
+SHADOW_EVERY = 3                                     # frames between shadow-map / lighting updates (10 a second)
 RECT_JS = "() => { const r = renderer.domElement.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }"
 HUD_OFF = "#top,#side,#corner,#dock,#vignette,#away{display:none!important}"
 
@@ -89,7 +92,7 @@ def capture(run, out, tag, log=print):
             x, y, cw, ch = pg.evaluate(RECT_JS)
             kinds, t0 = [], time.time()
             for i in range(secs * FPS):
-                kind, data = pg.evaluate(STEP_JS, [1 / FPS, hour])
+                kind, data = pg.evaluate(STEP_JS, [1 / FPS, hour, i % SHADOW_EVERY == 0])
                 canvas = Image.open(io.BytesIO(base64.b64decode(data.split(",", 1)[1]))).convert("RGB")
                 if canvas.size != (cw, ch):                                   # the page's adaptive pixel ratio
                     canvas = canvas.resize((cw, ch), Image.BILINEAR)
@@ -118,7 +121,7 @@ def encode(out, final, max_mb, log=print):
                "-framerate", str(FPS), "-i", str(out / "frames_new_1280" / "%05d.jpg"),
                "-framerate", str(FPS), "-i", str(out / "frames_old_390" / "%05d.jpg"),
                "-framerate", str(FPS), "-i", str(out / "frames_new_390" / "%05d.jpg"),
-               "-filter_complex", "[0:v][1:v]hstack[top];[2:v][3:v]hstack,scale=-2:800,pad=2560:800:(ow-iw)/2:0[bot];[top][bot]concat=n=2:v=1:a=0[v]",
+               "-filter_complex", "[0:v][1:v]hstack,format=yuv420p,setsar=1[top];[2:v][3:v]hstack,scale=-2:800,pad=2560:800:(ow-iw)/2:0,format=yuv420p,setsar=1[bot];[top][bot]concat=n=2:v=1:a=0[v]",
                "-map", "[v]", "-c:v", "libx264", "-preset", "slow", "-crf", str(crf), "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(final)]
         subprocess.run(cmd, check=True)
         mb = final.stat().st_size / 1e6
