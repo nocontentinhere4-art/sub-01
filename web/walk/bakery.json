@@ -1,0 +1,15 @@
+{
+  "note": "The bakery walk (prototype). splat: the 3DGS scene (Lyra 1 output converted by walk_scenes/README.md; the placeholder until the real one exists). frame 'opencv': Lyra's first-camera frame (y down, z forward), turned 180 degrees about x into three.js's, then scaled and moved by offset so the street is at y = 0 and the camera started at x = z = 0. path: where his feet go, [x, z] on the street, metres. Tune scale/offset/path by eye with ?free&grid.",
+  "title": "Bakery",
+  "splat": "walk/bakery_placeholder.spz",
+  "frame": "opencv",
+  "scale": 1.0,
+  "offset": [0, 1.6, 0],
+  "path": [[-0.9, -1.5], [-0.7, -6.0], [0.4, -9.5], [1.85, -11.6]],
+  "face": [3.2, -11.8],
+  "speed": 0.9,
+  "arrive_clip": "idle",
+  "camera": {"behind": 3.2, "side": 1.1, "height": 1.55, "look_ahead": 1.5},
+  "light": {"sun": [-4, 8, 3], "sun_color": "#fff1dc", "sun_intensity": 2.2, "sky": "#cfe0ff", "ground": "#5a5650", "hemi_intensity": 1.1},
+  "background": "#bcd3ea"
+}
