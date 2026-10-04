@@ -1,13 +1,14 @@
 # CC0 1.0, made for SUB-01 by room_build/clothes_mh/build_clothes.py
 name hoodie_black
-diffuseColor 0.1689 0.1689 0.1764
+diffuseColor 1.0000 1.0000 1.0000
 specularColor 0.03 0.03 0.03
 shininess 0.100
 opacity 1.0
 translucency 0.0
 backfaceCull False
-normalmapTexture hoodie_black_normal.jpg
+normalmapTexture fleece_normal.jpg
 normalmapIntensity 1.00
 shaderConfig normal True
 shaderConfig diffuse True
-# per-group materials of the .obj (g lines): aglet, cord, fleece, rib
+diffuseTexture fleece_color.jpg
+# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: aglet, cord, fleece, rib

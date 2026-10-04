@@ -1,5 +1,5 @@
 """One still sheet from build_clothes.py's renders: standing | seated at the desk | the hood and the knit over the
-elbow close-up. No text. Also shrinks the garments' normal maps to 512 px for the repository.
+elbow close-up. No text.
     python compose_sheet.py [out_dir] [sheet.jpg]"""
 import os, sys, glob
 from PIL import Image
@@ -17,6 +17,3 @@ ce = ce.resize((w, h - g - ch.size[1]), Image.LANCZOS)
 sheet.paste(ch, (2 * (w + g), 0)); sheet.paste(ce, (2 * (w + g), ch.size[1] + g))
 os.makedirs(os.path.dirname(dst), exist_ok=True)
 sheet.save(dst, quality=88); print("wrote", dst, sheet.size)
-for p in glob.glob(os.path.join(HERE, "assets", "*", "*_normal.jpg")):
-    im = Image.open(p)
-    if max(im.size) > 512: im.convert("RGB").resize((512, 512), Image.LANCZOS).save(p, quality=90); print("shrank", p)

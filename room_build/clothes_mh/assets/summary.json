@@ -7,7 +7,7 @@
  "track_trousers": {
   "verts": 3773,
   "faces": 3612,
-  "hides": 1350
+  "hides": 1352
  },
  "socks_white": {
   "verts": 2286,
@@ -15,8 +15,8 @@
   "hides": 2286
  },
  "slides_black": {
-  "verts": 2604,
-  "faces": 2604,
+  "verts": 1764,
+  "faces": 1668,
   "hides": 0
  }
 }

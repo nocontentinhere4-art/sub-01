@@ -263,20 +263,47 @@ def fabric(name, rgb, rough, normal_asset=None, tile=0.3, nstr=1.0, sheen=0.0, s
     return m
 
 
-MAT = {
+# the fabrics: tileable colour and normal maps baked once (fabric_bake.py: Poly Haven's photo normal + a procedural
+# jersey stitch for the knits), mapped by the garments' box-projected UVs (one UV tile = `tile` dm of cloth). The same
+# maps go into the .mhmat files and the web materials, so the sheet shows what a web material shows.
+import fabric_bake
+TEXOUT = os.path.join(OUT, "textures"); os.makedirs(TEXOUT, exist_ok=True)
+FABRICS = {   # tile dm, linear rgb, rough, sheen (weight, tint), Poly Haven normal + strength, melange, knit stitches per tile, size
+    "fleece":  dict(tile=0.9, rgb=(0.02, 0.02, 0.022), rough=0.9, sheen=(1.0, 0.22), normal="jersey_melange", nstr=1.4, melange="jogging_melange", mel_amt=0.5, cols=41, rows=41, kstr=1.2, size=1024),
+    "rib":     dict(tile=0.35, rgb=(0.017, 0.017, 0.019), rough=0.92, sheen=(1.0, 0.2), normal="ribbed_corduroy", nstr=1.8, cols=12, rows=12, kstr=1.5, size=512),
+    "cord":    dict(tile=0.2, rgb=(0.035, 0.035, 0.037), rough=0.75, sheen=(0.6, 0.2), normal="jersey_melange", nstr=0.8, size=256),
+    "track":   dict(tile=0.8, rgb=(0.016, 0.018, 0.025), rough=0.62, sheen=(0.5, 0.16), normal="bi_stretch", nstr=1.0, size=512),
+    "stripe":  dict(tile=0.8, rgb=(0.6, 0.6, 0.58), rough=0.65, sheen=(0.0, 0.0), normal="bi_stretch", nstr=0.8, size=256),
+    "sock":    dict(tile=0.5, rgb=(0.8, 0.8, 0.78), rough=0.97, sheen=(0.7, 0.5), normal="knitted_fleece", nstr=1.2, cols=20, rows=20, kstr=1.0, size=512),
+    "sockrib": dict(tile=0.25, rgb=(0.78, 0.78, 0.76), rough=0.97, sheen=(0.7, 0.5), normal="ribbed_corduroy", nstr=1.6, cols=8, rows=8, kstr=1.2, size=256),
+    "eva":     dict(tile=1.2, rgb=(0.02, 0.02, 0.022), rough=0.62, sheen=(0.0, 0.0), normal="hessian_380", nstr=0.25, size=256),
+}
+
+
+def uv_fabric(name, f):
+    cp, npth = fabric_bake.bake(name, f, TEX, TEXOUT)
+    m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; P = nt.nodes["Principled BSDF"]
+    P.inputs["Roughness"].default_value = f["rough"]; P.inputs["Specular IOR Level"].default_value = 0.15
+    if f["sheen"][0]:
+        P.inputs["Sheen Weight"].default_value = f["sheen"][0]; P.inputs["Sheen Roughness"].default_value = 0.45
+        P.inputs["Sheen Tint"].default_value = (f["sheen"][1],) * 3 + (1,)
+    uvn = nt.nodes.new("ShaderNodeUVMap"); uvn.uv_map = "UVMap"
+    ci = nt.nodes.new("ShaderNodeTexImage"); ci.image = bpy.data.images.load(cp); nt.links.new(uvn.outputs["UV"], ci.inputs["Vector"])
+    nt.links.new(ci.outputs["Color"], P.inputs["Base Color"])
+    ni = nt.nodes.new("ShaderNodeTexImage"); ni.image = bpy.data.images.load(npth); ni.image.colorspace_settings.name = "Non-Color"
+    nt.links.new(uvn.outputs["UV"], ni.inputs["Vector"])
+    nm = nt.nodes.new("ShaderNodeNormalMap"); nt.links.new(ni.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], P.inputs["Normal"])
+    m["tile"] = f["tile"]; m["rgb"] = list(f["rgb"]); m["rough"] = f["rough"]; m["color_map"] = cp; m["normal_map"] = npth
+    return m
+
+
+MAT = {k: uv_fabric(k, f) for k, f in FABRICS.items()}
+MAT.update({
     "skin": fabric("skin", (0.52, 0.36, 0.28), 0.5, spec=0.35),
-    "fleece": fabric("fleece", (0.02, 0.02, 0.022), 0.9, "jersey_melange", 0.9, 1.4, sheen=1.0, sheen_tint=(0.55, 0.55, 0.58), melange="jogging_melange", mel_amt=0.5, spec=0.12, stitch=0.022, bump=0.45),
-    "rib": fabric("rib", (0.017, 0.017, 0.019), 0.92, "ribbed_corduroy", 0.35, 1.8, sheen=1.0, sheen_tint=(0.5, 0.5, 0.53), spec=0.12, stitch=0.03, bump=0.6),
-    "cord": fabric("cord", (0.035, 0.035, 0.037), 0.75, "jersey_melange", 0.2, 0.8, sheen=0.6, spec=0.2),
     "aglet": fabric("aglet", (0.02, 0.02, 0.02), 0.3, spec=0.5),
-    "track": fabric("track", (0.016, 0.018, 0.025), 0.62, "bi_stretch", 0.8, 1.0, sheen=0.5, sheen_tint=(0.35, 0.37, 0.42), spec=0.25),
-    "stripe": fabric("stripe", (0.6, 0.6, 0.58), 0.65, "bi_stretch", 0.8, 0.8, spec=0.25),
-    "sock": fabric("sock", (0.8, 0.8, 0.78), 0.97, "knitted_fleece", 0.5, 1.2, sheen=0.7, sheen_tint=(0.9, 0.9, 0.9), spec=0.15, stitch=0.025, bump=0.5),
-    "sockrib": fabric("sockrib", (0.78, 0.78, 0.76), 0.97, "ribbed_corduroy", 0.25, 1.6, sheen=0.7, spec=0.15),
-    "eva": fabric("eva", (0.02, 0.02, 0.022), 0.62, "hessian_380", 1.2, 0.25, spec=0.3),
     "studio": fabric("studio", (0.42, 0.42, 0.42), 0.8),
     "desk": fabric("desk", (0.3, 0.3, 0.3), 0.6),
-}
+})
 body.data.materials.append(MAT["skin"])
 
 
@@ -428,7 +455,7 @@ def pocket(shell, hem_z):
 
 
 # ================================================================ the trousers
-def trousers():
+def trousers(hem_z):
     o = part(JEANS_SRC, "trousers", [MAT["track"], MAT["rib"]]); subdivide(o, 1)
     P = verts_np(o); N = normals_np(o); out = P.copy(); cuff = np.zeros(len(P), bool)
     ankle_z = J("foot.L")[2]; knee_z = J("lowerleg01.L")[2]
@@ -446,6 +473,13 @@ def trousers():
     for i in np.nonzero(cuff)[0]:                                                       # elastic cuffs gather in
         p = Vector(out[i]); side = "L" if p.x > 0 else "R"; a = J(f"lowerleg02.{side}", "tail")
         r = p - a; r.z = 0; out[i] = np.array(p - r * 0.14)
+    # under the hoodie the waist is snug to the body (2.5 mm), blending back to the relaxed fit 7 cm below the hem, so the
+    # gathered hem band always lies over it (it poked through the band at the hips)
+    for i, p in enumerate(out):
+        k = smooth01(hem_z - 0.7, hem_z + 0.1, p[2])
+        if k <= 0: continue
+        loc, nor, _, _ = BODY_BVH.find_nearest(Vector(p))
+        out[i] = p * (1 - k) + np.array(loc + nor * 0.25 * CM) * k
     set_verts(o, out)
     for poly in o.data.polygons: poly.material_index = 1 if all(cuff[v] for v in poly.vertices) else 0
     push_out(o, 0.35 * CM)
@@ -485,14 +519,25 @@ def socks():
         vs = list(poly.vertices)
         for a, b2 in zip(vs, vs[1:] + vs[:1]): nb.setdefault(a, set()).add(b2); nb.setdefault(b2, set()).add(a)
     front = [v.index for v in o.data.vertices if v.co.y < J("foot.L", "tail").y + 0.75 and v.co.z < J("foot.L")[2] + 0.35]
-    for it in range(60):
-        P = verts_np(o); N = normals_np(o)
-        for i in front:
-            avg = P[list(nb[i])].mean(0); d = float((avg - P[i]) @ N[i])
-            if d > 0: P[i] = P[i] + N[i] * d * 0.9
-        set_verts(o, P)
-    bm = bmesh.new(); bm.from_mesh(o.data)
-    for _ in range(3): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front] if False else bm.verts[:], factor=0.3, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    # a sock is one smooth shape over the toes (a morphological closing of the skin): the front of the foot is smoothed
+    # well inside the skin, then every front vertex goes out along the smoothed normal to just past the OUTERMOST skin
+    # hit of a small disk of rays (5 mm across), so the knit bridges the gaps between the toes and never enters the skin
+    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
+    for _ in range(25): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front], factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+    S = verts_np(o); NS = normals_np(o); P = S.copy(); r = 0.25 * CM
+    for i in front:
+        base, n = Vector(S[i]), Vector(NS[i]).normalized(); t1 = n.orthogonal().normalized(); t2 = n.cross(t1)
+        best = None
+        for k in range(7):
+            off = Vector((0, 0, 0)) if k == 0 else (t1 * math.cos(k * math.pi / 3) + t2 * math.sin(k * math.pi / 3)) * r
+            hit = BODY_BVH.ray_cast(base + n * 1.2 + off, -n, 2.5)
+            if hit[0] is not None:
+                t = (hit[0] - base).dot(n); best = t if best is None else max(best, t)
+        if best is not None: P[i] = np.array(base + n * (best + 0.25 * CM))
+    set_verts(o, P)
+    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
+    for _ in range(2): bmesh.ops.smooth_vert(bm, verts=[bm.verts[i] for i in front], factor=0.35, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bm.to_mesh(o.data); bm.free(); o.data.update()
     push_out(o, 0.2 * CM, iters=1)
     for poly in o.data.polygons:
@@ -518,18 +563,18 @@ def slides(sock_obj):
             outline.append(max(proj.max(), 0.3) + 0.8 * CM)
         sm_ = [sum(outline[(k + j) % 48] for j in (-2, -1, 0, 1, 2)) / 5 for k in range(48)]
         bm = bmesh.new(); bot, topv = [], []
-        z0, z1 = floor - 2.2 * CM, floor + 0.2 * CM
+        z0, z1 = floor - 1.6 * CM, floor + 0.2 * CM                                      # an 1.8 cm sole
         for k in range(48):
             a = 2 * math.pi * k / 48; x, y = cx + sm_[k] * math.cos(a), cy + sm_[k] * math.sin(a)
             bot.append(bm.verts.new((x, y, z0))); topv.append(bm.verts.new((x, y, z1)))
         bm.faces.new(list(reversed(bot))); bm.faces.new(topv)
         for k in range(48): bm.faces.new([bot[k], bot[(k + 1) % 48], topv[(k + 1) % 48], topv[k]])
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.45 * CM, segments=3, affect='EDGES', clamp_overlap=True)
+        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.18 * CM, segments=2, affect='EDGES', clamp_overlap=True)   # a flatter edge
         me = bpy.data.meshes.new("slide_sole"); bm.to_mesh(me); bm.free()
         so = bpy.data.objects.new("slide_sole", me); SC.collection.objects.link(so); me.materials.append(MAT["eva"]); parts.append(so)
         # the strap: arcs over the instep, from one edge of the footbed to the other
-        ys = [cy + (foot[:, 1].min() - cy) * f for f in (0.08, 0.2, 0.32, 0.44, 0.56)]   # over the instep, towards the toes (-y)
+        ys = [cy + (foot[:, 1].min() - cy) * f for f in (0.0, 0.11, 0.22, 0.33, 0.44, 0.55, 0.64)]   # a wide strap over the instep
         rows = []
         for y in ys:
             row = []
@@ -547,7 +592,7 @@ def slides(sock_obj):
             sp = np.array([[q.x, q.y, q.z] for r in rows for q in r]); so_ = verts_np(sock_obj); so_ = so_[so_[:, 0] * sgn > 0.3]
             print("STRAPDBG", side, "cx cy", round(cx, 2), round(cy, 2), "foot y", round(foot[:, 1].min(), 2), round(foot[:, 1].max(), 2), "strap min", sp.min(0).round(2), "max", sp.max(0).round(2), "sock min", so_.min(0).round(2), "max", so_.max(0).round(2))
         st = grid_obj("slide_strap", rows, MAT["eva"])
-        sm = st.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.7 * CM; sm.offset = 1; sm.use_rim = True
+        sm = st.modifiers.new("solid", "SOLIDIFY"); sm.thickness = 0.55 * CM; sm.offset = 1; sm.use_rim = True
         parts.append(st)
     return parts
 
@@ -556,7 +601,7 @@ def slides(sock_obj):
 shell, HEM_Z = hoodie()
 hood, cords = hood_and_cords(shell)
 pk = pocket(shell, HEM_Z)
-pants, stripes = trousers()
+pants, stripes = trousers(HEM_Z)
 sock, SOCK_IDS = socks()
 sl = slides(sock); print("STRAP ray misses", MISSES[0])
 for o in (hood, pk): bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="solid")
@@ -566,6 +611,20 @@ HOODIE = join([shell, hood, pk] + cords, "hoodie_black")
 TROUSERS = join([pants] + stripes, "track_trousers")
 SLIDES = join(sl, "slides_black")
 GARMENTS = {"hoodie_black": HOODIE, "track_trousers": TROUSERS, "socks_white": sock, "slides_black": SLIDES}
+
+
+def box_uvs(o):
+    """per face, a box projection in fabric units: one UV tile = the material's tile (dm)"""
+    me = o.data; uvl = me.uv_layers.get("UVMap") or me.uv_layers.new(name="UVMap")
+    for p in me.polygons:
+        tile = me.materials[p.material_index].get("tile", 0.3); n = p.normal; ax = max(range(3), key=lambda i: abs(n[i]))
+        for li in p.loop_indices:
+            c = me.vertices[me.loops[li].vertex_index].co
+            u, v = (c.x, c.y) if ax == 2 else (c.y, c.z) if ax == 0 else (c.x, c.z)
+            uvl.data[li].uv = (u / tile, v / tile)
+
+
+for o in GARMENTS.values(): box_uvs(o)
 
 
 # ================================================================ bind (.mhclo), hide the covered skin, skin the garments
@@ -623,23 +682,20 @@ def write_garment(name, o, tags):
     d = os.path.join(OUT, name); os.makedirs(d, exist_ok=True)
     me = o.data; V = [MHv(v.co) for v in me.vertices]; F = [list(p.vertices) for p in me.polygons]
     groups = [me.materials[p.material_index].name for p in me.polygons]
-    UV, FT = [], []
+    uvl = me.uv_layers["UVMap"]; UV, FT = [], []
     for p in me.polygons:
-        m = me.materials[p.material_index]; tile = m.get("tile", 0.3); n = p.normal; ax = max(range(3), key=lambda i: abs(n[i]))
-        ft = []
-        for vi in p.vertices:
-            c = me.vertices[vi].co; u, v = ((c.x, c.y) if ax == 2 else (c.y, c.z) if ax == 0 else (c.x, c.z))
-            UV.append((u / tile, v / tile)); ft.append(len(UV) - 1)
-        FT.append(ft)
+        FT.append([len(UV) + k for k in range(len(p.loop_indices))])
+        UV.extend(tuple(uvl.data[li].uv) for li in p.loop_indices)
     M.write_obj(os.path.join(d, f"{name}.obj"), V, F, UV, FT, groups)
     mats = {me.materials[p.material_index].name for p in me.polygons}
     main = max(mats, key=lambda k: groups.count(k)); mm = MAT[main]
-    nor = None
-    if mm["normal_asset"]:
-        nor = f"{name}_normal.jpg"; shutil.copy(tex_path(mm["normal_asset"]), os.path.join(d, nor))
-    srgb = [c ** (1 / 2.2) for c in mm["rgb"]]
-    M.write_mhmat(os.path.join(d, f"{name}.mhmat"), name, srgb, nor, 1.0, mm["rough"],
-                  extra="# per-group materials of the .obj (g lines): " + ", ".join(sorted(mats)) + "\n")
+    for k in mats:                                            # every group's baked maps go with the garment
+        if MAT[k].get("color_map"):
+            shutil.copy(MAT[k]["color_map"], d); shutil.copy(MAT[k]["normal_map"], d)
+    col, nor = os.path.basename(mm["color_map"]), os.path.basename(mm["normal_map"])
+    M.write_mhmat(os.path.join(d, f"{name}.mhmat"), name, (1.0, 1.0, 1.0), nor, 1.0, mm["rough"],
+                  extra=f"diffuseTexture {col}\n# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: "
+                        + ", ".join(sorted(mats)) + "\n")
     M.write_mhclo(os.path.join(d, f"{name}.mhclo"), name, str(uuid.uuid5(uuid.NAMESPACE_URL, "sub01/clothes/" + name)),
                   BIND[name], DELETE[name], f"{name}.obj", f"{name}.mhmat", tags,
                   "Shapes partly derived from MakeHuman's CC0 system asset male_casualsuit02." if name in ("hoodie_black", "track_trousers") else "",
@@ -719,7 +775,7 @@ def lights():
                                    ("rim", (6, 16, 16), (-60, 0, 160), 5200, 7)):
         ld = bpy.data.lights.new(nm, 'AREA'); ld.energy = en; ld.size = size
         lo = bpy.data.objects.new(nm, ld); lo.location = loc; lo.rotation_euler = [math.radians(a) for a in rot]; SC.collection.objects.link(lo)
-    floor = min(B(REST[i]).z for i in BODY_IDS) - 2.2 * CM
+    floor = min(B(REST[i]).z for i in BODY_IDS) - 1.6 * CM
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, floor)); bpy.context.active_object.data.materials.append(MAT["studio"])
     return floor
 
@@ -767,6 +823,7 @@ if RENDER:
     render(camera("c_hood", (-3.6, -9.5, 6.2), (0.2, 0.0, 3.4), 60), W, W, f"{SHEET_DIR}/close_hood.png")
     if os.environ.get("POSE_DEBUG"):
         render(camera("c_knit", (0.6, -3.2, 2.2), (0.3, 0, 2.0), 50), 500, 500, f"{SHEET_DIR}/debug_knit.png")
+        render(camera("c_hem", (3.2, -5.5, 0.6), (1.2, 0, 0.2), 50), 500, 500, f"{SHEET_DIR}/debug_hem.png")
         fl = J("foot.L"); render(camera("c_foot", (fl.x - 2.5, fl.y - 4.5, fl.z + 1.6), (fl.x, fl.y - 0.5, fl.z - 0.4), 50), 500, 500, f"{SHEET_DIR}/debug_foot.png")
     pose_seated(); bpy.context.view_layer.update()
     # lower the rig so the feet stay on the floor
@@ -781,5 +838,13 @@ if RENDER:
         render(cs, 600, 600, f"{SHEET_DIR}/debug_side.png")
     bpy.context.view_layer.update(); el = RIG.matrix_world @ RIG.pose.bones["lowerarm01.R"].head
     render(camera("c_seat", (-21, -15, 3.0), (0, -1.6, -3.4), 50), W, Hh, f"{SHEET_DIR}/seated.png")
+    bpy.ops.object.select_all(action='DESELECT'); dg = bpy.context.evaluated_depsgraph_get(); posed = []
+    for o in [body, bpy.data.objects["stool"], bpy.data.objects["desk"]] + list(GARMENTS.values()):   # posed copies (the glTF
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)                       # exporter skips armatures)
+        c = bpy.data.objects.new(o.name.split(".")[0], me); c.matrix_world = o.matrix_world.copy(); SC.collection.objects.link(c)
+        c.select_set(True); posed.append(c)
+    bpy.ops.export_scene.gltf(filepath=f"{SHEET_DIR}/web_check.glb", export_format='GLB', use_selection=True, export_apply=True,
+                              export_yup=True, export_texcoords=True, export_normals=True, export_materials='EXPORT', export_image_format='JPEG')
+    for c in posed: bpy.data.objects.remove(c)
     render(camera("c_elbow", (el.x - 5.5, el.y - 1.0, el.z + 2.6), (el.x + 0.6, el.y - 0.6, el.z - 0.2), 55), W, W, f"{SHEET_DIR}/close_elbow.png")
 print("DONE")

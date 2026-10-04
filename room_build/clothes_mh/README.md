@@ -12,16 +12,24 @@ the knees or anywhere else under the cloth.
 |---|---|---|
 | black cotton hoodie | `assets/hoodie_black/` | hood down (a soft double layer rolled behind the neck and falling down the back), two drawstrings with aglets, kangaroo pocket with sloped openings, ribbed cuffs and hem (gathered), weight folds: diagonal creases at the inner elbows, stacking above the cuffs, folds falling to the hem, the fleece blousing over the band |
 | dark track trousers | `assets/track_trousers/` | relaxed fit, one off-white side stripe per leg (one plain stripe: no maker's design), elastic ribbed ankle cuffs with stacking above them, soft knee folds |
-| white crew socks | `assets/socks_white/` | the feet and lower shins 2 mm out, one smooth envelope over the toes, a ribbed top |
-| black slides | `assets/slides_black/` | a 2.4 cm EVA footbed from the foot's footprint and a wide padded strap over the instep |
+| white crew socks | `assets/socks_white/` | the feet and lower shins 2 mm out; over the toes one smooth sock shape (a closing of the skin: the front smoothed, then each vertex just past the outermost skin hit of a 5 mm disk of rays), only a hint of the toe line; a ribbed top |
+| black slides | `assets/slides_black/` | a 1.8 cm EVA footbed (flat edge, 2 mm radius) from the foot's footprint and a wide padded strap over the instep |
 
 `assets/summary.json` gives each garment's vertex and face counts and how many body vertices it hides.
 
-Fabric: in the `.obj` each face's UVs are a box projection in fabric units (one UV tile = the material's tile size),
-so the tiled normal map in the `.mhmat` repeats at a real fabric scale; each `.obj` has one `g` group per material
-(fleece, rib, cord, aglet; track, stripe; sock, sockrib; eva). The sheet's renderer (Cycles) adds a procedural
-jersey stitch (columns of V stitches, 2.2 mm apart on the hoodie) and a heather tone on top of the photo normal map;
-a web material would bake those into the textures.
+Fabric: every material has a baked, tileable **colour map** (sRGB) and **normal map** (OpenGL tangent space),
+made by `fabric_bake.py`: Poly Haven's photo-scanned fabric normal, combined with a procedural jersey stitch for the
+knits (columns of V stitches, a whole number per tile: 41 on the hoodie's 9 cm tile, about 2.2 mm apart, plus fuzz),
+and a colour toned by a photo-scanned melange and darkened in the stitch grooves so the knit still reads where the
+normal map is mip-mapped away. The `.obj` UVs are a box projection in fabric units (one UV tile = the material's tile),
+one `g` group per material (fleece, rib, cord, aglet; track, stripe; sock, sockrib; eva); each garment folder holds
+its groups' `<group>_color.jpg` and `<group>_normal.jpg`, and `assets/textures/` all of them. The sheet renders with
+exactly these maps.
+
+**Web check** (`web_check.py`, `docs/design/clothes-mh/web_check.jpg`): the posed figure exported to glTF (the maps,
+sheen as `KHR_materials_sheen`) and rendered by three.js r169 with the room page's lights: daylight (sun 0xfff0dc,
+sky fill, hemisphere) and the evening desk lamp (0xffb468, distance 2.2, decay 1.8), ACES, the room environment, at
+2.3 m and at the room's 5 m. Top: day; bottom: the lamp.
 
 ## Sources and licences (every one CC0)
 | what | source | licence |
@@ -42,6 +50,7 @@ From `room_build/clothes_mh/`, with Blender 4.2:
     python ../ph.py tex 1k jersey_melange jogging_melange ribbed_corduroy bi_stretch knitted_fleece hessian_380
     blender -b -P build_clothes.py -- --mh makehuman/makehuman/data --sys mh_sys --tex ../tex [--quick]
     python compose_sheet.py        # docs/design/clothes-mh/clothes_sheet.jpg from out/*.png
+    python web_check.py            # docs/design/clothes-mh/web_check.jpg (three.js, the room's lights; Playwright + Chromium)
 
 The build verifies every written `.mhclo`: read back and refitted on the body with MakeHuman's rule, it must give the
 garment back (it does to < 0.01 mm). The sheet's body is the plain base mesh with the young-male target, a neutral

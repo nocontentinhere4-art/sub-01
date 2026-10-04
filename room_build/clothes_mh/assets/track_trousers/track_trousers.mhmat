@@ -1,13 +1,14 @@
 # CC0 1.0, made for SUB-01 by room_build/clothes_mh/build_clothes.py
 name track_trousers
-diffuseColor 0.1526 0.1610 0.1870
+diffuseColor 1.0000 1.0000 1.0000
 specularColor 0.03 0.03 0.03
 shininess 0.380
 opacity 1.0
 translucency 0.0
 backfaceCull False
-normalmapTexture track_trousers_normal.jpg
+normalmapTexture track_normal.jpg
 normalmapIntensity 1.00
 shaderConfig normal True
 shaderConfig diffuse True
-# per-group materials of the .obj (g lines): rib, stripe, track
+diffuseTexture track_color.jpg
+# per-group materials of the .obj (g lines), each with <group>_color.jpg and <group>_normal.jpg: rib, stripe, track
