@@ -1095,7 +1095,7 @@ $("cam").onclick = () => { pinned = !pinned; CAM.force = pinned ? "overview" : n
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
-const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, aim:new THREE.Vector3(0, -9, 0)};
+const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, keptLos:-9, aim:new THREE.Vector3(0, -9, 0)};
 const SHOT_S = {face:14, screen:12, medium:16, over:12};                  // seconds a shot holds before the cycle moves on
 // the overview is in every cycle and holds three quarters of what the other shots hold together: >= 40 % of the time
 const holdOf = (kind, list) => kind === "overview" ? Math.max(12, 0.75 * list.reduce((s, k) => s + (SHOT_S[k] || 0), 0)) : SHOT_S[kind];
@@ -1144,7 +1144,13 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
   // position still clears the walls and the furniture (the rays are cast again otherwise)
   if (!(CAM.cut || CAM.pick === null || T - CAM.losAt > 2 || c.distanceTo(CAM.aim) > 0.4)) {
     out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(CAM.pick)), dist).addScaledVector(UP, h);
-    if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12) { CAM.ang = CAM.pick; return out; }
+    // ... and nothing came between it and him since (the line of sight again every 0.25 s: he may have walked behind
+    // the laundry hanger after the angle was scored)
+    if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12) {
+      if (T - CAM.keptLos < 0.25) { CAM.ang = CAM.pick; return out; }
+      CAM.keptLos = T;
+      if (!occluded(out, c) && !(eyes && faceHidden(out, c))) { CAM.ang = CAM.pick; return out; }
+    }
   }
   CAM.aim.copy(c);
   head.getWorldPosition(_cfp); (bones.headfront || head).getWorldPosition(_cfd); _cfd.sub(_cfp).setY(0);
