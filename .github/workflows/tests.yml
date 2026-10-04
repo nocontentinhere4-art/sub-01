@@ -1,9 +1,12 @@
 name: tests
 
 on:
+  # docs-only changes skip CI: the Actions minutes are a monthly budget
   pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
 
 permissions:
   contents: read
