@@ -125,7 +125,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   (`youtube_api.CHANNELS`; `channels.list` forHandle → uploads playlist (kept), `playlistItems.list`, `videos.list`
   for durations, Shorts ≤ 180 s: 3 units, each list cached 3 h), else `search.list` (100 units). Without a key or
   quota: no discovery, the note "no API key or no quota left…", and a replay of the videos already found today
-  (`Quota.today`). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+  (`Quota.today`). `/api/screens` → `youtube` (key set, units used today, errors) is reported even while the
+  browser idles (`Live.youtube_view`, from the saved state and the server's environment); the raw quota now rides
+  `/state` as `youtube_state`, is saved in `browsing.json` and restored by `/init`, so a browser restart keeps
+  today's units (before, the public view overwrote it and every restart reset the count). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
 - Variety guard: at most `HOST_STREAK_MAX` (3) pages in a row on one site and `HOST_DAY_CAP` (20) a day (the video
   players excepted); the site streak also raises the leave pull (`streak_pull`). Every page is now checked against
   robots.txt before it is opened (not only searches); the seeds were re-chosen accordingly (old.reddit.com,
