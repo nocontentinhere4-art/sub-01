@@ -3,11 +3,11 @@
  "hour": 14,
  "scene": {"life": {"activity": "research", "place": "room"}},
  "shots": [
-  {"label": "desk, 14:00", "seconds": 90, "hour": 14, "scene": {"life": {"activity": "research", "place": "room"}}, "settle": 3,
+  {"label": "desk", "seconds": 90, "hour": 14, "scene": {"life": {"activity": "research", "place": "room"}}, "settle": 3,
    "cam": {"pos": [0.60, 1.90, 0.40], "target": [-1.15, 1.12, -0.95]}},
-  {"label": "window, 14:00", "seconds": 20, "hour": 14, "scene": {"life": {"activity": "window", "place": "room"}}, "settle": 6,
+  {"label": "window", "seconds": 20, "hour": 14, "scene": {"life": {"activity": "window", "place": "room"}}, "settle": 6,
    "cam": {"pos": [0.80, 1.75, 0.65], "target": [-1.55, 1.35, -0.05]}},
-  {"label": "phone in bed, 22:00", "seconds": 20, "hour": 22, "scene": {"life": {"activity": "phone", "place": "bed", "phone": "shorts"}}, "settle": 8}
+  {"label": "phone in bed", "seconds": 20, "hour": 22, "scene": {"life": {"activity": "phone", "place": "bed", "phone": "shorts"}}, "settle": 8}
  ],
  "_cameras": "the bed shot has no camera: the page's own follow camera (as #103's 23:00 segment) gives the close shot of his face and the phone"
 }
