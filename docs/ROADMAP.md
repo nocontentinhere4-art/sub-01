@@ -338,11 +338,16 @@ only, its mocap is CC BY-NC 4.0.
     - a lit desk-monitor stub, used in preview renders only (the live room is unchanged).
     - Validated locally by B: pytest 1234 passed / 27 skipped, smoke OK, visual 5 passed.
 - **Decisions today:**
+  - Owner: every visual item is delivered side by side with a real reference photo.
   - CI skips docs-only changes. Workers push with `[skip ci]` and validate locally.
   - CI runs once on main per merge. Budget: about 1,000 Actions minutes for 28 days, about 20 min per run.
 - **Waiting:**
   - #135 (client-side player, the fix for the YouTube bot wall): owner's OK asked.
   - #103: owner's choice, close-up camera or the current overhead view.
+    - **Merge guard:** before any merge, `preview/skin_eyes/` (G6's sheets with third-party reference crops) is
+      removed in its own commit and must be absent from the squash.
+    - Rule for every branch: comparison sheets and reference photos live only on preview branches or `preview/`
+      folders, never in main.
   - #129: do not merge yet.
   - #134: head 5a32f70 has a bed regression; not to be merged.
   - #137: clearance, waiting for the owner's OK.
