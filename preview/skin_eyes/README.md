@@ -62,7 +62,7 @@ Fourth pass (the coordinator's read of the first body sheet: "still plastic"):
 
 Fifth pass (the coordinator: floating lashes, a pasted-in eye, a flat cheek):
 - the lashes grow from the lid's front rim: rooted where the lid meets the ball (the crossing nearest the opening),
-  brought forward by the lid's thickness, along the lid's curve; the uppers fan up and out, the lowers are shorter,
+  brought forward by the lid's thickness, along the lid's curve; the uppers (60, up to 6.8 mm: a young man's, not mascara) fan up and out, the lowers are shorter,
   sparser and lie forward;
 - the eye sits in the lids: a soft occlusion band of the upper lid on the ball (the top of the iris and the sclera
   darker), a thin wet waterline along the upper lid so it has a thickness, the gaze a little up so the iris tucks

@@ -502,7 +502,7 @@ export function addEyes(THREE, group, P, eyes, {iris = [0.24, 0.13, 0.06], index
       }
       // the lash strands need the visible margin (the edge crossings: a mesh open at the lids, as G2's body)
       if (crossings.length) {
-        const strands = new THREE.Mesh(lashStrands(THREE, upper, C, 1, {count: 90, len: 0.0082, width: 0.00012}), strandMat);
+        const strands = new THREE.Mesh(lashStrands(THREE, upper, C, 1, {count: 60, len: 0.0068, width: 0.00011}), strandMat);
         strands.name = "lashes_up_" + side; group.add(strands);
       }
     }
