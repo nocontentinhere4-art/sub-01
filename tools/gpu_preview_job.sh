@@ -19,12 +19,16 @@ R=/work/new/tools/gpu_preview_render.py
 
 # which flags give Chromium the NVIDIA GPU here: the first set whose WebGL renderer names it wins
 GPU_ARGS=""
-for cand in "--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" \
+# (channel=chromium: Playwright's full Chromium in the new headless mode rather than the headless shell)
+# (the first is the one that worked on an RTX A5000 pod, driver 595: ANGLE over the NVIDIA EGL library)
+for cand in "channel=chromium,--use-gl=angle,--use-angle=gl-egl" \
+            "channel=chromium,--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" \
+            "channel=chromium,--use-gl=egl" \
             "--use-gl=angle,--use-angle=gl-egl" \
+            "--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" \
             "--use-gl=egl" \
-            "--use-angle=gl,--use-gl=angle" \
-            "--headless=new,--use-angle=vulkan,--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan"; do
-  r=$(python3 $R --probe --gpu-args "$cand" 2>&1 | tail -1)
+            "channel=chromium,--use-angle=gl,--use-gl=angle"; do
+  r=$(python3 $R --probe --gpu-args="$cand" 2>&1 | tail -1)
   echo "probe [$cand] -> $r"
   case "$r" in *NVIDIA*|*nvidia*) GPU_ARGS="$cand"; break;; esac
 done
@@ -36,9 +40,9 @@ for size in $SIZES; do
     SHOTS_ARG=""; [ -n "${SHOTS:-}" ] && SHOTS_ARG="--shots /in/$SHOTS"
     Q=$([ $side = old ] && echo "${QUERY_OLD:-}" || echo "${QUERY_NEW:-}")
     python3 $R --web /work/$side/web --side $side --size $size --fps $FPS --segments "$SEGMENTS" $SHOTS_ARG --query "$Q" --frames /work/frames/$size \
-      --gpu-args "$GPU_ARGS" --require-gpu --port 88$([ $side = old ] && echo 71 || echo 72) || exit 1
+      --gpu-args="$GPU_ARGS" --require-gpu --port 88$([ $side = old ] && echo 71 || echo 72) || exit 1
   done
   python3 $R --encode --frames /work/frames/$size --out /out/preview_$size.mp4 --max-mb "$MAX_MB" --label-old "$LABEL_OLD" --label-new "$LABEL_NEW" || exit 1
   cp /work/frames/$size/*_meta.json /out/ 2>/dev/null; for s in old new; do cp /work/frames/$size/${s}_meta.json /out/${s}_${size}_meta.json; done
 done
-cd /out && tar -czf preview.tar.gz preview_*.mp4 preview_*.json *_meta.json gpu_args.txt && ls -la /out
+ls -la /out                                       # (the videos and their JSON stay in /out as files: fetched one by one, so a size that failed does not lose the others)

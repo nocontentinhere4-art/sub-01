@@ -124,7 +124,8 @@ def main():
 
     cmd = [sys.executable, str(ROOT / "analysis" / "runpod_job.py"), "--kind", "a5000", "--wait-min", str(a.wait_min), "--image", IMAGE,
            "--script", str(ROOT / "tools" / "gpu_preview_job.sh"), "--upload", str(work / "old.tar.gz"), str(work / "new.tar.gz")] + ([str(Path(a.shots).resolve())] if a.shots else []) + [
-           "--fetch", "preview.tar.gz", "--dest", str(work / "fetched"), "--tag", f"{TAG}-{a.name}", "--disk", "40", "--max-min", str(max_min),
+           "--fetch"] + [f"preview_{sz}.{ext}" for sz in a.sizes.split(",") for ext in ("mp4", "json")] + ["gpu_args.txt",
+           "--dest", str(work / "fetched"), "--tag", f"{TAG}-{a.name}", "--disk", "40", "--max-min", str(max_min),
            "--env", f"SIZES={' '.join(a.sizes.split(','))}", f"FPS={a.fps}", f"SEGMENTS={a.segments}", f"LABEL_OLD={a.label_old}", f"LABEL_NEW={a.label_new}",
            f"MAX_MB={a.max_mb:g}", "NVIDIA_DRIVER_CAPABILITIES=all", f"SHOTS={Path(a.shots).name if a.shots else ''}", f"QUERY_OLD={a.query_old}", f"QUERY_NEW={a.query_new}"]
     if a.dry_run:
@@ -132,18 +133,17 @@ def main():
         return 0
     t0 = time.time()
     r = subprocess.run(cmd, cwd=ROOT)
-    fetched = work / "fetched" / "preview.tar.gz"
-    if r.returncode != 0 or not fetched.exists():
-        sys.exit(f"the pod job failed (exit {r.returncode}); the runner's log is in {work / 'fetched'} if it got that far")
-    with tarfile.open(fetched) as t:
-        t.extractall(work / "res")
     got = []
-    for mp4 in sorted((work / "res").glob("preview_*.mp4")):
+    mp4s = sorted((work / "fetched").glob("preview_*.mp4"))
+    if r.returncode != 0 or not mp4s:
+        sys.exit(f"the pod job failed (exit {r.returncode}) and brought no video; the runner's log is in {work / 'fetched'} if it got that far")
+    for mp4 in mp4s:
         dest = out / f"{a.name}_{mp4.name.split('_', 1)[1]}"
         shutil.copy(mp4, dest); got.append(dest)
         j = mp4.with_suffix(".json")
         if j.exists():
             shutil.copy(j, dest.with_suffix(".json"))
+    (work / "fetched" / f"{TAG}-{a.name}_log.txt").exists() and shutil.copy(work / "fetched" / f"{TAG}-{a.name}_log.txt", out / f"{a.name}_pod_log.txt")
     usd2, runs2 = spent()
     log(f"done in {(time.time() - t0) / 60:.1f} min; this run ${usd2 - usd:.3f}; tool total ${usd2:.2f} over {runs2} runs")
     for d in got:

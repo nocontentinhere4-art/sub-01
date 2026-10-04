@@ -61,9 +61,15 @@ def serve(web, port):
 
 
 def launch(p, gpu_args, chromium):
-    args = ["--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--enable-zero-copy", "--disable-gpu-vsync"] + [a for a in gpu_args.split(",") if a]
+    """Chromium with the given flags; a 'channel=chromium' entry picks Playwright's full Chromium build (new headless)
+    instead of the headless shell, which may have no GPU path."""
+    flags = [a for a in gpu_args.split(",") if a]
+    args = ["--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--enable-zero-copy", "--disable-gpu-vsync"] + [a for a in flags if not a.startswith("channel=")]
     kw = {"args": args, "headless": True}
-    if chromium:
+    ch = [a.split("=", 1)[1] for a in flags if a.startswith("channel=")]
+    if ch:
+        kw["channel"] = ch[0]
+    elif chromium:
         kw["executable_path"] = chromium
     return p.chromium.launch(**kw)
 
@@ -223,6 +229,7 @@ def encode(a):
     fps = metas[sides[0]]["fps"]
     for crf in (20, 23, 26, 29, 32, 36):
         subprocess.run([a.ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-framerate", str(fps), "-i", str(comp / "c_%05d.jpg"),
+                        "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",            # (libx264 needs even sizes; the phone canvas is 390 x 523)
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", str(crf), "-preset", "medium", "-movflags", "+faststart", str(out)], check=True)
         if out.stat().st_size <= a.max_mb * 1e6:
             break
