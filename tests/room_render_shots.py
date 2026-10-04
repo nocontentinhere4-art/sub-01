@@ -181,8 +181,10 @@ class Run:
           if ({json.dumps(screen)} === "desk" && monitor) monitor.set(drawReading({{title: "Inokashira Park", host: "en.wikipedia.org", kind: "wiki",
             extract: "Inokashira Park is a park in Musashino and Mitaka, western Tokyo. It straddles the border between the two cities, and was opened in 1917. The park has a pond, a zoo, a shrine to Benzaiten, a boating area and many cherry trees."}}));
           settle(); updateCameraGoal();
-          camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); }}""")
+          camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update(); sim(0.05); }}""")
         pg.wait_for_timeout(2500)
+        pg.evaluate("window.FREEZE = true; post.render(0.1)")   # the frame the screenshot takes is drawn from the placed camera (software GL may not have drawn one yet)
+        pg.evaluate("window.FREEZE = false")
 
 
 def cloth_metric(pg, out, name):

@@ -1116,6 +1116,12 @@ function camAround(out, c, facing, dist, h, ang){
   CAM.ang = bestA;                                                         // how far round him the shot ended up (0 = his front)
   return out.copy(best);
 }
+// the overview; on a tall frame from further back (the whole width of the room instead of its middle; the orbit's 12 m
+// limit allows it) and aimed higher, so the room sits under the overlays
+function overviewGoal(){
+  camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target);
+  if (camera.aspect < 1) { camGoal.pos.sub(camGoal.target).multiplyScalar(1.28).add(camGoal.target); camGoal.target.y += 0.9; }
+}
 function updateCameraGoal(){
   const nowS = T, home = boy && boy.visible && head;                      // the simulation's clock: a frozen page (QA) holds its shot
   const atDesk = (screenOn === "desk" || chatting) && monitor && home;
@@ -1128,7 +1134,7 @@ function updateCameraGoal(){
   if (CAM.force && list.includes(CAM.force)) { if (CAM.kind !== CAM.force) { CAM.kind = CAM.force; CAM.since = nowS; CAM.cut = true; } }
   else if (!list.includes(CAM.kind) || nowS - CAM.since > holdOf(CAM.kind, list)) {
     CAM.kind = list[(list.indexOf(CAM.kind) + 1) % list.length]; CAM.since = nowS; CAM.cut = true; }
-  if (CAM.kind === "overview" || !home) { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); return; }
+  if (CAM.kind === "overview" || !home) return overviewGoal();
   (bones.headfront || head).getWorldPosition(v2);                           // his face
   const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
   v1.copy(v2).addScaledVector(UP, -0.28);                                   // his chest
@@ -1160,7 +1166,7 @@ function updateCameraGoal(){
     // the overview instead, never a hood that fills the frame; the same 30° vertical field of view holds less width,
     // so the camera stands a third further back, and the aim point is lifted by an eighth of the distance (a seventh
     // of the frame's height): his head sits below the top third, where the title, the plan and the chip are
-    if (CAM.kind !== "over" && Math.abs(CAM.ang) > 60) { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); return; }
+    if (CAM.kind !== "over" && Math.abs(CAM.ang) > 60) return overviewGoal();
     camGoal.pos.sub(camGoal.target).multiplyScalar(1.35).add(camGoal.target); camClamp(camGoal.pos);
     camGoal.target.addScaledVector(UP, 0.12 * camGoal.pos.distanceTo(camGoal.target));
   }
