@@ -208,3 +208,43 @@ def test_with_the_key_a_search_with_no_fitting_site_becomes_a_youtube_search(mon
     b.YT_SEARCH_SHARE = 1.0                                  # and a share of all searches go to YouTube first
     run(b._search(sc, "Toyota GR Supra", "", "interests"))
     assert videos[-1][1] == "Toyota GR Supra" and searched.count("carscoops") == 0
+
+
+def test_login_walled_social_pages_are_never_opened_or_offered():
+    """Live 2026-10-04 09:0x Tokyo: Serious Eats' Instagram page, a "See photos, videos and more… Sign up / Log in"
+    modal, was on his monitor."""
+    b = Browser(decide=True)
+    b.hungry = True
+    for h in ("www.instagram.com", "www.facebook.com", "x.com", "twitter.com", "www.threads.net"):
+        assert not b.host_ok(h), h
+    assert b.host_ok("www.tiktok.com") and b.host_ok("www.youtube-nocookie.com")
+    sc = b.screens["desk"]
+    sc.info = {"title": "Serious Eats", "host": "seriouseats.com", "kind": "page"}
+    raw = [("https://www.instagram.com/seriouseats/", "Follow Serious Eats on Instagram", 9000, True),
+           ("https://www.seriouseats.com/best-ramen-recipe-tonkotsu", "The best tonkotsu ramen at home", 9000, True)]
+    assert _page_links(b, sc, "https://www.seriouseats.com/", raw) == [raw[1][0]]
+    assert browse.LOGIN_WALL.search("See photos, videos and more from Serious Eats. Sign up  Log in")
+
+
+def test_the_first_thing_at_the_desk_is_a_video():
+    b = Browser(decide=True, rng=random.Random(0))
+    sc = b.screens["desk"]
+    asked = []
+
+    async def _public_videos(sc_, kind, q, why, origin="", short=True):
+        asked.append((kind, short))
+        sc_.info = {"url": "https://www.youtube.com/watch?v=abcDEF12345", "title": q, "host": "youtube.com",
+                    "kind": "page", "why": why, "t": 0, "embed": "x"}
+        b.watched = True
+        return True
+    b._public_videos = _public_videos
+    assert run(b._next(sc, [], {"query": "", "from": "", "hour": 9}))
+    assert asked == [("youtube", False)]
+
+    async def _search(sc_, q, why="", origin=""):
+        asked.append(("search", q))
+        return True
+    b._search = _search
+    b.rng = SimpleNamespace(random=lambda: 0.5, choice=random.Random(0).choice)
+    run(b._next(sc, [], {"query": "", "from": "", "hour": 9}))
+    assert asked[-1][0] == "search"                          # after that, the usual mix

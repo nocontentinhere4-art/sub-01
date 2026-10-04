@@ -181,7 +181,12 @@ HOST_FALSE_HITS = re.compile(r"sussex|essex|middlesex|wessex", re.I)
 # a sign-in wall: the page is mostly a login / sign-up prompt (he leaves; he never signs in to get past it)
 LOGIN_WALL = re.compile(r"(log|sign) ?in to (continue|view|see|read|keep reading|tiktok|watch)|sign up to (continue|read|see|view)|"
                         r"create (a free |an )?account to (continue|read|view)|you must be (logged|signed) in|"
-                        r"please (log|sign) in", re.I)
+                        r"please (log|sign) in|see (photos|posts), videos and more|log in or sign up|"
+                        r"sign up to see|join [\w ]{1,30} to see|new to (x|instagram|facebook)\?", re.I)
+# #89 live (2026-10-04): social sites whose public pages are a login / sign-up modal for a logged-out visitor; he
+# never opens them (TikTok and YouTube are reached through their official players instead)
+WALLED_SOCIAL = re.compile(r"(^|\.)(instagram\.com|facebook\.com|fb\.com|x\.com|twitter\.com|threads\.(net|com)|"
+                           r"linkedin\.com|pinterest\.[a-z.]+|snapchat\.com)$", re.I)
 LOGIN_WALL_MAX_CHARS = 3000
 
 # --- the only typing: a site's own search box (#29) ------------------------------------------------------------------
@@ -620,6 +625,7 @@ class Browser:
         self.yt = YT.Quota(state=s.get("youtube"))          # YouTube Data API units today (only with the key)
         self.yt_used = {}                                   # channel handle -> last used (keyless rotation)
         self.hungry = False                                 # #89 teen: food and cooking sites only while hungry
+        self.watched = False                                # a video has been on a screen since the browser started
         self.diag = {}                                      # site -> why its logged-in feed showed no video
         self.diag_shot = {}                                 # site -> masked screenshot of that page (admin only)
 
@@ -634,6 +640,8 @@ class Browser:
         h = (host or "").lower().removeprefix("www.")
         if RECIPE_HOST.search(h) and not getattr(self, "hungry", False):
             return False                                        # no recipe loops outside meals
+        if WALLED_SOCIAL.search(h):
+            return False                                        # a login wall for him: never opened
         if any(h == f.removeprefix("www.") for f in HOST_CAP_FREE):
             return True
         if self.variety.host_count(h) >= HOST_DAY_CAP:
@@ -1052,6 +1060,13 @@ class Browser:
         sc.chain = 0
         if sc.mode == "shorts" and await self._shorts(sc, interest):
             return True
+        if not self.watched and sc.mode != "shorts":            # #89 live: the first watch as early as possible
+            d = interest if isinstance(interest, dict) else {}
+            p = I.pick(self.variety, hour=d.get("hour", I.tokyo_hour()), rng=self.rng, mult=d.get("tastes"),
+                       discover=True, hungry=self.hungry)
+            if query_ok(p["query"]) and await self._public_videos(
+                    sc, "youtube", p["query"], f"watched a video on {p['topic']}", "interests", short=False):
+                return True
         if sc.mode == "video":                                  # watching videos: YouTube's Data API + embed player
             d = interest if isinstance(interest, dict) else {}
             q = query_ok(SS.interest_text(interest)) if d.get("from") not in ("", None, "interests") else None
@@ -1818,6 +1833,8 @@ class Browser:
             self.visited.add(i["url"], i["title"])                     # #89: not opened again for 7 days
             if getattr(sc, "mode", None) == "shorts" and (i.get("card") or VIDEO_LINK.search(i["url"])):
                 self._clip(sc)
+            if i.get("embed") or VIDEO_LINK.search(i["url"]):
+                self.watched = True
         if not sc.history or sc.history[-1] != i["url"]:
             sc.history = (sc.history + [i["url"]])[-20:]
             sc.chain += 1

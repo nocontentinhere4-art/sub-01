@@ -138,6 +138,11 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   short video + YouTube 75 % of the simulated day (no key: 56 %). Each API search logs "browse: YouTube API search
   (…), n results, units today" and counts in `/api/screens` → `youtube.searches` / `units_used` / `errors`. The
   9,000-unit cap is ~90 searches a day; after it, the channels' pages take over.
+- Live 09:00–09:10 Tokyo: an Instagram login modal on his monitor, Serious Eats again. Social sites whose public pages
+  are login walls for a logged-out visitor (`WALLED_SOCIAL`: Instagram, Facebook, X/Twitter, Threads, LinkedIn,
+  Pinterest, Snapchat) are never offered or opened, and `LOGIN_WALL` also recognises their "see photos, videos and
+  more… sign up / log in" modal. The first thing he does at the desk after the browser starts is a video
+  (`Browser.watched`).
 
 ## Short video live, the honest way (#89 live follow-up, PR `feature/more-search`)
 - Live 2026-10-03 (full day, browser up): 390 pages, TikTok / Shorts / YouTube 0 %, bursts only on pages, an HN Algolia
