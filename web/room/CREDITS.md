@@ -201,7 +201,6 @@ skateboard's graphic an original pattern; no brands, logos or characters of othe
 | waste bin with a liner | under the desk (the modelled one and its stickers, cut out) | `b52a9f88-6d94-4244-a2f1-19f37250e268` |
 | game controller (generic) | the desk (the modelled one, cut out) | `39586f31-cc3e-488b-8454-533df47ffed9` |
 | computer monitor | the desk; fitted around the page's live screen, which stays the page's own quad (the modelled one, cut out) | `40a67c5e-c2f0-4b5f-8a05-b6cba29fc020` |
-| mouse | the desk mat (the modelled one, cut out) | `7f6dd270-5668-4826-82ed-090af0124e8b` |
 | bookshelf speaker, used for the pair | the desk (the modelled pair, cut out) | `ae7531ac-6f5e-4ca1-bc85-3fc761223e7b` |
 | skateboard | new, on the floor by the door, wheels up | `fd5e06a2-38c1-402c-bbe1-78bb7deb0d2e` |
 | game console (generic) | new, the desk's back | `b08f7166-7a2e-4538-86e6-e3a05838fb38` |
@@ -210,7 +209,8 @@ skateboard's graphic an original pattern; no brands, logos or characters of othe
 | stack of sneaker boxes | new, by the door | `827927f2-220e-4563-bd36-3a1680d02a34` |
 | 35mm film camera (no brand) | new, on the desk's books | `0f650a9e-edaa-4828-94f2-b9f959671e75` |
 
-Generated and not used (paid for, left out): a first desk lamp, whose shade floated off its arm
+Generated and not used (paid for, left out): a mouse (`7f6dd270-5668-4826-82ed-090af0124e8b`; the mouse modelled in code
+below took its place, built to the profile his hand is solved against); a first desk lamp, whose shade floated off its arm
 (`21b4442f-4fc2-408b-81a5-d911bb16337a`); a first plant, with purple leaves (`2df53e11-6008-4f00-9d52-2b3452078f93`); a
 keyboard, built on a wedge with letters on its keys (`64db3634-167d-498a-8589-9140e01b7782`; the modelled keyboard stays,
 his typing is aimed at it); an office chair (`5af3f609-8dc7-4815-996f-6c9cd2f27247`; the modelled chair stays, his sitting
@@ -225,7 +225,8 @@ prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces
 
 The keyboard (`keyboard.glb`, `room_build/build_keyboard.mjs`) is modelled in code for this project, CC0: a full-size
 104-key layout, plain keycaps with no legends, no maker's design; it takes the modelled tenkeyless one's place, its home
-row where that one's was.
+row where that one's was. So is the mouse on its pad (`mouse.glb`, `room_build/build_mouse.mjs`, CC0): a generic shape,
+no logo, 4 cm right of the keyboard.
 
 The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
 page paints it over the record sleeve in the posters atlas.

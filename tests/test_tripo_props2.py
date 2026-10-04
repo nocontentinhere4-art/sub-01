@@ -90,3 +90,16 @@ def test_keyboard_is_light_and_placed_by_its_home_row():
     assert 0 < tris <= 20000
     html = (ROOT / "web" / "room.html").read_text()
     assert 'load("room/keyboard.glb")' in html and "const KB_HOME = [" in html
+
+
+def test_mouse_is_light_and_by_the_keyboard():
+    data = (ROOT / "web" / "room" / "mouse.glb").read_bytes()
+    assert len(data) <= 1024 * 1024
+    n = struct.unpack_from("<I", data, 12)[0]
+    j = json.loads(data[20:20 + n])
+    assert sorted(nd["name"] for nd in j["nodes"]) == ["mouse", "mousepad"]
+    tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
+    assert 0 < tris <= 20000
+    html = (ROOT / "web" / "room.html").read_text()
+    assert 'load("room/mouse.glb")' in html and "MOUSE_AT = [" in html
+    assert "mouse" not in props()                                                  # (the Tripo mouse is left out)

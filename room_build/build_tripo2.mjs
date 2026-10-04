@@ -32,8 +32,6 @@ export const PROPS2 = [
   {name:"cans", size:{w:0.13}, turn:[0, 0], at:[0.80, FTOP, -1.07, 0.4]},               // the fridge's top, by the tissues
   {name:"shoeboxes", size:{w:0.33}, turn:[0, 0], at:[1.82, F, -0.58, Math.PI / 2]},     // the floor by the door
   {name:"monitor", fit:"monitor"},                                                       // around the page's live screen
-  {name:"mouse", size:{h:0.032}, turn:[0, 0], at:[-0.755, DTOP + 0.003, -0.95, Math.PI]},  // props_hard.py MC, on the mat (its buttons +z: turned);
-                                                      // its back at DTOP + 0.035, the old one's height
   {name:"speaker_l", file:"speaker", size:{h:0.20}, turn:[0, 0], at:[-1.42, DTOP, -1.30, 0.22 - Math.PI / 2]},   // the pair's turns; the left one
                                                       // 10 cm right of its old place, clear of the lamp's clamp (the page moves the sticky notes along)
   {name:"speaker_r", file:"speaker", size:{h:0.20}, turn:[0, 0], at:[-0.59, DTOP, -1.30, -0.18 - Math.PI / 2]},  // (the front faces +x; the right one 1 cm left, clear of the pen cup); 20 cm
