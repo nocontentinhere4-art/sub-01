@@ -219,7 +219,16 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     `/?s=` results pages; a robots.txt refusal sets a source aside for the day; the tail of `route()` is only the
     any-query sources (`TAIL`: hn, news); `Limits` state v2 drops the pre-fix blocks.
   - Chromium: each restart records why (`/api/health` → `chromium.restart_log`: exit code / signal ("out of
-    memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory.
+    memory?" for SIGKILL) / over `BROWSE_MEM_MB` / hung) with its memory, and for a memory restart the hosts on screen.
+  - Chromium memory (live 2026-10-04 04:02-04:53 UTC: 12 restarts "over 1200 MB", some 7-21 s apart, loop lag p95
+    3.5 s). `Guard.route` loads nothing from ad / tracking / outstream-video networks (`memory_guard.AD_HOST`) and no
+    cross-site iframe (`cross_site_frame`). The browser reads its own memory every `MEM_CHECK_S` (in a thread) and at
+    `SOFT_MEM_MB` (0.75 x `BROWSE_MEM_MB`) records the pages on screen as heavy and closes Chromium itself (the next
+    step starts afresh). `memory_guard.HeavyPages`: a page that blew the cap is never opened again; a host that did
+    it twice within an hour is left alone for 30 min. The watchdog (`LocalBrowser`) records the pages on screen at a
+    memory restart, waits 30 s, 60 s... (`backoff_s`) before restarting again within 10 min, hands the heavy pages
+    to the new process with /init (`init_state`), reads /proc in a thread, and runs the service under
+    `nice -n BROWSE_NICE` (10) so the brain's ticks come first. `/api/health` chromium has `heavy` {pages, cooling}.
   - Viewers: YouTube shorts also get the official embed in the screens panel and on /life's phone.
 - `analysis/novelty_replay.py --youtube-key` (stubbed network as Railway answered on 2026-10-03; not a browser):
   shorts 34/h on the phone, mean burst 0.18 vs news 0.09 / pages ~0.03, 6,000 API units in 3 h (the 9,000 cap is
