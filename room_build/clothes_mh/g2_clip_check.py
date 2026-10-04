@@ -38,9 +38,9 @@ const propMat = new THREE.MeshStandardMaterial({color:0x9a958c, roughness:0.85})
 const bed = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.66, 1.25), new THREE.MeshStandardMaterial({color:0xd8d4cc, roughness:0.9}));
 bed.position.set((-1.0 + 0.75) / 2, 0.33, (0.74 + 1.99) / 2); bed.castShadow = bed.receiveShadow = true;
 const chair = new THREE.Group();
-{ const seat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.44), propMat); seat.position.y = 0.505 - 0.025; chair.add(seat);
-  for (const [x, z] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.455, 0.03), propMat); l.position.set(x, 0.2275, z); chair.add(l); }
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.45, 0.03), propMat); back.position.set(0, 0.505 + 0.225, -0.22); chair.add(back);
+{ const seat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.44), propMat); seat.position.y = 0.52 - 0.025; chair.add(seat);
+  for (const [x, z] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.495, 0.03), propMat); l.position.set(x, 0.2475, z); chair.add(l); }
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.45, 0.03), propMat); back.position.set(0, 0.52 + 0.225, -0.22); chair.add(back);
   chair.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); }
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({color:0x6b5440, roughness:0.75}));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);

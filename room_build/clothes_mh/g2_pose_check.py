@@ -22,7 +22,7 @@ DRESSED = os.path.join(HERE, "assets", "g2", "boy_g2_dressed.glb")
 NAKED = os.path.join(HERE, "g2", "boy_g2.glb")                     # the full body's triangles (for the inside test)
 OUTD = os.path.join(HERE, "out"); os.makedirs(OUTD, exist_ok=True)
 SHEET = os.path.join(HERE, "..", "..", "docs", "design", "clothes-mh", "g2_poses.jpg")
-SEAT_Y, MATTRESS_Y = 0.505, 0.66
+SEAT_Y, MATTRESS_Y = 0.52, 0.66                                     # (G3 raised the chair seat to 0.52 m)
 POSES = [("rest", 0.0, None), ("desk_type_ik", 3.0, "seat"), ("room_walk", 0.3, None), ("room_bed_lie", 4.0, "bed"),
          ("room_bed_lie", 12.0, "bed"), ("room_sit_down", -0.01, "chair")]
 BED_X, BED_Z = (-1.0, 0.75), (0.74, 1.99)                            # the bed in room_bed_lie's frame (COORD A)
