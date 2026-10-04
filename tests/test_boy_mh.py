@@ -26,7 +26,8 @@ def test_body_is_the_makehuman_rig():
 
 
 def test_desk_clips_animate_the_fingers():
-    for clip in ("desk_type_ik", "desk_mouse_ik", "desk_watch", "04_Open_Window", "02_Lie_Down_01"):
+    for clip in ("desk_type_ik", "desk_mouse_ik", "desk_watch", "04_Open_Window", "room_walk", "room_sit_down",
+                 "room_stand_up", "room_bed_lie", "room_bed_wake"):
         g = glb_json(WEB / "mh" / f"{clip}.glb")
         assert g.get("animations"), clip
         targets = {g["nodes"][c["target"]["node"]]["name"] for c in g["animations"][0]["channels"]}
@@ -44,7 +45,7 @@ def test_hook_switches_to_the_module_for_the_makehuman_rig():
 def test_module_encodes_the_desk_rule():
     js = (WEB / "boy_mh.js").read_text()
     for s in ('"desk_type_ik"', '"desk_mouse_ik"', '"desk_watch"', "search.query", 'kind === "video"', 'kind === "short"',
-              '"watch_video"', '"chart"', '"play_chess"', "FADE = 0.4", "function ccd(", "function pin(", "keys.c[1] + 0.003", "ROOM.pad + 0.011"):
+              '"watch_video"', '"chart"', '"play_chess"', "FADE = 0.4", "function ccd(", "function pin(", "keys.c[1] + 0.003", "P.pad + 0.011"):
         assert s in js, s
     assert "finger" in js and "getObjectByName(\"keyboard\")" in js and "getObjectByName(\"mouse\")" in js   # the fingers are only read; the props swap in
 

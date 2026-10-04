@@ -20,13 +20,22 @@
 // glides) and for lying (the last frame of a lie-down); the old rig's interludes, breathing, look-at, foot IK and phone
 // hold are off.
 
-const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "04_Open_Window", lie: "02_Lie_Down_01"};
+const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "04_Open_Window",
+  walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake"};
 // the room (main): keycaps (G10d) centre, top y, turn about y, size; the mouse centre on the pad; the desk / pad top
 const ROOM = {keys: {c: [-1.070, 1.001, -0.976], ry: 0.06, w: 0.356, d: 0.134}, mouse: [-0.755, 0.973, -0.950], pad: 0.973};
 // the clips' frame (root at the feet, facing +z; measured in the page: the recorded wrists sit on the README's pins in
 // it): the keyboard the typing was pinned to (keycaps' centre at KEYTOP; the wrists' pins (0.03 / -0.13, 0.878, 0.32)
 // lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README
-const CLIP = {kb: [-0.05, 0.83, 0.33], mouse: [-0.36, 0.807, 0.39], desk: 0.809};
+const CLIP = {kb: [-0.05, 0.83, 0.33], mouse: [-0.36, 0.807, 0.39], desk: 0.809,
+  home: [-0.003, 0.83, 0.317]};                              // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
+// the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13);
+// stand_up starts seated with it at (0, 0); the bed clips are lifted to the 0.66 m mattress (the room's: 0.82 - 0.16)
+const SEAT = {down: [-0.26, -0.13], up: [0, 0]};
+const BED = {hips: [-1.0, 0.89], head: -1,                 // where his hips lie on the duvet (x, z), the head toward -x (the headboard),
+  edge: [-0.40, 0.36], face: Math.PI,                        // where he sits on its edge (ANCHOR.bedside's seat), facing the desk (-z),
+  box: [-1.90, -0.20, 0.25, 1.50], top: 0.805};              // and the mattress (x0, x1, z0, z1) with its top less 1.5 cm of give
+const WALK_V = 0.67;                                         // room_walk's travel speed (m/s)
 const HUMP = 0.02;                                           // a room mouse's hump: 2 cm behind its centre (the back third)
 const FADE = 0.4;
 
@@ -46,6 +55,60 @@ export function createMH(env) {
     const tr = clip.tracks.find(t => t.name === "Hips.position");
     return tr ? Array.from(tr.createInterpolant().evaluate(at)) : [0, 0.87, -0.076];
   }
+  // a clip's pose at a time, in its own frame (the root at the feet): the hips' and the head's positions
+  function sampler(clip) {
+    const mx = new THREE.AnimationMixer(env.boy), a = mx.clipAction(clip); a.play();
+    const B = env.bones, out = t => { a.time = t; mx.update(0); env.boy.updateMatrixWorld(true);
+      const loc = n => env.boy.worldToLocal(B[n].getWorldPosition(V()));
+      return {t, hips: loc("Hips"), head: loc("Head"), knee: loc("LeftLeg").add(loc("RightLeg")).multiplyScalar(0.5),
+        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y)}; };
+    out.done = () => { a.stop(); mx.uncacheRoot(env.boy); };
+    return out;
+  }
+  function segments(got) {
+    const scan = (clip, dt = 0.05) => { const s = sampler(clip), r = []; for (let t = 0; t <= clip.duration + 1e-6; t += dt) r.push(s(Math.min(t, clip.duration))); s.done(); return r; };
+    const S = {};
+    // sit_down: the last moment the hips are still high (standing) before they drop onto the seat
+    const sd = scan(got.sit_down); let i = sd.length - 1; while (i > 0 && sd[i].hips.y < 0.80) i--;
+    S.sit = {from: Math.max(0, sd[i].t - 0.3), to: got.sit_down.duration};
+    // bed_lie: on the edge = hips low with the head up; lying = the head low
+    const bl = scan(got.bed_lie);
+    const e0 = bl.find(p => p.hips.y < 0.80 && p.head.y > 1.05) || bl[Math.floor(bl.length / 3)];
+    const l0 = bl.find(p => p.t > e0.t && p.head.y < 1.0) || bl[Math.floor(bl.length * 2 / 3)];
+    // sitting on the edge: the middle of the stretch where he sits upright with his feet down (before they swing up to lie)
+    const up = bl.filter(p => p.t >= e0.t && p.t <= l0.t && p.hips.y < 0.76 && p.head.y > 1.3 && p.foot < 0.3), sat = up.length ? up[up.length >> 1] : e0;
+    S.lie = {stand: Math.max(0, e0.t - 1.6), edge: sat.t, end: got.bed_lie.duration, endPose: bl[bl.length - 1]};
+    // bed_wake: lying -> sitting up (head high again) -> standing (hips high)
+    const bw = scan(got.bed_wake);
+    const s0 = bw.find(p => p.head.y > 1.05 && p.hips.y < 0.80) || bw[Math.floor(bw.length / 3)];
+    S.wake = {sat: Math.min(s0.t + 0.6, got.bed_wake.duration), end: got.bed_wake.duration, startPose: bw[0]};
+    // the bed's placement: the lying pose turned so the head points toward the headboard, the hips on the duvet
+    S.bedLie = bedPlace(S.lie.endPose); S.bedWake = bedPlace(S.wake.startPose);
+    // on the edge: the clip's bed is not laid out like the room's, so the sitting moments get their own placement
+    const atT = (r, t) => r.reduce((b, q) => Math.abs(q.t - t) < Math.abs(b.t - t) ? q : b);
+    S.lieEdge = edgePlace(atT(bl, S.lie.edge)); S.wakeEdge = edgePlace(atT(bw, S.wake.sat));
+    return S;
+  }
+  function edgePlace(p) {                                    // the root that seats this pose on the room's bed edge, facing out
+    const a = Math.atan2(p.knee.z - p.hips.z, p.knee.x - p.hips.x);                 // the way his knees point (local)
+    const want = Math.atan2(Math.cos(BED.face), Math.sin(BED.face)), ry = a - want;
+    const c = Math.cos(ry), s = Math.sin(ry), hx = p.hips.x * c + p.hips.z * s, hz = -p.hips.x * s + p.hips.z * c;
+    return {ry, x: BED.edge[0] - hx, z: BED.edge[1] - hz};
+  }
+  // two placements blended about his hips (not the root, which sits a metre away when he lies and would swing him
+  // through the bed): h is the clip's hips at this moment, in its own frame
+  function mixPlace(A, B, k, h) {
+    const rot = ry => { const c = Math.cos(ry), s = Math.sin(ry); return [h[0] * c + h[2] * s, -h[0] * s + h[2] * c]; };
+    const ha = rot(A.ry), hb = rot(B.ry), ry = angLerp(A.ry, B.ry, k), hr = rot(ry);
+    const wx = A.x + ha[0] + (B.x + hb[0] - A.x - ha[0]) * k, wz = A.z + ha[1] + (B.z + hb[1] - A.z - ha[1]) * k;
+    return {ry, x: wx - hr[0], z: wz - hr[1]};
+  }
+  function bedPlace(p) {                                     // the root's turn and position that lay this pose on the room's bed
+    const vx = p.head.x - p.hips.x, vz = p.head.z - p.hips.z, a = Math.atan2(vz, vx);
+    const ry = a - (BED.head < 0 ? Math.PI : 0);             // (a local direction at angle a ends at angle a - ry in the room)
+    const c = Math.cos(ry), s = Math.sin(ry), hx = p.hips.x * c + p.hips.z * s, hz = -p.hips.x * s + p.hips.z * c;
+    return {ry, x: BED.hips[0] - hx, z: BED.hips[1] - hz};
+  }
   async function load() {
     const got = {};
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`room/mh/${f}.glb`).then(g => { got[k] = g.animations[0]; })));
@@ -55,16 +118,27 @@ export function createMH(env) {
     const LEGS = /^(Left|Right)(UpLeg|Leg|Foot|ToeBase)\.|^Hips\.quaternion$/;
     got.desk_watch = new THREE.AnimationClip("desk_watch", Math.max(got.desk_watch.duration, got.desk_mouse.duration),
       [...got.desk_watch.tracks.filter(t => !LEGS.test(t.name)), ...got.desk_mouse.tracks.filter(t => LEGS.test(t.name))]);
-    const stand = stillClip("mh_stand", got.stand, 0), lie = stillClip("mh_lie", got.lie, got.lie.duration);
     const make = c => mixer.clipAction(c);
+    M.clips = got;
+    // the transitions' moments, from the clips' own poses: on the bed edge (hips low, head up), lying (head low)
+    const seg = segments(got);
+    M.seg = seg; M.sampler = sampler;                          // (?debug: a clip's hips, head, knees and feet at a time)
+    const stand = stillClip("mh_stand", got.stand, 0), lie = stillClip("mh_lie", got.bed_lie, got.bed_lie.duration),
+      edge = stillClip("mh_edge", got.bed_lie, seg.lie.edge);
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = hipsAt(got[k], 0); }
     M.actions.stand = make(stand); H.mh_stand = hipsAt(stand, 0);
+    M.actions.walk = make(got.walk); H.room_walk = hipsAt(got.walk, 0);
     M.actions.lie = make(lie); H.mh_lie = hipsAt(lie, 0);
-    // every slot the page plays: seated -> relaxed in the chair, standing / walking -> the stand, lying -> the lie
-    const seated = ["sit", "dine", "eat", "edge", "phone_sit", "type"], upright = ["idle", "stand", "lean", "deliver", "phone_stand", "door", "walk"],
+    M.actions.edge = make(edge); H.mh_edge = hipsAt(edge, 0);
+    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake"]) { const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    // every slot the page plays: seated at the desk -> relaxed in the chair, on the bed's edge -> the edge, standing ->
+    // the stand, walking -> the walk loop (the page scales it to his speed), lying -> the lie
+    const seated = ["sit", "dine", "eat", "type"], onEdge = ["edge", "phone_sit"], upright = ["idle", "stand", "lean", "deliver", "phone_stand", "door"],
       lying = ["sleep", "phone_lie", "listen", "lie_phone"];
     for (const k of seated) { A[k] = M.actions.desk_watch; H[k] = H.desk_watch.slice(); }
+    for (const k of onEdge) { A[k] = M.actions.edge; H[k] = H.mh_edge.slice(); }
     for (const k of upright) { A[k] = M.actions.stand; H[k] = H.mh_stand.slice(); }
+    A.walk = M.actions.walk; H.walk = H.room_walk.slice(); if (env.setStride) env.setStride(WALK_V);
     for (const k of lying) { A[k] = M.actions.lie; H[k] = H.mh_lie.slice(); }
     for (let i = 0; i < 600 && !(env.chairNode && env.chairNode()); i++) await new Promise(r => setTimeout(r, 100));   // (the room may still be loading)
     seatHeight(); props();
@@ -82,25 +156,20 @@ export function createMH(env) {
     for (const k of ["desk_type", "desk_mouse", "desk_watch", "sit", "dine", "eat", "edge", "phone_sit", "type"]) if (H[k]) H[k][1] = hy;
   }
   // the room's keyboard and mouse: separate nodes when the room has them (G10d's), else the numbers above
-  const P = {keys: null, mouse: null, mouseNode: null, mouseHome: null};
-  function props() {
-    const room = env.room && env.room();
-    const kb = room && room.getObjectByName("keyboard");
-    if (kb) {                                                // its bounds in its own frame: the top, the centre, the size
-      kb.updateMatrixWorld(true);
-      const inv = new THREE.Matrix4().copy(kb.matrixWorld).invert(), bb = new THREE.Box3();
-      kb.traverse(o => { if (o.isMesh) { o.geometry.computeBoundingBox(); bb.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld).applyMatrix4(inv)); } });
-      const c = kb.localToWorld(bb.getCenter(V())), top = kb.localToWorld(V(0, bb.max.y, 0)).y;
-      P.keys = {c: [c.x, top, c.z], ry: kb.getWorldQuaternion(new THREE.Quaternion()) && new THREE.Euler().setFromQuaternion(kb.getWorldQuaternion(new THREE.Quaternion()), "YXZ").y,
-        w: bb.max.x - bb.min.x, d: bb.max.z - bb.min.z};
-    } else P.keys = ROOM.keys;
-    const ms = room && room.getObjectByName("mouse");
-    if (ms) {                                                // next to the keyboard's right end, 4 cm of gap
-      const k = P.keys, half = new THREE.Box3().setFromObject(ms).getSize(V()).x / 2, u = k.w / 2 + 0.04 + half;
-      ms.position.set(k.c[0] + Math.cos(k.ry) * u, ms.position.y, k.c[2] - Math.sin(k.ry) * u + 0.01); ms.updateMatrixWorld(true);
-      P.mouseNode = ms; P.mouseHome = ms.position.clone();
-      P.mouse = [ms.position.x, ROOM.pad, ms.position.z];
-    } else P.mouse = ROOM.mouse;
+  // (G10d's are top-level scene nodes: "keyboard" with its origin on the home row (the middle of F and J) on the desk
+  // top, and "mouse" with its origin at its base centre on the pad, already placed next to the keyboard's right end)
+  const P = {keys: ROOM.keys, ref: CLIP.kb, mouse: ROOM.mouse, pad: ROOM.pad, mouseNode: null, mouseHome: null, kbNode: null, seen: 0};
+  function props(force) {
+    const sc = env.scene; if (!sc || (!force && P.kbNode && P.mouseNode)) return;
+    if (!P.kbNode) { const kb = sc.getObjectByName("keyboard");
+      if (kb && kb.children.length) {                        // the keycaps' top from its meshes; the home row is its origin
+        kb.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(kb);
+        const ry = new THREE.Euler().setFromQuaternion(kb.getWorldQuaternion(new THREE.Quaternion()), "YXZ").y;
+        P.keys = {c: [kb.position.x, Math.min(bb.max.y, kb.position.y + 0.045), kb.position.z], ry, w: ROOM.keys.w, d: ROOM.keys.d};
+        P.ref = CLIP.home; P.kbNode = kb; } }
+    if (!P.mouseNode) { const ms = sc.getObjectByName("mouse");
+      if (ms && ms.parent === sc) {                          // where G10d put it; it follows the palm while he holds it
+        P.mouseNode = ms; P.mouseHome = ms.position.clone(); P.pad = ms.position.y; P.mouse = [ms.position.x, ms.position.y, ms.position.z]; } }
   }
 
   // ---------- the desk modes ----------
@@ -163,10 +232,10 @@ export function createMH(env) {
     if (M.noIK) return;
     env.boy.updateMatrixWorld(true);
     // the offsets: the clip's keyboard to the room's (keycaps' centre, top), the clip's mouse hump to the room's (on the pads)
-    _k.set(...P.keys.c); dK.subVectors(_k, toWorld(CLIP.kb, _c));
+    _k.set(...P.keys.c); dK.subVectors(_k, toWorld(P.ref, _c));
     const ry = env.boy.rotation.y; _m.set(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
     dM.subVectors(_m, toWorld(CLIP.mouse, _c));
-    const keyFloor = P.keys.c[1] + 0.003, padFloor = ROOM.pad + 0.011;
+    const keyFloor = P.keys.c[1] + 0.003, padFloor = P.pad + 0.011;
     if (M.w.type > 0.01) { pin("Left", dK, keyFloor, M.w.type); pin("Right", dK, keyFloor, M.w.type); }
     if (M.w.mouse > 0.01) { pin("Right", dM, padFloor, M.w.mouse); pin("Left", dK, keyFloor, M.w.mouse); }
     // a separate room mouse follows the right palm (60% from the wrist to the middle knuckle) while he holds it
@@ -190,12 +259,90 @@ export function createMH(env) {
     const ch = env.chairNode && env.chairNode(); if (ch) { ch.position.x += bx; ch.position.z += bz; ch.updateMatrixWorld(true); }
   }
 
+  // ---------- getting on and off the chair and the bed: the room clips, inside the page's own pose steps ----------
+  // The page moves his hips along keyed paths between two poses (posePose); here the matching stretch of a room clip
+  // plays instead, its time following the step's progress, placed rigidly on the chair or the bed (its root on the
+  // floor), and it hands back to the page's poses at both ends (the first and last 15 % blend).
+  const sstep = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
+  function chairPlace(off) {                                 // the root for a clip whose seat centre is at off (x, z), on the room's chair
+    const ch = env.chairNode && env.chairNode(); if (!ch) return null;
+    ch.updateMatrixWorld(true); const p = ch.getWorldPosition(V()), cry = ch.rotation.y;
+    const r = Math.atan2(-Math.sin(cry), -Math.cos(cry)), c = Math.cos(r), s = Math.sin(r);   // the way a person on it faces
+    return {ry: r, x: p.x - (off[0] * c + off[1] * s), z: p.z - (-off[0] * s + off[1] * c)};
+  }
+  function transitionFor(S) {
+    if (!S || S.k !== "pose" || S.t == null) return null;
+    const G = M.seg, to = S.to, from = S.from;
+    if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(SEAT.down), back: true};
+    if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up), back: true};
+    if (to === "bedside" && from !== "bedlie") return {k: "bed_lie", a: G.lie.stand, b: G.lie.edge, at: () => G.lieEdge};
+    const hips = (clip, a, b) => u => hipsAt(M.clips[clip], a + (b - a) * u);
+    if (to === "bedlie") { const h = hips("bed_lie", G.lie.edge, G.lie.end);
+      return {k: "bed_lie", a: G.lie.edge, b: G.lie.end, at: u => mixPlace(G.lieEdge, G.bedLie, sstep(0.1, 0.7, u), h(u))}; }
+    if (to === "bedside" && from === "bedlie") { const h = hips("bed_wake", 0, G.wake.sat);
+      return {k: "bed_wake", a: 0, b: G.wake.sat, at: u => mixPlace(G.bedWake, G.wakeEdge, sstep(0.3, 0.9, u), h(u))}; }
+    if (!to && from === "bedside") return {k: "bed_wake", a: G.wake.sat, b: G.wake.end, at: () => G.wakeEdge, back: true};
+    return null;
+  }
+  function transition(st) {
+    const S = st.step, T = transitionFor(S);
+    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake"]) if (!T || T.k !== k) { const a = M.actions[k]; if (a.isRunning() || a.getEffectiveWeight() > 0) { a.setEffectiveWeight(0); a.stop(); } }
+    if (!T) return false;
+    const place = T.at(Math.min(1, Math.max(0, S.t))); if (!place) return false;
+    if (S.mhd === undefined) { S.mhd = S.d; S.d = Math.max(S.d, T.b - T.a); }   // the step lasts as long as the clip's stretch (the page's ~1 s is too quick)
+    const u = Math.min(1, Math.max(0, S.t)), w = sstep(0, 0.15, u) * (1 - sstep(0.85, 1, u));
+    const a = M.actions[T.k]; if (!a.isRunning()) { a.reset(); a.play(); }
+    a.paused = true; a.time = T.a + (T.b - T.a) * u; a.setEffectiveWeight(w);
+    if (S.A && S.A !== a) S.A.setEffectiveWeight(u < 0.5 ? 1 - w : 0);          // the page's poses only at the two ends
+    if (S.B && S.B !== a) S.B.setEffectiveWeight(u < 0.5 ? 0 : 1 - w);
+    env.mixer.update(0);
+    const b = env.boy, wr = T.back ? w : sstep(0, 0.15, u);  // the root: from the page's toward the clip's placement (onto the bed: kept)
+    b.position.set(b.position.x + (place.x - b.position.x) * wr, b.position.y + (env.F - b.position.y) * wr, b.position.z + (place.z - b.position.z) * wr);
+    b.rotation.y = angLerp(b.rotation.y, place.ry, wr);
+    return true;
+  }
+  // the clips were recorded on another bed: while he sits on, lies down on or gets up from this one, any of his skin
+  // that dips into the mattress lifts him by as much (eased back down when clear)
+  let skin = null;
+  function bedLift(st, dt) {
+    const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
+    if (!on && !M.lift) return;
+    const b = env.boy; let need = 0, every = 3;
+    if (on && !st.step) {                                      // still on the bed: every vertex, once a second (cheap on a phone)
+      M.liftT = (M.liftT || 0) - dt; if (M.liftT > 0) { b.position.y += M.lift; return; }
+      M.liftT = 1; every = 1; M.lift = 0;
+    }
+    if (on) {
+      if (!skin) b.traverse(o => { if (o.isSkinnedMesh && !skin) skin = o; });
+      b.updateMatrixWorld(true);
+      const P = skin.geometry.attributes.position, v = V();
+      for (let i = 0; i < P.count; i += every) { skin.getVertexPosition(i, v).applyMatrix4(skin.matrixWorld);
+        const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
+        if (e > 0) need = Math.max(need, BED.top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); }   // (its edge is rounded, r 5 cm)
+    }
+    M.lift = Math.max(need, (M.lift || 0) - 0.1 * dt);
+    if (M.lift < 1e-4) M.lift = 0;
+    b.position.y += M.lift;
+  }
+  function onBed(st) {                                       // lying on, or sitting on the edge of, the bed: placed by the lie clip's pose
+    if (st.step || (st.at !== "bedlie" && st.at !== "bedside")) return;
+    const p = st.at === "bedlie" ? M.seg.bedLie : M.seg.lieEdge, b = env.boy; b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry;
+  }
+
   // ---------- one step (instead of the page's animate: the mixer, his plan and walk, the desk modes, the wrists) ----------
   function animate(dt) {
     const moving = env.step0(dt);
     if (!M.ready) return moving;
+    if (!P.kbNode || !P.mouseNode) { P.seen += dt; if (P.seen > 1) { P.seen = 0; props(); } }   // (G10d's nodes may arrive late)
     const st = env.state(), m = wanted(st);
-    if (m) setMode(m); else if (M.mode) { M.mode = null; M.w.type = M.w.mouse = 0; M.off = 0; for (const k of ["sit", "dine", "type"]) env.actions[k] = M.actions.desk_watch; }
+    if (m) setMode(m); else if (M.mode) {                    // off the desk modes (eating, leaving): seated he just sits back
+      M.mode = null; M.w.type = M.w.mouse = 0; M.off = 0; const a = M.actions.desk_watch, cur = st.current;
+      for (const k of ["sit", "dine", "type"]) env.actions[k] = a;
+      if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
+    }
+    if (!transition(st)) onBed(st);
+    bedLift(st, dt);
     if (M.mode) { roll(dt); hands(dt); }
     return moving;
   }

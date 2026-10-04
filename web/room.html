@@ -1810,7 +1810,7 @@ function doVariant(V, c){
   }
   if (V.n === "drink") drinkFrom(V, u);
 }
-const MOUSE = new THREE.Vector3(-0.785, 0.985, -0.975);
+const MOUSE = new THREE.Vector3(-0.735, 0.985, -0.965);   // G10d's mouse (MOUSE_AT): its hump
 
 // ---- now playing (#75): what he listens to (#68), as /brain shows it: art, title · artist, Spotify's official embed
 // (compact; the visitor presses play on their own device, nothing autoplays). Hidden when nothing plays
@@ -2886,7 +2886,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   const animate0 = animate; let motion = null, mh = null, rig = null;
   // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
   // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
-  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, get boy(){ return boy; }, get mixer(){ return mixer; },
+  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),

@@ -23,7 +23,7 @@
 const BOWL_KINDS = new Set(["ramen", "curry"]);
 const BOWL_RIM = 0.09;                                   // the held bowl's rim over its base (the Tripo ramen bowl, #131)
 const KEYBOARD = {c: [-1.07, 1.0, -0.97], ry: 0.06, w: 0.36, d: 0.13};   // room_build/build_room.py: KB_C, KB_RY, kb_body (keys top at DTOP + 0.03)
-const MOUSE = [-0.785, 0.985, -0.975];
+const MOUSE = [-0.735, 0.985, -0.965];                    // G10d's mouse (room.html MOUSE_AT): its hump
 const SWAP = {                                   // manifest clip -> the page's action it replaces, and the HIPS keys it owns
   type: {slot: "desk", action: "sit", hips: ["sit", "m_type"], edge: true},
   eat: {slot: "eating", action: "dine", hips: ["dine", "m_eat"], edge: true},
