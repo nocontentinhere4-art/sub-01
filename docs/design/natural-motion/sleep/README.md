@@ -81,3 +81,8 @@ frozen; the page's own `sim()` steps him. Scripts are in `tools/`; run them agai
     30 FPS. The reshape runs at 10 Hz on a 2.5 cm grid; its normals come from the grid's slope.
   - Draw calls: +1 (the duvet copy replaces the duvet, the pillow copy replaces the bed sheet, and the parked slides add one).
   - As in part 1, the real frame rate can't be measured headless: SwiftShader draws WebGL on the CPU.
+
+## The new room model (#107/#110)
+The duvet, pillow and mattress were remade as game-quality soft goods after this was written, which broke the lift and
+the measurements above. `bedfix/README.md` has what replaced them: the duvet over him is generated rather than lifted,
+and his place on the bed is measured on the new pillow.

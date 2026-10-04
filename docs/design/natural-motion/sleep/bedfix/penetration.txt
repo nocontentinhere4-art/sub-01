@@ -1,0 +1,128 @@
+# Penetration and the bed checks on the new bed (room_clean.glb of #107/#110), every vertex every 0.25 s.
+# node ../tools/sweep_s.mjs <port> 1 <seed>: into bed, both turns, the phone and music on top, back to sleep, getting up.
+# 'worst' counts bed + chair vertices, and (lying) vertices past the curtain line x = -1.775; head-pillow is the
+# furthest his head's centre got from the pillow's centre while he lay on the bed.
+
+## sleep sweep, seed 63
+research                worst 0 head-pillow 0.000
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = ROLL.ang   worst 0 head-pillow 0.035
+ROLL.force = 0          worst 0 head-pillow 0.013
+ROLL.force = -ROLL.ang  worst 0 head-pillow 0.029
+ROLL.force = null; ROL  worst 0 head-pillow 0.013
+phone                   worst 0 head-pillow 0.053
+listen_music            worst 0 head-pillow 0.012
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = ROLL.ang   worst 0 head-pillow 0.031
+research                worst 0 head-pillow 0.009
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = -ROLL.ang  worst 0 head-pillow 0.029
+window                  worst 0 head-pillow 0.015
+order_food              worst 0 head-pillow 0.000
+sleep                   worst 0 head-pillow 0.011
+get_delivery            worst 0 head-pillow 0.000
+WORST 0
+
+## sleep sweep, seed 7
+research                worst 0 head-pillow 0.000
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = ROLL.ang   worst 0 head-pillow 0.035
+ROLL.force = 0          worst 0 head-pillow 0.014
+ROLL.force = -ROLL.ang  worst 0 head-pillow 0.028
+ROLL.force = null; ROL  worst 0 head-pillow 0.032
+phone                   worst 0 head-pillow 0.052
+listen_music            worst 0 head-pillow 0.012
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = ROLL.ang   worst 0 head-pillow 0.032
+research                worst 0 head-pillow 0.013
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = -ROLL.ang  worst 0 head-pillow 0.031
+window                  worst 0 head-pillow 0.019
+order_food              worst 0 head-pillow 0.000
+sleep                   worst 0 head-pillow 0.012
+get_delivery            worst 0 head-pillow 0.000
+WORST 0
+
+## sleep sweep, seed 1234
+research                worst 0 head-pillow 0.000
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = ROLL.ang   worst 0 head-pillow 0.033
+ROLL.force = 0          worst 0 head-pillow 0.013
+ROLL.force = -ROLL.ang  worst 0 head-pillow 0.030
+ROLL.force = null; ROL  worst 0 head-pillow 0.012
+phone                   worst 0 head-pillow 0.053
+listen_music            worst 0 head-pillow 0.012
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = ROLL.ang   worst 0 head-pillow 0.030
+research                worst 0 head-pillow 0.010
+sleep                   worst 0 head-pillow 0.011
+ROLL.force = -ROLL.ang  worst 0 head-pillow 0.030
+window                  worst 0 head-pillow 0.016
+order_food              worst 0 head-pillow 0.000
+sleep                   worst 0 head-pillow 0.012
+get_delivery            worst 0 head-pillow 0.000
+WORST 0
+
+# the chained sweep of every activity (17 changes, ~12 simulated minutes), ../tools/sweep.mjs:
+
+## seed 63
+research      max 0 
+eat           max 3 0.75 3 pose  {"chair:RightLeg":3,"pts":[[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83]]}
+phone         max 0 
+order_food    max 0 
+window        max 0 
+get_delivery  max 0 
+eat           max 0 
+research      max 0 
+eat           max 3 0.75 3 pose  {"chair:RightLeg":3,"pts":[[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83]]}
+window        max 0 
+order_food    max 0 
+chat          max 0 
+sleep         max 0 
+phone         max 0 
+get_delivery  max 0 
+window        max 0 
+research      max 0 
+WORST 3
+
+## seed 7
+research      max 0 
+eat           max 3 0.75 3 pose  {"chair:RightLeg":3,"pts":[[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83]]}
+phone         max 0 
+order_food    max 0 
+window        max 0 
+get_delivery  max 0 
+eat           max 0 
+research      max 0 
+eat           max 3 0.75 3 pose  {"chair:RightLeg":3,"pts":[[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83]]}
+window        max 0 
+order_food    max 0 
+chat          max 0 
+sleep         max 0 
+phone         max 0 
+get_delivery  max 0 
+window        max 0 
+research      max 0 
+WORST 3
+
+## seed 1234
+research      max 0 
+eat           max 3 0.75 3 pose  {"chair:RightLeg":3,"pts":[[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83]]}
+phone         max 0 
+order_food    max 0 
+window        max 0 
+get_delivery  max 0 
+eat           max 0 
+research      max 0 
+eat           max 3 0.75 3 pose  {"chair:RightLeg":3,"pts":[[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83],[0.141,0.486,-0.242,-1.11,0.65,-0.83]]}
+window        max 0 
+order_food    max 0 
+chat          max 0 
+sleep         max 0 
+phone         max 0 
+get_delivery  max 0 
+window        max 0 
+research      max 0 
+WORST 3
+
+# The 3 chair vertices in 'eat' are on main too (f1aa14a, same frame, same 3 vertices): not from this PR.

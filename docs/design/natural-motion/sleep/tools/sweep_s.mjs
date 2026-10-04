@@ -23,10 +23,12 @@ let worst = 0;
 for (const [how, a, secs, x] of SEQ) {
   await page.evaluate(([how, a, x]) => { if (how === "js") eval(a); else { ROLL.force = null; (how === "act" ? act : live)(a, x || {}); } }, [how, a, x]);
   const res = await page.evaluate(([n]) => { const out = {max:0, bad:[]}; for (let i = 0; i < n; i++) { for (let j = 0; j < 5; j++) animate_(0.05);
-      const p = penetration(1, true); const s = p.bed + p.chair; if (s) out.bad.push([+(i * 0.25).toFixed(2), s, pose().step && pose().step.k, gz().iv, JSON.stringify(p.by)]); out.max = Math.max(out.max, s); }
+      const p = penetration(1, true); const c = (i % 4 === 0) ? contacts(4) : null; const inbed = pose().at === "bedlie"; const s = p.bed + p.chair + (c && inbed ? c.wall.n : 0);
+      if (s) out.bad.push([+(i * 0.25).toFixed(2), s, pose().step && pose().step.k, gz().iv, JSON.stringify(p.by) + (c && inbed && c.wall.n ? " wall " + c.wall.n : "")]);
+      out.max = Math.max(out.max, s); if (c) { out.pill = Math.max(out.pill || 0, inbed ? c.pillow.d : 0); } }
     return out; }, [Math.round(secs * k / 0.25)]);
   worst = Math.max(worst, res.max);
-  console.log(a.slice(0, 22).padEnd(23), "max", res.max, res.bad.slice(0, 4).map(b => b.join(" ")).join(" | "));
+  console.log(a.slice(0, 22).padEnd(23), "worst", res.max, "head-pillow", (res.pill || 0).toFixed(3), "|", "max", res.max, res.bad.slice(0, 4).map(b => b.join(" ")).join(" | "));
 }
 console.log("WORST", worst);
 await browser.close();

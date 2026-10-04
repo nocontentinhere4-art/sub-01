@@ -378,7 +378,7 @@ const ANCHOR = {
   // standing ones give the root (`p`). The clean room: chair at (-1.13, -0.585), seat top 0.665; the bed's mattress top
   // y 0.82, frame x -1.90..-0.20 (headboard at -1.90), z 0.25..1.50 (open side at 0.25)
   desk:    {seat:[-1.12, 0.87, -0.56], r:-2.85, stand:[-0.68, -0.55]},   // on the desk chair, facing the monitor; he sits down from its side
-  bedlie:  {p:[-1.18, -0.095, 0.89], r:Math.PI / 2}, // on his back on the duvet, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
+  bedlie:  {p:[-1.03, -0.095, 0.89], r:Math.PI / 2}, // on his back on the duvet, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
   bedside: {seat:[-0.40, 1.06, 0.36], r:Math.PI, stand:[-0.36, -0.18]},      // sitting on the edge, on the duvet (0.7 m up: his feet hang)
   door:    {p:[1.22, F, -0.92], r:2.2},              // in front of the door
   window:  {p:[0.18, F, -0.15], r:-Math.PI / 2},     // standing, looking out of the window over the foot of the bed
@@ -2204,7 +2204,7 @@ function tuck(){
 }
 // ---- in bed: asleep he is under the duvet (it is pulled up from the foot of the bed and follows his body and his
 // breathing) and his slides are parked by the bed; whenever he lies on the bed his head and shoulders dent the pillow
-const DUV = {src:null, mesh:null, base:null, lift:null, segs:null, w:0, acc:0, x0:0, x1:0};
+const DUV = {src:null, segs:null, w:0, acc:0};
 const PIL = {src:null, mesh:null, base:null, idx:null, on:false};
 const BODY_SEGS = [["Hips", "Spine02"], ["Spine02", "Spine01"], ["Spine01", "Spine"], ["Spine", "neck"],
   ["LeftUpLeg", "LeftLeg"], ["LeftLeg", "LeftFoot"], ["LeftFoot", "LeftToeBase"], ["RightUpLeg", "RightLeg"], ["RightLeg", "RightFoot"], ["RightFoot", "RightToeBase"],
@@ -2225,14 +2225,12 @@ const shapeable = (src, name) => {                      // a world-space copy of
   return [m, Float32Array.from(g.attributes.position.array)];
 };
 function bedInit(){                                    // the duvet and the pillow, and how thick he is around each bone
-  if (DUV.mesh || !room) return !!DUV.mesh;
+  if (COV.mesh || !room) return !!COV.mesh;
   room.traverse(o => { if (o.isMesh && o.material && o.material.name === "duvet") DUV.src = o;
     if (o.isMesh && o.material && o.material.name === "sheet") PIL.src = o; });
   const sm = skinMesh(); if (!DUV.src || !PIL.src || !sm) return false;
-  [DUV.mesh, DUV.base] = shapeable(DUV.src, "duvet_over"); [PIL.mesh, PIL.base] = shapeable(PIL.src, "pillow_dent");
-  const g = DUV.mesh.geometry; DUV.lift = new Float32Array(g.attributes.position.count); DUV.nbase = Float32Array.from(g.attributes.normal.array);
-  g.computeBoundingBox(); DUV.x0 = g.boundingBox.min.x; DUV.x1 = g.boundingBox.max.x; DUV.mesh.frustumCulled = false;
-  PIL.idx = []; for (let i = 0; i < PIL.base.length / 3; i++) if (PIL.base[3 * i] < -1.3 && PIL.base[3 * i + 1] > 0.83) PIL.idx.push(i);   // the pillow's vertices
+  [PIL.mesh, PIL.base] = shapeable(PIL.src, "pillow_dent");
+  PIL.idx = []; for (let i = 0; i < PIL.base.length / 3; i++) if (PIL.base[3 * i] < -1.3 && PIL.base[3 * i + 1] > 0.84) PIL.idx.push(i);   // the pillow's vertices
   // how thick he is around each bone segment: the 90th percentile of his vertices' distance from it, in his bind pose
   // (no skinning needed), at his scale
   const names = sm.skeleton.bones.map(b => b.name), segOf = {}; BODY_SEGS.forEach(([a], k) => { if (!(a in segOf)) segOf[a] = k; });
@@ -2243,8 +2241,8 @@ function bedInit(){                                    // the duvet and the pill
   for (let i = 0; i < P.count; i += 2) { const k = segOf[names[domBone(sm.geometry, i)]]; if (k === undefined) continue;
     v.fromBufferAttribute(P, i).applyMatrix4(sm.bindMatrix); d[k].push((seg[k].distance() > 1e-6 ? seg[k].closestPointToPoint(v, true, _l4) : seg[k].start).distanceTo(v) * sc); }
   DUV.segs = BODY_SEGS.map(([a, b], k) => { const s = d[k].sort((x, y) => x - y);
-    return {a:bones[a], b:bones[b], head:!!BODY_SEGS[k][2], r:clamp(s.length ? s[Math.floor(s.length * 0.9)] : 0.05, 0.03, a === b ? 0.09 : 0.2), A:new THREE.Vector3(), B:new THREE.Vector3()}; });
-  return true;
+    return {a:bones[a], b:bones[b], head:!!BODY_SEGS[k][2], r:clamp(s.length ? s[Math.floor(s.length * 0.97)] : 0.05, 0.03, a === b ? 0.1 : 0.22), A:new THREE.Vector3(), B:new THREE.Vector3()}; });
+  return coverInit();
 }
 function pillowDent(k){                                // the pillow gives under his head and shoulders
   const g = PIL.mesh.geometry, pos = g.attributes.position.array, base = PIL.base, RIM = 0.05;
@@ -2263,55 +2261,98 @@ function pillowDent(k){                                // the pillow gives under
   }
   g.attributes.position.needsUpdate = true; g.computeVertexNormals();
 }
-const DG = {x0:0, z0:0, c:0.025, nx:0, nz:0, lift:null, cell:null, wt:null, act:null, cov:null, front:0};   // the lift is worked out on a 2.5 cm grid, then read per vertex
-function duvetGrid(){
-  const g = DUV.mesh.geometry, bb = g.boundingBox, n = DUV.lift.length;
-  DG.x0 = bb.min.x - 0.05; DG.z0 = bb.min.z - 0.05; DG.nx = Math.ceil((bb.max.x - DG.x0 + 0.05) / DG.c) + 1; DG.nz = Math.ceil((bb.max.z - DG.z0 + 0.05) / DG.c) + 1;
-  DG.lift = new Float32Array(DG.nx * DG.nz); DG.cell = new Int32Array(n); DG.wt = new Float32Array(2 * n);
-  for (let i = 0; i < n; i++) { const fx = (DUV.base[3 * i] - DG.x0) / DG.c, fz = (DUV.base[3 * i + 2] - DG.z0) / DG.c, ix = Math.floor(fx), iz = Math.floor(fz);
-    DG.cell[i] = ix * DG.nz + iz; DG.wt[2 * i] = fx - ix; DG.wt[2 * i + 1] = fz - iz; }
-}
-function duvetShape(){                                 // lift the duvet over him: the highest of his limbs under each point
-  if (!DG.lift) duvetGrid();
-  const g = DUV.mesh.geometry, pos = g.attributes.position.array, nor = g.attributes.normal.array, base = DUV.base, nb = DUV.nbase, TH = 0.03, DR = 0.2, REF = 0.866;
-  const L = DG.lift, c = DG.c, nz = DG.nz; L.fill(0);
-  for (const s of DUV.segs) { if (s.head) continue; s.a.getWorldPosition(s.A); s.b.getWorldPosition(s.B);
-    const R = s.r + DR, ax = s.A.x, az = s.A.z, dx = s.B.x - ax, dz = s.B.z - az, Lq = dx * dx + dz * dz;
-    const i0 = Math.max(0, Math.floor((Math.min(ax, s.B.x) - R - DG.x0) / c)), i1 = Math.min(DG.nx - 1, Math.ceil((Math.max(ax, s.B.x) + R - DG.x0) / c));
-    const k0 = Math.max(0, Math.floor((Math.min(az, s.B.z) - R - DG.z0) / c)), k1 = Math.min(nz - 1, Math.ceil((Math.max(az, s.B.z) + R - DG.z0) / c));
-    for (let i = i0; i <= i1; i++) { const x = DG.x0 + i * c;
-      for (let k = k0; k <= k1; k++) { const z = DG.z0 + k * c;
-        const t = Lq > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / Lq, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
-        const dd = Math.sqrt(px * px + pz * pz); if (dd >= R) continue;
-        const h = s.A.y + (s.B.y - s.A.y) * t + s.r + TH;           // the top of this limb, with the duvet's thickness
-        const l = (h - REF) * (1 - smooth(0.25, 1, dd / R)); if (l > L[i * nz + k]) L[i * nz + k] = l; } } }
-  // pulled up from the foot of the bed (x1) to just below his shoulders: the duvet ahead of the hem stays flat, under him
-  // (on his side, off his raised shoulder). Which vertices can move, and how much, only changes with the hem.
-  const front = DUV.x1 + (bones.neck.getWorldPosition(_l1).x + 0.21 + 0.12 * Math.abs(ROLL.a) / ROLL.ang - 0.12 - DUV.x1) * DUV.w;
-  if (!DG.act || Math.abs(front - DG.front) > 0.002) {
-    pos.set(base); nor.set(nb); DG.front = front; const act = [], cov = [];
-    for (let i = 0; i < base.length / 3; i++) { const x = base[3 * i], y0 = base[3 * i + 1];
-      // the whole thickness lifts by the same amount (from the flat duvet's top, REF); past the end of the mattress it
-      // falls over his toes and hangs down again
-      const cv = smooth(front, front + 0.12, x) * (1 - smooth(-0.2, -0.155, x)) * smooth(0.80, 0.84, y0);
-      if (cv > 0 || x > -0.34) { act.push(i); cov.push(cv); } }
-    DG.act = Int32Array.from(act); DG.cov = Float32Array.from(cov); }
-  // he is longer than the mattress (his toes end ~7 cm past their bones, past its end): there the duvet's end is pushed out over them
-  const t0 = bones.LeftToeBase.getWorldPosition(_l2), t1 = bones.RightToeBase.getWorldPosition(_l3);
-  const act = DG.act, cov = DG.cov;
-  for (let j = 0; j < act.length; j++) {
-    const i = act[j], x = base[3 * i], z = base[3 * i + 2], cv = cov[j];
-    if (cv > 0) { const q = DG.cell[i], u = DG.wt[2 * i], v = DG.wt[2 * i + 1], a = L[q], b = L[q + 1], e = L[q + nz], f = L[q + nz + 1];
-      pos[3 * i + 1] = base[3 * i + 1] + ((a * (1 - v) + b * v) * (1 - u) + (e * (1 - v) + f * v) * u) * cv;
-      // the normal tilts with the slope of the lift (read off the grid): no need to recompute them all
-      const sx = ((e - a) * (1 - v) + (f - b) * v) / c * cv, sz = ((b - a) * (1 - u) + (f - e) * u) / c * cv, ny = nb[3 * i + 1];
-      let nx = nb[3 * i] - sx * ny, nzz = nb[3 * i + 2] - sz * ny; const m = 1 / Math.sqrt(nx * nx + ny * ny + nzz * nzz);
-      nor[3 * i] = nx * m; nor[3 * i + 1] = ny * m; nor[3 * i + 2] = nzz * m; }
-    if (x > -0.34) { let push = 0;
-      for (const q of [t0, t1]) push = Math.max(push, (q.x + 0.105 - DUV.x1) * (1 - smooth(0.07, 0.17, Math.abs(z - q.z))));
-      pos[3 * i] = x + Math.max(0, push) * smooth(-0.34, -0.2, x) * DUV.w; }
+// The duvet he sleeps under is generated here, rather than by reshaping the folded quilt the room model lays on the bed
+// (#107): that quilt has its own loft and folds, and lifting it over him made a tent whose inside faces showed through.
+// This is a closed shell (a top and an underside, joined at the rim, all normals outward) at a modest height: the top of
+// whatever is under each point, plus the duvet's own thickness. While he is under it the room's folded quilt is hidden:
+// he has picked it up.
+const COV = {mesh:null, pos:null, nor:null, uv:null, nx:60, nz:46, nt:0, hem:0, acc:0, lastHem:9, len:0,
+  XFOOT:0.02, XFOLD:-1.33, Z0:0.14, Z1:1.61, ZM0:0.26, ZM1:1.49, BED:0.82, LOFT:0.055, THICK:0.05, DROP:0.26, DR:0.17, TEX:3.6};
+function coverInit(){                                  // the grid, its faces and its UVs: built once
+  const {nx, nz} = COV, nt = COV.nt = nx * nz, g = new THREE.BufferGeometry();
+  COV.pos = new Float32Array(nt * 2 * 3); COV.nor = new Float32Array(nt * 2 * 3); COV.uv = new Float32Array(nt * 2 * 2);
+  COV.body = new Float32Array(nt); COV.h = new Float32Array(nt); COV.tmp = new Float32Array(nt); COV.rowEnd = new Float32Array(nz);
+  const idx = [], at = (i, j) => i * nz + j, ab = (i, j) => nt + i * nz + j;
+  for (let i = 0; i < nx - 1; i++) for (let j = 0; j < nz - 1; j++) {
+    idx.push(at(i, j), at(i + 1, j + 1), at(i + 1, j), at(i, j), at(i, j + 1), at(i + 1, j + 1));          // the top, facing up
+    idx.push(ab(i, j), ab(i + 1, j), ab(i + 1, j + 1), ab(i, j), ab(i + 1, j + 1), ab(i, j + 1));          // the underside
   }
-  g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true;
+  for (let i = 0; i < nx - 1; i++) {                                                                       // the two long edges
+    idx.push(at(i, 0), ab(i, 0), ab(i + 1, 0), at(i, 0), ab(i + 1, 0), at(i + 1, 0));
+    idx.push(at(i, nz - 1), at(i + 1, nz - 1), ab(i + 1, nz - 1), at(i, nz - 1), ab(i + 1, nz - 1), ab(i, nz - 1));
+  }
+  for (let j = 0; j < nz - 1; j++) {                                                                       // the hem, and the foot end
+    idx.push(at(0, j), at(0, j + 1), ab(0, j + 1), at(0, j), ab(0, j + 1), ab(0, j));
+    idx.push(at(nx - 1, j), ab(nx - 1, j), ab(nx - 1, j + 1), at(nx - 1, j), ab(nx - 1, j + 1), at(nx - 1, j + 1));
+  }
+  g.setAttribute("position", new THREE.BufferAttribute(COV.pos, 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(COV.nor, 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(COV.uv, 2));
+  g.setIndex(idx);
+  const m = DUV.src.material.clone(); m.side = THREE.FrontSide; m.aoMap = null;        // closed, and the model's AO needs its own UVs
+  COV.mesh = new THREE.Mesh(g, m); COV.mesh.name = "duvet_over"; COV.mesh.castShadow = true; COV.mesh.receiveShadow = true;
+  COV.mesh.frustumCulled = false; COV.mesh.visible = false; scene.add(COV.mesh);
+  return true;
+}
+function coverShape(){                                 // the duvet over him, this frame
+  const {nx, nz, nt, pos, nor, uv, ZM0, ZM1, BED, LOFT, THICK, DROP, DR} = COV;
+  // pulled up from where it lay folded to just under his shoulders; on his side, back off his raised shoulder
+  const up = bones.neck.getWorldPosition(_l1).x + 0.17 + 0.10 * Math.abs(ROLL.a) / ROLL.ang;
+  const hem = Math.min(COV.XFOOT - 0.06, COV.XFOOT + (up - COV.XFOOT) * DUV.w);   // drawn up from the foot of the bed over him
+  const len = COV.XFOOT - hem, newUV = Math.abs(hem - COV.lastHem) > 1e-4;
+  COV.hem = hem; COV.lastHem = hem; COV.len = len;
+  const B = COV.body, H = COV.h, T = COV.tmp;
+  for (const s of DUV.segs) { if (s.head) continue; s.a.getWorldPosition(s.A); s.b.getWorldPosition(s.B); }
+  // 1. what is under each grid point: the top of his outline there, eased out to the bed
+  for (let i = 0; i < nx; i++) { const x = hem + len * (i / (nx - 1));
+    for (let j = 0; j < nz; j++) { const z = COV.Z0 + (COV.Z1 - COV.Z0) * (j / (nz - 1));
+      let h = BED;
+      for (const s of DUV.segs) { if (s.head) continue;
+        const ax = s.A.x, az = s.A.z, dx = s.B.x - ax, dz = s.B.z - az, L = dx * dx + dz * dz;
+        const t = L > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / L, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
+        const dd = Math.sqrt(px * px + pz * pz), R = s.r + DR; if (dd >= R) continue;
+        const top = s.A.y + (s.B.y - s.A.y) * t + Math.sqrt(Math.max(0, s.r * s.r - Math.min(dd, s.r) ** 2));
+        const y = BED + (top - BED) * (1 - smooth(0.25, 1, dd / R)); if (y > h) h = y;
+      }
+      B[i * nz + j] = h; H[i * nz + j] = h + LOFT;
+    } }
+  // he is longer than the mattress: along each row the cloth stays up until past whatever it covers there, then falls
+  for (let j = 0; j < nz; j++) { let e = -0.21;                       // (the foot end of the mattress)
+    for (let i = 0; i < nx; i++) if (B[i * nz + j] > BED + 0.015) e = hem + len * (i / (nx - 1));
+    COV.rowEnd[j] = Math.min(e + 0.03, COV.XFOOT - 0.10); }
+  // 2. cloth, not shrink wrap: smooth the surface (it bridges between his limbs), but never below him
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
+      T[i * nz + j] = (H[i0 * nz + j] + H[i1 * nz + j] + H[i * nz + j0] + H[i * nz + j1] + 2 * H[i * nz + j]) / 6;
+    }
+    for (let k = 0; k < nx * nz; k++) H[k] = Math.max(T[k], B[k] + 0.03);      // it rests on him, it does not sink into him
+    H[0] = H[0];
+  }
+  // 3. the vertices: the top, the underside a duvet's thickness below it, and over the edges of the mattress and past
+  // his feet it hangs down
+  for (let i = 0; i < nx; i++) { const u = i / (nx - 1), x = hem + len * u;
+    for (let j = 0; j < nz; j++) { const k = i * nz + j, kb = nt + k, z = COV.Z0 + (COV.Z1 - COV.Z0) * (j / (nz - 1));
+      const over = Math.max(smooth(ZM0, COV.Z0, z), smooth(ZM1, COV.Z1, z), smooth(COV.rowEnd[j], COV.XFOOT, x));
+      // over the edges it falls freely; where he is under it, it still rests on him
+      const floor = B[k] > BED + 0.005 ? B[k] + 0.03 : -9;
+      const h = Math.max(H[k] - DROP * over * over, floor);
+      pos[3 * k] = pos[3 * kb] = x; pos[3 * k + 2] = pos[3 * kb + 2] = z;
+      pos[3 * k + 1] = h; pos[3 * kb + 1] = Math.min(h - 0.012, Math.max(h - THICK, Math.min(B[k], BED) - 0.01));
+      if (newUV) { uv[2 * k] = uv[2 * kb] = u * len * COV.TEX; uv[2 * k + 1] = uv[2 * kb + 1] = z * COV.TEX; }
+      H[k] = h;
+    } }
+  for (let i = 0; i < nx; i++) { const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), ddx = len / (nx - 1) * (i1 - i0);
+    for (let j = 0; j < nz; j++) {                       // normals from the slope of the surface itself
+      const k = i * nz + j, kb = nt + k, j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
+      const dx = (H[i1 * nz + j] - H[i0 * nz + j]) / ddx, dz = (H[i * nz + j1] - H[i * nz + j0]) / ((COV.Z1 - COV.Z0) / (nz - 1) * (j1 - j0));
+      const m = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
+      nor[3 * k] = -dx * m; nor[3 * k + 1] = m; nor[3 * k + 2] = -dz * m;
+      nor[3 * kb] = dx * m; nor[3 * kb + 1] = -m; nor[3 * kb + 2] = dz * m;
+    } }
+  const g = COV.mesh.geometry;
+  g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true; if (newUV) g.attributes.uv.needsUpdate = true;
+  g.computeBoundingSphere();
 }
 const SLIDES = {full:null, bare:null, parked:null, off:false};
 function slidesInit(){                                 // which of his vertices are the slides (dark, on the feet, below the ankle)
@@ -2326,11 +2367,23 @@ function slidesInit(){                                 // which of his vertices 
       py = Math.min(H - 1, Math.floor((sm.material.map.flipY ? 1 - w : w) * H)), k = (py * W + px) * 4;
     if (D[k] + D[k + 1] + D[k + 2] < 0.3 * 765) slide.push(i); }
   if (!slide.length || !g.index) return false;
-  // his mesh without them (the socks are open underneath: only ever shown under the duvet)
   const isSlide = new Uint8Array(P.count); for (const i of slide) isSlide[i] = 1;
-  const idx = g.index.array, keep = [], tri = [];
-  for (let t = 0; t < idx.length; t += 3) (isSlide[idx[t]] && isSlide[idx[t + 1]] && isSlide[idx[t + 2]] ? tri : keep).push(idx[t], idx[t + 1], idx[t + 2]);
-  SLIDES.full = g.index; SLIDES.bare = new THREE.BufferAttribute(new Uint32Array(keep), 1);
+  const idx = g.index.array, tri = [];
+  for (let t = 0; t < idx.length; t += 3) if (isSlide[idx[t]] && isSlide[idx[t + 1]] && isSlide[idx[t + 2]]) tri.push(idx[t], idx[t + 1], idx[t + 2]);
+  // his feet without them. The sock has no sole of its own (the slide is it), so the slide's shape stays and only its
+  // colour goes: the dark rubber reads as the sock, and his foot is a sock, not an open shell.
+  const sock = []; for (let i = 0; i < P.count; i++) if (!isSlide[i] && /Foot|Toe/.test(names[domBone(g, i)])) sock.push(i);
+  let bu = 0, bv = 0, bscore = -1;                      // the flattest bright patch of the texture: the sock's own white
+  for (let py = 4; py < H - 4; py += 4) for (let px = 4; px < W - 4; px += 4) {
+    let sum = 0, sq = 0; for (let dy = -3; dy <= 3; dy += 2) for (let dx = -3; dx <= 3; dx += 2) {
+      const k = ((py + dy) * W + px + dx) * 4, l = (D[k] + D[k + 1] + D[k + 2]) / 765; sum += l; sq += l * l; }
+    const n = 16, m = sum / n, sd = Math.sqrt(Math.max(0, sq / n - m * m)), sc = m - 4 * sd;
+    if (m > 0.72 && sc > bscore) { bscore = sc; bu = (px + 0.5) / W; bv = (py + 0.5) / H; } }
+  if (bscore < 0) return false;
+  const bare = new THREE.Float32BufferAttribute(UV.count * 2, 2);
+  for (let i = 0; i < UV.count; i++) bare.setXY(i, UV.getX(i), UV.getY(i));
+  for (const i of slide) bare.setXY(i, bu, sm.material.map.flipY ? 1 - bv : bv);
+  SLIDES.full = UV; SLIDES.bare = bare;
   // the parked pair: the slides' own triangles as they are in his bind pose (standing, feet flat), at his scale, by the bed
   const inv = n => new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert(), bp = n => new THREE.Vector3().setFromMatrixPosition(inv(n));
   const sc = bones.LeftFoot.getWorldPosition(_l1).distanceTo(bones.LeftToeBase.getWorldPosition(_l2)) / bp("LeftFoot").distanceTo(bp("LeftToeBase"));
@@ -2348,13 +2401,14 @@ function slidesInit(){                                 // which of his vertices 
 }
 function setSlides(off){
   if (off === SLIDES.off || (!SLIDES.full && !slidesInit())) return;
-  SLIDES.off = off; skinMesh().geometry.setIndex(off ? SLIDES.bare : SLIDES.full); SLIDES.parked.visible = off;
+  SLIDES.off = off; const g = skinMesh().geometry;
+  g.setAttribute("uv", off ? SLIDES.bare : SLIDES.full); g.attributes.uv.needsUpdate = true; SLIDES.parked.visible = off;
 }
 // lying on the bed the clip has his legs raised and his head sunk into the pillow: tip him back level (about his hips)
 // and down onto the bed: onto the sheet under the duvet, onto the duvet when he lies on top of it
-const LIE = {pitch:0.155, dy:0.03, spine:0.10, legs:0, knee:-0.185, foot:0.2};
+const LIE = {pitch:0.155, dy:0.03, spine:0.10, legs:0, knee:-0.185, foot:0.2, hip:-0.4, bend:0.8};
 // asleep he turns onto his side now and then (every 3-8 min, for 1-4 min; slowly, ~2.5 s), towards the room or the wall
-const ROLL = {a:0, goal:0, next:90, ang:1.15, lift:0.055, hip:0.065, knee:-0.5, neck:0, side:[0.2, 0], stack:0.13, fwd:0.08, arm:[0.12, 0.025, 0.265, 0.16], force:null};
+const ROLL = {a:0, goal:0, next:90, ang:1.15, lift:0.055, hip:0.065, knee:-0.5, neck:0, side:[0.2, 0], stack:0.13, fwd:0.08, zfix:0.075, arm:[0.12, 0.025, 0.265, 0.16], force:null};
 const _X = new THREE.Vector3(1, 0, 0), _Z = new THREE.Vector3(0, 0, 1);   // along the bed; across it (turning about it lowers his head)
 function rollStep(dt, asleep){
   if (ROLL.force != null) ROLL.goal = ROLL.force;
@@ -2375,10 +2429,14 @@ function lieFit(){
   bend(bones.Spine02, _l3, LIE.spine * k);                                   // the small of his back down, the chest stays on the pillow
   bend(bones.LeftUpLeg, _l3, LIE.legs * k); bend(bones.RightUpLeg, _l3, LIE.legs * k);   // the legs flat on the bed
   bend(bones.LeftLeg, _l3, LIE.knee * k); bend(bones.RightLeg, _l3, LIE.knee * k);
+  // asleep he is 1.72 m long in a 1.65 m bed: his knees stay a little bent, as they would in a bed this size. The phone
+  // and music clips lie with their own bent legs, so this is only for the sleeping one.
+  if (goal && goal.clip === "sleep") for (const sd of ["Left", "Right"]) { bend(bones[sd + "UpLeg"], _l3, LIE.hip * k); bend(bones[sd + "Leg"], _l3, LIE.bend * k); }
   bend(bones.LeftFoot, _l3, LIE.foot * k); bend(bones.RightFoot, _l3, LIE.foot * k);   // the feet fall forward (relaxed)
   const a = ROLL.a * k, u = Math.abs(a) / ROLL.ang; if (!a) return;
   // on his side: the whole body turns about the bed's long axis, up off his shoulder, the hips and knees bend a little
   B.getWorldPosition(_l1); bend(B, _X, a); _l1.y += ROLL.lift * Math.pow(Math.sin(Math.abs(a)) / Math.sin(ROLL.ang), 0.6);
+  _l1.z -= ROLL.zfix * Math.sin(a) / Math.sin(ROLL.ang);              // turning over, he stays on the pillow
   B.parent.worldToLocal(_l1); B.position.copy(_l1); B.updateMatrixWorld(true);
   _l4.copy(_l3).applyAxisAngle(_X, a);
   for (const s of ["Left", "Right"]) { bend(bones[s + "UpLeg"], _l4, ROLL.hip * u); bend(bones[s + "Leg"], _l4, ROLL.knee * u); }
@@ -2402,17 +2460,20 @@ function lieFit(){
 }
 function inBed(dt){                                    // after the last pose layer of the frame
   if (!boy || !bones.Hips) return;
-  setSlides(boy.visible && DUV.w > 0.3);                  // once the duvet is over his feet
+  const k = boy.visible ? lieW() : 0;
+  setSlides(k > 0);                                       // off before he lies down, and back on when he is up
   const asleep = boy.visible && goal && goal.clip === "sleep" && goal.anchor === "bedlie" && (at === "bedlie" || (step && step.k === "pose" && step.to === "bedlie"));
   rollStep(dt, asleep && at === "bedlie" && DUV.w >= 1);
-  const w = clamp(DUV.w + (asleep ? dt / 2.2 : -dt / 1.2), 0, 1), k = boy.visible ? lieW() : 0;
-  if (w === 0 && DUV.w === 0 && k === 0) { if (DUV.mesh) { DUV.mesh.visible = PIL.mesh.visible = false; DUV.src.visible = PIL.src.visible = true; } return; }
+  // the page may open while he is already asleep: he is under it from the first frame, not on top of it
+  const w = DUV.w === 0 && asleep && at === "bedlie" && !step ? 1 : clamp(DUV.w + (asleep ? dt / 2.2 : -dt / 1.2), 0, 1);
+  if (w === 0 && DUV.w === 0 && k === 0) { if (COV.mesh) { COV.mesh.visible = PIL.mesh.visible = false; DUV.src.visible = PIL.src.visible = true; } return; }
   if (!bedInit()) return;
   DUV.w = w; DUV.acc += dt;
   const still = Math.abs(ROLL.goal - ROLL.a) < 1e-3;
   if (DUV.acc >= (still ? 0.1 : 1 / 30) || (w > 0 && w < 1 && DUV.acc >= 1 / 30) || (k > 0 && k < 1)) {   // 10 Hz once he lies still (breathing), 30 while he moves
-    DUV.acc = 0; boy.updateMatrixWorld(true); if (w > 0) duvetShape(); if (k > 0) pillowDent(k); }
-  DUV.mesh.visible = w > 0; DUV.src.visible = !DUV.mesh.visible; PIL.mesh.visible = k > 0; PIL.src.visible = !PIL.mesh.visible;
+    DUV.acc = 0; boy.updateMatrixWorld(true); if (w > 0) coverShape(); if (k > 0) pillowDent(k); }
+  COV.mesh.visible = w > 0; DUV.src.visible = !COV.mesh.visible;    // the folded quilt: he has picked it up
+  PIL.mesh.visible = k > 0; PIL.src.visible = !PIL.mesh.visible;
 }
 // ---- which situation he is in
 function context(){
@@ -2784,9 +2845,9 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) { windowView.update(0.1, hour); lighting(0.1); } },   // the window follows the hour too (QA freezes the loop)
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, studioEnv, roomEnv, setEnv,
-  penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the duvet top, or the sheet as the duvet comes over him, less 2 cm of give; rounded edge) and the chair
+  penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
-    const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 + 0.035 * (1 - DUV.w) - 0.02, ch = chairNode(), V = ch && chairVox();
+    const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
     let bed = 0, chair = 0; const u = new THREE.Vector3(), by = {}, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
     const note = (i, what) => { if (!detail) return; let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
@@ -2798,8 +2859,8 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } }
     return detail ? {bed, chair, by} : {bed, chair, of:Math.ceil(P.count / every)}; },
-  LIE, DUV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
-    if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), duvet:new Float32Array(NX * NZ).fill(-1)};
+  LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
+    if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
       room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
         o.updateMatrixWorld(true); const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();
         for (let t = 0; t < (ix ? ix.count : P.count); t += 3) { const id = k => ix ? ix.getX(t + k) : t + k;
@@ -2811,15 +2872,22 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
             const l1 = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d, l2 = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / d, l3 = 1 - l1 - l2;
             if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue; const y = l1 * a.y + l2 * b.y + l3 * c.y; if (y > H[i * NZ + k]) H[i * NZ + k] = y; } } });
       window._HM = {X0, Z0, N, NX, NZ, hm}; }
-    const {X0, Z0, N, NX, NZ, hm} = window._HM, under = DUV.w >= 1;
+    const {X0, Z0, N, NX, NZ, hm} = window._HM;
     const surf = (x, z) => { const i = Math.round((x - X0) / N), k = Math.round((z - Z0) / N); if (i < 0 || k < 0 || i >= NX || k >= NZ) return -1;
-      return under ? hm.sheet[i * NZ + k] : Math.max(hm.sheet[i * NZ + k], hm.duvet[i * NZ + k]); };
+      return Math.max(hm.sheet[i * NZ + k], hm.jersey[i * NZ + k]); };
     const sm = skinMesh(), P = sm.geometry.attributes.position, names = sm.skeleton.bones.map(b => b.name), v = new THREE.Vector3(), out = {};
     boy.updateMatrixWorld(true);
     const part = n => /Head|head|neck/.test(n) ? "head" : /Spine/.test(n) ? "back" : n === "Hips" ? "pelvis" : /UpLeg/.test(n) ? "thighs" : /Leg$/.test(n) ? "shins" : /Foot|Toe/.test(n) ? "feet" : "arms";
     for (let i = 0; i < P.count; i += every) { sm.getVertexPosition(i, v).applyMatrix4(sm.matrixWorld); const h = surf(v.x, v.z); if (h < 0) continue;
       const g = part(names[domBone(sm.geometry, i)]), o = out[g] = out[g] || {gap:9, near:0}; o.gap = Math.min(o.gap, v.y - h); if (v.y - h < 0.015) o.near++; }
     for (const o of Object.values(out)) o.gap = +o.gap.toFixed(3);
+    // the wall behind the bed: the curtain hangs at x -1.778 and the headboard behind it, so nothing of his may go past it
+    let wall = 0, minx = 9;
+    for (let i = 0; i < P.count; i += every) { sm.getVertexPosition(i, v).applyMatrix4(sm.matrixWorld);
+      if (v.y > 0.6 && v.z > 0.2 && v.z < 1.6) { minx = Math.min(minx, v.x); if (v.x < -1.775) wall++; } }
+    out.wall = {n:wall, minx:+minx.toFixed(3)};
+    const hd = bones.Head.getWorldPosition(v);                      // and his head belongs on the pillow
+    out.pillow = {d:+Math.hypot(hd.x + 1.545, hd.z - 0.871).toFixed(3)};
     return out; },
   live: (a, x = {}) => { const l = {activity:a, place:"room", ...x}; lastLife = l; place(l); screens(l, "AWAKE"); },
   act: (a, x = {}) => { untouch(); if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"}); if (chairNode()) placeChair(0); const l = {activity:a, place:"room", ...x}; lastLife = l; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = phoneWanted ? 1 : 0; mixer.update(1); },
@@ -2829,6 +2897,25 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     root:boy.position.toArray().map(x => +x.toFixed(3)), ry:+boy.rotation.y.toFixed(2)}) });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, current:{get:() => current}, want:{get:() => want}, hand:{get:() => hand}, head:{get:() => head},
     monitor:{get:() => monitor}, sky:{get:() => sky}, dpr:{get:() => dpr}, mixer:{get:() => mixer}}); }
+
+// ===== #98 G3: the motion layer (feature/gl-motion) lives in web/room/boy_motion.js; this block is this branch's only change here. =====
+// Clips generated with NVIDIA ARDY (boy_m_*.glb) take the place of some actions, and after each animate() the module adds
+// breathing, weight shifts, foot IK on the floor, hands on the keyboard / mouse / bowl, eye and head look-at and a pop
+// killer. It gets the page's internals here, and registers every bone it moves with touch(). ?debug: window.motion.
+{
+  const animate0 = animate; let motion = null;
+  import("./room/boy_motion.js").then(m => { motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
+    get boy(){ return boy; }, get mixer(){ return mixer; }, touch, reach, aimBone, setWorldQuat,
+    state: () => ({ctx:ctxNow, at, step, goal, current, holdW, peek, phoneWanted, life:lastLife, T, iv:IV.cur && IV.cur.n,
+      held:Object.keys(PROP.held).length > 0 || bag === "hand" || !!(trash && trash.held)}),
+    setCurrent: a => { current = a; },
+    movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
+    HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
+    setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
+  animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
+}
+// ===== end #98 G3 =====
 </script>
 </body>
 </html>
