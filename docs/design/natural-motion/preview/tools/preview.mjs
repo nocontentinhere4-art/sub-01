@@ -2,11 +2,13 @@
 // framing rendered at half resolution (640 x 360), 30 fps, by stepping the page's own clock (?debug&nolive, its rAF loop
 // frozen; animate(1/30) per frame, the motion layer included). Every idle is made to play in turn with the page's
 // variant(); the page's own scheduler is held off so nothing else starts in between. A variant a page doesn't have (main)
-// plays nothing: what main does then is what it shows.
+// plays nothing: what main does then is what it shows. START=n resumes a run: the page is stepped to frame n (the same
+// simulation; rendering changes nothing in it) and drawn from there.
 import { chromium } from "playwright";
 import fs from "fs";
 import { execSync } from "child_process";
 const [port, view, out] = process.argv.slice(2);
+const START = +(process.env.START || 0);              // resume: the frames before this one are already on disk
 const TL = JSON.parse(fs.readFileSync(new URL("./timeline.json", import.meta.url)));
 fs.mkdirSync(out, {recursive:true});
 const browser = await chromium.launch({executablePath:process.env.SUB01_CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
@@ -33,6 +35,7 @@ for (const [where, label, variant, secs] of TL.segments) {
   const frames = Math.round(secs * TL.fps);
   await page.evaluate(([v, d]) => { if (v) { variant(v, d); IV.cur.s = 0.5; } }, [variant, secs]);
   for (let i = 0; i < frames; i++, n++) {
+    if (n < START) { await page.evaluate(() => { IV.next = 1e9; if ("big" in IV) IV.big = 1e9; animate_(1 / 30); }); continue; }   // (resuming: stepped, not drawn)
     const url = await page.evaluate(() => {
       IV.next = 1e9; if ("big" in IV) IV.big = 1e9;
       sim(1 / 30); return renderer.domElement.toDataURL("image/jpeg", 0.9);   // (one step of him, the light, the shadows, a render)
