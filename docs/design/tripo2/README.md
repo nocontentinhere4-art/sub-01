@@ -1,6 +1,8 @@
 # The Tripo props, second batch
 
-Eighteen props made with Tripo (paid API) replace earlier ones or are new in the room, plus a made-up car poster. The
+Sixteen props made with Tripo (paid API) replace earlier ones or are new in the room, plus a made-up car poster. The Tripo
+game controller and monitor were later replaced by ones modelled in code (`room_build/build_desk_tech.mjs`; see
+`docs/design/props/controller_before_after.jpg`, `monitor_before_after.jpg`), and the stills below predate that. The
 details, task ids and what was left out are in `web/room/CREDITS.md`, "The Tripo props, second batch".
 
 - `1280_<shot>.webp` (before above, after below) and `390_<shot>.webp` (before left, after right): the room with the

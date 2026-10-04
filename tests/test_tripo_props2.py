@@ -110,3 +110,17 @@ def test_tripo_mouse_for_comparison():
     tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
     assert 0 < tris <= 5000 + 100, tris
     assert "mouse" in {nd.get("name") for nd in j["nodes"]}
+
+
+def test_controller_and_monitor_modelled_in_code():
+    html = (ROOT / "web" / "room.html").read_text()
+    assert 'load("room/controller.glb")' in html and 'load("room/monitor.glb")' in html and "const CTRL_AT = [" in html
+    assert "controller" not in props() and "monitor" not in props()                # (the Tripo ones are left out)
+    for f, name, limit in (("controller.glb", "controller", 20000), ("monitor.glb", "monitor", 8000)):
+        data = (ROOT / "web" / "room" / f).read_bytes()
+        assert len(data) <= 512 * 1024, f
+        n = struct.unpack_from("<I", data, 12)[0]
+        j = json.loads(data[20:20 + n])
+        assert name in {nd.get("name") for nd in j["nodes"]}
+        tris = sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
+        assert 0 < tris <= limit, (f, tris)
