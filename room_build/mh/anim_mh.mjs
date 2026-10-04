@@ -104,9 +104,33 @@ function armIK(Wq, L, rootPos) {
       const top = +(process.env["KEYTOP_" + s] || process.env.KEYTOP || -1); if (top < 0) break;
       let low = 1e9; for (let f = 1; f <= 5; f++) low = Math.min(low, tipY(L, rootPos, `finger${f}-3.${s}`));
       if (low >= top + 0.002) break; dy += top + 0.003 - low; }
+    if (MOUSE && s === "R") {
+      // the palm rests on the mouse's back: lower (or lift) the pin until a point 60% from the wrist to the middle
+      // knuckle touches the dome (1.6 cm of palm under the bone)
+      let dyM = 0;
+      for (let it = 0; it < 6; it++) { L[up] = keep.up.clone(); L[lo] = keep.lo.clone(); solveSide(Wq, L, rootPos, s, dyM);
+        const w = bonePos(L, rootPos, wr), k = bonePos(L, rootPos, `finger3-1.${s}`), pp = w.lerp(k, 0.6);
+        let lo_ = -0.08, hi_ = 0.08; for (let j = 0; j < 20; j++) { const m = (lo_ + hi_) / 2; if (dome(pp.clone().setY(pp.y + m), 0.016) > 0) hi_ = m; else lo_ = m; }
+        if (Math.abs(lo_) < 0.001) break; dyM += lo_; }
+      // each finger curls (middle and end joints) until its tip meets the dome's skin (8 mm pad); ring and little
+      // finger may wrap further down the side
+      const base = {}; for (const n of rest.order) if (/finger[2-5]-[23]\.R$/.test(n)) base[n] = L[n].clone();
+      for (let f = 2; f <= 5; f++) { const pip = `finger${f}-2.R`, dip = `finger${f}-3.R`;
+        const at = e => { L[pip] = curlQ(pip, e).multiply(base[pip]); L[dip] = curlQ(dip, e * 0.6).multiply(base[dip]); return dome(bonePos(L, rootPos, dip, true), 0.008); };
+        let a = -25, b = 70; if (at(a) < 0) { at(a); continue; } if (at(b) > 0) { at(b); continue; }
+        for (let j = 0; j < 22; j++) { const m = (a + b) / 2; if (at(m) > 0) a = m; else b = m; } at(a); }
+    }
   }
 }
 // world position of a bone's tail from the local rotations (rest is world-aligned, so offsets are rest differences)
+function bonePos(L, rootPos, n, tail) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
+  const p = V3(rootPos); let W = new THREE.Quaternion();
+  for (let i = 0; i < path.length; i++) { if (i) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(W)); W = W.clone().multiply(L[path[i]]); }
+  return tail ? p.add(V3(rest.tail[n]).sub(V3(rest.head[n])).applyQuaternion(W)) : p; }
+// MOUSE={"c":[x,y,z],"r":[rx,ry,rz]}: an ellipsoid dome; >0 outside, <0 inside (radii inflated by the skin's thickness)
+const MOUSE = process.env.MOUSE ? JSON.parse(process.env.MOUSE) : null;
+const dome = (p, pad) => { const [cx, cy, cz] = MOUSE.c, [rx, ry, rz] = MOUSE.r;
+  return Math.hypot((p.x - cx) / (rx + pad), (Math.max(p.y, cy) - cy) / (ry + pad), (p.z - cz) / (rz + pad)) - 1; };
 function tipY(L, rootPos, n) { const path = []; for (let b = n; b; b = par[b]) path.unshift(b);
   const p = V3(rootPos); let W = new THREE.Quaternion();
   for (let i = 0; i < path.length; i++) { if (i) p.add(V3(rest.head[path[i]]).sub(V3(rest.head[path[i - 1]])).applyQuaternion(W)); W = W.clone().multiply(L[path[i]]); }

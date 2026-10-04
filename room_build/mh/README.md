@@ -12,9 +12,10 @@
 - `glb/clips/desk_type_ik.glb`: desk_type with a baked arm IK from the owner's typing photo (elbows bent and close,
   hands together on the home row, pointing forward; wrists pinned at world (0.03, 0.878, 0.32) / (-0.13, 0.878, 0.32), drifting with the recorded wrists (70%) for
   a body whose hips sit at the origin), fingers recorded at 80% strength, thumbs swung toward the space bar, fingertips kept above KEYTOP 0.83 (the pin lifts). Awaiting the owner's verdict.
-- `glb/clips/desk_mouse_ik.glb`: the mouse held as in the owner's photos: palm resting on the mouse's back, fingers
-  down its front (GRIP_R [22,32,18] deg over 25% of the recorded fingers), thumb on its inner side, an index click now and
-  then. Mouse: a dome 6.4 x 7.6 x 11.6 cm, centre (-0.36, 0.807, 0.40) for hips at the origin (next to the keyboard's
-  right end); wrist pin (-0.345, 0.828, 0.305), hand pointing straight (yaw 0.12 in, no recorded hand turn), pitched up 0.3; index and middle on the buttons, ring and little finger down the right side, thumb out on the left side. Left hand resting on the keyboard.
+- `glb/clips/desk_mouse_ik.glb`: the mouse held as in the owner's photos, solved for contact: the palm rests on the
+  mouse's back (the wrist pin moves until a point 60% from the wrist to the middle knuckle touches the dome + 1.6 cm),
+  and each finger curls until its tip meets the dome (+8 mm), fingers together (ADDUCT_R 5), the hand flat and straight
+  (pitch 0, yaw 0.12 in), thumb on the inner side, an index click now and then. Mouse dome: radii 3.2 x 3.8 x 6 cm,
+  centre (-0.36, 0.807, 0.41) for hips at the origin. In the room, pass the real mouse's centre and size as MOUSE.
 - Scripts: `build_mh.mjs` (base GLB), `anim_mh.mjs` (retarget; env DY, YAW, ANIMONLY, NAME), `rename_mh.mjs`.
   The source FBX files are not in the repo.
