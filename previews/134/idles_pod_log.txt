@@ -1,0 +1,162 @@
++ cd /work
+++ nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
++ echo 'gpu: NVIDIA RTX A5000, 580.159.04'
+gpu: NVIDIA RTX A5000, 580.159.04
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -qq
++ apt-get install -y -qq ffmpeg fonts-dejavu-core libegl1 libgles2 libgl1 libvulkan1 mesa-vulkan-drivers
++ tail -2
+Processing triggers for libc-bin (2.35-0ubuntu3.9) ...
+Processing triggers for libgdk-pixbuf-2.0-0:amd64 (2.42.8+dfsg-1ubuntu0.5) ...
++ pip install -q playwright pillow
++ tail -1
+[notice] To update, run: python -m pip install --upgrade pip
++ python3 -m playwright install --with-deps chromium
++ tail -2
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 114.3 MiB
+Chrome Headless Shell 153.0.8010.12 (playwright chromium-headless-shell v1243) downloaded to /root/.cache/ms-playwright/chromium_headless_shell-1243
++ ls /usr/lib/x86_64-linux-gnu/
++ grep -i 'nvidia-egl\|EGL_nvidia\|nvidia-glvkspirv\|GLX_nvidia'
++ head -5
+libEGL_nvidia.so.0
+libEGL_nvidia.so.580.159.04
+libGLX_nvidia.so.0
+libGLX_nvidia.so.580.159.04
+libnvidia-egl-gbm.so.1
++ ls /etc/vulkan/icd.d/ /usr/share/vulkan/icd.d/
++ head -5
+/etc/vulkan/icd.d/:
+nvidia_icd.json
+
+/usr/share/vulkan/icd.d/:
+intel_hasvk_icd.x86_64.json
++ mkdir -p /work/old /work/new /work/frames
++ tar -xzf /in/old.tar.gz -C /work/old
++ tar -xzf /in/new.tar.gz -C /work/new
++ R=/work/new/tools/gpu_preview_render.py
++ GPU_ARGS=
++ for cand in "channel=chromium,--use-gl=angle,--use-angle=gl-egl" "channel=chromium,--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" "channel=chromium,--use-gl=egl" "--use-gl=angle,--use-angle=gl-egl" "--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" "--use-gl=egl" "channel=chromium,--use-angle=gl,--use-gl=angle"
+++ python3 /work/new/tools/gpu_preview_render.py --probe --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl
+++ tail -1
++ r='ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)'
++ echo 'probe [channel=chromium,--use-gl=angle,--use-angle=gl-egl] -> ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)'
+probe [channel=chromium,--use-gl=angle,--use-angle=gl-egl] -> ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ case "$r" in
++ GPU_ARGS=channel=chromium,--use-gl=angle,--use-angle=gl-egl
++ break
++ '[' -z channel=chromium,--use-gl=angle,--use-angle=gl-egl ']'
++ echo channel=chromium,--use-gl=angle,--use-angle=gl-egl
++ for size in $SIZES
++ for side in old new
++ SHOTS_ARG=
++ '[' -n living_idles.json ']'
++ SHOTS_ARG='--shots /in/living_idles.json'
+++ '[' old = old ']'
+++ echo ''
++ Q=
+++ '[' old = old ']'
+++ echo 71
++ python3 /work/new/tools/gpu_preview_render.py --web /work/old/web --side old --size 1280x800 --fps 30 --segments 14:60,23:30 --shots /in/living_idles.json --query '' --frames /work/frames/1280x800 --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl --require-gpu --port 8871
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":{"x":-102.1485,"dir":1},"
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":{"x":-102.1485,"dir":1},"
+  old 1280x800 desk frame 0/2700 (30 s)
+  old 1280x800 desk frame 150/2700 (42 s)
+  old 1280x800 desk frame 300/2700 (54 s)
+  old 1280x800 desk frame 450/2700 (65 s)
+  old 1280x800 desk frame 600/2700 (77 s)
+  old 1280x800 desk frame 750/2700 (89 s)
+  old 1280x800 desk frame 900/2700 (100 s)
+  old 1280x800 desk frame 1050/2700 (112 s)
+  old 1280x800 desk frame 1200/2700 (124 s)
+  old 1280x800 desk frame 1350/2700 (136 s)
+  old 1280x800 desk frame 1500/2700 (147 s)
+  old 1280x800 desk frame 1650/2700 (158 s)
+  old 1280x800 desk frame 1800/2700 (170 s)
+  old 1280x800 desk frame 1950/2700 (181 s)
+  old 1280x800 desk frame 2100/2700 (193 s)
+  old 1280x800 desk frame 2250/2700 (204 s)
+  old 1280x800 desk frame 2400/2700 (216 s)
+  old 1280x800 desk frame 2550/2700 (227 s)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":null,"time":90.5794999999
+  old 1280x800 window frame 0/600 (238 s)
+  old 1280x800 window frame 150/600 (250 s)
+  old 1280x800 window frame 300/600 (262 s)
+  old 1280x800 window frame 450/600 (274 s)
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+  window view: {"hour":22,"sun":-0.8826787983255471,"weather":{"kind":"clear","cloud":0.04470991936000386,"rain":0,"n":0.5770266794272481},"override":null,"litP":0.74,"train":{"x":-93.062,"dir":1},"time":1.114,"prob
+  old 1280x800 phone in bed frame 0/600 (292 s)
+  old 1280x800 phone in bed frame 150/600 (302 s)
+  old 1280x800 phone in bed frame 300/600 (312 s)
+  old 1280x800 phone in bed frame 450/600 (322 s)
+old: 3900 frames in 332.1 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ for side in old new
++ SHOTS_ARG=
++ '[' -n living_idles.json ']'
++ SHOTS_ARG='--shots /in/living_idles.json'
+++ '[' new = old ']'
+++ echo ''
++ Q=
+++ '[' new = old ']'
+++ echo 72
++ python3 /work/new/tools/gpu_preview_render.py --web /work/new/web --side new --size 1280x800 --fps 30 --segments 14:60,23:30 --shots /in/living_idles.json --query '' --frames /work/frames/1280x800 --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl --require-gpu --port 8872
+pageerror Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":{"x":-95.19379999351501,"
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":{"x":-95.19379999351501,"
+  new 1280x800 desk frame 0/2700 (8 s)
+  new 1280x800 desk frame 150/2700 (20 s)
+  new 1280x800 desk frame 300/2700 (32 s)
+  new 1280x800 desk frame 450/2700 (43 s)
+  new 1280x800 desk frame 600/2700 (55 s)
+  new 1280x800 desk frame 750/2700 (66 s)
+  new 1280x800 desk frame 900/2700 (78 s)
+  new 1280x800 desk frame 1050/2700 (89 s)
+  new 1280x800 desk frame 1200/2700 (100 s)
+  new 1280x800 desk frame 1350/2700 (112 s)
+  new 1280x800 desk frame 1500/2700 (123 s)
+  new 1280x800 desk frame 1650/2700 (134 s)
+  new 1280x800 desk frame 1800/2700 (146 s)
+  new 1280x800 desk frame 1950/2700 (158 s)
+  new 1280x800 desk frame 2100/2700 (169 s)
+  new 1280x800 desk frame 2250/2700 (181 s)
+  new 1280x800 desk frame 2400/2700 (192 s)
+  new 1280x800 desk frame 2550/2700 (204 s)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"overcast","cloud":0.5650119007172728,"rain":0,"n":0.5021788839905864},"override":null,"litP":0.2357142857142857,"train":null,"time":90.9886000003
+  new 1280x800 window frame 0/600 (215 s)
+  new 1280x800 window frame 150/600 (227 s)
+  new 1280x800 window frame 300/600 (239 s)
+  new 1280x800 window frame 450/600 (251 s)
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Unexpected end of JSON input
+  window view: {"hour":22,"sun":-0.8826787983255471,"weather":{"kind":"clear","cloud":0.04470991936000386,"rain":0,"n":0.5770266794272481},"override":null,"litP":0.74,"train":{"x":-93.24220000648498,"dir":1},"time":
+  new 1280x800 phone in bed frame 0/600 (268 s)
+  new 1280x800 phone in bed frame 150/600 (277 s)
+  new 1280x800 phone in bed frame 300/600 (287 s)
+  new 1280x800 phone in bed frame 450/600 (297 s)
+new: 3900 frames in 306.5 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ python3 /work/new/tools/gpu_preview_render.py --encode --frames /work/frames/1280x800 --out /out/preview_1280x800.mp4 --max-mb 25 --label-old 'main (old)' --label-new 'living idles (#134)'
+wrote /out/preview_1280x800.mp4: 3900 frames, 130.0 s, 23.8 MB (crf 23)
++ cp /work/frames/1280x800/new_meta.json /work/frames/1280x800/old_meta.json /out/
++ for s in old new
++ cp /work/frames/1280x800/old_meta.json /out/old_1280x800_meta.json
++ for s in old new
++ cp /work/frames/1280x800/new_meta.json /out/new_1280x800_meta.json
++ ls -la /out
+total 32812
+drwxr-xr-x 2 root root     4096 Oct  4 05:52 .
+drwxr-xr-x 1 root root      185 Oct  4 05:36 ..
+-rw-r--r-- 1 root root        3 Oct  4 05:36 UP
+-rw-r--r-- 1 root root       51 Oct  4 05:37 gpu_args.txt
+-rw-r--r-- 1 root root     9329 Oct  4 05:52 log.txt
+-rw-r--r-- 1 root root      521 Oct  4 05:52 new_1280x800_meta.json
+-rw-r--r-- 1 root root      521 Oct  4 05:52 new_meta.json
+-rw-r--r-- 1 root root      521 Oct  4 05:52 old_1280x800_meta.json
+-rw-r--r-- 1 root root      521 Oct  4 05:52 old_meta.json
+-rw-r--r-- 1 root root     1277 Oct  4 05:52 preview_1280x800.json
+-rw-r--r-- 1 root root 23806231 Oct  4 05:52 preview_1280x800.mp4

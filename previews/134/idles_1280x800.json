@@ -1,0 +1,69 @@
+{
+ "frames": 3900,
+ "fps": 30,
+ "seconds": 130.0,
+ "bytes": 23806231,
+ "crf": 23,
+ "sides": {
+  "old": {
+   "side": "old",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "desk",
+     "seconds": 90.0,
+     "first": 0,
+     "frames": 2700
+    },
+    {
+     "hour": 14,
+     "label": "window",
+     "seconds": 20.0,
+     "first": 2700,
+     "frames": 600
+    },
+    {
+     "hour": 22,
+     "label": "phone in bed",
+     "seconds": 20.0,
+     "first": 3300,
+     "frames": 600
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 332.1
+  },
+  "new": {
+   "side": "new",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "desk",
+     "seconds": 90.0,
+     "first": 0,
+     "frames": 2700
+    },
+    {
+     "hour": 14,
+     "label": "window",
+     "seconds": 20.0,
+     "first": 2700,
+     "frames": 600
+    },
+    {
+     "hour": 22,
+     "label": "phone in bed",
+     "seconds": 20.0,
+     "first": 3300,
+     "frames": 600
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 306.5
+  }
+ }
+}
