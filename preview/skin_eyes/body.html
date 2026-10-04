@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>skin and eyes on G2's body</title>
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// G2's final body (boy_g2.glb, rest pose) with the skin, eyes and hands from body.js, shot to match the real
+// reference photos in refs/ (render_body.py puts each panel beside its photo): an eye, a cheek patch, the back of the
+// right hand, the fingertips and nails. Lights: the room's colours (web/room.html), set per shot to the photo's side.
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { dressBody } from "./body.js";
+
+const W = 900, H = 675;
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.toneMapping = THREE.AgXToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+const key = new THREE.DirectionalLight(0xfff0dc, 3); scene.add(key, key.target);
+const fill = new THREE.DirectionalLight(0xe4ecff, 1); scene.add(fill, fill.target);
+const hemi = new THREE.HemisphereLight(0xfff1dd, 0x3a3028, 0.2); scene.add(hemi);
+
+window.__stage = "load";
+const gltf = await new GLTFLoader().loadAsync("boy_g2.glb");
+window.__stage = "dress";
+scene.add(gltf.scene);
+const info = dressBody(THREE, gltf.scene);
+window.__stage = "shots";
+scene.updateMatrixWorld(true);
+const M = info.skin.matrixWorld, wp = p => p.clone().applyMatrix4(M), wd = d => d.clone().transformDirection(M);
+
+// a point on the skin and its normal, nearest a guess (the cheek patch)
+function onSkin(guess){
+  const P = info.skin.geometry.attributes.position, N = info.skin.geometry.attributes.normal, v = new THREE.Vector3();
+  let best = 0, bd = 1e9; for (let i = 0; i < P.count; i++) { const d = v.fromBufferAttribute(P, i).distanceToSquared(guess); if (d < bd) { bd = d; best = i; } }
+  return {p: new THREE.Vector3().fromBufferAttribute(P, best), n: new THREE.Vector3().fromBufferAttribute(N, best)};
+}
+
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.005, 20);
+const panels = [];
+// light from the camera's side: (right, up, toward the camera) in the camera's frame
+function rig(dirKey, dirFill, {kc = 0xfff0dc, ki = 3, fc = 0xe4ecff, fi = 0.8, bg = 0x1b1916, env = 0.15, exp = 1.0, hemiI = 0.2} = {}){
+  const R = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), U = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1), B = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 2);
+  const at = d => R.clone().multiplyScalar(d[0]).addScaledVector(U, d[1]).addScaledVector(B, d[2]).normalize();
+  key.position.copy(at(dirKey)); key.target.position.set(0, 0, 0); key.color.set(kc); key.intensity = ki;
+  fill.position.copy(at(dirFill)); fill.target.position.set(0, 0, 0); fill.color.set(fc); fill.intensity = fi;
+  scene.background = new THREE.Color(bg); scene.environmentIntensity = env; renderer.toneMappingExposure = exp; hemi.intensity = hemiI;
+}
+function shot(pos, target, up, fov, light){
+  cam.fov = fov; cam.up.copy(up); cam.position.copy(pos); cam.lookAt(target); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+  rig(...light); renderer.render(scene, cam); window.__stage = "shot " + panels.length; panels.push(renderer.domElement.toDataURL("image/jpeg", 0.93));
+}
+const Y = new THREE.Vector3(0, 1, 0);
+
+// 1. the eye (his left), a little from the side, in warm lamp light from the upper left (the photo's light)
+{ const C = wp(info.eyes.l.center), d = new THREE.Vector3(0.28, 0.06, 1).normalize();
+  shot(C.clone().addScaledVector(d, 0.075), C.clone().add(new THREE.Vector3(0.002, 0.002, 0)), Y, 30,
+    [[-0.7, 0.6, 0.6], [0.8, -0.1, 0.5], {kc: 0xffb468, ki: 2.6, fc: 0xffc98a, fi: 0.5, env: 0.12, exp: 1.25}]); }
+// 2. a cheek patch (his left cheek, under the eye), 6 cm away, soft daylight from the side
+{ const e = info.eyes.l.center, s = onSkin(e.clone().add(new THREE.Vector3(0.012, -0.036, 0.0)));
+  const p = wp(s.p), n = wd(s.n);
+  shot(p.clone().addScaledVector(n, 0.055), p, Y, 30, [[-0.9, 0.5, 0.35], [0.6, 0.2, 0.7], {ki: 2.8, fi: 0.6}]); }
+// a dark cloth under the hand (the photo's table), only for the hand shot: it hides the rest of the body
+const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshStandardMaterial({color: 0x26262a, roughness: 0.95}));
+cloth.visible = false; scene.add(cloth);
+// 3. the back of his right hand, fingers to the left, thumb at the bottom, seen a little from the thumb's side
+{ const h = info.hands.R, c = wp(h.centre).addScaledVector(wd(h.fingers), 0.02), dz = wd(h.dorsal), f = wd(h.fingers), t = wd(h.thumb);
+  cloth.position.copy(c).addScaledVector(dz, -0.03); cloth.lookAt(c.clone().addScaledVector(dz, 1)); cloth.visible = true;
+  shot(c.clone().addScaledVector(dz, 0.34).addScaledVector(t, 0.12).addScaledVector(f, -0.05), c, t.clone().negate(), 30,
+    [[0.3, 0.8, 0.5], [-0.6, 0.2, 0.6], {ki: 2.6, fi: 0.7, bg: 0x2a2a2c, env: 0.2}]); cloth.visible = false; }
+// 4. the fingertips and the nails (middle and ring fingers), close, from above and in front of the tips
+{ const h = info.hands.R, f = wd(h.fingers), dz = wd(h.dorsal), t = wd(h.thumb);
+  const tip = wp(h.tips[3]).add(wp(h.tips[4])).multiplyScalar(0.5);
+  shot(tip.clone().addScaledVector(dz, 0.10).addScaledVector(f, 0.07).addScaledVector(t, 0.03), tip.clone().addScaledVector(f, -0.008), t.clone().negate(), 30,
+    [[-0.4, 0.8, 0.6], [0.7, -0.2, 0.5], {ki: 2.6, fi: 0.6, bg: 0xd9d2cc, env: 0.35, exp: 1.05}]); }
+
+window.__info = {eyeBox: info.eyes, eyes: info.eyes, lidLoops: info.lidLoops, hands: info.hands, landmarks: info.landmarks};
+window.__panels = () => panels;
+window.__done = true;
+</script></body></html>

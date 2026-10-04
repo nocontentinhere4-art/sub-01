@@ -29,6 +29,39 @@ clearcoat highlight) and stays on the lid margin.
 - `head.json`: the head of MakeHuman's `base.obj` (the `body` group above the neck, in metres, origin at
   `joint-head`, with its UVs), and the eye centres and radius from the `helper-l-eye` / `helper-r-eye` groups.
 
+## On G2's body, beside real photos
+
+`body_sheet.jpg`: G2's final body (`room_build/mh/glb/boy_g2.glb` on `preview/mh-motion`, rest pose) with this skin,
+these eyes and the hands, each row the render on the left and a real photo on the right at a similar angle and light:
+an eye, a cheek patch, the back of the right hand, the fingertips and nails.
+
+- `body.js`: `dressBody(THREE, gltf.scene)`. The skeleton, the rest pose and the vertex order are not touched (G2's
+  clips stay valid): the skin gets this material and three vertex attributes (colour, `skinData`, `handData`), all in
+  the mesh's bind-pose space so they move with it; G2's eye primitive is hidden and these eyes, lash and tear lines are
+  parented to the `Head` bone, at the centres of G2's eyeballs.
+- The hands (`handData`, and `sk_hand` in `skin_eyes.js`): each finger vertex knows where it sits along its finger (by
+  phalanx, from the finger bones), across it and toward the back of the hand (the hand's plane from its vertices, the
+  side from the thumb). Per pixel: the nail plate on the last phalanx (a curved cuticle, a pink bed, a paler lunula at
+  its base, a whitish free edge, a glossy thin coat), a darker, drier rim round it, fine creases over the joints on the
+  back and deep ones on the pad side, a slightly darker, pinker skin over the knuckles, redder fingertips.
+- `body.html` shoots the four panels; `render_body.py` serves the glb straight from G2's branch (`git show`, no copy
+  committed here), renders them and puts each beside its crop in `refs/`.
+
+Where it still differs from the photos: no fine body hair (the arm patch and the back of the hand in the photos
+have it); the hand is paler and less red than the photo's (an older man's hand; G2's boy is lighter-skinned, the
+tone is the one kept from the head passes); the photo's eye is a macro with a mirror-like cornea and a big room
+reflection, the render's cornea carries only a small highlight under the lamp.
+
+Real references (`refs/`, cropped and scaled to 900x675; no face is shown), all under the Pexels licence (free to use,
+modify and share, no attribution required; https://www.pexels.com/license/):
+
+| crop | photo | source |
+|---|---|---|
+| `refs/eye.jpg` | "Brown Human Eye" | https://www.pexels.com/photo/946727/ |
+| `refs/skin.jpg` | "A Person's Skin In Close-up View" | https://www.pexels.com/photo/4046562/ |
+| `refs/hand.jpg` | "Close-Up Photo of a Person's Hand" | https://www.pexels.com/photo/7298848/ |
+| `refs/nails.jpg` | "Human's Fingers in Close Up Photography" | https://www.pexels.com/photo/7479569/ |
+
 Sources and licences: the base mesh is MakeHuman 1.x `makehuman/data/3dobjs/base.obj` from
 github.com/makehumancommunity/makehuman. Its `LICENSE.md` section C puts the base mesh, proxies, targets and textures
 under CC0 1.0 (full text in `LICENSE.ASSETS.md`). No texture is used: the iris, the colour variation and the pores are
