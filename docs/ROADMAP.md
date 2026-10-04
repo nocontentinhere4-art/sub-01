@@ -312,6 +312,45 @@ the character, the camera, lighting) merges without the owner's OK on a preview 
 coordinator sends it to the owner and merges on his OK. AI4Animation was asked about and declined: research/education
 only, its mocap is CC BY-NC 4.0.
 
+**Pass 41 (2026-10-04 16:00 UTC): two coordinators.**
+- **Split:** the owner asked for two coordinators to go faster.
+  - A keeps the character track: G2, G6, G4, G11, G10d, the mocap retarget, the room preview and the live checks.
+  - B keeps the technical PRs, the Actions budget, this file and GitHub hygiene.
+- **Merged since pass 40:**
+  - #139 and #140: see pass 40.
+  - #141: the day-live restart log says why each pod died; pods never made don't burn the restart cap.
+  - #142: /api/screens keeps today's counts, last pages and notes across a deploy.
+  - #143: gpu_preview gets a per-shot hour and life state, a window-texture wait and a living-idles shot list.
+  - #144: walls:
+    - messaging and app pages are never opened;
+    - after a bot check, that site cools down for 6 h;
+    - finance pages need a title word.
+  - #145: a Spotify hit that matches a genre only through its album name is dropped.
+  - #146: desk video mix:
+    - at most 2 in a row from one channel;
+    - after 4 desk videos, a 5-minute break of pages;
+    - shopping lists last.
+  - #148: gpu-preview runs get a 600-minute pod-time cap (owner OK); other jobs keep 2 h.
+  - #147: gpu_preview:
+    - programs are compiled and textures uploaded per shot, so no dropped materials;
+    - a dropout check on encode;
+    - the canvas is reset;
+    - a lit desk-monitor stub, used in preview renders only (the live room is unchanged).
+    - Validated locally by B: pytest 1234 passed / 27 skipped, smoke OK, visual 5 passed.
+- **Decisions today:**
+  - CI skips docs-only changes. Workers push with `[skip ci]` and validate locally.
+  - CI runs once on main per merge. Budget: about 1,000 Actions minutes for 28 days, about 20 min per run.
+- **Waiting:**
+  - #135 (client-side player, the fix for the YouTube bot wall): owner's OK asked.
+  - #103: owner's choice, close-up camera or the current overhead view.
+  - #129: do not merge yet.
+  - #134: head 5a32f70 has a bed regression; not to be merged.
+  - #137: clearance, waiting for the owner's OK.
+  - #117, #131 and #138: A's track.
+- **Owner, GitHub settings:**
+  - update the repo description, which still says "wired to live Solana trades";
+  - enable "Automatically delete head branches".
+
 **Pass 40 (2026-10-04 05:30 UTC).**
 - **Merged since pass 39:**
   - Tests and fixes:
