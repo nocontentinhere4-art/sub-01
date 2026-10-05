@@ -593,7 +593,36 @@ OVERLAY_WALL = re.compile(
 
 def overlay_wall(body):
     """#89: an ad-block or paywall overlay's text in the page (it covers the content: not something to read)."""
-    return bool(OVERLAY_WALL.search(str(body or "")[:20000]))
+    return bool(OVERLAY_WALL.search(str(body or "")[:40000]))
+
+
+# #89 live (2026-10-05 11:08 Tokyo, his phone): sciencenews.org's "Looks like your ad blocker is on" modal stayed on
+# screen. The page's first 20000 characters of text do not reach a modal appended at the end of a long article, and
+# a modal can live in a shadow root or a script-written frame. Read: the start and end of the text, every visible
+# dialog / fixed / sticky box (also inside open shadow roots), and (in Python) the page's child frames.
+OVERLAY_TEXT_JS = """() => {
+  const out = [], b = document.body ? (document.body.innerText || '') : '';
+  out.push(b.slice(0, 20000));
+  if (b.length > 20000) out.push(b.slice(-8000));
+  const shown = el => { const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    return r.width >= 100 && r.height >= 30 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.05; };
+  let n = 0;
+  const walk = (root, depth) => {
+    for (const el of root.querySelectorAll('*')) {
+      if (++n > 20000 || out.length > 60) return;
+      if (el.shadowRoot && depth < 4) {
+        for (const c of el.shadowRoot.children) if (c.innerText && shown(c)) out.push(c.innerText.slice(0, 3000));
+        walk(el.shadowRoot, depth + 1);
+      }
+      const role = (el.getAttribute('role') || '').toLowerCase();
+      const box = el.tagName === 'DIALOG' ? el.open : role === 'dialog' || role === 'alertdialog'
+        || el.getAttribute('aria-modal') === 'true' || ['fixed', 'sticky'].includes(getComputedStyle(el).position);
+      if (box && shown(el)) { const t = el.innerText || ''; if (t.length < 3000) out.push(t); }
+    }
+  };
+  walk(document, 0);
+  return out.join('\\n').slice(0, 40000);
+}"""
 
 
 def challenge_title(title, url):
@@ -2012,7 +2041,9 @@ class Browser:
         if not url_ok(page.url):                                       # redirected somewhere it must not be
             self.last_skip = "did not load" if page.url.startswith("chrome-error:") else "guard"
             return await self._leave(sc)
-        await self._dismiss(sc)
+        over = await self._overlay_walled(page)                        # before any banner is pressed or hidden:
+        if not over:                                                   # an ad-block / paywall modal is never closed
+            await self._dismiss(sc)
         await page.add_style_tag(content=HIDE_BANNERS)
         await page.evaluate(UNBLOCK_JS)
         if not url_ok(page.url):
@@ -2028,7 +2059,7 @@ class Browser:
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
                   else "bot wall" if challenge_title(page_title, page.url) or await self._walled(page, body)
-                  else "overlay wall" if overlay_wall(body)
+                  else "overlay wall" if over or overlay_wall(body) or await self._overlay_walled(page)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
                   or await self._login_walled(page, body) else None)
         if reason and sc.site:                                         # why a logged-in feed shows nothing
@@ -2221,6 +2252,24 @@ class Browser:
             await page.evaluate(VO.HIDE_ACCOUNT_JS)
         return True
 
+    async def _overlay_walled(self, page):
+        """#89: an ad-block or paywall overlay on the page: in its text (start and end), a dialog or fixed box (also in
+        a shadow root), or a child frame (a script-written or same-site one; cross-site frames are not loaded)."""
+        texts = []
+        for frame in [None] + [f for f in list(getattr(page, "frames", None) or []) if f is not page.main_frame]:
+            if frame is not None:
+                fu = getattr(frame, "url", "") or ""
+                if YOUTUBE_HOST.search(urllib.parse.urlsplit(fu).hostname or "") or SV.is_tiktok(
+                        urllib.parse.urlsplit(fu).hostname or ""):
+                    continue                                            # the players' frames: not overlays
+            try:
+                texts.append(await asyncio.wait_for((frame or page).evaluate(OVERLAY_TEXT_JS), 3))
+            except Exception:                                           # a detached or slow frame
+                continue
+            if len(texts) > 8:
+                break
+        return any(overlay_wall(t) for t in texts if isinstance(t, str))
+
     def _cool(self, url, seconds):
         """#89: a site that showed a bot check or an overlay wall is not opened again for `seconds`."""
         h = (urllib.parse.urlsplit(url or "").hostname or "").lower().removeprefix("www.")
@@ -2233,11 +2282,7 @@ class Browser:
             print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
             await self._leave(sc)
             return False
-        try:                                                            # ... or get an ad-block / paywall overlay
-            body = await sc.page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
-        except Exception:
-            body = ""
-        if overlay_wall(body):
+        if await self._overlay_walled(sc.page):                         # ... or get an ad-block / paywall overlay
             print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (overlay wall)", flush=True)
             self.last_skip = "overlay wall"
             self._cool(sc.page.url, OVERLAY_COOLDOWN_S)
