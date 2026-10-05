@@ -1,7 +1,8 @@
 // Contact checks for the room upgrade (preview/room-upgrade): his skin against the desk chair, the keyboard, the mouse and
 // the game controller, vertex by vertex, frame by frame, in the page's own states (?debug: act(), live(), mh.show()).
 // Each object is turned into columns of inside-intervals in its own frame (vertical rays every CELL metres through its
-// closed meshes), so a point is inside when it lies between an entry and the next exit under/over it. Run by
+// closed meshes), so a point is inside when it lies between an entry and the next exit under/over it. A chair that is not
+// closed (the owner's Tripo chair) is tested through a signed distance grid instead (--chair-sdf, tests/visual/chair_sdf.py). Run by
 // tests/visual/contacts.py; it reports, per scenario, every penetrating (vertex, frame) with its depth and its bone.
 (() => {
   const CELL = 0.005, EPS = 0.0005;
@@ -31,6 +32,10 @@
     return {node, x0: bb.min.x, z0: bb.min.z, nx, nz, cols, odd, inv: new THREE.Matrix4()};
   }
   function inside(o, p) {                                // depth (m) of a world point inside the object, else 0
+    if (o.sdf) { const g = o.sdf, u = p.clone().applyMatrix4(o.inv);   // (a signed distance grid, mm, in the chair's frame)
+      const i = Math.round((u.x - g.lo[0]) / g.step), j = Math.round((u.y - g.lo[1]) / g.step), k = Math.round((u.z - g.lo[2]) / g.step);
+      if (i < 0 || j < 0 || k < 0 || i >= g.dims[0] || j >= g.dims[1] || k >= g.dims[2]) return 0;
+      const d = g.data[(i * g.dims[1] + j) * g.dims[2] + k]; return d < -g.tol ? -d / 1000 : 0; }
     if (o.subs) { let d = 0; for (const s of o.subs) { s.inv.copy(o.inv); d = Math.max(d, inside(s, p)); } return d; }
     const u = p.clone().applyMatrix4(o.inv), i = Math.round((u.x - o.x0) / CELL), k = Math.round((u.z - o.z0) / CELL);
     if (i < 0 || k < 0 || i >= o.nx || k >= o.nz) return 0;
@@ -62,7 +67,10 @@
     build() {
       const D = roomDbg(), ch = D.chairNode(), keep = ch && [ch.position.clone(), ch.rotation.y];
       // the chair: one set of columns per closed part (its parts overlap where they join: parity holds within each)
-      if (ch) { const p = new THREE.Vector3(), r = D.chairAt(0, p); ch.position.copy(p); ch.rotation.y = r; ch.updateMatrixWorld(true);
+      if (ch && window.__chairSDF) { const g = window.__chairSDF, b = atob(g.b64), a = new Int8Array(b.length);
+        for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i) << 24 >> 24;
+        objs.chair = {node: ch, sdf: {lo: g.lo, step: g.step, dims: g.dims, data: a, tol: g.tol}, odd: 0, nx: g.dims[0] * g.dims[1] * g.dims[2], nz: 1, inv: new THREE.Matrix4()}; }
+      else if (ch) { const p = new THREE.Vector3(), r = D.chairAt(0, p); ch.position.copy(p); ch.rotation.y = r; ch.updateMatrixWorld(true);
         const subs = []; for (const c of ch.children) { const prev = c.parent; const o = columnsOf(c, ch); if (o) subs.push(o); }
         objs.chair = {node: ch, subs, odd: subs.reduce((a, s) => a + s.odd, 0), nx: subs.reduce((a, s) => a + s.nx * s.nz, 0), nz: 1, inv: new THREE.Matrix4()};
         ch.position.copy(keep[0]); ch.rotation.y = keep[1]; ch.updateMatrixWorld(true); }

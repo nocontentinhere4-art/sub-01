@@ -25,7 +25,20 @@ def test_office_chair_seat_is_052_and_light():
     names = {nd.get("name") for nd in j["nodes"]}
     for part in ("cushion", "back_frame", "back_mesh", "arms", "base", "casters"):
         assert "chair_" + part in names                                          # (one closed mesh per part)
-    assert 'load("room/chair_office.glb")' in HTML and "n.userData.raised = true" in HTML   # (not lifted again by raiseChair)
+    assert '["chair_office.glb", "chair_office"]' in HTML and "n.userData.raised = true" in HTML   # (?chair=code; not lifted again)
+
+
+def test_owner_chair_is_the_default_at_052():
+    data, j = glb("chair_owner.glb")                                              # (preview/chair-tripo: his Tripo chair, repaired)
+    assert len(data) <= 1024 * 1024 and 0 < tris(j) <= 60000
+    node = next(nd for nd in j["nodes"] if nd.get("name") == "chair_owner")
+    assert node["extras"]["seatTop"] == 0.52 and node["extras"]["back"] == 0.05
+    a = j["accessors"][j["meshes"][0]["primitives"][0]["attributes"]["POSITION"]]
+    k = 32767 if a.get("normalized") else 1                                       # (quantised: int16, the node's scale undoes it)
+    s, t = node.get("scale", [1, 1, 1])[1], node.get("translation", [0, 0, 0])[1]
+    lo, hi = a["min"][1] / k * s + t, a["max"][1] / k * s + t
+    assert abs(lo) < 0.01 and 1.2 <= hi <= 1.3, (lo, hi)                          # (on the floor, 1.2-1.3 m tall)
+    assert '["chair_owner.glb", "chair_owner"]' in HTML and 'load("room/" + CHAIR_SET[0])' in HTML
 
 
 def test_picked_props_only_the_approved_ones():

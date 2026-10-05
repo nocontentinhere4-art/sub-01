@@ -338,3 +338,11 @@ Owner-approved pieces from the props previews, a new desk chair, and the clothes
   sneakers standing by the door, modelled in code for preview/props-soft (`props_soft.py`), CC0, no brand.
 - Taken out at load (`web/room.html`, UPGRADE_DROP): the hoodie on the door, the jeans on the floor, and the T-shirt with the
   grey floor cushion under it. Their baked shadows are lightened out of the floor's occlusion map.
+
+## The owner's chair (preview/chair-tripo)
+- `chair_owner.glb` (`room_build/fbx2ply.mjs` -> `room_build/chair_owner_repair.py` -> `room_build/build_chair_owner.mjs`):
+  the office chair the owner generated on Tripo (https://www.tripo3d.ai), used under Tripo's terms of service; the
+  owner's export is `docs/design/chair-tripo/chair_owner_raw.fbx`. The letter-shaped holes and dents Tripo put on the backrest, the
+  lumbar pad, the headrest and the back of the mesh frame are covered over with new smooth surface; nothing else in the
+  model is changed. Scaled to a 0.52 m seat, turned to face the desk and placed in the room's `chair` node. Until its
+  textures arrive it has a plain dark material. `?chair=code` shows the code-built `chair_office.glb` instead.

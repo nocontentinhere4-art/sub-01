@@ -616,18 +616,23 @@ if (TRIPO) Promise.all([load("room/props_picked.glb"), load("room/sneakers_door.
   for (const g of [pg, sg]) { g.scene.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
     m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; }); scene.add(g.scene); }
 }).catch(e => console.warn("room upgrade props", e));
-// the new desk chair (room_build/build_chair.mjs: an office chair modelled in code, its seat 0.52 m over the floor where he
-// sits): its meshes go into the room's own "chair" node in place of the old ones, so the node, its place and everything
-// that moves it (CHAIR: pulled out, swivelled, ridden in, left where his legs push it) stay as they are. Built at 0.52 m,
-// boy_mh.js's raiseChair() (the old chair's 1.6 cm lift) must not raise it again: marked raised
-if (TRIPO) Promise.all([load("room/chair_office.glb"),
+// the desk chair: the office chair the owner made on Tripo (room_build/chair_owner_repair.py took the letter-shaped holes
+// out, build_chair_owner.mjs scaled it to a 0.52 m seat, turned it to face -z and set its gas lift on the pivot, 5 cm
+// back). It goes into the room's own "chair" node in place of the old meshes, so the node, its place and everything that
+// moves it (CHAIR: pulled out, swivelled, ridden in, left where his legs push it) stay as they are. Built at 0.52 m,
+// boy_mh.js's raiseChair() (the old chair's 1.6 cm lift) must not raise it again: marked raised. ?chair=code: the chair
+// modelled in code (chair_office.glb) instead
+const CHAIR_SET = new URLSearchParams(location.search).get("chair") === "code" ? ["chair_office.glb", "chair_office"] : ["chair_owner.glb", "chair_owner"];
+if (TRIPO) Promise.all([load("room/" + CHAIR_SET[0]),
   new Promise(ok => { const wait = () => room && chairNode() ? ok() : setTimeout(wait, 100); wait(); })]).then(([cg]) => {
-  const n = chairNode(), src = cg.scene.getObjectByName("chair_office"); if (!n || !src) return;
+  const n = chairNode(), src = cg.scene.getObjectByName(CHAIR_SET[1]); if (!n || !src) return;
   for (const c of [...n.children]) n.remove(c);
-  for (const c of [...src.children]) { c.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
-    m.material.envMap = scene.environment; m.material.envMapIntensity = m.material.name === "chair_chrome" ? 1.0 : 0.5; }); n.add(c); }
+  const parts = src.isMesh ? [src] : [...src.children];             // (one mesh, or a node of parts)
+  for (const c of parts) { c.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = m.material.name === "chair_chrome" ? 1.0 : 0.5; });
+    n.add(c); }                                                       // (its own transform: the quantisation's offset and scale)
   n.userData.raised = true; n.updateMatrixWorld(true); VOX = null;
-}).catch(e => console.warn("chair_office.glb", e));
+}).catch(e => console.warn(CHAIR_SET[0], e));
 // the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C
 // (tex_prep.py: x 683..1024 of 1024, y 0..341 of 512)
 if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"),

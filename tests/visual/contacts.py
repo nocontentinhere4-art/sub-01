@@ -37,6 +37,8 @@ def main():
     ap.add_argument("--stride", type=int, default=2)
     ap.add_argument("--every", type=int, default=1)
     ap.add_argument("--only", default="")
+    ap.add_argument("--chair-sdf", default="", help="a signed distance grid of the chair (tests/visual/chair_sdf.py) for its test, in place of ray parity")
+    ap.add_argument("--chair-tol-mm", type=int, default=2)
     ap.add_argument("--occupancy", default="", help="instead of the checks: write where his skin goes in the chair's frame (JSON)")
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -48,6 +50,12 @@ def main():
         h.browser = p.chromium.launch(executable_path=CHROMIUM, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
         ctx, pg, st = h.open("1280"); h.goto_scene(pg, "desk", 14)
         pg.wait_for_function("() => !window.mh || window.mh.ready", timeout=120000)
+        if a.chair_sdf:                                    # (a generated chair is not closed: its grid instead)
+            import base64
+            import numpy as np
+            z = np.load(a.chair_sdf)
+            pg.evaluate("(g) => { window.__chairSDF = g; }", {"b64": base64.b64encode(z["sd"].astype(np.int8).tobytes()).decode(), "lo": z["lo"].tolist(),
+                                                              "step": float(z["step"]), "dims": list(z["sd"].shape), "tol": a.chair_tol_mm})
         pg.add_script_tag(path=str(Path(__file__).with_name("contacts.js")))
         report["objects"] = pg.evaluate("__contacts.build()")
         for label, setup, secs in SCENARIOS:
