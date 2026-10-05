@@ -370,6 +370,14 @@ only, its mocap is CC BY-NC 4.0.
       neurochemistry, what CT teaches her.
     - **Step 1 (B):** find the scan, build her connectome with the v1 dipy pipeline on CPU, simulate a day of both,
       and bring the owner the numbers.
+    - **Step 1 result (B, offline, rate model, no slow layer, 300 votes per brain on 12 option kinds):**
+      - Her scan: OpenNeuro ds002785 (AOMIC-PIOP1) sub-0001, CC0, adult female. Connectome v1 (dipy) gives
+        214 regions, 6,147 edges.
+      - Him vs her: preference profile r = 0.995; choice shares differ by 3.7 %. That is less than the same brain
+        with another noise seed (7–8 %), and less than his own rewired brain (12.7 %).
+      - Both pick games, then chess, memes and music.
+      - Conclusion: the scan alone gives no visible difference. A different personality must come from her
+        profile.
   - CI skips docs-only changes. Workers push with `[skip ci]` and validate locally.
   - CI runs once on main per merge. Budget: about 1,000 Actions minutes for 28 days, about 20 min per run.
 - **Waiting:**
