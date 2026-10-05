@@ -4,7 +4,7 @@ f=np.load('bust_fit.npy'); s=f[0]; R=f[1:10].reshape(3,3); t=f[10:13]; CUT=float
 P=np.fromfile('bust_pos.bin',np.float32).reshape(-1,3).astype(np.float64); Q=s*P@R.T+t
 c=np.array([Q[(Q[:,1]>0.83)&(Q[:,1]<0.84),0].mean(),Q[(Q[:,1]>0.83)&(Q[:,1]<0.84),2].mean()])
 rr=np.hypot(Q[:,0]-c[0],Q[:,2]-c[1])
-keep=(Q[:,1]>CUT)&~((Q[:,1]<float(os.environ.get('SHY','0.845')))&(rr>float(os.environ.get('SHR','0.05')))&(Q[:,0]<c[0]+0.03))   # no shoulders: neck only below the jaw line
+keep=(Q[:,1]>CUT)&~((Q[:,1]<float(os.environ.get('SHY','0.845')))&(rr>float(os.environ.get('SHR','0.05')))&((Q[:,0]<c[0]+0.03)|(Q[:,1]<float(os.environ.get('FRY','0.0')))))   # no shoulders: neck only below the jaw line
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath='../v5/bust3d.glb')
 ob=[o for o in bpy.context.scene.objects if o.type=='MESH'][0]; me=ob.data; assert len(me.vertices)==len(Q)

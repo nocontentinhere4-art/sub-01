@@ -1,4 +1,4 @@
-# Character v5: a Tripo bust with a natural neck on the Tripo body (candidate next to v4)
+# Character v5: a Tripo bust with a natural neck on the Tripo body (chosen by the owner)
 
 AI-generated content, made with Tripo (tripo3d.ai, paid API) and used under Tripo's terms of service. The character is
 an original fictional ~20-year-old man, not a real person, with no brands or logos. Preview only: nothing here is used
@@ -36,12 +36,24 @@ Balance: 1275 before, 1180 after. Commands: `python room_build/tripo_char.py edi
    upper spine, clavicles). The body's old head, neck and hair are removed, and the hood is kept whole. Built with
    `MATTE=0.8 node room_build/build_char_tripo.mjs`.
 
+## Final polish (after the owner chose v5)
+
+- **Skin-coloured chip on the hood edge:** removed. The bust's shoulder remnants below the jaw line are cut all the way
+  round (`stage1b.py`, `FRY=0.826`).
+- **Skin tone:** a gentle shift toward the reference's neutral light skin, on skin texels only: saturation x0.82, a
+  touch less red and more blue, brightness x1.03 (`fixskin.py`, bust texture only).
+- **Nostrils:** the dark texels around and under the nose tip are moved 35% toward the local skin colour. The mesh
+  holes are filled in `stage1b.py`.
+- **Inner hood rim:** the light lining texels near the neck are clamped to the hoodie tone (`weights_full.py`,
+  `LIN=4`).
+
 ## QA
 
 - `qa/quick_preview.webp`: front, 3/4 and profile at face distance, an idle frame, a walk frame, and the full body.
 - `qa/neck_seam.webp`: the neck and hood from the front, 3/4, side and back.
 - `qa/anim_face.webp`: two idle and two walk frames at face distance.
-- `qa/face_ref_v4_bust.webp`: the reference, the v4 head (the owner's) and the bust, at the same cameras.
+- `qa/face_compare.webp`: reference | v5 (final), front, 3/4 a, 3/4 b.
+- `qa/face_ref_v4_bust.webp`: the reference, the v4 head (the owner's) and the bust before the polish, at the same cameras.
 
 **Better than v4.** A natural neck of normal length runs into a round dark T-shirt collar inside the hoodie, with no
 seam from any angle and none in the clips.
@@ -53,4 +65,4 @@ but:
 - the nostrils read darker and heavier from the front;
 - the hair is a little less defined.
 
-**Left:** a few light-grey wisps on the inner hood rim, close up only.
+**Left:** faint grey shading on the inner hood near the neck, close up only.

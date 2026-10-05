@@ -23,7 +23,8 @@ const np = doc.createPrimitive()
   .setIndices(doc.createAccessor().setType("SCALAR").setArray(hidx).setBuffer(buf));
 const hm = hp.getMaterial(), mat = doc.createMaterial("owner_head").setRoughnessFactor(0.8).setMetallicFactor(0);
 const tex = (t, n) => t && doc.createTexture(n).setImage(t.getImage()).setMimeType(t.getMimeType());
-mat.setBaseColorTexture(tex(hm.getBaseColorTexture(), "head_base"));
+const hbf = `${WD}/head_base_fix.jpeg`;
+mat.setBaseColorTexture(fs.existsSync(hbf) && process.env.HEADFIX ? doc.createTexture("head_base").setImage(fs.readFileSync(hbf)).setMimeType("image/jpeg") : tex(hm.getBaseColorTexture(), "head_base"));
 const nrmFile = `${WD}/head_normal_baked.png`;
 if (hm.getNormalTexture()) mat.setNormalTexture(tex(hm.getNormalTexture(), "head_normal"));
 else if (fs.existsSync(nrmFile)) mat.setNormalTexture(doc.createTexture("head_normal").setImage(fs.readFileSync(nrmFile)).setMimeType("image/png"));
