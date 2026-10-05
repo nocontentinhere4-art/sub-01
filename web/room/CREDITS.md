@@ -182,7 +182,7 @@ to 1024 px WebP and meshopt-compresses the lot (3.8k–4.6k triangles a prop). T
     node build_tripo.mjs <folder> ../web/room/props_tripo.glb
 
 ## The Tripo props, second batch: made with Tripo (paid API)
-`props_tripo2.glb` holds eighteen props **made with Tripo (paid API)** (https://www.tripo3d.ai), model `P1-20260311`, PBR,
+`props_tripo2.glb` holds sixteen props **made with Tripo (paid API)** (https://www.tripo3d.ai), model `P1-20260311`, PBR,
 standard textures, generated on 2026-10-04 (AI-generated content under Tripo's terms of service, not a Creative Commons
 licence). Most came from text prompts asking for plain, unbranded objects. The desk lamp and the floor plant came from
 images (image-to-model): Poly Haven's own renders of the CC0 models they replace, `desk_lamp_arm_01` (Yann Kervran,
@@ -199,8 +199,6 @@ skateboard's graphic an original pattern; no brands, logos or characters of othe
 | black canvas backpack | by the bed (the modelled one, cut out) | `b7b15962-24d0-4d99-85c7-05d09cf4748b` |
 | floor fan | by the door (the modelled one, cut out) | `5b704311-1409-4b14-ba67-a71988047dc1` |
 | waste bin with a liner | under the desk (the modelled one and its stickers, cut out) | `b52a9f88-6d94-4244-a2f1-19f37250e268` |
-| game controller (generic) | the desk (the modelled one, cut out) | `39586f31-cc3e-488b-8454-533df47ffed9` |
-| computer monitor | the desk; fitted around the page's live screen, which stays the page's own quad (the modelled one, cut out) | `40a67c5e-c2f0-4b5f-8a05-b6cba29fc020` |
 | bookshelf speaker, used for the pair | the desk (the modelled pair, cut out) | `ae7531ac-6f5e-4ca1-bc85-3fc761223e7b` |
 | skateboard | new, on the floor by the door, wheels up | `fd5e06a2-38c1-402c-bbe1-78bb7deb0d2e` |
 | game console (generic) | new, the desk's back | `b08f7166-7a2e-4538-86e6-e3a05838fb38` |
@@ -214,14 +212,16 @@ below took its place, built to the profile his hand is solved against); a first 
 (`21b4442f-4fc2-408b-81a5-d911bb16337a`); a first plant, with purple leaves (`2df53e11-6008-4f00-9d52-2b3452078f93`); a
 keyboard, built on a wedge with letters on its keys (`64db3634-167d-498a-8589-9140e01b7782`; the modelled keyboard stays,
 his typing is aimed at it); an office chair (`5af3f609-8dc7-4815-996f-6c9cd2f27247`; the modelled chair stays, his sitting
-poses and resting hands are fitted to it). His phone stays too: the one he holds is the hand-and-phone mesh above.
+poses and resting hands are fitted to it); a game controller (`39586f31-cc3e-488b-8454-533df47ffed9`) and a computer monitor
+(`40a67c5e-c2f0-4b5f-8a05-b6cba29fc020`), both replaced by ones modelled in code (below). His phone stays too: the one he
+holds is the hand-and-phone mesh above.
 
 `room_build/build_tripo2.mjs` scales and turns each, puts it in its place in the room and joins them all into one mesh
 (the lamp kept apart, out of its own light's shadow map) with one material, its maps packed in atlases (a 512 px tile per
 prop), WebP, meshopt. The page puts it in and hides or cuts out what it replaces (`web/room.html`, "Tripo props");
 `?props=old` shows the earlier room. Rebuild, from `room_build/`, with the raw GLBs in a folder:
 
-    node build_tripo2.mjs <folder> ../web/room/props_tripo2.glb
+    node build_tripo2.mjs <folder> ../web/room/props_tripo2.glb controller,monitor
 
 The keyboard is the tenkeyless one modelled in `room_clean.glb` (above); the page cuts its triangles out of the joined
 static mesh into a group of its own named `keyboard` (origin: the middle of F and J on the desk top), so nothing about its
@@ -233,6 +233,16 @@ installed: a full-size keyboard modelled in code (`room_build/build_keyboard.mjs
 Tripo (paid API, image-to-model from renders of the code-made ones; keyboard task `0c5caa4a-9169-4ed7-bbfc-f90cd06883be`,
 mouse task `926e444c-4a59-4b34-b318-db6d3f72f95a`, fitted by `room_build/build_kbm_tripo.mjs`); the Tripo mouse is kept
 as `mouse_tripo.glb` for comparison (`?debug&kb=tripo`).
+
+The game controller (`controller.glb`) and the monitor (`monitor.glb`), both from `room_build/build_desk_tech.mjs`, are
+modelled in code for this project, CC0, with no maker's shape or logo. The controller is a generic modern gamepad, 15.4 ×
+10.4 × 5.6 cm, resting on its grips: two analogue sticks with knurled concave caps on rubber boots, a D-pad, four plain face
+buttons, two menu buttons and a round centre button, bumpers and triggers, matte dark plastic with glossier buttons. The
+monitor's panel is fitted around the page's live screen (SURF_monitor, 0.64 × 0.37 m) with 6 mm bezels, a 14 mm chin and a
+glossy rim. Behind it are a tapered rear housing with vent slots, a port bay and a VESA plate, a hinge, a flat dark-metal
+neck with a cable hole and a flat rounded foot. Its cable runs down behind the neck and over the desk's back edge. Both use
+ambientCG's **Plastic 016 A** (CC0 1.0) via `desk_pbr.mjs`. When the screen is off, the page gives it an anti-glare finish
+that faintly reflects the room.
 
 The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
 page paints it over the record sleeve in the posters atlas.
