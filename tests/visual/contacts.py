@@ -34,6 +34,19 @@ SCENARIOS = [  # label, setup (JS), seconds: the live character's seated clips a
     ("sitting down at the desk", "act('window'); for (let i = 0; i < 30; i++) animate_(1/30); live('research', {screen: {device: 'desk', id: 'p2', kind: 'page'}})", 16),
 ]
 
+MH_DESK = "act('research', {screen: {device: 'desk', id: 'p1', kind: 'page'}})"
+SCENARIOS_MH = [  # the room clips under room/boy_mh.js (preview/room-mh; v5 on preview/room-v5): label, setup (JS), seconds or an act clip
+    ("desk typing", "act('research', {screen: {device: 'desk', id: 'q1', kind: 'page', query: 'ramen near kichijoji'}})", 10),
+    ("desk mouse", "act('chart', {screen: {device: 'desk', id: 'c1', kind: 'page'}})", 8),
+    ("desk watch", "act('watch_video', {screen: {device: 'desk', id: 'v1', kind: 'video'}})", 6),
+    ("room_read", MH_DESK + "; for (let i = 0; i < 30; i++) animate_(1/30); mh.show('read')", "read"),
+    ("room_phone", MH_DESK + "; for (let i = 0; i < 30; i++) animate_(1/30); mh.show('phone')", "phone"),
+    ("room_phone_scroll", MH_DESK + "; for (let i = 0; i < 30; i++) animate_(1/30); mh.show('phone_scroll')", "phone_scroll"),
+    ("eating at the desk", "act('eat', {eating: 'ramen', food: 1})", 8),
+    ("bedtime: stretch, get up, to bed", MH_DESK + "; for (let i = 0; i < 60; i++) animate_(1/30); live('sleep', {activity: 'sleep'})", 22),
+    ("getting up to the window", MH_DESK + "; for (let i = 0; i < 60; i++) animate_(1/30); live('window', {activity: 'window'})", 12),
+    ("sitting down at the desk", "act('window'); for (let i = 0; i < 30; i++) animate_(1/30); live('research', {screen: {device: 'desk', id: 'p2', kind: 'page'}})", 16),
+]
 
 def main():
     ap = argparse.ArgumentParser()
@@ -62,7 +75,8 @@ def main():
                                                               "step": float(z["step"]), "dims": list(z["sd"].shape), "tol": a.chair_tol_mm})
         pg.add_script_tag(path=str(Path(__file__).with_name("contacts.js")))
         report["objects"] = pg.evaluate("__contacts.build()")
-        for label, setup, secs in SCENARIOS:
+        mh = pg.evaluate("() => !!window.mh")                       # (boy_mh.js drives him: its clips' scenarios)
+        for label, setup, secs in (SCENARIOS_MH if mh else SCENARIOS):
             if a.only and a.only not in label:
                 continue
             if isinstance(secs, str):                      # a showcase clip: one loop of it

@@ -332,3 +332,11 @@ Owner-approved pieces from the props previews and the clothes the owner turned d
   black upholstery from ambientCG's **Fabric 030** (CC0 1.0, https://ambientcg.com/a/Fabric030); the plastic's roughness
   from ambientCG's **Plastic 006** (CC0 1.0, https://ambientcg.com/a/Plastic006). Matched to two CC0 photos
   (`docs/design/chair-tripo/real_reference.jpg`, WordPress Photo Directory: Ohidul Islam, Manjil Aryal).
+
+## Character v5 in the room (preview/room-v5, an integration preview)
+| file | source | licence |
+|---|---|---|
+| `char_v5.glb` (for now the placeholder `docs/design/char-tripo-v5/char_tripo_v5.glb` from preview/char-tripo-v2, turned to face +z) | the v5 character: AI-generated with Tripo (tripo3d.ai, paid API), an original fictional young man, no brands | Tripo's terms of service |
+| `mh_v5/*.glb` (the room clips retargeted onto v5, by G14; the same names as preview/room-mh's `mh/`) | preview/mh-motion's clips, retargeted | as their sources |
+| `mh/props_g2.json` (the activity clips' placeholder props and the door / window keys) | preview/mh-motion `room_build/mh/glb/clips_g2/props_g2.json` | made for this project, CC0 |
+| `boy_mh.js` (the clip player and the room choreography: desk modes, sit / stand, the chair pulled and pushed, routes) | preview/room-mh (G3, G10d) | this project's code |

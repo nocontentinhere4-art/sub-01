@@ -49,6 +49,23 @@ SCENES = {
     "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "m_window"),
 }
 # the hour each scene is shot at in the core set, and the full matrix
+# preview/room-mh: when room/boy.glb is the MakeHuman rig (web/room/boy_mh.js drives it with its own clips) pose()
+# reports these instead: the desk modes (desk_type_ik / desk_mouse_ik / desk_watch), the stand and the lie stills, the
+# recorded walk loop; eating plays room_eat, asleep he lies as room_bedtime ends (mh_sleep)
+MH_CLIP = {"desk": "desk_", "eating": "room_eat", "sleeping": "mh_sleep", "sleeping_side": "mh_sleep", "phone": "mh_lie",
+           "door": "mh_stand", "walking": "room_walk", "window": "mh_stand"}
+
+
+def makehuman_rig():
+    """room/boy.glb is the MakeHuman rig (163 bones, fingers named metacarpal1.L ...)."""
+    import json, struct
+    from pathlib import Path
+    raw = (Path(__file__).resolve().parents[2] / "web" / "room" / "boy.glb").read_bytes()
+    n = struct.unpack_from("<I", raw, 12)[0]
+    g = json.loads(raw[20:20 + n])
+    return any(nd.get("name") == "metacarpal1.L" for nd in g.get("nodes", []))
+
+
 NATURAL_HOUR = {"desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
 HOURS = (8, 14, 19, 23)
 SIZES = {"1280": (1280, 800, False), "390": (390, 844, True)}

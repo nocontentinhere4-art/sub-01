@@ -1,0 +1,53 @@
+// Character v5 in the room (preview/room-v5): room/char_v5.glb (the Tripo v5 character, 41 bones, faces +X; fingers
+// later) driven by room/boy_mh.js with the room clips retargeted onto it (room/mh_v5/, the same names as room/mh/;
+// G14's room_build/kimodo/mh_retarget.mjs on preview/anim-kimodo).
+//
+// boy_mh.js was written for the MakeHuman rig: its bones' names (Hips, LeftUpLeg, ...), its clips in the body's own frame
+// (feet at y = 0, facing +z, metres; Hips.position the hips' place in it). v5 is made to look the same to it:
+//   - the rig is turned to face +z (a group turned -90 deg about y: G14's "v5 root at MH heading - 90 deg");
+//   - its Hip is hung straight under that group, keeping its world transform (the skin follows the bones themselves, so
+//     nothing moves), so a Hip.position is in the body's frame, like the MakeHuman Hips'; each clip's Hip tracks are
+//     carried into that frame (through the Armature's scale and the Z-up Root's turn) and the Root's dropped;
+//   - the bones G3's code names get the MakeHuman names (G14's map, the other way), in the rig and in the clips' tracks.
+// Bones without a MakeHuman counterpart (the twist bones, Pelvis, Waist, Spine01, NeckTwist02) keep their v5 names.
+
+export const TO_MH = {Hip: "Hips", Spine02: "Spine", NeckTwist01: "neck", Head: "Head"};
+for (const [s, S] of [["L", "Left"], ["R", "Right"]])
+  Object.assign(TO_MH, {[`${s}_Clavicle`]: `${S}Shoulder`, [`${s}_Upperarm`]: `${S}Arm`, [`${s}_Forearm`]: `${S}ForeArm`, [`${s}_Hand`]: `${S}Hand`,
+    [`${s}_Thigh`]: `${S}UpLeg`, [`${s}_Calf`]: `${S}Leg`, [`${s}_Foot`]: `${S}Foot`, [`${s}_ToeBase`]: `${S}ToeBase`});
+
+// the loaded glTF (g.scene: the v5 rig) made into the body boy_mh.js expects; returns the conversion for its clips
+export function prep(THREE, g) {
+  const sc = g.scene, turn = new THREE.Group(); turn.name = "v5_turn"; turn.rotation.y = -Math.PI / 2;
+  for (const c of [...sc.children]) turn.add(c);
+  sc.add(turn); sc.updateMatrixWorld(true);
+  const hip = sc.getObjectByName("Hip"), root = hip && hip.parent;
+  if (!hip) throw new Error("char_v5: no Hip bone");
+  // a Hip value in the Root's frame -> in the turned group's: M = turn^-1 * Root (world matrices, the scene at rest)
+  const M = new THREE.Matrix4().copy(turn.matrixWorld).invert().multiply(root.matrixWorld);
+  const mp = new THREE.Vector3(), mq = new THREE.Quaternion(), ms = new THREE.Vector3(); M.decompose(mp, mq, ms);
+  turn.attach(hip);                                    // (world transform kept: the skin is unchanged)
+  sc.traverse(o => { if (o.isBone && TO_MH[o.name]) o.name = TO_MH[o.name]; });
+  const conv = {M, q: mq, s: ms.x};
+  g.animations = g.animations.map(c => fixClip(THREE, c, conv));
+  sc.userData.v5 = conv;
+  return conv;
+}
+
+// a clip on the bare v5 rig (G14's) -> on the prepared body: the Hip's tracks in the turned frame, MakeHuman names
+export function fixClip(THREE, clip, conv) {
+  const v = new THREE.Vector3(), q = new THREE.Quaternion(), tracks = [];
+  for (const tr of clip.tracks) {
+    const i = tr.name.lastIndexOf("."), bone = tr.name.slice(0, i), prop = tr.name.slice(i + 1);
+    if (bone === "Root" || bone === "Armature") continue;          // (the Root no longer carries the body)
+    let values = tr.values;
+    if (bone === "Hip") {
+      values = tr.values.slice();
+      if (prop === "position") for (let k = 0; k < values.length; k += 3) v.fromArray(values, k).applyMatrix4(conv.M).toArray(values, k);
+      else if (prop === "quaternion") for (let k = 0; k < values.length; k += 4) q.fromArray(values, k).premultiply(conv.q).toArray(values, k);
+      else if (prop === "scale") for (let k = 0; k < values.length; k++) values[k] *= conv.s;
+    }
+    tracks.push(new tr.constructor(`${TO_MH[bone] || bone}.${prop}`, tr.times, values));
+  }
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
