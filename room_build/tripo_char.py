@@ -6,6 +6,8 @@ refuses if its <name>.task or <name>.glb already exists in --out, so a re-run ne
     python room_build/tripo_char.py model    <name> --out DIR      # multiview to model from docs/design/char-tripo/refs
     python room_build/tripo_char.py model    <name> --out DIR --set '{"face_limit": 400000}'   # override settings
     python room_build/tripo_char.py texture  <name> <model_task> --out DIR [--set '{...}']     # re-texture, same mesh
+    python room_build/tripo_char.py edit     <name> <image> "<prompt>" --out DIR               # image to image (PNG out)
+    python room_build/tripo_char.py image    <name> <image or edit task> --out DIR [--set '{...}']  # image to model
     python room_build/tripo_char.py rigcheck <name> <model_task>   # free
     python room_build/tripo_char.py rig      <name> <model_task> --out DIR
     python room_build/tripo_char.py retarget <name> <rig_task> <preset> [--in-place] --out DIR
@@ -67,12 +69,15 @@ def run(name, out, endpoint, body_fn):
         sys.exit(1)
     o = d["output"]
     url = o.get("model_url") or o.get("pbr_model_url") or o.get("model")
+    if not url:                                              # image tasks: save the picture next to the .task file
+        url = o.get("generated_image_url") or o.get("image_url") or o.get("generated_image")
+        glb = glb.with_suffix(".png")
     urllib.request.urlretrieve(url, glb)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("kind", choices=("balance", "model", "texture", "rigcheck", "rig", "retarget"))
+    ap.add_argument("kind", choices=("balance", "model", "texture", "edit", "image", "rigcheck", "rig", "retarget"))
     ap.add_argument("args", nargs="*")
     ap.add_argument("--out", default=".")
     ap.add_argument("--in-place", action="store_true")
@@ -93,6 +98,17 @@ def main():
             "input": a.args[1], "model": "v3.5-20260815", "pbr": True, "texture_quality": "detailed",
             "texture_alignment": "original_image",
             "texture_prompt": {"images": [upload(Path(a.refs) / v) for v in VIEWS.values()]}, **json.loads(a.set)})
+    elif a.kind == "edit":
+        run(a.args[0], out, "generation/image-to-image", lambda: {
+            "input": upload(a.args[1]), "prompt": a.args[2], "model": "chat_image_2.5_sunburst", "quality": "high",
+            "output_format": "png", **json.loads(a.set)})
+    elif a.kind == "image":
+        src = a.args[1]
+        run(a.args[0], out, "generation/image-to-model", lambda: {
+            "input": src if not Path(src).exists() else upload(src),
+            "model": "v3.1-20260211", "geometry_quality": "detailed", "face_limit": 1000000, "texture": True, "pbr": True,
+            "texture_quality": "extreme", "texture_version": "v3.5-20260815", "texture_alignment": "original_image",
+            **json.loads(a.set)})
     elif a.kind == "rigcheck":
         tid = req("POST", f"{API}/animations/rig-check", {"input": a.args[1]})["data"]["task_id"]
         d = wait(tid)
