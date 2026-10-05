@@ -305,7 +305,8 @@ export function createMH(env) {
   // watching (or just sitting, eating): relaxed in the chair he leans back, a little further from the desk: he and the
   // chair roll 0.12 m back, and in again for the keys and the mouse (to 8.5 cm back for the keys, 6 for the mouse: the hoodie's front clears the desk's edge)
   function roll(dt) {
-    const want = M.mode === "desk_watch" || !M.mode ? 0.12 : M.mode === "desk_mouse" ? 0.06 : 0.085, k = 1 - Math.exp(-dt / 0.35);
+    const lap = M.sc && ["read", "phone", "phone_scroll"].includes(M.sc.k);   // (a book or a phone on his lap: clear of the desk)
+    const want = lap ? 0.45 : M.mode === "desk_watch" || !M.mode ? 0.12 : M.mode === "desk_mouse" ? 0.06 : 0.085, k = 1 - Math.exp(-dt / 0.35);
     const p = env.boy.position;
     if (M.rollAt && (Math.abs(p.x - M.rollAt[0]) > 1e-6 || Math.abs(p.z - M.rollAt[1]) > 1e-6)) M.off = 0;   // (the page placed him anew)
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
@@ -510,6 +511,11 @@ export function createMH(env) {
     for (const p of spec.held || []) { const nm = MHB[p.bone] || p.bone, bone = env.bones[nm.replace(".", "")] || env.bones[nm]; if (!bone) { console.warn("prop bone", p.bone); continue; }
       const m = propMesh(p); m.position.set(...p.off); m.visible = false; bone.add(m); set.held.push(m); }
     for (const p of spec.world || []) { const m = propMesh(p); m.position.set(...p.pos); set.world.add(m); }
+    set.pages = [];                                           // turning pages: hinged on the spine (a group at the pivot), turned
+    for (const p of spec.pages || []) {                       // about the axis by the keys [t, deg] (0 on the right half, -160 on the left)
+      const m = propMesh({...p, rot: null}); m.geometry.translate(p.size[0] / 2, 0, 0); m.rotation.set(...p.rot.map(d => THREE.MathUtils.degToRad(d)));
+      const g = new THREE.Group(); g.position.set(...p.pivot); g.add(m); set.world.add(g);
+      set.pages.push({g, axis: V(...p.axis).normalize(), keys: p.keys}); }
     set.world.visible = false; env.boy.add(set.world);
     return PR.sets[k] = set;
   }
@@ -520,6 +526,12 @@ export function createMH(env) {
   function props_(st) {                                      // which clip's props are out, and the door / the sash
     if (!PR.json) return;
     for (const k of ["eat", "read", "phone", "phone_scroll", "drink"]) { const a = M.actions["act_" + k]; showProps(k, !!a && a.isRunning() && a.getEffectiveWeight() > 0.5); }
+    const rd = PR.sets.read, ra = M.actions.act_read;
+    if (rd && rd.pages && ra && rd.world.visible) for (const pg of rd.pages) {
+      const K = pg.keys, t = ra.time; let i = 0; while (i < K.length - 2 && K[i + 1][0] <= t) i++;
+      const a = K[i], b = K[Math.min(i + 1, K.length - 1)], u = b[0] > a[0] ? Math.min(1, Math.max(0, (t - a[0]) / (b[0] - a[0]))) : 0;
+      const deg = t <= K[0][0] ? K[0][1] : t >= K[K.length - 1][0] ? K[K.length - 1][1] : a[1] + (b[1] - a[1]) * u;
+      pg.g.quaternion.setFromAxisAngle(pg.axis, THREE.MathUtils.degToRad(deg)); }
     const sc = M.sc;
     // (the clip pulls the door toward him, rotY < 0: in this room that is a negative setDoor, the leaf's free edge to +z)
     if (sc && sc.k === "door" && env.setDoor) { const [ry] = keyAt(PR.json.room_door.anim[0].keys, sc.a.time); env.setDoor(THREE.MathUtils.degToRad(ry)); }
@@ -551,6 +563,32 @@ export function createMH(env) {
     for (const a of env.mixer._actions) if (a !== sc.a && a.getEffectiveWeight() > 0) a.setEffectiveWeight(0);
     sc.a.setEffectiveWeight(1); env.mixer.update(0);
   }
+  // ---------- G11's hair (room/hair: ~60,000 strands grown on G2's head; preview/hair-mh): on the Head bone (its frame is
+  // the bone's rest frame), the half-density LOD at room distance, lit from the room's own lights ----------
+  const HAIR = {mesh: null, t: 9};
+  function hairInit() {
+    if (HAIR.tried) return; HAIR.tried = true;
+    Promise.all([env.load("room/hair/hair_mh.glb"), import("./hair/hair_strands.js")]).then(([g, mod]) => {
+      const hair = g.scene.getObjectByName("hair_mh") || g.scene, head = env.bones.Head; if (!head) return;
+      hair.position.set(0, 0, 0); head.add(hair); HAIR.mesh = mod.useStrands(THREE, hair, {lod: true}); HAIR.root = hair;
+      hair.traverse(o => { if (o.isMesh) o.castShadow = false; });
+    }).catch(e => console.warn("hair:", e));
+  }
+  const _ld = V(), _lt = V();
+  function hairLights(dt) {                                  // twice a second: the strongest directional light is the key, the next
+    const m = HAIR.mesh; if (!m || !m.material || !m.material.uniforms) return;   // the rim; the hemisphere / ambient the sky and ground
+    HAIR.t += dt; if (HAIR.t < 0.5) return; HAIR.t = 0;
+    const U = m.material.uniforms, dirs = [], amb = new THREE.Color(0, 0, 0); let hemi = null;
+    env.scene.traverse(o => { if (!o.visible) return; if (o.isDirectionalLight || o.isSpotLight) dirs.push(o); else if (o.isHemisphereLight) hemi = o;
+      else if (o.isAmbientLight) amb.add(o.color.clone().multiplyScalar(o.intensity)); });
+    dirs.sort((a, b) => b.intensity - a.intensity);
+    const set = (L, dirU, colU) => { if (!L) { U[colU].value.setRGB(0, 0, 0); return; }
+      L.getWorldPosition(_ld); (L.target ? L.target.getWorldPosition(_lt) : _lt.set(0, 0, 0)); U[dirU].value.copy(_ld.sub(_lt).normalize());
+      U[colU].value.copy(L.color).multiplyScalar(Math.min(3, L.intensity * 0.6)); };
+    set(dirs[0], "keyDir", "keyCol"); set(dirs[1], "rimDir", "rimCol");
+    if (hemi) { U.sky.value.copy(hemi.color).multiplyScalar(hemi.intensity * 0.5).add(amb); U.ground.value.copy(hemi.groundColor).multiplyScalar(hemi.intensity * 0.5).add(amb); }
+    else { U.sky.value.copy(amb); U.ground.value.copy(amb).multiplyScalar(0.6); }
+  }
   function onBed(st) {                                       // lying on, or sitting on the edge of, the bed: placed by the lie clip's pose
     if (st.step || (st.at !== "bedlie" && st.at !== "bedside")) return;
     const sleep = M.seg.bt && st.goal && st.goal.clip === "sleep";
@@ -563,7 +601,7 @@ export function createMH(env) {
     const moving = env.step0(dt);
     if (!M.ready) return moving;
     if (!P.kbNode || !P.mouseNode) { P.seen += dt; if (P.seen > 1) { P.seen = 0; props(); } }   // (G10d's nodes may arrive late)
-    const st = env.state(), m = wanted(st);
+    const st = env.state(), m = M.sc ? null : wanted(st);       // (the showcase plays its own clip: no desk modes, no arm pins)
     if (m) setMode(m); else if (M.mode) {                    // off the desk modes (eating, leaving): seated he just sits back
       M.mode = null; M.w.type = M.w.mouse = 0; const a = st.goal && st.goal.clip === "dine" ? M.actions.act_eat : M.actions.desk_watch, cur = st.current;
       for (const k of ["sit", "type"]) env.actions[k] = M.actions.desk_watch;
@@ -576,7 +614,7 @@ export function createMH(env) {
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
-    props_(st);
+    props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
   }
