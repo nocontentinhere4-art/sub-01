@@ -1095,7 +1095,7 @@ $("cam").onclick = () => { pinned = !pinned; CAM.force = pinned ? "overview" : n
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
-const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, keptLos:-9, clear:true, viaPhone:false, aim:new THREE.Vector3(0, -9, 0)};
+const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, keptLos:-9, clear:true, viaPhone:false, phoneL:null, badSince:null, aim:new THREE.Vector3(0, -9, 0)};
 const SHOT_S = {face:14, screen:12, medium:16, over:12};                  // seconds a shot holds before the cycle moves on
 // the overview is in every cycle and holds three quarters of what the other shots hold together: >= 40 % of the time
 const holdOf = (kind, list) => kind === "overview" ? Math.max(12, 0.75 * list.reduce((s, k) => s + (SHOT_S[k] || 0), 0)) : SHOT_S[kind];
@@ -1204,17 +1204,23 @@ const PHONE_POS = {
 function phoneShot(out, aim, face, ph, facing, lying){
   const L = lying ? PHONE_POS.lie : PHONE_POS.sit;
   const at = i => { const [a, dist, h] = L[i]; out.copy(aim).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h); return out; };
-  const ok = i => { at(i); if (camClamp(out) + (camInside(out) ? 1 : 0) >= 0.12 || out.distanceTo(face) < 0.95) return false;
-    return !occluded(out, aim) && !occluded(out, face) && !occluded(out, ph)                       // (the desk lamp beside the monitor)
-      && !bodyBlocks(out, face, 0.12) && !bodyBlocks(out, ph, 0.09) && !faceHidden(out, face); };
+  // level 0: everything clear; 1: his face clear (the phone may sit behind his hand a moment); 2: off the walls, 0.95 m
+  // from his head and the room not in front of his face
+  const ok = (i, lv = 0) => { at(i); if (camClamp(out) + (camInside(out) ? 1 : 0) >= 0.12 || out.distanceTo(face) < 0.95 || occluded(out, face)) return false;
+    if (lv >= 2) return true;
+    if (occluded(out, aim) || occluded(out, ph) || bodyBlocks(out, face, 0.12)) return false;      // (the desk lamp beside the monitor)
+    return lv >= 1 || (!bodyBlocks(out, ph, 0.09) && !faceHidden(out, face)); };
   const set = i => { CAM.pick = i; CAM.ang = L[i][0]; return out; };
   if (!(CAM.cut || CAM.pick === null) && CAM.phoneL === L && L[CAM.pick]) {
     if (T - CAM.keptLos < 0.25) { at(CAM.pick); camClamp(out); return set(CAM.pick); }
-    CAM.keptLos = T; if (ok(CAM.pick)) return set(CAM.pick);
+    CAM.keptLos = T;
+    // the settled position is dropped only when it fails for over a second (a glance up, a hand passing: not a cut)
+    if (ok(CAM.pick)) { CAM.badSince = null; return set(CAM.pick); }
+    if (CAM.badSince === null) CAM.badSince = T;
+    if (T - CAM.badSince < 1 && ok(CAM.pick, 2)) return set(CAM.pick);
   }
-  CAM.keptLos = T; CAM.phoneL = L;
-  for (let i = 0; i < L.length; i++) if (ok(i)) return set(i);
-  // nothing clears everything: the first that keeps off his body and the walls, else the first
+  CAM.keptLos = T; CAM.phoneL = L; CAM.badSince = null;
+  for (let lv = 0; lv <= 2; lv++) for (let i = 0; i < L.length; i++) if (ok(i, lv)) return set(i);
   for (let i = 0; i < L.length; i++) { at(i); if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12 && !bodyBlocks(out, face, 0.12)) return set(i); }
   at(0); camClamp(out); return set(0);
 }
