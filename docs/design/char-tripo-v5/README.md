@@ -6,7 +6,7 @@ by the live site.
 
 v4 (`../char-tripo-v4/`) uses the owner's own Tripo head. That head has no neck under its collar, so its neck stops
 just under the chin. v5 is the alternative with a full natural neck: a Tripo bust (head and bare neck), generated
-through the API from the same face reference, on the same v3 body, rig and clips. The owner chooses between them.
+through the API from the same face reference, on the same v3 body, rig and clips. The owner chose v5.
 
 ## `char_tripo_v5.glb`
 
@@ -61,8 +61,8 @@ seam from any angle and none in the clips.
 **Worse than v4.** The face is Tripo's, not the owner's own export. It is close to the references, with a slimmer jaw,
 but:
 
-- the skin is flatter and a little warmer;
-- the nostrils read darker and heavier from the front;
+- the skin is flatter (after the polish its tone is closer to the reference's neutral light skin);
+- the nostrils still read a little heavier from the front;
 - the hair is a little less defined.
 
 **Left:** faint grey shading on the inner hood near the neck, close up only.
