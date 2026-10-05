@@ -1,0 +1,177 @@
+<!doctype html><html><head><meta charset="utf-8"><title>anim scene</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script></head>
+<body><script type="module">
+// The room (room_clean.glb, authored in world metres), the owner's chair in its "chair" node (as room.html places it:
+// squared to the desk, 15 cm further in, pulled out / swivelled by k), the v4 character driven by one retargeted clip.
+// window.setup(cfg) -> loads; window.pose(t) poses everything at time t; window.shot(cam) renders; window.qa(dt) the
+// penetration report (skinned vertices vs the chair, desk top, keyboard, bed, book).
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+const W = +(new URLSearchParams(location.search).get("w") || 960), H = +(new URLSearchParams(location.search).get("h") || 540);
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(W, H); renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x20232a);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xfff4e8, 0x40342c, 0.9));
+const sun = new THREE.DirectionalLight(0xfff1dc, 1.6); sun.position.set(-1.0, 3.2, 1.6); sun.target.position.set(-0.8, 0.6, -0.3);
+sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, {left: -2.5, right: 2.5, top: 2.5, bottom: -2.5, near: 0.5, far: 8});
+sun.shadow.bias = -0.0004; scene.add(sun, sun.target);
+const fill = new THREE.PointLight(0xffe0c0, 0.6, 5, 1.5); fill.position.set(0.5, 2.0, 0.6); scene.add(fill);
+const camera = new THREE.PerspectiveCamera(45, W / H, 0.05, 30);
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const load = u => new Promise((ok, no) => loader.load(u, ok, undefined, no));
+let room, chair, CH = {home: new THREE.Vector3(), ry: 0}, char, mixer, action, clipDur = 0, cfg, props = {}, skinned = [];
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+function chairPlace(k, dx = 0, dz = 0, rot = null){          // room.html chairAt(): out 0.40 along its front, swivel -pi/2 past k=0.375
+  const turn = rot != null ? rot : -Math.PI / 2 * clamp((k - 0.375) / (1 - 0.375), 0, 1);
+  chair.position.set(CH.home.x + dx, CH.home.y, CH.home.z + 0.40 * k + dz); chair.rotation.y = CH.ry + turn; chair.updateMatrixWorld(true);
+}
+function interp(keys, t){                                     // keys [[t, v...]] -> v at t (linear, clamped)
+  if (!keys || !keys.length) return null; let i = 0; while (i + 1 < keys.length && keys[i + 1][0] <= t) i++;
+  const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)]; if (b[0] <= a[0]) return a.slice(1);
+  let u = clamp((t - a[0]) / (b[0] - a[0]), 0, 1); u = u * u * (3 - 2 * u); return a.slice(1).map((v, k) => v + (b[k + 1] - v) * u);
+}
+function makeBook(){                                           // an open book (plain cloth cover, cream pages), origin at its base centre
+  const g = new THREE.Group(), cover = new THREE.MeshStandardMaterial({color: 0x2e4a6b, roughness: 0.8}), page = new THREE.MeshStandardMaterial({color: 0xf1eadb, roughness: 0.9});
+  const c = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.004, 0.21), cover); c.position.y = 0.002; g.add(c);
+  for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.142, 0.014, 0.198), page); p.position.set(s * 0.073, 0.011, 0); p.rotation.z = -s * 0.04; g.add(p); }
+  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return g;
+}
+function makePhone(){
+  const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.152, 0.008), new THREE.MeshStandardMaterial({color: 0x1a1c20, roughness: 0.4}));
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(0.066, 0.142), new THREE.MeshBasicMaterial({color: 0x9fc4e8})); s.position.z = 0.0042; g.add(b, s); return g;
+}
+window.setup = async (c) => {
+  cfg = c;
+  const [rg, cg, chg, ag] = await Promise.all([load("room/room_clean.glb"), load("room/chair_owner.glb"), load("char.glb"), load(c.clip)]);
+  room = rg.scene; scene.add(room);
+  room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = !/desk_lamp/i.test(o.name); if (o.material) o.material.envMapIntensity = 0.35; } });
+  chair = room.getObjectByName("chair"); chair.rotation.y = 0; chair.position.z -= 0.15; CH.home.copy(chair.position); CH.ry = 0;
+  for (const k of [...chair.children]) chair.remove(k);
+  const src = cg.scene.getObjectByName("chair_owner"); for (const k of (src.isMesh ? [src] : [...src.children])) { k.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); chair.add(k); }
+  chairPlace(0.375);
+  char = chg.scene; scene.add(char);
+  char.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true; if (o.isSkinnedMesh) skinned.push(o); } });
+  mixer = new THREE.AnimationMixer(char); const clip = ag.animations[0]; clipDur = clip.duration;
+  action = mixer.clipAction(clip); action.play();
+  if (c.book) { props.book = makeBook(); props.book.position.set(...c.book.pos); props.book.rotation.y = c.book.ry || 0; props.book.scale.setScalar(c.book.scale || 1); scene.add(props.book); }
+  if (c.phone) { props.phone = makePhone(); scene.add(props.phone); }
+  window.pose(0); return {dur: clipDur};
+};
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
+window.pose = (t) => {
+  const pl = interp(cfg.root, t) || [0, 0, 0, 0];             // [x, y, z, ry] of the rig's origin in the room
+  char.position.set(pl[0], pl[1], pl[2]); char.rotation.y = pl[3];
+  action.time = Math.min(t, clipDur - 1e-4); mixer.update(0); char.updateMatrixWorld(true);
+  if (cfg.chair) { const ck = interp(cfg.chair, t); chairPlace(ck[0], ck[1] || 0, ck[2] || 0, ck.length > 3 ? ck[3] : null); }
+  if (cfg.chairFollow) {                                       // the chair rides with his hand on it (the push): its z keeps the offset it had from the hand at `from`
+    const F = cfg.chairFollow, h = char.getObjectByName(F.hand); h.updateMatrixWorld(true); const hz = h.getWorldPosition(new THREE.Vector3()).z;
+    if (t < F.from) window._cf = {};
+    else { const cf = window._cf || (window._cf = {}); if (cf.dz === undefined) cf.dz = chair.position.z - hz;
+      if (t <= F.to || cf.z === undefined) cf.z = Math.max(F.zmin, Math.min(F.zmax, hz + cf.dz));
+      chair.position.z = cf.z; chair.updateMatrixWorld(true); }
+  }
+  if (props.phone) { const hand = char.getObjectByName(cfg.phone.hand || "R_Hand"); hand.updateMatrixWorld(true);
+    props.phone.position.copy(hand.localToWorld(_v.set(...cfg.phone.off))); props.phone.quaternion.copy(hand.getWorldQuaternion(_q)).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...cfg.phone.rot))); }
+  return true;
+};
+window.shot = (cam) => { camera.position.set(...cam.pos); camera.lookAt(...cam.at); camera.fov = cam.fov || 45; camera.updateProjectionMatrix(); renderer.render(scene, camera); return true; };
+// ---------- QA: vertical-column interiors of the chair (its mesh, as placed) and of the room's furniture boxes
+function columnsOf(meshes, cell = 0.01, box = null){
+  const tris = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (const m of meshes) { m.updateMatrixWorld(true); const g = m.geometry, P = g.attributes.position, I = g.index;
+    const n = I ? I.count : P.count; for (let i = 0; i < n; i += 3) { const ia = I ? I.getX(i) : i, ib = I ? I.getX(i + 1) : i + 1, ic = I ? I.getX(i + 2) : i + 2;
+      a.fromBufferAttribute(P, ia).applyMatrix4(m.matrixWorld); b.fromBufferAttribute(P, ib).applyMatrix4(m.matrixWorld); c.fromBufferAttribute(P, ic).applyMatrix4(m.matrixWorld);
+      if (box && !(box.containsPoint(a) || box.containsPoint(b) || box.containsPoint(c))) continue; tris.push([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z]); } }
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const t of tris) for (let k = 0; k < 9; k += 3) { x0 = Math.min(x0, t[k]); x1 = Math.max(x1, t[k]); z0 = Math.min(z0, t[k + 2]); z1 = Math.max(z1, t[k + 2]); }
+  const nx = Math.ceil((x1 - x0) / cell) + 1, nz = Math.ceil((z1 - z0) / cell) + 1, hits = Array.from({length: nx * nz}, () => []);
+  for (const t of tris) {                                      // each column centre's vertical ray against the triangle
+    const tx0 = Math.min(t[0], t[3], t[6]), tx1 = Math.max(t[0], t[3], t[6]), tz0 = Math.min(t[2], t[5], t[8]), tz1 = Math.max(t[2], t[5], t[8]);
+    for (let i = Math.max(0, Math.ceil((tx0 - x0) / cell - 0.5)); i <= Math.min(nx - 1, Math.floor((tx1 - x0) / cell - 0.5)); i++)
+      for (let j = Math.max(0, Math.ceil((tz0 - z0) / cell - 0.5)); j <= Math.min(nz - 1, Math.floor((tz1 - z0) / cell - 0.5)); j++) {
+        const px = x0 + (i + 0.5) * cell, pz = z0 + (j + 0.5) * cell;
+        const d = (t[3] - t[0]) * (t[8] - t[2]) - (t[6] - t[0]) * (t[5] - t[2]); if (Math.abs(d) < 1e-12) continue;
+        const u = ((px - t[0]) * (t[8] - t[2]) - (t[6] - t[0]) * (pz - t[2])) / d, v = ((t[3] - t[0]) * (pz - t[2]) - (px - t[0]) * (t[5] - t[2])) / d;
+        if (u < 0 || v < 0 || u + v > 1) continue; hits[i * nz + j].push(t[1] + u * (t[4] - t[1]) + v * (t[7] - t[1]));
+      } }
+  const cols = hits.map(h => { h.sort((p, q) => p - q); const iv = []; for (let k = 0; k + 1 < h.length; k += 2) iv.push([h[k], h[k + 1]]); return iv; });
+  return {x0, z0, nx, nz, cell, cols, tris: tris.length};
+}
+function inside(C, p){                                          // depth (m) of p inside the column set, 0 outside
+  const i = Math.floor((p.x - C.x0) / C.cell), j = Math.floor((p.z - C.z0) / C.cell); if (i < 0 || j < 0 || i >= C.nx || j >= C.nz) return 0;
+  const iv = C.cols[i * C.nz + j].find(([lo, hi]) => p.y > lo && p.y < hi); if (!iv) return 0;
+  let d = Math.min(p.y - iv[0], iv[1] - p.y);
+  for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let s = 1; s * C.cell < d; s++) {   // the nearest outside column at this height
+    const ii = i + di * s, jj = j + dj * s; const out = ii < 0 || jj < 0 || ii >= C.nx || jj >= C.nz || !C.cols[ii * C.nz + jj].some(([lo, hi]) => p.y > lo && p.y < hi);
+    if (out) { d = Math.min(d, s * C.cell); break; } }
+  return d;
+}
+const _lp = new THREE.Vector3();
+const boxDepth = (b, p) => b.local ? boxDepth(b.box, _lp.copy(p).applyMatrix4(b.inv)) * props.book.scale.x : b.containsPoint(p) ? Math.min(p.x - b.min.x, b.max.x - p.x, p.y - b.min.y, b.max.y - p.y, p.z - b.min.z, b.max.z - p.z) : 0;
+window.qa = (dt = 0.1, tol = 0.005) => {
+  const chairMeshes = []; chair.traverse(m => { if (m.isMesh) chairMeshes.push(m); });
+  const B3 = (a, b) => new THREE.Box3(new THREE.Vector3(...a), new THREE.Vector3(...b));
+  // fixed furniture (room_clean.glb, room_static: props_hard.py's desk DX -1.86..-0.36, DZ wall..-0.80, top 0.94..0.97;
+  // the keyboard box room.html splits off; the bed frame x -1.90..-0.20, z 0.25..1.50, mattress top 0.82 (the duvet's
+  // softness: 2 cm allowed))
+  const boxes = {desk: B3([-1.86, 0.94, -1.43], [-0.36, 0.97, -0.80]), keyboard: B3([-1.26, 0.9725, -1.055], [-0.88, 1.012, -0.885]),
+    bed: B3([-1.90, 0.16, 0.25], [-0.20, 0.80, 1.50])};
+  if (props.book) { props.book.updateMatrixWorld(true); boxes.book = {local: true, inv: props.book.matrixWorld.clone().invert(), box: new THREE.Box3(new THREE.Vector3(-0.15, 0, -0.105), new THREE.Vector3(0.15, 0.025, 0.105))}; }
+  const res = {chair: {n: 0, max: 0, frames: 0}}; for (const k in boxes) res[k] = {n: 0, max: 0, frames: 0};
+  const rows = []; const v = new THREE.Vector3();
+  for (let t = 0; t <= clipDur + 1e-6; t += dt) {
+    window.pose(t); const C = columnsOf(chairMeshes, 0.01);
+    const row = {t: +t.toFixed(2)}; for (const k in res) row[k] = [0, 0];
+    for (const m of skinned) { const P = m.geometry.attributes.position; m.updateMatrixWorld(true);
+      for (let i = 0; i < P.count; i += 2) { m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld);
+        const dc = inside(C, v); if (dc > tol) { row.chair[0]++; row.chair[1] = Math.max(row.chair[1], dc); }
+        for (const k in boxes) { const d = boxDepth(boxes[k], v); if (d > (k === "bed" ? 0.02 : tol)) { row[k][0]++; row[k][1] = Math.max(row[k][1], d); } } } }
+    for (const k in res) { res[k].n += row[k][0]; res[k].max = Math.max(res[k].max, row[k][1]); if (row[k][0]) res[k].frames++; row[k][1] = +row[k][1].toFixed(3); }
+    rows.push(row);
+  }
+  for (const k in res) res[k].max = +res[k].max.toFixed(3);
+  return {summary: res, rows, samples: rows.length, note: "every 2nd skin vertex; counts are vertex-samples deeper than 5 mm (bed: 2 cm)"};
+};
+window.qaDetail = (t) => {                                     // where the chair hits are: per skin joint (largest weight), depth
+  const chairMeshes = []; chair.traverse(m => { if (m.isMesh) chairMeshes.push(m); });
+  window.pose(t); const C = columnsOf(chairMeshes, 0.01); const v = new THREE.Vector3(), by = {}; const inv = chair.matrixWorld.clone().invert();
+  const probe = [[0, 0.62, 0], [0, 0.75, 0], [0, 0.9, 0.2], [0, 0.45, 0.0], [0.2, 0.62, 0]].map(([x, y, z]) => { const p = chair.localToWorld(new THREE.Vector3(x, y, z)); return [x, y, z, +inside(C, p).toFixed(3)]; });
+  for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
+    for (let i = 0; i < P.count; i += 2) { m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); const d = inside(C, v); if (d <= 0.005) continue;
+      let bj = 0, bw = 0; for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k); if (w > bw) { bw = w; bj = SI.getComponent(i, k); } }
+      const nm = m.skeleton.bones[bj].name; const l = v.clone().applyMatrix4(inv); const e = by[nm] || (by[nm] = {n: 0, max: 0, y: [9, -9], z: [9, -9]});
+      e.n++; e.max = Math.max(e.max, d); e.y = [Math.min(e.y[0], l.y), Math.max(e.y[1], l.y)]; e.z = [Math.min(e.z[0], l.z), Math.max(e.z[1], l.z)]; } }
+  return {probe, by, tris: C.tris};
+};
+window.bones = (t, names) => { window.pose(t); const v = new THREE.Vector3(); const o = {};
+  for (const n of names) { const b = char.getObjectByName(n); b.updateMatrixWorld(true); o[n] = b.getWorldPosition(v).toArray().map(x => +x.toFixed(3)); }
+  o.chair = chair.position.toArray().map(x => +x.toFixed(3)); return o; };
+window.front = (t) => { window.pose(t); const v = new THREE.Vector3(); let zmin = 9, kmin = 9;   // his front (most -z skin point) between 0.8 and 1.1 m up: the belly / chest
+  for (const m of skinned) { const P = m.geometry.attributes.position; for (let i = 0; i < P.count; i += 3) { m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld);
+    if (v.y > 0.85 && v.y < 1.15 && Math.abs(v.x + 1.13) < 0.15) zmin = Math.min(zmin, v.z); } } return +zmin.toFixed(3); };
+window.qaBones = (t) => {                                      // per collider: which skin joints are inside, how deep
+  const chairMeshes = []; chair.traverse(m => { if (m.isMesh) chairMeshes.push(m); });
+  window.pose(t); const C = columnsOf(chairMeshes, 0.01); const v = new THREE.Vector3(), out = {};
+  const B3 = (a, b) => new THREE.Box3(new THREE.Vector3(...a), new THREE.Vector3(...b));
+  const boxes = {desk: B3([-1.86, 0.94, -1.43], [-0.36, 0.97, -0.80]), keyboard: B3([-1.26, 0.9725, -1.055], [-0.88, 1.012, -0.885]), bed: B3([-1.90, 0.16, 0.25], [-0.20, 0.80, 1.50])};
+  if (props.book) { props.book.updateMatrixWorld(true); boxes.book = {local: true, inv: props.book.matrixWorld.clone().invert(), box: new THREE.Box3(new THREE.Vector3(-0.15, 0, -0.105), new THREE.Vector3(0.15, 0.025, 0.105))}; }
+  for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
+    for (let i = 0; i < P.count; i += 2) { m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld);
+      const hits = {chair: inside(C, v)}; for (const k in boxes) hits[k] = boxDepth(boxes[k], v);
+      for (const k in hits) { if (hits[k] <= (k === "bed" ? 0.02 : 0.005)) continue;
+        let bj = 0, bw = 0; for (let q = 0; q < 4; q++) { const w = SW.getComponent(i, q); if (w > bw) { bw = w; bj = SI.getComponent(i, q); } }
+        const nm = k + ":" + m.skeleton.bones[bj].name, e = out[nm] || (out[nm] = {n: 0, max: 0, y: 9}); e.n++; e.max = Math.max(e.max, +hits[k].toFixed(3)); e.y = Math.min(e.y, +v.y.toFixed(3)); } } }
+  return out; };
+window.bellyZ = (t) => { window.pose(t); const v = new THREE.Vector3(); let z = 9;      // the front of his belly/chest (skin mostly on Waist/Spine01/Spine02)
+  for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
+    for (let i = 0; i < P.count; i += 2) { let bj = 0, bw = 0; for (let q = 0; q < 4; q++) { const w = SW.getComponent(i, q); if (w > bw) { bw = w; bj = SI.getComponent(i, q); } }
+      if (!["Waist", "Spine01", "Spine02"].includes(m.skeleton.bones[bj].name)) continue; m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); z = Math.min(z, v.z); } }
+  return +z.toFixed(3); };
+window.ready = true;
+</script></body></html>

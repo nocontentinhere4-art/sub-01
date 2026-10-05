@@ -1,0 +1,16 @@
+{
+ "prompts": [
+  "A person sits relaxed on an office chair at a desk, typing on a computer keyboard with both hands, looking at the screen.",
+  "A person sits at a desk typing on a keyboard with the left hand and moving a computer mouse with the right hand."
+ ],
+ "durations": [
+  8,
+  8
+ ],
+ "name": "b_type1",
+ "seeds": [
+  1,
+  2
+ ],
+ "num_samples": 4
+}

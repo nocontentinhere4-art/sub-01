@@ -1,0 +1,16 @@
+{
+ "prompts": [
+  "A person lying on the back wakes up and sits up.",
+  "The person swings the legs over the side of the bed, puts the feet on the floor and stands up."
+ ],
+ "durations": [
+  4,
+  4
+ ],
+ "name": "g_wake1",
+ "seeds": [
+  1,
+  2
+ ],
+ "num_samples": 4
+}

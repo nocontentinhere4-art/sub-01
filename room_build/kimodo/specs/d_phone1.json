@@ -1,0 +1,16 @@
+{
+ "prompts": [
+  "A person sits relaxed on a chair holding a smartphone in both hands, looking down at it and scrolling with the thumb.",
+  "A person sitting on a chair looks at a phone held in the right hand and scrolls with the thumb."
+ ],
+ "durations": [
+  7,
+  7
+ ],
+ "name": "d_phone1",
+ "seeds": [
+  1,
+  2
+ ],
+ "num_samples": 4
+}
