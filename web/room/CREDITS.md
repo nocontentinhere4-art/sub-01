@@ -308,3 +308,27 @@ re-downloads them (Wikimedia rate-limits shared addresses; the script waits and 
 The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
 pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented
 as a forecast or an observation.
+
+## The room upgrade (preview/room-upgrade-live)
+Owner-approved pieces from the props previews and the clothes the owner turned down taken out:
+- `props_picked.glb` (`room_build/pick_props.mjs`, from preview/props-hard's `props_clutter.glb`): the laundry hamper
+  (Poly Haven `wicker_basket_02`, Kuutti Siitonen), the key bowl (`wooden_bowl_02`, Kuutti Siitonen) with the keys in it
+  (modelled for preview/props-hard), and the notebook (`binder_notebook`, DaDrood; its emblem cloned out) with a pen and a
+  pencil (`stationery_supplies`, Mateusz Sadek; the printed maker's name cloned out). All CC0 1.0 (https://polyhaven.com).
+- `sneakers_door.glb` (`room_build/pick_sneakers.mjs`, from preview/props-soft's `room_clean.glb`): the pair of worn canvas
+  sneakers standing by the door, modelled in code for preview/props-soft (`props_soft.py`), CC0, no brand.
+- Taken out at load (`web/room.html`, UPGRADE_DROP): the hoodie on the door, the jeans on the floor, and the T-shirt with the
+  grey floor cushion under it. Their baked shadows are lightened out of the floor's occlusion map.
+
+## The owner's chair
+- `chair_owner.glb` (`room_build/fbx2ply.mjs` -> `chair_owner_repair.py` -> `chair_owner_parts.py` -> `build_chair_owner.mjs`):
+  the office chair the owner generated on Tripo (https://www.tripo3d.ai), used under Tripo's terms of service; the
+  owner's export is `docs/design/chair-tripo/chair_owner_raw.fbx`. The letter-shaped holes and dents Tripo put on the
+  backrest, the lumbar pad, the headrest and the back of the mesh panel are covered over with new smooth surface; nothing
+  else in the model is changed. Scaled to the live seat height (0.505 m), turned to face the desk and placed in the room's
+  `chair` node.
+  Tripo's texture atlas is not used. Its materials are made for this project: a black knit mesh, black matte plastic
+  (a moulded grain drawn in the build) and soft arm pads, a black gas lift, a polished aluminium base, black casters, and
+  black upholstery from ambientCG's **Fabric 030** (CC0 1.0, https://ambientcg.com/a/Fabric030); the plastic's roughness
+  from ambientCG's **Plastic 006** (CC0 1.0, https://ambientcg.com/a/Plastic006). Matched to two CC0 photos
+  (`docs/design/chair-tripo/real_reference.jpg`, WordPress Photo Directory: Ohidul Islam, Manjil Aryal).

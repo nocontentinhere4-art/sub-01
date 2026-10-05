@@ -38,7 +38,7 @@ from tests.visual.cdn_cache import CdnCache                # noqa: E402
 CHROMIUM = os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium")
 # the waits below poll on a timer (polling=100), not on requestAnimationFrame: the 390 page is a second, background page
 # whose frames Chromium may not schedule, so a rAF-polled predicate could stay unevaluated though already true
-GLB_FILES = 16                                              # room_clean, boy, 6 clips, hand_phone, food, props_tripo(2), mouse, controller, monitor, boy_moves
+GLB_FILES = 19                                              # room_clean, boy, 6 clips, hand_phone, food, props_tripo(2), mouse, controller, monitor, props_picked, sneakers_door, chair_owner, boy_moves
 PIP_URL = "/mini-brain?mini"                                # the room's embed (#116), served as web/index.html; "&neurons=1" is the regression
 BUDGETS = json.loads((HERE / "budgets.json").read_text())
 
