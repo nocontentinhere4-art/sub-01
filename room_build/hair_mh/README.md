@@ -7,7 +7,7 @@ the way game grooms do it. The owner changed the style to a medium-length, soft,
   at the crown;
 - the two halves of the fringe fall to the brows and outer eye corners and sweep out toward the temples, with a few
   loose strands across the forehead;
-- the sides are 5-6 cm over the upper half of the ears and behind them;
+- the sides are 6-8 cm over the upper half of the ears and behind them;
 - the nape is 8-10 cm to the collar, with soft flicked-out ends;
 - loose waves, piece-y clumps of ~30 hairs that twist and split, and near-black colour (#14100e) with faint brown in
   the light.
@@ -16,16 +16,23 @@ The short textured cut before it (e4339a6 to 96d389d) was dropped.
 
 ## The sheet (`hair_sheet.png`, preview branch only)
 
-This round is a crude first look: front and 3/4 only, each next to a real photo of the cut cropped to the hair above
-the eyes (no face). Locked camera, neutral light, G2's head in plain skin with G2's own eyes, and no text on the sheet.
-`VIEWS=front,q34` gives this crude sheet; without it, `render.mjs` gives the full sheet (front, 3/4, side, back, and
-the room distance with the LOD).
+The sheet has three rows.
+
+- **Top row:** front render, then its real photo; 3/4 render, then its real photo.
+- **Middle row:** side render, then its real photo; back render, then its real photo.
+- **Bottom row:** the room distance (2.2 m through room.html's 30-degree lens, with the LOD), at 1:1 pixels and as
+  the whole frame.
+
+Each photo is of the same kind of cut, cropped to the hair, with no face. The renders use a locked camera, neutral
+light and G2's head in plain skin with G2's own eyes, and there is no text on the sheet. `VIEWS=front,q34` renders a
+crude two-view sheet instead.
 
 | view | trait compared with the photo |
 |---|---|
 | front | the part near the centre, the two fringe halves sweeping out to the temples, volume at the top |
 | 3/4 | the curtain falling past the brow toward the temple, the length over the ear, the layered top |
-| back (full sheet) | the length down the back of the head to the collar, the soft ends |
+| side | the side length over the upper ear and behind it, the nape to the collar, the layered top |
+| back | the length down the back of the head to the collar, the soft ends, no seam |
 
 ### Reference photos
 
@@ -36,9 +43,10 @@ from `ref/` in its source folder. Each is cropped to the hair above the eyes (`R
 |---|---|---|---|
 | `ref/front.jpg` | https://unsplash.com/photos/man-in-black-crew-neck-shirt-near-brown-wall-khV4fTy6-D8 | Oliver Ragfelt | images.unsplash.com/photo-1513956589380-bad6acb9b9d4 |
 | `ref/q34.jpg` | https://unsplash.com/photos/a-close-up-of-a-person-wearing-a-blue-shirt-3wReHaYiL9k | Stuart Isaac Harrier | images.unsplash.com/photo-1688679446493-d22bad16b8ae |
+| `ref/side.jpg` | https://unsplash.com/photos/a-man-with-long-black-hair-and-a-hoodie-S-xKshOVEw0 | Sehajpal Singh | images.unsplash.com/photo-1677827366776-ded6db523800 |
 | `ref/back.jpg` | https://unsplash.com/photos/the-back-of-a-mans-head-in-a-blue-shirt-9mDU8BxZVkA | George Huffman | images.unsplash.com/photo-1731951039647-94f50eea1fd5 |
 
-Download each with `?w=1200&q=85&fm=jpg`.
+Download each with `?w=1200&q=85&fm=jpg`. The side photo is cropped behind the face, to the hair only.
 
 ## How the hair is made
 
@@ -47,14 +55,16 @@ Download each with `?w=1200&q=85&fm=jpg`.
   to 2.2 cm from the macro targets), where `hair_gen.js`'s hairline, ear and whorl settings live. Hairs are raycast
   onto the real G2 surface, then mapped back.
 - **Growth** (`strands.js`):
-  - About 1,650 clump guides, about 5 mm apart, are grown along a combing field: away from the part, forward over the
-    forehead at the front and then out toward the temples, down over the sides and behind the ears, down the back.
+  - About 1,200 clump guides, about 6 mm apart, are grown along a combing field. Over the front half of the head the
+    hair flows away from the part; the fringe comes down over the forehead and curves out and back toward the
+    temples near the brows. It runs down over the sides and behind the ears, and down the back with no seam.
   - While the head is under the hair, a guide sits on it at a height that grows with the distance travelled, so
     longer hair lies over shorter, with lifted roots by the part and volume at the crown. Once it leaves the skull,
     it hangs under gravity.
-  - A slow wave (4-9 mm, 3.5-6 cm long) rides along each guide.
-  - Each guide carries about 30 hairs rooted round it. They twist round it along their length, and most are pulled
-    back into it toward the tips; about 18 % split away as loose pieces.
+  - A soft, loose wave (2-5 mm, 5-8 cm long) rides along each guide.
+  - The fringe guides are cut evenly at the brows and outer eye corners, then resampled.
+  - Each guide carries about 36 hairs rooted round it. They twist gently round it along their length and are pulled
+    back into it toward the tips, giving fuller, softer clumps; about 5 % split away as pieces.
   - The ends at the sides and nape flick out. Each hair gets a little frizz, and a few loose strands cross the
     forehead.
   - Near the hairline the hairs thin out over about 7 mm.
@@ -69,8 +79,8 @@ Download each with `?w=1200&q=85&fm=jpg`.
     up into soft fuzz. Alpha-to-coverage was tried first: every hair of the same alpha gets the same sample pattern,
     so they never add up.
 - **Shading:**
-  - Kajiya-Kay along the strand with two lobes: a dim near-white primary toward the root and a dimmer warm secondary
-    toward the tip. It is dry and matte.
+  - Kajiya-Kay along the strand with two broad, dim lobes (near-white toward the root, warm toward the tip), varied
+    per hair: a dry, soft sheen rather than a gloss.
   - The base is near-black (#14100e), with a per-hair tint and slightly browner tips.
   - A wrap term over the scalp normal, plus self-shadow (darker deep in the hair and toward the roots).
   - Under the hairs is a painted scalp base: a dark layer with strokes along the growth direction, feathered at the
@@ -83,14 +93,14 @@ faster.
 
 | | |
 |---|---|
-| hairs | 43,550 (1,653 clumps) |
-| strand points | 480,205 (436,655 segments) |
-| ribbon vertices / triangles | 960k / 873k (the LOD: 437k triangles) |
-| grow time | ~1-2.5 s (offline; the GLB carries the result) |
-| strand draw, close-up 480×480, full | ~2.7 s |
-| strand draw, 1280×800 at 2.2 m, full | ~1.6 s |
-| strand draw, 1280×800 at 2.2 m, LOD | ~0.7 s |
-| `hair_mh.glb` | 4.2 MB (quantized and meshopt-compressed) |
+| hairs | 43,709 (1,203 clumps) |
+| strand points | 536,160 (492,451 segments) |
+| ribbon vertices / triangles | 1.07M / 985k (the LOD: 492k triangles) |
+| grow time | ~1.3-2.7 s (offline; the GLB carries the result) |
+| strand draw, close-up 480×480, full | ~2.4 s |
+| strand draw, 1280×800 at 2.2 m, full | ~1.45 s |
+| strand draw, 1280×800 at 2.2 m, LOD | ~0.73 s |
+| `hair_mh.glb` | 6.2 MB (quantized and meshopt-compressed) |
 
 ## Using it in three.js (r169)
 
@@ -120,14 +130,12 @@ Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.05
 | `extract_head_g2.py`, `extract_head.py`, `hair_gen.js`, `strands.js`, `hair_strands.js`, `hair_tex.js`, `hair_material.js`, `preview.html`, `render.mjs`, `compress.mjs` | the sources | made here, CC0 1.0 |
 | G2's body | the head the hair grows on | built from MakeHuman base.obj and targets (CC0 1.0, `LICENSE.ASSETS.md` in github.com/makehumancommunity/makehuman) |
 
-## Known gaps against the photos (crude round)
+## Known gaps against the photos
 
-- The real cut sweeps out from the part in smooth S-curves; ours hangs straighter and looks shaggier.
-- The middle of the forehead is open (the part), but the fringe halves don't yet reach the brows evenly.
-- A few long strays arc above the top.
-- There is no side reference photo yet.
-- The draw is about twice the short cut's (873k triangles at full density; the LOD halves it). On software GL it is
-  heavy; it has not been measured on a GPU or a phone.
+- The back is a smoother, darker mass than the photo; its clumps and light-catching texture are weaker.
+- The crown has less height than in the side photo.
+- From the side, the fringe's front edge reads a little straight.
+- The draw is heavy: 985k triangles at full density (the LOD halves it). It has not been measured on a GPU or a phone.
 
 ## Rebuild
 

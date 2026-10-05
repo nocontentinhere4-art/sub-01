@@ -63,7 +63,7 @@ vec3 light(vec3 T, vec3 N, vec3 V, vec3 L, vec3 col, vec3 alb, float id){
   float wrap = clamp((dot(N, L) + 0.4) / 1.4, 0.0, 1.0);
   float dif = mix(0.3, 1.0, sqrt(max(0.0, 1.0 - pow(dot(T, L), 2.0))));
   vec3 T1 = normalize(T + N * (0.10 + 0.12 * id)), T2 = normalize(T + N * (-0.10 + 0.16 * id));
-  vec3 spec = vec3(0.020) * kk(T1, H, 120.0) + vec3(0.016, 0.010, 0.006) * kk(T2, H, 30.0);   // dry: the albedo is ~0.01
+  vec3 spec = (vec3(0.012) * kk(T1, H, 60.0) + vec3(0.012, 0.008, 0.005) * kk(T2, H, 18.0)) * (0.5 + vS.y);   // dry, soft sheen; per-hair variation
   return col * wrap * (alb * dif + spec);
 }
 void main(){

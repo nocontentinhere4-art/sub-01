@@ -90,7 +90,7 @@ function timeDraw(cam, useLod, w, h){
 // ---- the comparison sheet: each close-up next to a real photo of short black hair at about the same angle
 // (ref/*.jpg, cropped to the hair above the brows; sources and licences in README.md), then the room distance.
 const loadImg = src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
-const REFS = {front: [360, 640, 520, 300], q34: [470, 0, 680, 270], back: [330, 100, 540, 620]};   // x, y, w, h (side: no reference yet)
+const REFS = {front: [360, 640, 520, 300], q34: [470, 0, 680, 270], side: [540, 250, 610, 750], back: [330, 100, 540, 620]};   // x, y, w, h
 const refs = {}; for (const k in REFS) refs[k] = await loadImg(`./ref/${k}.jpg`);
 const ONLY = new URLSearchParams(location.search).get("views");   // e.g. ?views=front,q34 for a crude first look
 const S = 480, sheet = document.createElement("canvas"); sheet.width = S * 4; sheet.height = ONLY ? S : S * 3;
