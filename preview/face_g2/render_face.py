@@ -106,7 +106,6 @@ def main():
                     sys.exit("page error: " + " | ".join(errors[:5]))
                 pg.wait_for_timeout(1000)
             compose(pg.evaluate("window.__panels()"), args.out)
-            (HERE / "face_shape_delta.json").write_text(json.dumps(pg.evaluate("window.__shape")))   # for G2 to bake
             panels = pg.evaluate("window.__panels()")
             strip = Image.new("RGB", (3 * 600 + 4 * 12, 220 + 50), (22, 22, 24)); sd = ImageDraw.Draw(strip)
             try:
