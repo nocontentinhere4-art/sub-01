@@ -564,13 +564,15 @@ export function createMH(env) {
     sc.a.setEffectiveWeight(1); env.mixer.update(0);
   }
   // ---------- G11's hair (room/hair: ~60,000 strands grown on G2's head; preview/hair-mh): on the Head bone (its frame is
-  // the bone's rest frame), the half-density LOD at room distance, lit from the room's own lights ----------
+  // the bone's rest frame), the half-density LOD at room distance, lit from the room's own lights; preview/hair-mh 875d61c ----------
   const HAIR = {mesh: null, t: 9};
   function hairInit() {
     if (HAIR.tried) return; HAIR.tried = true;
     Promise.all([env.load("room/hair/hair_mh.glb"), import("./hair/hair_strands.js")]).then(([g, mod]) => {
       const hair = g.scene.getObjectByName("hair_mh") || g.scene, head = env.bones.Head; if (!head) return;
-      hair.position.set(0, 0, 0); head.add(hair); HAIR.mesh = mod.useStrands(THREE, hair, {lod: true}); HAIR.root = hair;
+      hair.position.set(0, 0, 0); head.add(hair); HAIR.root = hair;
+      // (half the hairs at room distance; the spine turns on the collar collider: the nape hair stays on the hood)
+      HAIR.mesh = mod.useStrands(THREE, hair, {lod: 0.5, spine: env.boy.getObjectByName("Spine")});
       hair.traverse(o => { if (o.isMesh) o.castShadow = false; });
     }).catch(e => console.warn("hair:", e));
   }
