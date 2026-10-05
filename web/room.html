@@ -584,6 +584,50 @@ if (TRIPO) Promise.all([load("room/controller.glb"), load("room/monitor.glb"),
   const m = mg.scene.getObjectByName("monitor"); if (m) scene.add(m);
   offMat.roughness = 0.32; offMat.envMap = scene.environment; offMat.envMapIntensity = 0.35; offMat.needsUpdate = true;
 }).catch(e => console.warn("controller/monitor", e));
+// the room upgrade (preview/room-upgrade), owner-approved pieces of the props previews, already in place in world metres:
+// props_picked.glb (room_build/pick_props.mjs, from preview/props-hard): the woven laundry basket, the key bowl with the
+// keys, the notebook with a pen and a pencil; sneakers_door.glb (room_build/pick_sneakers.mjs, from preview/props-soft):
+// the upright pair by the door. And the clothes the owner turned down come out of the room: the hoodie on the door, the
+// jeans on the floor, the T-shirt and the grey cushion on the floor (UPGRADE_DROP)
+const UPGRADE_DROP = {hide:["hang_hoodie", "hang_rib", "denim", "cushion"], cut:[["jersey", [0.94, 0.15, 0.60], [1.70, 0.31, 1.36]]],
+  floor:[[0.94, 0.59, 1.70, 1.37], [0.21, 1.12, 0.74, 1.63]]};          // (x0, z0, x1, z1): the cushion with the T-shirt, the jeans
+if (TRIPO) Promise.all([load("room/props_picked.glb"), load("room/sneakers_door.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([pg, sg]) => {
+  room.traverse(o => { if (o.isMesh && o.material && UPGRADE_DROP.hide.includes(o.material.name)) o.visible = false; });
+  for (const [mat, lo, hi] of UPGRADE_DROP.cut) { const b = new THREE.Box3(new THREE.Vector3(...lo), new THREE.Vector3(...hi));
+    room.traverse(o => { if (o.isMesh && o.material && o.material.name === mat) cutBox(o, b); }); }
+  // the floor's baked occlusion (its aoMap, on uv1) still holds the dark patches those clothes threw: lighten them away
+  let fl = null; room.traverse(o => { if (o.isMesh && o.material && o.material.name === "floor") fl = o; });
+  const ao = fl && fl.material.aoMap, uv = fl && (fl.geometry.attributes.uv1 || fl.geometry.attributes.uv);
+  if (ao && ao.image && uv) {
+    fl.updateMatrixWorld(true); const P = fl.geometry.attributes.position, idx = fl.geometry.index, w = [0, 1, 2].map(k => idx ? idx.getX(k) : k);
+    const p = w.map(i => new THREE.Vector3().fromBufferAttribute(P, i).applyMatrix4(fl.matrixWorld)), t = w.map(i => [uv.getX(i), uv.getY(i)]);
+    // the affine map from world (x, z) to uv, from the floor's first triangle
+    const d1 = [p[1].x - p[0].x, p[1].z - p[0].z], d2 = [p[2].x - p[0].x, p[2].z - p[0].z], det = d1[0] * d2[1] - d1[1] * d2[0];
+    const toUV = (x, z) => { const a = ((x - p[0].x) * d2[1] - (z - p[0].z) * d2[0]) / det, b = (d1[0] * (z - p[0].z) - d1[1] * (x - p[0].x)) / det;
+      return [0, 1].map(k => t[0][k] + a * (t[1][k] - t[0][k]) + b * (t[2][k] - t[0][k])); };
+    const W = ao.image.width, H = ao.image.height, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g2 = cv.getContext("2d"); g2.drawImage(ao.image, 0, 0); g2.globalCompositeOperation = "lighten"; g2.fillStyle = "#fff";
+    g2.filter = `blur(${Math.max(2, Math.round(W / 256))}px)`;
+    for (const [x0, z0, x1, z1] of UPGRADE_DROP.floor) { const a = toUV(x0, z0), b = toUV(x1, z1);
+      g2.fillRect(Math.min(a[0], b[0]) * W, Math.min(a[1], b[1]) * H, Math.abs(b[0] - a[0]) * W, Math.abs(b[1] - a[1]) * H); }
+    const nt = new THREE.CanvasTexture(cv); nt.flipY = ao.flipY; nt.colorSpace = ao.colorSpace; nt.wrapS = ao.wrapS; nt.wrapT = ao.wrapT;
+    nt.channel = ao.channel; nt.anisotropy = ao.anisotropy; fl.material.aoMap = nt; fl.material.needsUpdate = true; }
+  for (const g of [pg, sg]) { g.scene.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; }); scene.add(g.scene); }
+}).catch(e => console.warn("room upgrade props", e));
+// the new desk chair (room_build/build_chair.mjs: an office chair modelled in code, its seat 0.52 m over the floor where he
+// sits): its meshes go into the room's own "chair" node in place of the old ones, so the node, its place and everything
+// that moves it (CHAIR: pulled out, swivelled, ridden in, left where his legs push it) stay as they are. Built at 0.52 m,
+// boy_mh.js's raiseChair() (the old chair's 1.6 cm lift) must not raise it again: marked raised
+if (TRIPO) Promise.all([load("room/chair_office.glb"),
+  new Promise(ok => { const wait = () => room && chairNode() ? ok() : setTimeout(wait, 100); wait(); })]).then(([cg]) => {
+  const n = chairNode(), src = cg.scene.getObjectByName("chair_office"); if (!n || !src) return;
+  for (const c of [...n.children]) n.remove(c);
+  for (const c of [...src.children]) { c.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = m.material.name === "chair_chrome" ? 1.0 : 0.5; }); n.add(c); }
+  n.userData.raised = true; n.updateMatrixWorld(true); VOX = null;
+}).catch(e => console.warn("chair_office.glb", e));
 // the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C
 // (tex_prep.py: x 683..1024 of 1024, y 0..341 of 512)
 if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"),

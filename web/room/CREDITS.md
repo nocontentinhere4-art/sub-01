@@ -321,3 +321,20 @@ as a forecast or an observation.
 
 The body is fictional (MakeHuman's base with generic macro settings) and resembles no real person. In the room the watching mode takes its
 pelvis and legs from the mouse clip, so he sits in the chair with his feet on the floor (the recorded clip props them up).
+
+## The room upgrade (preview/room-upgrade)
+Owner-approved pieces from the props previews, a new desk chair, and the clothes the owner turned down taken out:
+- `chair_office.glb` (`room_build/build_chair.mjs`, its shape in `room_build/chair_shape.mjs`): a generic ergonomic office
+  chair modelled in code for this project (CC0; no maker's design or logo), its seat cushion 0.52 m over the floor where he
+  sits, 0.50 × 0.48 m, with a waterfall front, a mesh back in a plastic frame, T-armrests, a gas lift with a chrome piston and
+  a five-star base on twin-wheel casters. The seat fabric's and the mesh's weave normal maps are drawn by the build script;
+  the plastic uses ambientCG's **Plastic 016 A** (CC0 1.0) via `desk_pbr.mjs`. The page puts its meshes into the room's own
+  `chair` node, so where it stands and how it is pulled, swivelled and ridden stay as they were.
+- `props_picked.glb` (`room_build/pick_props.mjs`, from preview/props-hard's `props_clutter.glb`): the laundry hamper
+  (Poly Haven `wicker_basket_02`, Kuutti Siitonen), the key bowl (`wooden_bowl_02`, Kuutti Siitonen) with the keys in it
+  (modelled for preview/props-hard), and the notebook (`binder_notebook`, DaDrood; its emblem cloned out) with a pen and a
+  pencil (`stationery_supplies`, Mateusz Sadek; the printed maker's name cloned out). All CC0 1.0 (https://polyhaven.com).
+- `sneakers_door.glb` (`room_build/pick_sneakers.mjs`, from preview/props-soft's `room_clean.glb`): the pair of worn canvas
+  sneakers standing by the door, modelled in code for preview/props-soft (`props_soft.py`), CC0, no brand.
+- Taken out at load (`web/room.html`, UPGRADE_DROP): the hoodie on the door, the jeans on the floor, and the T-shirt with the
+  grey floor cushion under it. Their baked shadows are lightened out of the floor's occlusion map.
