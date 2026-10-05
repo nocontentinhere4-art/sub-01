@@ -17,6 +17,7 @@ import { paintScalp } from "./hair_tex.js";
 import { scalpMaterial, setupHair } from "./hair_material.js";
 import { growStrands } from "./strands.js";
 import { strandMesh } from "./hair_strands.js";
+import { pushOutOfSkin } from "./collide.js";
 
 const H = await (await fetch("./head_g2.json")).json();
 const tex = (cv, name) => { const t = new THREE.CanvasTexture(cv); t.flipY = false; t.name = name; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return t; };
@@ -24,6 +25,9 @@ const tex = (cv, name) => { const t = new THREE.CanvasTexture(cv); t.flipY = fal
 const t0 = performance.now();
 const hair = buildHair(THREE, H.head, {layers: []});            // the head's helpers and the painted scalp base, no cards
 const grown = growStrands(THREE, hair, {count: 62000});
+const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.Float32BufferAttribute(H.head.v, 3)); hg.setIndex(H.head.i); hg.computeVertexNormals();
+// no hair point inside the skin: 2 mm out, 6 mm round the ears (partly weighted to the neck, they move a little against the Head bone in the clips)
+const pushed = pushOutOfSkin(THREE, grown.lines, hg, {margin: p => (hair.ear(p) ? 0.006 : 0.002) / H.map.s});
 const msGrow = Math.round(performance.now() - t0);
 const scalpCanvas = paintScalp(hair.scalpStrokes);
 const scalp = new THREE.Mesh(hair.scalp, scalpMaterial(THREE, tex(scalpCanvas, "hair_scalp"))); scalp.name = "hair_scalp"; scalp.renderOrder = 1;
@@ -44,7 +48,6 @@ const glb = await new GLTFExporter().parseAsync(exportGroup, {binary: true});
 
 // ---- the stand-in head (G2's, plain skin), the eyes, the scalp base and the strands
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8c8c8c);
-const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.Float32BufferAttribute(H.head.v, 3)); hg.setIndex(H.head.i); hg.computeVertexNormals();
 scene.add(new THREE.Mesh(hg, new THREE.MeshStandardMaterial({color: 0xc49a82, roughness: 0.58})));
 { // G2's own eyeballs (MakeHuman's high-poly eyes, CC0) with their iris colours
   const eg = new THREE.BufferGeometry(); eg.setAttribute("position", new THREE.Float32BufferAttribute(H.eyes.v, 3));
@@ -113,7 +116,7 @@ if (!ONLY){
 }
 
 const stats = {...grown.stats, ribbonVerts: full.geometry.attributes.position.count, ribbonTris: full.geometry.index.count / 3,
-  lodTris: lod.geometry.drawRange.count / 3, msGrow,
+  lodTris: lod.geometry.index.count / 3, msGrow, pushedPoints: pushed.moved, pushedHairs: pushed.hairs,
   msDrawFull_close480: timeDraw(closeCam, false, S, S), msDrawLod_room1280x800: timeDraw(far.cam, true, 1280, 800),
   msDrawFull_room1280x800: timeDraw(far.cam, false, 1280, 800)};
 const b64 = buf => { let s = ""; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };

@@ -1,0 +1,83 @@
+<!doctype html><html><body style="margin:0;background:#888">
+<script type="importmap">{ "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }</script>
+<script type="module">
+// The hair on the dressed G2 in a clip, as the room page binds it: hair_mh parented to the "Head" bone, the strands
+// with the collar collider on the "Spine" bone, the clothes' corrective shapes driven each frame. Renders
+//   on_g2_<clip>.png: front and 3/4 close (all hairs), then front and 3/4 at 2.2 m through room.html's 30-degree lens
+//   (the half LOD), head and torso cropped at 1:1 pixels from the 1280x800 frame;
+//   hair_lod_room.png: the head at 2.2 m at 1:1 pixels with all hairs, 1/2, 1/4 and 1/8.
+// Files next to it: boy_g2_dressed.glb, <clip>.glb (clips_g2), hair_mh.glb. ?clip=room_read&t=6 (seconds)
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { useStrands } from "./hair_strands.js";
+const Q = new URLSearchParams(location.search), CLIP = Q.get("clip") || "room_read", T = +(Q.get("t") || 6);
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const [dressed, clipG] = await Promise.all(["boy_g2_dressed.glb", CLIP + ".glb"].map(f => loader.loadAsync("./" + f)));
+const root = dressed.scene, CORR = (dressed.parser.json.extras || {}).correctives, head = root.getObjectByName("Head"), spine = root.getObjectByName("Spine");
+root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+const hairs = [];
+async function addHair(lod){ const g = await loader.loadAsync("./hair_mh.glb"), h = g.scene.getObjectByName("hair_mh"); h.position.set(0, 0, 0); head.add(h);
+  const m = useStrands(THREE, h, {lod, spine}); hairs.push({h, m}); return h; }
+const LODS = [false, 0.5, 0.25, 0.125];
+for (const l of LODS) await addHair(l);
+if (Q.get("wexp")) hairs.forEach((x, i) => { if (LODS[i]) x.m.material.uniforms.width.value = 0.00008 * Math.pow(1 / LODS[i], +Q.get("wexp")); });   // tuning
+const show = k => hairs.forEach((x, i) => x.h.visible = i === k);
+const mixer = new THREE.AnimationMixer(root); mixer.clipAction(clipG.animations[0]).play(); mixer.setTime(T);
+root.updateMatrixWorld(true);
+{ // the clothes' corrective shapes (README of clothes_mh)
+  const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const p = n => { const v = new THREE.Vector3(); root.getObjectByName(n).getWorldPosition(v); return v; };
+  const down = p("Hips").sub(p("neck")).normalize(), deg = (a, b) => THREE.MathUtils.radToDeg(a.angleTo(b)), w = {};
+  for (const [name, d] of Object.entries(CORR ? CORR.drivers : {})){
+    let v = 0;
+    if (d.type === "hip_bend") v = (deg(p("LeftLeg").sub(p("LeftUpLeg")), down) + deg(p("RightLeg").sub(p("RightUpLeg")), down)) / 2;
+    else if (d.type === "elbow_bend") v = deg(p(d.side + "ForeArm").sub(p(d.side + "Arm")), p(d.side + "Hand").sub(p(d.side + "ForeArm")));
+    else if (d.type === "chest_up"){ const f = new THREE.Vector3().crossVectors(p("LeftArm").sub(p("RightArm")), down.clone().negate()).normalize(); v = f.y; }
+    w[name] = smooth(d.from, d.to, v);
+  }
+  root.traverse(o => { if (o.isMesh && o.morphTargetDictionary) for (const [nm, i] of Object.entries(o.morphTargetDictionary)) o.morphTargetInfluences[i] = w[nm] || 0; });
+}
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8c8c8c); scene.add(root);
+const r = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true}); r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.55;
+const key = new THREE.DirectionalLight(0xffffff, 1.7), rim = new THREE.DirectionalLight(0xffffff, 0.9);
+scene.add(key, rim, new THREE.HemisphereLight(0xffffff, 0x6a625c, 0.35));
+// the body faces +z in the clip's frame at its start; the camera is placed round the Hips' facing
+const hips = new THREE.Vector3(), hj = new THREE.Vector3(); root.getObjectByName("Hips").getWorldPosition(hips); head.getWorldPosition(hj);
+const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(root.getObjectByName("Hips").getWorldQuaternion(new THREE.Quaternion())); fwd.y = 0; fwd.normalize();
+const yaw = Math.atan2(fwd.x, fwd.z);
+function cam(az, dist, look, w, h){
+  const a = yaw + az * Math.PI / 180, c = new THREE.PerspectiveCamera(30, w / h, 0.02, 50);
+  c.position.set(look.x + Math.sin(a) * dist, look.y + 0.05, look.z + Math.cos(a) * dist); c.lookAt(look); return c;
+}
+function lights(c){ // key from the camera's upper right, rim from behind
+  const f = new THREE.Vector3().subVectors(hj, c.position).setY(0).normalize(), rt = new THREE.Vector3(-f.z, 0, f.x);
+  key.position.copy(hj).addScaledVector(f, -1.6).addScaledVector(rt, 0.9).setY(hj.y + 0.7); key.target.position.copy(hj); scene.add(key.target);
+  rim.position.copy(hj).addScaledVector(f, 1.6).addScaledVector(rt, -1.0).setY(hj.y + 0.3); rim.target.position.copy(hj); scene.add(rim.target);
+  for (const x of hairs){ const u = x.m.material.uniforms; u.keyDir.value.subVectors(key.position, hj).normalize(); u.rimDir.value.subVectors(rim.position, hj).normalize(); }
+}
+function shot(c, w, h){ lights(c); r.setSize(w, h, false); r.render(scene, c);
+  const gl = r.getContext(); gl.colorMask(false, false, false, true); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.colorMask(true, true, true, true); r.resetState();
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d").drawImage(r.domElement, 0, 0); return cv; }
+const S = 640, sheet = document.createElement("canvas"); sheet.width = S * 2; sheet.height = S * 2; const g = sheet.getContext("2d");
+const chest = hj.clone().add(new THREE.Vector3(0, -0.2, 0));
+show(0);
+g.drawImage(shot(cam(0, 1.5, chest, S, S), S, S), 0, 0);
+g.drawImage(shot(cam(40, 1.5, chest, S, S), S, S), S, 0);
+show(1);
+const upper = hj.clone().add(new THREE.Vector3(0, -0.3, 0));
+for (const [i, az] of [[0, 0], [1, 40]]){
+  const c = cam(az, 2.2, upper, 1280, 800), f = shot(c, 1280, 800);   // room.html's lens at 2.2 m
+  const p = upper.clone().project(c), cx = (p.x * 0.5 + 0.5) * 1280, cy = (1 - (p.y * 0.5 + 0.5)) * 800;
+  g.drawImage(f, cx - 300, cy - 300, 600, 600, i * S + 20, S + 20, 600, 600);                         // head and torso at 1:1 pixels
+}
+// the LOD strip: the head at 2.2 m, 1:1 pixels, each density
+const lodC = document.createElement("canvas"); lodC.width = 4 * 200; lodC.height = 200; const lg = lodC.getContext("2d");
+LODS.forEach((l, i) => { show(i); const c = cam(30, 2.2, hj, 1280, 800), f = shot(c, 1280, 800); const p = hj.clone().project(c);
+  lg.drawImage(f, (p.x * 0.5 + 0.5) * 1280 - 100, (1 - (p.y * 0.5 + 0.5)) * 800 - 100, 200, 200, i * 200, 0, 200, 200); });
+const tris = hairs.map(x => x.m.geometry.index.count / 3);
+window.OUT = {clip: CLIP, t: T, tris, widths: hairs.map(x => x.m.material.uniforms.width.value),
+  ["on_g2_" + CLIP + "_png"]: sheet.toDataURL("image/png").split(",")[1], hair_lod_room_png: lodC.toDataURL("image/png").split(",")[1]};
+</script></body></html>

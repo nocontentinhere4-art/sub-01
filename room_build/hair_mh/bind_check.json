@@ -1,0 +1,354 @@
+{
+ "hairs": 60304,
+ "points": 545998,
+ "collar": true,
+ "dt": 0.25,
+ "clips": {
+  "room_read": {
+   "duration": 17.47,
+   "frames": 70,
+   "maxHairsInSkin": 1,
+   "maxHairsThroughHoodie": 0,
+   "framesWithCollarPush": 18,
+   "maxPointsPushed": 102,
+   "maxPushMm": 8.7,
+   "rows": [
+    {
+     "t": 0,
+     "pushed": 0,
+     "pushMaxMm": 0,
+     "inPts": 1,
+     "inHairs": 1,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 5.25,
+     "pushed": 0,
+     "pushMaxMm": 0,
+     "inPts": 1,
+     "inHairs": 1,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 10.5,
+     "pushed": 3,
+     "pushMaxMm": 1.7,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 10.75,
+     "pushed": 41,
+     "pushMaxMm": 5.7,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 11,
+     "pushed": 48,
+     "pushMaxMm": 6.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 11.25,
+     "pushed": 31,
+     "pushMaxMm": 4.8,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 11.5,
+     "pushed": 15,
+     "pushMaxMm": 3.5,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 11.75,
+     "pushed": 5,
+     "pushMaxMm": 2.8,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 12,
+     "pushed": 5,
+     "pushMaxMm": 2.7,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 12.25,
+     "pushed": 3,
+     "pushMaxMm": 2,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 12.5,
+     "pushed": 2,
+     "pushMaxMm": 1.2,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 12.75,
+     "pushed": 1,
+     "pushMaxMm": 0.9,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 14.5,
+     "pushed": 2,
+     "pushMaxMm": 1.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 14.75,
+     "pushed": 1,
+     "pushMaxMm": 0.2,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 15.25,
+     "pushed": 102,
+     "pushMaxMm": 8.7,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 15.75,
+     "pushed": 50,
+     "pushMaxMm": 7,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16,
+     "pushed": 7,
+     "pushMaxMm": 2.9,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16.25,
+     "pushed": 3,
+     "pushMaxMm": 1.8,
+     "inPts": 1,
+     "inHairs": 1,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16.5,
+     "pushed": 4,
+     "pushMaxMm": 2.5,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16.75,
+     "pushed": 2,
+     "pushMaxMm": 1.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    }
+   ]
+  },
+  "room_drink": {
+   "duration": 17.97,
+   "frames": 72,
+   "maxHairsInSkin": 0,
+   "maxHairsThroughHoodie": 0,
+   "framesWithCollarPush": 16,
+   "maxPointsPushed": 15056,
+   "maxPushMm": 69.1,
+   "rows": [
+    {
+     "t": 12.25,
+     "pushed": 424,
+     "pushMaxMm": 17.6,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 12.5,
+     "pushed": 4787,
+     "pushMaxMm": 40.5,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 12.75,
+     "pushed": 10375,
+     "pushMaxMm": 53,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 13,
+     "pushed": 14314,
+     "pushMaxMm": 61.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 13.25,
+     "pushed": 15056,
+     "pushMaxMm": 63.4,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 13.5,
+     "pushed": 14215,
+     "pushMaxMm": 61.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 13.75,
+     "pushed": 6351,
+     "pushMaxMm": 42.7,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 15.75,
+     "pushed": 711,
+     "pushMaxMm": 43.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16,
+     "pushed": 2088,
+     "pushMaxMm": 64.5,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16.25,
+     "pushed": 1693,
+     "pushMaxMm": 66.3,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16.5,
+     "pushed": 1783,
+     "pushMaxMm": 69.1,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 16.75,
+     "pushed": 1813,
+     "pushMaxMm": 68.8,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 17,
+     "pushed": 3145,
+     "pushMaxMm": 66.2,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 17.25,
+     "pushed": 4406,
+     "pushMaxMm": 67.1,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 17.5,
+     "pushed": 4161,
+     "pushMaxMm": 65.8,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    },
+    {
+     "t": 17.75,
+     "pushed": 4049,
+     "pushMaxMm": 64.8,
+     "inPts": 0,
+     "inHairs": 0,
+     "cross": 0,
+     "crossHairs": 0
+    }
+   ]
+  }
+ }
+}
