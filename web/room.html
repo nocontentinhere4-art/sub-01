@@ -1095,7 +1095,7 @@ $("cam").onclick = () => { pinned = !pinned; CAM.force = pinned ? "overview" : n
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
-const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, keptLos:-9, aim:new THREE.Vector3(0, -9, 0)};
+const CAM = {kind:null, since:0, cut:false, force:null, ang:0, pick:null, losAt:-9, keptLos:-9, clear:true, viaPhone:false, aim:new THREE.Vector3(0, -9, 0)};
 const SHOT_S = {face:14, screen:12, medium:16, over:12};                  // seconds a shot holds before the cycle moves on
 // the overview is in every cycle and holds three quarters of what the other shots hold together: >= 40 % of the time
 const holdOf = (kind, list) => kind === "overview" ? Math.max(12, 0.75 * list.reduce((s, k) => s + (SHOT_S[k] || 0), 0)) : SHOT_S[kind];
@@ -1149,7 +1149,7 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
     if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12) {
       if (T - CAM.keptLos < 0.25) { CAM.ang = CAM.pick; return out; }
       CAM.keptLos = T;
-      if (!occluded(out, c) && !(eyes && (faceHidden(out, c) || bodyBlocks(out, c, 0.12)))) { CAM.ang = CAM.pick; return out; }
+      if (!occluded(out, c) && !(eyes && (faceHidden(out, c) || bodyBlocks(out, c, 0.12)))) { CAM.ang = CAM.pick; CAM.clear = true; return out; }
     }
   }
   CAM.aim.copy(c);
@@ -1167,6 +1167,7 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
     if (s > bestS + 1e-6) { bestS = s; best = out.clone(); bestA = a; }
   }
   CAM.losAt = T;
+  CAM.clear = !!best;                                                      // (false: nothing clear, the least blocked)
   if (best) { CAM.ang = CAM.pick = bestA; return out.copy(best); }
   CAM.ang = CAM.pick = fallA; return out.copy(fallback);                   // nothing clear: the least blocked (how far round him, 0 = his front)
 }
@@ -1191,16 +1192,17 @@ function bodyBlocks(pos, p, spare){
     if (segDist(pos, _bq, _ba, _bb) < r) return true; }
   return false;
 }
-// the phone shot: his face and the phone in his hands, from a front three-quarter a little above his head (sitting,
+// the phone shot: his face and the phone in his hands, 1.2 m off, from a front three-quarter a little above his head (sitting,
 // standing) or from the open side of the bed (lying): the first angle whose position clears the walls, the furniture,
-// the room's meshes and his own body (to his face and to the phone), at least 0.8 m from his head; the settled angle is
+// the room's meshes and his own body (to his face and to the phone), at least 0.95 m from his head; the settled angle is
 // kept while it still clears them (checked every 0.25 s)
 const PHONE_ANGS = {sit:[38, -38, 62, -62, 88, -88, 18, -18], lie:[90, -90, 65, -65, 115, -115]};
 function phoneShot(out, aim, face, ph, facing, lying){
-  const angs = lying ? PHONE_ANGS.lie : PHONE_ANGS.sit, dist = lying ? 1.15 : 1.05, h = lying ? 0.6 : 0.32;
+  const angs = lying ? PHONE_ANGS.lie : PHONE_ANGS.sit, dist = lying ? 1.15 : 1.2, h = lying ? 0.6 : 0.34;
   const at = a => { out.copy(aim).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h); return out; };
-  const ok = a => { at(a); if (camClamp(out) + (camInside(out) ? 1 : 0) >= 0.12 || out.distanceTo(face) < 0.8) return false;
-    return !occluded(out, aim) && !bodyBlocks(out, face, 0.12) && !bodyBlocks(out, ph, 0.09) && !faceHidden(out, face); };
+  const ok = a => { at(a); if (camClamp(out) + (camInside(out) ? 1 : 0) >= 0.12 || out.distanceTo(face) < 0.95) return false;
+    return !occluded(out, aim) && !occluded(out, face) && !occluded(out, ph)                       // (the desk lamp beside the monitor)
+      && !bodyBlocks(out, face, 0.12) && !bodyBlocks(out, ph, 0.09) && !faceHidden(out, face); };
   if (!(CAM.cut || CAM.pick === null) && angs.includes(CAM.pick)) {
     if (T - CAM.keptLos < 0.25) { CAM.ang = CAM.pick; return at(CAM.pick); }
     CAM.keptLos = T; if (ok(CAM.pick)) { CAM.ang = CAM.pick; return out; }
@@ -1237,9 +1239,17 @@ function updateCameraGoal(){
   if (CAM.kind === "face") {
     // a medium close-up of his face: from the front-left (at the desk: from the desk's end, the monitor lighting him);
     // lying down: from the side of the bed, looking down at him
-    if (lying) camAround(camGoal.pos, v2, v3, 1.1, 0.6, 90, true); else camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0, true);   // eyes: his phone or hands must not hide his face
-    camGoal.target.copy(v2).addScaledVector(UP, -0.06);
-    if (atDesk) camGoal.target.lerp(v5.set(...SURF.monitor.c), 0.12);
+    // on the phone with no clear angle on his face (on the desk chair the desk and the wall are in front of him: the
+    // rear three-quarter is his hood), the phone shot's search instead, framed closer on his face; kept till the next cut
+    if (CAM.cut) CAM.viaPhone = false;
+    if (!CAM.viaPhone) { if (lying) camAround(camGoal.pos, v2, v3, 1.1, 0.6, 90, true); else camAround(camGoal.pos, v2, v3, 1.25, 0.14, atDesk ? -52 : 0, true); }   // eyes: his phone, hands or body must not hide his face
+    if (onPhone && (CAM.viaPhone || !CAM.clear)) {
+      CAM.viaPhone = true; phone.getWorldPosition(v1); camGoal.target.copy(v1).lerp(v2, 0.7);
+      phoneShot(camGoal.pos, camGoal.target, v2, v1, v3, lying);
+    } else {
+      camGoal.target.copy(v2).addScaledVector(UP, -0.06);
+      if (atDesk) camGoal.target.lerp(v5.set(...SURF.monitor.c), 0.12);
+    }
   } else if (CAM.kind === "medium") {
     camAround(camGoal.pos, v1, v3, 2.4, lying ? 1.0 : 0.5, 50);
     if (!lying && Math.abs(CAM.ang) >= 90) camAround(camGoal.pos, v1, v3, 3.0, 0.1, CAM.ang);   // a profile (at the sill he faces the wall): lower and further, so the hood does not hide his face
@@ -1261,7 +1271,7 @@ function updateCameraGoal(){
     // the overview instead, never a hood that fills the frame; the same 30° vertical field of view holds less width,
     // so the camera stands a third further back, and the aim point is lifted by an eighth of the distance (a seventh
     // of the frame's height): his head sits below the top third, where the title, the plan and the chip are
-    if (CAM.kind !== "over" && !atDesk && Math.abs(CAM.ang) > 60) return overviewGoal();   // at the desk his head turns to the screen: the rear three-quarter from the desk's end shows his face
+    if (CAM.kind !== "over" && !CAM.viaPhone && !atDesk && Math.abs(CAM.ang) > 60) return overviewGoal();   // (the phone shots are searched for his face and the phone already)   // at the desk his head turns to the screen: the rear three-quarter from the desk's end shows his face
     camGoal.pos.sub(camGoal.target).multiplyScalar(1.35).add(camGoal.target); camClamp(camGoal.pos);
     camGoal.target.addScaledVector(UP, 0.12 * camGoal.pos.distanceTo(camGoal.target));
   }
