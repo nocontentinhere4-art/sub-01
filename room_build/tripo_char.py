@@ -76,6 +76,7 @@ def main():
     ap.add_argument("args", nargs="*")
     ap.add_argument("--out", default=".")
     ap.add_argument("--in-place", action="store_true")
+    ap.add_argument("--refs", default=str(REFS), help="folder with the four body views (default: the original refs)")
     ap.add_argument("--set", default="{}", help="JSON object merged over the task's default settings")
     a = ap.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
@@ -83,7 +84,7 @@ def main():
         print(req("GET", f"{API}/account/balance")["data"])
     elif a.kind == "model":
         run(a.args[0], out, "generation/multiview-to-model", lambda: {
-            "inputs": [{k: upload(REFS / v)} for k, v in VIEWS.items()],
+            "inputs": [{k: upload(Path(a.refs) / v)} for k, v in VIEWS.items()],
             "model": "v3.1-20260211", "geometry_quality": "detailed", "face_limit": 150000,
             "texture": True, "pbr": True, "texture_quality": "detailed", "texture_version": "v3.5-20260815",
             **json.loads(a.set)})
@@ -91,7 +92,7 @@ def main():
         run(a.args[0], out, "models/texture", lambda: {
             "input": a.args[1], "model": "v3.5-20260815", "pbr": True, "texture_quality": "detailed",
             "texture_alignment": "original_image",
-            "texture_prompt": {"images": [upload(REFS / v) for v in VIEWS.values()]}, **json.loads(a.set)})
+            "texture_prompt": {"images": [upload(Path(a.refs) / v) for v in VIEWS.values()]}, **json.loads(a.set)})
     elif a.kind == "rigcheck":
         tid = req("POST", f"{API}/animations/rig-check", {"input": a.args[1]})["data"]["task_id"]
         d = wait(tid)

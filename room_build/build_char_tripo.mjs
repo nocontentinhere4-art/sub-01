@@ -8,6 +8,7 @@
 //   loop stays on the spot and the stride, sway and bob are kept.
 // - Scaled to 1.75 m tall (from the bind-pose mesh top; Tripo outputs him about 0.98 units tall) on the Armature node, so
 //   the clips scale with him.
+// - MATTE=0.8 (optional): flat roughness instead of the metal/roughness map, see below.
 // - Textures to WebP (base colour 4096 px for the face, normal and metal/roughness 2048 px), geometry meshopt-compressed.
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
@@ -53,6 +54,12 @@ for (const m of root.listMeshes()) for (const pr of m.listPrimitives()) ymax = M
 for (const n of top) n.setScale(n.getScale().map(v => v * HEIGHT / ymax));
 console.log(`bind-pose mesh top ${ymax.toFixed(3)} (Tripo units); scaled x${(HEIGHT / ymax).toFixed(3)}`);
 
+// MATTE=<r>: drop Tripo's metal/roughness map (it makes the fleece and cotton read as satin) and use one flat roughness
+// and metalness 0 instead: a material setting, the colours are untouched.
+if (process.env.MATTE) for (const m of root.listMaterials()) {
+  m.setMetallicRoughnessTexture(null).setRoughnessFactor(Number(process.env.MATTE)).setMetallicFactor(0);
+  console.log(`material ${m.getName()}: roughness ${process.env.MATTE}, metalness 0, metal/roughness map removed`);
+}
 const tex = root.listTextures();
 await doc.transform(
   dedup(), prune(),
