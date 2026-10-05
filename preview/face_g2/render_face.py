@@ -105,6 +105,16 @@ def main():
                 pg.wait_for_timeout(1000)
             compose(pg.evaluate("window.__panels()"), args.out)
             (HERE / "face_shape_delta.json").write_text(json.dumps(pg.evaluate("window.__shape")))   # for G2 to bake
+            panels = pg.evaluate("window.__panels()")
+            strip = Image.new("RGB", (3 * 600 + 4 * 12, 220 + 50), (22, 22, 24)); sd = ImageDraw.Draw(strip)
+            try:
+                sf = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
+            except OSError:
+                sf = ImageFont.load_default()
+            for i, c in enumerate((0, 50, 100)):
+                strip.paste(Image.open(io.BytesIO(base64.b64decode(panels[f"blink_{c}"].split(",", 1)[1]))).convert("RGB"), (12 + i * 612, 12))
+                sd.text((16 + i * 612, 238), f"blink: lids {c} % closed", fill=(220, 220, 220), font=sf)
+            strip.save(HERE / "blink_strip.jpg", quality=88)
             print(json.dumps({"out": args.out, "info": pg.evaluate("window.__info"), "errors": errors[:5]}, default=str)[:4000])
             b.close()
     finally:

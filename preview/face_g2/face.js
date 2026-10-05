@@ -124,7 +124,7 @@ function relaxLids(THREE, skin, eyes, drop = 0.0006){
     const y0 = meanY(); b.rotateX(0.1); b.updateMatrixWorld(true); const y1 = meanY(); b.quaternion.copy(q0);
     const per = (y1 - y0) / 0.1; if (Math.abs(per) < 1e-5) continue;
     b.rotateX(-drop / per); b.updateMatrixWorld(true);                        // the turn that lowers the lid by `drop`
-    done.push([b.name, +(-drop / per).toFixed(3)]);
+    done.push({side, bone: b, per, ids: best.ids, rest: b.quaternion.clone(), turn: +(-drop / per).toFixed(3)});
   }
   skin.skeleton.update();
   return done;
@@ -164,9 +164,49 @@ function refitLashes(THREE, skin, stat, E, headBone){
       add(new THREE.Mesh(lashStrands(THREE, upper, C, 1, {count: 100, len: 0.0086, width: 0.0002, fwd: 0.0003}), strandMat), "lashes_up_" + k);
     }
     if (lower.length > 6) add(new THREE.Mesh(lashStrands(THREE, lower.slice(2, -2), C, -1, {count: 18, len: 0.0034, width: 0.0001, fwd: 0.0002}), strandMat), "lashes_low_" + k);
-    out[k] = [upper.length, lower.length];
+    const midY = pts => { const c = pts.filter(p => Math.abs(p.x - C.x) < r * 0.3); return c.reduce((s, p) => s + p.y, 0) / Math.max(1, c.length); };
+    out[k] = {upper: upper.length, lower: lower.length, gap: upper.length && lower.length ? midY(upper) - midY(lower) : 0.009, lowerY: lower.length ? midY(lower) : C.y - r * 0.4, cx: C.x, r};
   }
   return out;
+}
+
+// the blink and the eyes' small movements. Each upper lid's bone (relaxLids found it) turns the lid down over the ball
+// by 95 % of the gap between the lids; the upper lash line and lashes are moved under that bone so they close with the
+// lid. A blink every 3 to 6 s (now and then a double one): 80 ms down, 40 ms shut, 150 ms up. The eyes (their groups)
+// make a small saccade every 1 to 3 s, a degree or two, and come back toward the middle.
+//   const b = info.blink; each frame: b.update(dt); or b.set(closure 0..1) for a still
+function blinkRig(THREE, root, headBone, lids, edges, skin){
+  const lid = {}, v = new THREE.Vector3(), qq = new THREE.Quaternion(), XA = new THREE.Vector3(1, 0, 0);
+  for (const d of lids) { const k = d.side === "L" ? "l" : "r", e = edges[k]; if (!e) continue;
+    // the turn that brings the middle of the upper lid's edge down to the lower lid's edge (found by bisection: the
+    // lid's travel is not linear in the turn); the turn's sign is the one that lowered the lid in relaxLids
+    const dir = d.per > 0 ? -1 : 1, P = skin.geometry.attributes.position;
+    const mid = d.ids.filter(i => Math.abs(v.fromBufferAttribute(P, i).x - e.cx) < e.r * 0.35);
+    const lowest = a => { d.bone.quaternion.copy(d.rest).multiply(qq.setFromAxisAngle(XA, dir * a)); d.bone.updateMatrixWorld(true); skin.skeleton.update();
+      let m = Infinity; for (const i of mid) { v.fromBufferAttribute(P, i); skin.applyBoneTransform(i, v); m = Math.min(m, v.y); } return m; };
+    let lo = 0, hi = 0.9; const target = e.lowerY + 0.0004;
+    for (let it = 0; it < 22; it++) { const a = (lo + hi) / 2; if (lowest(a) > target) lo = a; else hi = a; }
+    d.bone.quaternion.copy(d.rest); d.bone.updateMatrixWorld(true);
+    lid[k] = {bone: d.bone, rest: d.rest.clone(), full: dir * lo};
+    root.updateMatrixWorld(true);
+    for (const nm of ["lash_" + k, "lashes_up_" + k]) { const o = headBone.getObjectByName(nm); if (o) d.bone.attach(o); } }
+  const eyes = ["l", "r"].map(k => headBone.getObjectByName("eye_" + k)).filter(Boolean), eyeRest = eyes.map(e => e.quaternion.clone());
+  const q = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0);
+  const set = c => { for (const k in lid) { const L = lid[k]; L.bone.quaternion.copy(L.rest).multiply(q.setFromAxisAngle(X, L.full * c)); } };
+  let t = 0, next = 3 + Math.random() * 3, phase = -1, sacT = 1 + Math.random() * 2, look = [0, 0], cur = [0, 0];
+  const closure = s => s < 0.08 ? s / 0.08 : s < 0.12 ? 1 : s < 0.27 ? 1 - (s - 0.12) / 0.15 : 0;
+  return {
+    set,
+    update(dt){
+      t += dt;
+      if (phase < 0 && t > next) { phase = 0; }
+      if (phase >= 0) { phase += dt; set(closure(phase)); if (phase > 0.27) { phase = -1; t = 0; next = Math.random() < 0.15 ? 0.25 : 3 + Math.random() * 3; set(0); } }
+      sacT -= dt; if (sacT <= 0) { sacT = 1 + Math.random() * 2; look = [(Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.025]; if (Math.random() < 0.4) look = [0, 0]; }
+      cur[0] += (look[0] - cur[0]) * Math.min(1, dt * 25); cur[1] += (look[1] - cur[1]) * Math.min(1, dt * 25);   // a saccade is fast
+      eyes.forEach((e, i) => e.quaternion.copy(eyeRest[i]).multiply(q.setFromAxisAngle(Y, cur[0])).multiply(new THREE.Quaternion().setFromAxisAngle(X, -cur[1])));
+    },
+    info: Object.fromEntries(Object.entries(lid).map(([k, L]) => [k, +L.full.toFixed(3)])),
+  };
 }
 
 export function dressFace(THREE, root, opts = {}){
@@ -176,7 +216,7 @@ export function dressFace(THREE, root, opts = {}){
   const lids = relaxLids(THREE, skin0, eyes0);
   root.updateMatrixWorld(true);
   const info = dressBody(THREE, root, opts);
-  info.shapeDelta = shape; info.lidsRelaxed = lids;
+  info.shapeDelta = shape; info.lidsRelaxed = lids.map(d => [d.bone.name, d.turn]);
   const skin = info.skin, E = info.eyes;                                 // E: the eye centres in the skinned (rest) pose
   // a static copy of the skin in its rest pose, to root the brows on (the skinned mesh raycasts slowly)
   root.updateMatrixWorld(true);
@@ -192,7 +232,12 @@ export function dressFace(THREE, root, opts = {}){
     skin.add(m); root.updateMatrixWorld(true); headBone.attach(m); brows.push(m);
   }
   info.brows = brows.map(m => m.geometry.index.count / 24);
+  // the per-pixel lash band of the head-only preview is off: the lash line and lashes are geometry here, and the band
+  // (in the skin's bind space) would ride down the lid as a dark patch when he blinks
+  { const u = skin.material.userData.uniforms; u.uEyeL.value.w = 0; u.uEyeR.value.w = 0; }
   info.lidEdges = refitLashes(THREE, skin, stat, E, headBone);
+  info.blink = blinkRig(THREE, root, headBone, lids, info.lidEdges, skin);
+  skin.skeleton.update();
   info.lidBones = lidBones(THREE, skin, E);
   return info;
 }

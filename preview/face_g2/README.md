@@ -37,6 +37,14 @@ Second round (the coordinator's notes on 3fcb539):
   a firmer, wider jaw and a stronger chin, a little more cheekbone, less fat in the lower cheek, a firmer nose bridge;
   the neck, the ears, the skull and the eyes keep their places (the hair and the clothes stay valid).
 
+The blink and the small movements (`info.blink` from `dressFace`; `update(dt)` each frame, `set(closure)` for a still):
+each upper lid's bone (orbicularis03 L/R) turns the lid down over the ball, the full turn found by bisection so the
+middle of the upper lid's edge meets the lower lid's (0.42 rad); the upper lash line and lashes are moved under that
+bone, so they close with the lid. A blink every 3 to 6 s, now and then a double one: 80 ms down, 40 ms shut, 150 ms up.
+The eyes make a small saccade every 1 to 3 s (a degree or two) and come back toward the middle. `blink_strip.jpg`: the
+lids 0, 50 and 100 % closed. (The head-only preview's per-pixel lash band is off here: drawn in the skin's bind space,
+it rode down the lid as a dark patch in a blink; the lash line is geometry now.)
+
 Real references (cropped on the detail, no face shown; Pexels licence, free to use and modify,
 https://www.pexels.com/license/): `refs/lips.jpg` from "Close Up Photo of Man's Lip",
 https://www.pexels.com/photo/3749984/; `refs/brow.jpg` from "Close-Up of a Person's Eye",

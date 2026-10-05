@@ -75,8 +75,17 @@ detail("d_skin", L.clone().add(new THREE.Vector3(-0.004, -0.03, 0.012)), new THR
 const lip = mid.clone().add(new THREE.Vector3(0, -0.075, 0.012));
 detail("d_lips", lip, new THREE.Vector3(0.15, -0.05, 1), 0.11, 30);
 
+// the blink, as stills: the eyes at closure 0, 0.5 and 1 (front, close)
+for (const c of [0, 0.5, 1]) {
+  after.info.blink.set(c); after.root.updateMatrixWorld(true);
+  before.root.visible = false; after.root.visible = true;
+  renderer.setSize(600, 220); cam.aspect = 600 / 220; cam.fov = 18;
+  cam.position.copy(mid).add(new THREE.Vector3(0, 0.004, 0.33)); cam.lookAt(mid.clone().add(new THREE.Vector3(0, 0.002, 0))); cam.updateProjectionMatrix();
+  renderer.render(scene, cam); panels["blink_" + Math.round(c * 100)] = renderer.domElement.toDataURL("image/jpeg", 0.92);
+}
+after.info.blink.set(0);
 window.__shape = after.info.shapeDelta;
-window.__info = {lidEdges: after.info.lidEdges, lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
+window.__info = {blink: after.info.blink.info, lidEdges: after.info.lidEdges, lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
   mid: mid.toArray().map(x => +x.toFixed(3))};
 window.__panels = () => panels;
 window.__done = true;
