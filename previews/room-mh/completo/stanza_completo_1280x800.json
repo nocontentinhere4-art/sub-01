@@ -1,0 +1,131 @@
+{
+ "frames": 1680,
+ "fps": 30,
+ "seconds": 56.0,
+ "bytes": 13789065,
+ "crf": 20,
+ "sides": {
+  "old": {
+   "side": "old",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "Cerca qualcosa: scrive sulla tastiera, poi usa il mouse",
+     "seconds": 8.0,
+     "first": 0,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Si alza e va alla finestra",
+     "seconds": 8.0,
+     "first": 240,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Legge un libro (gira le pagine)",
+     "seconds": 8.0,
+     "first": 480,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Beve: versa l'acqua dalla bottiglia nel bicchiere",
+     "seconds": 8.0,
+     "first": 720,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Guarda i video brevi sul telefono (scorre col pollice)",
+     "seconds": 8.0,
+     "first": 960,
+     "frames": 240
+    },
+    {
+     "hour": 23,
+     "label": "Di notte: si stira sulla sedia e si alza per andare a letto",
+     "seconds": 8.0,
+     "first": 1200,
+     "frames": 240
+    },
+    {
+     "hour": 23,
+     "label": "Si siede sul letto e si sdraia sotto il piumone",
+     "seconds": 8.0,
+     "first": 1440,
+     "frames": 240
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 172.9,
+   "clean": true
+  },
+  "new": {
+   "side": "new",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "Cerca qualcosa: scrive sulla tastiera, poi usa il mouse",
+     "seconds": 8.0,
+     "first": 0,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Si alza e va alla finestra",
+     "seconds": 8.0,
+     "first": 240,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Legge un libro (gira le pagine)",
+     "seconds": 8.0,
+     "first": 480,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Beve: versa l'acqua dalla bottiglia nel bicchiere",
+     "seconds": 8.0,
+     "first": 720,
+     "frames": 240
+    },
+    {
+     "hour": 14,
+     "label": "Guarda i video brevi sul telefono (scorre col pollice)",
+     "seconds": 8.0,
+     "first": 960,
+     "frames": 240
+    },
+    {
+     "hour": 23,
+     "label": "Di notte: si stira sulla sedia e si alza per andare a letto",
+     "seconds": 8.0,
+     "first": 1200,
+     "frames": 240
+    },
+    {
+     "hour": 23,
+     "label": "Si siede sul letto e si sdraia sotto il piumone",
+     "seconds": 8.0,
+     "first": 1440,
+     "frames": 240
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 176.4,
+   "clean": true
+  }
+ },
+ "dropouts_replaced": {
+  "old": [],
+  "new": []
+ }
+}
