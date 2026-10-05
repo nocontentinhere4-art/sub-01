@@ -1,0 +1,130 @@
+{
+ "tag": "before",
+ "software_webgl": true,
+ "note": "headless Chromium with SwiftShader (software WebGL): FPS is a CPU rasteriser's, not a phone GPU's",
+ "before_1280_h08.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
+ },
+ "before_1280_h14.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true
+ },
+ "before_1280_h19.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
+ },
+ "before_1280_h23.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true
+ },
+ "before_390_h08.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
+ },
+ "before_390_h14.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true
+ },
+ "before_390_h19.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true,
+  "shot": null,
+  "cam": [
+   -0.32,
+   1.78,
+   0.65
+  ]
+ },
+ "before_390_h23.jpg": {
+  "errors": [],
+  "dpr": 1,
+  "post": null,
+  "gl": true
+ },
+ "fps_1280": {
+  "cpu_throttle": 1,
+  "errors": [],
+  "direct": {
+   "fps": 0.0,
+   "js": null,
+   "dpr": 1,
+   "post": null
+  }
+ },
+ "fps_390": {
+  "cpu_throttle": 1,
+  "errors": [],
+  "direct": {
+   "fps": 0.9,
+   "js": null,
+   "dpr": 1,
+   "post": null
+  }
+ },
+ "fps_390x4": {
+  "cpu_throttle": 4,
+  "errors": [],
+  "direct": {
+   "fps": 0.8,
+   "js": null,
+   "dpr": 1,
+   "post": null
+  }
+ },
+ "before_1280_h23s.jpg": {
+  "errors": [
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
+  ],
+  "dpr": 1,
+  "post": null,
+  "gl": true,
+  "shot": null
+ },
+ "before_390_h23s.jpg": {
+  "errors": [
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES",
+   "console.error: Failed to load resource: net::ERR_TOO_MANY_RETRIES"
+  ],
+  "dpr": 1,
+  "post": null,
+  "gl": true,
+  "shot": null
+ }
+}
