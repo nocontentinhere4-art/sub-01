@@ -236,6 +236,10 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     titles and bodies in `BOT_WALL` / `BODY_WALL`) is left at once, never shown or counted, and its site is left alone
     for `WALL_COOLDOWN_S` (6 h; `Browser.walled`, kept in the browsing state; the video players keep their own pause).
     `is_finance` counts distinct finance words and needs one in the title unless the text has five.
+    Ad-block / paywall overlays (live 2026-10-05 09:10 Tokyo on the phone: "We noticed that ads aren't being
+    displayed"; our ad blocking from #140 triggers them): `OVERLAY_WALL` / `overlay_wall` in `_settle` and at every
+    screenshot (`_shoot`) make the page an "overlay wall": left, never dismissed or worked around, and the site is
+    left alone for `OVERLAY_COOLDOWN_S` (2 h, `Browser._cool`).
   - Chromium memory (live 2026-10-04 04:02-04:53 UTC: 12 restarts "over 1200 MB", some 7-21 s apart, loop lag p95
     3.5 s). `Guard.route` loads nothing from ad / tracking / outstream-video networks (`memory_guard.AD_HOST`) and no
     cross-site iframe (`cross_site_frame`). The browser reads its own memory every `MEM_CHECK_S` (in a thread) and at

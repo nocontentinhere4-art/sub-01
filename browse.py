@@ -579,6 +579,21 @@ def text_ok(title, body):
 
 
 WALL_COOLDOWN_S = 6 * 3600              # #89: a site that showed him a bot check is left alone this long
+OVERLAY_COOLDOWN_S = 2 * 3600           # ... and one that put an ad-block or paywall overlay over the page
+# #89 live (2026-10-05 09:10 Tokyo, his phone): "We noticed that ads aren't being displayed" over the article. An
+# ad-block / paywall overlay is a wall: the page is left, never dismissed or worked around (the ads stay blocked)
+OVERLAY_WALL = re.compile(
+    r"ads? (aren't|are not|isn't|is not) being (displayed|shown)|"
+    r"(please )?(disable|turn off|pause|deactivate) (your |the )?ad[ -]?block(er|ing)?s?\b|"
+    r"(we('ve| have)? )?(noticed|detected|see) (that )?you('re| are) (using |running )?an? ad[ -]?block|"
+    r"ad[ -]?block(er)? (detected|is enabled|is on)|(white|allow)[ -]?list (us|this site|our site|our domain)|"
+    r"you('ve| have) reached your (free )?(article )?limit|subscribe to (continue|keep) reading|"
+    r"(this|the) (article|story|content) is (only )?(available )?(for|to) (subscribers|members) only", re.I)
+
+
+def overlay_wall(body):
+    """#89: an ad-block or paywall overlay's text in the page (it covers the content: not something to read)."""
+    return bool(OVERLAY_WALL.search(str(body or "")[:20000]))
 
 
 def challenge_title(title, url):
@@ -2013,6 +2028,7 @@ class Browser:
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
         reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
                   else "bot wall" if challenge_title(page_title, page.url) or await self._walled(page, body)
+                  else "overlay wall" if overlay_wall(body)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
                   or await self._login_walled(page, body) else None)
         if reason and sc.site:                                         # why a logged-in feed shows nothing
@@ -2026,11 +2042,8 @@ class Browser:
         if reason:
             print(f"browse: skipped {urllib.parse.urlsplit(page.url).hostname} ({reason}: {page_title[:40]!r})", flush=True)
             self.last_skip = reason
-            if reason == "bot wall" and kind != "search":           # #89: the site's bot check: left alone a while
-                h = (urllib.parse.urlsplit(page.url).hostname or "").lower().removeprefix("www.")
-                if h and not YOUTUBE_HOST.search(h) and not SV.is_tiktok(h):   # the players have their own pause
-                    self.walled[h] = time.time() + WALL_COOLDOWN_S
-                    self.walled = dict(sorted(self.walled.items(), key=lambda kv: kv[1])[-200:])
+            if reason in ("bot wall", "overlay wall") and kind != "search":   # #89: left alone a while
+                self._cool(page.url, WALL_COOLDOWN_S if reason == "bot wall" else OVERLAY_COOLDOWN_S)
             return await self._leave(sc)
         host = urllib.parse.urlsplit(page.url).hostname or ""
         channel = ""
@@ -2208,9 +2221,26 @@ class Browser:
             await page.evaluate(VO.HIDE_ACCOUNT_JS)
         return True
 
+    def _cool(self, url, seconds):
+        """#89: a site that showed a bot check or an overlay wall is not opened again for `seconds`."""
+        h = (urllib.parse.urlsplit(url or "").hostname or "").lower().removeprefix("www.")
+        if h and not YOUTUBE_HOST.search(h) and not SV.is_tiktok(h):    # the players have their own pause
+            self.walled[h] = max(self.walled.get(h, 0.0), time.time() + seconds)
+            self.walled = dict(sorted(self.walled.items(), key=lambda kv: kv[1])[-200:])
+
     async def _shoot(self, sc):
         if await self._walled(sc.page):                                 # a page can turn into a bot check later
             print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (bot wall)", flush=True)
+            await self._leave(sc)
+            return False
+        try:                                                            # ... or get an ad-block / paywall overlay
+            body = await sc.page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+        except Exception:
+            body = ""
+        if overlay_wall(body):
+            print(f"browse: left {urllib.parse.urlsplit(sc.page.url).hostname} (overlay wall)", flush=True)
+            self.last_skip = "overlay wall"
+            self._cool(sc.page.url, OVERLAY_COOLDOWN_S)
             await self._leave(sc)
             return False
         if not await self._private_ok(sc):

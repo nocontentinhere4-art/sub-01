@@ -8,7 +8,8 @@ Hard rules (enforced here):
 - pods are only ever created, read and deleted by id from data/analysis/my_pods.json - pods we did not create
   (e.g. "BRAIN") are never touched;
 - the pod is deleted when the job finishes, fails, on Ctrl-C / SIGTERM, and at the latest after --max-min (<= 60) minutes;
-- total pod time across all jobs is capped at 2 h (data/analysis/costs.jsonl is the ledger);
+- total pod time across all jobs is capped at 2 h, and the gpu-preview runs (tools/gpu_preview.py) at 10 h of their own
+  (data/analysis/costs.jsonl is the ledger);
 - every job appends {tag, pod, kind, cost_per_hr, minutes, usd, status} to data/analysis/costs.jsonl.
 
 Pod side: a tiny HTTP server (pod/server.py, sent base64 in env) on port 8000 accepts PUT uploads into /in and serves
@@ -31,6 +32,7 @@ API = "https://rest.runpod.io/v1"
 LEDGER = ROOT / "data" / "analysis" / "costs.jsonl"
 MINE = ROOT / "data" / "analysis" / "my_pods.json"
 TOTAL_CAP_MIN = 120.0
+PREVIEW_TAG, PREVIEW_CAP_MIN = "gpu-preview", 600.0   # tools/gpu_preview.py runs: their own pod-minute budget (owner OK 2026-10-04)
 UA = "sub01-analysis/1.0 (curl-compatible)"          # Cloudflare rejects the default Python-urllib agent
 
 
@@ -51,10 +53,12 @@ def remember(ids):
     MINE.write_text(json.dumps(ids))
 
 
-def spent_minutes():
+def spent_minutes(preview=False):
+    """Pod minutes in the ledger: the gpu-preview runs, or every other job (each has its own cap)."""
     if not LEDGER.exists():
         return 0.0
-    return sum(json.loads(l).get("minutes", 0) for l in LEDGER.read_text().splitlines() if l.strip())
+    rows = [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()]
+    return sum(r.get("minutes", 0) for r in rows if str(r.get("tag", "")).startswith(PREVIEW_TAG) == preview)
 
 
 def log_cost(rec):
@@ -105,9 +109,11 @@ def main():
     remember(alive)
     if alive:
         sys.exit(f"refusing: our pod(s) {alive} still exist - delete them first")
-    left = TOTAL_CAP_MIN - spent_minutes()
+    preview = a.tag.startswith(PREVIEW_TAG)
+    cap = PREVIEW_CAP_MIN if preview else TOTAL_CAP_MIN
+    left = cap - spent_minutes(preview)
     if left < 5:
-        sys.exit(f"refusing: pod-time budget used ({spent_minutes():.1f} of {TOTAL_CAP_MIN} min)")
+        sys.exit(f"refusing: pod-time budget used ({spent_minutes(preview):.1f} of {cap} min)")
     max_min = min(a.max_min, left)
 
     env = {"SERVER": base64.b64encode((HERE / "pod" / "server.py").read_bytes()).decode(),
