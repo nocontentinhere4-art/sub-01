@@ -168,8 +168,8 @@ export function dressBody(THREE, root, {iris = [0.24, 0.13, 0.06]} = {}){
       if (z < L.eyeZ - 0.06 || y > L.eyeY - 0.012 || y < L.lip[1] - 0.06) continue;
       const cheek = g(Math.hypot(ax - 0.05, y - (L.eyeY - 0.04)), 0.02) * Math.min(1, Math.max(0, (ax - 0.022) / 0.012));
       if (cheek < 0.05) continue;
-      const d = 0.3 * cheek;
-      hd.setXYZW(i, -0.2 * Math.sign(x), -0.32, -0.1, 1 - d);
+      const d = 0.15 * cheek;
+      hd.setXYZW(i, -0.13 * Math.sign(x), -0.2, -0.06, 1 - d);   // (|direction| 0.25: pale)
     }
     hd.needsUpdate = true; }
   skin.material = makeSkinMaterial(THREE);

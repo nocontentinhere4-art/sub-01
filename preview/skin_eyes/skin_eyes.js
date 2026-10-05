@@ -23,7 +23,7 @@
 //   - the tear line: a thin wet tube along the lower lid margin, and the pink caruncle in the inner corner.
 
 const EYE_K = 0.85;                                 // the eyeball's radius, as a share of MakeHuman's eye helper sphere
-const SKIN_SRGB = [0.81, 0.645, 0.55];            // base albedo (sRGB): the agreed tone, a little warmer
+const SKIN_SRGB = [0.80, 0.62, 0.51];             // base albedo (sRGB): warm light-medium (the owner: not pale, not grey)
 
 // ---------- landmarks and per-vertex skin data ----------
 function smoothNormals(THREE, geo){
@@ -60,7 +60,7 @@ export function skinData(THREE, geo, data){
   const col = new Float32Array(n * 3), sd = new Float32Array(n * 4);   // sd: thin, oily (T-zone), cavity AO, lips
   const g = (d, s) => Math.exp(-(d * d) / (2 * s * s));
   const lin = c => Math.pow(c, 2.2);
-  const base = SKIN_SRGB.map(lin), red = [0.74, 0.36, 0.32].map(lin), lip = [0.62, 0.27, 0.28].map(lin), brow = [0.30, 0.22, 0.18].map(lin);
+  const base = SKIN_SRGB.map(lin), red = [0.74, 0.36, 0.32].map(lin), lip = [0.66, 0.38, 0.36].map(lin), brow = [0.30, 0.22, 0.18].map(lin);
   const eyes = [data.eyes.l, data.eyes.r];
   for (let i = 0; i < n; i++) {
     const x = P.getX(i), y = P.getY(i), z = P.getZ(i), ax = Math.abs(x);
@@ -71,7 +71,7 @@ export function skinData(THREE, geo, data){
     const chin = g(Math.hypot(x, y - (L.lip[1] - 0.045), z - (L.lip[2] - 0.01)), 0.014);
     let redK = 0.6 * nose + 0.32 * cheek + 0.7 * ear + 0.12 * chin;
     // lips: a band under the nose, centred, on the front of the face
-    const lips = Math.min(1, 1.6 * g(y - (L.lip[1] - 0.005), 0.0062) * g(x, 0.02) * (z > L.lip[2] - 0.03 ? 1 : 0));
+    const lips = Math.min(1, 1.3 * g(y - (L.lip[1] - 0.005), 0.0068) * g(x, 0.017) * (z > L.lip[2] - 0.03 ? 1 : 0));   // a soft edge: no lipstick line
     // eye socket ring (cavity) and the under-eye; the brow line above
     let cav = 0, browK = 0;
     for (const e of eyes) {
@@ -97,8 +97,8 @@ export function skinData(THREE, geo, data){
     const c = [0, 1, 2].map(k => {
       let v = base[k];
       v = v * (1 - 0.35 * redK) + red[k] * 0.35 * redK;
-      v = v * (1 - 0.9 * lips) + lip[k] * 0.9 * lips;
-      v = v * (1 - 0.35 * browK) + brow[k] * 0.35 * browK;
+      v = v * (1 - 0.7 * lips) + lip[k] * 0.7 * lips;
+      v = v * (1 - 0.55 * browK) + brow[k] * 0.55 * browK;   // the brows' base under the hairs
       v = v * (1 - 0.30 * cav);
       return v * (1 - 0.82 * lash) + 0.012 * 0.82 * lash;
     });

@@ -8,7 +8,7 @@ import { dressBody } from "../skin_eyes/body.js";
 // the eyebrows: thin tapered ribbons rooted on the skin along each brow's arc (thicker at the head, thinning to the
 // tail), the hairs at the head pointing up, along the body outward and a little up, at the tail outward and down;
 // lying close to the skin (the root's normal from the skin under it), each a little curved and uneven
-function browStrands(THREE, skinMesh, eye, side, {count = 300, colour = [0.032, 0.022, 0.016]} = {}){
+function browStrands(THREE, skinMesh, eye, side, {count = 560, colour = [0.022, 0.015, 0.011]} = {}){
   const ray = new THREE.Raycaster(), pos = [], idx = [], col = [];
   const rnd = (a) => { const x = Math.sin(a * 127.1 + side * 311.7) * 43758.5453; return x - Math.floor(x); };
   const C = eye.center, r = eye.radius, s = Math.sign(C.x);                  // s: +1 his left (x > 0)
@@ -30,7 +30,7 @@ function browStrands(THREE, skinMesh, eye, side, {count = 300, colour = [0.032, 
     const ang = THREE.MathUtils.degToRad(a);
     const d = new THREE.Vector3(s * Math.cos(ang), Math.sin(ang), 0);
     d.addScaledVector(nrm, -d.dot(nrm)).normalize();                          // along the skin
-    const L = (0.0055 + 0.003 * rnd(n + 9)) * (1 - 0.25 * u), w = 0.00007 * (0.8 + 0.4 * rnd(n + 3));
+    const L = (0.0060 + 0.003 * rnd(n + 9)) * (1 - 0.25 * u), w = 0.00013 * (0.8 + 0.4 * rnd(n + 3));   // (thicker than real: the room's distance)
     const lift = nrm.clone().multiplyScalar(0.0006 + 0.0006 * rnd(n + 21));
     const p1 = p0.clone().addScaledVector(d, L * 0.5).add(lift), p2 = p0.clone().addScaledVector(d, L).addScaledVector(nrm, 0.0003);
     const side3 = new THREE.Vector3().crossVectors(d, nrm).normalize();

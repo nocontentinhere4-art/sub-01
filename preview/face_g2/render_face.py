@@ -33,6 +33,11 @@ DETAILS = [("d_eye", PREVIEW / "skin_eyes/refs/eye.jpg", "REAL eye (Pexels 94672
            ("d_lips", HERE / "refs/lips.jpg", "REAL lips (Pexels 3749984)")]
 
 
+def serve(blob, ctype):
+    # (a route handler of its own: Playwright passes the request as a second argument to a two-parameter lambda)
+    return lambda route: route.fulfill(status=200, body=blob, content_type=ctype)
+
+
 def compose(panels, out):
     img = {k: Image.open(io.BytesIO(base64.b64decode(v.split(",", 1)[1]))).convert("RGB") for k, v in panels.items()}
     PW, PH, DW, DH, PAD, CAP = 600, 750, 400, 300, 12, 30
@@ -85,11 +90,11 @@ def main():
                 pg.route(f"https://{h}/**", cdn_router(os.environ.get("SUB01_CDN_CACHE", "/tmp/sub01-cdn-cache")))
             for name, blob in blobs.items():
                 ctype = "text/javascript" if name.endswith(".js") else "model/gltf-binary"
-                pg.route(f"**/face_g2/{name}", lambda route, blob=blob, ctype=ctype: route.fulfill(status=200, body=blob, content_type=ctype))
+                pg.route(f"**/face_g2/{name}", serve(blob, ctype))
             errors = []
             pg.on("pageerror", lambda e: errors.append(str(e)))
             pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-            pg.goto(f"http://127.0.0.1:{args.port}/face_g2/face.html", timeout=120000)
+            pg.goto(f"http://127.0.0.1:{args.port}/face_g2/face.html", timeout=120000, wait_until="commit")   # (the module renders before "load")
             for _ in range(1200):
                 if pg.evaluate("window.__done === true"):
                     break
