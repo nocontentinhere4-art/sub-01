@@ -6,8 +6,9 @@ finger bones). Its rig is identical to v4's (`char-tripo-v4`: the same bone name
 clips play on both; the renders use v5 (d0fc37d). No brands or logos.
 
 Seven clips, generated with **Kimodo-SOMA-RP-v1.1** (text-to-motion with kinematic constraints, SOMA skeleton),
-retargeted onto the rig and rendered in the room (`room_clean.glb` with the owner's chair from preview/chair-tripo,
-placed as `web/room.html` does: squared to the desk, 15 cm further in, pulled out / swivelled by k).
+retargeted onto the rig and rendered in the room (`room_clean.glb` with the live site's chair, `chair_owner.glb` of preview/room-upgrade-live,
+added whole as the live `room.html` does; its seat top measures 0.50-0.505 m). While he sits, the chair is placed under
+his hips (hip joints 10 cm in front of its pivot: his buttocks on the rear half of the seat, back by the backrest).
 
 | clip | file | length | what happens |
 |---|---|---|---|
@@ -23,14 +24,15 @@ Each GLB is the bare rig (no mesh) with one animation: rotations of all 41 bones
 resampled (tolerance 2e-4), 0.3-0.4 MB. The rig's origin goes at the place in `room_build/kimodo/opts/cfg_*.json`
 (`root`: x, y, z, turn about y); the chair moves by its `chair` keys (and `chairFollow`: the push in e).
 
-`renders/<clip>.mp4`: the clip in the room from two cameras side by side (640x360 each, 15 fps, software WebGL);
+`renders/<clip>.mp4`: the clip in the room from two cameras side by side (640x360 each, 30 fps, headless Chromium on
+an RTX 4090 pod: WebGL on the NVIDIA card through ANGLE/EGL);
 `renders/<clip>_sheet.jpg`: six frames from each camera. `qa/`: the contact QA (below).
 
 ## Prompts and constraints (`room_build/kimodo/specs/`)
 
 Kimodo's canonical frame: the SOMA Hips root at the origin at frame 0, +Z = the desk direction (world -Z), metres of the
 SOMA skeleton. `room_targets.py` turns room points into it (the rig is 0.949 x SOMA by leg length; the floor is y 0.16).
-The desk clips pin the hips to the seat height of the 0.52 m chair and the wrists to the keyboard, the mouse or the book
+The desk clips pin the hips to a seat height (generated for the 0.52 m chair; the retarget then fits them onto the live 0.505 m seat) and the wrists to the keyboard, the mouse or the book
 (end-effector constraints, every 0.5 s); the bed clips place a whole lying or seated pose (moved and turned) on the
 mattress; walking uses 2D root waypoints with headings. Long actions are split into short generations (Kimodo allows
 10 s per prompt and its chained segments drift) and joined (`join.py`: heading and ground position matched, 8-frame
@@ -66,10 +68,14 @@ per-segment pass broke later segments' constraints); foot sliding is fixed in th
   lowered 2.9 cm because the rig's ankle sits lower over its soles.
 - **Foot contact**: wherever Kimodo's contact labels say a foot is planted and the ankle is near the floor, the ankle is
   locked to the run's mean position (two-bone leg IK, eased over 4 frames): no sliding. Soles never go under the floor.
-- **Seated** (the windows in `seated`): the room's chair is 0.52 m high, taller than his knees, so the heels lift 6 cm
-  with the feet 14 cm forward (toes on the floor, the thighs clear the seat's front edge); the hips 3 cm up; the torso
-  leans forward over the hips (0.45 rad typing, 0.5 reading, 0.3 phone, the head turned back up by 60-75 %) so the
-  shoulders are over the hips and the elbows bend at ~100-115° next to the body.
+- **Seated** (the windows in `seated`): the torso leans forward over the hips (0.33 rad typing, 0.45 reading, 0.25
+  phone and the get-up, the head turned back up by 60-75 %) so the shoulders are over the hips and the elbows bend at
+  ~100-115° by the body; both feet are planted flat on the floor 0.36 m in front of the hips, 0.13 m to each side
+  (`feetPin`, two-bone leg IK, the toes put down too).
+- **Seat contact** (`seatfit.py` with the scene's `seatGap`): every 0.1 s the skin behind the hip joints (buttocks)
+  over the seat is compared with the seat top under it; the Hip height is corrected per sample (two passes, 0.5 s
+  smoothing, linearly interpolated) so the deepest buttock point is 1.5 cm into the cushion. `qa/<clip>_seat.json`
+  holds every sample.
 - **Hand targets**: two-bone arm IK onto the keyboard (wrists over ASDF and JKL, keytops 1.012 m), the mouse
   (`MOUSE_AT` of room.html), the backrest during the pushes and pulls, the book (resting and turning pages); the
   hand is levelled (pitch -0.08 to -0.1 rad); Kimodo's own small wrist motion (its offset from its 1 s mean, 50-60 %)
@@ -78,7 +84,13 @@ per-segment pass broke later segments' constraints); foot sliding is fixed in th
   mattress top (0.82 m), smoothed over 0.3 s; hands over the bed rest on top of it; feet up on the bed are not locked to
   the floor; timed root offsets (`rootKeys`) keep the feet and calves in front of the bed's solid side when he sits
   on its edge.
-- Loops (b, c, d): the last 0.6 s ease into the first frame.
+- Loops (b, c, d): the last 0.6 s ease into the first frame, before the hand pins (so the seam keeps the contacts).
+- **Smoothing** (against Kimodo's frame-to-frame tremble): a zero-phase Gaussian over time on every bone's rotation
+  (quaternions sign-aligned and averaged, sigma 1 frame ≈ 5 Hz on the limbs, 1.7 frames ≈ 3 Hz on the spine, neck and
+  head) and on the Hip translation, right after the mapping; a second pass after all the IK (sigma 1-2.2 frames) with the
+  hand pins re-solved. The hand targets' detail is low-passed too. Reaches (to the mouse, page turns) follow eased paths
+  (smootherstep) with a small arc. `qa/<clip>_jitter.json`: the high-frequency jitter (RMS of the 2nd derivative of the
+  wrists', head's and hips' positions after removing their 4-frame-smoothed motion), before and after.
 
 ## Quality gate (`qa/`)
 
@@ -87,7 +99,24 @@ placed at that moment, as columns of inside intervals at 1 cm), the desk top, th
 the bed (frame and mattress, 2 cm allowed for the duvet) and, in c, the book (in its own frame). `qa/<clip>_qa.json`
 holds every sample; `qa/contact_table.md` the table (`room_build/kimodo/contact_table.py`).
 
-QA_TABLE_HERE
+Summary (the full per-second table is `qa/contact_table.md`):
+
+- Desk and keyboard: 0 in a, b, d, f, g; (b) fingertip touches ≤0.7 cm; (c) the right forearm rests on the keyboard's end
+  and the book's edge ≤2 cm around the page turns (the hands are clear); (e) 4 samples ≤1.5 cm as he rises.
+- Seat: buttocks 1.0-2.0 cm into the cushion in every seated sample of b, c, d and e (never above it); (a) 0.4-3 cm, with
+  one 0.4 s dip to 6.6 cm while the chair swivels under him.
+- Thighs: with his feet flat, the fronts of the thighs press ~6 cm into the seat's front edge in every seated clip: the
+  0.505 m seat is higher than his knees (~0.48 m). Heels up or a seat ~3 cm lower would clear it (an owner decision).
+  His back rests 2-3 cm into the padded backrest.
+- (e): the left calf brushes the chair ≤4 cm while his legs push it back; (a) the hands' grip on the backrest ≤2 cm.
+- Bed (f, g): lying on the mattress, sitting on its edge; ≤5 cm at the mattress edge while sitting down or getting up.
+
+## Real references (`refs/`)
+
+`refs/<clip>_refs.jpg`: real photos (Pexels license, `refs/SOURCES.md`: page, photographer, view; brand marks
+pixelated) next to our frames: typing (side, 3/4 rear), reading at a desk, phone in a chair, stretching in an office
+chair, lying in bed, sitting on the bed's edge. The typing pose follows them: hips back on the seat, an upright trunk
+over the hips, elbows bent by the body, wrists level with the keys, feet flat.
 
 ## Licences and attribution
 
