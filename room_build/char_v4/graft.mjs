@@ -8,19 +8,24 @@ bp.setIndices(doc.createAccessor().setType("SCALAR").setArray(rd("body_keep_idx.
 const nb = `${WD}/body_base_neck.jpeg`;
 if (fs.existsSync(nb)) bp.getMaterial().getBaseColorTexture().setImage(fs.readFileSync(nb)).setMimeType("image/jpeg");
 const hp = hd.getRoot().listMeshes()[0].listPrimitives()[0];
+const X = fs.existsSync(`${WD}/headx_pos.bin`);            // extended neck (extrude.py) replaces the GLB's geometry
+const hpos = X ? rd("headx_pos.bin", Float32Array) : hp.getAttribute("POSITION").getArray();
+const hnrm = X ? rd("headx_nrm.bin", Float32Array) : hp.getAttribute("NORMAL").getArray();
+const huv = X ? rd("headx_uv.bin", Float32Array) : hp.getAttribute("TEXCOORD_0").getArray();
+const hidx = X ? rd("headx_idx.bin", Uint32Array) : Uint32Array.from(hp.getIndices().getArray());
 const acc = (a, t) => doc.createAccessor().setType(t).setArray(a.slice()).setBuffer(buf);
 const np = doc.createPrimitive()
-  .setAttribute("POSITION", acc(hp.getAttribute("POSITION").getArray(), "VEC3"))
-  .setAttribute("NORMAL", acc(hp.getAttribute("NORMAL").getArray(), "VEC3"))
-  .setAttribute("TEXCOORD_0", acc(hp.getAttribute("TEXCOORD_0").getArray(), "VEC2"))
+  .setAttribute("POSITION", acc(hpos, "VEC3"))
+  .setAttribute("NORMAL", acc(hnrm, "VEC3"))
+  .setAttribute("TEXCOORD_0", acc(huv, "VEC2"))
   .setAttribute("JOINTS_0", acc(rd("headlo_j.bin", Uint16Array), "VEC4"))
   .setAttribute("WEIGHTS_0", acc(rd("headlo_w.bin", Float32Array), "VEC4"))
-  .setIndices(doc.createAccessor().setType("SCALAR").setArray(Uint32Array.from(hp.getIndices().getArray())).setBuffer(buf));
+  .setIndices(doc.createAccessor().setType("SCALAR").setArray(hidx).setBuffer(buf));
 const hm = hp.getMaterial(), mat = doc.createMaterial("owner_head").setRoughnessFactor(0.8).setMetallicFactor(0);
 const tex = (t, n) => t && doc.createTexture(n).setImage(t.getImage()).setMimeType(t.getMimeType());
 mat.setBaseColorTexture(tex(hm.getBaseColorTexture(), "head_base"));
 const nrmFile = `${WD}/head_normal_baked.png`;
 if (hm.getNormalTexture()) mat.setNormalTexture(tex(hm.getNormalTexture(), "head_normal"));
 else if (fs.existsSync(nrmFile)) mat.setNormalTexture(doc.createTexture("head_normal").setImage(fs.readFileSync(nrmFile)).setMimeType("image/png"));
-np.setMaterial(mat); mesh.addPrimitive(np);
+mat.setDoubleSided(true); np.setMaterial(mat); mesh.addPrimitive(np);
 await io.write(OUT, doc); console.log(OUT);

@@ -7,8 +7,10 @@ names=json.load(open('body_joints.json')); H,N1,N2=[names.index(n) for n in ['He
 wj=lambda j:(W*(J==j)).sum(1)
 dom=J[np.arange(len(J)),W.argmax(1)]
 # source for weight transfer: verts driven mostly by head/neck bones
-src=np.isin(dom,[H,N1,N2])&(bP[:,1]>0.74)
-hP=np.fromfile('headlo_pos.bin',np.float32).reshape(-1,3)
+ok=[names.index(n) for n in ['Head','NeckTwist01','NeckTwist02','Spine02','L_Clavicle','R_Clavicle']]
+src=np.isin(dom,ok)&(bP[:,1]>0.70)
+HX='headx' if __import__('os').path.exists('headx_pos.bin') else 'headlo'
+hP=np.fromfile(HX+'_pos.bin',np.float32).reshape(-1,3)
 tr=cKDTree(bP[src]); d,k=tr.query(hP,k=4)
 ws=1/np.maximum(d,1e-5)**2; ws/=ws.sum(1,keepdims=True)
 # accumulate weights per joint over the 4 nearest
@@ -26,7 +28,7 @@ dh,_=cKDTree(hP).query(bP); hair=(~bs)&(wj(H)>0.3)&(dh<float(__import__('os').en
 bc0=colors('body',bUV)
 rr=np.hypot(bP[:,0]-0.02,bP[:,2]+0.006); NR=float(__import__('os').environ.get('NR','0.055'))
 plane=0.13+(0.25-xo)*0.42
-rm=(((wj(H)>0.3)|bs)&(yo>plane+MARGIN))|(bs&(xo>-0.1)&(yo>0.10+float(__import__("os").environ.get("FM","0.05"))))|hair|(bs&(bP[:,1]>float(__import__('os').environ.get('JY','0.825')))&(dh>0.004)&(rr>0.035))   # old jaw outside the new neck; same slanted cut as the head, body kept a little above it (overlap)
+rm=(wj(H)>0.3)|(bs&(bP[:,1]>float(__import__('os').environ.get('NECKY','0.76')))&(rr<0.07))|hair   # old head, old neck skin, old hair
 tri=bI[~rm[bI].any(1)]
 tri.astype(np.uint32).tofile('body_keep_idx.bin'); print('body tris',len(bI),'->',len(tri))
 # match the body's neck skin tone (below the cut) to the owner's neck just above it
@@ -34,7 +36,7 @@ from PIL import Image, ImageDraw, ImageFilter
 hUV=np.fromfile('headlo_uv.bin',np.float32).reshape(-1,2)
 him=np.asarray(Image.open('headlo_base.jpeg').convert('RGB')).astype(np.float32); hh,hw=him.shape[:2]
 hc=him[np.clip((hUV[:,1]%1)*hh,0,hh-1).astype(int),np.clip((hUV[:,0]%1)*hw,0,hw-1).astype(int)]
-hneck=skin(hc)&(hP[:,1]>hP[:,1].min()+0.008)&(hP[:,1]<hP[:,1].min()+0.03)&(hP[:,0]<0.06)
+hPl=np.fromfile('headlo_pos.bin',np.float32).reshape(-1,3); hneck=skin(hc)&(hPl[:,1]>hPl[:,1].min()+0.002)&(hPl[:,1]<hPl[:,1].min()+0.02)
 bneckv=bs&(bP[:,1]>0.70)&(np.abs(bP[:,2])<0.06)
 bc=colors('body',bUV)
 ratio=hc[hneck].mean(0)/bc[bneckv].mean(0); print('neck tone ratio',ratio,hneck.sum(),bneckv.sum())
