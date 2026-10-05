@@ -55,10 +55,10 @@ def passes(m):
 
 def body_share(pg):
     # his mesh flat over a blue room: the share of the frame that is not blue
-    pg.evaluate(MASK_JS)
-    shot = pg.screenshot(type="png", timeout=480000, animations="disabled")
+    x, y, w, h = pg.evaluate(MASK_JS)                              # (the canvas's rectangle: the page may not fill the window)
+    shot = pg.screenshot(type="png", timeout=480000, animations="disabled", clip={"x": x, "y": y, "width": w, "height": h})
     import io
-    im = Image.open(io.BytesIO(shot)).convert("RGB").resize((160, 100))
+    im = Image.open(io.BytesIO(shot)).convert("RGB").resize((100, max(1, round(100 * h / w))))
     px = list(im.get_flattened_data()) if hasattr(im, 'get_flattened_data') else list(im.getdata())
     return round(sum(1 for r, g, b in px if not (b > 200 and r < 60 and g < 60)) / len(px), 3)
 
@@ -69,6 +69,7 @@ def frames(run, out, tag):
         ctx, pg, errors = run.page(w, h, 23, mobile)
         pg.add_style_tag(content=HUD_OFF)
         has_shots = pg.evaluate("() => !!window.setShot")
+        pg.evaluate("() => scene.traverse(o => { if (o.isMesh && o.geometry.type === 'SphereGeometry' && o.material.color && o.material.color.getHex() === 0xff00ff) o.visible = false; })")   # ?debug's marker balls
         for pose, js in POSES.items():
             for shot in (SHOTS if has_shots else ("follow",)):
                 pg.evaluate(f"""() => {{ setHour(23); setStage("AWAKE"); setScreen("phone"); if (window.setShot) setShot({json.dumps(shot)});
