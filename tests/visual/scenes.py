@@ -57,10 +57,14 @@ MH_CLIP = {"desk": "desk_", "eating": "room_eat", "sleeping": "mh_sleep", "sleep
 
 
 def makehuman_rig():
-    """room/boy.glb is the MakeHuman rig (163 bones, fingers named metacarpal1.L ...)."""
+    """room/boy.glb is the MakeHuman rig (163 bones, fingers named metacarpal1.L ...), or the page plays room/char_v5.glb
+    (preview/room-v5: v5 under room/boy_mh.js, its bones given the MakeHuman names by room/char_v5.js)."""
     import json, struct
     from pathlib import Path
-    raw = (Path(__file__).resolve().parents[2] / "web" / "room" / "boy.glb").read_bytes()
+    room = Path(__file__).resolve().parents[2] / "web" / "room"
+    if (room / "char_v5.glb").exists() and 'load("room/char_v5.glb")' in (room.parent / "room.html").read_text():
+        return True
+    raw = (room / "boy.glb").read_bytes()
     n = struct.unpack_from("<I", raw, 12)[0]
     g = json.loads(raw[20:20 + n])
     return any(nd.get("name") == "metacarpal1.L" for nd in g.get("nodes", []))

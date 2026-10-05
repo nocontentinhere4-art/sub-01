@@ -547,6 +547,14 @@ export function createMH(env) {
     const y = env.boy.position.y; if (M.lastY === undefined || Math.abs(y - M.lastY) > 1e-7) M.baseY = y;
     env.boy.position.y = M.baseY; return M.baseY;
   }
+  // a body thicker than the clips' (v5: the hoodie, the thighs) sits higher on the seat: env.seatLift (m), seated at the
+  // desk; it eases in and out over the sit-down and the stand-up (?debug: window.__seatLift overrides it)
+  function seatLift(st) {
+    const L = window.__seatLift ?? env.seatLift ?? 0; if (!L) return;
+    const s = st.step, t = s ? Math.min(1, Math.max(0, s.t || 0)) : 0;     // (a step's t runs 0 -> 1)
+    const k = st.at === "desk" && (!s || s.k === "chair") ? 1 : s && s.k === "pose" && s.to === "desk" ? t : s && s.k === "pose" && st.at === "desk" ? 1 - t : 0;
+    env.boy.position.y += L * k;
+  }
   function bedLift(st, dt) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
     if (!on && !M.lift) return;
@@ -785,7 +793,7 @@ export function createMH(env) {
     if (!transition(st)) onBed(st);
     pivot(st, dt);
     showStep();                                                // (the showcase's clip, before the guards measure him)
-    baseY(); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
+    baseY(); seatLift(st); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
     shove(st, dt);                                             // (after the root is final: the hand reaches the chair where it is)
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
