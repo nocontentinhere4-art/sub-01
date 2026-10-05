@@ -1,0 +1,84 @@
+// The face of the dressed G2 character (#98, G6; preview/room-mh's web/room/boy.glb = clothes-mh's boy_g2_dressed.glb):
+// the skin, the eyes and lashes from preview/skin_eyes (body.js: dressBody), plus eyebrows as real strands, on the
+// skinned body without touching its skeleton, rest pose or vertex order.
+//
+//   dressFace(THREE, root)  ->  info (dressBody's, plus brows and the lid bones found)
+import { dressBody } from "../skin_eyes/body.js";
+
+// the eyebrows: thin tapered ribbons rooted on the skin along each brow's arc (thicker at the head, thinning to the
+// tail), the hairs at the head pointing up, along the body outward and a little up, at the tail outward and down;
+// lying close to the skin (the root's normal from the skin under it), each a little curved and uneven
+function browStrands(THREE, skinMesh, eye, side, {count = 300, colour = [0.032, 0.022, 0.016]} = {}){
+  const ray = new THREE.Raycaster(), pos = [], idx = [], col = [];
+  const rnd = (a) => { const x = Math.sin(a * 127.1 + side * 311.7) * 43758.5453; return x - Math.floor(x); };
+  const C = eye.center, r = eye.radius, s = Math.sign(C.x);                  // s: +1 his left (x > 0)
+  const SEG = 4;
+  for (let n = 0; n < count; n++) {
+    // u along the brow from its head (over the inner corner) to its tail; v across it
+    const u = Math.pow(rnd(n), 0.85), v = rnd(n + 77) * 2 - 1;
+    const x = C.x + s * (-0.0185 + 0.046 * u);
+    const yc = C.y + 0.0195 + 0.0055 * Math.sin(Math.PI * Math.min(1, u * 1.15)) - 0.0045 * Math.max(0, u - 0.7) / 0.3;
+    const halfH = 0.0034 * (1 - 0.55 * u);
+    if (rnd(n + 13) > 1 - 0.25 * Math.max(0, u - 0.75) / 0.25) continue;     // the tail thins out
+    const y = yc + v * halfH;
+    // the skin under it: a ray from the front
+    ray.set(new THREE.Vector3(x, y, C.z + 0.08), new THREE.Vector3(0, 0, -1));
+    const hit = ray.intersectObject(skinMesh, false)[0]; if (!hit) continue;
+    const p0 = hit.point, nrm = hit.face.normal.clone().transformDirection(skinMesh.matrixWorld);
+    // the hair's direction: up at the head, outward-up along the body, outward-down at the tail, plus a little scatter
+    const a = (u < 0.18 ? 75 - 200 * u : u < 0.7 ? 28 - 25 * (u - 0.18) : 15 - 80 * (u - 0.7)) + (rnd(n + 5) - 0.5) * 22 - 18 * v * (u < 0.3 ? 1 : 0.4);
+    const ang = THREE.MathUtils.degToRad(a);
+    const d = new THREE.Vector3(s * Math.cos(ang), Math.sin(ang), 0);
+    d.addScaledVector(nrm, -d.dot(nrm)).normalize();                          // along the skin
+    const L = (0.0055 + 0.003 * rnd(n + 9)) * (1 - 0.25 * u), w = 0.00007 * (0.8 + 0.4 * rnd(n + 3));
+    const lift = nrm.clone().multiplyScalar(0.0006 + 0.0006 * rnd(n + 21));
+    const p1 = p0.clone().addScaledVector(d, L * 0.5).add(lift), p2 = p0.clone().addScaledVector(d, L).addScaledVector(nrm, 0.0003);
+    const side3 = new THREE.Vector3().crossVectors(d, nrm).normalize();
+    const base = pos.length / 3, shade = 0.75 + 0.5 * rnd(n + 31);
+    for (let k = 0; k <= SEG; k++) {
+      const t = k / SEG, A = (1 - t) * (1 - t), B = 2 * t * (1 - t), Cq = t * t;
+      const q = new THREE.Vector3().addScaledVector(p0, A).addScaledVector(p1, B).addScaledVector(p2, Cq).addScaledVector(nrm, 0.0001);
+      const hw = w * (1 - 0.8 * t) / 2;
+      pos.push(q.x - side3.x * hw, q.y - side3.y * hw, q.z - side3.z * hw, q.x + side3.x * hw, q.y + side3.y * hw, q.z + side3.z * hw);
+      for (let e = 0; e < 2; e++) col.push(colour[0] * shade, colour[1] * shade, colour[2] * shade);
+      if (k < SEG) { const o = base + 2 * k; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+// which bones move the skin round the eyes (the lids): the skin vertices within 2.2 radii of each eye's centre whose
+// weight to a bone other than the head's is over 0.3, by bone
+function lidBones(THREE, skin, E){
+  const P = skin.geometry.attributes.position, J = skin.geometry.attributes.skinIndex, W = skin.geometry.attributes.skinWeight;
+  const names = skin.skeleton.bones.map(b => b.name), out = {}, v = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i);
+    const near = ["l", "r"].some(k => v.distanceTo(E[k].center) < E[k].radius * 2.2); if (!near) continue;
+    for (let c = 0; c < 4; c++) { const w = W.getComponent(i, c), nm = names[J.getComponent(i, c)];
+      if (w > 0.3 && nm !== "Head") out[nm] = (out[nm] || 0) + 1; } }
+  return out;
+}
+
+export function dressFace(THREE, root, opts = {}){
+  const info = dressBody(THREE, root, opts);
+  const skin = info.skin, E = info.eyes;                                 // E: the eye centres in the skinned (rest) pose
+  // a static copy of the skin in its rest pose, to root the brows on (the skinned mesh raycasts slowly)
+  root.updateMatrixWorld(true);
+  const g = skin.geometry, P = g.attributes.position, pv = new THREE.Vector3(), rest = new Float32Array(P.count * 3);
+  for (let i = 0; i < P.count; i++) { pv.fromBufferAttribute(P, i); skin.applyBoneTransform(i, pv); rest.set([pv.x, pv.y, pv.z], 3 * i); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(rest, 3)); sg.setIndex(g.index);
+  const stat = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({side: THREE.DoubleSide}));
+  stat.matrixWorld.identity(); stat.matrixAutoUpdate = false;
+  const browMat = new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.55, side: THREE.DoubleSide});
+  const headBone = skin.skeleton.bones.find(b => b.name === "Head"), brows = [];
+  for (const [k, side] of [["l", 1], ["r", -1]]) {
+    const m = new THREE.Mesh(browStrands(THREE, stat, E[k], side), browMat); m.name = "brow_" + k;
+    skin.add(m); root.updateMatrixWorld(true); headBone.attach(m); brows.push(m);
+  }
+  info.brows = brows.map(m => m.geometry.index.count / 24);
+  info.lidBones = lidBones(THREE, skin, E);
+  return info;
+}

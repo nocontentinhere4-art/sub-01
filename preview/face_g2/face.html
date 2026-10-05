@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>G2 face: before and after</title>
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// The dressed G2 character's face (preview/room-mh's web/room/boy.glb, its hair_mh.glb and hair_strands.js, served by
+// render_face.py from that branch): BEFORE as room-mh draws it (the glTF's own materials: vertex colours, roughness
+// 0.55), AFTER with dressFace (face.js). Front, three-quarter and side under the room's daylight (the sun 0xfff0dc
+// through the window, the sky 0xe4ecff, the room's bounce), and three close-ups of AFTER for the detail references.
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { useStrands } from "./hair_strands.js";
+import { dressFace } from "./face.js";
+
+const W = 600, H = 750;
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.1; renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2a2724);
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.18;
+// the room by day: the window is on his left (+x), a little in front; the sky's fill from the same side; the walls' warm bounce
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.position.set(1.6, 1.0, 1.2); scene.add(sun, sun.target);
+const sky = new THREE.DirectionalLight(0xe4ecff, 0.9); sky.position.set(1.4, 0.3, -0.2); scene.add(sky, sky.target);
+const hemi = new THREE.HemisphereLight(0xfff1dd, 0x3a3028, 0.35); scene.add(hemi);
+const bounce = new THREE.DirectionalLight(0xffd9b0, 0.35); bounce.position.set(-1.2, -0.3, 0.8); scene.add(bounce, bounce.target);
+
+const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+async function character(dress){
+  const g = await loader.loadAsync("boy_dressed.glb"), root = g.scene;
+  root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  scene.add(root); root.updateMatrixWorld(true);
+  let info = null;
+  if (dress) info = dressFace(THREE, root);
+  const head = root.getObjectByName("Head");
+  const hg = await loader.loadAsync("hair_mh.glb"), hair = hg.scene.getObjectByName("hair_mh") || hg.scene;
+  hair.position.set(0, 0, 0); head.add(hair); useStrands(THREE, hair, {lod: false, spine: root.getObjectByName("Spine")});
+  root.updateMatrixWorld(true);
+  return {root, info, head};
+}
+const before = await character(false), after = await character(true);
+
+// the face's centre: between the eyes (G2's eye primitive), from after's info
+const E = after.info.eyes, mid = E.l.center.clone().add(E.r.center).multiplyScalar(0.5).applyMatrix4(after.info.skin.matrixWorld);
+const cam = new THREE.PerspectiveCamera(24, W / H, 0.01, 20);
+const panels = {};
+function shot(name, who, ang, dist, aimDy = -0.035, fov = 24, w = W, h = H){
+  before.root.visible = who === before; after.root.visible = who === after;
+  renderer.setSize(w, h); cam.aspect = w / h; cam.fov = fov;
+  const aim = mid.clone().add(new THREE.Vector3(0, aimDy, 0));
+  const a = THREE.MathUtils.degToRad(ang);
+  cam.position.copy(aim).add(new THREE.Vector3(Math.sin(a) * dist, 0.02, Math.cos(a) * dist));
+  cam.lookAt(aim); cam.updateProjectionMatrix();
+  renderer.render(scene, cam); panels[name] = renderer.domElement.toDataURL("image/jpeg", 0.92);
+}
+for (const [v, ang] of [["front", 0], ["three_quarter", 35], ["side", 85]]) {
+  shot(`before_${v}`, before, ang, 0.62); shot(`after_${v}`, after, ang, 0.62);
+}
+// the details beside the real photos (4:3): his left eye, the cheek under it, the lips
+const L = after.info.eyes.l.center.clone().applyMatrix4(after.info.skin.matrixWorld);
+function detail(name, target, dir, dist, fov){
+  before.root.visible = false; after.root.visible = true;
+  renderer.setSize(400, 300); cam.aspect = 4 / 3; cam.fov = fov;
+  cam.position.copy(target).addScaledVector(dir.normalize(), dist); cam.lookAt(target); cam.updateProjectionMatrix();
+  renderer.render(scene, cam); panels[name] = renderer.domElement.toDataURL("image/jpeg", 0.92);
+}
+detail("d_eye", L.clone().add(new THREE.Vector3(0.002, 0.003, 0)), new THREE.Vector3(0.25, 0.05, 1), 0.075, 30);
+detail("d_skin", L.clone().add(new THREE.Vector3(0.012, -0.034, 0.002)), new THREE.Vector3(0.45, -0.1, 1), 0.06, 30);
+const lip = mid.clone().add(new THREE.Vector3(0, -0.075, 0.012));
+detail("d_lips", lip, new THREE.Vector3(0.15, -0.05, 1), 0.11, 30);
+
+window.__info = {lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
+  mid: mid.toArray().map(x => +x.toFixed(3))};
+window.__panels = () => panels;
+window.__done = true;
+</script></body></html>
