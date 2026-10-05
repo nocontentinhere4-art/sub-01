@@ -76,7 +76,7 @@ const lip = mid.clone().add(new THREE.Vector3(0, -0.075, 0.012));
 detail("d_lips", lip, new THREE.Vector3(0.15, -0.05, 1), 0.11, 30);
 
 window.__shape = after.info.shapeDelta;
-window.__info = {lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
+window.__info = {lidEdges: after.info.lidEdges, lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
   mid: mid.toArray().map(x => +x.toFixed(3))};
 window.__panels = () => panels;
 window.__done = true;

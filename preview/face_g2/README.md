@@ -23,8 +23,10 @@ three details of AFTER beside real photos of the same detail.
 Second round (the coordinator's notes on 3fcb539):
 - the brows: ~900 strands a side, full and upward at the head, denser in the body, thinning at the tail, a straight
   low man's line, the roots crowding the middle so no outline is drawn, a darker base on the skin under them;
-- the lashes: longer (to 8.8 mm), denser, darker and thicker at the root, leaning forward so from the front they read
-  as a dark fringe; a few sparse lower ones;
+- the lashes: longer (to 8.6 mm), denser, darker and thicker at the root, leaning forward so from the front they read
+  as a dark fringe; a few sparse lower ones. They and the lash line are rooted on the lids' edges as the camera sees
+  them (`refitLashes`: down each column across the eye, where the first thing a ray from the front hits turns from the
+  lid's skin to the ball), not where the coarse lid rims cross the ball (there they floated above the lid line);
 - the skin: deeper pores (deepest on the nose), a stronger furrow net, faint light marks and darker flecks, a
   day's stubble on the chin, the upper lip and along the jaw (a blue-grey shadow and dots where the hairs come
   through), a sharper, smaller highlight on the nose and the forehead;

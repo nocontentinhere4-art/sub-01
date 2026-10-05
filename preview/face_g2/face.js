@@ -4,6 +4,7 @@
 //
 //   dressFace(THREE, root)  ->  info (dressBody's, plus brows and the lid bones found)
 import { dressBody } from "../skin_eyes/body.js";
+import { lashStrands } from "../skin_eyes/skin_eyes.js";
 
 // the eyebrows: thin tapered ribbons rooted on the skin along each brow's arc (thicker at the head, thinning to the
 // tail), the hairs at the head pointing up, along the body outward and a little up, at the tail outward and down;
@@ -129,6 +130,45 @@ function relaxLids(THREE, skin, eyes, drop = 0.0006){
   return done;
 }
 
+// the lids' edges as the camera sees them from the front: down each column across the eye (every 0.75 mm), the lowest
+// point where the first thing a ray from the front hits is the lid's skin and not the ball (the upper lid), and up from
+// below for the lower lid; the lash line and the lashes are rebuilt on those edges (the mesh's lid rims are coarse and
+// run into the ball at an angle: rooted where they cross the ball, the lashes floated above the lid line)
+function refitLashes(THREE, skin, stat, E, headBone){
+  const ray = new THREE.Raycaster(), out = {};
+  const lashMat = new THREE.MeshStandardMaterial({color: new THREE.Color(0.02, 0.016, 0.014), roughness: 0.6});
+  const strandMat = new THREE.MeshStandardMaterial({color: new THREE.Color(0.012, 0.009, 0.008), roughness: 0.45, side: THREE.DoubleSide});
+  for (const k of ["l", "r"]) {
+    const C = E[k].center, r = E[k].radius;
+    // the skin's triangles near this eye only (a few hundred: the rays stay cheap)
+    const P = stat.geometry.attributes.position, I = stat.geometry.index.array, near = [], a = new THREE.Vector3();
+    for (let t = 0; t < I.length; t += 3) { a.fromBufferAttribute(P, I[t]); if (a.distanceTo(C) < r * 2.4) near.push(I[t], I[t + 1], I[t + 2]); }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", P); g.setIndex(near);
+    const local = new THREE.Mesh(g, new THREE.MeshBasicMaterial({side: THREE.DoubleSide})); local.matrixAutoUpdate = false;
+    const ballT = (o) => { const oc = o.clone().sub(C), c = oc.lengthSq() - r * r, D = oc.z * oc.z - c; return D < 0 ? Infinity : oc.z - Math.sqrt(D); };   // (the ray goes -z)
+    const firstSkin = (x, y) => { const o = new THREE.Vector3(x, y, C.z + 0.08); ray.set(o, new THREE.Vector3(0, 0, -1));
+      const h = ray.intersectObject(local, false)[0], tb = ballT(o); return h && h.distance < tb ? h.point : (tb < Infinity ? null : h ? h.point : undefined); };
+    const edge = up => { const pts = [];
+      for (let x = C.x - r * 0.98; x <= C.x + r * 0.98; x += 0.00075) {
+        let last = null;
+        for (let i = 0; i <= 70; i++) { const y = up ? C.y + r * 0.95 - i * 0.0002 : C.y - r * 0.95 + i * 0.0002;
+          const p = firstSkin(x, y); if (p === null) { if (last) pts.push(last); break; } if (p) last = p; } }
+      return pts; };
+    const upper = edge(true), lower = edge(false);
+    // the old lash line and strands (fitted to the crossings) out, the new ones in
+    for (const nm of ["lash_" + k, "lashes_up_" + k, "lashes_low_" + k]) { const o = headBone.getObjectByName(nm); if (o) o.parent.remove(o); }
+    const add = (mesh, name) => { mesh.name = name; skin.add(mesh); skin.parent.updateMatrixWorld(true); headBone.attach(mesh); };
+    if (upper.length > 4) {
+      const line = upper.map(p => p.clone().add(new THREE.Vector3(0, 0.0002, 0.0003)));
+      add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(line), 64, 0.0006, 6, false), lashMat), "lash_" + k);
+      add(new THREE.Mesh(lashStrands(THREE, upper, C, 1, {count: 100, len: 0.0086, width: 0.0002, fwd: 0.0003}), strandMat), "lashes_up_" + k);
+    }
+    if (lower.length > 6) add(new THREE.Mesh(lashStrands(THREE, lower.slice(2, -2), C, -1, {count: 18, len: 0.0034, width: 0.0001, fwd: 0.0002}), strandMat), "lashes_low_" + k);
+    out[k] = [upper.length, lower.length];
+  }
+  return out;
+}
+
 export function dressFace(THREE, root, opts = {}){
   let skin0, eyes0; root.traverse(o => { if (o.isSkinnedMesh) { if (o.material.name === "eyes") eyes0 = o; else if (o.material.name === "skin") skin0 = o; } });
   const shape = opts.shape === false ? {} : faceShape(THREE, skin0, eyes0, opts.shape || 1.4);
@@ -152,6 +192,7 @@ export function dressFace(THREE, root, opts = {}){
     skin.add(m); root.updateMatrixWorld(true); headBone.attach(m); brows.push(m);
   }
   info.brows = brows.map(m => m.geometry.index.count / 24);
+  info.lidEdges = refitLashes(THREE, skin, stat, E, headBone);
   info.lidBones = lidBones(THREE, skin, E);
   return info;
 }

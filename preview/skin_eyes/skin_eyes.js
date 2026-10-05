@@ -421,7 +421,7 @@ function corneaMaterial(THREE){
 // positions (the lid margins are found on it), eyes = {l: {center, radius}, r: ...} with the helper sphere's radius
 // the lashes: thin curved ribbons along a lid margin (sorted across the eye), leaning out of the lid and curling up
 // (upper) or down (lower); longest past the middle toward the outer corner, a little uneven in length and angle
-function lashStrands(THREE, pts, C, up, {count, len, width}){
+export function lashStrands(THREE, pts, C, up, {count, len, width, fwd = 0.0012}){
   const curve = new THREE.CatmullRomCurve3(pts), pos = [], idx = [];
   const rnd = a => { const x = Math.sin(a * 91.345 + up * 13.1) * 43758.5453; return x - Math.floor(x); };
   const Y = new THREE.Vector3(0, up, 0), Z = new THREE.Vector3(0, 0, 1), SEG = 6;
@@ -430,7 +430,7 @@ function lashStrands(THREE, pts, C, up, {count, len, width}){
     const t = Math.min(0.995, Math.max(0.005, (n + 0.5 + 0.6 * (rnd(n) - 0.5)) / count));
     const T = curve.getTangentAt(t), m = curve.getPointAt(t);
     // the root on the lid's visible edge (where it meets the ball), brought forward by the lid's thickness
-    const p0 = m.clone().addScaledVector(m.clone().sub(C).normalize(), 0.00015).addScaledVector(Z, 0.0012);   // the lid's thickness: the lashes grow from its front rim
+    const p0 = m.clone().addScaledVector(m.clone().sub(C).normalize(), 0.00015).addScaledVector(Z, fwd);   // the lid's thickness: the lashes grow from its front rim
     const tOut = outerSign > 0 ? t : 1 - t;                      // 0 at the inner corner, 1 at the outer
     const L = len * (0.45 + 0.55 * Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * tOut))) * (0.8 + 0.4 * rnd(n + 50));
     const out = p0.clone().sub(C).normalize();
