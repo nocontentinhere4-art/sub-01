@@ -226,7 +226,12 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
     Ad-block / paywall overlays (live 2026-10-05 09:10 Tokyo on the phone: "We noticed that ads aren't being
     displayed"; our ad blocking from #140 triggers them): `OVERLAY_WALL` / `overlay_wall` in `_settle` and at every
     screenshot (`_shoot`) make the page an "overlay wall": left, never dismissed or worked around, and the site is
-    left alone for `OVERLAY_COOLDOWN_S` (2 h, `Browser._cool`).
+    left alone for `OVERLAY_COOLDOWN_S` (2 h, `Browser._cool`). `Browser._overlay_walled` (live 2026-10-05 11:08
+    Tokyo: sciencenews.org's "Looks like your ad blocker is on" modal, appended after a long article, stayed on screen)
+    reads the start and end of the page text, every visible dialog / fixed / sticky box (also in open shadow roots)
+    and the child frames (`OVERLAY_TEXT_JS`), and runs before the banner step, so an overlay's close button or
+    "Continue without supporting us" is never pressed. Tested in a local Chromium on fixture pages
+    (`tests/test_overlay_walls_chromium.py`, no network).
   - Chromium memory (live 2026-10-04 04:02-04:53 UTC: 12 restarts "over 1200 MB", some 7-21 s apart, loop lag p95
     3.5 s). `Guard.route` loads nothing from ad / tracking / outstream-video networks (`memory_guard.AD_HOST`) and no
     cross-site iframe (`cross_site_frame`). The browser reads its own memory every `MEM_CHECK_S` (in a thread) and at
