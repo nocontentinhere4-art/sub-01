@@ -1,6 +1,6 @@
 # Medium curtain cut as real strands, for G2's body (preview)
 
-About 45,000 individual hairs grown on the scalp of G2's head (`room_build/mh/glb/boy_g2.glb` on `preview/mh-motion`),
+About 60,000 individual hairs grown on the scalp of G2's head (`room_build/mh/glb/boy_g2.glb` on `preview/mh-motion`),
 the way game grooms do it. The owner changed the style to a medium-length, soft, layered curtain cut on a ~20-year-old:
 
 - the top is 9-12 cm from a part near the centre (a little to his left), lifted at the roots by the part, with volume
@@ -59,16 +59,17 @@ Download each with `?w=1200&q=85&fm=jpg`. The side photo is cropped behind the f
     hair flows away from the part; the fringe comes down over the forehead and curves out and back toward the
     temples near the brows. It runs down over the sides and behind the ears, and down the back with no seam.
   - While the head is under the hair, a guide sits on it at a height that grows with the distance travelled, so
-    longer hair lies over shorter, with lifted roots by the part and volume at the crown. Once it leaves the skull,
+    longer hair stacks over shorter (up to 2.8 cm), with lifted roots across the top, more by the part, and volume
+    at the crown, so the curtain halves stand out from the head before they fall. Once it leaves the skull,
     it hangs under gravity.
   - A soft, loose wave (2-5 mm, 5-8 cm long) rides along each guide.
   - The fringe guides are cut evenly at the brows and outer eye corners, then resampled.
-  - Each guide carries about 36 hairs rooted round it. They twist gently round it along their length and are pulled
+  - Each guide carries about 50 hairs rooted round it (dense enough that no scalp shows). They twist gently round it along their length and are pulled
     back into it toward the tips, giving fuller, softer clumps; about 5 % split away as pieces.
   - The ends at the sides and nape flick out. Each hair gets a little frizz, and a few loose strands cross the
     forehead.
   - Near the hairline the hairs thin out over about 7 mm.
-  - Each hair has 5-14 points.
+  - Each hair has 5-11 points (fewer points per hair keeps the cost flat with more hairs).
   - Hairs are shuffled, so the first half is a uniform half-density LOD.
 - **Rendering** (`hair_strands.js`):
   - Each hair point becomes two vertices pushed apart across the view: about 0.08 mm wide, full width and opacity
@@ -93,14 +94,14 @@ faster.
 
 | | |
 |---|---|
-| hairs | 43,709 (1,203 clumps) |
-| strand points | 536,160 (492,451 segments) |
-| ribbon vertices / triangles | 1.07M / 985k (the LOD: 492k triangles) |
-| grow time | ~1.3-2.7 s (offline; the GLB carries the result) |
-| strand draw, close-up 480×480, full | ~2.4 s |
-| strand draw, 1280×800 at 2.2 m, full | ~1.45 s |
-| strand draw, 1280×800 at 2.2 m, LOD | ~0.73 s |
-| `hair_mh.glb` | 6.2 MB (quantized and meshopt-compressed) |
+| hairs | 60,304 (1,203 clumps) |
+| strand points | 545,998 (485,694 segments) |
+| ribbon vertices / triangles | 1.09M / 971k (the LOD: 486k triangles) |
+| grow time | ~1-2.7 s (offline; the GLB carries the result) |
+| strand draw, close-up 480×480, full | ~3.1 s |
+| strand draw, 1280×800 at 2.2 m, full | ~1.7 s |
+| strand draw, 1280×800 at 2.2 m, LOD | ~0.96 s |
+| `hair_mh.glb` | 6.5 MB (quantized and meshopt-compressed) |
 
 ## Using it in three.js (r169)
 
@@ -133,9 +134,9 @@ Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.05
 ## Known gaps against the photos
 
 - The back is a smoother, darker mass than the photo; its clumps and light-catching texture are weaker.
-- The crown has less height than in the side photo.
+- The crown is fuller now, but still lower than in the side photo; seen from the side, the part shows as a small notch at the top.
 - From the side, the fringe's front edge reads a little straight.
-- The draw is heavy: 985k triangles at full density (the LOD halves it). It has not been measured on a GPU or a phone.
+- The draw is heavy: 971k triangles at full density (the LOD halves it). It has not been measured on a GPU or a phone.
 
 ## Rebuild
 

@@ -69,13 +69,13 @@ export function growStrands(THREE, hair, opt = {}){
   // distance travelled (and a lift at the roots by the part and the crown); past the head, hang under gravity.
   const guides = [];
   for (const r of roots){
-    const L = lengthAt(r.p) * (0.88 + 0.24 * R()), P = Math.max(5, Math.min(14, Math.round(L / 0.008) + 1)), step = L / (P - 1);
+    const L = lengthAt(r.p) * (0.88 + 0.24 * R()), P = Math.max(5, Math.min(11, Math.round(L / 0.0115) + 1)), step = L / (P - 1);
     const nearPart = 1 - smooth(0.004, 0.025, Math.abs(r.p.x - PART_X)), top = smooth(0.79, 0.835, r.p.y);
-    const lift = (0.005 + 0.012 * nearPart * top + 0.008 * top) * (0.7 + 0.6 * R());   // lifted roots by the part, volume at the crown
+    const lift = (0.007 + 0.014 * nearPart * top + 0.014 * top) * (0.75 + 0.5 * R());   // lifted roots across the top, more by the part, volume at the crown
     const wave = {A: 0.002 + 0.003 * R(), lam: 0.05 + 0.03 * R(), ph: R() * 6.28};   // soft, loose waves
     const pts = [], nrm = []; let p = r.p.clone(), n = r.n.clone(), dir = comb(p, n), free = false, arc = 0;
     for (let k = 0; k < P; k++){
-      const off = Math.min(0.02, 0.0006 + lift * Math.sin(Math.min(1, arc / 0.03) * Math.PI / 2) + 0.06 * arc);   // longer hair lies over shorter (capped)
+      const off = Math.min(0.028, 0.0006 + lift * Math.sin(Math.min(1, arc / 0.025) * Math.PI / 2) + 0.09 * arc);  // longer hair stacks over shorter (capped)
       const side = new V().crossVectors(n, dir).normalize();
       const w = wave.A * smooth(0, 0.03, arc) * Math.sin(arc / wave.lam * 6.28 + wave.ph);
       pts.push(p.clone().addScaledVector(n, free ? 0 : off).addScaledVector(side, w)); nrm.push(r.n);

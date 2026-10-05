@@ -23,7 +23,7 @@ const tex = (cv, name) => { const t = new THREE.CanvasTexture(cv); t.flipY = fal
 
 const t0 = performance.now();
 const hair = buildHair(THREE, H.head, {layers: []});            // the head's helpers and the painted scalp base, no cards
-const grown = growStrands(THREE, hair, {count: 45000});
+const grown = growStrands(THREE, hair, {count: 62000});
 const msGrow = Math.round(performance.now() - t0);
 const scalpCanvas = paintScalp(hair.scalpStrokes);
 const scalp = new THREE.Mesh(hair.scalp, scalpMaterial(THREE, tex(scalpCanvas, "hair_scalp"))); scalp.name = "hair_scalp"; scalp.renderOrder = 1;
