@@ -94,7 +94,12 @@ How the bones were placed (`room_build/char_v5_fingers/`):
 4. **Inject** (`inject.mjs`): each new joint's local transform is the inverse of its parent's bind times its own bind,
    so the rest pose is unchanged. Then `MATTE=0.8 node room_build/build_char_tripo.mjs`.
 
+Hand skin: a blue-grey tint on the thumbs, the fingertips and the sides of the fingers is recoloured to the hands' own
+skin tone (`handfix.py`, body texture, hand UV islands only). The tint is recoloured with its shading kept; nails and
+creases stay. The palms have no slits: the dark lines in the first palm renders came from a camera placed inside the
+hoodie torso, and the palm views are now taken from outside the body.
+
 QA: `qa/fingers_rest.webp`, `qa/fingers_fist.webp`, `qa/fingers_pinch.webp` and `qa/fingers_phone.webp` show both
-hands, each from the front, the outside and the inside. The test poses are made with `poses.py`. The fingers bend
+hands, each from the front, the outside and the palm side. The test poses are made with `poses.py`. The fingers bend
 cleanly at the knuckles with no tearing. Small flaw: a little V-shaped fold at the base of the index finger in the
 right-hand fist.
