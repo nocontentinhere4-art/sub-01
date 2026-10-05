@@ -54,7 +54,7 @@ window.setup = async (c) => {
   room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = !/desk_lamp/i.test(o.name); if (o.material) o.material.envMapIntensity = 0.35; } });
   chair = room.getObjectByName("chair"); chair.rotation.y = 0; chair.position.z -= 0.15; CH.home.copy(chair.position); CH.ry = 0;
   for (const k of [...chair.children]) chair.remove(k);
-  const src = cg.scene.getObjectByName("chair_owner"); for (const k of (src.isMesh ? [src] : [...src.children])) { k.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); chair.add(k); }
+  const src = cg.scene.getObjectByName("chair_owner"); src.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); chair.add(src);   // whole, as the live room.html (its node carries the quantisation transform)
   chairPlace(0.375);
   char = chg.scene; scene.add(char);
   char.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true; if (o.isSkinnedMesh) skinned.push(o); } });
@@ -70,6 +70,17 @@ window.pose = (t) => {
   char.position.set(pl[0], pl[1], pl[2]); char.rotation.y = pl[3];
   action.time = Math.min(t, clipDur - 1e-4); mixer.update(0); char.updateMatrixWorld(true);
   if (cfg.chair) { const ck = interp(cfg.chair, t); chairPlace(ck[0], ck[1] || 0, ck[2] || 0, ck.length > 3 ? ck[3] : null); }
+  if (cfg.chairFromHip && t >= cfg.chairFromHip.from && t <= cfg.chairFromHip.to) {   // the seat stays under his hips (riding the chair)
+    const hp = char.getObjectByName("Hip").getWorldPosition(new THREE.Vector3()), r = chair.rotation.y, dz = cfg.chairFromHip.dz;
+    chair.position.x = hp.x - dz * Math.sin(r); chair.position.z = hp.z - dz * Math.cos(r); chair.updateMatrixWorld(true);
+  }
+  if (cfg.chairPushedBy && t >= cfg.chairPushedBy.from) {      // his legs push the chair back as he rises: the seat front keeps ahead of his calves
+    const P = cfg.chairPushedBy; let need = -9;
+    for (const b of P.bones) { const w = char.getObjectByName(b).getWorldPosition(new THREE.Vector3()); if (Math.abs(w.x - chair.position.x) < 0.30 && w.z < chair.position.z) need = Math.max(need, w.z + P.gap); }
+    window._cp = Math.max(window._cp ?? -9, need); if (t < P.from + 1e-6) window._cp = need;
+    if (t <= P.to) chair.position.z = Math.max(chair.position.z, window._cp); else chair.position.z = Math.max(chair.position.z, window._cp);
+    chair.updateMatrixWorld(true);
+  }
   if (cfg.chairFollow) {                                       // the chair rides with his hand on it (the push): its z keeps the offset it had from the hand at `from`
     const F = cfg.chairFollow, h = char.getObjectByName(F.hand); h.updateMatrixWorld(true); const hz = h.getWorldPosition(new THREE.Vector3()).z;
     if (t < F.from) window._cf = {};
@@ -145,7 +156,7 @@ window.qaDetail = (t) => {                                     // where the chai
   for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
     for (let i = 0; i < P.count; i += 2) { m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); const d = inside(C, v); if (d <= 0.005) continue;
       let bj = 0, bw = 0; for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k); if (w > bw) { bw = w; bj = SI.getComponent(i, k); } }
-      const nm = m.skeleton.bones[bj].name; const l = v.clone().applyMatrix4(inv); const e = by[nm] || (by[nm] = {n: 0, max: 0, y: [9, -9], z: [9, -9]});
+      const nm = m.skeleton.bones[bj].name; const l = v.clone().applyMatrix4(inv); const e = by[nm] || (by[nm] = {n: 0, max: 0, y: [9, -9], z: [9, -9], x: [9, -9]}); e.x = [Math.min(e.x[0], l.x), Math.max(e.x[1], l.x)];
       e.n++; e.max = Math.max(e.max, d); e.y = [Math.min(e.y[0], l.y), Math.max(e.y[1], l.y)]; e.z = [Math.min(e.z[0], l.z), Math.max(e.z[1], l.z)]; } }
   return {probe, by, tris: C.tris};
 };
@@ -173,5 +184,22 @@ window.bellyZ = (t) => { window.pose(t); const v = new THREE.Vector3(); let z = 
     for (let i = 0; i < P.count; i += 2) { let bj = 0, bw = 0; for (let q = 0; q < 4; q++) { const w = SW.getComponent(i, q); if (w > bw) { bw = w; bj = SI.getComponent(i, q); } }
       if (!["Waist", "Spine01", "Spine02"].includes(m.skeleton.bones[bj].name)) continue; m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); z = Math.min(z, v.z); } }
   return +z.toFixed(3); };
+window.seatTop = () => { const ms = []; chair.traverse(m => { if (m.isMesh) ms.push(m); }); const C = columnsOf(ms, 0.01); const out = [];
+  for (const [x, z] of [[0, 0.15], [0, 0.05], [0, -0.05], [0, -0.15], [0, -0.22], [0.12, 0.05]]) { const p = chair.localToWorld(new THREE.Vector3(x, 0, z));
+    const i = Math.floor((p.x - C.x0) / C.cell), j = Math.floor((p.z - C.z0) / C.cell); const iv = C.cols[i * C.nz + j] || [];
+    out.push([x, z, iv.map(v => v.map(y => +(y - 0.16).toFixed(3)))]); } return out; };
+window.seatGap = (dt = 0.1) => {                              // per sample: the buttock/thigh skin's gap to the seat top under it (m, < 0 = into the cushion)
+  const ms = []; chair.traverse(m => { if (m.isMesh) ms.push(m); }); const BUT = new Set(["Hip", "Pelvis", "Waist", "L_Thigh", "R_Thigh", "L_ThighTwist01", "R_ThighTwist01", "L_ThighTwist02", "R_ThighTwist02"]);
+  const v = new THREE.Vector3(), l = new THREE.Vector3(), out = [];
+  for (let t = 0; t <= clipDur + 1e-6; t += dt) { window.pose(t); const C = columnsOf(ms, 0.01), inv = chair.matrixWorld.clone().invert(); let gap = null; const hipL = char.getObjectByName("Hip").getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+    for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
+      for (let i = 0; i < P.count; i += 2) { let bj = 0, bw = 0; for (let q = 0; q < 4; q++) { const w = SW.getComponent(i, q); if (w > bw) { bw = w; bj = SI.getComponent(i, q); } }
+        if (!BUT.has(m.skeleton.bones[bj].name)) continue; m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); l.copy(v).applyMatrix4(inv);
+        if (Math.abs(l.x) > 0.20 || l.z < -0.16 || l.z > 0.12 || l.y > 0.80) continue;
+        const ci = Math.floor((v.x - C.x0) / C.cell), cj = Math.floor((v.z - C.z0) / C.cell); const iv = (C.cols[ci * C.nz + cj] || []).filter(([lo, hi]) => hi - chair.position.y < 0.56 && hi - chair.position.y > 0.40 && v.y > lo);   // the cushion under (or around) this skin point: not skin hanging below it
+        if (!iv.length) continue; const top = Math.max(...iv.map(x => x[1])); const g = v.y - top, key = l.z > hipL.z - 0.03 ? "glute" : "thigh"; if (!gap) gap = {}; if (gap[key] === undefined || g < gap[key]) gap[key] = +g.toFixed(4);
+        if (key === "glute") { gap.gz = gap.gz || []; } } }
+    out.push([+t.toFixed(2), gap]); }
+  return out; };
 window.ready = true;
 </script></body></html>

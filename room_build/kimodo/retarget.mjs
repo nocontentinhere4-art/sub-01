@@ -123,6 +123,43 @@ function toLocal(Wmap, hipWorld){                // world rotations of mapped bo
 }
 let seq = frames.map(f => toLocal(f.W, f.hip));
 
+// jitter: RMS of the 2nd derivative (m/s^2) of the wrists' and head's positions (rig space), before and after
+const JIT = ["L_Hand", "R_Hand", "Head", "Hip"];
+function jitter(sq){ const P = sq.map(f => fk(f.L, f.ht).P); const o = {};
+  // high-frequency part only: the track minus its Gaussian-smoothed self (sigma 4 frames, ~1.2 Hz and up kept out), so
+  // deliberate motion (a reach, a step) does not count as jitter
+  for (const n of JIT) { const x = P.map(m => m.get(B(n)).clone()), r = x.map((_, k) => { const a = new THREE.Vector3(); let ws = 0;
+      for (let j = -12; j <= 12; j++) { const kk = Math.min(x.length - 1, Math.max(0, k + j)), w = Math.exp(-j * j / 32); a.add(x[kk].clone().multiplyScalar(w)); ws += w; }
+      return x[k].clone().sub(a.multiplyScalar(1 / ws)); });
+    let s2 = 0; for (let k = 1; k < r.length - 1; k++) s2 += r[k - 1].clone().add(r[k + 1]).sub(r[k].clone().multiplyScalar(2)).multiplyScalar(fps * fps).lengthSq();
+    o[n] = +Math.sqrt(s2 / Math.max(1, r.length - 2)).toFixed(3); }
+  return o; }
+const jitterBefore = jitter(seq);
+// zero-phase smoothing: a Gaussian kernel over time (both directions, so no lag), rotations averaged in quaternion space
+// (sign-aligned to the centre frame, normalised; for small angles that is the slerp average), the Hip translation too.
+// Cut-off ~5 Hz on the limbs (sigma 1 frame), ~3 Hz on the spine, neck and head (sigma 1.7 frames)
+function smoothSeq(sigL, sigS) {
+  const SPINE = new Set(["Hip", "Waist", "Spine01", "Spine02", "NeckTwist01", "NeckTwist02", "Head", "Pelvis"]);
+  const kern = sg => { const r = Math.ceil(sg * 3), w = []; for (let j = -r; j <= r; j++) w.push(Math.exp(-j * j / (2 * sg * sg))); return {r, w}; };
+  const KL = kern(sigL), KS = kern(sigS);
+  const out = seq.map(f => ({L: new Map(f.L), ht: f.ht.clone()}));
+  for (const n of bonesTD) { const name = n.getName(); if (!seq[0].L.has(n)) continue; const K = SPINE.has(name) ? KS : KL;
+    for (let k = 0; k < T; k++) { const c = seq[k].L.get(n), acc = new THREE.Vector4(0, 0, 0, 0); let ws = 0;
+      for (let j = -K.r; j <= K.r; j++) { const kk = Math.min(T - 1, Math.max(0, k + j)), q = seq[kk].L.get(n), w = K.w[j + K.r];
+        const sgn = (q.x * c.x + q.y * c.y + q.z * c.z + q.w * c.w) < 0 ? -1 : 1; acc.x += sgn * w * q.x; acc.y += sgn * w * q.y; acc.z += sgn * w * q.z; acc.w += sgn * w * q.w; ws += w; }
+      out[k].L.set(n, new THREE.Quaternion(acc.x, acc.y, acc.z, acc.w).normalize()); } }
+  for (let k = 0; k < T; k++) { const acc = new THREE.Vector3(); let ws = 0;
+    for (let j = -KS.r; j <= KS.r; j++) { const kk = Math.min(T - 1, Math.max(0, k + j)), w = KS.w[j + KS.r]; acc.add(seq[kk].ht.clone().multiplyScalar(w)); ws += w; }
+    out[k].ht = acc.multiplyScalar(1 / ws); }
+  seq = out;
+}
+if (O.smooth !== false) smoothSeq(O.smoothSigma ?? 1.0, O.smoothSigmaSpine ?? 1.7);
+// seat height: per-frame Hip offsets (m, world y) measured on the skin against the seat by the scene (seat.mjs), applied
+// in the seated windows
+if (O.hipDY) { const pr = parentOf.get(B("Hip"));
+  seq.forEach((f, k) => { const x = Math.min(O.hipDY.length - 1, (k / fps) / 0.1), i = Math.floor(x), u = x - i, d = (O.hipDY[i] * (1 - u) + O.hipDY[Math.min(i + 1, O.hipDY.length - 1)] * u) * SEATW(k / fps);
+    f.ht.add(new THREE.Vector3(0, d / rest.S.get(pr), 0).applyQuaternion(rest.W.get(pr).clone().invert())); }); }
+
 // ---------- two-bone IK (rig space): bend a-b-c so that c reaches `goal`, the bend plane kept by the current mid joint
 function twoBone(L, ht, a, b, c, goal, w = 1){
   const st = fk(L, ht), A = st.P.get(B(a)), Bp = st.P.get(B(b)), Cp = st.P.get(B(c));
@@ -202,6 +239,23 @@ if (CL.contacts && O.footlock !== false) {
     }
   }
 }
+// seated feet: O.feetPin = {fwd, side} (m): in the seated windows both feet are planted flat at the hips' position + fwd
+// along his facing, +-side to his left/right (soles on the floor, the foot pitched so its toe joint is down too)
+if (O.feetPin) for (let k = 0; k < T; k++) {
+  const w = SEATW(k / fps); if (w <= 0) continue;
+  const st0 = fk(seq[k].L, seq[k].ht), hp = st0.P.get(B("Hip")), fw = frames[k].fwd, rg = new THREE.Vector3(0, 1, 0).cross(fw).multiplyScalar(-1);
+  for (const [sd, sg] of [["L", -1], ["R", 1]]) {
+    const cur = fk(seq[k].L, seq[k].ht).P.get(B(`${sd}_Foot`));
+    const goal = hp.clone().add(fw.clone().multiplyScalar(O.feetPin.fwd)).add(rg.clone().multiplyScalar(sg * O.feetPin.side)); goal.y = FLOOR + ankleH[sd];
+    twoBone(seq[k].L, seq[k].ht, `${sd}_Thigh`, `${sd}_Calf`, `${sd}_Foot`, cur.clone().lerp(goal, w), 1);
+    const st = fk(seq[k].L, seq[k].ht), A = st.P.get(B(`${sd}_Foot`)), To = st.P.get(B(`${sd}_ToeBase`));
+    const fdir = To.clone().sub(A).setY(0).normalize(), ax = new THREE.Vector3(0, 1, 0).cross(fdir).normalize(), len = To.distanceTo(A);
+    const want = FLOOR + restP(`${sd}_ToeBase`).y - A.y, now = To.y - A.y;
+    const ang = (Math.asin(THREE.MathUtils.clamp(-want / len, -1, 1)) - Math.asin(THREE.MathUtils.clamp(-now / len, -1, 1))) * w;
+    const Wf = new THREE.Quaternion().setFromAxisAngle(ax, ang).multiply(st.W.get(B(`${sd}_Foot`)));
+    seq[k].L.set(B(`${sd}_Foot`), st.W.get(parentOf.get(B(`${sd}_Foot`))).clone().invert().multiply(Wf));
+  }
+}
 // floor: lift the hips by any sole under the floor (smoothed)
 {
   const pen = seq.map(f => { const st = fk(f.L, f.ht); let m = 0; for (const s of ["L", "R"]) { m = Math.max(m, FLOOR + ankleH[s] * 0.9 - st.P.get(B(`${s}_Foot`)).y, FLOOR + 0.015 - st.P.get(B(`${s}_ToeBase`)).y); } return m; });
@@ -218,16 +272,19 @@ if (O.loop) {
 }
 // the hand's own direction (wrist towards the knuckles) in its bone frame: the rest forearm-to-wrist direction
 const handDir = Object.fromEntries(["L", "R"].map(sd => [sd, restP(`${sd}_Hand`).sub(restP(`${sd}_Forearm`)).normalize().applyQuaternion(rest.W.get(B(`${sd}_Hand`)).clone().invert())]));
+function runHands(){
 for (const h of O.hands || []) {
   // keepDetail: Kimodo's own small wrist motion (its offset from its 1 s running mean) rides on the target
   let det = null;
   if (h.keepDetail) { const wp = seq.map(f => fk(f.L, f.ht).P.get(B(`${h.hand}_Hand`)));
-    det = wp.map((p, k) => { const m = new THREE.Vector3(); let n = 0; for (let j = Math.max(0, k - 15); j <= Math.min(T - 1, k + 15); j++) { m.add(wp[j]); n++; } return p.clone().sub(m.multiplyScalar(1 / n)).multiplyScalar(h.keepDetail); }); }
+    const raw = wp.map((p, k) => { const m = new THREE.Vector3(); let n = 0; for (let j = Math.max(0, k - 15); j <= Math.min(T - 1, k + 15); j++) { m.add(wp[j]); n++; } return p.clone().sub(m.multiplyScalar(1 / n)).multiplyScalar(h.keepDetail); });
+    det = raw.map((_, k) => { const a = new THREE.Vector3(); let ws = 0; for (let j = -12; j <= 12; j++) { const kk = Math.min(T - 1, Math.max(0, k + j)), w = Math.exp(-j * j / 32); a.add(raw[kk].clone().multiplyScalar(w)); ws += w; } return a.multiplyScalar(1 / ws); }); }
   for (let k = 0; k < T; k++) {
     const t = k / fps; if (t < h.from - h.ramp || t > h.to + h.ramp) continue;
     const w = t < h.from ? (t - h.from + h.ramp) / h.ramp : t > h.to ? (h.to + h.ramp - t) / h.ramp : 1;
     let g; if (h.path) { let i = 0; while (i + 1 < h.path.length && h.path[i + 1][0] <= t) i++; const a = h.path[i], b = h.path[Math.min(i + 1, h.path.length - 1)];
-      const u = b[0] > a[0] ? THREE.MathUtils.clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0; g = V(a.slice(1)).lerp(V(b.slice(1)), u); } else g = V(h.pos);
+      let u = b[0] > a[0] ? THREE.MathUtils.clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0; const ue = u * u * u * (u * (6 * u - 15) + 10);   // smootherstep: ease in and out
+      g = V(a.slice(1, 4)).lerp(V(b.slice(1, 4)), ue); if (b[4]) g.y += b[4] * Math.sin(Math.PI * ue); } else g = V(h.pos);
     if (h.relHip) g.add(fk(seq[k].L, seq[k].ht).P.get(B("Hip")));
     if (det) g.add(det[k]);
     const ws = w * w * (3 - 2 * w);
@@ -240,6 +297,8 @@ for (const h of O.hands || []) {
     }
   }
 }
+}
+runHands();
 
 // hands on the bed rest on the mattress, not in it
 if (O.bed && O.place) {
@@ -250,6 +309,9 @@ if (O.bed && O.place) {
       w.y = bd.top + 0.08; twoBone(seq[k].L, seq[k].ht, `${sd}_Upperarm`, `${sd}_Forearm`, `${sd}_Hand`, w.sub(pp).applyQuaternion(pqi), 1); }
   }
 }
+// final pass: the joins, foot locks and lifts above can leave small pops; a last zero-phase smoothing of every bone and the
+// Hip, then the hand pins re-solved so the contacts stay exact
+if (O.postSmooth) { smoothSeq(O.postSmooth, O.postSmooth * 1.5); runHands(); }
 // ---------- write: the rig without its mesh, one animation
 for (const a of root.listAnimations()) a.dispose();
 for (const n of root.listNodes()) if (n.getMesh()) { n.setMesh(null); n.setSkin(null); n.dispose(); }
@@ -266,6 +328,9 @@ for (const n of bonesTD) { if (n.getName() === "Armature") continue;
   seq.forEach((f, t) => { const q = (f.L.get(n) || restL.get(n)).clone().normalize(); if (prev && q.dot(prev) < 0) { q.x = -q.x; q.y = -q.y; q.z = -q.z; q.w = -q.w; } q.toArray(arr, t * 4); prev = q; });
   add(n, "rotation", arr, "VEC4"); }
 const hip = new Float32Array(T * 3); seq.forEach((f, t) => f.ht.toArray(hip, t * 3)); add(B("Hip"), "translation", hip, "VEC3");
+const jitterAfter = jitter(seq);
+console.log("jitter (RMS 2nd derivative, m/s^2) before", JSON.stringify(jitterBefore), "after", JSON.stringify(jitterAfter));
+if (O.report) fs.writeFileSync(O.report, JSON.stringify({jitterBefore, jitterAfter}));
 await doc.transform(resample({tolerance: 2e-4}), prune({keepLeaves: true}));
 await io.write(OUT, doc);
 console.log(`${name}: ${T} frames @${fps}, scale ${scale.toFixed(3)}, ankle dy ${(tgtAnkle - scale * srcAnkle).toFixed(3)}, ${(fs.statSync(OUT).size / 1024).toFixed(0)} KB, max floor lift ${(Math.max(...seq.map(f => f.lift)) * 100).toFixed(1)} cm`);

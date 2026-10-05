@@ -42,7 +42,7 @@ if (!qaOnly) {
   // a contact sheet: 6 frames of camera 0 and 1
   const pick = [0, 0.2, 0.4, 0.6, 0.8, 1].map(u => Math.min(n - 1, Math.round(u * (n - 1))));
   const sh = []; for (const c of cfg.cams.keys()) for (const i of pick) sh.push("-i", path.join(tmp, `c${c}_${String(i).padStart(5, "0")}.jpg`));
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...sh, "-filter_complex", `xstack=inputs=${pick.length * cfg.cams.length}:grid=${pick.length}x${cfg.cams.length},scale=iw/2:-2`, "-q:v", "4", path.join(OUT, `${name}_sheet.jpg`)]);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...sh, "-filter_complex", `xstack=inputs=${pick.length * cfg.cams.length}:layout=${cfg.cams.flatMap((_, r) => pick.map((_, c) => `${c ? Array(c).fill("w0").join("+") : "0"}_${r ? Array(r).fill("h0").join("+") : "0"}`)).join("|")},scale=iw/2:-2`, "-q:v", "4", path.join(OUT, `${name}_sheet.jpg`)]);
   fs.rmSync(tmp, {recursive: true});
   console.log(`${name}: ${n} frames -> ${name}.mp4`);
 }
