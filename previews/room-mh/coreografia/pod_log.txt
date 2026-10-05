@@ -1,0 +1,120 @@
++ cd /work
+++ nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
++ echo 'gpu: NVIDIA RTX A5000, 580.159.04'
+gpu: NVIDIA RTX A5000, 580.159.04
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -qq
++ apt-get install -y -qq ffmpeg fonts-dejavu-core libegl1 libgles2 libgl1 libvulkan1 mesa-vulkan-drivers
++ tail -2
+Processing triggers for libc-bin (2.35-0ubuntu3.9) ...
+Processing triggers for libgdk-pixbuf-2.0-0:amd64 (2.42.8+dfsg-1ubuntu0.5) ...
++ pip install -q playwright pillow
++ tail -1
+[notice] To update, run: python -m pip install --upgrade pip
++ python3 -m playwright install --with-deps chromium
++ tail -2
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 114.3 MiB
+Chrome Headless Shell 153.0.8010.12 (playwright chromium-headless-shell v1243) downloaded to /root/.cache/ms-playwright/chromium_headless_shell-1243
++ ls /usr/lib/x86_64-linux-gnu/
++ grep -i 'nvidia-egl\|EGL_nvidia\|nvidia-glvkspirv\|GLX_nvidia'
++ head -5
+libEGL_nvidia.so.0
+libEGL_nvidia.so.580.159.04
+libGLX_nvidia.so.0
+libGLX_nvidia.so.580.159.04
+libnvidia-egl-gbm.so.1
++ ls /etc/vulkan/icd.d/ /usr/share/vulkan/icd.d/
++ head -5
+/etc/vulkan/icd.d/:
+nvidia_icd.json
+
+/usr/share/vulkan/icd.d/:
+intel_hasvk_icd.x86_64.json
++ mkdir -p /work/old /work/new /work/frames
++ tar -xzf /in/old.tar.gz -C /work/old
++ tar -xzf /in/new.tar.gz -C /work/new
++ R=/work/new/tools/gpu_preview_render.py
++ GPU_ARGS=
++ for cand in "channel=chromium,--use-gl=angle,--use-angle=gl-egl" "channel=chromium,--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" "channel=chromium,--use-gl=egl" "--use-gl=angle,--use-angle=gl-egl" "--use-angle=vulkan,--use-vulkan=native,--enable-features=Vulkan" "--use-gl=egl" "channel=chromium,--use-angle=gl,--use-gl=angle"
+++ python3 /work/new/tools/gpu_preview_render.py --probe --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl
+++ tail -1
++ r='ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)'
++ echo 'probe [channel=chromium,--use-gl=angle,--use-angle=gl-egl] -> ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)'
+probe [channel=chromium,--use-gl=angle,--use-angle=gl-egl] -> ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ case "$r" in
++ GPU_ARGS=channel=chromium,--use-gl=angle,--use-angle=gl-egl
++ break
++ '[' -z channel=chromium,--use-gl=angle,--use-angle=gl-egl ']'
++ echo channel=chromium,--use-gl=angle,--use-angle=gl-egl
++ for size in $SIZES
++ for side in old new
++ SHOTS_ARG=
++ '[' -n room_mh_choreo.json ']'
++ SHOTS_ARG='--shots /in/room_mh_choreo.json'
+++ '[' old = old ']'
+++ echo ''
++ Q=
+++ '[' old = old ']'
+++ echo 71
++ python3 /work/new/tools/gpu_preview_render.py --web /work/old/web --side old --size 1280x800 --fps 30 --segments 14:60,23:30 --shots /in/room_mh_choreo.json --query '' --frames /work/frames/1280x800 --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl --require-gpu --port 8871
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"clear","cloud":0.035647066864228284,"rain":0,"n":0.5795924956163101},"override":null,"litP":0.2357142857142857,"train":{"x":-91.8498999967575,"di
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"clear","cloud":0.035647066864228284,"rain":0,"n":0.5795924956163101},"override":null,"litP":0.2357142857142857,"train":{"x":-91.8498999967575,"di
+  warm-up: 140 textures
+  old 1280x800 Si alza e va alla finestra frame 0/240 (35 s)
+  old 1280x800 Si alza e va alla finestra frame 150/240 (51 s)
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+  window view: {"hour":23,"sun":-0.9732643737003825,"weather":{"kind":"overcast","cloud":1,"rain":0.011981876990084125,"n":0.41095539406109227},"override":null,"litP":0.55,"train":{"x":-92.14059998703003,"dir":1},"t
+  warm-up: 140 textures
+  old 1280x800 Di notte: si stira sulla sedia e si alza per andare a letto frame 0/240 (72 s)
+  old 1280x800 Di notte: si stira sulla sedia e si alza per andare a letto frame 150/240 (88 s)
+old: 480 frames in 98.6 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ for side in old new
++ SHOTS_ARG=
++ '[' -n room_mh_choreo.json ']'
++ SHOTS_ARG='--shots /in/room_mh_choreo.json'
+++ '[' new = old ']'
+++ echo ''
++ Q=
+++ '[' new = old ']'
+++ echo 72
++ python3 /work/new/tools/gpu_preview_render.py --web /work/new/web --side new --size 1280x800 --fps 30 --segments 14:60,23:30 --shots /in/room_mh_choreo.json --query '' --frames /work/frames/1280x800 --gpu-args=channel=chromium,--use-gl=angle,--use-angle=gl-egl --require-gpu --port 8872
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+WebGL: ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"clear","cloud":0.035647066864228284,"rain":0,"n":0.5795924956163101},"override":null,"litP":0.2357142857142857,"train":{"x":-87.82940001296997,"d
+  window view: {"hour":14,"sun":0.8296770135526188,"weather":{"kind":"clear","cloud":0.035647066864228284,"rain":0,"n":0.5795924956163101},"override":null,"litP":0.2357142857142857,"train":{"x":-87.82940001296997,"d
+  warm-up: 140 textures
+  new 1280x800 Si alza e va alla finestra frame 0/240 (12 s)
+  new 1280x800 Si alza e va alla finestra frame 150/240 (28 s)
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+pageerror Failed to execute 'json' on 'Response': Unexpected end of JSON input
+  window view: {"hour":23,"sun":-0.9732643737003825,"weather":{"kind":"overcast","cloud":1,"rain":0.011981876990084125,"n":0.41095539406109227},"override":null,"litP":0.55,"train":{"x":-91.29230002593994,"dir":1},"t
+  warm-up: 140 textures
+  new 1280x800 Di notte: si stira sulla sedia e si alza per andare a letto frame 0/240 (47 s)
+  new 1280x800 Di notte: si stira sulla sedia e si alza per andare a letto frame 150/240 (64 s)
+new: 480 frames in 73.9 s on ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)
++ python3 /work/new/tools/gpu_preview_render.py --encode --frames /work/frames/1280x800 --out /out/preview_1280x800.mp4 --max-mb 25 --label-old Prima --label-new Dopo
+wrote /out/preview_1280x800.mp4: 480 frames, 16.0 s, 3.8 MB (crf 20)
++ cp /work/frames/1280x800/new_meta.json /work/frames/1280x800/old_meta.json /out/
++ for s in old new
++ cp /work/frames/1280x800/old_meta.json /out/old_1280x800_meta.json
++ for s in old new
++ cp /work/frames/1280x800/new_meta.json /out/new_1280x800_meta.json
++ ls -la /out
+total 7848
+drwxr-xr-x 2 root root    4096 Oct  5 05:25 .
+drwxr-xr-x 1 root root     185 Oct  5 05:21 ..
+-rw-r--r-- 1 root root       3 Oct  5 05:21 UP
+-rw-r--r-- 1 root root      51 Oct  5 05:22 gpu_args.txt
+-rw-r--r-- 1 root root    7387 Oct  5 05:25 log.txt
+-rw-r--r-- 1 root root     500 Oct  5 05:25 new_1280x800_meta.json
+-rw-r--r-- 1 root root     500 Oct  5 05:25 new_meta.json
+-rw-r--r-- 1 root root     500 Oct  5 05:25 old_1280x800_meta.json
+-rw-r--r-- 1 root root     500 Oct  5 05:25 old_meta.json
+-rw-r--r-- 1 root root    1261 Oct  5 05:25 preview_1280x800.json
+-rw-r--r-- 1 root root 3824973 Oct  5 05:25 preview_1280x800.mp4

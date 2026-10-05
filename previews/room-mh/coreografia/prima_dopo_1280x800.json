@@ -1,0 +1,61 @@
+{
+ "frames": 480,
+ "fps": 30,
+ "seconds": 16.0,
+ "bytes": 3824973,
+ "crf": 20,
+ "sides": {
+  "old": {
+   "side": "old",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "Si alza e va alla finestra",
+     "seconds": 8.0,
+     "first": 0,
+     "frames": 240
+    },
+    {
+     "hour": 23,
+     "label": "Di notte: si stira sulla sedia e si alza per andare a letto",
+     "seconds": 8.0,
+     "first": 240,
+     "frames": 240
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 98.6,
+   "clean": true
+  },
+  "new": {
+   "side": "new",
+   "size": "1280x800",
+   "fps": 30,
+   "segments": [
+    {
+     "hour": 14,
+     "label": "Si alza e va alla finestra",
+     "seconds": 8.0,
+     "first": 0,
+     "frames": 240
+    },
+    {
+     "hour": 23,
+     "label": "Di notte: si stira sulla sedia e si alza per andare a letto",
+     "seconds": 8.0,
+     "first": 240,
+     "frames": 240
+    }
+   ],
+   "renderer": "ANGLE (NVIDIA Corporation, NVIDIA RTX A5000/PCIe/SSE2, OpenGL ES 3.2) | Google Inc. (NVIDIA Corporation)",
+   "seconds_render": 73.9,
+   "clean": true
+  }
+ },
+ "dropouts_replaced": {
+  "old": [],
+  "new": []
+ }
+}
