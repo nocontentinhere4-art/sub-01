@@ -339,6 +339,28 @@ only, its mocap is CC BY-NC 4.0.
     - Validated locally by B: pytest 1234 passed / 27 skipped, smoke OK, visual 5 passed.
 - **Decisions today:**
   - Owner: every visual item is delivered side by side with a real reference photo.
+  - **Owner (2026-10-05): the building ("il palazzo").** Why people come back: the audience is crypto Twitter, so
+    the answer is a world the community builds. The brain stays as the engine: every choice he makes comes from it.
+    - **V1 (OK):** a building across from his window, with 3 lit windows and 3 fictional CT archetype neighbors:
+      - the degen, lights on at 4 a.m. and three monitors;
+      - the one shouting from the balcony;
+      - the calm one meditating.
+      - Their energy follows total market activity, never price direction or individual trades.
+      - No text, no wallets.
+    - **Later:**
+      - V2: apartments earned through community participation (gifts, votes), never through the coin.
+      - Eviction after 7 days away.
+      - The mystery neighbor (a season-long puzzle with clues in his dreams, chess and searches).
+      - The building's weekly meeting with community votes.
+      - The building gains a floor at each participation milestone.
+    - **Hard limits:**
+      - no neighbor per trader;
+      - no coin or wallet gating;
+      - names and letters filtered;
+      - no character talks about prices;
+      - no claims about what he feels.
+    - **Split:** B does the server (building state, activity energy, later points and moderation). A does the visuals
+      and brings the owner a still first.
   - CI skips docs-only changes. Workers push with `[skip ci]` and validate locally.
   - CI runs once on main per merge. Budget: about 1,000 Actions minutes for 28 days, about 20 min per run.
 - **Waiting:**
