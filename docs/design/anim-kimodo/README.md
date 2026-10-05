@@ -113,8 +113,8 @@ Summary (the full per-second table is `qa/contact_table.md`):
 
 ## Real references (`refs/`)
 
-`refs/<clip>_refs.jpg`: real photos (Pexels license, `refs/SOURCES.md`: page, photographer, view; brand marks
-pixelated) next to our frames: typing (side, 3/4 rear), reading at a desk, phone in a chair, stretching in an office
+`refs/<clip>_refs.jpg`: real photos (Pexels license, `refs/SOURCES.md`: page, photographer, view; every face blurred
+and brand marks pixelated) next to our frames: typing (side, 3/4 rear), reading at a desk, phone in a chair, stretching in an office
 chair, lying in bed, sitting on the bed's edge. The typing pose follows them: hips back on the seat, an upright trunk
 over the hips, elbows bent by the body, wrists level with the keys, feet flat.
 
