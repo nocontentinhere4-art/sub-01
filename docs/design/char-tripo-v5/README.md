@@ -66,3 +66,35 @@ but:
 - the hair is a little less defined.
 
 **Left:** faint grey shading on the inner hood near the neck, close up only.
+
+## Finger bones: `char_tripo_v5_fingers.glb`
+
+The same character with finger bones, 79 joints in all: the 41 Tripo joints, unchanged, plus 19 per hand. The names,
+parents and rest orientations match the MakeHuman rig on `preview/room-mh` (`web/room/mh/*.glb`), so MakeHuman finger
+channels can be retargeted 1:1:
+
+- **Thumb:** `finger1-1`, `finger1-2`, `finger1-3`, with `finger1-1` a child of `L_Hand` / `R_Hand`.
+- **Metacarpals:** `metacarpal1` to `metacarpal4`, children of the hand.
+- **Fingers:** `finger2-*` (index) under `metacarpal1`, `finger3-*` (middle) under `metacarpal2`, `finger4-*` (ring)
+  under `metacarpal3`, `finger5-*` (pinky) under `metacarpal4`, with the suffix `.L` / `.R`.
+- **Rest orientation:** MakeHuman's finger rest frames are identity (world-aligned, facing +Z). Here every finger
+  joint's rest world rotation is that frame turned +90° about Y, because this model faces +X. A MakeHuman local
+  rotation therefore applies unchanged. The metacarpals carry no skin weight (the palm stays on the hand), as in a
+  plain retarget.
+
+How the bones were placed (`room_build/char_v5_fingers/`):
+
+1. **Find the fingers** (`seg.py`, `fingers.py`): the hand mesh is cut across at two levels. The upper cut separates
+   the thumb; the lower one separates the four fingers. The pieces are ordered front (thumb side, +X) to back.
+2. **Place the joints:** each finger's axis is the main direction of its piece of mesh. Knuckles sit 8 mm (in Tripo
+   units, about 1.4 cm) above the web, and the phalanges are 46%, 29% and 25% of knuckle-to-tip. The thumb's
+   `finger1-1` sits 1.4 cm above where the thumb separates from the hand.
+3. **Weights:** smooth ramps along each finger chain: palm-to-knuckle about 1 cm, then narrower at the middle and end
+   joints.
+4. **Inject** (`inject.mjs`): each new joint's local transform is the inverse of its parent's bind times its own bind,
+   so the rest pose is unchanged. Then `MATTE=0.8 node room_build/build_char_tripo.mjs`.
+
+QA: `qa/fingers_rest.webp`, `qa/fingers_fist.webp`, `qa/fingers_pinch.webp` and `qa/fingers_phone.webp` show both
+hands, each from the front, the outside and the inside. The test poses are made with `poses.py`. The fingers bend
+cleanly at the knuckles with no tearing. Small flaw: a little V-shaped fold at the base of the index finger in the
+right-hand fist.
