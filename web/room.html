@@ -1149,7 +1149,7 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
     if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12) {
       if (T - CAM.keptLos < 0.25) { CAM.ang = CAM.pick; return out; }
       CAM.keptLos = T;
-      if (!occluded(out, c) && !(eyes && faceHidden(out, c))) { CAM.ang = CAM.pick; return out; }
+      if (!occluded(out, c) && !(eyes && (faceHidden(out, c) || bodyBlocks(out, c, 0.12)))) { CAM.ang = CAM.pick; return out; }
     }
   }
   CAM.aim.copy(c);
@@ -1160,7 +1160,7 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
     out.copy(c).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h);
     const d = camClamp(out) + (camInside(out) ? 1 : 0);
     if (d < fallD) { fallD = d; fallback = out.clone(); fallA = a; }
-    const occ = d < 0.12 && (occluded(out, c) || (eyes && faceHidden(out, c)));
+    const occ = d < 0.12 && (occluded(out, c) || (eyes && (faceHidden(out, c) || bodyBlocks(out, c, 0.12))));   // eyes: nor his own body (his shoulder, his arm)
     const s = d < 0.12 && !occ ? _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd) : null;   // 1: straight at his face, -1: the back of his head
     if (DEBUG) { (CAM.trace = CAM.trace || []).push([a, +d.toFixed(2), occ, s === null ? null : +s.toFixed(2)]); if (CAM.trace.length > 64) CAM.trace.shift(); }
     if (s === null) continue;
@@ -1169,6 +1169,47 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
   CAM.losAt = T;
   if (best) { CAM.ang = CAM.pick = bestA; return out.copy(best); }
   CAM.ang = CAM.pick = fallA; return out.copy(fallback);                   // nothing clear: the least blocked (how far round him, 0 = his front)
+}
+// his own body between the camera and what the shot is about (on the phone: his back, his shoulder or his arm in front
+// of his face or of the phone): capsules on his bones (the torso, the shoulders, the neck and head, the arms), tested
+// against the line of sight; `spare` metres at its far end are left out (the head round the face, the hand round the phone)
+const BODY_CAPS = [["Hips", "Spine02", 0.15], ["Spine02", "neck", 0.17], ["LeftArm", "RightArm", 0.08], ["neck", "Head", 0.07],
+  ["Head", "headfront", 0.11], ["LeftArm", "LeftForeArm", 0.055], ["RightArm", "RightForeArm", 0.055], ["LeftForeArm", "LeftHand", 0.045], ["RightForeArm", "RightHand", 0.045]];
+const _ba = new THREE.Vector3(), _bb = new THREE.Vector3(), _bq = new THREE.Vector3(), _bu = new THREE.Vector3(), _bv = new THREE.Vector3(), _bw = new THREE.Vector3();
+function segDist(p0, p1, q0, q1){                       // the shortest distance between two segments
+  _bu.subVectors(p1, p0); _bv.subVectors(q1, q0); _bw.subVectors(p0, q0);
+  const a = _bu.dot(_bu), b = _bu.dot(_bv), c = _bv.dot(_bv), d = _bu.dot(_bw), e = _bv.dot(_bw), D = a * c - b * b;
+  let s = D > 1e-9 ? clamp((b * e - c * d) / D, 0, 1) : 0, t = c > 1e-9 ? clamp((b * s + e) / c, 0, 1) : 0;
+  s = a > 1e-9 ? clamp((b * t - d) / a, 0, 1) : 0;
+  return _bw.addScaledVector(_bu, s).addScaledVector(_bv, -t).length();
+}
+function bodyBlocks(pos, p, spare){
+  const d = pos.distanceTo(p); if (d <= spare + 0.05) return false;
+  _bq.copy(pos).lerp(p, (d - spare) / d);
+  for (const [n0, n1, r] of BODY_CAPS) { const b0 = bones[n0], b1 = bones[n1]; if (!b0 || !b1) continue;
+    b0.getWorldPosition(_ba); b1.getWorldPosition(_bb);
+    if (segDist(pos, _bq, _ba, _bb) < r) return true; }
+  return false;
+}
+// the phone shot: his face and the phone in his hands, from a front three-quarter a little above his head (sitting,
+// standing) or from the open side of the bed (lying): the first angle whose position clears the walls, the furniture,
+// the room's meshes and his own body (to his face and to the phone), at least 0.8 m from his head; the settled angle is
+// kept while it still clears them (checked every 0.25 s)
+const PHONE_ANGS = {sit:[38, -38, 62, -62, 88, -88, 18, -18], lie:[90, -90, 65, -65, 115, -115]};
+function phoneShot(out, aim, face, ph, facing, lying){
+  const angs = lying ? PHONE_ANGS.lie : PHONE_ANGS.sit, dist = lying ? 1.15 : 1.05, h = lying ? 0.6 : 0.32;
+  const at = a => { out.copy(aim).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h); return out; };
+  const ok = a => { at(a); if (camClamp(out) + (camInside(out) ? 1 : 0) >= 0.12 || out.distanceTo(face) < 0.8) return false;
+    return !occluded(out, aim) && !bodyBlocks(out, face, 0.12) && !bodyBlocks(out, ph, 0.09) && !faceHidden(out, face); };
+  if (!(CAM.cut || CAM.pick === null) && angs.includes(CAM.pick)) {
+    if (T - CAM.keptLos < 0.25) { CAM.ang = CAM.pick; return at(CAM.pick); }
+    CAM.keptLos = T; if (ok(CAM.pick)) { CAM.ang = CAM.pick; return out; }
+  }
+  CAM.keptLos = T;
+  for (const a of angs) if (ok(a)) { CAM.ang = CAM.pick = a; return out; }
+  // nothing clears everything: the first that keeps off his body and the walls, else the least blocked
+  for (const a of angs) { at(a); if (camClamp(out) + (camInside(out) ? 1 : 0) < 0.12 && !bodyBlocks(out, face, 0.12)) { CAM.ang = CAM.pick = a; return out; } }
+  CAM.ang = CAM.pick = angs[0]; at(angs[0]); camClamp(out); return out;
 }
 // the overview; on a tall frame from further back (the whole width of the room instead of its middle; the orbit's 12 m
 // limit allows it) and aimed higher, so the room sits under the overlays
@@ -1209,12 +1250,11 @@ function updateCameraGoal(){
     camGoal.pos.copy(v2).addScaledVector(v3, -0.62).addScaledVector(v4, 0.42).addScaledVector(UP, 0.30); camClamp(camGoal.pos);
     camGoal.target.set(...m.c).lerp(v2, 0.25);
   } else if (CAM.kind === "over") {
-    // above his right shoulder, looking down past his cheek onto the phone: phone, hands and face in frame
+    // the phone in his hands and his face: a front three-quarter (from the side of the bed lying), never from behind
+    // him (over the shoulder at 0.6 m the frame was his back and hood: neither the phone nor his face)
     phone.getWorldPosition(v1);
-    camGoal.target.copy(v1).lerp(v2, 0.3);
-    if (current === actions.phone_lie) camGoal.pos.copy(v2).addScaledVector(UP, 0.5).addScaledVector(v4, -1.0).addScaledVector(v3, 0.35);   // lying: from the open side of the bed, low
-    else camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
-    camClamp(camGoal.pos);
+    camGoal.target.copy(v1).lerp(v2, 0.45);
+    phoneShot(camGoal.pos, camGoal.target, v2, v1, v3, lying);
   }
   if (narrow) {
     // a tall frame: a shot that the walls turned to his profile or his back (at the sill he faces the window wall) is
@@ -2932,7 +2972,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) { windowView.update(0.1, hour); lighting(0.1); } },   // the window follows the hour too (QA freezes the loop)
-  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, camClamp, camInside, occluded, faceHidden, camAround, studioEnv, roomEnv, setEnv,
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; post.render(0.1); }, animate_: animate, post, gradeAt, CAM, setShot: k => { CAM.force = k || null; }, camClamp, camInside, occluded, faceHidden, bodyBlocks, phoneShot, camAround, studioEnv, roomEnv, setEnv,
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
     let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
     const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
