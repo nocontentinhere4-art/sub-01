@@ -1,12 +1,15 @@
 # owner head: cut collar, fit to body (glTF coords), save hi-poly .blend
 import bpy, bmesh, numpy as np, time, os
 exec(open('load.py').read())
-S=0.166; T=np.array([0.078-S*0.418, 0.873-S*0.365, -0.006])
+S=0.166; T=np.array([0.078-S*0.418, 0.873-S*0.365-float(os.environ.get('DROPHEAD','0')), -0.006])   # DROPHEAD: lower the whole head
 hP,hUV,hI,_=load('head',True); hs=skin(colors('head',hUV))
 keep=(hP[:,1]>0.13+(0.25-hP[:,0])*0.42)|(hs&(hP[:,1]>0.10)&(hP[:,0]>-0.1))   # slanted cut just above the owner's collar line; skin in front of the ears always kept (jaw)
 keep&=~((hP[:,1]<0.33)&(np.abs(hP[:,2])>0.25)&(hP[:,0]>-0.15))   # collar sides outside the jaw
+hb=colors('head',hUV).mean(1)
+if os.environ.get('LINING'): keep&=~((~hs)&(hP[:,1]<0.36)&(hb>45))   # his collar's grey inner lining (hair is darker)
 if os.environ.get('FULL'): keep[:]=True   # the owner's whole bust: neck and collar kept
-if os.environ.get('NOCOLLAR'): keep=~((~hs)&(hP[:,1]<np.where(hP[:,0]<-0.1,float(os.environ.get('BACKY','0.26')),0.30)))   # everything but his collar: his neck ends on the smooth collar line
+if os.environ.get('NOCOLLAR'): keep=~((~hs)&(hP[:,1]<np.where(hP[:,0]<-0.1,float(os.environ.get('BACKY','0.26')),0.30)))
+if os.environ.get('LINING'): keep&=~((~hs)&(hP[:,1]<0.36)&(colors('head',hUV).mean(1)>45))   # everything but his collar: his neck ends on the smooth collar line
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 _,wid=np.unique(np.round(hP*2e5).astype(np.int64),axis=0,return_inverse=True); wid=wid.ravel()
