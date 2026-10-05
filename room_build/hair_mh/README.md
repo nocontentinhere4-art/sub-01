@@ -24,7 +24,7 @@ The sheet has three rows.
   the whole frame.
 
 Each photo is of the same kind of cut, cropped to the hair, with no face. The renders use a locked camera, neutral
-light and G2's head in plain skin with G2's own eyes, and there is no text on the sheet. `VIEWS=front,q34` renders a
+light (a key light and a back light) and G2's head in plain skin with G2's own eyes, and there is no text on the sheet. `VIEWS=front,q34` renders a
 crude two-view sheet instead.
 
 | view | trait compared with the photo |
@@ -55,16 +55,20 @@ Download each with `?w=1200&q=85&fm=jpg`. The side photo is cropped behind the f
   to 2.2 cm from the macro targets), where `hair_gen.js`'s hairline, ear and whorl settings live. Hairs are raycast
   onto the real G2 surface, then mapped back.
 - **Growth** (`strands.js`):
-  - About 1,200 clump guides, about 6 mm apart, are grown along a combing field. Over the front half of the head the
-    hair flows away from the part; the fringe comes down over the forehead and curves out and back toward the
-    temples near the brows. It runs down over the sides and behind the ears, and down the back with no seam.
+  - About 1,200 clump guides, about 6 mm apart, are grown along a combing field. Over the front of the head the hair
+    flows away from the part. By the part, the fringe goes nearly straight down the forehead, leaving a narrow V, and
+    curves out and back toward the temples from mid-forehead. It runs down over the sides and behind the ears, and
+    down the back with no seam (the part stops before the crown).
   - While the head is under the hair, a guide sits on it at a height that grows with the distance travelled, so
-    longer hair stacks over shorter (up to 2.8 cm), with lifted roots across the top, more by the part, and volume
-    at the crown, so the curtain halves stand out from the head before they fall. Once it leaves the skull,
+    longer hair stacks over shorter (up to 2.8 cm), with lifted roots across the top, more by the part at the front,
+    and a raised crown, so the curtain halves stand out from the head before they fall. Once it leaves the skull,
     it hangs under gravity.
   - A soft, loose wave (2-5 mm, 5-8 cm long) rides along each guide.
-  - The fringe guides are cut evenly at the brows and outer eye corners, then resampled.
-  - Each guide carries about 50 hairs rooted round it (dense enough that no scalp shows). They twist gently round it along their length and are pulled
+  - The fringe guides are cut along a curved front edge (brow height at the middle, cheekbone height at the temple,
+    with jitter), then resampled.
+  - Each guide carries about 50 hairs rooted round it (dense enough that no scalp shows). On the sides and nape the
+    hairs stay wider apart toward the tips and end evenly, giving fuller locks instead of spikes. Clumps vary in
+    brightness, so the locks read. They twist gently round it along their length and are pulled
     back into it toward the tips, giving fuller, softer clumps; about 5 % split away as pieces.
   - The ends at the sides and nape flick out. Each hair gets a little frizz, and a few loose strands cross the
     forehead.
@@ -80,8 +84,8 @@ Download each with `?w=1200&q=85&fm=jpg`. The side photo is cropped behind the f
     up into soft fuzz. Alpha-to-coverage was tried first: every hair of the same alpha gets the same sample pattern,
     so they never add up.
 - **Shading:**
-  - Kajiya-Kay along the strand with two broad, dim lobes (near-white toward the root, warm toward the tip), varied
-    per hair: a dry, soft sheen rather than a gloss.
+  - Kajiya-Kay along the strand with two broad, soft lobes (near-white toward the root, warm toward the tip), varied
+    per lock: a dry sheen rather than a gloss. The ends are lighter and browner.
   - The base is near-black (#14100e), with a per-hair tint and slightly browner tips.
   - A wrap term over the scalp normal, plus self-shadow (darker deep in the hair and toward the roots).
   - Under the hairs is a painted scalp base: a dark layer with strokes along the growth direction, feathered at the
@@ -98,9 +102,9 @@ faster.
 | strand points | 545,998 (485,694 segments) |
 | ribbon vertices / triangles | 1.09M / 971k (the LOD: 486k triangles) |
 | grow time | ~1-2.7 s (offline; the GLB carries the result) |
-| strand draw, close-up 480×480, full | ~3.1 s |
-| strand draw, 1280×800 at 2.2 m, full | ~1.7 s |
-| strand draw, 1280×800 at 2.2 m, LOD | ~0.96 s |
+| strand draw, close-up 480×480, full | ~2.4 s |
+| strand draw, 1280×800 at 2.2 m, full | ~1.4 s |
+| strand draw, 1280×800 at 2.2 m, LOD | ~0.66 s |
 | `hair_mh.glb` | 6.5 MB (quantized and meshopt-compressed) |
 
 ## Using it in three.js (r169)
@@ -133,9 +137,10 @@ Both are in G2's frame relative to the Head bone's rest position (0, 1.590, 0.05
 
 ## Known gaps against the photos
 
-- The back is a smoother, darker mass than the photo; its clumps and light-catching texture are weaker.
-- The crown is fuller now, but still lower than in the side photo; seen from the side, the part shows as a small notch at the top.
-- From the side, the fringe's front edge reads a little straight.
+- From the side, the front edge of the top layer still reads fairly level at the temple; the curve back toward the
+  ear is weaker than in a real curtain cut.
+- The back is still darker and smoother than the photo. Lock variation and the back light help, but less than hoped.
+- A small tuft remains at the front of the part in the side view.
 - The draw is heavy: 971k triangles at full density (the LOD halves it). It has not been measured on a GPU or a phone.
 
 ## Rebuild

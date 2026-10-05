@@ -41,12 +41,13 @@ export function growStrands(THREE, hair, opt = {}){
   function comb(p, n){
     const side = Math.sign(p.x - PART_X) || 1, a = Math.abs(az(p)), top = smooth(0.78, 0.83, p.y);
     const front = 1 - smooth(20, 70, a), back = smooth(110, 160, a);
-    const fronthalf = 1 - smooth(55, 115, a);                                       // the part only runs over the front half of the head
-    const d = new V(side * (0.45 + 0.5 * top) * fronthalf * (1 - 0.75 * front), 0, 0);   // away from the part
+    const fronthalf = smooth(0.025, 0.075, p.z);                                    // the part only runs over the front half of the head (none at the crown)
+    const nearPart = 1 - smooth(0.004, 0.03, Math.abs(p.x - PART_X));
+    const d = new V(side * (0.45 + 0.5 * top) * fronthalf * (1 - 0.75 * front) * (1 - 0.8 * nearPart * front), 0, 0);   // away from the part; by the part at the front, straight forward
     d.z += 1.2 * front * top - 0.8 * back * top;                                    // forward over the forehead at the front, back behind
     d.y -= 0.35 + 0.9 * (1 - top);                                                  // gravity, stronger off the top
     if (p.y < 0.80 && front > 0.3){                                                 // the curtains: down over the forehead, then out and back toward the temples near the brows
-      const k = smooth(0.79, 0.755, p.y); d.x += side * (0.25 + 1.1 * k); d.z -= 0.3 * k; d.y -= 0.5 - 0.25 * k; }
+      const k = smooth(0.795, 0.76, p.y); d.x += side * (0.15 + 1.6 * k); d.z -= 0.4 * k; d.y -= 0.55 - 0.3 * k; }   // a narrow V at the part, then the curtains turn out
     if (a > 70 && a < 130 && p.y < 0.79) d.z -= 0.45;                               // over and behind the ears
     d.addScaledVector(n, -d.dot(n));
     return d.normalize();
@@ -70,8 +71,9 @@ export function growStrands(THREE, hair, opt = {}){
   const guides = [];
   for (const r of roots){
     const L = lengthAt(r.p) * (0.88 + 0.24 * R()), P = Math.max(5, Math.min(11, Math.round(L / 0.0115) + 1)), step = L / (P - 1);
-    const nearPart = 1 - smooth(0.004, 0.025, Math.abs(r.p.x - PART_X)), top = smooth(0.79, 0.835, r.p.y);
-    const lift = (0.007 + 0.014 * nearPart * top + 0.014 * top) * (0.75 + 0.5 * R());   // lifted roots across the top, more by the part, volume at the crown
+    const nearPart = (1 - smooth(0.004, 0.025, Math.abs(r.p.x - PART_X))) * smooth(0.05, 0.09, r.p.z), top = smooth(0.79, 0.835, r.p.y);   // the part's lift only at the front (no notch at the crown)
+    const crown = smooth(0.825, 0.845, r.p.y) * (1 - smooth(0.03, 0.08, r.p.z));    // the crown, behind the part
+    const lift = (0.007 + 0.014 * nearPart * top + 0.014 * top + 0.008 * crown) * (0.75 + 0.5 * R());   // lifted roots across the top, more by the part, raised crown
     const wave = {A: 0.002 + 0.003 * R(), lam: 0.05 + 0.03 * R(), ph: R() * 6.28};   // soft, loose waves
     const pts = [], nrm = []; let p = r.p.clone(), n = r.n.clone(), dir = comb(p, n), free = false, arc = 0;
     for (let k = 0; k < P; k++){
@@ -91,7 +93,7 @@ export function growStrands(THREE, hair, opt = {}){
     const a = Math.abs(az(r.p)), front = a < 50 && r.p.y > 0.785;
     let Lg = L, gp = pts;
     if (front){                                                                     // the fringe ends evenly at the brows / outer eye corners
-      const target = 0.744 + 0.006 * R() - 0.006 * smooth(15, 45, a), cut = [gp[0]];
+      const target = 0.753 - 0.022 * smooth(5, 50, a) + (R() - 0.5) * 0.008, cut = [gp[0]];   // a curved front edge: brows at the middle, cheekbone at the temple
       for (let k = 1; k < gp.length; k++){
         if (gp[k].y > target){ cut.push(gp[k]); continue; }
         const u = (gp[k - 1].y - target) / Math.max(1e-6, gp[k - 1].y - gp[k].y); cut.push(gp[k - 1].clone().lerp(gp[k], u)); break;
@@ -113,8 +115,10 @@ export function growStrands(THREE, hair, opt = {}){
       const a0 = R() * Math.PI * 2, rr = Math.sqrt(R()) * GAP * 0.85;
       const root = g.pts[0].clone().addScaledVector(t1, Math.cos(a0) * rr).addScaledVector(t2, Math.sin(a0) * rr), ins = inside(root);
       if (ins < 0.0003 || R() > 0.12 + 0.88 * smooth(0.0, 0.007, ins)) continue;          // a soft, thinning hairline
-      const split = R() < 0.05, stray = g.front && R() < 0.004;                             // a few pieces split away; rare strays over the forehead
-      const clump = split ? 0.3 + 0.3 * R() : 0.55 + 0.3 * R(), lf = g.front ? 0.95 + 0.05 * R() : 0.85 + 0.15 * R(), rnd = 0.6 * clumpRnd + 0.4 * R();
+      const split = R() < (g.top < 0.4 ? 0.02 : 0.05), stray = g.front && R() < 0.004;                             // a few pieces split away; rare strays over the forehead
+      const sideLock = g.top < 0.4;                                                       // sides and nape: fuller locks, no stick spikes
+      const clump = split ? 0.3 + 0.3 * R() : sideLock ? 0.3 + 0.25 * R() : 0.55 + 0.3 * R();
+      const lf = g.front ? 0.95 + 0.05 * R() : sideLock ? 0.93 + 0.07 * R() : 0.85 + 0.15 * R(), rnd = 0.6 * clumpRnd + 0.4 * R();
       const ph = R() * 6.28, frizz = 0.0002 + 0.00025 * R(), edge = rr / (GAP * 0.85), cshade = 1 - 0.3 * edge * edge;
       const pts = [], col = [], nrm = [];
       for (let k = 0; k < g.P; k++){
@@ -125,7 +129,7 @@ export function growStrands(THREE, hair, opt = {}){
         p.add(new V(Math.sin(ph + t * 9), Math.cos(ph * 1.3 + t * 7), Math.sin(ph * 0.7 + t * 11)).multiplyScalar(frizz * t));
         if (g.flick) p.addScaledVector(g.nrm[0], 0.008 * smooth(0.75, 1.0, t));            // flicked-out ends
         if (stray) p.add(new V((ph - 3) * 0.002 * t, -0.002 * t, 0.002 * t));
-        const shade = (0.45 + 0.55 * smooth(0.0, 0.5, t)) * (0.85 + 0.15 * g.top) * cshade;
+        const shade = Math.min(1, (0.45 + 0.55 * smooth(0.0, 0.5, t)) * (0.85 + 0.15 * g.top) * cshade * (0.7 + 0.55 * clumpRnd));   // locks read: per-clump light and dark
         const tip = Math.min(1, (1 - t) * g.L * lf / 0.01);
         pts.push(p); nrm.push(g.nrm[0]); col.push(t, rnd, shade, tip);
       }

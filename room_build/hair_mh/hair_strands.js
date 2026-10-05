@@ -63,13 +63,13 @@ vec3 light(vec3 T, vec3 N, vec3 V, vec3 L, vec3 col, vec3 alb, float id){
   float wrap = clamp((dot(N, L) + 0.4) / 1.4, 0.0, 1.0);
   float dif = mix(0.3, 1.0, sqrt(max(0.0, 1.0 - pow(dot(T, L), 2.0))));
   vec3 T1 = normalize(T + N * (0.10 + 0.12 * id)), T2 = normalize(T + N * (-0.10 + 0.16 * id));
-  vec3 spec = (vec3(0.012) * kk(T1, H, 60.0) + vec3(0.012, 0.008, 0.005) * kk(T2, H, 18.0)) * (0.5 + vS.y);   // dry, soft sheen; per-hair variation
+  vec3 spec = (vec3(0.018) * kk(T1, H, 50.0) + vec3(0.016, 0.011, 0.007) * kk(T2, H, 16.0)) * (0.3 + 1.2 * vS.y);   // dry, soft sheen, varied per lock
   return col * wrap * (alb * dif + spec);
 }
 void main(){
   float t = vS.x, id = vS.y - 0.5, sh = vS.z;
   vec3 T = normalize(vT), N = normalize(vN), V = normalize(cameraPosition - vW);
-  vec3 alb = base * (0.8 + 0.45 * vS.y) * mix(vec3(1.0), vec3(1.25, 1.12, 1.0), t * t) * sh;   // tint, browner tips, self-shadow
+  vec3 alb = base * (0.8 + 0.45 * vS.y) * mix(vec3(1.0), vec3(1.6, 1.4, 1.2), t * t) * sh;   // tint, browner tips, self-shadow
   vec3 c = light(T, N, V, keyDir, keyCol, alb, id) + light(T, N, V, rimDir, rimCol, alb, id);
   c += alb * mix(ground, sky, N.y * 0.5 + 0.5);
   gl_FragColor = vec4(c, vCov * smoothstep(0.0, 0.15, vS.w));   // opaque to the last ~1.5 mm

@@ -61,7 +61,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = 
 const pm = new THREE.PMREMGenerator(renderer);
 scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.55;
 const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(0.9, 2.2, 1.6); scene.add(key);
-const rim = new THREE.DirectionalLight(0xffffff, 0.5); rim.position.set(-1.2, 1.4, -1.6); scene.add(rim);
+const rim = new THREE.DirectionalLight(0xffffff, 0.9); rim.position.set(-1.0, 1.8, -1.6); scene.add(rim);   // a back light, so the back's locks read
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6a625c, 0.35));
 for (const m of [full, lod]){ const u = m.material.uniforms; u.keyDir.value.copy(key.position).normalize(); u.rimDir.value.copy(rim.position).normalize(); }
 
