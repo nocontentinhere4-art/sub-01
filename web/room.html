@@ -449,6 +449,153 @@ function readMarkers(root){
   if (lmp) SURF.lamp = {c:lmp.getWorldPosition(p).toArray()};
 }
 
+// ---- Tripo props: four props made with Tripo's paid API (web/room/props_tripo.glb, room_build/build_tripo.mjs), each
+// in metres with its origin at its base centre. They take the place of the Kenney ramen bowl (food.glb), the desk mug and
+// the headphones on the wall hook (both in room_clean.glb), and add white sneakers on the floor. ?props=old: the old ones
+const TRIPO = !OLD_ROOM && new URLSearchParams(location.search).get("props") !== "old";
+const MUG_AT = new THREE.Vector3(-0.50, 0.97, -0.98);       // props_hard.py's MUG on the desk top (DTOP)
+const SNEAKERS_AT = [1.70, 0.16, 1.32, -2.6];               // x, floor, z, turn: the front right corner, off his routes
+function cutBox(root, box){                                 // drop a merged mesh's triangles lying wholly inside a world box
+  const v = new THREE.Vector3();
+  root.traverse(o => { if (!o.isMesh || !o.geometry.index) return;
+    o.updateMatrixWorld(true); const pos = o.geometry.attributes.position, idx = o.geometry.index, keep = [];
+    const inside = i => box.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+    for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+      if (!(inside(a) && inside(b) && inside(c))) keep.push(a, b, c); }
+    if (keep.length < idx.count) o.geometry.setIndex(keep); });
+}
+if (TRIPO) Promise.all([load("room/props_tripo.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
+  const T = {}; for (const c of g.scene.children) T[c.name.replace(/^T_/, "")] = c;
+  for (const o of Object.values(T)) o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true;
+    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; } });
+  // the mug: the modelled one (body, tea and handle) is cut out of the static room, the new one stands in its place
+  const st = room.getObjectByName("room_static");
+  if (st) cutBox(st, new THREE.Box3(new THREE.Vector3(MUG_AT.x - 0.045, MUG_AT.y - 0.002, MUG_AT.z - 0.045),
+    new THREE.Vector3(MUG_AT.x + 0.085, MUG_AT.y + 0.1, MUG_AT.z + 0.045)));
+  const coffee = new THREE.Mesh(new THREE.CircleGeometry(0.0335, 28).rotateX(-Math.PI / 2),   // coffee in it, as the old one had
+    new THREE.MeshStandardMaterial({color:0x24140a, roughness:0.12, metalness:0, envMap:scene.environment, envMapIntensity:0.5}));
+  coffee.position.set(-0.0158, 0.082, 0); coffee.receiveShadow = true; T.mug.add(coffee);   // (the body's centre; the handle is at +x)
+  T.mug.position.copy(MUG_AT); scene.add(T.mug);
+  // the headphones on the hook: the new pair fills the old one's box inside its node, so taking them off still works
+  const hp = room.getObjectByName("headphones"), old = room.getObjectByName("headphones_mesh");
+  if (hp && old) { hp.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(old), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+    const w = new THREE.Group(); w.add(T.headphones); scene.add(w);
+    w.scale.setScalar(s.y / 0.20); w.position.set(c.x, b.min.y, c.z);       // (T_headphones is 20 cm tall)
+    hp.attach(w); old.visible = false; }
+  // the sneakers, a pair on the floor
+  T.sneakers.position.set(SNEAKERS_AT[0], SNEAKERS_AT[1], SNEAKERS_AT[2]); T.sneakers.rotation.y = SNEAKERS_AT[3]; scene.add(T.sneakers);
+  // the ramen: food.glb's models are scaled by KS (0.30 for a bowl); this one is already in metres. (Named like the
+  // Kenney model it replaces, F_bowl-broth: the visual QA hides the dishes of earlier scenes by that prefix)
+  const ramen = new THREE.Group(); ramen.name = "F_bowl-broth"; T.ramen.scale.setScalar(1 / 0.30); ramen.add(T.ramen);
+  const swap = () => { if (!FOOD.models) return setTimeout(swap, 200); FOOD.models["bowl-broth"] = ramen; }; swap();
+}).catch(e => console.warn("props_tripo.glb", e));
+// the second batch (room_build/build_tripo2.mjs): one mesh, one atlas material, already in place in world metres; its
+// scene says which props it holds. Each replaces an old one: a node of the room hidden, or the prop cut out of the static
+// room (and its decals) by a box around it
+const T2_OLD = {lamp2:{hide:["desk_lamp_arm_01"]}, plant2:{hide:["potted_plant_02_leaves", "potted_plant_02_pot"]},
+  box:{hide:["cardboard_box_01"]}, alarm:{hide:["alarm_clock_01"]}, succulent:{hide:["potted_plant_04_dirt"]},
+  backpack:{cut:[[-0.198, 0.155, 1.02], [0.07, 0.70, 1.46]]},   // props_soft.py backpack(): by the bed's side at z 1.24 (x from just off the bed, -0.20)
+  fan:{cut:[[1.53, 0.155, 0.13], [1.87, 0.72, 0.47]]},                  // props_hard.py fan(): FAN (1.70, 0.30)
+  bin:{cut:[[-0.68, 0.155, -1.35], [-0.42, 0.48, -1.09]]},             // props_hard.py: the bin and its bag at (-0.55, -1.22)
+  controller:{cut:[[-0.89, 0.965, -1.27], [-0.71, 1.02, -1.13]]},      // props_hard.py controller(): (-0.80, DTOP, -1.20)
+  monitor:{cut:[[-1.41, 0.968, -1.34], [-0.71, 1.545, -1.14]]},
+  speaker_l:{cut:[[-1.62, 0.968, -1.40], [-1.42, 1.172, -1.20]]},      // props_hard.py speaker("spk_l", -1.52, -1.30)
+  speaker_r:{cut:[[-0.665, 0.968, -1.40], [-0.507, 1.172, -1.20]]}};   // speaker("spk_r", -0.58, -1.30), clear of the pen cup at x -0.505       // props_hard.py: MON_C (-1.06, 1.33, -1.19), its neck and foot
+                                                                       // (the live screen quad, SURF_monitor, is the page's own: kept)
+if (TRIPO) Promise.all([load("room/props_tripo2.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
+  g.scene.traverse(m => { if (m.isMesh) { m.castShadow = m.name !== "T2_lamp"; m.receiveShadow = true;   // (the lamp: not in its own light's shadow)
+    m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; } });
+  const st = room.getObjectByName("room_static"), dec = room.getObjectByName("decals");
+  for (const name of g.scene.userData.props || []) { const r = T2_OLD[name]; if (!r) continue;
+    for (const n of r.hide || []) { const o = room.getObjectByName(n); if (o) o.visible = false; }
+    if (r.cut) { const b = new THREE.Box3(new THREE.Vector3(...r.cut[0]), new THREE.Vector3(...r.cut[1]));
+      if (st) cutBox(st, b); if (dec) cutBox(dec, b); } }
+  const props = g.scene.userData.props || [], notes = room.getObjectByName("office_notepads_sticky_stack");
+  if (props.includes("speaker_l") && notes) notes.position.x += 0.10;   // on the left speaker, moved 10 cm right with it
+  if (props.includes("lamp2") && g.scene.userData.lampLight) lamp.position.set(...g.scene.userData.lampLight);   // in the new shade
+  scene.add(g.scene);
+}).catch(e => console.warn("props_tripo2.glb", e));
+// the keyboard: the modelled tenkeyless one (props_hard.py KB_C, KB_RY: its body, keycaps with legends, feet, LED and the
+// cable's first stretch) taken out of the static room as it is, same geometry and materials, into a top-level node named
+// "keyboard" (G3's integration finds it by name and pins the hands to it), its origin the middle of F and J on the desk top
+// (KB_HOME: that point, and the keyboard's turn). In every mode: it is the room's own keyboard, only split off
+const KB_HOME = [-1.1173, 0.97, -0.9631, 0.06];
+function splitBox(root, box, name){                         // a merged mesh's triangles wholly inside a world box -> own node
+  const g = new THREE.Group(); g.name = name; g.position.set(KB_HOME[0], KB_HOME[1], KB_HOME[2]); g.rotation.y = KB_HOME[3];
+  scene.add(g); g.updateMatrixWorld(true);
+  const v = new THREE.Vector3(), parts = [];
+  root.traverse(o => { if (!o.isMesh || !o.geometry.index) return;
+    o.updateMatrixWorld(true); const pos = o.geometry.attributes.position, idx = o.geometry.index, keep = [], out = [];
+    const inside = i => box.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+    for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+      (inside(a) && inside(b) && inside(c) ? out : keep).push(a, b, c); }
+    if (!out.length) return;
+    o.geometry.setIndex(keep);
+    const remap = new Map(), used = []; for (const i of out) if (!remap.has(i)) { remap.set(i, used.length); used.push(i); }
+    const ng = new THREE.BufferGeometry();                  // its own compact vertices, so its bounds are the keyboard's
+    for (const k in o.geometry.attributes) { const src = o.geometry.attributes[k], n = src.itemSize, arr = new Float32Array(used.length * n);
+      const get = [src.getX, src.getY, src.getZ, src.getW];  // (these undo quantisation and interleaving)
+      used.forEach((i, j) => { for (let c = 0; c < n; c++) arr[j * n + c] = get[c].call(src, i); });
+      ng.setAttribute(k, new THREE.BufferAttribute(arr, n)); }
+    ng.setIndex(out.map(i => remap.get(i)));
+    const m = new THREE.Mesh(ng, o.material); m.name = name + "_" + (o.material.name || "part");
+    m.castShadow = o.castShadow; m.receiveShadow = o.receiveShadow; o.matrixWorld.decompose(m.position, m.quaternion, m.scale);
+    parts.push(m); });
+  for (const m of parts) { scene.add(m); g.attach(m); }
+  return g;
+}
+new Promise(ok => { const wait = () => room && room.getObjectByName("room_static") ? ok() : setTimeout(wait, 100); wait(); }).then(() => {
+  splitBox(room.getObjectByName("room_static"), new THREE.Box3(new THREE.Vector3(-1.26, 0.9725, -1.055), new THREE.Vector3(-0.88, 1.012, -0.885)), "keyboard");
+});
+// the mouse on its pad, modelled in code (room_build/build_mouse.mjs): a node named "mouse" (G3 parents it to the palm), its
+// contact shadow a child; 4 cm right of the keyboard's right end, turned -0.15 (its front towards his right). The modelled
+// mouse is cut out of the static room. (The pad's underside sinks into the desk mat it overlaps.) ?debug&kb=tripo: the
+// Tripo-made mouse instead (mouse_tripo.glb), for comparison
+const MOUSE_AT = [-0.736, 0.9745, -0.985, -0.15], PAD_AT = [-0.700, 0.9715, -0.980, -0.15];
+const KB_SET = DEBUG && new URLSearchParams(location.search).get("kb") === "tripo" ? "_tripo" : "";
+if (TRIPO) Promise.all([load(`room/mouse${KB_SET}.glb`),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([mg]) => {
+  const st = room.getObjectByName("room_static");
+  if (st) cutBox(st, new THREE.Box3(new THREE.Vector3(-0.80, 0.972, -1.02), new THREE.Vector3(-0.71, 1.01, -0.88)));   // the mouse (MC)
+  mg.scene.traverse(m => { if (!m.isMesh) return;
+    if (/_contact$/.test(m.name)) { m.castShadow = m.receiveShadow = false; m.material.depthWrite = false; m.renderOrder = 1; return; }
+    m.castShadow = true; m.receiveShadow = true; m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; });
+  const put = (o, [x, y, z, ry]) => { if (!o) return; o.position.set(x, y, z); o.rotation.set(0, ry, 0); scene.add(o); };
+  put(mg.scene.getObjectByName("mouse"), MOUSE_AT); put(mg.scene.getObjectByName("mousepad"), PAD_AT);
+}).catch(e => console.warn("mouse", e));
+// the game controller and the monitor, modelled in code (room_build/build_desk_tech.mjs). The controller (its origin the
+// middle of its footprint, the grips towards +z) where the old one lay; the monitor already in world metres, its panel
+// around the live screen (SURF_monitor). The old ones are cut out of the static room by T2_OLD's boxes. The screen when off:
+// an anti-glare finish that still shows the room faintly
+const CTRL_AT = [-0.80, 0.97, -1.20, -0.35];
+if (TRIPO) Promise.all([load("room/controller.glb"), load("room/monitor.glb"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([cg, mg]) => {
+  const st = room.getObjectByName("room_static"), dec = room.getObjectByName("decals");
+  for (const k of ["controller", "monitor"]) { const b = new THREE.Box3(new THREE.Vector3(...T2_OLD[k].cut[0]), new THREE.Vector3(...T2_OLD[k].cut[1]));
+    if (st) cutBox(st, b); if (dec) cutBox(dec, b); }
+  for (const g of [cg, mg]) g.scene.traverse(m => { if (!m.isMesh) return;
+    if (/_contact$/.test(m.name)) { m.castShadow = m.receiveShadow = false; m.material.depthWrite = false; m.renderOrder = 1; return; }
+    m.castShadow = true; m.receiveShadow = true; m.material.envMap = scene.environment; m.material.envMapIntensity = 0.5; });
+  const c = cg.scene.getObjectByName("controller");
+  if (c) { c.position.set(CTRL_AT[0], CTRL_AT[1], CTRL_AT[2]); c.rotation.set(0, CTRL_AT[3], 0); scene.add(c); }
+  const m = mg.scene.getObjectByName("monitor"); if (m) scene.add(m);
+  offMat.roughness = 0.32; offMat.envMap = scene.environment; offMat.envMapIntensity = 0.35; offMat.needsUpdate = true;
+}).catch(e => console.warn("controller/monitor", e));
+// the made-up car poster (room_build/poster_car.py) goes over the record sleeve in the posters atlas's square slot C
+// (tex_prep.py: x 683..1024 of 1024, y 0..341 of 512)
+if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"),
+  new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([car]) => {
+  let mat = null; room.traverse(o => { if (o.isMesh && o.material && o.material.name === "posters") mat = o.material; });
+  const old = mat && mat.map; if (!old || !old.image) return;
+  const W = old.image.width, H = old.image.height, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d"); g.drawImage(old.image, 0, 0); g.drawImage(car, Math.round(W * 683 / 1024), 0, W - Math.round(W * 683 / 1024), Math.round(H * 341 / 512));
+  const t = new THREE.CanvasTexture(cv); t.flipY = old.flipY; t.colorSpace = old.colorSpace; t.wrapS = old.wrapS; t.wrapT = old.wrapT;
+  t.anisotropy = old.anisotropy; mat.map = t; mat.needsUpdate = true;
+}).catch(e => console.warn("poster_car.webp", e));
+
 load("room/boy.glb").then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
   boy.traverse(o => {
