@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script></head>
+<body><script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w')||800), H = +(q.get('h')||1000);
+const r = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+r.setSize(W,H); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NeutralToneMapping;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(q.get('bg')||'#2a2a2e');
+const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(new RoomEnvironment(),0.04).texture;
+scene.environmentIntensity = 0.8;
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(1.5,3,4); scene.add(key);
+const cam = new THREE.PerspectiveCamera(30, W/H, 0.01, 100);
+const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(q.get('glb'));
+const root = gltf.scene; scene.add(root);
+let mixer = null, clips = gltf.animations;
+window.info = {clips: clips.map(c=>[c.name,c.duration]), bones:[], tris:0};
+root.traverse(o=>{ if(o.isBone) info.bones.push(o.name); if(o.isMesh){ o.frustumCulled=false; const g=o.geometry; info.tris += (g.index?g.index.count:g.attributes.position.count)/3; }});
+const box = new THREE.Box3().setFromObject(root); info.box=[box.min.toArray(),box.max.toArray()];
+window.shot = (pos, tgt, fov, clip, t, follow) => {
+  if (clip != null) { mixer = mixer || new THREE.AnimationMixer(root); mixer.stopAllAction();
+    const a = mixer.clipAction(clips.find(c=>c.name===clip)||clips[+clip]); a.play(); mixer.setTime(t); }
+  if (follow) { root.updateMatrixWorld(true); const h = new THREE.Vector3(); root.getObjectByName(follow).getWorldPosition(h);
+    pos = [pos[0]+h.x, pos[1], pos[2]+h.z]; tgt = [tgt[0]+h.x, tgt[1], tgt[2]+h.z]; }
+  key.position.set(pos[0]+1, pos[1]+2, pos[2]+2);
+  cam.fov = fov; cam.updateProjectionMatrix(); cam.position.fromArray(pos); cam.lookAt(new THREE.Vector3(...tgt));
+  r.render(scene, cam); return true;
+};
+window.ready = true;
+</script></body></html>
