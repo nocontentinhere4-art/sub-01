@@ -135,8 +135,10 @@ over the hips, elbows bent by the body, wrists level with the keys, feet flat.
 
 ## GPU and cost
 
-One RunPod pod (RTX 4090, Secure Cloud, $0.74/h) for 80 min: install, model download, all generations; deleted at the
-end. A second pod (L40S) was created by mistake by the same request loop and deleted after ~10 s. Total about $1.00.
+Generation: one RunPod pod (RTX 4090, Secure Cloud, $0.74/h) for 80 min: install, model download, all generations; deleted at the
+end. A second pod (L40S) was created by mistake by the same request loop and deleted after ~10 s. Renders: three
+short runs of one RTX 4090 pod ($0.74/h, `room_build/kimodo/pod/setup_render.sh`), each deleted when done, about $0.35.
+Total about $1.35.
 The pod named BRAIN was not touched. The pod ran `room_build/kimodo/pod/exec_server.py` (commands over the RunPod
 HTTPS proxy, a random per-run key in the pod's environment, not stored anywhere) and `gen_server.py`.
 
