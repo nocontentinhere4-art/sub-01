@@ -25,7 +25,7 @@ for (const l of fs.readFileSync(`${D}/3dobjs/base.obj`, "utf8").split("\n")) {
 }
 const applied = [];
 function target(rel, w) {
-  if (w <= 1e-6) return;
+  if (Math.abs(w) <= 1e-6) return;
   const f = `${D}/targets/${rel}`; if (!fs.existsSync(f)) throw new Error("missing target " + rel);
   for (const l of fs.readFileSync(f, "utf8").split("\n")) {
     if (!l || l[0] === "#") continue; const t = l.trim().split(/\s+/); if (t.length < 4) continue;
@@ -40,18 +40,35 @@ const tri = v => v < 0.5 ? { min: 1 - v / 0.5, average: v / 0.5 } : { average: (
 const muscles = Object.fromEntries(Object.entries(tri(MUSCLE)).map(([k, w]) => [k + "muscle", w]));
 const weights = Object.fromEntries(Object.entries(tri(WEIGHT)).map(([k, w]) => [k + "weight", w]));
 const gender = "male";
-for (const [eth, ew] of [["african", 1 / 3], ["asian", 1 / 3], ["caucasian", 1 / 3]])
-  for (const [age, aw] of Object.entries(ages)) target(`macrodetails/${eth}-${gender}-${age}.target`, ew * aw);
-for (const [age, aw] of Object.entries(ages)) for (const [mu, mw] of Object.entries(muscles)) for (const [we, ww] of Object.entries(weights)) {
-  target(`macrodetails/universal-${gender}-${age}-${mu}-${we}.target`, aw * mw * ww);
-  if (age !== "baby") target(`macrodetails/proportions/${gender}-${age}-${mu}-${we}-idealproportions.target`, aw * mw * ww * Math.max(0, (PROPS - 0.5) / 0.5));
+function macro(ages, sign) {
+  for (const [eth, ew] of [["african", 1 / 3], ["asian", 1 / 3], ["caucasian", 1 / 3]])
+    for (const [age, aw] of Object.entries(ages)) target(`macrodetails/${eth}-${gender}-${age}.target`, sign * ew * aw);
+  for (const [age, aw] of Object.entries(ages)) for (const [mu, mw] of Object.entries(muscles)) for (const [we, ww] of Object.entries(weights)) {
+    target(`macrodetails/universal-${gender}-${age}-${mu}-${we}.target`, sign * aw * mw * ww);
+    if (age !== "baby") target(`macrodetails/proportions/${gender}-${age}-${mu}-${we}-idealproportions.target`, sign * aw * mw * ww * Math.max(0, (PROPS - 0.5) / 0.5));
+  }
 }
+macro(ages, 1);
 for (const s of ["l", "r"]) for (const [k, w] of Object.entries(HAND)) target(`armslegs/${s}-hand-${k}.target`, w);
+// ---- optional adult face (env FACE = a json {"age_y": 25, "targets": {"chin/...target": w, ...}}): the face's own
+// difference from the macro age AGE_Y to age_y plus the face targets, kept to the FACE ONLY by a soft mask (below the
+// brows, in front of the ears, above the jaw's underside; the orbits around the eyeballs stay). Skeleton, eyes, scale,
+// skull, ears and neck are computed from the body without it, so the rig, the hair and the clothes stay valid.
+let VF = null;
+const FACE = process.env.FACE ? JSON.parse(fs.readFileSync(process.env.FACE, "utf8")) : null;
+if (FACE) {
+  const V0 = V.map(v => v.slice());
+  if (FACE.age_y) { const a = 0.1875 + (FACE.age_y - 11) / (25 - 11) * (0.5 - 0.1875);
+    macro(a < 0.5 ? { child: (0.5 - a) / (0.5 - 0.1875), young: (a - 0.1875) / (0.5 - 0.1875) } : { young: (1 - a) / 0.5, old: (a - 0.5) / 0.5 }, 1); macro(ages, -1); }
+  for (const [rel, w] of Object.entries(FACE.targets || {})) target(rel, w);
+  VF = V.map(v => v.slice()); V0.forEach((v, i) => { V[i] = v; });
+}
 // ---- metres, uniform scale to the height, feet at y = 0
 const body = [...new Set(F.flat())];
 let y0 = Infinity, y1 = -Infinity; for (const i of body) { y0 = Math.min(y0, V[i][1]); y1 = Math.max(y1, V[i][1]); }
 const S = HEIGHT / (y1 - y0);
 for (const v of V) { v[0] *= S; v[1] = (v[1] - y0) * S; v[2] *= S; }
+if (VF) for (const v of VF) { v[0] *= S; v[1] = (v[1] - y0) * S; v[2] *= S; }
 
 // ---- skeleton and weights (as build_mh.mjs)
 const sk = JSON.parse(fs.readFileSync(`${D}/rigs/default.mhskel`, "utf8"));
@@ -64,7 +81,39 @@ const head = Object.fromEntries(order.map(n => [n, jp(sk.bones[n].head)]));
 const tail = Object.fromEntries(order.map(n => [n, jp(sk.bones[n].tail)]));
 const used = [...body].sort((a, b) => a - b), remap = new Map(used.map((v, i) => [v, i]));
 const P = [], N = [], Jt = [], Wt = [], I = [];
-used.forEach(v => P.push(...V[v]));
+const faceW = new Float32Array(V.length);
+if (VF) {   // the mask, in metres around the eyes and the head joint
+  const eL = jp(sk.bones["eye.L"].head), eR = jp(sk.bones["eye.R"].head), ey = (eL[1] + eR[1]) / 2, ez = (eL[2] + eR[2]) / 2;
+  const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // the age difference also moves and scales the whole head (a child's neck and head differ): align the face body to
+  // the original on the cranium (above the brows; translation + uniform scale), so only the face's SHAPE changes
+  const cr = body.filter(v => V[v][1] > ey + 0.04);
+  const c0 = [0, 1, 2].map(k => cr.reduce((t, v) => t + V[v][k], 0) / cr.length), c1 = [0, 1, 2].map(k => cr.reduce((t, v) => t + VF[v][k], 0) / cr.length);
+  const rms = (A, c) => Math.sqrt(cr.reduce((t, v) => t + (A[v][0] - c[0]) ** 2 + (A[v][1] - c[1]) ** 2 + (A[v][2] - c[2]) ** 2, 0) / cr.length);
+  const sc = rms(V, c0) / rms(VF, c1);
+  for (const v of body) VF[v] = [0, 1, 2].map(k => c0[k] + sc * (VF[v][k] - c1[k]));
+  console.error("face align: shift mm", [0, 1, 2].map(k => ((c1[k] - c0[k]) * 1000).toFixed(1)).join(","), "scale", sc.toFixed(4));
+  const M = FACE.mask || {};
+  const top = ey + (M.top ?? 0.012), topF = M.top_fade ?? 0.014, bot = ey - (M.bottom ?? 0.125), botF = M.bottom_fade ?? 0.02;
+  const back = ez - (M.back ?? 0.075), backF = M.back_fade ?? 0.03, orb = M.orbit ?? 0.0135, orbF = M.orbit_fade ?? 0.008;
+  for (const v of body) { const p = V[v];
+    let w = ss(top + topF, top, p[1]) * ss(bot - botF, bot, p[1]) * ss(back - backF, back, p[2]);
+    const dE = Math.min(Math.hypot(p[0] - eL[0], p[1] - eL[1], p[2] - eL[2]), Math.hypot(p[0] - eR[0], p[1] - eR[1], p[2] - eR[2]));
+    w *= ss(orb, orb + orbF, dE);
+    w *= 1 - ss(ey - 0.05, ey - 0.03, p[1]) * ss(ez - 0.035, ez - 0.06, p[2]);   // temples and sideburns stay (hair)
+    faceW[v] = w; }
+}
+used.forEach(v => P.push(...(VF ? [0, 1, 2].map(k => V[v][k] + faceW[v] * (VF[v][k] - V[v][k])) : V[v])));
+if (VF) { const delta = {}; for (const v of used) { const dd = [0, 1, 2].map(k => faceW[v] * (VF[v][k] - V[v][k]));
+    if (Math.hypot(...dd) > 1e-6) delta[v] = dd.map(x => +x.toFixed(6)); }
+  fs.writeFileSync(OUT.replace(/\.glb$/, "_face_delta.json"), JSON.stringify({ about: "metres, added to boy_g2 in its rest pose; delta: per MakeHuman base.obj vertex index (0-based); delta_gltf: the same per boy_g2.glb POSITION index", face: FACE, delta,
+    delta_gltf: Object.fromEntries(Object.entries(delta).map(([v, dd]) => [remap.get(+v), dd])) }));
+  const mags = Object.values(delta).map(d => Math.hypot(...d)); console.error("face verts moved", mags.length, "max mm", (Math.max(...mags) * 1000).toFixed(2));
+  if (process.env.FACE_DEBUG) { const eL = jp(sk.bones["eye.L"].head), st = {};   // where the face moves, by region (mm)
+    for (const [v, d] of Object.entries(delta)) { const p = V[v], m = Math.hypot(...d) * 1000;
+      const reg = p[1] > eL[1] + 0.012 ? "above_brow" : (p[1] > eL[1] - 0.04 && p[2] < eL[2] - 0.045) ? "sideburn" : p[2] < eL[2] - 0.06 ? "by_ear" : p[1] < eL[1] - 0.11 ? "under_jaw" : "face";
+      st[reg] = st[reg] || { n: 0, max: 0, at: null }; st[reg].n++; if (m > st[reg].max) { st[reg].max = +m.toFixed(2); st[reg].at = p.map(x => +x.toFixed(3)); } }
+    console.error(JSON.stringify(st)); } }
 for (const f of F) { const q = f.map(v => remap.get(v)); I.push(q[0], q[1], q[2]); if (q.length === 4) I.push(q[0], q[2], q[3]); }
 const per = used.map(() => []);
 order.forEach((n, bi) => { for (const [v, w] of (W[n] || [])) { const i = remap.get(v); if (i !== undefined) per[i].push([bi, w]); } });

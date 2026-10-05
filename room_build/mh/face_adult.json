@@ -1,0 +1,22 @@
+{
+ "age_y": 25,
+ "targets": {
+  "head/head-fat-decr.target": 0.5,
+  "head/head-age-incr.target": 0.35,
+  "chin/chin-bones-incr.target": 0.4,
+  "chin/chin-prominent-incr.target": 0.3,
+  "chin/chin-height-incr.target": 0.2,
+  "cheek/l-cheek-bones-incr.target": 0.35,
+  "cheek/r-cheek-bones-incr.target": 0.35,
+  "cheek/l-cheek-volume-decr.target": 0.5,
+  "cheek/r-cheek-volume-decr.target": 0.5,
+  "cheek/l-cheek-inner-decr.target": 0.3,
+  "cheek/r-cheek-inner-decr.target": 0.3,
+  "nose/nose-scale-vert-incr.target": 0.2,
+  "nose/nose-width1-decr.target": 0.25,
+  "nose/nose-hump-incr.target": 0.15,
+  "nose/nose-point-width-decr.target": 0.2,
+  "chin/chin-width-incr.target": 0.15,
+  "head/head-square.target": 0.15
+ }
+}

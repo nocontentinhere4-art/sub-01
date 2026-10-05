@@ -106,3 +106,27 @@ is the default default.mhskel (163 bones) with default_weights.mhw, at identity 
   baked angle keys (no fingertip-follow logic needed in the room).
 - `anim_mh.mjs`: `thumbKeys` (thumb curl keys inside GRASP off windows) and `offClamp` (fingers never sink into the
   grasped box while the grip is off).
+
+### Adult face (`glb/boy_g2_face.glb`, preview only)
+
+`FACE=face_adult.json node build_g2.mjs <data> raw.glb && node rename_mh.mjs raw.glb glb/boy_g2_face.glb`. This is
+boy_g2 with a FACE-ONLY change so he reads as an adult man of about 20, not a teenager. Same vertices, skeleton, rest
+pose, eyes and boy_g2_rest.json; without FACE the build still gives boy_g2.glb byte for byte. The change is:
+- **Adult face proportions:** the face's own difference between MakeHuman's age macro at 20 (a 36 % "child" blend) and
+  at 25, aligned on the cranium so that only the shape changes, not the head's place or size.
+- **MakeHuman CC0 face targets (`face_adult.json`):**
+  - head: less fat, older, a little square;
+  - chin and jaw: stronger, more prominent, taller, wider;
+  - cheeks: higher cheekbones, less cheek volume, hollower inner cheek;
+  - nose: longer, narrower bridge, a slight hump, narrower tip.
+- **A soft mask keeps it on the face only:** below the brows, in front of the ears, above the jaw's underside. The
+  orbits round the eyeballs, the temples and the sideburns stay. Measured: up to 12 mm at the chin and jaw angle, 1.6 mm
+  at most at the sideburns, 1.1 mm at the brow; the cranium, ears and neck don't move. So the hair (on Head, skin
+  collision) and the clothes stay valid.
+- **`glb/boy_g2_face_delta.json`:** the same change as per-vertex offsets in metres at rest, keyed by MakeHuman base.obj
+  index (`delta`) and by boy_g2.glb POSITION index (`delta_gltf`, the dressed GLB has the same vertices). It is for
+  applying under another skin or a dressed copy.
+- **`glb/boy_g2_face_sheet.jpg`:** PRIMA | DOPO, front / three-quarter / side, next to a real adult skull. The skull
+  drawings are Gray's *Anatomy* (1918), public domain:
+  - https://commons.wikimedia.org/wiki/File:Gray190.png (front)
+  - https://commons.wikimedia.org/wiki/File:Gray188.png (side)
