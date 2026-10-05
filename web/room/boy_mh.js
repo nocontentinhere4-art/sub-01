@@ -23,15 +23,17 @@
 // edge and lying; the old rig's interludes, breathing, look-at, foot IK and phone hold are off.
 
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
-  walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake"};
+  walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
+  eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
+  bedtime: "room_bedtime"};
 // the room (main): keycaps (G10d) centre, top y, turn about y, size; the mouse centre on the pad; the desk / pad top
 const ROOM = {keys: {c: [-1.070, 1.001, -0.976], ry: 0.06, w: 0.356, d: 0.134}, mouse: [-0.755, 0.973, -0.950], pad: 0.973};
 // the clips' frame (root at the feet, facing +z; measured in the page: the recorded wrists sit on the README's pins in
 // it): the keyboard the typing was pinned to (keycaps' centre at KEYTOP; the wrists' pins (0.03 / -0.13, 0.878, 0.32)
 // lie over its near half) and the mouse dome's hump (on DESK_Y), from preview/mh-motion's README. G2's clips (clips_g2)
-// sit the typing and the mouse higher (DY 0.023 at 52a1070, for the slides and trousers on the 0.505 m seat); measured
-// in the page, raising the clip's keyboard and mouse by 1.7 cm puts the pressing fingertips 2-5 mm over the keycaps
-const DY = 0.017;
+// sit the typing and the mouse higher (DY 0.032 at 4f1f995, on the 0.52 m seat); measured in the page, raising the clip's
+// keyboard and mouse by 2.6 cm puts the pressing fingertips 2-5 mm over the keycaps
+const DY = 0.026;
 const CLIP = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], desk: 0.809 + DY,
   home: [-0.003, 0.83 + DY, 0.317]};                         // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
 // the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13) (boy_mh;
@@ -97,6 +99,19 @@ export function createMH(env) {
     // on the edge: the clip's bed is not laid out like the room's, so the sitting moments get their own placement
     const atT = (r, t) => r.reduce((b, q) => Math.abs(q.t - t) < Math.abs(b.t - t) ? q : b);
     S.lieEdge = edgePlace(atT(bl, S.lie.edge)); S.wakeEdge = edgePlace(atT(bw, S.wake.sat));
+    // room_bedtime (the late "go to sleep"): seated stretch -> up at the chair; walk in -> on the edge; -> lying. Its chair
+    // and bed are not this room's (2.4 m apart, here 1.6 m): the first part plays at the room's chair, the page walks him
+    // across, and the rest plays at the bed's edge and on the duvet, placed like room_bed_lie's
+    if (got.bedtime) {
+      const bt = scan(got.bedtime), up = bt.find(p => p.hips.y > 0.9) || bt[Math.floor(bt.length / 4)];
+      const e1 = bt.find(p => p.t > up.t + 2 && p.hips.y < 0.80 && p.head.y > 1.05) || bt[Math.floor(bt.length / 2)];
+      const l1 = bt.find(p => p.t > e1.t && p.head.y < 1.0) || bt[Math.floor(bt.length * 3 / 4)];
+      const sit = bt.filter(p => p.t >= e1.t && p.t <= l1.t && p.head.y > 1.3 && p.foot < 0.3), on = sit.length ? sit[sit.length >> 1] : e1;
+      const s0 = bt[0], face = Math.atan2(s0.knee.z - s0.hips.z, s0.knee.x - s0.hips.x);
+      const su0 = sampler(got.stand_up), h0 = su0(0).hips; su0.done();
+      S.bt = {up: up.t, walk: Math.max(up.t + 0.5, e1.t - 1.6), edge: on.t, end: got.bedtime.duration,
+        seat: [s0.hips.x - h0.x, s0.hips.z - h0.z], face, edgePl: edgePlace(on), lie: bedPlace(bt[bt.length - 1])};
+    }
     return S;
   }
   function edgePlace(p) {                                    // the root that seats this pose on the room's bed edge, facing out
@@ -148,19 +163,25 @@ export function createMH(env) {
     M.actions.walk = make(got.walk); H.room_walk = hipsAt(got.walk, 0);
     M.actions.lie = make(lie); H.mh_lie = hipsAt(lie, 0);
     M.actions.edge = make(edge); H.mh_edge = hipsAt(edge, 0);
-    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake"]) { const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime"]) { const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     // every slot the page plays: seated at the desk -> relaxed in the chair, on the bed's edge -> the edge, standing ->
     // the stand, walking -> the walk loop (the page scales it to his speed), lying -> the lie
     const seated = ["sit", "dine", "eat", "type"], onEdge = ["edge", "phone_sit"], upright = ["idle", "stand", "lean", "deliver", "phone_stand", "door"],
       lying = ["sleep", "phone_lie", "listen", "lie_phone"];
     for (const k of seated) { A[k] = M.actions.desk_watch; H[k] = H.desk_watch.slice(); }
+    // eating at the desk: room_eat (the food to his lips); the other activity clips play in the preview showcase (show())
+    for (const k of ["eat", "read", "phone", "phone_scroll", "drink", "door", "window"]) { M.actions["act_" + k] = make(got[k]); H["act_" + k] = hipsAt(got[k], 0); }
+    for (const k of ["dine", "eat"]) { A[k] = M.actions.act_eat; H[k] = H.act_eat.slice(); }
     for (const k of onEdge) { A[k] = M.actions.edge; H[k] = H.mh_edge.slice(); }
     for (const k of upright) { A[k] = M.actions.stand; H[k] = H.mh_stand.slice(); }
     A.walk = M.actions.walk; H.walk = H.room_walk.slice(); if (env.setStride) env.setStride(WALK_V);
     for (const k of lying) { A[k] = M.actions.lie; H[k] = H.mh_lie.slice(); }
+    if (seg.bt) {                                             // asleep: lying as room_bedtime ends (it is how he got there)
+      const sl = stillClip("mh_sleep", got.bedtime, got.bedtime.duration); M.actions.sleep = make(sl); H.mh_sleep = hipsAt(sl, 0);
+      A.sleep = M.actions.sleep; H.sleep = H.mh_sleep.slice(); }
     for (let i = 0; i < 600 && !(env.chairNode && env.chairNode()); i++) await new Promise(r => setTimeout(r, 100));   // (the room may still be loading)
     { const sp = sampler(stand); M.standFeet = sp(0).feet; sp.done(); }     // (he turns on the spot about his feet, not the root)
-    seatHeight(); props();
+    raiseChair(); seatHeight(); props();
     for (const a of Object.values(M.actions)) a.stop();
     mixer.stopAllAction();
     const first = A[env.state().want] || M.actions.stand; first.reset().setEffectiveWeight(1).play(); env.setCurrent(first);
@@ -169,6 +190,19 @@ export function createMH(env) {
   }
   // the page puts the root at the seat anchor less the clip's hips; the MakeHuman clips have the feet at y = 0, so the
   // seated slots' hip height is the seat anchor's height over the floor: the root (his feet) stays on the floor
+  // G2's seated clips all sit on a 0.52 m seat (preview/mh-motion 4f1f995): the room's chair (seat top 0.504 m) is raised
+  // 1.6 cm at the gas lift: every vertex above 0.30 m (the seat, the back, the armrests) moves up, the lift's column stretches
+  const SEAT_UP = 0.016, LIFT_CUT = 0.30;
+  function raiseChair() {
+    const n = env.chairNode && env.chairNode(); if (!n || n.userData.raised) return;
+    n.updateMatrixWorld(true); const v = V(), floor = env.F;
+    n.traverse(o => { if (!o.isMesh) return;
+      const g = o.geometry.clone(), A = g.attributes.position, f = new Float32Array(A.count * 3), inv = o.matrixWorld.clone().invert();
+      for (let i = 0; i < A.count; i++) { v.fromBufferAttribute(A, i).applyMatrix4(o.matrixWorld);
+        if (v.y > floor + LIFT_CUT) v.y += SEAT_UP; v.applyMatrix4(inv); f.set([v.x, v.y, v.z], 3 * i); }
+      g.setAttribute("position", new THREE.BufferAttribute(f, 3)); g.computeBoundingBox(); g.computeBoundingSphere(); o.geometry = g; });
+    n.userData.raised = true; if (env.chairChanged) env.chairChanged();
+  }
   function seatHeight() {
     const n = env.chairNode && env.chairNode(); if (!n) return;
     const p = n.localToWorld(V(0, 0.735, 0.02)), hy = p.y - env.F, H = env.HIPS;
@@ -210,7 +244,7 @@ export function createMH(env) {
     if (m === M.mode) return;
     const a = M.actions[m], cur = env.state().current;
     if (a !== cur) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
-    for (const k of ["sit", "dine", "type"]) env.actions[k] = a;   // the page's own play("sit") then keeps this mode
+    for (const k of ["sit", "type"]) env.actions[k] = a;   // the page's own play("sit") then keeps this mode
     M.mode = m; M.log.push([+env.state().T.toFixed(2), m]); if (M.log.length > 50) M.log.shift();
   }
 
@@ -287,15 +321,23 @@ export function createMH(env) {
   // floor), and it hands back to the page's poses at both ends (the first and last 15 % blend).
   const sstep = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
   const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
-  function chairPlace(off) {                                 // the root for a clip whose seat centre is at off (x, z), on the room's chair
-    const ch = env.chairNode && env.chairNode(); if (!ch) return null;
+  function chairPlace(off, face) {                           // the root for a clip whose seat centre is at off (x, z), on the room's chair
+    const ch = env.chairNode && env.chairNode(); if (!ch) return null;   // (face: the way the seated clip faces, in its frame; +z if not given)
     ch.updateMatrixWorld(true); const p = ch.getWorldPosition(V()), cry = ch.rotation.y;
-    const r = Math.atan2(-Math.sin(cry), -Math.cos(cry)), c = Math.cos(r), s = Math.sin(r);   // the way a person on it faces
+    let r = Math.atan2(-Math.sin(cry), -Math.cos(cry));                 // the way a person on it faces
+    if (face != null) r = face - Math.atan2(Math.cos(r), Math.sin(r));   // (a local direction at angle a ends at a - ry in the room)
+    const c = Math.cos(r), s = Math.sin(r);
     return {ry: r, x: p.x - (off[0] * c + off[1] * s), z: p.z - (-off[0] * s + off[1] * c)};
   }
   function transitionFor(S) {
     if (!S || S.k !== "pose" || S.t == null) return null;
-    const G = M.seg, to = S.to, from = S.from;
+    const G = M.seg, to = S.to, from = S.from, g = env.state().goal, B = G.bt;
+    if (B && g && g.clip === "sleep" && g.anchor === "bedlie") {          // going to sleep: room_bedtime
+      if (!to && from === "desk") return {k: "bedtime", a: 0, b: B.up, at: () => chairPlace(B.seat, B.face), back: true};
+      if (to === "bedside" && from !== "bedlie") return {k: "bedtime", a: B.walk, b: B.edge, at: () => B.edgePl};
+      if (to === "bedlie" && from === "bedside") { const h = u => hipsAt(M.clips.bedtime, B.edge + (B.end - B.edge) * u);
+        return {k: "bedtime", a: B.edge, b: B.end, at: u => mixPlace(B.edgePl, B.lie, sstep(0.1, 0.7, u), h(u))}; }
+    }
     if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(G.seatDown || SEAT.down), back: true};
     if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up), back: true};
     if (to === "bedside" && from !== "bedlie") return {k: "bed_lie", a: G.lie.stand, b: G.lie.edge, at: () => G.lieEdge};
@@ -309,7 +351,7 @@ export function createMH(env) {
   }
   function transition(st) {
     const S = st.step, T = transitionFor(S);
-    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake"]) if (!T || T.k !== k) { const a = M.actions[k]; if (a.isRunning() || a.getEffectiveWeight() > 0) { a.setEffectiveWeight(0); a.stop(); } }
+    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime"]) if (!T || T.k !== k) { const a = M.actions[k]; if (a.isRunning() || a.getEffectiveWeight() > 0) { a.setEffectiveWeight(0); a.stop(); } }
     if (!T) return false;
     const place = T.at(Math.min(1, Math.max(0, S.t))); if (!place) return false;
     if (S.mhd === undefined) { S.mhd = S.d; S.d = Math.max(S.d, T.b - T.a); }   // the step lasts as long as the clip's stretch (the page's ~1 s is too quick)
@@ -418,9 +460,102 @@ export function createMH(env) {
     b.updateMatrixWorld(true); const w0 = H.getWorldPosition(V()), w1 = w0.clone().add(V((a0[0] - a1[0]) * k, 0, (a0[1] - a1[1]) * k));
     H.position.add(H.parent.worldToLocal(w1).sub(H.parent.worldToLocal(w0)));
   }
+  // the clothes' corrective shapes (G4's morph targets on the hoodie and the trousers: seated, elbow_L/R, lying), weighted
+  // each frame after the animation from the joints, by the drivers the file carries (extras.correctives)
+  const CORR = {drivers: null, meshes: []};
+  fetch("room/boy.glb").then(r => r.arrayBuffer()).then(buf => {
+    const dv = new DataView(buf), n = dv.getUint32(12, true);
+    const js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, n)));
+    CORR.drivers = ((js.extras || {}).correctives || {}).drivers || null;
+  }).catch(() => {});
+  const smooth = (a, b, x) => sstep(a, b, x);
+  function correctives() {
+    if (!CORR.drivers) return;
+    if (!CORR.meshes.length) env.boy.traverse(o => { if (o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences) CORR.meshes.push(o); });
+    if (!CORR.meshes.length) return;
+    const B = env.bones, p = n => B[n].getWorldPosition(V());
+    const down = p("Hips").sub(p("neck")).normalize(), deg = (a, b) => THREE.MathUtils.radToDeg(a.angleTo(b)), w = {};
+    for (const [name, d] of Object.entries(CORR.drivers)) {
+      let v = 0;
+      if (d.type === "hip_bend") v = (deg(p("LeftLeg").sub(p("LeftUpLeg")), down) + deg(p("RightLeg").sub(p("RightUpLeg")), down)) / 2;
+      else if (d.type === "elbow_bend") v = deg(p(d.side + "ForeArm").sub(p(d.side + "Arm")), p(d.side + "Hand").sub(p(d.side + "ForeArm")));
+      else if (d.type === "chest_up") v = V().crossVectors(p("LeftArm").sub(p("RightArm")), down.clone().negate()).normalize().y;
+      w[name] = smooth(d.from, d.to, v);
+    }
+    for (const o of CORR.meshes) for (const [nm, i] of Object.entries(o.morphTargetDictionary)) o.morphTargetInfluences[i] = w[nm] || 0;
+    M.corr = w;
+  }
+  // ---------- the activity clips' props (room/mh/props_g2.json: placeholder boxes and cylinders, real models later) ----------
+  // held ones ride a hand bone (offset and turn in its frame), the others stand in the clip's own frame (a child of him:
+  // his root is that frame); each set shows while its clip plays. The door's swing and the window's sash follow the
+  // clip's keys [t, rotY, dx, dy, dz].
+  const PR = {json: null, sets: {}, sash: null};
+  fetch("room/mh/props_g2.json").then(r => r.json()).then(j => { PR.json = j; }).catch(() => {});
+  const COLOR = w => /screen/.test(w) ? 0x6aa0ff : /phone/.test(w) ? 0x111214 : /plate/.test(w) ? 0xf2f0ea : /glass/.test(w) ? 0xcfe8f5
+    : /bottle/.test(w) ? 0x6fb37a : /cover/.test(w) ? 0x9a3b30 : /page|paperback|half/.test(w) ? 0xf5f1e6 : /counter/.test(w) ? 0xb79c7e : 0xd9a35b;
+  function propMesh(p) {
+    const z = p.size, geo = p.shape === "cyl" ? new THREE.CylinderGeometry(z[0], z[2] != null ? z[2] : z[0], z[1], 20) : new THREE.BoxGeometry(z[0], z[1], z[2]);
+    const mat = new THREE.MeshStandardMaterial({color: p.color ? Number(p.color) : COLOR(p.what || ""), roughness: p.rough != null ? p.rough : 0.6,
+      transparent: p.opacity != null || /glass/.test(p.what || ""), opacity: p.opacity != null ? p.opacity : /glass/.test(p.what || "") ? 0.45 : 1,
+      emissive: /screen/.test(p.what || "") ? 0x335599 : 0x000000});
+    const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true;
+    if (p.rot) m.rotation.set(...p.rot.map(d => THREE.MathUtils.degToRad(d)));
+    return m;
+  }
+  function propSet(k) {                                      // built once per clip
+    if (PR.sets[k] !== undefined || !PR.json) return PR.sets[k] || null;
+    const spec = PR.json["room_" + k]; if (!spec) return PR.sets[k] = null;
+    const set = {held: [], world: new THREE.Group()};
+    const MHB = {"wrist.L": "LeftHand", "wrist.R": "RightHand"};          // (MakeHuman's names for the room rig's)
+    for (const p of spec.held || []) { const nm = MHB[p.bone] || p.bone, bone = env.bones[nm.replace(".", "")] || env.bones[nm]; if (!bone) { console.warn("prop bone", p.bone); continue; }
+      const m = propMesh(p); m.position.set(...p.off); m.visible = false; bone.add(m); set.held.push(m); }
+    for (const p of spec.world || []) { const m = propMesh(p); m.position.set(...p.pos); set.world.add(m); }
+    set.world.visible = false; env.boy.add(set.world);
+    return PR.sets[k] = set;
+  }
+  function showProps(k, on) { const set = propSet(k); if (!set) return; set.world.visible = on; for (const m of set.held) m.visible = on; }
+  const keyAt = (keys, t) => { if (!keys || !keys.length) return [0, 0, 0, 0]; let i = 0; while (i < keys.length - 2 && keys[i + 1][0] <= t) i++;
+    const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)], u = b[0] > a[0] ? Math.min(1, Math.max(0, (t - a[0]) / (b[0] - a[0]))) : 0;
+    return [1, 2, 3, 4].map(j => a[j] + (b[j] - a[j]) * u); };
+  function props_(st) {                                      // which clip's props are out, and the door / the sash
+    if (!PR.json) return;
+    for (const k of ["eat", "read", "phone", "phone_scroll", "drink"]) { const a = M.actions["act_" + k]; showProps(k, !!a && a.isRunning() && a.getEffectiveWeight() > 0.5); }
+    const sc = M.sc;
+    // (the clip pulls the door toward him, rotY < 0: in this room that is a negative setDoor, the leaf's free edge to +z)
+    if (sc && sc.k === "door" && env.setDoor) { const [ry] = keyAt(PR.json.room_door.anim[0].keys, sc.a.time); env.setDoor(THREE.MathUtils.degToRad(ry)); }
+    if (sc && sc.k === "window") {
+      const W = PR.json.room_window, an = W.anim[0];
+      if (!PR.sash) { PR.sash = new THREE.Group(); for (const p of W.anim) { const m = propMesh(p); PR.sash.add(m); } env.scene.add(PR.sash); }
+      const [, dx] = keyAt(an.keys, sc.a.time), b = env.boy;
+      // the room's window is higher than the clip's (sill 1.11 m above the floor, the clip's 0.825): the sash sits in
+      // the real opening, just inside the glass, and slides as keyed
+      const loc = V(an.pivot[0] + dx, an.pivot[1] + 0.24, 1.05); b.updateMatrixWorld(true); PR.sash.position.copy(b.localToWorld(loc));
+      PR.sash.rotation.y = b.rotation.y; PR.sash.visible = true;
+    } else if (PR.sash) PR.sash.visible = false;
+  }
+  // ---------- the preview showcase (?debug: mh.show("read" | "phone" | "drink" | "door" | "window"), mh.show(null) ends it):
+  // the activity clips awaiting the owner's word, played where they belong in the room ----------
+  const SHOW = {read: null, phone: null, phone_scroll: null,  // at the desk, seated: where the page has him
+    drink: [0.50, 0.05, 0],                                  // standing, a counter in front (the clip's own placeholder)
+    door: [1.73, -0.48, Math.PI],                            // facing the door: its handle where the clip's hand reaches
+    window: [-0.90, -0.06, -Math.PI / 2]};                   // facing the window between the chair and the bed
+  function show(k) {
+    if (M.sc) { M.sc.a.setEffectiveWeight(0); M.sc.a.stop(); if (M.sc.k === "door" && env.setDoor) env.setDoor(0); M.sc = null;
+      if (!k) env.resnap(); }                                // (back where the page has him, its clip at full weight)
+    if (!k || !M.actions["act_" + k]) return;
+    const a = M.actions["act_" + k]; a.reset(); a.setLoop(THREE.LoopRepeat, Infinity); a.play(); M.sc = {k, a, root: SHOW[k]};
+  }
+  function showStep() {
+    const sc = M.sc; if (!sc) return;
+    const b = env.boy; if (sc.root) { b.position.set(sc.root[0], env.F, sc.root[1]); b.rotation.y = sc.root[2]; }
+    for (const a of env.mixer._actions) if (a !== sc.a && a.getEffectiveWeight() > 0) a.setEffectiveWeight(0);
+    sc.a.setEffectiveWeight(1); env.mixer.update(0);
+  }
   function onBed(st) {                                       // lying on, or sitting on the edge of, the bed: placed by the lie clip's pose
     if (st.step || (st.at !== "bedlie" && st.at !== "bedside")) return;
-    const p = st.at === "bedlie" ? M.seg.bedLie : M.seg.lieEdge, b = env.boy; b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry;
+    const sleep = M.seg.bt && st.goal && st.goal.clip === "sleep";
+    const p = st.at === "bedlie" ? (sleep ? M.seg.bt.lie : M.seg.bedLie) : (sleep ? M.seg.bt.edgePl : M.seg.lieEdge), b = env.boy;
+    b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry;
   }
 
   // ---------- one step (instead of the page's animate: the mixer, his plan and walk, the desk modes, the wrists) ----------
@@ -430,16 +565,19 @@ export function createMH(env) {
     if (!P.kbNode || !P.mouseNode) { P.seen += dt; if (P.seen > 1) { P.seen = 0; props(); } }   // (G10d's nodes may arrive late)
     const st = env.state(), m = wanted(st);
     if (m) setMode(m); else if (M.mode) {                    // off the desk modes (eating, leaving): seated he just sits back
-      M.mode = null; M.w.type = M.w.mouse = 0; const a = M.actions.desk_watch, cur = st.current;
-      for (const k of ["sit", "dine", "type"]) env.actions[k] = a;
+      M.mode = null; M.w.type = M.w.mouse = 0; const a = st.goal && st.goal.clip === "dine" ? M.actions.act_eat : M.actions.desk_watch, cur = st.current;
+      for (const k of ["sit", "type"]) env.actions[k] = M.actions.desk_watch;
       if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
     pivot(st, dt);
+    showStep();                                                // (the showcase's clip, before the guards measure him)
     baseY(); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
+    props_(st);
+    env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
@@ -451,5 +589,5 @@ export function createMH(env) {
       mouseAt: P.mouseNode ? P.mouseNode.position.toArray().map(v => +v.toFixed(3)) : null, grab: M.grab ? M.grab.toArray().map(v => +v.toFixed(3)) : null};
   }
   load().catch(e => console.warn("MakeHuman clips:", e));
-  return {animate, dbg, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
+  return {animate, dbg, show, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
 }

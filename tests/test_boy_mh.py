@@ -27,7 +27,8 @@ def test_body_is_the_makehuman_rig():
 
 def test_desk_clips_animate_the_fingers():
     for clip in ("desk_type_ik", "desk_mouse_ik", "desk_watch", "room_window", "room_walk", "room_sit_down",
-                 "room_stand_up", "room_bed_lie", "room_bed_wake"):
+                 "room_stand_up", "room_bed_lie", "room_bed_wake", "room_eat", "room_read", "room_phone", "room_drink",
+                 "room_door", "room_bedtime", "room_phone_scroll"):
         g = glb_json(WEB / "mh" / f"{clip}.glb")
         assert g.get("animations"), clip
         targets = {g["nodes"][c["target"]["node"]]["name"] for c in g["animations"][0]["channels"]}
@@ -53,3 +54,13 @@ def test_module_encodes_the_desk_rule():
 def test_licences_recorded():
     credits = (WEB / "CREDITS.md").read_text()
     assert "MakeHuman" in credits and "CC0" in credits and "Anderson Rohr" in credits
+
+
+def test_props_and_correctives_wired():
+    js = (WEB / "boy_mh.js").read_text()
+    props = json.loads((WEB / "mh" / "props_g2.json").read_text())
+    for k in ("room_eat", "room_read", "room_phone", "room_phone_scroll", "room_drink", "room_door", "room_window", "room_bedtime"):
+        assert k in props, k
+    assert 'fetch("room/mh/props_g2.json")' in js and "morphTargetInfluences" in js and "correctives" in js
+    g = glb_json(WEB / "boy.glb")
+    assert set(g["extras"]["correctives"]["drivers"]) == {"seated", "elbow_L", "elbow_R", "lying"}

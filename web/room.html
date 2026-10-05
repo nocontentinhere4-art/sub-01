@@ -2081,7 +2081,7 @@ function buildDoor(root){
 function setDoor(a){                                    // a: how far open (rad, into the room)
   DOOR.a = a; if (!DOOR.leaf) return;
   if (DOOR.hang) DOOR.hang.rotation.y = a;             // the hook rail, the tote and the hoodie swing with the leaf
-  DOOR.leaf.visible = DOOR.hole.visible = a > 0.002; DOOR.leaf.rotation.y = a; DOOR.leaf.updateMatrixWorld(true);
+  DOOR.leaf.visible = DOOR.hole.visible = Math.abs(a) > 0.002; DOOR.leaf.rotation.y = a; DOOR.leaf.updateMatrixWorld(true);   // (a < 0: into the room, as preview/room-mh's door clip pulls it)
   DOOR.leaf.localToWorld(DOOR.handle.set(DOOR.W - 0.10, 1.02 - F - 0.008, 0.06));
 }
 // opening (rotation.y > 0 swings the free edge towards +z, into the room). The step takes 5.6 s:
@@ -2896,6 +2896,8 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),
+    chairChanged: () => { VOX = null; },                // (the chair's shape changed: its collision voxels anew)
+    setDoor: a => setDoor(a), snap: (anchor, clip) => snap(anchor, clip),
     cover: (w, dt) => {                                 // the page's duvet over him (asleep at night), w 0..1: drawn up from the foot
       if (w <= 0 && DUV.w <= 0) return; if (!bedInit()) return; DUV.w = w; DUV.acc += dt;
       if (w > 0 && (DUV.acc >= 0.1 || w < 1)) { DUV.acc = 0; boy.updateMatrixWorld(true); coverShape(); }
