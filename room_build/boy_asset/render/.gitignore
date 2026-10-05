@@ -1,0 +1,4 @@
+_*.glb
+_*.mjs
+node_modules
+vendor/

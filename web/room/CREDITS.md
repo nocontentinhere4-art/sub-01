@@ -222,3 +222,16 @@ re-downloads them (Wikimedia rate-limits shared addresses; the script waits and 
 The weather shown is **not real weather**: the server has no weather feed, so `weatherAt()` is a deterministic daily
 pattern over Tokyo time (about a fifth of the hours wet, a third overcast), the same for every viewer and never presented
 as a forecast or an observation.
+
+## The character (#98, G2): `boy.glb` rebuilt in place
+`boy.glb` is still the project's own AI-generated character (Meshy, via Higgsfield; the owner's choice), with the same
+24-bone rig, rest pose and embedded sit clip as before, so the clips `boy_*.glb` and the page keep working unchanged.
+Everything added by the rebuild in `room_build/boy_asset/` is original work for this project, released under CC0: the
+welded and subdivided mesh, the new UV layout, the procedural materials and the baked normal / roughness / occlusion
+maps (Blender 4.2 Cycles), the eyeball, cornea and eyelid meshes and the drawn iris. The face's skin was repainted: three unlit renders of this
+character's own head were given to an image model (Higgsfield, GPT Image 2.5, about 4.5 credits; plus 10 credits of
+upscaler tests) with the instruction to keep the same face and render real skin, and the results were projected back
+onto the mesh (face landmarks from MediaPipe's Face Landmarker, Apache-2.0, used only at build time). The same was
+tried on the clothes (four full-body views, about 6 credits); those repaints are not in the shipped file, they served
+only as a tone reference: the clothes' colour maps are procedural fabric materials made by the build script. No photo of
+any person was used; the character does not depict any real person.

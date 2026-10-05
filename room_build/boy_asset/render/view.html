@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#2a2d33;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+const Q = new URLSearchParams(location.search);
+const W = +Q.get("w") || 800, H = +Q.get("h") || 1000;
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setSize(W, H); renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(Q.get("bg") || "#2a2d33");
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xfff2e0, 2.2); sun.position.set(1.5, 3, 2); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = sun.shadow.camera.bottom = -1.5; sun.shadow.camera.right = sun.shadow.camera.top = 1.5; sun.shadow.bias = -0.0005; scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x4a4035, 0.6));
+const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5); fill.position.set(-2, 1.5, 1); scene.add(fill);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({color:0x6b6560, roughness:0.9})); floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+const camera = new THREE.PerspectiveCamera(+Q.get("fov") || 30, W / H, 0.01, 50);
+const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+const load = u => new Promise((res, rej) => loader.load(u, res, undefined, rej));
+const glb = Q.get("glb") || "/room/boy.glb", clip = Q.get("clip") || "", t = +Q.get("t") || 0;
+const g = await load(glb); const boy = g.scene; scene.add(boy);
+let info = {meshes:[], tris:0};
+boy.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true; const m = o.material;
+  if (Q.get("roomlike") !== "0") { if (m.emissive) { m.emissive.setRGB(0,0,0); m.emissiveIntensity = 0; } m.roughness = 0.78; m.envMapIntensity = 0.5; }
+  if (Q.get("wire")) { m.wireframe = true; }
+  if (Q.get("hide") && Q.get("hide").split(",").some(n => m.name === "boy_" + n || m.name === n)) o.visible = false;
+  if (Q.get("mats")) { const C=[0xf0c0a0,0x202020,0x6080c0,0xc04040,0xf0f0f0,0x40c060,0xff00ff,0x00ffff]; const i = (o.parent.children.indexOf(o)) % C.length; o.material = new THREE.MeshStandardMaterial({color:C[i], roughness:0.8, skinning:true}); } if (Q.get("flat")) { m.flatShading = true; m.needsUpdate = true; }
+  const idx = o.geometry.index; info.meshes.push({name:o.name, mat:m.name, type:m.type, verts:o.geometry.attributes.position.count, tris:(idx ? idx.count : o.geometry.attributes.position.count) / 3, morphs:o.morphTargetInfluences ? o.morphTargetInfluences.length : 0});
+  info.tris += (idx ? idx.count : o.geometry.attributes.position.count) / 3; } });
+const mixer = new THREE.AnimationMixer(boy);
+let clips = g.animations;
+if (clip) { const a = await load(`/room/${clip}.glb`); clips = a.animations; }
+if (clips.length && Q.get("noanim") == null) { const act = mixer.clipAction(clips[0]); act.play(); mixer.setTime(t); info.clip = clips[0].name; info.dur = clips[0].duration; }
+boy.updateMatrixWorld(true);
+// camera presets
+const preset = Q.get("cam") || "full";
+const head = boy.getObjectByName("Head"), hf = boy.getObjectByName("headfront"); const hp = new THREE.Vector3(), fwd = new THREE.Vector3(0, 0, 1);
+if (head) head.getWorldPosition(hp); if (hf) { hf.getWorldPosition(fwd).sub(hp).setY(0).normalize(); }
+const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).negate();   // his right... (camera-right when facing him)
+const box = new THREE.Box3().setFromObject(boy); const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+info.bbox = {min:box.min.toArray(), max:box.max.toArray()};
+if (preset === "face") { camera.fov = 18; camera.updateProjectionMatrix(); camera.position.copy(hp).addScaledVector(fwd, 0.72).addScaledVector(right, 0.22).add(new THREE.Vector3(0, 0.1, 0)); camera.lookAt(hp.x, hp.y + 0.05, hp.z); }
+else if (preset === "face_side") { camera.fov = 18; camera.updateProjectionMatrix(); camera.position.copy(hp).addScaledVector(fwd, 0.35).addScaledVector(right, 0.7).add(new THREE.Vector3(0, 0.1, 0)); camera.lookAt(hp.x, hp.y + 0.05, hp.z); }
+else if (preset === "head_room") { camera.fov = +Q.get("fov") || 30; camera.updateProjectionMatrix(); camera.position.copy(hp).addScaledVector(fwd, 2.2).add(new THREE.Vector3(0, 0.15, 0)); camera.lookAt(hp.x, hp.y, hp.z); }   // frontal, the room camera's distance: the head at 1:1 pixels in a 1280-wide frame
+else if (preset === "neck") { camera.fov = 16; camera.updateProjectionMatrix(); camera.position.copy(hp).addScaledVector(fwd, 0.7).addScaledVector(right, 0.25).add(new THREE.Vector3(0, -0.12, 0)); camera.lookAt(hp.x, hp.y - 0.13, hp.z); }
+else if (preset === "neck_low") { camera.fov = 16; camera.updateProjectionMatrix(); camera.position.copy(hp).addScaledVector(fwd, 0.6).addScaledVector(right, 0.3).add(new THREE.Vector3(0, -0.3, 0)); camera.lookAt(hp.x, hp.y - 0.12, hp.z); }
+else if (preset === "hands") { const h = boy.getObjectByName("RightHand"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 20; camera.updateProjectionMatrix(); camera.position.set(p.x + 0.1, p.y + 0.3, p.z + 0.6); camera.lookAt(p); }
+else if (preset === "feet") { const h = boy.getObjectByName("LeftFoot"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 25; camera.updateProjectionMatrix(); camera.position.set(p.x + 0.3, p.y + 0.35, p.z + 0.8); camera.lookAt(p.x, p.y - 0.05, p.z); }
+else if (preset === "eye" || preset === "brow") {                                   // macro: his left eye / brow, 1:1 detail
+  const n = boy.getObjectByName("LeftEye"), p = new THREE.Vector3(); if (n) n.getWorldPosition(p); else p.copy(hp).add(new THREE.Vector3(0, 0.07, 0)).addScaledVector(fwd, 0.08).addScaledVector(right, -0.03);
+  if (preset === "brow") p.add(new THREE.Vector3(0, 0.028, 0));
+  camera.fov = preset === "eye" ? 9 : 11; camera.updateProjectionMatrix(); camera.position.copy(p).addScaledVector(fwd, 0.2).addScaledVector(right, -0.04).add(new THREE.Vector3(0, 0.015, 0)); camera.lookAt(p); }
+else if (preset === "ear") {                                                       // macro: his left ear from the side
+  const p = hp.clone().add(new THREE.Vector3(0, 0.055, 0)).addScaledVector(fwd, 0.048).addScaledVector(right, -0.072);
+  camera.fov = 12; camera.updateProjectionMatrix(); camera.position.copy(p).addScaledVector(right, -0.32).addScaledVector(fwd, 0.06).add(new THREE.Vector3(0, 0.02, 0)); camera.lookAt(p); }
+else if (preset === "foot_macro") { const h = boy.getObjectByName("LeftFoot"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 16; camera.updateProjectionMatrix(); camera.position.set(p.x + 0.22, p.y + 0.16, p.z + 0.36); camera.lookAt(p.x, p.y - 0.03, p.z + 0.03); }
+else if (preset === "feet_room") { const h = boy.getObjectByName("LeftFoot"), p = new THREE.Vector3(); h.getWorldPosition(p); camera.fov = 30; camera.updateProjectionMatrix(); camera.position.copy(p).add(new THREE.Vector3(0.6, 0.9, 0)).addScaledVector(fwd, 1.9); camera.lookAt(p.x - 0.1, p.y, p.z); }   // the feet at the room camera's distance
+else if (preset === "back") { camera.position.set(c.x, c.y + 0.1, c.z - 3.4); camera.lookAt(c.x, c.y, c.z); }
+else if (preset === "three_q") { camera.position.set(c.x + 2.2, c.y + 0.5, c.z + 2.6); camera.lookAt(c.x, c.y, c.z); }
+else { camera.position.set(c.x, c.y + 0.1, c.z + 3.4); camera.lookAt(c.x, c.y, c.z); }
+if (Q.get("cx")) { camera.position.set(+Q.get("cx"), +Q.get("cy"), +Q.get("cz")); camera.lookAt(+Q.get("lx"), +Q.get("ly"), +Q.get("lz")); }
+renderer.render(scene, camera); renderer.render(scene, camera);
+window.__info = info; document.title = "ready";
+</script></body></html>
