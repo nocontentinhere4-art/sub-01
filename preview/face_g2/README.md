@@ -45,6 +45,16 @@ The eyes make a small saccade every 1 to 3 s (a degree or two) and come back tow
 lids 0, 50 and 100 % closed. (The head-only preview's per-pixel lash band is off here: drawn in the skin's bind space,
 it rode down the lid as a dark patch in a blink; the lash line is geometry now.)
 
+Third round (the coordinator's choice of G2's face, and the eyes and lips): the face's shape is now G2's adult face
+(preview/mh-motion 9612b7b, `boy_g2_face_delta.json`'s `delta_gltf`: the face's age 20->25 difference and MakeHuman's
+chin, jaw, cheekbone, cheek and nose targets, keyed by the glTF vertex index), added to the rest positions before the
+skin, the lashes and the blink are fitted, the normals of the moved vertices recomputed; the Gaussian displacement of
+round 2 (and its face_shape_delta.json) is dropped. `hair_check.jpg`: the hair against the forehead's hairline and the
+temple and sideburn, before and after (the cranium does not move: the hair sits as it did). The upper lip a little
+fuller (its vermilion up to 1 mm forward) with a cupid's bow in its border and more vertical lines; the lids at rest
+(no longer lowered); the iris larger, the gaze level, the sclera warmer with faint vessels toward the corners, a
+sharper highlight on the cornea, which reflects the room.
+
 Real references (cropped on the detail, no face shown; Pexels licence, free to use and modify,
 https://www.pexels.com/license/): `refs/lips.jpg` from "Close Up Photo of Man's Lip",
 https://www.pexels.com/photo/3749984/; `refs/brow.jpg` from "Close-Up of a Person's Eye",

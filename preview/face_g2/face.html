@@ -30,12 +30,13 @@ const hemi = new THREE.HemisphereLight(0xfff1dd, 0x3a3028, 0.35); scene.add(hemi
 const bounce = new THREE.DirectionalLight(0xffd9b0, 0.35); bounce.position.set(-1.2, -0.3, 0.8); scene.add(bounce, bounce.target);
 
 const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+const DELTA = (await (await fetch("g2_face_delta.json")).json()).delta_gltf;   // G2's adult face (preview/mh-motion 9612b7b)
 async function character(dress){
   const g = await loader.loadAsync("boy_dressed.glb"), root = g.scene;
   root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
   scene.add(root); root.updateMatrixWorld(true);
   let info = null;
-  if (dress) info = dressFace(THREE, root);
+  if (dress) { info = dressFace(THREE, root, {delta: DELTA}); info.cornea.envMap = scene.environment; info.cornea.envMapIntensity = 1.3; }
   const head = root.getObjectByName("Head");
   const hg = await loader.loadAsync("hair_mh.glb"), hair = hg.scene.getObjectByName("hair_mh") || hg.scene;
   hair.position.set(0, 0, 0); head.add(hair); useStrands(THREE, hair, {lod: false, spine: root.getObjectByName("Spine")});
@@ -84,8 +85,17 @@ for (const c of [0, 0.5, 1]) {
   renderer.render(scene, cam); panels["blink_" + Math.round(c * 100)] = renderer.domElement.toDataURL("image/jpeg", 0.92);
 }
 after.info.blink.set(0);
+// the hair against the new face: the forehead's hairline (front, close) and the temple and sideburn (side, close)
+for (const [nm, who] of [["before", before], ["after", after]]) {
+  before.root.visible = who === before; after.root.visible = who === after;
+  renderer.setSize(500, 375); cam.aspect = 4 / 3; cam.fov = 26;
+  cam.position.copy(mid).add(new THREE.Vector3(0, 0.05, 0.36)); cam.lookAt(mid.clone().add(new THREE.Vector3(0, 0.045, 0))); cam.updateProjectionMatrix();
+  renderer.render(scene, cam); panels[`hair_front_${nm}`] = renderer.domElement.toDataURL("image/jpeg", 0.92);
+  cam.position.copy(mid).add(new THREE.Vector3(0.36, 0.0, -0.02)); cam.lookAt(mid.clone().add(new THREE.Vector3(0.07, -0.005, -0.06))); cam.updateProjectionMatrix();
+  renderer.render(scene, cam); panels[`hair_side_${nm}`] = renderer.domElement.toDataURL("image/jpeg", 0.92);
+}
 window.__shape = after.info.shapeDelta;
-window.__info = {blink: after.info.blink.info, lidEdges: after.info.lidEdges, lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
+window.__info = {shape: after.info.shape, blink: after.info.blink.info, lidEdges: after.info.lidEdges, lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
   mid: mid.toArray().map(x => +x.toFixed(3))};
 window.__panels = () => panels;
 window.__done = true;

@@ -71,7 +71,8 @@ export function skinData(THREE, geo, data){
     const chin = g(Math.hypot(x, y - (L.lip[1] - 0.045), z - (L.lip[2] - 0.01)), 0.014);
     let redK = 0.6 * nose + 0.32 * cheek + 0.7 * ear + 0.12 * chin;
     // lips: a band under the nose, centred, on the front of the face
-    const lips = Math.min(1, 1.3 * g(y - (L.lip[1] - 0.005), 0.0068) * g(x, 0.017) * (z > L.lip[2] - 0.03 ? 1 : 0));   // a soft edge: no lipstick line
+    const bow = y > L.lip[1] - 0.005 ? 0.0009 * g(ax - 0.0045, 0.0024) - 0.0005 * g(x, 0.0016) : 0;   // the cupid's bow on the upper border
+    const lips = Math.min(1, 1.3 * g(y - bow - (L.lip[1] - 0.005), 0.0068) * g(x, 0.017) * (z > L.lip[2] - 0.03 ? 1 : 0));   // a soft edge: no lipstick line
     // eye socket ring (cavity) and the under-eye; the brow line above
     let cav = 0, browK = 0;
     for (const e of eyes) {
@@ -298,10 +299,10 @@ void RE_IndirectDiffuse_Physical`);
         }
         // the lips: fine vertical lines, a lighter vermilion border at their edge, wetter on the lower lip
         float sk_lip = vSkin.w;
-        float sk_lipLines = sk_lip * (1.0 - smoothstep(0.0, 0.14, abs(fract(vObj.x * 1300.0 + 0.6 * sk_noise(vObj * 400.0)) - 0.5) * 2.0)) * smoothstep(0.3, 0.6, sk_noise(vObj * vec3(300.0, 900.0, 300.0)));
+        float sk_lipLines = sk_lip * (1.0 - smoothstep(0.0, 0.14, abs(fract(vObj.x * 1700.0 + 0.6 * sk_noise(vObj * 400.0)) - 0.5) * 2.0)) * smoothstep(0.25, 0.55, sk_noise(vObj * vec3(300.0, 900.0, 300.0)));
         float sk_border = smoothstep(0.18, 0.28, sk_lip) * (1.0 - smoothstep(0.34, 0.46, sk_lip));
         float sk_lower = sk_lip * smoothstep(0.0012, -0.0012, vObj.y - uLipY);
-        diffuseColor.rgb *= (1.0 - 0.28 * sk_lipLines) * (1.0 + 0.16 * sk_border);
+        diffuseColor.rgb *= (1.0 - 0.36 * sk_lipLines) * (1.0 + 0.18 * sk_border);
         diffuseColor.rgb *= 1.0 - 0.55 * smoothstep(0.1, 0.3, sk_lip) * (1.0 - smoothstep(0.0, 0.0011, abs(vObj.y - uLipY - 0.0002)));   // the mouth's line
         float sk_hairC = sk_hair(vObj, normalize(vObjN), vHairD);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.032, 0.022), 0.8 * min(1.0, length(vHairD.xyz)) * sk_hairC);`)
@@ -350,12 +351,12 @@ void RE_IndirectDiffuse_Physical`);
         reflectedLight.indirectDiffuse *= 1.0 - 0.45 * vSkin.z;
         reflectedLight.indirectSpecular *= 1.0 - 0.6 * vSkin.z;`);
   };
-  m.customProgramCacheKey = () => "skin-v12";
+  m.customProgramCacheKey = () => "skin-v13";
   return m;
 }
 
 // ---------- the eyes ----------
-export function irisTexture(THREE, {w = 1024, h = 512, iris = [0.24, 0.13, 0.06], irisDeg = 25, pupilDeg = 7} = {}){
+export function irisTexture(THREE, {w = 1024, h = 512, iris = [0.24, 0.13, 0.06], irisDeg = 27, pupilDeg = 7.4} = {}){
   // equirectangular, the iris centred on the top pole (row 0 = the front of the eye once the ball is turned)
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const g = c.getContext("2d"), img = g.createImageData(w, h), d = img.data;
@@ -380,8 +381,8 @@ export function irisTexture(THREE, {w = 1024, h = 512, iris = [0.24, 0.13, 0.06]
         // sclera: off-white, a little greyer and pinker away from the cornea, faint veins toward the corners
         const t = Math.min(1, (th - irisDeg) / 70);
         const vein = Math.max(0, Math.sin(x * 0.11 + Math.sin(th * 0.3) * 3) * Math.sin(x * 0.023 + th * 0.07)) ;
-        const v = t > 0.35 ? Math.pow(vein, 18) * (t - 0.35) : 0;
-        [r, gg, b] = [0.78 - 0.08 * t + 0.45 * v, 0.74 - 0.12 * t - 0.22 * v, 0.70 - 0.12 * t - 0.22 * v];
+        const v = t > 0.25 ? Math.pow(vein, 14) * (t - 0.25) * 1.3 : 0;
+        [r, gg, b] = [0.80 - 0.06 * t + 0.45 * v, 0.745 - 0.10 * t - 0.25 * v, 0.68 - 0.11 * t - 0.25 * v];   // warm, faint vessels toward the corners
         if (th < irisDeg + 1.2) { const s = (th - irisDeg) / 1.2; [r, gg, b] = [r * (0.35 + 0.65 * s), gg * (0.35 + 0.65 * s), b * (0.35 + 0.65 * s)]; }
       }
       const o = 4 * (y * w + x);
@@ -413,7 +414,7 @@ function eyeballMaterial(THREE, map){
 
 function corneaMaterial(THREE){
   // additive: black base, only the specular and the environment's reflection are added on top of the iris
-  return new THREE.MeshPhysicalMaterial({color: 0x000000, roughness: 0.035, metalness: 0, ior: 1.376, specularIntensity: 1,
+  return new THREE.MeshPhysicalMaterial({color: 0x000000, roughness: 0.015, metalness: 0, ior: 1.376, specularIntensity: 1,
     envMapIntensity: 1.6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending});
 }
 
@@ -467,7 +468,7 @@ export function addEyes(THREE, group, P, eyes, {iris = [0.24, 0.13, 0.06], index
     const C = new THREE.Vector3(...e.center), r = e.radius * EYE_K;   // e.radius: the helper sphere's
     const eye = new THREE.Group(); eye.position.copy(C); eye.name = "eye_" + side;
     // the ball looks ahead and very slightly out (a relaxed gaze converges a little at the room distance)
-    const fwd = new THREE.Vector3(Math.sign(C.x) * 0.03, 0.05, 1).normalize();
+    const fwd = new THREE.Vector3(Math.sign(C.x) * 0.03, 0.015, 1).normalize();
     const ball = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 48), ballMat);
     ball.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), fwd);   // the texture's top pole (the iris) forward
     eye.add(ball);

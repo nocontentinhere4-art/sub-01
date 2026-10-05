@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 from tests.room_render_shots import CDN_HOSTS, cdn_router   # noqa: E402
 
 FROM_BRANCH = {"boy_dressed.glb": "web/room/boy.glb", "hair_mh.glb": "web/room/hair/hair_mh.glb", "hair_strands.js": "web/room/hair/hair_strands.js"}
+FROM_REF = {"g2_face_delta.json": ("9612b7b", "room_build/mh/glb/boy_g2_face_delta.json")}   # G2's adult face (preview/mh-motion)
 DETAILS = [("d_eye", PREVIEW / "skin_eyes/refs/eye.jpg", "REAL eye (Pexels 946727)"),
            ("d_brow", HERE / "refs/brow.jpg", "REAL brow (Pexels 4823600)"),
            ("d_skin", PREVIEW / "skin_eyes/refs/skin.jpg", "REAL skin (Pexels 4046562)"),
@@ -80,6 +81,7 @@ def main():
     ap.add_argument("--chromium", default=os.environ.get("SUB01_CHROMIUM", "/opt/pw-browsers/chromium"))
     args = ap.parse_args()
     blobs = {k: subprocess.run(["git", "show", f"{args.branch}:{p}"], cwd=ROOT, check=True, capture_output=True).stdout for k, p in FROM_BRANCH.items()}
+    blobs.update({k: subprocess.run(["git", "show", f"{ref}:{p}"], cwd=ROOT, check=True, capture_output=True).stdout for k, (ref, p) in FROM_REF.items()})
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(PREVIEW))
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -91,7 +93,7 @@ def main():
             for h in CDN_HOSTS:
                 pg.route(f"https://{h}/**", cdn_router(os.environ.get("SUB01_CDN_CACHE", "/tmp/sub01-cdn-cache")))
             for name, blob in blobs.items():
-                ctype = "text/javascript" if name.endswith(".js") else "model/gltf-binary"
+                ctype = "text/javascript" if name.endswith(".js") else "application/json" if name.endswith(".json") else "model/gltf-binary"
                 pg.route(f"**/face_g2/{name}", serve(blob, ctype))
             errors = []
             pg.on("pageerror", lambda e: errors.append(str(e)))
@@ -115,6 +117,12 @@ def main():
                 strip.paste(Image.open(io.BytesIO(base64.b64decode(panels[f"blink_{c}"].split(",", 1)[1]))).convert("RGB"), (12 + i * 612, 12))
                 sd.text((16 + i * 612, 238), f"blink: lids {c} % closed", fill=(220, 220, 220), font=sf)
             strip.save(HERE / "blink_strip.jpg", quality=88)
+            hc = Image.new("RGB", (2 * 500 + 3 * 12, 2 * 375 + 3 * 12 + 60), (22, 22, 24)); hd = ImageDraw.Draw(hc)
+            for c, nm in enumerate(("before", "after")):
+                hd.text((12 + c * 512, 8), "BEFORE (MakeHuman face)" if nm == "before" else "AFTER (G2's adult face)", fill=(220, 220, 220), font=sf)
+                for r, view in enumerate(("front", "side")):
+                    hc.paste(Image.open(io.BytesIO(base64.b64decode(panels[f"hair_{view}_{nm}"].split(",", 1)[1]))).convert("RGB"), (12 + c * 512, 40 + r * 387))
+            hc.save(HERE / "hair_check.jpg", quality=88)
             print(json.dumps({"out": args.out, "info": pg.evaluate("window.__info"), "errors": errors[:5]}, default=str)[:4000])
             b.close()
     finally:

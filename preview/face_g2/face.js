@@ -78,6 +78,30 @@ const FACE_SHAPE = [   // [x (mirrored), y, z] from the eye centres' midpoint, s
   [[0.047, -0.020, -0.020], 0.011, [0.002, 0, 0.0015]],         // the cheekbone: a little more
   [[0, -0.004, 0.017], 0.008, [0, 0, 0.0015]],                  // the nose bridge
 ];
+// G2's adult face (preview/mh-motion 9612b7b, boy_g2_face_delta.json: the face's age 20->25 difference and MakeHuman's
+// chin, jaw, cheekbone, cheek and nose targets; {glTF POSITION index: [dx, dy, dz]} in metres at rest, the dressed
+// glb's vertex order), and a little more volume in the upper lip (its vermilion forward and up, at most 1 mm; the
+// cupid's bow is drawn in the lips' colour); the normals of the moved vertices recomputed
+function applyDelta(THREE, skin, eyes, delta){
+  const g = skin.geometry, P = g.attributes.position, used = new Set(g.index.array), moved = new Set(), v = new THREE.Vector3();
+  for (const [k, d] of Object.entries(delta)) { const i = +k; v.fromBufferAttribute(P, i); P.setXYZ(i, v.x + d[0], v.y + d[1], v.z + d[2]); moved.add(i); }
+  // the upper lip: round its middle, in front of the mouth's line (from the eyes: the mouth sits 77 mm under them)
+  const box = new THREE.Box3(); for (const i of new Set(eyes.geometry.index.array)) box.expandByPoint(v.fromBufferAttribute(P, i));
+  const eyeY = box.getCenter(v).y, mouthY = eyeY - 0.077;
+  let front = -1; for (const i of used) { v.fromBufferAttribute(P, i); if (Math.abs(v.x) < 0.004 && v.y > mouthY && v.y < mouthY + 0.012 && v.z > front) front = v.z; }
+  for (const i of used) { v.fromBufferAttribute(P, i);
+    if (v.z < front - 0.015) continue;
+    const k = Math.exp(-(v.x * v.x) / (2 * 0.012 ** 2)) * Math.exp(-((v.y - (mouthY + 0.0045)) ** 2) / (2 * 0.0035 ** 2));
+    if (k < 0.01) continue;
+    P.setXYZ(i, v.x, v.y + 0.0004 * k, v.z + 0.0011 * k); moved.add(i); }
+  P.needsUpdate = true;
+  const tmp = new THREE.BufferGeometry(); tmp.setAttribute("position", P); tmp.setIndex(g.index); tmp.computeVertexNormals();
+  const N = g.attributes.normal, N2 = tmp.attributes.normal;
+  for (const i of moved) if (used.has(i)) N.setXYZ(i, N2.getX(i), N2.getY(i), N2.getZ(i));
+  N.needsUpdate = true; g.computeBoundingSphere();
+  return {moved: moved.size, mouthY};
+}
+
 function faceShape(THREE, skin, eyes, amount = 1){
   const g = skin.geometry, P = g.attributes.position, used = new Set(g.index.array), eyeV = new Set(eyes.geometry.index.array);
   const box = new THREE.Box3(), v = new THREE.Vector3(); for (const i of eyeV) box.expandByPoint(v.fromBufferAttribute(P, i));
@@ -211,12 +235,13 @@ function blinkRig(THREE, root, headBone, lids, edges, skin){
 
 export function dressFace(THREE, root, opts = {}){
   let skin0, eyes0; root.traverse(o => { if (o.isSkinnedMesh) { if (o.material.name === "eyes") eyes0 = o; else if (o.material.name === "skin") skin0 = o; } });
-  const shape = opts.shape === false ? {} : faceShape(THREE, skin0, eyes0, opts.shape || 1.4);
+  // the face's shape: G2's delta when given (the coordinator's choice), else the earlier Gaussian displacement
+  const shape = opts.delta ? applyDelta(THREE, skin0, eyes0, opts.delta) : opts.shape === false ? {} : faceShape(THREE, skin0, eyes0, opts.shape || 1.4);
   root.updateMatrixWorld(true);
-  const lids = relaxLids(THREE, skin0, eyes0);
+  const lids = relaxLids(THREE, skin0, eyes0, opts.lidDrop ?? 0);          // (0: the lids at rest; the blink still uses their bones)
   root.updateMatrixWorld(true);
   const info = dressBody(THREE, root, opts);
-  info.shapeDelta = shape; info.lidsRelaxed = lids.map(d => [d.bone.name, d.turn]);
+  info.shapeDelta = opts.delta ? {} : shape; info.shape = opts.delta ? shape : {gaussian: Object.keys(shape).length}; info.lidsRelaxed = lids.map(d => [d.bone.name, d.turn]);
   const skin = info.skin, E = info.eyes;                                 // E: the eye centres in the skinned (rest) pose
   // a static copy of the skin in its rest pose, to root the brows on (the skinned mesh raycasts slowly)
   root.updateMatrixWorld(true);
