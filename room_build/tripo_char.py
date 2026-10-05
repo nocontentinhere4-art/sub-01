@@ -4,6 +4,8 @@ refuses if its <name>.task or <name>.glb already exists in --out, so a re-run ne
 
     python room_build/tripo_char.py balance
     python room_build/tripo_char.py model    <name> --out DIR      # multiview to model from docs/design/char-tripo/refs
+    python room_build/tripo_char.py model    <name> --out DIR --set '{"face_limit": 400000}'   # override settings
+    python room_build/tripo_char.py texture  <name> <model_task> --out DIR [--set '{...}']     # re-texture, same mesh
     python room_build/tripo_char.py rigcheck <name> <model_task>   # free
     python room_build/tripo_char.py rig      <name> <model_task> --out DIR
     python room_build/tripo_char.py retarget <name> <rig_task> <preset> [--in-place] --out DIR
@@ -70,10 +72,11 @@ def run(name, out, endpoint, body_fn):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("kind", choices=("balance", "model", "rigcheck", "rig", "retarget"))
+    ap.add_argument("kind", choices=("balance", "model", "texture", "rigcheck", "rig", "retarget"))
     ap.add_argument("args", nargs="*")
     ap.add_argument("--out", default=".")
     ap.add_argument("--in-place", action="store_true")
+    ap.add_argument("--set", default="{}", help="JSON object merged over the task's default settings")
     a = ap.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     if a.kind == "balance":
@@ -82,7 +85,13 @@ def main():
         run(a.args[0], out, "generation/multiview-to-model", lambda: {
             "inputs": [{k: upload(REFS / v)} for k, v in VIEWS.items()],
             "model": "v3.1-20260211", "geometry_quality": "detailed", "face_limit": 150000,
-            "texture": True, "pbr": True, "texture_quality": "detailed", "texture_version": "v3.5-20260815"})
+            "texture": True, "pbr": True, "texture_quality": "detailed", "texture_version": "v3.5-20260815",
+            **json.loads(a.set)})
+    elif a.kind == "texture":
+        run(a.args[0], out, "models/texture", lambda: {
+            "input": a.args[1], "model": "v3.5-20260815", "pbr": True, "texture_quality": "detailed",
+            "texture_alignment": "original_image",
+            "texture_prompt": {"images": [upload(REFS / v) for v in VIEWS.values()]}, **json.loads(a.set)})
     elif a.kind == "rigcheck":
         tid = req("POST", f"{API}/animations/rig-check", {"input": a.args[1]})["data"]["task_id"]
         d = wait(tid)

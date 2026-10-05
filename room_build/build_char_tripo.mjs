@@ -6,7 +6,8 @@
 // - The walk is made in place: Tripo's walk carries the Hip forward 1.33 units over the clip although the task asked for
 //   animate_in_place; the straight-line drift from the first key to the last is taken off the Hip's forward axis, so the
 //   loop stays on the spot and the stride, sway and bob are kept.
-// - Scaled to 1.75 m tall (Tripo outputs him 0.98 units tall) on the Armature node, so the clips scale with him.
+// - Scaled to 1.75 m tall (from the bind-pose mesh top; Tripo outputs him about 0.98 units tall) on the Armature node, so
+//   the clips scale with him.
 // - Textures to WebP (base colour 4096 px for the face, normal and metal/roughness 2048 px), geometry meshopt-compressed.
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
@@ -16,6 +17,7 @@ import sharp from "sharp";
 import path from "node:path";
 
 const [,, DIR, OUT = path.join(DIR, "char_tripo.glb")] = process.argv;
+const BASE = Number(process.env.BASE_PX || 4096);         // base colour size; normal and metal/roughness at half
 const HEIGHT = 1.75;
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ "meshopt.encoder": MeshoptEncoder });
@@ -48,14 +50,14 @@ for (const ch of wa.listChannels()) {
 const top = root.listScenes()[0].listChildren();
 let ymax = 0;
 for (const m of root.listMeshes()) for (const pr of m.listPrimitives()) ymax = Math.max(ymax, pr.getAttribute("POSITION").getMax([])[1]);
-for (const n of top) n.setScale(n.getScale().map(v => v * HEIGHT / 0.98));
-console.log(`bind-pose mesh top ${ymax.toFixed(3)} (Tripo units); scaled x${(HEIGHT / 0.98).toFixed(3)}`);
+for (const n of top) n.setScale(n.getScale().map(v => v * HEIGHT / ymax));
+console.log(`bind-pose mesh top ${ymax.toFixed(3)} (Tripo units); scaled x${(HEIGHT / ymax).toFixed(3)}`);
 
 const tex = root.listTextures();
 await doc.transform(
   dedup(), prune(),
-  textureCompress({ encoder: sharp, targetFormat: "webp", quality: 88, slots: /baseColor/, resize: [4096, 4096] }),
-  textureCompress({ encoder: sharp, targetFormat: "webp", quality: 90, slots: /normal|metallicRoughness/, resize: [2048, 2048] }),
+  textureCompress({ encoder: sharp, targetFormat: "webp", quality: 88, slots: /baseColor/, resize: [BASE, BASE] }),
+  textureCompress({ encoder: sharp, targetFormat: "webp", quality: 90, slots: /normal|metallicRoughness/, resize: [BASE / 2, BASE / 2] }),
   meshopt({ encoder: MeshoptEncoder, level: "medium" }),
 );
 await io.write(OUT, doc);
