@@ -11,7 +11,11 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   project** (Poldrack et al. 2015, Nat Commun 6:8885; OpenNeuro ds000031) on `/about.html` and in the README. Do
   not state or highlight whose brain it is anywhere (site, diary, X posts, coin material); never use the person or
   the project's name to promote the site or the coin.
-- Live on Railway (`sub01-production.up.railway.app`, behind `SITE_PASSWORD`), auto-deploys from `main`.
+- Live on Railway (`sub01-production.up.railway.app`, behind `SITE_PASSWORD`), auto-deploys from `main`. A push whose
+  head commit says `[skip ci]` is not deployed; the next push without it deploys everything up to it.
+- Room upgrade live 2026-10-05 (owner OK): the owner's Tripo office chair (repaired, own materials, seat 0.505 m),
+  the Tripo props, basket / key bowl / notebook, sneakers by the door; hoodie, jeans and T-shirt/cushion removed.
+  Notes and contacts: `docs/design/room-upgrade-live/README.md`.
 - Memecoin context: no financial advice, no buy pressure, no wallets or on-chain actions without explicit approval.
 
 ## Pages (all on `main`)
