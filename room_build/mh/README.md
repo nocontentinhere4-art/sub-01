@@ -95,3 +95,14 @@ is the default default.mhskel (163 bones) with default_weights.mhw, at identity 
 - `room_phone` (approved): two-hand grip from Pexels/Mixkit references, typing slowed to ~1.6 taps/s;
   `room_phone_scroll` (approved): same grip, the right thumb scrolls a short-video feed every 2.5-6 s.
 - Props for all three are in `props_g2.json` (drink: held parts with bone offsets; phone: world).
+
+## Owner round 4: reading, copied from the owner's own videos
+
+- `room_read` (approved): redone from two clips the owner filmed (kept local, not committed): book on the lap, right
+  hand resting with fingertips on the right page, left hand on the left cover's edge. Page turn as in his video: tips
+  pinch toward the thumb, lift, carry the page all the way over, lay and hold it on the left page, flick open, return
+  (~2.7 s). The page follows the pinching fingers; hand skin is kept out of the book (checked every 0.1 s, 0 mm).
+- `props_g2.json` `room_read`: book halves and covers (world) and the two turning pages with hinge pivot/axis and
+  baked angle keys (no fingertip-follow logic needed in the room).
+- `anim_mh.mjs`: `thumbKeys` (thumb curl keys inside GRASP off windows) and `offClamp` (fingers never sink into the
+  grasped box while the grip is off).

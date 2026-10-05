@@ -462,7 +462,7 @@ if (process.env.GRASP) { const G = JSON.parse(process.env.GRASP), out = {};
       if (o.oppose !== undefined) { const t1 = `finger1-1.${sd}`; f.L[t1] = new THREE.Quaternion().setFromAxisAngle(PALM[sd], (sd === "L" ? -1 : 1) * (o.swing ?? 0) * D2R).multiply(new THREE.Quaternion().setFromAxisAngle(fdir(`finger2-1.${sd}`), (sd === "L" ? -1 : 1) * o.oppose * D2R)).multiply(o.fromRest ? new THREE.Quaternion() : f.L[t1]); }
       for (let fi = 1; fi <= 5; fi++) { if (o.fingers && !o.fingers.includes(fi)) continue;
         const names = fi === 1 ? [`finger1-2.${sd}`, `finger1-3.${sd}`] : [`finger${fi}-1.${sd}`, `finger${fi}-2.${sd}`, `finger${fi}-3.${sd}`];
-        const ratio = fi === 1 ? [1, 0.8] : [0.75, 1, 0.7], base = names.map(n => o.fromRest ? new THREE.Quaternion() : f.L[n].clone()),
+        const ratio = fi === 1 ? (o.thumbRatio || [1, 0.8]) : (o.ratio || [0.75, 1, 0.7]), base = names.map(n => o.fromRest ? new THREE.Quaternion() : f.L[n].clone()),
           _tg = fi > 1 && o.together ? (base[0] = togetherQ(sd, fi, o.together).multiply(base[0])) : null, pad = fi === 1 ? 0.010 + (o.thumbHover ?? 0) : 0.009;
         const set = e => names.forEach((n, j) => { f.L[n] = _tg && j === 0 ? base[0].clone().multiply(curlQ(n, e * ratio[j])) : curlQ(n, e * ratio[j]).multiply(base[j]); });
         const dist = e => { set(e); const ps = (o.tipOnly && fi > 1 ? names.slice(-1) : names.slice(1)).map(n => bonePos(f.L, f.root, n)); ps.push(bonePos(f.L, f.root, names[names.length - 1], true));
@@ -472,12 +472,22 @@ if (process.env.GRASP) { const G = JSON.parse(process.env.GRASP), out = {};
           return Math.min(Math.min(...ps.map(sdf)) - pad, side); };
         // off=[[t0, t1], ...]: windows where this hand lets go (e.g. turning a page): fingers ease to a relaxed curl
         const tNow = frames.indexOf(f) / fps;
-        if (o.off && o.off.some(([a, b]) => tNow >= a && tNow <= b)) { let e = o.relax ?? 20; const key = "k" + fi;
-          if (prev[key] !== undefined) e = prev[key] + (e - prev[key]) * 0.2; prev[key] = e; set(e); continue; }
+        // relaxKeys=[[dt, curl], ...]: inside each off window the fingers follow these curls (dt from the window's start),
+        // e.g. a page turn recorded on video: pinch the corner, open flat to sweep it over, back to rest
+        const win = o.off && o.off.find(([a, b]) => tNow >= a && tNow <= b);
+        if (win) { let e = o.relax ?? 20; const key = "k" + fi;
+          if ((o.relaxKeys && fi > 1) || (o.thumbKeys && fi === 1)) { const K = fi === 1 ? o.thumbKeys : o.relaxKeys, dt = tNow - win[0]; e = K[K.length - 1][1];
+            if (dt <= K[0][0]) e = K[0][1]; else for (let j = 0; j < K.length - 1; j++) if (dt >= K[j][0] && dt <= K[j + 1][0]) { const u = (dt - K[j][0]) / (K[j + 1][0] - K[j][0]); e = K[j][1] + (K[j + 1][1] - K[j][1]) * u * u * (3 - 2 * u); break; } }
+          if (prev[key] !== undefined) e = prev[key] + (e - prev[key]) * (o.relaxKeys ? 0.6 : 0.2);
+          // offClamp: even with the grip off a finger may not sink into the object: open it until it is outside
+          if (o.offClamp) { let k = 0; while (k++ < 30 && dist(e) < -0.001) e -= 5; }
+          prev[key] = e; set(e); continue; }
         const mc = fi === 1 ? (o.thumbMinCurl ?? o.minCurl ?? -10) : (o.minCurl ?? -10); let best = mc, bestD = 1e9, hit = null, pe = mc;
         for (let e = mc; e <= (o.maxCurl ?? 95); e += 5) { const d = dist(e); if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = e; } if (d <= 0) { hit = [pe, e]; break; } pe = e; }
         let e = best; if (hit) { let a = hit[0], b = hit[1]; if (a === b) e = a; else { for (let j = 0; j < 14; j++) { const m = (a + b) / 2; if (dist(m) > 0) a = m; else b = m; } e = a; } }
-        const key = "k" + fi; if (prev[key] !== undefined) e = prev[key] + (e - prev[key]) * 0.35; prev[key] = e; set(e);
+        const key = "k" + fi, eRaw = e; if (prev[key] !== undefined) e = prev[key] + (e - prev[key]) * 0.35;
+        if (e !== eRaw && dist(e) < -0.002) e = eRaw;   // the smoothing never pushes a finger into the object
+        prev[key] = e; set(e);
         // thumbHover + thumbTap: the thumb rests just above the screen and taps it (THUMBTAP's bursts) after the solve
         if (fi === 1 && o.thumbTap && IKT && IKT._tt) { const t = frames.indexOf(f) / fps; let pulse = 0;
           for (const [t0, s2] of IKT._tt) { if (t0 > t) break; if (s2 !== sd) continue; const uu = t - t0; const TD = +(process.env.TAP_DUR || 0.18); if (uu < TD) pulse = Math.max(pulse, Math.sin(Math.PI * uu / TD)); }
