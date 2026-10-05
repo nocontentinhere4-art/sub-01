@@ -69,11 +69,14 @@ function detail(name, target, dir, dist, fov){
   renderer.render(scene, cam); panels[name] = renderer.domElement.toDataURL("image/jpeg", 0.92);
 }
 detail("d_eye", L.clone().add(new THREE.Vector3(0.002, 0.003, 0)), new THREE.Vector3(0.25, 0.05, 1), 0.075, 30);
-detail("d_skin", L.clone().add(new THREE.Vector3(0.012, -0.034, 0.002)), new THREE.Vector3(0.45, -0.1, 1), 0.06, 30);
+detail("d_brow", L.clone().add(new THREE.Vector3(0.004, 0.019, 0.004)), new THREE.Vector3(0.2, 0.1, 1), 0.075, 30);
+detail("d_chin", mid.clone().add(new THREE.Vector3(0.012, -0.108, 0.012)), new THREE.Vector3(0.45, -0.25, 1), 0.085, 30);
+detail("d_skin", L.clone().add(new THREE.Vector3(-0.004, -0.03, 0.012)), new THREE.Vector3(0.5, -0.1, 1), 0.06, 30);   // the cheek beside the nose
 const lip = mid.clone().add(new THREE.Vector3(0, -0.075, 0.012));
 detail("d_lips", lip, new THREE.Vector3(0.15, -0.05, 1), 0.11, 30);
 
-window.__info = {lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
+window.__shape = after.info.shapeDelta;
+window.__info = {lidsRelaxed: after.info.lidsRelaxed, shaped: Object.keys(after.info.shapeDelta).length, lidBones: after.info.lidBones, brows: after.info.brows, lidLoops: after.info.lidLoops, landmarks: after.info.landmarks,
   mid: mid.toArray().map(x => +x.toFixed(3))};
 window.__panels = () => panels;
 window.__done = true;

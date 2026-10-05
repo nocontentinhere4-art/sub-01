@@ -29,8 +29,10 @@ from tests.room_render_shots import CDN_HOSTS, cdn_router   # noqa: E402
 
 FROM_BRANCH = {"boy_dressed.glb": "web/room/boy.glb", "hair_mh.glb": "web/room/hair/hair_mh.glb", "hair_strands.js": "web/room/hair/hair_strands.js"}
 DETAILS = [("d_eye", PREVIEW / "skin_eyes/refs/eye.jpg", "REAL eye (Pexels 946727)"),
+           ("d_brow", HERE / "refs/brow.jpg", "REAL brow (Pexels 4823600)"),
            ("d_skin", PREVIEW / "skin_eyes/refs/skin.jpg", "REAL skin (Pexels 4046562)"),
-           ("d_lips", HERE / "refs/lips.jpg", "REAL lips (Pexels 3749984)")]
+           ("d_lips", HERE / "refs/lips.jpg", "REAL lips (Pexels 3749984)"),
+           ("d_chin", HERE / "refs/stubble.jpg", "REAL stubble (Pexels 13072564, b/w)")]
 
 
 def serve(blob, ctype):
@@ -61,8 +63,8 @@ def compose(panels, out):
         label = view.replace("_", "-")
         d.text((x0 + 4, y + PH + 4), f"before, {label}", fill=(220, 220, 220), font=f)
         d.text((x1 + 4, y + PH + 4), f"after, {label}", fill=(220, 220, 220), font=f)
-        key, ref, cap = DETAILS[r]
-        dy = y + (PH - DH) // 2
+    for r, (key, ref, cap) in enumerate(DETAILS):                  # the details, stacked down the right
+        dy = 40 + PAD + r * (DH + CAP + 2 * PAD)
         sheet.paste(img[key], (x2, dy))
         sheet.paste(Image.open(ref).convert("RGB").resize((DW, DH)), (x3, dy))
         d.text((x2 + 4, dy + DH + 4), "after, " + key[2:], fill=(220, 220, 220), font=f)
@@ -102,6 +104,7 @@ def main():
                     sys.exit("page error: " + " | ".join(errors[:5]))
                 pg.wait_for_timeout(1000)
             compose(pg.evaluate("window.__panels()"), args.out)
+            (HERE / "face_shape_delta.json").write_text(json.dumps(pg.evaluate("window.__shape")))   # for G2 to bake
             print(json.dumps({"out": args.out, "info": pg.evaluate("window.__info"), "errors": errors[:5]}, default=str)[:4000])
             b.close()
     finally:

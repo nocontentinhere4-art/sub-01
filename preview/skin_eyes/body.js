@@ -171,8 +171,21 @@ export function dressBody(THREE, root, {iris = [0.24, 0.13, 0.06]} = {}){
       const d = 0.15 * cheek;
       hd.setXYZW(i, -0.13 * Math.sign(x), -0.2, -0.06, 1 - d);   // (|direction| 0.25: pale)
     }
+    // the stubble's area (a young man's, shaved a day ago): the upper lip, the chin, a little along the jaw; stored as
+    // hairData with no direction (the shader's beard mask, w = 1 - beard)
+    const sm = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
+    for (let i = 0; i < n; i++) {
+      const x = shifted[3 * i], y = shifted[3 * i + 1], z = shifted[3 * i + 2], ax = Math.abs(x);
+      if (z < L.lip[2] - 0.07) continue;
+      const upper = sm(L.lip[1] - 0.004, L.lip[1] + 0.002, y) * (1 - sm(L.nose[1] - 0.017, L.nose[1] - 0.011, y)) * (1 - sm(0.022, 0.03, ax));
+      const chin = sm(L.lip[1] - 0.075, L.lip[1] - 0.06, y) * (1 - sm(L.lip[1] - 0.024, L.lip[1] - 0.017, y)) * (1 - sm(0.03, 0.045, ax));
+      const jaw = 0.5 * sm(L.lip[1] - 0.085, L.lip[1] - 0.07, y) * (1 - sm(L.lip[1] - 0.03, L.lip[1] - 0.015, y)) * sm(0.03, 0.045, ax) * (1 - sm(0.06, 0.07, ax));
+      const beard = Math.max(upper, chin, jaw) * (1 - 0.9 * Math.min(1, skin.geometry.attributes.skinData.getW(i) * 2));   // (not on the lips)
+      if (beard > 0.05) hd.setXYZW(i, 0, 0, 0, 1 - 0.85 * beard);
+    }
     hd.needsUpdate = true; }
   skin.material = makeSkinMaterial(THREE);
+  skin.material.userData.uniforms.uLipY.value = O.y + L.lip[1] - 0.008;   // the mouth's line (mesh frame): the lower lip is wet
   { const u = skin.material.userData.uniforms;
     u.uEyeL.value.set(...E.l.center.toArray(), E.l.radius); u.uEyeR.value.set(...E.r.center.toArray(), E.r.radius); }
   // my eyes in place of G2's, built in the skin's bind frame and then moved under the Head bone
