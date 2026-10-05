@@ -1,4 +1,4 @@
-// node build_char_tripo.mjs <dir> [out.glb] : the Tripo character for the web (preview/char-tripo).
+// node build_char_tripo.mjs <dir> [out.glb] [face dir] : the Tripo character for the web (preview/char-tripo).
 //
 // Input, in <dir>, from tripo_char.py: char_idle.glb and char_walk.glb, Tripo's retargets of the rig (char_rig.glb),
 // the same skinned mesh and 41-bone skeleton in each, one clip each. Output: one GLB with the mesh, the skeleton and both
@@ -14,8 +14,9 @@ import { prune, dedup, meshopt, textureCompress } from "@gltf-transform/function
 import { MeshoptEncoder } from "meshoptimizer";
 import sharp from "sharp";
 import path from "node:path";
+import fs from "node:fs";
 
-const [,, DIR, OUT = path.join(DIR, "char_tripo.glb")] = process.argv;
+const [,, DIR, OUT = path.join(DIR, "char_tripo.glb"), FACE] = process.argv;
 const HEIGHT = 1.75;
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ "meshopt.encoder": MeshoptEncoder });
@@ -23,6 +24,18 @@ const doc = await io.read(path.join(DIR, "char_idle.glb"));
 const walk = await io.read(path.join(DIR, "char_walk.glb"));
 const root = doc.getRoot();
 const nodes = Object.fromEntries(root.listNodes().map(n => [n.getName(), n]));
+
+// the reworked face (room_build/char_face/): bind positions and normals with the face reshaped to the reference photos,
+// and the base colour / normal / metal-roughness maps with the photos projected onto it (same vertex order as Tripo's)
+if (FACE) {
+  const prim = root.listMeshes()[0].listPrimitives()[0];
+  prim.getAttribute("POSITION").setArray(new Float32Array(fs.readFileSync(path.join(FACE, "pos.f32")).buffer.slice(0)));
+  prim.getAttribute("NORMAL").setArray(new Float32Array(fs.readFileSync(path.join(FACE, "nrm.f32")).buffer.slice(0)));
+  const m = prim.getMaterial();
+  for (const [t, f] of [[m.getBaseColorTexture(), "base.png"], [m.getNormalTexture(), "normal.png"], [m.getMetallicRoughnessTexture(), "orm.png"]])
+    t.setImage(new Uint8Array(fs.readFileSync(path.join(FACE, f)))).setMimeType("image/png");
+  console.log("face from", FACE);
+}
 
 // copy the walk clip onto this document's nodes, by bone name
 const wa = walk.getRoot().listAnimations()[0];

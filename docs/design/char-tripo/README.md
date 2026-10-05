@@ -86,6 +86,26 @@ drive them as fractions of the forearm/upper-arm/thigh/calf roll. Rokoko's finge
 | Left/RightFoot | L/R_Foot |
 | Left/RightToe | L/R_ToeBase |
 
+## Face rework (2026-10-05, 0 credits)
+
+The owner asked for the face to be much closer to the reference photos; the body, rig and clips are unchanged.
+Scripts are in `room_build/char_face/` (see its README).
+
+- **Shape:** the face vertices (2,632 of 79,801; nothing below the jaw line, no hair) were moved onto the photos'
+  landmarks, triangulated from the front and both 3/4 photos with cameras fitted to the mesh. Two passes were run, and the
+  lower jaw contour was moved in the front image plane only. Skin weights are unchanged: same vertices, new bind positions.
+- **Texture:** the three close-ups were projected onto the base colour, with weights by facing angle and visibility and
+  feathered masks. The profiles were left out (they are too small and differently lit, and left seams). The rest of the
+  skin was tinted toward the photos' tone.
+- **Shading:** the normal map was flattened on the face skin. Its creases aged him and turned the brown irises grey
+  under reflections. Skin roughness is 0.5 and metalness 0.
+- **Sheets:** `qa/face_compare.webp` (the same 5-row layout and cameras as before; the earlier one is
+  `qa/face_compare_v1.webp`) and `qa/face_motion.webp` (two idle and two walk frames at face distance).
+- **Still different:** the face is still a little wide at the cheeks, and the eyes are rounder than the reference's
+  almond shape. The nose bridge is a little long. The lips are close. The fringe covers more of the forehead than in the
+  photos. There is a faint seam on the cheek in front of each ear where the projection ends, the ears are slightly pink,
+  and some hair colour remains on the left temple.
+
 ## Quality check
 
 Rendered with three.js in headless Chromium (SwiftShader), lit by a room environment and one key light:

@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script></head>
+<body><script type="module">
+// Render utility for the face projection bake: the rigged mesh in its bind pose as a plain mesh (positions = world),
+// from a camera given as OpenCV K/R/t (perspective) or an orthographic box; returns colour and a world-position buffer.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({antialias:false, preserveDrawingBuffer:true});
+r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NeutralToneMapping;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#2a2a2e');
+const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(new RoomEnvironment(),0.04).texture;
+scene.environmentIntensity = 0.8;
+const key = new THREE.DirectionalLight(0xffffff, 1.6); scene.add(key);
+const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(q.get('glb'));
+let src; gltf.scene.traverse(o => { if (o.isMesh) src = o; });
+gltf.scene.updateMatrixWorld(true);
+const geo = src.geometry.clone();
+if (q.get('world') === 'skinned') geo.applyMatrix4(src.matrixWorld);
+const mat = src.material;
+const mesh = new THREE.Mesh(geo, mat); scene.add(mesh);
+const posMat = new THREE.ShaderMaterial({
+  vertexShader: 'varying vec3 wp; void main(){ wp = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: 'varying vec3 wp; void main(){ gl_FragColor = vec4(wp, 1.0); }', side: THREE.DoubleSide});
+const box = new THREE.Box3().setFromObject(mesh);
+window.info = {box: [box.min.toArray(), box.max.toArray()], verts: geo.attributes.position.count};
+let texOverride = null;
+window.setTexture = async (url, slot = 'map') => {   // swap a texture (to view a bake): map, normalMap, orm
+  const t = await new THREE.TextureLoader().loadAsync(url); t.flipY = false;
+  if (slot === 'map') t.colorSpace = THREE.SRGBColorSpace;
+  if (slot === 'orm') { mat.roughnessMap = t; mat.metalnessMap = t; } else mat[slot] = t;
+  mat.needsUpdate = true; return true;
+};
+function camFrom(c, w, h) {
+  // c.full = [W, H] of the whole frame; c.crop = [x0, y0, w, h] renders only that window of it
+  const [W, H] = c.full || [w, h];
+  let cam;
+  if (c.ortho) { const [l, rr, t, b] = c.ortho; cam = new THREE.OrthographicCamera(l, rr, t, b, 0.001, 100); }
+  else {
+    const fovy = 2 * Math.atan(H / 2 / c.fy) * 180 / Math.PI;
+    cam = new THREE.PerspectiveCamera(fovy, W / H, 0.01, 100);
+  }
+  if (c.crop) cam.setViewOffset(W, H, ...c.crop);
+  cam.updateProjectionMatrix();
+  // c.cw: camera-to-world 4x4 row-major in three.js camera convention (-Z forward, +Y up)
+  const m = new THREE.Matrix4().set(...c.cw);
+  cam.matrixAutoUpdate = false; cam.matrixWorld.copy(m); cam.matrixWorldInverse.copy(m).invert();
+  return cam;
+}
+function b64(f32) { const u = new Uint8Array(f32.buffer); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+window.view = (c, w, h, wantPos) => {
+  r.setSize(w, h, false); r.domElement.style.width = w + 'px'; r.domElement.style.height = h + 'px';
+  const cam = camFrom(c, w, h);
+  const p = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+  key.position.set(p.x + 0.5, p.y + 1, p.z + 0.5);
+  mesh.material = mat; scene.background = new THREE.Color('#2a2a2e');
+  r.setRenderTarget(null); r.render(scene, cam);
+  const out = {};
+  if (wantPos) {
+    const rt = new THREE.WebGLRenderTarget(w, h, {type: THREE.FloatType, format: THREE.RGBAFormat});
+    mesh.material = posMat; const bg = scene.background; scene.background = null; const env = scene.environment;
+    r.setRenderTarget(rt); r.setClearColor(0x000000, 0); r.clear(); r.render(scene, cam); r.setRenderTarget(null);
+    const buf = new Float32Array(w * h * 4); r.readRenderTargetPixels(rt, 0, 0, w, h, buf);
+    out.pos = b64(buf); rt.dispose(); mesh.material = mat; scene.background = bg;
+    r.render(scene, cam);   // leave the colour image on the canvas for the screenshot
+  }
+  return out;
+};
+window.matHack = (o) => { if (o.noNormal) mat.normalMap = null; if (o.rough != null) { mat.roughnessMap = null; mat.roughness = o.rough; }
+  if (o.noMetal) { mat.metalnessMap = null; mat.metalness = 0; } mat.needsUpdate = true; return true; };
+window.ready = true;
+</script></body></html>
