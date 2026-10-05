@@ -138,3 +138,56 @@ def test_an_anime_page_with_in_game_words_is_not_finance():
     st = dict(info, url="https://myanimelist.net/anime/52991/x", title="Sousou no Frieren", kind="page")
     assert readings.kind_of(st) == "page" and SC.screen_kind(st) == "other"
     assert browse.is_finance("https://example.org/a", "Bitcoin and Solana prices", "crypto trading and memecoins")
+
+
+# --- #89 live (2026-10-05 09:10 Tokyo, his phone): "We noticed that ads aren't being displayed" over the article -------
+
+@pytest.mark.parametrize("body", [
+    "Article text... We noticed that ads aren't being displayed. Please support us.",
+    "Ad blocker detected. Please disable your ad blocker to continue.",
+    "We've detected that you're using an ad blocker. Whitelist this site to keep reading.",
+    "You've reached your free article limit. Subscribe to continue reading.",
+    "This article is for subscribers only."])
+def test_ad_block_and_paywall_overlays_are_walls(body):
+    assert browse.overlay_wall(body)
+
+
+@pytest.mark.parametrize("body", [
+    "How ad blockers work, and why publishers worry about them.",
+    "The best ad blockers for 2026 compared.", "Subscribe to our newsletter for weekly updates."])
+def test_articles_about_ad_blockers_are_not_walls(body):
+    assert not browse.overlay_wall(body)
+
+
+def test_an_overlay_wall_is_left_and_its_site_cools_down_briefly():
+    b = browse.Browser(decide=False)
+    sc = b.screens["phone"]
+    body = "Today in Tokyo. " * 40 + "We noticed that ads aren't being displayed. Please disable your ad blocker."
+    sc.page, sc.ctx = Page("https://www.example-news.com/story/1", "A story", body), object()
+    shown = []
+
+    async def show(sc_):
+        shown.append(sc_.info["url"])
+        return True
+
+    async def leave(sc_):
+        sc_.page.url = "about:blank"
+        return False
+    b.show, b._leave = show, leave
+    assert not run(b._settle(sc, "followed a link", "page"))
+    assert b.last_skip == "overlay wall" and shown == []
+    until = b.walled["example-news.com"]
+    assert time.time() + browse.OVERLAY_COOLDOWN_S - 60 < until < time.time() + browse.WALL_COOLDOWN_S
+
+
+def test_an_overlay_that_appears_after_the_page_loaded_is_left_at_the_next_screenshot():
+    b = browse.Browser(decide=False)
+    sc = b.screens["phone"]
+    sc.page = Page("https://www.example-news.com/story/2", "A story", "Ad blocker detected. Please disable your ad blocker.")
+    left = []
+
+    async def leave(sc_):
+        left.append(sc_.page.url)
+    b._leave = leave
+    assert run(b._shoot(sc)) is False and left and b.last_skip == "overlay wall"
+    assert b.walled["example-news.com"] > time.time()
