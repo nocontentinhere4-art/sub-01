@@ -21,6 +21,10 @@
 // down / get up on the bed, each pose step lasting its clip's stretch and placed by the clip's own pose (the seat, the
 // bed's edge, lying on the duvet). Still frames stand in for standing (room_window's first) and for sitting on the bed's
 // edge and lying; the old rig's interludes, breathing, look-at, foot IK and phone hold are off.
+//
+// Leaving the desk is one take of room_bedtime's get-up (flow()): seated he rolls back and swivels with the chair, rises
+// (his legs push it on; it stays there), turns as he walks off and the walk loop takes over mid-stride. The walk plays
+// as recorded (knees and elbows bend, the arms swing).
 
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
   walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
@@ -69,7 +73,7 @@ export function createMH(env) {
     const B = env.bones, out = t => { a.time = t; mx.update(0); env.boy.updateMatrixWorld(true);
       const loc = n => env.boy.worldToLocal(B[n].getWorldPosition(V()));
       return {t, hips: loc("Hips"), head: loc("Head"), knee: loc("LeftLeg").add(loc("RightLeg")).multiplyScalar(0.5),
-        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y),
+        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y), fl: loc("LeftFoot").y, fr: loc("RightFoot").y,
         feet: loc("LeftFoot").add(loc("RightFoot")).add(loc("LeftToeBase")).add(loc("RightToeBase")).multiplyScalar(0.25)}; };
     out.done = () => { a.stop(); mx.uncacheRoot(env.boy); };
     return out;
@@ -112,7 +116,60 @@ export function createMH(env) {
       S.bt = {up: up.t, walk: Math.max(up.t + 0.5, e1.t - 1.6), edge: on.t, end: got.bedtime.duration,
         seat: [s0.hips.x - h0.x, s0.hips.z - h0.z], face, edgePl: edgePlace(on), lie: bedPlace(bt[bt.length - 1])};
     }
+    // the get-up (room_bedtime, re-rooted as seated at the desk: see getupClips): seated (the stretch first after a long
+    // sit) -> up (the hips over 0.9 m) -> turning while he walks off over about three steps -> walking straight. Its
+    // moments from the clip's own poses: the chair rolls back under him from 2.0 to 1.0 s before the hips are up (they
+    // start rising at 1.1 s), his legs push it on until 0.2 s after, he turns from 0.9 s to 3.1 s after, walks by 3.7 s.
+    // Two of them: as recorded (he turns to his left) and mirrored (to his right)
+    if (got.getupL) {
+      const W = (() => { const w = sampler(got.walk), r = []; for (let t = 0; t < got.walk.duration; t += 1 / 30) r.push(w(t)); w.done(); return r; })();
+      for (const side of ["L", "R"]) {
+        const s = sampler(got["getup" + side]), R = [], dt = 1 / 30; let up = null;
+        for (let t = 0; t <= got.bedtime.duration; t += dt) { const p = s(t); R.push(p); if (!up && p.hips.y > 0.9) up = t; if (up && t > up + 4.2) break; }
+        s.done();
+        const at = t => R[Math.min(R.length - 1, Math.round(t / dt))], d = p => p.fl - p.fr;
+        // where the walk loop may take over (after two, three or four steps), each with the loop's moment whose feet match
+        // the get-up's as it takes over (the foot heights and their change)
+        const ends = [2.2, 2.9, 3.7].map(k => { const end = up + k, e = at(end - 0.4), slope = d(at(end - 0.4 + dt)) - d(e);
+          let best = 0, bc = 1e9; W.forEach((p, i) => { const q = W[(i + 1) % W.length], c = (d(p) - d(e)) ** 2 + 9 * ((d(q) - d(p)) - slope) ** 2; if (c < bc) { bc = c; best = i; } });
+          return {end, phase: best * dt}; });
+        S["gu" + side] = {side, rows: R, dt, up, start: up - 2.1, stand: up + 0.8, ride: [up - 2.0, up - 1.0], push: [up - 0.9, up + 0.2],
+          turn: [up + 0.9, up + 3.1], ends, end: ends[ends.length - 1].end};
+      }
+    }
     return S;
+  }
+  // a clip mirrored left <-> right (the rig is symmetric with every bone world-aligned at rest: a local turn (x, y, z, w)
+  // mirrors to (x, -y, -z, w) on the other side's bone, a position's x flips)
+  function mirrorClip(clip, name) {
+    const B = env.bones, mir = n => { const m = /Left/.test(n) ? n.replace("Left", "Right") : /Right/.test(n) ? n.replace("Right", "Left")
+      : /L$/.test(n) ? n.slice(0, -1) + "R" : /R$/.test(n) ? n.slice(0, -1) + "L" : n; return B[m] ? m : n; };
+    const tracks = clip.tracks.map(tr => { const i = tr.name.lastIndexOf("."), bone = tr.name.slice(0, i), prop = tr.name.slice(i + 1), v = tr.values.slice();
+      if (prop === "quaternion") for (let k = 0; k < v.length; k += 4) { v[k + 1] = -v[k + 1]; v[k + 2] = -v[k + 2]; }
+      else if (prop === "position") for (let k = 0; k < v.length; k += 3) v[k] = -v[k];
+      return new tr.constructor(mir(bone) + "." + prop, tr.times.slice(), v); });
+    return new THREE.AnimationClip(name, clip.duration, tracks);
+  }
+  // a clip turned about y by r and moved by (dx, dz) in his frame (the hips carry the whole body: rest-aligned, a root bone)
+  function rerootClip(clip, r, dx, dz) {
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r), p = new THREE.Quaternion();
+    for (const tr of clip.tracks) { const v = tr.values;
+      if (tr.name === "Hips.position") for (let k = 0; k < v.length; k += 3) { const x = v[k], z = v[k + 2]; v[k] = x * Math.cos(r) + z * Math.sin(r) + dx; v[k + 2] = -x * Math.sin(r) + z * Math.cos(r) + dz; }
+      else if (tr.name === "Hips.quaternion") for (let k = 0; k < v.length; k += 4) { p.fromArray(v, k).premultiply(q); p.toArray(v, k); } }
+    return clip;
+  }
+  // the get-ups: room_bedtime as recorded and mirrored, each re-rooted so its seated pose sits where the desk clips' does
+  // (facing +z, the hips over the same spot): from the desk he goes straight into it, no root jump, no turn of the frame
+  const GETUP_FWD = 0.05;                                      // (its recorded chair's back was further back: his clears this one's in the stretch)
+  function getupClips(got) {
+    const hd = hipsAt(got.desk_watch, 0);
+    for (const [side, c] of [["L", got.bedtime.clone()], ["R", mirrorClip(got.bedtime, "room_getup_R")]]) {
+      c.name = "room_getup_" + side;
+      const s = sampler(c); let t = 0; while (t < c.duration && s(t).hips.y <= 0.9) t += 0.1; const p = s(Math.max(0, t - 2.1)); s.done();
+      const face = Math.atan2(p.knee.z - p.hips.z, p.knee.x - p.hips.x), r = face - Math.PI / 2;
+      const hx = p.hips.x * Math.cos(r) + p.hips.z * Math.sin(r), hz = -p.hips.x * Math.sin(r) + p.hips.z * Math.cos(r);
+      got["getup" + side] = rerootClip(c, r, hd[0] - hx, hd[2] - hz + GETUP_FWD);
+    }
   }
   function edgePlace(p) {                                    // the root that seats this pose on the room's bed edge, facing out
     const a = Math.atan2(p.knee.z - p.hips.z, p.knee.x - p.hips.x);                 // the way his knees point (local)
@@ -148,6 +205,7 @@ export function createMH(env) {
     M.watchLegs = feetUp ? "desk_mouse" : "recorded";
     const make = c => mixer.clipAction(c);
     M.clips = got;
+    if (got.bedtime) getupClips(got);
     // the transitions' moments, from the clips' own poses: on the bed edge (hips low, head up), lying (head low)
     const seg = segments(got);
     M.seg = seg; M.sampler = sampler;                          // (?debug: a clip's hips, head, knees and feet at a time)
@@ -155,15 +213,11 @@ export function createMH(env) {
       edge = stillClip("mh_edge", got.bed_lie, seg.lie.edge);
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = hipsAt(got[k], 0); }
     M.actions.stand = make(stand); H.mh_stand = hipsAt(stand, 0);
-    // indoors the arms barely swing (a tenth) (the recorded swing takes a hand 40 cm out: into the chair by the bed)
-    const ARMS = /^(Left|Right)(Arm|ForeArm|Hand)\.quaternion$|^(upperarm|lowerarm)0[12](L|R)\.quaternion$/, q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion();
-    for (const tr of got.walk.tracks) { if (!ARMS.test(tr.name)) continue;
-      const st = got.stand.tracks.find(t => t.name === tr.name); if (!st) continue; q1.fromArray(st.values, 0);
-      for (let i = 0; i < tr.values.length; i += 4) { q0.fromArray(tr.values, i).slerp(q1, 0.9); q0.toArray(tr.values, i); } }
+    // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
     M.actions.walk = make(got.walk); H.room_walk = hipsAt(got.walk, 0);
     M.actions.lie = make(lie); H.mh_lie = hipsAt(lie, 0);
     M.actions.edge = make(edge); H.mh_edge = hipsAt(edge, 0);
-    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime"]) { const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime", "getupL", "getupR"]) { if (!got[k]) continue; const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     // every slot the page plays: seated at the desk -> relaxed in the chair, on the bed's edge -> the edge, standing ->
     // the stand, walking -> the walk loop (the page scales it to his speed), lying -> the lie
     const seated = ["sit", "dine", "eat", "type"], onEdge = ["edge", "phone_sit"], upright = ["idle", "stand", "lean", "deliver", "phone_stand", "door"],
@@ -186,6 +240,7 @@ export function createMH(env) {
     mixer.stopAllAction();
     const first = A[env.state().want] || M.actions.stand; first.reset().setEffectiveWeight(1).play(); env.setCurrent(first);
     env.resnap();                                            // placed for the old clips: again, with these hips
+    if (seg.guL && env.flow && env.chairPose) env.flow(true);   // leaving the desk: one take (flow())
     M.ready = true;
   }
   // the page puts the root at the seat anchor less the clip's hips; the MakeHuman clips have the feet at y = 0, so the
@@ -333,6 +388,9 @@ export function createMH(env) {
   function transitionFor(S) {
     if (!S || S.k !== "pose" || S.t == null) return null;
     const G = M.seg, to = S.to, from = S.from, g = env.state().goal, B = G.bt;
+    if (S.flow && G.guL && !to && from === "desk") {            // up from the desk and away: one take (see flow())
+      const sleepy = g && g.clip === "sleep", U = G.guL;          // (both sides share the clip's timing)
+      return {k: "getup", flow: true, a: S.stiff || sleepy ? 0 : U.start, b: S.next ? U.end : U.stand}; }
     if (B && g && g.clip === "sleep" && g.anchor === "bedlie") {          // going to sleep: room_bedtime
       if (!to && from === "desk") return {k: "bedtime", a: 0, b: B.up, at: () => chairPlace(B.seat, B.face), back: true};
       if (to === "bedside" && from !== "bedlie") return {k: "bedtime", a: B.walk, b: B.edge, at: () => B.edgePl};
@@ -350,10 +408,123 @@ export function createMH(env) {
     if (!to && from === "bedside") return {k: "bed_wake", a: G.wake.sat, b: G.wake.end, at: () => G.wakeEdge, back: true};
     return null;
   }
+  // Up from the desk and away in one take (the owner: no standing still to turn round, no chair put back by itself).
+  // Seated, he and the chair roll back and swivel toward the side he leaves by; his legs push the chair on as he rises
+  // (back, and to the other side) and it stays there; his hips then follow the clip's own travel, its heading turned a
+  // little more or less while he turns and walks (W, spread over those steps) so he leaves toward the page's next
+  // waypoint; over the last 0.4 s the walk loop takes over at the moment whose feet match, the root moving under his
+  // hips, and the page walks on from there. The room is tight (the bed 30-60 cm behind the chair, the plant on its left,
+  // the desk in front): of the two get-ups (turning left, turning right) and a few swivels and pushes, the one needing
+  // the smallest W whose hips keep off the desk and the furniture, whose walk-off passes the pushed chair, and from
+  // whose end the page's path to the next waypoint is clear with the chair where he left it. Where no push leaves a way
+  // (the window sill: its only way is the 30 cm gap behind the chair), the path is planned with the chair parked under
+  // the desk and he shoves it there in passing (shove(): a hand on it for 0.35 s, it rolls on by itself; he never stops)
+  const rotXZ = (h, r) => [h[0] * Math.cos(r) + h[1] * Math.sin(r), -h[0] * Math.sin(r) + h[1] * Math.cos(r)];
+  const CHAIR_R = 0.33, BODY_R = 0.17, LEG_PUSH = 0.05;       // the chair's footprint (a circle), half his width, his legs' last push
+  function flowPlan(S, T0, G, swivel, back, side, after, end) {
+    const T = {a: T0.a, b: end ? end.end : T0.b}, turn = [G.turn[0], Math.min(G.turn[1], T.b - 0.3)];
+    const R = G.rows, n = Math.max(1, Math.ceil((T.b - T.a) / G.dt)), b = env.boy, ch = env.chairNode();
+    const hAt = t => { const f = Math.min(R.length - 1, Math.max(0, t / G.dt)), i = Math.floor(f), j = Math.min(R.length - 1, i + 1), k = f - i;
+      return [R[i].hips.x + (R[j].hips.x - R[i].hips.x) * k, R[i].hips.z + (R[j].hips.z - R[i].hips.z) * k]; };
+    const hw = [env.HIPS.walk[0], env.HIPS.walk[2]], r0 = b.rotation.y, x0 = b.position.x, z0 = b.position.z;
+    const c0 = [ch.position.x, ch.position.z, ch.rotation.y], bk = [-Math.sin(r0), -Math.cos(r0)], rt = [-Math.cos(r0), Math.sin(r0)], v = [x0 - c0[0], z0 - c0[1]];
+    const ride = back, sw = Math.sign(swivel);                     // (rt: his right as he sits; side > 0 pushes it to his right)
+    const legs = t => { const e = sstep(G.ride[0], G.ride[1], t), e2 = sstep(G.push[0], G.push[1], t), d = ride * e + LEG_PUSH * e2;
+      return [c0[0] + bk[0] * d + rt[0] * side * e2, c0[1] + bk[1] * d + rt[1] * side * e2, c0[2] + swivel * e + sw * 0.15 * e2]; };
+    const chairAt = legs, cEnd = chairAt(T.b), home = after && env.chairHome ? env.chairHome() : null, cWay = home || cEnd;
+    const why = {desk: 0, room: 0, chair: 0, bed: 0};
+    { const into = c => Math.max(0, ...env.boxes().map(([x0, x1, z0, z1], i) => i === 1 || i === 2 ? 0     // (how deep its footprint is in the bed,
+        : CHAIR_R - Math.hypot(Math.max(x0 - c[0], 0, c[0] - x1), Math.max(z0 - c[1], 0, c[1] - z1))));        //  the shelf, the fridge, the plant)
+      if (into(chairAt(T.b)) > into(c0) + 0.02) why.bed = 50; }                                                  // (pushed no deeper than it was)
+    const build = W => { const out = []; let hx = 0, hz = 0, hp = null, bad = why.bed; for (const k of ["desk", "room", "chair"]) why[k] = 0;
+      for (let i = 0; i <= n; i++) { const t = T.a + (T.b - T.a) * i / n, h = hAt(t);
+        let ry, rx, rz;
+        if (t <= G.ride[1]) {                                   // riding the chair: his root turns and moves with it
+          const e = sstep(G.ride[0], G.ride[1], t), dr = swivel * e, rv = rotXZ(v, dr);
+          ry = r0 + dr; rx = c0[0] + bk[0] * ride * e + rv[0]; rz = c0[1] + bk[1] * ride * e + rv[1];
+          const r = rotXZ(h, ry); hx = rx + r[0]; hz = rz + r[1];
+        } else {                                                // on his feet: the hips' own travel, its heading turned by W
+          ry = r0 + swivel + W * sstep(turn[0], turn[1], t);
+          const d = rotXZ([h[0] - hp[0], h[1] - hp[1]], ry); hx += d[0]; hz += d[1];
+          const r = rotXZ(h, ry); rx = hx - r[0]; rz = hz - r[1];
+          if (t > G.up - 1.1 && env.blocked(hx, hz, t < G.up + 0.5 ? 0.14 : BODY_R)) { bad++; why[t < G.up + 0.5 ? "desk" : "room"]++; }  // (rising: the belly clear of the desk)
+          if (t > G.up + 1.0) { const c = chairAt(t); if (Math.hypot(hx - c[0], hz - c[1]) < CHAIR_R + BODY_R - 0.08) { bad++; why.chair++; } } }   // (his hips past the seat's edge)
+        hp = h; const rw = rotXZ(hw, ry); out.push([rx, rz, ry, hx - rw[0], hz - rw[1]]); }
+      return {out, bad}; };
+    let W = 0, P = build(0), way = true, be = 0, left = 9;
+    if (S.next && env.chairRoute) {                            // the turn W that leaves him walking toward the next waypoint
+      const e0 = hAt(T.b - 0.4), e1 = hAt(T.b), ac = Math.atan2(e1[0] - e0[0], e1[1] - e0[1]);
+      const err = W => { const B = build(W), L = B.out[n], q = env.chairRoute([L[3], L[4]], S.next, cWay).pts[0], want = Math.atan2(q[0] - L[3], q[1] - L[4]);
+        return Math.abs(Math.atan2(Math.sin(want - r0 - swivel - W - ac), Math.cos(want - r0 - swivel - W - ac))); };
+      be = 1e9; for (let w = -1.2; w <= 1.2001; w += 0.1) { const e = err(w); if (e < be) { be = e; W = w; } }
+      for (const d of [-0.05, -0.025, 0.025, 0.05]) { const e = err(W + d); if (e < be) { be = e; W += d; } }
+      P = build(W); const L = P.out[n], rt = env.chairRoute([L[3], L[4]], S.next, cWay); way = rt.ok;
+      left = 0; let p = [L[3], L[4]]; for (const q of rt.pts) { left += Math.hypot(q[0] - p[0], q[1] - p[1]); p = q; } }   // (the walk left after it)
+    return {G, n, W, a: T.a, b: T.b, phase: end ? end.phase : 0, arr: P.out, bad: P.bad, why: {...why}, way, chairAt, swivel, back, side, shove: home, err: be, left,
+      cost: Math.abs(W) + 2 * be + P.bad * 0.1 + (way ? 0 : 20) - 0.3 * (back + Math.abs(side)) + (home ? 1 : 0) + (left < 0.5 ? 3 * (0.5 - left) : 0)};
+  }
+  // the chair shoved in in passing: once his near hand can reach its backrest or an armrest (from the shoulder, 0.65 m),
+  // the hand goes to it (0.15 s), pushes for 0.35 s while the chair speeds up, lets go, and the chair rolls on to its
+  // place under the desk, slowing over 0.9 s (a constant push, then rolling friction); he walks on all the while
+  const GRIPS = [[0.15, 1.26, 0.36], [-0.15, 1.26, 0.36], [0.26, 0.92, 0.0], [-0.26, 0.92, 0.0]];   // (chair's frame: the backrest's top, the armrests)
+  const SHOVE = {reach: 0.65, hand: 0.15, push: 0.35, roll: 0.9};
+  function shove(st, dt) {
+    const H = M.shove, S = st.step; if (!H) return;
+    const going = S ? S.k === "walk" || (S.k === "pose" && S.flow) : !st.at;          // (between two steps: still going)
+    if (!going && H.tau == null) { M.shove = null; return; }                         // (the plan changed before he got there)
+    const ch = env.chairNode(); if (!ch) return; env.boy.updateMatrixWorld(true); ch.updateMatrixWorld(true);
+    if (H.tau == null) {                                       // not yet: within reach?
+      let bd = 1e9, pick = null;
+      for (const side of ["Right", "Left"]) { const sh = env.bones[side + "Arm"].getWorldPosition(V());
+        for (const g of GRIPS) { const d = sh.distanceTo(ch.localToWorld(V(...g))); if (d < bd) { bd = d; pick = [side, g]; } } }
+      if (bd > SHOVE.reach || !S || (S.k === "pose" && S.t < 0.6)) return;
+      H.tau = 0; H.grip = pick; H.from = [ch.position.x, ch.position.z, ch.rotation.y];
+    }
+    H.tau += dt;
+    const s = H.tau - SHOVE.hand, ta = SHOVE.push, td = SHOVE.roll, v = 2 / (ta + td);
+    const p = s <= 0 ? 0 : s < ta ? v * s * s / (2 * ta) : s < ta + td ? v * ta / 2 + v * (s - ta) - v * (s - ta) ** 2 / (2 * td) : 1;
+    const f = H.from, h = H.home;
+    env.chairPose(f[0] + (h[0] - f[0]) * p, f[1] + (h[1] - f[1]) * p, f[2] + Math.atan2(Math.sin(h[2] - f[2]), Math.cos(h[2] - f[2])) * p);
+    const w = sstep(0, SHOVE.hand, H.tau) * (1 - sstep(SHOVE.hand + ta, SHOVE.hand + ta + 0.2, H.tau));
+    if (w > 0.01) { ch.updateMatrixWorld(true); ccd(H.grip[0], ch.localToWorld(V(...H.grip[1])), w); }
+    if (p >= 1 && w <= 0.01) M.shove = null;
+  }
+  function flow(S, T) {
+    if (!S.fl) {
+      if (!env.chairNode()) return false;
+      let best = null;                                         // (left: swivel +, the chair pushed to his right; right: the mirror)
+      const all = [];
+      for (const G of [M.seg.guL, M.seg.guR]) for (const sv of [0.3, 0.6, 0.9]) {
+        const sg = G.side === "L" ? 1 : -1;
+        for (const E of S.next ? G.ends : [null]) for (const after of [false, true])
+          for (const bk of [0.15, 0.25, 0.32]) for (const sd of [0, 0.1, 0.2]) { const P = flowPlan(S, T, G, sg * sv, bk, sg * sd, after, E); all.push(P); if (!best || P.cost < best.cost) best = P; } }
+      S.fl = best; S.mhd = S.d; S.d = best.b - best.a;
+      M.flowLog = {side: best.G.side, W: +best.W.toFixed(2), bad: best.bad, way: best.way, swivel: best.swivel, back: best.back, push: best.side, shove: !!best.shove,
+        end: +(best.b - best.G.up).toFixed(1), err: +best.err.toFixed(2), left: +best.left.toFixed(2),
+        top: all.sort((a, b) => a.cost - b.cost).slice(0, 5).map(P => [P.G.side, P.swivel, P.back, P.side, !!P.shove, +(P.b - P.G.up).toFixed(1), +P.W.toFixed(2), P.why, P.way, +P.cost.toFixed(2)])};
+    }
+    const F = S.fl, G = F.G, n = F.n, u = Math.min(1, Math.max(0, S.t)), f = u * n, i = Math.min(n - 1, Math.floor(f)), k = f - i, A0 = F.arr[i], A1 = F.arr[i + 1];
+    const L = j => A0[j] + (A1[j] - A0[j]) * k, t = F.a + (F.b - F.a) * u;
+    const win = sstep(F.a, F.a + 0.5, t), kout = sstep(F.b - 0.4, F.b, t);
+    const a = M.actions["getup" + G.side]; if (!a.isRunning()) { a.reset(); a.play(); }
+    a.paused = true; a.time = t; a.setEffectiveWeight(win * (1 - kout));
+    if (S.A && S.A !== S.B && S.A !== a) S.A.setEffectiveWeight(1 - win);
+    if (S.B) { S.B.setEffectiveWeight(kout);
+      if (S.next && S.B === M.actions.walk) { S.B.timeScale = 1; S.B.time = (F.phase + Math.max(0, t - (F.b - 0.4))) % M.clips.walk.duration; } }
+    const c = F.chairAt(t); env.chairPose(c[0], c[1], c[2]);
+    env.mixer.update(0);
+    const b = env.boy, ry = A0[2] + Math.atan2(Math.sin(A1[2] - A0[2]), Math.cos(A1[2] - A0[2])) * k;
+    b.position.set(L(0) + (L(3) - L(0)) * kout, env.F, L(1) + (L(4) - L(1)) * kout); b.rotation.y = ry;
+    if (F.shove && !M.shove) M.shove = {home: F.shove, from: null, tau: null};   // (the shove in passing: shove())
+    if (F.shove && kout > 0.5) env.chairBlock(F.shove[0], F.shove[1]);         // (the page walks on as if it were in)
+    return true;
+  }
   function transition(st) {
     const S = st.step, T = transitionFor(S);
-    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime"]) if (!T || T.k !== k) { const a = M.actions[k]; if (a.isRunning() || a.getEffectiveWeight() > 0) { a.setEffectiveWeight(0); a.stop(); } }
+    const on = !T ? null : T.flow ? (S.fl ? "getup" + S.fl.G.side : null) : T.k;
+    for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime", "getupL", "getupR"]) if (k !== on) { const a = M.actions[k]; if (a && (a.isRunning() || a.getEffectiveWeight() > 0)) { a.setEffectiveWeight(0); a.stop(); } }
     if (!T) return false;
+    if (T.flow) return flow(S, T);
     const place = T.at(Math.min(1, Math.max(0, S.t))); if (!place) return false;
     if (S.mhd === undefined) { S.mhd = S.d; S.d = Math.max(S.d, T.b - T.a); }   // the step lasts as long as the clip's stretch (the page's ~1 s is too quick)
     const u = Math.min(1, Math.max(0, S.t)), w = sstep(0, 0.15, u) * (1 - sstep(0.85, 1, u));
@@ -443,7 +614,7 @@ export function createMH(env) {
     _lp.copy(b.position); M.lpOk = true;
     const walking = !!(S && (S.k === "walk" || S.k === "turn") && st.current === W);
     const want = walking ? Math.min(1, Math.max(0.15, speed / 0.35)) : 1;
-    if (walking && !M.wasWalking) M.ww = 0.15;                  // (from standing: the first steps are short ones)
+    if (walking && !M.wasWalking) M.ww = S.flow ? 1 : 0.15;     // (from standing: the first steps are short ones; after the get-up he is mid-stride)
     M.wasWalking = walking;
     M.ww = (M.ww == null ? 1 : M.ww) + (want - (M.ww == null ? 1 : M.ww)) * (1 - Math.exp(-dt / 0.15));
     if (!walking) { M.ry0 = null; if (M.pivoting) { M.pivoting = false; if (St !== st.current) { St.setEffectiveWeight(0); St.stop(); } } M.ww = 1; return; }
@@ -613,6 +784,7 @@ export function createMH(env) {
     pivot(st, dt);
     showStep();                                                // (the showcase's clip, before the guards measure him)
     baseY(); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
+    shove(st, dt);                                             // (after the root is final: the hand reaches the chair where it is)
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
