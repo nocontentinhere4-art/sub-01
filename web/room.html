@@ -1161,7 +1161,8 @@ function camAround(out, c, facing, dist, h, ang, eyes = false){
     const d = camClamp(out) + (camInside(out) ? 1 : 0);
     if (d < fallD) { fallD = d; fallback = out.clone(); fallA = a; }
     const occ = d < 0.12 && (occluded(out, c) || (eyes && (faceHidden(out, c) || bodyBlocks(out, c, 0.12))));   // eyes: nor his own body (his shoulder, his arm)
-    const s = d < 0.12 && !occ ? _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd) : null;   // 1: straight at his face, -1: the back of his head
+    let s = d < 0.12 && !occ ? _cfp.subVectors(out, c).setY(0).normalize().dot(_cfd) : null;   // 1: straight at his face, -1: the back of his head
+    if (eyes && s !== null && s < -0.3 && screenOn === "phone") s = null;   // on the phone: never from behind his face (his hood; elsewhere the best of them stands)
     if (DEBUG) { (CAM.trace = CAM.trace || []).push([a, +d.toFixed(2), occ, s === null ? null : +s.toFixed(2)]); if (CAM.trace.length > 64) CAM.trace.shift(); }
     if (s === null) continue;
     if (s > bestS + 1e-6) { bestS = s; best = out.clone(); bestA = a; }
@@ -1203,12 +1204,15 @@ const PHONE_POS = {
   lie:[[90, 1.15, 0.6], [-90, 1.15, 0.6], [65, 1.15, 0.6], [-65, 1.15, 0.6], [115, 1.15, 0.6], [-115, 1.15, 0.6]]};
 function phoneShot(out, aim, face, ph, facing, lying){
   const L = lying ? PHONE_POS.lie : PHONE_POS.sit;
+  head.getWorldPosition(_cfp); (bones.headfront || head).getWorldPosition(_cfd); _cfd.sub(_cfp).setY(0);   // where his head points
+  if (_cfd.lengthSq() < 1e-6) _cfd.copy(facing); _cfd.normalize();
+  const front = () => _cfp.subVectors(out, face).setY(0).normalize().dot(_cfd) >= -0.3;               // not behind his face
   const at = i => { const [a, dist, h] = L[i]; out.copy(aim).addScaledVector(v5.copy(facing).applyAxisAngle(UP, THREE.MathUtils.degToRad(a)), dist).addScaledVector(UP, h); return out; };
   // level 0: everything clear; 1: his face clear (the phone may sit behind his hand a moment); 2: off the walls, 0.95 m
-  // from his head and the room not in front of his face
+  // from his head and the room not in front of his face (levels 0 and 1: not behind where his head points either)
   const ok = (i, lv = 0) => { at(i); if (camClamp(out) + (camInside(out) ? 1 : 0) >= 0.12 || out.distanceTo(face) < 0.95 || occluded(out, face)) return false;
     if (lv >= 2) return true;
-    if (occluded(out, aim) || occluded(out, ph) || bodyBlocks(out, face, 0.12)) return false;      // (the desk lamp beside the monitor)
+    if (!front() || occluded(out, aim) || occluded(out, ph) || bodyBlocks(out, face, 0.12)) return false;      // (the desk lamp beside the monitor)
     return lv >= 1 || (!bodyBlocks(out, ph, 0.09) && !faceHidden(out, face)); };
   const set = i => { CAM.pick = i; CAM.ang = L[i][0]; return out; };
   if (!(CAM.cut || CAM.pick === null) && CAM.phoneL === L && L[CAM.pick]) {
