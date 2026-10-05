@@ -211,6 +211,9 @@ async def _shut(b):
         await b.pw.stop()
 
 
+VIDEOS = "https://www.slowbakery-videos.org"                       # a video site that is not YouTube (fixture pages)
+
+
 def _serve(sc, pages):
     async def handler(route):
         url = route.request.url
@@ -218,27 +221,33 @@ def _serve(sc, pages):
         if html is None:
             return await route.abort()
         await route.fulfill(status=200, content_type="text/html", body=html)
-    return sc.page.route("https://www.youtube.com/**", handler)
+    return sc.page.route("https://**/*", handler)
 
 
 def test_chromium_watch_is_muted_restricted_bounded_then_decides_again(monkeypatch):
+    """Since #130 YouTube's own pages are never opened in Chromium (its videos play in the official embed), so the
+    watch loop is checked on another video site's page; a youtube.com/watch URL is refused before any request."""
     if not Browser.available():
         pytest.skip("playwright not installed")
     monkeypatch.setattr(browse, "MIN_WATCH_S", 0.5)
     monkeypatch.setattr(browse, "VIDEO_SHOT_S", 0.0)
+    page = WATCH.replace("https://www.youtube.com/watch?v=", VIDEOS + "/videos/").replace(" - YouTube</title>", "</title>")
 
     async def main():
         b, sc = await _chromium()
         try:
             cookies = await sc.ctx.cookies("https://www.youtube.com")
             assert {(c["name"], c["value"]) for c in cookies} >= {("PREF", "f2=8000000")}   # Restricted Mode
-            await _serve(sc, {"v=a1": WATCH.format(title="Sourdough from scratch", channel="Slow Bakery",
-                                                   text="A quiet morning of baking. " * 10),
-                              "v=bad": WATCH.format(title="$PEPE 100x pump live", channel="x", text="x " * 50)})
+            requested = []
+            sc.page.on("request", lambda r: requested.append(r.url))
+            await _serve(sc, {"/videos/a1": page.format(title="Sourdough from scratch", channel="Slow Bakery",
+                                                       text="A quiet morning of baking. " * 10),
+                              "/videos/bad": page.format(title="Gallery", channel="x", text="nude " * 3 + "x " * 50)})
             sc.mode = "video"
-            assert await b._open(sc, "https://www.youtube.com/watch?v=a1", "picked", "page")
-            assert sc.info["channel"] == "Slow Bakery"
-            assert not await sc.page.evaluate("() => !!document.querySelector('#comments').offsetParent")   # hidden
+            assert not await b._open(sc, "https://www.youtube.com/watch?v=a1", "picked", "page")   # #130
+            assert "YouTube page" in b.last_skip and not [u for u in requested if "youtube.com" in u]
+            b.robots.load("www.slowbakery-videos.org", 200, "User-agent: *\nAllow: /")   # its robots.txt (fixture)
+            assert await b._open(sc, VIDEOS + "/videos/a1", "picked", "page")
             state = await b._play_muted(sc)
             assert state["muted"] and state["volume"] == 0
             await b._start_watch(sc, 2.5)
@@ -259,8 +268,8 @@ def test_chromium_watch_is_muted_restricted_bounded_then_decides_again(monkeypat
             links = out["decide"]["links"]
             assert {l["text"] for l in links if l["video"]} == {"Kneading dough by hand, slowly",
                                                                  "Rye bread in a wood oven, full process"}
-            # a refused title is never shown
-            assert not await b._open(sc, "https://www.youtube.com/watch?v=bad", "picked", "page")
+            # a page the guard refuses is never shown (finance titles are viewable on the web since #56)
+            assert not await b._open(sc, VIDEOS + "/videos/bad", "picked", "page")
             assert b.last_skip == "guard"
         finally:
             await _shut(b)
