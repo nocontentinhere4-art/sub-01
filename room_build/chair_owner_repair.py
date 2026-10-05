@@ -24,12 +24,15 @@ from scipy.spatial import cKDTree
 
 # per area: x0, x1, y0, y1 (a rectangle round the letters), zlo, zhi (the depth window holding that surface and not the
 # frame or the spine behind it), side (+1: the surface faces +z, the front; -1: it faces -z, the back). Model units (the
-# chair is 0.978 tall here, facing +z; build_chair_owner.mjs scales and turns it)
+# chair is 0.978 tall here, facing +z; build_chair_owner.mjs scales and turns it); near (optional): how far the mesh may
+# lie from the fitted surface and still count as this cushion's (6 mm; more where the surface curves away, the headrest's
+# recess)
 REGIONS = {
     "backrest_front": dict(box=(-0.163, 0.172, 0.598, 0.814), z=(-0.178, -0.110), side=1),
-    "backrest_back": dict(box=(-0.174, 0.172, 0.648, 0.834), z=(-0.190, -0.132), side=-1),
+    "backrest_back": dict(box=(-0.174, 0.172, 0.598, 0.834), z=(-0.190, -0.132), side=-1),
     "lumbar_front": dict(box=(-0.140, 0.162, 0.458, 0.592), z=(-0.134, -0.082), side=1),
     "headrest_front": dict(box=(-0.090, 0.130, 0.872, 0.960), z=(-0.175, -0.130), side=1),
+    "headrest_back": dict(box=(-0.091, 0.095, 0.879, 0.954), z=(-0.188, -0.140), side=-1, near=0.012),
 }
 
 
@@ -136,8 +139,8 @@ def repair(C, name, R, report, step=0.005, lift=0.0012, tuck=0.0008, edge=0.022)
     zs = surface_z(XY, P[face_ok], sd).reshape(gx.shape)
     zf = f(XY).reshape(gx.shape)
     from scipy.ndimage import binary_fill_holes, binary_dilation, binary_erosion, distance_transform_edt
-    # the surface under each grid point: this cushion's (within 6 mm of the fit: not its neighbour's, not a pit's floor)
-    valid = ~np.isnan(zs) & (np.abs(np.nan_to_num(zs, nan=9) - zf) < 0.006)
+    # the surface under each grid point: this cushion's (within 6 mm of the fit, or `near`: not its neighbour's, not a pit's floor)
+    valid = ~np.isnan(zs) & (np.abs(np.nan_to_num(zs, nan=9) - zf) < R.get("near", 0.006))
     outline = binary_fill_holes(binary_erosion(binary_dilation(valid, iterations=2), iterations=2))   # (the letters' holes in)
     inside = inside & outline
     # the tuck: towards the rectangle's edge and towards the cushion's own outline alike

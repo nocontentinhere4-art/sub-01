@@ -340,9 +340,14 @@ Owner-approved pieces from the props previews, a new desk chair, and the clothes
   grey floor cushion under it. Their baked shadows are lightened out of the floor's occlusion map.
 
 ## The owner's chair (preview/chair-tripo)
-- `chair_owner.glb` (`room_build/fbx2ply.mjs` -> `room_build/chair_owner_repair.py` -> `room_build/build_chair_owner.mjs`):
+- `chair_owner.glb` (`room_build/fbx2ply.mjs` -> `chair_owner_repair.py` -> `chair_owner_parts.py` -> `build_chair_owner.mjs`):
   the office chair the owner generated on Tripo (https://www.tripo3d.ai), used under Tripo's terms of service; the
-  owner's export is `docs/design/chair-tripo/chair_owner_raw.fbx`. The letter-shaped holes and dents Tripo put on the backrest, the
-  lumbar pad, the headrest and the back of the mesh frame are covered over with new smooth surface; nothing else in the
-  model is changed. Scaled to a 0.52 m seat, turned to face the desk and placed in the room's `chair` node. Until its
-  textures arrive it has a plain dark material. `?chair=code` shows the code-built `chair_office.glb` instead.
+  owner's export is `docs/design/chair-tripo/chair_owner_raw.fbx`. The letter-shaped holes and dents Tripo put on the
+  backrest, the lumbar pad, the headrest and the back of the mesh panel are covered over with new smooth surface; nothing
+  else in the model is changed. Scaled to a 0.52 m seat, turned to face the desk and placed in the room's `chair` node.
+  Tripo's texture atlas is not used. Its materials are made for this project: a black knit mesh, black matte plastic
+  (a moulded grain drawn in the build) and soft arm pads, a black gas lift, a polished aluminium base, black casters, and
+  black upholstery from ambientCG's **Fabric 030** (CC0 1.0, https://ambientcg.com/a/Fabric030); the plastic's roughness
+  from ambientCG's **Plastic 006** (CC0 1.0, https://ambientcg.com/a/Plastic006). Matched to two CC0 photos
+  (`docs/design/chair-tripo/real_reference.jpg`, WordPress Photo Directory: Ohidul Islam, Manjil Aryal).
+  `?chair=code` shows the code-built `chair_office.glb` instead.

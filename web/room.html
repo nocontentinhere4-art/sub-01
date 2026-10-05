@@ -618,7 +618,8 @@ if (TRIPO) Promise.all([load("room/props_picked.glb"), load("room/sneakers_door.
 }).catch(e => console.warn("room upgrade props", e));
 // the desk chair: the office chair the owner made on Tripo (room_build/chair_owner_repair.py took the letter-shaped holes
 // out, build_chair_owner.mjs scaled it to a 0.52 m seat, turned it to face -z and set its gas lift on the pivot, 5 cm
-// back). It goes into the room's own "chair" node in place of the old meshes, so the node, its place and everything that
+// back; its materials made for it, matched to a real chair). It goes into the room's own "chair" node in place of the old
+// meshes, so the node, its place and everything that
 // moves it (CHAIR: pulled out, swivelled, ridden in, left where his legs push it) stay as they are. Built at 0.52 m,
 // boy_mh.js's raiseChair() (the old chair's 1.6 cm lift) must not raise it again: marked raised. ?chair=code: the chair
 // modelled in code (chair_office.glb) instead
@@ -627,9 +628,11 @@ if (TRIPO) Promise.all([load("room/" + CHAIR_SET[0]),
   new Promise(ok => { const wait = () => room && chairNode() ? ok() : setTimeout(wait, 100); wait(); })]).then(([cg]) => {
   const n = chairNode(), src = cg.scene.getObjectByName(CHAIR_SET[1]); if (!n || !src) return;
   for (const c of [...n.children]) n.remove(c);
-  const parts = src.isMesh ? [src] : [...src.children];             // (one mesh, or a node of parts)
+  // the owner's chair is one mesh of several materials: three.js makes it a group that carries the quantisation's offset
+  // and scale, so it goes in whole; the code-built chair is a node of closed parts, each with its own transform
+  const parts = src.isMesh || CHAIR_SET[1] === "chair_owner" ? [src] : [...src.children];
   for (const c of parts) { c.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
-    m.material.envMap = scene.environment; m.material.envMapIntensity = m.material.name === "chair_chrome" ? 1.0 : 0.5; });
+    m.material.envMap = scene.environment; m.material.envMapIntensity = m.material.metalness > 0.5 ? 1.0 : 0.5; });
     n.add(c); }                                                       // (its own transform: the quantisation's offset and scale)
   n.userData.raised = true; n.updateMatrixWorld(true); VOX = null;
 }).catch(e => console.warn(CHAIR_SET[0], e));

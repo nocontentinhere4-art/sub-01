@@ -30,13 +30,14 @@ def test_office_chair_seat_is_052_and_light():
 
 def test_owner_chair_is_the_default_at_052():
     data, j = glb("chair_owner.glb")                                              # (preview/chair-tripo: his Tripo chair, repaired)
-    assert len(data) <= 1024 * 1024 and 0 < tris(j) <= 60000
+    assert len(data) <= 1536 * 1024 and 0 < tris(j) <= 60000
+    assert {m["name"] for m in j["materials"]} == {"chair_mesh", "chair_fabric", "chair_plastic", "chair_armpad", "chair_lift", "chair_base", "chair_caster"}
     node = next(nd for nd in j["nodes"] if nd.get("name") == "chair_owner")
     assert node["extras"]["seatTop"] == 0.52 and node["extras"]["back"] == 0.05
-    a = j["accessors"][j["meshes"][0]["primitives"][0]["attributes"]["POSITION"]]
-    k = 32767 if a.get("normalized") else 1                                       # (quantised: int16, the node's scale undoes it)
+    acc = [j["accessors"][p["attributes"]["POSITION"]] for p in j["meshes"][0]["primitives"]]
+    k = 32767 if acc[0].get("normalized") else 1                                  # (quantised: int16, the node's scale undoes it)
     s, t = node.get("scale", [1, 1, 1])[1], node.get("translation", [0, 0, 0])[1]
-    lo, hi = a["min"][1] / k * s + t, a["max"][1] / k * s + t
+    lo, hi = min(a["min"][1] for a in acc) / k * s + t, max(a["max"][1] for a in acc) / k * s + t
     assert abs(lo) < 0.01 and 1.2 <= hi <= 1.3, (lo, hi)                          # (on the floor, 1.2-1.3 m tall)
     assert '["chair_owner.glb", "chair_owner"]' in HTML and 'load("room/" + CHAIR_SET[0])' in HTML
 
