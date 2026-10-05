@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>doc</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --awake: #ff9a3c; --nrem: #4d7cff; --rem: #c26bff; --red: #ff3b3b; --green: #39f5a0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1350px; background: #000; overflow: hidden; font-family: Inter, sans-serif; color: #fff; }
+  #st { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: #050506; }
+  img.bg { position: absolute; left: 0; top: 0; width: 1080px; height: 1350px; object-fit: cover; transform-origin: 50% 50%; }
+  #L { position: absolute; inset: 0; }
+  .t { position: absolute; left: 50px; right: 50px; font-weight: 900; letter-spacing: -1.5px; line-height: 1.02;
+       text-shadow: 0 3px 24px rgba(0,0,0,.95), 0 0 4px rgba(0,0,0,.9); }
+  .h1 { font-size: 80px; } .h2 { font-size: 54px; font-weight: 800; letter-spacing: -.8px; } .h3 { font-size: 40px; font-weight: 800; }
+  .mono { font-family: "JetBrains Mono", monospace; letter-spacing: 0; }
+  .y { color: var(--awake); } .r { color: var(--red); } .g { color: var(--green); } .p { color: var(--rem); }
+  .chip { display: inline-block; font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 30px; padding: 6px 14px 5px;
+          border-radius: 6px; background: #fff; color: #000; }
+  .search { position: absolute; left: 50px; right: 50px; height: 96px; border-radius: 48px; background: #fff; color: #111;
+            display: flex; align-items: center; padding: 0 34px; font-size: 40px; font-weight: 700; box-shadow: 0 12px 50px rgba(0,0,0,.6); }
+  .search .ic { width: 34px; height: 34px; border: 5px solid #555; border-radius: 50%; margin-right: 22px; position: relative; flex: none; }
+  .caret { display: inline-block; width: 4px; height: 44px; background: #111; margin-left: 4px; vertical-align: middle; }
+  .opt { position: absolute; left: 50px; right: 50px; height: 200px; border-radius: 22px; background: rgba(20,20,24,.92);
+         border: 3px solid rgba(255,255,255,.25); padding: 26px 30px; overflow: hidden; }
+  .opt .lbl { font-size: 44px; font-weight: 800; letter-spacing: -.5px; position: relative; z-index: 2; }
+  .opt .pct { position: absolute; right: 30px; bottom: 22px; font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 60px; z-index: 2; }
+  .opt .bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,154,60,.28); z-index: 1; }
+  .opt .tag { font-family: "JetBrains Mono", monospace; font-size: 24px; color: rgba(255,255,255,.65); margin-bottom: 10px; position: relative; z-index: 2; }
+  .stamp { position: absolute; font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 56px; color: var(--green);
+           border: 6px solid var(--green); padding: 4px 20px; border-radius: 10px; transform: rotate(-8deg); background: rgba(0,0,0,.6); }
+  #label { position: absolute; left: 18px; bottom: 16px; font-family: "JetBrains Mono", monospace; font-size: 18px; color: rgba(255,255,255,.8);
+           background: rgba(0,0,0,.55); padding: 5px 10px; border-radius: 5px; z-index: 9; }
+  #rec { position: absolute; right: 22px; top: 20px; font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 800; z-index: 9;
+         background: rgba(0,0,0,.6); padding: 6px 12px; border-radius: 6px; }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 8; }
+  .scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, transparent 2px 4px); z-index: 7; pointer-events: none; }
+  .grad-t { position: absolute; left: 0; right: 0; top: 0; height: 520px; background: linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,0)); }
+  .grad-b { position: absolute; left: 0; right: 0; bottom: 0; height: 560px; background: linear-gradient(0deg, rgba(0,0,0,.92), rgba(0,0,0,0)); }
+  .err { position: absolute; left: 50px; right: 50px; font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 46px; color: var(--red);
+         background: rgba(0,0,0,.85); border: 3px solid var(--red); padding: 22px 26px; border-radius: 12px; }
+</style></head>
+<body><div id="st">
+  <img class="bg" id="b1"><img class="bg" id="b2">
+  <div id="L"></div>
+  <div class="scan" id="scan" style="display:none"></div>
+  <div id="flash"></div>
+  <div id="rec"></div>
+  <div id="label">AI · fictional character · simulated brain · real recording</div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+window.frame = async (s) => {
+  const loads = [];
+  for (const [id, k] of [['b1', 'img'], ['b2', 'img2']]) {
+    const el = $(id);
+    if (s[k]) { el.style.display = 'block'; if (el.getAttribute('src') !== s[k]) { el.src = s[k]; loads.push(el.decode().catch(() => {})); } }
+    else el.style.display = 'none';
+    el.style.transform = s[k + 'T'] || ''; el.style.opacity = s[k + 'A'] ?? 1; el.style.objectPosition = s[k + 'P'] || '50% 50%';
+    el.style.filter = s[k + 'F'] || '';
+  }
+  $('L').innerHTML = s.html || '';
+  $('flash').style.opacity = s.flash || 0;
+  $('scan').style.display = s.scan ? 'block' : 'none';
+  $('rec').innerHTML = s.rec || '';
+  $('rec').style.display = s.rec ? 'block' : 'none';
+  await Promise.all(loads); await document.fonts.ready;
+  return true;
+};
+</script></body></html>
