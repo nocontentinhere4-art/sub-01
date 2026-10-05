@@ -1,4 +1,4 @@
-import numpy as np, json
+import numpy as np, json, os
 from scipy.spatial import cKDTree
 exec(open('load.py').read())
 bP,bUV,bI,_=load('body'); bs=skin(colors('body',bUV))
@@ -24,11 +24,19 @@ print('head verts',len(hP),'mean dist to source',d[:,0].mean(),'dominant joints'
 # remove the old head: triangles whose vertices are all head-driven or neck skin above the collar
 S_=0.166; T_=np.array([0.078-S_*0.418, 0.873-S_*0.365, -0.006]); MARGIN=float(__import__('os').environ.get('MARGIN','0.05'))
 xo=(bP[:,0]-T_[0])/S_; yo=(bP[:,1]-T_[1])/S_
-dh,_=cKDTree(hP).query(bP); hair=(~bs)&(wj(H)>0.3)&(dh<float(__import__('os').environ.get('HAIRD','0.012')))&(bP[:,1]>0.83)
+dh,_=cKDTree(hP).query(bP); hair=(~bs)&(wj(H)>0.3)&((bP[:,1]>float(os.environ.get('HAIRY','0.87')))|((bP[:,1]>0.83)&(colors('body',bUV).mean(1)<36)))&(dh<float(__import__('os').environ.get('HAIRD','0.012')))&(bP[:,1]>0.83)
 bc0=colors('body',bUV)
 rr=np.hypot(bP[:,0]-0.02,bP[:,2]+0.006); NR=float(__import__('os').environ.get('NR','0.055'))
 plane=0.13+(0.25-xo)*0.42
-rm=(wj(H)>0.3)|(bs&(bP[:,1]>float(__import__('os').environ.get('NECKY','0.76')))&(rr<0.07))|hair   # old head, old neck skin, old hair
+rm=((wj(H)>0.3)&bs)|(bs&(bP[:,1]>float(__import__('os').environ.get('NECKY','0.76')))&(rr<0.07))|hair   # old head, old neck skin, old hair
+HD=float(os.environ.get('HOODD','0.01')); dh2,_=cKDTree(hP).query(bP)
+rm|=(~bs)&(dh2<HD)&(bP[:,1]>0.78)                                     # body hood surface right at his collar: his collar is the hood top
+bright=bc0.mean(1)>85
+rm|=bright&(bP[:,1]>0.72)&(bP[:,1]<0.82)&(np.abs(bP[:,2]+0.006)<0.04)&(bP[:,0]>0.03)   # the light lining chip at the V
+bcv=colors('body',bUV).mean(1)
+#rm|=(bcv>70)&(bP[:,0]>0.03)&(bP[:,1]>0.74)&(bP[:,1]<0.83)&(rr<0.13)            # light lining chips at the V
+rm|=(~bs)&(wj(H)>0.3)&(dh<0.03)&(bP[:,1]>0.84)&(bcv<40)   # last old-hair specks
+rm|=bs&(bP[:,1]>0.66)&(rr<0.13)   # all body skin around the neck and chest: no skin left at the hood
 tri=bI[~rm[bI].any(1)]
 tri.astype(np.uint32).tofile('body_keep_idx.bin'); print('body tris',len(bI),'->',len(tri))
 # match the body's neck skin tone (below the cut) to the owner's neck just above it
@@ -49,3 +57,15 @@ mask=mask.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(4))
 a=np.asarray(im).astype(np.float32); m=np.asarray(mask).astype(np.float32)[...,None]/255
 out=a*(1-m)+np.clip(a*ratio,0,255)*m
 Image.fromarray(out.astype(np.uint8)).save('body_base_neck.jpeg',quality=92); print('neck tris toned',len(ntri))
+
+# no skin colour on the hoodie: in the UV area of the cloth triangles around the hood, skin-toned texels take the
+# median hoodie colour (body texture only)
+cl=tri[(~bs[tri]).all(1)&(bP[tri,1].min(1)>0.62)&(rr[tri].max(1)<0.2)]
+base=np.asarray(Image.open('body_base_neck.jpeg').convert('RGB')).copy(); H_,W_=base.shape[:2]
+m=Image.new('L',(W_,H_),0); dr=ImageDraw.Draw(m)
+for t in cl: dr.polygon([(float(bUV[v,0]%1*W_),float(bUV[v,1]%1*H_)) for v in t],fill=255)
+m=np.asarray(m.filter(ImageFilter.MaxFilter(5)))>0
+px=base.astype(np.int32); sk=((px[...,0]>90)&(px[...,0]>px[...,2]+15)&(px[...,0]>px[...,1]+5))|(px.mean(-1)>75)
+cloth=base[m&~sk]; fill=np.median(cloth,0).astype(np.uint8) if len(cloth) else np.array([40,40,42],np.uint8)
+sel=m&sk; base[sel]=fill; print('hoodie skin texels recoloured',int(sel.sum()),'to',fill)
+Image.fromarray(base).save('body_base_neck.jpeg',quality=92)

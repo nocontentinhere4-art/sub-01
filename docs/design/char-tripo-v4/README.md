@@ -10,28 +10,31 @@ a real person, with no brands or logos. Preview only: nothing here is used by th
 
 ## `char_tripo_v4.glb`
 
-5.9 MB (meshopt and WebP), 1.75 m, faces +X, `idle` (15.4 s) and `walk` (2.37 s, in place). Two materials: the body
+5.8 MB (meshopt and WebP), 1.75 m, faces +X, `idle` (15.4 s) and `walk` (2.37 s, in place). Two materials: the body
 (base colour 4096 px, normal 2048 px) and the owner's head (base colour 4096 px, normal 2048 px). Both are matte
 (roughness 0.8, metalness 0).
 
 ## How the graft was done (scripts in `room_build/char_v4/`)
 
-The owner's head is kept whole, as in his Tripo web view: face, hair, his full neck, and his own hood collar. That is
-what makes the neck continuous with no seam.
-
-1. **Fit** (`stage1.py`, run with Blender's Python module, `FULL=1 STRETCH=1.5`): the head is turned 90° about Y (it
-   faced +Z; the body faces +X), then scaled by 0.166 and moved so that the chin-to-nose and nose-to-crown distances
-   and the nose tip match the body's own head. The band below his chin (lower neck and collar, below 8% of the head
-   model's height) is stretched downward with a linear falloff, so the bottom of his collar sinks into the body's hood.
-   The face and everything above the chin are not moved.
-2. **Decimate** (`simp.mjs`): meshopt simplification from 1.98M to 60k triangles. It respects UV seams, so the owner's
-   own base colour and normal maps fit unchanged. No baking, reshaping or repainting.
-3. **Skin** (`weights_full.py`): the joints and weights come from the 4 nearest vertices of the body (head, neck,
-   upper spine and clavicles), with an inverse-distance blend. The face and hair follow `Head`; his collar follows the
-   clavicles and neck, like the body's hood.
-4. **Body** (`weights_full.py`): the body's old head, its hair, and its neck skin above 0.80 (Tripo units) are
-   removed. The hood is kept. Assembled with `graft.mjs` (one skinned mesh, two primitives), then
-   `MATTE=0.8 node room_build/build_char_tripo.mjs`.
+1. **Fit** (`stage1.py`, run with Blender's Python module, `NOCOLLAR=1 STRETCH=2.5 BACKY=0.26`):
+   - **Collar removed.** The owner's own hood collar is dropped: his non-skin parts below the jaw line. His neck then
+     ends along the smooth line where his collar met it. Only the largest piece is kept, so no loose collar bits remain.
+   - **Placed.** The head is turned 90° about Y (it faced +Z; the body faces +X), then scaled by 0.166 and moved so
+     that the chin-to-nose and nose-to-crown distances and the nose tip match the body's own head.
+   - **Neck lengthened.** Only the neck band below the chin (in front) and below the hairline (at the back) is
+     stretched downward with a linear falloff, so the neck runs down inside the body's hood. The face and hair are not
+     moved.
+2. **Decimate** (`simp.mjs`): meshopt simplification to 60k triangles. It respects UV seams, so the owner's own base
+   colour and normal maps fit unchanged. No baking, reshaping or repainting of the head.
+3. **Skin** (`weights_full.py`): the joints and weights come from the 4 nearest body vertices (head, neck, upper spine,
+   clavicles), with an inverse-distance blend.
+4. **Body** (`weights_full.py`):
+   - **Removed:** the body's old face and neck skin, all body skin around the neck and the hood's V, and its old hair
+     near the new head.
+   - **Kept:** the body's hood, whole and unchanged in shape, so its edge is the body's own smooth edge.
+   - **Recoloured:** any skin-toned or bright texels on the hoodie triangles around the neck now use the hoodie's
+     median colour, so no pink is left on the hoodie. This touches the body texture only.
+5. Assembled with `graft.mjs` (one skinned mesh, two primitives), then `MATTE=0.8 node room_build/build_char_tripo.mjs`.
 
 ## QA
 
@@ -39,10 +42,8 @@ what makes the neck continuous with no seam.
 - `qa/neck_seam.webp`: the neck and hood from the front, 3/4, side and back.
 - `qa/anim_face.webp`: two idle and two walk frames at face distance.
 
-The neck is continuous into the hood from the front, 3/4 and profile, and in the idle and walk frames. Remaining small
-flaws:
-
-- In profile and from behind, where his collar overlaps the body's hood, the hood top has some darker blotches.
-- At the bottom of the hood's V-neck there is a small light chip of the body's lining.
+His neck runs continuously into the body's hood from every angle and in the clips. There is no collar overlap and no
+skin colour on the hoodie. Left: a few small light-grey flecks of the hood's lining at the bottom of the V, and a
+couple of tiny dark specks near the jaw at close range.
 
 Likeness: the face is the owner's own Tripo head, unchanged.
