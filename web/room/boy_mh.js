@@ -208,6 +208,9 @@ export function createMH(env) {
     // (the clips' folder and their fit to the body come from the page: room/mh as recorded, room/mh_v5 for v5 through char_v5.js)
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
+    // each desk mode its own copy of its clip, named for the mode (two modes now play one capture, room_seated_idle, and
+    // the page and its tests know a desk clip by its "desk_" name, not the capture's "mixamo.com")
+    for (const k of ["desk_type", "desk_mouse", "desk_watch"]) if (got[k] && !got[k].name.startsWith("desk_")) { got[k] = got[k].clone(); got[k].name = k; }
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // watching "simply sits in the chair": room_seated_idle plays as recorded, feet on the floor (the old watch clip
     // propped its feet up and took the mouse clip's legs and pelvis; that swap is gone with it)
