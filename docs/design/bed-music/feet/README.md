@@ -54,7 +54,7 @@ which tore the heel off the foot when the foot points, as it does lying down.
 - `feet_three_view.webp`: the old three-view sheet (front, low side, walk frame), slides on and slides off.
 - `feet_close.webp`: close views (front, low side, top, under), slides on and slides off.
 
-## Left
+## Known and open (accepted for now, close-crop only)
 
 - The sole is flat and quite boxy at the heel's back corner from the low side.
 - Just under the trouser cuff, Tripo's own sock above the join has a ragged edge, seen close from a low side.
