@@ -194,7 +194,8 @@ export function createMH(env) {
   async function load() {
     const got = {};
     // (the clips' folder and their fit to the body come from the page: room/mh as recorded, room/mh_v5 for v5 through char_v5.js)
-    await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; })));
+    await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
+      e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // watching "simply sits in the chair": the recorded clip (boy_mh's and G2's alike) slouches and props its feet up at
     // the desk's height, so its pelvis (turn and height) and legs come from the mouse clip (seated on the seat, feet on
@@ -447,6 +448,7 @@ export function createMH(env) {
           const r = rotXZ(h, ry); hx = rx + r[0]; hz = rz + r[1];
         } else {                                                // on his feet: the hips' own travel, its heading turned by W
           ry = r0 + swivel + W * sstep(turn[0], turn[1], t);
+          if (!hp) { hp = h; const r = rotXZ(h, ry); hx = x0 + r[0]; hz = z0 + r[1]; }   // (a clip whose ride ends before the take starts: on his feet from where he is)
           const d = rotXZ([h[0] - hp[0], h[1] - hp[1]], ry); hx += d[0]; hz += d[1];
           const r = rotXZ(h, ry); rx = hx - r[0]; rz = hz - r[1];
           if (t > G.up - 1.1 && env.blocked(hx, hz, t < G.up + 0.5 ? 0.14 : BODY_R)) { bad++; why[t < G.up + 0.5 ? "desk" : "room"]++; }  // (rising: the belly clear of the desk)
