@@ -542,7 +542,8 @@ export function createMH(env) {
       const sleepy = g && g.clip === "sleep", U = G.guL;          // (both sides share the clip's timing)
       return {k: "getup", flow: true, a: S.stiff || sleepy ? 0 : U.start, b: S.next ? U.end : U.stand}; }
     if (B && g && g.clip === "sleep" && g.anchor === "bedlie") {          // going to sleep: room_bedtime
-      if (!to && from === "desk") return {k: "bedtime", a: 0, b: B.up, at: () => chairPlace(B.seat, B.face), back: true};
+      // (up from the desk he stands up as always, room_mx_sit_to_stand below: room_bedtime's own get-up at its chair put
+      // his legs and hips through ours, up to 3300 vertices on main)
       if (to === "bedside" && from !== "bedlie") return {k: "bedtime", a: B.walk, b: B.edge, at: () => B.edgePl};
       if (to === "bedlie" && from === "bedside") { const h = u => hipsAt(M.clips.bedtime, B.edge + (B.end - B.edge) * u);
         return {k: "bedtime", a: B.edge, b: B.end, at: u => mixPlace(B.edgePl, B.lie, sstep(0.1, 0.7, u), h(u))}; }

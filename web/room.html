@@ -1617,14 +1617,18 @@ function replan(){                                    // the steps from where he
 }
 // the free floor: hand-placed waypoints between the furniture (room_build/build_room.py) and the walkable links
 const NODES = {bs:[-0.36, -0.18], ds:[-0.62, -0.35], w:[0.15, -0.12], c:[0.45, -0.35], m:[0.35, 0.05], d:[1.22, -0.92], f:[0.15, 0.75],
-  sl:[-1.10, -0.06], g:[-0.62, -0.08], bn:[-0.17, -0.66]};   // bn: by the desk's end, towards the bin                 // g, sl: through the gap between the chair and the bed, to the window sill
+  sl:[-1.10, 0.03], g:[-0.62, 0.03], bn:[-0.17, -0.66]};   // bn: by the desk's end, towards the bin                 // g, sl: through the gap between the chair and the bed, to the window sill
+// (g, sl: the middle of that gap - the parked chair's route box ends at z -0.065 with its pad, the bed's at 0.13 - so his
+// swinging arm clears the backrest; at z -0.06 / -0.08 his left forearm passed through it)
 const LINKS = [["bs","ds"], ["bs","w"], ["ds","w"], ["w","m"], ["w","c"], ["m","c"], ["c","d"], ["m","d"], ["w","f"], ["m","f"], ["bs","g"], ["g","sl"], ["w","g"], ["bs","bn"], ["ds","bn"], ["c","bn"]];
 const BLOCK = [[-1.90, -0.20, 0.25, 1.50], [-1.86, -0.36, -1.45, -0.80], [-1.42, -0.84, -0.88, -0.30], [-0.12, 0.32, -1.45, -1.17],
   [0.45, 0.93, -1.45, -0.97], [-1.90, -1.42, -0.60, -0.12]];          // bed, desk, chair, shelf, fridge, plant (x0, x1, z0, z1)
+const ARM_PAD = 0.25;                                  // (walking past the chair his swinging arm reaches ~0.3 m out: its backrest's top is at arm height)
 function free(a, b, pad = 0.12){                      // is the straight line a -> b clear of the furniture
   const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.04);
   for (let i = 1; i < n; i++) { const x = a[0] + (b[0] - a[0]) * i / n, z = a[1] + (b[1] - a[1]) * i / n;
-    for (const [x0, x1, z0, z1] of BLOCK) if (x > x0 - pad && x < x1 + pad && z > z0 - pad && z < z1 + pad) return false; }
+    for (let k = 0; k < BLOCK.length; k++) { const [x0, x1, z0, z1] = BLOCK[k], p = k === 2 && pad === 0.12 ? ARM_PAD : pad;
+      if (x > x0 - p && x < x1 + p && z > z0 - p && z < z1 + p) return false; } }
   return true;
 }
 function route(a, b){                                 // shortest path a -> b over the waypoints (a straight line when it is clear)

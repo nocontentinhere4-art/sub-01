@@ -317,3 +317,20 @@ Still to wire when the character arrives:
 - boy_mh.js's MakeHuman-only names: `isMH()` (metacarpals), "Spine" in the rare-event reach (Mixamo's lowest spine bone becomes Spine02 here, so the reach's "Spine" is Mixamo's Spine2: correct), and the fingertip names (finger*-3 maps to Mixamo's third joint; Mixamo also has a fourth, the tip).
 
 The placements (seat points, chair rides, spots, rare-event distances) sample each clip on the body, so they carry over.
+
+## Walking past the chair
+
+Traced with the page's `penetration()` every 0.1 s, in walks that pass or leave the desk:
+
+| walk | main | this branch, before | now |
+|---|---|---|---|
+| window → desk | forearm through the backrest (27–37 vertices at 2.6–2.7 s) | the same | **clear** (one 25-vertex sample at the landing, 8.2 s) |
+| desk → window | (main's get-up: 14–238 over most of the span) | 7 + 10 vertices (two samples) | 7 + 10 |
+| door → desk | | | clear |
+| desk → bed, to sleep | **68 samples, up to 3315 vertices** (room_bedtime's get-up at its own chair) | 65 samples, up to 5570 | 7 + 10, as any time he leaves |
+
+- **The path between the chair and the bed** (`NODES` g, sl) runs down the middle of that gap: z 0.03, against −0.06 / −0.08. The parked chair's route box (with its pad) ends at z −0.065 and the bed's at 0.13; that also holds for the 1.90 m bed on preview/bed-music, which only extends the foot end.
+- **`free()` keeps the route 0.25 m off the chair's box** (`ARM_PAD`), not 0.12 m. His swinging arm reaches about 0.3 m out, and the backrest's top is at arm height. That was the cut through the corner, from the sill straight to the desk.
+- **Going to sleep from the desk**, he now stands up with `room_mx_sit_to_stand` like any other departure. `room_bedtime` plays only its part at the bed.
+
+tests/visual core set: 0 hard failures. tests/test_boy_mh.py: 7 passed.
