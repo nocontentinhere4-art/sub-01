@@ -22,12 +22,14 @@
 // bed's edge, lying on the duvet). Still frames stand in for standing (room_window's first) and for sitting on the bed's
 // edge and lying; the old rig's interludes, breathing, look-at, foot IK and phone hold are off.
 //
-// Leaving the desk is one take of room_bedtime's get-up (flow()): seated he rolls back and swivels with the chair, rises
-// (his legs push it on; it stays there), turns as he walks off and the walk loop takes over mid-stride. The walk plays
-// as recorded (knees and elbows bend, the arms swing).
+// At the desk the seated pose, the sit-down and the stand-up are real captures (Mixamo, retargeted onto v5 and fitted to
+// this chair: docs/design/mixamo): room_seated_idle (watching, and every seated slot), room_mx_stand_to_sit,
+// room_mx_sit_to_stand. Leaving the desk he rides the chair back out, stands up with room_mx_sit_to_stand and walks off;
+// where the sit-down starts and the stand-up ends come from the clips (env.setSpots). (room_bedtime's one-take get-up,
+// flow(), is no longer used for leaving the desk: it put his torso 9 cm into the chair.) The walk plays as recorded.
 
-const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
-  walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
+const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "room_seated_idle", stand: "room_window",
+  walk: "room_walk", sit_down: "room_mx_stand_to_sit", stand_up: "room_mx_sit_to_stand", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
   bedtime: "room_bedtime"};
 // the room (main): keycaps (G10d) centre, top y, turn about y, size; the mouse centre on the pad; the desk / pad top
@@ -208,14 +210,10 @@ export function createMH(env) {
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
-    // watching "simply sits in the chair": the recorded clip (boy_mh's and G2's alike) slouches and props its feet up at
-    // the desk's height, so its pelvis (turn and height) and legs come from the mouse clip (seated on the seat, feet on
-    // the floor); the back, arms and head stay relaxed. A watch clip with its feet already down plays as recorded.
-    const ws = sampler(got.desk_watch), feetUp = ws(0).foot > 0.12; ws.done();
-    const LEGS = /^(Left|Right)(UpLeg|Leg|Foot|ToeBase)\.|^Hips\.(quaternion|position)$/;
-    if (feetUp) got.desk_watch = new THREE.AnimationClip("desk_watch", Math.max(got.desk_watch.duration, got.desk_mouse.duration),
-      [...got.desk_watch.tracks.filter(t => !LEGS.test(t.name)), ...got.desk_mouse.tracks.filter(t => LEGS.test(t.name))]);
-    M.watchLegs = feetUp ? "desk_mouse" : "recorded";
+    // the rare events at the desk (optional: the room plays on without them)
+    await Promise.all(Object.entries(RARE).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got["rare_" + k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
+    // watching "simply sits in the chair": room_seated_idle plays as recorded, feet on the floor (the old watch clip
+    // propped its feet up and took the mouse clip's legs and pelvis; that swap is gone with it)
     const make = c => mixer.clipAction(c);
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
@@ -228,7 +226,17 @@ export function createMH(env) {
     M.seg = seg; M.sampler = sampler;                          // (?debug: a clip's hips, head, knees and feet at a time)
     const stand = stillClip("mh_stand", got.stand, 0), lie = stillClip("mh_lie", got.bed_lie, got.bed_lie.duration),
       edge = stillClip("mh_edge", got.bed_lie, seg.lie.edge);
-    for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = pageHips(got[k], 0); }
+    // the desk modes sit on the seat by their hips as the body has them (its own frame, as the page's rootOf turns them):
+    // the legacy turn (pageHips) put a clip's forward offset on the seat sideways (room_seated_idle's 1.9 cm: its right
+    // thigh against the armrest)
+    const bodyHips = c => { const s = sampler(c), h = s(0).hips; s.done(); return [h.x, h.y, h.z]; };
+    for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = bodyHips(got[k]); }
+    // each rare event: its action (once, held at its end), its hips (placed on the seated loop's seat point) and how much
+    // further back he and the chair go for it: how much further forward than the seated loop any part of him reaches
+    // under the desk's top, plus 3 cm (reach())
+    for (const k of Object.keys(RARE)) { const c = got["rare_" + k]; if (!c) continue;
+      const a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
+      H["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration}; }
     M.actions.stand = make(stand); H.mh_stand = pageHips(stand, 0);
     // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
     M.actions.walk = make(got.walk); H.room_walk = pageHips(got.walk, 0);
@@ -257,7 +265,18 @@ export function createMH(env) {
     mixer.stopAllAction();
     const first = A[env.state().want] || M.actions.stand; first.reset().setEffectiveWeight(1).play(); env.setCurrent(first);
     env.resnap();                                            // placed for the old clips: again, with these hips
-    if (seg.guL && env.flow && env.chairPose) env.flow(true);   // leaving the desk: one take (flow())
+    // where he stands to sit down and where the stand-up leaves him, from the clips: the root that puts the walk's hips on
+    // the sit-down's as it starts, and the standing pose's hips on the stand-up's as it ends ([right, forward] of the seat)
+    if (env.setSpots) { const sd = sampler(got.sit_down), a = sd(seg.sit.from).hips; sd.done();
+      const su = sampler(got.stand_up), e = su(got.stand_up.duration).hips; su.done();
+      const wk = sampler(got.walk), w0 = wk(0).hips; wk.done(); const sp = sampler(stand), s0 = sp(0).hips; sp.done();
+      const sdn = seg.seatDown || SEAT.down;
+      const sa = SEAT_AT.desk_watch, sx = -sa[0], sz = -sa[1];   // (the seat point, [right, forward] of the turned seat: the chair's front is its -z)
+      // (he turns on the spot there before he sits: the walk loop's turning steps swing his feet, and turning closer than
+      // TURN_CLEAR to the turned seat they caught its front edge; the rest of the way he goes as he sits back: transition())
+      const sitF = Math.max(sz + a.z - sdn[1] - w0.z, TURN_CLEAR);
+      M.spots = {sit: [sx + a.x - sdn[0] - w0.x, sitF], up: [sx + e.x - SEAT.up[0] - s0.x, sz + e.z - SEAT.up[1] - s0.z], seat: sa.slice()};
+      env.setSpots(M.spots); }
     M.ready = true;
   }
   // the page puts the root at the seat anchor less the clip's hips; the MakeHuman clips have the feet at y = 0, so the
@@ -394,20 +413,113 @@ export function createMH(env) {
       } else M.grab = null;
     }
   }
-  // watching (or just sitting, eating): relaxed in the chair he leans back, a little further from the desk: he and the
-  // chair roll 0.12 m back, and in again for the keys and the mouse (to 8.5 cm back for the keys, 6 for the mouse: the hoodie's front clears the desk's edge)
+  // seated at the desk: each mode's clip has its hips (at its first frame) on a seat point in the chair's own frame
+  // (SEAT_AT: across, forward; the chair's front is its -z), and he and the chair roll to where that capture puts his hands:
+  // the clip's keyboard (typing) or mouse (mousing) onto the room's, along the way he faces. Watching (room_seated_idle:
+  // hands on the armrests and knees) needs nothing on the desk, so he stays where the last mode left him (snapped in:
+  // where the mouse would put him). A book or a phone on his lap: 0.45 m back, clear of the desk.
+  // SEAT_AT, swept in the room (the page's penetration() every 0.25 s over 10 s, and contact_pass.mjs): how far forward
+  // of the chair's pivot each clip's hips sit with nothing of him in the chair. room_seated_idle: clear from 2 to 6.5 cm
+  // (closer, its calves catch the cushion's front edge); 5.5 cm also clears the sit-down, whose hips land 2.7 cm further
+  // back than they rest. The mouse clip: clear from 3.5 cm (main's 0.6 cm puts its left calf on the front edge); the
+  // typing clip, the same family, with it (docs/design/mixamo)
+  // The rare events, swept the same way over the whole event (the page's penetration() every 0.1 s): Scared clear from
+  // 9.5 cm to at least 13.5 cm (closer, his left calf catches the cushion's front edge as he springs up), Angry_Gesture
+  // from 7.5 cm (closer, his left thigh presses into the cushion as he leans in); Standing_Clap is clear where he sits to
+  // watch
+  const SEAT_AT = {desk_type: [0, -0.045], desk_mouse: [0, -0.045], desk_watch: [0, -0.055], rare_scared: [0, -0.115], rare_angry: [0, -0.085]};
+  // the nearest the turn on the spot before the sit-down clears the turned seat (the walking scene swept: 0.45 m caught
+  // his right foot, 0.52 m his toes, 0.60 m clear)
+  const TURN_CLEAR = 0.60;
+  const _f = V(), _st = V();
+  // ---------- rare events at the desk (room_build/kimodo/mixamo_chains.json "rare"): the whole capture, seated -> up -> seated
+  // (Scared, Standing_Clap) or seated throughout (Angry_Gesture). The chair moves, not the performance: before it he rides the
+  // chair back as far as the capture needs (M.rare[k].back), the capture plays whole, and after it he rides back in.
+  // mh.rare("scared" | "angry" | "clap") starts one (the page's scheduler: rare, never twice close together) ----------
+  const RARE = {scared: "room_mx_scared", angry: "room_mx_angry_gesture", clap: "room_mx_standing_clap"};
+  M.rare = {};
+  // how far he and the chair ride back for a capture: its parts (hands, forearms, knees, feet, chest, head; sampled every
+  // 0.1 s, in the body's frame from its first frame's hips) against the room in front of the seat (free(): rays toward
+  // the desk across his width at each height, once), the deepest any part would go past it, plus 3 cm
+  const PARTS = [["LeftHand", 0.05], ["RightHand", 0.05], ["LeftForeArm", 0.05], ["RightForeArm", 0.05], ["LeftLeg", 0.08], ["RightLeg", 0.08],
+    ["LeftFoot", 0.05], ["RightFoot", 0.05], ["LeftToeBase", 0.05], ["RightToeBase", 0.05], ["Spine", 0.16], ["Head", 0.12]];
+  function parts(clip) {
+    const s = sampler(clip), h0 = s(0).hips, B = env.boy, out = [];
+    for (let t = 0; t <= clip.duration + 1e-6; t += 0.1) { s(Math.min(t, clip.duration));
+      for (const [n, r] of PARTS) { const b = env.bones[n]; if (!b) continue; const p = B.worldToLocal(b.getWorldPosition(V())); out.push([p.x - h0.x, p.y, p.z - h0.z, r]); } }
+    s.done(); return out;
+  }
+  const FREE = {lat: [-0.35, -0.25, -0.15, -0.05, 0.05, 0.15, 0.25, 0.35], ys: Array.from({length: 20}, (_, i) => 0.03 + 0.05 * i)};
+  function free(S, f, l) {                                   // [lateral][height] -> the free depth (m) in front of S along f
+    const room = env.room && env.room(); if (!room) return null;
+    const ch = env.chairNode && env.chairNode(), solid = [];                // (the room's furniture, not the chair he sits on)
+    room.traverse(o => { if (!o.isMesh || !o.visible) return; for (let p = o; p; p = p.parent) if (p === ch) return; solid.push(o); });
+    const ray = new THREE.Raycaster(), o = V(), d = V(f.x, 0, f.z), side = solid.map(m => m.material.side);
+    solid.forEach(m => { m.material.side = THREE.DoubleSide; });          // (a face seen from behind is still the desk)
+    const D = FREE.lat.map(x => FREE.ys.map(y => { o.set(S.x + l.x * x, env.F + y, S.z + l.z * x); ray.set(o, d); ray.far = 1.5;
+      const h = ray.intersectObjects(solid, false)[0]; return h ? h.distance : 1.5; }));
+    // the desk's top is a thin plate (3 mm): where it starts in front of him, and its height, by rays down every 2 cm
+    const dn = V(0, -1, 0); D.top = FREE.lat.map(x => { for (let t = 0; t <= 1.2; t += 0.02) {
+      o.set(S.x + l.x * x + f.x * t, env.F + 1.2, S.z + l.z * x + f.z * t); ray.set(o, dn); ray.far = 0.65;
+      const h = ray.intersectObjects(solid, false)[0]; if (h && h.point.y > env.F + 0.6) return [t, h.point.y - env.F]; } return [1.5, 0]; });
+    solid.forEach((m, i) => { m.material.side = side[i]; }); return D;
+  }
+  function backFor(R, k) {                                   // the ride back (m) this capture needs, from where he sits now
+    const ch = env.chairNode && env.chairNode(); if (!ch) return 0;
+    const ry = env.boy.rotation.y, f = V(Math.sin(ry), 0, Math.cos(ry)), l = V(Math.cos(ry), 0, -Math.sin(ry));
+    const at = (window.__seatAt && window.__seatAt["rare_" + k]) || SEAT_AT["rare_" + k] || SEAT_AT.desk_watch;
+    ch.updateMatrixWorld(true); const S = ch.localToWorld(V(at[0], 0, at[1]));
+    const D = free(S, f, l); if (!D) return 0.3;
+    let need = 0;
+    for (const [x, y, z, r] of R.pts) {
+      const i = FREE.lat.reduce((b, v, j) => Math.abs(v - x) < Math.abs(FREE.lat[b] - x) ? j : b, 0), [te, ty] = D.top[i];
+      if (Math.abs(ty - y) <= r) need = Math.max(need, z + r - te);              // (crossing the desk's top: its front edge)
+      for (let j = 0; j < FREE.ys.length; j++) if (Math.abs(FREE.ys[j] - y) <= r + 0.025) need = Math.max(need, z + r - D[i][j]); }
+    return need > 0 ? need + 0.03 : 0;
+  }
+  const RIDE = 1.0;                                           // (s) riding the chair back before, and in after
+  const EV_FADE = 0.8;                                        // (s) into and out of the capture: the hands go from the armrests to the thighs (42-49 deg, chain_joins.py)
+  function rare(k) {
+    const R = M.rare[k], a = M.actions["rare_" + k], st = env.state(); if (!R || !a || M.ev || st.at !== "desk" || st.step) return false;
+    M.ev = {k, a, t: 0, R: {...R, back: backFor(R, k)}}; M.log.push([+st.T.toFixed(2), "rare:" + k + " back " + M.ev.R.back.toFixed(3)]); return true;
+  }
+  function rareStep(dt) {                                     // its phases: ride back, the capture, ride in
+    const E = M.ev; if (!E) { M.evOff = 0; return; }
+    E.t += dt; const t = E.t, D = E.R.dur, end = RIDE + D;
+    M.evOff = E.R.back * (t < RIDE ? sstep(0, RIDE, t) : t < end ? 1 : 1 - sstep(end, end + RIDE, t));
+    const w = M.actions.desk_watch;
+    if (t >= RIDE && !E.on) { E.on = true; E.a.reset(); E.a.setEffectiveWeight(1); E.a.fadeIn(EV_FADE).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EV_FADE); env.setCurrent(E.a); }
+    if (E.on && !E.off && t >= end - EV_FADE) { E.off = true; w.reset(); w.setEffectiveWeight(1); w.fadeIn(EV_FADE).play(); E.a.fadeOut(EV_FADE); env.setCurrent(w); }
+    if (t >= end + RIDE) { E.a.stop(); M.ev = null; }
+  }
+  function handRoll(m) {                                     // the roll back (m) that puts the clip's keyboard / mouse on the room's
+    const ry = env.boy.rotation.y; _f.set(Math.sin(ry), 0, Math.cos(ry)); env.boy.updateMatrixWorld(true);
+    if (m === "desk_type") return (M.off || 0) - _k.set(...P.keys.c).sub(toWorld(P.ref, _c)).dot(_f);
+    if (m === "desk_mouse") { _m.set(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
+      return (M.off || 0) - _m.sub(toWorld(CLIP.mouse, _c)).dot(_f); }
+    return null;
+  }
   function roll(dt) {
-    const lap = M.sc && ["read", "phone", "phone_scroll"].includes(M.sc.k);   // (a book or a phone on his lap: clear of the desk)
-    // env.seatIn (v5: 0.06): G14's v5 clips sit him that much deeper on the seat (clear of the arm pads' front ends, against
-    // the backrest); he and the chair roll in by as much, so his hands stay on the keys / mouse / book and his elbows keep their angle
-    const want = (lap ? 0.45 : M.mode === "desk_watch" || !M.mode ? 0.12 : M.mode === "desk_mouse" ? 0.06 : 0.085) - (env.seatIn || 0), k = 1 - Math.exp(-dt / 0.35);
-    const p = env.boy.position;
-    if (M.rollAt && (Math.abs(p.x - M.rollAt[0]) > 1e-6 || Math.abs(p.z - M.rollAt[1]) > 1e-6)) M.off = 0;   // (the page placed him anew)
+    const lap = M.sc && ["read", "phone", "phone_scroll"].includes(M.sc.k);
+    const p = env.boy.position, H = env.HIPS, k = 1 - Math.exp(-dt / 0.35);
+    if (M.rollAt && (Math.abs(p.x - M.rollAt[0]) > 1e-6 || Math.abs(p.z - M.rollAt[1]) > 1e-6)) { M.off = 0; M.held = null; }   // (the page placed him anew)
+    const ry = env.boy.rotation.y, c = Math.cos(ry), s = Math.sin(ry), ch = env.chairNode && env.chairNode();
+    // a desk mode (or watching after one) is placed by its clip; anything else seated (eating: room_eat with the dish) as before
+    const desk = !lap && (M.mode || M.held != null);
+    let want;
+    if (desk) { const hr = handRoll(M.mode) ?? (M.held ?? handRoll("desk_mouse")); if (M.mode && M.mode !== "desk_watch") M.held = hr; want = (hr ?? 0) + (M.evOff || 0); }
+    else want = lap ? 0.45 : 0.12 - (env.seatIn || 0);
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
-    const ry = env.boy.rotation.y, bx = -Math.sin(ry) * d, bz = -Math.cos(ry) * d;      // back: against the way he faces
-    p.x += bx; p.z += bz; M.rollAt = [p.x, p.z];
-    if (Math.abs(d) < 1e-6) return;
-    const ch = env.chairNode && env.chairNode(); if (ch) { ch.position.x += bx; ch.position.z += bz; ch.updateMatrixWorld(true); }
+    if (ch && Math.abs(d) > 1e-6) { ch.position.x += -s * d; ch.position.z += -c * d; ch.updateMatrixWorld(true); }   // (back: against the way he faces)
+    if (ch && desk) {                                        // his root: each mode's hips on its seat point, blended as the clips are
+      ch.updateMatrixWorld(true); let tx = 0, tz = 0, W = 0;
+      for (const m of ["desk_type", "desk_mouse", "desk_watch", ...Object.keys(M.rare).map(k => "rare_" + k)]) {
+        const a = M.actions[m], w = a && a.isRunning() ? a.getEffectiveWeight() : 0; if (w < 1e-3) continue;   // (an action never played reports weight 1)
+        const hm = H[m], at = (window.__seatAt && window.__seatAt[m]) || SEAT_AT[m] || SEAT_AT.desk_watch; ch.localToWorld(_st.set(at[0], 0, at[1]));
+        tx += w * (_st.x - (hm[0] * c + hm[2] * s)); tz += w * (_st.z - (-hm[0] * s + hm[2] * c)); W += w; }
+      if (W > 0.5) { p.x = tx / W; p.z = tz / W; }
+    } else if (Math.abs(d) > 1e-6) { p.x += -s * d; p.z += -c * d; }
+    M.rollAt = [p.x, p.z];
   }
 
   // ---------- getting on and off the chair and the bed: the room clips, inside the page's own pose steps ----------
@@ -416,9 +528,9 @@ export function createMH(env) {
   // floor), and it hands back to the page's poses at both ends (the first and last 15 % blend).
   const sstep = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
   const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
-  function chairPlace(off, face) {                           // the root for a clip whose seat centre is at off (x, z), on the room's chair
-    const ch = env.chairNode && env.chairNode(); if (!ch) return null;   // (face: the way the seated clip faces, in its frame; +z if not given)
-    ch.updateMatrixWorld(true); const p = ch.getWorldPosition(V()), cry = ch.rotation.y;
+  function chairPlace(off, face, at) {                       // the root for a clip whose seat centre is at off (x, z), on the room's chair
+    const ch = env.chairNode && env.chairNode(); if (!ch) return null;   // (face: the way the seated clip faces, in its frame; +z if not given;
+    ch.updateMatrixWorld(true); const p = at ? ch.localToWorld(V(at[0], 0, at[1])) : ch.getWorldPosition(V()), cry = ch.rotation.y;   // at: the seat point in the chair's frame, else its pivot)
     let r = Math.atan2(-Math.sin(cry), -Math.cos(cry));                 // the way a person on it faces
     if (face != null) r = face - Math.atan2(Math.cos(r), Math.sin(r));   // (a local direction at angle a ends at a - ry in the room)
     const c = Math.cos(r), s = Math.sin(r);
@@ -431,13 +543,14 @@ export function createMH(env) {
       const sleepy = g && g.clip === "sleep", U = G.guL;          // (both sides share the clip's timing)
       return {k: "getup", flow: true, a: S.stiff || sleepy ? 0 : U.start, b: S.next ? U.end : U.stand}; }
     if (B && g && g.clip === "sleep" && g.anchor === "bedlie") {          // going to sleep: room_bedtime
-      if (!to && from === "desk") return {k: "bedtime", a: 0, b: B.up, at: () => chairPlace(B.seat, B.face), back: true};
+      // (up from the desk he stands up as always, room_mx_sit_to_stand below: room_bedtime's own get-up at its chair put
+      // his legs and hips through ours, up to 3300 vertices on main)
       if (to === "bedside" && from !== "bedlie") return {k: "bedtime", a: B.walk, b: B.edge, at: () => B.edgePl};
       if (to === "bedlie" && from === "bedside") { const h = u => hipsAt(M.clips.bedtime, B.edge + (B.end - B.edge) * u);
         return {k: "bedtime", a: B.edge, b: B.end, at: u => mixPlace(B.edgePl, B.lie, sstep(0.1, 0.7, u), h(u))}; }
     }
-    if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(G.seatDown || SEAT.down), back: true};
-    if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up), back: true};
+    if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(G.seatDown || SEAT.down, null, SEAT_AT.desk_watch), back: true};   // (onto the seated loop's seat point)
+    if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up, null, SEAT_AT.desk_watch), back: true};
     if (to === "bedside" && from !== "bedlie") return {k: "bed_lie", a: G.lie.stand, b: G.lie.edge, at: () => G.lieEdge};
     const hips = (clip, a, b) => u => hipsAt(M.clips[clip], a + (b - a) * u);
     if (to === "bedlie" && from !== "bedlie") { const h = hips("bed_lie", G.lie.edge, G.lie.end);   // (lying already: no lie-down)
@@ -573,7 +686,9 @@ export function createMH(env) {
     if (S.A && S.A !== a) S.A.setEffectiveWeight(u < 0.5 ? 1 - w : 0);          // the page's poses only at the two ends
     if (S.B && S.B !== a) S.B.setEffectiveWeight(u < 0.5 ? 0 : 1 - w);
     env.mixer.update(0);
-    const b = env.boy, wr = T.back ? w : sstep(0, 0.15, u);  // the root: from the page's toward the clip's placement (onto the bed: kept)
+    // the root: from the page's toward the clip's placement (onto the bed: kept); sitting down from further out than the
+    // clip starts (TURN_CLEAR), over the first 35 % while he already sits back, so it adds to his own travel
+    const b = env.boy, wr = T.k === "sit_down" && u < 0.5 ? sstep(0, 0.35, u) : T.back ? w : sstep(0, 0.15, u);
     b.position.set(b.position.x + (place.x - b.position.x) * wr, b.position.y + (env.F - b.position.y) * wr, b.position.z + (place.z - b.position.z) * wr);
     b.rotation.y = angLerp(b.rotation.y, place.ry, wr);
     return true;
@@ -822,14 +937,21 @@ export function createMH(env) {
 
   // ---------- one step (instead of the page's animate: the mixer, his plan and walk, the desk modes, the wrists) ----------
   function animate(dt) {
+    if (M.ready) rareStep(dt);                                 // (before the mixer: a crossfade it starts is in this frame's pose)
     const moving = env.step0(dt);
     if (!M.ready) return moving;
     if (!P.kbNode || !P.mouseNode) { P.seen += dt; if (P.seen > 1) { P.seen = 0; props(); } }   // (G10d's nodes may arrive late)
-    const st = env.state(), m = M.sc ? null : wanted(st);       // (the showcase plays its own clip: no desk modes, no arm pins)
+    const st = env.state();
+    // (a desk mode only once he has settled: between the sit-down and the chair's ride in the page has no step for a
+    // frame, and a mode switched in then rode the turned chair in, its legs through it)
+    M.still = st.at === "desk" && !st.step ? (M.still || 0) + dt : 0;
+    if (M.ev && (st.at !== "desk" || st.step)) { M.ev.a.stop(); M.ev = null; }   // (the page moved him on: the event ends)
+    const m = M.sc || M.still < 0.3 ? null : M.ev ? "desk_watch" : wanted(st);   // (the showcase plays its own clip; an event sits him back)
     if (m) setMode(m); else if (M.mode) {                    // off the desk modes (eating, leaving): seated he just sits back
       M.mode = null; M.w.type = M.w.mouse = 0; const a = st.goal && st.goal.clip === "dine" ? M.actions.act_eat : M.actions.desk_watch, cur = st.current;
       for (const k of ["sit", "type"]) env.actions[k] = M.actions.desk_watch;
-      if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
+      // (riding the chair out to leave too: he sits back first, so the page rides it with the seated loop on its seat point)
+      if (st.at === "desk" && (!st.step || st.step.k === "chair") && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
     // the quilt and the pillow give under him lying awake on the bed: in as he lies down (the lift follows it frame by
@@ -845,7 +967,7 @@ export function createMH(env) {
     M.pil = lying;
     shove(st, dt);                                             // (after the root is final: the hand reaches the chair where it is)
     bedThings(st, dt);
-    if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
+    if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.held = null; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
@@ -860,5 +982,5 @@ export function createMH(env) {
       mouseAt: P.mouseNode ? P.mouseNode.position.toArray().map(v => +v.toFixed(3)) : null, grab: M.grab ? M.grab.toArray().map(v => +v.toFixed(3)) : null};
   }
   load().catch(e => console.warn("MakeHuman clips:", e));
-  return {animate, dbg, show, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
+  return {animate, dbg, show, rare, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
 }
