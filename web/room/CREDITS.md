@@ -247,6 +247,35 @@ that faintly reflects the room.
 The car poster (`poster_car.webp`, `room_build/poster_car.py`) is an original drawing, CC0, of no real car or maker; the
 page paints it over the record sleeve in the posters atlas.
 
+## The bottle of green tea: made with Tripo (paid API)
+`bottle.glb` is the bottle on the desk **made with Tripo (paid API)** (https://www.tripo3d.ai): image-to-model, model
+`v3.1-20260211`, PBR, detailed textures, `face_limit` 2500, generated on 2026-10-06 (AI-generated content under Tripo's
+terms of service, not a Creative Commons licence). Task `dcee8d97-ef32-4d6a-974e-ad0a53a41bec`. It takes the place of the
+last prop still modelled in `web/room.html` itself — four cylinders making a translucent body, a green band, a cone
+shoulder and a white cap — which `?bottle=old` brings back. 2 372 triangles, 96 KB.
+
+It was generated from a reference built for it, not from a photograph as found. The photograph is **"Bottle of Water"**
+by Jiafei Slay Queen (https://commons.wikimedia.org/wiki/File:Bottle_of_Water.jpg, Wikimedia Commons, **CC0 1.0**): a
+plain, label-free, unbranded clear PET bottle with a white screw cap, shot upright and front-on. On top of it, made
+here: the bottle filled to the neck with green tea, and a label of leaves, a cream band and a thin rule wrapped round
+the middle with cylindrical foreshortening. The label is an original design — no text, no logo, no brand, no real
+product, and no person appears in the photograph. The reference is not committed.
+
+`room_build/build_bottle.mjs` scales it by its width to a 3.2 cm radius (21.6 cm tall), turns it, puts its origin where
+the page holds the prop (the base 0.08 m under it, so it stands on the desk top), sets the metallic factor to 0 — Tripo
+baked a metal look into its ORM map, and a PET bottle is not metal — and cuts its maps to 1024 px colour with the
+metal/roughness and normal maps at 512, WebP, meshopt. The page loads it into the same `PROP.bottle` group, so taking
+it, drinking and putting it back are unchanged. The raw download is not committed. Rebuild, from `room_build/`:
+
+    node build_bottle.mjs <raw bottle.glb> ../web/room/bottle.glb
+
+Generated and not used (paid for, left out): a first bottle (`a9e6a027-4f9f-4f55-9761-65bdc50fa5de`), made from a
+reference that kept the photograph's half-full, clear-walled upper body; it came back dented, with the cap swallowed
+into the body. Before and after, the budget and what is still wrong: `docs/design/prop-bottle/README.md`.
+
+Credits: 80 of a budget of 150 (40 for each of the two tasks, the rejected one and the one in the room). The Tripo
+balance went 1180 → 1100.
+
 ## His motion: clips generated with NVIDIA ARDY (#98 G3)
 `boy_m_*.glb` (listed in `boy_m_manifest.json`) are motions generated from text prompts with **ARDY**
 (https://github.com/nv-tlabs/ardy, NVIDIA; the paper's authors are credited there), checkpoint

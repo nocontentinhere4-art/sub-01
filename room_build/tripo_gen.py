@@ -1,7 +1,7 @@
 """One Tripo generation per run (paid API: https://openapi.tripo3d.ai/v3), guarded against spending twice.
 
     python room_build/tripo_gen.py text  <name> <prompt.json> [--out DIR]          # text-to-model; prompt.json is the request body
-    python room_build/tripo_gen.py image <name> <image.png> <face_limit> [--out DIR]   # image-to-model (P1) from a picture
+    python room_build/tripo_gen.py image <name> <image.png> <face_limit> [more.json] [--out DIR]   # image-to-model from a picture
     python room_build/tripo_gen.py balance
 
 No key is read, printed or stored here: the session's egress proxy adds the credential for openapi.tripo3d.ai. Each run
@@ -11,6 +11,8 @@ exists, the model to <name>.glb. Costs seen on 2026-10-04: text-to-model P1 40 c
 A prompt.json, for example:
     {"prompt": "Photorealistic ... plain, no logos, no text, no brand.", "negative_prompt": "cartoon, text, logo, brand",
      "model": "P1-20260311", "face_limit": 4000, "texture": true, "pbr": true, "texture_quality": "standard"}
+`image` defaults to P1; its optional more.json is merged into the request body last, so a newer model and better
+textures are a file away, e.g. {"model": "v3.1-20260211", "texture_quality": "detailed"}.
 Then fit, atlas and compress the GLBs for the web with room_build/build_tripo2.mjs (or build_tripo.mjs / build_kbm_tripo.mjs).
 """
 import argparse
@@ -64,13 +66,14 @@ def main():
         name, prompt = a.args
         run(name, out, lambda: {**json.loads(Path(prompt).read_text()), "_endpoint": "text-to-model"})
     else:
-        name, image, face_limit = a.args
+        name, image, face_limit, *rest = a.args
+        more = json.loads(Path(rest[0]).read_text()) if rest else {}
 
         def body():                                   # upload the picture (multipart: curl), then image-to-model with its token
             up = json.loads(subprocess.run(["curl", "-sS", "-F", f"file=@{image}", f"{API}/files"],
                                            capture_output=True, text=True, check=True).stdout)
             return {"input": up["data"]["file_token"], "model": "P1-20260311", "face_limit": int(face_limit),
-                    "texture": True, "pbr": True, "texture_quality": "standard", "_endpoint": "image-to-model"}
+                    "texture": True, "pbr": True, "texture_quality": "standard", **more, "_endpoint": "image-to-model"}
         run(name, out, body)
 
 

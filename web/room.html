@@ -659,7 +659,7 @@ let V5 = null;                                        // (char_v5.js and the bod
   });
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
-  scene.add(phone); makeProps();
+  scene.add(phone); makeProps(); tripoBottle();
   if (slidesInit()) { SLIDES.parked.visible = true;                 // its shader is built now, not when he first goes to bed
     renderer.compileAsync(SLIDES.parked, camera, scene).catch(() => {}).finally(() => { SLIDES.parked.visible = SLIDES.off; }); }
   Promise.all(Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"})
@@ -1954,12 +1954,13 @@ function makeProps(){
   add(bb, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.04), kraft)).position.set(0, 0.17, 0.0);   // the folded top
   PROP.breadbag = bb;
   // a bottle of green tea: clear PET, green label, white cap; origin at its middle, axis +y
-  const bo = new THREE.Group();
+  const bo = new THREE.Group(); bo.name = "tea_bottle";        // (named for the contact probe, tests/visual/contacts.js)
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.031, 0.031, 0.16, 18), M(0xa9d6b0, 0.15, {transparent:true, opacity:0.55, metalness:0})));
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.0315, 0.0315, 0.07, 18), M(0x2f7d46, 0.5))).position.y = -0.01;
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.031, 0.04, 18), M(0xa9d6b0, 0.15, {transparent:true, opacity:0.55}))).position.y = 0.10;
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, 0.022, 14), M(0xf2f2f2, 0.5))).position.y = 0.13;
   PROP.bottle = bo; bo.position.copy(BOTTLE_AT).add(_l1.set(0, 0.08, 0));
+  // (tripoBottle() puts the generated model in its place; what is built here is the fallback and ?bottle=old)
   // headphones: a band over the top of his head and two cups, a child of the head bone (built in metres, its local frame:
   // x across the ears, y up the crown, z where the face looks; the bone's frame is pitched 45 degrees and in cm)
   const hp = new THREE.Group(), dark = M(0x26262c, 0.45), pad = M(0x111114, 0.9), acc = M(0xff6a00, 0.5);
@@ -1973,6 +1974,22 @@ function makeProps(){
     hp.rotation.x = -Math.PI / 4; hp.position.set(0, 0.085 * q * s, -0.085 * q * s).addScaledVector(_l2.set(0, q, q), 0.01 * s); }
   for (const k of ["bag", "bento", "sticks", "bread", "breadbag", "bottle"]) { scene.add(PROP[k]); PROP[k].visible = k === "bottle"; }
   PROP.breadbag.position.copy(BAG_AT); PROP.breadbag.rotation.y = 0.3;
+}
+// the bottle of green tea, made with Tripo's paid API (web/room/bottle.glb, room_build/build_bottle.mjs): the last prop
+// still modelled here. It is built in metres with its long axis +y, the cap up and its origin where this page holds the
+// prop (the base 0.08 m under it), so it goes straight inside PROP.bottle and everything that moves the bottle - his
+// right hand taking it, drinkFrom(), drop() - keeps working untouched. ?bottle=old keeps the one modelled above
+const BOTTLE_TRIPO = !OLD_ROOM && new URLSearchParams(location.search).get("bottle") !== "old";
+function tripoBottle(){
+  if (!BOTTLE_TRIPO || !PROP.bottle) return;
+  load("room/bottle.glb").then(g => {
+    const m = g.scene.getObjectByName("T_bottle"); if (!m) throw new Error("no T_bottle node");
+    m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true;
+      o.material.envMap = scene.environment; o.material.envMapIntensity = 0.5; } });
+    const bo = PROP.bottle;
+    while (bo.children.length) bo.remove(bo.children[0]);        // the modelled cylinders give way to it
+    bo.add(m);
+  }).catch(e => console.warn("bottle.glb", e));
 }
 // the bag he carries or that stands on the desk: the courier's paper bag (a pizza comes in its own box), the bakery's
 // paper bag, the konbini's white bag. PROP.bag's origin is where his hand holds it; on the desk it stands on BAG_AT

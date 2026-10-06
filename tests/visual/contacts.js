@@ -53,6 +53,9 @@
       if (p >= 0) return PARTS[p] === "plastic" ? (Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm_post" : "frame") : PARTS[p] === "seat" ? (u.z < -0.17 ? "seat_front" : "seat") : PARTS[p]; }
     return Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm" : u.z < -0.17 && u.y < 0.62 ? "front" : u.z > 0.12 && u.y > 0.55 ? "back" : u.y < 0.30 ? "base" : "seat"; };
   const HAND = /hand|finger|thumb|index|middle|ring|pinky|metacarpal|wrist|palm/i;
+  const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|ear|face|chin/i;
+  // the tea bottle he picks up and drinks from: his hand holds it, so it is tested against his head as well as his hands
+  const takes = (name, b) => name === "tea_bottle" ? (HAND.test(b) || HEAD.test(b)) : HAND.test(b);
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
   function check(res, frame, every = 1) {             // one frame: every skinned vertex against every object
     boy.updateMatrixWorld(true);
@@ -64,7 +67,7 @@
       for (let i = 0; i < P.count; i += every) {
         sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); res.samples++;
         for (const [name, o] of Object.entries(objs)) {
-          if (name !== "chair" && !HAND.test(bone(i))) continue;          // (hands only, against the desk things)
+          if (name !== "chair" && !takes(name, bone(i))) continue;        // (hands only, against the desk things)
           const d = inside(o, v); if (d <= 0) continue;
           // the chair's hits by where on it (its own frame: the sitter faces -z, the seat's front edge at z ~ -0.25)
           const key = (name === "chair" && window.__chairRegions ? "chair@" + region(_u.copy(v).applyMatrix4(o.inv)) : name) + ":" + bone(i), r = res.hits[key] = res.hits[key] || {n: 0, verts: new Set(), max: 0, frames: new Set()};
@@ -85,7 +88,7 @@
         const subs = []; for (const c of ch.children) { const prev = c.parent; const o = columnsOf(c, ch); if (o) subs.push(o); }
         objs.chair = {node: ch, subs, odd: subs.reduce((a, s) => a + s.odd, 0), nx: subs.reduce((a, s) => a + s.nx * s.nz, 0), nz: 1, inv: new THREE.Matrix4()};
         ch.position.copy(keep[0]); ch.rotation.y = keep[1]; ch.updateMatrixWorld(true); }
-      for (const n of ["keyboard", "mouse", "controller"]) { const o = scene.getObjectByName(n); if (o) columns(n, o); }
+      for (const n of ["keyboard", "mouse", "controller", "tea_bottle"]) { const o = scene.getObjectByName(n); if (o) columns(n, o); }
       return Object.fromEntries(Object.entries(objs).map(([k, o]) => [k, {cells: o.nx * o.nz, odd_rays: o.odd}]));
     },
     // run a scenario: setup() then n frames of 1/30 s, checking every `stride` frames
