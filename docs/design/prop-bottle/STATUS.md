@@ -3,6 +3,24 @@
 Reporting here because `send_message` is blocked behind a permission prompt in this session. Everything below is
 measured, not estimated.
 
+## For G10d, who owns `preview/room-v5` and renders the full-day strip
+
+**The bottle has landed on your branch** (merge `b5ca210`; still present at `0cc087e`, your bedtime commit, which I
+fast-forwarded to rather than touching). Your next strip will include it. I could not message you directly — the
+`send_message` tool is blocked behind a permission prompt here — so this is the channel. Three things that affect what
+your strip shows:
+
+1. **He never picks the bottle up on v5, so do not wait for a drink frame.** On the v5 rig `animate` returns
+   `mh.animate(dt)` before `animate0(dt)`, and `drinkFrom()` lives in that old layer. Measured: the bottle moves
+   **0.0 mm** over 240 frames with the drink forced on v5, against 412 mm on `?char=old`. On v5 it is a static desk
+   prop, standing in front of the mouse. That is the engine, not the prop, and not something your strip is doing wrong.
+2. **The visual suite's one failure on v5 is not mine.** `desk_14_1280: chair penetration 208 / desk penetration 205
+   sampled vertices`. I ran that same test on `4500931` with my merge absent and got identical numbers, so it predates
+   the bottle — it is in the seated scene, somewhere in the seated fix or the re-made sit/stand. Worth knowing before it
+   lands in your strip's QA column and gets blamed on the new prop.
+3. **`?bottle=old`** brings the four modelled cylinders back if you want a before frame for the strip; everything else
+   in the page is unchanged by it.
+
 ## Where things are
 
 | | |
