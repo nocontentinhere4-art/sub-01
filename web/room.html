@@ -351,9 +351,10 @@ const F = 0.16;
 const ANCHOR = {
   // seated anchors give where his hips go (`seat`; the root follows from the clip) and where he stands to sit down;
   // standing ones give the root (`p`). The clean room: chair at (-1.13, -0.585), seat top 0.665; the bed's mattress top
-  // y 0.82, frame x -1.90..-0.20 (headboard at -1.90), z 0.25..1.50 (open side at 0.25)
+  // y 0.82, frame x -1.90..0.05 (headboard at -1.90; 1.90 m long, a standard single: room_build/bed_length.mjs), z 0.25..1.50 (open side at 0.25)
   desk:    {seat:[-1.12, 0.87, -0.56], r:-2.85, stand:[-0.68, -0.55]},   // on the desk chair, facing the monitor; he sits down from its side
-  bedlie:  {p:[-1.03, -0.095, 0.89], r:Math.PI / 2}, // on his back on the duvet, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
+  bedlie:  {p:[-0.93, -0.095, 0.89], r:Math.PI / 2}, // on his back on the duvet, head on the pillow (the clip lifts the hips ~1.1 m); in and out by the edge
+  //   (10 cm further from the headboard since the 1.90 m bed: the back of his head was 5 cm into its oak)
   bedside: {seat:[-0.40, 1.06, 0.36], r:Math.PI, stand:[-0.36, -0.18]},      // sitting on the edge, on the duvet (0.7 m up: his feet hang)
   door:    {p:[1.22, F, -0.92], r:2.2},              // in front of the door
   window:  {p:[0.18, F, -0.15], r:-Math.PI / 2},     // standing, looking out of the window over the foot of the bed
@@ -496,7 +497,7 @@ if (TRIPO) Promise.all([load("room/props_tripo.glb"),
 // room (and its decals) by a box around it
 const T2_OLD = {lamp2:{hide:["desk_lamp_arm_01"]}, plant2:{hide:["potted_plant_02_leaves", "potted_plant_02_pot"]},
   box:{hide:["cardboard_box_01"]}, alarm:{hide:["alarm_clock_01"]}, succulent:{hide:["potted_plant_04_dirt"]},
-  backpack:{cut:[[-0.198, 0.155, 1.02], [0.07, 0.70, 1.46]]},   // props_soft.py backpack(): by the bed's side at z 1.24 (x from just off the bed, -0.20)
+  backpack:{cut:[[0.052, 0.155, 1.02], [0.32, 0.70, 1.46]]},    // props_soft.py backpack(): by the bed's side at z 1.24 (x from just off the bed's foot, 0.05: bed_length.mjs moved it +0.25)
   fan:{cut:[[1.53, 0.155, 0.13], [1.87, 0.72, 0.47]]},                  // props_hard.py fan(): FAN (1.70, 0.30)
   bin:{cut:[[-0.68, 0.155, -1.35], [-0.42, 0.48, -1.09]]},             // props_hard.py: the bin and its bag at (-0.55, -1.22)
   controller:{cut:[[-0.89, 0.965, -1.27], [-0.71, 1.02, -1.13]]},      // props_hard.py controller(): (-0.80, DTOP, -1.20)
@@ -1504,10 +1505,10 @@ function replan(){                                    // the steps from where he
   plan = P;
 }
 // the free floor: hand-placed waypoints between the furniture (room_build/build_room.py) and the walkable links
-const NODES = {bs:[-0.36, -0.18], ds:[-0.62, -0.35], w:[0.15, -0.12], c:[0.45, -0.35], m:[0.35, 0.05], d:[1.22, -0.92], f:[0.15, 0.75],
+const NODES = {bs:[-0.36, -0.18], ds:[-0.62, -0.35], w:[0.15, -0.12], c:[0.45, -0.35], m:[0.35, 0.05], d:[1.22, -0.92], f:[0.40, 0.75],
   sl:[-1.10, -0.06], g:[-0.62, -0.08], bn:[-0.17, -0.66]};   // bn: by the desk's end, towards the bin                 // g, sl: through the gap between the chair and the bed, to the window sill
 const LINKS = [["bs","ds"], ["bs","w"], ["ds","w"], ["w","m"], ["w","c"], ["m","c"], ["c","d"], ["m","d"], ["w","f"], ["m","f"], ["bs","g"], ["g","sl"], ["w","g"], ["bs","bn"], ["ds","bn"], ["c","bn"]];
-const BLOCK = [[-1.90, -0.20, 0.25, 1.50], [-1.86, -0.36, -1.45, -0.80], [-1.42, -0.84, -0.88, -0.30], [-0.12, 0.32, -1.45, -1.17],
+const BLOCK = [[-1.90, 0.05, 0.25, 1.50], [-1.86, -0.36, -1.45, -0.80], [-1.42, -0.84, -0.88, -0.30], [-0.12, 0.32, -1.45, -1.17],
   [0.45, 0.93, -1.45, -0.97], [-1.90, -1.42, -0.60, -0.12]];          // bed, desk, chair, shelf, fridge, plant (x0, x1, z0, z1)
 function free(a, b, pad = 0.12){                      // is the straight line a -> b clear of the furniture
   const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.04);
@@ -2387,7 +2388,7 @@ function dentPress(base, pos, idx, top, B, MIN, k){
     pos[i + 1] = y0 + (B + (y0 - B) * s - y0) * k; };
   if (idx) for (const i of idx) one(3 * i); else for (let i = 0; i < base.length; i += 3) one(i);
 }
-const DENT = {mesh:null, base:null, under:null, X0:-1.95, Z0:0.20, C:0.02, NX:92, NZ:70, SLOPE:0.6, MIN:0.014, top:null, tg:null, k:0, acc:0};
+const DENT = {mesh:null, base:null, under:null, X0:-1.95, Z0:0.20, C:0.02, NX:105, NZ:70, SLOPE:0.6, MIN:0.014, top:null, tg:null, k:0, acc:0};
 function quiltDent(k, dt){
   DENT.k = k; if (k <= 0 && !DENT.mesh) return;
   if (!bedInit()) return;
@@ -2431,7 +2432,7 @@ function quiltDent(k, dt){
 // whatever is under each point, plus the duvet's own thickness. While he is under it the room's folded quilt is hidden:
 // he has picked it up.
 const COV = {mesh:null, pos:null, nor:null, uv:null, nx:60, nz:46, nt:0, hem:0, acc:0, lastHem:9, len:0,
-  XFOOT:0.32, XFOLD:-1.33, FALL:0.28, Z0:0.14, Z1:1.61, ZM0:0.26, ZM1:1.49, BED:0.82, LOFT:0.055, THICK:0.05, DROP:0.26, DR:0.17, TEX:3.6};
+  XFOOT:0.57, XFOLD:-1.33, FALL:0.28, Z0:0.14, Z1:1.61, ZM0:0.26, ZM1:1.49, BED:0.82, LOFT:0.055, THICK:0.05, DROP:0.26, DR:0.17, TEX:3.6};
 function coverInit(){                                  // the grid, its faces and its UVs: built once
   const {nx, nz} = COV, nt = COV.nt = nx * nz, g = new THREE.BufferGeometry();
   COV.pos = new Float32Array(nt * 2 * 3); COV.nor = new Float32Array(nt * 2 * 3); COV.uv = new Float32Array(nt * 2 * 2);
@@ -2522,7 +2523,7 @@ function coverShape(){                                 // the duvet over him, th
     } }
   // he is longer than the mattress: the cloth stays up until past all of him (one straight line, so the end hangs as one
   // straight curtain, not in strands), then the rest of it hangs down to a straight hem
-  let end = -0.21;                                                    // (the foot end of the mattress), or past his toes' tips
+  let end = 0.04;                                                     // (the foot end of the mattress), or past his toes' tips
   for (const n of ["LeftToeBase", "RightToeBase", "LeftFoot", "RightFoot"]) end = Math.max(end, bones[n].getWorldPosition(_l2).x + (/Toe/.test(n) ? 0.09 : 0.16));
   const iEnd = Math.min(nx - 3, Math.ceil((end - hem) / len * (nx - 1)));
   // 2. cloth, not shrink wrap: smooth the surface (it bridges between his limbs), but never below him
@@ -3069,14 +3070,14 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
     const hid = SLIDES.state === 2 && sm === skinMesh() ? SLIDES.parkedIdx : null;   // (the slides parked by the bed are not on him)
     for (let i = 0; i < P.count; i += every) { if (hid && hid.has(i)) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
-      const e = Math.min(v.x + 1.90, -0.20 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
+      const e = Math.min(v.x + 1.90, 0.05 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
       if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0)) { bed++; note(i, "bed"); }
       if (V) { ch.worldToLocal(u.copy(v)); const ci = Math.floor((u.x - V.x0) / V.c), ck = Math.floor((u.z - V.z0) / V.c);
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } } }
     return detail ? {bed, chair, by} : {bed, chair, of:count}; },
   LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
-    if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
+    if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 205, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
       room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
         o.updateMatrixWorld(true); const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();
         for (let t = 0; t < (ix ? ix.count : P.count); t += 3) { const id = k => ix ? ix.getX(t + k) : t + k;

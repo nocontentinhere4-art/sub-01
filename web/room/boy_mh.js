@@ -47,9 +47,10 @@ const CLIP = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], de
 // measured from the clips at load: G2's is at (-0.28, -0.15));
 // stand_up starts seated with it at (0, 0); the bed clips are lifted to the 0.66 m mattress (the room's: 0.82 - 0.16)
 const SEAT = {down: [-0.26, -0.13], up: [0, 0]};
-const BED = {hips: [-1.0, 0.89], head: -1,                 // where his hips lie on the duvet (x, z), the head toward -x (the headboard),
+const BED = {hips: [-0.90, 0.89], head: -1,               // where his hips lie on the duvet (x, z), the head toward -x (the headboard;
+  // 10 cm from it since the 1.90 m bed: the back of his head was 5 cm into its oak, G10d),
   edge: [-0.40, 0.36], face: Math.PI,                        // where he sits on its edge (ANCHOR.bedside's seat), facing the desk (-z),
-  box: [-1.90, -0.20, 0.25, 1.50], top: 0.805};              // and the mattress (x0, x1, z0, z1) with its top less 1.5 cm of give
+  box: [-1.90, 0.05, 0.25, 1.50], top: 0.805};                // and the mattress (x0, x1, z0, z1) with its top less 1.5 cm of give
 const WALK_V = 0.67;                                         // room_walk's travel speed (m/s)
 const HUMP = 0.02;                                           // a room mouse's hump: 2 cm behind its centre (the back third)
 const FADE = 0.4;
