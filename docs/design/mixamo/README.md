@@ -350,3 +350,25 @@ tests/visual core set: 0 hard failures. tests/test_boy_mh.py: 7 passed.
 The desk set rests its hands on the thighs (4–5 cm over them). Seated_Idle stays the base. The 0.8 s hands-to-thighs blend gets its contact pass on the Mixamo rig, the body it will play on.
 
 The forward lean G14 measured (13–19°) is partly this pipeline's: the v5 seated fit tipped the spine 10° (`pitch` in `mixamo_clips.json`). On the Mixamo rig there is no fit.
+
+## Rig-change checklist (re-measure first when the Mixamo-rigged character lands)
+
+Measured on 20d32f0 every frame (contact_pass perFrame, positions in the chair's frame; seat cushion top y 0.504, front −z). Everything below is inside the chair; desk, floor and bed are 0.
+
+1. **Sit-down landing** (window → desk, 0.67–0.70 s into the step), 2 frames, up to 1.2 cm.
+   - Right lower thigh into the cushion's front, 1.3–1.6 cm under its top.
+   - COORD: inside the contract's give (−2.5…+0.5 cm), not a defect. Re-measure.
+2. **Rising** (desk → window / bed, 0.47–0.57 s), 4 frames (0.13 s), up to 1.6 cm.
+   - The back of the left calf under the cushion's front edge (y 0.435, z −0.24).
+   - COORD: a small defect. Re-measure on the new rig.
+3. **First step away** (1.93–2.03 s), 4 frames (0.13 s), up to 3.8 cm.
+   - The left lower calf/ankle through the chair base's front leg (y 0.05–0.08, z −0.27…−0.30).
+   - COORD: a real defect. Fix it on the new rig: the walk-off foot placement, or roll the chair before he steps. Not patched on v5.
+
+Also on the new rig, before anything else is accepted:
+- the seat-point sweeps (`SEAT_AT`);
+- the chair-ride distances for the rare events;
+- the 0.8 s hands-to-thighs blend, contact-passed against thighs, armrests and desk edge;
+- hoodie stretch per seated clip;
+- the forward lean, measured with no fit;
+- the mouse-mode body (Seated_Idle vs Typing), with G14's resolver.
