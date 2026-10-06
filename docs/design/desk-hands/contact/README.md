@@ -102,3 +102,31 @@ Typing mode now plays G12's Mixamo capture, with the hands settled by the same r
 - **Resting fingers:** 37 resting samples are more than 5 mm up, probably small lifts under the 8 mm threshold.
 - **Elbow swing** fires on most frames (up to 14.4° against the 15° cap) to keep the sleeve out of the desk.
 - **Hand height** is clamped at 6 cm on both hands, so the capture's real knuckle drop may be larger.
+
+### Typing capture, second pass (COORD's three open items)
+1. **The hand-height clamp.** The capture's knuckle-to-resting-fingertip drop is steady, not out of range: left median 6.1 cm (5.4–6.6), right 6.6 cm (5.5–6.8). The knuckle, surface and units all check.
+   - The 6 cm ceiling was simply set too low. It cut 1–8 mm off, which pressed the resting fingers into the caps and ate the strokes' lift.
+   - Now bounded at a finger's length (9 cm). Clamped on 0% of frames on both hands.
+2. **The −5.4 mm fingertip** was the right index at 9.25 s, at the keyboard's right end, while the capture's hand travelled. Two causes:
+   - The height map's nearest cell could read the lower level next to a keycap's side step. The lookup now takes the highest of the cell and its 8 neighbours.
+   - The hand-raise for a finger still in a key, even straightened, acted only on the next frame. It now raises the hand and re-solves the fingers in the same frame, twice at most.
+   - The skin samples per phalanx are now chosen pad and tip first.
+   - Deepest now −1.3 mm. 0 samples more than 2 mm into a cap.
+3. **The elbow.** "14.4° on most frames" was my own misreading: the counter counted calls (several per frame, both hands, since page start), not frames. Per frame over the clip:
+   - left: never engaged;
+   - right: 1.2% of frames;
+   - median and 90th percentile 0°; max 14.9° (the cap), on those few frames.
+
+**Measured now over the whole 16.5 s, every 0.25 s** (`key_contact_mx_typing.json`):
+
+| | value |
+|---|---|
+| All fingertips | median +1.1 mm, min −1.3 mm |
+| Resting fingers | median +0.9 mm; 66% in the 0 to +2 mm band, 76% within ±3 mm; 0 more than 2 mm in |
+| Fingers in a stroke | median +9.3 mm up; 35 of 57 kept more than 6 mm up |
+
+- **Resting fingers more than 5 mm up:** 15% of resting samples. Of these:
+  - 37 are over a gap, edge or frame, where the probe measures to the plate under the fingertip (an artifact of the measure);
+  - 47 (8% of resting samples) are over a cap top. These are probably the capture's small finger moves under the 8 mm stroke threshold.
+
+**Sheet:** `typing_capture_sheet.jpg` has four frames over his right shoulder, 4 s apart, and both hands from his left at key height.

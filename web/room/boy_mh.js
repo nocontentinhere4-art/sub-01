@@ -400,8 +400,12 @@ export function createMH(env) {
     const m = {node, x0: bb.min.x, z0: bb.min.z, s, nx, nz, h, peak: pk}; MAPS.set(node, m); return m;
   }
   function topAt(m, p) {                                     // the surface's top under p (world y), null off it
-    m.node.worldToLocal(_l.copy(p)); const i = Math.round((_l.x - m.x0) / m.s), k = Math.round((_l.z - m.z0) / m.s);
-    if (i < 0 || k < 0 || i >= m.nx || k >= m.nz) return null; const y = m.h[i * m.nz + k]; if (Number.isNaN(y)) return null;
+    // (the highest of the cell and its 8 neighbours: next to a step, a keycap's side, the nearest cell alone could read the
+    // lower level and let a fingertip 5 mm into the cap's edge)
+    m.node.worldToLocal(_l.copy(p)); const i0 = Math.round((_l.x - m.x0) / m.s), k0 = Math.round((_l.z - m.z0) / m.s);
+    let y = -Infinity;
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let k = k0 - 1; k <= k0 + 1; k++) { if (i < 0 || k < 0 || i >= m.nx || k >= m.nz) continue; const h = m.h[i * m.nz + k]; if (!Number.isNaN(h) && h > y) y = h; }
+    if (y === -Infinity) return null;
     return m.node.localToWorld(_l.set(_l.x, y, _l.z)).y;
   }
   const SURF = {mouse: () => P.mouseNode, keys: () => P.kbNode};
@@ -442,6 +446,7 @@ export function createMH(env) {
   }
   M.swing = {frames: 0, maxIn: 0, maxA: 0};                 // (?debug: how often and how far the elbow had to swing)
   function swingElbow(side, weight) {                        // the elbow up about the shoulder-wrist line until the arm is out of the desk
+    M.swingNow = M.swingNow || {}; M.swingNow[side] = 0;   // (?debug: this frame's swing, rad)
     const d0 = armIn(side); if (d0 <= 0.003) return; M.swing.frames++; M.swing.maxIn = Math.max(M.swing.maxIn, d0);
     const B = env.bones, ua = B[side + "Arm"], sh = ua.getWorldPosition(V()), axis = B[side + "Hand"].getWorldPosition(V()).sub(sh).normalize();
     const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
@@ -449,9 +454,9 @@ export function createMH(env) {
     const elbowY = a => { set(a); return B[side + "ForeArm"].getWorldPosition(_g).y; };
     const sgn = elbowY(0.1) > elbowY(-0.1) ? 1 : -1;        // (the way that lifts the elbow)
     let lo = 0, hi = 0.26 * sgn; set(hi);                  // (at most 15 deg: past that the shoulder reads as hunched)
-    if (armIn(side) > 0.003) { set(hi * weight); return; }
+    if (armIn(side) > 0.003) { set(hi * weight); M.swingNow[side] = Math.abs(hi); return; }
     for (let it = 0; it < 10; it++) { const m = (lo + hi) / 2; set(m); if (armIn(side) > 0.003) lo = m; else hi = m; }
-    set(hi * weight); M.swing.maxA = Math.max(M.swing.maxA, Math.abs(hi));
+    set(hi * weight); M.swing.maxA = Math.max(M.swing.maxA, Math.abs(hi)); M.swingNow[side] = Math.max(M.swingNow[side], Math.abs(hi));
   }
 
   function pin(side, delta, weight, fit, o = {}) {           // the recorded wrist + delta, the arm turned to it, then fit()'s corrections
@@ -534,7 +539,7 @@ export function createMH(env) {
     }
     return b3.localToWorld(out.copy(TIP[key]));
   }
-  // the middle and end phalanges are tested by their own skin (up to 40 of each one's vertices, skinned as drawn): a bone
+  // the middle and end phalanges are tested by their own skin (~48 of each one's vertices, skinned as drawn): a bone
   // line with a radius missed the pad under the tip by up to 8 mm on the keys
   const SKIN = {};
   function skinOf(side, i, k) {
@@ -542,7 +547,14 @@ export function createMH(env) {
     const b = S(side, i, k), all = [];
     env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
       for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (o.skeleton.bones[k0] === b) all.push([o, n]); } });
-    const st = Math.max(1, Math.ceil(all.length / 40)); return (SKIN[key] = all.filter((_, n) => n % st === 0));
+    // (the pad and the tip's end first: the vertices furthest towards the palm and the tip, then an even spread of the rest)
+    const p0 = b.getWorldPosition(V()), c = k < 3 ? S(side, i, k + 1).getWorldPosition(V()) : tipOf(side, i, V()), dir = c.clone().sub(p0).normalize();
+    const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(V()), h = S(side, 3, 1).getWorldPosition(V()).sub(wr).normalize(), l = S(side, 5, 1).getWorldPosition(V()).sub(S(side, 2, 1).getWorldPosition(V()));
+    let palm = h.clone().cross(l).normalize(); if (palm.y > 0) palm.negate();
+    const v = V(), score = all.map(([o, n]) => { o.getVertexPosition(n, v).applyMatrix4(o.matrixWorld); const d = v.sub(p0); return d.dot(palm) + 0.5 * d.dot(dir); });
+    const order = all.map((_, n) => n).sort((a, b2) => score[b2] - score[a]), pick = new Set(order.slice(0, 32));
+    const st = Math.max(1, Math.ceil(all.length / 16)); all.forEach((_, n) => { if (n % st === 0) pick.add(n); });
+    return (SKIN[key] = [...pick].map(n => all[n]));
   }
   function gap(side, name, i, j) {                           // finger i from its joint j to the tip: the least clearance over what is under it
     let low = 1e9;
@@ -668,7 +680,8 @@ export function createMH(env) {
     // at that height over the caps, so a resting finger touches as recorded and a stroke stays up (followed over ~1 s)
     let ky = 0, kn = 0; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (k) { ky += k.getWorldPosition(_s).y; kn++; } }
     let drop = 0, dn = 0; for (let i = 2; i <= 5; i++) if (S(side, i, 3) && !out.has(i)) { drop += ky / kn - (tipOf(side, i, _e).y - FING_R); dn++; }
-    if (dn) { const want = Math.max(0.015, Math.min(0.06, drop / dn)); M.kk[side] += (want - M.kk[side]) * (1 - Math.exp(-dt / 1.0)); }
+    // (the drop's bounds: a finger's length; the capture's own drop is 5.4-6.8 cm, steady)
+    if (dn) { M.kkRaw = M.kkRaw || {}; M.kkRaw[side] = drop / dn; const want = Math.max(0.015, Math.min(0.09, drop / dn)); M.kk[side] += (want - M.kk[side]) * (1 - Math.exp(-dt / 1.0)); }   // (?debug: kkRaw, unclamped)
     M.lifted = M.lifted || {}; M.lifted[side] = [...out];   // (?debug)
     return out;
   }
@@ -680,8 +693,16 @@ export function createMH(env) {
       const e = keyTarget(side).sub(tipOf(side, 2, V())).setY(0); M.kOff[side].addScaledVector(e, Math.min(1, dt / 0.8));
       const L = M.kOff[side].length(); if (L > 0.15) M.kOff[side].multiplyScalar(0.15 / L);
     }
-    const left = layFingers(side, "keys", w, 1, 0.15, dt, liftedFingers(side, dt));           // (a finger still in a key: the hand up by as much next frame; else back down slowly)
-    M.kUp[side] = left < -0.0005 ? Math.min(0.03, M.kUp[side] - left) : Math.max(0, M.kUp[side] - 0.002 * dt * 30 * 0.25);
+    const lifted = liftedFingers(side, dt);
+    let left = layFingers(side, "keys", w, 1, 0.15, dt, lifted);
+    // a finger still in a key even straightened: the hand up by as much and the fingers solved again in this frame (twice
+    // at most: next frame was too late while the hand travelled, a fingertip stayed 5 mm in a cap); else back down slowly
+    for (let pass = 0; pass < 2 && left < -0.0005; pass++) {
+      M.kUp[side] = Math.min(0.03, M.kUp[side] - left);
+      for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j), r = b && GR.get(b); if (r) { b.quaternion.copy(r.pre); b.updateMatrixWorld(true); GR.delete(b); } }
+      pin(side, V(), w, keyFit(side)); left = layFingers(side, "keys", w, 1, 0.15, dt, lifted);
+    }
+    if (left >= -0.0005) M.kUp[side] = Math.max(0, M.kUp[side] - 0.002 * dt * 30 * 0.25);
   }
   // a separate room mouse follows the recorded right palm (60% from the wrist to the middle knuckle) while he holds it
   function follow() {
