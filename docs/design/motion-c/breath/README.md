@@ -17,10 +17,11 @@ For G10d's continuous additive breathing layer, under every clip.
   - Record **b004**, channel RESP (thoracic piezoresistive band), a healthy volunteer at rest, 5 kHz.
   - Resampled to 30 Hz, drift removed, one trough-to-trough stretch of ~59 s, closed with a 1 s cross-fade.
   - Open Access; licence **Open Data Commons Attribution License v1.0** (ODC-By 1.0).
-  - Attribution: García-González MA, Argelagós-Palau A, Fernández-Chimeno M, Ramos-Castro J. *A comparison of heartbeat
-    detectors for the seismocardiogram.* Computing in Cardiology 2013; 40:461-464. And Goldberger AL et al. PhysioBank,
-    PhysioToolkit, and PhysioNet. Circulation 2000; 101(23):e215-e220. https://physionet.org/content/cebsdb/1.0.0/
-    (DOI 10.13026/C2KW23).
+  - Attribution, as the PhysioNet page asks: García-González MA, Argelagós-Palau A, Fernández-Chimeno M, Ramos-Castro J.
+    *A comparison of heartbeat detectors for the seismocardiogram.* Computing in Cardiology Conference (CinC), 2013.
+    And the standard PhysioNet citation: Pollard T, Moody BE, Lehman L, Gow B, Fernandes C, Xie C, Johnson A, Mark RG,
+    Heldt T. *PhysioNet as a global platform for biomedical research.* Nature Health (2026),
+    https://doi.org/10.1038/s44360-026-00096-z. Dataset: https://physionet.org/content/cebsdb/1.0.0/ (DOI 10.13026/C2KW23).
   - Chosen over b001-b006 for the calmest rate (14.6/min at rest; b001 21.5, b002/b003/b005 ~16.5, b006 14.4 but CV 32 %).
 - **Amplitude:** De Groote A, Wantier M, Chéron G, Estenne M, Paiva M. *Chest wall motion during tidal breathing.*
   J Appl Physiol 1997; 83(5):1531-1537.
