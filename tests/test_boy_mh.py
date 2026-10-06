@@ -43,7 +43,7 @@ def test_room_clips_retargeted_onto_v5():
 
 def test_char_v5_module_maps_to_the_makehuman_names():
     js = (WEB / "char_v5.js").read_text()
-    for s in ('Hip: "Hips"', "Thigh`]: `${S}UpLeg`", "Hand`]: `${S}Hand`", "turn.rotation.y = -Math.PI / 2", "turn.attach(hip)", "export function fixClip("):
+    for s in ('Hip: "Hips"', "Thigh`]: `${S}UpLeg`", "Hand`]: `${S}Hand`", "turn.rotation.y = -Math.PI / 2", "sc.attach(hip)", "export function fixClip("):
         assert s in js, s
 
 

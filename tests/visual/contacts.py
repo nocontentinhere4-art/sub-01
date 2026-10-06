@@ -1,6 +1,7 @@
 """Contact checks for the room upgrade (preview/room-upgrade): his skinned vertices against the desk chair (all of him)
 and against the keyboard, the mouse and the game controller (his hands and fingers), frame by frame through every
-seated scenario, in the page's own states (?debug act() / live() / variant()). Prints a JSON report.
+seated scenario, and (v5) in bed against the mattress (a plane) and the page's duvet over him (poking through it), in the
+page's own states (?debug act() / live() / variant()). Prints a JSON report.
 
     python -m tests.visual.contacts [--out DIR] [--stride 2] [--every 1]
 
@@ -46,6 +47,9 @@ SCENARIOS_MH = [  # the room clips under room/boy_mh.js (preview/room-mh; v5 on 
     ("bedtime: stretch, get up, to bed", MH_DESK + "; for (let i = 0; i < 60; i++) animate_(1/30); live('sleep', {activity: 'sleep'})", 22),
     ("getting up to the window", MH_DESK + "; for (let i = 0; i < 60; i++) animate_(1/30); live('window', {activity: 'window'})", 12),
     ("sitting down at the desk", "act('window'); for (let i = 0; i < 30; i++) animate_(1/30); live('research', {screen: {device: 'desk', id: 'p2', kind: 'page'}})", 16),
+    # in bed (from the harness's sleeping scene, 23:00, under the duvet): the mattress and the duvet, and how far over it he lies
+    ("in bed, asleep (mh_sleep: room_bedtime's end)", "", 8, "sleeping"),
+    ("waking, out of bed (room_bed_wake)", "live('window', {activity: 'window'})", 10, "sleeping"),
 ]
 
 def main():
@@ -80,9 +84,11 @@ def main():
         pg.add_script_tag(path=str(Path(__file__).with_name("contacts.js")))
         report["objects"] = pg.evaluate("__contacts.build()")
         mh = pg.evaluate("() => !!window.mh")                       # (boy_mh.js drives him: its clips' scenarios)
-        for label, setup, secs in (SCENARIOS_MH if mh else SCENARIOS):
+        for label, setup, secs, *start in (SCENARIOS_MH if mh else SCENARIOS):
             if a.only and a.only not in label:
                 continue
+            if start:                                      # (a scenario that starts in one of the harness's scenes)
+                h.goto_scene(pg, start[0], 23)
             if isinstance(secs, str):                      # a showcase clip: one loop of it
                 secs = pg.evaluate(f"(() => {{ const c = mh.M.actions['act_{secs}']; return c ? c.getClip().duration : 0; }})()")
             t0 = time.time()

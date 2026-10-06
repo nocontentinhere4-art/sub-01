@@ -67,13 +67,19 @@ export function createMH(env) {
     const tr = clip.tracks.find(t => t.name === "Hips.position");
     return tr ? Array.from(tr.createInterpolant().evaluate(at)) : [0, 0.87, -0.076];
   }
+  // the hips for the page's own table (HIPS: where it puts his root so the hips land on a seat, the bed, a spot). G14
+  // tuned v5's seat placement (env.seatIn, the chair rolled in, the hips centred) while char_v5.js still hung the Hip
+  // under its turned group, i.e. against these values turned back into that group's frame; env.pageHips does that turn,
+  // so the page places him exactly as tuned. boy_mh.js's own sums (the segments, the re-rooted get-up, the bed's
+  // placements) use hipsAt, in the body's frame like its sampler
+  const pageHips = (clip, at) => env.pageHips ? env.pageHips(hipsAt(clip, at)) : hipsAt(clip, at);
   // a clip's pose at a time, in its own frame (the root at the feet): the hips' and the head's positions
   function sampler(clip) {
     const mx = new THREE.AnimationMixer(env.boy), a = mx.clipAction(clip); a.play();
     const B = env.bones, out = t => { a.time = t; mx.update(0); env.boy.updateMatrixWorld(true);
       const loc = n => env.boy.worldToLocal(B[n].getWorldPosition(V()));
       return {t, hips: loc("Hips"), head: loc("Head"), knee: loc("LeftLeg").add(loc("RightLeg")).multiplyScalar(0.5),
-        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y), fl: loc("LeftFoot").y, fr: loc("RightFoot").y,
+        foot: Math.max(loc("LeftFoot").y, loc("RightFoot").y), fl: loc("LeftFoot").y, fr: loc("RightFoot").y, hand: Math.max(loc("LeftHand").y, loc("RightHand").y),
         feet: loc("LeftFoot").add(loc("RightFoot")).add(loc("LeftToeBase")).add(loc("RightToeBase")).multiplyScalar(0.25)}; };
     out.done = () => { a.stop(); mx.uncacheRoot(env.boy); };
     return out;
@@ -82,21 +88,21 @@ export function createMH(env) {
     const scan = (clip, dt = 0.05) => { const s = sampler(clip), r = []; for (let t = 0; t <= clip.duration + 1e-6; t += dt) r.push(s(Math.min(t, clip.duration))); s.done(); return r; };
     const S = {};
     // sit_down: the last moment the hips are still high (standing) before they drop onto the seat
-    const sd = scan(got.sit_down); let i = sd.length - 1; while (i > 0 && sd[i].hips.y < 0.80) i--;
+    const sd = scan(got.sit_down); let i = sd.length - 1; while (i > 0 && sd[i].hips.y < 0.80 * M.k) i--;
     S.sit = {from: Math.max(0, sd[i].t - 0.3), to: got.sit_down.duration};
     // the chair's seat centre in sit_down's frame: where it leaves the hips, less where stand_up starts them (its seat at 0, 0)
     const su = sampler(got.stand_up), h0 = su(0).hips; su.done();
     S.seatDown = [sd[sd.length - 1].hips.x - h0.x, sd[sd.length - 1].hips.z - h0.z];
     // bed_lie: on the edge = hips low with the head up; lying = the head low
     const bl = scan(got.bed_lie);
-    const e0 = bl.find(p => p.hips.y < 0.80 && p.head.y > 1.05) || bl[Math.floor(bl.length / 3)];
-    const l0 = bl.find(p => p.t > e0.t && p.head.y < 1.0) || bl[Math.floor(bl.length * 2 / 3)];
+    const e0 = bl.find(p => p.hips.y < 0.80 * M.k && p.head.y > 1.05 * M.k) || bl[Math.floor(bl.length / 3)];
+    const l0 = bl.find(p => p.t > e0.t && p.head.y < 1.0 * M.k) || bl[Math.floor(bl.length * 2 / 3)];
     // sitting on the edge: the middle of the stretch where he sits upright with his feet down (before they swing up to lie)
-    const up = bl.filter(p => p.t >= e0.t && p.t <= l0.t && p.hips.y < 0.76 && p.head.y > 1.3 && p.foot < 0.3), sat = up.length ? up[up.length >> 1] : e0;
+    const up = bl.filter(p => p.t >= e0.t && p.t <= l0.t && p.hips.y < 0.76 * M.k && p.head.y > 1.3 * M.k && p.foot < 0.3), sat = up.length ? up[up.length >> 1] : e0;
     S.lie = {stand: Math.max(0, e0.t - 1.6), edge: sat.t, end: got.bed_lie.duration, endPose: bl[bl.length - 1]};
     // bed_wake: lying -> sitting up (head high again) -> standing (hips high)
     const bw = scan(got.bed_wake);
-    const s0 = bw.find(p => p.head.y > 1.05 && p.hips.y < 0.80) || bw[Math.floor(bw.length / 3)];
+    const s0 = bw.find(p => p.head.y > 1.05 * M.k && p.hips.y < 0.80 * M.k) || bw[Math.floor(bw.length / 3)];
     S.wake = {sat: Math.min(s0.t + 0.6, got.bed_wake.duration), end: got.bed_wake.duration, startPose: bw[0]};
     // the bed's placement: the lying pose turned so the head points toward the headboard, the hips on the duvet
     S.bedLie = bedPlace(S.lie.endPose); S.bedWake = bedPlace(S.wake.startPose);
@@ -107,17 +113,17 @@ export function createMH(env) {
     // and bed are not this room's (2.4 m apart, here 1.6 m): the first part plays at the room's chair, the page walks him
     // across, and the rest plays at the bed's edge and on the duvet, placed like room_bed_lie's
     if (got.bedtime) {
-      const bt = scan(got.bedtime), up = bt.find(p => p.hips.y > 0.9) || bt[Math.floor(bt.length / 4)];
-      const e1 = bt.find(p => p.t > up.t + 2 && p.hips.y < 0.80 && p.head.y > 1.05) || bt[Math.floor(bt.length / 2)];
-      const l1 = bt.find(p => p.t > e1.t && p.head.y < 1.0) || bt[Math.floor(bt.length * 3 / 4)];
-      const sit = bt.filter(p => p.t >= e1.t && p.t <= l1.t && p.head.y > 1.3 && p.foot < 0.3), on = sit.length ? sit[sit.length >> 1] : e1;
+      const bt = scan(got.bedtime), up = bt.find(p => p.hips.y > 0.9 * M.k) || bt[Math.floor(bt.length / 4)];
+      const e1 = bt.find(p => p.t > up.t + 2 && p.hips.y < 0.80 * M.k && p.head.y > 1.05 * M.k) || bt[Math.floor(bt.length / 2)];
+      const l1 = bt.find(p => p.t > e1.t && p.head.y < 1.0 * M.k) || bt[Math.floor(bt.length * 3 / 4)];
+      const sit = bt.filter(p => p.t >= e1.t && p.t <= l1.t && p.head.y > 1.3 * M.k && p.foot < 0.3), on = sit.length ? sit[sit.length >> 1] : e1;
       const s0 = bt[0], face = Math.atan2(s0.knee.z - s0.hips.z, s0.knee.x - s0.hips.x);
       const su0 = sampler(got.stand_up), h0 = su0(0).hips; su0.done();
       S.bt = {up: up.t, walk: Math.max(up.t + 0.5, e1.t - 1.6), edge: on.t, end: got.bedtime.duration,
         seat: [s0.hips.x - h0.x, s0.hips.z - h0.z], face, edgePl: edgePlace(on), lie: bedPlace(bt[bt.length - 1])};
     }
     // the get-up (room_bedtime, re-rooted as seated at the desk: see getupClips): seated (the stretch first after a long
-    // sit) -> up (the hips over 0.9 m) -> turning while he walks off over about three steps -> walking straight. Its
+    // sit) -> up (the hips over 0.9 m, times M.k) -> turning while he walks off over about three steps -> walking straight. Its
     // moments from the clip's own poses: the chair rolls back under him from 2.0 to 1.0 s before the hips are up (they
     // start rising at 1.1 s), his legs push it on until 0.2 s after, he turns from 0.9 s to 3.1 s after, walks by 3.7 s.
     // Two of them: as recorded (he turns to his left) and mirrored (to his right)
@@ -125,7 +131,7 @@ export function createMH(env) {
       const W = (() => { const w = sampler(got.walk), r = []; for (let t = 0; t < got.walk.duration; t += 1 / 30) r.push(w(t)); w.done(); return r; })();
       for (const side of ["L", "R"]) {
         const s = sampler(got["getup" + side]), R = [], dt = 1 / 30; let up = null;
-        for (let t = 0; t <= got.bedtime.duration; t += dt) { const p = s(t); R.push(p); if (!up && p.hips.y > 0.9) up = t; if (up && t > up + 4.2) break; }
+        for (let t = 0; t <= got.bedtime.duration; t += dt) { const p = s(t); R.push(p); if (!up && p.hips.y > 0.9 * M.k) up = t; if (up && t > up + 4.2) break; }
         s.done();
         const at = t => R[Math.min(R.length - 1, Math.round(t / dt))], d = p => p.fl - p.fr;
         // where the walk loop may take over (after two, three or four steps), each with the loop's moment whose feet match
@@ -133,7 +139,11 @@ export function createMH(env) {
         const ends = [2.2, 2.9, 3.7].map(k => { const end = up + k, e = at(end - 0.4), slope = d(at(end - 0.4 + dt)) - d(e);
           let best = 0, bc = 1e9; W.forEach((p, i) => { const q = W[(i + 1) % W.length], c = (d(p) - d(e)) ** 2 + 9 * ((d(q) - d(p)) - slope) ** 2; if (c < bc) { bc = c; best = i; } });
           return {end, phase: best * dt}; });
-        S["gu" + side] = {side, rows: R, dt, up, start: up - 2.1, stand: up + 0.8, ride: [up - 2.0, up - 1.0], push: [up - 0.9, up + 0.2],
+        // (from the desk it starts once the seated stretch is over: 0.4 s after his hands were last over his head; the chair
+        // rolls back from then on)
+        let st0 = 0; R.forEach((p, k) => { if (k * dt < up && p.hand > p.head.y) st0 = k * dt + 0.4; });
+        const start = Math.max(up - 2.1, Math.min(st0, up - 1.2));
+        S["gu" + side] = {side, rows: R, dt, up, start, stand: up + 0.8, ride: [Math.max(up - 2.0, start), up - 1.0], push: [up - 0.9, up + 0.2],
           turn: [up + 0.9, up + 3.1], ends, end: ends[ends.length - 1].end};
       }
     }
@@ -165,7 +175,7 @@ export function createMH(env) {
     const hd = hipsAt(got.desk_watch, 0);
     for (const [side, c] of [["L", got.bedtime.clone()], ["R", mirrorClip(got.bedtime, "room_getup_R")]]) {
       c.name = "room_getup_" + side;
-      const s = sampler(c); let t = 0; while (t < c.duration && s(t).hips.y <= 0.9) t += 0.1; const p = s(Math.max(0, t - 2.1)); s.done();
+      const s = sampler(c); let t = 0; while (t < c.duration && s(t).hips.y <= 0.9 * M.k) t += 0.1; const p = s(Math.max(0, t - 2.1)); s.done();
       const face = Math.atan2(p.knee.z - p.hips.z, p.knee.x - p.hips.x), r = face - Math.PI / 2;
       const hx = p.hips.x * Math.cos(r) + p.hips.z * Math.sin(r), hz = -p.hips.x * Math.sin(r) + p.hips.z * Math.cos(r);
       got["getup" + side] = rerootClip(c, r, hd[0] - hx, hd[2] - hz + GETUP_FWD);
@@ -207,18 +217,22 @@ export function createMH(env) {
     M.watchLegs = feetUp ? "desk_mouse" : "recorded";
     const make = c => mixer.clipAction(c);
     M.clips = got;
+    // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
+    // body's (its hips 0.977 m up, walking): scaled to this body's by its own walking hips (v5's are about 0.87 m up, so they
+    // never passed 0.9 m and the get-up from the desk started at room_bedtime's seated stretch, the arms up)
+    M.k = hipsAt(got.walk, 0)[1] / 0.977;
     if (got.bedtime) getupClips(got);
     // the transitions' moments, from the clips' own poses: on the bed edge (hips low, head up), lying (head low)
     const seg = segments(got);
     M.seg = seg; M.sampler = sampler;                          // (?debug: a clip's hips, head, knees and feet at a time)
     const stand = stillClip("mh_stand", got.stand, 0), lie = stillClip("mh_lie", got.bed_lie, got.bed_lie.duration),
       edge = stillClip("mh_edge", got.bed_lie, seg.lie.edge);
-    for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = hipsAt(got[k], 0); }
-    M.actions.stand = make(stand); H.mh_stand = hipsAt(stand, 0);
+    for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = pageHips(got[k], 0); }
+    M.actions.stand = make(stand); H.mh_stand = pageHips(stand, 0);
     // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
-    M.actions.walk = make(got.walk); H.room_walk = hipsAt(got.walk, 0);
-    M.actions.lie = make(lie); H.mh_lie = hipsAt(lie, 0);
-    M.actions.edge = make(edge); H.mh_edge = hipsAt(edge, 0);
+    M.actions.walk = make(got.walk); H.room_walk = pageHips(got.walk, 0);
+    M.actions.lie = make(lie); H.mh_lie = pageHips(lie, 0);
+    M.actions.edge = make(edge); H.mh_edge = pageHips(edge, 0);
     for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime", "getupL", "getupR"]) { if (!got[k]) continue; const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     // every slot the page plays: seated at the desk -> relaxed in the chair, on the bed's edge -> the edge, standing ->
     // the stand, walking -> the walk loop (the page scales it to his speed), lying -> the lie
@@ -226,14 +240,14 @@ export function createMH(env) {
       lying = ["sleep", "phone_lie", "listen", "lie_phone"];
     for (const k of seated) { A[k] = M.actions.desk_watch; H[k] = H.desk_watch.slice(); }
     // eating at the desk: room_eat (the food to his lips); the other activity clips play in the preview showcase (show())
-    for (const k of ["eat", "read", "phone", "phone_scroll", "drink", "door", "window"]) { M.actions["act_" + k] = make(got[k]); H["act_" + k] = hipsAt(got[k], 0); }
+    for (const k of ["eat", "read", "phone", "phone_scroll", "drink", "door", "window"]) { M.actions["act_" + k] = make(got[k]); H["act_" + k] = pageHips(got[k], 0); }
     for (const k of ["dine", "eat"]) { A[k] = M.actions.act_eat; H[k] = H.act_eat.slice(); }
     for (const k of onEdge) { A[k] = M.actions.edge; H[k] = H.mh_edge.slice(); }
     for (const k of upright) { A[k] = M.actions.stand; H[k] = H.mh_stand.slice(); }
     A.walk = M.actions.walk; H.walk = H.room_walk.slice(); if (env.setStride) env.setStride(WALK_V);
     for (const k of lying) { A[k] = M.actions.lie; H[k] = H.mh_lie.slice(); }
     if (seg.bt) {                                             // asleep: lying as room_bedtime ends (it is how he got there)
-      const sl = stillClip("mh_sleep", got.bedtime, got.bedtime.duration); M.actions.sleep = make(sl); H.mh_sleep = hipsAt(sl, 0);
+      const sl = stillClip("mh_sleep", got.bedtime, got.bedtime.duration); M.actions.sleep = make(sl); H.mh_sleep = pageHips(sl, 0);
       A.sleep = M.actions.sleep; H.sleep = H.mh_sleep.slice(); }
     for (let i = 0; i < 600 && !(env.chairNode && env.chairNode()); i++) await new Promise(r => setTimeout(r, 100));   // (the room may still be loading)
     { const sp = sampler(stand); M.standFeet = sp(0).feet; sp.done(); }     // (he turns on the spot about his feet, not the root)
@@ -326,12 +340,31 @@ export function createMH(env) {
   function lowestTip(side) {                                // the lowest fingertip: the end bone's head, a finger's half thickness lower
     let low = 1e9; for (const b of tipNames(side)) { b.getWorldPosition(_a); low = Math.min(low, _a.y - 0.008); } return low;
   }
+  // the right hand over a separate room mouse (on its way between the keys and the mouse): its tips, knuckles and palm
+  // (60% from the wrist to the middle knuckle) stay over the mouse's shell, by their half thickness (8 / 12 / 20 mm)
+  const _ray = new THREE.Raycaster(), _dn = V(0, -1, 0), _o = V();
+  function overMouse(side) {
+    if (side !== "Right" || !P.mouseNode) return -1;
+    const B = env.bones, s = "R", f = n => B[n + s] || B[n + "." + s], pts = [];
+    for (const b of tipNames(side)) pts.push([b, 0.008]);
+    for (let i = 1; i <= 5; i++) if (f(`finger${i}-1`)) pts.push([f(`finger${i}-1`), 0.012]);
+    let need = -1;
+    for (const [b, r] of pts) need = Math.max(need, shell(b.getWorldPosition(_a), r));
+    const hand = B.RightHand, kn = f("finger3-1");
+    if (hand && kn) need = Math.max(need, shell(hand.getWorldPosition(_a).lerp(kn.getWorldPosition(_b), 0.6), 0.02));
+    return need;
+  }
+  function shell(p, r) {                                     // how far p (r thick) is into the mouse's shell under it
+    _ray.set(_o.set(p.x, p.y + 0.3, p.z), _dn); _ray.far = 0.6;
+    const x = _ray.intersectObject(P.mouseNode, true)[0];
+    return x ? x.point.y - (p.y - r) : -1;
+  }
   function pin(side, delta, floor, weight) {                 // the recorded wrist + delta, lifted until no tip is under the floor
     const hand = env.bones[side + "Hand"]; if (!hand || weight <= 0) return;
     const w0 = hand.getWorldPosition(V()), t = w0.clone().add(delta);
     for (let it = 0; it < 3; it++) {
       ccd(side, t, weight);
-      const deficit = floor - lowestTip(side); if (deficit <= 0.001) break;
+      const deficit = Math.max(floor - lowestTip(side), overMouse(side)); if (deficit <= 0.001) break;
       t.y += deficit;
     }
   }

@@ -51,3 +51,65 @@ v5, with the original arms -> with the rejected 3.5 cm (max mm into the part):
 The rest is not a matter of width: G14's clips sit him 8-20 cm forward on the seat (seen from above, the seat is behind
 his hips in typing, mouse and eating), so his thighs cross the pads' and posts' front ends rather than pressing on their
 sides; eating does not change at all.
+
+## Two page bugs behind "he raises his fists as he gets up" (fixed)
+Getting up from the desk to go somewhere does not play `room_stand_up`: boy_mh.js's one-take get-up ("flow") plays the
+get-up stretch of `room_bedtime` (as recorded, and mirrored as `room_getup_R`), from just before his hips rise.
+- **Body-relative heights.** boy_mh.js found the clips' moments by fixed heights of the MakeHuman body: "up" = the hips
+  over 0.9 m, on the bed's edge = the hips under 0.80 m with the head over 1.05 m, and so on. v5's hips stand about
+  0.87 m up, so "up" was never found and the get-up began at room_bedtime's seated stretch, arms over his head. Every such
+  height is now multiplied by `M.k` = this body's walking hips / the MakeHuman body's (0.977 m): 0.887 for v5. The desk
+  get-up also starts 0.4 s after his hands were last over his head, whatever the clip.
+- **The Hip's frame.** char_v5.js used to hang v5's Hip under the group that turns the rig 90 deg, so a clip's raw
+  `Hips.position` values (boy_mh.js's hipsAt, the re-rooted get-up, the bed's mixPlace, the page's HIPS) were turned
+  90 deg from where boy_mh.js samples his hips (the body's frame): the re-rooted get-up put him 2 m off, through the wall.
+  The Hip now hangs straight under the body (world transform kept: what the mixer plays is the same in the room), so
+  every raw value is in the body's frame by construction. One exception, on purpose: the page's own placement table
+  (HIPS, where it puts his root so his hips land on the seat) gets the values turned back as they read before
+  (char_v5.js `legacyHips`, boy_mh.js `pageHips`): G14 tuned v5's seat placement (pass 2, f525887) against those, and
+  with the corrected values he sat up to 14.5 cm off (eating: 756 sampled vertices into the chair back).
+The new segment times (s): the get-up from the desk 5.97 (was -2.1, the stretch); bed_lie: stand 0.9, edge 2.9 (were
+0.35, 1.95); bed_wake: sat 4.6 (4.85); sit_down: from 2.0 (1.1); bedtime: walk 13.15, edge 17.05 (12.6, 17.85).
+
+## The bed in the contact pass
+`tests.visual.contacts` now also checks him in bed (two scenarios from the harness's "sleeping" scene, 23:00: asleep,
+and waking out of it): `bed@mattress:<bone>` is skin under the mattress top (boy_mh.js's BED: 0.82 m less 1.5 cm of give,
+over its footprint), `bed@duvet:<bone>` is skin over the top of the page's duvet over him (`duvet_over`; his head and
+neck excluded), and `bed_gap_mm` is how far his lowest point lies over the mattress while he is on the bed (0: lying on
+it; much more: floating). The duvet is the page's own: room.html's coverShape builds it every frame 3 cm over whatever
+part of him is under each point, so its hills are his raised knees, hands and feet. The pose it covers asleep is
+room_bedtime's last frame (boy_mh.js's `mh_sleep`), not room_bed_lie's.
+
+## The duvet over v5 (fixed in the page)
+The duvet he sleeps under (room.html coverShape) rests on a model of his body: a tube along each bone segment
+(BODY_SEGS), its thickness the 97th percentile of how far his skin lies from the bone, measured once. On v5 that model
+was wrong three ways, which is what made the "mountain range" even over G12's flat sleeping pose:
+1. most of a limb's skin follows Tripo's twist bones (L_ThighTwist01 ... R_ForearmTwist02), and the toes' and fingers'
+   skin their own bones, none of them in BODY_SEGS: the legs and forearms got the least thickness and poked through;
+2. the thickness was the girth all round, in the standing bind pose: his oversized hoodie and trousers are far wider
+   than deep, so (once 1 was fixed) the cover stood a hand over him and buried his head;
+3. a round tube cannot cover a body that is wide and shallow: its sides poked through.
+On v5 (only: the live character's duvet is unchanged) the twist bones count for their limb, the toes for the foot and
+the fingers for the hand; and since bedInit first runs as he lies down under it, each segment is measured on him as he
+lies: how high his skin rises over the bone, and how far to the sides; each segment is an oval of those two. Asleep:
+skin through the duvet up to 145 mm (fingers, toes, thighs) -> none; lying on the mattress (gap 0).
+
+## The contact table (f525887 + these fixes; max mm / frames, every 2nd frame)
+`SEAT=0.505 python -m tests.visual.contacts --chair-sdf sdf.npz --chair-regions`. Chair by part; hands against the keyboard, the mouse and the tea bottle (and his head against the bottle); the bed as above.
+
+| scenario | frames | chair (max mm / frames) by part | hands vs keyboard / mouse / bottle | bed |
+|---|---|---|---|---|
+| desk typing | 150 | seat 10/150, seat_front 4/55 | keyboard 3.4/1, mouse 0.9/1 |  |
+| desk mouse | 120 | seat 10/120, seat_front 4/120 | 0 |  |
+| desk watch | 90 | 0 | 0 |  |
+| room_read | 262 | seat 17/262, seat_front 7/262 | 0 |  |
+| room_phone | 326 | seat 8/326, seat_front 3/3 | 0 |  |
+| room_phone_scroll | 326 | seat 8/326, seat_front 3/3 | 0 |  |
+| eating at the desk | 120 | seat 3/52, seat_front 3/39 | keyboard 6/23 |  |
+| bedtime: stretch, get up, to bed | 330 | base 5/1, caster 4/1, frame 17/78, lumbar 17/79, mesh 17/81, seat 33/97, seat_front 28/97 | tea_bottle 107.9/11 | mattress 40.2/15 |
+| getting up to the window | 180 | arm_post 29/11, armpad 25/11, base 14/5, caster 20/4, frame 40/9, lumbar 14/4, mesh 13/4, seat 40/10, seat_front 25/9 | keyboard 4.7/1, tea_bottle 107.9/4 | mattress 573.8/3 |
+| sitting down at the desk | 240 | arm_post 19/5, armpad 15/4, frame 22/27, seat 17/110, seat_front 23/108 | keyboard 14/5, mouse 15.4/2 |  |
+| in bed, asleep (mh_sleep: room_bedtime's end) | 120 | 0 | 0 | 0 (gap -0 mm) |
+| waking, out of bed (room_bed_wake) | 150 | 0 | 0 | duvet 5.9/4, mattress 18.5/1 (gap 40.6 mm) |
+
+The tea bottle in the get-ups (108 mm) is his left hand passing through it as he pushes up from the desk (the bottle stands where the hand goes); "getting up to the window": his right toe enters the bed's footprint for 3 frames as he walks off past it. Not yet run against the branch without these fixes, so not attributed; noted for G14 and the prop scope.

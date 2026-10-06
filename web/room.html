@@ -2302,18 +2302,38 @@ function bedInit(){                                    // the duvet and the pill
   // how thick he is around each bone segment: the 90th percentile of his vertices' distance from it, in his bind pose
   // (no skinning needed), at his scale
   const names = sm.skeleton.bones.map(b => b.name), segOf = {}; BODY_SEGS.forEach(([a], k) => { if (!(a in segOf)) segOf[a] = k; });
-  const v = new THREE.Vector3(), d = BODY_SEGS.map(() => []);
+  const v = new THREE.Vector3(), d = BODY_SEGS.map(() => []), dw = BODY_SEGS.map(() => []);   // (dw: v5 lying, his half-width over each segment)
   const bind = n => new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert();
   const bp = n => names.includes(n) ? new THREE.Vector3().setFromMatrixPosition(bind(n))
     : (o => o.position.clone().applyMatrix4(bind(o.parent.name)))(boy.getObjectByName(n));   // (an end bone that is not a joint of the skin: from its parent)
   const seg = BODY_SEGS.map(([a, b]) => new THREE.Line3(bp(a), bp(b)));
   const sc = bones.LeftUpLeg.getWorldPosition(_l1).distanceTo(bones.LeftLeg.getWorldPosition(_l2)) / seg[segOf.LeftUpLeg].distance();
   const parts = []; boy.traverse(o => { if (o.isSkinnedMesh) parts.push(o); });   // (dressed: his clothes too)
-  for (const pm of parts) { const P = pm.geometry.attributes.position, pn = pm.skeleton.bones.map(b => b.name);
+  // (v5, Tripo's rig: most of a limb's skin follows its twist bones, L_ThighTwist01 ... R_ForearmTwist02, which BODY_SEGS
+  // does not name: they count for their limb's segment, or the legs and forearms get the least thickness and poke through)
+  const LIMB = {Thigh:"UpLeg", Calf:"Leg", Upperarm:"Arm", Forearm:"ForeArm"};
+  const segName = n => { const m = /^([LR])_(Thigh|Calf|Upperarm|Forearm)Twist/.exec(n); if (m) return (m[1] === "L" ? "Left" : "Right") + LIMB[m[2]];
+    if (!V5) return n;                                     // (v5: the toes count for the foot, the fingers for the hand: their tips poked through)
+    const t = /^(Left|Right)ToeBase$/.exec(n); if (t) return t[1] + "Foot";
+    const f = /^finger\d-\d\.?([LR])$/.exec(n); return f ? (f[1] === "L" ? "Left" : "Right") + "Hand" : n; };
+  // (v5: his oversized hoodie and trousers are far wider than they are deep, and lying on his back it is how far he rises
+  // over each bone that lifts the duvet, not his girth all round, which buried him under a mound up to his head. bedInit
+  // first runs as he lies down under it, so there each segment's thickness is measured on him as he lies: his skinned
+  // vertices' height over the segment, in metres)
+  const lying = V5 && lieW() > 0.5, segW = lying && BODY_SEGS.map(([a, b]) => { const A = (bones[a] || boy.getObjectByName(a)).getWorldPosition(new THREE.Vector3()),
+    B = (bones[b] || boy.getObjectByName(b)).getWorldPosition(new THREE.Vector3()); return new THREE.Line3(A, B); });
+  if (lying) boy.updateMatrixWorld(true);
+  for (const pm of parts) { const P = pm.geometry.attributes.position, pn = pm.skeleton.bones.map(b => segName(b.name));
   for (let i = 0; i < P.count; i += 2) { const k = segOf[pn[domBone(pm.geometry, i)]]; if (k === undefined) continue;
+    if (lying) { pm.getVertexPosition(i, v).applyMatrix4(pm.matrixWorld); const L = segW[k], c = L.distance() > 1e-6 ? L.closestPointToPoint(v, true, _l4) : L.start;
+      if (v.y > c.y) { d[k].push(v.y - c.y); dw[k].push(Math.hypot(v.x - c.x, v.z - c.z)); } continue; }   // (the upper half: how high, how wide)
     v.fromBufferAttribute(P, i).applyMatrix4(pm.bindMatrix); d[k].push((seg[k].distance() > 1e-6 ? seg[k].closestPointToPoint(v, true, _l4) : seg[k].start).distanceTo(v) * sc); } }
-  DUV.segs = BODY_SEGS.map(([a, b], k) => { const s = d[k].sort((x, y) => x - y);
-    return {a:bones[a] || boy.getObjectByName(a), b:bones[b] || boy.getObjectByName(b), head:!!BODY_SEGS[k][2], r:clamp(s.length ? s[Math.floor(s.length * 0.97)] : 0.05, 0.03, a === b ? 0.1 : 0.22), A:new THREE.Vector3(), B:new THREE.Vector3()}; });
+  const pct = (a, q) => { a.sort((x, y) => x - y); return a.length ? a[Math.floor(a.length * q)] : null; };
+  DUV.segs = BODY_SEGS.map(([a, b], k) => { const r = clamp(pct(d[k], 0.97) ?? 0.05, 0.03, a === b ? 0.1 : 0.22);
+    // (r: how high he is over the segment; w: how far to the sides that height reaches. All round, w = r: a round limb;
+    // v5 lying measures both, an oval: his clothes are wide and shallow)
+    const w = lying && dw[k].length ? clamp(pct(dw[k], 0.97), r, 0.3) : r;
+    return {a:bones[a] || boy.getObjectByName(a), b:bones[b] || boy.getObjectByName(b), head:!!BODY_SEGS[k][2], r, w, A:new THREE.Vector3(), B:new THREE.Vector3()}; });
   return coverInit();
 }
 function pillowDent(k){                                // the pillow gives under his head and shoulders
@@ -2382,9 +2402,9 @@ function coverShape(){                                 // the duvet over him, th
       for (const s of DUV.segs) { if (s.head) continue;
         const ax = s.A.x, az = s.A.z, dx = s.B.x - ax, dz = s.B.z - az, L = dx * dx + dz * dz;
         const t = L > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / L, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
-        const dd = Math.sqrt(px * px + pz * pz), R = s.r + DR; if (dd >= R) continue;
-        const top = s.A.y + (s.B.y - s.A.y) * t + Math.sqrt(Math.max(0, s.r * s.r - Math.min(dd, s.r) ** 2));
-        const y = BED + (top - BED) * (1 - smooth(0.25, 1, dd / R)); if (y > h) h = y;
+        const dd = Math.sqrt(px * px + pz * pz), R = s.w + DR; if (dd >= R) continue;
+        const top = s.A.y + (s.B.y - s.A.y) * t + s.r * Math.sqrt(Math.max(0, 1 - (Math.min(dd, s.w) / s.w) ** 2));
+        const y = BED + (top - BED) * (1 - (s.w > s.r ? smooth(s.w, R, dd) : smooth(0.25, 1, dd / R))); if (y > h) h = y;   // (an oval: full over his width, then it drapes off)
       }
       B[i * nz + j] = h; H[i * nz + j] = h + LOFT;
     } }
@@ -2990,7 +3010,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
   // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
   const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
-    ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
+    ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),

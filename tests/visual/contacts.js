@@ -57,15 +57,43 @@
   // the tea bottle he picks up and drinks from: his hand holds it, so it is tested against his head as well as his hands
   const takes = (name, b) => name === "tea_bottle" ? (HAND.test(b) || HEAD.test(b)) : HAND.test(b);
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
+  // the bed: the mattress as a plane (boy_mh.js's BED: x0, x1, z0, z1 and its top, 0.82 m less 1.5 cm of give) and the
+  // page's duvet over him (duvet_over: a grid of rows across the bed, nz points each from z 0.14 to 1.61, its top surface
+  // first): a vertex under the plane is into the mattress, one over the duvet's top (not his head or neck) is through it
+  const MAT = {x0: -1.90, x1: -0.20, z0: 0.25, z1: 1.50, top: 0.805}, DZ = [0.14, 1.61];
+  function duvet() {
+    const m = scene.getObjectByName("duvet_over"); if (!m || !m.visible) return null;
+    const P = m.geometry.attributes.position.array, nt = P.length / 6, x0 = P[0];
+    let nz = 0; while (nz < nt && Math.abs(P[3 * nz] - x0) < 1e-6) nz++;
+    const nx = nt / nz, xs = []; for (let i = 0; i < nx; i++) xs.push(P[3 * i * nz]);
+    return {P, nz, nx, xs};
+  }
+  function duvetTop(D, x, z) {                         // the duvet's top over (x, z), or null where it is not over the bed
+    if (x < D.xs[0] || z < DZ[0] || z > DZ[1]) return null;
+    let i = 0; while (i < D.nx - 2 && D.xs[i + 1] < x) i++;
+    if (x > D.xs[i + 1] || D.xs[i + 1] - D.xs[i] < 1e-6) return null;
+    const fx = (x - D.xs[i]) / (D.xs[i + 1] - D.xs[i]), fz = (z - DZ[0]) / (DZ[1] - DZ[0]) * (D.nz - 1), j = Math.min(D.nz - 2, Math.floor(fz)), gz = fz - j;
+    const y = (a, b) => D.P[3 * (a * D.nz + b) + 1];
+    return (y(i, j) * (1 - gz) + y(i, j + 1) * gz) * (1 - fx) + (y(i + 1, j) * (1 - gz) + y(i + 1, j + 1) * gz) * fx;
+  }
   function check(res, frame, every = 1) {             // one frame: every skinned vertex against every object
     boy.updateMatrixWorld(true);
     for (const o of Object.values(objs)) { o.node.updateMatrixWorld(true); o.inv.copy(o.node.matrixWorld).invert(); }
-    const v = new THREE.Vector3();
+    const v = new THREE.Vector3(), D = duvet(), TOL = 0.002;
+    let low = 9;                                         // his lowest vertex over the mattress (lying on it: how far over it)
+    const hit = (key, d) => { const r = res.hits[key] = res.hits[key] || {n: 0, verts: new Set(), max: 0, frames: new Set()};
+      r.n++; r.max = Math.max(r.max, d); r.frames.add(frame); return r; };
     for (const sm of skins()) {
       const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight;
       const bone = i => { let b = 0, bw = -1; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); } return sm.skeleton.bones[b].name; };
       for (let i = 0; i < P.count; i += every) {
         sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); res.samples++;
+        if (v.x > MAT.x0 && v.x < MAT.x1 && v.z > MAT.z0 && v.z < MAT.z1) {
+          low = Math.min(low, v.y - MAT.top);
+          if (MAT.top - v.y > TOL) hit("bed@mattress:" + bone(i), MAT.top - v.y).verts.add(sm.name + "#" + i);
+          const h = D && !HEAD.test(bone(i)) ? duvetTop(D, v.x, v.z) : null;
+          if (h !== null && v.y - h > TOL) hit("bed@duvet:" + bone(i), v.y - h).verts.add(sm.name + "#" + i);
+        }
         for (const [name, o] of Object.entries(objs)) {
           if (name !== "chair" && !takes(name, bone(i))) continue;        // (hands only, against the desk things)
           const d = inside(o, v); if (d <= 0) continue;
@@ -75,6 +103,9 @@
         }
       }
     }
+    const pz = pose();
+    if (low < 9 && (pz.at === "bedlie" || pz.at === "bedside")) {   // (on the bed: how far his lowest point is over the mattress)
+      const g = res.bedGap = res.bedGap || {min: 9, max: -9, frames: 0}; g.min = Math.min(g.min, low); g.max = Math.max(g.max, low); g.frames++; }
   }
   window.__contacts = {
     build() {
@@ -98,7 +129,9 @@
       const n = Math.round(seconds * 30);
       for (let f = 0; f < n; f++) { animate_(1 / 30); if (f % stride === 0) { check(res, f, every); res.frames++; } }
       const hits = Object.fromEntries(Object.entries(res.hits).map(([k, r]) => [k, {samples: r.n, vertices: r.verts.size, frames: r.frames.size, max_mm: +(r.max * 1000).toFixed(1)}]));
-      return {label, frames: res.frames, samples: res.samples, hits, at: pose().at, clip: pose().clip};
+      const out = {label, frames: res.frames, samples: res.samples, hits, at: pose().at, clip: pose().clip};
+      if (res.bedGap) out.bed_gap_mm = {lowest: +(res.bedGap.min * 1000).toFixed(1), highest: +(res.bedGap.max * 1000).toFixed(1), frames: res.bedGap.frames};
+      return out;
     },
     // where his skin goes in the chair's frame: 5 mm voxels (keys "i,j,k" from the origin), each with a bit mask of the
     // body regions in it (1 hands, 2 arms, 4 head, 8 torso, 16 legs), within 0.5 m of the chair's pivot axis
