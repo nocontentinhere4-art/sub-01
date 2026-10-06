@@ -36,7 +36,7 @@ SCENARIOS = [  # label, setup (JS), seconds: the live character's seated clips a
 
 MH_DESK = "act('research', {screen: {device: 'desk', id: 'p1', kind: 'page'}})"
 SCENARIOS_MH = [  # the room clips under room/boy_mh.js (preview/room-mh; v5 on preview/room-v5): label, setup (JS), seconds or an act clip
-    ("desk typing", "act('research', {screen: {device: 'desk', id: 'q1', kind: 'page', query: 'ramen near kichijoji'}})", 10),
+    ("desk typing", "act('research', {screen: {device: 'desk', id: 'q1', kind: 'page', search: {query: 'ramen near kichijoji'}}})", 10),
     ("desk mouse", "act('chart', {screen: {device: 'desk', id: 'c1', kind: 'page'}})", 8),
     ("desk watch", "act('watch_video', {screen: {device: 'desk', id: 'v1', kind: 'video'}})", 6),
     ("room_read", MH_DESK + "; for (let i = 0; i < 30; i++) animate_(1/30); mh.show('read')", "read"),
