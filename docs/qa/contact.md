@@ -1,0 +1,94 @@
+# Contact: what has to touch what
+
+Written 2026-10-06 by the coordinator, after four separate floating-body defects were found on `main` in one
+afternoon by three different people. It is the acceptance contract for every pose and every clip. The gate measures
+against this file; clip work is judged against this file.
+
+## Why this exists
+
+Every check we had asked one question: **is any part of him inside something?** `budgets.json` is four counters of
+"sampled skinned vertices inside that surface". `floorLift` and the mattress lift only ever push him **up** out of a
+surface. `pin()` lifts the hand until the lowest fingertip clears the keycaps. The camera test forbids seeing inside
+him.
+
+Nothing anywhere asked the opposite question: **is he touching what he is supposed to be touching?**
+
+A body that floats penetrates nothing, so it passed everything. What that cost us, all live on `main` on
+2026-10-06 and none of it caught by the suite:
+
+| what | measured | found by |
+|---|---|---|
+| both feet off the floor, seated at the desk | 5–14 cm, the whole clip | G12 |
+| fingertips over the keycaps, typing | 0.5–1.1 cm, never touching, the whole clip | G12 |
+| right hand beside the mouse instead of on it | palm 7.2 cm behind the mouse centre, wrist 8.6 cm up | G14 |
+| back off the mattress, lying in bed | visible gap in every rendered view | coordinator, from G10d's sheet |
+
+The typing hover was not even unknown: `defects.md` item 27 recorded "both hands float 3–5 cm above the keys" days
+ago. It was written down, routed, and shipped anyway, because nothing failed when it was true.
+
+One cause, not four: **we built the half of the system that rejects penetration and never built the half that
+requires contact.** The keyboard rule is the clearest proof that this was arithmetic, not bad luck — `pin()` lifts
+the hand until the lowest fingertip **bone** is 8 mm above the caps +3 mm, and fingertip skin is 10–11 mm thick, so
+contact was impossible by construction. Nobody mistuned it. It could never have worked.
+
+## The contract
+
+For each pose: what must be **touching**, and what must stay **out**. Contact means the skin is within the tolerance
+of the surface — neither further away nor further inside.
+
+Tolerances are per surface because the surfaces differ: a cushion and a mattress compress under load, a desk top and
+a keycap do not.
+
+### Seated at the desk — all three modes (type, mouse, watch)
+
+| part | surface | must |
+|---|---|---|
+| both soles | floor | touch, 0 to +1 cm (he is in slides: the sole sits on the slide, the slide on the floor) |
+| buttocks and back of thighs | seat cushion | touch, −2.5 to +0.5 cm (the cushion gives) |
+| back | backrest | touch in `watch`, where he leans back; free in `type` and `mouse` |
+| right hand | mouse shell, in `mouse` | palm on the shell, fingertips on the buttons, skin into the shell ≤ 2 mm |
+| both hands' fingertips | keycaps, in `type` | touch, 0 to +2 mm, through the whole clip, not at one frame |
+| left hand | keyboard, desk or thigh, in `mouse` | touch **something**; resting on nothing is a defect |
+| forearms | desk front edge | out, 0 vertices inside |
+| any part | desk top, chair frame, the chair's arm pads | out, 0 vertices inside |
+
+### Lying in bed — awake, with music, and asleep
+
+| part | surface | must |
+|---|---|---|
+| back, hips, shoulders | mattress (or the quilt folded under him) | touch, −1 to +0.5 cm |
+| head | pillow | touch, −2 to 0 cm (the pillow gives more than the mattress) |
+| feet | within the mattress, not past its end | inside its length |
+| whole body | headboard and bed frame | out, 0 vertices inside |
+| duvet, where it covers him | his skin | follow his shape; no gap reading as a balloon over him |
+
+### Standing — at the door, the window, walking
+
+| part | surface | must |
+|---|---|---|
+| the supporting sole | floor | touch, 0 to +1 cm, on the foot bearing weight at that frame |
+| any part | wall, sill, furniture | out, 0 vertices inside |
+
+## How it is measured
+
+Three rules, each of which one of today's defects would have broken:
+
+1. **Every mode.** `test_visual` checked a single frame of **mouse** mode only, which is why watch mode could carry
+   3713 chair contacts over 8 s and still be green.
+2. **Every frame of the clip, not one sample.** A pose can be right at frame 0 and wrong for the rest of the loop.
+   Report the worst frame, not the average.
+3. **Every solid in the room**, not a named list of two per pose. The headboard intersection survived because the
+   bed's check knew only the mattress plane and the duvet.
+
+And the gate reports **both signs**: how far inside, and how far away. A gap at a surface that the table above says
+must be touched is a failure of the same weight as a penetration.
+
+## Status
+
+The table is the target, not a description of today. As of 2026-10-06 `main` fails it in the four rows listed at
+the top, plus the mouse-mode `desk_14` chair contact (6 sampled vertices, budget 0 — a hard failure on live `main`,
+repeatedly reported as "accepted", which it never was).
+
+The seated rows are being fixed by replacement rather than by patching: the hand-built seated poses are being
+replaced with retargeted motion capture, and the patches that propped them up (the leg swap when a watch clip's
+ankles start above 0.12 m, the roll distances tuned to the old poses) go with them.
