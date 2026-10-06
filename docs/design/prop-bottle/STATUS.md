@@ -7,9 +7,15 @@ measured, not estimated.
 
 | | |
 |---|---|
-| `preview/prop-bottle` | `79fdedd` — the prop on its own, cut from `main` (`56525bb`), fast-forwardable |
-| `preview/room-v5` merge | merged at `b5ca210`, plus `94ea7ac` (a fix of mine, below) |
+| `preview/prop-bottle` | the prop on its own, cut from `main` (`56525bb`), fast-forwardable |
+| `preview/room-v5` | `008358d` — the bottle merged in (`b5ca210`), my `contacts.js` fix (`94ea7ac`), this file, and your sock/slides work merged back in (`9f356c1`) |
 | `main` | untouched, still `56525bb`. Nothing pushed to it, no PR opened |
+
+`preview/room-v5` moved from `4500931` to `9f356c1` while I was testing (the v5 sock and slides rebuild). I merged
+those in rather than force-pushing, so the push was a plain fast-forward and nothing of yours was dropped. Their
+commits touch only `char_v5.glb` and two `docs/design/room-v5` images, so there was no overlap with the bottle. I
+re-ran the v5 page against the new `char_v5.glb` afterwards: the bottle still loads, 1 mesh, 2 372 triangles, base at
+y = 0.970, no page errors.
 
 The merge of `preview/prop-bottle` into `preview/room-v5` (`4500931`) had **no conflicts**. v5 never touches `room.html`'s
 prop block, so the only overlap was `tests/visual/contacts.*`, and git combined them correctly: my `takes()` line (which
