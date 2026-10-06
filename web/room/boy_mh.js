@@ -26,9 +26,12 @@
 // (his legs push it on; it stays there), turns as he walks off and the walk loop takes over mid-stride. The walk plays
 // as recorded (knees and elbows bend, the arms swing).
 
-// lying on the bed listening to music, awake (G12, preview/bed-music): in once from room_bed_lie's last frame, the 8 s loop,
-// out once into room_bed_wake's first frame
-const EXTRA = {music_in: "room_bed_music_in", music: "room_bed_music", music_out: "room_bed_music_out"};
+// lying awake listening: a loop over his lying pose (EXTRA.music; music_in / music_out optional, without them it fades).
+// Interim (2026-10-06): none. Both candidates fail in the page: the keyed loop (the arm flung up tears the sleeve, the
+// hand reads raised) and the captured Laying_Nodding as retargeted (fists raised before his face, legs lifted 11-19 cm),
+// so he holds room_bed_lie's end, breathing (docs/design/bed-music/lying_awake_options.jpg). A corrected capture goes
+// here as {music: "<its clip>"}: it fades in over his lying pose and back out, no hand-made in / out needed
+const EXTRA = {};
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
   walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
@@ -222,8 +225,8 @@ export function createMH(env) {
       [...got.desk_watch.tracks.filter(t => !LEGS.test(t.name)), ...got.desk_mouse.tracks.filter(t => LEGS.test(t.name))]);
     M.watchLegs = feetUp ? "desk_mouse" : "recorded";
     const make = c => mixer.clipAction(c);
-    if (got.music_in && got.music && got.music_out) {
-      for (const k of ["music_in", "music", "music_out"]) { const a = M.actions[k] = make(got[k]); if (k !== "music") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } }
+    if (got.music) {
+      for (const k of ["music_in", "music", "music_out"]) if (got[k]) { const a = M.actions[k] = make(got[k]); if (k !== "music") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } }
       M.music = true; }
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
@@ -941,18 +944,23 @@ export function createMH(env) {
     const S = st.step, listening = st.goal && st.goal.clip === "listen";
     if (!BM.ph) {
       if (!(listening && st.at === "bedlie" && !S)) return;
-      bmPlay("music_in");
+      BM.a = st.current || null; bmPlay(M.actions.music_in ? "music_in" : "music");   // (no in: the loop fades in over his lying pose)
     }
     BM.t += dt;
     if (BM.ph === "music_in" && BM.a.time >= BM.a.getClip().duration - 1e-3) bmPlay("music");
     const leaving = S && S.from === "bedlie";
-    if (BM.ph === "music" && (leaving || !listening) && BM.a.time < 3.5) bmPlay("music_out");
-    if (BM.ph === "music_out" && BM.a.time >= BM.a.getClip().duration - 1e-3) {   // (done: the step goes on, or the page's clip again)
-      for (const k of ["music_in", "music", "music_out"]) { M.actions[k].setEffectiveWeight(0); M.actions[k].stop(); }
+    if (BM.ph === "music" && (leaving || !listening) && (!M.actions.music_out || BM.a.time < 3.5)) {
+      if (M.actions.music_out) bmPlay("music_out"); else { BM.ph = "fade"; BM.t = 0; } }   // (no out: back to his lying pose)
+    if (BM.ph === "fade") {
+      const w = Math.min(1, BM.t / 0.6), lie = st.current; BM.a.setEffectiveWeight(1 - w);
+      if (lie && lie !== BM.a) { if (!lie.isRunning()) lie.play(); lie.setEffectiveWeight(w); }
+      if (S) S.t = 0; env.mixer.update(0); if (w < 1) return; }
+    if (BM.ph === "fade" || (BM.ph === "music_out" && BM.a.time >= BM.a.getClip().duration - 1e-3)) {   // (done: the step goes on, or the page's clip again)
+      for (const k of ["music_in", "music", "music_out"]) if (M.actions[k]) { M.actions[k].setEffectiveWeight(0); M.actions[k].stop(); }
       if (!S && st.current) { st.current.setEffectiveWeight(1); st.current.play(); }
       BM.ph = null; BM.a = BM.prev = null; env.mixer.update(0); return; }
     if (S) S.t = 0;                                          // (the page's step waits for the out)
-    bmOnly(BM.a, Math.min(1, BM.t / (BM.ph === "music_in" ? 0.15 : 0.25)));
+    bmOnly(BM.a, Math.min(1, BM.t / (BM.ph === "music_in" ? 0.15 : M.actions.music_in ? 0.25 : 0.8)));
     env.mixer.update(0);
   }
   function music(st, dt) {
