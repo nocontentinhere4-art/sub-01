@@ -28,17 +28,18 @@ set (desk typing / mouse / watch, read, phone, phone scroll, eating, the bedtime
 sitting down) on the v5 skin, vertex by vertex, against the chair (all of him) and the keyboard, mouse and controller
 (hands).
 
-## The armrests, 3.5 cm further out (preview/room-v5 only)
-v5's wide trousers pressed into the owner's chair's armrests in every seated clip. `chair_owner_parts.py --arms-out 0.0282`
-(model metres; 3.5 cm in the room) moves each arm's pad and post outward, whole; the bar each post bends into under the
-seat stretches to the mechanism, so the mount stays attached; the seat, its rim strip, the backrest and the mesh do not
-move. Built with `SEAT=0.505 node room_build/build_chair_owner.mjs parts.ply <ambientCG> web/room/chair_owner.glb`
-(without `--arms-out` it gives main's chair byte for byte). `arms_before_after.jpg`: the chair alone, before and after;
-`arms_seated_side.jpg`: him seated, close side view, before and after.
+## The armrests 3.5 cm further out: tried and rejected
+v5's wide trousers pressed into the owner's chair's armrests in every seated clip, so each arm's pad and post was moved
+3.5 cm outward (the bar under the seat stretched to keep the mount attached) at 6f2ca19. Rejected (coordinator): it no
+longer reads as the chair the owner approved (from the front the pads stand off the seat on a thin stalk, from above they
+sit outside its silhouette on stretched bars), and it bought about 1 mm of depth per 3.5 mm of width, nothing at all while
+eating. The chair is main's again, byte for byte. The record: `arms_before_after.jpg` (the chair alone, before and after),
+`arms_seated_side.jpg` (him seated, close side view, before and after). The fix is in the clips instead (G14): he sits
+deeper on the seat, the chair moved toward the desk by as much, so his thighs lie between the arms.
 
 The contact grid can now say which part of the chair a hit is in (`SEAT=0.505 python -m tests.visual.chair_sdf parts.ply
 sdf.npz` stores each cell's nearest part; `tests.visual.contacts --chair-sdf sdf.npz --chair-regions`). G14's seated clips,
-v5, before -> after (max mm into the part):
+v5, with the original arms -> with the rejected 3.5 cm (max mm into the part):
 
 | clip | arm posts | arm pads | seat top | seat front | frame |
 |---|---|---|---|---|---|
