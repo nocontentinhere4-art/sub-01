@@ -29,7 +29,7 @@ def loft(rings):        # rings: list of (NC,3) arrays -> closed tube with end c
     T_=np.array(T_); c_=V_.mean(0); fn=np.cross(V_[T_[:,1]]-V_[T_[:,0]],V_[T_[:,2]]-V_[T_[:,0]])
     if ((V_[T_].mean(1)-c_)*fn).sum(1).mean()<0: T_=T_[:,[0,2,1]]
     return V_,T_
-parts=[]; NS,NC=56,40
+parts=[]; NS,NC=56,40; tubes={}
 for side,sg in (('L',-1),('R',1)):
     V=fv[np.sign(P[fv,2])==sg]; Q=P[V]
     dv=np.unique(I[dark&foot[I].all(1)&(np.sign(cen[:,2])==sg)].ravel()); D=P[dv][:,[0,2]]
@@ -44,7 +44,7 @@ for side,sg in (('L',-1),('R',1)):
         f=float(np.interp(yy,[0.022,0.035,0.045,0.055,YG,YG+0.005],[0.55,0.72,0.84,0.90,0.92,0.84]))
         rings.append(np.array([[*(tc+e1*r1*f*np.cos(a)+e2*r2*f*np.sin(a))] for a in np.linspace(0,2*np.pi,NC,endpoint=False)])[:,[0,1]])
     rings=[np.c_[r[:,0],np.full(len(r),yy),r[:,1]] for r,yy in zip(rings,np.linspace(0,1,14)*(YG+0.005-0.022)+0.022)]
-    parts.append(loft(rings))
+    parts.append(loft(rings)); tubes[sg]=(tc,e1,e2,r1,r2)
     # foot
     toes=np.isin(V,srcw)&(y>FB+0.003)&(y<0.035)
     t_toe=t[toes].max(); tb=float(((tc-c)@ax)-max(abs(e1@ax)*r1,abs(e2@ax)*r2)*0.84-0.003)
@@ -97,7 +97,43 @@ for j in range(3): np.add.at(vn,T[:,j],fn)
 vn/=np.linalg.norm(vn,axis=1,keepdims=True)+1e-12
 _,nk=cKDTree(P[srcw]).query(V); vuv=UV[srcw[nk]]
 TU=vuv[T]; span=np.max(np.abs(TU-TU.mean(1,keepdims=True)).max(2),1); bad=span>float(os.environ.get('SPAN','0.01'))
-TU[:]=SK if os.environ.get('PLAIN','1')=='1' else TU; TU[bad]=SK
+TU[:]=SK
+# the knit: per new triangle near the ankle, Tripo's own sock UVs from the band just above the join (same angle around
+# the leg, one UV island, local affine fit), mirrored downward so the ribs carry on at their scale and the join at YG
+# is continuous
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
+BAND=float(os.environ.get('BAND','0.014'))
+srcT=I[gone&(L>float(os.environ.get('KL','185')))&(P[I][:,:,1].min(1)>0.03)&(P[I][:,:,1].max(1)<YG+0.004)]   # Tripo's visible sock (the replaced surface)
+sv_=np.unique(srcT.ravel()); n_=len(P)
+g_=coo_matrix((np.ones(len(srcT)*3),(np.r_[srcT[:,0],srcT[:,1],srcT[:,2]],np.r_[srcT[:,1],srcT[:,2],srcT[:,0]])),shape=(n_,n_))
+_,isl=connected_components(g_,directed=False)
+knit=0
+for ti in range(len(T)):
+    g=V[T[ti]].mean(0); sg=1 if g[2]>0 else -1
+    if sg not in tubes or g[1]<FB+0.006: continue
+    tc_,e1_,e2_,r1_,r2_=tubes[sg]
+    def th(p): d=p[[0,2]]-tc_; return np.arctan2((d@e2_)/r2_,(d@e1_)/r1_)
+    d=g[[0,2]]-tc_
+    if np.hypot((d@e1_)/r1_,(d@e2_)/r2_)>1.45: continue                 # the toes keep the plain sock colour
+    cand_=sv_[np.sign(P[sv_,2])==sg]
+    thc=th(g); ths=np.array([th(p) for p in P[cand_]]); dth=np.angle(np.exp(1j*(ths-thc)))
+    w_=np.abs(dth)<np.radians(14)
+    if w_.sum()<6: continue
+    ids,cnt=np.unique(isl[cand_[w_]],return_counts=True); best=ids[np.argmax(cnt)]
+    m_=w_&(isl[cand_]==best)
+    if m_.sum()<6: continue
+    A=np.c_[dth[m_],P[cand_[m_],1],np.ones(m_.sum())]; coef,*_=np.linalg.lstsq(A,UV[cand_[m_]],rcond=None)
+    ylo,yhi=P[cand_[m_],1].min(),P[cand_[m_],1].max()
+    out=[]
+    for p in V[T[ti]]:
+        yr=min(max(p[1],ylo),yhi)                                        # where the strap hid the sock, the ribs run on
+        out.append(np.array([np.angle(np.exp(1j*(th(p)-thc))),yr,1.0])@coef)
+    out=np.array(out); smp=np.vstack([out,out.mean(0)[None],(out[[0,1,2]]+out[[1,2,0]])/2])
+    if tex(smp).mean(1).min()<float(os.environ.get('DARKK','170')): continue   # an island edge: keep the plain sock colour
+    TU[ti]=out; knit+=1
+print('knit-textured triangles',knit,'of',len(T))
+bad[:]=False
 VV=V[T].reshape(-1,3).astype(np.float32); NN=vn[T].reshape(-1,3).astype(np.float32); UU=TU.reshape(-1,2).astype(np.float32); TT=np.arange(len(VV),dtype=np.uint32)
 d,k=cKDTree(P[fv]).query(VV,k=4); src=fv[k]; ws=1/np.maximum(d,1e-5)**2; ws/=ws.sum(1,keepdims=True)
 Jn=np.zeros((len(VV),4),np.uint16); Wn=np.zeros((len(VV),4),np.float32)
