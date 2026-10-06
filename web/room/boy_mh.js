@@ -28,6 +28,11 @@
 
 // optional clips: G14's captured breath loops (awake; asleep, slower and deeper), played additively under every clip
 const EXTRA = {breath: "room_breath", breath_lie: "room_breath_lie"};
+// idle variants: G14's captured clips that play now and then over a held pose (each starts and ends in that pose, its
+// hips matched), never hand-made motion. An entry goes in only once its clip is gated in the page; G14 gives, with the
+// clip, where it plays (at: the page's anchor; modes: the desk modes, null for any) and how long he holds the pose before
+// it (gap: [min, max] s). Empty: nothing plays. variantStep() plays them
+const VARIANTS = [];   // e.g. {k: "seat_shift", clip: "var_seat_shift", at: "desk", modes: ["desk_watch"], gap: [a, b]}
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
   walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
@@ -209,6 +214,7 @@ export function createMH(env) {
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
     // optional: clips some bodies have and others not (v5: G14's captured breath loops); a missing one just stays off
+    for (const v of VARIANTS) EXTRA["var_" + v.k] = v.clip;
     await Promise.all(Object.entries(EXTRA).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // watching "simply sits in the chair": the recorded clip (boy_mh's and G2's alike) slouches and props its feet up at
@@ -227,6 +233,7 @@ export function createMH(env) {
       if (!c.tracks.length) continue;
       THREE.AnimationUtils.makeClipAdditive(c, 0); c.name = "room_" + k + "_add";
       const a = M.actions[k] = mixer.clipAction(c); a.blendMode = THREE.AdditiveAnimationBlendMode; a.setEffectiveWeight(0); a.play(); }
+    for (const v of VARIANTS) if (got["var_" + v.k]) { const a = M.actions["var_" + v.k] = mixer.clipAction(got["var_" + v.k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
     // body's (its hips 0.977 m up, walking): scaled to this body's by its own walking hips (v5's are about 0.87 m up, so they
@@ -841,6 +848,7 @@ export function createMH(env) {
     if (!transition(st)) onBed(st);
     pivot(st, dt);
     showStep();                                                // (the showcase's clip, before the guards measure him)
+    variantStep(st, dt);                                       // (an idle variant over the held pose, before the guards and the pins)
     baseY(); seatLift(st); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
     shove(st, dt);                                             // (after the root is final: the hand reaches the chair where it is)
     bedThings(st, dt);
@@ -851,6 +859,35 @@ export function createMH(env) {
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
+  }
+  // ---------- idle variants (VARIANTS): when he has held a pose a variant may play in for its gap, it fades in over the
+  // pose (0.3 s), plays once and fades out, the pose's own weights put back as they were. Any step, a change of desk mode
+  // or of place ends it at once ----------
+  const VS = {cur: null, t: 0, base: null, held: 0, next: null, key: ""};
+  function variantStep(st, dt) {
+    if (!VARIANTS.length || M.sc) return;
+    const key = st.at + "|" + (M.mode || ""), ok = v => M.actions["var_" + v.k] && v.at === st.at && (!v.modes || v.modes.includes(M.mode));
+    if (VS.cur && (st.step || key !== VS.key)) endVariant();
+    if (st.step || key !== VS.key) { VS.key = key; VS.held = 0; VS.next = null; if (st.step) return; }
+    VS.held += dt;
+    if (!VS.cur) {
+      const L = VARIANTS.filter(ok); if (!L.length) return;
+      if (VS.next === null) { VS.pick = L[Math.floor(Math.random() * L.length)]; VS.next = VS.pick.gap[0] + Math.random() * (VS.pick.gap[1] - VS.pick.gap[0]); }
+      if (VS.held < VS.next) return;
+      const a = M.actions["var_" + VS.pick.k]; VS.base = [];
+      for (const b of env.mixer._actions) if (b !== a && b.getEffectiveWeight() > 0 && b.blendMode !== THREE.AdditiveAnimationBlendMode) VS.base.push([b, b.getEffectiveWeight()]);
+      a.reset(); a.play(); VS.cur = a; VS.t = 0;
+    }
+    const a = VS.cur, d = a.getClip().duration; VS.t += dt;
+    const w = Math.min(1, VS.t / 0.3, Math.max(0, (d - VS.t) / 0.3));
+    a.setEffectiveWeight(w); for (const [b, w0] of VS.base) b.setEffectiveWeight(w0 * (1 - w));
+    env.mixer.update(0);
+    if (VS.t >= d) endVariant();
+  }
+  function endVariant() {
+    const a = VS.cur; if (!a) return;
+    a.setEffectiveWeight(0); a.stop(); for (const [b, w0] of VS.base) b.setEffectiveWeight(w0);
+    VS.cur = null; VS.base = null; VS.held = 0; VS.next = null; env.mixer.update(0);
   }
   // ---------- breathing: G14's captured breath, additive under every clip, never stopping between clips (a breath baked
   // into each clip would restart at every loop point). Asleep the lying loop (slower, deeper) takes over. The weights only
