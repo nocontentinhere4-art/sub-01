@@ -9,6 +9,7 @@
 //   floor  below the floor (F); soles: each foot's lowest gap to what is under it (the floor, the chair's base, furniture)
 //   bed    inside the bed (the page's box: the mattress top less 2 cm of give, rounded edge)
 //   legs   his hands and fingers inside his own thighs (capsules on the thigh bones, radius from his thigh skin)
+//   keys   his fingertips over the room keyboard: their lowest height over its key tops each frame (touching within 5 mm)
 // A penetration is a vertex more than 1 cm inside (the page's own margin); depth = how far inside, vertically.
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
@@ -76,6 +77,11 @@ const res = await p.evaluate(([activity, secs]) => {
       parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { if (THV[pi][i] !== s) continue; sm.getVertexPosition(i, vv); vv.applyMatrix4(sm.matrixWorld);
         const t = vv.clone().sub(a).dot(ab) / L2; if (t < 0 || t > 1) continue; const d = vv.distanceTo(a.clone().addScaledVector(ab, t)); bands[Math.min(9, Math.floor(t * 10))].push(d); } });
       RAD[s] = bands.map(bd => { if (!bd.length) return 0; bd.sort((x, y) => x - y); return bd[Math.floor(bd.length * 0.9)]; }); } }
+  // the keyboard: his fingertips (the skin of the last finger joints) over its footprint, against its key tops
+  const KB = scene.getObjectByName("keyboard"); let KBB = null; if (KB) { KB.updateMatrixWorld(true); KBB = new THREE.Box3().setFromObject(KB); }
+  const TIPV = parts.map(sm => { const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, n = sm.geometry.attributes.position.count, r = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); } r[i] = /finger[2-5]-3/.test(sm.skeleton.bones[bb].name) ? 1 : 0; } return r; });
+  S.keys = KBB ? {top: +KBB.max.y.toFixed(3), framesOver: 0, framesTouch: 0, framesBelow: 0, minGap_cm: 99, maxGap_cm: -99, gaps: []} : null;
   S.legs = {framesIn: 0, maxVerts: 0, maxDepth: 0, worstT: null, radius_cm: Object.fromEntries(Object.entries(RAD).map(([k, r]) => [k, r.map(x => +(x * 100).toFixed(1))]))};
   const v = new THREE.Vector3(), u = new THREE.Vector3(), N = Math.round(secs * 30);
   for (let f = 0; f < N; f++) {
@@ -122,6 +128,9 @@ const res = await p.evaluate(([activity, secs]) => {
         for (const s of ["L", "R"]) { const [a, b] = segs[s], ab = b.clone().sub(a), t = v.clone().sub(a).dot(ab) / ab.lengthSq(); if (t < 0 || t > 1) continue;
           const d = v.distanceTo(a.clone().addScaledVector(ab, t)), r = RAD[s][Math.min(9, Math.floor(t * 10))]; if (d < r - 0.005) { nIn++; dMax = Math.max(dMax, r - d); } } } });
       if (nIn) { S.legs.framesIn++; if (nIn > S.legs.maxVerts) { S.legs.maxVerts = nIn; S.legs.worstT = +(f / 30).toFixed(2); } S.legs.maxDepth = Math.max(S.legs.maxDepth, dMax); } }
+    if (KBB) { let lo = 9; parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position; for (let i = 0; i < P.count; i++) { if (!TIPV[pi][i]) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
+        if (v.x > KBB.min.x && v.x < KBB.max.x && v.z > KBB.min.z && v.z < KBB.max.z) lo = Math.min(lo, v.y - KBB.max.y); } });
+      if (lo < 9) { const K = S.keys; K.framesOver++; if (lo < 0.005) K.framesTouch++; if (lo < -0.005) K.framesBelow++; K.minGap_cm = Math.min(K.minGap_cm, +(lo * 100).toFixed(1)); K.maxGap_cm = Math.max(K.maxGap_cm, +(lo * 100).toFixed(1)); if (f % 15 === 0) K.gaps.push(+(lo * 100).toFixed(1)); } }
     if (nPen) S.worst.push([+(f / 30).toFixed(2), nPen]);
     S.frames++; }
   for (const k of ["chair", "desk", "other", "floor", "bed"]) for (const r in S[k]) { const e = S[k][r]; e.maxCount = Math.max(e.maxCount, e._n); delete e._f; delete e._n; e.maxDepth = +(e.maxDepth * 100).toFixed(1); }

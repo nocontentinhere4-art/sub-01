@@ -15,7 +15,7 @@ from skinlib import mats, skin_setup, skin, seat_low
 jdir, clip, inj, outj = sys.argv[1:5]
 SEAT = 0.505
 import os as _os
-SEAT_UP = float(_os.environ.get('SEAT_UP', 0)); SEAT_HIP_Y = float(_os.environ.get('SEAT_HIP_Y', 0)); SOLE_UP = float(_os.environ.get('SOLE_UP', 0.002)); SEAT_FWD = float(_os.environ.get('SEAT_FWD', 0))   # (m) the room fit for seated frames
+SEAT_UP = float(_os.environ.get('SEAT_UP', 0)); SEAT_HIP_Y = float(_os.environ.get('SEAT_HIP_Y', 0)); SOLE_UP = float(_os.environ.get('SOLE_UP', 0.002)); SHIFT_MAX = float(_os.environ.get('SHIFT_MAX', 0.25)); SEAT_FWD = float(_os.environ.get('SEAT_FWD', 0))   # (m) the room fit for seated frames
 C = qy(np.pi / 2)
 v5 = json.load(open(Path(jdir) / 'v5.json')); rj = json.load(open(inj))
 ts = Skel(rj); an = rj['anims'][0]; dur = max(max(c['t']) for c in an['ch']); F = int(round(dur * FPS)) + 1
@@ -98,7 +98,7 @@ for PASS in range(2):
   # keep the peaks: a running max over +-0.25 s before the smoothing, so a short dip is not averaged away
   pk = np.array([need[max(0, f - 8):f + 9].max() for f in range(F)])
   need = np.where(need > 0, np.maximum(need, lowpass(pk, 2.0)), need)
-  need = np.clip(lowpass(need, 3.0), -0.25 - total, 0.25 - total); total += need
+  need = np.clip(lowpass(need, 3.0), -SHIFT_MAX - total, SHIFT_MAX - total); total += need
   if PASS == 0 and (SEAT_UP or SEAT_FWD):
       # (a fit measured in the room: the contact pass gives how far his thighs sink into OUR cushion and his back into
       # the backrest; the seated frames move up / forward by that, the feet stay planted by the leg IK below)
@@ -130,6 +130,13 @@ for s, m in (('L', 'Left'), ('R', 'Right')):
     l1 = np.linalg.norm(T[0, b]) * Sc[a]; l2 = np.linalg.norm(T[0, c]) * Sc[b]
     goal = sP[:, ss.ix[f'{m}Hand']]
     goal = goal + np.array([0, float(_os.environ.get('HAND_UP', 0)), 0])   # (a hand resting on his thigh: on the cloth, not in it)
+    KEY = [float(x) for x in _os.environ.get('KEYS', '0,0').split(',')]
+    if KEY[0] or KEY[1]:
+        # (a performer who typed at another desk: while his hands are out at the keyboard (the wrist 0.30 -> 0.40 m in
+        # front of his hips, eased in), they move by [forward, up] onto OUR keyboard; resting hands do not)
+        reach = (goal[:, 0] - sP[:, ss.ix['Hips'], 0]) * float(_os.environ.get('K_HIP', 0.91))
+        wk = sm((reach - 0.30) / 0.10)
+        goal = goal + np.stack([KEY[0] * wk, KEY[1] * wk, np.zeros(F)], -1)
     if _os.environ.get('HANDS_RIDE'):
         # (a source posed on another chair: the hands move with the body as it is fitted onto ours, up and forward)
         goal = goal + np.stack([SEAT_FWD * w_seat, total, np.zeros(F)], -1)

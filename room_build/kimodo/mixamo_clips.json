@@ -1,5 +1,5 @@
 {
- "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame.",
+ "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame. keys [forward, up] (m): hands out at the keyboard move onto ours (eased in by their reach).",
  "defaults": {
   "seated": {
    "scale": "hip",
@@ -32,6 +32,38 @@
    "kind": "bed",
    "ref": "room_bed_lie",
    "out": "room_laying_nodding"
+  },
+  "Stand_To_Sit": {
+   "kind": "seated",
+   "out": "room_mx_stand_to_sit"
+  },
+  "Sit_To_Stand": {
+   "kind": "seated",
+   "out": "room_mx_sit_to_stand"
+  },
+  "Sit_To_Type": {
+   "kind": "seated",
+   "out": "room_mx_sit_to_type",
+   "keys": [
+    -0.09,
+    0.115
+   ]
+  },
+  "Typing": {
+   "kind": "seated",
+   "out": "room_mx_typing",
+   "keys": [
+    -0.09,
+    0.115
+   ]
+  },
+  "Type_To_Sit": {
+   "kind": "seated",
+   "out": "room_mx_type_to_sit",
+   "keys": [
+    -0.09,
+    0.115
+   ]
   }
  }
 }

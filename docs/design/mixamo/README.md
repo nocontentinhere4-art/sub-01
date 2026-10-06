@@ -81,3 +81,18 @@ All three clips loop on their own: the first and last frames match within 1.3°.
 | Laying_Nodding → `room_laying_nodding.glb` | 1.43 s loop; on his back, hands clasped on his chest, a 5° nod | 0 | 0 | **12–18 cm past** | for lying awake (`laying_sleeping_nodding_room.jpg`) |
 
 He is 1.75 m and the mattress is 1.65 m. A straight-legged lying capture therefore overhangs its end whatever the retarget does. Pulling the feet in means bending the captured legs, or sliding him into the headboard. Either changes the performance, so this is left open as a decision rather than patched.
+
+
+## The desk transitions: built, not yet passing
+
+Stand_To_Sit, Sit_To_Stand, Sit_To_Type, Typing and Type_To_Sit are built with the seated fit:
+- `web/room/mh_v5/room_mx_*.glb`
+- the hip lift reaches 0.27–0.29 m (the performer's chair is lower); the cap is now an option and set to 0.45 m
+- feet on the floor and seat contact as in Seated_Idle
+
+They are not accepted yet. Typing measures as follows (the `keys` row of the contact pass: his fingertip skin over the room keyboard against its key tops, every frame):
+- **main's typing:** fingertips 0.5…1.1 cm over the key tops (touching within 5 mm in 0 of 180 frames).
+- **Mixamo Typing as retargeted:** fingertips 10–20 cm under the key tops. The performer typed at a lower desk.
+- **with the hands moved onto our keyboard** (`keys`: 9 cm back, 11.5 cm up, eased in by the wrists' reach): -10.1…-2.8 cm. The forearms still run through the desk's front edge, because only the wrists move.
+
+Open question: bake the keyboard fit into the clip, or let the page's own wrist re-pin for the typing mode carry the hands to the keys. The page's re-pin is the mechanism G14 is fixing for the mouse hand; this is the same class of problem.
