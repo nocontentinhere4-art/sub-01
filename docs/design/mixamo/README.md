@@ -334,3 +334,19 @@ Traced with the page's `penetration()` every 0.1 s, in walks that pass or leave 
 - **Going to sleep from the desk**, he now stands up with `room_mx_sit_to_stand` like any other departure. `room_bedtime` plays only its part at the bed.
 
 tests/visual core set: 0 hard failures. tests/test_boy_mh.py: 7 passed.
+
+## The base seated loop, on the captures' own skeleton
+
+`room_build/kimodo/mixamo_seated_src.mjs` (FBXLoader, no retarget):
+
+| capture | what it shows | worst jump into / out of the desk set |
+|---|---|---|
+| Seated_Idle (4.2 s) | hands on the armrests (13–14 cm over the thighs, 28–31 cm to the side), head 11 cm ahead of the hips | 46–48° (right hand) |
+| Sitting (4.4 s) | not an idle: starts standing and sits down (wraps at 85°) | 92° |
+| Sitting_1 (1.2 s) | hands on the lap, head upright; a 1.2 s loop | 49–53° (arms) |
+| Sitting_Rubbing_Arm (8.0 s) | leaning in, head 28 cm ahead | 82° |
+| Sitting_Talking (44 s) | talking with his hands (ruled out as the base) | 6–11° |
+
+The desk set rests its hands on the thighs (4–5 cm over them). Seated_Idle stays the base. The 0.8 s hands-to-thighs blend gets its contact pass on the Mixamo rig, the body it will play on.
+
+The forward lean G14 measured (13–19°) is partly this pipeline's: the v5 seated fit tipped the spine 10° (`pitch` in `mixamo_clips.json`). On the Mixamo rig there is no fit.
