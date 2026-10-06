@@ -45,7 +45,7 @@
     return 0;
   }
   const HAND = /hand|finger|thumb|index|middle|ring|pinky|metacarpal|wrist|palm/i;
-  const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|ear|face|chin/i;
+  const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|chin|skull/i;   // (not "ear": it matches ForeArm)
   // the tea bottle he picks up and drinks from: his hand holds it, so it is tested against his head as well as his hands
   const takes = (name, b) => name === "tea_bottle" ? (HAND.test(b) || HEAD.test(b)) : HAND.test(b);
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
