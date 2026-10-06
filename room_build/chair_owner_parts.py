@@ -23,7 +23,7 @@ import numpy as np
 from scipy import ndimage
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from chair_owner_repair import load_ply  # noqa: E402
+from chair_owner_repair import load_ply, weld  # noqa: E402
 
 PARTS = ["mesh", "lumbar", "seat", "plastic", "armpad", "lift", "base", "caster"]
 PREVIEW = {"mesh": (40, 90, 220), "lumbar": (230, 150, 40), "seat": (220, 60, 60), "plastic": (150, 150, 150),
@@ -124,10 +124,45 @@ def save_preview(path, C, L):
     open(path, "wb").write(hdr.encode() + v.tobytes() + f.tobytes())
 
 
+def widen_arms(C, L, d):
+    """move both arm assemblies (pad and post) d (model m) outward along x. The pads and the posts move whole; the bar
+    each post bends into under the seat stretches to the mechanism, so the mount stays attached; the seat pan's rim, the
+    backrest frame, the seat, the mesh and the lumbar pad do not move. preview/room-v5: v5's wide trousers
+    pressed 23-29 mm into the posts in every seated clip"""
+    if not d:
+        return C
+    sm = lambda e0, e1, t: (lambda u: u * u * (3 - 2 * u))(np.clip((t - e0) / (e1 - e0), 0, 1))
+    mov = np.isin(L, ["plastic", "armpad"])
+    P = C[:, :, :3]; x, y, z = P[..., 0], P[..., 1], P[..., 2]
+    ax, band = np.abs(x), sm(-0.11, -0.07, z) * (1 - sm(0.16, 0.20, z))
+    pad = (ax > 0.19) * band * sm(0.46, 0.49, y)                       # the pads (and the posts' tops under them): whole
+    # the posts: the connected pieces of plastic beside the seat that run from under it (y < 0.33) up to the pads
+    # (y > 0.46); the strip on the seat's rim beside them is a piece of its own and stays
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    F, pos = weld(C); cen = P.mean(1)
+    sel = (L == "plastic") & (np.abs(cen[:, 0]) > 0.19) & (cen[:, 1] > 0.27) & (cen[:, 1] < 0.50) & (cen[:, 2] > -0.09) & (cen[:, 2] < 0.17)
+    Fs = F[sel]; e = np.concatenate([Fs[:, [0, 1]], Fs[:, [1, 2]]])
+    _, lab = connected_components(coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(len(pos),) * 2), directed=False)
+    fl = lab[Fs[:, 0]]; posts = np.zeros(len(pos), bool)
+    for c in np.unique(fl):
+        Q = cen[sel][fl == c]
+        if Q[:, 1].min() < 0.33 and Q[:, 1].max() > 0.46: posts[np.unique(Fs[fl == c])] = True
+    post = posts[F].astype(float)
+    # under them (y < 0.31) the bend and the bar to the mechanism: round each post's line (|x| 0.229, z 0.015), fading out
+    r = np.hypot((ax - 0.229) / 0.022, (z - 0.015) / 0.042)
+    bar = (1 - sm(1.0, 1.5, r)) * sm(0.24, 0.28, y) * (1 - sm(0.30, 0.32, y))
+    w = np.maximum(np.maximum(pad, post), bar)
+    C = C.copy(); C[..., 0] += np.sign(x) * d * w * mov[:, None]
+    return C
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("src"); ap.add_argument("out"); ap.add_argument("--preview", default="")
+    ap.add_argument("--arms-out", type=float, default=0.0, help="widen the armrests: each moves this far out (model m; x1.241 in the room)")
     a = ap.parse_args()
     C, L = parts(load_ply(a.src))
+    C = widen_arms(C, L, a.arms_out)
     save(a.out, C, box_uv(C), np.array([PARTS.index(p) for p in L], np.float32))
     if a.preview:
         save_preview(a.preview, C, L)

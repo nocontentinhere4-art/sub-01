@@ -45,7 +45,13 @@
     return 0;
   }
   const _u = new THREE.Vector3();
-  const region = u => Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm" : u.z < -0.17 && u.y < 0.62 ? "front" : u.z > 0.12 && u.y > 0.55 ? "back" : u.y < 0.30 ? "base" : "seat";
+  // the region: the chair part nearest the cell (chair_sdf.py from chair_owner_parts.py's output), else by place
+  const PARTS = ["mesh", "lumbar", "seat", "plastic", "armpad", "lift", "base", "caster"];
+  const region = u => { const g = objs.chair && objs.chair.sdf;
+    if (g && g.part) { const i = Math.round((u.x - g.lo[0]) / g.step), j = Math.round((u.y - g.lo[1]) / g.step), k = Math.round((u.z - g.lo[2]) / g.step);
+      const p = g.part[(i * g.dims[1] + j) * g.dims[2] + k];
+      if (p >= 0) return PARTS[p] === "plastic" ? (Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm_post" : "frame") : PARTS[p] === "seat" ? (u.z < -0.17 ? "seat_front" : "seat") : PARTS[p]; }
+    return Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm" : u.z < -0.17 && u.y < 0.62 ? "front" : u.z > 0.12 && u.y > 0.55 ? "back" : u.y < 0.30 ? "base" : "seat"; };
   const HAND = /hand|finger|thumb|index|middle|ring|pinky|metacarpal|wrist|palm/i;
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
   function check(res, frame, every = 1) {             // one frame: every skinned vertex against every object
@@ -73,7 +79,8 @@
       // the chair: one set of columns per closed part (its parts overlap where they join: parity holds within each)
       if (ch && window.__chairSDF) { const g = window.__chairSDF, b = atob(g.b64), a = new Int8Array(b.length);
         for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i) << 24 >> 24;
-        objs.chair = {node: ch, sdf: {lo: g.lo, step: g.step, dims: g.dims, data: a, tol: g.tol}, odd: 0, nx: g.dims[0] * g.dims[1] * g.dims[2], nz: 1, inv: new THREE.Matrix4()}; }
+        const pb = g.part && atob(g.part), pa = pb && Int8Array.from(pb, c => c.charCodeAt(0) << 24 >> 24);
+        objs.chair = {node: ch, sdf: {lo: g.lo, step: g.step, dims: g.dims, data: a, tol: g.tol, part: pa}, odd: 0, nx: g.dims[0] * g.dims[1] * g.dims[2], nz: 1, inv: new THREE.Matrix4()}; }
       else if (ch) { const p = new THREE.Vector3(), r = D.chairAt ? D.chairAt(0, p) : (p.copy(ch.position), ch.rotation.y);   // (columns in its own frame) ch.position.copy(p); ch.rotation.y = r; ch.updateMatrixWorld(true);
         const subs = []; for (const c of ch.children) { const prev = c.parent; const o = columnsOf(c, ch); if (o) subs.push(o); }
         objs.chair = {node: ch, subs, odd: subs.reduce((a, s) => a + s.odd, 0), nx: subs.reduce((a, s) => a + s.nx * s.nz, 0), nz: 1, inv: new THREE.Matrix4()};

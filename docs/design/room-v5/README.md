@@ -27,3 +27,26 @@ the PLY), then `python -m tests.visual.contacts --chair-sdf sdf.npz`: with `boy_
 set (desk typing / mouse / watch, read, phone, phone scroll, eating, the bedtime get-up, getting up to the window,
 sitting down) on the v5 skin, vertex by vertex, against the chair (all of him) and the keyboard, mouse and controller
 (hands).
+
+## The armrests, 3.5 cm further out (preview/room-v5 only)
+v5's wide trousers pressed into the owner's chair's armrests in every seated clip. `chair_owner_parts.py --arms-out 0.0282`
+(model metres; 3.5 cm in the room) moves each arm's pad and post outward, whole; the bar each post bends into under the
+seat stretches to the mechanism, so the mount stays attached; the seat, its rim strip, the backrest and the mesh do not
+move. Built with `SEAT=0.505 node room_build/build_chair_owner.mjs parts.ply <ambientCG> web/room/chair_owner.glb`
+(without `--arms-out` it gives main's chair byte for byte). `arms_before_after.jpg`: the chair alone, before and after;
+`arms_seated_side.jpg`: him seated, close side view, before and after.
+
+The contact grid can now say which part of the chair a hit is in (`SEAT=0.505 python -m tests.visual.chair_sdf parts.ply
+sdf.npz` stores each cell's nearest part; `tests.visual.contacts --chair-sdf sdf.npz --chair-regions`). G14's seated clips,
+v5, before -> after (max mm into the part):
+
+| clip | arm posts | arm pads | seat top | seat front | frame |
+|---|---|---|---|---|---|
+| typing / mouse | 23 -> 11 | 20 -> 11 | 18 -> 18 | 8 -> 8 | 13 -> 0 |
+| read | 29 -> 19 | 25 -> 15 | 11 -> 11 | 0 | 13 -> 0 |
+| phone / phone scroll | 24 -> 12 | 20 -> 7 | 0 | 0 | 12 -> 0 |
+| eating | 29 -> 29 | 25 -> 25 | 3 -> 3 | 0 | 13 -> 0 |
+
+The rest is not a matter of width: G14's clips sit him 8-20 cm forward on the seat (seen from above, the seat is behind
+his hips in typing, mouse and eating), so his thighs cross the pads' and posts' front ends rather than pressing on their
+sides; eating does not change at all.

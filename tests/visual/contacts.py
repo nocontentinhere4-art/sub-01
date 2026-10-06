@@ -74,7 +74,8 @@ def main():
             z = np.load(a.chair_sdf)
             pg.evaluate(f"window.__chairRegions = {'true' if a.chair_regions else 'false'}")
             pg.evaluate("(g) => { window.__chairSDF = g; }", {"b64": base64.b64encode(z["sd"].astype(np.int8).tobytes()).decode(), "lo": z["lo"].tolist(),
-                                                              "step": float(z["step"]), "dims": list(z["sd"].shape), "tol": a.chair_tol_mm})
+                                                              "step": float(z["step"]), "dims": list(z["sd"].shape), "tol": a.chair_tol_mm,
+                                                              "part": base64.b64encode(z["part"].tobytes()).decode() if "part" in z else None})
         pg.add_script_tag(path=str(Path(__file__).with_name("contacts.js")))
         report["objects"] = pg.evaluate("__contacts.build()")
         mh = pg.evaluate("() => !!window.mh")                       # (boy_mh.js drives him: its clips' scenarios)
