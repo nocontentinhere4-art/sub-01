@@ -26,6 +26,8 @@
 // (his legs push it on; it stays there), turns as he walks off and the walk loop takes over mid-stride. The walk plays
 // as recorded (knees and elbows bend, the arms swing).
 
+// optional clips: G14's captured breath loops (awake; asleep, slower and deeper), played additively under every clip
+const EXTRA = {breath: "room_breath", breath_lie: "room_breath_lie"};
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
   walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
@@ -206,6 +208,8 @@ export function createMH(env) {
     // (the clips' folder and their fit to the body come from the page: room/mh as recorded, room/mh_v5 for v5 through char_v5.js)
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
+    // optional: clips some bodies have and others not (v5: G14's captured breath loops); a missing one just stays off
+    await Promise.all(Object.entries(EXTRA).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // watching "simply sits in the chair": the recorded clip (boy_mh's and G2's alike) slouches and props its feet up at
     // the desk's height, so its pelvis (turn and height) and legs come from the mouse clip (seated on the seat, feet on
@@ -216,6 +220,13 @@ export function createMH(env) {
       [...got.desk_watch.tracks.filter(t => !LEGS.test(t.name)), ...got.desk_mouse.tracks.filter(t => LEGS.test(t.name))]);
     M.watchLegs = feetUp ? "desk_mouse" : "recorded";
     const make = c => mixer.clipAction(c);
+    // breathing: the captured loop's turns (the spine, the clavicles, the neck, and the head, which counter-turns so it stays
+    // put), made additive against its own first frame, under everything at the context's weight (breathe())
+    for (const k of ["breath", "breath_lie"]) { if (!got[k]) continue;
+      const c = got[k].clone(); c.tracks = c.tracks.filter(t => /\.quaternion$/.test(t.name));
+      if (!c.tracks.length) continue;
+      THREE.AnimationUtils.makeClipAdditive(c, 0); c.name = "room_" + k + "_add";
+      const a = M.actions[k] = mixer.clipAction(c); a.blendMode = THREE.AdditiveAnimationBlendMode; a.setEffectiveWeight(0); a.play(); }
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
     // body's (its hips 0.977 m up, walking): scaled to this body's by its own walking hips (v5's are about 0.87 m up, so they
@@ -835,9 +846,92 @@ export function createMH(env) {
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
+    breathe(st, dt);
+    gaze(st, dt);
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
+  }
+  // ---------- breathing: G14's captured breath, additive under every clip, never stopping between clips (a breath baked
+  // into each clip would restart at every loop point). Asleep the lying loop (slower, deeper) takes over. The weights only
+  // fade; the loops keep their own time, so a change of context never restarts a breath ----------
+  // (the loops run on their own clocks here: the page stops every action when it snaps or starts a pose, which put the
+  // breath back to its start or left it stopped)
+  // GA, GL: the loops' depth on this body. Played at full weight on v5 in the room the upper-arm heads rose 7.5 mm at a
+  // median breath (3.4 to 9.2) awake, 10.6 lying: G14's target for the clip is 3.0 mm awake (De Groote et al. 1997: the
+  // sternum moves 3-5 mm), 1.25 times that lying. Measured in the page, docs/design/life-c/README.md
+  const BR = {w: 0, wl: 0, t: 0, tl: 0, GA: 0.40, GL: 0.35};
+  const keep = (a, t) => { if (!a.isScheduled()) a.play(); a.enabled = true; a.paused = true; a.time = t % a.getClip().duration; };
+  function breathe(st, dt) {
+    const a = M.actions.breath, l = M.actions.breath_lie; if (!a && !l) return;
+    const asleep = st.goal && st.goal.clip === "sleep" && st.at === "bedlie";
+    const k = 1 - Math.exp(-dt / 0.8);
+    BR.w += ((env.boy.visible && !asleep ? 1 : 0) - BR.w) * k; BR.wl += ((env.boy.visible && asleep ? 1 : 0) - BR.wl) * k;
+    if (window.NOBREATH) BR.w = BR.wl = 0;                     // (DEBUG: without it, to measure what it does)
+    BR.t += dt; BR.tl += dt;
+    if (a) { keep(a, BR.t); a.setEffectiveWeight(BR.GA * (l ? BR.w : BR.w + BR.wl)); } if (l) { keep(l, BR.tl); l.setEffectiveWeight(BR.GL * BR.wl); }
+    // (no mixer.update here: it would put back every bone the layers above have set this frame, the pinned hands, the
+    // roll, the dents' lift. The page's own update applies it next frame, 33 ms on a breath of 4 s)
+  }
+  // ---------- gaze: his head turns toward what he looks at (the page's director picks the target per context), with
+  // human timing, an additive turn over whatever the clip does with his head. The numbers are measured human values
+  // (docs/design/life-c/README.md has the sources): the head starts 63 ms after the gaze target changes (Goossens & Van
+  // Opstal 1997, eye-head latency, visual targets, pooled: 63 +/- 36 ms; v5 has no eyes, so the head is the gaze),
+  // turns with a minimum-jerk profile at the measured peak speed of a 30 deg head turn (Boulanger et al. 2026: yaw
+  // 72 deg/s, pitch 66 deg/s, median, 62 adults), within the head and neck's range (Ferrario et al. 2002: about 155 deg
+  // of axial rotation in all, +/-77), the neck taking 40% of it, the head the rest; past NECK_OK the upper spine takes
+  // the excess ----------
+  const GZH = {LAT: 0.063, VYAW: 72, VPIT: 66, ROM: 77, NECK_OK: 45, SMALL: 4,
+    fwdL: null, cur: null, from: null, to: null, t0: 0, dur: 0, w: 0};
+  const D2R = Math.PI / 180, _g1 = V(), _g2 = V(), _g3 = V(), _gq = new THREE.Quaternion(), _gp = new THREE.Quaternion(), _gw = new THREE.Quaternion();
+  const _gm = new THREE.Matrix4();
+  function turnW(bone, axis, ang) {                          // turn a bone by ang about a room axis
+    if (!bone || Math.abs(ang) < 1e-5) return;
+    _gq.setFromAxisAngle(axis, ang); bone.parent.getWorldQuaternion(_gp); bone.getWorldQuaternion(_gw);
+    bone.quaternion.copy(_gp.invert().multiply(_gq.multiply(_gw))); bone.updateMatrixWorld(true);
+  }
+  function headFwd() {                                       // the way his face looks, in the Head bone's own frame (from his rest pose)
+    if (GZH.fwdL) return GZH.fwdL;
+    let sm = null; env.boy.traverse(o => { if (o.isSkinnedMesh && (!sm || o.skeleton.bones.length > sm.skeleton.bones.length)) sm = o; });
+    const head = env.bones.Head; if (!sm || !head) return null;
+    const keepQ = sm.skeleton.bones.map(b => b.quaternion.clone()), keepP = sm.skeleton.bones.map(b => b.position.clone());
+    sm.skeleton.pose(); env.boy.updateMatrixWorld(true);
+    const f = V(0, 0, 1).transformDirection(env.boy.matrixWorld);   // (the body faces +z at rest)
+    GZH.fwdL = f.applyQuaternion(head.getWorldQuaternion(_gw).invert()).normalize();
+    sm.skeleton.bones.forEach((b, i) => { b.quaternion.copy(keepQ[i]); b.position.copy(keepP[i]); }); env.boy.updateMatrixWorld(true);   // (this frame's pose back)
+    return GZH.fwdL;
+  }
+  const yp = v => [Math.atan2(v.x, v.z) / D2R, Math.atan2(v.y, Math.hypot(v.x, v.z)) / D2R];   // (body frame: yaw, pitch, degrees)
+  const mj = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * u * (10 - 15 * u + 6 * u * u);       // (minimum jerk)
+  function gaze(st, dt) {
+    const g = env.gaze ? env.gaze(dt) : null, head = env.bones.Head, neck = env.bones.neck;
+    GZH.w += ((g && g.w > 0.01 && !st.step ? g.w : 0) - GZH.w) * (1 - Math.exp(-dt * 3));
+    if (!g || !head || !neck || GZH.w < 0.01 || !headFwd()) { GZH.cur = null; return; }
+    const b = env.boy; b.updateMatrixWorld(true);
+    // where the target is from his head, and where the clip has his face, both in his body's frame
+    const hp = head.getWorldPosition(_g1), tgt = b.worldToLocal(_g2.copy(g.goal)).sub(b.worldToLocal(_g3.copy(hp)));
+    const face = _g3.copy(GZH.fwdL).applyQuaternion(head.getWorldQuaternion(_gw)).transformDirection(_gm.copy(b.matrixWorld).invert());
+    const want = yp(tgt), clip = yp(face);
+    // a new target: a new turn from where his gaze is now, after the eye-head latency, as long as the speed says
+    if (!GZH.cur) { GZH.cur = clip.slice(); GZH.to = clip.slice(); }
+    if (Math.hypot(want[0] - GZH.to[0], want[1] - GZH.to[1]) > 1) {
+      GZH.from = GZH.cur.slice(); GZH.to = want; GZH.t0 = st.T + GZH.LAT;
+      const ay = Math.abs(want[0] - GZH.from[0]), ap = Math.abs(want[1] - GZH.from[1]);
+      GZH.dur = Math.max(0.2, 1.875 * ay / GZH.VYAW, 1.875 * ap / GZH.VPIT);    // (min-jerk peak speed = 1.875 A / T)
+    }
+    const u = GZH.dur > 0 ? mj((st.T - GZH.t0) / GZH.dur) : 1;
+    if (GZH.from) GZH.cur = [GZH.from[0] + (GZH.to[0] - GZH.from[0]) * u, GZH.from[1] + (GZH.to[1] - GZH.from[1]) * u];
+    // the turn on top of the clip: what is left between his gaze and the clip's face, within reach
+    let dy = ((GZH.cur[0] - clip[0] + 540) % 360) - 180, dp = GZH.cur[1] - clip[1];
+    const small = Math.max(Math.abs(dy), Math.abs(dp));      // (a few degrees: the eyes alone would do it; the head eases in)
+    if (small < GZH.SMALL) { dy *= small / GZH.SMALL; dp *= small / GZH.SMALL; }
+    dy = Math.max(-GZH.ROM, Math.min(GZH.ROM, dy)) * GZH.w; dp = Math.max(-40, Math.min(30, dp)) * GZH.w;
+    const torso = Math.sign(dy) * Math.max(0, Math.abs(dy) - GZH.NECK_OK), hy = dy - torso;
+    const sp = env.bones.Spine, up = b.localToWorld(_g1.set(0, 1, 0)).sub(b.getWorldPosition(_g2)).normalize();
+    if (torso && sp) turnW(sp, up, torso * D2R);
+    turnW(neck, up, 0.4 * hy * D2R); turnW(head, up, 0.6 * hy * D2R);
+    const fw = _g3.copy(GZH.fwdL).applyQuaternion(head.getWorldQuaternion(_gw)), lat = _g2.crossVectors(up, fw).normalize();
+    turnW(neck, lat, -0.4 * dp * D2R); turnW(head, lat, -0.6 * dp * D2R);
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
   function dbg() {

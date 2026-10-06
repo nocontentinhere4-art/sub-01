@@ -20,6 +20,8 @@ def glb_json(path):
 CLIPS = ("desk_type_ik", "desk_mouse_ik", "desk_watch", "room_window", "room_walk", "room_sit_down", "room_stand_up",
          "room_bed_lie", "room_bed_wake", "room_eat", "room_read", "room_phone", "room_drink", "room_door", "room_bedtime",
          "room_phone_scroll")
+EXTRA = ("room_bed_music_in", "room_bed_music", "room_bed_music_out")   # (boy_mh's EXTRA: optional, loaded when present)
+ADDITIVE = ("room_breath", "room_breath_lie")                         # (G14's breath loops: a few trunk turns, played additively)
 
 
 def test_body_is_the_v5_rig():
@@ -31,14 +33,20 @@ def test_body_is_the_v5_rig():
 
 
 def test_room_clips_retargeted_onto_v5():
-    have = sorted(p.stem for p in (WEB / "mh_v5").glob("*.glb"))
-    assert set(have) <= set(CLIPS), set(have) - set(CLIPS)                  # (room-mh's names, 1:1; G14 drops them in)
+    have = sorted(p.stem for p in (WEB / "mh_v5").glob("*.glb") if p.stem not in ADDITIVE)
+    assert set(have) <= set(CLIPS + EXTRA), set(have) - set(CLIPS + EXTRA)                # (room-mh's names, 1:1; G14 drops them in)
     for clip in have:
         g = glb_json(WEB / "mh_v5" / f"{clip}.glb")
         assert g.get("animations"), clip
         ch = g["animations"][0]["channels"]
         targets = {(g["nodes"][c["target"]["node"]]["name"], c["target"]["path"]) for c in ch}
         assert ("Hip", "translation") in targets and ("L_Hand", "rotation") in targets, clip
+    for clip in ADDITIVE:                                                  # (optional: when present, the trunk's turns only)
+        p = WEB / "mh_v5" / f"{clip}.glb"
+        if not p.exists():
+            continue
+        g = glb_json(p); ch = g["animations"][0]["channels"]
+        assert {c["target"]["path"] for c in ch} == {"rotation"}, clip
 
 
 def test_char_v5_module_maps_to_the_makehuman_names():
