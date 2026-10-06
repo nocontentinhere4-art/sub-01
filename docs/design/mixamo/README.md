@@ -283,3 +283,37 @@ From his seated place that is 27–33 cm for Scared, 16–22 cm for Angry_Gestur
 - Sheet: `rare_events_desk.jpg`, from the room's side, seconds into each event. The dark first frame in two rows is a stale capture of the canvas; the log has him seated there.
 - Angry_Gesture's 3.4 cm in the thigh capsule: his fist rests on his thigh as he leans in. The capsule is the weak instrument noted above, and it should be checked against the trouser mesh when the contact gate lands.
 - Not wired to the scheduler (G10d's). `mixamo_chains.json` "rare" lists each event; celebrating is Standing_Clap played whole.
+
+## The Mixamo skeleton path (no retarget)
+
+COORD is moving the character onto Mixamo's own skeleton: the owner's v5 goes through Mixamo's auto-rigger (Standard Skeleton, 65 bones with fingers). The twenty captures then play on the skeleton they were recorded on, by bone name. The retarget (`mh_retarget.mjs`, `post.py`, `bed_fit.py`) is not used for new clips.
+
+Ready for the file:
+- `room_build/kimodo/mixamo_glb.mjs <in.fbx> <out.glb> [--test-skin] [--no-anim]`: a Mixamo FBX (a skinned character, or a clip downloaded "Without Skin") as a GLB.
+  - The mixamorig names are kept, and the whole scene goes under one node scaled 0.01 (centimetres to metres).
+  - `--test-skin` binds a plain box body to a clip's skeleton, for testing without the character.
+- `web/room/char_mixamo.js`, the same shape as `char_v5.js`:
+  - `prep()` hangs the hips under the body and gives the bones the names the page already uses (`NAMES`: Mixamo's limb names unchanged, the spine chain to Spine02 / Spine01 / Spine, Neck → neck, the fingers to finger1..5-1..4.L/R).
+  - `fixClip()` renames a clip's tracks the same way, carries the hips' track into the body's frame, and scales only the hips' translation by hip height (the character's over the clip skeleton's).
+- `room_build/kimodo/mixamo_check.mjs <character.glb> <clip.glb> <clip.fbx> [--scale k]`: the proof. It plays the clip through `char_mixamo.js` and compares every joint's world position every 0.1 s against three's FBXLoader playing the same FBX on its own skeleton.
+
+| clip | character | bones matched | worst gap | lowest foot (played / reference) |
+|---|---|---|---|---|
+| Seated_Idle | the clip skeleton, as is | 65 / 65 | 0.00 cm | 0.002 / 0.002 m |
+| Seated_Idle | scaled 0.9 | 65 / 65 | 0.00 cm | 0.002 / 0.002 m |
+| Laying_Nodding | as is | 65 / 65 | 0.00 cm | 1.030 / 1.030 m |
+| Laying_Nodding | scaled 0.9 | 65 / 65 | 0.00 cm | 0.927 / 0.927 m |
+
+`mixamo_skeleton_loader.jpg` shows the test body playing Seated_Idle and Laying_Nodding in the browser, with the page's three.js (0.169) and `char_mixamo.js`.
+
+What this settles about the lying clips. G10d measured our retargeted Laying_Nodding with the fists raised in front of the face and the legs lifted 11–19 cm. Played on its own skeleton, the capture lies flat (on the performer's bed, 1.03 m up):
+- the hands rest on the stomach, 51 cm from the head and about 10 cm over the hips;
+- the ankles are 9.6 cm below the hips.
+
+Laying_Sleeping is the same. The lift and the raised fists came from the retarget and bed-fit chain, not from the captures.
+
+Still to wire when the character arrives:
+- room.html's `pickRig` / `V5` switch and `env.fixClip` / `pageHips`;
+- boy_mh.js's MakeHuman-only names: `isMH()` (metacarpals), "Spine" in the rare-event reach (Mixamo's lowest spine bone becomes Spine02 here, so the reach's "Spine" is Mixamo's Spine2: correct), and the fingertip names (finger*-3 maps to Mixamo's third joint; Mixamo also has a fourth, the tip).
+
+The placements (seat points, chair rides, spots, rare-event distances) sample each clip on the body, so they carry over.
