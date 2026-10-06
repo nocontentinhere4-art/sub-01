@@ -28,3 +28,10 @@ For G10d's continuous additive breathing layer, under every clip.
   - Seated subjects; at the sternum the inspiratory displacement is mainly cranial and ventral, 3-5 mm, and laterally 1-2 mm.
   - v5's skin has no rib-cage expansion, so the cranial part is carried by the clavicles (3.0 mm up), and a 0.65 deg
     thoracic extension adds the small chest motion.
+
+## In the page's format (for G10d)
+- `web/room/mh_v5/room_breath.glb` is the same clip as `breath_v5.glb`: 58.8 s, seamless. Make it additive against its own first frame.
+- `web/room/mh_v5/room_breath_lie.glb` is the lying/asleep version, 76.5 s, seamless, built from `breath_curve_b004_lie.json`.
+  - It is the same recorded b004 loop, slowed 1.3x (11.3 breaths/min) and deepened 1.25x, with the same irregularity in relative terms.
+  - This sleep adjustment is **derived, not measured**. Slower and deeper breathing in sleep is the usual physiology, but a
+    recorded sleeping subject would be the stricter source.
