@@ -143,3 +143,14 @@ The first pass fixed where each finger sat, not what the hand was doing. The fin
 - Not yet solved: tilting the hand to lift the heel diverged, and moving the palm back made a claw.
 
 `mouse_grip_silhouette.jpg` shows mouse2 beside our top-down, mouse1 beside ours from behind-left above, ours from his left, and the new mouse alone.
+
+### Third pass: the fingers drape (COORD: from his left, 30/45/25 still read as a claw)
+- **Bends lowered at the middle and end joints, set absolutely:**
+  - index and middle: 25 / 32 / 12°;
+  - ring: 32 / 40 / 15°;
+  - little: 36 / 45 / 18°.
+- **Fingers together:** index turned 3° in, ring along the middle finger, little 2° out.
+- **The arch** is left to the wrist tilt and the palm on the hump (wrist 2.7 cm, knuckles 5.7 cm over the pad).
+- **Measured:** the fingers seen from above are 0.86 of the palm (mouse2: 0.65). This moved the wrong way, as expected, and is accepted: from the side they now lie along the shell.
+- **Over 15 s:** median 1.0 mm into the shell, max 9.3 mm. The max is the thumb's root at the left flank (vertical depth), still open.
+- **Pictures:** `mouse_grip_silhouette.jpg` now also has the view over his right shoulder (the owner's usual camera side).

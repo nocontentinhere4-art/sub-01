@@ -450,7 +450,7 @@ export function createMH(env) {
   function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }
   // the grip, measured off mouse1 / mouse2 (the fingers' seen length in the top-down is ~65% of the palm's: these bends):
   // [knuckle, middle, end joint] in degrees, and each finger's turn from the middle finger's line in the palm (+ = away from it)
-  const GRIP = {2: [30, 45, 25, -2], 3: [30, 45, 25, 0], 4: [38, 52, 28, 2], 5: [42, 55, 28, 5]};
+  const GRIP = {2: [25, 32, 12, -3], 3: [25, 32, 12, 0], 4: [32, 40, 15, 0], 5: [36, 45, 18, 2]};
   const tipSkin = (side, name, i) => { let low = 1e9; for (const [o, n] of skinOf(side, i, 3)) { o.getVertexPosition(n, _p).applyMatrix4(o.matrixWorld); low = Math.min(low, _p.y - under(name, _p)); } return low; };
   function curl(side, G, weight) {                           // each finger set to G's bends in the hand's own frame (absolute: they never add up)
     const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(V()), k2 = S(side, 2, 1).getWorldPosition(V()), k3 = S(side, 3, 1).getWorldPosition(V()), k5 = S(side, 5, 1).getWorldPosition(V());
