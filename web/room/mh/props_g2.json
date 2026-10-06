@@ -34,8 +34,8 @@
     ],
     "pos": [
      -0.28,
-     0.811,
-     0.64
+     0.9113,
+     0.79
     ]
    },
    {
@@ -48,8 +48,8 @@
     ],
     "pos": [
      -0.22,
-     0.834,
-     0.62
+     0.9343,
+     0.77
     ]
    }
   ],
@@ -68,13 +68,13 @@
     ],
     "pos": [
      0.07085,
-     0.78124,
-     0.33955
+     0.90529,
+     0.38379
     ],
     "rot": [
-     70.0,
-     10.0,
-     -0.0
+     53,
+     10,
+     0
     ],
     "color": "0xf1ead8"
    },
@@ -88,13 +88,13 @@
     ],
     "pos": [
      0.07449,
-     0.76992,
-     0.34367
+     0.89567,
+     0.39103
     ],
     "rot": [
-     70.0,
-     10.0,
-     -0.0
+     53,
+     10,
+     0
     ],
     "color": "0x2f6b4f"
    },
@@ -108,13 +108,13 @@
     ],
     "pos": [
      -0.07085,
-     0.78124,
-     0.33955
+     0.90529,
+     0.38379
     ],
     "rot": [
-     70.0,
-     -10.0,
-     -0.0
+     53,
+     -10,
+     0
     ],
     "color": "0xf1ead8"
    },
@@ -128,13 +128,13 @@
     ],
     "pos": [
      -0.07449,
-     0.76992,
-     0.34367
+     0.89567,
+     0.39103
     ],
     "rot": [
-     70.0,
-     -10.0,
-     -0.0
+     53,
+     -10,
+     0
     ],
     "color": "0x2f6b4f"
    }
@@ -149,20 +149,20 @@
      0.0008
     ],
     "rot": [
-     -110.0,
-     10.0,
-     -180.0
+     -127,
+     10,
+     -180
     ],
     "color": "0xf6f1e3",
     "pivot": [
-     0.0,
-     0.78019,
-     0.33993
+     0,
+     0.9044,
+     0.38446
     ],
     "axis": [
-     0.0,
-     0.34202,
-     0.93969
+     0,
+     0.60181,
+     0.79863
     ],
     "keys": [
      [
@@ -195,7 +195,7 @@
      ],
      [
       4.583,
-      -0.0
+      0
      ],
      [
       4.617,
@@ -339,7 +339,7 @@
      ]
     ],
     "strips": 5,
-    "bend": -50.0
+    "bend": -50
    },
    {
     "what": "turning page",
@@ -350,20 +350,20 @@
      0.0008
     ],
     "rot": [
-     -110.0,
-     10.0,
-     -180.0
+     -127,
+     10,
+     -180
     ],
     "color": "0xf6f1e3",
     "pivot": [
-     0.0,
-     0.78019,
-     0.33993
+     0,
+     0.9044,
+     0.38446
     ],
     "axis": [
-     0.0,
-     0.34202,
-     0.93969
+     0,
+     0.60181,
+     0.79863
     ],
     "keys": [
      [
@@ -396,7 +396,7 @@
      ],
      [
       12.083,
-      -0.0
+      0
      ],
      [
       12.117,
@@ -540,7 +540,7 @@
      ]
     ],
     "strips": 5,
-    "bend": -50.0
+    "bend": -50
    }
   ],
   "notes": "Seated reading from the owner's own videos. Book on the lap; the left hand holds the left cover's outer edge, the right hand rests on the right page, fingertips down. Two page turns (4.0-6.8 s and 11.5-14.3 s): fingers land spread, tips draw in to the thumb (pinch), the hand lifts and carries the page all the way over, lays it on the left page and holds it ~0.6 s, then flicks open and comes back. Hand skin checked out of the book every 0.1 s. pages[]: a thin box hinged on the spine: put a group at 'pivot', inside it the page with 'rot' (deg, XYZ) and its left edge on the pivot (box spans local x 0..size[0]); rotate the group about 'axis' by keys=[[t_s, deg]] (linear, 30 fps; 0 = lying on the right half, -160 = on the left half). Optional paper bend: split it into 'strips' along x, each hinge bent by bend*sin(pi*|deg|/160)/(strips-1) deg about local y. Approved by the owner."
@@ -563,8 +563,8 @@
     "what": "phone",
     "pos": [
      0.0,
-     0.98244,
-     0.18264
+     1.08894,
+     0.36974
     ]
    },
    {
@@ -583,8 +583,8 @@
     "what": "screen (emissive)",
     "pos": [
      0.0,
-     0.9849399999999999,
-     0.17954
+     1.09144,
+     0.36664
     ]
    }
   ],
@@ -4405,8 +4405,8 @@
     "what": "phone",
     "pos": [
      0.0,
-     0.98244,
-     0.18264
+     1.08894,
+     0.36974
     ]
    },
    {
@@ -4425,8 +4425,8 @@
     "what": "screen (emissive)",
     "pos": [
      0.0,
-     0.9849399999999999,
-     0.17954
+     1.09144,
+     0.36664
     ]
    }
   ],
