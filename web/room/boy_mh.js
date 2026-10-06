@@ -601,7 +601,7 @@ export function createMH(env) {
       M.liftT = 1; every = 2; M.lift = 0;
     }
     if (on) {
-      if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh) skin.push(o); }); }     // every part (dressed: his clothes too)
+      if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh && !/_inside$/.test(o.name)) skin.push(o); }); }     // every part (dressed: his clothes too; not the page's drawn inside)
       b.updateMatrixWorld(true); const v = V();
       for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
       for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
@@ -617,7 +617,7 @@ export function createMH(env) {
   let feet = null;
   function floorLift(dt) {
     const b = env.boy;
-    if (!feet) { feet = []; b.traverse(o => { if (!o.isSkinnedMesh) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, ids = [];
+    if (!feet) { feet = []; b.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, ids = [];
       for (let i = 0; i < g.attributes.position.count; i++) { let k0 = 0, w0 = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w0) { w0 = W.getComponent(i, k); k0 = I.getComponent(i, k); }
         if (/Foot|ToeBase|toe/.test(o.skeleton.bones[k0].name)) ids.push(i); }
       if (ids.length) feet.push([o, ids.filter((_, j) => j % 2 === 0)]); }); }
@@ -632,7 +632,7 @@ export function createMH(env) {
   // page's duvet is drawn up over him to his chest (a daytime rest stays on top of it)
   const SL = {on: [], pair: null, off: false, duv: 0};
   function slidesInit() {
-    env.boy.traverse(o => { if (o.isSkinnedMesh && /slide/i.test(o.name)) SL.on.push(o); });
+    env.boy.traverse(o => { if (o.isSkinnedMesh && /slide/i.test(o.name) && !/_inside$/.test(o.name)) SL.on.push(o); });
     if (!SL.on.length) return;
     const pair = new THREE.Group(), box = new THREE.Box3(), c = V();
     for (const o of SL.on) { const g = o.geometry.clone(); g.applyMatrix4(o.bindMatrix); for (const k of ["skinIndex", "skinWeight"]) g.deleteAttribute(k);
