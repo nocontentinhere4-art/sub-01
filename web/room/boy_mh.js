@@ -596,7 +596,7 @@ export function createMH(env) {
     }
   }
 
-  const _k = V(), _c = V(), dK = V(), _hp = V();
+  const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V();
   function hands(dt) {
     const typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse";
     const k = 1 - Math.exp(-dt / 0.13);
