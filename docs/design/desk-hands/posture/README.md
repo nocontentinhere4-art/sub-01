@@ -44,3 +44,19 @@ The watch row is from a run of the same build: the depth is the same as type/mou
 ## Renders
 `posture_<clip>.jpg`: before (left, main) and after (right), side view, frames 1 s apart (1-6 s).
 - These are G14's render scene with the chair placed relative to his hips as the page places it.
+
+## Watch mode, checked over the whole clip (G14, after the first push)
+`test_visual` covers only the mouse pose (desk_14). The page's own body check (`__qa.body`) every 0.25 s while it
+plays desk_watch (watch mode):
+
+| watch mode, max sampled vertices | desk | chair |
+|---|---|---|
+| main 95abd03 | 86 | 715 |
+| this branch, first push (pitch -15) | 143 | 1001 |
+| this branch now (desk_watch pitch -10, resting hands 2 cm higher) | 221 | 886 |
+
+The same check in mouse mode over the whole clip: desk 0, chair 0.
+- His hips sit at the same spot in the chair's frame in both modes (0.009, 0.676, -0.016).
+- The watch-mode chair hits are the lower back (Spine01) and the calves and thighs (the mouse clip's legs, which the page
+  uses in watch mode), so the difference is in what the page does in watch mode. Open with G10d.
+- Watch posture now: spine 8.0 deg forward, lumbar gap 0.4 cm, elbows 109 / 115.
