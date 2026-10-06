@@ -27,3 +27,28 @@ to 23 mm (typing, right thigh) and the seat front 18 mm; the page's mouse re-pin
 in the typing scenario. The elbow angles at the desk are the page's wrist re-pin onto the room's keyboard (unchanged by this
 pass; not 100-115 deg: flagged). Stills: `*_side.png`, `all_side.jpg` (G14's render scene with the chair where the page has
 it relative to his hips; read, type, mouse, watch / phone, phone_scroll, eat).
+
+## Pass 2: `test_visual.py::test_room_renders_without_hard_errors`, scene desk_14_1280 (mouse mode)
+
+Measured in the page: the left forearm (mouse mode, hand not pinned) crossed the desk's front edge 3.6 cm below its top
+(elbow at y 1.00 m, z -0.79); the page pins his seated hips to its own height (boy_mh.js seatHeight), so the clips' seat
+lift did not raise him and the right thigh sat 23 mm in the cushion. desk_type_ik / desk_mouse_ik (mh_retarget options,
+final2.py): the left arm swung up about its shoulder-wrist axis until the elbow is 4 cm higher (`elbowUp`; the hand keeps
+its place and turn: no stretch), the hips 2.1 cm higher over the feet (the page's floor lift carries him up), the feet 2.5
+cm forward and the left foot 2 cm more (`feetForward`, `leftFootForward`: the calves clear of the seat front). Lateral
+centring, the 6 cm depth and env.seatIn 0.06 unchanged.
+
+| desk_14_1280 (test_visual) | before | after |
+|---|---|---|
+| desk (sampled vertices) | 208 (L_ForearmTwist01) | 0 |
+| chair (sampled vertices) | 211 (R thigh 167, L calf 39, R calf 5) | 6 (L calf) - still over the budget of 0 |
+
+| contacts --chair-regions, max mm | before | after |
+|---|---|---|
+| desk typing: seat / front / arm | 23 / 18 / 0 | 10 / 4 / 0 |
+| desk mouse: seat / front / arm | 23 / 18 / 0 | 10 / 4 / 0 |
+| left forearm below the desk top (page probe) | 36 | 0 |
+| hips in chair frame (x, y, z) | 0.000, 0.656, -0.006 | 0.000, 0.677, -0.006 |
+| elbows L / R, mouse (deg) | 53 / 61 | 65 / 64 |
+
+Unchanged by this pass: room_read seat 17 mm, the page's mouse re-pin 12.5 mm into the mouse, G12's sit-down / get-up.
