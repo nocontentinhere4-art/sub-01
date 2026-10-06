@@ -36,10 +36,17 @@ these are worth more to us than the Kimodo takes, which carried no fingers at al
 | `Sit_To_Type.fbx` | hands coming up to the keyboard | entering the typing pose |
 | `Typing.fbx` | typing | the working pose itself |
 | `Type_To_Sit.fbx` | hands coming back down | leaving the typing pose |
+| `Standing_Clap.fbx` | celebrating | rare moment — something at the computer goes brilliantly |
 
-The last five replace the two takes the owner called out as broken — standing up and sitting
-down — and give us the transition in and out of typing, which we never had: until now the
-hands arrived at the keyboard by teleporting there.
+The transition takes replace the two the owner called out as broken — standing up and sitting
+down — and give us the way in and out of typing, which we never had: until now the hands
+arrived at the keyboard by teleporting there.
+
+`Standing_Clap` is performed standing, and he is seated at the computer. It is played as a
+chain — `Sit_To_Stand` → `Standing_Clap` → `Stand_To_Sit` — so he comes up out of the chair to
+celebrate and settles back down. Grafting a standing upper body onto a seated base is what
+produced the stitched-together poses we have already thrown away once; all three parts here
+are real captures, so the chain costs us nothing and reads as one motion.
 
 The last two are deliberately rare: they are punctuation, not behaviour. They play once in a
 long while and never twice near each other.
