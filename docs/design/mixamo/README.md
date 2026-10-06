@@ -255,3 +255,31 @@ Still open, reported rather than patched:
 - **Walking from the window to the desk**, his left forearm swings through the parked chair's backrest (27–37 vertices at 2.6–2.7 s). It is identical on main: the path through the gap between the chair and the bed passes 15 cm from the backrest.
 - **The phone in bed has no capture.** Texting is standing, Texting_While_Standing and the tablet are standing, and Gaming is seated. None of them is lying down, which is where he watches most of his shorts, so the bed phone pose stays as it is. It is the one place in his day we have no capture for.
 - **The hands-vs-thighs row is a weak instrument in transitions.** It is a capsule around the thigh bone sized from baggy trousers (radius up to 16 cm), so a fist resting on the cloth reads as deep. The honest measurement is against the trouser mesh, and it should come with the contact gate.
+
+## The rare events at the desk: the whole capture, the chair moved
+
+COORD's rule for Scared, Angry_Gesture and Standing_Clap: play the whole capture and move the chair, not the performance. `boy_mh.js` `rare(k)` (`mh.rare("scared" | "angry" | "clap")`; the page's scheduler decides when, rarely and never twice close together):
+
+1. **He rides the chair back** (1 s, seated), as far as that capture needs.
+2. **The whole capture plays**, with 0.8 s crossfades in and out of the seated loop. The joins are 42–49°, hands from the armrests to the thighs (`chain_joins.py`).
+3. **He rides back in** (1 s).
+
+How far back is derived per capture, against the room, when the event starts:
+- the capture's hands, forearms, knees, feet, chest and head, every 0.1 s, from its first frame's hips;
+- against the free space in front of where he sits: rays toward the desk across his width at every 5 cm of height, plus downward rays for the desk's top, a 3 mm plate at 0.81 m that horizontal rays slip past;
+- the deepest any part would go, plus 3 cm.
+
+From his seated place that is 27–33 cm for Scared, 16–22 cm for Angry_Gesture, and 23–37 cm for Standing_Clap. Each capture's hips sit on a seat point swept the same way (`SEAT_AT`): Scared 11.5 cm forward (clear from 9.5), Angry_Gesture 8.5 (clear from 7.5), Standing_Clap where he sits to watch.
+
+`contact_pass.mjs` with `RARE=<k>`, every frame, over the whole event:
+
+| | chair | desk | floor, bed | seat on landing | soles | hands vs thighs |
+|---|---|---|---|---|---|---|
+| Scared (12.5 s) | **0** | **0** (was torso 186 frames, legs 161) | 0 | −0.1 cm | −0.2…4.8 cm | capsule 15 cm (hands push on the thighs to rise) |
+| Angry_Gesture (8.3 s) | **0** | **0** (was feet 15 cm into its frame) | 0 | −0.6 cm | 0.1…4.8 cm | 132 frames, 3.4 cm |
+| Standing_Clap (7.2 s) | **0** | **0** (was torso 80 frames, legs 80) | 0 | −0.1 cm | −0.2…4.8 cm | capsule 14 cm (as Scared) |
+
+- Two fixes on the way. An action that was never played reports an effective weight of 1, which pulled his seated placement 4.8 cm sideways. And an event's crossfade has to start before the frame's mixer update; otherwise the root is placed for one frame for a pose that is not showing yet (10.6 cm).
+- Sheet: `rare_events_desk.jpg`, from the room's side, seconds into each event. The dark first frame in two rows is a stale capture of the canvas; the log has him seated there.
+- Angry_Gesture's 3.4 cm in the thigh capsule: his fist rests on his thigh as he leans in. The capsule is the weak instrument noted above, and it should be checked against the trouser mesh when the contact gate lands.
+- Not wired to the scheduler (G10d's). `mixamo_chains.json` "rare" lists each event; celebrating is Standing_Clap played whole.

@@ -26,17 +26,21 @@
     "blend": 0.2
    }
   ],
-  "celebrating": {
-   "pending": "Standing_Clap starts and ends seated (README): trim it to its standing middle and chain Sit_To_Stand -> clap -> Stand_To_Sit, or play it whole with the page moving the chair; COORD's choice"
-  }
+  "celebrating": [
+   {
+    "clip": "room_mx_standing_clap",
+    "rare": true,
+    "note": "the capture rises, claps and sits by itself: played whole with the chair rolled back (boy_mh.js rare())"
+   }
+  ]
  },
  "rare": {
   "minGap": 600,
   "events": {
-   "room_mx_scared": "pending the chair (README)",
-   "room_mx_angry_gesture": "pending the feet (README)",
-   "room_mx_standing_clap": "celebrating",
-   "room_sleeping_idle": "a night turn-over (README's criteria)"
+   "room_mx_scared": "mh.rare('scared'): rides back 27-33 cm, the whole capture, rides in",
+   "room_mx_angry_gesture": "mh.rare('angry'): rides back 16-22 cm",
+   "room_mx_standing_clap": "mh.rare('clap'): rides back 23-37 cm (celebrating: the whole capture)",
+   "room_sleeping_idle": "a night turn-over (README's criteria); not wired"
   }
  },
  "links": [
@@ -47,6 +51,36 @@
   ],
   [
    "room_mx_type_to_sit",
+   "room_seated_idle",
+   0.8
+  ],
+  [
+   "room_seated_idle",
+   "room_mx_scared",
+   0.8
+  ],
+  [
+   "room_mx_scared",
+   "room_seated_idle",
+   0.8
+  ],
+  [
+   "room_seated_idle",
+   "room_mx_angry_gesture",
+   0.8
+  ],
+  [
+   "room_mx_angry_gesture",
+   "room_seated_idle",
+   0.8
+  ],
+  [
+   "room_seated_idle",
+   "room_mx_standing_clap",
+   0.8
+  ],
+  [
+   "room_mx_standing_clap",
    "room_seated_idle",
    0.8
   ]
