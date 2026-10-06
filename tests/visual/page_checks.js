@@ -135,7 +135,7 @@
   };
   qa.body = (every = 2) => {
     // every skinned part of him (one body, or a dressed one: body, hoodie, trousers, socks, slides)
-    const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) parts.push(o); }); boy.updateMatrixWorld(true);
+    const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible && !/_inside$/.test(o.name)) parts.push(o); }); boy.updateMatrixWorld(true);   // (not his drawn inside: the same skin again)
     const v = V(), desk = qa.columns("desk", -1.92, -0.30, -1.47, -0.72);
     const out = {sampled: 0, below_floor: 0, desk: 0, min_y: 9, by: {}, foot_min_y: {Left: 9, Right: 9}, bed: 0, chair: 0};
     for (const sm of parts) {
