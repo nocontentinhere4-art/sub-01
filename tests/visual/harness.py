@@ -188,6 +188,8 @@ class Harness:
 
     def check_pose(self, key, name, pose):
         _, _, _, _, at, clip, _ = S.scene(name)
+        if S.makehuman_rig():
+            clip = S.MH_CLIP.get(name, clip)
         ok_at = at is None or pose.get("at") == at
         ok_clip = clip is None or clip in (pose.get("clip") or "")
         if name == "walking":

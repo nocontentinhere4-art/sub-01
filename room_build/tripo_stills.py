@@ -4,7 +4,7 @@ same moment. Shots: the overview, close-ups of the mug, the headphones on the ho
 ramen. Writes docs/design/tripo/<size>_<shot>.webp, each the old frame over (390: beside) the new one. With --set 2 the
 second batch (props_tripo2.glb, the car poster) with him at the desk: docs/design/tripo2/.
 
-    python room_build/tripo_stills.py [--set 2] [--only shot,shot]   # from the repository root; needs what tests/visual needs
+    python room_build/tripo_stills.py [--set 2|bottle] [--only shot,shot]   # from the repository root; needs what tests/visual needs
 """
 import argparse
 import sys
@@ -43,6 +43,14 @@ SHOTS2 = {
     "bin": ((-0.30, 0.75, -0.30), (-0.55, 0.30, -1.22)),
     "posters_car": ((-1.20, 1.85, 0.45), (-1.20, 1.85, -1.45)),
 }
+# the bottle of green tea (--set bottle, ?bottle=old): the desk, a close-up of it in front of the mouse, and him
+# drinking from it. `drink` is the forced variant, stepped to the moment the bottle is at his mouth
+SHOTS3 = {
+    "overview": ((5.2, 5.0, 6.0), (0, 0.6, 0)),
+    "desk_bottle": ((-0.50, 1.21, -0.46), (-0.83, 1.03, -0.86)),
+    "bottle_close": ((-0.62, 1.12, -0.63), (-0.83, 1.045, -0.85)),
+    "drink": "drink",
+}
 FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
 
 
@@ -69,10 +77,12 @@ def eating(h, pg, server, what):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", type=int, default=1)
+    ap.add_argument("--set", default="1", help="1, 2 or bottle")
     ap.add_argument("--only", default="", help="comma-separated shot names to (re)render")
-    args = ap.parse_args(); second = args.set == 2
-    shots_cam, out_dir = (SHOTS2, ROOT / "docs/design/tripo2") if second else (SHOTS, OUT)
+    args = ap.parse_args(); second, bottle = args.set == "2", args.set == "bottle"
+    shots_cam, out_dir, old_q = ((SHOTS3, ROOT / "docs/design/prop-bottle", "&bottle=old") if bottle else
+                                 (SHOTS2, ROOT / "docs/design/tripo2", "&props=old") if second else
+                                 (SHOTS, OUT, "&props=old"))
     if args.only:
         shots_cam = {k: v for k, v in shots_cam.items() if k in args.only.split(",")}
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -83,19 +93,26 @@ def main():
                                     args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
         for size in ("1280", "390"):
             shots = {}
-            for tag, q in (("old", "&props=old"), ("new", "")):
+            for tag, q in (("old", old_q), ("new", "")):
                 h = Harness(tmp / tag, log=lambda *a: None, cdn_cache=ROOT / "tests/visual/.cdn_cache")
                 h.query = q; h.server = server; h.base = server.base; h.browser = browser
                 server.set_scene("desk", HOUR)    # a fresh page must start the meal after the harness has cleared the desk
                 ctx, pg, st = h.open(size)
-                if second:                      # him typing at the desk; the second batch has no food
+                if second or bottle:            # him typing at the desk; neither set has food
                     h.goto_scene(pg, "desk", HOUR)
+                    if bottle:                  # park the idle variants (an unknown name does nothing and holds the
+                        pg.evaluate("setSeed(1); variant('none', 60)")   # slot), so both pages show the same typing pose
                     pg.evaluate("__qa.step(1/30, 60); __qa.hud(false)")
                 else:
                     eating(h, pg, server, f"{size} {tag}")
                 for name, cam in shots_cam.items():
                     if cam == "hands":
                         pg.evaluate("__qa.closeup('hands')")
+                    elif cam == "drink":        # the forced variant, stepped to where the bottle is at his mouth
+                        pg.evaluate("setSeed(1); variant('drink', 7); __qa.step(1/30, 115)")
+                        pg.evaluate("(() => { const b = scene.getObjectByName('tea_bottle'); b.updateMatrixWorld(true);"
+                                    " const p = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);"
+                                    " camera.position.set(p.x + 0.40, p.y + 0.18, p.z + 0.44); controls.target.copy(p); controls.update(); })()")
                     else:
                         (x, y, z), (a, b, c) = cam
                         pg.evaluate(f"camera.position.set({x}, {y}, {z}); controls.target.set({a}, {b}, {c}); controls.update()")

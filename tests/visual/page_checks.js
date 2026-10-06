@@ -134,22 +134,25 @@
     return columnsCache[key] = {x0, z0, cell, nx, nz, cols, ms: Math.round(performance.now() - t0)};
   };
   qa.body = (every = 2) => {
-    let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
-    const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, v = V();
-    const desk = qa.columns("desk", -1.92, -0.30, -1.47, -0.72);
-    const boneOf = i => { let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); } return sm.skeleton.bones[b].name; };
-    const out = {sampled: 0, below_floor: 0, desk: 0, min_y: 9, by: {}, foot_min_y: {Left: 9, Right: 9}};
-    for (let i = 0; i < P.count; i += every) {
-      sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); out.sampled++;
-      out.min_y = Math.min(out.min_y, v.y);
-      const bn = boneOf(i);
-      if (/Foot|ToeBase/.test(bn)) { const s = bn.startsWith("Left") ? "Left" : "Right"; out.foot_min_y[s] = Math.min(out.foot_min_y[s], v.y); }
-      if (v.y < F - 0.012) { out.below_floor++; out.by["floor:" + bn] = (out.by["floor:" + bn] || 0) + 1; }
-      if (desk) { const ci = Math.floor((v.x - desk.x0) / desk.cell), ck = Math.floor((v.z - desk.z0) / desk.cell);
-        const col = ci >= 0 && ci < desk.nx && ck >= 0 && ck < desk.nz && desk.cols[ci * desk.nz + ck];
-        if (col) for (let j = 0; j < col.length; j += 2) if (v.y > col[j] + 0.01 && v.y < col[j + 1] - 0.01) { out.desk++; out.by["desk:" + bn] = (out.by["desk:" + bn] || 0) + 1; break; } }
+    // every skinned part of him (one body, or a dressed one: body, hoodie, trousers, socks, slides)
+    const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) parts.push(o); }); boy.updateMatrixWorld(true);
+    const v = V(), desk = qa.columns("desk", -1.92, -0.30, -1.47, -0.72);
+    const out = {sampled: 0, below_floor: 0, desk: 0, min_y: 9, by: {}, foot_min_y: {Left: 9, Right: 9}, bed: 0, chair: 0};
+    for (const sm of parts) {
+      const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight;
+      const boneOf = i => { let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); } return sm.skeleton.bones[b].name; };
+      for (let i = 0; i < P.count; i += every) {
+        sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); out.sampled++;
+        out.min_y = Math.min(out.min_y, v.y);
+        const bn = boneOf(i);
+        if (/Foot|ToeBase/.test(bn)) { const s = bn.startsWith("Left") ? "Left" : "Right"; out.foot_min_y[s] = Math.min(out.foot_min_y[s], v.y); }
+        if (v.y < F - 0.012) { out.below_floor++; out.by["floor:" + bn] = (out.by["floor:" + bn] || 0) + 1; }
+        if (desk) { const ci = Math.floor((v.x - desk.x0) / desk.cell), ck = Math.floor((v.z - desk.z0) / desk.cell);
+          const col = ci >= 0 && ci < desk.nx && ck >= 0 && ck < desk.nz && desk.cols[ci * desk.nz + ck];
+          if (col) for (let j = 0; j < col.length; j += 2) if (v.y > col[j] + 0.01 && v.y < col[j + 1] - 0.01) { out.desk++; out.by["desk:" + bn] = (out.by["desk:" + bn] || 0) + 1; break; } }
+      }
     }
-    const pen = window.penetration(every, true);
+    const pen = window.penetration(every, true);                      // (the page's: every visible skinned part too)
     out.bed = pen.bed; out.chair = pen.chair; Object.assign(out.by, Object.fromEntries(Object.entries(pen.by).filter(([k]) => k !== "pts")));
     for (const k of ["min_y"]) out[k] = +out[k].toFixed(3);
     out.foot_min_y = {Left: +out.foot_min_y.Left.toFixed(3), Right: +out.foot_min_y.Right.toFixed(3)};

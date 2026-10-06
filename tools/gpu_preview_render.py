@@ -216,6 +216,11 @@ def render(a):
                         pg.add_style_tag(content=HUD_OFF)
                         pg.add_script_tag(content=(ROOT / "tests" / "visual" / "page_checks.js").read_text())
                         pg.evaluate("s => { window.FREEZE = true; settle(); if (window.setSeed) setSeed(s); __qa.hideMarkers(); }", a.seed)
+                        # (preview/room-mh: the MakeHuman rig loads its clips, its props and G11's hair after the page; wait for them)
+                        if pg.evaluate("() => !!window.boy.getObjectByName('metacarpal1L')"):
+                            pg.wait_for_function("() => window.mh && window.mh.ready", timeout=600000)
+                            pg.evaluate("() => animate_(1/30)")      # (his first step asks for the hair)
+                            pg.wait_for_function("() => !!window.boy.getObjectByName('hair_mh')", timeout=600000)
                         textures_ready(pg)
                         hour = h
                     if isinstance(sc, dict):
@@ -233,6 +238,7 @@ def render(a):
                         pg.evaluate(sc)
                     pg.evaluate("(n) => { for (let i = 0; i < n; i++) animate_(1/30); }", int(round(settle_s * 30)))
                     print("  window view:", pg.evaluate("() => window.windowView && windowView.state ? JSON.stringify(windowView.state()) : 'n/a'")[:200], flush=True)
+                meta["clean"] = bool(sh.get("clean"))           # (the owner's format: the shot's own label, no hour, timer or renderer)
                 load(int(sh.get("hour", 14)), sh.get("scene", ""))
                 for shot in sh["shots"]:
                     if "hour" in shot or "scene" in shot:                   # a shot with its own hour and/or scene (life state or JS), settled for shot.settle seconds
@@ -359,7 +365,8 @@ def encode(a):
     w, h = first.size
     labels = {"old": a.label_old, "new": a.label_new}
     narrow = w * len(sides) < 1100                      # (the phone pair: the caption goes on a second line under the side labels)
-    bar = 52 if narrow else 28
+    clean = bool(metas[sides[0]].get("clean"))
+    bar = 64 if clean else 52 if narrow else 28           # (clean: the side labels, then the shot's own label on a line of its own)
     for k in range(n):
         S = Image.new("RGB", (w * len(sides), h + bar), (8, 8, 10))
         d = ImageDraw.Draw(S)
@@ -370,7 +377,9 @@ def encode(a):
             S.paste(im, (i * w, bar))
             d.text((i * w + 8, 5), labels[s], font=font, fill=(255, 220, 120) if s == "new" else (210, 210, 220))
         seg = next((sg for sg in metas[sides[0]]["segments"] if sg["first"] <= k < sg["first"] + sg["frames"]), None)
-        if seg:
+        if seg and clean:
+            d.text((w * len(sides) // 2 - d.textlength(seg.get("label", ""), font=font) // 2, 34), seg.get("label", ""), font=font, fill=(240, 240, 240))
+        elif seg:
             cap = f"{seg.get('label', '')} {seg['hour']:02d}:00  {(k - seg['first']) / metas[sides[0]]['fps']:5.1f} s  {metas[sides[0]]['renderer'].split('|')[0].strip()[:28]}"
             d.text((8, 29) if narrow else (w * len(sides) - 420, 5), cap, font=font, fill=(200, 200, 210))
         S.save(comp / f"c_{k:05d}.jpg", quality=92)

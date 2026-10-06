@@ -642,7 +642,12 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
   t.anisotropy = old.anisotropy; mat.map = t; mat.needsUpdate = true;
 }).catch(e => console.warn("poster_car.webp", e));
 
-load("room/boy.glb").then(g => {
+// preview/room-v5: the v5 character (room/char_v5.glb, prepared by room/char_v5.js for room/boy_mh.js and its clips in
+// room/mh_v5/); ?char=old: the live character (room/boy.glb) with its own clips
+const CHAR_V5 = new URLSearchParams(location.search).get("char") !== "old";
+let V5 = null;                                        // (char_v5.js and the body's clip conversion)
+(CHAR_V5 ? Promise.all([load("room/char_v5.glb"), import("./room/char_v5.js")]).then(([g, m]) => { V5 = {m, conv: m.prep(THREE, g)}; return g; })
+  : load("room/boy.glb")).then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
   boy.traverse(o => {
     if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
@@ -654,7 +659,7 @@ load("room/boy.glb").then(g => {
   });
   mixer = new THREE.AnimationMixer(boy);
   addClips("sit", g.animations);
-  scene.add(phone); makeProps();
+  scene.add(phone); makeProps(); tripoBottle();
   if (slidesInit()) { SLIDES.parked.visible = true;                 // its shader is built now, not when he first goes to bed
     renderer.compileAsync(SLIDES.parked, camera, scene).catch(() => {}).finally(() => { SLIDES.parked.visible = SLIDES.off; }); }
   Promise.all(Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"})
@@ -1376,6 +1381,10 @@ const _w = new THREE.Vector3();
 // him, sits down from the front, then rides it back in, turning to the desk (and the reverse to get up). Without the
 // node he sits down from the chair's side, as before.
 const CHAIR = {node:undefined, home:new THREE.Vector3(), ry:0, out:0.40, turn:-Math.PI / 2, k:0, seat:0.375, dx:0};   // seat: k where he sits (#63)
+// the MakeHuman layer's get-up (preview/room-mh): set when it plays one continuous mocap from the desk (seated he rolls
+// back, rises pushing the chair with his legs, turns as he walks off); the chair stays where he left it until he next sits
+let FLOW = null;
+const CHAIR_FOOT = 0.33;                              // (the half size of a chair left out: its base and seat; turning, its arms reach 0.40)
 const _cs = new THREE.Vector3();
 function chairNode(){
   if (CHAIR.node !== undefined || !room) return CHAIR.node || null;
@@ -1468,10 +1477,12 @@ function replan(){                                    // the steps from where he
   if (cur === g.anchor && !fetch) { plan = [...P, stay()]; return; }
   const C = chairNode() && chairSpots();             // the chair is its own node: pull it out, sit, ride it in (and the reverse)
   const stiff = cur === "desk" && sitAt != null && T - sitAt > 240;           // up after sitting for a while: a stretch
-  if (cur === "desk" && C) P.push(...(trash ? [{k:"act", name:"take", d:1.3, keep:true}] : []), {k:"chair", to:1, d:0.9, ride:true, dx:0}, {k:"pose", stand:C[2], clip:"stand"}, {k:"walk", to:C[1], direct:true},
+  const flow = cur === "desk" && C && FLOW;
+  if (flow) P.push(...(trash ? [{k:"act", name:"take", d:1.3, keep:true}] : []), {k:"pose", stand:C[2], clip:"walk", flow:true, stiff});
+  else if (cur === "desk" && C) P.push(...(trash ? [{k:"act", name:"take", d:1.3, keep:true}] : []), {k:"chair", to:1, d:0.9, ride:true, dx:0}, {k:"pose", stand:C[2], clip:"stand"}, {k:"walk", to:C[1], direct:true},
     {k:"turn", r:Math.atan2(CHAIR.home.x - C[0][0], CHAIR.home.z - C[0][1])}, {k:"chair", to:0, d:0.9, hand:true, step:C[0]});
   else if (cur && ANCHOR[cur].seat) P.push({k:"pose", stand:standOf(cur), clip:"stand"});   // stand up where he would sit down
-  if (stiff) P.push({k:"act", name:"stretch", d:3.6});
+  if (stiff && !flow) P.push({k:"act", name:"stretch", d:3.6});   // (the get-up's mocap stretches seated)
   if (trash && (trash.held || cur === "desk")) P.push({k:"walk", to:standOf("bin")}, {k:"turn", r:ANCHOR.bin.r}, {k:"act", name:"bin", d:2.4});   // the empty dish into the bin
   const toDesk = [{k:"walk", to:standOf("deskside")}, {k:"turn", r:ANCHOR.deskside.r}, {k:"act", name:"put", d:1.6}];
   if (g.clip === "deliver") {                         // to the door, open it, take the bag, shut it, the bag onto the desk
@@ -1622,19 +1633,22 @@ function drive(dt){                                   // one frame of the plan; 
   if (!placed) { placed = true; snap(goal.anchor, goal.clip); return false; }    // the first tick: just be there
   if (!step && at === "bedlie" && Math.abs(ROLL.a) > 0.02) return false;        // on his side: onto his back first, then up
   if (!step) { if (!plan.length) return false; step = plan.shift(); step.t = 0;
-    if (step.k === "pose") startPose(step);
+    if (step.k === "pose") { if (step.flow) { const w = plan[0]; if (w && w.k === "walk") { step.next = w.to; w.flow = true; } else step.clip = "stand"; }
+      startPose(step); }
     else if (step.k === "chair") { step.k0 = CHAIR.k; step.p0 = boy.position.clone(); step.dx0 = CHAIR.dx;
+      const r = chairAt(CHAIR.k, _cs); step.off0 = CHAIR.node.position.clone().sub(_cs); step.off0.x -= CHAIR.dx; step.r0 = wrapA(CHAIR.node.rotation.y - r);   // (from where he left it)
       if (step.ride) { step.rel = CHAIR.node.worldToLocal(boy.position.clone()); step.rr = boy.rotation.y - CHAIR.node.rotation.y; } else play("stand", 0.3); }
     else if (step.k === "walk") { at = null; step.pts = step.direct ? [step.to] : route([boy.position.x, boy.position.z], step.to); boy.position.y = F; step.v = 0;
       const q = step.pts[0], h = Math.atan2(q[0] - boy.position.x, q[1] - boy.position.z);
-      if (Math.abs(wrapA(h - boy.rotation.y)) > 0.6 && Math.hypot(q[0] - boy.position.x, q[1] - boy.position.z) > 0.25) step.turn0 = h;   // turn on the spot first
-      play("walk", 0.4); if (actions.walk) actions.walk.timeScale = step.turn0 != null ? STEP_TS : 0.3; }
+      if (!step.flow && Math.abs(wrapA(h - boy.rotation.y)) > 0.6 && Math.hypot(q[0] - boy.position.x, q[1] - boy.position.z) > 0.25) step.turn0 = h;   // turn on the spot first
+      if (step.flow) step.v = 0.5;                       // (already walking: the get-up hands over mid-stride)
+      play("walk", 0.4); if (actions.walk && !step.flow) actions.walk.timeScale = step.turn0 != null ? STEP_TS : 0.3; }
     else if (step.k === "turn") { step.stepping = Math.abs(wrapA(step.r - boy.rotation.y)) > 0.35; play(step.stepping ? "walk" : "stand", 0.4);
       if (step.stepping && actions.walk) actions.walk.timeScale = STEP_TS; }
     else if (step.k === "act") { if (!step.keep) { at = null; play("stand", 0.5); } }   // keep: seated, he stays as he is
     else if (step.k === "clip") { play(step.clip, 0.5); at = goal.anchor; step = null; return false; } }
   const S = step;
-  if (S.k === "pose") { S.t = Math.min(1, S.t + dt / S.d); posePose(S); mixer.update(0);   // this frame's weights, now (not next frame)
+  if (S.k === "pose") { S.t = Math.min(1, S.t + dt / S.d); if (!S.flow) posePose(S); mixer.update(0);   // this frame's weights, now (not next frame) (the get-up: the MakeHuman layer places him)
     if (S.t >= 1) { if (S.A && S.A !== S.B) S.A.stop(); S.B.setEffectiveWeight(1); at = S.to || null; step = null; if (at === "desk") sitAt = T; if (S.replan) replan(); } return true; }
   if (S.k === "act") { S.t = Math.min(1, S.t + dt / S.d); if (S.t >= 1) { endAct(S); step = null; if (S.replan) replan(); } return false; }
   if (S.k === "walk") {
@@ -1655,6 +1669,7 @@ function drive(dt){                                   // one frame of the plan; 
   if (S.k === "chair") { S.t = Math.min(1, S.t + dt / S.d); const e = S.t * S.t * (3 - 2 * S.t);
     if (S.dx != null) CHAIR.dx = S.dx0 + (S.dx - S.dx0) * e;
     placeChair(S.k0 + (S.to - S.k0) * e);
+    if (S.off0 && (S.off0.lengthSq() > 1e-8 || Math.abs(S.r0) > 1e-4)) { CHAIR.node.position.addScaledVector(S.off0, 1 - e); CHAIR.node.rotation.y += S.r0 * (1 - e); CHAIR.node.updateMatrixWorld(true); }   // (no jump: from where it is)
     if (S.ride) { boy.position.copy(S.rel); CHAIR.node.localToWorld(boy.position); boy.rotation.y = CHAIR.node.rotation.y + S.rr; }
     else if (S.step) { boy.position.x = S.p0.x + (S.step[0] - S.p0.x) * e; boy.position.z = S.p0.z + (S.step[1] - S.p0.z) * e; }   // gives way as it comes
     if (S.hand) handOn(Math.sin(Math.PI * Math.min(1, S.t / 0.6)));               // a hand on the backrest to start it, then lets go
@@ -1874,7 +1889,7 @@ function doVariant(V, c){
   }
   if (V.n === "drink") drinkFrom(V, u);
 }
-const MOUSE = new THREE.Vector3(-0.785, 0.985, -0.975);
+const MOUSE = new THREE.Vector3(-0.735, 0.985, -0.965);   // G10d's mouse (MOUSE_AT): its hump
 
 // ---- now playing (#75): what he listens to (#68), as /brain shows it: art, title · artist, Spotify's official embed
 // (compact; the visitor presses play on their own device, nothing autoplays). Hidden when nothing plays
@@ -1939,12 +1954,13 @@ function makeProps(){
   add(bb, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.04), kraft)).position.set(0, 0.17, 0.0);   // the folded top
   PROP.breadbag = bb;
   // a bottle of green tea: clear PET, green label, white cap; origin at its middle, axis +y
-  const bo = new THREE.Group();
+  const bo = new THREE.Group(); bo.name = "tea_bottle";        // (named for the contact probe, tests/visual/contacts.js)
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.031, 0.031, 0.16, 18), M(0xa9d6b0, 0.15, {transparent:true, opacity:0.55, metalness:0})));
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.0315, 0.0315, 0.07, 18), M(0x2f7d46, 0.5))).position.y = -0.01;
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.031, 0.04, 18), M(0xa9d6b0, 0.15, {transparent:true, opacity:0.55}))).position.y = 0.10;
   add(bo, new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, 0.022, 14), M(0xf2f2f2, 0.5))).position.y = 0.13;
   PROP.bottle = bo; bo.position.copy(BOTTLE_AT).add(_l1.set(0, 0.08, 0));
+  // (tripoBottle() puts the generated model in its place; what is built here is the fallback and ?bottle=old)
   // headphones: a band over the top of his head and two cups, a child of the head bone (built in metres, its local frame:
   // x across the ears, y up the crown, z where the face looks; the bone's frame is pitched 45 degrees and in cm)
   const hp = new THREE.Group(), dark = M(0x26262c, 0.45), pad = M(0x111114, 0.9), acc = M(0xff6a00, 0.5);
@@ -1958,6 +1974,22 @@ function makeProps(){
     hp.rotation.x = -Math.PI / 4; hp.position.set(0, 0.085 * q * s, -0.085 * q * s).addScaledVector(_l2.set(0, q, q), 0.01 * s); }
   for (const k of ["bag", "bento", "sticks", "bread", "breadbag", "bottle"]) { scene.add(PROP[k]); PROP[k].visible = k === "bottle"; }
   PROP.breadbag.position.copy(BAG_AT); PROP.breadbag.rotation.y = 0.3;
+}
+// the bottle of green tea, made with Tripo's paid API (web/room/bottle.glb, room_build/build_bottle.mjs): the last prop
+// still modelled here. It is built in metres with its long axis +y, the cap up and its origin where this page holds the
+// prop (the base 0.08 m under it), so it goes straight inside PROP.bottle and everything that moves the bottle - his
+// right hand taking it, drinkFrom(), drop() - keeps working untouched. ?bottle=old keeps the one modelled above
+const BOTTLE_TRIPO = !OLD_ROOM && new URLSearchParams(location.search).get("bottle") !== "old";
+function tripoBottle(){
+  if (!BOTTLE_TRIPO || !PROP.bottle) return;
+  load("room/bottle.glb").then(g => {
+    const m = g.scene.getObjectByName("T_bottle"); if (!m) throw new Error("no T_bottle node");
+    m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true;
+      o.material.envMap = scene.environment; o.material.envMapIntensity = 0.5; } });
+    const bo = PROP.bottle;
+    while (bo.children.length) bo.remove(bo.children[0]);        // the modelled cylinders give way to it
+    bo.add(m);
+  }).catch(e => console.warn("bottle.glb", e));
 }
 // the bag he carries or that stands on the desk: the courier's paper bag (a pizza comes in its own box), the bakery's
 // paper bag, the konbini's white bag. PROP.bag's origin is where his hand holds it; on the desk it stands on BAG_AT
@@ -2145,7 +2177,7 @@ function buildDoor(root){
 function setDoor(a){                                    // a: how far open (rad, into the room)
   DOOR.a = a; if (!DOOR.leaf) return;
   if (DOOR.hang) DOOR.hang.rotation.y = a;             // the hook rail, the tote and the hoodie swing with the leaf
-  DOOR.leaf.visible = DOOR.hole.visible = a > 0.002; DOOR.leaf.rotation.y = a; DOOR.leaf.updateMatrixWorld(true);
+  DOOR.leaf.visible = DOOR.hole.visible = Math.abs(a) > 0.002; DOOR.leaf.rotation.y = a; DOOR.leaf.updateMatrixWorld(true);   // (a < 0: into the room, as preview/room-mh's door clip pulls it)
   DOOR.leaf.localToWorld(DOOR.handle.set(DOOR.W - 0.10, 1.02 - F - 0.008, 0.06));
 }
 // opening (rotation.y > 0 swings the free edge towards +z, into the room). The step takes 5.6 s:
@@ -2263,20 +2295,45 @@ function bedInit(){                                    // the duvet and the pill
   if (COV.mesh || !room) return !!COV.mesh;
   room.traverse(o => { if (o.isMesh && o.material && o.material.name === "duvet") DUV.src = o;
     if (o.isMesh && o.material && o.material.name === "sheet") PIL.src = o; });
-  const sm = skinMesh(); if (!DUV.src || !PIL.src || !sm) return false;
+  let sm = null; boy.traverse(o => { if (o.isSkinnedMesh && (!sm || o.skeleton.bones.length > sm.skeleton.bones.length)) sm = o; });   // (the whole skeleton: a dressed body's parts may carry only some of it)
+  if (!DUV.src || !PIL.src || !sm) return false;
   [PIL.mesh, PIL.base] = shapeable(PIL.src, "pillow_dent");
   PIL.idx = []; for (let i = 0; i < PIL.base.length / 3; i++) if (PIL.base[3 * i] < -1.3 && PIL.base[3 * i + 1] > 0.84) PIL.idx.push(i);   // the pillow's vertices
   // how thick he is around each bone segment: the 90th percentile of his vertices' distance from it, in his bind pose
   // (no skinning needed), at his scale
   const names = sm.skeleton.bones.map(b => b.name), segOf = {}; BODY_SEGS.forEach(([a], k) => { if (!(a in segOf)) segOf[a] = k; });
-  const P = sm.geometry.attributes.position, v = new THREE.Vector3(), d = BODY_SEGS.map(() => []);
-  const bp = n => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert());
+  const v = new THREE.Vector3(), d = BODY_SEGS.map(() => []), dw = BODY_SEGS.map(() => []);   // (dw: v5 lying, his half-width over each segment)
+  const bind = n => new THREE.Matrix4().copy(sm.skeleton.boneInverses[names.indexOf(n)]).invert();
+  const bp = n => names.includes(n) ? new THREE.Vector3().setFromMatrixPosition(bind(n))
+    : (o => o.position.clone().applyMatrix4(bind(o.parent.name)))(boy.getObjectByName(n));   // (an end bone that is not a joint of the skin: from its parent)
   const seg = BODY_SEGS.map(([a, b]) => new THREE.Line3(bp(a), bp(b)));
   const sc = bones.LeftUpLeg.getWorldPosition(_l1).distanceTo(bones.LeftLeg.getWorldPosition(_l2)) / seg[segOf.LeftUpLeg].distance();
-  for (let i = 0; i < P.count; i += 2) { const k = segOf[names[domBone(sm.geometry, i)]]; if (k === undefined) continue;
-    v.fromBufferAttribute(P, i).applyMatrix4(sm.bindMatrix); d[k].push((seg[k].distance() > 1e-6 ? seg[k].closestPointToPoint(v, true, _l4) : seg[k].start).distanceTo(v) * sc); }
-  DUV.segs = BODY_SEGS.map(([a, b], k) => { const s = d[k].sort((x, y) => x - y);
-    return {a:bones[a], b:bones[b], head:!!BODY_SEGS[k][2], r:clamp(s.length ? s[Math.floor(s.length * 0.97)] : 0.05, 0.03, a === b ? 0.1 : 0.22), A:new THREE.Vector3(), B:new THREE.Vector3()}; });
+  const parts = []; boy.traverse(o => { if (o.isSkinnedMesh) parts.push(o); });   // (dressed: his clothes too)
+  // (v5, Tripo's rig: most of a limb's skin follows its twist bones, L_ThighTwist01 ... R_ForearmTwist02, which BODY_SEGS
+  // does not name: they count for their limb's segment, or the legs and forearms get the least thickness and poke through)
+  const LIMB = {Thigh:"UpLeg", Calf:"Leg", Upperarm:"Arm", Forearm:"ForeArm"};
+  const segName = n => { const m = /^([LR])_(Thigh|Calf|Upperarm|Forearm)Twist/.exec(n); if (m) return (m[1] === "L" ? "Left" : "Right") + LIMB[m[2]];
+    if (!V5) return n;                                     // (v5: the toes count for the foot, the fingers for the hand: their tips poked through)
+    const t = /^(Left|Right)ToeBase$/.exec(n); if (t) return t[1] + "Foot";
+    const f = /^finger\d-\d\.?([LR])$/.exec(n); return f ? (f[1] === "L" ? "Left" : "Right") + "Hand" : n; };
+  // (v5: his oversized hoodie and trousers are far wider than they are deep, and lying on his back it is how far he rises
+  // over each bone that lifts the duvet, not his girth all round, which buried him under a mound up to his head. bedInit
+  // first runs as he lies down under it, so there each segment's thickness is measured on him as he lies: his skinned
+  // vertices' height over the segment, in metres)
+  const lying = V5 && lieW() > 0.5, segW = lying && BODY_SEGS.map(([a, b]) => { const A = (bones[a] || boy.getObjectByName(a)).getWorldPosition(new THREE.Vector3()),
+    B = (bones[b] || boy.getObjectByName(b)).getWorldPosition(new THREE.Vector3()); return new THREE.Line3(A, B); });
+  if (lying) boy.updateMatrixWorld(true);
+  for (const pm of parts) { const P = pm.geometry.attributes.position, pn = pm.skeleton.bones.map(b => segName(b.name));
+  for (let i = 0; i < P.count; i += 2) { const k = segOf[pn[domBone(pm.geometry, i)]]; if (k === undefined) continue;
+    if (lying) { pm.getVertexPosition(i, v).applyMatrix4(pm.matrixWorld); const L = segW[k], c = L.distance() > 1e-6 ? L.closestPointToPoint(v, true, _l4) : L.start;
+      if (v.y > c.y) { d[k].push(v.y - c.y); dw[k].push(Math.hypot(v.x - c.x, v.z - c.z)); } continue; }   // (the upper half: how high, how wide)
+    v.fromBufferAttribute(P, i).applyMatrix4(pm.bindMatrix); d[k].push((seg[k].distance() > 1e-6 ? seg[k].closestPointToPoint(v, true, _l4) : seg[k].start).distanceTo(v) * sc); } }
+  const pct = (a, q) => { a.sort((x, y) => x - y); return a.length ? a[Math.floor(a.length * q)] : null; };
+  DUV.segs = BODY_SEGS.map(([a, b], k) => { const r = clamp(pct(d[k], 0.97) ?? 0.05, 0.03, a === b ? 0.1 : 0.22);
+    // (r: how high he is over the segment; w: how far to the sides that height reaches. All round, w = r: a round limb;
+    // v5 lying measures both, an oval: his clothes are wide and shallow)
+    const w = lying && dw[k].length ? clamp(pct(dw[k], 0.97), r, 0.3) : r;
+    return {a:bones[a] || boy.getObjectByName(a), b:bones[b] || boy.getObjectByName(b), head:!!BODY_SEGS[k][2], r, w, A:new THREE.Vector3(), B:new THREE.Vector3()}; });
   return coverInit();
 }
 function pillowDent(k){                                // the pillow gives under his head and shoulders
@@ -2329,6 +2386,45 @@ function coverInit(){                                  // the grid, its faces an
   COV.mesh.frustumCulled = false; COV.mesh.visible = false; scene.add(COV.mesh);
   return true;
 }
+// v5 (his bulk in the oversized hoodie: 34 cm deep lying down): a quilt is a stiff-ish sheet, not a shrink wrap. Along
+// him it spans taut from one high point to the next (chest, knees, feet: the upper hull of his outline down each
+// lengthwise line, sagging a little between), across him it spans over him in the same way and then falls steeply to the
+// mattress at his sides; it creases across a sleeper, so it is smoothed hard along his length and barely across
+const CLOTH = {SAG:0.25, FALL:0.08, ALONG:8, ACROSS:1};
+function hull(xs, ys, n, out){                         // the upper convex hull of (xs, ys)[0..n), sampled back at each xs
+  const st = [];
+  for (let i = 0; i < n; i++) { while (st.length >= 2) { const a = st[st.length - 2], b = st[st.length - 1];
+      if ((xs[b] - xs[a]) * (ys[i] - ys[a]) - (ys[b] - ys[a]) * (xs[i] - xs[a]) >= 0) st.pop(); else break; }
+    st.push(i); }
+  for (let k = 0; k + 1 < st.length; k++) { const a = st[k], b = st[k + 1];
+    for (let i = a; i <= b; i++) out[i] = ys[a] + (ys[b] - ys[a]) * (b > a ? (xs[i] - xs[a]) / (xs[b] - xs[a]) : 0); }
+  if (st.length === 1) out[st[0]] = ys[st[0]];
+}
+function coverCloth(iEnd){
+  const {nx, nz, BED, LOFT} = COV, B = COV.body, H = COV.h, T = COV.tmp, n = iEnd + 1;
+  const X = COV.cx || (COV.cx = new Float32Array(Math.max(nx, nz))), Y = COV.cy || (COV.cy = new Float32Array(Math.max(nx, nz))), O = COV.co || (COV.co = new Float32Array(Math.max(nx, nz)));
+  const zAt = j => COV.Z0 + (COV.Z1 - COV.Z0) * (j / (nz - 1)), on = k => B[k] > BED + 0.01;
+  // along him, down each lengthwise line: taut over the high points, sagging a little between them
+  for (let j = 0; j < nz; j++) { for (let i = 0; i < n; i++) { X[i] = i; Y[i] = B[i * nz + j] + LOFT; } hull(X, Y, n, O);
+    for (let i = 0; i < n; i++) H[i * nz + j] = O[i] - CLOTH.SAG * (O[i] - Y[i]); }
+  // across him, row by row: spanning over him, then falling steeply to the mattress beside him
+  for (let i = 0; i < n; i++) { let jl = -1, jr = -1;
+    for (let j = 0; j < nz; j++) if (on(i * nz + j) || H[i * nz + j] > BED + LOFT + 0.02) { if (jl < 0) jl = j; jr = j; }
+    if (jl < 0) { for (let j = 0; j < nz; j++) H[i * nz + j] = BED + LOFT; continue; }
+    for (let j = jl; j <= jr; j++) { X[j - jl] = zAt(j); Y[j - jl] = H[i * nz + j]; } hull(X, Y, jr - jl + 1, O);
+    for (let j = jl; j <= jr; j++) H[i * nz + j] = O[j - jl];
+    for (let j = 0; j < nz; j++) { if (j >= jl && j <= jr) continue; const e = j < jl ? jl : jr, d = Math.abs(zAt(j) - zAt(e));
+      H[i * nz + j] = BED + LOFT + (H[i * nz + e] - BED - LOFT) * (1 - smooth(0, CLOTH.FALL, d)); } }
+  // smoothed hard along him, barely across; never into him
+  for (let pass = 0; pass < CLOTH.ALONG; pass++) {
+    const across = pass < CLOTH.ACROSS;
+    for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), k = i * nz + j;
+      let v = (H[i0 * nz + j] + H[i1 * nz + j] + 2 * H[k]) / 4;
+      if (across) { const j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1); v = (2 * v + H[i * nz + j0] + H[i * nz + j1]) / 4; }
+      T[k] = v; }
+    for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const k = i * nz + j; H[k] = Math.max(T[k], on(k) ? B[k] + 0.03 : BED + LOFT * 0.6); } }
+  for (let i = n; i < nx; i++) for (let j = 0; j < nz; j++) H[i * nz + j] = H[iEnd * nz + j];   // (past him: the curtain takes its top from here)
+}
 function coverShape(){                                 // the duvet over him, this frame
   const {nx, nz, nt, pos, nor, uv, ZM0, ZM1, BED, LOFT, THICK, DROP, DR} = COV;
   // pulled up from where it lay folded to just under his shoulders; on his side, back off his raised shoulder
@@ -2345,9 +2441,10 @@ function coverShape(){                                 // the duvet over him, th
       for (const s of DUV.segs) { if (s.head) continue;
         const ax = s.A.x, az = s.A.z, dx = s.B.x - ax, dz = s.B.z - az, L = dx * dx + dz * dz;
         const t = L > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / L, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
-        const dd = Math.sqrt(px * px + pz * pz), R = s.r + DR; if (dd >= R) continue;
-        const top = s.A.y + (s.B.y - s.A.y) * t + Math.sqrt(Math.max(0, s.r * s.r - Math.min(dd, s.r) ** 2));
-        const y = BED + (top - BED) * (1 - smooth(0.25, 1, dd / R)); if (y > h) h = y;
+        const dd = Math.sqrt(px * px + pz * pz), R = s.w + DR; if (dd >= R) continue;
+        const top = s.A.y + (s.B.y - s.A.y) * t + s.r * Math.sqrt(Math.max(0, 1 - (Math.min(dd, s.w) / s.w) ** 2));
+        const y = V5 ? (dd <= s.w ? top : BED)               // (v5: his outline itself; the cloth below spans and falls from it)
+          : BED + (top - BED) * (1 - (s.w > s.r ? smooth(s.w, R, dd) : smooth(0.25, 1, dd / R))); if (y > h) h = y;
       }
       B[i * nz + j] = h; H[i * nz + j] = h + LOFT;
     } }
@@ -2357,6 +2454,7 @@ function coverShape(){                                 // the duvet over him, th
   for (const n of ["LeftToeBase", "RightToeBase", "LeftFoot", "RightFoot"]) end = Math.max(end, bones[n].getWorldPosition(_l2).x + (/Toe/.test(n) ? 0.09 : 0.16));
   const iEnd = Math.min(nx - 3, Math.ceil((end - hem) / len * (nx - 1)));
   // 2. cloth, not shrink wrap: smooth the surface (it bridges between his limbs), but never below him
+  if (V5) coverCloth(iEnd); else
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
@@ -2889,20 +2987,22 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; renderer.render(scene, camera); }, animate_: animate,
+  roomDbg: () => ({CHAIR, BLOCK, NODES, LINKS, chairAt, chairSpots, chairNode, route, plan, step, at}),   // (the planner's state, for probes)
   penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
-    let sm; boy.traverse(o => { if (o.isSkinnedMesh) sm = o; }); boy.updateMatrixWorld(true);
-    const P = sm.geometry.attributes.position, v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
-    let bed = 0, chair = 0; const u = new THREE.Vector3(), by = {}, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight;
+    const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) parts.push(o); }); boy.updateMatrixWorld(true);   // (every part: a dressed body has several)
+    const v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
+    let bed = 0, chair = 0, count = 0; const u = new THREE.Vector3(), by = {};
+    for (const sm of parts) { const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight; count += Math.ceil(P.count / every);
     const note = (i, what) => { if (!detail) return; let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
-    const hid = SLIDES.state === 2 ? SLIDES.parkedIdx : null;                     // (the slides parked by the bed are not on him)
+    const hid = SLIDES.state === 2 && sm === skinMesh() ? SLIDES.parkedIdx : null;   // (the slides parked by the bed are not on him)
     for (let i = 0; i < P.count; i += every) { if (hid && hid.has(i)) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
       const e = Math.min(v.x + 1.90, -0.20 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
       if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0)) { bed++; note(i, "bed"); }
       if (V) { ch.worldToLocal(u.copy(v)); const ci = Math.floor((u.x - V.x0) / V.c), ck = Math.floor((u.z - V.z0) / V.c);
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
-        if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } }
-    return detail ? {bed, chair, by} : {bed, chair, of:Math.ceil(P.count / every)}; },
+        if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } } }
+    return detail ? {bed, chair, by} : {bed, chair, of:count}; },
   LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
     if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 180, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
       room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
@@ -2947,8 +3047,41 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
 // breathing, weight shifts, foot IK on the floor, hands on the keyboard / mouse / bowl, eye and head look-at and a pop
 // killer. It gets the page's internals here, and registers every bone it moves with touch(). ?debug: window.motion.
 {
-  const animate0 = animate; let motion = null;
-  import("./room/boy_motion.js").then(m => { motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
+  const animate0 = animate; let motion = null, mh = null, rig = null;
+  // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
+  // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
+  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
+    ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
+    movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
+    resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
+    state: () => ({at, step, goal, current, want, T, life:lastLife}),
+    chairChanged: () => { VOX = null; },                // (the chair's shape changed: its collision voxels anew)
+    setDoor: a => setDoor(a), snap: (anchor, clip) => snap(anchor, clip),
+    flow: f => { FLOW = f; },                           // (the get-up: see FLOW)
+    boxes: () => BLOCK,                                 // (bed, desk, chair, shelf, fridge, plant)
+    chairBlock: (x, z) => { BLOCK[2] = [x - CHAIR_FOOT, x + CHAIR_FOOT, z - CHAIR_FOOT, z + CHAIR_FOOT]; },   // (where the chair will be: the path ahead)
+    chairHome: () => { const r = chairAt(0, _cs); return [_cs.x, _cs.z, r]; },   // (parked under the desk)
+    blocked: (x, z, pad) => BLOCK.some(([x0, x1, z0, z1], i) => i !== 2 && x > x0 - pad && x < x1 + pad && z > z0 - pad && z < z1 + pad),
+    chairRoute: (a, b, c) => { const keep = BLOCK[2]; BLOCK[2] = [c[0] - CHAIR_FOOT, c[0] + CHAIR_FOOT, c[1] - CHAIR_FOOT, c[1] + CHAIR_FOOT];   // the page's path a -> b,
+      const pts = route(a, b); let p = a, ok = true; for (const q of pts) { if (!free(p, q, 0.03)) { ok = false; break; } p = q; }   // and whether it is clear,
+      BLOCK[2] = keep; return {pts, ok}; },                                                                    // with the chair at c
+    chairPose: (x, z, ry) => { const n = CHAIR.node; n.position.x = x; n.position.z = z; n.rotation.y = ry; n.updateMatrixWorld(true);
+      BLOCK[2] = [x - CHAIR_FOOT, x + CHAIR_FOOT, z - CHAIR_FOOT, z + CHAIR_FOOT]; },   // (left out: its footprint, not its sweep)
+    cover: (w, dt) => {                                 // the page's duvet over him (asleep at night), w 0..1: drawn up from the foot
+      if (w <= 0 && DUV.w <= 0) return; if (!bedInit()) return; DUV.w = w; DUV.acc += dt;
+      if (w > 0 && (DUV.acc >= 0.1 || w < 1)) { DUV.acc = 0; boy.updateMatrixWorld(true); coverShape(); }
+      COV.mesh.visible = w > 0; DUV.src.visible = !COV.mesh.visible; },
+    step0: dt => { untouch(); if (mixer) mixer.update(dt); T += dt; if (!boy) return false; boy.visible = visible; return drive(dt); }});
+  const pickRig = () => {
+    if (rig || !boy) return rig;
+    rig = bones["metacarpal1L"] || bones["metacarpal1.L"] || V5 ? "mh" : "old";   // (three.js drops the dot from node names; v5: boy_mh.js too)
+    if (rig === "mh") import("./room/boy_mh.js").then(async m => {
+      for (let i = 0; i < 600 && !(!MOVES || movesOn); i++) await new Promise(r => setTimeout(r, 100));   // after #76's loads
+      mh = m.createMH(mhEnv()); if (DEBUG) window.mh = mh; }).catch(e => console.warn("MakeHuman layer off:", e));
+    return rig;
+  };
+  (async () => { for (let i = 0; i < 1200 && !pickRig(); i++) await new Promise(r => setTimeout(r, 100)); })()   // the body decides the layer
+    .then(() => rig === "mh" ? null : import("./room/boy_motion.js")).then(m => { if (!m) return; motion = m.createMotion({THREE, load, bones, actions, HIPS, EDGE, OFF, GZ, FOOD, PROP, DISH_AT, F,
     get boy(){ return boy; }, get mixer(){ return mixer; }, touch, reach, aimBone, setWorldQuat,
     state: () => ({ctx:ctxNow, at, step, goal, current, holdW, peek, phoneWanted, life:lastLife, T, iv:IV.cur && IV.cur.n,
       held:Object.keys(PROP.held).length > 0 || bag === "hand" || !!(trash && trash.held)}),
@@ -2956,7 +3089,8 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
     HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
     setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
-  animate = dt => { const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  animate = dt => { if (pickRig() === "mh") return mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
+    const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
   if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====
