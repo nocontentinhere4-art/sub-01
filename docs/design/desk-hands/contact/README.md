@@ -68,3 +68,37 @@ All measurements are in the page, scene desk_14, every 0.25 s.
 - **G12's typing clip.** Needs the clip's keyboard reference point (where the performer's home row was) to replace the clip-to-room offset in step 1. The resolver does the rest.
 - **The QA's desk test** cannot see this desk (above).
 - **Right little finger.** On our current static-finger typing clip it lifts up to 8 mm at moments.
+
+## The keys with a real typing capture (room_mx_typing, G12)
+Typing mode now plays G12's Mixamo capture, with the hands settled by the same resolver.
+
+**Placement.** The resolver takes G12's measured reference points (the left and right index fingers' last joints, means over the clip).
+- Each is moved 1.5 cm on to the fingertip and 1 cm down to the key top.
+- Each hand's mean is carried onto our F and J. Each keeps its own motion about that mean, so the right hand still travels its 13.6 cm.
+- A rigid map of the performer's keyboard plane was tried first. The performer's hands sat 18 cm apart, which put the left little finger off our narrower keyboard, so it was dropped.
+
+**Hand height.** It comes from the capture itself: the drop from the knuckles to the resting fingertips' skin, followed over ~1 s. The resting fingers then touch as recorded.
+- It reads 6 cm on both hands, which is the clamp's limit.
+- It is held over the highest surface under any knuckle, so a hand half off the keyboard is not lowered.
+
+**Keystrokes survive.** A finger counts as in a stroke while the capture's fingertip is more than 8 mm above its lowest over the last 1.5 s (G12's lifts: median 0.4 s, longest 1.6 s).
+- In a stroke the finger is left as recorded and only opened out of a key.
+- Once down, it is settled onto the cap over 0.15 s.
+
+**Measured over the whole 16.5 s, every 0.25 s** (`key_contact_mx_typing.json`):
+
+| | value |
+|---|---|
+| All fingertips | median 0.0 mm, min −5.4 mm, max +28.7 mm |
+| Resting fingers | median −0.1 mm, 86% within ±3 mm, 1 sample more than 5 mm into a cap |
+| Fingers in a stroke | median +6.8 mm up; 32 of 57 kept more than 6 mm up |
+| Arm skin in the desk | 0; the elbow swings up to 14° |
+| Chair and desk (page QA) | 0 |
+| Baseline: main | hovering 0.5–1.1 cm, touching in 0 of 180 frames (G12) |
+| Baseline: unfitted | 10.4–19.5 cm under the caps (G12) |
+
+**Open:**
+- **Strokes:** 25 of 57 stroke samples still read under 6 mm.
+- **Resting fingers:** 37 resting samples are more than 5 mm up, probably small lifts under the 8 mm threshold.
+- **Elbow swing** fires on most frames (up to 14.4° against the 15° cap) to keep the sleeve out of the desk.
+- **Hand height** is clamped at 6 cm on both hands, so the capture's real knuckle drop may be larger.

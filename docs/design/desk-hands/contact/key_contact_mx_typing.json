@@ -1,0 +1,29 @@
+{
+ "clip": "room_mx_typing (G12, 16.5 s)",
+ "samples_every_s": 0.25,
+ "fingertip_skin_over_cap_mm": {
+  "all": {
+   "n": 614,
+   "min": -5.4,
+   "median": 0.0,
+   "max": 28.7
+  },
+  "resting": {
+   "n": 557,
+   "median": -0.1,
+   "within_3mm": 0.858,
+   "into_over_5mm": 1,
+   "up_over_5mm": 37
+  },
+  "in_a_stroke": {
+   "n": 57,
+   "median": 6.8,
+   "kept_up_over_6mm": 32
+  }
+ },
+ "desk_qa_hits": 0,
+ "baselines": {
+  "main_live": "0.5-1.1 cm over the caps, touching in 0 of 180 frames (G12)",
+  "unfitted": "10.4-19.5 cm under the caps (G12)"
+ }
+}

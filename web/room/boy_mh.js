@@ -28,7 +28,7 @@
 // where the sit-down starts and the stand-up ends come from the clips (env.setSpots). (room_bedtime's one-take get-up,
 // flow(), is no longer used for leaving the desk: it put his torso 9 cm into the chair.) The walk plays as recorded.
 
-const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "room_seated_idle", desk_watch: "room_seated_idle", stand: "room_window",
+const CLIPS = {desk_type: "room_mx_typing", desk_mouse: "room_seated_idle", desk_watch: "room_seated_idle", stand: "room_window",
   walk: "room_walk", sit_down: "room_mx_stand_to_sit", stand_up: "room_mx_sit_to_stand", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
   bedtime: "room_bedtime"};
@@ -50,6 +50,12 @@ const BED = {hips: [-1.0, 0.89], head: -1,                 // where his hips lie
   edge: [-0.40, 0.36], face: Math.PI,                        // where he sits on its edge (ANCHOR.bedside's seat), facing the desk (-z),
   box: [-1.90, -0.20, 0.25, 1.50], top: 0.805};              // and the mattress (x0, x1, z0, z1) with its top less 1.5 cm of give
 const WALK_V = 0.67;                                         // room_walk's travel speed (m/s)
+// the Mixamo typing capture (room_mx_typing, G12): where the performer's index fingers were, in the clip's frame as the page
+// has it (fixClip: body = (-z, y + 0.02, x) of the GLB's): G12's measured F (left index) and J (right index) last joints,
+// means over the clip, 1.5 cm on to the fingertips and 1 cm down to the key tops under them. Each hand is carried by its
+// own mean onto our F / J (the performer's keyboard was wider: his hands sat 18 cm apart, which put the left little finger
+// off ours), and keeps its own motion about it (the right hand travels 13.6 cm: kept, not pinned)
+const CLIP_MX = {F: [0.118, 0.695, 0.541], J: [-0.063, 0.717, 0.569], clip: "room_mx_typing"};
 const HUMP = 0.02;                                           // a room mouse's hump: 2 cm behind its centre (the back third)
 const FADE = 0.4;
 
@@ -506,8 +512,9 @@ export function createMH(env) {
     return d.setY(Math.max(under("mouse", pm) + PALM_R - pm.y, knuckleNeed("Right", "mouse")));
   }
   const keyFit = side => () => {                              // the knuckles 3 cm over the caps under them (never closer than their skin)
-    let y = 0, n = 0, top = 0; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); y += _s.y; top += under("keys", _s); n++; }
-    return V(0, Math.max(top / n + KEY_KNUCKLE + M.kUp[side] - y / n, knuckleNeed(side, "keys")), 0);
+    // (the highest surface under any knuckle: a hand half off the keyboard is held over the caps, not lowered to the pad's average)
+    let y = 0, n = 0, top = -1e9; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); y += _s.y; top = Math.max(top, under("keys", _s)); n++; }
+    return V(0, Math.max(top + (MX() && M.w.type >= M.w.mouse ? M.kk[side] : KEY_KNUCKLE) + M.kUp[side] - y / n, knuckleNeed(side, "keys")), 0);
   };
   function keyTarget(side) { return P.kbNode ? P.kbNode.localToWorld(V(side === "Left" ? -FJ : FJ, 0, 0)) : V(...P.keys.c); }
 
@@ -554,7 +561,7 @@ export function createMH(env) {
   // keys (slow > 0): the bend that brings a finger down to the caps is followed over `slow` seconds, so the clip's own
   // quick strokes (a finger lifted for a key) stay; never into a key, though: the bend is never more than the touch's
   const FA = new Map();
-  function layFingers(side, name, weight, first = 2, slow = 0, dt = 1 / 30) {   // each joint bends (down) or straightens (up) until its part of the finger touches
+  function layFingers(side, name, weight, first = 2, slow = 0, dt = 1 / 30, lifted = null) {   // each joint bends (down) or straightens (up) until its part of the finger touches
     const mine = []; for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b && !GR.has(b)) { GR.set(b, {pre: b.quaternion.clone(), post: null}); mine.push(b); } }
     if (name === "mouse") { thumbOnFlank(weight); besideMiddle(side, weight); }
     for (let i = first; i <= 5; i++) for (let j = 1; j <= 3; j++) {
@@ -571,7 +578,8 @@ export function createMH(env) {
       for (let a = lo0 + 0.15; a <= HI + 1e-6; a += 0.15) { set(a); const g = gap(side, name, i, j); if (g <= 0) { hi = a; break; } if (g < bestG) { bestG = g; best = a; } lo = a; }
       let a = best;                                          // (no touch within reach: as near as it comes)
       if (hi !== null) { for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; set(m); if (gap(side, name, i, j) > 0) lo = m; else hi = m; } a = lo; }
-      if (slow > 0) { const f = FA.has(b) ? FA.get(b) : a, nf = f + (a - f) * (1 - Math.exp(-dt / slow)); FA.set(b, nf); a = Math.min(nf, a); }
+      if (lifted && lifted.has(i)) { const f = FA.has(b) ? FA.get(b) : 0; FA.set(b, f * Math.exp(-dt / 0.1)); a = Math.min(0, a); }   // (a stroke: the clip's finger, only opened out of a key)
+      else if (slow > 0) { const f = FA.has(b) ? FA.get(b) : a, nf = f + (a - f) * (1 - Math.exp(-dt / slow)); FA.set(b, nf); a = Math.min(nf, a); }
       set(a * weight);
     }
     for (const b of mine) GR.get(b).post = b.quaternion.clone();
@@ -621,7 +629,7 @@ export function createMH(env) {
     env.boy.updateMatrixWorld(true);
     // the clip's keyboard to the room's (its home row, the caps' top): the recorded motion's carrier; keyOn() then centres the
     // index fingertips over F and J (a slow correction, so the typing itself stays the clip's)
-    _k.set(...P.keys.c); dK.subVectors(_k, toWorld(P.ref, _c));
+    _k.set(...P.keys.c); dK.subVectors(_k, toWorld(kbRef(), _c));
     const wk = Math.max(M.w.type, M.w.mouse);                // (the left hand stays on the keys while he mouses)
     if (wk > 0.01) keyOn("Left", wk, dt);
     if (M.w.type > 0.01) keyOn("Right", M.w.type, dt);
@@ -637,14 +645,42 @@ export function createMH(env) {
     unpress("Right", "mouse", GRIP, w);
     for (const b of mine) GR.get(b).post = b.quaternion.clone();
   }
+  const MX = () => CLIPS.desk_type === CLIP_MX.clip;
+  const kbRef = () => MX() ? CLIP_MX.F.map((v, i) => (v + CLIP_MX.J[i]) / 2) : P.ref;   // (the clip's keyboard point: for the roll)
+  const dKs = {Left: V(), Right: V()};
+  function keyDelta(side) {                                  // the carry for one hand onto the keys
+    if (!MX() || !P.kbNode || M.w.type < M.w.mouse) return dK;   // (mousing: the left hand on a seated body, placed by the correction below)
+    return dKs[side].subVectors(keyTarget(side), toWorld(side === "Left" ? CLIP_MX.F : CLIP_MX.J, _c));
+  }
+  // a finger in a stroke: the clip's own fingertip raised more than 8 mm above its lowest over the last 1.5 s, measured
+  // towards the back of the hand (G12's measure of the capture's lifts: median 0.4 s, the longest 1.6 s); while it is
+  // up the resolver leaves it as recorded, and settles it onto the key again over 0.15 s once it is down
+  const LIFT = {Left: {}, Right: {}};
+  function liftedFingers(side, dt) {
+    const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(V()), k2 = S(side, 2, 1).getWorldPosition(V()), k3 = S(side, 3, 1).getWorldPosition(V()), k5 = S(side, 5, 1).getWorldPosition(V());
+    const h = k3.clone().sub(wr).normalize(), l = k5.clone().sub(k2); l.addScaledVector(h, -l.dot(h)).normalize();
+    let up = h.clone().cross(l).normalize(); if (up.y < 0) up.negate();   // (the back of the hand)
+    const out = new Set(), L = LIFT[side], now = (L.t = (L.t || 0) + dt);
+    for (let i = 1; i <= 5; i++) { if (!S(side, i, 3)) continue; const d = tipOf(side, i, V()).sub(wr).dot(up), H = L[i] || (L[i] = []);
+      H.push([now, d]); while (H.length && H[0][0] < now - 1.5) H.shift(); let lo = 1e9; for (const x of H) lo = Math.min(lo, x[1]);
+      if (d - lo > 0.008) out.add(i); }
+    // the clip's own drop from the knuckles to the resting fingertips' skin (fingers 2-5 not in a stroke): the hand is held
+    // at that height over the caps, so a resting finger touches as recorded and a stroke stays up (followed over ~1 s)
+    let ky = 0, kn = 0; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (k) { ky += k.getWorldPosition(_s).y; kn++; } }
+    let drop = 0, dn = 0; for (let i = 2; i <= 5; i++) if (S(side, i, 3) && !out.has(i)) { drop += ky / kn - (tipOf(side, i, _e).y - FING_R); dn++; }
+    if (dn) { const want = Math.max(0.015, Math.min(0.06, drop / dn)); M.kk[side] += (want - M.kk[side]) * (1 - Math.exp(-dt / 1.0)); }
+    M.lifted = M.lifted || {}; M.lifted[side] = [...out];   // (?debug)
+    return out;
+  }
+  M.kk = {Left: KEY_KNUCKLE, Right: KEY_KNUCKLE};
   M.kOff = {Left: V(), Right: V()}; M.kUp = {Left: 0, Right: 0};   // (kUp: the hand raised where a finger could not clear the caps even straightened)
   function keyOn(side, w, dt) {                              // a hand onto the keys: placed, the arm out of the desk, every finger on the caps
-    pin(side, dK.clone().add(M.kOff[side]), w, keyFit(side));
-    if (P.kbNode && w > 0.9) {                               // the index fingertip's drift from F / J, taken out over ~1 s
+    pin(side, keyDelta(side).clone().add(M.kOff[side]), w, keyFit(side));
+    if (P.kbNode && w > 0.9 && !(MX() && M.w.type >= M.w.mouse)) {   // the index fingertip's drift from F / J, taken out over ~1 s (not for a capture: its hands travel)
       const e = keyTarget(side).sub(tipOf(side, 2, V())).setY(0); M.kOff[side].addScaledVector(e, Math.min(1, dt / 0.8));
       const L = M.kOff[side].length(); if (L > 0.15) M.kOff[side].multiplyScalar(0.15 / L);
     }
-    const left = layFingers(side, "keys", w, 1, 0.4, dt);           // (a finger still in a key: the hand up by as much next frame; else back down slowly)
+    const left = layFingers(side, "keys", w, 1, 0.15, dt, liftedFingers(side, dt));           // (a finger still in a key: the hand up by as much next frame; else back down slowly)
     M.kUp[side] = left < -0.0005 ? Math.min(0.03, M.kUp[side] - left) : Math.max(0, M.kUp[side] - 0.002 * dt * 30 * 0.25);
   }
   // a separate room mouse follows the recorded right palm (60% from the wrist to the middle knuckle) while he holds it
@@ -674,7 +710,7 @@ export function createMH(env) {
   const _f = V(), _st = V();
   function handRoll(m) {                                     // the roll back (m) that puts the clip's keyboard / mouse on the room's
     const ry = env.boy.rotation.y; _f.set(Math.sin(ry), 0, Math.cos(ry)); env.boy.updateMatrixWorld(true);
-    if (m === "desk_type") return (M.off || 0) - _k.set(...P.keys.c).sub(toWorld(P.ref, _c)).dot(_f);
+    if (m === "desk_type") return (M.off || 0) - _k.set(...P.keys.c).sub(toWorld(kbRef(), _c)).dot(_f);
     // mousing: the body is a seated capture with no mouse in it (Mixamo has none) and the contact resolver takes the right
     // arm to the mouse, so he sits where the old mouse clip had his hips: 0.389 m behind the mouse along the way he faces
     if (m === "desk_mouse") { _m.set(P.mouse[0], P.mouse[1], P.mouse[2]);
