@@ -1281,6 +1281,52 @@ function updateCameraGoal(){
   } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
 }
 
+// ---------- the camera never inside him: the visitor can orbit and zoom in close (to 0.4 m from the target, the
+// monitor at the desk), and the near plane is 2 cm; inside his body's surface the camera sees the clothes' single-sided
+// shells from within (the owner: "I can see inside his body"). He is a set of capsules, one per bone of his skin (bone
+// to child bone, as thick as the skin that bone carries, measured once on him), and each frame, wherever the follow
+// camera or the visitor put it, the camera is pushed out of them to CLEAR beyond their surface: it slides round him.
+const CLEAR = 0.06;
+const CAMB = {segs:null, tries:0};
+function camBody(){                                   // the capsules, measured once his skin and clips are in
+  if (CAMB.segs || !boy || CAMB.tries > 600) return CAMB.segs; CAMB.tries++;
+  const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) parts.push(o); });
+  if (!parts.length || !mixer) return null;
+  boy.updateMatrixWorld(true);
+  const segs = new Map(), v = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), L = new THREE.Line3(), q = new THREE.Vector3();
+  const segOf = bone => { if (segs.has(bone)) return segs.get(bone);
+    const kids = bone.children.filter(c => c.isBone), s = {a:bone, b:kids.length ? kids : null, d:[]}; segs.set(bone, s); return s; };
+  for (const sm of parts) { const g = sm.geometry, P = g.attributes.position, I = g.attributes.skinIndex, W = g.attributes.skinWeight;
+    for (let i = 0; i < P.count; i += 3) { let k0 = 0, w0 = -1; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w0) { w0 = W.getComponent(i, k); k0 = I.getComponent(i, k); }
+      const s = segOf(sm.skeleton.bones[k0]); sm.getVertexPosition(i, v).applyMatrix4(sm.matrixWorld);
+      s.a.getWorldPosition(a); let d = v.distanceTo(a);
+      if (s.b) for (const c of s.b) { c.getWorldPosition(b); L.set(a, b); d = Math.min(d, L.closestPointToPoint(v, true, q).distanceTo(v)); }
+      s.d.push(d); } }
+  // (and what he carries that is not skin: his hair, a mesh on the head bone; the headphones; anything hung on a bone)
+  boy.traverse(o => { if (!o.isMesh || o.isSkinnedMesh || !o.visible) return; let bn = o.parent; while (bn && !bn.isBone) bn = bn.parent; if (!bn) return;
+    const s = segOf(bn), P = o.geometry.attributes.position; o.updateMatrixWorld(true);
+    for (let i = 0; i < P.count; i += 3) { v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); s.a.getWorldPosition(a); let d = v.distanceTo(a);
+      if (s.b) for (const c of s.b) { c.getWorldPosition(b); L.set(a, b); d = Math.min(d, L.closestPointToPoint(v, true, q).distanceTo(v)); }
+      s.d.push(d); } });
+  CAMB.segs = [];
+  for (const s of segs.values()) { if (s.d.length < 4) continue; s.d.sort((x, y) => x - y);
+    CAMB.segs.push({a:s.a, b:s.b, r:s.d[s.d.length - 1], A:new THREE.Vector3(), B:new THREE.Vector3()}); }   // (all of it: the camera may not be inside any of it)
+  return CAMB.segs;
+}
+const _kc = new THREE.Vector3(), _kq = new THREE.Vector3(), _kL = new THREE.Line3();
+function keepClear(){
+  if (DEBUG && window.NOCLEAR) return;                 // (?debug: the camera as it would be without this)
+  const S = boy && boy.visible ? camBody() : null; if (!S) return;
+  const c = camera.position;
+  for (let it = 0; it < 4; it++) { let moved = false;
+    for (const s of S) { s.a.getWorldPosition(s.A); let best = s.A, bd = c.distanceTo(s.A);
+      if (s.b) for (const k of s.b) { k.getWorldPosition(s.B); _kL.set(s.A, s.B); const p = _kL.closestPointToPoint(c, true, _kq), d = p.distanceTo(c); if (d < bd) { bd = d; best = _kc.copy(p); } }
+      const need = s.r + CLEAR; if (bd >= need) continue;
+      const dir = bd > 1e-4 ? _kq.subVectors(c, best).normalize() : _kq.subVectors(c, controls.target).normalize();
+      c.copy(best).addScaledVector(dir, need); moved = true; }
+    if (!moved) break; }
+}
+
 // ---------- day and night (from his Tokyo clock) ----------
 let hour = FIXED_HOUR ? +FIXED_HOUR : 12, stage = "AWAKE", lampOn = 0, roomOn = 0;
 const roomTint = new THREE.Color(), WHITE = new THREE.Color(1, 1, 1);
@@ -2967,7 +3013,7 @@ function frame(now){
     camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
   }
   shadows(now, moving);
-  controls.update(); renderer.render(scene, camera);
+  controls.update(); keepClear(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
 function animate(dt){                                // one step of him: clips, his plan, seats, life, the phone, the head
@@ -3036,7 +3082,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   live: (a, x = {}) => { const l = {activity:a, place:"room", ...x}; lastLife = l; place(l); screens(l, "AWAKE"); },
   act: (a, x = {}) => { untouch(); if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"}); if (chairNode()) placeChair(0); const l = {activity:a, place:"room", ...x}; lastLife = l; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = phoneWanted ? 1 : 0; mixer.update(1); },
   setLife: x => { lastLife = {...lastLife, ...x}; }, gz: () => ({p:GZ.p.toArray().map(v => +v.toFixed(2)), w:+GZ.w.toFixed(2), why:GZ.why, iv:IV.cur && IV.cur.n, ctx:ctxNow, bag, eat:EAT.kind, trash:trash && (trash.held ? "held" : "desk"), tpos:trash && trash.g.position.toArray().map(v => +v.toFixed(2))}),
-  setSeed: v => { seed = v; }, dbg: () => ({lean, T, clr:clearance(), TL:TL.toArray(), TU:TU.toArray(), TF:TF.toArray()}), armTo, torso, reach, bend, TL, shiftHips, variant: (n, d = 4) => { IV.cur = {n, d, t:0, side:"Left", s:0.3}; IV.last = n; }, setDoor,
+  setSeed: v => { seed = v; }, __keepClear: () => keepClear(), dbg: () => ({lean, T, clr:clearance(), TL:TL.toArray(), TU:TU.toArray(), TF:TF.toArray()}), armTo, torso, reach, bend, TL, shiftHips, variant: (n, d = 4) => { IV.cur = {n, d, t:0, side:"Left", s:0.3}; IV.last = n; }, setDoor,
   pose: () => ({at, step:step && {k:step.k, t:step.t && +step.t.toFixed(2), to:step.to}, plan:plan.map(p => p.k + (p.to ? ":" + p.to : "")), goal, clip:current && current.getClip().name,
     root:boy.position.toArray().map(x => +x.toFixed(3)), ry:+boy.rotation.y.toFixed(2)}) });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, current:{get:() => current}, want:{get:() => want}, hand:{get:() => hand}, head:{get:() => head},
