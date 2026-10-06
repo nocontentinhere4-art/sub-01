@@ -28,7 +28,7 @@
 // where the sit-down starts and the stand-up ends come from the clips (env.setSpots). (room_bedtime's one-take get-up,
 // flow(), is no longer used for leaving the desk: it put his torso 9 cm into the chair.) The walk plays as recorded.
 
-const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "room_seated_idle", stand: "room_window",
+const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "room_seated_idle", desk_watch: "room_seated_idle", stand: "room_window",
   walk: "room_walk", sit_down: "room_mx_stand_to_sit", stand_up: "room_mx_sit_to_stand", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
   bedtime: "room_bedtime"};
@@ -228,6 +228,7 @@ export function createMH(env) {
     // thigh against the armrest)
     const bodyHips = c => { const s = sampler(c), h = s(0).hips; s.done(); return [h.x, h.y, h.z]; };
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = bodyHips(got[k]); }
+    M.mouseHips = H.desk_mouse;                              // (the mouse-mode body's hips at its first frame, its own frame)
     M.actions.stand = make(stand); H.mh_stand = pageHips(stand, 0);
     // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
     M.actions.walk = make(got.walk); H.room_walk = pageHips(got.walk, 0);
@@ -448,10 +449,21 @@ export function createMH(env) {
     const hand = env.bones[side + "Hand"]; if (!hand || weight <= 0) return;
     const w0 = hand.getWorldPosition(V()), t = w0.clone().add(delta), q0 = hand.getWorldQuaternion(new THREE.Quaternion());   // (the clip's hand turn)
     const keepTurn = () => { const pq = hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), q = q0.clone();
-      if (o.pitch) { const h = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())), ax = h.clone().cross(_dn2).normalize(); q.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, o.pitch())); }   // (o.pitch(): + = fingers down, about the wrist)
-      if (o.roll) { const h = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())).normalize(), f = fwdV(), lt = V(f.z, 0, -f.x), sg = h.clone().cross(lt).y > 0 ? 1 : -1;
+      if (o.pitch && !o.aim) { const h = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())), ax = h.clone().cross(_dn2).normalize(); q.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, o.pitch())); }   // (o.pitch(): + = fingers down, about the wrist)
+      if (o.roll && !o.aim) { const h = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())).normalize(), f = fwdV(), lt = V(f.z, 0, -f.x), sg = h.clone().cross(lt).y > 0 ? 1 : -1;
         q.premultiply(new THREE.Quaternion().setFromAxisAngle(h, sg * o.roll * Math.PI / 180)); }   // (o.roll: deg, his left side of the hand up)
-      hand.quaternion.slerp(pq.multiply(q), weight); hand.updateMatrixWorld(true); if (o.post) o.post(); };
+      hand.quaternion.slerp(pq.multiply(q), weight); hand.updateMatrixWorld(true);
+      if (o.aim) {                                         // (o.aim(): [forward, right] the hand should point: wrist->middle knuckle, index->little knuckle)
+        const [hw, lw] = o.aim(), wr = hand.getWorldPosition(V()), h = S(side, 3, 1).getWorldPosition(V()).sub(wr).normalize(), l = S(side, 5, 1).getWorldPosition(V()).sub(S(side, 2, 1).getWorldPosition(V()));
+        const basis = (a, b) => { const x = a.clone().normalize(), z = x.clone().cross(b).normalize(), y = z.clone().cross(x); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); };
+        const R = basis(hw, lw).multiply(basis(h, l).invert()), pq2 = hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+        hand.quaternion.copy(pq2.multiply(hand.getWorldQuaternion(new THREE.Quaternion()).premultiply(R.slerp(new THREE.Quaternion(), 1 - weight)))); hand.updateMatrixWorld(true);
+        if (o.pitch || o.roll) { const q2 = hand.getWorldQuaternion(new THREE.Quaternion());   // (the tilt and the roll on top of the aim)
+          if (o.pitch) { const h2 = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())), ax = h2.clone().cross(_dn2).normalize(); q2.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, o.pitch() * weight)); }
+          if (o.roll) { const h2 = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())).normalize(), f = fwdV(), lt = V(f.z, 0, -f.x), sg = h2.clone().cross(lt).y > 0 ? 1 : -1; q2.premultiply(new THREE.Quaternion().setFromAxisAngle(h2, sg * o.roll * Math.PI / 180 * weight)); }
+          hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(q2)); hand.updateMatrixWorld(true); }
+      }
+      if (o.post) o.post(); };
     for (let it = 0; it < (o.iters || 5); it++) {
       ccd(side, t, weight); swingElbow(side, weight); keepTurn();
       const d = fit ? fit() : V(); if (d.length() <= 0.001 && !o.iters) break; t.addScaledVector(d, weight);
@@ -618,7 +630,7 @@ export function createMH(env) {
   }
   function mouseHold(w) {                                    // the grip pose, the hand tilted and placed so palm and fingertips meet the shell
     const mine = []; for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S("Right", i, j); if (b && !GR.has(b)) { GR.set(b, {pre: b.quaternion.clone(), post: null}); mine.push(b); } }
-    pin("Right", V(), w, mouseFit, {iters: 6, pitch: () => M.mPitch, roll: GRIP_ROLL, post: () => { curl("Right", GRIP, w); thumbOnFlank(w); }});
+    pin("Right", V(), w, mouseFit, {iters: 6, pitch: () => M.mPitch, roll: GRIP_ROLL, aim: () => { const f = fwdV(), rt = V(-f.z, 0, f.x); return [f.clone().applyAxisAngle(_up1, 8 * Math.PI / 180), rt]; }, post: () => { curl("Right", GRIP, w); thumbOnFlank(w); }});
     unpress("Right", "mouse", GRIP, w);
     for (const b of mine) GR.get(b).post = b.quaternion.clone();
   }
@@ -651,7 +663,8 @@ export function createMH(env) {
   // (closer, its calves catch the cushion's front edge); 5.5 cm also clears the sit-down, whose hips land 2.7 cm further
   // back than they rest. The mouse clip: clear from 3.5 cm (main's 0.6 cm puts its left calf on the front edge); the
   // typing clip, the same family, with it (docs/design/mixamo)
-  const SEAT_AT = {desk_type: [0, -0.045], desk_mouse: [0, -0.045], desk_watch: [0, -0.055]};
+  const SEAT_AT = {desk_type: [0, -0.045], desk_mouse: [0, -0.055], desk_watch: [0, -0.055]};   // (mousing plays room_seated_idle's body: its seat point)
+  const MOUSE_HIPS_BACK = 0.389;                              // (the old mouse clip's hips behind the mouse, measured in the page)
   // the nearest the turn on the spot before the sit-down clears the turned seat (the walking scene swept: 0.45 m caught
   // his right foot, 0.52 m his toes, 0.60 m clear)
   const TURN_CLEAR = 0.60;
@@ -659,8 +672,10 @@ export function createMH(env) {
   function handRoll(m) {                                     // the roll back (m) that puts the clip's keyboard / mouse on the room's
     const ry = env.boy.rotation.y; _f.set(Math.sin(ry), 0, Math.cos(ry)); env.boy.updateMatrixWorld(true);
     if (m === "desk_type") return (M.off || 0) - _k.set(...P.keys.c).sub(toWorld(P.ref, _c)).dot(_f);
-    if (m === "desk_mouse") { _m.set(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
-      return (M.off || 0) - _m.sub(toWorld(CLIP.mouse, _c)).dot(_f); }
+    // mousing: the body is a seated capture with no mouse in it (Mixamo has none) and the contact resolver takes the right
+    // arm to the mouse, so he sits where the old mouse clip had his hips: 0.389 m behind the mouse along the way he faces
+    if (m === "desk_mouse") { _m.set(P.mouse[0], P.mouse[1], P.mouse[2]);
+      return (M.off || 0) - (_m.sub(toWorld(M.mouseHips, _c)).dot(_f) - MOUSE_HIPS_BACK); }
     return null;
   }
   function roll(dt) {
