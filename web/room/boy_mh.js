@@ -340,177 +340,250 @@ export function createMH(env) {
   function lowestTip(side) {                                // the lowest fingertip: the end bone's head, a finger's half thickness lower
     let low = 1e9; for (const b of tipNames(side)) { b.getWorldPosition(_a); low = Math.min(low, _a.y - 0.008); } return low;
   }
-  // the right hand over a separate room mouse (on its way between the keys and the mouse): its tips, knuckles and palm
-  // (60% from the wrist to the middle knuckle) stay over the mouse's shell, by their half thickness (8 / 12 / 20 mm)
-  const _ray = new THREE.Raycaster(), _dn = V(0, -1, 0), _o = V();
-  function overMouse(side) {
-    if (side !== "Right" || !P.mouseNode) return -1;
-    const B = env.bones, s = "R", f = n => B[n + s] || B[n + "." + s], pts = [];
-    for (const b of tipNames(side)) pts.push([b, 0.008]);
-    for (let i = 1; i <= 5; i++) if (f(`finger${i}-1`)) pts.push([f(`finger${i}-1`), 0.012]);
-    let need = -1;
-    for (const [b, r] of pts) need = Math.max(need, shell(b.getWorldPosition(_a), r));
-    const hand = B.RightHand, kn = f("finger3-1");
-    if (hand && kn) need = Math.max(need, shell(hand.getWorldPosition(_a).lerp(kn.getWorldPosition(_b), 0.6), 0.02));
-    return need;
+  // ---------- contact: his hand settled ONTO a named surface, not kept clear of it ----------
+  // The owner: "the right hand must hold the mouse"; then (G12) on the keys his fingertips hovered 0.5-1.1 cm over the caps
+  // for the whole clip: the old rules only ever lifted the hand out of things. One resolver, two callers:
+  //   mouse: the palm on the shell's hump, the fingers along it, the thumb on its left flank (references mouse1, mouse2);
+  //   keys:  the index fingertips over F and J, the knuckles 3 cm over the caps, every finger laid onto the keycaps (kb1, kb2).
+  // For both, per frame: the hand is placed by a point of the hand itself (never a clip reference: that put the palm 5 cm
+  // short of the mouse and the fingertips past the keyboard's far edge); the whole arm turns to get the wrist there (the
+  // upper arm at the shoulder, the forearm at the elbow; the wrist keeps the clip's turn); the elbow swings about the
+  // shoulder-wrist line until forearm and upper arm are out of the desk (the room's own solid, as the page QA tests it);
+  // then each finger is bent down joint by joint until it touches what is under it: contact, the surface the hard limit.
+  // Half thicknesses (measured off his skin): palm 16 mm below the bones' line, knuckles 11, fingers 10; the arm and the
+  // last two phalanges are tested by their own skin.
+  const PALM_R = 0.016, KN_R = 0.011, FING_R = 0.010;
+  const GRIP_BACK = 0.022, GRIP_RIGHT = 0.012;   // mouse: the palm 2.2 cm behind the hump's top and 1.2 cm right of it (index
+                                                 // and middle on the buttons, ring and little on the right flank, as mouse2)
+  const KEY_KNUCKLE = 0.030, FJ = 0.0285;        // keys: knuckles 3 cm over the caps; F and J 1.5 keys either side of the
+                                                 // keyboard's origin (G10d's: the middle of F and J)
+  const S = (side, i, j) => env.bones[`finger${i}-${j}${side[0]}`] || env.bones[`finger${i}-${j}.${side[0]}`];
+  const fwdV = () => V(Math.sin(env.boy.rotation.y), 0, Math.cos(env.boy.rotation.y));
+  const _l = V(), _p = V(), _n = V(), _s = V(), _e = V(), _g = V(), _sd = V(), _ax = V(), _up1 = V(0, 1, 0), _dn2 = V(0, -1, 0);
+  const _q0 = new THREE.Quaternion(), _rq = new THREE.Quaternion();
+
+  // a surface's top as a height map in the node's own frame (2.5 mm): the highest hit of a vertical ray (keycaps, the shell)
+  const MAPS = new Map();
+  function topMap(node) {
+    if (MAPS.has(node)) return MAPS.get(node);
+    node.updateMatrixWorld(true); const meshes = []; node.traverse(m => { if (m.isMesh && !/_contact$/.test(m.name)) meshes.push(m); });
+    const inv = node.matrixWorld.clone().invert(), bb = new THREE.Box3(), v = V();
+    for (const m of meshes) { const P = m.geometry.attributes.position; m.updateMatrixWorld(true); for (let i = 0; i < P.count; i++) bb.expandByPoint(v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv)); }
+    const s = 0.0025, nx = Math.ceil((bb.max.x - bb.min.x) / s) + 1, nz = Math.ceil((bb.max.z - bb.min.z) / s) + 1, h = new Float32Array(nx * nz).fill(NaN);
+    const ray = new THREE.Raycaster(), o = V(), dn = V(0, -1, 0); let peak = -1e9; const pk = V();
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+      const lx = bb.min.x + i * s, lz = bb.min.z + k * s; node.localToWorld(o.set(lx, bb.max.y + 0.1, lz)); ray.set(o, dn);
+      const x = ray.intersectObjects(meshes, false)[0]; if (!x) continue;
+      const ly = x.point.clone().applyMatrix4(inv).y; h[i * nz + k] = ly; if (ly > peak) { peak = ly; pk.set(lx, ly, lz); } }
+    const m = {node, x0: bb.min.x, z0: bb.min.z, s, nx, nz, h, peak: pk}; MAPS.set(node, m); return m;
   }
-  function shell(p, r) {                                     // how far p (r thick) is into the mouse's shell under it
-    _ray.set(_o.set(p.x, p.y + 0.3, p.z), _dn); _ray.far = 0.6;
-    const x = _ray.intersectObject(P.mouseNode, true)[0];
-    return x ? x.point.y - (p.y - r) : -1;
+  function topAt(m, p) {                                     // the surface's top under p (world y), null off it
+    m.node.worldToLocal(_l.copy(p)); const i = Math.round((_l.x - m.x0) / m.s), k = Math.round((_l.z - m.z0) / m.s);
+    if (i < 0 || k < 0 || i >= m.nx || k >= m.nz) return null; const y = m.h[i * m.nz + k]; if (Number.isNaN(y)) return null;
+    return m.node.localToWorld(_l.set(_l.x, y, _l.z)).y;
   }
-  function pin(side, delta, floor, weight, fit) {            // the recorded wrist + delta, lifted until no tip is under the floor
+  const SURF = {mouse: () => P.mouseNode, keys: () => P.kbNode};
+  function under(name, p) { const n = SURF[name](); const y = n ? topAt(topMap(n), p) : null; return y == null ? P.pad : y; }   // the surface, else the pad / desk top
+
+  // the desk: the room's static mesh over the desk's zone, its top (the highest face between 0.90 and 1.00 m, 1 cm cells)
+  // taken as a 3 cm slab: the room draws the desk as a 3 mm skin, which no inside-test can see a forearm in
+  let DESK = null;
+  function deskCols() {
+    if (DESK !== null) return DESK;
+    const st = env.scene && env.scene.getObjectByName("room_static"); if (!st) return (DESK = false);
+    const meshes = []; st.traverse(m => { if (m.isMesh) meshes.push(m); });
+    const sides = meshes.map(m => m.material.side); meshes.forEach(m => { m.material.side = THREE.DoubleSide; });
+    const x0 = -1.92, x1 = -0.30, z0 = -1.47, z1 = -0.72, c = 0.01, nx = Math.ceil((x1 - x0) / c), nz = Math.ceil((z1 - z0) / c), tops = new Float32Array(nx * nz).fill(NaN);
+    const ray = new THREE.Raycaster(), o = V(), up = V(0, 1, 0);
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+      ray.set(o.set(x0 + (i + 0.5) * c, 0.5, z0 + (k + 0.5) * c), up); ray.far = 0.7; let t = NaN;
+      for (const h of ray.intersectObjects(meshes, false)) if (h.point.y > 0.90 && h.point.y < 1.00) t = Number.isNaN(t) ? h.point.y : Math.max(t, h.point.y);
+      tops[i * nz + k] = t; }
+    meshes.forEach((m, i) => { m.material.side = sides[i]; });
+    return (DESK = {x0, z0, c, nx, nz, tops});
+  }
+  const DESK_SLAB = 0.03;
+  function inDesk(p) {                                       // how deep a world point is inside the desk's slab (m), 0 outside
+    const D = deskCols(); if (!D) return 0; const i = Math.floor((p.x - D.x0) / D.c), k = Math.floor((p.z - D.z0) / D.c);
+    if (i < 0 || k < 0 || i >= D.nx || k >= D.nz) return 0; let t = D.tops[i * D.nz + k]; if (Number.isNaN(t)) return 0; t += M.deskTest || 0;   // (?debug: the slab raised, to see the swing work)
+    return p.y < t && p.y > t - DESK_SLAB ? Math.min(t - p.y, p.y - (t - DESK_SLAB)) : 0;
+  }
+  const ARM = {};
+  function armIn(side) {                                     // the deepest point of his arm's skin (sleeve included, up to 120 vertices) in the desk
+    if (!ARM[side]) { const bs = new Set(), hand = env.bones[side + "Hand"];   // (every bone of the arm but the hand's: the skin hangs on its twist bones)
+      env.bones[side + "Arm"].traverse(b => { if (!b.isBone) return; let n = b; while (n && n !== hand) n = n.parent; if (!n) bs.add(b); }); const all = [];
+      env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
+        for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (bs.has(o.skeleton.bones[k0])) all.push([o, n]); } });
+      const st = Math.max(1, Math.ceil(all.length / 120)); ARM[side] = all.filter((_, n) => n % st === 0); }
+    let d = 0; for (const [o, n] of ARM[side]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld); d = Math.max(d, inDesk(_g)); }
+    return d;
+  }
+  M.swing = {frames: 0, maxIn: 0, maxA: 0};                 // (?debug: how often and how far the elbow had to swing)
+  function swingElbow(side, weight) {                        // the elbow up about the shoulder-wrist line until the arm is out of the desk
+    const d0 = armIn(side); if (d0 <= 0.003) return; M.swing.frames++; M.swing.maxIn = Math.max(M.swing.maxIn, d0);
+    const B = env.bones, ua = B[side + "Arm"], sh = ua.getWorldPosition(V()), axis = B[side + "Hand"].getWorldPosition(V()).sub(sh).normalize();
+    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
+    const set = a => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axis, a).clone().multiply(w0)); ua.updateMatrixWorld(true); };
+    const elbowY = a => { set(a); return B[side + "ForeArm"].getWorldPosition(_g).y; };
+    const sgn = elbowY(0.1) > elbowY(-0.1) ? 1 : -1;        // (the way that lifts the elbow)
+    let lo = 0, hi = 0.26 * sgn; set(hi);                  // (at most 15 deg: past that the shoulder reads as hunched)
+    if (armIn(side) > 0.003) { set(hi * weight); return; }
+    for (let it = 0; it < 10; it++) { const m = (lo + hi) / 2; set(m); if (armIn(side) > 0.003) lo = m; else hi = m; }
+    set(hi * weight); M.swing.maxA = Math.max(M.swing.maxA, Math.abs(hi));
+  }
+
+  function pin(side, delta, weight, fit) {                   // the recorded wrist + delta, the arm turned to it, then fit()'s corrections
     const hand = env.bones[side + "Hand"]; if (!hand || weight <= 0) return;
     const w0 = hand.getWorldPosition(V()), t = w0.clone().add(delta), q0 = hand.getWorldQuaternion(new THREE.Quaternion());   // (the clip's hand turn)
     const keepTurn = () => { const pq = hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert(); hand.quaternion.slerp(pq.multiply(q0), weight); hand.updateMatrixWorld(true); };
-    for (let it = 0; it < (fit ? 5 : 3); it++) {
-      ccd(side, t, weight); keepTurn();
-      if (fit) { const d = fit(); if (d.length() <= 0.001) break; t.addScaledVector(d, weight); continue; }
-      const deficit = Math.max(floor - lowestTip(side), overMouse(side)); if (deficit <= 0.001) break;
-      t.y += deficit;
+    for (let it = 0; it < 5; it++) {
+      ccd(side, t, weight); swingElbow(side, weight); keepTurn();
+      const d = fit ? fit() : V(); if (d.length() <= 0.001) break; t.addScaledVector(d, weight);
     }
   }
-  // the right hand ON a separate room mouse (the owner: hold it, not rest next to it; references mouse1/mouse2, a palm
-  // grip): the palm lies on the shell's hump, the knuckles arch over it, and each finger is laid down, joint by joint,
-  // onto the shell (or the pad beside it) until it touches it: contact, the shell the hard limit. Half thicknesses:
-  // palm 16 mm (below the bones' line, wrist to middle knuckle at 60%), knuckles 11, fingers 10 (measured off his skin).
-  const PALM_R = 0.016, KN_R = 0.011, FING_R = 0.010, GRIP_BACK = 0.022, GRIP_RIGHT = 0.012;
-  // (the palm 2.2 cm behind the hump's top, so the fingertips end at the front edge, and 1.2 cm right of it, so index and
-  // middle lie on the two buttons and the ring and little finger on the right flank, as mouse2)
-  let HM = null;                                             // the shell's top as a height map in the mouse's own frame (2.5 mm)
-  function shellMap() {
-    const ms = P.mouseNode; ms.updateMatrixWorld(true); const g = ms.geometry; g.computeBoundingBox(); const bb = g.boundingBox.clone(), s = 0.0025;
-    const nx = Math.ceil((bb.max.x - bb.min.x) / s) + 1, nz = Math.ceil((bb.max.z - bb.min.z) / s) + 1, h = new Float32Array(nx * nz).fill(NaN);
-    const ray = new THREE.Raycaster(), o = V(), dn = V(0, -1, 0); let peak = -1e9; const pk = V();
-    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
-      const lx = bb.min.x + i * s, lz = bb.min.z + k * s; ms.localToWorld(o.set(lx, bb.max.y + 0.1, lz)); ray.set(o, dn);
-      const x = ray.intersectObject(ms, false)[0]; if (!x) continue;
-      const ly = ms.worldToLocal(x.point.clone()).y; h[i * nz + k] = ly; if (ly > peak) { peak = ly; pk.set(lx, ly, lz); } }
-    return {bb, s, nx, nz, h, peak: pk};
+  const palmAt = (side, out) => env.bones[side + "Hand"].getWorldPosition(out).lerp(S(side, 3, 1).getWorldPosition(_e), 0.6);
+  function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }
+  function mouseFit() {                                      // palm over the hump, resting on it; no knuckle in the shell
+    palmAt("Right", _p); const m = topMap(P.mouseNode), hump = P.mouseNode.localToWorld(_n.copy(m.peak)), f = fwdV();
+    const d = V(hump.x - GRIP_BACK * f.x - GRIP_RIGHT * f.z - _p.x, 0, hump.z - GRIP_BACK * f.z + GRIP_RIGHT * f.x - _p.z);
+    return d.setY(Math.max(under("mouse", _p) + PALM_R - _p.y, knuckleNeed("Right", "mouse")));
   }
-  const _l = V();
-  function shellTop(p) {                                     // the shell's top under p (world y), null off the shell
-    if (!HM) HM = shellMap();
-    P.mouseNode.worldToLocal(_l.copy(p)); const i = Math.round((_l.x - HM.bb.min.x) / HM.s), k = Math.round((_l.z - HM.bb.min.z) / HM.s);
-    if (i < 0 || k < 0 || i >= HM.nx || k >= HM.nz) return null; const y = HM.h[i * HM.nz + k]; if (Number.isNaN(y)) return null;
-    return P.mouseNode.localToWorld(_l.set(_l.x, y, _l.z)).y;
-  }
-  const below = p => { const y = shellTop(p); return y == null ? P.pad : y; };   // what is under p: the shell, else the pad
-  const fbone = (i, j) => env.bones[`finger${i}-${j}R`] || env.bones[`finger${i}-${j}.R`];
-  const _p = V(), _n = V(), _s = V(), _e = V();
-  const fwdV = () => V(Math.sin(env.boy.rotation.y), 0, Math.cos(env.boy.rotation.y));
-  function palmAt(out) { return env.bones.RightHand.getWorldPosition(out).lerp(fbone(3, 1).getWorldPosition(_e), 0.6); }
-  function gripFit() {                                       // the wrist's correction: palm over the hump, resting on it; no knuckle in the shell
-    palmAt(_p); HM || (HM = shellMap());
-    const hump = P.mouseNode.localToWorld(_n.copy(HM.peak)), f = fwdV(), d = V(hump.x - GRIP_BACK * f.x - GRIP_RIGHT * f.z - _p.x, 0, hump.z - GRIP_BACK * f.z + GRIP_RIGHT * f.x - _p.z);
-    let dy = below(_p) + PALM_R - _p.y;                      // (down onto it, or up out of it)
-    for (let i = 2; i <= 5; i++) { const k = fbone(i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, below(_s) + KN_R - _s.y); }
-    return d.setY(dy);
-  }
-  const _sd = V(), _g = V(), _up1 = V(0, 1, 0);
-  // the fingertip, measured once off his skin (the end bone's farthest vertex, less a finger's half thickness), carried
-  // in the end bone's own frame so it follows that joint
+  const keyFit = side => () => {                              // the knuckles 3 cm over the caps under them (never closer than their skin)
+    let y = 0, n = 0, top = 0; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); y += _s.y; top += under("keys", _s); n++; }
+    return V(0, Math.max(top / n + KEY_KNUCKLE + M.kUp[side] - y / n, knuckleNeed(side, "keys")), 0);
+  };
+  function keyTarget(side) { return P.kbNode ? P.kbNode.localToWorld(V(side === "Left" ? -FJ : FJ, 0, 0)) : V(...P.keys.c); }
+
+  // the fingertip, measured once off his skin (the end bone's farthest vertex, less a finger's half thickness), carried in
+  // the end bone's own frame so it follows that joint
   const TIP = {};
-  function tipOf(i, out) {
-    const b3 = fbone(i, 3);
-    if (!TIP[i]) {
-      const p3 = b3.getWorldPosition(V()), d = p3.clone().sub(fbone(i, 2).getWorldPosition(V())).normalize(), v = V(); let best = null, far = -1;
-      env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const P = o.geometry.attributes.position, I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
-        for (let n = 0; n < P.count; n++) { let k0 = 0, w0 = 0; for (let k = 0; k < 4; k++) if (W.getComponent(n, k) > w0) { w0 = W.getComponent(n, k); k0 = I.getComponent(n, k); }
+  function tipOf(side, i, out) {
+    const b3 = S(side, i, 3), key = side + i;
+    if (!TIP[key]) {
+      const p3 = b3.getWorldPosition(V()), d = p3.clone().sub(S(side, i, 2).getWorldPosition(V())).normalize(), v = V(); let best = null, far = -1;
+      env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const P_ = o.geometry.attributes.position, I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
+        for (let n = 0; n < P_.count; n++) { let k0 = 0, w0 = 0; for (let k = 0; k < 4; k++) if (W.getComponent(n, k) > w0) { w0 = W.getComponent(n, k); k0 = I.getComponent(n, k); }
           if (o.skeleton.bones[k0] !== b3) continue; o.getVertexPosition(n, v).applyMatrix4(o.matrixWorld); const a = v.clone().sub(p3).dot(d); if (a > far) { far = a; best = p3.clone().addScaledVector(d, a); } } });
-      if (!best) best = p3.clone().addScaledVector(d, 0.015);
-      best.sub(p3).multiplyScalar(Math.max(0, 1 - FING_R / Math.max(far, 1e-3))).add(p3);   // (to the pad's centre, a half thickness back from the end)
-      TIP[i] = b3.worldToLocal(best);
+      if (!best) { best = p3.clone().addScaledVector(d, 0.015); far = 0.015; }
+      best.sub(p3).multiplyScalar(Math.max(0, 1 - FING_R / Math.max(far, 1e-3))).add(p3);   // (the pad's centre, a half thickness back from the end)
+      TIP[key] = b3.worldToLocal(best);
     }
-    return b3.localToWorld(out.copy(TIP[i]));
+    return b3.localToWorld(out.copy(TIP[key]));
   }
-  function gap(i, j) {                                       // finger i from its joint j to the tip: the least clearance over what is under it
+  // the middle and end phalanges are tested by their own skin (up to 40 of each one's vertices, skinned as drawn): a bone
+  // line with a radius missed the pad under the tip by up to 8 mm on the keys
+  const SKIN = {};
+  function skinOf(side, i, k) {
+    const key = side + i + k; if (SKIN[key]) return SKIN[key];
+    const b = S(side, i, k), all = [];
+    env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
+      for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (o.skeleton.bones[k0] === b) all.push([o, n]); } });
+    const st = Math.max(1, Math.ceil(all.length / 40)); return (SKIN[key] = all.filter((_, n) => n % st === 0));
+  }
+  function gap(side, name, i, j) {                           // finger i from its joint j to the tip: the least clearance over what is under it
     let low = 1e9;
-    for (let k = j; k <= 3; k++) {
-      fbone(i, k).getWorldPosition(_s);
-      if (k < 3) fbone(i, k + 1).getWorldPosition(_e); else tipOf(i, _e);
-      _sd.subVectors(_e, _s).cross(_up1).setY(0).normalize().multiplyScalar(0.7 * FING_R);   // (across the finger: on a slope its uphill side is lower over the shell)
+    if (j === 1) {                                           // the first phalanx: its bone line, a finger's half thickness round it
+      S(side, i, 1).getWorldPosition(_s); S(side, i, 2).getWorldPosition(_e);
+      _sd.subVectors(_e, _s).cross(_up1).setY(0).normalize().multiplyScalar(0.7 * FING_R);   // (across the finger: on a slope its uphill side is lower)
       for (let u = 0.25; u <= 1.0001; u += 0.25) { _p.lerpVectors(_s, _e, u);
-        const top = Math.max(below(_p), below(_g.copy(_p).add(_sd)), below(_g.copy(_p).sub(_sd))); low = Math.min(low, _p.y - FING_R - top); }
+        const top = Math.max(under(name, _p), under(name, _g.copy(_p).add(_sd)), under(name, _g.copy(_p).sub(_sd))); low = Math.min(low, _p.y - FING_R - top); }
     }
+    for (let k = Math.max(2, j); k <= 3; k++) for (const [o, n] of skinOf(side, i, k)) { o.getVertexPosition(n, _p).applyMatrix4(o.matrixWorld); low = Math.min(low, _p.y - under(name, _p)); }
     return low;
   }
-  const _q0 = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _ax = V(), _dn2 = V(0, -1, 0);
-  // the page's own turns of the right fingers, undone the next frame where the clip has not written them again (they never add up)
+  // the page's own turns of the fingers are undone the next frame where the clip has not written them again (they never add up)
   const GR = new Map();
-  function gripRestore() { for (const [b, r] of GR) if (r.post && b.quaternion.angleTo(r.post) < 1e-3) { b.quaternion.copy(r.pre); b.updateMatrixWorld(true); } GR.clear(); }
-  function layFingers(weight) {                              // each joint bends (down) or straightens (up) until its part of the finger touches
-    gripRestore(); env.bones.RightHand.updateMatrixWorld(true);
-    for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = fbone(i, j); if (b) GR.set(b, {pre: b.quaternion.clone(), post: null}); }
-    gripTurn(weight);
-    for (const [b, r] of GR) r.post = b.quaternion.clone();
-  }
-  function gripTurn(weight) {
-    thumbOnFlank(weight);
-    // index and ring set beside the middle finger (mouse2: index and middle together on the buttons, the ring beside),
-    // as a fixed angle to the middle finger's line, seen from above (index 3 deg in, ring along it)
-    const yawOf = i => { const b = fbone(i, 1), c = fbone(i, 2); return Math.atan2(c.getWorldPosition(_e).x - b.getWorldPosition(_s).x, _e.z - _s.z); };
-    const ym = yawOf(3), dx = Math.sin(ym), dz = Math.cos(ym), o = fbone(2, 1).getWorldPosition(V()).sub(fbone(3, 1).getWorldPosition(_g));
-    const side = Math.sign(dz * o.x - dx * o.z) || 1;       // (the turn that takes a line from the middle finger's toward the index knuckle's side)
-    for (const [i, deg] of [[2, -3], [4, 0]]) { const b = fbone(i, 1); if (!b) continue;
-      let dy = ym + side * deg * Math.PI / 180 - yawOf(i); dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      _rq.setFromAxisAngle(_up1, dy * weight); const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-      b.quaternion.copy(pq.multiply(b.getWorldQuaternion(_q0).premultiply(_rq))); b.updateMatrixWorld(true); }
-    for (let i = 2; i <= 5; i++) for (let j = 1; j <= 3; j++) {
-      const b = fbone(i, j), c = j < 3 ? fbone(i, j + 1) : null; if (!b) continue;
-      b.getWorldPosition(_s); (c ? c.getWorldPosition(_e) : _e.copy(_s).sub(fbone(i, j - 1).getWorldPosition(_n)).add(_s));
+  function contactRestore() { for (const [b, r] of GR) if (r.post && b.quaternion.angleTo(r.post) < 1e-3) { b.quaternion.copy(r.pre); b.updateMatrixWorld(true); } GR.clear(); }
+  // keys (slow > 0): the bend that brings a finger down to the caps is followed over `slow` seconds, so the clip's own
+  // quick strokes (a finger lifted for a key) stay; never into a key, though: the bend is never more than the touch's
+  const FA = new Map();
+  function layFingers(side, name, weight, first = 2, slow = 0, dt = 1 / 30) {   // each joint bends (down) or straightens (up) until its part of the finger touches
+    const mine = []; for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b && !GR.has(b)) { GR.set(b, {pre: b.quaternion.clone(), post: null}); mine.push(b); } }
+    if (name === "mouse") { thumbOnFlank(weight); besideMiddle(side, weight); }
+    for (let i = first; i <= 5; i++) for (let j = 1; j <= 3; j++) {
+      const b = S(side, i, j), c = j < 3 ? S(side, i, j + 1) : null; if (!b) continue;
+      b.getWorldPosition(_s); (c ? c.getWorldPosition(_e) : _e.copy(_s).sub(S(side, i, j - 1).getWorldPosition(_n)).add(_s));
       _ax.subVectors(_e, _s).normalize().cross(_dn2); if (_ax.lengthSq() < 1e-8) continue; _ax.normalize();
       b.getWorldQuaternion(_q0); const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
       const set = a => { _rq.setFromAxisAngle(_ax, a); b.quaternion.copy(pq).multiply(_rq.clone().multiply(_q0)); b.updateMatrixWorld(true); };
-      let lo = j === 1 ? -0.6 : -0.15, hi = 1.2;             // (the middle and end joints barely over-straighten)
-      set(lo); if (gap(i, j) < 0) { set(lo * weight); continue; }   // (in it even straightened: as far out as it goes)
-      set(hi); if (gap(i, j) > 0) { set(hi * weight); continue; }
-      for (let it = 0; it < 12; it++) { const m = (lo + hi) / 2; set(m); if (gap(i, j) > 0) lo = m; else hi = m; }
-      set(lo * weight);
+      // from straightest down in steps to the first touch, then halved in between (bent past the vertical a finger
+      // comes up again, so the first touch, not the last)
+      const lo0 = j === 1 ? -0.6 : -0.15, HI = 1.2;          // (the middle and end joints barely over-straighten)
+      set(lo0); if (gap(side, name, i, j) < 0) { set(lo0 * weight); if (slow > 0) FA.set(b, lo0); continue; }   // (in it even straightened: as far out as it goes)
+      let lo = lo0, hi = null, best = lo0, bestG = 1e9;
+      for (let a = lo0 + 0.15; a <= HI + 1e-6; a += 0.15) { set(a); const g = gap(side, name, i, j); if (g <= 0) { hi = a; break; } if (g < bestG) { bestG = g; best = a; } lo = a; }
+      let a = best;                                          // (no touch within reach: as near as it comes)
+      if (hi !== null) { for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; set(m); if (gap(side, name, i, j) > 0) lo = m; else hi = m; } a = lo; }
+      if (slow > 0) { const f = FA.has(b) ? FA.get(b) : a, nf = f + (a - f) * (1 - Math.exp(-dt / slow)); FA.set(b, nf); a = Math.min(nf, a); }
+      set(a * weight);
     }
+    for (const b of mine) GR.get(b).post = b.quaternion.clone();
+    let worst = 0; for (let i = first; i <= 5; i++) if (S(side, i, 1)) worst = Math.min(worst, gap(side, name, i, 1)); return worst;
   }
-  const _k = V(), _c = V(), _m = V(), dK = V(), dM = V(), _hp = V();
+  // mouse: index and ring set beside the middle finger, as a fixed angle to its line seen from above (index 3 deg in, ring along it)
+  function besideMiddle(side, weight) {
+    const yawOf = i => { const b = S(side, i, 1), c = S(side, i, 2); return Math.atan2(c.getWorldPosition(_e).x - b.getWorldPosition(_s).x, _e.z - _s.z); };
+    const ym = yawOf(3), dx = Math.sin(ym), dz = Math.cos(ym), o = S(side, 2, 1).getWorldPosition(V()).sub(S(side, 3, 1).getWorldPosition(_g));
+    const sd = Math.sign(dz * o.x - dx * o.z) || 1;         // (the turn that takes a line from the middle finger's toward the index knuckle's side)
+    for (const [i, deg] of [[2, -3], [4, 0]]) { const b = S(side, i, 1); if (!b) continue;
+      let dy = ym + sd * deg * Math.PI / 180 - yawOf(i); dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      _rq.setFromAxisAngle(_up1, dy * weight); const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+      b.quaternion.copy(pq.multiply(b.getWorldQuaternion(_q0).premultiply(_rq))); b.updateMatrixWorld(true); }
+  }
+  // mouse: the thumb along the shell's left flank (mouse2): its tip on the flank 1 cm ahead of the palm, 1.6 cm over the pad
+  function thumbOnFlank(weight) {
+    const f = fwdV(), lt = V(f.z, 0, -f.x), m = topMap(P.mouseNode);   // (his left)
+    palmAt("Right", _p); const q = _p.clone().addScaledVector(f, 0.01); let edge = null;
+    for (let k = 0; k < 40; k++) { q.addScaledVector(lt, 0.002); if (topAt(m, q) == null) { edge = q; break; } }
+    if (!edge) return;
+    const T = edge.clone().addScaledVector(lt, FING_R).setY(P.pad + 0.016);   // (the tip's pad against the flank)
+    const b1 = S("Right", 1, 1), b2 = S("Right", 1, 2), b3 = S("Right", 1, 3); if (!b1 || !b2 || !b3) return;
+    const B0 = b1.getWorldPosition(V()), Mid = B0.clone().lerp(T, 0.5).addScaledVector(lt, 0.006).setY(Math.max(B0.y, T.y) + 0.004);   // (the joint between: out from the shell, a little higher)
+    const aim = (bone, from, to) => { bone.getWorldPosition(_a); _u.subVectors(from(), _a).normalize(); _v.subVectors(to, _a).normalize();
+      if (_u.dot(_v) > 0.99999) return; _q.setFromUnitVectors(_u, _v); _q.slerp(new THREE.Quaternion(), 1 - weight);
+      bone.parent.getWorldQuaternion(_pq); bone.quaternion.copy(_pq.invert().multiply(bone.getWorldQuaternion(_wq).premultiply(_q))); bone.updateMatrixWorld(true); };
+    const tip = () => tipOf("Right", 1, V());
+    aim(b1, () => b2.getWorldPosition(V()), Mid); aim(b2, tip, T); aim(b3, tip, T);
+  }
+
+  const _k = V(), _c = V(), dK = V(), _hp = V();
   function hands(dt) {
     const typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse";
     const k = 1 - Math.exp(-dt / 0.13);
     M.w.type += ((typing ? 1 : 0) - M.w.type) * k; M.w.mouse += ((mousing ? 1 : 0) - M.w.mouse) * k;
+    contactRestore();
     if (M.noIK) return;
     env.boy.updateMatrixWorld(true);
-    // the offsets: the clip's keyboard to the room's (keycaps' centre, top), the clip's mouse hump to the room's (on the pads)
+    // the clip's keyboard to the room's (its home row, the caps' top): the recorded motion's carrier; keyOn() then centres the
+    // index fingertips over F and J (a slow correction, so the typing itself stays the clip's)
     _k.set(...P.keys.c); dK.subVectors(_k, toWorld(P.ref, _c));
-    const ry = env.boy.rotation.y; _m.set(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
-    dM.subVectors(_m, toWorld(CLIP.mouse, _c));
-    const keyFloor = P.keys.c[1] + 0.003, padFloor = P.pad + 0.011;
-    if (M.w.type > 0.01) { pin("Left", dK, keyFloor, M.w.type); pin("Right", dK, keyFloor, M.w.type); }
-    if (M.w.mouse > 0.01) {
-      pin("Right", dM, padFloor, M.w.mouse);                 // the recorded hand carried to the room's mouse: where it goes, the mouse goes
-      if (P.mouseNode) { follow(); pin("Right", V(), padFloor, M.w.mouse, gripFit); layFingers(M.w.mouse); }   // then the hand onto the mouse
-      pin("Left", dK, keyFloor, M.w.mouse);
-    } else { M.grab = null; if (GR.size) gripRestore(); }
+    const wk = Math.max(M.w.type, M.w.mouse);                // (the left hand stays on the keys while he mouses)
+    if (wk > 0.01) keyOn("Left", wk, dt);
+    if (M.w.type > 0.01) keyOn("Right", M.w.type, dt);
+    if (M.w.mouse > 0.01 && P.mouseNode) {
+      const ry = env.boy.rotation.y, home = V(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
+      pin("Right", home.sub(toWorld(CLIP.mouse, _c)), M.w.mouse);   // the recorded hand carried to the room's mouse: where it goes, the mouse goes
+      follow(); pin("Right", V(), M.w.mouse, mouseFit); layFingers("Right", "mouse", M.w.mouse);   // then the hand onto the mouse
+    } else M.grab = null;
+  }
+  M.kOff = {Left: V(), Right: V()}; M.kUp = {Left: 0, Right: 0};   // (kUp: the hand raised where a finger could not clear the caps even straightened)
+  function keyOn(side, w, dt) {                              // a hand onto the keys: placed, the arm out of the desk, every finger on the caps
+    pin(side, dK.clone().add(M.kOff[side]), w, keyFit(side));
+    if (P.kbNode && w > 0.9) {                               // the index fingertip's drift from F / J, taken out over ~1 s
+      const e = keyTarget(side).sub(tipOf(side, 2, V())).setY(0); M.kOff[side].addScaledVector(e, Math.min(1, dt / 0.8));
+      const L = M.kOff[side].length(); if (L > 0.15) M.kOff[side].multiplyScalar(0.15 / L);
+    }
+    const left = layFingers(side, "keys", w, 1, 0.4, dt);           // (a finger still in a key: the hand up by as much next frame; else back down slowly)
+    M.kUp[side] = left < -0.0005 ? Math.min(0.03, M.kUp[side] - left) : Math.max(0, M.kUp[side] - 0.002 * dt * 30 * 0.25);
   }
   // a separate room mouse follows the recorded right palm (60% from the wrist to the middle knuckle) while he holds it
   function follow() {
-    const hand = env.bones.RightHand, kn = env.bones["finger3-1R"] || env.bones["finger3-1.R"];
+    const hand = env.bones.RightHand, kn = S("Right", 3, 1);
     if (!hand || !kn || M.w.mouse <= 0.97) { M.grab = null; return; }   // (once the hand is on it)
     hand.getWorldPosition(_hp).lerp(kn.getWorldPosition(_a), 0.6);
     if (!M.grab) M.grab = P.mouseHome.clone().sub(_hp).setY(0);
     const H0 = P.mouseHome, cl = v => Math.max(-0.06, Math.min(0.06, v));   // (it stays on the pad: within 6 cm of home)
     P.mouseNode.position.set(H0.x + cl(_hp.x + M.grab.x - H0.x), H0.y, H0.z + cl(_hp.z + M.grab.z - H0.z)); P.mouseNode.updateMatrixWorld(true);
-  }
-  // the thumb along the shell's left flank (mouse2): its tip on the flank 1 cm ahead of the palm, 1.5 cm over the pad
-  function thumbOnFlank(weight) {
-    const f = fwdV(), lt = V(f.z, 0, -f.x);                 // (his left)
-    palmAt(_p); const q = _p.clone().addScaledVector(f, 0.01); let edge = null;
-    for (let k = 0; k < 40; k++) { q.addScaledVector(lt, 0.002); if (shellTop(q) == null) { edge = q; break; } }
-    if (!edge) return;
-    const T = edge.clone().addScaledVector(lt, FING_R).setY(P.pad + 0.016);   // (the tip's pad against the flank)
-    const b1 = fbone(1, 1), b2 = fbone(1, 2), b3 = fbone(1, 3); if (!b1 || !b2 || !b3) return;
-    const B = b1.getWorldPosition(V()), Mid = B.clone().lerp(T, 0.5).addScaledVector(lt, 0.006).setY(Math.max(B.y, T.y) + 0.004);   // (the joint between: out from the shell, a little higher)
-    const aim = (bone, from, to) => { bone.getWorldPosition(_a); _u.subVectors(from(), _a).normalize(); _v.subVectors(to, _a).normalize();
-      if (_u.dot(_v) > 0.99999) return; _q.setFromUnitVectors(_u, _v); _q.slerp(new THREE.Quaternion(), 1 - weight);
-      bone.parent.getWorldQuaternion(_pq); bone.quaternion.copy(_pq.invert().multiply(bone.getWorldQuaternion(_wq).premultiply(_q))); bone.updateMatrixWorld(true); };
-    const tip = () => b3.getWorldPosition(_s).clone().sub(b2.getWorldPosition(_n)).multiplyScalar(0.8).add(b3.getWorldPosition(_e));
-    aim(b1, () => b2.getWorldPosition(V()), Mid); aim(b2, tip, T); aim(b3, tip, T);
   }
   // watching (or just sitting, eating): relaxed in the chair he leans back, a little further from the desk: he and the
   // chair roll 0.12 m back, and in again for the keys and the mouse (to 8.5 cm back for the keys, 6 for the mouse: the hoodie's front clears the desk's edge)
@@ -967,5 +1040,7 @@ export function createMH(env) {
       mouseAt: P.mouseNode ? P.mouseNode.position.toArray().map(v => +v.toFixed(3)) : null, grab: M.grab ? M.grab.toArray().map(v => +v.toFixed(3)) : null};
   }
   load().catch(e => console.warn("MakeHuman clips:", e));
+  M.armIn = side => +(armIn(side) * 1000).toFixed(1); M.inDesk = (x, y, z) => +(inDesk(V(x, y, z)) * 1000).toFixed(1);
+  M.contactGap = (side, name, i) => [1, 2, 3].map(j => +(gap(side, name, i, j) * 1000).toFixed(1));   // (?debug: a finger's clearance, mm)
   return {animate, dbg, show, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
 }
