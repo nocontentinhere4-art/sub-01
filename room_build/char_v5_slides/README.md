@@ -14,3 +14,19 @@ From the uncompressed v5 build with finger bones (`char_idle.glb` + `char_walk.g
    dequantization into each skin's inverse bind matrices. The slides get real float positions in metres again (with
    matching inverse bind matrices), so a page that clones their geometry with `bindMatrix` (boy_mh.js parks a pair by
    the bed) gets life-size slides.
+
+## Natural feet (delivered to preview/bed-music)
+
+`footfill_natural.py` replaces `footfill3.py`'s lofted foot. The foot is one implicit surface with measured adult-male
+proportions: the ankle tapers into the heel, there is an instep and a medial arch, the ball is wider than the heel, the
+toe end is squared off and obliquely cut, and the toes show as soft ridges. It stays at least 2.5 mm inside the slide's
+strap and footbed, so the look with the slides on is unchanged. The sock below the ankle is skinned to the Foot bone.
+
+The steps are the same as above: run it with `DARKK=195 python3 footfill_natural.py`, then `splitslides.mjs`,
+`build_char_tripo.mjs` and `dequant_slides.mjs`.
+
+Lying check: `node room_build/char_bed_shots.mjs <char.glb> <room_bed_lie.glb> <outdir> 1` renders the end pose of the
+clip on a stand-in mattress from the foot end and from a low side, with the slides hidden. The clip is
+`web/room/mh_v5/room_bed_lie.glb` on main.
+
+Proportions, renders and what is left: `docs/design/bed-music/feet/README.md` on preview/bed-music.
