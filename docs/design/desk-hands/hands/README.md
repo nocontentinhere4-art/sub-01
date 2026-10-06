@@ -118,3 +118,28 @@ The numbers, measured in the page in mouse mode (desk_14 scene, `mouseprobe`):
 - **Top row:** the mouse2 reference beside our top-down over the mouse. The mouse is mostly hidden under the hand.
 - **Middle row:** mouse1 beside the view from his left (palm on the shell, thumb on the flank).
 - **Bottom row:** the view from his right.
+
+## Mouse grip, second pass: the hand's SHAPE (owner: "not similar at all"; COORD: a flat plank laid on the mouse)
+The first pass fixed where each finger sat, not what the hand was doing. The fingers were laid down until they touched, and on a low shell that made them straight. The back of the hand was flat.
+
+**The prop came first.** `room_build/build_mouse.mjs` made an 11.8 × 6.2 × 3.6 cm mouse whose top fell to 62% of the hump at the nose (about 2.2 cm) and rounded off 22% at the sides: a low pebble a hand cannot curl over.
+- Now 12.0 × 6.4 × 4.0 cm, with the nose at 70% of the hump and 14% side rounding. Same origin and footprint on the pad.
+- The builder was re-run first with its old numbers and reproduced the shipped `mouse.glb` byte for byte.
+- See `mouse_prop_before_after.jpg`.
+
+**The pose, measured off the references.** In mouse2's top-down, the fingers' seen length is about 65% of the palm's. In mouse1, the knuckle row is a dome and the fingers bend at both joints over the front.
+- Bends set absolutely in the hand's own frame (knuckle / middle / end joint):
+  - index and middle: 30 / 45 / 25°;
+  - ring: 38 / 52 / 28°;
+  - little: 42 / 55 / 28°.
+- Index turned 2° in, ring and little 2° and 5° out: the fingers lie together.
+- A stronger set (35/55/30) matched the top-down length exactly (0.64 against 0.65) but stood up like a claw from the side. The softer set reads right from the side; its top-down length is 0.75 of the palm.
+- **The dome.** The hand tilts about the wrist until the index and middle fingertips meet the shell, with the palm resting on the hump. The wrist ends 2.7 cm over the pad and the knuckles 5.7 cm. The hand is also rolled 12° thumb side up (a hand on a mouse is not flat palm-down).
+- **The fingers are no longer laid down.** A finger is only opened if it would enter the shell.
+- **The thumb** lies along the left flank, pointing forward: its tip about halfway along the mouse, the pad on the flank 1.6 cm over the pad. Its middle joint moves out and up until none of its skin is in the shell (up to 4 cm).
+
+**Measured over 15 s** (`grip_contact.json`): hand skin into the shell median 1.4 mm, 90th percentile 6.8 mm, max 9 mm. Below the pad: 0.
+- The deep values are the thumb's root (the thenar pad) pressing the left flank at moments, measured vertically. On a steep flank that is about 3–5 mm sideways.
+- Not yet solved: tilting the hand to lift the heel diverged, and moving the palm back made a claw.
+
+`mouse_grip_silhouette.jpg` shows mouse2 beside our top-down, mouse1 beside ours from behind-left above, ours from his left, and the new mouse alone.
