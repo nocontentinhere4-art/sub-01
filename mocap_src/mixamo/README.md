@@ -64,11 +64,17 @@ The transition takes replace the two the owner called out as broken — standing
 down — and give us the way in and out of typing, which we never had: until now the hands
 arrived at the keyboard by teleporting there.
 
-`Standing_Clap` is performed standing, and he is seated at the computer. It is played as a
-chain — `Sit_To_Stand` → `Standing_Clap` → `Stand_To_Sit` — so he comes up out of the chair to
-celebrate and settles back down. Grafting a standing upper body onto a seated base is what
-produced the stitched-together poses we have already thrown away once; all three parts here
-are real captures, so the chain costs us nothing and reads as one motion.
+The three punctuation clips are played **whole**, and the chair moves instead of the performance.
+Measured rather than read from their names (G12): `Standing_Clap` starts and ends seated and
+contains its own rise and sit-down; `Scared` is a seated startle that jumps up and sits back;
+`Angry_Gesture` stays seated with the feet 0.6 m in front of the hips. An earlier note here said
+`Standing_Clap` would play as `Sit_To_Stand` → `Standing_Clap` → `Stand_To_Sit` — that was decided
+from the name and would have stood him up twice. Before each of the three, the page rolls the
+chair back by a distance derived from that clip's own reach, and rolls it in once he is seated.
+
+The three phone takes are all **standing** (`Texting` included, despite its name), and `Gaming` is
+seated with the controller over his lap. None of them is lying down, so the phone in bed — where
+he watches most of his shorts — has no capture yet.
 
 The last two are deliberately rare: they are punctuation, not behaviour. They play once in a
 long while and never twice near each other.
