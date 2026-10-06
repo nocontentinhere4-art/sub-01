@@ -175,3 +175,26 @@ From the captures (`phone_gaming_postures.jpg`); none of them travels (hips 0.00
 - Gaming (5.0 s): **seated**, a controller held in both hands over the lap, head down. The performer sits low (hips 0.58 m before scaling).
 
 Not built yet; they follow the chains.
+
+## The chains as data
+
+`room_build/kimodo/mixamo_chains.json` lists each behaviour as clips in order: the cross-fade into each one, which one loops, and the rare events with their minimum gap. `room_build/kimodo_g12/chain_joins.py` measures every join from the baked clips:
+- the worst bone-angle jump: the largest angle between the two local rotations of any joint, last frame of one clip against the first of the next;
+- that jump spread over the cross-fade;
+- the hips' jump.
+
+| join | worst joint | jump | blend | per frame | hips |
+|---|---|---|---|---|---|
+| arriving: Stand_To_Sit → Seated_Idle | L forearm (R hand 50.8°, R forearm 46.7°) | 52.0° | 0.8 s | 2.2° | 2.0 cm |
+| Seated_Idle (loop wrap) | neck | 0.1° | — | — | 0 |
+| working: Sit_To_Type → Typing | L thumb | 2.3° | 0.2 s | 0.4° | 0.1 cm |
+| Typing (loop wrap) | L index | 1.2° | — | 1.2° | 0 |
+| working: Typing → Type_To_Sit | R hand | 4.3° | 0.2 s | 0.7° | 0 |
+| link: Seated_Idle → Sit_To_Type | L forearm | 52.0° | 0.8 s | 2.2° | 5.4 cm |
+| link: Type_To_Sit → Seated_Idle | L forearm | 52.0° | 0.8 s | 2.2° | 5.5 cm |
+
+- Mixamo's desk set (Stand_To_Sit, Sit_To_Type, Typing, Type_To_Sit) shares one seated rest pose, with the hands on the thighs, so it chains within a few degrees.
+- Seated_Idle rests the hands on the armrests instead. Every join into or out of it is a 52° move of the forearms. The 0.8 s blends make that the hands moving from thighs to armrests, not a snap. Whether the blend passes the hands through the thighs or armrests is not measured yet: that needs a chain player in the page.
+- The hips' 5.4 cm at the links is horizontal. The seated slot re-places Seated_Idle on the seat, so the page absorbs it; the heights agree within 0.4 cm.
+- From the captures in scratch, Sitting_Talking (44 s, seated) joins the desk set within 6–11°, against Seated_Idle's 46–48°. It would be the seamless base, but it is a person talking with his hands; it is offered, not chosen.
+- Celebrating is pending the Standing_Clap decision (above). The rare events are listed with what each waits on.

@@ -1,0 +1,54 @@
+{
+ "_": "Behaviour chains as data: each a list of clips (web/room/mh_v5/<clip>.glb) played in order, blend = the cross-fade into that clip (s), loop = it repeats until the behaviour ends. rare = a punctuation event: fires occasionally, never twice within minGap seconds. kimodo_g12/chain_joins.py measures every join (the worst bone-angle jump, the hips' jump) and every loop's wrap. links: the joins between chains (from, to, blend).",
+ "chains": {
+  "arriving": [
+   {
+    "clip": "room_mx_stand_to_sit"
+   },
+   {
+    "clip": "room_seated_idle",
+    "blend": 0.8,
+    "loop": true
+   }
+  ],
+  "working": [
+   {
+    "clip": "room_mx_sit_to_type",
+    "blend": 0.3
+   },
+   {
+    "clip": "room_mx_typing",
+    "blend": 0.2,
+    "loop": true
+   },
+   {
+    "clip": "room_mx_type_to_sit",
+    "blend": 0.2
+   }
+  ],
+  "celebrating": {
+   "pending": "Standing_Clap starts and ends seated (README): trim it to its standing middle and chain Sit_To_Stand -> clap -> Stand_To_Sit, or play it whole with the page moving the chair; COORD's choice"
+  }
+ },
+ "rare": {
+  "minGap": 600,
+  "events": {
+   "room_mx_scared": "pending the chair (README)",
+   "room_mx_angry_gesture": "pending the feet (README)",
+   "room_mx_standing_clap": "celebrating",
+   "room_sleeping_idle": "a night turn-over (README's criteria)"
+  }
+ },
+ "links": [
+  [
+   "room_seated_idle",
+   "room_mx_sit_to_type",
+   0.8
+  ],
+  [
+   "room_mx_type_to_sit",
+   "room_seated_idle",
+   0.8
+  ]
+ ]
+}
