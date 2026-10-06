@@ -43,7 +43,8 @@ Neither is hand-authored motion. The breath is a recorded human signal (G14's cl
   - Source: Goossens & Van Opstal 1997, *Human eye-head coordination in two dimensions under different sensorimotor conditions*, Exp Brain Res 114:542–560, Table 2, eye–head latency, visual targets, pooled: 63 ± 36 ms.
   - v5 has no eyes that move; the head turns for the part of the shift the eyes would not cover (below).
 - **Speed and profile:** a minimum-jerk turn. Its duration is set so that the peak speed matches the measured peak speed of a 30° head turn: **72°/s yaw, 66°/s pitch**.
-  - Source: Boulanger et al. 2026, arXiv:2608.17904, median of 62 adults.
+  - Source: Boulanger N, Buisseret F, Burny J, Dierick F, Estievenart W, Teregulov A, White O. *A higher-derivative model predicts a smoothness vs duration relationship in head-pointing movements*, arXiv:2608.17904 (2026). 62 healthy young adults, 30° head-pointing movements.
+  - The numbers are in **Table 2**: peak angular velocity v_M, horizontal (yaw) **72.3°/s**, median [58.1; 88.4]; vertical (pitch) **65.9°/s**, median [54.5; 82.1]. Horizontal is significantly faster (p = 0.025). They are not in the abstract; the HTML full text is at https://arxiv.org/html/2608.17904v1.
   - For a minimum-jerk profile, peak speed = 1.875 · amplitude / duration. The shortest turn is 0.2 s.
 - **How much of a gaze shift the head takes:** for gaze shifts inside the eye-only range the eyes move alone. Beyond it, the head moves 0.77 of the excess.
   - Source: Stahl JS 1999, *Amplitude of human head movements associated with horizontal saccades*, Exp Brain Res 126:41–54. In normal subjects the eye-only range is 35.8 ± 31.9° and the slope of the eye–head range 0.77 ± 0.16.
