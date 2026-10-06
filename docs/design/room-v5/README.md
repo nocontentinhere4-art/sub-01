@@ -5,6 +5,42 @@ merged in (0b6efe3): room/boy_mh.js (the clip player and G3's choreography: desk
 pushed, routes, the bed), `mh/props_g2.json`, the page's wiring for it, its tests. Not merged in: G2's MakeHuman body,
 G11's hair and the MakeHuman-rig clips (`mh/*.glb`). `?char=old` shows the live character with its own clips.
 
+## Release note (for the owner's go; nothing of this is on `main` yet)
+
+**What changes on the live site** (main 56525bb -> this branch, one release):
+- **The character:** the v5 Tripo character (`web/room/char_v5.glb`, his own hair, socked feet with slides that come off
+  in bed) replaces the live one. `?char=old` still shows the live character with its own clips, unchanged.
+- **His motion:** 16 mocap clips retargeted onto him (`web/room/mh_v5/`, G14 and G12), played by `web/room/boy_mh.js`
+  through `web/room/char_v5.js`: typing for a search, the mouse otherwise, seated for videos, 0.4 s crossfades, the
+  wrists re-pinned to the real keyboard and mouse, sitting down / getting up with the chair, walking, the window, the
+  door, going to bed, asleep under the duvet (a quilt drawn up over him), waking.
+- **The tea bottle:** G15's generated bottle replaces the last code-modelled prop (`web/room/bottle.glb`; `?bottle=old`
+  keeps the old one).
+- **Weight:** about 13.8 MB of new binary assets (the character 6.8 MB, the clips 6.9 MB, the bottle 0.1 MB).
+- **Tests:** tests/test_boy_mh.py, tests/test_prop_bottle.py, and tests/visual's contact pass with the chair by part,
+  the bed (mattress plane, duvet) and the bottle.
+
+**Known and accepted (by the coordinator):**
+- tests/visual `desk_14_1280`: chair penetration **6 sampled vertices** (left calf at the seat's front edge, about
+  4 mm: contact, not penetration). The visual suite's one failure; everything else passes (pytest 1285 passed).
+- `room_read`: **17 mm** into the seat top: the cushion's give.
+
+**Known and open (with the owner: not in this release unless he decides otherwise):**
+- On v5 the page's old prop layer does not run (`room.html` returns into boy_mh.js before it): the bottle is never
+  picked up, the phone is not in his hand, the headphones do not go on, meals show placeholder shapes instead of the
+  dish, the bags are not carried; and the old idle variants, gaze and breathing are off. Three scopes are with the owner.
+- The get-ups: his left hand passes through the tea bottle (up to 108 mm), his right toe enters the bed's footprint for
+  3 frames on the way to the window, the chair up to 40 mm as he rises (to be assigned with the prop scope).
+
+**Merging to `main` (mechanical, once the owner says go):**
+1. Every commit on this branch carries `[skip ci]`, and Railway does not deploy a `main` whose head commit message
+   contains `[skip ci]`. So **never fast-forward**: the branch starts at main's head, so a plain merge would
+   fast-forward and leave a `[skip ci]` commit on top.
+2. From an up-to-date `main`: `git merge --no-ff origin/preview/room-v5 -m "Release: the v5 character in the room
+   (preview/room-v5)"`. The merge commit's own message must **not** contain `[skip ci]`.
+3. Before pushing, check: `git log -1 --format=%B main | grep -c "skip ci"` prints `0`.
+4. Push `main`; watch Railway deploy that merge commit; open the live room and check one desk frame and the bed at night.
+
 ## The contract
 - **The body:** `web/room/char_v5.glb`, the v5 character as Tripo's rig gives it (41 bones, faces +X; G13's finger bones
   welcome, MakeHuman names `finger1-1.L` ... `finger5-3.R`). For now: preview/char-tripo-v2's
