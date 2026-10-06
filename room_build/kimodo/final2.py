@@ -8,6 +8,10 @@ f = json.load(open(f"{S}/data/fit_{clip}.json"))
 fixed = clip in ("desk_type_ik", "desk_mouse_ik")
 o = {"seatLift": f["seatLift"], "pitch": 15, "heelLift": 0.085, "forward": f["hipsForward"], "shift": [-BACK, left], "handShift": [0, 0] if fixed else [-BACK, left]}
 if fixed: o.update(handLift=0, handForward=False)
+# room-v5 desk_14_1280 (test_visual): the page pins his seated hips to its own height and lifts him off the floor when
+# his feet would sink: the hips 1.5 cm higher over the feet raise him 1.5 cm on the seat (cushion); the left forearm,
+# resting low over the desk's front edge in the mouse pose, swung up 4 cm at the elbow
+if clip in ("desk_type_ik", "desk_mouse_ik"): o["seatLift"] = round(o["seatLift"] + 0.021, 4); o["elbowUp"] = {"L": 0.04}; o["feetForward"] = 0.025; o["leftFootForward"] = 0.02   # (calves clear of the seat front)
 if clip == "room_read": o["book"] = json.load(open(f"{S}/data/book_read.json"))
 if clip in ("room_phone", "room_phone_scroll", "room_eat"):
     import fcntl

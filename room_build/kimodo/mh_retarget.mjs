@@ -116,7 +116,7 @@ for (let f = 0; f < T; f++) { const t = Math.min(f / FPS, dur), s = sFK(t), W = 
   const SH = O.shift || [0, 0], HS = O.handShift || SH;
   const hip = new THREE.Vector3(hm.x + fwd + SH[0], (hm.y - srcAnkle) * k + tgtAnkle + lift, hm.z - SH[1]);
   const eff = {}; for (const [n, sn] of [["L_Hand", "LeftHand"], ["R_Hand", "RightHand"], ["L_Foot", "LeftFoot"], ["R_Foot", "RightFoot"]]) {
-    const p = s.P.get(sn).clone().applyQuaternion(C); if (n.endsWith("Foot")) { p.y = p.y - srcAnkle + tgtAnkle; p.x += fwd + SH[0]; p.z -= SH[1]; } else { p.y += O.handLift ?? lift; if (O.handForward !== false) p.x += fwd; p.x += HS[0]; p.z -= HS[1]; } eff[n] = p; }
+    const p = s.P.get(sn).clone().applyQuaternion(C); if (n.endsWith("Foot")) { p.y = p.y - srcAnkle + tgtAnkle; p.x += fwd + SH[0] + (O.feetForward || 0) + (n === "L_Foot" ? O.leftFootForward || 0 : 0); p.z -= SH[1]; } else { p.y += O.handLift ?? lift; if (O.handForward !== false) p.x += fwd; p.x += HS[0]; p.z -= HS[1]; } eff[n] = p; }
   frames.push({W, hip, eff}); }
 function toLocal(Wmap, hipWorld){ const L = new Map(), Wc = new Map();
   for (const n of bonesTD) { const p = parentOf.get(n), name = n.getName(), pw = p ? Wc.get(p) : new THREE.Quaternion();
@@ -170,6 +170,18 @@ const jit = () => { const o = {}; const P = seq.map(f => fk(f.L, f.ht).P);
 const jitterBefore = jit();
 smoothSeq(O.sigma ?? 1.0, O.sigmaSpine ?? 1.7); pins();
 smoothSeq(O.post ?? 1.0, (O.post ?? 1.0) * 1.5); pins();
+// elbowUp {L: m, R: m}: the arm swung about its shoulder-wrist axis until the elbow is that much higher (the hand keeps its
+// place and turn): a forearm resting low on the desk's front edge lifted clear of it
+function elbowUp(L, ht, s, dy){
+  const U = B(`${s}_Upperarm`), F = B(`${s}_Forearm`), Hn = B(`${s}_Hand`); let st = fk(L, ht);
+  const S0 = st.P.get(U), E0 = st.P.get(F), W0 = st.P.get(Hn), ax = W0.clone().sub(S0).normalize(), Wh = st.W.get(Hn).clone();
+  const yAt = th => E0.clone().sub(S0).applyAxisAngle(ax, th).add(S0).y;
+  const sg = yAt(0.05) > yAt(-0.05) ? 1 : -1; let lo = 0, hi = Math.PI / 2;
+  if (yAt(sg * hi) - E0.y < dy) lo = hi; else for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (yAt(sg * m) - E0.y < dy) lo = m; else hi = m; }
+  const q = new THREE.Quaternion().setFromAxisAngle(ax, sg * lo), Wu = q.multiply(st.W.get(U));
+  L.set(U, st.W.get(parentOf.get(U)).clone().invert().multiply(Wu)); st = fk(L, ht);
+  L.set(Hn, st.W.get(F).clone().invert().multiply(Wh)); }
+if (O.elbowUp) for (let f = 0; f < T; f++) for (const s of ["L", "R"]) if (O.elbowUp[s]) elbowUp(seq[f].L, seq[f].ht, s, O.elbowUp[s]);
 if (O.book) bookGrip(O.book);
 const jitterAfter = jit();
 // effector error after the pins (m)
