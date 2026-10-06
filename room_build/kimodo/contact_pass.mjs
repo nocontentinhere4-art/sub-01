@@ -8,6 +8,7 @@
 //          here the same way: vertical rays, every crossing counted, 1.5 cm columns), labelled desk where over the desk
 //   floor  below the floor (F); soles: each foot's lowest gap to what is under it (the floor, the chair's base, furniture)
 //   bed    inside the bed (the page's box: the mattress top less 2 cm of give, rounded edge)
+//   legs   his hands and fingers inside his own thighs (capsules on the thigh bones, radius from his thigh skin)
 // A penetration is a vertex more than 1 cm inside (the page's own margin); depth = how far inside, vertically.
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
@@ -62,6 +63,20 @@ const res = await p.evaluate(([activity, secs]) => {
   const S = {frames: 0, at, clip: cur, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: []};
   const add = (k, reg, d, f) => { const e = S[k][reg] || (S[k][reg] = {frames: 0, maxDepth: 0, maxCount: 0, _f: -1, _n: 0});
     if (e._f !== f) { if (e._f >= 0) e.maxCount = Math.max(e.maxCount, e._n); e._f = f; e._n = 0; e.frames++; } e._n++; e.maxDepth = Math.max(e.maxDepth, d); };
+  // his own legs: each thigh a capsule on its bone (hip joint -> knee), its radius along the bone measured from his thigh
+  // skin in the first frame (the 90th percentile of the skin's distance from the bone, 10 bands); a hand or finger vertex
+  // inside it (by more than 5 mm) is a hand in the leg
+  const TH = {L: ["LeftUpLeg", "LeftLeg"], R: ["RightUpLeg", "RightLeg"]}, HANDV = parts.map((sm, pi) => vreg[pi].map(r => r === "hands"));
+  const THV = parts.map(sm => { const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, n = sm.geometry.attributes.position.count, r = new Array(n);
+    for (let i = 0; i < n; i++) { let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); }
+      const nm = sm.skeleton.bones[bb].name; r[i] = /^LeftUpLeg|^L_Thigh/.test(nm) ? "L" : /^RightUpLeg|^R_Thigh/.test(nm) ? "R" : null; } return r; });
+  const segOf = s => { const a = boy.getObjectByName(TH[s][0]).getWorldPosition(new THREE.Vector3()), b = boy.getObjectByName(TH[s][1]).getWorldPosition(new THREE.Vector3()); return [a, b]; };
+  const RAD = {}; { boy.updateMatrixWorld(true); const vv = new THREE.Vector3();
+    for (const s of ["L", "R"]) { const [a, b] = segOf(s), ab = b.clone().sub(a), L2 = ab.lengthSq(), bands = Array.from({length: 10}, () => []);
+      parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { if (THV[pi][i] !== s) continue; sm.getVertexPosition(i, vv); vv.applyMatrix4(sm.matrixWorld);
+        const t = vv.clone().sub(a).dot(ab) / L2; if (t < 0 || t > 1) continue; const d = vv.distanceTo(a.clone().addScaledVector(ab, t)); bands[Math.min(9, Math.floor(t * 10))].push(d); } });
+      RAD[s] = bands.map(bd => { if (!bd.length) return 0; bd.sort((x, y) => x - y); return bd[Math.floor(bd.length * 0.9)]; }); } }
+  S.legs = {framesIn: 0, maxVerts: 0, maxDepth: 0, worstT: null, radius_cm: Object.fromEntries(Object.entries(RAD).map(([k, r]) => [k, r.map(x => +(x * 100).toFixed(1))]))};
   const v = new THREE.Vector3(), u = new THREE.Vector3(), N = Math.round(secs * 30);
   for (let f = 0; f < N; f++) {
     animate_(1 / 30); boy.updateMatrixWorld(true); let seatLow = 9, solL = 9, solR = 9, nPen = 0;
@@ -102,11 +117,16 @@ const res = await p.evaluate(([activity, secs]) => {
           if (col2) for (let j = 1; j < col2.length; j += 2) if (col2[j] < v.y + 0.03 && col2[j] > sup) { sup = col2[j]; what = "furniture"; }
           if (v.y - sup < lo) { lo = v.y - sup; S.soles[s[0]].on = what; } } });
       const k = s[0], g = lo; if (lo < 9) { S.soles[k].min = Math.min(S.soles[k].min, g); S.soles[k].max = Math.max(S.soles[k].max, g); } }
+    { const segs = {L: segOf("L"), R: segOf("R")}; let nIn = 0, dMax = 0;
+      parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { if (!HANDV[pi][i]) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
+        for (const s of ["L", "R"]) { const [a, b] = segs[s], ab = b.clone().sub(a), t = v.clone().sub(a).dot(ab) / ab.lengthSq(); if (t < 0 || t > 1) continue;
+          const d = v.distanceTo(a.clone().addScaledVector(ab, t)), r = RAD[s][Math.min(9, Math.floor(t * 10))]; if (d < r - 0.005) { nIn++; dMax = Math.max(dMax, r - d); } } } });
+      if (nIn) { S.legs.framesIn++; if (nIn > S.legs.maxVerts) { S.legs.maxVerts = nIn; S.legs.worstT = +(f / 30).toFixed(2); } S.legs.maxDepth = Math.max(S.legs.maxDepth, dMax); } }
     if (nPen) S.worst.push([+(f / 30).toFixed(2), nPen]);
     S.frames++; }
   for (const k of ["chair", "desk", "other", "floor", "bed"]) for (const r in S[k]) { const e = S[k][r]; e.maxCount = Math.max(e.maxCount, e._n); delete e._f; delete e._n; e.maxDepth = +(e.maxDepth * 100).toFixed(1); }
   S.seat = {lowestGap_min_cm: +(S.seat.min * 100).toFixed(1), lowestGap_max_cm: +(S.seat.max * 100).toFixed(1), framesUnder: S.seat.framesUnder || 0, maxVertsUnder: S.seat.maxUnder || 0, maxDepth_cm: +((S.seat.maxDepth || 0) * 100).toFixed(1)};
   for (const k of ["L", "R"]) S.soles[k] = {min_cm: +(S.soles[k].min * 100).toFixed(1), max_cm: +(S.soles[k].max * 100).toFixed(1), on: S.soles[k].on};
-  S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5);
+  S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5); S.legs.maxDepth = +(S.legs.maxDepth * 100).toFixed(1);
   return S; }, [activity, +secs]);
 const txt = JSON.stringify(res, null, 1); if (out) fs.writeFileSync(out, txt); console.log(txt); await b.close();

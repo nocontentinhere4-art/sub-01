@@ -1,0 +1,7 @@
+{
+ "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/.",
+ "defaults": {"seated": {"scale": "hip", "seatHipY": 0.68, "seatForward": 0.045, "pitch": 10, "soleUp": 0.027, "handUp": 0.012}},
+ "clips": {
+  "Seated_Idle": {"kind": "seated", "out": "room_seated_idle"}
+ }
+}
