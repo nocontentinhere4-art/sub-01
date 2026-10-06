@@ -18,8 +18,7 @@ All three keep `room_bed_lie`'s end hips and heading, so `seg.bedLie` places the
 
 - The right arm is flung up beside the head, elbow bent, hand palm up on the pillow by the temple.
 - The left forearm lies across the stomach.
-- The right knee is drawn up, its foot flat on the mattress.
-- The left leg is long and loose: rolled out, knee slightly bent so the heel rests.
+- Both knees are up and both feet stand flat on the quilt, the legs running along the bed. He is 5 cm longer than the mattress, so his toes are held 11 cm inside its end (x ≤ −0.32 in the room; the mattress ends at −0.21).
 - The head is propped toward the chest and turned toward the room.
 
 "Hand behind the head" was tried and dropped, because v5's stiff hood bulges behind the neck and swallows the hand.
@@ -30,8 +29,8 @@ The loop is 90 bpm, 12 beats per 8 s.
 
 - The head bobs on each beat, sways slowly side to side, and rolls a little every two beats.
 - The left hand taps on the stomach (0–3.7 s), lifts from the elbow and dances loose at the wrist to the beat (3.7–7.8 s), then settles back.
-- The left foot taps on the beat.
-- The raised knee drifts out and back.
+- The right foot's toes tap on the beat.
+- The left knee drifts out and back.
 
 ## Contacts
 
@@ -39,31 +38,32 @@ These were measured in the room with `room.html?debug`, `live("listen_music")`, 
 
 | part | gap to the surface under it |
 |---|---|
-| right sole | 0.4 cm (duvet) |
-| left heel | 0.6 cm (duvet) |
-| left calf | 1.7 cm (duvet) |
-| right calf | 2.0 cm (duvet) |
-| right hand | 1.3 cm (pillow) |
-| back | rests about 2 cm into the mattress (within the page's give) |
+| right sole | −0.5 cm (into the quilt) |
+| left sole | 0.2 cm (quilt) |
+| left calf | 0.5 cm (quilt) |
+| right calf | 3.6 cm (knee up) |
+| right hand | −0.1 cm (pillow) |
+| head | 3.7 cm over the pillow: it rests on the stiff hood (the pillow dent is the page's) |
+| back | about 1 cm into the mattress (within the page's give) |
 
-`penetration()` is 0 over the loop.
+`penetration()` is 0 over the loop. His axis runs along the bed (feet → hips 0.5°), and both foot tips stay at x −0.32 or less through the loop.
 
-His lowest skin is held at the flat pose's level in every frame of all three clips, using a vertical move of the Hip.
-The page lifts him by his lowest skin and re-measures it only once a second while he lies still.
-Because the level is held, the lift stays at bed_lie's value through in → loop → out (0.2149–0.2154 m, against 0.2153 m on main).
-So nothing steps, and the hood never dips between two measurements.
+His lowest skin is held at one level in every frame of all three clips, using a vertical move of the Hip, so the page's lift (re-measured once a second while he lies still) never changes during in → loop → out.
+It settles at 0.197 m, 1.8 cm under bed_lie's 0.2153 m, because a planted calf is now his lowest point; his place in the room is the same, and the page's eased lift takes the change on the way in.
+
+Why he looked as if he floated from the page's camera (941c316): his legs ran past the mattress end and splayed corner to corner, and nothing marks where his body meets the quilt (it does not dent, and the sun puts his shadow on the floor past the bed's end). The legs are fixed here (`legs_before_after.jpg`); the quilt dent is G10d's.
 
 ## For the page (G10d)
 
-- Wire "listen" only: in once, then the loop, then out before the bed_wake step.
-- Start the out when the loop's time is under 3.5 s (or wait for the wrap), so the dancing hand never drops in a 0.4 s crossfade.
+- "listen" only: in once, then the loop, then out before the bed_wake step; the out starts when the loop's time is under 3.5 s (wired in 2da310a).
 - `phone_lie` / `lie_phone` are left as they are.
 
 ## Stills
 
 | file | what it shows |
 |---|---|
-| `loop_room_camera.jpg` | the page's camera, cropped to the bed, one bar of the loop |
+| `loop_room_camera.jpg` | the page's camera, cropped to the bed, a second apart over one bar |
+| `legs_before_after.jpg` | the page's camera: 941c316's legs and the fixed ones |
 | `loop_near.jpg` | close, from the foot of the bed |
 | `loop_head_end.jpg` | from the desk side by the pillow |
 | `mattress_level.jpg` | eye level with the mattress (he lies on it) |

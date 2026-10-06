@@ -5,11 +5,10 @@ move his head a little, or do a small hand dance lying down). Three clips for th
   room_bed_music_out  from the loop's first frame into room_bed_wake's first frame, once (placed as the page places it)
 The pose (references: people lying on a bed with headphones; "hand behind the head" was dropped: v5's stiff hood bulges
 behind the neck and would swallow the hand): the right arm flung up beside the head, the elbow bent, the hand palm up on
-the pillow by the temple; the left forearm across the stomach; the right knee drawn up, its foot flat on the mattress;
-the left leg long and loose, rolled out, the knee a little bent so the heel rests; the head propped (24 deg toward the
-chest) and turned 14 deg toward the room. The music (90 bpm, 12 beats a loop): the head bobs on the beat, sways slowly
+the pillow by the temple; the left forearm across the stomach; both knees up, the feet flat on the quilt, the legs along the bed (he is 5 cm longer than the mattress: his toes stay
+11 cm inside its end), the left knee drifting; the head propped (14 deg toward the chest) and turned 14 deg toward the room. The music (90 bpm, 12 beats a loop): the head bobs on the beat, sways slowly
 side to side and rolls a little every two beats; the left hand taps on the stomach, then lifts from the elbow and
-dances loose at the wrist to the beat (3.7-7.8 s), then settles back; the left foot taps; the raised knee drifts.
+dances loose at the wrist to the beat (3.7-7.8 s), then settles back; the right foot's toes tap; the raised knee drifts.
 His lowest skin is held at the flat pose's level in every frame (a vertical move of the Hip), so the page's lift
 (from his lowest skin, re-measured once a second while he lies still) stays what it was at bed_lie's end.
 python music.py <bed_lie.x.json> <bed_wake.x.json> <outdir>"""
@@ -155,6 +154,9 @@ print('chest top over Spine02: %.3f' % CHEST)
 def turn_about(T, R, i, axis, ang):
     turnw(T, R, i, qaxis(axis, ang))
 
+KN, LG = 'L', 'R'        # the raised knee: the far side from the page's camera (his left); the near leg lies long
+SK = {'L': None, 'R': None}
+PULL_L = 0.29          # the left foot drawn in: his toes stay inside the mattress's end (he is 5 cm longer than it)
 ADJ = {'ankleY': 0.0, 'headLift': 0.0, 'elbowL': 0.0, 'wristRY': 0.0, 'ankleL': 0.0}
 
 def base_angles(t, dance=0.0):
@@ -176,7 +178,7 @@ def pose(t, spec=None, w=1.0):
         turn_about(T, R, ix[n], LEFT, w * np.radians(deg) + (a['breath'] * w if n == 'Spine02' else 0))
     # the neck and the head: propped on the hand, turned toward the room (his left), bobbing on the beat
     P, Q, _ = fk(T, R)
-    lift = np.radians(24) + ADJ['headLift']
+    lift = np.radians(14) + ADJ['headLift']
     turn_about(T, R, ix['NeckTwist01'], LEFT, w * lift * 0.5); turn_about(T, R, ix['Head'], LEFT, w * (lift * 0.5 + a['nod']))
     P, Q, _ = fk(T, R); nax = nrm(P[ix['Head']] - P[ix['NeckTwist01']])
     turn_about(T, R, ix['NeckTwist01'], nax, w * a['yaw'] * 0.4); turn_about(T, R, ix['Head'], nax, w * a['yaw'] * 0.6)
@@ -214,10 +216,11 @@ def limbs(T, R, t, a, w=1.0, goals=None, legL=True):
     tap = np.radians(16) * np.sin(np.pi * ph) ** 2 * (1 - d)          # the fingers lift between the beats, down on each
     g['fL'], g['nL'] = f, n; g['tapL'] = tap; g['dance'] = d
     # right knee up, the foot flat on the mattress
-    hipR = P[ix['R_Thigh']]
-    g['aR'] = hipR - along * 0.46 + RIGHT * 0.05; g['aR'][1] = P0[ix['R_Foot']][1] + ADJ['ankleY']
+    SKN = RIGHT if KN == 'R' else LEFT; SLG = RIGHT if LG == 'R' else LEFT
+    hipR = P[ix[KN + '_Thigh']]
+    g['aR'] = hipR - along * 0.50 + SKN * 0.05; g['aR'][1] = P0[ix[KN + '_Foot']][1] + ADJ['ankleY']
     sw = a['sway']; ax = nrm(g['aR'] - hipR)
-    g['kR'] = qrot(qaxis(ax, sw), nrm(up + RIGHT * 0.12))
+    g['kR'] = qrot(qaxis(ax, sw), nrm(up + SKN * 0.12))
     if goals: g.update(goals(g))
     # ---- solve
     limb(T, R, ix['R_Upperarm'], ix['R_Forearm'], ix['R_Hand'], g['wR'], g['pR'], H_EL['R'])
@@ -246,27 +249,29 @@ def limbs(T, R, t, a, w=1.0, goals=None, legL=True):
         hand_to(T, R, 'L', qrot(r, g['fL']), qrot(r, g['nL']))
     fingers(R, 'L', np.radians(22) + np.radians(14) * g['dance'], thumb=0.4)
     fingers(R, 'R', np.radians(38), thumb=0.4)
-    limb(T, R, ix['R_Thigh'], ix['R_Calf'], ix['R_Foot'], g['aR'], g['kR'], H_KN['R'])
+    limb(T, R, ix[KN + '_Thigh'], ix[KN + '_Calf'], ix[KN + '_Foot'], g['aR'], g['kR'], H_KN[KN])
     P, Q, _ = fk(T, R)
-    toe = nrm(-along + RIGHT * 0.18)
-    setw(R, Q, ix['R_Foot'], qmul(qbetween(FWD, toe), Qr[ix['R_Foot']]))
-    P, Q, _ = fk(T, R); setw(R, Q, ix['R_ToeBase'], qmul(qbetween(FWD, toe), Qr[ix['R_ToeBase']]))
+    toe = nrm(-along + SKN * 0.18)
+    setw(R, Q, ix[KN + '_Foot'], qmul(qbetween(FWD, toe), Qr[ix[KN + '_Foot']]))
+    P, Q, _ = fk(T, R); setw(R, Q, ix[KN + '_ToeBase'], qmul(qbetween(FWD, toe), Qr[ix[KN + '_ToeBase']]))
     # the left leg long and loose: rolled out a little, the toes dipping on the beat
     if not legL: return g
-    P, Q, _ = fk(T, R); tax = nrm(P[ix['L_Calf']] - P[ix['L_Thigh']])
-    r = qaxis(tax, np.radians(14)); 
-    if qrot(r, up) @ LEFT < 0: r = qaxis(tax, -np.radians(14))
-    turnw(T, R, ix['L_Thigh'], qmul(r, qaxis(LEFT, np.radians(3.5))))     # (and down a little: the calf rests on the folded duvet)
-    # the knee a little bent (a loose leg): the ankle down until the heel rests, the knee falling out a little
+    P, Q, _ = fk(T, R); tax = nrm(P[ix[LG + '_Calf']] - P[ix[LG + '_Thigh']])
+    r = qaxis(tax, np.radians(5))
+    if qrot(r, up) @ SLG < 0: r = qaxis(tax, -np.radians(5))
+    turnw(T, R, ix[LG + '_Thigh'], qmul(r, qaxis(LEFT, np.radians(3.5))))     # (and down a little: the calf rests on the folded duvet)
+    # the knee a little bent (a loose leg): the ankle down until the heel rests and drawn in (the toes inside the mattress's end), the knee up
     if ADJ.get('ankleL', 0) > 0:
-        P, Q, _ = fk(T, R); Qf = Q[ix['L_Foot']].copy()
-        limb(T, R, ix['L_Thigh'], ix['L_Calf'], ix['L_Foot'], P[ix['L_Foot']] - up * ADJ['ankleL'] + along * 0.3 * ADJ['ankleL'], nrm(up + LEFT * 0.5), H_KN['L'])
-        P, Q, _ = fk(T, R); setw(R, Q, ix['L_Foot'], Qf)
-    P, Q, _ = fk(T, R); tax = nrm(P[ix['L_Calf']] - P[ix['L_Thigh']]); fax = nrm(np.cross(P[ix['L_ToeBase']] - P[ix['L_Foot']], tax))
-    r = qaxis(fax, np.radians(12) + a['tapL'])
-    tdir = P[ix['L_ToeBase']] - P[ix['L_Foot']]
-    if qrot(r, tdir) @ along > tdir @ along: r = qaxis(fax, -(np.radians(12) + a['tapL']))
-    turnw(T, R, ix['L_Foot'], r)
+        P, Q, _ = fk(T, R); Qf = Q[ix[LG + '_Foot']].copy()
+        limb(T, R, ix[LG + '_Thigh'], ix[LG + '_Calf'], ix[LG + '_Foot'], P[ix[LG + '_Foot']] - up * ADJ['ankleL'] + along * (0.3 * ADJ['ankleL'] + PULL_L), nrm(up + SLG * 0.15), H_KN[LG])
+    # the knee up, so the foot stands flat on the quilt (as the other one), the toes lifting on the beat
+    P, Q, _ = fk(T, R); toe2 = nrm(-along + SLG * 0.15)
+    setw(R, Q, ix[LG + '_Foot'], qmul(qbetween(FWD, toe2), Qr[ix[LG + '_Foot']]))
+    P, Q, _ = fk(T, R); setw(R, Q, ix[LG + '_ToeBase'], qmul(qbetween(FWD, toe2), Qr[ix[LG + '_ToeBase']]))
+    P, Q, _ = fk(T, R); tdir = P[ix[LG + '_ToeBase']] - P[ix[LG + '_Foot']]; fax = nrm(np.cross(tdir, up))
+    r = qaxis(fax, a['tapL'])
+    if qrot(r, tdir)[1] < tdir[1]: r = qaxis(fax, -a['tapL'])
+    turnw(T, R, ix[LG + '_Foot'], r)
     return g
 
 def full(t, goals=None):
@@ -275,7 +280,7 @@ def full(t, goals=None):
 # ---- calibrate the contacts on the loop's first frame: the right hand under the head at the level the page lifts him to,
 # the head resting on it, the planted sole on the mattress, the left arm off it
 HV = np.isin(dom, ['Head']); HANDV = np.isin(dom, ['R_Hand', 'R_Forearm', 'R_ForearmTwist01', 'R_ForearmTwist02'] + [n for n in ts.names if n.endswith('.R')])
-SOLE = np.isin(dom, ['R_Foot', 'R_ToeBase'])
+SOLE = np.isin(dom, [KN + '_Foot', KN + '_ToeBase'])
 def headback(T, R):
     """the back of the skull (where a hand behind the head cups it): from the head joint, back (against the face) and
     up toward the crown, measured on the skin: the head's vertices farthest behind the face, around the crown's middle"""
@@ -295,10 +300,10 @@ for it in range(8):
     T, R = full(0.0); X = skinpos(T, R); lw = lows(X)
     headlow = X[HV, 1].min(); handlow = X[HANDV, 1].min(); solelow = X[SOLE, 1].min(); elow = X[PM['armL'], 1].min()
     print('it %d: hand %.3f head %.3f sole %.3f armL %.3f back %.3f all %.3f' % (it, handlow - MAT, headlow - MAT, solelow - MAT, elow - MAT, lw['back'] - MAT, lw['all'] - MAT))
-    ADJ['wristRY'] += (LOW + 0.012) - handlow
-    ADJ['ankleY'] += (MAT - 0.005) - solelow
+    ADJ['wristRY'] += (LOW - 0.010) - handlow
+    ADJ['ankleY'] += (MAT - 0.025) - solelow
     if elow < MAT: ADJ['elbowL'] += min(0.3, (MAT - elow) * 4)
-    footL = X[np.isin(dom, ['L_Foot', 'L_ToeBase']), 1].min(); ADJ['ankleL'] = max(0.0, ADJ['ankleL'] + (footL - (MAT + 0.01)) * 0.8)
+    footL = X[np.isin(dom, [LG + '_Foot', LG + '_ToeBase']), 1].min(); ADJ['ankleL'] = max(0.0, ADJ['ankleL'] + (footL - (MAT + 0.01)) * 0.8)
     print('   left heel %.3f' % (footL - MAT))
 print('ADJ', {k: round(float(v), 3) for k, v in ADJ.items()})
 
@@ -316,7 +321,7 @@ if os.environ.get('STILL'):
     write('m', [(T, R), (T, R)], os.path.join(outd, 'still.json')); sys.exit()
 
 # ---------------------------------------------------------------- the clips
-CHAINS = {'armR': ('R_Upperarm', 'R_Forearm', 'R_Hand'), 'armL': ('L_Upperarm', 'L_Forearm', 'L_Hand'), 'legR': ('R_Thigh', 'R_Calf', 'R_Foot')}
+CHAINS = {'armR': ('R_Upperarm', 'R_Forearm', 'R_Hand'), 'armL': ('L_Upperarm', 'L_Forearm', 'L_Hand'), 'legR': (KN + '_Thigh', KN + '_Calf', KN + '_Foot')}
 def measure(T, R):
     """a pose's limb goals: wrists / ankle, the elbow / knee side (pole), the hands' fingers and palms, the foot"""
     P, Q, _ = fk(T, R); g = {}
@@ -325,7 +330,7 @@ def measure(T, R):
         g['goal_' + k] = C.copy(); g['pole_' + k] = nrm(pole)
     for s in 'LR':
         h = ix[f'{s}_Hand']; g['f' + s] = nrm(P[ix[f'finger3-1.{s}']] - P[h]); g['n' + s] = qrot(Q[h], HF[s][2])
-    g['footR'] = Q[ix['R_Foot']].copy(); g['toeR'] = Q[ix['R_ToeBase']].copy()
+    g['footR'] = Q[ix[KN + '_Foot']].copy(); g['toeR'] = Q[ix[KN + '_ToeBase']].copy()
     return g
 
 def bez(p0, p1, lift, u):
@@ -360,7 +365,7 @@ def transition(Ta, Ra, Tb, Rb, dur, win, lifts):
             pole = qrot(qaxis(dn, sw * u), pa)
             lp = lifts.get(k + '_pole', 0)
             if not np.isscalar(lp): pole = nrm(pole + perp(lp) * np.sin(np.pi * u) * 0.5)
-            hax = H_EL['R'] if k == 'armR' else H_EL['L'] if k == 'armL' else H_KN['R']
+            hax = H_EL['R'] if k == 'armR' else H_EL['L'] if k == 'armL' else H_KN[KN]
             limb_pole(T, R, ix[a], ix[b], ix[c], goal, pole, hax)
             if k.startswith('arm'):
                 s = k[-1]; hand_to(T, R, s, nrm(ga['f' + s] * (1 - u) + gb['f' + s] * u), nrm(ga['n' + s] * (1 - u) + gb['n' + s] * u))
@@ -368,8 +373,8 @@ def transition(Ta, Ra, Tb, Rb, dur, win, lifts):
                     for j in range(1, 4):
                         i = ix[f'finger{kk}-{j}.{s}']; R[i] = qslerp(Ra[i], Rb[i], u)
             else:
-                P, Q, _ = fk(T, R); setw(R, Q, ix['R_Foot'], qslerp(ga['footR'], gb['footR'], u))
-                P, Q, _ = fk(T, R); setw(R, Q, ix['R_ToeBase'], qslerp(ga['toeR'], gb['toeR'], u))
+                P, Q, _ = fk(T, R); setw(R, Q, ix[KN + '_Foot'], qslerp(ga['footR'], gb['footR'], u))
+                P, Q, _ = fk(T, R); setw(R, Q, ix[KN + '_ToeBase'], qslerp(ga['toeR'], gb['toeR'], u))
         e0 = 1 - sstep(0, 0.12, s_); e1 = sstep(0.88, 1, s_)          # exactly a at the start, exactly b at the end
         for i in range(N):
             R[i] = qslerp(qslerp(R[i], Ra[i], e0), Rb[i], e1)
