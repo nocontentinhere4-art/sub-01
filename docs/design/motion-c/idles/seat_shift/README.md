@@ -45,3 +45,10 @@ Pexels video 5125886 ("An unmotivated man working", by james, Pexels License). T
 
 ## Not copied from the reference
 His right arm crosses his chest to rub his neck during the shift. That is a separate action, so it is not in this clip. The hands keep the base take's rest on the thighs and desk edge.
+
+## TODO: raise k when the seating is fixed
+**k = 0.65 is a limit set by the chair, not by the measurement.** The clip carries 54% of the real person's sideways shift because at full amplitude his hips go 1.4 cm into the seat side. That comes from how the page seats him; the performer did not move less. When the page's seating fix lands (watch-mode root height and depth), the clip must be rebuilt with the largest k that keeps chair contact under 1 cm, aiming for 1.0:
+
+`python3 tools/motion/shift_curves.py K out.json 0.57`, then `kimodo_retarget.mjs`.
+
+Then re-gate it and update the error table. Do not let 0.65 stand as "correct".
