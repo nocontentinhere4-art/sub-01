@@ -74,8 +74,8 @@ for (const [s, S, x] of [["L", "Left", "L"], ["R", "Right", "R"]]) {
     [`${s}_Forearm`]: [`${S}ForeArm`, `${S}Hand`, `${s}_Hand`], [`${s}_Hand`]: [`${S}Hand`, `finger3-1.${x}`, HAS_FINGERS ? `finger3-1.${x}` : null],
     [`${s}_Thigh`]: [`${S}UpLeg`, `${S}Leg`, `${s}_Calf`], [`${s}_Calf`]: [`${S}Leg`, `${S}Foot`, `${s}_Foot`],
     [`${s}_Foot`]: [`${S}Foot`, `${S}ToeBase`, `${s}_ToeBase`], [`${s}_ToeBase`]: [`${S}ToeBase`, `toe1-2.${x}`, null]});
-  if (HAS_FINGERS) for (let f = 1; f <= 5; f++) for (let j = 1; j <= 3; j++) { const nm = `finger${f}-${j}.${x}`; if (!B(nm)) continue;
-    const nx = j < 3 ? `finger${f}-${j + 1}.${x}` : null; MAP[nm] = [nm, nx, nx && B(nx) ? nx : null]; }
+  if (HAS_FINGERS) { for (let f = 1; f <= 5; f++) for (let j = 1; j <= 3; j++) { const nm = `finger${f}-${j}.${x}`; if (B(nm)) MAP[nm] = [nm, null, null]; }
+    for (let m = 1; m <= 4; m++) { const nm = `metacarpal${m}.${x}`; if (B(nm)) MAP[nm] = [nm, null, null]; } }
 }
 for (const k of Object.keys(MAP)) if (!B(k) || !sNodes.has(MAP[k][0])) delete MAP[k];
 const order = Object.keys(MAP).sort((a, b) => depth(B(a)) - depth(B(b)));
@@ -83,6 +83,14 @@ const ALIGN = {};
 for (const b of order) { const [src, sc, tc] = MAP[b];
   let ds = sc && sNodes.has(sc) ? srcP(sc).sub(srcP(src)).normalize() : null, dt = tc ? restP(tc).sub(restP(b)).normalize() : null;
   if (b === "Head") dt = new THREE.Vector3(0, 1, 0);
+  // the hand: a full basis (wrist -> middle-finger base, index base -> little-finger base), so the palm's facing and its
+  // fingers' curl axis carry over, not only the hand's pointing direction (a lone direction leaves its twist free)
+  const hs = (b.match(/^([LR])_Hand$/) || [])[1];
+  if (hs && HAS_FINGERS) { const bas = (p, h) => { const x = p(`finger3-1.${hs}`).sub(p(h)).normalize(), y = p(`finger5-1.${hs}`).sub(p(`finger2-1.${hs}`));
+      y.sub(x.clone().multiplyScalar(y.dot(x))).normalize(); return new THREE.Matrix4().makeBasis(x, y, x.clone().cross(y)); };
+    const Ms = bas(srcP, src), Mt = bas(restP, b); ALIGN[b] = new THREE.Quaternion().setFromRotationMatrix(Mt.multiply(Ms.transpose())); continue; }
+  // fingers and metacarpals ride the hand: its alignment, so each finger keeps its pose relative to the palm
+  if (/^(finger|metacarpal)/.test(b)) { ALIGN[b] = ALIGN[`${b.slice(-1)}_Hand`].clone(); continue; }
   if (ds && dt && ds.lengthSq() > 0.5 && dt.lengthSq() > 0.5) ALIGN[b] = new THREE.Quaternion().setFromUnitVectors(ds, dt);
   else { let a = null; for (let n = parentOf.get(B(b)); n && !a; n = parentOf.get(n)) a = ALIGN[n.getName()]; ALIGN[b] = a ? a.clone() : new THREE.Quaternion(); } }
 
@@ -95,10 +103,14 @@ const k = tgtLeg / srcLeg, srcAnkle = sRestP.get("LeftFoot").y, tgtAnkle = (rest
 const frames = [];
 for (let f = 0; f < T; f++) { const t = Math.min(f / FPS, dur), s = sFK(t), W = {};
   for (const b of order) W[b] = C.clone().multiply(s.W.get(MAP[b][0])).multiply(Ci).multiply(ALIGN[b].clone().invert()).multiply(rest.W.get(B(b)));
+  if (O.pitch) { const SPN = ["Waist", "Spine01", "Spine02"].map(B);   // the torso tipped forward off the backrest, spread over the three spine joints
+    for (const b of order) { let n = 0; for (let x = B(b); x; x = parentOf.get(x)) if (SPN.includes(x)) n++;
+      if (n) W[b] = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -O.pitch * Math.PI / 180 * n / 3).multiply(W[b]); } }
   const hm = s.P.get("LeftUpLeg").clone().add(s.P.get("RightUpLeg")).multiplyScalar(0.5).applyQuaternion(C);
-  const hip = new THREE.Vector3(hm.x, (hm.y - srcAnkle) * k + tgtAnkle, hm.z);
+  const lift = O.seatLift || 0;   // (m) the hips, hands and anything held go up by this onto a taller seat; the feet stay on the floor
+  const hip = new THREE.Vector3(hm.x, (hm.y - srcAnkle) * k + tgtAnkle + lift, hm.z);
   const eff = {}; for (const [n, sn] of [["L_Hand", "LeftHand"], ["R_Hand", "RightHand"], ["L_Foot", "LeftFoot"], ["R_Foot", "RightFoot"]]) {
-    const p = s.P.get(sn).clone().applyQuaternion(C); if (n.endsWith("Foot")) p.y = p.y - srcAnkle + tgtAnkle; eff[n] = p; }
+    const p = s.P.get(sn).clone().applyQuaternion(C); if (n.endsWith("Foot")) p.y = p.y - srcAnkle + tgtAnkle; else p.y += O.handLift ?? lift; eff[n] = p; }
   frames.push({W, hip, eff}); }
 function toLocal(Wmap, hipWorld){ const L = new Map(), Wc = new Map();
   for (const n of bonesTD) { const p = parentOf.get(n), name = n.getName(), pw = p ? Wc.get(p) : new THREE.Quaternion();
@@ -135,16 +147,133 @@ for (const n of ["L_Hand", "R_Hand", "L_Foot", "R_Foot"]) { const raw = frames.m
 function pins(){ const FLOOR = 0;
   for (let f = 0; f < T; f++) {
     for (const s of ["L", "R"]) { if (O.hands !== false) twoBone(seq[f].L, seq[f].ht, `${s}_Upperarm`, `${s}_Forearm`, `${s}_Hand`, frames[f].eff[`${s}_Hand`], O.handW ?? 1);
-      if (O.feet !== false) { const g = frames[f].eff[`${s}_Foot`].clone(); g.y = Math.max(g.y, FLOOR + tgtAnkle * 0.95); twoBone(seq[f].L, seq[f].ht, `${s}_Thigh`, `${s}_Calf`, `${s}_Foot`, g, O.footW ?? 1); } } } }
+      if (O.feet !== false) { const g = frames[f].eff[`${s}_Foot`].clone(); g.y = Math.max(g.y, FLOOR + tgtAnkle * 0.95); const g0y = g.y; g.y += O.heelLift || 0;
+        twoBone(seq[f].L, seq[f].ht, `${s}_Thigh`, `${s}_Calf`, `${s}_Foot`, g, O.footW ?? 1);
+        if (O.heelLift) heelUp(seq[f].L, seq[f].ht, s, g0y); } } } }
+// heel lifted off the floor, the ball of the foot stays down: the foot pitched about its ankle until the toe joint is back at
+// the height a flat foot would have it (rest offset under the unlifted ankle); the toes keep their world rotation (bent flat)
+const TOE_REL = restP("L_ToeBase").y - restP("L_Foot").y;
+function heelUp(L, ht, s, g0y){ const st = fk(L, ht), F = B(`${s}_Foot`), Tb = B(`${s}_ToeBase`), pa = st.P.get(F), pt = st.P.get(Tb), len = pa.distanceTo(pt);
+  const d0 = Math.asin(THREE.MathUtils.clamp((pt.y - pa.y) / len, -1, 1)), d1 = Math.asin(THREE.MathUtils.clamp((g0y + TOE_REL - pa.y) / len, -1, 1));
+  const dirH = new THREE.Vector3(pt.x - pa.x, 0, pt.z - pa.z).normalize(), axis = dirH.clone().cross(new THREE.Vector3(0, -1, 0)).normalize();
+  const Qd = new THREE.Quaternion().setFromAxisAngle(axis, d0 - d1), Wf = Qd.clone().multiply(st.W.get(F)), Wt = st.W.get(Tb);
+  L.set(F, st.W.get(parentOf.get(F)).clone().invert().multiply(Wf)); L.set(Tb, Wf.clone().invert().multiply(Wt)); }
 const jit = () => { const o = {}; const P = seq.map(f => fk(f.L, f.ht).P);
   for (const n of ["L_Hand", "R_Hand", "Head", "Hip"]) { const x = P.map(m => m.get(B(n)).clone()), r = x.map((_, i) => { const a = new THREE.Vector3(); let ws = 0; for (let j = -12; j <= 12; j++) { const w = Math.exp(-j * j / 32); a.add(x[Math.min(T - 1, Math.max(0, i + j))].clone().multiplyScalar(w)); ws += w; } return x[i].clone().sub(a.multiplyScalar(1 / ws)); });
     let s2 = 0; for (let i = 1; i < T - 1; i++) s2 += r[i - 1].clone().add(r[i + 1]).sub(r[i].clone().multiplyScalar(2)).multiplyScalar(FPS * FPS).lengthSq(); o[n] = +Math.sqrt(s2 / Math.max(1, T - 2)).toFixed(3); } return o; };
 const jitterBefore = jit();
 smoothSeq(O.sigma ?? 1.0, O.sigmaSpine ?? 1.7); pins();
 smoothSeq(O.post ?? 1.0, (O.post ?? 1.0) * 1.5); pins();
+if (O.book) bookGrip(O.book);
 const jitterAfter = jit();
 // effector error after the pins (m)
 let errH = 0, errF = 0; seq.forEach((f, i) => { const P = fk(f.L, f.ht).P; for (const s of ["L", "R"]) { errH = Math.max(errH, P.get(B(`${s}_Hand`)).distanceTo(frames[i].eff[`${s}_Hand`])); errF = Math.max(errF, P.get(B(`${s}_Foot`)).distanceTo(frames[i].eff[`${s}_Foot`])); } });
+
+// ---------- the book held as people hold one (O.book = {props, clip, tilt, out, gy}): each hand behind its half's cover near
+// the outer edge, palm on the cover, fingers spread toward the top, the thumb over the outer edge on the page margin; the book
+// tilted `tilt` degrees more toward his face (about its centre; the tilted props written to `out`). For each page turn the
+// right hand leaves its cover, thumb and index pinch the turning page's lower outer corner, carry it over and let it down,
+// then go back. Arms by two-bone IK onto the wrist that puts the palm / pinch exactly there; fingers set on the hand.
+function bookGrip(OB){
+  const DEG = Math.PI / 180, all = JSON.parse(fs.readFileSync(OB.props)), P = JSON.parse(JSON.stringify(all[OB.clip]));
+  const qOf = r => new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0] * DEG, r[1] * DEG, r[2] * DEG, "XYZ"));
+  const eul = q => { const e = new THREE.Euler().setFromQuaternion(q, "XYZ"); return [e.x, e.y, e.z].map(x => +(x / DEG).toFixed(3)); };
+  const items = P.world.filter(w => /page block|cover/.test(w.what)), c = items.reduce((a, w) => a.add(V(w.pos)), new THREE.Vector3()).multiplyScalar(1 / items.length);
+  const Rt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -(OB.tilt || 0) * DEG);   // the far edge up: steeper toward his face
+  const sh = V(OB.shift || [0, 0, 0]);   // the book moved (MakeHuman clip frame, m) into the v5 arms' reach
+  const tp = p => V(p).sub(c).applyQuaternion(Rt).add(c).add(sh).toArray().map(x => +x.toFixed(5));
+  for (const w of items) { w.pos = tp(w.pos); w.rot = eul(Rt.clone().multiply(qOf(w.rot || [0, 0, 0]))); }
+  for (const pg of P.pages || []) { pg.pivot = tp(pg.pivot); pg.rot = eul(Rt.clone().multiply(qOf(pg.rot))); pg.axis = V(pg.axis).applyQuaternion(Rt).toArray().map(x => +x.toFixed(5)); }
+  if (OB.out) { const o = fs.existsSync(OB.out) ? JSON.parse(fs.readFileSync(OB.out)) : JSON.parse(JSON.stringify(all)); o[OB.clip] = P; fs.writeFileSync(OB.out, JSON.stringify(o, null, 1)); }
+  const lift = O.seatLift || 0, R = p => V(p).applyQuaternion(C).add(new THREE.Vector3(0, lift, 0)), Rd = v => v.clone().applyQuaternion(C);
+  const cen = R(c.clone().add(sh).toArray());
+  const half = side => { const pg = items.find(w => /page block/.test(w.what) && (side === "L" ? /left/.test(w.what) : /right/.test(w.what))), cv = items.find(w => /cover/.test(w.what) && (side === "L" ? /left/.test(w.what) : /right/.test(w.what)));
+    const Q = C.clone().multiply(qOf(pg.rot)), ex = new THREE.Vector3(1, 0, 0).applyQuaternion(Q), ey = new THREE.Vector3(0, 1, 0).applyQuaternion(Q), ez = new THREE.Vector3(0, 0, 1).applyQuaternion(Q);
+    const pc = R(pg.pos), cc = R(cv.pos), up = ez.clone().multiplyScalar(cc.clone().sub(pc).dot(ez) > 0 ? -1 : 1), out = ex.clone().multiplyScalar(pc.clone().sub(cen).dot(ex) > 0 ? 1 : -1);
+    const top = ey.clone().multiplyScalar(ey.x > 0 ? 1 : -1), under = cc.clone().sub(up.clone().multiplyScalar(Math.max(cv.size[2], 0.005) / 2));
+    return {pc, up, out, top, under, hw: pg.size[0] / 2, hz: pg.size[2] / 2, cw: cv.size[0] / 2}; };
+  const H = {L: half("L"), R: half("R")};
+  // the v5 hand's rest basis: x wrist -> middle base, y index base -> little base, z = x * y; the palm faces +-z
+  const basis = (x, y) => { x = x.clone().normalize(); y = y.clone().sub(x.clone().multiplyScalar(y.dot(x))).normalize(); return new THREE.Matrix4().makeBasis(x, y, x.clone().cross(y)); };
+  const RB = {}; for (const s of ["L", "R"]) RB[s] = basis(restP(`finger3-1.${s}`).sub(restP(`${s}_Hand`)), restP(`finger5-1.${s}`).sub(restP(`finger2-1.${s}`))).transpose();
+  // hand world rotation from (fingers' direction x, palm normal n); thumb side t = n * x (left), x * n (right); y = -t
+  const handRot = (s, x, n) => { const t = s === "L" ? n.clone().cross(x) : x.clone().cross(n); const Mt = basis(x, t.clone().negate());
+    return new THREE.Quaternion().setFromRotationMatrix(Mt.multiply(RB[s].clone())).multiply(rest.W.get(B(`${s}_Hand`))); };
+  const tipOf = (st, f, s) => { const a = B(`finger${f}-3.${s}`), b = B(`finger${f}-2.${s}`), off = restP(`finger${f}-3.${s}`).sub(restP(`finger${f}-2.${s}`)).multiplyScalar(0.85);
+    return st.P.get(a).clone().add(off.applyQuaternion(rest.W.get(a).clone().invert()).applyQuaternion(st.W.get(a))); };
+  const palmOf = (st, s) => st.P.get(B(`${s}_Hand`)).clone().lerp(st.P.get(B(`finger3-1.${s}`)), 0.55);
+  // fingers 2-5: flex (deg, the three joints) toward the palm side, spread (deg) about the palm normal toward the thumb
+  const SPREAD = {2: 5, 3: 0, 4: -4, 5: -9};
+  function setFingers(L, ht, s, flex, n, thumbGoal){
+    let st;
+    for (let m = 1; m <= 4; m++) { const mb = B(`metacarpal${m}.${s}`); if (mb) L.set(mb, restL.get(mb).clone()); }
+    st = fk(L, ht);
+    // v5's rest fingers bend ~45 deg off the wrist-knuckle line, so each phalanx is aimed explicitly: along the hand's
+    // wrist -> knuckle line (spread about the palm normal), then turned toward the palm by the summed flex of the joints so far
+    const Rh = st.W.get(B(`${s}_Hand`)).clone().multiply(rest.W.get(B(`${s}_Hand`)).clone().invert());
+    const xw = restP(`finger3-1.${s}`).sub(restP(`${s}_Hand`)).normalize().applyQuaternion(Rh), nn = n.clone().sub(xw.clone().multiplyScalar(n.dot(xw))).normalize();
+    for (let f = 2; f <= 5; f++) { let parW = st.W.get(parentOf.get(B(`finger${f}-1.${s}`))), phi = 0;
+      const df = xw.clone().applyAxisAngle(nn, (s === "L" ? 1 : -1) * (SPREAD[f] || 0) * DEG), ax = df.clone().cross(nn).normalize();
+      for (let j = 1; j <= 3; j++) { const b = B(`finger${f}-${j}.${s}`);
+        let W = parW.clone().multiply(restL.get(b)); const dir = (j < 3 ? restP(`finger${f}-${j + 1}.${s}`).sub(restP(`finger${f}-${j}.${s}`)) : restP(`finger${f}-3.${s}`).sub(restP(`finger${f}-2.${s}`))).normalize().applyQuaternion(rest.W.get(b).clone().invert()).applyQuaternion(W);
+        phi += flex[f][j - 1] * DEG; const want = df.clone().applyAxisAngle(ax, phi);
+        W = new THREE.Quaternion().setFromUnitVectors(dir, want).multiply(W); L.set(b, parW.clone().invert().multiply(W)); parW = W; } }
+    // the thumb: CCD on its three joints, its tip onto thumbGoal
+    const TB = [1, 2, 3].map(j => B(`finger1-${j}.${s}`));
+    for (const b of TB) L.set(b, restL.get(b).clone());
+    for (let it = 0; it < 12; it++) for (let j = 2; j >= 0; j--) { st = fk(L, ht); const tip = tipOf(st, 1, s), pj = st.P.get(TB[j]);
+      const a = tip.clone().sub(pj).normalize(), g = thumbGoal.clone().sub(pj).normalize(); let q = new THREE.Quaternion().setFromUnitVectors(a, g);
+      const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w))); if (ang > 0.35) q = new THREE.Quaternion().slerp(q, 0.35 / ang);
+      const Wj = q.multiply(st.W.get(TB[j])), pw = st.W.get(parentOf.get(TB[j])); L.set(TB[j], pw.clone().invert().multiply(Wj)); }
+  }
+  // the page turns: angle curves, start (first motion) and release (80 % of the way over)
+  const turns = (P.pages || []).map(pg => { const ks = pg.keys, amin = Math.min(...ks.map(k => k[1])); const ts = ks.find(k => k[1] < -0.5)[0], te = ks.find(k => k[1] <= amin * 0.8)[0];
+    return {pg, ts, te, ang: t => keyAt(ks, t), piv: R(pg.pivot), axis: Rd(V(pg.axis)).normalize(), Qp: C.clone().multiply(qOf(pg.rot))}; });
+  function keyAt(ks, t){ let i = 0; while (i + 1 < ks.length && ks[i + 1][0] <= t) i++; const a = ks[i], b = ks[Math.min(i + 1, ks.length - 1)]; if (t <= a[0] || b[0] <= a[0]) return a[1]; return a[1] + (b[1] - a[1]) * Math.min(1, (t - a[0]) / (b[0] - a[0])); }
+  const sstep = u => { u = THREE.MathUtils.clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+  const HOLDF = {2: [4, 4, 3], 3: [4, 4, 3], 4: [5, 5, 4], 5: [6, 6, 5]}, PINCHF = {2: [28, 38, 22], 3: [45, 55, 30], 4: [55, 60, 35], 5: [58, 62, 38]};
+  const gy = OB.gy ?? -0.03;
+  const hold = s => { const h = H[s], x = h.top.clone().multiplyScalar(Math.cos(25 * DEG)).sub(h.out.clone().multiplyScalar(Math.sin(25 * DEG))).normalize();
+    const E = h.under.clone().add(h.out.clone().multiplyScalar(h.cw)).add(h.top.clone().multiplyScalar(gy));
+    return {rot: handRot(s, x, h.up), n: h.up.clone(), palm: E.clone().sub(h.out.clone().multiplyScalar(0.04)).sub(h.up.clone().multiplyScalar(0.015)),
+      thumb: h.pc.clone().add(h.out.clone().multiplyScalar(h.hw - 0.022)).add(h.top.clone().multiplyScalar(gy + 0.03)).add(h.up.clone().multiplyScalar(h.hz + 0.008)), flex: HOLDF}; };
+  const HOLD = {L: hold("L"), R: hold("R")};
+  function pinchAt(tr, t){ const a = tr.ang(t) * DEG, Qa = new THREE.Quaternion().setFromAxisAngle(tr.axis, a), h = H.R;
+    // the page's lower outer corner (local x 0..size0 from the spine, y +-size1/2; the one nearer him), a little in
+    const Qw = Qa.clone().multiply(tr.Qp), lx = new THREE.Vector3(1, 0, 0).applyQuaternion(tr.Qp), ly = new THREE.Vector3(0, 1, 0).applyQuaternion(tr.Qp), sy = ly.dot(h.top) > 0 ? -1 : 1;
+    const loc = new THREE.Vector3(tr.pg.size[0] - 0.012, sy * (tr.pg.size[1] / 2 - 0.018), 0).applyQuaternion(tr.Qp);
+    const corner = loc.applyQuaternion(Qa).add(tr.piv);
+    const fol = Math.abs(a) <= 90 * DEG ? a : Math.sign(a) * (90 * DEG + 0.5 * (Math.abs(a) - 90 * DEG)), Qf = new THREE.Quaternion().setFromAxisAngle(tr.axis, fol);
+    const x0 = h.out.clone().multiplyScalar(-Math.cos(40 * DEG)).add(h.top.clone().multiplyScalar(Math.sin(40 * DEG))).normalize(), n0 = h.up.clone().negate();
+    const x = x0.applyQuaternion(Qf), n = n0.applyQuaternion(Qf); return {rot: handRot("R", x, n), n, corner, flex: PINCHF}; }
+  const lerpFlex = (A, Bf, w) => { const o = {}; for (const f in A) o[f] = A[f].map((v, i) => v + (Bf[f][i] - v) * w); return o; };
+  const solveHand = (L, ht, s, rot, n, flex, contact, thumbGoal, isPinch) => {
+    let wt = contact.clone();
+    for (let it = 0; it < 3; it++) { twoBone(L, ht, `${s}_Upperarm`, `${s}_Forearm`, `${s}_Hand`, wt, 1);
+      let st = fk(L, ht); L.set(B(`${s}_Hand`), st.W.get(B(`${s}_Forearm`)).clone().invert().multiply(rot));
+      if (isPinch !== undefined) { st = fk(L, ht); const tg = isPinch > 0 ? tipOf(st, 2, s).add(n.clone().multiplyScalar(-0.012)) : thumbGoal; setFingers(L, ht, s, flex, n, tg); }
+      else setFingers(L, ht, s, flex, n, thumbGoal);
+      st = fk(L, ht); const cp = isPinch > 0 ? tipOf(st, 2, s).lerp(tipOf(st, 1, s), 0.5) : (isPinch === 0 ? palmOf(st, s) : palmOf(st, s)); wt.add(contact.clone().sub(cp)); } };
+  for (let f = 0; f < T; f++) { const t = f / FPS, L = seq[f].L, ht = seq[f].ht;
+    const hl = HOLD.L; solveHand(L, ht, "L", hl.rot, hl.n, hl.flex, hl.palm, hl.thumb);
+    let w = 0, tr = null; for (const x of turns) { const ww = t < x.ts ? sstep((t - (x.ts - 0.45)) / 0.45) : t <= x.te ? 1 : 1 - sstep((t - x.te) / 0.5); if (ww > w) { w = ww; tr = x; } }
+    const hr = HOLD.R;
+    if (OB.debug && f === 90) { const st = fk(L, ht), f3 = v => v.toArray().map(x => +x.toFixed(3)); const s = "L", h = H[s];
+      console.error(JSON.stringify({top: f3(h.top), out: f3(h.out), up: f3(h.up), under: f3(h.under), pc: f3(h.pc), palmT: f3(hl.palm), palm: f3(palmOf(st, s)), wrist: f3(st.P.get(B("L_Hand"))), mid: f3(st.P.get(B("finger3-1.L"))), tip3: f3(tipOf(st, 3, s)), thumbT: f3(hl.thumb), thumb: f3(tipOf(st, 1, s)),
+        dirMid: f3(st.P.get(B("finger3-1.L")).sub(st.P.get(B("L_Hand"))).normalize()), idx2pky: f3(st.P.get(B("finger5-1.L")).sub(st.P.get(B("finger2-1.L"))).normalize()), thumbBase: f3(st.P.get(B("finger1-1.L")))})); }
+    if (w <= 0.001) { solveHand(L, ht, "R", hr.rot, hr.n, hr.flex, hr.palm, hr.thumb); continue; }
+    const pc = pinchAt(tr, Math.min(Math.max(t, tr.ts), tr.te));
+    // blend: the contact point moves from the palm spot to the corner along an arc out and up (round the cover's edge / over the pages)
+    const arc = H.R.up.clone().add(H.R.out.clone().multiplyScalar(t < tr.ts ? 0.8 : 0.0)).multiplyScalar(0.05 * Math.sin(Math.PI * w) * (w < 1 ? 1 : 0));
+    if (w >= 0.999) { solveHand(L, ht, "R", pc.rot, pc.n, pc.flex, pc.corner, null, 1); continue; }
+    // in between: hand rotation slerped, contact on a mixed point, fingers blended; the thumb follows the index (pinch) as w grows
+    const rot = hr.rot.clone().slerp(pc.rot, w), n = hr.n.clone().lerp(pc.n, w).normalize(), flex = lerpFlex(hr.flex, pc.flex, w);
+    const contact = hr.palm.clone().lerp(pc.corner, w).add(arc);
+    let wt = contact.clone();
+    for (let it = 0; it < 3; it++) { twoBone(L, ht, "R_Upperarm", "R_Forearm", "R_Hand", wt, 1); let st = fk(L, ht); L.set(B("R_Hand"), st.W.get(B("R_Forearm")).clone().invert().multiply(rot));
+      st = fk(L, ht); const tg = hr.thumb.clone().lerp(tipOf(st, 2, "R").add(n.clone().multiplyScalar(-0.012)), w); setFingers(L, ht, "R", flex, n, tg);
+      st = fk(L, ht); const cp = palmOf(st, "R").lerp(tipOf(st, 2, "R").lerp(tipOf(st, 1, "R"), 0.5), w); wt.add(contact.clone().sub(cp)); } }
+}
 
 // ---------- write
 for (const a of root.listAnimations()) a.dispose();

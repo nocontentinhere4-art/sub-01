@@ -26,6 +26,7 @@ const fill = new THREE.PointLight(0xffe0c0, 0.6, 5, 1.5); fill.position.set(0.5,
 const camera = new THREE.PerspectiveCamera(45, W / H, 0.05, 30);
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const load = u => new Promise((ok, no) => loader.load(u, ok, undefined, no));
+const REST_W = new Map();
 let room, chair, CH = {home: new THREE.Vector3(), ry: 0}, char, mixer, action, clipDur = 0, cfg, props = {}, skinned = [];
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 function chairPlace(k, dx = 0, dz = 0, rot = null){          // room.html chairAt(): out 0.40 along its front, swivel -pi/2 past k=0.375
@@ -49,7 +50,7 @@ function makePhone(){
 }
 window.setup = async (c) => {
   cfg = c;
-  const [rg, cg, chg, ag] = await Promise.all([load("room/room_clean.glb"), load("room/chair_owner.glb"), load("char.glb"), load(c.clip)]);
+  const [rg, cg, chg, ag] = await Promise.all([load("room/room_clean.glb"), load("room/chair_owner.glb"), load(c.char || "char.glb"), load(c.clip)]);
   room = rg.scene; scene.add(room);
   room.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = !/desk_lamp/i.test(o.name); if (o.material) o.material.envMapIntensity = 0.35; } });
   chair = room.getObjectByName("chair"); chair.rotation.y = 0; chair.position.z -= 0.15; CH.home.copy(chair.position); CH.ry = 0;
@@ -58,17 +59,70 @@ window.setup = async (c) => {
   chairPlace(0.375);
   char = chg.scene; scene.add(char);
   char.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true; if (o.isSkinnedMesh) skinned.push(o); } });
+  char.updateMatrixWorld(true); char.traverse(o => { if (o.isBone) REST_W.set(o.name, o.getWorldQuaternion(new THREE.Quaternion())); });
   mixer = new THREE.AnimationMixer(char); const clip = ag.animations[0]; clipDur = clip.duration;
   action = mixer.clipAction(clip); action.play();
   if (c.book) { props.book = makeBook(); props.book.position.set(...c.book.pos); props.book.rotation.y = c.book.ry || 0; props.book.scale.setScalar(c.book.scale || 1); scene.add(props.book); }
   if (c.phone) { props.phone = makePhone(); scene.add(props.phone); }
+  if (c.props) await buildProps(c.props);
   window.pose(0); return {dur: clipDur};
 };
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
+// props_g2.json (preview/room-mh): props in each MakeHuman clip's own frame (+Z forward; the v5 clips are that frame
+// turned 90° about Y): 'world' boxes, 'pages' turning about a pivot axis by keyed angles, 'held' boxes/cylinders on bones
+// (off/rot in the MakeHuman bone's rest frame = world-aligned; on v5 converted through the bone's rest world rotation)
+const PROPS = {root: null, pages: [], held: [], worldKeys: []};
+const DEG = Math.PI / 180, Cq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+// room-mh's own prop builder (boy_mh.js propMesh): colours by what it is, 'cyl' = [radiusTop, height, radiusBottom],
+// see-through only for glass/water (opacity), roughness 0.6
+const PCOL = w => /screen/.test(w) ? 0x6aa0ff : /phone/.test(w) ? 0x111214 : /plate/.test(w) ? 0xf2f0ea : /glass/.test(w) ? 0xcfe8f5
+  : /bottle/.test(w) ? 0x6fb37a : /cover/.test(w) ? 0x9a3b30 : /page|paperback|half/.test(w) ? 0xf5f1e6 : /counter/.test(w) ? 0xb79c7e : 0xd9a35b;
+// paper cues for the placeholder book: printed lines on a page face, fine stripes on the page block's edges
+const TEX = {};
+function paperTex(kind){ if (TEX[kind]) return TEX[kind]; const c = document.createElement("canvas"); c.width = 256; c.height = 384; const g = c.getContext("2d");
+  g.fillStyle = "#f3ecdc"; g.fillRect(0, 0, 256, 384);
+  if (kind === "text") { g.fillStyle = "#8a8378"; for (let y = 34; y < 350; y += 11) { const w = 180 - (y % 7) * 6 - (Math.random() * 24 | 0); g.fillRect(28, y, w, 3); } }
+  else { for (let y = 0; y < 384; y += 3) { g.fillStyle = y % 6 ? "#e6dcc6" : "#d8cdb5"; g.fillRect(0, y, 256, 1); } }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return TEX[kind] = t; }
+function shapeMesh(p){ const z = p.size, w = p.what || "";
+  if (/page/.test(w) && p.shape === "box") {   // box faces: +x -x +y -y +z -z; thickness along z: the faces are the page sides
+    const face = new THREE.MeshStandardMaterial({map: paperTex("text"), roughness: 0.85}), edge = new THREE.MeshStandardMaterial({map: paperTex("edge"), roughness: 0.9});
+    face.envMapIntensity = edge.envMapIntensity = 0.4; const m = new THREE.Mesh(new THREE.BoxGeometry(z[0], z[1], z[2]), [edge, edge, edge, edge, face, face]); m.castShadow = m.receiveShadow = true; return m; }
+  if (/cover/.test(w) && p.shape === "box") { const m = new THREE.Mesh(new THREE.BoxGeometry(z[0], z[1], Math.max(z[2], 0.005)), new THREE.MeshStandardMaterial({color: 0x24533d, roughness: 0.7}));
+    m.material.envMapIntensity = 0.4; m.castShadow = m.receiveShadow = true; return m; }
+  const geo = (p.shape === "cyl" || p.shape === "cylinder") ? new THREE.CylinderGeometry(z[0], z[2] != null ? z[2] : z[0], z[1], 20) : new THREE.BoxGeometry(z[0], z[1], z[2]);
+  const see = p.opacity != null || /glass/.test(w);
+  const mat = new THREE.MeshStandardMaterial({color: p.color ? Number(p.color) : PCOL(w), roughness: p.rough != null ? p.rough : 0.6,
+    transparent: see, opacity: p.opacity != null ? p.opacity : /glass/.test(w) ? 0.45 : 1, depthWrite: !see, emissive: /screen/.test(w) ? 0x335599 : 0x000000});
+  mat.envMapIntensity = 0.5; const o = new THREE.Mesh(geo, mat); o.castShadow = !see; o.receiveShadow = true; return o; }
+async function buildProps(spec){
+  const all = await (await fetch(cfg.propsFile || "props_g2.json")).json(), P = all[spec]; if (!P) return;
+  const root = new THREE.Group(), inner = new THREE.Group(); inner.quaternion.copy(Cq); root.add(inner); scene.add(root); PROPS.root = root;
+  for (const w of P.world || []) { if (/counter/.test(w.what || "")) continue; const o = shapeMesh(w); o.position.set(...(w.pos || [0, 0, 0])); const r = w.rot || [0, 0, 0]; o.rotation.set(r[0] * DEG, r[1] * DEG, r[2] * DEG, "XYZ");
+    if (w.keys) { const g = new THREE.Group(); g.add(o); inner.add(g); PROPS.worldKeys.push({g, keys: w.keys}); } else inner.add(o); }
+  for (const pg of P.pages || []) { const piv = new THREE.Group(); piv.position.set(...pg.pivot); inner.add(piv);
+    const o = shapeMesh(pg); o.rotation.set(pg.rot[0] * DEG, pg.rot[1] * DEG, pg.rot[2] * DEG, "XYZ");
+    // the page's own centre half a page width from the spine, along its local x
+    o.position.copy(new THREE.Vector3(pg.size[0] / 2, 0, 0).applyEuler(o.rotation)); piv.add(o); PROPS.pages.push({piv, axis: new THREE.Vector3(...pg.axis).normalize(), keys: pg.keys}); }
+  const MHB = {"wrist.L": "L_Hand", "wrist.R": "R_Hand", "LeftHand": "L_Hand", "RightHand": "R_Hand"};
+  for (const h of P.held || []) { const b = char.getObjectByName(MHB[h.bone] || h.bone); if (!b) { console.warn("prop bone", h.bone); continue; } const o = shapeMesh(h);
+    // MakeHuman bone rest frame = world; the v5 bone's rest world rotation turns it into the bone's local frame
+    b.updateMatrixWorld(true); const rq = REST_W.get(MHB[h.bone] || h.bone) || new THREE.Quaternion();
+    const off = new THREE.Vector3(...(h.off || [0, 0, 0])).applyQuaternion(Cq).applyQuaternion(rq.clone().invert());
+    const q = rq.clone().invert().multiply(Cq).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...(h.rot || [0, 0, 0]).map(x => x * DEG), "XYZ")));
+    o.position.copy(off); o.quaternion.copy(q); b.add(o); PROPS.held.push({o, h}); }
+}
+const keyAt = (keys, t) => { if (!keys.length) return 0; let i = 0; while (i + 1 < keys.length && keys[i + 1][0] <= t) i++; const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)];
+  if (t <= a[0] || b[0] <= a[0]) return a.slice(1); const u = Math.min(1, (t - a[0]) / (b[0] - a[0])); return a.slice(1).map((v, k) => v + (b[k + 1] - v) * u); };
+function poseProps(t){ if (!PROPS.root) return; PROPS.root.position.copy(char.position); PROPS.root.position.y += cfg.propsLift || 0; PROPS.root.quaternion.copy(char.quaternion);
+  for (const p of PROPS.pages) { const a = keyAt(p.keys, t)[0] || 0; p.piv.quaternion.setFromAxisAngle(p.axis, a * DEG); }
+  for (const w of PROPS.worldKeys) { const k = keyAt(w.keys, t); w.g.rotation.y = (k[0] || 0) * DEG; w.g.position.set(k[1] || 0, k[2] || 0, k[3] || 0); }
+  for (const h of PROPS.held) { if (h.h.on) { const on = h.h.on.some(([a, b]) => t >= a && t <= b); h.o.visible = on; } } }
 window.pose = (t) => {
   const pl = interp(cfg.root, t) || [0, 0, 0, 0];             // [x, y, z, ry] of the rig's origin in the room
   char.position.set(pl[0], pl[1], pl[2]); char.rotation.y = pl[3];
   action.time = Math.min(t, clipDur - 1e-4); mixer.update(0); char.updateMatrixWorld(true);
+  poseProps(t);
   if (cfg.chair) { const ck = interp(cfg.chair, t); chairPlace(ck[0], ck[1] || 0, ck[2] || 0, ck.length > 3 ? ck[3] : null); }
   if (cfg.chairFromHip && t >= cfg.chairFromHip.from && t <= cfg.chairFromHip.to) {   // the seat stays under his hips (riding the chair)
     const hp = char.getObjectByName("Hip").getWorldPosition(new THREE.Vector3()), r = chair.rotation.y, dz = cfg.chairFromHip.dz;
@@ -195,11 +249,42 @@ window.seatGap = (dt = 0.1) => {                              // per sample: the
     for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
       for (let i = 0; i < P.count; i += 2) { let bj = 0, bw = 0; for (let q = 0; q < 4; q++) { const w = SW.getComponent(i, q); if (w > bw) { bw = w; bj = SI.getComponent(i, q); } }
         if (!BUT.has(m.skeleton.bones[bj].name)) continue; m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); l.copy(v).applyMatrix4(inv);
-        if (Math.abs(l.x) > 0.20 || l.z < -0.16 || l.z > 0.12 || l.y > 0.80) continue;
+        if (Math.abs(l.x) > 0.20 || l.z < -0.34 || l.z > 0.12 || l.y > 0.80) continue;
         const ci = Math.floor((v.x - C.x0) / C.cell), cj = Math.floor((v.z - C.z0) / C.cell); const iv = (C.cols[ci * C.nz + cj] || []).filter(([lo, hi]) => hi - chair.position.y < 0.56 && hi - chair.position.y > 0.40 && v.y > lo);   // the cushion under (or around) this skin point: not skin hanging below it
-        if (!iv.length) continue; const top = Math.max(...iv.map(x => x[1])); const g = v.y - top, key = l.z > hipL.z - 0.03 ? "glute" : "thigh"; if (!gap) gap = {}; if (gap[key] === undefined || g < gap[key]) gap[key] = +g.toFixed(4);
+        if (!iv.length) continue; const top = Math.max(...iv.map(x => x[1])); const g = v.y - top, key = l.z > hipL.z - 0.03 ? "glute" : l.z < -0.17 ? "thigh" : "mid"; if (!gap) gap = {}; if (gap[key] === undefined || g < gap[key]) gap[key] = +g.toFixed(4);
         if (key === "glute") { gap.gz = gap.gz || []; } } }
     out.push([+t.toFixed(2), gap]); }
   return out; };
+window.chairProfile = (x = 0) => { const ms = []; chair.traverse(m => { if (m.isMesh) ms.push(m); }); window.pose(0); const C = columnsOf(ms, 0.01); const out = [];
+  for (let z = -0.35; z <= 0.45; z += 0.02) { const p = chair.localToWorld(new THREE.Vector3(x, 0, z)); const i = Math.floor((p.x - C.x0) / C.cell), j = Math.floor((p.z - C.z0) / C.cell);
+    out.push([+z.toFixed(2), (C.cols[i * C.nz + j] || []).map(v => v.map(y => +(y - 0.16).toFixed(3)))]); } return {rot: chair.rotation.y, pos: chair.position.toArray(), out}; };
+// the backrest (and lumbar pad): rays along the chair's local +z over an (x, y) grid in chair space; the front skin of the
+// backrest is the first hit above the seat. Skin behind that front surface (inside the pad) = penetration depth.
+function backCols(cell = 0.01){ const ms = []; chair.traverse(m => { if (m.isMesh) ms.push(m); }); chair.updateMatrixWorld(true); const inv = chair.matrixWorld.clone().invert();
+  const tris = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (const m of ms) { m.updateMatrixWorld(true); const M = inv.clone().multiply(m.matrixWorld), g = m.geometry, P = g.attributes.position, I = g.index, n = I ? I.count : P.count;
+    for (let i = 0; i < n; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(M); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(M); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(M);
+      if (Math.max(a.z, b.z, c.z) < 0.08 || Math.max(a.y, b.y, c.y) < 0.52) continue; tris.push([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z]); } }
+  const x0 = -0.30, y0 = 0.50, nx = 61, ny = 81, hits = Array.from({length: nx * ny}, () => []);
+  for (const t of tris) { const tx0 = Math.min(t[0], t[3], t[6]), tx1 = Math.max(t[0], t[3], t[6]), ty0 = Math.min(t[1], t[4], t[7]), ty1 = Math.max(t[1], t[4], t[7]);
+    for (let i = Math.max(0, Math.ceil((tx0 - x0) / cell - 0.5)); i <= Math.min(nx - 1, Math.floor((tx1 - x0) / cell - 0.5)); i++)
+      for (let j = Math.max(0, Math.ceil((ty0 - y0) / cell - 0.5)); j <= Math.min(ny - 1, Math.floor((ty1 - y0) / cell - 0.5)); j++) {
+        const px = x0 + (i + 0.5) * cell, py = y0 + (j + 0.5) * cell, d = (t[3] - t[0]) * (t[7] - t[1]) - (t[6] - t[0]) * (t[4] - t[1]); if (Math.abs(d) < 1e-12) continue;
+        const u = ((px - t[0]) * (t[7] - t[1]) - (t[6] - t[0]) * (py - t[1])) / d, v = ((t[3] - t[0]) * (py - t[1]) - (px - t[0]) * (t[4] - t[1])) / d;
+        if (u < 0 || v < 0 || u + v > 1) continue; hits[i * ny + j].push(t[2] + u * (t[5] - t[2]) + v * (t[8] - t[2])); } }
+  return {x0, y0, nx, ny, cell, inv, front: hits.map(h => h.length ? Math.min(...h) : null), back: hits.map(h => h.length ? Math.max(...h) : null)}; }
+const BACK_SKIN = new Set(["Waist", "Spine01", "Spine02", "L_Clavicle", "R_Clavicle", "NeckTwist01", "Hip", "Pelvis", "L_Upperarm", "R_Upperarm"]);
+window.backGap = (dt = 0.1) => {   // per sample: [t, max depth of back skin behind the backrest front (m, > 0 = inside), count of skin samples > 3 mm in, closest gap (m, < 0 = in)]
+  const out = [], v = new THREE.Vector3(); let BC = null;
+  for (let t = 0; t <= clipDur + 1e-6; t += dt) { window.pose(t); BC = backCols(); let mx = -9, n = 0;
+    for (const m of skinned) { const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
+      for (let i = 0; i < P.count; i += 2) { let bj = 0, bw = 0; for (let q = 0; q < 4; q++) { const w = SW.getComponent(i, q); if (w > bw) { bw = w; bj = SI.getComponent(i, q); } }
+        if (!BACK_SKIN.has(m.skeleton.bones[bj].name)) continue; m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(BC.inv);
+        const ci = Math.floor((v.x - BC.x0) / BC.cell), cj = Math.floor((v.y - BC.y0) / BC.cell); if (ci < 0 || cj < 0 || ci >= BC.nx || cj >= BC.ny) continue;
+        const f = BC.front[ci * BC.ny + cj]; if (f == null || v.z > BC.back[ci * BC.ny + cj] + 0.02) continue; const d = v.z - f; mx = Math.max(mx, d); if (d > 0.003) n++; } }
+    out.push([+t.toFixed(2), +mx.toFixed(4), n]); }
+  return out; };
+window.backProfile = () => { window.pose(0); const BC = backCols(); const o = []; for (let j = 0; j < BC.ny; j += 5) { const i = 30; o.push([+(BC.y0 + (j + 0.5) * BC.cell - 0.0).toFixed(2), BC.front[i * BC.ny + j] && +BC.front[i * BC.ny + j].toFixed(3), BC.back[i * BC.ny + j] && +BC.back[i * BC.ny + j].toFixed(3)]); } return o; };
+Object.assign(window, {THREE, backCols, columnsOf, inside}); for (const [k, f] of Object.entries({char: () => char, chair: () => chair, skinned: () => skinned, clipDur: () => clipDur})) Object.defineProperty(window, k, {get: f});
 window.ready = true;
 </script></body></html>
