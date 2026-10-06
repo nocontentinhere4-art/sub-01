@@ -41,7 +41,8 @@ def test_no_view_into_anything(tmp_path):
     bad = []
     with Server() as server, sync_playwright() as p:
         h.server = server; h.base = server.base
-        h.browser = p.chromium.launch(executable_path=H.CHROMIUM, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        exe = H.CHROMIUM if Path(H.CHROMIUM).exists() else None      # (the harness's rule: CI has Playwright's own Chromium)
+        h.browser = p.chromium.launch(executable_path=exe, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
         ctx, pg, st = h.open("1280"); h.goto_scene(pg, "desk", 20)
         pg.wait_for_function("() => !window.mh || window.mh.ready", timeout=180000)
         pg.evaluate("act('research', {screen: {device: 'desk', id: 'p1', kind: 'page'}}); for (let i = 0; i < 60; i++) animate_(1/30)")
