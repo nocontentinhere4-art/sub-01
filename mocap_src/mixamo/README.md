@@ -42,6 +42,22 @@ these are worth more to us than the Kimodo takes, which carried no fingers at al
 | `Sleeping_Idle.fbx` | asleep, breathing | the bed, replacing the flat pose |
 | `Laying_Sleeping.fbx` | asleep, a second reading | the bed, variation |
 | `Laying_Nodding.fbx` | head moving while lying down | the bed, awake with music |
+| `Texting.fbx` | on the phone | his phone sessions — most of his shorts are watched on it |
+| `Texting_While_Standing.fbx` | on the phone, standing | on his feet by the window or the door |
+| `Standing_Using_Touchscreen_Tablet.fbx` | holding a flat screen, standing | a larger screen held in both hands |
+
+The posture of the three phone takes (seated, standing, how the arms are held) is whatever
+Mixamo captured, not what their names imply. Confirm each on retarget before deciding which of
+his phone moments it belongs to.
+
+## Deliberately not here
+
+`Laying Hand Gesture` — the owner looked at it and rejected it. He had asked for the hands to
+move while he lies in bed, and this is the clip for it, but he did not like the performance. So
+the bed carries head motion and breathing and no hand gesture, by his decision. Do not add it,
+and do not hand-animate a replacement: invented hand motion is the thing this whole set exists
+to get rid of. If the hands read as dead once the bed clips are retargeted, that is a question
+for him, not something to paper over.
 
 The transition takes replace the two the owner called out as broken — standing up and sitting
 down — and give us the way in and out of typing, which we never had: until now the hands
