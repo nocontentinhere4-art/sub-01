@@ -11,7 +11,7 @@ side to side and rolls a little every two beats; the left hand taps on the stoma
 dances loose at the wrist to the beat (3.7-7.8 s), then settles back; the right foot's toes tap; the raised knee drifts.
 His lowest skin is held at the flat pose's level in every frame (a vertical move of the Hip), so the page's lift
 (from his lowest skin, re-measured once a second while he lies still) stays what it was at bed_lie's end.
-python music.py <bed_lie.x.json> <bed_wake.x.json> <outdir>"""
+V5JSON=<exp.mjs of web/room/char_v5.glb> python music.py <bed_lie.x.json> <bed_wake.x.json> <outdir>"""
 import json, sys, os, numpy as np
 from rt import Skel, qmul, qinv, qrot, qnorm, qbetween, qslerp, FPS
 from skinlib import mats, skin_setup, skin
@@ -26,7 +26,7 @@ def last(d, first=False):
     return T[f].copy(), R[f].copy(), {d['nodes'][c['node']]['name'] for c in an['ch'] if c['path'] == 'rotation'}
 T0, R0, animated = last(dl)
 Tw, Rw, _ = last(json.load(open(wake_p)), first=True)
-v5 = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'json', 'v5.json')))
+v5 = json.load(open(os.environ.get('V5JSON') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'json', 'v5.json')))   # the body the page shows (exp.mjs of web/room/char_v5.glb)
 vn = [n['name'] for n in v5['nodes']]
 J, ibm, V, JI, WW = skin_setup(v5, 3); Jn = np.array([ix[vn[j]] for j in J])
 dom = np.array(vn)[J[JI[np.arange(len(JI)), WW.argmax(1)]]]
@@ -414,10 +414,12 @@ if __name__ == '__main__' and not os.environ.get('STILL'):
     # his lowest skin, re-measured once a second while he lies still, so a lowest point that moves would step him
     # (or dip the hood into the mattress between two measures); held, the lift never changes from bed_lie's end on
     par = ts.parent[hi]; Cl = L0['all']
+    J1, ibm1, V1, JI1, WW1 = skin_setup(v5, 1); Jn1 = np.array([ix[vn[j]] for j in J1])   # every vertex (the page measures every other one)
+    P_, Q_, S_ = fk(T0, R0); Cl = float(skin(mats(P_[None], Q_[None], S_), Jn1, ibm1, V1, JI1, WW1)[0][:, 1].min())
     def hold(frames):
         out = []
         for T, R in frames:
-            T = T.copy(); X = skinpos(T, R); d = Cl - float(X[:, 1].min())
+            T = T.copy(); P_, Q_, S_ = fk(T, R); d = Cl - float(skin(mats(P_[None], Q_[None], S_), Jn1, ibm1, V1, JI1, WW1)[0][:, 1].min())
             T[hi] = T[hi] + qrot(qinv(Q0[par]), np.array([0, d, 0])) / Sc[par]; out.append((T, R))
         return out
     intro, loop, outro = hold(intro), hold(loop[:-1]), hold(outro); loop.append(loop[0])

@@ -38,18 +38,17 @@ These were measured in the room with `room.html?debug`, `live("listen_music")`, 
 
 | part | gap to the surface under it |
 |---|---|
-| right sole | −0.5 cm (into the quilt) |
-| left sole | 0.2 cm (quilt) |
-| left calf | 0.5 cm (quilt) |
-| right calf | 3.6 cm (knee up) |
-| right hand | −0.1 cm (pillow) |
-| head | 3.7 cm over the pillow: it rests on the stiff hood (the pillow dent is the page's) |
-| back | about 1 cm into the mattress (within the page's give) |
+| back | 0.1 cm (mattress) |
+| left sole | about 3 cm into the quilt (his lowest point, within the page's give) |
+| right sole | 0.8 cm (quilt) |
+| calves | 1.1 / 1.8 cm (quilt) |
+| right hand | 1.1 cm (pillow) |
+| head | 4.8 cm over the pillow: it rests on the stiff hood (the pillow dent is the page's) |
 
-`penetration()` is 0 over the loop. His axis runs along the bed (feet → hips 0.5°), and both foot tips stay at x −0.32 or less through the loop.
+ is 0 over the loop. His axis runs along the bed (feet → hips 0.5°), and both foot tips stay at x −0.32 or less through the loop.
 
-His lowest skin is held at one level in every frame of all three clips, using a vertical move of the Hip, so the page's lift (re-measured once a second while he lies still) never changes during in → loop → out.
-It settles at 0.197 m, 1.8 cm under bed_lie's 0.2153 m, because a planted calf is now his lowest point; his place in the room is the same, and the page's eased lift takes the change on the way in.
+His lowest skin is held at one level in every frame of all three clips, using a vertical move of the Hip, measured on every vertex of the body the page shows ( as on this branch, with G10d's new feet).
+With G10d's wiring (2da310a) the page's lift is 0.2153 m at every sample through in → loop, the same as bed_lie's on main, so he never bobs and nothing steps.
 
 Why he looked as if he floated from the page's camera (941c316): his legs ran past the mattress end and splayed corner to corner, and nothing marks where his body meets the quilt (it does not dent, and the sun puts his shadow on the floor past the bed's end). The legs are fixed here (`legs_before_after.jpg`); the quilt dent is G10d's.
 
