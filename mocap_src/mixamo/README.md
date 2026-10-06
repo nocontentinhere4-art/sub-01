@@ -31,6 +31,15 @@ these are worth more to us than the Kimodo takes, which carried no fingers at al
 | `Seated_Idle.fbx` | seated idle | desk, the idle under everything else |
 | `Scared.fbx` | startle | rare moment at the computer — something outside, a jolt, as if the building moved |
 | `Angry_Gesture.fbx` | frustration | rare moment at the computer — something he is working on goes wrong |
+| `Stand_To_Sit.fbx` | lowering into the chair | arriving at the desk |
+| `Sit_To_Stand.fbx` | rising out of the chair | leaving the desk |
+| `Sit_To_Type.fbx` | hands coming up to the keyboard | entering the typing pose |
+| `Typing.fbx` | typing | the working pose itself |
+| `Type_To_Sit.fbx` | hands coming back down | leaving the typing pose |
+
+The last five replace the two takes the owner called out as broken — standing up and sitting
+down — and give us the transition in and out of typing, which we never had: until now the
+hands arrived at the keyboard by teleporting there.
 
 The last two are deliberately rare: they are punctuation, not behaviour. They play once in a
 long while and never twice near each other.
