@@ -44,6 +44,8 @@
     for (let j = 0; j < c.length; j += 2) if (u.y > c[j] && u.y < c[j + 1]) return Math.min(u.y - c[j], c[j + 1] - u.y);
     return 0;
   }
+  const _u = new THREE.Vector3();
+  const region = u => Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm" : u.z < -0.17 && u.y < 0.62 ? "front" : u.z > 0.12 && u.y > 0.55 ? "back" : u.y < 0.30 ? "base" : "seat";
   const HAND = /hand|finger|thumb|index|middle|ring|pinky|metacarpal|wrist|palm/i;
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
   function check(res, frame, every = 1) {             // one frame: every skinned vertex against every object
@@ -58,7 +60,8 @@
         for (const [name, o] of Object.entries(objs)) {
           if (name !== "chair" && !HAND.test(bone(i))) continue;          // (hands only, against the desk things)
           const d = inside(o, v); if (d <= 0) continue;
-          const key = name + ":" + bone(i), r = res.hits[key] = res.hits[key] || {n: 0, verts: new Set(), max: 0, frames: new Set()};
+          // the chair's hits by where on it (its own frame: the sitter faces -z, the seat's front edge at z ~ -0.25)
+          const key = (name === "chair" && window.__chairRegions ? "chair@" + region(_u.copy(v).applyMatrix4(o.inv)) : name) + ":" + bone(i), r = res.hits[key] = res.hits[key] || {n: 0, verts: new Set(), max: 0, frames: new Set()};
           r.n++; r.verts.add(sm.name + "#" + i); r.max = Math.max(r.max, d); r.frames.add(frame);
         }
       }

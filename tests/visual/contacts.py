@@ -56,6 +56,7 @@ def main():
     ap.add_argument("--only", default="")
     ap.add_argument("--chair-sdf", default="", help="a signed distance grid of the chair (tests/visual/chair_sdf.py) for its test, in place of ray parity")
     ap.add_argument("--chair-tol-mm", type=int, default=2)
+    ap.add_argument("--chair-regions", action="store_true", help="split the chair's hits by where on it (chair@arm / front / seat / back / base)")
     ap.add_argument("--occupancy", default="", help="instead of the checks: write where his skin goes in the chair's frame (JSON)")
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -71,6 +72,7 @@ def main():
             import base64
             import numpy as np
             z = np.load(a.chair_sdf)
+            pg.evaluate(f"window.__chairRegions = {'true' if a.chair_regions else 'false'}")
             pg.evaluate("(g) => { window.__chairSDF = g; }", {"b64": base64.b64encode(z["sd"].astype(np.int8).tobytes()).decode(), "lo": z["lo"].tolist(),
                                                               "step": float(z["step"]), "dims": list(z["sd"].shape), "tol": a.chair_tol_mm})
         pg.add_script_tag(path=str(Path(__file__).with_name("contacts.js")))
