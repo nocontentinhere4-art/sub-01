@@ -10,7 +10,8 @@ const body = bodyNode.getMesh().listPrimitives()[0];
 const idx = body.getIndices().getArray(); const sl = rd("slide_tris.bin", Uint32Array);
 const isSl = new Uint8Array(idx.length / 3); for (const t of sl) isSl[t] = 1;
 const keep = [], slv = [];
-for (let t = 0; t < idx.length / 3; t++) (isSl[t] ? slv : keep).push(idx[3*t], idx[3*t+1], idx[3*t+2]);
+const gone = fs.existsSync(`${WD}/gone_tris.bin`) ? fs.readFileSync(`${WD}/gone_tris.bin`) : null;   // original sock/toe pieces replaced by the new feet
+for (let t = 0; t < idx.length / 3; t++) { if (isSl[t]) slv.push(idx[3*t], idx[3*t+1], idx[3*t+2]); else if (!(gone && gone[t])) keep.push(idx[3*t], idx[3*t+1], idx[3*t+2]); }
 const A = n => body.getAttribute(n), sem = ["POSITION", "NORMAL", "TEXCOORD_0", "JOINTS_0", "WEIGHTS_0"];
 // foot closure: extra vertices appended to the body's attributes
 let nb = A("POSITION").getCount();
