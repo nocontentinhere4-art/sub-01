@@ -65,3 +65,19 @@ Before: main's seated idle, feet hovering 5–14 cm. After: on the seat, feet on
 ## A note for the page's wiring
 
 `boy_mh.js` swaps in the mouse clip's legs when the watch clip's feet start more than 0.12 m up. Seated_Idle's ankles sit 2.7 cm higher for the slides, which trips that test. So the test here plays it with that swap off, and the wiring should do the same for these clips (or give them their own slot).
+
+## The bed set: what the three captures are, and how they sit on our bed
+
+The page does not place a lying clip by its own pose. It turns and moves him by a reference pose (asleep: `room_bedtime`'s end; lying awake: `room_bed_lie`'s end). So `room_build/kimodo_g12/bed_fit.py` does two things for each clip:
+- puts the clip's hips and heading on the reference's;
+- holds his lowest skin at the reference's level in every frame, so the page's once-a-second lift never steps (he turns over in Sleeping_Idle).
+
+All three clips loop on their own: the first and last frames match within 1.3°.
+
+| clip (out) | what it actually is | bed penetration | hands in his thighs | feet vs the mattress end (x −0.21) | notes |
+|---|---|---|---|---|---|
+| Sleeping_Idle → `room_sleeping_idle.glb` | 17.6 s; curled on his side; turns over and back (head 85°, arms 100°) | 0 (whole clip) | 0 | inside (−0.27…−0.37) | the turns carry his head 33 cm off the pillow, and the duvet balloons over the moving arms (`sleeping_idle_room.jpg`) |
+| Laying_Sleeping → `room_laying_sleeping.glb` | 1.7 s loop; on his back, breathing (spine/neck 3–4°) | 0 | 0 | **12–18 cm past** (−0.09 / −0.03) | head on the pillow, hands on his chest under the duvet |
+| Laying_Nodding → `room_laying_nodding.glb` | 1.43 s loop; on his back, hands clasped on his chest, a 5° nod | 0 | 0 | **12–18 cm past** | for lying awake (`laying_sleeping_nodding_room.jpg`) |
+
+He is 1.75 m and the mattress is 1.65 m. A straight-legged lying capture therefore overhangs its end whatever the retarget does. Pulling the feet in means bending the captured legs, or sliding him into the headboard. Either changes the performance, so this is left open as a decision rather than patched.

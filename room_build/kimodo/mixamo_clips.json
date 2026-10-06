@@ -1,7 +1,37 @@
 {
- "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/.",
- "defaults": {"seated": {"scale": "hip", "seatHipY": 0.68, "seatForward": 0.045, "pitch": 10, "soleUp": 0.027, "handUp": 0.012}},
+ "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame.",
+ "defaults": {
+  "seated": {
+   "scale": "hip",
+   "seatHipY": 0.68,
+   "seatForward": 0.045,
+   "pitch": 10,
+   "soleUp": 0.027,
+   "handUp": 0.012
+  },
+  "bed": {
+   "scale": "hip"
+  }
+ },
  "clips": {
-  "Seated_Idle": {"kind": "seated", "out": "room_seated_idle"}
+  "Seated_Idle": {
+   "kind": "seated",
+   "out": "room_seated_idle"
+  },
+  "Sleeping_Idle": {
+   "kind": "bed",
+   "ref": "room_bedtime",
+   "out": "room_sleeping_idle"
+  },
+  "Laying_Sleeping": {
+   "kind": "bed",
+   "ref": "room_bedtime",
+   "out": "room_laying_sleeping"
+  },
+  "Laying_Nodding": {
+   "kind": "bed",
+   "ref": "room_bed_lie",
+   "out": "room_laying_nodding"
+  }
  }
 }
