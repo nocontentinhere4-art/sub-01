@@ -871,37 +871,60 @@ export function createMH(env) {
   // alive() layer do not run here), back on the hook when it stops. (Lying on the bed listening, his motion is G12's
   // clips, room_bed_music*: nothing procedural here) ----------
   const MU = {set: null, wall: null};
-  function headphones() {                                    // a copy of the wall pair, fitted to his head from his own skin
+  // The pair he wears, built to fit THIS head (the wall pair is a single scanned mesh, folded shut on its hook with the hook
+  // in it; it cannot be opened cleanly). Real over-ear headphones: each cup about 9-10 cm tall, 7-8 wide, 3-4 deep, the
+  // cushions about 2 cm thick; the band about 3 cm wide. His head on v5, measured in the Head bone's frame at bind (the
+  // owner_head skin, G10d 2026-10-06): the ears' outer surfaces 15.5 cm apart, the ear's centre 6.9 local units up and
+  // 1.45 back of the bone; the band follows his hair's own outline over the top, from cup to cup, resting on it.
+  // Built in the Head bone's frame, so it stays put however he turns his head
+  const HP = {CUP_H: 0.095, CUP_W: 0.075, CUP_D: 0.03, CUSH: 0.02, PRESS: 0.004, BAND_W: 0.03, BAND_T: 0.009,
+    EAR_Y: 0.069, EAR_Z: -0.0145, EAR_WIN: [0.057, 0.080, -0.026, -0.003], GREY: 0x8f8b86, DARK: 0x262626};
+  function headphones() {
     if (MU.set !== null) return MU.set;
     const room = env.room && env.room(), wall = room && room.getObjectByName("headphones"), head = env.bones.Head;
-    if (!wall || !head) return MU.set = null;
+    if (!head) return MU.set = null;
     MU.wall = wall;
-    const src = wall.children.find(c => c.name !== "headphones_mesh" && c.visible !== false); if (!src) return MU.set = null;
-    const m = src.clone(true); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1); m.updateMatrixWorld(true);
-    let mb = new THREE.Box3().setFromObject(m);              // (its height is y: it hangs on the hook band up; the ears are its long side)
-    if (mb.getSize(V()).z > mb.getSize(V()).x) { m.rotation.y = Math.PI / 2; m.updateMatrixWorld(true); mb = new THREE.Box3().setFromObject(m); }   // (ears along x)
-    const ms = mb.getSize(V()), mc = mb.getCenter(V());
-    // his head, as it is now: the skin his Head bone carries most; its up (to head_end), across (shoulder to shoulder)
-    env.boy.updateMatrixWorld(true);
-    const H0 = head.getWorldPosition(V()), up = (env.boy.getObjectByName("head_end") || head).getWorldPosition(V()).sub(H0).normalize();
-    const lat = env.bones.LeftShoulder.getWorldPosition(V()).sub(env.bones.RightShoulder.getWorldPosition(V())); lat.addScaledVector(up, -lat.dot(up)).normalize();
-    const fwd = V().crossVectors(lat, up);
-    let top = -9, l0 = 9, l1 = -9, f0 = 9, f1 = -9; const v = V();
-    env.boy.traverse(o => { if (!o.isSkinnedMesh || !o.visible) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, P = g.attributes.position;
-      const hi = o.skeleton.bones.indexOf(head); if (hi < 0) return;
-      for (let i = 0; i < P.count; i += 2) { let b = 0, bw = -1; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); }
-        if (b !== hi) continue; o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld).sub(H0);
-        top = Math.max(top, v.dot(up)); const a = v.dot(lat), f = v.dot(fwd); l0 = Math.min(l0, a); l1 = Math.max(l1, a); f0 = Math.min(f0, f); f1 = Math.max(f1, f); } });
-    if (top < 0) return MU.set = null;
-    // scaled so the cups clear his head (the pair's inside about 80% of its width), the band on his crown, the cups over
-    // his ears (a little behind the middle of his head, front to back)
-    const sc = (l1 - l0 + 0.02) / (0.8 * ms.x);
-    const g = new THREE.Group(); g.add(m); m.position.set(-mc.x, -mb.max.y, -mc.z);   // (its band top, centred, at the group's origin)
-    g.scale.setScalar(sc);
-    const at = H0.clone().addScaledVector(up, top + 0.008).addScaledVector(lat, (l0 + l1) / 2).addScaledVector(fwd, f0 + (f1 - f0) * 0.45);
-    const R = new THREE.Matrix4().makeBasis(lat, up, fwd); g.quaternion.setFromRotationMatrix(R); g.position.copy(at);
+    let sm = null; env.boy.traverse(o => { if (o.isSkinnedMesh && o.skeleton.bones.includes(head)) {
+      const hi = o.skeleton.bones.indexOf(head), W = o.geometry.attributes.skinWeight, I = o.geometry.attributes.skinIndex; let n = 0;
+      for (let i = 0; i < o.geometry.attributes.position.count; i += 50) for (let k = 0; k < 4; k++) if (I.getComponent(i, k) === hi && W.getComponent(i, k) > 0.5) n++;
+      if (n > 50 && (!sm || n > sm.n)) { sm = o; sm.n = n; } } });
+    if (!sm) return MU.set = null;
+    head.updateMatrixWorld(true); const ws = head.getWorldScale(V()).x;           // (the bone's units -> metres)
+    const hi = sm.skeleton.bones.indexOf(head), inv = sm.skeleton.boneInverses[hi], P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight;
+    const v = V(), [y0, y1, z0, z1] = HP.EAR_WIN, prof = new Map(); let earL = 0, earR = 0;
+    for (let i = 0; i < P.count; i++) { let d = 0, bw = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); d = I.getComponent(i, k); }
+      if (d !== hi) continue; v.fromBufferAttribute(P, i).applyMatrix4(sm.bindMatrix).applyMatrix4(inv);
+      if (v.y > y0 && v.y < y1 && v.z > z0 && v.z < z1) { earL = Math.min(earL, v.x); earR = Math.max(earR, v.x); }
+      if (Math.abs(v.z - HP.EAR_Z) < 0.02 && v.y > HP.EAR_Y) {                   // (his outline across the top, at the cups' plane)
+        const k = Math.round((v.y - HP.EAR_Y) * ws / 0.005); prof.set(k, Math.max(prof.get(k) || 0, Math.abs(v.x) * ws)); } }
+    // in metres, from the ear's centre (the group's origin): x across, y up
+    const e = (earR - earL) / 2 * ws, cx = e - HP.PRESS + HP.CUSH + HP.CUP_D / 2;   // (the cushion on the ear, pressed a little)
+    const ks = [...prof.keys()].sort((a, b) => a - b), top = ks[ks.length - 1] * 0.005;
+    const half = y => { let w = 0; for (const k of ks) if (Math.abs(k * 0.005 - y) <= 0.0075) w = Math.max(w, prof.get(k)); return w; };
+    // the band's centre line: from the top of each cup, up over his outline (half its thickness off it), across the crown
+    const y0b = HP.CUP_H / 2 - 0.01, N = 24, ys = [], need = [];
+    for (let i = 0; i <= N; i++) { const t = i / N, y = y0b + (top - y0b) * Math.sin(t * Math.PI / 2); ys.push(y); need.push(half(y) + HP.BAND_T / 2); }
+    // (it can only come in as it rises: the widest of his outline from here up, then smoothed, never inside the outline)
+    const xs = need.map((_, i) => Math.max(...need.slice(i), cx * Math.cos(i / N * Math.PI / 2)));
+    for (let pass = 0; pass < 6; pass++) for (let i = 1; i < N; i++) xs[i] = Math.max(need[i], (xs[i - 1] + xs[i] + xs[i + 1]) / 3);
+    xs[0] = cx; xs[N] = 0; ys[N] = top + HP.BAND_T / 2;
+    const right = xs.map((x, i) => V(x, ys[i], 0));                                  // (the right half: cup top -> crown)
+    const line = [...right.map(p => V(-p.x, p.y, 0)), ...right.slice(0, -1).reverse()];   // (left cup -> crown -> right cup)
+    const grey = new THREE.MeshStandardMaterial({color: HP.GREY, roughness: 0.55, metalness: 0.1}), dark = new THREE.MeshStandardMaterial({color: HP.DARK, roughness: 0.9});
+    const sh = new THREE.Shape(); { const w = HP.BAND_W / 2, t = HP.BAND_T / 2, r = 0.003; sh.moveTo(-t + r, -w); sh.lineTo(t - r, -w); sh.quadraticCurveTo(t, -w, t, -w + r);
+      sh.lineTo(t, w - r); sh.quadraticCurveTo(t, w, t - r, w); sh.lineTo(-t + r, w); sh.quadraticCurveTo(-t, w, -t, w - r); sh.lineTo(-t, -w + r); sh.quadraticCurveTo(-t, -w, -t + r, -w); }
+    const band = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {steps: 64, bevelEnabled: false, extrudePath: new THREE.CatmullRomCurve3(line)}), grey);
+    const g = new THREE.Group(); g.add(band);
+    for (const sx of [-1, 1]) {                                                     // each cup: its shell and its cushion, facing the ear
+      const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 40), grey); shell.rotation.z = Math.PI / 2;
+      shell.scale.set(HP.CUP_H, HP.CUP_D, HP.CUP_W); shell.position.set(sx * cx, 0, 0);
+      const cush = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.16, 16, 40), dark); cush.rotation.y = Math.PI / 2;
+      cush.scale.set(HP.CUP_W * 0.92, HP.CUP_H * 0.92, HP.CUSH / 0.32); cush.position.set(sx * (e - HP.PRESS + HP.CUSH / 2), 0, 0);
+      const yoke = new THREE.Mesh(new THREE.BoxGeometry(HP.BAND_T, 0.02, HP.BAND_W * 0.8), grey); yoke.position.set(sx * cx, HP.CUP_H / 2 - 0.004, 0);
+      g.add(shell, cush, yoke); }
     g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    env.scene.add(g); g.updateMatrixWorld(true); head.attach(g); g.visible = false; g.name = "headphones_on";
+    head.add(g); g.position.set(0, HP.EAR_Y, HP.EAR_Z); g.scale.setScalar(1 / ws); g.visible = false; g.name = "headphones_on";
+    M.hpFit = MU.fit = {ear_span_cm: +(2 * e * 100).toFixed(1), crown_over_ear_cm: +(top * 100).toFixed(1), cup_centre_out_cm: +(cx * 100).toFixed(1)};
     return MU.set = g;
   }
   // lying on the bed listening (the page's "listen"): in -> the loop; when the page gets him up, its step waits while the
