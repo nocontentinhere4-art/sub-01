@@ -111,9 +111,12 @@ for (let f = 0; f < T; f++) { const t = Math.min(f / FPS, dur), s = sFK(t), W = 
   // forward (m): his hips further forward on the seat (off the backrest), with his hands (unless handForward false: they
   // stay on the keyboard / mouse / plate); baked into the clip, so the page's chair placement needs no change
   const fwd = O.forward || 0;
-  const hip = new THREE.Vector3(hm.x + fwd, (hm.y - srcAnkle) * k + tgtAnkle + lift, hm.z);
+  // shift [forward, left] (m): the body re-centred on the page's seat (hips + feet); handShift: the hands (and anything held
+  // or world props), default = shift (type / mouse: only the forward part, the keys and mouse stay put)
+  const SH = O.shift || [0, 0], HS = O.handShift || SH;
+  const hip = new THREE.Vector3(hm.x + fwd + SH[0], (hm.y - srcAnkle) * k + tgtAnkle + lift, hm.z - SH[1]);
   const eff = {}; for (const [n, sn] of [["L_Hand", "LeftHand"], ["R_Hand", "RightHand"], ["L_Foot", "LeftFoot"], ["R_Foot", "RightFoot"]]) {
-    const p = s.P.get(sn).clone().applyQuaternion(C); if (n.endsWith("Foot")) { p.y = p.y - srcAnkle + tgtAnkle; p.x += fwd; } else { p.y += O.handLift ?? lift; if (O.handForward !== false) p.x += fwd; } eff[n] = p; }
+    const p = s.P.get(sn).clone().applyQuaternion(C); if (n.endsWith("Foot")) { p.y = p.y - srcAnkle + tgtAnkle; p.x += fwd + SH[0]; p.z -= SH[1]; } else { p.y += O.handLift ?? lift; if (O.handForward !== false) p.x += fwd; p.x += HS[0]; p.z -= HS[1]; } eff[n] = p; }
   frames.push({W, hip, eff}); }
 function toLocal(Wmap, hipWorld){ const L = new Map(), Wc = new Map();
   for (const n of bonesTD) { const p = parentOf.get(n), name = n.getName(), pw = p ? Wc.get(p) : new THREE.Quaternion();
@@ -187,12 +190,13 @@ function bookGrip(OB){
   const tp = p => V(p).sub(c).applyQuaternion(Rt).add(c).add(sh).toArray().map(x => +x.toFixed(5));
   for (const w of items) { w.pos = tp(w.pos); w.rot = eul(Rt.clone().multiply(qOf(w.rot || [0, 0, 0]))); }
   for (const pg of P.pages || []) { pg.pivot = tp(pg.pivot); pg.rot = eul(Rt.clone().multiply(qOf(pg.rot))); pg.axis = V(pg.axis).applyQuaternion(Rt).toArray().map(x => +x.toFixed(5)); }
-  const Pw = JSON.parse(JSON.stringify(P)), dd = [0, O.seatLift || 0, O.forward || 0];
+  const HSw = O.handShift || O.shift || [0, 0], Pw = JSON.parse(JSON.stringify(P)), dd = [HSw[1], O.seatLift || 0, (O.forward || 0) + HSw[0]];
   for (const w of Pw.world) if (/page block|cover/.test(w.what)) w.pos = w.pos.map((x, i) => +(x + dd[i]).toFixed(5));
   for (const pg of Pw.pages || []) pg.pivot = pg.pivot.map((x, i) => +(x + dd[i]).toFixed(5));
   if (OB.out) { const o = fs.existsSync(OB.out) ? JSON.parse(fs.readFileSync(OB.out)) : JSON.parse(JSON.stringify(all)); o[OB.clip] = Pw; fs.writeFileSync(OB.out, JSON.stringify(o, null, 1)); }
   // the seat lift and the forward shift baked into the written props (clip frame: +y up, +z his forward)
-  const D = new THREE.Vector3(0, O.seatLift || 0, O.forward || 0), R = p => V(p).add(D).applyQuaternion(C), Rd = v => v.clone().applyQuaternion(C);
+  const HS0 = O.handShift || O.shift || [0, 0];
+  const D = new THREE.Vector3(HS0[1], O.seatLift || 0, (O.forward || 0) + HS0[0]), R = p => V(p).add(D).applyQuaternion(C), Rd = v => v.clone().applyQuaternion(C);
   const cen = R(c.clone().add(sh).toArray());   // (R adds D)
   const half = side => { const pg = items.find(w => /page block/.test(w.what) && (side === "L" ? /left/.test(w.what) : /right/.test(w.what))), cv = items.find(w => /cover/.test(w.what) && (side === "L" ? /left/.test(w.what) : /right/.test(w.what)));
     const Q = C.clone().multiply(qOf(pg.rot)), ex = new THREE.Vector3(1, 0, 0).applyQuaternion(Q), ey = new THREE.Vector3(0, 1, 0).applyQuaternion(Q), ez = new THREE.Vector3(0, 0, 1).applyQuaternion(Q);
