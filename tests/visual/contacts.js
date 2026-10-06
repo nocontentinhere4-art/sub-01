@@ -60,7 +60,7 @@
   // the bed: the mattress as a plane (boy_mh.js's BED: x0, x1, z0, z1 and its top, 0.82 m less 1.5 cm of give) and the
   // page's duvet over him (duvet_over: a grid of rows across the bed, nz points each from z 0.14 to 1.61, its top surface
   // first): a vertex under the plane is into the mattress, one over the duvet's top (not his head or neck) is through it
-  const MAT = {x0: -1.90, x1: -0.20, z0: 0.25, z1: 1.50, top: 0.805}, DZ = [0.14, 1.61];
+  const MAT = {x0: -1.90, x1: 0.05, z0: 0.25, z1: 1.50, top: 0.805}, DZ = [0.14, 1.61];
   function duvet() {
     const m = scene.getObjectByName("duvet_over"); if (!m || !m.visible) return null;
     const P = m.geometry.attributes.position.array, nt = P.length / 6, x0 = P[0];
