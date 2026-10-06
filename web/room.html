@@ -2272,7 +2272,7 @@ function tuck(){
 // ---- in bed: asleep he is under the duvet (it is pulled up from the foot of the bed and follows his body and his
 // breathing) and his slides are parked by the bed; whenever he lies on the bed his head and shoulders dent the pillow
 const DUV = {src:null, segs:null, w:0, acc:0};
-const PIL = {src:null, mesh:null, base:null, idx:null, on:false};
+const PIL = {src:null, mesh:null, base:null, idx:null, top:null, FLOOR:0.84, on:false};
 const BODY_SEGS = [["Hips", "Spine02"], ["Spine02", "Spine01"], ["Spine01", "Spine"], ["Spine", "neck"],
   ["LeftUpLeg", "LeftLeg"], ["LeftLeg", "LeftFoot"], ["LeftFoot", "LeftToeBase"], ["RightUpLeg", "RightLeg"], ["RightLeg", "RightFoot"], ["RightFoot", "RightToeBase"],
   ["LeftShoulder", "LeftArm"], ["LeftArm", "LeftForeArm"], ["LeftForeArm", "LeftHand"], ["LeftHand", "LeftHand"],
@@ -2298,7 +2298,7 @@ function bedInit(){                                    // the duvet and the pill
   let sm = null; boy.traverse(o => { if (o.isSkinnedMesh && (!sm || o.skeleton.bones.length > sm.skeleton.bones.length)) sm = o; });   // (the whole skeleton: a dressed body's parts may carry only some of it)
   if (!DUV.src || !PIL.src || !sm) return false;
   [PIL.mesh, PIL.base] = shapeable(PIL.src, "pillow_dent");
-  PIL.idx = []; for (let i = 0; i < PIL.base.length / 3; i++) if (PIL.base[3 * i] < -1.3 && PIL.base[3 * i + 1] > 0.84) PIL.idx.push(i);   // the pillow's vertices
+  PIL.idx = []; for (let i = 0; i < PIL.base.length / 3; i++) if (PIL.base[3 * i] < -1.3 && PIL.base[3 * i + 1] > PIL.FLOOR) PIL.idx.push(i);   // the pillow's vertices
   // how thick he is around each bone segment: the 90th percentile of his vertices' distance from it, in his bind pose
   // (no skinning needed), at his scale
   const names = sm.skeleton.bones.map(b => b.name), segOf = {}; BODY_SEGS.forEach(([a], k) => { if (!(a in segOf)) segOf[a] = k; });
@@ -2351,6 +2351,78 @@ function pillowDent(k){                                // the pillow gives under
     }
     pos[3 * i + 1] = y0 + (Math.max(y, 0.83) - y0) * k;
   }
+  g.attributes.position.needsUpdate = true; g.computeVertexNormals();
+}
+// Lying awake on top of the bed, the folded quilt under him gives: each of its vertices under his body goes down to just
+// under his skin there, and round his outline the cloth rises again at a slope (DENT.SLOPE), so his back, hips and legs
+// meet it along a contact line instead of passing through an undeformed shape (v5, G12's music pose). From his skin
+// itself (a 2 cm grid of his underside over the bed); pressed flat it keeps 1.4 cm of quilt over the sheet
+// over DENT's grid: the highest rest vertex of a mesh in each cell and its neighbours (which also fills cells none fell in)
+function dentTop(base, idx){
+  const {X0, Z0, C, NX, NZ} = DENT, T0 = new Float32Array(NX * NZ).fill(-9), T = new Float32Array(NX * NZ);
+  const each = f => { if (idx) for (const i of idx) f(3 * i); else for (let i = 0; i < base.length; i += 3) f(i); };
+  each(i => { const ci = Math.floor((base[i] - X0) / C), ck = Math.floor((base[i + 2] - Z0) / C);
+    if (ci >= 0 && ck >= 0 && ci < NX && ck < NZ) T0[ci * NZ + ck] = Math.max(T0[ci * NZ + ck], base[i + 1]); });
+  for (let ci = 0; ci < NX; ci++) for (let ck = 0; ck < NZ; ck++) { let m = -9;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const ii = ci + a, kk = ck + b; if (ii >= 0 && kk >= 0 && ii < NX && kk < NZ) m = Math.max(m, T0[ii * NZ + kk]); }
+    T[ci * NZ + ck] = m; }
+  return T;
+}
+function dentAt(F, x, z){                              // a grid field read between its cells
+  const {X0, Z0, C, NX, NZ} = DENT, fx = clamp((x - X0) / C - 0.5, 0, NX - 1.001), fz = clamp((z - Z0) / C - 0.5, 0, NZ - 1.001);
+  const i = Math.floor(fx), k = Math.floor(fz), u = fx - i, w = fz - k, j = i * NZ + k;
+  return (F[j] * (1 - w) + F[j + 1] * w) * (1 - u) + (F[j + NZ] * (1 - w) + F[j + NZ + 1] * w) * u;
+}
+// The folded quilt is several layers of cloth: pressing each vertex to the same height laid them onto one another and they
+// showed through in blotches. Instead each column of it is squashed as a whole, every layer keeping its order and its
+// share of the thickness: its top goes to the dent's height (DENT.tg) and everything under it scales down towards B,
+// keeping at least MIN over it
+function dentPress(base, pos, idx, top, B, MIN, k){
+  const {X0, Z0, C, NX, NZ} = DENT, Tg = DENT.tg;
+  const one = i => { const x = base[i], y0 = base[i + 1], z = base[i + 2];
+    if (x < X0 || z < Z0 || x >= X0 + NX * C || z >= Z0 + NZ * C || y0 <= B) { pos[i + 1] = y0; return; }
+    const t = dentAt(Tg, x, z), T = dentAt(top, x, z);
+    if (t >= T || T - B < 0.005) { pos[i + 1] = y0; return; }
+    const s = Math.min(1, (Math.max(t, B + MIN) - B) / (T - B));
+    pos[i + 1] = y0 + (B + (y0 - B) * s - y0) * k; };
+  if (idx) for (const i of idx) one(3 * i); else for (let i = 0; i < base.length; i += 3) one(i);
+}
+const DENT = {mesh:null, base:null, under:null, X0:-1.95, Z0:0.20, C:0.02, NX:92, NZ:70, SLOPE:0.6, MIN:0.014, top:null, tg:null, k:0, acc:0};
+function quiltDent(k, dt){
+  DENT.k = k; if (k <= 0 && !DENT.mesh) return;
+  if (!bedInit()) return;
+  if (!DENT.mesh) { [DENT.mesh, DENT.base] = shapeable(DUV.src, "quilt_dent"); DENT.under = new Float32Array(DENT.NX * DENT.NZ); }
+  const show = k > 0 && DUV.w <= 0;                   // (asleep the room's quilt is folded away: he has the duvet over him)
+  DENT.mesh.visible = show; if (DUV.w <= 0) DUV.src.visible = !show;
+  if (!show) return;
+  DENT.acc += dt; if (DENT.acc < 0.1 && k >= 1) return; DENT.acc = 0;
+  const U = DENT.under, {X0, Z0, C, NX, NZ, SLOPE} = DENT; U.fill(9);
+  const v = new THREE.Vector3(); boy.updateMatrixWorld(true);
+  boy.traverse(o => { if (!o.isSkinnedMesh || !o.visible) return; const P = o.geometry.attributes.position;
+    for (let i = 0; i < P.count; i += 3) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
+      const ci = Math.floor((v.x - X0) / C), ck = Math.floor((v.z - Z0) / C); if (ci < 0 || ck < 0 || ci >= NX || ck >= NZ) continue;
+      const j = ci * NZ + ck; if (v.y < U[j]) U[j] = v.y; } });
+  const g = DENT.mesh.geometry, pos = g.attributes.position.array, base = DENT.base, B = COV.BED;
+  if (!DENT.top) DENT.top = dentTop(base, null);        // (the quilt's own top over each cell, from its rest shape: built once)
+  // the dent's height over each cell: his underside, rising at DENT.SLOPE with the distance from it until it meets the
+  // cloth (a chamfer sweep over the grid, both ways; then read between cells, so the rim is a smooth slope: a rise cut off
+  // at a fixed radius left a cliff, in 2 cm stairs, where the rolled fold stands taller than the slope reached)
+  const Tg = DENT.tg || (DENT.tg = new Float32Array(NX * NZ)), S1 = SLOPE * C, S2 = S1 * Math.SQRT2;
+  for (let j = 0; j < NX * NZ; j++) Tg[j] = U[j] > 8 ? 9 : U[j] - 0.003;
+  for (let ci = 0; ci < NX; ci++) for (let ck = 0; ck < NZ; ck++) { const j = ci * NZ + ck; let t = Tg[j];
+    if (ck > 0) t = Math.min(t, Tg[j - 1] + S1);
+    if (ci > 0) { t = Math.min(t, Tg[j - NZ] + S1); if (ck > 0) t = Math.min(t, Tg[j - NZ - 1] + S2); if (ck < NZ - 1) t = Math.min(t, Tg[j - NZ + 1] + S2); }
+    Tg[j] = t; }
+  for (let ci = NX - 1; ci >= 0; ci--) for (let ck = NZ - 1; ck >= 0; ck--) { const j = ci * NZ + ck; let t = Tg[j];
+    if (ck < NZ - 1) t = Math.min(t, Tg[j + 1] + S1);
+    if (ci < NX - 1) { t = Math.min(t, Tg[j + NZ] + S1); if (ck < NZ - 1) t = Math.min(t, Tg[j + NZ + 1] + S2); if (ck > 0) t = Math.min(t, Tg[j + NZ - 1] + S2); }
+    Tg[j] = t; }
+  dentPress(base, pos, null, DENT.top, B, DENT.MIN, k);
+  // the pillow too, from the same field (lying awake: his head, not a bone's thickness, decides where it gives; the bones'
+  // pillowDent stays for him asleep under the duvet). Only its upper part, over PIL.FLOOR, moves, as pillowDent's
+  if (PIL.mesh) { if (!PIL.top) PIL.top = dentTop(PIL.base, PIL.idx);
+    const pg = PIL.mesh.geometry; dentPress(PIL.base, pg.attributes.position.array, PIL.idx, PIL.top, PIL.FLOOR, 0.005, k);
+    pg.attributes.position.needsUpdate = true; pg.computeVertexNormals(); }
   g.attributes.position.needsUpdate = true; g.computeVertexNormals();
 }
 // The duvet he sleeps under is generated here, rather than by reshaping the folded quilt the room model lays on the bed
@@ -3067,6 +3139,9 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       BLOCK[2] = keep; return {pts, ok}; },                                                                    // with the chair at c
     chairPose: (x, z, ry) => { const n = CHAIR.node; n.position.x = x; n.position.z = z; n.rotation.y = ry; n.updateMatrixWorld(true);
       BLOCK[2] = [x - CHAIR_FOOT, x + CHAIR_FOOT, z - CHAIR_FOOT, z + CHAIR_FOOT]; },   // (left out: its footprint, not its sweep)
+    quiltDent: (k, dt) => quiltDent(k, dt),            // (lying awake on the bed: the folded quilt gives under him)
+    quiltTop: COV.BED + DENT.MIN,                       // (the quilt pressed flat: what he rests on lying awake on it)
+    pillowDent: k => { if (bedInit()) { PIL.mesh.visible = k > 0; PIL.src.visible = !(k > 0); if (k > 0 && !(DENT.mesh && DENT.mesh.visible)) pillowDent(k); } },   // (on the quilt: quiltDent shapes it)
     cover: (w, dt) => {                                 // the page's duvet over him (asleep at night), w 0..1: drawn up from the foot
       if (w <= 0 && DUV.w <= 0) return; if (!bedInit()) return; DUV.w = w; DUV.acc += dt;
       if (w > 0 && (DUV.acc >= 0.1 || w < 1)) { DUV.acc = 0; boy.updateMatrixWorld(true); coverShape(); }

@@ -20,6 +20,7 @@ def glb_json(path):
 CLIPS = ("desk_type_ik", "desk_mouse_ik", "desk_watch", "room_window", "room_walk", "room_sit_down", "room_stand_up",
          "room_bed_lie", "room_bed_wake", "room_eat", "room_read", "room_phone", "room_drink", "room_door", "room_bedtime",
          "room_phone_scroll")
+EXTRA = ("room_bed_music_in", "room_bed_music", "room_bed_music_out")   # (boy_mh's EXTRA: optional, loaded when present)
 
 
 def test_body_is_the_v5_rig():
@@ -32,7 +33,7 @@ def test_body_is_the_v5_rig():
 
 def test_room_clips_retargeted_onto_v5():
     have = sorted(p.stem for p in (WEB / "mh_v5").glob("*.glb"))
-    assert set(have) <= set(CLIPS), set(have) - set(CLIPS)                  # (room-mh's names, 1:1; G14 drops them in)
+    assert set(have) <= set(CLIPS + EXTRA), set(have) - set(CLIPS + EXTRA)                # (room-mh's names, 1:1; G14 drops them in)
     for clip in have:
         g = glb_json(WEB / "mh_v5" / f"{clip}.glb")
         assert g.get("animations"), clip

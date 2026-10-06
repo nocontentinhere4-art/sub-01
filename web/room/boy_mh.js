@@ -604,10 +604,13 @@ export function createMH(env) {
     const b = env.boy; let need = 0;
     if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh) skin.push(o); }); }     // every part (dressed: his clothes too)
     b.updateMatrixWorld(true); const v = V();
+    // (lying awake on top of it, he rests on the folded quilt pressed flat under him, env.quiltTop, not on the bare mattress:
+    // there his back and soles went 1 to 3 cm into the dented quilt)
+    const top = env.quiltTop ? BED.top + (M.dentW || 0) * (env.quiltTop - BED.top) : BED.top;
     for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
     for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
       const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
-      if (e > 0) need = Math.max(need, BED.top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
+      if (e > 0) need = Math.max(need, top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
     return need;
   }
   function bedLift(st, dt) {
@@ -846,9 +849,14 @@ export function createMH(env) {
     }
     if (!transition(st)) onBed(st);
     bedMusic(st, dt);
+    const lying = st.at === "bedlie" && !st.step, asleep = lying && st.goal && st.goal.clip === "sleep";   // (the quilt and the pillow give under him)
+    M.dentW = Math.max(0, Math.min(1, (M.dentW || 0) + (lying && !asleep ? dt : -dt) / 0.6));
     pivot(st, dt);
     showStep();                                                // (the showcase's clip, before the guards measure him)
     baseY(); seatLift(st); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
+    // (after the lifts: the dents are shaped from where he is drawn, not from his clip's height before bedLift raises him)
+    if (env.quiltDent) env.quiltDent(M.dentW, dt); if (env.pillowDent && lying) env.pillowDent(1); else if (env.pillowDent && M.pil) env.pillowDent(0);
+    M.pil = lying;
     shove(st, dt);                                             // (after the root is final: the hand reaches the chair where it is)
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
