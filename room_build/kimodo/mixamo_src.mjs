@@ -1,4 +1,4 @@
-// node mixamo_src.mjs <clip.fbx> <out.glb> [--in-place] [--fps 30]
+// node mixamo_src.mjs <clip.fbx> <out.glb> [--in-place] [--fps 30] [--trim from,to (s)]
 // A Mixamo clip (FBX Binary, "Without Skin", mixamorig:* skeleton) as a source for mh_retarget.mjs: the same conventions
 // as the MakeHuman room clips it was written for, so the retarget (its bone map, rest alignment, leg-length scale, IK
 // pins) runs unchanged on it:
@@ -9,7 +9,8 @@
 //     taken relative to the bone's rest world rotation, and the rest pose becomes the bones' rest positions with no turn;
 //   - metres (Mixamo's FBX is in centimetres), Y up, facing +Z (both as MakeHuman's);
 //   - --in-place: the hips' horizontal travel removed (for clips Mixamo has no "In Place" variant of and that do not
-//     travel); the hips' height is kept.
+//     travel); the hips' height is kept;
+//   - --trim: only that stretch of the capture (a take that runs on past the act, e.g. sitting back down after standing).
 // Mixamo's terms allow its animations in a game or app but not the raw files redistributed: the FBX files stay out of the
 // repository; only the clips retargeted onto v5 and baked are committed.
 import fs from "node:fs";
@@ -19,7 +20,8 @@ const THREE = await import("three");
 const { FBXLoader } = await import("three/examples/jsm/loaders/FBXLoader.js");
 
 const args = process.argv.slice(2), SRC = args[0], OUT = args[1];
-const IN_PLACE = args.includes("--in-place"), FPS = +(args[args.indexOf("--fps") + 1] || 30) || 30;
+const IN_PLACE = args.includes("--in-place"), FPS = args.includes("--fps") ? +args[args.indexOf("--fps") + 1] : 30;
+const TRIM = args.includes("--trim") ? args[args.indexOf("--trim") + 1].split(",").map(Number) : null;
 
 // Mixamo -> MakeHuman (the names mh_retarget.mjs maps onto v5)
 const NAME = {Hips: "Hips", Spine: "spine04", Spine1: "spine02", Spine2: "Spine", Neck: "neck", Head: "Head", HeadTop_End: "head_end"};
@@ -48,10 +50,11 @@ const unit = restP.Hips.y > 10 ? 0.01 : 1;                              // centi
 
 // per frame: world rotation relative to rest (the rest pose made world-aligned), world position
 const mixer = new THREE.AnimationMixer(g), act = mixer.clipAction(clip); act.play();
-const T = Math.round(clip.duration * FPS) + 1, Wq = {}, Wp = {};
+const t0 = TRIM ? Math.max(0, TRIM[0]) : 0, t1 = TRIM ? Math.min(clip.duration, TRIM[1]) : clip.duration;
+const T = Math.round((t1 - t0) * FPS) + 1, Wq = {}, Wp = {};
 for (const s of names) { Wq[s] = []; Wp[s] = []; }
 for (let f = 0; f < T; f++) {
-  mixer.setTime(Math.min(f / FPS, clip.duration)); g.updateMatrixWorld(true);
+  mixer.setTime(Math.min(t0 + f / FPS, t1)); g.updateMatrixWorld(true);
   for (const s of names) { Wq[s].push(bone[s].getWorldQuaternion(new THREE.Quaternion()).multiply(restQ[s].clone().invert()));
     Wp[s].push(bone[s].getWorldPosition(new THREE.Vector3()).multiplyScalar(unit)); }
 }
@@ -75,5 +78,5 @@ for (const s of names) {
   anim.addSampler(smp).addChannel(doc.createAnimationChannel().setTargetNode(nodes.Hips).setTargetPath("translation").setSampler(smp)); }
 await new NodeIO().write(OUT, doc);
 const leg = restP.LeftUpLeg.distanceTo(restP.LeftLeg) + restP.LeftLeg.distanceTo(restP.LeftFoot);
-console.log(`${SRC.split("/").pop()} -> ${OUT.split("/").pop()}: ${names.length} bones (${names.filter(s => /Hand(Thumb|Index|Middle|Ring|Pinky)/.test(s)).length} finger), ${T} frames ${(clip.duration).toFixed(2)} s, ` +
+console.log(`${SRC.split("/").pop()} -> ${OUT.split("/").pop()}: ${names.length} bones (${names.filter(s => /Hand(Thumb|Index|Middle|Ring|Pinky)/.test(s)).length} finger), ${T} frames ${(t1 - t0).toFixed(2)} s${TRIM ? ` (of ${clip.duration.toFixed(2)})` : ""}, ` +
   `hips ${(restP.Hips.y * unit).toFixed(3)} m up, leg ${(leg * unit).toFixed(3)} m${IN_PLACE ? ", in place" : ""}`);

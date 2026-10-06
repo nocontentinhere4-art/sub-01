@@ -1,4 +1,4 @@
-// node contact_pass.mjs <port> <activity> <seconds> [out.json] : the room (room.html?debug) with the character doing
+// node contact_pass.mjs <port> <activity | activity>next> <seconds> [out.json] : the room (room.html?debug) with the character doing
 // <activity> (research, chart, chat, eat: seated at the desk; listen_music: on the bed), sampled every frame for <seconds> once he is in place; every
 // vertex of his skin (every 2nd) tested against the furniture, split by body region:
 //   chair  inside the desk chair (inside-intervals of the chair's own meshes, in its frame, as the page's chairVox, so it
@@ -23,12 +23,16 @@ await p.route(/^https:\/\/(cdn\.jsdelivr\.net|unpkg\.com)\//, async r => { const
 p.on("pageerror", e => console.log("pageerror", e.message));
 await p.goto(`http://localhost:${port}/room.html?debug&nolive&hour=15`);
 await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
-const res = await p.evaluate(([activity, secs]) => {
+const res = await p.evaluate(([activity, secs]) => { let S0step = null;
+  // "a>b": settle doing a, then switch to b and sample from the moment his pose step (sitting down, getting up) begins
+  const [act0, act1] = activity.split(">"); activity = act0;
   window.FREEZE = true; settle(); live(activity, {});
   // in place: no step for a second
   const WANT = {research: "desk", chart: "desk", chat: "desk", eat: "desk", listen_music: "bedlie", sleep: "bedlie", phone: "bedside"}[activity];
   let t = 0, still = 0; while (t < 120 && still < 1) { animate_(1 / 30); t += 1 / 30; still = pose().step || (WANT && pose().at !== WANT) ? 0 : still + 1 / 30; }
+  if (act1) { live(act1, {}); let w = 0; while (w < 60 && !(pose().step && pose().step.k === "pose")) { animate_(1 / 30); w += 1 / 30; } }
   const at = pose().at, cur = pose().current && pose().current._clip && pose().current._clip.name;
+  S0step = pose().step ? {k: pose().step.k, from: pose().step.from, to: pose().step.to} : null;
   // ---- the static furniture as inside-intervals (desk region and around), world frame
   const SOLID = /^(oak|steel|painted|white|plastic_black|book|metal_dark|rubber|alu|cable|desk_lamp_arm_01|potted_plant_02_pot|potted_plant_04)$/;
   const meshes = []; room.traverse(o => { if (o.isMesh && o.material && SOLID.test(o.material.name)) { meshes.push(o); o.material.side = THREE.DoubleSide; } });
@@ -61,7 +65,7 @@ const res = await p.evaluate(([activity, secs]) => {
       (CV.seat = CV.seat || [])[i * CV.nz + k] = st; }
     cm.forEach(m => { m.material.side = THREE.FrontSide; }); }
   const F = 0.16, TOP = 0.82 - 0.02, M = 0.01;
-  const S = {frames: 0, at, clip: cur, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: []};
+  const S = {frames: 0, at, clip: cur, step: S0step, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: []};
   const add = (k, reg, d, f) => { const e = S[k][reg] || (S[k][reg] = {frames: 0, maxDepth: 0, maxCount: 0, _f: -1, _n: 0});
     if (e._f !== f) { if (e._f >= 0) e.maxCount = Math.max(e.maxCount, e._n); e._f = f; e._n = 0; e.frames++; } e._n++; e.maxDepth = Math.max(e.maxDepth, d); };
   // his own legs: each thigh a capsule on its bone (hip joint -> knee), its radius along the bone measured from his thigh

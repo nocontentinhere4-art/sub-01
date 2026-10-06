@@ -51,6 +51,9 @@ def body(T, R):
 
 
 P, Q, Sc, M = body(T, R)
+# the seat in the clip's frame: where the hips rest while he is seated; "over it" within 0.20 m of that (horizontally)
+_sc = P[w_seat > 0.9, hi][:, [0, 2]].mean(0) if (w_seat > 0.9).any() else None
+over_seat = np.zeros(F, bool) if _sc is None else np.linalg.norm(P[:, hi][:, [0, 2]] - _sc, axis=1) < 0.20
 ankles0 = {s: P[:, ts.ix[f'{s}_Foot']].copy() for s in 'LR'}
 # planted feet: while an ankle is low and slow (the recorded shuffles drift up to 4.5 cm over a long stance) it is held
 # on one spot (the stance's mean), blended in and out over 0.15 s
@@ -78,14 +81,18 @@ for s in 'LR':
 print(clip, 'planted stances locked', locks)
 total = np.zeros(F)
 for PASS in range(2):
-  need = np.zeros(F)
+  need = np.zeros(F); hard = np.zeros(F, bool)
   for f0 in range(0, F, 60):
       sl = slice(f0, min(F, f0 + 60))
       X = skin(M[sl], Jn, ibm, V, JI, WW)
       Y = skin(mats(sP[sl], sQ[sl], sSc)[:, :], mJn, mibm, mV, mJI, mWW) if MHB and w_lie[sl].max() > 0 else None
       for k, f in enumerate(range(sl.start, sl.stop)):
           x = X[k]; d = 0.0; wt = 0.0
-          if w_seat[f] > 0:
+          if SEAT_HIP_Y and over_seat[f] and P[f, hi, 1] < SEAT_HIP_Y:
+              # (the hips over the seat, under its height: he is landing on it or pushing off it, bent forward with his
+              # head low, so not "seated" by the weight; the cushion stops him, whatever the blend)
+              d += SEAT_HIP_Y - P[f, hi, 1]; wt += 1; hard[f] = True
+          elif w_seat[f] > 0:
               lo = seat_low(P[f], ts.ix, RTH)
               if SEAT_HIP_Y: d += w_seat[f] * (SEAT_HIP_Y - P[f, hi, 1]); wt += w_seat[f]   # (the hips' joint at a set height on OUR chair)
               elif lo == lo: d += w_seat[f] * (SEAT + SEAT_UP - lo); wt += w_seat[f]
@@ -95,9 +102,10 @@ for PASS in range(2):
               pen = Y[k][mback, 1].min() - x[backv, 1].min()          # > 0: the back is under the mattress
               d += pen if pen > 0 else w_lie[f] * pen; wt += w_lie[f]   # never into it, whatever the blend
           need[f] = d
-  # keep the peaks: a running max over +-0.25 s before the smoothing, so a short dip is not averaged away
-  pk = np.array([need[max(0, f - 8):f + 9].max() for f in range(F)])
-  need = np.where(need > 0, np.maximum(need, lowpass(pk, 2.0)), need)
+  # keep the peaks: a running max over +-0.25 s before the smoothing, so a short dip is not averaged away (not the
+  # seat's floor: a lift spread 0.25 s early would hold him up before he lands, so his hips would bounce on the way down)
+  pk = np.array([np.where(hard, 0, need)[max(0, f - 8):f + 9].max() for f in range(F)])
+  need = np.where((need > 0) & ~hard, np.maximum(need, lowpass(pk, 2.0)), need)
   need = np.clip(lowpass(need, 3.0), -SHIFT_MAX - total, SHIFT_MAX - total); total += need
   if PASS == 0 and (SEAT_UP or SEAT_FWD):
       # (a fit measured in the room: the contact pass gives how far his thighs sink into OUR cushion and his back into
@@ -147,6 +155,13 @@ for s, m in (('L', 'Left'), ('R', 'Right')):
     P, Q, Sc, M = body(T, R)
 print(clip, 'hip shift: seated max %.3f, lying %.3f..%.3f m' % (total[w_seat > 0.5].max() if (w_seat > 0.5).any() else 0,
       total[w_lie > 0.5].min() if (w_lie > 0.5).any() else 0, total[w_lie > 0.5].max() if (w_lie > 0.5).any() else 0))
+if _os.environ.get('SEAT_ORIGIN') and (w_seat > 0.9).any():
+    # (a transition the page places by its chair, chairPlace: the seat centre at the clip's origin, as room_stand_up's;
+    # the whole clip moves along the floor so his seated hips are there, as the seated loops' are once the page centres them)
+    # (at the seated end it joins the page's seated pose by: a sit-down's last frame, a stand-up's first)
+    c = P[-1, hi] if P[0, hi, 1] > P[-1, hi, 1] else P[0, hi]; v = np.array([-c[0], 0, -c[2]]); par = ts.parent[hi]
+    T[:, hi] = T[:, hi] + qrot(qinv(Q[:, par]), np.broadcast_to(v, (F, 3))) / Sc[par]; P, Q, Sc, M = body(T, R)
+    print(clip, 'seated hips moved to the origin by (%.3f, %.3f) m' % (v[0], v[2]))
 joints = set(v5['skin']['joints']); jn = {vn[j] for j in joints}
 out = {'name': an['name'], 'fps': FPS, 'F': F, 'nodes': [{'name': n['name'], 'parent': n['parent'], 't': n['t'], 'r': n['r'], 's': n['s']} for n in rj['nodes']],
        'rot': {i: np.round(R[:, i], 6).ravel().tolist() for i, n in enumerate(ts.names) if n in jn},
