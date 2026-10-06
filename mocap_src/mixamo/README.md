@@ -37,6 +37,11 @@ these are worth more to us than the Kimodo takes, which carried no fingers at al
 | `Typing.fbx` | typing | the working pose itself |
 | `Type_To_Sit.fbx` | hands coming back down | leaving the typing pose |
 | `Standing_Clap.fbx` | celebrating | rare moment — something at the computer goes brilliantly |
+| `Sitting_Rubbing_Arm.fbx` | rubbing an arm | small seated idle, breaks the loop |
+| `Sitting_Talking.fbx` | talking with the hands | small seated idle, breaks the loop |
+| `Sleeping_Idle.fbx` | asleep, breathing | the bed, replacing the flat pose |
+| `Laying_Sleeping.fbx` | asleep, a second reading | the bed, variation |
+| `Laying_Nodding.fbx` | head moving while lying down | the bed, awake with music |
 
 The transition takes replace the two the owner called out as broken — standing up and sitting
 down — and give us the way in and out of typing, which we never had: until now the hands
