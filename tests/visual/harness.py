@@ -220,14 +220,16 @@ class Harness:
             pg.evaluate("__qa.render()")
             self.shoot(pg, self.out / f"{key}_char.png", hud=False)
             pg.evaluate("__qa.followCam()")
-            r["body"] = pg.evaluate("__qa.body(2)")
+            if name in ("desk", "eating", "sleeping", "window") and hour in (14, 23):
+                self.res["props"][key] = pg.evaluate("__qa.props()")    # (before the sweep below moves the clip on)
+            # the worst frame over 8 s of the clip, not the one frame the scene stopped on (docs/qa/contact.md): a
+            # single frame read 6 or 14 on the same code depending on how long the page took to load
+            r["body"] = pg.evaluate("__qa.bodySweep(2, 8, 0.25)")
             b = r["body"]
             for what, field in (("bed", "bed"), ("chair", "chair"), ("desk", "desk"), ("below_floor", "below_floor")):
                 lim = BUDGETS.get(f"{what}_vertices")                   # null: reported, not failed
                 if lim is not None and b[field] > lim:
-                    self.res["hard_failures"].append(f"{key}: {what} penetration {b[field]} sampled vertices (budget {lim})")
-            if name in ("desk", "eating", "sleeping", "window") and hour in (14, 23):
-                self.res["props"][key] = pg.evaluate("__qa.props()")
+                    self.res["hard_failures"].append(f"{key}: {what} penetration {b[field]} sampled vertices at {b['sweep']['worst_at_s'][field]} s of 8 (budget {lim})")
         r["seconds"] = round(time.time() - t0, 1)
         self.res["shots"][key] = r
         self.log(f"  {key}: pose {pose.get('at')}/{pose.get('clip')} monitor {'on' if r['screen']['monitor_on'] else 'off'} cam {r['screen']['camera']} black {r['exposure']['black_frac']:.1%} "

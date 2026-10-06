@@ -159,6 +159,30 @@
     out.floor_y = F; out.desk_columns_ms = desk && desk.ms;
     return out;
   };
+  // the same counters over a stretch of the clip, not one frame (docs/qa/contact.md): body() alone measures whichever
+  // frame the scene happened to stop on, and how far the clip had run by then depends on how long the page took to load
+  // (real frames tick under the load wait), so desk_14's chair read 6 on one run and 14 on the next. Stepping a fixed
+  // span at a fixed rate and keeping the worst frame of each counter gives the same number every run, and it is the
+  // number that matters: a pose that goes through the chair for half a second is through the chair.
+  qa.bodySweep = (every = 2, span = 8, dt = 0.25) => {
+    const n = Math.max(1, Math.round(span / dt)), sub = Math.max(1, Math.round(dt * 30));
+    let worst = null; const at = {}, hover = {Left: -9, Right: -9};
+    for (let i = 0; i < n; i++) {
+      if (i) qa.step(1 / 30, sub);
+      const b = qa.body(every), t = +(i * dt).toFixed(2);
+      for (const s of ["Left", "Right"]) hover[s] = Math.max(hover[s], b.foot_min_y[s]);
+      if (!worst) { worst = b; for (const k of ["bed", "chair", "desk", "below_floor"]) at[k] = t; continue; }
+      for (const k of ["bed", "chair", "desk", "below_floor"]) if (b[k] > worst[k]) { worst[k] = b[k]; at[k] = t; }
+      worst.min_y = Math.min(worst.min_y, b.min_y);
+      for (const s of ["Left", "Right"]) worst.foot_min_y[s] = Math.min(worst.foot_min_y[s], b.foot_min_y[s]);
+      for (const [k, v] of Object.entries(b.by)) worst.by[k] = Math.max(worst.by[k] || 0, v);
+    }
+    // the highest each foot's lowest point got over the span: a sole that leaves the floor and stays up is a gap, which
+    // body() alone never reported (reported only for now; the per-pose contact budgets come with the contact gate)
+    worst.foot_hover_max = {Left: +hover.Left.toFixed(3), Right: +hover.Right.toFixed(3)};
+    worst.sweep = {samples: n, span_s: span, dt_s: dt, worst_at_s: at};
+    return worst;
+  };
 
   // ---- props: does each separate object rest on something (a downward ray from just above its lowest point)?
   // gap > 8 mm: floating; the surface under it above its bottom: sunk into it. Wall-hung things are listed, not judged.
