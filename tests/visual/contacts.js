@@ -56,7 +56,7 @@
   const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|chin|skull/i;   // (not "ear": it matches ForeArm)
   // the tea bottle he picks up and drinks from: his hand holds it, so it is tested against his head as well as his hands
   const takes = (name, b) => name === "tea_bottle" ? (HAND.test(b) || HEAD.test(b)) : HAND.test(b);
-  function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
+  function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible && !/_inside$/.test(o.name)) s.push(o); }); return s; }   // (not his drawn inside: the same skin again)
   // the bed: the mattress as a plane (boy_mh.js's BED: x0, x1, z0, z1 and its top, 0.82 m less 1.5 cm of give) and the
   // page's duvet over him (duvet_over: a grid of rows across the bed, nz points each from z 0.14 to 1.61, its top surface
   // first): a vertex under the plane is into the mattress, one over the duvet's top (not his head or neck) is through it
