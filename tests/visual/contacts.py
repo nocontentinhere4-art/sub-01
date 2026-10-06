@@ -44,13 +44,14 @@ def main():
     ap.add_argument("--chair-sdf", default="", help="a signed distance grid of the chair (tests/visual/chair_sdf.py) for its test, in place of ray parity")
     ap.add_argument("--chair-tol-mm", type=int, default=2)
     ap.add_argument("--occupancy", default="", help="instead of the checks: write where his skin goes in the chair's frame (JSON)")
+    ap.add_argument("--query", default="", help="extra query for the page, e.g. '&bottle=old' to probe the prop it replaced")
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     h = Harness(out, log=lambda *x: None, cdn_cache=ROOT / "tests" / "visual" / ".cdn_cache")
     report = {"objects": None, "scenarios": []}
     with Server() as server, sync_playwright() as p:
-        h.server = server; h.base = server.base
+        h.server = server; h.base = server.base; h.query = a.query
         h.browser = p.chromium.launch(executable_path=CHROMIUM, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
         ctx, pg, st = h.open("1280"); h.goto_scene(pg, "desk", 14)
         pg.wait_for_function("() => !window.mh || window.mh.ready", timeout=120000)

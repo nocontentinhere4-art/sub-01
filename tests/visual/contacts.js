@@ -45,6 +45,9 @@
     return 0;
   }
   const HAND = /hand|finger|thumb|index|middle|ring|pinky|metacarpal|wrist|palm/i;
+  const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|ear|face|chin/i;
+  // the tea bottle he picks up and drinks from: his hand holds it, so it is tested against his head as well as his hands
+  const takes = (name, b) => name === "tea_bottle" ? (HAND.test(b) || HEAD.test(b)) : HAND.test(b);
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
   function check(res, frame, every = 1) {             // one frame: every skinned vertex against every object
     boy.updateMatrixWorld(true);
@@ -56,7 +59,7 @@
       for (let i = 0; i < P.count; i += every) {
         sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); res.samples++;
         for (const [name, o] of Object.entries(objs)) {
-          if (name !== "chair" && !HAND.test(bone(i))) continue;          // (hands only, against the desk things)
+          if (name !== "chair" && !takes(name, bone(i))) continue;        // (hands only, against the desk things)
           const d = inside(o, v); if (d <= 0) continue;
           const key = name + ":" + bone(i), r = res.hits[key] = res.hits[key] || {n: 0, verts: new Set(), max: 0, frames: new Set()};
           r.n++; r.verts.add(sm.name + "#" + i); r.max = Math.max(r.max, d); r.frames.add(frame);
@@ -75,7 +78,7 @@
         const subs = []; for (const c of ch.children) { const prev = c.parent; const o = columnsOf(c, ch); if (o) subs.push(o); }
         objs.chair = {node: ch, subs, odd: subs.reduce((a, s) => a + s.odd, 0), nx: subs.reduce((a, s) => a + s.nx * s.nz, 0), nz: 1, inv: new THREE.Matrix4()};
         ch.position.copy(keep[0]); ch.rotation.y = keep[1]; ch.updateMatrixWorld(true); }
-      for (const n of ["keyboard", "mouse", "controller"]) { const o = scene.getObjectByName(n); if (o) columns(n, o); }
+      for (const n of ["keyboard", "mouse", "controller", "tea_bottle"]) { const o = scene.getObjectByName(n); if (o) columns(n, o); }
       return Object.fromEntries(Object.entries(objs).map(([k, o]) => [k, {cells: o.nx * o.nz, odd_rays: o.odd}]));
     },
     // run a scenario: setup() then n frames of 1/30 s, checking every `stride` frames
