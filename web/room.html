@@ -2386,6 +2386,45 @@ function coverInit(){                                  // the grid, its faces an
   COV.mesh.frustumCulled = false; COV.mesh.visible = false; scene.add(COV.mesh);
   return true;
 }
+// v5 (his bulk in the oversized hoodie: 34 cm deep lying down): a quilt is a stiff-ish sheet, not a shrink wrap. Along
+// him it spans taut from one high point to the next (chest, knees, feet: the upper hull of his outline down each
+// lengthwise line, sagging a little between), across him it spans over him in the same way and then falls steeply to the
+// mattress at his sides; it creases across a sleeper, so it is smoothed hard along his length and barely across
+const CLOTH = {SAG:0.25, FALL:0.08, ALONG:8, ACROSS:1};
+function hull(xs, ys, n, out){                         // the upper convex hull of (xs, ys)[0..n), sampled back at each xs
+  const st = [];
+  for (let i = 0; i < n; i++) { while (st.length >= 2) { const a = st[st.length - 2], b = st[st.length - 1];
+      if ((xs[b] - xs[a]) * (ys[i] - ys[a]) - (ys[b] - ys[a]) * (xs[i] - xs[a]) >= 0) st.pop(); else break; }
+    st.push(i); }
+  for (let k = 0; k + 1 < st.length; k++) { const a = st[k], b = st[k + 1];
+    for (let i = a; i <= b; i++) out[i] = ys[a] + (ys[b] - ys[a]) * (b > a ? (xs[i] - xs[a]) / (xs[b] - xs[a]) : 0); }
+  if (st.length === 1) out[st[0]] = ys[st[0]];
+}
+function coverCloth(iEnd){
+  const {nx, nz, BED, LOFT} = COV, B = COV.body, H = COV.h, T = COV.tmp, n = iEnd + 1;
+  const X = COV.cx || (COV.cx = new Float32Array(Math.max(nx, nz))), Y = COV.cy || (COV.cy = new Float32Array(Math.max(nx, nz))), O = COV.co || (COV.co = new Float32Array(Math.max(nx, nz)));
+  const zAt = j => COV.Z0 + (COV.Z1 - COV.Z0) * (j / (nz - 1)), on = k => B[k] > BED + 0.01;
+  // along him, down each lengthwise line: taut over the high points, sagging a little between them
+  for (let j = 0; j < nz; j++) { for (let i = 0; i < n; i++) { X[i] = i; Y[i] = B[i * nz + j] + LOFT; } hull(X, Y, n, O);
+    for (let i = 0; i < n; i++) H[i * nz + j] = O[i] - CLOTH.SAG * (O[i] - Y[i]); }
+  // across him, row by row: spanning over him, then falling steeply to the mattress beside him
+  for (let i = 0; i < n; i++) { let jl = -1, jr = -1;
+    for (let j = 0; j < nz; j++) if (on(i * nz + j) || H[i * nz + j] > BED + LOFT + 0.02) { if (jl < 0) jl = j; jr = j; }
+    if (jl < 0) { for (let j = 0; j < nz; j++) H[i * nz + j] = BED + LOFT; continue; }
+    for (let j = jl; j <= jr; j++) { X[j - jl] = zAt(j); Y[j - jl] = H[i * nz + j]; } hull(X, Y, jr - jl + 1, O);
+    for (let j = jl; j <= jr; j++) H[i * nz + j] = O[j - jl];
+    for (let j = 0; j < nz; j++) { if (j >= jl && j <= jr) continue; const e = j < jl ? jl : jr, d = Math.abs(zAt(j) - zAt(e));
+      H[i * nz + j] = BED + LOFT + (H[i * nz + e] - BED - LOFT) * (1 - smooth(0, CLOTH.FALL, d)); } }
+  // smoothed hard along him, barely across; never into him
+  for (let pass = 0; pass < CLOTH.ALONG; pass++) {
+    const across = pass < CLOTH.ACROSS;
+    for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), k = i * nz + j;
+      let v = (H[i0 * nz + j] + H[i1 * nz + j] + 2 * H[k]) / 4;
+      if (across) { const j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1); v = (2 * v + H[i * nz + j0] + H[i * nz + j1]) / 4; }
+      T[k] = v; }
+    for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const k = i * nz + j; H[k] = Math.max(T[k], on(k) ? B[k] + 0.03 : BED + LOFT * 0.6); } }
+  for (let i = n; i < nx; i++) for (let j = 0; j < nz; j++) H[i * nz + j] = H[iEnd * nz + j];   // (past him: the curtain takes its top from here)
+}
 function coverShape(){                                 // the duvet over him, this frame
   const {nx, nz, nt, pos, nor, uv, ZM0, ZM1, BED, LOFT, THICK, DROP, DR} = COV;
   // pulled up from where it lay folded to just under his shoulders; on his side, back off his raised shoulder
@@ -2404,7 +2443,8 @@ function coverShape(){                                 // the duvet over him, th
         const t = L > 1e-6 ? clamp(((x - ax) * dx + (z - az) * dz) / L, 0, 1) : 0, px = ax + dx * t - x, pz = az + dz * t - z;
         const dd = Math.sqrt(px * px + pz * pz), R = s.w + DR; if (dd >= R) continue;
         const top = s.A.y + (s.B.y - s.A.y) * t + s.r * Math.sqrt(Math.max(0, 1 - (Math.min(dd, s.w) / s.w) ** 2));
-        const y = BED + (top - BED) * (1 - (s.w > s.r ? smooth(s.w, R, dd) : smooth(0.25, 1, dd / R))); if (y > h) h = y;   // (an oval: full over his width, then it drapes off)
+        const y = V5 ? (dd <= s.w ? top : BED)               // (v5: his outline itself; the cloth below spans and falls from it)
+          : BED + (top - BED) * (1 - (s.w > s.r ? smooth(s.w, R, dd) : smooth(0.25, 1, dd / R))); if (y > h) h = y;
       }
       B[i * nz + j] = h; H[i * nz + j] = h + LOFT;
     } }
@@ -2414,6 +2454,7 @@ function coverShape(){                                 // the duvet over him, th
   for (const n of ["LeftToeBase", "RightToeBase", "LeftFoot", "RightFoot"]) end = Math.max(end, bones[n].getWorldPosition(_l2).x + (/Toe/.test(n) ? 0.09 : 0.16));
   const iEnd = Math.min(nx - 3, Math.ceil((end - hem) / len * (nx - 1)));
   // 2. cloth, not shrink wrap: smooth the surface (it bridges between his limbs), but never below him
+  if (V5) coverCloth(iEnd); else
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);

@@ -94,6 +94,15 @@ the fingers for the hand; and since bedInit first runs as he lies down under it,
 lies: how high his skin rises over the bone, and how far to the sides; each segment is an oval of those two. Asleep:
 skin through the duvet up to 145 mm (fingers, toes, thighs) -> none; lying on the mattress (gap 0).
 
+That stopped him poking through, but the cover still followed every bulge of him, 3 cm over each (a lumpy mass: v5 is
+34 cm deep lying down in that hoodie). So on v5 the cloth itself behaves like a quilt (room.html `coverCloth`): along
+his length it spans taut from one high point to the next (chest, knees, feet: the upper convex hull of his outline down
+each lengthwise line, sagging a quarter of the way back toward him between them); across, it spans over him the same way
+and falls to the mattress within 8 cm of his side, instead of flaring wide; and it is smoothed hard along his length,
+barely across (a quilt creases across a sleeper). Never into him: 0 vertices through it asleep and while he gets out.
+References looked at (Unsplash licence, not committed: close crops, part of a face): photo-1531353826977 and
+photo-1525169267298, a sleeper under a quilt from the side; the cover spans the body in one soft form, creased across.
+
 ## The contact table (f525887 + these fixes; max mm / frames, every 2nd frame)
 `SEAT=0.505 python -m tests.visual.contacts --chair-sdf sdf.npz --chair-regions`. Chair by part; hands against the keyboard, the mouse and the tea bottle (and his head against the bottle); the bed as above.
 
