@@ -132,3 +132,46 @@ The performer's keyboard point, from `room_mx_typing.glb` over its 16.5 s. It is
 - left hand: (0.534, 0.679, -0.152), steady (sd 0.5 / 1.7 / 0.5 cm); 0.463 m in front of the hips, level with them
 - right hand: (0.564, 0.707, 0.095), but it wanders sideways (sd 13.6 cm across the keyboard)
 - our key tops are at 0.84 m over the floor in the same frame (1.001 in the room), so the resolver lifts the hands about 16 cm
+
+## The punctuation clips: what the captures are
+
+Measured from the captures, not their names (`punctuation_postures.jpg`, side views of the retargeted skeleton across each clip):
+
+| clip (out, `web/room/mh_v5/`) | what it is | length |
+|---|---|---|
+| Scared → `room_mx_scared.glb` | **seated**, startles, jumps up and stands back from the desk (2.9–7.2 s), then sits back down | 10.1 s |
+| Angry_Gesture → `room_mx_angry_gesture.glb` | **seated throughout**, a raised fist and a shake, leaning forward | 5.8 s |
+| Standing_Clap → `room_mx_standing_clap.glb` | **seated**, stands up (0.7 s), claps with the arms overhead (1.3–2.7 s), sits back down (3.4–4.1 s) | 4.8 s |
+
+All three start and end seated, so they are built with the seated fit (the cushion stops the hips, and the feet are planted).
+
+Contact pass at the desk, in the seated slot, each over its whole length:
+
+| region | Scared | Angry_Gesture | Standing_Clap |
+|---|---|---|---|
+| chair | legs 8.4 cm (139 frames) | legs 4.8 cm (128) | legs 6.4 cm (60) |
+| desk | **torso 186 frames, legs 161**, arms 41, hands 27 | **feet 14.9 cm, every frame** | **legs 80 frames, torso 80**, arms 19 |
+| other furniture | torso, legs, arms | feet 16.5 cm, every frame | legs, torso, arms |
+| seat | -1.6 cm lowest | no thigh within 10 cm of the cushion top (he sits on its front edge, leaning forward) | -1.1 cm |
+| soles over the floor | -0.2…4.8 cm | -0.6…4.8 cm | -0.2…4.8 cm |
+| floor, bed | clear | clear | clear |
+
+Stills, the page's camera and beside the chair: `scared_desk.jpg`, `standing_clap_desk.jpg`, `angry_gesture_desk.jpg`.
+
+- **Scared and Standing_Clap stand up inside the clip.** In the desk slot the chair is rolled in under the desk, so he stands up into the desk's front edge. A person stands up by pushing the chair back. The page does that for its own get-up (`flow()`), but not for a slot clip. These are not accepted.
+- **Angry_Gesture's performer sat with his feet far forward** (0.6 m in front of the hips). Under our desk that runs his feet into its frame in every frame. Not accepted.
+- They are built but not wired, and not accepted.
+
+What the captures change about the chains: Standing_Clap already contains its own stand-up and sit-down. "Sit_To_Stand → Standing_Clap → Stand_To_Sit" would stand him up twice. The two honest options are below; the choice is COORD's.
+1. **Trim to the act:** Standing_Clap's row keeps its standing middle (about 1.0–3.2 s), and the chain's own Sit_To_Stand / Stand_To_Sit carry him up and down, with the join jumps measured. This works for the clap. Scared's startle IS the jump up from the chair, so trimming it loses the act.
+2. **Whole clip, the chair moved by the page:** the chair rolls back before he rises and in after he sits, as the get-up take does. That is the page's (G10d's).
+
+## The phone clips and Gaming: postures confirmed
+
+From the captures (`phone_gaming_postures.jpg`); none of them travels (hips 0.00 m):
+- Texting (18.5 s): **standing**, the phone in both hands at the chest, head down. Not a seated clip, despite the name.
+- Texting_While_Standing (23.6 s): standing, the phone in one hand.
+- Standing_Using_Touchscreen_Tablet (33.1 s): standing, both hands forward on a tablet.
+- Gaming (5.0 s): **seated**, a controller held in both hands over the lap, head down. The performer sits low (hips 0.58 m before scaling).
+
+Not built yet; they follow the chains.

@@ -1,5 +1,5 @@
 {
- "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame. seatOrigin: a transition the page places by its chair (chairPlace): the clip moved along the floor so his seated hips are at its origin, as room_stand_up's. trim [from, to] (s): only that stretch of the take. No keyboard fit is baked: the page's resolver (G14) maps the performer's keyboard point (README) onto ours, settling the whole arm.",
+ "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame. seatOrigin: a transition the page places by its chair (chairPlace): the clip moved along the floor so his seated hips are at its origin, as room_stand_up's. trim [from, to] (s): only that stretch of the take. No keyboard fit is baked: the page's resolver (G14) maps the performer's keyboard point (README) onto ours, settling the whole arm. standing = on his feet in the room (the soles soleUp over the floor for the slides, planted stances held).",
  "defaults": {
   "seated": {
    "scale": "hip",
@@ -11,6 +11,10 @@
   },
   "bed": {
    "scale": "hip"
+  },
+  "standing": {
+   "scale": "hip",
+   "soleUp": 0.027
   }
  },
  "clips": {
@@ -58,6 +62,18 @@
   "Type_To_Sit": {
    "kind": "seated",
    "out": "room_mx_type_to_sit"
+  },
+  "Scared": {
+   "kind": "seated",
+   "out": "room_mx_scared"
+  },
+  "Angry_Gesture": {
+   "kind": "seated",
+   "out": "room_mx_angry_gesture"
+  },
+  "Standing_Clap": {
+   "kind": "seated",
+   "out": "room_mx_standing_clap"
   }
  }
 }
