@@ -161,6 +161,18 @@ set in `web/room.html`. Rebuild (from `room_build/`, with the kit unzipped somew
 
     node build_food.mjs "<kit>/Models/GLB format" ../web/room/food.glb      # 84 KB
 
+## The headphones he wears: made with Tripo (paid API)
+`headphones_worn.glb` is one model **made with Tripo (paid API)** (https://www.tripo3d.ai): text-to-model, model
+`P1-20260311`, PBR textures at standard quality, generated on 2026-10-06 from a text prompt for generic over-ear
+headphones in the open, worn shape, with no brand, logo or text (task `58f46e68-2ee5-46d1-bd8e-01dd14ba42f6`, 40
+credits). It is AI-generated content under Tripo's terms of service, not a Creative Commons licence.
+`room_build/build_headphones.mjs` cuts it where the band meets the cups into the band and two cups, scales it (the cup
+9.5 cm tall), cuts its textures to 512 px WebP and meshopt-compresses it (5.8k triangles, 160 KB);
+`web/room/boy_mh.js` (`headphones()`) fits the pieces to his head. The raw download is not committed. Rebuild (from
+`room_build/`):
+
+    node build_headphones.mjs <raw Tripo GLB> ../web/room/headphones_worn.glb
+
 ## The Tripo props: made with Tripo (paid API)
 `props_tripo.glb` holds four props **made with Tripo (paid API)** (https://www.tripo3d.ai): text-to-model, model
 `P1-20260311` (low-poly), PBR textures at standard quality, generated on 2026-10-04 from text prompts asking for plain
@@ -171,7 +183,7 @@ licence. Each prop and its Tripo task id:
 |---|---|---|
 | ramen bowl with chopsticks: tonkotsu, chashu, ajitama egg, nori, in a matte stoneware bowl | the ramen he eats at the desk (it replaces Kenney's `bowl-broth`; the empty bowl is still Kenney's `bowl`) | `4a044baf-40b1-4c6f-a5f6-e290acc4c5b2` |
 | ceramic mug | the mug on the desk (the modelled one is cut out of the static room by the page) | `277633c0-2bfe-4b38-ae60-0bcaa9445a0f` |
-| over-ear headphones | the pair on the wall hook (inside the room's `headphones` node; the pair he wears is still procedural) | `6a2cac63-a839-4d0c-8e0f-53c67e641321` |
+| over-ear headphones | the pair on the wall hook (inside the room's `headphones` node; the pair he wears is `headphones_worn.glb`, below) | `6a2cac63-a839-4d0c-8e0f-53c67e641321` |
 | white sneakers | a pair on the floor in the front right corner | `62e8af56-3302-4a6a-9fe4-d4af8bd5d821` |
 
 `room_build/build_tripo.mjs` scales each to real size (origin at the centre of its base), turns it, cuts its textures

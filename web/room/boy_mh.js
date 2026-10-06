@@ -873,17 +873,21 @@ export function createMH(env) {
   // ---------- music: the headphones from the wall hook on his head while a track plays (the page's own pair and its
   // alive() layer do not run here), back on the hook when it stops. (Lying on the bed listening, his motion is G12's
   // clips, room_bed_music*: nothing procedural here) ----------
-  const MU = {set: null, wall: null};
-  // The pair he wears, built to fit THIS head (the wall pair is a single scanned mesh, folded shut on its hook with the hook
-  // in it; it cannot be opened cleanly). Real over-ear headphones: each cup about 9-10 cm tall, 7-8 wide, 3-4 deep, the
-  // cushions about 2 cm thick; the band about 3 cm wide. His head on v5, measured in the Head bone's frame at bind (the
-  // owner_head skin, G10d 2026-10-06): the ears' outer surfaces 15.5 cm apart, the ear's centre 6.9 local units up and
-  // 1.45 back of the bone; the band follows his hair's own outline over the top, from cup to cup, resting on it.
+  const MU = {set: undefined, wall: null, glb: null};
+  env.load("room/headphones_worn.glb").then(g => { MU.glb = g; }, e => { MU.set = null; console.warn("headphones_worn.glb", e); });
+  // The pair he wears: generic over-ear headphones made with Tripo in the open, worn shape (room_build/build_headphones.mjs:
+  // the band and the two cups, cut where the band meets the cups), fitted to THIS head here. His head on v5, measured in the
+  // Head bone's frame at bind (the owner_head skin, G10d 2026-10-06): the ears' outer surfaces 15.5 cm apart, the ear's
+  // centre 6.9 local units up and 1.45 back of the bone, his hair's outline across the top in the cups' plane.
+  //  - each cup, rigid: its cushion's face on the ear, pressed PRESS, the cup's axis across his head, centred on the ear;
+  //  - the band: its inner surface laid along his hair's outline (GAP off it), from one cup's hinge pin over the crown to
+  //    the other's. Its cross-section is kept; its length follows the outline (the slider and the band's flex of a real
+  //    pair, spread along it: MU.fit.band_stretch).
   // Built in the Head bone's frame, so it stays put however he turns his head
-  const HP = {CUP_H: 0.095, CUP_W: 0.075, CUP_D: 0.03, CUSH: 0.02, PRESS: 0.004, BAND_W: 0.03, BAND_T: 0.009,
-    EAR_Y: 0.069, EAR_Z: -0.0145, EAR_WIN: [0.057, 0.080, -0.026, -0.003], GREY: 0x8f8b86, DARK: 0x262626};
+  const HP = {PRESS: 0.004, GAP: 0.001, EAR_Y: 0.069, EAR_Z: -0.0145, EAR_WIN: [0.057, 0.080, -0.026, -0.003]};
   function headphones() {
-    if (MU.set !== null) return MU.set;
+    if (MU.set !== undefined) return MU.set;
+    if (!MU.glb) return null;                                                       // (still loading)
     const room = env.room && env.room(), wall = room && room.getObjectByName("headphones"), head = env.bones.Head;
     if (!head) return MU.set = null;
     MU.wall = wall;
@@ -901,33 +905,71 @@ export function createMH(env) {
       if (Math.abs(v.z - HP.EAR_Z) < 0.02 && v.y > HP.EAR_Y) {                   // (his outline across the top, at the cups' plane)
         const k = Math.round((v.y - HP.EAR_Y) * ws / 0.005); prof.set(k, Math.max(prof.get(k) || 0, Math.abs(v.x) * ws)); } }
     // in metres, from the ear's centre (the group's origin): x across, y up
-    const e = (earR - earL) / 2 * ws, cx = e - HP.PRESS + HP.CUSH + HP.CUP_D / 2;   // (the cushion on the ear, pressed a little)
+    const e = (earR - earL) / 2 * ws, fx = e - HP.PRESS;                            // (the cushions' faces)
     const ks = [...prof.keys()].sort((a, b) => a - b), top = ks[ks.length - 1] * 0.005;
     const half = y => { let w = 0; for (const k of ks) if (Math.abs(k * 0.005 - y) <= 0.0075) w = Math.max(w, prof.get(k)); return w; };
-    // the band's centre line: from the top of each cup, up over his outline (half its thickness off it), across the crown
-    const y0b = HP.CUP_H / 2 - 0.01, N = 24, ys = [], need = [];
-    for (let i = 0; i <= N; i++) { const t = i / N, y = y0b + (top - y0b) * Math.sin(t * Math.PI / 2); ys.push(y); need.push(half(y) + HP.BAND_T / 2); }
-    // (it can only come in as it rises: the widest of his outline from here up, then smoothed, never inside the outline)
-    const xs = need.map((_, i) => Math.max(...need.slice(i), cx * Math.cos(i / N * Math.PI / 2)));
-    for (let pass = 0; pass < 6; pass++) for (let i = 1; i < N; i++) xs[i] = Math.max(need[i], (xs[i - 1] + xs[i] + xs[i + 1]) / 3);
-    xs[0] = cx; xs[N] = 0; ys[N] = top + HP.BAND_T / 2;
-    const right = xs.map((x, i) => V(x, ys[i], 0));                                  // (the right half: cup top -> crown)
-    const line = [...right.map(p => V(-p.x, p.y, 0)), ...right.slice(0, -1).reverse()];   // (left cup -> crown -> right cup)
-    const grey = new THREE.MeshStandardMaterial({color: HP.GREY, roughness: 0.55, metalness: 0.1}), dark = new THREE.MeshStandardMaterial({color: HP.DARK, roughness: 0.9});
-    const sh = new THREE.Shape(); { const w = HP.BAND_W / 2, t = HP.BAND_T / 2, r = 0.003; sh.moveTo(-t + r, -w); sh.lineTo(t - r, -w); sh.quadraticCurveTo(t, -w, t, -w + r);
-      sh.lineTo(t, w - r); sh.quadraticCurveTo(t, w, t - r, w); sh.lineTo(-t + r, w); sh.quadraticCurveTo(-t, w, -t, w - r); sh.lineTo(-t, -w + r); sh.quadraticCurveTo(-t, -w, -t + r, -w); }
-    const band = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {steps: 64, bevelEnabled: false, extrudePath: new THREE.CatmullRomCurve3(line)}), grey);
-    const g = new THREE.Group(); g.add(band);
-    for (const sx of [-1, 1]) {                                                     // each cup: its shell and its cushion, facing the ear
-      const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 40), grey); shell.rotation.z = Math.PI / 2;
-      shell.scale.set(HP.CUP_H, HP.CUP_D, HP.CUP_W); shell.position.set(sx * cx, 0, 0);
-      const cush = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.16, 16, 40), dark); cush.rotation.y = Math.PI / 2;
-      cush.scale.set(HP.CUP_W * 0.92, HP.CUP_H * 0.92, HP.CUSH / 0.32); cush.position.set(sx * (e - HP.PRESS + HP.CUSH / 2), 0, 0);
-      const yoke = new THREE.Mesh(new THREE.BoxGeometry(HP.BAND_T, 0.02, HP.BAND_W * 0.8), grey); yoke.position.set(sx * cx, HP.CUP_H / 2 - 0.004, 0);
-      g.add(shell, cush, yoke); }
+    const src = MU.glb.scene; src.updateMatrixWorld(true);
+    const part = n => src.getObjectByName(n), g = new THREE.Group();
+    // the cups: rigid, the cushion's face on the ear; each turned on its yoke (about the fore-aft axis through the face's
+    // centre), top outward, as far as his head's side needs (his hair is wider above the ear than the ear is): no point of
+    // his (skin and hair, Head-weighted) within the cushion's outline past the shell's inner wall. The cushion is the soft,
+    // open ring the ear sits in (pressed PRESS); the wall, the driver's cover, is the cup's innermost surface within 1.5 cm
+    // of its axis
+    let ry = 0, rz = 0; const shellIn = {"-1": 1, "1": 1};
+    for (const [n, sx] of [["hp_cupL", -1], ["hp_cupR", 1]]) { const c = part(n), CP = c.geometry.attributes.position;
+      for (let i = 0; i < CP.count; i++) { v.fromBufferAttribute(CP, i).applyMatrix4(c.matrix); const d = sx * v.x;
+        if (d < 0.003) { ry = Math.max(ry, Math.abs(v.y)); rz = Math.max(rz, Math.abs(v.z)); }
+        if (Math.hypot(v.y, v.z) < 0.015 && d > 0.002) shellIn[sx] = Math.min(shellIn[sx], d); } }
+    const tilt = {"-1": 0, "1": 0};
+    env.boy.traverse(o => { if (!o.isSkinnedMesh || !o.skeleton.bones.includes(head)) return;
+      const hj = o.skeleton.bones.indexOf(head), inv2 = o.skeleton.boneInverses[hj], Q = o.geometry.attributes.position, J = o.geometry.attributes.skinIndex, K = o.geometry.attributes.skinWeight;
+      for (let i = 0; i < Q.count; i++) { let d = 0, bw = 0; for (let k = 0; k < 4; k++) if (K.getComponent(i, k) > bw) { bw = K.getComponent(i, k); d = J.getComponent(i, k); }
+        if (d !== hj) continue; v.fromBufferAttribute(Q, i).applyMatrix4(o.bindMatrix).applyMatrix4(inv2);
+        const x = v.x * ws, y = (v.y - HP.EAR_Y) * ws, z = (v.z - HP.EAR_Z) * ws;
+        if (y < 0.01 || (y / ry) ** 2 + (z / rz) ** 2 > 1) continue;
+        const sx = x < 0 ? -1 : 1, over = sx * x - (fx + shellIn[sx]); if (over > 0) tilt[sx] = Math.max(tilt[sx], Math.atan2(over, y)); } });
+    const cups = {};
+    for (const [n, sx] of [["hp_cupL", -1], ["hp_cupR", 1]]) {
+      const c = part(n).clone(), yoke = new THREE.Group(); yoke.position.x = sx * fx; yoke.rotation.z = -sx * tilt[sx]; yoke.add(c); g.add(yoke); cups[sx] = yoke; }
+    // the band: the model's inner outline (about its O, from straight up to the pin) -> his hair's, by length along it
+    const bm = part("hp_band"), U = bm.userData, inner = U.inner, pinR = V(...U.pinR), cupPin = V(...part("hp_cupR").userData.pin);
+    const rho = ph => { const i = Math.min(inner.length - 2, Math.floor(ph / inner[inner.length - 1][0] * (inner.length - 1))), [a, ra] = inner[i], [b, rb] = inner[i + 1];
+      return ra + (rb - ra) * Math.min(1, Math.max(0, (ph - a) / (b - a))); };
+    const NM = 48, phE = inner[inner.length - 1][0], mPts = [], mLen = [0];
+    for (let i = 0; i <= NM; i++) { const ph = phE * i / NM; mPts.push(V(Math.sin(ph) * rho(ph), Math.cos(ph) * rho(ph), 0)); if (i) mLen.push(mLen[i - 1] + mPts[i].distanceTo(mPts[i - 1])); }
+    // his: from the right pin's place (with the model's offset from its pin to its outline's end) up over his hair to the crown
+    const curve = sx => {                                                           // (one half: crown -> that cup's pin)
+      cups[sx].updateMatrix(); const pin = V(...part(sx > 0 ? "hp_cupR" : "hp_cupL").userData.pin).applyMatrix4(cups[sx].matrix); pin.x *= sx;
+      const E = pin.add(mPts[NM].clone().sub(pinR)), yc = top + HP.GAP, N = 32, ys = [], need = [];
+      for (let i = 0; i <= N; i++) { const t = i / N, y = E.y + (yc - E.y) * Math.sin(t * Math.PI / 2); ys.push(y); need.push(half(y) + HP.GAP); }
+      const xs = need.map((_, i) => Math.max(...need.slice(i), E.x * Math.cos(i / N * Math.PI / 2)));
+      for (let pass = 0; pass < 6; pass++) for (let i = 1; i < N; i++) xs[i] = Math.max(need[i], (xs[i - 1] + xs[i] + xs[i + 1]) / 3);
+      xs[0] = E.x; xs[N] = 0; ys[N] = yc;
+      const pts = xs.map((x, i) => V(x, ys[i], 0)).reverse(), len = [0];
+      for (let i = 1; i <= N; i++) len.push(len[i - 1] + pts[i].distanceTo(pts[i - 1]));
+      return {pts, len, L: len[N]}; };
+    const tc = {"-1": curve(-1), "1": curve(1)};
+    const at = (pts, len, s) => { let i = 1; while (i < len.length - 1 && len[i] < s) i++;      // point, tangent, outward normal at length s
+      const a = pts[i - 1], b = pts[i], t = Math.min(1, Math.max(0, (s - len[i - 1]) / (len[i] - len[i - 1]))), T = b.clone().sub(a).normalize();
+      return [a.clone().lerp(b, t), T, V(T.y, -T.x, 0)]; };
+    const geo = bm.geometry.clone(), BP = geo.attributes.position, BN = geo.attributes.normal, pos = new Float32Array(BP.count * 3), nrm = new Float32Array(BP.count * 3);
+    const mLenE = mLen[NM], q = V(), n = V();
+    for (let i = 0; i < BP.count; i++) {
+      q.fromBufferAttribute(BP, i).applyMatrix4(bm.matrix); const sx = q.x < 0 ? -1 : 1; q.x *= sx;
+      const ph = Math.min(phE, Math.atan2(q.x, q.y)), k = Math.min(NM - 1, Math.floor(ph / phE * NM));
+      const s = mLen[k] + (mLen[k + 1] - mLen[k]) * (ph / phE * NM - k);
+      const [pm, tm, nm] = at(mPts, mLen, s), [pt, tt, nt] = at(tc[sx].pts, tc[sx].len, s / mLenE * tc[sx].L);
+      const d = q.clone().sub(pm), a = d.x * tm.x + d.y * tm.y, b = d.x * nm.x + d.y * nm.y;
+      pos[3 * i] = sx * (pt.x + a * tt.x + b * nt.x); pos[3 * i + 1] = pt.y + a * tt.y + b * nt.y; pos[3 * i + 2] = q.z;
+      if (BN) { n.fromBufferAttribute(BN, i).applyMatrix3(new THREE.Matrix3().getNormalMatrix(bm.matrix)).normalize(); n.x *= sx;
+        const na = n.x * tm.x + n.y * tm.y, nb = n.x * nm.x + n.y * nm.y, r = V(na * tt.x + nb * nt.x, na * tt.y + nb * nt.y, n.z).normalize();
+        nrm[3 * i] = sx * r.x; nrm[3 * i + 1] = r.y; nrm[3 * i + 2] = r.z; } }
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); if (BN) geo.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
+    geo.computeBoundingSphere(); const band = new THREE.Mesh(geo, bm.material); band.name = "hp_band"; g.add(band);
     g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     head.add(g); g.position.set(0, HP.EAR_Y, HP.EAR_Z); g.scale.setScalar(1 / ws); g.visible = false; g.name = "headphones_on";
-    M.hpFit = MU.fit = {ear_span_cm: +(2 * e * 100).toFixed(1), crown_over_ear_cm: +(top * 100).toFixed(1), cup_centre_out_cm: +(cx * 100).toFixed(1)};
+    M.hpFit = MU.fit = {ear_span_cm: +(2 * e * 100).toFixed(1), crown_over_ear_cm: +(top * 100).toFixed(1), cushion_faces_cm: +(2 * fx * 100).toFixed(1),
+      band_stretch: [+(tc[-1].L / mLenE).toFixed(2), +(tc[1].L / mLenE).toFixed(2)], shell_wall_mm: [+(shellIn[-1] * 1000).toFixed(1), +(shellIn[1] * 1000).toFixed(1)], cup_tilt_deg: [+(tilt[-1] * 180 / Math.PI).toFixed(1), +(tilt[1] * 180 / Math.PI).toFixed(1)]};
     return MU.set = g;
   }
   // lying on the bed listening (the page's "listen"): in -> the loop; when the page gets him up, its step waits while the
