@@ -33,6 +33,7 @@ def test_body_is_the_v5_rig():
 def test_room_clips_retargeted_onto_v5():
     have = sorted(p.stem for p in (WEB / "mh_v5").glob("*.glb"))
     assert set(have) <= set(CLIPS), set(have) - set(CLIPS)                  # (room-mh's names, 1:1; G14 drops them in)
+    assert set(CLIPS) <= set(have), set(CLIPS) - set(have)                  # (every required clip is there: boy_mh.js load() throws without one)
     for clip in have:
         g = glb_json(WEB / "mh_v5" / f"{clip}.glb")
         assert g.get("animations"), clip
