@@ -361,9 +361,10 @@ export function createMH(env) {
   }
   function pin(side, delta, floor, weight) {                 // the recorded wrist + delta, lifted until no tip is under the floor
     const hand = env.bones[side + "Hand"]; if (!hand || weight <= 0) return;
-    const w0 = hand.getWorldPosition(V()), t = w0.clone().add(delta);
+    const w0 = hand.getWorldPosition(V()), t = w0.clone().add(delta), q0 = hand.getWorldQuaternion(new THREE.Quaternion());   // (the clip's hand turn)
+    const keepTurn = () => { const pq = hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert(); hand.quaternion.slerp(pq.multiply(q0), weight); hand.updateMatrixWorld(true); };
     for (let it = 0; it < 3; it++) {
-      ccd(side, t, weight);
+      ccd(side, t, weight); keepTurn();
       const deficit = Math.max(floor - lowestTip(side), overMouse(side)); if (deficit <= 0.001) break;
       t.y += deficit;
     }
