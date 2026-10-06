@@ -130,3 +130,26 @@ Typing mode now plays G12's Mixamo capture, with the hands settled by the same r
   - 47 (8% of resting samples) are over a cap top. These are probably the capture's small finger moves under the 8 mm stroke threshold.
 
 **Sheet:** `typing_capture_sheet.jpg` has four frames over his right shoulder, 4 s apart, and both hands from his left at key height.
+
+### Typing capture, third pass: the hands crossed (owner: "on the keyboard the hands cross")
+**Measured per frame over the whole clip, in the keyboard's frame** (`typing_hand_separation.json`, `typing_hand_separation.png`):
+
+| | wrists, right minus left | inner edges (index knuckles) |
+|---|---|---|
+| The capture alone (resolver off) | min 14.8 cm, 0 frames negative | min 6.0 cm, 0 negative (112 frames under 8 cm) |
+| Before (8fd5c5f) | median −0.4 cm, 256 of 495 frames negative, worst −5.6 cm at 10.23 s | 284 frames negative |
+| Now | min 14.7 cm, median 19.4 cm, 0 frames negative | min 5.9 cm, median 10.9 cm, 0 negative (135 under 8 cm) |
+
+So the crossing was ours, not the capture's.
+
+**Cause 1: not a mirrored axis.** The F / J points in the page's frame match the capture's own mean index joints to within 1 cm. The cause was **a stale correction**: the slow F / J pull on the left hand, built up in mouse mode (where it brings the seated body's left hand from the knee), was never reset and was added to the typing hands at +10.3 cm. There is now one correction per context (mousing, typing), never carried from one into the other. The capture's typing uses none.
+
+**Cause 2: the F / J anchoring** (COORD's second suspect). Carrying each hand's mean onto its own key took the performer's 18 cm spacing down to F–J's 5.7 cm and laid the inner edges over each other. Now both hands share one carry, so the capture keeps its own spacing. The pair is centred 4.5 cm to his right of the F / J middle (`MX_SHIFT`), so the left little finger stays over the keys (its knuckle at −12.6 cm, the keyboard edge at −13.8). No clamp holds the hands apart.
+
+**Contact after the fix (16.5 s):**
+- Resting fingertips: median +0.5 mm, 81% in the 0 to +2 mm band, 0 more than 2 mm in, deepest −0.9 mm.
+- Strokes: median +8.7 mm, 37 of 60 kept more than 6 mm up.
+
+**Pictures:** `typing_front_views_fixed.jpg` is the same front view (monitor hidden in that render only) at t = 3/7/11/15 s. At 11 s the right hand is away to his right, off the keys toward the mouse: the capture's own travel.
+
+**Open:** the inner edges come within 8 cm on 135 frames. The capture itself does so on 112.

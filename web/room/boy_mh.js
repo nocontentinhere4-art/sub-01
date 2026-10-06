@@ -56,6 +56,7 @@ const WALK_V = 0.67;                                         // room_walk's trav
 // own mean onto our F / J (the performer's keyboard was wider: his hands sat 18 cm apart, which put the left little finger
 // off ours), and keeps its own motion about it (the right hand travels 13.6 cm: kept, not pinned)
 const CLIP_MX = {F: [0.118, 0.695, 0.541], J: [-0.063, 0.717, 0.569], clip: "room_mx_typing"};
+const MX_SHIFT = 0.045;   // (m along the keys, + = his right: the capture's hands centred so its left little finger is on the keys; its hands sit 18 cm apart, wider than F-J)
 const HUMP = 0.02;                                           // a room mouse's hump: 2 cm behind its centre (the back third)
 const FADE = 0.4;
 
@@ -662,7 +663,11 @@ export function createMH(env) {
   const dKs = {Left: V(), Right: V()};
   function keyDelta(side) {                                  // the carry for one hand onto the keys
     if (!MX() || !P.kbNode || M.w.type < M.w.mouse) return dK;   // (mousing: the left hand on a seated body, placed by the correction below)
-    return dKs[side].subVectors(keyTarget(side), toWorld(side === "Left" ? CLIP_MX.F : CLIP_MX.J, _c));
+    // one carry for both hands (the capture's hands keep their own spacing; carrying each onto F / J on its own took 12 cm
+    // out of it and laid the hands over each other): the middle of its index fingertips onto our keyboard's home row,
+    // MX_SHIFT along the keys
+    const mid = CLIP_MX.F.map((v, i) => (v + CLIP_MX.J[i]) / 2);
+    return dKs[side].subVectors(P.kbNode.localToWorld(V(window.__mxShift ?? MX_SHIFT, 0, 0)), toWorld(mid, _c));
   }
   // a finger in a stroke: the clip's own fingertip raised more than 8 mm above its lowest over the last 1.5 s, measured
   // towards the back of the hand (G12's measure of the capture's lifts: median 0.4 s, the longest 1.6 s); while it is
@@ -686,12 +691,17 @@ export function createMH(env) {
     return out;
   }
   M.kk = {Left: KEY_KNUCKLE, Right: KEY_KNUCKLE};
-  M.kOff = {Left: V(), Right: V()}; M.kUp = {Left: 0, Right: 0};   // (kUp: the hand raised where a finger could not clear the caps even straightened)
+  // the slow F / J correction, one per context: mousing (the left hand on a seated body) and typing kept apart, so one's
+  // never carries into the other (it did: mousing's +10 cm on the left hand pushed the typing hands across each other)
+  M.kOff = {type: {Left: V(), Right: V()}, mouse: {Left: V(), Right: V()}};
+  const kCtx = () => M.w.type >= M.w.mouse ? "type" : "mouse";
+  M.kUp = {Left: 0, Right: 0};   // (kUp: the hand raised where a finger could not clear the caps even straightened)
   function keyOn(side, w, dt) {                              // a hand onto the keys: placed, the arm out of the desk, every finger on the caps
-    pin(side, keyDelta(side).clone().add(M.kOff[side]), w, keyFit(side));
+    const ko = M.kOff[kCtx()][side];
+    pin(side, keyDelta(side).clone().add(MX() && kCtx() === "type" ? V() : ko), w, keyFit(side));   // (a capture's typing: carried by its own measured means only)
     if (P.kbNode && w > 0.9 && !(MX() && M.w.type >= M.w.mouse)) {   // the index fingertip's drift from F / J, taken out over ~1 s (not for a capture: its hands travel)
-      const e = keyTarget(side).sub(tipOf(side, 2, V())).setY(0); M.kOff[side].addScaledVector(e, Math.min(1, dt / 0.8));
-      const L = M.kOff[side].length(); if (L > 0.15) M.kOff[side].multiplyScalar(0.15 / L);
+      const e = keyTarget(side).sub(tipOf(side, 2, V())).setY(0); ko.addScaledVector(e, Math.min(1, dt / 0.8));
+      const L = ko.length(); if (L > 0.15) ko.multiplyScalar(0.15 / L);
     }
     const lifted = liftedFingers(side, dt);
     let left = layFingers(side, "keys", w, 1, 0.15, dt, lifted);
