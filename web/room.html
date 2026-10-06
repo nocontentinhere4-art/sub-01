@@ -3178,6 +3178,11 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       if (w <= 0 && DUV.w <= 0) return; if (!bedInit()) return; DUV.w = w; DUV.acc += dt;
       if (w > 0 && (DUV.acc >= 0.1 || w < 1)) { DUV.acc = 0; boy.updateMatrixWorld(true); coverShape(); }
       COV.mesh.visible = w > 0; DUV.src.visible = !COV.mesh.visible; },
+    // where he looks: the page's own gaze director (the screen, the window, the room, the door when the courier comes),
+    // per context; boy_mh.js turns his head there with human timing (gaze())
+    gaze: dt => { if (!boy || !boy.visible) return null; const c = context(); ctxNow = c;
+      if (c && c !== "sleep" && c !== "walk" && c !== "move" && c !== "act") director(c); else GZ.wGoal = 0;
+      gazeStep(dt); return {goal:GZ.goal, w:GZ.w, why:GZ.why, ctx:c}; },
     step0: dt => { untouch(); if (mixer) mixer.update(dt); T += dt; if (!boy) return false; boy.visible = visible; return drive(dt); }});
   const pickRig = () => {
     if (rig || !boy) return rig;

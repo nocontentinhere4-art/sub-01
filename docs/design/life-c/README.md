@@ -3,7 +3,7 @@
 Two procedural layers in `web/room/boy_mh.js` run over whatever clip is playing:
 
 - **breathing** (`breathe()`): a continuous additive layer;
-- **gaze** (`gaze()`): his head turns toward what he looks at. The code is in, but it stays inert until the page's `gaze` hook lands in a later commit, after its own validation.
+- **gaze** (`gaze()`): his head turns toward what he looks at.
 
 Neither is hand-authored motion. The breath is a recorded human signal (G14's clip). The gaze's timing and range are measured human values, listed with their sources below. The few numbers that are engineering choices are marked as such.
 
@@ -41,17 +41,28 @@ Neither is hand-authored motion. The breath is a recorded human signal (G14's cl
 **Head timing and range, from measured human values:**
 - **Latency:** the head starts **63 ms** after the gaze target changes.
   - Source: Goossens & Van Opstal 1997, *Human eye-head coordination in two dimensions under different sensorimotor conditions*, Exp Brain Res 114:542–560, Table 2, eye–head latency, visual targets, pooled: 63 ± 36 ms.
-  - v5 has no eyes, so the head is the gaze.
+  - v5 has no eyes that move; the head turns for the part of the shift the eyes would not cover (below).
 - **Speed and profile:** a minimum-jerk turn. Its duration is set so that the peak speed matches the measured peak speed of a 30° head turn: **72°/s yaw, 66°/s pitch**.
   - Source: Boulanger et al. 2026, arXiv:2608.17904, median of 62 adults.
   - For a minimum-jerk profile, peak speed = 1.875 · amplitude / duration. The shortest turn is 0.2 s.
+- **How much of a gaze shift the head takes:** for gaze shifts inside the eye-only range the eyes move alone. Beyond it, the head moves 0.77 of the excess.
+  - Source: Stahl JS 1999, *Amplitude of human head movements associated with horizontal saccades*, Exp Brain Res 126:41–54. In normal subjects the eye-only range is 35.8 ± 31.9° and the slope of the eye–head range 0.77 ± 0.16.
+  - I take the eye-only range as the total width: ±17.9° of predicted eye eccentricity from where the head points.
+  - Stahl measured horizontal shifts only. The same model is used for pitch, by analogy.
+  - This replaced an unsourced 4° dead zone.
 - **Range:** head and neck together reach **±77°** of axial rotation, about 155° in all. Source: Ferrario, Sforza et al. 2002, 3D head–neck range of motion.
 
 **Engineering choices (not sourced):**
 - `NECK_OK` 45°: past this, the upper spine takes the excess turn.
-- `SMALL` 4°: below this, the head eases in, since the eyes alone would cover it.
 - The turn is split 40% neck, 60% head.
 - Pitch is limited to −40/+30°.
+
+## Gaze, measured in the page
+
+The target comes from the page's own director.
+- At the window, 30 s: 10 retargets. A look back into the room 139° away turned the head 41°. Shifts under 18° from the head left it still. Peak head speed was 72°/s, the cap.
+- At the desk, 30 s: the screen targets are mostly inside the eye-only range, so the head stays nearly still. As the chair rolls, the target drifts in his body frame and the head follows in sub-degree steps.
+- Frames 1 s apart: `gaze_frames.jpg`.
 
 ## Measurements
 

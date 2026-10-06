@@ -876,13 +876,17 @@ export function createMH(env) {
   // ---------- gaze: his head turns toward what he looks at (the page's director picks the target per context), with
   // human timing, an additive turn over whatever the clip does with his head. The numbers are measured human values
   // (docs/design/life-c/README.md has the sources): the head starts 63 ms after the gaze target changes (Goossens & Van
-  // Opstal 1997, eye-head latency, visual targets, pooled: 63 +/- 36 ms; v5 has no eyes, so the head is the gaze),
+  // Opstal 1997, eye-head latency, visual targets, pooled: 63 +/- 36 ms), and only for the part of the gaze shift the
+  // eyes would not cover: within the eye-only range the eyes do it alone, past it the head takes 0.77 of the rest (Stahl
+  // 1999, normal subjects: eye-only range 35.8 deg wide, +/-17.9, slope 0.77; horizontal, used for pitch too). It
   // turns with a minimum-jerk profile at the measured peak speed of a 30 deg head turn (Boulanger et al. 2026: yaw
   // 72 deg/s, pitch 66 deg/s, median, 62 adults), within the head and neck's range (Ferrario et al. 2002: about 155 deg
   // of axial rotation in all, +/-77), the neck taking 40% of it, the head the rest; past NECK_OK the upper spine takes
   // the excess ----------
-  const GZH = {LAT: 0.063, VYAW: 72, VPIT: 66, ROM: 77, NECK_OK: 45, SMALL: 4,
-    fwdL: null, cur: null, from: null, to: null, t0: 0, dur: 0, w: 0};
+  const GZH = {LAT: 0.063, VYAW: 72, VPIT: 66, ROM: 77, NECK_OK: 45, EOR: 17.9, SLOPE: 0.77,
+    fwdL: null, cur: null, from: null, to: null, want: null, t0: 0, dur: 0, w: 0};
+  M.gzh = GZH;                                               // (?debug: the gaze's state)
+  const eyeHead = d => { const a = Math.abs(d) - GZH.EOR; return a > 0 ? Math.sign(d) * GZH.SLOPE * a : 0; };   // (the head's share of a gaze shift d)
   const D2R = Math.PI / 180, _g1 = V(), _g2 = V(), _g3 = V(), _gq = new THREE.Quaternion(), _gp = new THREE.Quaternion(), _gw = new THREE.Quaternion();
   const _gm = new THREE.Matrix4();
   function turnW(bone, axis, ang) {                          // turn a bone by ang about a room axis
@@ -904,7 +908,7 @@ export function createMH(env) {
   const yp = v => [Math.atan2(v.x, v.z) / D2R, Math.atan2(v.y, Math.hypot(v.x, v.z)) / D2R];   // (body frame: yaw, pitch, degrees)
   const mj = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * u * (10 - 15 * u + 6 * u * u);       // (minimum jerk)
   function gaze(st, dt) {
-    const g = env.gaze ? env.gaze(dt) : null, head = env.bones.Head, neck = env.bones.neck;
+    const g = env.gaze && !window.NOGAZE ? env.gaze(dt) : null, head = env.bones.Head, neck = env.bones.neck;   // (DEBUG: NOGAZE)
     GZH.w += ((g && g.w > 0.01 && !st.step ? g.w : 0) - GZH.w) * (1 - Math.exp(-dt * 3));
     if (!g || !head || !neck || GZH.w < 0.01 || !headFwd()) { GZH.cur = null; return; }
     const b = env.boy; b.updateMatrixWorld(true);
@@ -913,18 +917,18 @@ export function createMH(env) {
     const face = _g3.copy(GZH.fwdL).applyQuaternion(head.getWorldQuaternion(_gw)).transformDirection(_gm.copy(b.matrixWorld).invert());
     const want = yp(tgt), clip = yp(face);
     // a new target: a new turn from where his gaze is now, after the eye-head latency, as long as the speed says
-    if (!GZH.cur) { GZH.cur = clip.slice(); GZH.to = clip.slice(); }
-    if (Math.hypot(want[0] - GZH.to[0], want[1] - GZH.to[1]) > 1) {
-      GZH.from = GZH.cur.slice(); GZH.to = want; GZH.t0 = st.T + GZH.LAT;
-      const ay = Math.abs(want[0] - GZH.from[0]), ap = Math.abs(want[1] - GZH.from[1]);
+    if (!GZH.cur) { GZH.cur = clip.slice(); GZH.to = clip.slice(); GZH.want = clip.slice(); }
+    if (Math.hypot(want[0] - GZH.want[0], want[1] - GZH.want[1]) > 1) {
+      GZH.want = want; GZH.from = GZH.cur.slice(); GZH.t0 = st.T + GZH.LAT;
+      const ey = ((want[0] - GZH.from[0] + 540) % 360) - 180, ep = want[1] - GZH.from[1];   // (where his eyes would end up, the head still)
+      GZH.to = [GZH.from[0] + eyeHead(ey), GZH.from[1] + eyeHead(ep)];
+      const ay = Math.abs(GZH.to[0] - GZH.from[0]), ap = Math.abs(GZH.to[1] - GZH.from[1]);
       GZH.dur = Math.max(0.2, 1.875 * ay / GZH.VYAW, 1.875 * ap / GZH.VPIT);    // (min-jerk peak speed = 1.875 A / T)
     }
     const u = GZH.dur > 0 ? mj((st.T - GZH.t0) / GZH.dur) : 1;
     if (GZH.from) GZH.cur = [GZH.from[0] + (GZH.to[0] - GZH.from[0]) * u, GZH.from[1] + (GZH.to[1] - GZH.from[1]) * u];
     // the turn on top of the clip: what is left between his gaze and the clip's face, within reach
     let dy = ((GZH.cur[0] - clip[0] + 540) % 360) - 180, dp = GZH.cur[1] - clip[1];
-    const small = Math.max(Math.abs(dy), Math.abs(dp));      // (a few degrees: the eyes alone would do it; the head eases in)
-    if (small < GZH.SMALL) { dy *= small / GZH.SMALL; dp *= small / GZH.SMALL; }
     dy = Math.max(-GZH.ROM, Math.min(GZH.ROM, dy)) * GZH.w; dp = Math.max(-40, Math.min(30, dp)) * GZH.w;
     const torso = Math.sign(dy) * Math.max(0, Math.abs(dy) - GZH.NECK_OK), hy = dy - torso;
     const sp = env.bones.Spine, up = b.localToWorld(_g1.set(0, 1, 0)).sub(b.getWorldPosition(_g2)).normalize();
