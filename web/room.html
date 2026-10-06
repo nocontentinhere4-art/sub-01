@@ -2608,6 +2608,32 @@ function coverCloth(iEnd){
     for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const k = i * nz + j; H[k] = Math.max(T[k], on(k) ? B[k] + 0.03 : BED + LOFT * 0.6); } }
   for (let i = n; i < nx; i++) for (let j = 0; j < nz; j++) H[i * nz + j] = H[iEnd * nz + j];   // (past him: the curtain takes its top from here)
 }
+// v5: the duvet lies on him. Its underside is his skin's height field (B, from coverShape) GAP over him, closed with a
+// parabola (a grey-scale closing: dilate, then erode, with -(dx²/2RX + dz²/2RZ)): it spans only hollows too tight for
+// the cloth to follow (between his legs, a cell no vertex fell in), lies on everything else, and past his outline falls
+// to the mattress along the same parabola, not as a wall. RX along him, RZ across. The top is the duvet's thickness over it
+const DRAPE = {GAP:0.01, RX:0.12, RZ:0.08};
+function coverDrape(iEnd, dx){
+  const {nx, nz, BED, THICK} = COV, B = COV.body, H = COV.h, T = COV.tmp, n = iEnd + 1, dz = (COV.Z1 - COV.Z0) / (nz - 1);
+  for (let k = 0; k < nx * nz; k++) H[k] = B[k] > BED + 0.002 ? B[k] + DRAPE.GAP : BED;
+  const pass = (src, dst, along, R, d, sgn) => {         // 1-d dilation (sgn 1) or erosion (sgn -1) with the parabola
+    const N = along ? n : nz, M = along ? nz : n, W = Math.ceil(Math.sqrt(2 * R * 0.5) / d);
+    for (let m = 0; m < M; m++) for (let a = 0; a < N; a++) { let best = sgn > 0 ? -9 : 9;
+      for (let b = Math.max(0, a - W); b <= Math.min(N - 1, a + W); b++) { const k = along ? b * nz + m : m * nz + b, o = ((a - b) * d) ** 2 / (2 * R);
+        const val = src[k] - sgn * o; if (sgn > 0 ? val > best : val < best) best = val; }
+      dst[along ? a * nz + m : m * nz + a] = best; } };
+  pass(H, T, true, DRAPE.RX, dx, 1); pass(T, H, false, DRAPE.RZ, dz, 1);      // dilate
+  pass(H, T, true, DRAPE.RX, dx, -1); pass(T, H, false, DRAPE.RZ, dz, -1);    // erode
+  // the top: the thickness over the underside, smoothed (a 5 cm duvet does not show every fold of what is under it), never
+  // thinner than 3 cm; COV.thk keeps each point's thickness for the underside
+  const K = COV.thk || (COV.thk = new Float32Array(nx * nz)), U = COV.und || (COV.und = new Float32Array(nx * nz));
+  for (let k = 0; k < nx * nz; k++) { U[k] = Math.max(H[k], BED); H[k] = U[k] + THICK; }
+  for (let p = 0; p < 3; p++) { for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
+      T[i * nz + j] = (4 * H[i * nz + j] + H[i0 * nz + j] + H[i1 * nz + j] + H[i * nz + j0] + H[i * nz + j1]) / 8; }
+    for (let i = 0; i < n; i++) for (let j = 0; j < nz; j++) { const k = i * nz + j; H[k] = Math.max(T[k], U[k] + 0.03); } }
+  for (let k = 0; k < nx * nz; k++) K[k] = H[k] - U[k];
+  for (let i = n; i < nx; i++) for (let j = 0; j < nz; j++) { H[i * nz + j] = H[iEnd * nz + j]; K[i * nz + j] = K[iEnd * nz + j]; }   // (past him: the curtain takes its top from here)
+}
 function coverShape(){                                 // the duvet over him, this frame
   const {nx, nz, nt, pos, nor, uv, ZM0, ZM1, BED, LOFT, THICK, DROP, DR} = COV;
   // pulled up from where it lay folded to just under his shoulders; on his side, back off his raised shoulder
@@ -2617,7 +2643,15 @@ function coverShape(){                                 // the duvet over him, th
   COV.hem = hem; COV.lastHem = hem; COV.len = len;
   const B = COV.body, H = COV.h, T = COV.tmp;
   for (const s of DUV.segs) { if (s.head) continue; s.a.getWorldPosition(s.A); s.b.getWorldPosition(s.B); }
-  // 1. what is under each grid point: the top of his outline there, eased out to the bed
+  // 1. what is under each grid point: the top of his outline there, eased out to the bed. v5: his skin itself, the highest
+  // of his vertices (every third) nearest each grid point; the capsules round his bones stood up to 16 cm over his legs
+  if (V5) { B.fill(BED); const v = _l3, dz = (COV.Z1 - COV.Z0) / (nz - 1), dx = len / (nx - 1);
+    boy.traverse(o => { if (!o.isSkinnedMesh || !o.visible || /_inside$/.test(o.name)) return; const P = o.geometry.attributes.position;
+      for (let q = 0; q < P.count; q += 3) { o.getVertexPosition(q, v).applyMatrix4(o.matrixWorld);
+        const i = Math.round((v.x - hem) / dx), j = Math.round((v.z - COV.Z0) / dz); if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
+        const k = i * nz + j; if (v.y > B[k]) B[k] = v.y; } });
+    for (let k = 0; k < nx * nz; k++) H[k] = B[k];
+  } else
   for (let i = 0; i < nx; i++) { const x = hem + len * (i / (nx - 1));
     for (let j = 0; j < nz; j++) { const z = COV.Z0 + (COV.Z1 - COV.Z0) * (j / (nz - 1));
       let h = BED;
@@ -2637,7 +2671,7 @@ function coverShape(){                                 // the duvet over him, th
   for (const n of ["LeftToeBase", "RightToeBase", "LeftFoot", "RightFoot"]) end = Math.max(end, bones[n].getWorldPosition(_l2).x + (/Toe/.test(n) ? 0.09 : 0.16));
   const iEnd = Math.min(nx - 3, Math.ceil((end - hem) / len * (nx - 1)));
   // 2. cloth, not shrink wrap: smooth the surface (it bridges between his limbs), but never below him
-  if (V5) coverCloth(iEnd); else
+  if (V5) coverDrape(iEnd, len / (nx - 1)); else
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
@@ -2654,7 +2688,7 @@ function coverShape(){                                 // the duvet over him, th
       const over = Math.max(smooth(ZM0, COV.Z0, z), smooth(ZM1, COV.Z1, z));
       let x = x0, h;
       if (i <= iEnd) {                                                  // on the bed: where he is under it, it rests on him
-        const floor = B[k] > BED + 0.005 ? B[k] + 0.03 : -9;
+        const floor = V5 ? -9 : B[k] > BED + 0.005 ? B[k] + 0.03 : -9;
         h = Math.max(H[k] - DROP * over * over, floor);
       } else {                                                          // the end: a curtain, its top the edge it hangs from
         const sE = (i - iEnd) / (nx - 1 - iEnd), top = H[iEnd * nz + j];   // (its final height, set above)
@@ -2662,7 +2696,7 @@ function coverShape(){                                 // the duvet over him, th
         h = top + (Math.min(hemY, top - 0.05) - top) * sE;
       }
       pos[3 * k] = pos[3 * kb] = x; pos[3 * k + 2] = pos[3 * kb + 2] = z;
-      pos[3 * k + 1] = h; pos[3 * kb + 1] = i <= iEnd ? Math.min(h - 0.012, Math.max(h - THICK, Math.min(B[k], BED) - 0.01)) : h;
+      pos[3 * k + 1] = h; pos[3 * kb + 1] = i <= iEnd ? (V5 ? h - COV.thk[k] : Math.min(h - 0.012, Math.max(h - THICK, Math.min(B[k], BED) - 0.01))) : h;
       if (i > iEnd) pos[3 * kb] = x - THICK * 0.6;
       if (newUV) { uv[2 * k] = uv[2 * kb] = u * len * COV.TEX; uv[2 * k + 1] = uv[2 * kb + 1] = z * COV.TEX; }
       H[k] = h;
