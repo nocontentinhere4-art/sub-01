@@ -26,6 +26,9 @@
 // (his legs push it on; it stays there), turns as he walks off and the walk loop takes over mid-stride. The walk plays
 // as recorded (knees and elbows bend, the arms swing).
 
+// lying on the bed listening to music, awake (G12, preview/bed-music): in once from room_bed_lie's last frame, the 8 s loop,
+// out once into room_bed_wake's first frame
+const EXTRA = {music_in: "room_bed_music_in", music: "room_bed_music", music_out: "room_bed_music_out"};
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "desk_watch", stand: "room_window",
   walk: "room_walk", sit_down: "room_sit_down", stand_up: "room_stand_up", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
@@ -206,6 +209,8 @@ export function createMH(env) {
     // (the clips' folder and their fit to the body come from the page: room/mh as recorded, room/mh_v5 for v5 through char_v5.js)
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
+    // optional: the clips some bodies have and others not (v5: G12's awake-on-the-bed music clips); a missing one just stays off
+    await Promise.all(Object.entries(EXTRA).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // watching "simply sits in the chair": the recorded clip (boy_mh's and G2's alike) slouches and props its feet up at
     // the desk's height, so its pelvis (turn and height) and legs come from the mouse clip (seated on the seat, feet on
@@ -216,6 +221,9 @@ export function createMH(env) {
       [...got.desk_watch.tracks.filter(t => !LEGS.test(t.name)), ...got.desk_mouse.tracks.filter(t => LEGS.test(t.name))]);
     M.watchLegs = feetUp ? "desk_mouse" : "recorded";
     const make = c => mixer.clipAction(c);
+    if (got.music_in && got.music && got.music_out) {
+      for (const k of ["music_in", "music", "music_out"]) { const a = M.actions[k] = make(got[k]); if (k !== "music") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } }
+      M.music = true; }
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
     // body's (its hips 0.977 m up, walking): scaled to this body's by its own walking hips (v5's are about 0.87 m up, so they
@@ -592,22 +600,31 @@ export function createMH(env) {
     const k = st.at === "desk" && (!s || s.k === "chair") ? 1 : s && s.k === "pose" && s.to === "desk" ? t : s && s.k === "pose" && st.at === "desk" ? 1 - t : 0;
     env.boy.position.y += L * k;
   }
+  function measureLift(every) {                              // how far his lowest skin over the mattress is under its top (m)
+    const b = env.boy; let need = 0;
+    if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh) skin.push(o); }); }     // every part (dressed: his clothes too)
+    b.updateMatrixWorld(true); const v = V();
+    for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
+    for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
+      const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
+      if (e > 0) need = Math.max(need, BED.top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
+    return need;
+  }
   function bedLift(st, dt) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
     if (!on && !M.lift) return;
     const b = env.boy; let need = 0, every = 3;
-    if (on && !st.step) {                                      // still on the bed: every other vertex, once a second (cheap on a phone)
-      M.liftT = (M.liftT || 0) - dt; if (M.liftT > 0) { b.position.y += M.lift; return; }
-      M.liftT = 1; every = 2; M.lift = 0;
+    if (on && !st.step) {                                      // still on the bed: every other vertex, once a second (cheap on a phone),
+      // and between the measures the lift eases toward it (G12's lying clips move: a set lift would step): up at 10 cm/s,
+      // down at 3; a change of more than 5 cm is taken at once
+      M.liftT = (M.liftT || 0) - dt;
+      if (M.liftT <= 0) { M.liftT = 1; every = 2; M.liftGoal = measureLift(2); }
+      const g = M.liftGoal ?? M.lift ?? 0, l = Math.abs(g - (M.lift || 0)) > 0.05 ? g : M.lift || 0;   // (more than 5 cm either way, as when the page opens on him in bed: at once)
+      M.lift = l + Math.max(-0.03 * dt, Math.min(0.10 * dt, g - l)); if (M.lift < 1e-4) M.lift = 0;
+      b.position.y += M.lift; return;
     }
-    if (on) {
-      if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh) skin.push(o); }); }     // every part (dressed: his clothes too)
-      b.updateMatrixWorld(true); const v = V();
-      for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
-      for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
-        const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
-        if (e > 0) need = Math.max(need, BED.top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
-    }
+    M.liftGoal = null;
+    if (on) need = measureLift(every);
     M.lift = Math.max(need, (M.lift || 0) - 0.1 * dt);
     if (M.lift < 1e-4) M.lift = 0;
     b.position.y += M.lift;
@@ -828,6 +845,7 @@ export function createMH(env) {
       if (st.at === "desk" && !st.step && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
+    bedMusic(st, dt);
     pivot(st, dt);
     showStep();                                                // (the showcase's clip, before the guards measure him)
     baseY(); seatLift(st); bedLift(st, dt); floorLift(dt); M.lastY = env.boy.position.y;
@@ -841,17 +859,9 @@ export function createMH(env) {
     return moving;
   }
   // ---------- music: the headphones from the wall hook on his head while a track plays (the page's own pair and its
-  // alive() layer do not run here), and lying on the bed listening, a little life over the held pose: his head turns
-  // slowly and nods to the beat, his right forearm lifts off the bed and the hand moves in time. Additive, in the
-  // room's axes, on the bones as the clip left them this frame (so it composes with whatever lying pose is held) ----------
-  const UPW = V(0, 1, 0);
-  const MU = {set: null, wall: null, w: 0, BEAT: 1.7};       // (BEAT: the page's easy pace, Hz; it does not know the track's tempo)
-  const _r1 = V(), _r2 = V(), _r3 = V(), _rq = new THREE.Quaternion(), _rp = new THREE.Quaternion(), _rw = new THREE.Quaternion();
-  function turnWorld(bone, axis, ang) {                      // turn a bone by ang about a room axis through its own origin
-    if (!bone || !ang) return;
-    _rq.setFromAxisAngle(axis, ang); bone.parent.getWorldQuaternion(_rp); bone.getWorldQuaternion(_rw);
-    bone.quaternion.copy(_rp.invert().multiply(_rq.multiply(_rw))); bone.updateMatrixWorld(true);
-  }
+  // alive() layer do not run here), back on the hook when it stops. (Lying on the bed listening, his motion is G12's
+  // clips, room_bed_music*: nothing procedural here) ----------
+  const MU = {set: null, wall: null};
   function headphones() {                                    // a copy of the wall pair, fitted to his head from his own skin
     if (MU.set !== null) return MU.set;
     const room = env.room && env.room(), wall = room && room.getObjectByName("headphones"), head = env.bones.Head;
@@ -885,27 +895,38 @@ export function createMH(env) {
     env.scene.add(g); g.updateMatrixWorld(true); head.attach(g); g.visible = false; g.name = "headphones_on";
     return MU.set = g;
   }
+  // lying on the bed listening (the page's "listen"): in -> the loop; when the page gets him up, its step waits while the
+  // out plays (started with the loop under 3.5 s, else at its wrap: the dancing hand never drops in a cross-fade), then
+  // goes on into bed_wake, whose first frame the out ends on. These clips own his whole body meanwhile
+  const BM = {ph: null, a: null};
+  function bmOnly(a, w) {                                    // this clip alone (the page's lie and any fading action out)
+    for (const x of env.mixer._actions) if (x !== a && x !== BM.prev && x.getEffectiveWeight() > 0) x.setEffectiveWeight(0);
+    a.setEffectiveWeight(w); if (BM.prev && BM.prev !== a) BM.prev.setEffectiveWeight(1 - w);
+  }
+  function bmPlay(k) { const a = M.actions[k]; BM.prev = BM.a; a.reset(); a.play(); BM.a = a; BM.ph = k; BM.t = 0; }
+  function bedMusic(st, dt) {
+    if (!M.music) return;
+    const S = st.step, listening = st.goal && st.goal.clip === "listen";
+    if (!BM.ph) {
+      if (!(listening && st.at === "bedlie" && !S)) return;
+      bmPlay("music_in");
+    }
+    BM.t += dt;
+    if (BM.ph === "music_in" && BM.a.time >= BM.a.getClip().duration - 1e-3) bmPlay("music");
+    const leaving = S && S.from === "bedlie";
+    if (BM.ph === "music" && (leaving || !listening) && BM.a.time < 3.5) bmPlay("music_out");
+    if (BM.ph === "music_out" && BM.a.time >= BM.a.getClip().duration - 1e-3) {   // (done: the step goes on, or the page's clip again)
+      for (const k of ["music_in", "music", "music_out"]) { M.actions[k].setEffectiveWeight(0); M.actions[k].stop(); }
+      if (!S && st.current) { st.current.setEffectiveWeight(1); st.current.play(); }
+      BM.ph = null; BM.a = BM.prev = null; env.mixer.update(0); return; }
+    if (S) S.t = 0;                                          // (the page's step waits for the out)
+    bmOnly(BM.a, Math.min(1, BM.t / (BM.ph === "music_in" ? 0.15 : 0.25)));
+    env.mixer.update(0);
+  }
   function music(st, dt) {
     const on = !!(st.life && st.life.music) && env.boy.visible;
     const g = on || MU.set ? headphones() : null;
     if (g) g.visible = on; if (MU.wall) MU.wall.visible = !(on && g);
-    const lying = on && st.at === "bedlie" && !st.step && st.goal && st.goal.clip === "listen";
-    MU.w += ((lying ? 1 : 0) - MU.w) * (1 - Math.exp(-dt / 0.6));
-    if (MU.w < 0.01) return;
-    const T = st.T, w = MU.w, B = env.bones, beat = Math.max(0, Math.sin(T * Math.PI * 2 * MU.BEAT));
-    env.boy.updateMatrixWorld(true);
-    // the head: a slow turn about its own length, and a small nod on the beat
-    if (B.Head) { const H0 = B.Head.getWorldPosition(_r1), up = (env.boy.getObjectByName("head_end") || B.Head).getWorldPosition(_r2).sub(H0).normalize();
-      turnWorld(B.neck || B.Head, up, w * 0.16 * Math.sin(T * 0.55));
-      const lat = B.LeftShoulder.getWorldPosition(_r3).sub(B.RightShoulder.getWorldPosition(_r2)).normalize();
-      turnWorld(B.Head, lat, -w * 0.07 * beat); }
-    // the right hand: the forearm lifts off the bed (about its elbow, toward the ceiling), the wrist sways in time
-    if (B.RightForeArm && B.RightHand) {
-      const E = B.RightForeArm.getWorldPosition(_r1), dir = B.RightHand.getWorldPosition(_r2).sub(E).normalize(), ax = _r3.crossVectors(dir, UPW).normalize();
-      turnWorld(B.RightForeArm, ax, w * (0.75 + 0.12 * Math.sin(T * Math.PI * 2 * MU.BEAT / 2)));
-      const H = B.RightHand.getWorldPosition(_r1), d2 = B.RightForeArm.getWorldPosition(_r2).sub(H).negate().normalize();
-      turnWorld(B.RightHand, _r3.crossVectors(d2, UPW).normalize(), w * 0.35 * Math.sin(T * Math.PI * 2 * MU.BEAT));
-      turnWorld(B.RightHand, d2, w * 0.25 * Math.sin(T * Math.PI * MU.BEAT)); }
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
   function dbg() {
