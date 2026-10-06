@@ -2973,7 +2973,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
   // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
   const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
-    ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), seatUp: 0, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
+    ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),

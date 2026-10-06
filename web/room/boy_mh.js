@@ -364,7 +364,9 @@ export function createMH(env) {
   // chair roll 0.12 m back, and in again for the keys and the mouse (to 8.5 cm back for the keys, 6 for the mouse: the hoodie's front clears the desk's edge)
   function roll(dt) {
     const lap = M.sc && ["read", "phone", "phone_scroll"].includes(M.sc.k);   // (a book or a phone on his lap: clear of the desk)
-    const want = lap ? 0.45 : M.mode === "desk_watch" || !M.mode ? 0.12 : M.mode === "desk_mouse" ? 0.06 : 0.085, k = 1 - Math.exp(-dt / 0.35);
+    // env.seatIn (v5: 0.06): G14's v5 clips sit him that much deeper on the seat (clear of the arm pads' front ends, against
+    // the backrest); he and the chair roll in by as much, so his hands stay on the keys / mouse / book and his elbows keep their angle
+    const want = (lap ? 0.45 : M.mode === "desk_watch" || !M.mode ? 0.12 : M.mode === "desk_mouse" ? 0.06 : 0.085) - (env.seatIn || 0), k = 1 - Math.exp(-dt / 0.35);
     const p = env.boy.position;
     if (M.rollAt && (Math.abs(p.x - M.rollAt[0]) > 1e-6 || Math.abs(p.z - M.rollAt[1]) > 1e-6)) M.off = 0;   // (the page placed him anew)
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
