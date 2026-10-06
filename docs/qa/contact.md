@@ -83,6 +83,23 @@ Three rules, each of which one of today's defects would have broken:
 And the gate reports **both signs**: how far inside, and how far away. A gap at a surface that the table above says
 must be touched is a failure of the same weight as a penetration.
 
+Two more, learned the hard way on the same day:
+
+4. **Measure contact where the contact is supposed to be, not at the body's lowest point.** The bed probe said "back
+   and hips 1–3 mm over the quilt" while the render showed open air under his spine. G10d found why: the slice took
+   each 10 cm bin's single *lowest* vertex — the buttocks or the heels. As long as any one part of him touches, a
+   lowest-point measure reports contact, so it is structurally blind to a gap under the back. Contact for a lying back
+   is measured along the spine; for a seated back, against the backrest; for a hand, at the palm and fingertips.
+5. **A number that changes between runs on the same code is not a measurement.** `desk_14`'s chair count read 6 on
+   one run and 14 on the next. It measured whichever frame the scene stopped on, and how far the clip had run by then
+   depended on how long the page took to load. The sweep (`qa.bodySweep`) steps a fixed span at a fixed rate and
+   keeps the worst frame, so the same code gives the same number.
+
+And one about tests in general: three of our gates measured nothing they claimed to. The chair count tracked load
+time. `test_boy_mh` asserted `set(have) <= set(CLIPS)`, which can never fail on a missing required clip. The bed
+probe sampled the lowest point. When a test is changed to make it pass, the report says what the test no longer
+catches — and a fix to a test is proven by breaking the thing it guards and watching it fail.
+
 ## Status
 
 The table is the target, not a description of today. As of 2026-10-06 `main` fails it in the four rows listed at
