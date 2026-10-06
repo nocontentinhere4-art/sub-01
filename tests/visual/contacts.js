@@ -53,7 +53,7 @@
       if (p >= 0) return PARTS[p] === "plastic" ? (Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm_post" : "frame") : PARTS[p] === "seat" ? (u.z < -0.17 ? "seat_front" : "seat") : PARTS[p]; }
     return Math.abs(u.x) > 0.25 && u.y > 0.30 ? "arm" : u.z < -0.17 && u.y < 0.62 ? "front" : u.z > 0.12 && u.y > 0.55 ? "back" : u.y < 0.30 ? "base" : "seat"; };
   const HAND = /hand|finger|thumb|index|middle|ring|pinky|metacarpal|wrist|palm/i;
-  const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|ear|face|chin/i;
+  const HEAD = /head|neck|jaw|eye|nose|lip|tongue|teeth|chin|skull/i;   // (not "ear": it matches ForeArm)
   // the tea bottle he picks up and drinks from: his hand holds it, so it is tested against his head as well as his hands
   const takes = (name, b) => name === "tea_bottle" ? (HAND.test(b) || HEAD.test(b)) : HAND.test(b);
   function skins() { const s = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible) s.push(o); }); return s; }
