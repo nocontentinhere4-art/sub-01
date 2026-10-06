@@ -45,6 +45,7 @@ these are worth more to us than the Kimodo takes, which carried no fingers at al
 | `Texting.fbx` | on the phone | his phone sessions — most of his shorts are watched on it |
 | `Texting_While_Standing.fbx` | on the phone, standing | on his feet by the window or the door |
 | `Standing_Using_Touchscreen_Tablet.fbx` | holding a flat screen, standing | a larger screen held in both hands |
+| `Gaming.fbx` | holding a controller | the gamepad that is already on his desk |
 
 The posture of the three phone takes (seated, standing, how the arms are held) is whatever
 Mixamo captured, not what their names imply. Confirm each on retarget before deciding which of
