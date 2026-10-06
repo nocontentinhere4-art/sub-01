@@ -103,12 +103,21 @@ for (let t = 0; t < T; t++) {
     const under = (b, root) => { let n = B(b); while (n) { if (n.getName() === root) return true; n = parentOf.get(n); } return false; };
     for (const b of order) { if (under(b, "Waist")) W[b].premultiply(lq); if (under(b, "NeckTwist01")) W[b].premultiply(hq); }
   }
+  // rollCurve [[t, rad], ...]: a measured sideways torso lean (+ = toward his left), the head turned back by rollHead of it
+  const rollT = curve(O.rollCurve, t / fps);
+  if (rollT) {
+    const under = (b, root) => { let n = B(b); while (n) { if (n.getName() === root) return true; n = parentOf.get(n); } return false; };
+    const rq = new THREE.Quaternion().setFromAxisAngle(fwd, -rollT * sw), hq = new THREE.Quaternion().setFromAxisAngle(fwd, (O.rollHead ?? 0) * rollT * sw);
+    for (const b of order) { if (under(b, "Waist")) W[b].premultiply(rq); if (under(b, "NeckTwist01")) W[b].premultiply(hq); }
+  }
+  // sideCurve [[t, m], ...]: the hips slid sideways on the seat (+ = toward his left), the measured weight shift's pelvis part
+  const sideT = curve(O.sideCurve, t / fps);
   if (O.rootKeys) {                             // timed root offsets (rig space, m): [[t, dx, dy, dz], ...], smoothstep between keys
     const K = O.rootKeys, tt = t / fps; let i = 0; while (i + 1 < K.length && K[i + 1][0] <= tt) i++;
     const a = K[i], b = K[Math.min(i + 1, K.length - 1)]; let u = b[0] > a[0] ? Math.min(1, Math.max(0, (tt - a[0]) / (b[0] - a[0]))) : 0; u = u * u * (3 - 2 * u);
     frames.rk = new THREE.Vector3(a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u);
   } else frames.rk = new THREE.Vector3();
-  const hip = Pw[JI.LeftLeg].clone().add(Pw[JI.RightLeg]).multiplyScalar(0.5 * scale).add(off).add(fwd.clone().multiplyScalar(seatOff.x)).add(new THREE.Vector3(0, seatOff.y * sw, 0)).add(rgt.clone().multiplyScalar(seatOff.z)).add(frames.rk);
+  const hip = Pw[JI.LeftLeg].clone().add(Pw[JI.RightLeg]).multiplyScalar(0.5 * scale).add(off).add(fwd.clone().multiplyScalar(seatOff.x)).add(new THREE.Vector3(0, seatOff.y * sw, 0)).add(rgt.clone().multiplyScalar(seatOff.z - sideT)).add(frames.rk);
   frames.push({W, hip, Pw, fwd});
 }
 function toLocal(Wmap, hipWorld){                // world rotations of mapped bones -> local quats (Map), Hip local translation

@@ -1,0 +1,15 @@
+{
+ "shape_rms": 0.034,
+ "half_rise_s": {
+  "reference": 1.25,
+  "clip": 1.27
+ },
+ "half_fall_s": {
+  "reference": 5.05,
+  "clip": 5.07
+ },
+ "amplitude_shoulder_widths": {
+  "reference": 0.363,
+  "clip": 0.196
+ }
+}
