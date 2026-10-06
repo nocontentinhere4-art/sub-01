@@ -835,9 +835,77 @@ export function createMH(env) {
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
+    music(st, dt);
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
+  }
+  // ---------- music: the headphones from the wall hook on his head while a track plays (the page's own pair and its
+  // alive() layer do not run here), and lying on the bed listening, a little life over the held pose: his head turns
+  // slowly and nods to the beat, his right forearm lifts off the bed and the hand moves in time. Additive, in the
+  // room's axes, on the bones as the clip left them this frame (so it composes with whatever lying pose is held) ----------
+  const UPW = V(0, 1, 0);
+  const MU = {set: null, wall: null, w: 0, BEAT: 1.7};       // (BEAT: the page's easy pace, Hz; it does not know the track's tempo)
+  const _r1 = V(), _r2 = V(), _r3 = V(), _rq = new THREE.Quaternion(), _rp = new THREE.Quaternion(), _rw = new THREE.Quaternion();
+  function turnWorld(bone, axis, ang) {                      // turn a bone by ang about a room axis through its own origin
+    if (!bone || !ang) return;
+    _rq.setFromAxisAngle(axis, ang); bone.parent.getWorldQuaternion(_rp); bone.getWorldQuaternion(_rw);
+    bone.quaternion.copy(_rp.invert().multiply(_rq.multiply(_rw))); bone.updateMatrixWorld(true);
+  }
+  function headphones() {                                    // a copy of the wall pair, fitted to his head from his own skin
+    if (MU.set !== null) return MU.set;
+    const room = env.room && env.room(), wall = room && room.getObjectByName("headphones"), head = env.bones.Head;
+    if (!wall || !head) return MU.set = null;
+    MU.wall = wall;
+    const src = wall.children.find(c => c.name !== "headphones_mesh" && c.visible !== false); if (!src) return MU.set = null;
+    const m = src.clone(true); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1); m.updateMatrixWorld(true);
+    let mb = new THREE.Box3().setFromObject(m);              // (its height is y: it hangs on the hook band up; the ears are its long side)
+    if (mb.getSize(V()).z > mb.getSize(V()).x) { m.rotation.y = Math.PI / 2; m.updateMatrixWorld(true); mb = new THREE.Box3().setFromObject(m); }   // (ears along x)
+    const ms = mb.getSize(V()), mc = mb.getCenter(V());
+    // his head, as it is now: the skin his Head bone carries most; its up (to head_end), across (shoulder to shoulder)
+    env.boy.updateMatrixWorld(true);
+    const H0 = head.getWorldPosition(V()), up = (env.boy.getObjectByName("head_end") || head).getWorldPosition(V()).sub(H0).normalize();
+    const lat = env.bones.LeftShoulder.getWorldPosition(V()).sub(env.bones.RightShoulder.getWorldPosition(V())); lat.addScaledVector(up, -lat.dot(up)).normalize();
+    const fwd = V().crossVectors(lat, up);
+    let top = -9, l0 = 9, l1 = -9, f0 = 9, f1 = -9; const v = V();
+    env.boy.traverse(o => { if (!o.isSkinnedMesh || !o.visible) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, P = g.attributes.position;
+      const hi = o.skeleton.bones.indexOf(head); if (hi < 0) return;
+      for (let i = 0; i < P.count; i += 2) { let b = 0, bw = -1; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); }
+        if (b !== hi) continue; o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld).sub(H0);
+        top = Math.max(top, v.dot(up)); const a = v.dot(lat), f = v.dot(fwd); l0 = Math.min(l0, a); l1 = Math.max(l1, a); f0 = Math.min(f0, f); f1 = Math.max(f1, f); } });
+    if (top < 0) return MU.set = null;
+    // scaled so the cups clear his head (the pair's inside about 80% of its width), the band on his crown, the cups over
+    // his ears (a little behind the middle of his head, front to back)
+    const sc = (l1 - l0 + 0.02) / (0.8 * ms.x);
+    const g = new THREE.Group(); g.add(m); m.position.set(-mc.x, -mb.max.y, -mc.z);   // (its band top, centred, at the group's origin)
+    g.scale.setScalar(sc);
+    const at = H0.clone().addScaledVector(up, top + 0.008).addScaledVector(lat, (l0 + l1) / 2).addScaledVector(fwd, f0 + (f1 - f0) * 0.45);
+    const R = new THREE.Matrix4().makeBasis(lat, up, fwd); g.quaternion.setFromRotationMatrix(R); g.position.copy(at);
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    env.scene.add(g); g.updateMatrixWorld(true); head.attach(g); g.visible = false; g.name = "headphones_on";
+    return MU.set = g;
+  }
+  function music(st, dt) {
+    const on = !!(st.life && st.life.music) && env.boy.visible;
+    const g = on || MU.set ? headphones() : null;
+    if (g) g.visible = on; if (MU.wall) MU.wall.visible = !(on && g);
+    const lying = on && st.at === "bedlie" && !st.step && st.goal && st.goal.clip === "listen";
+    MU.w += ((lying ? 1 : 0) - MU.w) * (1 - Math.exp(-dt / 0.6));
+    if (MU.w < 0.01) return;
+    const T = st.T, w = MU.w, B = env.bones, beat = Math.max(0, Math.sin(T * Math.PI * 2 * MU.BEAT));
+    env.boy.updateMatrixWorld(true);
+    // the head: a slow turn about its own length, and a small nod on the beat
+    if (B.Head) { const H0 = B.Head.getWorldPosition(_r1), up = (env.boy.getObjectByName("head_end") || B.Head).getWorldPosition(_r2).sub(H0).normalize();
+      turnWorld(B.neck || B.Head, up, w * 0.16 * Math.sin(T * 0.55));
+      const lat = B.LeftShoulder.getWorldPosition(_r3).sub(B.RightShoulder.getWorldPosition(_r2)).normalize();
+      turnWorld(B.Head, lat, -w * 0.07 * beat); }
+    // the right hand: the forearm lifts off the bed (about its elbow, toward the ceiling), the wrist sways in time
+    if (B.RightForeArm && B.RightHand) {
+      const E = B.RightForeArm.getWorldPosition(_r1), dir = B.RightHand.getWorldPosition(_r2).sub(E).normalize(), ax = _r3.crossVectors(dir, UPW).normalize();
+      turnWorld(B.RightForeArm, ax, w * (0.75 + 0.12 * Math.sin(T * Math.PI * 2 * MU.BEAT / 2)));
+      const H = B.RightHand.getWorldPosition(_r1), d2 = B.RightForeArm.getWorldPosition(_r2).sub(H).negate().normalize();
+      turnWorld(B.RightHand, _r3.crossVectors(d2, UPW).normalize(), w * 0.35 * Math.sin(T * Math.PI * 2 * MU.BEAT));
+      turnWorld(B.RightHand, d2, w * 0.25 * Math.sin(T * Math.PI * MU.BEAT)); }
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
   function dbg() {
