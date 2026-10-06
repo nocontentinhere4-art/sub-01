@@ -46,3 +46,33 @@ Pexels License, no faces, logos pixelated; details in `SOURCES.md`:
 - kb1 18966470 and kb2 28993052: Matheus Bertelli.
 - mouse1 5745010: Ryutaro Tsukata.
 - mouse2 5185149: cottonbro studio.
+
+## Mouse grip tightened (COORD's nit: the fingers were fanned in the top-down view)
+Measured on the references (mouse2 top-down, pixel positions):
+- The index finger points about 14 deg toward the thumb from the middle finger. In mouse1 the two lie closer still.
+- The middle and ring fingers are together; the little finger is tucked under the ring on the shell's right flank.
+- The thumb lies flat on the left flank.
+
+New per-phalanx pose (MCP / PIP / DIP flex, spread about the palm normal):
+
+| finger | flex (deg) | spread (deg) |
+|---|---|---|
+| index | 8 / 12 / 6 | +2 |
+| middle | 8 / 12 / 6 | 0 |
+| ring | 42 / 44 / 22 | -4 |
+| little | 52 / 50 / 28 | -7 |
+
+- Ring and little are curled down beside the shell's right side instead of fanned across the pad.
+- They cannot curl into the shell: the page lifts the hand until every fingertip clears the shell by 8 mm (`overMouse`).
+
+The numbers, measured in the page in mouse mode (desk_14 scene, `mouseprobe`):
+
+| | wrist above the pad | lowest fingertip above the pad | index tip to mouse centre (xz) |
+|---|---|---|---|
+| main 95abd03 | 10.0 cm | 8.8 cm | 1.2 cm |
+| c36173a (committed hands) | 8.1 cm | 2.8 cm | 3.0 cm |
+| tightened grip | 8.7 cm | 2.9 cm | 2.9 cm |
+
+**Correction to the earlier figure:** "wrist 1.3 cm above the pad" was measured before the palm-down hand orientation was added. With the palm resting on top of the ~4 cm shell, the wrist joint sits ~8 cm up. The fingertips are on the buttons in both.
+
+`mouse_grip_tightened.jpg` shows the references on top, then c36173a vs the tightened grip, from three views: top-down, his right side, over his left shoulder.
