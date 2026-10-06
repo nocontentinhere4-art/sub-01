@@ -185,16 +185,73 @@ Not built yet; they follow the chains.
 
 | join | worst joint | jump | blend | per frame | hips |
 |---|---|---|---|---|---|
-| arriving: Stand_To_Sit → Seated_Idle | L forearm (R hand 50.8°, R forearm 46.7°) | 52.0° | 0.8 s | 2.2° | 2.0 cm |
+| arriving: Stand_To_Sit → Seated_Idle | R hand (L forearm 42.1°) | 50.8° | 0.8 s | 2.1° | 0 (both at the seat point) |
 | Seated_Idle (loop wrap) | neck | 0.1° | — | — | 0 |
 | working: Sit_To_Type → Typing | L thumb | 2.3° | 0.2 s | 0.4° | 0.1 cm |
 | Typing (loop wrap) | L index | 1.2° | — | 1.2° | 0 |
 | working: Typing → Type_To_Sit | R hand | 4.3° | 0.2 s | 0.7° | 0 |
-| link: Seated_Idle → Sit_To_Type | L forearm | 52.0° | 0.8 s | 2.2° | 5.4 cm |
-| link: Type_To_Sit → Seated_Idle | L forearm | 52.0° | 0.8 s | 2.2° | 5.5 cm |
+| link: Seated_Idle → Sit_To_Type | R hand | 48.6° | 0.8 s | 2.0° | horizontal only |
+| link: Type_To_Sit → Seated_Idle | R hand | 48.9° | 0.8 s | 2.0° | horizontal only |
 
 - Mixamo's desk set (Stand_To_Sit, Sit_To_Type, Typing, Type_To_Sit) shares one seated rest pose, with the hands on the thighs, so it chains within a few degrees.
-- Seated_Idle rests the hands on the armrests instead. Every join into or out of it is a 52° move of the forearms. The 0.8 s blends make that the hands moving from thighs to armrests, not a snap. Whether the blend passes the hands through the thighs or armrests is not measured yet: that needs a chain player in the page.
+- Seated_Idle rests the hands on the armrests instead. Every join into or out of it is a 49–51° move of the hands and forearms. The 0.8 s blends make that the hands moving from thighs to armrests, not a snap. Whether the blend passes the hands through the thighs or armrests is not measured yet: that needs a chain player in the page.
 - The hips' 5.4 cm at the links is horizontal. The seated slot re-places Seated_Idle on the seat, so the page absorbs it; the heights agree within 0.4 cm.
 - From the captures in scratch, Sitting_Talking (44 s, seated) joins the desk set within 6–11°, against Seated_Idle's 46–48°. It would be the seamless base, but it is a person talking with his hands; it is offered, not chosen.
 - Celebrating is pending the Standing_Clap decision (above). The rare events are listed with what each waits on.
+
+
+## The desk, wired (this branch)
+
+COORD moved the desk to this workstream: replace the hand-built seated poses with the captures, and re-derive every constant that was tuned to them rather than inheriting it. In `web/room/boy_mh.js` and `web/room.html`:
+
+- **Clips:** watching, and every seated slot, is `room_seated_idle`. The sit-down is `room_mx_stand_to_sit`, the stand-up `room_mx_sit_to_stand`.
+- **Gone:**
+  - the leg swap (the mouse clip's legs and pelvis forced onto the watch clip when its feet started over 0.12 m). This changes the `sit` / `dine` / `eat` slots too. On the old MakeHuman path the feet would go back up; that path is not shipped.
+  - the one-take get-up from `room_bedtime` for leaving the desk (`flow()`): it put his torso 9 cm into the chair.
+- **Where he stands** to sit down and where the stand-up leaves him come from the clips (`env.setSpots`): the walk's hips meet the sit-down's, and the standing pose's hips meet the stand-up's.
+  - The one exception is a measured clearance. He turns on the spot before sitting, and the walk loop's turning steps caught the turned seat's front edge closer than 0.60 m (0.45 m: his right foot; 0.52 m: his toes). He turns at 0.60 m, and the remaining 24 cm is covered over the first 35 % of the sit-down while he is already sitting back.
+- **Where each clip's hips sit on the seat** (`SEAT_AT`, in the chair's own frame) was swept in the room:
+  - `room_seated_idle`: clear of the chair from 2 to 6.5 cm in front of the pivot. Closer, its calves catch the cushion's front edge.
+  - 5.5 cm: also clears the sit-down, whose hips land 2.7 cm further back than they rest.
+  - The old mouse and typing clips: clear from 3.5 cm (4.5 used). Main's 0.6 cm puts the mouse clip's left calf on the front edge.
+  - The page's own seat point (2 cm behind the pivot) and `env.seatIn` (6 cm) were compensations for the next item, and are no longer used for the desk.
+- **The legacy hips turn is not used for the desk slots.** The page placed the desk slots by `pageHips`, a −90° turn kept so G14's v5 tuning still placed the old clips. It moves a clip's forward offset sideways: `room_seated_idle` sat 2.3 cm off centre, its right thigh against the armrest. The desk slots now use the hips as the body has them.
+- **How far he and the chair roll** follows from where each capture puts its hands. Typing: the clip's keyboard onto the room's (3.2 cm in). Mouse: the clip's mouse onto the room's (3.9 cm out). Watching (hands on the armrests and knees) needs nothing on the desk, so he stays where he was. During a crossfade his root is the weight-blend of each mode's own placement.
+  - The old constants (watch 0.12, mouse 0.06, keys 0.085, less seatIn) are gone for the desk modes. Eating keeps main's, because it is not a desk mode.
+- **Seated fit:** `seatHipY` 0.68 → 0.70 for every seated clip. At 0.68 his thighs sat 2.5 cm into the cushion top, which the page counts as in the chair (its margin is 1 cm); at 0.70 they rest on it. The numbers in the sections above were measured at 0.68.
+- **Three page bugs fixed on the way:**
+  - Walking to the desk while the tick still says `walking`, the page's goal clip was `stand`, so he sat down into the standing pose. That was most of main's walking 105.
+  - A desk mode could switch in during the one frame between the sit-down and the chair's ride-in, and ride the turned chair in with its legs through it.
+  - The debug `chairVox()` put the chair back at the page's own position, discarding where it had been rolled.
+
+### Measured in the page
+
+The visual gate (`python -m tests.visual.harness`, the core set, every scene swept over 8 s):
+
+| | main (0174183) | this branch |
+|---|---|---|
+| hard failures | 2 | **0** |
+| walking_8: chair | 105 | **0** |
+| desk_14: chair | 16 | **0** |
+| eating_19: chair | 0 | 0 |
+
+`contact_pass.mjs`, every frame, every second vertex, in the page's own steps:
+
+| | chair | seat (thighs vs cushion top) | desk | floor | soles | hands vs thighs |
+|---|---|---|---|---|---|---|
+| watching (`LIFE='{"screen":{"kind":"video"}}'`), 8 s | **0** | −0.1…4.7 cm | 0 | 0 | L 0.1…4.8, R −0.2…4.5 cm | 20 frames, 0.5 cm |
+| mouse (old clip), 8 s | **0** | −0.4…4.5 cm | 0 | 0 | **L 9.1…13.9, R 5.3…10.4 cm** | 0 |
+| typing (old clip), 6 s | **0** | −0.2…4.5 cm | 0 | 0 | **L 9.2…14.1, R 5.9…10.7 cm** | 0 |
+| sit-down (`window>research`) | 78 vertices at 1.8 cm, as the chair rides in | −1.2 cm | 0 | 0 | −0.2…9.4 cm (steps) | (hands pushing on the thighs) |
+
+G14's watch-mode numbers to beat:
+- root 6.1 cm low and 7.1 cm back of mouse: now on the floor, and on the seat point for its own clip;
+- 3713 chair contacts over 8 s: now 0;
+- feet 5–14 cm off the floor: now 0–4.8 cm (a heel lifting in the capture).
+
+Still open, reported rather than patched:
+- **The old typing and mouse clips hover their feet 5–14 cm.** That is in those two hand-built clips. It goes when they are replaced: Typing with G14's contact resolver, and the mouse needs a capture (none of the twenty is one). Moving another clip's legs onto them would be the leg swap again.
+- **Leaving the desk:** two samples remain, out of 60 at 0.1 s. At 1.5 s, 7 vertices: his left calf at the cushion's front edge as he rises. At 3.0 s, 10 vertices: his calf by the chair's base as he walks off. Main's get-up measured 14–238 vertices over most of the same span.
+- **Walking from the window to the desk**, his left forearm swings through the parked chair's backrest (27–37 vertices at 2.6–2.7 s). It is identical on main: the path through the gap between the chair and the bed passes 15 cm from the backrest.
+- **The phone in bed has no capture.** Texting is standing, Texting_While_Standing and the tablet are standing, and Gaming is seated. None of them is lying down, which is where he watches most of his shorts, so the bed phone pose stays as it is. It is the one place in his day we have no capture for.
+- **The hands-vs-thighs row is a weak instrument in transitions.** It is a capsule around the thigh bone sized from baggy trousers (radius up to 16 cm), so a fist resting on the cloth reads as deep. The honest measurement is against the trouser mesh, and it should come with the contact gate.

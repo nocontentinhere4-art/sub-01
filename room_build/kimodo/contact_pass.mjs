@@ -11,6 +11,7 @@
 //   legs   his hands and fingers inside his own thighs (capsules on the thigh bones, radius from his thigh skin)
 //   keys   his fingertips over the room keyboard: their lowest height over its key tops each frame (touching within 5 mm)
 // A penetration is a vertex more than 1 cm inside (the page's own margin); depth = how far inside, vertically.
+// LIFE='{"screen": {"id": "v", "kind": "video"}}': more of the tick for live() (a video on the screen: watching).
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
 const [port, activity = "research", secs = "8", out] = process.argv.slice(2);
@@ -23,14 +24,14 @@ await p.route(/^https:\/\/(cdn\.jsdelivr\.net|unpkg\.com)\//, async r => { const
 p.on("pageerror", e => console.log("pageerror", e.message));
 await p.goto(`http://localhost:${port}/room.html?debug&nolive&hour=15`);
 await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
-const res = await p.evaluate(([activity, secs]) => { let S0step = null;
+const res = await p.evaluate(([activity, secs, X]) => { let S0step = null;
   // "a>b": settle doing a, then switch to b and sample from the moment his pose step (sitting down, getting up) begins
   const [act0, act1] = activity.split(">"); activity = act0;
-  window.FREEZE = true; settle(); live(activity, {});
+  window.FREEZE = true; settle(); live(activity, X);
   // in place: no step for a second
   const WANT = {research: "desk", chart: "desk", chat: "desk", eat: "desk", listen_music: "bedlie", sleep: "bedlie", phone: "bedside"}[activity];
   let t = 0, still = 0; while (t < 120 && still < 1) { animate_(1 / 30); t += 1 / 30; still = pose().step || (WANT && pose().at !== WANT) ? 0 : still + 1 / 30; }
-  if (act1) { live(act1, {}); let w = 0; while (w < 60 && !(pose().step && pose().step.k === "pose")) { animate_(1 / 30); w += 1 / 30; } }
+  if (act1) { live(act1, X); let w = 0; while (w < 60 && !(pose().step && pose().step.k === "pose")) { animate_(1 / 30); w += 1 / 30; } }
   const at = pose().at, cur = pose().current && pose().current._clip && pose().current._clip.name;
   S0step = pose().step ? {k: pose().step.k, from: pose().step.from, to: pose().step.to} : null;
   // ---- the static furniture as inside-intervals (desk region and around), world frame
@@ -141,5 +142,5 @@ const res = await p.evaluate(([activity, secs]) => { let S0step = null;
   S.seat = {lowestGap_min_cm: +(S.seat.min * 100).toFixed(1), lowestGap_max_cm: +(S.seat.max * 100).toFixed(1), framesUnder: S.seat.framesUnder || 0, maxVertsUnder: S.seat.maxUnder || 0, maxDepth_cm: +((S.seat.maxDepth || 0) * 100).toFixed(1)};
   for (const k of ["L", "R"]) S.soles[k] = {min_cm: +(S.soles[k].min * 100).toFixed(1), max_cm: +(S.soles[k].max * 100).toFixed(1), on: S.soles[k].on};
   S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5); S.legs.maxDepth = +(S.legs.maxDepth * 100).toFixed(1);
-  return S; }, [activity, +secs]);
+  S.mode = window.mh && mh.M.mode; return S; }, [activity, +secs, JSON.parse(process.env.LIFE || "{}")]);
 const txt = JSON.stringify(res, null, 1); if (out) fs.writeFileSync(out, txt); console.log(txt); await b.close();

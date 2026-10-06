@@ -3,7 +3,7 @@
  "defaults": {
   "seated": {
    "scale": "hip",
-   "seatHipY": 0.68,
+   "seatHipY": 0.7,
    "seatForward": 0.045,
    "pitch": 10,
    "soleUp": 0.027,
