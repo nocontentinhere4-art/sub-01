@@ -1,0 +1,14 @@
+{
+ "window_s": [
+  3,
+  18
+ ],
+ "samples": 60,
+ "hand_into_shell_mm": {
+  "max": 1.2,
+  "median": 0,
+  "p90": 0.5
+ },
+ "hand_below_pad_mm_max": 0,
+ "over_2mm": {}
+}

@@ -76,3 +76,45 @@ The numbers, measured in the page in mouse mode (desk_14 scene, `mouseprobe`):
 **Correction to the earlier figure:** "wrist 1.3 cm above the pad" was measured before the palm-down hand orientation was added. With the palm resting on top of the ~4 cm shell, the wrist joint sits ~8 cm up. The fingertips are on the buttons in both.
 
 `mouse_grip_tightened.jpg` shows the references on top, then c36173a vs the tightened grip, from three views: top-down, his right side, over his left shoulder.
+
+## Mouse grip: contact instead of clearance (COORD: "he reads as resting his hand next to a mouse")
+**What was wrong, measured in the page** (mouse mode, desk_14; `tools/motion/grip_probe.py`). The room's mouse shell is 11 cm long and 6.5 cm wide. Its top is 36 mm high at 2 cm behind its centre.
+- **Palm not on the shell.** The palm (60% from wrist to middle knuckle) was 7.2 cm behind the mouse's centre. That is behind the shell's rear edge (−5.5 cm), and 7.9 cm above the pad.
+- **Fingers floating.** The fingertips hung 2–3 cm over the buttons.
+- **Two causes:**
+  - The wrist pin aligned the clip's mouse point, not the hand's actual palm, with the room's mouse. Since the photo-referenced hand poses, that put the palm 5 cm short.
+  - `overMouse` then lifted the whole hand until every fingertip and knuckle cleared the shell by 8–20 mm. The hand could never come down onto the shell.
+- **Correction to the line above** ("the palm resting on top of the ~4 cm shell"): it was not. The palm was behind the shell.
+
+**Fix: the page resolves the hand against the shell by contact** (`boy_mh.js`, mouse mode only; typing still uses `overMouse` while the hand passes the mouse).
+- **Shell height map.** The shell's top is sampled once into a 2.5 mm height map in the mouse's own frame.
+- **Mouse follows the clip.** The recorded hand still moves the mouse, as before.
+- **Hand placed on the shell.** The wrist is then re-pinned so that:
+  - The palm is centred 2.2 cm behind the top of the hump and 1.2 cm right of it. That is where the hand sits in mouse2: index and middle on the two buttons, ring and little on the right flank.
+  - The palm rests on the shell: palm skin 16 mm below the bones' line.
+  - No knuckle goes into it (11 mm).
+- **Fingers laid down.** Each finger is laid down joint by joint (base, middle, end) onto whatever is under it, the shell or the pad, until it touches. The shell is the hard limit.
+  - Clearance is checked along each phalanx and across its width, so the uphill side counts on the curved shell.
+  - The fingertip is measured once off his skin and follows the end joint.
+- **Thumb** along the left flank: tip 1.6 cm over the pad, 1 cm ahead of the palm.
+- **Index and ring** set beside the middle finger, seen from above: index turned 3° in, ring parallel.
+- **No build-up.** Every finger turn the page makes is undone the next frame unless the clip has rewritten that bone. The turns never add up between frames.
+
+**Measured over 15 s of mouse mode, every 0.25 s** (`grip_contact.json`):
+
+| | before (5f3bc7f) | now |
+|---|---|---|
+| Palm centre vs mouse | 7.2 cm behind centre, 7.9 cm up | on the hump (−4.3 cm), 5.6 cm up |
+| Wrist above the pad | 8.6 cm | 5.6 cm |
+| Fingertips over the shell | 2–3 cm | 1.0–1.3 cm, which is the 10 mm finger half-thickness: touching |
+| Hand skin inside the shell | n/a | max 1.2 mm, median 0 |
+| Hand skin below the pad | 0 | 0 |
+
+**Still open:**
+- **Palm hollow.** The palm's centre stays about 1.2 cm over the hump. The knuckle row sits on the shell (the 11 mm limit), so the palm arches over the hump instead of pressing into it.
+- **Mouse size.** His hand is long for this 11 cm mouse, so the index and middle tips end right at the front edge.
+
+`mouse_grip_contact.jpg` shows:
+- **Top row:** the mouse2 reference beside our top-down over the mouse. The mouse is mostly hidden under the hand.
+- **Middle row:** mouse1 beside the view from his left (palm on the shell, thumb on the flank).
+- **Bottom row:** the view from his right.
