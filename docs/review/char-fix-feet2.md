@@ -1,11 +1,29 @@
 # Review: preview/char-fix-feet2 (G10d)
 
-- Reviewed: `9052af0` (2026-10-07 14:36 UTC), reviewed 2026-10-07 17:20 UTC by G26 (takes over from G23).
+- Latest: `6880ee3`, round 2 (below). Round 1: `9052af0` (2026-10-07 14:36 UTC), reviewed 2026-10-07 17:25 UTC by G26 (takes over from G23).
 - Scope: `web/room/char_v5.glb` on top of main's b2593d7 (the one character source). Same meshes and the same vertex and
   triangle counts as main (`tripo`, `slides`, `hood_lining`, `hood_patches`, `socks`). The slides are still the last
   skinned mesh.
 
-## Verdict: NOT OK. The feet atlas fix is real and good. Of the collar brief, only the nape changed, and only a little
+## Round 2 (6880ee3, 2026-10-07 16:33 UTC: "throat edge closed, neck opening as a band, hood holes in the hood's own fabric"), reviewed 17:50 UTC by G26: NOT OK
+
+Same shots as round 1 (desk / door / phone in bed), against main.
+![round 2](img/char-fix-feet2_4_round2_back_throat_top.jpg)
+Main left, 6880ee3 right. Top: the back, from behind the chair. Middle: the throat, 3/4 from above. Bottom: the nape
+from above.
+- **Throat (round 1, defect 3): better.** The neck skin now meets a dark band, and the black void under the skin at the
+  front is gone. The lining inside the hood is still a field of flat, faceted shards. A white glint remains low on
+  the left by the drawstring.
+- **Hood base on the back (defect 1, HIGH): still there.** The light saw-tooth band under the hood is unchanged in
+  shape and brightness. This is what the page camera sees at the desk. The fix is as in round 1.
+- **Nape from above (defect 2, MEDIUM): still torn.** Ragged lining rim, white specular slivers, saw-tooth skin edge,
+  and now a small skin-coloured fleck in the lining on the right. Fix as in round 1 (smooth the rim ring, roughness 1
+  on the lining).
+- Feet: as in round 1 (OK).
+
+---
+
+## Round 1 verdict (9052af0): NOT OK. The feet atlas fix is real and good. Of the collar brief, only the nape changed, and only a little
 
 How I checked: the page (`room.html?debug`, tests/visual fake server, SwiftShader) on main 0ac47f8 and on this branch,
 scenes door / desk / phone in bed / asleep. Frames 0, 1.5 s and 3 s. The page camera, plus close-ups of the throat

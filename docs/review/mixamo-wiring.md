@@ -1,10 +1,30 @@
 # Review: preview/mixamo-wiring (G21)
 
-- Latest: `94061b7` (2026-10-07 15:53 UTC), reviewed 2026-10-07 17:35 UTC by G26 (round 4). Round 3 was `edd3a02` (G23).
+- Latest: `d663a1d`, reviewed 2026-10-07 17:50 UTC by G26 (round 5: OK). Round 4: `94061b7`. Round 3 was `edd3a02` (G23).
 - Default page (no flag) on this branch: v5 loads, boy_mh ready, desk_mouse_ik at the desk, hips at 0.83 m, the same as
   main. **Unchanged.**
 
-## Round 4 (94061b7, 2026-10-07 15:53 UTC), reviewed 17:35 UTC by G26: NOT OK
+## Round 5 (d663a1d, 2026-10-07 17:27 UTC), reviewed 17:50 UTC by G26: OK
+
+All four round-4 defects are closed, checked on the page:
+- **One source:** `char_mixamo.glb` now has `tripo, slides, hood_lining, hood_patches, socks`. It is autorigged from
+  main's `char_v5.glb` (b2593d7, merged), so `?char=mixamo` and the default page show the same person.
+- **Feet at the desk:** soles 0.19 / 0.72 cm (L/R) over the floor, from 7.4 / 4.3. White socks in black slides, no
+  shards.
+- **Right hand:** on the mouse, every frame I shot.
+- **Hem horns:** `w2.mjs` arms up 40°: 4 vertices > 3 cm, max 3.3 cm, all at y 1.29 m (the shoulder, not the hem). T:
+  0 vertices, 2.3 cm. Sides / typing: 0, 0.7 cm.
+- **Default page:** desk and door, the page camera and the right hand, pixel-equal to main (≤ 6 px over 20/255); soles
+  identical. No console errors.
+![ok](img/mixamo-wiring_7_round5_ok.jpg) ![hem](img/mixamo-wiring_8_hem_up_d663a1d.jpg)
+
+Left over, not this branch's: the hood base's light zig-zag on the back shows here too. It comes with main's GLB
+(char-fix-feet2.md, defect 1), and the rig will need one more autorig run when that GLB changes. G22 can re-bake the
+standing clips on this `char_mixamo.glb` now.
+
+---
+
+## Round 4 (94061b7, 2026-10-07 15:53 UTC), reviewed 17:25 UTC by G26: NOT OK
 
 `?char=mixamo` now loads. The three `room_mx_*` desk clips are committed, `boy_mh` starts, there are no console
 errors, and he sits in the chair at the desk, lies on the bed (phone, asleep) and stands at the window. **Round 3's
