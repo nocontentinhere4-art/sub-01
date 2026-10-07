@@ -183,15 +183,27 @@ def wrist_by(f, s, vec):
     R[f, up] = qnorm(qmul(qinv(Q2[0, ts.parent[up]]), qmul(qbetween(E - Sx, E2 - Sx), Q2[0, up])))
     P3, Q3, _ = ts.fk(T[[f]], R[[f]]); R[f, fa] = qnorm(qmul(qinv(Q3[0, ts.parent[fa]]), qmul(qbetween(P3[0, hn] - P3[0, fa], G2 - P3[0, fa]), Q3[0, fa])))
     P4, Q4, _ = ts.fk(T[[f]], R[[f]]); R[f, hn] = qnorm(qmul(qinv(Q4[0, ts.parent[hn]]), Wq))
+def hand_low(f, sd):
+    P2, Q2, S2 = ts.fk(T[[f]], R[[f]]); X = skin(mats(P2, Q2, S2), Jnt, ibmt, Vt, JIt, WWt)[0]
+    return float(X[HANDS_T[sd], 1].min()), float(X[~HANDS_T['L'] & ~HANDS_T['R'], 1].min())
 face_moved = []
 for f in list(range(1, nT)) + list(range(F - nT, F - 1)):
     for sd in 'LR':
         if hand_in_face(f, sd) <= 0.0: continue
-        keep = R[f].copy(); P2, _, _ = ts.fk(T[[f]], R[[f]]); toward = P2[0, ix['Hip']] - P2[0, ix[f'{sd}_Hand']]; toward /= np.linalg.norm(toward)
+        keep = R[f].copy(); P2, Q2, _ = ts.fk(T[[f]], R[[f]]); W0 = P2[0, ix[f'{sd}_Hand']]
+        hip = P2[0, ix['Hip']] - W0; hip[1] = 0                      # toward his hip, level: straight at it put the hand in the bed
+        hb = P2[0, ix['Head']]; hu = qrot(Q2[0, ix['Head']], np.array([0, 1.0, 0])); out = W0 - hb; out -= (out @ hu) * hu; out[1] = max(out[1], 0)
+        dirs = [v / np.linalg.norm(v) for v in (hip, out, np.array([0, 1.0, 0]), hip / (np.linalg.norm(hip) + 1e-9) + np.array([0, 1.0, 0])) if np.linalg.norm(v) > 1e-6]
+        t0 = hand_in_torso(f, sd); lo0 = min(hand_low(f, sd)); best = None   # never further into his chest, never under his own lowest skin
         for k in range(1, 21):
-            R[f] = keep; wrist_by(f, sd, toward * 0.02 * k)
-            if hand_in_face(f, sd) <= 0.0: break
-        face_moved.append(2 * k)
+            for v in dirs:
+                R[f] = keep; wrist_by(f, sd, v * 0.02 * k)
+                if hand_in_face(f, sd) <= 0.0 and hand_in_torso(f, sd) <= max(t0, 0) + 0.005 and hand_low(f, sd)[0] >= lo0 - 0.002: best = (k, v); break
+            if best: break
+        R[f] = keep
+        if best: wrist_by(f, sd, best[1] * 0.02 * best[0]); face_moved.append(2 * best[0])
+        else: face_moved.append(-1)
+print('face: frames left in his face', sum(1 for m in face_moved if m < 0))
 
 # the toes kept short of the mattress's end mid-roll: the loop's own reach (its first frame) is the limit along the bed; a
 # blend that reaches further moves the hips back toward the headboard by as much (main's v5 has longer socks: 0.4 cm past)
@@ -212,7 +224,7 @@ for f0 in range(0, F, 40):
         dy = low0 - float(X[k][BODY, 1].min()); steps.append(dy)
         T[f, hi] = T[f, hi] + qrot(qinv(Q2[k, par]), np.array([0, dy, 0])) / SC[par]
 print(json.dumps({'frames': F, 'seconds': round(F / FPS, 2), 'turn_s': TURN, 'hold_loops': HOLD, 'head_rel_cm': [round(hA * 100, 1), round(hB * 100, 1)],
-                  'neck_fix_deg': [min(fixed or [0]), max(fixed or [0])], 'elbow_swing_deg': [min(swung or [0]), max(swung or [0])], 'wrists_lowered_cm': max(capped or [0]), 'toes_held_cm': round(max(slid) * 100, 1), 'hands_off_face': {'frames': len(face_moved), 'max_cm': max(face_moved or [0])}, 'hips_moved_cm': [round(min(steps) * 100, 1), round(max(steps) * 100, 1)],
+                  'neck_fix_deg': [min(fixed or [0]), max(fixed or [0])], 'elbow_swing_deg': [min(swung or [0]), max(swung or [0])], 'wrists_lowered_cm': max(capped or [0]), 'toes_held_cm': round(max(slid) * 100, 1), 'hands_off_face': {'frames': len(face_moved), 'max_cm': max(face_moved or [0]), 'not_cleared': sum(1 for m in face_moved if m < 0)}, 'hips_moved_cm': [round(min(steps) * 100, 1), round(max(steps) * 100, 1)],
                   'ends_match_deg': round(float(np.degrees(2 * np.arccos(np.clip(np.abs(np.sum(R[[0, -1]] * RA[[0, 0]], -1)), 0, 1))).max()), 3)}))
 animated = set(A['rot'].keys())
 json.dump({'name': os.environ.get('CLIP_NAME', 'room_sleep_turn'), 'fps': FPS, 'F': F, 'nodes': A['nodes'],
