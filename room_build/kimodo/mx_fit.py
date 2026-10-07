@@ -166,9 +166,12 @@ for it in range(2):
 KNEE = g("kneeY", 0.0)
 rep["knees_before_m"] = [round(float(P[w_seat > 0.5, cix[S + "Leg"], 1].mean()), 3) if (w_seat > 0.5).any() else None for S in ("Left", "Right")]
 if KNEE:
+    # (seated, and while his hips are over the seat and near its height: landing on it and pushing off it his thighs
+    # press on its front edge just the same)
+    w_knee = np.maximum(w_seat, over_seat * sm((SEAT_Y + 0.12 - joints(P)[:, 1]) / 0.12)) if SEAT_Y else w_seat
     for s, S in (("L", "Left"), ("R", "Right")):
         a, b, c, t = cix[S + "UpLeg"], cix[S + "Leg"], cix[S + "Foot"], cix[S + "ToeBase"]
-        raise_ = lowpass(np.maximum(0, KNEE - P[:, b, 1]) * w_seat, 3.0)
+        raise_ = lowpass(np.maximum(0, KNEE - P[:, b, 1]) * w_knee, 3.0)
         lat = P[:, cix["LeftUpLeg"]] - P[:, cix["RightUpLeg"]]; lat /= np.linalg.norm(lat, axis=1, keepdims=True)
         foot = np.linalg.norm((P[:, t] - P[:, c])[:, [0, 2]], axis=1)                  # (ankle to the ball, across the floor)
         ang = np.arcsin(np.clip(raise_ / np.maximum(foot, 0.05), 0, 0.9))

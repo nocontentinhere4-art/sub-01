@@ -87,4 +87,8 @@ export const ROOM = {
   links: {in: 0.3, out: 0.2, fromWatch: 0.8, toWatch: 0.8},
   // (kimodo/mx_build.sh Typing's report, fingertips_mean: x across, y up, z forward of his feet; the keys lie under it)
   clipFrame: {kb: [0.039, 0.862, 0.617], home: [0.039, 0.862, 0.617]},
+  // the seat points (boy_mh.js SEAT_AT: [across, forward of the chair's pivot]), swept in the room for this character
+  // (kimodo/seat_sweep.mjs: the page's penetration() every 0.1 s over each mode's clip): clear of the chair from -0.05
+  // (watching), -0.06 (typing), -0.04 m (the mouse) to past -0.12 m; each set 1.5 cm or more inside that
+  seatAt: {desk_watch: [0, -0.065], desk_type: [0, -0.075], desk_mouse: [0, -0.055]},
 };

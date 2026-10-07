@@ -1,6 +1,6 @@
 // node kimodo/wiring_sheet.mjs <out.jpg> <before port> <after port> [after query]
 // The ?char=mixamo wiring sheet: seated watching and typing at the desk, each from the page's own camera and from his
-// right side (a camera 2.6 m off his right, at his chest's height), before (main, served on <before port>) and after (this branch with
+// right side (a camera 3.1 m off his right), before (main, served on <before port>) and after (this branch with
 // room.html?char=mixamo, on <after port>). Each still is taken once he has settled in that mode, 3 s in.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
 import sharp from "sharp";
@@ -28,11 +28,11 @@ async function shots(port, qs) {
     const cv = await p.$("canvas"); const bb = await cv.boundingBox();
     // the page's camera: the middle of the view, where the camera holds him
     const page = await p.screenshot({clip: {x: bb.x + bb.width * 0.1, y: bb.y + bb.height * 0.08, width: bb.width * 0.5, height: bb.height * 0.6}});
-    // his right side: a camera 2.6 m off his right, a little over his hips, looking at them
+    // his right side: a camera 3.1 m off his right at his hips' height, looking a little under them (the feet in view)
     await p.evaluate(() => { window.__cam = [camera.position.clone(), camera.quaternion.clone()];
       const h = boy.getObjectByName("Hips").getWorldPosition(new THREE.Vector3()), ry = boy.rotation.y;
-      const right = new THREE.Vector3(-Math.cos(ry), 0, Math.sin(ry)); camera.position.copy(h).addScaledVector(right, 2.6).add(new THREE.Vector3(0, 0.2, 0));
-      camera.lookAt(h.clone().add(new THREE.Vector3(0, 0.12, 0))); camera.updateProjectionMatrix(); renderer.render(scene, camera); });
+      const right = new THREE.Vector3(-Math.cos(ry), 0, Math.sin(ry)); camera.position.copy(h).addScaledVector(right, 3.1).add(new THREE.Vector3(0, 0.1, 0));
+      camera.lookAt(h.clone().add(new THREE.Vector3(0, -0.12, 0))); camera.updateProjectionMatrix(); renderer.render(scene, camera); });
     const side = await p.screenshot({clip: {x: bb.x, y: bb.y, width: bb.width, height: bb.height}});
     await p.evaluate(() => { camera.position.copy(window.__cam[0]); camera.quaternion.copy(window.__cam[1]); camera.updateProjectionMatrix(); });   // (the page's camera back)
     out.push({label, info, page, side});

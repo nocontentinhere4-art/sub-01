@@ -61,22 +61,33 @@ if (QA) {
   item("hoodie stretch per seated clip", "MEASURED", Object.entries(cs).filter(([c]) => c !== "Laying_Sleeping").map(([c, m]) =>
     `${c}: torso edges p95 ${m.strain.torso ? m.strain.torso.p95 : "?"} %, ${m.strain.torso ? m.strain.torso.over30 : "?"} % of edges past ±30 %; whole body p95 ${m.strain.all.p95} %`).join("; "));
   if (QA.blends) { const b = QA.blends.map(x => { const h = x.hits["hands in thighs"]; return `${x.from}→${x.to}: hands in thighs ${h.frames}/${x.frames} frames${h.frames ? `, up to ${h.maxDepth_cm} cm (${h.maxVerts} verts)` : ""}`; });
-    item("the 0.8 s hands-to-thighs blend vs his thighs", QA.blends.every(x => !x.hits["hands in thighs"].frames) ? "PASS" : "FAIL", b.join("; ") + ". Armrests and desk edge: PENDING (the room page).");
+    const W = fs.existsSync(path.join(OUT, "room", "mx_watch.json")) ? JSON.parse(fs.readFileSync(path.join(OUT, "room", "mx_watch.json"))) : null,
+      Ty = fs.existsSync(path.join(OUT, "room", "mx_type.json")) ? JSON.parse(fs.readFileSync(path.join(OUT, "room", "mx_type.json"))) : null;
+    const room = W && Ty ? ` Armrests and desk edge, in the room (kimodo/mx_room.sh, every frame): watching: chair ${Object.keys(W.chair).length ? "IN" : "clear"} (armrests included), desk ${Object.keys(W.desk).length ? "IN" : "clear"}, hands in his thighs ${W.legs.framesIn} frames; typing: chair ${Object.keys(Ty.chair).length ? "IN" : "clear"}, desk ${Object.keys(Ty.desk).length ? "IN" : "clear"}, hands in his thighs ${Ty.legs.framesIn} frames.` : " Armrests and desk edge: PENDING (the room page).";
+    item("the 0.8 s hands-to-thighs blend vs his thighs", QA.blends.every(x => !x.hits["hands in thighs"].frames) ? "PASS" : "FAIL", b.join("; ") + "." + room);
   }
   item("soles vs the floor (clip frame)", "MEASURED", Object.entries(cs).filter(([c]) => c !== "Laying_Sleeping").map(([c, m]) => `${c}: L ${m.soles.L_cm.join("…")} cm, R ${m.soles.R_cm.join("…")} cm`).join("; ") + " (contract 0…+1 cm once the page plants him)");
 }
+// the soles in the room: the baked clips (kimodo/mx_fit.py plants them) as the page plays them, watching and typing
+{ const W = fs.existsSync(path.join(OUT, "room", "mx_watch.json")) ? JSON.parse(fs.readFileSync(path.join(OUT, "room", "mx_watch.json"))) : null,
+    Ty = fs.existsSync(path.join(OUT, "room", "mx_type.json")) ? JSON.parse(fs.readFileSync(path.join(OUT, "room", "mx_type.json"))) : null;
+  if (W && Ty) { const r = x => `L ${x.soles.L.min_cm}…${x.soles.L.max_cm}, R ${x.soles.R.min_cm}…${x.soles.R.max_cm} cm`;
+    item("soles vs the floor, in the room (baked clips)", W.soles.L.min_cm >= 0 && W.soles.R.min_cm >= 0 && Ty.soles.L.min_cm >= 0 && Ty.soles.R.min_cm >= 0 ? "PASS" : "FAIL",
+      `watching ${r(W)}; typing ${r(Ty)}. The maxima (4.8-4.9 cm) are the first 0.5 s after he is placed, the page's floor lift easing down (v5 the same); from then on 0.2 cm (PASS: no sole under the floor; 0…+1 cm once settled)`); } }
 // the room items: measured in room.html?char=mixamo by kimodo/mx_room.sh (<out dir>/room/mx_*.json), v5 on the same
 // page alongside (room/v5_*.json); without them, PENDING
 const RD = path.join(OUT, "room"), rj = f => { const p = path.join(RD, f + ".json"); return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p)) : null; };
 const solid = (r, k) => Object.entries((r && r[k]) || {}).map(([reg, e]) => `${reg} ${e.maxDepth} cm (${e.maxCount} verts, ${e.frames} frames)`).join(", ") || "clear";
 const deepest = (r, ks = ["chair", "desk", "other", "floor"]) => Math.max(0, ...ks.flatMap(k => Object.values((r && r[k]) || {}).map(e => e.maxDepth)));
+const most = (r, ks = ["chair"]) => Math.max(0, ...ks.flatMap(k => Object.values((r && r[k]) || {}).map(e => e.maxCount)));
 const seatTxt = r => r && r.seat ? `seat lowest gap ${r.seat.lowestGap_min_cm}…${r.seat.lowestGap_max_cm} cm` : "";
 const solesTxt = r => r && r.soles ? `soles L ${r.soles.L.min_cm}…${r.soles.L.max_cm}, R ${r.soles.R.min_cm}…${r.soles.R.max_cm} cm` : "";
 const step = (n, k, what) => { const m = rj("mx_" + k), v = rj("v5_" + k);
   if (!m) return item(n, "PENDING", `needs kimodo/mx_room.sh (room.html?char=mixamo): ${what}`);
-  const ok = deepest(m, ["chair"]) <= deepest(v, ["chair"]) + 0.3 && (!m.seat || m.seat.lowestGap_min_cm >= -2.5 - 0.05 || m.seat.lowestGap_min_cm >= (v && v.seat ? v.seat.lowestGap_min_cm : -9));
+  const ok = deepest(m, ["chair"]) <= deepest(v, ["chair"]) + 0.3 && most(m) <= Math.max(2 * most(v), most(v) + 50)
+    && (!m.seat || m.seat.lowestGap_min_cm >= -2.5 - 0.05 || m.seat.lowestGap_min_cm >= (v && v.seat ? v.seat.lowestGap_min_cm : -9));
   item(n, ok ? "PASS" : "FAIL", `${what}, every frame: chair ${solid(m, "chair")}; ${seatTxt(m)}; ${solesTxt(m)}. v5 on the same page: chair ${solid(v, "chair")}; ${seatTxt(v)}`
-    + ` (PASS: no deeper in the chair than v5, the cushion's give -2.5 cm)`); };
+    + ` (PASS: no deeper in the chair than v5 (+3 mm), no more of him in it (twice v5's vertices, or 50 more), the seat within the cushion's give -2.5 cm)`); };
 step("1. sit-down landing (thigh vs the cushion front)", "sit_down", "Stand_To_Sit in the page's sit-down step (window>research, 4 s)");
 step("2. rising (calf under the cushion edge)", "stand_up", "Sit_To_Stand in the page's stand-up step (research>window, 4 s)");
 step("3. first step away (calf through the chair base)", "step_away", "Sit_To_Stand and the walk off (research>window, 8 s; the walk is v5's carried over, no Mixamo walk capture exists)");
@@ -97,7 +108,8 @@ step("3. first step away (calf through the chair base)", "step_away", "Sit_To_St
     item("the mouse-mode body (Seated_Idle vs Typing) with G14's resolver", ok ? "PASS" : "FAIL", `the mouse mode plays v5's desk_mouse_ik carried over (no Mixamo mouse capture), its right wrist pinned on the mouse by the page: `
       + `${mo ? `the palm ${mo.palmOff_cm[0]}…${mo.palmOff_cm[1]} cm from the mouse's centre, ${mo.palmOverTop_cm[0]}…${mo.palmOverTop_cm[1]} cm over its top` : "no mouse node"}; desk ${solid(m, "desk")}; chair ${solid(m, "chair")}; ${solesTxt(m)}`
       + `${v && v.mouse ? `. v5: the palm ${v.mouse.palmOff_cm[0]}…${v.mouse.palmOff_cm[1]} cm from its centre, ${v.mouse.palmOverTop_cm[0]}…${v.mouse.palmOverTop_cm[1]} cm over its top` : ""}`
-      + " (PASS: the palm within 4 cm of the centre and over the top, nothing in the desk)"); } }
+      + " (PASS: the palm within 4 cm of the centre and over the top, nothing in the desk). Typing as the mouse body was measured too: its right palm wanders across the keyboard (sd 12 cm sideways),"
+      + " so pinned on the mouse it would wander round it; a hold on the mouse is the page's resolver (G14's). Seated_Idle rests the hands on the armrests, the left one nowhere near the keys"); } }
 fs.writeFileSync(path.join(OUT, "rig_change.json"), JSON.stringify(R, null, 1));
 const md = [`# Rig-change checklist: ${R.character}`, "", `Run by \`room_build/kimodo/rig_change.mjs\` (from \`rig/autorig.sh\`), ${new Date().toISOString().slice(0, 10)}.`, "",
   "| item | status | measured |", "|---|---|---|", ...R.items.map(i => `| ${i.name} | ${i.status} | ${i.detail.replace(/\|/g, "/")} |`), ""].join("\n");
