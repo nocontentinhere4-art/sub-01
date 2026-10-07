@@ -71,3 +71,15 @@ def test_the_public_card_shows_a_swearing_video_title_and_its_player():
     s.seen({"url": "https://www.youtube.com/watch?v=abcdefghijk", "title": "Loser (Official Video)"})
     row = s.public(browse.card_title_ok)["last"][0]
     assert row["title"] == "Loser (Official Video)" and "embed" in row
+
+
+@pytest.mark.parametrize("title", ["Porn star dancing", "XXX nude video", "Hentai compilation", "OnlyFans leak",
+                                   "white power anthem", "Self-harm song"])
+def test_adult_and_hate_song_titles_are_refused_like_videos(title):
+    assert M.track_from_api(track(title)) is None
+    assert M.track_from_api(track("A Song", artist=title)) is None
+
+
+def test_an_explicit_swearing_track_is_kept_while_an_adult_one_is_refused():
+    assert M.track_from_api(track("Fuck You", explicit=True)) is not None
+    assert M.track_from_api(track("Porn star dancing", explicit=True)) is None

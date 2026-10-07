@@ -193,7 +193,9 @@ def track_from_api(x):
     album = x.get("album") if isinstance(x.get("album"), dict) else {}
     imgs = [i for i in album.get("images") or [] if isinstance(i, dict) and str(i.get("url", "")).startswith("https://")]
     art = min(imgs, key=lambda i: abs((i.get("width") or 300) - 300))["url"] if imgs else None
-    if not title or blocked(title, media=True) or blocked(artist, media=True):   # explicit lyrics allowed (owner)
+    from browse import BAD_WORDS                                # the guard's adult / gore / self-harm / hate words
+    if (not title or blocked(title, media=True) or blocked(artist, media=True)     # explicit lyrics allowed (owner)
+            or BAD_WORDS.search(title) or BAD_WORDS.search(artist)):
         return None
     return {"id": x["id"], "title": title, "artist": artist, "album": " ".join(str(album.get("name") or "").split())[:120],
             "art": art, "ms": int(x.get("duration_ms") or 0)}
