@@ -2518,7 +2518,9 @@ function quiltDent(k, dt){
   DENT.acc += dt; if (DENT.acc < 0.1 && k >= 1) return; DENT.acc = 0;
   const U = DENT.under, {X0, Z0, C, NX, NZ, SLOPE} = DENT; U.fill(9);
   const v = new THREE.Vector3(); boy.updateMatrixWorld(true);
-  boy.traverse(o => { if (!o.isSkinnedMesh || !o.visible || /_inside$/.test(o.name)) return; const P = o.geometry.attributes.position;   // (not the page's drawn inside: the same skin)
+  const hpOn = boy.getObjectByName("headphones_on"), worn = hpOn && hpOn.visible;   // (and the headphones he wears: the pillow gives under the cups too)
+  boy.traverse(o => { const hp = worn && o.isMesh && !o.isSkinnedMesh && (o.parent === hpOn || (o.parent && o.parent.parent === hpOn));
+    if (!hp && (!o.isSkinnedMesh || !o.visible || /_inside$/.test(o.name))) return; const P = o.geometry.attributes.position;   // (not the page's drawn inside: the same skin)
     for (let i = 0; i < P.count; i += 3) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
       const ci = Math.floor((v.x - X0) / C), ck = Math.floor((v.z - Z0) / C); if (ci < 0 || ck < 0 || ci >= NX || ck >= NZ) continue;
       const j = ci * NZ + ck; if (v.y < U[j]) U[j] = v.y; } });
@@ -2550,6 +2552,7 @@ function quiltDent(k, dt){
 // This is a closed shell (a top and an underside, joined at the rim, all normals outward) at a modest height: the top of
 // whatever is under each point, plus the duvet's own thickness. While he is under it the room's folded quilt is hidden:
 // he has picked it up.
+let BED_MOVING = false;                                 // (boy_mh.js: a captured turn in his sleep is playing)
 const COV = {mesh:null, pos:null, nor:null, uv:null, nx:60, nz:46, nt:0, hem:0, acc:0, lastHem:9, len:0,
   XFOOT:0.57, XFOLD:-1.33, FALL:0.28, Z0:0.14, Z1:1.61, ZM0:0.26, ZM1:1.49, BED:0.82, LOFT:0.055, THICK:0.05, DROP:0.26, DR:0.17, TEX:3.6};
 function coverInit(){                                  // the grid, its faces and its UVs: built once
@@ -2840,7 +2843,7 @@ function inBed(dt){                                    // after the last pose la
   if (w === 0 && DUV.w === 0 && k === 0) { if (COV.mesh) { COV.mesh.visible = PIL.mesh.visible = false; DUV.src.visible = PIL.src.visible = true; } return; }
   if (!bedInit()) return;
   DUV.w = w; DUV.acc += dt;
-  const still = Math.abs(ROLL.goal - ROLL.a) < 1e-3;
+  const still = Math.abs(ROLL.goal - ROLL.a) < 1e-3 && !BED_MOVING;   // (BED_MOVING: a captured turn in his sleep, boy_mh.js)
   if (DUV.acc >= (still ? 0.1 : 1 / 30) || (w > 0 && w < 1 && DUV.acc >= 1 / 30) || (k > 0 && k < 1)) {   // 10 Hz once he lies still (breathing), 30 while he moves
     DUV.acc = 0; boy.updateMatrixWorld(true); if (w > 0) coverShape(); if (k > 0) pillowDent(k); }
   COV.mesh.visible = w > 0; DUV.src.visible = !COV.mesh.visible;    // the folded quilt: he has picked it up
@@ -3295,6 +3298,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     chairPose: (x, z, ry) => { const n = CHAIR.node; n.position.x = x; n.position.z = z; n.rotation.y = ry; n.updateMatrixWorld(true);
       BLOCK[2] = [x - CHAIR_FOOT, x + CHAIR_FOOT, z - CHAIR_FOOT, z + CHAIR_FOOT]; },   // (left out: its footprint, not its sweep)
     quiltDent: (k, dt) => quiltDent(k, dt),            // (lying awake on the bed: the folded quilt gives under him)
+    bedMoving: v => { BED_MOVING = v; },                // (he turns over in his sleep: the duvet follows him at 30 Hz, not 10)
     quiltTop: COV.BED + DENT.MIN,                       // (the quilt pressed flat: what he rests on lying awake on it)
     pillowDent: k => { if (bedInit()) { PIL.mesh.visible = k > 0; PIL.src.visible = !(k > 0); if (k > 0 && !(DENT.mesh && DENT.mesh.visible)) pillowDent(k); } },   // (on the quilt: quiltDent shapes it)
     cover: (w, dt) => {                                 // the page's duvet over him (asleep at night), w 0..1: drawn up from the foot

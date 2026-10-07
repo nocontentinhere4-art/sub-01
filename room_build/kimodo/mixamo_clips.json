@@ -1,5 +1,5 @@
 {
- "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame. seatOrigin: a transition the page places by its chair (chairPlace): the clip moved along the floor so his seated hips are at its origin, as room_stand_up's. trim [from, to] (s): only that stretch of the take. No keyboard fit is baked: the page's resolver (G14) maps the performer's keyboard point (README) onto ours, settling the whole arm. standing = on his feet in the room (the soles soleUp over the floor for the slides, planted stances held).",
+ "_": "Mixamo clips for v5, one row each (adding a clip is a row). kind: seated = fitted onto OUR desk chair (the hips' joint at seatHipY over the floor, forward by seatForward, the spine tipped forward by pitch degrees off the backrest, the soles soleUp over the floor for the slides, resting hands handUp off his thighs). out: the clip under web/room/mh_v5/. bed = lying: retargeted, then kimodo_g12/bed_fit.py onto the page reference pose (sleep: room_bedtime end; awake: room_bed_lie end), his lowest skin held at its level every frame. seatOrigin: a transition the page places by its chair (chairPlace): the clip moved along the floor so his seated hips are at its origin, as room_stand_up's. trim [from, to] (s): only that stretch of the take. No keyboard fit is baked: the page's resolver (G14) maps the performer's keyboard point (README) onto ours, settling the whole arm. standing = on his feet in the room (the soles soleUp over the floor for the slides, planted stances held). bed + fit bed_clip (G17): kimodo_g12/bed_clip.py instead of bed_fit.py, see \"bed\".",
  "defaults": {
   "seated": {
    "scale": "hip",
@@ -25,17 +25,22 @@
   "Sleeping_Idle": {
    "kind": "bed",
    "ref": "room_bedtime",
-   "out": "room_sleeping_idle"
+   "out": "room_sleeping_idle",
+   "note": "the whole take is not used (the head left the pillow by 33 cm, the duvet ballooned): its side-lying stretch is Sleeping_Idle_side, in the turn"
   },
   "Laying_Sleeping": {
    "kind": "bed",
    "ref": "room_bedtime",
-   "out": "room_laying_sleeping"
+   "out": "room_laying_sleeping",
+   "mode": "asleep",
+   "fit": "bed_clip"
   },
   "Laying_Nodding": {
    "kind": "bed",
    "ref": "room_bed_lie",
-   "out": "room_laying_nodding"
+   "out": "room_laying_nodding",
+   "mode": "awake",
+   "fit": "bed_clip"
   },
   "Stand_To_Sit": {
    "kind": "seated",
@@ -74,6 +79,34 @@
   "Standing_Clap": {
    "kind": "seated",
    "out": "room_mx_standing_clap"
+  },
+  "Sleeping_Idle_side": {
+   "kind": "bed",
+   "src": "Sleeping_Idle",
+   "trim": [
+    10.0,
+    11.33
+   ],
+   "ref": "room_bedtime",
+   "mode": "asleep",
+   "side": true,
+   "fit": "bed_clip",
+   "out": null
+  }
+ },
+ "bed": {
+  "_": "room_build/kimodo/bed_rebake.sh <character.glb>: the bed clips (G17, docs/design/bed-clips). Each row with fit bed_clip goes through kimodo_g12/bed_clip.py onto our bed (mode asleep: on the mattress under the duvet; awake: on the folded quilt; side: lying on his side); then the turn is composed by kimodo_g12/bed_turn.py from the sleep loop and the side stretch.",
+  "clips": [
+   "Laying_Nodding",
+   "Laying_Sleeping",
+   "Sleeping_Idle_side"
+  ],
+  "turn": {
+   "loop": "Laying_Sleeping",
+   "side": "Sleeping_Idle_side",
+   "out": "room_sleep_turn",
+   "turn_s": 2.6,
+   "hold": 9
   }
  }
 }

@@ -32,8 +32,11 @@
 // Interim (2026-10-06): none. Both candidates fail in the page: the keyed loop (the arm flung up tears the sleeve, the
 // hand reads raised) and the captured Laying_Nodding as retargeted (fists raised before his face, legs lifted 11-19 cm),
 // so he holds room_bed_lie's end, breathing (docs/design/bed-music/lying_awake_options.jpg). A corrected capture goes
-// here as {music: "<its clip>"}: it fades in over his lying pose and back out, no hand-made in / out needed
-const EXTRA = {};
+// here as {music: "<its clip>"}: it fades in over his lying pose and back out, no hand-made in / out needed.
+// G17 (docs/design/bed-clips): the captures fitted to this bed (room_build/kimodo/bed_rebake.sh): lying awake with the
+// music, Laying_Nodding; asleep, Laying_Sleeping as the loop, and now and then the turn onto his side and back
+// (sleep_turn: Sleeping_Idle's side-lying, from the loop's first frame to it), sleepTurn() below
+const EXTRA = {music: "room_laying_nodding", sleep_loop: "room_laying_sleeping", sleep_turn: "room_sleep_turn"};
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "room_seated_idle", stand: "room_window",
   walk: "room_walk", sit_down: "room_mx_stand_to_sit", stand_up: "room_mx_sit_to_stand", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
@@ -216,7 +219,9 @@ export function createMH(env) {
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
     // optional: the clips some bodies have and others not (v5: G12's awake-on-the-bed music clips); a missing one just stays off
-    await Promise.all(Object.entries(EXTRA).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
+    // (?nobedcap: without the captured bed clips, as before them - to measure against)
+    const extra = typeof location !== "undefined" && /[?&]nobedcap\b/.test(location.search) ? {} : EXTRA;
+    await Promise.all(Object.entries(extra).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // the rare events at the desk (optional: the room plays on without them)
     await Promise.all(Object.entries(RARE).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got["rare_" + k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
@@ -226,6 +231,7 @@ export function createMH(env) {
     if (got.music) {
       for (const k of ["music_in", "music", "music_out"]) if (got[k]) { const a = M.actions[k] = make(got[k]); if (k !== "music") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } }
       M.music = true; }
+    if (got.sleep_turn && got.sleep_loop) { const a = M.actions.sleep_turn = make(got.sleep_turn); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
     // body's (its hips 0.977 m up, walking): scaled to this body's by its own walking hips (v5's are about 0.87 m up, so they
@@ -267,7 +273,8 @@ export function createMH(env) {
     A.walk = M.actions.walk; H.walk = H.room_walk.slice(); if (env.setStride) env.setStride(WALK_V);
     for (const k of lying) { A[k] = M.actions.lie; H[k] = H.mh_lie.slice(); }
     if (seg.bt) {                                             // asleep: lying as room_bedtime ends (it is how he got there)
-      const sl = stillClip("mh_sleep", got.bedtime, got.bedtime.duration); M.actions.sleep = make(sl); H.mh_sleep = pageHips(sl, 0);
+      // (or, when the body has it, the captured sleep loop, fitted onto room_bedtime's end: bed_rebake.sh)
+      const sl = got.sleep_loop || stillClip("mh_sleep", got.bedtime, got.bedtime.duration); M.actions.sleep = make(sl); H.mh_sleep = pageHips(sl, 0);
       A.sleep = M.actions.sleep; H.sleep = H.mh_sleep.slice(); }
     for (let i = 0; i < 600 && !(env.chairNode && env.chairNode()); i++) await new Promise(r => setTimeout(r, 100));   // (the room may still be loading)
     { const sp = sampler(stand); M.standFeet = sp(0).feet; sp.done(); }     // (he turns on the spot about his feet, not the root)
@@ -719,8 +726,8 @@ export function createMH(env) {
     const k = st.at === "desk" && (!s || s.k === "chair") ? 1 : s && s.k === "pose" && s.to === "desk" ? t : s && s.k === "pose" && st.at === "desk" ? 1 - t : 0;
     env.boy.position.y += L * k;
   }
-  function measureLift(every) {                              // how far his lowest skin over the mattress is under its top (m)
-    const b = env.boy; let need = 0;
+  function measureLift(every, signed) {                      // how far his lowest skin over the mattress is under its top (m)
+    const b = env.boy; let need = signed ? -9 : 0;            // (signed: also how far it is over it, negative)
     if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh && !/_inside$/.test(o.name)) skin.push(o); }); }     // every part (dressed: his clothes too; not the page's drawn inside)
     b.updateMatrixWorld(true); const v = V();
     // (lying awake on top of it, he rests on the folded quilt pressed flat under him, env.quiltTop, not on the bare mattress:
@@ -730,7 +737,13 @@ export function createMH(env) {
     for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
       const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
       if (e > 0) need = Math.max(need, top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
-    return need;
+    return need === -9 ? 0 : need;
+  }
+  // a captured bed clip playing (and settled: its cross-fade in is over)
+  function capBed(st) {
+    if (st.at !== "bedlie" || st.step || !st.goal) return false;
+    const a = st.goal.clip === "sleep" && M.clips.sleep_loop ? M.actions.sleep : st.goal.clip === "listen" && M.music ? M.actions.music : null;
+    return !!(a && a.isRunning() && a.getEffectiveWeight() > 0.99) || (st.goal.clip === "sleep" && TN.on);   // (or turning over: its lowest skin is held at the loop's)
   }
   function bedLift(st, dt) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
@@ -740,15 +753,20 @@ export function createMH(env) {
       // and between the measures the lift eases toward it (G12's lying clips move: a set lift would step): up at 10 cm/s,
       // down at 3; a change of more than 5 cm is taken at once
       M.liftT = (M.liftT || 0) - dt;
-      if (M.liftT <= 0) { M.liftT = 1; every = 2; M.liftGoal = measureLift(2); }
+      // The captured bed clips (EXTRA: the sleep loop, the music loop; bed_rebake.sh) rest on the bed: his lowest skin is put
+      // ON it, down as well as up (a capture fitted on another body or bed must not float over ours); every other pose is
+      // only ever lifted out of it, as before
+      const cap = capBed(st);
+      if (M.liftT <= 0) { M.liftT = 1; every = 2; M.liftGoal = measureLift(2, cap); }
       const g = M.liftGoal ?? M.lift ?? 0, l = Math.abs(g - (M.lift || 0)) > 0.05 ? g : M.lift || 0;   // (more than 5 cm either way, as when the page opens on him in bed: at once)
-      M.lift = l + Math.max(-0.03 * dt, Math.min(0.10 * dt, g - l)); if (M.lift < 1e-4) M.lift = 0;
+      M.lift = l + Math.max(-0.03 * dt, Math.min(0.10 * dt, g - l)); if (!cap && M.lift < 1e-4) M.lift = 0;
       b.position.y += M.lift; return;
     }
     M.liftGoal = null;
     if (on) need = measureLift(every);
-    M.lift = Math.max(need, (M.lift || 0) - 0.1 * dt);
-    if (M.lift < 1e-4) M.lift = 0;
+    const prev = M.lift || 0;                                  // (down from a captured clip's rest at 10 cm/s, never with a jump)
+    M.lift = prev < 0 ? Math.max(need, Math.min(Math.max(need, 0), prev + 0.1 * dt)) : Math.max(need, prev - 0.1 * dt);
+    if (Math.abs(M.lift) < 1e-4) M.lift = 0;
     b.position.y += M.lift;
   }
   // the soles: no vertex of his feet (or of the slides on them) under the floor; a step that dips lifts him by as much,
@@ -974,7 +992,7 @@ export function createMH(env) {
       if (st.at === "desk" && (!st.step || st.step.k === "chair") && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
-    bedMusic(st, dt);
+    bedMusic(st, dt); sleepTurn(st, dt);
     // the quilt and the pillow give under him lying awake on the bed: in as he lies down (the lift follows it frame by
     // frame through the step, no pop once he is down), out as he gets up or falls asleep under the duvet
     const lying = st.at === "bedlie" && !st.step, asleep = !!(st.goal && st.goal.clip === "sleep");
@@ -1130,6 +1148,30 @@ export function createMH(env) {
     bmOnly(BM.a, Math.min(1, BM.t / (BM.ph === "music_in" ? 0.15 : M.actions.music_in ? 0.25 : 0.8)));
     env.mixer.update(0);
   }
+  // asleep, now and then he turns onto his side and, a while later, back (room_sleep_turn: from the sleep loop's first frame
+  // to it, so it starts at the loop's wrap and hands back at time 0: no cross-fade, nothing steps). Rare: the first a minute
+  // or two after he falls asleep, then every 2 to 5 minutes. If the page gets him up meanwhile, the turn fades back into
+  // the loop (0.8 s) while the page's step waits. ?debug: mh.sleepTurn() starts one at the next wrap.
+  const TN = {next: null, on: false, t: 0, last: 0, fade: 0};
+  function sleepTurn(st, dt) {
+    const turn = M.actions.sleep_turn, loop = M.actions.sleep; if (!turn || !loop) return;
+    const asleep = st.at === "bedlie" && st.goal && st.goal.clip === "sleep" && env.state().current === loop;
+    if (!TN.on) {
+      if (!asleep || st.step) { TN.next = null; return; }
+      if (TN.next === null) TN.next = 60 + 60 * Math.random();
+      TN.next -= dt; const wrap = loop.time < TN.last; TN.last = loop.time;
+      if (TN.next > 0 || !wrap || !(loop.getEffectiveWeight() > 0.99)) return;
+      turn.reset(); turn.setEffectiveWeight(1); turn.play(); loop.setEffectiveWeight(0); loop.time = 0;
+      TN.on = true; TN.fade = 0; if (env.bedMoving) env.bedMoving(true); env.mixer.update(0); return; }
+    const S = st.step;
+    if (S || !asleep) {                                        // (got up meanwhile: back into the loop, the step waits)
+      TN.fade = Math.min(1, TN.fade + dt / 0.8); turn.setEffectiveWeight(1 - TN.fade); loop.setEffectiveWeight(TN.fade); if (!loop.isRunning()) loop.play();
+      if (S) S.t = 0; env.mixer.update(0); if (TN.fade < 1) return; }
+    else if (turn.time < turn.getClip().duration - 1e-3) return;
+    turn.setEffectiveWeight(0); turn.stop(); loop.reset(); loop.setEffectiveWeight(1); loop.play();
+    TN.on = false; TN.next = 120 + 180 * Math.random(); TN.last = 0; if (env.bedMoving) env.bedMoving(false); env.mixer.update(0);
+  }
+  function startTurn() { TN.next = 0; return !!M.actions.sleep_turn; }
   function music(st, dt) {
     const on = !!(st.life && st.life.music) && env.boy.visible;
     const g = on || MU.set ? headphones() : null;
@@ -1144,5 +1186,5 @@ export function createMH(env) {
       mouseAt: P.mouseNode ? P.mouseNode.position.toArray().map(v => +v.toFixed(3)) : null, grab: M.grab ? M.grab.toArray().map(v => +v.toFixed(3)) : null};
   }
   load().catch(e => console.warn("MakeHuman clips:", e));
-  return {animate, dbg, show, rare, M, get ready() { return M.ready; }, get mode() { return M.mode; }};
+  return {animate, dbg, show, rare, sleepTurn: startTurn, M, get turning() { return TN.on; }, get ready() { return M.ready; }, get mode() { return M.mode; }};
 }

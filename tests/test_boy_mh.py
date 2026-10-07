@@ -22,7 +22,8 @@ CLIPS = ("desk_type_ik", "desk_mouse_ik", "desk_watch", "room_window", "room_wal
          "room_phone_scroll")
 # the Mixamo captures retargeted onto v5 (docs/design/mixamo): one row each in room_build/kimodo/mixamo_clips.json
 MIXAMO = tuple(r["out"] for r in json.loads((ROOT / "room_build" / "kimodo" / "mixamo_clips.json").read_text())["clips"].values())
-EXTRA = ("room_bed_music_in", "room_bed_music", "room_bed_music_out", "room_laying_nodding", "room_laying_sleeping", "room_sleeping_idle")   # (optional clips, loaded when present)
+EXTRA = ("room_bed_music_in", "room_bed_music", "room_bed_music_out", "room_laying_nodding", "room_laying_sleeping", "room_sleeping_idle",
+         "room_sleep_turn")   # (optional clips, loaded when present)
 
 
 def test_body_is_the_v5_rig():
@@ -43,6 +44,20 @@ def test_room_clips_retargeted_onto_v5():
         ch = g["animations"][0]["channels"]
         targets = {(g["nodes"][c["target"]["node"]]["name"], c["target"]["path"]) for c in ch}
         assert ("Hip", "translation") in targets and ("L_Hand", "rotation") in targets, clip
+
+
+def test_bed_captures_wired_and_rebakeable():
+    # G17 (docs/design/bed-clips): the bed captures the page loads are on disk, and one command re-bakes them
+    js = (WEB / "boy_mh.js").read_text()
+    for k, f in (("music", "room_laying_nodding"), ("sleep_loop", "room_laying_sleeping"), ("sleep_turn", "room_sleep_turn")):
+        assert f'{k}: "{f}"' in js, k
+        assert (WEB / "mh_v5" / f"{f}.glb").exists(), f
+    bed = json.loads((ROOT / "room_build" / "kimodo" / "mixamo_clips.json").read_text())["bed"]
+    assert bed["turn"]["out"] == "room_sleep_turn" and bed["turn"]["loop"] == "Laying_Sleeping"
+    sh = ROOT / "room_build" / "kimodo" / "bed_rebake.sh"
+    assert sh.exists() and sh.stat().st_mode & 0o111
+    # the captured bed clips rest ON the bed (the page's lift both ways for them), and the turn starts at the loop's wrap
+    assert "function capBed(" in js and "measureLift(2, cap)" in js and "function sleepTurn(" in js
 
 
 def test_char_v5_module_maps_to_the_makehuman_names():
