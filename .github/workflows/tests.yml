@@ -93,7 +93,19 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-server.txt
       - run: pip install -r requirements-server.txt pytest
-      - run: python -m playwright install --with-deps chromium
+      # the browser cached by Playwright's version; the system packages (apt) apart, with their own timeout and one retry
+      # (main 7f2bf6e: one install took 14.5 min, the other ran out the job's 30 with no test run)
+      - run: echo "PW_VERSION=$(python -c 'import importlib.metadata as m; print(m.version("playwright"))')" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.PW_VERSION }}
+      - name: browser system packages
+        timeout-minutes: 10
+        run: python -m playwright install-deps chromium || (sleep 30 && python -m playwright install-deps chromium)
+      - name: browser
+        timeout-minutes: 10
+        run: python -m playwright install chromium
       - run: python -m pytest -q -rA --durations=0 ${{ matrix.part.tests }}
         env:
           SUB01_VISUAL: "1"            # a skip (no browser) is an error here
