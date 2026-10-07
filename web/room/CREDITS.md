@@ -366,6 +366,7 @@ Owner-approved pieces from the props previews and the clothes the owner turned d
 | file | source | licence |
 |---|---|---|
 | `char_v5.glb` (for now the placeholder `docs/design/char-tripo-v5/char_tripo_v5.glb` from preview/char-tripo-v2, turned to face +z) | the v5 character: AI-generated with Tripo (tripo3d.ai, paid API), an original fictional young man, no brands | Tripo's terms of service |
+| `char_v5.glb`'s socks and slides (preview/char-fix-feet, `room_build/charfix/feet.mjs`) | the owner's own Tripo character (preview/char-owner-tripo), its feet transplanted onto v5's | Tripo's terms of service |
 | `mh_v5/*.glb` (the room clips retargeted onto v5, by G14; the same names as preview/room-mh's `mh/`) | preview/mh-motion's clips, retargeted | as their sources |
 | `mh/props_g2.json` (the activity clips' placeholder props and the door / window keys) | preview/mh-motion `room_build/mh/glb/clips_g2/props_g2.json` | made for this project, CC0 |
 | `boy_mh.js` (the clip player and the room choreography: desk modes, sit / stand, the chair pulled and pushed, routes) | preview/room-mh (G3, G10d) | this project's code |
