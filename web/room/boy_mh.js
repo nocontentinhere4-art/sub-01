@@ -40,7 +40,7 @@ const ROOM = {keys: {c: [-1.070, 1.001, -0.976], ry: 0.06, w: 0.356, d: 0.134}, 
 // sit the typing and the mouse higher (DY 0.032 at 4f1f995, on the 0.52 m seat); measured in the page, raising the clip's
 // keyboard and mouse by 2.6 cm puts the pressing fingertips 2-5 mm over the keycaps
 const DY = 0.026;
-const CLIP = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], desk: 0.809 + DY,
+const CLIP0 = {kb: [-0.05, 0.83 + DY, 0.33], mouse: [-0.36, 0.807 + DY, 0.39], desk: 0.809 + DY,
   home: [-0.003, 0.83 + DY, 0.317]};                         // the same keyboard's home row (F/J, KB_HOME): 4.7 cm left, 1.3 cm nearer
 // the room clips (preview/mh-motion README): sit_down ends facing +z with the chair's seat centre at (-0.26, -0.13) (boy_mh;
 // measured from the clips at load: G2's is at (-0.28, -0.15));
@@ -65,6 +65,11 @@ export const isMH = bones => !!(bones && (bones["metacarpal1L"] || bones["metaca
 
 export function createMH(env) {
   const {THREE} = env;
+  // (a character with its own desk clips, room.html?char=mixamo: env.clips names the clip per slot, type_in / type_out
+  // the way into and out of typing, env.links their cross-fades; env.clipFrame its typing keyboard; env.seatAt its seat
+  // points. Without them, the clips and numbers above)
+  const CL = {...CLIPS, ...(env.clips || {})}, CLIP = {...CLIP0, ...(env.clipFrame || {})};
+  const MXK = env.clipMX || CLIP_MX;                          // (the typing capture's F / J points: env.clipMX for its own bake)
   const M = {ready: false, mode: null, typeUntil: 0, lastScreen: null, actions: {}, w: {type: 0, mouse: 0}, log: [], noIK: false, zoff: 0};
   const V = (...a) => new THREE.Vector3(...a);
 
@@ -214,12 +219,14 @@ export function createMH(env) {
   async function load() {
     const got = {};
     // (the clips' folder and their fit to the body come from the page: room/mh as recorded, room/mh_v5 for v5 through char_v5.js)
-    await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
+    await Promise.all(Object.entries(CL).filter(([k]) => !/^type_(in|out)$/.test(k)).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
     // each desk mode its own copy of its clip, named for the mode (two modes now play one capture, room_seated_idle, and
     // the page and its tests know a desk clip by its "desk_" name, not the capture's "mixamo.com")
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) if (got[k] && !got[k].name.startsWith("desk_")) { got[k] = got[k].clone(); got[k].name = k; }
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
+    // the way into and out of typing (optional)
+    await Promise.all(["type_in", "type_out"].filter(k => CL[k]).map(k => env.load(`${env.clipDir || "room/mh"}/${CL[k]}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     // the rare events at the desk (optional: the room plays on without them)
     await Promise.all(Object.entries(RARE).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got["rare_" + k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     // watching "simply sits in the chair": room_seated_idle plays as recorded, feet on the floor (the old watch clip
@@ -241,6 +248,7 @@ export function createMH(env) {
     // thigh against the armrest)
     const bodyHips = c => { const s = sampler(c), h = s(0).hips; s.done(); return [h.x, h.y, h.z]; };
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = bodyHips(got[k]); }
+    for (const k of ["type_in", "type_out"]) if (got[k]) { const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; H[k] = bodyHips(got[k]); }
     M.mouseHips = H.desk_mouse;                              // (the mouse-mode body's hips at its first frame, its own frame)
     // the thumbs' hinges from the typing clip's own first frame (not from whatever pose the first ownerKeys call meets: a
     // session that starts mousing took the left thumb's plane from the mouse clip's resting hand, or mid-crossfade)
@@ -312,7 +320,7 @@ export function createMH(env) {
   function seatHeight() {
     const n = env.chairNode && env.chairNode(); if (!n) return;
     const p = n.localToWorld(V(0, 0.735, 0.02)), hy = p.y - env.F, H = env.HIPS;
-    for (const k of ["desk_type", "desk_mouse", "desk_watch", "sit", "dine", "eat", "edge", "phone_sit", "type"]) if (H[k]) H[k][1] = hy;
+    for (const k of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", "sit", "dine", "eat", "edge", "phone_sit", "type"]) if (H[k]) H[k][1] = hy;
   }
   // the room's keyboard and mouse: separate nodes when the room has them (G10d's), else the numbers above
   // (G10d's are top-level scene nodes: "keyboard" with its origin on the home row (the middle of F and J) on the desk
@@ -348,12 +356,23 @@ export function createMH(env) {
   }
   function setMode(m) {
     if (m === M.mode) return;
-    const a = M.actions[m], cur = env.state().current;
-    if (a !== cur) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
+    const a = M.actions[m], cur = env.state().current, L = env.links || {};
+    // into or out of typing by its own clips when the character has them (Sit_To_Type, Type_To_Sit): the link plays once,
+    // then hands over to the mode's loop (link())
+    const via = m === "desk_type" ? M.actions.type_in : M.mode === "desk_type" ? M.actions.type_out : null;
+    if (via && cur !== via) {
+      const fin = via === M.actions.type_in ? (M.mode === "desk_watch" ? L.fromWatch : L.in) : L.out, fout = via === M.actions.type_in ? L.out : (m === "desk_watch" ? L.toWatch : FADE);
+      via.reset(); via.setEffectiveWeight(1); via.fadeIn(fin || FADE).play(); if (cur) cur.fadeOut(fin || FADE); env.setCurrent(via);
+      M.link = {a: via, to: a, fade: fout || FADE};
+    } else if (a !== cur) { M.link = null; a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     for (const k of ["sit", "type"]) env.actions[k] = a;   // the page's own play("sit") then keeps this mode
     M.mode = m; M.log.push([+env.state().T.toFixed(2), m]); if (M.log.length > 50) M.log.shift();
   }
 
+  function link() {                                           // a link's end: on into the mode's loop
+    const L = M.link; if (!L) return;
+    if (L.a.time >= L.a.getClip().duration - L.fade) { L.to.reset(); L.to.setEffectiveWeight(1); L.to.fadeIn(L.fade).play(); L.a.fadeOut(L.fade); env.setCurrent(L.to); M.link = null; }
+  }
   // ---------- re-pinning the wrists (the arm's two bones turn; the wrist and the fingers keep the clip) ----------
   const _a = V(), _b = V(), _u = V(), _v = V(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _wq = new THREE.Quaternion();
   const toWorld = (p, out) => env.boy.localToWorld(out.set(p[0], p[1], p[2] + M.zoff));   // the clip's frame -> the room
@@ -830,15 +849,15 @@ export function createMH(env) {
     return c;
   }
 
-  const MX = () => CLIPS.desk_type === CLIP_MX.clip;
-  const kbRef = () => MX() ? CLIP_MX.F.map((v, i) => (v + CLIP_MX.J[i]) / 2) : P.ref;   // (the clip's keyboard point: for the roll)
+  const MX = () => CL.desk_type === MXK.clip;
+  const kbRef = () => MX() ? MXK.F.map((v, i) => (v + MXK.J[i]) / 2) : P.ref;   // (the clip's keyboard point: for the roll)
   const dKs = {Left: V(), Right: V()};
   function keyDelta(side) {                                  // the carry for one hand onto the keys
     if (!MX() || !P.kbNode || M.w.type < M.w.mouse) return dK;   // (mousing: the left hand on a seated body, placed by the correction below)
     // one carry for both hands (the capture's hands keep their own spacing; carrying each onto F / J on its own took 12 cm
     // out of it and laid the hands over each other): the middle of its index fingertips onto our keyboard's home row,
     // MX_SHIFT along the keys
-    const mid = CLIP_MX.F.map((v, i) => (v + CLIP_MX.J[i]) / 2);
+    const mid = MXK.F.map((v, i) => (v + MXK.J[i]) / 2);
     return dKs[side].subVectors(P.kbNode.localToWorld(V(window.__mxShift ?? MX_SHIFT, 0, 0)), toWorld(mid, _c));
   }
   // a finger in a stroke: the clip's own fingertip raised more than 8 mm above its lowest over the last 1.5 s, measured
@@ -1064,7 +1083,8 @@ export function createMH(env) {
   // from 7.5 cm (closer, his left thigh presses into the cushion as he leans in); Standing_Clap is clear where he sits to
   // watch
   // (mousing here plays room_seated_idle's body: its seat point, as desk_watch's; main's -0.045 was for desk_mouse_ik)
-  const SEAT_AT = {desk_type: [0, -0.045], desk_mouse: [0, -0.055], desk_watch: [0, -0.055], rare_scared: [0, -0.115], rare_angry: [0, -0.085]};
+  const SEAT_AT = {desk_type: [0, -0.045], desk_mouse: [0, -0.055], desk_watch: [0, -0.055], rare_scared: [0, -0.115], rare_angry: [0, -0.085], ...(env.seatAt || {})};
+  SEAT_AT.type_in = SEAT_AT.type_in || SEAT_AT.desk_type; SEAT_AT.type_out = SEAT_AT.type_out || SEAT_AT.desk_type;
   const MOUSE_HIPS_BACK = 0.389;                              // (the old mouse clip's hips behind the mouse, measured in the page)
   // the nearest the turn on the spot before the sit-down clears the turned seat (the walking scene swept: 0.45 m caught
   // his right foot, 0.52 m his toes, 0.60 m clear)
@@ -1153,7 +1173,7 @@ export function createMH(env) {
     if (ch && Math.abs(d) > 1e-6) { ch.position.x += -s * d; ch.position.z += -c * d; ch.updateMatrixWorld(true); }   // (back: against the way he faces)
     if (ch && desk) {                                        // his root: each mode's hips on its seat point, blended as the clips are
       ch.updateMatrixWorld(true); let tx = 0, tz = 0, W = 0;
-      for (const m of ["desk_type", "desk_mouse", "desk_watch", ...Object.keys(M.rare).map(k => "rare_" + k)]) {
+      for (const m of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", ...Object.keys(M.rare).map(k => "rare_" + k)]) {
         const a = M.actions[m], w = a && a.isRunning() ? a.getEffectiveWeight() : 0; if (w < 1e-3) continue;   // (an action never played reports weight 1)
         const hm = H[m], at = (window.__seatAt && window.__seatAt[m]) || SEAT_AT[m] || SEAT_AT.desk_watch; ch.localToWorld(_st.set(at[0], 0, at[1]));
         tx += w * (_st.x - (hm[0] * c + hm[2] * s)); tz += w * (_st.z - (-hm[0] * s + hm[2] * c)); W += w; }
@@ -1588,8 +1608,8 @@ export function createMH(env) {
     M.still = st.at === "desk" && !st.step ? (M.still || 0) + dt : 0;
     if (M.ev && (st.at !== "desk" || st.step)) { M.ev.a.stop(); M.ev = null; }   // (the page moved him on: the event ends)
     const m = M.sc || M.still < 0.3 ? null : M.ev ? "desk_watch" : wanted(st);   // (the showcase plays its own clip; an event sits him back)
-    if (m) setMode(m); else if (M.mode) {                    // off the desk modes (eating, leaving): seated he just sits back
-      M.mode = null; M.w.type = M.w.mouse = 0; const a = st.goal && st.goal.clip === "dine" ? M.actions.act_eat : M.actions.desk_watch, cur = st.current;
+    if (m) { setMode(m); link(); } else if (M.mode) {        // off the desk modes (eating, leaving): seated he just sits back
+      M.mode = null; M.link = null; M.w.type = M.w.mouse = 0; const a = st.goal && st.goal.clip === "dine" ? M.actions.act_eat : M.actions.desk_watch, cur = st.current;
       for (const k of ["sit", "type"]) env.actions[k] = M.actions.desk_watch;
       // (riding the chair out to leave too: he sits back first, so the page rides it with the seated loop on its seat point)
       if (st.at === "desk" && (!st.step || st.step.k === "chair") && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
