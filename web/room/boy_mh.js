@@ -535,9 +535,10 @@ export function createMH(env) {
       }
       if (o.post) o.post(); };
     for (let it = 0; it < (o.iters || 5); it++) {
-      ccd(side, t, weight); if (e0) swivelTo(side, e0, weight); swingElbow(side, weight); keepTurn();
+      ccd(side, t, weight); swingElbow(side, weight); keepTurn();
       const d = fit ? fit() : V(); if (d.length() <= 0.001 && !o.iters) break; t.addScaledVector(d, weight);
     }
+    if (e0) { swivelTo(side, e0, weight); swingElbow(side, weight); keepTurn(); }   // (once the wrist is placed)
   }
   const palmAt = (side, out) => env.bones[side + "Hand"].getWorldPosition(out).lerp(S(side, 3, 1).getWorldPosition(_e), 0.6);
   function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }
@@ -1106,8 +1107,10 @@ export function createMH(env) {
     let ky = 0, kn = 0, drop = 0, dn = 0; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (k) { ky += k.getWorldPosition(_s).y; kn++; } }
     for (const all of [false, true]) { if (dn) break; for (let i = 2; i <= 5; i++) if (S(side, i, 3) && (all || !lifted.has(i))) { drop += ky / kn - (tipOf(side, i, _e).y - FING_R); dn++; } }
     if (dn && kn) OT.kk[side] += (Math.max(0.005, Math.min(0.09, drop / dn)) - OT.kk[side]) * (1 - Math.exp(-dt / 0.3));   // (no end bones: kept, never NaN)
-    let left = otSettle(side, Gs, lifted, w, f0.thumb, 0.0015 * mix);
-    if (left < -0.0005) { M.kUp[side] = Math.min(0.03, M.kUp[side] - left); Gs = solve(); left = otSettle(side, Gs, lifted, w, f0.thumb, 0.0015 * mix); }   // (one retry pass: G24 F9)
+    // (the thumb's margin over the height map: 1 mm typing, 1.5 at rest; the map misses the caps' steep sides, and with none
+    // the thumb read 2.1 mm into the space bar on the mesh)
+    let left = otSettle(side, Gs, lifted, w, f0.thumb, 0.001 + 0.0005 * mix);
+    if (left < -0.0005) { M.kUp[side] = Math.min(0.03, M.kUp[side] - left); Gs = solve(); left = otSettle(side, Gs, lifted, w, f0.thumb, 0.001 + 0.0005 * mix); }   // (one retry pass: G24 F9)
     if (left >= -0.0005) M.kUp[side] = Math.max(0, M.kUp[side] - 0.002 * dt * 30 * 0.25);
     OT.roll[side] = OT.thumbIn[side] < -0.0005 ? Math.min(0.52, OT.roll[side] + 0.05 * dt * 30) : Math.max(0, OT.roll[side] - 0.004 * dt * 30);
     M.ot = M.ot || {}; M.ot[side] = {t: +OT.t.toFixed(3), lifted: [...lifted], k: OTK[side].map(x => +x.toFixed(2)), kk: +OT.kk[side].toFixed(3), roll: +(OT.roll[side] * 57.3).toFixed(1), thumbIn: +(OT.thumbIn[side] * 1000).toFixed(1)};   // (?debug)
