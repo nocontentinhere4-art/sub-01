@@ -1,9 +1,26 @@
 # Review: preview/standing-clips (G22)
 
-- Latest: `9640cbf`, round 2 by G26 (below). Round 1: `7aec913` (2026-10-07 14:14 UTC, WIP), reviewed 2026-10-07 15:10 UTC by G23.
+- Latest: `4202e97`, round 3 by G26: OK (below). Round 2: `9640cbf`. Round 1: `7aec913` (2026-10-07 14:14 UTC, WIP), reviewed 2026-10-07 15:10 UTC by G23.
 - Scope: 9 Mixamo clips on `char_mixamo.glb` via `room.html?char=mixamo&clip=<Clip>` (`standing_preview.js`).
 - Default page: the new `room.html` block only runs with both `char=mixamo` and `clip` (code read; it returns before
   touching anything otherwise). Unchanged without the flag.
+
+## Round 3 (4202e97; clips from d267212, 2026-10-07 19:39 UTC), reviewed 20:25 UTC by G26: OK
+
+- **Rig blocker closed.** The clips are re-baked on G21's `char_mixamo.glb` (byte-equal to mixamo-wiring 94c2554,
+  autorigged from main's `char_v5.glb`): white socks in black slides, the closed collar.
+- **Texting_While_Standing (round 2, defect 2): closed.** At 30 % and 60 % both hands hold the phone in front of his
+  chest, screen up to his face, thumbs on it.
+- Soles every frame of the whole clip: Texting_While_Standing 0.40 cm (707 frames), Gaming 0.40 (151), Standing_Clap
+  0.39–0.40 (143). 0 frames over 1 cm, none under −0.5. No console errors.
+- **Default page:** desk (page camera, right hand, frames 0 and 2 s) pixel-equal to main 7f2bf6e under main's harness.
+  Merges cleanly with main.
+![round 3](img/standing-clips_8_round3_4202e97.jpg)
+
+Left, LOW, not blocking: Gaming's left fingers are still open beside the grip (round 2, defect 3). The Standing_Clap
+`front` view has a bottle on the desk in the foreground.
+
+---
 
 ## Round 2 (9640cbf, 2026-10-07 16:09 UTC; clips from 63efec3), reviewed 17:45 UTC by G26: NOT OK, blocked on the rig
 
