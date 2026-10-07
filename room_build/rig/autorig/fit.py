@@ -307,7 +307,7 @@ for i in range(NB):
 WG = np.where(allow, 1.0 / (d2 + 1e-6) ** 2, 0.0)
 WG /= WG.sum(1, keepdims=True) + 1e-30
 
-ALPHA = float(json.load(open(f"{OUT}/params.json"))["alpha"]) if __import__("os").path.exists(f"{OUT}/params.json") else 0.5
+ALPHA = float(__import__("os").environ.get("AUTORIG_ALPHA", "0.5"))     # (geometric share; the rest is the old skin moved over)
 ITERS = 12
 W = ALPHA * WG + (1 - ALPHA) * WT
 

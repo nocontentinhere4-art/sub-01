@@ -58,6 +58,11 @@ window.QA = {
     const nreg = Object.keys(reg.edgeSets);
     for (const n of nreg) { out.strain[n] = {p95: 0, max: 0, over30: 0}; out.inside[n] = undefined; }
     const per = {}; const lows = [];
+    // the same pairs in the rest pose: what the mesh already overlaps as modelled (the baggy sleeves on the hoodie)
+    // and with the arms down as v5 was modelled (63 deg under the horizontal): the sleeves against the hoodie as scanned
+    for (const [key, down] of [["insideRest", 0], ["insideArmsDown", 1.1]]) { QA.pose(null, 0);
+      if (down) { for (const [n, sg] of [["LeftArm", -1], ["RightArm", 1]]) body.getObjectByName(n).rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), sg * down); body.updateMatrixWorld(true); }
+      const s0 = skinned(); out[key] = {}; for (const [nm, A, B] of PAIRS) { const r = inside(s0, reg.sets[A], reg.sets[B]); out[key][nm] = {verts: r.n, depth_cm: +(r.d * 100).toFixed(1)}; } }
     for (let t = 0; t <= clips[k].duration + 1e-6; t += dt) {
       QA.pose(k, t); const s = skinned(); out.frames++;
       for (const n of nreg) { const ids = reg.edgeSets[n]; const st = new Float32Array(ids.length);
@@ -82,6 +87,18 @@ window.QA = {
     for (const n of nreg) out.strain[n].over30 = +(out.strain[n].over30 * 100).toFixed(2);
     out.soles = {L_cm: out.soles.L.map(v => +(v * 100).toFixed(1)), R_cm: out.soles.R.map(v => +(v * 100).toFixed(1))};
     return out;
+  },
+  // a crossfade from clip a (at ta) into clip b (from tb) over dur seconds, as the page blends: hands vs thighs and the
+  // arms vs the torso every frame (1/30 s)
+  blend(a, b, dur = 0.8, ta = 0, tb = 0) {
+    const reg = regions(); mixer.stopAllAction(); const A = mixer.clipAction(clips[a]), B = mixer.clipAction(clips[b]);
+    A.reset().play(); A.time = ta; mixer.update(0); B.reset().play(); B.time = tb; A.crossFadeTo(B, dur, false);
+    const out = {from: a, to: b, dur, frames: 0, hits: {}};
+    for (let f = 0; f <= Math.round(dur * 30) + 3; f++) { body.updateMatrixWorld(true); const s = skinned(); out.frames++;
+      for (const [nm, X, Y] of PAIRS.slice(0, 3)) { const r = inside(s, reg.sets[X], reg.sets[Y]);
+        const o = out.hits[nm] || (out.hits[nm] = {frames: 0, maxVerts: 0, maxDepth_cm: 0}); if (r.n) { o.frames++; o.maxVerts = Math.max(o.maxVerts, r.n); o.maxDepth_cm = Math.max(o.maxDepth_cm, +(r.d * 100).toFixed(1)); } }
+      mixer.update(1 / 30); }
+    mixer.stopAllAction(); return out;
   },
   // world rotation and position of every bone, for the comparison against the FBX's own skeleton
   bones() { const o = {}; for (const b of meshes[0].skeleton.bones) { o[b.name] = [...b.getWorldPosition(new THREE.Vector3()).toArray(), ...b.getWorldQuaternion(new THREE.Quaternion()).toArray()]; } return o; },
@@ -152,8 +169,10 @@ function regions() {
   _reg = {sets, edgeSets: {}};
   // edge sets: an edge is in a joint region if both its ends are
   const E = edges();
+  sets.j_torso = sets.torso || [];                                        // (the hoodie's body)
   for (const k of Object.keys(sets).filter(k => k.startsWith("j_"))) { const inS = new Uint8Array(n); for (const i of sets[k]) inS[i] = 1;
     const ids = []; for (let e = 0; e < E.length; e++) if (inS[E[e][0]] && inS[E[e][1]]) ids.push(e); _reg.edgeSets[k.slice(2)] = ids; }
+  _reg.edgeSets.all = E.map((_, e) => e).filter(e => e % 4 === 0);           // (every 4th edge of the whole body)
   return _reg;
 }
 const PAIRS = [["hands in thighs", "handsAll", "thighs"], ["left arm in torso", "armL", "torso"], ["right arm in torso", "armR", "torso"],
@@ -173,14 +192,5 @@ function inside(s, A, B) {
     if (dot < -0.005) { n++; d = Math.max(d, -dot); } }
   return {n, d};
 }
-QA._dbg = () => { const out = {};
-  for (const k of [null, "Seated_Idle"]) { QA.pose(k, 1); const s = skinned(); let lo = [9,9,9], hi = [-9,-9,-9];
-    for (let i = 0; i < s.pos.length; i += 3) for (let c = 0; c < 3; c++) { lo[c] = Math.min(lo[c], s.pos[i+c]); hi[c] = Math.max(hi[c], s.pos[i+c]); }
-    const g = n => body.getObjectByName(n).getWorldPosition(new THREE.Vector3()).toArray().map(x => +x.toFixed(3));
-    out[k || "rest"] = {lo, hi, hips: g("Hips"), lfoot: g("LeftFoot"), lhand: g("LeftHand")}; }
-  out.pos = clips.Seated_Idle.tracks.filter(t => t.name.endsWith(".position")).map(t => t.name).slice(0, 5);
-  out.npos = clips.Seated_Idle.tracks.filter(t => t.name.endsWith(".position")).length;
-  out.ntr = clips.Seated_Idle.tracks.length;
-  return JSON.stringify(out); };
 window.QA_READY = true;
 </script></body></html>

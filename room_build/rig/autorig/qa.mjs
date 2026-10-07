@@ -31,7 +31,8 @@ const W = 300, H = 400, rows = [];
 rows.push(await Promise.all([["front", "rest, front"], ["side", "rest, side"], ["back", "rest, back"], [{dir: "front", focus: "LeftHand", r: 0.12}, "rest, left hand"],
   [{dir: "top", focus: "RightHand", r: 0.12}, "rest, right hand (top)"]].map(async ([v, t]) => tile(await img(null, 0, v, W, H), t, W, H))));
 for (const c of CL) { const D = info.clips[c], ts = [0, D * 0.33, D * 0.66, D * 0.99].map(t => +t.toFixed(2)), r = [];
-  for (const t of ts.slice(0, 2)) for (const v of ["front", "side"]) r.push(await tile(await img(c, t, v, W, H), `${c} ${t}s ${v}`, W, H));
+  const vs = /Lay|Sleep/.test(c) ? ["top", "side"] : ["front", "side"];   // (lying: from above and beside)
+  for (const t of ts.slice(0, 2)) for (const v of vs) r.push(await tile(await img(c, t, v, W, H), `${c} ${t}s ${v}`, W, H));
   r.push(await tile(await img(c, ts[2], "three", W, H), `${c} ${ts[2]}s 3/4`, W, H));
   rows.push(r);
   const z = [];
@@ -43,6 +44,9 @@ const sheet = await sharp({create: {width: W * 5, height: (H + 26) * rows.length
 fs.writeFileSync(`${OUT}/sheet.jpg`, sheet);
 const qa = {character: path.basename(CHAR), bones: info.bones, hipH_m: +info.hipH.toFixed(3), clips: {}};
 for (const c of CL) { const t0 = Date.now(); qa.clips[c] = await p.evaluate(k => QA.measure(k, 0.1), c); console.log(c, `${((Date.now() - t0) / 1000).toFixed(0)} s`, JSON.stringify(qa.clips[c])); }
+if (CL.includes("Seated_Idle") && CL.includes("Typing")) {                 // (the README's 0.8 s hands-to-thighs blend, both ways)
+  qa.blends = [await p.evaluate(() => QA.blend("Seated_Idle", "Typing")), await p.evaluate(() => QA.blend("Typing", "Seated_Idle"))];
+  console.log("blends", JSON.stringify(qa.blends)); }
 fs.writeFileSync(`${OUT}/qa.json`, JSON.stringify(qa, null, 1));
 await b.close(); srv.close();
 console.log(`${OUT}/sheet.jpg, ${OUT}/qa.json`);

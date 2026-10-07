@@ -13,6 +13,7 @@
 // A penetration is a vertex more than 1 cm inside (the page's own margin); depth = how far inside, vertically.
 // LIFE='{"screen": {"id": "v", "kind": "video"}}': more of the tick for live() (a video on the screen: watching).
 // RARE=scared|angry|clap: once settled at the desk, start that rare event (boy_mh.js mh.rare) and sample from there.
+// perFrame in the output: for every frame with something inside a solid, {"solid:region": [vertices, depth cm]} (frame = 1/30 s).
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
 const [port, activity = "research", secs = "8", out] = process.argv.slice(2);
@@ -68,9 +69,10 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       (CV.seat = CV.seat || [])[i * CV.nz + k] = st; }
     cm.forEach(m => { m.material.side = THREE.FrontSide; }); }
   const F = 0.16, TOP = 0.82 - 0.02, M = 0.01;
-  const S = {frames: 0, at, clip: cur, step: S0step, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: []};
+  const S = {frames: 0, at, clip: cur, step: S0step, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: [], perFrame: {}};
   const add = (k, reg, d, f) => { const e = S[k][reg] || (S[k][reg] = {frames: 0, maxDepth: 0, maxCount: 0, _f: -1, _n: 0});
-    if (e._f !== f) { if (e._f >= 0) e.maxCount = Math.max(e.maxCount, e._n); e._f = f; e._n = 0; e.frames++; } e._n++; e.maxDepth = Math.max(e.maxDepth, d); };
+    if (e._f !== f) { if (e._f >= 0) e.maxCount = Math.max(e.maxCount, e._n); e._f = f; e._n = 0; e.frames++; } e._n++; e.maxDepth = Math.max(e.maxDepth, d);
+    const p = S.perFrame[f] || (S.perFrame[f] = {}), q = p[k + ":" + reg] || (p[k + ":" + reg] = [0, 0]); q[0]++; q[1] = Math.max(q[1], +(d * 100).toFixed(1)); };   // (frame -> "solid:region" -> [vertices, depth cm])
   // his own legs: each thigh a capsule on its bone (hip joint -> knee), its radius along the bone measured from his thigh
   // skin in the first frame (the 90th percentile of the skin's distance from the bone, 10 bands); a hand or finger vertex
   // inside it (by more than 5 mm) is a hand in the leg
