@@ -91,8 +91,7 @@ export const ROOM = {
   // means over the clip, 1.5 cm on along the finger and 1 cm down, as G14 measured them on v5's bake
   clipMX: {F: [0.17, 0.829, 0.599], J: [-0.095, 0.859, 0.639], clip: "room_mx_typing"},
   // the seat points (boy_mh.js SEAT_AT: [across, forward of the chair's pivot]), swept in the room for this character
-  // (kimodo/seat_sweep.mjs: the page's penetration() every 0.1 s over each mode's clip): clear of the chair from -0.05
-  // (watching), -0.06 m (typing) to past -0.12 m; each set 1.5 cm or more inside that. The mouse plays watching's body
-  // (main's boy_mh.js: room_seated_idle), so its seat point is watching's
-  seatAt: {desk_watch: [0, -0.065], desk_type: [0, -0.075], desk_mouse: [0, -0.065]},
+  // (kimodo/seat_sweep.mjs: the page's penetration() every 0.1 s over each mode's clip): clear of the chair from -0.06 m
+  // (watching, typing and the mouse, which plays watching's body as on main) to past -0.12 m; each set 1.5 cm inside that
+  seatAt: {desk_watch: [0, -0.075], desk_type: [0, -0.075], desk_mouse: [0, -0.075]},
 };
