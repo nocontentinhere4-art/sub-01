@@ -641,13 +641,32 @@ OVERLAY_TEXT_JS = """() => {
 }"""
 
 
+# 2026-10-07 14:39 UTC live: "The Drive - Permission Request Form" (permissions.thedrive.threesai.com) was shown and
+# logged. A consent / permission / cookie-request page is a wall like a bot check: left, not shown, its site cooled off.
+# By the title (one of its parts is only such a request: an article about privacy settings is not) or by a host whose
+# first label is one (permissions.*, consent.*, cookies.*, cmp.*, gdpr.*).
+CONSENT_TITLE = re.compile(r"(\w+ )?(permissions? request|request (for )?permissions?|permissions? required|"
+                           r"cookie (consent|preferences|settings|policy|choices)|privacy (choices|preferences|center)|"
+                           r"manage (cookies|consent|your privacy)|consent( management| preferences| request)?)"
+                           r"( form| page)?")
+CONSENT_HOST = re.compile(r"^(permissions?|consent|cookies?|cmp|gdpr)\.[\w-]+\.[\w.-]+$")
+
+
+def consent_wall(title, url):
+    t = " ".join(str(title or "").split()).lower().rstrip(".")
+    host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
+    return (any(CONSENT_TITLE.fullmatch(part.strip()) for part in re.split(r"\s[-|–—:·]\s|\|", t))
+            or bool(CONSENT_HOST.match(host)))
+
+
 def challenge_title(title, url):
     """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    a geo-block title ("... isn't available in your region"), or a title that is only the bare host name (an
-    interstitial, not content)."""
+    a geo-block title ("... isn't available in your region"), a consent / permission request, or a title that is only
+    the bare host name (an interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
     return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t)) and not GEO_TITLE_ASK.search(t)
+            or consent_wall(title, url)
             or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
