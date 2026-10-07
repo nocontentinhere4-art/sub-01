@@ -27,3 +27,5 @@ Measured on **main's character** (0ac47f8, the hood with its lining from b2593d7
 | headphones under the pillow | 0 | 0 | – | – |
 
 Videos `listen.mp4` and `sleep_turn.mp4` are re-recorded on main's character with these clips.
+
+Full pytest on this commit's tree: 1450 passed, 27 skipped, exit 0; `tests/visual/out/results.json` hard_failures `[]`.
