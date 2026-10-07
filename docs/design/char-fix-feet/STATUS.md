@@ -1,6 +1,6 @@
 # char-fix-feet (G19): STATUS
 
-**State: delivered; full pytest running.** Branch `preview/char-fix-feet`, off main 92395c7. See README.md for how it works.
+**State: DONE.** Branch `preview/char-fix-feet`, off main 92395c7. See README.md for how it works.
 
 ## Paths
 - Script: `room_build/charfix/feet.mjs` (in GLB -> out GLB; feet and ankles only). Its input:
@@ -42,4 +42,6 @@ It is worth a check against G12's desk work (0eaf73a).
   the reason for the 170 parity hits above.
 
 ## Tests
-- full pytest: running (results below when done).
+- Full pytest on this branch (with the new char_v5.glb), `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`:
+  **1287 passed, 27 skipped, pytest exit 0** (10 min 37 s). `tests/visual/out/results.json`: **hard_failures == []**.
+- RunPod: not used. No pods created.
