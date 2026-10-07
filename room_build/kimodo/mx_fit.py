@@ -9,9 +9,9 @@ G12's seated fit (kimodo_g12/post.py) on this skeleton, plus the arm clearance t
     off it) the cushion stops them, whatever the blend;
   - the spine tipped forward by pitch degrees (seated);
   - the feet: planted stances locked, and each sole (his skin and the slides) soleUp over the floor, by leg IK;
-  - the wrists on the performer's (scaled to his size), carried up and forward with him onto our seat, + handUp (the
-    performer's armrests and desk were lower than ours), and moved by keys [forward, up] while the hands are out at the
-    keyboard (eased in by reach), by arm IK;
+  - the wrists where the clip's rotations put them on him (carried up and forward with him onto our seat), + handUp
+    (the performer's armrests and desk were lower than ours), and moved by keys [forward, up] while the hands are out
+    at the keyboard (eased in by reach), by arm IK;
   - the sleeves off the hoodie: the performer's arms hung against a slimmer body. Where a sleeve vertex is more than
     clearMax inside the hoodie (qa.html's test: behind the nearest hoodie vertex's normal, within 2.5 cm), the elbow
     swings out about the shoulder-wrist line (the wrist and the hand stay where they are), and where that is not
@@ -121,6 +121,10 @@ if PITCH:                                                     # the spine tipped
     a = PITCH * w_seat / 2; dq = np.concatenate([ax * np.sin(a)[:, None], np.cos(a)[:, None]], 1)
     Qn = qmul(dq, Q[:, sp]); R[:, sp] = qnorm(qmul(qinv(Q[:, cs.parent[sp]]), Qn))
 P, Q, Sc, M = body_fk(T, R)
+def axis_q(ax, ang):
+    ax = ax / (np.linalg.norm(ax, axis=-1, keepdims=True) + 1e-12); return np.concatenate([ax * np.sin(ang / 2)[..., None], np.cos(ang / 2)[..., None]], -1)
+
+
 # ---- the feet: planted stances locked (low and slow, held on the stance's mean), each sole SOLE over the floor
 SOLE = g("soleUp", 0.002)
 ank0 = {}
@@ -155,14 +159,36 @@ for it in range(2):
         lift = (lowpass(-low + SOLE, 4.0) if it == 0 else -low + SOLE)
         goal = (ank0[s] if it == 0 else P[:, cix[S + "Foot"]].copy()) + np.stack([np.zeros(F), lift if it == 0 else np.maximum(0, lift), np.zeros(F)], -1)
         ik(T, R, P, Q, Sc, cix[S + "UpLeg"], cix[S + "Leg"], cix[S + "Foot"], goal); P, Q, Sc, M = body_fk(T, R)
+# the knees up to kneeY (seated): our chair is high for him, and with his feet flat (his shin and ankle reach 0.48 m)
+# his thighs slope down through the cushion's front edge; as on a high chair, his heels come up and he rests on the
+# balls of his feet (v5's seated clips have his knees at 0.55 m the same way). The heel rises by what the knee lacks,
+# the foot turned toes-down about his left-right axis so the ball stays where it was
+KNEE = g("kneeY", 0.0)
+rep["knees_before_m"] = [round(float(P[w_seat > 0.5, cix[S + "Leg"], 1].mean()), 3) if (w_seat > 0.5).any() else None for S in ("Left", "Right")]
+if KNEE:
+    for s, S in (("L", "Left"), ("R", "Right")):
+        a, b, c, t = cix[S + "UpLeg"], cix[S + "Leg"], cix[S + "Foot"], cix[S + "ToeBase"]
+        raise_ = lowpass(np.maximum(0, KNEE - P[:, b, 1]) * w_seat, 3.0)
+        lat = P[:, cix["LeftUpLeg"]] - P[:, cix["RightUpLeg"]]; lat /= np.linalg.norm(lat, axis=1, keepdims=True)
+        foot = np.linalg.norm((P[:, t] - P[:, c])[:, [0, 2]], axis=1)                  # (ankle to the ball, across the floor)
+        ang = np.arcsin(np.clip(raise_ / np.maximum(foot, 0.05), 0, 0.9))
+        Qf = qmul(axis_q(lat, ang), Q[:, c])                                            # (toes down: about +lat, his left)
+        ik(T, R, P, Q, Sc, a, b, c, P[:, c] + np.stack([np.zeros(F), raise_, np.zeros(F)], -1)); P, Q, Sc, M = body_fk(T, R)
+        R[:, c] = qnorm(qmul(qinv(Q[:, b]), Qf)); P, Q, Sc, M = body_fk(T, R)
+        rep.setdefault("heel_raise_cm", {})[s] = round(float(raise_.max()) * 100, 1)
+    for s, S in (("L", "Left"), ("R", "Right")):              # (and no sole under the floor after it: lifted where one is)
+        X = np.concatenate([skin_at(M[i:i + 40], sole) for i in range(0, F, 40)]); low = X[:, side_of == s, 1].min(1)
+        ik(T, R, P, Q, Sc, cix[S + "UpLeg"], cix[S + "Leg"], cix[S + "Foot"], P[:, cix[S + "Foot"]] + np.stack([np.zeros(F), np.maximum(0, SOLE - low), np.zeros(F)], -1))
+        P, Q, Sc, M = body_fk(T, R)
 X = np.concatenate([skin_at(M[i:i + 40], sole) for i in range(0, F, 40)])
 rep["soles_cm"] = {s: [round(float(X[:, side_of == s, 1].min(1).min() * 100), 1), round(float(X[:, side_of == s, 1].min(1).max() * 100), 1)] for s in "LR"}
 # ---- the wrists: the performer's (scaled to him) + handUp; at the keyboard, moved by keys
 HUP = g("handUp", 0.0); KEYS = g("keys", [0, 0])
 for s, S in (("L", "Left"), ("R", "Right")):
-    # (the performer sat lower than our seat, 16-24 cm at his size: his hands ride with him as he is lifted onto ours,
-    # then handUp puts them on our furniture: back down onto our armrests, or off his thighs)
-    goal = kP[:, kix[S + "Hand"]] * k + np.array([0, HUP, 0]) + shift
+    # (his own wrist as the clip's rotations put it, carried with him onto our seat (the performer sat 16-24 cm lower,
+    # at his size), then handUp puts it on our furniture: back down onto our armrests, or off his thighs. Not the
+    # performer's wrist: his shoulders are not ours, and reaching for it pulled the right arm across the chest)
+    goal = P[:, cix[S + "Hand"]] + np.array([0, HUP, 0])
     if KEYS[0] or KEYS[1]:
         reach = goal[:, 2] - P[:, hi, 2]; wk = sm((reach - 0.30) / 0.10)
         goal = goal + np.stack([np.zeros(F), KEYS[1] * wk, KEYS[0] * wk], -1)
@@ -193,9 +219,6 @@ def depth(Mf, S, hd=None, where=False):                       # the deepest slee
     return float(max(0.0, -dot.min()))
 
 
-def axis_q(ax, ang):
-    ax = ax / (np.linalg.norm(ax, axis=-1, keepdims=True) + 1e-12); return np.concatenate([ax * np.sin(ang / 2)[..., None], np.cos(ang / 2)[..., None]], -1)
-
 
 def swing(T, R, S, sw, ab):
     """The elbow out about the shoulder-wrist line by sw (the wrist stays, the hand keeps its turn), then the whole arm
@@ -225,12 +248,13 @@ def both(M):                                                  # the two arms' de
 before = both(M)
 rep["arm_in_torso_before_cm"] = {S: round(float(v.max()) * 100, 1) for S, v in before.items()}
 if os.environ.get("MX_DIAG"):                                 # (where the sleeves are in the hoodie before the clearance, and stop)
+    tips = [cix[f"{S}Hand{f}3"] for S in ("Left", "Right") for f in ("Index", "Middle", "Ring", "Pinky")]; rep["fingertips_mean"] = P[:, tips].mean((0, 1)).round(3).tolist()
     for S, v in before.items():
         for f in list(np.argsort(-v)[:2]) + [F // 2]: print(S, int(f), round(float(v[f]) * 100, 1), depth(M[f], S, where=True))
         if os.environ.get("MX_DIAG") == "verts":
             for x in depth(M[int(v.argmax())], S, where="verts"): print("  ", x)
     print(json.dumps(rep)); sys.exit(0)
-STEP = np.radians(2); MAXSW, MAXAB = np.radians(g("swingMax", 30)), np.radians(g("abductMax", 16))
+STEP = np.radians(2); MAXSW, MAXAB = np.radians(g("swingMax", 30)), np.radians(g("abductMax", 24))
 SW = {S: np.zeros(F) for S in ("Left", "Right")}; AB = {S: np.zeros(F) for S in ("Left", "Right")}
 
 
@@ -271,6 +295,7 @@ if g("seatOrigin") and seated.any():
     J2 = joints(P); c = J2[-1] if J2[0, 1] > J2[-1, 1] else J2[0]; v = np.array([-c[0], 0, -c[2]])
     T[:, hi] += qrot(qinv(np.broadcast_to(Q0[0, cpar], (F, 4))), np.broadcast_to(v, (F, 3))) / S0[cpar]
     P, Q, Sc, M = body_fk(T, R); rep["origin_shift_m"] = [round(float(v[0]), 3), round(float(v[2]), 3)]
+rep["knees_m"] = [round(float(P[w_seat > 0.5, cix[S + "Leg"], 1].mean()), 3) if (w_seat > 0.5).any() else None for S in ("Left", "Right")]
 rep["hip_joints_seated_m"] = [round(float(x), 3) for x in joints(P)[seated].mean(0)] if seated.any() else None
 # the performer's keyboard point after the fit (the page rolls him and the chair so it lands on the room's keyboard):
 # the mean of his last finger joints, both hands, while they are out at the keyboard

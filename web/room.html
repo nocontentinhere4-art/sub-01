@@ -660,7 +660,7 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
 // their own skeleton (room/mh_mx/, baked for our chair: kimodo/mx_build.sh) and v5's other room clips carried over
 const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q === "mixamo";
 let V5 = null;                                        // (char_v5.js / char_mixamo.js and the body's clip conversion)
-(CHAR_V5 ? Promise.all([load(CHAR_MX ? "room/char_mixamo.glb" : "room/char_v5.glb"), import(CHAR_MX ? "./room/char_mixamo.js" : "./room/char_v5.js")])
+(CHAR_V5 ? Promise.all([CHAR_MX ? load("room/char_mixamo.glb") : load("room/char_v5.glb"), import(CHAR_MX ? "./room/char_mixamo.js" : "./room/char_v5.js")])
   .then(([g, m]) => { V5 = {m, conv: m.prep(THREE, g), mx: CHAR_MX};
     // (behind the camera's clearance, a backstop: his clothes are one single-sided shell, so wherever a view still reached
     // inside it, the visitor would see through him. With an inside, the inside of the fabric shows as fabric; his shadows

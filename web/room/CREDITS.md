@@ -369,3 +369,11 @@ Owner-approved pieces from the props previews and the clothes the owner turned d
 | `mh_v5/*.glb` (the room clips retargeted onto v5, by G14; the same names as preview/room-mh's `mh/`) | preview/mh-motion's clips, retargeted | as their sources |
 | `mh/props_g2.json` (the activity clips' placeholder props and the door / window keys) | preview/mh-motion `room_build/mh/glb/clips_g2/props_g2.json` | made for this project, CC0 |
 | `boy_mh.js` (the clip player and the room choreography: desk modes, sit / stand, the chair pulled and pushed, routes) | preview/room-mh (G3, G10d) | this project's code |
+
+## The same character on the Mixamo skeleton (room.html?char=mixamo, preview/mixamo-wiring)
+| file | source | licence |
+|---|---|---|
+| `char_mixamo.glb` (v5 put on the Mixamo Standard Skeleton by `room_build/rig/autorig.sh`, without mixamo.com: the same mesh and textures, a new skeleton and weights) | `char_v5.glb` | as `char_v5.glb` (Tripo's terms of service); the rig is made for this project |
+| `mh_mx/room_seated_idle.glb`, `mh_mx/room_mx_*.glb` (Mixamo animations baked for this character and our chair by `room_build/kimodo/mx_build.sh`) | Mixamo (mixamo.com, Adobe) | Mixamo's terms: royalty-free, commercial use in a project allowed; the raw animation files are not redistributed (they stay out of the repository) |
+| `mh_mx/` the other clips (`desk_mouse_ik`, `room_walk`, `room_window`, `room_bed_*`, `room_bedtime`, `room_eat`, `room_read`, `room_phone*`, `room_drink`, `room_door`) | `mh_v5/`'s clips carried onto this skeleton by `room_build/kimodo/mx_convert.mjs` | as their sources |
+| `char_mixamo.js` (the loader and which clip plays which slot) | preview/mixamo-pipeline (G12, G20), this branch | this project's code |

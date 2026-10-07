@@ -316,13 +316,16 @@ for S in ("Left", "Right"):
 # takes nothing of the spine and the hoodie nothing of the arm. v5's skin blends them 0.2-0.3 each way down the armpit,
 # so with the arm swung 20 deg forward (Seated_Idle) the blend sheared the sleeve 2.4 cm into the hoodie. Within PIT of
 # the shoulder joint (T-pose) both keep everything: the shoulder still rounds over. (Measured against ramps over 6-22 cm
-# under the joint: each was worse at the armpit, the back of the shoulder or both.)
+# under the joint: each was worse at the armpit, the back of the shoulder or both.) The price, with linear blending:
+# raised high (the T-pose), the arm leaves the back of the armpit behind, a web (the report's tpose_dev: 10,010
+# vertices over 5 cm off v5's own T-pose, up to 19.5 cm); with no cut (PIT 9) that is 29 vertices, but seated the
+# sleeves go 2.3 cm into the hoodie again. An arm-raise corrective shape would take both; not made yet.
 PIT = float(__import__("os").environ.get("AUTORIG_PIT", "0.07"))
 SHCUT = float(__import__("os").environ.get("AUTORIG_SHCUT", "0.06"))
 TORSO = [RI[mx(n)] for n in ("Hips", "Spine", "Spine1", "Spine2", "Neck", "Head")]
 is_torso = np.isin(dom, [JI[n] for n in ("Hip", "Pelvis", "Waist", "Spine01", "Spine02", "NeckTwist01", "NeckTwist02") if n in JI])
 # (the arm part is skin round the arm itself: within SLEEVE of its bind axis (shoulder -> elbow -> wrist, as modelled),
-# not before the shoulder joint. v5's skin gives the upper arm 0.9 of patches of the hoodie's back and chest inside the
+# not before the shoulder joint, and not across from it toward the middle. v5's skin gives the upper arm 0.9 of patches of the hoodie's back and chest inside the
 # shoulder (x 0.15 against the joint's 0.20); those are the hoodie's)
 SLEEVE = float(__import__("os").environ.get("AUTORIG_SLEEVE", "0.13"))
 
@@ -340,6 +343,11 @@ for s, S in (("L", "Left"), ("R", "Right")):
     arm_new = [RI[n] for n in RN if n.startswith((mx(S + "Arm"), mx(S + "ForeArm"), mx(S + "Hand")))]
     far = np.linalg.norm(Vt - BP[RI[mx(S + "Arm")]], axis=1) > PIT
     on_arm = round_limb(s, [J[JI[f"{s}_Upperarm"]], J[JI[f"{s}_Forearm"]], J[JI[f"{s}_Hand"]], J[JI[f"finger3-1.{s}"]]])
+    # (and not inside the shoulder joint across the body by more than 2.5 cm: the front of the chest by the armpit is
+    # within 13 cm of the axis too, the joint being forward of the sleeve, and with 1.0 of the arm it went 2.4 cm into
+    # the chest typing)
+    side = 1 if s == "L" else -1
+    on_arm &= side * V[:, 0] > side * J[JI[f"{s}_Upperarm"]][0] - 0.025
     is_arm = np.isin(dom, armJ) & on_arm
     is_torso = is_torso | (np.isin(dom, armJ) & ~on_arm)
     for j in arm_new: allow[is_torso & far, j] = False
@@ -417,6 +425,11 @@ Vb = V; Nb = NV / (np.linalg.norm(NV, axis=1, keepdims=True) + 1e-12)
 top = np.argsort(-W, axis=1)[:, :4]; tw = np.take_along_axis(W, top, 1)
 tw[tw < 0.01] = 0; tw /= tw.sum(1, keepdims=True)
 
+# how far the new skin's T-pose is from the T-pose v5's own skin made (step 1, which G20's sheet shows whole): where the
+# arm and the hoodie part company, a web of skin left behind shows as vertices centimetres off it
+_tp = np.zeros_like(Vt)
+for c in range(4): _tp += tw[:, c:c + 1] * (np.einsum("nab,nb->na", np.stack(BMAP)[top[:, c], :3, :3], V) + np.stack(BMAP)[top[:, c], :3, 3])
+_dv = np.linalg.norm(_tp - Vt, axis=1); TPOSE_DEV = [round(float(np.percentile(_dv, 99)) * 100, 1), round(float(_dv.max()) * 100, 1), int((_dv > 0.05).sum())]
 # ---------------------------------------------------------------------------------------------------- out
 np.savez(f"{OUT}/mesh.npz", pos=Vt.astype(np.float32), nrm=Nt.astype(np.float32), jnt=top.astype(np.uint16),
          wgt=tw.astype(np.float32), off=off, Vbind=V.astype(np.float32))
@@ -427,7 +440,7 @@ skel = [{"name": RN[i], "parent": RN[par[i]] if par[i] >= 0 else None, "p": BP[i
          "bindmap": BMAP[i].T.ravel().tolist()} for i in range(NB)]
 rep = {"finger_centring_mm": SHIFT, "twist_deg": {s: round(float(np.degrees(TWIST[s])), 1) for s in TWIST},
        "height_m": round(float(Vt[:, 1].max()), 3), "hips_m": round(float(BP[RI[mx("Hips")], 1]), 3),
-       "alpha": ALPHA, "verts": int(nv), "bones": NB,
+       "alpha": ALPHA, "verts": int(nv), "bones": NB, "tpose_dev_cm_p99_max_n5cm": TPOSE_DEV,
        # (the source's bind space (its first primitive's) -> this file's mesh space: kimodo/mx_convert.mjs carries the
        # source's clips over with it)
        "from_source_bind": (np.array([[*(K * Rw[0]), 0], [*(K * Rw[1]), -floor], [*(K * Rw[2]), 0], [0, 0, 0, 1]]).T.ravel()).tolist(),
@@ -440,4 +453,5 @@ for i in range(NB):
         rep["direction_err_deg"][RN[i][10:]] = round(float(np.degrees(np.arccos(np.clip(unit(a) @ unit(b), -1, 1)))), 1)
 json.dump({"bones": skel, "counts": cnt, "report": rep}, open(f"{OUT}/skel.json", "w"), indent=1)
 big = {k: v for k, v in rep["direction_err_deg"].items() if v > 8}
+print("T-pose vs v5's own skin (cm p99, max, verts > 5 cm):", TPOSE_DEV)
 print(json.dumps({k: rep[k] for k in ("finger_centring_mm", "twist_deg", "height_m", "hips_m", "verts", "bones")}), "direction >10deg:", big)

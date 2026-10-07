@@ -85,5 +85,6 @@ export function legacyHips(THREE, h) {
 export const ROOM = {
   clips: {desk_type: "room_mx_typing", type_in: "room_mx_sit_to_type", type_out: "room_mx_type_to_sit"},
   links: {in: 0.3, out: 0.2, fromWatch: 0.8, toWatch: 0.8},
-  clipFrame: null,                                   // (set below from the baked Typing's measured keyboard point)
+  // (kimodo/mx_build.sh Typing's report, fingertips_mean: x across, y up, z forward of his feet; the keys lie under it)
+  clipFrame: {kb: [0.039, 0.862, 0.617], home: [0.039, 0.862, 0.617]},
 };

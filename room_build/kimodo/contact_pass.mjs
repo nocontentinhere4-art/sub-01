@@ -155,5 +155,5 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
   S.seat = {lowestGap_min_cm: +(S.seat.min * 100).toFixed(1), lowestGap_max_cm: +(S.seat.max * 100).toFixed(1), framesUnder: S.seat.framesUnder || 0, maxVertsUnder: S.seat.maxUnder || 0, maxDepth_cm: +((S.seat.maxDepth || 0) * 100).toFixed(1)};
   for (const k of ["L", "R"]) S.soles[k] = {min_cm: +(S.soles[k].min * 100).toFixed(1), max_cm: +(S.soles[k].max * 100).toFixed(1), on: S.soles[k].on};
   S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5); S.legs.maxDepth = +(S.legs.maxDepth * 100).toFixed(1);
-  S.mode = window.mh && mh.M.mode; return S; }, [activity, +secs, JSON.parse(process.env.LIFE || "{}"), process.env.RARE || null]);
+  S.mode = window.mh && mh.M.mode; S.mhlog = window.mh ? mh.M.log.slice(-8) : null; return S; }, [activity, +secs, JSON.parse(process.env.LIFE || "{}"), process.env.RARE || null]);
 const txt = JSON.stringify(res, null, 1); if (out) fs.writeFileSync(out, txt); console.log(txt); await b.close();
