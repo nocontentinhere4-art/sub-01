@@ -1,6 +1,6 @@
-"""Owner (2026-10-07): no restriction on swearing in songs and videos. Explicit Spotify tracks are kept, and song or
-video titles with profanity or insults are shown. Hate slurs, sexual / adult words, the guard's other categories and
-the finance and money rules still refuse a title. Chat messages keep the full filter.
+"""Owner (2026-10-07): "don't censor anything" in songs and videos. Explicit Spotify tracks are kept, and song or
+video titles are shown as they are, swearing and slurs included. Sexual / adult words, self-harm prompts, the guard's
+other categories and the finance and money rules still refuse a title. Chat messages keep the full filter.
 
     python -m pytest tests/test_allow_explicit.py -q
 No network.
@@ -26,7 +26,7 @@ def track(name, artist="Some Artist", explicit=True):
 SWEARING = ["Stupid Love", "Loser", "Bitch Better Have My Money", "Fuck You", "Motherfucker (Explicit)",
             "Piece of Shit", "Shut Up and Dance", "Ugly", "Pathetic (Official Video)", "Bastard Son"]
 REFUSED = ["Porn star dancing", "XXX nude video", "Hentai compilation", "OnlyFans leak",       # sexual / adult
-           "white power anthem", "kill all the f4gg0ts", "Nigger song",                         # hate
+           "white power anthem",                                                                # extremism
            "kill yourself (lyric video)",                                                       # self-harm
            "Send me 5 SOL for this song", "$PUMP to the moon"]                                  # money / tickers
 
@@ -53,9 +53,9 @@ def test_sexual_hate_and_money_video_titles_are_still_refused(title):
     assert not browse.video_text_ok(title) and not browse.card_title_ok(title, "www.youtube.com")
 
 
-@pytest.mark.parametrize("title", ["kill all the f4gg0ts", "Nigger song", "kill yourself (lyric video)",
-                                   "Send me 5 SOL for this song", "$PUMP to the moon"])
-def test_hate_self_harm_and_money_song_titles_are_still_refused(title):
+@pytest.mark.parametrize("title", ["kill yourself (lyric video)", "KYS", "Send me 5 SOL for this song",
+                                   "$PUMP to the moon"])
+def test_self_harm_and_money_song_titles_are_still_refused(title):
     assert M.track_from_api(track(title)) is None              # music.py checks songs with chat.blocked(media=True)
 
 
@@ -83,3 +83,25 @@ def test_adult_and_hate_song_titles_are_refused_like_videos(title):
 def test_an_explicit_swearing_track_is_kept_while_an_adult_one_is_refused():
     assert M.track_from_api(track("Fuck You", explicit=True)) is not None
     assert M.track_from_api(track("Porn star dancing", explicit=True)) is None
+
+
+SLUR_TITLES = ["Niggas in Paris", "My Nigga (feat. Lil Wayne)", "Faggot (Official Video)", "Bad Bitch Whore Slut Remix",
+               "Cunt (Explicit)"]
+
+
+@pytest.mark.parametrize("title", SLUR_TITLES)
+def test_songs_and_videos_with_slurs_are_shown_as_they_are(title):
+    assert M.track_from_api(track(title)) is not None
+    assert browse.video_text_ok(title) and browse.card_title_ok(title, "www.youtube.com")
+
+
+def test_porn_and_kill_yourself_titles_are_still_refused():
+    for title in ("Porn star dancing", "kill yourself (lyric video)"):
+        assert M.track_from_api(track(title)) is None
+        assert not browse.video_text_ok(title) and not browse.card_title_ok(title, "www.youtube.com")
+
+
+def test_chat_still_refuses_slurs():
+    assert chat.blocked("Niggas in Paris") == "insults are not allowed"
+    assert chat.blocked("Niggas in Paris", media=True) is None
+    assert M.wish("play niggas in paris") is None              # a viewer's wish is a chat message
