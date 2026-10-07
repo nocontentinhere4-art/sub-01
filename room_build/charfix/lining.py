@@ -17,8 +17,9 @@ def dense(A, i):
     return w
 from scipy.spatial import cKDTree
 kB, kH = cKDTree(PB), cKDTree(PH)
-# the neck skin's cut lower edge: the open edges of the head's mesh round the collar (y 1.41-1.56), per angle over +-9
-# deg: highest and lowest point. At the front the throat ends in a ring at 1.454 m; at the sides and back the skin ends
+# the neck skin's cut lower edge: the open edges of the head's mesh round the collar (y 1.41-1.56), per angle over +-3
+# deg: highest and lowest point (over +-9 deg the highest tooth of a wider stretch lifted the lining over the hood's lip at
+# the side, 75-95 deg, where it stood up as a flap above his shoulder; C's check of the final sheet). At the front the throat ends in a ring at 1.454 m; at the sides and back the skin ends
 # in a saw-toothed cut, 1.443-1.478 m, some of it standing out 8 cm (under it, other surfaces of the bust carry on down:
 # the neck's surface is not where the skin you see is)
 from bnd import boundary_loops
@@ -27,7 +28,7 @@ EH = np.vstack([L for L in _lp if L[:, 1].min() > 1.41 and L[:, 1].max() < 1.56]
 eth = np.arctan2(EH[:, 2] - c0[2], EH[:, 0] - c0[0]) % (2 * np.pi)
 edge_hi, edge_lo = np.full(NT, np.nan), np.full(NT, np.nan)
 for b in range(NT):
-    dth = np.abs((eth - (b + 0.5) / NT * 2 * np.pi + np.pi) % (2 * np.pi) - np.pi); m = dth < np.radians(9)
+    dth = np.abs((eth - (b + 0.5) / NT * 2 * np.pi + np.pi) % (2 * np.pi) - np.pi); m = dth < np.radians(3)
     if m.any(): edge_hi[b], edge_lo[b] = EH[m, 1].max(), EH[m, 1].min()
 # (the highest tooth's height smoothed round the neck, over +-12 deg twice, where there is a cut: a lining edge that
 # jumped from angle to angle stood up in spikes)
@@ -65,7 +66,9 @@ for b in range(NT):
     # the edge's lowest point (G23's review: a ragged throat edge with a black sliver and a pinhole of light under it)
     cut = not np.isnan(edge_hi[b])
     # (not at the back: there the roll arches from the lip onto the neck and already covers its cut)
-    if cut and w < 0.75: yj = max(yj, edge_hi[b] + 0.004)
+    # (but never more than 3 mm over the hood's own lip there: at his side, 75-95 deg, the cut's teeth reach 1.477 m over a
+    # lower lip, and a lining climbing from the lip to them stood up as a flap above his shoulder; C's check)
+    if cut and w < 0.75: yj = max(yj, min(edge_hi[b] + 0.004, prof[-1][1] + 0.003))
     rnj = neck_r(ch, yj) or 0.05
     # from the lip to the neck, 6 steps: sagging into the groove at the front, arching into a roll at the back
     rl, yl = prof[-1]; rc, yc = 0.5 * (rl + rnj), (1 - w) * (min(yl, yj) - 0.004) + w * (max(yl, yj) + 0.008)
