@@ -52,15 +52,25 @@ After the fix (worst share in frame / frames with the head cut):
 | on his side | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
 | lying, music | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
 | phone in bed | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
-| into bed (door → lying, 630 frames) | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| into bed (door → lying, 623 frames) | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| out of bed, on the way (608 frames) | 0.884 / 0 | 0.889 / 0 | 0.852 / 0 | 0 / 516 (as main) |
+| out of bed, sitting down (monitor shot, 60 frames) | 0.16 / 0 | 0.155 / 0 | 0.165 / 0 | 0.13 / 21 (as main) |
 | desk (monitor shot) | 0.327 / 0 | 0.319 / 0 | 0.335 / 0 | 0.548 / 0 |
 | standing (door) | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
 | walking | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
 
-Out of bed (on the way, until he is at the desk anchor; then the monitor shot, head only): re-measured in the full run
-below (the test's arrival check now runs every frame).
+Out of bed, "on the way" ends where the page starts the monitor shot (sitting down at the desk), checked every frame;
+from there only the head is required. Largest camera move per frame getting out of bed: 3.2 cm on the phones (no jump;
+1280: 0.33 m, as on main). `pytest tests/visual/test_phone_camera.py`: 6 passed (636 s).
 
 Sheet: `docs/qa/phone_camera_before_after.jpg` (390×844 asleep, awake in bed with music, at the desk, walking, before /
 after; 1280×800 asleep before / after).
 
-## Milestone 3 — full suite: running
+## Milestone 3 — full suite: done
+`set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"` → **1446 passed, 27 skipped, 3 warnings in
+1526.67 s; pytest exit 0**. `tests/visual/out/results.json` `hard_failures == []`. (Environment note: `chess` needed
+`pip install --upgrade setuptools` before it would build here.)
+
+Files changed: `web/room.html` (camera logic only: `updateCameraGoal`, the phone framing, the spring arm's mesh list),
+`tests/visual/test_phone_camera.py`, `tests/visual/phone_camera.js`, `tests/visual/scenes.py` (a music-in-bed scene and
+the 360 / 430 phone sizes, both kept out of the shot sets). char_v5.glb and the bed clips are not touched.
