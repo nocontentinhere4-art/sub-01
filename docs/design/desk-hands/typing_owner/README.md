@@ -42,15 +42,31 @@ take:
   as read.
 
 ## Measured in the page (`owner_typing_contact.json`; desk_14, 64 samples over two loops)
-| | his hands, now | the capture before |
+**What the image can check, ours against his** (medians; index / middle / ring / little):
+
+| | left, ours | left, his | right, ours | right, his |
+|---|---|---|---|---|
+| Reach from above (wrist→fingertip / palm length) | 1.88 / 1.94 / 1.77 / 1.52 | 1.82 / 1.81 / 1.63 / 1.46 | 1.72 / 1.79 / 1.64 / 1.48 | 1.85 / 1.88 / 1.75 / 1.61 |
+| Spread from the middle finger (index / ring / little) | 5 / 3 / 12° | 6 / 4 / 12° | 6 / 6.5 / 19° | 7 / 6 / 19° |
+| Hand's turn (+ = toward his right) | 22.5° | 19.1° | −6.2° | −9.6° |
+| Index fingertip along the keys | −3.4 cm (F −2.85) | on F | +3.7 cm (J +2.85) | on J |
+
+**Contact, on the keyboard's mesh** (not a height map: G12 found the height map blind to steep flanks and overhangs on
+the mouse, and keycaps flare). Faces are double-sided. Inside = an odd number of crossings of a ray straight up, with hits
+less than 0.05 mm apart merged. Depth = the nearest face over 6 axis rays. Self-check on every sample: 2 mm under F's
+cap top reads −2.0, 3 mm over reads +3.0.
+
+| | his hands, now | the capture before (height-map probe) |
 |---|---|---|
-| Resting fingertips over the cap | median +1.2 mm, 83% in 0..+2 mm, deepest −0.5, none >2 mm in | median +0.5, 77% in 0..+2 |
-| Strokes | 4% of finger samples, median +9.7 mm | 15%, median +5.4 |
-| Thumbs | deepest −1.5 mm, none >2 mm in | 0 |
+| Resting fingertips over the cap | median +1.2 mm, 85% in 0..+2 mm, deepest −0.5, none >2 mm in | median +0.5, 77% in 0..+2 |
+| Any vertex of either hand inside the keyboard | deepest 0.9 mm (thumb tip) | — |
+| Strokes | 3% of finger samples, median +5.6 mm | 15%, median +5.4 |
 | Hands, right minus left along the keys | wrists min 13.7 cm, index knuckles min 4.8 cm; never crossing | wrists min 14.7, knuckles min 6.0 |
-| Reach, wrist to fingertip over palm length | 1.21–1.49 (his 1.46–1.88) | 1.06–1.46: the claw |
 | Skin over 2.5× bind (hands, fingers, forearms, sleeves) | median 48 triangles per frame, worst 6.2× | 33.5, worst 12.7× |
 | Arm skin in the desk | 0 | 0 |
+
+(Correction: a first version of this table gave our reach as 1.21–1.49. That probe put the fingertip along the end bone's
++Y, which points back toward the hand.)
 
 **Joints against his table** (rig median vs table, MCP / PIP / DIP):
 
@@ -65,8 +81,8 @@ take:
 | right ring | 24 / 20 / 15 | 46 / 40 / 29 |
 | right little | 29 / 18 / 12 | 43 / 36 / 41 |
 
-So we are not within 10° of the table, by design: the table is the `world` depth that folded the fingers into claws.
-The reach seen from above is what the image can check: ours is 0.1–0.4 palm lengths short of his (the curl floor).
+So we are not within 10° of the table, by design: the table is the `world` depth that folded the fingers into claws. It is information, not a target.
+The reach seen from above is what the image can check, and it is within 0.13 palm lengths of his on every finger.
 
 ## Open
 - **Strokes are few.** A resting finger is held on its cap, so the take's smaller finger moves are flattened. Finger

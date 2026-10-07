@@ -66,16 +66,7 @@
     12
    ]
   },
-  "reach_wrist_tip_over_palm": {
-   "L2": 1.49,
-   "L3": 1.49,
-   "L4": 1.4,
-   "L5": 1.39,
-   "R2": 1.39,
-   "R3": 1.43,
-   "R4": 1.34,
-   "R5": 1.21
-  }
+  "reach_wrist_tip_over_palm": "superseded: that probe put the fingertip along the end bone's +Y, which points back; see image_checks"
  },
  "capture_before": {
   "samples": 32,
@@ -101,16 +92,7 @@
    "max": 70,
    "worst_ratio": 12.7
   },
-  "reach_wrist_tip_over_palm": {
-   "L2": 1.15,
-   "L3": 1.4,
-   "L4": 1.46,
-   "L5": 1.29,
-   "R2": 1.1,
-   "R3": 1.17,
-   "R4": 1.13,
-   "R5": 1.06
-  }
+  "reach_wrist_tip_over_palm": "same probe error; not re-measured"
  },
  "his_take": {
   "joints_table_world": {
@@ -169,5 +151,84 @@
  "notes": [
   "stretch: triangles of the hands, fingers, forearms and sleeves over 2.5x their bind edge; most are 2-4 mm skin pieces at the knuckles and the thumb web, and the right forearm twist (as in the capture)",
   "joints: the table comes from MediaPipe world landmarks, whose depth is wrong in this take; our angles follow the image's reach instead (see README)"
- ]
+ ],
+ "mesh_contact": {
+  "method": "the keyboard's mesh, DoubleSide; inside = odd crossings of a ray straight up (hits <0.05 mm apart merged); depth = nearest face over 6 axis rays; outside, the gap to the first face below. Self-check each sample: 2 mm under F's cap top reads -2.0, 3 mm over reads +3.0.",
+  "samples": 64,
+  "resting_median_mm": 1.2,
+  "resting_in_0_to_2mm_pct": 85,
+  "resting_deepest_mm": -0.5,
+  "resting_over_2mm_in": 0,
+  "stroke_share_pct": 3,
+  "stroke_median_mm": 5.6,
+  "thumb_deepest_mm": -0.9,
+  "any_hand_vertex_inside_deepest_mm_by_bone": {
+   "finger2-3R": -0.5,
+   "finger2-3L": -0.5,
+   "finger1-3L": -0.9,
+   "finger1-3R": -0.7,
+   "finger5-3L": -0.1,
+   "finger1-2L": -0.6
+  }
+ },
+ "image_checks": {
+  "L": {
+   "reach_ours": [
+    1.88,
+    1.94,
+    1.77,
+    1.52
+   ],
+   "reach_his": [
+    1.82,
+    1.81,
+    1.63,
+    1.46
+   ],
+   "spread_ours_index_ring_little": [
+    5.1,
+    3.0,
+    11.6
+   ],
+   "spread_his": [
+    6,
+    4,
+    12
+   ],
+   "yaw_ours": 22.5,
+   "yaw_his": 19.1,
+   "index_tip_along_keys_cm": -3.4,
+   "index_tip_toward_him_cm": -1.2,
+   "F_or_J_cm": -2.85
+  },
+  "R": {
+   "reach_ours": [
+    1.72,
+    1.79,
+    1.64,
+    1.48
+   ],
+   "reach_his": [
+    1.85,
+    1.88,
+    1.75,
+    1.61
+   ],
+   "spread_ours_index_ring_little": [
+    6.2,
+    6.5,
+    18.9
+   ],
+   "spread_his": [
+    7,
+    6,
+    19
+   ],
+   "yaw_ours": -6.2,
+   "yaw_his": -9.6,
+   "index_tip_along_keys_cm": 3.7,
+   "index_tip_toward_him_cm": -0.9,
+   "F_or_J_cm": 2.85
+  }
+ }
 }
