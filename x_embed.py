@@ -1,5 +1,7 @@
 """Opt-in, read-only desk player. No private room APIs or account cookies are shared."""
 import asyncio
+import hashlib
+import io
 import html
 import json
 import math
@@ -19,7 +21,7 @@ ASSETS = {
     'character.js': ROOT / 'room/char_v5.js',
     'idle.glb': ROOT / 'room/mh_v5/room_seated_idle.glb',
 }
-PUBLIC_PATHS = frozenset(['/share/sub01', '/embed/sub01', '/embed/state'] +
+PUBLIC_PATHS = frozenset(['/share/sub01', '/embed/sub01', '/embed/state', '/embed/fomo-frame.jpg'] +
                          ['/embed/assets/' + name for name in ASSETS])
 
 
@@ -73,6 +75,25 @@ def account_snapshot(path):
     return out
 
 
+def approved_frame(path, digest):
+    """An exact reviewed frame only. Arbitrary/new browser screenshots never become public."""
+    if len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
+        return None
+    from PIL import Image
+    try:
+        with path.open('rb') as f:
+            raw=f.read(4*1024*1024+1)
+        if len(raw)>4*1024*1024 or hashlib.sha256(raw).hexdigest()!=digest:
+            return None
+        with Image.open(io.BytesIO(raw)) as image:
+            if image.format!='JPEG' or image.width*image.height>2073600:
+                return None
+            image.verify()
+        return raw
+    except (OSError,ValueError):
+        return None
+
+
 def attach(app, live, data_dir):
     enabled = os.environ.get('SUB01_X_EMBED') == '1'
     app[ENABLED] = enabled
@@ -81,6 +102,8 @@ def attach(app, live, data_dir):
     origin = public_origin(os.environ.get('SUB01_PUBLIC_URL', ''))
     cached, cached_at = None, -math.inf
     lock = asyncio.Lock()
+    frame_path = Path(data_dir) / 'embed/fomo-reviewed-frame.jpg'
+    frame_hash = os.environ.get('SUB01_FOMO_FRAME_SHA256', '')
 
     async def state(request):
         nonlocal cached, cached_at
@@ -88,11 +111,13 @@ def attach(app, live, data_dir):
             now = time.monotonic()
             if cached is None or now - cached_at >= 2:
                 account = await asyncio.to_thread(account_snapshot, Path(data_dir) / 'embed/fomo.json')
+                frame = await asyncio.to_thread(approved_frame, frame_path, frame_hash)
                 tick = getattr(live, 'last_tick', None)
                 cached = {'version': 1, 'server_time': time.time(),
                           'simulation': 'demo' if getattr(live, 'demo', False) else 'running',
                           'connected': tick is not None and now - tick < 15,
-                          'fomo': {'connected': account['state'] == 'connected'}, 'trading': account}
+                          'fomo': {'connected': account['state'] == 'connected'}, 'trading': account,
+                          'monitor': {'available': frame is not None, 'revision': frame_hash if frame else None, 'mode': 'reviewed_still'}}
                 cached_at = now
         return web.json_response(cached, headers={'Cache-Control': 'no-store',
                                                   'X-Content-Type-Options': 'nosniff'})
@@ -126,6 +151,13 @@ def attach(app, live, data_dir):
         return web.FileResponse(path, headers={'Cache-Control': 'no-cache',
                                                'X-Content-Type-Options': 'nosniff'})
 
+    async def frame(request):
+        raw = await asyncio.to_thread(approved_frame, frame_path, frame_hash)
+        if raw is None:
+            raise web.HTTPNotFound()
+        return web.Response(body=raw, content_type='image/jpeg', headers={'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})
+
+    app.router.add_get('/embed/fomo-frame.jpg', frame)
     app.router.add_get('/share/sub01', share)
     app.router.add_get('/embed/sub01', player)
     app.router.add_get('/embed/state', state)

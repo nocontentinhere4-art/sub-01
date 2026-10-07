@@ -74,3 +74,17 @@ def test_real_snapshot_requires_correct_source_and_redacts_secrets(tmp_path):
     assert x_embed.account_snapshot(p)['state']=='disconnected'
     p.write_text('{bad')
     assert x_embed.account_snapshot(p)['operations']==[]
+
+
+def test_only_exact_reviewed_frame_is_publishable(tmp_path):
+    import hashlib,io
+    from PIL import Image
+    path=tmp_path/'frame.jpg'
+    out=io.BytesIO();Image.new('RGB',(640,360)).save(out,format='JPEG');raw=out.getvalue();path.write_bytes(raw)
+    approved=hashlib.sha256(raw).hexdigest()
+    assert x_embed.approved_frame(path,approved)==raw
+    assert x_embed.approved_frame(path,'') is None
+    path.write_bytes(raw+b'changed')
+    assert x_embed.approved_frame(path,approved) is None
+    path.write_bytes(b'cookies')
+    assert x_embed.approved_frame(path,hashlib.sha256(b'cookies').hexdigest()) is None

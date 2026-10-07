@@ -31,3 +31,7 @@ Before funded operation, connect the dedicated account through a private server-
 ## Browser screen follow-up
 
 The owner requested the actual Fomo page, including charts and the dedicated account. The existing Chrome profile @iswizy is explicitly not the SUB-01 account. No cookies were exported or received. A private empty cookie file was prepared outside this repository; never commit it. The public player still uses its status panel. An arbitrary JPEG-to-public endpoint was rejected by automatic review, including after scoped screen-sharing approval, because it did not enforce cropping/redaction in code. It was not added. A future screen bridge must apply and verify cropping/redaction before publishing and must keep login, settings and unrelated private data out of the stream.
+
+## Reviewed Fomo frame preview
+
+A narrow read-only `/embed/fomo-frame.jpg` route now supports one exact reviewed JPEG at `data_dir/embed/fomo-reviewed-frame.jpg`, enabled only when its SHA-256 matches `SUB01_FOMO_FRAME_SHA256`. New/arbitrary screenshots are never exposed automatically. The frame is bounded to 4 MiB and 1080p and verified as JPEG; missing, invalid or changed files fail closed. The player labels it as a captured preview, not a live screen stream. Browser login has been observed in Chrome on the dedicated account, now renamed SUBZERONE01. The owner additionally authorized public nickname and balance display; cookies/security dialogs remain private. The actual frame and cookie files are not committed. A continuing live browser bridge is still required.
