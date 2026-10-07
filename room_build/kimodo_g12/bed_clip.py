@@ -92,8 +92,11 @@ v5 = json.load(open(v5_p)); rename(v5); vn = [n['name'] for n in v5['nodes']]
 J, ibm, V, JI, WW = skin_setup(v5, 3); Jn = np.array([ix.get(vn[j], 0) for j in J])
 dom = np.array([vn[J[j]] for j in JI[np.arange(len(JI)), WW.argmax(1)]])
 BODY = dom != 'slides'
+MAT = np.concatenate([[m.get('mat', '')] * len(range(0, len(m['pos']) // 3, 3)) for m in v5['mesh']])   # (skin_setup takes every 3rd vertex)
 BACK = np.isin(dom, ['Hip', 'Pelvis', 'Waist', 'Spine01', 'Spine02', 'L_Clavicle', 'R_Clavicle'])
 HEAD = np.isin(dom, ['Head'])
+# (his head itself, for his hands: the hood is weighted to the Head bone too)
+FACE = HEAD & ((MAT == 'owner_head') if (MAT == 'owner_head').any() else True)
 TORSO = np.isin(dom, ['Hip', 'Waist', 'Spine01', 'Spine02'])
 # (the hands and the wrist half of the forearms: by the elbow the sleeve lies against the hoodie's loose flank, cloth on cloth)
 FORE = np.array([bool(n.startswith(('L_ForearmTwist02', 'R_ForearmTwist02', 'L_Hand', 'R_Hand', 'finger', 'metacarpal'))) for n in dom])
@@ -269,7 +272,7 @@ def head_in(X, P2, side):
     """his hand in his head: for each hand / wrist vertex near his head's skin (within 4 cm), how far it is inside the
     surface there - nearer the head's centre than the nearest head-skin point, measured along the line from the centre
     (a polar map round the bone reads the ears as the head's surface and missed a hand pressed to his face)"""
-    H = X[HEAD]; c = H.mean(0); tree = cKDTree(H); k = FORE & (SIDEOF == side); Pk = X[k]
+    H = X[FACE]; c = H.mean(0); tree = cKDTree(H); k = FORE & (SIDEOF == side); Pk = X[k]
     d, j = tree.query(Pk, distance_upper_bound=0.04); ok = np.isfinite(d)
     if not ok.any(): return 0.0
     u = Pk[ok] - c; r = np.linalg.norm(u, axis=1); u /= r[:, None]

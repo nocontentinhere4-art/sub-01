@@ -101,12 +101,15 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
     L.QUILT = L.awake ? 0.014 : 0;                                    // (awake: on the folded quilt pressed flat, the page's quiltTop)
     L.rc = rc; L.DN = DN; L.UP = UPv;
     // per vertex: what it is (by its main bone)
+    // (his head is the "owner_head" material; the hood - the hoodie's, and the hood lining - is weighted to the Head bone too,
+    // and a hand against the hood read as a hand in his head)
     L.kind = parts.map(sm => { const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, n = sm.geometry.attributes.position.count, r = new Array(n);
+      const headMat = !sm.material || !parts.some(o => o.material && o.material.name === "owner_head") || sm.material.name === "owner_head";
       for (let i = 0; i < n; i++) { let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); }
         const nm = sm.skeleton.bones[bb].name;
         // (as kimodo_g12/bed_clip.py: "back" his torso, "shoulder" the clavicles and the pelvis, both lie on the bed; "fore" his
         // hands and the wrist half of his forearms - by the elbow his sleeve lies on the hoodie's loose flank, cloth on cloth)
-        r[i] = /^(Hips|Spine|Spine0[12])$/.test(nm) ? "back" : /Shoulder$|^Pelvis$/.test(nm) ? "shoulder" : /^(Head|head_end)$/.test(nm) ? "head" : /ForearmTwist02|Hand$|finger|metacarpal|thumb/i.test(nm) ? "fore"
+        r[i] = /^(Hips|Spine|Spine0[12])$/.test(nm) ? "back" : /Shoulder$|^Pelvis$/.test(nm) ? "shoulder" : /^(Head|head_end)$/.test(nm) ? (headMat ? "head" : "hood") : /ForearmTwist02|Hand$|finger|metacarpal|thumb/i.test(nm) ? "fore"
           : /UpLeg|ThighTwist/.test(nm) ? (/^(Left|L_)/.test(nm) ? "thighL" : "thighR") : /Foot|Toe/.test(nm) ? "foot" : "other"; } return r; });
     L.segs = {torso: ["Hips", "neck", "back"], thighL: ["LeftUpLeg", "LeftLeg", "thighL"], thighR: ["RightUpLeg", "RightLeg", "thighR"], head: ["Head", "head_end", "head"]};
     L.back = {}; L.head = {min: 9, max: -9}; L.feet = {maxX: -9}; L.self = {framesIn: 0, maxVerts: 0, maxDepth_cm: 0, by: {}};

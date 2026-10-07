@@ -17,7 +17,7 @@ for (const n of nodes) { const sk = n.getSkin(), m = n.getMesh(); if (!sk || !m 
   const js = sk.listJoints(), IB = sk.getInverseBindMatrices().getArray(), local = js.map((j, k) => {
     J.push(ix.get(j)); ibm.push(...IB.slice(16 * k, 16 * k + 16)); return J.length - 1; });
   for (const p of m.listPrimitives()) { const P = p.getAttribute('POSITION'), JA = Array.from(p.getAttribute('JOINTS_0').getArray());
-    out.mesh.push({part: n.getName(), pos: Array.from(P.getArray()), j: JA.map(k => local[k]), w: Array.from(p.getAttribute('WEIGHTS_0').getArray()), norm: P.getNormalized ? P.getNormalized() : false}); }
+    out.mesh.push({part: n.getName(), mat: p.getMaterial() ? p.getMaterial().getName() : '', pos: Array.from(P.getArray()), j: JA.map(k => local[k]), w: Array.from(p.getAttribute('WEIGHTS_0').getArray()), norm: P.getNormalized ? P.getNormalized() : false}); }
   out.parts.push(n.getName()); }
 out.skin = {joints: J, ibm};
 fs.writeFileSync(args[1], JSON.stringify(out));
