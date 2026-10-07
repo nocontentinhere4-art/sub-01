@@ -19,6 +19,16 @@ pod, no Tripo credits used. Method and pipeline: `README.md`, last section.
   actions so `setMode` takes main's branch, `link()` returns at once, the seat loop skips them.
   `desk_14_1280` (11 vertices) shows up only after the hands-reach merge. I have not root-caused it yet (G14's desk
   hands, or noise in the sampled frame).
+- **Switch test** `tests/visual/test_char_switch.py` (C's request). It works in the page, with no screenshot diff:
+  - Default `room.html`: it fetches `room/char_v5.glb` and `room/mh_v5/*`, never `room/char_mixamo.glb`/`.js` or
+    `room/mh_mx/*`. The skinned skeleton has v5's 79 joints with its 32 twist/metacarpal bones and none of Mixamo's
+    end bones.
+  - `?char=mixamo`: it fetches `char_mixamo.glb`/`.js` and `mh_mx/*`, never `char_v5.glb` or `mh_v5/*`. The skeleton has
+    65 joints (all `mixamorig:` in the GLB) with the 13 Mixamo end bones and none of v5's.
+  - Both page loaders rename bones to the page's names, so the test tells the skeletons apart by size and signature
+    bones, not by name.
+  - Result: 2 passed. With `CHAR_MX` inverted locally (`!==`), both fail.
+  - It is a commit on top of the merge, not inside it: 2973f0b was already pushed when the request reached me.
 - So **hard_failures is not [] on 2973f0b**, and it is not [] on main either.
 - 18:57 UTC: **`origin/preview/hands-reach` 2198d69 alone passes test_visual (hard_failures [])**. Its base is 402e21f.
   Between 402e21f and main 7f2bf6e, main only changed `web/room.html` (+41/−13) and tests/visual. That is b3b14cd
