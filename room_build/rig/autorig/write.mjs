@@ -1,6 +1,6 @@
 // node rig/autorig/write.mjs <in.glb> <fit dir> <out.glb>
-// fit.py's result written over the character's own file: the same meshes, materials and textures, with the T-posed
-// positions and normals, the Mixamo Standard Skeleton (65 bones, "mixamorig:*", Mixamo's hierarchy and T-pose rest)
+// fit.py's result written over the character's own file: the same meshes, materials and textures, with the positions
+// and normals as modelled (the bind pose; fit.py's bindmap per bone; AUTORIG_BIND=tpose: T-posed), the Mixamo Standard Skeleton (65 bones, "mixamorig:*", Mixamo's hierarchy and T-pose rest)
 // and the new weights. The skeleton hangs under one node scaled 0.01 and its numbers are centimetres, as Mixamo's FBX
 // is (mixamo_glb.mjs's convention), so a clip's hips translation means the same on both. The meshes sit at the scene's
 // root in metres (feet on y = 0, facing +z, 1.78 m with the slides). Meshopt-compressed like v5, but the positions stay
@@ -59,11 +59,15 @@ for (const b of B) {
 const skin = doc.createSkin("mixamorig").setSkeleton(nodes[B[0].name]);
 const ibm = new Float32Array(16 * B.length);
 B.forEach((b, i) => {
+  // (bound as modelled: the T-pose placement's inverse after the bone's rigid map from the modelled mesh, fit.py's bindmap)
   const m = new THREE.Matrix4().compose(new THREE.Vector3(...b.p), new THREE.Quaternion(...b.q), new THREE.Vector3(1, 1, 1).multiplyScalar(0.01)).invert();
+  if (b.bindmap) m.multiply(new THREE.Matrix4().fromArray(b.bindmap));
   ibm.set(m.elements, 16 * i); skin.addJoint(nodes[b.name]);
 });
 skin.setInverseBindMatrices(doc.createAccessor().setType("MAT4").setArray(ibm).setBuffer(buf));
 for (const n of meshNodes) n.setSkin(skin);
+// (provenance: the source's bind space -> these meshes' space, column-major; kimodo/mx_convert.mjs reads it)
+scene.setExtras({...scene.getExtras(), autorig: {fromSourceBind: S.report.from_source_bind}});
 await doc.transform(prune({keepLeaves: true}), reorder({encoder: MeshoptEncoder, target: "size"}),
   quantize({pattern: /^(NORMAL|TEXCOORD_\d+|JOINTS_\d+|WEIGHTS_\d+)$/}));      // (meshopt() itself would quantize POSITION too)
 doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({method: EXTMeshoptCompression.EncoderMethod.QUANTIZE});

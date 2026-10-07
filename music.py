@@ -35,6 +35,14 @@ from chat import blocked, networks_for
 from sleep import local
 from state_io import append_jsonl, load_json, read_jsonl, save_json
 
+try:                                    # one rule for song and video titles (browse.media_title_ok, review G24 F5/F12)
+    from browse import media_title_ok
+except Exception as e:                  # never on a normal deployment; without the guard no track is shown (fail closed)
+    print(f"music: browse.media_title_ok unavailable ({type(e).__name__}); API tracks are not shown", flush=True)
+
+    def media_title_ok(text):
+        return False
+
 HERE = Path(__file__).parent
 CURATED = HERE / "music_curated.json"
 ID = re.compile(r"[A-Za-z0-9]{22}")
@@ -185,7 +193,7 @@ class SpotifyAPI:
 
 def track_from_api(x):
     """A Web API track object -> our track dict (metadata only; preview_url is never read), or None."""
-    if not isinstance(x, dict) or not valid_id(x.get("id")) or x.get("explicit") or x.get("is_playable") is False:
+    if not isinstance(x, dict) or not valid_id(x.get("id")) or x.get("is_playable") is False:
         return None
     title = " ".join(str(x.get("name") or "").split())[:120]
     artist = ", ".join(" ".join(str(a.get("name") or "").split()) for a in (x.get("artists") or [])[:3]
@@ -193,7 +201,7 @@ def track_from_api(x):
     album = x.get("album") if isinstance(x.get("album"), dict) else {}
     imgs = [i for i in album.get("images") or [] if isinstance(i, dict) and str(i.get("url", "")).startswith("https://")]
     art = min(imgs, key=lambda i: abs((i.get("width") or 300) - 300))["url"] if imgs else None
-    if not title or blocked(title) or blocked(artist):
+    if not title or not media_title_ok(title) or not media_title_ok(artist):   # explicit lyrics allowed (owner)
         return None
     return {"id": x["id"], "title": title, "artist": artist, "album": " ".join(str(album.get("name") or "").split())[:120],
             "art": art, "ms": int(x.get("duration_ms") or 0)}

@@ -21,7 +21,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x666655, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(1.5, 3, 2.5); scene.add(sun);
 const grid = new THREE.GridHelper(4, 40, 0x888888, 0xbbbbbb); scene.add(grid);
 const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 50);
-let body, conv, mixer, clips = {}, meshes = [], act = null, wire = null;
+let body, conv, mixer, clips = {}, meshes = [], act = null, wire = null, REST = [];
 
 window.QA = {
   async load(charUrl, clipUrls) {
@@ -30,13 +30,13 @@ window.QA = {
     mixer = new THREE.AnimationMixer(body);
     for (const [k, u] of Object.entries(clipUrls)) { const c = await load(u);
       clips[k] = CM.fixClip(THREE, c.animations[0], conv, CM.clipHipHeight(THREE, c)); }
-    const bones = meshes[0].skeleton.bones;
+    const bones = meshes[0].skeleton.bones; REST = bones.map(b => [b, b.position.clone(), b.quaternion.clone()]);
     return {bones: bones.length, names: bones.map(b => b.name), hipH: conv.hipH, clips: Object.fromEntries(Object.entries(clips).map(([k, c]) => [k, c.duration]))};
   },
   pose(k, t) {                                                // k null: the rest (T) pose
     mixer.stopAllAction(); if (act) act = null;
     if (k) { act = mixer.clipAction(clips[k]); act.play(); mixer.setTime(t); }
-    else meshes[0].skeleton.pose();
+    else for (const [b, p, q] of REST) { b.position.copy(p); b.quaternion.copy(q); }   // (the nodes' rest: Mixamo's T-pose, not the bind)
     body.updateMatrixWorld(true);
   },
   shot(view, w = 360, h = 480) {
@@ -102,7 +102,7 @@ window.QA = {
       const s0 = skinned(); out[key] = {}; for (const [nm, A, B] of PAIRS) { const r = inside(s0, reg.sets[A], reg.sets[B]); out[key][nm] = {verts: r.n, depth_cm: +(r.d * 100).toFixed(1)}; } }
     const N = Math.round(clips[k].duration / dt) + 1;
     for (let f = 0; f < N; f++) { const t = Math.min(f * dt, clips[k].duration - 1e-4); QA.pose(k, t); const s = skinned(); out.frames++;
-      for (const [nm, A, B] of PAIRS) { const L = [], r = inside(s, reg.sets[A], reg.sets[B], L);
+      for (const [nm, A, B] of PAIRS) { const r = inside(s, reg.sets[A], reg.sets[B], true), L = r.list;
         const o = out.inside[nm] || (out.inside[nm] = {frames: 0, maxDepth_cm: 0, maxVerts: 0, worstT: null});
         if (r.n) { o.frames++; if (r.n > o.maxVerts) { o.maxVerts = r.n; o.worstT = +t.toFixed(2); } o.maxDepth_cm = Math.max(o.maxDepth_cm, +(r.d * 100).toFixed(1)); }
         // an arm in the torso: the fold at the armpit (within 15 cm of the shoulder joint, the rig's weights) apart from
@@ -125,6 +125,12 @@ window.QA = {
       mixer.update(1 / 30); }
     mixer.stopAllAction(); return out;
   },
+  // the vertices of pair nm inside at (k, t): [index, depth m, the other part's nearest vertex], for diagnosis
+  insideList(k, t, nm) { QA.pose(k, t); const reg = regions(), s = skinned(), pr = PAIRS.find(p => p[0] === nm), {offs} = cat(), names = meshes[0].skeleton.bones.map(b => b.name);
+    const info = i => { let m = meshes.length - 1; while (offs[m] > i) m--; const g = meshes[m].geometry, j = i - offs[m], A = g.attributes;
+      return {p: [A.position.getX(j), A.position.getY(j), A.position.getZ(j)].map(x => +x.toFixed(3)), at: [0, 1, 2].map(c => +s.pos[3 * i + c].toFixed(3)),
+        w: [0, 1, 2, 3].filter(c => A.skinWeight.getComponent(j, c) > 0).map(c => names[A.skinIndex.getComponent(j, c)] + ":" + A.skinWeight.getComponent(j, c).toFixed(2)).join(" ")}; };
+    return inside(s, reg.sets[pr[1]], reg.sets[pr[2]], true).list.map(([i, d, b]) => [i, d, b, info(i), info(b)]); },
   // world rotation and position of every bone, for the comparison against the FBX's own skeleton
   bones() { const o = {}; for (const b of meshes[0].skeleton.bones) { o[b.name] = [...b.getWorldPosition(new THREE.Vector3()).toArray(), ...b.getWorldQuaternion(new THREE.Quaternion()).toArray()]; } return o; },
 };
@@ -139,7 +145,7 @@ function cat() {
 function skinned(rest) {
   const {n, offs} = cat(), pos = new Float32Array(3 * n), nrm = new Float32Array(3 * n), v = new THREE.Vector3(), m4 = new THREE.Matrix4(), acc = new THREE.Matrix4();
   meshes.forEach((m, k) => { const g = m.geometry, P = g.attributes.position, N = g.attributes.normal, J = g.attributes.skinIndex, W = g.attributes.skinWeight;
-    if (rest) { m.skeleton.pose(); body.updateMatrixWorld(true); }
+    if (rest) { m.skeleton.pose(); body.updateMatrixWorld(true); }   // (the bind: the mesh as modelled, the stretch's reference)
     m.skeleton.update(); const BM = m.skeleton.boneMatrices, o = offs[k];
     const mw = m.matrixWorld.clone().multiply(m.bindMatrixInverse), bm = m.bindMatrix;
     for (let i = 0; i < P.count; i++) { const e = acc.elements; e.fill(0);
@@ -148,6 +154,7 @@ function skinned(rest) {
       m4.multiplyMatrices(mw, acc).multiply(bm);
       v.fromBufferAttribute(P, i).applyMatrix4(m4); pos.set([v.x, v.y, v.z], 3 * (o + i));
       v.fromBufferAttribute(N, i).transformDirection(m4); nrm.set([v.x, v.y, v.z], 3 * (o + i)); } });
+  if (rest) { for (const [b, p, q] of REST) { b.position.copy(p); b.quaternion.copy(q); } body.updateMatrixWorld(true); }   // (the bones back on their rest)
   return {pos, nrm};
 }
 // the unique edges of every mesh (indices into the concatenated list)
@@ -204,18 +211,18 @@ const PAIRS = [["hands in thighs", "handsAll", "thighs"], ["left arm in torso", 
   ["left leg in right leg", "legL", "legR"], ["left hand in right hand", "handL", "handR"]];
 // A's vertices inside B: B hashed in 1 cm cells; for each A vertex, B's nearest vertex within 2.5 cm; inside when it is
 // behind that vertex's normal by > 5 mm
-function inside(s, A, B, list) {
+function inside(s, A, B, wantList) {
   const H = new Map(), c = 0.025, key = (x, y, z) => `${Math.floor(x / c)},${Math.floor(y / c)},${Math.floor(z / c)}`;
   for (let k = 0; k < B.length; k += 2) { const i = B[k], kk = key(s.pos[3 * i], s.pos[3 * i + 1], s.pos[3 * i + 2]); (H.get(kk) || H.set(kk, []).get(kk)).push(i); }
-  let n = 0, d = 0;
+  let n = 0, d = 0; const list = [];
   for (let k = 0; k < A.length; k += 2) { const i = A[k], x = s.pos[3 * i], y = s.pos[3 * i + 1], z = s.pos[3 * i + 2];
     const gx = Math.floor(x / c), gy = Math.floor(y / c), gz = Math.floor(z / c); let best = -1, bd = c * c;
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let e = -1; e <= 1; e++) { const L = H.get(`${gx + a},${gy + b},${gz + e}`); if (!L) continue;
       for (const j of L) { const dd = (s.pos[3 * j] - x) ** 2 + (s.pos[3 * j + 1] - y) ** 2 + (s.pos[3 * j + 2] - z) ** 2; if (dd < bd) { bd = dd; best = j; } } }
     if (best < 0) continue;
     const dot = (x - s.pos[3 * best]) * s.nrm[3 * best] + (y - s.pos[3 * best + 1]) * s.nrm[3 * best + 1] + (z - s.pos[3 * best + 2]) * s.nrm[3 * best + 2];
-    if (dot < -0.005) { n++; d = Math.max(d, -dot); if (list) list.push([i, -dot]); } }
-  return {n, d};
+    if (dot < -0.005) { n++; d = Math.max(d, -dot); if (wantList) list.push([i, -dot, best]); } }
+  return {n, d, list};
 }
 window.QA_READY = true;
 </script></body></html>

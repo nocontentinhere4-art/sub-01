@@ -27,5 +27,11 @@ for (const node of root.listNodes()) { const m = node.getMesh(); if (!m || !node
     w(p.getIndices(), "idx", Uint32Array);
     prims.push({file: f, toBind, node: node.getName(), mesh: m.getName(), material: p.getMaterial()?.getName(), count: p.getAttribute("POSITION").getCount()});
   } }
-fs.writeFileSync(`${OUT}/rig.json`, JSON.stringify({joints: J, prims}));
+// the size the character is drawn at: its joints' spread in the world (through the armature's own scale) over their
+// spread in bind space (v5: 0.8508, 1.73 m in the page with the slides), so fit.py keeps it that size
+const wp = joints.map(j => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(j.getWorldMatrix())));
+const bp = J.map(j => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(j.bind)));
+const ratios = wp.slice(1).map((p, i) => [p.distanceTo(wp[0]), bp[i + 1].distanceTo(bp[0])]).filter(([, b]) => b > 1e-3).map(([a, b]) => a / b).sort((a, b) => a - b);
+const worldScale = ratios[ratios.length >> 1];
+fs.writeFileSync(`${OUT}/rig.json`, JSON.stringify({joints: J, prims, worldScale}));
 console.log(`${prims.length} primitives, ${J.length} joints -> ${OUT}`);

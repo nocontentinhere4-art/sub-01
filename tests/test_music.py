@@ -145,7 +145,9 @@ def test_api_search_uses_client_credentials_and_hides_the_keys(tmp_path, capsys)
     assert searches and all(h["Authorization"] == "Bearer TOKEN-abc" and "market=JP" in u for _, u, h, _ in searches)
     assert sum(1 for c_ in fake.calls if c_[1] == M.TOKEN_URL) == 1                # the token is reused
     api_ids = {x["id"] for x in c if x["source"] == "api"}
-    assert "1111111111111111111111" not in api_ids                                  # explicit tracks are dropped
+    explicit = next(i for i in SEARCH["tracks"]["items"] if i.get("explicit"))
+    assert explicit["id"] == "1111111111111111111111"
+    assert M.track_from_api(explicit)["title"] == "An Explicit Track"              # explicit lyrics allowed (owner)
     t = M.track_from_api(SEARCH["tracks"]["items"][0])
     assert t["art"].endswith("00001e0281052badd62d5e14c3377786") and t["artist"] == "Miki Matsubara"
     assert "preview" not in json.dumps(t)                                           # the preview URL is never kept

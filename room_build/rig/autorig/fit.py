@@ -21,10 +21,12 @@ from scipy.sparse import coo_matrix, diags
 from scipy.spatial import cKDTree
 
 EXT, REF, OUT = sys.argv[1:4]
-K = 0.875                                   # the bind space is 2.0 tall about its middle: 1.75 m (static.mjs)
-
 # ---------------------------------------------------------------------------------------------------------- inputs
 rig = json.load(open(f"{EXT}/rig.json"))
+# bind space -> metres: the size the character is drawn at (extract.mjs: through its armature's scale; v5 0.8508, 1.73 m
+# in the page with the slides, as on main). It was 0.875 here (1.75 m without the slides, static.mjs's), which made
+# the Mixamo character 1.78 m: 5 cm taller than the v5 the room's chair and desk fits were made for
+K = rig.get("worldScale") or 0.875
 JN = [j["name"] for j in rig["joints"]]; JI = {n: i for i, n in enumerate(JN)}
 JP = [j["parent"] for j in rig["joints"]]
 Rw = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]], float)      # -90 deg about y: +x (his front in v5) -> +z
@@ -298,6 +300,84 @@ adj[sp1, :] |= adj[sp, :] | adj[sp2, :]; adj[:, sp1] |= adj[:, sp] | adj[:, sp2]
 allow = (WT > 0.02).astype(float) @ adj.astype(float) > 0
 allow[:, list(END)] = False
 
+# a limb bone only within its own span along the limb, plus a margin at each joint: v5's own skin (Tripo's) gives the
+# armpit's sleeve 0.18 of the forearm and the chest a little of the thigh, and with the elbow bent 90 deg seated 0.18 of
+# the forearm carries the armpit 5-7 cm off (2.4 cm into the hoodie). Measured along the limb in the T-pose (straight)
+SPAN = {"elbow": 0.06, "wrist": 0.04, "knee": 0.07, "ankle": 0.05}
+for S in ("Left", "Right"):
+    for up, mid, low, k1, k2 in (("Arm", "ForeArm", "Hand", "elbow", "wrist"), ("UpLeg", "Leg", "Foot", "knee", "ankle")):
+        a, b, c = RI[mx(S + up)], RI[mx(S + mid)], RI[mx(S + low)]
+        sb = (Vt - BP[b]) @ unit(BP[b] - BP[a]); sc = (Vt - BP[c]) @ unit(BP[c] - BP[b])
+        allow[sb < -SPAN[k1], b] = False; allow[sb > SPAN[k1], a] = False         # (the middle bone: from the joint above it on)
+        low_ids = [RI[n] for n in RN if n.startswith(mx(S + low))]                # (the hand and its fingers, the foot and its toes)
+        for j in low_ids: allow[sc < -SPAN[k2], j] = False
+        allow[sc > SPAN[k2], b] = False
+# the sleeve and the hoodie's side as two parts (by the old skin's main joint): away from the shoulder joint the sleeve
+# takes nothing of the spine and the hoodie nothing of the arm. v5's skin blends them 0.2-0.3 each way down the armpit,
+# so with the arm swung 20 deg forward (Seated_Idle) the blend sheared the sleeve 2.4 cm into the hoodie. Within PIT of
+# the shoulder joint (T-pose) both keep everything: the shoulder still rounds over. (Measured against ramps over 6-22 cm
+# under the joint: each was worse at the armpit, the back of the shoulder or both.) The price, with linear blending:
+# raised high (the T-pose), the arm leaves the back of the armpit behind, a web (the report's tpose_dev: 10,010
+# vertices over 5 cm off v5's own T-pose, up to 19.5 cm); with no cut (PIT 9) that is 29 vertices, but seated the
+# sleeves go 2.3 cm into the hoodie again. An arm-raise corrective shape would take both; not made yet.
+PIT = float(__import__("os").environ.get("AUTORIG_PIT", "0.07"))
+SHCUT = float(__import__("os").environ.get("AUTORIG_SHCUT", "0.06"))
+TORSO = [RI[mx(n)] for n in ("Hips", "Spine", "Spine1", "Spine2", "Neck", "Head")]
+is_torso = np.isin(dom, [JI[n] for n in ("Hip", "Pelvis", "Waist", "Spine01", "Spine02", "NeckTwist01", "NeckTwist02") if n in JI])
+# (and the hoodie's hem: v5's skin gives its sides to the thigh, 0.5, so it counted as neither part and kept 0.1 of the
+# upper arm: raised, the arm pulled the hem's sides up 5-7 cm, "horns". Skin over the hip joints by 4 cm whose main
+# joint is a thigh is the hoodie's)
+_thighs = [JI[n] for n in JN if n.startswith(("L_Thigh", "R_Thigh"))]
+is_torso |= np.isin(dom, _thighs) & (V[:, 1] > max(J[JI["L_Thigh"], 1], J[JI["R_Thigh"], 1]) + 0.04)
+# (the arm part is skin round the arm itself: within SLEEVE of its bind axis (shoulder -> elbow -> wrist, as modelled),
+# not before the shoulder joint, and not across from it toward the middle. v5's skin gives the upper arm 0.9 of patches of the hoodie's back and chest inside the
+# shoulder (x 0.15 against the joint's 0.20); those are the hoodie's)
+SLEEVE = float(__import__("os").environ.get("AUTORIG_SLEEVE", "0.13"))
+
+
+def round_limb(s, pts):                                         # the vertices within SLEEVE of the polyline pts (bind), past its start
+    near = np.zeros(nv, bool)
+    for a, b in zip(pts[:-1], pts[1:]):
+        ab = b - a; L2 = ab @ ab; t = (V - a) @ ab / L2; c = a + np.clip(t, 0, 1)[:, None] * ab
+        near |= (np.linalg.norm(V - c, axis=1) < SLEEVE) & (t > -0.02 / np.sqrt(L2))
+    return near
+
+
+for s, S in (("L", "Left"), ("R", "Right")):
+    armJ = [JI[n] for n in JN if n.startswith((f"{s}_Upperarm", f"{s}_Forearm", f"{s}_Hand")) or (n.endswith("." + s) and n.startswith(("finger", "metacarpal")))]
+    arm_new = [RI[n] for n in RN if n.startswith((mx(S + "Arm"), mx(S + "ForeArm"), mx(S + "Hand")))]
+    far = np.linalg.norm(Vt - BP[RI[mx(S + "Arm")]], axis=1) > PIT
+    on_arm = round_limb(s, [J[JI[f"{s}_Upperarm"]], J[JI[f"{s}_Forearm"]], J[JI[f"{s}_Hand"]], J[JI[f"finger3-1.{s}"]]])
+    # (and not inside the shoulder joint across the body by more than 2.5 cm: the front of the chest by the armpit is
+    # within 13 cm of the axis too, the joint being forward of the sleeve, and with 1.0 of the arm it went 2.4 cm into
+    # the chest typing)
+    side = 1 if s == "L" else -1
+    on_arm &= side * V[:, 0] > side * J[JI[f"{s}_Upperarm"]][0] - 0.025
+    is_arm = np.isin(dom, armJ) & on_arm
+    is_torso = is_torso | (np.isin(dom, armJ) & ~on_arm)
+    for j in arm_new: allow[is_torso & far, j] = False
+    for j in TORSO: allow[is_arm & far, j] = False
+    # the sleeve takes the clavicle only over the shoulder: v5's skin and the distance term put 0.3-0.45 of it on the
+    # sleeve at the armpit, 30 cm under its joint, where the clip's shoulder roll (seated, the shoulders forward) carried
+    # the sleeve 4-10 cm through the hoodie (the hoodie's side keeps it: cut there too, the hoodie went 2.5 cm into the
+    # sleeve instead)
+    allow[is_arm & (Vt[:, 1] < BP[RI[mx(S + "Arm")], 1] - SHCUT), RI[mx(S + "Shoulder")]] = False
+# a side's bones only on its own side (and across the middle by 4 cm): the distance term and the smoothing put up to 0.1
+# of the right clavicle on the left sleeve's back
+for i, n in enumerate(RN):
+    if n.startswith(mx("Left")): allow[Vt[:, 0] < -0.04, i] = False
+    if n.startswith(mx("Right")): allow[Vt[:, 0] > 0.04, i] = False
+# the legs only below the hips: v5's skin puts up to 0.2 of the thigh on the chest at the armpit (1.1 m up), and seated
+# (the thigh turned 90 deg) that drags the hoodie's side into the sleeve
+HIPCUT = float(__import__("os").environ.get("AUTORIG_HIPCUT", "0.10"))
+for S in ("Left", "Right"):
+    above = Vt[:, 1] > BP[RI[mx(S + "UpLeg")], 1] + HIPCUT
+    for n in RN:
+        if n.startswith((mx(S + "UpLeg"), mx(S + "Leg"), mx(S + "Foot"), mx(S + "ToeBase"), mx(S + "Toe"))): allow[above, RI[n]] = False
+allow[:, list(END)] = False
+lost = ~allow.any(1)                                            # (a vertex left with no bone keeps its old ones)
+allow[lost] = WT[lost] > 0.02
+
 # distance to each segment
 d2 = np.empty((nv, NB))
 for i in range(NB):
@@ -324,19 +404,51 @@ from scipy.sparse.csgraph import connected_components
 cp = cKDTree(Vt).query_pairs(2e-4, output_type="ndarray")
 ng, lab = connected_components(coo_matrix((np.ones(len(cp)), (cp[:, 0], cp[:, 1])), shape=(nv, nv)), directed=False)
 G = np.zeros((ng, NB)); np.add.at(G, lab, W); W = G[lab] / np.bincount(lab, minlength=ng)[lab, None]
+# the bind pose: the mesh as modelled (arms down), not the T-pose. Each Mixamo bone's bind is its T-pose placement taken
+# back through the rigid T-posing map of the old joint it stands for (map_j: v -> D_j (v - J_j) + Pp_j), so a rigid part
+# poses exactly as before, but a vertex shared by two bones is no longer T-posed by the blend of their maps first: with
+# a T-posed bind, bringing the arms back down did not undo the T-posing at the armpit (linear blending is not
+# invertible where the two maps differ), and the sleeve's top went 2.4 cm into the hoodie. Bound as modelled, a pose
+# near the modelled one gives back the modelled mesh. AUTORIG_BIND=tpose: the old T-posed bind.
+BIND_T = __import__("os").environ.get("AUTORIG_BIND") == "tpose"
+NEW2OLD = {"Hips": "Hip", "Spine": "Spine01", "Spine1": "Spine01", "Spine2": "Spine02", "Neck": "NeckTwist01", "Head": "Head"}
+for s, S in (("L", "Left"), ("R", "Right")):
+    NEW2OLD.update({f"{S}Shoulder": f"{s}_Clavicle", f"{S}Arm": f"{s}_Upperarm", f"{S}ForeArm": f"{s}_Forearm", f"{S}Hand": f"{s}_Hand",
+                    f"{S}UpLeg": f"{s}_Thigh", f"{S}Leg": f"{s}_Calf", f"{S}Foot": f"{s}_Foot", f"{S}ToeBase": f"{s}_ToeBase"})
+    for f, F_ in ((1, "Thumb"), (2, "Index"), (3, "Middle"), (4, "Ring"), (5, "Pinky")):
+        for k in (1, 2, 3): NEW2OLD[f"{S}Hand{F_}{k}"] = f"finger{f}-{k}.{s}"
+BMAP = []                                                       # per Mixamo bone: map_j as a 4x4 (work space, metres)
+for i in range(NB):
+    b = i
+    while RN[b][10:] not in NEW2OLD: b = par[b]                 # (an end bone: its parent's)
+    j = JI[NEW2OLD[RN[b][10:]]]; m = np.eye(4); m[:3, :3] = D[j]; m[:3, 3] = Pp[j] - D[j] @ J[j]
+    BMAP.append(np.eye(4) if BIND_T else m)
+# (V is the bind mesh as extracted, feet on y = 0; Pp carries the T-pose's lift, so map_j already lands on the lifted Vt)
+Vb = V; Nb = NV / (np.linalg.norm(NV, axis=1, keepdims=True) + 1e-12)
+
 # 4 per vertex
 top = np.argsort(-W, axis=1)[:, :4]; tw = np.take_along_axis(W, top, 1)
 tw[tw < 0.01] = 0; tw /= tw.sum(1, keepdims=True)
 
+# how far the new skin's T-pose is from the T-pose v5's own skin made (step 1, which G20's sheet shows whole): where the
+# arm and the hoodie part company, a web of skin left behind shows as vertices centimetres off it
+_tp = np.zeros_like(Vt)
+for c in range(4): _tp += tw[:, c:c + 1] * (np.einsum("nab,nb->na", np.stack(BMAP)[top[:, c], :3, :3], V) + np.stack(BMAP)[top[:, c], :3, 3])
+_dv = np.linalg.norm(_tp - Vt, axis=1); TPOSE_DEV = [round(float(np.percentile(_dv, 99)) * 100, 1), round(float(_dv.max()) * 100, 1), int((_dv > 0.05).sum())]
 # ---------------------------------------------------------------------------------------------------- out
 np.savez(f"{OUT}/mesh.npz", pos=Vt.astype(np.float32), nrm=Nt.astype(np.float32), jnt=top.astype(np.uint16),
          wgt=tw.astype(np.float32), off=off, Vbind=V.astype(np.float32))
-for nm, a in (("pos", Vt.astype(np.float32)), ("nrm", Nt.astype(np.float32)), ("jnt", top.astype(np.uint16)), ("wgt", tw.astype(np.float32))):
+PB, NB_ = (Vt, Nt) if BIND_T else (Vb, Nb)
+for nm, a in (("pos", PB.astype(np.float32)), ("nrm", NB_.astype(np.float32)), ("jnt", top.astype(np.uint16)), ("wgt", tw.astype(np.float32))):
     a.tofile(f"{OUT}/{nm}.bin")                                 # (raw, for write.mjs; primitives in extract's order, counts in skel.json)
-skel = [{"name": RN[i], "parent": RN[par[i]] if par[i] >= 0 else None, "p": BP[i].tolist(), "q": RQ[i].tolist()} for i in range(NB)]
+skel = [{"name": RN[i], "parent": RN[par[i]] if par[i] >= 0 else None, "p": BP[i].tolist(), "q": RQ[i].tolist(),
+         "bindmap": BMAP[i].T.ravel().tolist()} for i in range(NB)]
 rep = {"finger_centring_mm": SHIFT, "twist_deg": {s: round(float(np.degrees(TWIST[s])), 1) for s in TWIST},
        "height_m": round(float(Vt[:, 1].max()), 3), "hips_m": round(float(BP[RI[mx("Hips")], 1]), 3),
-       "alpha": ALPHA, "verts": int(nv), "bones": NB,
+       "alpha": ALPHA, "verts": int(nv), "bones": NB, "tpose_dev_cm_p99_max_n5cm": TPOSE_DEV,
+       # (the source's bind space (its first primitive's) -> this file's mesh space: kimodo/mx_convert.mjs carries the
+       # source's clips over with it)
+       "from_source_bind": (np.array([[*(K * Rw[0]), 0], [*(K * Rw[1]), -floor], [*(K * Rw[2]), 0], [0, 0, 0, 1]]).T.ravel()).tolist(),
        "direction_err_deg": {}}
 # how far each bone's rest direction is from Mixamo's (the clips assume Mixamo's)
 for i in range(NB):
@@ -346,4 +458,5 @@ for i in range(NB):
         rep["direction_err_deg"][RN[i][10:]] = round(float(np.degrees(np.arccos(np.clip(unit(a) @ unit(b), -1, 1)))), 1)
 json.dump({"bones": skel, "counts": cnt, "report": rep}, open(f"{OUT}/skel.json", "w"), indent=1)
 big = {k: v for k, v in rep["direction_err_deg"].items() if v > 8}
+print("T-pose vs v5's own skin (cm p99, max, verts > 5 cm):", TPOSE_DEV)
 print(json.dumps({k: rep[k] for k in ("finger_centring_mm", "twist_deg", "height_m", "hips_m", "verts", "bones")}), "direction >10deg:", big)
