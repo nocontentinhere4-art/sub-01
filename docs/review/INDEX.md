@@ -10,7 +10,7 @@ One line per branch: verdict, reviewed commit, time (UTC). Details in `<branch>.
 | preview/char-fix-feet (G19) | **OK** (2 fixes advised) | 8e65af7 | 2026-10-07 13:45 | big step up from main; in bed a dark seam line across each sock (medium), grey nick on left big toe (low); seated hover 5–14 cm is main's, not this branch's |
 | preview/char-fix (G10d) | **NOT OK** | 92003d6 | 2026-10-07 14:45 | collar closed, big step up from main; but no socks/slides (G19's feet.mjs not run), ragged throat edge with a black sliver + pinhole of light, the front fill reads as a flat patch |
 | preview/mixamo-wiring (G21) | **OK** | 94c2554 | 2026-10-07 19:25 | char_mixamo from main's char_v5 (collar, socks); `?char=mixamo` desk soles 0.2/0.7 cm, hand on the mouse, hem horns gone; default page pixel-equal to main 7f2bf6e (under main's harness) |
-| preview/bed-clips (G17) | **NOT OK** | 41842ca (WIP) | 2026-10-07 22:58 | 41842ca: headphone cups still at the jaw, not on the ears (widening didn't lift them); from 48cb1bb: hand-in-head fixed, duvet tent unchanged (high), its contact_pass crashed headless |
+| preview/bed-clips (G17) | **NOT OK** | 41842ca (WIP) | 2026-10-07 22:48 | 41842ca: headphone cups still at the jaw, not on the ears (widening didn't lift them); from 48cb1bb: hand-in-head fixed, duvet tent unchanged (high), its contact_pass crashed headless |
 | preview/standing-clips (G22) | **OK** | 4202e97 | 2026-10-07 20:15 | re-baked on G21's char_mixamo (main's char_v5); texting in front of his chest with both hands; soles 0.4 cm every frame; default page pixel-equal to main; low: Gaming's left fingers open |
 
 ## Integration (C to decide)
@@ -24,5 +24,5 @@ fc96f54). One chain, scripts not binaries: collar → `feet.mjs` → `bed_rebake
 - Seated at the desk both soles 5–14 cm over the floor (char-fix-feet.md, defect 3).
 
 
-## G26 status, 23:00 UTC
-Reviewer stopped at 23:00 UTC as instructed. OK: mixamo-wiring 94c2554, standing-clips 4202e97, phone-camera 86cae2c. NOT OK: char-fix-feet2 6880ee3 (hood-base zig-zag, nape), bed-clips 41842ca (duvet, headphones). Tools: `tools/shoot2.py`, `phonecam.py`, `bedprobe.py`, `turnhand.py`.
+## G26 status, 22:50 UTC
+Last round 22:48 UTC; the loop runs to 23:00 UTC. OK: mixamo-wiring 94c2554, standing-clips 4202e97, phone-camera 86cae2c. NOT OK: char-fix-feet2 6880ee3 (hood-base zig-zag, nape), bed-clips 41842ca (duvet, headphones). Tools: `tools/shoot2.py`, `phonecam.py`, `bedprobe.py`, `turnhand.py`.

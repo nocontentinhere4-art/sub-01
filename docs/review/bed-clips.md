@@ -4,12 +4,12 @@
 - Scope: Laying_Nodding with the headphones (music), Laying_Sleeping, the side turn, `capBed`, wired into the default
   page (`boy_mh.js`, `room.html`): this changes the default page by design.
 
-## Round 4 (41842ca, WIP, 2026-10-07 22:45 UTC), quick check 22:58 UTC by G26: NOT OK (headphones only checked)
+## Round 4 (41842ca, WIP, 2026-10-07 22:45 UTC), quick check 22:48 UTC by G26: NOT OK (headphones only checked)
 ![headphones](img/bed-clips_7_headphones_41842ca.jpg)
 Top 48cb1bb, bottom 41842ca: listening, from above, left and right. The cups widened by 0.8 cm look the same: both still
 sit at the angle of the jaw, under and behind the ear, not over it. Widening doesn't move them up. The cups' centre must
 go to the ear's centre (about 3–4 cm up toward the crown and 1–2 cm forward, from these shots). The buttocks, hands-mid-roll
-and duvet items were not re-checked this round (out of time at 23:00).
+and duvet items were not re-checked this round (the loop ends at 23:00).
 
 ---
 
