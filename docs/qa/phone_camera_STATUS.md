@@ -95,3 +95,20 @@ the 360 / 430 phone sizes, both kept out of the shot sets). char_v5.glb and the 
   1.0 with the head always in; out of bed on the way 0.884 / 0.889 / 0.852; desk head in every frame; 1280 as main).
 - Full suite on `d9bbf3a`: **1471 passed, 27 skipped, 8 warnings in 2176 s; pytest exit 0**; `results.json`
   `hard_failures == []`.
+
+## Milestone 5 — main moved again (7f2bf6e): merged, tests trimmed for CI (`5628d3f`)
+- Merged origin/main 7f2bf6e cleanly (CI: the visual job split into "scenes" and "pages", 30 min each; the harness
+  freezes the page from its first script; tests/visual/conftest.py).
+- My tests are in the "pages" part: trimmed so it stays well inside its 30 min. `test_phone_camera.py` measures the three
+  phones only in pytest (1280 is recorded by hand: `python -m tests.visual.test_phone_camera 1280`); the live load test
+  2 loads instead of 4 (the forced stale-hips case pins the defect). The "pages" part here: 12 passed in 13 min 12 s.
+- Full suite on `5628d3f`: **2 failed, 1469 passed, 27 skipped (31 min); pytest exit 1**; `hard_failures`:
+  `walking_8_1280: desk penetration 100 sampled vertices`, `eating_19_1280: desk penetration 53 sampled vertices`.
+  - `test_visual` (those desk penetrations): **main's, not this branch's.** A clean worktree of origin/main 7f2bf6e
+    fails it with the identical two hard failures (`pytest tests/visual/test_arrival.py tests/visual/test_visual.py`
+    on main: 1 failed, 6 passed). This branch merged with main 448a0b8 (`d9bbf3a`) had it green; the change in
+    between is main's harness/CI commit 7f2bf6e (it freezes the page from its first script). Not a camera change; not
+    fixed here (out of this branch's scope). For C / the owner of 7f2bf6e.
+  - `test_arrival.py::test_he_sits_in_real_time_on_a_slow_frame_rate`: timing-sensitive; failed once in that full run
+    (its message not kept: the run's output was tailed), passed on this branch alone (2 passed, 109 s), in the "pages"
+    run and in the d9bbf3a full run, and on main. In the suite it runs before any phone-camera test.
