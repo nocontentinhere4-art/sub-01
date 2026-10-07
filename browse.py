@@ -377,6 +377,7 @@ def title_ok(text, media=False):
     t = text or ""
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
                 or MONEY_ASK.search(t) or (chat.MEDIA_RE if media else chat.SLUR_RE).search(chat.normalise(t))
+                or media and chat.incitement(t)
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
 
 

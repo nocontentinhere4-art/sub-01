@@ -39,6 +39,21 @@ SLURS = HATE_SLURS + SELF_HARM + INSULTS
 _slur_re = lambda words: re.compile(r"\b(" + "|".join(re.escape(w) for w in words) + r")(s|es|ed|ing|y|ic)?\b")  # noqa: E731
 SLUR_RE = _slur_re(SLURS)
 MEDIA_RE = _slur_re(SELF_HARM)
+# ... and explicit calls to violence against a group or by slur ("kill all the ...", "death to ..."): never shown,
+# whatever the title (matched on the normalised text; slurs in ordinary titles stay allowed)
+GROUPS = HATE_SLURS + ("jews", "jew", "muslims", "muslim", "christians", "arabs", "blacks", "whites", "asians",
+                       "mexicans", "immigrants", "migrants", "refugees", "gays", "gay people", "lesbians", "trans people",
+                       "transgenders", "women", "hindus", "sikhs", "gypsies", "roma", "africans", "chinese", "japanese",
+                       "koreans", "indians", "palestinians", "israelis", "ukrainians", "russians", "atheists")
+_group = r"(?:" + "|".join(re.escape(g) for g in GROUPS) + r")(?:s|es)?\b"
+INCITE_RE = re.compile(r"\b(?:kill|burn|gas|hang|lynch|shoot|exterminate|slaughter|murder|genocide)\s+(?:all\s+)?"
+                       r"(?:(?:the|those|these|every|them)\s+)?" + _group +
+                       r"|\bdeath\s+to\s+(?:all\s+)?(?:(?:the|those)\s+)?" + _group)
+
+
+def incitement(text):
+    """A call to violence against a group (INCITE_RE); punctuation goes first, as LEET reads "!" as "i"."""
+    return bool(INCITE_RE.search(normalise(re.sub(r"[!?.,;:]+", " ", text or ""))))
 LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
 
 
@@ -65,7 +80,7 @@ def blocked(text, media=False):
         return "no personal data"
     if MONEY.search(text):
         return "no requests for money"
-    if (MEDIA_RE if media else SLUR_RE).search(normalise(text)):
+    if (MEDIA_RE if media else SLUR_RE).search(normalise(text)) or media and incitement(text):
         return "insults are not allowed"
     return None
 

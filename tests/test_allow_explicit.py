@@ -105,3 +105,20 @@ def test_chat_still_refuses_slurs():
     assert chat.blocked("Niggas in Paris") == "insults are not allowed"
     assert chat.blocked("Niggas in Paris", media=True) is None
     assert M.wish("play niggas in paris") is None              # a viewer's wish is a chat message
+
+
+INCITEMENT = ["kill all the f4gg0ts", "Kill all the Jews", "burn all the immigrants (lyric video)", "Gas the Muslims",
+              "Death to all gays", "hang those n1ggers", "Death to the Mexicans!"]
+
+
+@pytest.mark.parametrize("title", INCITEMENT)
+def test_incitement_titles_are_refused(title):
+    assert M.track_from_api(track(title)) is None
+    assert not browse.video_text_ok(title) and not browse.card_title_ok(title, "www.youtube.com")
+
+
+@pytest.mark.parametrize("title", ["Niggas in Paris", "Kill All the Lights", "Burn It Down", "Death to Disco",
+                                   "Kill the Noise", "Gay Bar", "Jews of Brooklyn (documentary)",
+                                   "Women Who Kill (Official Trailer)", "Hang Up on Me"])
+def test_slurs_and_ordinary_violent_words_are_not_incitement(title):
+    assert browse.video_text_ok(title) and M.track_from_api(track(title)) is not None
