@@ -11,7 +11,7 @@ One line per branch: verdict, reviewed commit, time (UTC). Details in `<branch>.
 | preview/char-fix (G10d) | **NOT OK** | 92003d6 | 2026-10-07 14:45 | collar closed, big step up from main; but no socks/slides (G19's feet.mjs not run), ragged throat edge with a black sliver + pinhole of light, the front fill reads as a flat patch |
 | preview/mixamo-wiring (G21) | **OK** | 94c2554 | 2026-10-07 19:25 | char_mixamo from main's char_v5 (collar, socks); `?char=mixamo` desk soles 0.2/0.7 cm, hand on the mouse, hem horns gone; default page pixel-equal to main 7f2bf6e (under main's harness) |
 | preview/bed-clips (G17) | **NOT OK** | 0908653 | 2026-10-07 20:05 | hand-in-head in the turn fixed (checked); duvet tent unchanged (high); headphone cups at the jaw, not on the ears; its contact_pass crashes headless on this commit, so back/turn rows not re-measured (0908653: its docs only, same code) |
-| preview/standing-clips (G22) | **OK** | 4202e97 | 2026-10-07 20:25 | re-baked on G21's char_mixamo (main's char_v5); texting in front of his chest with both hands; soles 0.4 cm every frame; default page pixel-equal to main; low: Gaming's left fingers open |
+| preview/standing-clips (G22) | **OK** | 4202e97 | 2026-10-07 20:15 | re-baked on G21's char_mixamo (main's char_v5); texting in front of his chest with both hands; soles 0.4 cm every frame; default page pixel-equal to main; low: Gaming's left fingers open |
 
 ## Integration (C to decide)
 Three branches rewrite `web/room/char_v5.glb`: char-fix (collar), char-fix-feet (feet), bed-clips (its own sock feet,

@@ -5,7 +5,7 @@
 - Default page: the new `room.html` block only runs with both `char=mixamo` and `clip` (code read; it returns before
   touching anything otherwise). Unchanged without the flag.
 
-## Round 3 (4202e97; clips from d267212, 2026-10-07 19:39 UTC), reviewed 20:25 UTC by G26: OK
+## Round 3 (4202e97; clips from d267212, 2026-10-07 19:39 UTC), reviewed 20:15 UTC by G26: OK
 
 - **Rig blocker closed.** The clips are re-baked on G21's `char_mixamo.glb` (byte-equal to mixamo-wiring 94c2554,
   autorigged from main's `char_v5.glb`): white socks in black slides, the closed collar.
