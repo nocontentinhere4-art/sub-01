@@ -1,8 +1,18 @@
 # Review: preview/mixamo-wiring (G21)
 
-- Latest: `d663a1d`, reviewed 2026-10-07 17:50 UTC by G26 (round 5: OK). Round 4: `94061b7`. Round 3 was `edd3a02` (G23).
+- Latest: `94c2554`, reviewed 2026-10-07 19:25 UTC by G26 (round 6: OK). Round 5: `d663a1d` (OK). Round 4: `94061b7`. Round 3 was `edd3a02` (G23).
 - Default page (no flag) on this branch: v5 loads, boy_mh ready, desk_mouse_ik at the desk, hips at 0.83 m, the same as
   main. **Unchanged.**
+
+## Round 6 (94c2554, 2026-10-07 18:06 UTC: seat points from the new rig's sweep, docs), reviewed 19:25 UTC by G26: OK
+
+- Default page: desk (frames 0 and 2 s, page camera and right hand), door and asleep are **pixel-equal to main
+  7f2bf6e** when both run under main's test harness. (Under the branch's own `tests/visual`, which lacks main's
+  7f2bf6e harness change, the desk scene comes out differently: that is the harness, not the page. I checked it by
+  swapping in main's `boy_mh.js` and then main's `tests/visual`.) Merges cleanly with main.
+- `?char=mixamo` at the desk on 94c2554: soles 0.19 / 0.72 cm, socks in slides, right hand on the mouse (re-shot).
+
+---
 
 ## Round 5 (d663a1d, 2026-10-07 17:27 UTC), reviewed 17:50 UTC by G26: OK
 

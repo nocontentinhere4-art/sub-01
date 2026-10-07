@@ -5,11 +5,11 @@ One line per branch: verdict, reviewed commit, time (UTC). Details in `<branch>.
 | branch | verdict | commit | reviewed | one line |
 |---|---|---|---|---|
 | preview/char-fix-feet2 (G10d) | **NOT OK** | 6880ee3 | 2026-10-07 17:50 | feet atlas fixed (checked); throat better; still the light zig-zag at the hood base on his back, seen by the desk camera (high), nape lining torn with glints (medium) |
-| preview/phone-camera (G25) | **NOT OK** (1 fix) | ba06b4f | 2026-10-07 17:50 | 390: asleep/phone in bed/door/walking framed under the header, desk shot slid down, 1280 identical to main; but once right after load it framed the old rig's hips → camera at y 115 m, black canvas (high, intermittent); scenes.py conflicts with main |
+| preview/phone-camera (G25) | **OK** | d9bbf3a | 2026-10-07 19:20 | 390: asleep (also first after load), phone in bed, door, walking framed under the header; desk shot slid down; 1280 identical to main; merges clean |
 | preview/mixamo-pipeline (G20) | **NOT OK** | 2cbbfa1 | 2026-10-07 13:22 | flank "fins": 4,792 torso vertices skinned to the upper arm down to y 1.04 m, move 15.7 cm with arms down; arms-up web |
 | preview/char-fix-feet (G19) | **OK** (2 fixes advised) | 8e65af7 | 2026-10-07 13:45 | big step up from main; in bed a dark seam line across each sock (medium), grey nick on left big toe (low); seated hover 5–14 cm is main's, not this branch's |
 | preview/char-fix (G10d) | **NOT OK** | 92003d6 | 2026-10-07 14:45 | collar closed, big step up from main; but no socks/slides (G19's feet.mjs not run), ragged throat edge with a black sliver + pinhole of light, the front fill reads as a flat patch |
-| preview/mixamo-wiring (G21) | **OK** | d663a1d | 2026-10-07 17:50 | char_mixamo autorigged from main's char_v5 (collar, socks); desk soles 0.2/0.7 cm, hand on the mouse, hem horns gone (3.3 cm at the shoulder); default page pixel-equal to main |
+| preview/mixamo-wiring (G21) | **OK** | 94c2554 | 2026-10-07 19:25 | char_mixamo from main's char_v5 (collar, socks); `?char=mixamo` desk soles 0.2/0.7 cm, hand on the mouse, hem horns gone; default page pixel-equal to main 7f2bf6e (under main's harness) |
 | preview/bed-clips (G17) | **NOT OK** | ebb2756 | 2026-10-07 18:50 | char_v5.glb is main's now and contacts() takes the body by name (both closed); still the duvet tent (torso 27 cm, taller than main), the hand 4.7 cm into his head in the roll-back (new), back +2.7 cm while listening, left headphone cup 2.9 cm in |
 | preview/standing-clips (G22) | **NOT OK** (blocked) | 9640cbf | 2026-10-07 17:25 | props fixed (controller, tablet), feet 0.4 cm; re-bake on G21's d663a1d char_mixamo now (unblocked); Texting_While_Standing holds the phone at his hip (medium) |
 

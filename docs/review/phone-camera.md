@@ -1,9 +1,22 @@
 # Review: preview/phone-camera (G25)
 
-- Reviewed: `ba06b4f` (2026-10-07 17:07 UTC), reviewed 2026-10-07 17:50 UTC by G26.
+- Latest: `d9bbf3a`, round 2: OK (below). Round 1: `ba06b4f` (2026-10-07 17:07 UTC), reviewed 2026-10-07 17:50 UTC by G26.
 - Scope: `web/room.html` camera logic, phones only (`camera.aspect < 1`), plus a test (`tests/visual/test_phone_camera.py`).
 
-## Verdict: NOT OK. One fix away: the framing is right, but once it framed a stale bone and the canvas went black
+## Round 2 (d9bbf3a, 2026-10-07 ~18:45 UTC, main merged in), reviewed 19:20 UTC by G26: OK
+
+- **Defect 1 closed.** `narrow()` now needs the drawn, ready body (`bodyReady`: the MakeHuman layer's `mh.ready`) and
+  hips inside `IN_ROOM`, else the overview. Re-tested the failing case: a fresh 390 page with **asleep as the first
+  scene after load**. Framed (head at px 121, 312, under the 156 px header), camera at (2.21, 4.20, 4.48). Phone in
+  bed, walking and desk are as in round 1.
+- **Defect 2 closed.** Main is merged; the branch now merges cleanly with main 7f2bf6e.
+- **1280 unchanged.** All four scenes give the same camera and head pixels as main.
+![390](img/phone-camera_3_round2_390.jpg)
+390×844: asleep (first after load), phone in bed, walking, desk.
+
+---
+
+## Round 1 verdict (ba06b4f): NOT OK. One fix away: the framing is right, but once it framed a stale bone and the canvas went black
 
 How I checked: my own tool (`tools/phonecam.py`), not the branch's test. The page at 390×844 (mobile) and 1280×800, on
 this branch and on main 0ac47f8. Scenes asleep, phone in bed, door, desk, walking. Each time the follow camera runs
