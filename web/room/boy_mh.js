@@ -1323,6 +1323,10 @@ export function createMH(env) {
     return need === -9 ? 0 : need;
   }
   // a captured bed clip playing (and settled: its cross-fade in is over)
+  // the mattress gives under his back and hips (bed_clip.py BED_SINK): these clips are fitted to lie with his lowest skin -
+  // his back - this far under the bed's top (m), his legs and head where they were (?debug: window.__bedSink overrides)
+  const BED_SINK = {listen: 0, sleep: 0};
+  function capSink(st) { const o = window.__bedSink; return o != null ? +o : st.goal && st.goal.clip === "listen" ? BED_SINK.listen : BED_SINK.sleep; }
   function capBed(st) {
     if (st.at !== "bedlie" || st.step || !st.goal) return false;
     const a = st.goal.clip === "sleep" && M.clips.sleep_loop ? M.actions.sleep : st.goal.clip === "listen" && M.music ? M.actions.music : null;
@@ -1340,7 +1344,7 @@ export function createMH(env) {
       // ON it, down as well as up (a capture fitted on another body or bed must not float over ours); every other pose is
       // only ever lifted out of it, as before
       const cap = capBed(st);
-      if (M.liftT <= 0) { M.liftT = 1; every = 2; M.liftGoal = measureLift(2, cap); }
+      if (M.liftT <= 0) { M.liftT = 1; every = 2; M.liftGoal = measureLift(2, cap) - (cap ? capSink(st) : 0); }
       const g = M.liftGoal ?? M.lift ?? 0, l = Math.abs(g - (M.lift || 0)) > 0.05 ? g : M.lift || 0;   // (more than 5 cm either way, as when the page opens on him in bed: at once)
       M.lift = l + Math.max(-0.03 * dt, Math.min(0.10 * dt, g - l)); if (!cap && M.lift < 1e-4) M.lift = 0;
       b.position.y += M.lift; return;

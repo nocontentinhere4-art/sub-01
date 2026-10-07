@@ -46,6 +46,12 @@ AWAKE = mode == 'awake'
 PILLOW_SINK = 0.011           # the back of his head this far into the pillow's rest top (contract: -2..0 cm)
 BACK_UP = 0.010 if not AWAKE else 0.002   # his back over his lowest skin (asleep his lowest goes 1.5 cm into the mattress's give)
 HAND_CLEAR = 0.006            # forearms and hands this far out of his torso's skin
+# BED_SINK: the mattress gives under his hips and back (a real one sinks most there): his back and buttocks go this much
+# further into it than the fit would otherwise rest them, his legs and head stay where they were. The page puts his lowest
+# skin PAGE_SINK under the bed's top for these clips (boy_mh.js BED_SINK) - his back, now his lowest - and the heels and
+# the head are fitted for that height. BED_FLAT: the hips' and knees' bend blended this far toward straight (0..1)
+SINK = float(os.environ.get('BED_SINK', 0)); FLAT = float(os.environ.get('BED_FLAT', 0))
+PAGE_SINK = max(0.0, SINK - BACK_UP)
 
 # ---- the clip, onto the reference's hips and heading (as bed_fit.py)
 dr = json.load(open(ref_p)); rename(dr); sr = Skel(dr); ar = dr['anims'][0]; Fr = int(round(max(max(c['t']) for c in ar['ch']) * FPS)) + 1
@@ -64,6 +70,11 @@ SLIDE = float(os.environ.get('BED_SLIDE', 0.04))
 hd_ref = Pr[0, sr.ix['Head']] - Pr[0, sr.ix['Hip']]; hd_ref = qrot(qy(RIG), np.array([hd_ref[0], 0, hd_ref[2]])); hd_ref /= np.linalg.norm(hd_ref)
 ph = qrot(np.broadcast_to(Y, (F, 4)), P[:, hi] - c0) + np.array([hr[0], c0[1], hr[2]]) + SLIDE * hd_ref
 R[:, hi] = qnorm(qmul(qinv(Q[:, par]), Qh)); T[:, hi] = qrot(qinv(Q[:, par]), ph - P[:, par]) / Sc[par]
+
+if FLAT > 0:                                                  # (rest = his bind pose: legs straight)
+    for b in ('L_Thigh', 'R_Thigh', 'L_Calf', 'R_Calf'):
+        j = ix[b]; r0 = np.asarray(d['nodes'][j].get('r', [0, 0, 0, 1]), float)
+        R[:, j] = qnorm(np.array([qslerp(R[f, j], r0, FLAT) for f in range(F)]))
 
 def fk(f=None):
     return ts.fk(T, R) if f is None else ts.fk(T[f], R[f])
@@ -209,7 +220,7 @@ def head_err(fs):
         y, s, x, z = heights(X[f]); back = backlow(X[f])
         m = HEAD & (x < -1.30); k = np.argmin(y[m] - s[m])
         # the head's lowest point against the pillow top under it, with his back on the mattress top
-        e.append((y[m] - min(back - BACK_UP, y[BODY].min()) + TOP - s[m]).min() + PILLOW_SINK)   # (the page rests his lowest skin at TOP)
+        e.append((y[m] - min(back - BACK_UP + SINK, y[BODY].min()) + TOP - PAGE_SINK - s[m]).min() + PILLOW_SINK)   # (the page rests his lowest skin at TOP less PAGE_SINK)
     return float(np.mean(e))
 NECK = ['NeckTwist01', 'NeckTwist02', 'Head']           # (not the upper back: that lifts his back off the mattress)
 NECKW = [(b, w) for b, w in zip(NECK, (0.4, 0.35, 0.25)) if b in ix]; NECKW = [(b, w / sum(x for _, x in NECKW)) for b, w in NECKW]
@@ -222,7 +233,7 @@ diag('after pillow')
 def heel_err(fs):
     X, _ = skinf(fs); e = []
     for f in range(len(fs)):
-        y, s, x, z = heights(X[f]); e.append(y[HEEL & BODY].min() - (backlow(X[f]) - BACK_UP))
+        y, s, x, z = heights(X[f]); e.append(y[HEEL & BODY].min() - (backlow(X[f]) - BACK_UP + SINK))
     return float(np.mean(e))
 LEG_AX = [SIDE]
 def bend_legs(a):
@@ -260,7 +271,7 @@ diag('after knees')
 CALF = np.array([bool(re.match(r'[LR]_(Calf|Foot|ToeBase)', n)) for n in dom])
 BUTT_OVER = 0.02   # (his buttocks this far over the small of his back: there the hoodie hangs below his body line, and gives)
 def calf_err(fs):
-    X, _ = skinf(fs); return float(np.mean([X[f][CALF & BODY, 1].min() - (backlow(X[f]) - BACK_UP) for f in range(len(fs))]))
+    X, _ = skinf(fs); return float(np.mean([X[f][CALF & BODY, 1].min() - (backlow(X[f]) - BACK_UP + SINK) for f in range(len(fs))]))
 a_bt = a_kh = 0.0
 # (off: measured on main's v5, it took the buttocks from +3.2..+4.0 to +2.4..+2.9 cm but made the backs of his thighs his
 # lowest skin - the page rests that on the bed - so his whole back floated, +0.2..+0.6 asleep and +1.8..+4.0 awake, with
@@ -305,7 +316,7 @@ def head_in(X, P2, side):
 def hand_err(side, fs):
     # in his torso or head, or (on his side, the lower arm) under his torso's contact with the bed
     X, P2 = skinf(fs); return max(max(torso_in(X[f], P2[f], side), head_in(X[f], P2[f], side),
-        backlow(X[f]) - BACK_UP - X[f][ARM & BODY & (SIDEOF == side), 1].min()) for f in range(len(fs))) - 1e-9
+        backlow(X[f]) - BACK_UP + SINK - X[f][ARM & BODY & (SIDEOF == side), 1].min()) for f in range(len(fs))) - 1e-9
 WDIR = [np.array([0, 1.0, 0])]
 def lift_wrist(fs, side, dy):
     """two-bone IK: the wrist moved by dy along WDIR[0] (straight up unless set; the elbow bends in its own plane), the hand keeps its turn"""
@@ -372,23 +383,27 @@ if LOOP:
     R[F - 1] = R[0]; T[F - 1] = T[0]
 
 # ---- report: the contacts in the room's frame (the page puts his lowest skin at the bed's top)
-X, P2 = skinf(allf); top = TOP
+X, P2 = skinf(allf); top = TOP - PAGE_SINK
 rep = {'head_turn_deg': round(float(np.degrees(a_ht)), 1), 'head_roll_deg': round(float(np.degrees(head_roll(SAMPLE))), 1), 'pelvis_deg': round(float(np.degrees(a_pv)), 1), 'pelvis_err_cm': round(e_pv * 100, 1), 'level_deg': round(float(np.degrees(a_lvl)), 1), 'level_err_cm': round(e_lvl * 100, 1), 'neck_deg': round(float(np.degrees(a_nk)), 1),
        'head_err_cm': round(e_nk * 100, 1), 'legs_deg': round(float(np.degrees(a_lg)), 1), 'knees_deg': round(float(np.degrees(a_kn)), 1), 'thighs_for_buttocks_deg': round(float(np.degrees(a_bt)), 1), 'knees_for_heels_deg': round(float(np.degrees(a_kh)), 1), 'heel_err_cm': round(e_lg * 100, 1),
        'wrists_moved_cm': {s: [round(a_hand[s][0] * 100, 1), a_hand[s][2]] for s in 'LR'}, 'hands_in_cm': {s: round(a_hand[s][1] * 100, 1) for s in 'LR'}}
 lows = X[:, BODY, 1].min(1); off = top - lows                    # the page's lift per frame
-back_g, sh_g, head_g, toe = [], [], [], []
+back_g, sh_g, head_g, toe, butt_g, bedrow = [], [], [], [], [], []
 for f in range(F):
     y = X[f][:, 1] + off[f]; x, z = room_xz(X[f]); s = surf(x, z) + (0.014 if AWAKE else 0)
     mb = BACK & BODY & (s < 0.84 + (0.014 if AWAKE else 0)); pb = BACK & BODY & ~mb
     back_g.append((y[mb] - s[mb]).min()); sh_g.append((y[pb] - s[pb]).min() if pb.any() else 9)
     m = HEAD & (x < -1.30); head_g.append((y[m] - surf(x[m], z[m])).min()); toe.append(x[FOOT & BODY].max())
+    bt = THIGH & BODY & (s < 0.84 + (0.014 if AWAKE else 0)) & (x > HIPS_ROOM[0] - 0.15) & (x < HIPS_ROOM[0] + 0.06)
+    butt_g.append((y[bt] - s[bt]).min() if bt.any() else 9)
+    ov = BODY & (s > 0.5) & (s < 0.84 + (0.014 if AWAKE else 0)); bedrow.append((y[ov] - 0.80).min())
 X0 = X[0][:, 1]; o = np.argsort(X0)[:400]; lowparts = {}
 for j in o: lowparts[dom[j]] = round(float(X0[j] - X0[o[0]]) * 100, 1) if dom[j] not in lowparts else lowparts[dom[j]]
 rep['slide_cm'] = round(SLIDE * 100, 1); rep['to_reference_cm'] = round(dy0 * 100, 1); rep['lowest_parts_cm'] = dict(list(lowparts.items())[:8]); rep['back_over_lowest_cm'] = round(float(backlow(X[0]) - X0.min()) * 100, 1)
 rep.update({'lowest_step_cm': round(float(np.ptp(lows)) * 100, 2), 'back_lowest_cm': [round(float(min(back_g)) * 100, 1), round(float(max(back_g)) * 100, 1)],
             'shoulders_into_pillow_edge_cm': round(float(min(sh_g)) * 100, 1),
             'head_on_pillow_cm': [round(float(min(head_g)) * 100, 1), round(float(max(head_g)) * 100, 1)],
+            'buttocks_cm': [round(float(min(butt_g)) * 100, 1), round(float(max(butt_g)) * 100, 1)], 'bed_row_min_cm': round(float(min(bedrow)) * 100, 1), 'sink_cm': round(SINK * 100, 1), 'page_sink_cm': round(PAGE_SINK * 100, 1), 'flat': FLAT,
             'toes_max_x': round(float(max(toe)), 3), 'toes_inside_end_cm': round((G['page']['mattressEnd'] - float(max(toe))) * 100, 1)})
 print(json.dumps(rep))
 animated = {ts.names[c['node']] for c in an['ch'] if c['path'] == 'rotation'}
