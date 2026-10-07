@@ -1,5 +1,5 @@
 """G23: shoot + measure ?char=mixamo&clip=<Clip> (G22 standing_preview). python clips.py <worktree> <out> Clip[,Clip]"""
-import json, sys
+import json, os, sys
 from pathlib import Path
 ROOT = Path(sys.argv[1]).resolve(); OUT = Path(sys.argv[2]); OUT.mkdir(parents=True, exist_ok=True)
 CLIPS = sys.argv[3].split(",")
@@ -48,9 +48,9 @@ with Server() as server, sync_playwright() as p:
                          "worst_over_t": round(low.index(max(low)) / 30, 2), "errors": st["errors"]}
         print(clip, json.dumps(r), flush=True)
         D = r["duration"]
-        for k, t in enumerate([0.1, 0.45, 0.8]):
+        for k, t in enumerate([float(x) for x in os.environ.get("TIMES", "0.1,0.45,0.8").split(",")]):
             pg.evaluate(f"SP.setTime({D * t})")
-            for c in ["front", "side", "feet", "hands"]:
+            for c in os.environ.get("CCAMS", "front,side,feet,hands").split(","):
                 pg.evaluate(f"__cv.shots.{c}(); __cv.render()")
                 pg.screenshot(path=str(OUT / f"{clip}_t{k}_{c}.png"), animations="disabled")
         ctx.close()
