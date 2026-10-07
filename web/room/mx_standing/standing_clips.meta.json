@@ -26,6 +26,26 @@
    "L": 0.0,
    "R": 0.0
   },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
   "soles_cm": {
    "L": [
     0.4,
@@ -96,8 +116,8 @@
    "kind": "seated",
    "seatOrigin": true,
    "spot": "chair",
-   "name": "Angry_Gesture",
-   "seatAt": -0.18
+   "seatAt": -0.18,
+   "name": "Angry_Gesture"
   }
  },
  "Gaming": {
@@ -126,6 +146,26 @@
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [
@@ -197,8 +237,8 @@
    "seatOrigin": true,
    "hold": "controller",
    "spot": "chair",
-   "name": "Gaming",
-   "seatAt": -0.2
+   "seatAt": -0.2,
+   "name": "Gaming"
   }
  },
  "Scared": {
@@ -227,6 +267,26 @@
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [
@@ -299,8 +359,8 @@
    "kind": "transition",
    "seatOrigin": true,
    "spot": "open",
-   "name": "Scared",
-   "seatAt": -0.2
+   "seatAt": -0.2,
+   "name": "Scared"
   }
  },
  "Sit_To_Stand": {
@@ -314,13 +374,13 @@
    "L": 49,
    "R": 60
   },
-  "seat_lift_m": 0.2052,
-  "seat_hip_y": 0.7082,
+  "seat_lift_m": 0.1922,
+  "seat_hip_y": 0.6952,
   "seat_low_cm": 29.6,
-  "cushion_hold_frames": 16,
+  "cushion_hold_frames": 15,
   "hip_shift_m": [
    -0.0043,
-   0.2131
+   0.2001
   ],
   "seat_origin_shift_m": [
    -0.0022,
@@ -329,6 +389,26 @@
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [
@@ -354,14 +434,14 @@
     1.772
    ],
    "z": [
-    -0.27,
+    -0.269,
     0.814
    ]
   },
   "hips_start_end": [
    [
     -0.004,
-    0.719,
+    0.706,
     -0.011
    ],
    [
@@ -396,7 +476,7 @@
   },
   "row": {
    "soleUp": 0.004,
-   "seatTop": 0.505,
+   "seatTop": 0.492,
    "seatGap": -0.004,
    "kind": "transition",
    "seatOrigin": true,
@@ -405,8 +485,8 @@
     2.07
    ],
    "spot": "out",
-   "name": "Sit_To_Stand",
-   "seatAt": -0.24
+   "seatAt": -0.24,
+   "name": "Sit_To_Stand"
   }
  },
  "Stand_To_Sit": {
@@ -420,13 +500,13 @@
    "L": 55,
    "R": 68
   },
-  "seat_lift_m": 0.1995,
-  "seat_hip_y": 0.7131,
+  "seat_lift_m": 0.1865,
+  "seat_hip_y": 0.7001,
   "seat_low_cm": 30.2,
-  "cushion_hold_frames": 14,
+  "cushion_hold_frames": 13,
   "hip_shift_m": [
    -0.0067,
-   0.2009
+   0.1879
   ],
   "seat_origin_shift_m": [
    0.0005,
@@ -435,6 +515,26 @@
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    3,
+    0.8
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [
@@ -456,7 +556,7 @@
     0.486
    ],
    "y": [
-    0.003,
+    0.004,
     1.782
    ],
    "z": [
@@ -472,7 +572,7 @@
    ],
    [
     -0.0,
-    0.713,
+    0.7,
     -0.004
    ]
   ],
@@ -502,13 +602,13 @@
   },
   "row": {
    "soleUp": 0.004,
-   "seatTop": 0.505,
+   "seatTop": 0.492,
    "seatGap": -0.004,
    "kind": "transition",
    "seatOrigin": true,
    "spot": "out",
-   "name": "Stand_To_Sit",
-   "seatAt": -0.22
+   "seatAt": -0.22,
+   "name": "Stand_To_Sit"
   }
  },
  "Standing_Clap": {
@@ -537,6 +637,26 @@
   "leg_ik_miss_cm": {
    "L": 0.27,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [
@@ -609,8 +729,8 @@
    "kind": "transition",
    "seatOrigin": true,
    "spot": "open",
-   "name": "Standing_Clap",
-   "seatAt": -0.22
+   "seatAt": -0.22,
+   "name": "Standing_Clap"
   }
  },
  "Standing_Using_Touchscreen_Tablet": {
@@ -631,6 +751,26 @@
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [
@@ -722,6 +862,26 @@
    "L": 0.0,
    "R": 0.0
   },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
+  },
   "soles_cm": {
    "L": [
     0.4,
@@ -811,6 +971,26 @@
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
+  },
+  "hands_in_thighs_before": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    34,
+    3.34
+   ]
+  },
+  "hands_in_thighs_after": {
+   "L": [
+    0,
+    0.0
+   ],
+   "R": [
+    0,
+    0.0
+   ]
   },
   "soles_cm": {
    "L": [

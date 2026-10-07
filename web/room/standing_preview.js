@@ -51,8 +51,11 @@ export async function start(ctx) {
   if (row.spot === "out") {
     // the chair where the page itself has it for his sit-down and stand-up: pulled out and turned (room.html chairAt(1))
     const n = chairNode(), sz = row.seatAt ?? SEAT_AT.z; const ry = chairAt(1, n.position); n.rotation.y = ry; n.updateMatrixWorld(true);
-    const p = new THREE.Vector3(SEAT_AT.x, 0, sz).applyMatrix4(n.matrixWorld);
-    holder.position.set(p.x, FLOOR, p.z); holder.rotation.y = ry + Math.PI;
+    const p = new THREE.Vector3(SEAT_AT.x, 0, sz).applyMatrix4(n.matrixWorld), feet = new THREE.Vector3(SEAT_AT.x, 0, sz - 0.45).applyMatrix4(n.matrixWorld);
+    // (his feet there are on the rug's edge, the chair on the floor: he stands on what is under his feet, and the row's
+    // seatTop is the cushion over that)
+    const y = floorAt(feet.x, feet.z, [holder, n]);
+    holder.position.set(p.x, y, p.z); holder.rotation.y = ry + Math.PI; SP.floor = +y.toFixed(4);
     SP.chair = {x: +n.position.x.toFixed(3), z: +n.position.z.toFixed(3), ry: +ry.toFixed(4), seatAt: sz, pageSitDown: true};
   } else if (row.spot === "open") {
     // the chair out in the open middle of the room (on the rug), for the clips that get up out of it and need the

@@ -97,7 +97,7 @@ window.QA = {
     QA.pose(null, 0); const R0 = skinned(true), sleeve = {};
     for (const [nm, S] of [["left", "Left"], ["right", "Right"]]) { const sx = body.getObjectByName(S + "Arm").getWorldPosition(new THREE.Vector3()).x, sg = Math.sign(sx);
       sleeve[nm] = new Uint8Array(R0.pos.length / 3); for (let i = 0; i < sleeve[nm].length; i++) if (sg * R0.pos[3 * i] > sg * sx + 0.02) sleeve[nm][i] = 1; }
-    for (const [key, down] of [["insideRest", 0], ["insideArmsDown", 1.1]]) { QA.pose(null, 0);
+    for (const [key, down] of [["insideRest", 0], ["insideArmsDown", 1.1], ["insideArmsAtSides", 1.4]]) { QA.pose(null, 0);
       if (down) { for (const [n, sg] of [["LeftArm", -1], ["RightArm", 1]]) body.getObjectByName(n).rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), sg * down); body.updateMatrixWorld(true); }
       const s0 = skinned(); out[key] = {}; for (const [nm, A, B] of PAIRS) { const r = inside(s0, reg.sets[A], reg.sets[B]); out[key][nm] = {verts: r.n, depth_cm: +(r.d * 100).toFixed(1)}; } }
     const N = Math.round(clips[k].duration / dt) + 1;

@@ -10,7 +10,9 @@ rig's rest rotations are Mixamo's, G20). What the bake adds is the room:
    the chair's seat point, SEAT_AT in the chair's frame);
  - feet: planted stances (the performer's ankle low and slow for 0.3 s or more) held on one spot, and every sole put
    on the floor by leg IK (two-bone, the knee in its own bend plane, the foot keeping its world rotation); a lifted foot
-   keeps its lift over the stance's level, and no sole goes under the floor.
+   keeps its lift over the stance's level, and no sole goes under the floor;
+ - hands: off his thighs (his own thigh skin as a cross-section around the bone, every frame), the wrist moved out and
+   the arm re-solved where a hand would be inside one.
 
 python standing_bake.py <character.json> <clip.json> <row.json> <out.json> <meta.json>
 (<character.json> / <clip.json>: standing_exp.mjs of char_mixamo.glb / of mixamo_glb.mjs's clip; <row.json>: the row
@@ -174,6 +176,59 @@ for it in range(3):
         miss[s] = leg_ik(s, g)
 log['leg_ik_miss_cm'] = {s[0]: round(miss[s] * 100, 2) for s in miss}
 
+# ---- the hands off his thighs: each thigh's skin as a star-shaped cross-section around its bone (10 bands along it,
+# 24 sectors around it, the outermost skin in each), measured every frame on his own thigh skin; a hand vertex inside
+# it by more than 3 mm moves its wrist out along that thigh's radius (by the depth + 5 mm, smoothed, held 0.2 s either
+# side), the arm re-solved by two-bone IK with the hand keeping its world rotation
+handv = {s: np.array([d == f'{s}Hand' or (d.startswith(f'{s}Hand') and d[len(s) + 4:5] in 'TIMRP') for d in dom]) for s in ('Left', 'Right')}
+thighv = {s: dom == f'{s}UpLeg' for s in ('Left', 'Right')}
+NB, NS = 10, 24
+
+
+def thigh_push(P, Q, Sc):
+    TH = {s: skinned(thighv[s], P, Q, Sc) for s in thighv}; HA = {s: skinned(handv[s], P, Q, Sc) for s in handv}
+    push = {s: np.zeros((F, 3)) for s in handv}; deep = {s: np.zeros(F) for s in handv}
+    for f in range(F):
+        for t in ('Left', 'Right'):
+            a, b = P[f, cix[f'{t}UpLeg']], P[f, cix[f'{t}Leg']]; ax = b - a; L = np.linalg.norm(ax); ax = ax / L
+            ref = np.cross(ax, [0, 0, 1.0]); ref /= np.linalg.norm(ref); ref2 = np.cross(ax, ref)
+            def polar(X):
+                v = X - a; tt = v @ ax; r = v - tt[:, None] * ax; rad = np.linalg.norm(r, axis=1)
+                ang = np.arctan2(r @ ref2, r @ ref); return tt / L, rad, ang, r
+            tt, rad, ang, _ = polar(TH[t][f]); ok = (tt > 0.05) & (tt < 0.95)
+            bi = np.clip((tt[ok] * NB).astype(int), 0, NB - 1); si = ((ang[ok] + np.pi) / (2 * np.pi) * NS).astype(int) % NS
+            R = np.zeros((NB, NS)); np.maximum.at(R, (bi, si), rad[ok])
+            for s in ('Left', 'Right'):
+                ht, hr, ha, hv = polar(HA[s][f]); m = (ht > 0.1) & (ht < 0.9)
+                if not m.any(): continue
+                hb = np.clip((ht[m] * NB).astype(int), 0, NB - 1); hs = ((ha[m] + np.pi) / (2 * np.pi) * NS).astype(int) % NS
+                d = R[hb, hs] - hr[m]; k = np.argmax(d)
+                if d[k] > 0.003 and d[k] > deep[s][f]:
+                    deep[s][f] = d[k]; push[s][f] = hv[m][k] / max(hr[m][k], 1e-6) * (d[k] + 0.005)
+    return push, deep
+
+
+_, deep0 = thigh_push(P, Q, Sc)
+log['hands_in_thighs_before'] = {s[0]: [int((deep0[s] > 0).sum()), round(float(deep0[s].max() * 100), 2)] for s in deep0}
+for it in range(3):
+    push, deep = thigh_push(P, Q, Sc)
+    if not any(deep[s].any() for s in deep): break
+    for s in ('Left', 'Right'):
+        if not deep[s].any(): continue
+        g = push[s].copy()
+        hold = np.array([np.abs(g[max(0, f - 6):f + 7]).max(0) * np.sign(g[max(0, f - 6):f + 7].sum(0) + 1e-12) for f in range(F)])
+        g = lowpass(hold, 3.0)
+        a, b, c = cix[f'{s}Arm'], cix[f'{s}ForeArm'], cix[f'{s}Hand']
+        l1 = np.linalg.norm(T[0, b]) * Sc[a]; l2 = np.linalg.norm(T[0, c]) * Sc[b]
+        goal = P[:, c] + g
+        nb, gg = two_bone(P[:, a], P[:, b], P[:, c], goal, l1, l2)
+        d1 = qbetween(P[:, b] - P[:, a], nb - P[:, a]); Qa = qmul(d1, Q[:, a]); Qb = qmul(d1, Q[:, b])
+        pc = nb + qrot(Qb, Sc[b] * T[:, c]); d2 = qbetween(pc - nb, gg - nb); Qb = qmul(d2, Qb)
+        R[:, a] = qnorm(qmul(qinv(Q[:, ts.parent[a]]), Qa)); R[:, b] = qnorm(qmul(qinv(Qa), Qb)); R[:, c] = qnorm(qmul(qinv(Qb), Q[:, c]))
+        P, Q, Sc = fk()
+_, deep1 = thigh_push(P, Q, Sc)
+log['hands_in_thighs_after'] = {s[0]: [int((deep1[s] > 0).sum()), round(float(deep1[s].max() * 100), 2)] for s in deep1}
+
 # ---- what the page and the table need
 X = {s: skinned(footv[s], P, Q, Sc) for s in footv}
 log['soles_cm'] = {s[0]: [round(float(X[s][..., 1].min(1).min() * 100), 2), round(float(X[s][..., 1].min(1).max() * 100), 2)] for s in X}
@@ -211,4 +266,4 @@ out = {'name': row.get('name', 'clip'), 'fps': FPS, 'F': F, 'nodes': nodes,
        'trans': {kix2[HI]: np.round(T[:, HI], 4).ravel().tolist()}}
 json.dump(out, open(outj, 'w'))
 json.dump(log, open(metaj, 'w'), indent=1)
-print(json.dumps({k_: log[k_] for k_ in ('clip', 'frames', 'hip_scale', 'seated_frames', 'hip_shift_m', 'soles_cm', 'leg_ik_miss_cm', 'planted_ankle_drift_cm') if k_ in log}))
+print(json.dumps({k_: log[k_] for k_ in ('clip', 'frames', 'hip_scale', 'seated_frames', 'hip_shift_m', 'soles_cm', 'leg_ik_miss_cm', 'planted_ankle_drift_cm', 'hands_in_thighs_before', 'hands_in_thighs_after') if k_ in log}))
