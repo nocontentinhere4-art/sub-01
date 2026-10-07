@@ -16,6 +16,23 @@
     "normalMap": "charfix/hood_patch_n.png",
     "mirror": true
    }
+  },
+  {
+   "name": "hood_patches",
+   "dir": "charfix/p_patches",
+   "material": {
+    "name": "hood_patches",
+    "color": [
+     1,
+     1,
+     1
+    ],
+    "roughness": 0.95,
+    "doubleSided": true,
+    "map": "charfix/hood_patch.png",
+    "normalMap": "charfix/hood_patch_n.png",
+    "mirror": true
+   }
   }
  ]
 }

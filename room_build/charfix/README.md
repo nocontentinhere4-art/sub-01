@@ -12,9 +12,14 @@ sagging groove down to the neck 2.5 cm below the lip, 2 mm into it (closed all r
 vertices at the top and the neck's at the bottom. Its fabric is a 7.6 cm patch of the hood's own texture (base colour
 and normal map), mirrored-tiled at real scale. The face, the neck and the hood's outer shape are untouched.
 
+`hood_patches` fills the hood's own holes round the collar: every open-edge loop of its mesh there (10 of them, 237
+triangles; the loop along the hood's top rim, behind the lining, stays open), a fan about each loop's centre in the
+same fabric, skinned from the nearest hood vertices (`patches.py`).
+
 Rebuild (from `room_build/`; the dumps under `charfix/v5` are made by `dump.mjs` from `web/room/char_v5.glb`, the
 fabric patch by hand from its texture as described in `lining.py`):
 
     node charfix/dump.mjs ../web/room/char_v5.glb charfix/v5
     python3 charfix/lining.py            # -> lining.npz, then its raw files and spec_collar.json
+    python3 charfix/patches.py           # -> the patches' raw files
     node charfix/add_parts.mjs <char_v5.glb> <out.glb> spec_collar.json
