@@ -206,7 +206,14 @@ GEO_WALL = re.compile(r"(?:(?:not|n['’]t)\s+(?:currently\s+|yet\s+)?available|
                       r"(?:not|n['’]t)\s+(?:currently\s+)?available where you are|"
                       r"(?:blocked|restricted) in your (?:region|country|location)|"
                       r"bbc iplayer only works in the uk|only available (?:to watch )?in the uk\b|"
-                      r"not made this video available in your country|geo-?(?:blocked|restricted)", re.I)
+                      r"not made this video available in your country|geo-?(?:blocked|restricted)|"
+                      # (G14: the US / EU walls and the licence wording - "not available outside the United States",
+                      # "only available in the US", "due to licensing restrictions ... in your country")
+                      r"not available (?:to (?:users|viewers) )?outside (?:of )?the (?:uk|united kingdom|us|usa|united states|eu)\b|"
+                      r"only (?:works|available|playable) (?:to (?:users|viewers|people) )?in the (?:us|usa|united states)\b|"
+                      r"due to (?:licensing|rights|legal) restrictions[^.]{0,60}\b(?:country|region|location)\b", re.I)
+# a title asking about it is an article, not the wall ("Why Netflix shows aren't available in your country")
+GEO_TITLE_ASK = re.compile(r"^\s*(?:why|how|what|which|when|where|is|are|can|do|does)\b", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -640,7 +647,7 @@ def challenge_title(title, url):
     interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
-    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t))
+    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t)) and not GEO_TITLE_ASK.search(t)
             or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
