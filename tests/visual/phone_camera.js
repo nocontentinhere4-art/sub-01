@@ -47,17 +47,20 @@
     controls.update(); __keepClear();
   }
   // n frames of dt: the simulation and the camera; worst share and head misses; snap the camera first if asked
-  window.__phoneCam = (n, dt, snap) => {
+  // (until: a predicate checked before each frame; the run stops there and says so: done)
+  window.__phoneCam = (n, dt, snap, until) => {
     window.FREEZE = true; if (snap) { animate_(dt); camStep(dt, true); }
     let worst = 1, worstAt = null, headMiss = 0, frames = 0, sum = 0, maxJump = 0; const P = camera.position.clone();
+    let done = false;
     for (let i = 0; i < n; i++) {
+      if (until && until()) { done = true; break; }
       animate_(dt); camStep(dt, false); frames++;
       maxJump = Math.max(maxJump, camera.position.distanceTo(P)); P.copy(camera.position);
       const r = measure(); sum += r.frac;
       if (!r.head) headMiss++;
       if (r.frac < worst) { worst = r.frac; worstAt = {i, ...r, pose: pose().at, step: pose().step}; }
     }
-    return {frames, worst: +worst.toFixed(3), mean: +(sum / frames).toFixed(3), head_miss: headMiss, worst_at: worstAt,
+    return {frames, done, worst: +worst.toFixed(3), mean: +(sum / Math.max(1, frames)).toFixed(3), head_miss: headMiss, worst_at: worstAt,
             max_cam_step_m: +maxJump.toFixed(3), cam: camera.position.toArray().map(v => +v.toFixed(2)), tgt: controls.target.toArray().map(v => +v.toFixed(2))};
   };
   window.__phoneCamNow = measure;

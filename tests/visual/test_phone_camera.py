@@ -45,13 +45,13 @@ def _transition(h, pg, to, hour, done_js, limit_s=60):
     t0, extra, n = time.time(), None, 0
     while n < limit_s * 30:
         pg.wait_for_timeout(30)                       # (the fake socket's ticks reach the page between chunks)
-        r = pg.evaluate(f"__phoneCam(15, {DT}, false)")
+        r = pg.evaluate(f"__phoneCam(15, {DT}, false, {done_js if extra is None else 'null'})")
         agg = way if extra is None else there
         n += r["frames"]; agg["frames"] += r["frames"]; agg["head_miss"] += r["head_miss"]
         agg["max_cam_step_m"] = max(agg["max_cam_step_m"], r["max_cam_step_m"])
         if r["worst"] < agg["worst"]:
             agg["worst"], agg["worst_at"] = r["worst"], r["worst_at"]
-        if extra is None and pg.evaluate(done_js):
+        if extra is None and r["done"]:
             extra = n + 60
         if extra is not None and n >= extra:
             break
@@ -82,7 +82,7 @@ def measure(sizes, log=lambda *a: None):
                 h.goto_scene(pg, "door", 23); pg.evaluate(f"__phoneCam(30, {DT}, true)")
                 r["into_bed"] = _transition(h, pg, "sleeping", 23, "() => { const p = pose(); return p.at === 'bedlie' && !p.step; }")
                 log(f"  {size} into_bed: {r['into_bed']['worst']} worst, head out {r['into_bed']['head_miss']}/{r['into_bed']['frames']}")
-                r["out_of_bed"] = _transition(h, pg, "desk", 14, "() => { const p = pose(); return p.at === 'desk' && !p.step; }")
+                r["out_of_bed"] = _transition(h, pg, "desk", 14, "() => pose().at === 'desk'")   # (at the desk: the monitor shot)
                 log(f"  {size} out_of_bed: {r['out_of_bed']['worst']} worst, head out {r['out_of_bed']['head_miss']}/{r['out_of_bed']['frames']}")
                 r["errors"] = list(st["errors"])
                 ctx.close(); h.pages.pop(size, None)

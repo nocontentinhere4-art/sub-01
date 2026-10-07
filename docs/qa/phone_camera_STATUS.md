@@ -29,3 +29,38 @@ into bed 690, out of bed 750):
 On the phones the overview (fixed at (5.2, 5, 6) → (0, 0.6, 0), vertical FOV 30° on a 0.74-aspect canvas) puts his
 head ~11 px from the left edge and the bed past it. Out of bed the monitor shot starts as soon as the desk tick arrives,
 while he is still getting up from the bed (at 1280 too: 538/750 frames; left as it is, 1280 must not change).
+
+## Milestone 2 — the fix: done (web/room.html, camera logic only)
+- Phones (`camera.aspect < 1`, he is in the room): instead of the fixed overview, the follow camera keeps the overview's
+  angle but frames him: a 1.05 m sphere round his hips (lying: him and the bed; standing: head to feet) fitted into the
+  band of the canvas under the header (`#top`, read twice a second), so the distance follows the aspect ratio and the
+  header's height; his hips sit in the middle of that band. The goal follows his hips continuously and the page's 1.2/s
+  lerp moves the camera, so there is no jump between asleep / on his side / awake / getting in or out.
+- Phones: the monitor shot waits until he is at the desk (at main it started as soon as the desk tick arrived, with him
+  still in bed); at the desk it is the same shot (angle, distance) slid up under the header so his head is not under it.
+- The camera's spring arm no longer collides with `shadow_shell` (the invisible slabs that only close the cut-open room
+  for the sun's shadow map: no colour, no depth): near the door it pulled the phone camera into his back.
+- 1280×800 / desktop: the same code path as before (`aspect ≥ 1`): camera positions identical, 1280 shots pixel-equal
+  (max diff 8/255, SwiftShader noise), the desk camera unchanged. 1280's numbers equal main's, including the out-of-bed
+  frames where the monitor shot comes in early (538/750, not touched: desktop must not change).
+
+After the fix (worst share in frame / frames with the head cut):
+
+| mode | 390×844 | 360×780 | 430×932 | 1280×800 |
+|---|---|---|---|---|
+| asleep | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| on his side | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| lying, music | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| phone in bed | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| into bed (door → lying, 630 frames) | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| desk (monitor shot) | 0.327 / 0 | 0.319 / 0 | 0.335 / 0 | 0.548 / 0 |
+| standing (door) | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+| walking | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 | 1.0 / 0 |
+
+Out of bed (on the way, until he is at the desk anchor; then the monitor shot, head only): re-measured in the full run
+below (the test's arrival check now runs every frame).
+
+Sheet: `docs/qa/phone_camera_before_after.jpg` (390×844 asleep, awake in bed with music, at the desk, walking, before /
+after; 1280×800 asleep before / after).
+
+## Milestone 3 — full suite: running

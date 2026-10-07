@@ -1287,11 +1287,37 @@ $("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", fol
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
+// phones (a canvas taller than wide): the overview's room does not fit across, and the bed fell off the left edge with him
+// in it. There the camera keeps the overview's angle but frames him: a sphere round his hips (him, and the bed when he is
+// in it) fitted into the part of the canvas under the header (#top lies over the canvas's top), so the distance follows
+// the aspect and the header's height; the monitor shot waits until he is at the desk. Wider canvases keep the old goals.
+const OV_DIR = OVERVIEW.pos.clone().sub(OVERVIEW.target).normalize();
+const OV_UP = UP.clone().addScaledVector(OV_DIR, -UP.dot(OV_DIR)).normalize();     // the overview camera's up
+const FRAME_R = 1.05;                                // the sphere round his hips: his height lying, his feet standing
+let hudAt = -1e9, hudTop = 1;
+const narrow = () => camera.aspect < 1 && !!(boy && boy.visible && bones.Hips);
+function hudBand(){                                  // the header's bottom, as NDC y over the canvas (read twice a second)
+  const now = performance.now(); if (now - hudAt < 500) return hudTop; hudAt = now;
+  const c = renderer.domElement.getBoundingClientRect(), t = $("top").getBoundingClientRect();
+  return hudTop = c.height > 0 ? clamp(1 - 2 * Math.max(0, t.bottom - c.top) / c.height, 0.2, 1) : 1;
+}
+// how far up to move a camera d metres from its target so the target sits in the middle of the band under the header
+const bandShift = d => -(hudBand() - 1) / 2 * Math.tan(camera.fov * Math.PI / 360) * d;
+function frameHim(){
+  const ty = Math.tan(camera.fov * Math.PI / 360), half = (hudBand() + 1) / 2;   // the free band's half height (NDC)
+  const d = FRAME_R / Math.sin(Math.atan(Math.min(ty * camera.aspect, ty * half)));
+  bones.Hips.getWorldPosition(v1).addScaledVector(OV_UP, bandShift(d));       // (his hips at the band's middle)
+  camGoal.target.copy(v1); camGoal.pos.copy(v1).addScaledVector(OV_DIR, d);
+}
 function updateCameraGoal(){
-  if ((screenOn === "desk" || chatting) && monitor) {
+  const nar = narrow();
+  if ((screenOn === "desk" || chatting) && monitor && !(nar && at !== "desk" && !(step && step.to === "desk"))) {
     const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
     camGoal.target.set(...m.c);
     camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+    if (nar) { const off = bandShift(camGoal.pos.distanceTo(camGoal.target));     // (phones: the same shot, slid under the header)
+      v1.subVectors(camGoal.target, camGoal.pos).normalize(); v2.copy(UP).addScaledVector(v1, -UP.dot(v1)).normalize();
+      camGoal.target.addScaledVector(v2, off); camGoal.pos.addScaledVector(v2, off); }
   } else if (screenOn === "phone" && phone.visible && head) {
     // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
     phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
@@ -1303,7 +1329,8 @@ function updateCameraGoal(){
       camGoal.target.copy(v1).lerp(v2, 0.3);
       camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
     }
-  } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
+  } else if (nar) frameHim();
+  else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
 }
 
 // ---------- the camera never inside him: the visitor can orbit and zoom in close (to 0.4 m from the target, the
@@ -1347,7 +1374,8 @@ function camRoom(){                                   // the solids, refreshed e
   if (!room) return null; const now = performance.now();
   if (CAMR.meshes && now - CAMR.at < 2000) return CAMR.meshes; CAMR.at = now;
   const isBoy = o => { for (let q = o; q; q = q.parent) if (q === boy) return true; return false; };
-  CAMR.meshes = []; scene.traverse(o => { if (!o.isMesh || !o.visible || isBoy(o) || o.name === "duvet_over" || o.name === "quilt_dent" || o.name === "pillow_dent") return;
+  CAMR.meshes = []; scene.traverse(o => { if (!o.isMesh || !o.visible || isBoy(o) || o.name === "duvet_over" || o.name === "quilt_dent" || o.name === "pillow_dent"
+    || o.name === "shadow_shell") return;                // (the sun's shadow slabs: unseen, no colour, no depth; on a phone the framing shot looked through them)
     if (!o.geometry.boundsTree) o.geometry.computeBoundsTree(); CAMR.meshes.push(o); });
   if (!CAMR.box) { const st = room.getObjectByName("room_static"); if (st) CAMR.box = new THREE.Box3().setFromObject(st); }
   return CAMR.meshes;
