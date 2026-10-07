@@ -1,6 +1,6 @@
 // node bed_shots.mjs <port> <activity> <out.png> [times s, comma] [views: page,side,head,foot]
 // The room (room.html?debug) with him doing <activity> (sleep / listen_music), settled on the bed, then one row per time:
-// the page's own camera (pagez: from where it stands, zoomed onto the bed) and fixed cameras beside the bed (side: from the room, level with him; head: by the pillow; foot:
+// the page's own camera (pagez: from where it stands, zoomed onto the bed; headcam/headcam2: close on his head, either side) and fixed cameras beside the bed (side: from the room, level with him; head: by the pillow; foot:
 // from the foot end), tiled into one PNG (rows = times, columns = views). LIFE noDuvet: 1 hides the duvet (to see him under it); turn: 1 starts the turn onto his side (t 0 = its first frame). LIFE='{"music":{...}}' as in contact_pass.mjs.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
 const [port, activity = "sleep", out = "bed.png", times = "0,1,2", views = "page,side,head"] = process.argv.slice(2);
@@ -16,7 +16,8 @@ const hour = process.env.HOUR || (activity === "sleep" ? 23 : 15);
 await p.goto(`http://localhost:${port}/room.html?debug&nolive${process.env.QS || ""}&hour=${hour}`);
 await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
 await p.evaluate(([a, X]) => { window.FREEZE = true; window.NODUVET = !!X.noDuvet; settle(); live(a, {activity: a, ...X});
-  let t = 0, still = 0; while (t < 120 && still < 1) { animate_(1 / 30); t += 1 / 30; still = pose().step || pose().at !== "bedlie" ? 0 : still + 1 / 30; }
+  const onBed = a === "sleep" || a === "listen_music";             // (anything else: settled when no step runs)
+  let t = 0, still = 0; while (t < 120 && still < 1) { animate_(1 / 30); t += 1 / 30; still = pose().step || (onBed && pose().at !== "bedlie") ? 0 : still + 1 / 30; }
   for (let i = 0; i < 90; i++) animate_(1 / 30);
   if (X.turn) { mh.sleepTurn(); for (let i = 0; i < 90 && !mh.turning; i++) animate_(1 / 30); }   // (the turn starts at the loop's wrap)
   window._t0 = 0; }, [activity, JSON.parse(process.env.LIFE || "{}")]);
@@ -29,6 +30,13 @@ for (const t of T) {
   for (const v of VS) {
     const png = await p.evaluate(([v, C]) => { const cam = camera, keep = [cam.position.clone(), controls.target.clone(), cam.fov];
       if (v === "pagez") { cam.fov = keep[2] / 3.2; controls.target.set(-0.95, 0.85, 0.85); cam.updateProjectionMatrix(); cam.lookAt(controls.target); window.NOCLEAR = true; }
+      else if (v === "headabove") {                               // straight down onto his head and collar, wherever he is
+        const h = bones.Head.getWorldPosition(new THREE.Vector3()); cam.position.set(h.x + 0.02, h.y + 0.45, h.z + 0.02); controls.target.copy(h);
+        cam.fov = 45; cam.updateProjectionMatrix(); cam.lookAt(controls.target); window.NOCLEAR = true; }
+      else if (v === "headcam" || v === "headcam2") {            // close on his head wherever he is: beside and a little above it
+        const h = bones.Head.getWorldPosition(new THREE.Vector3()), r = boy.rotation.y, side = v === "headcam" ? 1 : -1;
+        cam.position.set(h.x + 0.30 * Math.sin(r + side * 1.2), h.y + 0.12, h.z + 0.30 * Math.cos(r + side * 1.2)); controls.target.copy(h);
+        cam.fov = 40; cam.updateProjectionMatrix(); cam.lookAt(controls.target); window.NOCLEAR = true; }
       else if (v === "profile") {                                  // straight from the side, nearly flat (fov 9), what stands between hidden
         cam.position.set(...C[v][0]); controls.target.set(...C[v][1]); cam.fov = 9; cam.updateProjectionMatrix(); cam.lookAt(controls.target); window.NOCLEAR = true;
         window._hid = []; const bb = new THREE.Box3(); scene.traverse(o => { if (o.isMesh && o.visible && !boy.getObjectById(o.id)) { bb.setFromObject(o); if (bb.max.z < 0.30 || (bb.min.z < 0.2 && bb.max.y > 1.6)) { o.visible = false; window._hid.push(o); } } }); }

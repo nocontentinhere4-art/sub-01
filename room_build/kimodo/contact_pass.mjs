@@ -41,6 +41,7 @@ const cdn = path.join(process.env.CDN_CACHE || "/tmp", "cdn_cache"); fs.mkdirSyn
 await p.route(/^https:\/\/(cdn\.jsdelivr\.net|unpkg\.com)\//, async r => { const u = r.request().url(), f = path.join(cdn, u.replace(/[^a-z0-9.]+/gi, "_"));
   if (!fs.existsSync(f)) execSync(`curl -sSfL -o ${f} '${u}'`); await r.fulfill({status: 200, contentType: u.endsWith(".css") ? "text/css" : "application/javascript", body: fs.readFileSync(f)}); });
 p.on("pageerror", e => console.log("pageerror", e.message));
+if (process.env.HP) await p.addInitScript(`window.__HP = ${process.env.HP};`);   // (HP='{"up":0.01,"out":0}': boy_mh.js's headphone offsets, to sweep)
 await p.goto(`http://localhost:${port}/room.html?debug&nolive${process.env.QS || ""}&hour=15`);
 await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
 const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
@@ -127,10 +128,10 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
     return {inside: p => { const c = cell(p); return c < 0 || !R[c] ? 0 : R[c] - rad(p); }, dbg: p => { const c = cell(p); return {c, band: Math.floor(c / NS), sec: c % NS, r: +rad(p).toFixed(3), R: +R[c].toFixed(3)}; }}; }
   // his head's skin (and hair) this frame, in a 1 cm hash, each vertex with its normal (rigid on the Head bone): a point is
   // inside by how far it is behind the nearest skin vertex's surface (within 2 cm of it)
-  function headSkin(L) { const G = new Map(), C = 0.01, n = new THREE.Vector3(), m3 = new THREE.Matrix3(), M4 = new THREE.Matrix4();
+  function headSkin(L, KIND = "head") { const G = new Map(), C = 0.01, n = new THREE.Vector3(), m3 = new THREE.Matrix3(), M4 = new THREE.Matrix4();
     parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position, N = sm.geometry.attributes.normal, K = L.kind[pi]; if (!N) return;
       const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight;
-      for (let i = 0; i < P.count; i++) { if (K[i] !== "head") continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
+      for (let i = 0; i < P.count; i++) { if (K[i] !== KIND && !(KIND === "hood" && /hood/.test(sm.name))) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
         let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); }
         M4.multiplyMatrices(sm.skeleton.bones[bb].matrixWorld, sm.skeleton.boneInverses[bb]).premultiply(sm.bindMatrixInverse).premultiply(sm.matrixWorld).multiply(sm.bindMatrix); m3.getNormalMatrix(M4);
         n.fromBufferAttribute(N, i).applyMatrix3(m3).normalize(); const key = `${Math.floor(v.x / C)},${Math.floor(v.y / C)},${Math.floor(v.z / C)}`;
@@ -138,12 +139,25 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
     // (inside = nearer the head's centre than the nearest head-skin point, along the line from the centre: his hair cards
     // are two-sided, so a normal there can point into the head, and read a hand against the hair as 4.6 cm inside;
     // kimodo_g12/bed_clip.py measures the same way)
+    const hbone = boy.getObjectByName("Head"); hbone.updateMatrixWorld(true); const hb = hbone.getWorldPosition(new THREE.Vector3()),
+      hu = new THREE.Vector3(0, 1, 0).applyQuaternion(hbone.getWorldQuaternion(new THREE.Quaternion())).normalize();
+    let HTOP = -9; for (const g of G.values()) for (let j = 0; j < g.length; j += 6) HTOP = Math.max(HTOP, (g[j] - hb.x) * hu.x + (g[j + 1] - hb.y) * hu.y + (g[j + 2] - hb.z) * hu.z);
     let n0 = 0; const cen = new THREE.Vector3(); for (const g of G.values()) for (let j = 0; j < g.length; j += 6) { cen.x += g[j]; cen.y += g[j + 1]; cen.z += g[j + 2]; n0++; } cen.divideScalar(n0 || 1);
-    return {inside: p => { let best = 9, bj = null; const cx = Math.floor(p.x / C), cy = Math.floor(p.y / C), cz = Math.floor(p.z / C);
+    return {near: p => { let best = 9; const cx = Math.floor(p.x / C), cy = Math.floor(p.y / C), cz = Math.floor(p.z / C);
+        for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (let c = -2; c <= 2; c++) { const g = G.get(`${cx + a},${cy + b},${cz + c}`); if (!g) continue;
+          for (let j = 0; j < g.length; j += 6) best = Math.min(best, (p.x - g[j]) ** 2 + (p.y - g[j + 1]) ** 2 + (p.z - g[j + 2]) ** 2); } return Math.sqrt(best); },
+      inside: p => { let best = 9, bj = null; const cx = Math.floor(p.x / C), cy = Math.floor(p.y / C), cz = Math.floor(p.z / C);
       for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++) for (let c = -4; c <= 4; c++) { const g = G.get(`${cx + a},${cy + b},${cz + c}`); if (!g) continue;
         for (let j = 0; j < g.length; j += 6) { const dx = p.x - g[j], dy = p.y - g[j + 1], dz = p.z - g[j + 2], d2 = dx * dx + dy * dy + dz * dz; if (d2 < best) { best = d2; bj = [g[j], g[j + 1], g[j + 2]]; } } }
-      if (!bj) return 0; const ux = p.x - cen.x, uy = p.y - cen.y, uz = p.z - cen.z, r = Math.hypot(ux, uy, uz);
-      return ((bj[0] - cen.x) * ux + (bj[1] - cen.y) * uy + (bj[2] - cen.z) * uz) / r - r; }}; }
+      if (!bj) return 0;
+      // seen from the head's own axis (the Head bone's up line) at that point's height - sideways at his ears and jaw,
+      // where a cup or a hand meets him - and from the head's centre only up by the crown (from the centre alone a cup's
+      // rim by his jaw, a centimetre clear of it sideways, read as 1.5 cm inside)
+      const t = (p.x - hb.x) * hu.x + (p.y - hb.y) * hu.y + (p.z - hb.z) * hu.z, top = t > HTOP - 0.05;
+      const ox = top ? cen.x : hb.x + hu.x * t, oy = top ? cen.y : hb.y + hu.y * t, oz = top ? cen.z : hb.z + hu.z * t;
+      let ux = p.x - ox, uy = p.y - oy, uz = p.z - oz; if (!top) { const k = ux * hu.x + uy * hu.y + uz * hu.z; ux -= hu.x * k; uy -= hu.y * k; uz -= hu.z * k; }
+      const r = Math.hypot(ux, uy, uz); if (r < 1e-6) return 0;
+      return ((bj[0] - ox) * ux + (bj[1] - oy) * uy + (bj[2] - oz) * uz) / r - r; }}; }
   function lyingFrame(L, f) { L.n++; const t = +(f / 30).toFixed(2);
     // back along the spine, head on the pillow, feet to the mattress end
     const bins = {}; let hlo = 9, fx = -9;
@@ -169,10 +183,15 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
     const hp = scene.getObjectByName("headphones_on");
     if (hp && hp.visible) { const H = L.phones || (L.phones = {frames: 0, headIn: 0, headMax_cm: 0, headFrames: 0, pillowIn: 0, pillowMax_cm: 0, pillowFrames: 0, minClear_cm: 99});
       H.frames++; hp.updateMatrixWorld(true); const pil = []; scene.traverse(o => { if (o.isMesh && o.visible && (o.name === "pillow_dent" || o.name === "quilt_dent" || (o.material && o.material.name === "sheet"))) pil.push(o); });
-      let hi = 0, hd = 0, pn = 0, pd = 0, clr = 9; const w = new THREE.Vector3();
+      let hi = 0, hd = 0, pn = 0, pd = 0, clr = 9; const w = new THREE.Vector3(), cross = {}, hood = headSkin(L, "hood");   // (its collar, lining, patches)
       hp.traverse(o => { if (!o.isMesh) return; const P = o.geometry.attributes.position; if (!o.name) o.name = o.parent && o.parent.children.length ? (o.parent.name || "cup") : "part"; for (let i = 0; i < P.count; i += 2) { w.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld);
         const d = maps.head.inside(w); if (d > 0.002) { hi++; hd = Math.max(hd, d); H.part = H.part || {}; H.part[o.name] = Math.max(H.part[o.name] || 0, +(d * 100).toFixed(1)); }
+        // the hood is a shell round his neck: a cup rim inside its collar ring touches nothing; a cup with vertices on both
+        // sides of the shell close to it (within 1.5 cm of its nearest hood point) cuts through it
+        { const nd = hood.near(w); if (nd < 0.015) { const dh = hood.inside(w), cs = cross[o.name] || (cross[o.name] = {in: 0, out: 0, d: 0});
+          if (dh > 0.002) { cs.in++; cs.d = Math.max(cs.d, dh); } else if (dh < -0.002) cs.out++; } }
         if (w.x < -1.25 && w.y < 1.05) { L.rc.set(w.clone().setY(1.6), L.DN); const h = L.rc.intersectObjects(pil, false)[0]; if (h) { const g = w.y - h.point.y; clr = Math.min(clr, g); if (g < -0.003) { pn++; pd = Math.max(pd, -g); H.ppart = H.ppart || {}; H.ppart[o.name] = Math.max(H.ppart[o.name] || 0, +(-g * 100).toFixed(1)); } } } } });
+      for (const [k, cs] of Object.entries(cross)) if (cs.in && cs.out) { H.hoodFrames = (H.hoodFrames || 0) + 1; H.hoodCut = H.hoodCut || {}; H.hoodCut[k] = Math.max(H.hoodCut[k] || 0, +(cs.d * 100).toFixed(1)); }
       if (hi) { H.headFrames++; H.headIn = Math.max(H.headIn, hi); H.headMax_cm = Math.max(H.headMax_cm, +(hd * 100).toFixed(1)); }
       if (pn) { H.pillowFrames++; H.pillowIn = Math.max(H.pillowIn, pn); H.pillowMax_cm = Math.max(H.pillowMax_cm, +(pd * 100).toFixed(1)); }
       H.minClear_cm = Math.min(H.minClear_cm, +(clr * 100).toFixed(1)); }
@@ -199,7 +218,7 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       gap_by_region: Object.fromEntries(Object.entries(D.by).map(([k, e]) => [k, {max_cm: cm(e.max), mean_cm: cm(e.sum / e.n), at_max_s: e.tmax}]))}; }
     return out; }
   const F = 0.16, TOP = 0.82 - 0.02, M = 0.01;
-  const LY = LYING ? lyingSetup() : null;
+  const LY = LYING || X.music ? lyingSetup() : null;              // (with music on: the headphones' rows anywhere)
   const S = {frames: 0, at, clip: cur, step: S0step, chair: {}, desk: {}, other: {}, bedframe: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: [], perFrame: {}};
   const add = (k, reg, d, f) => { const e = S[k][reg] || (S[k][reg] = {frames: 0, maxDepth: 0, maxCount: 0, _f: -1, _n: 0});
     if (e._f !== f) { if (e._f >= 0) e.maxCount = Math.max(e.maxCount, e._n); e._f = f; e._n = 0; e.frames++; } e._n++; e.maxDepth = Math.max(e.maxDepth, d);

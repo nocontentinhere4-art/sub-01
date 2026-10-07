@@ -1694,7 +1694,7 @@ export function createMH(env) {
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); if (BN) geo.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
     geo.computeBoundingSphere(); const band = new THREE.Mesh(geo, bm.material); band.name = "hp_band"; g.add(band);
     g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    head.add(g); g.position.set(0, HP.EAR_Y, HP.EAR_Z); g.scale.setScalar(1 / ws); g.visible = false; g.name = "headphones_on";
+    head.add(g); g.position.set(0, HP.EAR_Y + HP.UP / ws, HP.EAR_Z); g.scale.setScalar(1 / ws); g.visible = false; g.name = "headphones_on";
     M.hpFit = MU.fit = {ear_span_cm: +(2 * e * 100).toFixed(1), crown_over_ear_cm: +(top * 100).toFixed(1), cushion_faces_cm: +(2 * fx * 100).toFixed(1),
       band_stretch: [+(tc[-1].L / mLenE).toFixed(2), +(tc[1].L / mLenE).toFixed(2)], shell_wall_mm: [+(shellIn[-1] * 1000).toFixed(1), +(shellIn[1] * 1000).toFixed(1)], cup_tilt_deg: [+(tilt[-1] * 180 / Math.PI).toFixed(1), +(tilt[1] * 180 / Math.PI).toFixed(1)]};
     return MU.set = g;
@@ -1764,10 +1764,23 @@ export function createMH(env) {
     TN.on = false; TN.next = 120 + 180 * Math.random(); TN.last = 0; if (env.bedMoving) env.bedMoving(false); env.mixer.update(0);
   }
   function startTurn() { TN.next = 0; return !!M.actions.sleep_turn; }
+  // lying in bed the pair sits out of his hair: wider across his ears by HP.BED_OUT a side (the whole pair, band and cups
+  // together, so nothing parts), eased in over 0.5 s as he lies down. G10d's fit is untouched elsewhere; lying, the hair at
+  // his ears stood up to 1.0 cm into the cups (contract: 0.5)
+  HP.BED_OUT = 0.008;
+  // and in every pose clear of the hood's collar (main's v5, b2593d7): it stands behind and under his ears, and the cups'
+  // lower rims cut 1.4-1.8 cm into it standing and lying (G10d). The pair sits HP.UP higher on his head and HP.OUT wider
+  // a side (?debug: window.__HP = {up, out} before the page loads, to sweep them)
+  const HPO = (typeof window !== "undefined" && window.__HP) || {}; HP.UP = HPO.up ?? 0.0; HP.OUT = HPO.out ?? 0.0;
+  if (HPO.bedOut != null) HP.BED_OUT = HPO.bedOut; HP.BED_UP = HPO.bedUp ?? 0.0;   // (lying: the hood's collar rides up behind his ears)
   function music(st, dt) {
     const on = !!(st.life && st.life.music) && env.boy.visible;
     const g = on || MU.set ? headphones() : null;
     if (g) g.visible = on; if (MU.wall) MU.wall.visible = !(on && g);
+    if (g && MU.fit) { const bed = st.at === "bedlie" || !!(st.step && (st.step.to === "bedlie" || st.step.from === "bedlie"));
+      MU.bw = Math.max(0, Math.min(1, (MU.bw || 0) + (bed ? dt : -dt) / 0.5));
+      g.scale.x = g.scale.y * (1 + (HP.OUT + MU.bw * HP.BED_OUT) * 2 / (MU.fit.cushion_faces_cm / 100));
+      g.position.y = HP.EAR_Y + (HP.UP + MU.bw * HP.BED_UP) * g.scale.y; }   // (g.scale.y: metres -> the head bone's units)
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
   function dbg() {

@@ -182,7 +182,7 @@ a_pv, e_pv = (0.0, 0.0) if ONSIDE else solve(tilt_pelvis, lambda: pelvis_err(SAM
 diag('after pelvis')
 # 2a. the head's turn (awake, with the headphones on): no more than HEAD_TURN toward his side. Laying_Nodding's
 # performer lies with his head turned 50 deg: the lower cup then sits at his jaw, in the hood's collar and on the pillow
-HEAD_TURN = np.radians(20)
+HEAD_TURN = np.radians(float(os.environ.get('BED_HEAD_TURN', 20)))
 def head_roll(fs):
     _, Q2, _ = ts.fk(T[fs], R[fs]); ear = qrot(Q2[:, ix['Head']], np.broadcast_to(np.array([1.0, 0, 0]), (len(fs), 3)))
     return float(np.mean(np.arcsin(np.clip(ear[:, 1], -1, 1))))
@@ -253,6 +253,31 @@ if toe_x(SAMPLE) > G['page']['mattressEnd'] - TOE_IN:
     a_kn *= sg
 
 diag('after knees')
+# 3c. buttocks (on his back): the heel step above turns his thighs at the hips, which lifts his buttocks off the mattress
+# again after the pelvic tilt (3-4 cm). Here the thighs are set by the buttocks instead - turned at the hips until his
+# buttocks lie as low as the small of his back - and the knees then bend just enough that his calves and heels stay out
+# of the mattress (a sleeper's knees are never locked straight)
+CALF = np.array([bool(re.match(r'[LR]_(Calf|Foot|ToeBase)', n)) for n in dom])
+BUTT_OVER = 0.02   # (his buttocks this far over the small of his back: there the hoodie hangs below his body line, and gives)
+def calf_err(fs):
+    X, _ = skinf(fs); return float(np.mean([X[f][CALF & BODY, 1].min() - (backlow(X[f]) - BACK_UP) for f in range(len(fs))]))
+a_bt = a_kh = 0.0
+# (off: measured on main's v5, it took the buttocks from +3.2..+4.0 to +2.4..+2.9 cm but made the backs of his thighs his
+# lowest skin - the page rests that on the bed - so his whole back floated, +0.2..+0.6 asleep and +1.8..+4.0 awake, with
+# his knees bent 35-50 deg; BED_BUTTOCKS=1 turns it on)
+if os.environ.get('BED_BUTTOCKS') and not ONSIDE and LEG_AX[0] is SIDE:
+    a_bt, e_pv = solve(tilt_pelvis, lambda: pelvis_err(SAMPLE) - BUTT_OVER, -0.5, 0.5)
+    if calf_err(SAMPLE) < -0.002:
+        def bend_knees2(a):
+            for b in ('L_Calf', 'R_Calf'): turn(allf, b, SIDE, a)
+        keep_k = R.copy(); best = None
+        for lo, hi_ in ((0.0, 1.3), (-1.3, 0.0)):
+            R[:] = keep_k; a, e = solve(bend_knees2, lambda: calf_err(SAMPLE), lo, hi_)
+            if abs(e) < 0.003 and (best is None or abs(a) < abs(best)): best = a
+        R[:] = keep_k
+        if best is not None: bend_knees2(best); a_kh = best
+    e_pv = pelvis_err(SAMPLE)
+diag('after buttocks')
 # 4. hands: each arm raised at the shoulder until the forearms and hands clear his torso (polar map round the spine)
 def torso_in(X, P2, side):
     a, b = P2[ix['Hip']], P2[ix['NeckTwist01']]; ax = (b - a) / np.linalg.norm(b - a); L = np.linalg.norm(b - a)
@@ -349,7 +374,7 @@ if LOOP:
 # ---- report: the contacts in the room's frame (the page puts his lowest skin at the bed's top)
 X, P2 = skinf(allf); top = TOP
 rep = {'head_turn_deg': round(float(np.degrees(a_ht)), 1), 'head_roll_deg': round(float(np.degrees(head_roll(SAMPLE))), 1), 'pelvis_deg': round(float(np.degrees(a_pv)), 1), 'pelvis_err_cm': round(e_pv * 100, 1), 'level_deg': round(float(np.degrees(a_lvl)), 1), 'level_err_cm': round(e_lvl * 100, 1), 'neck_deg': round(float(np.degrees(a_nk)), 1),
-       'head_err_cm': round(e_nk * 100, 1), 'legs_deg': round(float(np.degrees(a_lg)), 1), 'knees_deg': round(float(np.degrees(a_kn)), 1), 'heel_err_cm': round(e_lg * 100, 1),
+       'head_err_cm': round(e_nk * 100, 1), 'legs_deg': round(float(np.degrees(a_lg)), 1), 'knees_deg': round(float(np.degrees(a_kn)), 1), 'thighs_for_buttocks_deg': round(float(np.degrees(a_bt)), 1), 'knees_for_heels_deg': round(float(np.degrees(a_kh)), 1), 'heel_err_cm': round(e_lg * 100, 1),
        'wrists_moved_cm': {s: [round(a_hand[s][0] * 100, 1), a_hand[s][2]] for s in 'LR'}, 'hands_in_cm': {s: round(a_hand[s][1] * 100, 1) for s in 'LR'}}
 lows = X[:, BODY, 1].min(1); off = top - lows                    # the page's lift per frame
 back_g, sh_g, head_g, toe = [], [], [], []
