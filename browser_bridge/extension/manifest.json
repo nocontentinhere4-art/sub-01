@@ -1,0 +1,1 @@
+{"manifest_version":3,"name":"SUB-01 Fomo Live Monitor","version":"0.1.0","description":"Broadcast the dedicated SUB-01 Fomo token tab to its desk monitor.","permissions":["activeTab","tabCapture","offscreen","scripting"],"host_permissions":["https://fomo.family/*","http://127.0.0.1:8878/*"],"background":{"service_worker":"background.js"},"action":{"default_popup":"popup.html"}}

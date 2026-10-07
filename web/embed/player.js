@@ -74,11 +74,18 @@ function update(data){
   const plan=data.strategy?.last;
   $('strategy').textContent=plan?`NEXT: ${plan.action==='buy'?'COPY '+plan.asset:'HOLD CASH'} · ${plan.reason}`:'Copy-trading · '+(data.strategy?.state||'waiting for feed');
   $('screen-toggle').hidden=!data.monitor?.available;
-  if(data.monitor?.available)loadFrame(data.monitor);else{$('screen-detail').hidden=true;updateMonitor(data);}
+  const liveScreen=data.monitor?.mode==='live_browser';
+  $('screen-note').textContent=liveScreen?'LIVE FOMO · scroll to explore':'CAPTURED PREVIEW · scroll to explore';
+  if(data.monitor?.available)loadFrame(data.monitor);else{
+    $('screen-detail').hidden=true;$('screen-toggle').textContent='Enlarge Fomo ↗';$('screen-toggle').setAttribute('aria-expanded','false');
+    screenStamp=null;if(screenMaterial?.map){screenMaterial.map.dispose();screenMaterial.map=null;screenMaterial.color.set('#17110d');screenMaterial.needsUpdate=true;}
+    updateMonitor(data);
+  }
   $('badge').textContent=connected?'THE DESK · CONNECTED':'THE DESK · OFFLINE';
   $('mode').textContent=connected?'ACCOUNT EXECUTIONS':'ACCOUNT NOT CONNECTED';
   $('status').textContent=connected?'Fomo account feed · reported confirmations':s.updated_at?'Account offline · showing last received operations':'Waiting for Fomo account · no real operations yet';
-  if(data.monitor?.available){$('badge').textContent='THE DESK · FOMO PREVIEW';$('mode').textContent='REVIEWED SCREEN';$('status').textContent='Fomo account screen · captured preview';}
+  if(data.monitor?.available){$('badge').textContent=liveScreen?'THE DESK · LIVE FOMO':'THE DESK · FOMO PREVIEW';$('mode').textContent=liveScreen?'LIVE BROWSER':'REVIEWED SCREEN';$('status').textContent=liveScreen?'Real Fomo tab · follows detected token purchases':'Fomo account screen · captured preview';}
+  else if(liveScreen){$('badge').textContent='THE DESK · SCREEN PAUSED';$('mode').textContent='BROWSER DISCONNECTED';$('status').textContent='Waiting for the live Fomo tab · screen hidden';}
   if(!rows.length){$('ops').replaceChildren(Object.assign(document.createElement('div'),{className:'empty',textContent:data.monitor?.available?'No operations received.':connected?'No confirmed operations received yet.':'Account not connected. Real operations will appear here.'}));return;}
   $('ops').replaceChildren(...rows.slice().reverse().map(r=>{
     const row=document.createElement('div');row.className='row';
@@ -101,7 +108,7 @@ async function loadFrame(meta){
     if(previousUrl)URL.revokeObjectURL(previousUrl);
     const bitmap=await createImageBitmap(blob,{imageOrientation:'flipY'});
     const tex=new THREE.CanvasTexture(bitmap);tex.colorSpace=THREE.SRGBColorSpace;
-    const old=screenMaterial.map;screenMaterial.map=tex;screenMaterial.needsUpdate=true;screenStamp=meta.revision;
+    const old=screenMaterial.map;screenMaterial.map=tex;screenMaterial.color.set('#ffffff');screenMaterial.needsUpdate=true;screenStamp=meta.revision;
     if(old){old.image?.close?.();old.dispose();}
   }catch{$('status').textContent+=' · screen unavailable';}
   finally{screenBusy=false;}
@@ -109,6 +116,6 @@ async function loadFrame(meta){
 
 async function poll(){
   if(!document.hidden){try{const res=await fetch('/embed/state',{credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(8000)});if(!res.ok)throw Error();update(await res.json());}catch{$('status').textContent='Connection lost · displayed operations may be old';}}
-  setTimeout(poll,3000);
+  setTimeout(poll,750);
 }
 boot().then(poll).catch(e=>{console.error('Desk failed',e);fail();poll();});

@@ -1,0 +1,3 @@
+# Optional funded copy runner; never needed by the public read-only player.
+aiohttp>=3.10,<4
+solders>=0.26,<1

@@ -1,0 +1,1 @@
+for(const action of ['start','stop'])document.getElementById(action).onclick=async()=>{try{const result=await chrome.runtime.sendMessage({type:action});document.getElementById('status').textContent=result?.error||result?.message||'Done';}catch(e){document.getElementById('status').textContent=e.message;}};

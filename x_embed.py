@@ -94,10 +94,45 @@ def approved_frame(path, digest):
         return None
 
 
-def strategy_status(app):
+def live_frame(data_dir):
+    """Fresh frames from the authenticated, token-page-only local bridge."""
+    try:
+        directory=Path(data_dir)/'embed'
+        with (directory/'fomo-live-frame.json').open('rb') as f:raw=f.read(2049)
+        if len(raw)>2048:return None, None
+        meta=json.loads(raw)
+        from browser_bridge.server import TOKEN_PAGE
+        updated=meta.get('updated_at')
+        if (meta.get('version')!=1 or meta.get('mode')!='live_browser'
+            or meta.get('source')!='fomo-tab-extension'
+            or not TOKEN_PAGE.fullmatch(meta.get('page',''))
+            or type(updated) not in (int,float) or not math.isfinite(updated)
+            or not 0<=time.time()-updated<=4):return None,None
+        frame=approved_frame(directory/'fomo-live-frame.jpg',meta.get('revision',''))
+        return (frame,meta) if frame else (None,None)
+    except (OSError,ValueError,TypeError,AttributeError):return None,None
+
+
+def strategy_status(app, data_dir=None):
     from copytrading.account import KEY
     planner=app.get(KEY)
-    return planner.public() if planner else {'state':'waiting for risk limits','last':None}
+    out=planner.public() if planner else {'state':'waiting for risk limits','last':None}
+    if data_dir is not None:
+        try:
+            path=Path(data_dir)/'copytrading/runner-status.json'
+            with path.open('rb') as f:raw=f.read(8193)
+            if len(raw)>8192:return out
+            status=json.loads(raw)
+            updated=status.get('updated_at')
+            following=status.get('following')
+            if (type(updated) in (int,float) and math.isfinite(updated) and 0<=time.time()-updated<=30
+                and status.get('running') is True and status.get('execution_enabled') is True
+                and isinstance(following,list) and 1<=len(following)<=30):
+                active=status.get('connected') is True and status.get('halted') is False
+                out.update(state=f'watching {len(following)} wallets' if active else 'account stream paused',
+                           execution='connected' if active else 'paused')
+        except (OSError,ValueError,TypeError,AttributeError):pass
+    return out
 
 
 def attach(app, live, data_dir):
@@ -110,21 +145,27 @@ def attach(app, live, data_dir):
     lock = asyncio.Lock()
     frame_path = Path(data_dir) / 'embed/fomo-reviewed-frame.jpg'
     frame_hash = os.environ.get('SUB01_FOMO_FRAME_SHA256', '')
+    use_live = os.environ.get('SUB01_FOMO_LIVE') == '1'
 
     async def state(request):
         nonlocal cached, cached_at
         async with lock:
             now = time.monotonic()
-            if cached is None or now - cached_at >= 2:
+            if cached is None or now - cached_at >= (.5 if use_live else 2):
                 account = await asyncio.to_thread(account_snapshot, Path(data_dir) / 'embed/fomo.json')
-                frame = await asyncio.to_thread(approved_frame, frame_path, frame_hash)
+                if use_live:
+                    frame,frame_meta=await asyncio.to_thread(live_frame,data_dir)
+                    monitor={'available':frame is not None,'revision':frame_meta['revision'] if frame_meta else None,'mode':'live_browser'}
+                else:
+                    frame=await asyncio.to_thread(approved_frame,frame_path,frame_hash)
+                    monitor={'available':frame is not None,'revision':frame_hash if frame else None,'mode':'reviewed_still'}
                 tick = getattr(live, 'last_tick', None)
                 cached = {'version': 1, 'server_time': time.time(),
                           'simulation': 'demo' if getattr(live, 'demo', False) else 'running',
                           'connected': tick is not None and now - tick < 15,
                           'fomo': {'connected': account['state'] == 'connected'}, 'trading': account,
-                          'strategy': strategy_status(app),
-                          'monitor': {'available': frame is not None, 'revision': frame_hash if frame else None, 'mode': 'reviewed_still'}}
+                          'strategy': strategy_status(app, data_dir),
+                          'monitor':monitor}
                 cached_at = now
         return web.json_response(cached, headers={'Cache-Control': 'no-store',
                                                   'X-Content-Type-Options': 'nosniff'})
@@ -159,7 +200,8 @@ def attach(app, live, data_dir):
                                                'X-Content-Type-Options': 'nosniff'})
 
     async def frame(request):
-        raw = await asyncio.to_thread(approved_frame, frame_path, frame_hash)
+        if use_live:raw,_=await asyncio.to_thread(live_frame,data_dir)
+        else:raw=await asyncio.to_thread(approved_frame,frame_path,frame_hash)
         if raw is None:
             raise web.HTTPNotFound()
         return web.Response(body=raw, content_type='image/jpeg', headers={'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})
