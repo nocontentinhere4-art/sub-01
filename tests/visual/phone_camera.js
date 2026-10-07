@@ -47,14 +47,15 @@
     controls.update(); __keepClear();
   }
   // n frames of dt: the simulation and the camera; worst share and head misses; snap the camera first if asked
-  // (until: a predicate checked before each frame; the run stops there and says so: done)
+  // (until: a predicate checked after each step; the run stops there, that frame unmeasured, and says so: done)
   window.__phoneCam = (n, dt, snap, until) => {
     window.FREEZE = true; if (snap) { animate_(dt); camStep(dt, true); }
     let worst = 1, worstAt = null, headMiss = 0, frames = 0, sum = 0, maxJump = 0; const P = camera.position.clone();
     let done = false;
     for (let i = 0; i < n; i++) {
-      if (until && until()) { done = true; break; }
-      animate_(dt); camStep(dt, false); frames++;
+      animate_(dt); camStep(dt, false);
+      if (until && until()) { done = true; break; }     // (this frame is the next phase's)
+      frames++;
       maxJump = Math.max(maxJump, camera.position.distanceTo(P)); P.copy(camera.position);
       const r = measure(); sum += r.frac;
       if (!r.head) headMiss++;
