@@ -128,5 +128,26 @@ On type → mouse the right fingertip's speed rises and falls over about 20 fram
 | typing: thumb lowest | −0.8 mm | −2.1 mm |
 | mouse mode, left hand: tips in 0..+2 mm | 83% | 84% |
 
+**Typing contact back** (COORD: the thumb at −2.1 mm and 78% of the tips were not inside the limits). Three runs of the
+version above gave 80 / 78 / 78% and a thumb at −1.7 / −2.1 / −2.1 mm: not noise.
+- **The thumb.** It has a 1 mm margin over the height map while typing (1.5 mm at rest, as before). The height map misses
+  the keycaps' steep sides, as on the mouse.
+- **The elbow's swing.** It is now done once, after the arm's passes, not in each of them. Swung in every pass, it moved
+  the fit under the right hand: 12 of its tip samples were in the keys, against 5.
+
+| typing (64 samples) | 402e21f | above | now |
+|---|---|---|---|
+| resting tips in 0..+2 mm | 82% | 78% | 82% |
+| tips more than 2 mm in | 0 | 0 | 0 |
+| thumb lowest | −0.8 mm | −2.1 mm | −1.3 mm |
+| deepest hand vertex | 1.4 mm | 2.5 mm | 1.6 mm |
+
+Unchanged:
+- **The elbow.** No jump over 25 mm in 300 frames of typing.
+- **Switches.** Right tip at most 25 mm a frame; elbow at most 32 mm (one frame).
+- **Mouse.** `grip_probe.py contact` reads 0 mm of hand into the shell. The mesh probe puts the thumb's deepest vertex at
+  3.0 mm into the flank, where it is meant to sit; it was 2.6 mm.
+- **The left hand in mouse mode.** 83% of tips in 0..+2 mm.
+
 **Test.** `tests/visual/test_hand_switch.py` now allows at most 40 mm a frame for the right fingertip and 50 mm for the
 right elbow. At 402e21f it fails: right tip 83 mm, elbow 275 mm.
