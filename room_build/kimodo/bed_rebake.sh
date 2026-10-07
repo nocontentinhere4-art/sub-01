@@ -23,7 +23,7 @@ if ! curl -s -o /dev/null "http://localhost:$PORT/room.html"; then
   (cd "$R/web" && exec python3 -m http.server "$PORT" > "$WK/http.log" 2>&1) & SRV=$!; trap 'kill $SRV 2>/dev/null' EXIT; sleep 1; fi
 cd "$R/room_build"
 node $K/bed_surface.mjs $PORT "$WK/json/bed_surface.json"
-node $G/exp.mjs "$CH" "$WK/json/char.json" > /dev/null
+node $K/bed_exp.mjs "$CH" "$WK/json/char.json"   # (every skinned part but the slides: his feet are the socks mesh)
 for r in room_bedtime room_bed_lie; do node $G/exp.mjs "$R/web/room/mh_v5/$r.glb" "$WK/json/$r.x.json" > /dev/null; done
 MIX=$(python3 -c "import json,sys; sys.path.insert(0,'$G'); from bedrig import is_mixamo; print(1 if is_mixamo([n['name'] for n in json.load(open('$WK/json/char.json'))['nodes']]) else '')")
 echo "rig: ${MIX:+Mixamo}${MIX:-v5} ($CH)"

@@ -22,7 +22,7 @@
 //          balloon) by body region, and any of him poking out over its top
 //   self   his hands and the wrist half of his forearms inside his own torso or thighs (a polar map of each one's skin round
 //          its bone axis, every frame: 13 bands x 24 sectors, its largest skin radius, not a capsule) or his head (behind
-//          the nearest skin vertex's surface, by its normal: the head is not round - the ears stand out of it)
+//          the nearest head-skin point, seen from the head's centre: the head is not round - the ears stand out of it)
 //   phones the headphones (when worn): their vertices inside his head or hair (as for his hands), and under the
 //          pillow's shown (dented) surface
 // LIFE='{"screen": {"id": "v", "kind": "video"}}': more of the tick for live() (a video on the screen: watching).
@@ -132,10 +132,15 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
         M4.multiplyMatrices(sm.skeleton.bones[bb].matrixWorld, sm.skeleton.boneInverses[bb]).premultiply(sm.bindMatrixInverse).premultiply(sm.matrixWorld).multiply(sm.bindMatrix); m3.getNormalMatrix(M4);
         n.fromBufferAttribute(N, i).applyMatrix3(m3).normalize(); const key = `${Math.floor(v.x / C)},${Math.floor(v.y / C)},${Math.floor(v.z / C)}`;
         (G.get(key) || G.set(key, []).get(key)).push(v.x, v.y, v.z, n.x, n.y, n.z); } });
-    return {inside: p => { let best = 9, bd = 0; const cx = Math.floor(p.x / C), cy = Math.floor(p.y / C), cz = Math.floor(p.z / C);
-      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (let c = -2; c <= 2; c++) { const g = G.get(`${cx + a},${cy + b},${cz + c}`); if (!g) continue;
-        for (let j = 0; j < g.length; j += 6) { const dx = p.x - g[j], dy = p.y - g[j + 1], dz = p.z - g[j + 2], d2 = dx * dx + dy * dy + dz * dz; if (d2 < best) { best = d2; bd = -(dx * g[j + 3] + dy * g[j + 4] + dz * g[j + 5]); } } }
-      return best < 9 ? bd : 0; }}; }
+    // (inside = nearer the head's centre than the nearest head-skin point, along the line from the centre: his hair cards
+    // are two-sided, so a normal there can point into the head, and read a hand against the hair as 4.6 cm inside;
+    // kimodo_g12/bed_clip.py measures the same way)
+    let n0 = 0; const cen = new THREE.Vector3(); for (const g of G.values()) for (let j = 0; j < g.length; j += 6) { cen.x += g[j]; cen.y += g[j + 1]; cen.z += g[j + 2]; n0++; } cen.divideScalar(n0 || 1);
+    return {inside: p => { let best = 9, bj = null; const cx = Math.floor(p.x / C), cy = Math.floor(p.y / C), cz = Math.floor(p.z / C);
+      for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++) for (let c = -4; c <= 4; c++) { const g = G.get(`${cx + a},${cy + b},${cz + c}`); if (!g) continue;
+        for (let j = 0; j < g.length; j += 6) { const dx = p.x - g[j], dy = p.y - g[j + 1], dz = p.z - g[j + 2], d2 = dx * dx + dy * dy + dz * dz; if (d2 < best) { best = d2; bj = [g[j], g[j + 1], g[j + 2]]; } } }
+      if (!bj) return 0; const ux = p.x - cen.x, uy = p.y - cen.y, uz = p.z - cen.z, r = Math.hypot(ux, uy, uz);
+      return ((bj[0] - cen.x) * ux + (bj[1] - cen.y) * uy + (bj[2] - cen.z) * uz) / r - r; }}; }
   function lyingFrame(L, f) { L.n++; const t = +(f / 30).toFixed(2);
     // back along the spine, head on the pillow, feet to the mattress end
     const bins = {}; let hlo = 9, fx = -9;

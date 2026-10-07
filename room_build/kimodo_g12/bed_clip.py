@@ -15,6 +15,8 @@ What it does, on every frame of the clip (the same constant turns on every frame
             head and heels are 6 deg below the hips, on a bed with no pillow.)
   1b. pelvis the pelvis and legs turned about the hip joint and the waist turned back (the upper body stays) until his
             buttocks lie as low as the small of his back (the captures lie as over a bump)
+  2a. head  awake (the headphones on), his head turned back to no more than 20 deg toward his side (the capture's 50
+            put the lower cup at his jaw, in the hood's collar)
   2. pillow the neck and head bent about the side axis until the back of his head rests on the pillow's top
             (PILLOW_SINK into it; the rest surface of the room's own sheet/pillow mesh, bed_surface.mjs)
   3. heels  the legs turned at the hips until the heels rest on the mattress (the heels at his lowest); and if his toes
@@ -175,6 +177,27 @@ def tilt_pelvis(a):
     if 'Waist' in ix: turn(allf, 'Waist', SIDE, -a)
 a_pv, e_pv = (0.0, 0.0) if ONSIDE else solve(tilt_pelvis, lambda: pelvis_err(SAMPLE), -0.35, 0.35)
 diag('after pelvis')
+# 2a. the head's turn (awake, with the headphones on): no more than HEAD_TURN toward his side. Laying_Nodding's
+# performer lies with his head turned 50 deg: the lower cup then sits at his jaw, in the hood's collar and on the pillow
+HEAD_TURN = np.radians(20)
+def head_roll(fs):
+    _, Q2, _ = ts.fk(T[fs], R[fs]); ear = qrot(Q2[:, ix['Head']], np.broadcast_to(np.array([1.0, 0, 0]), (len(fs), 3)))
+    return float(np.mean(np.arcsin(np.clip(ear[:, 1], -1, 1))))
+a_ht = 0.0
+if AWAKE and 'Head' in ix:
+    r0 = head_roll(SAMPLE)
+    if abs(r0) > HEAD_TURN:
+        _, Q0, _ = ts.fk(T[[0]], R[[0]]); UPH = qrot(Q0[0, ix['Head']], np.array([0, 1.0, 0]))   # (the head's own up, at frame 0)
+        HT = [(b, w) for b, w in (('NeckTwist01', 0.3), ('NeckTwist02', 0.3), ('Head', 0.4)) if b in ix]
+        def turn_head(a):
+            for b, w in HT: turn(allf, b, UPH, a * w)
+        keep_h = R.copy(); best = None
+        for lo, hi_ in ((-1.2, 0.0), (0.0, 1.2)):               # (either way round: the smaller turn that does it)
+            R[:] = keep_h; a, e = solve(turn_head, lambda: abs(head_roll(SAMPLE)) - HEAD_TURN, lo, hi_)
+            if abs(e) < 0.01 and (best is None or abs(a) < abs(best)): best = a
+        R[:] = keep_h
+        if best is not None: turn_head(best); a_ht = best
+diag('after head turn')
 # 2. pillow: the neck and upper back bent until the back of his head is PILLOW_SINK into the pillow's top, his back on the
 # mattress: in the room, his lowest skin is put on the bed (the page), so this is the head's height over his back's
 def head_err(fs):
@@ -241,14 +264,16 @@ def torso_in(X, P2, side):
         for j in o: print(side, dom[k][j], 'band', band[k][j], 'sec', sec[k][j], 'r %.3f R %.3f t %.2f' % (r[k][j], Rm[c[k]][j], t[k][j]))
     return float(np.max(np.r_[0, Rm[c[k]] - r[k]]))
 ARM = np.array([bool(re.match(r'[LR]_(Forearm|Hand|Upperarm)|finger|metacarpal', n)) for n in dom])
-HEAD_TOL = 0.02 if not ONSIDE else 0.005   # (the polar map reads the ears as the head's surface: 2 cm of slack by his ears; on his side his hand lies by his face, not his ears)
-def head_in(X, P2, side):                                       # (his hand in his head: a polar map round Head -> head_end; > 2 cm, the ears stand out)
-    a, b = P2[ix['Head']], P2[ix['head_end']] if 'head_end' in ix else P2[ix['Head']] + np.array([0, 0.2, 0])
-    ax = (b - a) / np.linalg.norm(b - a); L = np.linalg.norm(b - a); e1 = np.cross([0, 1.0, 0], ax); e1 /= np.linalg.norm(e1) + 1e-9; e2 = np.cross(ax, e1)
-    w = X - a; t = w @ ax / L; r = np.hypot(w @ e1, w @ e2); phi = np.arctan2(w @ e2, w @ e1)
-    NB, NS = 13, 24; band = np.clip(((t + 0.3) / 1.6 * NB).astype(int), 0, NB - 1); sec = np.clip(((phi + np.pi) / (2 * np.pi) * NS).astype(int), 0, NS - 1)
-    ok = (t > -0.3) & (t < 1.3); Rm = np.zeros(NB * NS); c = band * NS + sec; m = HEAD & ok; np.maximum.at(Rm, c[m], r[m])
-    k = FORE & (SIDEOF == side) & ok & (Rm[c] > 0); return float(np.max(np.r_[0, Rm[c[k]] - r[k] - HEAD_TOL]))
+from scipy.spatial import cKDTree
+def head_in(X, P2, side):
+    """his hand in his head: for each hand / wrist vertex near his head's skin (within 4 cm), how far it is inside the
+    surface there - nearer the head's centre than the nearest head-skin point, measured along the line from the centre
+    (a polar map round the bone reads the ears as the head's surface and missed a hand pressed to his face)"""
+    H = X[HEAD]; c = H.mean(0); tree = cKDTree(H); k = FORE & (SIDEOF == side); Pk = X[k]
+    d, j = tree.query(Pk, distance_upper_bound=0.04); ok = np.isfinite(d)
+    if not ok.any(): return 0.0
+    u = Pk[ok] - c; r = np.linalg.norm(u, axis=1); u /= r[:, None]
+    return float(np.max(np.r_[0, ((H[j[ok]] - c) * u).sum(1) - r]))
 def hand_err(side, fs):
     # in his torso or head, or (on his side, the lower arm) under his torso's contact with the bed
     X, P2 = skinf(fs); return max(max(torso_in(X[f], P2[f], side), head_in(X[f], P2[f], side),
@@ -320,7 +345,7 @@ if LOOP:
 
 # ---- report: the contacts in the room's frame (the page puts his lowest skin at the bed's top)
 X, P2 = skinf(allf); top = TOP
-rep = {'pelvis_deg': round(float(np.degrees(a_pv)), 1), 'pelvis_err_cm': round(e_pv * 100, 1), 'level_deg': round(float(np.degrees(a_lvl)), 1), 'level_err_cm': round(e_lvl * 100, 1), 'neck_deg': round(float(np.degrees(a_nk)), 1),
+rep = {'head_turn_deg': round(float(np.degrees(a_ht)), 1), 'head_roll_deg': round(float(np.degrees(head_roll(SAMPLE))), 1), 'pelvis_deg': round(float(np.degrees(a_pv)), 1), 'pelvis_err_cm': round(e_pv * 100, 1), 'level_deg': round(float(np.degrees(a_lvl)), 1), 'level_err_cm': round(e_lvl * 100, 1), 'neck_deg': round(float(np.degrees(a_nk)), 1),
        'head_err_cm': round(e_nk * 100, 1), 'legs_deg': round(float(np.degrees(a_lg)), 1), 'knees_deg': round(float(np.degrees(a_kn)), 1), 'heel_err_cm': round(e_lg * 100, 1),
        'wrists_moved_cm': {s: [round(a_hand[s][0] * 100, 1), a_hand[s][2]] for s in 'LR'}, 'hands_in_cm': {s: round(a_hand[s][1] * 100, 1) for s in 'LR'}}
 lows = X[:, BODY, 1].min(1); off = top - lows                    # the page's lift per frame
