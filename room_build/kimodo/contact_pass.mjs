@@ -13,6 +13,7 @@
 // A penetration is a vertex more than 1 cm inside (the page's own margin); depth = how far inside, vertically.
 // LIFE='{"screen": {"id": "v", "kind": "video"}}': more of the tick for live() (a video on the screen: watching).
 // RARE=scared|angry|clap: once settled at the desk, start that rare event (boy_mh.js mh.rare) and sample from there.
+// support: the lower sole each frame (the foot bearing his weight), its range and the frames outside 0..+1 cm.
 // perFrame in the output: for every frame with something inside a solid, {"solid:region": [vertices, depth cm]} (frame = 1/30 s).
 // CLIP=<Clip> (G22): instead of his day, one of the standing / in-between clips on the Mixamo-rigged character
 // (room.html?char=mixamo&clip=<Clip>, room/standing_preview.js), every frame of the whole clip once from its first
@@ -54,11 +55,12 @@ const res = await p.evaluate(([activity, secs, X, RARE, CLIP]) => { let S0step =
       for (let q = o; q; q = q.parent) if (!q.visible) return;
       if (/^(floor|wall|cut|decal|curtain|screen|led|alu|posters)$/.test(o.material.name || "")) return;
       meshes.push(o); o.material.side = THREE.DoubleSide; }); }
+  const TOPS = [];   // (CLIP: every surface over a column, an odd one too: a rug or a mat is something to stand on, not a solid)
   const R = CLIP ? {x0: -1.99, x1: 1.99, z0: -1.45, z1: 1.59, c: 0.015} : {x0: -1.95, x1: 0.35, z0: -1.50, z1: 0.25, c: 0.015}, nx = Math.ceil((R.x1 - R.x0) / R.c), nz = Math.ceil((R.z1 - R.z0) / R.c), cols = new Array(nx * nz);
   const ray = new THREE.Raycaster(), o = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
   for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) { o.set(R.x0 + (i + 0.5) * R.c, 0.17, R.z0 + (k + 0.5) * R.c); ray.set(o, UP);
     const hits = []; for (const h of ray.intersectObjects(meshes, false)) { const y = h.point.y; if (!hits.length || y - hits[hits.length - 1] > 0.002) hits.push(y); }
-    cols[i * nz + k] = hits.length >= 2 ? hits.slice(0, hits.length - (hits.length % 2)) : null; }
+    cols[i * nz + k] = hits.length >= 2 ? hits.slice(0, hits.length - (hits.length % 2)) : null; if (CLIP && hits.length) (TOPS[i * nz + k] = hits); }
   meshes.forEach(m => { m.material.side = THREE.FrontSide; });
   const DESK = {x0: -1.56, x1: -0.34, z0: -1.46, z1: -0.84};          // the desk's footprint (its top and legs)
   // ---- body regions by each vertex's main bone
@@ -148,8 +150,11 @@ const res = await p.evaluate(([activity, secs, X, RARE, CLIP]) => { let S0step =
             if (col) for (let j = 1; j < col.length; j += 2) if (col[j] < u.y + 0.03) { const wy = ch.localToWorld(u.clone().setY(col[j])).y; if (wy > sup) { sup = wy; what = "chair"; } } }
           const i2 = Math.floor((v.x - R.x0) / R.c), k2 = Math.floor((v.z - R.z0) / R.c), col2 = i2 >= 0 && i2 < nx && k2 >= 0 && k2 < nz && cols[i2 * nz + k2];
           if (col2) for (let j = 1; j < col2.length; j += 2) if (col2[j] < v.y + 0.03 && col2[j] > sup) { sup = col2[j]; what = "furniture"; }
+          const tp = i2 >= 0 && i2 < nx && k2 >= 0 && k2 < nz && TOPS[i2 * nz + k2]; if (tp) for (const y of tp) if (y < v.y + 0.03 && y > sup) { sup = y; what = "surface"; }
           if (v.y - sup < lo) { lo = v.y - sup; S.soles[s[0]].on = what; } } });
-      const k = s[0], g = lo; if (lo < 9) { S.soles[k].min = Math.min(S.soles[k].min, g); S.soles[k].max = Math.max(S.soles[k].max, g); } }
+      const k = s[0], g = lo; if (lo < 9) { S.soles[k].min = Math.min(S.soles[k].min, g); S.soles[k].max = Math.max(S.soles[k].max, g); } (S._sole = S._sole || {})[k] = lo; }
+    // the supporting sole: the lower of the two each frame (standing: the foot bearing his weight)
+    if (S._sole) { const lo = Math.min(S._sole.L ?? 9, S._sole.R ?? 9); if (lo < 9) { const u = S.support || (S.support = {min: 9, max: -9, out: 0}); u.min = Math.min(u.min, lo); u.max = Math.max(u.max, lo); if (lo < -0.0005 || lo > 0.0105) u.out++; } S._sole = null; }
     { const segs = {L: segOf("L"), R: segOf("R")}; let nIn = 0, dMax = 0;
       parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { if (!HANDV[pi][i]) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
         for (const s of ["L", "R"]) { const [a, b] = segs[s], ab = b.clone().sub(a), t = v.clone().sub(a).dot(ab) / ab.lengthSq(); if (t < 0 || t > 1) continue;
@@ -162,6 +167,7 @@ const res = await p.evaluate(([activity, secs, X, RARE, CLIP]) => { let S0step =
     S.frames++; }
   for (const k of ["chair", "desk", "other", "floor", "bed", "wall", "phone"]) for (const r in S[k]) { const e = S[k][r]; e.maxCount = Math.max(e.maxCount, e._n); delete e._f; delete e._n; e.maxDepth = +(e.maxDepth * 100).toFixed(1); }
   S.seat = {lowestGap_min_cm: +(S.seat.min * 100).toFixed(1), lowestGap_max_cm: +(S.seat.max * 100).toFixed(1), framesUnder: S.seat.framesUnder || 0, maxVertsUnder: S.seat.maxUnder || 0, maxDepth_cm: +((S.seat.maxDepth || 0) * 100).toFixed(1)};
+  if (S.support) S.support = {min_cm: +(S.support.min * 100).toFixed(2), max_cm: +(S.support.max * 100).toFixed(2), framesOutside_0_1cm: S.support.out}; delete S._sole;
   for (const k of ["L", "R"]) S.soles[k] = {min_cm: +(S.soles[k].min * 100).toFixed(1), max_cm: +(S.soles[k].max * 100).toFixed(1), on: S.soles[k].on};
   S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5); S.legs.maxDepth = +(S.legs.maxDepth * 100).toFixed(1);
   S.mode = window.mh && mh.M.mode; return S; }, [activity, +secs || 8, JSON.parse(process.env.LIFE || "{}"), process.env.RARE || null, CLIP]);

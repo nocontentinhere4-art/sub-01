@@ -91,14 +91,26 @@ window.QA = {
   // self contact only (G22), every dt seconds (1/30: every frame): the PAIRS, with the rest and arms-down baselines
   selfContact(k, dt = 1 / 30) {
     const reg = regions(), out = {clip: k, frames: 0, inside: {}, worst: {}};
+    // the sleeve proper: an arm vertex that is further out than its shoulder joint in the T-pose rest (the rig also gives
+    // the arm bones hoodie vertices on his flanks, down to the waist: G23's review of preview/mixamo-pipeline, item 1;
+    // those follow the arm into his sides in any arms-down pose, whatever the clip)
+    QA.pose(null, 0); const R0 = skinned(true), sleeve = {};
+    for (const [nm, S] of [["left", "Left"], ["right", "Right"]]) { const sx = body.getObjectByName(S + "Arm").getWorldPosition(new THREE.Vector3()).x, sg = Math.sign(sx);
+      sleeve[nm] = new Uint8Array(R0.pos.length / 3); for (let i = 0; i < sleeve[nm].length; i++) if (sg * R0.pos[3 * i] > sg * sx + 0.02) sleeve[nm][i] = 1; }
     for (const [key, down] of [["insideRest", 0], ["insideArmsDown", 1.1]]) { QA.pose(null, 0);
       if (down) { for (const [n, sg] of [["LeftArm", -1], ["RightArm", 1]]) body.getObjectByName(n).rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), sg * down); body.updateMatrixWorld(true); }
       const s0 = skinned(); out[key] = {}; for (const [nm, A, B] of PAIRS) { const r = inside(s0, reg.sets[A], reg.sets[B]); out[key][nm] = {verts: r.n, depth_cm: +(r.d * 100).toFixed(1)}; } }
     const N = Math.round(clips[k].duration / dt) + 1;
     for (let f = 0; f < N; f++) { const t = Math.min(f * dt, clips[k].duration - 1e-4); QA.pose(k, t); const s = skinned(); out.frames++;
-      for (const [nm, A, B] of PAIRS) { const r = inside(s, reg.sets[A], reg.sets[B]);
+      for (const [nm, A, B] of PAIRS) { const L = [], r = inside(s, reg.sets[A], reg.sets[B], L);
         const o = out.inside[nm] || (out.inside[nm] = {frames: 0, maxDepth_cm: 0, maxVerts: 0, worstT: null});
-        if (r.n) { o.frames++; if (r.n > o.maxVerts) { o.maxVerts = r.n; o.worstT = +t.toFixed(2); } o.maxDepth_cm = Math.max(o.maxDepth_cm, +(r.d * 100).toFixed(1)); } } }
+        if (r.n) { o.frames++; if (r.n > o.maxVerts) { o.maxVerts = r.n; o.worstT = +t.toFixed(2); } o.maxDepth_cm = Math.max(o.maxDepth_cm, +(r.d * 100).toFixed(1)); }
+        // an arm in the torso: the fold at the armpit (within 15 cm of the shoulder joint, the rig's weights) apart from
+        // the arm anywhere else in his body (the forearm or the elbow through his side or chest: the clip)
+        if (/arm in torso/.test(nm)) { const side = nm.startsWith("left") ? "left" : "right", sh = body.getObjectByName(side === "left" ? "LeftArm" : "RightArm").getWorldPosition(new THREE.Vector3());
+          let n = 0, d = 0; for (const [i, dd] of L) if (sleeve[side][i] && Math.hypot(s.pos[3 * i] - sh.x, s.pos[3 * i + 1] - sh.y, s.pos[3 * i + 2] - sh.z) > 0.15) { n++; d = Math.max(d, dd); }
+          const key = side + " sleeve in torso, away from the armpit", q = out.inside[key] || (out.inside[key] = {frames: 0, maxDepth_cm: 0, maxVerts: 0, worstT: null});
+          if (n) { q.frames++; if (n > q.maxVerts) { q.maxVerts = n; q.worstT = +t.toFixed(2); } q.maxDepth_cm = Math.max(q.maxDepth_cm, +(d * 100).toFixed(1)); } } } }
     return out;
   },
   // a crossfade from clip a (at ta) into clip b (from tb) over dur seconds, as the page blends: hands vs thighs and the
@@ -192,7 +204,7 @@ const PAIRS = [["hands in thighs", "handsAll", "thighs"], ["left arm in torso", 
   ["left leg in right leg", "legL", "legR"], ["left hand in right hand", "handL", "handR"]];
 // A's vertices inside B: B hashed in 1 cm cells; for each A vertex, B's nearest vertex within 2.5 cm; inside when it is
 // behind that vertex's normal by > 5 mm
-function inside(s, A, B) {
+function inside(s, A, B, list) {
   const H = new Map(), c = 0.025, key = (x, y, z) => `${Math.floor(x / c)},${Math.floor(y / c)},${Math.floor(z / c)}`;
   for (let k = 0; k < B.length; k += 2) { const i = B[k], kk = key(s.pos[3 * i], s.pos[3 * i + 1], s.pos[3 * i + 2]); (H.get(kk) || H.set(kk, []).get(kk)).push(i); }
   let n = 0, d = 0;
@@ -202,7 +214,7 @@ function inside(s, A, B) {
       for (const j of L) { const dd = (s.pos[3 * j] - x) ** 2 + (s.pos[3 * j + 1] - y) ** 2 + (s.pos[3 * j + 2] - z) ** 2; if (dd < bd) { bd = dd; best = j; } } }
     if (best < 0) continue;
     const dot = (x - s.pos[3 * best]) * s.nrm[3 * best] + (y - s.pos[3 * best + 1]) * s.nrm[3 * best + 1] + (z - s.pos[3 * best + 2]) * s.nrm[3 * best + 2];
-    if (dot < -0.005) { n++; d = Math.max(d, -dot); } }
+    if (dot < -0.005) { n++; d = Math.max(d, -dot); if (list) list.push([i, -dot]); } }
   return {n, d};
 }
 window.QA_READY = true;

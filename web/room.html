@@ -3336,7 +3336,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       while (!room || !boy) await new Promise(r => setTimeout(r, 100));
       scene.remove(boy); follow = false;
       const m = await import("./room/standing_preview.js");
-      SP = await m.start({THREE, scene, load, clip: CLIP, chairNode, phone});
+      SP = await m.start({THREE, scene, load, clip: CLIP, chairNode, chairAt, phone});
       const v = SP.view("front"); controls.target.copy(v.target); camera.position.copy(v.pos);
       controls.update(); if (DEBUG) window.SP = SP;
     })().catch(e => console.warn("standing preview:", e));

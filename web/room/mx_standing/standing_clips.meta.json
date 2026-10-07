@@ -96,7 +96,8 @@
    "kind": "seated",
    "seatOrigin": true,
    "spot": "chair",
-   "name": "Angry_Gesture"
+   "name": "Angry_Gesture",
+   "seatAt": -0.18
   }
  },
  "Gaming": {
@@ -196,7 +197,8 @@
    "seatOrigin": true,
    "hold": "controller",
    "spot": "chair",
-   "name": "Gaming"
+   "name": "Gaming",
+   "seatAt": -0.2
   }
  },
  "Scared": {
@@ -296,8 +298,9 @@
    "seatGap": -0.004,
    "kind": "transition",
    "seatOrigin": true,
-   "spot": "chair",
-   "name": "Scared"
+   "spot": "open",
+   "name": "Scared",
+   "seatAt": -0.2
   }
  },
  "Sit_To_Stand": {
@@ -401,8 +404,9 @@
     0,
     2.07
    ],
-   "spot": "chair",
-   "name": "Sit_To_Stand"
+   "spot": "out",
+   "name": "Sit_To_Stand",
+   "seatAt": -0.24
   }
  },
  "Stand_To_Sit": {
@@ -502,8 +506,9 @@
    "seatGap": -0.004,
    "kind": "transition",
    "seatOrigin": true,
-   "spot": "chair",
-   "name": "Stand_To_Sit"
+   "spot": "out",
+   "name": "Stand_To_Sit",
+   "seatAt": -0.22
   }
  },
  "Standing_Clap": {
@@ -603,8 +608,9 @@
    "seatGap": -0.004,
    "kind": "transition",
    "seatOrigin": true,
-   "spot": "chair",
-   "name": "Standing_Clap"
+   "spot": "open",
+   "name": "Standing_Clap",
+   "seatAt": -0.22
   }
  },
  "Standing_Using_Touchscreen_Tablet": {
