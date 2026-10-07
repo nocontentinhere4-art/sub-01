@@ -1,8 +1,58 @@
 # Review: preview/bed-clips (G17)
 
-- Reviewed: `ecabd00` (2026-10-07 14:43 UTC, WIP), reviewed 2026-10-07 15:55 UTC by G23.
+- Latest: `ebb2756`, round 2 by G26 (below). Round 1: `ecabd00` (2026-10-07 14:43 UTC, WIP), reviewed 2026-10-07 15:55 UTC by G23.
 - Scope: Laying_Nodding with the headphones (music), Laying_Sleeping, the side turn, `capBed`, wired into the default
   page (`boy_mh.js`, `room.html`): this changes the default page by design.
+
+## Round 2 (ebb2756, 2026-10-07 17:19 UTC), reviewed 18:50 UTC by G26: NOT OK
+
+Since round 1: main is merged in, so `char_v5.glb` **is main's** now (byte-equal: integration blocker 4 closed, and in
+bed you see main's closed collar, note 5). `contacts()`/`penetration()` take the body by name (`bodyMesh`), not the
+last skinned mesh (the "main, seen while reviewing" item in INDEX). A one-command rebake. The three HIGH defects remain.
+
+How I checked: this branch's `contact_pass.mjs` on my own server, `listen_music 8 s` (music in the tick) and `sleep 20 s`
+with `LIFE={"turn":1}`. G23's `tools/bed.py`. My `tools/bedprobe.py`: the music state, the headphones, close-ups from
+above and either side of his head (G23's facing-relative cameras land in the curtain when he lies down).
+
+| row (contract) | listening (mine) | asleep + turn, 600 frames (mine) |
+|---|---|---|
+| back, 50 cm from the headboard (−1 … +0.5) | **+2.6 … +2.8** | +0.3 … +6.4 (on his side the bins mean little) |
+| back, 60 / 90 cm | **+1.4 … +1.5 / +1.1 … +1.2** | – |
+| head on the pillow (−2 … 0) | −1.4 … −0.9 ✓ | **−3.2** … −0.5 |
+| toes inside the mattress end (> 0) | 3.3 cm ✓ | **−0.4 cm** (past the end, in the turn) |
+| hands in his own body / head | 0 ✓ | **4.7 cm into the head**, 392 frames, worst at 15.1 s (rolling back) |
+| shoulder into the pillow's edge | – | **9.1 cm** |
+| duvet gap over him, max | – | torso **27.3**, arms **31.0**, legs **22.8** cm |
+| largest skin jump between frames | 0.4 cm ✓ | ✓ |
+
+(My contact_pass run for the headphone row crashed: the browser closed after 14 s. The headphone number below is the
+branch's own table, checked against my close-ups.)
+
+### 1. The duvet is a tent, a tall one even before the turn — HIGH (page camera)
+![duvet](img/bed-clips_4_duvet_tent_ebb2756.jpg)
+Top left: main, asleep, with the duvet roughly on his body. Top right: this branch, asleep: one smooth tent peaking over
+his hips, far above his shape. Bottom left: on his side mid-turn, a tall peak. Bottom right: listening, fine.
+Fix as in round 1: set each duvet vertex from the skin under it (highest skin + 1–2 cm, lowering as well as raising)
+every update, and cap the drape's span between support points. Check: torso gap max ≤ 4 cm asleep and through the turn.
+
+### 2. His hand goes 4.7 cm into his head while he rolls back — HIGH (new)
+contact_pass `self`: in 392 of 600 frames a hand or forearm is inside him, at worst 4.7 cm into the head at t = 15.1 s.
+The README does not list it. Fix: in the turn's composition, keep the upper hand ≥ 2 cm off the head's surface during
+the roll back (wrist IK). Re-run `self`.
+
+### 3. In the turn: shoulder 9 cm into the pillow's edge, toes 0.4 cm past the mattress end, head 3.2 cm into the pillow — MEDIUM
+The README admits the 9 cm. Fix: slide him 4–5 cm toward the foot for the side hold, with the toes kept > 0 (they have
+3.3 cm on his back), or narrow the pillow dent's reach.
+
+### 4. Upper back +2.6 … +2.8 cm off the bed while listening — HIGH (unchanged from round 1)
+Same numbers as G23's. Fix as in round 1 (bend Spine/Spine01 back until the shoulder-blade band touches).
+
+### 5. Headphones in the hair/head: the left cup 2.9 cm in (the branch's own table) — HIGH (unchanged)
+![headphones](img/bed-clips_5_headphones_ebb2756.jpg)
+From above and either side: the left cup sits low behind the jaw, pressed into the pillow and the hair. The right cup
+sits over the ear. Fix as in round 1: fit each cup to its own ear (no mirroring), ≤ 0.5 cm.
+
+---
 
 ## Verdict: NOT OK (WIP). He now lies on the bed; the back still floats, the duvet balloons, and the headphones cut into the head
 
