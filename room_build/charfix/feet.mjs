@@ -338,8 +338,8 @@ function swatch(px, bright, S = 96) {
     for (let dy = 0; dy < S; dy += 8) for (let dx = 0; dx < S; dx += 8) { const k = ((y + dy) * Wd + x + dx) * Ch, l = (data[k] + data[k + 1] + data[k + 2]) / 765; s += l; q += l * l; n++; }
     const m = s / n, sd = Math.sqrt(Math.max(0, q / n - m * m)), score = bright ? m - 3 * sd : (1 - m) - 3 * sd;
     if ((bright ? m > 0.7 : m < 0.15) && (!best || score > best.score)) best = {x, y, score}; }
-  const A = info.width;
-  return (s, t) => [(best.x + 4 + t * (S - 8)) / A, (best.y + 4 + s * (S - 8)) / A];
+  const A = info.width, f = (s, t) => [(best.x + 4 + t * (S - 8)) / A, (best.y + 4 + s * (S - 8)) / A];
+  f.rect = [best.x, best.y, S]; return f;
 }
 const uvSock = swatch(ref.px, true), uvSlide = swatch(ref.px, false);
 for (const side of ["L", "R"]) {           // the reference faces +z: his left foot is on +x
@@ -488,7 +488,7 @@ if (DEBUG) {
 // (the colour split does not follow the triangles exactly: under the sock's triangles the strap's black, the toe's
 // dark spot and the seam lines are filled from the sock's white round them; under the slides', the white fringe from
 // the slides' black)
-async function cleanAtlas(src, sockMeshes, isBad) {
+async function cleanAtlas(src, sockMeshes, isBad, grow = 0, val = null) {
   const {data, info} = src.raw ? src : await sharp(Buffer.from(src)).removeAlpha().raw().toBuffer({resolveWithObject: true});
   const W = info.width, H = info.height, mask = new Uint8Array(W * H);
   for (const m of sockMeshes) for (const t of m.tri) {          // rasterise each triangle's UVs (+1 px)
@@ -502,9 +502,15 @@ async function cleanAtlas(src, sockMeshes, isBad) {
       const w0 = ((P[1][0] - px) * (P[2][1] - py) - (P[2][0] - px) * (P[1][1] - py)) / ar, w1 = ((P[2][0] - px) * (P[0][1] - py) - (P[0][0] - px) * (P[2][1] - py)) / ar, w2 = 1 - w0 - w1;
       const e = 1.5 / Math.sqrt(Math.abs(ar));
       if (w0 > -e && w1 > -e && w2 > -e) mask[y * W + x] = 1; } }
-  const L = k => (data[3 * k] + data[3 * k + 1] + data[3 * k + 2]) / 765;
+  const L = val ? k => val(data, k) : k => (data[3 * k] + data[3 * k + 1] + data[3 * k + 2]) / 765;
   const bad = new Uint8Array(W * H); let nBad = 0;
   for (let k = 0; k < W * H; k++) if (mask[k] && isBad(L(k))) { bad[k] = 1; nBad++; }
+  // (grown by `grow` px inside the charts: a bad line's own anti-aliased rim, too light to count as bad, is what still
+  // showed as a dark seam across the sock in bed, and as the grey nick on the big toe; G23's review)
+  for (let g = 0; g < grow; g++) { const add = [];
+    for (let k = 0; k < W * H; k++) if (mask[k] && !bad[k]) { const x = k % W, y = (k - x) / W;
+      if ((x > 0 && bad[k - 1]) || (x < W - 1 && bad[k + 1]) || (y > 0 && bad[k - W]) || (y < H - 1 && bad[k + W])) add.push(k); }
+    for (const k of add) { bad[k] = 1; nBad++; } }
   // fill the bad pixels from their good neighbours, ring by ring
   for (let it = 0; it < 64 && nBad; it++) { const fix = [];
     for (let k = 0; k < W * H; k++) if (bad[k]) { let r = 0, g = 0, b = 0, n = 0; const x = k % W, y = (k - x) / W;
@@ -512,13 +518,36 @@ async function cleanAtlas(src, sockMeshes, isBad) {
         if (!bad[q] && mask[q] && !isBad(L(q))) { r += data[3 * q]; g += data[3 * q + 1]; b += data[3 * q + 2]; n++; } }
       if (n) fix.push([k, r / n, g / n, b / n]); }
     for (const [k, r, g, b] of fix) { data[3 * k] = r; data[3 * k + 1] = g; data[3 * k + 2] = b; bad[k] = 0; nBad--; } }
-  return {data, info, raw: true};
+  return {data, info, raw: true, mask};
 }
-const cleaned = await cleanAtlas(await cleanAtlas(ref.color, [feetRef.L.sock, feetRef.R.sock], l => l < 0.55),
-  [feetRef.L.dark, feetRef.R.dark], l => l > 0.4);                     // (and the slides' own charts all black)
-const colorWebp = await sharp(cleaned.data, {raw: {width: cleaned.info.width, height: cleaned.info.height, channels: 3}}).webp({quality: 90}).toBuffer();
+// the texels round a mesh's charts (and its swatch) taken from the charts' own edge, `n` rings out: the socks and the
+// slides each get their own copy of the atlas, so that no texture filtering (bilinear, the mip levels) brings the
+// other's colour over a chart's edge. That bleed was the dark line along the sock's edges, under the strap and round
+// the toes, once the slides are hidden (G23's review: the seam across the sock in bed, the grey nick on the big toe)
+function bleed(img, mask, rect, n = 16) {
+  const {info} = img, W = info.width, H = info.height, data = Buffer.from(img.data), keep = Uint8Array.from(mask);
+  const [rx, ry, rs] = rect; for (let y = ry; y < ry + rs; y++) for (let x = rx; x < rx + rs; x++) keep[y * W + x] = 1;
+  for (let it = 0; it < n; it++) { const fix = [];
+    for (let k = 0; k < W * H; k++) if (!keep[k]) { let r = 0, g = 0, b = 0, c = 0; const x = k % W, y = (k - x) / W;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const q = yy * W + xx;
+        if (keep[q]) { r += data[3 * q]; g += data[3 * q + 1]; b += data[3 * q + 2]; c++; } }
+      if (c) fix.push([k, r / c, g / c, b / c]); }
+    for (const [k, r, g, b] of fix) { data[3 * k] = r; data[3 * k + 1] = g; data[3 * k + 2] = b; keep[k] = 1; } }
+  return sharp(data, {raw: {width: W, height: H, channels: 3}}).webp({quality: 90}).toBuffer();
+}
+const sockClean = await cleanAtlas(ref.color, [feetRef.L.sock, feetRef.R.sock], l => l < 0.6, 4);
+const sockColorWebp = await bleed(sockClean, sockClean.mask, uvSock.rect);
+const cleaned = await cleanAtlas({...sockClean, data: Buffer.from(sockClean.data)},
+  [feetRef.L.dark, feetRef.R.dark], l => l > 0.4, 1);                  // (and the slides' own charts all black)
+const colorWebp = await bleed(cleaned, cleaned.mask, uvSlide.rect);
+// the normal map too: the strap's edge is baked into it as a relief rim along the sock's charts (lit as a dark line
+// across the sock in bed, with the slides hidden; G23's review): inside the sock's charts every texel tilted more than
+// ~30 degrees (the knit's own relief stays under it) is filled from the flat knit round it
+const nz = (d, k) => d[3 * k + 2] / 127.5 - 1;
+const normalClean = await cleanAtlas(ref.normal, [feetRef.L.sock, feetRef.R.sock], z => z < 0.87, 3, nz);
+const sockNormalWebp = await bleed(normalClean, normalClean.mask, uvSock.rect);
 const normalWebp = await sharp(Buffer.from(ref.normal)).webp({quality: 90}).toBuffer();
-console.log("atlas: colour", colorWebp.length, "normal", normalWebp.length, "bytes");
+console.log("atlas: slides colour", colorWebp.length, "normal", normalWebp.length, "/ socks colour", sockColorWebp.length, "normal", sockNormalWebp.length, "bytes");
 if (DEBUG) await sharp(cleaned.data, {raw: {width: cleaned.info.width, height: cleaned.info.height, channels: 3}}).png().toFile(path.join(DEBUG, "atlas_clean.png"));
 
 // ---------------------------------------------------------------- skin weights: from v5's nearest (old feet, slides, hem)
@@ -573,14 +602,16 @@ const acc = (type, arr) => doc.createAccessor().setType(type).setArray(arr).setB
 const color = doc.createTexture("feet_color").setImage(new Uint8Array(colorWebp)).setMimeType("image/webp");
 const normalT = doc.createTexture("feet_normal").setImage(new Uint8Array(normalWebp)).setMimeType("image/webp");
 const feetMat = doc.createMaterial("feet").setBaseColorTexture(color).setNormalTexture(normalT).setMetallicFactor(0).setRoughnessFactor(0.8);
-function primOf(m, W, Minv) {
+const sockMat = doc.createMaterial("socks").setBaseColorTexture(doc.createTexture("socks_color").setImage(new Uint8Array(sockColorWebp)).setMimeType("image/webp"))
+  .setNormalTexture(doc.createTexture("socks_normal").setImage(new Uint8Array(sockNormalWebp)).setMimeType("image/webp")).setMetallicFactor(0).setRoughnessFactor(0.8);
+function primOf(m, W, Minv, mat = feetMat) {
   const nrm = normals(m), n = m.pos.length;
   const P = new Float32Array(n * 3), N = new Float32Array(n * 3), U = new Float32Array(n * 2), J = new Uint8Array(n * 4), Wt = new Float32Array(n * 4);
   const R3 = [Minv[0], Minv[1], Minv[2], Minv[4], Minv[5], Minv[6], Minv[8], Minv[9], Minv[10]];
   for (let i = 0; i < n; i++) { P.set(xf(Minv, m.pos[i]), 3 * i);
     const q = nrm[i], v = norm([R3[0] * q[0] + R3[3] * q[1] + R3[6] * q[2], R3[1] * q[0] + R3[4] * q[1] + R3[7] * q[2], R3[2] * q[0] + R3[5] * q[1] + R3[8] * q[2]]);
     N.set(v, 3 * i); U.set(m.uv[i], 2 * i); J.set(W[i].j, 4 * i); Wt.set(W[i].w, 4 * i); }
-  return doc.createPrimitive().setMaterial(feetMat)
+  return doc.createPrimitive().setMaterial(mat)
     .setAttribute("POSITION", acc("VEC3", P)).setAttribute("NORMAL", acc("VEC3", N)).setAttribute("TEXCOORD_0", acc("VEC2", U))
     .setAttribute("JOINTS_0", acc("VEC4", J)).setAttribute("WEIGHTS_0", acc("VEC4", Wt)).setIndices(acc("SCALAR", new Uint32Array(m.tri.flat())));
 }
@@ -588,7 +619,7 @@ const slideInv = inv4(restMatrix(slideNode));
 const oldSlideTris = oldSl ? oldSl.p.getIndices().getCount() / 3 : 0;
 const slideMesh = slideNode.getMesh(); for (const p of slideMesh.listPrimitives()) { slideMesh.removePrimitive(p); p.dispose(); }
 slideMesh.addPrimitive(primOf(slideAll, slideW, slideInv));
-const sockMesh = doc.createMesh("socks").addPrimitive(primOf(sockAll, sockW, slideInv));
+const sockMesh = doc.createMesh("socks").addPrimitive(primOf(sockAll, sockW, slideInv, sockMat));
 const sockNode = doc.createNode("socks").setMesh(sockMesh).setSkin(slideNode.getSkin());
 const parent = slideNode.getParentNode(), scene = root.listScenes().find(s => s.listChildren().includes(slideNode));
 if (parent) { parent.removeChild(slideNode); parent.addChild(sockNode).addChild(slideNode); }   // (the slides stay last: the page's skinMesh())
