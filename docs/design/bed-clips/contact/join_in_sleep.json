@@ -20,13 +20,13 @@
  },
  "soles": {
   "L": {
-   "min_cm": 0.4,
-   "max_cm": 103.6,
+   "min_cm": 0.5,
+   "max_cm": 103.5,
    "on": "floor"
   },
   "R": {
    "min_cm": -0.2,
-   "max_cm": 89.8,
+   "max_cm": 89.3,
    "on": "floor"
   }
  },
@@ -41,34 +41,34 @@
   "gaps": []
  },
  "legs": {
-  "framesIn": 234,
-  "maxVerts": 3822,
+  "framesIn": 233,
+  "maxVerts": 3806,
   "maxDepth": 14.8,
-  "worstT": 3.63,
+  "worstT": 3.53,
   "radius_cm": {
    "L": [
     15.9,
-    15.5,
+    15.4,
     15.3,
     14.9,
     14.1,
     13.8,
     13.8,
-    13.5,
-    13.1,
-    12.3
+    13.6,
+    13.2,
+    12.2
    ],
    "R": [
     16.8,
     15.7,
-    15.1,
+    15,
     14.4,
     14,
-    13.4,
+    13.6,
     13.2,
     13.2,
     12.8,
-    11.1
+    10.8
    ]
   }
  },
@@ -77,18 +77,18 @@
   "back": [
    {
     "from_headboard_cm": 40,
-    "lowestGap_min_cm": 7.9,
+    "lowestGap_min_cm": 8.1,
     "lowestGap_max_cm": 13.1
    },
    {
     "from_headboard_cm": 50,
     "lowestGap_min_cm": -1,
-    "lowestGap_max_cm": 30.9
+    "lowestGap_max_cm": 31.5
    },
    {
     "from_headboard_cm": 60,
     "lowestGap_min_cm": -1.5,
-    "lowestGap_max_cm": 35.9
+    "lowestGap_max_cm": 35.7
    },
    {
     "from_headboard_cm": 70,
@@ -108,7 +108,7 @@
    {
     "from_headboard_cm": 100,
     "lowestGap_min_cm": -1.9,
-    "lowestGap_max_cm": 57.2
+    "lowestGap_max_cm": 57.1
    },
    {
     "from_headboard_cm": 110,
@@ -132,37 +132,37 @@
    },
    {
     "from_headboard_cm": 150,
-    "lowestGap_min_cm": -2,
-    "lowestGap_max_cm": 23.5
+    "lowestGap_min_cm": -1.6,
+    "lowestGap_max_cm": 40.9
    },
    {
     "from_headboard_cm": 160,
-    "lowestGap_min_cm": -1.9,
-    "lowestGap_max_cm": 43.1
+    "lowestGap_min_cm": 5.9,
+    "lowestGap_max_cm": 52.3
    },
    {
     "from_headboard_cm": 170,
     "lowestGap_min_cm": 11.2,
-    "lowestGap_max_cm": 62
+    "lowestGap_max_cm": 62.2
    }
   ],
   "back_worst": {
    "min_cm": -2.1,
-   "max_cm": 62
+   "max_cm": 62.2
   },
   "head_on_pillow": {
-   "min_cm": -9,
+   "min_cm": -3.2,
    "max_cm": 53.2,
    "at_max_s": 7.2
   },
-  "shoulders_into_pillow_edge_cm": -10.4,
+  "shoulders_into_pillow_edge_cm": -10.5,
   "feet": {
-   "toes_max_x": 0.448,
-   "inside_end_cm": -39.8
+   "toes_max_x": 0.446,
+   "inside_end_cm": -39.6
   },
   "self": {
    "framesIn": 68,
-   "maxVerts": 4038,
+   "maxVerts": 3998,
    "maxDepth_cm": 14.5,
    "by": {
     "torso": 9.6,
@@ -178,27 +178,27 @@
    "pokeMax_cm": 0,
    "gap_by_region": {
     "feet": {
-     "max_cm": 13,
-     "mean_cm": 1.9,
+     "max_cm": 15.6,
+     "mean_cm": 1.4,
      "at_max_s": 14.1
     },
     "legs": {
-     "max_cm": 24.6,
+     "max_cm": 24.5,
      "mean_cm": 2.7,
      "at_max_s": 15.1
     },
     "torso": {
-     "max_cm": 20.6,
+     "max_cm": 22.2,
      "mean_cm": 4.3,
-     "at_max_s": 19.1
+     "at_max_s": 15.2
     },
     "hands": {
-     "max_cm": 5.3,
+     "max_cm": 5.5,
      "mean_cm": 1.7,
      "at_max_s": 15.3
     },
     "arms": {
-     "max_cm": 15.8,
+     "max_cm": 15.6,
      "mean_cm": 3,
      "at_max_s": 15.3
     }
@@ -206,16 +206,16 @@
   }
  },
  "jump": {
-  "max_cm_per_frame": 22.3,
+  "max_cm_per_frame": 22,
   "worst": [
    [
     0.27,
-    22.3,
+    22,
     "pose"
    ],
    [
     0.3,
-    21.5,
+    21.4,
     "pose"
    ],
    [

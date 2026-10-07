@@ -98,55 +98,70 @@ It runs end to end on G12's box test body. The fit numbers there mean nothing, b
 
 "base" = `?nobedcap` (main's still poses on this branch's bed and page).
 
+Measured on **main's character** (`char_v5.glb` of 0ac47f8: the hood collar, the socks and slides as their own meshes), on the clips `bed_rebake.sh` baked onto it. On this character "head" is his head itself (the `owner_head` material): the hood is weighted to the Head bone too, and a hand against the hood used to read as a hand in his head.
+
 | row | contract | listen: base | listen: Laying_Nodding | sleep: base | sleep: Laying_Sleeping | the turn (17.4 s) |
 |---|---|---|---|---|---|---|
 | frames sampled | every frame | 87 (2.9 s) | 87 (2.9 s) | 102 (3.4 s) | 102 (3.4 s) | 522 (17.4 s) |
-| back, hips over the mattress / quilt (cm) | −1 … +0.5 | **FAIL** +3.2 … +6.2 | **FAIL** +0.3 … +4.4 | **FAIL** +1.7 … +4.7 | **FAIL** -0.6 … +4.0 | **FAIL** -2.0 … +32.1 |
-| head on the pillow (cm) | −2 … 0 | **FAIL** -6.7 … -6.7 | -1.4 … -0.9 | **FAIL** -9.6 … -9.6 | -1.8 … -0.5 | **FAIL** -3.2 … -0.4 |
-| shoulders into the pillow's edge (cm) | (the page dents it) | -7.4 | -4 | -10.3 | -6.7 | -9.1 |
-| toes inside the mattress end (cm) | > 0 | 13.9 | 4.1 | 13.9 | 4.2 | 0.3 |
+| back, hips over the mattress / quilt (cm) | −1 … +0.5 | **FAIL** +3.2 … +6.2 | **FAIL** +0.3 … +4.4 | **FAIL** +1.7 … +4.7 | **FAIL** -0.6 … +4.0 | **FAIL** -1.9 … +34.3 |
+| head on the pillow (cm) | −2 … 0 | **FAIL** +0.5 … +0.5 | **FAIL** +2.5 … +3.7 | **FAIL** -2.4 … -2.4 | -1.7 … -0.5 | **FAIL** -2.1 … +1.1 |
+| shoulders into the pillow's edge (cm) | (the page dents it) | -7.4 | -4 | -10.3 | -6.7 | -9 |
+| toes inside the mattress end (cm) | > 0 | 14.6 | 3.3 | 14.6 | 3.4 | 2.8 |
 | bed (inside the mattress less its give) | 0 | 0 | 0 | 0 | 0 | 0 |
 | headboard / bed frame | 0 | 0 | 0 | 0 | 0 | 0 |
 | floor | 0 | 0 | 0 | 0 | 0 | 0 |
-| his hands / forearms in his own torso, thighs, head | 0 | **FAIL** 87 frames, up to 22 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 102 frames, up to 22 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 279 frames, up to 2784 verts, 4.7 cm {'torso': 1.6, 'head': 4.7} |
-| headphones in his head / hair | 0 | **FAIL** 87 frames, 68 verts, 1.2 cm {'hp_cupL': 0.6, 'hp_cupR': 1, 'hp_band': 1.2} | **FAIL** 87 frames, 198 verts, 2.9 cm {'hp_cupL': 2.9, 'hp_cupR': 1, 'hp_band': 1.2} | - | - | - |
-| headphones under the pillow's surface | 0 | 0 (closest 5.4 cm) | **FAIL** 26 frames, 0.5 cm {'hp_cupL': 0.3, 'hp_band': 0.5} | - | - | - |
+| his hands / forearms in his own torso, thighs, head | 0 | **FAIL** 87 frames, up to 20 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 102 frames, up to 20 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 78 frames, up to 3390 verts, 8 cm {'torso': 3, 'head': 8} |
+| headphones in his head / hair | 0 | **FAIL** 87 frames, 35 verts, 1.8 cm {'hp_cupL': 1.8, 'hp_cupR': 1} | **FAIL** 87 frames, 80 verts, 1.9 cm {'hp_cupL': 1.9, 'hp_cupR': 1} | - | - | - |
+| headphones under the pillow's surface | 0 | 0 (closest 5.4 cm) | 0 (closest 6.2 cm) | - | - | - |
 | duvet: any of him through it | 0 | - | - | 0 | 0 | 0 |
-| duvet over him: gap, mean / max (cm) | follows him | - | - | hands 1.9/9.1; arms 2.5/8.8; torso 1.7/4.4; legs 2.8/11.9; feet 5.6/18.1 | hands 1.7/4.2; arms 3/9.6; legs 2.7/18.9; torso 4.3/20.3; feet 1.9/5.2 | hands 1.7/5.2; arms 4.1/31; legs 3.5/22.5; torso 3.3/27.8; feet 2.4/12.8 |
+| duvet over him: gap, mean / max (cm) | follows him | - | - | hands 1.9/9.1; arms 2.5/8.5; legs 2.8/11.2; torso 1.7/4.5; feet 4.1/10.5 | hands 1.7/3.7; arms 3/9.6; torso 4.3/20.2; legs 2.7/18.9; feet 1.6/4.7 | hands 1.8/7.4; arms 4.1/25.5; torso 3.2/26.6; legs 3.5/22.7; feet 2/10.4 |
 
 The back, bin by bin (10 cm along the bed from the headboard; the lowest back skin's gap, min … max over the clip, cm):
 
 | from the headboard | 50 (pillow's edge) | 60 | 70 | 80 | 90 (hip joint) | 100 (just past it) |
 |---|---|---|---|---|---|---|
-| asleep | +1.6 … +2.6 | +0.3 … +1.1 | −0.5 … 0 | −0.6 … −0.1 | +0.2 … +0.8 | +3.2 … +4.0 |
-| awake (on the quilt) | +2.7 … +2.8 | +1.4 … +1.5 | +0.4 … +0.5 | +0.3 … +0.4 | +1.1 … +1.2 | +4.3 … +4.4 |
+| asleep | +1.5 … +2.6 | +0.4 … +1.1 | −0.5 … 0 | −0.6 … −0.1 | +0.2 … +0.8 | +3.2 … +4.0 |
+| awake (on the quilt) | +2.7 … +2.8 | +1.4 … +1.5 | +0.4 … +0.5 | +0.3 … +0.4 | +1.1 … +1.2 | +4.2 … +4.4 |
 
 Sheets (page camera, zoomed onto the bed from where it stands, and fixed cameras beside it), in this folder:
 - `listen.jpg`: page, page zoomed, side profile, his face with the headphones;
 - `sleep.jpg`: under the duvet, page and foot;
 - `sleep_no_duvet.jpg`: the same with the duvet hidden;
-- `turn.jpg`, `turn_no_duvet.jpg`: the turn at 0, 1.3, 2.6, 8, 15.9 and 17.2 s.
+- `turn.jpg`, `turn_no_duvet.jpg`: the turn at 0, 1.3, 2.6, 8, 15.9 and 17.2 s;
+- `headphones.jpg`: beside his head on both sides and from above his face, lying awake.
 
-Videos: `sleep_turn.mp4` (the turn, 17.4 s, page camera zoomed + side), `listen.mp4` (3 s, page camera zoomed + his face). `room_build/kimodo/bed_video.sh` makes them.
+Videos: `sleep_turn.mp4` (the turn, 17.4 s, page camera zoomed + side) and `listen.mp4` (3 s, page camera zoomed + his face) are of the clips **before** main's character and the fixes below (the sheets are current). `room_build/kimodo/bed_video.sh` makes them.
+
+## Main's character (0ac47f8): what changed
+
+- Merged main. `char_v5.glb` is main's (the hood collar, G19's socks and slides).
+- `room.html`: `contacts()` and `penetration()` take his body mesh by name (`bodyMesh()`). `skinMesh()` returns the last skinned mesh, which on this character is the socks. The page's own slides code (`slidesInit` / `setSlides`) is for a body of one mesh; v5's separate `slides` mesh is parked by boy_mh.js's `bedThings`, as before.
+- The fit saw only the first skinned mesh, and on this character his feet are the socks mesh. `room_build/kimodo/bed_exp.mjs` exports every part except the slides, each with its own joint slots (gltfpack folds each part's dequantization into its own inverse bind matrices).
+- **Headphones round the neck, through the hood**: Laying_Nodding's performer lies with his head turned 57° to his side, which puts the lower cup at his jaw, in the hood's collar. Lying awake, the fit now turns his head back to within 20° (9° here). Both cups sit on his ears with the band over his head (`headphones.jpg`), and nothing of them goes under the pillow's surface (it was 0.5 cm).
+- **The turn**:
+  - each wrist is capped mid-roll, but never into his chest (a straight cap put his hands 16 cm into it);
+  - the duvet over his arm: 25.5 cm, was 31;
+  - his toes are held 2.8 cm inside the mattress's end while he rolls (his socks are longer: they went 0.4 cm past).
+- **Instruments**: the head test in the contact pass and in the fit is now the same rule (behind the nearest head-skin point, seen from the head's centre), and the hood is not his head.
 
 ## Open
 
-- **The back is not yet flush everywhere.** The small of his back and his mid back touch: −0.6…0 cm asleep, +0.3…+0.5 cm awake. Two places do not:
-  - just past the hip joint, his buttocks are +3…+4.4 cm up;
-  - at the pillow's edge, his shoulder blades are +1.6…+2.8 cm up.
-  The fitter's own measure, on the same skin in the same frame, reports the buttocks level with the small of his back after the pelvic tilt (5.5–6.7°). The page reads 2–3 cm more there. That disagreement is not found yet. The base (main's still poses) reads +1.7…+6.2 cm on this row.
-- **The headphones sit in his hair**: cups up to 2.9 cm and the band 1.2 cm into the head's skin and hair surface. The base pose reads 1.2 cm, so the head's angle in the capture adds the rest; the fit is G10d's, owner-approved. They also come up to 0.5 cm under the pillow's shown surface in 26 of 87 frames, now that the pillow gives under them.
+- **The back**: the small of his back and his mid back touch, −0.6…0 cm asleep and +0.3…+0.5 cm awake. Two places do not:
+  - just past the hip joint his buttocks are +3.2…+4.4 cm up;
+  - at the pillow's edge his shoulder blades are +1.5…+2.8 cm up.
+  The cause of the buttocks gap is found, not fixed. The pelvic tilt levels them, then the heel step turns his thighs at the hips (9–16°) and lifts them again. Solving the two in turn diverges, because with the legs as captured, heels down and buttocks down conflict. The base reads +1.7…+6.2 cm on this row.
+- **His head awake**: the hood rests on the pillow, and the back of his skull sits +2.5…+3.7 cm above the pillow's top through it. Asleep: −1.7…−0.5 cm, in the contract.
+- **The headphone cups**: 1.0–1.9 cm into his hair at the ears. The base pose reads 1.8 cm, so this is the fit itself (G10d's), not this capture.
 - **The turn**:
-  - In the side hold, a hand lies by his face, 4.7 cm into his head's skin (279 frames). The fitter's own head test, a polar map, does not see it.
-  - Mid-roll his head goes 3.2 cm into the pillow (the contract's give is 2).
-  - His lower shoulder presses 9 cm into the pillow's edge, and the page's dent shows the mattress through the pillow there (`turn_no_duvet.jpg`).
-  - The duvet stands up to 28–31 cm over his rising arm mid-roll. It follows him at 30 Hz with nothing poking through, but it is a tent, not a cover.
-  - The back bins at the pillow's edge and past the hips read up to +32 cm while he is on his side. A back-along-the-spine measure means little for a body on its side.
-- **The duvet asleep**: up to 19–20 cm over his legs and torso, against 12 cm on the base. Nothing pokes through.
-- **The joins** (`contact_pass.mjs "a>b"`, the jump row):
-  - **Into sleep**: fixed (above).
-  - **Out of listening**: 44 cm in the step's first frame. The base's step jumps 29.5 cm there too: the page re-places his root as the get-up begins.
-  - **Into listening**: 27 cm of his legs go into the mattress for 50 frames during the lie-down (`room_bed_lie`), identical on the base.
-  - **Out of sleep** (and out of listening), as he reaches the bed's edge: a 1.27 m one-frame jump. Identical on the base, so the page's, not these clips'.
+  - mid-roll (78 frames, worst at 1.87 s) a hand passes 8 cm through his face;
+  - his head goes 2.1 cm into the pillow (the give is 2), and rises 1.1 cm off it;
+  - his lower shoulder presses 9 cm into the pillow's edge in the side hold, and the dent shows the mattress through the pillow (`turn_no_duvet.jpg`);
+  - the duvet is a 25–27 cm tent over his arm and torso mid-roll, though nothing pokes through;
+  - the back bins read up to +34 cm while he is on his side (a back-along-the-spine measure means little there).
+- **The duvet asleep**: up to 19–20 cm over his legs and torso, against 11 cm on the base. Nothing pokes through.
+- **The joins** (`contact/join_*.json`):
+  - **Into sleep**: clean; nothing above the walk's 22 cm/frame.
+  - **Out of listening**: the worst move in the get-up's first second is now 26.8 cm/frame (was 44; the base's step jumps 29.5 cm on its first frame).
+  - **Into listening**: during `room_bed_lie`'s lie-down his legs go 27 cm into the mattress for 46 frames, the same on the base.
+  - **At the bed's edge** (out of sleep or listening): a 1.27 m one-frame jump, identical on the base, so the page's.
 - **The Mixamo-rigged path** is unverified on the real character (above).
-

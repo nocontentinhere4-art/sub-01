@@ -17,13 +17,13 @@
  },
  "soles": {
   "L": {
-   "min_cm": 86.3,
-   "max_cm": 86.3,
+   "min_cm": 93.4,
+   "max_cm": 93.4,
    "on": "floor"
   },
   "R": {
-   "min_cm": 84.8,
-   "max_cm": 84.8,
+   "min_cm": 82.3,
+   "max_cm": 82.3,
    "on": "floor"
   }
  },
@@ -39,32 +39,32 @@
  },
  "legs": {
   "framesIn": 87,
-  "maxVerts": 326,
-  "maxDepth": 2.6,
+  "maxVerts": 318,
+  "maxDepth": 2.5,
   "worstT": 0,
   "radius_cm": {
    "L": [
     16.8,
     15.7,
     15.1,
-    14.8,
+    14.9,
     14,
     13.8,
     13.9,
-    13.7,
-    13.3,
+    13.8,
+    13.4,
     12.6
    ],
    "R": [
     17.2,
     16.4,
-    15.6,
-    14.8,
+    15.5,
+    14.7,
     14.3,
-    13.9,
+    14,
     13.5,
     13.8,
-    13.6,
+    13.5,
     13.3
    ]
   }
@@ -108,18 +108,18 @@
    "max_cm": 6.2
   },
   "head_on_pillow": {
-   "min_cm": -6.7,
-   "max_cm": -6.7,
+   "min_cm": 0.5,
+   "max_cm": 0.5,
    "at_max_s": 2.87
   },
   "shoulders_into_pillow_edge_cm": -7.4,
   "feet": {
-   "toes_max_x": -0.089,
-   "inside_end_cm": 13.9
+   "toes_max_x": -0.096,
+   "inside_end_cm": 14.6
   },
   "self": {
    "framesIn": 87,
-   "maxVerts": 22,
+   "maxVerts": 20,
    "maxDepth_cm": 0.9,
    "by": {
     "torso": 0.9
@@ -128,17 +128,16 @@
   },
   "phones": {
    "frames": 87,
-   "headIn": 68,
-   "headMax_cm": 1.2,
+   "headIn": 35,
+   "headMax_cm": 1.8,
    "headFrames": 87,
    "pillowIn": 0,
    "pillowMax_cm": 0,
    "pillowFrames": 0,
    "minClear_cm": 5.4,
    "part": {
-    "hp_cupL": 0.6,
-    "hp_cupR": 1,
-    "hp_band": 1.2
+    "hp_cupL": 1.8,
+    "hp_cupR": 1
    }
   }
  },
