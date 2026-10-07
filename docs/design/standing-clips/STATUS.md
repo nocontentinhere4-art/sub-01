@@ -31,7 +31,11 @@ See `README.md`, "Contact table". In short:
 - Arm in torso: the rig's (G20's weights; G23's review, items 1 and 3), shown against the no-clip baselines.
 
 ## Tests
-Run on 63efec3, the final clips and code, 2026-10-07:
+Round 3, run on d267212 (re-baked on the new rig, merged with preview/mixamo-wiring), 2026-10-07 19:5x UTC:
+- `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`: **1471 passed, 27 skipped, exit 0** (16 min 4 s).
+- `tests/visual/out/results.json`: `hard_failures == []`.
+
+Earlier, on 63efec3 (old rig):
 - `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`: **1292 passed, 27 skipped, exit 0**
   (12 min 24 s). This includes `tests/test_standing_clips.py`: the nine clips on the character's skeleton, the fit
   recorded with hands-in-thighs 0 after the bake, no raw capture in `web/`, and the preview only with its parameters.
