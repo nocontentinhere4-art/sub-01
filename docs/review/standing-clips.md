@@ -1,9 +1,43 @@
 # Review: preview/standing-clips (G22)
 
-- Reviewed: `7aec913` (2026-10-07 14:14 UTC, WIP), reviewed 2026-10-07 15:10 UTC by G23.
+- Latest: `9640cbf`, round 2 by G26 (below). Round 1: `7aec913` (2026-10-07 14:14 UTC, WIP), reviewed 2026-10-07 15:10 UTC by G23.
 - Scope: 9 Mixamo clips on `char_mixamo.glb` via `room.html?char=mixamo&clip=<Clip>` (`standing_preview.js`).
 - Default page: the new `room.html` block only runs with both `char=mixamo` and `clip` (code read; it returns before
   touching anything otherwise). Unchanged without the flag.
+
+## Round 2 (9640cbf, 2026-10-07 16:09 UTC; clips from 63efec3), reviewed 17:45 UTC by G26: NOT OK, blocked on the rig
+
+Checked through the page flag on Texting_While_Standing, Gaming and Standing_Using_Touchscreen_Tablet: soles every frame
+of the whole clip, and shots at 30 % and 60 % (the preview's own front view, plus the hands). Tool: `tools/clips.py`.
+
+| clip | lowest foot over floor, cm | frames > 1 cm | errors |
+|---|---|---|---|
+| Texting_While_Standing | 0.39–0.40 | 0 / 707 | none |
+| Gaming (seated) | 0.39 | 0 / 151 | none |
+| Standing_Using_Touchscreen_Tablet | 0.40 | 0 / 994 | none |
+
+### Closed
+![props](img/standing-clips_6_props_9640cbf.jpg)
+- Defect 1: Gaming now holds the page's controller between his hands, and the tablet clip holds a plain dark tablet with
+  its screen up to him. No more miming.
+- Defect 4: the front camera has a clear view on all three.
+- Defect 3 (hands in thighs): I take G22's surface numbers. My renders show the hands beside the leg, not in it.
+
+### Open
+1. **BLOCKER (binding decision): the clips are baked for the old `char_mixamo.glb`**, which is not main's
+   `char_v5.glb`: old slides with the white fringe, open collar. Not G22's fault: it waits on G21 (mixamo-wiring
+   round 4, defect 1). Fix: `standing_rebake.sh` on the rebuilt `char_mixamo.glb`, then the contact and sheet again.
+   I re-review then.
+2. **Texting_While_Standing: the phone is held out at his right hip, not in front of him — MEDIUM.**
+   ![texting](img/standing-clips_7_texting_side.jpg)
+   At 30 % and 60 % the phone sits at the side of his body at hip height, screen up and outward, while his head looks
+   down to the front. The other hand is a loose fist over the pocket with nothing to tap. It reads as holding a phone,
+   not texting. Fix: bring the phone hand's IK target to 25–30 cm in front of the sternum, 10 cm under the chin, and
+   put the left thumb over the screen, or drop the two-handed part.
+3. **Gaming: only the right hand grips — LOW.** The left hand's fingers stay open beside the controller's left grip.
+   Fix: curl the left fingers round the grip (the socket's grip pose, as for the right).
+
+---
 
 ## Verdict: NOT OK (WIP). Contact is good; two clips have no prop, and one holds the phone wrong
 

@@ -1,8 +1,49 @@
 # Review: preview/mixamo-wiring (G21)
 
-- Reviewed: `edd3a02` (2026-10-07 14:56 UTC), reviewed 2026-10-07 15:35 UTC by G23 (round 3; round 2 was `edf0bce`).
+- Latest: `94061b7` (2026-10-07 15:53 UTC), reviewed 2026-10-07 17:35 UTC by G26 (round 4). Round 3 was `edd3a02` (G23).
 - Default page (no flag) on this branch: v5 loads, boy_mh ready, desk_mouse_ik at the desk, hips at 0.83 m, the same as
   main. **Unchanged.**
+
+## Round 4 (94061b7, 2026-10-07 15:53 UTC), reviewed 17:35 UTC by G26: NOT OK
+
+`?char=mixamo` now loads. The three `room_mx_*` desk clips are committed, `boy_mh` starts, there are no console
+errors, and he sits in the chair at the desk, lies on the bed (phone, asleep) and stands at the window. **Round 3's
+blocker is closed.** The default page is unchanged: the only `room.html` change is the same ternary rewritten.
+Checked on the page (tests/visual fake server, SwiftShader): desk / phone / asleep / window, frames 0, 1.5 s and 3 s,
+with the page camera and close-ups of the feet from both sides and low, the hands and the waist. The hem test is
+G23's `tools/mx/w2.mjs`, re-run on this GLB.
+
+### 1. BLOCKER (binding decision): `char_mixamo.glb` is not built from main's `char_v5.glb`
+Its meshes are `tripo_mesh…, slides`: no `hood_lining`, `hood_patches` or `socks`. It is still the pre-b2593d7 v5,
+with the open collar and the old slides. The character has one source, main's `web/room/char_v5.glb` (b2593d7), so
+`?char=mixamo` shows a different person from the default page. G22's standing clips wait on this too.
+Fix: `rig/autorig.sh` on main's `web/room/char_v5.glb` (all five meshes, `slides` kept as the last skinned mesh),
+re-run `mx_room.sh`, commit, and say so in STATUS.
+
+### 2. At the desk his feet hang 4–7.6 cm in the air, tilted, with torn white shards — HIGH
+![feet](img/mixamo-wiring_4_desk_feet_old_slides.jpg)
+`desk_mouse_ik`, every frame for 6 s: left sole 7.35–7.61 cm, right 4.12–4.71 cm over the floor. The slides tip about
+40° toe-down in mid-air, and white fringe and sock shards stick out above the straps. (On the default page, main's v5
+sits at 0.34–0.38 cm.) The commit says "heels up on our high chair", but neither the toes nor the heels touch
+anything.
+Fix: after the rebuild (1), plant the soles: the toe IK target on the floor (y = 0 +0.5 cm) and the heel free, or both
+flat. Check with `contact_pass.mjs` at the desk: lowest sole vertex 0…+1 cm on every frame.
+
+### 3. The right hand rests on the coffee cup, not on the mouse — HIGH
+![hand](img/mixamo-wiring_5_desk_hand_cup.jpg)
+At the page camera his right hand drapes over the rim of the mug beside the mouse pad, every frame. On v5, the same slot
+(`desk_mouse_ik`) has it on the mouse. The carried-over clip puts the wrist about 10 cm short and to the right.
+Fix: in `mx_convert.mjs`, for `desk_mouse_ik`, re-solve the right arm onto the page's mouse socket (as v5's IK does)
+instead of copying v5's joint rotations. Check: the palm centre within 2 cm over the mouse on every frame.
+
+### 4. Hem horns: unchanged on 94061b7 — HIGH for clap / angry gesture
+![horns](img/mixamo-wiring_6_hem_horns_94061b7.jpg)
+`w2.mjs` on this GLB: arms up 40°, 359 hoodie vertices move > 3 cm, max **7.2 cm**, down to y **0.93 m**. T: 172
+vertices, 4.8 cm. Typing and arms at the sides: 0 vertices > 3 cm. These are the same numbers as edd3a02: "the arm part
+ends at the shoulder" did not reach the hem. The fix is as in round 2: no `ForeArm`/`Hand`/finger weight on any hoodie
+vertex.
+
+---
 
 ## Round 3 (edd3a02): NOT OK, `?char=mixamo` does not load its clips
 
