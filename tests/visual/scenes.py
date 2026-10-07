@@ -47,6 +47,10 @@ SCENES = {
     # since #104: `walking` true with `path` and `path_to` (before that the page treated him as already at the desk)
     "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "m_walk"),
     "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "m_window"),
+    # at the computer with a page on the screen, as the live server sends it once his walk there has ended (the caption:
+    # "at the computer" only once the page has him seated; tests/visual/test_arrival.py)
+    "computer": (life("research", "desk", "reading at the computer", reading=READING,
+                      screen={"device": "desk", "id": "qa1", "kind": "page", "title": "Inokashira Park - Wikipedia"}), "AWAKE", None, 1.0, "desk", None),
 }
 # the hour each scene is shot at in the core set, and the full matrix
 # preview/room-mh: when room/boy.glb is the MakeHuman rig (web/room/boy_mh.js drives it with its own clips) pose()
@@ -70,7 +74,7 @@ def makehuman_rig():
     return any(nd.get("name") == "metacarpal1.L" for nd in g.get("nodes", []))
 
 
-NATURAL_HOUR = {"desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
+NATURAL_HOUR = {"computer": 14, "desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
 HOURS = (8, 14, 19, 23)
 SIZES = {"1280": (1280, 800, False), "390": (390, 844, True)}
 
@@ -87,7 +91,7 @@ CLOSEUPS = {
     "night": ("sleeping", 23, "bed"),       # the same bed at night: what the dark room shows
     "side":  ("sleeping_side", 14, "bed"),  # asleep on his side under the duvet (#108)
 }
-CORE_SCENES = [s for s in SCENES if s != "sleeping_side"]          # the side pose is covered by its close-up
+CORE_SCENES = [s for s in SCENES if s not in ("sleeping_side", "computer")]   # the side pose: its close-up; the computer: test_arrival.py
 CORE_SHOTS = [(s, NATURAL_HOUR[s], "1280") for s in CORE_SCENES] + [("desk", 14, "390"), ("sleeping", 23, "390")]
 FULL_SHOTS = [(s, h, z) for s in CORE_SCENES for h in HOURS for z in SIZES] + [("sleeping_side", 23, "1280"), ("sleeping_side", 14, "390")]
 
