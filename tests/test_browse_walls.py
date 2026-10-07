@@ -315,3 +315,41 @@ def test_more_geo_block_bodies_are_walls(body):
 def test_a_title_asking_about_geo_blocks_is_an_article_not_a_wall(title):
     assert not browse.challenge_title(title, "https://www.example-news.com/streaming")
     assert browse.challenge_title("Sorry, BBC iPlayer isn't available in your region", "https://www.bbc.co.uk/iplayer")
+
+
+# 2026-10-07 14:39 UTC live: he opened "The Drive - Permission Request Form" (permissions.thedrive.threesai.com) and it
+# went into the browsing log. A consent / permission / cookie-request page is a wall: left, not shown, its site cooled.
+PERMISSION_BODY = ("Permission Request Form\nPlease fill in the form below to request permission to use content.\n"
+                   "Name\nEmail\nCompany\nDescribe the intended use\nSubmit\n")
+
+
+@pytest.mark.parametrize("title, url", [
+    ("The Drive - Permission Request Form", "https://permissions.thedrive.threesai.com/"),
+    ("The Drive - Permission Request Form", "https://www.thedrive.com/permissions"),
+    ("Request form", "https://permissions.thedrive.threesai.com/form"),           # by the host alone
+    ("Cookie preferences | BBC", "https://www.bbc.co.uk/usingthebbc/cookies"),
+    ("Your Privacy Choices - Example", "https://www.example.com/privacy"),
+    ("Consent Management", "https://consent.example.com/"),
+    ("Manage cookies", "https://cookies.example-news.com/")])
+def test_permission_and_consent_request_pages_are_walls(title, url):
+    assert browse.challenge_title(title, url)
+
+
+@pytest.mark.parametrize("title, url", [
+    ("How to manage your privacy settings on iPhone", "https://www.example.com/a"),
+    ("Permission to Dance: the video, explained", "https://www.example.com/b"),
+    ("The Drive: car news and reviews", "https://www.thedrive.com/"),
+    ("Cookie recipes for the weekend - Food & Wine", "https://www.foodandwine.com/x"),
+    ("Privacy policy", "https://example.com/privacy")])
+def test_pages_about_permissions_or_cookies_are_not_walls(title, url):
+    assert not browse.challenge_title(title, url)
+
+
+def test_the_permission_request_form_is_left_not_shown_and_its_site_cools_down():
+    b, sc, shown, ok = _settle_once("https://permissions.thedrive.threesai.com/", "The Drive - Permission Request Form",
+                                    PERMISSION_BODY)
+    assert not ok and b.last_skip == "bot wall" and shown == [] and not b.log
+    assert b.walled and min(b.walled.values()) > time.time() + browse.WALL_COOLDOWN_S - 60    # 6 h
+    sc.page.url = "about:blank"
+    assert not run(b._open(sc, "https://permissions.thedrive.threesai.com/other", "x", "page"))
+    assert "left alone" in b.last_skip
