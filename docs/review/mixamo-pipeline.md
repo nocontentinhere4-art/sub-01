@@ -1,6 +1,6 @@
 # Review: preview/mixamo-pipeline (G20)
 
-- Reviewed: `2cbbfa1` (2026-10-07 12:53 UTC), reviewed 2026-10-07 13:25 UTC by G23.
+- Reviewed: `2cbbfa1` (2026-10-07 12:53 UTC), reviewed 2026-10-07 13:22 UTC by G23.
 - Scope: `web/room/char_mixamo.glb` (v5 on the 65-bone Mixamo skeleton). The page does not load it yet (that is G21),
   so the default page is unchanged by construction: `room.html` / `boy_mh.js` are not in the diff.
 
@@ -33,7 +33,7 @@ Arms raised 40° above horizontal: the whole hoodie side stretches into a wing f
 **10.3 cm, 7.2 cm outward**. Same root cause as 1; will show in Stretching / Standing_Clap / Angry_Gesture.
 Fix: same clamp; then re-shoot arms-up 40° and 90° from the front.
 
-### 3. Armpit crease streaks — WITHDRAWN 14:45 (the streak is in the texture, present in G21's bind pose too; see mixamo-wiring.md)
+### 3. Armpit crease streaks — WITHDRAWN 14:33 (the streak is in the texture, present in G21's bind pose too; see mixamo-wiring.md)
 ![crease](img/mixamo-pipeline_3_armpit_crease.jpg)
 Dark parallel streaks across the shoulder/armpit seam in arms-down and typing (front and from below): a narrow band of
 stretched/folded triangles where the weight jumps between `Spine` and `*Arm`. G20's own number: arm in torso ≤ 2.5 cm
@@ -49,5 +49,5 @@ Elbows bend cleanly in the typing pose (no candy-wrapper at the elbow or wrist),
 the seated pose are clean, the back of the neck/hood is closed, fingers present (65 bones, `finger1-1.R` …).
 
 
-## Update 14:45
+## Update 14:33
 Superseded by preview/mixamo-wiring (G21 re-did autorig's weights). Defects 1 and 2 are mostly fixed there (numbers in mixamo-wiring.md); defect 3 withdrawn.

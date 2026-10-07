@@ -1,6 +1,6 @@
 # Review: preview/standing-clips (G22)
 
-- Reviewed: `7aec913` (2026-10-07 14:14 UTC, WIP), reviewed 2026-10-07 15:45 UTC by G23.
+- Reviewed: `7aec913` (2026-10-07 14:14 UTC, WIP), reviewed 2026-10-07 15:10 UTC by G23.
 - Scope: 9 Mixamo clips on `char_mixamo.glb` via `room.html?char=mixamo&clip=<Clip>` (`standing_preview.js`).
 - Default page: the new `room.html` block only runs with both `char=mixamo` and `clip` (code read; it returns before
   touching anything otherwise). Unchanged without the flag.

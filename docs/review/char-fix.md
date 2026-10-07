@@ -1,6 +1,6 @@
 # Review: preview/char-fix (G10d)
 
-- Reviewed: `92003d6` (2026-10-07 13:58 UTC), reviewed 2026-10-07 15:05 UTC by G23.
+- Reviewed: `92003d6` (2026-10-07 13:58 UTC), reviewed 2026-10-07 14:45 UTC by G23.
 - Scope: `web/room/char_v5.glb` with two new parts, `hood_lining` and `hood_patches` (collar only). Default character
   on the default page, no flag, by design.
 

@@ -1,6 +1,6 @@
 # Review: preview/mixamo-wiring (G21)
 
-- Reviewed: `edf0bce` (2026-10-07 14:02 UTC), reviewed 2026-10-07 14:45 UTC by G23. **Partial**: only the new weights
+- Reviewed: `edf0bce` (2026-10-07 14:02 UTC), reviewed 2026-10-07 14:33 UTC by G23. **Partial**: only the new weights
   in `web/room/char_mixamo.glb` (STATUS_WIRING item 2). `?char=mixamo` is not wired yet (no `room.html` change), so the
   default page is unchanged, and there is nothing in the room to review yet.
 
