@@ -48,11 +48,11 @@ def test_caption_says_going_to_the_desk_until_he_sits(tmp_path):
         for i in range(30 * 40):                                  # up to 40 s of his time, manual steps
             pg.evaluate("__qa.step(1/30, 1)")
             s = pg.evaluate(STATE)
-            if s["at"] == "desk" and not s["step"]:
+            if s["at"] == "desk" and (not s["step"] or s["step"] == "chair"):   # (hips on the seat: riding the chair in counts)
                 seated = s; break
             assert "at the computer" not in s["story"], (i, s)     # never before he sits
         assert seated, "he never sat down"
-        pg.evaluate("__qa.step(1/30, 30)")                         # (the caption is written on the page's next updates)
+        pg.evaluate("__qa.step(1/30, 2)")                          # (re-checked every step: not left to the next tick)
         after = pg.evaluate(STATE)
         assert "at the computer" in after["story"] and "Inokashira" in after["story"], after
         h.browser.close()
