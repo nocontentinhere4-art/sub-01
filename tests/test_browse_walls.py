@@ -353,3 +353,19 @@ def test_the_permission_request_form_is_left_not_shown_and_its_site_cools_down()
     sc.page.url = "about:blank"
     assert not run(b._open(sc, "https://permissions.thedrive.threesai.com/other", "x", "page"))
     assert "left alone" in b.last_skip
+
+
+# COORD: "consent" anywhere in a title made it a wall, so an article about cookie consent was left. Only a title part that
+# is the request itself is one (as consent_wall); Google's "Before you continue" stays a wall.
+@pytest.mark.parametrize("title, wall", [
+    ("Why websites ask for cookie consent - The Verge", False),
+    ("Informed consent in medicine: a guide | Example Health", False),
+    ("The age of consent debate, explained", False),
+    ("Consent", True),
+    ("Your consent | BBC", True),
+    ("Privacy & consent - Example News", True),
+    ("Cookie consent", True),
+    ("Before you continue", True),
+    ("Before you continue to YouTube", True)])
+def test_only_a_consent_request_title_is_a_wall(title, wall):
+    assert browse.challenge_title(title, "https://www.example.com/x") is wall

@@ -101,8 +101,17 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ env.PW_VERSION }}
       - name: browser system packages
-        timeout-minutes: 10
-        run: python -m playwright install-deps chromium || (sleep 30 && python -m playwright install-deps chromium)
+        timeout-minutes: 12
+        # each attempt bounded (a mirror that hangs fails in minutes, not the job's 30), apt's own retries and timeouts on;
+        # one more attempt after 30 s (main 39cf160: install-deps hung 2 x 10 min)
+        run: |
+          for i in 1 2; do
+            timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 update \
+              && timeout 300 python -m playwright install-deps chromium && exit 0
+            echo "browser system packages: attempt $i failed"; sleep 30
+            sudo pkill -x apt-get || true; sudo pkill -x dpkg || true; sudo dpkg --configure -a || true   # (timeout stops playwright, not its apt-get: free the lock)
+          done
+          exit 1
       - name: browser
         timeout-minutes: 10
         run: python -m playwright install chromium

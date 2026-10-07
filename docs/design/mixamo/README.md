@@ -350,3 +350,150 @@ tests/visual core set: 0 hard failures. tests/test_boy_mh.py: 7 passed.
 The desk set rests its hands on the thighs (4–5 cm over them). Seated_Idle stays the base. The 0.8 s hands-to-thighs blend gets its contact pass on the Mixamo rig, the body it will play on.
 
 The forward lean G14 measured (13–19°) is partly this pipeline's: the v5 seated fit tipped the spine 10° (`pitch` in `mixamo_clips.json`). On the Mixamo rig there is no fit.
+
+## Rig-change checklist (re-measure first when the Mixamo-rigged character lands)
+
+Measured on 20d32f0 every frame (contact_pass perFrame, positions in the chair's frame; seat cushion top y 0.504, front −z). Everything below is inside the chair; desk, floor and bed are 0.
+
+1. **Sit-down landing** (window → desk, 0.67–0.70 s into the step), 2 frames, up to 1.2 cm.
+   - Right lower thigh into the cushion's front, 1.3–1.6 cm under its top.
+   - COORD: inside the contract's give (−2.5…+0.5 cm), not a defect. Re-measure.
+2. **Rising** (desk → window / bed, 0.47–0.57 s), 4 frames (0.13 s), up to 1.6 cm.
+   - The back of the left calf under the cushion's front edge (y 0.435, z −0.24).
+   - COORD: a small defect. Re-measure on the new rig.
+3. **First step away** (1.93–2.03 s), 4 frames (0.13 s), up to 3.8 cm.
+   - The left lower calf/ankle through the chair base's front leg (y 0.05–0.08, z −0.27…−0.30).
+   - COORD: a real defect. Fix it on the new rig: the walk-off foot placement, or roll the chair before he steps. Not patched on v5.
+
+Also on the new rig, before anything else is accepted:
+- the seat-point sweeps (`SEAT_AT`);
+- the chair-ride distances for the rare events;
+- the 0.8 s hands-to-thighs blend, contact-passed against thighs, armrests and desk edge;
+- hoodie stretch per seated clip;
+- the forward lean, measured with no fit;
+- the mouse-mode body (Seated_Idle vs Typing), with G14's resolver.
+
+## The Mixamo skeleton without mixamo.com (G20, `rig/autorig.sh`)
+
+`room_build/rig/autorig.sh <in.glb> <out.glb> [clips dir]` puts the character on the Mixamo Standard Skeleton in about
+17 s (v5: 260,660 vertices), with no upload and no Adobe login. With a clips dir it then runs the QA and this README's
+rig-change checklist (2.5 min in all). On v5 from main the result is `web/room/char_mixamo.glb` (7.3 MB, meshopt; the
+page does not load it yet).
+
+How (`room_build/rig/autorig/`):
+1. `extract.mjs`: the mesh and v5's own 79-joint skin in its bind space (the slides' second skin brought into the
+   first's).
+2. `fit.py`:
+   - **T-pose from v5's own skin.** Each upper arm, forearm, hand, finger segment and thigh is swung to the direction
+     the Mixamo T-pose gives it; the calf to the ankle. The hand is also rolled palm-down (knuckles running as
+     Mixamo's: L 13.3°, R −13.6°), and that roll is spread down the forearm's twist bones (15 % / 55 %) so the wrist
+     does not wrap. Baked, then the soles put back on y = 0.
+   - **Joints.** Where v5 has the joint, its posed position (shoulders, elbows, wrists, knees, finger joints, thumb).
+     Where it does not, the mesh: the ankle is the lower leg's cross-section centre at Mixamo's ankle height (v5's
+     Foot joints sat on the sole); the finger and thumb tips are the furthest skin along each finger; the top of the
+     head is the highest head skin. Finger middle joints are re-centred in the finger's own cross-section (≤ 2.8 mm).
+     Where a joint is a convention rather than anatomy, Mixamo's direction decides it: the hips over the hip joints,
+     the spine chain in Mixamo's proportions up to v5's neck, the clavicle root, the neck base, the toes.
+   - **Rest rotations are Mixamo's.** Every bone keeps the Standard Skeleton's T-pose world rotation
+     (`mixamo_standard_skeleton.json`: names, rest positions and rotations only, read from a capture's rest; no motion).
+     So a clip's local rotations give the performer's world rotations exactly: the clips play by name.
+   - **Weights.** Half geometry, half v5's skin: inverse 4th-power distance to each new bone's segment, only among
+     the bones v5's skin already gives that part of the body and their neighbours (no arm vertex bound to the ribs);
+     blended 50/50 with v5's weights moved onto the new bones; smoothed 12 times over the surface; coincident
+     vertices (UV seams, the head/body join) forced to one set (without that the hoodie cracked open at its seams);
+     4 per vertex. 50/50 was chosen by measurement against 0 and 100 % geometry (below).
+3. `write.mjs`: the same file (meshes, UVs, materials, textures) with the new positions, normals, skeleton and skin.
+   The skeleton is in centimetres under one node scaled 0.01, as `mixamo_glb.mjs` writes Mixamo's own FBX, so a clip's
+   hips translation means the same on both. Positions stay float: quantizing a skinned mesh's positions moves the
+   dequantization into the inverse bind matrices, and then three's `skeleton.pose()` puts the bones somewhere else.
+
+Result on v5: 65 bones, `mixamorig:Hips` … `mixamorig:LeftToe_End`, the hierarchy exactly the Standard Skeleton's;
+1.78 m with the slides, hips 0.92 m. Joint directions within 3° of Mixamo's along every limb (arm, forearm, hand,
+legs, feet, thumb segments); the larger offsets are joint roots where his anatomy differs (thumb base 30–46°, clavicle
+root 17°, hip joints 11–12°: he is wider at the hips than the performer).
+
+### Proof and numbers
+
+`kimodo/mixamo_check.mjs` now also compares every bone's **world rotation** with the FBX played on its own skeleton
+(positions cannot match: his proportions are his own):
+
+| clip | bones matched | worst rotation gap | worst position gap (proportions) |
+|---|---|---|---|
+| Seated_Idle | 65 / 65 | 0.03° | 9.1 cm (knee) |
+| Typing | 65 / 65 | 0.03° | 10.1 cm (thumb tip) |
+| Laying_Sleeping | 65 / 65 | 0.04° | 23.1 cm (thumb tip, arms longer than the performer's) |
+
+Deformation (`rig/autorig/qa.mjs`, the skinned mesh every 0.1 s; edge length change in each joint region, worst
+frame's 95th percentile and share of edges changed by more than 30 %; folds at a bent joint compress, so these are
+large by nature and are for comparing weightings):
+
+| weights | elbows | shoulders | wrists | hips | knees | fingers | whole body |
+|---|---|---|---|---|---|---|---|
+| v5's moved over (0 % geometry), Typing | 147 % / 46 % | 95 / 32 | 61 / 17 | 103 / 39 | 136 / 39 | 36 / 7 | 60 / 13 |
+| **50 / 50 (used)**, Typing | **88 / 30** | **75 / 23** | **53 / 13** | 104 / 39 | 118 / 40 | 35 / 7 | 58 / 13 |
+| 100 % geometry, Typing | 65 / 24 | 83 / 23 | 64 / 17 | 110 / 41 | 100 / 42 | 35 / 7 | 58 / 14 |
+
+Contact and self-contact numbers are in `docs/qa/contact.md` (section "The auto-rigged character"). Sheet:
+`autorig_v5_sheet.jpg` (T-pose front / side / back and hands; each clip at four moments; close-ups of shoulder, elbow,
+hips and both hands). The checklist report: `rig_change_v5.md`.
+
+### The rig-change checklist, automatic
+
+`room_build/kimodo/rig_change.mjs <character.glb> <clips dir> <out dir>` (run by `autorig.sh`) writes
+`rig_change.md` / `.json`. On v5: the loader proof PASS; the 0.8 s hands-to-thighs blend PASS (0/28 frames both ways,
+against his thighs); the forward lean with no fit measured (Seated_Idle 3.9°, performer 7.9°; Typing 4.4°, performer
+5.1°); hoodie stretch and soles measured. The three chair items, the seat-point sweeps, the chair-ride distances and
+the mouse-mode body are reported **PENDING**: they need room.html to play this character (a `?char=mixamo` switch in
+`pickRig` / `V5`, G10d's) and, for the first step away, a walk, which no Mixamo capture provides.
+
+### Tripo's auto-rig: not used
+
+Tried on 2026-10-06 (room_build/rig/README.md): 25 credits for a 22-bone biped with no fingers. That is over this
+task's 5-credit budget and without the fingers the whole point needs, so it was not run again (0 credits spent).
+
+### Fallback: mixamo.com by hand
+
+Only if the result above is not accepted: `rig/mixamo_upload.sh <in.glb> <out.zip>` (OBJ + MTL + 2048² JPEG; v5 →
+160,899 triangles, 4.3 MB), the owner's steps in `UPLOAD_STEPS.md` (Italian), then
+`rig/mixamo_import.sh <mixamo.fbx> <out.glb> [original.glb]`. The import has only been exercised on a skinless
+capture (no Mixamo-rigged FBX of ours exists to test the textured path).
+
+## `room.html?char=mixamo`: the Mixamo skeleton in the room (G21)
+
+The page loads `room/char_mixamo.glb` with `room/char_mixamo.js` and plays the Mixamo captures on their own skeleton,
+bone for bone: nothing is retargeted to the old rig. Without the flag the page is unchanged (v5). Status and every
+number: `STATUS_WIRING.md`. Sheet: `wiring_sheet.jpg` (watching and typing; the page's camera and his right side; main
+above, `?char=mixamo` below).
+
+### The clips (`web/room/mh_mx/`, `room_build/kimodo/mx_build.sh <Clip> <work dir>`, rows in `mx_clips.json`)
+`kimodo/mx_fit.py` bakes each capture for this character and our chair. It is G12's seated fit ported to the Mixamo
+skeleton, plus what this body needs:
+- **The hip joints at 0.68 m, 4.5 cm forward.** G12's numbers: v5's Hip joint sits at the hip joints, where these are
+  measured. On the seat, the cushion stops the hips.
+- **The hands where the clip puts them on him.** They ride up with him onto our seat (the performer sat 16–24 cm lower
+  at his size), then `handUp` / `keys` move them onto our furniture: typing −11 cm onto our keys. Not the performer's
+  wrists: his shoulders are not ours, and reaching for them pulled the right arm across the chest.
+- **The knees at 0.55 m.** Our chair is high for him: with his feet flat, his shin and ankle reach 0.48 m and his thighs
+  went 3–8 cm through the cushion's front edge. As on a high chair, his heels come up 7–8 cm and he rests on the balls
+  of his feet (v5's clips hold his knees at 0.55 m the same way). This applies whenever his hips are over the seat and
+  near its height, so it covers landing and pushing off too.
+- **The feet planted** (stances locked, soles +0.2 cm over the floor with the slides counted).
+- **The sleeves off the hoodie.** Where a sleeve would still go more than 0.8 cm in, the elbow swings out about the
+  shoulder–wrist line (wrist and hand stay), then the arm abducts at the shoulder (≤ 24°): per frame, the least that
+  clears, smoothed.
+
+Slots without a Mixamo capture (the mouse, walking, standing, the bed, eating, the door, the window) play v5's room
+clips carried onto this skeleton (`kimodo/mx_convert.mjs`): each bone moves as the v5 joint it was fitted from, plus
+place tracks where the two skeletons' joints differ. Measured against v5, the median skin offset is 2–3 mm.
+
+### The page
+- `room.html` picks the character: `CHAR_MX ? load("room/char_mixamo.glb") : load("room/char_v5.glb")`.
+- `char_mixamo.js` `ROOM` tells `boy_mh.js` (through the page's env):
+  - which clip plays which slot;
+  - typing's way in and out (Sit_To_Type / Type_To_Sit, with G12's 0.3 / 0.2 / 0.8 s links);
+  - the baked Typing's keyboard point (the page rolls him and the chair onto the room's keyboard by it);
+  - the seat points, swept for this character with `kimodo/seat_sweep.mjs`.
+- `boy_mh.js` takes these as optional env (`clips`, `links`, `clipFrame`, `seatAt`); without them, everything is as on
+  main.
+- The rig-change checklist's room items are measured by `kimodo/mx_room.sh` (contact_pass.mjs and seat_sweep.mjs, on
+  `?char=mixamo` and on v5 alongside). `kimodo/rig_change.mjs` reads them; result: `rig_change_v5.md`.

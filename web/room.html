@@ -660,10 +660,13 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
 }).catch(e => console.warn("poster_car.webp", e));
 
 // preview/room-v5: the v5 character (room/char_v5.glb, prepared by room/char_v5.js for room/boy_mh.js and its clips in
-// room/mh_v5/); ?char=old: the live character (room/boy.glb) with its own clips
-const CHAR_V5 = new URLSearchParams(location.search).get("char") !== "old";
-let V5 = null;                                        // (char_v5.js and the body's clip conversion)
-(CHAR_V5 ? Promise.all([load("room/char_v5.glb"), import("./room/char_v5.js")]).then(([g, m]) => { V5 = {m, conv: m.prep(THREE, g)};
+// room/mh_v5/); ?char=old: the live character (room/boy.glb) with its own clips; ?char=mixamo: the same character on the
+// Mixamo Standard Skeleton (room/char_mixamo.glb, rig/autorig.sh; room/char_mixamo.js), playing the Mixamo clips on
+// their own skeleton (room/mh_mx/, baked for our chair: kimodo/mx_build.sh) and v5's other room clips carried over
+const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q === "mixamo";
+let V5 = null;                                        // (char_v5.js / char_mixamo.js and the body's clip conversion)
+(CHAR_V5 ? Promise.all([CHAR_MX ? load("room/char_mixamo.glb") : load("room/char_v5.glb"), import(CHAR_MX ? "./room/char_mixamo.js" : "./room/char_v5.js")])
+  .then(([g, m]) => { V5 = {m, conv: m.prep(THREE, g), mx: CHAR_MX};
     // (behind the camera's clearance, a backstop: his clothes are one single-sided shell, so wherever a view still reached
     // inside it, the visitor would see through him. With an inside, the inside of the fabric shows as fabric; his shadows
     // do not change: the inside casts none)
@@ -3302,6 +3305,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
   const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, DISH_AT, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
     ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
+    ...(V5 && V5.mx ? {clipDir: "room/mh_mx", ...V5.m.ROOM} : {}),   // (?char=mixamo: its clips, which clip plays which slot, the clips' keyboard and mouse)
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),
