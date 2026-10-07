@@ -1,0 +1,15 @@
+{
+ "_": "G22: the standing and in-between Mixamo captures baked for the character on the Mixamo Standard Skeleton (web/room/char_mixamo.glb), one row each; standing_rebake.sh builds them all into web/room/mx_standing/<Clip>.glb (+ standing_clips.meta.json). kind: standing = on his feet (the lowest sole soleUp over the floor, planted stances held); seated = in OUR desk chair throughout (G12's fit: the thighs on the cushion, seatGap from its top, feet planted on the floor by leg IK); transition = both, blended by how low the hips are, the cushion stopping the hips whenever they are over the seat. seatOrigin: the seated hips at the clip's origin (the page puts it on the chair's seat point). trim [from, to] s: only that stretch (Sit_To_Stand runs on past the act: G12). hold: what the hands hold (phone = the page's phone, on the right hand; tablet / controller: a socket only, no prop in the page). spot: where ?char=mixamo&clip=<Clip> shows it (rug: on his feet in the open middle of the room, on the rug, facing the window; chair: the desk chair rolled back from the desk by the clip's own reach).",
+ "defaults": {"soleUp": 0.004, "seatTop": 0.505, "seatGap": -0.004},
+ "clips": {
+  "Texting_While_Standing": {"kind": "standing", "hold": "phone", "spot": "rug"},
+  "Standing_Using_Touchscreen_Tablet": {"kind": "standing", "hold": "tablet", "spot": "rug"},
+  "Texting": {"kind": "standing", "hold": "phone", "spot": "rug"},
+  "Standing_Clap": {"kind": "transition", "seatOrigin": true, "spot": "chair"},
+  "Angry_Gesture": {"kind": "seated", "seatOrigin": true, "spot": "chair"},
+  "Scared": {"kind": "transition", "seatOrigin": true, "spot": "chair"},
+  "Stand_To_Sit": {"kind": "transition", "seatOrigin": true, "spot": "chair"},
+  "Sit_To_Stand": {"kind": "transition", "seatOrigin": true, "trim": [0, 2.07], "spot": "chair"},
+  "Gaming": {"kind": "seated", "seatOrigin": true, "hold": "controller", "spot": "chair"}
+ }
+}

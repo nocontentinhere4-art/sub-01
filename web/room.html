@@ -3324,6 +3324,25 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====
+// ===== G22: ?char=mixamo&clip=<Clip> =====
+// A preview of one of the standing / in-between Mixamo clips (room/standing_preview.js) on the Mixamo-rigged character,
+// in the room. Only with both parameters: the page's own day is switched off (his v5 body out of the scene, the planner
+// not stepped), the camera framed on him once. Without ?clip nothing here runs.
+{
+  const q = new URLSearchParams(location.search), CLIP = q.get("char") === "mixamo" && q.get("clip");
+  if (CLIP && /^[A-Za-z_]+$/.test(CLIP)) {
+    let SP = null; animate = dt => (SP ? SP.step(dt) : false); if (DEBUG) window.animate_ = animate;
+    (async () => {
+      while (!room || !boy) await new Promise(r => setTimeout(r, 100));
+      scene.remove(boy); follow = false;
+      const m = await import("./room/standing_preview.js");
+      SP = await m.start({THREE, scene, load, clip: CLIP, chairNode, phone});
+      const v = SP.view("front"); controls.target.copy(v.target); camera.position.copy(v.pos);
+      controls.update(); if (DEBUG) window.SP = SP;
+    })().catch(e => console.warn("standing preview:", e));
+  }
+}
+// ===== end G22 =====
 </script>
 </body>
 </html>

@@ -14,9 +14,13 @@
 // LIFE='{"screen": {"id": "v", "kind": "video"}}': more of the tick for live() (a video on the screen: watching).
 // RARE=scared|angry|clap: once settled at the desk, start that rare event (boy_mh.js mh.rare) and sample from there.
 // perFrame in the output: for every frame with something inside a solid, {"solid:region": [vertices, depth cm]} (frame = 1/30 s).
+// CLIP=<Clip> (G22): instead of his day, one of the standing / in-between clips on the Mixamo-rigged character
+// (room.html?char=mixamo&clip=<Clip>, room/standing_preview.js), every frame of the whole clip once from its first
+// (<seconds> = "clip"), placed where the preview puts it; the furniture is then the whole room's, the walls are checked
+// (wall: any skin past a wall's plane), and with the phone in his hand his hand's skin inside the phone (phone).
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
-const [port, activity = "research", secs = "8", out] = process.argv.slice(2);
+const [port, activity = "research", secs = "8", out] = process.argv.slice(2), CLIP = process.env.CLIP || null;
 const b = await chromium.launch({executablePath: process.env.CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]});
 const p = await b.newPage({viewport: {width: 480, height: 320}});
@@ -24,9 +28,13 @@ const cdn = path.join(process.env.CDN_CACHE || "/tmp", "cdn_cache"); fs.mkdirSyn
 await p.route(/^https:\/\/(cdn\.jsdelivr\.net|unpkg\.com)\//, async r => { const u = r.request().url(), f = path.join(cdn, u.replace(/[^a-z0-9.]+/gi, "_"));
   if (!fs.existsSync(f)) execSync(`curl -sSfL -o ${f} '${u}'`); await r.fulfill({status: 200, contentType: u.endsWith(".css") ? "text/css" : "application/javascript", body: fs.readFileSync(f)}); });
 p.on("pageerror", e => console.log("pageerror", e.message));
-await p.goto(`http://localhost:${port}/room.html?debug&nolive&hour=15`);
-await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
-const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
+await p.goto(`http://localhost:${port}/room.html?debug&nolive&hour=15${CLIP ? `&char=mixamo&clip=${CLIP}` : ""}`);
+if (CLIP) await p.waitForFunction(() => window.SP && window.SP.ready && window.roomDbg, null, {timeout: 300000});
+else await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
+const res = await p.evaluate(([activity, secs, X, RARE, CLIP]) => { let S0step = null;
+  const boy = CLIP ? SP.char : window.boy, step1 = f => CLIP ? SP.setTime(Math.min(f / 30, SP.duration - 1e-4)) : animate_(1 / 30);
+  if (CLIP) { window.FREEZE = true; settle(); SP.setTime(0); secs = (Math.round(SP.duration * 30) + 1) / 30; activity = "clip:" + CLIP; }
+  else {
   // "a>b": settle doing a, then switch to b and sample from the moment his pose step (sitting down, getting up) begins
   const [act0, act1] = activity.split(">"); activity = act0;
   window.FREEZE = true; settle(); live(activity, X);
@@ -34,13 +42,19 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
   const WANT = {research: "desk", chart: "desk", chat: "desk", eat: "desk", listen_music: "bedlie", sleep: "bedlie", phone: "bedside"}[activity];
   let t = 0, still = 0; while (t < 120 && still < 1) { animate_(1 / 30); t += 1 / 30; still = pose().step || (WANT && pose().at !== WANT) ? 0 : still + 1 / 30; }
   if (RARE) { const ok = mh.rare(RARE); if (!ok) return {error: "rare " + RARE + " did not start"}; }
-  if (act1) { live(act1, X); let w = 0; while (w < 60 && !(pose().step && pose().step.k === "pose")) { animate_(1 / 30); w += 1 / 30; } }
-  const at = pose().at, cur = pose().current && pose().current._clip && pose().current._clip.name;
-  S0step = pose().step ? {k: pose().step.k, from: pose().step.from, to: pose().step.to} : null;
+  if (act1) { live(act1, X); let w = 0; while (w < 60 && !(pose().step && pose().step.k === "pose")) { animate_(1 / 30); w += 1 / 30; } } }
+  const at = CLIP ? activity : pose().at, cur = CLIP ? CLIP : pose().current && pose().current._clip && pose().current._clip.name;
+  S0step = CLIP ? null : pose().step ? {k: pose().step.k, from: pose().step.from, to: pose().step.to} : null;
   // ---- the static furniture as inside-intervals (desk region and around), world frame
   const SOLID = /^(oak|steel|painted|white|plastic_black|book|metal_dark|rubber|alu|cable|desk_lamp_arm_01|potted_plant_02_pot|potted_plant_04)$/;
   const meshes = []; room.traverse(o => { if (o.isMesh && o.material && SOLID.test(o.material.name)) { meshes.push(o); o.material.side = THREE.DoubleSide; } });
-  const R = {x0: -1.95, x1: 0.35, z0: -1.50, z1: 0.25, c: 0.015}, nx = Math.ceil((R.x1 - R.x0) / R.c), nz = Math.ceil((R.z1 - R.z0) / R.c), cols = new Array(nx * nz);
+  if (CLIP) {   // (the clip preview: every visible mesh in the room, props and the rug included, but him, his phone, the chair (its own test), the floor, walls and debug markers)
+    const own = new Set(); for (const r of [SP.holder, roomDbg().CHAIR && roomDbg().CHAIR.node]) if (r) r.traverse(o => own.add(o));
+    const seen = new Set(meshes); scene.traverse(o => { if (!o.isMesh || seen.has(o) || own.has(o) || !o.material || o.material.isMeshBasicMaterial) return;
+      for (let q = o; q; q = q.parent) if (!q.visible) return;
+      if (/^(floor|wall|cut|decal|curtain|screen|led|alu|posters)$/.test(o.material.name || "")) return;
+      meshes.push(o); o.material.side = THREE.DoubleSide; }); }
+  const R = CLIP ? {x0: -1.99, x1: 1.99, z0: -1.45, z1: 1.59, c: 0.015} : {x0: -1.95, x1: 0.35, z0: -1.50, z1: 0.25, c: 0.015}, nx = Math.ceil((R.x1 - R.x0) / R.c), nz = Math.ceil((R.z1 - R.z0) / R.c), cols = new Array(nx * nz);
   const ray = new THREE.Raycaster(), o = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
   for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) { o.set(R.x0 + (i + 0.5) * R.c, 0.17, R.z0 + (k + 0.5) * R.c); ray.set(o, UP);
     const hits = []; for (const h of ray.intersectObjects(meshes, false)) { const y = h.point.y; if (!hits.length || y - hits[hits.length - 1] > 0.002) hits.push(y); }
@@ -69,7 +83,7 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       (CV.seat = CV.seat || [])[i * CV.nz + k] = st; }
     cm.forEach(m => { m.material.side = THREE.FrontSide; }); }
   const F = 0.16, TOP = 0.82 - 0.02, M = 0.01;
-  const S = {frames: 0, at, clip: cur, step: S0step, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: [], perFrame: {}};
+  const S = {frames: 0, at, clip: cur, step: S0step, chair: {}, desk: {}, other: {}, floor: {}, bed: {}, wall: {}, phone: {}, seat: {min: 9, max: -9}, soles: {L: {min: 9, max: -9}, R: {min: 9, max: -9}}, worst: [], perFrame: {}};
   const add = (k, reg, d, f) => { const e = S[k][reg] || (S[k][reg] = {frames: 0, maxDepth: 0, maxCount: 0, _f: -1, _n: 0});
     if (e._f !== f) { if (e._f >= 0) e.maxCount = Math.max(e.maxCount, e._n); e._f = f; e._n = 0; e.frames++; } e._n++; e.maxDepth = Math.max(e.maxDepth, d);
     const p = S.perFrame[f] || (S.perFrame[f] = {}), q = p[k + ":" + reg] || (p[k + ":" + reg] = [0, 0]); q[0]++; q[1] = Math.max(q[1], +(d * 100).toFixed(1)); };   // (frame -> "solid:region" -> [vertices, depth cm])
@@ -94,10 +108,14 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
   S.legs = {framesIn: 0, maxVerts: 0, maxDepth: 0, worstT: null, radius_cm: Object.fromEntries(Object.entries(RAD).map(([k, r]) => [k, r.map(x => +(x * 100).toFixed(1))]))};
   const v = new THREE.Vector3(), u = new THREE.Vector3(), N = Math.round(secs * 30);
   for (let f = 0; f < N; f++) {
-    animate_(1 / 30); boy.updateMatrixWorld(true); let seatLow = 9, solL = 9, solR = 9, nPen = 0;
+    step1(f); boy.updateMatrixWorld(true); let seatLow = 9, solL = 9, solR = 9, nPen = 0;
+    const PH = CLIP && SP.phone ? (SP.phone.updateMatrixWorld(true), new THREE.Matrix4().copy(SP.phone.matrixWorld).invert()) : null, ph = new THREE.Vector3();
     parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position, reg = vreg[pi];
       for (let i = 0; i < P.count; i += 2) { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); const rg = reg[i];
         if (v.y < F - M) { add("floor", rg, F - v.y, f); nPen++; }
+        if (CLIP) { const wd = Math.max(-2.0 - v.x, v.x - 2.0, -1.45 - v.z, v.z - 1.60); if (wd > M) { add("wall", rg, wd, f); nPen++; } }
+        if (PH && rg === "hands") { ph.copy(v).applyMatrix4(PH); const [pw, phh, pd] = SP.phoneSize, d = Math.min(pw / 2 - Math.abs(ph.x), phh / 2 - Math.abs(ph.y), pd / 2 - Math.abs(ph.z));
+          if (d > 0.002) add("phone", rg, d, f); }
         if (rg === "feet") { const side = v.z; }
         const e = Math.min(v.x + 1.90, -0.20 - v.x, v.z - 0.25, 1.50 - v.z);
         if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - M) { add("bed", rg, TOP - v.y, f); nPen++; }
@@ -142,9 +160,9 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       if (lo < 9) { const K = S.keys; K.framesOver++; if (lo < 0.005) K.framesTouch++; if (lo < -0.005) K.framesBelow++; K.minGap_cm = Math.min(K.minGap_cm, +(lo * 100).toFixed(1)); K.maxGap_cm = Math.max(K.maxGap_cm, +(lo * 100).toFixed(1)); if (f % 15 === 0) K.gaps.push(+(lo * 100).toFixed(1)); } }
     if (nPen) S.worst.push([+(f / 30).toFixed(2), nPen]);
     S.frames++; }
-  for (const k of ["chair", "desk", "other", "floor", "bed"]) for (const r in S[k]) { const e = S[k][r]; e.maxCount = Math.max(e.maxCount, e._n); delete e._f; delete e._n; e.maxDepth = +(e.maxDepth * 100).toFixed(1); }
+  for (const k of ["chair", "desk", "other", "floor", "bed", "wall", "phone"]) for (const r in S[k]) { const e = S[k][r]; e.maxCount = Math.max(e.maxCount, e._n); delete e._f; delete e._n; e.maxDepth = +(e.maxDepth * 100).toFixed(1); }
   S.seat = {lowestGap_min_cm: +(S.seat.min * 100).toFixed(1), lowestGap_max_cm: +(S.seat.max * 100).toFixed(1), framesUnder: S.seat.framesUnder || 0, maxVertsUnder: S.seat.maxUnder || 0, maxDepth_cm: +((S.seat.maxDepth || 0) * 100).toFixed(1)};
   for (const k of ["L", "R"]) S.soles[k] = {min_cm: +(S.soles[k].min * 100).toFixed(1), max_cm: +(S.soles[k].max * 100).toFixed(1), on: S.soles[k].on};
   S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5); S.legs.maxDepth = +(S.legs.maxDepth * 100).toFixed(1);
-  S.mode = window.mh && mh.M.mode; return S; }, [activity, +secs, JSON.parse(process.env.LIFE || "{}"), process.env.RARE || null]);
+  S.mode = window.mh && mh.M.mode; return S; }, [activity, +secs || 8, JSON.parse(process.env.LIFE || "{}"), process.env.RARE || null, CLIP]);
 const txt = JSON.stringify(res, null, 1); if (out) fs.writeFileSync(out, txt); console.log(txt); await b.close();

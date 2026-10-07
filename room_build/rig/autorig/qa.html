@@ -88,6 +88,19 @@ window.QA = {
     out.soles = {L_cm: out.soles.L.map(v => +(v * 100).toFixed(1)), R_cm: out.soles.R.map(v => +(v * 100).toFixed(1))};
     return out;
   },
+  // self contact only (G22), every dt seconds (1/30: every frame): the PAIRS, with the rest and arms-down baselines
+  selfContact(k, dt = 1 / 30) {
+    const reg = regions(), out = {clip: k, frames: 0, inside: {}, worst: {}};
+    for (const [key, down] of [["insideRest", 0], ["insideArmsDown", 1.1]]) { QA.pose(null, 0);
+      if (down) { for (const [n, sg] of [["LeftArm", -1], ["RightArm", 1]]) body.getObjectByName(n).rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), sg * down); body.updateMatrixWorld(true); }
+      const s0 = skinned(); out[key] = {}; for (const [nm, A, B] of PAIRS) { const r = inside(s0, reg.sets[A], reg.sets[B]); out[key][nm] = {verts: r.n, depth_cm: +(r.d * 100).toFixed(1)}; } }
+    const N = Math.round(clips[k].duration / dt) + 1;
+    for (let f = 0; f < N; f++) { const t = Math.min(f * dt, clips[k].duration - 1e-4); QA.pose(k, t); const s = skinned(); out.frames++;
+      for (const [nm, A, B] of PAIRS) { const r = inside(s, reg.sets[A], reg.sets[B]);
+        const o = out.inside[nm] || (out.inside[nm] = {frames: 0, maxDepth_cm: 0, maxVerts: 0, worstT: null});
+        if (r.n) { o.frames++; if (r.n > o.maxVerts) { o.maxVerts = r.n; o.worstT = +t.toFixed(2); } o.maxDepth_cm = Math.max(o.maxDepth_cm, +(r.d * 100).toFixed(1)); } } }
+    return out;
+  },
   // a crossfade from clip a (at ta) into clip b (from tb) over dur seconds, as the page blends: hands vs thighs and the
   // arms vs the torso every frame (1/30 s)
   blend(a, b, dur = 0.8, ta = 0, tb = 0) {
