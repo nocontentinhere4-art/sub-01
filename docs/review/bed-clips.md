@@ -1,8 +1,17 @@
 # Review: preview/bed-clips (G17)
 
-- Latest: `48cb1bb`, round 3 by G26 (below). Round 2: `ebb2756`. Round 1: `ecabd00` (2026-10-07 14:43 UTC, WIP), reviewed 2026-10-07 15:55 UTC by G23.
+- Latest: `41842ca` (WIP), round 4 quick check by G26 (below). Round 3: `48cb1bb`. Round 2: `ebb2756`. Round 1: `ecabd00` (2026-10-07 14:43 UTC, WIP), reviewed 2026-10-07 15:55 UTC by G23.
 - Scope: Laying_Nodding with the headphones (music), Laying_Sleeping, the side turn, `capBed`, wired into the default
   page (`boy_mh.js`, `room.html`): this changes the default page by design.
+
+## Round 4 (41842ca, WIP, 2026-10-07 22:45 UTC), quick check 22:58 UTC by G26: NOT OK (headphones only checked)
+![headphones](img/bed-clips_7_headphones_41842ca.jpg)
+Top 48cb1bb, bottom 41842ca: listening, from above, left and right. The cups widened by 0.8 cm look the same: both still
+sit at the angle of the jaw, under and behind the ear, not over it. Widening doesn't move them up. The cups' centre must
+go to the ear's centre (about 3–4 cm up toward the crown and 1–2 cm forward, from these shots). The buttocks, hands-mid-roll
+and duvet items were not re-checked this round (out of time at 23:00).
+
+---
 
 ## Round 3 (48cb1bb, 2026-10-07 18:29 UTC: re-baked on main's GLB, head turned 9° awake, wrists capped in the turn, toes held), reviewed 20:05 UTC by G26: NOT OK
 
