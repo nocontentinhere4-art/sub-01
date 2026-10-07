@@ -14,6 +14,13 @@ stays on the coordinator's machine, by the owner's rule. What is here is only nu
 
 Landmark order (MediaPipe): 0 wrist; thumb 1–4; index 5–8; middle 9–12; ring 13–16; little 17–20.
 
+> **Caution (G14, 2026-10-07): do not use the flexion tables below as targets.** They come from MediaPipe's `world`
+> landmarks, and from straight above a finger's flexion lies mostly in depth, which is `world`'s weak axis. In the
+> typing take it puts the knuckles 3 cm apart (they are ~8), pitches the palm 49° and fans the fingers 17–50° (the
+> image shows 4–19°). Applied to the rig, the table makes claws. Take directions, reach (knuckle to fingertip seen from
+> above, as a fraction of his palm length) and spread from `img`, and only the joints' proportions and timing from
+> `world`. The same caution applies to the mouse table, and to its 31° roll: the front take gives 14–21°.
+
 Joint flexion measured from `world` over the whole take (degrees of bend, median, with p10–p90 in brackets):
 
 | joint | left index | left middle | left ring | right index | right middle | right ring |
