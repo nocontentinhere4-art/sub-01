@@ -191,3 +191,54 @@ def test_an_overlay_that_appears_after_the_page_loaded_is_left_at_the_next_scree
     b._leave = leave
     assert run(b._shoot(sc)) is False and left and b.last_skip == "overlay wall"
     assert b.walled["example-news.com"] > time.time()
+
+
+# region walls (live 2026-10-07 08:00 Tokyo: "Sorry, BBC iPlayer isn't available in your region" was shown in the card)
+@pytest.mark.parametrize("title, wall", [
+    ("Sorry, BBC iPlayer isn't available in your region", True),
+    ("BBC iPlayer - iPlayer is not available in your country", True),
+    ("Content unavailable in your location", True),
+    ("Video not available in your country", True),
+    ("Why Netflix shows aren't available in your country", False),          # an article about it
+    ("Parental Controls – BBC iPlayer", False),
+    ("BBC iPlayer - Home", False)])
+def test_region_wall_titles(title, wall):
+    assert browse.challenge_title(title, "https://www.bbc.co.uk/iplayer") is wall
+
+
+@pytest.mark.parametrize("body", [
+    "Sorry, BBC iPlayer isn't available in your region. BBC iPlayer only works in the UK. Sorry, it's due to rights issues.",
+    "This video is not available in your country.",
+    "The uploader has not made this video available in your country.",
+    "This content is unavailable in your region.",
+    "We're sorry, this service is not available outside the United States.",
+    "This page is geo-blocked."])
+def test_region_wall_bodies(body):
+    assert browse.Browser.wall_text(body)
+
+
+@pytest.mark.parametrize("body", [
+    "Streaming services restrict what is available in your region by licence. " * 40,      # a long article about it
+    "Opening hours: the museum shop is available in your visit's ticket price."])
+def test_articles_about_region_locks_are_not_walls(body):
+    assert not browse.Browser.wall_text(body)
+
+
+def test_a_region_wall_is_left_not_shown_and_its_site_cools_down():
+    b = browse.Browser(decide=False)
+    sc = b.screens["desk"]
+    sc.page, sc.ctx = Page("https://www.bbc.co.uk/iplayer/region", "BBC iPlayer",
+                           "Sorry, BBC iPlayer isn't available in your region. BBC iPlayer only works in the UK."), object()
+    shown = []
+
+    async def show(sc_):
+        shown.append(sc_.info["url"])
+        return True
+
+    async def leave(sc_):
+        sc_.page.url = "about:blank"
+        return False
+    b.show, b._leave = show, leave
+    assert not run(b._settle(sc, "followed a link", "page"))
+    assert b.last_skip == "bot wall" and shown == []
+    assert b.walled["bbc.co.uk"] > time.time() + browse.WALL_COOLDOWN_S - 60

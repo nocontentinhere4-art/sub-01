@@ -193,6 +193,23 @@ BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you
                        r"please enable js and disable any ad blocker|press (&|and) hold to confirm you are|"
                        r"access to this page has been denied|pardon our interruption|ray id: [0-9a-f]{8}|"
                        r"performance & security by cloudflare|request unsuccessful\. incapsula", re.I)
+# region walls (live 2026-10-07 08:00: "Sorry, BBC iPlayer isn't available in your region" shown in the card): a geo-block
+# page is a wall like a bot check - left at once, never shown, the site cooled down. In the page text (short pages only,
+# as BODY_WALL), and in a short title that is not a question ("Why X isn't available in your country" is an article)
+REGION_WALL = re.compile(r"(isn['’]?t|is not|are not|aren['’]?t|not|no longer) (currently )?available in your "
+                         r"(region|country|location|area|territory)|unavailable in your (region|country|location|area|territory)|"
+                         r"only (works|available|playable) (in|to (users|viewers|people) in) the (uk|united kingdom|us|usa|united states)|"
+                         r"not available (to (users|viewers) )?outside (of )?the (uk|united kingdom|us|usa|united states|eu)|"
+                         r"(has not|hasn['’]?t) made this (video|content|programme|show) available in your (country|region)|"
+                         r"geo[- ]?(blocked|restricted)|due to (licensing|rights|legal) restrictions[^.]{0,60}(country|region|location)", re.I)
+REGION_TITLE_ASK = re.compile(r"^\s*(why|how|what|which|when|where|is|are|can|do|does)\b", re.I)
+
+
+def region_wall_title(title):
+    t = " ".join(str(title or "").split())
+    return len(t) <= 90 and not REGION_TITLE_ASK.search(t) and bool(REGION_WALL.search(t))
+
+
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -601,10 +618,11 @@ OVERLAY_TEXT_JS = """() => {
 
 def challenge_title(title, url):
     """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    or a title that is only the bare host name (an interstitial, not content)."""
+    a region wall's title, or a title that is only the bare host name (an interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
-    return bool(BOT_WALL.search(t)) or bool(t) and t in (host, host.removeprefix("www."), "www." + host)
+    return (bool(BOT_WALL.search(t)) or region_wall_title(t)
+            or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
 def cross_site_frame(req, host):
@@ -2126,7 +2144,7 @@ class Browser:
 
     @staticmethod
     def wall_text(body):
-        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body) or REGION_WALL.search(body))
 
     async def _walled(self, page, body=None):
         """A bot check (CAPTCHA, 'unusual traffic', browser challenge) fills the page."""
