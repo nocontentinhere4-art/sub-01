@@ -4,7 +4,7 @@
 - Scope: Laying_Nodding with the headphones (music), Laying_Sleeping, the side turn, `capBed`, wired into the default
   page (`boy_mh.js`, `room.html`): this changes the default page by design.
 
-## Round 3 (48cb1bb, 2026-10-07 18:29 UTC: re-baked on main's GLB, head turned 9° awake, wrists capped in the turn, toes held), reviewed 20:45 UTC by G26: NOT OK
+## Round 3 (48cb1bb, 2026-10-07 18:29 UTC: re-baked on main's GLB, head turned 9° awake, wrists capped in the turn, toes held), reviewed 20:05 UTC by G26: NOT OK
 
 - **Hand in the head (round 2, defect 2): closed.** My own check (`tools/turnhand.py`, every 2nd frame of the 17.2 s
   turn: each hand's skin against the head skin's radius, by direction). On 48cb1bb no hand vertex comes within
