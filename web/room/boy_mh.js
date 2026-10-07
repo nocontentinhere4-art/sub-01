@@ -746,20 +746,14 @@ export function createMH(env) {
   // towards straight (its first segment laid into the palm's plane, the splay kept)
   function omFingers(F, weight, open = null) {
     const [h, l, n] = palmFrame("Right");
-    // the thumb: its root (finger1-1) as recorded, then his own two bends on from it - MCP and IP, each the turn from one
-    // of his segments to the next (about 14 and 9 deg: his thumb lies almost straight along the flank). The character's
-    // thumb root lies inside its index knuckle's line and his outside it, so his segments' directions taken as they are
-    // bent ours 22 / 18 deg to get there (the owner: "the thumb is curved"); and any turn of that root tears the skin at
-    // the thumb's base (its triangles to 5x their bind length; as recorded, 2.3x). The hand is placed across the mouse
-    // so that this straight thumb meets the left flank (mouseSettle)
-    if (S("Right", 1, 3)) {
-      const seg = k => h.clone().multiplyScalar(F.d[k * 3]).addScaledVector(l, F.d[k * 3 + 1]).addScaledVector(n, F.d[k * 3 + 2]).normalize();
-      const s0 = seg(0), s1 = seg(1), s2 = seg(2), d = S("Right", 1, 2).getWorldPosition(V()).sub(S("Right", 1, 1).getWorldPosition(_g)).normalize();
-      for (const [j, a, b] of [[2, s0, s1], [3, s1, s2]]) {      // (his bend's angle, about his bend's axis carried onto ours)
-        const ax = a.clone().cross(b), sn = ax.length(), th = Math.atan2(sn, a.dot(b)); ax.addScaledVector(d, -ax.dot(d));   // (square to our segment: the angle kept whole)
-        if (sn > 1e-6 && ax.lengthSq() > 1e-12) d.applyAxisAngle(ax.normalize(), th);
-        aimBone(1, j, d, weight, true); }
-    }
+    // the thumb: straight, its MCP and IP bones on along its root's line (finger1-1, as recorded). The owner: "the thumb
+    // is STRAIGHT, not curved"; his take agrees (bends of 14 and 9 deg from above, the weak axis). The character's thumb
+    // root lies inside its index knuckle's line and his outside it, so his segments' directions taken as they are bent
+    // ours 22 / 18 deg; any turn of that root tears the skin at the thumb's base (its triangles to 5x their bind length;
+    // as recorded, 2.3x). The hand is placed across the mouse, and the mouse turned under the thumb, so that this
+    // straight thumb meets the left flank (mouseSettle)
+    if (S("Right", 1, 3)) { const d = S("Right", 1, 2).getWorldPosition(V()).sub(S("Right", 1, 1).getWorldPosition(_g)).normalize();
+      aimBone(1, 2, d, weight); aimBone(1, 3, d, weight, true); }
     for (let i = 2; i <= 5; i++) { if (!S("Right", i, 1)) continue;
       const ds = [0, 1, 2].map(k => { const o = ((i - 1) * 3 + k) * 3; return V(F.d[o], F.d[o + 1], F.d[o + 2]); });
       if (open && open[i] != null) { const m = open[i], d0 = ds[0].clone().setZ(0).normalize(), out = [d0];
