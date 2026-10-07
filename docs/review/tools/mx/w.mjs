@@ -1,0 +1,14 @@
+import fs from "node:fs"; import http from "node:http"; import path from "node:path";
+import { chromium } from "/home/user/sub-01/room_build/node_modules/playwright-core/index.mjs";
+const [ROOT] = process.argv.slice(2); const HERE = path.dirname(new URL(import.meta.url).pathname);
+const T = {".html": "text/html", ".js": "text/javascript", ".glb": "model/gltf-binary"};
+const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split("?")[0]); const f = u.startsWith("/__rv/") ? path.join(HERE, u.slice(6)) : path.join(ROOT, u);
+  fs.readFile(f, (e, b) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, {"content-type": T[path.extname(f)] || "application/octet-stream"}); r.end(b); }); });
+await new Promise(ok => srv.listen(0, ok));
+const b = await chromium.launch({executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]});
+const p = await b.newPage(); await p.goto(`http://localhost:${srv.address().port}/__rv/mx.html`); await p.waitForFunction(() => window.READY);
+await p.evaluate(() => MX.load("/web/room/char_mixamo.glb"));
+console.log(await p.evaluate(() => { MX.rest(); const a = MX.armW(); const o = {torsoVertsWithArmWeight: a.n, w30: a.w30, lowestY_m: +a.minY.toFixed(3)};
+  MX.rot("LeftArm", [0, 0, 1], -63); MX.rot("RightArm", [0, 0, 1], 63); o.armsDown = MX.disp(a.list);
+  MX.rest(); MX.rot("LeftArm", [0, 0, 1], 40); MX.rot("RightArm", [0, 0, 1], -40); o.armsUp40 = MX.disp(a.list); return JSON.stringify(o); }));
+await b.close(); srv.close();

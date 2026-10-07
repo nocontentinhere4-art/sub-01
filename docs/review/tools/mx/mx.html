@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#ddd}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/room_build/node_modules/three/build/three.module.js","three/addons/":"/room_build/node_modules/three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import * as CM from "/web/room/char_mixamo.js";
+const R = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true}); R.setSize(500, 500); R.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(R.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xd0d0cc);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x555544, 1.5)); const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(1.5, 3, 2.5); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(35, 1, 0.01, 50); let body, meshes = [];
+const V = () => new THREE.Vector3();
+const bn = n => body.getObjectByName(n);
+window.MX = {
+  async load(u) { const g = await new Promise((ok, no) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(u, ok, undefined, no));
+    body = g.scene; CM.prep(THREE, g); scene.add(body); body.traverse(o => { if (o.isSkinnedMesh) { meshes.push(o); o.frustumCulled = false; } });
+    const names = []; body.traverse(o => { if (o.isBone) names.push(o.name); }); return {names, meshes: meshes.map(m => [m.name, m.geometry.attributes.position.count])}; },
+  pos(n) { return bn(n).getWorldPosition(V()).toArray().map(x => +x.toFixed(3)); },
+  rest() { meshes[0].skeleton.pose(); body.updateMatrixWorld(true); },
+  // rotate bone n about WORLD axis [x,y,z] by deg
+  rot(n, ax, deg) { const b = bn(n); if (!b) throw new Error("no bone " + n); body.updateMatrixWorld(true);
+    const qw = new THREE.Quaternion().setFromAxisAngle(V().set(...ax).normalize(), THREE.MathUtils.degToRad(deg));
+    const bw = b.getWorldQuaternion(new THREE.Quaternion()), pw = b.parent.getWorldQuaternion(new THREE.Quaternion());
+    b.quaternion.copy(pw.invert().multiply(qw).multiply(bw)); body.updateMatrixWorld(true); },
+  shot(focus, dir, r) { const t = focus ? bn(focus).getWorldPosition(V()) : V().set(0, 0.9, 0); const d = V().set(...dir).normalize();
+    cam.position.copy(t).addScaledVector(d, r); cam.lookAt(t); R.render(scene, cam); return R.domElement.toDataURL("image/png"); },
+};
+MX.armW = () => { // vertices of the torso region (rest |x| < 0.30, y 0.85..1.25) carrying LeftArm/RightArm weight
+  const out = {n: 0, w10: 0, w30: 0, minY: 9, list: []}; const v = V();
+  for (const m of meshes) { if (/slides|socks/.test(m.name)) continue; const sk = m.skeleton, I = m.geometry.attributes.skinIndex, W = m.geometry.attributes.skinWeight, P = m.geometry.attributes.position;
+    for (let i = 0; i < P.count; i++) { let aw = 0; for (let c = 0; c < 4; c++) { const nm = sk.bones[I.getComponent(i, c)].name; if (/^(Left|Right)(Arm|ForeArm)$/.test(nm)) aw += W.getComponent(i, c); }
+      if (aw < 0.1) continue; v.fromBufferAttribute(P, i).applyMatrix4(m.bindMatrix).applyMatrix4(m.matrixWorld);
+      if (Math.abs(v.x) < 0.30 && v.y > 0.85 && v.y < 1.25) { out.n++; if (aw >= 0.3) out.w30++; out.minY = Math.min(out.minY, v.y); out.list.push([m.name, i]); } } }
+  return out; };
+MX.disp = list => { let mx = 0, mxOut = 0; const v = V(), r = V(); for (const [mn, i] of list) { const m = meshes.find(x => x.name === mn);
+    m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld); r.fromBufferAttribute(m.geometry.attributes.position, i).applyMatrix4(m.bindMatrix).applyMatrix4(m.matrixWorld);
+    mx = Math.max(mx, v.distanceTo(r)); mxOut = Math.max(mxOut, Math.abs(v.x) - Math.abs(r.x)); } return {maxMove_cm: +(mx * 100).toFixed(1), maxOutward_cm: +(mxOut * 100).toFixed(1)}; };
+window.READY = true;
+</script></body></html>
