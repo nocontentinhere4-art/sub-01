@@ -358,17 +358,17 @@ def choose_dismiss(buttons):
     return None
 
 
-def display_ok(text, media=False):
+def display_ok(text):
     """Text in his words or in the card's own lines (mind notes, the card title, video titles): no links, addresses,
     tickers, money, slurs, blocked topics or finance talk (the chat filter's rules, without its phone-number rule,
-    which catches year ranges). Web titles and link labels use the looser title_ok (#56). media=True: a song or video
-    title, shown as it is (owner): no slur or swearing check, only self-harm prompts (chat.MEDIA_RE)."""
+    which catches year ranges). Web titles and link labels use the looser title_ok (#56); song and video titles use
+    media_title_ok."""
     import chat
     t = text or ""
-    return (title_ok(t, media) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
+    return (title_ok(t) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
 
 
-def title_ok(text, media=False):
+def title_ok(text):
     """A web page's title, a link label or a search result on the public screen (#56): finance words, prices and
     tickers may show (crypto and stock pages are viewable), but never links, addresses, e-mails, money requests,
     slurs or the guard's blocked words and topics."""
@@ -376,9 +376,20 @@ def title_ok(text, media=False):
     from research import BLOCK as TOPIC_BLOCK
     t = text or ""
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
-                or MONEY_ASK.search(t) or (chat.MEDIA_RE if media else chat.SLUR_RE).search(chat.normalise(t))
-                or media and chat.incitement(t)
+                or MONEY_ASK.search(t) or chat.SLUR_RE.search(chat.normalise(t))
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+
+
+def media_title_ok(text):
+    """A song or video title, channel or artist (owner: "don't censor anything", shown as it is): one rule for
+    Spotify tracks and YouTube / TikTok cards (review G24, F5). Refused: the guard's sexual / porn, gore, extremism,
+    self-harm and drug words (BAD_WORDS, word-bounded) and hosts (BAD_HOST), and chat.blocked(media=True): links,
+    addresses, tickers, e-mails, money requests with a currency, coin or wallet, "kys" and calls to violence against
+    a group. Not applied: slurs and swearing, research.BLOCK's topic substrings ("nazi" in "Nazionale", "rape" in
+    "Grapevine", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
+    import chat
+    t = text or ""
+    return not (BAD_WORDS.search(t) or BAD_HOST.search(t)) and chat.blocked(t, media=True) is None
 
 
 # finance talk kept out of his own words (mind.py's FINANCE rule for replies stays; research.BLOCK had these before #56)
@@ -445,11 +456,8 @@ def is_video_host(host):
 
 
 def video_text_ok(text):
-    """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked),
-    both with media=True: titles are shown as they are, swearing and slurs included (owner); the guard's adult,
-    gore, extremism and self-harm words and the money and finance rules still refuse one."""
-    import chat
-    return display_ok(text, media=True) and chat.blocked(text or "", media=True) is None
+    """A video title, caption or channel name on the public screen: the song and video rule (media_title_ok)."""
+    return media_title_ok(text)
 
 
 def card_title_ok(title, host=""):

@@ -26,6 +26,8 @@ MONEY = re.compile(r"\b(send|give|pay|tip|donate|lend|transfer|spare)\b.{0,20}\b
                    r"cash|funds|coins?|tokens?|dollars?|bucks|euros?|\d+)\b|\$\s?\d|\d\s?(sol|usd|eur|€)\b|"
                    r"\b(donations?|donate|giveaway|airdrop|venmo|paypal|cash ?app|zelle|wallet|seed phrase|private key)\b",
                    re.I)
+# song and video titles (media=True): the same money rule without its bare-number amount ("Give It 2 Me")
+MEDIA_MONEY = re.compile(MONEY.pattern.replace(r"|\d+)\b", r")\b", 1), re.I)
 # small built-in list of slurs and insults (matched on a normalised, de-leeted copy of the text). Chat messages,
 # nicknames and viewer wishes are checked against all of them. Song and video titles (media=True) are real songs and
 # videos and are shown as they are (owner, 2026-10-07: "don't censor anything"): only the self-harm prompts still
@@ -39,26 +41,83 @@ SLURS = HATE_SLURS + SELF_HARM + INSULTS
 _slur_re = lambda words: re.compile(r"\b(" + "|".join(re.escape(w) for w in words) + r")(s|es|ed|ing|y|ic)?\b")  # noqa: E731
 SLUR_RE = _slur_re(SLURS)
 MEDIA_RE = _slur_re(SELF_HARM)
-# ... and explicit calls to violence against a group or by slur ("kill all the ...", "death to ..."): never shown,
-# whatever the title (matched on the normalised text; slurs in ordinary titles stay allowed)
-GROUPS = HATE_SLURS + ("jews", "jew", "muslims", "muslim", "christians", "arabs", "blacks", "whites", "asians",
-                       "mexicans", "immigrants", "migrants", "refugees", "gays", "gay people", "lesbians", "trans people",
-                       "transgenders", "women", "hindus", "sikhs", "gypsies", "roma", "africans", "chinese", "japanese",
-                       "koreans", "indians", "palestinians", "israelis", "ukrainians", "russians", "atheists")
-_group = r"(?:" + "|".join(re.escape(g) for g in GROUPS) + r")(?:s|es)?\b"
-INCITE_RE = re.compile(r"\b(?:kill|burn|gas|hang|lynch|shoot|exterminate|slaughter|murder|genocide)\s+(?:all\s+)?"
-                       r"(?:(?:the|those|these|every|them)\s+)?" + _group +
-                       r"|\bdeath\s+to\s+(?:all\s+)?(?:(?:the|those)\s+)?" + _group)
+# ... and explicit calls to violence against a group, or a slur used as one ("kill all the ...", "death to ...",
+# "... must die"; also in Italian and Spanish): never shown, whatever the title (review G24, F1-F4). A title is cut
+# into segments (" - ", " | ", brackets, sentence punctuation); a call counts only when its verb opens the segment
+# (after an optional "let's" / "we must" ...) and the group word ends it, so "How to Kill Japanese Beetles",
+# "Shoot Women's Portraits" or "Lazio slaughter Roma 3-0" are not calls. Nation chants ("death to <country>") are
+# left to the owner. Rule-based: a floor, not a classifier.
+_EN_GROUPS = ("jew", "jewish people", "muslim", "muslim people", "christian", "arab", "black", "white", "asian",
+              "mexican", "immigrant", "migrant", "refugee", "gay", "gay people", "lesbian", "trans people",
+              "transgender", "hindu", "sikh", "gypsy", "gypsies", "roma", "african", "chinese", "japanese", "korean",
+              "indian", "palestinian", "israeli", "ukrainian", "russian", "atheist", "boer", "afrikaner", "woman",
+              "women", "black people", "white people", "asian people")
+_IT_GROUPS = ("ebrei", "ebreo", "musulmani", "islamici", "cristiani", "arabi", "neri", "negri", "immigrati", "migranti",
+              "profughi", "stranieri", "zingari", "rom", "froci", "gay", "donne", "africani", "cinesi", "terroni")
+_ES_GROUPS = ("judios", "judio", "musulmanes", "cristianos", "arabes", "negros", "inmigrantes", "migrantes",
+              "refugiados", "gitanos", "maricones", "gays", "mujeres", "moros", "sudacas", "indios", "chinos")
+
+
+def _alt(words, plural=True):
+    return (r"(?:" + "|".join(re.escape(w) for w in sorted(words, key=len, reverse=True)) + r")"
+            + (r"(?:s|es)?" if plural else ""))
+
+
+_G, _GIT, _GES = _alt(_EN_GROUPS + HATE_SLURS), _alt(_IT_GROUPS, False), _alt(_ES_GROUPS, False)
+# the postfix form ("<group> must die") without the bare colour words: "White Will Die?" is a chess line
+_GPOST = _alt(tuple(g for g in _EN_GROUPS if g not in ("black", "white")) + ("blacks", "whites") + HATE_SLURS)
+_NOW = r"(?:\s+(?:now|today|already|right now|asap|tonight))?"
+_CALL = r"(?:(?:lets|let us|we must|we should|we need to|time to|go|just|i want to|i will|we will)\s+)?"
+_VERB = (r"(?:kill|killing|burn|burning|gas|gassing|hang|hanging|lynch|lynching|shoot|shooting|exterminate|"
+         r"exterminating|slaughter|murder|genocide|nuke|bomb|bombing|stab|massacre|behead|wipe out|eliminate|purge)")
+_DET = r"(?:(?:all|all of|every|every single|each)\s+)?(?:(?:the|those|these|them|em)\s+)?"
+_DIE = r"(?:die|burn|hang|be (?:killed|gassed|shot|burned|burnt|hanged|exterminated|wiped out))"
+INCITE_RE = re.compile("|".join((
+    r"^" + _CALL + _VERB + r"\s+" + _DET + _G + _NOW + r"$",                               # kill (all) (the) jews
+    r"\bdeath\s+to\s+" + _DET + _G + _NOW + r"$",                                          # death to (all) (the) gays
+    r"^(?:all\s+)?(?:the\s+)?" + _GPOST + r"\s+(?:must|should|need to|will|deserve to)\s+(?:all\s+)?" + _DIE + r"$",
+    r"^(?:all\s+)?(?:the\s+)?" + _GPOST + r"\s+deserves?\s+(?:death|to die)$",           # <group> deserve death
+    r"^(?:uccidi|uccidete|ammazza|ammazzate|brucia|bruciate|impiccate|sterminate|spara|sparate)\s+"
+    r"(?:(?:a|ai|agli|alle)\s+)?(?:tutt[ie]\s+)?(?:(?:i|gli|le|quei|quegli)\s+)?" + _GIT + r"$",
+    r"\bmorte\s+(?:a|ai|agli|alle)\s+(?:tutt[ie]\s+)?(?:(?:i|gli|le)\s+)?" + _GIT + r"$",
+    r"^(?:matar|maten|mata|matad|quemen|quemar|quemad|exterminar|exterminen)\s+(?:a\s+)?(?:tod[oa]s\s+)?"
+    r"(?:(?:los|las)\s+)?" + _GES + r"$",
+    r"\bmuerte\s+a\s+(?:tod[oa]s\s+)?(?:(?:los|las)\s+)?" + _GES + r"$")))
+_SEGMENT = re.compile(r"\s[-|–—]\s|[()\[\]{}\"]+|\s{2,}")          # the parts of a title
+_SENTENCE = re.compile(r"[!?.:;]+")                                  # ... and the sentences inside a part
+
+
+def _segments(text):
+    """A title's segments, normalised: accents folded, CamelCase and "-", "_", "/", "#" split into words ("#KillAllX",
+    "kill-all-x"), apostrophes dropped ("let's" -> "lets"), a lone "2" read as "to". Each sentence of a part is a
+    segment, and so is the part with its stops read as spaces ("kill. all. the. jews"); a comma never cuts ("Kill the
+    Indian, Save the Man" is one phrase)."""
+    t = fold(text or "")
+    t = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t)
+    for part in _SEGMENT.split(t):
+        for seg in _SENTENCE.split(part) + [_SENTENCE.sub(" ", part)]:
+            seg = re.sub(r"[-_/#,]+", " ", seg.replace("'", "").replace("’", ""))
+            seg = normalise(re.sub(r"(?<=\s)2(?=\s)", "to", " " + seg + " "))
+            if seg:
+                yield seg
 
 
 def incitement(text):
-    """A call to violence against a group (INCITE_RE); punctuation goes first, as LEET reads "!" as "i"."""
-    return bool(INCITE_RE.search(normalise(re.sub(r"[!?.,;:]+", " ", text or ""))))
+    """A call to violence against a group (INCITE_RE) in any segment of the title."""
+    return any(INCITE_RE.search(s) for s in _segments(text))
+
+
 LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
 
 
+def fold(text):
+    """Accents folded, not deleted (review F4: "judíos" -> "judios", not "judos")."""
+    t = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", text))
+    return "".join(c for c in t if not unicodedata.combining(c))
+
+
 def normalise(text):
-    t = unicodedata.normalize("NFKC", text).lower().translate(LEET)
+    t = fold(text).lower().translate(LEET)
     t = re.sub(r"[^a-z\s]", "", t)
     return re.sub(r"(.)\1{2,}", r"\1\1", re.sub(r"\s+", " ", t)).strip()
 
@@ -69,16 +128,17 @@ def dedupe_key(text):
 
 def blocked(text, media=False):
     """Reason string if the message must be dropped, else None. media=True: a song or video title, shown as it is:
-    only self-harm prompts (MEDIA_RE instead of SLUR_RE); every other rule stays."""
+    no slur check, only self-harm prompts (MEDIA_RE) and calls to violence against a group (incitement); no phone
+    rule (it reads year ranges, "2000 - 2010"), and money only with a currency, coin or wallet (MEDIA_MONEY)."""
     if URL.search(text):
         return "links are not allowed"
     if SOL_ADDR.search(text) or ETH_ADDR.search(text):
         return "addresses are not allowed"
     if TICKER.search(text):
         return "tickers are not allowed"
-    if EMAIL.search(text) or PHONE.search(text):
+    if EMAIL.search(text) or not media and PHONE.search(text):
         return "no personal data"
-    if MONEY.search(text):
+    if (MEDIA_MONEY if media else MONEY).search(text):
         return "no requests for money"
     if (MEDIA_RE if media else SLUR_RE).search(normalise(text)) or media and incitement(text):
         return "insults are not allowed"
