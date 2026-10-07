@@ -154,3 +154,30 @@ The first pass fixed where each finger sat, not what the hand was doing. The fin
 - **Measured:** the fingers seen from above are 0.86 of the palm (mouse2: 0.65). This moved the wrong way, as expected, and is accepted: from the side they now lie along the shell.
 - **Over 15 s:** median 1.0 mm into the shell, max 9.3 mm. The max is the thumb's root at the left flank (vertical depth), still open.
 - **Pictures:** `mouse_grip_silhouette.jpg` now also has the view over his right shoulder (the owner's usual camera side).
+
+### Fourth pass: the thumb (owner: "the thumb, if you can fix it")
+**Measured first** (`thumb_contact.json`; 15 s of mouse mode). "Along" runs from −1 at the mouse's back to +1 at its front; the index finger's middle knuckle is at +0.30.
+
+| | before (7772f12) | the capture's own thumb, unedited | now |
+|---|---|---|---|
+| Thumb line vs the mouse's long axis, from above | 44° | 14.5° | **15.9°** |
+| Thumb tip along the mouse | −0.22 | +0.14 | **+0.07** (1.4 cm behind the index middle knuckle) |
+| Thumb skin into the shell | max 5.9 mm | max 8.8 mm | **max 1.4 mm, median 1.3** (side gap 0: touching) |
+| Triangles at the thumb's base over 2.5× bind | 20–38, worst 10× | 0 | **0** |
+
+**Causes.**
+1. **The tear was ours.** The old `thumbOnFlank` aimed the thumb's joints at a point on the flank and turned its root up to 45°. The capture already lays the thumb along the mouse; it was only about 8 mm too far into the shell.
+2. **Why it never went away.** The clip holds the thumb still. three.js's mixer does not write a value that has not changed since its last write, so the mixer never put the thumb back after the page turned it. The page's undo only fired when the bone still matched exactly what the page had left. During the mode fade it was off by about 0.15°, so the undo skipped, and from then on the page's turn became the thumb's pose for good.
+
+**Fix.**
+- The thumb is now left as recorded: no thumb code at all.
+- The hand rolls 25° thumb-side up instead of 12°. That lifts the thumb's side onto the flank. Scan: 12° gave 8.8 mm in, 18° 7.7, 24° 2.0, 25° 1.4, 26° 0.4, 30° 0 (hovering).
+- The page's finger turns are undone unconditionally at the start of each step, before the mixer runs. They can no longer build up.
+
+**Whole hand, 15 s:** skin into the shell max 1.7 mm, median 1.3 (was max 9.3). Below the pad: the thumb tip, max 1.7 mm into the mouse mat.
+
+**Still over 2.5×:** 2 faces at the index knuckle (3 mm edges at 8.4 mm, 2.74×). They come from the accepted grip's index bend, not the thumb. They are there with the old code too, and they are gone with the page's hand solve off.
+
+**Seen in the renders:** from his left, the thumb reads as one piece with the edge of the palm on the flank. The white disc by the keyboard in the new views is a desk object (it is still there with his body hidden); the forearm used to cover it.
+
+`mouse_thumb_before_after.jpg`: reference | before | now. Views: from his left at mouse height (close), from his left, top-down, behind-left above, and over his right shoulder.
