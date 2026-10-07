@@ -15,7 +15,8 @@ window.load = async (url, opt = {}) => { if (root && !opt.add) S.remove(root); c
   if (opt.rotY) root.rotation.y = opt.rotY; if (opt.scale) root.scale.setScalar(opt.scale); if (opt.pos) root.position.fromArray(opt.pos);
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (opt.hide && new RegExp(opt.hide).test(o.name)) o.visible = false; if (opt.double) o.material.side = THREE.DoubleSide; } });
   S.add(root); root.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(root); window._gltf = g; return [b.min.toArray(), b.max.toArray()]; };
-window.vis = (re, v) => root.traverse(o => { if (o.isMesh && new RegExp(re).test(o.name)) o.visible = v; });
+window.wire = (re, v) => S.traverse(o => { if (o.isMesh && new RegExp(re).test(o.name)) o.material.wireframe = v; });
+window.vis = (re, v) => S.traverse(o => { if (o.isMesh && new RegExp(re).test(o.name)) o.visible = v; });
 window.floorVis = v => { floor.visible = v; };
 window.shot = (p, t, fov = 30) => { cam.fov = fov; cam.updateProjectionMatrix(); cam.position.fromArray(p); cam.lookAt(new THREE.Vector3().fromArray(t)); R.render(S, cam); return R.domElement.toDataURL("image/png"); };
 window.THREE = THREE; window.S = S; window.ready = true;

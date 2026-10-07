@@ -19,8 +19,8 @@
 //      underside are the same tube 0.4 mm further out (so the sock never enters the slide);
 //   3. each foot is placed on v5's (the old slides' footprint: direction, length, centre; soles on y = 0), and the
 //      sock's top is drawn into v5's trouser cuff (2 mm inside the hem, extended 2.5 cm up inside the leg);
-//   4. skin weights: from the nearest v5 vertices of the old feet, slides and hem (4 nearest, inverse distance), one
-//      set per position, so the sock and the slide over it move together.
+//   4. skin weights: a smooth field over v5's vertices of the old feet, slides and hem (gaussian, sigma 1.2 cm, top 4
+//      bones), one set per position, so the sock and the slide over it move together.
 // The reference's texture charts come in one 2048² atlas (base colour and normal), shared by both new meshes.
 import {NodeIO, Document} from "@gltf-transform/core";
 import {ALL_EXTENSIONS} from "@gltf-transform/extensions";
@@ -126,6 +126,35 @@ function rayHit(m, tris, o, d) {
   return best;
 }
 
+function ptTri(p, a, b, c) {             // distance from p to the triangle abc
+  const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a), d1 = dot(ab, ap), d2 = dot(ac, ap);
+  if (d1 <= 0 && d2 <= 0) return len(ap);
+  const bp = sub(p, b), d3 = dot(ab, bp), d4 = dot(ac, bp); if (d3 >= 0 && d4 <= d3) return len(bp);
+  const vc = d1 * d4 - d3 * d2; if (vc <= 0 && d1 >= 0 && d3 <= 0) return len(sub(p, add(a, mul(ab, d1 / (d1 - d3)))));
+  const cp = sub(p, c), d5 = dot(ab, cp), d6 = dot(ac, cp); if (d6 >= 0 && d5 <= d6) return len(cp);
+  const vb = d5 * d2 - d1 * d6; if (vb <= 0 && d2 >= 0 && d6 <= 0) return len(sub(p, add(a, mul(ac, d2 / (d2 - d6)))));
+  const va = d3 * d6 - d5 * d4; if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return len(sub(p, add(b, mul(sub(c, b), (d4 - d3) / ((d4 - d3) + (d5 - d6))))));
+  const dn = 1 / (va + vb + vc); return len(sub(p, add(a, add(mul(ab, vb * dn), mul(ac, vc * dn)))));
+}
+// the nearest distance from p to mesh b (triangles within 2 cm)
+function nearDist(b, p, R = 0.02) { let best = Infinity;
+  for (const t of b.tri) { const A = b.pos[t[0]]; if (Math.abs(A[0] - p[0]) > R || Math.abs(A[1] - p[1]) > R || Math.abs(A[2] - p[2]) > R) continue;
+    best = Math.min(best, ptTri(p, A, b.pos[t[1]], b.pos[t[2]])); } return best; }
+
+// the vertices of a inside the closed mesh b (a +y ray crosses b an odd number of times); a's vertices on b's surface
+// (the shared seam) do not count
+function insideOf(a, b) {
+  const C = 0.005, G = new Map(), keys = new Set(b.pos.map(p => p.map(x => Math.round(x * 1e6)).join(",")));
+  b.tri.forEach((t, i) => { const P = t.map(j => b.pos[j]);
+    for (let x = Math.floor(Math.min(P[0][0], P[1][0], P[2][0]) / C); x <= Math.floor(Math.max(P[0][0], P[1][0], P[2][0]) / C); x++)
+      for (let z = Math.floor(Math.min(P[0][2], P[1][2], P[2][2]) / C); z <= Math.floor(Math.max(P[0][2], P[1][2], P[2][2]) / C); z++) { const k = x + "," + z; (G.get(k) || G.set(k, []).get(k)).push(i); } });
+  const out = [];
+  for (const p of a.pos) { if (keys.has(p.map(x => Math.round(x * 1e6)).join(","))) continue;
+    let n = 0; for (const ti of G.get(Math.floor(p[0] / C) + "," + Math.floor(p[2] / C)) || []) if (rayHit(b, [b.tri[ti]], p, [0, 1, 0]) < Infinity) n++;
+    if (n % 2) out.push(p); }
+  return out;
+}
+
 // ---------------------------------------------------------------- the reference's feet
 async function loadRef() {
   const doc = await io.read(REF), p = doc.getRoot().listMeshes()[0].listPrimitives()[0], mat = p.getMaterial();
@@ -215,16 +244,19 @@ function bridge(sock, dark, heel, toe, fr) {
     return {L, uOf, sample, ok: s1 > 0 && s3 > s1};
   };
   const H = prep(heel, true), Tt = prep(toe, false);
+  if (process.env.LOOPDUMP) for (const [nm, Lp] of [["heel", H], ["toe", Tt]]) { const rows = [];
+    for (let q = 0; q < Lp.L.length; q += 6) { const c = cyl(sock.pos[Lp.L[q]]); rows.push(`u ${Lp.uOf[q].toFixed(2)} x ${(c.x * 100).toFixed(1)} w ${(c.w * 100).toFixed(1)} h ${(c.h * 100).toFixed(1)}`); }
+    console.log(nm, "y0", y0.toFixed(3), "yFb", yFb.toFixed(3), "\n" + rows.join("\n")); }
   if (!H.ok || !Tt.ok) throw new Error("bridge: a loop without its anchors");
-  const strap = dark.tri.filter(t => t.some(i => dark.pos[i][1] > yFb + 0.006));
+  const allD = dark.tri;
   const NU = NTH, grid = [];
   for (let j = 1; j < NRING; j++) { const s = j / NRING, ring = [];
     for (let k = 0; k < NU; k++) { const u = 4 * k / NU; let p = lerp(H.sample(u), Tt.sample(u), s);
       const c = cyl(p), dir = norm(sub(at(c.x, c.th, 1), at(c.x, c.th, 0)));
-      const hit = rayHit(dark, strap, at(c.x, c.th, 0), dir);
+      const hit = rayHit(dark, allD, at(c.x, c.th, 0), dir);
       let r = c.r;
       if (hit < Infinity && c.h > 0) r = hit - T_STRAP;             // over the axis: snug under the strap
-      else if (hit < Infinity) r = Math.min(r, hit - T_STRAP);
+      else if (hit < Infinity) r = Math.min(r, hit - T_STRAP);       // (under it: inside the sole's rim)
       p = at(c.x, c.th, r); if (p[1] < yFb) p[1] = yFb;
       ring.push(p); }
     grid.push(ring); }
@@ -234,15 +266,31 @@ function bridge(sock, dark, heel, toe, fr) {
       const q = [grid[j][(k + 1) % NU], grid[j][(k + NU - 1) % NU], grid[j - 1][k], grid[j + 1][k]];
       g2[j][k] = lerp(grid[j][k], mul(q.reduce(add, [0, 0, 0]), 1 / 4), 0.5); if (g2[j][k][1] < yFb) g2[j][k][1] = yFb; }
     grid.splice(0, grid.length, ...g2); }
-  return {grid, at, cyl, H, T: Tt, yFb, o, fr, NU};
+  // a point back inside the slide's opening (from the axis toward it, short of the slide's surface: 2.5 mm under the
+  // strap, 1.5 mm elsewhere)
+  const clamp = p => { const c = cyl(p); if (c.r < 1e-6) return p; const dir = norm(sub(at(c.x, c.th, 1), at(c.x, c.th, 0)));
+    const hit = rayHit(dark, allD, at(c.x, c.th, 0), dir), m = c.h > 0 ? T_STRAP : 0.0015;
+    return hit < Infinity && c.r > hit - m ? at(c.x, c.th, Math.max(0.002, hit - m)) : p; };
+  for (const row of grid) for (let k = 0; k < NU; k++) row[k] = clamp(row[k]);
+  return {grid, at, cyl, H, T: Tt, yFb, o, fr, NU, clamp};
 }
 
 // the tube's triangles: ring rows plus a zip to each loop (the loop's own vertices: shared with the sock and the slide);
 // dr pushes the rows out by that much (the slide's side of it)
 function tubeMesh(src, B, dr, uvOf) {
   const m = mesh(), G = B.grid, NU = B.NU, rows = [];
-  const push = p => { const c = B.cyl(p); return B.at(c.x, c.th, c.r + dr); };
-  for (let j = 0; j < G.length; j++) rows.push(G[j].map((p, k) => addV(m, push(p), uvOf((j + 1) / NRING, k / NU))));
+  // the slide's side (dr > 0): each ring vertex pushed out along the sock's own normal there (the grid's), so the two
+  // stay dr apart everywhere, the sole's flat bottom included
+  let off = null;
+  if (dr) { off = G.map(r => r.map(() => [0, 0, 0]));
+    const P = (j, k) => G[Math.max(0, Math.min(G.length - 1, j))][((k % NU) + NU) % NU];
+    for (let j = 0; j < G.length; j++) for (let k = 0; k < NU; k++) {
+      let n = cross(sub(P(j, k + 1), P(j, k - 1)), sub(P(j + 1, k), P(j - 1, k)));
+      const c = B.cyl(G[j][k]), radial = sub(G[j][k], add(B.o, mul(B.fr.a, c.x)));
+      if (dot(n, radial) < 0) n = mul(n, -1);
+      off[j][k] = mul(norm(n), dr); } }
+  const push = (j, k, p) => off ? add(p, off[j][k]) : p;
+  for (let j = 0; j < G.length; j++) rows.push(G[j].map((p, k) => addV(m, push(j, k, p), uvOf((j + 1) / NRING, k / NU))));
   for (let j = 0; j + 1 < rows.length; j++) for (let k = 0; k < NU; k++) { const a = rows[j][k], b = rows[j][(k + 1) % NU], c = rows[j + 1][(k + 1) % NU], d = rows[j + 1][k];
     m.tri.push([a, b, c], [a, c, d]); }
   const zip = (Lp, row, s, flip) => {           // the loop (by its u) against a ring (ring vertex k at u = 4k/NU)
@@ -281,7 +329,7 @@ async function debugGlb(file, parts, tex) {
 
 // ================================================================ main
 const ref = await loadRef();
-const feetRef = {};
+const feetRef = {}, B_ref = {};
 // two swatches of the atlas for the hidden parts: the flattest bright patch (the sock's knit) and the flattest dark one
 function swatch(px, bright, S = 96) {
   const {data, info} = px, Wd = info.width, Ch = info.channels; let best = null;
@@ -304,11 +352,24 @@ for (const side of ["L", "R"]) {           // the reference faces +z: his left f
   Ls.sort((a, b) => b.y - a.y);
   const top = Ls[0].L, [heel, toe] = Ls.slice(1).map(l => l.L).sort((A, Bq) => dot(sub(sock.pos[A[0]], fr.c), fr.a) - dot(sub(sock.pos[Bq[0]], fr.c), fr.a));
   const B = bridge(sock, dark, heel, toe, fr);
+  // the sole of the bridge: lowered wherever the sock's own surface would be under it (inside the slide): the foot
+  // rests on the footbed at the arch's height, not on a line from the heel cup's rim to the toes
+  for (let it = 0; it < 8; it++) {
+    const t2 = tubeMesh(sock, B, GAP, uvSlide), bad = insideOf(sock, merge(dark, t2));
+    if (!bad.length) break;
+    let moved = 0;
+    for (const row of B.grid) for (const p of row) { const c = B.cyl(p); if (c.h >= 0) continue;
+      let lo = Infinity; for (const q of bad) if (Math.hypot(q[0] - p[0], q[2] - p[2]) < 0.015 && q[1] < p[1] + 0.002) lo = Math.min(lo, q[1]);
+      if (lo < Infinity) { const y = Math.max(0.004, lo - 0.002 - GAP); if (y < p[1]) { p[1] = y; const q = B.clamp(p); p[0] = q[0]; p[1] = q[1]; p[2] = q[2]; moved++; } } }
+    console.log(side, "bridge: sock inside the slide", bad.length, "-> lowered", moved);
+    if (!moved) break;
+  }
   const tube = tubeMesh(sock, B, 0, uvSock), tube2 = tubeMesh(sock, B, GAP, uvSlide);
   orientRadial(tube, B, true); orientRadial(tube2, B, false);
   console.log(side, "frame", fr.a.map(x => x.toFixed(3)), "L", fr.L.toFixed(3), "W", fr.Wd.toFixed(3), "yFb", B.yFb.toFixed(3), "tube", tube.tri.length,
     "sock+tube open edges", openEdges(merge(sock, tube)).length, "slide+tube2 open", openEdges(merge(dark, tube2)).length);
-  feetRef[side] = {sock, dark, Ls, fr, B, tube, tube2, top, heel, toe};
+  feetRef[side] = {sock, dark, Ls, fr, B, tube, tube2, top, heel, toe}; B_ref[side] = B;
+  if (DEBUG) writeFileSync(path.join(DEBUG, `parts_${side}.json`), JSON.stringify({fr, o: B.o, S: {p: sock.pos, t: sock.tri}, D: {p: dark.pos, t: dark.tri}, I: {p: tube.pos, t: tube.tri}, I2: {p: tube2.pos, t: tube2.tri}}));
   if (DEBUG) await debugGlb(path.join(DEBUG, `bridge_${side}.glb`), {sock, dark, tube, tube2}, ref.color);
   if (DEBUG) { mkdirSync(DEBUG, {recursive: true}); await debugGlb(path.join(DEBUG, `ref_${side}.glb`), {sock, dark}, ref.color); }
 }
@@ -478,7 +539,13 @@ const weightCache = new Map();
 function weightsAt(p) {
   const key = p.map(x => Math.round(x * 1e6)).join(","); let w = weightCache.get(key); if (w) return w;
   const acc = new Map();
-  for (const [d, i] of nearest(p)) { const f = 1 / (d + 1e-4) ** 2; for (const [j, x] of srcSkin[i]) acc.set(j, (acc.get(j) || 0) + f * x); }
+  // a smooth field (gaussian, sigma 1.2 cm, over v5's vertices within 3 cm; the nearest ones if none): the sock and
+  // the slide over it, a few mm apart, get the same weights to within a hair, so they move together
+  const SIG = 0.012, cx = Math.floor(p[0] / CELL), cy = Math.floor(p[1] / CELL), cz = Math.floor(p[2] / CELL); let tot = 0;
+  for (let x = cx - 3; x <= cx + 3; x++) for (let y = cy - 3; y <= cy + 3; y++) for (let z = cz - 3; z <= cz + 3; z++) for (const i of grid.get(gk(x, y, z)) || []) {
+    const d = len(sub(srcPts[i], p)); if (d > 0.03) continue; const f = Math.exp(-d * d / (2 * SIG * SIG)); tot += f;
+    for (const [j, x2] of srcSkin[i]) acc.set(j, (acc.get(j) || 0) + f * x2); }
+  if (tot < 1e-6) for (const [d, i] of nearest(p)) { const f = 1 / (d + 1e-4) ** 2; for (const [j, x] of srcSkin[i]) acc.set(j, (acc.get(j) || 0) + f * x); }
   const top = [...acc.entries()].sort((a, b) => b[1] - a[1] || jIndex.get(a[0]) - jIndex.get(b[0])).slice(0, 4), sum = top.reduce((s, q) => s + q[1], 0);
   w = {j: [0, 1, 2, 3].map(k => top[k] ? jIndex.get(top[k][0]) : 0), w: [0, 1, 2, 3].map(k => top[k] ? top[k][1] / sum : 0)};
   if (w.j.some(x => x === undefined)) throw new Error("a v5 bone missing from the slides' skin");
@@ -539,6 +606,59 @@ else { scene.removeChild(slideNode); scene.addChild(sockNode).addChild(slideNode
 }
 for (const m of root.listMaterials()) if (!m.listParents().some(x => x.propertyType === "Primitive")) m.dispose();
 await io.write(DST, doc);
+// ---------------------------------------------------------------- checks (rest pose)
+// orientation: edges two triangles run the same way; inward faces: a ray from a triangle's middle along its normal
+// that leaves through the mesh an odd number of times (3D grid walk); open edges (welded by position)
+function checks(m, closeTop) {
+  const W = weld(m), E = new Map(); let conflicts = 0;
+  for (const t of m.tri) for (let e = 0; e < 3; e++) { const a = W.id[t[e]], b = W.id[t[(e + 1) % 3]], k = a + "," + b; E.set(k, (E.get(k) || 0) + 1); }
+  for (const [k, n] of E) if (n > 1) conflicts += n - 1;
+  const where = []; for (const [k, n] of E) if (n > 1) { const [a, b] = k.split(",").map(Number); const i = W.id.indexOf(a); where.push(+m.pos[i][1].toFixed(3)); }
+  // signed volume (positive: the faces point out), an open top closed by a fan to its loop's centre
+  let vol = 0; const tv = (a, b, c) => dot(a, cross(b, c)) / 6;
+  for (const t of m.tri) vol += tv(m.pos[t[0]], m.pos[t[1]], m.pos[t[2]]);
+  if (closeTop) for (const L of loops(m, W)) { const c = mul(L.reduce((s, i) => add(s, m.pos[i]), [0, 0, 0]), 1 / L.length);
+    for (let i = 0; i < L.length; i++) vol += tv(m.pos[L[(i + 1) % L.length]], m.pos[L[i]], c); }
+  return {triangles: m.tri.length, open_edges: openEdges(m, W).length, orientation_conflicts: conflicts, conflict_heights_m: where, signed_volume_cm3: +(vol * 1e6).toFixed(1)};
+}
+report.checks = {socks: checks(sockAll, true), slides: checks(slideAll, false)};
+// the socks inside the slides (rest): +y ray parity against the slides, every sock vertex not on the shared seam
+{
+  const C = 0.005, G = new Map();
+  slideAll.tri.forEach((t, i) => { const P = t.map(j => slideAll.pos[j]);
+    for (let x = Math.floor(Math.min(P[0][0], P[1][0], P[2][0]) / C); x <= Math.floor(Math.max(P[0][0], P[1][0], P[2][0]) / C); x++)
+      for (let z = Math.floor(Math.min(P[0][2], P[1][2], P[2][2]) / C); z <= Math.floor(Math.max(P[0][2], P[1][2], P[2][2]) / C); z++) { const k = x + "," + z; (G.get(k) || G.set(k, []).get(k)).push(i); } });
+  const slideKeys = new Set(slideAll.pos.map(p => p.map(x => Math.round(x * 1e6)).join(",")));
+  let inside = 0, depth = 0, seam = 0; const insideAt = [], dbgCat = {}, depthHist = {"<0.5mm": 0, "0.5-1mm": 0, "1-2mm": 0, ">2mm": 0};
+  for (const p of sockAll.pos) { if (slideKeys.has(p.map(x => Math.round(x * 1e6)).join(","))) { seam++; continue; }
+    let n = 0, near = 9;
+    for (const ti of G.get(Math.floor(p[0] / C) + "," + Math.floor(p[2] / C)) || []) { const h = rayHit(slideAll, [slideAll.tri[ti]], p, [0, 1, 0]); if (h < Infinity) n++;
+      const h2 = rayHit(slideAll, [slideAll.tri[ti]], p, [0, -1, 0]); near = Math.min(near, h, h2); }
+    if (n % 2) { inside++; const d3 = nearDist(slideAll, p); depth = Math.max(depth, d3); depthHist[d3 < 0.0005 ? "<0.5mm" : d3 < 0.001 ? "0.5-1mm" : d3 < 0.002 ? "1-2mm" : ">2mm"]++; if (DEBUG) { insideAt.push(p);
+      const hits = (G.get(Math.floor(p[0] / C) + "," + Math.floor(p[2] / C)) || []).filter(ti => rayHit(slideAll, [slideAll.tri[ti]], p, [0, 1, 0]) < Infinity);
+      const nDl = placed.L.R.dark.tri.length, nL = placed.L.slide.tri.length, nDr = placed.R.R.dark.tri.length;
+      const cat = ti => ti < nL ? (ti < nDl ? "L.dark" : "L.tube2") : (ti - nL < nDr ? "R.dark" : "R.tube2");
+      const si = sockAll.pos.indexOf(p), nSl = placed.L.R.sock.pos.length, nTl = placed.L.R.tube.pos.length, nAll = placed.L.sock.pos.length;
+      const scat = si < nAll ? (si < nSl ? "L.S" : si < nSl + nTl ? "L.tube" : "L.band") : (si - nAll < placed.R.R.sock.pos.length ? "R.S" : si - nAll < placed.R.R.sock.pos.length + placed.R.R.tube.pos.length ? "R.tube" : "R.band");
+      let ring = ""; if (/tube/.test(scat)) { const base = scat[0] === "L" ? nSl : nAll + placed.R.R.sock.pos.length; const ti = si - base; ring = ti < (NRING - 1) * NTH ? " ring" + Math.floor(ti / NTH) + " h" + (B_ref[scat[0]].cyl(placed[scat[0]].R.tube.pos[ti]).h > 0 ? "+" : "-") : " zip"; }
+      const key = scat + ring + " under " + hits.map(cat).join("+"); dbgCat[key] = (dbgCat[key] || 0) + 1; } } }
+  if (DEBUG) { console.log("inside by part", dbgCat);
+    const P = placed.L, nS = P.R.sock.tri.length, nT = P.R.tube.tri.length, nD = P.R.dark.tri.length;
+    const part = (m, a, b) => subset(m, m.tri.map((_, i) => i).filter(i => i >= a && i < b));
+    await debugGlb(path.join(DEBUG, "partsL.glb"), {S: part(P.sock, 0, nS), tube: part(P.sock, nS, nS + nT), dark: part(P.slide, 0, nD), tube2: part(P.slide, nD, 1e9)}, ref.color); }
+  // the tube under the strap: each sock vertex and the slide's over it
+  let gmin = 9, gmax = 0; for (const side of ["L", "R"]) { const P = placed[side], nS = P.R.sock.pos.length, nD = P.R.dark.pos.length;
+    for (let i = 0; i < P.R.tube.pos.length; i++) { const d = len(sub(P.sock.pos[nS + i], P.slide.pos[nD + i])); gmin = Math.min(gmin, d); gmax = Math.max(gmax, d); } }
+  // the soles: the slides' vertices within 1 mm of y = 0 (and the lowest), per foot
+  const soles = {}; for (const side of ["L", "R"]) { const ys = placed[side].slide.pos.map(p => p[1]); soles[side] = {lowest_mm: +(Math.min(...ys) * 1000).toFixed(2), within_1mm_of_floor: ys.filter(y => y < 0.001).length}; }
+  report.sock_slide_rest = {sock_vertices_inside_slides: inside, deepest_mm: +(depth * 1000).toFixed(2), inside_by_depth: depthHist, shared_seam_vertices: seam,
+    tube_gap_mm: [+(gmin * 1000).toFixed(3), +(gmax * 1000).toFixed(3)]};
+  report.soles_rest = soles;
+  if (DEBUG) { const mk = mesh(); for (const p of insideAt) { const a = addV(mk, add(p, [0.002, 0, 0]), [0, 0]), b = addV(mk, add(p, [-0.001, 0, 0.0017]), [0, 0]), c = addV(mk, add(p, [-0.001, 0, -0.0017]), [0, 0]), d = addV(mk, add(p, [0, 0.003, 0]), [0, 0]);
+    mk.tri.push([a, b, c], [a, d, b], [b, d, c], [c, d, a]); }
+    await debugGlb(path.join(DEBUG, "inside.glb"), {marks: mk, slides: slideAll}, ref.color); }
+}
+console.log(JSON.stringify({checks: report.checks, sock_slide_rest: report.sock_slide_rest, soles_rest: report.soles_rest}));
 report.output = DST;
 report.triangles = {body_removed: delTri.length, old_slides: oldSlideTris, socks: sockAll.tri.length, slides: slideAll.tri.length,
   added: sockAll.tri.length + slideAll.tri.length - delTri.length - oldSlideTris};

@@ -28,11 +28,14 @@ SCENARIOS = [  # label, start scene (hour), setup JS, seconds
     ("in bed, asleep", ("sleeping", 23), "", 6),
     ("waking, out of bed (slides go back on)", ("sleeping", 23), "live('window', {activity: 'window'})", 12),
 ]
-SHOTS = [  # name, scene (hour), [views]
-    ("standing", ("door", 14), ["front", "side", "back", "q"]),
-    ("seated", ("desk", 14), ["front", "side", "q"]),
-    ("bed", ("sleeping", 14), None),
+SHOTS = [  # name, scene (hour), camera distance, height, what
+    ("standing", ("door", 14), 0.6, 0.22, "feet"),
+    ("seated", ("desk", 14), 0.7, 0.25, "feet"),
+    ("on_the_bed", ("phone", 14), 0.7, 0.35, "feet"),      # lying on top of the duvet with the phone: slides off, socks on
+    ("asleep", ("sleeping", 23), 0.9, 0.6, "feet"),          # under the duvet at night
+    ("parked", ("sleeping", 23), 0.55, 0.30, "parked"),      # the slides by the bed
 ]
+AZ = [("front", 0), ("front-right", -0.8), ("front-left", 0.8), ("right", -1.57), ("left", 1.57), ("back-right", -2.4), ("back-left", 2.4), ("back", 3.14)]
 
 
 def main():
@@ -56,22 +59,22 @@ def main():
         rep["states"]["load"] = pg.evaluate("__feet.state()")
         print("state", rep["states"]["load"], flush=True)
         if not a.no_shots:
-            for name, (scene, hour), views in SHOTS:
+            for name, (scene, hour), dist, up, what in SHOTS:
                 h.goto_scene(pg, scene, hour)
                 pg.evaluate("for (let i = 0; i < 20; i++) animate_(1/30)")
                 rep["states"][name] = pg.evaluate("__feet.state()")
-                for v in (views or []):
-                    pg.evaluate(f"__feet.feetCam({json.dumps(v)}, {0.75 if name == 'seated' else 0.6})")
+                got = 0
+                for vname, az in AZ:                 # the first three clear views, in this order
+                    c = pg.evaluate(f"__feet.feetCam({az}, {dist}, {up}, {json.dumps(what)})")
+                    if not c["clear"]:
+                        continue
                     pg.evaluate("__qa.render()")
-                    h.shoot(pg, out / f"{a.tag}_{name}_{v}.png", hud=False)
-                if views is None:
-                    for cn in ("bed", "duvet"):
-                        pg.evaluate(f"__qa.closeup({json.dumps(cn)})"); pg.evaluate("__qa.render()")
-                        h.shoot(pg, out / f"{a.tag}_{name}_{cn}.png", hud=False)
-                    pg.evaluate("camera.position.set(-0.30, 0.75, 0.55); controls.target.set(-0.66, 0.16, 0.12); controls.update(); camera.lookAt(-0.66, 0.16, 0.12)")
-                    pg.evaluate("__qa.render()")
-                    h.shoot(pg, out / f"{a.tag}_{name}_parked.png", hud=False)
-                pg.evaluate("__qa.followCam()")
+                    h.shoot(pg, out / f"{a.tag}_{name}_{vname}.png", hud=False)
+                    rep["states"].setdefault("cams", {})[f"{name}_{vname}"] = c
+                    got += 1
+                    if got == 3:
+                        break
+                pg.evaluate("window.NOCLEAR = false; __qa.followCam()")
         for label, (scene, hour), setup, secs in SCENARIOS:
             if a.only and a.only not in label:
                 continue

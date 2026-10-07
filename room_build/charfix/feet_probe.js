@@ -49,7 +49,7 @@
       const x0 = Math.floor(Math.min(pos[3 * a], pos[3 * b], pos[3 * c]) / C), x1 = Math.floor(Math.max(pos[3 * a], pos[3 * b], pos[3 * c]) / C);
       const z0 = Math.floor(Math.min(pos[3 * a + 2], pos[3 * b + 2], pos[3 * c + 2]) / C), z1 = Math.floor(Math.max(pos[3 * a + 2], pos[3 * b + 2], pos[3 * c + 2]) / C);
       for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x + "," + z; (grid.get(k) || grid.set(k, []).get(k)).push(t); } }
-    let inside = 0, maxDepth = 0;
+    let inside = 0, maxDepth = 0; const hist = [0, 0, 0, 0], TRI = new THREE.Triangle();
     const sp = new Float32Array(3);
     for (const i of cand) { if (seam.has(i)) continue; so.getVertexPosition(i, v).applyMatrix4(so.matrixWorld);
       const tris = grid.get(Math.floor(v.x / C) + "," + Math.floor(v.z / C)) || []; let cross = 0, nearest = 9;
@@ -60,10 +60,14 @@
         const w0 = ((bz - cz) * (v.x - cx) + (cx - bx) * (v.z - cz)) / d, w1 = ((cz - az) * (v.x - cx) + (ax - cx) * (v.z - cz)) / d, w2 = 1 - w0 - w1;
         if (w0 < 0 || w1 < 0 || w2 < 0) continue;
         const y = w0 * pos[a + 1] + w1 * pos[b + 1] + w2 * pos[c + 1]; if (y > v.y) cross++; nearest = Math.min(nearest, Math.abs(y - v.y)); }
-      if (cross % 2 === 1) { inside++; maxDepth = Math.max(maxDepth, nearest); } }
+      if (cross % 2 === 1) { inside++;       // its depth: the 3D distance to the slides' surface (the triangles round it)
+        const cx = Math.floor(v.x / C), cz = Math.floor(v.z / C); let d3 = 9;
+        for (let x = cx - 2; x <= cx + 2; x++) for (let z = cz - 2; z <= cz + 2; z++) for (const t of grid.get(x + "," + z) || []) {
+          TRI.a.fromArray(pos, 3 * I[t]); TRI.b.fromArray(pos, 3 * I[t + 1]); TRI.c.fromArray(pos, 3 * I[t + 2]); d3 = Math.min(d3, TRI.closestPointToPoint(v, u).distanceTo(v)); }
+        hist[d3 < 0.0005 ? 0 : d3 < 0.001 ? 1 : d3 < 0.002 ? 2 : 3]++; maxDepth = Math.max(maxDepth, d3); } }
     let gapMax = 0, gapMin = 9;
     for (const [i, j] of pairs) { so.getVertexPosition(i, v).applyMatrix4(so.matrixWorld); sl.getVertexPosition(j, u).applyMatrix4(sl.matrixWorld); const d = v.distanceTo(u); gapMax = Math.max(gapMax, d); gapMin = Math.min(gapMin, d); }
-    return {inside, depth_mm: +(maxDepth * 1000).toFixed(2), cand: cand.length, pairs: pairs.length, seam: seam.size, gap_max_mm: +(gapMax * 1000).toFixed(3), gap_min_mm: +(gapMin * 1000).toFixed(3)};
+    return {inside, depth_mm: +(maxDepth * 1000).toFixed(2), by_depth: {"<0.5mm": hist[0], "0.5-1mm": hist[1], "1-2mm": hist[2], ">2mm": hist[3]}, cand: cand.length, pairs: pairs.length, seam: seam.size, gap_max_mm: +(gapMax * 1000).toFixed(3), gap_min_mm: +(gapMin * 1000).toFixed(3)};
   }
   function run(setup, seconds, stride = 3, withPen = true) {
     setup(); const n = Math.round(seconds * 30), res = {frames: 0, sole: {L: [9, -9], R: [9, -9], low: [9, -9], high_support: -9}, pen: {inside_max: 0, depth_max_mm: 0, gap_max_mm: 0}, on_frames: 0, off_frames: 0};
@@ -71,20 +75,27 @@
       const s = sole(); s.on ? res.on_frames++ : res.off_frames++;
       for (const k of ["L", "R"]) { res.sole[k][0] = Math.min(res.sole[k][0], s[k]); res.sole[k][1] = Math.max(res.sole[k][1], s[k]); }
       const lo = Math.min(s.L, s.R); res.sole.low[0] = Math.min(res.sole.low[0], lo); res.sole.low[1] = Math.max(res.sole.low[1], lo);
-      if (withPen) { const p = pen(); if (p) { res.pen.inside_max = Math.max(res.pen.inside_max, p.inside); res.pen.depth_max_mm = Math.max(res.pen.depth_max_mm, p.depth_mm); res.pen.gap_max_mm = Math.max(res.pen.gap_max_mm, p.gap_max_mm); res.pen.info = {cand: p.cand, pairs: p.pairs, seam: p.seam}; } } }
+      if (withPen) { const p = pen(); if (p) { res.pen.inside_max = Math.max(res.pen.inside_max, p.inside); res.pen.depth_max_mm = Math.max(res.pen.depth_max_mm, p.depth_mm); res.pen.gap_max_mm = Math.max(res.pen.gap_max_mm, p.gap_max_mm);
+        res.pen.by_depth_worst = res.pen.by_depth_worst || {}; for (const [k, n] of Object.entries(p.by_depth)) res.pen.by_depth_worst[k] = Math.max(res.pen.by_depth_worst[k] || 0, n); res.pen.info = {cand: p.cand, pairs: p.pairs, seam: p.seam}; } } }
     const mm = x => +(x * 1000).toFixed(1);
     return {frames: res.frames, slides_on_frames: res.on_frames, slides_off_frames: res.off_frames,
       sole_mm: {L: res.sole.L.map(mm), R: res.sole.R.map(mm), lowest_foot: res.sole.low.map(mm)}, sock_slide: res.pen};
   }
-  function feetCam(view, dist = 0.6) {        // a camera on his feet: front / side / back / q (three-quarter) / low
-    const b = boy(); b.updateMatrixWorld(true);
-    const L = D.bones.LeftFoot.getWorldPosition(V()), R = D.bones.RightFoot.getWorldPosition(V()), m = L.clone().add(R).multiplyScalar(0.5);
-    const fy = D.bones.Hips.getWorldQuaternion(new THREE.Quaternion()), f = V().set(0, 0, 1).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
-    const right = V().set(f.z, 0, -f.x); const tgt = V().set(m.x, F + 0.06, m.z).addScaledVector(f, 0.06);
-    const dir = {front: f.clone(), back: f.clone().negate(), side: right.clone(), side2: right.clone().negate(), q: f.clone().add(right).normalize()}[view] || f.clone();
-    const pos = tgt.clone().addScaledVector(dir, dist).add(V().set(0, view === "low" ? 0.02 : 0.22, 0));
+  // a camera on his feet (or on the parked slides): azimuths round them from his facing, the first ones with a clear
+  // line of sight (no room mesh between) inside the room; NOCLEAR: the page's own camera clearance off for the shot
+  function feetCam(az, dist = 0.6, up = 0.22, what = "feet") {
+    D.NOCLEAR = true; const b = boy(); b.updateMatrixWorld(true);
+    let tgt;
+    if (what === "parked") { const pk = D.scene.getObjectByName("slides_parked"); tgt = new THREE.Box3().setFromObject(pk).getCenter(V()); }
+    else { const L = D.bones.LeftFoot.getWorldPosition(V()), R = D.bones.RightFoot.getWorldPosition(V()); tgt = L.add(R).multiplyScalar(0.5); tgt.y = Math.max(tgt.y, F) + 0.05; }
+    const f = V().set(0, 0, 1).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize(), a0 = Math.atan2(f.x, f.z) + az;
+    const pos = tgt.clone().add(V().set(Math.sin(a0) * dist, up, Math.cos(a0) * dist));
+    const meshes = []; D.scene.traverse(m => { if (!m.isMesh || !m.visible) return; let o = m; while (o) { if (o === b) return; o = o.parent; } meshes.push(m); });
+    const ray = new THREE.Raycaster(), dir = V().subVectors(tgt, pos), d = dir.length(); ray.set(pos, dir.normalize()); ray.far = d - 0.12;
+    const hit = ray.intersectObjects(meshes, false)[0];
+    const inRoom = pos.x > -1.85 && pos.z > -1.4 && pos.x < 3.5 && pos.z < 3.5 && pos.y > F + 0.03;
     D.camera.position.copy(pos); D.controls.target.copy(tgt); D.controls.update(); D.camera.position.copy(pos); D.camera.lookAt(tgt);
-    return {pos: pos.toArray(), tgt: tgt.toArray()};
+    return {clear: !hit && inRoom, by: hit ? hit.object.name : null, pos: pos.toArray().map(x => +x.toFixed(3)), tgt: tgt.toArray().map(x => +x.toFixed(3))};
   }
   function state() { const sl = byName("slides"), so = byName("socks"), parked = D.scene.getObjectByName("slides_parked");
     return {slides: sl ? sl.visible : null, socks: so ? so.visible : null, parked: parked ? parked.visible : null, parked_children: parked ? parked.children.length : 0,
