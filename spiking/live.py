@@ -1,6 +1,6 @@
 """His spiking neurons in the day: a small spiking network on the server CPU takes part in his real choices (#55).
 
-A small simulated spiking network (20,000 neurons by default) built on the same wiring as the nightly 1M-neuron
+A small simulated spiking network (100,000 neurons by default) built on the same wiring as the nightly 1M-neuron
 network (the same construction and seed: spiking/wiring.py) runs in its own child process, like browse_service.py, so
 the 50 ms brain tick never waits for it. It is a decision server: the main process sends the labels of the options
 on offer, the network gets them as cues, its striatal action pools race (spiking/choice.py, #39), and it answers with
@@ -56,6 +56,7 @@ import json
 import math
 import os
 import select
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -64,12 +65,13 @@ import numpy as np
 
 from spiking import frames
 from spiking.config import Config
+from spiking.profiles import SIMPLE_NEURONS
 from spiking.regions import Regions
 from spiking.wiring import Layout, input_regions, synapse_lists, word_neurons
 from spiking.words import words
 
 HERE = Path(__file__).resolve().parent.parent
-N_NEURONS = 20_000
+N_NEURONS = SIMPLE_NEURONS
 CUE_GROUPS = ("visual", "language")
 ACTION_GROUP = "reward"           # striatum: caudate, putamen, accumbens
 LABEL_WORDS = 4                   # content words of a label used as its cue
@@ -90,7 +92,7 @@ CALIB_LABELS = ("apple", "river", "cloud", "stone", "lamp", "bird", "salt", "rop
 DA_SHOW_TAU_S = 30.0              # the page's dopamine reading decays back to 0 (wall seconds) after a burst (#89)
 FRAME_S = 0.2                     # at most 5 frames/s to the page
 RASTER_ROWS = 200
-IDLE_MS = int(os.environ.get("SUB01_SPIKING_LIVE_IDLE_MS", 50))     # background run between decisions (0: none)
+IDLE_MS = int(os.environ.get("SUB01_SPIKING_LIVE_IDLE_MS", 10))     # smaller idle pulse at 100k (0: none)
 IDLE_EVERY_S = 2.0
 GROUP_KEYS = ("visual", "somatomotor", "attention", "salience", "limbic", "control", "default", "reward", "fear",
               "memory", "relay", "language")
@@ -338,8 +340,8 @@ def _save_npz_atomic(path, **arrays):
 
 
 class LiveBrain:
-    def __init__(self, n_neurons=N_NEURONS, weights=None, regions=None, twin=True, log=print):
-        self.cfg = Config(n_neurons=n_neurons)
+    def __init__(self, n_neurons=N_NEURONS, weights=None, regions=None, twin=True, log=print, seed=1):
+        self.cfg = Config(n_neurons=n_neurons, seed=seed)
         self.net = LiveNet(self.cfg, regions)
         self.ch = Chooser(self.net)
         self.tw = Chooser(self.net.twin()) if twin else None
@@ -388,6 +390,12 @@ class LiveBrain:
         try:
             with np.load(self.path) as z:
                 if str(z["config_hash"]) != self.cfg.config_hash() or int(z["n_plastic"]) != len(self.dw):
+                    # Changing size cannot migrate synapses. Preserve the previous
+                    # checkpoint before calibration saves this network's fresh weights.
+                    digest = hashlib.sha256(self.path.read_bytes()).hexdigest()[:16]
+                    backup = self.path.with_name(f"{self.path.name}.incompatible-{digest}")
+                    if not backup.exists():
+                        shutil.copy2(self.path, backup)
                     self.log(f"spiking live: {self.path.name} is for another network, starting fresh")
                     return False
                 self.dw = z["dw"].astype(np.float32)
@@ -503,7 +511,7 @@ class LiveBrain:
     def learn(self, did, followed, delta):
         """Dopamine for decision `did`: the tastes prediction error of the stay, tagged on the option that was followed
         (None: the network's own pick)."""
-        tag = self.pending.pop(did, None)
+        tag = self.pending.get(did)
         if tag is None:
             return {"ok": False, "why": "unknown or too old decision"}
         q, pre, post, k, own = tag
@@ -513,6 +521,8 @@ class LiveBrain:
             return {"ok": False, "why": "bad delta"}
         if not math.isfinite(delta) or not 0 <= followed < k:
             return {"ok": False, "why": "bad delta"}
+        # A malformed delayed reward must not destroy the eligibility for a valid retry.
+        self.pending.pop(did)
         da = max(-1.0, min(1.0, DA_GAIN * delta))
         p = np.where(post == followed, 1.0, np.where(post >= 0, -1.0 / max(1, k - 1), 0.0)).astype(np.float32)
         eta = self.eta()

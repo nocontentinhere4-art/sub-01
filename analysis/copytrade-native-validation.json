@@ -1,0 +1,153 @@
+{
+  "python": "3.12.13",
+  "numpy": "2.5.3",
+  "base_commit": "2fa357b3c51f4fdf9cf963bee1e8e474bf7ed113",
+  "source": "synthetic",
+  "notice": "Deliberately constructed regime reversal, not exchange data.",
+  "rows": [
+    {
+      "seed": 0,
+      "policy": "adaptive",
+      "native": true,
+      "realized_pnl": 461.74363606744504,
+      "copied": 94,
+      "early_best_last20": 0.95,
+      "reversed_best_last20": 1.0,
+      "unresolved": 0,
+      "wall_s": 8.860897874925286,
+      "learned": 94
+    },
+    {
+      "seed": 0,
+      "policy": "random",
+      "native": false,
+      "realized_pnl": -142.55588701113862,
+      "copied": 78,
+      "early_best_last20": 0.35,
+      "reversed_best_last20": 0.3,
+      "unresolved": 0,
+      "wall_s": 0.009757583029568195,
+      "learned": 0
+    },
+    {
+      "seed": 0,
+      "policy": "fixed",
+      "native": false,
+      "realized_pnl": -124.85064298112073,
+      "copied": 100,
+      "early_best_last20": 1.0,
+      "reversed_best_last20": 0.0,
+      "unresolved": 0,
+      "wall_s": 0.009340040851384401,
+      "learned": 0
+    },
+    {
+      "seed": 0,
+      "policy": "cash",
+      "native": false,
+      "realized_pnl": 0,
+      "copied": 0,
+      "early_best_last20": 0.0,
+      "reversed_best_last20": 0.0,
+      "unresolved": 0,
+      "wall_s": 0.009231624891981483,
+      "learned": 0
+    },
+    {
+      "seed": 1,
+      "policy": "adaptive",
+      "native": true,
+      "realized_pnl": 448.1494899143891,
+      "copied": 92,
+      "early_best_last20": 1.0,
+      "reversed_best_last20": 0.95,
+      "unresolved": 0,
+      "wall_s": 8.645900124916807,
+      "learned": 92
+    },
+    {
+      "seed": 1,
+      "policy": "random",
+      "native": false,
+      "realized_pnl": -94.06749765440773,
+      "copied": 66,
+      "early_best_last20": 0.15,
+      "reversed_best_last20": 0.25,
+      "unresolved": 0,
+      "wall_s": 0.009228124981746078,
+      "learned": 0
+    },
+    {
+      "seed": 1,
+      "policy": "fixed",
+      "native": false,
+      "realized_pnl": -80.96475326279533,
+      "copied": 100,
+      "early_best_last20": 1.0,
+      "reversed_best_last20": 0.0,
+      "unresolved": 0,
+      "wall_s": 0.009083832846954465,
+      "learned": 0
+    },
+    {
+      "seed": 1,
+      "policy": "cash",
+      "native": false,
+      "realized_pnl": 0,
+      "copied": 0,
+      "early_best_last20": 0.0,
+      "reversed_best_last20": 0.0,
+      "unresolved": 0,
+      "wall_s": 0.009038875112310052,
+      "learned": 0
+    },
+    {
+      "seed": 2,
+      "policy": "adaptive",
+      "native": true,
+      "realized_pnl": 484.62419747608334,
+      "copied": 95,
+      "early_best_last20": 1.0,
+      "reversed_best_last20": 0.9,
+      "unresolved": 0,
+      "wall_s": 6.191186834126711,
+      "learned": 95
+    },
+    {
+      "seed": 2,
+      "policy": "random",
+      "native": false,
+      "realized_pnl": -285.51767803228086,
+      "copied": 78,
+      "early_best_last20": 0.0,
+      "reversed_best_last20": 0.2,
+      "unresolved": 0,
+      "wall_s": 0.009794082958251238,
+      "learned": 0
+    },
+    {
+      "seed": 2,
+      "policy": "fixed",
+      "native": false,
+      "realized_pnl": -117.40167025793153,
+      "copied": 100,
+      "early_best_last20": 1.0,
+      "reversed_best_last20": 0.0,
+      "unresolved": 0,
+      "wall_s": 0.009764207992702723,
+      "learned": 0
+    },
+    {
+      "seed": 2,
+      "policy": "cash",
+      "native": false,
+      "realized_pnl": 0,
+      "copied": 0,
+      "early_best_last20": 0.0,
+      "reversed_best_last20": 0.0,
+      "unresolved": 0,
+      "wall_s": 0.00967954215593636,
+      "learned": 0
+    }
+  ]
+}

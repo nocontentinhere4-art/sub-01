@@ -1,0 +1,261 @@
+{
+  "python": "3.12.13",
+  "numpy": "2.5.3",
+  "base_commit": "2fa357b3c51f4fdf9cf963bee1e8e474bf7ed113",
+  "source": "synthetic",
+  "notice": "Deliberately constructed regime reversal, not exchange data.",
+  "rows": [
+    {
+      "neurons": 20000,
+      "network_seed": 1,
+      "build_s": 0.5918797920458019,
+      "run_s": 7.5384258748963475,
+      "synapses": 2019400,
+      "result": {
+        "trials": 100,
+        "seed": 919,
+        "learned": 0.65,
+        "twin": 0.33,
+        "chance": 0.28,
+        "learned_last50": 0.66,
+        "twin_last50": 0.34,
+        "curve": [
+          0.48,
+          0.8,
+          0.6,
+          0.72
+        ],
+        "twin_curve": [
+          0.2,
+          0.44,
+          0.32,
+          0.36
+        ]
+      }
+    },
+    {
+      "neurons": 40000,
+      "network_seed": 1,
+      "build_s": 1.1904184580780566,
+      "run_s": 19.24385629198514,
+      "synapses": 4038900,
+      "result": {
+        "trials": 100,
+        "seed": 919,
+        "learned": 0.76,
+        "twin": 0.31,
+        "chance": 0.28,
+        "learned_last50": 0.78,
+        "twin_last50": 0.34,
+        "curve": [
+          0.64,
+          0.84,
+          0.68,
+          0.88
+        ],
+        "twin_curve": [
+          0.32,
+          0.24,
+          0.28,
+          0.4
+        ]
+      }
+    },
+    {
+      "neurons": 80000,
+      "network_seed": 1,
+      "build_s": 2.527310000034049,
+      "run_s": 33.19134762487374,
+      "synapses": 8077700,
+      "result": {
+        "trials": 100,
+        "seed": 919,
+        "learned": 0.81,
+        "twin": 0.31,
+        "chance": 0.28,
+        "learned_last50": 0.84,
+        "twin_last50": 0.3,
+        "curve": [
+          0.6,
+          0.96,
+          0.88,
+          0.8
+        ],
+        "twin_curve": [
+          0.2,
+          0.44,
+          0.32,
+          0.28
+        ]
+      }
+    },
+    {
+      "neurons": 20000,
+      "network_seed": 2,
+      "build_s": 0.5648028750438243,
+      "run_s": 10.086469292175025,
+      "synapses": 2019400,
+      "result": {
+        "trials": 100,
+        "seed": 920,
+        "learned": 0.6,
+        "twin": 0.47,
+        "chance": 0.298,
+        "learned_last50": 0.62,
+        "twin_last50": 0.46,
+        "curve": [
+          0.48,
+          0.68,
+          0.68,
+          0.56
+        ],
+        "twin_curve": [
+          0.48,
+          0.48,
+          0.44,
+          0.48
+        ]
+      }
+    },
+    {
+      "neurons": 40000,
+      "network_seed": 2,
+      "build_s": 1.0843947499524802,
+      "run_s": 16.549956375034526,
+      "synapses": 4038900,
+      "result": {
+        "trials": 100,
+        "seed": 920,
+        "learned": 0.52,
+        "twin": 0.34,
+        "chance": 0.298,
+        "learned_last50": 0.48,
+        "twin_last50": 0.38,
+        "curve": [
+          0.52,
+          0.6,
+          0.44,
+          0.52
+        ],
+        "twin_curve": [
+          0.32,
+          0.28,
+          0.44,
+          0.32
+        ]
+      }
+    },
+    {
+      "neurons": 80000,
+      "network_seed": 2,
+      "build_s": 2.248413332970813,
+      "run_s": 28.596127334050834,
+      "synapses": 8077700,
+      "result": {
+        "trials": 100,
+        "seed": 920,
+        "learned": 0.55,
+        "twin": 0.31,
+        "chance": 0.298,
+        "learned_last50": 0.62,
+        "twin_last50": 0.32,
+        "curve": [
+          0.4,
+          0.56,
+          0.52,
+          0.72
+        ],
+        "twin_curve": [
+          0.28,
+          0.32,
+          0.44,
+          0.2
+        ]
+      }
+    },
+    {
+      "neurons": 20000,
+      "network_seed": 3,
+      "build_s": 0.5508629579562694,
+      "run_s": 10.419759707991034,
+      "synapses": 2019400,
+      "result": {
+        "trials": 100,
+        "seed": 921,
+        "learned": 0.68,
+        "twin": 0.32,
+        "chance": 0.286,
+        "learned_last50": 0.72,
+        "twin_last50": 0.26,
+        "curve": [
+          0.52,
+          0.76,
+          0.76,
+          0.68
+        ],
+        "twin_curve": [
+          0.32,
+          0.44,
+          0.28,
+          0.24
+        ]
+      }
+    },
+    {
+      "neurons": 40000,
+      "network_seed": 3,
+      "build_s": 1.0902400410268456,
+      "run_s": 12.069713541073725,
+      "synapses": 4038900,
+      "result": {
+        "trials": 100,
+        "seed": 921,
+        "learned": 0.67,
+        "twin": 0.29,
+        "chance": 0.286,
+        "learned_last50": 0.74,
+        "twin_last50": 0.32,
+        "curve": [
+          0.48,
+          0.72,
+          0.68,
+          0.8
+        ],
+        "twin_curve": [
+          0.28,
+          0.24,
+          0.28,
+          0.36
+        ]
+      }
+    },
+    {
+      "neurons": 80000,
+      "network_seed": 3,
+      "build_s": 2.2504758341237903,
+      "run_s": 26.677734999917448,
+      "synapses": 8077700,
+      "result": {
+        "trials": 100,
+        "seed": 921,
+        "learned": 0.7,
+        "twin": 0.39,
+        "chance": 0.286,
+        "learned_last50": 0.78,
+        "twin_last50": 0.32,
+        "curve": [
+          0.56,
+          0.68,
+          0.72,
+          0.84
+        ],
+        "twin_curve": [
+          0.4,
+          0.52,
+          0.24,
+          0.4
+        ]
+      }
+    }
+  ]
+}

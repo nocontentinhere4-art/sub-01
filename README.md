@@ -52,8 +52,9 @@ and credit. Diary lines and dream images are AI-generated and labelled as such.
 - **An AI reads and remembers for him; his brain model chooses.** A language model writes short notes on pages, proposes
   day plans for the brain model to vote on, and can write chat replies tagged "his reply (AI-written)". Capped at
   $2.00 per Tokyo day.
+- **Learns whom to copy (paper experiment).** A strict imported signal/quote journal drives simulated copies, recent-outcome reputation, and native spiking reward learning. Cash is an option; every choice and result is auditable. Trading targets 500k neurons on CUDA, simple tasks 100k. No exchange account or live execution. ([docs/copytrading/README.md](docs/copytrading/README.md))
 - **Spiking neurons.** One million simulated spiking neurons inside his wiring run on rented GPUs (scheduled, capped),
-  with a 20,000-neuron network on the server CPU as a fallback. They vote in choices, learn from a dopamine signal, and
+  with a 100,000-neuron network on the server CPU as a fallback. They vote in choices, learn from a dopamine signal, and
   take a daily memory test. Also YouTube and chess at the desk, music picked by the brain vote, and food orders
   (simulated).
 
@@ -65,7 +66,7 @@ flowchart LR
   A --> C["Resting-state<br/>recordings"]
   B --> D["Brain model<br/>slow Hopf layer + fast 10 Hz layer"]
   C --> D
-  B --> E["Spiking network<br/>1M neurons (GPU) / 20k (CPU)"]
+  B --> E["Spiking network<br/>1M neurons (GPU) / 100k (CPU)"]
   D --> F["Sleep circuit,<br/>neuromodulators, pulse"]
   D --> G["Brain vote<br/>(what to click, play, plan)"]
   E --> G
