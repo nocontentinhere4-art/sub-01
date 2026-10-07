@@ -2,7 +2,7 @@
 // Adds skinned parts to the v5 character: each a new node and mesh on the same skeleton as its "slides" part (a skin
 // whose bind is the identity: positions in the rig's world at bind, metres), from raw little-endian files written by
 // room_build/char_fix (P f32x3, N f32x3, UV f32x2, J u16x4, W f32x4, I u32). parts.json: [{name, dir, material:
-// {name, color:[r,g,b], roughness, metalness, doubleSided, map, normalMap, ormMap, mirror}}], `map` & co. image files
+// {name, color:[r,g,b], roughness, metalness, doubleSided, map, normalMap, ormMap, mirror, from}}], `map` & co. image files
 // (`mirror`: MIRRORED_REPEAT wrapping, for a small patch tiled).
 // `drop`: names of nodes to remove (their meshes go too). Writes with meshopt, like the source.
 import { NodeIO } from "@gltf-transform/core";
@@ -22,7 +22,12 @@ const rd = (f, T) => { const b = fs.readFileSync(f); return new T(b.buffer, b.by
 const tex = (f, mime) => doc.createTexture(f).setImage(fs.readFileSync(f)).setMimeType(mime || (f.endsWith(".png") ? "image/png" : f.endsWith(".webp") ? "image/webp" : "image/jpeg"));
 for (const p of S.parts) {
   const d = p.dir, mt = p.material;
-  const mat = doc.createMaterial(mt.name).setBaseColorFactor([...(mt.color || [1, 1, 1]), 1]).setRoughnessFactor(mt.roughness ?? 0.9).setMetallicFactor(mt.metalness ?? 0).setDoubleSided(!!mt.doubleSided);
+  // (`from`: a copy of the source's material of that name, its own textures and all, e.g. the hood's fabric for a patch
+  // in it; `doubleSided` as given)
+  const src0 = mt.from && root.listMaterials().find(m => m.getName() === mt.from);
+  if (mt.from && !src0) throw new Error(`no material ${mt.from}`);
+  const mat = src0 ? src0.clone().setName(mt.name).setDoubleSided(!!mt.doubleSided)
+    : doc.createMaterial(mt.name).setBaseColorFactor([...(mt.color || [1, 1, 1]), 1]).setRoughnessFactor(mt.roughness ?? 0.9).setMetallicFactor(mt.metalness ?? 0).setDoubleSided(!!mt.doubleSided);
   if (mt.map) mat.setBaseColorTexture(tex(mt.map)); if (mt.normalMap) mat.setNormalTexture(tex(mt.normalMap)); if (mt.ormMap) mat.setMetallicRoughnessTexture(tex(mt.ormMap));
   if (mt.mirror) for (const ti of [mat.getBaseColorTextureInfo(), mat.getNormalTextureInfo(), mat.getMetallicRoughnessTextureInfo()]) if (ti) ti.setWrapS(10497 + 33648 - 10497).setWrapT(33648);   // (MIRRORED_REPEAT: a small patch tiles without seams)
   const acc = (arr, type) => doc.createAccessor().setType(type).setArray(arr).setBuffer(buf);
