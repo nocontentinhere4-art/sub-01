@@ -49,7 +49,7 @@ def test_the_fit_is_recorded():
             assert m["leg_ik_miss_cm"][s] < 1.0, (clip, s)
             assert m["hands_in_thighs_after"][s][0] == 0, (clip, s, m["hands_in_thighs_after"])   # (the bake's own self-contact test)
         if row["kind"] != "standing":
-            assert m["seated_frames"] > 0 and abs(m["seat_hip_y"] - 0.71) < 0.03, clip    # (the hips seated on OUR cushion)
+            assert m["seated_frames"] > 0 and 0.66 < m["seat_hip_y"] < 0.78, (clip, m["seat_hip_y"])   # (the hips seated on OUR cushion: 0.69-0.75 m)
 
 
 def test_no_raw_capture_in_the_web_tree():

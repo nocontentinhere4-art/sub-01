@@ -12,7 +12,7 @@
 "phone": {},
 "seat": {
 "lowestGap_min_cm": -0.6,
-"lowestGap_max_cm": 46.5,
+"lowestGap_max_cm": 36.5,
 "framesUnder": 0,
 "maxVertsUnder": 0,
 "maxDepth_cm": 0
@@ -20,53 +20,66 @@
 "soles": {
 "L": {
 "min_cm": 0.4,
-"max_cm": 0.9,
+"max_cm": 0.7,
 "on": "surface"
 },
 "R": {
 "min_cm": 0.5,
-"max_cm": 1.5,
+"max_cm": 1.1,
 "on": "surface"
 }
 },
 "worst": [],
 "perFrame": {},
+"mouse": {
+"frames": 144,
+"palmOff_cm": [
+99,
+159.5
+],
+"palmOverTop_cm": [
+-24,
+71.1
+]
+},
 "legs": {
-"framesIn": 5,
-"maxVerts": 549,
-"maxDepth": 3.7,
+"framesIn": 7,
+"maxVerts": 719,
+"maxDepth": 6.2,
 "worstT": 3.5,
 "radius_cm": {
 "L": [
-15.1,
-16,
-16,
-15.3,
-14.8,
-14,
-13.2,
-12,
-11.2,
-10.5
-],
-"R": [
-15.3,
+14.5,
 15.5,
-15.2,
+15.6,
+15,
 14.7,
 14.4,
-13.4,
-12.2,
+14.2,
+13.9,
+11.2,
+10.2
+],
+"R": [
+14.9,
+15.4,
+15.1,
+14.7,
+14.7,
+14.3,
+13.9,
+13.9,
 10.9,
-10.7,
 8.1
 ]
 }
 },
 "support": {
-"min_cm": 0.44,
-"max_cm": 0.58,
+"min_cm": 0.45,
+"max_cm": 0.52,
 "framesOutside_0_1cm": 0
 },
-"mode": null
+"facing": null,
+"mode": null,
+"mhlog": []
 }

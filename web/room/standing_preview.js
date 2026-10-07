@@ -10,7 +10,7 @@
 // turned); the two that get up and move about (Scared, Standing_Clap) in the chair out in the open ("open").
 // Hands: a socket (an empty Object3D, "socket_R" / "socket_L", in the palm) on both hands. The phone clips carry the
 // page's phone (its body and screen, not the rigid gripping hand made for the finger-less rig) on the right one, its
-// screen turned to his eyes; Gaming holds the page's controller (room/controller.glb) and the tablet clip a plain
+// screen turned to his eyes (Texting_While_Standing, two-handed: between his palms); Gaming holds the page's controller (room/controller.glb) and the tablet clip a plain
 // tablet (the page has none), each between his palms, every frame.
 import { prep, fixClip, pageName } from "./char_mixamo.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
@@ -145,11 +145,18 @@ export async function start(ctx) {
     SP.phone = ph; SP.phoneSize = [w, h, d]; SP.phoneLift = +top.toFixed(4);
     SP.props.push({name: "phone", obj: ph, min: [-w / 2, -h / 2, -d / 2], max: [w / 2, h / 2, d / 2]});
     SP.phoneFacing = facing(ph, new THREE.Vector3(0, 0, 1));
-  } else if (row.hold === "controller" || row.hold === "tablet") {
+  } else if (row.hold === "controller" || row.hold === "tablet" || row.hold === "phone2") {
     // held in both hands: placed every frame between his palms (the two sockets), across them from his left palm to his
     // right, its face (the controller's buttons, the tablet's screen) turned towards his eyes as far as that allows
     let obj, face, box;
-    if (row.hold === "controller") {
+    if (row.hold === "phone2") {
+      // (the page's phone held in both hands, two-handed texting: its body and screen, the made-up feed on the glass)
+      const [w, h, d] = [0.078, 0.162, 0.008]; obj = new THREE.Group();
+      const body = phone.children[0].clone(); body.visible = true; obj.add(body);
+      const sc = phone.userData.screen.mesh.clone(); sc.visible = true; sc.geometry = new THREE.PlaneGeometry(w * 0.92, h * 0.95); sc.position.set(0, 0, d / 2 + 0.0006);
+      sc.material = glass(144, 300, [[0.07, 0.07, 0.86, 0.23, "#d9e4f5"], [0.07, 0.33, 0.86, 0.13, "#8fb3e8"], [0.07, 0.49, 0.86, 0.23, "#e9d9c6"], [0.07, 0.75, 0.86, 0.13, "#8fb3e8"]]);
+      obj.add(sc); face = new THREE.Vector3(0, 0, 1); box = {min: [-w / 2, -h / 2, -d / 2], max: [w / 2, h / 2, d / 2]};
+    } else if (row.hold === "controller") {
       const g = await load("room/controller.glb"); obj = g.scene.getObjectByName("controller") || g.scene;   // (room_build/build_desk_tech.mjs; origin the middle of its footprint, grips +z)
       obj.traverse(m => { if (m.isMesh) { m.castShadow = true; if (/_contact$/.test(m.name)) m.visible = false; } });
       face = new THREE.Vector3(0, 1, 0); box = {min: [-0.087, 0, -0.056], max: [0.087, 0.056, 0.064]};
@@ -167,10 +174,11 @@ export async function start(ctx) {
       x.subVectors(R_, L).normalize();                                             // (his left palm to his right)
       f.subVectors(eyes(), c); f.addScaledVector(x, -f.dot(x)).normalize();        // (towards his eyes, square to that)
       if (row.hold === "controller") { up.copy(f); z.crossVectors(x, up); } else { z.copy(f); up.crossVectors(z, x); }
+      if (row.hold === "phone2") c.addScaledVector(z, 0.012);                    // (on his palms, not in them)
       m.makeBasis(x, up, z).setPosition(c); hi.copy(holder.matrixWorld).invert(); m.premultiply(hi);
       m.decompose(obj.position, obj.quaternion, obj.scale); obj.updateMatrixWorld(true); };
-    SP.props.push({name: row.hold, obj, min: box.min, max: box.max});
-    SP.propFacing = facing(obj, face);
+    SP.props.push({name: row.hold === "phone2" ? "phone" : row.hold, obj, min: box.min, max: box.max});
+    SP.propFacing = facing(obj, face); if (row.hold === "phone2") { SP.phone = obj; SP.phoneFacing = SP.propFacing; }
   }
   mixer.setTime(0); holder.updateMatrixWorld(true); place();
 

@@ -1,6 +1,6 @@
 # Standing and in-between clips on the Mixamo-rigged character (G22)
 
-Nine Mixamo captures, baked for `web/room/char_mixamo.glb` (v5 on the Mixamo Standard Skeleton, G20) and placed in the
+Nine Mixamo captures, baked for `web/room/char_mixamo.glb` (main's `char_v5.glb`, b2593d7, collar closed and socks in the slides, on the Mixamo Standard Skeleton: G21's autorig on `preview/mixamo-wiring`, merged here) and placed in the
 room: Texting_While_Standing, Standing_Using_Touchscreen_Tablet, Texting, Standing_Clap, Angry_Gesture, Scared,
 Stand_To_Sit, Sit_To_Stand, Gaming. The desk clips (G21) and the bed clips (G17) are not touched.
 
@@ -37,7 +37,7 @@ the FBX from a folder instead of the branch). The pipeline for each clip:
 ### The fit (`standing_bake.py`)
 
 - **No retarget.** The capture's local rotations play by bone name: the rig's rest rotations are Mixamo's (G20).
-- **Hips' travel scaled by hip height.** The scale is 0.893 (his 0.92 m over the performer's), the same as
+- **Hips' travel scaled by hip height.** The scale is 0.873 (his hip height over the performer's), the same as
   `char_mixamo.js` `fixClip`.
 - **Standing frames.** The hips move up or down so that his lowest sole (the slides' underside) is 0.4 cm over the
   floor. The contract range is 0…+1 cm.
@@ -46,7 +46,8 @@ the FBX from a folder instead of the branch). The pipeline for each clip:
     into its top (0.505 m over the floor).
   - The cushion stops him: while his hips are over the seat they never go under the seated height. This matters when
     he lands on the seat or pushes off it.
-  - The seated hips end at 0.708–0.728 m over the floor. G12's v5 fit used 0.70.
+  - The seated hips end at 0.689–0.749 m over the floor (Angry_Gesture highest: he perches on the front edge). G12's
+    v5 fit used 0.70.
   - The rows with `seatOrigin` put the seated hips at the clip's origin, and the page places that origin on the chair.
 - **Transitions blend the two fits** by how low the hips are.
 - **Feet:**
@@ -60,11 +61,19 @@ the FBX from a folder instead of the branch). The pipeline for each clip:
     (a jump: Scared, 7 frames) they stay up.
 - **Hands off his thighs**, by the same test as the self-contact pass (a hand vertex behind the nearest thigh vertex by
   more than 5 mm along its normal):
-  - there the wrist moves out along that normal by the depth + 5 mm (held 0.2 s either side, smoothed), and the arm is
+  - there the wrist moves out along that normal by the depth + 8 mm (held 0.2 s either side, smoothed), and the arm is
     re-solved by two-bone IK with the hand keeping its world rotation;
-  - it changed two stretches and nothing else: Texting_While_Standing's right hand, 69 frames up to 2.49 cm into the
-    front of his trousers as both hands come down (20.6–23 s), and Texting's left hand, hanging at his side, 10 frames
-    at 0.56 cm. Both are 0 after.
+  - it changed two stretches and nothing else: Texting_While_Standing's right hand, 62 frames up to 2.49 cm into the
+    front of his trousers as both hands come down (20.6–23 s), and Texting's left hand, hanging at his side, 4 frames
+    at 0.54 cm. Both are 0 after by the bake's test; the self-contact pass (every 2nd vertex) still reads one vertex of
+    Texting's left hand at 0.5 cm, its own threshold, in 3 frames.
+- **Hands up (Texting_While_Standing only, row option `handsUp`).** The performer texted with both hands low at his
+  belly, his right hand out at his hip (G26's round 2). While both hands are up (each wrist 10 cm or more over the
+  hips' joint, eased in over the next 8 cm), the wrists go by arm IK to a point 32 cm in front of his upper spine and
+  5 cm under his neck joint, 10 cm either side of his middle; the hands keep their world rotations. That holds for
+  467 of the 708 frames, lifts the hands up to 31.6 cm, and the IK reaches within 0.02 cm. (The gap was swept:
+  wrists 13 cm apart put his hands into each other for 568 frames at 2.2 cm, 17 cm for 313 frames at 1.5 cm, 20 cm for
+  17 frames at 1.0 cm while they come together.)
 
 ### Where each plays (`standing_preview.js`, `standing_clips.json` `spot` / `seatAt`)
 
@@ -86,8 +95,8 @@ the FBX from a folder instead of the branch). The pipeline for each clip:
 **The seat point (`seatAt`, metres in the chair's frame, forward −z; the cushion's front edge is at −0.27)** was swept
 per clip in the room. Each value is the first one where no skin is more than 1 cm inside the chair's frame:
 - Angry_Gesture −0.18
-- Scared and Gaming −0.20
-- Stand_To_Sit and Standing_Clap −0.22
+- Gaming −0.20
+- Scared, Stand_To_Sit and Standing_Clap −0.22 (Scared re-swept on the new rig: clear from −0.21)
 - Sit_To_Stand −0.24
 
 That puts him on the front of the seat, as people sit when they sit down, stand up, or lean in to game or gesture.
@@ -107,20 +116,21 @@ back on the seat during the cross-fade (as people do), or take the loop's seat p
 
 Each palm has a socket, an empty Object3D (`socket_R` / `socket_L`), built from his own finger bones on the clip's first
 frame. What he holds:
-- **Texting and Texting_While_Standing: the page's phone on the right hand.** That is its rounded body and its screen,
-  with a plain made-up feed on the glass. The rigid gripping-hand mesh made for the finger-less rig is not used.
+- **Texting: the page's phone on the right hand.** That is its rounded body and its screen, with a plain made-up feed
+  on the glass. The rigid gripping-hand mesh made for the finger-less rig is not used.
   - Its screen is turned towards his eyes: their direction in the palm's frame, averaged over the clip. Its long side
     runs along his fingers as far as that allows.
   - As the page does for its own phone, it is lifted just enough that no skin of his right hand is inside it or over
     its screen, over the whole clip. So it rests on his curled fingers. It is not wrapped in a grip: the captured hand
     is a loose fist.
   - Measured on this rig, the names have the hands the other way round. Texting is one-handed: the right hand is at
-    the chest from 0.8 to 17 s, the left hand down. Texting_While_Standing is two-handed: both hands are at the chest
-    from 2 to 20.6 s, about 20 cm apart. The phone is on the right hand as asked, so the left hand taps beside it.
+    the chest from 0.8 to 17 s, the left hand down. Texting_While_Standing is two-handed.
+- **Texting_While_Standing: the same phone in both hands** (`hold: phone2`), brought up in front of his chest by the
+  bake's hands-up step and placed between his palms every frame, screen to his eyes, like the tablet.
 - **Gaming: the page's controller** (`room/controller.glb`, a second instance; the one on the desk stays).
 - **Standing_Using_Touchscreen_Tablet: a plain tablet.** The page has none, so this is a rounded slab 25 × 17 × 0.7 cm
   with a made-up screen, built in code, with no brand.
-- The controller and the tablet are held in both hands. Every frame they are placed between his palms, running across
+- The controller, the tablet and Texting_While_Standing's phone are held in both hands. Every frame they are placed between his palms, running across
   from his left palm to his right, with their face (the buttons, the screen) turned towards his eyes as far as that
   allows.
 
@@ -136,23 +146,23 @@ Measured in the room as the preview places each clip, every frame of the whole c
 The JSON is in `contact/`.
 
 <!-- table -->
-| clip | frames | furniture, walls, floor (> 1 cm inside) | supporting sole, cm (frames outside 0…+1) | soles L / R, cm | seat: lowest thigh / buttock gap to the cushion, cm | held prop: hand skin inside its box; its face to his eyes (mean, frames within 30°) | hands in thighs (bake: before → after the fix) | hands in thighs, surface test (normal-based) | hands in thighs, contact_pass's capsule (overstates: radius from the baggy trousers) | sleeve in torso, away from the armpit, L / R | arm in torso (the pair, rig included) L / R | leg in leg | planted ankle drift, cm |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Texting_While_Standing | 708 | **0** | 0.34…0.34 (0) | 0.4…0.4 / 0.3…0.3 | — | phone: 0.4 cm (2 fr); 22.7°, 78 % | R 69 fr 2.49 cm → 0 fr | 0 | 10.2 cm (106 fr, ≤3084 v) | 2.5 cm (708 fr, ≤714 v) / 2.5 cm (708 fr, ≤790 v) | 2.5 cm (708 fr, ≤826 v) / 2.5 cm (708 fr, ≤1020 v) | 0.8 cm (708 fr, ≤4 v) | 0.0 / 0.0 |
-| Standing_Using_Touchscreen_Tablet | 995 | **0** | 0.36…0.36 (0) | 0.5…0.5 / 0.4…0.4 | — | tablet: 0.3 cm (923 fr); 12.9°, 92 % | 0 | 0 | 7.2 cm (56 fr, ≤755 v) | 2.5 cm (995 fr, ≤836 v) / 2.5 cm (995 fr, ≤886 v) | 2.5 cm (995 fr, ≤904 v) / 2.5 cm (995 fr, ≤1126 v) | 0.7 cm (995 fr, ≤4 v) | 0.0 / 0.0 |
-| Texting | 557 | **0** | 0.38…0.39 (0) | 0.4…0.5 / 0.4…0.4 | — | phone: 0; 11.2°, 91 % | L 10 fr 0.56 cm → 0 fr | 0 | 7.9 cm (557 fr, ≤2054 v) | 2.5 cm (557 fr, ≤745 v) / 2.5 cm (557 fr, ≤654 v) | 2.5 cm (557 fr, ≤826 v) / 2.5 cm (557 fr, ≤667 v) | 0.6 cm (375 fr, ≤2 v) | 0.0 / 0.0 |
-| Standing_Clap | 144 | **0** | 0.44…0.58 (0) | 0.4…0.9 / 0.5…1.5 | -0.6…46.5 (0 fr > 1 cm under) | — | 0 | 0 | 3.7 cm (5 fr, ≤549 v) | 2.5 cm (144 fr, ≤537 v) / 2.5 cm (144 fr, ≤355 v) | 2.5 cm (144 fr, ≤590 v) / 2.5 cm (144 fr, ≤429 v) | 1.5 cm (144 fr, ≤33 v) | 0.07 / 0.0 |
-| Angry_Gesture | 176 | **0** | 0.4…0.4 (0) | 0.4…0.4 / 0.4…0.4 | -0.3…1.8 (0 fr > 1 cm under) | — | 0 | 0 | 0 | 2.5 cm (176 fr, ≤622 v) / 2.5 cm (174 fr, ≤540 v) | 2.5 cm (176 fr, ≤660 v) / 2.5 cm (176 fr, ≤623 v) | 1.4 cm (176 fr, ≤32 v) | 0.0 / 0.0 |
-| Scared | 303 | **0** | 0.45…3.26 (3) | 0.5…3.3 / 0.4…4.3 | -0.7…51.9 (0 fr > 1 cm under) | — | 0 | 0 | 2.5 cm (28 fr, ≤256 v) | 2.5 cm (303 fr, ≤927 v) / 2.5 cm (298 fr, ≤596 v) | 2.5 cm (303 fr, ≤965 v) / 2.5 cm (298 fr, ≤634 v) | 1.8 cm (303 fr, ≤51 v) | 0.0 / 0.0 |
-| Stand_To_Sit | 68 | **0** | 0.33…0.78 (0) | 0.3…1.6 / 0.8…1 | -0.1…40.8 (0 fr > 1 cm under) | — | 0 | 0 | 8.2 cm (27 fr, ≤3067 v) | 2.5 cm (68 fr, ≤657 v) / 2.5 cm (56 fr, ≤390 v) | 2.5 cm (68 fr, ≤734 v) / 2.5 cm (58 fr, ≤589 v) | 2.1 cm (68 fr, ≤41 v) | 0.0 / 0.0 |
-| Sit_To_Stand | 63 | **0** | 0.32…1.15 (3) | 0.3…1.6 / 0.5…1.2 | 0.4…40.9 (0 fr > 1 cm under) | — | 0 | 0 | 8.5 cm (17 fr, ≤2013 v) | 2.5 cm (55 fr, ≤724 v) / 2.5 cm (39 fr, ≤437 v) | 2.5 cm (55 fr, ≤817 v) / 2.5 cm (59 fr, ≤471 v) | 1.8 cm (63 fr, ≤31 v) | 0.0 / 0.0 |
-| Gaming | 152 | **0** | 0.4…0.4 (0) | 0.4…0.4 / 0.4…0.4 | -0.3…0.3 (0 fr > 1 cm under) | controller: 2.8 cm (152 fr); 1.4°, 100 % | 0 | 0 | 0 | 2 cm (152 fr, ≤24 v) / 2 cm (152 fr, ≤60 v) | 2 cm (152 fr, ≤33 v) / 2 cm (152 fr, ≤68 v) | 1.7 cm (152 fr, ≤39 v) | 0.0 / 0.0 |
+| clip | frames | furniture, walls, floor (> 1 cm inside) | supporting sole, cm (frames outside 0…+1) | soles L / R, cm | seat: lowest thigh / buttock gap to the cushion, cm | held prop: hand skin inside its box; its face to his eyes (mean, frames within 30°) | hands in thighs (bake: before → after the fix) | hands in thighs, surface test (normal-based) | hands in thighs, contact_pass's capsule (overstates: radius from the baggy trousers) | sleeve in torso, away from the armpit, L / R | arm in torso (the pair, rig included) L / R | leg in leg | hand in hand | planted ankle drift, cm |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Texting_While_Standing | 708 | **0** | 0.42…0.44 (0) | 0.4…0.4 / 0.4…0.4 | — | phone2: 0.4 cm (571 fr); 6.9°, 100 % | R 62 fr 2.49 cm → 0 fr | 0 | 9.6 cm (108 fr, ≤3343 v) | 2.5 cm (84 fr, ≤508 v) / 2.5 cm (235 fr, ≤687 v) | 2.5 cm (670 fr, ≤562 v) / 2.5 cm (475 fr, ≤761 v) | 0.7 cm (708 fr, ≤6 v) | 1 cm (17 fr, ≤35 v) | 0.0 / 0.0 |
+| Standing_Using_Touchscreen_Tablet | 995 | **0** | 0.41…0.41 (0) | 0.5…0.5 / 0.4…0.4 | — | tablet: 0.3 cm (926 fr); 12.9°, 92 % | 0 | 0 | 6.9 cm (56 fr, ≤932 v) | 2.5 cm (995 fr, ≤525 v) / 2.5 cm (851 fr, ≤929 v) | 2.5 cm (995 fr, ≤542 v) / 2.5 cm (949 fr, ≤1014 v) | 0.8 cm (995 fr, ≤4 v) | 0 | 0.0 / 0.0 |
+| Texting | 557 | **0** | 0.4…0.41 (0) | 0.4…0.5 / 0.4…0.4 | — | phone: 0; 11.2°, 91 % | L 4 fr 0.54 cm → 0 fr | 0.5 cm (3 fr, ≤1 v) | 7.8 cm (557 fr, ≤2382 v) | 2.5 cm (557 fr, ≤710 v) / 2.5 cm (557 fr, ≤658 v) | 2.5 cm (557 fr, ≤714 v) / 2.5 cm (557 fr, ≤673 v) | 0 | 0 | 0.0 / 0.0 |
+| Standing_Clap | 144 | **0** | 0.45…0.52 (0) | 0.4…0.7 / 0.5…1.1 | -0.6…36.5 (0 fr > 1 cm under) | — | 0 | 0 | 6.2 cm (7 fr, ≤719 v) | 2.2 cm (18 fr, ≤42 v) / 2.5 cm (36 fr, ≤306 v) | 2.5 cm (40 fr, ≤302 v) / 2.5 cm (40 fr, ≤365 v) | 1.5 cm (144 fr, ≤34 v) | 1.3 cm (6 fr, ≤104 v) | 0.07 / 0.0 |
+| Angry_Gesture | 176 | **0** | 0.4…0.4 (0) | 0.4…0.4 / 0.4…0.4 | -0.9…1.8 (0 fr > 1 cm under) | — | 0 | 0 | 0 | 2.5 cm (127 fr, ≤115 v) / 2.5 cm (124 fr, ≤330 v) | 2.5 cm (144 fr, ≤339 v) / 2.5 cm (129 fr, ≤410 v) | 1.5 cm (176 fr, ≤29 v) | 0 | 0.0 / 0.0 |
+| Scared | 303 | **0** | 0.48…3.57 (3) | 0.5…3.6 / 0.5…5.1 | -0.4…42.4 (0 fr > 1 cm under) | — | 0 | 0 | 2.3 cm (26 fr, ≤226 v) | 2.5 cm (169 fr, ≤509 v) / 2.5 cm (200 fr, ≤489 v) | 2.5 cm (199 fr, ≤634 v) / 2.5 cm (206 fr, ≤539 v) | 1.7 cm (303 fr, ≤52 v) | 0 | 0.0 / 0.0 |
+| Stand_To_Sit | 68 | **0** | 0.32…1.05 (7) | 0.3…2 / 1…1.1 | -0.4…35.2 (0 fr > 1 cm under) | — | 0 | 0 | 8.5 cm (28 fr, ≤3326 v) | 2.5 cm (13 fr, ≤431 v) / 2.5 cm (19 fr, ≤658 v) | 2.5 cm (24 fr, ≤538 v) / 2.5 cm (20 fr, ≤712 v) | 1.8 cm (68 fr, ≤44 v) | 0 | 0.0 / 0.0 |
+| Sit_To_Stand | 63 | **0** | 0.33…1.14 (3) | 0.3…1.3 / 0.7…1.3 | 0.1…37.1 (0 fr > 1 cm under) | — | 0 | 0 | 8.3 cm (18 fr, ≤2189 v) | 2.5 cm (15 fr, ≤580 v) / 2.5 cm (13 fr, ≤92 v) | 2.5 cm (19 fr, ≤652 v) / 2.5 cm (13 fr, ≤167 v) | 1.7 cm (63 fr, ≤37 v) | 0 | 0.0 / 0.0 |
+| Gaming | 152 | **0** | 0.4…0.4 (0) | 0.4…0.4 / 0.4…0.4 | -0.7…-0.1 (0 fr > 1 cm under) | controller: 2.8 cm (152 fr); 1.4°, 100 % | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 1.6 cm (152 fr, ≤38 v) | 0 | 0.0 / 0.0 |
 
-Baseline, the same instrument on the character with no clip, the T-pose rest: hands in thighs 0 v ≤ 0 cm, left arm in torso 0 v ≤ 0 cm, right arm in torso 2 v ≤ 0.8 cm, left leg in right leg 2 v ≤ 0.8 cm, left hand in right hand 0 v ≤ 0 cm.
+Baseline, the same instrument on the character with no clip, the T-pose rest: hands in thighs 0 v ≤ 0 cm, left arm in torso 0 v ≤ 0 cm, right arm in torso 0 v ≤ 0 cm, left leg in right leg 2 v ≤ 0.7 cm, left hand in right hand 0 v ≤ 0 cm.
 
-Baseline, the same instrument on the character with no clip, the arms 63° down (as v5 was modelled): hands in thighs 0 v ≤ 0 cm, left arm in torso 8 v ≤ 0.7 cm, right arm in torso 15 v ≤ 1.2 cm, left leg in right leg 2 v ≤ 0.8 cm, left hand in right hand 0 v ≤ 0 cm.
+Baseline, the same instrument on the character with no clip, the arms 63° down (as v5 was modelled): hands in thighs 0 v ≤ 0 cm, left arm in torso 0 v ≤ 0 cm, right arm in torso 0 v ≤ 0 cm, left leg in right leg 2 v ≤ 0.7 cm, left hand in right hand 0 v ≤ 0 cm.
 
-Baseline, the same instrument on the character with no clip, the arms 80° down, at his sides: hands in thighs 0 v ≤ 0 cm, left arm in torso 45 v ≤ 1.4 cm, right arm in torso 44 v ≤ 1.7 cm, left leg in right leg 2 v ≤ 0.8 cm, left hand in right hand 0 v ≤ 0 cm.
+Baseline, the same instrument on the character with no clip, the arms 80° down, at his sides: hands in thighs 0 v ≤ 0 cm, left arm in torso 0 v ≤ 0 cm, right arm in torso 0 v ≤ 0 cm, left leg in right leg 2 v ≤ 0.7 cm, left hand in right hand 0 v ≤ 0 cm.
 <!-- /table -->
 
 How to read it:
@@ -179,22 +189,24 @@ How to read it:
 
 ### What is not clean, and why
 
-- **Sleeve in torso (all nine clips).** The performer's arms hang against a slimmer body. On this character the baggy
-  sleeve and the baggy hoodie, both skinned by linear blending, overlap where the arm meets his side. With no clip and
-  the arms 80° down, the same instrument gives 44–45 vertices at ≤ 1.7 cm; the clips put the arms closer in than that.
-  - I tried a clip-side fix: turning each upper arm out about the chest's forward axis, only where the sleeve is
-    inside, at most 15°. On Gaming that only took the depth (measured with a 5 cm search) from 4.06 / 4.29 cm to
-    3.59 / 2.62 cm, and at 15° the arms visibly stand out from his body. So it is not baked: it bends the performance
-    and does not clear it.
-  - The fix belongs to the character: the shoulder and flank weights (G20; G23's items 1 and 3) or a cloth collision.
-    It is reported here rather than hidden. From the outside the sleeve lies against his side in every render
-    (`sheet.jpg`); the overlap is inside the cloth.
-- **Scared, the supporting sole over 1 cm in 3 frames (up to 3.26 cm).** These fall inside the 7 frames where the
+- **Sleeve in torso.** On G21's rebuilt rig (its sleeve and hoodie weight rules) this is much smaller than on the
+  first rig: 0 in Gaming, 13–40 frames in the sit-down, stand-up, Scared and Standing_Clap, and with no clip and the
+  arms 80° down it is now 0. What remains is the three standing clips (and Angry_Gesture), where the performer's arms
+  hang or hold at the chest against a slimmer body than his baggy hoodie: 2.5 cm (the instrument's cap) in most frames.
+  - On the first rig I tried a clip-side fix: turning each upper arm out about the chest's forward axis, only where the
+    sleeve is inside, at most 15°. On Gaming that only took the depth from 4.06 / 4.29 cm to 3.59 / 2.62 cm, and at 15°
+    the arms visibly stand out from his body. So it is not baked.
+  - The fix belongs to the character's weights or a cloth collision (G21 / G20). From the outside the sleeve lies
+    against his side in every render (`sheet.jpg`); the overlap is inside the cloth.
+- **Texting_While_Standing, hand in hand: 17 frames at ≤ 1.0 cm (35 vertices), around 1.9 s,** while the hands-up step
+  brings his two hands in from where the performer held them. With the wrists 20 cm apart there is none in the held
+  stretch (13 cm: 568 frames at 2.2 cm; 17 cm: 313 frames at 1.5 cm).
+- **Scared, the supporting sole over 1 cm in 3 frames (up to 3.57 cm).** These fall inside the 7 frames where the
   performer has both feet in the air: the startle's jump. The bake keeps a jump a jump.
-- **Sit_To_Stand, the supporting sole at 1.0–1.15 cm in 3 frames.** At the page's sit-down chair pose his feet are on
-  the rug's edge. On the bake's flat floor his lower sole never exceeds 0.45 cm. In the room, the edge of the 1.3 cm rug
-  under his feet changes what the sole stands on.
-- **Leg in leg, 0.6–2.1 cm, ≤ 51 vertices.** The two baggy trouser legs touching at the inner knee (baseline with no
+- **Sit_To_Stand and Stand_To_Sit, the supporting sole at 1.0–1.14 cm in 3 / 7 frames.** At the page's sit-down chair
+  pose his feet are on the rug's edge. On the bake's flat floor his lower sole stays at 0.4 cm. In the room, the edge
+  of the 1.3 cm rug under his feet changes what the sole stands on.
+- **Leg in leg, 0.7–1.8 cm, ≤ 52 vertices.** The two baggy trouser legs touching at the inner knee (baseline with no
   clip: 2 vertices at 0.8 cm). It is the same cloth overlap as the sleeves, much smaller.
 
 ## Render sheet

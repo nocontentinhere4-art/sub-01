@@ -4,15 +4,16 @@ Branch `preview/standing-clips` (off `origin/preview/mixamo-pipeline`). No raw c
 the FBX from `claude/loving-davinci-6hqmjx` into a temp dir and deletes them after. Details and the contact table:
 `README.md`.
 
-## State (2026-10-07): done; G23's review answered (below)
+## State (2026-10-07): done; G23's review answered (below), round 3 (C / G26) below
 - [x] The nine clips are baked for `web/room/char_mixamo.glb`: `web/room/mx_standing/<Clip>.glb`, plus
       `standing_clips.meta.json`.
 - [x] One re-bake command: `room_build/kimodo/standing_rebake.sh <character.glb> [Clip ...]`. It covers all nine,
       including the hands-off-thighs step.
 - [x] Page entry: `room.html?char=mixamo&clip=<Clip>` (`web/room/standing_preview.js`, plus the marked G22 block at
       the end of `room.html`). The default page is unchanged: without `clip`, nothing runs.
-- [x] Hands: sockets `socket_R` / `socket_L` in each palm. The page's phone is on the right hand (Texting,
-      Texting_While_Standing), its screen turned to his eyes and lifted onto his curled fingers. Gaming holds the page's
+- [x] Hands: sockets `socket_R` / `socket_L` in each palm. The page's phone is on Texting's right hand, its screen
+      turned to his eyes and lifted onto his curled fingers. Texting_While_Standing holds it in both hands in front of
+      his chest (round 3). Gaming holds the page's
       controller and the tablet clip a plain tablet (the page has none), each between his palms every frame.
 - [x] Contact in the room, every frame, every visible mesh: `CLIP=<Clip> contact_pass.mjs <port> x clip`.
 - [x] Self contact, every frame: `standing_selfcontact.mjs` (`QA.selfContact`). Arm in torso is shown with and without
@@ -38,7 +39,7 @@ Run on 63efec3, the final clips and code, 2026-10-07:
 - The re-bake reproduces the committed clips byte for byte (checked on Sit_To_Stand and Stand_To_Sit, GLB and meta).
 
 ## Open, for others
-- Page wiring (G21 / G10d): the seat points `seatAt` (−0.18…−0.24 m) differ from the seated loop's. The join needs a
+- Page wiring (G21 / G10d): the seat points `seatAt` (−0.18…−0.24 m; G21's desk loops sit at −0.075) differ from the seated loop's. The join needs a
   slide back on the seat during the cross-fade, or the loop's seat point taken from the same sweep. At the desk, the
   rare events need more roll-back than the bed allows.
 - Rig (G20): the arm-in-torso numbers come from the flank and armpit weights.
@@ -67,10 +68,27 @@ Run on 63efec3, the final clips and code, 2026-10-07:
 5. **Main's old slides: noted.** That is the rig's input (G20). After autorig re-runs on the new `char_v5.glb`,
    `standing_rebake.sh <char.glb>` re-bakes all nine in one command.
 
-## Next: re-bake on the one character source (C, 2026-10-07 16:09)
-- The character has one source: main's `web/room/char_v5.glb` (b2593d7: collar + feet). This branch does not change
-  `char_v5.glb` or `char_mixamo.glb`: `git diff origin/preview/mixamo-pipeline..HEAD` shows neither.
-- [ ] When G21's `char_mixamo.glb`, rebuilt from that GLB, is on `preview/mixamo-wiring`: run
-      `room_build/kimodo/standing_rebake.sh <that char_mixamo.glb>`, re-run the contact, self-contact and sheet, and
-      push. As of 16:10 UTC, `preview/mixamo-wiring` (94061b7) says nothing yet about being rebuilt from b2593d7, so
-      this waits.
+## Round 3 (C, 2026-10-07 17:57): re-baked on the one character source, Texting_While_Standing fixed
+- [x] **The character.** `origin/preview/mixamo-wiring` (bc063fb: its `char_mixamo.glb` autorigged from main's
+      `char_v5.glb`, b2593d7, collar + socks; G26 OK on d663a1d, and the GLB is the same at bc063fb) is merged into
+      this branch. So the branch's `char_v5.glb` is main's again (the old one came with the mixamo-pipeline base), and
+      the preview plays the clips on the rebuilt character.
+- [x] **All nine re-baked** with `standing_rebake.sh web/room/char_mixamo.glb`. Hip scale 0.873 on this rig (0.893 on
+      the old one).
+- [x] **Scared's seat point re-swept** on the new rig: clear from −0.21, set to −0.22 (it was −0.20, which left 7
+      vertices 1.2 cm into the chair for 8 frames). The other seat points measure clean as they are.
+- [x] **Texting_While_Standing (G26 round 2, item 2): the phone at his hip → in front of his chest, screen to his eyes.**
+  - The bake's new `handsUp` row option: while both hands are up (467 of 708 frames), arm IK takes the wrists to
+    32 cm in front of his upper spine and 5 cm under his neck joint, 10 cm either side of his middle. The hands keep
+    their world rotations.
+  - The phone is held in both hands (`hold: phone2`), between his palms every frame. Its screen is 6.9° from his
+    eyes on average and 19.6° at worst: 100 % of samples within 30°.
+  - Hand in hand: 17 frames at ≤ 1.0 cm, while the hands come together at about 1.9 s. The wrist gap was swept:
+    13 cm gave 568 frames at 2.2 cm, 17 cm gave 313 frames at 1.5 cm.
+- [ ] **Gaming's open left fingers (G26 round 2, item 3, LOW): not done.** The left hand holds the controller's grip
+      as the capture has it. Curling the fingers would be invented hand motion, and the mocap README rules that out
+      without the owner. Left for C / the owner to decide.
+- [x] The contact table, `contact/` and `sheet.jpg` are re-measured on the new rig; the numbers are in `README.md`.
+- In the room, on the new rig: 0 vertices more than 1 cm inside furniture, walls or the floor, in all nine clips and
+  every frame. Hands in thighs: 0. The sleeve-in-torso overlap is much smaller (0 in Gaming; 13–40 frames in the chair
+  transitions); the standing clips still have it (README, "What is not clean").

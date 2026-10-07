@@ -22,8 +22,8 @@ def solids(d):
     return '; '.join(out) or '**0**'
 
 
-rows = ["| clip | frames | furniture, walls, floor (> 1 cm inside) | supporting sole, cm (frames outside 0…+1) | soles L / R, cm | seat: lowest thigh / buttock gap to the cushion, cm | held prop: hand skin inside its box; its face to his eyes (mean, frames within 30°) | hands in thighs (bake: before → after the fix) | hands in thighs, surface test (normal-based) | hands in thighs, contact_pass's capsule (overstates: radius from the baggy trousers) | sleeve in torso, away from the armpit, L / R | arm in torso (the pair, rig included) L / R | leg in leg | planted ankle drift, cm |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+rows = ["| clip | frames | furniture, walls, floor (> 1 cm inside) | supporting sole, cm (frames outside 0…+1) | soles L / R, cm | seat: lowest thigh / buttock gap to the cushion, cm | held prop: hand skin inside its box; its face to his eyes (mean, frames within 30°) | hands in thighs (bake: before → after the fix) | hands in thighs, surface test (normal-based) | hands in thighs, contact_pass's capsule (overstates: radius from the baggy trousers) | sleeve in torso, away from the armpit, L / R | arm in torso (the pair, rig included) L / R | leg in leg | hand in hand | planted ankle drift, cm |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
 fmt = lambda e: '0' if not e or not e.get('frames') else f"{e['maxDepth_cm']} cm ({e['frames']} fr, ≤{e['maxVerts']} v)"
 for c in order:
     f = Path(cpd) / f'{c}.json'
@@ -32,7 +32,7 @@ for c in order:
     sup = d.get('support') or {}
     so = d['soles']
     seat = d['seat']; seat_s = '—' if seat['lowestGap_min_cm'] > 100 else f"{seat['lowestGap_min_cm']}…{seat['lowestGap_max_cm']} ({seat['framesUnder']} fr > 1 cm under)"
-    hold = m.get('row', {}).get('hold'); ph = d.get('phone', {}).get(hold) if hold else None; fc = d.get('facing') or {}
+    hold = m.get('row', {}).get('hold'); ph = d.get('phone', {}).get('phone' if hold == 'phone2' else hold) if hold else None; fc = d.get('facing') or {}
     ph_s = '—' if not hold else (f"{hold}: " + ('0' if not ph else f"{ph['maxDepth']} cm ({ph['frames']} fr)") +
                                   (f"; {fc['meanDeg']}°, {round(fc['within30'] * 100)} %" if fc else ''))
     hb, ha = m.get('hands_in_thighs_before', {}), m.get('hands_in_thighs_after', {})
@@ -42,7 +42,7 @@ for c in order:
     rows.append(f"| {c} | {d['frames']} | {solids(d)} | {sup.get('min_cm', '?')}…{sup.get('max_cm', '?')} ({sup.get('framesOutside_0_1cm', '?')}) | "
                 f"{so['L']['min_cm']}…{so['L']['max_cm']} / {so['R']['min_cm']}…{so['R']['max_cm']} | {seat_s} | {ph_s} | {hf} | {fmt(s.get('hands in thighs'))} | {cap} | "
                 f"{fmt(s.get('left sleeve in torso, away from the armpit'))} / {fmt(s.get('right sleeve in torso, away from the armpit'))} | "
-                f"{fmt(s.get('left arm in torso'))} / {fmt(s.get('right arm in torso'))} | {fmt(s.get('left leg in right leg'))} | {dr.get('L', '?')} / {dr.get('R', '?')} |")
+                f"{fmt(s.get('left arm in torso'))} / {fmt(s.get('right arm in torso'))} | {fmt(s.get('left leg in right leg'))} | {fmt(s.get('left hand in right hand'))} | {dr.get('L', '?')} / {dr.get('R', '?')} |")
 print('\n'.join(rows))
 first = next(iter(SC.values()), {})
 for key, what in (('insideRest', 'the T-pose rest'), ('insideArmsDown', 'the arms 63° down (as v5 was modelled)'), ('insideArmsAtSides', 'the arms 80° down, at his sides')):

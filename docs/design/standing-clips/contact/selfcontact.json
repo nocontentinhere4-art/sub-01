@@ -10,40 +10,40 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 708,
+    "frames": 670,
     "maxDepth_cm": 2.5,
-    "maxVerts": 826,
-    "worstT": 22.27
+    "maxVerts": 562,
+    "worstT": 0.43
    },
    "left sleeve in torso, away from the armpit": {
-    "frames": 708,
+    "frames": 84,
     "maxDepth_cm": 2.5,
-    "maxVerts": 714,
-    "worstT": 22.27
+    "maxVerts": 508,
+    "worstT": 0.43
    },
    "right arm in torso": {
-    "frames": 708,
+    "frames": 475,
     "maxDepth_cm": 2.5,
-    "maxVerts": 1020,
-    "worstT": 21.43
+    "maxVerts": 761,
+    "worstT": 23.33
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 708,
+    "frames": 235,
     "maxDepth_cm": 2.5,
-    "maxVerts": 790,
-    "worstT": 21.43
+    "maxVerts": 687,
+    "worstT": 23.33
    },
    "left leg in right leg": {
     "frames": 708,
-    "maxDepth_cm": 0.8,
-    "maxVerts": 4,
-    "worstT": 1.17
+    "maxDepth_cm": 0.7,
+    "maxVerts": 6,
+    "worstT": 15.1
    },
    "left hand in right hand": {
-    "frames": 0,
-    "maxDepth_cm": 0,
-    "maxVerts": 0,
-    "worstT": null
+    "frames": 17,
+    "maxDepth_cm": 1,
+    "maxVerts": 35,
+    "worstT": 1.9
    }
   },
   "worst": {},
@@ -57,12 +57,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -75,16 +75,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -97,16 +97,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -127,32 +127,32 @@
    "left arm in torso": {
     "frames": 995,
     "maxDepth_cm": 2.5,
-    "maxVerts": 904,
-    "worstT": 3.4
+    "maxVerts": 542,
+    "worstT": 14.23
    },
    "left sleeve in torso, away from the armpit": {
     "frames": 995,
     "maxDepth_cm": 2.5,
-    "maxVerts": 836,
-    "worstT": 3.4
+    "maxVerts": 525,
+    "worstT": 14.23
    },
    "right arm in torso": {
-    "frames": 995,
+    "frames": 949,
     "maxDepth_cm": 2.5,
-    "maxVerts": 1126,
-    "worstT": 0.47
+    "maxVerts": 1014,
+    "worstT": 7.93
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 995,
+    "frames": 851,
     "maxDepth_cm": 2.5,
-    "maxVerts": 886,
-    "worstT": 7.57
+    "maxVerts": 929,
+    "worstT": 7.93
    },
    "left leg in right leg": {
     "frames": 995,
-    "maxDepth_cm": 0.7,
+    "maxDepth_cm": 0.8,
     "maxVerts": 4,
-    "worstT": 13.93
+    "worstT": 7.6
    },
    "left hand in right hand": {
     "frames": 0,
@@ -172,12 +172,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -190,16 +190,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -212,16 +212,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -234,40 +234,40 @@
   "frames": 557,
   "inside": {
    "hands in thighs": {
-    "frames": 0,
-    "maxDepth_cm": 0,
-    "maxVerts": 0,
-    "worstT": null
+    "frames": 3,
+    "maxDepth_cm": 0.5,
+    "maxVerts": 1,
+    "worstT": 4.87
    },
    "left arm in torso": {
     "frames": 557,
     "maxDepth_cm": 2.5,
-    "maxVerts": 826,
-    "worstT": 4.13
+    "maxVerts": 714,
+    "worstT": 15.2
    },
    "left sleeve in torso, away from the armpit": {
     "frames": 557,
     "maxDepth_cm": 2.5,
-    "maxVerts": 745,
-    "worstT": 4.3
+    "maxVerts": 710,
+    "worstT": 15.2
    },
    "right arm in torso": {
     "frames": 557,
     "maxDepth_cm": 2.5,
-    "maxVerts": 667,
-    "worstT": 18.03
+    "maxVerts": 673,
+    "worstT": 0.33
    },
    "right sleeve in torso, away from the armpit": {
     "frames": 557,
     "maxDepth_cm": 2.5,
-    "maxVerts": 654,
-    "worstT": 18.03
+    "maxVerts": 658,
+    "worstT": 0.33
    },
    "left leg in right leg": {
-    "frames": 375,
-    "maxDepth_cm": 0.6,
-    "maxVerts": 2,
-    "worstT": 13.23
+    "frames": 0,
+    "maxDepth_cm": 0,
+    "maxVerts": 0,
+    "worstT": null
    },
    "left hand in right hand": {
     "frames": 0,
@@ -287,12 +287,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -305,16 +305,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -327,16 +327,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -355,39 +355,39 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 144,
+    "frames": 40,
     "maxDepth_cm": 2.5,
-    "maxVerts": 590,
-    "worstT": 3.97
+    "maxVerts": 302,
+    "worstT": 3.9
    },
    "left sleeve in torso, away from the armpit": {
-    "frames": 144,
-    "maxDepth_cm": 2.5,
-    "maxVerts": 537,
-    "worstT": 3.97
+    "frames": 18,
+    "maxDepth_cm": 2.2,
+    "maxVerts": 42,
+    "worstT": 3.93
    },
    "right arm in torso": {
-    "frames": 144,
+    "frames": 40,
     "maxDepth_cm": 2.5,
-    "maxVerts": 429,
-    "worstT": 4.73
+    "maxVerts": 365,
+    "worstT": 4.5
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 144,
+    "frames": 36,
     "maxDepth_cm": 2.5,
-    "maxVerts": 355,
-    "worstT": 0.57
+    "maxVerts": 306,
+    "worstT": 0
    },
    "left leg in right leg": {
     "frames": 144,
     "maxDepth_cm": 1.5,
-    "maxVerts": 33,
-    "worstT": 0.47
+    "maxVerts": 34,
+    "worstT": 0.53
    },
    "left hand in right hand": {
     "frames": 6,
     "maxDepth_cm": 1.3,
-    "maxVerts": 91,
+    "maxVerts": 104,
     "worstT": 1.27
    }
   },
@@ -402,12 +402,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -420,16 +420,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -442,16 +442,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -470,34 +470,34 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 176,
+    "frames": 144,
     "maxDepth_cm": 2.5,
-    "maxVerts": 660,
-    "worstT": 5.3
+    "maxVerts": 339,
+    "worstT": 0.6
    },
    "left sleeve in torso, away from the armpit": {
-    "frames": 176,
+    "frames": 127,
     "maxDepth_cm": 2.5,
-    "maxVerts": 622,
-    "worstT": 5.3
+    "maxVerts": 115,
+    "worstT": 0.2
    },
    "right arm in torso": {
-    "frames": 176,
+    "frames": 129,
     "maxDepth_cm": 2.5,
-    "maxVerts": 623,
-    "worstT": 2.77
+    "maxVerts": 410,
+    "worstT": 2.8
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 174,
+    "frames": 124,
     "maxDepth_cm": 2.5,
-    "maxVerts": 540,
-    "worstT": 2.77
+    "maxVerts": 330,
+    "worstT": 2.8
    },
    "left leg in right leg": {
     "frames": 176,
-    "maxDepth_cm": 1.4,
-    "maxVerts": 32,
-    "worstT": 1.07
+    "maxDepth_cm": 1.5,
+    "maxVerts": 29,
+    "worstT": 0.83
    },
    "left hand in right hand": {
     "frames": 0,
@@ -517,12 +517,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -535,16 +535,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -557,16 +557,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -585,34 +585,34 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 303,
-    "maxDepth_cm": 2.5,
-    "maxVerts": 965,
-    "worstT": 3.8
-   },
-   "left sleeve in torso, away from the armpit": {
-    "frames": 303,
-    "maxDepth_cm": 2.5,
-    "maxVerts": 927,
-    "worstT": 3.8
-   },
-   "right arm in torso": {
-    "frames": 298,
+    "frames": 199,
     "maxDepth_cm": 2.5,
     "maxVerts": 634,
-    "worstT": 5.03
+    "worstT": 3.03
+   },
+   "left sleeve in torso, away from the armpit": {
+    "frames": 169,
+    "maxDepth_cm": 2.5,
+    "maxVerts": 509,
+    "worstT": 3.03
+   },
+   "right arm in torso": {
+    "frames": 206,
+    "maxDepth_cm": 2.5,
+    "maxVerts": 539,
+    "worstT": 6.73
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 298,
+    "frames": 200,
     "maxDepth_cm": 2.5,
-    "maxVerts": 596,
-    "worstT": 4.97
+    "maxVerts": 489,
+    "worstT": 5.03
    },
    "left leg in right leg": {
     "frames": 303,
-    "maxDepth_cm": 1.8,
-    "maxVerts": 51,
-    "worstT": 1.7
+    "maxDepth_cm": 1.7,
+    "maxVerts": 52,
+    "worstT": 0.7
    },
    "left hand in right hand": {
     "frames": 0,
@@ -632,12 +632,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -650,16 +650,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -672,16 +672,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -700,34 +700,34 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 68,
+    "frames": 24,
     "maxDepth_cm": 2.5,
-    "maxVerts": 734,
-    "worstT": 0.33
+    "maxVerts": 538,
+    "worstT": 0.23
    },
    "left sleeve in torso, away from the armpit": {
-    "frames": 68,
+    "frames": 13,
     "maxDepth_cm": 2.5,
-    "maxVerts": 657,
-    "worstT": 0.33
+    "maxVerts": 431,
+    "worstT": 0.17
    },
    "right arm in torso": {
-    "frames": 58,
+    "frames": 20,
     "maxDepth_cm": 2.5,
-    "maxVerts": 589,
-    "worstT": 0.37
+    "maxVerts": 712,
+    "worstT": 0.1
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 56,
+    "frames": 19,
     "maxDepth_cm": 2.5,
-    "maxVerts": 390,
-    "worstT": 0.4
+    "maxVerts": 658,
+    "worstT": 0.07
    },
    "left leg in right leg": {
     "frames": 68,
-    "maxDepth_cm": 2.1,
-    "maxVerts": 41,
-    "worstT": 0.67
+    "maxDepth_cm": 1.8,
+    "maxVerts": 44,
+    "worstT": 0.6
    },
    "left hand in right hand": {
     "frames": 0,
@@ -747,12 +747,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -765,16 +765,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -787,16 +787,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -815,34 +815,34 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 55,
+    "frames": 19,
     "maxDepth_cm": 2.5,
-    "maxVerts": 817,
-    "worstT": 1.83
+    "maxVerts": 652,
+    "worstT": 1.7
    },
    "left sleeve in torso, away from the armpit": {
-    "frames": 55,
+    "frames": 15,
     "maxDepth_cm": 2.5,
-    "maxVerts": 724,
-    "worstT": 1.83
+    "maxVerts": 580,
+    "worstT": 1.77
    },
    "right arm in torso": {
-    "frames": 59,
+    "frames": 13,
     "maxDepth_cm": 2.5,
-    "maxVerts": 471,
-    "worstT": 1.7
+    "maxVerts": 167,
+    "worstT": 1.93
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 39,
+    "frames": 13,
     "maxDepth_cm": 2.5,
-    "maxVerts": 437,
-    "worstT": 1.7
+    "maxVerts": 92,
+    "worstT": 2.07
    },
    "left leg in right leg": {
     "frames": 63,
-    "maxDepth_cm": 1.8,
-    "maxVerts": 31,
-    "worstT": 0.77
+    "maxDepth_cm": 1.7,
+    "maxVerts": 37,
+    "worstT": 1.17
    },
    "left hand in right hand": {
     "frames": 0,
@@ -862,12 +862,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -880,16 +880,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -902,16 +902,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -930,34 +930,34 @@
     "worstT": null
    },
    "left arm in torso": {
-    "frames": 152,
-    "maxDepth_cm": 2,
-    "maxVerts": 33,
-    "worstT": 0.9
+    "frames": 0,
+    "maxDepth_cm": 0,
+    "maxVerts": 0,
+    "worstT": null
    },
    "left sleeve in torso, away from the armpit": {
-    "frames": 152,
-    "maxDepth_cm": 2,
-    "maxVerts": 24,
-    "worstT": 3.67
+    "frames": 0,
+    "maxDepth_cm": 0,
+    "maxVerts": 0,
+    "worstT": null
    },
    "right arm in torso": {
-    "frames": 152,
-    "maxDepth_cm": 2,
-    "maxVerts": 68,
-    "worstT": 2.6
+    "frames": 0,
+    "maxDepth_cm": 0,
+    "maxVerts": 0,
+    "worstT": null
    },
    "right sleeve in torso, away from the armpit": {
-    "frames": 152,
-    "maxDepth_cm": 2,
-    "maxVerts": 60,
-    "worstT": 2.63
+    "frames": 0,
+    "maxDepth_cm": 0,
+    "maxVerts": 0,
+    "worstT": null
    },
    "left leg in right leg": {
     "frames": 152,
-    "maxDepth_cm": 1.7,
-    "maxVerts": 39,
-    "worstT": 4.17
+    "maxDepth_cm": 1.6,
+    "maxVerts": 38,
+    "worstT": 2.23
    },
    "left hand in right hand": {
     "frames": 0,
@@ -977,12 +977,12 @@
     "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 2,
-    "depth_cm": 0.8
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -995,16 +995,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 8,
-    "depth_cm": 0.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 15,
-    "depth_cm": 1.2
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,
@@ -1017,16 +1017,16 @@
     "depth_cm": 0
    },
    "left arm in torso": {
-    "verts": 45,
-    "depth_cm": 1.4
+    "verts": 0,
+    "depth_cm": 0
    },
    "right arm in torso": {
-    "verts": 44,
-    "depth_cm": 1.7
+    "verts": 0,
+    "depth_cm": 0
    },
    "left leg in right leg": {
     "verts": 2,
-    "depth_cm": 0.8
+    "depth_cm": 0.7
    },
    "left hand in right hand": {
     "verts": 0,

@@ -191,9 +191,41 @@ if fix.any():
         g = P[:, cix[f'{s}Foot']].copy(); g[:, 1] += dz; miss[s] = max(miss[s], leg_ik(s, g))
 log['leg_ik_miss_cm'] = {s[0]: round(miss[s] * 100, 2) for s in miss}
 
+
+def arm_ik(s, goal):
+    """two-bone IK of an arm (upper arm, forearm) to a wrist goal, the hand keeping its world rotation"""
+    global P, Q, Sc
+    a, b, c = cix[f'{s}Arm'], cix[f'{s}ForeArm'], cix[f'{s}Hand']
+    l1 = np.linalg.norm(T[0, b]) * Sc[a]; l2 = np.linalg.norm(T[0, c]) * Sc[b]
+    nb, gg = two_bone(P[:, a], P[:, b], P[:, c], goal, l1, l2)
+    d1 = qbetween(P[:, b] - P[:, a], nb - P[:, a]); Qa = qmul(d1, Q[:, a]); Qb = qmul(d1, Q[:, b])
+    pc = nb + qrot(Qb, Sc[b] * T[:, c]); d2 = qbetween(pc - nb, gg - nb); Qb = qmul(d2, Qb)
+    R[:, a] = qnorm(qmul(qinv(Q[:, ts.parent[a]]), Qa)); R[:, b] = qnorm(qmul(qinv(Qa), Qb)); R[:, c] = qnorm(qmul(qinv(Qb), Q[:, c]))
+    P, Q, Sc = fk()
+    return float(np.linalg.norm(P[:, c] - goal, axis=1).max())
+
+
+# ---- handsUp (a row option): a two-handed phone the performer held low at his belly comes up in front of his chest.
+# While both hands are up (each wrist 10 cm or more over the hips' joint, eased in over the next 8 cm), the wrists go to
+# a point `forward` in front of his upper spine and `underNeck` under his neck joint, `halfGap` either side of his
+# middle, so the phone lies between his palms; the hands keep their world rotations (palms up to the phone)
+HU = row.get('handsUp')
+if HU:
+    hipsW = P[:, HI]; up_ = np.minimum(P[:, cix['LeftHand'], 1], P[:, cix['RightHand'], 1]) - hipsW[:, 1]
+    w = lowpass(sm((up_ - 0.10) / 0.08), 2.0)[:, None]
+    fw = P[:, cix['LeftUpLeg']] - P[:, cix['RightUpLeg']]; fw = np.cross(fw, [0, 1.0, 0]); fw[:, 1] = 0; fw /= np.linalg.norm(fw, axis=1, keepdims=True)
+    lat = np.cross([0, 1.0, 0], fw)                                   # (his left, horizontally)
+    centre = P[:, cix['Spine2']] + fw * HU['forward']; centre[:, 1] = P[:, cix['Neck'], 1] - HU['underNeck']
+    before = {s_: P[:, cix[f'{s_}Hand']].copy() for s_ in ('Left', 'Right')}
+    for s_, sg in (('Left', 1.0), ('Right', -1.0)):
+        goal = before[s_] * (1 - w) + (centre + lat * sg * HU['halfGap']) * w
+        miss[s_ + 'Arm'] = arm_ik(s_, goal)
+    log['hands_up'] = {'frames': int((w[:, 0] > 0.99).sum()), 'lift_cm': round(float(np.max(np.linalg.norm(P[:, cix['RightHand']] - before['Right'], axis=1)) * 100), 1),
+                       'arm_ik_miss_cm': round(max(miss['LeftArm'], miss['RightArm']) * 100, 2)}
+
 # ---- the hands off his thighs, by the same test as the self-contact pass (rig/autorig/qa.html inside()): a hand vertex
 # behind the nearest thigh vertex (within 2.5 cm) by more than 5 mm along that vertex's normal is inside; there the
-# wrist moves out along that normal by the depth + 5 mm (held 0.2 s either side, smoothed), the arm re-solved by
+# wrist moves out along that normal by the depth + 8 mm (held 0.2 s either side, smoothed), the arm re-solved by
 # two-bone IK with the hand keeping its world rotation. Every vertex of the hands and thighs, skinned with normals.
 from scipy.spatial import cKDTree
 J1, ibm1, V1, JI1, WW1 = skin_setup(C, 1)
@@ -224,13 +256,13 @@ def thigh_push(P, Q, Sc):
             d, j = tree.query(HA[s][f], distance_upper_bound=0.025); ok = np.isfinite(d)
             if not ok.any(): continue
             jj = j[ok]; dot = ((HA[s][f][ok] - TX[f][jj]) * TN[f][jj]).sum(1); k_ = np.argmin(dot)
-            if dot[k_] < -0.005: deep[s][f] = -dot[k_]; push[s][f] = TN[f][jj[k_]] * (-dot[k_] + 0.005)
+            if dot[k_] < -0.005: deep[s][f] = -dot[k_]; push[s][f] = TN[f][jj[k_]] * (-dot[k_] + 0.008)
     return push, deep
 
 
 _, deep0 = thigh_push(P, Q, Sc)
 log['hands_in_thighs_before'] = {s[0]: [int((deep0[s] > 0).sum()), round(float(deep0[s].max() * 100), 2)] for s in deep0}
-for it in range(4):
+for it in range(6):
     push, deep = thigh_push(P, Q, Sc)
     if not any(deep[s].any() for s in deep): break
     for s in ('Left', 'Right'):
@@ -286,4 +318,4 @@ out = {'name': row.get('name', 'clip'), 'fps': FPS, 'F': F, 'nodes': nodes,
        'trans': {kix2[HI]: np.round(T[:, HI], 4).ravel().tolist()}}
 json.dump(out, open(outj, 'w'))
 json.dump(log, open(metaj, 'w'), indent=1)
-print(json.dumps({k_: log[k_] for k_ in ('clip', 'frames', 'hip_scale', 'seated_frames', 'hip_shift_m', 'soles_cm', 'leg_ik_miss_cm', 'planted_ankle_drift_cm', 'hands_in_thighs_before', 'hands_in_thighs_after') if k_ in log}))
+print(json.dumps({k_: log[k_] for k_ in ('clip', 'frames', 'hip_scale', 'seated_frames', 'hip_shift_m', 'soles_cm', 'leg_ik_miss_cm', 'planted_ankle_drift_cm', 'hands_in_thighs_before', 'hands_in_thighs_after', 'hands_up') if k_ in log}))

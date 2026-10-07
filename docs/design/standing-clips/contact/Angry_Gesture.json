@@ -11,7 +11,7 @@
 "wall": {},
 "phone": {},
 "seat": {
-"lowestGap_min_cm": -0.3,
+"lowestGap_min_cm": -0.9,
 "lowestGap_max_cm": 1.8,
 "framesUnder": 0,
 "maxVertsUnder": 0,
@@ -31,6 +31,17 @@
 },
 "worst": [],
 "perFrame": {},
+"mouse": {
+"frames": 176,
+"palmOff_cm": [
+10.7,
+43
+],
+"palmOverTop_cm": [
+5,
+58.8
+]
+},
 "legs": {
 "framesIn": 0,
 "maxVerts": 0,
@@ -38,28 +49,28 @@
 "worstT": null,
 "radius_cm": {
 "L": [
-14.6,
-15.5,
+14.2,
+15.2,
 15.4,
-14.7,
-14.3,
+14.6,
+14.4,
+14.2,
+14.2,
 13.9,
-12.9,
-11.5,
-10.9,
-10
+11.1,
+9.8
 ],
 "R": [
-16,
-16.2,
+15.7,
+15.9,
 15.4,
 14.8,
-14.5,
-13.3,
-12,
-10.8,
-10.5,
-8.1
+14.6,
+14.3,
+14,
+13.9,
+11.1,
+8.3
 ]
 }
 },
@@ -68,5 +79,7 @@
 "max_cm": 0.4,
 "framesOutside_0_1cm": 0
 },
-"mode": null
+"facing": null,
+"mode": null,
+"mhlog": []
 }

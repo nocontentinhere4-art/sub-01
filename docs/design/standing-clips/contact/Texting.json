@@ -31,48 +31,60 @@
 },
 "worst": [],
 "perFrame": {},
+"mouse": {
+"frames": 557,
+"palmOff_cm": [
+99,
+135.7
+],
+"palmOverTop_cm": [
+-6.8,
+29.3
+]
+},
 "legs": {
 "framesIn": 557,
-"maxVerts": 2054,
-"maxDepth": 7.9,
+"maxVerts": 2382,
+"maxDepth": 7.8,
 "worstT": 0.3,
 "radius_cm": {
 "L": [
-15.2,
-15.7,
-15.5,
-14.6,
+15,
+15.3,
+15.4,
 14.3,
-13.6,
-13.7,
-13.4,
-12.6,
-11.9
+14.2,
+13.9,
+14.2,
+14,
+12.5,
+11.4
 ],
 "R": [
-17.2,
-16,
-15.2,
-14.3,
+17.1,
+16.2,
+15.4,
+14.4,
 13.7,
-13.3,
-13.6,
-13.7,
+13.1,
 13.5,
-13.1
+13.8,
+13.3,
+12.7
 ]
 }
 },
 "support": {
-"min_cm": 0.38,
-"max_cm": 0.39,
+"min_cm": 0.4,
+"max_cm": 0.41,
 "framesOutside_0_1cm": 0
 },
 "facing": {
 "meanDeg": 11.2,
-"worstDeg": 77.5,
+"worstDeg": 77.7,
 "within30": 0.907,
 "samples": 75
 },
-"mode": null
+"mode": null,
+"mhlog": []
 }
