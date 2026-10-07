@@ -310,3 +310,85 @@ def test_porn_self_harm_and_money_requests_are_still_refused(title):
 def test_web_pages_and_chat_keep_the_host_ticker_and_price_rules():
     assert not browse.display_ok("Sex on Fire")                       # web titles: BAD_HOST still applies
     assert chat.blocked("$PUMP to the moon") and chat.blocked("only $5 today")
+
+
+
+@pytest.mark.parametrize("title", ["Cocaine", "Heroin", "Casino Royale (2006) Trailer", "Gin and Juice",
+                                   "Meth Lab Ep. 3", "The Gambler - Kenny Rogers"])
+def test_drug_and_gambling_words_pass_as_songs_and_videos(title):
+    assert browse.video_text_ok(title) and M.track_from_api(track(title)) is not None
+    assert not browse.display_ok(title) or title in ("Gin and Juice", "The Gambler - Kenny Rogers")  # web: full words
+
+
+@pytest.mark.parametrize("title", ["Beheading video", "neo-nazi rally", "Rape scene", "XXX nude video",
+                                   "Suicide tutorial", "Kill Yourself (Part III)", "Self-harm song"])
+def test_gore_extremism_sexual_and_self_harm_still_refuse(title):
+    assert not browse.video_text_ok(title) and M.track_from_api(track(title)) is None
+
+
+
+def test_video_search_results_follow_the_media_rule():
+    rs = [{"url": "https://www.youtube.com/watch?v=aaaaaaaaaaa", "title": "Eric Clapton - Cocaine"},
+          {"url": "https://www.youtube.com/watch?v=bbbbbbbbbbb", "title": "Inno Nazionale Italiano"},
+          {"url": "https://www.youtube.com/watch?v=ccccccccccc", "title": "Porn star dancing"},
+          {"url": "https://en.wikipedia.org/wiki/Cocaine", "title": "Cocaine - Wikipedia"}]
+    kept = [r["title"] for r in browse.Browser.safe_results(rs)]
+    assert kept == ["Eric Clapton - Cocaine", "Inno Nazionale Italiano"]      # web pages keep the full guard
+
+
+class _Page:
+    def __init__(self, url, title, body):
+        self.url, self._title, self.body, self.frames, self.main_frame = url, title, body, [], None
+
+    async def wait_for_timeout(self, ms):
+        pass
+
+    async def add_style_tag(self, **k):
+        pass
+
+    async def title(self):
+        return self._title
+
+    async def evaluate(self, js, *a):
+        return self.body if "innerText" in js else False
+
+
+def _settle(url, title):
+    import asyncio
+    b = browse.Browser(decide=False)
+    sc = b.screens["desk"]
+    sc.page, sc.ctx = _Page(url, title, "A video page. " * 20), object()
+    shown = []
+
+    async def show(sc_):
+        shown.append(sc_.info["title"])
+        return True
+
+    async def leave(sc_):
+        return False
+    b.show, b._leave = show, leave
+    return b, shown, asyncio.run(b._settle(sc, "followed a link", "page", min_text=10))
+
+
+def test_a_youtube_page_titled_cocaine_is_shown_and_a_porn_one_is_left():
+    b, shown, ok = _settle("https://www.youtube.com/watch?v=aaaaaaaaaaa", "Eric Clapton - Cocaine - YouTube")
+    assert ok and shown == ["Eric Clapton - Cocaine - YouTube"]
+    b, shown, ok = _settle("https://www.youtube.com/watch?v=ccccccccccc", "Porn star dancing - YouTube")
+    assert not ok and b.last_skip == "guard" and shown == []
+    b, shown, ok = _settle("https://en.wikipedia.org/wiki/Cocaine", "Cocaine - Wikipedia")
+    assert not ok and b.last_skip == "guard"                                  # a web page keeps the full guard
+
+
+
+@pytest.mark.parametrize("title", ["Best online casino bonus", "100 FREE SPINS no deposit bonus", "Sportsbook tips live",
+                                   "Sports betting odds for tonight", "bet365 promo"])
+def test_gambling_promotion_is_still_refused(title):
+    assert not browse.video_text_ok(title) and M.track_from_api(track(title)) is None
+
+
+def test_video_option_labels_follow_the_media_rule():
+    import eyes as E
+    assert E.clean_label("Eric Clapton - Cocaine", video=True) == "Eric Clapton - Cocaine"
+    assert E.clean_label("Inno Nazionale Italiano", video=True) == "Inno Nazionale Italiano"
+    assert E.clean_label("Eric Clapton - Cocaine") == ""                     # a web link keeps the full guard
+    assert E.clean_label("Porn star dancing", video=True) == ""

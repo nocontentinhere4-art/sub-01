@@ -170,12 +170,15 @@ BAD_HOST = re.compile(
     r"4chan|8kun|kiwifarms|bestgore|liveleak|theync|"
     r"railway\.app|up\.railway", re.I)
 # words that must not be on a page shown live (title anywhere; body when repeated)
-BAD_WORDS = re.compile(
-    r"\b(porn\w*|xxx|nsfw|nude|nudes|naked|hentai|onlyfans|escort\w*|camgirl\w*|fetish\w*|erotic\w*|"
-    r"gore|beheading|dismember\w*|suicide|self[- ]?harm|rape|raped|child abuse|"
-    r"terrorist\w*|jihad\w*|neo-?nazi\w*|white power|"
-    r"cocaine|heroin|meth|fentanyl|"
-    r"casino\w*|sportsbook|gambling)\b", re.I)
+_HARM_WORDS = (r"porn\w*|xxx|nsfw|nude|nudes|naked|hentai|onlyfans|escort\w*|camgirl\w*|fetish\w*|erotic\w*|"
+               r"gore|beheading|dismember\w*|suicide|self[- ]?harm|rape|raped|child abuse|"
+               r"terrorist\w*|jihad\w*|neo-?nazi\w*|white power")
+BAD_WORDS = re.compile(r"\b(" + _HARM_WORDS + r"|cocaine|heroin|meth|fentanyl|casino\w*|sportsbook|gambling)\b", re.I)
+# song and video titles: the same words without drugs and gambling ("Cocaine", "Heroin", "Casino Royale" pass)
+MEDIA_BAD_WORDS = re.compile(r"\b(" + _HARM_WORDS + r")\b", re.I)
+# ... but gambling promotion still counts, like coin pressure ("Best online casino bonus", "free spins")
+GAMBLING_PROMO = re.compile(r"\b(online casinos?|casino bonus(es)?|free spins?|no deposit bonus|sportsbooks?|"
+                            r"sports betting|betting (tips|odds)|bet365|stake\.com)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
@@ -382,14 +385,16 @@ def title_ok(text):
 
 def media_title_ok(text):
     """A song or video title, channel or artist (owner: "don't censor anything", shown as it is): one rule for
-    Spotify tracks and YouTube / TikTok cards (review G24, F5). Refused: the guard's sexual / porn, gore, extremism,
-    self-harm and drug words (BAD_WORDS, word-bounded), and chat.blocked(media=True): links, addresses, e-mails,
+    Spotify tracks and YouTube / TikTok cards (review G24, F5). Refused: the guard's sexual / porn, gore, extremism
+    and self-harm words (MEDIA_BAD_WORDS, word-bounded; drugs and gambling words pass, gambling
+    promotion does not: GAMBLING_PROMO), and chat.blocked(media=True): links, addresses, e-mails,
     requests for money, "kys" and calls to violence against a group. Not applied: slurs and swearing, BAD_HOST (a host
     list: "Sex on Fire"), a "$" in an artist's styling ("$uicideboy$"), prices ("$5 Pizza Hack"), research.BLOCK's topic substrings ("nazi"
     in "Nazionale", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
     import chat
     t = text or ""
-    return not BAD_WORDS.search(t) and chat.blocked(t, media=True) is None
+    return (not (MEDIA_BAD_WORDS.search(t) or GAMBLING_PROMO.search(t))
+            and chat.blocked(t, media=True) is None)
 
 
 # finance talk kept out of his own words (mind.py's FINANCE rule for replies stays; research.BLOCK had these before #56)
@@ -573,11 +578,13 @@ def url_ok(url):
             and host_ok(u.hostname or "") and not SKIP_EXT.search(u.path))
 
 
-def text_ok(title, body):
-    """Title must be clean; the body may mention a word once (news) but not be about it."""
-    if BAD_WORDS.search(title or ""):
+def text_ok(title, body, media=False):
+    """Title must be clean; the body may mention a word once (news) but not be about it. media=True (a YouTube /
+    TikTok page): the song and video words (MEDIA_BAD_WORDS: drugs and gambling pass)."""
+    words = MEDIA_BAD_WORDS if media else BAD_WORDS
+    if words.search(title or ""):
         return False
-    return len(BAD_WORDS.findall((body or "")[:6000])) < 3
+    return len(words.findall((body or "")[:6000])) < 3
 
 
 WALL_COOLDOWN_S = 6 * 3600              # #89: a site that showed him a bot check is left alone this long
@@ -1082,14 +1089,16 @@ class Browser:
     @staticmethod
     def safe_results(results):
         """Results that may be numbered for the brain and shown: the guard on the URL (url_ok, login/sign-up links)
-        and on the title (title_ok; videos also the chat filter); a snippet that fails title_ok is dropped."""
+        and on the title (title_ok; a video's by the song and video rule, video_text_ok); a snippet that fails
+        title_ok is dropped."""
         out = []
         for r in results or []:
             url, title = str(r.get("url") or ""), " ".join(str(r.get("title") or "").split())
             host = urllib.parse.urlsplit(url).hostname or ""
+            video = is_video_host(host) or r.get("video")                # a video's title: the song and video rule
             if (len(title) < 3 or not url_ok(url) or LOGIN_HREF.search(url) or LOGIN_LINK.search(title)
-                    or not title_ok(title) or BAD_WORDS.search(title) or money_action(title, url)
-                    or ((is_video_host(host) or r.get("video")) and not video_text_ok(title))
+                    or (not video_text_ok(title) if video else not title_ok(title) or BAD_WORDS.search(title))
+                    or money_action(title, url)
                     or not all(video_text_ok(h) for h in r.get("hashtags") or [])):
                 continue
             snippet = " ".join(str(r.get("snippet") or "").split())
@@ -1138,7 +1147,7 @@ class Browser:
                                                                                 "wikidata.org"))
             yt = is_youtube(u.hostname or "")
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
-                    or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)
+                    or not (video_text_ok if yt else title_ok)(label) or money_action(label, href)
                     or (kind not in ("next", "comments") and NV.footer_link(label, href, url))
                     or not self.fresh(href, label) or not self.host_ok(u.hostname, cur.hostname) or app_wall(href)):
                 continue                                        # #89: no footer links, nothing opened this week
@@ -2058,7 +2067,8 @@ class Browser:
                 return await self._leave(sc)
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
-        reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
+        video = is_video_host(urllib.parse.urlsplit(page.url).hostname or "")
+        reason = ("guard" if not text_ok(page_title, body, media=video) else "empty" if len(body.strip()) < min_text
                   else "bot wall" if challenge_title(page_title, page.url) or await self._walled(page, body)
                   else "overlay wall" if over or overlay_wall(body) or await self._overlay_walled(page)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
