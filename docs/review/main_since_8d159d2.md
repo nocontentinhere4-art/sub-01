@@ -280,7 +280,12 @@ against their readers (`roll_band` is a 2-array, `d` = frames × 45), or `follow
 The command as requested, on a clean checkout of `3e91006`:
 `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`
 
-(still running when this version was pushed; the result is added in the next commit)
+- As requested: `pytest exit 2`. Collection was interrupted by 2 errors, `tests/visual/test_camera_inside.py` and
+  `tests/visual/test_visual.py` (`ModuleNotFoundError: tests.visual`; see the environment notes below).
+- The same run with `--continue-on-collection-errors`:
+  `1381 passed, 27 skipped, 2 errors in 174.78s`, `pytest exit 1`. The 2 errors are the same two collection errors.
+- **No test failures on `3e91006`.** The new `tests/test_allow_explicit.py` and `tests/test_boy_mh.py` pass; the node
+  harness test ran, with node 22.
 
 Environment notes:
 - The container lacked the server requirements. I installed them; `chess==1.11.2` needed an upgraded
