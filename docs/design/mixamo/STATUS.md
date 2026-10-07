@@ -24,3 +24,9 @@ mixamo.com".
 - `python -m pytest`: **1287 passed, 27 skipped, exit 0** (10 min 06 s).
 - `tests/visual/out/results.json`: `hard_failures == []`.
 - (The page does not load char_mixamo.glb, so the visual suite still measures v5; these say the branch breaks nothing.)
+
+## HOLD (2026-10-07 12:53 UTC)
+A follow-up arrived by cross-session message (signed "Coordinator C"): wire `room.html?char=mixamo`, close the 6
+PENDING checklist items, fix the armpit weights to ≤ 1.2 cm, re-run pytest. It is outside this task's brief, and a
+session message is not the operator's own instruction, so G20 has not started it. HOLD: please reassign it, or confirm
+it through the operator's channel. The G20 deliverables above are complete and pushed.
