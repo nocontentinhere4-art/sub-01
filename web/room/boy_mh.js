@@ -250,6 +250,9 @@ export function createMH(env) {
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) { M.actions[k] = make(got[k]); H[k] = bodyHips(got[k]); }
     for (const k of ["type_in", "type_out"]) if (got[k]) { const a = M.actions[k] = make(got[k]); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; H[k] = bodyHips(got[k]); }
     M.mouseHips = H.desk_mouse;                              // (the mouse-mode body's hips at its first frame, its own frame)
+    // the thumbs' hinges from the typing clip's own first frame (not from whatever pose the first ownerKeys call meets: a
+    // session that starts mousing took the left thumb's plane from the mouse clip's resting hand, or mid-crossfade)
+    { const s = sampler(got.desk_type); s(0); for (const sd of ["Left", "Right"]) if (S(sd, 1, 3) && env.bones[sd + "Hand"]) OT.hinge[sd] = otHinges(sd); s.done(); }
     // each rare event: its action (once, held at its end), its hips (placed on the seated loop's seat point) and how much
     // further back he and the chair go for it: how much further forward than the seated loop any part of him reaches
     // under the desk's top, plus 3 cm (reach())
@@ -515,6 +518,7 @@ export function createMH(env) {
   function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }
   const tipSkin = (side, name, i) => { let low = 1e9; for (const [o, n] of skinOf(side, i, 3)) { o.getVertexPosition(n, _p).applyMatrix4(o.matrixWorld); low = Math.min(low, _p.y - under(name, _p)); } return low; };
   function curl(side, G, weight) {                           // each finger set to G's bends in the hand's own frame (absolute: they never add up)
+    if (!env.bones[side + "Hand"] || !S(side, 2, 1) || !S(side, 3, 1) || !S(side, 5, 1)) return;   // (another rig: degrade, never throw)
     const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(V()), k2 = S(side, 2, 1).getWorldPosition(V()), k3 = S(side, 3, 1).getWorldPosition(V()), k5 = S(side, 5, 1).getWorldPosition(V());
     const h = k3.clone().sub(wr).normalize(), l = k5.clone().sub(k2); l.addScaledVector(h, -l.dot(h)).normalize();
     let n = h.clone().cross(l).normalize(); if (n.y > 0) n.negate();   // (the palm's side: down)
@@ -631,6 +635,10 @@ export function createMH(env) {
     const st = Math.max(1, Math.ceil(all.length / 16)); all.forEach((_, n) => { if (n % st === 0) pick.add(n); });
     return (SKIN[key] = [...pick].map(n => all[n]));
   }
+  // on the keys only the pad matters (the caps are below it, tested straight down): the 12 pad-most of skinOf's vertices,
+  // pad-first already (G24 F9: each skin test re-skins its vertices on the CPU, dozens of times a frame)
+  const PAD = {};
+  const padOf = (side, i, k) => PAD[side + i + k] || (PAD[side + i + k] = skinOf(side, i, k).slice(0, 12));
   const SKALL = {};
   function skinAll(side, i, k) {                             // every vertex skinned mostly to finger i's bone k
     const key = side + i + k; if (SKALL[key]) return SKALL[key]; const b = S(side, i, k), all = [];
@@ -646,7 +654,7 @@ export function createMH(env) {
       for (let u = 0.25; u <= 1.0001; u += 0.25) { _p.lerpVectors(_s, _e, u);
         const top = Math.max(under(name, _p), under(name, _g.copy(_p).add(_sd)), under(name, _g.copy(_p).sub(_sd))); low = Math.min(low, _p.y - FING_R - top); }
     }
-    for (let k = Math.max(2, j); k <= 3; k++) for (const [o, n] of skinOf(side, i, k)) { o.getVertexPosition(n, _p).applyMatrix4(o.matrixWorld); low = Math.min(low, _p.y - under(name, _p)); }
+    for (let k = Math.max(2, j); k <= 3; k++) for (const [o, n] of (name === "keys" && i > 1 ? padOf(side, i, k) : skinOf(side, i, k))) { o.getVertexPosition(n, _p).applyMatrix4(o.matrixWorld); low = Math.min(low, _p.y - under(name, _p)); }
     // the mouse: every vertex of the finger's skin on the shell's own mesh (under its bulge the height map reads clear, and
     // a finger down a flank touches it with its side, which the subset above leaves out)
     if (name === "mouse" && low >= 0) { _bb.setFromObject(P.mouseNode);
@@ -686,8 +694,12 @@ export function createMH(env) {
 
   const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V();
   function hands(dt) {
+    const t0 = performance.now(); handsBody(dt); const ms = performance.now() - t0;
+    M.handsMs = ms; M.handsMsAvg = M.handsMsAvg == null ? ms : M.handsMsAvg + (ms - M.handsMsAvg) * 0.05;   // (?debug: the hands' cost per frame)
+  }
+  function handsBody(dt) {
     const typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse";
-    const k = 1 - Math.exp(-dt / 0.13);
+    const k = 1 - Math.exp(-dt / 0.3);                       // (0.3 s: a reach from the keys to the mouse takes about half a second; at 0.13 s the right hand crossed 35 cm at 2.6 m/s)
     M.w.type += ((typing ? 1 : 0) - M.w.type) * k; M.w.mouse += ((mousing ? 1 : 0) - M.w.mouse) * k;
     if (M.noIK) return;
     env.boy.updateMatrixWorld(true);
@@ -695,22 +707,45 @@ export function createMH(env) {
     // index fingertips over F and J (a slow correction, so the typing itself stays the clip's)
     _k.set(...P.keys.c); dK.subVectors(_k, toWorld(kbRef(), _c));
     const wk = Math.max(M.w.type, M.w.mouse);                // (the left hand stays on the keys while he mouses)
-    // typing: the owner's own hands; mousing: his left hand at rest on the keys, drifting slowly through his take
-    const own = OT.json && P.kbNode && kCtx() === "type", rest = OT.json && P.kbNode && kCtx() === "mouse";
-    if (own) OT.t += dt * OT.json.speed;
-    if (rest) OT.tr += dt * OT.json.speed * OT_REST;
-    if (wk > 0.01) (own ? ownerKeys : rest ? (s, w_, d) => ownerKeys(s, w_, d, {rest: true}) : keyOn)("Left", wk, dt);
-    if (M.w.type > 0.01) (own ? ownerKeys : keyOn)("Right", M.w.type, dt);
+    // typing: the owner's own hands; mousing: his left hand at rest on the keys, drifting slowly through his take. Across a
+    // mode switch the left hand blends the two by their weights (its rest share: w.mouse over both), each clock running
+    // while its mode has weight; the right hand stays on his typing take until w.type is gone (never the old capture path:
+    // a switch snapped the left index ~5 cm in a frame and put the right hand through keyOn's placement for ~15 frames)
+    const ot = OT.json && P.kbNode;
+    if (ot && M.w.type > 0.01) OT.t += dt * OT.json.speed;
+    if (ot && M.w.mouse > 0.01) OT.tr += dt * OT.json.speed * OT_REST;
+    const mix = wk > 0 ? M.w.mouse / (M.w.type + M.w.mouse) : 0;
+    if (wk > 0.01) { if (ot) ownerKeys("Left", wk, dt, {mix}); else keyOn("Left", wk, dt); }
+    const both = ot && M.w.type > 0.01 && M.w.mouse > 0.01, qc = both ? rightChain().map(b => b.quaternion.clone()) : null;   // (the clip's right arm, before the mouse moves it)
     if (M.w.mouse > 0.01 && P.mouseNode) {
       const ry = env.boy.rotation.y, home = V(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
-      omStep(dt); const F = omNow(), f = fwdV(), pw = S("Right", 2, 1).getWorldPosition(V()).distanceTo(S("Right", 5, 1).getWorldPosition(_a));   // (his palm width, 5 -> 17: the character's)
+      omStep(dt); const F = omNow(), f = fwdV(), k2 = S("Right", 2, 1), k5 = S("Right", 5, 1), pw = k2 && k5 ? k2.getWorldPosition(V()).distanceTo(k5.getWorldPosition(_a)) : 0;   // (his palm width, 5 -> 17: the character's)
       if (F) home.addScaledVector(f, F.move[0] * pw).addScaledVector(V(-f.z, 0, f.x), F.move[1] * pw);   // (his wrist's travel over the pad)
       pin("Right", home.sub(toWorld(CLIP.mouse, _c)), M.w.mouse);   // the recorded hand carried to the room's mouse: where it goes, the mouse goes
       follow(); mouseHold(M.w.mouse);                        // then the hand onto the mouse
     } else M.grab = null;
+    // (after the mouse: its pin carries the clip's own hand by an offset, so it must see the clip's hand, not one already
+    // placed on the keys - mid-switch that sent the right hand 22 cm in one frame; the typing placement is absolute.) While
+    // both modes have weight the right arm crossfades exactly: the mouse's pose and the typing's (placed at full weight),
+    // slerped bone by bone by w.type - pin() is not linear in its weight (at w.type 0.01 it still landed the hand on the
+    // keys, then let go: 28 cm in a frame)
+    if (M.w.type > 0.01) {
+      if (!ot) keyOn("Right", M.w.type, dt);
+      else if (both) { const chain = rightChain(), qm = chain.map(b => b.quaternion.clone());
+        chain.forEach((b, i) => b.quaternion.copy(qc[i])); env.boy.updateMatrixWorld(true);   // (the typing solved from the clip's hand, as in steady typing: from the mouse's pose its IK flipped mid-switch)
+        ownerKeys("Right", 1, dt);
+        chain.forEach((b, i) => { b.quaternion.copy(qm[i].slerp(b.quaternion, M.w.type)); }); env.boy.updateMatrixWorld(true); }
+      else ownerKeys("Right", M.w.type, dt);
+    }
+  }
+  const RCHAIN = [];
+  function rightChain() {                                    // the bones the right hand's placement turns: the arm, the hand, the fingers
+    if (!RCHAIN.length) { for (const n of ["RightArm", "RightForeArm", "RightHand"]) if (env.bones[n]) RCHAIN.push(env.bones[n]);
+      for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S("Right", i, j); if (b) RCHAIN.push(b); } }
+    return RCHAIN;
   }
   function mouseHold(w) {                                    // his hand from the take, placed so palm and fingertips meet the shell
-    const F = omNow(); if (!F) return; shellSync();
+    const F = omNow(); if (!F || !S("Right", 2, 1) || !S("Right", 3, 1) || !S("Right", 5, 1)) return; shellSync();   // (palmFrame needs the knuckles)
     for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S("Right", i, j); if (b && !GR.has(b)) GR.set(b, {pre: b.quaternion.clone()}); }
     pin("Right", V(), w, mouseFit, {iters: 6, pitch: () => M.mPitch, aim: () => omAim(F), post: () => omFingers(F, w)});
     omOpen(F, w); if (w > 0.97) mouseSettle();
@@ -874,7 +909,7 @@ export function createMH(env) {
   // from his overhead video). Per frame, at 0.75x his speed, looped with a crossfade: every finger joint's bend and spread,
   // the thumb's, each hand's turn over the keys and its travel. The capture's body stays; the arms reach his wrists.
   const OT_REST = 0.2, OT_DRIFT = 0.35;   // (mousing: the resting left hand runs through his take at a fifth of the typing's pace)
-  const OT = {json: null, t: 0, tr: 0, kk: {Left: 0.02, Right: 0.02}, hinge: {}, thumbIn: {Left: 0, Right: 0}, roll: {Left: 0, Right: 0}};
+  const OT = {json: null, t: 0, tr: 0, kk: {Left: 0.02, Right: 0.02}, hinge: {}, mean2: {}, acc: {}, thumbIn: {Left: 0, Right: 0}, roll: {Left: 0, Right: 0}};
   fetch("room/mh/owner_typing.json").then(r => r.json()).then(j => { OT.json = j; }).catch(() => {});
   function otFrame(side, t = OT.t) {                         // the take at t, linear between its frames
     const J = OT.json, H = J.hands[side], n = J.frames, x = ((t * J.fps) % n + n) % n, i0 = Math.floor(x), i1 = (i0 + 1) % n, u = x - i0;
@@ -926,6 +961,7 @@ export function createMH(env) {
   }
   // a resting finger onto the cap under it by its knuckle bend alone (at most 12 deg either way; the take's middle and end
   // joints kept); a finger in a stroke only opened out of a key
+  const OTS = {Left: {}, Right: {}};   // (each resting finger's last knuckle bend: the next frame's warm start)
   function otSettle(side, G, lifted, weight, T0, thumbGap = 0) {   // thumbGap: the thumb's margin over the height map (m)
     let worst = 0;
     for (const i of [2, 3, 4, 5]) { if (!S(side, i, 1)) continue; const g = G[i];
@@ -934,10 +970,18 @@ export function createMH(env) {
         for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; curl(side, {[i]: g.map((x, k) => k < 3 ? x * m : x)}, weight); if (gp() >= 0) lo = m; else hi = m; }
         curl(side, {[i]: g.map((x, k) => k < 3 ? x * lo : x)}, weight); worst = Math.min(worst, gp()); continue; }
       const set = dm => curl(side, {[i]: [Math.max(-5, g[0] + dm), g[1], g[2], g[3]]}, weight), TGT = 0.001;   // (never bent back past 5 deg at the knuckle)
-      set(-12); if (gp() < TGT) { worst = Math.min(worst, gp()); continue; }   // (down on the cap even opened: as open as it goes)
-      set(12); if (gp() > TGT) continue;                                       // (out of reach: the most it bends)
+      const memo = OTS[side], c = memo[i];
+      // warm start (G24 F9: each finger's search cost ~12 skin tests a frame): last frame's bend first, kept while the
+      // fingertip still touches (0.5-2 mm over its cap); else a narrow bracket round it; else the full search
+      if (c != null) { set(c); const g0 = gp();
+        if (g0 >= TGT - 0.0005 && g0 <= TGT + 0.001) { worst = Math.min(worst, g0); continue; }
+        const lo2 = Math.max(-12, c - 3), hi2 = Math.min(12, c + 3); set(lo2); const a = gp() > TGT; set(hi2); const b = gp() <= TGT;
+        if (a && b) { let lo = lo2, hi = hi2; for (let it = 0; it < 5; it++) { const m = (lo + hi) / 2; set(m); if (gp() > TGT) lo = m; else hi = m; }
+          set(lo); memo[i] = lo; worst = Math.min(worst, gp()); continue; } }
+      set(-12); if (gp() < TGT) { memo[i] = -12; worst = Math.min(worst, gp()); continue; }   // (down on the cap even opened: as open as it goes)
+      set(12); if (gp() > TGT) { memo[i] = 12; continue; }                                  // (out of reach: the most it bends)
       let lo = -12, hi = 12; for (let it = 0; it < 9; it++) { const m = (lo + hi) / 2; set(m); if (gp() > TGT) lo = m; else hi = m; }
-      set(lo); worst = Math.min(worst, gp());
+      set(lo); memo[i] = lo; worst = Math.min(worst, gp());
     }
     // the thumb, if it would be in the space bar: its metacarpal lifted toward the back of the hand by the least angle that
     // clears it (at most 25 deg), its bends kept. It never raises the hand.
@@ -947,9 +991,10 @@ export function createMH(env) {
       const lift = a => { [1, 2, 3].forEach((j, k) => { const b = S(side, 1, j); b.quaternion.copy(q0[k]); b.updateMatrixWorld(true); });
         const d = S(side, 1, 2).getWorldPosition(V()).sub(b1.getWorldPosition(V())).normalize(), ax = d.clone().cross(n).normalize();
         aimSeg(b1, d, d.clone().applyAxisAngle(ax, -a), weight); };
-      const MAX = 25 * Math.PI / 180; lift(MAX);
-      if (tg() >= 0) { let lo = 0, hi = MAX; for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; lift(m); if (tg() < 0) lo = m; else hi = m; } lift(hi); }
-      void T0; }
+      const MAX = 25 * Math.PI / 180;
+      lift(MAX); OTS[side].th = MAX;
+      if (tg() >= 0) { let lo = 0, hi = MAX; for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; lift(m); if (tg() < 0) lo = m; else hi = m; } lift(hi); OTS[side].th = hi; }
+      void T0; } else OTS[side].th = 0;
     OT.thumbIn[side] = b1 ? Math.min(0, tg()) : 0;   // (still in at the most: the hand rolls thumb side up next frame)
     return worst;
   }
@@ -957,6 +1002,7 @@ export function createMH(env) {
   // take's share of the palm's length (the take's bends are right in their timing, not in their depth: see the builder)
   const OTK = {Left: [1, 1, 1, 1], Right: [1, 1, 1, 1]};
   function otReach(side, G, reach, weight) {
+    if (!S(side, 2, 1) || !S(side, 3, 1) || !S(side, 5, 1)) return;
     const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(V()), k3 = S(side, 3, 1).getWorldPosition(V()), h = k3.clone().sub(wr).normalize();
     const l = S(side, 5, 1).getWorldPosition(V()).sub(S(side, 2, 1).getWorldPosition(V())); l.addScaledVector(h, -l.dot(h)).normalize();
     const n = h.clone().cross(l).normalize(), palm = k3.distanceTo(wr);
@@ -974,30 +1020,41 @@ export function createMH(env) {
 
 
   const otScaled = (side, G) => { const o = {}; [2, 3, 4, 5].forEach((i, k) => { const m = OTK[side][k]; o[i] = [G[i][0] * m, G[i][1] * m, G[i][2] * m, G[i][3]]; }); return o; };
-  function ownerKeys(side, w, dt, o = {}) {                  // o.rest: at rest (mousing), slow, every finger settled on its cap
+  // at rest (mousing): his take on its own slow clock, his index fingertip's track centred on F and a third of its travel
+  // kept round it (his own place, 3.5 cm left of the middle, and his full 8 cm travel put our little finger off the
+  // keyboard's left edge)
+  function otRestFrame(side) {
+    const fr = otFrame(side, OT.tr);
+    if (!OT.mean2[side]) { const T2 = OT.json.hands[side].tip2; OT.mean2[side] = [0, 1].map(k => T2.reduce((a, v) => a + v[k], 0) / T2.length); }
+    const m = OT.mean2[side]; fr.tip2 = [(fr.tip2[0] - m[0]) * OT_DRIFT - FJ, (fr.tip2[1] - m[1]) * OT_DRIFT]; return fr;
+  }
+  const otBlend = (a, b, u) => { const o = {}; for (const k in a) o[k] = Array.isArray(a[k]) ? a[k].map((v, i) => v + (b[k][i] - v) * u) : a[k] + (b[k] - a[k]) * u; return o; };
+  function ownerKeys(side, w, dt, o = {}) {                  // o.mix: the share at rest (mousing: slow, every finger settled on its cap)
+    if (!S(side, 2, 1) || !S(side, 3, 1) || !S(side, 5, 1) || !env.bones[side + "Hand"]) return;   // (another rig: degrade, never throw every frame)
     for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b && !GR.has(b)) GR.set(b, {pre: b.quaternion.clone()}); }
-    if (!OT.hinge[side]) OT.hinge[side] = otHinges(side);
-    const f0 = otFrame(side, o.rest ? OT.tr : OT.t), G = {2: f0.G.slice(0, 4), 3: f0.G.slice(4, 8), 4: f0.G.slice(8, 12), 5: f0.G.slice(12, 16)};
+    if (!OT.hinge[side]) OT.hinge[side] = otHinges(side);   // (normally set at load from the typing clip: otHingesAtLoad)
+    const mix = Math.max(0, Math.min(1, o.mix || 0)), rest = mix >= 0.5;
+    const f0 = mix <= 0 ? otFrame(side, OT.t) : mix >= 1 ? otRestFrame(side) : otBlend(otFrame(side, OT.t), otRestFrame(side), mix);
+    const G = {2: f0.G.slice(0, 4), 3: f0.G.slice(4, 8), 4: f0.G.slice(8, 12), 5: f0.G.slice(12, 16)};
     // placed by the index fingertip (his sit 7 cm apart, about F-J); the wrist where the arm and the hand's turn put it
     const f = fwdV(), rt = V(-f.z, 0, f.x), home = P.kbNode.localToWorld(V(0, 0, 0)), at = p => home.clone().addScaledVector(rt, p[0]).addScaledVector(f, p[1]);
-    // (at rest: his index fingertip's track centred on F and a third of its travel kept round it - his own place, 3.5 cm left
-    // of the middle, and his full 8 cm travel put our little finger off the keyboard's left edge)
-    if (o.rest && !OT.mean2) { const T2 = OT.json.hands.Left.tip2; OT.mean2 = [0, 1].map(k => T2.reduce((a, v) => a + v[k], 0) / T2.length); }
-    const tip2 = o.rest ? [(f0.tip2[0] - OT.mean2[0]) * OT_DRIFT - FJ, (f0.tip2[1] - OT.mean2[1]) * OT_DRIFT] : f0.tip2;
-    const want = at(f0.wrist), tipWant = at(tip2), hand = env.bones[side + "Hand"];
+    const want = at(f0.wrist), tipWant = at(f0.tip2), hand = env.bones[side + "Hand"];
     const fit = () => { let y = 0, n = 0, top = -1e9; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); y += _s.y; top = Math.max(top, under("keys", _s)); n++; }
       return tipWant.clone().sub(tipOf(side, 2, _g)).setY(Math.max(top + OT.kk[side] + M.kUp[side] - y / n, knuckleNeed(side, "keys"))); };
+    // the searches (each finger's reach and its bend onto the cap, the thumb's lift) at 15 Hz; the frames between reuse
+    // their results (G24 F9: the hands cost ~26 ms a frame here under software GL, most of it in these searches)
+    OT.acc[side] = (OT.acc[side] || 0) + dt; const full = OT.acc[side] >= 1 / 15 - 1e-6 || !OTS[side].done; if (full) { OT.acc[side] = 0; OTS[side].done = true; }
     const solve = () => { pin(side, want.clone().sub(hand.getWorldPosition(V())).setY(0), w, fit, {iters: 5, aim: () => otAim(side, f0), post: () => { curl(side, otScaled(side, G), w); otThumb(side, f0.thumb, w); }});
-      otReach(side, G, f0.reach, w); return otScaled(side, G); };
+      if (full) otReach(side, G, f0.reach, w); return otScaled(side, G); };
     let Gs = solve();
     let lifted = liftedFingers(side, dt);
-    if (o.rest) { lifted = new Set(); M.lifted[side] = []; }   // (at rest: no strokes)
+    if (rest) { lifted = new Set(); M.lifted[side] = []; }   // (at rest: no strokes)
     // the hand's height: its own knuckle->fingertip drop (resting fingers; all four if every one is up), followed over 0.3 s
     let ky = 0, kn = 0, drop = 0, dn = 0; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (k) { ky += k.getWorldPosition(_s).y; kn++; } }
     for (const all of [false, true]) { if (dn) break; for (let i = 2; i <= 5; i++) if (S(side, i, 3) && (all || !lifted.has(i))) { drop += ky / kn - (tipOf(side, i, _e).y - FING_R); dn++; } }
-    OT.kk[side] += (Math.max(0.005, Math.min(0.09, drop / dn)) - OT.kk[side]) * (1 - Math.exp(-dt / 0.3));
-    let left = otSettle(side, Gs, lifted, w, f0.thumb, o.rest ? 0.0015 : 0);
-    for (let pass = 0; pass < 2 && left < -0.0005; pass++) { M.kUp[side] = Math.min(0.03, M.kUp[side] - left); Gs = solve(); left = otSettle(side, Gs, lifted, w, f0.thumb, o.rest ? 0.0015 : 0); }
+    if (dn && kn) OT.kk[side] += (Math.max(0.005, Math.min(0.09, drop / dn)) - OT.kk[side]) * (1 - Math.exp(-dt / 0.3));   // (no end bones: kept, never NaN)
+    let left = otSettle(side, Gs, lifted, w, f0.thumb, 0.0015 * mix);
+    if (left < -0.0005) { M.kUp[side] = Math.min(0.03, M.kUp[side] - left); Gs = solve(); left = otSettle(side, Gs, lifted, w, f0.thumb, 0.0015 * mix); }   // (one retry pass: G24 F9)
     if (left >= -0.0005) M.kUp[side] = Math.max(0, M.kUp[side] - 0.002 * dt * 30 * 0.25);
     OT.roll[side] = OT.thumbIn[side] < -0.0005 ? Math.min(0.52, OT.roll[side] + 0.05 * dt * 30) : Math.max(0, OT.roll[side] - 0.004 * dt * 30);
     M.ot = M.ot || {}; M.ot[side] = {t: +OT.t.toFixed(3), lifted: [...lifted], k: OTK[side].map(x => +x.toFixed(2)), kk: +OT.kk[side].toFixed(3), roll: +(OT.roll[side] * 57.3).toFixed(1), thumbIn: +(OT.thumbIn[side] * 1000).toFixed(1)};   // (?debug)
