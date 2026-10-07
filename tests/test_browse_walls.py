@@ -296,3 +296,22 @@ def test_a_normal_page_mentioning_region_is_shown():
     b, sc, shown, ok = _settle_once("https://www.example.org/wine", "Wine regions of France",
                                     "Bordeaux is the best-known region; your region's climate decides the harvest. " * 5)
     assert ok and shown == ["https://www.example.org/wine"] and not b.walled
+
+
+# (G14, on top of GEO_WALL) the US / EU walls and the licence wording it did not catch, and an article title about
+# geo-blocking that it took for the wall
+@pytest.mark.parametrize("body", [
+    "We're sorry, this service is not available outside the United States.",
+    "This content is not available to viewers outside the UK.",
+    "This service is only available in the US.",
+    "Due to licensing restrictions this programme cannot be played in your country."])
+def test_more_geo_block_bodies_are_walls(body):
+    assert browse.Browser.wall_text(body)
+
+
+@pytest.mark.parametrize("title", ["Why Netflix shows aren't available in your country",
+                                   "How to watch shows that are not available in your region",
+                                   "Is BBC iPlayer not available in your country? Here's why"])
+def test_a_title_asking_about_geo_blocks_is_an_article_not_a_wall(title):
+    assert not browse.challenge_title(title, "https://www.example-news.com/streaming")
+    assert browse.challenge_title("Sorry, BBC iPlayer isn't available in your region", "https://www.bbc.co.uk/iplayer")
