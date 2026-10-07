@@ -118,14 +118,36 @@ def iso_seconds(d):
 REGION = "JP"                         # he is in Tokyo: a video must play there
 
 
+# Explicit music videos ("(Explicit Video)", "[Not Clean]", "(Uncensored)") are not shown, as music.py drops explicit
+# Spotify tracks; the owner can set this to True to allow them. YouTube has no explicit flag for ordinary videos (only
+# ytAgeRestricted), so the title, tags and hashtags are the signal. The bare words count only in brackets or as a
+# suffix ("Song - Explicit"), so a title that merely mentions them ("Explicit Content: a review") is not refused.
+EXPLICIT_VIDEOS_OK = False
+_EXPLICIT_WORDS = (r"explicit(?: (?:version|video|audio|lyrics?|edit))?|uncensored|not clean|"
+                   r"dirty (?:version|edit)|parental advisory")
+EXPLICIT_VIDEO = re.compile(rf"[(\[][^)\]]{{0,40}}?\b(?:{_EXPLICIT_WORDS})\b[^)\]]{{0,40}}[)\]]|"
+                            rf"(?:^|\s)[-–—|:/]\s*(?:{_EXPLICIT_WORDS})\s*$|"
+                            r"^\s*#?(?:explicit|uncensored|nsfw)\s*$|\bnsfw\b", re.I)
+EXPLICIT_TAGS = {"explicit", "explicit version", "explicit video", "uncensored", "parental advisory", "nsfw"}
+
+
+def explicit_video(text):
+    """A video title, hashtag or caption that marks an explicit version (refused unless EXPLICIT_VIDEOS_OK)."""
+    return not EXPLICIT_VIDEOS_OK and bool(EXPLICIT_VIDEO.search(" ".join(str(text or "").split())))
+
+
 def playable(item, region=REGION):
     """A videos.list item that the embed player will really play for us: embeddable, public, not age-restricted,
-    not region-blocked (#89 live: an F1 video's embed showed "Video unavailable")."""
+    not marked explicit (EXPLICIT_VIDEOS_OK), not region-blocked (#89 live: an F1 video's embed showed "Video unavailable")."""
     st = (item or {}).get("status") or {}
     cd = (item or {}).get("contentDetails") or {}
     if st.get("embeddable") is not True or st.get("privacyStatus") != "public":
         return False
     if (cd.get("contentRating") or {}).get("ytRating") == "ytAgeRestricted":
+        return False
+    sn = (item or {}).get("snippet") or {}
+    if not EXPLICIT_VIDEOS_OK and (explicit_video(sn.get("title")) or EXPLICIT_TAGS & {
+            " ".join(str(t).lower().split()) for t in (sn.get("tags") or [])}):
         return False
     rr = cd.get("regionRestriction") or {}
     if region in (rr.get("blocked") or []) or ("allowed" in rr and region not in (rr.get("allowed") or [])):

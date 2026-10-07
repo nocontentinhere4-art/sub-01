@@ -443,9 +443,10 @@ def is_video_host(host):
 
 
 def video_text_ok(text):
-    """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked)."""
+    """A video title or channel name on the public screen: the guard (display_ok), the chat filter (chat.blocked) and
+    no explicit version (YT.explicit_video, unless YT.EXPLICIT_VIDEOS_OK)."""
     import chat
-    return display_ok(text) and chat.blocked(text or "") is None
+    return display_ok(text) and chat.blocked(text or "") is None and not YT.explicit_video(text)
 
 
 def scene_change(prev_jpeg, jpeg):
