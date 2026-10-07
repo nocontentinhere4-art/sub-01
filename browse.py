@@ -170,12 +170,15 @@ BAD_HOST = re.compile(
     r"4chan|8kun|kiwifarms|bestgore|liveleak|theync|"
     r"railway\.app|up\.railway", re.I)
 # words that must not be on a page shown live (title anywhere; body when repeated)
-BAD_WORDS = re.compile(
-    r"\b(porn\w*|xxx|nsfw|nude|nudes|naked|hentai|onlyfans|escort\w*|camgirl\w*|fetish\w*|erotic\w*|"
-    r"gore|beheading|dismember\w*|suicide|self[- ]?harm|rape|raped|child abuse|"
-    r"terrorist\w*|jihad\w*|neo-?nazi\w*|white power|"
-    r"cocaine|heroin|meth|fentanyl|"
-    r"casino\w*|sportsbook|gambling)\b", re.I)
+_HARM_WORDS = (r"porn\w*|xxx|nsfw|nude|nudes|naked|hentai|onlyfans|escort\w*|camgirl\w*|fetish\w*|erotic\w*|"
+               r"gore|beheading|dismember\w*|suicide|self[- ]?harm|rape|raped|child abuse|"
+               r"terrorist\w*|jihad\w*|neo-?nazi\w*|white power")
+BAD_WORDS = re.compile(r"\b(" + _HARM_WORDS + r"|cocaine|heroin|meth|fentanyl|casino\w*|sportsbook|gambling)\b", re.I)
+# song and video titles: the same words without drugs and gambling ("Cocaine", "Heroin", "Casino Royale" pass)
+MEDIA_BAD_WORDS = re.compile(r"\b(" + _HARM_WORDS + r")\b", re.I)
+# ... but gambling promotion still counts, like coin pressure ("Best online casino bonus", "free spins")
+GAMBLING_PROMO = re.compile(r"\b(online casinos?|casino bonus(es)?|free spins?|no deposit bonus|sportsbooks?|"
+                            r"sports betting|betting (tips|odds)|bet365|stake\.com)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
@@ -193,6 +196,24 @@ BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you
                        r"please enable js and disable any ad blocker|press (&|and) hold to confirm you are|"
                        r"access to this page has been denied|pardon our interruption|ray id: [0-9a-f]{8}|"
                        r"performance & security by cloudflare|request unsuccessful\. incapsula", re.I)
+# 2026-10-07 live: "Sorry, BBC iPlayer isn't available in your region" was shown in the card. A geo-block / region
+# wall is a wall like a bot check: left at once, not shown or counted, its site left alone (never worked around).
+# Whole phrases only ("region" alone is not enough), on a page of its own (GEO_WALL_MAX_CHARS of text at most:
+# such pages carry the site's header and footer, so they run longer than a bot check)
+GEO_WALL_MAX_CHARS = 6000
+GEO_WALL = re.compile(r"(?:(?:not|n['’]t)\s+(?:currently\s+|yet\s+)?available|unavailable)\s+(?:to (?:watch|stream|view)\s+)?"
+                      r"(?:in|from|for)\s+your\s+(?:region|country|location|area|territory|part of the world)|"
+                      r"(?:not|n['’]t)\s+(?:currently\s+)?available where you are|"
+                      r"(?:blocked|restricted) in your (?:region|country|location)|"
+                      r"bbc iplayer only works in the uk|only available (?:to watch )?in the uk\b|"
+                      r"not made this video available in your country|geo-?(?:blocked|restricted)|"
+                      # (G14: the US / EU walls and the licence wording - "not available outside the United States",
+                      # "only available in the US", "due to licensing restrictions ... in your country")
+                      r"not available (?:to (?:users|viewers) )?outside (?:of )?the (?:uk|united kingdom|us|usa|united states|eu)\b|"
+                      r"only (?:works|available|playable) (?:to (?:users|viewers|people) )?in the (?:us|usa|united states)\b|"
+                      r"due to (?:licensing|rights|legal) restrictions[^.]{0,60}\b(?:country|region|location)\b", re.I)
+# a title asking about it is an article, not the wall ("Why Netflix shows aren't available in your country")
+GEO_TITLE_ASK = re.compile(r"^\s*(?:why|how|what|which|when|where|is|are|can|do|does)\b", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -350,7 +371,8 @@ def choose_dismiss(buttons):
 def display_ok(text):
     """Text in his words or in the card's own lines (mind notes, the card title, video titles): no links, addresses,
     tickers, money, slurs, blocked topics or finance talk (the chat filter's rules, without its phone-number rule,
-    which catches year ranges). Web titles and link labels use the looser title_ok (#56)."""
+    which catches year ranges). Web titles and link labels use the looser title_ok (#56); song and video titles use
+    media_title_ok."""
     import chat
     t = text or ""
     return (title_ok(t) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
@@ -366,6 +388,20 @@ def title_ok(text):
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
                 or MONEY_ASK.search(t) or chat.SLUR_RE.search(chat.normalise(t))
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+
+
+def media_title_ok(text):
+    """A song or video title, channel or artist (owner: "don't censor anything", shown as it is): one rule for
+    Spotify tracks and YouTube / TikTok cards (review G24, F5). Refused: the guard's sexual / porn, gore, extremism
+    and self-harm words (MEDIA_BAD_WORDS, word-bounded; drugs and gambling words pass, gambling
+    promotion does not: GAMBLING_PROMO), and chat.blocked(media=True): links, addresses, e-mails,
+    requests for money, "kys" and calls to violence against a group. Not applied: slurs and swearing, BAD_HOST (a host
+    list: "Sex on Fire"), a "$" in an artist's styling ("$uicideboy$"), prices ("$5 Pizza Hack"), research.BLOCK's topic substrings ("nazi"
+    in "Nazionale", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
+    import chat
+    t = text or ""
+    return (not (MEDIA_BAD_WORDS.search(t) or GAMBLING_PROMO.search(t))
+            and chat.blocked(t, media=True) is None)
 
 
 # finance talk kept out of his own words (mind.py's FINANCE rule for replies stays; research.BLOCK had these before #56)
@@ -432,9 +468,13 @@ def is_video_host(host):
 
 
 def video_text_ok(text):
-    """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked)."""
-    import chat
-    return display_ok(text) and chat.blocked(text or "") is None
+    """A video title, caption or channel name on the public screen: the song and video rule (media_title_ok)."""
+    return media_title_ok(text)
+
+
+def card_title_ok(title, host=""):
+    """The public card's title: a video's (YouTube / TikTok host) by video_text_ok, any other page's by display_ok."""
+    return video_text_ok(title) if is_video_host(host) else display_ok(title)
 
 
 def scene_change(prev_jpeg, jpeg):
@@ -545,11 +585,13 @@ def url_ok(url):
             and host_ok(u.hostname or "") and not SKIP_EXT.search(u.path))
 
 
-def text_ok(title, body):
-    """Title must be clean; the body may mention a word once (news) but not be about it."""
-    if BAD_WORDS.search(title or ""):
+def text_ok(title, body, media=False):
+    """Title must be clean; the body may mention a word once (news) but not be about it. media=True (a YouTube /
+    TikTok page): the song and video words (MEDIA_BAD_WORDS: drugs and gambling pass)."""
+    words = MEDIA_BAD_WORDS if media else BAD_WORDS
+    if words.search(title or ""):
         return False
-    return len(BAD_WORDS.findall((body or "")[:6000])) < 3
+    return len(words.findall((body or "")[:6000])) < 3
 
 
 WALL_COOLDOWN_S = 6 * 3600              # #89: a site that showed him a bot check is left alone this long
@@ -601,10 +643,12 @@ OVERLAY_TEXT_JS = """() => {
 
 def challenge_title(title, url):
     """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    or a title that is only the bare host name (an interstitial, not content)."""
+    a geo-block title ("... isn't available in your region"), or a title that is only the bare host name (an
+    interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
-    return bool(BOT_WALL.search(t)) or bool(t) and t in (host, host.removeprefix("www."), "www." + host)
+    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t)) and not GEO_TITLE_ASK.search(t)
+            or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
 def cross_site_frame(req, host):
@@ -1052,14 +1096,16 @@ class Browser:
     @staticmethod
     def safe_results(results):
         """Results that may be numbered for the brain and shown: the guard on the URL (url_ok, login/sign-up links)
-        and on the title (title_ok; videos also the chat filter); a snippet that fails title_ok is dropped."""
+        and on the title (title_ok; a video's by the song and video rule, video_text_ok); a snippet that fails
+        title_ok is dropped."""
         out = []
         for r in results or []:
             url, title = str(r.get("url") or ""), " ".join(str(r.get("title") or "").split())
             host = urllib.parse.urlsplit(url).hostname or ""
+            video = is_video_host(host) or r.get("video")                # a video's title: the song and video rule
             if (len(title) < 3 or not url_ok(url) or LOGIN_HREF.search(url) or LOGIN_LINK.search(title)
-                    or not title_ok(title) or BAD_WORDS.search(title) or money_action(title, url)
-                    or ((is_video_host(host) or r.get("video")) and not video_text_ok(title))
+                    or (not video_text_ok(title) if video else not title_ok(title) or BAD_WORDS.search(title))
+                    or money_action(title, url)
                     or not all(video_text_ok(h) for h in r.get("hashtags") or [])):
                 continue
             snippet = " ".join(str(r.get("snippet") or "").split())
@@ -1108,7 +1154,7 @@ class Browser:
                                                                                 "wikidata.org"))
             yt = is_youtube(u.hostname or "")
             if (len(label) < 4 or not url_ok(href) or LOGIN_LINK.search(label) or LOGIN_HREF.search(href)
-                    or not title_ok(label) or (yt and not video_text_ok(label)) or money_action(label, href)
+                    or not (video_text_ok if yt else title_ok)(label) or money_action(label, href)
                     or (kind not in ("next", "comments") and NV.footer_link(label, href, url))
                     or not self.fresh(href, label) or not self.host_ok(u.hostname, cur.hostname) or app_wall(href)):
                 continue                                        # #89: no footer links, nothing opened this week
@@ -2028,7 +2074,8 @@ class Browser:
                 return await self._leave(sc)
         page_title = (await page.title() or "").strip()
         body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
-        reason = ("guard" if not text_ok(page_title, body) else "empty" if len(body.strip()) < min_text
+        video = is_video_host(urllib.parse.urlsplit(page.url).hostname or "")
+        reason = ("guard" if not text_ok(page_title, body, media=video) else "empty" if len(body.strip()) < min_text
                   else "bot wall" if challenge_title(page_title, page.url) or await self._walled(page, body)
                   else "overlay wall" if over or overlay_wall(body) or await self._overlay_walled(page)
                   else "sign-in wall" if LOGIN_HREF.search(urllib.parse.urlsplit(page.url).path + "?")
@@ -2126,15 +2173,19 @@ class Browser:
 
     @staticmethod
     def wall_text(body):
-        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+        n = len(body.strip())
+        return (n < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+                or n < GEO_WALL_MAX_CHARS and bool(GEO_WALL.search(body)))
 
     async def _walled(self, page, body=None):
-        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) fills the page."""
+        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) or a geo-block fills the page."""
         if body is None:
             body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+        if self.wall_text(body):
+            return True
         if len(body.strip()) >= WALL_MAX_CHARS:
             return False
-        return self.wall_text(body) or await page.evaluate(WALL_FRAMES)
+        return await page.evaluate(WALL_FRAMES)
 
     async def show(self, sc):
         """Screenshot the current page and log the visit (only pages that passed the guard get here).

@@ -170,7 +170,7 @@ def test_room_html_wiring_is_tight():
     assert 'import { createWindowView } from "./room/window_view.js";' in html
     assert 'createWindowView(THREE, {base:"room/window/"' in html
     assert "sky = windowView.build(w, scene, renderer);" in html                 # on the GLB's SURF_window marker, as before
-    assert "windowView.update(dt, hour);" in html                               # once per frame, driven by his Tokyo clock
+    assert "windowView.update(real, hour);" in html                             # once per frame (its whole time), driven by his Tokyo clock
     assert "skyMaterial" not in html and "ShaderMaterial" not in html            # the old in-page sky shader is gone
     assert html.count("windowView") <= 8                                         # a small block, nothing else touched
 

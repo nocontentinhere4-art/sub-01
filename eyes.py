@@ -32,7 +32,8 @@ import time
 from pathlib import Path
 
 from brain_sim import GROUPS
-from browse import BAD_HOST, BAD_WORDS, LOGIN_HREF, LOGIN_LINK, money_action, title_ok, url_ok, words
+from browse import (BAD_HOST, BAD_WORDS, LOGIN_HREF, LOGIN_LINK, money_action, title_ok, url_ok, video_text_ok,
+                    words)
 from chat import blocked as chat_blocked, networks_for
 from research import BLOCK as TOPIC_BLOCK
 from search_sources import follow_ups, interest_text
@@ -307,11 +308,12 @@ def parse(raw):
     return []
 
 
-def clean_label(s, fallback=""):
+def clean_label(s, fallback="", video=False):
     """At most 8 words, and only text that may be shown on the public card (title_ok: no links, addresses, money
-    requests, blocked topics) and with no buy / sell wording (#56)."""
+    requests, blocked topics; a video's label: the song and video rule, video_text_ok) and with no buy / sell
+    wording (#56)."""
     s = " ".join(str(s or fallback).split()[:8])[:60]
-    return s if s and title_ok(s) and not BUY_SELL.search(s) else ""
+    return s if s and (video_text_ok if video else title_ok)(s) and not BUY_SELL.search(s) else ""
 
 
 def query_ok(q):
@@ -354,12 +356,13 @@ def validate(items, page):
         action = it.get("action")
         if action not in ACTIONS:
             continue
-        target, label_text = None, ""
+        target, label_text, link = None, "", None
         if action in LINK_FLAG:
             t = str(it.get("target") or "").strip()
             link = links.get(t) or links.get(t.upper()) or by_href.get(t)
             if (not link or not url_ok(link["href"]) or LOGIN_LINK.search(link["text"]) or LOGIN_HREF.search(link["href"])
-                    or not title_ok(link["text"]) or money_action(link["text"], link["href"])
+                    or not (video_text_ok if link.get("video") else title_ok)(link["text"])   # a video: media rule
+                    or money_action(link["text"], link["href"])
                     or money_action(str(it.get("label") or ""))):
                 continue
             if LINK_FLAG[action] and not link.get(LINK_FLAG[action]):
@@ -374,7 +377,7 @@ def validate(items, page):
             label_text = target
         elif action == "back" and not page.get("can_back"):
             continue
-        label = clean_label(it.get("label"), label_text or action)
+        label = clean_label(it.get("label"), label_text or action, video=bool(link and link.get("video")))
         if not label:
             continue
         key = (action, target)

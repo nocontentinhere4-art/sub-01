@@ -324,6 +324,11 @@ PIT = float(__import__("os").environ.get("AUTORIG_PIT", "0.07"))
 SHCUT = float(__import__("os").environ.get("AUTORIG_SHCUT", "0.06"))
 TORSO = [RI[mx(n)] for n in ("Hips", "Spine", "Spine1", "Spine2", "Neck", "Head")]
 is_torso = np.isin(dom, [JI[n] for n in ("Hip", "Pelvis", "Waist", "Spine01", "Spine02", "NeckTwist01", "NeckTwist02") if n in JI])
+# (and the hoodie's hem: v5's skin gives its sides to the thigh, 0.5, so it counted as neither part and kept 0.1 of the
+# upper arm: raised, the arm pulled the hem's sides up 5-7 cm, "horns". Skin over the hip joints by 4 cm whose main
+# joint is a thigh is the hoodie's)
+_thighs = [JI[n] for n in JN if n.startswith(("L_Thigh", "R_Thigh"))]
+is_torso |= np.isin(dom, _thighs) & (V[:, 1] > max(J[JI["L_Thigh"], 1], J[JI["R_Thigh"], 1]) + 0.04)
 # (the arm part is skin round the arm itself: within SLEEVE of its bind axis (shoulder -> elbow -> wrist, as modelled),
 # not before the shoulder joint, and not across from it toward the middle. v5's skin gives the upper arm 0.9 of patches of the hoodie's back and chest inside the
 # shoulder (x 0.15 against the joint's 0.20); those are the hoodie's)

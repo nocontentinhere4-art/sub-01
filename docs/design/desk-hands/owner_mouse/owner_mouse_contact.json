@@ -1,0 +1,643 @@
+{
+ "about": "mouse mode, desk_14, every 0.25 s over the take's 28.3 s loop (pg/mousechk.mjs instruments, independent of the resolver: the shell's mesh, double-sided, crossings of a ray up; the thumb's clearance by rays toward the mouse's centre; stretch against the skin's own bind-pose lengths)",
+ "before_9961024": {
+  "ms_frame": 19.2,
+  "samples": 113,
+  "modes": [
+   "desk_mouse"
+  ],
+  "flex": [
+   [
+    "th1",
+    6.7,
+    38,
+    -31.3
+   ],
+   [
+    "th2",
+    32.3,
+    14,
+    18.3
+   ],
+   [
+    "th3",
+    14.6,
+    9,
+    5.6
+   ],
+   [
+    "ix1",
+    27.1,
+    40,
+    -12.9
+   ],
+   [
+    "ix2",
+    32,
+    35,
+    -3
+   ],
+   [
+    "ix3",
+    16.6,
+    16,
+    0.6
+   ],
+   [
+    "md1",
+    25,
+    39,
+    -14
+   ],
+   [
+    "md2",
+    32,
+    31,
+    1
+   ],
+   [
+    "md3",
+    8.6,
+    29,
+    -20.4
+   ],
+   [
+    "rg1",
+    35.1,
+    44,
+    -8.9
+   ],
+   [
+    "rg2",
+    40,
+    33,
+    7
+   ],
+   [
+    "rg3",
+    11.7,
+    33,
+    -21.3
+   ],
+   [
+    "lt1",
+    38.8,
+    44,
+    -5.2
+   ],
+   [
+    "lt2",
+    40.8,
+    28,
+    12.8
+   ],
+   [
+    "lt3",
+    17.1,
+    38,
+    -20.9
+   ]
+  ],
+  "flexWorstDiff": 31.3,
+  "thumbIn_mm": {
+   "max": 19.96,
+   "med": 19.26
+  },
+  "thumbClear_mm": {
+   "max": 0,
+   "med": 0
+  },
+  "thumbAxis_deg": {
+   "max": 3,
+   "med": 2.9
+  },
+  "fingIn_mm_max": [
+   0,
+   0,
+   14.59,
+   0
+  ],
+  "tipGap_mm_med": [
+   15.46,
+   8.28,
+   -14.05,
+   null
+  ],
+  "tipGap_mm_max": [
+   15.5,
+   8.36
+  ],
+  "palmIn_mm_max": 1.87,
+  "leftOn": [
+   null,
+   "Scene"
+  ],
+  "leftTouching": "62/113",
+  "leftDeepest_mm": 1.5,
+  "stretch": {
+   "max": 4.18,
+   "med": 4.18,
+   "p99max": 1.9,
+   "tris": 973
+  },
+  "pen": {
+   "chair": 0,
+   "desk": 0
+  },
+  "thumbTurn_deg_max": 0,
+  "mPitch_deg": [
+   -15.9,
+   -14.7
+  ],
+  "mouseTravel_cm": {
+   "x": [
+    -72,
+    -71.9
+   ],
+   "z": [
+    -99.6,
+    -99.6
+   ]
+  }
+ },
+ "after": {
+  "ms_frame": 23.4,
+  "samples": 113,
+  "modes": [
+   "desk_mouse"
+  ],
+  "flex": [
+   [
+    "th1",
+    6.7,
+    38,
+    -31.3
+   ],
+   [
+    "th2",
+    21.7,
+    14,
+    7.7
+   ],
+   [
+    "th3",
+    17.8,
+    9,
+    8.8
+   ],
+   [
+    "ix1",
+    43.2,
+    40,
+    3.2
+   ],
+   [
+    "ix2",
+    34.4,
+    35,
+    -0.6
+   ],
+   [
+    "ix3",
+    20.2,
+    16,
+    4.2
+   ],
+   [
+    "md1",
+    36.5,
+    39,
+    -2.5
+   ],
+   [
+    "md2",
+    28.4,
+    31,
+    -2.6
+   ],
+   [
+    "md3",
+    21.9,
+    29,
+    -7.1
+   ],
+   [
+    "rg1",
+    29.2,
+    44,
+    -14.8
+   ],
+   [
+    "rg2",
+    31.7,
+    33,
+    -1.3
+   ],
+   [
+    "rg3",
+    26.8,
+    33,
+    -6.2
+   ],
+   [
+    "lt1",
+    25.2,
+    44,
+    -18.8
+   ],
+   [
+    "lt2",
+    27.6,
+    28,
+    -0.4
+   ],
+   [
+    "lt3",
+    39.2,
+    38,
+    1.2
+   ]
+  ],
+  "flexWorstDiff": 31.3,
+  "thumbIn_mm": {
+   "max": 5.21,
+   "med": 0.93
+  },
+  "thumbClear_mm": {
+   "max": 0.53,
+   "med": 0
+  },
+  "thumbAxis_deg": {
+   "max": 21.9,
+   "med": 7.7
+  },
+  "fingIn_mm_max": [
+   0,
+   0,
+   0,
+   2.02
+  ],
+  "tipGap_mm_med": [
+   7.65,
+   1.15,
+   5.41,
+   23.96
+  ],
+  "tipGap_mm_max": [
+   26.54,
+   15.54
+  ],
+  "palmIn_mm_max": 1.37,
+  "leftOn": [
+   "keyboard"
+  ],
+  "leftTouching": "113/113",
+  "leftDeepest_mm": -0.45,
+  "stretch": {
+   "max": 4.04,
+   "med": 3.8,
+   "p99max": 2.05,
+   "tris": 902
+  },
+  "pen": {
+   "chair": 0,
+   "desk": 0
+  },
+  "thumbTurn_deg_max": 0,
+  "mPitch_deg": [
+   11.7,
+   22.2
+  ],
+  "mouseTravel_cm": {
+   "x": [
+    -76.5,
+    -68.5
+   ],
+   "z": [
+    -101.3,
+    -98.3
+   ]
+  }
+ },
+ "thumb_straight": {
+  "about": "the thumb straight (its MCP and IP on along its root's line), the mouse turned under it; 72d8f50 against this, 113 samples over the 28.3 s loop",
+  "before_72d8f50": {
+   "ms_frame": 26.4,
+   "samples": 113,
+   "modes": [
+    "desk_mouse"
+   ],
+   "flex": [
+    [
+     "th1",
+     6.7,
+     38,
+     -31.3
+    ],
+    [
+     "th2",
+     21.7,
+     14,
+     7.7
+    ],
+    [
+     "th3",
+     17.8,
+     9,
+     8.8
+    ],
+    [
+     "ix1",
+     43.2,
+     40,
+     3.2
+    ],
+    [
+     "ix2",
+     34.4,
+     35,
+     -0.6
+    ],
+    [
+     "ix3",
+     20.2,
+     16,
+     4.2
+    ],
+    [
+     "md1",
+     36.5,
+     39,
+     -2.5
+    ],
+    [
+     "md2",
+     28.3,
+     31,
+     -2.7
+    ],
+    [
+     "md3",
+     22,
+     29,
+     -7
+    ],
+    [
+     "rg1",
+     29.3,
+     44,
+     -14.7
+    ],
+    [
+     "rg2",
+     32,
+     33,
+     -1
+    ],
+    [
+     "rg3",
+     26.9,
+     33,
+     -6.1
+    ],
+    [
+     "lt1",
+     25.2,
+     44,
+     -18.8
+    ],
+    [
+     "lt2",
+     27.7,
+     28,
+     -0.3
+    ],
+    [
+     "lt3",
+     39.5,
+     38,
+     1.5
+    ]
+   ],
+   "flexWorstDiff": 31.3,
+   "thumbIn_mm": {
+    "max": 4.92,
+    "med": 0.91
+   },
+   "thumbClear_mm": {
+    "max": 2.59,
+    "med": 0
+   },
+   "thumbAxis_deg": {
+    "max": 21.9,
+    "med": 7.7
+   },
+   "fingIn_mm_max": [
+    0,
+    0,
+    0,
+    3.1
+   ],
+   "tipGap_mm_med": [
+    7.7,
+    1.15,
+    5.32,
+    null
+   ],
+   "tipGap_mm_max": [
+    23.09,
+    15.5
+   ],
+   "palmIn_mm_max": 1.5,
+   "leftOn": [
+    "keyboard"
+   ],
+   "leftTouching": "113/113",
+   "leftDeepest_mm": -0.45,
+   "stretch": {
+    "max": 4.03,
+    "med": 3.79,
+    "p99max": 2.07,
+    "tris": 904
+   },
+   "pen": {
+    "chair": 0,
+    "desk": 0
+   },
+   "thumbTurn_deg_max": 0,
+   "mPitch_deg": [
+    11.2,
+    22
+   ],
+   "mouseTravel_cm": {
+    "x": [
+     -76.5,
+     -68.5
+    ],
+    "z": [
+     -101.1,
+     -98.1
+    ]
+   }
+  },
+  "after": {
+   "ms_frame": 24.8,
+   "samples": 113,
+   "modes": [
+    "desk_mouse"
+   ],
+   "flex": [
+    [
+     "th1",
+     6.7,
+     38,
+     -31.3
+    ],
+    [
+     "th2",
+     0,
+     14,
+     -14
+    ],
+    [
+     "th3",
+     0,
+     9,
+     -9
+    ],
+    [
+     "ix1",
+     43.1,
+     40,
+     3.1
+    ],
+    [
+     "ix2",
+     34.2,
+     35,
+     -0.8
+    ],
+    [
+     "ix3",
+     20.2,
+     16,
+     4.2
+    ],
+    [
+     "md1",
+     39,
+     39,
+     0
+    ],
+    [
+     "md2",
+     30.6,
+     31,
+     -0.4
+    ],
+    [
+     "md3",
+     24.6,
+     29,
+     -4.4
+    ],
+    [
+     "rg1",
+     29.9,
+     44,
+     -14.1
+    ],
+    [
+     "rg2",
+     33.4,
+     33,
+     0.4
+    ],
+    [
+     "rg3",
+     28,
+     33,
+     -5
+    ],
+    [
+     "lt1",
+     24.3,
+     44,
+     -19.7
+    ],
+    [
+     "lt2",
+     28.2,
+     28,
+     0.2
+    ],
+    [
+     "lt3",
+     38.1,
+     38,
+     0.1
+    ]
+   ],
+   "flexWorstDiff": 31.3,
+   "thumbIn_mm": {
+    "max": 2.34,
+    "med": 1
+   },
+   "thumbClear_mm": {
+    "max": 0,
+    "med": 0
+   },
+   "thumbAxis_deg": {
+    "max": 16.4,
+    "med": 7.8
+   },
+   "fingIn_mm_max": [
+    0,
+    0,
+    0,
+    1.69
+   ],
+   "tipGap_mm_med": [
+    2.18,
+    2.16,
+    8.91,
+    12.77
+   ],
+   "tipGap_mm_max": [
+    20.56,
+    37.31
+   ],
+   "palmIn_mm_max": 0.8,
+   "leftOn": [
+    "keyboard"
+   ],
+   "leftTouching": "113/113",
+   "leftDeepest_mm": -0.45,
+   "stretch": {
+    "max": 4.33,
+    "med": 4.19,
+    "p99max": 2.03,
+    "tris": 896
+   },
+   "pen": {
+    "chair": 0,
+    "desk": 0
+   },
+   "thumbTurn_deg_max": 0,
+   "mPitch_deg": [
+    11.3,
+    19.8
+   ],
+   "mouseTravel_cm": {
+    "x": [
+     -76.5,
+     -68.5
+    ],
+    "z": [
+     -101.1,
+     -98.1
+    ]
+   }
+  }
+ }
+}
