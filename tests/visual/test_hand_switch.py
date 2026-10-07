@@ -1,6 +1,9 @@
 """Switching between typing and the mouse at the desk (review F6): the hands must not snap. Before, the right hand jumped
 23 cm in one frame when he took the mouse and the left 5.6 cm (the mode picked the code path at once while the weights
-crossfaded). Max per-frame movement of each index fingertip across type -> mouse -> type, in the page, frame by frame.
+crossfaded). Max per-frame movement of each index fingertip across type -> mouse -> type, in the page, frame by frame. A real reach
+peaks about 1 m/s (minimum-jerk, bell-shaped): at most 40 mm a frame at 30 fps; at 402e21f the right hand still moved
+72 mm in a frame (2+ m/s). And the right elbow: the arm's solve left its swing round the shoulder-wrist line free, and
+it leapt up to 22 cm in a frame, also in steady typing.
 Skipped where headless Chromium or Playwright is missing, like test_visual.py."""
 import math
 import sys
@@ -15,8 +18,8 @@ from tests.visual import harness as H          # noqa: E402
 from tests.visual.fake_server import Server    # noqa: E402
 
 TIP = """() => { const g = n => { const b = boy.getObjectByName(n); return b ? b.getWorldPosition(new THREE.Vector3()).toArray() : null; };
-  return {L: g('finger2-3L'), R: g('finger2-3R')}; }"""
-LEFT_MM, RIGHT_MM = 30, 120     # (the right hand travels ~40 cm from the keys to the mouse in ~0.6 s: ~70 mm a frame at most)
+  return {L: g('finger2-3L'), R: g('finger2-3R'), E: bones.RightForeArm.getWorldPosition(new THREE.Vector3()).toArray()}; }"""
+LEFT_MM, RIGHT_MM, ELBOW_MM = 30, 40, 50     # (the right hand travels ~32 cm from the keys to the mouse in 0.8 s, peaking ~25 mm a frame)
 
 
 def test_no_snap_switching_between_keys_and_mouse(tmp_path):
@@ -44,6 +47,7 @@ def test_no_snap_switching_between_keys_and_mouse(tmp_path):
         pg.evaluate("() => { mh.M.typeUntil = 1e9; }"); run(45)        # mouse -> type
         errors = list(st["errors"])
         h.browser.close()
-    jump = {s: max(math.dist(a[s], b[s]) * 1000 for a, b in zip(rows, rows[1:])) for s in ("L", "R")}
+    jump = {s: max(math.dist(a[s], b[s]) * 1000 for a, b in zip(rows, rows[1:])) for s in ("L", "R", "E")}
     assert not errors, errors[:3]
     assert jump["L"] <= LEFT_MM and jump["R"] <= RIGHT_MM, f"per-frame index tip jump (mm): {jump}"
+    assert jump["E"] <= ELBOW_MM, f"per-frame right elbow jump (mm): {jump}"

@@ -66,3 +66,67 @@ had then.
   hand's typing/rest share may change by at most 0.3 per frame. On main: `keyOn` 17 times on the right, share step 1.
 - `tests/visual/test_hand_switch.py`, in the page: type → mouse → type. Each index fingertip may move at most 30 mm
   (left) and 120 mm (right) per frame. On main the right hand jumped 258 mm in one frame.
+
+## Follow-up: a real reach, a steady elbow, a cheaper mouse hold
+COORD: at 402e21f the right hand still moved 72 mm in one frame on type → mouse (2+ m/s). A real reach peaks around
+1 m/s, so: at most 40 mm a frame at 30 fps, with a bell-shaped speed profile.
+
+**Weights.** Each mode's weight is a phase moving at a constant rate (`REACH_S` = 0.8 s), shaped minimum-jerk
+(10p³ − 15p⁴ + 6p⁵). It starts and ends at rest. The exponential approach peaked at its start.
+
+**The right arm mid-switch, in task space.** Slerping the arm bone by bone between the mouse pose and the typing pose did
+not give a smooth path. The forearm turned about 160° between the two poses, so the shortest way round swapped mid-switch:
+117 mm in one frame. Now:
+- The mouse pose is solved at full weight.
+- The wrist moves along the straight line between the two poses' wrists, by the weight.
+- The arm is solved to that point from the clip's pose.
+- The elbow swings to the blend of the two poses' elbows.
+- The hand's turn is slerped in the world, and the fingers in their own frames.
+
+**The elbow.** The arm's solve (`ccd`) leaves the elbow's swing about the shoulder–wrist line free. Even in steady typing
+the elbow leapt up to 22 cm in one frame while the wrist moved 5 mm. Main does the same: up to 92 mm in a second of
+typing, 247 mm on a switch.
+- After each pass, `pin` swings the elbow onto the side of that line where a reference point lies. The wrist stays put.
+- The reference is last frame's elbow, drawn over 0.5 s toward the clip's.
+- The clip's elbow alone is no reference. Its typing arm is nearly straight, with the elbow 8 mm off the line, so the
+  side it lay on turned round from frame to frame.
+
+**Per-frame movement, max (mm; desk_14, 30 fps):**
+
+| | type → mouse, right tip | mouse → type, right tip | right elbow, switches | right elbow, steady typing (300 frames) |
+|---|---|---|---|---|
+| main | 229 | 31 | 247 | 92 (in 30 frames) |
+| 402e21f | 72 | 42 | 143–275 | 79 |
+| now | 25 | 26 | 14 (one 35 mm frame at the start of mouse → type) | ≤ 25 |
+
+On type → mouse the right fingertip's speed rises and falls over about 20 frames, peaking at 25 mm a frame half-way
+(~0.75 m/s).
+
+**`mouseHold`, profiled** (ms per frame, mousing; headless software GL):
+
+| | before | now |
+|---|---|---|
+| whole | 11.4 | 7.7 |
+| shell pin (`mouseFit`, elbow, hand turn) | 3.8 | 3.4 |
+| `omOpen` (fingers opened out of the shell) | 4.1 | 2.9 |
+| `mouseSettle` (thumb on the flank) | 3.4 | 1.3 |
+
+- **`omOpen` warm start.** Each opened finger tries last frame's share first. It keeps it while the finger only
+  touches (0–0.5 mm clear). Else it bisects a ±0.06 bracket, and only then the whole range (8 skin tests on the shell).
+- **`thumbSide`.** At most ~60 vertices per thumb bone, one ray each, where before it cast one from every vertex.
+
+**Contact, after both changes:**
+
+| | before | now |
+|---|---|---|
+| right fingertips on the mouse (index / middle, median over the shell) | 1.6 / 2.4 mm | 1.6 / 2.6 mm |
+| right thumb (median) | 2.5 mm | 1.9 mm |
+| right hand, deepest vertex | 2.3 mm in | 2.6 mm in |
+| hand into the shell (`grip_probe.py contact`) | 0 | 0 |
+| typing: resting tips in 0..+2 mm | 82% | 78% (83% without the elbow swing) |
+| typing: tips more than 2 mm in | 0 | 0 |
+| typing: thumb lowest | −0.8 mm | −2.1 mm |
+| mouse mode, left hand: tips in 0..+2 mm | 83% | 84% |
+
+**Test.** `tests/visual/test_hand_switch.py` now allows at most 40 mm a frame for the right fingertip and 50 mm for the
+right elbow. At 402e21f it fails: right tip 83 mm, elbow 275 mm.
