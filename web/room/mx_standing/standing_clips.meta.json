@@ -22,6 +22,8 @@
    0.2672,
    -0.161
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -143,6 +145,8 @@
    -0.0044,
    -0.0318
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -264,6 +268,8 @@
    -0.0011,
    -0.0252
   ],
+  "support_fixed_frames": 2,
+  "airborne_frames": 7,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -290,12 +296,12 @@
   },
   "soles_cm": {
    "L": [
-    0.4,
-    3.24
+    0.38,
+    3.2
    ],
    "R": [
     0.4,
-    4.36
+    4.13
    ]
   },
   "planted_ankle_drift_cm": {
@@ -386,6 +392,8 @@
    -0.0022,
    -0.0406
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -512,6 +520,8 @@
    0.0005,
    0.417
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -522,8 +532,8 @@
     0.0
    ],
    "R": [
-    3,
-    0.8
+    0,
+    0.0
    ]
   },
   "hands_in_thighs_after": {
@@ -634,6 +644,8 @@
    -0.0004,
    -0.0311
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.27,
    "R": 0.0
@@ -748,6 +760,8 @@
    -0.0093,
    -0.0077
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -858,14 +872,16 @@
    -0.0084,
    -0.0059
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
   },
   "hands_in_thighs_before": {
    "L": [
-    0,
-    0.0
+    10,
+    0.56
    ],
    "R": [
     0,
@@ -968,6 +984,8 @@
    -0.0071,
    -0.0059
   ],
+  "support_fixed_frames": 0,
+  "airborne_frames": 0,
   "leg_ik_miss_cm": {
    "L": 0.0,
    "R": 0.0
@@ -978,8 +996,8 @@
     0.0
    ],
    "R": [
-    34,
-    3.34
+    69,
+    2.49
    ]
   },
   "hands_in_thighs_after": {
@@ -1016,7 +1034,7 @@
     1.78
    ],
    "z": [
-    -0.376,
+    -0.374,
     0.325
    ]
   },

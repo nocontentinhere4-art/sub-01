@@ -8,10 +8,12 @@
 // desk by the clip's own reach (its skin, every 0.1 s, by 10 cm height band) plus 3 cm, as boy_mh.js rare() does, and
 // to the side; the sit-down and the stand-up with the chair where the page has it for them ("out": pulled out and
 // turned); the two that get up and move about (Scared, Standing_Clap) in the chair out in the open ("open").
-// Hands: the page's phone (its body and screen, not the rigid gripping hand made for the finger-less rig) on the right
-// hand for the phone clips; a socket (an empty Object3D, "socket_R" / "socket_L", in the palm) on both hands for the
-// rest: the tablet has no prop in the page, and the controller (room/controller.glb) is left on the desk for now.
+// Hands: a socket (an empty Object3D, "socket_R" / "socket_L", in the palm) on both hands. The phone clips carry the
+// page's phone (its body and screen, not the rigid gripping hand made for the finger-less rig) on the right one, its
+// screen turned to his eyes; Gaming holds the page's controller (room/controller.glb) and the tablet clip a plain
+// tablet (the page has none), each between his palms, every frame.
 import { prep, fixClip, pageName } from "./char_mixamo.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 // standing: x, z on the floor (y is the page's floor), heading = the world direction his +z (Mixamo's forward) turns to
 export const SPOTS = {
@@ -100,46 +102,97 @@ export async function start(ctx) {
     h.add(sock); sockets[s] = sock;
   }
   SP.sockets = sockets;
+  // the hand skin, by side (each vertex whose main bone is that hand or one of its fingers)
+  const parts = []; ch.traverse(o => { if (o.isSkinnedMesh) parts.push(o); });
+  const handIdx = side => parts.map(sm => { const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, r = [], re = new RegExp(`^(${side === "R" ? "Right" : "Left"}Hand|finger\\d-\\d\\.${side})$`);
+    for (let i = 0; i < I.count; i++) { let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); }
+      if (re.test(sm.skeleton.bones[bb].name)) r.push(i); } return r; });
+  const eyes = () => bone("Head").localToWorld(new THREE.Vector3(0, 8, 9));       // (the head bone, in its centimetres: about his eyes)
+  const T_ = []; for (let t = 0; t <= anim.duration + 1e-6; t += 0.25) T_.push(Math.min(t, anim.duration - 1e-4));
+  const glass = (W, H, cards) => {                                                // a plain made-up screen: cards on a dark blue ground
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const x = cv.getContext("2d");
+    x.fillStyle = "#16223a"; x.fillRect(0, 0, W, H); cards.forEach(([a, b, w, h, c]) => { x.fillStyle = c; x.fillRect(a * W, b * H, w * W, h * H); });
+    const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshBasicMaterial({map: tx, toneMapped: false}); };
+  SP.props = [];
+  // how far each prop's screen (or face) turns from his eyes over the clip, every 0.25 s
+  const facing = (obj, axis) => { let worst = 0, sum = 0, in30 = 0; const n = new THREE.Vector3(), p = new THREE.Vector3();
+    for (const t of T_) { mixer.setTime(t); holder.updateMatrixWorld(true); place(); obj.updateMatrixWorld(true);
+      n.copy(axis).transformDirection(obj.matrixWorld); obj.getWorldPosition(p); const a = THREE.MathUtils.radToDeg(n.angleTo(eyes().sub(p)));
+      worst = Math.max(worst, a); sum += a; if (a <= 30) in30++; }
+    return {meanDeg: +(sum / T_.length).toFixed(1), worstDeg: +worst.toFixed(1), within30: +(in30 / T_.length).toFixed(3), samples: T_.length}; };
+  let place = () => {};
   if (row.hold === "phone" && phone) {
-    // the page's phone: its body (a rounded slab) and its screen, the long side along the fingers, the screen out of the palm
+    // the page's phone (its body, a rounded slab, and its screen; not the rigid gripping hand made for the finger-less
+    // rig) on his right palm: its screen turned to his eyes (their direction in the palm's frame, averaged over the clip),
+    // its long side along his fingers as far as that allows; then, as the page lifts its own phone, off the palm just
+    // enough that no skin of his right hand is inside it or in front of its screen, over the whole clip
     const ph = new THREE.Group(); ph.name = "mx_phone";
     const body = phone.children[0].clone(); body.visible = true; ph.add(body);
     const scr = phone.userData.screen.mesh.clone(); scr.visible = true; ph.add(scr);
-    // (its glass lit with a plain made-up feed: cards on a dark blue ground, no app, no brand)
-    const cv = document.createElement("canvas"); cv.width = 144; cv.height = 300; const x = cv.getContext("2d");
-    x.fillStyle = "#16223a"; x.fillRect(0, 0, 144, 300);
-    [[10, 22, 124, 70, "#d9e4f5"], [10, 100, 124, 40, "#8fb3e8"], [10, 148, 124, 70, "#e9d9c6"], [10, 226, 124, 40, "#8fb3e8"]].forEach(([a, b, w, h, c]) => { x.fillStyle = c; x.fillRect(a, b, w, h); });
-    const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; scr.material = new THREE.MeshBasicMaterial({map: tx, toneMapped: false});
+    scr.material = glass(144, 300, [[0.07, 0.07, 0.86, 0.23, "#d9e4f5"], [0.07, 0.33, 0.86, 0.13, "#8fb3e8"], [0.07, 0.49, 0.86, 0.23, "#e9d9c6"], [0.07, 0.75, 0.86, 0.13, "#8fb3e8"]]);
     const [w, h, d] = [0.078, 0.162, 0.008];
     scr.geometry = new THREE.PlaneGeometry(w * 0.92, h * 0.95); scr.position.set(0, 0, d / 2 + 0.0006);
-    sockets.R.add(ph); SP.phone = ph; SP.phoneSize = [w, h, d];
-    // as the page lifts its own phone: off the palm just enough that no skin of his right hand is inside it or in front
-    // of its screen, over the whole clip (every 0.25 s): it rests on his curled fingers
-    const parts = []; ch.traverse(o => { if (o.isSkinnedMesh) parts.push(o); });
-    const idx = parts.map(sm => { const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, r = [];
-      for (let i = 0; i < I.count; i++) { let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); }
-        if (/^(RightHand|finger\d-\d\.R)$/.test(sm.skeleton.bones[bb].name)) r.push(i); } return r; });
-    const v = new THREE.Vector3(), inv = new THREE.Matrix4(); let top = -0.01;
-    const PY = 0.02; ph.position.set(0, PY, 0);
-    for (let t = 0; t <= anim.duration; t += 0.25) { mixer.setTime(t); holder.updateMatrixWorld(true); inv.copy(sockets.R.matrixWorld).invert();
+    const S = sockets.R, inv = new THREE.Matrix4(), n = new THREE.Vector3(), v = new THREE.Vector3();
+    for (const t of T_) { mixer.setTime(t); holder.updateMatrixWorld(true); inv.copy(S.matrixWorld).invert(); n.add(eyes().applyMatrix4(inv).normalize()); }
+    n.normalize(); const up = new THREE.Vector3(0, 1, 0).addScaledVector(n, -n.y).normalize(), X = new THREE.Vector3().crossVectors(up, n);
+    const PY = 0.02, base = new THREE.Vector3(0, PY, 0); ph.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, up, n)); ph.position.copy(base);
+    S.add(ph); ph.updateMatrixWorld(true);
+    const idx = handIdx("R"); let top = -0.02;
+    for (const t of T_) { mixer.setTime(t); holder.updateMatrixWorld(true); inv.copy(ph.matrixWorld).invert();
       parts.forEach((sm, pi) => { for (const i of idx[pi]) { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld).applyMatrix4(inv);
-        if (Math.abs(v.x) < w / 2 && Math.abs(v.y - PY) < h / 2) top = Math.max(top, v.z); } }); }
-    ph.position.z = top + d / 2 + 0.001; SP.phoneLift = +top.toFixed(4); mixer.setTime(0); holder.updateMatrixWorld(true);
+        if (Math.abs(v.x) < w / 2 && Math.abs(v.y) < h / 2) top = Math.max(top, v.z); } }); }
+    ph.position.copy(base).addScaledVector(n, top + d / 2 + 0.001);
+    SP.phone = ph; SP.phoneSize = [w, h, d]; SP.phoneLift = +top.toFixed(4);
+    SP.props.push({name: "phone", obj: ph, min: [-w / 2, -h / 2, -d / 2], max: [w / 2, h / 2, d / 2]});
+    SP.phoneFacing = facing(ph, new THREE.Vector3(0, 0, 1));
+  } else if (row.hold === "controller" || row.hold === "tablet") {
+    // held in both hands: placed every frame between his palms (the two sockets), across them from his left palm to his
+    // right, its face (the controller's buttons, the tablet's screen) turned towards his eyes as far as that allows
+    let obj, face, box;
+    if (row.hold === "controller") {
+      const g = await load("room/controller.glb"); obj = g.scene.getObjectByName("controller") || g.scene;   // (room_build/build_desk_tech.mjs; origin the middle of its footprint, grips +z)
+      obj.traverse(m => { if (m.isMesh) { m.castShadow = true; if (/_contact$/.test(m.name)) m.visible = false; } });
+      face = new THREE.Vector3(0, 1, 0); box = {min: [-0.087, 0, -0.056], max: [0.087, 0.056, 0.064]};
+    } else {
+      // (no tablet in the page: a plain one, a rounded slab 25 x 17 x 0.7 cm, its screen made up like the phone's)
+      const [w, h, d] = [0.25, 0.17, 0.007]; obj = new THREE.Group();
+      obj.add(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 4, 0.006), new THREE.MeshStandardMaterial({color: 0x1b1c22, roughness: 0.35, metalness: 0.6})));
+      const sc = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.92, h * 0.88), glass(300, 204, [[0.05, 0.08, 0.42, 0.84, "#d9e4f5"], [0.52, 0.08, 0.43, 0.38, "#8fb3e8"], [0.52, 0.54, 0.43, 0.38, "#e9d9c6"]]));
+      sc.position.z = d / 2 + 0.0006; obj.add(sc); face = new THREE.Vector3(0, 0, 1); box = {min: [-w / 2, -h / 2, -d / 2], max: [w / 2, h / 2, d / 2]};
+    }
+    obj.name = "mx_" + row.hold; holder.add(obj);
+    const L = new THREE.Vector3(), R_ = new THREE.Vector3(), c = new THREE.Vector3(), x = new THREE.Vector3(), f = new THREE.Vector3(), up = new THREE.Vector3(), z = new THREE.Vector3(), m = new THREE.Matrix4(), hi = new THREE.Matrix4();
+    place = () => {
+      sockets.L.getWorldPosition(L); sockets.R.getWorldPosition(R_); c.addVectors(L, R_).multiplyScalar(0.5);
+      x.subVectors(R_, L).normalize();                                             // (his left palm to his right)
+      f.subVectors(eyes(), c); f.addScaledVector(x, -f.dot(x)).normalize();        // (towards his eyes, square to that)
+      if (row.hold === "controller") { up.copy(f); z.crossVectors(x, up); } else { z.copy(f); up.crossVectors(z, x); }
+      m.makeBasis(x, up, z).setPosition(c); hi.copy(holder.matrixWorld).invert(); m.premultiply(hi);
+      m.decompose(obj.position, obj.quaternion, obj.scale); obj.updateMatrixWorld(true); };
+    SP.props.push({name: row.hold, obj, min: box.min, max: box.max});
+    SP.propFacing = facing(obj, face);
   }
+  mixer.setTime(0); holder.updateMatrixWorld(true); place();
 
-  SP.step = dt => { SP.t = (SP.t + dt) % anim.duration; mixer.setTime(SP.t); holder.updateMatrixWorld(true); return true; };
-  SP.setTime = t => { SP.t = t % anim.duration; mixer.setTime(SP.t); holder.updateMatrixWorld(true); };
-  // a camera for a look at him: "front" (his forward, turned up to 40 deg until it is inside the room), "side" (his
-  // right or left, whichever is inside the room); distance d from his hips, looking at his middle
+  SP.step = dt => { SP.t = (SP.t + dt) % anim.duration; mixer.setTime(SP.t); holder.updateMatrixWorld(true); place(); return true; };
+  SP.setTime = t => { SP.t = t % anim.duration; mixer.setTime(SP.t); holder.updateMatrixWorld(true); place(); };
+  // a camera for a look at him: "front" (from his forward, turned up to 80 deg), "side" (from his right or left, up to
+  // 40 deg off), the first direction and distance (d, then closer) that is inside the room with nothing between it and
+  // him (his chair aside); looking at his middle
+  const blockers = []; scene.traverse(o => { if (!o.isMesh || !o.visible) return; for (let q = o; q; q = q.parent) if (q === holder || q === chairNode()) return; blockers.push(o); });
   SP.view = (k, d = 1.9) => {
-    const c = holder.position, f = new THREE.Vector3(0, 0, 1).applyQuaternion(holder.quaternion), r = new THREE.Vector3(-f.z, 0, f.x);
+    const c = holder.position, f = new THREE.Vector3(0, 0, 1).applyQuaternion(holder.quaternion), Y = new THREE.Vector3(0, 1, 0);
+    const target = new THREE.Vector3(c.x, c.y + (row.spot === "chair" || row.spot === "out" || row.spot === "open" ? 0.7 : 0.9), c.z);
     const inRoom = p => p.x > -1.9 && p.x < 1.9 && p.z > -1.38 && p.z < 1.5;
-    const tries = k === "side" ? [r, r.clone().negate(), r.clone().lerp(f, 0.3), r.clone().negate().lerp(f, 0.3)]
-      : [0, 20, -20, 30, -30, 40, -40, 50, -50, 60, -60].map(a => f.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a * Math.PI / 180));
-    let dir = tries[0], dd = d;
-    for (const dd2 of [d, d * 0.85, d * 0.7]) { const t = tries.find(u => inRoom(c.clone().addScaledVector(u.clone().normalize(), dd2))); if (t) { dir = t.clone().normalize(); dd = dd2; break; } }
-    const target = new THREE.Vector3(c.x, c.y + (row.spot === "chair" ? 0.7 : 0.9), c.z);
-    return {pos: target.clone().addScaledVector(dir, dd).setY(c.y + 1.15), target};
+    const angles = k === "side" ? [90, -90, 70, -70, 110, -110, 55, -55, 125, -125] : [0, 20, -20, 35, -35, 50, -50, 65, -65, 80, -80];
+    const ray = new THREE.Raycaster();
+    for (const dd of [d, d * 0.85, d * 0.7, d * 0.55]) for (const a of angles) {
+      const u = f.clone().applyAxisAngle(Y, a * Math.PI / 180), pos = target.clone().addScaledVector(u, dd).setY(c.y + 1.15);
+      if (!inRoom(pos)) continue;
+      const dir = pos.clone().sub(target), L = dir.length(); ray.set(target, dir.normalize()); ray.far = L;
+      if (!ray.intersectObjects(blockers, false).length) return {pos, target};
+    }
+    return {pos: target.clone().addScaledVector(f, d).setY(c.y + 1.15), target};
   };
   SP.bone = bone; SP.pageName = pageName; SP.ready = true;
   return SP;

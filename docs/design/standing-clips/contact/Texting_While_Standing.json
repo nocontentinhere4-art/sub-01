@@ -1,0 +1,97 @@
+{
+"frames": 708,
+"at": "clip:Texting_While_Standing",
+"clip": "Texting_While_Standing",
+"step": null,
+"chair": {},
+"desk": {},
+"other": {},
+"floor": {},
+"bed": {},
+"wall": {},
+"phone": {
+"phone": {
+"frames": 2,
+"maxDepth": 0.4,
+"maxCount": 16
+}
+},
+"seat": {
+"lowestGap_min_cm": 900,
+"lowestGap_max_cm": -900,
+"framesUnder": 0,
+"maxVertsUnder": 0,
+"maxDepth_cm": 0
+},
+"soles": {
+"L": {
+"min_cm": 0.4,
+"max_cm": 0.4,
+"on": "surface"
+},
+"R": {
+"min_cm": 0.3,
+"max_cm": 0.3,
+"on": "surface"
+}
+},
+"worst": [],
+"perFrame": {
+"468": {
+"phone:phone": [
+13,
+0.4
+]
+},
+"469": {
+"phone:phone": [
+16,
+0.4
+]
+}
+},
+"legs": {
+"framesIn": 106,
+"maxVerts": 3084,
+"maxDepth": 10.2,
+"worstT": 23.5,
+"radius_cm": {
+"L": [
+15.5,
+15.3,
+15.3,
+14.6,
+14.2,
+13.9,
+14,
+13.8,
+13.3,
+12.5
+],
+"R": [
+17,
+16,
+15.1,
+14.3,
+13.9,
+13.6,
+13.7,
+13.8,
+13.6,
+13.4
+]
+}
+},
+"support": {
+"min_cm": 0.34,
+"max_cm": 0.34,
+"framesOutside_0_1cm": 0
+},
+"facing": {
+"meanDeg": 22.7,
+"worstDeg": 84.7,
+"within30": 0.779,
+"samples": 95
+},
+"mode": null
+}

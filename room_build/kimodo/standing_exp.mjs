@@ -16,7 +16,8 @@ if (sk) {
   for (const mn of nodes.filter(n => n.getMesh() && n.getSkin() === sk))
     for (const p of mn.getMesh().listPrimitives()) {
       const P = p.getAttribute('POSITION');
-      out.mesh.push({node: mn.getName(), pos: Array.from(P.getArray()), j: Array.from(p.getAttribute('JOINTS_0').getArray()),
+      const NR = p.getAttribute('NORMAL');
+      out.mesh.push({node: mn.getName(), pos: Array.from(P.getArray()), nrm: NR ? Array.from(NR.getArray()) : null, j: Array.from(p.getAttribute('JOINTS_0').getArray()),
         w: Array.from(p.getAttribute('WEIGHTS_0').getArray()), norm: P.getNormalized ? P.getNormalized() : false});
     }
 }

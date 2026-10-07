@@ -1,21 +1,64 @@
-# G22 — standing and in-between clips on the Mixamo-rigged character: status
+# G22: standing and in-between clips on the Mixamo-rigged character (status)
 
-Branch `preview/standing-clips` (off `origin/preview/mixamo-pipeline`). No raw capture is committed: the FBX are read from
-`claude/loving-davinci-6hqmjx` into a temp dir by the re-bake and deleted after.
+Branch `preview/standing-clips` (off `origin/preview/mixamo-pipeline`). No raw capture is committed: the re-bake reads
+the FBX from `claude/loving-davinci-6hqmjx` into a temp dir and deletes them after. Details and the contact table:
+`README.md`.
 
-## State (2026-10-07, WIP)
-- [x] Bake: `room_build/kimodo/standing_bake.py` (+ `standing_exp.mjs`, `standing_clips.json`); one command
-      `room_build/kimodo/standing_rebake.sh <character.glb>` → `web/room/mx_standing/<Clip>.glb` + `standing_clips.meta.json` (9 clips, ~4 min).
-- [x] Page entry: `room.html?char=mixamo&clip=<Clip>` (`web/room/standing_preview.js`); the default page is unchanged (no `clip` → nothing runs).
-- [x] Contact in the room: `CLIP=<Clip> room_build/kimodo/contact_pass.mjs <port> x clip` (every frame, whole room, walls, phone).
-- [x] Self contact: `room_build/kimodo/standing_selfcontact.mjs` (every frame; `rig/autorig/qa.html` `QA.selfContact`).
-- [x] Seat points swept per clip in the room (`seatAt`): his knee is 0.49 m up with the foot flat and the cushion
-      top 0.505 m, so he sits 18–24 cm forward of the chair's pivot (the seat pan's front edge otherwise runs 2–4 cm
-      into his thighs); Gaming and Angry_Gesture then measure 0 contacts at the desk.
-- [x] Spots: standing on the rug; Gaming / Angry_Gesture at the desk (chair rolled back + 0.28 m aside, clear of the
-      props beside the desk); Stand_To_Sit / Sit_To_Stand with the chair where the page has it for them (`chairAt(1)`);
-      Scared / Standing_Clap with the chair in the open (at the desk they need more roll-back than the bed allows).
-- [x] Phone: the page's phone on the right hand, lifted onto his curled fingers (no hand skin inside it or over its screen).
-- [ ] Contact table per clip (re-running after the spot changes)
-- [ ] Render sheet `docs/design/standing-clips/sheet.jpg`
-- [ ] Full pytest + visual gate
+## State (2026-10-07)
+- [x] The nine clips are baked for `web/room/char_mixamo.glb`: `web/room/mx_standing/<Clip>.glb`, plus
+      `standing_clips.meta.json`.
+- [x] One re-bake command: `room_build/kimodo/standing_rebake.sh <character.glb> [Clip ...]`. It covers all nine,
+      including the hands-off-thighs step.
+- [x] Page entry: `room.html?char=mixamo&clip=<Clip>` (`web/room/standing_preview.js`, plus the marked G22 block at
+      the end of `room.html`). The default page is unchanged: without `clip`, nothing runs.
+- [x] Hands: sockets `socket_R` / `socket_L` in each palm. The page's phone is on the right hand (Texting,
+      Texting_While_Standing), its screen turned to his eyes and lifted onto his curled fingers. Gaming holds the page's
+      controller and the tablet clip a plain tablet (the page has none), each between his palms every frame.
+- [x] Contact in the room, every frame, every visible mesh: `CLIP=<Clip> contact_pass.mjs <port> x clip`.
+- [x] Self contact, every frame: `standing_selfcontact.mjs` (`QA.selfContact`). Arm in torso is shown with and without
+      the rig's flank weights.
+- [x] Contact table per clip in `README.md`; the JSON in `contact/`.
+- [x] Render sheet: `sheet.jpg` (each clip at 10 / 50 / 90 %, front and side, in the room).
+- [x] Full pytest and the visual gate (below).
+
+## Numbers
+See `README.md`, "Contact table". In short:
+- Furniture, walls, floor: 0 vertices more than 1 cm inside, all nine clips, every frame.
+- Supporting sole 0…+1 cm: every frame except the ones the README lists (Scared's jump; Sit_To_Stand on the rug's
+  edge).
+- Hands in thighs: 0 after the bake's fix.
+- Arm in torso: the rig's (G20's weights; G23's review, items 1 and 3), shown against the no-clip baselines.
+
+## Tests
+- `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`: see the last run below.
+- `tests/visual/out/results.json`: `hard_failures == []`.
+
+## Open, for others
+- Page wiring (G21 / G10d): the seat points `seatAt` (−0.18…−0.24 m) differ from the seated loop's. The join needs a
+  slide back on the seat during the cross-fade, or the loop's seat point taken from the same sweep. At the desk, the
+  rare events need more roll-back than the bed allows.
+- Rig (G20): the arm-in-torso numbers come from the flank and armpit weights.
+
+## Review (G23, docs/review/standing-clips.md on preview/review, of 7aec913): answers
+1. **No prop for Gaming and the tablet (HIGH): fixed.**
+   - Gaming holds the page's controller (`room/controller.glb`).
+   - The tablet clip holds a plain 25 × 17 × 0.7 cm tablet, built in code with no brand.
+   - Both are placed between his palms every frame, face to his eyes: controller 1.4° mean, 4.4° worst. Table column
+     "held prop".
+2. **Texting_While_Standing's phone edge-on (HIGH): fixed.** For both phone clips, the screen now turns towards his eyes
+   (averaged over the clip in the palm's frame) and is lifted off his hand skin. Mean angle and the share of frames
+   within 30° are in the table. The frames that miss are the start and end of each clip, with his phone hand down at
+   his side.
+3. **Hands in thighs (MEDIUM): it is real in two stretches, and both are fixed in the bake.**
+   - contact_pass's capsule overstates it, as you suspected. Both numbers are in the table.
+   - Against his trouser surface (nearest thigh vertex and its normal, `QA.selfContact`), the hands were 2.49 cm in
+     for 69 frames (Texting_While_Standing, hands coming down) and 0.56 cm for 10 frames (Texting's hanging left
+     hand). The bake moves the wrist out and re-solves the arm, so both are 0 now.
+   - Scared, Sit_To_Stand and Stand_To_Sit are 0 by the surface test: the capsule was reading hands hanging beside the
+     leg.
+   - The 3–5° arm-out step you suggest does not clear the sleeves (see README, "What is not clean"): 15° only took
+     Gaming from 4.3 to 2.6 cm. It is not baked.
+4. **Blocked front camera (LOW): fixed.** `SP.view` takes the first direction and distance with a clear line of sight
+   to him; `sheet.jpg` is re-rendered.
+5. **Main's old slides: noted.** That is the rig's input (G20). After autorig re-runs on the new `char_v5.glb`,
+   `standing_rebake.sh <char.glb>` re-bakes all nine in one command.

@@ -174,49 +174,69 @@ for it in range(3):
         corr = np.maximum(corr, SOLE - h)
         g[:, 1] += corr
         miss[s] = leg_ik(s, g)
+# the supporting sole: where the performer has a foot down (its ankle within 3.5 cm of its lowest) but both of his
+# soles are over SOLE + 6 mm (a stance between two planted ones, as he rises or turns), the lower one goes down to SOLE;
+# a frame where the performer has both feet up (a jump) keeps them up
+down = (ank0['Left'][:, 1] < ank0['Left'][:, 1].min() + 0.035) | (ank0['Right'][:, 1] < ank0['Right'][:, 1].min() + 0.035)
+X = {s: skinned(footv[s], P, Q, Sc) for s in footv}; h = {s: X[s][..., 1].min(1) for s in X}
+lowf = np.minimum(h['Left'], h['Right']); fix = down & (lowf > SOLE + 0.006)
+log['support_fixed_frames'] = int(fix.sum()); log['airborne_frames'] = int((~down).sum())
+if fix.any():
+    for s in ('Left', 'Right'):
+        mine = fix & (h[s] <= h['Left' if s == 'Right' else 'Right'])
+        if not mine.any(): continue
+        dz = np.where(mine, SOLE - h[s], 0.0); dz = np.minimum(dz, 0)
+        dz = -lowpass(np.array([(-dz[max(0, f - 3):f + 4]).max() for f in range(F)]), 5.0)
+        dz = np.maximum(dz, SOLE - h[s])                                   # (never under the floor where it was on it)
+        g = P[:, cix[f'{s}Foot']].copy(); g[:, 1] += dz; miss[s] = max(miss[s], leg_ik(s, g))
 log['leg_ik_miss_cm'] = {s[0]: round(miss[s] * 100, 2) for s in miss}
 
-# ---- the hands off his thighs: each thigh's skin as a star-shaped cross-section around its bone (10 bands along it,
-# 24 sectors around it, the outermost skin in each), measured every frame on his own thigh skin; a hand vertex inside
-# it by more than 3 mm moves its wrist out along that thigh's radius (by the depth + 5 mm, smoothed, held 0.2 s either
-# side), the arm re-solved by two-bone IK with the hand keeping its world rotation
-handv = {s: np.array([d == f'{s}Hand' or (d.startswith(f'{s}Hand') and d[len(s) + 4:5] in 'TIMRP') for d in dom]) for s in ('Left', 'Right')}
-thighv = {s: dom == f'{s}UpLeg' for s in ('Left', 'Right')}
-NB, NS = 10, 24
+# ---- the hands off his thighs, by the same test as the self-contact pass (rig/autorig/qa.html inside()): a hand vertex
+# behind the nearest thigh vertex (within 2.5 cm) by more than 5 mm along that vertex's normal is inside; there the
+# wrist moves out along that normal by the depth + 5 mm (held 0.2 s either side, smoothed), the arm re-solved by
+# two-bone IK with the hand keeping its world rotation. Every vertex of the hands and thighs, skinned with normals.
+from scipy.spatial import cKDTree
+J1, ibm1, V1, JI1, WW1 = skin_setup(C, 1)
+N1 = np.concatenate([np.array(m['nrm'], float).reshape(-1, 3) for m in C['mesh']])
+dom1 = bn[JI1[np.arange(len(JI1)), WW1.argmax(1)]] if len(J1) == len(J) else None
+handv = {s: np.array([d == f'{s}Hand' or (d.startswith(f'{s}Hand') and d[len(s) + 4:5] in 'TIMRP') for d in dom1]) for s in ('Left', 'Right')}
+thighv = np.isin(dom1, ['LeftUpLeg', 'RightUpLeg'])
+
+
+def skinned_n(mask, P, Q, Sc):
+    """positions and unit normals of the masked vertices (full resolution), every frame"""
+    X = np.zeros((F, mask.sum(), 3)); Nn = np.zeros((F, mask.sum(), 3))
+    Vh = np.concatenate([V1[mask], np.ones((mask.sum(), 1))], 1); Nh = np.concatenate([N1[mask], np.zeros((mask.sum(), 1))], 1)
+    for f0 in range(0, F, 20):
+        sl = slice(f0, min(F, f0 + 20)); S = mats(P[sl], Q[sl], Sc)[:, J1] @ ibm1[None]
+        for k_ in range(4):
+            Sk = S[:, JI1[mask][:, k_]]; w = WW1[mask][None, :, k_, None]
+            X[sl] += w * np.einsum('fvij,vj->fvi', Sk, Vh)[..., :3]; Nn[sl] += w * np.einsum('fvij,vj->fvi', Sk, Nh)[..., :3]
+    return X, Nn / np.maximum(np.linalg.norm(Nn, axis=-1, keepdims=True), 1e-9)
 
 
 def thigh_push(P, Q, Sc):
-    TH = {s: skinned(thighv[s], P, Q, Sc) for s in thighv}; HA = {s: skinned(handv[s], P, Q, Sc) for s in handv}
+    TX, TN = skinned_n(thighv, P, Q, Sc); HA = {s: skinned_n(handv[s], P, Q, Sc)[0] for s in handv}
     push = {s: np.zeros((F, 3)) for s in handv}; deep = {s: np.zeros(F) for s in handv}
     for f in range(F):
-        for t in ('Left', 'Right'):
-            a, b = P[f, cix[f'{t}UpLeg']], P[f, cix[f'{t}Leg']]; ax = b - a; L = np.linalg.norm(ax); ax = ax / L
-            ref = np.cross(ax, [0, 0, 1.0]); ref /= np.linalg.norm(ref); ref2 = np.cross(ax, ref)
-            def polar(X):
-                v = X - a; tt = v @ ax; r = v - tt[:, None] * ax; rad = np.linalg.norm(r, axis=1)
-                ang = np.arctan2(r @ ref2, r @ ref); return tt / L, rad, ang, r
-            tt, rad, ang, _ = polar(TH[t][f]); ok = (tt > 0.05) & (tt < 0.95)
-            bi = np.clip((tt[ok] * NB).astype(int), 0, NB - 1); si = ((ang[ok] + np.pi) / (2 * np.pi) * NS).astype(int) % NS
-            R = np.zeros((NB, NS)); np.maximum.at(R, (bi, si), rad[ok])
-            for s in ('Left', 'Right'):
-                ht, hr, ha, hv = polar(HA[s][f]); m = (ht > 0.1) & (ht < 0.9)
-                if not m.any(): continue
-                hb = np.clip((ht[m] * NB).astype(int), 0, NB - 1); hs = ((ha[m] + np.pi) / (2 * np.pi) * NS).astype(int) % NS
-                d = R[hb, hs] - hr[m]; k = np.argmax(d)
-                if d[k] > 0.003 and d[k] > deep[s][f]:
-                    deep[s][f] = d[k]; push[s][f] = hv[m][k] / max(hr[m][k], 1e-6) * (d[k] + 0.005)
+        tree = cKDTree(TX[f])
+        for s in handv:
+            d, j = tree.query(HA[s][f], distance_upper_bound=0.025); ok = np.isfinite(d)
+            if not ok.any(): continue
+            jj = j[ok]; dot = ((HA[s][f][ok] - TX[f][jj]) * TN[f][jj]).sum(1); k_ = np.argmin(dot)
+            if dot[k_] < -0.005: deep[s][f] = -dot[k_]; push[s][f] = TN[f][jj[k_]] * (-dot[k_] + 0.005)
     return push, deep
 
 
 _, deep0 = thigh_push(P, Q, Sc)
 log['hands_in_thighs_before'] = {s[0]: [int((deep0[s] > 0).sum()), round(float(deep0[s].max() * 100), 2)] for s in deep0}
-for it in range(3):
+for it in range(4):
     push, deep = thigh_push(P, Q, Sc)
     if not any(deep[s].any() for s in deep): break
     for s in ('Left', 'Right'):
         if not deep[s].any(): continue
         g = push[s].copy()
-        hold = np.array([np.abs(g[max(0, f - 6):f + 7]).max(0) * np.sign(g[max(0, f - 6):f + 7].sum(0) + 1e-12) for f in range(F)])
+        hold = np.array([g[max(0, f - 6):f + 7][np.argmax(np.linalg.norm(g[max(0, f - 6):f + 7], axis=1))] for f in range(F)])
         g = lowpass(hold, 3.0)
         a, b, c = cix[f'{s}Arm'], cix[f'{s}ForeArm'], cix[f'{s}Hand']
         l1 = np.linalg.norm(T[0, b]) * Sc[a]; l2 = np.linalg.norm(T[0, c]) * Sc[b]

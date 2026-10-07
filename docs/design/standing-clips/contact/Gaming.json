@@ -1,0 +1,997 @@
+{
+"frames": 152,
+"at": "clip:Gaming",
+"clip": "Gaming",
+"step": null,
+"chair": {},
+"desk": {},
+"other": {},
+"floor": {},
+"bed": {},
+"wall": {},
+"phone": {
+"controller": {
+"frames": 152,
+"maxDepth": 2.8,
+"maxCount": 374
+}
+},
+"seat": {
+"lowestGap_min_cm": -0.3,
+"lowestGap_max_cm": 0.3,
+"framesUnder": 0,
+"maxVertsUnder": 0,
+"maxDepth_cm": 0
+},
+"soles": {
+"L": {
+"min_cm": 0.4,
+"max_cm": 0.4,
+"on": "floor"
+},
+"R": {
+"min_cm": 0.4,
+"max_cm": 0.4,
+"on": "floor"
+}
+},
+"worst": [],
+"perFrame": {
+"0": {
+"phone:controller": [
+320,
+2.8
+]
+},
+"1": {
+"phone:controller": [
+312,
+2.8
+]
+},
+"2": {
+"phone:controller": [
+305,
+2.8
+]
+},
+"3": {
+"phone:controller": [
+306,
+2.8
+]
+},
+"4": {
+"phone:controller": [
+305,
+2.8
+]
+},
+"5": {
+"phone:controller": [
+304,
+2.8
+]
+},
+"6": {
+"phone:controller": [
+300,
+2.8
+]
+},
+"7": {
+"phone:controller": [
+297,
+2.8
+]
+},
+"8": {
+"phone:controller": [
+296,
+2.8
+]
+},
+"9": {
+"phone:controller": [
+302,
+2.8
+]
+},
+"10": {
+"phone:controller": [
+306,
+2.7
+]
+},
+"11": {
+"phone:controller": [
+321,
+2.7
+]
+},
+"12": {
+"phone:controller": [
+329,
+2.8
+]
+},
+"13": {
+"phone:controller": [
+338,
+2.8
+]
+},
+"14": {
+"phone:controller": [
+339,
+2.7
+]
+},
+"15": {
+"phone:controller": [
+336,
+2.8
+]
+},
+"16": {
+"phone:controller": [
+334,
+2.8
+]
+},
+"17": {
+"phone:controller": [
+333,
+2.8
+]
+},
+"18": {
+"phone:controller": [
+335,
+2.8
+]
+},
+"19": {
+"phone:controller": [
+333,
+2.8
+]
+},
+"20": {
+"phone:controller": [
+327,
+2.7
+]
+},
+"21": {
+"phone:controller": [
+314,
+2.8
+]
+},
+"22": {
+"phone:controller": [
+287,
+2.7
+]
+},
+"23": {
+"phone:controller": [
+280,
+2.7
+]
+},
+"24": {
+"phone:controller": [
+277,
+2.7
+]
+},
+"25": {
+"phone:controller": [
+280,
+2.7
+]
+},
+"26": {
+"phone:controller": [
+292,
+2.8
+]
+},
+"27": {
+"phone:controller": [
+298,
+2.8
+]
+},
+"28": {
+"phone:controller": [
+301,
+2.8
+]
+},
+"29": {
+"phone:controller": [
+302,
+2.8
+]
+},
+"30": {
+"phone:controller": [
+304,
+2.8
+]
+},
+"31": {
+"phone:controller": [
+308,
+2.8
+]
+},
+"32": {
+"phone:controller": [
+304,
+2.8
+]
+},
+"33": {
+"phone:controller": [
+305,
+2.8
+]
+},
+"34": {
+"phone:controller": [
+302,
+2.8
+]
+},
+"35": {
+"phone:controller": [
+302,
+2.8
+]
+},
+"36": {
+"phone:controller": [
+302,
+2.8
+]
+},
+"37": {
+"phone:controller": [
+303,
+2.7
+]
+},
+"38": {
+"phone:controller": [
+302,
+2.7
+]
+},
+"39": {
+"phone:controller": [
+301,
+2.7
+]
+},
+"40": {
+"phone:controller": [
+299,
+2.7
+]
+},
+"41": {
+"phone:controller": [
+298,
+2.7
+]
+},
+"42": {
+"phone:controller": [
+296,
+2.7
+]
+},
+"43": {
+"phone:controller": [
+297,
+2.7
+]
+},
+"44": {
+"phone:controller": [
+296,
+2.7
+]
+},
+"45": {
+"phone:controller": [
+290,
+2.7
+]
+},
+"46": {
+"phone:controller": [
+285,
+2.7
+]
+},
+"47": {
+"phone:controller": [
+287,
+2.7
+]
+},
+"48": {
+"phone:controller": [
+301,
+2.8
+]
+},
+"49": {
+"phone:controller": [
+315,
+2.8
+]
+},
+"50": {
+"phone:controller": [
+324,
+2.7
+]
+},
+"51": {
+"phone:controller": [
+338,
+2.7
+]
+},
+"52": {
+"phone:controller": [
+347,
+2.7
+]
+},
+"53": {
+"phone:controller": [
+355,
+2.8
+]
+},
+"54": {
+"phone:controller": [
+361,
+2.8
+]
+},
+"55": {
+"phone:controller": [
+361,
+2.8
+]
+},
+"56": {
+"phone:controller": [
+360,
+2.7
+]
+},
+"57": {
+"phone:controller": [
+357,
+2.7
+]
+},
+"58": {
+"phone:controller": [
+352,
+2.7
+]
+},
+"59": {
+"phone:controller": [
+353,
+2.8
+]
+},
+"60": {
+"phone:controller": [
+358,
+2.8
+]
+},
+"61": {
+"phone:controller": [
+364,
+2.8
+]
+},
+"62": {
+"phone:controller": [
+361,
+2.8
+]
+},
+"63": {
+"phone:controller": [
+358,
+2.8
+]
+},
+"64": {
+"phone:controller": [
+351,
+2.7
+]
+},
+"65": {
+"phone:controller": [
+349,
+2.8
+]
+},
+"66": {
+"phone:controller": [
+352,
+2.8
+]
+},
+"67": {
+"phone:controller": [
+358,
+2.8
+]
+},
+"68": {
+"phone:controller": [
+358,
+2.8
+]
+},
+"69": {
+"phone:controller": [
+360,
+2.8
+]
+},
+"70": {
+"phone:controller": [
+363,
+2.8
+]
+},
+"71": {
+"phone:controller": [
+365,
+2.8
+]
+},
+"72": {
+"phone:controller": [
+365,
+2.8
+]
+},
+"73": {
+"phone:controller": [
+366,
+2.8
+]
+},
+"74": {
+"phone:controller": [
+370,
+2.8
+]
+},
+"75": {
+"phone:controller": [
+374,
+2.8
+]
+},
+"76": {
+"phone:controller": [
+371,
+2.8
+]
+},
+"77": {
+"phone:controller": [
+366,
+2.8
+]
+},
+"78": {
+"phone:controller": [
+358,
+2.8
+]
+},
+"79": {
+"phone:controller": [
+350,
+2.8
+]
+},
+"80": {
+"phone:controller": [
+345,
+2.8
+]
+},
+"81": {
+"phone:controller": [
+344,
+2.8
+]
+},
+"82": {
+"phone:controller": [
+343,
+2.8
+]
+},
+"83": {
+"phone:controller": [
+342,
+2.8
+]
+},
+"84": {
+"phone:controller": [
+343,
+2.8
+]
+},
+"85": {
+"phone:controller": [
+341,
+2.8
+]
+},
+"86": {
+"phone:controller": [
+339,
+2.8
+]
+},
+"87": {
+"phone:controller": [
+338,
+2.7
+]
+},
+"88": {
+"phone:controller": [
+338,
+2.7
+]
+},
+"89": {
+"phone:controller": [
+336,
+2.7
+]
+},
+"90": {
+"phone:controller": [
+333,
+2.7
+]
+},
+"91": {
+"phone:controller": [
+333,
+2.8
+]
+},
+"92": {
+"phone:controller": [
+333,
+2.8
+]
+},
+"93": {
+"phone:controller": [
+335,
+2.8
+]
+},
+"94": {
+"phone:controller": [
+337,
+2.7
+]
+},
+"95": {
+"phone:controller": [
+340,
+2.8
+]
+},
+"96": {
+"phone:controller": [
+345,
+2.8
+]
+},
+"97": {
+"phone:controller": [
+343,
+2.8
+]
+},
+"98": {
+"phone:controller": [
+343,
+2.8
+]
+},
+"99": {
+"phone:controller": [
+343,
+2.7
+]
+},
+"100": {
+"phone:controller": [
+345,
+2.8
+]
+},
+"101": {
+"phone:controller": [
+354,
+2.7
+]
+},
+"102": {
+"phone:controller": [
+362,
+2.7
+]
+},
+"103": {
+"phone:controller": [
+370,
+2.7
+]
+},
+"104": {
+"phone:controller": [
+372,
+2.8
+]
+},
+"105": {
+"phone:controller": [
+370,
+2.8
+]
+},
+"106": {
+"phone:controller": [
+369,
+2.8
+]
+},
+"107": {
+"phone:controller": [
+365,
+2.8
+]
+},
+"108": {
+"phone:controller": [
+366,
+2.8
+]
+},
+"109": {
+"phone:controller": [
+366,
+2.8
+]
+},
+"110": {
+"phone:controller": [
+364,
+2.8
+]
+},
+"111": {
+"phone:controller": [
+361,
+2.8
+]
+},
+"112": {
+"phone:controller": [
+354,
+2.8
+]
+},
+"113": {
+"phone:controller": [
+351,
+2.8
+]
+},
+"114": {
+"phone:controller": [
+343,
+2.8
+]
+},
+"115": {
+"phone:controller": [
+340,
+2.7
+]
+},
+"116": {
+"phone:controller": [
+339,
+2.8
+]
+},
+"117": {
+"phone:controller": [
+333,
+2.8
+]
+},
+"118": {
+"phone:controller": [
+330,
+2.8
+]
+},
+"119": {
+"phone:controller": [
+325,
+2.8
+]
+},
+"120": {
+"phone:controller": [
+323,
+2.8
+]
+},
+"121": {
+"phone:controller": [
+321,
+2.8
+]
+},
+"122": {
+"phone:controller": [
+320,
+2.8
+]
+},
+"123": {
+"phone:controller": [
+317,
+2.8
+]
+},
+"124": {
+"phone:controller": [
+317,
+2.8
+]
+},
+"125": {
+"phone:controller": [
+316,
+2.8
+]
+},
+"126": {
+"phone:controller": [
+314,
+2.7
+]
+},
+"127": {
+"phone:controller": [
+308,
+2.8
+]
+},
+"128": {
+"phone:controller": [
+307,
+2.8
+]
+},
+"129": {
+"phone:controller": [
+308,
+2.8
+]
+},
+"130": {
+"phone:controller": [
+308,
+2.8
+]
+},
+"131": {
+"phone:controller": [
+305,
+2.8
+]
+},
+"132": {
+"phone:controller": [
+302,
+2.8
+]
+},
+"133": {
+"phone:controller": [
+301,
+2.7
+]
+},
+"134": {
+"phone:controller": [
+302,
+2.7
+]
+},
+"135": {
+"phone:controller": [
+302,
+2.7
+]
+},
+"136": {
+"phone:controller": [
+305,
+2.7
+]
+},
+"137": {
+"phone:controller": [
+310,
+2.7
+]
+},
+"138": {
+"phone:controller": [
+314,
+2.7
+]
+},
+"139": {
+"phone:controller": [
+317,
+2.8
+]
+},
+"140": {
+"phone:controller": [
+318,
+2.8
+]
+},
+"141": {
+"phone:controller": [
+321,
+2.7
+]
+},
+"142": {
+"phone:controller": [
+322,
+2.7
+]
+},
+"143": {
+"phone:controller": [
+323,
+2.7
+]
+},
+"144": {
+"phone:controller": [
+321,
+2.7
+]
+},
+"145": {
+"phone:controller": [
+319,
+2.7
+]
+},
+"146": {
+"phone:controller": [
+320,
+2.7
+]
+},
+"147": {
+"phone:controller": [
+322,
+2.7
+]
+},
+"148": {
+"phone:controller": [
+322,
+2.7
+]
+},
+"149": {
+"phone:controller": [
+319,
+2.7
+]
+},
+"150": {
+"phone:controller": [
+322,
+2.8
+]
+},
+"151": {
+"phone:controller": [
+321,
+2.8
+]
+}
+},
+"legs": {
+"framesIn": 0,
+"maxVerts": 0,
+"maxDepth": 0,
+"worstT": null,
+"radius_cm": {
+"L": [
+14.6,
+15.5,
+15.6,
+15.3,
+15.2,
+14.7,
+13.2,
+11.3,
+10.6,
+10.4
+],
+"R": [
+15.1,
+15.2,
+15,
+14.6,
+14.4,
+13.2,
+11.8,
+10.2,
+9.9,
+8
+]
+}
+},
+"support": {
+"min_cm": 0.4,
+"max_cm": 0.4,
+"framesOutside_0_1cm": 0
+},
+"facing": {
+"meanDeg": 1.4,
+"worstDeg": 4.4,
+"within30": 1,
+"samples": 21
+},
+"mode": null
+}

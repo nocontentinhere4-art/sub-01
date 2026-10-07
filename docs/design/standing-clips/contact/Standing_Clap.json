@@ -1,0 +1,72 @@
+{
+"frames": 144,
+"at": "clip:Standing_Clap",
+"clip": "Standing_Clap",
+"step": null,
+"chair": {},
+"desk": {},
+"other": {},
+"floor": {},
+"bed": {},
+"wall": {},
+"phone": {},
+"seat": {
+"lowestGap_min_cm": -0.6,
+"lowestGap_max_cm": 46.5,
+"framesUnder": 0,
+"maxVertsUnder": 0,
+"maxDepth_cm": 0
+},
+"soles": {
+"L": {
+"min_cm": 0.4,
+"max_cm": 0.9,
+"on": "surface"
+},
+"R": {
+"min_cm": 0.5,
+"max_cm": 1.5,
+"on": "surface"
+}
+},
+"worst": [],
+"perFrame": {},
+"legs": {
+"framesIn": 5,
+"maxVerts": 549,
+"maxDepth": 3.7,
+"worstT": 3.5,
+"radius_cm": {
+"L": [
+15.1,
+16,
+16,
+15.3,
+14.8,
+14,
+13.2,
+12,
+11.2,
+10.5
+],
+"R": [
+15.3,
+15.5,
+15.2,
+14.7,
+14.4,
+13.4,
+12.2,
+10.9,
+10.7,
+8.1
+]
+}
+},
+"support": {
+"min_cm": 0.44,
+"max_cm": 0.58,
+"framesOutside_0_1cm": 0
+},
+"mode": null
+}

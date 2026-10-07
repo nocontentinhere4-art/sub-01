@@ -1,0 +1,72 @@
+{
+"frames": 303,
+"at": "clip:Scared",
+"clip": "Scared",
+"step": null,
+"chair": {},
+"desk": {},
+"other": {},
+"floor": {},
+"bed": {},
+"wall": {},
+"phone": {},
+"seat": {
+"lowestGap_min_cm": -0.7,
+"lowestGap_max_cm": 51.9,
+"framesUnder": 0,
+"maxVertsUnder": 0,
+"maxDepth_cm": 0
+},
+"soles": {
+"L": {
+"min_cm": 0.5,
+"max_cm": 3.3,
+"on": "surface"
+},
+"R": {
+"min_cm": 0.4,
+"max_cm": 4.3,
+"on": "surface"
+}
+},
+"worst": [],
+"perFrame": {},
+"legs": {
+"framesIn": 28,
+"maxVerts": 256,
+"maxDepth": 2.5,
+"worstT": 5.07,
+"radius_cm": {
+"L": [
+15.4,
+16.2,
+16.3,
+16.1,
+15.9,
+15.1,
+13.3,
+11.4,
+10.8,
+10.2
+],
+"R": [
+16.6,
+16.7,
+15.7,
+15.3,
+15,
+13.5,
+11.8,
+10.6,
+9.8,
+8.2
+]
+}
+},
+"support": {
+"min_cm": 0.45,
+"max_cm": 3.26,
+"framesOutside_0_1cm": 3
+},
+"mode": null
+}

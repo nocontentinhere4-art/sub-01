@@ -18,7 +18,8 @@
 // CLIP=<Clip> (G22): instead of his day, one of the standing / in-between clips on the Mixamo-rigged character
 // (room.html?char=mixamo&clip=<Clip>, room/standing_preview.js), every frame of the whole clip once from its first
 // (<seconds> = "clip"), placed where the preview puts it; the furniture is then the whole room's, the walls are checked
-// (wall: any skin past a wall's plane), and with the phone in his hand his hand's skin inside the phone (phone).
+// (wall: any skin past a wall's plane), and his hand skin inside what he holds (phone: {phone | controller | tablet},
+// more than 2 mm inside the prop's box; the controller's box is its bounding box, so its rounded grips read deeper).
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
 const [port, activity = "research", secs = "8", out] = process.argv.slice(2), CLIP = process.env.CLIP || null;
@@ -111,13 +112,14 @@ const res = await p.evaluate(([activity, secs, X, RARE, CLIP]) => { let S0step =
   const v = new THREE.Vector3(), u = new THREE.Vector3(), N = Math.round(secs * 30);
   for (let f = 0; f < N; f++) {
     step1(f); boy.updateMatrixWorld(true); let seatLow = 9, solL = 9, solR = 9, nPen = 0;
-    const PH = CLIP && SP.phone ? (SP.phone.updateMatrixWorld(true), new THREE.Matrix4().copy(SP.phone.matrixWorld).invert()) : null, ph = new THREE.Vector3();
+    const PR = CLIP && SP.props ? SP.props.map(q => (q.obj.updateMatrixWorld(true), {q, inv: new THREE.Matrix4().copy(q.obj.matrixWorld).invert()})) : [], ph = new THREE.Vector3();
     parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position, reg = vreg[pi];
       for (let i = 0; i < P.count; i += 2) { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); const rg = reg[i];
         if (v.y < F - M) { add("floor", rg, F - v.y, f); nPen++; }
         if (CLIP) { const wd = Math.max(-2.0 - v.x, v.x - 2.0, -1.45 - v.z, v.z - 1.60); if (wd > M) { add("wall", rg, wd, f); nPen++; } }
-        if (PH && rg === "hands") { ph.copy(v).applyMatrix4(PH); const [pw, phh, pd] = SP.phoneSize, d = Math.min(pw / 2 - Math.abs(ph.x), phh / 2 - Math.abs(ph.y), pd / 2 - Math.abs(ph.z));
-          if (d > 0.002) add("phone", rg, d, f); }
+        if (rg === "hands") for (const {q, inv} of PR) { ph.copy(v).applyMatrix4(inv);
+          const d = Math.min(ph.x - q.min[0], q.max[0] - ph.x, ph.y - q.min[1], q.max[1] - ph.y, ph.z - q.min[2], q.max[2] - ph.z);
+          if (d > 0.002) add("phone", q.name, d, f); }
         if (rg === "feet") { const side = v.z; }
         const e = Math.min(v.x + 1.90, -0.20 - v.x, v.z - 0.25, 1.50 - v.z);
         if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - M) { add("bed", rg, TOP - v.y, f); nPen++; }
@@ -170,5 +172,6 @@ const res = await p.evaluate(([activity, secs, X, RARE, CLIP]) => { let S0step =
   if (S.support) S.support = {min_cm: +(S.support.min * 100).toFixed(2), max_cm: +(S.support.max * 100).toFixed(2), framesOutside_0_1cm: S.support.out}; delete S._sole;
   for (const k of ["L", "R"]) S.soles[k] = {min_cm: +(S.soles[k].min * 100).toFixed(1), max_cm: +(S.soles[k].max * 100).toFixed(1), on: S.soles[k].on};
   S.worst = S.worst.sort((a, b) => b[1] - a[1]).slice(0, 5); S.legs.maxDepth = +(S.legs.maxDepth * 100).toFixed(1);
+  if (CLIP) S.facing = SP.phoneFacing || SP.propFacing || null;
   S.mode = window.mh && mh.M.mode; return S; }, [activity, +secs || 8, JSON.parse(process.env.LIFE || "{}"), process.env.RARE || null, CLIP]);
 const txt = JSON.stringify(res, null, 1); if (out) fs.writeFileSync(out, txt); console.log(txt); await b.close();

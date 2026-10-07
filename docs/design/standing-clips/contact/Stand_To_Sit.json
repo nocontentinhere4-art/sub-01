@@ -1,0 +1,72 @@
+{
+"frames": 68,
+"at": "clip:Stand_To_Sit",
+"clip": "Stand_To_Sit",
+"step": null,
+"chair": {},
+"desk": {},
+"other": {},
+"floor": {},
+"bed": {},
+"wall": {},
+"phone": {},
+"seat": {
+"lowestGap_min_cm": -0.1,
+"lowestGap_max_cm": 40.8,
+"framesUnder": 0,
+"maxVertsUnder": 0,
+"maxDepth_cm": 0
+},
+"soles": {
+"L": {
+"min_cm": 0.3,
+"max_cm": 1.6,
+"on": "surface"
+},
+"R": {
+"min_cm": 0.8,
+"max_cm": 1,
+"on": "surface"
+}
+},
+"worst": [],
+"perFrame": {},
+"legs": {
+"framesIn": 27,
+"maxVerts": 3067,
+"maxDepth": 8.2,
+"worstT": 0,
+"radius_cm": {
+"L": [
+15.5,
+15.3,
+15.3,
+14.6,
+14.2,
+13.9,
+14,
+13.9,
+13.4,
+12.5
+],
+"R": [
+17.1,
+16.1,
+15.1,
+14.3,
+13.8,
+13.6,
+13.7,
+13.8,
+13.6,
+13.5
+]
+}
+},
+"support": {
+"min_cm": 0.33,
+"max_cm": 0.78,
+"framesOutside_0_1cm": 0
+},
+"mode": null
+}
