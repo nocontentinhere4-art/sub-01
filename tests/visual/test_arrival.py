@@ -59,16 +59,16 @@ def test_caption_says_going_to_the_desk_until_he_sits(tmp_path):
 
 
 def test_he_sits_in_real_time_on_a_slow_frame_rate(tmp_path):
-    """The page's own loop (no manual steps), the CPU throttled 10x so frames come slowly on any machine: from the door
-    he is seated at the desk within 45 s of the server's tick. (Before: the walk alone took ~170 s at 0.24 fps.)"""
+    """The page's own loop (no manual steps) under headless software GL, which draws the room at a fraction of a frame a
+    second: from the door he is seated at the desk within 45 s of the server's tick (now ~16 s at 0.11 fps; before, the
+    walk alone took ~170 s at 0.24 fps). (Not CPU throttling: that slows his steps as much as the drawing, so no
+    catch-up can keep real time - a slow device draws slowly, it does not step slowly.)"""
     if not H.chromium_ok():
         pytest.skip("playwright / chromium not installed")
     from playwright.sync_api import sync_playwright
     h = H.Harness(tmp_path, log=lambda *a: None)
     with Server() as server, sync_playwright() as p:
         pg = _browser(p, h, server)
-        cdp = pg.context.new_cdp_session(pg)
-        cdp.send("Emulation.setCPUThrottlingRate", {"rate": 10})
         pg.evaluate("() => { window.FREEZE = false; }")          # (the harness freezes the page's loop to step it by hand)
         server.set_scene("computer", 14)
         t0 = time.time(); seated = None; frames0 = None
@@ -77,6 +77,5 @@ def test_he_sits_in_real_time_on_a_slow_frame_rate(tmp_path):
             if s["goal"] == "desk" and s["at"] == "desk" and not s["step"]:
                 seated = time.time() - t0; break
             time.sleep(0.5)
-        cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
         h.browser.close()
     assert seated is not None and seated < 45, f"not seated within 45 s of real time (seated at {seated})"

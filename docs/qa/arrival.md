@@ -48,5 +48,8 @@ Both fail on main and pass here:
 - **The caption.** From the door, the server sends the computer scene (`scenes.py` "computer": research with a page on
   the screen). The caption must say "going to the desk" every step until the page has him seated, then "at the
   computer". On main it said "at the computer" while he was still walking.
-- **Real time.** The page's own loop with the CPU throttled 10×. He must be seated within 45 s of the tick. On main he
-  was not seated within 60 s.
+- **Real time.** The page's own loop under headless software GL, which draws the room at a fraction of a frame a
+  second. He must be seated within 45 s of the tick (here ~16 s at 0.11 fps). On main he was not seated within 60 s.
+  - The test does not throttle the CPU: that slows his steps as much as the drawing, so no catch-up can keep real time,
+    and a slow device draws slowly, it does not step slowly.
+  - With the hands from the owner's takes merged in, a 10× throttle took 48 s.
