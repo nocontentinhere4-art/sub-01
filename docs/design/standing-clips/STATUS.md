@@ -66,3 +66,11 @@ Run on 63efec3, the final clips and code, 2026-10-07:
    to him; `sheet.jpg` is re-rendered.
 5. **Main's old slides: noted.** That is the rig's input (G20). After autorig re-runs on the new `char_v5.glb`,
    `standing_rebake.sh <char.glb>` re-bakes all nine in one command.
+
+## Next: re-bake on the one character source (C, 2026-10-07 16:09)
+- The character has one source: main's `web/room/char_v5.glb` (b2593d7: collar + feet). This branch does not change
+  `char_v5.glb` or `char_mixamo.glb`: `git diff origin/preview/mixamo-pipeline..HEAD` shows neither.
+- [ ] When G21's `char_mixamo.glb`, rebuilt from that GLB, is on `preview/mixamo-wiring`: run
+      `room_build/kimodo/standing_rebake.sh <that char_mixamo.glb>`, re-run the contact, self-contact and sheet, and
+      push. As of 16:10 UTC, `preview/mixamo-wiring` (94061b7) says nothing yet about being rebuilt from b2593d7, so
+      this waits.
