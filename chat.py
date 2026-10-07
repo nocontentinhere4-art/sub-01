@@ -26,12 +26,18 @@ MONEY = re.compile(r"\b(send|give|pay|tip|donate|lend|transfer|spare)\b.{0,20}\b
                    r"cash|funds|coins?|tokens?|dollars?|bucks|euros?|\d+)\b|\$\s?\d|\d\s?(sol|usd|eur|€)\b|"
                    r"\b(donations?|donate|giveaway|airdrop|venmo|paypal|cash ?app|zelle|wallet|seed phrase|private key)\b",
                    re.I)
-# small built-in list of slurs and insults (matched on a normalised, de-leeted copy of the text)
-SLURS = ("nigger", "nigga", "faggot", "fag", "kike", "spic", "chink", "gook", "wetback", "tranny", "retard",
-         "dyke", "cunt", "whore", "slut", "bitch", "bastard", "idiot", "moron", "imbecile", "stupid", "dumbass",
-         "loser", "asshole", "dickhead", "motherfucker", "fuck you", "fuck off", "stfu", "kys", "kill yourself",
-         "shut up", "piece of shit", "worthless", "pathetic", "ugly")
-SLUR_RE = re.compile(r"\b(" + "|".join(re.escape(w) for w in SLURS) + r")(s|es|ed|ing|y|ic)?\b")
+# small built-in list of slurs and insults (matched on a normalised, de-leeted copy of the text). Chat messages and
+# nicknames are checked against all of them. Song and video titles (media=True) only against HATE_SLURS: the owner
+# allows explicit lyrics and swearing in songs and videos ("Stupid Love", "Loser", "Bitch Better Have My Money"),
+# never hate slurs, sexual slurs or self-harm prompts.
+HATE_SLURS = ("nigger", "nigga", "faggot", "fag", "kike", "spic", "chink", "gook", "wetback", "tranny", "retard",
+              "dyke", "cunt", "whore", "slut", "kys", "kill yourself")
+INSULTS = ("bitch", "bastard", "idiot", "moron", "imbecile", "stupid", "dumbass", "loser", "asshole", "dickhead",
+           "motherfucker", "fuck you", "fuck off", "stfu", "shut up", "piece of shit", "worthless", "pathetic", "ugly")
+SLURS = HATE_SLURS + INSULTS
+_slur_re = lambda words: re.compile(r"\b(" + "|".join(re.escape(w) for w in words) + r")(s|es|ed|ing|y|ic)?\b")  # noqa: E731
+SLUR_RE = _slur_re(SLURS)
+HATE_RE = _slur_re(HATE_SLURS)
 LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
 
 
@@ -45,8 +51,9 @@ def dedupe_key(text):
     return re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", text).lower())
 
 
-def blocked(text):
-    """Reason string if the message must be dropped, else None."""
+def blocked(text, media=False):
+    """Reason string if the message must be dropped, else None. media=True: a song or video title, where swearing and
+    insults are allowed (HATE_RE instead of SLUR_RE); every other rule stays."""
     if URL.search(text):
         return "links are not allowed"
     if SOL_ADDR.search(text) or ETH_ADDR.search(text):
@@ -57,7 +64,7 @@ def blocked(text):
         return "no personal data"
     if MONEY.search(text):
         return "no requests for money"
-    if SLUR_RE.search(normalise(text)):
+    if (HATE_RE if media else SLUR_RE).search(normalise(text)):
         return "insults are not allowed"
     return None
 

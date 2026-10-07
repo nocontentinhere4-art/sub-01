@@ -390,7 +390,7 @@ def test_tiktok_rows_carry_the_official_embed_without_autoplay():
     row = s.public()["last"][0]
     assert row["embed"]["label"] == "TikTok (official embed)" and "autoplay=0" in row["embed"]["src"]
     s.seen({"url": "https://www.tiktok.com/@x.y/video/6718335390845095174", "title": "any caption"})
-    assert "embed" not in s.public(lambda t: False)["last"][0]  # a caption that fails the filter: no player
+    assert "embed" not in s.public(lambda t, host="": False)["last"][0]  # a caption that fails the filter: no player
     s.idle("he is not at a screen")
     assert s.public()["browser"]["state"] == "idle"
 
