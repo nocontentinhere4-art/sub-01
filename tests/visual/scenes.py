@@ -51,8 +51,9 @@ SCENES = {
 # the hour each scene is shot at in the core set, and the full matrix
 # preview/room-mh: when room/boy.glb is the MakeHuman rig (web/room/boy_mh.js drives it with its own clips) pose()
 # reports these instead: the desk modes (desk_type_ik / desk_mouse_ik / desk_watch), the stand and the lie stills, the
-# recorded walk loop; eating plays room_eat, asleep he lies as room_bedtime ends (mh_sleep)
-MH_CLIP = {"desk": "desk_", "eating": "room_eat", "sleeping": "mh_sleep", "sleeping_side": "mh_sleep", "phone": "mh_lie",
+# recorded walk loop; eating plays room_eat, asleep he plays the captured sleep loop (room_laying_sleeping, G17; the still of
+# room_bedtime's end, mh_sleep, without it)
+MH_CLIP = {"desk": "desk_", "eating": "room_eat", "sleeping": "room_laying_sleeping", "sleeping_side": "room_laying_sleeping", "phone": "mh_lie",
            "door": "mh_stand", "walking": "room_walk", "window": "mh_stand"}
 
 

@@ -107,7 +107,7 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
         // (as kimodo_g12/bed_clip.py: "back" his torso, "shoulder" the clavicles and the pelvis, both lie on the bed; "fore" his
         // hands and the wrist half of his forearms - by the elbow his sleeve lies on the hoodie's loose flank, cloth on cloth)
         r[i] = /^(Hips|Spine|Spine0[12])$/.test(nm) ? "back" : /Shoulder$|^Pelvis$/.test(nm) ? "shoulder" : /^(Head|head_end)$/.test(nm) ? "head" : /ForearmTwist02|Hand$|finger|metacarpal|thumb/i.test(nm) ? "fore"
-          : /UpLeg/.test(nm) ? (nm.startsWith("Left") ? "thighL" : "thighR") : /Foot|Toe/.test(nm) ? "foot" : "other"; } return r; });
+          : /UpLeg|ThighTwist/.test(nm) ? (/^(Left|L_)/.test(nm) ? "thighL" : "thighR") : /Foot|Toe/.test(nm) ? "foot" : "other"; } return r; });
     L.segs = {torso: ["Hips", "neck", "back"], thighL: ["LeftUpLeg", "LeftLeg", "thighL"], thighR: ["RightUpLeg", "RightLeg", "thighR"], head: ["Head", "head_end", "head"]};
     L.back = {}; L.head = {min: 9, max: -9}; L.feet = {maxX: -9}; L.self = {framesIn: 0, maxVerts: 0, maxDepth_cm: 0, by: {}};
     L.duvet = null; L.phones = null;
@@ -141,7 +141,7 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
     const bins = {}; let hlo = 9, fx = -9;
     let pil = 9; const hipX = boy.getObjectByName("Hips").getWorldPosition(new THREE.Vector3()).x;
     parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position, K = L.kind[pi]; for (let i = 0; i < P.count; i += 2) { let k = K[i];
-      if (k === "thighL" || k === "thighR") { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); if (Math.abs(v.x - hipX) < 0.15) k = "back"; else continue; }   // (his buttocks: thigh-weighted skin by the hips)
+      if (k === "thighL" || k === "thighR") { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); if (v.x > hipX - 0.15 && v.x < hipX + 0.06) k = "back"; else continue; }   // (his buttocks: thigh-weighted skin by the hips, short of the backs of his thighs)
       if (k !== "back" && k !== "shoulder" && k !== "head" && k !== "foot") continue;
       sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld); if (k === "foot") { if (v.y > 0.5) fx = Math.max(fx, v.x); continue; }   // (not the slides parked on the floor)
       const top = L.top(v.x, v.z); if (top < 0) continue;

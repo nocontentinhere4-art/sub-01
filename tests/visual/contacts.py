@@ -48,7 +48,7 @@ SCENARIOS_MH = [  # the room clips under room/boy_mh.js (preview/room-mh; v5 on 
     ("getting up to the window", MH_DESK + "; for (let i = 0; i < 60; i++) animate_(1/30); live('window', {activity: 'window'})", 12),
     ("sitting down at the desk", "act('window'); for (let i = 0; i < 30; i++) animate_(1/30); live('research', {screen: {device: 'desk', id: 'p2', kind: 'page'}})", 16),
     # in bed (from the harness's sleeping scene, 23:00, under the duvet): the mattress and the duvet, and how far over it he lies
-    ("in bed, asleep (mh_sleep: room_bedtime's end)", "", 8, "sleeping"),
+    ("in bed, asleep (room_laying_sleeping, the captured loop)", "", 8, "sleeping"),
     ("waking, out of bed (room_bed_wake)", "live('window', {activity: 'window'})", 10, "sleeping"),
 ]
 

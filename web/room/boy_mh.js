@@ -1127,6 +1127,7 @@ export function createMH(env) {
   function bedMusic(st, dt) {
     if (!M.music) return;
     const S = st.step, listening = st.goal && st.goal.clip === "listen";
+    if (!BM.ph && !S) { const a = M.actions.music; if (a && a.isRunning() && !(listening && st.at === "bedlie")) { a.setEffectiveWeight(0); a.stop(); } }   // (handed to a step: off once it is over)
     if (!BM.ph) {
       if (!(listening && st.at === "bedlie" && !S)) return;
       BM.a = st.current || null; bmPlay(M.actions.music_in ? "music_in" : "music");   // (no in: the loop fades in over his lying pose)
@@ -1135,11 +1136,18 @@ export function createMH(env) {
     if (BM.ph === "music_in" && BM.a.time >= BM.a.getClip().duration - 1e-3) bmPlay("music");
     const leaving = S && S.from === "bedlie";
     if (BM.ph === "music" && (leaving || !listening) && (!M.actions.music_out || BM.a.time < 3.5)) {
-      if (M.actions.music_out) bmPlay("music_out"); else { BM.ph = "fade"; BM.t = 0; } }   // (no out: back to his lying pose)
+      if (M.actions.music_out) bmPlay("music_out");
+      else { BM.ph = "fade"; BM.t = 0; } }                  // (no out: back to his lying pose, or into the get-up)
     if (BM.ph === "fade") {
-      const w = Math.min(1, BM.t / 0.6), lie = st.current; BM.a.setEffectiveWeight(1 - w);
+      // (into what the page shows next: getting up, the step's own first pose - the page's lying pose its step starts from,
+      // held while this fades - not the page's current clip, which by then is the pose at the step's far end, on the edge:
+      // fading into that and then starting the step from lying snapped his head 64 cm in one frame)
+      // Getting up, the step runs as it does from the plain lying pose (its own cross-fade from the page's lying pose into
+      // the get-up) and the music pose fades out over it in 0.3 s; holding the step while fading back to the page's lying
+      // pose (as before) jumped his head 64 cm when the step then went on
+      const w = Math.min(1, BM.t / (S ? 0.3 : 0.6)), lie = S ? null : st.current; BM.a.setEffectiveWeight(1 - w);
       if (lie && lie !== BM.a) { if (!lie.isRunning()) lie.play(); lie.setEffectiveWeight(w); }
-      if (S) S.t = 0; env.mixer.update(0); if (w < 1) return; }
+      env.mixer.update(0); if (w < 1) return; }
     if (BM.ph === "fade" || (BM.ph === "music_out" && BM.a.time >= BM.a.getClip().duration - 1e-3)) {   // (done: the step goes on, or the page's clip again)
       for (const k of ["music_in", "music", "music_out"]) if (M.actions[k]) { M.actions[k].setEffectiveWeight(0); M.actions[k].stop(); }
       if (!S && st.current) { st.current.setEffectiveWeight(1); st.current.play(); }

@@ -1,0 +1,182 @@
+{
+ "frames": 87,
+ "at": "bedlie",
+ "step": null,
+ "chair": {},
+ "desk": {},
+ "other": {},
+ "bedframe": {},
+ "floor": {},
+ "bed": {},
+ "seat": {
+  "lowestGap_min_cm": 900,
+  "lowestGap_max_cm": -900,
+  "framesUnder": 0,
+  "maxVertsUnder": 0,
+  "maxDepth_cm": 0
+ },
+ "soles": {
+  "L": {
+   "min_cm": 71.9,
+   "max_cm": 72.1,
+   "on": "floor"
+  },
+  "R": {
+   "min_cm": 71.4,
+   "max_cm": 71.6,
+   "on": "floor"
+  }
+ },
+ "worst": [],
+ "keys": {
+  "top": 1.001,
+  "framesOver": 0,
+  "framesTouch": 0,
+  "framesBelow": 0,
+  "minGap_cm": 99,
+  "maxGap_cm": -99,
+  "gaps": []
+ },
+ "legs": {
+  "framesIn": 0,
+  "maxVerts": 0,
+  "maxDepth": 0,
+  "worstT": null,
+  "radius_cm": {
+   "L": [
+    16,
+    15,
+    14.5,
+    14.5,
+    13.8,
+    13.7,
+    13.8,
+    13.6,
+    13.2,
+    12.3
+   ],
+   "R": [
+    15.9,
+    15.4,
+    15,
+    14.4,
+    14.1,
+    13.9,
+    13.4,
+    13.6,
+    13.3,
+    13
+   ]
+  }
+ },
+ "lying": {
+  "surface": "folded quilt (sheet + 1.4 cm)",
+  "back": [
+   {
+    "from_headboard_cm": 50,
+    "lowestGap_min_cm": 2.7,
+    "lowestGap_max_cm": 2.8
+   },
+   {
+    "from_headboard_cm": 60,
+    "lowestGap_min_cm": 1.4,
+    "lowestGap_max_cm": 1.5
+   },
+   {
+    "from_headboard_cm": 70,
+    "lowestGap_min_cm": 0.4,
+    "lowestGap_max_cm": 0.5
+   },
+   {
+    "from_headboard_cm": 80,
+    "lowestGap_min_cm": 0.3,
+    "lowestGap_max_cm": 0.4
+   },
+   {
+    "from_headboard_cm": 90,
+    "lowestGap_min_cm": 1.1,
+    "lowestGap_max_cm": 1.2
+   },
+   {
+    "from_headboard_cm": 100,
+    "lowestGap_min_cm": 4.3,
+    "lowestGap_max_cm": 4.4
+   }
+  ],
+  "back_worst": {
+   "min_cm": 0.3,
+   "max_cm": 4.4
+  },
+  "head_on_pillow": {
+   "min_cm": -1.4,
+   "max_cm": -0.9,
+   "at_max_s": 2.77
+  },
+  "shoulders_into_pillow_edge_cm": -4,
+  "feet": {
+   "toes_max_x": 0.009,
+   "inside_end_cm": 4.1
+  },
+  "self": {
+   "framesIn": 0,
+   "maxVerts": 0,
+   "maxDepth_cm": 0,
+   "by": {}
+  },
+  "phones": {
+   "frames": 87,
+   "headIn": 198,
+   "headMax_cm": 2.9,
+   "headFrames": 87,
+   "pillowIn": 4,
+   "pillowMax_cm": 0.5,
+   "pillowFrames": 26,
+   "minClear_cm": -0.5,
+   "part": {
+    "hp_cupL": 2.9,
+    "hp_cupR": 1,
+    "hp_band": 1.2
+   },
+   "ppart": {
+    "hp_cupL": 0.3,
+    "hp_band": 0.5
+   }
+  }
+ },
+ "jump": {
+  "max_cm_per_frame": 0.4,
+  "worst": [
+   [
+    0.27,
+    0.4,
+    "mh_lie"
+   ],
+   [
+    1.7,
+    0.4,
+    "mh_lie"
+   ],
+   [
+    0.03,
+    0.3,
+    "mh_lie"
+   ],
+   [
+    0.23,
+    0.3,
+    "mh_lie"
+   ],
+   [
+    0.3,
+    0.3,
+    "mh_lie"
+   ],
+   [
+    0.33,
+    0.3,
+    "mh_lie"
+   ]
+  ]
+ },
+ "mode": null
+}

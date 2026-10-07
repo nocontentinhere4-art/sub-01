@@ -1,0 +1,111 @@
+{
+ "frames": 300,
+ "at": null,
+ "step": {
+  "k": "pose",
+  "to": "bedside"
+ },
+ "chair": {},
+ "desk": {},
+ "other": {},
+ "bedframe": {},
+ "floor": {},
+ "bed": {},
+ "seat": {
+  "lowestGap_min_cm": 900,
+  "lowestGap_max_cm": -900,
+  "framesUnder": 0,
+  "maxVertsUnder": 0,
+  "maxDepth_cm": 0
+ },
+ "soles": {
+  "L": {
+   "min_cm": 6.3,
+   "max_cm": 101.9,
+   "on": "floor"
+  },
+  "R": {
+   "min_cm": 4.4,
+   "max_cm": 102.1,
+   "on": "floor"
+  }
+ },
+ "worst": [],
+ "keys": {
+  "top": 1.001,
+  "framesOver": 0,
+  "framesTouch": 0,
+  "framesBelow": 0,
+  "minGap_cm": 99,
+  "maxGap_cm": -99,
+  "gaps": []
+ },
+ "legs": {
+  "framesIn": 160,
+  "maxVerts": 3804,
+  "maxDepth": 14.6,
+  "worstT": 3.63,
+  "radius_cm": {
+   "L": [
+    16.5,
+    15.3,
+    14.8,
+    14.6,
+    13.9,
+    13.7,
+    13.9,
+    13.7,
+    13.1,
+    12.5
+   ],
+   "R": [
+    16.2,
+    15.6,
+    15.1,
+    14.4,
+    14.1,
+    13.8,
+    13.4,
+    13.7,
+    13.4,
+    13.2
+   ]
+  }
+ },
+ "jump": {
+  "max_cm_per_frame": 127.1,
+  "worst": [
+   [
+    4.43,
+    127.1,
+    "mh_edge"
+   ],
+   [
+    4.47,
+    41,
+    "pose"
+   ],
+   [
+    0.27,
+    26.6,
+    "pose"
+   ],
+   [
+    0.23,
+    20.2,
+    "pose"
+   ],
+   [
+    3.97,
+    17.6,
+    "pose"
+   ],
+   [
+    3.93,
+    17.3,
+    "pose"
+   ]
+  ]
+ },
+ "mode": null
+}

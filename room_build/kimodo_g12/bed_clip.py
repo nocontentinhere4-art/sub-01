@@ -13,6 +13,8 @@ What it does, on every frame of the clip (the same constant turns on every frame
   1. level  the body turned about his side axis (through the hips) until his back lies flat: the lowest back skin under
             the hips and under the shoulder blades level. (The captures lie V-shaped, hips highest: the performer's
             head and heels are 6 deg below the hips, on a bed with no pillow.)
+  1b. pelvis the pelvis and legs turned about the hip joint and the waist turned back (the upper body stays) until his
+            buttocks lie as low as the small of his back (the captures lie as over a bump)
   2. pillow the neck and head bent about the side axis until the back of his head rests on the pillow's top
             (PILLOW_SINK into it; the rest surface of the room's own sheet/pillow mesh, bed_surface.mjs)
   3. heels  the legs turned at the hips until the heels rest on the mattress (the heels at his lowest); and if his toes
@@ -157,6 +159,22 @@ def diag(tag):
     if not DEBUG: return
     X, _ = skinf([0]); y = X[0][:, 1]; print(tag, 'back %.3f legs %.3f low %.3f (%s)' % (backlow(X[0]), y[HEEL & BODY].min(), y[BODY].min(), dom[BODY][y[BODY].argmin()]))
 diag('after level')
+# 1b. pelvis: the pelvis and legs turned about the hip joint, the waist turned back (his upper body stays), until his
+# buttocks lie as low as the small of his back: the captures lie as over a bump (the performer's hips highest), which
+# left his lower back on the mattress and his buttocks 3-5 cm over it
+def pelvis_err(fs):
+    X, _ = skinf(fs); e = []
+    for f in range(len(fs)):
+        x, z = room_xz(X[f]); y = X[f][:, 1]; flat = surf(x, z) < 0.84
+        butt = THIGH & BODY & flat & (x > HIPS_ROOM[0]) & (x < HIPS_ROOM[0] + 0.15)
+        lumb = BACK & BODY & flat & (x > HIPS_ROOM[0] - 0.25) & (x < HIPS_ROOM[0] - 0.05)
+        e.append(y[butt].min() - y[lumb].min() if butt.any() and lumb.any() else 0.0)
+    return float(np.mean(e))
+def tilt_pelvis(a):
+    turn(allf, 'Hip', SIDE, a)
+    if 'Waist' in ix: turn(allf, 'Waist', SIDE, -a)
+a_pv, e_pv = (0.0, 0.0) if ONSIDE else solve(tilt_pelvis, lambda: pelvis_err(SAMPLE), -0.35, 0.35)
+diag('after pelvis')
 # 2. pillow: the neck and upper back bent until the back of his head is PILLOW_SINK into the pillow's top, his back on the
 # mattress: in the room, his lowest skin is put on the bed (the page), so this is the head's height over his back's
 def head_err(fs):
@@ -223,13 +241,14 @@ def torso_in(X, P2, side):
         for j in o: print(side, dom[k][j], 'band', band[k][j], 'sec', sec[k][j], 'r %.3f R %.3f t %.2f' % (r[k][j], Rm[c[k]][j], t[k][j]))
     return float(np.max(np.r_[0, Rm[c[k]] - r[k]]))
 ARM = np.array([bool(re.match(r'[LR]_(Forearm|Hand|Upperarm)|finger|metacarpal', n)) for n in dom])
+HEAD_TOL = 0.02 if not ONSIDE else 0.005   # (the polar map reads the ears as the head's surface: 2 cm of slack by his ears; on his side his hand lies by his face, not his ears)
 def head_in(X, P2, side):                                       # (his hand in his head: a polar map round Head -> head_end; > 2 cm, the ears stand out)
     a, b = P2[ix['Head']], P2[ix['head_end']] if 'head_end' in ix else P2[ix['Head']] + np.array([0, 0.2, 0])
     ax = (b - a) / np.linalg.norm(b - a); L = np.linalg.norm(b - a); e1 = np.cross([0, 1.0, 0], ax); e1 /= np.linalg.norm(e1) + 1e-9; e2 = np.cross(ax, e1)
     w = X - a; t = w @ ax / L; r = np.hypot(w @ e1, w @ e2); phi = np.arctan2(w @ e2, w @ e1)
     NB, NS = 13, 24; band = np.clip(((t + 0.3) / 1.6 * NB).astype(int), 0, NB - 1); sec = np.clip(((phi + np.pi) / (2 * np.pi) * NS).astype(int), 0, NS - 1)
     ok = (t > -0.3) & (t < 1.3); Rm = np.zeros(NB * NS); c = band * NS + sec; m = HEAD & ok; np.maximum.at(Rm, c[m], r[m])
-    k = FORE & (SIDEOF == side) & ok & (Rm[c] > 0); return float(np.max(np.r_[0, Rm[c[k]] - r[k] - 0.02]))
+    k = FORE & (SIDEOF == side) & ok & (Rm[c] > 0); return float(np.max(np.r_[0, Rm[c[k]] - r[k] - HEAD_TOL]))
 def hand_err(side, fs):
     # in his torso or head, or (on his side, the lower arm) under his torso's contact with the bed
     X, P2 = skinf(fs); return max(max(torso_in(X[f], P2[f], side), head_in(X[f], P2[f], side),
@@ -301,7 +320,7 @@ if LOOP:
 
 # ---- report: the contacts in the room's frame (the page puts his lowest skin at the bed's top)
 X, P2 = skinf(allf); top = TOP
-rep = {'level_deg': round(float(np.degrees(a_lvl)), 1), 'level_err_cm': round(e_lvl * 100, 1), 'neck_deg': round(float(np.degrees(a_nk)), 1),
+rep = {'pelvis_deg': round(float(np.degrees(a_pv)), 1), 'pelvis_err_cm': round(e_pv * 100, 1), 'level_deg': round(float(np.degrees(a_lvl)), 1), 'level_err_cm': round(e_lvl * 100, 1), 'neck_deg': round(float(np.degrees(a_nk)), 1),
        'head_err_cm': round(e_nk * 100, 1), 'legs_deg': round(float(np.degrees(a_lg)), 1), 'knees_deg': round(float(np.degrees(a_kn)), 1), 'heel_err_cm': round(e_lg * 100, 1),
        'wrists_moved_cm': {s: [round(a_hand[s][0] * 100, 1), a_hand[s][2]] for s in 'LR'}, 'hands_in_cm': {s: round(a_hand[s][1] * 100, 1) for s in 'LR'}}
 lows = X[:, BODY, 1].min(1); off = top - lows                    # the page's lift per frame

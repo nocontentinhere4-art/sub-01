@@ -91,11 +91,12 @@
    "mode": "asleep",
    "side": true,
    "fit": "bed_clip",
-   "out": null
+   "out": null,
+   "slide": -0.06
   }
  },
  "bed": {
-  "_": "room_build/kimodo/bed_rebake.sh <character.glb>: the bed clips (G17, docs/design/bed-clips). Each row with fit bed_clip goes through kimodo_g12/bed_clip.py onto our bed (mode asleep: on the mattress under the duvet; awake: on the folded quilt; side: lying on his side); then the turn is composed by kimodo_g12/bed_turn.py from the sleep loop and the side stretch.",
+  "_": "room_build/kimodo/bed_rebake.sh <character.glb>: the bed clips (G17, docs/design/bed-clips). Each row with fit bed_clip goes through kimodo_g12/bed_clip.py onto our bed (mode asleep: on the mattress under the duvet; awake: on the folded quilt; side: lying on his side); then the turn is composed by kimodo_g12/bed_turn.py from the sleep loop and the side stretch. slide (m, default 0.04): the clip moved toward the headboard (negative: toward the foot; on his side his lower shoulder otherwise lies 12 cm into the pillow's edge).",
   "clips": [
    "Laying_Nodding",
    "Laying_Sleeping",
