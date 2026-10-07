@@ -32,10 +32,13 @@ for b in range(NT):
     # (its innermost point); below the lip it falls away (the bowl), where the lining leaves it for the neck
     yt = max(wall); ylip = min(wall, key=lambda y: (wall[y], -y))
     prof = [(wall[yt] - 0.0015, yt - 0.0005)] + [(wall[y] - OFF, y) for y in sorted(wall, reverse=True) if y >= ylip]   # (over the rim's own edge first)
-    yj = max(1.415, ylip - DROP)
+    # (at the back the reference's lining is a thick roll hugging the nape: there the lining meets the neck just under its
+    # lip, arching up between them; at the front, the groove 2.5 cm down; w goes 0 at the front to 1 at the back)
+    w = (1 - np.cos(th)) / 2; drop = DROP - (DROP - 0.006) * w
+    yj = max(1.415, ylip - drop)
     rnj = neck.get(min(ys, key=lambda y: abs(y - yj))) or 0.05
-    # from the lip to the neck: a sagging curve (the groove), 6 steps
-    rl, yl = prof[-1]; rc, yc = 0.5 * (rl + rnj), min(yl, yj) - 0.004
+    # from the lip to the neck, 6 steps: sagging into the groove at the front, arching into a roll at the back
+    rl, yl = prof[-1]; rc, yc = 0.5 * (rl + rnj), (1 - w) * (min(yl, yj) - 0.004) + w * (max(yl, yj) + 0.008)
     for i in range(1, 7):
         u = i / 6; prof.append(((1 - u) ** 2 * rl + 2 * u * (1 - u) * rc + u ** 2 * (rnj - 0.002), (1 - u) ** 2 * yl + 2 * u * (1 - u) * yc + u ** 2 * yj))
     profiles.append((th, prof))
