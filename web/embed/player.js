@@ -5,6 +5,13 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {prep, fixClip} from './character.js';
 
 const $ = id => document.getElementById(id);
+$('screen-toggle').onclick=()=>{
+  const opening=$('screen-detail').hidden;
+  $('screen-detail').hidden=!opening;
+  $('screen-toggle').textContent=opening?'Back to desk ↙':'Enlarge Fomo ↗';
+  $('screen-toggle').setAttribute('aria-expanded',String(opening));
+  if(opening)$('screen-detail').scrollLeft=Math.max(0,($('screen-detail').scrollWidth-$('screen-detail').clientWidth)*.65);
+};
 let mixer, renderer, scene, camera, idle;
 const clock = new THREE.Clock();
 let updateMonitor=()=>{}, screenMaterial=null, screenStamp=null, screenBusy=false;
@@ -66,7 +73,8 @@ function update(data){
   $('rules').textContent=rules ? `${rules.budget_usd===null?'BUDGET PENDING':'$'+rules.budget_usd+' / $'+rules.per_order_usd+' ENTRY'} · ½ AT +100% · TRAIL 10% · SL −75%` : '';
   const plan=data.strategy?.last;
   $('strategy').textContent=plan?`NEXT: ${plan.action==='buy'?'COPY '+plan.asset:'HOLD CASH'} · ${plan.reason}`:'Copy-trading · '+(data.strategy?.state||'waiting for feed');
-  if(data.monitor?.available)loadFrame(data.monitor);else updateMonitor(data);
+  $('screen-toggle').hidden=!data.monitor?.available;
+  if(data.monitor?.available)loadFrame(data.monitor);else{$('screen-detail').hidden=true;updateMonitor(data);}
   $('badge').textContent=connected?'THE DESK · CONNECTED':'THE DESK · OFFLINE';
   $('mode').textContent=connected?'ACCOUNT EXECUTIONS':'ACCOUNT NOT CONNECTED';
   $('status').textContent=connected?'Fomo account feed · reported confirmations':s.updated_at?'Account offline · showing last received operations':'Waiting for Fomo account · no real operations yet';
@@ -87,7 +95,11 @@ async function loadFrame(meta){
   try{
     const res=await fetch('/embed/fomo-frame.jpg',{credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(8000)});
     if(!res.ok)throw Error();
-    const bitmap=await createImageBitmap(await res.blob(),{imageOrientation:'flipY'});
+    const blob=await res.blob();
+    const imageUrl=URL.createObjectURL(blob), previousUrl=$('screen-image').dataset.url;
+    $('screen-image').src=imageUrl;$('screen-image').dataset.url=imageUrl;
+    if(previousUrl)URL.revokeObjectURL(previousUrl);
+    const bitmap=await createImageBitmap(blob,{imageOrientation:'flipY'});
     const tex=new THREE.CanvasTexture(bitmap);tex.colorSpace=THREE.SRGBColorSpace;
     const old=screenMaterial.map;screenMaterial.map=tex;screenMaterial.needsUpdate=true;screenStamp=meta.revision;
     if(old){old.image?.close?.();old.dispose();}
