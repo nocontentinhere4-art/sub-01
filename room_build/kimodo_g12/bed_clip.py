@@ -388,7 +388,7 @@ rep = {'head_turn_deg': round(float(np.degrees(a_ht)), 1), 'head_roll_deg': roun
        'head_err_cm': round(e_nk * 100, 1), 'legs_deg': round(float(np.degrees(a_lg)), 1), 'knees_deg': round(float(np.degrees(a_kn)), 1), 'thighs_for_buttocks_deg': round(float(np.degrees(a_bt)), 1), 'knees_for_heels_deg': round(float(np.degrees(a_kh)), 1), 'heel_err_cm': round(e_lg * 100, 1),
        'wrists_moved_cm': {s: [round(a_hand[s][0] * 100, 1), a_hand[s][2]] for s in 'LR'}, 'hands_in_cm': {s: round(a_hand[s][1] * 100, 1) for s in 'LR'}}
 lows = X[:, BODY, 1].min(1); off = top - lows                    # the page's lift per frame
-back_g, sh_g, head_g, toe, butt_g, bedrow = [], [], [], [], [], []
+back_g, sh_g, head_g, toe, butt_g, bedrow, bins = [], [], [], [], [], [], {}
 for f in range(F):
     y = X[f][:, 1] + off[f]; x, z = room_xz(X[f]); s = surf(x, z) + (0.014 if AWAKE else 0)
     mb = BACK & BODY & (s < 0.84 + (0.014 if AWAKE else 0)); pb = BACK & BODY & ~mb
@@ -396,6 +396,9 @@ for f in range(F):
     m = HEAD & (x < -1.30); head_g.append((y[m] - surf(x[m], z[m])).min()); toe.append(x[FOOT & BODY].max())
     bt = THIGH & BODY & (s < 0.84 + (0.014 if AWAKE else 0)) & (x > HIPS_ROOM[0] - 0.15) & (x < HIPS_ROOM[0] + 0.06)
     butt_g.append((y[bt] - s[bt]).min() if bt.any() else 9)
+    hx = room_xz(P2[f, hi])[0]; mk = ((BACK & BODY) | (THIGH & BODY & (x > hx - 0.15) & (x < hx + 0.06))) & (s < 0.84 + (0.014 if AWAKE else 0))   # (the contact pass's back bins)
+    for bi in np.unique(np.floor((x[mk] + 1.90) / 0.10)).astype(int):
+        k = mk & (np.floor((x + 1.90) / 0.10) == bi); g = float((y[k] - s[k]).min()); e = bins.setdefault(int(bi), [9, -9]); e[0] = min(e[0], g); e[1] = max(e[1], g)
     ov = BODY & (s > 0.5) & (s < 0.84 + (0.014 if AWAKE else 0)); bedrow.append((y[ov] - 0.80).min())
 X0 = X[0][:, 1]; o = np.argsort(X0)[:400]; lowparts = {}
 for j in o: lowparts[dom[j]] = round(float(X0[j] - X0[o[0]]) * 100, 1) if dom[j] not in lowparts else lowparts[dom[j]]
@@ -403,7 +406,7 @@ rep['slide_cm'] = round(SLIDE * 100, 1); rep['to_reference_cm'] = round(dy0 * 10
 rep.update({'lowest_step_cm': round(float(np.ptp(lows)) * 100, 2), 'back_lowest_cm': [round(float(min(back_g)) * 100, 1), round(float(max(back_g)) * 100, 1)],
             'shoulders_into_pillow_edge_cm': round(float(min(sh_g)) * 100, 1),
             'head_on_pillow_cm': [round(float(min(head_g)) * 100, 1), round(float(max(head_g)) * 100, 1)],
-            'buttocks_cm': [round(float(min(butt_g)) * 100, 1), round(float(max(butt_g)) * 100, 1)], 'bed_row_min_cm': round(float(min(bedrow)) * 100, 1), 'sink_cm': round(SINK * 100, 1), 'page_sink_cm': round(PAGE_SINK * 100, 1), 'flat': FLAT,
+            'buttocks_cm': [round(float(min(butt_g)) * 100, 1), round(float(max(butt_g)) * 100, 1)], 'bed_row_min_cm': round(float(min(bedrow)) * 100, 1), 'back_bins_cm': {b * 10: [round(e[0] * 100, 1), round(e[1] * 100, 1)] for b, e in sorted(bins.items())}, 'sink_cm': round(SINK * 100, 1), 'page_sink_cm': round(PAGE_SINK * 100, 1), 'flat': FLAT,
             'toes_max_x': round(float(max(toe)), 3), 'toes_inside_end_cm': round((G['page']['mattressEnd'] - float(max(toe))) * 100, 1)})
 print(json.dumps(rep))
 animated = {ts.names[c['node']] for c in an['ch'] if c['path'] == 'rotation'}
