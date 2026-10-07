@@ -20,6 +20,12 @@ pod, no Tripo credits used. Method and pipeline: `README.md`, last section.
   `desk_14_1280` (11 vertices) shows up only after the hands-reach merge. I have not root-caused it yet (G14's desk
   hands, or noise in the sampled frame).
 - So **hard_failures is not [] on 2973f0b**, and it is not [] on main either.
+- 18:57 UTC: **`origin/preview/hands-reach` 2198d69 alone passes test_visual (hard_failures [])**. Its base is 402e21f.
+  Between 402e21f and main 7f2bf6e, main only changed `web/room.html` (+41/−13) and tests/visual. That is b3b14cd
+  "He sits in real time at any frame rate, and the caption says going to the desk" (G14 a307871 / db6eb20), plus 448a0b8 /
+  0ac47f8 (walls). So the red walking_8 / eating_19 desk penetration most likely comes from b3b14cd's change to how he
+  sits, not from mixamo-wiring and not from hands-reach. I haven't bisected it. desk_14 (11 vertices) then shows up when
+  hands-reach meets that main.
 
 ## Round after review (2026-10-07 18:30 UTC, head of this branch)
 Answers to Coordinator C's messages and G23 / G26's reviews (docs/review/mixamo-wiring.md on preview/review):
