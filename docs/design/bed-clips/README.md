@@ -110,9 +110,9 @@ Measured on **main's character** (`char_v5.glb` of 0ac47f8: the hood collar, the
 | bed (inside the mattress less its give) | 0 | 0 | 0 | 0 | 0 | 0 |
 | headboard / bed frame | 0 | 0 | 0 | 0 | 0 | 0 |
 | floor | 0 | 0 | 0 | 0 | 0 | 0 |
-| his hands / forearms in his own torso, thighs, head | 0 | **FAIL** 87 frames, up to 20 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 102 frames, up to 20 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 78 frames, up to 3390 verts, 8 cm {'torso': 3, 'head': 8} |
-| headphones in his head / hair | 0 | **FAIL** 87 frames, 35 verts, 1.8 cm {'hp_cupL': 1.8, 'hp_cupR': 1} | **FAIL** 87 frames, 80 verts, 1.9 cm {'hp_cupL': 1.9, 'hp_cupR': 1} | - | - | - |
-| headphones under the pillow's surface | 0 | 0 (closest 5.4 cm) | 0 (closest 6.2 cm) | - | - | - |
+| his hands / forearms in his own torso, thighs, head | 0 | **FAIL** 87 frames, up to 20 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 102 frames, up to 20 verts, 0.9 cm {'torso': 0.9} | 0 | **FAIL** 36 frames, up to 116 verts, 3 cm {'torso': 3} (his face: 0) |
+| headphones in his head / hair | 0 | **FAIL** 87 frames, 35 verts, 1.8 cm {'hp_cupL': 1.8, 'hp_cupR': 1} | **FAIL** 87 frames, 1 vert, 0.2 cm {'hp_cupR': 0.2} (target ≤ 0.5) | - | - | - |
+| headphones under the pillow's surface | 0 | 0 (closest 5.4 cm) | 0 (closest 6 cm) | - | - | - |
 | duvet: any of him through it | 0 | - | - | 0 | 0 | 0 |
 | duvet over him: gap, mean / max (cm) | follows him | - | - | hands 1.9/9.1; arms 2.5/8.5; legs 2.8/11.2; torso 1.7/4.5; feet 4.1/10.5 | hands 1.7/3.7; arms 3/9.6; torso 4.3/20.2; legs 2.7/18.9; feet 1.6/4.7 | hands 1.8/7.4; arms 4.1/25.5; torso 3.2/26.6; legs 3.5/22.7; feet 2/10.4 |
 
@@ -130,7 +130,9 @@ Sheets (page camera, zoomed onto the bed from where it stands, and fixed cameras
 - `turn.jpg`, `turn_no_duvet.jpg`: the turn at 0, 1.3, 2.6, 8, 15.9 and 17.2 s;
 - `headphones.jpg`: beside his head on both sides and from above his face, lying awake.
 
-Videos: `sleep_turn.mp4` (the turn, 17.4 s, page camera zoomed + side) and `listen.mp4` (3 s, page camera zoomed + his face) are of the clips **before** main's character and the fixes below (the sheets are current). `room_build/kimodo/bed_video.sh` makes them.
+Videos: `sleep_turn.mp4` (the turn, 17.4 s, page camera zoomed + side) and `listen.mp4` (3 s, page camera zoomed + his face), recorded on main's character with the clips of this commit. `room_build/kimodo/bed_video.sh` makes them.
+
+`owner.jpg`: one sheet for the owner, before (0908653) and after for each of C's fixes, then six frames each of LISTEN and SLEEP from the page's camera (zoomed onto the bed from where it stands).
 
 ## Main's character (0ac47f8): what changed
 
@@ -144,16 +146,23 @@ Videos: `sleep_turn.mp4` (the turn, 17.4 s, page camera zoomed + side) and `list
   - his toes are held 2.8 cm inside the mattress's end while he rolls (his socks are longer: they went 0.4 cm past).
 - **Instruments**: the head test in the contact pass and in the fit is now the same rule (behind the nearest head-skin point, seen from the head's centre), and the hood is not his head.
 
+## C's fixes (#6, #7)
+
+- **Hands off his face mid-roll** (`bed_turn.py`): on every frame of the roll where a hand or forearm is in his face (his head's own skin, measured from the head's axis as the contact pass does), the wrist is moved by two-bone IK, 2 cm at a time. It takes the first direction that clears his face, keeps the hand no deeper in his chest than before and keeps it above his own lowest skin. The directions: level toward his hip, out from his head, up, and up-and-toward his hip. A straight move toward the hip put the hand 11 cm into his chest and under him, and lifted his whole body 11 cm. Result: his face 0, on every frame (was 8 cm, 78 frames); 56 frames moved, up to 20 cm. Left over: up to 3 cm of hand in his chest on 36 frames, worst at 0.47 s, from the wrist cap.
+- **Cups out of his hair** (`boy_mh.js`, the bed clips only): lying, the pair is widened by `HP.BED_OUT` (0.8 cm per side, out along the ear's axis), blended in with his weight on the bed. Standing and at the desk the fit is G10d's, untouched. Cups in his hair: 1.9 → 0.2 cm.
+- **Neck rest clear of the hood** (C #6): his head is turned back to within 20° lying awake (9° here; the performer's was 57°). Standing and at the desk, the cups are 0 cm into the hood over every frame (with the lining, on b2593d7's v5). Lying awake, the lower cup's rim still touches the hood's edge on its outside, about 1.0 cm deep. Raising the pair 2.4–2.8 cm clears it (0.4 → 0 cm), but puts the cups back 0.7–0.8 cm into his hair. I kept the hair target, so this one is open (below).
+- **Buttocks ≤ +1 cm: not met.** A buttocks step after the heels (`BED_BUTTOCKS=1`, off by default) tilts the pelvis again and bends the knees to keep the heels down. Measured on main's v5, it takes the buttocks from +3.2…+4.4 to +2.4…+2.9 cm. But the backs of his thighs then become his lowest skin, and the page rests that on the bed, so his whole back floats: +0.2…+0.6 cm asleep and +1.8…+4.0 cm awake, with his knees bent 35–50°. The small of his back and mid back would leave the contract to get the buttocks part way, so the step stays off. Getting to ≤ +1 cm needs legs that lie flatter than either capture.
+
 ## Open
 
 - **The back**: the small of his back and his mid back touch, −0.6…0 cm asleep and +0.3…+0.5 cm awake. Two places do not:
   - just past the hip joint his buttocks are +3.2…+4.4 cm up;
   - at the pillow's edge his shoulder blades are +1.5…+2.8 cm up.
-  The cause of the buttocks gap is found, not fixed. The pelvic tilt levels them, then the heel step turns his thighs at the hips (9–16°) and lifts them again. Solving the two in turn diverges, because with the legs as captured, heels down and buttocks down conflict. The base reads +1.7…+6.2 cm on this row.
+  The buttocks are not fixed (see C's fixes above). The pelvic tilt levels them, then the heel step turns his thighs at the hips (9–16°) and lifts them again. Solving the two in turn diverges, because with the legs as captured, heels down and buttocks down conflict. The base reads +1.7…+6.2 cm on this row.
 - **His head awake**: the hood rests on the pillow, and the back of his skull sits +2.5…+3.7 cm above the pillow's top through it. Asleep: −1.7…−0.5 cm, in the contract.
-- **The headphone cups**: 1.0–1.9 cm into his hair at the ears. The base pose reads 1.8 cm, so this is the fit itself (G10d's), not this capture.
+- **The cups against the hood, lying awake**: about 1.0 cm at the lower cup's rim (above). Standing and at the desk: 0.
 - **The turn**:
-  - mid-roll (78 frames, worst at 1.87 s) a hand passes 8 cm through his face;
+  - mid-roll, up to 3 cm of a hand in his chest (36 frames); his face is clear;
   - his head goes 2.1 cm into the pillow (the give is 2), and rises 1.1 cm off it;
   - his lower shoulder presses 9 cm into the pillow's edge in the side hold, and the dent shows the mattress through the pillow (`turn_no_duvet.jpg`);
   - the duvet is a 25–27 cm tent over his arm and torso mid-roll, though nothing pokes through;
