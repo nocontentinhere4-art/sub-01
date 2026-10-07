@@ -4,6 +4,23 @@ Branch `preview/mixamo-wiring` (off `origin/preview/mixamo-pipeline`). The raw M
 `claude/loving-davinci-6hqmjx:mocap_src/mixamo/`); none is committed, only the clips baked for our skeleton. No RunPod
 pod, no Tripo credits used. Method and pipeline: `README.md`, last section.
 
+## Merge with hands-reach (2026-10-07 18:51 UTC, branch `preview/mixamo-wiring-main`)
+- `preview/mixamo-wiring-main` 5c6f9b9 + `origin/preview/hands-reach` 2198d69 merged: **2973f0b** (pushed). The conflict in
+  `web/room/boy_mh.js` kept both: G14's mode phases `M.ph` (minimum-jerk weights), task-space crossfade and elbow
+  reference, and the `?char=mixamo` wiring (`CL`/`CLIP`/`MXK` env overrides, type_in/type_out links + `link()`, `M.link`
+  reset, `SEAT_AT` with `env.seatAt`). `node --check` ok.
+- `tests/test_boy_mh.py`, `tests/test_char_mixamo.py`, `tests/visual/test_hand_switch.py`: 11 passed.
+- Full suite on 2973f0b: **1 failed, 1465 passed, 27 skipped, pytest exit 1**. The failure is
+  `test_visual.py::test_room_renders_without_hard_errors`, hard_failures:
+  `walking_8_1280: desk penetration 100 at 7.75 s`, `desk_14_1280: desk penetration 11 at 2.75 s`,
+  `eating_19_1280: desk penetration 53 at 2.25 s`.
+- **main 7f2bf6e alone** (clean worktree, same test): fails with the same `walking_8_1280` (100) and `eating_19_1280` (53).
+  These two come from main, not from this branch. Without `?char=mixamo` the wiring does nothing: `CL` = `CLIPS`, no type_in/out
+  actions so `setMode` takes main's branch, `link()` returns at once, the seat loop skips them.
+  `desk_14_1280` (11 vertices) shows up only after the hands-reach merge. I have not root-caused it yet (G14's desk
+  hands, or noise in the sampled frame).
+- So **hard_failures is not [] on 2973f0b**, and it is not [] on main either.
+
 ## Round after review (2026-10-07 18:30 UTC, head of this branch)
 Answers to Coordinator C's messages and G23 / G26's reviews (docs/review/mixamo-wiring.md on preview/review):
 - **404 / floating at 73 m (edd3a02): fixed.** That commit was pushed while the clips were still baking. All 26 clips the
