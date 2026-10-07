@@ -5,7 +5,7 @@ on:
   pull_request:
     paths-ignore: ["docs/**", "**/*.md"]
   push:
-    branches: [main]
+    branches: [main, "ci/**"]          # ci/*: a branch proving a CI change before it goes to main
     paths-ignore: ["docs/**", "**/*.md"]
 
 permissions:
@@ -73,9 +73,18 @@ jobs:
   # issue #98 (G8): the room's visual QA core set (tests/visual): headless Chromium with software WebGL puts the
   # character in each activity and shoots fixed cameras; only hard errors fail (page load, JS errors, missing poses,
   # bed/chair penetration); the rest is in the report, kept as an artifact. The heavy set is opt-in (SUB01_VISUAL_FULL=1).
+  # two jobs side by side, each well under its 30 min: the core set's scenes (test_visual.py, ~20 min) and the other
+  # pages (arrival, camera, hands). In one job nine tests took 28.5 of its 30 min (main 448a0b8).
   visual:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - {name: scenes, tests: tests/visual/test_visual.py}
+          - {name: pages, tests: tests/visual --ignore=tests/visual/test_visual.py}
+    name: visual (${{ matrix.part.name }})
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -85,13 +94,13 @@ jobs:
           cache-dependency-path: requirements-server.txt
       - run: pip install -r requirements-server.txt pytest
       - run: python -m playwright install --with-deps chromium
-      - run: python -m pytest -q tests/visual
+      - run: python -m pytest -q -rA --durations=0 ${{ matrix.part.tests }}
         env:
           SUB01_VISUAL: "1"            # a skip (no browser) is an error here
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: visual-qa
+          name: visual-qa-${{ matrix.part.name }}
           path: |
             tests/visual/out/*.png
             tests/visual/out/report.md
