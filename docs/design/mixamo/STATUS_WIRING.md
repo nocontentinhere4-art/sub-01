@@ -29,6 +29,9 @@ pod, no Tripo credits used. Method and pipeline: `README.md`, last section.
     bones, not by name.
   - Result: 2 passed. With `CHAR_MX` inverted locally (`!==`), both fail.
   - It is a commit on top of the merge, not inside it: 2973f0b was already pushed when the request reached me.
+- Full suite on **390af79** (merge + switch test): **1 failed, 1467 passed, 27 skipped, pytest exit 1**. The one failure
+  is the same `test_visual` (walking_8 100, desk_14 11, eating_19 53). It is red from main 7f2bf6e's harness, see the
+  bisect below. `test_char_switch` (2) and `test_hand_switch` pass.
 - So **hard_failures is not [] on 2973f0b**, and it is not [] on main either.
 - 18:57 UTC: **`origin/preview/hands-reach` 2198d69 alone passes test_visual (hard_failures [])**. Its base is 402e21f.
   Between 402e21f and main 7f2bf6e, main only changed `web/room.html` (+41/−13) and tests/visual. That is b3b14cd
