@@ -26,6 +26,13 @@ pod, no Tripo credits used. Method and pipeline: `README.md`, last section.
   0ac47f8 (walls). So the red walking_8 / eating_19 desk penetration most likely comes from b3b14cd's change to how he
   sits, not from mixamo-wiring and not from hands-reach. I haven't bisected it. desk_14 (11 vertices) then shows up when
   hands-reach meets that main.
+- 19:30 UTC, **bisect done** (test_visual alone, clean worktree each time). b851745, b3b14cd, 7541e19 and 448a0b8 are
+  all **green**, with hard_failures []. **7f2bf6e** is the first red one (walking_8 100, eating_19 53). That commit
+  changes no page code. Its `tests/visual/harness.py` adds `ctx.add_init_script("window.FREEZE = true")`, so the page's
+  loop is frozen from its first script, not only once it has booted. The scenes then start from a different boot state,
+  and walking_8 (7.75 s) and eating_19 (2.25 s) put him into the desk. The cause is that harness change on main (or the
+  page state it now skips), not mixamo-wiring and not b3b14cd. My note at 18:57 was wrong about b3b14cd.
+  desk_14 (11 vertices) appears in the same frozen-boot harness together with hands-reach.
 
 ## Round after review (2026-10-07 18:30 UTC, head of this branch)
 Answers to Coordinator C's messages and G23 / G26's reviews (docs/review/mixamo-wiring.md on preview/review):
