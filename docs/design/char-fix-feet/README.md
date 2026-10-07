@@ -27,9 +27,13 @@ Its input `room_build/charfix/ref_feet.glb` (committed, 1.4 MB) is made from the
 4. **Skin.** Weights are a smooth field over v5's old feet, old slides and hem (gaussian, σ 1.2 cm, top 4 bones), one
    set per position. Shared seam vertices get identical weights, the slide's tube copies the sock's, so sock and slide
    move together.
-5. **Texture.** The atlas (webp) is shared by both new meshes, material `feet`. Under the sock's triangles, the strap's
-   black, the toe's dark spot and the seam lines are filled with sock white. Under the slide's, the white fringe is filled
-   with black.
+5. **Texture.** Each new mesh has its own copy of the atlas (webp): material `socks` for the socks, `feet` for the
+   slides. Under the sock's triangles, the strap's black, the toe's dark spot and the seam lines are filled with sock
+   white, grown 4 texels to take their light rims too. Under the slide's, the white fringe is filled with black. Each
+   copy is then bled 16 texels out from its own charts, so texture filtering never brings the other's colour over a
+   chart's edge. That bleed was the dark line along the sock's edges in bed and the grey nick on the big toe (G23's
+   review; fixed on preview/char-fix-feet2). The sock's normal map is cleaned the same way: texels tilted more than
+   about 30° (the strap edge's relief rim) are filled from the flat knit.
 6. **v5's body** loses its old feet: 12,612 triangles (everything under 10.5 cm, the sock's white up to 16 cm),
    vertices compacted. The mesh `slides` is rebuilt; a new mesh `socks` is added before it (the slides stay the last
    skinned mesh, as the page's `skinMesh()` expects).
