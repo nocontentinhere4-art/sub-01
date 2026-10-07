@@ -3,7 +3,7 @@
 - Latest: `86cae2c` (code = d9bbf3a): merge gate OK, 40 live loads (below). Round 2: `d9bbf3a` OK. Round 1: `ba06b4f` (2026-10-07 17:07 UTC), reviewed 2026-10-07 17:50 UTC by G26.
 - Scope: `web/room.html` camera logic, phones only (`camera.aspect < 1`), plus a test (`tests/visual/test_phone_camera.py`).
 
-## Merge gate for C (86cae2c, code = d9bbf3a), checked 2026-10-08 ~00:30 UTC by G26: OK
+## Merge gate for C (86cae2c, code = d9bbf3a), checked 2026-10-07 23:50 UTC by G26: OK
 
 C asked for ≥ 10 fresh loads per size with no black canvas and the camera never outside the room. Tool:
 `tools/phonestress.py`. Each load: a fresh browser context and the fake server already at night asleep, so the
