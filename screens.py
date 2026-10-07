@@ -166,7 +166,7 @@ class ScreensStatus:
     def public(self, display_ok=None):
         self._roll()
         total = sum(self.counts.values())
-        ok = display_ok or (lambda s: True)
+        ok = display_ok or (lambda s, host="": True)   # (title, host) -> shown
         return {"browser": {"state": self.state, "why": self.why, "since": hhmm(self.since), "restarts": self.restarts},
                 "last": [self._row(x, ok) for x in reversed(self.last)],
                 "today": {"tokyo_day": self.day, "total": total, "counts": dict(self.counts),
@@ -175,11 +175,12 @@ class ScreensStatus:
 
 
 def _row_impl(x, ok):
-    r = dict(x, t=hhmm(x["t"]), title=x["title"] if ok(x["title"]) else x["host"])
+    good = ok(x["title"], x.get("host", ""))     # browse.card_title_ok: a video's title by the video rules
+    r = dict(x, t=hhmm(x["t"]), title=x["title"] if good else x["host"])
     vid, yid = r.pop("tiktok_id", None), r.pop("youtube_id", None)
-    if vid and ok(x["title"]):                 # a caption that fails the filter: no player either
+    if vid and good:                           # a caption that fails the filter: no player either
         r["embed"] = {"src": TIKTOK_EMBED.format(vid), "label": "TikTok (official embed)"}
-    elif yid and ok(x["title"]):
+    elif yid and good:
         import youtube_api
         r["embed"] = {"src": youtube_api.viewer_embed(yid), "label": "YouTube (official embed)"}
     return r
