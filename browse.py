@@ -183,7 +183,7 @@ BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
-                      r"before you continue|consent", re.I)
+                      r"before you continue", re.I)   # ("consent" alone: see CONSENT_TITLE, a title part that is only that)
 # bot checks recognised in the page text or by their challenge frames: he leaves these pages, never solves them
 # (only on short pages: a real bot check is a page of its own, not a sentence inside an article)
 WALL_MAX_CHARS = 2000
@@ -647,7 +647,8 @@ OVERLAY_TEXT_JS = """() => {
 # first label is one (permissions.*, consent.*, cookies.*, cmp.*, gdpr.*).
 CONSENT_TITLE = re.compile(r"(\w+ )?(permissions? request|request (for )?permissions?|permissions? required|"
                            r"cookie (consent|preferences|settings|policy|choices)|privacy (choices|preferences|center)|"
-                           r"manage (cookies|consent|your privacy)|consent( management| preferences| request)?)"
+                           r"manage (cookies|consent|your privacy)|consent( management| preferences| request)?|"
+                           r"(privacy|cookies?) (and|&) consent|consent (and|&) (privacy|cookies?))"
                            r"( form| page)?")
 CONSENT_HOST = re.compile(r"^(permissions?|consent|cookies?|cmp|gdpr)\.[\w-]+\.[\w.-]+$")
 
