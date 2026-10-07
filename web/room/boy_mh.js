@@ -555,6 +555,14 @@ export function createMH(env) {
     // had to open with the roll at its band's end, wider again (to its own) while they are clear; 0.3% a frame
     M.mWidth = Math.max(0.6, Math.min(1, M.mWidth + (opened && atBand ? -0.003 : clear ? 0.003 : 0)));
     mouseWidth(M.mWidth);
+    // the mouse turned under his thumb (his thumb lies along its flank in the take, so the flank runs where his thumb
+    // does): its long axis towards the thumb's line seen from above, 0.3 deg a frame, within 15 deg of where it was put
+    const n = P.mouseNode, ta = S("Right", 1, 3).getWorldPosition(V()).sub(S("Right", 1, 2).getWorldPosition(_g)).setY(0).normalize();
+    const la = (MW.axis === "x" ? V(0, 0, 1) : V(1, 0, 0)).transformDirection(n.matrixWorld).setY(0).normalize();
+    let dy = Math.atan2(la.x * ta.z - la.z * ta.x, la.dot(ta)); if (dy > Math.PI / 2) dy -= Math.PI; if (dy < -Math.PI / 2) dy += Math.PI;   // (an axis: either way along it)
+    if (MW.y0 == null) MW.y0 = n.rotation.y;
+    M.mYaw = Math.max(-0.26, Math.min(0.26, (M.mYaw || 0) - Math.max(-0.005, Math.min(0.005, dy))));
+    n.rotation.y = MW.y0 + M.mYaw; n.updateMatrixWorld(true);
   }
   // the mouse's width: its shorter horizontal extent in its own frame, scaled from its own (M.mWidth: the share kept)
   const MW = {axis: null, s0: 1}; M.mWidth = 1;
@@ -718,8 +726,19 @@ export function createMH(env) {
     const l = S(side, 5, 1).getWorldPosition(V()).sub(S(side, 2, 1).getWorldPosition(V())); l.addScaledVector(h, -l.dot(h)).normalize();
     return [h, l, h.clone().cross(l)];
   }
-  function aimBone(i, j, want, weight) {                     // finger i's joint j turned so its segment points along want
-    const b = S("Right", i, j); b.getWorldPosition(_a); (j < 3 ? S("Right", i, j + 1).getWorldPosition(_b) : tipOf("Right", i, _b)); _u.subVectors(_b, _a).normalize();
+  // the end of a finger as seen: the middle of its end bone's farthest skin (beyond 80% of the farthest vertex), carried
+  // in that bone's frame. (tipOf is the pad's centre for contact, which lies off the line the eye follows: aimed by it,
+  // the thumb's last joint read 19 deg bent where his is 9)
+  const SEEN = {};
+  function seenTip(side, i, out) {
+    const b3 = S(side, i, 3), key = side + i;
+    if (!SEEN[key]) { const h3 = b3.getWorldPosition(V()), vs = skinAll(side, i, 3).map(([o, n]) => o.getVertexPosition(n, V()).applyMatrix4(o.matrixWorld));
+      const far = Math.max(...vs.map(q => q.distanceTo(h3))), c = V(); let k = 0; for (const q of vs) if (q.distanceTo(h3) > 0.8 * far) { c.add(q); k++; }
+      SEEN[key] = b3.worldToLocal(k ? c.multiplyScalar(1 / k) : tipOf(side, i, V())); }
+    return b3.localToWorld(out.copy(SEEN[key]));
+  }
+  function aimBone(i, j, want, weight, seen = false) {       // finger i's joint j turned so its segment points along want
+    const b = S("Right", i, j); b.getWorldPosition(_a); (j < 3 ? S("Right", i, j + 1).getWorldPosition(_b) : seen ? seenTip("Right", i, _b) : tipOf("Right", i, _b)); _u.subVectors(_b, _a).normalize();
     if (_u.dot(want) > 0.99999) return; _q.setFromUnitVectors(_u, want); _q.slerp(new THREE.Quaternion(), 1 - weight);
     b.parent.getWorldQuaternion(_pq); b.quaternion.copy(_pq.invert().multiply(b.getWorldQuaternion(_wq).premultiply(_q))); b.updateMatrixWorld(true);
   }
@@ -727,11 +746,20 @@ export function createMH(env) {
   // towards straight (its first segment laid into the palm's plane, the splay kept)
   function omFingers(F, weight, open = null) {
     const [h, l, n] = palmFrame("Right");
-    // the thumb: its root (finger1-1) as recorded, its last two bones along his. The character's thumb root lies inside its
-    // index knuckle's line and his outside it, so his thumb carried whole either lies under the index finger (his
-    // directions) or bends 56 deg at the MCP to reach his joints' places; and any turn of that root tears the skin at the
-    // thumb's base (its triangles to 5x their bind length; as recorded, 2.3x)
-    if (S("Right", 1, 3)) for (let j = 2; j <= 3; j++) { const o = (j - 1) * 3; aimBone(1, j, h.clone().multiplyScalar(F.d[o]).addScaledVector(l, F.d[o + 1]).addScaledVector(n, F.d[o + 2]).normalize(), weight); }
+    // the thumb: its root (finger1-1) as recorded, then his own two bends on from it - MCP and IP, each the turn from one
+    // of his segments to the next (about 14 and 9 deg: his thumb lies almost straight along the flank). The character's
+    // thumb root lies inside its index knuckle's line and his outside it, so his segments' directions taken as they are
+    // bent ours 22 / 18 deg to get there (the owner: "the thumb is curved"); and any turn of that root tears the skin at
+    // the thumb's base (its triangles to 5x their bind length; as recorded, 2.3x). The hand is placed across the mouse
+    // so that this straight thumb meets the left flank (mouseSettle)
+    if (S("Right", 1, 3)) {
+      const seg = k => h.clone().multiplyScalar(F.d[k * 3]).addScaledVector(l, F.d[k * 3 + 1]).addScaledVector(n, F.d[k * 3 + 2]).normalize();
+      const s0 = seg(0), s1 = seg(1), s2 = seg(2), d = S("Right", 1, 2).getWorldPosition(V()).sub(S("Right", 1, 1).getWorldPosition(_g)).normalize();
+      for (const [j, a, b] of [[2, s0, s1], [3, s1, s2]]) {      // (his bend's angle, about his bend's axis carried onto ours)
+        const ax = a.clone().cross(b), sn = ax.length(), th = Math.atan2(sn, a.dot(b)); ax.addScaledVector(d, -ax.dot(d));   // (square to our segment: the angle kept whole)
+        if (sn > 1e-6 && ax.lengthSq() > 1e-12) d.applyAxisAngle(ax.normalize(), th);
+        aimBone(1, j, d, weight, true); }
+    }
     for (let i = 2; i <= 5; i++) { if (!S("Right", i, 1)) continue;
       const ds = [0, 1, 2].map(k => { const o = ((i - 1) * 3 + k) * 3; return V(F.d[o], F.d[o + 1], F.d[o + 2]); });
       if (open && open[i] != null) { const m = open[i], d0 = ds[0].clone().setZ(0).normalize(), out = [d0];
