@@ -193,6 +193,17 @@ BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you
                        r"please enable js and disable any ad blocker|press (&|and) hold to confirm you are|"
                        r"access to this page has been denied|pardon our interruption|ray id: [0-9a-f]{8}|"
                        r"performance & security by cloudflare|request unsuccessful\. incapsula", re.I)
+# 2026-10-07 live: "Sorry, BBC iPlayer isn't available in your region" was shown in the card. A geo-block / region
+# wall is a wall like a bot check: left at once, not shown or counted, its site left alone (never worked around).
+# Whole phrases only ("region" alone is not enough), on a page of its own (GEO_WALL_MAX_CHARS of text at most:
+# such pages carry the site's header and footer, so they run longer than a bot check)
+GEO_WALL_MAX_CHARS = 6000
+GEO_WALL = re.compile(r"(?:(?:not|n['’]t)\s+(?:currently\s+|yet\s+)?available|unavailable)\s+(?:to (?:watch|stream|view)\s+)?"
+                      r"(?:in|from|for)\s+your\s+(?:region|country|location|area|territory|part of the world)|"
+                      r"(?:not|n['’]t)\s+(?:currently\s+)?available where you are|"
+                      r"(?:blocked|restricted) in your (?:region|country|location)|"
+                      r"bbc iplayer only works in the uk|only available (?:to watch )?in the uk\b|"
+                      r"not made this video available in your country|geo-?(?:blocked|restricted)", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -601,10 +612,12 @@ OVERLAY_TEXT_JS = """() => {
 
 def challenge_title(title, url):
     """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    or a title that is only the bare host name (an interstitial, not content)."""
+    a geo-block title ("... isn't available in your region"), or a title that is only the bare host name (an
+    interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
-    return bool(BOT_WALL.search(t)) or bool(t) and t in (host, host.removeprefix("www."), "www." + host)
+    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t))
+            or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
 def cross_site_frame(req, host):
@@ -2126,15 +2139,19 @@ class Browser:
 
     @staticmethod
     def wall_text(body):
-        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+        n = len(body.strip())
+        return (n < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+                or n < GEO_WALL_MAX_CHARS and bool(GEO_WALL.search(body)))
 
     async def _walled(self, page, body=None):
-        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) fills the page."""
+        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) or a geo-block fills the page."""
         if body is None:
             body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+        if self.wall_text(body):
+            return True
         if len(body.strip()) >= WALL_MAX_CHARS:
             return False
-        return self.wall_text(body) or await page.evaluate(WALL_FRAMES)
+        return await page.evaluate(WALL_FRAMES)
 
     async def show(self, sc):
         """Screenshot the current page and log the visit (only pages that passed the guard get here).
