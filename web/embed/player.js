@@ -36,7 +36,7 @@ async function boot() {
   const heading = -2.85; char.scene.rotation.y = heading;
   local.applyAxisAngle(new THREE.Vector3(0,1,0),heading);
   char.scene.position.set(-1.12-local.x,.735-local.y,-.56-local.z);
-  // Public monitor is a status display; never mirror the authenticated Fomo browser.
+  // Monitor starts with status; an exact reviewed Fomo capture may replace it.
   const marker = room.scene.getObjectByName('SURF_monitor');
   const cv = document.createElement('canvas'); cv.width=768; cv.height=448; const g=cv.getContext('2d');
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace;
@@ -44,7 +44,6 @@ async function boot() {
     g.fillStyle='#111912';g.fillRect(0,0,768,448);g.fillStyle='#cfff87';g.font='bold 44px monospace';g.fillText('FOMO / SUB-01',32,70);
     g.fillStyle='#91a18c';g.font='22px monospace';g.fillText(state?.fomo?.connected?'ACCOUNT CONNECTED':'ACCOUNT NOT CONNECTED',32,112);
     const rows=state?.trading?.operations||[];
-    if(data.monitor?.available){$('badge').textContent='THE DESK · FOMO PREVIEW';$('mode').textContent='REVIEWED SCREEN';$('status').textContent='Fomo account screen · captured preview';}
   if(!rows.length){g.fillStyle='#e7efdf';g.fillText('WAITING FOR FOMO',32,220);g.fillStyle='#91a18c';g.fillText('Account not connected',32,265);}
     rows.slice(-4).forEach((r,i)=>{g.fillStyle='#cfff87';g.fillText((r.action==='buy'?'BUY ':'SELL ') +(r.asset||'') ,32,190+i*48);});
     g.fillStyle='#91a18c';g.font='18px monospace';g.fillText(state?.fomo?.connected?'Account execution feed':'Waiting for account connection',32,425);tex.needsUpdate=true;
@@ -68,7 +67,7 @@ function update(data){
   $('mode').textContent=connected?'ACCOUNT EXECUTIONS':'ACCOUNT NOT CONNECTED';
   $('status').textContent=connected?'Fomo account feed · reported confirmations':s.updated_at?'Account offline · showing last received operations':'Waiting for Fomo account · no real operations yet';
   if(data.monitor?.available){$('badge').textContent='THE DESK · FOMO PREVIEW';$('mode').textContent='REVIEWED SCREEN';$('status').textContent='Fomo account screen · captured preview';}
-  if(!rows.length){$('ops').replaceChildren(Object.assign(document.createElement('div'),{className:'empty',textContent:connected?'No confirmed operations received yet.':'Account not connected. Real operations will appear here.'}));return;}
+  if(!rows.length){$('ops').replaceChildren(Object.assign(document.createElement('div'),{className:'empty',textContent:data.monitor?.available?'No operations received.':connected?'No confirmed operations received yet.':'Account not connected. Real operations will appear here.'}));return;}
   $('ops').replaceChildren(...rows.slice().reverse().map(r=>{
     const row=document.createElement('div');row.className='row';
     const action=document.createElement('span');action.className='buy';action.textContent=`${r.action.toUpperCase()} ${r.asset}`;
