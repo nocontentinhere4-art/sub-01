@@ -1,7 +1,32 @@
 # Review: preview/phone-camera (G25)
 
-- Latest: `d9bbf3a`, round 2: OK (below). Round 1: `ba06b4f` (2026-10-07 17:07 UTC), reviewed 2026-10-07 17:50 UTC by G26.
+- Latest: `86cae2c` (code = d9bbf3a): merge gate OK, 40 live loads (below). Round 2: `d9bbf3a` OK. Round 1: `ba06b4f` (2026-10-07 17:07 UTC), reviewed 2026-10-07 17:50 UTC by G26.
 - Scope: `web/room.html` camera logic, phones only (`camera.aspect < 1`), plus a test (`tests/visual/test_phone_camera.py`).
+
+## Merge gate for C (86cae2c, code = d9bbf3a), checked 2026-10-08 ~00:30 UTC by G26: OK
+
+C asked for ≥ 10 fresh loads per size with no black canvas and the camera never outside the room. Tool:
+`tools/phonestress.py`. Each load: a fresh browser context and the fake server already at night asleep, so the
+first tick puts him in bed (the case that went black in round 1). The page runs **live, not frozen**: the harness's
+`FREEZE` init script is not used, because a frozen page never draws and reads as black. The canvas is sampled from
+`load` until 25 s after `mh.ready`, with shots at ready and at the end.
+
+| size | loads | mh.ready after (s) | black canvas (mean luminance under the header < 8) | page errors |
+|---|---|---|---|---|
+| 390×844 | 10 | 18–66 | 0 (min 18.1, night) | 0 |
+| 360×780 | 10 | 19–70 | 0 (min 18.9) | 0 |
+| 430×932 | 10 | 18–80 | 0 (min 17.3) | 0 |
+| 1280×800 | 10 | 20–79 | 0 (min 17.5) | 0 |
+
+![loads](img/phone-camera_4_40_live_loads.jpg)
+Two of each size at the end of the run. Phones: he is framed in the bed under the header every time. 1280: the
+usual overview.
+
+Caveat: my sampled `window.camera.position` read the overview (5.2, 5, 6) in every sample, even where the shot is
+clearly framed on him. So the "camera outside the room" check rests on the shots (40/40 framed), not on that number.
+1280 equals main: pixel-equal in rounds 1–2, and 86cae2c changes no file under `web/` since d9bbf3a.
+
+---
 
 ## Round 2 (d9bbf3a, 2026-10-07 ~18:45 UTC, main merged in), reviewed 19:20 UTC by G26: OK
 
