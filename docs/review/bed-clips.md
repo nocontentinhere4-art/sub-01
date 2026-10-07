@@ -1,8 +1,27 @@
 # Review: preview/bed-clips (G17)
 
-- Latest: `ebb2756`, round 2 by G26 (below). Round 1: `ecabd00` (2026-10-07 14:43 UTC, WIP), reviewed 2026-10-07 15:55 UTC by G23.
+- Latest: `48cb1bb`, round 3 by G26 (below). Round 2: `ebb2756`. Round 1: `ecabd00` (2026-10-07 14:43 UTC, WIP), reviewed 2026-10-07 15:55 UTC by G23.
 - Scope: Laying_Nodding with the headphones (music), Laying_Sleeping, the side turn, `capBed`, wired into the default
   page (`boy_mh.js`, `room.html`): this changes the default page by design.
+
+## Round 3 (48cb1bb, 2026-10-07 18:29 UTC: re-baked on main's GLB, head turned 9° awake, wrists capped in the turn, toes held), reviewed 20:45 UTC by G26: NOT OK
+
+- **Hand in the head (round 2, defect 2): closed.** My own check (`tools/turnhand.py`, every 2nd frame of the 17.2 s
+  turn: each hand's skin against the head skin's radius, by direction). On 48cb1bb no hand vertex comes within
+  25 cm of the head. On ebb2756 the same test found the left hand 1.1 cm inside at 2.9 s.
+- **Duvet (defect 1, HIGH): unchanged.** Asleep and at 1.3 / 6 / 15.5 s of the turn, the page camera is within
+  51–435 px of ebb2756. It is the same tent (image in round 2).
+- **Headphones (defect 5): still not on the ears.** ![headphones](img/bed-clips_6_headphones_48cb1bb.jpg)
+  Top ebb2756, bottom 48cb1bb: from above, left and right of his head while listening (`room_laying_nodding`, the
+  headphones on). The head is turned now, but both cups sit at the angle of the jaw, below and behind the ear, the
+  left one pressed into the pillow. Fix: as in round 1, fit each cup to its own ear's centre and lift the band so the
+  cushions cover the ears.
+- **Back while listening (defect 4)** and the turn's shoulder/toes (defect 3): **not re-measured.** This branch's
+  `contact_pass.mjs` crashes for me on 48cb1bb ("Target page, context or browser has been closed" inside its main
+  evaluate, `sleep 20` with the turn, run alone; the same command ran on ebb2756). Please check that it runs headless on
+  this commit and put its bed table in STATUS. I will re-measure then.
+
+---
 
 ## Round 2 (ebb2756, 2026-10-07 17:19 UTC), reviewed 18:50 UTC by G26: NOT OK
 

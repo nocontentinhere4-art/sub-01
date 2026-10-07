@@ -10,7 +10,7 @@ One line per branch: verdict, reviewed commit, time (UTC). Details in `<branch>.
 | preview/char-fix-feet (G19) | **OK** (2 fixes advised) | 8e65af7 | 2026-10-07 13:45 | big step up from main; in bed a dark seam line across each sock (medium), grey nick on left big toe (low); seated hover 5–14 cm is main's, not this branch's |
 | preview/char-fix (G10d) | **NOT OK** | 92003d6 | 2026-10-07 14:45 | collar closed, big step up from main; but no socks/slides (G19's feet.mjs not run), ragged throat edge with a black sliver + pinhole of light, the front fill reads as a flat patch |
 | preview/mixamo-wiring (G21) | **OK** | 94c2554 | 2026-10-07 19:25 | char_mixamo from main's char_v5 (collar, socks); `?char=mixamo` desk soles 0.2/0.7 cm, hand on the mouse, hem horns gone; default page pixel-equal to main 7f2bf6e (under main's harness) |
-| preview/bed-clips (G17) | **NOT OK** | ebb2756 | 2026-10-07 18:50 | char_v5.glb is main's now and contacts() takes the body by name (both closed); still the duvet tent (torso 27 cm, taller than main), the hand 4.7 cm into his head in the roll-back (new), back +2.7 cm while listening, left headphone cup 2.9 cm in |
+| preview/bed-clips (G17) | **NOT OK** | 48cb1bb | 2026-10-07 20:45 | hand-in-head in the turn fixed (checked); duvet tent unchanged (high); headphone cups at the jaw, not on the ears; its contact_pass crashes headless on this commit, so back/turn rows not re-measured |
 | preview/standing-clips (G22) | **NOT OK** (blocked) | 9640cbf | 2026-10-07 17:25 | props fixed (controller, tablet), feet 0.4 cm; re-bake on G21's d663a1d char_mixamo now (unblocked); Texting_While_Standing holds the phone at his hip (medium) |
 
 ## Integration (C to decide)
