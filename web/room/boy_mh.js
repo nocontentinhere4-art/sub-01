@@ -28,6 +28,12 @@
 // where the sit-down starts and the stand-up ends come from the clips (env.setSpots). (room_bedtime's one-take get-up,
 // flow(), is no longer used for leaving the desk: it put his torso 9 cm into the chair.) The walk plays as recorded.
 
+// lying awake listening: a loop over his lying pose (EXTRA.music; music_in / music_out optional, without them it fades).
+// Interim (2026-10-06): none. Both candidates fail in the page: the keyed loop (the arm flung up tears the sleeve, the
+// hand reads raised) and the captured Laying_Nodding as retargeted (fists raised before his face, legs lifted 11-19 cm),
+// so he holds room_bed_lie's end, breathing (docs/design/bed-music/lying_awake_options.jpg). A corrected capture goes
+// here as {music: "<its clip>"}: it fades in over his lying pose and back out, no hand-made in / out needed
+const EXTRA = {};
 const CLIPS = {desk_type: "desk_type_ik", desk_mouse: "desk_mouse_ik", desk_watch: "room_seated_idle", stand: "room_window",
   walk: "room_walk", sit_down: "room_mx_stand_to_sit", stand_up: "room_mx_sit_to_stand", bed_lie: "room_bed_lie", bed_wake: "room_bed_wake",
   eat: "room_eat", read: "room_read", phone: "room_phone", phone_scroll: "room_phone_scroll", drink: "room_drink", door: "room_door", window: "room_window",
@@ -209,12 +215,17 @@ export function createMH(env) {
     // (the clips' folder and their fit to the body come from the page: room/mh as recorded, room/mh_v5 for v5 through char_v5.js)
     await Promise.all(Object.entries(CLIPS).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; },
       e => { throw new Error(`${env.clipDir || "room/mh"}/${f}.glb: ${e && e.message || e}`); })));   // (which clip is missing: all are needed)
+    // optional: the clips some bodies have and others not (v5: G12's awake-on-the-bed music clips); a missing one just stays off
+    await Promise.all(Object.entries(EXTRA).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // the rare events at the desk (optional: the room plays on without them)
     await Promise.all(Object.entries(RARE).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got["rare_" + k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     // watching "simply sits in the chair": room_seated_idle plays as recorded, feet on the floor (the old watch clip
     // propped its feet up and took the mouse clip's legs and pelvis; that swap is gone with it)
     const make = c => mixer.clipAction(c);
+    if (got.music) {
+      for (const k of ["music_in", "music", "music_out"]) if (got[k]) { const a = M.actions[k] = make(got[k]); if (k !== "music") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; } }
+      M.music = true; }
     M.clips = got;
     // the heights in segments() and getupClips() ("the hips over 0.9 m", the head over 1.05 m, ...) are the MakeHuman
     // body's (its hips 0.977 m up, walking): scaled to this body's by its own walking hips (v5's are about 0.87 m up, so they
@@ -708,25 +719,34 @@ export function createMH(env) {
     const k = st.at === "desk" && (!s || s.k === "chair") ? 1 : s && s.k === "pose" && s.to === "desk" ? t : s && s.k === "pose" && st.at === "desk" ? 1 - t : 0;
     env.boy.position.y += L * k;
   }
+  function measureLift(every) {                              // how far his lowest skin over the mattress is under its top (m)
+    const b = env.boy; let need = 0;
+    if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh && !/_inside$/.test(o.name)) skin.push(o); }); }     // every part (dressed: his clothes too; not the page's drawn inside)
+    b.updateMatrixWorld(true); const v = V();
+    // (lying awake on top of it, he rests on the folded quilt pressed flat under him, env.quiltTop, not on the bare mattress:
+    // there his back and soles went 1 to 3 cm into the dented quilt)
+    const top = env.quiltTop ? BED.top + (M.dentW || 0) * (env.quiltTop - BED.top) : BED.top;
+    for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
+    for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
+      const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
+      if (e > 0) need = Math.max(need, top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
+    return need;
+  }
   function bedLift(st, dt) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
     if (!on && !M.lift) return;
     const b = env.boy; let need = 0, every = 3;
-    if (on && !st.step) {                                      // still on the bed: every other vertex, once a second (cheap on a phone)
-      M.liftT = (M.liftT || 0) - dt; if (M.liftT > 0) { b.position.y += M.lift; return; }
-      M.liftT = 1; every = 2; M.lift = 0;
+    if (on && !st.step) {                                      // still on the bed: every other vertex, once a second (cheap on a phone),
+      // and between the measures the lift eases toward it (G12's lying clips move: a set lift would step): up at 10 cm/s,
+      // down at 3; a change of more than 5 cm is taken at once
+      M.liftT = (M.liftT || 0) - dt;
+      if (M.liftT <= 0) { M.liftT = 1; every = 2; M.liftGoal = measureLift(2); }
+      const g = M.liftGoal ?? M.lift ?? 0, l = Math.abs(g - (M.lift || 0)) > 0.05 ? g : M.lift || 0;   // (more than 5 cm either way, as when the page opens on him in bed: at once)
+      M.lift = l + Math.max(-0.03 * dt, Math.min(0.10 * dt, g - l)); if (M.lift < 1e-4) M.lift = 0;
+      b.position.y += M.lift; return;
     }
-    if (on) {
-      if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh && !/_inside$/.test(o.name)) skin.push(o); }); }     // every part (dressed: his clothes too; not the page's drawn inside)
-      b.updateMatrixWorld(true); const v = V();
-      // (lying awake on top of it, he rests on the folded quilt pressed flat under him, env.quiltTop, not on the bare
-      // mattress: there his back and soles went 1 to 3 cm into the dented quilt)
-      const top = env.quiltTop ? BED.top + (M.dentW || 0) * (env.quiltTop - BED.top) : BED.top;
-      for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
-      for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
-        const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
-        if (e > 0) need = Math.max(need, top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
-    }
+    M.liftGoal = null;
+    if (on) need = measureLift(every);
     M.lift = Math.max(need, (M.lift || 0) - 0.1 * dt);
     if (M.lift < 1e-4) M.lift = 0;
     b.position.y += M.lift;
@@ -954,6 +974,7 @@ export function createMH(env) {
       if (st.at === "desk" && (!st.step || st.step.k === "chair") && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
     if (!transition(st)) onBed(st);
+    bedMusic(st, dt);
     // the quilt and the pillow give under him lying awake on the bed: in as he lies down (the lift follows it frame by
     // frame through the step, no pop once he is down), out as he gets up or falls asleep under the duvet
     const lying = st.at === "bedlie" && !st.step, asleep = !!(st.goal && st.goal.clip === "sleep");
@@ -969,9 +990,150 @@ export function createMH(env) {
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.held = null; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
+    music(st, dt);
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
+  }
+  // ---------- music: the headphones from the wall hook on his head while a track plays (the page's own pair and its
+  // alive() layer do not run here), back on the hook when it stops. (Lying on the bed listening, his motion is G12's
+  // clips, room_bed_music*: nothing procedural here) ----------
+  const MU = {set: undefined, wall: null, glb: null};
+  env.load("room/headphones_worn.glb").then(g => { MU.glb = g; }, e => { MU.set = null; console.warn("headphones_worn.glb", e); });
+  // The pair he wears: generic over-ear headphones made with Tripo in the open, worn shape (room_build/build_headphones.mjs:
+  // the band and the two cups, cut where the band meets the cups), fitted to THIS head here. His head on v5, measured in the
+  // Head bone's frame at bind (the owner_head skin, G10d 2026-10-06): the ears' outer surfaces 15.5 cm apart, the ear's
+  // centre 6.9 local units up and 1.45 back of the bone, his hair's outline across the top in the cups' plane.
+  //  - each cup, rigid: its cushion's face on the ear, pressed PRESS, the cup's axis across his head, centred on the ear;
+  //  - the band: its inner surface laid along his hair's outline (GAP off it), from one cup's hinge pin over the crown to
+  //    the other's. Its cross-section is kept; its length follows the outline (the slider and the band's flex of a real
+  //    pair, spread along it: MU.fit.band_stretch).
+  // Built in the Head bone's frame, so it stays put however he turns his head
+  const HP = {PRESS: 0.004, GAP: 0.001, EAR_Y: 0.069, EAR_Z: -0.0145, EAR_WIN: [0.057, 0.080, -0.026, -0.003]};
+  function headphones() {
+    if (MU.set !== undefined) return MU.set;
+    if (!MU.glb) return null;                                                       // (still loading)
+    const room = env.room && env.room(), wall = room && room.getObjectByName("headphones"), head = env.bones.Head;
+    if (!head) return MU.set = null;
+    MU.wall = wall;
+    let sm = null; env.boy.traverse(o => { if (o.isSkinnedMesh && o.skeleton.bones.includes(head)) {
+      const hi = o.skeleton.bones.indexOf(head), W = o.geometry.attributes.skinWeight, I = o.geometry.attributes.skinIndex; let n = 0;
+      for (let i = 0; i < o.geometry.attributes.position.count; i += 50) for (let k = 0; k < 4; k++) if (I.getComponent(i, k) === hi && W.getComponent(i, k) > 0.5) n++;
+      if (n > 50 && (!sm || n > sm.n)) { sm = o; sm.n = n; } } });
+    if (!sm) return MU.set = null;
+    head.updateMatrixWorld(true); const ws = head.getWorldScale(V()).x;           // (the bone's units -> metres)
+    const hi = sm.skeleton.bones.indexOf(head), inv = sm.skeleton.boneInverses[hi], P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight;
+    const v = V(), [y0, y1, z0, z1] = HP.EAR_WIN, prof = new Map(); let earL = 0, earR = 0;
+    for (let i = 0; i < P.count; i++) { let d = 0, bw = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); d = I.getComponent(i, k); }
+      if (d !== hi) continue; v.fromBufferAttribute(P, i).applyMatrix4(sm.bindMatrix).applyMatrix4(inv);
+      if (v.y > y0 && v.y < y1 && v.z > z0 && v.z < z1) { earL = Math.min(earL, v.x); earR = Math.max(earR, v.x); }
+      if (Math.abs(v.z - HP.EAR_Z) < 0.02 && v.y > HP.EAR_Y) {                   // (his outline across the top, at the cups' plane)
+        const k = Math.round((v.y - HP.EAR_Y) * ws / 0.005); prof.set(k, Math.max(prof.get(k) || 0, Math.abs(v.x) * ws)); } }
+    // in metres, from the ear's centre (the group's origin): x across, y up
+    const e = (earR - earL) / 2 * ws, fx = e - HP.PRESS;                            // (the cushions' faces)
+    const ks = [...prof.keys()].sort((a, b) => a - b), top = ks[ks.length - 1] * 0.005;
+    const half = y => { let w = 0; for (const k of ks) if (Math.abs(k * 0.005 - y) <= 0.0075) w = Math.max(w, prof.get(k)); return w; };
+    const src = MU.glb.scene; src.updateMatrixWorld(true);
+    const part = n => src.getObjectByName(n), g = new THREE.Group();
+    // the cups: rigid, the cushion's face on the ear; each turned on its yoke (about the fore-aft axis through the face's
+    // centre), top outward, as far as his head's side needs (his hair is wider above the ear than the ear is): no point of
+    // his (skin and hair, Head-weighted) within the cushion's outline past the shell's inner wall. The cushion is the soft,
+    // open ring the ear sits in (pressed PRESS); the wall, the driver's cover, is the cup's innermost surface within 1.5 cm
+    // of its axis
+    let ry = 0, rz = 0; const shellIn = {"-1": 1, "1": 1};
+    for (const [n, sx] of [["hp_cupL", -1], ["hp_cupR", 1]]) { const c = part(n), CP = c.geometry.attributes.position;
+      for (let i = 0; i < CP.count; i++) { v.fromBufferAttribute(CP, i).applyMatrix4(c.matrix); const d = sx * v.x;
+        if (d < 0.003) { ry = Math.max(ry, Math.abs(v.y)); rz = Math.max(rz, Math.abs(v.z)); }
+        if (Math.hypot(v.y, v.z) < 0.015 && d > 0.002) shellIn[sx] = Math.min(shellIn[sx], d); } }
+    const tilt = {"-1": 0, "1": 0};
+    env.boy.traverse(o => { if (!o.isSkinnedMesh || !o.skeleton.bones.includes(head)) return;
+      const hj = o.skeleton.bones.indexOf(head), inv2 = o.skeleton.boneInverses[hj], Q = o.geometry.attributes.position, J = o.geometry.attributes.skinIndex, K = o.geometry.attributes.skinWeight;
+      for (let i = 0; i < Q.count; i++) { let d = 0, bw = 0; for (let k = 0; k < 4; k++) if (K.getComponent(i, k) > bw) { bw = K.getComponent(i, k); d = J.getComponent(i, k); }
+        if (d !== hj) continue; v.fromBufferAttribute(Q, i).applyMatrix4(o.bindMatrix).applyMatrix4(inv2);
+        const x = v.x * ws, y = (v.y - HP.EAR_Y) * ws, z = (v.z - HP.EAR_Z) * ws;
+        if (y < 0.01 || (y / ry) ** 2 + (z / rz) ** 2 > 1) continue;
+        const sx = x < 0 ? -1 : 1, over = sx * x - (fx + shellIn[sx]); if (over > 0) tilt[sx] = Math.max(tilt[sx], Math.atan2(over, y)); } });
+    const cups = {};
+    for (const [n, sx] of [["hp_cupL", -1], ["hp_cupR", 1]]) {
+      const c = part(n).clone(), yoke = new THREE.Group(); yoke.position.x = sx * fx; yoke.rotation.z = -sx * tilt[sx]; yoke.add(c); g.add(yoke); cups[sx] = yoke; }
+    // the band: the model's inner outline (about its O, from straight up to the pin) -> his hair's, by length along it
+    const bm = part("hp_band"), U = bm.userData, inner = U.inner, pinR = V(...U.pinR), cupPin = V(...part("hp_cupR").userData.pin);
+    const rho = ph => { const i = Math.min(inner.length - 2, Math.floor(ph / inner[inner.length - 1][0] * (inner.length - 1))), [a, ra] = inner[i], [b, rb] = inner[i + 1];
+      return ra + (rb - ra) * Math.min(1, Math.max(0, (ph - a) / (b - a))); };
+    const NM = 48, phE = inner[inner.length - 1][0], mPts = [], mLen = [0];
+    for (let i = 0; i <= NM; i++) { const ph = phE * i / NM; mPts.push(V(Math.sin(ph) * rho(ph), Math.cos(ph) * rho(ph), 0)); if (i) mLen.push(mLen[i - 1] + mPts[i].distanceTo(mPts[i - 1])); }
+    // his: from the right pin's place (with the model's offset from its pin to its outline's end) up over his hair to the crown
+    const curve = sx => {                                                           // (one half: crown -> that cup's pin)
+      cups[sx].updateMatrix(); const pin = V(...part(sx > 0 ? "hp_cupR" : "hp_cupL").userData.pin).applyMatrix4(cups[sx].matrix); pin.x *= sx;
+      const E = pin.add(mPts[NM].clone().sub(pinR)), yc = top + HP.GAP, N = 32, ys = [], need = [];
+      for (let i = 0; i <= N; i++) { const t = i / N, y = E.y + (yc - E.y) * Math.sin(t * Math.PI / 2); ys.push(y); need.push(half(y) + HP.GAP); }
+      const xs = need.map((_, i) => Math.max(...need.slice(i), E.x * Math.cos(i / N * Math.PI / 2)));
+      for (let pass = 0; pass < 6; pass++) for (let i = 1; i < N; i++) xs[i] = Math.max(need[i], (xs[i - 1] + xs[i] + xs[i + 1]) / 3);
+      xs[0] = E.x; xs[N] = 0; ys[N] = yc;
+      const pts = xs.map((x, i) => V(x, ys[i], 0)).reverse(), len = [0];
+      for (let i = 1; i <= N; i++) len.push(len[i - 1] + pts[i].distanceTo(pts[i - 1]));
+      return {pts, len, L: len[N]}; };
+    const tc = {"-1": curve(-1), "1": curve(1)};
+    const at = (pts, len, s) => { let i = 1; while (i < len.length - 1 && len[i] < s) i++;      // point, tangent, outward normal at length s
+      const a = pts[i - 1], b = pts[i], t = Math.min(1, Math.max(0, (s - len[i - 1]) / (len[i] - len[i - 1]))), T = b.clone().sub(a).normalize();
+      return [a.clone().lerp(b, t), T, V(T.y, -T.x, 0)]; };
+    const geo = bm.geometry.clone(), BP = geo.attributes.position, BN = geo.attributes.normal, pos = new Float32Array(BP.count * 3), nrm = new Float32Array(BP.count * 3);
+    const mLenE = mLen[NM], q = V(), n = V();
+    for (let i = 0; i < BP.count; i++) {
+      q.fromBufferAttribute(BP, i).applyMatrix4(bm.matrix); const sx = q.x < 0 ? -1 : 1; q.x *= sx;
+      const ph = Math.min(phE, Math.atan2(q.x, q.y)), k = Math.min(NM - 1, Math.floor(ph / phE * NM));
+      const s = mLen[k] + (mLen[k + 1] - mLen[k]) * (ph / phE * NM - k);
+      const [pm, tm, nm] = at(mPts, mLen, s), [pt, tt, nt] = at(tc[sx].pts, tc[sx].len, s / mLenE * tc[sx].L);
+      const d = q.clone().sub(pm), a = d.x * tm.x + d.y * tm.y, b = d.x * nm.x + d.y * nm.y;
+      pos[3 * i] = sx * (pt.x + a * tt.x + b * nt.x); pos[3 * i + 1] = pt.y + a * tt.y + b * nt.y; pos[3 * i + 2] = q.z;
+      if (BN) { n.fromBufferAttribute(BN, i).applyMatrix3(new THREE.Matrix3().getNormalMatrix(bm.matrix)).normalize(); n.x *= sx;
+        const na = n.x * tm.x + n.y * tm.y, nb = n.x * nm.x + n.y * nm.y, r = V(na * tt.x + nb * nt.x, na * tt.y + nb * nt.y, n.z).normalize();
+        nrm[3 * i] = sx * r.x; nrm[3 * i + 1] = r.y; nrm[3 * i + 2] = r.z; } }
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); if (BN) geo.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
+    geo.computeBoundingSphere(); const band = new THREE.Mesh(geo, bm.material); band.name = "hp_band"; g.add(band);
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    head.add(g); g.position.set(0, HP.EAR_Y, HP.EAR_Z); g.scale.setScalar(1 / ws); g.visible = false; g.name = "headphones_on";
+    M.hpFit = MU.fit = {ear_span_cm: +(2 * e * 100).toFixed(1), crown_over_ear_cm: +(top * 100).toFixed(1), cushion_faces_cm: +(2 * fx * 100).toFixed(1),
+      band_stretch: [+(tc[-1].L / mLenE).toFixed(2), +(tc[1].L / mLenE).toFixed(2)], shell_wall_mm: [+(shellIn[-1] * 1000).toFixed(1), +(shellIn[1] * 1000).toFixed(1)], cup_tilt_deg: [+(tilt[-1] * 180 / Math.PI).toFixed(1), +(tilt[1] * 180 / Math.PI).toFixed(1)]};
+    return MU.set = g;
+  }
+  // lying on the bed listening (the page's "listen"): in -> the loop; when the page gets him up, its step waits while the
+  // out plays (started with the loop under 3.5 s, else at its wrap: the dancing hand never drops in a cross-fade), then
+  // goes on into bed_wake, whose first frame the out ends on. These clips own his whole body meanwhile
+  const BM = {ph: null, a: null};
+  function bmOnly(a, w) {                                    // this clip alone (the page's lie and any fading action out)
+    for (const x of env.mixer._actions) if (x !== a && x !== BM.prev && x.getEffectiveWeight() > 0) x.setEffectiveWeight(0);
+    a.setEffectiveWeight(w); if (BM.prev && BM.prev !== a) BM.prev.setEffectiveWeight(1 - w);
+  }
+  function bmPlay(k) { const a = M.actions[k]; BM.prev = BM.a; a.reset(); a.play(); BM.a = a; BM.ph = k; BM.t = 0; }
+  function bedMusic(st, dt) {
+    if (!M.music) return;
+    const S = st.step, listening = st.goal && st.goal.clip === "listen";
+    if (!BM.ph) {
+      if (!(listening && st.at === "bedlie" && !S)) return;
+      BM.a = st.current || null; bmPlay(M.actions.music_in ? "music_in" : "music");   // (no in: the loop fades in over his lying pose)
+    }
+    BM.t += dt;
+    if (BM.ph === "music_in" && BM.a.time >= BM.a.getClip().duration - 1e-3) bmPlay("music");
+    const leaving = S && S.from === "bedlie";
+    if (BM.ph === "music" && (leaving || !listening) && (!M.actions.music_out || BM.a.time < 3.5)) {
+      if (M.actions.music_out) bmPlay("music_out"); else { BM.ph = "fade"; BM.t = 0; } }   // (no out: back to his lying pose)
+    if (BM.ph === "fade") {
+      const w = Math.min(1, BM.t / 0.6), lie = st.current; BM.a.setEffectiveWeight(1 - w);
+      if (lie && lie !== BM.a) { if (!lie.isRunning()) lie.play(); lie.setEffectiveWeight(w); }
+      if (S) S.t = 0; env.mixer.update(0); if (w < 1) return; }
+    if (BM.ph === "fade" || (BM.ph === "music_out" && BM.a.time >= BM.a.getClip().duration - 1e-3)) {   // (done: the step goes on, or the page's clip again)
+      for (const k of ["music_in", "music", "music_out"]) if (M.actions[k]) { M.actions[k].setEffectiveWeight(0); M.actions[k].stop(); }
+      if (!S && st.current) { st.current.setEffectiveWeight(1); st.current.play(); }
+      BM.ph = null; BM.a = BM.prev = null; env.mixer.update(0); return; }
+    if (S) S.t = 0;                                          // (the page's step waits for the out)
+    bmOnly(BM.a, Math.min(1, BM.t / (BM.ph === "music_in" ? 0.15 : M.actions.music_in ? 0.25 : 0.8)));
+    env.mixer.update(0);
+  }
+  function music(st, dt) {
+    const on = !!(st.life && st.life.music) && env.boy.visible;
+    const g = on || MU.set ? headphones() : null;
+    if (g) g.visible = on; if (MU.wall) MU.wall.visible = !(on && g);
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
   function dbg() {

@@ -22,6 +22,7 @@ CLIPS = ("desk_type_ik", "desk_mouse_ik", "desk_watch", "room_window", "room_wal
          "room_phone_scroll")
 # the Mixamo captures retargeted onto v5 (docs/design/mixamo): one row each in room_build/kimodo/mixamo_clips.json
 MIXAMO = tuple(r["out"] for r in json.loads((ROOT / "room_build" / "kimodo" / "mixamo_clips.json").read_text())["clips"].values())
+EXTRA = ("room_bed_music_in", "room_bed_music", "room_bed_music_out", "room_laying_nodding", "room_laying_sleeping", "room_sleeping_idle")   # (optional clips, loaded when present)
 
 
 def test_body_is_the_v5_rig():
@@ -34,7 +35,7 @@ def test_body_is_the_v5_rig():
 
 def test_room_clips_retargeted_onto_v5():
     have = sorted(p.stem for p in (WEB / "mh_v5").glob("*.glb"))
-    assert set(have) <= set(CLIPS) | set(MIXAMO), set(have) - set(CLIPS) - set(MIXAMO)   # (room-mh's names, 1:1, and the Mixamo rows)
+    assert set(have) <= set(CLIPS) | set(MIXAMO) | set(EXTRA), set(have) - set(CLIPS) - set(MIXAMO) - set(EXTRA)   # (room-mh's names, 1:1, the Mixamo rows and the optional clips)
     assert set(CLIPS) <= set(have), set(CLIPS) - set(have)                  # (every required clip is there: boy_mh.js load() throws without one)
     for clip in have:
         g = glb_json(WEB / "mh_v5" / f"{clip}.glb")
