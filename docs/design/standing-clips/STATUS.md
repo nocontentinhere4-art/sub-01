@@ -4,7 +4,7 @@ Branch `preview/standing-clips` (off `origin/preview/mixamo-pipeline`). No raw c
 the FBX from `claude/loving-davinci-6hqmjx` into a temp dir and deletes them after. Details and the contact table:
 `README.md`.
 
-## State (2026-10-07)
+## State (2026-10-07): done; G23's review answered (below)
 - [x] The nine clips are baked for `web/room/char_mixamo.glb`: `web/room/mx_standing/<Clip>.glb`, plus
       `standing_clips.meta.json`.
 - [x] One re-bake command: `room_build/kimodo/standing_rebake.sh <character.glb> [Clip ...]`. It covers all nine,
@@ -30,8 +30,12 @@ See `README.md`, "Contact table". In short:
 - Arm in torso: the rig's (G20's weights; G23's review, items 1 and 3), shown against the no-clip baselines.
 
 ## Tests
-- `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`: see the last run below.
+Run on 63efec3, the final clips and code, 2026-10-07:
+- `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`: **1292 passed, 27 skipped, exit 0**
+  (12 min 24 s). This includes `tests/test_standing_clips.py`: the nine clips on the character's skeleton, the fit
+  recorded with hands-in-thighs 0 after the bake, no raw capture in `web/`, and the preview only with its parameters.
 - `tests/visual/out/results.json`: `hard_failures == []`.
+- The re-bake reproduces the committed clips byte for byte (checked on Sit_To_Stand and Stand_To_Sit, GLB and meta).
 
 ## Open, for others
 - Page wiring (G21 / G10d): the seat points `seatAt` (−0.18…−0.24 m) differ from the seated loop's. The join needs a
