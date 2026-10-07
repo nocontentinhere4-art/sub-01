@@ -10,7 +10,7 @@ and each frame his projected bounding box (every visible skinned mesh, skinned o
 Hard, on the phones: in every bed mode and in the transitions into and out of bed, at least MIN_IN of the box inside
 the frame (the 3D canvas under the header that covers its top) and his whole head inside, every frame; the same standing
 and walking; at the desk (the monitor shot) his head.
-1280 is only recorded (its camera must not change: see docs/qa/phone_camera_STATUS.md). Skipped without Playwright +
+1280 is only recorded, by hand (its camera must not change: see docs/qa/phone_camera_STATUS.md). Skipped without Playwright +
 Chromium, like test_visual.py. `python -m tests.visual.test_phone_camera` prints the numbers and writes
 tests/visual/out/phone_camera.json.
 """
@@ -95,7 +95,7 @@ def measure(sizes, log=lambda *a: None):
 def numbers():
     if not H.chromium_ok():
         pytest.skip("playwright / chromium not installed")
-    res = measure(PHONES + ("1280",))
+    res = measure(PHONES)          # (1280 is only recorded, by hand: python -m tests.visual.test_phone_camera; CI's 30 min)
     out = HERE / "out"; out.mkdir(exist_ok=True)
     (out / "phone_camera.json").write_text(json.dumps(res, indent=1) + "\n")
     return res

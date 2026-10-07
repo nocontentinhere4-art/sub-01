@@ -24,7 +24,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 from tests.visual import harness as H          # noqa: E402
 from tests.visual.fake_server import Server    # noqa: E402
 
-LOADS, SECONDS = 4, 40
+LOADS, SECONDS = 2, 40                  # (CI: the visual "pages" job has 30 min; the forced case below pins the cause)
 OUT, TOP = 10.5, 6.0
 
 RECORD = """(() => { const raf = window.requestAnimationFrame.bind(window);
