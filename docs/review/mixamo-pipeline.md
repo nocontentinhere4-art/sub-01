@@ -33,7 +33,7 @@ Arms raised 40° above horizontal: the whole hoodie side stretches into a wing f
 **10.3 cm, 7.2 cm outward**. Same root cause as 1; will show in Stretching / Standing_Clap / Angry_Gesture.
 Fix: same clamp; then re-shoot arms-up 40° and 90° from the front.
 
-### 3. Armpit crease streaks — MEDIUM
+### 3. Armpit crease streaks — WITHDRAWN 14:45 (the streak is in the texture, present in G21's bind pose too; see mixamo-wiring.md)
 ![crease](img/mixamo-pipeline_3_armpit_crease.jpg)
 Dark parallel streaks across the shoulder/armpit seam in arms-down and typing (front and from below): a narrow band of
 stretched/folded triangles where the weight jumps between `Spine` and `*Arm`. G20's own number: arm in torso ≤ 2.5 cm
@@ -47,3 +47,7 @@ Soles −0.5…−2.1 cm in the clip frame (G20's number), contact with chair/de
 ![ok](img/mixamo-pipeline_4_ok.jpg)
 Elbows bend cleanly in the typing pose (no candy-wrapper at the elbow or wrist), knees and the seat of the trousers in
 the seated pose are clean, the back of the neck/hood is closed, fingers present (65 bones, `finger1-1.R` …).
+
+
+## Update 14:45
+Superseded by preview/mixamo-wiring (G21 re-did autorig's weights). Defects 1 and 2 are mostly fixed there (numbers in mixamo-wiring.md); defect 3 withdrawn.
