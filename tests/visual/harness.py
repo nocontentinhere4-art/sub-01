@@ -101,11 +101,6 @@ class Harness:
             return self.pages[size]
         w, h, mobile = S.SIZES[size]
         ctx = self.browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile)
-        # the page's loop frozen from its first script, not only once it has booted: while the room and the character's
-        # GLBs decode, its loop drew a frame after frame in software GL and took the CPU from them. On 2 cores the boot
-        # took 53 s live against 17 s frozen; on CI's 2 slower vCPUs it reached the 180 s limit (main 448a0b8,
-        # test_hand_switch). Every test steps the page by hand after this anyway (window.FREEZE, ?debug only).
-        ctx.add_init_script("window.FREEZE = true")
         pg = ctx.new_page()
         st = {"errors": [], "failed": [], "glb": 0, "console": []}
         pg.on("pageerror", lambda e: st["errors"].append(str(e)))
@@ -122,7 +117,10 @@ class Harness:
             self.cdn.install(pg)
         tb = time.time()
         pg.goto(self.base + "/room.html?debug&hour=14" + self.query, wait_until="load")
-        wait_js(pg, "() => !!(window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9)", timeout=180000)
+        # 300 s: the page boots with its loop drawing live (software GL), which on CI's 2 vCPUs took up to ~180 s (main
+        # 448a0b8). Freezing the loop through the boot made it 15 s but changed what two scenes measured (7f2bf6e: walking_8
+        # and eating_19 into the desk), so it is not done until that is understood.
+        wait_js(pg, "() => !!(window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9)", timeout=300000)
         print(f"[visual] page {size} booted in {time.time() - tb:.0f} s", file=sys.stderr, flush=True)   # (CI: how close to the 180 s)
         t0 = time.time()
         while st["glb"] < GLB_FILES and time.time() - t0 < 60:
