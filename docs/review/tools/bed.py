@@ -19,7 +19,7 @@ STATE = "JSON.stringify({p: pose().at, g: pose().goal && pose().goal.clip, step:
 rep = {}
 h = Harness(OUT / "_h", log=print, cdn_cache=ROOT / "tests" / "visual" / ".cdn_cache")
 with Server() as server, sync_playwright() as p:
-    h.server = server; h.base = server.base
+    h.server = server; h.base = server.base; h.query = "&nolive"
     h.browser = p.chromium.launch(executable_path=CHROMIUM, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
     ctx, pg, st = h.open("1280")
     pg.add_script_tag(content=(HERE / "rv.js").read_text())
@@ -27,7 +27,7 @@ with Server() as server, sync_playwright() as p:
         pg.evaluate(f"""(() => {{ settle(); live({json.dumps(act)}, {json.dumps(X)}); let t = 0, still = 0;
           while (t < 150 && still < 1) {{ animate_(1/30); t += 1/30; still = pose().step || pose().at !== {json.dumps(want)} ? 0 : still + 1/30; }} return t; }})()""")
     # listening with music
-    h.goto_scene(pg, "window", 15)
+    pg.evaluate("setHour(15)")
     settle_into("listen_music", {"music": {"title": "a quiet track", "artist": "someone", "playing": True}})
     for k, adv in enumerate([30, 120, 120]):
         pg.evaluate(f"__qa.step(1/30, {adv})"); rep[f"listen_{k}"] = pg.evaluate(STATE); shoot(pg, h, f"listen_{k}")
