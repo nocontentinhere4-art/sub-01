@@ -40,7 +40,7 @@ from life import WORLD, Life
 from twin.body import Body
 from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
-from browse import Browser, display_ok
+from browse import Browser, card_title_ok
 import brain_vote
 import chess_game
 import clips
@@ -895,7 +895,7 @@ class Live:
             return {"device": dev, "restarting": True}
         st = self.browser.screens.get(dev)
         dec = self.decisions.get(dev)
-        if st and not display_ok(st.get("title", "")):           # the public card never shows such a title
+        if st and not card_title_ok(st.get("title", ""), st.get("host", "")):   # the public card never shows such a title
             st = dict(st, title=st.get("host", ""))
         elif st and (m := screens.TIKTOK_ID.search(str(st.get("url") or ""))):   # #89: viewers may play it in
             st = dict(st, embed={"src": screens.TIKTOK_EMBED.format(m.group(1)),     # TikTok's official player
@@ -1039,7 +1039,7 @@ class Live:
     def screens_view(self):
         """GET /api/screens: the browser up/down and why, the last 10 pages with kind and host, today's share by kind,
         the feed's notes, and the recent dopamine-like bursts."""
-        out = self.screens.public(display_ok)
+        out = self.screens.public(card_title_ok)
         out["dopamine"] = {"label": DA_LABEL, "bursts": [{"t": round(b["t"]), "size": b["size"], "kind": b["kind"],
                                                          "n": b["n"]} for b in self.da_bursts.trace[-60:]],
                            "da": round(self.neuro.levels["DA"], 3)}
@@ -1179,7 +1179,7 @@ class Live:
         self.targets = {k: v for k, v in self.targets.items() if now - v < 7 * 86400}
         self.targets[target_key(chosen)] = now
         title = page.get("title", "")[:120]
-        dec.update(device=dev, t=hhmm(t), page=title if display_ok(title) else page.get("host", ""), eyes=meta,
+        dec.update(device=dev, t=hhmm(t), page=title if card_title_ok(title, page.get("host", "")) else page.get("host", ""), eyes=meta,
                    page_url=page.get("url"))
         self.decisions[dev] = dec
         self.decision_log = (self.decision_log + [dec])[-30:]
