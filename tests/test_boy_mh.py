@@ -85,24 +85,25 @@ const out = {};
   out.away = wanted(st("research", {id: "s2", kind: "page", search: {query: "x"}}, 64, "bed")); }
 // 2. hands(dt): which hand code runs per mode (any vector op is a no-op stub)
 const calls = [];
-const vec = () => new Proxy(function () {}, {get: (t, p) => p === "x" || p === "y" || p === "z" ? 0 : p === "distanceTo" ? () => 0.07 : () => vec(), apply: () => vec()});
+const vec = () => new Proxy(function () {}, {get: (t, p) => p === "x" || p === "y" || p === "z" ? 0 : p === "distanceTo" ? () => 0.07 : typeof p === "symbol" ? undefined : vec(), apply: () => vec()});   // (a member is itself callable: hand.parent.getWorldQuaternion())
 // (the left hand's share at rest: o.mix, or main's old o.rest flag as 1)
 const share = o => !o ? 0 : o.mix != null ? o.mix : o.rest ? 1 : 0;
 const rec = name => (...a) => { calls.push([name, a[0], share(a[3]) >= 0.5 ? "rest" : "", share(a[3])]); };
 function build(M) {
-  const env = {boy: {updateMatrixWorld() {}, rotation: {y: 0}}};
+  const env = {boy: {updateMatrixWorld() {}, rotation: {y: 0}}, bones: {RightHand: vec(), RightForeArm: vec(), RightArm: vec()}};
   const P = {keys: {c: [0, 0, 0]}, kbNode: {}, mouseNode: {}, mouse: [0, 0, 0]};
   const OT = {json: {speed: 0.75}, t: 0, tr: 0};
   const deps = {M, env, P, OT, OT_REST: 0.2, HUMP: 0.02, CLIP: {mouse: [0, 0, 0]}, V: vec, _k: vec(), _c: vec(), _a: vec(), dK: vec(),
     toWorld: () => vec(), kbRef: () => [0, 0, 0], fwdV: () => vec(), S: () => vec(),
     ownerKeys: rec("ownerKeys"), keyOn: rec("keyOn"), pin: () => {}, follow: () => {}, mouseHold: rec("mouseHold"),
-    omStep: rec("omStep"), omNow: () => ({move: [0, 0]}), rightChain: () => []};
+    omStep: rec("omStep"), omNow: () => ({move: [0, 0]}), rightChain: () => [],
+    REACH_S: 0.8, ELB_REF: {}, elbowRef: () => {}, elbowKeep: () => {}, swivelTo: () => {}, THREE: {Quaternion: function () { return vec(); }}};
   const names = Object.keys(deps);
   return new Function(...names, SRC.kCtx + "; " + SRC.hands + "; " + (SRC.handsBody || "") + "; return hands;")(...names.map(n => deps[n]));
 }
 function run(mode, frames) {
   calls.length = 0;
-  const M = {mode, w: {type: 0, mouse: 0}, noIK: false}, hands = build(M);
+  const M = {mode, w: {type: 0, mouse: 0}, ph: {type: 0, mouse: 0}, noIK: false}, hands = build(M);
   for (let i = 0; i < frames; i++) hands(1 / 30);
   const by = {}; for (const [n, side, o] of calls) { const k = n + (side && typeof side === "string" ? ":" + side : "") + (o ? ":" + o : ""); by[k] = (by[k] || 0) + 1; }
   return by;
@@ -111,7 +112,7 @@ out.typing = run("desk_type", 60);
 out.mousing = run("desk_mouse", 60);
 // 3. switching modes in the middle (G24 F6): typing, then mousing, then typing again, frame by frame: the right hand never
 // takes the old capture path (keyOn), and the left hand's rest share moves by the weights, not in one jump
-{ const M = {mode: "desk_type", w: {type: 0, mouse: 0}, noIK: false}, hands = build(M), sw = {keyOnRight: 0, keyOnLeft: 0, maxShareStep: 0, frames: 0};
+{ const M = {mode: "desk_type", w: {type: 0, mouse: 0}, ph: {type: 0, mouse: 0}, noIK: false}, hands = build(M), sw = {keyOnRight: 0, keyOnLeft: 0, maxShareStep: 0, frames: 0};
   let last = null;
   for (let i = 0; i < 150; i++) {
     if (i === 60) M.mode = "desk_mouse"; if (i === 105) M.mode = "desk_type";
