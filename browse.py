@@ -383,13 +383,13 @@ def title_ok(text):
 def media_title_ok(text):
     """A song or video title, channel or artist (owner: "don't censor anything", shown as it is): one rule for
     Spotify tracks and YouTube / TikTok cards (review G24, F5). Refused: the guard's sexual / porn, gore, extremism,
-    self-harm and drug words (BAD_WORDS, word-bounded) and hosts (BAD_HOST), and chat.blocked(media=True): links,
-    addresses, tickers, e-mails, money requests with a currency, coin or wallet, "kys" and calls to violence against
-    a group. Not applied: slurs and swearing, research.BLOCK's topic substrings ("nazi" in "Nazionale", "rape" in
-    "Grapevine", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
+    self-harm and drug words (BAD_WORDS, word-bounded), and chat.blocked(media=True): links, addresses, e-mails,
+    requests for money, "kys" and calls to violence against a group. Not applied: slurs and swearing, BAD_HOST (a host
+    list: "Sex on Fire"), a "$" in an artist's styling ("$uicideboy$"), prices ("$5 Pizza Hack"), research.BLOCK's topic substrings ("nazi"
+    in "Nazionale", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
     import chat
     t = text or ""
-    return not (BAD_WORDS.search(t) or BAD_HOST.search(t)) and chat.blocked(t, media=True) is None
+    return not BAD_WORDS.search(t) and chat.blocked(t, media=True) is None
 
 
 # finance talk kept out of his own words (mind.py's FINANCE rule for replies stays; research.BLOCK had these before #56)

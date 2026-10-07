@@ -28,7 +28,7 @@ SWEARING = ["Stupid Love", "Loser", "Bitch Better Have My Money", "Fuck You", "M
 REFUSED = ["Porn star dancing", "XXX nude video", "Hentai compilation", "OnlyFans leak",       # sexual / adult
            "white power anthem",                                                                # extremism
            "kill yourself (lyric video)",                                                       # self-harm
-           "Send me 5 SOL for this song", "$PUMP to the moon"]                                  # money / tickers
+           "Send me 5 SOL for this song", "Donate 10 dollars for the next song"]                                  # money / tickers
 
 
 def test_an_explicit_spotify_track_is_kept():
@@ -54,7 +54,7 @@ def test_sexual_hate_and_money_video_titles_are_still_refused(title):
 
 
 @pytest.mark.parametrize("title", ["kill yourself (lyric video)", "KYS", "Send me 5 SOL for this song",
-                                   "$PUMP to the moon"])
+                                   "Donate 10 dollars for the next song"])
 def test_self_harm_and_money_song_titles_are_still_refused(title):
     assert M.track_from_api(track(title)) is None              # music.py checks songs with chat.blocked(media=True)
 
@@ -289,3 +289,24 @@ def test_music_without_browse_fails_closed():
                          cwd=str(Path(__file__).resolve().parents[1]), timeout=60)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip().splitlines()[-1] == "None" and "media_title_ok unavailable" in out.stdout
+
+
+
+@pytest.mark.parametrize("title", ["Sex on Fire", "Let's Talk About Sex", "$uicideboy$ - Paris",
+                                   "Suicideboys - Antarctica", "$5 Pizza Hack", "Pizza for 5 eur",
+                                   "A$AP Rocky - Praise the Lord", "Ke$ha - TiK ToK", "Give It 2 Me"])
+def test_sex_artist_stylings_and_prices_pass_as_songs_and_videos(title):
+    """Coordinator: BAD_HOST judges hosts, not titles; a "$" in an artist's name and bare prices are not money."""
+    assert browse.video_text_ok(title) and M.track_from_api(track(title)) is not None
+
+
+@pytest.mark.parametrize("title", ["Porn star dancing", "XXX nude video", "Suicide tutorial", "Send me 5 SOL",
+                                   "send $50 now", "Venmo me for the full song", "$PUMP to the moon",
+                                   "$PEPE 100x gem"])
+def test_porn_self_harm_and_money_requests_are_still_refused(title):
+    assert not browse.video_text_ok(title) and M.track_from_api(track(title)) is None
+
+
+def test_web_pages_and_chat_keep_the_host_ticker_and_price_rules():
+    assert not browse.display_ok("Sex on Fire")                       # web titles: BAD_HOST still applies
+    assert chat.blocked("$PUMP to the moon") and chat.blocked("only $5 today")

@@ -20,14 +20,21 @@ URL = re.compile(r"(https?://|www\.|\b[\w-]+\.(com|net|org|io|xyz|fun|app|gg|co|
 SOL_ADDR = re.compile(r"\b[1-9A-HJ-NP-Za-km-z]{32,44}\b")
 ETH_ADDR = re.compile(r"\b0x[a-fA-F0-9]{8,}")
 TICKER = re.compile(r"\$[A-Za-z][A-Za-z0-9]{1,11}\b")
+# song and video titles: a coin ticker still counts ("$PEPE to the moon"), a "$" in an artist's styling does not
+# ("$uicideboy$", "A$AP Rocky", "Ke$ha")
+MEDIA_TICKER = re.compile(r"(?<![A-Za-z0-9$])\$[A-Za-z][A-Za-z0-9]{1,11}\b(?!\$)")
 EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]+\b")
 PHONE = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
 MONEY = re.compile(r"\b(send|give|pay|tip|donate|lend|transfer|spare)\b.{0,20}\b(sol|eth|btc|usdc|usdt|crypto|money|"
                    r"cash|funds|coins?|tokens?|dollars?|bucks|euros?|\d+)\b|\$\s?\d|\d\s?(sol|usd|eur|€)\b|"
                    r"\b(donations?|donate|giveaway|airdrop|venmo|paypal|cash ?app|zelle|wallet|seed phrase|private key)\b",
                    re.I)
-# song and video titles (media=True): the same money rule without its bare-number amount ("Give It 2 Me")
-MEDIA_MONEY = re.compile(MONEY.pattern.replace(r"|\d+)\b", r")\b", 1), re.I)
+# song and video titles (media=True): only requests for money (a verb with a currency, coin or "$" amount, or a
+# donation / payment-app / wallet word); a bare number ("Give It 2 Me") or price ("$5 Pizza Hack", "5 eur") passes
+MEDIA_MONEY = re.compile(r"\b(send|give|pay|tip|donate|lend|transfer|spare)\b.{0,20}(\b(sol|eth|btc|usdc|usdt|crypto|"
+                         r"money|cash|funds|coins?|tokens?|dollars?|bucks|euros?)\b|\$\s?\d|\d\s?(sol|usd|eur|€)\b)|"
+                         r"\b(donations?|donate|giveaway|airdrop|venmo|paypal|cash ?app|zelle|wallet|seed phrase|"
+                         r"private key)\b", re.I)
 # small built-in list of slurs and insults (matched on a normalised, de-leeted copy of the text). Chat messages,
 # nicknames and viewer wishes are checked against all of them. Song and video titles (media=True) are real songs and
 # videos and are shown as they are (owner, 2026-10-07: "don't censor anything"): only the self-harm prompts still
@@ -128,13 +135,13 @@ def dedupe_key(text):
 
 def blocked(text, media=False):
     """Reason string if the message must be dropped, else None. media=True: a song or video title, shown as it is:
-    no slur check, only self-harm prompts (MEDIA_RE) and calls to violence against a group (incitement); no phone
-    rule (it reads year ranges, "2000 - 2010"), and money only with a currency, coin or wallet (MEDIA_MONEY)."""
+    no slur check, only self-harm prompts (MEDIA_RE) and calls to violence against a group (incitement); tickers only as coins
+    (MEDIA_TICKER: not "$uicideboy$"), no phone rule (it reads year ranges, "2000 - 2010"), and money only as a request (MEDIA_MONEY)."""
     if URL.search(text):
         return "links are not allowed"
     if SOL_ADDR.search(text) or ETH_ADDR.search(text):
         return "addresses are not allowed"
-    if TICKER.search(text):
+    if (MEDIA_TICKER if media else TICKER).search(text):
         return "tickers are not allowed"
     if EMAIL.search(text) or not media and PHONE.search(text):
         return "no personal data"
