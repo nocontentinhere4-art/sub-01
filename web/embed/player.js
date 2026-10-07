@@ -18,7 +18,7 @@ async function boot() {
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.25)); renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2;
   $('view').append(renderer.domElement);
-  scene = new THREE.Scene(); scene.background = new THREE.Color('#111612');
+  scene = new THREE.Scene(); scene.background = new THREE.Color('#110e0b');
   const pm = new THREE.PMREMGenerator(renderer), env = new RoomEnvironment();
   const envTarget = pm.fromScene(env); scene.environment = envTarget.texture; scene.environmentIntensity = .35; env.dispose(); pm.dispose();
   scene.add(new THREE.HemisphereLight(0xfff1dd,0x1a2520,1.1));
@@ -41,12 +41,12 @@ async function boot() {
   const cv = document.createElement('canvas'); cv.width=768; cv.height=448; const g=cv.getContext('2d');
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace;
   function monitor(state) {
-    g.fillStyle='#111912';g.fillRect(0,0,768,448);g.fillStyle='#cfff87';g.font='bold 44px monospace';g.fillText('FOMO / SUB-01',32,70);
-    g.fillStyle='#91a18c';g.font='22px monospace';g.fillText(state?.fomo?.connected?'ACCOUNT CONNECTED':'ACCOUNT NOT CONNECTED',32,112);
+    g.fillStyle='#17110d';g.fillRect(0,0,768,448);g.fillStyle='#ff6a00';g.font='bold 44px monospace';g.fillText('FOMO / SUB-01',32,70);
+    g.fillStyle='#ff9a3c';g.font='22px monospace';g.fillText(state?.fomo?.connected?'ACCOUNT CONNECTED':'ACCOUNT NOT CONNECTED',32,112);
     const rows=state?.trading?.operations||[];
-  if(!rows.length){g.fillStyle='#e7efdf';g.fillText('WAITING FOR FOMO',32,220);g.fillStyle='#91a18c';g.fillText('Account not connected',32,265);}
-    rows.slice(-4).forEach((r,i)=>{g.fillStyle='#cfff87';g.fillText((r.action==='buy'?'BUY ':'SELL ') +(r.asset||'') ,32,190+i*48);});
-    g.fillStyle='#91a18c';g.font='18px monospace';g.fillText(state?.fomo?.connected?'Account execution feed':'Waiting for account connection',32,425);tex.needsUpdate=true;
+  if(!rows.length){g.fillStyle='#ff6a00';g.fillText('WAITING FOR FOMO',32,220);g.fillStyle='#ff9a3c';g.fillText('Account not connected',32,265);}
+    rows.slice(-4).forEach((r,i)=>{g.fillStyle='#ff6a00';g.fillText((r.action==='buy'?'BUY ':'SELL ') +(r.asset||'') ,32,190+i*48);});
+    g.fillStyle='#ff9a3c';g.font='18px monospace';g.fillText(state?.fomo?.connected?'Account execution feed':'Waiting for account connection',32,425);tex.needsUpdate=true;
   }
   monitor(null); updateMonitor=monitor; screenMaterial=new THREE.MeshBasicMaterial({map:tex});
   if(marker){room.scene.updateMatrixWorld(true);const u=marker.userData;
@@ -62,6 +62,10 @@ async function boot() {
 
 function update(data){
   const s=data.trading, connected=data.fomo.connected, rows=s.operations;
+  const rules=data.strategy?.rules;
+  $('rules').textContent=rules ? `${rules.budget_usd===null?'BUDGET PENDING':'$'+rules.budget_usd+' / $'+rules.per_order_usd+' ENTRY'} · ½ AT +100% · TRAIL 10% · SL −75%` : '';
+  const plan=data.strategy?.last;
+  $('strategy').textContent=plan?`NEXT: ${plan.action==='buy'?'COPY '+plan.asset:'HOLD CASH'} · ${plan.reason}`:'Copy-trading · '+(data.strategy?.state||'waiting for feed');
   if(data.monitor?.available)loadFrame(data.monitor);else updateMonitor(data);
   $('badge').textContent=connected?'THE DESK · CONNECTED':'THE DESK · OFFLINE';
   $('mode').textContent=connected?'ACCOUNT EXECUTIONS':'ACCOUNT NOT CONNECTED';
@@ -72,7 +76,7 @@ function update(data){
     const row=document.createElement('div');row.className='row';
     const action=document.createElement('span');action.className='buy';action.textContent=`${r.action.toUpperCase()} ${r.asset}`;
     const amount=document.createElement('span');amount.textContent=String(r.amount);
-    const tx=document.createElement('a');tx.textContent='TX ↗';tx.href='https://solscan.io/tx/'+r.tx;tx.target='_blank';tx.rel='noopener noreferrer';tx.style.color='#9caa96';
+    const tx=document.createElement('a');tx.textContent='TX ↗';tx.href='https://solscan.io/tx/'+r.tx;tx.target='_blank';tx.rel='noopener noreferrer';tx.style.color='#ff9a3c';
     row.append(action,amount,tx);return row;
   }));
 }

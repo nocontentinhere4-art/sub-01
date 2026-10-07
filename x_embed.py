@@ -94,6 +94,12 @@ def approved_frame(path, digest):
         return None
 
 
+def strategy_status(app):
+    from copytrading.account import KEY
+    planner=app.get(KEY)
+    return planner.public() if planner else {'state':'waiting for risk limits','last':None}
+
+
 def attach(app, live, data_dir):
     enabled = os.environ.get('SUB01_X_EMBED') == '1'
     app[ENABLED] = enabled
@@ -117,6 +123,7 @@ def attach(app, live, data_dir):
                           'simulation': 'demo' if getattr(live, 'demo', False) else 'running',
                           'connected': tick is not None and now - tick < 15,
                           'fomo': {'connected': account['state'] == 'connected'}, 'trading': account,
+                          'strategy': strategy_status(app),
                           'monitor': {'available': frame is not None, 'revision': frame_hash if frame else None, 'mode': 'reviewed_still'}}
                 cached_at = now
         return web.json_response(cached, headers={'Cache-Control': 'no-store',

@@ -1794,6 +1794,8 @@ async def main(args):
         cpu_net.on_frame = live.spiking.relay if live.spiking else live.broadcast
     live.decider = brain_vote.Backend(cpu=cpu_net, gpu=spiking_manager, log=spiking_live.DecisionLog(data_dir))
     spiking_live.attach(app, live.decider)
+    from copytrading.account import attach as attach_account_planner
+    attach_account_planner(app, live, data_dir)
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
