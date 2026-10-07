@@ -86,25 +86,39 @@ const out = {};
 // 2. hands(dt): which hand code runs per mode (any vector op is a no-op stub)
 const calls = [];
 const vec = () => new Proxy(function () {}, {get: (t, p) => p === "x" || p === "y" || p === "z" ? 0 : p === "distanceTo" ? () => 0.07 : () => vec(), apply: () => vec()});
-const rec = name => (...a) => { calls.push([name, a[0], a[3] && a[3].rest ? "rest" : ""]); };
-function run(mode, frames) {
-  calls.length = 0;
-  const M = {mode, w: {type: 0, mouse: 0}, noIK: false};
+// (the left hand's share at rest: o.mix, or main's old o.rest flag as 1)
+const share = o => !o ? 0 : o.mix != null ? o.mix : o.rest ? 1 : 0;
+const rec = name => (...a) => { calls.push([name, a[0], share(a[3]) >= 0.5 ? "rest" : "", share(a[3])]); };
+function build(M) {
   const env = {boy: {updateMatrixWorld() {}, rotation: {y: 0}}};
   const P = {keys: {c: [0, 0, 0]}, kbNode: {}, mouseNode: {}, mouse: [0, 0, 0]};
   const OT = {json: {speed: 0.75}, t: 0, tr: 0};
   const deps = {M, env, P, OT, OT_REST: 0.2, HUMP: 0.02, CLIP: {mouse: [0, 0, 0]}, V: vec, _k: vec(), _c: vec(), _a: vec(), dK: vec(),
     toWorld: () => vec(), kbRef: () => [0, 0, 0], fwdV: () => vec(), S: () => vec(),
     ownerKeys: rec("ownerKeys"), keyOn: rec("keyOn"), pin: () => {}, follow: () => {}, mouseHold: rec("mouseHold"),
-    omStep: rec("omStep"), omNow: () => ({move: [0, 0]})};
+    omStep: rec("omStep"), omNow: () => ({move: [0, 0]}), rightChain: () => []};
   const names = Object.keys(deps);
-  const hands = new Function(...names, SRC.kCtx + "; " + SRC.hands + "; return hands;")(...names.map(n => deps[n]));
+  return new Function(...names, SRC.kCtx + "; " + SRC.hands + "; " + (SRC.handsBody || "") + "; return hands;")(...names.map(n => deps[n]));
+}
+function run(mode, frames) {
+  calls.length = 0;
+  const M = {mode, w: {type: 0, mouse: 0}, noIK: false}, hands = build(M);
   for (let i = 0; i < frames; i++) hands(1 / 30);
   const by = {}; for (const [n, side, o] of calls) { const k = n + (side && typeof side === "string" ? ":" + side : "") + (o ? ":" + o : ""); by[k] = (by[k] || 0) + 1; }
   return by;
 }
 out.typing = run("desk_type", 60);
 out.mousing = run("desk_mouse", 60);
+// 3. switching modes in the middle (G24 F6): typing, then mousing, then typing again, frame by frame: the right hand never
+// takes the old capture path (keyOn), and the left hand's rest share moves by the weights, not in one jump
+{ const M = {mode: "desk_type", w: {type: 0, mouse: 0}, noIK: false}, hands = build(M), sw = {keyOnRight: 0, keyOnLeft: 0, maxShareStep: 0, frames: 0};
+  let last = null;
+  for (let i = 0; i < 150; i++) {
+    if (i === 60) M.mode = "desk_mouse"; if (i === 105) M.mode = "desk_type";
+    calls.length = 0; hands(1 / 30); sw.frames++;
+    for (const [n, side, , sh] of calls) { if (n === "keyOn") sw[side === "Right" ? "keyOnRight" : "keyOnLeft"]++;
+      if (n === "ownerKeys" && side === "Left") { if (last != null) sw.maxShareStep = Math.max(sw.maxShareStep, Math.abs(sh - last)); last = sh; } } }
+  out.switching = sw; }
 console.log(JSON.stringify(out));
 """
 
@@ -122,6 +136,7 @@ def test_module_encodes_the_desk_rule():
         pytest.skip("node is not installed")
     js = (WEB / "boy_mh.js").read_text()
     src = {"wanted": _js_function(js, "function wanted(st)"), "hands": _js_function(js, "function hands(dt)"),
+           "handsBody": _js_function(js, "function handsBody(dt)") if "function handsBody(dt)" in js else "",
            "kCtx": next(line.strip() for line in js.splitlines() if line.strip().startswith("const kCtx ="))}
     import os
     r = subprocess.run([node, "-e", DESK_RULE_JS], capture_output=True, text=True, timeout=60, env={**os.environ, "DESK_RULE_SRC": json.dumps(src)})
@@ -136,6 +151,9 @@ def test_module_encodes_the_desk_rule():
     assert m.get("mouseHold", 0) > 30 and m.get("omStep", 0) > 30, m                  # (the right hand: the owner's mouse take)
     assert m.get("ownerKeys:Left:rest", 0) > 30, m                                    # (the left hand at rest on the keys)
     assert not any(k.startswith("keyOn") or k == "ownerKeys:Right" or k == "ownerKeys:Left" for k in m), m
+    sw = out["switching"]                                                             # (G24 F6: across a mode switch)
+    assert sw["keyOnRight"] == 0 and sw["keyOnLeft"] == 0, sw                         # (never the old capture path)
+    assert sw["maxShareStep"] <= 0.3, sw                                              # (the left hand blends: no one-frame jump)
     assert "const FADE = 0.4;" in js                                                  # (0.4 s crossfades between the modes)
     assert 'fetch("room/mh/owner_typing.json")' in js and 'fetch("room/mh/owner_mouse.json")' in js   # (the takes the page drives)
     for f in ("web/room/mh/owner_typing.json", "web/room/mh/owner_mouse.json"):
