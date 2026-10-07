@@ -1,13 +1,14 @@
 // node build_mouse.mjs <ambientCG Plastic016A 1K folder> ../web/room/mouse.glb
-// A generic computer mouse on a cloth pad, modelled in code (original, CC0; no maker's shape, no logo): 11.8 cm long, 6.2 cm
-// wide, 3.6 cm high, its hump in the back third, the two buttons sloping gently to the front with a seam between them, a
+// A generic computer mouse on a cloth pad, modelled in code (original, CC0; no maker's shape, no logo): 12.0 cm long, 6.4 cm
+// wide, 4.0 cm high (a full-size body that fills a palm: the hand at the desk grips it; the first one, 3.6 cm with a 2.2 cm
+// nose, read as a low pebble a hand could not curl over), its hump in the back third, the two buttons sloping gently to the front with a seam between them, a
 // small scroll wheel. Two nodes: "mouse" (origin: the middle of its base; its front, the buttons, towards -z) and
 // "mousepad" (origin: the middle of its underside). PBR (desk_pbr.mjs): a satin top, a matte skirt, a glossier wheel; the
 // pad a plain rough cloth; a contact shadow under the mouse (its child "mouse_contact").
 import { Document, NodeIO } from "@gltf-transform/core";
 import { plasticMaps, contactBlob } from "./desk_pbr.mjs";
 
-const L = 0.118, W = 0.062, H = 0.036, BASE = 0.004;
+const L = 0.120, W = 0.064, H = 0.040, BASE = 0.004;
 const BODY = [0.018, 0.018, 0.019], SEAM = [0.002, 0.002, 0.002], WHEEL = [0.035, 0.035, 0.038], PAD = [0.016, 0.017, 0.02];
 
 const parts = [];
@@ -16,15 +17,15 @@ function part(name){ const p = {name, pos: [], col: [], uv: [], idx: []}; parts.
 const vtx = (p, x, y, z, c, uv = [0.5 * (x / W + 0.5), 0.5 + z / L]) => { p.pos.push(x, y, z); p.col.push(...c, 1); p.uv.push(...uv); return p.pos.length / 3 - 1; };
 
 // the outline: a superellipse (|x/a|^2.6 + |z/b|^2.6 = 1), a little narrower at the front and pinched at the waist where
-// the thumb and the ring finger hold it (the widest part stays in the back third, 6.2 cm)
+// the thumb and the ring finger hold it (the widest part stays in the back third, 6.4 cm)
 const PE = 2.6;
 const narrow = z => (z < 0 ? 1 - 0.12 * (-z / (L / 2)) : 1) * (1 - 0.05 * Math.exp(-((((0.5 + z / L) - 0.42) / 0.16) ** 2)));
 const halfW = z => W / 2 * narrow(z) * Math.max(0, 1 - Math.abs(2 * z / L) ** PE) ** (1 / PE);
 // the height of the top at (x, z): the hump peaks a third from the back, the buttons slope to the front, rounded sideways
 function top(x, z){
   const u = 0.5 + z / L;                                       // 0 at the front, 1 at the back
-  const along = 0.62 + 0.38 * Math.exp(-(((u - 0.68) / 0.30) ** 2));
-  return H * along * (1 - 0.22 * (x / (W / 2)) ** 2);
+  const along = 0.70 + 0.30 * Math.exp(-(((u - 0.66) / 0.34) ** 2));   // (the nose at ~70% of the hump: buttons, not a blade)
+  return H * along * (1 - 0.14 * (x / (W / 2)) ** 2);
 }
 const m = part("mouse");
 const SEAM_Y = 0.012;                                          // the parting line between the top shell and the skirt
