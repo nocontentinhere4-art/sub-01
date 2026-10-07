@@ -362,7 +362,7 @@ def display_ok(text, media=False):
     """Text in his words or in the card's own lines (mind notes, the card title, video titles): no links, addresses,
     tickers, money, slurs, blocked topics or finance talk (the chat filter's rules, without its phone-number rule,
     which catches year ranges). Web titles and link labels use the looser title_ok (#56). media=True: a song or video
-    title, where swearing is allowed (only hate slurs are refused, chat.HATE_RE)."""
+    title, shown as it is (owner): no slur or swearing check, only self-harm prompts (chat.MEDIA_RE)."""
     import chat
     t = text or ""
     return (title_ok(t, media) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
@@ -376,7 +376,8 @@ def title_ok(text, media=False):
     from research import BLOCK as TOPIC_BLOCK
     t = text or ""
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
-                or MONEY_ASK.search(t) or (chat.HATE_RE if media else chat.SLUR_RE).search(chat.normalise(t))
+                or MONEY_ASK.search(t) or (chat.MEDIA_RE if media else chat.SLUR_RE).search(chat.normalise(t))
+                or media and chat.incitement(t)
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
 
 
@@ -445,8 +446,8 @@ def is_video_host(host):
 
 def video_text_ok(text):
     """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked),
-    both with media=True: swearing and explicit lyrics are allowed (owner), hate slurs and the guard's adult, gore,
-    extremism and finance rules are not."""
+    both with media=True: titles are shown as they are, swearing and slurs included (owner); the guard's adult,
+    gore, extremism and self-harm words and the money and finance rules still refuse one."""
     import chat
     return display_ok(text, media=True) and chat.blocked(text or "", media=True) is None
 

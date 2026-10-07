@@ -26,18 +26,34 @@ MONEY = re.compile(r"\b(send|give|pay|tip|donate|lend|transfer|spare)\b.{0,20}\b
                    r"cash|funds|coins?|tokens?|dollars?|bucks|euros?|\d+)\b|\$\s?\d|\d\s?(sol|usd|eur|€)\b|"
                    r"\b(donations?|donate|giveaway|airdrop|venmo|paypal|cash ?app|zelle|wallet|seed phrase|private key)\b",
                    re.I)
-# small built-in list of slurs and insults (matched on a normalised, de-leeted copy of the text). Chat messages and
-# nicknames are checked against all of them. Song and video titles (media=True) only against HATE_SLURS: the owner
-# allows explicit lyrics and swearing in songs and videos ("Stupid Love", "Loser", "Bitch Better Have My Money"),
-# never hate slurs, sexual slurs or self-harm prompts.
+# small built-in list of slurs and insults (matched on a normalised, de-leeted copy of the text). Chat messages,
+# nicknames and viewer wishes are checked against all of them. Song and video titles (media=True) are real songs and
+# videos and are shown as they are (owner, 2026-10-07: "don't censor anything"): only the self-harm prompts still
+# refuse one (MEDIA_RE); the guard's adult words, self-harm and money rules apply to them elsewhere.
+SELF_HARM = ("kys", "kill yourself")
 HATE_SLURS = ("nigger", "nigga", "faggot", "fag", "kike", "spic", "chink", "gook", "wetback", "tranny", "retard",
-              "dyke", "cunt", "whore", "slut", "kys", "kill yourself")
+              "dyke", "cunt", "whore", "slut")
 INSULTS = ("bitch", "bastard", "idiot", "moron", "imbecile", "stupid", "dumbass", "loser", "asshole", "dickhead",
            "motherfucker", "fuck you", "fuck off", "stfu", "shut up", "piece of shit", "worthless", "pathetic", "ugly")
-SLURS = HATE_SLURS + INSULTS
+SLURS = HATE_SLURS + SELF_HARM + INSULTS
 _slur_re = lambda words: re.compile(r"\b(" + "|".join(re.escape(w) for w in words) + r")(s|es|ed|ing|y|ic)?\b")  # noqa: E731
 SLUR_RE = _slur_re(SLURS)
-HATE_RE = _slur_re(HATE_SLURS)
+MEDIA_RE = _slur_re(SELF_HARM)
+# ... and explicit calls to violence against a group or by slur ("kill all the ...", "death to ..."): never shown,
+# whatever the title (matched on the normalised text; slurs in ordinary titles stay allowed)
+GROUPS = HATE_SLURS + ("jews", "jew", "muslims", "muslim", "christians", "arabs", "blacks", "whites", "asians",
+                       "mexicans", "immigrants", "migrants", "refugees", "gays", "gay people", "lesbians", "trans people",
+                       "transgenders", "women", "hindus", "sikhs", "gypsies", "roma", "africans", "chinese", "japanese",
+                       "koreans", "indians", "palestinians", "israelis", "ukrainians", "russians", "atheists")
+_group = r"(?:" + "|".join(re.escape(g) for g in GROUPS) + r")(?:s|es)?\b"
+INCITE_RE = re.compile(r"\b(?:kill|burn|gas|hang|lynch|shoot|exterminate|slaughter|murder|genocide)\s+(?:all\s+)?"
+                       r"(?:(?:the|those|these|every|them)\s+)?" + _group +
+                       r"|\bdeath\s+to\s+(?:all\s+)?(?:(?:the|those)\s+)?" + _group)
+
+
+def incitement(text):
+    """A call to violence against a group (INCITE_RE); punctuation goes first, as LEET reads "!" as "i"."""
+    return bool(INCITE_RE.search(normalise(re.sub(r"[!?.,;:]+", " ", text or ""))))
 LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
 
 
@@ -52,8 +68,8 @@ def dedupe_key(text):
 
 
 def blocked(text, media=False):
-    """Reason string if the message must be dropped, else None. media=True: a song or video title, where swearing and
-    insults are allowed (HATE_RE instead of SLUR_RE); every other rule stays."""
+    """Reason string if the message must be dropped, else None. media=True: a song or video title, shown as it is:
+    only self-harm prompts (MEDIA_RE instead of SLUR_RE); every other rule stays."""
     if URL.search(text):
         return "links are not allowed"
     if SOL_ADDR.search(text) or ETH_ADDR.search(text):
@@ -64,7 +80,7 @@ def blocked(text, media=False):
         return "no personal data"
     if MONEY.search(text):
         return "no requests for money"
-    if (HATE_RE if media else SLUR_RE).search(normalise(text)):
+    if (MEDIA_RE if media else SLUR_RE).search(normalise(text)) or media and incitement(text):
         return "insults are not allowed"
     return None
 
