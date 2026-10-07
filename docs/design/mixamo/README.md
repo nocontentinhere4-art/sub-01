@@ -255,3 +255,98 @@ Still open, reported rather than patched:
 - **Walking from the window to the desk**, his left forearm swings through the parked chair's backrest (27–37 vertices at 2.6–2.7 s). It is identical on main: the path through the gap between the chair and the bed passes 15 cm from the backrest.
 - **The phone in bed has no capture.** Texting is standing, Texting_While_Standing and the tablet are standing, and Gaming is seated. None of them is lying down, which is where he watches most of his shorts, so the bed phone pose stays as it is. It is the one place in his day we have no capture for.
 - **The hands-vs-thighs row is a weak instrument in transitions.** It is a capsule around the thigh bone sized from baggy trousers (radius up to 16 cm), so a fist resting on the cloth reads as deep. The honest measurement is against the trouser mesh, and it should come with the contact gate.
+
+## The rare events at the desk: the whole capture, the chair moved
+
+COORD's rule for Scared, Angry_Gesture and Standing_Clap: play the whole capture and move the chair, not the performance. `boy_mh.js` `rare(k)` (`mh.rare("scared" | "angry" | "clap")`; the page's scheduler decides when, rarely and never twice close together):
+
+1. **He rides the chair back** (1 s, seated), as far as that capture needs.
+2. **The whole capture plays**, with 0.8 s crossfades in and out of the seated loop. The joins are 42–49°, hands from the armrests to the thighs (`chain_joins.py`).
+3. **He rides back in** (1 s).
+
+How far back is derived per capture, against the room, when the event starts:
+- the capture's hands, forearms, knees, feet, chest and head, every 0.1 s, from its first frame's hips;
+- against the free space in front of where he sits: rays toward the desk across his width at every 5 cm of height, plus downward rays for the desk's top, a 3 mm plate at 0.81 m that horizontal rays slip past;
+- the deepest any part would go, plus 3 cm.
+
+From his seated place that is 27–33 cm for Scared, 16–22 cm for Angry_Gesture, and 23–37 cm for Standing_Clap. Each capture's hips sit on a seat point swept the same way (`SEAT_AT`): Scared 11.5 cm forward (clear from 9.5), Angry_Gesture 8.5 (clear from 7.5), Standing_Clap where he sits to watch.
+
+`contact_pass.mjs` with `RARE=<k>`, every frame, over the whole event:
+
+| | chair | desk | floor, bed | seat on landing | soles | hands vs thighs |
+|---|---|---|---|---|---|---|
+| Scared (12.5 s) | **0** | **0** (was torso 186 frames, legs 161) | 0 | −0.1 cm | −0.2…4.8 cm | capsule 15 cm (hands push on the thighs to rise) |
+| Angry_Gesture (8.3 s) | **0** | **0** (was feet 15 cm into its frame) | 0 | −0.6 cm | 0.1…4.8 cm | 132 frames, 3.4 cm |
+| Standing_Clap (7.2 s) | **0** | **0** (was torso 80 frames, legs 80) | 0 | −0.1 cm | −0.2…4.8 cm | capsule 14 cm (as Scared) |
+
+- Two fixes on the way. An action that was never played reports an effective weight of 1, which pulled his seated placement 4.8 cm sideways. And an event's crossfade has to start before the frame's mixer update; otherwise the root is placed for one frame for a pose that is not showing yet (10.6 cm).
+- Sheet: `rare_events_desk.jpg`, from the room's side, seconds into each event. The dark first frame in two rows is a stale capture of the canvas; the log has him seated there.
+- Angry_Gesture's 3.4 cm in the thigh capsule: his fist rests on his thigh as he leans in. The capsule is the weak instrument noted above, and it should be checked against the trouser mesh when the contact gate lands.
+- Not wired to the scheduler (G10d's). `mixamo_chains.json` "rare" lists each event; celebrating is Standing_Clap played whole.
+
+## The Mixamo skeleton path (no retarget)
+
+COORD is moving the character onto Mixamo's own skeleton: the owner's v5 goes through Mixamo's auto-rigger (Standard Skeleton, 65 bones with fingers). The twenty captures then play on the skeleton they were recorded on, by bone name. The retarget (`mh_retarget.mjs`, `post.py`, `bed_fit.py`) is not used for new clips.
+
+Ready for the file:
+- `room_build/kimodo/mixamo_glb.mjs <in.fbx> <out.glb> [--test-skin] [--no-anim]`: a Mixamo FBX (a skinned character, or a clip downloaded "Without Skin") as a GLB.
+  - The mixamorig names are kept, and the whole scene goes under one node scaled 0.01 (centimetres to metres).
+  - `--test-skin` binds a plain box body to a clip's skeleton, for testing without the character.
+- `web/room/char_mixamo.js`, the same shape as `char_v5.js`:
+  - `prep()` hangs the hips under the body and gives the bones the names the page already uses (`NAMES`: Mixamo's limb names unchanged, the spine chain to Spine02 / Spine01 / Spine, Neck → neck, the fingers to finger1..5-1..4.L/R).
+  - `fixClip()` renames a clip's tracks the same way, carries the hips' track into the body's frame, and scales only the hips' translation by hip height (the character's over the clip skeleton's).
+- `room_build/kimodo/mixamo_check.mjs <character.glb> <clip.glb> <clip.fbx> [--scale k]`: the proof. It plays the clip through `char_mixamo.js` and compares every joint's world position every 0.1 s against three's FBXLoader playing the same FBX on its own skeleton.
+
+| clip | character | bones matched | worst gap | lowest foot (played / reference) |
+|---|---|---|---|---|
+| Seated_Idle | the clip skeleton, as is | 65 / 65 | 0.00 cm | 0.002 / 0.002 m |
+| Seated_Idle | scaled 0.9 | 65 / 65 | 0.00 cm | 0.002 / 0.002 m |
+| Laying_Nodding | as is | 65 / 65 | 0.00 cm | 1.030 / 1.030 m |
+| Laying_Nodding | scaled 0.9 | 65 / 65 | 0.00 cm | 0.927 / 0.927 m |
+
+`mixamo_skeleton_loader.jpg` shows the test body playing Seated_Idle and Laying_Nodding in the browser, with the page's three.js (0.169) and `char_mixamo.js`.
+
+What this settles about the lying clips. G10d measured our retargeted Laying_Nodding with the fists raised in front of the face and the legs lifted 11–19 cm. Played on its own skeleton, the capture lies flat (on the performer's bed, 1.03 m up):
+- the hands rest on the stomach, 51 cm from the head and about 10 cm over the hips;
+- the ankles are 9.6 cm below the hips.
+
+Laying_Sleeping is the same. The lift and the raised fists came from the retarget and bed-fit chain, not from the captures.
+
+Still to wire when the character arrives:
+- room.html's `pickRig` / `V5` switch and `env.fixClip` / `pageHips`;
+- boy_mh.js's MakeHuman-only names: `isMH()` (metacarpals), "Spine" in the rare-event reach (Mixamo's lowest spine bone becomes Spine02 here, so the reach's "Spine" is Mixamo's Spine2: correct), and the fingertip names (finger*-3 maps to Mixamo's third joint; Mixamo also has a fourth, the tip).
+
+The placements (seat points, chair rides, spots, rare-event distances) sample each clip on the body, so they carry over.
+
+## Walking past the chair
+
+Traced with the page's `penetration()` every 0.1 s, in walks that pass or leave the desk:
+
+| walk | main | this branch, before | now |
+|---|---|---|---|
+| window → desk | forearm through the backrest (27–37 vertices at 2.6–2.7 s) | the same | **clear** (one 25-vertex sample at the landing, 8.2 s) |
+| desk → window | (main's get-up: 14–238 over most of the span) | 7 + 10 vertices (two samples) | 7 + 10 |
+| door → desk | | | clear |
+| desk → bed, to sleep | **68 samples, up to 3315 vertices** (room_bedtime's get-up at its own chair) | 65 samples, up to 5570 | 7 + 10, as any time he leaves |
+
+- **The path between the chair and the bed** (`NODES` g, sl) runs down the middle of that gap: z 0.03, against −0.06 / −0.08. The parked chair's route box (with its pad) ends at z −0.065 and the bed's at 0.13; that also holds for the 1.90 m bed on preview/bed-music, which only extends the foot end.
+- **`free()` keeps the route 0.25 m off the chair's box** (`ARM_PAD`), not 0.12 m. His swinging arm reaches about 0.3 m out, and the backrest's top is at arm height. That was the cut through the corner, from the sill straight to the desk.
+- **Going to sleep from the desk**, he now stands up with `room_mx_sit_to_stand` like any other departure. `room_bedtime` plays only its part at the bed.
+
+tests/visual core set: 0 hard failures. tests/test_boy_mh.py: 7 passed.
+
+## The base seated loop, on the captures' own skeleton
+
+`room_build/kimodo/mixamo_seated_src.mjs` (FBXLoader, no retarget):
+
+| capture | what it shows | worst jump into / out of the desk set |
+|---|---|---|
+| Seated_Idle (4.2 s) | hands on the armrests (13–14 cm over the thighs, 28–31 cm to the side), head 11 cm ahead of the hips | 46–48° (right hand) |
+| Sitting (4.4 s) | not an idle: starts standing and sits down (wraps at 85°) | 92° |
+| Sitting_1 (1.2 s) | hands on the lap, head upright; a 1.2 s loop | 49–53° (arms) |
+| Sitting_Rubbing_Arm (8.0 s) | leaning in, head 28 cm ahead | 82° |
+| Sitting_Talking (44 s) | talking with his hands (ruled out as the base) | 6–11° |
+
+The desk set rests its hands on the thighs (4–5 cm over them). Seated_Idle stays the base. The 0.8 s hands-to-thighs blend gets its contact pass on the Mixamo rig, the body it will play on.
+
+The forward lean G14 measured (13–19°) is partly this pipeline's: the v5 seated fit tipped the spine 10° (`pitch` in `mixamo_clips.json`). On the Mixamo rig there is no fit.

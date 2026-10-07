@@ -109,3 +109,10 @@ repeatedly reported as "accepted", which it never was).
 The seated rows are being fixed by replacement rather than by patching: the hand-built seated poses are being
 replaced with retargeted motion capture, and the patches that propped them up (the leg swap when a watch clip's
 ankles start above 0.12 m, the roll distances tuned to the old poses) go with them.
+
+**`sleeping_side` measures nothing on v5.** Found by G10d: the turn onto his side (`rollStep()`, applied in
+`lieFit()`) runs only on the old rig's per-frame path. With v5, `boy_mh.js` drives him, neither function runs, and
+`ROLL.a` stays 0 however long the scene plays. So the scene renders him on his back exactly like `sleeping`, and a pass
+there says nothing about lying on his side. Live has no side-lying sleep at all. The old roll is hand-set angles on the
+hips, knees, spine and arms, so it is not being ported. The side pose comes from a capture on the Mixamo rig, and the
+duvet drape is measured on it then. Until that lands, read `sleeping_side` as a second `sleeping`.

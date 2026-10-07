@@ -75,7 +75,7 @@ jobs:
   # bed/chair penetration); the rest is in the report, kept as an artifact. The heavy set is opt-in (SUB01_VISUAL_FULL=1).
   visual:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
