@@ -2399,6 +2399,11 @@ const BODY_SEGS = [["Hips", "Spine02"], ["Spine02", "Spine01"], ["Spine01", "Spi
   ["RightShoulder", "RightArm"], ["RightArm", "RightForeArm"], ["RightForeArm", "RightHand"], ["RightHand", "RightHand"],
   ["neck", "Head", 1], ["Head", "head_end", 1]];                      // (the head dents the pillow; the duvet stays below it)
 const skinMesh = () => { let sm = null; boy && boy.traverse(o => { if (o.isSkinnedMesh && !/_inside$/.test(o.name)) sm = o; }); return sm; };
+// his body's mesh, by name: v5 is several skinned meshes (the body "tripo_*", and since b2593d7 "slides", "socks",
+// "hood_lining", "hood_patches"), and skinMesh() returns whichever comes last (the socks). Bodies of one mesh: that one.
+// (G17: contacts(), penetration()'s parked-slides mask and the page's slides cut measured or cut the socks mesh as if it were him)
+const bodyMesh = () => { let sm = null, big = null; boy && boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return;
+  if (!sm && /^tripo_/.test(o.name)) sm = o; if (!big || o.geometry.attributes.position.count > big.geometry.attributes.position.count) big = o; }); return sm || big; };
 const domBone = (g, i) => { const I = g.attributes.skinIndex, W = g.attributes.skinWeight; let b = 0, bw = -1;
   for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); } return b; };
 const shapeable = (src, name) => {                      // a world-space copy of a room mesh, to reshape, shown instead of it
@@ -2728,7 +2733,8 @@ function coverShape(){                                 // the duvet over him, th
 }
 const SLIDES = {full:null, bare:null, parked:null, off:false, state:0};
 function slidesInit(){                                 // which of his vertices are the slides (dark, on the feet, below the ankle)
-  const sm = skinMesh(); if (!sm || !sm.material.map || !sm.material.map.image) return false;
+  // (a body of one mesh with the slides in it; v5's slides are their own mesh, taken off by boy_mh.js's bedThings)
+  const sm = bodyMesh(); if (!sm || !sm.material.map || !sm.material.map.image) return false;
   const g = sm.geometry, P = g.attributes.position, UV = g.attributes.uv, img = sm.material.map.image, names = sm.skeleton.bones.map(b => b.name);
   const W = Math.min(512, img.width), H = Math.min(512, img.height), cv = document.createElement("canvas"); cv.width = W; cv.height = H;   // (colour only: a small copy)
   const cx = cv.getContext("2d", {willReadFrequently:true}); cx.drawImage(img, 0, 0, W, H); const D = cx.getImageData(0, 0, W, H).data;
@@ -2773,7 +2779,8 @@ function slidesInit(){                                 // which of his vertices 
 }
 function setSlides(state){                            // 0 on his feet; 1 off, his socks seen (lying on the duvet); 2 off, under it
   if (state === SLIDES.state || (!SLIDES.full && !slidesInit())) return;
-  SLIDES.state = state; SLIDES.off = state > 0; const g = skinMesh().geometry;
+  SLIDES.state = state; SLIDES.off = state > 0;
+  const g = bodyMesh().geometry;
   g.setIndex(state === 2 ? SLIDES.bare : SLIDES.full);
   g.setAttribute("uv", state === 1 ? SLIDES.sockUV : SLIDES.uv); g.attributes.uv.needsUpdate = true;
   SLIDES.parked.visible = state > 0;
@@ -3243,7 +3250,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     for (const sm of parts) { const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight; count += Math.ceil(P.count / every);
     const note = (i, what) => { if (!detail) return; let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
-    const hid = SLIDES.state === 2 && sm === skinMesh() ? SLIDES.parkedIdx : null;   // (the slides parked by the bed are not on him)
+    const hid = SLIDES.state === 2 && sm === bodyMesh() ? SLIDES.parkedIdx : null;   // (the slides parked by the bed are not on him)
     for (let i = 0; i < P.count; i += every) { if (hid && hid.has(i)) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
       const e = Math.min(v.x + 1.90, 0.05 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
       if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0)) { bed++; note(i, "bed"); }
@@ -3267,7 +3274,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     const {X0, Z0, N, NX, NZ, hm} = window._HM;
     const surf = (x, z) => { const i = Math.round((x - X0) / N), k = Math.round((z - Z0) / N); if (i < 0 || k < 0 || i >= NX || k >= NZ) return -1;
       return Math.max(hm.sheet[i * NZ + k], hm.jersey[i * NZ + k]); };
-    const sm = skinMesh(), P = sm.geometry.attributes.position, names = sm.skeleton.bones.map(b => b.name), v = new THREE.Vector3(), out = {};
+    const sm = bodyMesh(), P = sm.geometry.attributes.position, names = sm.skeleton.bones.map(b => b.name), v = new THREE.Vector3(), out = {};
     boy.updateMatrixWorld(true);
     const part = n => /Head|head|neck/.test(n) ? "head" : /Spine/.test(n) ? "back" : n === "Hips" ? "pelvis" : /UpLeg/.test(n) ? "thighs" : /Leg$/.test(n) ? "shins" : /Foot|Toe/.test(n) ? "feet" : "arms";
     for (let i = 0; i < P.count; i += every) { sm.getVertexPosition(i, v).applyMatrix4(sm.matrixWorld); const h = surf(v.x, v.z); if (h < 0) continue;
