@@ -206,7 +206,14 @@ GEO_WALL = re.compile(r"(?:(?:not|n['’]t)\s+(?:currently\s+|yet\s+)?available|
                       r"(?:not|n['’]t)\s+(?:currently\s+)?available where you are|"
                       r"(?:blocked|restricted) in your (?:region|country|location)|"
                       r"bbc iplayer only works in the uk|only available (?:to watch )?in the uk\b|"
-                      r"not made this video available in your country|geo-?(?:blocked|restricted)", re.I)
+                      r"not made this video available in your country|geo-?(?:blocked|restricted)|"
+                      # (G14: the US / EU walls and the licence wording - "not available outside the United States",
+                      # "only available in the US", "due to licensing restrictions ... in your country")
+                      r"not available (?:to (?:users|viewers) )?outside (?:of )?the (?:uk|united kingdom|us|usa|united states|eu)\b|"
+                      r"only (?:works|available|playable) (?:to (?:users|viewers|people) )?in the (?:us|usa|united states)\b|"
+                      r"due to (?:licensing|rights|legal) restrictions[^.]{0,60}\b(?:country|region|location)\b", re.I)
+# a title asking about it is an article, not the wall ("Why Netflix shows aren't available in your country")
+GEO_TITLE_ASK = re.compile(r"^\s*(?:why|how|what|which|when|where|is|are|can|do|does)\b", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -634,13 +641,32 @@ OVERLAY_TEXT_JS = """() => {
 }"""
 
 
-def challenge_title(title, url):
-    """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    a geo-block title ("... isn't available in your region"), or a title that is only the bare host name (an
-    interstitial, not content)."""
+# 2026-10-07 14:39 UTC live: "The Drive - Permission Request Form" (permissions.thedrive.threesai.com) was shown and
+# logged. A consent / permission / cookie-request page is a wall like a bot check: left, not shown, its site cooled off.
+# By the title (one of its parts is only such a request: an article about privacy settings is not) or by a host whose
+# first label is one (permissions.*, consent.*, cookies.*, cmp.*, gdpr.*).
+CONSENT_TITLE = re.compile(r"(\w+ )?(permissions? request|request (for )?permissions?|permissions? required|"
+                           r"cookie (consent|preferences|settings|policy|choices)|privacy (choices|preferences|center)|"
+                           r"manage (cookies|consent|your privacy)|consent( management| preferences| request)?)"
+                           r"( form| page)?")
+CONSENT_HOST = re.compile(r"^(permissions?|consent|cookies?|cmp|gdpr)\.[\w-]+\.[\w.-]+$")
+
+
+def consent_wall(title, url):
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
-    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t))
+    return (any(CONSENT_TITLE.fullmatch(part.strip()) for part in re.split(r"\s[-|–—:·]\s|\|", t))
+            or bool(CONSENT_HOST.match(host)))
+
+
+def challenge_title(title, url):
+    """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
+    a geo-block title ("... isn't available in your region"), a consent / permission request, or a title that is only
+    the bare host name (an interstitial, not content)."""
+    t = " ".join(str(title or "").split()).lower().rstrip(".")
+    host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
+    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t)) and not GEO_TITLE_ASK.search(t)
+            or consent_wall(title, url)
             or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 

@@ -50,6 +50,10 @@ SCENES = {
     # lying awake on the bed with music on (#68), for the phone-camera test only (not in the shot sets)
     "music":    (life("listen_music", "bed", "listening to music", music={"id": "qa", "title": "QA track", "artist": "QA", "playing": True}),
                  "AWAKE", None, 3.0, "bedlie", None),
+    # at the computer with a page on the screen, as the live server sends it once his walk there has ended (the caption:
+    # "at the computer" only once the page has him seated; tests/visual/test_arrival.py)
+    "computer": (life("research", "desk", "reading at the computer", reading=READING,
+                      screen={"device": "desk", "id": "qa1", "kind": "page", "title": "Inokashira Park - Wikipedia"}), "AWAKE", None, 1.0, "desk", None),
 }
 # the hour each scene is shot at in the core set, and the full matrix
 # preview/room-mh: when room/boy.glb is the MakeHuman rig (web/room/boy_mh.js drives it with its own clips) pose()
@@ -73,7 +77,7 @@ def makehuman_rig():
     return any(nd.get("name") == "metacarpal1.L" for nd in g.get("nodes", []))
 
 
-NATURAL_HOUR = {"desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19, "music": 23}
+NATURAL_HOUR = {"computer": 14, "desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19, "music": 23}
 HOURS = (8, 14, 19, 23)
 SIZES = {"1280": (1280, 800, False), "390": (390, 844, True)}
 SHOT_SIZES = ("1280", "390")                                  # the shot sets; the phone-camera test adds two more phones
@@ -93,7 +97,7 @@ CLOSEUPS = {
     "night": ("sleeping", 23, "bed"),       # the same bed at night: what the dark room shows
     "side":  ("sleeping_side", 14, "bed"),  # asleep on his side under the duvet (#108)
 }
-CORE_SCENES = [s for s in SCENES if s not in ("sleeping_side", "music")]          # the side pose is covered by its close-up
+CORE_SCENES = [s for s in SCENES if s not in ("sleeping_side", "computer", "music")]   # the side pose: its close-up; the computer: test_arrival.py; music: test_phone_camera.py
 CORE_SHOTS = [(s, NATURAL_HOUR[s], "1280") for s in CORE_SCENES] + [("desk", 14, "390"), ("sleeping", 23, "390")]
 FULL_SHOTS = [(s, h, z) for s in CORE_SCENES for h in HOURS for z in SHOT_SIZES] + [("sleeping_side", 23, "1280"), ("sleeping_side", 14, "390")]
 
