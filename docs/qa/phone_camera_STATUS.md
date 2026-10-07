@@ -74,3 +74,24 @@ after; 1280×800 asleep before / after).
 Files changed: `web/room.html` (camera logic only: `updateCameraGoal`, the phone framing, the spring arm's mesh list),
 `tests/visual/test_phone_camera.py`, `tests/visual/phone_camera.js`, `tests/visual/scenes.py` (a music-in-bed scene and
 the 360 / 430 phone sizes, both kept out of the shot sets). char_v5.glb and the bed clips are not touched.
+
+## Milestone 4 — merge with main + review G26's defect: done (`d9bbf3a`)
+- Merged origin/main (448a0b8, includes A's desk-arrive). `web/room.html` merged by itself; `tests/visual/scenes.py`
+  conflicted (main's `computer` scene vs this branch's `music` scene): both kept, both out of the shot sets.
+- G26 (docs/review/phone-camera.md on preview/review), HIGH, intermittent: right after load, before the v5 layer was
+  ready, the framing followed the old rig's hips (~100 m up): camera at y 115 m, black canvas. Fix (`narrow()` in
+  web/room.html): the phone framing runs only when the drawn body is ready (the rig layer sets `bodyReady`: the v5 /
+  MakeHuman layer's `mh.ready`) and its hips are finite and inside the room box (x −1.75…3.5, y 0…2.5, z −1.3…3.5);
+  otherwise the overview, as on main.
+- `tests/visual/test_phone_camera_load.py`:
+  - forced: hips moved 100 m up, then NaN; the goal must stay the overview, and the framing must come back when the
+    hips do. Without the fix it fails exactly as the review saw: hips y 101 → camera goal y 104.2.
+  - live: the 390 page loaded 4×, the scene asleep from the first tick, the page's own loop running 40 s, the camera
+    recorded after every rendered frame (requestAnimationFrame wrapped by an init script). With the fix: 10–14 frames
+    per load before the v5 layer became ready (~42 s here, software GL), the camera at the overview every frame (9.08 m
+    from the room's centre, y 5.0), 0 NaN. The live race did not show here without the fix either (4 loads); the
+    forced case is the one that pins it.
+- Phone-camera numbers on the merged head: unchanged (asleep / side / music / phone / into bed / standing / walking
+  1.0 with the head always in; out of bed on the way 0.884 / 0.889 / 0.852; desk head in every frame; 1280 as main).
+- Full suite on `d9bbf3a`: **1471 passed, 27 skipped, 8 warnings in 2176 s; pytest exit 0**; `results.json`
+  `hard_failures == []`.
