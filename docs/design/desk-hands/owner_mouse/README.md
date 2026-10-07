@@ -22,7 +22,7 @@ middle 31/29, little 28/38.
 |---|---|---|
 | Finger bends (index to little) | the overhead take, `world` | each segment's direction in his palm's frame (wrist→middle knuckle, index→little knuckle); the page builds the same frame from the character's bones and aims each bone along it |
 | Finger spread | the overhead image | each finger's turn from the middle finger, seen from above |
-| Thumb | the overhead take | its MCP and IP segments as his; its root (finger1-1) as recorded (below) |
+| Thumb | the owner | straight: its MCP and IP bones on along its root's line; the root (finger1-1) as recorded (below) |
 | Hand's long axis | the overhead take | wrist→middle knuckle over the desk, per frame |
 | Hand's roll | the front take | base 18.7°, band 14.0–21.4° (below) |
 | Mouse travel | the overhead image | his wrist's track in palm widths (5→17, median 84 px), times the character's own 5→17 width; the room mouse follows the palm as before |
@@ -73,9 +73,48 @@ CMC sits outside the index line. So his thumb, carried over whole:
 - placed at his joints' positions, needs a 56° bend at the MCP (his is 14°).
 
 Turning finger1-1 tears the skin at the thumb's base: its triangles reach 5× their bind length at p99, and 10–14× at the
-worst triangle. Left as recorded, they stay at 2.05× (p99). The thumb's MCP and IP bones carry his segments.
+worst triangle. Left as recorded, they stay at 2.05× (p99). The thumb's MCP and IP bones continue its line, straight
+(next section).
 
-## Measured (`owner_mouse_contact.json`)
+## The thumb, straight
+The owner's verdict on 72d8f50: "the thumb is the only problem: STRAIGHT, not curved". His take agrees: from above, its
+bends are 14° and 9°, and the thumb lies almost straight along the left flank.
+
+On the rig the thumb read curved, measured on the bones and the visible tip (the middle of the end bone's farthest skin):
+- **MCP 22°, IP 18°.** His segments' directions were applied from the character's root, which lies inside the index
+  line; that put the bend at the MCP.
+- **The last bone was aimed at the contact pad's centre.** The pad lies off the line the eye follows, so the visible
+  end turned a further ~9°.
+
+Now:
+- **Straight.** The MCP and IP bones continue the root's line, and the last bone is aimed at the visible tip.
+- **The mouse turns under the thumb.** In the take his thumb lies along the flank, so the flank runs where his thumb
+  does. The room mouse's long axis follows the thumb's line seen from above, at 0.3° a frame, within 15° of where it
+  was put. Over the loop it sat at 10.5–14.9°.
+- **The hand moves across** until the straight thumb's pad touches the flank, as before. The thumb is never bent to
+  reach it.
+
+72d8f50 against this, every 0.25 s over the 28.3 s loop (113 samples):
+
+| | 72d8f50 | straight |
+|---|---|---|
+| Thumb MCP bend, median / max | 21.7 / 27.4° | 0 / 0° |
+| Thumb IP bend, median / max | 17.8 / 24.9° | 0 / 0° |
+| Thumb pad into the flank, median / p90 / max | 0.9 / 1.7 / 4.9 mm | 1.0 / 1.5 / 2.3 mm |
+| Thumb touching the flank | 112 of 113 | 113 of 113 |
+| Thumb to the mouse's axis, median / max | 7.7 / 21.9° | 7.8 / 16.4° |
+| Fingers into the shell, max (index, middle, ring, little) | 0, 0, 0, 3.1 mm | 0, 0, 0, 1.7 mm |
+| Palm into the shell, max | 1.5 mm | 0.8 mm |
+| Index tip on its button, ≤2 mm | 3 of 113 | 50 of 113 (median 2.2 mm) |
+| Middle tip on its button, ≤2 mm | 100 of 113 | 47 of 113 (median 2.2 mm) |
+| Left hand on the keyboard | 113 of 113 | 113 of 113 |
+| Skin stretch round the thumb's base, p99 / worst triangle | 2.07 / 4.03× | 2.03 / 4.33× |
+| Chair, desk penetration | 0 | 0 |
+
+The worst triangle is over 2.5× before and after, and in the clip's own pose with no IK at all. It comes from the
+character's skin weights, not the thumb's pose (below).
+
+## Measured, before the thumb was straightened (`owner_mouse_contact.json`)
 Desk_14, mouse mode, every 0.25 s over the whole 28.3 s loop (113 samples). The instruments are independent of the
 resolver: the shell's mesh, rays toward the mouse for the thumb, and the skin's own bind-pose edge lengths.
 
@@ -113,18 +152,18 @@ and after, in the clip's own pose too (no IK at all). It is in the character's s
 the honest figure for the pose.
 
 ## Open
-- **Index on its button.** With the thumb on the left flank, the character's index lies over the shell's left edge,
-  for the same thumb-root reason. Closing it onto the button (up to 30% more bend) bent it 11° past his table without
-  reaching, so it was dropped. On a regenerated character with the thumb root outside the index line, this should
-  close by itself.
+- **Index and middle on their buttons.** With the straight thumb and the mouse turned under it, each tip is within
+  2 mm about half the loop (index 50, middle 47 of 113; both median 2.2 mm). The cause is the same thumb-root
+  difference: the character's index sits over the shell's left edge. Closing a finger onto its button (up to 30% more
+  bend) bent it 11° past his table without reaching, so it was dropped. On a regenerated character with the thumb
+  root outside the index line, this should close by itself.
 - **Thumb-base stretch** belongs to the character's weights (above). The owner is regenerating the character on Tripo.
   Everything here is driven by his landmarks plus the character's own measured palm, with no constant tuned to v5's
   thumb, so it carries over.
-- **The page's own test** `test_module_encodes_the_desk_rule` (tests/test_boy_mh.py) fails on 9961024 too: it looks for
-  "desk_type_ik", which the module no longer names.
 
 ## Pictures
-- `mouse_sheet.jpg`: four views. Rows: from above, his right, his left (the thumb's side), over his right shoulder.
-  Columns: 9961024, then this branch at three moments of the loop (~5, 14 and 23 s into his take). In the side views
+- `mouse_sheet.jpg`: five views. Rows: close up from his left at mouse height (the thumb's whole length), from above,
+  his right, his left (the thumb's side), over his right shoulder. Columns: 72d8f50 (the curved thumb), then the
+  straight thumb at three moments of the loop (~5, 14 and 23 s into his take). In the side views
   the mug, the bottle, the controller, the monitor and the plant are hidden, in that render only.
 - `mouse_top_like_take.jpg`: straight down, framed like his take: the pad level, him at the bottom.
