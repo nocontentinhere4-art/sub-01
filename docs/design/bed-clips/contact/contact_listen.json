@@ -28,6 +28,7 @@
   }
  },
  "worst": [],
+ "perFrame": {},
  "keys": {
   "top": 1.001,
   "framesOver": 0,
@@ -125,16 +126,15 @@
   },
   "phones": {
    "frames": 87,
-   "headIn": 80,
-   "headMax_cm": 1.9,
+   "headIn": 1,
+   "headMax_cm": 0.2,
    "headFrames": 87,
    "pillowIn": 0,
    "pillowMax_cm": 0,
    "pillowFrames": 0,
-   "minClear_cm": 6.2,
+   "minClear_cm": 6,
    "part": {
-    "hp_cupL": 1.9,
-    "hp_cupR": 1
+    "hp_cupR": 0.2
    }
   }
  },

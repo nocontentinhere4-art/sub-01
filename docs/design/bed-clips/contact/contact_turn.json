@@ -28,6 +28,7 @@
   }
  },
  "worst": [],
+ "perFrame": {},
  "keys": {
   "top": 1.001,
   "framesOver": 0,
@@ -80,22 +81,22 @@
    {
     "from_headboard_cm": 50,
     "lowestGap_min_cm": -0.1,
-    "lowestGap_max_cm": 6.3
+    "lowestGap_max_cm": 6.4
    },
    {
     "from_headboard_cm": 60,
     "lowestGap_min_cm": -1.1,
-    "lowestGap_max_cm": 10.3
+    "lowestGap_max_cm": 9.7
    },
    {
     "from_headboard_cm": 70,
     "lowestGap_min_cm": -1.9,
-    "lowestGap_max_cm": 7.4
+    "lowestGap_max_cm": 7.2
    },
    {
     "from_headboard_cm": 80,
     "lowestGap_min_cm": -1.9,
-    "lowestGap_max_cm": 4.5
+    "lowestGap_max_cm": 4.7
    },
    {
     "from_headboard_cm": 90,
@@ -110,7 +111,7 @@
    {
     "from_headboard_cm": 110,
     "lowestGap_min_cm": 0.3,
-    "lowestGap_max_cm": 16.2
+    "lowestGap_max_cm": 16.3
    }
   ],
   "back_worst": {
@@ -122,20 +123,19 @@
    "max_cm": 1.1,
    "at_max_s": 14.87
   },
-  "shoulders_into_pillow_edge_cm": -9,
+  "shoulders_into_pillow_edge_cm": -9.1,
   "feet": {
    "toes_max_x": 0.022,
    "inside_end_cm": 2.8
   },
   "self": {
-   "framesIn": 78,
-   "maxVerts": 3390,
-   "maxDepth_cm": 8,
+   "framesIn": 36,
+   "maxVerts": 116,
+   "maxDepth_cm": 3,
    "by": {
-    "torso": 3,
-    "head": 8
+    "torso": 3
    },
-   "worstT": 1.87
+   "worstT": 0.47
   },
   "phones": null,
   "duvet": {
@@ -173,8 +173,18 @@
   }
  },
  "jump": {
-  "max_cm_per_frame": 7.1,
+  "max_cm_per_frame": 19,
   "worst": [
+   [
+    2.17,
+    19,
+    "room_laying_sleeping"
+   ],
+   [
+    15,
+    19,
+    "room_laying_sleeping"
+   ],
    [
     0.67,
     7.1,
@@ -193,16 +203,6 @@
    [
     16.53,
     4.8,
-    "room_laying_sleeping"
-   ],
-   [
-    0.6,
-    4.6,
-    "room_laying_sleeping"
-   ],
-   [
-    16.57,
-    4.6,
     "room_laying_sleeping"
    ]
   ]
