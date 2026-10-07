@@ -11,6 +11,7 @@ mixamo.com".
 - [x] G12 integration: `char_mixamo.js` loads it unchanged; `mixamo_check.mjs` (+ world-rotation gap, meshopt, textured characters); `kimodo/rig_change.mjs` runs the rig-change checklist → `docs/design/mixamo/rig_change_v5.md`.
 - [x] Fallback: `rig/mixamo_upload.sh` (v5 → 160,899 tris, 4.3 MB ZIP), `rig/mixamo_import.sh` (textured path untested: no Mixamo-rigged FBX exists), `UPLOAD_STEPS.md` (Italian).
 - [x] Tripo auto-rig: not run (previous run: 25 credits, 22 bones, no fingers; budget 5). 0 credits spent. No RunPod used.
+- [x] Full pytest + visual gate (below)
 - [ ] Page wiring (`?char=mixamo`) — G10d's; blocks the 6 PENDING checklist items.
 
 ## Numbers (v5 from main)
@@ -19,5 +20,7 @@ mixamo.com".
 - Checklist: loader PASS; 0.8 s Seated_Idle↔Typing blend: hands in thighs 0/28 frames both ways (PASS); lean 3.9° (performer 7.9°) seated, 4.4° (5.1°) typing; 6 items PENDING (need the page).
 - Contact (clip frame): soles −0.5…−2.1 cm seated/typing (fails 0…+1 until the page plants him); arm in torso ≤ 2.5 cm in all clips (baseline arms-down 8–15 verts ≤ 1.2 cm) — known weight defect at the armpit; lying: back touches, hips +8 cm, heels +10 cm.
 
-## Tests
-See the last commit message for the pytest / visual results on this branch.
+## Tests (this branch, 2026-10-07)
+- `python -m pytest`: **1287 passed, 27 skipped, exit 0** (10 min 06 s).
+- `tests/visual/out/results.json`: `hard_failures == []`.
+- (The page does not load char_mixamo.glb, so the visual suite still measures v5; these say the branch breaks nothing.)
