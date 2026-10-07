@@ -193,6 +193,17 @@ BODY_WALL = re.compile(r"unusual traffic from your (computer|network)|verify you
                        r"please enable js and disable any ad blocker|press (&|and) hold to confirm you are|"
                        r"access to this page has been denied|pardon our interruption|ray id: [0-9a-f]{8}|"
                        r"performance & security by cloudflare|request unsuccessful\. incapsula", re.I)
+# 2026-10-07 live: "Sorry, BBC iPlayer isn't available in your region" was shown in the card. A geo-block / region
+# wall is a wall like a bot check: left at once, not shown or counted, its site left alone (never worked around).
+# Whole phrases only ("region" alone is not enough), on a page of its own (GEO_WALL_MAX_CHARS of text at most:
+# such pages carry the site's header and footer, so they run longer than a bot check)
+GEO_WALL_MAX_CHARS = 6000
+GEO_WALL = re.compile(r"(?:(?:not|n['’]t)\s+(?:currently\s+|yet\s+)?available|unavailable)\s+(?:to (?:watch|stream|view)\s+)?"
+                      r"(?:in|from|for)\s+your\s+(?:region|country|location|area|territory|part of the world)|"
+                      r"(?:not|n['’]t)\s+(?:currently\s+)?available where you are|"
+                      r"(?:blocked|restricted) in your (?:region|country|location)|"
+                      r"bbc iplayer only works in the uk|only available (?:to watch )?in the uk\b|"
+                      r"not made this video available in your country|geo-?(?:blocked|restricted)", re.I)
 # a visible, checkbox-sized challenge frame (the invisible reCAPTCHA v3 badge and tiny widgets do not count)
 WALL_FRAMES = """() => [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], '
   + 'iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha-delivery"]')].some(f => {
@@ -347,16 +358,17 @@ def choose_dismiss(buttons):
     return None
 
 
-def display_ok(text):
+def display_ok(text, media=False):
     """Text in his words or in the card's own lines (mind notes, the card title, video titles): no links, addresses,
     tickers, money, slurs, blocked topics or finance talk (the chat filter's rules, without its phone-number rule,
-    which catches year ranges). Web titles and link labels use the looser title_ok (#56)."""
+    which catches year ranges). Web titles and link labels use the looser title_ok (#56). media=True: a song or video
+    title, shown as it is (owner): no slur or swearing check, only self-harm prompts (chat.MEDIA_RE)."""
     import chat
     t = text or ""
-    return (title_ok(t) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
+    return (title_ok(t, media) and not (chat.TICKER.search(t) or chat.MONEY.search(t) or FINANCE_TALK.search(t)))
 
 
-def title_ok(text):
+def title_ok(text, media=False):
     """A web page's title, a link label or a search result on the public screen (#56): finance words, prices and
     tickers may show (crypto and stock pages are viewable), but never links, addresses, e-mails, money requests,
     slurs or the guard's blocked words and topics."""
@@ -364,7 +376,8 @@ def title_ok(text):
     from research import BLOCK as TOPIC_BLOCK
     t = text or ""
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
-                or MONEY_ASK.search(t) or chat.SLUR_RE.search(chat.normalise(t))
+                or MONEY_ASK.search(t) or (chat.MEDIA_RE if media else chat.SLUR_RE).search(chat.normalise(t))
+                or media and chat.incitement(t)
                 or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
 
 
@@ -432,9 +445,16 @@ def is_video_host(host):
 
 
 def video_text_ok(text):
-    """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked)."""
+    """A video title or channel name on the public screen: the guard (display_ok) and the chat filter (chat.blocked),
+    both with media=True: titles are shown as they are, swearing and slurs included (owner); the guard's adult,
+    gore, extremism and self-harm words and the money and finance rules still refuse one."""
     import chat
-    return display_ok(text) and chat.blocked(text or "") is None
+    return display_ok(text, media=True) and chat.blocked(text or "", media=True) is None
+
+
+def card_title_ok(title, host=""):
+    """The public card's title: a video's (YouTube / TikTok host) by video_text_ok, any other page's by display_ok."""
+    return video_text_ok(title) if is_video_host(host) else display_ok(title)
 
 
 def scene_change(prev_jpeg, jpeg):
@@ -601,10 +621,12 @@ OVERLAY_TEXT_JS = """() => {
 
 def challenge_title(title, url):
     """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    or a title that is only the bare host name (an interstitial, not content)."""
+    a geo-block title ("... isn't available in your region"), or a title that is only the bare host name (an
+    interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
-    return bool(BOT_WALL.search(t)) or bool(t) and t in (host, host.removeprefix("www."), "www." + host)
+    return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t))
+            or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
 def cross_site_frame(req, host):
@@ -2126,15 +2148,19 @@ class Browser:
 
     @staticmethod
     def wall_text(body):
-        return len(body.strip()) < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+        n = len(body.strip())
+        return (n < WALL_MAX_CHARS and bool(BODY_WALL.search(body))
+                or n < GEO_WALL_MAX_CHARS and bool(GEO_WALL.search(body)))
 
     async def _walled(self, page, body=None):
-        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) fills the page."""
+        """A bot check (CAPTCHA, 'unusual traffic', browser challenge) or a geo-block fills the page."""
         if body is None:
             body = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 20000)")
+        if self.wall_text(body):
+            return True
         if len(body.strip()) >= WALL_MAX_CHARS:
             return False
-        return self.wall_text(body) or await page.evaluate(WALL_FRAMES)
+        return await page.evaluate(WALL_FRAMES)
 
     async def show(self, sc):
         """Screenshot the current page and log the visit (only pages that passed the guard get here).

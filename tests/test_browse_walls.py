@@ -191,3 +191,108 @@ def test_an_overlay_that_appears_after_the_page_loaded_is_left_at_the_next_scree
     b._leave = leave
     assert run(b._shoot(sc)) is False and left and b.last_skip == "overlay wall"
     assert b.walled["example-news.com"] > time.time()
+
+
+# 2026-10-07 08:00 UTC live: after "Parental Controls – BBC iPlayer" he opened a page saying "Sorry, BBC iPlayer isn't
+# available in your region" and it was shown in the card. A geo-block is a wall: left, not shown, its site cooled down.
+IPLAYER_GEO_BODY = ("BBC\nHome\nNews\nSport\nWeather\niPlayer\nSounds\nBitesize\n"
+                    "Sorry, BBC iPlayer isn't available in your region\n"
+                    "BBC iPlayer only works in the UK. Sorry, it's due to rights issues.\n"
+                    "Find out more about BBC iPlayer abroad\n" + "Terms of Use About the BBC Privacy Policy Cookies "
+                    "Accessibility Help Parental Guidance Contact the BBC Get Personalised Newsletters " * 30
+                    + "Copyright © 2026 BBC. The BBC is not responsible for the content of external sites.")
+YOUTUBE_GEO_BODY = ("Video unavailable\nThe uploader has not made this video available in your country\n"
+                    "Watch on YouTube")
+
+
+@pytest.mark.parametrize("title", [
+    "Sorry, BBC iPlayer isn't available in your region",
+    "BBC iPlayer - Sorry, BBC iPlayer isn’t available in your region",
+    "This video is not available in your country - YouTube",
+    "Content not available in your location",
+    "This content isn't available where you are",
+    "Content is not available in your area",
+    "Unavailable in your region | Hulu"])
+def test_geo_block_titles_are_walls(title):
+    assert browse.challenge_title(title, "https://www.bbc.co.uk/iplayer")
+
+
+@pytest.mark.parametrize("body", [
+    IPLAYER_GEO_BODY, YOUTUBE_GEO_BODY,
+    "This video is not available in your country.",
+    "We're sorry, this content is not available in your area.",
+    "Sorry, this programme isn't available where you are.",
+    "The content you requested is currently unavailable in your region due to licensing restrictions.",
+    "This service is not available in your location."])
+def test_geo_block_bodies_are_walls(body):
+    assert browse.Browser.wall_text(body)
+
+
+@pytest.mark.parametrize("title, body", [
+    ("Wine regions of France: a guide", "Bordeaux is the best-known region. Pick the region of your choice; "
+     "each country has its own grapes. Your region's climate decides the harvest. " * 3),
+    ("Weather for your area", "Forecast for your location and region: sunny spells, available sunshine all day."),
+    ("Is Netflix available in my country?", "Netflix is available in your country and in over 190 others. "
+     "Plans differ by region."),
+    ("BBC iPlayer - Parental Controls", "Parental Controls. Set a PIN to stop children watching programmes "
+     "with guidance labels. Available on all devices in the UK region settings.")])
+def test_pages_that_only_mention_region_are_not_walls(title, body):
+    assert not browse.challenge_title(title, "https://www.example.org/a")
+    assert not browse.Browser.wall_text(body)
+
+
+def test_a_long_article_quoting_a_geo_block_is_not_a_wall():
+    body = ("Travellers often see the message 'this video is not available in your country' when abroad. "
+            + "Here is how licensing works across Europe and why streaming catalogues differ. " * 120)
+    assert len(body) > browse.GEO_WALL_MAX_CHARS and not browse.Browser.wall_text(body)
+
+
+def _settle_once(url, title, body):
+    b = browse.Browser(decide=False)
+    sc = b.screens["desk"]
+    sc.page, sc.ctx = Page(url, title, body), object()
+    shown = []
+
+    async def show(sc_):
+        shown.append(sc_.info["url"])
+        return True
+
+    async def leave(sc_):
+        sc_.page.url = "about:blank"
+        return False
+    b.show, b._leave = show, leave
+    return b, sc, shown, run(b._settle(sc, "followed a link", "page", min_text=10))
+
+
+def test_the_iplayer_geo_block_is_left_not_shown_and_its_site_cools_down():
+    for title in ("BBC iPlayer - Home", "Sorry, BBC iPlayer isn't available in your region"):  # by body, by title
+        b, sc, shown, ok = _settle_once("https://www.bbc.co.uk/iplayer", title, IPLAYER_GEO_BODY)
+        assert not ok and b.last_skip == "bot wall" and shown == []
+        assert b.walled["bbc.co.uk"] > time.time() + browse.WALL_COOLDOWN_S - 60    # 6 h
+        sc.page.url = "about:blank"
+        assert not run(b._open(sc, "https://www.bbc.co.uk/iplayer/episode/x", "x", "page"))
+        assert "left alone" in b.last_skip                     # not opened again while cooling down
+
+
+def test_a_youtube_region_block_is_left_not_shown():
+    b, sc, shown, ok = _settle_once("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "YouTube", YOUTUBE_GEO_BODY)
+    assert not ok and b.last_skip == "bot wall" and shown == []
+
+
+def test_a_page_that_turns_into_a_geo_block_is_left_at_the_next_screenshot():
+    b = browse.Browser(decide=False)
+    sc = b.screens["desk"]
+    sc.page = Page("https://www.bbc.co.uk/iplayer", "BBC iPlayer", IPLAYER_GEO_BODY)
+    left = []
+
+    async def leave(sc_):
+        left.append(sc_.page.url)
+        return False
+    b._leave = leave
+    assert not run(b._shoot(sc)) and left == ["https://www.bbc.co.uk/iplayer"]
+
+
+def test_a_normal_page_mentioning_region_is_shown():
+    b, sc, shown, ok = _settle_once("https://www.example.org/wine", "Wine regions of France",
+                                    "Bordeaux is the best-known region; your region's climate decides the harvest. " * 5)
+    assert ok and shown == ["https://www.example.org/wine"] and not b.walled
