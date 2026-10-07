@@ -66,6 +66,8 @@ B.forEach((b, i) => {
 });
 skin.setInverseBindMatrices(doc.createAccessor().setType("MAT4").setArray(ibm).setBuffer(buf));
 for (const n of meshNodes) n.setSkin(skin);
+// (provenance: the source's bind space -> these meshes' space, column-major; kimodo/mx_convert.mjs reads it)
+scene.setExtras({...scene.getExtras(), autorig: {fromSourceBind: S.report.from_source_bind}});
 await doc.transform(prune({keepLeaves: true}), reorder({encoder: MeshoptEncoder, target: "size"}),
   quantize({pattern: /^(NORMAL|TEXCOORD_\d+|JOINTS_\d+|WEIGHTS_\d+)$/}));      // (meshopt() itself would quantize POSITION too)
 doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({method: EXTMeshoptCompression.EncoderMethod.QUANTIZE});

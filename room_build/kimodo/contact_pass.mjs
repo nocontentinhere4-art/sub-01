@@ -10,10 +10,12 @@
 //   bed    inside the bed (the page's box: the mattress top less 2 cm of give, rounded edge)
 //   legs   his hands and fingers inside his own thighs (capsules on the thigh bones, radius from his thigh skin)
 //   keys   his fingertips over the room keyboard: their lowest height over its key tops each frame (touching within 5 mm)
+//   mouse  his right palm (60% from the wrist to the middle knuckle) against the room mouse: across from its centre, over its top
 // A penetration is a vertex more than 1 cm inside (the page's own margin); depth = how far inside, vertically.
 // LIFE='{"screen": {"id": "v", "kind": "video"}}': more of the tick for live() (a video on the screen: watching).
 // RARE=scared|angry|clap: once settled at the desk, start that rare event (boy_mh.js mh.rare) and sample from there.
 // perFrame in the output: for every frame with something inside a solid, {"solid:region": [vertices, depth cm]} (frame = 1/30 s).
+// QS: more of the page's query (QS="&char=mixamo").
 // Needs a page served with ?debug (window.penetration, chairVox, live, pose, animate_). Uses playwright-core.
 import {chromium} from "playwright-core"; import fs from "fs"; import {execSync} from "child_process"; import path from "path";
 const [port, activity = "research", secs = "8", out] = process.argv.slice(2);
@@ -24,7 +26,7 @@ const cdn = path.join(process.env.CDN_CACHE || "/tmp", "cdn_cache"); fs.mkdirSyn
 await p.route(/^https:\/\/(cdn\.jsdelivr\.net|unpkg\.com)\//, async r => { const u = r.request().url(), f = path.join(cdn, u.replace(/[^a-z0-9.]+/gi, "_"));
   if (!fs.existsSync(f)) execSync(`curl -sSfL -o ${f} '${u}'`); await r.fulfill({status: 200, contentType: u.endsWith(".css") ? "text/css" : "application/javascript", body: fs.readFileSync(f)}); });
 p.on("pageerror", e => console.log("pageerror", e.message));
-await p.goto(`http://localhost:${port}/room.html?debug&nolive&hour=15`);
+await p.goto(`http://localhost:${port}/room.html?debug&nolive&hour=15${process.env.QS || ""}`);   // (QS="&char=mixamo": the Mixamo-rigged character)
 await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
 const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
   // "a>b": settle doing a, then switch to b and sample from the moment his pose step (sitting down, getting up) begins
@@ -91,6 +93,10 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
   const TIPV = parts.map(sm => { const I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight, n = sm.geometry.attributes.position.count, r = new Uint8Array(n);
     for (let i = 0; i < n; i++) { let bb = 0, bw = 0; for (let q = 0; q < 4; q++) if (W.getComponent(i, q) > bw) { bw = W.getComponent(i, q); bb = I.getComponent(i, q); } r[i] = /finger[2-5]-3/.test(sm.skeleton.bones[bb].name) ? 1 : 0; } return r; });
   S.keys = KBB ? {top: +KBB.max.y.toFixed(3), framesOver: 0, framesTouch: 0, framesBelow: 0, minGap_cm: 99, maxGap_cm: -99, gaps: []} : null;
+  // the mouse (a room node "mouse"): the right palm (60% from the wrist to the middle knuckle) against it each frame:
+  // how far it is from the mouse's centre across the pad, and its height over the mouse's top
+  const MS = scene.getObjectByName("mouse"), MB = MS ? new THREE.Box3() : null;
+  S.mouse = MS ? {frames: 0, palmOff_cm: [99, -99], palmOverTop_cm: [99, -99]} : null;
   S.legs = {framesIn: 0, maxVerts: 0, maxDepth: 0, worstT: null, radius_cm: Object.fromEntries(Object.entries(RAD).map(([k, r]) => [k, r.map(x => +(x * 100).toFixed(1))]))};
   const v = new THREE.Vector3(), u = new THREE.Vector3(), N = Math.round(secs * 30);
   for (let f = 0; f < N; f++) {
@@ -140,6 +146,9 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
     if (KBB) { let lo = 9; parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position; for (let i = 0; i < P.count; i++) { if (!TIPV[pi][i]) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
         if (v.x > KBB.min.x && v.x < KBB.max.x && v.z > KBB.min.z && v.z < KBB.max.z) lo = Math.min(lo, v.y - KBB.max.y); } });
       if (lo < 9) { const K = S.keys; K.framesOver++; if (lo < 0.005) K.framesTouch++; if (lo < -0.005) K.framesBelow++; K.minGap_cm = Math.min(K.minGap_cm, +(lo * 100).toFixed(1)); K.maxGap_cm = Math.max(K.maxGap_cm, +(lo * 100).toFixed(1)); if (f % 15 === 0) K.gaps.push(+(lo * 100).toFixed(1)); } }
+    if (MS) { MS.updateMatrixWorld(true); MB.setFromObject(MS); const c = MB.getCenter(new THREE.Vector3()), hd = boy.getObjectByName("RightHand"), kn = boy.getObjectByName("finger3-1.R") || boy.getObjectByName("finger3-1R");
+      if (hd && kn) { const pm = hd.getWorldPosition(new THREE.Vector3()).lerp(kn.getWorldPosition(new THREE.Vector3()), 0.6), o = Math.hypot(pm.x - c.x, pm.z - c.z) * 100, h = (pm.y - MB.max.y) * 100, M2 = S.mouse;
+        M2.frames++; M2.palmOff_cm = [Math.min(M2.palmOff_cm[0], +o.toFixed(1)), Math.max(M2.palmOff_cm[1], +o.toFixed(1))]; M2.palmOverTop_cm = [Math.min(M2.palmOverTop_cm[0], +h.toFixed(1)), Math.max(M2.palmOverTop_cm[1], +h.toFixed(1))]; } }
     if (nPen) S.worst.push([+(f / 30).toFixed(2), nPen]);
     S.frames++; }
   for (const k of ["chair", "desk", "other", "floor", "bed"]) for (const r in S[k]) { const e = S[k][r]; e.maxCount = Math.max(e.maxCount, e._n); delete e._f; delete e._n; e.maxDepth = +(e.maxDepth * 100).toFixed(1); }

@@ -21,10 +21,12 @@ from scipy.sparse import coo_matrix, diags
 from scipy.spatial import cKDTree
 
 EXT, REF, OUT = sys.argv[1:4]
-K = 0.875                                   # the bind space is 2.0 tall about its middle: 1.75 m (static.mjs)
-
 # ---------------------------------------------------------------------------------------------------------- inputs
 rig = json.load(open(f"{EXT}/rig.json"))
+# bind space -> metres: the size the character is drawn at (extract.mjs: through its armature's scale; v5 0.8508, 1.73 m
+# in the page with the slides, as on main). It was 0.875 here (1.75 m without the slides, static.mjs's), which made
+# the Mixamo character 1.78 m: 5 cm taller than the v5 the room's chair and desk fits were made for
+K = rig.get("worldScale") or 0.875
 JN = [j["name"] for j in rig["joints"]]; JI = {n: i for i, n in enumerate(JN)}
 JP = [j["parent"] for j in rig["joints"]]
 Rw = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]], float)      # -90 deg about y: +x (his front in v5) -> +z
@@ -319,11 +321,27 @@ PIT = float(__import__("os").environ.get("AUTORIG_PIT", "0.07"))
 SHCUT = float(__import__("os").environ.get("AUTORIG_SHCUT", "0.06"))
 TORSO = [RI[mx(n)] for n in ("Hips", "Spine", "Spine1", "Spine2", "Neck", "Head")]
 is_torso = np.isin(dom, [JI[n] for n in ("Hip", "Pelvis", "Waist", "Spine01", "Spine02", "NeckTwist01", "NeckTwist02") if n in JI])
+# (the arm part is skin round the arm itself: within SLEEVE of its bind axis (shoulder -> elbow -> wrist, as modelled),
+# not before the shoulder joint. v5's skin gives the upper arm 0.9 of patches of the hoodie's back and chest inside the
+# shoulder (x 0.15 against the joint's 0.20); those are the hoodie's)
+SLEEVE = float(__import__("os").environ.get("AUTORIG_SLEEVE", "0.13"))
+
+
+def round_limb(s, pts):                                         # the vertices within SLEEVE of the polyline pts (bind), past its start
+    near = np.zeros(nv, bool)
+    for a, b in zip(pts[:-1], pts[1:]):
+        ab = b - a; L2 = ab @ ab; t = (V - a) @ ab / L2; c = a + np.clip(t, 0, 1)[:, None] * ab
+        near |= (np.linalg.norm(V - c, axis=1) < SLEEVE) & (t > -0.02 / np.sqrt(L2))
+    return near
+
+
 for s, S in (("L", "Left"), ("R", "Right")):
     armJ = [JI[n] for n in JN if n.startswith((f"{s}_Upperarm", f"{s}_Forearm", f"{s}_Hand")) or (n.endswith("." + s) and n.startswith(("finger", "metacarpal")))]
     arm_new = [RI[n] for n in RN if n.startswith((mx(S + "Arm"), mx(S + "ForeArm"), mx(S + "Hand")))]
     far = np.linalg.norm(Vt - BP[RI[mx(S + "Arm")]], axis=1) > PIT
-    is_arm = np.isin(dom, armJ)
+    on_arm = round_limb(s, [J[JI[f"{s}_Upperarm"]], J[JI[f"{s}_Forearm"]], J[JI[f"{s}_Hand"]], J[JI[f"finger3-1.{s}"]]])
+    is_arm = np.isin(dom, armJ) & on_arm
+    is_torso = is_torso | (np.isin(dom, armJ) & ~on_arm)
     for j in arm_new: allow[is_torso & far, j] = False
     for j in TORSO: allow[is_arm & far, j] = False
     # the sleeve takes the clavicle only over the shoulder: v5's skin and the distance term put 0.3-0.45 of it on the
@@ -331,6 +349,11 @@ for s, S in (("L", "Left"), ("R", "Right")):
     # the sleeve 4-10 cm through the hoodie (the hoodie's side keeps it: cut there too, the hoodie went 2.5 cm into the
     # sleeve instead)
     allow[is_arm & (Vt[:, 1] < BP[RI[mx(S + "Arm")], 1] - SHCUT), RI[mx(S + "Shoulder")]] = False
+# a side's bones only on its own side (and across the middle by 4 cm): the distance term and the smoothing put up to 0.1
+# of the right clavicle on the left sleeve's back
+for i, n in enumerate(RN):
+    if n.startswith(mx("Left")): allow[Vt[:, 0] < -0.04, i] = False
+    if n.startswith(mx("Right")): allow[Vt[:, 0] > 0.04, i] = False
 # the legs only below the hips: v5's skin puts up to 0.2 of the thigh on the chest at the armpit (1.1 m up), and seated
 # (the thigh turned 90 deg) that drags the hoodie's side into the sleeve
 HIPCUT = float(__import__("os").environ.get("AUTORIG_HIPCUT", "0.10"))
@@ -405,6 +428,9 @@ skel = [{"name": RN[i], "parent": RN[par[i]] if par[i] >= 0 else None, "p": BP[i
 rep = {"finger_centring_mm": SHIFT, "twist_deg": {s: round(float(np.degrees(TWIST[s])), 1) for s in TWIST},
        "height_m": round(float(Vt[:, 1].max()), 3), "hips_m": round(float(BP[RI[mx("Hips")], 1]), 3),
        "alpha": ALPHA, "verts": int(nv), "bones": NB,
+       # (the source's bind space (its first primitive's) -> this file's mesh space: kimodo/mx_convert.mjs carries the
+       # source's clips over with it)
+       "from_source_bind": (np.array([[*(K * Rw[0]), 0], [*(K * Rw[1]), -floor], [*(K * Rw[2]), 0], [0, 0, 0, 1]]).T.ravel()).tolist(),
        "direction_err_deg": {}}
 # how far each bone's rest direction is from Mixamo's (the clips assume Mixamo's)
 for i in range(NB):
