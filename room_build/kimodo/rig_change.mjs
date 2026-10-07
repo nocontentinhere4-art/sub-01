@@ -105,11 +105,10 @@ step("3. first step away (calf through the chair base)", "step_away", "Sit_To_St
 { const m = rj("mx_mouse"), v = rj("v5_mouse");
   if (!m) item("the mouse-mode body (Seated_Idle vs Typing) with G14's resolver", "PENDING", "needs kimodo/mx_room.sh (chart, 8 s)");
   else { const mo = m.mouse, ok = mo && mo.palmOff_cm[1] <= 4 && mo.palmOverTop_cm[0] >= 0 && deepest(m, ["desk"]) === 0;
-    item("the mouse-mode body (Seated_Idle vs Typing) with G14's resolver", ok ? "PASS" : "FAIL", `the mouse mode plays v5's desk_mouse_ik carried over (no Mixamo mouse capture), its right wrist pinned on the mouse by the page: `
+    item("the mouse-mode body (Seated_Idle vs Typing) with G14's resolver", ok ? "PASS" : "FAIL", `no Mixamo mouse capture: the mouse mode plays watching's body (Seated_Idle, as main does), its right hand carried onto the mouse and the left onto the keys by the page's resolver (G14's): `
       + `${mo ? `the palm ${mo.palmOff_cm[0]}…${mo.palmOff_cm[1]} cm from the mouse's centre, ${mo.palmOverTop_cm[0]}…${mo.palmOverTop_cm[1]} cm over its top` : "no mouse node"}; desk ${solid(m, "desk")}; chair ${solid(m, "chair")}; ${solesTxt(m)}`
       + `${v && v.mouse ? `. v5: the palm ${v.mouse.palmOff_cm[0]}…${v.mouse.palmOff_cm[1]} cm from its centre, ${v.mouse.palmOverTop_cm[0]}…${v.mouse.palmOverTop_cm[1]} cm over its top` : ""}`
-      + " (PASS: the palm within 4 cm of the centre and over the top, nothing in the desk). Typing as the mouse body was measured too: its right palm wanders across the keyboard (sd 12 cm sideways),"
-      + " so pinned on the mouse it would wander round it; a hold on the mouse is the page's resolver (G14's). Seated_Idle rests the hands on the armrests, the left one nowhere near the keys"); } }
+      + " (PASS: the palm within 4 cm of the centre and over the top, nothing in the desk). Typing as the mouse body was measured too: its right palm wanders across the keyboard (sd 12 cm sideways)"); } }
 fs.writeFileSync(path.join(OUT, "rig_change.json"), JSON.stringify(R, null, 1));
 const md = [`# Rig-change checklist: ${R.character}`, "", `Run by \`room_build/kimodo/rig_change.mjs\` (from \`rig/autorig.sh\`), ${new Date().toISOString().slice(0, 10)}.`, "",
   "| item | status | measured |", "|---|---|---|", ...R.items.map(i => `| ${i.name} | ${i.status} | ${i.detail.replace(/\|/g, "/")} |`), ""].join("\n");

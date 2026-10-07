@@ -4,19 +4,68 @@ Branch `preview/mixamo-wiring` (off `origin/preview/mixamo-pipeline`). The raw M
 `claude/loving-davinci-6hqmjx:mocap_src/mixamo/`); none is committed, only the clips baked for our skeleton. No RunPod
 pod, no Tripo credits used. Method and pipeline: `README.md`, last section.
 
-## State (2026-10-07)
+## Round after review (2026-10-07 18:30 UTC, head of this branch)
+Answers to Coordinator C's messages and G23 / G26's reviews (docs/review/mixamo-wiring.md on preview/review):
+- **404 / floating at 73 m (edd3a02): fixed.** That commit was pushed while the clips were still baking. All 26 clips the
+  page asks for are committed, and `tests/test_char_mixamo.py` now fails if any is missing or not on the Mixamo skeleton.
+  The page check: he sits at the desk with his root at y 0.16 (the floor).
+- **One character source: done.** origin/main merged (448a0b8, after b2593d7). `rig/autorig.sh` re-run on main's
+  `web/room/char_v5.glb` (collar closed, socks in slides; 249,148 vertices, 6 primitives). Every clip re-baked and
+  re-converted on it.
+- **Hem "horns": fixed in autorig.** v5's skin gives the hoodie hem's sides to the thigh (0.5–0.7), so they were neither
+  sleeve nor hoodie and kept 0.1 of the upper arm. Skin 4 cm or more over the hip joints whose main joint is a thigh is
+  now the hoodie's. G23's pose (only the arms move; hoodie vertices below 1.15 m moved more than 3 cm):
+
+  | pose | G23 on edd3a02 | now |
+  |---|---|---|
+  | T | 172, max 4.8 cm | 0, max 0.8 cm |
+  | arms up 40° | 359, max 7.2 cm | 0, max 0.8 cm |
+
+- **Feet hanging 4–7.6 cm, right hand on the mug (94061b7): gone with main's mouse body.** Both came from v5's old
+  mouse clip carried over. The mouse now plays Seated_Idle's body, as on main, with G14's resolver:
+  - his palm is 3.2–4.6 cm from the mouse's centre and 2.1–4 cm over its top;
+  - his left hand is on the keys every frame;
+  - soles 0.2 cm (desk_mouse_ik is dropped from mh_mx).
+- **G14's typing resolver** now takes this bake's own F/J points (`char_mixamo.js` ROOM.clipMX, `boy_mh.js` env.clipMX).
+  Fingertips touch the keys on 171 of 180 frames (was 5).
+- Still the known cost of the armpit cut: raised high, the arm leaves the back of the armpit behind, a web (10,067
+  vertices over 5 cm off v5's own T-pose, up to 19.5 cm). It needs an arm-raise corrective shape; not made.
+
+## State
 - [x] 1. `room.html?char=mixamo` loads `room/char_mixamo.glb` with `room/char_mixamo.js` and plays the Mixamo clips on
   their own skeleton (`room/mh_mx/`, nothing retargeted to the old rig). Without the flag the page is as on main.
-  - Desk: Seated_Idle (watching), Typing with Sit_To_Type / Type_To_Sit in and out, Stand_To_Sit / Sit_To_Stand.
-  - Sitting, Sitting_1, Sitting_Rubbing_Arm and Sitting_Talking are baked, but no page slot plays them yet.
-  - G12's chair fit is ported (`kimodo/mx_fit.py`). He sits on our chair, fingertips over our keyboard, soles +0.2 cm
-    on the floor.
-- [x] 2. Armpit weights fixed in autorig, so every re-run produces them. Arm in torso ≤ 0.6 cm on the raw desk clips
-  and ≤ 0.8 cm on every frame of the baked desk clips (gate 1.2).
-- [x] 3. `rig_change.mjs`: the 6 PENDING items are measured in the room, none left PENDING (1 PASS, 2 FAIL, 3 FAIL,
-  4 PASS, 5 MEASURED, 6 FAIL). The contact pass ran over every frame. → `rig_change_v5.md`
-- [x] 4. `wiring_sheet.jpg`: main (v5) above, `?char=mixamo` below; watching and typing; page camera and his right side.
-- [x] 5. Full pytest and visual: see "Tests".
+  - Desk: Seated_Idle (watching, and the mouse's body as on main), Typing with Sit_To_Type / Type_To_Sit in and out,
+    Stand_To_Sit / Sit_To_Stand.
+  - Sitting* are baked, but no slot plays them.
+- [x] 2. Armpit weights fixed inside autorig. Arm in torso on the raw desk clips is ≤ 0.6 cm, and ≤ 0.8 cm on every frame
+  of the baked desk clips (gate 1.2).
+- [x] 3. `rig_change.mjs`: no PENDING items (1 PASS, 2 FAIL, 3 FAIL, 4 PASS, 5 MEASURED, 6 FAIL: below).
+  `contact_pass.mjs` over every frame.
+- [x] 4. `wiring_sheet.jpg`: main (448a0b8) above, `?char=mixamo` below.
+- [x] 5. pytest **1466 passed, 27 skipped, exit 0** (24 min 26 s, on 60d81ae + the seat points); visual `hard_failures == []`.
+
+## In the room, head of this branch (`kimodo/mx_room.sh`, every frame, ?char=mixamo against v5 on the same page)
+
+| | ?char=mixamo | v5 (no flag) |
+|---|---|---|
+| watching (8 s) | chair / desk / floor clear; seat −0.5…+4.1 cm; soles 0.2 (*); hands in thighs 0 frames | clear; seat −0.1…+4.5; hands in thighs 154 frames |
+| typing (6 s) | clear; seat −0.4…+4.2; fingertips touching 171/180 frames, 19 frames under 5 mm into the key tops (−0.8 cm deepest) | clear; touching 166/180, 1 frame under |
+| mouse (8 s) | clear; palm 3.2–4.6 cm from the mouse's centre, 2.1–4 cm over it; left hand on the keys 240/240 | palm 4.1–4.4 / 1.9–3.7 cm |
+| sit-down (4 s) | chair legs 1.3 cm (24 verts, 18 frames); seat −1.3 | chair legs 1.3 cm (58 verts, 2 frames); seat −1.3 |
+| stand-up (4 s) | **chair feet 3.9 cm (138 verts, 4 frames)**, legs 2.4 cm (124 verts, 3 frames); one sole −2.9 cm on the hand-over to the walk | chair legs 1.5 cm (102 verts, 6 frames) |
+| rare scared / angry / clap | ride back 35 / 0 / 32 cm; chair legs 2.2 cm (110 verts) / clear / 3.4 cm (442 verts) | 33 / 20 / 31 cm; chair clear |
+
+(*) Soles read up to 4.8 cm only in the first 0.5 s after he is placed, while the page's floor lift eases down (v5 the
+same).
+
+Seat points (swept on the new rig): clear from −0.06 m in all three modes. All set to −0.075 m.
+
+Checklist (`rig_change_v5.md`):
+- **1. Sit-down landing: PASS.**
+- **2. Rising and 3. First step away: FAIL.** A foot goes into the chair's base for 4 frames as he steps off.
+- **4. Seat points: PASS.**
+- **5. Rare events: MEASURED.** Angry_Gesture rides back 0: the performer sat off-centre.
+- **6. Mouse: FAIL** against my 4 cm criterion. The palm reaches 4.6 cm; v5 4.4 cm also fails it.
 
 ## 2. Weights (rig/autorig/fit.py, write.mjs, extract.mjs)
 All measured every frame at 30 fps, all vertices, with qa.html's test (an arm vertex more than 5 mm behind the nearest
@@ -53,7 +102,7 @@ What changed, and why:
   raise them are room_bedtime's stretch, Standing_Clap and the window. The fix for both is an arm-raise corrective
   shape; not made.
 
-## 1. The baked clips (`kimodo/mx_build.sh`, `mx_fit.py` report, every frame)
+## 1. The baked clips (`kimodo/mx_build.sh`, `mx_fit.py` report, every frame; before the re-bake on main's char_v5. Re-bake: the desk clips ≤ 0.8 cm again; Sitting 1.6 / 1.9 cm, Scared 1.1 / 2.2 cm)
 
 | clip | frames | arm in torso before the clearance, L / R cm | after | elbow swing ° L / R | abduction ° L / R | soles cm L / R | knees m |
 |---|---|---|---|---|---|---|---|
@@ -81,45 +130,10 @@ The fit, briefly:
   so his heels come up 7–8 cm, as on v5.
 - Feet planted with the soles +0.2 cm; sleeves off the hoodie.
 
-## 3. In the room (`kimodo/mx_room.sh`: contact_pass.mjs over every frame, ?char=mixamo against v5 on the same page)
-
-| | ?char=mixamo | v5 (the page without the flag) |
-|---|---|---|
-| watching (8 s) | chair, desk, other furniture, floor clear; seat lowest gap −0.6…+4.1 cm; soles 0.2 cm (*); hands in thighs 0 frames | clear; seat −0.1…+4.6; soles 0.1…4.8 / −0.2…4.5; hands in thighs 20 frames, 0.5 cm |
-| typing (6 s) | all clear; seat −0.2…+4.4; soles 0.2 (*); fingertips over the keys 178/180 frames, never below the key tops, touching (≤ 5 mm) 5 frames, gap 0…11.3 cm | chair legs 1 cm (4 verts); fingertips over 216 frames, touching 17, −2.5…+3.9 cm (5 frames into the keys); soles 9.2…14.1 / 5.7…10.7 cm |
-| mouse (8 s) | v5's clip carried over: all clear; palm 7.6 cm from the mouse's centre, 8.5–9.3 cm over its top; soles 7.4…12.2 / 4.1…9.3 cm | the same: palm 7.7 / 8.5–9.3; soles 9.1…13.9 / 5.3…10.4 |
-| sit-down (Stand_To_Sit, 4 s) | chair legs 1.4 cm (70 verts, 18 frames); seat −1.4 | chair legs 1.2 cm (50 verts, 2 frames); seat −1.2 |
-| stand-up (Sit_To_Stand, 4 s) | chair legs 3.4 cm (28 verts, 4 frames), **feet 4.1 cm (188 verts, 5 frames)**; seat −0.4; sole −3 cm on the hand-over to the walk | chair legs 3.8 cm (30 verts, 8 frames); seat −0.9 |
-| step away (8 s) | as the stand-up, plus feet 6.8 / legs 5 cm in the furniture by the chair while walking (v5's walk) | the same furniture contact: feet 6.6 / legs 5 cm |
-| rare: scared / angry / clap | rides back 39 / 0 / 34 cm; chair legs 2.5 cm (156 verts, 5 frames) / clear / 3.5 cm (546 verts, 77 frames); desk clear | 33 / 20 / 31 cm; chair clear |
-
-(*) The soles read up to 4.8–4.9 cm only in the first 0.5 s after he is placed: the page's floor lift eases down from
-the settle (v5 the same). From then on they hold at 0.2 cm.
-
-Seat points (boy_mh.js SEAT_AT, swept with `kimodo/seat_sweep.mjs`): clear of the chair at watching −0.05…−0.12 m,
-typing −0.06…−0.12, mouse −0.04…−0.12. Used −0.065 / −0.075 / −0.055 (`char_mixamo.js` ROOM.seatAt).
-
-The checklist's six (`rig_change_v5.md`):
-1. **Sit-down landing: PASS.** No deeper than v5 (1.4 against 1.2 cm, within 3 mm), seat −1.4 cm.
-2. **Rising: FAIL.** A foot goes 4.1 cm into the chair's base for 5 frames (188 vertices; v5: none) as he steps off.
-3. **First step away: FAIL.** The same foot frames. The walk itself matches v5's.
-4. **Seat points: PASS.**
-5. **Rare events' chair ride: MEASURED.** Angry_Gesture's ride is 0 here (v5 20 cm): his baked hips sit 27 cm to one
-   side (the performer sat off-centre), so backFor() finds nothing in front.
-6. **Mouse-mode body: FAIL**, the same as v5. There is no Mixamo mouse capture, so the mouse plays v5's clip carried
-   over: palm 7.6 cm off the mouse, feet hovering. Typing as the mouse body is no better without a resolver: its right
-   palm wanders 12 cm sideways (sd).
-
-Contact contract (docs/qa/contact.md), still open:
-- fingertips touching the keys through the whole clip (5/180 frames; G14's resolver);
-- the mouse (item 6);
-- the stand-up's foot in the chair base.
-
-## Tests (this branch, 2026-10-07)
-- `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"`: **1287 passed, 27 skipped, pytest exit 0**
-  (10 min 28 s).
-- First run: 1 failed, 1286 passed, 27 skipped. The failure was `test_boy_motion.py::test_licences_recorded`, which
-  asserts CREDITS.md never names Mixamo; my credits section did. **For the coordinator:** CREDITS now points to this
-  folder's README ("Sources and licences", G12's) instead of naming the source, as main's `mh_v5/` desk clips already
-  do. Whether that guard should stay is a policy call. I did not edit the test.
-- `tests/visual/out/results.json`: `hard_failures == []` (both runs).
+## Tests
+- Head of this branch: `set -o pipefail; python -m pytest 2>&1 | tail; echo "pytest exit $?"` → **1466 passed, 27
+  skipped, pytest exit 0**. `tests/visual/out/results.json` `hard_failures == []`.
+- Before the merge: 1287 passed, 27 skipped, exit 0. One earlier run failed `test_boy_motion.py::test_licences_recorded`,
+  which asserts CREDITS.md never names Mixamo. **For the coordinator:** CREDITS points to this folder's README
+  ("Sources and licences") instead of naming the source. Whether that guard should stay is a policy call. I did not
+  edit the test.
