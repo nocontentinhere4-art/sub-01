@@ -11,7 +11,7 @@ The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-
   4. Reazione – distratto, poi sorride
   5. A letto col telefono – video orizzontale
   6. Dorme – si gira sulla schiena
-- **`sova_montage.mp4`** (this commit; its SHA is the one this STATUS.md is committed with): 2 min 18 s, 1280x720, 30 fps, H.264, 4.4 MB, 21 clips.
+- **`sova_montage.mp4`** (commit 92d7f57): 2 min 18 s, 1280x720, 30 fps, H.264, 4.4 MB, 21 clips.
   - Scrivania ×5: attende, guarda a destra, guarda giù poi a destra, guarda avanti poi a sinistra, si gira a guardare dietro.
   - Reazioni ×6: pensa, distratto poi sorride, frustrato, si guarda intorno, si stira il collo, distoglie lo sguardo.
   - A letto col telefono ×4: video orizzontale, video verticale, scrive, alza il telefono sul viso (×2).
