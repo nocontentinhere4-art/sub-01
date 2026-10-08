@@ -18,7 +18,8 @@ for s in "$@"; do
   RF=$(python3 -c "import json; print(1 if json.load(open('$H/desk_rows.json')).get('$s',{}).get('restForce') else 0)")
   RL=$(python3 -c "import json; print(json.load(open('$H/desk_rows.json')).get('$s',{}).get('restLow',-1))")
   SF=$(python3 -c "import json; print(1 if json.load(open('$H/desk_rows.json')).get('$s',{}).get('smoothFingers') else 0)")
-  REST_LOW=$RL REST_FORCE=$RF REST_PASSES=8 python3 -I $H/fit_rest.py $W/char.glb $W/post_$s.json > $W/rest_$s.log
+  RW=$(python3 -c "import json; print(json.load(open('$H/desk_rows.json')).get('$s',{}).get('restFwd',-9))")
+  REST_FWD=$RW REST_LOW=$RL REST_FORCE=$RF REST_PASSES=8 python3 -I $H/fit_rest.py $W/char.glb $W/post_$s.json > $W/rest_$s.log
   python3 -I $H/fit_hands.py $W/char.glb $W/post_$s.json >> $W/rest_$s.log      # then nothing of the hands inside him
   # the fits' arm corrections smoothed over time (they jumped frame to frame), wrapped round for loops; clear again; smooth lightly
   LP=$(python3 -c "import json; print('loop' if json.load(open('$H/desk_rows.json')).get('$s',{}).get('loop') else '')")

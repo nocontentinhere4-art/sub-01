@@ -13,6 +13,7 @@ from fit_hands import apply, smooth_max
 GAP, REACH = 0.003, 0.15
 FORCE = os.environ.get('REST_FORCE') == '1'      # every frame resting (idle clips: no gesture to keep)
 PASSES = int(os.environ.get('REST_PASSES', '5'))
+REST_FWD = float(os.environ.get('REST_FWD', '-9'))  # rest only on thigh tops this far forward of the hip joints (m): a hand hanging by his hip goes onto the lap, not the armrest
 REST_LOW = float(os.environ.get('REST_LOW', '-1'))  # a hand whose lowest point drops under this (body frame, m) rests too: by the seat's edge it meets the chair
 
 def track(B, c, side, step=2):
@@ -21,7 +22,7 @@ def track(B, c, side, step=2):
     Wj, wm = B.joints(c); n = c['frames']; fr = list(range(0, n, step)); MV, ON, G = [], [], []
     for f in fr:
         p, nn = B.skin(Wj, f)
-        top = np.isin(B.bone, ['LeftUpLeg', 'RightUpLeg']) & (nn[:, 1] > 0.7); T = p[top]; hv = p[B.reg == side + 'Hand']
+        top = np.isin(B.bone, ['LeftUpLeg', 'RightUpLeg']) & (nn[:, 1] > 0.7) & (p[:, 2] > wm('mixamorig:' + side + 'UpLeg')[f, 2, 3] + REST_FWD); T = p[top]; hv = p[B.reg == side + 'Hand']
         ctr = hv.mean(0); d = np.linalg.norm((T - ctr)[:, [0, 2]], axis=1); k = d.argmin(); t = T[k]
         on = FORCE or (d[k] < REACH and ctr[1] - t[1] < 0.25) or hv[:, 1].min() < REST_LOW
         mv = np.array([t[0] - ctr[0], 0.0, t[2] - ctr[2]]) * 0.8
