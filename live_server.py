@@ -1753,6 +1753,9 @@ def password_gate(password):
             return web.Response(text=LOGIN_PAGE.format(msg=""), content_type="text/html")
         if spiking_server and request.path in spiking_server.POD_PATHS:
             return await handler(request)                  # the pod authenticates with its own secret in the handler
+        from x_embed import public_request
+        if public_request(request):
+            return await handler(request)
         if request.path == "/healthz" or (request.path in ADMIN_PATHS and admin_ok(request)):
             return await handler(request)                  # uptime monitors / Railway healthcheck; admin token
         if hmac.compare_digest(request.cookies.get("sub01", ""), token):
@@ -1769,6 +1772,8 @@ async def main(args):
                 parse_start(args.start) if args.start else None, args.trust_proxy)
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
+    from x_embed import attach as attach_x_embed
+    attach_x_embed(app, live, data_dir)
     app[GATED] = bool(middlewares)                # behind the password gate: its cookie also opens the admin APIs
     app.router.add_get("/ws", live.ws_handler)
     manager = None
@@ -1789,6 +1794,8 @@ async def main(args):
         cpu_net.on_frame = live.spiking.relay if live.spiking else live.broadcast
     live.decider = brain_vote.Backend(cpu=cpu_net, gpu=spiking_manager, log=spiking_live.DecisionLog(data_dir))
     spiking_live.attach(app, live.decider)
+    from copytrading.account import attach as attach_account_planner
+    attach_account_planner(app, live, data_dir)
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
