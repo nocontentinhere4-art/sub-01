@@ -31,7 +31,7 @@
 },
 "seat_thinking_touching_chin": {
 "pitch": 10,
-"restLow": 0.8,
+"restLow": 0.9,
 "smoothFingers": true,
 "restFwd": 0.15
 },
