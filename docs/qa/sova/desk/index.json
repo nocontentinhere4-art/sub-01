@@ -1,5 +1,5 @@
 {
- "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh). v3: the fits arm corrections smoothed over time (smooth_fit.py, loops wrapped); room_seated_idle moves at most 14 mm per frame. v5/v6 (thinking, frustrated V1): resting targets at least 15 cm forward of the hip joint (REST_FWD) and a rest trigger (REST_LOW), so hands that hung by his hips (the armrests) rest on the lap.",
+ "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh). v3: the fits arm corrections smoothed over time (smooth_fit.py, loops wrapped); room_seated_idle moves at most 14 mm per frame. v5/v6 (thinking, frustrated V1): resting targets at least 15 cm forward of the hip joint (REST_FWD) and a rest trigger (REST_LOW), so hands that hung by his hips (the armrests) rest on the lap. Hands (fix_hands_pose.py): fingers not retargeted, solved to the owner natural-hand ranges (docs/qa/hands), wrists clamped, contact yes / inside no.",
  "fps": 30,
  "clips": [
   {
@@ -60,7 +60,72 @@
     "LeftToe_End",
     1.5
    ],
-   "loop_seam_mm": null
+   "loop_seam_mm": null,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 14.8,
+     "wrist": {
+      "frames_clamped": 95,
+      "max_before_roll_flex_dev": [
+       20.0,
+       82.2,
+       65.0
+      ],
+      "bend_clamped_frames": 59
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 38.1
+     },
+     "bend_clamped_after_clear_0": 31,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 124,
+      "gap_before_cm": [
+       -0.4,
+       1.1
+      ],
+      "gap_after_cm": [
+       -0.4,
+       0.8
+      ]
+     },
+     "left_in_body_cm": 0.4
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 15.4,
+     "wrist": {
+      "frames_clamped": 138,
+      "max_before_roll_flex_dev": [
+       20.0,
+       68.6,
+       60.3
+      ],
+      "bend_clamped_frames": 20
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 32.5
+     },
+     "bend_clamped_after_clear_0": 16,
+     "bend_clamped_after_clear_1": 3,
+     "contact": {
+      "frames": 150,
+      "gap_before_cm": [
+       -0.4,
+       2.3
+      ],
+      "gap_after_cm": [
+       -0.3,
+       0.9
+      ]
+     },
+     "left_in_body_cm": 0.3
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "desk_look_behind",
@@ -141,7 +206,72 @@
     "HeadTop_End",
     2.07
    ],
-   "loop_seam_mm": 0
+   "loop_seam_mm": 0,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 7.1,
+     "wrist": {
+      "frames_clamped": 193,
+      "max_before_roll_flex_dev": [
+       20.0,
+       66.9,
+       24.4
+      ],
+      "bend_clamped_frames": 169
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 47.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 275,
+      "gap_before_cm": [
+       -0.4,
+       0.3
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.4
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       11.7,
+       59.3,
+       22.9
+      ],
+      "bend_clamped_frames": 7
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 44.5
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 275,
+      "gap_before_cm": [
+       0.5,
+       0.7
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "neutral_1",
@@ -222,7 +352,72 @@
     "LeftHandRing4",
     4.63
    ],
-   "loop_seam_mm": 1
+   "loop_seam_mm": 1,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 49,
+      "max_before_roll_flex_dev": [
+       15.2,
+       71.4,
+       6.3
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 74.1
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.2,
+       0.8
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 180,
+      "max_before_roll_flex_dev": [
+       15.0,
+       64.8,
+       20.3
+      ],
+      "bend_clamped_frames": 198
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 56.3
+     },
+     "bend_clamped_after_clear_0": 200,
+     "bend_clamped_after_clear_1": 149,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.5,
+       0.4
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.4
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "neutral_3",
@@ -303,7 +498,72 @@
     "LeftHandMiddle4",
     4.7
    ],
-   "loop_seam_mm": 3
+   "loop_seam_mm": 3,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 53,
+      "max_before_roll_flex_dev": [
+       15.4,
+       71.4,
+       6.6
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 74.1
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.2,
+       0.8
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 160,
+      "max_before_roll_flex_dev": [
+       15.0,
+       63.1,
+       20.2
+      ],
+      "bend_clamped_frames": 187
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 56.3
+     },
+     "bend_clamped_after_clear_0": 200,
+     "bend_clamped_after_clear_1": 156,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.5,
+       0.7
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "neutral_5",
@@ -384,7 +644,72 @@
     "LeftHandMiddle4",
     4.7
    ],
-   "loop_seam_mm": 3
+   "loop_seam_mm": 3,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 53,
+      "max_before_roll_flex_dev": [
+       15.4,
+       71.4,
+       6.6
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 74.1
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.2,
+       0.8
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 160,
+      "max_before_roll_flex_dev": [
+       15.0,
+       63.1,
+       20.2
+      ],
+      "bend_clamped_frames": 187
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 56.3
+     },
+     "bend_clamped_after_clear_0": 200,
+     "bend_clamped_after_clear_1": 156,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.5,
+       0.7
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "look_right_idle",
@@ -465,7 +790,72 @@
     "LeftForeArm",
     5.8
    ],
-   "loop_seam_mm": 1
+   "loop_seam_mm": 1,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 4.3,
+     "wrist": {
+      "frames_clamped": 137,
+      "max_before_roll_flex_dev": [
+       20.0,
+       39.6,
+       52.5
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 30.0
+     },
+     "bend_clamped_after_clear_0": 3,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.2,
+       0.9
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 201,
+      "max_before_roll_flex_dev": [
+       14.6,
+       21.4,
+       55.0
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 0.9
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 201,
+      "gap_before_cm": [
+       0.5,
+       0.5
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "look_left_idle",
@@ -546,7 +936,72 @@
     "RightForeArm",
     6.33
    ],
-   "loop_seam_mm": 2
+   "loop_seam_mm": 2,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 20.1,
+     "wrist": {
+      "frames_clamped": 201,
+      "max_before_roll_flex_dev": [
+       20.0,
+       74.8,
+       24.6
+      ],
+      "bend_clamped_frames": 73
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 26.6
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 201,
+      "gap_before_cm": [
+       1.1,
+       1.3
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.3
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 24.4,
+     "wrist": {
+      "frames_clamped": 201,
+      "max_before_roll_flex_dev": [
+       20.0,
+       53.6,
+       65.1
+      ],
+      "bend_clamped_frames": 135
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 61.8
+     },
+     "bend_clamped_after_clear_0": 97,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 201,
+      "gap_before_cm": [
+       -0.2,
+       0.8
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.4
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "look_down_to_right",
@@ -627,7 +1082,72 @@
     "HeadTop_End",
     9.13
    ],
-   "loop_seam_mm": 0
+   "loop_seam_mm": 0,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 6.3,
+     "wrist": {
+      "frames_clamped": 178,
+      "max_before_roll_flex_dev": [
+       20.0,
+       40.5,
+       54.1
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 28.4
+     },
+     "bend_clamped_after_clear_0": 26,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 300,
+      "gap_before_cm": [
+       -0.2,
+       0.9
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 300,
+      "max_before_roll_flex_dev": [
+       15.4,
+       20.1,
+       54.8
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 0.2
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 300,
+      "gap_before_cm": [
+       0.4,
+       0.6
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "look_front_to_left",
@@ -708,7 +1228,72 @@
     "HeadTop_End",
     1.67
    ],
-   "loop_seam_mm": 0
+   "loop_seam_mm": 0,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 18.4,
+     "wrist": {
+      "frames_clamped": 300,
+      "max_before_roll_flex_dev": [
+       20.0,
+       75.1,
+       20.4
+      ],
+      "bend_clamped_frames": 55
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 32.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 300,
+      "gap_before_cm": [
+       1.0,
+       1.4
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.3
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 23.8,
+     "wrist": {
+      "frames_clamped": 300,
+      "max_before_roll_flex_dev": [
+       20.0,
+       53.6,
+       69.4
+      ],
+      "bend_clamped_frames": 94
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 61.2
+     },
+     "bend_clamped_after_clear_0": 221,
+     "bend_clamped_after_clear_1": 162,
+     "contact": {
+      "frames": 300,
+      "gap_before_cm": [
+       -0.4,
+       1.3
+      ],
+      "gap_after_cm": [
+       -0.1,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.1
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_looking_away_idle",
@@ -790,7 +1375,72 @@
     "HeadTop_End",
     0.5
    ],
-   "loop_seam_mm": 38
+   "loop_seam_mm": 38,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 85,
+      "max_before_roll_flex_dev": [
+       15.5,
+       70.1,
+       10.7
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 77.5
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 110,
+      "gap_before_cm": [
+       -0.2,
+       0.9
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 40,
+      "max_before_roll_flex_dev": [
+       10.2,
+       64.8,
+       18.6
+      ],
+      "bend_clamped_frames": 32
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 57.4
+     },
+     "bend_clamped_after_clear_0": 47,
+     "bend_clamped_after_clear_1": 40,
+     "contact": {
+      "frames": 110,
+      "gap_before_cm": [
+       0.0,
+       0.9
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_looking_around_v1",
@@ -872,7 +1522,72 @@
     "HeadTop_End",
     8.67
    ],
-   "loop_seam_mm": 38
+   "loop_seam_mm": 38,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       15.9,
+       43.3,
+       14.0
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 74.2
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 157,
+      "gap_before_cm": [
+       -0.1,
+       1.8
+      ],
+      "gap_after_cm": [
+       -0.1,
+       0.7
+      ]
+     },
+     "left_in_body_cm": 0.1
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 167,
+      "max_before_roll_flex_dev": [
+       12.9,
+       73.2,
+       23.8
+      ],
+      "bend_clamped_frames": 141
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 60.9
+     },
+     "bend_clamped_after_clear_0": 105,
+     "bend_clamped_after_clear_1": 40,
+     "contact": {
+      "frames": 246,
+      "gap_before_cm": [
+       -0.4,
+       1.8
+      ],
+      "gap_after_cm": [
+       -0.4,
+       0.8
+      ]
+     },
+     "left_in_body_cm": 0.4
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_looking_around_v2",
@@ -954,7 +1669,72 @@
     "HeadTop_End",
     1.4
    ],
-   "loop_seam_mm": 2
+   "loop_seam_mm": 2,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       17.0,
+       53.6,
+       16.6
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 72.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 138,
+      "gap_before_cm": [
+       -0.3,
+       1.0
+      ],
+      "gap_after_cm": [
+       -0.1,
+       0.7
+      ]
+     },
+     "left_in_body_cm": 0.1
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       7.2,
+       58.1,
+       23.3
+      ],
+      "bend_clamped_frames": 3
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 57.0
+     },
+     "bend_clamped_after_clear_0": 1,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 75,
+      "gap_before_cm": [
+       -0.4,
+       1.2
+      ],
+      "gap_after_cm": [
+       -0.1,
+       0.7
+      ]
+     },
+     "left_in_body_cm": 0.1
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_looking_left",
@@ -1036,7 +1816,72 @@
     "HeadTop_End",
     2.63
    ],
-   "loop_seam_mm": 39
+   "loop_seam_mm": 39,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       11.8,
+       41.4,
+       14.9
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 72.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 15,
+      "gap_before_cm": [
+       0.4,
+       0.9
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 64,
+      "max_before_roll_flex_dev": [
+       12.9,
+       67.3,
+       20.3
+      ],
+      "bend_clamped_frames": 47
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 60.0
+     },
+     "bend_clamped_after_clear_0": 13,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 97,
+      "gap_before_cm": [
+       -0.0,
+       1.1
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_looking_right",
@@ -1118,7 +1963,72 @@
     "HeadTop_End",
     2.6
    ],
-   "loop_seam_mm": 37
+   "loop_seam_mm": 37,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.6,
+     "wrist": {
+      "frames_clamped": 17,
+      "max_before_roll_flex_dev": [
+       20.0,
+       60.4,
+       16.9
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 73.4
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 100,
+      "gap_before_cm": [
+       -0.4,
+       1.1
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 10,
+      "max_before_roll_flex_dev": [
+       12.8,
+       65.0,
+       17.8
+      ],
+      "bend_clamped_frames": 10
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 60.1
+     },
+     "bend_clamped_after_clear_0": 9,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 41,
+      "gap_before_cm": [
+       0.4,
+       1.4
+      ],
+      "gap_after_cm": [
+       -0.5,
+       0.7
+      ]
+     },
+     "left_in_body_cm": 0.5
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_neck_stretching_idle",
@@ -1200,7 +2110,72 @@
     "HeadTop_End",
     0.37
    ],
-   "loop_seam_mm": 35
+   "loop_seam_mm": 35,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 73,
+      "max_before_roll_flex_dev": [
+       14.7,
+       70.2,
+       11.7
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 75.3
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 96,
+      "gap_before_cm": [
+       -0.4,
+       0.6
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       9.0,
+       45.1,
+       14.2
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 57.0
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 93,
+      "gap_before_cm": [
+       0.5,
+       0.8
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.4
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_thinking_touching_chin",
@@ -1272,7 +2247,72 @@
     0.3
    ],
    "loop_seam_mm": null,
-   "fit_v": "v6"
+   "fit_v": "v6",
+   "hands_fix": {
+    "Left": {
+     "fingers": "the clip's own flex per joint (a hand to the face), owner range and speed",
+     "wrist_roll_to_forearm_deg": 21.1,
+     "wrist": {
+      "frames_clamped": 66,
+      "max_before_roll_flex_dev": [
+       20.0,
+       60.1,
+       49.9
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 77.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 208,
+      "gap_before_cm": [
+       -0.4,
+       3.9
+      ],
+      "gap_after_cm": [
+       -0.1,
+       0.8
+      ]
+     },
+     "left_in_body_cm": 0.1
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       4.6,
+       45.5,
+       36.8
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 18.5
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 250,
+      "gap_before_cm": [
+       0.5,
+       0.6
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.3
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_feeling_frustrated_v1",
@@ -1340,7 +2380,72 @@
     1.5
    ],
    "loop_seam_mm": null,
-   "fit_v": "v5"
+   "fit_v": "v5",
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 226,
+      "max_before_roll_flex_dev": [
+       12.8,
+       7.2,
+       42.4
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 5.4
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 226,
+      "gap_before_cm": [
+       0.5,
+       0.5
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 13.3,
+     "wrist": {
+      "frames_clamped": 37,
+      "max_before_roll_flex_dev": [
+       20.0,
+       29.5,
+       56.5
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 48.0
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 191,
+      "gap_before_cm": [
+       0.1,
+       3.4
+      ],
+      "gap_after_cm": [
+       0.1,
+       1.3
+      ]
+     },
+     "left_in_body_cm": 0.6
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_feeling_frustrated_v2",
@@ -1422,7 +2527,72 @@
     "LeftForeArm",
     1.7
    ],
-   "loop_seam_mm": null
+   "loop_seam_mm": null,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 13.0,
+     "wrist": {
+      "frames_clamped": 167,
+      "max_before_roll_flex_dev": [
+       20.0,
+       46.7,
+       72.2
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 27.4
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       0.1,
+       1.6
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.9,
+     "wrist": {
+      "frames_clamped": 49,
+      "max_before_roll_flex_dev": [
+       20.0,
+       46.4,
+       42.3
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 35.9
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 226,
+      "gap_before_cm": [
+       0.5,
+       0.6
+      ],
+      "gap_after_cm": [
+       0.2,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_distracted_then_smile",
@@ -1509,7 +2679,73 @@
     "HeadTop_End",
     6.13
    ],
-   "loop_seam_mm": null
+   "loop_seam_mm": null,
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       13.5,
+       34.8,
+       17.2
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 51.4
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 226,
+      "gap_before_cm": [
+       -3.0,
+       -2.8
+      ],
+      "gap_after_cm": [
+       -3.0,
+       -0.6
+      ]
+     },
+     "left_in_body_cm": 3.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 226,
+      "max_before_roll_flex_dev": [
+       7.9,
+       21.4,
+       52.8
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 3.3
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 226,
+      "gap_before_cm": [
+       -3.0,
+       1.3
+      ],
+      "gap_after_cm": [
+       -2.9,
+       2.4
+      ]
+     },
+     "left_in_body_cm": 2.9
+    }
+   },
+   "launch": "drop",
+   "launch_why": "crossed arms: pulled out of the other arm the hands come apart (one hangs in the air) and stay 3 cm inside the sleeves"
   },
   {
    "slug": "seat_happy",
@@ -1556,7 +2792,72 @@
     "other": {},
     "floor": {},
     "chair_within_2cm": 0
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 2.3,
+     "wrist": {
+      "frames_clamped": 112,
+      "max_before_roll_flex_dev": [
+       20.0,
+       72.6,
+       7.0
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 73.9
+     },
+     "bend_clamped_after_clear_0": 22,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 117,
+      "gap_before_cm": [
+       -0.3,
+       1.1
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 109,
+      "max_before_roll_flex_dev": [
+       16.0,
+       66.8,
+       19.8
+      ],
+      "bend_clamped_frames": 58
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 56.9
+     },
+     "bend_clamped_after_clear_0": 106,
+     "bend_clamped_after_clear_1": 95,
+     "contact": {
+      "frames": 120,
+      "gap_before_cm": [
+       -0.0,
+       1.0
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "seat_smiling",
@@ -1603,7 +2904,61 @@
     "other": {},
     "floor": {},
     "chair_within_2cm": 0
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       8.5,
+       7.5,
+       28.9
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 51.9
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 158,
+      "gap_before_cm": [
+       0.4,
+       1.5
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.6
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 9.7,
+     "wrist": {
+      "frames_clamped": 119,
+      "max_before_roll_flex_dev": [
+       20.0,
+       29.5,
+       36.3
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 36.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   }
  ]
 }

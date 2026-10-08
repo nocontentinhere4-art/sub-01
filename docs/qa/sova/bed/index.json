@@ -1,5 +1,5 @@
 {
- "note": "Sova bed/sleep clips fitted to the room bed (room_build/sova/bed_build.py): his lowest torso point over the clip on the mattress top less 1.5 cm give; played as the page lie clip (bedPlace: head toward -x, hips at BED.hips). mh_mx format (animation-only, char_mixamo node names; the 13 zero-weight end bones are not keyed and keep rest). Licence pending: preview only, never in web/ until COORD clears it. The phone is not in the GLB: the phone clips give its grip under the hand bone (phone fields, as build_glb.mjs builds it).",
+ "note": "Sova bed/sleep clips fitted to the room bed (room_build/sova/bed_build.py): his lowest torso point over the clip on the mattress top less 1.5 cm give; played as the page lie clip (bedPlace: head toward -x, hips at BED.hips). mh_mx format (animation-only, char_mixamo node names; the 13 zero-weight end bones are not keyed and keep rest). Licence pending: preview only, never in web/ until COORD clears it. The phone is not in the GLB: the phone clips give its grip under the hand bone (phone fields, as build_glb.mjs builds it). Hands (fix_hands_pose.py): fingers not retargeted, solved to the owner natural-hand ranges (docs/qa/hands), wrists clamped, contact yes / inside no.",
  "fps": 30,
  "room_pass": "room_build/kimodo/contact_pass.mjs on a scratch copy of the page, each clip as the lie clip; the legs capsule row counts the baggy-trouser capsule, not the mesh (the mesh extents are in extents_m)",
  "not_fitted": [
@@ -91,7 +91,49 @@
      "angle_deg_median": 6,
      "angle_deg_max": 7
     }
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "room_phone grip, joints into the owner range, still",
+     "wrist": "as baked (holds the phone)",
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 27.3
+     }
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       7.3,
+       43.1,
+       18.7
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 29.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.2,
+       0.6
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "bed_phone_watch_portrait",
@@ -155,7 +197,49 @@
      0.072
     ],
     "box_axes": "x thickness (screen normal), y long, z wide"
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "room_phone grip, joints into the owner range, still",
+     "wrist": "as baked (holds the phone)",
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 4.9
+     }
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       7.3,
+       43.1,
+       18.7
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 29.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.2,
+       0.6
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "bed_phone_typing",
@@ -237,7 +321,49 @@
      "angle_deg_median": 15,
      "angle_deg_max": 16
     }
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "room_phone grip, joints into the owner range, still",
+     "wrist": "as baked (holds the phone)",
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 4.9
+     }
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       6.8,
+       40.7,
+       18.3
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 38.6
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 38,
+      "gap_before_cm": [
+       0.3,
+       1.3
+      ],
+      "gap_after_cm": [
+       -0.0,
+       0.7
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "bed_phone_lift",
@@ -319,7 +445,49 @@
      "angle_deg_median": 28,
      "angle_deg_max": 80
     }
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "room_phone grip, joints into the owner range, still",
+     "wrist": "as baked (holds the phone)",
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 59.5
+     }
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 8.5,
+     "wrist": {
+      "frames_clamped": 488,
+      "max_before_roll_flex_dev": [
+       20.0,
+       18.3,
+       18.6
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 72.9
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 33,
+      "gap_before_cm": [
+       0.2,
+       1.6
+      ],
+      "gap_after_cm": [
+       -0.4,
+       1.0
+      ]
+     },
+     "left_in_body_cm": 0.4
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "sleep_side",
@@ -362,7 +530,50 @@
    "hands_in_body_after_fit_cm": {
     "Left": 0.0,
     "Right": 0.0
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 3.4,
+     "wrist": {
+      "frames_clamped": 72,
+      "max_before_roll_flex_dev": [
+       20.0,
+       27.7,
+       27.5
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 200,
+      "max_before": 85.9
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 200,
+      "max_before_roll_flex_dev": [
+       14.9,
+       22.9,
+       47.4
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 2.3
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "sleep_roll_to_back",
@@ -405,7 +616,61 @@
    "hands_in_body_after_fit_cm": {
     "Left": 0.0,
     "Right": 0.9
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 5.6,
+     "wrist": {
+      "frames_clamped": 146,
+      "max_before_roll_flex_dev": [
+       20.0,
+       70.9,
+       27.5
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 208,
+      "max_before": 85.9
+     },
+     "bend_clamped_after_clear_0": 69,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 202,
+      "gap_before_cm": [
+       0.0,
+       1.3
+      ],
+      "gap_after_cm": [
+       -0.3,
+       1.0
+      ]
+     },
+     "left_in_body_cm": 0.3
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 21.6,
+     "wrist": {
+      "frames_clamped": 313,
+      "max_before_roll_flex_dev": [
+       20.0,
+       23.4,
+       47.4
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 11,
+      "max_before": 90.9
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "sleep_back",
@@ -448,7 +713,61 @@
    "hands_in_body_after_fit_cm": {
     "Left": 0.0,
     "Right": 0.0
-   }
+   },
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       17.6,
+       44.0,
+       4.9
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 22.7
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 200,
+      "gap_before_cm": [
+       -0.1,
+       0.3
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.3
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 14.3,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       20.0,
+       6.3,
+       2.7
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 73.5
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "sleep_back_idle",
@@ -492,7 +811,72 @@
     "Left": 1.6,
     "Right": 0.0
    },
-   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace"
+   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace",
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       2.8,
+       40.8,
+       5.1
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 17.2
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 181,
+      "gap_before_cm": [
+       -0.5,
+       0.4
+      ],
+      "gap_after_cm": [
+       0.0,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 0,
+      "max_before_roll_flex_dev": [
+       4.6,
+       1.0,
+       22.0
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 16.4
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 181,
+      "gap_before_cm": [
+       0.1,
+       0.5
+      ],
+      "gap_after_cm": [
+       0.1,
+       0.5
+      ]
+     },
+     "left_in_body_cm": 0.0
+    }
+   },
+   "launch": "ok"
   },
   {
    "slug": "sleep_wake_and_back",
@@ -536,7 +920,73 @@
     "Left": 3.6,
     "Right": 1.3
    },
-   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace"
+   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace",
+   "hands_fix": {
+    "Left": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 47,
+      "max_before_roll_flex_dev": [
+       8.8,
+       48.5,
+       52.3
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 24.5
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 4,
+     "contact": {
+      "frames": 215,
+      "gap_before_cm": [
+       -0.5,
+       4.5
+      ],
+      "gap_after_cm": [
+       -1.7,
+       2.4
+      ]
+     },
+     "left_in_body_cm": 1.7
+    },
+    "Right": {
+     "fingers": "owner median flex (room_seated_idle hand) + 0.3 x clip curl, owner range and speed",
+     "wrist_roll_to_forearm_deg": 0.0,
+     "wrist": {
+      "frames_clamped": 124,
+      "max_before_roll_flex_dev": [
+       10.9,
+       44.3,
+       47.6
+      ],
+      "bend_clamped_frames": 0
+     },
+     "forearm_roll": {
+      "frames_clamped": 0,
+      "max_before": 26.6
+     },
+     "bend_clamped_after_clear_0": 0,
+     "bend_clamped_after_clear_1": 0,
+     "contact": {
+      "frames": 247,
+      "gap_before_cm": [
+       -0.4,
+       3.5
+      ],
+      "gap_after_cm": [
+       -0.5,
+       1.3
+      ]
+     },
+     "left_in_body_cm": 0.5
+    }
+   },
+   "launch": "drop",
+   "launch_why": "hands under the head still 1.7 cm inside him; feet 5.6 cm past the mattress end"
   }
  ]
 }
