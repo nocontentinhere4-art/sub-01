@@ -113,9 +113,9 @@ The existing suite and smoke run:
   - `test_visual::test_room_renders_without_hard_errors`: the same 3 items on the base and the branch (chair/desk
     penetration in `walking_8_1280`, desk penetration in `eating_19_1280`). Under CPU load it adds timing items on both
     (`desk_14_390`, and once `door_8_1280` here); run alone, the branch shows only the 3.
-  - `test_phone_camera` (6 cases): fail here (each takes minutes under software GL). **Not yet compared on the base**:
-    the base run hit its time limit before reaching them. This branch changes the phone layout only by adding the vote
-    card at the top of the cards and the reaction row in the dock, so these are the ones to check next.
+  - `test_phone_camera` (6 cases): fail here, and `test_in_bed_he_is_in_the_picture[390]` **fails the same way on the
+    base** ("out_of_bed, at the desk: head out 25/60"). Only that one case was re-run on the base (each takes ~6 min
+    under software GL).
 
 ## Demo video
 `demo.mp4`: 45 s, 1280×720. The desktop part shows a vote round, his move to the desk, then the reactions and the
