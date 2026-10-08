@@ -28,4 +28,4 @@ The page's own bed check (`penetration()`, the visual gate) gives his back and h
 
 Videos `listen.mp4` and `sleep_turn.mp4` are re-recorded with these clips.
 
-Full pytest on this commit's tree: 1450 passed, 27 skipped, exit 0; `tests/visual/out/results.json` hard_failures `[]`. Every push carries [skip ci] (C: Actions minutes).
+Merged origin/main (512f24d); ?char=mixamo loads no bed clips (they are baked for v5 only). Full pytest after the merge: 1489 passed, 27 skipped, exit 0; `tests/visual/out/results.json` hard_failures `[]`. Every push carries [skip ci] (C: Actions minutes).

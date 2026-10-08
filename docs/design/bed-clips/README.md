@@ -158,7 +158,7 @@ Re-measured with the clips of this commit, every frame (`contact/`). This supers
 | toes inside the mattress end | ≤ 3.5 cm | 0.8 | 0.8 | 0.3 |
 | bed (less its give) / bed frame / floor | 0 | 0 | 0 | 0 |
 | hands in his body | his face: 0 | 0 | 0 | chest 2.7 cm, 30 frames; face 0 |
-| duvet's top over his legs | ≤ 15 cm | – | 24.3–30.2 (32–40 next to his hips) | – |
+| duvet's top over his legs | ≤ 15 cm | – | 24.3–30.2 (32–40 next to his hips); C: target now ≤ 6 cm over his skin, met | – |
 
 - **The sink** (`bed_clip.py` BED_SINK, `boy_mh.js` BED_SINK, per row in `mixamo_clips.json`): the mattress gives under his back and hips. The fit lowers them by `sink` (2.0 cm awake, 1.65 cm asleep) and fits his heels and the back of his head for that height. The page rests his lowest skin, now his back, `sink − BACK_UP` under the bed's top (1.8 / 0.65 cm). Only the mattress takes it: the head is fitted to the pillow as before, and nothing reaches the bed frame or the floor. Asleep the heels sit 0.6 cm higher still (`heel_up`), so his calves stay within the mattress's 2 cm give. The page's `penetration()` gives his back and hips (skin weighted to the hip, waist, spine and upper thighs) 2.5 cm, as C allowed, and everything else 2 cm.
 - **Straight legs** (`flat`: 1.0): the hips' and knees' bend blended all the way to straight before the fit, and the toes allowed to within 0.8 cm of the mattress end (`toe_in`). At 40–70% the knees stayed up and the buttocks gap stayed at 1.2–1.6 cm. The heel step no longer counts his buttocks as legs: they are the back's, and counting them made the heels impossible to set above his back.
