@@ -305,6 +305,11 @@ const DEBUG = new URLSearchParams(location.search).has("debug");
 // ?room=old shows the earlier single-mesh scan with its lighting baked into the texture
 const OLD_ROOM = new URLSearchParams(location.search).get("room") === "old";
 const FIXED_HOUR = DEBUG && new URLSearchParams(location.search).get("hour");   // preview a time of day
+// ?mood=1: the mood layer (web/room/mood.js: sunlight, the hour's light, the visitor's own materials, its card), a preview
+// awaiting approval; without it the page does not load that file and nothing below changes
+const MOOD = !OLD_ROOM && new URLSearchParams(location.search).get("mood") === "1";
+const moodModule = MOOD ? import("./room/mood.js") : null;
+let mood = null;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
@@ -437,6 +442,12 @@ load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
     });
   }
   $("boot").classList.add("off"); setTimeout(() => $("boot").remove(), 800); buildSurfaces();
+  if (moodModule) moodModule.then(M => {
+    mood = M.createMood(THREE, {scene, renderer, pmrem, sun, hemi, ceiling, lamp, monitorGlow, skyLight, SURF, F, roomMats, windowView,
+      stage: () => stage, home: () => !!(boy && boy.visible), monitorOn: () => (monitor && monitor.mesh.material !== offMat ? monitor : null),
+      lite: matchMedia("(max-width: 900px)").matches || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent)});
+    mood.onRoom(room);
+  }).catch(e => console.error("mood layer:", e));
 }).catch(bootError);
 function mergeBoxes(list){           // axis-aligned boxes [[x0,x1],[y0,y1],[z0,z1]] -> one geometry
   const pos = [], idx = [];
@@ -1422,7 +1433,8 @@ function glowOf(img){
   catch { return null; }
 }
 function lighting(dt){
-  const sunEl = Math.sin(Math.PI * (hour - 5.6) / 12.2);           // Tokyo, autumn: ~05:35 to ~17:45
+  const H = mood ? mood.hour : hour;                               // (?mood=1: the visitor may be previewing another hour)
+  const sunEl = Math.sin(Math.PI * (H - 5.6) / 12.2);              // Tokyo, autumn: ~05:35 to ~17:45
   const day = smooth(-0.08, 0.3, sunEl), dusk = clamp(1 - Math.abs(sunEl - 0.03) / 0.25, 0, 1);
   const awake = stage === "AWAKE", home = boy && boy.visible;
   const evening = awake && day < 0.55 && home;
@@ -1470,6 +1482,7 @@ function lighting(dt){
   phoneGlow.intensity = phone.visible ? phoneGlowLevel(day, pOn) : 0;
   phoneGlow.color.copy(pOn ? PS.glass.glow : cScreen);
   if (phone.visible) { phone.getWorldPosition(phoneGlow.position); phoneTick(performance.now()); }
+  if (mood) mood.light(dt, {day});
 }
 
 // ---------- the boy follows the life simulation ----------
@@ -3206,7 +3219,7 @@ function frame(now){
   // 8-16 s while he moves (live 2026-10-08 08:02: the chair empty for 3 minutes of "at the computer"; with 8 s at most
   // he still ran at about half of real time). A tab coming back catches up 8 s at most, as before (CATCH.back)
   const real = Math.min(CATCH.back ?? CATCH.max, late), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n; CATCH.back = null;
-  windowView.update(real, hour);                      // the sky, the city, the weather follow his clock
+  windowView.update(real, mood ? mood.tick(real, hour) : hour);   // the sky, the city, the weather follow his clock (or the mood preview's)
   let moving = false; for (let i = 0; i < n; i++) moving = animate(dt) || moving;
   if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
   lighting(real);
@@ -3234,7 +3247,7 @@ function animate(dt){                                // one step of him: clips, 
   aliveHead(); inBed(dt);
   return moving;
 }
-if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, clock, CATCH, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
+if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, clock, CATCH, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture, moodLayer: () => mood,
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },

@@ -16,6 +16,7 @@
 //   view.setWeather("rain" | "overcast" | "clear" | null);   // null: back to the daily pattern
 //   view.setEmission(day, night);               // how bright the window is in the room's light units (G6's HDR: 5 / 0.05)
 //   view.light.sun                              // 0..1: how much direct sun the weather lets through (for the room's lights)
+//   view.light.dir                              // world direction to the sun (or the moon at night) as the window shows it
 //
 // By the hour: the photographs are relit (daylight as shot; dusk warm and dark; night a city-glow ambient with the homes'
 // windows switching on and off from a lights mask, each pane with its own id), the far skyline is a hazy silhouette by
@@ -48,6 +49,22 @@ export const PROBE = {size: 64, every: 20.0, first: 1.5};
 
 export function sunElevation(hour){            // Tokyo, autumn: up ~05:35, down ~17:45 (the room's lighting uses the same curve)
   return Math.sin(Math.PI * (hour - 5.6) / 12.2);
+}
+
+// the four moods of the day, as weights that sum to 1 and cross-fade over about an hour (the room's ?mood=1 layer,
+// web/room/mood.js, lights the room by them; the window itself keeps following sunElevation): morning from first light,
+// noon around the top of the sun, evening from the late afternoon into the dusk, night once the sky is dark
+export const PHASES = ["morning", "noon", "evening", "night"];
+export function dayPhase(hour){
+  const h = ((hour % 24) + 24) % 24;
+  const up = (a, b) => sstep(a, b, h), down = (a, b) => 1 - sstep(a, b, h);
+  const night = Math.max(down(5.0, 6.2), up(19.0, 20.4));
+  const morning = up(5.0, 6.2) * down(10.0, 11.4);
+  const evening = up(15.6, 17.0) * down(19.0, 20.4);
+  const noon = Math.max(0, 1 - night - morning - evening);
+  const w = {morning, noon, evening, night};
+  w.name = PHASES.reduce((a, k) => (w[k] > w[a] ? k : a), "morning");
+  return w;
 }
 
 // how many homes have their lights on, by Tokyo hour (the shader shows them only once the sky is dark enough)
@@ -289,7 +306,9 @@ export function createWindowView(THREE, opts = {}){
   });
   const U = material.uniforms;
   const state = {hour: 12, sun: 0.5, weather: {kind: "clear", cloud: 0, rain: 0}, override: opts.weather ?? null, litP: 0, train: null, time: 0, probes: 0, emit: {day: 1, night: 1}, hdr: false};
-  const light = {sun: 1, cloud: 0, rain: 0};
+  // dir: where the sun (by day) or the moon (by night) stands, a world direction from the window outwards once built;
+  // up: how high it is (sunElevation, -1..1); for the room's own lights to come in from where the window shows them
+  const light = {sun: 1, cloud: 0, rain: 0, dir: new THREE.Vector3(-1, 0.3, 0), moon: false, up: 0};
   let mesh = null, cloud = 0, rain = 0, probeCam = null, renderer = null, scene = null, probeAt = -1e9, emitSet = false;
 
   function build(surf, sc, rend){
@@ -335,6 +354,10 @@ export function createWindowView(THREE, opts = {}){
     const tn = (((hour - 17.8) / 12.2) % 1 + 1) % 1;
     const maz = (-40 + 80 * tn) * Math.PI / 180, mel = (10 + 28 * Math.sin(Math.PI * tn)) * Math.PI / 180;
     U.uMoonDir.value.set(Math.sin(maz) * Math.cos(mel), Math.sin(mel), Math.cos(maz) * Math.cos(mel));
+    if (mesh) {                                                   // the window's frame: x right, y up, z out of the room (-z of the plane)
+      const d = sunEl > -0.06 ? U.uSunDir.value : U.uMoonDir.value, ry = mesh.rotation.y, c = Math.cos(ry), s = Math.sin(ry);
+      light.dir.set(d.x * c - d.z * s, d.y, -d.x * s - d.z * c).normalize(); light.moon = sunEl <= -0.06; light.up = sunEl;
+    }
     // weather eases towards its target (a front takes minutes to arrive, a debug switch about two seconds)
     const w = target(); state.weather = w;
     const k = 1 - Math.exp(-dt * (state.override ? 1.5 : 0.05));
