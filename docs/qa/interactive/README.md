@@ -1,6 +1,6 @@
 # Viewers in the room: the vote on what he does next, live viewers, reactions (preview/interactive)
 
-Status: **first working version in progress** (G24). Branch `preview/interactive`; `main` untouched, no PR.
+Status: **first working version done** (G24): code, tests and the demo video are pushed. Branch `preview/interactive`; `main` untouched, no PR.
 
 ## What was built
 
@@ -42,7 +42,10 @@ Status: **first working version in progress** (G24). Branch `preview/interactive
 - **Aggregation**: accepted reactions are summed server-side and broadcast **in the existing tick** (`rx`: a count per
   emoji since the last tick); feeds at a lower rate (`?rate=5`) sum the skipped ticks' counts, like trades. They float up
   over the room for everyone (CSS, at most 40 on screen).
-- **Spike glance**: **≥ 10 reactions within 10 s** → the server sends `{type: "glance"}`, **at most once every 2 min**.
+- **Spike glance**: **≥ 10 reactions within 10 s** → the server sends `{type: "glance"}`, **at most once every 2 min**,
+  and only when he is **awake, in the room and upright** (sitting, standing or walking). Asleep, lying on the bed or out
+  at the park, the spike waits; a sleeping figure doesn't turn to the camera, and a head turn while lying down looked
+  like a twist.
   The page turns his head toward the camera once (`web/room/glance.js`: neck 40 % + head 60 %, capped at 55° turn /
   27° nod, 0.35 s in, 1.3 s hold, 0.6 s out), drawn after the clips; the desk-states layer gets the same message through
   its existing event hook (`deskEv` → `room/desk_states.js` `reactionFor`: `glance` → the calm `attend` loop).
@@ -70,11 +73,61 @@ Status: **first working version in progress** (G24). Branch `preview/interactive
   middleware, `/api/vote`, `--vote-round`, `Feed` sums `rx` over skipped ticks.
 - `web/room.html` — the vote card, the reactions bar + viewer count, floating reactions, the glance.
 - `web/room/glance.js`, `web/room/desk_states.js` (the `glance` event).
-- `tests/test_interactive.py` — 15 tests.
+- `tests/test_interactive.py` — 16 tests.
+- `Dockerfile` — copies `audience.py` (`test_dockerfile` caught it).
 - `tools/interactive_demo.py` — records `demo.mp4`.
 
+## Numbers
+- Server cost: `audience_tick` takes **3.1 µs per 50 ms tick** (viewer count, vote counts, reaction sums, spike check).
+  Opening a round (picking the options from his model's scores) takes 0.15 ms, once per round.
+- `python tests/smoke_demo.py`: **SMOKE OK**: 7.1 ms CPU per 50 ms tick (14 % of one core), tick body p50 9.6 /
+  p95 15.7 ms, RSS 143 MB, all pages and APIs 200, first `/ws` tick after 0.04 s.
+- Tick size: `aud` ≈ 40 bytes (`{"n":16,"v":[3,[1,8,3],97]}`); `rx` only on ticks with reactions. The brain page's
+  `q=1` feed is unchanged (it doesn't carry them).
+- Demo run (tools/interactive_demo.py): 16 viewers, a round of 12 votes (8 · 3 · 1) → "play a game of chess" won → he
+  got off the bed and sat down at the desk: *"sits down for a game of chess at the desk; viewers voted for it"*. Then 13
+  reactions in a few seconds → one glance. No page errors on desktop or phone.
+
 ## Tests
-_(filled in below as runs complete)_
+`tests/test_interactive.py`, **16 passed**:
+- vote round: one vote per viewer (the same cookie on another network, a cleared cookie on the same IP + UA, a second
+  tab: all refused), bad options and ended rounds refused, a new salt and no hashes kept after a round, **tie → the
+  option listed first**, no votes → no nudge, options in his model's order, options only what the schedule allows (no
+  park or chess at 3 am; no park for a 19:30 round that ends after 20:00), **asleep: the result waits, applied once
+  when awake**, dropped after 2 simulated days, the nudge tilts by `VOTE_BONUS` but never makes the impossible possible,
+  and once applied he does it ("…; viewers voted for it");
+- reactions: **rate limit (burst 5, then 1 every 3 s, per viewer, the burst capped after a pause)**, only the fixed
+  set (no free text), counts summed and drained per tick, spike → glance once, not again within 2 min, no spike when
+  spread out;
+- server: the `Feed` sums `rx` over skipped ticks, the HttpOnly cookie, hello / vote / react over a real websocket,
+  `aud.n` and `rx` in the tick, hashes only in memory, round end while asleep → applied on waking, glance only when awake
+  and upright in the room.
+
+The existing suite and smoke run:
+- `python tests/smoke_demo.py`: **SMOKE OK** (above).
+- `pytest tests`: before the Dockerfile fix, `-x` stopped at `test_dockerfile_copies_every_imported_module` (fixed:
+  audience.py is now copied) after 456 passed. Full-run result: see the line below (updated when the run finishes).
 
 ## Demo video
-_(in progress)_
+`demo.mp4`: 45 s, 1280×720. The desktop part shows a vote round, his move to the desk, then the reactions and the
+glance; the 390 px phone part shows the vote card, the dock with the reactions and the viewer count, and reactions
+floating over the room.
+
+How it was made: headless Chromium has no GPU here, and one software-GL (SwiftShader) frame of the room takes ~15 s.
+So `tools/interactive_demo.py` doesn't screen-record. It runs the demo server (`live_server.py --demo --start 21:00
+--time-scale 1.001 --vote-round 150`) with 14 bot viewers (websockets with their own cookie and user agent) and the
+page in `?debug` with `FREEZE`. The 3D view is rendered on keyframes with the page's own `sim()` and its follow camera.
+The glance uses a fixed camera on his face. The page's CSS animations run on a virtual clock, one step per frame. The
+frames are then timed to 45 s, so the video runs a little faster or slower than real time: the countdown on the card
+jumps between keyframes. Everything on screen comes from the running server.
+
+Stills: `desktop_vote.png` (your vote and the counts), `desktop_glance.png` (the glance at the desk),
+`phone_390.png`.
+
+## Not done / notes
+- Only the room page (`/`, `web/room.html`, the front page) has the panel and the reactions. The brain page
+  (`/brain`, `web/index.html`) is unchanged.
+- The vote result is carried by his **activity model** (`life.py`), the layer that picks what he does; it isn't a
+  stimulus to the simulated brain regions. That keeps it a nudge he can't be "forced" by and needs no new model.
+- Viewers behind one NAT with an identical browser build count as one voter (the IP + UA hash). That's the rule as
+  asked: cookie **and** hash.
