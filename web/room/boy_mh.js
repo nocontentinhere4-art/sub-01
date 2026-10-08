@@ -522,7 +522,7 @@ export function createMH(env) {
     return d;
   }
   function deskClear(side) {
-    const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"]) return;
+    const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
     const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn(); if (d0 <= 0.003) return; M.clear.frames++; M.clear.maxIn = Math.max(M.clear.maxIn, d0);
     const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
     const f = fwdV(), lat = V().crossVectors(f, _up1).normalize(), MAX = 25 * Math.PI / 180;

@@ -102,34 +102,52 @@ This is not from this layer: the same numbers show with `anim` off.
 **Before the first fixes:** the slots sat at their clip's hips height instead of the seat's, which lifted him 6 cm at each switch.
 
 ## The real clips (G23's seated takes; this branch only, never on main: their licence is pending)
-`web/room/desk_states/` carries G23's clips from `preview/sova-phone-src`, as committed: the dedda57 bake. `index.json` maps each slot to a file; a slot with its own clip plays it whole.
+`web/room/desk_states/` carries G23's desk v3 from `preview/sova-phone-src` (b578db3): hands on the thighs, nothing of them inside him, and the bake's arm corrections smoothed over time. `index.json` maps each slot to a file; a slot with its own clip plays it whole.
 
 | slot | clip | plays |
 |---|---|---|
 | attend | neutral_1 (head straight) | loop |
 | idle_a / idle_b | neutral_3 / neutral_5 | loop |
 | idle_c / idle_d | look_left_idle / look_right_idle | loop |
-| gesture_a / gesture_b / gesture_c | look_down_to_right / look_front_to_left / desk_look_behind | once (10 s / 10 s / 9.2 s) |
-| react_win / react_lose / react_up | (stand-ins as above: none of these clips is a reaction) | once |
+| gesture_a / gesture_b / gesture_c | look_down_to_right / look_front_to_left / desk_look_behind | once |
+| gesture_d / gesture_e / gesture_f | seat_looking_around_v2 / seat_neck_stretching_idle / seat_thinking_touching_chin | once |
+| react_win / react_up | seat_distracted_then_smile | once |
+| react_lose | seat_feeling_frustrated_v1 | once |
 
-- All of them sit at desk_watch's seat point (−0.075), as G23 measured.
+- All of them sit at desk_watch's seat point (−0.075).
 - desk_start_01, a sit-down transition, is not used.
+- The stand-ins stay for any slot index.json leaves out.
 
-**Measured with the merged fresh trees** (preview/freeze-why, 63538e6). The same sweeps as above, with the real clips in place:
+**Each clip alone** (the mixer only, every bone at 30 fps):
+- **v3:** 4–19 mm per frame (room_seated_idle 14 mm), loop seams 0–3 mm.
+  - seat_thinking_touching_chin: 62 mm on the fingers over 5 frames.
+  - seat_distracted_then_smile: 2 mm.
+- **The bake before v3** (0cd8768): 50–150 mm at the elbows.
 
-| | desk | chair | bed | floor | walls | furniture |
-|---|---|---|---|---|---|---|
-| every slot, 120 s natural, chess won | 0 (chess won: 1 vertex, at 0.8 s) | 0 | 0 | 0 | 0 | **the bottle: 115–388 sampled vertices, in every real clip** |
+**In the room** (fresh trees):
 
-**Why the bottle is hit**
-- In this bake both hands sit 0.92 m above his feet and about 0.20 m ahead of the hips; room_seated_idle has them at 0.78 m.
-- In the room that rests his hands on the desk's front edge, at world height 1.05–1.09 m against a desk top of 0.97 m.
-- The right hand and forearm stand in the bottle there.
-- The reactions' stand-ins were clean alone. Their counts here come from the crossfade into the real loops.
+| | walls | furniture (bottle and monitor included) | desk, fresh trees | desk, chair, bed, floor (`qa.body`) |
+|---|---|---|---|---|
+| every slot but gesture_f | 0 | 0 | 0 | 0 |
+| gesture_f (thinking) | 0 | 0 | 0 | **chair 90**: right fingers, at its end (8.7 s), at his side; seat points do not change it |
+| 120 s natural, chess won | | | | 0 |
+| into the first loop, from desk_watch | | | | desk 19 for one frame (2.0 s) |
 
-**One pop.** The crossfade from room_seated_idle into neutral_5 jumps a fingertip 233 mm in one frame. The hand rises through the desk's edge, and the desk clearing's arm swing (deskClear, from freeze-why) flips direction.
+- **react_lose (frustrated):** clean in v3; it had 270 in the chair before.
 
-**What fixes it.** G23's rebake (32a64dc: hands on the thighs, arm swing capped at 8°) changed the build, not the committed GLBs. They will be re-measured once they are in.
+**Transition pops, from the page's own hand and arm code, not from the clips**
+
+| transition | jump in one frame | cause | with the desk clearing off |
+|---|---|---|---|
+| into the arms-crossed take (react_win, react_up) | 147 mm, a fingertip | the frame the desk clearing (freeze-why's deskClear) switches on: the hand passes through the desk's slab on its way to the crossed arms | not measured |
+| the mouse into watching, then a won game (chess) | 295 mm, the left hand's fingers | the frame the mouse hold's weight falls to 0.01, where the hands stop: `pin()` is not linear in its weight, and the left hand leaves the keys for the thighs | not measured |
+
+- **Fix proposed, not made:** let the desk clearing and the hand weights ease in and out over a few frames. It is shared code with the default page, for COORD to schedule.
+
+**Videos** (G23's 0cd8768 clips, before v3):
+- `room_quick.mp4`: 25 s, 640×360.
+- `room_video.mp4`: 66 s, 1280×720.
+- Each records the real room, the page stepped frame by frame, with the events handed in as the socket sends them. The captions come from the event log.
 
 ## main's mixamo seated loop (COORD's item 2)
 - **Before the merge:** room_seated_idle (desk_watch on main) had 369–413 sampled vertices in the desk with fresh trees, and 10–22 in the bottle.
@@ -151,6 +169,10 @@ The dark spikes at the back of the hood are the hood's lining and patches (`hood
 | idle_c | 7.1 cm | 52 | 42 | 3.8 cm | 2742 |
 | gesture_b / react_win / react_up (sitting_talking) | 7.1 cm | 56–130 | 45–106 | 3.8–4.3 cm | 4811–5002 |
 | gesture_a / react_lose (rubbing_arm) | 7.1 cm | 384 | 257 | 7.1 cm | 5633 |
+
+With G23's v3 clips (hands on the thighs), compared the same way:
+- **The lining:** 6.3–6.9 cm out at most, with 239–312 vertices more than 1.6 cm out.
+- **The hood and shoulders:** 3.9–6.1 cm.
 
 With the arms up, a few hundred lining vertices go 1.6–7 cm past the hoodie. The arm raise pulls the hood's back and shoulders up to 7 cm off their seated place.
 
