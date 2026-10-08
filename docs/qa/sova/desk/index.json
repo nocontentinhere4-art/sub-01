@@ -1,5 +1,5 @@
 {
- "note": "Sova seated clips baked for our chair (room_build/sova/desk_build.sh -> kimodo/mx_fit.py), mh_mx format; licence pending: preview only, never in web/ until COORD clears it",
+ "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m.",
  "fps": 30,
  "clips": [
   {
@@ -19,18 +19,11 @@
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": 12.4,
-     "turn_deg_max": 13.5,
-     "frames": 176
-    },
-    "Right": {
-     "back_before_cm": 21.8,
-     "turn_deg_max": 28.5,
-     "frames": 179
-    }
-   },
+   "hands_y_median_m": [
+    0.849,
+    0.786
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      -0.003,
@@ -46,17 +39,8 @@
       0.2,
       0.6
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.7,
-     "Right": 0.5
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 0
     }
-   },
-   "room": "not measured as the watching loop (a transition: the sit-down step)"
+   }
   },
   {
    "slug": "desk_look_behind",
@@ -70,23 +54,16 @@
    "loop": true,
    "category": "gesture",
    "what": "turns round to look behind him, back to the screen",
-   "suggested_slot": "gesture_b (alt)",
+   "suggested_slot": "gesture_c",
    "seat_at": [
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": 17.9,
-     "turn_deg_max": 22.5,
-     "frames": 275
-    },
-    "Right": {
-     "back_before_cm": 8.8,
-     "turn_deg_max": 8.3,
-     "frames": 275
-    }
-   },
+   "hands_y_median_m": [
+    0.73,
+    0.746
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -102,37 +79,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.6,
-     "Right": 0.7
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 0
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.2,
-     4.8
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -146,24 +93,17 @@
    "duration_s": 6.67,
    "loop": true,
    "category": "idle",
-   "what": "seated, head straight, small arm moves",
-   "suggested_slot": "idle_a",
+   "what": "seated, head straight, hands on the thighs",
+   "suggested_slot": "attend / idle_a",
    "seat_at": [
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": -0.9,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    },
-    "Right": {
-     "back_before_cm": 10.5,
-     "turn_deg_max": 10.9,
-     "frames": 200
-    }
-   },
+   "hands_y_median_m": [
+    0.77,
+    0.755
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -179,37 +119,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.7,
-     "Right": 0.6
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 0
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -229,18 +139,11 @@
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": -0.9,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    },
-    "Right": {
-     "back_before_cm": 10.5,
-     "turn_deg_max": 10.9,
-     "frames": 200
-    }
-   },
+   "hands_y_median_m": [
+    0.77,
+    0.755
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -256,37 +159,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.7,
-     "Right": 0.6
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 0
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -306,18 +179,11 @@
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": -0.9,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    },
-    "Right": {
-     "back_before_cm": 10.5,
-     "turn_deg_max": 10.9,
-     "frames": 200
-    }
-   },
+   "hands_y_median_m": [
+    0.77,
+    0.755
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -333,37 +199,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.7,
-     "Right": 0.6
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 0
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -377,24 +213,17 @@
    "duration_s": 6.7,
    "loop": true,
    "category": "attend",
-   "what": "looking right, hands on the knees",
-   "suggested_slot": "attend",
+   "what": "looking right",
+   "suggested_slot": "idle",
    "seat_at": [
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": 1.0,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    },
-    "Right": {
-     "back_before_cm": 5.7,
-     "turn_deg_max": 3.9,
-     "frames": 201
-    }
-   },
+   "hands_y_median_m": [
+    0.773,
+    0.767
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -410,37 +239,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.8,
-     "Right": 0.9
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 65
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -454,24 +253,17 @@
    "duration_s": 6.7,
    "loop": true,
    "category": "attend",
-   "what": "looking left, hands on the knees",
-   "suggested_slot": null,
+   "what": "looking left",
+   "suggested_slot": "idle",
    "seat_at": [
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": 5.5,
-     "turn_deg_max": 3.7,
-     "frames": 201
-    },
-    "Right": {
-     "back_before_cm": -2.3,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    }
-   },
+   "hands_y_median_m": [
+    0.724,
+    0.761
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -487,37 +279,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 1.0,
-     "Right": 0.8
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 20,
-     "Right": 0
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.4,
-     5
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -537,18 +299,11 @@
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": 1.0,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    },
-    "Right": {
-     "back_before_cm": 5.7,
-     "turn_deg_max": 3.9,
-     "frames": 300
-    }
-   },
+   "hands_y_median_m": [
+    0.775,
+    0.768
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -564,37 +319,7 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.8,
-     "Right": 1.1
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 300
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "hands_in_thighs_frames": 0
    }
   },
   {
@@ -614,18 +339,11 @@
     0,
     -0.075
    ],
-   "shins_fit": {
-    "Left": {
-     "back_before_cm": 5.5,
-     "turn_deg_max": 3.7,
-     "frames": 300
-    },
-    "Right": {
-     "back_before_cm": -2.3,
-     "turn_deg_max": 0.0,
-     "frames": 0
-    }
-   },
+   "hands_y_median_m": [
+    0.724,
+    0.762
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
    "fit": {
     "hip_joints_seated_m": [
      0.0,
@@ -641,37 +359,417 @@
       0.2,
       0.2
      ]
-    },
-    "sleeves_in_hoodie_after_cm": {
-     "Left": 0.8,
-     "Right": 0.8
-    },
-    "sleeve_frames_over_0_8cm": {
-     "Left": 0,
-     "Right": 0
     }
-   },
-   "room": {
-    "chair": {},
-    "desk": {},
-    "other": {},
-    "floor": {},
-    "seat_gap_cm": [
-     0.4,
-     5
+   }
+  },
+  {
+   "slug": "seat_looking_away_idle",
+   "file": "desk/seat_looking_away_idle.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_17",
+    "[MOCAP] LOOKING AWAY - IDLE ",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 3.7,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks away (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.752,
+    0.75
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
     ],
-    "seat_frames_under": 0,
     "soles_cm": {
      "L": [
       0.2,
-      4.8
+      0.2
      ],
      "R": [
       0.2,
-      4.8
+      0.2
      ]
-    },
-    "hands_in_thighs_frames": 0
+    }
+   }
+  },
+  {
+   "slug": "seat_looking_around_v1",
+   "file": "desk/seat_looking_around_v1.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_19",
+    "[MOCAP] LOOKING AROUND V1",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 11.1,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks around (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.757,
+    0.748
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_looking_around_v2",
+   "file": "desk/seat_looking_around_v2.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_20",
+    "[MOCAP] LOOKING AROUND V2",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 6.57,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks around V2 (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.778,
+    0.777
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_looking_left",
+   "file": "desk/seat_looking_left.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_21",
+    "[MOCAP] LOOKING LEFT",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 4.1,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks left (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.77,
+    0.745
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_looking_right",
+   "file": "desk/seat_looking_right.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_22",
+    "[MOCAP] LOOKING RIGHT",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 4.1,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks right (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.745,
+    0.76
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_neck_stretching_idle",
+   "file": "desk/seat_neck_stretching_idle.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_27",
+    "[MOCAP] NECK STRETCHING - IDLE",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 3.27,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] stretches his neck (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.743,
+    0.755
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_thinking_touching_chin",
+   "file": "desk/seat_thinking_touching_chin.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_13",
+    "[HANDMADE] THINKING TOUCHING CHIN",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 8.33,
+   "loop": false,
+   "category": "reaction",
+   "what": "thinking, hand to the chin (performer arms)",
+   "suggested_slot": "react",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    1.24,
+    0.859
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_feeling_frustrated_v1",
+   "file": "desk/seat_feeling_frustrated_v1.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_4",
+    "[New!] [HANDMADE]  FEELING FRUSTRATED V1",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 7.53,
+   "loop": false,
+   "category": "reaction",
+   "what": "frustrated, hands to the hips (performer arms)",
+   "suggested_slot": "react_lose",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.849,
+    0.759
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_feeling_frustrated_v2",
+   "file": "desk/seat_feeling_frustrated_v2.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_5",
+    "[New!] [HANDMADE]  FEELING FRUSTRATED V2",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 7.53,
+   "loop": false,
+   "category": "reaction",
+   "what": "frustrated V2 (performer arms)",
+   "suggested_slot": "react_lose",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.757,
+    0.872
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "slug": "seat_distracted_then_smile",
+   "file": "desk/seat_distracted_then_smile.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_3",
+    "[New!] [HANDMADE]  DISTRACTED & THEN SMILE",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 7.53,
+   "loop": false,
+   "category": "reaction",
+   "what": "distracted, then smiles, arms crossed (performer arms)",
+   "suggested_slot": "react_win",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    1.056,
+    1.063
+   ],
+   "room": "pending (rebake of the hands on the thighs; see STATUS.md)",
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
    }
   }
  ]

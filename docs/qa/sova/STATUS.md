@@ -2,6 +2,30 @@
 
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
+## Desk: hands on the thighs (COORD's note, G14's finding) — GLBs rebaked, room re-check running
+**For G14: `docs/qa/sova/desk/*.glb` are the new bake; pull them.** `desk/index.json` now lists 19 clips, including the 10 seated Action & Reactions, with their hand heights.
+
+The cause:
+- The chair fit's sleeve clearance swung the arms out from the shoulder (up to its 24° cap) and lifted the hands.
+- In the dedda57 bake the hands sat at 0.92 m (body frame), 14 cm over `room_seated_idle`'s 0.78. In the page that put them on the desk's front edge and into the bottle (G14).
+
+Now, per frame:
+1. The chair fit swings an arm out at most 8°; the sleeves are allowed 1.5 cm on the hoodie (cloth on cloth).
+2. **After** the fit, each resting hand goes across to over the top of his thigh and down to 3 mm over the trousers (`fit_rest.py`: two-bone IK, the hand keeps its orientation, smoothed).
+3. In the idle/look clips both hands always rest. Their left hand used to hover in front of the lap at 0.89–0.93 m, which is desk-edge height.
+4. Gestures keep their hands.
+
+Hands' median height (wrist joint, body frame; `room_seated_idle` 0.787 / 0.783 m):
+- **Idle / look clips** (desk_look_behind, neutral_1/3/5, look_* ×4, seat_looking_* ×5, neck stretching): **0.72–0.78 m** both hands.
+- Gestures, high by their content:
+  - thinking: L 1.24, hand at the chin;
+  - distracted-then-smile: 1.06 / 1.06, arms crossed;
+  - frustrated V1 / V2: 0.85 / 0.87, a hand at the hip.
+  - These can still meet the desk edge if the page plays them close to it.
+- desk_start_01 (the sit-down): 0.85 / 0.79.
+
+The room re-check of the new bake (chair, desk, floor, seat, soles) is running; numbers to follow here.
+
 ## Desk group: seated set done (`desk/*.glb`, `desk/index.json`, `sova_desk_seated.jpg`)
 - Measured **in the room** with the room's own `contact_pass.mjs`: each clip played as the desk-watching clip, in a local symlinked copy of `web/` (nothing in `web/` changes), over the whole clip, every frame.
 - Every clip went through the shin fit + our chair's fit.
