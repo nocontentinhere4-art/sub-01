@@ -1,4 +1,20 @@
-LATEST: 797355c — all 30 Sova clips with the hands fixed are in `desk/` and `bed/` (pull these). Launch: 28 ok, 2 **drop for launch** (seat_distracted_then_smile, sleep_wake_and_back). The owner-range table and the re-rendered close-up and montage follow in the next push.
+LATEST: ec9a5c5 — `alive_ab.mp4` (round 4 "alive", 4 test clips, MATTINA / ORA / NUOVO, hand close-ups below each). Round 4 code 93f6021 (`fix_alive.py`). If NUOVO wins I run it on all 28 next. The 797355c GLBs (ORA) are still what is in `desk/` and `bed/`.
+
+## ROUND 4 "alive" — A/B/C: `alive_ab.mp4` (+ `alive_ab.jpg` stills)
+The four clips: neutral_1, thinking (chin), seat_happy, bed_phone_watch_landscape.
+- **MATTINA:** this morning's GLBs (before 797355c).
+- **ORA:** 797355c.
+- **NUOVO:** `fix_alive.py`, built on this morning's GLBs:
+  - **body untouched:** no smoothing or limit beyond the morning bake (b578db3/8051d88);
+  - **fingers:** the clip's **own flexion per joint**, rebuilt on Mixamo's relaxed hand as a pure curl. That removes the 23–47° roll of the left-hand fingers, nothing bends backwards (the curling branch), and the clamp is the owner's **p1–p99** only, with **no rate limit**;
+  - **phone hand:** round 2's grip;
+  - **wrists and forearms:** as baked, only single-frame flips undone (none found in the 4);
+  - **nothing inside his body:** moved only on frames that go in, eased (fit_hands.clear).
+    - In neutral_1, seat_happy and bed_phone the resting right hand's curled fingers sit 2.0–2.6 cm into the thigh/belly **on every frame**, so the push-out (2.5–3.1 cm) is on every frame there.
+    - The chin hand in thinking: 89 of 250 frames.
+
+**My look at the video:** NUOVO has the morning's body motion (same posture as MATTINA in every frame) and cleaner fingers than MATTINA. ORA's stiffened wrists are gone. The chin hand is close to MATTINA. Motion can't be judged from stills; the owner's verdict decides.
+
 
 # Sova clips: status (G23 → COORD)
 
