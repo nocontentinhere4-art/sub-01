@@ -5,7 +5,7 @@ import json, sys, os, io, base64, math, threading, http.server, socketserver, su
 from PIL import Image, ImageDraw, ImageFont
 from playwright.sync_api import sync_playwright
 HERE = os.path.dirname(os.path.abspath(__file__)); THREE = os.path.join(HERE, '..', '..', 'node_modules', 'three')
-W, H, FPS = 1280, 720, 30
+W, H, FPS = int(os.environ.get('MW', 1280)), int(os.environ.get('MH', 720)), int(os.environ.get('MFPS', 30)); K = W / 1280
 spec = json.load(open(sys.argv[1])); out = sys.argv[2]
 class Hd(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, p):
@@ -16,10 +16,10 @@ class Hd(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
 srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), Hd); port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
-F1 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 46)
-F2 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 22)
+F1 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', int(46 * K))
+F2 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', max(12, int(22 * K)))
 ff = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
-                       '-c:v', 'libx264', '-preset', 'medium', '-crf', '24', '-maxrate', '1300k', '-bufsize', '2600k',
+                       '-c:v', 'libx264', '-preset', 'medium', '-crf', '24', '-maxrate', os.environ.get('MRATE', '1300k'), '-bufsize', '2600k',
                        '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], stdin=subprocess.PIPE)
 def norm(v): n = math.sqrt(sum(x * x for x in v)) or 1; return [x / n for x in v]
 def roty(v, a): c, s = math.cos(a), math.sin(a); return [c * v[0] + s * v[2], v[1], -s * v[0] + c * v[2]]
@@ -57,9 +57,9 @@ with sync_playwright() as p:
             pg.evaluate(f'pose("{g["clip"]}", {t})')
             url = pg.evaluate(f'shot({json.dumps(c)}, {json.dumps(d)}, {dist})')
             im = Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).convert('RGB')
-            ov = Image.new('RGBA', (W, 96), (20, 22, 28, 170)); im.paste(ov, (0, 0), ov)
-            dr = ImageDraw.Draw(im); dr.text((40, 14), g['title'], font=F1, fill=(255, 255, 255))
-            if g.get('sub'): dr.text((42, 66), g['sub'], font=F2, fill=(210, 214, 222))
+            ov = Image.new('RGBA', (W, int(96 * K)), (20, 22, 28, 170)); im.paste(ov, (0, 0), ov)
+            dr = ImageDraw.Draw(im); dr.text((int(40 * K), int(14 * K)), g['title'], font=F1, fill=(255, 255, 255))
+            if g.get('sub') and K > 0.7: dr.text((int(42 * K), int(66 * K)), g['sub'], font=F2, fill=(210, 214, 222))
             ff.stdin.write(im.tobytes())
         total += n; print(f'{g["clip"]:30s} {n} frames, total {total / FPS:.1f}s', flush=True); pg.close()
     b.close()

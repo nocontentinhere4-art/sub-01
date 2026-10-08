@@ -2,6 +2,19 @@
 
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
+
+## Video: quick montage — `sova_quick.mp4` (38 s, 640x360, 24 fps, H.264)
+Six clips on our character, one 3/4-front camera each, Italian titles:
+1. Scrivania – guarda a destra
+2. Scrivania – si gira a guardare dietro
+3. Reazione – pensa
+4. Reazione – distratto, poi sorride
+5. A letto col telefono – video orizzontale
+6. Dorme – si gira sulla schiena (×2)
+
+Staging: the desk ones sit on a plain grey block at his seat height (0.58 m) instead of the room chair; the bed ones lie on a plain mattress block at the measured support height.
+The full montage (`sova_montage.mp4`, ~2 min 18 s, 1280x720, 30 fps, 21 clips) is rendering; it comes next.
+
 ## Desk: hands on the thighs — DONE (COORD's note, G14's finding)
 **For G14: `docs/qa/sova/desk/*.glb` (this commit) are the final bake; pull them.** `desk/index.json` lists all 19 clips with their hand heights, mesh test and room numbers.
 
