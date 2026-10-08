@@ -1,5 +1,5 @@
 {
- "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh). v3: the fits arm corrections smoothed over time (smooth_fit.py, loops wrapped); room_seated_idle moves at most 14 mm per frame.",
+ "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh). v3: the fits arm corrections smoothed over time (smooth_fit.py, loops wrapped); room_seated_idle moves at most 14 mm per frame. v5/v6 (thinking, frustrated V1): resting targets at least 15 cm forward of the hip joint (REST_FWD) and a rest trigger (REST_LOW), so hands that hung by his hips (the armrests) rest on the lap.",
  "fps": 30,
  "clips": [
   {
@@ -1221,30 +1221,19 @@
     -0.075
    ],
    "hands_y_median_m": [
-    1.194,
-    0.848
+    1.21,
+    0.784
    ],
    "room": {
     "chair": {},
     "desk": {},
     "other": {},
     "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+    "chair_within_2cm": {
+     "frames": 4,
+     "maxDepth": 0.6,
+     "maxCount": 106
+    }
    },
    "fit": {
     "hip_joints_seated_m": [
@@ -1278,11 +1267,12 @@
     }
    },
    "max_joint_move_per_frame_mm": [
-    62,
+    67,
     "LeftHandMiddle3",
-    0.27
+    0.3
    ],
-   "loop_seam_mm": null
+   "loop_seam_mm": null,
+   "fit_v": "v6"
   },
   {
    "slug": "seat_feeling_frustrated_v1",
@@ -1303,30 +1293,15 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.867,
-    0.787
+    0.784,
+    0.931
    ],
    "room": {
     "chair": {},
     "desk": {},
     "other": {},
     "floor": {},
-    "seat_gap_cm": [
-     0.3,
-     4.9
-    ],
-    "seat_frames_under": 0,
-    "soles_cm": {
-     "L": [
-      0.2,
-      4.8
-     ],
-     "R": [
-      0.2,
-      4.8
-     ]
-    },
-    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+    "chair_within_2cm": 0
    },
    "fit": {
     "hip_joints_seated_m": [
@@ -1360,11 +1335,12 @@
     }
    },
    "max_joint_move_per_frame_mm": [
-    17,
-    "RightHandIndex4",
-    0.3
+    14,
+    "RightForeArm",
+    1.5
    ],
-   "loop_seam_mm": null
+   "loop_seam_mm": null,
+   "fit_v": "v5"
   },
   {
    "slug": "seat_feeling_frustrated_v2",
@@ -1534,6 +1510,100 @@
     6.13
    ],
    "loop_seam_mm": null
+  },
+  {
+   "slug": "seat_happy",
+   "file": "desk/seat_happy.glb",
+   "source": [
+    "Sova Action & Reactions",
+    "[MOCAP] HAPPY (trimmed), upper body on the seated base, seated arms"
+   ],
+   "duration_s": 3.97,
+   "loop": false,
+   "category": "reaction",
+   "what": "chess win candidate: pleased sway (recommended)",
+   "suggested_slot": "chess_win",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.751,
+    0.759
+   ],
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    7,
+    "LeftForeArm",
+    0.13
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "chair_within_2cm": 0
+   }
+  },
+  {
+   "slug": "seat_smiling",
+   "file": "desk/seat_smiling.glb",
+   "source": [
+    "Sova Action & Reactions",
+    "SMILING, upper body on the seated base, performer arms"
+   ],
+   "duration_s": 5.23,
+   "loop": false,
+   "category": "reaction",
+   "what": "chess win candidate: smiling, wide right-arm talking gesture",
+   "suggested_slot": null,
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.829,
+    0.838
+   ],
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    41,
+    "RightHandIndex4",
+    2.47
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "chair_within_2cm": 0
+   }
   }
  ]
 }

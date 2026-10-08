@@ -3,6 +3,60 @@
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
 
+## COORD's three points — armrest fix, our bed, chess "win" (this push)
+
+### 1. Armrest: thinking (v6) and frustrated V1 (v5) — GLBs replaced in `desk/`, G14 please re-measure
+Cause, now found: in both clips, a standing performer's hand hangs **beside his hip**.
+- Thinking: the right hand the whole clip, and the left one after 5.3 s, at x 0.23–0.33 m from the centre, past the thigh's outer edge (0.23), 0.70 m high, level with the hip. That is the armrest.
+- `fit_rest` used to snap such a hand to the nearest thigh-top vertex, which is the hip's outer edge, so it never moved.
+
+Fix (`fit_rest.py`, rows in `desk_rows.json`):
+- `REST_FWD` 0.15: resting targets only on the thigh top at least 15 cm forward of the hip joint, so the hand goes onto the lap.
+- `REST_LOW`: a hand whose lowest point drops below this rests as well (thinking 0.9 m, frustrated 0.8 m). The chin hand is at 1.2 m and is left alone.
+- Then, as in v3: `fit_hands`, the arm corrections smoothed over time (`smooth_fit`), and here the fingers smoothed too.
+
+Whole clip, 30 fps, my room pass (`contact_pass.mjs`, the clip as `room_seated_idle`):
+
+| clip | chair / desk / other | within 2 cm of the chair (hands) | end pose | hands in his body | biggest move per frame |
+|---|---|---|---|---|---|
+| thinking v3 | 0 | 6 frames (5.0 s, 7.4 s) | R hand by the hip at 0.70 m | 0 | 62 mm |
+| **thinking v6** | **0** | 4 frames at 7.3–7.4 s, closest 1.4 cm | **both hands on the thighs** (x 0.11–0.24, 15 cm forward) | **0** | 67 mm |
+| frustrated V1 v3 | 0 | 5 frames (6.5 s) | L hand by the hip | 0 | 17 mm |
+| **frustrated V1 v5** | **0** | **0** | L hand on the thigh; R on his hip (the gesture), 0.84 m | **0** | 14 mm |
+
+The thinking fingers (G14's 62 mm/frame over 5 frames) are **not jumps**: they are the two gestures, lap→chin at 0.2–0.6 s and chin→lap at 5.2–5.4 s, each a smooth bell (frames, mm: 8 7 6 14 25 36 49 60 66 67 63 57 49 42 37 …).
+- The performer's own peak is 54 mm/frame; ours is faster because on our seated body the lap↔chin path is longer.
+- There is no single-frame spike left anywhere (finger smoothing is on).
+- Slowing the gesture would be a time-warp of the clip; I didn't do that. Say if you want it.
+
+I still can't reproduce G14's "90 vertices in the chair": my pass found 0 there in v3 too. **G14: please re-measure `desk/seat_thinking_touching_chin.glb` and `desk/seat_feeling_frustrated_v1.glb` at this SHA.**
+
+### 2. Bed and sleep on our bed — `bed/*.glb` + `bed/index.json`, `sova_bed_sheet.jpg`, `sova_bed_quick.mp4` (640×360, 37 s)
+Nine slots:
+- `bed_phone_watch_landscape`, `bed_phone_watch_portrait`, `bed_phone_typing`, `bed_phone_lift` (set_38/39/45/4)
+- `sleep_side`, `sleep_roll_to_back`, `sleep_back`, `sleep_back_idle`, `sleep_wake_and_back` (Pack 7 SLEEPING LOOP V1 / V1→V2 / V2, idle, wake-and-back)
+
+Fit (`bed_build.py`): his lowest torso point over the clip on the mattress top less 1.5 cm give, played as the page's lie clip (`bedPlace`: head toward the pillow, −x).
+
+Room pass, each clip as the lie clip on a scratch copy of the page:
+- **bed / floor / desk / chair / other = 0 in all 9**; resting lowest point 0.834.
+- Extents in the room (index `extents_m`): inside the mattress at the head end and both sides; the wall (z 1.6) is ≥ 22 cm away.
+- **Exception:** `sleep_back_idle` and `sleep_wake_and_back` have the feet **5.6 cm past the mattress end**. Fix in the page: place those two slots 6 cm toward the headboard (BED.hips x −0.06). It can't be done inside the clip, because `bedPlace` re-anchors the hips.
+- The legs capsule row (74/195/361 frames in lift, back_idle and wake) is the baggy-trouser capsule; the mesh extents above are the honest test.
+
+Hands and phone:
+- Hands in his body after the fit: 0, except sleep_back_idle (L 1.6 cm) and sleep_wake_and_back (L 3.6, R 1.3 cm): hands under the head, left as they are.
+- Phone clips: the phone never touches his face (gap 8.3–9.7 cm); fingers in the phone ≤ 0.4 cm; eye→screen 25–26 cm, 6–15° (lift 21–68 cm).
+- The phone is **not** in the GLBs. Each phone entry in `index.json` gives its grip under `mixamorig:LeftHand`: translation (cm), rotation, scale 100, box 0.008×0.150×0.072 m, as `build_glb.mjs` builds it. The video uses GLBs with it built in.
+
+Not fitted: `sitting_and_lying_on_bed` and `wake_up_and_leave_bed`. They are transitions, and need the page's bed-edge placement.
+Not used: the IN BED 01/02 calls and IN BED 03 B (across the bed, feet on the floor), and IN BED 04.
+
+### 3. Chess "win": two proposals (`sova_win_candidates.jpg`)
+- **`desk/seat_happy`: recommended.** 4.0 s, seated, a pleased sway. Room pass 0 (nothing within 2 cm of the chair), hands in his body 0, max 7 mm/frame. Added to `desk/index.json` (slot `chess_win`).
+- `desk/seat_distracted_then_smile`: the stronger "satisfied" read (a smile after looking away), but 7.5 s with the arms crossed. Use it if the win can be longer.
+- Not `seat_smiling` (5.2 s): it reads as talking, not winning, with a wide right-arm gesture (fingers 41 mm/frame). Its room pass is 0 too; it is in the index for reference.
+
 ## Desk v3: elbow jumps smoothed (G14's findings) — GLBs updated, pull them
 G14 measured the 0cd8768 bake per frame:
 - forearms jumping 50–150 mm in a frame (`room_seated_idle`: 14 mm);
