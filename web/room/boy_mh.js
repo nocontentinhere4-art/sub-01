@@ -521,21 +521,34 @@ export function createMH(env) {
     let d = 0; for (const [o, n] of HANDSKIN[side]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld); d = Math.max(d, inDesk(_g)); }
     return d;
   }
-  function deskClear(side) {
+  // (eased, preview/freeze-why-ease: the swing keeps last frame's way while that way still clears - the least angle
+  // over all four flipped from 6 deg back to 7 deg forward in one frame mid-crossfade, a fingertip 147 mm - and it lets
+  // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
+  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09;      // (s: the release's time constant, ~0.25 s to nothing)
+  function deskClear(side, dt = 1 / 30) {
     const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
-    const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn(); if (d0 <= 0.003) return; M.clear.frames++; M.clear.maxIn = Math.max(M.clear.maxIn, d0);
+    const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
     const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
     const f = fwdV(), lat = V().crossVectors(f, _up1).normalize(), MAX = 25 * Math.PI / 180;
+    const axes = {lat, fwd: f};
     const set = (ax, a) => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, a).clone().multiply(w0)); ua.updateMatrixWorld(true); };
-    // the whole arm swung about the shoulder - back or forward (his left-right axis), out or in (his forward axis) - by
-    // the least angle that takes its skin and the hand's out; none within 25 deg: left as the clip has it
+    const least = (k, sg) => { const ax = axes[k]; set(ax, sg * MAX); if (inn() > 0.003) return null;   // (the least angle that way that clears; none within 25 deg)
+      let lo = 0, hi = MAX; for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; set(ax, sg * m); if (inn() > 0.003) lo = m; else hi = m; } return hi; };
+    const prev = CLR[side], fade = prev ? prev.a * Math.exp(-dt / CLR_OUT) : 0;
     let best = null;
-    for (const ax of [lat, f]) for (const sg of [1, -1]) {
-      set(ax, sg * MAX); if (inn() > 0.003) continue;
-      let lo = 0, hi = MAX; for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; set(ax, sg * m); if (inn() > 0.003) lo = m; else hi = m; }
-      if (!best || hi < best.a) best = {ax, a: hi, sg};
+    if (d0 > 0.003) {
+      M.clear.frames++; M.clear.maxIn = Math.max(M.clear.maxIn, d0);
+      // the whole arm swung about the shoulder - back or forward (his left-right axis), out or in (his forward axis) - by
+      // the least angle that takes its skin and the hand's out: last frame's way if it still can, else the least of all four
+      if (prev) { const a = least(prev.k, prev.sg); if (a != null) best = {k: prev.k, sg: prev.sg, a}; }
+      if (!best) for (const k of ["lat", "fwd"]) for (const sg of [1, -1]) { const a = least(k, sg); if (a != null && (!best || a < best.a)) best = {k, sg, a}; }
+      if (best && prev && best.k === prev.k && best.sg === prev.sg) best.a = Math.max(best.a, fade);   // (never less than the release allows)
+    } else if (prev && fade > 0.003) {                       // out of the desk: the swing lets go gradually, if that keeps him out
+      set(axes[prev.k], prev.sg * fade); if (inn() <= 0.003) best = {k: prev.k, sg: prev.sg, a: fade};
     }
-    if (best) { set(best.ax, best.sg * best.a); M.clear.maxA = Math.max(M.clear.maxA || 0, best.a); } else set(lat, 0);
+    if (best) { set(axes[best.k], best.sg * best.a); M.clear.maxA = Math.max(M.clear.maxA || 0, best.a); } else set(lat, 0);
+    CLR[side] = best;
+    if (M.clearLog) M.clearLog.push([side, +d0.toFixed(4), best ? best.k + (best.sg > 0 ? "+" : "-") : "none", best ? +(best.a * 57.3).toFixed(1) : 0]);   // (?debug)
   }
   // eating at the desk (room_eat): the clip's reach for a bite goes 0.44 m out from the shoulder, 30 cm past the dish
   // and up into the monitor (eating_19: 774 sampled vertices of the right hand inside it). While the clip's hand is out
@@ -818,15 +831,18 @@ export function createMH(env) {
     if (ot && M.w.type > 0.01) OT.t += dt * OT.json.speed;
     if (ot && M.w.mouse > 0.01) OT.tr += dt * OT.json.speed * OT_REST;
     const mix = wk > 0 ? M.w.mouse / (M.w.type + M.w.mouse) : 0;
-    if (wk > 0.01) { if (ot) ownerKeys("Left", wk, dt, {mix}); else keyOn("Left", wk, dt); }
+    if (wk > 0.01) { if (ot) weighted("Left", wk, w => ownerKeys("Left", w, dt, {mix})); else keyOn("Left", wk, dt); }
     const both = ot && M.w.type > 0.01 && M.w.mouse > 0.01, qc = both ? rightChain().map(b => b.quaternion.clone()) : null;   // (the clip's right arm, before the mouse moves it)
     if (M.w.mouse > 0.01 && P.mouseNode) {
       const ry = env.boy.rotation.y, home = V(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
       omStep(dt); const F = omNow(), f = fwdV(), k2 = S("Right", 2, 1), k5 = S("Right", 5, 1), pw = k2 && k5 ? k2.getWorldPosition(V()).distanceTo(k5.getWorldPosition(_a)) : 0;   // (his palm width, 5 -> 17: the character's)
       if (F) home.addScaledVector(f, F.move[0] * pw).addScaledVector(V(-f.z, 0, f.x), F.move[1] * pw);   // (his wrist's travel over the pad)
-      const wm = both ? 1 : M.w.mouse;                       // (mid-switch the mouse's pose at full weight: the crossfade below then runs between two whole poses)
-      pin("Right", home.sub(toWorld(CLIP.mouse, _c)), wm);   // the recorded hand carried to the room's mouse: where it goes, the mouse goes
-      follow(); mouseHold(wm);                               // then the hand onto the mouse
+      // (mid-switch the mouse's pose at full weight: the crossfade below then runs between two whole poses; fading alone,
+      // the pose at full weight blended from the clip's by the weight)
+      const off = home.sub(toWorld(CLIP.mouse, _c));
+      weighted("Right", both ? 1 : M.w.mouse, () => {
+        pin("Right", off, 1);                                // the recorded hand carried to the room's mouse: where it goes, the mouse goes
+        follow(); mouseHold(1); });                          // then the hand onto the mouse
     } else M.grab = null;
     // (after the mouse: its pin carries the clip's own hand by an offset, so it must see the clip's hand, not one already
     // placed on the keys - mid-switch that sent the right hand 22 cm in one frame; the typing placement is absolute.) While
@@ -850,14 +866,26 @@ export function createMH(env) {
         swivelTo("Right", ew);                             // (the elbow to the two poses' elbow, blended)
         hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(hq));
         chain.forEach((b, i) => { if (i >= 3) b.quaternion.copy(qm[i].slerp(qt[i], wt)); }); env.boy.updateMatrixWorld(true); }
-      else ownerKeys("Right", M.w.type, dt);
+      else weighted("Right", M.w.type, w => ownerKeys("Right", w, dt));
     }
   }
-  const RCHAIN = [];
-  function rightChain() {                                    // the bones the right hand's placement turns: the arm, the hand, the fingers
-    if (!RCHAIN.length) { for (const n of ["RightArm", "RightForeArm", "RightHand"]) if (env.bones[n]) RCHAIN.push(env.bones[n]);
-      for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S("Right", i, j); if (b) RCHAIN.push(b); } }
-    return RCHAIN;
+  const CHAINS = {Left: [], Right: []};
+  function chainOf(side) {                                   // the bones a hand's placement turns: the arm, the hand, the fingers
+    const C = CHAINS[side];
+    if (!C.length) { for (const n of ["Arm", "ForeArm", "Hand"]) if (env.bones[side + n]) C.push(env.bones[side + n]);
+      for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b) C.push(b); } }
+    return C;
+  }
+  const rightChain = () => chainOf("Right");
+  // a hand placed at a fading weight (preview/freeze-why-ease): solved at full weight, then the arm blended bone by bone
+  // from the clip's pose by the weight. pin() is not linear in its weight: at a weight of 0.02 the mouse hold still had his
+  // hand on the mouse, then at 0.01 let go - the fingers 295 mm in one frame. At full weight (steady typing, mousing)
+  // nothing changes
+  function weighted(side, w, solve) {
+    if (w >= 0.999) return solve(1);
+    const C = chainOf(side), q0 = C.map(b => b.quaternion.clone());
+    solve(1);
+    C.forEach((b, i) => b.quaternion.copy(q0[i].slerp(b.quaternion, w))); env.boy.updateMatrixWorld(true);
   }
   function mouseHold(w) {                                    // his hand from the take, placed so palm and fingertips meet the shell
     const F = omNow(); if (!F || !S("Right", 2, 1) || !S("Right", 3, 1) || !S("Right", 5, 1)) return; shellSync();   // (palmFrame needs the knuckles)
@@ -1846,7 +1874,7 @@ export function createMH(env) {
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.held = null; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
-    if ((st.at === "desk" || (st.step && st.step.to === "desk")) && !(M.mode && M.w.type + M.w.mouse > 0.01)) { env.boy.updateMatrixWorld(true); eatReach(st, dt); deskClear("Left"); deskClear("Right"); }
+    if ((st.at === "desk" || (st.step && st.step.to === "desk")) && !(M.mode && M.w.type + M.w.mouse > 0.01)) { env.boy.updateMatrixWorld(true); eatReach(st, dt); deskClear("Left", dt); deskClear("Right", dt); }
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
