@@ -54,7 +54,7 @@ export function loadArrange(storage){
     const num = a => Array.isArray(a) && a.length >= 3 && a.slice(0, 3).every(Number.isFinite);
     if (num(v.plant)) out.plant = v.plant.slice(0, 3);
     if (Array.isArray(v.items)) for (const it of v.items)
-      if (out.items.length < MAX_ITEMS && Array.isArray(it) && TYPES[it[0]] && num(it.slice(1))) out.items.push([it[0], +it[1], +it[2], +it[3]]);
+      if (out.items.length < MAX_ITEMS && Array.isArray(it) && Object.hasOwn(TYPES, it[0]) && num(it.slice(1))) out.items.push([it[0], +it[1], +it[2], +it[3]]);
   } catch {}
   return out;
 }
@@ -132,7 +132,7 @@ export function createArrange(THREE, ctx){
     return spotOK(x, z, t.r, nav, others(t), plant ? PLANT_BLOCK : -1); }
   function place(t, x, z, r){ t.g.position.set(x, t.added ? F : 0, z); if (Number.isFinite(r)) t.g.rotation.y = r; t.g.updateMatrixWorld(true); ctx.shadowsDirty && ctx.shadowsDirty(); }
   function add(type, at, quiet){
-    if (!TYPES[type] || things.filter(t => t.added).length >= MAX_ITEMS) return null;
+    if (!Object.hasOwn(TYPES, type) || things.filter(t => t.added).length >= MAX_ITEMS) return null;
     if (type === "lamp" && things.filter(t => t.type === "lamp").length >= MAX_LAMPS) return null;
     const t = {g: makeThing(THREE, type), type, r: TYPES[type].r, added: true, label: TYPES[type].label};
     t.g.position.y = F; things.push(t); scene.add(t.g);

@@ -60,12 +60,13 @@ def test_mood_layer_in_the_page(tmp_path):
                     out[(size, scene, cam)] = pg.evaluate(OVERLAP)
             if size == "1280":
                 # a swatch: the floor's texture changes, and the choice is in this browser's storage
-                was = pg.evaluate("() => { let m = null; room.traverse(o => { if (o.isMesh && o.material.name === 'floor') m = o.material; }); window._fl = m; return m.map.uuid; }")
+                was = pg.evaluate("() => { let m = null; room.traverse(o => { if (o.isMesh && o.material.name === 'floor') m = o.material; }); window._fl = m; window._orig = m.map; window._img = m.map.image; return m.map.uuid; }")
                 pg.evaluate("() => document.querySelector('#mood .md-sw[data-group=floor] button[data-v=walnut]').click()")
-                out["swatch"] = pg.evaluate("() => ({uuid: _fl.map.uuid, stored: localStorage.getItem('sub01.room.mood.v1'), on: !!document.querySelector('#mood .md-sw[data-group=floor] button[data-v=walnut].on')})")
+                out["swatch"] = pg.evaluate("() => ({uuid: _fl.map.uuid, stored: localStorage.getItem('sub01.room.mood.v1'), on: !!document.querySelector('#mood .md-sw[data-group=floor] button[data-v=walnut].on'), ownImage: _fl.map.image !== _img, origKept: _orig.image === _img})")
                 out["swatch_was"] = was
                 pg.evaluate("() => document.getElementById('md-reset').click()")
                 out["swatch_back"] = pg.evaluate("() => _fl.map.uuid")
+                out["swatch_back_img"] = pg.evaluate("() => _fl.map === _orig && _fl.map.image === _img")
                 # the hour preview: held, then back to the real hour by itself
                 out["preview"] = pg.evaluate("""() => { const m = moodLayer(); m.setPreview(3); const held = m.tick(0.1, 19);
                   for (let i = 0; i < 10 * 6; i++) m.tick(0.1, 19); const mid = m.state.preview;
@@ -83,7 +84,8 @@ def test_mood_layer_in_the_page(tmp_path):
     assert len(seen) >= 8, f"he was on screen in too few views to check: {seen}"
     assert out["swatch"]["uuid"] != out["swatch_was"] and out["swatch"]["on"], out["swatch"]
     assert '"floor":"walnut"' in (out["swatch"]["stored"] or ""), out["swatch"]
-    assert out["swatch_back"] == out["swatch_was"]
+    assert out["swatch_back"] == out["swatch_was"] and out["swatch_back_img"], out
+    assert out["swatch"]["ownImage"] and out["swatch"]["origKept"], f"a swatch must not write into the room's own texture: {out['swatch']}"
     pv = out["preview"]
     assert abs(pv["held"] - 3) < 1e-6 and pv["mid"] is not None, pv
     assert pv["after"] is None and abs(pv["hour"] - 19) < 1e-6, pv

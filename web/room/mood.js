@@ -151,7 +151,7 @@ export function createMood(THREE, ctx){
   const choice = loadChoice();
   // the light's levels (in the room's units; ?debug can tune them live through mood.tune)
   const T = {sun: 7.0, moon: 0.6, sky: 8.0, skyDusk: 1.5, bounce: 2.6, hemi: 0.42, hemiLamp: 0.28, ceil: 4.6, desk: 2.6, screen: 6.0,
-    env: 0.55, exp0: 0.78, exp: 0.22, beam: 0.14, dust: 0.9};
+    env: 0.55, exp0: 0.80, exp: 0.30, beam: 0.14, dust: 0.9};
   const state = {hour: 12, real: 12, preview: null, from: 0, t: 0, holdUntil: 0, dragging: false, back: null, now: 0};
 
   // ---- light: soft sun shadows (a wider PCF kernel instead of the fixed soft one), a warm bounce, the beam, the dust
@@ -212,7 +212,7 @@ export function createMood(THREE, ctx){
   // ambient pick up the warm walls and floor (a cheap stand-in for light bouncing round the room); re-made only when
   // what it shows changes (the hour in quarter hours while it moves, a swatch, the lamps)
   const envCv = document.createElement("canvas"); envCv.width = 128; envCv.height = 64;
-  const envCx = envCv.getContext("2d"); let envTex = null, envKey = "", envAt = -1e9;
+  const envCx = envCv.getContext("2d"); let envTex = null, envRT = null, envKey = "", envAt = -1e9;
   const baseEnv = scene.environment;
   const colOf = (g) => { const v = GROUPS[g].variants.find(x => x.id === choice[g]); return new THREE.Color(Array.isArray(v.sw) ? v.sw[0] : v.sw); };
   const css = c => `rgb(${Math.round(255 * clamp(c.r, 0, 1))},${Math.round(255 * clamp(c.g, 0, 1))},${Math.round(255 * clamp(c.b, 0, 1))})`;
@@ -232,19 +232,18 @@ export function createMood(THREE, ctx){
     const win = sky.clone().multiplyScalar(1.0);
     g.fillStyle = css(win);
     for (const du of [-w, 0, w]) g.fillRect(u + du - w * 0.07, h * 0.30, w * 0.14, h * 0.16);
-    if (envTex) envTex.dispose();
     const t = new THREE.CanvasTexture(envCv); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     const rt = pmrem.fromEquirectangular(t); t.dispose();
     const prev = scene.environment; scene.environment = rt.texture;
     scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) if (m.envMap === prev || m.envMap === baseEnv) m.envMap = rt.texture; });
-    if (envTex && envTex !== baseEnv) envTex.dispose();
-    envTex = rt.texture;
+    if (envRT) envRT.dispose();                                  // (the render target, not only its texture: no GPU memory left behind)
+    envRT = rt; envTex = rt.texture;
   }
 
   // ---- materials: the room's, by name (only once the model is in)
   const mats = {};                                               // name -> [materials]
   const orig = new Map();                                        // material -> {map, roughness, color}
-  const cache = new Map();                                       // material.uuid + colour -> texture
+  const made = new Map();                                        // material -> {key, tex}: its one recoloured texture in use
   let arrange = null;
   function onRoom(room){
     if (ctx.controls && ctx.camera && ctx.dom) {
@@ -261,10 +260,19 @@ export function createMood(THREE, ctx){
     for (const name of G.mats) for (const m of mats[name] || []) {
       if (!orig.has(m)) orig.set(m, {map: m.map, roughness: m.roughness});
       const o = orig.get(m);
-      if (!v.c || !v.c[name] || !o.map || !o.map.image) { m.map = o.map; m.roughness = o.roughness; m.needsUpdate = true; continue; }
-      const key = m.uuid + v.c[name];
-      let t = cache.get(key);
-      if (!t) { t = o.map.clone(); t.image = recolour(o.map.image, v.c[name], lite ? 1024 : 2048); t.needsUpdate = true; cache.set(key, t); }
+      const was = made.get(m);
+      if (!v.c || !v.c[name] || !o.map || !o.map.image) {
+        m.map = o.map; m.roughness = o.roughness; m.needsUpdate = true;
+        if (was) { was.tex.dispose(); made.delete(m); }
+        continue;
+      }
+      const key = v.c[name];
+      if (was && was.key === key) continue;
+      // a texture of its own: a clone shares the original's image (its Source), so it gets a new Source; the room's own
+      // texture is never written to, and the previous recolour is freed (one recoloured texture per material at most)
+      const t = o.map.clone(); t.source = new THREE.Source(recolour(o.map.image, key, lite ? 1024 : 2048)); t.needsUpdate = true;
+      if (was) was.tex.dispose();
+      made.set(m, {key, tex: t});
       m.map = t; m.roughness = v.r ?? o.roughness; m.needsUpdate = true;
     }
     choice[group] = v.id;

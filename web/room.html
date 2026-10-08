@@ -448,6 +448,8 @@ load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
       lite: matchMedia("(max-width: 900px)").matches || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent),
       camera, controls, dom: renderer.domElement, BLOCK, NODES, LINKS, ANCHOR, holdCamera: () => { userMovedAt = performance.now(); }});
     mood.onRoom(room);
+    // its shaders compile once, now: that one slow frame is not a slow device (adapt() would keep a lower resolution)
+    renderer.compile(scene, camera); dprFail = 1e9; goodFor = 0; winN = winSum = winMax = 0; frameAt = 0;
   }).catch(e => console.error("mood layer:", e));
 }).catch(bootError);
 function mergeBoxes(list){           // axis-aligned boxes [[x0,x1],[y0,y1],[z0,z1]] -> one geometry
