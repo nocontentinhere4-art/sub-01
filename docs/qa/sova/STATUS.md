@@ -2,6 +2,37 @@
 
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
+## Sleep group: first pass done (`sova_sleep.jpg`, `contact_sleep.jsonl`)
+Clips:
+- **Machinima bed scene.** Identified from the motion (the filter did not keep the names):
+  - SITTING and LYING ON BED (24.4 s): sits on the edge, then lies down curled on his side; it ends exactly on V1's pose.
+  - SLEEPING LOOP V1 (6.7 s): on his side, knees drawn up.
+  - V1 TO V2 (14.4 s): rolls onto his back. It starts exactly on V1 and ends within 8° of V2.
+  - SLEEPING LOOP V2 (6.7 s): on his back, an arm up.
+  - The bed-object clips (9–41 channels, no body) are not retargeted.
+- **Animation Pack #7:**
+  - [01] sleeping idle (6 s loop, on his back);
+  - [02] wakes up, sits up and lies back down (12 s, returns to the start pose);
+  - [03] wakes up, swings his legs off and stands (15 s).
+- All the loops are seamless (first = last frame within 0.2°).
+
+Measured over the whole clip (mattress = his lowest torso point; resting hands cleared with `fit_hands.py`):
+
+| clip | torso on the mattress | legs vs the mattress | hands in his body after the fit |
+|---|---|---|---|
+| sleeping_loop_v1 | constant (0 cm range) | 2.5 cm under (his knees) | 0 |
+| sleeping_loop_v1_to_v2 | 1.1 cm range | −2.1…+1.4 cm | 0 |
+| sleeping_loop_v2 | constant | 0.7–1.0 cm over | 0 |
+| sleeping_idle (P7 01) | constant | 0.4 cm over | 1.6 cm (L hand on his thigh) |
+| wake_up_and_sleep_again (P7 02) | 1.0 cm range | 0.2–1.5 cm over | 3.6 cm (L hand pushing on his thigh as he sits up) |
+| sitting_and_lying_on_bed | sits up 41 cm, lies back down | feet on the floor while seated | 1.7 cm |
+| wake_up_and_leave_bed (P7 03) | gets up | feet on the floor at the end | 5.2 cm (L hand pushing on his thigh to stand) |
+
+- The "hand on the thigh" residues are the pushes when he sits up or stands (as in the Mixamo transitions).
+- No support fit was applied to the two clips with a standing part: pinning the torso to the mattress put the standing part 43 cm through the floor.
+- The bed placement in the room (our mattress top is 0.82 m, the Sims bed was lower) is the page's step, like the existing bed clips.
+- **Worth the most:** the two machinima loops + V1→V2 (a real side → back roll), and Pack 7 [03] (a full get-up).
+
 ## Desk group: in progress (baking on our chair, then the room check)
 Pipeline:
 1. Retarget, with the phone Ver. 8 calibration.
