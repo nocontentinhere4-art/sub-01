@@ -34,7 +34,7 @@ if __name__ == '__main__':
         c = json.load(open(f)); rep = {}
         for side in ('Left', 'Right'):
             MV0, ON0, G0 = track(B, c, side)
-            for it in range(3):
+            for it in range(5):
                 MV, ON, G = track(B, c, side) if it else (MV0, ON0, G0)
                 k = 5; mv = np.stack([np.convolve(np.pad(MV[:, j], k, mode='edge'), np.ones(2 * k + 1) / (2 * k + 1), 'valid') for j in range(3)], 1)
                 if np.linalg.norm(mv, axis=1).max() < 2e-3: break

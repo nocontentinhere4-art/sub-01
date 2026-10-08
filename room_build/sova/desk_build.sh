@@ -6,7 +6,7 @@ set -e
 W=$1; O=$2; shift 2; H=$(cd "$(dirname "$0")" && pwd); R=$H/../..; K=$R/room_build/kimodo; G=$R/room_build/kimodo_g12
 mkdir -p $O
 [ -f $W/char.json ] || ALLMESH=1 node $G/exp.mjs $R/web/room/char_mixamo.glb $W/char.json > /dev/null
-ROW=$(python3 -c "import json; t=json.load(open('$K/mx_clips.json')); d=dict(t['defaults']['seated']); d['seatOrigin']=True; print(json.dumps(d))")
+ROW=$(python3 -c "import json; t=json.load(open('$K/mx_clips.json')); d=dict(t['defaults']['seated']); d['seatOrigin']=True; d['clearMax']=0.015; d['abductMax']=8; print(json.dumps(d))")
 for s in "$@"; do
   ( cd $R/room_build && node sova/build_glb.mjs $W/char.glb $W/src_$s.glb none 64 $W/rt/$s.json > /dev/null 2>&1 )
   node $G/exp.mjs $W/src_$s.glb $W/src_$s.json > /dev/null
