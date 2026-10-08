@@ -784,7 +784,9 @@ function buildSurfaces(){
   monitor = makeScreen(m.w, m.h);
   monitor.mesh.rotation.set(m.rx, m.ry, 0, "YXZ"); monitor.mesh.position.set(...m.c);
   monitor.mesh.position.add(new THREE.Vector3(0, 0, m.off ?? 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
-  monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+  // (12 cm in front of the screen: at 35 cm it sat in his chest at the desk, 16 cm from his neck, and with its 1/d^2 fall-off
+  // and no shadow the hood's folds a few cm from it came out white, his back's hood rim too, lit from inside him)
+  monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
   const w = SURF.window;
   sky = windowView.build(w, scene, renderer);        // the view out of the window, on the glass marker (#98 G7)
   if (skyLight) {                    // just inside the glass, shining into the room
