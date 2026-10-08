@@ -3,17 +3,25 @@
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
 
-## Video: quick montage — `sova_quick.mp4` (38 s, 640x360, 24 fps, H.264)
-Six clips on our character, one 3/4-front camera each, Italian titles:
-1. Scrivania – guarda a destra
-2. Scrivania – si gira a guardare dietro
-3. Reazione – pensa
-4. Reazione – distratto, poi sorride
-5. A letto col telefono – video orizzontale
-6. Dorme – si gira sulla schiena (×2)
-
-Staging: the desk ones sit on a plain grey block at his seat height (0.58 m) instead of the room chair; the bed ones lie on a plain mattress block at the measured support height.
-The full montage (`sova_montage.mp4`, ~2 min 18 s, 1280x720, 30 fps, 21 clips) is rendering; it comes next.
+## Videos
+- **`sova_quick.mp4`** (commit ba8d006): 38 s, 640x360, 24 fps, H.264, 0.4 MB. Six clips:
+  1. Scrivania – guarda a destra
+  2. Scrivania – si gira a guardare dietro
+  3. Reazione – pensa
+  4. Reazione – distratto, poi sorride
+  5. A letto col telefono – video orizzontale
+  6. Dorme – si gira sulla schiena
+- **`sova_montage.mp4`** (this commit; its SHA is the one this STATUS.md is committed with): 2 min 18 s, 1280x720, 30 fps, H.264, 4.4 MB, 21 clips.
+  - Scrivania ×5: attende, guarda a destra, guarda giù poi a destra, guarda avanti poi a sinistra, si gira a guardare dietro.
+  - Reazioni ×6: pensa, distratto poi sorride, frustrato, si guarda intorno, si stira il collo, distoglie lo sguardo.
+  - A letto col telefono ×4: video orizzontale, video verticale, scrive, alza il telefono sul viso (×2).
+  - Sonno ×6: si siede e si sdraia (×3), sul fianco, si gira sulla schiena (×2), sulla schiena, si sveglia e si riaddormenta (×2), si alza dal letto (×2).
+- Both videos:
+  - one 3/4-front camera per clip, a key light on his face, neutral background;
+  - the desk clips sit on a plain grey block at his seat height (0.58 m), not the room chair;
+  - the bed clips lie on a plain mattress block at the measured support height;
+  - "×2/×3" = played faster to keep the long transitions short;
+  - the desk clips in the videos are the 0cd8768 bake (before the arm smoothing below).
 
 ## Desk: hands on the thighs — DONE (COORD's note, G14's finding)
 **For G14: `docs/qa/sova/desk/*.glb` (this commit) are the final bake; pull them.** `desk/index.json` lists all 19 clips with their hand heights, mesh test and room numbers.
