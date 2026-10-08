@@ -129,12 +129,12 @@
     const his = ["cortex (gyri and sulci)"].concat(st.meshes && specimen ? ["cerebellum (folia)", "brainstem"] : []);
     const lines = [];
     if (st.view === "fresh") lines.push("<b>fresh specimen</b>: pinkish-grey cortex under a glistening pia; colours are approximate, from open photographs; the reddish runs in the sulci are a shading cue for pial vessels, not drawn vessels");
-    else if (st.view === "fixed") lines.push(`<b>fixed and dissected</b>: formalin-grey; the ${st.cut.axis} cut shows HIS T1 scan as grey and white matter (ventricles dark)`);
+    else if (st.view === "fixed") lines.push(`<b>fixed and dissected</b>: formalin-grey${st.atlas ? `; the ${st.cut.axis} cut shows HIS T1 scan as grey and white matter (ventricles dark)` : ""}`);
     else if (st.view === "bundles") lines.push("<b>white-matter bundles</b>: his real diffusion fibres, muted colours by direction (red left-right, green front-back, blue up-down), no glow; a stimulus still travels along its route and sleep cools the tint; the cortex a ghost");
-    lines.push(`from HIS MRI: ${his.join(", ")}${st.view === "fixed" ? ", the cut (his T1, 2 mm)" : ""}; the fibres are his real tractography.`);
-    const shown = [].concat(st.layers.vessels ? names(["artery"]) : [], st.layers.nerves ? names(["nerve", "gland"]) : [], st.parts && specimen ? names(["cord"]) : []);
+    lines.push(`from HIS MRI: ${his.join(", ")}${st.view === "fixed" && st.atlas ? ", the cut (his T1, 2 mm)" : ""}; the fibres are his real tractography.`);
+    const shown = [].concat(st.parts && st.layers.vessels ? names(["artery"]) : [], st.parts && st.layers.nerves ? names(["nerve", "gland"]) : [], st.parts && specimen ? names(["cord"]) : []);
     if (shown.length) lines.push(`from an ATLAS (BodyParts3D, another adult; © DBCLS, CC BY 4.0${rms}): ${shown.join(", ")}.`);
-    if (st.layers.vessels && names(["vein"]).length) lines.push(`from an ATLAS (VENAT, 20 adults' veins at 7 T, Huck 2019, CC BY 4.0; affinely fitted): ${names(["vein"]).join(", ")}; the small bridging veins are below its threshold.`);
+    if (st.parts && st.layers.vessels && names(["vein"]).length) lines.push(`from an ATLAS (VENAT, 20 adults' veins at 7 T, Huck 2019, CC BY 4.0; affinely fitted): ${names(["vein"]).join(", ")}; the small bridging veins are below its threshold.`);
     const missing = meta && meta.parts && meta.parts.not_in_atlas;
     if ((st.layers.nerves || st.layers.vessels) && missing) lines.push(`not drawn (no licensed source; nothing is invented): ${missing.join(", ")}.`);
     if (st.tier === "low") lines.push("low-detail tier (frame rate)");
@@ -259,7 +259,7 @@
       col = mix(col, dcol * (0.75 + 0.5 * drive), sci);                                          // standard tractography colours
       float route = 0.0;
       for (int i = 0; i < 12; i++) { if (abs(tgt - float(i)) < 0.5) route = tgOn[i]; }
-      float pk = route * exp(-pow((tp - pulseT) * 3.5, 2.0)) * step(-0.5, pulseT);
+      float pq = (tp - pulseT) * 3.5, pk = route * exp(-pq * pq) * step(-0.5, pulseT);
       float trail = route * step(0.0, pulseT) * step(tp, pulseT) * exp(-(pulseT - tp) * 1.5);
       float busy = step(0.0, pulseT) * (1.0 - smoothstep(1.2, 1.6, pulseT));
       col *= 1.0 - 0.35 * busy * (1.0 - route);
@@ -379,7 +379,7 @@
       st.loading++;
       return partsP = loadMeta().then(m => fetchBuf(m.parts.file)).then(buf => {
         parts = parseParts(buf, meta.parts); parts.forEach(addPart); st.parts = true; st.loading--; apply();
-      }).catch(e => { st.loading--; console.warn("anatomy parts", e); });
+      }).catch(e => { st.loading--; console.warn("anatomy parts", e); apply(); });
     }
     function loadAtlas() {
       if (atlasP) return atlasP;
@@ -397,7 +397,7 @@
           vertexShader: CAP_V, fragmentShader: CAP_F, side: THREE.DoubleSide });
         cap = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), capMat); cap.name = "cut_cap"; cap.frustumCulled = false; cap.visible = false;
         group.add(cap); st.atlas = true; st.loading--; apply();
-      }).catch(e => { st.loading--; console.warn("anatomy atlas", e); });
+      }).catch(e => { st.loading--; console.warn("anatomy atlas", e); apply(); });
     }
 
     // --- state -> scene ---

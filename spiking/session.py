@@ -27,6 +27,7 @@ import sys
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 from collections import OrderedDict, deque
 from datetime import date, timedelta
@@ -127,13 +128,17 @@ class Link:
         return urllib.request.urlopen(req, timeout=timeout)
 
     def get_weights(self, path):
+        """True (weights written to path) or False: the server has no learned weights yet (404). Any other failure
+        raises, so the caller never takes 'could not ask' for 'nothing learned' (its upload would replace them)."""
         try:
             with self._req("/api/spiking/weights") as r:
                 Path(path).write_bytes(r.read())
             return True
-        except Exception as e:
-            print("no learned weights from server:", type(e).__name__, getattr(e, "code", ""), flush=True)
-            return False
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                print("no learned weights on the server yet", flush=True)
+                return False
+            raise
 
     def put_weights(self, path):
         with self._req("/api/spiking/weights", "POST", Path(path).read_bytes()) as r:
@@ -162,6 +167,8 @@ class Session:
         self.decide_q, self.reward_q = deque(), deque()
         self.pending = OrderedDict()        # decision id -> (wall time, eligibility)
         self.night = None                   # the night message once received
+        self.hello_for = None               # the link connect the last hello was sent for (see announce)
+        self.weights_unverified = False     # the server's weights could not be read: nothing is uploaded
         self.live_stats = {"decisions": 0, "rewards": 0, "late": 0, "refused": 0, "unknown_reward": 0,
                            "wall_ms": [], "uploads": 0, "upload_errors": 0}
         self._upload = None                 # background weight upload thread
@@ -188,6 +195,8 @@ class Session:
         if self.chat_until >= 0 and net.t >= self.chat_until:
             net.set_neuron_drive("chat", None)
             self.chat_until = -1
+        if self.link is not None and self.link.connects:
+            self.announce(self.link.connects)                            # hello before frames on each (re)connect
         if now - self.last_frame_wall >= 0.25:
             self.frame(net, now)
         if self.link is not None:
@@ -197,6 +206,15 @@ class Session:
                 except queue.Empty:
                     break
                 self.command(msg)
+
+    def announce(self, connect):
+        """hello once per websocket connect, in every phase: the hub clears a pod's hello (and with it the stream-lost
+        clock) when the socket closes, and only a new hello sets it again."""
+        if connect == self.hello_for:
+            return
+        self.hello_for = connect
+        self.link.send({"type": "hello", "session": self.cfg.get("session_id") or self.link.sid, "n_neurons": self.net.n,
+                        "device": self.results["build"]["gpu"] or str(self.net.device), "phases": self.cfg.get("phases")})
 
     def frame(self, net, now):
         if self.frame_snap is None:
@@ -292,8 +310,12 @@ class Session:
         self.pending_chat = []
         wpath = self.out / "weights_in.npz"
         meta = None
-        if self.link is not None and self.link.get_weights(wpath):
-            pass
+        if self.link is not None:
+            try:
+                self.link.get_weights(wpath)
+            except Exception as e:
+                self.weights_unverified = True               # the server may hold weights: upload nothing this session
+                self.log("could not read the server's learned weights, this session will not upload:", type(e).__name__, e)
         if wpath.exists() and net.plast is not None:
             try:
                 meta = net.plast.load(wpath, elapsed_days=float(c.get("elapsed_days", 0.0)))
@@ -303,9 +325,8 @@ class Session:
                 self.log("could not load learned weights:", e)
         self.results["build"]["weights_loaded"] = meta is not None
         net.hook = self.hook
-        if self.link is not None:
-            self.link.send({"type": "hello", "session": c.get("session_id") or self.link.sid, "n_neurons": net.n,
-                            "device": self.results["build"]["gpu"] or dev, "phases": c.get("phases")})
+        if self.link is not None and self.link.connects:
+            self.announce(self.link.connects)                            # later connects are announced by hook()
         net.run(500)                                                     # settle
 
     # --- phases -------------------------------------------------------------------------------------------------
@@ -492,7 +513,7 @@ class Session:
         """Frozen control on the same trials first (no weight change), then training with dopamine; reversal halfway;
         a random chooser on the same schedule. All three in one result, whatever the numbers are. With the day's
         real decisions in cfg "decisions" (day mode), they are replayed instead (ph_choice_replay)."""
-        if self.cfg.get("decisions"):
+        if self.cfg.get("decisions") is not None:                        # [] too: a quiet day replays nothing, learns nothing
             return self.ph_choice_replay()
         task = self._choice()
         n = int(self.cfg.get("choice_trials", 200))
@@ -697,7 +718,8 @@ class Session:
     def upload_weights(self, reason="periodic"):
         """Save the learned weights now and upload them in a background thread (skipped while one is running)."""
         net = self.net
-        if net.plast is None or self.link is None or (self._upload is not None and self._upload.is_alive()):
+        if (net.plast is None or self.link is None or self.weights_unverified
+                or (self._upload is not None and self._upload.is_alive())):
             return False
         path = self.out / "weights.live.npz"
         net.plast.save(path, {**self.weights_meta(), "sessions": int(net.plast.meta.get("sessions", 0))})
@@ -739,11 +761,9 @@ class Session:
         while self.night is None:
             if time.time() > self.deadline:
                 raise StopSession("deadline")
-            if self.link is not None and self.link.connects != seen:  # (re)connected: the hub forgets us
+            if self.link is not None and self.link.connects and self.link.connects != seen:  # (re)connected: hub forgets us
                 seen = self.link.connects
-                self.link.send({"type": "hello", "session": self.cfg.get("session_id") or self.link.sid,
-                                "n_neurons": net.n, "device": self.results["build"]["gpu"] or str(net.device),
-                                "phases": self.cfg.get("phases")})
+                self.announce(seen)                                       # hello first (no-op if hook() sent it)
                 self.link.send({"type": "live_ready", "n_neurons": net.n, "calibration": live.calib})
             self.drain()
             while self.decide_q:
@@ -986,7 +1006,10 @@ class Session:
                 info = net.plast.save(wpath, self.weights_meta())
                 self.results["weights"] = {**info, "stats": net.plast.stats(), "bytes": wpath.stat().st_size}
                 if self.link is not None and not self.cfg.get("validate") and err is None:
-                    self.results["weights"]["upload_status"] = self.link.put_weights(wpath)
+                    if self.weights_unverified:
+                        self.results["weights"]["upload_skipped"] = "server weights not read at start"
+                    else:
+                        self.results["weights"]["upload_status"] = self.link.put_weights(wpath)
         except Exception as e:
             err = err or f"save: {type(e).__name__}: {e}"
             traceback.print_exc()

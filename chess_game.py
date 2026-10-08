@@ -53,9 +53,14 @@ def hanging(board, move):
     attackers = after.attackers(not piece.color, to)
     if not attackers:
         return False
-    cheapest = min(VALUES[after.piece_type_at(a)] for a in attackers)
+    defended = after.attackers(piece.color, to)
+    # a king cannot take a defended piece (it would step into the defenders' fire), so it is no capturer there
+    capturers = [a for a in attackers if not (defended and after.piece_type_at(a) == chess.KING)]
+    if not capturers:
+        return False
+    cheapest = min(VALUES[after.piece_type_at(a)] for a in capturers)
     value = VALUES[after.piece_type_at(to) or piece.piece_type]
-    return not after.attackers(piece.color, to) or cheapest < value
+    return not defended or cheapest < value
 
 
 def features(board, move):

@@ -26,6 +26,8 @@ import urllib.parse
 from html.parser import HTMLParser
 from urllib.robotparser import RobotFileParser
 
+from sessions import site_for_host
+
 PER_HOST_HOUR = 20                  # requests per rolling hour per host (searches, API calls, robots.txt)
 MAX_RESULTS = 10
 BLOCK_AFTER = 2                      # consecutive failures before a source is set aside (#89: rotate, never loop)
@@ -43,6 +45,7 @@ UA_TOKEN = "Mozilla"                # robots.txt rules are read for a generic br
 BLOCK = {"p", "div", "li", "br", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "td", "th", "ul", "ol", "section",
          "article", "header", "footer", "dd", "dt", "figcaption", "blockquote", "table"}
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+SKIP_TEXT = ("script", "style", "noscript", "template")          # elements whose text is never visible
 
 
 class Node:
@@ -59,10 +62,16 @@ class Node:
         return any(c == prefix or c.startswith(prefix + "_") for c in self.cls())
 
     def iter(self):
-        for c in self.children:
-            if isinstance(c, Node):
-                yield c
-                yield from c.iter()
+        """Every descendant element, in document order (an explicit stack: no recursion limit on deep markup)."""
+        stack = [iter(self.children)]
+        while stack:
+            for c in stack[-1]:
+                if isinstance(c, Node):
+                    yield c
+                    stack.append(iter(c.children))
+                    break
+            else:
+                stack.pop()
 
     def find_all(self, tag=None, cls=None):
         return [n for n in self.iter() if (tag is None or n.tag == tag) and (cls is None or n.has_class(cls))]
@@ -72,16 +81,27 @@ class Node:
                     None)
 
     def text(self):
-        out = []
-        for c in self.children:
-            if isinstance(c, Node):
-                if c.tag in BLOCK:
-                    out.append(" " + c.text() + " ")
-                elif c.tag not in ("script", "style", "noscript", "template"):
-                    out.append(c.text())
-            else:
-                out.append(c)
-        return " ".join("".join(out).split())
+        """The visible text, whitespace collapsed. Children are finished before their parent (an explicit stack, so deep
+        markup cannot hit the recursion limit); each element's text is collapsed on its own, as before."""
+        done = {}                                           # id(node) -> its finished text
+        stack = [(self, False)]
+        while stack:
+            n, ready = stack.pop()
+            if not ready:
+                stack.append((n, True))
+                stack.extend((c, False) for c in n.children if isinstance(c, Node) and c.tag not in SKIP_TEXT)
+                continue
+            out = []
+            for c in n.children:
+                if isinstance(c, Node):
+                    if c.tag in SKIP_TEXT:
+                        continue
+                    t = done.pop(id(c))
+                    out.append(" " + t + " " if c.tag in BLOCK else t)
+                else:
+                    out.append(c)
+            done[id(n)] = " ".join("".join(out).split())
+        return done[id(self)]
 
 
 class _Builder(HTMLParser):
@@ -363,6 +383,7 @@ def parse_links(text, base):
     host = u0.hostname or ""
     q = " ".join(v for k, v in urllib.parse.parse_qsl(u0.query) if k in ("s", "q", "query", "searchTerm", "term"))
     words = [w for w in re.findall(r"\w+", q.lower()) if len(w) > 2]
+    phrase = " ".join(q.lower().split())                   # a query of short words only ("GT-R"): the whole phrase
     out = []
     for a in parse_html(text).find_all("a"):
         url = urllib.parse.urljoin(base, a.attrs.get("href", ""))
@@ -371,6 +392,8 @@ def parse_links(text, base):
         if (u.hostname or "") != host or len(t) < 20 or u.path in ("", "/") or "search" in u.path.lower():
             continue
         if words and not any(w in t.lower() for w in words):
+            continue
+        if not words and phrase and phrase not in t.lower():
             continue
         out.append(_result(url.split("#")[0], t))
     return _dedup(out)
@@ -903,6 +926,9 @@ def follow_ups(page, n=2, query_ok=None, seen=()):
     unknown term ("what is hypnagogia?": a long word repeated on the page, not a common one, not in the title).
     -> [{"query", "label", "kind"}]."""
     ok = query_ok or (lambda q: " ".join(str(q or "").split()) or None)
+    host = str(page.get("host") or "") or (urllib.parse.urlsplit(str(page.get("url") or "")).hostname or "")
+    if site_for_host(host):                                 # a login site's page (sessions.SITES): never a search
+        return []
     title = page.get("title", "") or ""
     text = f"{title}. {page.get('text', '') or ''}"[:4000]
     tl = title.lower()

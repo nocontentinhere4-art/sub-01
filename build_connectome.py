@@ -85,11 +85,11 @@ def main():
     head = mean_b0 > 0.1 * np.percentile(mean_b0[mask], 50)   # looser than the tracking mask
     labels = labels * head
     # grow cortical labels ~3 mm into unlabelled voxels so streamlines ending at the
-    # grey/white boundary get assigned to the region they reach
+    # grey/white boundary get assigned to the region they reach. Each grown voxel takes the
+    # label of its nearest labelled voxel (a max filter would give ties to the highest ID)
     from scipy import ndimage
-    for _ in range(2):
-        grown = ndimage.grey_dilation(labels, size=(3, 3, 3))
-        labels = np.where((labels == 0) & head, grown, labels)
+    d, idx = ndimage.distance_transform_cdt(labels == 0, metric="chessboard", return_indices=True)
+    labels = np.where((labels == 0) & head & (d <= 2), labels[tuple(idx)], labels)
     nib.save(nib.Nifti1Image(labels.astype(np.int32), dwi_img.affine), OUT / "labels_dwi.nii.gz")
     n = len(names)
     log(f"atlas in DWI space: {n} regions, present {len(np.unique(labels)) - 1}")

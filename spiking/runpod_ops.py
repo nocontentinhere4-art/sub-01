@@ -21,7 +21,7 @@ from spiking import podpack
 
 PREFIX = "sub01-spiking-"
 CREATE_TIMEOUT_S = 150              # RunPod can take more than a minute to place a pod when stock is low
-ADOPT_TRIES, ADOPT_EVERY_S = 6, 10  # after an ambiguous create error: look for the pod by name for ~1 min
+ADOPT_TRIES, ADOPT_EVERY_S = 18, 10  # ambiguous create error: look for the pod by name for ~3 min (CREATE_TIMEOUT_S)
 
 
 class NotOurs(RuntimeError):

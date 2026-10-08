@@ -13,7 +13,8 @@ Two rules write into the same learned component dw of each plastic synapse i -> 
    For Poisson firing the expected drift of e is r_j A+ (r_i tau+ - x_theta) - r_i (A- tau- r_j + h): with
    A+ = 1, A- = 0.5, tau = 20 ms, x_theta = 0.1, h = 0.1 it is +8/s for a pair firing together at 40 Hz and
    ~0 or negative for 40 -> 13 Hz, 13 -> 40 Hz and background pairs. The update uses e relative to its class mean
-   <e>_c (zero-sum: a reward does not uniformly grow or shrink all synapses).
+   <e>_c, taken over the same dopamine-targeted synapses it is applied to (zero-sum: a reward does not uniformly
+   grow or shrink them).
 
 2. Fast Hebbian rate rule (memory encoding and REM consolidation), applied once per presentation window T:
     dw += eta_c^M * [dr_i - theta]_+ * (dr_j - theta) * T,   dr = rate in the window - the neuron's 10 s running rate,
@@ -96,7 +97,8 @@ class Plasticity:
         self.dp = math.exp(-c.dt / c.tau_plus)
         self.dm = math.exp(-c.dt / c.tau_minus)
         self.h = c.h_pre
-        self.n_cls = [int((self.cls == k).sum()) for k in (0, 1)]
+        # class sizes over the dopamine-targeted synapses only: the centring mean must be over the set the update hits
+        self.n_cls = [max(1, int(((self.da_mask > 0) & (self.cls == k)).sum())) for k in (0, 1)]
         self.mod = {m: 0.0 for m in MODS}
         self.frozen = False
         self.stdp = True               # eligibility bookkeeping; off in phases where no dopamine can arrive
@@ -153,8 +155,9 @@ class Plasticity:
         if abs(m[0]) < 1e-9 and abs(m[1]) < 1e-9:
             return
         cls = self.cls_long
-        sums = torch.stack(((self.elig * (1 - self.cls)).sum(), (self.elig * self.cls).sum()))
-        mean = sums / torch.tensor([max(1, k) for k in self.n_cls], device=self.dev, dtype=torch.float32)
+        da = self.da_mask
+        sums = torch.stack(((self.elig * da * (1 - self.cls)).sum(), (self.elig * da * self.cls).sum()))
+        mean = sums / torch.tensor(self.n_cls, device=self.dev, dtype=torch.float32)
         mt = torch.tensor(m, device=self.dev, dtype=torch.float32)
         self.dw.add_(mt[cls] * (self.elig - mean[cls]) * self.da_mask * (dt_ms / 1000.0))
         self._apply()

@@ -211,8 +211,7 @@ class Life:
             self.wish = [m.group(1), t]
         for pat, act in DESIRES:
             if re.search(pat, low):
-                w = self.desires.get(act, [0, t])[0]
-                self.desires[act] = [min(1.5, w + 0.6), t]
+                self.desires[act] = [min(1.5, self.desire(act, t) + 0.6), t]     # the old wish has decayed to t first
 
     def desire(self, act, t):
         w, t0 = self.desires.get(act, [0.0, t])
@@ -354,6 +353,10 @@ class Life:
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
+        # asleep while doing something else (walking, at the desk, at the counter): he heads for bed, and the effects of
+        # the activity he stopped (a purchase, a meal, an order) are not applied; they happen only when he is awake
+        if stage != "AWAKE" and self.activity != "sleep":
+            self.start("sleep", t, "falls asleep" if self.place == "bed" else "goes to bed")
         # walking (real time, so viewers see continuous motion)
         if self.path:
             tx, tz = PLACES[self.path[0]]

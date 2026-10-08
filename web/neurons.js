@@ -84,6 +84,8 @@ window.Neurons = (() => {
   // ---------- live frames ----------
   function onMessage(m) {
     if (!S.inited || !m || m.type !== "spiking") return;
+    // the pod has left or finished (server: {live:false}, no numbers): not live now, and the CPU network may show again
+    if (m.live === false) { S.gpuWall = -1e9; S.lastWall = -1e9; if (S.live) setLive(false); return; }
     // the small CPU network (#55) streams too; while the GPU network streams, its frames win the raster
     if (m.net === "cpu") { if (performance.now() - (S.gpuWall || -1e9) < LIVE_MS) return; }
     else if (m.raster || m.t_sim != null) S.gpuWall = performance.now();

@@ -298,7 +298,8 @@ def simulate(C, a, w, seconds, tr, beta=BETA, dt=0.1, transient_s=120.0, seed=0,
     s = C.sum(-1)
     x = 0.1 * torch.randn(B, n, generator=g, device=dev, dtype=dtype)
     y = 0.1 * torch.randn(B, n, generator=g, device=dev, dtype=dtype)
-    every = int(round(tr / dt))
+    every = max(1, int(round(tr / dt)))
+    dt = tr / every                  # integrate on a step that divides the TR, so samples are exactly tr apart
     total = int(round((seconds + transient_s) / dt))
     start = int(round(transient_s / dt))
     out = []

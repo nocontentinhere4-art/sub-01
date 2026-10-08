@@ -84,17 +84,21 @@ class HeavyPages:
         self.strikes = {h: ts[-10:] for h, ts in self.strikes.items() if ts}
 
     def strike(self, pages):
-        """The pages that were on screen when Chromium went over its cap: [(url, host)]."""
+        """The pages that were on screen when Chromium went over its cap: [(url, host)]. One restart is one strike per
+        host, however many of its pages were open; merge() drops repeated timestamps, so both counts agree."""
         from novelty import url_key
         now = self.clock()
+        hosts = []
         for url, host in pages:
             if url and url.startswith("http"):
                 k = url_key(url)
                 if k not in self.urls:
                     self.urls = (self.urls + [k])[-HEAVY_URLS_MAX:]
             h = (host or "").lower().removeprefix("www.")
-            if h:
-                self.strikes[h] = self.strikes.get(h, []) + [now]
+            if h and h not in hosts:
+                hosts.append(h)
+        for h in hosts:
+            self.strikes[h] = self.strikes.get(h, []) + [now]
         self._trim()
 
     def heavy_url(self, url):

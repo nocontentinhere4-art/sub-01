@@ -129,15 +129,17 @@ class PongInterface:
         return (self.diff_ema - self.z_mean) / math.sqrt(self.z_var + 1e-9)
 
     def calibrate(self, game, ms=5000):
-        """Settle the read-out statistics (running mean / sd of L-R) with random ball positions, paddle still."""
+        """Settle the read-out statistics (running mean / sd of L-R) with random ball positions, paddle still.
+        Runs on a scratch game: the caller's game (and its rng, i.e. its ball sequence) is left untouched."""
         rng = np.random.default_rng(1)
+        scratch = Game(np.random.default_rng(1))
+        scratch.paddle = game.paddle
         for k in range(ms // FRAME_MS):
             if k % 50 == 0:
-                game.x, game.y = rng.uniform(0.05, 0.95), rng.uniform(0.05, 0.95)
-                self.net.set_region_drive("pong", self.encode(game))
+                scratch.x, scratch.y = rng.uniform(0.05, 0.95), rng.uniform(0.05, 0.95)
+                self.net.set_region_drive("pong", self.encode(scratch))
             self.net.run(FRAME_MS)
             self.motor(FRAME_MS)
-        game.reset()
         self.calibrated = True
 
     def velocity(self, z):
@@ -173,7 +175,7 @@ class Pong:
         if p is None or p.frozen or t - self.last_good < 30_000:
             return False
         self.last_good = t
-        p.dopamine(min(self.good_pulse, 0.5 * self.reward))
+        p.dopamine(min(self.good_pulse, 0.5 * self.reward * max(0.2, 1.0 - self.p_hit)))   # < the current hit reward
         return True
 
     def play(self, rallies, mode="train", game_seed=None):

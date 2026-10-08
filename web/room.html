@@ -34,6 +34,7 @@
   #story { margin-top:12px; font-size:27px; line-height:1.28; letter-spacing:-.01em; text-shadow:0 2px 24px #000, 0 1px 3px rgba(0,0,0,.8); min-height:1.3em; }
   #story.in { animation:storyin .7s ease-out; }
   @keyframes storyin { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) { #live.on, #story.in { animation:none; } }   /* the auto-played pulse and story slide stop for those who ask for less motion */
   #story em { font-style:normal; color:var(--st); }
   #why { margin-top:9px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; max-width:52ch; line-height:1.5; }
   #cam { margin-top:12px; background:rgba(10,10,16,.62); color:var(--dim); border:1px solid var(--line); border-radius:6px;
@@ -49,6 +50,8 @@
   #plan .h { color:var(--dim); } #plan s { color:var(--faint); }
   #plan .r { display:block; font-size:11px; color:var(--dim); margin-top:2px; }
   #plan .rs { display:block; font-size:11px; color:#9fb4ff; margin-top:2px; }
+  #loaderr { margin-top:10px; max-width:60ch; font-size:12px; line-height:1.5; color:#ff9a9a; text-shadow:0 1px 8px #000; }
+  #loaderr button { margin-left:6px; font:inherit; font-size:12px; background:var(--fg); color:#0a0a0a; border:0; padding:3px 10px; border-radius:5px; cursor:pointer; }
 
   #side { position:fixed; right:24px; top:24px; width:350px; display:flex; flex-direction:column; gap:12px; z-index:5;
     max-height:calc(100vh - 66px - var(--dockh, 74px)); overflow-y:auto; scrollbar-width:none; padding-bottom:4px; }
@@ -59,7 +62,7 @@
   .card .k a { text-decoration:none; color:var(--faint); transition:color .2s; } .card .k a:hover { color:var(--fg); }
   .card .t { font-size:14.5px; line-height:1.4; }
   .card .m { font-size:12px; color:#c9c9d6; margin-top:6px; line-height:1.55; }
-  .card .s { font-size:10.5px; color:var(--faint); margin-top:8px; line-height:1.45; }
+  .card .s { font-size:10.5px; color:var(--dim); margin-top:8px; line-height:1.45; }
   #musiccard .mu { display:flex; gap:10px; align-items:center; margin-bottom:9px; }
   #musiccard .mu img { width:46px; height:46px; border-radius:6px; flex:none; object-fit:cover; }
   #musiccard .mu .t { overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
@@ -134,7 +137,7 @@
   #honest { display:flex; gap:8px; align-items:baseline; max-width:min(92ch, 100%); }
   #honest .tx { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #honest:hover .tx, #honest:focus-within .tx, #honest:focus .tx { white-space:normal; }
-  #honest { font-size:11px; color:var(--faint); line-height:1.55; text-shadow:0 1px 6px #000; max-width:92ch;
+  #honest { font-size:11px; color:var(--dim); line-height:1.55; text-shadow:0 1px 6px #000; max-width:92ch;
     background:rgba(8,8,11,.55); padding:7px 10px; border-radius:8px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
   /* with the mind on, the /about link line carries its caption, under the disclaimer (which stays one line) */
   #honest .ln { flex:none; } #honest.mind { flex-wrap:wrap; row-gap:2px; } #honest.mind .ln { flex-basis:100%; }
@@ -146,7 +149,7 @@
   #feed[hidden] { display:none; }
   #feed .ln { font-size:11.5px; line-height:1.45; color:#c9c9d6; background:var(--card); border:1px solid var(--line); border-radius:8px;
     padding:5px 9px; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); overflow-wrap:anywhere; }
-  #feed .ln .w { color:var(--faint); font-size:10px; margin-right:6px; }
+  #feed .ln .w { color:var(--dim); font-size:10px; margin-right:6px; }
   #feed .ln.his { color:var(--fg); background:rgba(40,24,10,.82); border-color:rgba(255,154,60,.35); border-left:2px solid var(--st); }
   #feed .ln.his .tag { display:inline-block; font-size:9.5px; letter-spacing:.06em; color:#0a0a0a; background:var(--st); border-radius:2px;
     padding:0 5px; margin-right:6px; }
@@ -157,7 +160,7 @@
   #chat input:focus { outline:none; border-color:rgba(255,154,60,.6); }
   #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:8px; cursor:pointer; }
   #chat button:hover { background:#fff; }
-  #note { font-size:10px; color:var(--faint); margin-top:5px; min-height:1.2em; }
+  #note { font-size:10px; color:var(--dim); margin-top:5px; min-height:1.2em; }
   #note.err { color:#ff8a8a; }
   #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:13px; color:#d8d8e2; background:rgba(8,8,11,.6);
     border:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
@@ -208,6 +211,7 @@
   <div id="why"></div>
   <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's AI budget is used up; back tomorrow.</span></div>
   <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
+  <div id="loaderr" role="alert" hidden></div>
 </div>
 
 <div id="side">
@@ -249,7 +253,7 @@
       <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
       <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
     </form>
-    <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
+    <div class="s" id="tc-note" role="status" aria-live="polite">nickname optional · one per viewer per day · no links, addresses or tickers</div>
     <div class="h">Taught today</div>
     <div id="tc-today"><div class="it"><span class="w">nothing yet today</span></div></div>
     <div id="tc-yday" hidden><div class="h" id="tc-yk">Remembered from yesterday</div><div id="tc-ylist"></div></div>
@@ -266,7 +270,7 @@
 </div>
 
 <div id="corner">
-<a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
+<a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" title="his brain, live (preview)" aria-hidden="true" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
 <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
   An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
   <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
@@ -274,7 +278,7 @@
 <div id="dock">
   <div id="feed" hidden aria-live="polite"></div>
   <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
-  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+  <div id="note" role="status" aria-live="polite">words can make him curious, hungry or restless · no links, addresses or tickers</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -282,6 +286,13 @@
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
                "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js" } }
+</script>
+<script>
+// a module whose static imports fail never runs, so it cannot say so: if its render loop has not started 30 s after the
+// page loaded (window.__roomUp is set where the loop starts), the boot screen says what happened and offers a retry
+setTimeout(() => { const b = document.getElementById("boot"), t = document.getElementById("boot-t");
+  if (window.__roomUp || !b || !t || b.classList.contains("off") || b.classList.contains("err")) return;
+  b.classList.add("err"); t.innerHTML = "the 3D code did not start (a script did not load: check the connection).<br><button onclick=\"location.reload()\">try again</button>"; }, 30000);
 </script>
 <script type="module">
 import * as THREE from "three";
@@ -310,7 +321,9 @@ const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t
 
 // ---------- renderer, scene, camera ----------
 const host = $("scene");
-const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
+let renderer;
+try { renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"}); }
+catch (e) { bootError(e, "the 3D view"); throw e; }   // (no WebGL: the boot screen says so)
 const DPR_MAX = Math.min(1.5, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, devicePixelRatio > 1 ? 1 : 0.75);   // adaptive, see adapt()
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
@@ -402,9 +415,12 @@ function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) 
   const bar = $("boot-bar"); if (t && bar) bar.style.width = `${Math.round(100 * l / t)}%`; }
 function load(url){ return new Promise((ok, fail) => loader.load(url, ok,
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
-function bootError(e){
-  console.error(e); $("boot").classList.add("err");
-  $("boot-t").innerHTML = `the room did not load (${esc(e && e.message || "network error")}).<br><button onclick="location.reload()">try again</button>`;
+// a failure: on the boot screen while it is up (the room, the 3D view), else in the banner under the story, with a retry
+function bootError(e, what = "the room", banner = false){
+  console.error(e); const msg = `${what} did not load (${esc(e && e.message || "network error")}).`;
+  const b = $("boot");
+  if (!banner && b && !b.classList.contains("off")) { b.classList.add("err"); $("boot-t").innerHTML = `${msg}<br><button onclick="location.reload()">try again</button>`; return; }
+  const le = $("loaderr"); if (le) { le.innerHTML = `${msg} <button onclick="location.reload()">try again</button>`; le.hidden = false; }
 }
 
 let room = null, boy = null, mixer = null, actions = {}, current = null, want = null, hand = null, head = null;
@@ -704,7 +720,7 @@ let V5 = null;                                        // (char_v5.js / char_mixa
     renderer.compileAsync(SLIDES.parked, camera, scene).catch(() => {}).finally(() => { SLIDES.parked.visible = SLIDES.off; }); }
   Promise.all(Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"})
     .map(([name, file]) => load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {}))).then(loadMoves);
-}).catch(bootError);
+}).catch(e => bootError(e, "the character", true));
 // ---------- better motion (#76): CC0 clips (Quaternius' Universal Animation Library) and keyed poses, retargeted onto
 // this rig (room_build/boy_post.mjs -> room/boy_moves.glb), take over walking, sitting at the desk (typing) and lying
 // with the phone; eating keeps the first seated clip under its own layer (DINE), sleep stays with #63's bed work;
@@ -979,7 +995,8 @@ function showScreen(st){
   target.id = st.id;
   const url = `/api/screen/${st.device}.jpg?id=${st.id}`;
   const img = new Image(); img.decoding = "async";
-  img.onload = () => { const t = screenTexture(img); fitTop(t, target.aspect); target.set(t);
+  img.onload = () => { if (target.id !== st.id) return;   // a newer screen (or the screen off) came since: its own picture stays
+    const t = screenTexture(img); fitTop(t, target.aspect); target.set(t);
     if (screenOn === st.device) { $("s-img").src = url; } };
   img.src = url;
   if (screenOn === st.device) panel(st);
@@ -1299,7 +1316,8 @@ new MutationObserver(() => { const s = $("story"), t = s.textContent; if (t === 
   s.classList.remove("in"); void s.offsetWidth; s.classList.add("in"); }).observe($("story"), {childList:true});
 
 // ---------- camera: overview, or close to what he is looking at ----------
-let follow = true, userMovedAt = 0;
+let follow = true, userMovedAt = -Infinity;   // (never moved: the follow camera does not wait 20 s after the page loads)
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;   // (who asks for less motion: the camera jumps to its goal, no glide)
 $("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", follow); $("cam").textContent = follow ? "camera: follows him" : "camera: free"; };
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
@@ -2981,7 +2999,7 @@ function startMeal(kind){
   if (["ramen", "sushi", "pizza", "curry", "bento", "konbini_bento"].includes(kind)) { if (FOOD.dish) scene.remove(FOOD.dish.g); FOOD.dish = makeDish(kind); }
 }
 function endMeal(){                                     // the empty container stays on the desk until he takes it to the bin
-  if (FOOD.dish) { trash = FOOD.dish; FOOD.dish = null; }
+  if (FOOD.dish) { if (trash && !trash.held) scene.remove(trash.g); trash = FOOD.dish; FOOD.dish = null; }   // (an empty dish left on the desk by an earlier meal goes)
   if (FOOD.held) { scene.remove(FOOD.held); FOOD.held = null; }
   for (const o of [FOOD.roll, FOOD.onigiri]) if (o) o.visible = false;
   PROP.sticks.visible = false; EAT.kind = "";
@@ -3013,14 +3031,15 @@ function screens(life, st){
 }
 
 // ---------- map ----------
-const map = L.map("map", {zoomControl:false, attributionControl:true, minZoom:14, maxZoom:18}).setView([35.7055, 139.5745], 15);
-map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)');
+const map = typeof L === "undefined" ? null : L.map("map", {zoomControl:false, attributionControl:true, minZoom:14, maxZoom:18}).setView([35.7055, 139.5745], 15);   // (no Leaflet from unpkg: the map card stays empty, the room runs on)
+if (map) map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)');
 // no tile server (OSMF's tile policy, issue #43): his ~2 x 1.5 km area is one static OSM extract (room_build/osm_area.py),
 // drawn as dark vector layers on one canvas
 const AREA_STYLE = {green:{fill:"#141f19"}, water:{fill:"#122033"}, stream:{line:"#1b2f4a", w:1.5},
   building:{fill:"#191a22", line:"#20212b", w:0.5}, path:{line:"#282934", w:0.8, dash:"2 3"},
   minor:{line:"#30313c", w:1.4}, major:{line:"#464755", w:2.6}, rail:{line:"#55556a", w:1.6, dash:"6 4"}};
 function drawArea(a){
+  if (!map) return;
   const S = a.scale, o = [Math.round(a.origin[0] * S), Math.round(a.origin[1] * S)], lines = [];
   map.createPane("area").style.zIndex = 250;                 // under the routes and markers, whichever loads first
   const canvas = L.canvas({padding:0.5, pane:"area"});
@@ -3037,9 +3056,10 @@ function drawArea(a){
   const [s, w, n, e] = a.bbox; map.setMaxBounds([[s - 0.004, w - 0.004], [n + 0.004, e + 0.004]]);
 }
 fetch("tokyo_area.json").then(r => r.json()).then(drawArea);
-const dot = (c, r, cls) => L.circleMarker([0, 0], {radius:r, color:"#0a0a0d", weight:1.5, fillColor:c, fillOpacity:1, className:cls});
+const dot = (c, r, cls) => map && L.circleMarker([0, 0], {radius:r, color:"#0a0a0d", weight:1.5, fillColor:c, fillOpacity:1, className:cls});
 let homeMk, meMk = dot("#ff9a3c", 7, "mk-me"), courierMk = dot("#39f5a0", 6, "mk-courier"), routes = null;
 fetch("tokyo_routes.json").then(r => r.json()).then(d => {
+  if (!map) return;
   routes = d; homeMk = L.circleMarker(d.places.home, {radius:6, color:"#ececf2", weight:1.5, fillColor:"#ececf2", fillOpacity:.15}).addTo(map).bindTooltip("home");
   meMk.setLatLng(d.places.home).addTo(map);
 });
@@ -3187,7 +3207,7 @@ function applyTick(m){
     place(life); screens(life, stage);
     put("away", "display", outside ? "block" : "none");
     put("away", "textContent", outside ? `the room is empty · he is ${life.walking ? "walking" : LABEL_AWAY[life.activity] || "out"} — see the map` : "");
-    if (shown.get("mapcard.out") !== outside) { shown.set("mapcard.out", outside); $("mapcard").classList.toggle("out", outside); }
+    if (shown.get("mapcard.out") !== outside) { shown.set("mapcard.out", outside); $("mapcard").classList.toggle("out", outside); if (map) map.invalidateSize(); }
     if (routes) {
       const pos = life.geo ? [life.geo.lat, life.geo.lng] : outside && life.activity === "park" ? routes.places.park
         : outside ? routes.places.bakery : routes.places.home;
@@ -3241,6 +3261,8 @@ function shadows(now, moving){
   const inRoom = !!(boy && boy.visible);
   if (inRoom !== boyIn || (inRoom && (moving || now - shadowAt > 30))) {
     sun.shadow.needsUpdate = true; if (lamp.intensity > 0.01) lamp.shadow.needsUpdate = true; shadowAt = now; boyIn = inRoom;
+  } else if (!inRoom && now - shadowAt > 1000) {   // out: the sun still moves, so its shadows are redrawn about once a second
+    sun.shadow.needsUpdate = true; shadowAt = now;
   }
 }
 function frame(now){
@@ -3260,12 +3282,13 @@ function frame(now){
   lighting(real);
   if (follow && performance.now() - userMovedAt > 20000) {
     updateCameraGoal();
-    const k = 1 - Math.exp(-real * 1.2);
+    const k = REDUCED_MOTION ? 1 : 1 - Math.exp(-real * 1.2);
     camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
   }
   shadows(now, moving);
   controls.update(); keepClear(); renderer.render(scene, camera);
 }
+window.__roomUp = true;   // (the boot watchdog above: the render loop has started)
 requestAnimationFrame(frame);
 const CATCH = {max: 30, back: null};
 document.addEventListener("visibilitychange", () => { if (!document.hidden) CATCH.back = 8; });

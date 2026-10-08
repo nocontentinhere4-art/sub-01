@@ -321,6 +321,7 @@ CLOSE_BUTTON = re.compile(r"^(close|×|✕|✖|x|dismiss|no,? thanks?|not now|ma
                           r"close (dialog|modal|banner|this))$", re.I)
 BUTTONS_JS = """() => {
   const consentRe = /cookie|consent|gdpr|privacy|tracking|partners|personal data|your choices/i;
+  document.querySelectorAll('[data-sub01-btn]').forEach(e => e.removeAttribute('data-sub01-btn'));   // old numbers go
   const out = [], seen = new Set();
   const inFrame = window !== window.top && /consent|cmp|privacy|cookie|sp_message|gdpr/i.test(location.href);
   for (const el of document.querySelectorAll('button, [role=button], a, input[type=button], input[type=submit]')) {
@@ -579,9 +580,10 @@ def host_ok(host):
 def url_ok(url):
     try:
         u = urllib.parse.urlsplit(url)
+        port = u.port                                       # ValueError for a port like ":abc" or ":99999"
     except ValueError:
         return False
-    return (u.scheme in ("http", "https") and u.port in (None, 80, 443) and not u.username
+    return (u.scheme in ("http", "https") and port in (None, 80, 443) and not u.username
             and host_ok(u.hostname or "") and not SKIP_EXT.search(u.path))
 
 
@@ -1315,7 +1317,7 @@ class Browser:
             wished = query_ok(SS.wish(text))                    # "look up ...": the viewer's words, filtered
             if wished:
                 return await self._search(sc, wished, f"{SS.ORIGINS['chat']}: “{text[:60]}”", "chat")
-            q = " ".join(sorted(words(text), key=len, reverse=True)[:3])
+            q = query_ok(" ".join(sorted(words(text), key=len, reverse=True)[:3]))   # the chat filter, as for "look up"
             if q:
                 return await self._search(sc, q, f"from chat: “{text[:60]}”", "chat")
             break

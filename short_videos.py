@@ -20,6 +20,17 @@ TIKTOK_SHARE = 0.5                     # feeds that start on TikTok (else YouTub
 TIKTOK_VIDEO = re.compile(r"^https://www\.tiktok\.com/@([\w.]{2,30})/video/(\d{8,25})$")
 
 
+def _tiktok_links(box, base):
+    """The distinct TikTok video URLs of the links inside a node (one video linked twice counts once)."""
+    urls = set()
+    for n in box.iter():
+        if n.tag == "a":
+            u = urllib.parse.urljoin(base, n.attrs.get("href", "")).split("?")[0]
+            if TIKTOK_VIDEO.match(u):
+                urls.add(u)
+    return urls
+
+
 def parse_tiktok(text, base="https://www.tiktok.com/"):
     """A TikTok tag page as Chromium renders it (logged out): its video links, the caption next to each, the
     creator. Nothing when the page is only a login wall."""
@@ -32,7 +43,7 @@ def parse_tiktok(text, base="https://www.tiktok.com/"):
         box = a.parent
         cap = ""
         for _ in range(3):                                   # the caption sits next to the link in the item
-            if box is None:
+            if box is None or len(_tiktok_links(box, base)) > 1:   # a box holding another video is not this item
                 break
             d = next((n for n in box.iter() if n.attrs.get("data-e2e") in ("video-desc", "challenge-item-desc")
                       or "desc" in " ".join(n.cls()).lower()), None)

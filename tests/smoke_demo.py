@@ -21,6 +21,8 @@ import asyncio
 import os
 import secrets
 import re
+import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -52,21 +54,30 @@ def seed_torn(data_dir):
 def check_torn(data_dir, log_text):
     failures = []
     for name in TORN:
-        kept = list(Path(data_dir).glob(name + ".corrupt-*"))
         lines = [ln for ln in log_text.splitlines() if f"{name} is corrupt" in ln]
-        ok = len(kept) == 1 and len(lines) == 1
-        print(f"{'ok  ' if ok else 'FAIL'} torn {name:<13} {len(lines)} log line, kept aside: {kept[0].name if kept else '-'}")
+        # the aside file this run made, named in its log line ("... kept as <name>.corrupt-<time>; ..."), so aside
+        # files left by earlier runs in a reused --data-dir are not counted
+        m = re.search(r"kept as ([^;\s]+);", lines[0]) if len(lines) == 1 else None
+        kept = Path(data_dir) / m.group(1) if m else None
+        ok = kept is not None and kept.exists()
+        print(f"{'ok  ' if ok else 'FAIL'} torn {name:<13} {len(lines)} log line, kept aside: {kept.name if ok else '-'}")
         if not ok:
-            failures.append(f"torn {name}: {len(lines)} log lines, {len(kept)} files kept aside")
+            failures.append(f"torn {name}: {len(lines)} log lines, kept aside: {'-' if kept is None else kept.name}")
     return failures
+
+
+def is_browse_service(pid):
+    try:
+        return b"browse_service" in Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:                                     # it exited after descendants() took its snapshot
+        return False
 
 
 def browser_mb(server_pid):
     """Memory (PSS) of the browser service child and its Chromium processes, as its own watchdog counts it."""
     sys.path.insert(0, str(ROOT))
     from browse_service import descendants, tree_rss_mb
-    return sum(tree_rss_mb(p) for p in descendants(server_pid) if p != server_pid
-               and "browse_service" in Path(f"/proc/{p}/cmdline").read_bytes().decode(errors="replace"))
+    return sum(tree_rss_mb(p) for p in descendants(server_pid) if p != server_pid and is_browse_service(p))
 
 
 def spiking_child(server_pid):
@@ -238,10 +249,31 @@ async def run(args, proc):
                 print("TICK COST: not measured (/proc not available on this OS)")
             async with s.get(base + "/api/health", headers=ADMIN) as r:   # after the CPU reading
                 h = await r.json() if r.status == 200 else {}
+                if r.status != 200:
+                    failures.append(f"GET /api/health after the measurement -> {r.status}, expected 200")
             tm = h.get("tick_ms") or {}
             print(f"/api/health: tick body p50 {tm.get('p50')} p95 {tm.get('p95')} ms over {tm.get('n')} ticks · "
                   f"loop lag p95 {(h.get('loop_lag_ms') or {}).get('p95')} ms · RSS {h.get('rss_mb')} MB")
     return failures
+
+
+def port_free(port):
+    """True if nothing listens on 127.0.0.1:port. SO_REUSEADDR as asyncio sets it on POSIX, so leftover TIME_WAIT
+    connections from an earlier run do not count (on Windows it would let a busy port be bound, so it is not set)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if os.name == "posix":
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def exit_on_signal(signum, frame):
+    """A SIGTERM or SIGHUP would end this process without running main()'s finally, leaving the server running. As
+    SystemExit it unwinds through that finally, which stops the server."""
+    sys.exit(128 + signum)
 
 
 def main():
@@ -259,6 +291,9 @@ def main():
     p.add_argument("--browse", action="store_true", help="BROWSE=1: the real browser (playwright, Chromium, network)")
     args = p.parse_args()
 
+    if not port_free(args.port):                    # else wait_ready would measure the other server, not this one
+        print(f"SMOKE FAILED:\n  port {args.port} is in use (another server on 127.0.0.1?); pick another --port")
+        sys.exit(1)
     tmp = None
     if not args.data_dir:
         tmp = tempfile.TemporaryDirectory(prefix="sub01-smoke-")
@@ -280,6 +315,9 @@ def main():
     elif args.music:
         cmd += ["--time-scale", "60", "--start", "20:00"]
     print(f"$ BROWSE={env['BROWSE']} python live_server.py", " ".join(cmd[2:]))
+    for name in ("SIGTERM", "SIGHUP"):               # the server must not outlive this harness (see exit_on_signal)
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), exit_on_signal)
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:
         failures = asyncio.run(run(args, proc))

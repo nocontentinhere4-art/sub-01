@@ -1641,6 +1641,31 @@ class Live:
         return ws
 
 
+def tail_jsonl(path, n):
+    """The last n rows of a JSONL file, read from its end: a log that grows all day is not parsed whole (read_jsonl
+    does that). A torn or unparsable line is skipped, as read_jsonl skips it."""
+    if n < 1:
+        return []
+    try:
+        with open(path, "rb") as f:
+            pos = f.seek(0, os.SEEK_END)
+            data = b""
+            while pos > 0 and data.count(b"\n") <= n:
+                step = min(65536, pos)
+                pos -= step
+                f.seek(pos)
+                data = f.read(step) + data
+    except OSError:
+        return []
+    out = []
+    for ln in data.splitlines()[-n:]:                  # the first line may be cut short: it is never among the last n
+        try:
+            out.append(json.loads(ln))
+        except ValueError:
+            continue
+    return out
+
+
 def rss_mb():
     """Resident memory of this process in MB (Linux /proc; peak RSS elsewhere)."""
     try:
@@ -1655,14 +1680,20 @@ def rss_mb():
     return round(peak / (1024 ** 2 if sys.platform == "darwin" else 1024), 1)
 
 
+def secret_eq(got, want):
+    """Constant-time equality of a secret with a client's string, compared as UTF-8 bytes: a non-ASCII or non-UTF-8
+    client value is a mismatch, not the TypeError or UnicodeEncodeError (a 500) that hmac.compare_digest raises on str."""
+    import hmac
+    return hmac.compare_digest(str(got).encode("utf-8", "surrogatepass"), str(want).encode("utf-8", "surrogatepass"))
+
+
 def admin_ok(request):
     """True when the request carries SUB01_ADMIN_TOKEN (X-Admin-Token or Authorization: Bearer). No token set: False."""
-    import hmac
     token = os.environ.get("SUB01_ADMIN_TOKEN", "")
     if not token:
         return False
     got = request.headers.get("X-Admin-Token") or request.headers.get("Authorization", "").removeprefix("Bearer ")
-    return hmac.compare_digest(got.strip().encode(), token.encode())
+    return secret_eq(got.strip(), token)
 
 
 async def supervised(name, fn, backoff=5.0):
@@ -1735,7 +1766,6 @@ font:inherit">enter</button>{msg}</form></body>"""
 def password_gate(password):
     """Private preview: one shared password (SITE_PASSWORD), remembered in an HttpOnly cookie."""
     import hashlib
-    import hmac
     token = hashlib.sha256(("sub01:" + password).encode()).hexdigest()
 
     @web.middleware
@@ -1743,7 +1773,7 @@ def password_gate(password):
         if request.path == "/login":
             if request.method == "POST":
                 form = await request.post()
-                if hmac.compare_digest(str(form.get("password", "")), password):
+                if secret_eq(form.get("password", ""), password):
                     resp = web.HTTPFound("/")
                     resp.set_cookie("sub01", token, max_age=30 * 86400, httponly=True, samesite="Lax",
                                     secure=request.headers.get("X-Forwarded-Proto") == "https")
@@ -1755,7 +1785,7 @@ def password_gate(password):
             return await handler(request)                  # the pod authenticates with its own secret in the handler
         if request.path == "/healthz" or (request.path in ADMIN_PATHS and admin_ok(request)):
             return await handler(request)                  # uptime monitors / Railway healthcheck; admin token
-        if hmac.compare_digest(request.cookies.get("sub01", ""), token):
+        if secret_eq(request.cookies.get("sub01", ""), token):
             return await handler(request)
         if request.path == "/ws" or request.path.startswith("/api/"):
             raise web.HTTPUnauthorized()
@@ -1897,8 +1927,12 @@ async def main(args):
     app.router.add_get("/api/reading", reading)
 
     async def frames(request):                    # recent eye frames for the world page
+        try:
+            n = min(max(int(request.query.get("n", "40")), 1), 200)
+        except ValueError:
+            raise web.HTTPBadRequest(text="n must be a whole number")
         log = live.eye.log if live.eye else HERE / "missing"
-        rows = read_jsonl(log, last=int(request.query.get("n", "40")))         # a torn last line is skipped
+        rows = await asyncio.get_running_loop().run_in_executor(None, tail_jsonl, log, n)   # off the loop; torn lines skipped
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
         return web.json_response({"frames": rows, "world": world, "resting": RESTING if live.eye_resting else None})
     app.router.add_get("/api/frames", frames)
@@ -1907,15 +1941,16 @@ async def main(args):
 
     async def gmaps_works(key, referer):
         """Only hand the Maps key to browsers once Google really serves Street View with it (billing on)."""
-        if key not in gmaps_ok or time.time() - gmaps_ok[key][1] > 3600:
+        if key not in gmaps_ok or time.time() > gmaps_ok[key][1]:
             url = ("https://maps.googleapis.com/maps/api/streetview/metadata?location=35.70545,139.57455&radius=50&key="
                    + key)
             try:
                 async with aiohttp.ClientSession() as http, http.get(url, headers={"Referer": referer}) as r:
                     ok = (await r.json()).get("status") == "OK"
+                keep = 3600                              # a verdict from Google: kept an hour
             except Exception:
-                ok = False
-            gmaps_ok[key] = (ok, time.time())
+                ok, keep = False, 60                     # a network error is no verdict: asked again within a minute
+            gmaps_ok[key] = (ok, time.time() + keep)
         return gmaps_ok[key][0]
 
     async def config(request):                    # browser config (Maps JS keys are referrer-restricted by design)

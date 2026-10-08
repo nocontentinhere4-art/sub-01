@@ -32,6 +32,7 @@ import os
 import re
 import resource
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -176,12 +177,22 @@ def chrome(img, title, caption=None):
     d.text((62, 196), SITE, font=ft, fill=(10, 10, 10))
     d.text((48, 272), title, font=font(52, True), fill=FG, stroke_width=3, stroke_fill=(0, 0, 0))
     if caption:
-        fc = font(54, True)
-        lines = wrap(d, caption, fc, W - 160)[:4]
+        for size in (54, 46, 40):                              # a long caption takes a smaller face before it is cut
+            fc = font(size, True)
+            lines = wrap(d, caption, fc, W - 160)
+            if len(lines) <= 4:
+                break
+        if len(lines) > 4:                                     # still too long: the cut is marked with an ellipsis
+            lines = lines[:4]
+            last = lines[3]
+            while last and d.textlength(last + "…", font=fc) > W - 160:
+                last = last[:-1]
+            lines[3] = last.rstrip() + "…"
+        step = size + 18                                       # 72 px a line at 54 px, as before
         top = 1330 - 34 * len(lines)
-        d.rectangle((48, top - 28, W - 48, top + 72 * len(lines) + 16), fill=(0, 0, 0, 170))
+        d.rectangle((48, top - 28, W - 48, top + step * len(lines) + 16), fill=(0, 0, 0, 170))
         for i, ln in enumerate(lines):
-            d.text((80, top + 72 * i), ln, font=fc, fill=FG)
+            d.text((80, top + step * i), ln, font=fc, fill=FG)
     return img
 
 
@@ -561,11 +572,14 @@ class ClipMaker:
         proc = await asyncio.create_subprocess_exec(
             self.python, str(Path(__file__).resolve()), *args, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=child_env(),
-            preexec_fn=lambda: os.nice(NICE))
+            preexec_fn=lambda: os.nice(NICE), start_new_session=True)     # its own group: ffmpeg is in it too
         try:
             out, _ = await asyncio.wait_for(proc.communicate(stdin), WALL_S)
         except asyncio.TimeoutError:
-            proc.kill()
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)           # the python child and the ffmpeg it started
+            except ProcessLookupError:
+                pass
             await proc.wait()
             return -9, "timeout"
         return proc.returncode, out.decode(errors="replace")[-400:]
@@ -628,6 +642,10 @@ class ClipMaker:
                 gone += 1
         for p in self.days.iterdir() if self.days.exists() else ():
             if p.is_dir() and p.name < cut:
+                shutil.rmtree(p, ignore_errors=True)
+                gone += 1
+        for p in self.dir.glob("clip-*"):                      # frames of a render that was killed (no finally ran)
+            if p.is_dir() and self.clock() - p.stat().st_mtime > WALL_S:
                 shutil.rmtree(p, ignore_errors=True)
                 gone += 1
         made = self.state.get("made", {})
@@ -822,7 +840,9 @@ def admin_cookie(token):
 
 def cookie_ok(request):
     token = os.environ.get("SUB01_ADMIN_TOKEN", "")
-    return bool(token) and hmac.compare_digest(request.cookies.get(COOKIE, ""), admin_cookie(token))
+    # bytes: compare_digest refuses a str with non-ASCII characters (a UTF-8 cookie gave a 500)
+    return bool(token) and hmac.compare_digest(request.cookies.get(COOKIE, "").encode("utf-8", "replace"),
+                                               admin_cookie(token).encode())
 
 
 PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">

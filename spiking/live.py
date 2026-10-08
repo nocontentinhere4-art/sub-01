@@ -58,6 +58,7 @@ import os
 import select
 import sys
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
@@ -85,6 +86,7 @@ ETA_FLOOR = 0.25                  # ...and never goes below a quarter
 DA_GAIN = 2.0                     # tastes' prediction errors are mostly within +-0.5; x2 brings them to choice.py's +-1
 MAX_OPTIONS = 6
 PENDING = 8                       # decisions kept for a late dopamine (the next page's decision comes first)
+LABEL_CACHE = 2048                # labels whose cue and affinity arrays are kept (LRU; recomputed on a miss)
 VERSION = 1
 CALIB_LABELS = ("apple", "river", "cloud", "stone", "lamp", "bird", "salt", "rope")
 DA_SHOW_TAU_S = 30.0              # the page's dopamine reading decays back to 0 (wall seconds) after a burst (#89)
@@ -249,7 +251,7 @@ class Chooser:
         self.cue_space = np.concatenate([net.region_neurons(r, exc_only=True) for r in cue_regions])
         self.action = net.group_neurons(ACTION_GROUP, exc_only=True)
         self.regions = input_regions(net)
-        self._cue, self._aff = {}, {}
+        self._cue, self._aff = OrderedDict(), OrderedDict()
         is_cue = np.zeros(net.n, bool)
         is_cue[self.cue_space] = True
         is_act = np.zeros(net.n, bool)
@@ -263,9 +265,15 @@ class Chooser:
         self.timeout_ms = TIMEOUT_MS
 
     def cue(self, label):
-        if label not in self._cue:
+        if label in self._cue:
+            self._cue.move_to_end(label)                         # LRU: a label offered again stays cached
+            self._aff.move_to_end(label)
+        else:
             self._cue[label] = label_cue(self.net, label, self.cue_space, self.regions)
             self._aff[label] = label_affinity(label, len(self.action))
+            while len(self._cue) > LABEL_CACHE:                  # a long-running server: bounded, same values on a miss
+                self._cue.popitem(last=False)
+                self._aff.popitem(last=False)
         return self._cue[label]
 
     def present(self, labels, seed):

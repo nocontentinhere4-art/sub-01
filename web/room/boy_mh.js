@@ -1250,7 +1250,7 @@ export function createMH(env) {
     const hand = env.bones.RightHand, kn = S("Right", 3, 1);
     if (!hand || !kn || M.w.mouse <= 0.97) { M.grab = null; return; }   // (once the hand is on it)
     hand.getWorldPosition(_hp).lerp(kn.getWorldPosition(_a), 0.6);
-    if (!M.grab) M.grab = P.mouseHome.clone().sub(_hp).setY(0);
+    if (!M.grab) M.grab = P.mouseNode.position.clone().sub(_hp).setY(0);   // (a re-grab picks up where the mouse was left, not home)
     const H0 = P.mouseHome, cl = v => Math.max(-0.06, Math.min(0.06, v));   // (it stays on the pad: within 6 cm of home)
     P.mouseNode.position.set(H0.x + cl(_hp.x + M.grab.x - H0.x), H0.y, H0.z + cl(_hp.z + M.grab.z - H0.z)); P.mouseNode.updateMatrixWorld(true);
   }

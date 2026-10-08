@@ -14,7 +14,7 @@ BrowseReadings follows the screen statuses the browser sends:
   pages can say "watched a Short on youtube.com" instead of "read";
 - safety: the title must pass browse.display_ok (the strict filter for his own words and the cards); a finance
   page gives only its topic word ("memecoins", "stocks": no ticker, price or advice); a logged-in page keeps only
-  its public title (no excerpt); the excerpt keeps only sentences that pass display_ok.
+  its title (no excerpt, no link); the excerpt keeps only sentences that pass display_ok.
 Pure: no network, no AI, nothing paid.
 """
 import re
@@ -22,6 +22,7 @@ import time
 import urllib.parse
 
 from research import READ_EVERY_S, keywords
+from sessions import site_for_host
 
 READ_GAP_S = READ_EVERY_S                 # simulated seconds between two readings (~15 per hour at the desk)
 STALE_S = 30 * 60                         # an unused candidate older than this is dropped
@@ -169,7 +170,9 @@ class BrowseReadings:
         host = (urllib.parse.urlsplit(url).hostname or "").removeprefix("www.")
         title = " ".join(str(st.get("title") or "").split())[:140]
         text = self.texts.get(url, "")
-        logged_in = bool(st.get("site") or st.get("logged_in"))
+        # browse's status has no login flag: a login site's host (sessions.SITES) counts as logged in
+        logged_in = bool(st.get("site") or st.get("logged_in") or site_for_host(host))
+        private = logged_in and kind == "page"            # a logged-in page: its title only, no excerpt and no link
         topic = None
         if kind == "finance":                               # only the topic word: no ticker, price or advice
             topic = finance_word(title, text)
@@ -192,7 +195,7 @@ class BrowseReadings:
             pass
         score = min(dwell, 600) / 60 + (1.0 if len(extract) > 100 else 0.0) + (0.5 if kind != "page" else 0.0)
         why = KIND_LABEL[kind].format(host=host or "the web", topic=topic or "finance")
-        return {"title": title, "extract": extract, "url": "" if kind == "finance" else url, "host": host,
+        return {"title": title, "extract": extract, "url": "" if kind == "finance" or private else url, "host": host,
                 "kind": kind, "via": "browser", "topic": topic, "keywords": kws, "why": why, "t": t,
                 "dwell_s": round(dwell), "score": score}
 

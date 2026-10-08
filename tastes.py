@@ -94,8 +94,8 @@ class Tastes:
         return out
 
     def predict(self, topics):
-        vals = [self.pref[t] for t in topics if t in self.pref]
-        return sum(vals) / len(vals) if vals else 0.0
+        """The stay's expected response: the mean over ALL its topics, an unseen topic counting 0 (as in gains())."""
+        return sum(self.pref.get(t, 0.0) for t in topics) / len(topics) if topics else 0.0
 
     def alpha(self, topic):
         """Gain of a stay with this topic alone (for reading; learn() uses the gain of the whole stay)."""

@@ -26,7 +26,7 @@
   #phone .top { position:absolute; top:12px; left:0; right:0; text-align:center; font-size:10px; color:var(--dim); }
   #phone canvas, #phone img, #phone iframe { width:100%; height:100%; border:0; border-radius:10px; background:#000; display:block; object-fit:cover; object-position:top; }
   #screens div { font-size:12px; color:var(--dim); padding:2px 0; } #screens b { color:#ececf2; font-weight:500; }
-  #foot { position:absolute; left:16px; right:16px; bottom:8px; color:#5a5a6a; font-size:10px; pointer-events:none; text-align:right; }
+  #foot { position:absolute; left:16px; right:16px; bottom:8px; color:var(--dim); font-size:10px; pointer-events:none; text-align:right; }
   #side { width:330px; border-left:1px solid #1c1c26; padding:14px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
   .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
   .bar { display:flex; align-items:center; gap:8px; font-size:12px; margin:4px 0; }
@@ -41,7 +41,7 @@
   input { flex:1; background:#0c0c12; color:var(--fg); border:1px solid #2a2a36; padding:8px; font:inherit; font-size:12px; }
   form button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12px; }
   #ack { font-size:11px; color:var(--dim); min-height:1.2em; }
-  #note { font-size:10px; color:#55556a; }
+  #note { font-size:10px; color:var(--dim); }
   #music .mu { display:flex; gap:8px; align-items:center; margin-bottom:6px; font-size:12px; }
   #music .mu img { width:44px; height:44px; border-radius:4px; flex:none; object-fit:cover; }
   #music .mu span { color:var(--dim); display:block; font-size:11px; }
@@ -78,7 +78,7 @@
       <div id="meta"></div>
       <div id="thought"></div>
     </div>
-    <div id="tools"><button id="b-follow" class="on">follow</button><button id="b-lab">lab mode</button></div>
+    <div id="tools"><button id="b-follow" class="on" aria-pressed="true">follow</button><button id="b-lab" aria-pressed="false">lab mode</button></div>
     <div id="phone"><div class="top">SUB-01's phone · <span id="app"></span></div><img id="phoneimg" alt="" style="display:none"><iframe id="phonefr" title="TikTok (official embed)" allow="encrypted-media; fullscreen; picture-in-picture" style="display:none"></iframe></div>
     <div id="sv"></div>
     <div id="walk"><iframe id="walkvid" allow="autoplay; encrypted-media" title="real street footage"></iframe></div>
@@ -107,9 +107,9 @@
     <div><div class="lbl">Today</div><div id="log"></div></div>
     <div><div class="lbl">His screens</div><div id="screens">…</div><div id="scr-music"></div><div id="scr-tt"></div></div>
     <div><div class="lbl">Talk to it · messages become desires and stimuli</div>
-      <div id="chat"></div>
-      <form id="f"><input id="in" maxlength="280" placeholder="e.g. go and buy some bread" autocomplete="off"><button>send</button></form>
-      <div id="ack"></div>
+      <div id="chat" role="log" aria-live="polite"></div>
+      <form id="f"><input id="in" maxlength="280" placeholder="e.g. go and buy some bread" aria-label="message to SUB-01" autocomplete="off"><button>send</button></form>
+      <div id="ack" role="status" aria-live="polite"></div>
     </div>
     <div id="neurons"></div>
     <div id="note">It decides with its own needs and brain state: a suggestion makes an activity more likely, it does not command it. Phone: the real screen of his phone's browser (shown only when there is one); public TikTok videos play in TikTok's official embed player, muted, no autoplay.</div>
@@ -296,12 +296,19 @@ function pollScreens(){ fetch("/api/screens").then(r => r.ok ? r.json() : null).
 pollScreens(); setInterval(pollScreens, 5000);
 const shown = {x: 1.6, z: 1.3, h: 0};
 
+// the server answers {type:"full"} when it has no room for another viewer and closes the socket: then wait about a
+// minute, longer each time (to 4 min), with jitter; any other drop: 1.5 s doubling to 30 s, with jitter
+let sock = null, sockFull = false, sockRetry = 0;
 function connect(){
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
+    if (m.type === "full") { sockFull = true; document.getElementById("doing").textContent = "the room is full, reconnecting by itself"; return; }
+    sockFull = false; sockRetry = 0;                                    // the server took this socket
     if (m.type === "spiking") { Neurons.onMessage(m); return; }
-    if (m.type === "hello") { if (m.world && !world) buildWorld(m.world); (m.chat || []).forEach(addChat); return; }
+    if (m.type === "hello") { if (m.world && !world) buildWorld(m.world);
+      document.getElementById("chat").textContent = ""; chatLines.length = 0;   // a reconnect resends the last 30: no doubles
+      (m.chat || []).forEach(addChat); return; }
     if (m.type === "chat") { addChat(m); return; }
     if (m.type === "music") { if (m.playing) showMusic(m); else if (musicNow && musicNow.id === m.id) showMusic(null); return; }
     if (m.type === "chat_ack") { document.getElementById("ack").textContent = m.ok ? "sent — it heard you" : "not sent: " + m.reason; return; }
@@ -311,10 +318,19 @@ function connect(){
     for (const t of m.trades || []) { flowSum += (t.kind === "buy" ? 1 : -1) * Math.log10(1 + t.usd); flow.push(flowSum); if (flow.length > 90) flow.shift(); }
     if (m.life) onLife(m.life, m.sleep);
   };
-  ws.onclose = () => setTimeout(connect, 1500);
-  document.getElementById("f").onsubmit = ev => { ev.preventDefault(); const i = document.getElementById("in");
-    if (i.value.trim()) ws.send(JSON.stringify({type: "chat", text: i.value})); i.value = ""; };
+  ws.onclose = () => {
+    const wait = sockFull ? 60000 * Math.min(4, 2 ** sockRetry) * (0.75 + 0.5 * Math.random())
+                          : Math.min(30000, 1500 * 2 ** sockRetry) * (0.75 + 0.5 * Math.random());
+    sockRetry = Math.min(sockRetry + 1, 5);
+    if (!sockFull) document.getElementById("doing").textContent = "connection lost, reconnecting…";
+    setTimeout(connect, wait);
+  };
 }
+// a message is sent only on an open socket: ws.send() on a closed one drops it without an error, so the text is kept
+document.getElementById("f").onsubmit = ev => { ev.preventDefault(); const i = document.getElementById("in"), ack = document.getElementById("ack");
+  if (!i.value.trim()) { i.value = ""; return; }
+  if (!sock || sock.readyState !== WebSocket.OPEN) { ack.textContent = "offline, not sent: your text is kept, try again in a moment"; return; }
+  sock.send(JSON.stringify({type: "chat", text: i.value})); i.value = ""; };
 // music (#68): his brain model picks; Spotify's official embed, played on the visitor's own device (never by the server)
 let musicNow = null, musicEmbed = "";
 const SPOTIFY_EMBED = /^https:\/\/open\.spotify\.com\/embed\/track\/[A-Za-z0-9]{22}(\?[\w=&]*)?$/;
@@ -464,9 +480,9 @@ function onLife(L, S){
 }
 
 // ---------------- animation ----------------
-document.getElementById("b-follow").onclick = e => { follow = !follow; e.target.classList.toggle("on", follow); };
-document.getElementById("b-lab").onclick = e => { lab = !lab; e.target.classList.toggle("on", lab); };
-controls.addEventListener("start", () => { follow = false; document.getElementById("b-follow").classList.remove("on"); });
+document.getElementById("b-follow").onclick = e => { follow = !follow; e.target.classList.toggle("on", follow); e.target.setAttribute("aria-pressed", String(follow)); };
+document.getElementById("b-lab").onclick = e => { lab = !lab; e.target.classList.toggle("on", lab); e.target.setAttribute("aria-pressed", String(lab)); };
+controls.addEventListener("start", () => { follow = false; const b = document.getElementById("b-follow"); b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); });
 
 function romeHour(){ const [h, m] = clock.split(":").map(Number); return isNaN(h) ? 12 : h + m / 60; }
 function animate(t){

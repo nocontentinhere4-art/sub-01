@@ -14,6 +14,7 @@
 //   view.build(SURF.window, scene, renderer);   // the plane at the marker (c, w, h, ry); renderer: for the glass's reflection probe
 //   view.update(dt, hour);                      // every frame: Tokyo hour (0..24), the clock moves everything
 //   view.setWeather("rain" | "overcast" | "clear" | null);   // null: back to the daily pattern
+//   view.setPaused(on);                         // holds the window's own motion (rain, birds, train, drift, flicker); the sun, moon and lights still follow the hour; prefers-reduced-motion does the same
 //   view.setEmission(day, night);               // how bright the window is in the room's light units (G6's HDR: 5 / 0.05)
 //   view.light.sun                              // 0..1: how much direct sun the weather lets through (for the room's lights)
 //
@@ -93,6 +94,8 @@ const FRAG = /* glsl */`
   uniform vec3 uCentres;                                        // the x of each plate's centre: near, mid, far
   uniform vec4 uSky;                                            // rows, half azimuth (rad), el0 (rad), el1 (rad)
   uniform vec4 uTrainP;                                         // depth, y, height, length
+  uniform float uDrift; uniform float uRainT; uniform float uStreakT; uniform float uDropT;   // the time-driven phases, reduced
+  uniform float uBirdPh; uniform float uBirdW; uniform float uFlapT; uniform float uStill;    // in JS (see update())
 
   float h1(float x){ return fract(sin(x * 127.1 + 311.7) * 43758.5453); }
 
@@ -122,7 +125,7 @@ const FRAG = /* glsl */`
   // the sky in a direction: the photographs cross-faded by the phase of the day and the cloud cover (rows: clear, partly
   // cloudy, overcast, sunset, dusk, night), the city's glow at night
   vec3 skyColor(vec3 dir, float day, float golden, float blue, float night){
-    vec2 ae = vec2(atan(dir.x, dir.z) + uTime * 0.00003, asin(clamp(dir.y, -1.0, 1.0)));   // a very slow drift (6° an hour)
+    vec2 ae = vec2(atan(dir.x, dir.z) + uDrift, asin(clamp(dir.y, -1.0, 1.0)));   // a slow sway of ±20° (uDrift)
     float ov = smoothstep(0.45, 0.9, uCloud), partly = smoothstep(0.05, 0.45, uCloud);
     vec3 s = vec3(0.0);
     if (day > 0.005) s += day * mix(skyRow(0.0, ae), skyRow(1.0, ae), partly);
@@ -155,7 +158,7 @@ const FRAG = /* glsl */`
     // --- rain on the glass: drops refract the view (sliding down slowly), streaks run
     float dropA = 0.0;
     if (uRain > 0.002) {
-      vec4 n1 = texture2D(tNoise, vUv * vec2(1.9, 1.0) + vec2(0.0, uTime * 0.010));
+      vec4 n1 = texture2D(tNoise, vUv * vec2(1.9, 1.0) + vec2(0.0, uDropT));
       vec2 off = (n1.ba - 0.5) * 2.0;
       dropA = length(off);
       dx += off.x * 0.010 * uRain; dy += off.y * 0.010 * uRain;
@@ -177,13 +180,13 @@ const FRAG = /* glsl */`
     float moon = smoothstep(0.99955, 0.99975, cm) * (1.0 - 0.9 * smoothstep(0.99955, 0.99975, dot(dir, normalize(uMoonDir + vec3(0.012, 0.004, 0.0)))));
     sky += vec3(0.95, 0.97, 1.0) * night * moon * (1.0 - 0.9 * uCloud) + vec3(0.25, 0.30, 0.45) * night * 0.04 * pow(max(cm, 0.0), 40.0) * (1.0 - uCloud);
     // birds, by day: four of them crossing, flapping
-    if (day > 0.3 && dir.y > 0.05 && uRain < 0.3) {
+    if (day > 0.3 && dir.y > 0.05 && uRain < 0.3 && uStill < 0.5) {
       float az = atan(dir.x, dir.z), el = asin(clamp(dir.y, -1.0, 1.0));
       for (int i = 0; i < 4; i++) {
         float fi = float(i);
-        float ph = fract(uTime * 0.011 + fi * 0.26);
-        vec2 q = vec2(az - (ph * 1.7 - 0.85), el - (0.16 + 0.08 * sin(fi * 2.1 + uTime * 0.21) + 0.04 * fi));
-        float flap = sin(uTime * (9.0 + fi) + fi * 1.7);
+        float ph = fract(uBirdPh + fi * 0.26);
+        vec2 q = vec2(az - (ph * 1.7 - 0.85), el - (0.16 + 0.08 * sin(fi * 2.1 + uBirdW) + 0.04 * fi));
+        float flap = sin(uFlapT * (9.0 + fi) + fi * 1.7);
         float b = smoothstep(0.0022, 0.0009, abs(q.y - flap * 0.6 * abs(q.x))) * step(abs(q.x), 0.0075);
         sky = mix(sky, vec3(0.02, 0.02, 0.03), b * smoothstep(0.0, 0.1, ph) * smoothstep(1.0, 0.9, ph));
       }
@@ -208,17 +211,6 @@ const FRAG = /* glsl */`
       vec3 duskFar = mix(f.rgb * (0.55 + 0.45 * (1.0 - night)) + f.rgb * night * 0.25, horizonCol, haze * 0.5);
       col = mix(col, mix(duskFar, dayFar, day), f.a);
     }
-    // the train, between the far and the mid plates: lit windows gliding past at night (nothing by day)
-    if (uTrain > -uTrainP.w && dark > 0.05) {
-      vec2 tp = g + slope * uTrainP.x;
-      float tx = tp.x * uTrainDir - uTrain;
-      if (tp.y > uTrainP.y && tp.y < uTrainP.y + uTrainP.z && tx > 0.0 && tx < uTrainP.w) {
-        float ry = (tp.y - uTrainP.y) / uTrainP.z;
-        float win = step(0.50, ry) * step(ry, 0.80) * step(0.22, fract(tx / 1.5)) * step(0.15, fract(tx / 20.0)) * step(fract(tx / 20.0), 0.97);
-        col = mix(col, vec3(0.05, 0.05, 0.07) * dark + col * (1.0 - dark), 0.85 * dark);
-        col += vec3(1.0, 0.92, 0.7) * win * dark * 0.9;
-      }
-    }
     // mid: the neighbourhood. By day the daylight photograph, relit by the hour; the night photograph fades in through
     // the blue hour, with some of its real lit windows switching off and on
     float nightW = smoothstep(-0.02, -0.14, uSun);
@@ -232,10 +224,23 @@ const FRAG = /* glsl */`
       nightCol *= 1.0 - 0.3 * smoothstep(0.3, 0.9, uCloud);
       col = mix(col, mix(dayCol, nightCol, nightW), ma);
     }
+    // the train, in front of the mid plate (27 m against 40 m) and behind the near: lit windows gliding past at night
+    // (nothing by day). Drawn after the mid, or the houses would hide its lit windows. The gate only skips the work
+    // when the train is off (-1e3); the per-pixel test below decides what shows, so no visible pixel is ever skipped
+    if (uTrain > -500.0 && dark > 0.05) {
+      vec2 tp = g + slope * uTrainP.x;
+      float tx = tp.x * uTrainDir - uTrain;
+      if (tp.y > uTrainP.y && tp.y < uTrainP.y + uTrainP.z && tx > 0.0 && tx < uTrainP.w) {
+        float ry = (tp.y - uTrainP.y) / uTrainP.z;
+        float win = step(0.50, ry) * step(ry, 0.80) * step(0.22, fract(tx / 1.5)) * step(0.15, fract(tx / 20.0)) * step(fract(tx / 20.0), 0.97);
+        col = mix(col, vec3(0.05, 0.05, 0.07) * dark + col * (1.0 - dark), 0.85 * dark);
+        col += vec3(1.0, 0.92, 0.7) * win * dark * 0.9;
+      }
+    }
     // rain falling, in front of the buildings
     if (uRain > 0.002) {
       vec2 rp = g + slope * (uNear.x + 4.0);
-      float r = texture2D(tNoise, vec2(rp.x * 0.33, rp.y * 0.045 + uTime * 0.85)).g;
+      float r = texture2D(tNoise, vec2(rp.x * 0.33, rp.y * 0.045 + uRainT)).g;
       col = mix(col, horizonCol * 1.2 + vec3(0.08), smoothstep(0.35, 0.9, r) * uRain * 0.2);
     }
     // near: the utility pole and its cables, silhouettes
@@ -250,7 +255,7 @@ const FRAG = /* glsl */`
     env = min(mix(env, vec3(0.0), vec3(isnan(env))), vec3(1.0));   // a probe not yet rendered is black, a lit wall never blows out
     col = col * vec3(0.93, 0.96, 0.95) * (1.0 - 0.85 * fres) + env * fres * uReflect;
     if (uRain > 0.002) {
-      float s = texture2D(tNoise, vec2(vUv.x * 2.2, vUv.y * 0.5 + uTime * 0.22)).g;
+      float s = texture2D(tNoise, vec2(vUv.x * 2.2, vUv.y * 0.5 + uStreakT)).g;
       col += (smoothstep(0.6, 0.95, s) * 0.10 + dropA * dropA * 0.09) * uRain * (0.15 + 0.85 * day) * (sky * 0.5 + 0.2);
     }
     col = max(mix(col, vec3(0.0), vec3(isnan(col))), vec3(0.0));   // never a NaN or a negative texel (an environment capture reads this pane)
@@ -284,6 +289,7 @@ export function createWindowView(THREE, opts = {}){
       uCentres: {value: new THREE.Vector3(LAYERS.near.cx, LAYERS.mid.cx, LAYERS.far.cx)},
       uSky: {value: new THREE.Vector4(SKY.rows, rad(SKY.az), rad(SKY.el0), rad(SKY.el1))},
       uTrainP: {value: new THREE.Vector4(TRAIN.d, TRAIN.y, TRAIN.h, TRAIN.len)},
+      uDrift: {value: 0}, uRainT: {value: 0}, uStreakT: {value: 0}, uDropT: {value: 0}, uBirdPh: {value: 0}, uBirdW: {value: 0}, uFlapT: {value: 0}, uStill: {value: 0},
     },
     vertexShader: VERT, fragmentShader: FRAG, toneMapped: false,
   });
@@ -291,6 +297,8 @@ export function createWindowView(THREE, opts = {}){
   const state = {hour: 12, sun: 0.5, weather: {kind: "clear", cloud: 0, rain: 0}, override: opts.weather ?? null, litP: 0, train: null, time: 0, probes: 0, emit: {day: 1, night: 1}, hdr: false};
   const light = {sun: 1, cloud: 0, rain: 0};
   let mesh = null, cloud = 0, rain = 0, probeCam = null, renderer = null, scene = null, probeAt = -1e9, emitSet = false;
+  let clock = 0, paused = false;                                 // clock: real seconds (the probe's cadence); paused: setPaused()
+  const rmQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 
   function build(surf, sc, rend){
     mesh = new THREE.Mesh(new THREE.PlaneGeometry(surf.w, surf.h), material);
@@ -307,7 +315,7 @@ export function createWindowView(THREE, opts = {}){
       const was = renderer.getRenderTarget ? renderer.getRenderTarget() : null;
       for (let face = 0; face < 6; face++) { renderer.setRenderTarget(envRT, face); renderer.clear(); }
       renderer.setRenderTarget(was);
-      probe(); probeAt = state.time;
+      probe(); probeAt = clock;
     }
     return mesh;
   }
@@ -325,14 +333,26 @@ export function createWindowView(THREE, opts = {}){
     // a NaN hour or dt (a clock not yet read, a bad tick) would poison every uniform and light.sun: keep the last good ones
     if (!Number.isFinite(hour)) hour = state.hour;
     if (!Number.isFinite(dt) || dt < 0) dt = 0;
-    state.time += dt; state.hour = hour;
+    clock += dt;                                                   // real seconds: the reflection probe's cadence
+    const still = paused || !!(rmQuery && rmQuery.matches);       // the window's own motion holds (setPaused, reduced motion)
+    if (!still) state.time += dt;
+    state.hour = hour;
     const sunEl = sunElevation(hour); state.sun = sunEl;
-    U.uTime.value = state.time; U.uSun.value = sunEl;
+    const T = state.time;                                          // the motion clock, reduced for each phase below
+    U.uTime.value = T; U.uSun.value = sunEl; U.uStill.value = still ? 1 : 0;
+    U.uDrift.value = 0.35 * Math.sin(T * 0.0000857);               // a slow sway of ±20°: 6° an hour at its fastest, never clamped
+    U.uRainT.value = (T * 0.85) % 1;                               // the noise repeats every 1 vertically, so reducing it loses nothing
+    U.uStreakT.value = (T * 0.22) % 1;
+    U.uDropT.value = (T * 0.010) % 1;
+    U.uBirdPh.value = (T * 0.011) % 1;
+    U.uBirdW.value = (T * 0.21) % (2 * Math.PI);
+    U.uFlapT.value = T % (2 * Math.PI);                            // the flaps run at whole multiples of 1 rad/s: 2π-periodic
     // the sun crosses the window from the viewer's left to the right over the day, low in the morning and the evening
     const td = Math.min(1, Math.max(0, (hour - 5.6) / 12.2));
     const az = (-48 + 96 * td) * Math.PI / 180, el = (7 + 34 * Math.max(0, sunEl)) * Math.PI / 180;
     U.uSunDir.value.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
-    const tn = (((hour - 17.8) / 12.2) % 1 + 1) % 1;
+    // the moon's arc runs 17.8 h to 6.0 h (12.2 h); clamped, so it does not jump at midnight (24 is no multiple of 12.2)
+    const tn = Math.min(1, Math.max(0, (((hour - 17.8) % 24 + 24) % 24) / 12.2));
     const maz = (-40 + 80 * tn) * Math.PI / 180, mel = (10 + 28 * Math.sin(Math.PI * tn)) * Math.PI / 180;
     U.uMoonDir.value.set(Math.sin(maz) * Math.cos(mel), Math.sin(mel), Math.cos(maz) * Math.cos(mel));
     // weather eases towards its target (a front takes minutes to arrive, a debug switch about two seconds)
@@ -350,12 +370,13 @@ export function createWindowView(THREE, opts = {}){
     // the train: every TRAIN.every s one passes, alternating direction
     const cyc = Math.floor(state.time / TRAIN.every), ph = state.time - cyc * TRAIN.every, dir = cyc % 2 ? -1 : 1;
     const x = ph * TRAIN.speed - TRAIN.len - 40;                // its tail, from well off one side to well off the other
-    const on = x < 40;
+    const on = !still && x < 40;                                   // held off while still
     U.uTrain.value = on ? x : -1e3; U.uTrainDir.value = dir;
     state.train = on ? {x, dir} : null;
     // the glass's reflection of the room: refreshed every PROBE.every seconds (the first one once the room has loaded)
-    if (probeCam && state.time - probeAt > (state.probes ? PROBE.every : PROBE.first) && !(typeof document !== "undefined" && document.hidden)) { probeAt = state.time; probe(); }
+    if (probeCam && clock - probeAt > (state.probes ? PROBE.every : PROBE.first) && !(typeof document !== "undefined" && document.hidden)) { probeAt = clock; probe(); }
   }
   function setWeather(kind){ state.override = kind || null; }
-  return {material, get mesh(){ return mesh; }, build, update, setWeather, setEmission, probe, light, state: () => ({...state, cloud, rain}), LAYERS, GAIN, SKY};
+  function setPaused(on){ paused = !!on; }
+  return {material, get mesh(){ return mesh; }, build, update, setWeather, setPaused, setEmission, probe, light, state: () => ({...state, cloud, rain}), LAYERS, GAIN, SKY};
 }

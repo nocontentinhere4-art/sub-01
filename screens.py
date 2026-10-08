@@ -207,6 +207,7 @@ class DopamineBursts:
         self.last_any = t
         novelty = 0.3 if topic and t - self.topics.get(topic, -1e18) < NOVEL_S else 1.0
         if topic:
+            self.topics.pop(topic, None)                     # re-inserted: dict order is last-seen order (eviction)
             self.topics[topic] = t
             if len(self.topics) > 500:
                 self.topics.pop(next(iter(self.topics)))

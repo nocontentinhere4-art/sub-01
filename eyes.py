@@ -72,6 +72,7 @@ PRICES = {  # USD per million tokens (input, output), for the spend log
     # OpenRouter (estimate only when a response carries no cost)
     "anthropic/claude-opus-5.5": (4.0, 20.0), "anthropic/claude-sonnet-5.5": (2.0, 10.0),
     "anthropic/claude-haiku-4.5": (1.0, 5.0), "meta-llama/llama-3.3-70b-instruct": (0.10, 0.32)}
+UNPRICED = (4.0, 20.0)   # a model not in PRICES is estimated at the dearest rate above, never at zero (the caps must trip)
 VIDEO = re.compile(r"(youtube\.com/watch|youtu\.be/|vimeo\.com/\d|nicovideo\.jp/watch|dailymotion\.com/video|"
                    r"/video[s]?/|/watch\b)", re.I)
 
@@ -139,7 +140,7 @@ class Budget:
     def record(self, provider, model, tokens_in, tokens_out, ok, note="", usd=None):
         """`usd`: the cost the provider reported, else an estimate from PRICES."""
         if usd is None:
-            pin, pout = PRICES.get(model, (0.0, 0.0))
+            pin, pout = PRICES.get(model, UNPRICED)
             usd = (tokens_in * pin + tokens_out * pout) / 1e6
         row = {"t": self.clock(), "provider": provider, "model": model, "in": int(tokens_in), "out": int(tokens_out),
                "usd": round(usd, 6), "ok": bool(ok), "note": note[:80]}
@@ -581,8 +582,10 @@ class Eyes:
                 self.asked.pop(next(iter(self.asked)))
         if len(opts) < MIN_OPTIONS:                               # top up with the page's own links
             have = {(o["action"], o["target"]) for o in opts}
+            ai_n = len(opts)
             extra = [o for o in local_options(page, interest, rng) if (o["action"], o["target"]) not in have]
             opts = (opts + extra)[:MAX_OPTIONS]
+            meta["local_extra"] = len(opts) - ai_n                # how many options came from the page's own links
         if opts and not any(o["action"] == "leave" for o in opts):   # he can always leave: the vote decides
             leave = validate([{"action": "leave", "label": "wander somewhere else"}], page)
             opts = opts[:MAX_OPTIONS - 1] + leave

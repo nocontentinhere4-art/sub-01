@@ -119,7 +119,7 @@ def parse_cookies(raw, now=None):
         raise SessionError("too long")
     try:
         data = json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):            # a deeply nested value exhausts the parser's recursion
         raise SessionError("not JSON") from None
     if isinstance(data, dict) and isinstance(data.get("cookies"), list):
         data = data["cookies"]

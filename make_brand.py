@@ -1,11 +1,15 @@
 """X profile assets from the real fibre renders: out/x_logo*.png (400x400), out/x_banner.png (1500x500)."""
+import os
+
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-MONO = "/System/Library/Fonts/SFNSMono.ttf"
+MONOS = ["/System/Library/Fonts/SFNSMono.ttf",                       # macOS (where the renders were made)
+         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"]     # Linux fallback
 
 
 def font(size, weight=None):
-    f = ImageFont.truetype(MONO, size)
+    mono = next((p for p in MONOS if os.path.exists(p)), None)
+    f = ImageFont.truetype(mono, size) if mono else ImageFont.load_default(size=size)
     if weight:
         try:
             f.set_variation_by_name(weight)

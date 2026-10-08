@@ -23,6 +23,7 @@ import os
 import random
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -82,7 +83,8 @@ def links(title, lang="en"):
     q = urllib.parse.urlencode({"action": "query", "titles": title, "prop": "links", "plnamespace": 0,
                                 "pllimit": 200, "format": "json"})
     pages = get(API.format(lang=lang) + "?" + q).get("query", {}).get("pages", {})
-    out = [l["title"] for p in pages.values() for l in p.get("links", [])]
+    # "missing" marks a red link (no article behind it): not a title to read
+    out = [l["title"] for p in pages.values() for l in p.get("links", []) if "missing" not in l]
     return [t for t in out if safe(t) and not re.match(r"^(List of|Index of|Outline of|\d{3,4}\b)", t)]
 
 
@@ -94,6 +96,17 @@ def summary(title, lang="en"):
         return None
     return {"title": d.get("title", title), "extract": d["extract"][:420],
             "url": d.get("content_urls", {}).get("desktop", {}).get("page", ""), "lang": lang}
+
+
+def summary_or_none(title):
+    """summary(), where a 404 (no such article: a red link, a moved page) means "skip this title"; other errors
+    (offline, rate limit) still reach read()'s handler."""
+    try:
+        return summary(title)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
 
 
 def words(text):
@@ -217,7 +230,7 @@ class Reader:
         try:
             for w, why in tries:
                 for title in search(w):
-                    if title not in seen and (art := summary(title)):
+                    if title not in seen and (art := summary_or_none(title)):
                         return self._add(t, art, why)
             if last:
                 options = [x for x in links(last["title"]) if x not in seen]
@@ -226,11 +239,11 @@ class Reader:
                     if title is None:
                         break
                     options.remove(title)
-                    if art := summary(title):
+                    if art := summary_or_none(title):
                         return self._add(t, art, f"followed a link from “{last['title']}” · {info['why']}",
                                          curiosity=info)
             for title in ("Tokyo", "Kichijōji", "Inokashira Park", "Sleep", "Dream", "Bread", "Memory"):
-                if title not in seen and (art := summary(title)):
+                if title not in seen and (art := summary_or_none(title)):
                     return self._add(t, art, "started somewhere familiar")
         except Exception as e:                    # offline or rate-limited: try again next time
             print("research: wikipedia failed:", repr(e)[:120], flush=True)

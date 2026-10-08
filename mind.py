@@ -217,6 +217,12 @@ def parse_obj(raw):
     return d if isinstance(d, dict) else {}
 
 
+def _listed(x):
+    """A model's list, or [] when the answer has another shape (a number, a string, an object): ignored, not an error
+    that would make the same paid call again."""
+    return x if isinstance(x, list) else []
+
+
 def importance(brain=None):
     """Brain response at encoding -> 0..1. `brain`: {"reward", "attention", "fear"} changes, or a tastes-style float
     in -1..1, or None (0.3)."""
@@ -554,9 +560,9 @@ class Mind:
         summary = clean(d.get("summary"), 50)
         sents = re.split(r"(?<=[.!?])\s+", summary)
         summary = " ".join(sents[:2])
-        facts = [f for f in (clean(x, 20, 160) for x in (d.get("facts") or [])[:8] if isinstance(x, str)) if f][:5]
-        topics = [t for t in dict.fromkeys(clean_topic(x) for x in (d.get("topics") or [])[:8]) if t][:6]
-        links = [i for i in (d.get("connects") or []) if isinstance(i, str) and i in offered]
+        facts = [f for f in (clean(x, 20, 160) for x in _listed(d.get("facts"))[:8] if isinstance(x, str)) if f][:5]
+        topics = [t for t in dict.fromkeys(clean_topic(x) for x in _listed(d.get("topics"))[:8]) if t][:6]
+        links = [i for i in _listed(d.get("connects")) if isinstance(i, str) and i in offered]
         ai = bool(summary)
         if not ai:                                                # degraded: no summary, keywords only
             facts, topics = [], local_topics
@@ -660,11 +666,11 @@ class Mind:
                           ensure_ascii=False)
         d = parse_obj(self._ask("plan", SYSTEM_PLAN, user))
         out = []
-        for p in (d.get("plans") or [])[:3]:
+        for p in _listed(d.get("plans"))[:3]:
             if not isinstance(p, dict):
                 continue
-            steps = [s for s in (p.get("steps") or []) if isinstance(s, str) and s in vocab]
-            steps = [s for i, s in enumerate(steps) if i == 0 or s != steps[i - 1]][:6]
+            steps = [s for s in _listed(p.get("steps")) if isinstance(s, str) and s in vocab]
+            steps = [s for i, s in enumerate(steps) if i == 0 or s != steps[i - 1]][:(n_steps or 6)]
             reason = clean(p.get("reason"), 16, 120)
             lo = 1 if n_steps else 3
             if len(steps) >= lo and reason and not CLAIM.search(reason):

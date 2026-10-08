@@ -29,7 +29,7 @@
   #strip figure { margin:0; font-size:11px; color:var(--dim); line-height:1.4; }
   #strip img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; border:1px solid #1c1c26; margin-bottom:4px; transition:border-color .2s; }
   #strip figure:hover img { border-color:#3a3a4a; }
-  #note { color:#55556a; font-size:11px; padding:0 28px 18px; max-width:90ch; line-height:1.5; }
+  #note { color:var(--dim); font-size:11px; padding:0 28px 18px; max-width:90ch; line-height:1.5; }
   @media (max-width: 800px) { header, main, #strip, #note { padding-left:16px; padding-right:16px; }
     main { grid-template-columns: 1fr; } #thought { font-size:16px; } }
 </style>
@@ -66,15 +66,26 @@ async function refresh(){
   const d = await (await fetch("/api/frames?n=24")).json();
   document.getElementById("world").innerHTML = d.world.length
     ? d.world.map(o => `<div><span>${o.name.replace(/</g, "")}</span><span>${o.strength}</span></div>`).join("")
-    : `<div><span style="color:#55556a">empty — write something in the chat</span></div>`;
+    : `<div><span style="color:var(--dim)">empty — write something in the chat</span></div>`;
   document.getElementById("strip").innerHTML = d.frames.slice(0, -1).reverse().map(f =>
     `<figure><img src="${f.img}" loading="lazy"><figcaption>${f.t} ${f.stage} · ${(f.thought || "").replace(/</g, "").slice(0, 60)}</figcaption></figure>`).join("");
   if (d.frames.length) show({...d.frames[d.frames.length - 1], resting: d.resting});
 }
+// the server answers {type:"full"} when it has no room and closes the socket: wait about a minute, longer each time
+// (to 4 min), with jitter; any other drop: 1.5 s doubling to 30 s, with jitter
+let wsFull = false, wsRetry = 0;
 function connect(){
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-  ws.onmessage = e => { const m = JSON.parse(e.data); if (m.type === "eye") { show(m); refresh(); } };
-  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onmessage = e => { const m = JSON.parse(e.data);
+    if (m.type === "full") { wsFull = true; return; }
+    wsFull = false; wsRetry = 0;                                        // the server took this socket
+    if (m.type === "eye") { show(m); refresh(); } };
+  ws.onclose = () => {
+    const wait = wsFull ? 60000 * Math.min(4, 2 ** wsRetry) * (0.75 + 0.5 * Math.random())
+                        : Math.min(30000, 1500 * 2 ** wsRetry) * (0.75 + 0.5 * Math.random());
+    wsRetry = Math.min(wsRetry + 1, 5);
+    setTimeout(connect, wait);
+  };
 }
 refresh(); connect();
 </script>

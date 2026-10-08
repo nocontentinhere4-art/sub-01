@@ -301,6 +301,9 @@ class Neuromodulators:
             if k in d:
                 v = d[k]
                 setattr(self, k, dict(v) if isinstance(v, dict) else v)
+        # last_buy_t is a wall-clock stamp from the previous run, while since_buy runs on the model clock, which
+        # stops while the server is down. Drop the stamp so the first buy after a restart does not count the downtime.
+        self.last_buy_t = None
 
     @classmethod
     def from_dict(cls, d, **kw):

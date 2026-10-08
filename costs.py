@@ -158,17 +158,30 @@ class Ledger:
         yield float(r.get("t", 0)), part, float(r.get("usd", 0.0))
 
     def _pods(self):
-        """{tokyo day: {"runpod": usd}}; small file, read each time (an open pod is valued up to now)."""
+        """{tokyo day: {"runpod": usd}}: each pod's cost is spread over the Tokyo days its running time covers, split
+        at midnight as spiking/costs.py usage_on() splits it. Small file, read each time (an open pod is valued up to
+        now)."""
         path = self.dir / POD_FILE
         if not path.exists():
             return {}
         from spiking.costs import CostLog
+        now = lambda: datetime.fromtimestamp(self.clock(), timezone.utc)
         out = {}
-        for r in CostLog(path, clock=lambda: datetime.fromtimestamp(self.clock(), timezone.utc))._records():
+        for r in CostLog(path, clock=now)._records():
             try:
-                d = datetime.fromisoformat(r["start"]).astimezone(ROME).date().isoformat()
-                out.setdefault(d, {})["runpod"] = out.get(d, {}).get("runpod", 0.0) + float(r.get("cost_usd", 0.0))
-            except (KeyError, ValueError, TypeError):
+                a = datetime.fromisoformat(r["start"]).astimezone(ROME)
+                b = (datetime.fromisoformat(r["stop"]) if "stop" in r else now()).astimezone(ROME)
+                usd, span = float(r.get("cost_usd", 0.0)), (b - a).total_seconds()
+                parts = [(a.date(), 1.0)] if span <= 0 else []
+                lo = datetime(a.year, a.month, a.day, tzinfo=ROME)
+                while span > 0 and lo < b:                  # the share of the running time on each Tokyo day
+                    hi = lo + timedelta(days=1)
+                    parts.append((lo.date(), (min(b, hi) - max(a, lo)).total_seconds() / span))
+                    lo = hi
+                for d, share in parts:
+                    day = out.setdefault(d.isoformat(), {})
+                    day["runpod"] = day.get("runpod", 0.0) + usd * share
+            except (KeyError, ValueError, TypeError, OverflowError):
                 continue
         return out
 

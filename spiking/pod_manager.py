@@ -298,7 +298,9 @@ class PodManager:
                 if nxt is None:
                     return
                 start, end = nxt
+                last_sweep = None
                 while self.clock() < start:
+                    last_sweep = await self._sweep_every(last_sweep)
                     await self._sleep(min(30.0, max(1.0, (start - self.clock()).total_seconds())))
                 self.done_windows.add(start)
                 self._save()
@@ -408,6 +410,7 @@ class PodManager:
         minutes = min(self.max_session_min, (end - now).total_seconds() / 60, day_left * 60)
         if minutes < MIN_MINUTES:
             return f"skipped: only {minutes:.0f} min allowed (daily cap / window)"
+        await self._sweep_orphans()          # a pod left by a failed create or delete would make create() raise Busy
         cfg = self.session_config(start, minutes, now)
         data = await loop.run_in_executor(None, self._pack or podpack.pack_bytes)
         token = secrets.token_hex(24)
@@ -437,7 +440,7 @@ class PodManager:
 
     async def _watch(self, t0, c):
         """Poll until a stop condition; returns the reason the pod is deleted."""
-        stop_sent = False
+        stop_sent, last_sweep = False, None
         while True:
             now = self.clock()
             if c["done"] is not None:
@@ -458,22 +461,35 @@ class PodManager:
                         await self.send_stop()
                     except Exception:
                         pass
+            last_sweep = await self._sweep_every(last_sweep)     # a late-placed pod of ours is found, not left billing
             await self._sleep(self.tick)
 
+    async def _sweep_every(self, last):
+        """_sweep_orphans at most every ORPHAN_EVERY_S (as day-live does). Returns the time of the last sweep."""
+        now = self.clock()
+        if last is not None and (now - last).total_seconds() < ORPHAN_EVERY_S:
+            return last
+        await self._sweep_orphans()
+        return now
+
     async def _delete(self, pod_id, reason):
-        """Delete in the executor; if that is cancelled or fails, retry blocking so the pod never survives."""
+        """Delete in the executor; if that is cancelled or fails, retry blocking so the pod never survives. True when
+        the delete went through; False when the pod may still exist (the orphan sweep finds and retries it)."""
         loop = asyncio.get_running_loop()
         try:
             await loop.run_in_executor(None, self.ops.delete, pod_id, reason)
-            return
+            return True
         except BaseException as e:
             err = e
+        ok = False
         try:
             self.ops.delete(pod_id, reason)
+            ok = True
         except Exception as e2:
             print(f"spiking: could not delete pod {pod_id}: {type(e2).__name__}", file=sys.stderr, flush=True)
         if isinstance(err, asyncio.CancelledError):
             raise err
+        return ok
 
     # --- day-live mode (#58) -----------------------------------------------------------
     @staticmethod
@@ -621,8 +637,9 @@ class PodManager:
                     print(f"spiking: pod {pod['id']} ({str(pod.get('name'))[:60]}) is not one this manager makes: "
                           "left alone; no new pod until it is gone", flush=True)
                 continue
-            print(f"spiking: deleting orphan pod {pod['id']} (ours, not tracked)", flush=True)
-            await self._delete(pod["id"], "orphan")
+            print(f"spiking: deleting orphan pod {pod['id']} (ours, not in a running session)", flush=True)
+            if not await self._delete(pod["id"], "orphan"):      # still listed: the next sweep tries again
+                continue
             if pod["id"] not in known:                           # never logged: book its cost now
                 self.log.orphan(pod, self.clock())
             gone.append(pod["id"])

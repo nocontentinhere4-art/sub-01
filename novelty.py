@@ -5,7 +5,7 @@ Live log, 2026-10-02 17:33-18:11 UTC: "Studio Ghibli — Wikipedia" 3x plus "stu
 licence deed and "Contact Us" opened from page footers, and a search for "tiktok videos" that ended on Wikipedia.
 
 - Visited: a URL, a video id (YouTube watch/shorts, TikTok) or a near-duplicate title is never opened again within
-  REVISIT_S (7 days). Keys: url_key (host without www/m., path, the id-bearing query only) and title_key (lowercase,
+  REVISIT_S (7 days). Keys: url_key (host without www/m., path, the non-tracking query) and title_key (lowercase,
   site suffixes like " — Wikipedia" / " - YouTube" removed, the word "wikipedia" removed, punctuation folded).
 - Footer links: about, contact, privacy, terms, legal, licence / licence deeds, cookies, imprint, careers, ads, help,
   FAQ, sitemap, accessibility, and a site's own home page are never offered or followed.
@@ -25,7 +25,7 @@ FOLLOW_MAX = 0.25
 FOLLOW_WINDOW = 20
 SEEN_ORIGINS = ("video", "walk", "eye", "screen", "follow_up")
 
-ID_QUERY = ("v", "id", "p", "q", "search", "search_query", "query", "s", "list")
+TRACKING_QUERY = re.compile(r"(utm_\w*|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid|igshid|si|ref|ref_src|spm)$", re.I)
 YT_ID = re.compile(r"(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/)|youtu\.be/)([\w-]{6,20})", re.I)
 TT_ID = re.compile(r"tiktok\.com/(?:@[\w.]+/video/|player/v1/)(\d{8,25})", re.I)
 SUFFIX = re.compile(r"\s*[-—–|·:]\s*(wikipedia|wikimedia commons|youtube|tiktok|reddit|hacker news|the free encyclopedia|"
@@ -38,13 +38,13 @@ FOOTER_TEXT = re.compile(r"^\W*(about( us)?|contact( us)?|privacy( policy)?|term
 FOOTER_HREF = re.compile(r"/(about|about-us|contact|contact-us|privacy|privacy-policy|terms|terms-of-use|tos|legal|"
                          r"licen[cs]es?|copyright|cookies?|cookie-policy|imprint|impressum|careers|jobs|advertis\w*|"
                          r"help|faq|sitemap|accessibility|feedback|press)(/|\.|\?|$)|creativecommons\.org/(licenses|"
-                         r"publicdomain)|/wiki/(Help|Wikipedia|Special|Talk|Portal|File|Category|Template)[:_]", re.I)
+                         r"publicdomain)|/wiki/(Help|Wikipedia|Special|Talk|Portal|File|Category|Template):", re.I)
 VIDEO_WORDS = re.compile(r"\b(tiktoks?|tik tok|shorts?|reels?|videos?|clips?|vlogs?|yt)\b", re.I)
 
 
 def url_key(url):
-    """A URL's identity: video id when there is one, else host (no www./m.) + path (no trailing slash) + the id-like
-    query parameters."""
+    """A URL's identity: video id when there is one, else host (no www./m.) + path (no trailing slash) + the query
+    parameters except tracking ones (utm_*, fbclid, ...), so ?page=2 is not ?page=1."""
     u = str(url or "")
     if m := YT_ID.search(u):
         return f"yt:{m.group(1)}"
@@ -60,7 +60,7 @@ def url_key(url):
     host = host.replace(".m.", ".")                       # en.m.wikipedia.org = en.wikipedia.org
     path = urllib.parse.unquote(p.path or "/").rstrip("/").lower() or "/"
     q = urllib.parse.parse_qsl(p.query)
-    keep = "&".join(f"{k}={v.lower()}" for k, v in sorted(q) if k.lower() in ID_QUERY)
+    keep = "&".join(f"{k}={v.lower()}" for k, v in sorted(q) if not TRACKING_QUERY.match(k))
     return f"{host}{path}" + (f"?{keep}" if keep else "")
 
 

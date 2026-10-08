@@ -61,6 +61,18 @@ def clean_line(s, limit):
     return s
 
 
+def night_sig(night):
+    """The parts of a night record its diary entry is written from (see Diary.pending_close)."""
+    return [(night.get("sleep_onset") or "")[-5:], (night.get("woke_up") or "")[-5:],
+            len(night.get("wakeups", [])), len(night.get("replays", []))]
+
+
+def facts_sig(facts):
+    """The same parts, read back from a written entry's facts."""
+    return [facts.get("sleep_onset"), facts.get("woke_up"), facts.get("wakeups"),
+            facts.get("replays", 0) + facts.get("reading_replays", 0)]
+
+
 def music_facts(rows):
     """Tracks its brain model picked that day (music.Music.day rows) -> a few facts for the entry, or None. Genres and
     titles only: artists are people's names and stay out of the diary."""
@@ -144,14 +156,18 @@ class Diary:
 
     # --- in the morning --------------------------------------------------------
     def pending_close(self, engine):
-        """Date of a finished night whose diary entry is still open, else None."""
+        """Date of a finished night whose diary entry is missing or out of date, else None. A sleep that starts again
+        under the same night key (a nap after noon, a morning nap) continues that record, so the entry is written
+        again when the night closes with a different wake-up, wake-ups or replays."""
         n = engine.last_night
         if not n or (engine.night is not None and engine.night.get("date") == n["date"]):
             return None
         if not n.get("sleep_onset"):
             return None                                # stayed awake all night: nothing to write
         d = self.load(n["date"])
-        return None if d and d["closed"] else n["date"]
+        if d and d["closed"] and facts_sig(d.get("facts") or {}) == night_sig(n):
+            return None                                # written, and the night has not changed since
+        return n["date"]
 
     def close(self, night, llm=None, read_today=(), notes=None):
         """Write title, text and share text for a finished night. `llm.ask(system, user)` is optional.
@@ -168,7 +184,8 @@ class Diary:
         for r in allr:
             if r.get("source") == "reading":
                 rcounts[r["text"]] = rcounts.get(r["text"], 0) + 1
-        top = sorted(counts, key=lambda x: -counts[x])[:5]
+        top = [x for x in sorted(counts, key=lambda x: -counts[x])
+               if not BLOCK.search(str(x))][:5]           # quoted as is below: no blocked text
         today = {}
         for a in read_today:                            # #79: pages he stayed on (kind: video, short, forum, news, ...)
             today.setdefault(a["title"], {"title": a["title"], "url": a.get("url", ""), "replayed": 0, "today": True,
@@ -177,11 +194,13 @@ class Diary:
         for title, n in rcounts.items():
             today.setdefault(title, {"title": title, "url": "", "replayed": 0, "today": False})["replayed"] = n
         read = sorted(today.values(), key=lambda a: (-a["replayed"], not a["today"]))[:30]
+        read = [a for a in read if not BLOCK.search(str(a["title"]))]                              # quoted as is below
         top_read = [a["title"] for a in read if a["replayed"]][:3]
         facts = {"sleep_onset": (night.get("sleep_onset") or "")[-5:], "woke_up": (night.get("woke_up") or "")[-5:],
                  "wakeups": len(night.get("wakeups", [])), "replays": len(replays), "top_replayed": top,
                  "reading_replays": sum(rcounts.values()), "read": read, "dream_frames": len(d["frames"]),
-                 "read_topics": list(notes.get("topics", []))[:5], "conversations": len(notes.get("talked", [])),
+                 "read_topics": [t for t in list(notes.get("topics", [])) if not BLOCK.search(str(t))][:5],
+                 "conversations": len(notes.get("talked", [])),
                  **({"music": music} if music else {})}
         title = text = ""
         if llm is not None and d["frames"]:
@@ -226,9 +245,9 @@ class Diary:
                  + (f", woke {facts['wakeups']}x" if facts["wakeups"] else "") + "."]
         if facts["replays"]:
             lines.append(f"In REM it replayed {facts['replays']} of your messages.")
-            if facts["top_replayed"]:
+            if facts["top_replayed"] and not BLOCK.search(str(facts["top_replayed"][0])):
                 lines.append(f"Most often: “{facts['top_replayed'][0][:90]}”")
-        read = [a["title"] for a in facts.get("read", []) if a["replayed"]]
+        read = [a["title"] for a in facts.get("read", []) if a["replayed"] and not BLOCK.search(str(a["title"]))]
         if read:
             lines.append(f"It also replayed what it read: “{read[0][:70]}”.")
         lines.append("A model of brain activity, not a mind.")

@@ -16,7 +16,8 @@ RATE_S = 10.0
 
 # --- filter --------------------------------------------------------------------------
 URL = re.compile(r"(https?://|www\.|\b[\w-]+\.(com|net|org|io|xyz|fun|app|gg|co|me|ly|sol|to|ru|info|biz|link|"
-                 r"site|online|club|finance|exchange|money|pro|tech|dev|ai)\b|t\.me/|discord\.gg)", re.I)
+                 r"site|online|club|finance|exchange|money|pro|tech|dev|ai|be|gl|gd|ms|tv|cc|jp|de|fr|uk|us|au|ca|"
+                 r"cn|kr|eu|edu|gov)\b|t\.me/|discord\.gg)", re.I)
 SOL_ADDR = re.compile(r"\b[1-9A-HJ-NP-Za-km-z]{32,44}\b")
 ETH_ADDR = re.compile(r"\b0x[a-fA-F0-9]{8,}")
 TICKER = re.compile(r"\$[A-Za-z][A-Za-z0-9]{1,11}\b")
@@ -130,13 +131,18 @@ def normalise(text):
 
 
 def dedupe_key(text):
-    return re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", text).lower())
+    """Case, whitespace, ASCII punctuation and zero-width marks dropped; emoji and other symbols kept, so "lol" with one
+    emoji and "lol" with another differ. A text that is only punctuation keeps itself ("!!!" and "???" differ)."""
+    t = unicodedata.normalize("NFKC", text).lower()
+    return re.sub(r"[\s_\u200b-\u200f\u2060\ufeff!-/:-@\[-`{-~]+", "", t) or t.strip()
 
 
 def blocked(text, media=False):
     """Reason string if the message must be dropped, else None. media=True: a song or video title, shown as it is:
     no slur check, only self-harm prompts (MEDIA_RE) and calls to violence against a group (incitement); tickers only as coins
-    (MEDIA_TICKER: not "$uicideboy$"), no phone rule (it reads year ranges, "2000 - 2010"), and money only as a request (MEDIA_MONEY)."""
+    (MEDIA_TICKER: not "$uicideboy$"), no phone rule (it reads year ranges, "2000 - 2010"), and money only as a request (MEDIA_MONEY).
+    The text is NFKC-folded first, so fullwidth letters, digits and symbols ("ｗｗｗ．", "＄PUMP") match the same rules."""
+    text = unicodedata.normalize("NFKC", text)
     if URL.search(text):
         return "links are not allowed"
     if SOL_ADDR.search(text) or ETH_ADDR.search(text):

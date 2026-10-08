@@ -19,6 +19,7 @@ import json
 import re
 import os
 import time
+import unicodedata
 import urllib.parse
 
 KEY_ENV = "YOUTUBE_API_KEY"
@@ -133,18 +134,30 @@ def playable(item, region=REGION):
     return True
 
 
-YT_PAGE = re.compile(r"^https?://(?:(?:www|m|music)\.)?(?:youtube\.com|youtu\.be)(?:/|$)", re.I)
+YT_HOST = re.compile(r"^(?:(?:www|m|music)\.)?(?:youtube\.com|youtu\.be)$")
 YT_VIDEO = re.compile(r"^https?://(?:(?:www|m)\.)?(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|"
                       r"youtu\.be/)([\w-]{11})", re.I)
 
 
+def _browser_url(url):
+    """The URL as Chromium reads an http(s) address: tabs and newlines dropped, C0 controls and spaces trimmed at the
+    ends, a backslash read as a slash, and any slashes after the scheme read as the two that open the host."""
+    u = re.sub(r"^[\x00-\x20]+|[\x00-\x20]+$", "", re.sub(r"[\t\n\r]", "", str(url or ""))).replace("\\", "/")
+    return re.sub(r"^(https?):/*", r"\1://", u, flags=re.I)
+
+
 def page_video(url):
     """#89 live: a youtube.com / youtu.be page URL -> (video id or None, is a YouTube page). The browser never opens
-    YouTube's own pages (its Terms forbid automated access); a video link is played in the official embed instead."""
-    u = str(url or "")
-    if not YT_PAGE.match(u):
+    YouTube's own pages (its Terms forbid automated access); a video link is played in the official embed instead.
+    Only the host decides: a port, a query or a fragment after it does not make the page another one."""
+    try:
+        p = urllib.parse.urlsplit(_browser_url(url))
+        host = unicodedata.normalize("NFKC", urllib.parse.unquote(p.hostname or "")).lower().rstrip(".")
+    except ValueError:
         return None, False
-    m = YT_VIDEO.match(u)
+    if p.scheme not in ("http", "https") or not YT_HOST.match(host):
+        return None, False
+    m = YT_VIDEO.match(f"https://{host}{p.path}" + (f"?{p.query}" if p.query else ""))
     return (m.group(1) if m else None), True
 
 

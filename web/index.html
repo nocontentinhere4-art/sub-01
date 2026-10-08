@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · live</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-  :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
+  :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#7a7a8e; --line:rgba(255,255,255,.08); --or:#ff6a00;
           --card:rgba(10,10,16,.74); --st:#ff9a3c;
           --panel-w:clamp(340px, 22vw, 420px); --dock-h:150px; }   /* --dock-h: the dock's real height, set by a ResizeObserver */
   * { box-sizing:border-box; }
@@ -233,7 +233,7 @@
 <div id="n3mini"></div>
 
 <div id="dock">
-  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div>
+  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain, each drawn as a small real cell">neurons</button><button id="spin" title="the slow turn of the brain: on or off">rotate</button></div>
   <!-- brain_anatomy hook (G9, #99): the brain as a real specimen (web/brain_anatomy.js, loaded on the first click) -->
   <div id="anat"><span>view:</span><button data-v="glow" class="on" title="the page's own look: additive fibres and a rim-lit cortex (the look before #99)">glow</button><button data-v="fresh" title="a fresh specimen: pinkish-grey cortex, glistening pia, red arteries">fresh brain</button><button data-v="fixed" title="fixed and cut open: his own T1 scan on the cut, grey and white matter">dissected</button><button data-v="bundles" title="his real fibres as muted white-matter bundles, coloured by direction">bundles</button><button data-a="vessels" title="cerebral arteries (atlas, fitted to his brain)">vessels</button><button data-a="nerves" title="the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button><button id="anat-axis" title="which way the cut runs" hidden>coronal</button><input id="anat-cut" type="range" min="0" max="1" step="0.005" value="0.5" title="where the cut is" hidden></div>
   <div id="anatcap" hidden></div>
@@ -252,6 +252,7 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MINI = document.body.classList.contains("mini");
+const REDUCED = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);   // reduced motion: the brain starts still and the dive is a cut
 // "Neurons" panel: 1M simulated spiking neurons (model, not a mind). Not started in the mini (embedded) view.
 if (!MINI && window.Neurons) Neurons.init({mount: $("neurons"), open: true});
 
@@ -266,7 +267,7 @@ const camera = new THREE.PerspectiveCamera(32, 1, 1, 3000);
 camera.up.set(0, 0, 1); camera.position.set(-300, 170, 108);
 if (MINI) camera.position.multiplyScalar(0.72);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
+controls.enableDamping = true; controls.autoRotate = !REDUCED; controls.autoRotateSpeed = 0.35;
 let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, cortexIdx = null, n3wall = -1e9, n3net = null;
 function resize(){
   const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
@@ -314,7 +315,8 @@ function closeupOpen(kind, region){
   neuronsText();
 }
 function closeupExit(keepCamera){
-  if (n3close) { n3style = n3close.style(); n3close.close(); n3close = null; }
+  if (n3close) { n3style = n3close.style(); const gl = n3close.renderer; n3close.close(); n3close = null;
+    if (gl && gl.forceContextLoss) gl.forceContextLoss(); }   // the close-up's own WebGL context: browsers cap live ones (~16), so free it now
   if (!keepCamera && n3saved) {
     camera.position.copy(n3saved.pos); controls.target.copy(n3saved.target); n3saved = null; n3lodAt = performance.now();
     const d = camera.position.distanceTo(controls.target), min = Neurons3D.LOD_IN * 1.3;   // back outside the zoom-in distance, or the LOD reopens it
@@ -404,7 +406,7 @@ function zoomStart(animate){
   const col = Neurons3D.column({THREE, scene, morph: {cells: zoomStart.cells}, pos: p.pos, normal: p.normal, region: p.region, block});
   const look = new THREE.Vector3(...col.at(col.plan.thickness / 2)), deep = new THREE.Vector3(...col.at(block && block.depthUm ? (block.depthUm[0] + block.depthUm[1]) / 2 : ZOOM.blockUm));
   zoom = Object.assign(p, { N, P, side, col, look, deep, from: { pos: camera.position.clone(), target: controls.target.clone() },
-    t0: performance.now(), anim: animate ? { t0: performance.now(), dur: 11000 } : null, handed: false, backAt: 0,
+    t0: performance.now(), anim: animate ? { t0: performance.now(), dur: REDUCED ? 1 : 11000 } : null, handed: false, backAt: 0,
     saved: { min: controls.minDistance, zs: controls.zoomSpeed, rot: controls.autoRotate } });
   controls.autoRotate = false; controls.minDistance = 0.25; controls.zoomSpeed = 2.2;
 
@@ -541,6 +543,8 @@ const tgOn = new Array(12).fill(0);
 const actData = new Uint8Array(256 * 4);
 const actTex = new THREE.DataTexture(actData, 256, 1, THREE.RGBAFormat);
 
+let brainErr = "";                                  // set if the brain's data fails to load; the live feed carries on without it
+function brainFailed(e){ console.error("brain:", e); brainErr = "the 3D brain did not load; the live feed still runs"; $("sub").textContent = brainErr; }
 Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=>r.json()),
              fetch("fibres.bin").then(r=>r.arrayBuffer()), fetch("fibres_ends.bin").then(r=>r.arrayBuffer())])
 .then(([d, meta, fbuf, ebuf]) => {
@@ -643,9 +647,8 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
     });
     const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m);
     if (n3want) neuronsOn(true);
-  });
-  connect();
-});
+  }).catch(brainFailed);
+}).catch(brainFailed);
 
 // ---------- story ----------
 const tickerEl = $("ticker");
@@ -758,7 +761,7 @@ function drawBoard(g){
   const flip = g.color === "black", cells = [];
   for (let i = 0; i < 64; i++) {
     const k = flip ? 63 - i : i, file = k % 8, rank = 8 - Math.floor(k / 8), name = "abcdefgh"[file] + rank, p = sq[k];
-    const cls = [(file + rank) % 2 ? "" : "d", lit.includes(name) ? "l" : "", p && p === p.toUpperCase() ? "w" : ""].join(" ");
+    const cls = [(file + rank) % 2 ? "d" : "", lit.includes(name) ? "l" : "", p && p === p.toUpperCase() ? "w" : ""].join(" ");
     cells.push(`<div class="${cls}">${p ? PIECES[p.toUpperCase()] : ""}</div>`);
   }
   $("desk-board").innerHTML = cells.join("");
@@ -975,6 +978,10 @@ document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
   if (l === "sci") sciT = on ? 1 : 0;
   if (l === "neurons") { neuronsOn(on); if (!on) closeupExit(); }
 });
+// the rotate toggle: the brain's slow turn, on or off (it starts off with reduced motion)
+function setSpin(on){ const b = $("spin"); controls.autoRotate = on; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }
+$("spin").onclick = () => setSpin(!controls.autoRotate);
+setSpin(controls.autoRotate);
 document.querySelectorAll("#n3close button[data-k]").forEach(b => b.onclick = () => closeupOpen(b.dataset.k));
 $("n3dive").onclick = () => { if (!n3want) neuronsOn(true); closeupExit(); if (zoom) zoomEnd();
   const go = () => { if (n3d && n3morph) { zoomStart(true); } else setTimeout(go, 300); }; setTimeout(go, 50); };
@@ -1007,12 +1014,18 @@ $("anat-cut").oninput = () => { if (anat) anat.setCut(null, +$("anat-cut").value
   if (v0 !== "glow") anatView(v0);
   for (const a of (qs.get("layers") || "").split(",")) { const b = document.querySelector(`#anat button[data-a="${a}"]`); if (b) b.click(); } }
 // ---------- end of the brain_anatomy hook ----------
+// aria-pressed follows the .on class of each toggle (WCAG 4.1.2), so no click handler has to remember it
+const TOGGLES = '#layers button, #anat button[data-v], #anat button[data-a], #n3close button[data-k]:not([data-k=""])';
+const syncPressed = b => b.setAttribute("aria-pressed", String(b.classList.contains("on")));
+document.querySelectorAll(TOGGLES).forEach(syncPressed);
+if ("MutationObserver" in window) { const mo = new MutationObserver(ms => ms.forEach(m => { if (m.target.matches(TOGGLES)) syncPressed(m.target); }));
+  for (const id of ["layers", "anat", "n3close"]) mo.observe($(id), {subtree: true, attributes: true, attributeFilter: ["class"]}); }
 if ("IntersectionObserver" in window)            // draw only while the brain is on screen (the room's PiP, a phone's scroll)
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
 if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000); loadChess(); loadMusic();
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
 if (!MINI) setInterval(() => { if (full) $("story").textContent = FULL_TXT;
-  else if (stage) { $("story").innerHTML = story(); $("sub").innerHTML = subline(); } }, 500);
+  else if (stage) { $("story").innerHTML = story(); const s = subline(); $("sub").innerHTML = brainErr ? esc(brainErr) + (s ? " · " + s : "") : s; } }, 500);
 
 // ---------- loop ----------
 let last = performance.now(), t = 0;
@@ -1046,7 +1059,7 @@ function frame(now){
     const u = fibreMat.uniforms;
     u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
     u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.85 * n3dim) * zoomBrain;   // neurons on: the fibres step well back (#88 B); gone inside the column (#99)
-    if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
+    if (pulse.t >= 0) { pulse.t = Math.max(0, (now - pulse.start) / 2600); if (pulse.t > 1.6) pulse.t = -1; }
     u.pulseT.value = pulse.t;
   }
   if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci) * (1 - 0.7 * n3dim) * zoomBrain;   // a faint outline behind the cells
@@ -1066,6 +1079,7 @@ function frame(now){
   if (n3close) return;                                                            // the close-up overlay draws itself (NeuronRender)
   controls.update(); renderer.render(scene, camera);
 }
+connect();                                          // the live feed starts with the page, whether or not the brain's data loaded
 requestAnimationFrame(frame);
 </script>
 </body>

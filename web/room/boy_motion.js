@@ -437,7 +437,7 @@ export function createMotion(env){
   // ---------- the pop killer: a bone that jumps between two frames gets a decaying offset that bridges the jump. It runs
   // before the IK layers, on the clip-driven bones (the torso, the shoulders, the head, the legs' tops): a hand or a
   // foot that an IK layer places lands on its target whatever happened the frame before
-  const SM = new Map();                               // bone -> {q: last output, off: offset, k: how much of it is left}
+  const SM = new Map();                               // bone -> {q: last output, raw: last clip value, off: offset, k: how much of it is left}
   let lastRoot = null;
   const JUMP = 0.22, DECAY = 0.28;
   function smoothBones(dt){
@@ -453,14 +453,17 @@ export function createMotion(env){
     if (bed(st.at) || (st.step && st.step.k !== "walk")) { SM.clear(); lastRoot = null; return; }
     for (const name in B) {
       const b = B[name]; if (!b || !b.isBone) continue;
-      let s = SM.get(b); if (!s) SM.set(b, s = {q: b.quaternion.clone(), off: Q(), k: 0});
+      let s = SM.get(b); if (!s) SM.set(b, s = {q: b.quaternion.clone(), raw: b.quaternion.clone(), off: Q(), k: 0});
       const skip = teleport || dt > 0.25 || !/^(Hips|Spine02|Spine01|Spine|neck|Head|LeftShoulder|RightShoulder|LeftUpLeg|RightUpLeg)$/.test(name)
         || (skipR && /^Right(Arm|ForeArm|Hand)$/.test(name)) || (st.holdW > 0 && (name === "Head" || name === "neck"));
-      if (skip) { s.q.copy(b.quaternion); s.k = 0; continue; }
-      const ang = 2 * Math.acos(Math.min(1, Math.abs(b.quaternion.dot(s.q))));
+      if (skip) { s.q.copy(b.quaternion); s.raw.copy(b.quaternion); s.k = 0; continue; }
+      // the jump is measured on the clip's value, not on the bridged output: a bridge still decaying would otherwise see
+      // its own offset as a new jump and re-arm every frame (a 0.5 rad step took 1.5 s to settle at 60 fps, not 0.23 s)
+      const ang = 2 * Math.acos(Math.min(1, Math.abs(b.quaternion.dot(s.raw))));
       if (ang > JUMP) {                               // offset = last output * current^-1 (so offset * current = last output)
         s.off.copy(s.q).multiply(_q.copy(b.quaternion).invert()); s.k = 1;
       }
+      s.raw.copy(b.quaternion);                       // before the bridge below changes b.quaternion
       if (s.k > 0) {
         s.k = Math.max(0, s.k - dt / DECAY); const w = s.k * s.k * (3 - 2 * s.k);
         env.touch(b); _q.copy(s.off); _q2.identity().slerp(_q, w); b.quaternion.premultiply(_q2); b.updateMatrixWorld(true);
@@ -471,7 +474,7 @@ export function createMotion(env){
 
   // ---------- each frame, after the page's animate()
   function update(dt){
-    if (!M.on || !env.boy || !env.boy.visible || !B.Hips || !B.LeftArm) return;
+    if (!M.on || !env.boy || !env.boy.visible || !B.Hips || !B.LeftArm) { SM.clear(); lastRoot = null; return; }   // hidden: the next visible frame starts from the clip, with no bridge from the pose he left with
     M.T += dt;
     const st = env.state(), ctx = st.ctx;
     torso();

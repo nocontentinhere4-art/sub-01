@@ -16,6 +16,7 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
 
 import argparse
 import json
+import shutil
 import time
 import urllib.request
 from multiprocessing import Pool
@@ -32,6 +33,7 @@ OUT = Path("out/rest")
 QC = OUT / "qc.json"
 TMP = Path("data/tmp")
 HOMOTOPIC_MIN = 0.3
+TIMEOUT_S = 120                                                        # max silence on a connection before it fails
 
 _labels_t1 = _t1_masked = None                                         # per-worker globals (set by _init)
 
@@ -55,7 +57,8 @@ def run_name(key):
 def fetch(url, dst, tries=3):
     for i in range(tries):
         try:
-            urllib.request.urlretrieve(url, dst)
+            with urllib.request.urlopen(url, timeout=TIMEOUT_S) as r, open(dst, "wb") as f:  # a stall raises
+                shutil.copyfileobj(r, f, 1 << 20)
             return
         except Exception:
             if i == tries - 1:
@@ -68,7 +71,7 @@ def process(key, n_regions):
     dst = OUT / f"{name}.npz"
     if dst.exists():
         return "cached"
-    tr = json.loads(urllib.request.urlopen(S3 + key.replace(".nii.gz", ".json")).read())["RepetitionTime"]
+    tr = json.loads(urllib.request.urlopen(S3 + key.replace(".nii.gz", ".json"), timeout=TIMEOUT_S).read())["RepetitionTime"]
     tmp = TMP / Path(key).name
     try:
         fetch(S3 + key, tmp)
@@ -131,6 +134,8 @@ def validate(names):
     qc = json.loads(QC.read_text()) if QC.exists() else {}
     rejected_dir = OUT / "rejected"
     for f in sorted(OUT.glob("*.npz")):
+        if f.name.endswith(".part.npz"):                               # a run in progress or killed mid-write
+            continue
         ts = np.load(f)["ts"].astype(np.float64)
         ok = ~np.isnan(ts).any(0)
         c = np.full((ts.shape[1],) * 2, np.nan)
@@ -166,6 +171,8 @@ def main():
     if args.validate:
         validate(names)
         return
+    for stale in OUT.glob("*.part.npz"):                               # left by a run killed mid-write
+        stale.unlink()
     rejected = {k for k, v in json.loads(QC.read_text()).items() if not v["kept"]} if QC.exists() else set()
     keys = Path("rest_runs.txt").read_text().split()[:args.n_runs]
     todo = [k for k in keys if not (OUT / f"{run_name(k)}.npz").exists() and run_name(k) not in rejected]

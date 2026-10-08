@@ -34,6 +34,8 @@
   #strip { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px; margin-top:10px; }
   #strip img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:3px; border:1px solid var(--line); cursor:pointer; opacity:.7; }
   #strip img.on { opacity:1; border-color:var(--or); }
+  #strip button { display:block; width:100%; padding:0; border:0; background:none; cursor:pointer; }
+  #strip button:focus-visible { outline:2px solid var(--or); outline-offset:2px; }
   .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin:0 0 8px; }
   aside section { margin-bottom:22px; }
   #replays div { font-size:13px; padding:5px 0; border-bottom:1px solid #111118; }
@@ -41,7 +43,7 @@
   #read div { font-size:13px; padding:5px 0; border-bottom:1px solid #111118; display:flex; justify-content:space-between; gap:10px; }
   #read a { text-decoration:none; } #read a:hover { text-decoration:underline; }
   #read span { color:var(--dim); font-size:11px; flex:none; } #read .y { color:var(--or); }
-  .hint { color:#55556a; font-size:11px; line-height:1.5; margin-top:8px; }
+  .hint { color:var(--dim); font-size:11px; line-height:1.5; margin-top:8px; }
   #share { width:100%; min-height:150px; background:#0c0c12; color:var(--fg); border:1px solid #2a2a36; padding:10px;
     font:inherit; font-size:12px; line-height:1.5; resize:vertical; }
   .row { display:flex; gap:8px; margin-top:8px; align-items:center; }
@@ -50,7 +52,7 @@
   .row a { background:#0c0c12; color:var(--fg); border:1px solid #2a2a36; }
   #count { color:var(--dim); font-size:11px; margin-left:auto; }
   #empty { padding:40px 28px; color:var(--dim); font-size:14px; line-height:1.6; max-width:60ch; display:none; }
-  #note { color:#55556a; font-size:11px; padding:0 28px 22px; max-width:90ch; line-height:1.5; }
+  #note { color:var(--dim); font-size:11px; padding:0 28px 22px; max-width:90ch; line-height:1.5; }
   @media (max-width: 900px) { header, #nights, main, #empty, #note { padding-left:16px; padding-right:16px; }
     main { grid-template-columns:1fr; } #title { font-size:21px; } #cap { font-size:14px; } }
 </style>
@@ -66,6 +68,7 @@ even when nobody is watching; the entry is written the next morning, Tokyo time.
     <p id="text"></p>
     <div id="facts"></div>
     <div id="view"><img id="a" alt=""><img id="b" alt=""><div id="cap"></div></div>
+    <div class="row"><button id="pp" type="button">pause</button></div>
     <div id="strip"></div>
   </div>
   <aside>
@@ -86,6 +89,8 @@ messages it replays and from the titles of articles it read. They are not the re
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let night = null, idx = 0, front = "a", timer = null;
+// the slideshow can be paused; it starts paused for visitors who ask the system for less motion
+let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function show(i){
   const f = night.frames[i]; if (!f) return;
@@ -98,7 +103,7 @@ function show(i){
 }
 function play(){
   clearInterval(timer);
-  if (night.frames.length > 1) timer = setInterval(() => show((idx + 1) % night.frames.length), 5000);
+  if (night && !paused && night.frames.length > 1) timer = setInterval(() => show((idx + 1) % night.frames.length), 5000);
 }
 async function open(date){
   night = await (await fetch(`/api/diary/${encodeURIComponent(date)}`)).json();
@@ -110,38 +115,52 @@ async function open(date){
   $("facts").textContent = night.closed
     ? `slept ${x.sleep_onset}–${x.woke_up} Tokyo time · ${x.wakeups ? `woke ${x.wakeups}×` : "slept through"} · ${x.replays} message replays${x.reading_replays ? ` · ${x.reading_replays} reading replays` : ""} · ${x.dream_frames} dream frames`
     : `${night.frames.length} dream frames so far`;
-  $("strip").innerHTML = night.frames.map((f, k) => `<img src="${esc(f.img)}" loading="lazy" data-k="${k}" alt="">`).join("");
-  $("strip").onclick = e => { const k = e.target.dataset.k; if (k !== undefined) { show(+k); play(); } };
+  $("strip").innerHTML = night.frames.map((f, k) => `<button type="button" data-k="${k}" aria-label="frame ${k + 1}, ${esc(f.t)}"><img src="${esc(f.img)}" loading="lazy" alt=""></button>`).join("");
+  $("strip").onclick = e => { const b = e.target.closest("button[data-k]"); if (b) { show(+b.dataset.k); play(); } };
   const reps = (x.top_replayed && x.top_replayed.length) ? x.top_replayed
     : [...new Set(night.frames.flatMap(f => f.replayed || []))].slice(-5);
   $("replays").innerHTML = reps.length ? reps.map(r => `<div>“${esc(r)}”</div>`).join("")
-    : `<div style="color:#55556a">none — nobody wrote that day</div>`;
+    : `<div style="color:var(--dim)">none — nobody wrote that day</div>`;
   const read = x.read || [];
-  $("read").innerHTML = !night.closed ? `<div style="color:#55556a">written in the morning</div>`
+  $("read").innerHTML = !night.closed ? `<div style="color:var(--dim)">written in the morning</div>`
     : read.length ? read.map(a => `<div>${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}`
         + `<span class="${a.replayed ? "y" : ""}">${a.verb && a.verb !== "read" ? `${esc(a.verb)} · ` : ""}${a.replayed ? `replayed ${a.replayed}×` : "not replayed"}${a.today ? "" : " · read earlier"}</span></div>`).join("")
-    : `<div style="color:#55556a">nothing read that day</div>`;
+    : `<div style="color:var(--dim)">nothing read that day</div>`;
   $("sharebox").hidden = !night.closed;
   $("share").value = night.share || "";
   $("count").textContent = night.share ? `${night.share.length}/280` : "";
   const cover = night.frames[Math.floor(night.frames.length / 2)];
   $("img").href = cover ? cover.img : "#";
   $("img").style.display = cover ? "" : "none";
-  if (night.frames.length) { show(0); play(); } else { $("cap").textContent = ""; $("a").removeAttribute("src"); }
+  if (night.frames.length) { show(0); play(); }
+  else {   // no frames: clear both buffers, or the last night's image stays on screen under this night's title
+    clearInterval(timer);
+    for (const id of ["a", "b"]) { $(id).classList.remove("on"); $(id).removeAttribute("src"); }
+    front = "a"; $("cap").textContent = "";
+  }
 }
 $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText($("share").value); } catch { $("share").select(); document.execCommand("copy"); }
   $("copy").textContent = "copied"; setTimeout(() => $("copy").textContent = "copy", 1500);
 };
+$("pp").textContent = paused ? "play" : "pause";
+$("pp").onclick = () => { paused = !paused; $("pp").textContent = paused ? "play" : "pause"; play(); };
 (async () => {
-  const d = await (await fetch("/api/diary")).json();
-  if (!d.nights.length) { $("empty").style.display = "block"; return; }
-  $("nights").innerHTML = d.nights.map(n =>
-    `<button data-date="${esc(n.date)}">${esc(n.date)}${n.closed ? "" : " ·  tonight"} · ${n.frames}</button>`).join("");
-  $("nights").onclick = e => { const b = e.target.closest("button"); if (b) open(b.dataset.date); };
-  const want = new URLSearchParams(location.search).get("night");
-  const first = d.nights.find(n => n.date === want) || d.nights.find(n => n.closed) || d.nights[0];
-  open(first.date);
+  try {
+    const r = await fetch("/api/diary");
+    if (!r.ok) throw new Error(`diary ${r.status}`);
+    const d = await r.json();
+    if (!d.nights.length) { $("empty").style.display = "block"; return; }
+    $("nights").innerHTML = d.nights.map(n =>
+      `<button data-date="${esc(n.date)}">${esc(n.date)}${n.closed ? "" : " ·  tonight"} · ${n.frames}</button>`).join("");
+    $("nights").onclick = e => { const b = e.target.closest("button"); if (b) open(b.dataset.date); };
+    const want = new URLSearchParams(location.search).get("night");
+    const first = d.nights.find(n => n.date === want) || d.nights.find(n => n.closed) || d.nights[0];
+    await open(first.date);
+  } catch {
+    $("empty").textContent = "The diary could not be loaded. Try again in a minute.";
+    $("empty").style.display = "block";
+  }
 })();
 </script>
 </body>

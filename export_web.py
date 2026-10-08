@@ -22,10 +22,13 @@ def xyz(nm):
 
 
 def group(nm):
+    # longest matching pattern wins: "insula" (_SalVentAttn_FrOperIns) sits inside "salience" (_SalVentAttn_)
+    best = None
     for g, pats in GROUPS.items():
-        if any(p in nm for p in pats):
-            return g
-    return "other"
+        for p in pats:
+            if p in nm and (best is None or len(p) > best[0]):
+                best = (len(p), g)
+    return best[1] if best else "other"
 
 
 z = np.load("out/connectome.npz", allow_pickle=True)

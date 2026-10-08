@@ -333,14 +333,14 @@
       vec3 off = rotq(iQuat, aOff);
       vec4 cv = modelViewMatrix * vec4(c, 1.0);
       float fl = uFloorPx * (abs(aKind - 4.0) < 0.5 ? 2.4 : (abs(aKind - 5.0) < 0.5 ? 0.8 : 1.0));
-      float rr = max(aR * iScale, fl * uPixK * -cv.z);
+      float rr = iScale > 0.0 ? max(aR * iScale, fl * uPixK * -cv.z) : 0.0;     // scale 0 = hidden: collapses to nothing, not to a floor-size dot
       float dt = uTime - iSpike, on = step(0.0, dt);
       vSoma = on * exp(-dt / 0.3);
       float pulse = 0.0;
       if (aArrive >= 0.0) {
         if (abs(aKind - 6.0) < 0.5) pulse = on * step(aArrive, dt) * exp(-(dt - aArrive) / 0.9);                 // bouton: glows after arrival
         else { float x = dt - aArrive;                             // the travelling front; on the real axons the tube stays lit behind it, fading
-          pulse = on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 1.5)) * exp(-aArrive / uPulseFade); }
+          pulse = on * (exp(-(x / uPulseW) * (x / uPulseW)) + uPulseTail * step(0.0, x) * exp(-x / 1.5)) * exp(-aArrive / uPulseFade); }
       }
       vec3 nrm = rotq(iQuat, aNrm);
       vec3 w = c + off * rr + nrm * (uPulseSwell * min(1.0, pulse));                                             // the lit stretch of a real (thin) axon swells a little
@@ -416,7 +416,7 @@
       vDepth = clamp(-mv.z * uDepthK, 0.0, 1.0);
       float dt = uTime - iSpike, on = step(0.0, dt), x = dt - aArrive;
       vSoma = on * exp(-dt / 0.3);
-      vPulse = aArrive >= 0.0 ? on * (exp(-pow(x / uPulseW, 2.0)) + uPulseTail * step(0.0, x) * exp(-x / 1.5)) * exp(-aArrive / uPulseFade) : 0.0;
+      vPulse = aArrive >= 0.0 ? on * (exp(-(x / uPulseW) * (x / uPulseW)) + uPulseTail * step(0.0, x) * exp(-x / 1.5)) * exp(-aArrive / uPulseFade) : 0.0;
       vKind = aKind; vCol = iCol; vDist = aDist;
     }`;
   const FS_LINE = `
@@ -444,7 +444,7 @@
       vec2 c = gl_PointCoord - 0.5; float cs = cos(vAngle), sn = sin(vAngle);
       vec2 q = vec2(cs * c.x - sn * c.y, sn * c.x + cs * c.y);
       float streak = exp(-q.x * q.x * 14.0 - q.y * q.y * 260.0);
-      float d = length(c) * 2.0, blob = exp(-pow((d - 0.55) / 0.2, 2.0)) * 0.7 + exp(-d * d * 8.0) * 0.3;
+      float d = length(c) * 2.0, qb = (d - 0.55) / 0.2, blob = exp(-qb * qb) * 0.7 + exp(-d * d * 8.0) * 0.3;
       vec3 col = uStyle < 0.5 ? mix(uColA * 0.05 * streak, uColRed * 0.25 * blob, vKind) : mix(vec3(0.5, 0.45, 0.48) * 0.04 * streak, vec3(0.5, 0.36, 0.38) * blob * 0.12, vKind);
       gl_FragColor = vec4(col * uDim, 1.0);
     }`;
@@ -505,7 +505,8 @@
   let CELLS = null, loading = null;
   function load(url) {
     if (CELLS) return Promise.resolve(CELLS);
-    if (!loading) loading = fetch(url || ASSET).then(r => { if (!r.ok) throw new Error("cells.json " + r.status); return r.json(); }).then(j => (CELLS = j, NR.CELLS = j, j));
+    if (!loading) loading = fetch(url || ASSET).then(r => { if (!r.ok) throw new Error("cells.json " + r.status); return r.json(); }).then(j => (CELLS = j, NR.CELLS = j, j))
+      .catch(e => { loading = null; throw e; });                                  // a failed fetch is retried by the next open()
     return loading;
   }
 
@@ -543,7 +544,7 @@
                 worldPos: o.worldPos || null, normal: o.normal && o.normal.length === 3 ? o.normal.slice() : null, readyResolve: null, opacity: 1, entryFade: 1,
                 live: !!o.live, lastWall: o.live ? performance.now() : -1e9, forcedOffline: false, rate: 0, rateT: 0, spikes: 0, gap: 200, prev: 0,
                 onScreen: true, closed: false, fps: 0, jsMs: 0, frames: 0, jsSum: 0, fpsAt: performance.now(), focus: 0, t0: performance.now(),
-                userTouched: false, zoomedOut: false };
+                userTouched: false, zoomedOut: false, paused: !!(root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches) };   // the slow turn stays still for reduced motion
     const lodOf = () => S.lodName === "phone" || S.lodName === "desktop" ? S.lodName : (isPhone() ? "phone" : "desktop");
     let L = LOD[lodOf()];
     // DOM
@@ -560,7 +561,7 @@
     }
     const canvas = root.document.createElement("canvas"); canvas.className = "nr-canvas";
     const hud = root.document.createElement("div"); hud.className = "nr-hud";
-    hud.innerHTML = '<button data-s="fluorescence">fluorescence</button><button data-s="render">3D render</button><button data-s="em">EM</button><button class="nr-x" title="back to the whole brain">✕</button>';
+    hud.innerHTML = '<button data-s="fluorescence">fluorescence</button><button data-s="render">3D render</button><button data-s="em">EM</button><button class="nr-pause" title="stop the slow turn of the camera">pause turn</button><button class="nr-x" title="back to the whole brain" aria-label="back to the whole brain">✕</button>';
     const bar = root.document.createElement("div"); bar.className = "nr-bar"; bar.innerHTML = '<i></i><span></span>';
     const stat = root.document.createElement("div"); stat.className = "nr-stat";
     function applyOpacity() {                                      // nr.setOpacity() x the entry fade-in, on the canvas and the HUD alike
@@ -570,6 +571,8 @@
     container.appendChild(canvas); container.appendChild(hud); container.appendChild(stat); container.appendChild(bar);
     hud.querySelectorAll("button[data-s]").forEach(b => b.onclick = () => setStyle(b.dataset.s));
     hud.querySelector(".nr-x").onclick = () => { if (o.onClose) o.onClose("button"); };
+    const pauseBtn = hud.querySelector(".nr-pause"), syncPause = () => { pauseBtn.setAttribute("aria-pressed", String(S.paused)); pauseBtn.classList.toggle("on", S.paused); };
+    syncPause(); pauseBtn.onclick = () => { S.paused = !S.paused; syncPause(); };
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: "high-performance" });
     renderer.autoClear = true;
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(32, 1, 2, 9000);
@@ -798,7 +801,7 @@
         g.setAttribute("iCol", new THREE.InstancedBufferAttribute(col, 1)); g.instanceCount = n;
         const br = new Float32Array(n); cells.forEach((c, i) => { br[i] = c.A.br[c.j]; }); g.setAttribute("iBright", new THREE.InstancedBufferAttribute(br, 1));
         const mesh = new THREE.Mesh(g, matNuc); mesh.frustumCulled = false; mesh.renderOrder = 2; mesh.name = "nr-nuclei";
-        scene.add(mesh); meshes.push(mesh); nucSet = { geom: g, n };
+        scene.add(mesh); meshes.push(mesh); nucSet = { geom: g, n, base: sc.slice(), cells: cells.slice() };
         counts.triangles += (B.idx.length / 3) * n; counts.nucTri = (B.idx.length / 3) * n; counts.drawCalls++; }
       // the far tier: thin lines, one instanced draw call per type
       for (const [type, n] of want.far) { if (!n) continue;
@@ -854,6 +857,14 @@
     const up = e => { ptr.delete(e.pointerId); };
     canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
     canvas.addEventListener("wheel", e => { e.preventDefault(); S.userTouched = true; zoomTo(cam.dist * Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+    // keyboard: the arrows turn and tilt as a drag does, plus and minus zoom as the wheel does
+    canvas.tabIndex = 0; canvas.setAttribute("role", "application"); canvas.setAttribute("aria-label", "3D view of the neurons: arrow keys turn and tilt it, plus and minus zoom");
+    canvas.addEventListener("keydown", e => { const k = e.key, step = 0.08;
+      if (k === "ArrowLeft") cam.theta += step; else if (k === "ArrowRight") cam.theta -= step;
+      else if (k === "ArrowUp") cam.phi = Math.min(3.0, cam.phi + step); else if (k === "ArrowDown") cam.phi = Math.max(0.15, cam.phi - step);
+      else if (k === "+" || k === "=") zoomTo(cam.dist * 0.9); else if (k === "-" || k === "_") zoomTo(cam.dist / 0.9);
+      else return;
+      e.preventDefault(); S.userTouched = true; });
     function zoomTo(d) {
       cam.dist = Math.max(cam.dist0 * 0.12, Math.min(cam.dist0 * 4, d));
       if (cam.dist > cam.dist0 * 3.2 && !S.zoomedOut) { S.zoomedOut = true; if (o.onClose) o.onClose("zoomout"); }
@@ -868,16 +879,21 @@
       matComp.uniforms.uBg.value.set(em ? 0.012 : (fl ? 0.002 : 0.015), em ? 0.012 : (fl ? 0.006 : 0.018), em ? 0.014 : (fl ? 0.003 : 0.028));
       if (emPlane) emPlane.visible = em;
       if (bgPoints) bgPoints.visible = !em;
-      hud.querySelectorAll("button[data-s]").forEach(b => { b.classList.toggle("on", b.dataset.s === S.style); if (b.dataset.s === "render") b.style.display = S.h01 ? "none" : ""; });
+      hud.querySelectorAll("button[data-s]").forEach(b => { b.classList.toggle("on", b.dataset.s === S.style); b.setAttribute("aria-pressed", String(b.dataset.s === S.style));
+        if (b.dataset.s === "render") b.style.display = S.h01 ? "none" : ""; });
       // the 3D-render style of cortex is dense (five full arbors overlap): there, only 3 hero cells and half the mid tier
       if (built && kind === "cortex") {
         const lighter = !fl;
         S.trimTri = 0;
         for (const c of cells) if (c.tier === "hero") { const mesh = meshes.find(m => m.geometry === c.geom); const hide = lighter && cells.indexOf(c) >= 3;
-          if (mesh) mesh.visible = !hide; if (hide) S.trimTri += c.tri; }
+          c.hidden = hide; if (mesh) mesh.visible = !hide; if (hide) S.trimTri += c.tri; }
         for (const T of sets) if (T.tier === "mid") { const full = T.full != null ? T.full : (T.full = T.geom.instanceCount);
           T.geom.instanceCount = lighter ? Math.max(2, Math.round(full * 0.5)) : full; S.trimTri += (full - T.geom.instanceCount) * T.tri; }
       }
+      // a nucleus follows its cell: one hidden by the 3D-render trim or the triangle cap gets scale 0 (the shader collapses it)
+      if (nucSet) { const sc = nucSet.geom.getAttribute("iScale");
+        nucSet.cells.forEach((c, i) => { sc.array[i] = (c.hidden || (c.tier === "mid" && c.j >= c.geom.instanceCount)) ? 0 : nucSet.base[i]; });
+        sc.needsUpdate = true; }
     }
     function setStyle(s) { if (s !== "render" && s !== "fluorescence" && s !== "em") return; if (S.style === s) return; S.style = s; applyStyle(); if (o.onInfo) o.onInfo(info()); }
     // size and render targets
@@ -906,11 +922,11 @@
         cam.dist = cam.dist0 * (S.entry.from + (1 - S.entry.from) * e); S.entryFade = Math.min(1, u * 2.5); applyOpacity();
         if (u >= 1) { S.entry.on = false; cam.dist = cam.dist0; S.entryFade = 1; applyOpacity(); if (o.onEntryEnd) o.onEntryEnd(); }
       }
-      if (!S.userTouched && !(S.entry && S.entry.on)) cam.theta += 0.00004 * Math.min(50, now - (render.at || now));
+      if (!S.userTouched && !S.paused && !(S.entry && S.entry.on)) cam.theta += 0.00004 * Math.min(50, now - (render.at || now));
       render.at = now;
       placeCamera();
       if (now - (render.barAt || 0) > 400) {                        // the scale bar: a round length that spans 60-160 px at the focus depth
-        render.barAt = now; const umPerPx = cam.dist * uni.uPixK.value * (root.devicePixelRatio ? Math.min(root.devicePixelRatio, L.dpr) : 1) / (renderer.getPixelRatio ? renderer.getPixelRatio() : 1);
+        render.barAt = now; const umPerPx = cam.dist * uni.uPixK.value * (renderer.getPixelRatio ? renderer.getPixelRatio() : 1);   // uPixK is per physical pixel: this is per CSS px
         let len = 10; for (const Lb of [1, 2, 5, 10, 20, 50, 100, 200, 500]) { len = Lb; if (Lb / umPerPx >= 60) break; }
         const px = len / umPerPx; bar.firstChild.style.width = Math.round(px) + "px"; bar.lastChild.textContent = len + " µm";
       }
@@ -968,7 +984,7 @@
       if (gap > 30 && gap < 2000) S.gap = 0.7 * S.gap + 0.3 * gap;
       S.lastWall = now; S.forcedOffline = false;
       if (m.n3.rq) { const q = unb64(m.n3.rq); if (q.length > S.region) S.rate = q[S.region]; }
-      else if (o.groupRate) { const hz = o.groupRate(m); if (hz != null) S.rate = rateByte(hz) || S.rate; }
+      else if (o.groupRate) { const hz = o.groupRate(m); if (hz != null) S.rate = rateByte(hz); }   // 0 is a silent group, not "no rate"
       if (S.clock != null) return;                                 // the clock is held by the test hook (debugTime): no new spikes
       const b = unb64(m.n3.sq), play = Math.min(600, S.gap) / 1000, t = clock(now);
       const n = spikable().length;
@@ -1034,7 +1050,8 @@
     const nr = { onFrame, spike, rates, setLive, debugTime, setStyle, style: () => S.style, setLod: l => { if (LOD[l] || l === "auto") { S.lodName = l; } }, lod: lodOf, ready,
                  setOpacity: a => { S.opacity = Math.max(0, Math.min(1, Number(a) || 0)); applyOpacity(); }, opacity: () => S.opacity,
                  focus: i => { if (cells[i]) { S.focus = i; focusPos = cells[i].pos; fit(); } }, resize, info, caption, close, scene, camera, renderer, cells };
-    load(o.assetUrl).then(() => { if (!S.closed) build(); }).catch(e => { console.error("NeuronRender:", e); });
+    load(o.assetUrl).then(() => { if (!S.closed) build(); }).catch(e => { console.error("NeuronRender:", e);
+      if (!S.closed && o.onClose) o.onClose("error"); });                         // an openAt() hand-over would otherwise leave an invisible overlay over the brain
     return nr;
   }
 
