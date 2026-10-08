@@ -17,6 +17,7 @@ for s in "$@"; do
   python3 -I $H/fin_clip.py to_clip $W/fin_$s.json $W/post_$s.json
   RF=$(python3 -c "import json; print(1 if json.load(open('$H/desk_rows.json')).get('$s',{}).get('restForce') else 0)")
   REST_FORCE=$RF REST_PASSES=8 python3 -I $H/fit_rest.py $W/char.glb $W/post_$s.json > $W/rest_$s.log
+  python3 -I $H/fit_hands.py $W/char.glb $W/post_$s.json >> $W/rest_$s.log      # then nothing of the hands inside him
   python3 -I $H/fin_clip.py to_fin $W/post_$s.json $W/fin_$s.json
   node $G/writeclip.mjs $W/fin_$s.json $O/$s.glb | tail -1
 done
