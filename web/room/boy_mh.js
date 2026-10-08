@@ -524,7 +524,7 @@ export function createMH(env) {
   // (eased, preview/freeze-why-ease: the swing keeps last frame's way while that way still clears - the least angle
   // over all four flipped from 6 deg back to 7 deg forward in one frame mid-crossfade, a fingertip 147 mm - and it lets
   // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
-  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09;      // (s: the release's time constant, ~0.25 s to nothing)
+  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go)
   function deskClear(side, dt = 1 / 30) {
     const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
     const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
@@ -543,8 +543,12 @@ export function createMH(env) {
       if (prev) { const a = least(prev.k, prev.sg); if (a != null) best = {k: prev.k, sg: prev.sg, a}; }
       if (!best) for (const k of ["lat", "fwd"]) for (const sg of [1, -1]) { const a = least(k, sg); if (a != null && (!best || a < best.a)) best = {k, sg, a}; }
       if (best && prev && best.k === prev.k && best.sg === prev.sg) best.a = Math.max(best.a, fade);   // (never less than the release allows)
-    } else if (prev && fade > 0.003) {                       // out of the desk: the swing lets go gradually, if that keeps him out
-      set(axes[prev.k], prev.sg * fade); if (inn() <= 0.003) best = {k: prev.k, sg: prev.sg, a: fade};
+    } else if (prev && fade > 0.003) {                       // out of the desk: the swing lets go gradually - as much of it as keeps him out
+      set(axes[prev.k], prev.sg * fade);                     // (the clip's arm has moved on: the old way may now push it in. Letting go,
+      // up to 8 mm of the slab is allowed - the desk's check counts skin more than 1 cm in - for the way back to the clip's
+      // arm can pass the desk's edge: held to 3 mm, an 18 deg swing dropped at once, a fingertip 175-195 mm in a frame)
+      let a = fade; if (inn() > CLR_SLACK) { let lo = 0, hi = fade; for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; set(axes[prev.k], prev.sg * m); if (inn() > CLR_SLACK) hi = m; else lo = m; } a = lo; }
+      if (a > 0.003) best = {k: prev.k, sg: prev.sg, a};
     }
     if (best) { set(axes[best.k], best.sg * best.a); M.clear.maxA = Math.max(M.clear.maxA || 0, best.a); } else set(lat, 0);
     CLR[side] = best;
@@ -831,7 +835,10 @@ export function createMH(env) {
     if (ot && M.w.type > 0.01) OT.t += dt * OT.json.speed;
     if (ot && M.w.mouse > 0.01) OT.tr += dt * OT.json.speed * OT_REST;
     const mix = wk > 0 ? M.w.mouse / (M.w.type + M.w.mouse) : 0;
-    if (wk > 0.01) { if (ot) weighted("Left", wk, w => ownerKeys("Left", w, dt, {mix})); else keyOn("Left", wk, dt); }
+    // (the left hand stays on the keys between the keys and the mouse, its weight then never low: as before. Into and out of
+    // the desk modes it fades from or to the clip's pose: blended from its pose at full weight)
+    const inSwitch = M.w.type > 0.01 && M.w.mouse > 0.01;
+    if (wk > 0.01) { if (ot) { if (inSwitch) ownerKeys("Left", wk, dt, {mix}); else weighted("Left", wk, w => ownerKeys("Left", w, dt, {mix})); } else keyOn("Left", wk, dt); }
     const both = ot && M.w.type > 0.01 && M.w.mouse > 0.01, qc = both ? rightChain().map(b => b.quaternion.clone()) : null;   // (the clip's right arm, before the mouse moves it)
     if (M.w.mouse > 0.01 && P.mouseNode) {
       const ry = env.boy.rotation.y, home = V(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
@@ -1309,9 +1316,10 @@ export function createMH(env) {
     const RD = E.ride ?? RIDE;
     E.t += dt; const t = E.t, D = E.R.dur, end = RD + D;
     M.evOff = E.R.back * (t < RD ? sstep(0, RD, t) : t < end ? 1 : 1 - sstep(end, end + RD, t));
-    if (t >= RD && !E.on) { E.on = true; E.a.reset(); E.a.time = E.from || 0; E.a.setEffectiveWeight(1); E.a.fadeIn(EV_FADE).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EV_FADE); env.setCurrent(E.a); }
-    if (E.on && !E.off && t >= end - EV_FADE) { E.off = true; const n = E.then && E.then(), w = n ? n.a : M.actions.desk_watch;
-      w.reset(); if (n) w.time = n.from; w.setEffectiveWeight(1); w.fadeIn(EV_FADE).play(); E.a.fadeOut(EV_FADE); env.setCurrent(w);
+    const EF = E.fade || EV_FADE;                             // (the desk states' takes fade slower: their poses lie far apart)
+    if (t >= RD && !E.on) { E.on = true; E.a.reset(); E.a.time = E.from || 0; E.a.setEffectiveWeight(1); E.a.fadeIn(EF).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EF); env.setCurrent(E.a); }
+    if (E.on && !E.off && t >= end - EF) { E.off = true; const n = E.then && E.then(), w = n ? n.a : M.actions.desk_watch;
+      w.reset(); if (n) w.time = n.from; w.setEffectiveWeight(1); w.fadeIn(EF).play(); E.a.fadeOut(EF); env.setCurrent(w);
       for (const k of ["sit", "type"]) env.actions[k] = w; }
     if (t >= end + RD) { E.a.stop(); M.ev = null; }
   }
@@ -1322,7 +1330,7 @@ export function createMH(env) {
   // rare events' path (rareStep): the chair rides back first by what the take needs (backFor; no ride if it needs none),
   // and out of it he crossfades into the next loop the picker chose. Off desk_watch (typing, the mouse) the page's modes
   // play as before; the default page never loads any of this.
-  const SV_FADE = 0.8, SV_LOOK = 2.5, SV_MIN = 1.5;          // (s) a loop's crossfade; a look at the board; the least a loop holds before an event
+  const SV_FADE = 0.8, SV_LOOK = 2.5, SV_MIN = 1.5, SV_EV_FADE = 1.3, SV_REACT_BACK = 0.12;   // (s; SV_EV_FADE: into and out of a gesture or a reaction - 0.8 s from the hands on his thighs to his arms crossed moved a fingertip 107-187 mm in a frame)          // (s) a loop's crossfade; a look at the board; the least a loop holds before an event
   let SV = null;
   async function svLoad(make, bodyHips) {
     const D = await import("./desk_states.js"), dir = env.clipDir || "room/mh";
@@ -1375,8 +1383,10 @@ export function createMH(env) {
     const p = SV.pick.next(T, mode); if (!p) { SV.until = T + 2; return; }
     if (p.once) {                                             // a gesture or a reaction: once, through rareStep, then the next loop
       const k = "sv_" + p.name, R = M.rare[k], a = M.actions["rare_" + k]; if (!R || !a) return;
-      const back = backFor(R, k), dur = Math.min(R.dur - p.from, p.hold);
-      M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
+      // (a reaction rides at least SV_REACT_BACK back: its take's own frames clear the desk, but the crossfade from his hands
+      // on his thighs to his arms crossed swept them through the desk's edge, where the desk clearing then swung and flipped)
+      const back = Math.max(backFor(R, k), p.kind === "react" ? SV_REACT_BACK : 0), dur = Math.min(R.dur - p.from, p.hold);
+      M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, fade: SV_EV_FADE, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
         SV.cur = n ? {name: q.name} : {name: "desk_watch"}; SV.since = T2; SV.until = T2 + (n ? q.hold : 4); return n; }};
       M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "") + " back " + back.toFixed(3)]);
       return;
