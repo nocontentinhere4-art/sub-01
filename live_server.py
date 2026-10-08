@@ -1767,7 +1767,9 @@ async def main(args):
     data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 else "")
     live = Live(args.mint, args.demo, args.time_scale, data_dir,
                 parse_start(args.start) if args.start else None, args.trust_proxy)
-    middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if os.environ.get("SITE_PASSWORD") else []
+    # launched (owner, 2026-10-08): the site is public; the password gate only comes back with SITE_GATE=1
+    gate_on = os.environ.get("SITE_PASSWORD") and os.environ.get("SITE_GATE") == "1"
+    middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if gate_on else []
     app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
     app[GATED] = bool(middlewares)                # behind the password gate: its cookie also opens the admin APIs
     app.router.add_get("/ws", live.ws_handler)
