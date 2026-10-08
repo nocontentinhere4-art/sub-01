@@ -219,6 +219,16 @@ class Votes:
         return [r.id, r.counts, max(0, round(r.end - now))]
 
 
+OUTSIDE = ("counter", "bakery_in", "bench", "park_gate", "bakery_door")   # (life.PLACES out of the room's view)
+
+
+def glance_ok(stage, life):
+    """He can glance at the camera: awake, in the room (not out on a walk) and upright (sitting, standing, walking;
+    not lying on the bed). life: Life.snapshot()."""
+    return stage == "AWAKE" and bool(life) and not life.get("geo") and life.get("place") not in OUTSIDE \
+        and not str(life.get("pose", "")).startswith("lying")
+
+
 class TokenBucket:
     """Per-key token buckets: `rate` tokens a second, at most `burst` saved. Idle keys are forgotten."""
 

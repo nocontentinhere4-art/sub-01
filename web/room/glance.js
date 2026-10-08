@@ -24,7 +24,7 @@ export function createGlance(THREE) {
   const _h = new THREE.Vector3(), _f = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion(),
     _p = new THREE.Quaternion(), _w = new THREE.Quaternion(), _id = new THREE.Quaternion(), _e = new THREE.Euler();
   return {
-    trigger() { if (t < 0) t = 0; },                         // (one at a time: a second message mid-glance is the same glance)
+    trigger(upright = true) { if (t < 0 && upright) t = 0; },   // (one at a time; lying down: none, the server checks it too)
     get active() { return t >= 0; },
     // after the clips: turn bones.Neck / bones.Head toward camera.position by the envelope's weight
     apply(dt, boy, bones, camera) {

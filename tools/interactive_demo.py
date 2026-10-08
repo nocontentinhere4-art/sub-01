@@ -36,6 +36,15 @@ SNAP_JS = """() => {                      // render the 3D once and hold it as a
   im.src = url; renderer.domElement.style.visibility = "hidden";
   return new Promise(r => { if (im.complete) r(); else im.onload = () => r(); });
 }"""
+FOLLOW_JS = """() => {                    // the page's own follow camera, snapped to its goal (no easing between keyframes)
+  updateCameraGoal(); camera.position.copy(camGoal.pos); controls.target.copy(camGoal.target); controls.update();
+}"""
+FACE_JS = """() => {                      // a camera in front of him and to his side, on his face (for the glance)
+  const V = THREE.Vector3; boy.updateMatrixWorld(true);
+  const h = bones.Head.getWorldPosition(new V()), f = boy.getWorldDirection(new V()).setY(0).normalize(), s = new V(f.z, 0, -f.x);
+  camera.position.copy(h).addScaledVector(f, 0.62).addScaledVector(s, 0.7).add(new V(0, 0.06, 0));
+  controls.target.copy(h).add(new V(0, -0.12, 0)); controls.update();
+}"""
 STEP_CSS_JS = """dt => {                      // the page's CSS animations on a virtual clock: one step per video frame
   for (const a of document.getAnimations()) {
     if (!a.__v) { a.__v = 1; a.pause(); a.currentTime = 0; continue; }
@@ -73,13 +82,16 @@ async def api(path):
 class Rec:
     def __init__(self, page, outdir, tag):
         self.pg, self.dir, self.tag, self.frames, self.last_sim = page, outdir, tag, [], time.time()
+        self.cam = FOLLOW_JS
 
     async def sim(self, step=None):
         """Advance his animation (by the real time since the last render, or `step` seconds) and render the 3D."""
         el = time.time() - self.last_sim if step is None else step
         self.last_sim = time.time()
-        n = max(1, min(40, round(el / 0.1)))
+        n = max(1, min(300, round(el / 0.1)))
         await self.pg.evaluate(f"sim({el / n:.4f}, {n})")
+        if self.cam:
+            await self.pg.evaluate(self.cam)
         await self.pg.evaluate(SNAP_JS)
 
     async def frame(self, dur, dt=0.1):
@@ -110,7 +122,7 @@ async def open_page(b, vp, mobile):
 def pick_option(vote, avoid):
     """The option bots favour: one that is not what he is doing now, the desk ones first (the glance shows best there)."""
     opts = [o["act"] for o in vote["round"]["options"]]
-    for a in ("research", "watch_video", "play_chess", "listen_music", "phone", "window", "park"):
+    for a in ("research", "watch_video", "play_chess", "window", "listen_music", "phone", "park"):
         if a in opts and a != avoid:
             return opts.index(a)
     return 0
@@ -169,11 +181,22 @@ async def main(args):
             await r.hold(1.5)
             res = (await api("/api/vote"))["last"]
             log.append(f"result: {res}")
-            for _ in range(10):                                          # the nudge: he gets up for it
+            for _ in range(24):                                          # the nudge: he gets up for it
                 await r.sim()
-                await r.hold(0.4)
+                await r.hold(0.3)
+                story = await pg.evaluate("document.getElementById('story').textContent")
+                if any(w in story for w in ("reading", "at the computer", "watching", "chess")) and \
+                        await pg.evaluate("roomDbg().at === 'desk'"):
+                    break
+            for _ in range(4):                                           # he sits down
+                await r.sim()
+                await r.hold(0.3)
             log.append("he is now: " + await pg.evaluate("document.getElementById('story').textContent + ' / ' + document.getElementById('why').textContent"))
             # reactions: everyone taps; a spike (>= 10 in 10 s) makes him glance at the camera once
+            r.cam = None
+            await pg.evaluate(FACE_JS)
+            await r.sim()
+            await r.hold(0.8)
             await pg.click("#rx button >> nth=1")
             for i, bot in enumerate(bots[:12]):
                 await bot.send({"type": "react", "k": i % 6})
@@ -241,8 +264,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "docs" / "qa" / "interactive" / "demo.mp4"))
     ap.add_argument("--seconds", type=float, default=45.0)
-    ap.add_argument("--start", default="10:30", help="Tokyo time the demo clock starts at (awake, daytime; the clock runs at\n"
-                    "x1.001, as --start needs a scale other than 1)")
+    ap.add_argument("--start", default="21:00", help="Tokyo time the demo clock starts at (awake, at home: the park "
+                    "closes at 20:00; the clock runs at x1.001, as --start needs a scale other than 1)")
     ap.add_argument("--round", type=float, default=150.0, help="vote round length, seconds (the demo's; default 1 h live)")
     ap.add_argument("--chromium", default="/opt/pw-browsers/chromium")
     ap.add_argument("--keep", action="store_true", help="keep the frames")

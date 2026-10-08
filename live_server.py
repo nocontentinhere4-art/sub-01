@@ -1622,7 +1622,7 @@ class Live:
         rx = self.reactions.drain()
         if rx:
             msg["rx"] = rx
-        if self.engine.stage == "AWAKE" and self.reactions.glance_due():   # (asleep: no glance; the spike waits)
+        if audience.glance_ok(self.engine.stage, msg.get("life")) and self.reactions.glance_due():   # (else it waits)
             await self.broadcast({"type": "glance"})
 
     def audience_hello(self, ws):

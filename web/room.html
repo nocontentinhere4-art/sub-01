@@ -3254,7 +3254,7 @@ function connect(){
     if (m.type === "taught") { if (performance.now() - taughtAt > 2000) loadTaught(); return; }
     if (m.type === "vote" || m.type === "vote_ack" || m.type === "vote_result" || m.type === "vote_applied") { onVote(m); return; }
     if (m.type === "react_ack") { rxSlow(); return; }
-    if (m.type === "glance") { GLANCE.trigger(); return; }
+    if (m.type === "glance") { GLANCE.trigger(!(lastLife && /^lying/.test(lastLife.pose || ""))); return; }
     if (m.type === "tick" && m.aud) onAudience(m);
     if (m.type !== "tick" || !m.life) return;
     if ((m.events || []).some(ev => ev.type === "replay" && ev.source === "taught")) loadTaught();   // a new count

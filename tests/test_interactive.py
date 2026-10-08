@@ -289,10 +289,14 @@ def test_server_glance_only_when_awake(server):
         live.votes.open(["window", "research"])
         for i in range(10):
             live.reactions.react(f"v{i}", 0)
+        seated = {"place": "desk", "pose": "sitting_desk", "geo": None}
         live.engine.stage = "REM"
-        await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)
+        await live.audience_tick({"type": "tick", "life": seated}, live.clock.now(), {}, 0)
         assert not any(m["type"] == "glance" for m in sent)            # asleep: he does not turn to the camera
         live.engine.stage = "AWAKE"
-        await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)
-        assert sum(m["type"] == "glance" for m in sent) == 1
+        for life in ({"place": "bed", "pose": "lying_headphones"}, {"place": "bench", "pose": "sitting"}):
+            await live.audience_tick({"type": "tick", "life": life}, live.clock.now(), {}, 0)
+        assert not any(m["type"] == "glance" for m in sent)            # lying on the bed, out at the park: not either
+        await live.audience_tick({"type": "tick", "life": seated}, live.clock.now(), {}, 0)
+        assert sum(m["type"] == "glance" for m in sent) == 1            # at the desk: once
     asyncio.run(run())
