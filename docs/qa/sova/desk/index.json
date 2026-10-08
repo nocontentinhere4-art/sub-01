@@ -1,0 +1,678 @@
+{
+ "note": "Sova seated clips baked for our chair (room_build/sova/desk_build.sh -> kimodo/mx_fit.py), mh_mx format; licence pending: preview only, never in web/ until COORD clears it",
+ "fps": 30,
+ "clips": [
+  {
+   "slug": "desk_start_01",
+   "file": "desk/desk_start_01.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_7",
+    "DESK - START 01"
+   ],
+   "duration_s": 6.03,
+   "loop": false,
+   "category": "sit_down",
+   "what": "sit down at the desk: walks in, turns, sits (plays once)",
+   "suggested_slot": null,
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": 12.4,
+     "turn_deg_max": 13.5,
+     "frames": 176
+    },
+    "Right": {
+     "back_before_cm": 21.8,
+     "turn_deg_max": 28.5,
+     "frames": 179
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     -0.003,
+     0.68,
+     0.009
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.4
+     ],
+     "R": [
+      0.2,
+      0.6
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.7,
+     "Right": 0.5
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 0
+    }
+   },
+   "room": "not measured as the watching loop (a transition: the sit-down step)"
+  },
+  {
+   "slug": "desk_look_behind",
+   "file": "desk/desk_look_behind.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_8",
+    "DESK - LOOK BEHIND"
+   ],
+   "duration_s": 9.17,
+   "loop": true,
+   "category": "gesture",
+   "what": "turns round to look behind him, back to the screen",
+   "suggested_slot": "gesture_b (alt)",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": 17.9,
+     "turn_deg_max": 22.5,
+     "frames": 275
+    },
+    "Right": {
+     "back_before_cm": 8.8,
+     "turn_deg_max": 8.3,
+     "frames": 275
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.6,
+     "Right": 0.7
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 0
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.2,
+     4.8
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "neutral_1",
+   "file": "desk/neutral_1.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_33",
+    "[1] Neutral"
+   ],
+   "duration_s": 6.67,
+   "loop": true,
+   "category": "idle",
+   "what": "seated, head straight, small arm moves",
+   "suggested_slot": "idle_a",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": -0.9,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    },
+    "Right": {
+     "back_before_cm": 10.5,
+     "turn_deg_max": 10.9,
+     "frames": 200
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.7,
+     "Right": 0.6
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 0
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "neutral_3",
+   "file": "desk/neutral_3.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_35",
+    "[3] Neutral"
+   ],
+   "duration_s": 6.67,
+   "loop": true,
+   "category": "idle",
+   "what": "seated, head turned to one side",
+   "suggested_slot": "idle_b",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": -0.9,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    },
+    "Right": {
+     "back_before_cm": 10.5,
+     "turn_deg_max": 10.9,
+     "frames": 200
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.7,
+     "Right": 0.6
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 0
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "neutral_5",
+   "file": "desk/neutral_5.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_37",
+    "[5] Neutral"
+   ],
+   "duration_s": 6.67,
+   "loop": true,
+   "category": "idle",
+   "what": "seated, head turned to the other side",
+   "suggested_slot": "idle_c",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": -0.9,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    },
+    "Right": {
+     "back_before_cm": 10.5,
+     "turn_deg_max": 10.9,
+     "frames": 200
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.7,
+     "Right": 0.6
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 0
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "look_right_idle",
+   "file": "desk/look_right_idle.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_3",
+    "[New!] LOOK RIGHT - IDLE"
+   ],
+   "duration_s": 6.7,
+   "loop": true,
+   "category": "attend",
+   "what": "looking right, hands on the knees",
+   "suggested_slot": "attend",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": 1.0,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    },
+    "Right": {
+     "back_before_cm": 5.7,
+     "turn_deg_max": 3.9,
+     "frames": 201
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     -0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.8,
+     "Right": 0.9
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 65
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "look_left_idle",
+   "file": "desk/look_left_idle.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_4",
+    "[New!] LOOK LEFT - IDLE"
+   ],
+   "duration_s": 6.7,
+   "loop": true,
+   "category": "attend",
+   "what": "looking left, hands on the knees",
+   "suggested_slot": null,
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": 5.5,
+     "turn_deg_max": 3.7,
+     "frames": 201
+    },
+    "Right": {
+     "back_before_cm": -2.3,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 1.0,
+     "Right": 0.8
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 20,
+     "Right": 0
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.4,
+     5
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "look_down_to_right",
+   "file": "desk/look_down_to_right.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_1",
+    "[New!] LOOK DOWN -> RIGHT"
+   ],
+   "duration_s": 10.0,
+   "loop": true,
+   "category": "gesture",
+   "what": "looks down, then right",
+   "suggested_slot": "gesture_a",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": 1.0,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    },
+    "Right": {
+     "back_before_cm": 5.7,
+     "turn_deg_max": 3.9,
+     "frames": 300
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     -0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.8,
+     "Right": 1.1
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 300
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  },
+  {
+   "slug": "look_front_to_left",
+   "file": "desk/look_front_to_left.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_2",
+    "[New!] LOOK FRONT -> LEFT"
+   ],
+   "duration_s": 10.0,
+   "loop": true,
+   "category": "gesture",
+   "what": "looks ahead, then left",
+   "suggested_slot": "gesture_b",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "shins_fit": {
+    "Left": {
+     "back_before_cm": 5.5,
+     "turn_deg_max": 3.7,
+     "frames": 300
+    },
+    "Right": {
+     "back_before_cm": -2.3,
+     "turn_deg_max": 0.0,
+     "frames": 0
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    },
+    "sleeves_in_hoodie_after_cm": {
+     "Left": 0.8,
+     "Right": 0.8
+    },
+    "sleeve_frames_over_0_8cm": {
+     "Left": 0,
+     "Right": 0
+    }
+   },
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.4,
+     5
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "hands_in_thighs_frames": 0
+   }
+  }
+ ]
+}

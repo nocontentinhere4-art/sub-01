@@ -2,6 +2,36 @@
 
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
+## Desk group: seated set done (`desk/*.glb`, `desk/index.json`, `sova_desk_seated.jpg`)
+- Measured **in the room** with the room's own `contact_pass.mjs`: each clip played as the desk-watching clip, in a local symlinked copy of `web/` (nothing in `web/` changes), over the whole clip, every frame.
+- Every clip went through the shin fit + our chair's fit.
+
+| clip | len | chair | desk | other furniture | floor | seat gap (cm) | soles (cm) | hands in thighs | sleeves in hoodie (fit) |
+|---|---|---|---|---|---|---|---|---|---|
+| desk_look_behind | 9.2 s | 0 | 0 | 0 | 0 | 0.2…4.8 | 0.2–4.8 | 0 | 0.6–0.7 cm |
+| neutral_1 / _3 / _5 | 6.7 s | 0 | 0 | 0 | 0 | 0.3…4.9 | 0.2–4.8 | 0 | 0.6–0.7 |
+| look_right_idle | 6.7 s | 0 | 0 | 0 | 0 | 0.3…4.9 | 0.2–4.8 | 0 | 0.9 (65 frames over 0.8) |
+| look_left_idle | 6.7 s | 0 | 0 | 0 | 0 | 0.4…5.0 | 0.2–4.8 | 0 | 1.0 (20 frames over) |
+| look_down_to_right | 10 s | 0 | 0 | 0 | 0 | 0.3…4.9 | 0.2–4.8 | 0 | 1.1 (R, 300 frames over) |
+| look_front_to_left | 10 s | 0 | 0 | 0 | 0 | 0.4…5.0 | 0.2–4.8 | 0 | 0.8 |
+| desk_start_01 | 6.0 s | sit-down transition: not measured as a loop (it is the stand→sit step) | | | | | | | 0.5–0.7 |
+
+- Baseline, Mixamo's own `room_seated_idle` in the same pass: chair 0, desk 0, seat −0.5…4.1 cm, soles 0.2–4.8 cm.
+
+Verdict (seated):
+- **Clean on our chair and desk.** Upright, feet planted, loops seamless.
+- But they are pose-pack loops: they breathe and turn the head, they don't act.
+- The hands rest over the thighs with the elbows a little out (the sleeves kept off the hoodie).
+- Suggested slots (`desk/index.json`): idle_a/b/c = neutral_1/3/5, attend = look_right_idle, gesture_a/b = look_down_to_right / look_front_to_left (or desk_look_behind).
+
+Action & Reactions (standing, laid on the seated base):
+- First bake: the performers' standing arms hung at his sides, swung out by the sleeve fit (a scarecrow on a chair; that was also where the chair contacts came from: hands 1.2–3.4 cm into the chair in looking_away / looking_right).
+- They are being rebaked:
+  - the look clips get their arms from the seated base;
+  - the gesture clips (thinking chin, frustrated, distracted smile) keep the performer's arms;
+  - all are tipped 10° forward (they leaned back).
+- The numbers follow.
+
 ## Sleep group: first pass done (`sova_sleep.jpg`, `contact_sleep.jsonl`)
 Clips:
 - **Machinima bed scene.** Identified from the motion (the filter did not keep the names):
@@ -33,7 +63,7 @@ Measured over the whole clip (mattress = his lowest torso point; resting hands c
 - The bed placement in the room (our mattress top is 0.82 m, the Sims bed was lower) is the page's step, like the existing bed clips.
 - **Worth the most:** the two machinima loops + V1→V2 (a real side → back roll), and Pack 7 [03] (a full get-up).
 
-## Desk group: in progress (baking on our chair, then the room check)
+## Desk group: method
 Pipeline:
 1. Retarget, with the phone Ver. 8 calibration.
 2. **Shins turned forward under the knees** (`fit_shins.py`, new).
