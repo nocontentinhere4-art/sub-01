@@ -246,7 +246,7 @@ if abs(e_lg) > 0.003:                                           # (on his side t
 diag('after legs')
 # 3b. feet inside the mattress: if his toes reach past TOE_IN short of its end, the knees bend a little (the calves
 # turned at the knee, then the heels put back down at the hips), as a sleeper's legs lie, never straight-locked
-TOE_IN = 0.03
+TOE_IN = float(os.environ.get("BED_TOE_IN", 0.03))   # (C: the toes may come to within 0.5 cm of the end)
 def toe_x(fs):
     X, _ = skinf(fs); return max(float(room_xz(X[f])[0][FOOT & BODY].max()) for f in range(len(fs)))
 a_kn = 0.0

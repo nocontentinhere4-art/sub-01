@@ -197,7 +197,7 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       H.minClear_cm = Math.min(H.minClear_cm, +(clr * 100).toFixed(1)); }
     // the duvet over him (asleep): the gap from his highest skin to its underside, and any of him over its top
     const dv = scene.getObjectByName("duvet_over");
-    if (dv && dv.visible && f % 3 === 0) { const D = L.duvet || (L.duvet = {frames: 0, by: {}, top: {}, poke: 0, pokeFrames: 0, pokeMax_cm: 0}); D.frames++;
+    if (dv && dv.visible && f % 3 === 0) { const D = L.duvet || (L.duvet = {frames: 0, by: {}, top: {}, legx: {}, legs_skin: {}, poke: 0, pokeFrames: 0, pokeMax_cm: 0}); D.frames++;
       const side = dv.material.side; dv.material.side = THREE.DoubleSide; dv.updateMatrixWorld(true);
       const C = 0.03, cells = new Map(); parts.forEach((sm, pi) => { const P = sm.geometry.attributes.position, K = L.kind[pi], rg = vreg[pi]; for (let i = 0; i < P.count; i += 2) { sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
         if (K[i] === "head") continue; const key = Math.floor(v.x / C) * 1000 + Math.floor(v.z / C), c = cells.get(key); if (!c || v.y > c.y) cells.set(key, {y: v.y, x: v.x, z: v.z, rg: rg[i]}); } });
@@ -205,7 +205,8 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       for (const c of cells.values()) { if (c.x < hem + 0.05 || c.z < 0.27 || c.z > 1.48) continue;
         L.rc.set(new THREE.Vector3(c.x, c.y - 0.002, c.z), L.UP); const up = L.rc.intersectObject(dv, false)[0];
         if (up) { const g = up.distance - 0.002, e = D.by[c.rg] || (D.by[c.rg] = {max: 0, sum: 0, n: 0}); e.max = Math.max(e.max, g); e.sum += g; e.n++; if (g === e.max) e.tmax = t;
-          const top = up.point.y + (window.COV ? COV.THICK - COV.BED : 0.05 - 0.82), o = D.top[c.rg] || (D.top[c.rg] = {max: 0}); if (top > o.max) { o.max = top; o.t = t; } }   // (its top over the mattress, over each part of him)
+          const top = up.point.y + (window.COV ? COV.THICK - COV.BED : 0.05 - 0.82), o = D.top[c.rg] || (D.top[c.rg] = {max: 0}); if (top > o.max) { o.max = top; o.t = t; }
+          if (c.rg === "legs") { const xb = Math.floor((c.x + 1.90) / 0.10) * 10; D.legx[xb] = Math.max(D.legx[xb] || 0, +(top * 100).toFixed(1)); D.legs_skin[xb] = Math.max(D.legs_skin[xb] || 0, +((c.y - 0.82) * 100).toFixed(1)); } }   // (its top over the mattress, over each part of him)
         else { L.rc.set(new THREE.Vector3(c.x, c.y + 0.002, c.z), L.DN); const dn = L.rc.intersectObject(dv, false)[0]; if (dn) { pk++; pkd = Math.max(pkd, dn.distance); } } }
       if (pk) { D.pokeFrames++; D.poke = Math.max(D.poke, pk); D.pokeMax_cm = Math.max(D.pokeMax_cm, +(pkd * 100).toFixed(1)); }
       dv.material.side = side; } }
@@ -217,7 +218,7 @@ const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
       feet: {toes_max_x: +L.feet.maxX.toFixed(3), inside_end_cm: cm(0.05 - L.feet.maxX)}, self: L.self, phones: L.phones, dbg: L.dbg};
     if (L.duvet) { const D = L.duvet; out.duvet = {frames: D.frames, poke: D.poke, pokeFrames: D.pokeFrames, pokeMax_cm: D.pokeMax_cm,
       gap_by_region: Object.fromEntries(Object.entries(D.by).map(([k, e]) => [k, {max_cm: cm(e.max), mean_cm: cm(e.sum / e.n), at_max_s: e.tmax}])),
-      top_over_mattress: Object.fromEntries(Object.entries(D.top).map(([k, e]) => [k, {max_cm: cm(e.max), at_s: e.t}]))}; }
+      top_over_mattress: Object.fromEntries(Object.entries(D.top).map(([k, e]) => [k, {max_cm: cm(e.max), at_s: e.t}])), legs_top_by_cm_from_headboard: D.legx, legs_skin_top_by_cm: D.legs_skin}; }
     return out; }
   const F = 0.16, TOP = 0.82 - 0.02, M = 0.01;
   const LY = LYING || X.music ? lyingSetup() : null;              // (with music on: the headphones' rows anywhere)
