@@ -7,6 +7,10 @@ on:
   push:
     branches: [main, "ci/**"]          # ci/*: a branch proving a CI change before it goes to main
     paths-ignore: ["docs/**", "**/*.md"]
+  # the visual jobs run only on demand (Actions tab -> tests -> Run workflow): 32 of the 39 billed minutes of a
+  # push, and the full suite with the visual set already runs locally before every push to main (90% of the
+  # month's 3,000 minutes used on 2026-10-08)
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -76,6 +80,7 @@ jobs:
   # two jobs side by side, each well under its 30 min: the core set's scenes (test_visual.py, ~20 min) and the other
   # pages (arrival, camera, hands). In one job nine tests took 28.5 of its 30 min (main 448a0b8).
   visual:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
