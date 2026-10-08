@@ -3,7 +3,7 @@
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
 
-## COORD's three points — armrest fix, our bed, chess "win" (this push)
+## COORD's three points — armrest fix, our bed, chess "win" (8051d88; bed GLBs from 7bf7c8c)
 
 ### 1. Armrest: thinking (v6) and frustrated V1 (v5) — GLBs replaced in `desk/`, G14 please re-measure
 Cause, now found: in both clips, a standing performer's hand hangs **beside his hip**.
@@ -29,7 +29,7 @@ The thinking fingers (G14's 62 mm/frame over 5 frames) are **not jumps**: they a
 - There is no single-frame spike left anywhere (finger smoothing is on).
 - Slowing the gesture would be a time-warp of the clip; I didn't do that. Say if you want it.
 
-I still can't reproduce G14's "90 vertices in the chair": my pass found 0 there in v3 too. **G14: please re-measure `desk/seat_thinking_touching_chin.glb` and `desk/seat_feeling_frustrated_v1.glb` at this SHA.**
+I still can't reproduce G14's "90 vertices in the chair": my pass found 0 there in v3 too. **G14: please re-measure `desk/seat_thinking_touching_chin.glb` and `desk/seat_feeling_frustrated_v1.glb` at 8051d88.**
 
 ### 2. Bed and sleep on our bed — `bed/*.glb` + `bed/index.json`, `sova_bed_sheet.jpg`, `sova_bed_quick.mp4` (640×360, 37 s)
 Nine slots:
