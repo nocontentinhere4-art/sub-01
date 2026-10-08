@@ -1,0 +1,1609 @@
+{
+ "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh). v3: the fits arm corrections smoothed over time (smooth_fit.py, loops wrapped); room_seated_idle moves at most 14 mm per frame. v5/v6 (thinking, frustrated V1): resting targets at least 15 cm forward of the hip joint (REST_FWD) and a rest trigger (REST_LOW), so hands that hung by his hips (the armrests) rest on the lap.",
+ "fps": 30,
+ "clips": [
+  {
+   "slug": "desk_start_01",
+   "file": "desk/desk_start_01.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_7",
+    "DESK - START 01"
+   ],
+   "duration_s": 6.03,
+   "loop": false,
+   "category": "sit_down",
+   "what": "sit down at the desk: walks in, turns, sits (plays once)",
+   "suggested_slot": null,
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.845,
+    0.804
+   ],
+   "room": "not measured: a sit-down transition (played as the watching loop it walks through the chair, which says nothing)",
+   "fit": {
+    "hip_joints_seated_m": [
+     -0.003,
+     0.68,
+     0.009
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.4
+     ],
+     "R": [
+      0.2,
+      0.6
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    65,
+    "LeftToe_End",
+    1.5
+   ],
+   "loop_seam_mm": null
+  },
+  {
+   "slug": "desk_look_behind",
+   "file": "desk/desk_look_behind.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_8",
+    "DESK - LOOK BEHIND"
+   ],
+   "duration_s": 9.17,
+   "loop": true,
+   "category": "gesture",
+   "what": "turns round to look behind him, back to the screen",
+   "suggested_slot": "gesture_c",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.747,
+    0.762
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.2,
+     4.8
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    9,
+    "HeadTop_End",
+    2.07
+   ],
+   "loop_seam_mm": 0
+  },
+  {
+   "slug": "neutral_1",
+   "file": "desk/neutral_1.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_33",
+    "[1] Neutral"
+   ],
+   "duration_s": 6.67,
+   "loop": true,
+   "category": "idle",
+   "what": "seated, head straight, hands on the thighs",
+   "suggested_slot": "attend / idle_a",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.78,
+    0.757
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    6,
+    "LeftHandRing4",
+    4.63
+   ],
+   "loop_seam_mm": 1
+  },
+  {
+   "slug": "neutral_3",
+   "file": "desk/neutral_3.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_35",
+    "[3] Neutral"
+   ],
+   "duration_s": 6.67,
+   "loop": true,
+   "category": "idle",
+   "what": "seated, head turned to one side",
+   "suggested_slot": "idle_b",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.78,
+    0.756
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    6,
+    "LeftHandMiddle4",
+    4.7
+   ],
+   "loop_seam_mm": 3
+  },
+  {
+   "slug": "neutral_5",
+   "file": "desk/neutral_5.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_37",
+    "[5] Neutral"
+   ],
+   "duration_s": 6.67,
+   "loop": true,
+   "category": "idle",
+   "what": "seated, head turned to the other side",
+   "suggested_slot": "idle_c",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.78,
+    0.756
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    6,
+    "LeftHandMiddle4",
+    4.7
+   ],
+   "loop_seam_mm": 3
+  },
+  {
+   "slug": "look_right_idle",
+   "file": "desk/look_right_idle.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_3",
+    "[New!] LOOK RIGHT - IDLE"
+   ],
+   "duration_s": 6.7,
+   "loop": true,
+   "category": "attend",
+   "what": "looking right",
+   "suggested_slot": "idle",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.772,
+    0.767
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     -0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    4,
+    "LeftForeArm",
+    5.8
+   ],
+   "loop_seam_mm": 1
+  },
+  {
+   "slug": "look_left_idle",
+   "file": "desk/look_left_idle.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_4",
+    "[New!] LOOK LEFT - IDLE"
+   ],
+   "duration_s": 6.7,
+   "loop": true,
+   "category": "attend",
+   "what": "looking left",
+   "suggested_slot": "idle",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.738,
+    0.774
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.4,
+     5
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    4,
+    "RightForeArm",
+    6.33
+   ],
+   "loop_seam_mm": 2
+  },
+  {
+   "slug": "look_down_to_right",
+   "file": "desk/look_down_to_right.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_1",
+    "[New!] LOOK DOWN -> RIGHT"
+   ],
+   "duration_s": 10.0,
+   "loop": true,
+   "category": "gesture",
+   "what": "looks down, then right",
+   "suggested_slot": "gesture_a",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.775,
+    0.768
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     -0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    10,
+    "HeadTop_End",
+    9.13
+   ],
+   "loop_seam_mm": 0
+  },
+  {
+   "slug": "look_front_to_left",
+   "file": "desk/look_front_to_left.glb",
+   "source": [
+    "Sova_Sitting_Animations.package",
+    "set_2",
+    "[New!] LOOK FRONT -> LEFT"
+   ],
+   "duration_s": 10.0,
+   "loop": true,
+   "category": "gesture",
+   "what": "looks ahead, then left",
+   "suggested_slot": "gesture_b",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.739,
+    0.765
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.4,
+     5
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    8,
+    "HeadTop_End",
+    1.67
+   ],
+   "loop_seam_mm": 0
+  },
+  {
+   "slug": "seat_looking_away_idle",
+   "file": "desk/seat_looking_away_idle.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_17",
+    "[MOCAP] LOOKING AWAY - IDLE ",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 3.7,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks away (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.755,
+    0.758
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    16,
+    "HeadTop_End",
+    0.5
+   ],
+   "loop_seam_mm": 38
+  },
+  {
+   "slug": "seat_looking_around_v1",
+   "file": "desk/seat_looking_around_v1.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_19",
+    "[MOCAP] LOOKING AROUND V1",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 11.1,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks around (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.788,
+    0.761
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    34,
+    "HeadTop_End",
+    8.67
+   ],
+   "loop_seam_mm": 38
+  },
+  {
+   "slug": "seat_looking_around_v2",
+   "file": "desk/seat_looking_around_v2.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_20",
+    "[MOCAP] LOOKING AROUND V2",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 6.57,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks around V2 (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.793,
+    0.788
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    19,
+    "HeadTop_End",
+    1.4
+   ],
+   "loop_seam_mm": 2
+  },
+  {
+   "slug": "seat_looking_left",
+   "file": "desk/seat_looking_left.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_21",
+    "[MOCAP] LOOKING LEFT",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 4.1,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks left (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.808,
+    0.757
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    24,
+    "HeadTop_End",
+    2.63
+   ],
+   "loop_seam_mm": 39
+  },
+  {
+   "slug": "seat_looking_right",
+   "file": "desk/seat_looking_right.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_22",
+    "[MOCAP] LOOKING RIGHT",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 4.1,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] looks right (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.756,
+    0.779
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    23,
+    "HeadTop_End",
+    2.6
+   ],
+   "loop_seam_mm": 37
+  },
+  {
+   "slug": "seat_neck_stretching_idle",
+   "file": "desk/seat_neck_stretching_idle.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_27",
+    "[MOCAP] NECK STRETCHING - IDLE",
+    "spine, neck and head on neutral_1's seated hips, legs and arms"
+   ],
+   "duration_s": 3.27,
+   "loop": true,
+   "category": "gesture",
+   "what": "[MOCAP] stretches his neck (head/torso; seated arms)",
+   "suggested_slot": "gesture",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.749,
+    0.767
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    15,
+    "HeadTop_End",
+    0.37
+   ],
+   "loop_seam_mm": 35
+  },
+  {
+   "slug": "seat_thinking_touching_chin",
+   "file": "desk/seat_thinking_touching_chin.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_13",
+    "[HANDMADE] THINKING TOUCHING CHIN",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 8.33,
+   "loop": false,
+   "category": "reaction",
+   "what": "thinking, hand to the chin (performer arms)",
+   "suggested_slot": "react",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    1.21,
+    0.784
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "chair_within_2cm": {
+     "frames": 4,
+     "maxDepth": 0.6,
+     "maxCount": 106
+    }
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    67,
+    "LeftHandMiddle3",
+    0.3
+   ],
+   "loop_seam_mm": null,
+   "fit_v": "v6"
+  },
+  {
+   "slug": "seat_feeling_frustrated_v1",
+   "file": "desk/seat_feeling_frustrated_v1.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_4",
+    "[New!] [HANDMADE]  FEELING FRUSTRATED V1",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 7.53,
+   "loop": false,
+   "category": "reaction",
+   "what": "frustrated, hands to the hips (performer arms)",
+   "suggested_slot": "react_lose",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.784,
+    0.931
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "chair_within_2cm": 0
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    14,
+    "RightForeArm",
+    1.5
+   ],
+   "loop_seam_mm": null,
+   "fit_v": "v5"
+  },
+  {
+   "slug": "seat_feeling_frustrated_v2",
+   "file": "desk/seat_feeling_frustrated_v2.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_5",
+    "[New!] [HANDMADE]  FEELING FRUSTRATED V2",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 7.53,
+   "loop": false,
+   "category": "reaction",
+   "what": "frustrated V2 (performer arms)",
+   "suggested_slot": "react_lose",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.807,
+    0.872
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    23,
+    "LeftForeArm",
+    1.7
+   ],
+   "loop_seam_mm": null
+  },
+  {
+   "slug": "seat_distracted_then_smile",
+   "file": "desk/seat_distracted_then_smile.glb",
+   "source": [
+    "Sova_Action_Reactions_Animations.package",
+    "set_3",
+    "[New!] [HANDMADE]  DISTRACTED & THEN SMILE",
+    "upper body on neutral_1's seated hips and legs"
+   ],
+   "duration_s": 7.53,
+   "loop": false,
+   "category": "reaction",
+   "what": "distracted, then smiles, arms crossed (performer arms)",
+   "suggested_slot": "react_win",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    1.058,
+    1.065
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "seat_gap_cm": [
+     0.3,
+     4.9
+    ],
+    "seat_frames_under": 0,
+    "soles_cm": {
+     "L": [
+      0.2,
+      4.8
+     ],
+     "R": [
+      0.2,
+      4.8
+     ]
+    },
+    "thigh_capsule_note": "the room pass legs capsule (radius up to 15 cm, from the baggy trousers) reads hands resting ON the cloth as inside; hands_in_body_mesh is the trouser-mesh test"
+   },
+   "fit": {
+    "hip_joints_seated_m": [
+     0.0,
+     0.68,
+     0.0
+    ],
+    "soles_cm": {
+     "L": [
+      0.2,
+      0.2
+     ],
+     "R": [
+      0.2,
+      0.2
+     ]
+    }
+   },
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 113,
+     "max_verts": 550,
+     "max_depth_cm": 5.0,
+     "by_region_cm": {
+      "RightArm": 5.0
+     }
+    },
+    "Right": {
+     "frames": 113,
+     "max_verts": 444,
+     "max_depth_cm": 3.8,
+     "by_region_cm": {
+      "LeftArm": 3.8,
+      "LeftHand": 1.7
+     }
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    2,
+    "HeadTop_End",
+    6.13
+   ],
+   "loop_seam_mm": null
+  },
+  {
+   "slug": "seat_happy",
+   "file": "desk/seat_happy.glb",
+   "source": [
+    "Sova Action & Reactions",
+    "[MOCAP] HAPPY (trimmed), upper body on the seated base, seated arms"
+   ],
+   "duration_s": 3.97,
+   "loop": false,
+   "category": "reaction",
+   "what": "chess win candidate: pleased sway (recommended)",
+   "suggested_slot": "chess_win",
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.751,
+    0.759
+   ],
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    7,
+    "LeftForeArm",
+    0.13
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "chair_within_2cm": 0
+   }
+  },
+  {
+   "slug": "seat_smiling",
+   "file": "desk/seat_smiling.glb",
+   "source": [
+    "Sova Action & Reactions",
+    "SMILING, upper body on the seated base, performer arms"
+   ],
+   "duration_s": 5.23,
+   "loop": false,
+   "category": "reaction",
+   "what": "chess win candidate: smiling, wide right-arm talking gesture",
+   "suggested_slot": null,
+   "seat_at": [
+    0,
+    -0.075
+   ],
+   "hands_y_median_m": [
+    0.829,
+    0.838
+   ],
+   "hands_in_body_mesh": {
+    "Left": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    },
+    "Right": {
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
+    }
+   },
+   "max_joint_move_per_frame_mm": [
+    41,
+    "RightHandIndex4",
+    2.47
+   ],
+   "room": {
+    "chair": {},
+    "desk": {},
+    "other": {},
+    "floor": {},
+    "chair_within_2cm": 0
+   }
+  }
+ ]
+}

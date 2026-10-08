@@ -1,0 +1,542 @@
+{
+ "note": "Sova bed/sleep clips fitted to the room bed (room_build/sova/bed_build.py): his lowest torso point over the clip on the mattress top less 1.5 cm give; played as the page lie clip (bedPlace: head toward -x, hips at BED.hips). mh_mx format (animation-only, char_mixamo node names; the 13 zero-weight end bones are not keyed and keep rest). Licence pending: preview only, never in web/ until COORD clears it. The phone is not in the GLB: the phone clips give its grip under the hand bone (phone fields, as build_glb.mjs builds it).",
+ "fps": 30,
+ "room_pass": "room_build/kimodo/contact_pass.mjs on a scratch copy of the page, each clip as the lie clip; the legs capsule row counts the baggy-trouser capsule, not the mesh (the mesh extents are in extents_m)",
+ "not_fitted": [
+  "sitting_and_lying_on_bed",
+  "wake_up_and_leave_bed: transitions, need the page edge placement (sit/stand at the bed side)"
+ ],
+ "discarded": [
+  "IN BED 01/02 calls and IN BED 03 B: across the bed, feet on the floor",
+  "IN BED 04"
+ ],
+ "clips": [
+  {
+   "slug": "bed_phone_watch_landscape",
+   "file": "bed/bed_phone_watch_landscape.glb",
+   "source": [
+    "Sova_Phone_Animations (Ver8; V12 = same, set N+9)",
+    "bed_phone_watch_landscape",
+    "WATCHING A VIDEO VER. A - LANDSCAPE"
+   ],
+   "duration_s": 6.63,
+   "loop": true,
+   "what": "lying on his back, knees up, phone over the face held landscape: watching a video",
+   "suggested_slot": "bed_phone_watch_landscape",
+   "room": {
+    "frames": 216,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 0
+   },
+   "extents_m": {
+    "head_end_x_min": -1.661,
+    "feet_end_x_max": -0.011,
+    "z_min": 0.594,
+    "z_max": 1.233,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 36.7
+   },
+   "support_fit_cm": [
+    -0.0,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Right": 0.0
+   },
+   "phone": {
+    "hand": "Left",
+    "parent": "mixamorig:LeftHand",
+    "node_translation": [
+     0.7475,
+     7.8386,
+     6.3655
+    ],
+    "node_rotation_xyzw": [
+     0.004228,
+     -0.698371,
+     -0.158405,
+     0.697974
+    ],
+    "node_scale": 100,
+    "box_m": [
+     0.008,
+     0.15,
+     0.072
+    ],
+    "box_axes": "x thickness (screen normal), y long, z wide",
+    "phone_in_head": {
+     "frames": 0,
+     "max_verts": 0,
+     "min_gap_cm": 9.2
+    },
+    "fingers_in_phone": {
+     "frames": 100,
+     "max_verts": 105,
+     "max_depth_cm": 0.4
+    },
+    "eye_to_screen": {
+     "dist_cm": [
+      26,
+      26
+     ],
+     "angle_deg_median": 6,
+     "angle_deg_max": 7
+    }
+   }
+  },
+  {
+   "slug": "bed_phone_watch_portrait",
+   "file": "bed/bed_phone_watch_portrait.glb",
+   "source": [
+    "Sova_Phone_Animations (Ver8; V12 = same, set N+9)",
+    "bed_phone_watch_portrait",
+    "WATCHING A VIDEO VER. A - PORTRAIT"
+   ],
+   "duration_s": 6.63,
+   "loop": true,
+   "what": "same, phone held portrait",
+   "suggested_slot": "bed_phone_watch_portrait",
+   "room": {
+    "frames": 216,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 0
+   },
+   "extents_m": {
+    "head_end_x_min": -1.661,
+    "feet_end_x_max": -0.011,
+    "z_min": 0.588,
+    "z_max": 1.233,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 36.7
+   },
+   "support_fit_cm": [
+    -0.0,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Right": 0.0
+   },
+   "phone": {
+    "hand": "Left",
+    "parent": "mixamorig:LeftHand",
+    "node_translation": [
+     0.7763,
+     7.9355,
+     6.349
+    ],
+    "node_rotation_xyzw": [
+     -0.496727,
+     0.605798,
+     -0.381289,
+     -0.490806
+    ],
+    "node_scale": 100,
+    "box_m": [
+     0.008,
+     0.15,
+     0.072
+    ],
+    "box_axes": "x thickness (screen normal), y long, z wide"
+   }
+  },
+  {
+   "slug": "bed_phone_typing",
+   "file": "bed/bed_phone_typing.glb",
+   "source": [
+    "Sova_Phone_Animations (Ver8; V12 = same, set N+9)",
+    "bed_phone_typing",
+    "TYPING"
+   ],
+   "duration_s": 6.63,
+   "loop": true,
+   "what": "same, the right thumb types on the phone",
+   "suggested_slot": "bed_phone_typing",
+   "room": {
+    "frames": 216,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 0
+   },
+   "extents_m": {
+    "head_end_x_min": -1.661,
+    "feet_end_x_max": -0.011,
+    "z_min": 0.588,
+    "z_max": 1.271,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 32.9
+   },
+   "support_fit_cm": [
+    -0.0,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Right": 0.0
+   },
+   "phone": {
+    "hand": "Left",
+    "parent": "mixamorig:LeftHand",
+    "node_translation": [
+     0.7774,
+     7.9383,
+     6.3491
+    ],
+    "node_rotation_xyzw": [
+     -0.496726,
+     0.605798,
+     -0.381283,
+     -0.490811
+    ],
+    "node_scale": 100,
+    "box_m": [
+     0.008,
+     0.15,
+     0.072
+    ],
+    "box_axes": "x thickness (screen normal), y long, z wide",
+    "phone_in_head": {
+     "frames": 0,
+     "max_verts": 0,
+     "min_gap_cm": 9.7
+    },
+    "fingers_in_phone": {
+     "frames": 100,
+     "max_verts": 11,
+     "max_depth_cm": 0.3
+    },
+    "eye_to_screen": {
+     "dist_cm": [
+      25,
+      25
+     ],
+     "angle_deg_median": 15,
+     "angle_deg_max": 16
+    }
+   }
+  },
+  {
+   "slug": "bed_phone_lift",
+   "file": "bed/bed_phone_lift.glb",
+   "source": [
+    "Sova_Phone_Animations (Ver8; V12 = same, set N+9)",
+    "bed_phone_lift",
+    "IN BED 03 - VER. A"
+   ],
+   "duration_s": 18.3,
+   "loop": false,
+   "what": "lying back, lifts the phone over his face, then lowers it to his side (source lies across a bed with feet on the floor; here laid along our mattress, legs inside it per extents_m)",
+   "suggested_slot": "bed_phone_lift",
+   "room": {
+    "frames": 564,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 74
+   },
+   "extents_m": {
+    "head_end_x_min": -1.707,
+    "feet_end_x_max": -0.266,
+    "z_min": 0.508,
+    "z_max": 1.335,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 26.5
+   },
+   "support_fit_cm": [
+    -2.2,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Right": 0.0
+   },
+   "phone": {
+    "hand": "Left",
+    "parent": "mixamorig:LeftHand",
+    "node_translation": [
+     0.7433,
+     7.9056,
+     6.3674
+    ],
+    "node_rotation_xyzw": [
+     -0.496575,
+     0.605739,
+     -0.38184,
+     -0.490603
+    ],
+    "node_scale": 100,
+    "box_m": [
+     0.008,
+     0.15,
+     0.072
+    ],
+    "box_axes": "x thickness (screen normal), y long, z wide",
+    "phone_in_head": {
+     "frames": 0,
+     "max_verts": 0,
+     "min_gap_cm": 8.3
+    },
+    "fingers_in_phone": {
+     "frames": 275,
+     "max_verts": 11,
+     "max_depth_cm": 0.3
+    },
+    "eye_to_screen": {
+     "dist_cm": [
+      21,
+      68
+     ],
+     "angle_deg_median": 28,
+     "angle_deg_max": 80
+    }
+   }
+  },
+  {
+   "slug": "sleep_side",
+   "file": "bed/sleep_side.glb",
+   "source": [
+    "Sova Pack 7 bed/sleep",
+    "sleep_side",
+    "BED sleeping_loop_v1"
+   ],
+   "duration_s": 6.63,
+   "loop": true,
+   "what": "asleep on his side (loop)",
+   "suggested_slot": "sleep_side",
+   "room": {
+    "frames": 216,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 0
+   },
+   "extents_m": {
+    "head_end_x_min": -1.678,
+    "feet_end_x_max": -0.241,
+    "z_min": 0.655,
+    "z_max": 1.268,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 33.2
+   },
+   "support_fit_cm": [
+    -0.1,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Left": 0.0,
+    "Right": 0.0
+   }
+  },
+  {
+   "slug": "sleep_roll_to_back",
+   "file": "bed/sleep_roll_to_back.glb",
+   "source": [
+    "Sova Pack 7 bed/sleep",
+    "sleep_roll_to_back",
+    "BED sleeping_loop_v1_to_v2"
+   ],
+   "duration_s": 14.33,
+   "loop": false,
+   "what": "asleep: rolls from his side onto his back (plays once; side loop -> back loop)",
+   "suggested_slot": "sleep_roll_to_back",
+   "room": {
+    "frames": 447,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 0
+   },
+   "extents_m": {
+    "head_end_x_min": -1.703,
+    "feet_end_x_max": -0.03,
+    "z_min": 0.501,
+    "z_max": 1.304,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 29.6
+   },
+   "support_fit_cm": [
+    -4.7,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Left": 0.0,
+    "Right": 0.9
+   }
+  },
+  {
+   "slug": "sleep_back",
+   "file": "bed/sleep_back.glb",
+   "source": [
+    "Sova Pack 7 bed/sleep",
+    "sleep_back",
+    "BED sleeping_loop_v2"
+   ],
+   "duration_s": 6.63,
+   "loop": true,
+   "what": "asleep on his back (loop)",
+   "suggested_slot": "sleep_back",
+   "room": {
+    "frames": 216,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 0
+   },
+   "extents_m": {
+    "head_end_x_min": -1.674,
+    "feet_end_x_max": -0.0,
+    "z_min": 0.563,
+    "z_max": 1.378,
+    "past_mattress_end_cm": 0,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 22.2
+   },
+   "support_fit_cm": [
+    -0.1,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Left": 0.0,
+    "Right": 0.0
+   }
+  },
+  {
+   "slug": "sleep_back_idle",
+   "file": "bed/sleep_back_idle.glb",
+   "source": [
+    "Sova Pack 7 bed/sleep",
+    "sleep_back_idle",
+    "BED sleeping_idle"
+   ],
+   "duration_s": 6.0,
+   "loop": true,
+   "what": "asleep on his back, small idle shifts (loop)",
+   "suggested_slot": "sleep_back_idle",
+   "room": {
+    "frames": 195,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 195
+   },
+   "extents_m": {
+    "head_end_x_min": -1.56,
+    "feet_end_x_max": 0.106,
+    "z_min": 0.602,
+    "z_max": 1.303,
+    "past_mattress_end_cm": 5.6,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 29.7
+   },
+   "support_fit_cm": [
+    -0.0,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Left": 1.6,
+    "Right": 0.0
+   },
+   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace"
+  },
+  {
+   "slug": "sleep_wake_and_back",
+   "file": "bed/sleep_wake_and_back.glb",
+   "source": [
+    "Sova Pack 7 bed/sleep",
+    "sleep_wake_and_back",
+    "BED wake_up_and_sleep_again"
+   ],
+   "duration_s": 12.0,
+   "loop": false,
+   "what": "asleep on his back: wakes briefly, then settles back to sleep (plays once)",
+   "suggested_slot": "sleep_wake_and_back",
+   "room": {
+    "frames": 375,
+    "bed": 0,
+    "floor": 0,
+    "other": 0,
+    "desk": 0,
+    "chair": 0,
+    "legs_capsule_frames": 361
+   },
+   "extents_m": {
+    "head_end_x_min": -1.579,
+    "feet_end_x_max": 0.106,
+    "z_min": 0.547,
+    "z_max": 1.38,
+    "past_mattress_end_cm": 5.6,
+    "past_headboard_cm": 0,
+    "past_sides_cm": [
+     0,
+     0
+    ],
+    "wall_z1.6_gap_cm": 22.0
+   },
+   "support_fit_cm": [
+    -5.3,
+    0.0
+   ],
+   "hands_in_body_after_fit_cm": {
+    "Left": 3.6,
+    "Right": 1.3
+   },
+   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace"
+  }
+ ]
+}
