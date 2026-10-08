@@ -50,7 +50,7 @@ class Body:
             reg[np.isin(b, [s + 'UpLeg', s + 'Leg', s + 'Foot', s + 'ToeBase', s + 'Toe_End'])] = 'legs'
             reg[np.isin(b, [s + 'Arm', s + 'ForeArm'])] = s + 'Arm'
             reg[np.char.startswith(b.astype(str), s + 'Hand')] = s + 'Hand'
-        self.reg = reg
+        self.reg = reg; self.bone = b
         # eyes (bind pose): 3.5 cm above and 3 cm behind the nose tip (front-most midline head vertex below the fringe)
         hv = self.P[reg == 'head']; hv = hv[(np.abs(hv[:, 0]) < 0.03) & (hv[:, 1] < hv[:, 1].max() - 0.15)]
         self.eye_bind = hv[hv[:, 2].argmax()] * [0, 1, 1] + [0, 0.035, -0.03]

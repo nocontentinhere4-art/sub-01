@@ -11,6 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from measure import Body
 from fit_hands import apply, smooth_max
 GAP, REACH = 0.003, 0.15
+FORCE = os.environ.get('REST_FORCE') == '1'      # every frame resting (idle clips: no gesture to keep)
+PASSES = int(os.environ.get('REST_PASSES', '5'))
 
 def track(B, c, side, step=2):
     """per frame: the move that puts the hand ON the top of his thigh (the nearest trouser vertex facing up, found across
@@ -18,9 +20,9 @@ def track(B, c, side, step=2):
     Wj, wm = B.joints(c); n = c['frames']; fr = list(range(0, n, step)); MV, ON, G = [], [], []
     for f in fr:
         p, nn = B.skin(Wj, f)
-        top = (B.reg == 'legs') & (nn[:, 1] > 0.7); T = p[top]; hv = p[B.reg == side + 'Hand']
+        top = np.isin(B.bone, ['LeftUpLeg', 'RightUpLeg']) & (nn[:, 1] > 0.7); T = p[top]; hv = p[B.reg == side + 'Hand']
         ctr = hv.mean(0); d = np.linalg.norm((T - ctr)[:, [0, 2]], axis=1); k = d.argmin(); t = T[k]
-        on = d[k] < REACH and ctr[1] - t[1] < 0.25
+        on = FORCE or (d[k] < REACH and ctr[1] - t[1] < 0.25)
         mv = np.array([t[0] - ctr[0], 0.0, t[2] - ctr[2]]) * 0.8
         mv[1] = t[1] + GAP - hv[:, 1].min()
         MV.append(mv if on else np.zeros(3)); ON.append(on); G.append(hv[:, 1].min() - t[1])
@@ -34,7 +36,7 @@ if __name__ == '__main__':
         c = json.load(open(f)); rep = {}
         for side in ('Left', 'Right'):
             MV0, ON0, G0 = track(B, c, side)
-            for it in range(5):
+            for it in range(PASSES):
                 MV, ON, G = track(B, c, side) if it else (MV0, ON0, G0)
                 k = 5; mv = np.stack([np.convolve(np.pad(MV[:, j], k, mode='edge'), np.ones(2 * k + 1) / (2 * k + 1), 'valid') for j in range(3)], 1)
                 if np.linalg.norm(mv, axis=1).max() < 2e-3: break
