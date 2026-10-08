@@ -51,6 +51,7 @@ HAND_CLEAR = 0.006            # forearms and hands this far out of his torso's s
 # skin PAGE_SINK under the bed's top for these clips (boy_mh.js BED_SINK) - his back, now his lowest - and the heels and
 # the head are fitted for that height. BED_FLAT: the hips' and knees' bend blended this far toward straight (0..1)
 SINK = float(os.environ.get('BED_SINK', 0)); FLAT = float(os.environ.get('BED_FLAT', 0))
+HEEL_UP = float(os.environ.get('BED_HEEL_UP', 0))   # (the heels this much higher still: his calves stay within the mattress's 2 cm give while his back takes the sink)
 PAGE_SINK = max(0.0, SINK - BACK_UP)
 
 # ---- the clip, onto the reference's hips and heading (as bed_fit.py)
@@ -234,7 +235,7 @@ def heel_err(fs):
     X, _ = skinf(fs); e = []
     for f in range(len(fs)):
         y, s, x, z = heights(X[f]); lg = HEEL & BODY & ~(THIGH & (np.abs(x - HIPS_ROOM[0]) < 0.15))   # (not his buttocks: they are the back's)
-        e.append(y[lg].min() - (backlow(X[f]) - BACK_UP + SINK))
+        e.append(y[lg].min() - (backlow(X[f]) - BACK_UP + SINK + HEEL_UP))
     return float(np.mean(e))
 LEG_AX = [SIDE]
 def bend_legs(a):

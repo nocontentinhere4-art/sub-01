@@ -28,15 +28,15 @@ for r in room_bedtime room_bed_lie; do node $G/exp.mjs "$R/web/room/mh_v5/$r.glb
 MIX=$(python3 -c "import json,sys; sys.path.insert(0,'$G'); from bedrig import is_mixamo; print(1 if is_mixamo([n['name'] for n in json.load(open('$WK/json/char.json'))['nodes']]) else '')")
 echo "rig: ${MIX:+Mixamo}${MIX:-v5} ($CH)"
 echo '{"scale":"hip","hands":false,"feet":false}' > "$WK/o_bed.json"
-# the rows: name src trim ref mode side out slide sink flat toe_in
+# the rows: name src trim ref mode side out slide sink flat toe_in heel_up
 python3 - "$K/mixamo_clips.json" > "$WK/rows.txt" <<'PY'
 import json, sys
 t = json.load(open(sys.argv[1]))
 for n in t["bed"]["clips"]:
     r = t["clips"][n]; tr = ",".join(map(str, r["trim"])) if "trim" in r else "-"
-    print(n, r.get("src", n), tr, r["ref"], r["mode"], "1" if r.get("side") else "-", r["out"] or "-", r.get("slide", 0.04), r.get("sink", 0), r.get("flat", 0), r.get("toe_in", 0.03))
+    print(n, r.get("src", n), tr, r["ref"], r["mode"], "1" if r.get("side") else "-", r["out"] or "-", r.get("slide", 0.04), r.get("sink", 0), r.get("flat", 0), r.get("toe_in", 0.03), r.get("heel_up", 0))
 PY
-while read -r N SRC TRIM REF MODE SIDE O SL SK FL TI; do
+while read -r N SRC TRIM REF MODE SIDE O SL SK FL TI HU; do
   T=""; if [ "$TRIM" != "-" ]; then T=$TRIM; fi
   if [ -n "$MIX" ]; then
     node $K/mixamo_glb.mjs "$WK/src/$SRC.fbx" "$WK/mx_$N.glb" > /dev/null
@@ -48,7 +48,7 @@ while read -r N SRC TRIM REF MODE SIDE O SL SK FL TI; do
     node $G/exp.mjs "$WK/rt_$N.glb" "$WK/rt_$N.json" > /dev/null
   fi
   SF=""; if [ "$SIDE" = "1" ]; then SF=--side; fi; CN=$([ "$O" = "-" ] && echo "$N" || echo "$O"); echo "fit $N ($MODE $SF)"
-  (cd $G && BED_SLIDE=$SL BED_SINK=$SK BED_FLAT=$FL BED_TOE_IN=$TI CLIP_NAME=$CN python3 bed_clip.py "$WK/json/$REF.x.json" "$WK/rt_$N.json" "$WK/fit_$N.json" "$WK/json/char.json" "$WK/json/bed_surface.json" $MODE --loop $SF | tee "$WK/fit_$N.txt")
+  (cd $G && BED_SLIDE=$SL BED_SINK=$SK BED_FLAT=$FL BED_TOE_IN=$TI BED_HEEL_UP=$HU CLIP_NAME=$CN python3 bed_clip.py "$WK/json/$REF.x.json" "$WK/rt_$N.json" "$WK/fit_$N.json" "$WK/json/char.json" "$WK/json/bed_surface.json" $MODE --loop $SF | tee "$WK/fit_$N.txt")
   [ "$O" = "-" ] || node $G/writeclip.mjs "$WK/fit_$N.json" "$OUT/$O.glb"
 done < "$WK/rows.txt"
 read -r TL TS TO TT TH <<< "$(python3 -c "import json; t=json.load(open('$K/mixamo_clips.json'))['bed']['turn']; print(t['loop'], t['side'], t['out'], t['turn_s'], t['hold'])")"

@@ -3243,17 +3243,21 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; renderer.render(scene, camera); }, animate_: animate,
   roomDbg: () => ({CHAIR, BLOCK, NODES, LINKS, chairAt, chairSpots, chairNode, route, plan, step, at}),   // (the planner's state, for probes)
-  penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give; rounded edge) and the chair
+  penetration: (every = 2, detail = false) => {                      // his skinned vertices inside the bed (below the mattress top less 2 cm of give, 2.5 under his back and hips; rounded edge) and the chair
     const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible && !/_inside$/.test(o.name)) parts.push(o); }); boy.updateMatrixWorld(true);   // (every part: a dressed body has several; not his drawn inside, the same skin again)
     const v = new THREE.Vector3(), TOP = 0.82 - 0.02, ch = chairNode(), V = ch && chairVox();
     let bed = 0, chair = 0, count = 0; const u = new THREE.Vector3(), by = {};
+    const sinks = (sm, i) => { const I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight; let b = 0, bw = 0;
+      for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
+      return /^(Hip|Pelvis|Waist|Spine|[LR]_Thigh|Hips|LeftUpLeg|RightUpLeg)/.test(sm.skeleton.bones[b].name); };
     for (const sm of parts) { const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight; count += Math.ceil(P.count / every);
     const note = (i, what) => { if (!detail) return; let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (Wt.getComponent(i, k) > bw) { bw = Wt.getComponent(i, k); b = I.getComponent(i, k); }
       const n = what + ":" + sm.skeleton.bones[b].name; by[n] = (by[n] || 0) + 1; };
     const hid = SLIDES.state === 2 && sm === bodyMesh() ? SLIDES.parkedIdx : null;   // (the slides parked by the bed are not on him)
     for (let i = 0; i < P.count; i += every) { if (hid && hid.has(i)) continue; sm.getVertexPosition(i, v); v.applyMatrix4(sm.matrixWorld);
       const e = Math.min(v.x + 1.90, 0.05 - v.x, v.z - 0.25, 1.50 - v.z);      // in from the edge; the mattress edge is rounded (r 5 cm)
-      if (e > 0 && v.y < TOP - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0)) { bed++; note(i, "bed"); }
+      const rim = e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0;
+      if (e > 0 && v.y < TOP - rim && (v.y < TOP - 0.005 - rim || !sinks(sm, i))) { bed++; note(i, "bed"); }   // (his back and hips: 2.5 cm, the mattress gives most there - C #8)
       if (V) { ch.worldToLocal(u.copy(v)); const ci = Math.floor((u.x - V.x0) / V.c), ck = Math.floor((u.z - V.z0) / V.c);
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } } }

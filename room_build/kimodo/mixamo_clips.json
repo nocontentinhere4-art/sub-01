@@ -36,7 +36,8 @@
    "fit": "bed_clip",
    "sink": 0.0165,
    "flat": 1.0,
-   "toe_in": 0.008
+   "toe_in": 0.008,
+   "heel_up": 0.006
   },
   "Laying_Nodding": {
    "kind": "bed",
