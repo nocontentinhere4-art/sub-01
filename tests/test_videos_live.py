@@ -33,6 +33,19 @@ from live_server import Live  # noqa: E402
 DATA = Path(__file__).resolve().parent / "data" / "search"
 
 
+
+class CardPage:
+    """The server screen's page: only ever a local card now (#89 client player: videos play in the viewer's browser)."""
+
+    def __init__(self):
+        self.url, self.html = "about:blank", []
+
+    async def set_content(self, html, **k):
+        self.html.append(html)
+
+    async def wait_for_timeout(self, ms):
+        pass
+
 def run(coro):
     return asyncio.run(coro)
 
@@ -200,7 +213,7 @@ def test_live_like_a_short_from_the_api_drives_the_reward_regions(tmp_path, monk
     monkeypatch.setenv("YOUTUBE_API_KEY", "test-key-not-real")
     b = Browser(decide=True, rng=random.Random(0))
     sc = b.screens["phone"]
-    sc.mode, sc.page, sc.ctx = "shorts", SimpleNamespace(url="about:blank"), object()
+    sc.mode, sc.page, sc.ctx = "shorts", CardPage(), object()
 
     async def _fetch(sc_, url, hops=3, headers=None):
         if "/youtube/v3/videos?" in url:                    # the playability check (1 unit)

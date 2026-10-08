@@ -50,8 +50,8 @@ SUB-01 is a fictional man of about 20 in Tokyo, never presented as a minor. The 
   sneakers, memes, movies; then Tokyo and science; Wikipedia barely. Food has weight 0 unless he is hungry or ordering
   (`pick(hungry=True)`). There are no money or crypto topics.
 - **Where the time goes:** the phone is always the short-video feed. About half of desk time is YouTube, in 20-minute
-  sessions (`search_sources.desk_video`), more in the evening. Video plays in YouTube's official embed player and is
-  found only through YouTube's official Data API (`YOUTUBE_API_KEY`): the latest uploads of well-known channels per
+  sessions (`search_sources.desk_video`), more in the evening. Video plays in YouTube's official embed player, in the viewer's browser (the server
+  never opens it: YouTube refuses playback to the server's IP), and is found only through YouTube's official Data API (`YOUTUBE_API_KEY`): the latest uploads of well-known channels per
   topic (channels.list → playlistItems.list → videos.list, 3 units) or a search (100 units). YouTube's Terms of
   Service forbid automated access to its pages, so its pages and RSS are never read. Without a key or quota nothing
   new is looked up, and the panel says so. TikTok plays in its official player.

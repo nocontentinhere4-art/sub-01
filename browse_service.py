@@ -133,6 +133,13 @@ def make_app(browser, token=None):
                            ACT_LIMIT_S, dev)
         return web.json_response({"status": st})
 
+    async def video_error(request):
+        """#89 client player: the viewer's embed could not play the video on screen (only that one can be reported)."""
+        d = await body(request)
+        dev = device(d)
+        ok = browser.video_error(dev, str(d.get("id") or "")[:30], d.get("code"))
+        return web.json_response({"ok": ok, "status": browser.screens[dev].status() if ok else None})
+
     async def close(request):
         d = await body(request)
         await browser.close(d.get("device") if d.get("device") in browser.screens else None)
@@ -173,7 +180,7 @@ def make_app(browser, token=None):
         mb = await asyncio.to_thread(tree_rss_mb, os.getpid())     # /proc reads off the event loop (#89)
         return web.json_response({"ok": True, "pid": os.getpid(), "rss_mb": round(mb, 1)})
 
-    for path, fn in (("/init", init), ("/step", step), ("/act", act), ("/close", close)):
+    for path, fn in (("/init", init), ("/step", step), ("/act", act), ("/close", close), ("/video_error", video_error)):
         app.router.add_post(path, fn)
     app.router.add_get("/shot/{device}.jpg", shot)
     app.router.add_get("/state", state)
@@ -293,6 +300,12 @@ class BrowserClient:
         if d.get("status"):
             self.screens[device] = d["status"]
         return d.get("status")
+
+    async def video_error(self, device, vid, code):
+        d = await self._post("/video_error", {"device": device, "id": vid, "code": code}, timeout=10)
+        if d.get("status"):
+            self.screens[device] = d["status"]
+        return bool(d.get("ok"))
 
     async def close(self, device=None):
         self.screens.pop(device, None) if device else self.screens.clear()

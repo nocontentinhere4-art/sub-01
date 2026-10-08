@@ -22,6 +22,19 @@ from browse import Browser  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 
 
+
+class CardPage:
+    """The server screen's page: only ever a local card now (#89 client player: videos play in the viewer's browser)."""
+
+    def __init__(self):
+        self.url, self.html = "about:blank", []
+
+    async def set_content(self, html, **k):
+        self.html.append(html)
+
+    async def wait_for_timeout(self, ms):
+        pass
+
 def run(coro):
     return asyncio.run(coro)
 
@@ -87,7 +100,7 @@ def _api_browser(monkeypatch, key=True):
         monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
     b = Browser(decide=True, rng=random.Random(0))
     sc = b.screens["phone"]
-    sc.mode, sc.page, sc.ctx = "shorts", SimpleNamespace(url="about:blank"), object()
+    sc.mode, sc.page, sc.ctx = "shorts", CardPage(), object()
     calls, opened = [], []
 
     async def _fetch(sc_, url, hops=3, headers=None):
@@ -121,7 +134,9 @@ def test_shorts_from_a_topic_channels_uploads_through_the_api_for_3_units(monkey
     assert api[0][0].split("forHandle=%40")[1] in YT.CHANNELS["cars"]
     assert not [u for u, _ in calls if "youtube.com/@" in u or "/feeds/" in u]      # never YouTube's own pages
     assert sc.info["url"] in {f"https://www.youtube.com/shorts/abcDEF1234{i}" for i in (0, 2, 4)}   # the 45 s ones
-    assert opened[0].startswith("https://www.youtube-nocookie.com/embed/") and b.feed_note == YT.NOTE_UPLOADS
+    assert opened == [] and sc.info["now_watching"]["source"] == "youtube" and b.feed_note == YT.NOTE_UPLOADS
+    assert sc.info["now_watching"]["duration_s"] == 45                              # the API's duration
+    assert sc.info["embed"].startswith("https://www.youtube-nocookie.com/embed/")    # for the viewer's browser
     run(b._public_videos(sc, "shorts", "Toyota GR Supra", "again"))                 # uploads id kept, list cached
     assert b.yt.public()["units_used"] <= 6
 
@@ -129,7 +144,7 @@ def test_shorts_from_a_topic_channels_uploads_through_the_api_for_3_units(monkey
 def test_desk_videos_are_the_longer_uploads(monkeypatch):
     b, _, calls, opened = _api_browser(monkeypatch)
     sc = b.screens["desk"]
-    sc.page, sc.ctx = SimpleNamespace(url="about:blank"), object()
+    sc.page, sc.ctx = CardPage(), object()
     assert run(b._public_videos(sc, "youtube", "Toyota GR Supra", "videos", short=False))
     assert sc.info["url"] in {f"https://www.youtube.com/watch?v=abcDEF1234{i}" for i in (1, 3, 5)}
 

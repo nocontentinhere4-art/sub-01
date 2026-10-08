@@ -903,6 +903,12 @@ class Live:
         elif st and (m := screens.YT_ID.search(str(st.get("url") or ""))):        # ... or YouTube's
             import youtube_api
             st = dict(st, embed={"src": youtube_api.viewer_embed(m.group(1)), "label": "YouTube (official embed)"})
+        if st and st.get("now_watching"):                  # #89 client player: the viewer's page plays it
+            nw = st["now_watching"]
+            if display_ok(str(nw.get("title") or "")) and display_ok(str(nw.get("channel") or "")):
+                st = dict(st, now_watching=dict(nw, elapsed_s=max(0, round(time.time() - float(nw["started_at"])))))
+            else:                                               # a title the public page never shows: not played
+                st = {k: v for k, v in st.items() if k not in ("now_watching", "embed")}
         # the options belong to the page they were considered on and to the page the choice led to, no later one
         if st and dec and (st.get("url") == dec.get("page_url") or st.get("id") == dec.get("status_id")
                            or (st.get("video") and st.get("url") == dec.get("led_to"))):   # a chosen video playing
@@ -1025,6 +1031,32 @@ class Live:
                               "da": round(self.neuro.levels["DA"], 3)})
         return b
 
+    VIDEO_ERRORS_PER_MIN = 6                                   # reports from viewers' players, all viewers together
+
+    async def video_error(self, vid, code):
+        """#89 client player: a viewer's official embed could not play the published video (its onError code). Only
+        the video now on a screen counts, each once, and at most VIDEO_ERRORS_PER_MIN a minute: nothing else is taken
+        from the viewer (no personal data, no cookies)."""
+        now = time.time()
+        q = self.__dict__.setdefault("_video_errors", deque())
+        while q and now - q[0] > 60:
+            q.popleft()
+        seen = self.__dict__.setdefault("_video_error_ids", deque(maxlen=50))
+        if not self.browser or len(q) >= self.VIDEO_ERRORS_PER_MIN or vid in seen:
+            return {"ok": False}
+        dev = next((d for d, st in (getattr(self.browser, "screens", None) or {}).items()
+                    if ((st or {}).get("now_watching") or {}).get("id") == vid), None)
+        if dev is None:
+            return {"ok": False}
+        q.append(now)
+        seen.append(vid)
+        try:
+            ok = await self.browser.video_error(dev, vid, int(code))
+        except BrowserDown:
+            return {"ok": False}
+        print(f"viewer's player could not play {vid} on the {dev} (error {code})", flush=True)
+        return {"ok": ok}
+
     def save_screens(self):
         """#89: /api/screens' counts, last pages and notes, kept across deploys (a small file, at most every minute)."""
         sc, path = getattr(self, "screens", None), getattr(self, "screens_path", None)
@@ -1048,6 +1080,9 @@ class Live:
         out["feeds"] = {site: {k: d.get(k) for k in ("t", "reason", "video_links", "captcha", "login_prompt")}
                         for site, d in (getattr(self.browser, "diag", None) or {}).items()} if self.browser else {}
         out["music"] = self.music_line()
+        br = self.browser                                    # #89 client player: what the viewers' pages play
+        out["now_watching"] = {dev: (self.screen_status(dev) or {}).get("now_watching") for dev in ("desk", "phone")} \
+            if br and not getattr(br, "restarting", False) and isinstance(getattr(br, "screens", None), dict) else {}
         return out
 
     def browsing_view(self):
@@ -1732,6 +1767,22 @@ border:1px solid #2a2a36;padding:10px;font:inherit"><button style="background:#e
 font:inherit">enter</button>{msg}</form></body>"""
 
 
+async def video_error_handler(request, live):
+    """POST /api/screen/video_error {id, code}: the viewer's official embed could not play the video (#89 client
+    player). Only a video id and the player's error code are accepted; Live.video_error checks the rest."""
+    try:
+        d = await request.json()
+    except ValueError:
+        raise web.HTTPBadRequest()
+    if not isinstance(d, dict):
+        raise web.HTTPBadRequest()
+    vid, code = str(d.get("id") or ""), d.get("code")
+    if (not re.fullmatch(r"[\w-]{6,25}", vid) or isinstance(code, bool) or not isinstance(code, int)
+            or not 0 <= code <= 9999):
+        raise web.HTTPBadRequest()
+    return web.json_response(await live.video_error(vid, code))
+
+
 def password_gate(password):
     """Private preview: one shared password (SITE_PASSWORD), remembered in an HttpOnly cookie."""
     import hashlib
@@ -1834,6 +1885,8 @@ async def main(args):
             raise web.HTTPNotFound()
         return web.Response(body=shot, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
     app.router.add_get("/api/screen/{device}.jpg", screen_shot)
+
+    app.router.add_post("/api/screen/video_error", lambda r: video_error_handler(r, live))   # #89 client player
 
     async def browsing(request):                  # pages shown on his screens, newest last
         return web.json_response(live.browsing_view())

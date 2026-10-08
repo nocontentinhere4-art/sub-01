@@ -136,23 +136,36 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 - Embed guard (live bug 2026-10-04 10:46 Tokyo: Formula1's "FP3 Highlights" embed said "Video unavailable … blocked it
   from display on this website", a black screen). `videos.list` (part contentDetails,snippet,status; also checked for
   search results, 1 unit) keeps only `youtube_api.playable()` videos: embeddable, public, not age-restricted, not
-  region-blocked for JP. At run time `Browser._embed_error` reads the player 3 s after it opens and at each watch
-  screenshot (`EMBED_ERROR`: "video unavailable", "blocked it from display", …, or no video element): such a video is
-  left before it is ever shown, the next queued video plays instead, the id is refused for the day
-  (`Quota.refused`), and a channel with `BAD_CHANNEL` (2) refusals in a day is set aside (`channels_set_aside` in
-  /api/screens). Formula1 is out of `CHANNELS` (its videos are blocked from embedding on other sites).
+  region-blocked for JP. At run time the viewer's player reports a video it cannot play (client player, below): the
+  id is refused for the day (`Quota.refused`), and a channel with `BAD_CHANNEL` (2) refusals in a day is set aside
+  (`channels_set_aside` in /api/screens). (Before the client player the server read its own embed's error text,
+  `_embed_error`, removed.) Formula1 is out of `CHANNELS` (its videos are blocked from embedding on other sites).
 - No YouTube pages, ever (live bug 2026-10-04 10:58: a link chain loaded youtube.com/watch with ads, "Skip" and
   "Something went wrong"; YouTube's Terms forbid automated access to its pages). `Browser._open` turns any
   youtube.com/watch, /shorts, /live, youtu.be link (`youtube_api.page_video`) into "play this video":
-  `_play_video_id` checks it with videos.list (1 unit, `playable()`) and opens the youtube-nocookie embed; without a
-  key it is not played. Any other youtube.com page is refused, and `Guard.route` aborts a top-level navigation to one
-  (a redirect or a click on "Watch on YouTube"). An ad or YouTube's error in the embed (`EMBED_ERROR`, including
-  "advertisement playing" and "something went wrong") moves on to the next video; we never press "Skip". An ad does
-  not count against the channel. About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+  `_play_video_id` checks it with videos.list (1 unit, `playable()`) and publishes it for the viewer's player; without
+  a key it is not played. Any other youtube.com page is refused, and `Guard.route` aborts any navigation to one. We
+  never press "Skip" (the banner closer never touches a YouTube frame). About half of desk time is YouTube, in 20-minute slots (`desk_video`).
+- Client player (2026-10-04, after #132 showed YouTube refusing playback to the Railway IP, "bot wall"): videos play
+  in the VIEWER's browser, never in the server's Chromium. The brain picks the video as before (Data API search /
+  uploads, videos.list `playable()`, the dopamine model). `Browser._open_embed` then shows a local card on the
+  server's screen (thumbnail, title; no request to the video site, not even robots.txt) and publishes `now_watching`
+  (`browse.now_watching`: source youtube/tiktok, checked id, title, channel, duration, start, device, thumb) in the
+  screen status. The watch runs on the clock and the API's duration; the picture change is an estimate
+  (`CLIENT_SCENE`, `scene_estimated`). `live_server.screen_status` adds `elapsed_s` and drops `now_watching` for a
+  title the public page would not show; `/api/screens` has `now_watching` per device. The page
+  (`web/room/screen_player.js`, hooked in `room.html` `panel` / `showScreen`) plays the official embed in the side
+  panel: youtube-nocookie.com/embed (`mute=1`, `start=` elapsed, `enablejsapi` for onError, referrer policy
+  strict-origin-when-cross-origin) or tiktok.com/player/v1 (`muted=1`). The 3D monitor / phone show the server's
+  card with a "playing" frame and progress. The player's onError is POSTed to `/api/screen/video_error` (only
+  `{id, code}`; once per video, 3 a minute per page; the server takes only the video now on a screen, 6 a minute in
+  all) and `Browser.video_error` sets it aside (101/150/100: also against the channel; 2/5/153: the player itself,
+  `player_failed`) and ends the watch so the brain picks again. `Guard.route` aborts every navigation (any frame) to a
+  YouTube host or TikTok's player (`video_player_url`). Stills: `docs/screens/client_player/still.png` (the player
+  area there is a stand-in; the real player loads only in a viewer's browser).
 - When YouTube refuses the player itself (live 2026-10-04 11:54: every video became a card, "the video is not
-  played"): the embed page caught by `_settle` as a bot wall ("Sign in to confirm you're not a bot", error 153), a
-  sign-in wall or not loading is a player-level refusal (`PLAYER_REFUSALS`), not the video's fault.
-  `PLAYER_FAILS` (2) in a row pause YouTube for `PLAYER_PAUSE_S` (30 min, kept in the state). During the pause
+  played"; #132, then the client player above): a player-level error reported by the viewer's player (2, 5, 153) is
+  not the video's fault. `PLAYER_FAILS` (2) in a row pause YouTube for `PLAYER_PAUSE_S` (30 min, kept in the state). During the pause
   there are no YouTube videos, no API units are spent and the panel says why; he does other things. A YouTube
   video is never shown as a card. `/api/screens` youtube has `player`, `player_paused_until` and
   `last_player_refusal`. With a key set, the replay note says "API budget or hourly limit", not "no API key".

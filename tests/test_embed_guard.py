@@ -97,25 +97,23 @@ def card(vid, author="Formula1"):
             "thumb": "", "embed": YT.embed_url(vid), "host": "youtube.com"}
 
 
-def test_a_refused_embed_is_never_shown_and_the_next_video_plays():
-    blocked = ("Video unavailable This video contains content from Formula One Management, who has blocked it from "
-               "display on this website or application. Watch on YouTube")
-    b, sc, shown = _browser({"X3dw_sgRwF0": blocked})
+def test_a_video_the_viewers_player_refuses_is_set_aside_and_the_next_one_is_published():
+    """#89 client player: the F1 video's "blocked it from display on this website" now shows in the viewer's embed,
+    whose onError (150) reaches video_error: not again today, the channel counted, and the next video is published."""
+    b, sc, shown = _browser({})
     bad, good = card("X3dw_sgRwF0"), card("goodvideo01", author="TopGear")
+    sc.page.set_content = _noop
     sc.cards = {c["url"]: c for c in (bad, good)}
     sc.queue = [{"url": c["url"], "title": c["title"], "video": True} for c in (bad, good)]
-    assert run(b._show_card(sc, bad, "videos"))
-    assert shown == [good["url"]]                                   # the blocked one never reached the screen
-    assert b.yt.is_bad(bad["url"]) and not b._card_ok(bad)          # not again today
-    assert sc.watch_until > 0 and sc.info["url"] == good["url"]
+    assert run(b._show_card(sc, bad, "videos")) and sc.info["now_watching"]["id"] == "X3dw_sgRwF0"
+    assert b.video_error("desk", "X3dw_sgRwF0", 150)
+    assert b.yt.is_bad(bad["url"]) and not b._card_ok(bad) and b.yt.bad_by == {"Formula1": 1}   # not again today
+    assert run(b._show_card(sc, good, "videos")) and sc.info["now_watching"]["id"] == "goodvideo01"
+    assert sc.watch_until > 0 and shown == [bad["url"], good["url"]]
 
 
-def test_an_error_during_the_watch_leaves_the_video():
-    b, sc, shown = _browser({})
-    good = card("goodvideo01", author="TopGear")
-    assert run(b._open_embed(sc, good, "videos"))
-    sc.page.texts["goodvideo01"] = "An error occurred. Please try again later."
-    assert run(b._watch(sc)) is False and sc.watch_until == 0 and b.yt.is_bad(good["url"])
+async def _noop(*a, **k):
+    return None
 
 
 def test_a_channel_whose_embeds_keep_failing_is_set_aside_for_the_day():

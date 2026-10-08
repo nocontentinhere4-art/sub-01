@@ -285,19 +285,22 @@ def test_tiktok_found_by_search_plays_in_tiktoks_official_player():
     b, sc = _card_browser({"https://html.duckduckgo.com/": DDG_TIKTOK, "https://www.tiktok.com/oembed": oembed})
     opened = _embed_opens(b)
     assert run(b._public_videos(sc, "tiktok", "cute pets", "short videos — one of his interests"))
-    assert opened == [("https://www.tiktok.com/player/v1/6718335390845095173?autoplay=1&muted=1&loop=1&rel=0"
-                       "&description=1", browse.EMBED_REFERER)]
+    assert opened == []                                         # #89 client player: never in the server's browser
+    nw = sc.info["now_watching"]
+    assert (nw["source"], nw["id"], nw["device"]) == ("tiktok", "6718335390845095173", "phone")
+    assert "in your browser" in sc.page.html[-1] and "Scramble up ur name" in sc.page.html[-1]   # the local card
     assert sc.info["url"] == "https://www.tiktok.com/@scout2015/video/6718335390845095173" and sc.info["embed"]
     assert SC.screen_kind(dict(sc.info, device="phone")) == "tiktok" and sc.watch_until > 0   # played, muted
     assert b.feed_note == SV.NOTE_EMBEDS and b.limits.public()["per_source_today"].get("tiktok") == 1
 
 
-def test_a_refused_player_falls_back_to_the_card():
+def test_a_video_whose_player_the_viewer_reports_dead_is_left_for_the_next():
     oembed = (DATA / "tiktok_oembed.json").read_text()
     b, sc = _card_browser({"https://html.duckduckgo.com/": DDG_TIKTOK, "https://www.tiktok.com/oembed": oembed})
-    _embed_opens(b, ok=False)
     assert run(b._public_videos(sc, "tiktok", "cute pets", "short videos"))
-    assert sc.info["card"] and "Scramble up ur name" in sc.page.html[-1]
+    assert not b.video_error("phone", "1234567890123", 5)       # only the video on screen can be reported
+    assert b.video_error("phone", "6718335390845095173", 5)
+    assert sc.watch_until < browse.time.time() and "could not play" in sc.info["why"]
 
 
 def test_duckduckgos_bot_check_sets_it_aside_and_nothing_is_shown():
@@ -339,7 +342,8 @@ def test_youtube_api_shorts_play_in_the_official_embed_and_the_key_stays_in_a_he
     url, headers = next(c for c in calls if c[0].startswith(YT.SEARCH))
     assert "test-key-not-real" not in url and headers == {"X-Goog-Api-Key": "test-key-not-real"}
     assert "videoDuration=short" in url and "safeSearch=strict" in url
-    assert opened[0][0].startswith("https://www.youtube-nocookie.com/embed/") and "mute=1" in opened[0][0]
+    assert opened == [] and sc.info["now_watching"]["source"] == "youtube"   # played in the viewer's browser
+    assert sc.info["embed"].startswith("https://www.youtube-nocookie.com/embed/") and "mute=1" in sc.info["embed"]
     assert sc.info["url"].startswith("https://www.youtube.com/shorts/") and sc.watch_until > 0
     assert SC.screen_kind(dict(sc.info, device="phone")) == "shorts" and len(sc.queue) >= 1
     units = YT.SEARCH_UNITS + YT.LIST_UNITS                     # the search + the playability check

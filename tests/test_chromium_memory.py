@@ -80,21 +80,20 @@ def test_the_official_players_own_frames_are_never_cut():
     # another site's page holding a player, an ad or a social embed: not loaded
     assert not MG.frame_allowed("www.knowyourmeme.com", "www.youtube.com")
     assert not MG.frame_allowed("www.youtube-nocookie.com", "securepubads.g.doubleclick.net")
+    # #135 client player: the players play in the viewer's browser, so the server's guard refuses their pages and
+    # frames outright (video_player_url), whatever frame_allowed says
     g = browse.Guard()
 
     async def resolves_public(host):
         return True
     g.resolves_public = resolves_public
     for top in ("https://www.youtube-nocookie.com/embed/qpkTV1VolHU", "https://www.tiktok.com/player/v1/6718335390845095173"):
-        r = Route(top)                                          # the player page itself: a top-level navigation
+        r = Route(top)
         run(g.route(r))
-        assert r.seen == "go", top
+        assert r.seen == "abort", top
     r = Route("https://www.youtube.com/s/player/abc/frame.html", top_url="https://www.youtube-nocookie.com/embed/x")
     run(g.route(r))
-    assert r.seen == "go"
-    r = Route("https://www.tiktok.com/embed/frame", top_url="https://www.tiktok.com/player/v1/6718335390845095173")
-    run(g.route(r))
-    assert r.seen == "go"
+    assert r.seen == "abort"
 
 
 class Route:
