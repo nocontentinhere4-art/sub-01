@@ -212,13 +212,13 @@ if AWAKE and 'Head' in ix:
         R[:] = keep_h
         if best is not None: turn_head(best); a_ht = best
 diag('after head turn')
-# 2. pillow: the neck and upper back bent until the back of his head is PILLOW_SINK into the pillow's top, his back on the
+# 2. pillow: the neck and upper back bent until the back of his head (his head itself: the hood rests under it and gives) is PILLOW_SINK into the pillow's top, his back on the
 # mattress: in the room, his lowest skin is put on the bed (the page), so this is the head's height over his back's
 def head_err(fs):
     X, _ = skinf(fs); e = []
     for f in range(len(fs)):
         y, s, x, z = heights(X[f]); back = backlow(X[f])
-        m = HEAD & (x < -1.30); k = np.argmin(y[m] - s[m])
+        m = FACE & (x < -1.30); k = np.argmin(y[m] - s[m])
         # the head's lowest point against the pillow top under it, with his back on the mattress top
         e.append((y[m] - min(back - BACK_UP + SINK, y[BODY].min()) + TOP - PAGE_SINK - s[m]).min() + PILLOW_SINK)   # (the page rests his lowest skin at TOP less PAGE_SINK)
     return float(np.mean(e))
@@ -394,7 +394,7 @@ for f in range(F):
     y = X[f][:, 1] + off[f]; x, z = room_xz(X[f]); s = surf(x, z) + (0.014 if AWAKE else 0)
     mb = BACK & BODY & (s < 0.84 + (0.014 if AWAKE else 0)); pb = BACK & BODY & ~mb
     back_g.append((y[mb] - s[mb]).min()); sh_g.append((y[pb] - s[pb]).min() if pb.any() else 9)
-    m = HEAD & (x < -1.30); head_g.append((y[m] - surf(x[m], z[m])).min()); toe.append(x[FOOT & BODY].max())
+    m = FACE & (x < -1.30); head_g.append((y[m] - surf(x[m], z[m])).min()); toe.append(x[FOOT & BODY].max())
     bt = THIGH & BODY & (s < 0.84 + (0.014 if AWAKE else 0)) & (x > HIPS_ROOM[0] - 0.15) & (x < HIPS_ROOM[0] + 0.06)
     butt_g.append((y[bt] - s[bt]).min() if bt.any() else 9)
     hx = room_xz(P2[f, hi])[0]; mk = ((BACK & BODY) | (THIGH & BODY & (x > hx - 0.15) & (x < hx + 0.06))) & (s < 0.84 + (0.014 if AWAKE else 0))   # (the contact pass's back bins)
