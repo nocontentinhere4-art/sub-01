@@ -260,7 +260,6 @@ export function createMH(env) {
     for (const k of Object.keys(RARE)) { const c = got["rare_" + k]; if (!c) continue;
       const a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
       H["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration}; }
-    if (env.anim === "sova") try { await svLoad(make, bodyHips); } catch (e) { SV = null; M.sv = null; console.warn("desk states not loaded, Mixamo clips only", e); }   // (the desk states by default: their slots and the picker; a clip that fails is left out, all failing: the Mixamo clips)
     M.actions.stand = make(stand); H.mh_stand = pageHips(stand, 0);
     // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
     M.actions.walk = make(got.walk); H.room_walk = pageHips(got.walk, 0);
@@ -302,6 +301,9 @@ export function createMH(env) {
       M.spots = {sit: [sx + a.x - sdn[0] - w0.x, sitF], up: [sx + e.x - SEAT.up[0] - s0.x, sz + e.z - SEAT.up[1] - s0.z], seat: sa.slice()};
       env.setSpots(M.spots); }
     M.ready = true;
+    // the desk states (by default with the mixamo character): loaded after he is ready, so they never hold him back; until
+    // they are in, and if they fail, the Mixamo clips play (a clip that fails is left out)
+    if (env.anim === "sova") svLoad(make, bodyHips).then(() => seatHeight(), e => { SV = null; M.sv = null; console.warn("desk states not loaded, Mixamo clips only", e); });
   }
   // the page puts the root at the seat anchor less the clip's hips; the MakeHuman clips have the feet at y = 0, so the
   // seated slots' hip height is the seat anchor's height over the floor: the root (his feet) stays on the floor
