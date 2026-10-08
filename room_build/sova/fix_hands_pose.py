@@ -26,6 +26,18 @@ WB_HI = OWN['wrist'][1] - 1                                    # his wrist bend 
 def flex(q, ta, tb):                                           # the joint's flex: parent segment vs this bone's segment
     v = Rot.from_quat(q).apply(tb); return float(np.degrees(np.arccos(np.clip(ta @ v / np.linalg.norm(ta) / np.linalg.norm(v), -1, 1))))
 
+def bend_clamp(qh, ta, tb, q0):
+    """wrist bent past the owner's max: back toward the rest wrist until it isn't (in place); frames changed"""
+    nb = 0
+    for t in range(len(qh)):
+        if flex(qh[t], ta, tb) <= WB_HI: continue
+        rv = (Rot.from_quat(qh[t]).inv() * Rot.from_quat(q0)).as_rotvec(); lo_, hi_ = 0.0, 1.0
+        for _ in range(20):
+            mid_ = (lo_ + hi_) / 2; s_ = (Rot.from_quat(qh[t]) * Rot.from_rotvec(mid_ * rv)).as_quat()
+            (lo_, hi_) = (mid_, hi_) if flex(s_, ta, tb) > WB_HI else (lo_, mid_)
+        qh[t] = (Rot.from_quat(qh[t]) * Rot.from_rotvec(hi_ * rv)).as_quat(); nb += 1
+    return nb
+
 def solve(q, ta, tb, target):
     """the curl about the bone's X (the finger's curl axis, + = toward the palm) that gives this flex, on the curling
     branch (flex rising with the angle), nearest to the pose as it is"""
@@ -117,14 +129,7 @@ def main(src, dst, phone):
         else:
             q2, ch, mx = clamp_joint(rot(hn), rest[ix[hn]], a, l, n, WR, WF, WD); tr[ix[hn]]['rotation'] = q2
             r['wrist'] = dict(frames_clamped=ch, max_before_roll_flex_dev=[round(x, 1) for x in mx])
-            ta, tb, q0 = pos[ix[hn]], pos[ix[f'mixamorig:{side}HandMiddle1']], rest[ix[hn]]; qh = tr[ix[hn]]['rotation']; nb = 0
-            for t in range(F):                             # bent past his max: back toward the rest wrist until it isn't
-                if flex(qh[t], ta, tb) <= WB_HI: continue
-                lo_, hi_ = 0.0, 1.0
-                for _ in range(20):
-                    mid_ = (lo_ + hi_) / 2; qq = Rot.from_quat([qh[t], q0]); s_ = (Rot.from_quat(qh[t]) * Rot.from_rotvec(mid_ * (Rot.from_quat(qh[t]).inv() * Rot.from_quat(q0)).as_rotvec())).as_quat()
-                    (lo_, hi_) = (mid_, hi_) if flex(s_, ta, tb) > WB_HI else (lo_, mid_)
-                qh[t] = (Rot.from_quat(qh[t]) * Rot.from_rotvec(hi_ * (Rot.from_quat(qh[t]).inv() * Rot.from_quat(q0)).as_rotvec())).as_quat(); nb += 1
+            nb = bend_clamp(tr[ix[hn]]['rotation'], pos[ix[hn]], pos[ix[f'mixamorig:{side}HandMiddle1']], rest[ix[hn]])
             r['wrist']['bend_clamped_frames'] = nb
         fa = axis(fn, hn); u = np.cross(fa, [1, 0, 0] if abs(fa[0]) < 0.9 else [0, 1, 0]); u /= np.linalg.norm(u); w = np.cross(fa, u)
         q2, ch, mx = clamp_joint(rot(fn), rest[ix[fn]], fa, u, w, FR, 180, 180); tr[ix[fn]]['rotation'] = q2
@@ -135,7 +140,15 @@ def main(src, dst, phone):
         hi = ix['mixamorig:Hips']; c = dict(set='x', name='x', frames=F, fps=30, hand=phone if phone in ('Left', 'Right') else None, props={},
                  rot={N[i]['name']: d['rotation'].tolist() for i, d in tr.items() if 'rotation' in d},
                  hips=(tr[hi]['translation'] if 'translation' in tr.get(hi, {}) else np.tile(pos[hi], (F, 1))).tolist())
-        rep['clear'] = fit_hands.clear(Body(os.environ['CHAR_GLB'], vstep=2), c)
+        B = Body(os.environ['CHAR_GLB'], vstep=2)
+        for it in range(2):                                    # clear (the IK keeps the hand's world turn, so the wrist bends),
+            rep[f'clear_{it}'] = fit_hands.clear(B, c)         # then the wrist back into his range; twice
+            for side in ('Left', 'Right'):
+                if side == phone: continue
+                hn = f'mixamorig:{side}Hand'; qh = np.array(c['rot'][hn])
+                rep[side][f'bend_clamped_after_clear_{it}'] = bend_clamp(qh, pos[ix[hn]], pos[ix[f'mixamorig:{side}HandMiddle1']], rest[ix[hn]]); c['rot'][hn] = qh.tolist()
+        for side in ('Left', 'Right'):                         # what is left inside him
+            if side != phone: rep[side]['left_in_body_cm'] = round(float(fit_hands.depth_track(B, c, side)[0].max() * 100), 1)
         for nm, v in c['rot'].items(): tr.setdefault(ix[nm], {})['rotation'] = np.array(v)
     name = os.environ.get('CLIP_NAME') or j['anims'][0].get('name') or os.path.splitext(os.path.basename(dst))[0]
     fin = dict(name=name, fps=30, F=F, nodes=N,

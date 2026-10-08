@@ -1,6 +1,6 @@
 """Hand close-up video, before | after side by side: the camera follows the hands (both, or one), 640x360 by default.
 python3 -I handcam.py <spec.json> <out.mp4>
-spec: {"segments": [{"glb", "before": [clip.glb], "after": [clip.glb], "clip", "title", "secs", "t0"?, "bones"?: [...],
+spec: {"segments": [{"glb", "before": [clip.glb], "after": [clip.glb], "clip", "title", "secs", "before_glb"|"after_glb"?, "before_clip"|"after_clip"?, "t0"?, "bones"?: [...],
                      "dir"?: [x,y,z] (target -> camera, his frame: +Z forward, +X his left), "dist"?: m, "seat"?: y,
                      "stats"?: {"before"|"after": {"L"|"R": [% of frames out of the owner range: thumb..pinky]}}}]}"""
 import json, sys, os, io, base64, math, threading, http.server, socketserver, subprocess
@@ -35,21 +35,20 @@ with sync_playwright() as p:
             pg = b.new_page(viewport={'width': HW, 'height': H})
             pg.goto(f'http://127.0.0.1:{port}/view.html?w={HW}&h={H}&mattress=solid'); pg.wait_for_function('window.ready')
             clips = json.dumps(['/f' + os.path.abspath(c) for c in g[key]])
-            anims = dict(pg.evaluate(f'load("/f{os.path.abspath(g["glb"])}", {clips})'))
+            anims = dict(pg.evaluate(f'load("/f{os.path.abspath(g.get(key + "_glb", g["glb"]))}", {clips})'))
             pg.evaluate('setBg("#dfe3e8"); setKey(1.4); setFloor(true)')
             if g.get('seat') is not None: pg.evaluate(f'setSeat({g["seat"]})')
-            pages.append((pg, anims[g['clip']]))
+            cn = g.get(key + '_clip', g['clip']); pages.append((pg, anims[cn], cn))
         bones = json.dumps(g.get('bones', ['mixamorigLeftHand', 'mixamorigRightHand']))
         d = norm(g.get('dir', [0.35, 0.55, 1.0])); dist = g.get('dist', 0.9); t0 = g.get('t0', 0.0); n = int(round(g['secs'] * FPS))
-        tgt = None
+        tgts = [None, None]
         for i in range(n):
             ims = []
-            for k, (pg, dur) in enumerate(pages):
-                t = min(dur - 1e-3, t0 + i / FPS); pg.evaluate(f'pose("{g["clip"]}", {t})')
-                if k == 0:                        # one camera for both: follows the before-hands, smoothed
-                    pts = pg.evaluate(f'bones({bones})'); c = [sum(q[j] for q in pts) / len(pts) for j in range(3)]
-                    tgt = c if tgt is None else [0.85 * a + 0.15 * x for a, x in zip(tgt, c)]
-                url = pg.evaluate(f'shot({json.dumps(tgt)}, {json.dumps(d)}, {dist})')
+            for k, (pg, dur, cn) in enumerate(pages):
+                t = min(dur - 1e-3, t0 + i / FPS); pg.evaluate(f'pose("{cn}", {t})')
+                pts = pg.evaluate(f'bones({bones})'); c = [sum(q[j] for q in pts) / len(pts) for j in range(3)]; c[1] -= g.get('drop', 0.05)   # the fingers hang below the wrists
+                tgts[k] = c if tgts[k] is None else [0.85 * a + 0.15 * x for a, x in zip(tgts[k], c)]   # each side follows its hands, smoothed
+                url = pg.evaluate(f'shot({json.dumps(tgts[k])}, {json.dumps(d)}, {dist})')
                 ims.append(Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).convert('RGB'))
             im = Image.new('RGB', (W, H)); im.paste(ims[0], (0, 0)); im.paste(ims[1], (HW, 0))
             dr = ImageDraw.Draw(im); dr.rectangle([HW - 1, 0, HW, H], fill=(30, 30, 30))
@@ -58,7 +57,7 @@ with sync_playwright() as p:
             dr.text((8, H - H // 12 - 4), 'PRIMA', font=F2, fill=(200, 40, 40)); dr.text((HW + 8, H - H // 12 - 4), 'DOPO', font=F2, fill=(20, 130, 50))
             if g.get('stats'):                    # % of frames out of the owner's range, per finger (pol ind med anu mig)
                 for k, key in enumerate(('before', 'after')):
-                    x0 = k * HW + HW - int(HW * 0.62); y0 = H - int(H * 0.30); bx = Image.new('RGBA', (int(HW * 0.62) - 4, int(H * 0.30) - 4), (255, 255, 255, 200)); im.paste(bx, (x0, y0), bx)
+                    x0 = k * HW + HW - int(HW * 0.58); y0 = H // 9 + 2; bx = Image.new('RGBA', (int(HW * 0.58) - 2, LH * 4 + 6), (255, 255, 255, 190)); im.paste(bx, (x0, y0), bx)
                     dr.text((x0 + 4, y0 + 2), '% fuori range proprietario', font=F3, fill=(30, 30, 30))
                     dr.text((x0 + 4, y0 + 2 + LH), '    pol ind med anu mig', font=F3, fill=(30, 30, 30))
                     for j, hs in enumerate(('L', 'R')):
@@ -66,6 +65,6 @@ with sync_playwright() as p:
                         dr.text((x0 + 4, y0 + 2 + LH * (2 + j)), ('Sx ' if hs == 'L' else 'Dx ') + ' '.join(f'{x:3.0f}' for x in v), font=F3, fill=col)
             ff.stdin.write(im.tobytes())
         total += n; print(f'{g["clip"]:30s} {n} frames, total {total / FPS:.1f}s', flush=True)
-        for pg, _ in pages: pg.close()
+        for pg, *_ in pages: pg.close()
     b.close()
 ff.stdin.close(); ff.wait(); srv.shutdown(); print(out, os.path.getsize(out) // 1024, 'KB')
