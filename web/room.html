@@ -1310,7 +1310,7 @@ const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3
 // the aspect and the header's height; the monitor shot waits until he is at the desk. Wider canvases keep the old goals.
 const OV_DIR = OVERVIEW.pos.clone().sub(OVERVIEW.target).normalize();
 const OV_UP = UP.clone().addScaledVector(OV_DIR, -UP.dot(OV_DIR)).normalize();     // the overview camera's up
-const FRAME_R = 1.05;                                // the sphere round his hips: his height lying, his feet standing
+const FRAME_R = 1.08;                                // the sphere round his hips: his height lying, his feet standing
 let hudAt = -1e9, hudTop = 1;
 // only the body that is drawn, once it is ready (set by the rig layer below: the v5 / MakeHuman layer takes over a while
 // after load, and until then the old rig's hips can sit ~100 m up), and only hips inside the room; else the overview

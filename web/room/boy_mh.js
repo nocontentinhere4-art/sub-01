@@ -1435,7 +1435,7 @@ export function createMH(env) {
   }
   // eating at the desk (room_eat) he leans in over the dish: from the seat the desk modes use, his belly went 3.1 cm into
   // the desk's front edge and the right forearm 2.6 cm (eating_19, once the room's raycasts saw the whole desk)
-  const EAT_BACK = 0.05;
+  const EAT_BACK = env.eatBack ?? 0.05;                       // (per character: room/char_mixamo.js ROOM.eatBack)
   function roll(dt) {
     const lap = M.sc && ["read", "phone", "phone_scroll"].includes(M.sc.k);
     const p = env.boy.position, H = env.HIPS, k = 1 - Math.exp(-dt / 0.35);
@@ -1446,7 +1446,7 @@ export function createMH(env) {
     let want;
     if (desk) { const hr = handRoll(M.mode) ?? (M.held ?? handRoll("desk_mouse")); if (M.mode && M.mode !== "desk_watch") M.held = hr; want = (hr ?? 0) + (M.evOff || 0); }
     else want = lap ? 0.45 : 0.12 - (env.seatIn || 0);
-    if (env.state().current === M.actions.act_eat) want += EAT_BACK;   // (eating leans in: 5 cm further from the desk, see EAT_BACK)
+    if (env.state().current === M.actions.act_eat) want += window.__eatBack ?? EAT_BACK;   // (?debug: __eatBack)   // (eating leans in: 5 cm further from the desk, see EAT_BACK)
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
     if (ch && Math.abs(d) > 1e-6) { ch.position.x += -s * d; ch.position.z += -c * d; ch.updateMatrixWorld(true); }   // (back: against the way he faces)
     if (ch && desk) {                                        // his root: each mode's hips on its seat point, blended as the clips are
