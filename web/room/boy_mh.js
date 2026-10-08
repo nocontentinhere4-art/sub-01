@@ -517,7 +517,7 @@ export function createMH(env) {
   // (eased, preview/freeze-why-ease: the swing keeps last frame's way while that way still clears - the least angle
   // over all four flipped from 6 deg back to 7 deg forward in one frame mid-crossfade, a fingertip 147 mm - and it lets
   // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
-  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09;      // (s: the release's time constant, ~0.25 s to nothing)
+  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go)
   function deskClear(side, dt = 1 / 30) {
     const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"]) return;
     const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
@@ -536,8 +536,12 @@ export function createMH(env) {
       if (prev) { const a = least(prev.k, prev.sg); if (a != null) best = {k: prev.k, sg: prev.sg, a}; }
       if (!best) for (const k of ["lat", "fwd"]) for (const sg of [1, -1]) { const a = least(k, sg); if (a != null && (!best || a < best.a)) best = {k, sg, a}; }
       if (best && prev && best.k === prev.k && best.sg === prev.sg) best.a = Math.max(best.a, fade);   // (never less than the release allows)
-    } else if (prev && fade > 0.003) {                       // out of the desk: the swing lets go gradually, if that keeps him out
-      set(axes[prev.k], prev.sg * fade); if (inn() <= 0.003) best = {k: prev.k, sg: prev.sg, a: fade};
+    } else if (prev && fade > 0.003) {                       // out of the desk: the swing lets go gradually - as much of it as keeps him out
+      set(axes[prev.k], prev.sg * fade);                     // (the clip's arm has moved on: the old way may now push it in. Letting go,
+      // up to 8 mm of the slab is allowed - the desk's check counts skin more than 1 cm in - for the way back to the clip's
+      // arm can pass the desk's edge: held to 3 mm, an 18 deg swing dropped at once, a fingertip 175-195 mm in a frame)
+      let a = fade; if (inn() > CLR_SLACK) { let lo = 0, hi = fade; for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; set(axes[prev.k], prev.sg * m); if (inn() > CLR_SLACK) hi = m; else lo = m; } a = lo; }
+      if (a > 0.003) best = {k: prev.k, sg: prev.sg, a};
     }
     if (best) { set(axes[best.k], best.sg * best.a); M.clear.maxA = Math.max(M.clear.maxA || 0, best.a); } else set(lat, 0);
     CLR[side] = best;
