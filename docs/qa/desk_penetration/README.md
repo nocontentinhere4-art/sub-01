@@ -78,3 +78,41 @@ on at least 2 of 3 horizontal rays (the monitor's housing is open on top). Budge
 test_visual: desk 0, desk things 0, bed 0, chair 0, floor within budget. The existing budgets are unchanged; the new one is 0.
 
 `before_after.jpg`: both frames, before and after, from his front right and from above his shoulder at the desk edge.
+
+## Eased (preview/freeze-why-ease)
+The desk clearing and the hands' weights snapped in single frames.
+
+**What jumped**
+- **Mouse to watching (default page):** the mouse hold's `pin()` is not linear in its weight. At a weight of 0.02 his hand was still on the mouse; at 0.01 it let go.
+- **Into the arms-crossed reaction (`?char=mixamo&anim=sova`, preview/desk-states):** the clearing took the least swing of four ways each frame, and mid-crossfade it flipped from 6° back to 7° forward.
+- **On the default page,** `watch_video` and `play_chess` had no entry in the page's activity table. They fell back on standing at the desk, so each switch to them started a pose step and the desk modes dropped for a frame.
+
+**Fixes (`web/room/boy_mh.js`, `web/room.html`)**
+- **A hand at a fading weight** (the mouse hold, the left hand on the keys, the right hand's typing) is solved at full weight. The arm is then blended bone by bone from the clip's pose by the weight. At full weight (steady typing and mousing) nothing changes.
+- **The desk clearing's swing**
+  - keeps last frame's way while that way still clears, so it no longer flips;
+  - still comes in at once, so no skin stays in the desk;
+  - lets go over about 0.25 s. While letting go it may stay up to 8 mm in the slab (the desk check counts skin over 1 cm in). The clip's arm may have moved on, and the way back can pass the desk's edge: held to 3 mm, an 18° swing dropped at once.
+- **`watch_video` and `play_chess`** are seated at the desk, like research and chat.
+
+**The biggest move of any bone in one frame, stepped at 30 fps**
+
+| transition | before (63538e6) | after |
+|---|---|---|
+| default page: mouse → watching | 382 mm | 48 mm |
+| default page: → typing | 236 mm | 53 mm |
+| default page: typing → mouse | 210 mm | 31 mm |
+| default page: watching → mouse | 134 mm | ≤ 53 mm |
+| steady mousing (a forearm twist bone, the clip itself) | 50 mm | 50 mm |
+| mixamo + desk states: → watching, → mouse, → typing | 388 / 167 / 156 mm | 85 / 52 / 53 mm |
+| mixamo + desk states: into and out of the arms-crossed reaction | 143–147 mm | 19 mm, with the reactions' minimum ride-back (desk-states only) |
+| mixamo + desk states: a won game straight after the mouse | 275 mm | 140 mm |
+
+**Still open.** The won game straight after the mouse starts from room_seated_idle, whose forearms rest on the desk's edge and hold an 8–13° clearing swing. When the reaction takes the arms away, releasing that swing still meets the edge.
+
+**Typing contact** (`tools/motion/key_contact_mesh.py`, 64 samples over 16 s):
+
+| | resting fingertips in 0..+2 mm | more than 2 mm in | lowest thumb | deepest vertex |
+|---|---|---|---|---|
+| 63538e6, counted the same way | 83% | 0 | −1.3 mm | −1.4 mm |
+| eased | 83% | 0 | −1.3 mm | −1.3 mm |
