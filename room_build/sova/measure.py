@@ -76,10 +76,12 @@ class Body:
         return p, nn
 
 def measure(B, clip, step=2, lying=None):
-    Wj, wm = B.joints(clip); n = clip['frames']; side = clip['hand']
-    hand_m = wm(f'mixamorig:{side}Hand'); pr = clip['props'][side]
-    ph_local = mat(np.array(pr['pos']) / 0.01, np.array(pr['quat']), np.array([100., 100, 100]))
-    PHW = hand_m @ ph_local                                          # phone world [n,4,4]
+    Wj, wm = B.joints(clip); n = clip['frames']; side = clip.get('hand')
+    phone = side is not None
+    if phone:
+        hand_m = wm(f'mixamorig:{side}Hand'); pr = clip['props'][side]
+        ph_local = mat(np.array(pr['pos']) / 0.01, np.array(pr['quat']), np.array([100., 100, 100]))
+        PHW = hand_m @ ph_local                                      # phone world [n,4,4]
     head = wm('mixamorig:Head'); ji = B.jn.index('mixamorig:Head')
     eye_l = np.linalg.inv(B.ibm[ji]) @ np.append(B.eye_bind, 1)              # head-local position of the bind eye
     R = {k: [] for k in ('hand_body', 'phone_head', 'finger_phone', 'eye')}
@@ -100,6 +102,9 @@ def measure(B, clip, step=2, lying=None):
             byreg = {r: float(deep[rg == r].max()) for r in set(rg)}
             res[s] = (len(deep), float(deep.max()) if len(deep) else 0.0, byreg)
         R['hand_body'].append(res)
+        if lying is not None:
+            lows.append([p[reg == r][:, 1].min() for r in ('torso', 'legs', 'head')] + [p[:, 1].min()])
+        if not phone: continue
         # phone vs head, fingers vs phone
         inv = np.linalg.inv(PHW[f]); hl = (inv[:3, :3] @ p[reg == 'head'].T).T + inv[:3, 3]
         inside = np.all(np.abs(hl) < PH / 2, axis=1)
@@ -111,8 +116,6 @@ def measure(B, clip, step=2, lying=None):
         R['finger_phone'].append((int(fin.sum()), float(fdepth.max()) if len(fdepth) else 0.0))
         eye = (head[f] @ eye_l)[:3]; c = PHW[f][:3, 3]; nrm = PHW[f][:3, 0] / np.linalg.norm(PHW[f][:3, 0])
         v = eye - c; dist = np.linalg.norm(v); R['eye'].append((float(dist), float(np.degrees(np.arccos(np.clip(v @ nrm / dist, -1, 1))))))
-        if lying is not None:
-            lows.append([p[reg == r][:, 1].min() for r in ('torso', 'legs', 'head')] + [p[:, 1].min()])
     out = dict(set=clip['set'], name=clip['name'], hand=side, frames_measured=len(frames), step=step)
     for s in ('Left', 'Right'):
         a = np.array([r[s][:2] for r in R['hand_body']]); br = {}
@@ -127,9 +130,11 @@ def measure(B, clip, step=2, lying=None):
                 q = np.array(clip['rot'][f'mixamorig:{s}Hand{f}{k}']); med = q[len(q) // 2]
                 ang = 2 * np.degrees(np.arccos(np.clip(np.abs(q @ med), -1, 1))); rngs.append(np.percentile(ang, 98))
         out[f'{s}_finger_motion_deg'] = dict(median_joint=round(float(np.median(rngs)), 1), max_joint=round(float(np.max(rngs)), 1))
-    a = np.array(R['phone_head']); out['phone_in_head'] = dict(frames=int((a[:, 0] > 0).sum()), max_verts=int(a[:, 0].max()), min_gap_cm=round(a[:, 1].min() * 100, 1))
-    a = np.array(R['finger_phone']); out['fingers_in_phone'] = dict(frames=int((a[:, 0] > 0).sum()), max_verts=int(a[:, 0].max()), max_depth_cm=round(a[:, 1].max() * 100, 1))
-    a = np.array(R['eye']); out['eye_to_screen'] = dict(dist_cm=[round(a[:, 0].min() * 100), round(a[:, 0].max() * 100)], angle_deg_median=round(float(np.median(a[:, 1]))), angle_deg_max=round(float(a[:, 1].max())))
+    if not phone: R['phone_head'] = R['finger_phone'] = R['eye'] = None
+    if phone:
+      a = np.array(R['phone_head']); out['phone_in_head'] = dict(frames=int((a[:, 0] > 0).sum()), max_verts=int(a[:, 0].max()), min_gap_cm=round(a[:, 1].min() * 100, 1))
+      a = np.array(R['finger_phone']); out['fingers_in_phone'] = dict(frames=int((a[:, 0] > 0).sum()), max_verts=int(a[:, 0].max()), max_depth_cm=round(a[:, 1].max() * 100, 1))
+      a = np.array(R['eye']); out['eye_to_screen'] = dict(dist_cm=[round(a[:, 0].min() * 100), round(a[:, 0].max() * 100)], angle_deg_median=round(float(np.median(a[:, 1]))), angle_deg_max=round(float(a[:, 1].max())))
     if lying is not None:
         L = np.array(lows); plane = L[:, 0].min()                  # mattress = lowest torso point (back/buttocks) over the clip
         sup = L[:, 0]
