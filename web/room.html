@@ -3197,13 +3197,15 @@ function shadows(now, moving){
 }
 function frame(now){
   requestAnimationFrame(frame);
+  const late = clock.getDelta();                                  // (read every frame: a frozen page's time is not caught up)
   if (document.hidden || (DEBUG && window.FREEZE)) return;       // ?debug: FREEZE and step the simulation with sim()
   adapt(now);
   // his time follows the clock, not the frame rate: a late frame is caught up in steps of at most 0.1 s (a slow device
   // or a headless check at a few frames a second played him at a fraction of real time - standing by the chair for a
-  // minute while the caption said he was at the computer); at most 8 s at once (a tab coming back; a step costs ~30 ms of
-  // the 100 it covers, so even a frame every 4 s keeps up)
-  const real = Math.min(8, clock.getDelta()), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n;
+  // minute while the caption said he was at the computer). Up to 30 s at once: under headless software GL a frame takes
+  // 8-16 s while he moves (live 2026-10-08 08:02: the chair empty for 3 minutes of "at the computer"; with 8 s at most
+  // he still ran at about half of real time). A tab coming back catches up 8 s at most, as before (CATCH.back)
+  const real = Math.min(CATCH.back ?? CATCH.max, late), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n; CATCH.back = null;
   windowView.update(real, hour);                      // the sky, the city, the weather follow his clock
   let moving = false; for (let i = 0; i < n; i++) moving = animate(dt) || moving;
   if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
@@ -3217,6 +3219,8 @@ function frame(now){
   controls.update(); keepClear(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
+const CATCH = {max: 30, back: null};
+document.addEventListener("visibilitychange", () => { if (!document.hidden) CATCH.back = 8; });
 function animate(dt){                                // one step of him: clips, his plan, seats, life, the phone, the head
   untouch(); if (mixer) mixer.update(dt); T += dt;
   if (!boy) return false;
@@ -3230,7 +3234,7 @@ function animate(dt){                                // one step of him: clips, 
   aliveHead(); inBed(dt);
   return moving;
 }
-if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
+if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, clock, CATCH, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
