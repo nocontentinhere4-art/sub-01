@@ -111,7 +111,8 @@ This is not from this layer: the same numbers show with `anim` off.
 | idle_c / idle_d | look_left_idle / look_right_idle | loop |
 | gesture_a / gesture_b / gesture_c | look_down_to_right / look_front_to_left / desk_look_behind | once |
 | gesture_d / gesture_e / gesture_f | seat_looking_around_v2 / seat_neck_stretching_idle / seat_thinking_touching_chin | once |
-| react_win / react_up | seat_distracted_then_smile | once |
+| react_win | seat_happy (a pleased sway, 4 s: G23's pick for a won game) | once |
+| react_up | seat_distracted_then_smile | once |
 | react_lose | seat_feeling_frustrated_v1 | once |
 
 - All of them sit at desk_watch's seat point (−0.075).
@@ -129,20 +130,28 @@ This is not from this layer: the same numbers show with `anim` off.
 | | walls | furniture (bottle and monitor included) | desk, fresh trees | desk, chair, bed, floor (`qa.body`) |
 |---|---|---|---|---|
 | every slot but gesture_f | 0 | 0 | 0 | 0 |
-| gesture_f (thinking) | 0 | 0 | 0 | **chair 90**: right fingers, at its end (8.7 s), at his side; seat points do not change it |
+| gesture_f (thinking v6) | 0 | 0 | 0 | 0 (v3 had chair 90: right fingers at his side, at 8.7 s) |
+| react_lose (frustrated V1 v5), react_win (seat_happy) | 0 | 0 | 0 | 0 |
 | 120 s natural, chess won | | | | 0 |
 | into the first loop, from desk_watch | | | | desk 19 for one frame (2.0 s) |
 
-- **react_lose (frustrated):** clean in v3; it had 270 in the chair before.
+- **Off the armrests:** G23's armrest fix (94a87c9: a standing performer's hand beside the hip, now put on the lap) takes thinking and frustrated V1 out of the chair. Frustrated had 270 before.
+- **A one-off:** one run of the chess sequence counted 31 desk vertices at 10.9 s, after the reaction. Two reruns and a frame-by-frame trace did not reproduce it; the loops are picked at random.
 
-**Transition pops, from the page's own hand and arm code, not from the clips**
+**Transition pops: eased** (preview/freeze-why-ease, merged here; `docs/qa/desk_penetration/README.md`)
 
-| transition | jump in one frame | cause | with the desk clearing off |
-|---|---|---|---|
-| into the arms-crossed take (react_win, react_up) | 147 mm, a fingertip | the frame the desk clearing (freeze-why's deskClear) switches on: the hand passes through the desk's slab on its way to the crossed arms | not measured |
-| the mouse into watching, then a won game (chess) | 295 mm, the left hand's fingers | the frame the mouse hold's weight falls to 0.01, where the hands stop: `pin()` is not linear in its weight, and the left hand leaves the keys for the thighs | not measured |
+| transition (`?char=mixamo&anim=sova`, the biggest move of any bone in one frame) | before (01a061a) | after |
+|---|---|---|
+| into and out of the arms-crossed reaction | 143–147 mm | 19 mm |
+| → watching / → mouse / → typing | 388 / 167 / 156 mm | 85 / 52 / 53 mm |
+| a won game straight after the mouse | 275 mm | 140 mm |
 
-- **Fix proposed, not made:** let the desk clearing and the hand weights ease in and out over a few frames. It is shared code with the default page, for COORD to schedule.
+**What the easing changed**
+- **The desk clearing** keeps its way while that way still clears and lets go over about 0.25 s. While letting go it may stay up to 8 mm in the slab.
+- **Hands at a fading weight** are solved whole, then blended from the clip's pose.
+- **Here only:** gestures and reactions fade over 1.3 s, and a reaction rides back at least 12 cm. Without the ride, the crossfade to his arms crossed swept his hands through the desk's edge.
+
+**Still open.** A won game straight after the mouse starts from room_seated_idle (main's mixamo seated loop), whose forearms rest on the desk's edge and hold an 8–13° clearing swing. Letting that swing go as the arms cross still meets the edge (140 mm).
 
 **Videos** (G23's 0cd8768 clips, before v3):
 - `room_quick.mp4`: 25 s, 640×360.
