@@ -1,7 +1,11 @@
 # SovaSims "Phone Animations" on our character: evaluation (G23)
 
-**Internal evaluation only.** The licence of the source pack is unknown (`mocap_src/sova/README.md`). Nothing here goes
-into `web/`, onto main or online, and this branch (`preview/sova-phone-src`) is never merged.
+**Internal evaluation only.** SovaSims' public terms forbid converting the animations to other games and redistributing
+them without permission, and the owner is dealing with the author (`mocap_src/sova/README.md`). Until the author's OK
+is confirmed, nothing here goes into `web/`, onto main or online, and this branch (`preview/sova-phone-src`) is never merged.
+
+Evaluated source: `SovaSims_-_Phone_Animations.package` (Ver. 8, 46 clips). The newer Phone V12 package that landed
+on this branch afterwards (it adds IN BED 04) was not evaluated here; `run_all.sh` takes the package path in one place.
 
 Files:
 - `sova_best4.glb` (4.3 MB): char_v5 (`char_mixamo.glb`, 65-joint `mixamorig:*`) with 4 animations: `set_38`, `set_39`, `set_45`, `set_4`.
