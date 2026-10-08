@@ -21,6 +21,7 @@
 //   mood.onRoom(room)                      // once the room model is in: its materials for the swatches
 
 import { dayPhase } from "./window_view.js";
+import { createArrange } from "./mood_arrange.js";
 
 export const STORE_KEY = "sub01.room.mood.v1";
 export const HOLD_S = 6, BACK_S = 2.5;                  // a preview holds 6 s after the last touch, then eases back in 2.5 s
@@ -74,6 +75,8 @@ const wrap24 = h => ((h % 24) + 24) % 24;
 export const hourDelta = (from, to) => { let d = wrap24(to) - wrap24(from); if (d > 12) d -= 24; if (d < -12) d += 24; return d; };   // the short way round the clock
 export const fmtHour = h => { const m = Math.round(wrap24(h) * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
 // the lamps by the hour (auto): on from the late afternoon until after midnight
+// late in the evening the ceiling light dims and the desk lamp and the screen carry the room (1 = late)
+export const lateByHour = h => { h = wrap24(h); return h < 12 ? 1 : smooth(21.3, 23.0, h); };
 export const lampsByHour = h => { h = wrap24(h); return Math.max(smooth(16.6, 17.8, h), h < 6 ? 1 - smooth(0.3, 1.0, h) : 0); };
 
 // the visitor's choices: this browser only; any storage error (private mode, blocked, full) is the defaults
@@ -123,8 +126,8 @@ const BEAM_VERT = /* glsl */`
 const BEAM_FRAG = /* glsl */`
   uniform vec3 uColor; uniform float uI; uniform float uTime; varying vec2 vUV; varying vec3 vW;
   void main(){
-    float edge = pow(sin(3.14159 * clamp(vUV.x, 0.0, 1.0)), 1.2);
-    float along = pow(1.0 - vUV.y, 1.6) * smoothstep(0.0, 0.06, vUV.y);
+    float edge = pow(sin(3.14159 * clamp(vUV.x, 0.0, 1.0)), 2.2);
+    float along = pow(1.0 - vUV.y, 2.2) * smoothstep(0.0, 0.08, vUV.y);
     float drift = 0.8 + 0.2 * sin(vW.x * 6.0 + vW.z * 4.0 + uTime * 0.35) * sin(vW.y * 8.0 - uTime * 0.25);
     gl_FragColor = vec4(uColor * (uI * edge * along * drift), 1.0);
     #include <tonemapping_fragment>
@@ -146,6 +149,9 @@ export function createMood(THREE, ctx){
   const windowLight = () => (ctx.windowView && ctx.windowView.light) || {sun: 1, cloud: 0, dir: new THREE.Vector3(-1, 0.3, 0), up: 0, moon: false};
   const lite = !!ctx.lite;                                   // phones: fewer dust motes, a smaller shadow map, no screen area light
   const choice = loadChoice();
+  // the light's levels (in the room's units; ?debug can tune them live through mood.tune)
+  const T = {sun: 7.0, moon: 0.6, sky: 8.0, skyDusk: 1.5, bounce: 2.6, hemi: 0.42, hemiLamp: 0.28, ceil: 4.6, desk: 2.6, screen: 6.0,
+    env: 0.55, exp0: 0.78, exp: 0.22, beam: 0.14, dust: 0.9};
   const state = {hour: 12, real: 12, preview: null, from: 0, t: 0, holdUntil: 0, dragging: false, back: null, now: 0};
 
   // ---- light: soft sun shadows (a wider PCF kernel instead of the fixed soft one), a warm bounce, the beam, the dust
@@ -239,7 +245,12 @@ export function createMood(THREE, ctx){
   const mats = {};                                               // name -> [materials]
   const orig = new Map();                                        // material -> {map, roughness, color}
   const cache = new Map();                                       // material.uuid + colour -> texture
+  let arrange = null;
   function onRoom(room){
+    if (ctx.controls && ctx.camera && ctx.dom) {
+      arrange = createArrange(THREE, {...ctx, room, shadowsDirty: () => { sun.shadow.needsUpdate = true; }});
+      if (ui) { arrange.mount(ui.card.querySelector('section[data-tab="arr"]')); arrange.setActive(ui.tab() === "arr"); }
+    }
     room.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m && m.name) (mats[m.name] = mats[m.name] || []).includes(m) || mats[m.name].push(m); });
     for (const g of Object.keys(GROUPS)) apply(g, choice[g], true);
     for (const m of Object.values(mats).flat()) if (m.aoMap) m.aoMapIntensity = 1.25;   // the baked occlusion a little deeper
@@ -285,7 +296,7 @@ export function createMood(THREE, ctx){
   const cSun = new THREE.Color(), cLow = new THREE.Color(0xffa45c), cHigh = new THREE.Color(0xfff0dd), cMoon = new THREE.Color(0x8da2e0);
   const cSky = new THREE.Color(), cSkyDay = new THREE.Color(0xdfe9ff), cSkyDusk = new THREE.Color(0xffb27a), cSkyNight = new THREE.Color(0x1c2440);
   const cLamp = new THREE.Color(0xffa860), cCeil = new THREE.Color(0xffcf9a), cWarmHemi = new THREE.Color(0xffd7b0), cNightHemi = new THREE.Color(0.20, 0.24, 0.42);
-  let roomK = 0, deskK = 0, nightK = 0, rays = choice.rays ? 1 : 0, sDirect = 0;
+  let roomK = 0, deskK = 0, nightK = 0, lateK = 0, rays = choice.rays ? 1 : 0, sDirect = 0;
   function light(dt, base){
     const h = state.hour, ph = dayPhase(h), wl = windowLight();
     const up = wl.up ?? Math.sin(Math.PI * (h - 5.6) / 12.2), day = base && Number.isFinite(base.day) ? base.day : smooth(-0.08, 0.3, up);
@@ -299,25 +310,27 @@ export function createMood(THREE, ctx){
     const direct = wl.moon ? 0 : smooth(-0.02, 0.16, up) * (wl.sun ?? 1);
     sDirect += (direct - sDirect) * Math.min(1, dt * 4);
     cSun.copy(cLow).lerp(cHigh, smooth(0.08, 0.65, up));
-    if (wl.moon) { sun.color.copy(cMoon); sun.intensity = 0.32 * (1 - 0.8 * (wl.cloud ?? 0)); }
-    else { sun.color.copy(cSun); sun.intensity = 0.12 + 4.4 * sDirect; }
+    if (wl.moon) { sun.color.copy(cMoon); sun.intensity = T.moon * (1 - 0.8 * (wl.cloud ?? 0)); }
+    else { sun.color.copy(cSun); sun.intensity = 0.12 + T.sun * sDirect; }
     sun.position.copy(wc).addScaledVector(dir, 6); sun.target.position.copy(wc).addScaledVector(dir, -1.6);
     if (dir.distanceToSquared(lastDir) > 4e-6) { lastDir.copy(dir); placeBeam(dir); sun.shadow.needsUpdate = true; }
     // the sky's light through the glass: warm at dawn and dusk, deep blue at night
     cSky.copy(cSkyNight).lerp(cSkyDusk, smooth(-0.15, 0.05, up)).lerp(cSkyDay, smooth(0.1, 0.5, up));
-    if (ctx.skyLight) { ctx.skyLight.color.copy(cSky); ctx.skyLight.intensity = 0.25 + 6.0 * day * (0.55 + 0.45 * (wl.sun ?? 1)) + 1.5 * ph.evening * (1 - nightK); }
+    if (ctx.skyLight) { ctx.skyLight.color.copy(cSky); ctx.skyLight.intensity = 0.25 + T.sky * day * (0.55 + 0.45 * (wl.sun ?? 1)) + T.skyDusk * ph.evening * (1 - nightK); }
     // the floor where the sun lands throws warm light back up; the walls and the bed get it
     const floorC = colOf("floor"), alb = clamp(0.2126 * floorC.r + 0.7152 * floorC.g + 0.0722 * floorC.b, 0.15, 0.8);
     bounce.position.set(clamp(pool.x, ROOM.x0 + 0.2, ROOM.x1 - 0.2), F + 0.45, clamp(pool.z, ROOM.z0 + 0.2, ROOM.z1 - 0.2));
     bounce.color.copy(cSun).multiply(floorC.clone().lerp(new THREE.Color(1, 1, 1), 0.35));
-    bounce.intensity = 2.6 * sDirect * alb;
+    bounce.intensity = T.bounce * sDirect * alb;
     // ambient: warm by day and under the lamps, a cool dim blue at night with them off
     hemi.color.copy(cWarmHemi).lerp(cNightHemi, nightK * (1 - roomK));
     hemi.groundColor.copy(floorC).multiplyScalar(0.35).lerp(cNightHemi.clone().multiplyScalar(0.4), nightK * (1 - roomK));
-    hemi.intensity = 0.06 + 0.42 * day + 0.28 * roomK + 0.03 * nightK;
+    hemi.intensity = 0.06 + T.hemi * day + T.hemiLamp * roomK * (1 - 0.55 * lateK) + 0.10 * nightK;
     // the lamps: the ceiling light and the desk lamp, warm
-    ceiling.color.copy(cCeil); ceiling.intensity = Math.max(ceiling.intensity * (choice.lamps === "off" ? 0 : 1), 4.6 * roomK);
-    lamp.color.copy(cLamp); lamp.intensity = choice.lamps === "off" ? 0 : Math.max(lamp.intensity, 2.6 * deskK);
+    ceiling.color.copy(cCeil); lateK += (lateByHour(h) - lateK) * k;
+    // (the mood decides the lamps on its own: in the small hours they are off and the screen lights the room)
+    ceiling.intensity = T.ceil * roomK * (1 - 0.6 * lateK);
+    lamp.color.copy(cLamp); lamp.intensity = T.desk * deskK;
     // the monitor: its own light, the room's main light at night
     const mon = monitorOn();
     if (screenLight) {
@@ -325,22 +338,22 @@ export function createMood(THREE, ctx){
       screenLight.width = m.w; screenLight.height = m.h;
       screenLight.position.set(...m.c).addScaledVector(n, 0.02); screenLight.lookAt(screenLight.position.clone().add(n));
       screenLight.color.copy(mon && mon.glow || new THREE.Color(0xbcd4ff));
-      screenLight.intensity = mon ? 1.2 + 6.0 * nightK * (1 - 0.5 * roomK) : 0;
+      screenLight.intensity = mon ? 1.2 + T.screen * nightK * (1 - 0.5 * roomK) : 0;
       monitorGlow.intensity *= 0.5;
     } else if (mon) monitorGlow.intensity = Math.max(monitorGlow.intensity, 0.6 + 1.6 * nightK);
     // reflections: the painted environment, brighter by day
-    const envI = 0.10 + 0.55 * day + 0.25 * roomK + 0.05 * nightK;
+    const envI = 0.10 + T.env * day + 0.25 * roomK * (1 - 0.5 * lateK) + 0.05 * nightK;
     for (const m of roomMats) m.envMapIntensity = envI;
     scene.environmentIntensity = 0.25 + 0.35 * day + 0.2 * roomK;
-    renderer.toneMappingExposure = 0.78 + 0.22 * day + 0.12 * roomK + 0.05 * nightK * (mon ? 1 : 0);
+    renderer.toneMappingExposure = T.exp0 + T.exp * day + 0.12 * roomK + 0.05 * nightK * (mon ? 1 : 0);
     // the beam and the dust: only with direct sun, strongest when the sun is low
     beamMat.uniforms.uTime.value = state.now;
     rays += ((choice.rays ? 1 : 0) - rays) * k;
     const lowK = 1 - 0.55 * smooth(0.2, 0.75, up);
     beamMat.uniforms.uColor.value.copy(cSun);
-    beamMat.uniforms.uI.value = 0.075 * sDirect * lowK * rays;
+    beamMat.uniforms.uI.value = T.beam * sDirect * lowK * rays;
     beam.visible = beamMat.uniforms.uI.value > 0.002;
-    dustMat.uniforms.uI.value = 0.9 * sDirect * rays; dustMat.uniforms.uColor.value.copy(cSun);
+    dustMat.uniforms.uI.value = T.dust * sDirect * rays; dustMat.uniforms.uColor.value.copy(cSun);
     dustMat.uniforms.uSize.value = (lite ? 7 : 9) * renderer.getPixelRatio();
     dust.visible = dustMat.uniforms.uI.value > 0.01;
     if (dust.visible) {
@@ -359,6 +372,7 @@ export function createMood(THREE, ctx){
       envKey = key; envAt = state.now;
       paintEnv(cSky.clone().multiplyScalar(0.25 + 0.75 * day), cSun, sDirect, roomK, 0.12 + 0.6 * day + 0.25 * roomK);
     }
+    if (arrange) arrange.tick(dt, choice.lamps === "off" ? 0 : Math.max(roomK, choice.lamps === "on" ? 1 : 0));
     ui && ui.tick();
   }
 
@@ -377,7 +391,7 @@ export function createMood(THREE, ctx){
   #mood .md-body { margin-top:10px; }
   #mood.shut .md-body { display:none; }
   #mood .md-tabs { display:flex; gap:4px; background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:999px; padding:3px; margin-bottom:12px; }
-  #mood .md-tabs button { flex:1; font:inherit; font-size:11px; color:var(--dim); background:none; border:0; border-radius:999px; padding:6px 0; cursor:pointer; transition:background .2s, color .2s; }
+  #mood .md-tabs button { flex:1; font:inherit; font-size:10.5px; min-width:0; color:var(--dim); background:none; border:0; border-radius:999px; padding:6px 0; cursor:pointer; transition:background .2s, color .2s; }
   #mood .md-tabs button[aria-selected="true"] { background:var(--or); color:#0a0a0a; }
   #mood .md-tabs button:not([aria-selected="true"]):hover { color:var(--fg); }
   #mood section[hidden] { display:none; }
@@ -420,6 +434,8 @@ export function createMood(THREE, ctx){
   #mood .md-looks button.on { border-color:var(--or); color:var(--fg); }
   #mood .md-looks i { display:flex; height:8px; border-radius:4px; overflow:hidden; margin-bottom:6px; }
   #mood .md-looks i u { flex:1; }
+  #mood .md-hint { font-size:11px; color:var(--dim); line-height:1.45; margin-bottom:8px; }
+  #mood button:disabled { opacity:.4; cursor:default; }
   #mood .md-foot { font-size:10px; color:var(--faint); margin-top:10px; line-height:1.45; }
   #mood .md-reset { font:inherit; font-size:10px; color:var(--dim); background:none; border:0; text-decoration:underline; cursor:pointer; padding:0; }
   @media (max-width: 900px) {
@@ -433,7 +449,7 @@ export function createMood(THREE, ctx){
   <div class="k"><span>Room mood</span><span class="md-now" id="md-now"></span><button class="md-tog" id="md-tog" aria-expanded="true" aria-controls="md-body">hide</button></div>
   <div class="md-body" id="md-body">
     <div class="md-tabs" role="tablist">
-      <button role="tab" data-tab="time" aria-selected="true">Time</button><button role="tab" data-tab="light" aria-selected="false">Mood</button><button role="tab" data-tab="mat" aria-selected="false">Materials</button>
+      <button role="tab" data-tab="time" aria-selected="true">Time</button><button role="tab" data-tab="light" aria-selected="false">Mood</button><button role="tab" data-tab="mat" aria-selected="false">Materials</button><button role="tab" data-tab="arr" aria-selected="false">Arrange</button>
     </div>
     <section data-tab="time">
       <div class="md-clock"><b id="md-h">--:--</b><span id="md-st">live · Tokyo time</span></div>
@@ -453,6 +469,7 @@ export function createMood(THREE, ctx){
         G.variants.map(v => `<button data-v="${v.id}" title="${v.label}" aria-label="${G.label}: ${v.label}" style="background:${sw(v)}"></button>`).join("")}</div></div>`).join("")}
       <button class="md-reset" id="md-reset">back to the room as built</button>
     </section>
+    <section data-tab="arr" hidden><div class="md-hint">the room is still loading…</div></section>
     <div class="md-foot">Only in your browser: what you pick here is kept on this device and never changes the room for anyone else.</div>
   </div>`;
     const side = document.getElementById("side");
@@ -469,7 +486,8 @@ export function createMood(THREE, ctx){
       if (b.dataset.h === "live") goLive(); else setPreview(+b.dataset.h, true); });
     $$(".md-tabs button").forEach(b => b.addEventListener("click", () => {
       $$(".md-tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
-      $$("section[data-tab]").forEach(s => { s.hidden = s.dataset.tab !== b.dataset.tab; }); }));
+      $$("section[data-tab]").forEach(s => { s.hidden = s.dataset.tab !== b.dataset.tab; });
+      if (arrange) arrange.setActive(b.dataset.tab === "arr"); }));
     $$(".md-sw").forEach(row => row.addEventListener("click", e => { const b = e.target.closest("button"); if (b) apply(row.dataset.group, b.dataset.v); }));
     $("#md-looks").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       const L = LOOKS.find(x => x.id === b.dataset.look); for (const g of Object.keys(L.set)) apply(g, L.set[g]); });
@@ -497,22 +515,24 @@ export function createMood(THREE, ctx){
       $("#md-h").textContent = fmtHour(state.hour);
       const st = $("#md-st"); st.classList.toggle("pv", pv);
       st.textContent = !pv ? "live · Tokyo time" : state.back && state.back.then === "live" ? "back to live…"
-        : state.dragging ? `preview · now ${fmtHour(state.real)}` : `preview · live in ${Math.ceil(Math.max(0, state.holdUntil - state.now))} s`;
+        : state.dragging || state.holdUntil - state.now > 99 ? `preview · now ${fmtHour(state.real)}` : `preview · live in ${Math.ceil(Math.max(0, state.holdUntil - state.now))} s`;
       $("#md-now").innerHTML = pv ? `<i>preview</i> ${fmtHour(state.hour)}` : `${fmtHour(state.hour)} Tokyo`;
       if (!state.dragging) range.value = String(state.hour);
       $("#md-live").style.left = `calc(${(state.real / 24 * 100).toFixed(2)}% + ${(10 - 20 * state.real / 24).toFixed(1)}px)`;
       $$("#md-chips button").forEach(b => b.classList.toggle("on", b.dataset.h === "live" ? !pv : pv && Math.abs(hourDelta(+b.dataset.h, state.hour)) < 0.02));
     }
     sync();
-    return {card, sync, tick: tickUI};
+    const tab = () => (card.querySelector('.md-tabs button[aria-selected="true"]') || {}).dataset?.tab;
+    return {card, sync, tick: tickUI, tab};
   }
 
   return {
-    tick, light, onRoom, apply, setPreview, goLive, choice, state, GROUPS, LOOKS,
+    tune: T, tick, light, onRoom, apply, setPreview, goLive, choice, state, GROUPS, LOOKS,
     get hour(){ return state.hour; },
     get ui(){ return ui && ui.card; },
+    get arrange(){ return arrange; },
     // (tests: what the mood layer has done)
     info: () => ({hour: state.hour, real: state.real, preview: state.preview, choice: {...choice}, roomK, deskK, nightK, direct: sDirect,
-      beam: beam.visible ? +beamMat.uniforms.uI.value.toFixed(4) : 0, env: envKey, lite}),
+      beam: beam.visible ? +beamMat.uniforms.uI.value.toFixed(4) : 0, env: envKey, lite, arrange: arrange && arrange.info()}),
   };
 }

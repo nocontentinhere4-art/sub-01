@@ -445,7 +445,8 @@ load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
   if (moodModule) moodModule.then(M => {
     mood = M.createMood(THREE, {scene, renderer, pmrem, sun, hemi, ceiling, lamp, monitorGlow, skyLight, SURF, F, roomMats, windowView,
       stage: () => stage, home: () => !!(boy && boy.visible), monitorOn: () => (monitor && monitor.mesh.material !== offMat ? monitor : null),
-      lite: matchMedia("(max-width: 900px)").matches || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent)});
+      lite: matchMedia("(max-width: 900px)").matches || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent),
+      camera, controls, dom: renderer.domElement, BLOCK, NODES, LINKS, ANCHOR, holdCamera: () => { userMovedAt = performance.now(); }});
     mood.onRoom(room);
   }).catch(e => console.error("mood layer:", e));
 }).catch(bootError);
