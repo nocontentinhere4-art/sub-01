@@ -188,8 +188,9 @@ class Retarget:
         self.k = mid[1] / W0['b__ROOT_bind__'][0][0][1]
         self.hip_off = self.M.P('Hips') - mid
 
-    def run(self, set_id, twist=0.5):
-        c = self.clips[set_id]; n = c['nframes']
+    def run(self, set_id, twist=0.5, clip=None, name=None, phone=True):
+        """set_id of the reference (phone Ver. 8) package, or any decoded clip (s4clip.s3clip) from another package"""
+        c = clip if clip is not None else self.clips[set_id]; n = c['nframes']
         T = local_tracks(c, list(self.P) + PROPS); W = world(T, self.P)
         M = self.M; Rw = {}
         for sb, mb in S2M.items():
@@ -227,11 +228,14 @@ class Retarget:
             out[nm] = lq
         hips = self.k * W['b__ROOT_bind__'][0] + np.einsum('nij,j->ni', Rw['Hips'] @ q2m(M.Q('Hips')).T, self.hip_off)
         arm_scale = M.ls[M.idx['mixamo']][0]
+        if not phone:
+            return dict(set=set_id, name=name or '', hand=None, fps=30, frames=n, rot={k: v.round(6).tolist() for k, v in out.items()},
+                        hips=(hips / arm_scale).round(4).tolist(), props={}, k=self.k)
         props = {}
         hq = W['b__Head__'][1]; hp_ = W['b__Head__'][0]
         eye = hp_ + qrot(hq, np.array([0.06, 0.09, 0.]))           # Sims head: X up, Y forward, Z his left
         h_up, h_left = qrot(hq, X), qrot(hq, Z)
-        landscape = 'LANDSCAPE' in self.names.get(set_id, '')
+        landscape = 'LANDSCAPE' in (name or self.names.get(set_id, ''))
         for s, side in (('R', 'Right'), ('L', 'Left')):
             pw = T[f'b__{s}_Prop__'][0]; pq = T[f'b__{s}_Prop__'][1]      # baked world-space slot
             hp = W[f'b__{s}_Hand__'][0]
@@ -262,7 +266,7 @@ class Retarget:
         calls = [sd for sd in props if props[sd]['call']]
         # the viewing hand: the slot nearest his line of sight; a tie (both hands at the phone) goes to the rigid grip
         hand = calls[0] if calls else min(props, key=lambda sd: (round(props[sd]['gaze_deg'] / 5), props[sd]['grip_spread_deg']))
-        return dict(set=set_id, name=self.names.get(set_id, ''), hand=hand, fps=30, frames=n, rot={k: v.round(6).tolist() for k, v in out.items()},
+        return dict(set=set_id, name=name or self.names.get(set_id, ''), hand=hand, fps=30, frames=n, rot={k: v.round(6).tolist() for k, v in out.items()},
                     hips=(hips / arm_scale).round(4).tolist(), props=props, k=self.k)
 
 if __name__ == '__main__':

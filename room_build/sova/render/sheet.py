@@ -21,7 +21,8 @@ with sync_playwright() as p:
                           args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
     for g in spec['glbs']:
         pg = b.new_page(); pg.goto(f'http://127.0.0.1:{port}/view.html'); pg.wait_for_function('window.ready')
-        anims = dict(pg.evaluate(f'load("/f{os.path.abspath(g["glb"])}")'))
+        clips = json.dumps(['/f' + os.path.abspath(c) for c in g.get('clips', [])])
+        anims = dict(pg.evaluate(f'load("/f{os.path.abspath(g["glb"])}", {clips})'))
         dur = anims[g['clip']]; nf = g.get('frames', 8)
         plane_y = g['plane'][0] if g.get('plane') else None
         F, Lf = pg.evaluate(f'basis("{g["clip"]}", 6)')

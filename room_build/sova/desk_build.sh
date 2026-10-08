@@ -1,0 +1,17 @@
+#!/bin/sh
+# Seated Sova clips baked for our chair, the same way as the Mixamo desk clips (kimodo/mx_fit.py: seat, feet, hands, sleeves):
+# sh desk_build.sh <work dir> <out dir> <slug>...   (<work dir>/rt/<slug>.json from retarget_pkg.py; <work dir>/char.glb decoded)
+# -> <out dir>/<slug>.glb, animation-only on char_mixamo's skeleton (as web/room/mh_mx/), and <work dir>/fit_<slug>.json
+set -e
+W=$1; O=$2; shift 2; H=$(cd "$(dirname "$0")" && pwd); R=$H/../..; K=$R/room_build/kimodo; G=$R/room_build/kimodo_g12
+mkdir -p $O
+[ -f $W/char.json ] || ALLMESH=1 node $G/exp.mjs $R/web/room/char_mixamo.glb $W/char.json > /dev/null
+ROW=$(python3 -c "import json; t=json.load(open('$K/mx_clips.json')); d=dict(t['defaults']['seated']); d['seatOrigin']=True; print(json.dumps(d))")
+for s in "$@"; do
+  ( cd $R/room_build && node sova/build_glb.mjs $W/char.glb $W/src_$s.glb none 64 $W/rt/$s.json > /dev/null 2>&1 )
+  node $G/exp.mjs $W/src_$s.glb $W/src_$s.json > /dev/null
+  ROWS=$(python3 -c "import json,sys; r=json.loads(sys.argv[1]); r.update(json.load(open('$H/desk_rows.json')).get('$s',{})); print(json.dumps(r))" "$ROW")
+  python3 $K/mx_fit.py $W/char.json $W/src_$s.json "$ROWS" $W/fin_$s.json $W/fit_$s.json
+  python3 -c "import json; j=json.load(open('$W/fin_$s.json')); j['name']='$s'; json.dump(j,open('$W/fin_$s.json','w'))"
+  node $G/writeclip.mjs $W/fin_$s.json $O/$s.glb | tail -1
+done

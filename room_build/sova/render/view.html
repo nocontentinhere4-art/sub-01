@@ -13,9 +13,11 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x667080, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(1, 3, 2); scene.add(sun);
 const camera = new THREE.PerspectiveCamera(28, W / H, 0.05, 50);
 let gltf, mixer, actions = {}, plane;
-window.load = async (url) => {
+window.load = async (url, clipUrls) => {
   const L = new GLTFLoader(); L.setMeshoptDecoder(MeshoptDecoder);
   gltf = await L.loadAsync(url); scene.add(gltf.scene);
+  // animation-only clip GLBs (writeclip.mjs, on the same node names) played on this character
+  for (const c of clipUrls || []) { const g = await L.loadAsync(c); for (const a of g.animations) gltf.animations.push(a); }
   gltf.scene.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
   mixer = new THREE.AnimationMixer(gltf.scene);
   for (const a of gltf.animations) actions[a.name] = mixer.clipAction(a);
