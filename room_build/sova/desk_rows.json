@@ -1,27 +1,33 @@
 {
 "seat_looking_away_idle": {
 "pitch": 10,
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "seat_looking_around_v1": {
 "pitch": 10,
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "seat_looking_around_v2": {
 "pitch": 10,
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "seat_looking_left": {
 "pitch": 10,
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "seat_looking_right": {
 "pitch": 10,
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "seat_neck_stretching_idle": {
 "pitch": 10,
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "seat_thinking_touching_chin": {
 "pitch": 10
@@ -36,27 +42,35 @@
 "pitch": 10
 },
 "desk_look_behind": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "neutral_1": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "neutral_3": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "neutral_5": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "look_right_idle": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "look_left_idle": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "look_down_to_right": {
-"restForce": true
+"restForce": true,
+"loop": true
 },
 "look_front_to_left": {
-"restForce": true
+"restForce": true,
+"loop": true
 }
 }
