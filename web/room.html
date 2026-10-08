@@ -437,7 +437,26 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const progress = {};
 function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) => a + p[0], 0), t = v.reduce((a, p) => a + p[1], 0);
   const bar = $("boot-bar"); if (t && bar) bar.style.width = `${Math.round(100 * l / t)}%`; }
-function load(url){ return new Promise((ok, fail) => loader.load(url, ok,
+// phones and tablets: textures over TEX_MAX are drawn down before they reach the GPU (iOS Safari closes the tab past
+// a few hundred MB; the character's two 4096 maps alone were ~256 MB, the room ~170 MB)
+const TOUCH = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const TEX_MAX = TOUCH ? 1024 : Infinity;
+function shrinkTextures(gltf){
+  if (!isFinite(TEX_MAX)) return gltf;
+  const done = new Set();
+  gltf.scene.traverse(o => { if (!o.material) return;
+    for (const m of [].concat(o.material)) for (const k in m) { const t = m[k];
+      if (!t || !t.isTexture || done.has(t) || !t.image) continue; done.add(t);
+      const im = t.image, w = im.width || 0, h = im.height || 0;
+      if (Math.max(w, h) <= TEX_MAX) continue;
+      const f = TEX_MAX / Math.max(w, h), c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(w * f)); c.height = Math.max(1, Math.round(h * f));
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      if (im.close) im.close();                         // (an ImageBitmap: free the full-size copy now)
+      t.image = c; t.needsUpdate = true; window.texShrunk = (window.texShrunk || 0) + 1; } });   // (?debug: how many)
+  return gltf;
+}
+function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g)),
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
 function bootError(e){
   console.error(e); $("boot").classList.add("err");
