@@ -5,7 +5,13 @@ them without permission, and the owner is dealing with the author (`mocap_src/so
 is confirmed, nothing here goes into `web/`, onto main or online, and this branch (`preview/sova-phone-src`) is never merged.
 
 Evaluated source: `SovaSims_-_Phone_Animations.package` (Ver. 8, 46 clips). The newer Phone V12 package that landed
-on this branch afterwards (it adds IN BED 04) was not evaluated here; `run_all.sh` takes the package path in one place.
+on this branch afterwards (it adds IN BED 04) was not evaluated here. V12 renumbers the sets:
+- WATCHING A/B: set_47–51
+- TYPING: set_54
+- IN BED 01–03: set_20–24, 13, 14
+- TEXTING: set_19
+
+`run_all.sh` takes the Ver. 8 file from commit 91b7f89, so the set ids here stay valid.
 
 Files:
 - `sova_best4.glb` (4.3 MB): char_v5 (`char_mixamo.glb`, 65-joint `mixamorig:*`) with 4 animations: `set_38`, `set_39`, `set_45`, `set_4`.

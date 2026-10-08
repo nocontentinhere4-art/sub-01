@@ -2,7 +2,10 @@
 # Sova phone clips onto char_mixamo.glb, end to end (evaluation only, licence unknown: nothing goes to web/ or main).
 # sh run_all.sh <work dir>   (the work dir stays out of git)
 set -e
-W=${1:?work dir}; H=$(cd "$(dirname "$0")" && pwd); PKG=$H/../../mocap_src/sova/SovaSims_-_Phone_Animations.package
+W=${1:?work dir}; H=$(cd "$(dirname "$0")" && pwd); PKG=$W/SovaSims_-_Phone_Animations_v8.package
+mkdir -p $W
+# the evaluated package is Ver. 8 (set ids below are its own); the branch now carries V12 (renumbered), so take Ver. 8 from history
+git -C $H show 91b7f89:mocap_src/sova/SovaSims_-_Phone_Animations.package > $PKG
 SETS="set_11 set_12 set_13 set_14 set_15 set_4 set_5 set_38 set_39 set_40 set_41 set_42 set_45 set_18 set_20 set_10 set_35 set_43"
 mkdir -p $W/rt $W/glb
 ( cd $H/.. && node decode.mjs ../web/room/char_mixamo.glb $W/char.glb )                  # drop meshopt
