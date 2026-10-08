@@ -13,5 +13,9 @@ for s in "$@"; do
   ROWS=$(python3 -c "import json,sys; r=json.loads(sys.argv[1]); r.update(json.load(open('$H/desk_rows.json')).get('$s',{})); print(json.dumps(r))" "$ROW")
   python3 $K/mx_fit.py $W/char.json $W/src_$s.json "$ROWS" $W/fin_$s.json $W/fit_$s.json
   python3 -c "import json; j=json.load(open('$W/fin_$s.json')); j['name']='$s'; json.dump(j,open('$W/fin_$s.json','w'))"
+  # resting hands down onto the thighs, on the fitted clip (after the seat, the legs and the sleeves)
+  python3 -I $H/fin_clip.py to_clip $W/fin_$s.json $W/post_$s.json
+  python3 -I $H/fit_rest.py $W/char.glb $W/post_$s.json > $W/rest_$s.log
+  python3 -I $H/fin_clip.py to_fin $W/post_$s.json $W/fin_$s.json
   node $G/writeclip.mjs $W/fin_$s.json $O/$s.glb | tail -1
 done
