@@ -1,4 +1,4 @@
-LATEST: 797355c — all 30 Sova clips with the hands fixed are in  and  (pull these). Launch: 28 ok, 2 **drop for launch** (seat_distracted_then_smile, sleep_wake_and_back). The owner-range table and the re-rendered close-up and montage follow in the next push.
+LATEST: 797355c — all 30 Sova clips with the hands fixed are in `desk/` and `bed/` (pull these). Launch: 28 ok, 2 **drop for launch** (seat_distracted_then_smile, sleep_wake_and_back). The owner-range table and the re-rendered close-up and montage follow in the next push.
 
 # Sova clips: status (G23 → COORD)
 
@@ -12,7 +12,7 @@ Contact yes, inside no (COORD):
 - A hand that touches the face (the chin's skin follows Neck/Head) keeps **the clip's own finger flexion**, joint by joint, clamped into the owner's range and speed; all other hands take the owner's median.
 - Wrist roll over 20° moves into the forearm (exactly, the hand's world turn kept): that was the lump in the sleeve.
 
-Per clip, from the fit ( logs), left / right hand:
+Per clip, from the fit (`hfix` logs), left / right hand:
 
 | clip | fingers | contact gap where the source touched him (cm, min…max; − = inside) | left inside him (cm) | launch |
 |---|---|---|---|---|
