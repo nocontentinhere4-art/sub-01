@@ -16,6 +16,8 @@
 //                 from 0.45, react_up from 0.9 (only shorts reach it: video and pages are scaled to 0.5 / 0.25); react_up
 //                 stays seated (a laugh, a smile at the screen): only a won game gets him up (react_win)
 //   chat   a viewer's message reaches him -> he looks at the monitor (attend)
+//   glance (preview/interactive) viewers' reactions spiked -> a calm seated loop (attend) while room/glance.js turns his
+//                 head toward the camera once (the server sends it at most once every 2 minutes)
 // Trades are left out by design (nothing financial). Nothing is invented: no event, no reaction.
 
 export const SLOTS = {
@@ -60,6 +62,7 @@ export function reactionFor(m, prev) {
   }
   if (m.type === "decision") return {slot: "attend"};
   if (m.type === "chat") return m.text ? {slot: "attend"} : null;
+  if (m.type === "glance") return {slot: "attend"};
   if (m.type === "dopamine") {
     const s = +m.size; if (!(s > 0)) return null;
     return s >= DA.react ? {slot: "react_up"} : s >= DA.gesture ? {kind: "gesture"} : null;
