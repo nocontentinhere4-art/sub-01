@@ -42,7 +42,7 @@ values validated on load): nothing is sent anywhere, the server is never touched
 
 ## Frame rate (before / after)
 
-See `fps.md` (measured on a RunPod RTX A5000 through headless Chromium, and the CPU-throttled phone emulation; the
+Before / after at the same hour: `before_after_0800.jpg`, `before_after_1818.jpg`. See `fps.md` (measured on a RunPod RTX A5000 through headless Chromium, and the CPU-throttled phone emulation; the
 notes there say what those numbers can and cannot tell).
 
 ## Files

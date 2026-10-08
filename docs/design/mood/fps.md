@@ -1,6 +1,6 @@
 # Frame rate: before (main) and after (`?mood=1`)
 
-Measured with `tools`-style headless Chromium on a RunPod **RTX A5000** (WebGL on the GPU: "ANGLE (NVIDIA RTX A5000,
+Measured with headless Chromium (the setup of tools/gpu_preview.py) on a RunPod **RTX A5000** (WebGL on the GPU: "ANGLE (NVIDIA RTX A5000,
 OpenGL ES 3.2)"), one pod per run, deleted at the end (run 1: 15 min, run 2: 20 min, ~$0.16 together; the "BRAIN" pod
 was never touched). Same scene for all (him at the desk), four hours (08:00, 14:00, 18:18, 23:00), two cameras (the
 follow camera and the overview), clear weather. Three pages: main as it was (b0eff95), this branch's default page, and
