@@ -260,7 +260,7 @@ export function createMH(env) {
     for (const k of Object.keys(RARE)) { const c = got["rare_" + k]; if (!c) continue;
       const a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
       H["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration}; }
-    if (env.anim === "sova") await svLoad(make, bodyHips);      // (the desk states, ?anim=sova: their slots and the picker)
+    if (env.anim === "sova") try { await svLoad(make, bodyHips); } catch (e) { SV = null; M.sv = null; console.warn("desk states not loaded, Mixamo clips only", e); }   // (the desk states by default: their slots and the picker; a clip that fails is left out, all failing: the Mixamo clips)
     M.actions.stand = make(stand); H.mh_stand = pageHips(stand, 0);
     // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
     M.actions.walk = make(got.walk); H.room_walk = pageHips(got.walk, 0);

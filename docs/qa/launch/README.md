@@ -1,0 +1,6 @@
+# preview/launch
+1. Contents: origin/main (b0eff95) + preview/freeze-why-ease (e9338b2) + preview/char-fix-final + preview/phone-camera (all merged cleanly) + the forearm-twist fix (aafc5d1) + preview/desk-states with G23's 28 fixed GLBs from 797355c (web/room/desk_states/, bed clips in bed/, not wired yet); dropped: seat_distracted_then_smile (react_up now plays seat_smiling), sleep_wake_and_back; no .package files, no mocap_src/.
+2. SovaSims animations used with the author's permission (confirmed by the owner, 2026-10-08).
+3. The Sova desk layer is on by default with `?char=mixamo` (no `&anim=sova` needed; `&anim=mixamo` turns it off; a clip that fails to load is left out, and if the whole layer fails the Mixamo clips play). The page's default character is v5 (char_v5.glb), NOT Mixamo: on v5 the Sova clips made him vanish from the chair, so v5 stays without them.
+4. Tests (before the desk-states merge, 2 cores): smoke_demo SMOKE OK; pytest 1 failed, 1508 passed, 30 skipped, hard_failures []; the failure (test_room_raycast, run while a recording shared the machine) passed alone (1 passed). After the merge: see the line below.
+5. Video: docs/qa/launch/launch_room.mp4, the default room (v5) from the visitor camera, plus a 10 s hand close-up.

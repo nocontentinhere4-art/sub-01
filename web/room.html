@@ -668,7 +668,7 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
 const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q === "mixamo";
 // ?char=mixamo&anim=sova (preview/desk-states): the seated states at the desk (room/desk_states.js), fed the messages the
 // page already receives that they react to (chess, a decision, a dopamine burst, a viewer's chat); off by default
-const DESK_EV = CHAR_MX && new URLSearchParams(location.search).get("anim") === "sova" ? [] : null;
+const DESK_EV = CHAR_MX && new URLSearchParams(location.search).get("anim") !== "mixamo" ? [] : null;   // (?char=mixamo: the Sova desk states by default, &anim=mixamo without them; not on v5, whose clips they do not fit)
 const deskEv = m => { if (DESK_EV && m && ["chess", "decision", "dopamine", "chat"].includes(m.type)) { DESK_EV.push(m); if (DESK_EV.length > 32) DESK_EV.shift(); } };
 if (DEBUG && DESK_EV) window.__deskEv = deskEv;     // (?debug: the visual checks hand it messages as the socket would)
 let V5 = null;                                        // (char_v5.js / char_mixamo.js and the body's clip conversion)

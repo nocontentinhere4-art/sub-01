@@ -12,7 +12,7 @@
   "gesture_e": "seat_neck_stretching_idle.glb",
   "gesture_f": "seat_thinking_touching_chin.glb",
   "react_win": "seat_happy.glb",
-  "react_up": "seat_distracted_then_smile.glb",
+  "react_up": "seat_smiling.glb",
   "react_lose": "seat_feeling_frustrated_v1.glb"
  },
  "once": [
