@@ -39,7 +39,7 @@ export const GROUPS = {
   wall: {label: "Walls", mats: ["wall"], variants: [
     {id: "chalk", label: "Chalk", sw: "#e7e2d8"},
     {id: "linen", label: "Linen", c: {wall: "#eedfc8"}, sw: "#eedfc8"},
-    {id: "clay", label: "Clay", c: {wall: "#d8a68e"}, sw: "#d8a68e"},
+    {id: "clay", label: "Clay", c: {wall: "#dcb6a2"}, sw: "#dcb6a2"},
     {id: "sage", label: "Sage", c: {wall: "#b8c1a3"}, sw: "#b8c1a3"},
     {id: "dusk", label: "Dusk blue", c: {wall: "#a7adbf"}, sw: "#a7adbf"},
   ]},
@@ -50,12 +50,12 @@ export const GROUPS = {
     {id: "moss", label: "Moss", c: {duvet: "#6c7750"}, sw: "#6c7750"},
     {id: "charcoal", label: "Charcoal", c: {duvet: "#3d3f45"}, sw: "#3d3f45"},
   ]},
-  soft: {label: "Rug & cushion", mats: ["rug", "cushion"], variants: [
-    {id: "mustard", label: "Grey & mustard", sw: ["#8a8478", "#b8962f"]},
-    {id: "terra", label: "Cream & terracotta", c: {rug: "#d9cdb8", cushion: "#b9603a"}, sw: ["#d9cdb8", "#b9603a"]},
-    {id: "navy", label: "Oat & navy", c: {rug: "#c9bda5", cushion: "#34405e"}, sw: ["#c9bda5", "#34405e"]},
-    {id: "forest", label: "Charcoal & sage", c: {rug: "#55565a", cushion: "#9aa785"}, sw: ["#55565a", "#9aa785"]},
-    {id: "sun", label: "Sand & orange", c: {rug: "#bfae92", cushion: "#e0782e"}, sw: ["#bfae92", "#e0782e"]},
+  soft: {label: "Rug", mats: ["rug"], variants: [
+    {id: "mustard", label: "Stone grey", sw: "#8a8478"},
+    {id: "terra", label: "Cream", c: {rug: "#d9cdb8"}, sw: "#d9cdb8"},
+    {id: "navy", label: "Oat", c: {rug: "#c4b393"}, sw: "#c4b393"},
+    {id: "forest", label: "Charcoal", c: {rug: "#4f5054"}, sw: "#4f5054"},
+    {id: "sun", label: "Terracotta", c: {rug: "#b0674a"}, sw: "#b0674a"},
   ]},
 };
 // looks: a whole room at once (the same swatches)
@@ -460,7 +460,7 @@ export function createMood(THREE, ctx){
     </section>
     <section data-tab="light" hidden>
       <div class="md-looks" id="md-looks">${LOOKS.map(L => `<button data-look="${L.id}"><i>${["floor", "wall", "bed", "soft"].map(g => {
-        const v = GROUPS[g].variants.find(x => x.id === L.set[g]); return `<u style="background:${Array.isArray(v.sw) ? v.sw[1] : v.sw}"></u>`; }).join("")}</i>${L.label}</button>`).join("")}</div>
+        const v = GROUPS[g].variants.find(x => x.id === L.set[g]); return `<u style="background:${v.sw}"></u>`; }).join("")}</i>${L.label}</button>`).join("")}</div>
       <div class="md-row"><div class="l">Lamps</div><div class="md-seg" id="md-lamps">${LAMPS.map(x => `<button data-lamps="${x}">${x === "auto" ? "By the hour" : x[0].toUpperCase() + x.slice(1)}</button>`).join("")}</div></div>
       <div class="md-row"><div class="l">Sunbeams</div><div class="md-seg" id="md-rays"><button data-rays="1">On</button><button data-rays="0">Off</button></div></div>
     </section>
