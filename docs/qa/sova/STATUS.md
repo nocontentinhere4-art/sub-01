@@ -1,4 +1,23 @@
-LATEST: ec9a5c5 — `alive_ab.mp4` (round 4 "alive", 4 test clips, MATTINA / ORA / NUOVO, hand close-ups below each). Round 4 code 93f6021 (`fix_alive.py`). If NUOVO wins I run it on all 28 next. The 797355c GLBs (ORA) are still what is in `desk/` and `bed/`.
+LATEST: 0248b96 — **MATTINA for launch**: `docs/qa/sova/mattina/desk/` (19) and `mattina/bed/` (9), the owner's choice. 28 clips; the 2 drops (seat_distracted_then_smile, sleep_wake_and_back) are left out. No hands pass on any of them.
+
+## MATTINA set — 0248b96
+**What it is:** the exact GLBs used as MATTINA in `alive_ab.mp4`, byte for byte (taken from git at 797355c^). Same filenames as `desk/` and `bed/`; this morning's `index.json` alongside.
+
+**Source per clip** (all had a morning version, none needed the pre-hands fallback):
+- **8051d88**, the armrest fix: seat_thinking_touching_chin (v6), seat_feeling_frustrated_v1 (v5).
+- **e579d71**, the chess win candidates: seat_happy, seat_smiling.
+- **b578db3**, desk v3: desk_look_behind, desk_start_01, look_down_to_right, look_front_to_left, look_left_idle, look_right_idle, neutral_1, neutral_3, neutral_5, seat_feeling_frustrated_v2, seat_looking_around_v1, seat_looking_around_v2, seat_looking_away_idle, seat_looking_left, seat_looking_right, seat_neck_stretching_idle.
+- **7bf7c8c**, the bed: bed_phone_lift, bed_phone_typing, bed_phone_watch_landscape, bed_phone_watch_portrait, sleep_back, sleep_back_idle, sleep_roll_to_back, sleep_side.
+
+**Quick checks.** These are the numbers already measured on these same files; none is worse than this morning, because they *are* this morning's:
+- **Hands in his body (mesh):** 0 everywhere except sleep_back_idle, left hand 1.6 cm under the head.
+- **Chair, desk, room:** 0 in this morning's room passes. Thinking v6 comes within 1.4 cm of the chair on 4 frames (2 cm test); frustrated V1 v5 has nothing within 2 cm.
+- **Pose:** no T-pose in this morning's montage or the A/B stills.
+
+**Known, as this morning:**
+- the fingers are the Sims retarget (the twist the owner first saw);
+- in sleep_back_idle the feet are 5.6 cm past the mattress end: place that slot 6 cm toward the headboard (bed/index.json `place_note`).
+
 
 ## ROUND 4 "alive" — A/B/C: `alive_ab.mp4` (+ `alive_ab.jpg` stills)
 The four clips: neutral_1, thinking (chin), seat_happy, bed_phone_watch_landscape.
