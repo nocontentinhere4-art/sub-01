@@ -2559,7 +2559,7 @@ function quiltDent(k, dt){
 // he has picked it up.
 let BED_MOVING = false;                                 // (boy_mh.js: a captured turn in his sleep is playing)
 const COV = {mesh:null, pos:null, nor:null, uv:null, nx:60, nz:46, nt:0, hem:0, acc:0, lastHem:9, len:0,
-  XFOOT:0.57, XFOLD:-1.33, FALL:0.28, Z0:0.14, Z1:1.61, ZM0:0.26, ZM1:1.49, BED:0.82, LOFT:0.055, THICK:0.05, DROP:0.26, DR:0.17, TEX:3.6};
+  XFOOT:0.57, XFOLD:-1.33, FALL:0.28, Z0:0.14, Z1:1.61, ZM0:0.26, ZM1:1.49, BED:0.82, LOFT:0.055, THICK:0.035, DROP:0.26, DR:0.17, TEX:3.6};
 function coverInit(){                                  // the grid, its faces and its UVs: built once
   const {nx, nz} = COV, nt = COV.nt = nx * nz, g = new THREE.BufferGeometry();
   COV.pos = new Float32Array(nt * 2 * 3); COV.nor = new Float32Array(nt * 2 * 3); COV.uv = new Float32Array(nt * 2 * 2);
@@ -2629,7 +2629,7 @@ function coverCloth(iEnd){
 // parabola (a grey-scale closing: dilate, then erode, with -(dx²/2RX + dz²/2RZ)): it spans only hollows too tight for
 // the cloth to follow (between his legs, a cell no vertex fell in), lies on everything else, and past his outline falls
 // to the mattress along the same parabola, not as a wall. RX along him, RZ across. The top is the duvet's thickness over it
-const DRAPE = {GAP:0.01, RX:0.12, RZ:0.08};
+const DRAPE = {GAP:0.01, RX:0.06, RZ:0.04};   // (G17: 12 / 8 cm bridged a tent over his knees and hands; with his legs lying straight the cloth follows them)
 function coverDrape(iEnd, dx){
   const {nx, nz, BED, THICK} = COV, B = COV.body, H = COV.h, T = COV.tmp, n = iEnd + 1, dz = (COV.Z1 - COV.Z0) / (nz - 1);
   for (let k = 0; k < nx * nz; k++) H[k] = B[k] > BED + 0.002 ? B[k] + DRAPE.GAP : BED;
@@ -3258,7 +3258,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
         const col = ci >= 0 && ci < V.nx && ck >= 0 && ck < V.nz && V.cols[ci * V.nz + ck];
         if (col) for (let j = 0; j < col.length; j += 2) if (u.y > col[j] + 0.01 && u.y < col[j + 1] - 0.01) { chair++; note(i, "chair"); if (detail && (by.pts = by.pts || []).length < 4) by.pts.push(u.toArray().map(x => +x.toFixed(3)).concat(v.toArray().map(x => +x.toFixed(2)))); break; } } } }
     return detail ? {bed, chair, by} : {bed, chair, of:count}; },
-  LIE, DUV, COV, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
+  LIE, DUV, COV, DRAPE, PIL, SLIDES, ROLL, contacts: (every = 2) => {                                         // per body part: the lowest gap (m) to the bed under it, and how much lies within 1.5 cm
     if (!window._HM) { const X0 = -1.95, Z0 = 0.2, N = 0.01, NX = 205, NZ = 140, hm = {sheet:new Float32Array(NX * NZ).fill(-1), jersey:new Float32Array(NX * NZ).fill(-1)};
       room.traverse(o => { if (!o.isMesh || !o.material || !(o.material.name in hm)) return; const H = hm[o.material.name], g = o.geometry, P = g.attributes.position, ix = g.index;
         o.updateMatrixWorld(true); const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();

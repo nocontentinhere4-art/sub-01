@@ -44,6 +44,7 @@ p.on("pageerror", e => console.log("pageerror", e.message));
 if (process.env.HP) await p.addInitScript(`window.__HP = ${process.env.HP};`);   // (HP='{"up":0.01,"out":0}': boy_mh.js's headphone offsets, to sweep)
 await p.goto(`http://localhost:${port}/room.html?debug&nolive${process.env.QS || ""}&hour=15`);
 await p.waitForFunction(() => window.boy && window.mh && window.mh.ready && window.roomDbg, null, {timeout: 300000});
+if (process.env.PRE) await p.evaluate(process.env.PRE);          // (PRE='DRAPE.RX = 0.06': page settings to sweep)
 const res = await p.evaluate(([activity, secs, X, RARE]) => { let S0step = null;
   // "a>b": settle doing a, then switch to b and sample from the moment his pose step (sitting down, getting up) begins
   const [act0, act1] = activity.split(">"); activity = act0; const LYING = (act1 || act0) === "sleep" || (act1 || act0) === "listen_music";
