@@ -44,6 +44,7 @@ from research import Reader, reading_stimulus
 from browse import Browser, card_title_ok, screen_showable
 import audience
 import brain_vote
+import launchpad_eval
 import chess_game
 import clips
 import music as music_mod
@@ -2162,6 +2163,7 @@ async def main(args):
         cpu_net.on_frame = live.spiking.relay if live.spiking else live.broadcast
     live.decider = brain_vote.Backend(cpu=cpu_net, gpu=spiking_manager, log=spiking_live.DecisionLog(data_dir))
     spiking_live.attach(app, live.decider)
+    launchpad_eval.add_routes(app, live, data_dir)   # the launchpad asks his brain about ideas (signed, off without a secret)
 
     async def snap(request):                      # save a canvas capture posted by the page (local only)
         name = Path(request.query.get("name", "snap")).name
