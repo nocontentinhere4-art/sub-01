@@ -321,12 +321,16 @@ def query_ok(q):
     if not 2 <= len(q) <= 60 or len(q.split()) > 6:
         return None
     if (chat_blocked(q) or BAD_WORDS.search(q) or BAD_HOST.search(q) or TOPIC_BLOCK.search(q) or "/" in q
-            or BUY_SELL.search(q)):
+            or BUY_SELL.search(q) or SHOP_WORDS.search(q)):
         return None
     return q
 
 
 BUY_SELL = re.compile(r"\b(buy|buying|sell|selling|swap|invest|investing|ape into|to the moon)\b", re.I)   # never typed
+# a shop's words are not interests (live 2026-10-08: "Day Deals" and "discover shop next", from a shop page's titles,
+# became his searches); "Kichijoji shops" (the walk's street) stays
+SHOP_WORDS = re.compile(r"\b(deals?|sales?|shop|shopping|store|discounts?|coupons?|promo(tion)?s?|checkout|cart|offers?|"
+                        r"bestsellers?|best sellers?|new arrivals|gift cards?|free shipping)\b", re.I)
 
 
 def clean_networks(nets, text=""):

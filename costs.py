@@ -18,6 +18,10 @@ Daily caps (USD per Tokyo day, env vars):
   writes its template text.
 - SUB01_CAP_EYES_USD (1.00) and SUB01_CAP_MIND_USD (1.00): the existing eyes / mind shares of the shared ledger
   (mind.EYES_USD_PER_DAY / MIND_USD_PER_DAY, checked by mind.Share); over them, local options / yesterday's plan.
+- The eye's cap is paced over his waking day (`pace_allowed`): by a moment of the Tokyo day the eye may have spent
+  EYE_PACE_SLACK of its cap (dreams at night, the first frames of the morning) plus the rest in proportion to the waking
+  hours gone, 08:00 (sleep.WAKE_HOUR) to midnight, less one frame's cost (so the day's last frame stays in the cap). Spent at full rate it had used 0.80 of 1.00 by 11:00 and was capped
+  all afternoon and evening (live, 2026-10-07/08). The cap itself is unchanged; SUB01_EYE_PACE=0 turns the pacing off.
 - SUB01_CAP_TOTAL_USD (3.10): everything above together. Its default is the sum of the part caps
   (1.00 + 1.00 + 1.00 + 0.10), so with the defaults no part can starve another one; it only bites when a part cap
   is raised. RunPod is not in it: it keeps its own GPU-hour caps (spiking/pod_manager.py).
@@ -56,6 +60,26 @@ def caps():
     import mind
     return {"eye": _cap("SUB01_CAP_EYE_USD", 1.00), "diary": _cap("SUB01_CAP_DIARY_USD", 0.10),
             "eyes": mind.EYES_USD_PER_DAY, "mind": mind.MIND_USD_PER_DAY, "total": _cap("SUB01_CAP_TOTAL_USD", 3.10)}
+
+
+EYE_PACE_SLACK = 0.15                              # share of the eye's cap free at any hour of the Tokyo day
+EYE_FRAME_USD = 0.003 + (1000 * 0.05 + 80 * 0.25) / 1e6   # one frame and its thought (FLUX_SCHNELL_USD + llm_usd(1000, 80)):
+                                                   # the paced allowance stops that much short, so the last frame stays in the cap
+DAY_END_HOUR = 24                                  # the Tokyo day (and so the cap) ends at midnight
+
+
+def pace_share(t):
+    """Share of a paced daily cap that may be spent by time t: EYE_PACE_SLACK, plus the rest in proportion to the
+    waking hours gone (sleep.WAKE_HOUR to midnight); 1.0 at midnight."""
+    from sleep import WAKE_HOUR
+    d = datetime.fromtimestamp(t, ROME)
+    h = d.hour + d.minute / 60 + d.second / 3600
+    f = min(1.0, max(0.0, (h - WAKE_HOUR) / (DAY_END_HOUR - WAKE_HOUR)))
+    return EYE_PACE_SLACK + (1 - EYE_PACE_SLACK) * f
+
+
+def paced():
+    return os.environ.get("SUB01_EYE_PACE", "1") != "0"
 
 
 def tokyo_day(t):
@@ -188,11 +212,20 @@ class Ledger:
             return f"daily total AI budget (${cap:.2f}, Tokyo day) reached; resumes tomorrow"
         return None
 
+    def pace_allowed(self, service):
+        """USD `service` may have spent by now on this Tokyo day (the eye's cap paced over his waking hours; any
+        other service: its whole cap)."""
+        cap = caps()[service]
+        return cap * pace_share(self.clock()) - EYE_FRAME_USD if service == "eye" and paced() else cap
+
     def why_not(self, service):
         """None when a paid call of `service` (eye or diary) is allowed now, else the reason."""
-        cap = caps()[service]
-        if self.spent_today(service) >= cap:
+        cap, spent = caps()[service], self.spent_today(service)
+        if spent >= cap:
             return f"daily {service} budget (${cap:.2f}, Tokyo day) reached; resumes tomorrow"
+        allowed = self.pace_allowed(service)
+        if spent > 0 and spent >= allowed:
+            return f"{service} pacing its daily budget (${cap:.2f}) over the day; more later today"   # (constant: the server logs a new reason)
         return self.total_why_not()
 
     def check(self, service):
@@ -208,7 +241,7 @@ class Ledger:
         r2 = lambda d: {k: round(v, 4) for k, v in d.items()}
         return {"tokyo_day": today, "today": r2(per_day[today]),
                 "today_total_capped": round(sum(v for k, v in per_day[today].items() if k not in NOT_IN_TOTAL), 4),
-                "caps": c, "capped_now": {s: self.spent_today(s) >= c[s] for s in ("eye", "diary", "eyes", "mind")}
+                "caps": c, "eye_paced_allowed_now": round(self.pace_allowed("eye"), 4), "capped_now": {s: self.spent_today(s) >= c[s] for s in ("eye", "diary", "eyes", "mind")}
                 | {"total": self.total_today() >= c["total"]},
                 "days": [{"day": d, **r2(v), "total": round(sum(v.values()), 4)} for d, v in per_day.items()],
                 "last_7_days_total": round(sum(sum(v.values()) for v in per_day.values()), 4),

@@ -1345,14 +1345,15 @@ class Browser:
 
     SEED_GAP_S = 6 * 3600                                      # a seed site's front page at most every 6 hours
 
-    async def _seed(self, sc, why, topic=None, hungry=False):
+    async def _seed(self, sc, why, topic=None, hungry=False, only_topic=False):
         """A seed site's front page (a feed that changes, so not held to the 7-day rule), rotating: the ones opened in
-        the last SEED_GAP_S are left out; the topic's own sites first; cooking sites only when he is hungry."""
+        the last SEED_GAP_S are left out; the topic's own sites first (only them with only_topic: a failed search
+        falls back on a site about it or none); cooking sites only when he is hungry."""
         now = time.time()
-        pool = [u for u in SEEDS + (SEED_TOPICS["food"] if hungry else [])
+        mine = SEED_TOPICS.get(topic or "", [])
+        pool = [u for u in (mine if only_topic else SEEDS + (SEED_TOPICS["food"] if hungry else []))
                 if now - self.seed_t.get(u, 0) > self.SEED_GAP_S and self.host_ok(urllib.parse.urlsplit(u).hostname)]
         self.rng.shuffle(pool)
-        mine = SEED_TOPICS.get(topic or "", [])
         pool.sort(key=lambda u: u not in mine)
         for u in pool[:3]:
             self.seed_t[u] = now
@@ -1918,7 +1919,13 @@ class Browser:
         if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
                                      short=sc.name == "phone"):
             return True
-        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry)
+        # else a site about it, or nothing: never one about something else (live 2026-10-08: "Mark Rober" -> a Tokyo
+        # guide, "ramen in Osaka" -> a games site, "Day Deals" -> a music magazine)
+        if not topic or not SEED_TOPICS.get(topic):
+            self.last_skip = f"no search for “{q[:40]}” and no site about it"
+            return False
+        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry,
+                                only_topic=True)
 
     async def _video_search(self, sc, vq, q, why, origin):
         """A search asking for videos: the phone's short-video feed, or a video source at the desk."""
