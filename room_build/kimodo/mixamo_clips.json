@@ -33,14 +33,20 @@
    "ref": "room_bedtime",
    "out": "room_laying_sleeping",
    "mode": "asleep",
-   "fit": "bed_clip"
+   "fit": "bed_clip",
+   "sink": 0.0165,
+   "flat": 1.0,
+   "toe_in": 0.008
   },
   "Laying_Nodding": {
    "kind": "bed",
    "ref": "room_bed_lie",
    "out": "room_laying_nodding",
    "mode": "awake",
-   "fit": "bed_clip"
+   "fit": "bed_clip",
+   "sink": 0.02,
+   "flat": 1.0,
+   "toe_in": 0.008
   },
   "Stand_To_Sit": {
    "kind": "seated",

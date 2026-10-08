@@ -1325,7 +1325,7 @@ export function createMH(env) {
   // a captured bed clip playing (and settled: its cross-fade in is over)
   // the mattress gives under his back and hips (bed_clip.py BED_SINK): these clips are fitted to lie with his lowest skin -
   // his back - this far under the bed's top (m), his legs and head where they were (?debug: window.__bedSink overrides)
-  const BED_SINK = {listen: 0, sleep: 0};
+  const BED_SINK = {listen: 0.018, sleep: 0.0065};   // (mixamo_clips.json sink less bed_clip.py's BACK_UP: awake 2 - 0.2, asleep 1.65 - 1 cm)
   function capSink(st) { const o = window.__bedSink; return o != null ? +o : st.goal && st.goal.clip === "listen" ? BED_SINK.listen : BED_SINK.sleep; }
   function capBed(st) {
     if (st.at !== "bedlie" || st.step || !st.goal) return false;
