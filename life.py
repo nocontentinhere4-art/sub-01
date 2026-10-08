@@ -98,6 +98,8 @@ EAT_LABEL = {"bread": "eating bread at the table", "ramen": "eating ramen from t
              "onigiri": "eating an onigiri from the konbini", "konbini_bento": "eating a bento from the konbini"}
 CHESS_EVERY = 3600          # at most one chess game per simulated hour (#17)
 PLAN_BONUS = 0.35           # the day plan (mind.py) tilts the choice toward its next step; needs still come first
+VOTE_BONUS = 1.2            # viewers' vote (audience.py): a strong tilt toward the winning activity; needs still come first
+NUDGE_HOLD = 3600           # simulated seconds the vote's nudge lasts once applied (then it is spent)
 COOK_MIN = (8, 15)          # simulated minutes before the courier leaves the shop
 COURIER_SPEED = 4.0         # m / simulated second (bike)
 LABEL = {"sleep": "sleeping", "phone": "in bed scrolling the phone", "eat": "eating bread at the table",
@@ -190,6 +192,7 @@ class Life:
         self.last_chess = s.get("last_chess", -1e18)   # sim time the last chess game started (one per hour)
         self.can_watch = True                  # live_server: False when there is no browser for the desk screen
         self.music = None                      # live_server: {"title", "artist", "mode"} while a track plays (#68)
+        self.viewer_nudge = s.get("viewer_nudge")   # [activity, sim time applied]: what viewers voted for (audience.py)
         target = ACTIVITIES[self.activity][0]
         if target != self.place:                          # restored mid-activity somewhere else: walk there
             self.path = route(self.place, target)[1:]
@@ -265,7 +268,25 @@ class Life:
         }
         if s.get(self.plan_hint, 0.0) > 0:              # the plan only tilts what is possible now
             s[self.plan_hint] += PLAN_BONUS
+        nudge = self.nudge(t)
+        if nudge and s.get(nudge, 0.0) > 0:             # viewers' vote: the same, stronger; never the impossible
+            s[nudge] += VOTE_BONUS
         return s
+
+    def nudge(self, t):
+        """The activity viewers voted for, while its nudge lasts (NUDGE_HOLD after it was applied), else None."""
+        n = self.viewer_nudge
+        if not n or t - n[1] > NUDGE_HOLD or n[0] not in ACTIVITIES:
+            return None
+        return n[0]
+
+    def apply_vote(self, act, t):
+        """Viewers' vote result (audience.py): a strong nudge toward `act`. What he is doing at home ends early when the
+        nudged activity now beats it (wish_now), so it shows within a tick or two; needs still win."""
+        if act not in ACTIVITIES or act == "sleep":
+            return False
+        self.viewer_nudge = [act, t]
+        return True
 
     def choose(self, t, stage, rel, market_hot, pressure):
         if stage != "AWAKE":
@@ -289,9 +310,12 @@ class Life:
     def wish_now(self, t, rel, market_hot, pressure):
         """A wish heard in the chat (WISH_INTERRUPTS) beats what he is doing at home, or on the park bench, by
         INTERRUPT_MARGIN: he stops early to do it (the next choice still puts needs first)."""
-        if self.activity in WISH_INTERRUPTS or not (self.activity in INTERRUPTIBLE or self.activity == "park"):
+        if not (self.activity in INTERRUPTIBLE or self.activity == "park"):
             return False
-        wished = [a for a in WISH_INTERRUPTS if self.desire(a, t) >= WISH_MIN]
+        wished = [a for a in WISH_INTERRUPTS if self.desire(a, t) >= WISH_MIN and a != self.activity]
+        nudge = self.nudge(t)
+        if nudge and nudge != self.activity:            # viewers' vote: carried out like a wish
+            wished.append(nudge)
         if not wished:
             return False
         s = self.scores(t, rel, market_hot, pressure, going_on=True)
@@ -323,6 +347,8 @@ class Life:
         self.desires.pop(act, None)
         if act in FOOD_ACTS:
             self.desires.pop("buy_bread", None)         # "go eat" is answered by any way to food
+        if self.viewer_nudge and self.viewer_nudge[0] == act:
+            self.viewer_nudge = None                     # the vote is carried out: spent
         self.started = (self.started + [(t, act)])[-20:]
         self.say = why
         self.log = (self.log + [{"t": t, "what": why}])[-30:]
@@ -419,6 +445,8 @@ class Life:
             }[nxt]
             if nxt == self.plan_hint and nxt != "sleep":
                 why += "; it is in today's plan"
+            if self.viewer_nudge and nxt == self.viewer_nudge[0]:
+                why += "; viewers voted for it"
             if nxt == "eat" and self.food:
                 why = f"hungry: eats the {(self.food_items[0] if self.food_items else 'meal').replace('konbini_', '')} at the table"
             if woke:
@@ -486,5 +514,5 @@ class Life:
                 "food": self.food, "delivery": self.delivery, "food_items": self.food_items, "eating": self.eating,
                 "order_dish": self.order_dish, "wish": self.wish,
                 "boredom": self.boredom, "bread": self.bread, "desires": self.desires, "log": self.log,
-                "last_chess": self.last_chess,
+                "last_chess": self.last_chess, "viewer_nudge": self.viewer_nudge,
                 **({"body": self.body.to_dict()} if self.own_body else {})}

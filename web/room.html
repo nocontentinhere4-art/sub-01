@@ -158,6 +158,28 @@
   #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:8px; cursor:pointer; }
   #chat button:hover { background:#fff; }
   #note { font-size:10px; color:var(--faint); margin-top:5px; min-height:1.2em; }
+  /* viewers (preview/interactive): the reactions bar and the viewer count in the dock, reactions floating up over the room */
+  #rx { display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+  #rx button { flex:1 1 0; min-width:0; height:34px; font-size:17px; line-height:1; background:var(--card); border:1px solid var(--line); border-radius:8px;
+    cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); transition:transform .12s, border-color .2s; padding:0; }
+  #rx button:active { transform:scale(.9); } #rx button:hover { border-color:rgba(255,255,255,.25); }
+  #rx button.off { opacity:.45; }
+  #viewers { flex:none; font-size:10.5px; color:var(--dim); padding:0 4px 0 6px; white-space:nowrap; text-shadow:0 1px 6px #000; }
+  #viewers::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:#39f5a0; margin-right:5px; vertical-align:1px; }
+  #rxfloat { position:fixed; inset:0; pointer-events:none; z-index:4; overflow:hidden; }
+  #rxfloat span { position:absolute; bottom:18%; font-size:26px; will-change:transform, opacity; animation:rxup var(--d, 3s) ease-out forwards;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+  @keyframes rxup { 0% { transform:translate(0, 0) scale(.6); opacity:0; } 12% { opacity:1; transform:translate(0, -6vh) scale(1); }
+    100% { transform:translate(var(--dx, 0px), -52vh) scale(1.05); opacity:0; } }
+  /* the vote on what he does next */
+  #votecard .opt { position:relative; display:flex; justify-content:space-between; gap:8px; align-items:center; width:100%; margin-top:6px;
+    background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:9px 10px; font:inherit;
+    font-size:12.5px; text-align:left; cursor:pointer; overflow:hidden; }
+  #votecard .opt .bar { position:absolute; left:0; top:0; bottom:0; background:rgba(255,154,60,.16); transition:width .4s; pointer-events:none; }
+  #votecard .opt span { position:relative; } #votecard .opt .n { color:var(--dim); font-size:11.5px; white-space:nowrap; }
+  #votecard .opt.mine { border-color:rgba(255,154,60,.7); } #votecard .opt.mine .n::before { content:"your vote · "; color:var(--st); }
+  #votecard .opt:disabled { cursor:default; }
+  #votecard .s.err { color:#ff8a8a; }
   #note.err { color:#ff8a8a; }
   #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:13px; color:#d8d8e2; background:rgba(8,8,11,.6);
     border:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
@@ -194,6 +216,8 @@
     #feed .ln.his { border-top-color:transparent; border-bottom-color:transparent; box-shadow:0 0 0 1px rgba(255,154,60,.35); }   /* clipped at two lines: no padding for a third to show in */
     #plan { max-width:none; font-size:11px; padding:5px 8px; } #plan .r { display:none; }
     #away { top:31vh; width:calc(100vw - 48px); }
+    #rxfloat { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
+    #rx button { height:32px; font-size:16px; }
   }
 </style>
 </head>
@@ -211,6 +235,14 @@
 </div>
 
 <div id="side">
+  <div class="card" id="votecard" hidden>
+    <div class="k"><span>What next? · viewers vote</span><span id="v-left"></span></div>
+    <div id="v-opts"></div>
+    <div class="s" id="v-note">one vote per viewer per round</div>
+    <div class="s" id="v-last" hidden></div>
+    <div class="s">When the round ends, the most-voted option goes to his activity model as a strong nudge. Needs such as
+      food and sleep still come first; if he is asleep, it waits until he wakes. A tie goes to the option listed first.</div>
+  </div>
   <div class="card" id="screencard" hidden>
     <div class="k"><span id="s-k">On his screen</span><a id="s-link" href="#" target="_blank" rel="noopener noreferrer">open ↗</a></div>
     <div class="frame"><img id="s-img" alt="what is on his screen"></div>
@@ -271,7 +303,9 @@
   An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
   <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
 </div>
+<div id="rxfloat" aria-hidden="true"></div>
 <div id="dock">
+  <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
   <div id="feed" hidden aria-live="polite"></div>
   <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
   <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
@@ -288,6 +322,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { createGlance } from "./room/glance.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 // (bounding-volume trees for the room's meshes: the camera's collision casts rays into them every frame)
@@ -326,6 +361,8 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.35;
 const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 200);
+const GLANCE = createGlance(THREE);                   // he glances toward the camera when viewers' reactions spike
+if (DEBUG) window.GLANCE = GLANCE;
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.enablePan = false;
 controls.minPolarAngle = 0.35; controls.maxPolarAngle = 1.35; controls.minDistance = 0.4; controls.maxDistance = 12;
@@ -669,7 +706,7 @@ const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_
 // ?char=mixamo&anim=sova (preview/desk-states): the seated states at the desk (room/desk_states.js), fed the messages the
 // page already receives that they react to (chess, a decision, a dopamine burst, a viewer's chat); off by default
 const DESK_EV = CHAR_MX && new URLSearchParams(location.search).get("anim") !== "mixamo" ? [] : null;   // (?char=mixamo: the Sova desk states by default, &anim=mixamo without them; not on v5, whose clips they do not fit)
-const deskEv = m => { if (DESK_EV && m && ["chess", "decision", "dopamine", "chat"].includes(m.type)) { DESK_EV.push(m); if (DESK_EV.length > 32) DESK_EV.shift(); } };
+const deskEv = m => { if (DESK_EV && m && ["chess", "decision", "dopamine", "chat", "glance"].includes(m.type)) { DESK_EV.push(m); if (DESK_EV.length > 32) DESK_EV.shift(); } };
 if (DEBUG && DESK_EV) window.__deskEv = deskEv;     // (?debug: the visual checks hand it messages as the socket would)
 let V5 = null;                                        // (char_v5.js / char_mixamo.js and the body's clip conversion)
 (CHAR_V5 ? Promise.all([CHAR_MX ? load("room/char_mixamo.glb") : load("room/char_v5.glb"), import(CHAR_MX ? "./room/char_mixamo.js" : "./room/char_v5.js")])
@@ -3102,6 +3139,85 @@ $("tc-form").addEventListener("submit", ev => {
   sock.send(JSON.stringify({type:"teach", text, nick}));
 });
 
+// ---------- viewers: the vote on what he does next, the viewer count, reactions (preview/interactive) ----------
+let RX = [], vote = null, voteMine = null, voteEnds = 0, voteLast = null;
+function onAudienceHello(a){
+  RX = a.reactions || [];
+  const bar = $("rx"); bar.querySelectorAll("button").forEach(b => b.remove());
+  RX.forEach((e, k) => { const b = document.createElement("button"); b.type = "button"; b.textContent = e; b.title = "react";
+    b.addEventListener("click", () => react(k)); bar.insertBefore(b, $("viewers")); });
+  viewersText(a.viewers);
+  if (a.vote) { voteLast = a.vote.last; setRound(a.vote.round); if (a.vote.waiting) voteNote(`viewers voted “${a.vote.waiting.label}” · waiting until he is awake`); }
+}
+function viewersText(n){ if (typeof n === "number") put("viewers", "textContent", `${n} watching`); }
+function setRound(r){
+  vote = r; voteMine = r && typeof r.mine === "number" ? r.mine : null;
+  voteEnds = r ? performance.now() + r.ends_in * 1000 : 0; renderVote();
+}
+function renderVote(){
+  const card = $("votecard"); card.hidden = !vote && !voteLast; if (card.hidden) return;
+  const r = vote, tot = r ? Math.max(1, r.total) : 1;
+  $("v-opts").innerHTML = r ? r.options.map((o, k) => `<button type="button" class="opt${voteMine === k ? " mine" : ""}" data-k="${k}"${voteMine != null ? " disabled" : ""}>`
+    + `<i class="bar" style="width:${Math.round(100 * o.n / tot)}%"></i><span>${esc(o.label)}</span><span class="n">${o.n}</span></button>`).join("")
+    : `<div class="m">the next round opens soon</div>`;
+  $("v-last").hidden = !voteLast;
+  if (voteLast) $("v-last").textContent = voteLast.winner ? `Last round: viewers voted “${voteLast.label}” (${voteLast.options.find(o => o.act === voteLast.winner).n} of ${voteLast.total} votes)`
+    : "Last round: no votes, no nudge";
+  voteClock();
+}
+function voteClock(){
+  if (!vote) { put("v-left", "textContent", ""); return; }
+  const s = Math.max(0, Math.round((voteEnds - performance.now()) / 1000));
+  put("v-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)} h ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} min left`
+    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} left`);
+}
+setInterval(voteClock, 1000);
+function voteNote(t, err){ $("v-note").textContent = t; $("v-note").className = err ? "s err" : "s"; }
+$("v-opts").addEventListener("click", ev => {
+  const b = ev.target.closest(".opt"); if (!b || b.disabled || !vote) return;
+  if (!sock || sock.readyState !== 1) { voteNote("still connecting", true); return; }
+  sock.send(JSON.stringify({type: "vote", k: +b.dataset.k}));
+});
+function onVote(m){
+  if (m.type === "vote") { voteLast = m.last || voteLast; setRound(m.round); voteNote("one vote per viewer per round"); }
+  else if (m.type === "vote_ack") { if (typeof m.mine === "number") voteMine = m.mine;
+    voteNote(m.ok ? "vote counted · results when the round ends" : `not counted: ${m.reason}`, !m.ok); renderVote(); }
+  else if (m.type === "vote_result") { voteLast = m; vote = null; renderVote();
+    voteNote(m.winner ? `viewers voted “${m.label}” · passed to his activity model when he is awake` : "no votes this round"); }
+  else if (m.type === "vote_applied") voteNote(`viewers voted “${m.label}” · now a strong nudge in his activity model`);
+}
+function onAudience(m){
+  const a = m.aud; viewersText(a.n);
+  if (a.v && vote && a.v[0] === vote.id) {
+    const [, counts, left] = a.v; let changed = false;
+    counts.forEach((n, k) => { if (vote.options[k] && vote.options[k].n !== n) { vote.options[k].n = n; changed = true; } });
+    vote.total = counts.reduce((x, y) => x + y, 0); voteEnds = performance.now() + left * 1000;
+    if (changed) renderVote();
+  }
+  if (m.rx) floatUp(m.rx);
+}
+let rxAt = [], rxOff = 0;
+function react(k){
+  if (!sock || sock.readyState !== 1) return;
+  const now = performance.now(); rxAt = rxAt.filter(t => now - t < 15000);
+  if (now < rxOff) return;                                // (the server's limit, mirrored: 1 every 3 s, burst 5)
+  sock.send(JSON.stringify({type: "react", k}));
+}
+function rxSlow(){ rxOff = performance.now() + 3000; $("rx").querySelectorAll("button").forEach(b => b.classList.add("off"));
+  setTimeout(() => $("rx").querySelectorAll("button").forEach(b => b.classList.remove("off")), 3000); }
+const RX_MAX = 40;
+function floatUp(counts){                                 // the reactions since the last tick, over the room for everyone
+  if (document.hidden) return;
+  const box = $("rxfloat");
+  counts.forEach((n, k) => { for (let i = 0; i < Math.min(n, 6); i++) {
+    if (box.childElementCount >= RX_MAX) return;
+    const el = document.createElement("span"); el.textContent = RX[k] || "";
+    const narrow = innerWidth <= 900, left = narrow ? 8 + Math.random() * 74 : 22 + Math.random() * 40;
+    el.style.left = `${left}%`; el.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * 80)}px`);
+    el.style.setProperty("--d", `${(2.6 + Math.random() * 1.2).toFixed(2)}s`); el.style.animationDelay = `${(i * 0.18 + Math.random() * 0.2).toFixed(2)}s`;
+    el.addEventListener("animationend", () => el.remove()); box.appendChild(el); } });
+}
+
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery", buy_konbini:"at the konbini"};
 let sock = null, tickMsg = null, uiTimer = 0, uiAt = 0, panAt = 0, mePos = "";
@@ -3126,7 +3242,9 @@ function connect(){
       talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
               ...(m.replies || []).map(r => ({his:true, t:r.t || "", text:String(r.text || ""), re:r.replying_to || "", tag:r.tag || REPLY_TAG}))]
         .filter(x => x.text).map((x, i) => [x, i]).sort((a, b) => a[0].t < b[0].t ? -1 : a[0].t > b[0].t ? 1 : a[1] - b[1]).map(a => a[0]).slice(-40);
-      typing = null; chatDirty = true; renderFeed(); return;
+      typing = null; chatDirty = true; renderFeed();
+      if (m.audience) onAudienceHello(m.audience);
+      return;
     }
     if (m.type === "chat") { if (m.text) { addTalk({his:false, t:m.t || "", text:String(m.text)}); chatDirty = true; renderFeed(); } return; }
     if (m.type === "chat_reply") { hearReply(m, true); renderFeed(); return; }
@@ -3138,6 +3256,10 @@ function connect(){
       return;
     }
     if (m.type === "taught") { if (performance.now() - taughtAt > 2000) loadTaught(); return; }
+    if (m.type === "vote" || m.type === "vote_ack" || m.type === "vote_result" || m.type === "vote_applied") { onVote(m); return; }
+    if (m.type === "react_ack") { rxSlow(); return; }
+    if (m.type === "glance") { GLANCE.trigger(!(lastLife && /^lying/.test(lastLife.pose || ""))); return; }
+    if (m.type === "tick" && m.aud) onAudience(m);
     if (m.type !== "tick" || !m.life) return;
     if ((m.events || []).some(ev => ev.type === "replay" && ev.source === "taught")) loadTaught();   // a new count
     for (const t of m.trades || []) { trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd}); chartDirty = true; }
@@ -3400,8 +3522,11 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
     HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
     setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
-  animate = dt => { if (pickRig() === "mh") return mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
-    const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  animate = dt => { let moving;
+    if (pickRig() === "mh") moving = mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
+    else { moving = animate0(dt); if (motion) motion.update(dt); }
+    GLANCE.apply(dt, boy, bones, camera);              // (preview/interactive: a glance at the camera when reactions spike)
+    return moving; };
   if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====

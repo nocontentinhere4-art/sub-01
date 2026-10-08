@@ -41,6 +41,7 @@ from twin.body import Body
 from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
 from browse import Browser, card_title_ok
+import audience
 import brain_vote
 import chess_game
 import clips
@@ -226,6 +227,7 @@ class Feed:
             rate = min(max(rate, self.RATES[0]), self.RATES[1])
         self.every = max(1, round(1.0 / (TICK * rate))) if rate else 1
         self.lite, self.q, self.n, self.trades, self.events = lite, q and not lite, 0, [], []
+        self.rx = None                                  # reactions summed over skipped ticks
         self.bps = 0.0                                  # bytes a second of this feed's ticks (slow-client check)
         self.phase = 0                                  # global tick (mod every) its sends land on; see Live.feed_for
 
@@ -255,11 +257,16 @@ class Feed:
         if self.every > 1:
             self.trades += msg.get("trades") or []
             self.events += msg.get("events") or []
+            if msg.get("rx"):                          # viewers' reactions: summed over the skipped ticks
+                self.rx = [a + b for a, b in zip(self.rx, msg["rx"])] if self.rx else list(msg["rx"])
             self.n += 1
             if (self.n - 1) % self.every:              # the first tick goes out at once, then every n-th
                 return None
             out = msg | {"trades": self.trades, "events": self.events}
-            self.trades, self.events = [], []
+            out.pop("rx", None)
+            if self.rx:
+                out["rx"] = self.rx
+            self.trades, self.events, self.rx = [], [], None
         if self.lite:
             out = {k: v for k, v in out.items() if k not in LITE_DROP}
         elif self.q:
@@ -401,6 +408,11 @@ class Live:
         self.music_rng = random.Random(int(seed) + 6 if seed else None)
         self.music_bg = (None, False)      # (the activity start it was rolled for, background music wanted)
         self.music_busy = False            # a pick is being made (worker threads)
+        # viewers (preview/interactive, audience.py): the vote on what he does next, the viewer count, the reactions
+        self.votes = audience.Votes(rng=random.Random(int(seed) + 7 if seed else None))
+        self.reactions = audience.Reactions()
+        self.viewer_fp = audience.Fingerprints()   # the process's salt (memory only): a connection's ids, never raw
+        self.viewer_ids = {}               # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -828,6 +840,7 @@ class Live:
             if self.browser and (dev := self.screen_device()):
                 msg["life"]["screen"] = self.screen_status(dev)
                 self.pagewatch.feed(rel, now, TICK)
+            await self.audience_tick(msg, tsim, rel, hot)
             await self.broadcast(msg)
             if events:
                 await self.broadcast(self.nights())
@@ -1580,6 +1593,55 @@ class Live:
                 "last_memory_test": tests[-1].get("test_day") if tests else None,
                 "spend_today": {k: round(v, 4) for k, v in self.ledger.by_day(1).popitem()[1].items()}}
 
+    # --- viewers: the vote on what he does next, the reactions (preview/interactive, audience.py) ----------------
+    async def audience_tick(self, msg, tsim, rel, hot):
+        """Each brain tick: the viewer count and the vote's counts go in the tick, the reactions since the last tick too;
+        a round that ends hands its winner to his activity model (when he is awake and it is possible), a new round
+        opens with what his model allows now and at its end; a spike of reactions makes him glance at the camera."""
+        v = self.votes
+        now = v.clock()
+        if v.due(now):
+            res = v.close(tsim)
+            if res:
+                await self.broadcast({"type": "vote_result", **res})
+            pressure = self.engine.pressure(tsim)
+            end = tsim + v.round_s * self.time_scale
+            opts = audience.pick_options(self.life.scores(tsim, rel, hot, pressure),
+                                         self.life.scores(end, rel, hot, pressure), v.rng)
+            if v.open(opts, now):
+                await self.broadcast({"type": "vote", **v.public(now)})
+        p = v.pending
+        if p:
+            awake = self.engine.stage == "AWAKE" \
+                and self.life.scores(tsim, rel, hot, self.engine.pressure(tsim)).get(p["act"], 0.0) > 0
+            got = v.take_pending(tsim, awake)
+            if got and self.life.apply_vote(got["act"], tsim):
+                await self.broadcast({"type": "vote_applied", "act": got["act"], "label": got["label"],
+                                      "round": got["round"], "t": hhmm(tsim)})
+        msg["aud"] = {"n": len(self.sockets), "v": v.compact(now)}
+        rx = self.reactions.drain()
+        if rx:
+            msg["rx"] = rx
+        if audience.glance_ok(self.engine.stage, msg.get("life")) and self.reactions.glance_due():   # (else it waits)
+            await self.broadcast({"type": "glance"})
+
+    def audience_hello(self, ws):
+        ids = self.viewer_ids.get(ws, ())
+        return {"reactions": list(audience.REACTIONS), "viewers": len(self.sockets),
+                "vote": self.votes.public(mine=self.votes.mine(ids)), "react_every": audience.REACT_EVERY_S,
+                "react_burst": audience.REACT_BURST}
+
+    async def handle_vote(self, ws, k):
+        ids = self.viewer_ids.get(ws, ())
+        ok, reason = self.votes.cast(ids, k)
+        await ws.send_json({"type": "vote_ack", "ok": ok, "reason": reason, "mine": self.votes.mine(ids)})
+
+    async def handle_react(self, ws, k):
+        ids = self.viewer_ids.get(ws, ())
+        ok, reason = self.reactions.react(ids[-1] if ids else id(ws), k)   # the cookie's hash, else IP + UA's
+        if not ok:
+            await ws.send_json({"type": "react_ack", "ok": False, "reason": reason})
+
     # --- http ----------------------------------------------------------------
     async def ws_handler(self, request):
         # permessage-deflate costs CPU and ~0.2 MB of zlib state per socket: worth it for the room's lite feed (its
@@ -1599,6 +1661,8 @@ class Live:
             return ws
         self.sockets.add(ws)
         self.ws_per_ip[key] = self.ws_per_ip.get(key, 0) + 1
+        self.viewer_ids[ws] = self.viewer_fp.ids(request.cookies.get(audience.VIEWER_COOKIE), key,
+                                                 request.headers.get("User-Agent", ""))
         try:
             if request.transport is not None:                    # sends never wait: see backlogged()
                 request.transport.set_write_buffer_limits(high=WS_HIGH_WATER)
@@ -1612,7 +1676,8 @@ class Live:
             await ws.send_json({"type": "hello", "chat": [self.public(m) for m in self.memory.chat()[-30:]],
                                 "replies": getattr(self, "replies", [])[-10:],
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD,
-                                "music": self.music.public(self.music.now) if getattr(self, "music", None) else None})
+                                "music": self.music.public(self.music.now) if getattr(self, "music", None) else None,
+                                "audience": self.audience_hello(ws)})
             await ws.send_json(self.nights())
             if self.last_frame:
                 await ws.send_json(self.eye_frame())
@@ -1630,9 +1695,14 @@ class Live:
                 elif isinstance(d, dict) and d.get("type") == "teach" and isinstance(d.get("text"), str):
                     nick = d.get("nick") if isinstance(d.get("nick"), str) else ""
                     await self.handle_teach(ws, key, d["text"], nick)
+                elif isinstance(d, dict) and d.get("type") == "vote":
+                    await self.handle_vote(ws, d.get("k"))
+                elif isinstance(d, dict) and d.get("type") == "react":
+                    await self.handle_react(ws, d.get("k"))
         finally:                                       # also on errors / cancellation: never leak a client or its buffer
             self.drop_client(ws)
             self.sockets.discard(ws)
+            self.viewer_ids.pop(ws, None)
             n = self.ws_per_ip.get(key, 1) - 1
             if n > 0:
                 self.ws_per_ip[key] = n
@@ -1732,6 +1802,17 @@ border:1px solid #2a2a36;padding:10px;font:inherit"><button style="background:#e
 font:inherit">enter</button>{msg}</form></body>"""
 
 
+@web.middleware
+async def viewer_cookie(request, handler):
+    """The vote's one-per-viewer cookie (audience.py): a random id, HttpOnly, set on the pages (never on /ws, /api)."""
+    resp = await handler(request)
+    if request.method == "GET" and audience.VIEWER_COOKIE not in request.cookies and not resp.prepared \
+            and request.path in ("/", "/brain", "/room.html", "/index.html"):
+        resp.set_cookie(audience.VIEWER_COOKIE, audience.new_viewer_id(), max_age=365 * 86400, httponly=True,
+                        samesite="Lax", secure=request.secure or request.headers.get("X-Forwarded-Proto") == "https")
+    return resp
+
+
 def password_gate(password):
     """Private preview: one shared password (SITE_PASSWORD), remembered in an HttpOnly cookie."""
     import hashlib
@@ -1770,7 +1851,9 @@ async def main(args):
     # launched (owner, 2026-10-08): the site is public; the password gate only comes back with SITE_GATE=1
     gate_on = os.environ.get("SITE_PASSWORD") and os.environ.get("SITE_GATE") == "1"
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if gate_on else []
-    app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares)
+    if args.vote_round:
+        live.votes.round_s = args.vote_round
+    app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares + [viewer_cookie])
     app[GATED] = bool(middlewares)                # behind the password gate: its cookie also opens the admin APIs
     app.router.add_get("/ws", live.ws_handler)
     manager = None
@@ -1860,6 +1943,10 @@ async def main(args):
     async def chess_api(request):                 # the chess board at his desk, recent games, what the card says
         return web.json_response(live.chess_view())
     app.router.add_get("/api/chess", chess_api)
+
+    async def vote_api(request):                  # viewers' vote on what he does next: the round, the last result
+        return web.json_response(live.votes.public())
+    app.router.add_get("/api/vote", vote_api)
 
     async def music_api(request):                 # now playing (Spotify embed URL), today's tracks and why each was picked
         return web.json_response(live.music.view(live.clock.now()))
@@ -1985,6 +2072,8 @@ def build_parser():
     p.add_argument("--eye", action="store_true", help="generate what SUB-01 'sees' (local image + language models)")
     p.add_argument("--browse", action="store_true", default=os.environ.get("BROWSE") == "1",
                    help="real headless browser on the open web for his computer and phone screens (needs playwright)")
+    p.add_argument("--vote-round", type=float, default=None,
+                   help="seconds per viewers' vote round (default SUB01_VOTE_ROUND_S or 3600)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     return p
 
