@@ -115,8 +115,13 @@ class Harness:
         pg.on("response", on_resp)
         if self.cdn:
             self.cdn.install(pg)
+        tb = time.time()
         pg.goto(self.base + "/room.html?debug&hour=14" + self.query, wait_until="load")
-        wait_js(pg, "() => !!(window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9)", timeout=180000)
+        # 300 s: the page boots with its loop drawing live (software GL), which on CI's 2 vCPUs took up to ~180 s (main
+        # 448a0b8). Freezing the loop through the boot made it 15 s but changed what two scenes measured (7f2bf6e: walking_8
+        # and eating_19 into the desk), so it is not done until that is understood.
+        wait_js(pg, "() => !!(window.boy && window.room && !document.getElementById('boot') && Object.keys(window.actions).length >= 9)", timeout=300000)
+        print(f"[visual] page {size} booted in {time.time() - tb:.0f} s", file=sys.stderr, flush=True)   # (CI: how close to the 180 s)
         t0 = time.time()
         while st["glb"] < GLB_FILES and time.time() - t0 < 60:
             pg.wait_for_timeout(200)

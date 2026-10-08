@@ -116,3 +116,36 @@ ankles start above 0.12 m, the roll distances tuned to the old poses) go with th
 there says nothing about lying on his side. Live has no side-lying sleep at all. The old roll is hand-set angles on the
 hips, knees, spine and arms, so it is not being ported. The side pose comes from a capture on the Mixamo rig, and the
 duvet drape is measured on it then. Until that lands, read `sleeping_side` as a second `sleeping`.
+
+## The auto-rigged character (G20, preview/mixamo-pipeline): what can be measured before the page plays it
+
+`web/room/char_mixamo.glb` is v5 put on the Mixamo Standard Skeleton by `room_build/rig/autorig.sh` (no mixamo.com).
+The page does not load it yet, so the room rows above cannot be measured on it. What can be, is, by
+`room_build/rig/autorig/qa.mjs` on the skinned mesh itself, every 0.1 s of each clip, in the clip's own frame (the
+performer's floor at y = 0; the performer's bed and chair are not in the capture). 2026-10-07, on v5 from main:
+
+| check | Seated_Idle (4.2 s) | Typing (16.5 s) | Laying_Sleeping (1.7 s) |
+|---|---|---|---|
+| soles vs the floor (lowest sole skin) | L −0.6…−0.5, R −1.0 cm | L −1.4…−0.9, R −2.1…−1.7 cm | (lying) |
+| hands in his thighs | 0 frames | 0 frames | **18/18 frames, 2.2 cm** (hands resting on the stomach / hips, see below) |
+| arm in torso | 42/42 frames, ≤ 2.4 cm (≤ 532 verts) | 165/165, ≤ 2.3 cm | 18/18, ≤ 2.5 cm |
+| leg in the other leg | 42/42, ≤ 1.2 cm (≤ 37 verts) | 165/165, ≤ 1.5 cm | 18/18, ≤ 1.3 cm |
+| lying: each part's lowest skin over the lowest skin of the whole clip | — | — | back 0…0.3, head 2.1…3.3, shoulders 2.9…3.5, thighs 4.5…4.7, hips 8.3…8.4, heels 10.4 cm |
+
+Baselines, same instrument: in the T-pose rest 0–2 vertices of any pair are inside (≤ 0.8 cm); with the arms rotated
+down to v5's modelled pose, arm in torso is 8–15 vertices at ≤ 1.2 cm.
+
+Read it as:
+- **The soles are 0.5–2.1 cm under the floor seated.** His shin is longer and his thigh shorter than the performer's
+  in proportion (0.41 / 0.37 m against 0.39 / 0.39 at his scale), and the clip's hips are scaled by hip height, so a
+  seated foot lands lower. Against the contract (0…+1 cm) that fails until the page plants him; the page's seated fit
+  is re-derived on this rig anyway (rig-change checklist).
+- **Arm in torso, seated and lying (2.3–2.5 cm, hundreds of vertices):** the hoodie's sleeve folding into its body at
+  the armpit when the arms come down from the T-pose; with the arms down at rest it is 8–15 vertices. A real
+  deformation defect, small in depth and not visible in the sheet (`docs/design/mixamo/autorig_v5_sheet.jpg`); it is
+  the first thing to improve in the weights (the underarm fabric should follow the torso more).
+- **Lying is not flat on one plane:** the upper back touches, the hips are 8 cm and the heels 10 cm up. The capture's
+  pelvis and legs are raised relative to the back, and this hoodie is thick at the back. Per rule 4 this is per
+  region, not one lowest point; the bed fit must hold the back and the hips, not just the lowest skin.
+- The lying "hands in thighs" is the capsule-free version of the old instrument (a hand vertex behind the nearest thigh
+  vertex's normal): his hands rest on his stomach and hip, and the baggy trousers come up to them.

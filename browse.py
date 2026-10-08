@@ -183,7 +183,7 @@ BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
                       r"captcha|403 forbidden|404 not found|page not found|enable javascript|unusual traffic|"
-                      r"before you continue|consent", re.I)
+                      r"before you continue", re.I)   # ("consent" alone: see CONSENT_TITLE, a title part that is only that)
 # bot checks recognised in the page text or by their challenge frames: he leaves these pages, never solves them
 # (only on short pages: a real bot check is a page of its own, not a sentence inside an article)
 WALL_MAX_CHARS = 2000
@@ -641,13 +641,33 @@ OVERLAY_TEXT_JS = """() => {
 }"""
 
 
+# 2026-10-07 14:39 UTC live: "The Drive - Permission Request Form" (permissions.thedrive.threesai.com) was shown and
+# logged. A consent / permission / cookie-request page is a wall like a bot check: left, not shown, its site cooled off.
+# By the title (one of its parts is only such a request: an article about privacy settings is not) or by a host whose
+# first label is one (permissions.*, consent.*, cookies.*, cmp.*, gdpr.*).
+CONSENT_TITLE = re.compile(r"(\w+ )?(permissions? request|request (for )?permissions?|permissions? required|"
+                           r"cookie (consent|preferences|settings|policy|choices)|privacy (choices|preferences|center)|"
+                           r"manage (cookies|consent|your privacy)|consent( management| preferences| request)?|"
+                           r"(privacy|cookies?) (and|&) consent|consent (and|&) (privacy|cookies?))"
+                           r"( form| page)?")
+CONSENT_HOST = re.compile(r"^(permissions?|consent|cookies?|cmp|gdpr)\.[\w-]+\.[\w.-]+$")
+
+
+def consent_wall(title, url):
+    t = " ".join(str(title or "").split()).lower().rstrip(".")
+    host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
+    return (any(CONSENT_TITLE.fullmatch(part.strip()) for part in re.split(r"\s[-|–—:·]\s|\|", t))
+            or bool(CONSENT_HOST.match(host)))
+
+
 def challenge_title(title, url):
     """#89 live (2026-10-04 18:50 Tokyo: three myanimelist.net pages titled "myanimelist.net"): a bot check's title,
-    a geo-block title ("... isn't available in your region"), or a title that is only the bare host name (an
-    interstitial, not content)."""
+    a geo-block title ("... isn't available in your region"), a consent / permission request, or a title that is only
+    the bare host name (an interstitial, not content)."""
     t = " ".join(str(title or "").split()).lower().rstrip(".")
     host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
     return (bool(BOT_WALL.search(t)) or bool(GEO_WALL.search(t)) and not GEO_TITLE_ASK.search(t)
+            or consent_wall(title, url)
             or bool(t) and t in (host, host.removeprefix("www."), "www." + host))
 
 
@@ -1325,14 +1345,15 @@ class Browser:
 
     SEED_GAP_S = 6 * 3600                                      # a seed site's front page at most every 6 hours
 
-    async def _seed(self, sc, why, topic=None, hungry=False):
+    async def _seed(self, sc, why, topic=None, hungry=False, only_topic=False):
         """A seed site's front page (a feed that changes, so not held to the 7-day rule), rotating: the ones opened in
-        the last SEED_GAP_S are left out; the topic's own sites first; cooking sites only when he is hungry."""
+        the last SEED_GAP_S are left out; the topic's own sites first (only them with only_topic: a failed search
+        falls back on a site about it or none); cooking sites only when he is hungry."""
         now = time.time()
-        pool = [u for u in SEEDS + (SEED_TOPICS["food"] if hungry else [])
+        mine = SEED_TOPICS.get(topic or "", [])
+        pool = [u for u in (mine if only_topic else SEEDS + (SEED_TOPICS["food"] if hungry else []))
                 if now - self.seed_t.get(u, 0) > self.SEED_GAP_S and self.host_ok(urllib.parse.urlsplit(u).hostname)]
         self.rng.shuffle(pool)
-        mine = SEED_TOPICS.get(topic or "", [])
         pool.sort(key=lambda u: u not in mine)
         for u in pool[:3]:
             self.seed_t[u] = now
@@ -1898,7 +1919,13 @@ class Browser:
         if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
                                      short=sc.name == "phone"):
             return True
-        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry)
+        # else a site about it, or nothing: never one about something else (live 2026-10-08: "Mark Rober" -> a Tokyo
+        # guide, "ramen in Osaka" -> a games site, "Day Deals" -> a music magazine)
+        if not topic or not SEED_TOPICS.get(topic):
+            self.last_skip = f"no search for “{q[:40]}” and no site about it"
+            return False
+        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry,
+                                only_topic=True)
 
     async def _video_search(self, sc, vq, q, why, origin):
         """A search asking for videos: the phone's short-video feed, or a video source at the desk."""

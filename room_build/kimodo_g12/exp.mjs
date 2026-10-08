@@ -12,8 +12,11 @@ const sk = r.listSkins()[0];
 if (sk) {
   out.skin = {joints: sk.listJoints().map(j => ix.get(j)), ibm: Array.from(sk.getInverseBindMatrices().getArray())};
   const mn = nodes.find(n => n.getMesh() && n.getSkin()); out.skin.meshNode = ix.get(mn);
-  const prims = mn.getMesh().listPrimitives();
-  out.mesh = prims.map(p => ({pos: Array.from(p.getAttribute('POSITION').getArray()), j: Array.from(p.getAttribute('JOINTS_0').getArray()), w: Array.from(p.getAttribute('WEIGHTS_0').getArray()), norm: p.getAttribute('POSITION').getNormalized ? p.getAttribute('POSITION').getNormalized() : false}));
+  // (ALLMESH=1: every skinned mesh node's primitives, each tagged with its mesh's name: the slides too. They must share
+  // the first skin and mesh space, as an auto-rigged character's do)
+  const prims = process.env.ALLMESH ? nodes.filter(n => n.getMesh() && n.getSkin() === sk).flatMap(n => n.getMesh().listPrimitives().map(p => (p.__mesh = n.getName(), p)))
+    : mn.getMesh().listPrimitives();
+  out.mesh = prims.map(p => ({mesh: p.__mesh, ...(process.env.ALLMESH && p.getAttribute('NORMAL') ? {nrm: Array.from(p.getAttribute('NORMAL').getArray(), x => +x.toFixed(4))} : {}), pos: Array.from(p.getAttribute('POSITION').getArray()), j: Array.from(p.getAttribute('JOINTS_0').getArray()), w: Array.from(p.getAttribute('WEIGHTS_0').getArray()), norm: p.getAttribute('POSITION').getNormalized ? p.getAttribute('POSITION').getNormalized() : false}));
 }
 for (const a of r.listAnimations()) out.anims.push({name: a.getName(), ch: a.listChannels().map(c => ({node: ix.get(c.getTargetNode()), path: c.getTargetPath(),
   interp: c.getSampler().getInterpolation(), t: Array.from(c.getSampler().getInput().getArray()), v: Array.from(c.getSampler().getOutput().getArray())}))});

@@ -65,3 +65,33 @@ export function fixClip(THREE, clip, conv, srcHipH) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
+
+// a hips position in the body's frame -> as the page's HIPS table reads it (char_v5.js legacyHips: G14 tuned the seat
+// placement while v5's Hip hung under a group turned -90 deg; this body is the same mesh at the same size, so it is
+// placed the same way)
+export function legacyHips(THREE, h) {
+  const v = new THREE.Vector3(h[0], h[1], h[2]).applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+  return [v.x, v.y, v.z];
+}
+
+// room.html?char=mixamo: what boy_mh.js plays in each slot (room/mh_mx/). The desk is Mixamo's own captures on this
+// skeleton, baked for our chair (kimodo/mx_build.sh, rows in kimodo/mx_clips.json): watching room_seated_idle (Seated_Idle),
+// typing room_mx_typing (Typing) with Sit_To_Type / Type_To_Sit on the way in and out (kimodo/mixamo_chains.json's
+// "working" chain and its 0.8 s links), sitting down and standing up room_mx_stand_to_sit / room_mx_sit_to_stand. The
+// mouse plays watching's body (Seated_Idle, as on main), its right hand carried onto the mouse by the page; walking,
+// standing, the bed, eating, the door and the window are v5's room clips carried onto this skeleton (kimodo/mx_convert.mjs: each bone moves as the v5 joint it was fitted from).
+// kb / home: where the baked Typing has his fingertips over the keys (the mean of both hands' last finger joints over
+// the clip, the body's frame), for the page's keyboard (boy_mh.js rolls him and the chair so it lands on the room's)
+export const ROOM = {
+  clips: {desk_type: "room_mx_typing", type_in: "room_mx_sit_to_type", type_out: "room_mx_type_to_sit"},
+  links: {in: 0.3, out: 0.2, fromWatch: 0.8, toWatch: 0.8},
+  // (kimodo/mx_build.sh Typing's report, fingertips_mean: x across, y up, z forward of his feet; the keys lie under it)
+  clipFrame: {kb: [0.039, 0.862, 0.617], home: [0.039, 0.862, 0.617]},
+  // for G14's keyboard resolver (boy_mh.js CLIP_MX): this bake's index fingers, F (left) and J (right): the last joints'
+  // means over the clip, 1.5 cm on along the finger and 1 cm down, as G14 measured them on v5's bake
+  clipMX: {F: [0.17, 0.829, 0.599], J: [-0.095, 0.859, 0.639], clip: "room_mx_typing"},
+  // the seat points (boy_mh.js SEAT_AT: [across, forward of the chair's pivot]), swept in the room for this character
+  // (kimodo/seat_sweep.mjs: the page's penetration() every 0.1 s over each mode's clip): clear of the chair from -0.06 m
+  // (watching, typing and the mouse, which plays watching's body as on main) to past -0.12 m; each set 1.5 cm inside that
+  seatAt: {desk_watch: [0, -0.075], desk_type: [0, -0.075], desk_mouse: [0, -0.075]},
+};

@@ -7,6 +7,7 @@
 //   --test-skin: bind a plain body (a box along each bone) to the skeleton, for testing the skinned path with a clip
 //                downloaded "Without Skin"
 //   --no-anim:   the character only
+//   --no-textures: skip the FBX's textures (Node cannot decode them; rig/mixamo_import.sh puts our own back)
 // Mixamo's terms allow its characters and animations in a game or app but not the raw files redistributed: the FBX stays
 // out of the repository.
 import fs from "node:fs";
@@ -20,6 +21,7 @@ const { FBXLoader } = await import("three/examples/jsm/loaders/FBXLoader.js");
 const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
 
 const args = process.argv.slice(2), SRC = args[0], OUT = args[1];
+if (args.includes("--no-textures")) THREE.TextureLoader.prototype.load = () => new THREE.Texture();
 const buf = fs.readFileSync(SRC);
 const g = new FBXLoader().parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), "");
 const bones = []; g.traverse(o => { if (o.isBone) bones.push(o); });
@@ -48,6 +50,8 @@ if (args.includes("--test-skin")) {                          // a box from each 
   mesh.bind(new THREE.Skeleton(bones), mesh.matrixWorld);
 }
 
+if (args.includes("--no-textures")) g.traverse(o => { if (o.material) for (const m of [].concat(o.material))
+  for (const k of ["map", "normalMap", "specularMap", "bumpMap", "emissiveMap", "aoMap", "alphaMap"]) m[k] = null; });
 const root = new THREE.Group(); root.name = "mixamo"; root.scale.setScalar(0.01); root.add(g);   // centimetres -> metres
 const anims = args.includes("--no-anim") ? [] : g.animations.filter(a => a.tracks.length);
 const glb = await new GLTFExporter().parseAsync(root, {binary: true, animations: anims, onlyVisible: false});

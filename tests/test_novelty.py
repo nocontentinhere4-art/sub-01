@@ -200,7 +200,7 @@ def test_failing_sources_are_set_aside_and_the_rest_rotate():
     sc, opened, searched = _stub(b, {"hn": [{"url": "https://example.org/bread", "title": "Bread at home"}]})
     seeds = []
 
-    async def _seed(sc_, why, *a):
+    async def _seed(sc_, why, *a, **k):
         seeds.append(why)
         return True
     b._seed = _seed
@@ -322,3 +322,46 @@ def test_shorts_session_measurement():
     assert len(queries) == 60 and len(set(queries)) >= 50
     assert new / len(topics) >= 0.6, (new, topics)
     assert follow / len(queries) <= NV.FOLLOW_MAX + 0.02
+
+
+# live 2026-10-08 10:56-11:01 Tokyo: a failed search opened a site about something else ("Mark Rober" -> timeout.com
+# Tokyo, "ramen in Osaka" -> nintendolife.com, "Day Deals" -> nme.com, "discover shop next" -> thedrive.com)
+def _no_search(b):
+    sc, opened, searched = _stub(b)
+
+    async def _public_videos(*a, **k):
+        return False
+    b._public_videos = _public_videos
+    return sc, opened
+
+
+@pytest.mark.parametrize("q, hungry", [("Mark Rober", False), ("anime season", False), ("ramen in Osaka", True)])
+def test_a_failed_search_falls_back_on_a_site_about_it(q, hungry):
+    b = Browser(decide=True, rng=random.Random(5))
+    b.hungry = hungry                                                       # (recipe sites: only at meal times)
+    sc, opened = _no_search(b)
+    topic = I.topic_of(q)
+    assert run(b._search(sc, q, "", "chat"))
+    assert opened and all(u in browse.SEED_TOPICS[topic] for u in opened), (topic, opened)
+
+
+def test_a_failed_search_with_no_site_about_it_gives_up():
+    b = Browser(decide=True, rng=random.Random(5))
+    sc, opened = _no_search(b)
+    assert not run(b._search(sc, "quiet afternoon thoughts", "", "chat"))      # no topic: nothing opened
+    assert opened == [] and "no site about it" in b.last_skip
+    assert not run(b._search(sc, "ramen in Osaka", "", "chat"))              # not hungry: no recipe site, and
+    assert opened == []                                                      # not a games site instead
+    b.hungry = True
+    now = browse.time.time()
+    for u in browse.SEED_TOPICS["food"]:                                     # hungry, but its sites all opened lately
+        b.seed_t[u] = now
+    assert not run(b._search(sc, "ramen in Osaka", "", "chat")) and opened == []
+
+
+@pytest.mark.parametrize("q", ["Day Deals", "discover shop next", "Summer Sale", "free shipping on sneakers"])
+def test_a_shops_words_are_not_interests(q):
+    from eyes import query_ok
+    assert query_ok(q) is None
+    assert query_ok("Kichijoji shops") == "Kichijoji shops"                 # (the walk's street)
+    assert S.interest_for(seen={"screen": [q]}, query_ok=query_ok) is None
