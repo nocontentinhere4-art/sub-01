@@ -1,1 +1,4 @@
-{"clips": []}
+{"clips": {"attend": "neutral_1.glb", "idle_a": "neutral_3.glb", "idle_b": "neutral_5.glb", "idle_c": "look_left_idle.glb", "idle_d": "look_right_idle.glb",
+           "gesture_a": "look_down_to_right.glb", "gesture_b": "look_front_to_left.glb", "gesture_c": "desk_look_behind.glb"},
+ "once": ["gesture_a", "gesture_b", "gesture_c"],
+ "seat": {}}

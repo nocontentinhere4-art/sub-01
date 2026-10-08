@@ -101,6 +101,42 @@ This is not from this layer: the same numbers show with `anim` off.
 
 **Before the first fixes:** the slots sat at their clip's hips height instead of the seat's, which lifted him 6 cm at each switch.
 
+## The real clips (G23's seated takes; this branch only, never on main: their licence is pending)
+`web/room/desk_states/` carries G23's clips from `preview/sova-phone-src`, as committed: the dedda57 bake. `index.json` maps each slot to a file; a slot with its own clip plays it whole.
+
+| slot | clip | plays |
+|---|---|---|
+| attend | neutral_1 (head straight) | loop |
+| idle_a / idle_b | neutral_3 / neutral_5 | loop |
+| idle_c / idle_d | look_left_idle / look_right_idle | loop |
+| gesture_a / gesture_b / gesture_c | look_down_to_right / look_front_to_left / desk_look_behind | once (10 s / 10 s / 9.2 s) |
+| react_win / react_lose / react_up | (stand-ins as above: none of these clips is a reaction) | once |
+
+- All of them sit at desk_watch's seat point (−0.075), as G23 measured.
+- desk_start_01, a sit-down transition, is not used.
+
+**Measured with the merged fresh trees** (preview/freeze-why, 63538e6). The same sweeps as above, with the real clips in place:
+
+| | desk | chair | bed | floor | walls | furniture |
+|---|---|---|---|---|---|---|
+| every slot, 120 s natural, chess won | 0 (chess won: 1 vertex, at 0.8 s) | 0 | 0 | 0 | 0 | **the bottle: 115–388 sampled vertices, in every real clip** |
+
+**Why the bottle is hit**
+- In this bake both hands sit 0.92 m above his feet and about 0.20 m ahead of the hips; room_seated_idle has them at 0.78 m.
+- In the room that rests his hands on the desk's front edge, at world height 1.05–1.09 m against a desk top of 0.97 m.
+- The right hand and forearm stand in the bottle there.
+- The reactions' stand-ins were clean alone. Their counts here come from the crossfade into the real loops.
+
+**One pop.** The crossfade from room_seated_idle into neutral_5 jumps a fingertip 233 mm in one frame. The hand rises through the desk's edge, and the desk clearing's arm swing (deskClear, from freeze-why) flips direction.
+
+**What fixes it.** G23's rebake (32a64dc: hands on the thighs, arm swing capped at 8°) changed the build, not the committed GLBs. They will be re-measured once they are in.
+
+## main's mixamo seated loop (COORD's item 2)
+- **Before the merge:** room_seated_idle (desk_watch on main) had 369–413 sampled vertices in the desk with fresh trees, and 10–22 in the bottle.
+- **After merging preview/freeze-why:** 0 and 0. Its desk clearing, the least swing of the arm about the shoulder that takes its skin out of the desk's slab, already covers this loop, and the swing also takes his hand off the bottle.
+- Typing and the mouse are unchanged.
+- No further change was needed.
+
 ## The hood (`char_mixamo.glb`'s autorig; not fixed here: G21 / C)
 The dark spikes at the back of the hood are the hood's lining and patches (`hood_lining`, `hood_patches`; 3127 vertices) coming out through the hoodie.
 

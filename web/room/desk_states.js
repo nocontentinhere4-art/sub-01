@@ -2,9 +2,10 @@
 // is not typing or on the mouse: waiting, watching the monitor, small gestures, and now and then a reaction. This module
 // only decides (which slot, from when, for how long); room/boy_mh.js plays it (crossfades, the chair, the seat).
 //
-// The slots are named; each plays a clip by that name from room/desk_states/<name>.glb when one is there (the
-// retargeted captures, one GLB per slot, on the character's own mixamorig skeleton), else its stand-in, a Mixamo clip
-// already in room/mh_mx/ (index.json: {"clips": [names], "seat": {name: m}}, the named clips' own seat points). A slot without either is left out (idle_b: none of the wired clips fits the chair).
+// The slots are named; each plays its own clip from room/desk_states/ when index.json lists one (the retargeted
+// captures, one GLB per clip, on the character's own mixamorig skeleton: {"clips": {slot: "file.glb"}, "seat": {slot: m},
+// "once": [slots a loop plays through once]}, or a list of slots named <slot>.glb), else its stand-in, a Mixamo clip
+// already in room/mh_mx/. A slot without either is left out (idle_b: none of the wired clips fits the chair).
 //
 // The reactions come only from what the page already receives from the server (live_server.py), nothing else:
 //   chess  (#17)  the opponent moved and it is his turn -> he looks at the board (attend); check on him -> a gesture;
@@ -24,9 +25,11 @@ export const SLOTS = {
   idle_a:      {kind: "idle",    standIn: "room_seated_idle"},           // (desk_watch's own loop: never right after it)
   idle_b:      {kind: "idle",    standIn: null},    // (room_mx_sitting puts his legs through our chair's seat wherever he sits: 5000 vertices)
   idle_c:      {kind: "idle",    standIn: "room_mx_sitting_1"},
+  idle_d:      {kind: "idle",    standIn: null},
   attend:      {kind: "attend",  standIn: "room_seated_idle"},
   gesture_a:   {kind: "gesture", standIn: "room_mx_sitting_rubbing_arm", once: true, seat: -0.22},
   gesture_b:   {kind: "gesture", standIn: "room_mx_sitting_talking", span: [5, 8], seat: -0.22},
+  gesture_c:   {kind: "gesture", standIn: null, once: true},
   react_win:   {kind: "react",   standIn: "room_mx_sitting_talking", span: [3, 5], seat: -0.22},   // (room_mx_standing_clap: up at the desk, his fingers went into the monitor)
   react_lose:  {kind: "react",   standIn: "room_mx_sitting_rubbing_arm", once: true, seat: -0.22},   // (room_mx_angry_gesture: his forearms through the monitor, at -0.30 his hand through the bottle)
   react_up:    {kind: "react",   standIn: "room_mx_sitting_talking", span: [3, 5], seat: -0.22},   // (seated: a short does not get him up)

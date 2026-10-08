@@ -1241,9 +1241,9 @@ export function createMH(env) {
     room.traverse(o => { if (!o.isMesh || !o.visible) return; for (let p = o; p; p = p.parent) if (p === ch) return; solid.push(o); });
     if (SV) {                                                // (the desk states: the things on the desk too (the monitor, the lamp), and the
       const mine = o => { for (let p = o; p; p = p.parent) if (p === env.boy || p === ch || p === room) return true; return false; };   // room's trees built
-      env.scene.traverse(o => { if (!o.isMesh || !o.visible || o.isSkinnedMesh || mine(o)) return;                                      // anew once: one built
-        const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(V()); if (Math.max(sz.x, sz.y, sz.z) < 2 && bb.max.y < 2.5) solid.push(o); });   // before the
-      if (!SV.trees) { SV.trees = true; for (const m of solid) if (m.geometry.computeBoundsTree) m.geometry.computeBoundsTree(); }   // keyboard's cut missed it)
+      env.scene.traverse(o => { if (!o.isMesh || !o.visible || o.isSkinnedMesh || mine(o)) return;                                      // anew where the
+        const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(V()); if (Math.max(sz.x, sz.y, sz.z) < 2 && bb.max.y < 2.5) solid.push(o); });   // the
+      for (const m of solid) if (m.geometry.computeBoundsTree && !m.geometry.boundsTree) m.geometry.computeBoundsTree();             // keyboard's cut, if dropped)
     }
     const ray = new THREE.Raycaster(), o = V(), d = V(f.x, 0, f.z), side = solid.map(m => m.material.side);
     solid.forEach(m => { m.material.side = THREE.DoubleSide; });          // (a face seen from behind is still the desk)
@@ -1298,16 +1298,20 @@ export function createMH(env) {
   let SV = null;
   async function svLoad(make, bodyHips) {
     const D = await import("./desk_states.js"), dir = env.clipDir || "room/mh";
-    let named = [], seats = {}; try { const r = await fetch(`${D.DIR}/index.json`); if (r.ok) { const j = await r.json(); named = j.clips || []; seats = j.seat || {}; } } catch (e) { /* stand-ins */ }
+    let named = {}, seats = {}, once = [];                   // (slot -> its own clip's file; a list: <slot>.glb)
+    try { const r = await fetch(`${D.DIR}/index.json`); if (r.ok) { const j = await r.json(); const c = j.clips || [];
+      named = Array.isArray(c) ? Object.fromEntries(c.map(n => [n, n + ".glb"])) : c; seats = j.seat || {}; once = j.once || []; } } catch (e) { /* stand-ins */ }
     for (const n of ["finger1-4", "finger3-4", "finger5-4"]) for (const sd of ["L", "R"]) if (env.bones[`${n}.${sd}`]) PARTS.push([`${n}.${sd}`, 0.02]);   // (the fingertips too: up, a hand reaches 18 cm past the wrist)
     const files = {}, have = [], clipOf = {}, durOf = {}, loops = [];
     for (const [k, f] of [...Object.entries(CL), ...Object.entries(RARE).map(([k, f]) => ["rare_" + k, f])])   // (the clips already loaded: not again)
       if (M.clips[k]) files[`${dir}/${f}.glb`] = Promise.resolve(M.clips[k]);
     const get = f => files[f] || (files[f] = env.load(f).then(g => env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0], () => null));
-    for (const [n, sl] of Object.entries(D.SLOTS)) {
-      const f = named.includes(n) ? `${D.DIR}/${n}.glb` : sl.standIn ? `${dir}/${sl.standIn}.glb` : null, c0 = f && await get(f); if (!c0) continue;
+    for (const [n, sl0] of Object.entries(D.SLOTS)) {
+      const own = n in named, sl = own ? {...sl0, span: null, once: sl0.once || once.includes(n), seat: seats[n]} : sl0;   // (its own clip: whole, at its own seat point)
+      if (own) D.SLOTS[n] = sl;
+      const f = own ? `${D.DIR}/${named[n]}` : sl.standIn ? `${dir}/${sl.standIn}.glb` : null, c0 = f && await get(f); if (!c0) continue;
       const c = c0.clone(); c.name = "sv_" + n; have.push(n); clipOf[n] = f; durOf[n] = c.duration;
-      const z = named.includes(n) ? seats[n] : sl.seat; if (z != null) SEAT_AT[(sl.once || sl.span ? "rare_sv_" : "sv_") + n] = [0, z];
+      const z = sl.seat; if (z != null) SEAT_AT[(sl.once || sl.span ? "rare_sv_" : "sv_") + n] = [0, z];
       if (sl.once || sl.span) { const k = "sv_" + n, a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
         env.HIPS["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration, sv: n}; }
       else { const a = M.actions["sv_" + n] = make(c); a.setLoop(THREE.LoopRepeat, Infinity); env.HIPS["sv_" + n] = bodyHips(c); loops.push("sv_" + n); }

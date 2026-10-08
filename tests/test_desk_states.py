@@ -98,7 +98,8 @@ def test_page_wires_it_only_behind_anim_sova():
     js = (WEB / "room" / "boy_mh.js").read_text()
     assert 'if (env.anim === "sova") await svLoad(make, bodyHips);' in js
     assert 'await import("./desk_states.js")' in js and 'from "./desk_states.js"' not in js   # (the default page never loads it)
-    assert json.loads((WEB / "room" / "desk_states" / "index.json").read_text()) == {"clips": []}
+    ix = json.loads((WEB / "room" / "desk_states" / "index.json").read_text())   # (preview only: never on main, the clips' licence is pending)
+    assert all((WEB / "room" / "desk_states" / f).is_file() for f in ix["clips"].values()), ix
     ds = (WEB / "room" / "desk_states.js").read_text()
     for name in ("trade", "usd"):
         assert f'"{name}"' not in ds, name                       # (no financial message is read)
@@ -116,4 +117,4 @@ def test_no_desk_state_stands_him_up():
     assert r.returncode == 0, r.stderr
     slots = json.loads(r.stdout)
     assert not [n for n, s in slots.items() if s["standIn"] and ("standing" in s["standIn"] or "angry" in s["standIn"])], slots
-    assert all(s.get("seat") is not None for s in slots.values() if s["kind"] in ("gesture", "react")), slots
+    assert all(s.get("seat") is not None for s in slots.values() if s["standIn"] and s["kind"] in ("gesture", "react")), slots
