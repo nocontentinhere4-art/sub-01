@@ -30,10 +30,14 @@
 "loop": true
 },
 "seat_thinking_touching_chin": {
-"pitch": 10
+"pitch": 10,
+"restLow": 0.62,
+"smoothFingers": true
 },
 "seat_feeling_frustrated_v1": {
-"pitch": 10
+"pitch": 10,
+"restLow": 0.62,
+"smoothFingers": true
 },
 "seat_feeling_frustrated_v2": {
 "pitch": 10

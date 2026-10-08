@@ -15,8 +15,9 @@ k = int(3 * SIG); g = np.exp(-0.5 * (np.arange(-k, k + 1) / SIG) ** 2); g /= g.s
 def smooth(x):
     pad = np.pad(x, ((k, k), (0, 0)), mode='wrap' if loop else 'edge')
     return np.stack([np.convolve(pad[:, j], g, 'valid') for j in range(x.shape[1])], 1)
+FING = [f'Hand{f}{k}' for f in ('Thumb', 'Index', 'Middle', 'Ring', 'Pinky') for k in (1, 2, 3)] if os.environ.get('SMOOTH_FINGERS') == '1' else []
 for side in ('Left', 'Right'):
-    for b in ('Shoulder', 'Arm', 'ForeArm', 'Hand'):
+    for b in ['Shoulder', 'Arm', 'ForeArm', 'Hand'] + FING:
         nm = f'mixamorig:{side}{b}'
         qs, qf = np.array(src['rot'][nm]), np.array(fit['rot'][nm])
         d = qnorm(qmul(qf, qinv(qs)))
