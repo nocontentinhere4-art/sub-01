@@ -1,7 +1,66 @@
+LATEST: 797355c — all 30 Sova clips with the hands fixed are in  and  (pull these). Launch: 28 ok, 2 **drop for launch** (seat_distracted_then_smile, sleep_wake_and_back). The owner-range table and the re-rendered close-up and montage follow in the next push.
+
 # Sova clips: status (G23 → COORD)
 
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
+
+## HANDS, round 3: all 30 deliverables — 797355c
+Contact yes, inside no (COORD):
+- Where the source hand touched his body within 1 cm (any frame), the wrist pulls it to 2.5 mm off along the body normal, two-bone IK.
+- Anything inside is pushed out: the other arm counts as body.
+- A hand that touches the face (the chin's skin follows Neck/Head) keeps **the clip's own finger flexion**, joint by joint, clamped into the owner's range and speed; all other hands take the owner's median.
+- Wrist roll over 20° moves into the forearm (exactly, the hand's world turn kept): that was the lump in the sleeve.
+
+Per clip, from the fit ( logs), left / right hand:
+
+| clip | fingers | contact gap where the source touched him (cm, min…max; − = inside) | left inside him (cm) | launch |
+|---|---|---|---|---|
+| desk_look_behind | relaxed / relaxed | 0.0…0.4 / 0.2…0.5 | 0.0 / 0.0 | ok |
+| desk_start_01 | relaxed / relaxed | -0.4…0.8 / -0.3…0.9 | 0.4 / 0.3 | ok |
+| look_down_to_right | relaxed / relaxed | 0.0…0.5 / 0.2…0.5 | 0.0 / 0.0 | ok |
+| look_front_to_left | relaxed / relaxed | 0.2…0.3 / -0.1…0.6 | 0.0 / 0.1 | ok |
+| look_left_idle | relaxed / relaxed | 0.2…0.3 / 0.1…0.4 | 0.0 / 0.0 | ok |
+| look_right_idle | relaxed / relaxed | 0.0…0.5 / 0.2…0.5 | 0.0 / 0.0 | ok |
+| neutral_1 | relaxed / relaxed | 0.1…0.5 / -0.0…0.4 | 0.0 / 0.0 | ok |
+| neutral_3 | relaxed / relaxed | 0.1…0.5 / -0.0…0.5 | 0.0 / 0.0 | ok |
+| neutral_5 | relaxed / relaxed | 0.1…0.5 / -0.0…0.5 | 0.0 / 0.0 | ok |
+| **seat_distracted_then_smile** | relaxed / relaxed | -3.0…-0.6 / -2.9…2.4 | 3.0 / 2.9 | **DROP for launch** |
+| seat_feeling_frustrated_v1 | relaxed / relaxed | 0.2…0.5 / 0.1…1.3 | 0.0 / 0.6 | ok |
+| seat_feeling_frustrated_v2 | relaxed / relaxed | 0.1…0.6 / 0.2…0.5 | 0.0 / 0.0 | ok |
+| seat_happy | relaxed / relaxed | 0.0…0.5 / -0.0…0.5 | 0.0 / 0.0 | ok |
+| seat_looking_around_v1 | relaxed / relaxed | -0.1…0.7 / -0.4…0.8 | 0.1 / 0.4 | ok |
+| seat_looking_around_v2 | relaxed / relaxed | -0.1…0.7 / -0.1…0.7 | 0.1 / 0.1 | ok |
+| seat_looking_away_idle | relaxed / relaxed | 0.0…0.6 / 0.0…0.5 | 0.0 / 0.0 | ok |
+| seat_looking_left | relaxed / relaxed | 0.1…0.6 / 0.0…0.6 | 0.0 / 0.0 | ok |
+| seat_looking_right | relaxed / relaxed | 0.0…0.6 / -0.5…0.7 | 0.0 / 0.5 | ok |
+| seat_neck_stretching_idle | relaxed / relaxed | 0.1…0.5 / 0.2…0.4 | 0.0 / 0.0 | ok |
+| seat_smiling | relaxed / relaxed | -0.0…0.6 / no contact in source | 0.0 / 0.0 | ok |
+| seat_thinking_touching_chin | own curl (hand to face) / relaxed | -0.1…0.8 / 0.2…0.3 | 0.1 / 0.0 | ok |
+| bed_phone_lift | phone grip (still) / relaxed | – / -0.4…1.0 | – / 0.4 | ok |
+| bed_phone_typing | phone grip (still) / relaxed | – / -0.0…0.7 | – / 0.0 | ok |
+| bed_phone_watch_landscape | phone grip (still) / relaxed | – / -0.0…0.5 | – / 0.0 | ok |
+| bed_phone_watch_portrait | phone grip (still) / relaxed | – / -0.0…0.5 | – / 0.0 | ok |
+| sleep_back | relaxed / relaxed | 0.0…0.3 / no contact in source | 0.0 / 0.0 | ok |
+| sleep_back_idle | relaxed / relaxed | 0.0…0.5 / 0.1…0.5 | 0.0 / 0.0 | ok |
+| sleep_roll_to_back | relaxed / relaxed | -0.3…1.0 / no contact in source | 0.3 / 0.0 | ok |
+| sleep_side | relaxed / relaxed | no contact in source / no contact in source | 0.0 / 0.0 | ok |
+| **sleep_wake_and_back** | relaxed / relaxed | -1.7…2.4 / -0.5…1.3 | 1.7 / 0.5 | **DROP for launch** |
+
+Drop for launch:
+- **seat_distracted_then_smile:** crossed arms. Pulled out of the other arm, the hands come apart (one hangs in the air) and stay 3 cm inside the sleeves; the original had them 4–5 cm inside each other's sleeves. It needs an arms-crossed pose built for our sleeves.
+- **sleep_wake_and_back:** hands under the head still 1.7 cm inside him, and the feet 5.6 cm past the mattress end.
+
+Borderline, kept:
+- desk_start_01: 0.4 cm inside.
+- seat_feeling_frustrated_v1, right hand: up to 1.3 cm off where it touched.
+- bed_phone_lift, right hand: 0.4 cm inside.
+- sleep_roll_to_back, left hand: 0.3 cm inside.
+
+Looked at in the close-ups:
+- thinking: the chin rests on the thumb and index, fingers curled from the clip, no sleeve lump;
+- neutral / happy: relaxed hands;
+- phone: the grip closes round it.
 
 ## HANDS, round 2: the owner's hands as the target — close-up before/after: `sova_hands_before_after.mp4` (+ `.jpg` frames), 1a449e5
 
