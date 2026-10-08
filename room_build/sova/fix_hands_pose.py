@@ -16,7 +16,7 @@ EXP = os.path.join(H, '..', 'kimodo_g12', 'exp.mjs'); WRITE = os.path.join(H, '.
 REF = os.path.join(R, 'web', 'room', 'mh_mx', 'room_seated_idle.glb'); GRIP = os.path.join(R, 'web', 'room', 'mh_mx', 'room_phone.glb')
 E = lambda k, d: float(os.environ.get(k, d))
 CURL, CURL_MAX = E('CURL', 0.3), E('CURL_MAX', 15)
-WR, WF, WD, FR = E('WRIST_ROLL', 45), E('WRIST_FLEX', 60), E('WRIST_DEV', 40), E('FOREARM_ROLL', 80)
+WR, WF, WD, FR = E('WRIST_ROLL', 20), E('WRIST_FLEX', 60), E('WRIST_DEV', 40), E('FOREARM_ROLL', 80)
 FING = ('Thumb', 'Index', 'Middle', 'Ring', 'Pinky')
 sys.path.insert(0, H)
 from owner_cmp import limits
@@ -37,6 +37,18 @@ def bend_clamp(qh, ta, tb, q0):
             (lo_, hi_) = (mid_, hi_) if flex(s_, ta, tb) > WB_HI else (lo_, mid_)
         qh[t] = (Rot.from_quat(qh[t]) * Rot.from_rotvec(hi_ * rv)).as_quat(); nb += 1
     return nb
+
+def branch(q, ta, tb):
+    """the curl angles (about X) and flexes on the curling branch through 0, flex rising: for np.interp(flex -> angle)"""
+    g = np.arange(-90, 150.25, 0.25); v = (Rot.from_quat(q) * Rot.from_euler('x', g[:, None], degrees=True)).apply(tb)
+    fl = np.degrees(np.arccos(np.clip(v @ ta / np.linalg.norm(ta) / np.linalg.norm(v, axis=1), -1, 1)))
+    up = np.gradient(fl) > 0; i0 = int(np.argmin(np.abs(g)))
+    if not up[i0]: i0 = int(np.where(up)[0][np.argmin(np.abs(g[up]))])
+    a = i0
+    while a > 0 and up[a - 1]: a -= 1
+    b = i0
+    while b < len(g) - 1 and up[b + 1]: b += 1
+    return g[a:b + 1], fl[a:b + 1]
 
 def solve(q, ta, tb, target):
     """the curl about the bone's X (the finger's curl axis, + = toward the palm) that gives this flex, on the curling
@@ -100,8 +112,23 @@ def main(src, dst, phone):
     def axis(nm, child):                                       # bone direction in its own frame (= child's local offset)
         v = pos[ix[child]]; return v / np.linalg.norm(v)
     rep = {}
+    hi_ = ix['mixamorig:Hips']
+    def as_clip():
+        return dict(set='x', name='x', frames=F, fps=30, hand=phone if phone in ('Left', 'Right') else None, props={},
+                    rot={N[i]['name']: np.array(d['rotation']).tolist() for i, d in tr.items() if 'rotation' in d},
+                    hips=(tr[hi_]['translation'] if 'translation' in tr.get(hi_, {}) else np.tile(pos[hi_], (F, 1))).tolist())
+    B, contact, gest = None, {}, {}
+    if os.environ.get('CHAR_GLB'):                             # where the source hand touches him (contact yes, inside no)
+        from measure import Body
+        import fit_hands
+        B = Body(os.environ['CHAR_GLB'], vstep=2); c0 = as_clip()
+        for side in ('Left', 'Right'):
+            if side == phone: continue
+            G0, _, R0 = fit_hands.gap_track(B, c0, side); contact[side] = G0 < 0.01
+            face = np.array([b_ in ('Head', 'Neck', 'HeadTop_End') for b_ in R0])   # the chin's skin follows the neck
+            gest[side] = bool((contact[side] & face).sum() >= 5)   # a hand to the face: its own curl
     for side in ('Left', 'Right'):
-        held = side == phone; src_pose = grip if held else ref; r = rep.setdefault(side, {'fingers': 'room_phone grip, joints into the owner range, still' if held else f'owner median flex (room_seated_idle hand) + {CURL} x clip curl, owner range and speed'})
+        held = side == phone; src_pose = grip if held else ref; r = rep.setdefault(side, {'fingers': 'room_phone grip, joints into the owner range, still' if held else "the clip's own flex per joint (a hand to the face), owner range and speed" if gest.get(side) else f'owner median flex (room_seated_idle hand) + {CURL} x clip curl, owner range and speed'})
         for f in FING:
             lim = OWN[f.lower()]
             for k in (1, 2, 3):
@@ -109,6 +136,10 @@ def main(src, dst, phone):
                 ta, tb = pos[ix[nm]], pos[ix[f'mixamorig:{side}Hand{f}{k + 1}']]
                 lo, hi, mid, sp = lim['lo'][k - 1] + 1, lim['hi'][k - 1] - 1, lim['mid'][k - 1], lim['speed_p95'][k - 1]
                 if held: th = np.full(F, solve(qr, ta, tb, np.clip(flex(qr, ta, tb), lo, hi)))   # the grip, its joints into his range
+                elif gest.get(side):                           # a hand to the face: the clip's own flex per frame, in his range
+                    v = Rot.from_quat(q).apply(tb); fl = np.degrees(np.arccos(np.clip(v @ ta / np.linalg.norm(ta) / np.linalg.norm(v, axis=1), -1, 1)))
+                    g, fb = branch(qr, ta, tb); th = np.interp(np.clip(fl, lo, hi), fb, g)
+                    for t in range(1, F): th[t] = th[t - 1] + np.clip(th[t] - th[t - 1], -sp, sp)
                 else:                                          # his median, plus a slight curl from the clip (about X)
                     th0 = solve(qr, ta, tb, mid)
                     m = np.median(q, 0); m /= np.linalg.norm(m)
@@ -127,6 +158,13 @@ def main(src, dst, phone):
         n = np.cross(i1, p1); n -= (n @ a) * a; n /= np.linalg.norm(n); l = np.cross(a, n)
         if held: r['wrist'] = 'as baked (holds the phone)'
         else:
+            fa_ax = axis(fn, hn); qh, qf = rot(hn), rot(fn)
+            d = (Rot.from_quat(rest[ix[hn]]).inv() * Rot.from_quat(qh)).as_quat(); tw, _ = swing_twist(d, a)
+            ex = tw - np.clip(tw, -WR, WR)                     # the roll a real wrist can't take: the forearm turns instead
+            if np.abs(ex).max() > 0:
+                Rx = Rot.from_rotvec(np.radians(ex)[:, None] * fa_ax)
+                tr[ix[fn]]['rotation'] = (Rot.from_quat(qf) * Rx).as_quat(); tr[ix[hn]]['rotation'] = (Rx.inv() * Rot.from_quat(qh)).as_quat()
+            r['wrist_roll_to_forearm_deg'] = round(float(np.abs(ex).max()), 1)
             q2, ch, mx = clamp_joint(rot(hn), rest[ix[hn]], a, l, n, WR, WF, WD); tr[ix[hn]]['rotation'] = q2
             r['wrist'] = dict(frames_clamped=ch, max_before_roll_flex_dev=[round(x, 1) for x in mx])
             nb = bend_clamp(tr[ix[hn]]['rotation'], pos[ix[hn]], pos[ix[f'mixamorig:{side}HandMiddle1']], rest[ix[hn]])
@@ -134,21 +172,18 @@ def main(src, dst, phone):
         fa = axis(fn, hn); u = np.cross(fa, [1, 0, 0] if abs(fa[0]) < 0.9 else [0, 1, 0]); u /= np.linalg.norm(u); w = np.cross(fa, u)
         q2, ch, mx = clamp_joint(rot(fn), rest[ix[fn]], fa, u, w, FR, 180, 180); tr[ix[fn]]['rotation'] = q2
         r['forearm_roll'] = dict(frames_clamped=ch, max_before=round(mx[0], 1))
-    if os.environ.get('CHAR_GLB'):                             # then nothing of the (now curled) hands inside him: fit_hands
-        from measure import Body
-        import fit_hands
-        hi = ix['mixamorig:Hips']; c = dict(set='x', name='x', frames=F, fps=30, hand=phone if phone in ('Left', 'Right') else None, props={},
-                 rot={N[i]['name']: d['rotation'].tolist() for i, d in tr.items() if 'rotation' in d},
-                 hips=(tr[hi]['translation'] if 'translation' in tr.get(hi, {}) else np.tile(pos[hi], (F, 1))).tolist())
-        B = Body(os.environ['CHAR_GLB'], vstep=2)
+    if B is not None:                                          # then nothing of the (now curled) hands inside him: fit_hands
+        c = as_clip()
         for it in range(2):                                    # clear (the IK keeps the hand's world turn, so the wrist bends),
             rep[f'clear_{it}'] = fit_hands.clear(B, c)         # then the wrist back into his range; twice
             for side in ('Left', 'Right'):
                 if side == phone: continue
                 hn = f'mixamorig:{side}Hand'; qh = np.array(c['rot'][hn])
                 rep[side][f'bend_clamped_after_clear_{it}'] = bend_clamp(qh, pos[ix[hn]], pos[ix[f'mixamorig:{side}HandMiddle1']], rest[ix[hn]]); c['rot'][hn] = qh.tolist()
-        for side in ('Left', 'Right'):                         # what is left inside him
-            if side != phone: rep[side]['left_in_body_cm'] = round(float(fit_hands.depth_track(B, c, side)[0].max() * 100), 1)
+        for side in ('Left', 'Right'):                         # contact yes: where the source hand touched him, 0-5 mm off
+            if side == phone: continue
+            if contact[side].any(): rep[side]['contact'] = fit_hands.touch(B, c, side, contact[side])
+            G, _, _ = fit_hands.gap_track(B, c, side); rep[side]['left_in_body_cm'] = round(float(max(0, -G.min()) * 100), 1)
         for nm, v in c['rot'].items(): tr.setdefault(ix[nm], {})['rotation'] = np.array(v)
     name = os.environ.get('CLIP_NAME') or j['anims'][0].get('name') or os.path.splitext(os.path.basename(dst))[0]
     fin = dict(name=name, fps=30, F=F, nodes=N,

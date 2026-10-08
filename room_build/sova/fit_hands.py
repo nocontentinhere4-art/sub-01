@@ -21,7 +21,7 @@ def depth_track(B, c, side, step=2):
     other = 'Right' if side == 'Left' else 'Left'
     for f in fr:
         p, nn = B.skin(Wj, f)
-        body = np.isin(B.reg, ['torso', 'head', 'legs']); tree = cKDTree(p[body]); hv = p[B.reg == side + 'Hand']
+        body = np.isin(B.reg, ['torso', 'head', 'legs', other + 'Arm']); tree = cKDTree(p[body]); hv = p[B.reg == side + 'Hand']   # the other arm too (crossed arms)
         d, i = tree.query(hv, distance_upper_bound=0.10); ok = np.isfinite(d)
         q = p[body][i[ok]]; qn = nn[body][i[ok]]; dep = -np.einsum('ij,ij->i', hv[ok] - q, qn)
         m = dep > 0.005
@@ -30,6 +30,39 @@ def depth_track(B, c, side, step=2):
         else: D.append(0.0); N.append(np.zeros(3))
     D = np.interp(np.arange(n), fr, D); N = np.stack([np.interp(np.arange(n), fr, np.array(N)[:, k]) for k in range(3)], 1)
     return D, N
+
+def gap_track(B, c, side, step=2, regions=('torso', 'head', 'legs'), other_arm=True):
+    """per frame: the hand's (fingers too) nearest signed distance to his body (+ outside, - inside), the body normal
+    there, and the bone that skin follows; the other arm counts as body (crossed arms)"""
+    Wj, wm = B.joints(c); n = c['frames']; fr = list(range(0, n, step)); G, N, R = [], [], []
+    other = 'Right' if side == 'Left' else 'Left'
+    reg = list(regions) + ([other + 'Arm'] if other_arm else [])
+    body = np.isin(B.reg, reg)
+    for f in fr:
+        p, nn = B.skin(Wj, f)
+        tree = cKDTree(p[body]); hv = p[B.reg == side + 'Hand']
+        d, i = tree.query(hv); q = p[body][i]; qn = nn[body][i]; s = np.einsum('ij,ij->i', hv - q, qn)
+        s = np.where(d > 0.03, np.maximum(s, d), s)          # far from the surface: the distance, not the plane
+        k = s.argmin(); G.append(s[k]); N.append(qn[k]); R.append(B.bone[body][i[k]])
+    G = np.interp(np.arange(n), fr, G); N = np.stack([np.interp(np.arange(n), fr, np.array(N)[:, k]) for k in range(3)], 1)
+    N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+    R = [R[min(range(len(fr)), key=lambda j: abs(fr[j] - t))] for t in range(n)]
+    return G, N, R
+
+def touch(B, c, side, contact, gap=0.0025, near=0.005):
+    """frames where the hand should touch him (contact: bool [n]): where it is more than `near` off, the wrist moves
+    along the body normal until its nearest point is `gap` off; smoothed, two passes. Returns gap before/after (cm)"""
+    G0, _, _ = gap_track(B, c, side)
+    for it in range(3):
+        G, N, _ = gap_track(B, c, side) if it else (G0, *gap_track(B, c, side)[1:])
+        need = np.where(contact & (G > near), G - gap, 0.0) + np.where(G < 0, G - gap, 0.0); k = 4   # and nothing inside
+        amt = np.convolve(np.pad(need, k, mode='edge'), np.ones(2 * k + 1) / (2 * k + 1), 'valid')
+        if np.abs(amt).max() < 1e-4: break
+        apply(B, c, side, -N * amt[:, None])
+    G1, _, _ = gap_track(B, c, side)
+    m = contact.astype(bool)
+    return dict(frames=int(m.sum()), gap_before_cm=[round(float(G0[m].min() * 100), 1), round(float(G0[m].max() * 100), 1)] if m.any() else None,
+                gap_after_cm=[round(float(G1[m].min() * 100), 1), round(float(G1[m].max() * 100), 1)] if m.any() else None)
 
 def smooth_max(x, k):
     pad = np.pad(x, k, mode='edge'); mx = np.array([pad[i:i + 2 * k + 1].max() for i in range(len(x))])
