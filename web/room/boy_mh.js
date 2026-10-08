@@ -260,6 +260,7 @@ export function createMH(env) {
     for (const k of Object.keys(RARE)) { const c = got["rare_" + k]; if (!c) continue;
       const a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
       H["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration}; }
+    if (env.anim === "sova") await svLoad(make, bodyHips);      // (the desk states, ?anim=sova: their slots and the picker)
     M.actions.stand = make(stand); H.mh_stand = pageHips(stand, 0);
     // the walk as recorded: knees and elbows bend and the arms swing (the owner: "più liberi"); the paths keep him clear
     M.actions.walk = make(got.walk); H.room_walk = pageHips(got.walk, 0);
@@ -322,6 +323,7 @@ export function createMH(env) {
     const n = env.chairNode && env.chairNode(); if (!n) return;
     const p = n.localToWorld(V(0, 0.735, 0.02)), hy = p.y - env.F, H = env.HIPS;
     for (const k of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", "sit", "dine", "eat", "edge", "phone_sit", "type"]) if (H[k]) H[k][1] = hy;
+    if (SV) for (const k of [...SV.loops, ...Object.keys(M.rare).filter(k => M.rare[k].sv).map(k => "rare_" + k)]) H[k][1] = hy;   // (the desk states: seated as desk_watch)
   }
   // the room's keyboard and mouse: separate nodes when the room has them (G10d's), else the numbers above
   // (G10d's are top-level scene nodes: "keyboard" with its origin on the home row (the middle of F and J) on the desk
@@ -352,6 +354,11 @@ export function createMH(env) {
       if (act === "research" && query) M.typeUntil = st.T + Math.min(8, Math.max(4, 2.5 + 0.18 * query.length));
     }
     if (act === "watch_video" || kind === "video" || kind === "short") return "desk_watch";
+    const sv = M.sv;                                         // (the desk states: he waits in the chair while the opponent thinks,
+    if (sv && act === "play_chess") {                        // and looks at the board a moment before he takes the mouse)
+      const c = sv.pick.chess;
+      if (c && (c.done || c.turn === "opponent" || st.T - (sv.turnAt ?? -1e9) < sv.look)) return "desk_watch";   // (the game over: he sits back)
+    }
     if (act === "research" && st.T < M.typeUntil) return "desk_type";
     return "desk_mouse";
   }
@@ -1199,12 +1206,75 @@ export function createMH(env) {
   }
   function rareStep(dt) {                                     // its phases: ride back, the capture, ride in
     const E = M.ev; if (!E) { M.evOff = 0; return; }
-    E.t += dt; const t = E.t, D = E.R.dur, end = RIDE + D;
-    M.evOff = E.R.back * (t < RIDE ? sstep(0, RIDE, t) : t < end ? 1 : 1 - sstep(end, end + RIDE, t));
-    const w = M.actions.desk_watch;
-    if (t >= RIDE && !E.on) { E.on = true; E.a.reset(); E.a.setEffectiveWeight(1); E.a.fadeIn(EV_FADE).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EV_FADE); env.setCurrent(E.a); }
-    if (E.on && !E.off && t >= end - EV_FADE) { E.off = true; w.reset(); w.setEffectiveWeight(1); w.fadeIn(EV_FADE).play(); E.a.fadeOut(EV_FADE); env.setCurrent(w); }
-    if (t >= end + RIDE) { E.a.stop(); M.ev = null; }
+    // (the desk states' events, desk_states.js: no ride when the take needs no room (ride 0), a window of a long take
+    // (from, R.dur), and on out of it into the slot the picker chose (then()); the page's rare() as before)
+    const RD = E.ride ?? RIDE;
+    E.t += dt; const t = E.t, D = E.R.dur, end = RD + D;
+    M.evOff = E.R.back * (t < RD ? sstep(0, RD, t) : t < end ? 1 : 1 - sstep(end, end + RD, t));
+    if (t >= RD && !E.on) { E.on = true; E.a.reset(); E.a.time = E.from || 0; E.a.setEffectiveWeight(1); E.a.fadeIn(EV_FADE).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EV_FADE); env.setCurrent(E.a); }
+    if (E.on && !E.off && t >= end - EV_FADE) { E.off = true; const n = E.then && E.then(), w = n ? n.a : M.actions.desk_watch;
+      w.reset(); if (n) w.time = n.from; w.setEffectiveWeight(1); w.fadeIn(EV_FADE).play(); E.a.fadeOut(EV_FADE); env.setCurrent(w);
+      for (const k of ["sit", "type"]) env.actions[k] = w; }
+    if (t >= end + RD) { E.a.stop(); M.ev = null; }
+  }
+  // ---------- the desk states (room.html?char=mixamo&anim=sova; desk_states.js decides, this plays) ----------
+  // In desk_watch (a video, a page, the opponent's turn at chess) the seated loop is one of several: idle variants, his
+  // attention on the monitor, a small gesture, now and then a reaction to what the page received. Loops crossfade
+  // (SV_FADE) each from a random phase of its clip, for a random hold; a gesture or a reaction plays once through the
+  // rare events' path (rareStep): the chair rides back first by what the take needs (backFor; no ride if it needs none),
+  // and out of it he crossfades into the next loop the picker chose. Off desk_watch (typing, the mouse) the page's modes
+  // play as before; the default page never loads any of this.
+  const SV_FADE = 0.8, SV_LOOK = 2.5, SV_MIN = 1.5;          // (s) a loop's crossfade; a look at the board; the least a loop holds before an event
+  let SV = null;
+  async function svLoad(make, bodyHips) {
+    const D = await import("./desk_states.js"), dir = env.clipDir || "room/mh";
+    let named = [], seats = {}; try { const r = await fetch(`${D.DIR}/index.json`); if (r.ok) { const j = await r.json(); named = j.clips || []; seats = j.seat || {}; } } catch (e) { /* stand-ins */ }
+    const files = {}, have = [], clipOf = {}, durOf = {}, loops = [];
+    for (const [k, f] of [...Object.entries(CL), ...Object.entries(RARE).map(([k, f]) => ["rare_" + k, f])])   // (the clips already loaded: not again)
+      if (M.clips[k]) files[`${dir}/${f}.glb`] = Promise.resolve(M.clips[k]);
+    const get = f => files[f] || (files[f] = env.load(f).then(g => env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0], () => null));
+    for (const [n, sl] of Object.entries(D.SLOTS)) {
+      const f = named.includes(n) ? `${D.DIR}/${n}.glb` : sl.standIn ? `${dir}/${sl.standIn}.glb` : null, c0 = f && await get(f); if (!c0) continue;
+      const c = c0.clone(); c.name = "sv_" + n; have.push(n); clipOf[n] = f; durOf[n] = c.duration;
+      const z = named.includes(n) ? seats[n] : sl.seat; if (z != null) SEAT_AT[(sl.once || sl.span ? "rare_sv_" : "sv_") + n] = [0, z];
+      if (sl.once || sl.span) { const k = "sv_" + n, a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
+        env.HIPS["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration, sv: n}; }
+      else { const a = M.actions["sv_" + n] = make(c); a.setLoop(THREE.LoopRepeat, Infinity); env.HIPS["sv_" + n] = bodyHips(c); loops.push("sv_" + n); }
+    }
+    SV = {D, loops, cur: null, until: 0, since: 0, turnAt: null, look: SV_LOOK,
+      pick: D.createPicker({have, clipOf: n => clipOf[n], durOf: n => durOf[n], rng: env.rng || Math.random})};
+    SV.pick.S.lastClip = `${dir}/${CL.desk_watch}.glb`;      // (desk_watch's own clip counts as the one just played)
+    M.sv = SV;                                                // (?debug; svForce(name): that slot next, as if an event called for it)
+    M.svForce = n => { const T = env.state().T; SV.pick.S.at = {gesture: -1e9, react: -1e9}; SV.pick.S.last = SV.pick.S.lastClip = null; SV.pick.S.queue.push({slot: n, T, src: "force"}); SV.until = 0; SV.since = -1e9; };
+  }
+  function svLoop(p) {                                        // a loop slot: its action, crossfaded in from its phase
+    const a = M.actions["sv_" + p.name]; if (!a) return null; return {a, from: p.from};
+  }
+  function svEvents(st) {                                     // what the page received since the last frame (wherever he is)
+    for (const m of env.deskEvents ? env.deskEvents() : []) { const was = SV.pick.chess; SV.pick.event(m, st.T);
+      const c = SV.pick.chess; if (m && m.type === "chess" && c && c.turn === "his" && (!was || was.turn !== "his")) SV.turnAt = st.T; }
+  }
+  function svStep(st) {
+    const T = st.T;
+    if (M.link || M.ev || M.sc) return;
+    const life = st.life || {}, mode = life.activity === "play_chess" ? "wait" : "watch";
+    if (!SV.cur) { SV.cur = {name: "desk_watch"}; SV.since = T; SV.until = T + 3 + 3 * (env.rng || Math.random)(); return; }   // (the mode's own loop first)
+    if (T < SV.until && !(SV.pick.pending(T) && T - SV.since >= SV_MIN)) return;
+    const p = SV.pick.next(T, mode); if (!p) { SV.until = T + 2; return; }
+    if (p.once) {                                             // a gesture or a reaction: once, through rareStep, then the next loop
+      const k = "sv_" + p.name, R = M.rare[k], a = M.actions["rare_" + k]; if (!R || !a) return;
+      const back = backFor(R, k), dur = Math.min(R.dur - p.from, p.hold);
+      M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
+        SV.cur = n ? {name: q.name} : {name: "desk_watch"}; SV.since = T2; SV.until = T2 + (n ? q.hold : 4); return n; }};
+      M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "") + " back " + back.toFixed(3)]);
+      return;
+    }
+    const n = svLoop(p), cur = st.current; if (!n || n.a === cur) { SV.until = T + p.hold; return; }   // (already playing: no restart)
+    n.a.reset(); n.a.time = n.from; n.a.setEffectiveWeight(1); n.a.fadeIn(SV_FADE).play();
+    if (cur && cur !== n.a) cur.fadeOut(SV_FADE); env.setCurrent(n.a);
+    for (const k of ["sit", "type"]) env.actions[k] = n.a;   // (the page's play("sit") keeps it)
+    SV.cur = {name: p.name}; SV.since = T; SV.until = T + p.hold;
+    M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "")]); if (M.log.length > 50) M.log.shift();
   }
   function handRoll(m) {                                     // the roll back (m) that puts the clip's keyboard / mouse on the room's
     const ry = env.boy.rotation.y; _f.set(Math.sin(ry), 0, Math.cos(ry)); env.boy.updateMatrixWorld(true);
@@ -1229,7 +1299,7 @@ export function createMH(env) {
     if (ch && Math.abs(d) > 1e-6) { ch.position.x += -s * d; ch.position.z += -c * d; ch.updateMatrixWorld(true); }   // (back: against the way he faces)
     if (ch && desk) {                                        // his root: each mode's hips on its seat point, blended as the clips are
       ch.updateMatrixWorld(true); let tx = 0, tz = 0, W = 0;
-      for (const m of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", ...Object.keys(M.rare).map(k => "rare_" + k)]) {
+      for (const m of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", ...Object.keys(M.rare).map(k => "rare_" + k), ...(SV ? SV.loops : [])]) {
         const a = M.actions[m], w = a && a.isRunning() ? a.getEffectiveWeight() : 0; if (w < 1e-3) continue;   // (an action never played reports weight 1)
         const hm = H[m], at = (window.__seatAt && window.__seatAt[m]) || SEAT_AT[m] || SEAT_AT.desk_watch; ch.localToWorld(_st.set(at[0], 0, at[1]));
         tx += w * (_st.x - (hm[0] * c + hm[2] * s)); tz += w * (_st.z - (-hm[0] * s + hm[2] * c)); W += w; }
@@ -1654,6 +1724,7 @@ export function createMH(env) {
   // ---------- one step (instead of the page's animate: the mixer, his plan and walk, the desk modes, the wrists) ----------
   function animate(dt) {
     contactRestore();                                          // (the page's finger turns undone before the mixer runs)
+    if (M.ready && SV) { const s0 = env.state(); svEvents(s0); if (M.mode === "desk_watch" && s0.at === "desk" && !s0.step) svStep(s0); }   // (the desk states: likewise)
     if (M.ready) rareStep(dt);                                 // (before the mixer: a crossfade it starts is in this frame's pose)
     const moving = env.step0(dt);
     if (!M.ready) return moving;
@@ -1670,6 +1741,7 @@ export function createMH(env) {
       // (riding the chair out to leave too: he sits back first, so the page rides it with the seated loop on its seat point)
       if (st.at === "desk" && (!st.step || st.step.k === "chair") && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
+    if (SV && M.mode !== "desk_watch") SV.cur = null;        // (the desk states start over with the mode's own loop)
     if (!transition(st)) onBed(st);
     // the quilt and the pillow give under him lying awake on the bed: in as he lies down (the lift follows it frame by
     // frame through the step, no pop once he is down), out as he gets up or falls asleep under the duvet

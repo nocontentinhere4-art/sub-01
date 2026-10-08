@@ -659,6 +659,11 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
 // Mixamo Standard Skeleton (room/char_mixamo.glb, rig/autorig.sh; room/char_mixamo.js), playing the Mixamo clips on
 // their own skeleton (room/mh_mx/, baked for our chair: kimodo/mx_build.sh) and v5's other room clips carried over
 const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q === "mixamo";
+// ?char=mixamo&anim=sova (preview/desk-states): the seated states at the desk (room/desk_states.js), fed the messages the
+// page already receives that they react to (chess, a decision, a dopamine burst, a viewer's chat); off by default
+const DESK_EV = CHAR_MX && new URLSearchParams(location.search).get("anim") === "sova" ? [] : null;
+const deskEv = m => { if (DESK_EV && m && ["chess", "decision", "dopamine", "chat"].includes(m.type)) { DESK_EV.push(m); if (DESK_EV.length > 32) DESK_EV.shift(); } };
+if (DEBUG && DESK_EV) window.__deskEv = deskEv;     // (?debug: the visual checks hand it messages as the socket would)
 let V5 = null;                                        // (char_v5.js / char_mixamo.js and the body's clip conversion)
 (CHAR_V5 ? Promise.all([CHAR_MX ? load("room/char_mixamo.glb") : load("room/char_v5.glb"), import(CHAR_MX ? "./room/char_mixamo.js" : "./room/char_v5.js")])
   .then(([g, m]) => { V5 = {m, conv: m.prep(THREE, g), mx: CHAR_MX};
@@ -1081,7 +1086,7 @@ function chessTex(){
   if (chessTxVer !== chessVer) { chessTxVer = chessVer; chessTx.needsUpdate = true; }
   return chessTx;
 }
-function onChess(m){ chessGame = m; panelKey = null; }
+function onChess(m){ chessGame = m; panelKey = null; deskEv({type: "chess", ...m}); }
 fetch("/api/chess").then(r => r.ok ? r.json() : null).then(d => { if (d && d.playing && d.game && !chessGame) onChess(d.game); }).catch(() => {});
 
 // views drawn here (no browser needed): the market chart at the desk, the food app on the phone
@@ -3065,6 +3070,7 @@ function connect(){
   ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
+    if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
     if (m.type === "chess") { onChess(m); return; }
@@ -3301,6 +3307,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
     ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     ...(V5 && V5.mx ? {clipDir: "room/mh_mx", ...V5.m.ROOM} : {}),   // (?char=mixamo: its clips, which clip plays which slot, the clips' keyboard and mouse)
+    ...(DESK_EV ? {anim: "sova", deskEvents: () => DESK_EV.splice(0)} : {}),   // (&anim=sova: the desk states and what they react to)
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),
