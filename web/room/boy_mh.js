@@ -828,7 +828,10 @@ export function createMH(env) {
     if (ot && M.w.type > 0.01) OT.t += dt * OT.json.speed;
     if (ot && M.w.mouse > 0.01) OT.tr += dt * OT.json.speed * OT_REST;
     const mix = wk > 0 ? M.w.mouse / (M.w.type + M.w.mouse) : 0;
-    if (wk > 0.01) { if (ot) weighted("Left", wk, w => ownerKeys("Left", w, dt, {mix})); else keyOn("Left", wk, dt); }
+    // (the left hand stays on the keys between the keys and the mouse, its weight then never low: as before. Into and out of
+    // the desk modes it fades from or to the clip's pose: blended from its pose at full weight)
+    const inSwitch = M.w.type > 0.01 && M.w.mouse > 0.01;
+    if (wk > 0.01) { if (ot) { if (inSwitch) ownerKeys("Left", wk, dt, {mix}); else weighted("Left", wk, w => ownerKeys("Left", w, dt, {mix})); } else keyOn("Left", wk, dt); }
     const both = ot && M.w.type > 0.01 && M.w.mouse > 0.01, qc = both ? rightChain().map(b => b.quaternion.clone()) : null;   // (the clip's right arm, before the mouse moves it)
     if (M.w.mouse > 0.01 && P.mouseNode) {
       const ry = env.boy.rotation.y, home = V(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
