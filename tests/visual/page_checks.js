@@ -133,11 +133,25 @@
     meshes.forEach((m, i) => { m.material.side = sides[i]; });
     return columnsCache[key] = {x0, z0, cell, nx, nz, cols, ms: Math.round(performance.now() - t0)};
   };
+  // the solid things on the desk that are not the room's static mesh (the monitor, the game controller): his skin inside
+  // one. (eating_19 put his right hand through the monitor, unseen: the desk check knew only the static room.) The
+  // keyboard and the mouse are left out (his hands are on them by design), and so is what he picks up (mug, bottle).
+  // Inside = an odd number of crossings on at least two of three horizontal rays (the monitor's housing is open on top)
+  const THINGS = ["monitor", "controller"];
+  qa.deskThings = () => THINGS.map(n => scene.getObjectByName(n)).filter(Boolean).map(o => { o.updateMatrixWorld(true); const ms = [];
+    o.traverse(m => { if (m.isMesh && !/_contact$/.test(m.name)) ms.push(m); });
+    return {name: o.name, ms, box: new THREE.Box3().setFromObject(o).expandByScalar(0.002)}; });
+  const _tr = new THREE.Raycaster(), TDIRS = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(-0.7071, 0, -0.7071)];
+  qa.insideThing = (t, v) => {
+    const sides = t.ms.map(m => m.material.side); t.ms.forEach(m => { m.material.side = THREE.DoubleSide; });
+    let odd = 0; for (const d of TDIRS) { _tr.set(v, d); _tr.far = 2; let n = 0, last = -1; for (const h of _tr.intersectObjects(t.ms, false)) { if (h.distance - last > 5e-5) n++; last = h.distance; } if (n % 2 === 1) odd++; }
+    t.ms.forEach((m, i) => { m.material.side = sides[i]; }); return odd >= 2; };
   qa.body = (every = 2) => {
     // every skinned part of him (one body, or a dressed one: body, hoodie, trousers, socks, slides)
     const parts = []; boy.traverse(o => { if (o.isSkinnedMesh && o.visible && !/_inside$/.test(o.name)) parts.push(o); }); boy.updateMatrixWorld(true);   // (not his drawn inside: the same skin again)
     const v = V(), desk = qa.columns("desk", -1.92, -0.30, -1.47, -0.72);
-    const out = {sampled: 0, below_floor: 0, desk: 0, min_y: 9, by: {}, foot_min_y: {Left: 9, Right: 9}, bed: 0, chair: 0};
+    const out = {sampled: 0, below_floor: 0, desk: 0, things: 0, min_y: 9, by: {}, foot_min_y: {Left: 9, Right: 9}, bed: 0, chair: 0};
+    const things = qa.deskThings();
     for (const sm of parts) {
       const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, W = sm.geometry.attributes.skinWeight;
       const boneOf = i => { let b = 0, bw = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > bw) { bw = W.getComponent(i, k); b = I.getComponent(i, k); } return sm.skeleton.bones[b].name; };
@@ -150,6 +164,7 @@
         if (desk) { const ci = Math.floor((v.x - desk.x0) / desk.cell), ck = Math.floor((v.z - desk.z0) / desk.cell);
           const col = ci >= 0 && ci < desk.nx && ck >= 0 && ck < desk.nz && desk.cols[ci * desk.nz + ck];
           if (col) for (let j = 0; j < col.length; j += 2) if (v.y > col[j] + 0.01 && v.y < col[j + 1] - 0.01) { out.desk++; out.by["desk:" + bn] = (out.by["desk:" + bn] || 0) + 1; break; } }
+        for (const t of things) if (t.box.containsPoint(v) && qa.insideThing(t, v)) { out.things++; const k = "things:" + t.name + ":" + bn; out.by[k] = (out.by[k] || 0) + 1; break; }
       }
     }
     const pen = window.penetration(every, true);                      // (the page's: every visible skinned part too)
@@ -171,8 +186,8 @@
       if (i) qa.step(1 / 30, sub);
       const b = qa.body(every), t = +(i * dt).toFixed(2);
       for (const s of ["Left", "Right"]) hover[s] = Math.max(hover[s], b.foot_min_y[s]);
-      if (!worst) { worst = b; for (const k of ["bed", "chair", "desk", "below_floor"]) at[k] = t; continue; }
-      for (const k of ["bed", "chair", "desk", "below_floor"]) if (b[k] > worst[k]) { worst[k] = b[k]; at[k] = t; }
+      if (!worst) { worst = b; for (const k of ["bed", "chair", "desk", "things", "below_floor"]) at[k] = t; continue; }
+      for (const k of ["bed", "chair", "desk", "things", "below_floor"]) if (b[k] > worst[k]) { worst[k] = b[k]; at[k] = t; }
       worst.min_y = Math.min(worst.min_y, b.min_y);
       for (const s of ["Left", "Right"]) worst.foot_min_y[s] = Math.min(worst.foot_min_y[s], b.foot_min_y[s]);
       for (const [k, v] of Object.entries(b.by)) worst.by[k] = Math.max(worst.by[k] || 0, v);

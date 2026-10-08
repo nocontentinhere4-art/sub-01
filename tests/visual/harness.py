@@ -231,7 +231,7 @@ class Harness:
             # single frame read 6 or 14 on the same code depending on how long the page took to load
             r["body"] = pg.evaluate("__qa.bodySweep(2, 8, 0.25)")
             b = r["body"]
-            for what, field in (("bed", "bed"), ("chair", "chair"), ("desk", "desk"), ("below_floor", "below_floor")):
+            for what, field in (("bed", "bed"), ("chair", "chair"), ("desk", "desk"), ("desk_things", "things"), ("below_floor", "below_floor")):
                 lim = BUDGETS.get(f"{what}_vertices")                   # null: reported, not failed
                 if lim is not None and b[field] > lim:
                     self.res["hard_failures"].append(f"{key}: {what} penetration {b[field]} sampled vertices at {b['sweep']['worst_at_s'][field]} s of 8 (budget {lim})")

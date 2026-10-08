@@ -388,6 +388,8 @@ const ACT = {                                        // activity -> [anchor, cli
   chart:["desk","sit"], eat:["desk","dine"], window:["sill","lean"],   // dine: seated, the food in his hands (alive())
   get_delivery:["deskside","deliver"],               // to the door, open it, take the bag, close it, carry it to the desk (#63)
   chat:["desk","sit"],                               // answering chat at the computer (the mind layer, #33/#46)
+  watch_video:["desk","sit"], play_chess:["desk","sit"],   // (seated at the desk too: missing here, they fell back on standing there, and each switch to them
+                                                     // started a pose step that took him off the desk modes for a frame - the hands snapped 38 cm)
   listen_music:["bedlie","listen"],                  // on his back on the bed, headphones on (#68); alive() nods to it
 };
 // poses made here on top of a clip: the clip each one plays
@@ -464,6 +466,11 @@ function readMarkers(root){
 const TRIPO = !OLD_ROOM && new URLSearchParams(location.search).get("props") !== "old";
 const MUG_AT = new THREE.Vector3(-0.50, 0.97, -0.98);       // props_hard.py's MUG on the desk top (DTOP)
 const SNEAKERS_AT = [1.70, 0.16, 1.32, -2.6];               // x, floor, z, turn: the front right corner, off his routes
+// a geometry whose triangles changed loses its bounding-volume tree (camRoom() builds them on every room mesh from the
+// first frame, before these cuts run): a tree built on the old index made every raycast against the room miss what was
+// re-indexed (the desk's surfaces under the keyboard cut: 26% of them in the visual checks' desk zone); camRoom() builds
+// a new one on its next refresh
+const dropBVH = g => { if (g.boundsTree) g.disposeBoundsTree(); };
 function cutBox(root, box){                                 // drop a merged mesh's triangles lying wholly inside a world box
   const v = new THREE.Vector3();
   root.traverse(o => { if (!o.isMesh || !o.geometry.index) return;
@@ -471,7 +478,7 @@ function cutBox(root, box){                                 // drop a merged mes
     const inside = i => box.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
     for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
       if (!(inside(a) && inside(b) && inside(c))) keep.push(a, b, c); }
-    if (keep.length < idx.count) o.geometry.setIndex(keep); });
+    if (keep.length < idx.count) { o.geometry.setIndex(keep); dropBVH(o.geometry); } });
 }
 if (TRIPO) Promise.all([load("room/props_tripo.glb"),
   new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
@@ -542,7 +549,7 @@ function splitBox(root, box, name){                         // a merged mesh's t
     for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
       (inside(a) && inside(b) && inside(c) ? out : keep).push(a, b, c); }
     if (!out.length) return;
-    o.geometry.setIndex(keep);
+    o.geometry.setIndex(keep); dropBVH(o.geometry);
     const remap = new Map(), used = []; for (const i of out) if (!remap.has(i)) { remap.set(i, used.length); used.push(i); }
     const ng = new THREE.BufferGeometry();                  // its own compact vertices, so its bounds are the keyboard's
     for (const k in o.geometry.attributes) { const src = o.geometry.attributes[k], n = src.itemSize, arr = new Float32Array(used.length * n);
@@ -3302,7 +3309,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
   const animate0 = animate; let motion = null, mh = null, rig = null;
   // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
   // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
-  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
+  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, DISH_AT, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
     ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     ...(V5 && V5.mx ? {clipDir: "room/mh_mx", ...V5.m.ROOM} : {}),   // (?char=mixamo: its clips, which clip plays which slot, the clips' keyboard and mouse)
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
