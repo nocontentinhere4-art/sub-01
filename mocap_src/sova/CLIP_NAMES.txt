@@ -1,0 +1,359 @@
+## WW_SOVASIMS_Machinima Animations.package  clips=73 frames=160-761
+## [MB] Clipboard AccessoryHQHQ.package  clips=0 frames=0-0
+## {SovaSims} - Action & Reactions Animations.package  clips=28 frames=92-500
+  - CONFUSED / CHIN TOUCHING
+  - CURIOUS / LOOKING UNDER THE BED
+  - [MOCAP] LOOKING AWAY - IDLE 
+  - [MOCAP] LOOKING AWAY - TALK
+  - [MOCAP] LOOKING AROUND V1
+  - [MOCAP] LOOKING AROUND V2
+  - [MOCAP] LOOKING LEFT
+  - [MOCAP] LOOKING RIGHT
+  - [MOCAP] "IF U SAY SO" - IDLE
+  - [MOCAP] "YEAH WHATEVER" - IDLE
+  - [MOCAP] "FORGET IT" - IDLE
+  - [MOCAP] DIZZY - IDLE
+  - [MOCAP] NECK STRETCHING - IDLE
+  - [MOCAP] SEARCHING POCKETS - IDLE
+  - [HANDMADE] THINKING TOUCHING CHIN
+  - [HANDMADE] LOOKING UNDER BED
+  - [HANDMADE] DISGUSTED REACTION
+  - [HANDMADE] SAD IDLE 01
+  - [New!] [HANDMADE] LAUGH SIT
+  - [New!] [HANDMADE] TURN UPSET
+  - [HANDMADE] SAD IDLE 02
+  - [HANDMADE] SMILE SHYLY
+  - [HANDMADE] THINKING LOOKING RIGHT
+  - [HANDMADE] AVOIDING GLANCE
+  - [HANDMADE] DISSOCIATING LOOP
+  - [HANDMADE] DISSOCIATING REACT
+  - [HANDMADE]  TOUCHING LIPS
+  - [New!] [HANDMADE]  FEELING ANXIOUS
+  - [New!] [HANDMADE]  FEELING FRUSTRATED V1
+  - [New!] [HANDMADE]  DISTRACTED & THEN SMILE
+  - [New!] [HANDMADE]  FEELING FRUSTRATED V2
+  - [New!] [HANDMADE]  MOOD CHANGE
+## {SovaSims} - Animation Pack #7.package  clips=3 frames=181-451
+  - 01
+  - Sleeping Idle
+  - 02
+  - Waking up, Sleep again.
+  - 03
+  - Waking up, Leave bed.
+## {SovaSims} - Bed Animations.package  clips=16 frames=150-831
+  - Watching a Movie on Bed 01 / Sim A
+  - Sitting on bed (START) / Idle
+  - Watching a Movie on Bed 01 / Sim B
+  - Sitting / Looking at Sim A / Idle
+  - Sitting on bed (START) / Talk
+  - Watching a Movie on Bed 01 / Sim A
+  - Watching a Movie on Bed 01 / Sim B
+  - Sitting / Looking at Sim A / Talk
+  - Looking Down / Idle
+  - Watching a Movie on Bed 02 / Sim A
+  - Watching a Movie on Bed 02 / Sim B
+  - Looking Down / Idle
+  - Watching a Movie on Bed 02 / Sim A
+  - Looking Down / Talk
+  - Watching a Movie on Bed 02 / Sim B
+  - Looking Down / Talk
+  - Watching a Movie on Bed 02 / Sim A
+  - Looking Left / Idle
+  - Watching a Movie on Bed 02 / Sim B
+  - Looking Right / Idle
+  - Watching a Movie on Bed 02 / Sim A
+  - Looking Left / Talk
+  - Watching a Movie on Bed 02 / Sim B
+  - Looking Right / Talk
+  - [New!] SLEEPING ON LAP / SIM A - IDLE
+  - The one under.
+  - [New!] SLEEPING ON LAP / SIM B - IDLE
+  - The one sleeping.
+  - [New!] SLEEPING ON LAP / SIM A - TALKING
+  - The one under.
+  - The one sleeping.
+  - [New!] SLEEPING ON LAP / SIM B - TALKING
+## {SovaSims} - Idle + Talking Animations.package  clips=26 frames=200-200
+  - Look Down -> Front -> Down
+  - Shake Head
+  - Shake Head
+  - Front Look
+  - Front Look
+  - DISCOURAGED VER. A - IDLE
+  - DISCOURAGED VER. A - TALK
+  - DISCOURAGED VER. B - IDLE
+  - DISCOURAGED VER. B - TALK
+  - DISCOURAGED VER. C - IDLE
+  - DISCOURAGED VER. C - IDLE
+  - IDLE
+  - TALKING
+  - IDLE
+  - TALKING
+  - [New!] Admiring Ver. A
+  - [New!] Admiring Ver. A
+  - [New!] Admiring Ver. B
+  - [New!] Admiring Ver. B
+  - SUBTLE UPSET - IDLE
+  - SUBTLE UPSET - TALKING
+  - Look Down -> Front -> Down
+  - FRUSTRATED - IDLE
+  - Looking away
+  - FRUSTRATED - TALK
+  - Looking away
+  - ANNOYED - IDLE
+  - ANNOYED - TALK
+  - Hands on Hips
+  - Hands on Hips
+  - NERVOUS - IDLE
+  - NERVOUS - TALK
+  - [New!] ANGRY TALK
+  - [New!] NEUTRAL TALK
+  - [New!] SAD TALK
+  - [New!] ANNOYED IDLE
+  - [New!] ANNOYED TALK
+  - [New!] CONFUSED IDLE
+  - [New!] CONFUSED TALK
+  - [New!] WORRIED IDLE
+  - [New!] WORRIED TALK
+  - [New!] FLIRTY IDLE
+  - [New!] FLIRTY TALK
+  - [New!] FLIRTY LAUGH
+## {SovaSims} - Looking Animations.package  clips=2 frames=481-481
+  - TURN & STARE - SIM A
+  - TURN & STARE - SIM B
+  - LOOK FRONT THEN TO LOOK SOFT AT SIM A
+  - LOOK FRONT THEN TURN AND STARES SHYLY AT SIM B
+## {SovaSims} - MOCAP Talking Animations.package  clips=14 frames=157-577
+  - NEUTRAL
+  - SMILING
+  - UPSET
+  - BORED
+  - SAD
+  - COCKY
+  - [New!] SERIOUS - IDLE
+  - [New!] HAPPY - IDLE
+  - [New!] SERIOUS - TALK
+  - [New!] HAPPY - TALK
+  - [New!] ANGRY - IDLE
+  - [New!] ANGRY - TALK
+  - [New!] BASHFUL - TALK
+  - [New!] BASHFUL - IDLE
+## {SovaSims} - Office Animations.package  clips=6 frames=300-425
+  - WRITING ON CLIPBOARD - IDLE
+  - WRITING ON CLIPBOARD - TALK
+  - HOLDING CLIPBOARD VA - IDLE
+  - HOLDING CLIPBOARD VA - TALK
+  - HOLDING CLIPBOARD VB - IDLE
+  - HOLDING CLIPBOARD VB - TALK
+## {SovaSims} - Personal Animations.package  clips=6 frames=426-526
+  - STAGE 01 - SIM A - IGNORES WHILE USING PHONE
+  - STAGE 01 - SIM B - IGNORES WHILE USING PHONE
+  - STAGE 02 - SIM A - APOLOGIZING
+  - STAGE 02 - SIM B - APOLOGIZING
+  - STAGE 03 - SIM A - TEASING + COVERING EARS EMBARRASSED
+  - STAGE 03 - SIM B - TEASING + COVERING EARS EMBARRASSED
+## {SovaSims} - Phone Animations.package  clips=55 frames=200-1401
+  - LOOKING DOWN -> SURPRISED -> EMBARRASSED - IDLE
+  - LOOKING DOWN -> SURPRISED -> EMBARRASSED - TALK
+  - LOOKING DOWN -> SMILING - IDLE
+  - LOOKING DOWN -> SHOCK -> LOOKING AROUND
+  - IMPATIENT -> LOOKING DOWN -> EYE ROLL
+  - WATCHING A VIDEO VER. A - LANDSCAPE
+  - WATCHING A VIDEO VER. A - PORTRAIT
+  - IN A CALL VER. A - IDLE
+  - IN A CALL VER. A - TALK
+  - VER. A -> VER. B (START)
+  - WATCHING A VIDEO VER. B - LANDSCAPE
+  - WATCHING A VIDEO VER. B - PORTRAIT (HAPPY)
+  - WATCHING A VIDEO VER. B - PORTRAIT (UPSET)
+  - IN A CALL VER. B - IDLE
+  - IN A CALL VER. B - TALK
+  - TYPING
+  - REACT UPSET
+  - LEANING ON WALL - TYPING
+  - LEANING ON WALL - LOOK TO THE RIGHT
+  - GRABBING PHONE
+  - IN A CALL - IDLE
+  - IN A CALL - TALK
+  - IN A CALL - IDLE + NODDING
+  - IN A CALL - TALK + NODDING
+  - ON THE COUCH - READING
+  - ON THE COUCH - READING + TALK
+  - ON THE COUCH - THINKING
+  - ON THE COUCH - TYPING
+  - ON THE COUCH - TYPING + TALK
+  - ON THE COUCH - SIM B
+  - IN BED 01 - IDLE
+  - IN BED 01 - TALK VER. B
+  - IN BED 02 - IDLE
+  - IN BED 02 - TALK
+  - FURIOUS STANDING - IDLE
+  - FURIOUS STANDING - TALK VER. A
+  - FURIOUS STANDING - TALK VER. B
+  - GRAB PHONE *NEEDS PROP*
+  - TEXTING
+  - IN BED 03 - VER. A
+  - IN BED 03 - VER. B
+  - IN BED 01 - TALK VER. A
+  - ON THE COUCH - SIM A
+  - RECEIVE TEXT - WORRIED
+  - READING MESSAGE - MISCHIEVOUS
+  - READING MESSAGE - LAUGHING
+  - IN BED 04 - IN A CALL
+  - HANDING THE PHONE - THE ONE HANDING IT
+  - HANDING THE PHONE - THE ONE RECEIVING IT
+  - SHOWING PHONE - THE ONE SHOWING - IDLE
+  - SHOWING PHONE - THE ONE WATCHING - IDLE
+  - SHOWING PHONE - THE ONE SHOWING - TALK
+  - SHOWING PHONE - THE ONE WATCHING - TALK
+  - [New!] ANNOYING BUSYBODY - SIM A
+  - [New!] ANNOYING BUSYBODY - SIM B
+## {SovaSims} - SAD Animations.package  clips=10 frames=501-620
+  - BREAK UP / SIM A
+  - BREAK UP / SIM B
+  - COMFORTING V1 - THE ONE COMFORTING
+  - COMFORTING V1 - THE ONE BEING COMFORTED
+  - COMFORTING V2 - THE ONE COMFORTING
+  - IDLE VERSION
+  - COMFORTING V2 - THE ONE BEING COMFORTED
+  - IDLE VERSION
+  - COMFORTING V2 - THE ONE COMFORTING
+  - TALKING VERSION
+  - COMFORTING V2 - THE ONE BEING COMFORTED
+  - TALKING VERSION
+  - [New!] HEARTBROKEN - SITTING - IDLE
+  - [New!] HEARTBROKEN - SITTING - TALK
+## {SovaSims} - Sitting Animations 2.0.package  clips=10 frames=175-530
+  - Ver. 2
+  - UPSET - IDLE V1
+  - UPSET - TALK V1
+  - UPSET - V1 TO V2
+  - UPSET - IDLE V2
+  - UPSET - TALK V2
+  - UPSET - IDLE V3
+  - UPSET - TALK V3
+  - [New!] DRINKING WINE / IDLE
+  - [New!] DRINKING WINE / TALK
+## {SovaSims} - Sitting Animations.package  clips=57 frames=126-300
+  - Listen / Front
+  - [1] Neutral
+  - [2] Neutral
+  - Talking / Front
+  - Listen / Left
+  - [3] Neutral
+  - Talking / Left
+  - Listen / Right
+  - [4] Neutral
+  - [5] Neutral
+  - Talking / Right
+  - [6] Neutral
+  - [1] Upset
+  - Listen / Front
+  - Talking / Front
+  - [2] Upset
+  - Listen / Left
+  - [3] Upset
+  - Talking / Left
+  - Listen / Right
+  - [5] Upset
+  - Talking / Right
+  - [4] Upset
+  - [6] Upset
+  - [1] Sad
+  - Listen / Front
+  - Talking / Front
+  - [2] Sad
+  - Listen / Left
+  - [3] Sad
+  - Talking / Left
+  - [4] Sad
+  - Listen / Right
+  - [5] Sad
+  - Talking / Right
+  - [6] Sad
+  - [1] Bored
+  - Listen / Front
+  - Talking / Front
+  - [2] Bored
+  - Listen / Left
+  - [3] Bored
+  - [4] Bored
+  - Talking / Left
+  - Listen / Right
+  - Talking / Right
+  - [5] Bored
+  - [6] Bored
+  - ...with food tray
+  - Sitting Down
+  - Dinning Chair [3] 
+  - Dinning Chair [4]
+  - Dinning Chair [2] 
+  - Dinning Chair [1] 
+  - Sit Down
+  - Standing Up
+  - Looking Left / Idle
+  - Looking Left / Talking
+  - Couch [START 1]
+  - Front, neutral 
+  - Couch [START 2]
+  - Front, crossed arms, upset.
+  - Couch [START 3]
+  - Down, sad.
+  - Couch [START 4]
+  - Front, one leg above other.
+  - Couch [START 5]
+  - Front, both hands relaxed.
+  - Couch [START 6]
+  - Front, legs open.
+  - Front, neutral 
+  - Front, neutral 
+  - Front, crossed arms, upset.
+  - Front, crossed arms, upset.
+  - Down, sad.
+  - Down, sad.
+  - Front, one leg above other.
+  - Front, one leg above other.
+  - Front, both hands relaxed.
+  - Front, both hands relaxed.
+  - Front, legs open.
+  - Front, legs open.
+  - Couch [IDLE 1]
+  - Couch [IDLE 2]
+  - Couch [IDLE 3]
+  - Couch [IDLE 4]
+  - Couch [IDLE 5]
+  - Couch [IDLE 6]
+  - Couch [TALK 1]
+  - Couch [TALK 2]
+  - Couch [TALK 3]
+  - Couch [TALK 4]
+  - Couch [TALK 5]
+  - Couch [TALK 6]
+  - DESK - START 01
+  - DESK - LOOK BEHIND
+  - DESK - START 02 - SIM A 
+  - DESK - START 02 - SIM B
+  - [New!] LOOK DOWN -> RIGHT
+  - [New!] LOOK FRONT -> LEFT
+  - [New!] LOOK RIGHT - IDLE
+  - [New!] LOOK LEFT - IDLE
+  - [New!] LOOK RIGHT - TALK
+  - [New] LOOK LEFT - TALK
+## {SovaSims} - Turn Animations.package  clips=12 frames=236-236
+  - [RIGHT TURN] NEUTRAL IDLE
+  - [RIGHT TURN] NEUTRAL TALK
+  - [RIGHT TURN] CONFUSED V1
+  - [RIGHT TURN] CONFUSED V2
+  - [RIGHT TURN] SAD IDLE
+  - [RIGHT TURN] SAD TALK
+  - [RIGHT TURN] UPSET IDLE V1
+  - [RIGHT TURN] UPSET TALK V1
+  - [RIGHT TURN] UPSET IDLE V2
+  - [RIGHT TURN] UPSET TALK V2
+  - [RIGHT TURN] SURPRISED V1
+  - [RIGHT TURN] SURPRISED V2
+## {SovaSims} - Walking Animations.package  clips=2 frames=181-181
+  - GET IN THE WAY - SIM A
+  - GET IN THE WAY - SIM B
+  - SIM IS LEAVING BUT SIM B GETS IN THE WAY
+  - THE ONE THAT GETS IN THE WAY OF SIM A
