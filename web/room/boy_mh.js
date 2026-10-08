@@ -236,7 +236,7 @@ export function createMH(env) {
     for (const k of ["desk_type", "desk_mouse", "desk_watch"]) if (got[k] && !got[k].name.startsWith("desk_")) { got[k] = got[k].clone(); got[k].name = k; }
     // optional: the clips some bodies have and others not (v5: G12's awake-on-the-bed music clips); a missing one just stays off
     // (?nobedcap: without the captured bed clips, as before them - to measure against)
-    const extra = typeof location !== "undefined" && /[?&]nobedcap\b/.test(location.search) ? {} : EXTRA;
+    const extra = typeof location !== "undefined" && /[?&]nobedcap\b/.test(location.search) ? {} : env.extra || EXTRA;   // (env.extra: a character with its own, or none - ?char=mixamo has none baked yet)
     await Promise.all(Object.entries(extra).map(([k, f]) => env.load(`${env.clipDir || "room/mh"}/${f}.glb`).then(g => { got[k] = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; }, () => {})));
     const mixer = env.mixer, A = env.actions, H = env.HIPS;
     // the way into and out of typing (optional)

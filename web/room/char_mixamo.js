@@ -94,4 +94,7 @@ export const ROOM = {
   // (kimodo/seat_sweep.mjs: the page's penetration() every 0.1 s over each mode's clip): clear of the chair from -0.06 m
   // (watching, typing and the mouse, which plays watching's body as on main) to past -0.12 m; each set 1.5 cm inside that
   seatAt: {desk_watch: [0, -0.075], desk_type: [0, -0.075], desk_mouse: [0, -0.075]},
+  // the captured bed clips (boy_mh.js EXTRA, kimodo/bed_rebake.sh) are baked for v5 only: none here yet, he lies down as
+  // on main (bed_rebake.sh has a Mixamo-named-rig path, unverified on this character: OUTDIR=web/room/mh_mx)
+  extra: {},
 };
