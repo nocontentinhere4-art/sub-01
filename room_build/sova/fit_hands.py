@@ -54,21 +54,25 @@ def apply(B, c, side, off):
             if np.dot(out[i], out[i - 1]) < 0: out[i] = -out[i]
         c['rot'][nm(b)] = out.round(6).tolist()
 
+def clear(B, c):
+    """both resting hands out of his body (not the phone hand); rewrites c['rot'], returns the report"""
+    rep = {}
+    for side in ('Left', 'Right'):
+        if c.get('hand') == side: continue                       # the phone hand is the grip; it is not resting
+        D0, _ = depth_track(B, c, side); tot = np.zeros((c['frames'], 3))
+        for it in range(2):
+            D, N = depth_track(B, c, side) if it else (D0, depth_track(B, c, side)[1])
+            need = np.where(D > 0.005, D + 0.005, 0.0); k = 5
+            amt = smooth_max(need, k); nrm = np.stack([np.convolve(np.pad(N[:, j], k, mode='edge'), np.ones(2 * k + 1) / (2 * k + 1), 'valid') for j in range(3)], 1)
+            nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9); off = nrm * amt[:, None]
+            if amt.max() < 1e-4: break
+            apply(B, c, side, off); tot += off
+        D1, _ = depth_track(B, c, side)
+        rep[side] = dict(before_cm=round(float(D0.max() * 100), 1), after_cm=round(float(D1.max() * 100), 1),
+                         moved_cm=round(float(np.linalg.norm(tot, axis=1).max() * 100), 1), frames_moved=int((np.linalg.norm(tot, axis=1) > 1e-4).sum()))
+    return rep
+
 if __name__ == '__main__':
     B = Body(sys.argv[1], vstep=2)
     for f in sys.argv[2:]:
-        c = json.load(open(f)); rep = {}
-        for side in ('Left', 'Right'):
-            if c.get('hand') == side: continue                       # the phone hand is the grip; it is not resting
-            D0, _ = depth_track(B, c, side); tot = np.zeros((c['frames'], 3))
-            for it in range(2):
-                D, N = depth_track(B, c, side) if it else (D0, depth_track(B, c, side)[1])
-                need = np.where(D > 0.005, D + 0.005, 0.0); k = 5
-                amt = smooth_max(need, k); nrm = np.stack([np.convolve(np.pad(N[:, j], k, mode='edge'), np.ones(2 * k + 1) / (2 * k + 1), 'valid') for j in range(3)], 1)
-                nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9); off = nrm * amt[:, None]
-                if amt.max() < 1e-4: break
-                apply(B, c, side, off); tot += off
-            D1, _ = depth_track(B, c, side)
-            rep[side] = dict(before_cm=round(float(D0.max() * 100), 1), after_cm=round(float(D1.max() * 100), 1),
-                             moved_cm=round(float(np.linalg.norm(tot, axis=1).max() * 100), 1), frames_moved=int((np.linalg.norm(tot, axis=1) > 1e-4).sum()))
-        c['hands_fit_cm'] = rep; json.dump(c, open(f, 'w')); print(c['set'], rep, flush=True)
+        c = json.load(open(f)); c['hands_fit_cm'] = clear(B, c); json.dump(c, open(f, 'w')); print(c['set'], c['hands_fit_cm'], flush=True)

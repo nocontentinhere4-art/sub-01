@@ -1,7 +1,8 @@
 """Hand close-up video, before | after side by side: the camera follows the hands (both, or one), 640x360 by default.
 python3 -I handcam.py <spec.json> <out.mp4>
 spec: {"segments": [{"glb", "before": [clip.glb], "after": [clip.glb], "clip", "title", "secs", "t0"?, "bones"?: [...],
-                     "dir"?: [x,y,z] (target -> camera, his frame: +Z forward, +X his left), "dist"?: m, "seat"?: y}]}"""
+                     "dir"?: [x,y,z] (target -> camera, his frame: +Z forward, +X his left), "dist"?: m, "seat"?: y,
+                     "stats"?: {"before"|"after": {"L"|"R": [% of frames out of the owner range: thumb..pinky]}}}]}"""
 import json, sys, os, io, base64, math, threading, http.server, socketserver, subprocess
 from PIL import Image, ImageDraw, ImageFont
 from playwright.sync_api import sync_playwright
@@ -19,6 +20,7 @@ srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), Hd); port = srv.server_a
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 F1 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', max(12, H // 22))
 F2 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', max(12, H // 18))
+F3 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf', max(9, H // 32)); LH = max(10, H // 28)
 ff = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
                        '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-maxrate', os.environ.get('MRATE', '900k'), '-bufsize', '2600k',
                        '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], stdin=subprocess.PIPE)
@@ -54,6 +56,14 @@ with sync_playwright() as p:
             ov = Image.new('RGBA', (W, H // 9), (20, 22, 28, 170)); im.paste(ov, (0, 0), ov)
             dr.text((8, 4), g['title'], font=F1, fill=(255, 255, 255))
             dr.text((8, H - H // 12 - 4), 'PRIMA', font=F2, fill=(200, 40, 40)); dr.text((HW + 8, H - H // 12 - 4), 'DOPO', font=F2, fill=(20, 130, 50))
+            if g.get('stats'):                    # % of frames out of the owner's range, per finger (pol ind med anu mig)
+                for k, key in enumerate(('before', 'after')):
+                    x0 = k * HW + HW - int(HW * 0.62); y0 = H - int(H * 0.30); bx = Image.new('RGBA', (int(HW * 0.62) - 4, int(H * 0.30) - 4), (255, 255, 255, 200)); im.paste(bx, (x0, y0), bx)
+                    dr.text((x0 + 4, y0 + 2), '% fuori range proprietario', font=F3, fill=(30, 30, 30))
+                    dr.text((x0 + 4, y0 + 2 + LH), '    pol ind med anu mig', font=F3, fill=(30, 30, 30))
+                    for j, hs in enumerate(('L', 'R')):
+                        v = g['stats'][key][hs]; col = (200, 40, 40) if max(v) > 10 else (20, 130, 50)
+                        dr.text((x0 + 4, y0 + 2 + LH * (2 + j)), ('Sx ' if hs == 'L' else 'Dx ') + ' '.join(f'{x:3.0f}' for x in v), font=F3, fill=col)
             ff.stdin.write(im.tobytes())
         total += n; print(f'{g["clip"]:30s} {n} frames, total {total / FPS:.1f}s', flush=True)
         for pg, _ in pages: pg.close()
