@@ -1,5 +1,5 @@
 {
- "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh).",
+ "note": "Sova seated clips for our chair (room_build/sova/desk_build.sh: kimodo/mx_fit.py, then the resting hands put on the thighs); mh_mx format; licence pending: preview only, never in web/ until COORD clears it. Reference: room_seated_idle hands y 0.787/0.783 m. Final: fit_rest (hands onto the thighs) then fit_hands (nothing of the hands inside him, trouser/hoodie mesh). v3: the fits arm corrections smoothed over time (smooth_fit.py, loops wrapped); room_seated_idle moves at most 14 mm per frame.",
  "fps": 30,
  "clips": [
   {
@@ -20,8 +20,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.863,
-    0.802
+    0.845,
+    0.804
    ],
    "room": "not measured: a sit-down transition (played as the watching loop it walks through the chair, which says nothing)",
    "fit": {
@@ -43,12 +43,10 @@
    },
    "hands_in_body_mesh": {
     "Left": {
-     "frames": 1,
-     "max_verts": 2,
-     "max_depth_cm": 1.1,
-     "by_region_cm": {
-      "torso": 1.1
-     }
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
     },
     "Right": {
      "frames": 0,
@@ -56,7 +54,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    65,
+    "LeftToe_End",
+    1.5
+   ],
+   "loop_seam_mm": null
   },
   {
    "slug": "desk_look_behind",
@@ -76,8 +80,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.748,
-    0.763
+    0.747,
+    0.762
    ],
    "room": {
     "chair": {},
@@ -131,7 +135,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    9,
+    "HeadTop_End",
+    2.07
+   ],
+   "loop_seam_mm": 0
   },
   {
    "slug": "neutral_1",
@@ -206,7 +216,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    6,
+    "LeftHandRing4",
+    4.63
+   ],
+   "loop_seam_mm": 1
   },
   {
    "slug": "neutral_3",
@@ -227,7 +243,7 @@
    ],
    "hands_y_median_m": [
     0.78,
-    0.757
+    0.756
    ],
    "room": {
     "chair": {},
@@ -281,7 +297,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    6,
+    "LeftHandMiddle4",
+    4.7
+   ],
+   "loop_seam_mm": 3
   },
   {
    "slug": "neutral_5",
@@ -302,7 +324,7 @@
    ],
    "hands_y_median_m": [
     0.78,
-    0.757
+    0.756
    ],
    "room": {
     "chair": {},
@@ -356,7 +378,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    6,
+    "LeftHandMiddle4",
+    4.7
+   ],
+   "loop_seam_mm": 3
   },
   {
    "slug": "look_right_idle",
@@ -376,7 +404,7 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.775,
+    0.772,
     0.767
    ],
    "room": {
@@ -431,7 +459,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    4,
+    "LeftForeArm",
+    5.8
+   ],
+   "loop_seam_mm": 1
   },
   {
    "slug": "look_left_idle",
@@ -452,7 +486,7 @@
    ],
    "hands_y_median_m": [
     0.738,
-    0.775
+    0.774
    ],
    "room": {
     "chair": {},
@@ -506,7 +540,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    4,
+    "RightForeArm",
+    6.33
+   ],
+   "loop_seam_mm": 2
   },
   {
    "slug": "look_down_to_right",
@@ -581,7 +621,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    10,
+    "HeadTop_End",
+    9.13
+   ],
+   "loop_seam_mm": 0
   },
   {
    "slug": "look_front_to_left",
@@ -656,7 +702,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    8,
+    "HeadTop_End",
+    1.67
+   ],
+   "loop_seam_mm": 0
   },
   {
    "slug": "seat_looking_away_idle",
@@ -677,8 +729,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.76,
-    0.763
+    0.755,
+    0.758
    ],
    "room": {
     "chair": {},
@@ -732,7 +784,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    16,
+    "HeadTop_End",
+    0.5
+   ],
+   "loop_seam_mm": 38
   },
   {
    "slug": "seat_looking_around_v1",
@@ -753,8 +811,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.787,
-    0.762
+    0.788,
+    0.761
    ],
    "room": {
     "chair": {},
@@ -808,7 +866,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    34,
+    "HeadTop_End",
+    8.67
+   ],
+   "loop_seam_mm": 38
   },
   {
    "slug": "seat_looking_around_v2",
@@ -829,8 +893,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.794,
-    0.787
+    0.793,
+    0.788
    ],
    "room": {
     "chair": {},
@@ -884,7 +948,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    19,
+    "HeadTop_End",
+    1.4
+   ],
+   "loop_seam_mm": 2
   },
   {
    "slug": "seat_looking_left",
@@ -905,7 +975,7 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.796,
+    0.808,
     0.757
    ],
    "room": {
@@ -960,7 +1030,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    24,
+    "HeadTop_End",
+    2.63
+   ],
+   "loop_seam_mm": 39
   },
   {
    "slug": "seat_looking_right",
@@ -981,8 +1057,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.758,
-    0.774
+    0.756,
+    0.779
    ],
    "room": {
     "chair": {},
@@ -1036,7 +1112,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    23,
+    "HeadTop_End",
+    2.6
+   ],
+   "loop_seam_mm": 37
   },
   {
    "slug": "seat_neck_stretching_idle",
@@ -1057,8 +1139,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.751,
-    0.768
+    0.749,
+    0.767
    ],
    "room": {
     "chair": {},
@@ -1112,7 +1194,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    15,
+    "HeadTop_End",
+    0.37
+   ],
+   "loop_seam_mm": 35
   },
   {
    "slug": "seat_thinking_touching_chin",
@@ -1133,7 +1221,7 @@
     -0.075
    ],
    "hands_y_median_m": [
-    1.209,
+    1.194,
     0.848
    ],
    "room": {
@@ -1177,12 +1265,10 @@
    },
    "hands_in_body_mesh": {
     "Left": {
-     "frames": 1,
-     "max_verts": 1,
-     "max_depth_cm": 1.2,
-     "by_region_cm": {
-      "torso": 1.2
-     }
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
     },
     "Right": {
      "frames": 0,
@@ -1190,7 +1276,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    62,
+    "LeftHandMiddle3",
+    0.27
+   ],
+   "loop_seam_mm": null
   },
   {
    "slug": "seat_feeling_frustrated_v1",
@@ -1212,7 +1304,7 @@
    ],
    "hands_y_median_m": [
     0.867,
-    0.78
+    0.787
    ],
    "room": {
     "chair": {},
@@ -1266,7 +1358,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    17,
+    "RightHandIndex4",
+    0.3
+   ],
+   "loop_seam_mm": null
   },
   {
    "slug": "seat_feeling_frustrated_v2",
@@ -1287,8 +1385,8 @@
     -0.075
    ],
    "hands_y_median_m": [
-    0.778,
-    0.873
+    0.807,
+    0.872
    ],
    "room": {
     "chair": {},
@@ -1331,12 +1429,10 @@
    },
    "hands_in_body_mesh": {
     "Left": {
-     "frames": 76,
-     "max_verts": 39,
-     "max_depth_cm": 1.9,
-     "by_region_cm": {
-      "torso": 1.9
-     }
+     "frames": 0,
+     "max_verts": 0,
+     "max_depth_cm": 0.0,
+     "by_region_cm": {}
     },
     "Right": {
      "frames": 0,
@@ -1344,7 +1440,13 @@
      "max_depth_cm": 0.0,
      "by_region_cm": {}
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    23,
+    "LeftForeArm",
+    1.7
+   ],
+   "loop_seam_mm": null
   },
   {
    "slug": "seat_distracted_then_smile",
@@ -1366,7 +1468,7 @@
    ],
    "hands_y_median_m": [
     1.058,
-    1.064
+    1.065
    ],
    "room": {
     "chair": {},
@@ -1410,7 +1512,7 @@
    "hands_in_body_mesh": {
     "Left": {
      "frames": 113,
-     "max_verts": 552,
+     "max_verts": 550,
      "max_depth_cm": 5.0,
      "by_region_cm": {
       "RightArm": 5.0
@@ -1418,14 +1520,20 @@
     },
     "Right": {
      "frames": 113,
-     "max_verts": 440,
+     "max_verts": 444,
      "max_depth_cm": 3.8,
      "by_region_cm": {
       "LeftArm": 3.8,
       "LeftHand": 1.7
      }
     }
-   }
+   },
+   "max_joint_move_per_frame_mm": [
+    2,
+    "HeadTop_End",
+    6.13
+   ],
+   "loop_seam_mm": null
   }
  ]
 }

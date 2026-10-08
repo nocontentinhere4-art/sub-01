@@ -3,6 +3,32 @@
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
 
+## Desk v3: elbow jumps smoothed (G14's findings) — GLBs updated, pull them
+G14 measured the 0cd8768 bake per frame:
+- forearms jumping 50–150 mm in a frame (`room_seated_idle`: 14 mm);
+- loop seams 29–41 mm.
+
+The cause was the fits, not the clips: the retargeted motion moves at most 0–35 mm per frame, but the chair fit's sleeve swing and the hand fits solve each frame on its own.
+
+The fix (`smooth_fit.py`):
+- only the fits' correction to each arm bone (`q_final · q_source⁻¹`) is smoothed over time: Gaussian σ = 0.2 s, wrapped round for the loops;
+- then the hands are cleared out of his body again, and smoothed lightly (σ = 0.1 s).
+
+Whole clip, every bone, 30 fps (`desk/index.json`, `desk/hands_mesh.jsonl`):
+
+| clips | biggest move per frame | loop seam | hands (median) | hand inside his body (mesh) |
+|---|---|---|---|---|
+| neutral_1/3/5, look_* ×4, desk_look_behind | **4–10 mm** (was 50–132) | **0–3 mm** (was 29–41) | 0.74–0.78 m | **0** |
+| seat_looking_* ×5, neck stretching | 15–34 mm, the head (the performer's mocap) | 2–39 mm, the head: these mocap clips do not loop in the source, play them once | 0.75–0.81 m | **0** |
+| thinking | 62 mm, a fingertip at 0.27 s (the hand flies to the chin) | – | L 1.19 m (chin) | 0 |
+| frustrated V1 / V2 | 17 / 23 mm | – | 0.79–0.87 m | 0 |
+| distracted then smile | 2 mm | – | 1.06 m (crossed) | crossed arms in each other's sleeves, 3.8–5 cm |
+
+Not fixed:
+- G14's second finding, **fingers into the chair** in frustrated V1 (hands to the hips, from 0.2 s) and thinking (right hand, ~8.6 s). It is at his sides (the armrests), and my room pass does not see it (it measured 0 for the chair). Both are standing performers' hands on a seated body.
+- Suggestion: keep frustrated V1 out of the desk slots (or use V2, not measured by G14 yet); for thinking, trim the end (after ~8 s) or accept it.
+- I can fix them once G14's chair test (`qa.body`) is reproducible here.
+
 ## Videos
 - **`sova_quick.mp4`** (commit ba8d006): 38 s, 640x360, 24 fps, H.264, 0.4 MB. Six clips:
   1. Scrivania – guarda a destra
