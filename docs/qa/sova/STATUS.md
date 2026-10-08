@@ -2,29 +2,35 @@
 
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
-## Desk: hands on the thighs (COORD's note, G14's finding) — GLBs rebaked, room re-check running
-**For G14: `docs/qa/sova/desk/*.glb` are the new bake; pull them.** `desk/index.json` now lists 19 clips, including the 10 seated Action & Reactions, with their hand heights.
+## Desk: hands on the thighs — DONE (COORD's note, G14's finding)
+**For G14: `docs/qa/sova/desk/*.glb` (this commit) are the final bake; pull them.** `desk/index.json` lists all 19 clips with their hand heights, mesh test and room numbers.
 
 The cause:
 - The chair fit's sleeve clearance swung the arms out from the shoulder (up to its 24° cap) and lifted the hands.
-- In the dedda57 bake the hands sat at 0.92 m (body frame), 14 cm over `room_seated_idle`'s 0.78. In the page that put them on the desk's front edge and into the bottle (G14).
+- In the dedda57 bake the hands sat at 0.92 m (body frame), against `room_seated_idle`'s 0.78. In the page that put them on the desk's front edge and into the bottle.
 
 Now, per frame:
 1. The chair fit swings an arm out at most 8°; the sleeves are allowed 1.5 cm on the hoodie (cloth on cloth).
-2. **After** the fit, each resting hand goes across to over the top of his thigh and down to 3 mm over the trousers (`fit_rest.py`: two-bone IK, the hand keeps its orientation, smoothed).
-3. In the idle/look clips both hands always rest. Their left hand used to hover in front of the lap at 0.89–0.93 m, which is desk-edge height.
-4. Gestures keep their hands.
+2. After it, each resting hand goes across to over the top of his thigh and down onto the trousers (`fit_rest.py`; in the idle/look clips both hands always rest).
+3. Then any of the hand still inside him is pushed out along the surface (`fit_hands.py`).
+4. Two-bone IK throughout, the hand keeps its orientation, smoothed; nothing moves where it isn't needed.
 
-Hands' median height (wrist joint, body frame; `room_seated_idle` 0.787 / 0.783 m):
-- **Idle / look clips** (desk_look_behind, neutral_1/3/5, look_* ×4, seat_looking_* ×5, neck stretching): **0.72–0.78 m** both hands.
-- Gestures, high by their content:
-  - thinking: L 1.24, hand at the chin;
-  - distracted-then-smile: 1.06 / 1.06, arms crossed;
-  - frustrated V1 / V2: 0.85 / 0.87, a hand at the hip.
-  - These can still meet the desk edge if the page plays them close to it.
-- desk_start_01 (the sit-down): 0.85 / 0.79.
+Results:
+- **Idle / look clips** (desk_look_behind, neutral_1/3/5, look_* ×4, seat_looking_* ×5, neck stretching), whole clip, every 2nd frame:
+  - hands at **0.74–0.80 m** (reference 0.78);
+  - **0 vertices of either hand inside his body** (trouser/hoodie mesh test);
+  - room: chair **0**, desk **0**, other furniture **0**, floor **0**, seat gap +0.2…5.0 cm (never under), soles 0.2–4.8 cm on the floor.
+- **Gestures** (performer arms):
+  - thinking (hand to the chin, 1.21 m): 1 frame of 125 at 1.2 cm.
+  - frustrated V1 (hand at the hip, 0.87 m): 0.
+  - frustrated V2: the left hand 1.9 cm into the hoodie at the hip, 76 of 113 frames.
+  - distracted-then-smile (arms crossed, 1.06 m): each hand 3.8–5 cm into the other sleeve, every frame (crossed arms in baggy sleeves).
+  - Room: all 0 / clear.
+  - These raised hands can still meet the desk edge if the page plays them close to it.
+- desk_start_01 (the sit-down): not measured in the room as a loop; it belongs to the stand→sit step.
+- The room pass's "hands in thighs" row reads 100–350 frames at 10–13 cm for every clip now: its capsule (radius up to 15 cm, sized from the baggy trousers) counts a hand resting ON the cloth as inside, as its README warns. The mesh test above is the honest one.
 
-The room re-check of the new bake (chair, desk, floor, seat, soles) is running; numbers to follow here.
+Sheets: `sova_desk_seated.jpg`, `sova_desk_reactions.jpg` (front + side, 8 frames each).
 
 ## Desk group: seated set done (`desk/*.glb`, `desk/index.json`, `sova_desk_seated.jpg`)
 - Measured **in the room** with the room's own `contact_pass.mjs`: each clip played as the desk-watching clip, in a local symlinked copy of `web/` (nothing in `web/` changes), over the whole clip, every frame.
