@@ -1436,7 +1436,7 @@ function glowOf(img){
   catch { return null; }
 }
 function lighting(dt){
-  const H = mood ? mood.hour : hour;                               // (?mood=1: the visitor may be previewing another hour)
+  const H = mood ? mood.tick(dt, hour) : hour;                     // (?mood=1: the visitor may be previewing another hour)
   const sunEl = Math.sin(Math.PI * (H - 5.6) / 12.2);              // Tokyo, autumn: ~05:35 to ~17:45
   const day = smooth(-0.08, 0.3, sunEl), dusk = clamp(1 - Math.abs(sunEl - 0.03) / 0.25, 0, 1);
   const awake = stage === "AWAKE", home = boy && boy.visible;
@@ -3222,7 +3222,7 @@ function frame(now){
   // 8-16 s while he moves (live 2026-10-08 08:02: the chair empty for 3 minutes of "at the computer"; with 8 s at most
   // he still ran at about half of real time). A tab coming back catches up 8 s at most, as before (CATCH.back)
   const real = Math.min(CATCH.back ?? CATCH.max, late), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n; CATCH.back = null;
-  windowView.update(real, mood ? mood.tick(real, hour) : hour);   // the sky, the city, the weather follow his clock (or the mood preview's)
+  windowView.update(real, hour);                      // the sky, the city, the weather follow his clock
   let moving = false; for (let i = 0; i < n; i++) moving = animate(dt) || moving;
   if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
   lighting(real);

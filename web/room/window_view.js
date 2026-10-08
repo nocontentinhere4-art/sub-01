@@ -356,7 +356,8 @@ export function createWindowView(THREE, opts = {}){
     U.uMoonDir.value.set(Math.sin(maz) * Math.cos(mel), Math.sin(mel), Math.cos(maz) * Math.cos(mel));
     if (mesh) {                                                   // the window's frame: x right, y up, z out of the room (-z of the plane)
       const d = sunEl > -0.06 ? U.uSunDir.value : U.uMoonDir.value, ry = mesh.rotation.y, c = Math.cos(ry), s = Math.sin(ry);
-      light.dir.set(d.x * c - d.z * s, d.y, -d.x * s - d.z * c).normalize(); light.moon = sunEl <= -0.06; light.up = sunEl;
+      const x = d.x * c - d.z * s, z = -d.x * s - d.z * c, n = Math.hypot(x, d.y, z) || 1;
+      light.dir.x = x / n; light.dir.y = d.y / n; light.dir.z = z / n; light.moon = sunEl <= -0.06; light.up = sunEl;
     }
     // weather eases towards its target (a front takes minutes to arrive, a debug switch about two seconds)
     const w = target(); state.weather = w;

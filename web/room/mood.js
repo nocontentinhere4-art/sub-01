@@ -15,7 +15,7 @@
 //
 //   import { createMood } from "./room/mood.js";
 //   const mood = createMood(THREE, ctx);   // ctx: see the destructuring below
-//   mood.tick(dt, hour)                    // every frame, before windowView.update: returns the hour to show
+//   mood.tick(dt, hour)                    // every frame, in lighting(): returns the hour to show
 //   mood.hour                              // the hour the room is lit for (the real one, or the preview)
 //   mood.light(dt, {day})                  // every frame, after lighting(): the mood's lights on top
 //   mood.onRoom(room)                      // once the room model is in: its materials for the swatches
@@ -306,6 +306,8 @@ export function createMood(THREE, ctx){
   const cLamp = new THREE.Color(0xffa860), cCeil = new THREE.Color(0xffcf9a), cWarmHemi = new THREE.Color(0xffd7b0), cNightHemi = new THREE.Color(0.20, 0.24, 0.42);
   let roomK = 0, deskK = 0, nightK = 0, lateK = 0, rays = choice.rays ? 1 : 0, sDirect = 0;
   function light(dt, base){
+    // a preview: the window shows that hour too (its clock already ran this frame: dt 0 only re-aims the sky and the sun)
+    if (state.preview !== null && ctx.windowView) ctx.windowView.update(0, state.hour);
     const h = state.hour, ph = dayPhase(h), wl = windowLight();
     const up = wl.up ?? Math.sin(Math.PI * (h - 5.6) / 12.2), day = base && Number.isFinite(base.day) ? base.day : smooth(-0.08, 0.3, up);
     const k = Math.min(1, dt * 2.5), awake = stage() === "AWAKE", isHome = home();
