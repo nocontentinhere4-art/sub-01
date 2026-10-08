@@ -105,8 +105,16 @@ Status: **first working version done** (G24): code, tests and the demo video are
 
 The existing suite and smoke run:
 - `python tests/smoke_demo.py`: **SMOKE OK** (above).
-- `pytest tests`: before the Dockerfile fix, `-x` stopped at `test_dockerfile_copies_every_imported_module` (fixed:
-  audience.py is now copied) after 456 passed. Full-run result: see the line below (updated when the run finishes).
+- `pytest tests` (full suite, 1,558 tests with these 16): everything outside `tests/visual/` passes, including
+  `test_dockerfile` (it caught `audience.py` missing from the Dockerfile; fixed). In `tests/visual/` (headless Chromium
+  + SwiftShader), the tests that fail here **fail the same way on the untouched base commit `96d6cad`** (run side by
+  side in a worktree), so this branch didn't cause them:
+  - `test_hand_switch::test_no_snap_switching_between_keys_and_mouse`: fails on the base too.
+  - `test_visual::test_room_renders_without_hard_errors`: the same 3 items on the base and the branch (chair/desk
+    penetration in `walking_8_1280`, desk penetration in `eating_19_1280`). Under CPU load it adds timing items on both
+    (`desk_14_390`, and once `door_8_1280` here); run alone, the branch shows only the 3.
+  - `test_phone_camera` (6 cases): fail here (each takes minutes under software GL); they come after the hand-switch
+    failure and timed out on the base run too.
 
 ## Demo video
 `demo.mp4`: 45 s, 1280×720. The desktop part shows a vote round, his move to the desk, then the reactions and the
