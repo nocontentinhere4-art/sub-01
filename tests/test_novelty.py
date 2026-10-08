@@ -365,3 +365,18 @@ def test_a_shops_words_are_not_interests(q):
     assert query_ok(q) is None
     assert query_ok("Kichijoji shops") == "Kichijoji shops"                 # (the walk's street)
     assert S.interest_for(seen={"screen": [q]}, query_ok=query_ok) is None
+
+
+# live 2026-10-08 04:02: page titles became queries with their site's name ("anime movie — MyAnimeList", "Demon Slayer —
+# MyAnimeList", searched on MyAnimeList itself) and a video search was just the site's name ("myanimelist anime")
+@pytest.mark.parametrize("q, want", [
+    ("anime movie — MyAnimeList", "anime movie"), ("Demon Slayer — MyAnimeList", "Demon Slayer"),
+    ("Demon Slayer | MyAnimeList.net", "Demon Slayer"), ("Frieren: Beyond Journey's End - MyAnimeList.net", "Frieren: Beyond Journey's End"),
+    ("Inokashira Park - Wikipedia", "Inokashira Park"), ("Spirited Away ｜ YouTube", "Spirited Away"),
+    ("Spider-Man", "Spider-Man"), ("A - B", "A - B"), ("studio ghibli", "studio ghibli"), ("Mark Rober", "Mark Rober"),
+    ("myanimelist anime", None), ("MyAnimeList", None), ("YouTube video", None), ("Wikipedia — the free encyclopedia", None)])
+def test_a_page_titles_site_name_is_not_part_of_the_query(q, want):
+    from eyes import query_ok
+    assert query_ok(q) == want
+    it = S.interest_for(seen={"screen": [q]}, query_ok=query_ok)
+    assert (it and it["query"]) == (want or None)

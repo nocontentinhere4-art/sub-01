@@ -317,13 +317,47 @@ def clean_label(s, fallback="", video=False):
 
 
 def query_ok(q):
-    q = " ".join(str(q or "").split())
-    if not 2 <= len(q) <= 60 or len(q.split()) > 6:
+    q = strip_site(" ".join(str(q or "").split()))
+    if not 2 <= len(q) <= 60 or len(q.split()) > 6 or site_only(q):
         return None
     if (chat_blocked(q) or BAD_WORDS.search(q) or BAD_HOST.search(q) or TOPIC_BLOCK.search(q) or "/" in q
             or BUY_SELL.search(q) or SHOP_WORDS.search(q)):
         return None
     return q
+
+
+# a page's title carries its site's name ("Demon Slayer — MyAnimeList", "... | Wikipedia"): not part of what he looks up
+# (live 2026-10-08 04:02: "anime movie — MyAnimeList" and "Demon Slayer — MyAnimeList" were searched on MyAnimeList, and
+# "myanimelist anime" on YouTube). The tail after " — " / " | " goes when it is a few words (a site's name); after
+# " - " only when it is a site we know, since " - " also joins real titles. A query of a site's name and generic
+# words alone ("myanimelist anime", "YouTube video") is no interest.
+SITES = ("myanimelist", "wikipedia", "wikimedia commons", "youtube", "youtube shorts", "tiktok", "bing", "duckduckgo",
+         "google", "arxiv", "hacker news", "open library", "recipetin eats", "science news", "carscoops", "pc gamer",
+         "tmdb", "the movie database", "nme", "9to5mac", "imdb", "letterboxd", "reddit", "fandom", "anilist",
+         "crunchyroll", "netflix", "twitter", "instagram", "github", "medium", "quora", "bbc", "cnn")
+SITE_RE = "|".join(re.escape(x).replace(r"\ ", r"\s+") for x in sorted(SITES, key=len, reverse=True))
+SITE_TAIL = re.compile(r"\s+(?:[—–|｜·]\s*[^—–|｜·]{1,40}|-\s+(?:" + SITE_RE + r")(?:\.\w{2,4})?(?:\s+wiki)?)\s*$", re.I)
+SITE_WORD = re.compile(r"\b(?:" + SITE_RE + r")(?:\.\w{2,4})?\b", re.I)
+GENERIC = re.compile(r"\b(?:anime|manga|movies?|films?|videos?|shorts?|clips?|wiki|official|site|page|home|search|"
+                     r"channel|results?|news|the|a|an|on|of|in)\b", re.I)
+
+
+def strip_site(q):
+    """A page title's site suffix off a query: "Demon Slayer — MyAnimeList" -> "Demon Slayer" (once or twice)."""
+    for _ in range(2):
+        t = SITE_TAIL.sub("", q).strip()
+        if not t or len(t.split()) > len(q.split()) or t == q:
+            break
+        tail = q[len(t):]
+        if re.search(r"[—–|｜·]", tail) and len(tail.split()) > 5:    # (a long tail is the title, not a site's name)
+            break
+        q = t
+    return q
+
+
+def site_only(q):
+    """True when nothing is left of a query but site names and generic words ("myanimelist anime")."""
+    return bool(SITE_WORD.search(q)) and not GENERIC.sub(" ", SITE_WORD.sub(" ", q)).strip(" -–—|.:,")
 
 
 BUY_SELL = re.compile(r"\b(buy|buying|sell|selling|swap|invest|investing|ape into|to the moon)\b", re.I)   # never typed
