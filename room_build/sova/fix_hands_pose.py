@@ -175,7 +175,8 @@ def main(src, dst, phone):
     if B is not None:                                          # then nothing of the (now curled) hands inside him: fit_hands
         c = as_clip()
         for it in range(2):                                    # clear (the IK keeps the hand's world turn, so the wrist bends),
-            rep[f'clear_{it}'] = fit_hands.clear(B, c)         # then the wrist back into his range; twice
+            ch_ = c['hand']; c['hand'] = None                  # the phone hand too: the phone rides on it
+            rep[f'clear_{it}'] = fit_hands.clear(B, c); c['hand'] = ch_   # then the wrist back into his range; twice
             for side in ('Left', 'Right'):
                 if side == phone: continue
                 hn = f'mixamorig:{side}Hand'; qh = np.array(c['rot'][hn])

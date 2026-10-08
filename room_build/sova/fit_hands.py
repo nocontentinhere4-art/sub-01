@@ -21,7 +21,7 @@ def depth_track(B, c, side, step=2):
     other = 'Right' if side == 'Left' else 'Left'
     for f in fr:
         p, nn = B.skin(Wj, f)
-        body = np.isin(B.reg, ['torso', 'head', 'legs', other + 'Arm']); tree = cKDTree(p[body]); hv = p[B.reg == side + 'Hand']   # the other arm too (crossed arms)
+        body = np.isin(B.reg, ['torso', 'head', 'legs', other + 'Arm', other + 'Hand']); tree = cKDTree(p[body]); hv = p[B.reg == side + 'Hand']   # the other arm too (crossed arms)
         d, i = tree.query(hv, distance_upper_bound=0.10); ok = np.isfinite(d)
         q = p[body][i[ok]]; qn = nn[body][i[ok]]; dep = -np.einsum('ij,ij->i', hv[ok] - q, qn)
         m = dep > 0.005
@@ -36,7 +36,7 @@ def gap_track(B, c, side, step=2, regions=('torso', 'head', 'legs'), other_arm=T
     there, and the bone that skin follows; the other arm counts as body (crossed arms)"""
     Wj, wm = B.joints(c); n = c['frames']; fr = list(range(0, n, step)); G, N, R = [], [], []
     other = 'Right' if side == 'Left' else 'Left'
-    reg = list(regions) + ([other + 'Arm'] if other_arm else [])
+    reg = list(regions) + ([other + 'Arm', other + 'Hand'] if other_arm else [])   # hands together: the other hand too
     body = np.isin(B.reg, reg)
     for f in fr:
         p, nn = B.skin(Wj, f)
