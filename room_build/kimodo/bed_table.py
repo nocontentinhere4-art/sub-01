@@ -22,7 +22,7 @@ ROWS = [  # label, contract, value(d, L), pass(d, L)
      lambda d, L: not L.get('phones') or not L['phones']['pillowFrames']),
     ("duvet: any of him through it", "0", lambda d, L: "-" if not L.get('duvet') else (f"{L['duvet']['pokeFrames']} frames, {L['duvet']['poke']} cells, {L['duvet']['pokeMax_cm']} cm" if L['duvet']['pokeFrames'] else "0"),
      lambda d, L: not L.get('duvet') or not L['duvet']['pokeFrames']),
-    ("duvet's top over the mattress, over his legs (cm)", "≤ 15", lambda d, L: "-" if not (L.get('duvet') or {}).get('top_over_mattress', {}).get('legs') else L['duvet']['top_over_mattress']['legs']['max_cm'],
+    ("duvet's top over the mattress, over his legs (cm)", "≤ 15", lambda d, L: "-" if not (L.get('duvet') or {}).get('top_over_mattress', {}).get('legs') else str(L['duvet']['top_over_mattress']['legs']['max_cm']),
      lambda d, L: not (L.get('duvet') or {}).get('top_over_mattress', {}).get('legs') or L['duvet']['top_over_mattress']['legs']['max_cm'] <= 15),
     ("duvet over him: gap, mean / max (cm)", "follows him", lambda d, L: "-" if not L.get('duvet') else "; ".join(f"{k} {v['mean_cm']}/{v['max_cm']}" for k, v in L['duvet']['gap_by_region'].items()), lambda d, L: True),
 ]

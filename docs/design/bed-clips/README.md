@@ -146,12 +146,31 @@ Videos: `sleep_turn.mp4` (the turn, 17.4 s, page camera zoomed + side) and `list
   - his toes are held 2.8 cm inside the mattress's end while he rolls (his socks are longer: they went 0.4 cm past).
 - **Instruments**: the head test in the contact pass and in the fit is now the same rule (behind the nearest head-skin point, seen from the head's centre), and the hood is not his head.
 
+## C #8: the sink, the straight legs, the duvet
+
+Re-measured with the clips of this commit, every frame (`contact/`). This supersedes the back, head and duvet numbers above where they differ.
+
+| row | C's pass | listen | sleep | the turn |
+|---|---|---|---|---|
+| buttocks (bin 100, just past the hip joint) | ≤ +1 cm | +0.9 | +0.9 | – |
+| back, lowest | ≥ −2.5 cm | −2.1 | −2.4 | −2.8 (mid-roll) |
+| head on the pillow | −2 … 0 | −1.7 … −0.5 | −1.8 … −0.4 | −2.1 … +1.1 |
+| toes inside the mattress end | ≤ 3.5 cm | 0.8 | 0.8 | 0.4 |
+| bed (less its give) / bed frame / floor | 0 | 0 | 0 | 0 |
+| hands in his body | his face: 0 | 0 | 0 | chest 2.7 cm, 32 frames; face 0 |
+| duvet's top over his legs | ≤ 15 cm | – | 23.9–30.2 (32–40 next to his hips) | – |
+
+- **The sink** (`bed_clip.py` BED_SINK, `boy_mh.js` BED_SINK, per row in `mixamo_clips.json`): the mattress gives under his back and hips. The fit lowers them by `sink` (2.0 cm awake, 1.65 cm asleep) and fits his heels and the back of his head for that height. The page rests his lowest skin, now his back, `sink − BACK_UP` under the bed's top (1.8 / 0.65 cm). Only the mattress takes it: the head is fitted to the pillow as before, and nothing reaches the bed frame or the floor.
+- **Straight legs** (`flat`: 1.0): the hips' and knees' bend blended all the way to straight before the fit, and the toes allowed to within 0.8 cm of the mattress end (`toe_in`). At 40–70% the knees stayed up and the buttocks gap stayed at 1.2–1.6 cm. The heel step no longer counts his buttocks as legs: they are the back's, and counting them made the heels impossible to set above his back.
+- **The head on the pillow** is fitted by his head itself (`owner_head`), as the contact pass measures it. With his neck straighter, the hood touched the pillow first and his skull rode 2–7 cm over it.
+- **The duvet** (`room.html`): it bridges less (DRAPE 12/8 → 6/4 cm) and is thinner (5 → 3.5 cm). With his knees flat, the tent over them is gone. His legs themselves are 19–26 cm deep (the baggy track pants), so the duvet's top cannot come under 15 cm above the mattress without going through them.
+
 ## C's fixes (#6, #7)
 
 - **Hands off his face mid-roll** (`bed_turn.py`): on every frame of the roll where a hand or forearm is in his face (his head's own skin, measured from the head's axis as the contact pass does), the wrist is moved by two-bone IK, 2 cm at a time. It takes the first direction that clears his face, keeps the hand no deeper in his chest than before and keeps it above his own lowest skin. The directions: level toward his hip, out from his head, up, and up-and-toward his hip. A straight move toward the hip put the hand 11 cm into his chest and under him, and lifted his whole body 11 cm. Result: his face 0, on every frame (was 8 cm, 78 frames); 56 frames moved, up to 20 cm. Left over: up to 3 cm of hand in his chest on 36 frames, worst at 0.47 s, from the wrist cap.
 - **Cups out of his hair** (`boy_mh.js`, the bed clips only): lying, the pair is widened by `HP.BED_OUT` (0.8 cm per side, out along the ear's axis), blended in with his weight on the bed. Standing and at the desk the fit is G10d's, untouched. Cups in his hair: 1.9 → 0.2 cm.
 - **Neck rest clear of the hood** (C #6): his head is turned back to within 20° lying awake (9° here; the performer's was 57°). Standing and at the desk, the cups are 0 cm into the hood over every frame (with the lining, on b2593d7's v5). Lying awake, the lower cup's rim still touches the hood's edge on its outside, about 1.0 cm deep. Raising the pair 2.4–2.8 cm clears it (0.4 → 0 cm), but puts the cups back 0.7–0.8 cm into his hair. I kept the hair target, so this one is open (below).
-- **Buttocks ≤ +1 cm: not met.** A buttocks step after the heels (`BED_BUTTOCKS=1`, off by default) tilts the pelvis again and bends the knees to keep the heels down. Measured on main's v5, it takes the buttocks from +3.2…+4.4 to +2.4…+2.9 cm. But the backs of his thighs then become his lowest skin, and the page rests that on the bed, so his whole back floats: +0.2…+0.6 cm asleep and +1.8…+4.0 cm awake, with his knees bent 35–50°. The small of his back and mid back would leave the contract to get the buttocks part way, so the step stays off. Getting to ≤ +1 cm needs legs that lie flatter than either capture.
+- **Buttocks ≤ +1 cm: not met in #7** (met in #8, above). A buttocks step after the heels (`BED_BUTTOCKS=1`, off by default) tilts the pelvis again and bends the knees to keep the heels down. Measured on main's v5, it takes the buttocks from +3.2…+4.4 to +2.4…+2.9 cm. But the backs of his thighs then become his lowest skin, and the page rests that on the bed, so his whole back floats: +0.2…+0.6 cm asleep and +1.8…+4.0 cm awake, with his knees bent 35–50°. The small of his back and mid back would leave the contract to get the buttocks part way, so the step stays off. Getting to ≤ +1 cm needs legs that lie flatter than either capture.
 
 ## Open
 

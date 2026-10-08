@@ -17,13 +17,13 @@
  },
  "soles": {
   "L": {
-   "min_cm": 70.1,
-   "max_cm": 71.1,
+   "min_cm": 76.7,
+   "max_cm": 78.9,
    "on": "floor"
   },
   "R": {
-   "min_cm": 66.2,
-   "max_cm": 67.2,
+   "min_cm": 66.8,
+   "max_cm": 68.8,
    "on": "floor"
   }
  },
@@ -45,28 +45,28 @@
   "worstT": null,
   "radius_cm": {
    "L": [
-    16,
-    14.9,
-    14.5,
-    14.5,
+    16.9,
+    15.8,
+    15.1,
+    15,
+    14,
     13.8,
-    13.7,
+    13.9,
     13.8,
-    13.6,
-    13,
-    12.4
+    13.4,
+    12.6
    ],
    "R": [
-    15.8,
-    15.3,
-    14.9,
-    14.4,
+    17,
+    16.3,
+    15.5,
+    14.6,
+    14.2,
     14.1,
-    13.9,
-    13.4,
-    13.6,
-    13.3,
-    12.9
+    13.5,
+    13.8,
+    13.5,
+    13.3
    ]
   }
  },
@@ -75,48 +75,48 @@
   "back": [
    {
     "from_headboard_cm": 50,
-    "lowestGap_min_cm": 1.5,
-    "lowestGap_max_cm": 2.6
+    "lowestGap_min_cm": -0.2,
+    "lowestGap_max_cm": 0.9
    },
    {
     "from_headboard_cm": 60,
-    "lowestGap_min_cm": 0.4,
-    "lowestGap_max_cm": 1.1
+    "lowestGap_min_cm": -1.2,
+    "lowestGap_max_cm": -0.5
    },
    {
     "from_headboard_cm": 70,
-    "lowestGap_min_cm": -0.5,
-    "lowestGap_max_cm": 0
+    "lowestGap_min_cm": -2,
+    "lowestGap_max_cm": -1.6
    },
    {
     "from_headboard_cm": 80,
-    "lowestGap_min_cm": -0.6,
-    "lowestGap_max_cm": -0.1
+    "lowestGap_min_cm": -2.4,
+    "lowestGap_max_cm": -2.3
    },
    {
     "from_headboard_cm": 90,
-    "lowestGap_min_cm": 0.2,
-    "lowestGap_max_cm": 0.8
+    "lowestGap_min_cm": -1.6,
+    "lowestGap_max_cm": -1.4
    },
    {
     "from_headboard_cm": 100,
-    "lowestGap_min_cm": 3.2,
-    "lowestGap_max_cm": 4
+    "lowestGap_min_cm": 0.5,
+    "lowestGap_max_cm": 0.6
    }
   ],
   "back_worst": {
-   "min_cm": -0.6,
-   "max_cm": 4
+   "min_cm": -2.4,
+   "max_cm": 0.9
   },
   "head_on_pillow": {
-   "min_cm": -1.7,
-   "max_cm": -0.5,
-   "at_max_s": 3.33
+   "min_cm": -1.8,
+   "max_cm": -0.4,
+   "at_max_s": 0
   },
-  "shoulders_into_pillow_edge_cm": -6.7,
+  "shoulders_into_pillow_edge_cm": -8.7,
   "feet": {
-   "toes_max_x": 0.016,
-   "inside_end_cm": 3.4
+   "toes_max_x": 0.042,
+   "inside_end_cm": 0.8
   },
   "self": {
    "framesIn": 0,
@@ -137,58 +137,104 @@
      "at_max_s": 2.3
     },
     "arms": {
-     "max_cm": 9.6,
-     "mean_cm": 3,
-     "at_max_s": 1.8
-    },
-    "torso": {
-     "max_cm": 20.2,
-     "mean_cm": 4.3,
-     "at_max_s": 2.3
+     "max_cm": 8.6,
+     "mean_cm": 2.9,
+     "at_max_s": 2
     },
     "legs": {
-     "max_cm": 18.9,
-     "mean_cm": 2.7,
-     "at_max_s": 1.7
+     "max_cm": 16,
+     "mean_cm": 2.6,
+     "at_max_s": 0.1
+    },
+    "torso": {
+     "max_cm": 18.5,
+     "mean_cm": 3.4,
+     "at_max_s": 0.2
     },
     "feet": {
-     "max_cm": 4.7,
-     "mean_cm": 1.6,
-     "at_max_s": 3.2
+     "max_cm": 4.9,
+     "mean_cm": 1.9,
+     "at_max_s": 2.3
     }
+   },
+   "top_over_mattress": {
+    "hands": {
+     "max_cm": 45.9,
+     "at_s": 0.1
+    },
+    "arms": {
+     "max_cm": 44,
+     "at_s": 0.1
+    },
+    "legs": {
+     "max_cm": 39.9,
+     "at_s": 0
+    },
+    "torso": {
+     "max_cm": 43.2,
+     "at_s": 0
+    },
+    "feet": {
+     "max_cm": 32.8,
+     "at_s": 0
+    }
+   },
+   "legs_top_by_cm_from_headboard": {
+    "80": 39.6,
+    "90": 39.9,
+    "100": 32.3,
+    "110": 30.2,
+    "120": 29.1,
+    "130": 27.9,
+    "140": 25.1,
+    "150": 23.9,
+    "160": 24.8,
+    "170": 26.8
+   },
+   "legs_skin_top_by_cm": {
+    "80": 29,
+    "90": 29.5,
+    "100": 26.3,
+    "110": 25.6,
+    "120": 24.6,
+    "130": 23.1,
+    "140": 20.4,
+    "150": 19.1,
+    "160": 19.2,
+    "170": 20.4
    }
   }
  },
  "jump": {
-  "max_cm_per_frame": 0.4,
+  "max_cm_per_frame": 0.3,
   "worst": [
    [
-    0.17,
-    0.4,
+    0.57,
+    0.3,
     "room_laying_sleeping"
    ],
    [
-    3.27,
-    0.4,
-    "room_laying_sleeping"
-   ],
-   [
-    0.2,
-    0.2,
-    "room_laying_sleeping"
-   ],
-   [
-    2.23,
-    0.2,
+    0.6,
+    0.3,
     "room_laying_sleeping"
    ],
    [
     2.27,
-    0.2,
+    0.3,
     "room_laying_sleeping"
    ],
    [
     2.3,
+    0.3,
+    "room_laying_sleeping"
+   ],
+   [
+    0.17,
+    0.2,
+    "room_laying_sleeping"
+   ],
+   [
+    0.5,
     0.2,
     "room_laying_sleeping"
    ]

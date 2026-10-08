@@ -1,31 +1,27 @@
 # Bed clips: status (G17)
 
-Measured on **main's character** (0ac47f8, the hood with its lining from b2593d7), every frame. The full write-up is [README.md](README.md). The raw passes are in [contact/](contact/), and the before/after sheet is [owner.jpg](owner.jpg).
+Measured on **main's character** (0ac47f8, the hood with its lining), every frame. The full write-up is [README.md](README.md). The raw passes are in [contact/](contact/), and the sheet is [owner.jpg](owner.jpg): side views before (0d8bac0) and after, the duvet, and six page-camera frames each of LISTEN and SLEEP.
 
-## C #7 and #6
+## C #8
 
-| fix | target | before (0908653) | now |
-|---|---|---|---|
-| buttocks, just past the hip joint | ≤ +1 cm | +3.2 … +4.4 cm | +3.2 … +4.4 cm: **not met** |
-| a hand through his face mid-roll | never | 8 cm, 78 frames | **0** (56 frames moved, up to 20 cm) |
-| headphone cups in his hair | ≤ 0.5 cm | 1.9 cm | **0.2 cm** (in bed only: 0.8 cm wider per side; G10d's fit untouched) |
-| headphones against the hood | no contact, any frame | standing / desk 0, lying awake ~1.0 cm | standing / desk **0**; lying awake ~1.0 cm at the lower cup's rim: **open** |
+**1. He floats (buttocks): fixed with (a) + (b) together.**
 
-- **Buttocks**: the extra pelvis step works on its own, getting them to +2.4…+2.9 cm. But it makes the backs of his thighs his lowest skin, so the page floats his whole back: +1.8…+4.0 cm awake, +0.2…+0.6 cm asleep, with his knees bent 35–50°. It is off by default (`BED_BUTTOCKS=1` turns it on). ≤ +1 cm needs flatter-lying legs than either capture has.
-- **Hood, lying awake**: raising the headphones 2.4–2.8 cm clears the hood but puts the cups 0.7–0.8 cm back into his hair. I kept the hair target. C, your call.
-- **Hand in his face**: still up to 3 cm of a hand in his chest on 36 frames mid-roll (was 4.3 cm, 64 frames), from the wrist cap.
-
-## The rest (unchanged)
-
-| row | contract | listen | sleep | turn |
+| | C's pass | before (0d8bac0) | listen | sleep |
 |---|---|---|---|---|
-| back, mid / lower back (cm) | −1 … +0.5 | +0.3 … +0.5 | −0.6 … 0 | (on his side) |
-| head on the pillow (cm) | −2 … 0 | +2.5 … +3.7 (the hood between) | −1.7 … −0.5 | −2.1 … +1.1 |
-| toes inside the mattress end (cm) | > 0 | 3.3 | 3.4 | 2.8 |
-| bed / bed frame / floor | 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
-| hands in his own body | 0 | 0 | 0 | chest 3 cm, 36 frames |
-| headphones under the pillow | 0 | 0 | – | – |
+| buttocks (just past the hip joint) | ≤ +1 cm | +3.2 … +4.4 | +0.9 | +0.9 |
+| back, lowest | ≥ −2.5 cm | −0.6 | −2.1 | −2.4 |
+| hand in his face | none | – | 0 | 0 |
+| head on the pillow (as before) | −2 … 0 | −1.7 … −0.5 asleep | −1.7 … −0.5 | −1.8 … −0.4 |
+| bed (less its give) / bed frame / floor | 0 | 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| toes inside the mattress end | ≤ 3.5 cm | 3.3 / 3.4 | 0.8 | 0.8 |
 
-Videos `listen.mp4` and `sleep_turn.mp4` are re-recorded on main's character with these clips.
+- **(a) Mattress sink.** The page rests his lowest skin, now his back, under the bed's top by `BED_SINK` (boy_mh.js): 1.8 cm awake on the quilt, 0.65 cm asleep. The fit sinks his back and hips 2.0 cm and 1.65 cm, and fits his heels and head for that height, so his legs and head stay where they were. It applies to the mattress only: the head is fitted against the pillow as before, and nothing goes into the bed frame or the floor.
+- **(b) Flatter legs.** The hips and knees are blended 100% toward straight; 40–70% was not enough. His heels stay on the bed, and his toes come to 0.8 cm inside the end (C: ≤ 3.5). One fix came with it: the heel step had counted his buttocks among his legs, so it could not set the heels above his back.
+- The pillow step now fits his head itself, not the hood (as the contact pass measures). With his neck straighter, the hood had touched the pillow first and his skull rode 2–7 cm over it.
+- The turn (17.4 s): his face stays clear (0); up to 2.7 cm of a hand in his chest on 32 frames; his back at −2.8 cm at most, mid-roll.
 
-Full pytest on this commit's tree: 1450 passed, 27 skipped, exit 0; `tests/visual/out/results.json` hard_failures `[]`.
+**2. Duvet hump in SLEEP: smaller, ≤ 15 cm not reachable.** Over his legs the duvet's top is now 23.9–30.2 cm above the mattress (shins to thighs), against 25–35 before. Next to his hips it is 32–40 cm, where it comes down from his torso. The tent over his knees is gone because his knees lie flat. The cloth drapes tighter (bridging 12/8 → 6/4 cm) and is thinner (5 → 3.5 cm), and nothing of him comes through it. But his legs themselves are 19–26 cm deep lying down (v5's baggy track pants), so a top ≤ 15 cm above the mattress would have to go through them. The leg profile is in `contact/contact_sleep.json` (`legs_top_by_cm_from_headboard`, `legs_skin_top_by_cm`).
+
+**#6 (unchanged, as C decided)**: the cups stay at 0.2 cm in his hair, and the 1 cm rim against the hood stays.
+
+Videos `listen.mp4` and `sleep_turn.mp4` are re-recorded with these clips.
