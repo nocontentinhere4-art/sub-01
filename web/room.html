@@ -665,7 +665,7 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
 // room/mh_v5/); ?char=old: the live character (room/boy.glb) with its own clips; ?char=mixamo: the same character on the
 // Mixamo Standard Skeleton (room/char_mixamo.glb, rig/autorig.sh; room/char_mixamo.js), playing the Mixamo clips on
 // their own skeleton (room/mh_mx/, baked for our chair: kimodo/mx_build.sh) and v5's other room clips carried over
-const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q === "mixamo";
+const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q !== "v5" && CHAR_Q !== "old";   // (the launch default: the mixamo character with the Sova desk states; ?char=v5: v5)
 // ?char=mixamo&anim=sova (preview/desk-states): the seated states at the desk (room/desk_states.js), fed the messages the
 // page already receives that they react to (chess, a decision, a dopamine burst, a viewer's chat); off by default
 const DESK_EV = CHAR_MX && new URLSearchParams(location.search).get("anim") !== "mixamo" ? [] : null;   // (?char=mixamo: the Sova desk states by default, &anim=mixamo without them; not on v5, whose clips they do not fit)

@@ -1,6 +1,6 @@
-"""The character switch in room.html, in the page: the default room loads room/char_v5.glb and its clips (room/mh_v5/),
-never room/char_mixamo.glb nor anything under room/mh_mx/, and the rig he moves on is v5's own skeleton (as on main);
-?char=mixamo the other way round: room/char_mixamo.glb, its mixamorig bones, the clips under room/mh_mx/ and none from
+"""The character switch in room.html, in the page: ?char=v5 loads room/char_v5.glb and its clips (room/mh_v5/),
+never room/char_mixamo.glb nor anything under room/mh_mx/, and the rig he moves on is v5's own skeleton; the default room
+(the launch's: the mixamo character) the other way round: room/char_mixamo.glb, its mixamorig bones, the clips under room/mh_mx/ and none from
 room/mh_v5/. What the page fetched comes from its own resource timing; the bones are the skinned mesh's skeleton. Both
 characters' bones are renamed to the page's names when they are prepared (char_v5.js, char_mixamo.js), so a skeleton is
 told by its size (each GLB's own skin joint count) and by the bones only it has: v5's twist bones and metacarpals,
@@ -59,8 +59,8 @@ def skip_without_chromium():
         pytest.skip("playwright / chromium not installed")
 
 
-def test_default_page_is_v5(tmp_path, skip_without_chromium):
-    r = probe(tmp_path, "")
+def test_char_v5_page_is_v5(tmp_path, skip_without_chromium):
+    r = probe(tmp_path, "&char=v5")
     assert not r["errors"], r["errors"][:3]
     urls = r["urls"]
     assert "/room/char_v5.glb" in urls
@@ -73,8 +73,8 @@ def test_default_page_is_v5(tmp_path, skip_without_chromium):
     assert len([b for b in bones if V5_ONLY.search(b)]) >= 20 and not [b for b in bones if MX_ONLY.search(b)]
 
 
-def test_char_mixamo_page_is_mixamo(tmp_path, skip_without_chromium):
-    r = probe(tmp_path, "&char=mixamo")
+def test_default_page_is_mixamo(tmp_path, skip_without_chromium):
+    r = probe(tmp_path, "")
     assert not r["errors"], r["errors"][:3]
     urls = r["urls"]
     assert "/room/char_mixamo.glb" in urls and "/room/char_mixamo.js" in urls
