@@ -1813,6 +1813,37 @@ async def viewer_cookie(request, handler):
     return resp
 
 
+# links visitors may still have from before the launch, sent to the page they meant
+OLD_PATHS = {"/login": "/", "/room": "/", "/room/": "/", "/home": "/", "/index": "/", "/sees": "/world.html",
+             "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html"}
+
+NOT_FOUND_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>SUB-01</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><body style="margin:0;height:100vh;
+display:grid;place-items:center;background:#040406;color:#ececf2;font-family:ui-monospace,Menlo,monospace">
+<div style="display:grid;gap:14px;justify-items:center;text-align:center;padding:16px">
+<div style="background:#ff6a00;color:#0a0a0a;font-size:28px;letter-spacing:.12em;padding:2px 12px">SUB-01</div>
+<div>this page doesn't exist</div><a href="/" style="color:#ff6a00">back to his room</a></div></body>"""
+
+
+@web.middleware
+async def friendly_errors(request, handler):
+    """A page a person opens that isn't there (a 403 or 404 on a GET for HTML) gets a small page with a link to the room,
+    not the server's bare error; the APIs, the socket and the media keep their plain status codes."""
+    page = (request.method == "GET" and "text/html" in request.headers.get("Accept", "")
+            and not request.path.startswith(("/api/", "/ws", "/eye/", "/diary-img/")))
+    try:
+        resp = await handler(request)
+    except web.HTTPException as e:
+        if page and e.status in (403, 404):
+            return web.Response(text=NOT_FOUND_PAGE, content_type="text/html", status=404)
+        raise
+    if page and not resp.prepared and isinstance(resp, web.FileResponse):   # (the static route answers a missing file
+        path = getattr(resp, "_path", None)                                  # with a FileResponse that 404s on send)
+        if path is not None and not Path(path).is_file():
+            return web.Response(text=NOT_FOUND_PAGE, content_type="text/html", status=404)
+    return resp
+
+
 def password_gate(password):
     """Private preview: one shared password (SITE_PASSWORD), remembered in an HttpOnly cookie."""
     import hashlib
@@ -1853,7 +1884,7 @@ async def main(args):
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if gate_on else []
     if args.vote_round:
         live.votes.round_s = args.vote_round
-    app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares + [viewer_cookie])
+    app = web.Application(client_max_size=64 * 1024 ** 2, middlewares=middlewares + [viewer_cookie, friendly_errors])
     app[GATED] = bool(middlewares)                # behind the password gate: its cookie also opens the admin APIs
     app.router.add_get("/ws", live.ws_handler)
     manager = None
@@ -2013,6 +2044,8 @@ async def main(args):
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
     app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
+    for old, new in OLD_PATHS.items():             # links from before the launch (the login page, short names)
+        app.router.add_get(old, lambda r, new=new: web.HTTPFound(new))
     app.router.add_static("/", HERE / "web")
     runner = web.AppRunner(app)
     await runner.setup()

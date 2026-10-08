@@ -96,7 +96,7 @@ def test_page_wires_it_only_behind_anim_sova():
     assert 'CHAR_MX && new URLSearchParams(location.search).get("anim") !== "mixamo" ? [] : null' in html   # (on by default with the mixamo character)
     assert '...(DESK_EV ? {anim: "sova", deskEvents: () => DESK_EV.splice(0)} : {})' in html
     js = (WEB / "room" / "boy_mh.js").read_text()
-    assert 'if (env.anim === "sova") try { await svLoad(make, bodyHips); }' in js   # (a load that fails leaves the Mixamo clips)
+    assert 'if (env.anim === "sova") svLoad(make, bodyHips).then(() => seatHeight(), e => {' in js   # (after he is ready; a load that fails leaves the Mixamo clips)
     assert 'await import("./desk_states.js")' in js and 'from "./desk_states.js"' not in js   # (the default page never loads it)
     ix = json.loads((WEB / "room" / "desk_states" / "index.json").read_text())   # (used with the author's permission)
     assert all((WEB / "room" / "desk_states" / f).is_file() for f in ix["clips"].values()), ix

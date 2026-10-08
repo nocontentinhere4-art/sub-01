@@ -437,7 +437,26 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const progress = {};
 function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) => a + p[0], 0), t = v.reduce((a, p) => a + p[1], 0);
   const bar = $("boot-bar"); if (t && bar) bar.style.width = `${Math.round(100 * l / t)}%`; }
-function load(url){ return new Promise((ok, fail) => loader.load(url, ok,
+// phones and tablets: textures over TEX_MAX are drawn down before they reach the GPU (iOS Safari closes the tab past
+// a few hundred MB; the character's two 4096 maps alone were ~256 MB, the room ~170 MB)
+const TOUCH = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const TEX_MAX = TOUCH ? 1024 : Infinity;
+function shrinkTextures(gltf){
+  if (!isFinite(TEX_MAX)) return gltf;
+  const done = new Set();
+  gltf.scene.traverse(o => { if (!o.material) return;
+    for (const m of [].concat(o.material)) for (const k in m) { const t = m[k];
+      if (!t || !t.isTexture || done.has(t) || !t.image) continue; done.add(t);
+      const im = t.image, w = im.width || 0, h = im.height || 0;
+      if (Math.max(w, h) <= TEX_MAX) continue;
+      const f = TEX_MAX / Math.max(w, h), c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(w * f)); c.height = Math.max(1, Math.round(h * f));
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      if (im.close) im.close();                         // (an ImageBitmap: free the full-size copy now)
+      t.image = c; t.needsUpdate = true; window.texShrunk = (window.texShrunk || 0) + 1; } });   // (?debug: how many)
+  return gltf;
+}
+function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g)),
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
 function bootError(e){
   console.error(e); $("boot").classList.add("err");
@@ -1361,6 +1380,7 @@ function hudBand(){                                  // the header's bottom, as 
   return hudTop = c.height > 0 ? clamp(1 - 2 * Math.max(0, t.bottom - c.top) / c.height, 0.2, 1) : 1;
 }
 // how far up to move a camera d metres from its target so the target sits in the middle of the band under the header
+const DESK_SLIDE = 0.85;                              // (phones, the monitor shot: how far towards his head)
 const bandShift = d => -(hudBand() - 1) / 2 * Math.tan(camera.fov * Math.PI / 360) * d;
 function frameHim(){
   const ty = Math.tan(camera.fov * Math.PI / 360), half = (hudBand() + 1) / 2;   // the free band's half height (NDC)
@@ -1370,13 +1390,16 @@ function frameHim(){
 }
 function updateCameraGoal(){
   const nar = narrow();
-  if ((screenOn === "desk" || chatting) && monitor && !(nar && at !== "desk" && !(step && step.to === "desk"))) {
+  if ((screenOn === "desk" || chatting) && monitor && !(nar && (at !== "desk" || step))) {   // (phones: the monitor shot once he is seated; until then he is framed)
     const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
     camGoal.target.set(...m.c);
     camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
     if (nar) { const off = bandShift(camGoal.pos.distanceTo(camGoal.target));     // (phones: the same shot, slid under the header)
       v1.subVectors(camGoal.target, camGoal.pos).normalize(); v2.copy(UP).addScaledVector(v1, -UP.dot(v1)).normalize();
-      camGoal.target.addScaledVector(v2, off); camGoal.pos.addScaledVector(v2, off); }
+      camGoal.target.addScaledVector(v2, off); camGoal.pos.addScaledVector(v2, off);
+      // (and slid sideways halfway to his head: the shot over his shoulder left it off the narrow canvas's edge)
+      if (head) { v3.crossVectors(v1, UP).normalize(); (bones.headfront || head).getWorldPosition(v4); const o = v4.sub(camGoal.target).dot(v3) * DESK_SLIDE;
+        camGoal.target.addScaledVector(v3, o); camGoal.pos.addScaledVector(v3, o); } }
   } else if (screenOn === "phone" && phone.visible && head) {
     // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
     phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
