@@ -1,0 +1,146 @@
+[
+  {
+    "title": "Sitting 2.0",
+    "file": "{SovaSims} - Sitting Animations 2.0.package",
+    "bytes": 644587,
+    "sha256": "66646a93f22eb6ff0c424c0e8c9d43caa7086457e8b6e1545bbe94fe37c72cba",
+    "source": "https://www.patreon.com/posts/128164081",
+    "use": "Posture e gesti da seduto",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Sitting V6",
+    "file": "{SovaSims} - Sitting Animations.package",
+    "bytes": 2173901,
+    "sha256": "c1d9b2defb9db9f0cddf1ed9808eafd91587a47f4c01fca237cbcbaabbdd78ea",
+    "source": "https://www.patreon.com/posts/106817628",
+    "use": "Altri gesti da seduto; famiglia distinta da Sitting 2.0",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Actions & Reactions V6",
+    "file": "{SovaSims} - Action & Reactions Animations.package",
+    "bytes": 1504748,
+    "sha256": "c59a9cbe567c03fe03054784a10f30b7f1aa1fa47ebe404ae9d0045e20d9891a",
+    "source": "https://www.patreon.com/posts/147603471",
+    "use": "Azioni e reazioni",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Sad V4",
+    "file": "{SovaSims} - SAD Animations.package",
+    "bytes": 1584005,
+    "sha256": "71c6fb5c2a7ad09ccf8015d2ad887ce89f2461d2ed90c330ea854dceb29d8b62",
+    "source": "https://www.patreon.com/posts/137727744",
+    "use": "Tristezza e reazioni emotive",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Office",
+    "file": "{SovaSims} - Office Animations.package",
+    "bytes": 395891,
+    "sha256": "97b4e4b70e2641af6f41280b254b6b5cddbed7616acc8f3688640b2134abbaac",
+    "source": "https://www.patreon.com/posts/103245631",
+    "use": "Gesti da ufficio con clipboard e penna",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Clipboard accessory",
+    "file": "[MB] Clipboard AccessoryHQHQ.package",
+    "bytes": 24046,
+    "sha256": "2cde80fd5e8e0bc9c76fe2cb959604bc791623629bb226cc31912375d5e08e00",
+    "source": "https://www.patreon.com/posts/103245631",
+    "use": "Accessorio per Office; la penna separata non è inclusa",
+    "kind": "accessory"
+  },
+  {
+    "title": "Idle + Talking V3",
+    "file": "{SovaSims} - Idle + Talking Animations.package",
+    "bytes": 1261376,
+    "sha256": "9b6dcf6d50c99fc6624fbbbbbe65044334ac21e6b03dae8ce041e70e2aca3d32",
+    "source": "https://www.patreon.com/posts/99894596",
+    "use": "Movimenti di attesa e conversazione",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "MOCAP Talking V2",
+    "file": "{SovaSims} - MOCAP Talking Animations.package",
+    "bytes": 1446828,
+    "sha256": "7494eef1a689eb55b3c89e1a76b1f5b1d7acc5d61714c2ed964583fea233b340",
+    "source": "https://www.patreon.com/posts/99773515",
+    "use": "Conversazioni da motion capture",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Animation Pack #7",
+    "file": "{SovaSims} - Animation Pack #7.package",
+    "bytes": 342267,
+    "sha256": "13e0d29bad0a860ffe133278860dcf573421af18be3bc0ad25bb0c0d72d07acd",
+    "source": "https://www.patreon.com/posts/45008828",
+    "use": "Sonno e incubi",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "WW Machinima",
+    "file": "WW_SOVASIMS_Machinima Animations.package",
+    "bytes": 3991193,
+    "sha256": "f719445d0d270881df829ee3438b4370b82f696e85b2c79b3964f70238d843dc",
+    "source": "https://www.patreon.com/posts/141854657",
+    "use": "Pacchetto Machinima per WickedWhims",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Phone V12",
+    "file": "{SovaSims} - Phone Animations.package",
+    "bytes": 3604301,
+    "sha256": "daa94b8a135825f3d652e85857a0e7fd07c709eb6e5e102624901a43c67c0987",
+    "source": "https://www.patreon.com/posts/124431803",
+    "use": "Telefono, gesti e interazioni",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Personal V3",
+    "file": "{SovaSims} - Personal Animations.package",
+    "bytes": 556683,
+    "sha256": "f76668e173e6aacd6cc4aa1f2791a9fed22d22106ab0dcddb8ca7c56d4a4660b",
+    "source": "https://www.patreon.com/posts/124431932",
+    "use": "Gesti personali quotidiani",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Looking V1",
+    "file": "{SovaSims} - Looking Animations.package",
+    "bytes": 162536,
+    "sha256": "d65c078122ad71433e6b61609bf85ef2c596f4d77b33be9df0c13bcca3f53410",
+    "source": "https://www.patreon.com/posts/129315129",
+    "use": "Sguardi e attenzione",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Bed V3",
+    "file": "{SovaSims} - Bed Animations.package",
+    "bytes": 978439,
+    "sha256": "ddb3e0ed4219562588844565d42be095a8cbe5ed6a5ca62550f80736f61c6ad6",
+    "source": "https://www.patreon.com/posts/133852135",
+    "use": "Movimenti a letto",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Walking",
+    "file": "{SovaSims} - Walking Animations.package",
+    "bytes": 95755,
+    "sha256": "3c90ea5aa178563833fa8a2f069eb44072ed8a05e71b2a492016095566a46ef0",
+    "source": "https://www.patreon.com/posts/129886987",
+    "use": "Camminate",
+    "kind": "animation_pack"
+  },
+  {
+    "title": "Turn V1",
+    "file": "{SovaSims} - Turn Animations.package",
+    "bytes": 576622,
+    "sha256": "df04e77973839cd95d24b46fdba60daa6d74b605217dcc0c2b12c2288be219c9",
+    "source": "https://www.patreon.com/posts/126022702",
+    "use": "Rotazioni e cambi di direzione",
+    "kind": "animation_pack"
+  }
+]
