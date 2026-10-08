@@ -3,6 +3,27 @@
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
 
+## HANDS (top priority): diagnosis done, fix built — close-up before/after and montage rendering, numbers to follow in this section
+
+Measured per frame on our character (`room_build/sova/hand_qa.py`), against Mixamo's own clips in `web/room/mh_mx` (room_seated_idle, mx_typing, phone, mx_sitting_talking). Values are median / 95th percentile / max over the clip, degrees off the rest pose, worst finger.
+
+| | finger twist about its own axis | finger spread at the knuckle | PIP/DIP side bend | finger speed | wrist flexion | forearm roll vs upper arm |
+|---|---|---|---|---|---|---|
+| Mixamo references | 2–19 | 9–50 (the phone grip 35–48) | 3–21 | 56–860 °/s (they move: taps) | 3–67 | 0–27 |
+| Sova desk (neutral_1, look_left, happy) | **23–31 (L hand)** | 9–17 | 5–9 | **0: frozen** | **61–76 (limp)** | **33–74** |
+| Sova thinking (L) | 19–33 | **161: a finger bent backwards** | 15–22 | 156–243 | 52–61 | 48–57 |
+| Sova bed (phone, sleep) | **23–47 (L)** | 12–47; **lift R 144** | 9–29 | 0 (lift R 108–175) | 1–37 | 27–83 |
+
+Diagnosis:
+- **The Sims fingers are the main fault.** The left hand's fingers are rolled 23–47° about their own axis in every clip; two clips bend a finger the wrong way at the knuckle (161°, 144°). The fingers are also frozen (0 °/s), a held claw.
+- **The wrists hang**: desk clips are flexed 61–76° against 43° on Mixamo's seated hands on the thighs.
+- **The forearm rolls 50–80°** against the upper arm (Mixamo 0–27). It is within a real pronation range (±80–90) but twists our elbow skin.
+
+The fix (`room_build/sova/fix_hands_pose.py`, on the baked GLBs, nothing else in the clip changes):
+- **Fingers are not retargeted any more.** Every finger bone takes Mixamo's relaxed seated hand (room_seated_idle, each bone's median), plus 0.3 × the clip's own curl about the bone's curl axis (clamped ±15°). The thumb takes the relaxed pose only.
+- **The phone hand** (bed_phone_*) takes Mixamo's phone grip (room_phone, same side), still. Its wrist is left as baked, because the phone rides on it.
+- **Wrists are clamped**: flexion ±60°, deviation ±40°, roll at the wrist ±45°, and forearm roll ±80°.
+
 ## COORD's three points — armrest fix, our bed, chess "win" (8051d88; bed GLBs from 7bf7c8c)
 
 ### 1. Armrest: thinking (v6) and frustrated V1 (v5) — GLBs replaced in `desk/`, G14 please re-measure
