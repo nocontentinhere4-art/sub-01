@@ -122,7 +122,7 @@ async def main(args):
     frames.mkdir()
     env = dict(os.environ, BROWSE="0", SUB01_SPIKING_LIVE="0", SUB01_MAX_WS_PER_IP="60")
     srv = subprocess.Popen([sys.executable, str(ROOT / "live_server.py"), "--demo", "--port", str(PORT), "--data-dir",
-                            str(tmp / "data"), "--start", args.start, "--vote-round", str(args.round)],
+                            str(tmp / "data"), "--start", args.start, "--time-scale", "1.001", "--vote-round", str(args.round)],
                            cwd=ROOT, env=env, stdout=open(tmp / "server.log", "w"), stderr=subprocess.STDOUT)
     log = []
     try:
@@ -241,7 +241,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "docs" / "qa" / "interactive" / "demo.mp4"))
     ap.add_argument("--seconds", type=float, default=45.0)
-    ap.add_argument("--start", default="10:30", help="Tokyo time the demo clock starts at (awake, daytime)")
+    ap.add_argument("--start", default="10:30", help="Tokyo time the demo clock starts at (awake, daytime; the clock runs at\n"
+                    "x1.001, as --start needs a scale other than 1)")
     ap.add_argument("--round", type=float, default=150.0, help="vote round length, seconds (the demo's; default 1 h live)")
     ap.add_argument("--chromium", default="/opt/pw-browsers/chromium")
     ap.add_argument("--keep", action="store_true", help="keep the frames")

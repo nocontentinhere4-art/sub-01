@@ -193,7 +193,7 @@ def decode_trades(logs, mint=None, pools=None):
 LITE_DROP = ("act", "wave", "groups", "slow")     # per-region brain activity: only the brain page draws it
 ACT_LO, ACT_HI = 0.01, 10.0     # q=1: act on a log scale, one byte a region (~1.4 % steps), clipped to this range
 # q=1 keeps only what web/index.html draws (one source of truth for the brain page's fields)
-BRAIN_KEEP = ("type", "sync", "trades", "events", "sleep", "baseline", "slow", "life", "aud", "rx")
+BRAIN_KEEP = ("type", "sync", "trades", "events", "sleep", "baseline", "slow", "life")
 BRAIN_SLEEP = ("stage", "burst", "clock", "tz", "gain", "debt", "woken_tonight")
 BRAIN_LIFE = ("doing", "walking")
 
@@ -1622,7 +1622,7 @@ class Live:
         rx = self.reactions.drain()
         if rx:
             msg["rx"] = rx
-        if self.reactions.glance_due():
+        if self.engine.stage == "AWAKE" and self.reactions.glance_due():   # (asleep: no glance; the spike waits)
             await self.broadcast({"type": "glance"})
 
     def audience_hello(self, ws):

@@ -276,3 +276,23 @@ def test_server_round_end_applies_when_awake(server):
         await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)
         assert v.pending is None and live.life.nudge(live.clock.now()) == "window"
     asyncio.run(run())
+
+
+def test_server_glance_only_when_awake(server):
+    async def run():
+        live, app = await server()
+        sent = []
+
+        async def broadcast(msg):
+            sent.append(msg)
+        live.broadcast = broadcast
+        live.votes.open(["window", "research"])
+        for i in range(10):
+            live.reactions.react(f"v{i}", 0)
+        live.engine.stage = "REM"
+        await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)
+        assert not any(m["type"] == "glance" for m in sent)            # asleep: he does not turn to the camera
+        live.engine.stage = "AWAKE"
+        await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)
+        assert sum(m["type"] == "glance" for m in sent) == 1
+    asyncio.run(run())
