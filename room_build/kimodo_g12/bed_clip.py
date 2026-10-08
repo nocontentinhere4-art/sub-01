@@ -233,7 +233,8 @@ diag('after pillow')
 def heel_err(fs):
     X, _ = skinf(fs); e = []
     for f in range(len(fs)):
-        y, s, x, z = heights(X[f]); e.append(y[HEEL & BODY].min() - (backlow(X[f]) - BACK_UP + SINK))
+        y, s, x, z = heights(X[f]); lg = HEEL & BODY & ~(THIGH & (np.abs(x - HIPS_ROOM[0]) < 0.15))   # (not his buttocks: they are the back's)
+        e.append(y[lg].min() - (backlow(X[f]) - BACK_UP + SINK))
     return float(np.mean(e))
 LEG_AX = [SIDE]
 def bend_legs(a):
