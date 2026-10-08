@@ -3,6 +3,42 @@
 The newest entry is at the top. Code: `room_build/sova/`. Branch: `preview/sova-phone-src` only, nothing in `web/`.
 
 
+## HANDS, round 2: the owner's hands as the target — close-up before/after: `sova_hands_before_after.mp4` (+ `.jpg` frames), 1a449e5
+
+**Target:** COORD's `docs/qa/hands/owner_hands_ref.json`. The same angles are computed on our skeleton from the joint positions (`room_build/sova/owner_cmp.py`):
+- MCP / PIP / DIP flexion, each the angle between consecutive bone vectors (the wrist→knuckle vector, then each phalanx);
+- side bend;
+- palm spread;
+- wrist bend (forearm vs wrist→middle knuckle).
+
+**Allowed range per joint:** his p5–p95, over **both** hands pooled, because MediaPipe's left/right labels are as seen. Speed: his p95 frame-to-frame flex change.
+
+**Fix** (`fix_hands_pose.py`, round 2):
+- Every finger joint is solved to **his median flexion** (a turn about the bone's curl axis, on the curl side).
+- Plus 0.3 × the clip's own curl, **clamped into his p5–p95**, and rate-limited to **his p95 speed**.
+- The phone hand: Mixamo's phone grip with each joint pushed into his range, held still.
+- Wrists: twist / flexion / deviation clamped as in round 1, then the bend clamped to his max (62°).
+- Then the hands are cleared out of his body (`fit_hands.clear`, the IK keeps the hand's world turn) and the wrist re-clamped, twice. **Nothing is left inside him: 0.0 cm** in all four clips.
+
+**% of frames out of his range per finger** (thumb, index, middle, ring, pinky; any joint, side bend or speed), before → after. This is also in the video, on each half:
+
+| clip | left hand | right hand | wrist out of range, L / R | hands in his body |
+|---|---|---|---|---|
+| neutral_1 | 100 100 100 100 0 → **0 0 0 0 0** | 100 100 100 0 0 → **0 0 0 0 0** | 22 / 80 → **0 / 0** | 0 → 0 |
+| thinking (chin) | 15 85 94 92 89 → **0 0 0 0 0** | 100 100 100 0 100 → **0 0 0 0 0** | 5 / 0 → 5 / 0 (below his min: a straighter wrist than he ever has; not clamped) | 0 → 0 |
+| seat_happy (win) | 100 100 100 100 0 → **0 0 0 0 0** | 100 100 100 0 0 → **0 0 0 0 0** | 92 / 78 → **0 / 0** | 0 → 0 |
+| bed_phone_watch_landscape | 100 100 100 0 0 → **0 0 0 0 0** (grip) | 100 0 0 0 0 → **0 0 0 0 0** | 0 / 0 → 0 / 0 | 0 → 0; fingers in the phone ≤ 0.4 cm |
+
+Not fixable by a pose:
+- **Palm spread is out on 100% of frames, before and after.** On our skeleton the index and pinky knuckles sit 56° (L) / 46° (R) apart as seen from the wrist joint, in the rest pose; he has 17–42°. That is the rig's proportions (the knuckle joints are fixed offsets from the hand bone), not a pose; it would take moving the joints in the skin.
+
+Seen in the close-up:
+- The resting hands relax: no claw, no splayed fingers.
+- The phone hand closes round the phone.
+- **Regression:** in thinking, the chin hand's fingers are now his relaxed desk median, so the index points off the chin instead of touching it. The gesture-specific shape is lost. If that matters, the chin frames need their own target (e.g. a closer curl from the clip, CURL 1.0 on that hand), not the desk median.
+
+Next, running now: the same fix on all 30 deliverables (21 done), all of them measured (the table goes here), the GLBs replaced in `desk/` and `bed/`, and the full montage re-rendered.
+
 ## HANDS (top priority): diagnosis done, fix built — close-up before/after and montage rendering, numbers to follow in this section
 
 Measured per frame on our character (`room_build/sova/hand_qa.py`), against Mixamo's own clips in `web/room/mh_mx` (room_seated_idle, mx_typing, phone, mx_sitting_talking). Values are median / 95th percentile / max over the clip, degrees off the rest pose, worst finger.
