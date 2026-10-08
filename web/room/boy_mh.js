@@ -544,6 +544,16 @@ export function createMH(env) {
     const tgt = V().copy(env.DISH_AT).add(V(0, 0.10, 0)).addScaledVector(f, -0.05);   // (10 cm over the dish, its near side)
     pin("Right", tgt.sub(hand).multiplyScalar(M.eatReach), 1, null, {iters: 4});
   }
+  const FORE = {};
+  function foreIn(side) {                                    // armIn() on the forearm's skin alone (120 vertices there, not spread over the upper arm,
+    if (!FORE[side]) { const bs = new Set(), hand = env.bones[side + "Hand"];   // whose samples missed forearm skin 1 cm in the desk's edge over the mouse)
+      env.bones[side + "ForeArm"].traverse(b => { if (!b.isBone) return; let n = b; while (n && n !== hand) n = n.parent; if (!n) bs.add(b); }); const all = [];
+      env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
+        for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (bs.has(o.skeleton.bones[k0])) all.push([o, n]); } });
+      const st = Math.max(1, Math.ceil(all.length / 120)); FORE[side] = all.filter((_, n) => n % st === 0); }
+    let d = 0; for (const [o, n] of FORE[side]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld); d = Math.max(d, inDesk(_g)); }
+    return d;
+  }
   M.swing = {frames: 0, maxIn: 0, maxA: 0};                 // (?debug: how often and how far the elbow had to swing)
   function swingElbow(side, weight) {                        // the elbow up about the shoulder-wrist line until the arm is out of the desk
     M.swingNow = M.swingNow || {}; M.swingNow[side] = 0;   // (?debug: this frame's swing, rad)
@@ -583,7 +593,16 @@ export function createMH(env) {
       ccd(side, t, weight); swingElbow(side, weight); keepTurn();
       const d = fit ? fit() : V(); if (d.length() <= 0.001 && !o.iters) break; t.addScaledVector(d, weight);
     }
-    if (e0) { swivelTo(side, e0, weight); swingElbow(side, weight); keepTurn(); }   // (once the wrist is placed)
+    if (e0) {                                                // (once the wrist is placed)
+      // the elbow towards its reference, as far as the desk allows: on the mouse, where the full swing left the forearm in
+      // the desk's edge (the 15 deg elbow lift could not clear it), only the share that keeps it out
+      const ua = env.bones[side + "Arm"], q = ua.quaternion.clone(), go = k => { ua.quaternion.copy(q); ua.updateMatrixWorld(true); if (k > 0) swivelTo(side, e0, weight * k); swingElbow(side, weight); };
+      swivelTo(side, e0, weight); swingElbow(side, weight);   // (the whole swing, as before)
+      // (on the mouse only: typing, both forearms rest on the desk's edge and capping there moved the left hand's fit, 80%
+      // of resting tips on their caps against 81%)
+      if (M.w.mouse > 0.5 && foreIn(side) > 0.003) { let lo = 0, hi = 1; for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; go(m); if (foreIn(side) > 0.003) hi = m; else lo = m; } go(lo); }
+      keepTurn();
+    }
   }
   const palmAt = (side, out) => env.bones[side + "Hand"].getWorldPosition(out).lerp(S(side, 3, 1).getWorldPosition(_e), 0.6);
   function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }

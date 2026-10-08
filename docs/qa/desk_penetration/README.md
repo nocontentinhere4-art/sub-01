@@ -65,6 +65,15 @@ on at least 2 of 3 horizontal rays (the monitor's housing is open on top). Budge
   | main | 25.9, 35.8, 14.5 |
   | now | 15.5, 35.7, 27.3, 30.9 |
 
+- **On the mouse** (desk_14, found once merged with the hands' elbow swivel, 2198d69/d4d1970): after the arm's passes
+  the elbow swings to its reference, lower over the mouse, and the 15° elbow lift could not take the right forearm out
+  of the desk's edge again (9 sampled vertices, 12 mm under the top). On the mouse the swing now goes only as far as
+  keeps the forearm out; its check samples the forearm alone (`foreIn`: 120 vertices on the forearm, where `armIn`'s
+  120 spread over the whole arm missed it).
+  - Raising the lift to 20° also cleared it, but his shoulder rose and the upper sleeve showed a stretch crease.
+  - Typing is untouched: 81% of resting tips in 0..+2 mm (main 82%), none more than 2 mm in, thumb lowest −1.3 mm,
+    deepest vertex 1.3 mm.
+
 ## After
 test_visual: desk 0, desk things 0, bed 0, chair 0, floor within budget. The existing budgets are unchanged; the new one is 0.
 
