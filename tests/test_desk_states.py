@@ -102,3 +102,18 @@ def test_page_wires_it_only_behind_anim_sova():
     ds = (WEB / "room" / "desk_states.js").read_text()
     for name in ("trade", "usd"):
         assert f'"{name}"' not in ds, name                       # (no financial message is read)
+
+
+def test_no_desk_state_stands_him_up():
+    """COORD's review of 33f7f2d: standing up to clap at the desk put his fingers into the monitor, and a short does not
+    get him up; the stand-ins are seated takes only, and every gesture and reaction has its swept seat point."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    js = "const {SLOTS} = await import(process.env.DS); console.log(JSON.stringify(SLOTS));"
+    r = subprocess.run([node, "--input-type=module", "-e", js], capture_output=True, text=True, timeout=60,
+                       env={**os.environ, "DS": (WEB / "room" / "desk_states.js").as_uri()})
+    assert r.returncode == 0, r.stderr
+    slots = json.loads(r.stdout)
+    assert not [n for n, s in slots.items() if s["standIn"] and ("standing" in s["standIn"] or "angry" in s["standIn"])], slots
+    assert all(s.get("seat") is not None for s in slots.values() if s["kind"] in ("gesture", "react")), slots

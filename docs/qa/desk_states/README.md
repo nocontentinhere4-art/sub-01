@@ -12,11 +12,18 @@ These states play in `desk_watch` only: a video, a page, or waiting for the oppo
 | idle_b | waiting | none | left out: `room_mx_sitting` puts his legs through the seat at every seat point tried (≈5000 vertices) |
 | idle_c | waiting | room_mx_sitting_1 | loop |
 | attend | on the monitor | room_seated_idle | loop |
-| gesture_a | small gesture | room_mx_sitting_rubbing_arm | once; seat −0.17 |
-| gesture_b | small gesture | room_mx_sitting_talking | a 5–8 s window, once; seat −0.11 |
-| react_win | reaction | room_mx_standing_clap | once; seat −0.13 |
-| react_lose | reaction | room_mx_angry_gesture | once |
-| react_up | reaction | room_mx_standing_clap | once; seat −0.13 |
+| gesture_a | small gesture | room_mx_sitting_rubbing_arm | once; seat −0.22 |
+| gesture_b | small gesture | room_mx_sitting_talking | a 5–8 s window, once; seat −0.22 |
+| react_win | reaction (a won game only) | room_mx_sitting_talking | a 3–5 s window, once; seat −0.22 |
+| react_lose | reaction | room_mx_sitting_rubbing_arm | once; seat −0.22 |
+| react_up | reaction (a big burst on a short) | room_mx_sitting_talking | a 3–5 s window, once; seat −0.22 |
+
+**No desk state stands him up.** Two stand-ins were dropped, and react_up stays seated: a short doesn't get him up. Later it becomes Sova's LAUGH SIT / DISTRACTED & THEN SMILE.
+
+| dropped stand-in | was for | why |
+|---|---|---|
+| room_mx_standing_clap | react_win, react_up | up at the desk, his fingers went into the monitor (up to 834 sampled vertices); his hands were a few cm from the lamp and the monitor |
+| room_mx_angry_gesture | react_lose | his forearms went through the monitor (1269 vertices). At seat −0.30 it cleared the monitor, but his right hand went through the bottle on the desk (369) |
 
 **How the loops are picked**
 - Each loop is picked at random and never follows the same clip. Two slots on one stand-in count as one clip, so desk_watch is never followed by idle_a or attend.
@@ -57,26 +64,58 @@ These states play in `desk_watch` only: a video, a page, or waiting for the oppo
 - **Scared has no event.** Nothing the page receives warrants it, so it stays unmapped.
 
 ## Measured
-Measured locally, alone on 2 cores (`taskset -c 0,1`), with the page's `qa.body(2)` every 0.1 s.
-- **Each slot:** swept whole. For a once slot that covers ride, take and ride back.
+Measured locally, alone on 2 cores (`taskset -c 0,1`).
+
+**What each sweep covers**
+- **Each slot:** swept whole every 0.1 s. For a once slot that covers ride, take and ride back.
 - **Natural watching:** 120 s with the page's messages handed in as the socket sends them.
 - **Chess:** the wait and look sequence, then a won game.
 
-| sweep | desk | chair | bed | below floor |
-|---|---|---|---|---|
-| every slot, the crossfades, 120 s natural, chess won | 0 | 0 | 0 | 0 |
+**Desk, chair, bed, floor** (the page's `qa.body(2)`): 0 in every sweep.
 
-**Crossfades frame by frame** (idle_c↔attend, idle_a→idle_c): chair + desk 0 on every frame.
+**All of the room** (`sv_room2.py` in the session scratchpad: every room part and every scene object, not only desk/chair/bed/floor):
+- **Closed furniture:** inside means an odd number of crossings on 2 of 3 rays, both faces counted. This covers the wardrobe, door, shelves, monitor, lamp, controller, mug and bottle.
+- **Walls:** checked against the room's box.
+- **Left out:** the keys and the mouse (his hands work on them), flat decals and 4-vertex helper quads.
+- **The desk:** counted with freshly built raycast trees. On main the page's trees are stale after the keyboard cut, so they miss 26% of the desk (the freeze-why bug).
 
-**Seat points for the stand-ins.** Swept against the chair, the clearest of −0.03…−0.17 m:
+| | inside furniture | past a wall | desk during the take (fresh trees) | nearest wall (limbs) | nearest thing other than the desk (limbs) |
+|---|---|---|---|---|---|
+| every gesture and reaction | 0 | 0 | 0 | ≥ 44 cm | ≥ 3.4 cm (the desk's shelf rail) |
 
-| stand-in | at desk_watch's seat point (−0.075) |
-|---|---|
-| gesture_a | 545 vertices (left thigh) |
-| react_win | 180 |
-| gesture_b | 10 |
+**Inherited from main's own mixamo seated loop** (room_seated_idle, desk_watch's clip on main, and so idle_a and attend too):
+- 369–413 sampled vertices are in the desk once the trees are fresh: the forearms on its front edge, which the stale trees hide.
+- His right hand and forearm are in the bottle on the desk: 10–22 vertices.
 
-**Before these fixes**
-- The sova slots were placed by the clip's hips height instead of the seat's, which lifted him 6 cm at each switch. They now sit at the seat height, as desk_watch does.
+This is not from this layer: the same numbers show with `anim` off.
 
-`sheet.jpg`: each slot mid-play from the character camera, plus react_win on a won game.
+**The chair ride**
+- The rides are longer now: 0.21–0.51 m on top of the slot's seat point.
+- The ride-back (`backFor`) misses things in three ways, all fixed for the desk states only (the default page's `rare()` is unchanged):
+  - it sampled no fingertips, though raised hands reach 18 cm past the wrist;
+  - its rays stopped at 1.14 m, under the monitor;
+  - it raycast through main's stale trees.
+- The seat points were then swept against the desk counted with fresh trees.
+
+**Crossfades frame by frame** (idle_c↔attend, idle_a→idle_c): chair + desk 0 on every frame. The switches run before the mixer update; run after it, the root saw the new clip at full weight for one frame (an 862-vertex chair spike).
+
+**Before the first fixes:** the slots sat at their clip's hips height instead of the seat's, which lifted him 6 cm at each switch.
+
+## The hood (`char_mixamo.glb`'s autorig; not fixed here: G21 / C)
+The dark spikes at the back of the hood are the hood's lining and patches (`hood_lining`, `hood_patches`; 3127 vertices) coming out through the hoodie.
+
+**How it is measured**
+- **The lining:** the signed distance of each lining or patch vertex to the hoodie's surface near the neck. A vertex counts as out when it is past the outer face. Each vertex is compared with its own value in desk_watch's seated pose, so only the extra counts: the hood's rim is out by design.
+- **The hood and shoulders:** the hoodie's own vertices over the shoulders and behind the neck. This reports how much further from the neck they move than in the seated pose, in the neck's frame. That includes the shoulders' ordinary movement as the arms rise.
+
+| slot (take) | lining out, most | lining vertices out more than 0.5 cm | more than 1.6 cm | hood and shoulders, most | vertices more than 1.6 cm |
+|---|---|---|---|---|---|
+| idle_a (desk_watch's loop, other frames) | 5.6 cm | 9 | 8 | 0.1 cm | 0 |
+| attend | 6.3 cm | 32 | 26 | 3.1 cm | 2001 |
+| idle_c | 7.1 cm | 52 | 42 | 3.8 cm | 2742 |
+| gesture_b / react_win / react_up (sitting_talking) | 7.1 cm | 56–130 | 45–106 | 3.8–4.3 cm | 4811–5002 |
+| gesture_a / react_lose (rubbing_arm) | 7.1 cm | 384 | 257 | 7.1 cm | 5633 |
+
+With the arms up, a few hundred lining vertices go 1.6–7 cm past the hoodie. The arm raise pulls the hood's back and shoulders up to 7 cm off their seated place.
+
+`sheet.jpg`: each slot mid-play from the character camera.

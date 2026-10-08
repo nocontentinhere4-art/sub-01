@@ -12,7 +12,8 @@
 //                 he waits in the chair (boy_mh's wanted(): the idle slots, not the mouse).
 //   decision (#55) his brain picked a page or a video on the monitor -> he looks at it (attend)
 //   dopamine (#89) the burst a new clip or page gives (size: novelty + predicted interest - expectation) -> a gesture
-//                 from 0.45, react_up from 0.9 (only shorts reach it: video and pages are scaled to 0.5 / 0.25)
+//                 from 0.45, react_up from 0.9 (only shorts reach it: video and pages are scaled to 0.5 / 0.25); react_up
+//                 stays seated (a laugh, a smile at the screen): only a won game gets him up (react_win)
 //   chat   a viewer's message reaches him -> he looks at the monitor (attend)
 // Trades are left out by design (nothing financial). Nothing is invented: no event, no reaction.
 
@@ -24,11 +25,11 @@ export const SLOTS = {
   idle_b:      {kind: "idle",    standIn: null},    // (room_mx_sitting puts his legs through our chair's seat wherever he sits: 5000 vertices)
   idle_c:      {kind: "idle",    standIn: "room_mx_sitting_1"},
   attend:      {kind: "attend",  standIn: "room_seated_idle"},
-  gesture_a:   {kind: "gesture", standIn: "room_mx_sitting_rubbing_arm", once: true, seat: -0.17},
-  gesture_b:   {kind: "gesture", standIn: "room_mx_sitting_talking", span: [5, 8], seat: -0.11},
-  react_win:   {kind: "react",   standIn: "room_mx_standing_clap", once: true, seat: -0.13},
-  react_lose:  {kind: "react",   standIn: "room_mx_angry_gesture", once: true},
-  react_up:    {kind: "react",   standIn: "room_mx_standing_clap", once: true, seat: -0.13},
+  gesture_a:   {kind: "gesture", standIn: "room_mx_sitting_rubbing_arm", once: true, seat: -0.22},
+  gesture_b:   {kind: "gesture", standIn: "room_mx_sitting_talking", span: [5, 8], seat: -0.22},
+  react_win:   {kind: "react",   standIn: "room_mx_sitting_talking", span: [3, 5], seat: -0.22},   // (room_mx_standing_clap: up at the desk, his fingers went into the monitor)
+  react_lose:  {kind: "react",   standIn: "room_mx_sitting_rubbing_arm", once: true, seat: -0.22},   // (room_mx_angry_gesture: his forearms through the monitor, at -0.30 his hand through the bottle)
+  react_up:    {kind: "react",   standIn: "room_mx_sitting_talking", span: [3, 5], seat: -0.22},   // (seated: a short does not get him up)
 };
 export const DIR = "room/desk_states";                       // (the named GLBs, when they arrive)
 

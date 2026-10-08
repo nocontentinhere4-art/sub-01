@@ -1175,6 +1175,12 @@ export function createMH(env) {
     const room = env.room && env.room(); if (!room) return null;
     const ch = env.chairNode && env.chairNode(), solid = [];                // (the room's furniture, not the chair he sits on)
     room.traverse(o => { if (!o.isMesh || !o.visible) return; for (let p = o; p; p = p.parent) if (p === ch) return; solid.push(o); });
+    if (SV) {                                                // (the desk states: the things on the desk too (the monitor, the lamp), and the
+      const mine = o => { for (let p = o; p; p = p.parent) if (p === env.boy || p === ch || p === room) return true; return false; };   // room's trees built
+      env.scene.traverse(o => { if (!o.isMesh || !o.visible || o.isSkinnedMesh || mine(o)) return;                                      // anew once: one built
+        const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(V()); if (Math.max(sz.x, sz.y, sz.z) < 2 && bb.max.y < 2.5) solid.push(o); });   // before the
+      if (!SV.trees) { SV.trees = true; for (const m of solid) if (m.geometry.computeBoundsTree) m.geometry.computeBoundsTree(); }   // keyboard's cut missed it)
+    }
     const ray = new THREE.Raycaster(), o = V(), d = V(f.x, 0, f.z), side = solid.map(m => m.material.side);
     solid.forEach(m => { m.material.side = THREE.DoubleSide; });          // (a face seen from behind is still the desk)
     const D = FREE.lat.map(x => FREE.ys.map(y => { o.set(S.x + l.x * x, env.F + y, S.z + l.z * x); ray.set(o, d); ray.far = 1.5;
@@ -1229,6 +1235,7 @@ export function createMH(env) {
   async function svLoad(make, bodyHips) {
     const D = await import("./desk_states.js"), dir = env.clipDir || "room/mh";
     let named = [], seats = {}; try { const r = await fetch(`${D.DIR}/index.json`); if (r.ok) { const j = await r.json(); named = j.clips || []; seats = j.seat || {}; } } catch (e) { /* stand-ins */ }
+    for (const n of ["finger1-4", "finger3-4", "finger5-4"]) for (const sd of ["L", "R"]) if (env.bones[`${n}.${sd}`]) PARTS.push([`${n}.${sd}`, 0.02]);   // (the fingertips too: up, a hand reaches 18 cm past the wrist)
     const files = {}, have = [], clipOf = {}, durOf = {}, loops = [];
     for (const [k, f] of [...Object.entries(CL), ...Object.entries(RARE).map(([k, f]) => ["rare_" + k, f])])   // (the clips already loaded: not again)
       if (M.clips[k]) files[`${dir}/${f}.glb`] = Promise.resolve(M.clips[k]);
@@ -1243,8 +1250,17 @@ export function createMH(env) {
     }
     SV = {D, loops, cur: null, until: 0, since: 0, turnAt: null, look: SV_LOOK,
       pick: D.createPicker({have, clipOf: n => clipOf[n], durOf: n => durOf[n], rng: env.rng || Math.random})};
+    FREE.ys = Array.from({length: 30}, (_, i) => 0.03 + 0.05 * i);   // (the desk states: up to 1.48 m, the monitor's height too)
     SV.pick.S.lastClip = `${dir}/${CL.desk_watch}.glb`;      // (desk_watch's own clip counts as the one just played)
     M.sv = SV;                                                // (?debug; svForce(name): that slot next, as if an event called for it)
+    M.svBack = k => { const R = M.rare[k], ch = env.chairNode(), ry = env.boy.rotation.y, f = V(Math.sin(ry), 0, Math.cos(ry)), l = V(Math.cos(ry), 0, -Math.sin(ry));
+      const at = (window.__seatAt && window.__seatAt["rare_" + k]) || SEAT_AT["rare_" + k] || SEAT_AT.desk_watch; ch.updateMatrixWorld(true); const S = ch.localToWorld(V(at[0], 0, at[1]));
+      const D = free(S, f, l); let need = 0, w = null;
+      for (const [x, y, z, r] of R.pts) { const i = FREE.lat.reduce((b, v, j) => Math.abs(v - x) < Math.abs(FREE.lat[b] - x) ? j : b, 0), [te, ty] = D.top[i];
+        if (Math.abs(ty - y) <= r && z + r - te > need) { need = z + r - te; w = ["top", x, y, z, te, ty]; }
+        for (let j = 0; j < FREE.ys.length; j++) if (Math.abs(FREE.ys[j] - y) <= r + 0.025 && z + r - D[i][j] > need) { need = z + r - D[i][j]; w = ["wall", x, y, z, D[i][j], FREE.ys[j]]; } }
+      const ymax = Math.max(...R.pts.map(p => p[1])), zmax = Math.max(...R.pts.map(p => p[2]));
+      return {need, w, ymax, zmax, ys: FREE.ys.length, S: S.toArray(), D: D.map(c => c.map(x => +x.toFixed(2))), top: D.top}; };   // (?debug)
     M.svForce = n => { const T = env.state().T; SV.pick.S.at = {gesture: -1e9, react: -1e9}; SV.pick.S.last = SV.pick.S.lastClip = null; SV.pick.S.queue.push({slot: n, T, src: "force"}); SV.until = 0; SV.since = -1e9; };
   }
   function svLoop(p) {                                        // a loop slot: its action, crossfaded in from its phase
