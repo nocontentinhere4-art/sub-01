@@ -72,5 +72,12 @@
 "look_front_to_left": {
 "restForce": true,
 "loop": true
+},
+"seat_happy": {
+"pitch": 10,
+"restForce": true
+},
+"seat_smiling": {
+"pitch": 10
 }
 }
