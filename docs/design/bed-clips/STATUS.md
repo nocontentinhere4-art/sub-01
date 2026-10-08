@@ -27,3 +27,5 @@ Measured on **main's character** (0ac47f8, the hood with its lining), every fram
 The page's own bed check (`penetration()`, the visual gate) gives his back and hips 2.5 cm, as C #8 allows. Everything else keeps 2 cm.
 
 Videos `listen.mp4` and `sleep_turn.mp4` are re-recorded with these clips.
+
+Full pytest on this commit's tree: 1450 passed, 27 skipped, exit 0; `tests/visual/out/results.json` hard_failures `[]`. Every push carries [skip ci] (C: Actions minutes).
