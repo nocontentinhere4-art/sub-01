@@ -801,9 +801,33 @@ export function createMH(env) {
 
   const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V();
   function hands(dt) {
+    for (const sd of ["Left", "Right"]) forearmTwistKeep(sd);
     const t0 = performance.now(); handsBody(dt); const ms = performance.now() - t0;
+    for (const sd of ["Left", "Right"]) forearmTwistBack(sd);
     if (ELB_REF.Left || ELB_REF.Right) { elbowKeep(); ELB_REF.Left = ELB_REF.Right = null; }   // (other placements keep the clip's elbow)
     M.handsMs = ms; M.handsMsAvg = M.handsMsAvg == null ? ms : M.handsMsAvg + (ms - M.handsMsAvg) * 0.05;   // (?debug: the hands' cost per frame)
+  }
+  // a rig with no forearm twist bones (the Mixamo character): the arm's solve leaves the upper arm's and the forearm's own
+  // twist (about their length) free, and frame to frame they jumped - the upper arm 145 deg in one frame while he typed,
+  // the hand's turn on the forearm 151-165 deg, the sleeve wrung round. Handing the twist to the wrist or the forearm only
+  // moved the flip (the elbow then 121-179 deg a frame). So the upper arm and the forearm keep the clip's own twist, each
+  // child turned back by as much: the hand's pose in the room, the fingertips and the contacts unchanged, the elbow where
+  // it was. The default page's v5 has twist bones
+  const FTW = {};
+  const twistOf = (q, a) => { const v = V(q.x, q.y, q.z), p = a.clone().multiplyScalar(v.dot(a)), t = new THREE.Quaternion(p.x, p.y, p.z, q.w);
+    if (t.lengthSq() < 1e-12) return 0; t.normalize(); if (t.w < 0) t.set(-t.x, -t.y, -t.z, -t.w); return 2 * Math.acos(Math.min(1, t.w)) * Math.sign(V(t.x, t.y, t.z).dot(a) || 1); };
+  function noTwistBones(side) { return !env.bones[(side === "Left" ? "L" : "R") + "_ForearmTwist01"]; }
+  const TWIST_CHAIN = side => [[side + "Arm", side + "ForeArm"], [side + "ForeArm", side + "Hand"]];   // (each bone, the child on its length)
+  function forearmTwistKeep(side) {                          // before the hands are placed: the clip's twist of the upper arm and the forearm
+    FTW[side] = noTwistBones(side) ? TWIST_CHAIN(side).map(([b, c]) => { const B = env.bones[b], C = env.bones[c];
+      return B && C && C.parent === B ? twistOf(B.quaternion, C.position.clone().normalize()) : null; }) : null;
+  }
+  function forearmTwistBack(side) {                          // after: back to it (the upper arm first), each child turned back by as much
+    if (!FTW[side]) return; const out = [];
+    TWIST_CHAIN(side).forEach(([b, c], k) => { const t0 = FTW[side][k], B = env.bones[b], C = env.bones[c]; if (t0 == null) return;
+      const a = C.position.clone().normalize(); let d = t0 - twistOf(B.quaternion, a); d = Math.atan2(Math.sin(d), Math.cos(d)); out.push(+(d * 57.3).toFixed(1)); if (Math.abs(d) < 1e-4) return;
+      const R = new THREE.Quaternion().setFromAxisAngle(a, d); B.quaternion.multiply(R); C.quaternion.premultiply(R.invert()); B.updateMatrixWorld(true); });
+    M.wrist = M.wrist || {}; M.wrist[side] = out;            // (?debug: how far the solve had turned the upper arm and the forearm)
   }
   function handsBody(dt) {
     const typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse";
