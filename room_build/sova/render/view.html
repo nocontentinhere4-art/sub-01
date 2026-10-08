@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
-const W = 480, H = 480;
+const QS = new URLSearchParams(location.search); const W = +(QS.get('w') || 480), H = +(QS.get('h') || 480);
 const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
 renderer.setSize(W, H); renderer.setPixelRatio(1); document.body.appendChild(renderer.domElement);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -12,6 +12,16 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0xd9dde2);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x667080, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(1, 3, 2); scene.add(sun);
 const camera = new THREE.PerspectiveCamera(28, W / H, 0.05, 50);
+const key = new THREE.DirectionalLight(0xfff4e8, 0); scene.add(key); scene.add(key.target);
+let floor = null;
+window.setFloor = (on) => { if (floor) scene.remove(floor); floor = null; if (!on) return;
+  floor = new THREE.Mesh(new THREE.CircleGeometry(3, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({color: 0xc9cdd3, roughness: 0.9})); scene.add(floor); };
+window.setKey = (i) => { key.intensity = i; };
+let seat = null;
+window.setSeat = (y) => { if (seat) scene.remove(seat); seat = null; if (y === null) return;   // a plain stool: top at his seat height
+  seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, y, 0.46), new THREE.MeshStandardMaterial({color: 0x5b6068, roughness: 0.8}));
+  seat.position.set(0, y / 2, 0.02); scene.add(seat); };
+window.setBg = (hex) => { scene.background = new THREE.Color(hex); };
 let gltf, mixer, actions = {}, plane;
 window.load = async (url, clipUrls) => {
   const L = new GLTFLoader(); L.setMeshoptDecoder(MeshoptDecoder);
@@ -26,8 +36,10 @@ window.load = async (url, clipUrls) => {
 window.setPlane = (y, cx, cz, sx, sz) => {
   if (plane) scene.remove(plane);
   if (y === null) return;
-  plane = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.002, sz), new THREE.MeshBasicMaterial({color: 0x7a5c3a, transparent: true, opacity: 0.35, depthWrite: false}));
-  plane.position.set(cx, y - 0.001, cz); scene.add(plane);
+  const solid = QS.get('mattress') === 'solid';
+  plane = solid ? new THREE.Mesh(new THREE.BoxGeometry(sx, 0.22, sz), new THREE.MeshStandardMaterial({color: 0xe9e4da, roughness: 0.95}))
+                : new THREE.Mesh(new THREE.BoxGeometry(sx, 0.002, sz), new THREE.MeshBasicMaterial({color: 0x7a5c3a, transparent: true, opacity: 0.35, depthWrite: false}));
+  plane.position.set(cx, solid ? y - 0.11 : y - 0.001, cz); scene.add(plane);
 };
 const V = () => new THREE.Vector3();
 window.pose = (name, t) => {
@@ -39,8 +51,10 @@ window.shot = (target, dir, dist) => {   // dir: unit vector from target to came
   const tg = V().fromArray(target), d = V().fromArray(dir).normalize();
   camera.position.copy(tg).addScaledVector(d, dist);
   camera.up.set(0, 1, 0); if (Math.abs(d.y) > 0.95) camera.up.set(0, 0, -1);
-  camera.lookAt(tg); renderer.render(scene, camera);
-  return renderer.domElement.toDataURL("image/jpeg", 0.85);
+  camera.lookAt(tg);
+  key.position.copy(camera.position).add(V().set(0, 0.6, 0)); key.target.position.copy(tg);   // key light from the camera side, on his face
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL("image/jpeg", 0.92);
 };
 let rest = {};
 window.basis = (name, n) => {   // chest forward / his left, averaged over the clip (T-pose rest: forward +Z, left +X)
