@@ -358,3 +358,12 @@ def test_eye_pacing_can_be_turned_off_and_leaves_the_other_caps_alone(tmp_path, 
     monkeypatch.delenv("SUB01_EYE_PACE")
     led = costs.Ledger(tmp_path / "d", clock=lambda: at(2026, 10, 8, 9))
     assert led.pace_allowed("diary") == costs.caps()["diary"] and led.why_not("diary") is None
+
+
+def test_the_night_keeps_enough_frames_for_the_dream_diary(tmp_path):
+    """The diary is made of the night's frames (2026-10-05: 76, 2026-10-07: 71): before he wakes the slack must allow
+    at least 75 of them, however fast the dreams ask (every 5 s here), and the day still ends within the cap."""
+    led, made = _simulate_day(tmp_path, every_s=5)
+    night = [t for t, _ in made if t < at(2026, 10, 8, 8)]
+    assert len(night) >= 75
+    assert made[-1][1] <= costs.caps()["eye"] + 1e-9

@@ -19,7 +19,7 @@ Daily caps (USD per Tokyo day, env vars):
 - SUB01_CAP_EYES_USD (1.00) and SUB01_CAP_MIND_USD (1.00): the existing eyes / mind shares of the shared ledger
   (mind.EYES_USD_PER_DAY / MIND_USD_PER_DAY, checked by mind.Share); over them, local options / yesterday's plan.
 - The eye's cap is paced over his waking day (`pace_allowed`): by a moment of the Tokyo day the eye may have spent
-  EYE_PACE_SLACK of its cap (dreams at night, the first frames of the morning) plus the rest in proportion to the waking
+  EYE_PACE_SLACK (25%) of its cap (dreams at night, the first frames of the morning) plus the rest in proportion to the waking
   hours gone, 08:00 (sleep.WAKE_HOUR) to midnight, less one frame's cost (so the day's last frame stays in the cap). Spent at full rate it had used 0.80 of 1.00 by 11:00 and was capped
   all afternoon and evening (live, 2026-10-07/08). The cap itself is unchanged; SUB01_EYE_PACE=0 turns the pacing off.
 - SUB01_CAP_TOTAL_USD (3.10): everything above together. Its default is the sum of the part caps
@@ -62,7 +62,7 @@ def caps():
             "eyes": mind.EYES_USD_PER_DAY, "mind": mind.MIND_USD_PER_DAY, "total": _cap("SUB01_CAP_TOTAL_USD", 3.10)}
 
 
-EYE_PACE_SLACK = 0.15                              # share of the eye's cap free at any hour of the Tokyo day
+EYE_PACE_SLACK = 0.25                              # share of the eye's cap free at any hour of the Tokyo day: the night's dreams (~80 frames; the diary had 71-76)
 EYE_FRAME_USD = 0.003 + (1000 * 0.05 + 80 * 0.25) / 1e6   # one frame and its thought (FLUX_SCHNELL_USD + llm_usd(1000, 80)):
                                                    # the paced allowance stops that much short, so the last frame stays in the cap
 DAY_END_HOUR = 24                                  # the Tokyo day (and so the cap) ends at midnight
