@@ -96,7 +96,7 @@ function build(M) {
   const deps = {M, env, P, OT, OT_REST: 0.2, HUMP: 0.02, CLIP: {mouse: [0, 0, 0]}, V: vec, _k: vec(), _c: vec(), _a: vec(), dK: vec(),
     toWorld: () => vec(), kbRef: () => [0, 0, 0], fwdV: () => vec(), S: () => vec(),
     ownerKeys: rec("ownerKeys"), keyOn: rec("keyOn"), pin: () => {}, follow: () => {}, mouseHold: rec("mouseHold"),
-    omStep: rec("omStep"), omNow: () => ({move: [0, 0]}), rightChain: () => [], weighted: (side, w, solve) => solve(1),
+    omStep: rec("omStep"), omNow: () => ({move: [0, 0]}), rightChain: () => [], weighted: (side, w, solve) => solve(1), forearmTwistKeep: () => {}, forearmTwistBack: () => {},
     REACH_S: 0.8, ELB_REF: {}, elbowRef: () => {}, elbowKeep: () => {}, swivelTo: () => {}, THREE: {Quaternion: function () { return vec(); }}};
   const names = Object.keys(deps);
   return new Function(...names, SRC.kCtx + "; " + SRC.hands + "; " + (SRC.handsBody || "") + "; return hands;")(...names.map(n => deps[n]));

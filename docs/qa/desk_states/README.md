@@ -158,6 +158,18 @@ This is not from this layer: the same numbers show with `anim` off.
 - `room_video.mp4`: 66 s, 1280×720.
 - Each records the real room, the page stepped frame by frame, with the events handed in as the socket sends them. The captions come from the event log.
 
+## The twisted hands (the owner's review of the videos)
+- **Cause:** the arm's IK (pin, ccd, the elbow swing) leaves each arm bone's roll about its own length free. Mixamo's rig has no forearm twist bones, so that roll landed on the upper arm and forearm. They flipped 145–165° from one frame to the next and wrung the sleeve into spikes.
+- **Fix (`hands()` in boy_mh.js):** keep the clip's own twist of the upper arm and the forearm (swing-twist decomposition) and counter-rotate each child. The hand's world pose and its contacts are unchanged. It only applies to rigs without twist bones.
+- **Typing, mouse and watching:**
+
+| | wrist per frame, most | elbow per frame, most | jumps over 30° |
+|---|---|---|---|
+| before | 150–165° | 57–70° | 27 |
+| after | 12–15° | 20–23° | 0 |
+
+`hands_twist_before_after.jpg`: hand close-ups, before | after.
+
 ## main's mixamo seated loop (COORD's item 2)
 - **Before the merge:** room_seated_idle (desk_watch on main) had 369–413 sampled vertices in the desk with fresh trees, and 10–22 in the bottle.
 - **After merging preview/freeze-why:** 0 and 0. Its desk clearing, the least swing of the arm about the shoulder that takes its skin out of the desk's slab, already covers this loop, and the swing also takes his hand off the bottle.
