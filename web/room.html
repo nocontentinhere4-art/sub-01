@@ -35,6 +35,12 @@
   #story.in { animation:storyin .7s ease-out; }
   @keyframes storyin { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
   #story em { font-style:normal; color:var(--st); }
+  /* the one line that is always on the first screen, before any tick: what he is (S10). Never hidden, never moved off */
+  #fiction { margin-top:6px; font-size:11.5px; color:#d8d8e2; line-height:1.45; text-shadow:0 1px 8px #000, 0 0 3px #000, 0 0 1px #000; max-width:60ch; }   /* (readable over the white wall) */
+  #fiction a { color:#b9b9c6; text-decoration:underline dotted; } #fiction a:hover { color:var(--fg); }
+  /* the night line under the story while he sleeps: when he fell asleep, what was replayed (R3) */
+  #night { margin-top:6px; font-size:12px; color:#9fb4ff; line-height:1.5; text-shadow:0 1px 8px #000; max-width:60ch; }
+  #night[hidden] { display:none; }
   #why { margin-top:9px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; max-width:52ch; line-height:1.5; }
   #cam { margin-top:12px; background:rgba(10,10,16,.62); color:var(--dim); border:1px solid var(--line); border-radius:6px;
     font:inherit; font-size:11px; padding:6px 10px; cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
@@ -203,6 +209,7 @@
       background:linear-gradient(rgba(4,4,6,.82), rgba(4,4,6,.55) 70%, rgba(4,4,6,0)); }   /* phones: the header reads over any part of the room */
     #story { font-size:15px; line-height:1.3; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     #state { font-size:11px; gap:8px; } #why { font-size:11px; margin-top:5px; color:#b9b9c6; }
+    #fiction { font-size:10.5px; margin-top:5px; max-width:none; } #night { font-size:11px; margin-top:5px; }
     #cam { display:none; }
     #note { font-size:9.5px; }
     #brand h1 { font-size:15px; } #state { margin-top:10px; } #why { max-width:none; }
@@ -304,9 +311,18 @@
   #brainpip { width:72px; height:72px; aspect-ratio:auto; border-radius:50%; box-shadow:none; }
   #brainpip iframe { width:300px; height:225px; transform:translate(-114px, -76px) scale(.5); transform-origin:center; }
   #brainpip span { display:none; }
+  /* the dream frame while he sleeps (R3): the eye's newest image over the room, above the brain thumbnail; a link to /world */
+  #dream { position:fixed; left:var(--gap); bottom:calc(var(--gap) + 84px); width:min(220px, 24vw); z-index:5; display:block; text-decoration:none;
+    color:#c6c6d4; font-size:10.5px; line-height:1.4; background:rgba(8,8,11,.6); border:1px solid var(--line); border-radius:var(--r); padding:6px;
+    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #dream[hidden] { display:none; }
+  #dream img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:8px; background:#0d0e13; }
+  #dream span { display:block; margin-top:5px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  #dream b { font-weight:normal; color:#c26bff; }
 
   @media (max-width: 900px) {
     #scene, #vignette, #rxfloat { height:56vh; }
+    #dream { position:absolute; left:auto; right:12px; bottom:auto; top:calc(56vh - 132px); width:140px; padding:4px; font-size:9.5px; }
     #top { padding:12px 16px 18px; max-width:none; }
     #story { font-size:15px; margin-top:6px; }
     #tools { margin-top:8px; } #cam { display:none; }
@@ -344,6 +360,8 @@
   <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
+  <div id="fiction">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></div>
+  <div id="night" hidden></div>
   <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
 <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
   <div id="today" hidden>
@@ -441,6 +459,7 @@
 <div id="corner">
 <a id="brainpip" href="/brain" title="open the brain"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
 </div>
+<a id="dream" href="/world.html" hidden title="an image an AI renders from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t"></span></a>
 <div id="rxpill">
   <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
 </div>
@@ -574,7 +593,7 @@ const SURF = {
 const PLACE2ANCHOR = {bed:"bedside", desk:"desk", table:"desk", window:"window", door_in:"door", door_out:"door"};
 const ACT = {                                        // activity -> [anchor, clip]
   sleep:["bedlie","sleep"], phone:["bedside","phone_sit"], order_food:["bedside","phone_sit"], research:["desk","sit"],
-  chart:["desk","sit"], eat:["desk","dine"], window:["sill","lean"],   // dine: seated, the food in his hands (alive())
+  eat:["desk","dine"], window:["sill","lean"],       // dine: seated, the food in his hands (alive())
   get_delivery:["deskside","deliver"],               // to the door, open it, take the bag, close it, carry it to the desk (#63)
   chat:["desk","sit"],                               // answering chat at the computer (the mind layer, #33/#46)
   watch_video:["desk","sit"], play_chess:["desk","sit"],   // (seated at the desk too: missing here, they fell back on standing there, and each switch to them
@@ -1213,18 +1232,19 @@ let screenOn = null;               // "desk" | "phone" | null (from the server)
 let phoneWanted = false;           // the activity has the phone in his hand (he may also take it out for a look: peek)
 let chatting = false;              // at the desk answering chat: the monitor shows the chat window
 let lastStatus = {};               // device -> status
-let trades = [];                   // recent trade flow, for the chart view
+// (no trade feed reaches this page: the coin's trades are a stimulus inside the model only, never a picture on a screen)
 function showScreen(st){
   if (!st) return;
   if (st.restarting) { lastStatus[st.device] = st; if (screenOn === st.device) panel(st); return; }
   lastStatus[st.device] = st;
   const target = st.device === "desk" ? monitor : phone.userData.screen;
-  if (!target || target.id === st.id) return;
+  if (!target || target.id === st.id || target.failed === st.id) return;   // (failed: a 404'd shot is not asked for again)
   target.id = st.id;
   const url = `/api/screen/${st.device}.jpg?id=${st.id}`;
   const img = new Image(); img.decoding = "async";
   img.onload = () => { const t = screenTexture(img); fitTop(t, target.aspect); target.set(t);
     if (screenOn === st.device) { $("s-img").src = url; } };
+  img.onerror = () => { if (target.id === st.id) { target.failed = st.id; target.id = null; } };   // the glass stays as it was; screens() darkens it
   img.src = url;
   if (screenOn === st.device) panel(st);
 }
@@ -1268,9 +1288,9 @@ function panel(st){
   $("s-k").textContent = st.device === "phone" ? "On his phone" : "On his computer";
   $("s-link").hidden = false; $("s-foot").textContent = PAGE_FOOT;
   card.querySelector(".frame").hidden = !!st.restarting;
-  if (st.restarting) {
-    $("s-title").innerHTML = `<div class="restarting">browser restarting…</div>`; $("s-url").textContent = "";
-    $("s-why").textContent = "the screen's browser runs apart from the brain; the brain model keeps running"; $("s-opts").hidden = true;
+  if (st.restarting) {               // (an in-world line: what the page's machinery is doing is not his story)
+    $("s-title").innerHTML = `<div class="restarting">the next page is loading…</div>`; $("s-url").textContent = "";
+    $("s-why").textContent = ""; $("s-opts").hidden = true;
     return;
   }
   const dec = st.decision;
@@ -1342,45 +1362,23 @@ function chessTex(){
 function onChess(m){ chessGame = m; panelKey = null; deskEv({type: "chess", ...m}); }
 fetch("/api/chess").then(r => r.ok ? r.json() : null).then(d => { if (d && d.playing && d.game && !chessGame) onChess(d.game); }).catch(() => {});
 
-// views drawn here (no browser needed): the market chart at the desk, the food app on the phone
-const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 600; const cx = cv.getContext("2d");
+// views drawn here (no browser needed): the food app on the phone, the article while the browser is down, a page loading.
+// (The trading terminal that was drawn here is gone for good: no chart, trade counts or amounts are ever on a screen.)
 const pv = document.createElement("canvas"); pv.width = 390; pv.height = 844; const px = pv.getContext("2d");
-let cvTex = null, pvTex = null;
-function drawChart(){
-  // a trading terminal: dark panel, grid, a time axis, buys up / sells down; no prices, no calls to action
-  const W = cv.width, H = cv.height, L = 60, R = W - 24, T = 92, B = H - 56, y0 = (T + B) / 2, now = Date.now() / 1000;
-  cx.fillStyle = "#0a0c11"; cx.fillRect(0, 0, W, H);
-  cx.fillStyle = "#11141b"; cx.fillRect(0, 0, W, 56);
-  cx.fillStyle = "#e6e8ef"; cx.font = "bold 22px monospace"; cx.fillText("TRADE FLOW", 24, 36);
-  cx.fillStyle = "#6f7488"; cx.font = "17px monospace"; cx.fillText("live · last 5 minutes · buys up, sells down", 190, 36);
-  const buys = trades.filter(t => t.kind === "buy").length, sells = trades.length - buys;
-  cx.textAlign = "right"; cx.fillStyle = "#39f5a0"; cx.fillText(`${buys} buys`, R - 110, 36); cx.fillStyle = "#ff5a6e"; cx.fillText(`${sells} sells`, R, 36); cx.textAlign = "left";
-  cx.strokeStyle = "#171a23"; cx.lineWidth = 1;
-  for (let i = 0; i <= 6; i++) { const y = T + (B - T) * i / 6; cx.beginPath(); cx.moveTo(L, y); cx.lineTo(R, y); cx.stroke(); }
-  cx.fillStyle = "#4b5064"; cx.font = "14px monospace"; cx.textAlign = "right";
-  for (let i = 0; i <= 5; i++) { const x = L + (R - L) * i / 5; cx.beginPath(); cx.moveTo(x, T); cx.lineTo(x, B); cx.stroke();
-    cx.fillText(`-${5 - i}m`, x + 14, B + 22); }
-  cx.textAlign = "left";
-  cx.strokeStyle = "#2a2f3f"; cx.beginPath(); cx.moveTo(L, y0); cx.lineTo(R, y0); cx.stroke();
-  for (const t of trades) { const x = L + (R - L) * (1 - (now - t.t) / 300); if (x < L) continue;
-    const h = Math.min((B - T) / 2 - 4, 10 + 26 * Math.log10(1 + t.usd)), buy = t.kind === "buy";
-    const g = cx.createLinearGradient(0, buy ? y0 - h : y0, 0, buy ? y0 : y0 + h);
-    g.addColorStop(0, buy ? "#39f5a0" : "#ff5a6e88"); g.addColorStop(1, buy ? "#39f5a088" : "#ff5a6e");
-    cx.fillStyle = g; cx.fillRect(x - 3, buy ? y0 - h : y0, 6, h); }
-  cx.fillStyle = "#39f5a0"; cx.fillRect(L - 46, T, 3, (B - T) / 2 - 2); cx.fillStyle = "#ff5a6e"; cx.fillRect(L - 46, y0 + 2, 3, (B - T) / 2 - 2);
-  cx.fillStyle = "#4b5064"; cx.font = "13px monospace"; cx.fillText("bar height = log(usd) · public trade feed · a picture of activity, not advice", 24, H - 16);
-  if (!cvTex) { cvTex = screenTexture(cv); fitTop(cvTex, SURF.monitor.w / SURF.monitor.h); } cvTex.needsUpdate = true; return cvTex;
-}
-let chartAt = 0, chartDirty = true, foodKey = null;
-function chartTex(){                 // redraw when trades arrive, else twice a second (the bars scroll ~3 px/s)
-  const now = performance.now();
-  if (!cvTex || chartDirty || now - chartAt > 500) { chartDirty = false; chartAt = now; drawChart(); }
-  return cvTex;
-}
+let pvTex = null, foodKey = null, loadTex = null;
 function foodTex(c){                 // redraw only when the order changes
   const k = c ? `${c.status}|${c.eta_min}|${c.dish}` : `|${lastLife && lastLife.order}`;
   if (!pvTex || k !== foodKey) { foodKey = k; drawFood(c); }
   return pvTex;
+}
+function loadingTex(){               // the monitor while the browser brings the next page up: a blank page and a thin bar, not the old page
+  if (loadTex) return loadTex;
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 600; const g = c.getContext("2d");
+  g.fillStyle = "#f4f5f7"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#e3e5ea"; g.fillRect(0, 0, c.width, 64);
+  g.fillStyle = "#fff"; g.beginPath(); g.roundRect(120, 17, 784, 30, 15); g.fill();
+  g.fillStyle = "#6f7488"; g.fillRect(0, 64, 380, 4);
+  g.fillStyle = "#9aa0ad"; g.font = "22px sans-serif"; g.fillText("loading…", 440, 320);
+  loadTex = screenTexture(c); fitTop(loadTex, SURF.monitor.w / SURF.monitor.h); return loadTex;
 }
 function drawReading(r){
   // the article he is reading, laid out like the real page: sidebar, title in serif, infobox placeholder, two-column body
@@ -2337,7 +2335,8 @@ const MOUSE = new THREE.Vector3(-0.735, 0.985, -0.965);   // G10d's mouse (MOUSE
 let musicNow = null, musicEmbed = "";
 const SPOTIFY_EMBED = /^https:\/\/open\.spotify\.com\/embed\/track\/[A-Za-z0-9]{22}(\?[\w=&]*)?$/;
 function renderMusic(){
-  const m = musicNow; $("musiccard").hidden = !m; if (!m) return;
+  const m = musicNow; $("musiccard").hidden = !m;
+  if (!m) { if (musicEmbed) { musicEmbed = ""; $("mu-embed").removeAttribute("src"); } return; }   // (R2: a stopped track's player goes too, so nothing keeps playing)
   $("mu-k").textContent = m.mode === "background" ? "in the background" : "headphones on";
   $("mu-t").textContent = m.title || ""; $("mu-a").textContent = [m.artist, m.genre_label].filter(Boolean).join(" · ");
   const art = $("mu-art"), ok = /^https:\/\//.test(m.art || ""); art.hidden = !ok; if (ok && art.src !== m.art) art.src = m.art;
@@ -3263,26 +3262,30 @@ function endMeal(){                                     // the empty container s
 let trash = null;                                       // the empty dish he will put in the bin
 
 function screens(life, st){
-  const atDesk = !life.path && ["research","chart","watch_video","play_chess"].includes(life.activity) && st === "AWAKE";
+  const atDesk = !life.path && ["research","watch_video","play_chess"].includes(life.activity) && st === "AWAKE";
   const onPhone = !life.path && ["phone","order_food"].includes(life.activity) && st === "AWAKE" && visible;
   phoneWanted = onPhone && !!hand;
   chatting = !life.path && life.activity === "chat" && st === "AWAKE" && visible;
   chessOn = atDesk && life.activity === "play_chess" && !!chessGame;
   screenOn = ["research","watch_video"].includes(life.activity) && atDesk ? "desk" : life.activity === "phone" && onPhone ? "phone" : null;
   if (life.screen) showScreen(life.screen);
+  const deskSt = lastStatus.desk, deskLive = screenOn === "desk" && deskSt && !deskSt.restarting;   // a page is really on it
   // desk monitor
   if (monitor) {
     if (chatting) { monitor.id = null; const t = chatTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
-    else if (life.activity === "chart" && atDesk) { monitor.id = null; const t = chartTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
     else if (chessOn) { monitor.id = null; const t = chessTex(); if (monitor.tex !== t || monitor.mesh.material !== monitor.on) monitor.set(t); }
-    else if (screenOn === "desk" && lastStatus.desk) { if (monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
-    else if (atDesk && life.activity === "research" && life.reading) {            // no browser: the article he is reading
+    else if (deskLive) { if (monitor.mesh.material === offMat && monitor.tex) monitor.mesh.material = monitor.on; }
+    else if (atDesk && life.activity === "research" && life.reading) {            // no browser, or its page still loading: the article he is reading
       if (monitor.id !== "wiki:" + life.reading.title) { monitor.set(drawReading(life.reading)); monitor.id = "wiki:" + life.reading.title; } }
+    else if (screenOn === "desk" && deskSt && deskSt.restarting) {                 // the browser is bringing the next page up: never the old page frozen
+      if (monitor.id !== "loading") { monitor.set(loadingTex()); monitor.id = "loading"; } }
     else if (st !== "AWAKE" || !visible) monitor.off();
   }
-  // phone
-  const ps = phone.userData.screen;
-  if (life.activity === "order_food" && onPhone) { ps.id = null; const t = foodTex(life.courier); if (ps.tex !== t || ps.mesh.material !== ps.on) ps.set(t); }
+  // phone: the delivery app while he orders; otherwise only a page that is really on it now, else dark glass
+  // (#R2: no stale picture: the food app after the order, or the last page when the browser is down or a shot 404'd)
+  const ps = phone.userData.screen, psc = life.screen && life.screen.device === "phone" && !life.screen.restarting ? life.screen : null;
+  if (life.activity === "order_food" && onPhone) { ps.id = null; const t = foodTex(life.courier); if (ps.tex !== t || ps.mesh.material !== ps.on) ps.set(t); ps.id = "food"; }
+  else if (ps.tex && (ps.id === "food" || (life.activity === "phone" && (!psc || ps.failed === psc.id)))) ps.off();
   panel(chessOn ? null : screenOn ? lastStatus[screenOn] : null);
 }
 
@@ -3525,6 +3528,8 @@ function connect(){
     if (m.type === "screen") { showScreen(m); return; }
     if (m.type === "chess") { onChess(m); return; }
     if (m.type === "music") { onMusic(m); return; }
+    if (m.type === "eye") { onEye(m); return; }          // (R3: the dream frame while he sleeps)
+    if (m.type === "nights") { onNights(m); return; }
     if (m.type === "hello") {          // the latest chat and his replies, merged by time (hh:mm); what is playing
       if ("music" in m) { musicNow = m.music ? {...m.music, card:musicNow && m.music && musicNow.id === m.music.id ? musicNow.card : null} : null; renderMusic(); }
       talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
@@ -3550,8 +3555,6 @@ function connect(){
     if (m.type === "tick" && m.aud) onAudience(m);
     if (m.type !== "tick" || !m.life) return;
     if ((m.events || []).some(ev => ev.type === "replay" && ev.source === "taught")) loadTaught();   // a new count
-    for (const t of m.trades || []) { trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd}); chartDirty = true; }
-    if (trades.length > 500) trades = trades.filter(t => Date.now() / 1000 - t.t < 300);
     tickMsg = m; scheduleUI();
   };
 }
@@ -3572,19 +3575,53 @@ function storyCheck(){                                // after each step of his 
   if (seatedNow !== seatedWas) { seatedWas = seatedNow; if (lastLife) story(lastLife, outsideOf(lastLife)); }
 }
 const outsideOf = life => !!life.geo || ["counter","bakery_in","bench","park_gate","bakery_door"].includes(life.place);
-function story(life, outside){
+// the caption is his activity in a verb (reading, watching, on his phone), with the page's title when there is one (else
+// its host): never "at the computer: ." and never the page's machinery (a restart is not his story); while the browser brings
+// the next page up it says so in-world, and keeps the article he is reading in view (R1)
+const LOADING = "the next page is loading…";
+function storyText(life, outside, seated){
   const r = life.reading, sc = life.screen, short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
-  const desk = sc && sc.device !== "phone", going = desk && visible && !seatedAtDesk();
-  put("story", "innerHTML", sc && sc.restarting && !life.path ? (going ? "is going to the desk (browser restarting)." : `is ${sc.device === "phone" ? "on his phone" : "at the computer"} (browser restarting).`)
-    : sc && !life.path ? (going ? `is going to the desk: <em>${esc(short(sc.title))}</em>.` : `is ${sc.device === "phone" ? "on his phone" : "at the computer"}: <em>${esc(short(sc.title))}</em>.`)
-    : outside && life.walking ? `is <em>walking</em> · next: ${esc(life.doing)}.`   // a walk home takes minutes: don't say he's already there
-    : r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`);
+  const phone = sc && sc.device === "phone", going = sc && !phone && !seated, act = life.activity;
+  const what = sc && !sc.restarting ? esc(short(sc.title || sc.host || "")) : "";
+  if (sc && !life.path && sc.restarting) return r && !phone ? `is reading <em>${esc(r.title)}</em> · ${LOADING}`
+    : `is ${going ? "going to the desk" : phone ? "on his phone" : "at the computer"} · ${LOADING}`;
+  if (sc && !life.path) {
+    if (going) return what ? `is going to the desk: <em>${what}</em>.` : "is going to the desk.";
+    if (phone) return what ? `is on his phone: <em>${what}</em>.` : "is on his phone.";
+    if (act === "watch_video") return what ? `is watching <em>${what}</em>, muted.` : "is watching a video at the computer, muted.";
+    if (act === "research") return what ? `is reading <em>${what}</em>.` : r ? `is reading <em>${esc(r.title)}</em>.` : "is reading at the computer.";
+    return what ? `is at the computer: <em>${what}</em>.` : "is at the computer.";
+  }
+  if (outside && life.walking) return `is <em>walking</em> · next: ${esc(life.doing)}.`;   // a walk home takes minutes: don't say he's already there
+  return r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`;
+}
+function story(life, outside){ put("story", "innerHTML", storyText(life, outside, !(visible && !seatedAtDesk()))); }
+// ---------- the night (R3): while he sleeps the room is not dead air: the eye's newest frame, and the night so far ----------
+let eyeFrame = null, nights = null, stageWas = null;
+function onEye(f){ if (f && f.img) { eyeFrame = f; dreamCard(); } }
+function onNights(m){ nights = m; nightLine(); }
+function dreamCard(){                                   // the dream frame shows only while he is asleep; by day /world has it
+  const f = eyeFrame, on = !!(f && stage !== "AWAKE");
+  put("dream", "hidden", !on); if (!on) return;
+  if ($("dream-img").getAttribute("src") !== f.img) $("dream-img").src = f.img;
+  put("dream-t", "innerHTML", `<b>${f.stage === "REM" ? "dreaming" : "deep sleep"}</b>${f.thought ? ` · “${esc(String(f.thought).slice(0, 90))}”` : " · the eye's image of the model's state"}`);
+}
+function nightLine(){                                   // under the story while he sleeps: when he fell asleep, how often woken, what came back
+  const n = nights && nights.tonight, on = !!(n && stage !== "AWAKE");   // (tonight's record only: last night's onset is not "asleep since")
+  put("night", "hidden", !on); if (!on) return;
+  const tm = s => s ? String(s).slice(11, 16) : "";
+  const reps = n.replays || [], nr = n.n_replays, last = reps[reps.length - 1];
+  const bits = [n.sleep_onset ? `asleep since ${tm(n.sleep_onset)}` : "falling asleep",
+    (n.wakeups || []).length ? `woken ${n.wakeups.length}×` : "", nr ? `${nr.chat + nr.reading + nr.taught} replay${nr.chat + nr.reading + nr.taught === 1 ? "" : "s"} so far` : "",
+    last ? `last: ${{reading: "read ", taught: "taught "}[last.source] || ""}“${esc(String(last.text || "").slice(0, 60))}”` : ""].filter(Boolean);
+  put("night", "innerHTML", bits.join(" · "));
 }
 function applyTick(m){
     const life = m.life, sl = m.sleep || {};
     lastLife = life; stage = sl.stage || "AWAKE";
+    if (stage !== stageWas) { const asleep = stage !== "AWAKE"; stageWas = stage; dreamCard();          // (a stage change: the dream frame, the vote note)
+      if (asleep && vote) voteNote("he is asleep · the winning option reaches his activity model when he wakes"); }
     const hm = /(\d+):(\d+)/.exec(sl.clock || ""); if (hm && !FIXED_HOUR) hour = +hm[1] + hm[2] / 60;
-    trades = trades.filter(t => Date.now() / 1000 - t.t < 300);
     put("chip", "textContent", sl.stage === "AWAKE" ? "AWAKE" : sl.stage === "REM" ? "REM" : "ASLEEP");
     put("chip", "background", sl.stage === "AWAKE" ? "#ff9a3c" : sl.stage === "REM" ? "#c26bff" : "#4d7cff");
     put("clock", "textContent", `${sl.clock || ""} Tokyo`);
@@ -3593,8 +3630,9 @@ function applyTick(m){
     const r = life.reading, sc = life.screen;
     const short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
     story(life, outside);
+    nightLine();
     put("why", "textContent", life.say || "");
-    if (r && !sc) { put("readcard", "hidden", false); put("r-title", "textContent", r.title); put("r-text", "textContent", r.extract);
+    if (r && (!sc || sc.restarting)) { put("readcard", "hidden", false); put("r-title", "textContent", r.title); put("r-text", "textContent", r.extract);   // (the article stays in view while the browser brings a page up)
       put("r-link", "href", r.url || "#"); put("r-why", "textContent", r.why || "");
       const kw = r.keywords || [], nets = (r.networks || []).map(n => NET[n] || n);
       put("r-kw", "innerHTML", kw.length ? `keywords <b>${esc(kw.join(", "))}</b>${nets.length ? ` → stimulus to ${esc(nets.join(", "))}${r.gain != null && r.gain < 0.99 ? ` (${Math.round(r.gain * 100)}% gets through)` : ""}` : ""}` : "");
@@ -3713,7 +3751,7 @@ function animate(dt){                                // one step of him: clips, 
   return moving;
 }
 if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, clock, CATCH, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
-  setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
+  setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawFood, drawReading, loadingTex, onEye, onNights,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
   sim: (dt, n = 1) => { for (let i = 0; i < n; i++) animate(dt); lighting(0.1); controls.update(); sun.shadow.needsUpdate = true; renderer.render(scene, camera); }, animate_: animate,
