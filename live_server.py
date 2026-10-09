@@ -639,7 +639,10 @@ class Live:
         self.viewer_ids = {}        # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
         self.viewer_addr = {}       # websocket -> its address's salted hash (per-address caps: votes, reactions)
         self.max_ws = int(os.environ.get("SUB01_MAX_WS", 400))
-        self.max_ws_ip = int(os.environ.get("SUB01_MAX_WS_PER_IP", 4))
+        # per address: 12, not 4 - a viewer with a few tabs, and the phones of a whole carrier behind one NAT address,
+        # were refused with "full" (2026-10-09: the room stuck at "connecting…" for the owner's own tabs). The total cap
+        # still bounds the process; both are env-tunable
+        self.max_ws_ip = int(os.environ.get("SUB01_MAX_WS_PER_IP", 12))
         self.ws_stats = {"lag": [], "late": [], "skipped": 0, "refused": 0, "t0": None, "ticks": 0,
                          "at": time.monotonic(), "every": float(os.environ.get("SUB01_WS_STATS_S", 300))}
 
@@ -1659,8 +1662,9 @@ class Live:
         key = self.client_ip(request)
         if len(self.sockets) >= self.max_ws or self.ws_per_ip.get(key, 0) >= self.max_ws_ip:
             self.ws_stats["refused"] += 1
+            why = "all" if len(self.sockets) >= self.max_ws else "ip"   # (the page says which: too many tabs/addresses, or the room)
             try:
-                await ws.send_json({"type": "full"})
+                await ws.send_json({"type": "full", "why": why, "retry": 30})
                 await ws.close(code=1013, message=b"full")       # 1013: try again later
             except Exception:
                 pass
