@@ -154,3 +154,12 @@ Stills: `desktop_vote.png` (your vote and the counts), `desktop_glance.png` (the
   - `POST /api/vote`: 405.
 - `tests/test_interactive.py`: 17 passed; smoke OK. `origin/main` is merged in (`7e72cd3`).
 - The full pytest run asked for was stopped when the work was reprioritised; the last full results are above.
+
+## Follow-up (2026-10-09): test_feed / test_neurons3d after the merge
+- Reported from main: `test_feed::test_caps_total_and_per_ip` and `::test_without_trust_proxy_the_header_is_ignored`
+  (the socket closed on them), and `test_neurons3d::test_stream_per_viewer_under_3_kb_s`.
+- Cause: these tests build a bare `Live` through `init_sockets()`, without the viewer state (`viewer_fp`, `votes`,
+  `reactions`) that `ws_handler` now uses. G23's `e7c2640` moves that state into the socket bookkeeping. It is merged
+  here.
+- On `preview/interactive` (with `e7c2640`): all 32 tests in `test_feed.py` and `test_neurons3d.py` pass, and the
+  bandwidth test passed 3 runs out of 3. No test expectation was changed.
