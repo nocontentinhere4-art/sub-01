@@ -1,4 +1,4 @@
-LATEST: test fixes for main 01f3a0d → commit 46f6e71 on preview/sova-phone-src (origin/main merged in first, 5fc23a0; the fix is its own commit, cause in its message). The 3 tests + test_interactive: 20 passed; smoke_demo: SMOKE OK. The patch file in docs/qa/test-fixes/ is the same change.
+LATEST: UI QA of preview/interactive 4deaa67 → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`), newest commit only. On preview/sova-phone-src: pushing to preview/ui-simple-qa needs the owner's explicit OK.
 
 ## Test fixes on main 01f3a0d (all 3 from the interactive merge)
 - **One cause for all three:**
