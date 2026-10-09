@@ -1188,6 +1188,7 @@ function wristOnPhone(){
 const RAMP = ["RightArm", "RightForeArm", "RightHand"], _q0 = RAMP.map(() => new THREE.Quaternion()), _up = new THREE.Vector3();
 // w: 0..1, how far the arm and head have gone from the clip's pose to the grip (it ramps up when he picks the phone up)
 function holdPhone(w){
+  if (phone.userData.byClip) return;                    // (a clip that holds the phone itself: room/boy_mh.js's bed layer)
   const B = bones, G = GRIP, t = T; if (!B.RightArm || !B.LeftArm || !head) return;
   const lying = (current && current === actions.phone_lie) || TU.y < 0.5;   // (the torso, so a clip change mid-ramp keeps it right)
   touch(B.RightArm, B.RightForeArm, B.RightHand, head);
@@ -1614,7 +1615,7 @@ function updateCameraGoal(){
       // (and slid sideways halfway to his head: the shot over his shoulder left it off the narrow canvas's edge)
       if (head) { v3.crossVectors(v1, UP).normalize(); (bones.headfront || head).getWorldPosition(v4); const o = v4.sub(camGoal.target).dot(v3) * DESK_SLIDE;
         camGoal.target.addScaledVector(v3, o); camGoal.pos.addScaledVector(v3, o); } }
-  } else if (screenOn === "phone" && phone.visible && head) {
+  } else if (screenOn === "phone" && phone.visible && head && !phone.userData.byClip) {   // (a phone the bed layer's clip holds: framed as lying, not this shot)
     // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
     phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
     const ry = boy.rotation.y; v3.set(Math.sin(ry), 0, Math.cos(ry)); v4.crossVectors(v3, UP);   // facing, his right
@@ -3752,7 +3753,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
     ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     ...(V5 && V5.mx ? {clipDir: "room/mh_mx", ...V5.m.ROOM} : {}),   // (?char=mixamo: its clips, which clip plays which slot, the clips' keyboard and mouse)
     ...(DESK_EV ? {anim: "sova", deskEvents: () => DESK_EV.splice(0)} : {}),   // (&anim=sova: the desk states and what they react to)
-    movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
+    movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; }, phone: () => phone,
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),
     chairChanged: () => { VOX = null; },                // (the chair's shape changed: its collision voxels anew)

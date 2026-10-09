@@ -304,6 +304,8 @@ export function createMH(env) {
     // the desk states (by default with the mixamo character): loaded after he is ready, so they never hold him back; until
     // they are in, and if they fail, the Mixamo clips play (a clip that fails is left out)
     if (env.anim === "sova") svLoad(make, bodyHips).then(() => seatHeight(), e => { SV = null; M.sv = null; console.warn("desk states not loaded, Mixamo clips only", e); });
+    if (env.anim === "sova") bedLoad(make).catch(e => { M.bed = null; console.warn("bed clips not loaded, Mixamo clips only", e); }).finally(() => { M.bedTried = true; });   // (the bed layer: bedStep())
+    else M.bedTried = true;
   }
   // the page puts the root at the seat anchor less the clip's hips; the MakeHuman clips have the feet at y = 0, so the
   // seated slots' hip height is the seat anchor's height over the floor: the root (his feet) stays on the floor
@@ -1916,6 +1918,83 @@ export function createMH(env) {
     b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry;
   }
 
+  // ---------- the bed layer (room/desk_states/bed: G23's Sova bed clips, fitted to the room's bed) ----------
+  // Lying on the bed with the phone, the phone clips by what is on it: a portrait short (or anything else) -> watching it
+  // held upright, a video -> held sideways, a chat -> typing (the lift over his face, bed_phone_lift, is left out: see
+  // BED_SKIP). Asleep: on his side, after a while he rolls onto his back (once), then on his back with small
+  // shifts now and then. Crossfaded like the desk states; the page's lie and sleep clips stay underneath (a clip that does
+  // not load is left out; none loaded: the page's clips as before). The phone clips hold the phone in his left hand
+  // themselves: the page's holdPhone() stands aside (phone.userData.byClip) and the phone hangs on the hand by the clip's grip
+  const BED_DIR = "room/desk_states/bed", BED_FADE = 0.8;
+  // (bed_phone_lift is left out: its source lies across a bed with the feet on the floor, and laid along this mattress its
+  // legs went 7122 sampled vertices into it - G23's extents_m say as much; the other seven: 0 in the bed over each clip)
+  const BED_SKIP = ["bed_phone_lift"];
+  // the page's phone (x its width, y its length, z out of its screen) in the clips' phone box (x its thickness = the screen's
+  // normal, y its length, z its width)
+  const BED_AXES = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(0, 0, -1), V(0, 1, 0), V(1, 0, 0)));
+  async function bedLoad(make) {
+    const r = await fetch(`${BED_DIR}/index.json`); if (!r.ok) throw new Error(`${BED_DIR}/index.json: ${r.status}`);
+    const ix = (await r.json()).clips || {}, clips = {};
+    await Promise.all(Object.entries(ix).filter(([name]) => !BED_SKIP.includes(name)).map(([name, e]) => env.load(`${BED_DIR}/${e.file}`).then(g => {
+      const c0 = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; if (!c0) return; const c = c0.clone(); c.name = "bed_" + name;
+      const a = make(c); if (e.loop) a.setLoop(THREE.LoopRepeat, Infinity); else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+      const sp = sampler(c), p0 = sp(0); sp.done();
+      clips[name] = {a, dur: c.duration, loop: !!e.loop, place: bedPlace(p0), phone: e.phone ? {t: V(...e.phone.node_translation), q: new THREE.Quaternion(...e.phone.node_rotation_xyzw)} : null};
+    }, () => null)));
+    if (!Object.keys(clips).length) throw new Error("no bed clip loaded");
+    const A = env.actions; M.bed = {clips, cur: null, slot: null, until: 0, def: {phone_lie: A.phone_lie, lie_phone: A.lie_phone, sleep: A.sleep}, from: null, k: 1};
+  }
+  function bedPhoneClip(life) {                              // which phone clip, by what is on the phone
+    const sc = life && life.screen, app = life && life.phone, has = n => M.bed.clips[n] ? n : null;
+    if (app === "chat") return has("bed_phone_typing") || has("bed_phone_watch_portrait");
+    if ((sc && sc.device === "phone" && sc.kind === "video") || app === "video" || app === "youtube") return has("bed_phone_watch_landscape") || has("bed_phone_watch_portrait");
+    return has("bed_phone_watch_portrait") || has("bed_phone_watch_landscape");
+  }
+  function bedPlay(name, st) {
+    const B = M.bed, C = B.clips[name], a = C.a, cur = st.current;
+    a.reset(); a.setEffectiveWeight(1); a.fadeIn(BED_FADE).play(); if (cur && cur !== a) cur.fadeOut(BED_FADE); env.setCurrent(a);
+    for (const k of B.slot === "phone" ? ["phone_lie", "lie_phone"] : ["sleep"]) env.actions[k] = a;   // (the page's play() keeps it)
+    const b = env.boy; B.from = {x: b.position.x, z: b.position.z, ry: b.rotation.y}; B.k = 0; B.cur = name;
+    M.log.push([+st.T.toFixed(2), "bed:" + name]); if (M.log.length > 50) M.log.shift();
+  }
+  function bedOff() {
+    const B = M.bed; for (const [k, a] of Object.entries(B.def)) if (a) env.actions[k] = a;
+    B.cur = B.slot = null; const ph = env.phone && env.phone(); if (ph && ph.userData.byClip) { ph.userData.byClip = false; ph.visible = false; }
+  }
+  function bedStep(st, dt) {
+    const B = M.bed; if (!B) return;
+    const g = st.goal, slot = !st.step && st.at === "bedlie" && g ? (g.clip === "phone_lie" ? "phone" : g.clip === "sleep" ? "sleep" : null) : null;
+    if (!slot) { if (B.cur) bedOff(); return; }
+    const T = st.T, rng = env.rng || Math.random, has = n => !!B.clips[n], fresh = B.slot !== slot || !B.cur; let want = B.cur;
+    B.slot = slot;
+    if (slot === "phone") {
+      const base = bedPhoneClip(st.life);
+      if (fresh) { want = base; B.until = T + 25 + 35 * rng(); }
+      else if (B.cur === "bed_phone_lift") { if (T >= B.until) { want = base; B.until = T + 30 + 40 * rng(); } }
+      else if (B.cur !== base) want = base;
+      else if (T >= B.until && has("bed_phone_lift")) { want = "bed_phone_lift"; B.until = T + B.clips.bed_phone_lift.dur - BED_FADE; }
+    } else {
+      const back = () => (has("sleep_back") ? "sleep_back" : "sleep_back_idle");
+      if (fresh) { want = has("sleep_side") ? "sleep_side" : back(); B.until = T + 40 + 50 * rng(); }
+      else if (B.cur === "sleep_side" && T >= B.until && has("sleep_roll_to_back")) { want = "sleep_roll_to_back"; B.until = T + B.clips.sleep_roll_to_back.dur - BED_FADE; }
+      else if (B.cur === "sleep_roll_to_back" && T >= B.until) { want = back(); B.until = T + 30 + 30 * rng(); }
+      else if ((B.cur === "sleep_back" || B.cur === "sleep_back_idle") && T >= B.until) { want = B.cur === "sleep_back" && has("sleep_back_idle") ? "sleep_back_idle" : back(); B.until = T + 20 + 30 * rng(); }
+    }
+    if (M.bedForce && has(M.bedForce)) want = M.bedForce;      // (?debug: that clip, now)
+    if (want && want !== B.cur && has(want)) bedPlay(want, st);
+    const C = B.clips[B.cur]; if (!C) return;
+    // the root: each clip's own placement on the bed (the page's is the lie clip's), eased over the crossfade
+    if ((window.__bedPlace ?? "own") === "own") { B.k = Math.min(1, B.k + dt / BED_FADE); const k = B.k * B.k * (3 - 2 * B.k), F0 = B.from || C.place, b = env.boy;
+      b.position.set(F0.x + (C.place.x - F0.x) * k, env.F, F0.z + (C.place.z - F0.z) * k); b.rotation.y = angLerp(F0.ry, C.place.ry, k); b.updateMatrixWorld(true); }
+    // the phone: in his left hand by the clip's grip (else the page holds it as before)
+    // (this body's step - the page's step0 - has no phone of its own: shown here while a clip holds it, hidden after)
+    const ph = env.phone && env.phone(); if (!ph) return;
+    if (!C.phone) { if (ph.userData.byClip) { ph.userData.byClip = false; ph.visible = false; } return; }
+    ph.userData.byClip = true; ph.visible = true;
+    const hb = env.bones.LeftHand; if (!hb) return; hb.updateWorldMatrix(true, false);
+    ph.position.copy(hb.localToWorld(C.phone.t.clone())); ph.quaternion.copy(hb.getWorldQuaternion(new THREE.Quaternion()).multiply(C.phone.q).multiply(BED_AXES)); ph.updateMatrixWorld(true);
+  }
+
   // ---------- one step (instead of the page's animate: the mixer, his plan and walk, the desk modes, the wrists) ----------
   function animate(dt) {
     contactRestore();                                          // (the page's finger turns undone before the mixer runs)
@@ -1938,6 +2017,7 @@ export function createMH(env) {
     }
     if (SV && M.mode !== "desk_watch") SV.cur = null;        // (the desk states start over with the mode's own loop)
     if (!transition(st)) onBed(st);
+    bedStep(st, dt);                                           // (the Sova bed clips over the page's lie and sleep, and the phone they hold)
     // the quilt and the pillow give under him lying awake on the bed: in as he lies down (the lift follows it frame by
     // frame through the step, no pop once he is down), out as he gets up or falls asleep under the duvet
     const lying = st.at === "bedlie" && !st.step, asleep = !!(st.goal && st.goal.clip === "sleep");
