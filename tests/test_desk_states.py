@@ -45,6 +45,8 @@ r.lost = reactionFor({type: "chess", plies: 40, result: "lost", finished: true},
 r.draw = reactionFor({type: "chess", plies: 40, result: "draw", finished: true}, null);
 r.decision = reactionFor({type: "decision", chosen: 1}); r.chat = reactionFor({type: "chat", text: "hi"});
 r.daSmall = reactionFor({type: "dopamine", size: 0.2}); r.daMid = reactionFor({type: "dopamine", size: 0.6}); r.daBig = reactionFor({type: "dopamine", size: 1.0});
+r.glance = Object.fromEntries(["\u{1f44b}", "\u2764\ufe0f", "\u{1f602}", "\u{1f62e}", "\u{1f44f}", "\u2728", "?"].map(e => [e, reactionFor({type: "glance", emoji: e})]));
+r.glanceOld = reactionFor({type: "glance"});
 r.trade = reactionFor({type: "tick", trades: [{kind: "buy", usd: 5}]}); r.music = reactionFor({type: "music", playing: true});
 // a second reaction within the cool-down is not played; a stale event is dropped
 const q = createPicker({have, clipOf, durOf, rng}); q.event({type: "dopamine", size: 1.2}, 0); r.firstUp = q.next(0).name;
@@ -87,6 +89,12 @@ def test_reactions_only_on_the_pages_own_messages():
     assert r["decision"] == {"slot": "attend"} and r["chat"] == {"slot": "attend"}, r
     assert r["daSmall"] is None and r["daMid"] == {"kind": "gesture"} and r["daBig"] == {"slot": "react_up"}, r
     assert r["trade"] is None and r["music"] is None, r          # (nothing financial, nothing else)
+    g = r["glance"]                                               # (viewers' reactions spiked: the dominant one picks his answer)
+    assert g["\U0001f44b"] == {"slot": "attend", "wave": True}, g       # a wave: he waves back
+    assert g["\u2764\ufe0f"] == g["\U0001f602"] == {"slot": "react_up"}, g   # a heart, a laugh: the smile
+    assert g["\U0001f62e"] == {"slot": "gesture_d"}, g                  # surprise: a look around
+    assert g["\U0001f44f"] == g["\u2728"] == {"slot": "react_win"}, g      # applause, sparkle: happy
+    assert g["?"] == r["glanceOld"] == {"slot": "attend"}, g             # unknown or none (an older server): a look up
     assert r["firstUp"] == "react_up" and r["secondUp"] != "react", r
     assert r["stale"] is None, r
 

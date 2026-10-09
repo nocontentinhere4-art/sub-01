@@ -16,8 +16,12 @@
 //                 from 0.45, react_up from 0.9 (only shorts reach it: video and pages are scaled to 0.5 / 0.25); react_up
 //                 stays seated (a laugh, a smile at the screen): only a won game gets him up (react_win)
 //   chat   a viewer's message reaches him -> he looks at the monitor (attend)
-//   glance (preview/interactive) viewers' reactions spiked -> a calm seated loop (attend) while room/glance.js turns his
-//                 head toward the camera once (the server sends it at most once every 2 minutes)
+//   glance (preview/interactive) viewers' reactions spiked (the server: at most once every 2 minutes) -> room/glance.js
+//                 turns his head toward the camera once, and the spike's dominant reaction picks his answer (GLANCE):
+//                 a wave -> a calm seated loop and a short wave of his right hand (boy_mh.js wave()); a heart or a laugh ->
+//                 react_up (a smile); surprise -> gesture_d (a look around); applause or sparkle -> react_win (happy);
+//                 none named (an older server) -> attend. Like every event: only while he sits watching (never typing,
+//                 never on the mouse for a chess move) and only within KEEP seconds, else dropped
 // Trades are left out by design (nothing financial). Nothing is invented: no event, no reaction.
 
 export const SLOTS = {
@@ -48,6 +52,10 @@ export const COOL = {gesture: 25, react: 150};               // (s) at least bet
 export const KEEP = 4;                                       // (s) an event not played by then is dropped (he was busy)
 export const DA = {gesture: 0.45, react: 0.9};
 
+// a spike of viewers' reactions (the glance message's emoji) -> his answer
+export const GLANCE = {"👋": {slot: "attend", wave: true}, "❤️": {slot: "react_up"}, "😂": {slot: "react_up"},
+  "😮": {slot: "gesture_d"}, "👏": {slot: "react_win"}, "✨": {slot: "react_win"}};
+
 // one page message -> what it calls for ({slot} or {kind}), or null. prev: the last chess message seen (its turn, plies)
 export function reactionFor(m, prev) {
   if (!m || typeof m !== "object") return null;
@@ -62,7 +70,7 @@ export function reactionFor(m, prev) {
   }
   if (m.type === "decision") return {slot: "attend"};
   if (m.type === "chat") return m.text ? {slot: "attend"} : null;
-  if (m.type === "glance") return {slot: "attend"};
+  if (m.type === "glance") return GLANCE[m.emoji] ? {...GLANCE[m.emoji]} : {slot: "attend"};
   if (m.type === "dopamine") {
     const s = +m.size; if (!(s > 0)) return null;
     return s >= DA.react ? {slot: "react_up"} : s >= DA.gesture ? {kind: "gesture"} : null;
@@ -113,7 +121,7 @@ export function createPicker({have, clipOf, durOf, rng = Math.random}) {
         if (!name) continue; const k = SLOTS[name].kind;
         if (!allowed(k, T) || (k !== "react" && !fresh(name))) continue;
         S.queue.length = 0;                                  // (the rest came with it: one answer to them)
-        return {...plan(name, T), why: e.src};
+        return {...plan(name, T), why: e.src, ...(e.wave ? {wave: true} : {})};
       }
       const w = MIX[mode] || MIX.watch, kinds = Object.keys(w).filter(k => of(k).some(fresh) && allowed(k, T));
       if (!kinds.length) return null;
