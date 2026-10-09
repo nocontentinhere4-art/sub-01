@@ -343,18 +343,83 @@
     #viewers { font-size:10.5px; padding:0 8px 0 4px; }
   }
   @media (max-width: 380px) { #rx button { width:34px; font-size:17px; } #viewers { font-size:10px; padding:0 6px 0 2px; } #rxpill { padding:3px 4px 3px 3px; } }
+
+  /* ===== the owner's second pass (2026-10-09): nothing over the room. A slim solid bar above it (SUB-01 + nav + today;
+     the status line; "is …"), the room under the bar. Phones: the room, the reactions, one compact vote card and a fixed
+     chat bar whose ••• opens a sheet with Chat history · Teach · More. ===== */
+  :root { --barh:92px; }
+  #top { position:fixed; left:0; right:0; top:0; max-width:none; padding:10px var(--gap) 10px; z-index:8; pointer-events:auto;
+    background:var(--bg); border-bottom:1px solid var(--line); }
+  #top #state, #top #story { text-shadow:none; }
+  #brand { gap:12px; } #brand h1 { font-size:14px; } #brand nav a { padding:6px 7px; }
+  #todaybtn { margin-left:auto; font:inherit; font-size:11px; color:var(--dim); background:none; border:0; padding:6px 4px; cursor:pointer; min-height:32px; }
+  #todaybtn:hover, #todaybtn[aria-expanded="true"] { color:var(--fg); }
+  #state { margin-top:6px; font-size:11.5px; gap:8px; flex-wrap:nowrap; white-space:nowrap; overflow:hidden; }
+  #story { margin-top:4px; font-size:15px; min-height:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  #story.in { animation:none; }
+  #tools, #cam, #vignette, #votecard .how, #v-last { display:none !important; }
+  #away { display:none; position:static; transform:none; background:none; border:0; padding:0; margin-top:2px; width:auto; text-align:left;
+    font-size:11px; color:var(--dim); backdrop-filter:none; -webkit-backdrop-filter:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #away[style*="block"] { display:block; }
+  #today { left:auto; right:var(--gap); top:100%; margin-top:6px; }
+  #scene { top:var(--barh); }
+  #rxfloat { top:var(--barh); }
+  #side { top:calc(var(--barh) + var(--gap)); max-height:calc(100vh - var(--barh) - 2 * var(--gap)); }
+  #sheetbtn, #tabs #sheetclose { display:none; }
+  #brand h1, #todaybtn { white-space:nowrap; flex:none; }
+  @media (max-width: 380px) { #brand { gap:6px; } #brand nav a { padding:6px 4px; } #brand nav { gap:0; } }
+
+  @media (max-width: 900px) {
+    html, body { overflow:visible; height:auto; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+    #top { position:sticky; order:1; padding:8px 16px; background:var(--bg); }
+    #top #story { font-size:14px; -webkit-line-clamp:unset; }
+    #scene { position:relative; order:2; top:auto; inset:auto; height:55vh; flex:none; }
+    #rxfloat { position:absolute; top:var(--barh); height:55vh; }
+    #rxpill { position:static; order:3; transform:none; align-self:center; margin:10px 0 0; background:rgba(10,10,16,.72); }
+    body[data-tab="chat"] #rxpill { bottom:auto; }
+    #side { order:4; margin:0; padding:0; }
+    #tabs { display:none; }
+    .pane { display:none !important; padding:14px 16px calc(84px + env(safe-area-inset-bottom)); }
+    body:not(.sheet) .pane[data-pane="vote"] { display:block !important; }
+    .pane { flex:none; }                                                  /* (in the sheet the panes stack; no sharing of its height) */
+    .pane[data-pane="chat"] { display:block !important; padding:0; }     /* (it holds the fixed chat bar: always laid out) */
+    body:not(.sheet) #feed, body.sheet:not([data-tab="chat"]) #feed, body:not(.sheet) #note,
+      body.sheet:not([data-tab="chat"]) #note { display:none !important; }
+    body.sheet[data-tab="chat"] .pane[data-pane="chat"] { padding:14px 16px calc(84px + env(safe-area-inset-bottom)); }
+    #votecard .k { margin-bottom:6px; }
+    #votecard .opt { min-height:46px; margin-top:6px; padding:10px 14px; }
+    #v-note { margin-top:6px; }
+    /* the chat bar: always at the bottom; ••• opens the sheet */
+    body:not([data-tab="chat"]) #chat, #chat { display:flex; position:fixed; left:0; right:0; bottom:0; z-index:30; gap:8px;
+      padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(8,8,11,.96); border-top:1px solid var(--line); }
+    #sheetbtn { display:block; flex:none; width:44px; min-height:44px; font:inherit; font-size:15px; letter-spacing:1px; color:var(--fg);
+      background:var(--card2); border:1px solid rgba(255,255,255,.14); border-radius:var(--r); cursor:pointer; }
+    #sheetbtn[aria-expanded="true"] { border-color:rgba(255,154,60,.6); }
+    #note { display:none; }
+    body.sheet #note { display:block; }
+    /* the sheet */
+    body.sheet #side { position:fixed; left:0; right:0; top:14vh; bottom:0; z-index:25; overflow-y:auto; background:var(--bg);
+      border-top:1px solid var(--line); border-radius:var(--r) var(--r) 0 0; box-shadow:0 -20px 40px rgba(0,0,0,.6); }
+    body.sheet #tabs { display:flex; position:sticky; top:0; z-index:2; margin:0; padding:8px 12px; background:var(--bg); border-bottom:1px solid var(--line); }
+    body.sheet #tabs button { border:0; border-radius:8px; background:none; } body.sheet #tabs button.on { background:rgba(255,255,255,.08); }
+    body.sheet #tabs [data-tab="vote"] { display:none; }
+    body.sheet #tabs #sheetclose { display:inline-flex; flex:none; width:44px; }
+    body.sheet .pane.on { display:block !important; }
+    body.sheet { overflow:hidden; }
+  }
 </style>
 </head>
 <body>
 <div id="scene"></div><div id="vignette"></div>
 <div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
-<div id="away"></div>
 <div id="top">
-  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
+  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav>
+    <button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
-  <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
-<button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
+  <div id="away"></div>
+  <div id="tools"><button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
   <div id="today" hidden>
   <div id="why"></div>
   <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's AI budget is used up; back tomorrow.</span></div>
@@ -367,12 +432,13 @@
     <button type="button" role="tab" data-tab="chat">Chat <i id="tab-dot" hidden></i></button>
     <button type="button" role="tab" data-tab="teach">Teach</button>
     <button type="button" role="tab" data-tab="more">More</button>
+    <button type="button" id="sheetclose" aria-label="close">✕</button>
   </nav>
   <section class="pane on" data-pane="vote" role="tabpanel">
   <div class="card" id="votecard" hidden>
-    <div class="k"><span>What next? · viewers vote</span><span id="v-left"></span></div>
+    <div class="k"><span>What next?</span><span id="v-left"></span></div>
     <div id="v-opts"></div>
-    <div class="s" id="v-note">one vote per viewer per round</div>
+    <div class="s" id="v-note">one vote each</div>
     <div class="s" id="v-last" hidden></div>
     <details class="how"><summary>The winner nudges what he does next · <span>how it works</span></summary>
       <div class="s">When the round ends, the most-voted option goes to his activity model as a strong nudge. Needs such as
@@ -383,7 +449,7 @@
   <section class="pane" data-pane="chat" role="tabpanel">
 <div id="dock">
   <div id="feed" hidden aria-live="polite"></div>
-  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
+  <form id="chat"><button type="button" id="sheetbtn" aria-label="chat history, teach and more" aria-expanded="false">•••</button><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
   <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
   </section>
   <section class="pane" data-pane="teach" role="tabpanel">
@@ -1512,7 +1578,8 @@ const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3
 // the aspect and the header's height; the monitor shot waits until he is at the desk. Wider canvases keep the old goals.
 const OV_DIR = OVERVIEW.pos.clone().sub(OVERVIEW.target).normalize();
 const OV_UP = UP.clone().addScaledVector(OV_DIR, -UP.dot(OV_DIR)).normalize();     // the overview camera's up
-const FRAME_R = 1.08;                                // the sphere round his hips: his height lying, his feet standing
+const FRAME_R = 1.08;
+const FRAME_PAD = 1.1;                               // (a margin round him: since nothing sits over the room, no header band adds it)                                // the sphere round his hips: his height lying, his feet standing
 let hudAt = -1e9, hudTop = 1;
 // only the body that is drawn, once it is ready (set by the rig layer below: the v5 / MakeHuman layer takes over a while
 // after load, and until then the old rig's hips can sit ~100 m up), and only hips inside the room; else the overview
@@ -1530,7 +1597,7 @@ const DESK_SLIDE = 0.85;                              // (phones, the monitor sh
 const bandShift = d => -(hudBand() - 1) / 2 * Math.tan(camera.fov * Math.PI / 360) * d;
 function frameHim(){
   const ty = Math.tan(camera.fov * Math.PI / 360), half = (hudBand() + 1) / 2;   // the free band's half height (NDC)
-  const d = FRAME_R / Math.sin(Math.atan(Math.min(ty * camera.aspect, ty * half)));
+  const d = FRAME_PAD * FRAME_R / Math.sin(Math.atan(Math.min(ty * camera.aspect, ty * half)));
   bones.Hips.getWorldPosition(v1).addScaledVector(OV_UP, bandShift(d));       // (his hips at the band's middle)
   camGoal.target.copy(v1); camGoal.pos.copy(v1).addScaledVector(OV_DIR, d);
 }
@@ -3346,7 +3413,7 @@ $("v-opts").addEventListener("click", ev => {
   sock.send(JSON.stringify({type: "vote", k: +b.dataset.k}));
 });
 function onVote(m){
-  if (m.type === "vote") { voteLast = m.last || voteLast; setRound(m.round); voteNote("one vote per viewer per round"); }
+  if (m.type === "vote") { voteLast = m.last || voteLast; setRound(m.round); voteNote("one vote each"); }
   else if (m.type === "vote_ack") { if (typeof m.mine === "number") voteMine = m.mine;
     voteNote(m.ok ? "vote counted · results when the round ends" : `not counted: ${m.reason}`, !m.ok); renderVote(); }
   else if (m.type === "vote_result") { voteLast = m; vote = null; renderVote();
@@ -3407,6 +3474,20 @@ function floatUp(counts){                                 // the reactions since
   const btn = $("todaybtn"), box = $("today");
   btn.addEventListener("click", () => { box.hidden = !box.hidden; btn.setAttribute("aria-expanded", !box.hidden); });
   document.addEventListener("click", ev => { if (!box.hidden && !ev.target.closest("#today, #todaybtn")) { box.hidden = true; btn.setAttribute("aria-expanded", false); } });
+}
+
+// the bar's height (the room starts under it) and the phone sheet (••• in the chat bar: Chat history · Teach · More)
+{
+  const top = $("top"), setH = () => document.documentElement.style.setProperty("--barh", `${Math.ceil(top.offsetHeight)}px`);
+  new ResizeObserver(() => { setH(); window.dispatchEvent(new Event("resize")); }).observe(top); setH();
+  const btn = $("sheetbtn"), open = on => {
+    document.body.classList.toggle("sheet", on); btn.setAttribute("aria-expanded", on);
+    if (on && !["chat", "teach", "more"].includes(document.body.dataset.tab)) document.querySelector('#tabs [data-tab="chat"]').click();
+    if (!on && innerWidth <= 900) document.querySelector('#tabs [data-tab="vote"]').click();
+  };
+  btn.addEventListener("click", () => open(!document.body.classList.contains("sheet")));
+  $("sheetclose").addEventListener("click", () => open(false));
+  addEventListener("keydown", ev => { if (ev.key === "Escape") open(false); });
 }
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery", buy_konbini:"at the konbini"};
