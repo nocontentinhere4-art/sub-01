@@ -18,12 +18,13 @@ PROBE = '''() => {
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && +s.opacity > 0.05 &&
            r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth; };
   const name = e => (e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : ''))
-                    + ((e.innerText || e.value || e.getAttribute('aria-label') || '').trim() ? ' "' + (e.innerText || e.value || e.getAttribute('aria-label')).trim().slice(0, 24) + '"' : '');
+                    + ((e.innerText || e.value || e.getAttribute('aria-label') || '').trim() ? ' "' + (e.innerText || e.value || e.getAttribute('aria-label')).trim().replace(/\s+/g, ' ').slice(0, 24) + '"' : '');
   const se = document.scrollingElement;
   const taps = [...document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=tab], [onclick], summary, label[for]')]
     .filter(vis).map(e => { const r = e.getBoundingClientRect(); return {el: name(e), w: Math.round(r.width), h: Math.round(r.height)}; })
     .filter(t => t.w < 44 || t.h < 44);
-  const fixed = [...document.querySelectorAll('body *')].filter(e => getComputedStyle(e).position === 'fixed' && vis(e));
+  const big = e => { const r = e.getBoundingClientRect(); return r.width * r.height > 0.5 * innerWidth * innerHeight; };   // a full-screen layer (the scene) is the background, not an overlap
+  const fixed = [...document.querySelectorAll('body *')].filter(e => getComputedStyle(e).position === 'fixed' && vis(e) && !big(e));
   const over = [];
   for (let i = 0; i < fixed.length; i++) for (let j = i + 1; j < fixed.length; j++) {
     const a = fixed[i], b = fixed[j]; if (a.contains(b) || b.contains(a)) continue;
