@@ -1,4 +1,5 @@
-LATEST: 0248b96 — **MATTINA for launch**: `docs/qa/sova/mattina/desk/` (20) and `mattina/bed/` (8), the owner's choice. 28 clips; the 2 drops (seat_distracted_then_smile, sleep_wake_and_back) are left out. No hands pass on any of them.
+LATEST: UI QA of preview/interactive 5ac6cd9 → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`). On this branch (preview/sova-phone-src): pushing to preview/ui-simple-qa needs the owner's explicit OK. 0d01d2d is running now.
+
 
 ## MATTINA set — 0248b96
 **What it is:** the exact GLBs used as MATTINA in `alive_ab.mp4`, byte for byte (taken from git at 797355c^). Same filenames as `desk/` and `bed/`; this morning's `index.json` alongside.

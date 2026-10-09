@@ -51,7 +51,7 @@ with sync_playwright() as p:
             note = ''
             if st != 'loaded':
                 loc = None
-                for get in (lambda: pg.get_by_role('tab', name=st, exact=True), lambda: pg.get_by_role('button', name=st, exact=True),
+                for get in (lambda: pg.locator(f'[role=tab][data-tab="{st.lower()}"]'), lambda: pg.get_by_role('tab', name=st, exact=True), lambda: pg.get_by_role('button', name=st, exact=True),
                             lambda: pg.get_by_text(st, exact=True)):
                     try:
                         l = get()
@@ -60,7 +60,7 @@ with sync_playwright() as p:
                 if loc is None: note = 'TAB NOT FOUND'
                 else:
                     try: loc.click(timeout=15000); pg.wait_for_timeout(1500)
-                    except Exception as e: note = f'click failed: {e}'[:160]
+                    except Exception as e: note = 'click failed: ' + ' '.join(str(e).split())[:700]
             f = f'{OUT}/{vn}_{st}.png'
             try: pg.screenshot(path=f, timeout=180000, animations='disabled'); shots[(vn, st)] = f
             except Exception as e: note += f' shot: {e}'[:120]
