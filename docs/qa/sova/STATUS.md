@@ -1,4 +1,4 @@
-LATEST: UI QA of preview/interactive 5ac6cd9 → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`). On this branch (preview/sova-phone-src): pushing to preview/ui-simple-qa needs the owner's explicit OK. 0d01d2d is running now.
+LATEST: UI QA of preview/interactive e3e846e → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`), newest commit only. On preview/sova-phone-src: pushing to preview/ui-simple-qa needs the owner's explicit OK.
 
 
 ## MATTINA set — 0248b96
