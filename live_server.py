@@ -411,9 +411,6 @@ class Live:
         # viewers (preview/interactive, audience.py): the vote on what he does next, the viewer count, the reactions
         self.votes = audience.Votes(rng=random.Random(int(seed) + 7 if seed else None))
         self.reactions = audience.Reactions()
-        self.viewer_fp = audience.Fingerprints()   # the process's salt (memory only): a connection's ids, never raw
-        self.viewer_ids = {}               # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
-        self.viewer_addr = {}              # websocket -> its address's salted hash (per-address caps: votes, reactions)
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -637,6 +634,10 @@ class Live:
         self.transports = {}        # websocket -> its transport (write-buffer size for the slow-client check)
         self.sockets = set()        # every accepted websocket, also while its hello is being sent
         self.ws_per_ip = {}         # client address -> open websockets (only counts, kept in memory)
+        # viewers (audience.py): per connection, set in ws_handler, so here with the rest of the websocket state
+        self.viewer_fp = audience.Fingerprints()   # the process's salt (memory only): a connection's ids, never raw
+        self.viewer_ids = {}        # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
+        self.viewer_addr = {}       # websocket -> its address's salted hash (per-address caps: votes, reactions)
         self.max_ws = int(os.environ.get("SUB01_MAX_WS", 400))
         self.max_ws_ip = int(os.environ.get("SUB01_MAX_WS_PER_IP", 4))
         self.ws_stats = {"lag": [], "late": [], "skipped": 0, "refused": 0, "t0": None, "ticks": 0,
@@ -1629,6 +1630,8 @@ class Live:
                 await self.broadcast({"type": "glance", "emoji": emoji})   # (the spike's dominant reaction: how he answers)
 
     def audience_hello(self, ws):
+        if getattr(self, "votes", None) is None:               # a Live with only its websocket parts (as music, replies)
+            return None
         ids = self.viewer_ids.get(ws, ())
         return {"reactions": list(audience.REACTIONS), "viewers": len(self.sockets),
                 "vote": self.votes.public(mine=self.votes.mine(ids)), "react_every": audience.REACT_EVERY_S,
