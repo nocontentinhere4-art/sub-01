@@ -105,8 +105,17 @@ Status: **first working version done** (G24): code, tests and the demo video are
 
 The existing suite and smoke run:
 - `python tests/smoke_demo.py`: **SMOKE OK** (above).
-- `pytest tests`: before the Dockerfile fix, `-x` stopped at `test_dockerfile_copies_every_imported_module` (fixed:
-  audience.py is now copied) after 456 passed. Full-run result: see the line below (updated when the run finishes).
+- `pytest tests` (full suite, 1,558 tests with these 16): everything outside `tests/visual/` passes, including
+  `test_dockerfile` (it caught `audience.py` missing from the Dockerfile; fixed). In `tests/visual/` (headless Chromium
+  + SwiftShader), the tests that fail here **fail the same way on the untouched base commit `96d6cad`** (run side by
+  side in a worktree), so this branch didn't cause them:
+  - `test_hand_switch::test_no_snap_switching_between_keys_and_mouse`: fails on the base too.
+  - `test_visual::test_room_renders_without_hard_errors`: the same 3 items on the base and the branch (chair/desk
+    penetration in `walking_8_1280`, desk penetration in `eating_19_1280`). Under CPU load it adds timing items on both
+    (`desk_14_390`, and once `door_8_1280` here); run alone, the branch shows only the 3.
+  - `test_phone_camera` (6 cases): fail here, and `test_in_bed_he_is_in_the_picture[390]` **fails the same way on the
+    base** ("out_of_bed, at the desk: head out 25/60"). Only that one case was re-run on the base (each takes ~6 min
+    under software GL).
 
 ## Demo video
 `demo.mp4`: 45 s, 1280×720. The desktop part shows a vote round, his move to the desk, then the reactions and the
@@ -131,3 +140,17 @@ Stills: `desktop_vote.png` (your vote and the counts), `desktop_glance.png` (the
   stimulus to the simulated brain regions. That keeps it a nudge he can't be "forced" by and needs no new model.
 - Viewers behind one NAT with an identical browser build count as one voter (the IP + UA hash). That's the rule as
   asked: cookie **and** hash.
+
+## Follow-up (2026-10-09): abuse limits
+- Reactions are rate-limited per viewer by the IP + UA hash (a new cookie per connection no longer gives a fresh
+  bucket), and per address: 1 a second, burst 15, all of an address's browsers together.
+- Votes: at most 10 voters per address per round (`VOTES_PER_ADDRESS`), so one machine faking a new cookie and user
+  agent per vote is capped. A shared network still gets 10.
+- `test_abuse_rapid_requests_and_cookieless_clients`:
+  - 50 rapid votes and reactions from one viewer: 1 vote and 5 reactions count;
+  - a cookie-less client: 1 vote and 5 reactions;
+  - a new cookie per connection: nothing more;
+  - a new cookie and UA per connection: the address caps hold;
+  - `POST /api/vote`: 405.
+- `tests/test_interactive.py`: 17 passed; smoke OK. `origin/main` is merged in (`7e72cd3`).
+- The full pytest run asked for was stopped when the work was reprioritised; the last full results are above.

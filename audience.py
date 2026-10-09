@@ -25,6 +25,8 @@ from collections import deque
 
 VOTE_ROUND_S = float(os.environ.get("SUB01_VOTE_ROUND_S", 3600))
 VOTE_OPTIONS = 3
+VOTES_PER_ADDRESS = 10        # at most this many voters per address per round (a shared network is fine; one machine
+                              # faking a new cookie and user agent per vote is not)
 VOTE_BONUS = 1.2              # added to the winning activity's score (the day plan's tilt is 0.35, a meal need 1.6)
 NUDGE_HOLD_S = 3600           # simulated seconds the nudge stays on once he is awake (then it is spent)
 PENDING_MAX_S = 2 * 86400     # simulated seconds a result may wait for him to wake (a long night, a nap)
@@ -43,6 +45,8 @@ VOTABLE = {
 REACTIONS = ("👋", "❤️", "😂", "😮", "👏", "✨")
 REACT_EVERY_S = 3.0           # one token every 3 s ...
 REACT_BURST = 5               # ... up to 5 saved up
+REACT_IP_EVERY_S, REACT_IP_BURST = 1.0, 15   # and per address (all its browsers together): a fresh cookie or user agent
+                                             # per connection cannot multiply the rate
 SPIKE_N, SPIKE_S = 10, 10.0   # 10 reactions within 10 s: he glances toward the camera
 GLANCE_EVERY_S = 120.0        # at most once every 2 minutes
 VIEWER_COOKIE = "sub01v"
@@ -73,6 +77,10 @@ class Fingerprints:
             out.append(self._h("cookie", cookie[:64]))
         return tuple(out)
 
+    def address(self, ip):
+        """The address alone, hashed (the reactions' per-address bucket; never used for the vote)."""
+        return self._h("ip", ip or "")
+
     def rehash(self, ids):
         """Hashes of hashes: a connection's ids (made once with the process's salt) under this round's salt."""
         return tuple(self._h("id", i) for i in ids)
@@ -87,16 +95,22 @@ class VoteRound:
         self.labels = [(labels or VOTABLE).get(a, a) for a in self.options]
         self.counts = [0] * len(self.options)
         self.voted = {}                                    # viewer hash -> option index (memory only)
+        self.per_addr = {}                                 # address hash -> voters from it this round (memory only)
         self.closed = False
 
-    def cast(self, ids, k, now):
-        """(ok, reason). ids: the viewer's hashes (cookie, IP + UA); any one of them seen already = voted."""
+    def cast(self, ids, k, now, addr=None):
+        """(ok, reason). ids: the viewer's hashes (cookie, IP + UA); any one of them seen already = voted. addr: the
+        address's hash; at most VOTES_PER_ADDRESS voters from one address per round."""
         if self.closed or now >= self.end:
             return False, "this round has ended"
         if not isinstance(k, int) or isinstance(k, bool) or not 0 <= k < len(self.options):
             return False, "not an option"
         if any(i in self.voted for i in ids):
             return False, "one vote per viewer per round"
+        if addr is not None and self.per_addr.get(addr, 0) >= VOTES_PER_ADDRESS:
+            return False, "too many votes from this network this round"
+        if addr is not None:
+            self.per_addr[addr] = self.per_addr.get(addr, 0) + 1
         for i in ids:
             self.voted[i] = k
         self.counts[k] += 1
@@ -119,6 +133,7 @@ class VoteRound:
         self.closed = True
         k = self.winner()
         self.voted.clear()                                 # nothing kept about who voted
+        self.per_addr.clear()
         return k
 
     def public(self, now, mine=None):
@@ -194,12 +209,13 @@ class Votes:
         self.pending = None
         return p
 
-    def cast(self, ids, k, now=None):
-        """ids: the viewer's hashes (Fingerprints.ids, made once per connection); rehashed with this round's salt."""
+    def cast(self, ids, k, now=None, addr=None):
+        """ids: the viewer's hashes (Fingerprints.ids, made once per connection); rehashed with this round's salt, as
+        is addr (Fingerprints.address)."""
         now = self.clock() if now is None else now
         if self.round is None:
             return False, "no round right now"
-        return self.round.cast(self.fp.rehash(ids), k, now)
+        return self.round.cast(self.fp.rehash(ids), k, now, None if addr is None else self.fp.rehash((addr,))[0])
 
     def mine(self, ids):
         return None if self.round is None else self.round.choice_of(self.fp.rehash(ids))
@@ -237,6 +253,11 @@ class TokenBucket:
         self.b = {}                                         # key -> (tokens, last time)
         self.purged = clock()
 
+    def peek(self, key):
+        """Tokens `key` has now (without taking one)."""
+        tok, last = self.b.get(key, (self.burst, self.clock()))
+        return min(self.burst, tok + (self.clock() - last) / self.every)
+
     def allow(self, key):
         now = self.clock()
         if now - self.purged > 60:                          # a full bucket is the same as no entry: forget it
@@ -257,17 +278,23 @@ class Reactions:
     def __init__(self, clock=time.monotonic, every=REACT_EVERY_S, burst=REACT_BURST):
         self.clock = clock
         self.limit = TokenBucket(every, burst, clock)
+        self.limit_ip = TokenBucket(REACT_IP_EVERY_S, REACT_IP_BURST, clock)
         self.counts = [0] * len(REACTIONS)
         self.recent = deque()                               # times of accepted reactions, the last SPIKE_S seconds
         self.last_glance = -1e18
         self.total = 0
 
-    def react(self, key, k):
-        """(ok, reason). key: the viewer's hash (never the raw address)."""
+    def react(self, key, k, addr=None):
+        """(ok, reason). key: the viewer's IP + UA hash; addr: the address's hash (never the raw address). Both
+        buckets must have a token: per viewer (1 every 3 s, burst 5) and per address (1 a second, burst 15)."""
         if not isinstance(k, int) or isinstance(k, bool) or not 0 <= k < len(REACTIONS):
             return False, "not a reaction"
+        if addr is not None and self.limit_ip.peek(addr) < 1.0:
+            return False, "slow down"
         if not self.limit.allow(key):
             return False, "slow down"
+        if addr is not None:
+            self.limit_ip.allow(addr)
         self.counts[k] += 1
         self.total += 1
         self.recent.append(self.clock())

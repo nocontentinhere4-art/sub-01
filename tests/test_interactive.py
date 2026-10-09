@@ -300,3 +300,94 @@ def test_server_glance_only_when_awake(server):
         await live.audience_tick({"type": "tick", "life": seated}, live.clock.now(), {}, 0)
         assert sum(m["type"] == "glance" for m in sent) == 1            # at the desk: once
     asyncio.run(run())
+
+
+def test_abuse_rapid_requests_and_cookieless_clients(server):
+    """50 rapid votes and reactions from one viewer, a cookie-less client, a client with a new cookie per connection
+    and one with a new cookie and user agent per connection: the counts never move past the limits; /api/vote takes no
+    votes."""
+    import aiohttp
+    from aiohttp import web
+    from aiohttp.test_utils import TestClient, TestServer
+
+    async def run():
+        live, app = await server()
+        async def vote_api(request):
+            return web.json_response(live.votes.public())
+        app.router.add_get("/api/vote", vote_api)
+        live.votes.round_s = 3600                                       # (the round must outlast the test)
+        frozen = lambda: 1000.0                                         # no refill while the test runs (the
+        live.reactions.limit.clock = live.reactions.limit_ip.clock = frozen   # limits, not the machine's speed)
+        live.votes.open(["research", "window", "phone"])
+        tsim = live.clock.now()
+
+        async def drain_acks(ws, n):
+            acks = []
+            for _ in range(n):
+                try:
+                    acks.append(await asyncio.wait_for(ws.receive_json(), 2))
+                except asyncio.TimeoutError:
+                    break
+            return acks
+
+        async def counts():
+            msg = {"type": "tick"}
+            await live.audience_tick(msg, tsim, {}, 0)
+            return list(live.votes.round.counts), sum(msg.get("rx") or [])
+
+        async with TestClient(TestServer(app)) as c:
+            await c.get("/")                                            # gets the cookie
+            ws = await c.ws_connect("/ws", headers={"User-Agent": "UA-a"})
+            await ws.receive_json(); await ws.receive_json()
+            for _ in range(50):                                         # one viewer, 50 votes, 50 reactions
+                await ws.send_json({"type": "vote", "k": 0})
+            for _ in range(50):
+                await ws.send_json({"type": "react", "k": 1})
+            acks = await drain_acks(ws, 100)
+            votes = [a for a in acks if a["type"] == "vote_ack"]
+            assert len(votes) == 50 and sum(a["ok"] for a in votes) == 1
+            assert sum(1 for a in acks if a["type"] == "react_ack") == 45            # 5 got through, 45 refused
+            assert await counts() == ([1, 0, 0], 5)
+
+            # a cookie-less client (no cookie jar), its own user agent: one vote, a burst of 5 reactions, no more
+            async with aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar()) as s:
+                url = c.make_url("/ws")
+                ws2 = await s.ws_connect(url, headers={"User-Agent": "UA-b"})
+                await ws2.receive_json(); await ws2.receive_json()
+                for _ in range(50):
+                    await ws2.send_json({"type": "vote", "k": 1})
+                    await ws2.send_json({"type": "react", "k": 2})
+                await drain_acks(ws2, 100)
+                assert await counts() == ([1, 1, 0], 5)
+                await ws2.close()
+                # the same browser, a new cookie on every connection: still the same IP + UA, nothing more counts
+                for i in range(6):
+                    w = await s.ws_connect(url, headers={"User-Agent": "UA-b", "Cookie": f"sub01v=fake{i}"})
+                    await w.receive_json(); await w.receive_json()
+                    for _ in range(10):
+                        await w.send_json({"type": "vote", "k": 2})
+                        await w.send_json({"type": "react", "k": 3})
+                    await drain_acks(w, 20)
+                    await w.close()
+                assert await counts() == ([1, 1, 0], 0)
+                # a new cookie AND a new user agent on every connection (one machine posing as many): the address caps
+                for i in range(40):
+                    w = await s.ws_connect(url, headers={"User-Agent": f"UA-fake-{i}", "Cookie": f"sub01v=x{i}"})
+                    await w.receive_json(); await w.receive_json()
+                    await w.send_json({"type": "vote", "k": 2})
+                    for _ in range(5):
+                        await w.send_json({"type": "react", "k": 4})
+                    await drain_acks(w, 6)
+                    await w.close()
+                c_votes, rx = await counts()
+                assert sum(c_votes) == audience.VOTES_PER_ADDRESS               # 2 + 8 more from the fake ones
+                assert rx <= audience.REACT_IP_BURST                            # the address's bucket (already part used)
+
+            # /api/vote is read-only
+            r = await c.post("/api/vote", json={"k": 0})
+            assert r.status == 405
+            r = await c.get("/api/vote?k=0")
+            assert (await r.json())["round"]["total"] == audience.VOTES_PER_ADDRESS
+            await ws.close()
+    asyncio.run(run())
+

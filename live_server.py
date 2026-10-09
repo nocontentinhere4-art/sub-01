@@ -413,6 +413,7 @@ class Live:
         self.reactions = audience.Reactions()
         self.viewer_fp = audience.Fingerprints()   # the process's salt (memory only): a connection's ids, never raw
         self.viewer_ids = {}               # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
+        self.viewer_addr = {}              # websocket -> its address's salted hash (per-address caps: votes, reactions)
 
     # --- trades -> stimuli ---------------------------------------------------
     def apply(self, tr):
@@ -1633,12 +1634,12 @@ class Live:
 
     async def handle_vote(self, ws, k):
         ids = self.viewer_ids.get(ws, ())
-        ok, reason = self.votes.cast(ids, k)
+        ok, reason = self.votes.cast(ids, k, addr=self.viewer_addr.get(ws))
         await ws.send_json({"type": "vote_ack", "ok": ok, "reason": reason, "mine": self.votes.mine(ids)})
 
     async def handle_react(self, ws, k):
         ids = self.viewer_ids.get(ws, ())
-        ok, reason = self.reactions.react(ids[-1] if ids else id(ws), k)   # the cookie's hash, else IP + UA's
+        ok, reason = self.reactions.react(ids[0] if ids else id(ws), k, self.viewer_addr.get(ws))   # IP + UA, the address
         if not ok:
             await ws.send_json({"type": "react_ack", "ok": False, "reason": reason})
 
@@ -1661,6 +1662,7 @@ class Live:
             return ws
         self.sockets.add(ws)
         self.ws_per_ip[key] = self.ws_per_ip.get(key, 0) + 1
+        self.viewer_addr[ws] = self.viewer_fp.address(key)
         self.viewer_ids[ws] = self.viewer_fp.ids(request.cookies.get(audience.VIEWER_COOKIE), key,
                                                  request.headers.get("User-Agent", ""))
         try:
@@ -1703,6 +1705,7 @@ class Live:
             self.drop_client(ws)
             self.sockets.discard(ws)
             self.viewer_ids.pop(ws, None)
+            self.viewer_addr.pop(ws, None)
             n = self.ws_per_ip.get(key, 1) - 1
             if n > 0:
                 self.ws_per_ip[key] = n
