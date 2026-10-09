@@ -2958,7 +2958,14 @@ function coverShape(){                                 // the duvet over him, th
   const {nx, nz, nt, pos, nor, uv, ZM0, ZM1, BED, LOFT, THICK, DROP, DR} = COV;
   // pulled up from where it lay folded to just under his shoulders; on his side, back off his raised shoulder
   const up = bones.neck.getWorldPosition(_l1).x + 0.17 + 0.10 * Math.abs(ROLL.a) / ROLL.ang;
-  const hem = Math.min(COV.XFOOT - 0.06, COV.XFOOT + (up - COV.XFOOT) * DUV.w);   // drawn up from the foot of the bed over him
+  // he is longer than the mattress: the cloth stays up until past all of him (one straight line, so the end hangs as one
+  // straight curtain, not in strands), then the rest of it hangs down to a straight hem
+  let end = 0.04;                                                     // (the foot end of the mattress), or past his toes' tips
+  for (const n of ["LeftToeBase", "RightToeBase", "LeftFoot", "RightFoot"]) end = Math.max(end, bones[n].getWorldPosition(_l2).x + (/Toe/.test(n) ? 0.09 : 0.16));
+  // drawn up from the foot of the bed over him; never back past the edge it hangs from (fading back to the foot, DUV.w -> 0
+  // as he gets up, the hem passed his feet: end < hem made iEnd negative, H[iEnd * nz + j] read undefined and every vertex
+  // came out NaN). Drawn back that far, all of it hangs from that edge
+  const hem = Math.min(COV.XFOOT - 0.06, COV.XFOOT + (up - COV.XFOOT) * DUV.w, end);
   const len = COV.XFOOT - hem, newUV = Math.abs(hem - COV.lastHem) > 1e-4;
   COV.hem = hem; COV.lastHem = hem; COV.len = len;
   const B = COV.body, H = COV.h, T = COV.tmp;
@@ -2985,11 +2992,7 @@ function coverShape(){                                 // the duvet over him, th
       }
       B[i * nz + j] = h; H[i * nz + j] = h + LOFT;
     } }
-  // he is longer than the mattress: the cloth stays up until past all of him (one straight line, so the end hangs as one
-  // straight curtain, not in strands), then the rest of it hangs down to a straight hem
-  let end = 0.04;                                                     // (the foot end of the mattress), or past his toes' tips
-  for (const n of ["LeftToeBase", "RightToeBase", "LeftFoot", "RightFoot"]) end = Math.max(end, bones[n].getWorldPosition(_l2).x + (/Toe/.test(n) ? 0.09 : 0.16));
-  const iEnd = Math.min(nx - 3, Math.ceil((end - hem) / len * (nx - 1)));
+  const iEnd = Math.min(nx - 3, Math.ceil((end - hem) / len * (nx - 1)));          // (>= 0: hem <= end, above)
   // 2. cloth, not shrink wrap: smooth the surface (it bridges between his limbs), but never below him
   if (V5) coverDrape(iEnd, len / (nx - 1)); else
   for (let pass = 0; pass < 3; pass++) {
