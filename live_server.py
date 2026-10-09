@@ -19,6 +19,7 @@ import math
 import os
 import random
 import re
+import signal
 import socket
 import time
 from collections import deque
@@ -58,6 +59,7 @@ from screens import DA_LABEL, DopamineBursts, ScreensStatus
 from eyes import Eyes
 import mind as mind_mod
 from tastes import PageWatch, Tastes
+import state_io
 from state_io import append_jsonl, load_json, read_jsonl, save_json
 
 try:                                             # the GPU spiking brain is optional: the server runs without it
@@ -69,6 +71,7 @@ from spiking.words import half_cue_ok              # torch-free, like pod_manage
 from spiking import live as spiking_live           # numpy only: his spiking neurons in the day, a child process (#55)
 
 HERE = Path(__file__).parent
+START = time.monotonic()        # import time: the startup log line says how long the process took to listen (a deploy gap)
 TICK = 0.05                     # seconds of simulated time per broadcast (real time)
 BASELINE_DRIVE = 1.6            # excitability per z-unit of the recorded resting-state signal
 GOOD = re.compile(r"\bgood\b!?", re.I)    # chat 'good!' -> dopamine pulse on the spiking pod
@@ -850,15 +853,37 @@ class Live:
             if events:
                 await self.broadcast(self.nights())
             if now - last_save >= SAVE_S:
-                self.store.save(self.engine, self.memory)
-                save_json(self.life_path, self.life.to_dict())
-                save_json(self.body_path, {"body": self.body.to_dict(), "neuro": self.neuro.to_dict()})
-                save_json(self.reading_path, self.reader.to_dict(), ensure_ascii=False)
+                await self.save_state()                               # written off the loop; a disk error is logged
                 last_save = now
             self.tick_s.append(time.perf_counter() - t0)
             self.last_tick = time.monotonic()
             next_t += TICK
             await asyncio.sleep(max(0.0, next_t - time.time()))
+
+    def state_files(self):
+        """What the periodic save writes: [(path, object, json.dumps kwargs)]. The same files and formats as
+        Store.save (state.json, nights/<date>.json) plus life.json, body.json and reading.json."""
+        night = {"indent": 1, "ensure_ascii": False}
+        files = [(self.store.root / "state.json", {"engine": self.engine.to_dict(), "memory": self.memory.items}, night)]
+        for n in (self.engine.night, self.engine.last_night):
+            if n is not None:
+                files.append((self.store.root / "nights" / f"{n['date']}.json", n, night))
+        files += [(self.life_path, self.life.to_dict(), {}),
+                  (self.body_path, {"body": self.body.to_dict(), "neuro": self.neuro.to_dict()}, {}),
+                  (self.reading_path, self.reader.to_dict(), {"ensure_ascii": False})]
+        return files
+
+    async def save_state(self):
+        """The periodic save (every SAVE_S, from the brain loop): serialised on the event loop, because the objects keep
+        changing under the loop, then written (tmp + fsync + rename, one file at a time) in a worker thread, so the
+        20 Hz loop never waits on the volume's fsync. A full or failing disk is logged, never fatal: before this an
+        OSError here ended the brain loop and with it the process (a Railway restart, a 502 window)."""
+        loop = asyncio.get_running_loop()
+        try:
+            data = [(path, json.dumps(obj, **kw)) for path, obj, kw in self.state_files()]
+            await loop.run_in_executor(None, write_json_files, data)
+        except (OSError, TypeError, ValueError) as e:
+            print("state: periodic save failed:", repr(e)[:160], flush=True)
 
     # --- the computer: what it reads -------------------------------------------------
     def wiki_fallback(self):
@@ -1226,7 +1251,7 @@ class Live:
     def chess_view(self):
         """GET /api/chess: the game on the board (or the last one), recent games, what the card says."""
         g = self.chess.public() if self.chess else self.chess_last
-        return {"playing": self.chess is not None, "game": g, "games": read_jsonl(self.chess_path, last=10)[::-1],
+        return {"playing": self.chess is not None, "game": g, "games": tail_jsonl(self.chess_path, 10)[::-1],
                 "card": chess_game.CARD, "note": chess_game.NOTE}
 
     def chess_pace(self, his):
@@ -1586,7 +1611,7 @@ class Live:
                                 mem_limit_mb=getattr(self.local_browser, "mem_mb", None),
                                 heavy=self.local_browser.heavy.public() if hasattr(self.local_browser, "heavy") else None)
         nights = self.diary.index(1) if self.diary else []
-        tests = read_jsonl(self.data_dir / "spiking" / "memory_tests.jsonl", last=1)
+        tests = tail_jsonl(self.data_dir / "spiking" / "memory_tests.jsonl", 1)
         return {"ok": self.healthy(),
                 "last_tick_s_ago": round(time.monotonic() - self.last_tick, 3) if self.last_tick else None,
                 "tick_ms": {"p50": pct(ticks, 0.5), "p95": pct(ticks, 0.95), "max": round(1000 * ticks[-1], 2) if ticks
@@ -1721,6 +1746,41 @@ class Live:
             else:
                 self.ws_per_ip.pop(key, None)
         return ws
+
+
+def tail_jsonl(path, n, block=64 * 1024):
+    """The last `n` rows of a JSONL file, read from its end in 64 KB blocks; lines that do not parse are skipped (as in
+    state_io.read_jsonl, which reads and splits the whole file: the eye's frames.jsonl and the chess log grow on the
+    volume for months, and /api/frames read all of it on the event loop at every request)."""
+    if n <= 0:
+        return []
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            end, buf = f.tell(), b""
+            while end > 0 and buf.count(b"\n") <= n:      # n + 1 newlines: the n-th line from the end is whole
+                start = max(0, end - block)
+                f.seek(start)
+                buf = f.read(end - start) + buf
+                end = start
+    except OSError:
+        return []
+    out = []
+    for ln in buf.splitlines()[-n:]:
+        try:
+            out.append(json.loads(ln))
+        except ValueError:
+            continue
+    return out
+
+
+def write_json_files(items):
+    """[(path, json text)] -> each written as state_io.save_json does (tmp + fsync + os.replace, one writer per path at
+    a time, shared with the sync savers of the same files). Runs in a worker thread: Live.save_state."""
+    for path, data in items:
+        path = Path(path)
+        with state_io._lock(path.absolute()):
+            state_io._write_replace(path, data)
 
 
 def rss_mb():
@@ -1889,8 +1949,10 @@ def password_gate(password):
 
 async def main(args):
     data_dir = Path(args.data_dir) if args.data_dir else HERE / "data" / ("demo" if args.time_scale != 1 else "")
+    t_build = time.monotonic()
     live = Live(args.mint, args.demo, args.time_scale, data_dir,
                 parse_start(args.start) if args.start else None, args.trust_proxy)
+    built_s = time.monotonic() - t_build          # the brain model (+ the fitted slow layer's eig) and the saved state
     # launched (owner, 2026-10-08): the site is public; the password gate only comes back with SITE_GATE=1
     gate_on = os.environ.get("SITE_PASSWORD") and os.environ.get("SITE_GATE") == "1"
     middlewares = [password_gate(os.environ["SITE_PASSWORD"])] if gate_on else []
@@ -2028,7 +2090,12 @@ async def main(args):
 
     async def frames(request):                    # recent eye frames for the world page
         log = live.eye.log if live.eye else HERE / "missing"
-        rows = read_jsonl(log, last=int(request.query.get("n", "40")))         # a torn last line is skipped
+        try:
+            n = max(1, min(500, int(request.query.get("n", "40"))))
+        except ValueError:
+            n = 40
+        # frames.jsonl grows for as long as the volume lives: read its tail only, and off the event loop
+        rows = await asyncio.get_running_loop().run_in_executor(None, tail_jsonl, log, n)   # a torn line is skipped
         world = live.eye.world.top(live.clock.now(), 20) if live.eye else []
         return web.json_response({"frames": rows, "world": world, "resting": RESTING if live.eye_resting else None})
     app.router.add_get("/api/frames", frames)
@@ -2064,11 +2131,17 @@ async def main(args):
     await web.TCPSite(runner, args.host, args.port).start()
     print(f"SUB-01 live on http://localhost:{args.port}  ({'demo' if args.demo else (args.mint or 'no coin yet: trade feed off')}, "
           f"time x{args.time_scale:g}, state in {data_dir})", flush=True)
+    # the deploy gap: until this line the edge gets "connection refused" (a 502); a slow build shows up here
+    print(f"startup: listening {time.monotonic() - START:.1f} s after import (brain + state built in {built_s:.1f} s); "
+          f"/healthz answers 200 from the first brain tick", flush=True)
     live.life.can_watch = bool(live.browser)     # no browser: no videos at the desk
-    tasks = [live.run_brain(), live.run_research(), live.demo_trades() if args.demo else live.rpc_trades(),
+    # every long-running part is supervised: an unexpected error restarts that part, instead of ending asyncio.gather
+    # and with it the process (a Railway restart = a 502 window for every page until the new process listens)
+    tasks = [supervised("brain", live.run_brain, backoff=1.0), supervised("research", live.run_research),
+             supervised("trades", live.demo_trades if args.demo else live.rpc_trades),
              supervised("chess", live.run_chess), supervised("music", live.run_music)]
     if live.eye:
-        tasks.append(live.run_eye())
+        tasks.append(supervised("eye", live.run_eye))
     if live.browser:
         tasks.append(supervised("browse", live.run_browse))
     if live.mind:
@@ -2079,6 +2152,17 @@ async def main(args):
         tasks.append(supervised("spiking live", cpu_net.run))
     if getattr(live, "clips", None):
         tasks.append(supervised("clips", lambda: live.clips.run(live, args.port), backoff=60))
+    me, stopping = asyncio.current_task(), []
+
+    def on_sigterm():                             # a redeploy / `docker stop`: SIGTERM, then SIGKILL after a grace period.
+        if not stopping:                          # Without this the process died at once and the last minute of state
+            stopping.append(True)                 # (memory, sleep, life) was lost; now the finally below saves it first.
+            print("SIGTERM: saving state and stopping", flush=True)
+            me.cancel()
+    try:
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, on_sigterm)
+    except (NotImplementedError, RuntimeError, ValueError):    # not on this platform / not the main thread
+        pass
     try:
         await asyncio.gather(*tasks)
     finally:
@@ -2124,4 +2208,7 @@ def build_parser():
 
 
 if __name__ == "__main__":
-    asyncio.run(main(build_parser().parse_args()))
+    try:
+        asyncio.run(main(build_parser().parse_args()))
+    except asyncio.CancelledError:                # SIGTERM (a redeploy): the state was saved in main()'s finally
+        pass

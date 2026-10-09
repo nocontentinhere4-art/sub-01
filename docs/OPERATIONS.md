@@ -66,11 +66,21 @@ final word. Rows for the eyes and the mind carry OpenRouter's reported cost when
   - `eye.resting`, `last_diary`, `last_memory_test`, `spend_today`.
 
 ### Railway healthcheck
-Service → **Settings → Deploy → Healthcheck Path**: `/healthz`. You can do the same in config-as-code (`railway.toml`
-→ `[deploy] healthcheckPath = "/healthz"`); this repo does not add that file, so the setting stays in the dashboard.
+`railway.json` in the repo sets `deploy.healthcheckPath = "/healthz"`, `healthcheckTimeout = 300` and the restart policy
+`ON_FAILURE` (10 retries); config in the file overrides the dashboard for that deployment. Railway has deprecated
+config-as-code (files keep working for existing services until 2026-12-01), so also set Service → **Settings → Deploy →
+Healthcheck Path** `/healthz` in the dashboard: a deploy then goes live only once `/healthz` answers 200.
 
 - Railway calls the path from `healthcheck.railway.app` (nothing in the server filters hosts) on `$PORT`. It waits up to
-  `RAILWAY_HEALTHCHECK_TIMEOUT_SEC` (default 300 s; the server ticks within a few seconds of starting).
+  `RAILWAY_HEALTHCHECK_TIMEOUT_SEC` (default 300 s; the server ticks within a few seconds of starting). The log line
+  `startup: listening N s after import (brain + state built in M s)` says how long the process took to listen: that is
+  the deploy gap on a volume service (below); ~2–3 s with `OPENBLAS_NUM_THREADS=1` (the Dockerfile sets it; with free
+  BLAS threads the slow layer's `eig` took 25+ s on a loaded 4-core box).
+- On a redeploy (or `docker stop`) Railway sends SIGTERM: the server saves its state (memory, sleep, life) and exits
+  cleanly (`SIGTERM: saving state and stopping` in the log); the Dockerfile `exec`s python so the signal reaches it.
+- Every long-running part (brain loop, research, trades, eye, browser, mind, …) is supervised: an unexpected error
+  restarts that part after a short backoff (`<part> task failed, restarting in Ns` in the log) instead of ending the
+  process. The periodic state save is written in a worker thread and a disk error there is logged, not fatal.
 - A deploy that never answers 200 (an import error as in #49, a crash at start, a stalled loop) is marked **Failed**
   instead of becoming the active deployment.
 - **Caveat (Railway docs):** a service with a volume (ours: `/data`) cannot run two deployments at once. Railway stops

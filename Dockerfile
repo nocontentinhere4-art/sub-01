@@ -32,4 +32,5 @@ COPY out/rest ./out/rest
 # service instead: same repo, start command `python browse_service.py --host :: --port $PORT`, no public domain,
 # BROWSE_SERVICE_TOKEN set on both services, and BROWSE_SERVICE_URL=http://<service>.railway.internal:<port> here.
 ENTRYPOINT ["/usr/local/bin/sub01-entrypoint"]
-CMD ["sh", "-c", "python live_server.py --host 0.0.0.0 --port ${PORT:-8080} --eye --trust-proxy --data-dir /data --frames-dir /data/frames ${EXTRA_ARGS:-}"]
+# `exec`: python is PID 1 (not sh), so Railway's SIGTERM at a redeploy reaches it and live_server.py saves its state
+CMD ["sh", "-c", "exec python live_server.py --host 0.0.0.0 --port ${PORT:-8080} --eye --trust-proxy --data-dir /data --frames-dir /data/frames ${EXTRA_ARGS:-}"]
