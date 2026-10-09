@@ -504,6 +504,9 @@ renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = !LITE;
 renderer.shadowMap.type = THREE.PCFShadowMap;              // (not the soft variant: 4x the taps) redrawn only when needed, see shadows()
 renderer.setClearColor(0x08080b);
+// nothing is drawn below the floor: the room GLB carries a stray dark rod 1.8 m under it (room_static_8, metal_dark,
+// 172 vertices at y -1.83 along x 2.2) that a viewer saw as a black line under the room from an outside angle
+renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.05)];
 host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
