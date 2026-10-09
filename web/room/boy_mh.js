@@ -71,7 +71,8 @@ export function createMH(env) {
   // points. Without them, the clips and numbers above)
   const CL = {...CLIPS, ...(env.clips || {})}, CLIP = {...CLIP0, ...(env.clipFrame || {})};
   const MXK = env.clipMX || CLIP_MX;                          // (the typing capture's F / J points: env.clipMX for its own bake)
-  const M = {ready: false, mode: null, typeUntil: 0, lastScreen: null, actions: {}, w: {type: 0, mouse: 0}, ph: {type: 0, mouse: 0}, log: [], noIK: false, zoff: 0};
+  const M = {ready: false, mode: null, typeUntil: 0, lastScreen: null, actions: {}, w: {type: 0, mouse: 0}, ph: {type: 0, mouse: 0}, log: [], noIK: false, zoff: 0,
+    handsHz: 15};                                            // (the hands' contact solve, times a second; 0: every frame. ?debug: mh.M.handsHz)
   const V = (...a) => new THREE.Vector3(...a);
 
   // ---------- clips: two approved desk loops, the relaxed one, and two still poses, under the page's slot names ----------
@@ -395,7 +396,7 @@ export function createMH(env) {
       bone.getWorldPosition(_a); hand.getWorldPosition(_b);
       _u.subVectors(_b, _a).normalize(); _v.subVectors(target, _a).normalize();
       if (_u.dot(_v) > 0.99999) continue;
-      _q.setFromUnitVectors(_u, _v); _q.slerp(new THREE.Quaternion(), 1 - weight);
+      _q.setFromUnitVectors(_u, _v); _q.slerp(_ID, 1 - weight);
       bone.parent.getWorldQuaternion(_pq);
       bone.quaternion.copy(_pq.invert().multiply(bone.getWorldQuaternion(_wq).premultiply(_q)));
       bone.updateMatrixWorld(true);
@@ -407,22 +408,24 @@ export function createMH(env) {
   // 0.5 s toward the clip's: the clip's alone is no reference, its typing arm is near straight (the elbow 8 mm off the
   // shoulder-wrist line), so the side it lies on turned round from frame to frame.
   const ELB = {Left: null, Right: null}, ELB_REF = {Left: null, Right: null}; let elbFrame = 0, elbSeen = {Left: -9, Right: -9};
+  const _elb = {Left: V(), Right: V()}, _elbRef = {Left: V(), Right: V()};   // (their own vectors, written in place: a frame's elbow and its reference)
   function elbowRef(dt) {                                    // once a frame, before any arm is placed
     elbFrame++;
-    for (const side of ["Left", "Right"]) { const fa = env.bones[side + "ForeArm"]; if (!fa) continue; const c = fa.getWorldPosition(V());
-      ELB_REF[side] = ELB[side] && elbSeen[side] === elbFrame - 1 ? ELB[side].clone().lerp(c, 1 - Math.exp(-dt / 0.5)) : c; }
+    for (const side of ["Left", "Right"]) { const fa = env.bones[side + "ForeArm"]; if (!fa) continue; const c = fa.getWorldPosition(_a);
+      ELB_REF[side] = ELB[side] && elbSeen[side] === elbFrame - 1 ? _elbRef[side].copy(ELB[side]).lerp(c, 1 - Math.exp(-dt / 0.5)) : _elbRef[side].copy(c); }
   }
   function elbowKeep() {                                     // once a frame, after the arms are placed
-    for (const side of ["Left", "Right"]) { const fa = env.bones[side + "ForeArm"]; if (fa) { ELB[side] = fa.getWorldPosition(V()); elbSeen[side] = elbFrame; } }
+    for (const side of ["Left", "Right"]) { const fa = env.bones[side + "ForeArm"]; if (fa) { ELB[side] = fa.getWorldPosition(_elb[side]); elbSeen[side] = elbFrame; } }
   }
+  const _vsh = V(), _vax = V(), _ve0 = V(), _ve1 = V(), _vx = V(), _vpq = new THREE.Quaternion(), _vw0 = new THREE.Quaternion(), _vr = new THREE.Quaternion();
   function swivelTo(side, e, weight = 1) {
     const B = env.bones, ua = B[side + "Arm"], fa = B[side + "ForeArm"], hand = B[side + "Hand"]; if (!ua || !fa || !hand) return;
-    const sh = ua.getWorldPosition(V()), ax = hand.getWorldPosition(V()).sub(sh); if (ax.lengthSq() < 1e-8) return; ax.normalize();
-    const e0 = fa.getWorldPosition(V()).sub(sh), e1 = e.clone().sub(sh); e0.addScaledVector(ax, -e0.dot(ax)); e1.addScaledVector(ax, -e1.dot(ax));
+    const sh = ua.getWorldPosition(_vsh), ax = hand.getWorldPosition(_vax).sub(sh); if (ax.lengthSq() < 1e-8) return; ax.normalize();
+    const e0 = fa.getWorldPosition(_ve0).sub(sh), e1 = _ve1.copy(e).sub(sh); e0.addScaledVector(ax, -e0.dot(ax)); e1.addScaledVector(ax, -e1.dot(ax));
     if (e0.lengthSq() < 1e-8 || e1.lengthSq() < 1e-8) return;
-    const a = Math.atan2(e0.clone().cross(e1).dot(ax), e0.dot(e1)) * weight;
-    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
-    ua.quaternion.copy(pq.multiply(new THREE.Quaternion().setFromAxisAngle(ax, a).multiply(w0))); ua.updateMatrixWorld(true);
+    const a = Math.atan2(_vx.copy(e0).cross(e1).dot(ax), e0.dot(e1)) * weight;
+    const pq = ua.parent.getWorldQuaternion(_vpq).invert(), w0 = ua.getWorldQuaternion(_vw0);
+    ua.quaternion.copy(pq.multiply(_vr.setFromAxisAngle(ax, a).multiply(w0))); ua.updateMatrixWorld(true);
   }
   const tipNames = side => [1, 2, 3, 4, 5].map(f => env.bones[`finger${f}-3${side === "Left" ? "L" : "R"}`] || env.bones[`finger${f}-3.${side === "Left" ? "L" : "R"}`]).filter(Boolean);
   function lowestTip(side) {                                // the lowest fingertip: the end bone's head, a finger's half thickness lower
@@ -445,10 +448,15 @@ export function createMH(env) {
                                                  // left flank (mouseFit)
   const KEY_KNUCKLE = 0.030, FJ = 0.0285;        // keys: knuckles 3 cm over the caps; F and J 1.5 keys either side of the
                                                  // keyboard's origin (G10d's: the middle of F and J)
-  const S = (side, i, j) => env.bones[`finger${i}-${j}${side[0]}`] || env.bones[`finger${i}-${j}.${side[0]}`];
-  const fwdV = () => V(Math.sin(env.boy.rotation.y), 0, Math.cos(env.boy.rotation.y));
-  const _l = V(), _p = V(), _n = V(), _s = V(), _e = V(), _g = V(), _sd = V(), _ax = V(), _up1 = V(0, 1, 0), _dn2 = V(0, -1, 0);
-  const _q0 = new THREE.Quaternion(), _rq = new THREE.Quaternion();
+  // (a finger bone by side, finger, joint, looked up once: S() built two names a call, thousands of times a frame)
+  const SB = new Map();
+  const S = (side, i, j) => { const k = (side[0] === "L" ? 0 : 100) + i * 10 + j; let b = SB.get(k);
+    if (b === undefined) { b = env.bones[`finger${i}-${j}${side[0]}`] || env.bones[`finger${i}-${j}.${side[0]}`] || null; SB.set(k, b); } return b || undefined; };
+  // his forward in the room: one vector, kept while his turn is the same; read-only to its callers (deskV copies it)
+  const _fw = V(); let _fwRy = null;
+  const fwdV = () => { const ry = env.boy.rotation.y; if (ry !== _fwRy) { _fwRy = ry; _fw.set(Math.sin(ry), 0, Math.cos(ry)); } return _fw; };
+  const _l = V(), _p = V(), _n = V(), _s = V(), _e = V(), _g = V(), _sd = V(), _ax = V(), _up1 = V(0, 1, 0), _dn2 = V(0, -1, 0), _zero = V();
+  const _q0 = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _rq2 = new THREE.Quaternion(), _ID = new THREE.Quaternion();   // (_ID: the identity, slerp's far end; never written)
 
   // a surface's top as a height map in the node's own frame (2.5 mm): the highest hit of a vertical ray (keycaps, the shell)
   const MAPS = new Map();
@@ -530,13 +538,14 @@ export function createMH(env) {
   // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
   const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008, CLR_TURN = 0.12;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go; s: a change of way)
   const WLIFT = {}, WLIFT_STEP = 0.04;                        // (weighted(): the wrist's lift over the desk, m, and its most per frame)
+  const _dpq = new THREE.Quaternion(), _dw0 = new THREE.Quaternion(), _dlat = V(), _daxes = {lat: _dlat, fwd: null};
   function deskClear(side, dt = 1 / 30) {
     const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
     const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
-    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
-    const f = fwdV(), lat = V().crossVectors(f, _up1).normalize(), MAX = 25 * Math.PI / 180;
-    const axes = {lat, fwd: f};
-    const set = (ax, a) => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, a).clone().multiply(w0)); ua.updateMatrixWorld(true); };
+    const pq = ua.parent.getWorldQuaternion(_dpq).invert(), w0 = ua.getWorldQuaternion(_dw0);
+    const f = fwdV(), lat = _dlat.crossVectors(f, _up1).normalize(), MAX = 25 * Math.PI / 180;
+    const axes = _daxes; axes.fwd = f;
+    const set = (ax, a) => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, a).multiply(w0)); ua.updateMatrixWorld(true); };
     const least = (k, sg) => { const ax = axes[k]; set(ax, sg * MAX); if (inn() > 0.003) return null;   // (the least angle that way that clears; none within 25 deg)
       let lo = 0, hi = MAX; for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; set(ax, sg * m); if (inn() > 0.003) lo = m; else hi = m; } return hi; };
     const prev = CLR[side], fade = prev ? prev.a * Math.exp(-dt / CLR_OUT) : 0;
@@ -561,7 +570,7 @@ export function createMH(env) {
     if (best && prev && (best.k !== prev.k || best.sg !== prev.sg)) { best.from = prev.from && prev.r < 1 ? prev.from : {k: prev.k, sg: prev.sg, a: prev.a}; best.r = 0; }
     else if (best && prev && prev.from) { best.from = prev.from; best.r = prev.r; }
     if (best && best.from) { best.r = Math.min(1, best.r + dt / CLR_TURN); const r = best.r * best.r * (3 - 2 * best.r);
-      ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axes[best.k], best.sg * best.a * r).clone().multiply(new THREE.Quaternion().setFromAxisAngle(axes[best.from.k], best.from.sg * best.from.a * (1 - r))).multiply(w0));
+      ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axes[best.k], best.sg * best.a * r).multiply(_rq2.setFromAxisAngle(axes[best.from.k], best.from.sg * best.from.a * (1 - r))).multiply(w0));
       ua.updateMatrixWorld(true); if (best.r >= 1) best.from = null; }
     else if (best) set(axes[best.k], best.sg * best.a);
     else set(lat, 0);
@@ -580,9 +589,9 @@ export function createMH(env) {
   function clearRelease(side, dt) {
     const p = CLR[side], ua = env.bones[side + "Arm"]; if (!p || !ua) return;
     const a = p.a * Math.exp(-dt / 0.15); if (a < 0.003) { CLR[side] = null; return; }
-    const f = fwdV(), ax = p.k === "lat" ? V().crossVectors(f, _up1).normalize() : f;
-    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
-    ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, p.sg * a).clone().multiply(w0)); ua.updateMatrixWorld(true);
+    const f = fwdV(), ax = p.k === "lat" ? _dlat.crossVectors(f, _up1).normalize() : f;
+    const pq = ua.parent.getWorldQuaternion(_dpq).invert(), w0 = ua.getWorldQuaternion(_dw0);
+    ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, p.sg * a).multiply(w0)); ua.updateMatrixWorld(true);
     CLR[side] = {k: p.k, sg: p.sg, a};
   }
   M.eatReach = 0;                                            // (?debug: the share)
@@ -605,12 +614,13 @@ export function createMH(env) {
     return d;
   }
   M.swing = {frames: 0, maxIn: 0, maxA: 0};                 // (?debug: how often and how far the elbow had to swing)
+  const _ssh = V(), _sax = V(), _spq = new THREE.Quaternion(), _sw0 = new THREE.Quaternion();
   function swingElbow(side, weight) {                        // the elbow up about the shoulder-wrist line until the arm is out of the desk
     M.swingNow = M.swingNow || {}; M.swingNow[side] = 0;   // (?debug: this frame's swing, rad)
     const d0 = armIn(side); if (d0 <= 0.003) return; M.swing.frames++; M.swing.maxIn = Math.max(M.swing.maxIn, d0);
-    const B = env.bones, ua = B[side + "Arm"], sh = ua.getWorldPosition(V()), axis = B[side + "Hand"].getWorldPosition(V()).sub(sh).normalize();
-    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
-    const set = a => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axis, a).clone().multiply(w0)); ua.updateMatrixWorld(true); };
+    const B = env.bones, ua = B[side + "Arm"], sh = ua.getWorldPosition(_ssh), axis = B[side + "Hand"].getWorldPosition(_sax).sub(sh).normalize();
+    const pq = ua.parent.getWorldQuaternion(_spq).invert(), w0 = ua.getWorldQuaternion(_sw0);
+    const set = a => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axis, a).multiply(w0)); ua.updateMatrixWorld(true); };
     const elbowY = a => { set(a); return B[side + "ForeArm"].getWorldPosition(_g).y; };
     const sgn = elbowY(0.1) > elbowY(-0.1) ? 1 : -1;        // (the way that lifts the elbow)
     let lo = 0, hi = 0.26 * sgn; set(hi);                  // (at most 15 deg: past that the shoulder reads as hunched)
@@ -619,34 +629,38 @@ export function createMH(env) {
     set(hi * weight); M.swing.maxA = Math.max(M.swing.maxA, Math.abs(hi)); M.swingNow[side] = Math.max(M.swingNow[side], Math.abs(hi));
   }
 
+  // (pin's own vectors and turns, written in place - it ran ~20 allocations an iteration, 5-6 iterations a hand a solve; pin
+  // never nests: fit(), aim() and post() place fingers and read the hand, they do not pin)
+  const _pw0 = V(), _pt = V(), _pe0 = V(), _kwr = V(), _kh = V(), _kl = V(), _kax = V(), _klt = V(), _bx = V(), _by = V(), _bz = V(), _bm = new THREE.Matrix4();
+  const _pq0 = new THREE.Quaternion(), _kpq = new THREE.Quaternion(), _kq = new THREE.Quaternion(), _kq2 = new THREE.Quaternion(), _kr = new THREE.Quaternion(), _kR = new THREE.Quaternion(), _kR2 = new THREE.Quaternion(), _puq = new THREE.Quaternion();
   function pin(side, delta, weight, fit, o = {}) {           // the recorded wrist + delta, the arm turned to it, then fit()'s corrections
     const hand = env.bones[side + "Hand"]; if (!hand || weight <= 0) return;
-    const w0 = hand.getWorldPosition(V()), t = w0.clone().add(delta), q0 = hand.getWorldQuaternion(new THREE.Quaternion());   // (the clip's hand turn)
-    const fa = env.bones[side + "ForeArm"], e0 = ELB_REF[side] || (fa ? fa.getWorldPosition(V()) : null);   // (see swivelTo)
-    const keepTurn = () => { const pq = hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), q = q0.clone();
-      if (o.pitch && !o.aim) { const h = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())), ax = h.clone().cross(_dn2).normalize(); q.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, o.pitch())); }   // (o.pitch(): + = fingers down, about the wrist)
-      if (o.roll && !o.aim) { const h = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())).normalize(), f = fwdV(), lt = V(f.z, 0, -f.x), sg = h.clone().cross(lt).y > 0 ? 1 : -1;
-        q.premultiply(new THREE.Quaternion().setFromAxisAngle(h, sg * o.roll * Math.PI / 180)); }   // (o.roll: deg, his left side of the hand up)
+    const w0 = hand.getWorldPosition(_pw0), t = _pt.copy(w0).add(delta), q0 = hand.getWorldQuaternion(_pq0);   // (the clip's hand turn)
+    const fa = env.bones[side + "ForeArm"], e0 = ELB_REF[side] || (fa ? fa.getWorldPosition(_pe0) : null);   // (see swivelTo)
+    const basis = (a, b, out) => { const x = _bx.copy(a).normalize(), z = _bz.copy(x).cross(b).normalize(), y = _by.copy(z).cross(x); return out.setFromRotationMatrix(_bm.makeBasis(x, y, z)); };
+    const keepTurn = () => { const pq = hand.parent.getWorldQuaternion(_kpq).invert(), q = _kq.copy(q0);
+      if (o.pitch && !o.aim) { const h = S(side, 3, 1).getWorldPosition(_kh).sub(hand.getWorldPosition(_kwr)), ax = _kax.copy(h).cross(_dn2).normalize(); q.premultiply(_kr.setFromAxisAngle(ax, o.pitch())); }   // (o.pitch(): + = fingers down, about the wrist)
+      if (o.roll && !o.aim) { const h = S(side, 3, 1).getWorldPosition(_kh).sub(hand.getWorldPosition(_kwr)).normalize(), f = fwdV(), lt = _klt.set(f.z, 0, -f.x), sg = _kax.copy(h).cross(lt).y > 0 ? 1 : -1;
+        q.premultiply(_kr.setFromAxisAngle(h, sg * o.roll * Math.PI / 180)); }   // (o.roll: deg, his left side of the hand up)
       hand.quaternion.slerp(pq.multiply(q), weight); hand.updateMatrixWorld(true);
       if (o.aim) {                                         // (o.aim(): [forward, right] the hand should point: wrist->middle knuckle, index->little knuckle)
-        const [hw, lw] = o.aim(), wr = hand.getWorldPosition(V()), h = S(side, 3, 1).getWorldPosition(V()).sub(wr).normalize(), l = S(side, 5, 1).getWorldPosition(V()).sub(S(side, 2, 1).getWorldPosition(V()));
-        const basis = (a, b) => { const x = a.clone().normalize(), z = x.clone().cross(b).normalize(), y = z.clone().cross(x); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); };
-        const R = basis(hw, lw).multiply(basis(h, l).invert()), pq2 = hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-        hand.quaternion.copy(pq2.multiply(hand.getWorldQuaternion(new THREE.Quaternion()).premultiply(R.slerp(new THREE.Quaternion(), 1 - weight)))); hand.updateMatrixWorld(true);
-        if (o.pitch || o.roll) { const q2 = hand.getWorldQuaternion(new THREE.Quaternion());   // (the tilt and the roll on top of the aim)
-          if (o.pitch) { const h2 = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())), ax = h2.clone().cross(_dn2).normalize(); q2.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, o.pitch() * weight)); }
-          if (o.roll) { const h2 = S(side, 3, 1).getWorldPosition(V()).sub(hand.getWorldPosition(V())).normalize(), f = fwdV(), lt = V(f.z, 0, -f.x), sg = h2.clone().cross(lt).y > 0 ? 1 : -1; q2.premultiply(new THREE.Quaternion().setFromAxisAngle(h2, sg * o.roll * Math.PI / 180 * weight)); }
-          hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(q2)); hand.updateMatrixWorld(true); }
+        const [hw, lw] = o.aim(), wr = hand.getWorldPosition(_kwr), h = S(side, 3, 1).getWorldPosition(_kh).sub(wr).normalize(), l = S(side, 5, 1).getWorldPosition(_kl).sub(S(side, 2, 1).getWorldPosition(_kax));
+        const R = basis(hw, lw, _kR).multiply(basis(h, l, _kR2).invert()), pq2 = hand.parent.getWorldQuaternion(_kpq).invert();
+        hand.quaternion.copy(pq2.multiply(hand.getWorldQuaternion(_kq).premultiply(R.slerp(_ID, 1 - weight)))); hand.updateMatrixWorld(true);
+        if (o.pitch || o.roll) { const q2 = hand.getWorldQuaternion(_kq2);   // (the tilt and the roll on top of the aim)
+          if (o.pitch) { const h2 = S(side, 3, 1).getWorldPosition(_kh).sub(hand.getWorldPosition(_kwr)), ax = _kax.copy(h2).cross(_dn2).normalize(); q2.premultiply(_kr.setFromAxisAngle(ax, o.pitch() * weight)); }
+          if (o.roll) { const h2 = S(side, 3, 1).getWorldPosition(_kh).sub(hand.getWorldPosition(_kwr)).normalize(), f = fwdV(), lt = _klt.set(f.z, 0, -f.x), sg = _kax.copy(h2).cross(lt).y > 0 ? 1 : -1; q2.premultiply(_kr.setFromAxisAngle(h2, sg * o.roll * Math.PI / 180 * weight)); }
+          hand.quaternion.copy(hand.parent.getWorldQuaternion(_kpq).invert().multiply(q2)); hand.updateMatrixWorld(true); }
       }
       if (o.post) o.post(); };
     for (let it = 0; it < (o.iters || 5); it++) {
       ccd(side, t, weight); swingElbow(side, weight); keepTurn();
-      const d = fit ? fit() : V(); if (d.length() <= 0.001 && !o.iters) break; t.addScaledVector(d, weight);
+      const d = fit ? fit() : _zero; if (d.length() <= 0.001 && !o.iters) break; t.addScaledVector(d, weight);
     }
     if (e0) {                                                // (once the wrist is placed)
       // the elbow towards its reference, as far as the desk allows: on the mouse, where the full swing left the forearm in
       // the desk's edge (the 15 deg elbow lift could not clear it), only the share that keeps it out
-      const ua = env.bones[side + "Arm"], q = ua.quaternion.clone(), go = k => { ua.quaternion.copy(q); ua.updateMatrixWorld(true); if (k > 0) swivelTo(side, e0, weight * k); swingElbow(side, weight); };
+      const ua = env.bones[side + "Arm"], q = _puq.copy(ua.quaternion), go = k => { ua.quaternion.copy(q); ua.updateMatrixWorld(true); if (k > 0) swivelTo(side, e0, weight * k); swingElbow(side, weight); };
       swivelTo(side, e0, weight); swingElbow(side, weight);   // (the whole swing, as before)
       // (on the mouse only: typing, both forearms rest on the desk's edge and capping there moved the left hand's fit, 80%
       // of resting tips on their caps against 81%)
@@ -657,18 +671,19 @@ export function createMH(env) {
   const palmAt = (side, out) => env.bones[side + "Hand"].getWorldPosition(out).lerp(S(side, 3, 1).getWorldPosition(_e), 0.6);
   function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }
   const tipSkin = (side, name, i) => { let low = 1e9; for (const [o, n] of skinOf(side, i, 3)) { o.getVertexPosition(n, _p).applyMatrix4(o.matrixWorld); low = Math.min(low, _p.y - under(name, _p)); } return low; };
+  const _cwr = V(), _ck2 = V(), _ck3 = V(), _ck5 = V(), _ch = V(), _cl = V(), _cn = V(), _cd0 = V(), _cax = V(), _cw = V();   // (curl's: it runs inside every finger search, ~20 allocations a call before)
   function curl(side, G, weight) {                           // each finger set to G's bends in the hand's own frame (absolute: they never add up)
     if (!env.bones[side + "Hand"] || !S(side, 2, 1) || !S(side, 3, 1) || !S(side, 5, 1)) return;   // (another rig: degrade, never throw)
-    const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(V()), k2 = S(side, 2, 1).getWorldPosition(V()), k3 = S(side, 3, 1).getWorldPosition(V()), k5 = S(side, 5, 1).getWorldPosition(V());
-    const h = k3.clone().sub(wr).normalize(), l = k5.clone().sub(k2); l.addScaledVector(h, -l.dot(h)).normalize();
-    let n = h.clone().cross(l).normalize(); if (n.y > 0) n.negate();   // (the palm's side: down)
+    const hand = env.bones[side + "Hand"], wr = hand.getWorldPosition(_cwr), k2 = S(side, 2, 1).getWorldPosition(_ck2), k3 = S(side, 3, 1).getWorldPosition(_ck3), k5 = S(side, 5, 1).getWorldPosition(_ck5);
+    const h = _ch.copy(k3).sub(wr).normalize(), l = _cl.copy(k5).sub(k2); l.addScaledVector(h, -l.dot(h)).normalize();
+    let n = _cn.copy(h).cross(l).normalize(); if (n.y > 0) n.negate();   // (the palm's side: down)
     for (const i of [2, 3, 4, 5]) { const g = G[i]; if (!g || !S(side, i, 1)) continue;
       const a = g[3] * Math.PI / 180, out = i === 2 ? -1 : 1;   // (the index lies on the -l side of the middle finger, ring and little on +l)
-      const d0 = h.clone().multiplyScalar(Math.cos(a)).addScaledVector(l, out * Math.sin(a));
-      const ax = d0.clone().cross(n).normalize(); let acc = 0;
-      for (let j = 1; j <= 3; j++) { acc += g[j - 1] * Math.PI / 180; const want = d0.clone().applyAxisAngle(ax, acc), b = S(side, i, j);
+      const d0 = _cd0.copy(h).multiplyScalar(Math.cos(a)).addScaledVector(l, out * Math.sin(a));
+      const ax = _cax.copy(d0).cross(n).normalize(); let acc = 0;
+      for (let j = 1; j <= 3; j++) { acc += g[j - 1] * Math.PI / 180; const want = _cw.copy(d0).applyAxisAngle(ax, acc), b = S(side, i, j);
         b.getWorldPosition(_a); (j < 3 ? S(side, i, j + 1).getWorldPosition(_b) : tipOf(side, i, _b)); _u.subVectors(_b, _a).normalize();
-        if (_u.dot(want) > 0.99999) continue; _q.setFromUnitVectors(_u, want); _q.slerp(new THREE.Quaternion(), 1 - weight);
+        if (_u.dot(want) > 0.99999) continue; _q.setFromUnitVectors(_u, want); _q.slerp(_ID, 1 - weight);
         b.parent.getWorldQuaternion(_pq); b.quaternion.copy(_pq.invert().multiply(b.getWorldQuaternion(_wq).premultiply(_q))); b.updateMatrixWorld(true); }
     }
   }  M.mPitch = 0; M.mSide = 0;
@@ -806,17 +821,22 @@ export function createMH(env) {
   // (before the mixer's update: a clip that holds a bone still is not written again by the mixer, three.js skipping an
   // unchanged value, so a test of "did the clip write it" missed: one missed frame and the page's turn stayed for good)
   function contactRestore() { for (const [b, r] of GR) { b.quaternion.copy(r.pre); b.updateMatrixWorld(true); } GR.clear(); }
+  // (a record per bone, reused: the clip's turn is copied in, not cloned - 30 fresh quaternions a solve before)
+  const GRP = new Map();
+  function grKeep(b) { if (!b || GR.has(b)) return; let r = GRP.get(b); if (!r) GRP.set(b, r = {pre: new THREE.Quaternion()}); r.pre.copy(b.quaternion); GR.set(b, r); }
+  function grKeepHand(side) { for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) grKeep(S(side, i, j)); }
   // keys (slow > 0): the bend that brings a finger down to the caps is followed over `slow` seconds, so the clip's own
   // quick strokes (a finger lifted for a key) stay; never into a key, though: the bend is never more than the touch's
   const FA = new Map();
+  const _lpq = new THREE.Quaternion();
   function layFingers(side, name, weight, first = 2, slow = 0, dt = 1 / 30, lifted = null) {   // each joint bends (down) or straightens (up) until its part of the finger touches
-    for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b && !GR.has(b)) GR.set(b, {pre: b.quaternion.clone()}); }
+    grKeepHand(side);
     for (let i = first; i <= 5; i++) for (let j = 1; j <= 3; j++) {
       const b = S(side, i, j), c = j < 3 ? S(side, i, j + 1) : null; if (!b) continue;
       b.getWorldPosition(_s); (c ? c.getWorldPosition(_e) : _e.copy(_s).sub(S(side, i, j - 1).getWorldPosition(_n)).add(_s));
       _ax.subVectors(_e, _s).normalize().cross(_dn2); if (_ax.lengthSq() < 1e-8) continue; _ax.normalize();
-      b.getWorldQuaternion(_q0); const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-      const set = a => { _rq.setFromAxisAngle(_ax, a); b.quaternion.copy(pq).multiply(_rq.clone().multiply(_q0)); b.updateMatrixWorld(true); };
+      b.getWorldQuaternion(_q0); const pq = b.parent.getWorldQuaternion(_lpq).invert();
+      const set = a => { _rq.setFromAxisAngle(_ax, a); b.quaternion.copy(pq).multiply(_rq.multiply(_q0)); b.updateMatrixWorld(true); };
       // from straightest down in steps to the first touch, then halved in between (bent past the vertical a finger
       // comes up again, so the first touch, not the last)
       const lo0 = j === 1 ? -0.6 : -0.15, HI = 1.2;          // (the middle and end joints barely over-straighten)
@@ -833,12 +853,36 @@ export function createMH(env) {
   }
 
   const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V();
+  // the solve at M.handsHz (15 a second): the contact solves skin vertices inside bisection searches for 15 joints x 2 hands,
+  // 13-16 ms a frame under software GL and the hottest thing on the owner's Mac (its fans). The frames between re-apply
+  // the last solve's local turns of the bones it touches (both arms: upper arm, forearm, hand, every finger bone - chainOf)
+  // over the clip the mixer just wrote, so nothing snaps back to the clip pose, and the clip's turns go in GR so the next
+  // frame starts from the clip again (contactRestore); the solve's clocks (the takes, the phases, the follows) run on the
+  // time accumulated since. Every frame still while a reach is in progress (a mode switch: the weights move each frame,
+  // minimum-jerk), on a mode or a clip change, until a first solve is held, and while nothing is placed (the modes' weights
+  // gone: nothing to hold, and the body is cheap)
+  const HZ = {acc: 0, held: false, mode: null, cur: null, q: {Left: [], Right: []}};
   function hands(dt) {
+    const t0 = performance.now(), typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse", cur = env.state().current;
+    const reaching = (typing ? M.ph.type < 1 : M.ph.type > 0) || (mousing ? M.ph.mouse < 1 : M.ph.mouse > 0);
+    HZ.acc += dt;
+    const full = !(M.handsHz > 0) || !HZ.held || reaching || M.noIK || M.mode !== HZ.mode || cur !== HZ.cur || HZ.acc >= 1 / M.handsHz - 1e-6;
+    HZ.mode = M.mode; HZ.cur = cur;
+    if (full) { const dta = HZ.acc; HZ.acc = 0; handsSolve(dta); HZ.held = M.w.type > 0.01 || M.w.mouse > 0.01; if (HZ.held) handsHold(true); }
+    else handsHold(false);
+    const ms = performance.now() - t0;
+    M.handsMs = ms; M.handsMsAvg = M.handsMsAvg == null ? ms : M.handsMsAvg + (ms - M.handsMsAvg) * 0.05;   // (?debug: the hands' cost per frame)
+  }
+  function handsSolve(dt) {                                  // the whole solve, as every frame before the throttle
     for (const sd of ["Left", "Right"]) forearmTwistKeep(sd);
-    const t0 = performance.now(); handsBody(dt); const ms = performance.now() - t0;
+    handsBody(dt);
     for (const sd of ["Left", "Right"]) forearmTwistBack(sd);
     if (ELB_REF.Left || ELB_REF.Right) { elbowKeep(); ELB_REF.Left = ELB_REF.Right = null; }   // (other placements keep the clip's elbow)
-    M.handsMs = ms; M.handsMsAvg = M.handsMsAvg == null ? ms : M.handsMsAvg + (ms - M.handsMsAvg) * 0.05;   // (?debug: the hands' cost per frame)
+  }
+  function handsHold(save) {                                 // save: the solved pose kept; else put back over the clip's (between solves)
+    for (const side of ["Left", "Right"]) { const C = chainOf(side), Q = HZ.q[side];
+      C.forEach((b, i) => { if (save) { (Q[i] || (Q[i] = new THREE.Quaternion())).copy(b.quaternion); return; }
+        grKeep(b); b.quaternion.copy(Q[i]); }); }               // (the clip's turn kept: back before the next mixer update)
   }
   // a rig with no forearm twist bones (the Mixamo character): the arm's solve leaves the upper arm's and the forearm's own
   // twist (about their length) free, and frame to frame they jumped - the upper arm 145 deg in one frame while he typed,
@@ -962,7 +1006,7 @@ export function createMH(env) {
   }
   function mouseHold(w) {                                    // his hand from the take, placed so palm and fingertips meet the shell
     const F = omNow(); if (!F || !S("Right", 2, 1) || !S("Right", 3, 1) || !S("Right", 5, 1)) return; shellSync();   // (palmFrame needs the knuckles)
-    for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S("Right", i, j); if (b && !GR.has(b)) GR.set(b, {pre: b.quaternion.clone()}); }
+    grKeepHand("Right");
     pin("Right", V(), w, mouseFit, {iters: 6, pitch: () => M.mPitch, aim: () => omAim(F), post: () => omFingers(F, w)});
     omOpen(F, w); if (w > 0.97) mouseSettle();
   }
@@ -984,13 +1028,14 @@ export function createMH(env) {
   // the hand's aim: the take's long axis (wrist -> middle knuckle) over the desk, rolled about it little side down by the
   // front take's roll (owner_mouse.py: the overhead take's depth is its weak axis), plus M.mRoll: contact's correction,
   // inside the front take's band only
+  const _oahw = V(), _oart = V(), _oal1 = V(), _oal2 = V(), _oay = V();   // (the aims' vectors, read by pin's keepTurn at once)
   function omAim(F) {
-    const hw = deskV(F.hand, 0), f = fwdV(), rt = V(-f.z, 0, f.x).addScaledVector(hw, -V(-f.z, 0, f.x).dot(hw)).normalize();
+    const hw = deskV(F.hand, 0, _oahw), f = fwdV(), rt = _oart.set(-f.z, 0, f.x); rt.addScaledVector(hw, -rt.dot(hw)).normalize();
     const j = OM.j, deg = Math.max(j.roll_band[0], Math.min(j.roll_band[1], j.roll_base + M.mRoll)), a = deg * Math.PI / 180;
-    const l1 = rt.clone().applyAxisAngle(hw, a), l2 = rt.clone().applyAxisAngle(hw, -a);
+    const l1 = _oal1.copy(rt).applyAxisAngle(hw, a), l2 = _oal2.copy(rt).applyAxisAngle(hw, -a);
     M.rollDeg = deg; return [hw, l1.y < l2.y ? l1 : l2];   // (the little side down)
   }
-  const deskV = (a, k) => { const f = fwdV(), rt = V(-f.z, 0, f.x); return f.multiplyScalar(a[k]).addScaledVector(rt, a[k + 1]).add(V(0, a[k + 2], 0)).normalize(); };
+  const deskV = (a, k, out) => { const f = fwdV(), rt = _oart.set(-f.z, 0, f.x); return out.copy(f).multiplyScalar(a[k]).addScaledVector(rt, a[k + 1]).add(_oay.set(0, a[k + 2], 0)).normalize(); };
   function palmFrame(side) {                                 // the character's palm, as the take's: h wrist -> middle knuckle, l index -> little, n = h x l
     const wr = env.bones[side + "Hand"].getWorldPosition(V()), h = S(side, 3, 1).getWorldPosition(V()).sub(wr).normalize();
     const l = S(side, 5, 1).getWorldPosition(V()).sub(S(side, 2, 1).getWorldPosition(V())); l.addScaledVector(h, -l.dot(h)).normalize();
@@ -1009,7 +1054,7 @@ export function createMH(env) {
   }
   function aimBone(i, j, want, weight, seen = false) {       // finger i's joint j turned so its segment points along want
     const b = S("Right", i, j); b.getWorldPosition(_a); (j < 3 ? S("Right", i, j + 1).getWorldPosition(_b) : seen ? seenTip("Right", i, _b) : tipOf("Right", i, _b)); _u.subVectors(_b, _a).normalize();
-    if (_u.dot(want) > 0.99999) return; _q.setFromUnitVectors(_u, want); _q.slerp(new THREE.Quaternion(), 1 - weight);
+    if (_u.dot(want) > 0.99999) return; _q.setFromUnitVectors(_u, want); _q.slerp(_ID, 1 - weight);
     b.parent.getWorldQuaternion(_pq); b.quaternion.copy(_pq.invert().multiply(b.getWorldQuaternion(_wq).premultiply(_q))); b.updateMatrixWorld(true);
   }
   // each segment along the take's, in the character's palm; open (finger -> share): that finger's bends taken by that share
@@ -1027,7 +1072,7 @@ export function createMH(env) {
     for (let i = 2; i <= 5; i++) { if (!S("Right", i, 1)) continue;
       const ds = [0, 1, 2].map(k => { const o = ((i - 1) * 3 + k) * 3; return V(F.d[o], F.d[o + 1], F.d[o + 2]); });
       if (open && open[i] != null) { const m = open[i], d0 = ds[0].clone().setZ(0).normalize(), out = [d0];
-        for (let k = 0; k < 3; k++) { const q = new THREE.Quaternion().setFromUnitVectors(k ? ds[k - 1] : d0, ds[k]).slerp(new THREE.Quaternion(), 1 - m); out.push(out[k].clone().applyQuaternion(q)); }
+        for (let k = 0; k < 3; k++) { const q = _rq2.setFromUnitVectors(k ? ds[k - 1] : d0, ds[k]).slerp(_ID, 1 - m); out.push(out[k].clone().applyQuaternion(q)); }
         ds.splice(0, 3, out[1], out[2], out[3]); }
       for (let j = 1; j <= 3; j++) { const d = ds[j - 1]; aimBone(i, j, h.clone().multiplyScalar(d.x).addScaledVector(l, d.y).addScaledVector(n, d.z).normalize(), weight); }
     }
@@ -1143,28 +1188,29 @@ export function createMH(env) {
     const o = {}; for (const k of ["G", "reach", "thumb", "yaw", "roll", "pitch", "wrist", "tip2"]) o[k] = mix(H[k][i0], H[k][i1]); return o;
   }
   function aimSeg(b, cur, want, weight) {                    // a bone turned (in the world) so its segment's line goes from cur to want
-    if (cur.dot(want) > 0.99999) return; _q.setFromUnitVectors(cur, want); _q.slerp(new THREE.Quaternion(), 1 - weight);
+    if (cur.dot(want) > 0.99999) return; _q.setFromUnitVectors(cur, want); _q.slerp(_ID, 1 - weight);
     b.parent.getWorldQuaternion(_pq); b.quaternion.copy(_pq.invert().multiply(b.getWorldQuaternion(_wq).premultiply(_q))); b.updateMatrixWorld(true);
   }
   // the thumb: its metacarpal turned in the palm plane to the take's angle from the index metacarpal's line (its lift out
   // of the plane kept), then its MCP and IP bends toward the palm (absolute: they never add up)
+  const _twr = V(), _tk2 = V(), _th = V(), _tl = V(), _tn = V(), _tim = V(), _td = V(), _tin = V(), _tp = V(), _ts = V(), _tax = V(), _tw = V(), _thq = new THREE.Quaternion();   // (otThumb's, once a pin iteration)
   function otThumb(side, T, weight) {
     const hand = env.bones[side + "Hand"], b1 = S(side, 1, 1), b2 = S(side, 1, 2), b3 = S(side, 1, 3); if (!b1 || !b2 || !b3) return;
-    const wr = hand.getWorldPosition(V()), k2 = S(side, 2, 1).getWorldPosition(V()), h = S(side, 3, 1).getWorldPosition(V()).sub(wr).normalize();
-    const l = S(side, 5, 1).getWorldPosition(V()).sub(k2); l.addScaledVector(h, -l.dot(h)).normalize();
-    const n = h.clone().cross(l).normalize(); if (n.y > 0) n.negate();   // (the palm's side: down)
-    const im = k2.clone().sub(wr); im.addScaledVector(n, -im.dot(n)).normalize();   // (the index metacarpal's line, in the palm plane)
-    const seg = (b, c) => (c ? c.getWorldPosition(V()) : tipOf(side, 1, V())).sub(b.getWorldPosition(V())).normalize();
-    const d = seg(b1, b2), up = d.dot(n), inPl = d.clone().addScaledVector(n, -up), L = inPl.length(); if (L < 1e-6) return;
-    const sg = Math.sign(im.clone().cross(inPl).dot(n)) || 1;   // (the side the thumb lies on, from the index line)
-    aimSeg(b1, d, im.clone().applyAxisAngle(n, sg * T[0] * Math.PI / 180).multiplyScalar(L).addScaledVector(n, up).normalize(), weight);
+    const wr = hand.getWorldPosition(_twr), k2 = S(side, 2, 1).getWorldPosition(_tk2), h = S(side, 3, 1).getWorldPosition(_th).sub(wr).normalize();
+    const l = S(side, 5, 1).getWorldPosition(_tl).sub(k2); l.addScaledVector(h, -l.dot(h)).normalize();
+    const n = _tn.copy(h).cross(l).normalize(); if (n.y > 0) n.negate();   // (the palm's side: down)
+    const im = _tim.copy(k2).sub(wr); im.addScaledVector(n, -im.dot(n)).normalize();   // (the index metacarpal's line, in the palm plane)
+    const seg = (b, c, out) => (c ? c.getWorldPosition(out) : tipOf(side, 1, out)).sub(b.getWorldPosition(_a)).normalize();
+    const d = seg(b1, b2, _td), up = d.dot(n), inPl = _tin.copy(d).addScaledVector(n, -up), L = inPl.length(); if (L < 1e-6) return;
+    const sg = Math.sign(_tw.copy(im).cross(inPl).dot(n)) || 1;   // (the side the thumb lies on, from the index line)
+    aimSeg(b1, d, _tw.copy(im).applyAxisAngle(n, sg * T[0] * Math.PI / 180).multiplyScalar(L).addScaledVector(n, up).normalize(), weight);
     // the bends about the thumb's own hinge: the plane its joints bend in as the capture holds it (kept in the hand's frame;
     // a thumb bends across the palm, not down like the fingers)
-    const hq = hand.getWorldQuaternion(new THREE.Quaternion());
+    const hq = hand.getWorldQuaternion(_thq);
     [[b1, b2, b2, b3, T[1], 0], [b2, b3, b3, null, T[2], 1]].forEach(([p0, p1, b, c, a, k]) => {
-      const prev = seg(p0, p1), hinge = OT.hinge[side] && OT.hinge[side][k];
-      const ax = hinge ? hinge.clone().applyQuaternion(hq) : prev.clone().cross(n).normalize(); ax.addScaledVector(prev, -ax.dot(prev)); if (ax.lengthSq() < 1e-8) return; ax.normalize();
-      aimSeg(b, seg(b, c), prev.clone().applyAxisAngle(ax, a * Math.PI / 180), weight);
+      const prev = seg(p0, p1, _tp), hinge = OT.hinge[side] && OT.hinge[side][k];
+      const ax = hinge ? _tax.copy(hinge).applyQuaternion(hq) : _tax.copy(prev).cross(n).normalize(); ax.addScaledVector(prev, -ax.dot(prev)); if (ax.lengthSq() < 1e-8) return; ax.normalize();
+      aimSeg(b, seg(b, c, _ts), _tw.copy(prev).applyAxisAngle(ax, a * Math.PI / 180), weight);
     });
   }
   function otHinges(side) {                                  // (from the clip's pose, before the page turns anything: per joint, in the hand's frame)
@@ -1178,9 +1224,9 @@ export function createMH(env) {
   // flat keyboard that hung its index 4.5 cm over the keys with the little finger in them, while both type. The
   // foreshortening is not only roll.)
   function otAim(side, f0) {
-    const f = fwdV(), rt = V(-f.z, 0, f.x), y = f0.yaw * Math.PI / 180, p = f0.pitch * Math.PI / 180, r = OT.roll[side];   // (roll: by contact, see below)
-    const hw = f.clone().multiplyScalar(Math.cos(y)).addScaledVector(rt, Math.sin(y));
-    const lw = rt.clone().multiplyScalar(Math.cos(y)).addScaledVector(f, -Math.sin(y)); if (side === "Left") lw.negate();
+    const f = fwdV(), rt = _oart.set(-f.z, 0, f.x), y = f0.yaw * Math.PI / 180, p = f0.pitch * Math.PI / 180, r = OT.roll[side];   // (roll: by contact, see below)
+    const hw = _oahw.copy(f).multiplyScalar(Math.cos(y)).addScaledVector(rt, Math.sin(y));
+    const lw = _oal1.copy(rt).multiplyScalar(Math.cos(y)).addScaledVector(f, -Math.sin(y)); if (side === "Left") lw.negate();
     lw.multiplyScalar(Math.cos(r)).addScaledVector(_up1, -Math.sin(r));
     hw.multiplyScalar(Math.cos(p)).addScaledVector(_up1, Math.sin(p));
     return [hw, lw];
@@ -1257,7 +1303,7 @@ export function createMH(env) {
   const otBlend = (a, b, u) => { const o = {}; for (const k in a) o[k] = Array.isArray(a[k]) ? a[k].map((v, i) => v + (b[k][i] - v) * u) : a[k] + (b[k] - a[k]) * u; return o; };
   function ownerKeys(side, w, dt, o = {}) {                  // o.mix: the share at rest (mousing: slow, every finger settled on its cap)
     if (!S(side, 2, 1) || !S(side, 3, 1) || !S(side, 5, 1) || !env.bones[side + "Hand"]) return;   // (another rig: degrade, never throw every frame)
-    for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b && !GR.has(b)) GR.set(b, {pre: b.quaternion.clone()}); }
+    grKeepHand(side);
     if (!OT.hinge[side]) OT.hinge[side] = otHinges(side);   // (normally set at load from the typing clip: otHingesAtLoad)
     const mix = Math.max(0, Math.min(1, o.mix || 0)), rest = mix >= 0.5;
     const f0 = mix <= 0 ? otFrame(side, OT.t) : mix >= 1 ? otRestFrame(side) : otBlend(otFrame(side, OT.t), otRestFrame(side), mix);
@@ -1715,19 +1761,33 @@ export function createMH(env) {
     b.position.y += M.lift;
   }
   // the soles: no vertex of his feet (or of the slides on them) under the floor; a step that dips lifts him by as much,
-  // eased back down (the vertices whose main bone is a foot or a toe, gathered once over every skinned part)
-  let feet = null;
+  // eased back down. The vertices whose main bone is a foot or a toe, gathered once over every skinned part - only the
+  // sole's extreme points of each bone's skin, though: the lowest under a fan of directions about down in the bind pose
+  // (tilted up to 80 deg every 10, 24 ways round: a heel strike, a toe off, a foot swung sideways), so whichever way the
+  // bone turns its lowest vertex is among them within ~1 mm. Skinned as drawn each frame: ~400 vertices against half of
+  // all ~14 000 foot vertices before, which cost 3-4 ms a frame under software GL (the owner's Mac ran its fans)
+  let feet = null; const _lv = V();
+  function feetPick() {
+    const dirs = [V(0, -1, 0)]; for (let t = 10; t <= 80; t += 10) for (let a = 0; a < 360; a += 15) { const r = t * Math.PI / 180, p = a * Math.PI / 180; dirs.push(V(Math.sin(r) * Math.cos(p), -Math.cos(r), Math.sin(r) * Math.sin(p))); }
+    const out = [], v = V();
+    env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, P = g.attributes.position, by = new Map();
+      for (let i = 0; i < P.count; i++) { let k0 = 0, w0 = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w0) { w0 = W.getComponent(i, k); k0 = I.getComponent(i, k); }
+        if (/Foot|ToeBase|toe/.test(o.skeleton.bones[k0].name)) { if (!by.has(k0)) by.set(k0, []); by.get(k0).push(i); } }
+      const pick = new Set();
+      for (const ids of by.values()) { const pos = ids.map(i => v.fromBufferAttribute(P, i).applyMatrix4(o.bindMatrix).clone());   // (the bind pose, upright)
+        for (const d of dirs) { let best = 0, bd = -Infinity; for (let n = 0; n < pos.length; n++) { const s = pos[n].dot(d); if (s > bd) { bd = s; best = n; } } pick.add(ids[best]); } }   // (the farthest along d: the lowest were d down)
+      if (pick.size) out.push([o, [...pick]]); });
+    return out;
+  }
   function floorLift(dt) {
-    const b = env.boy;
-    if (!feet) { feet = []; b.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const g = o.geometry, I = g.attributes.skinIndex, W = g.attributes.skinWeight, ids = [];
-      for (let i = 0; i < g.attributes.position.count; i++) { let k0 = 0, w0 = 0; for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w0) { w0 = W.getComponent(i, k); k0 = I.getComponent(i, k); }
-        if (/Foot|ToeBase|toe/.test(o.skeleton.bones[k0].name)) ids.push(i); }
-      if (ids.length) feet.push([o, ids.filter((_, j) => j % 2 === 0)]); }); }
-    b.updateMatrixWorld(true); let low = 9; const v = V();
+    const b = env.boy, t0 = performance.now();
+    if (!feet) feet = feetPick();
+    b.updateMatrixWorld(true); let low = 9; const v = _lv;
     for (const [o, ids] of feet) for (const i of ids) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld); if (v.y < low) low = v.y; }
-    const need = Math.max(0, env.F - 0.002 - low);
+    const need = Math.max(0, env.F - 0.002 - low); M.floorLow = low;   // (?debug: the soles' lowest point, to check against every vertex)
     M.flift = Math.max(need, (M.flift || 0) - 0.1 * dt); if (M.flift < 1e-4) M.flift = 0;
     b.position.y += M.flift;
+    const ms = performance.now() - t0; M.floorMs = ms; M.floorMsAvg = M.floorMsAvg == null ? ms : M.floorMsAvg + (ms - M.floorMsAvg) * 0.05;   // (?debug: the floor check's cost per frame)
   }
   // in bed: the slides come off before he sits on the bed's edge (a pair parked on the floor by it, toes toward the bed,
   // their own geometry as in his bind pose: standing, feet flat) and go back on as he stands up; asleep at night the
@@ -1789,18 +1849,18 @@ export function createMH(env) {
     const js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, n)));
     CORR.drivers = ((js.extras || {}).correctives || {}).drivers || null;
   }).catch(() => {});
-  const smooth = (a, b, x) => sstep(a, b, x);
+  const smooth = (a, b, x) => sstep(a, b, x), _cdn = V(), _c1 = V(), _c2 = V(), _c3 = V(), _c4 = V();
   function correctives() {
     if (!CORR.drivers) return;
     if (!CORR.meshes.length) env.boy.traverse(o => { if (o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences) CORR.meshes.push(o); });
     if (!CORR.meshes.length) return;
-    const B = env.bones, p = n => B[n].getWorldPosition(V());
-    const down = p("Hips").sub(p("neck")).normalize(), deg = (a, b) => THREE.MathUtils.radToDeg(a.angleTo(b)), w = {};
+    const B = env.bones, p = (n, o) => B[n].getWorldPosition(o);   // (into a scratch vector: a dozen joints a frame)
+    const down = p("Hips", _cdn).sub(p("neck", _c1)).normalize(), deg = (a, b) => THREE.MathUtils.radToDeg(a.angleTo(b)), w = {};
     for (const [name, d] of Object.entries(CORR.drivers)) {
       let v = 0;
-      if (d.type === "hip_bend") v = (deg(p("LeftLeg").sub(p("LeftUpLeg")), down) + deg(p("RightLeg").sub(p("RightUpLeg")), down)) / 2;
-      else if (d.type === "elbow_bend") v = deg(p(d.side + "ForeArm").sub(p(d.side + "Arm")), p(d.side + "Hand").sub(p(d.side + "ForeArm")));
-      else if (d.type === "chest_up") v = V().crossVectors(p("LeftArm").sub(p("RightArm")), down.clone().negate()).normalize().y;
+      if (d.type === "hip_bend") v = (deg(p("LeftLeg", _c1).sub(p("LeftUpLeg", _c2)), down) + deg(p("RightLeg", _c1).sub(p("RightUpLeg", _c2)), down)) / 2;
+      else if (d.type === "elbow_bend") v = deg(p(d.side + "ForeArm", _c1).sub(p(d.side + "Arm", _c2)), p(d.side + "Hand", _c3).sub(p(d.side + "ForeArm", _c4)));
+      else if (d.type === "chest_up") v = _c3.crossVectors(p("LeftArm", _c1).sub(p("RightArm", _c2)), _c4.copy(down).negate()).normalize().y;
       w[name] = smooth(d.from, d.to, v);
     }
     for (const o of CORR.meshes) for (const [nm, i] of Object.entries(o.morphTargetDictionary)) o.morphTargetInfluences[i] = w[nm] || 0;
