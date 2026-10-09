@@ -1,4 +1,16 @@
-LATEST: UI QA of preview/interactive e3e846e → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`), newest commit only. On preview/sova-phone-src: pushing to preview/ui-simple-qa needs the owner's explicit OK.
+LATEST: test fixes for main 01f3a0d → `docs/qa/test-fixes/0001-viewer-state-in-init_sockets.patch` (one commit, `git am`-ready; not pushed to preview/test-fixes: pushing another branch needs the owner's explicit OK). UI QA loop on preview/interactive keeps publishing to `docs/qa/ui-simple/`.
+
+## Test fixes on main 01f3a0d (all 3 from the interactive merge)
+- **One cause for all three:**
+  - The merge put the per-connection viewer state (`viewer_fp`, `viewer_ids`, `viewer_addr`) in `Live.__init__`.
+  - The tests build a Live with `init_sockets()` only (`bare_live`).
+  - So `ws_handler` raised `AttributeError` (then `votes` in `audience_hello`), aiohttp closed the socket, and the client read CLOSED (257).
+- **test_stream_per_viewer_under_3_kb_s:** failed the same way, timing out because its viewers never joined. **It was not the bandwidth**: with the fix it passes unchanged, `aud`/`rx` included.
+- **Fix** (`live_server.py` only, no test changed, `web/room.html` untouched):
+  - the three maps move to `init_sockets()`;
+  - `audience_hello()` returns None without vote state, as the hello already does for music and replies.
+- **Run:** test_feed + test_neurons3d + test_interactive 49 passed; smoke_demo SMOKE OK.
+
 
 
 ## MATTINA set — 0248b96

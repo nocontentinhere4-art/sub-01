@@ -1,0 +1,65 @@
+From 772b13541a339e983db8bdba4c69f067033ccf62 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 9 Oct 2026 01:42:36 +0000
+Subject: [PATCH] Fix the websocket tests broken by the interactive merge:
+ viewer state lives with the socket state
+
+Cause (all 3 failures): the interactive merge (4a22c43/df4bea5) added per-connection viewer state
+(viewer_fp, viewer_ids, viewer_addr) in Live.__init__, while everything ws_handler needs is set up by
+init_sockets() - which tests build alone (bare_live: Live.__new__ + init_sockets). ws_handler then raised
+AttributeError ('Live' object has no attribute 'viewer_fp', then 'votes' in audience_hello), aiohttp closed
+the socket, and the client read CLOSED (257) instead of the hello:
+- test_feed::test_caps_total_and_per_ip, ::test_without_trust_proxy_the_header_is_ignored: WSMessageTypeError 257.
+- test_neurons3d::test_stream_per_viewer_under_3_kb_s: its 3 viewers never joined (same AttributeError);
+  it timed out waiting for them. Not the bandwidth: with the fix it passes as is, aud/rx included.
+
+Fix: the three per-connection maps move into init_sockets() (with the rest of the websocket bookkeeping);
+audience_hello() returns None when the Live has no vote state, as the hello already does for music and
+replies (the page only calls onAudienceHello when it is set). No test changed. Production unchanged
+(__init__ still calls init_sockets() before anything uses them).
+
+Run: tests/test_feed.py, tests/test_neurons3d.py, tests/test_interactive.py: 49 passed; tests/smoke_demo.py: SMOKE OK.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01P9mLnsa7ue8RcMGhevnTr1
+---
+ live_server.py | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/live_server.py b/live_server.py
+index 47efe2f..0d0e72b 100644
+--- a/live_server.py
++++ b/live_server.py
+@@ -411,9 +411,6 @@ class Live:
+         # viewers (preview/interactive, audience.py): the vote on what he does next, the viewer count, the reactions
+         self.votes = audience.Votes(rng=random.Random(int(seed) + 7 if seed else None))
+         self.reactions = audience.Reactions()
+-        self.viewer_fp = audience.Fingerprints()   # the process's salt (memory only): a connection's ids, never raw
+-        self.viewer_ids = {}               # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
+-        self.viewer_addr = {}              # websocket -> its address's salted hash (per-address caps: votes, reactions)
+ 
+     # --- trades -> stimuli ---------------------------------------------------
+     def apply(self, tr):
+@@ -637,6 +634,10 @@ class Live:
+         self.transports = {}        # websocket -> its transport (write-buffer size for the slow-client check)
+         self.sockets = set()        # every accepted websocket, also while its hello is being sent
+         self.ws_per_ip = {}         # client address -> open websockets (only counts, kept in memory)
++        # viewers (audience.py): per connection, set in ws_handler, so here with the rest of the websocket state
++        self.viewer_fp = audience.Fingerprints()   # the process's salt (memory only): a connection's ids, never raw
++        self.viewer_ids = {}        # websocket -> its salted hashes (cookie, IP + UA), dropped with the connection
++        self.viewer_addr = {}       # websocket -> its address's salted hash (per-address caps: votes, reactions)
+         self.max_ws = int(os.environ.get("SUB01_MAX_WS", 400))
+         self.max_ws_ip = int(os.environ.get("SUB01_MAX_WS_PER_IP", 4))
+         self.ws_stats = {"lag": [], "late": [], "skipped": 0, "refused": 0, "t0": None, "ticks": 0,
+@@ -1627,6 +1628,8 @@ class Live:
+             await self.broadcast({"type": "glance"})
+ 
+     def audience_hello(self, ws):
++        if getattr(self, "votes", None) is None:               # a Live with only its websocket parts (as music, replies)
++            return None
+         ids = self.viewer_ids.get(ws, ())
+         return {"reactions": list(audience.REACTIONS), "viewers": len(self.sockets),
+                 "vote": self.votes.public(mine=self.votes.mine(ids)), "react_every": audience.REACT_EVERY_S,
+-- 
+2.43.0
+
