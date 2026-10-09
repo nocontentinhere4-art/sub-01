@@ -179,6 +179,10 @@ MEDIA_BAD_WORDS = re.compile(r"\b(" + _HARM_WORDS + r")\b", re.I)
 # ... but gambling promotion still counts, like coin pressure ("Best online casino bonus", "free spins")
 GAMBLING_PROMO = re.compile(r"\b(online casinos?|casino bonus(es)?|free spins?|no deposit bonus|sportsbooks?|"
                             r"sports betting|betting (tips|odds)|bet365|stake\.com)\b", re.I)
+# money-making and trading promotion (owner rules: no financial advice or buy pressure, no Fomo / trading on the monitor;
+# live 2026-10-09 09:03 Tokyo: "How to make millions on FOMO app", "Prop Firm Scalper ... Made $2.5+ Million"): never
+# searched, opened or shown, as a page, a video or a song; plain finance words ("Stockholm", "stock photo") pass
+MONEY_HYPE = re.compile(r"\b(fomo app|pump\.fun|memecoins?|meme coins?|altcoins?|crypto (trading|signals|gems?)|day ?trad(ing|er|ers)|forex|scalp(ing|er|ers)|prop firms?|ict trader|options trading|trading (strategy|signals|bot|course)|get rich|make (\$?\d[\d,.]*[kmb]?|millions?|thousands?|money) (fast|online|daily|a day|with|from|on|trading)|how to make (millions?|money|\$\d)|passive income|100x|1000x|to the moon|financial freedom)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
@@ -387,7 +391,7 @@ def title_ok(text):
     t = text or ""
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
                 or MONEY_ASK.search(t) or chat.SLUR_RE.search(chat.normalise(t))
-                or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+                or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t) or MONEY_HYPE.search(t))
 
 
 def media_title_ok(text):
@@ -400,7 +404,7 @@ def media_title_ok(text):
     in "Nazionale", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
     import chat
     t = text or ""
-    return (not (MEDIA_BAD_WORDS.search(t) or GAMBLING_PROMO.search(t))
+    return (not (MEDIA_BAD_WORDS.search(t) or GAMBLING_PROMO.search(t) or MONEY_HYPE.search(t))
             and chat.blocked(t, media=True) is None)
 
 
