@@ -1,0 +1,1222 @@
+[
+ {
+  "view": "1280x800",
+  "state": "loaded",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 1280,
+  "innerW": 1280,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "1280x800",
+  "state": "Vote",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 1280,
+  "innerW": 1280,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "1280x800",
+  "state": "Chat",
+  "note": "click failed: Locator.click: Timeout 15000ms exceeded. Call log: - waiting for locator(\"[role=tab][data-tab=\\\"chat\\\"]\").first - locator resolved to <button role=\"tab\" type=\"button\" data-tab=\"chat\" aria-selected=\"false\">\u2026</button> - attempting click action - waiting for element to be visible, enabled and stable - element is not stable - retrying click action - waiting for element to be visible, enabled and stable",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 1280,
+  "innerW": 1280,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "1280x800",
+  "state": "Teach",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 1280,
+  "innerW": 1280,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "1280x800",
+  "state": "More",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 1280,
+  "innerW": 1280,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "a \"Leaflet\"",
+    "w": 52,
+    "h": 10
+   },
+   {
+    "el": "a \"OpenStreetMap\"",
+    "w": 70,
+    "h": 10
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "390x844",
+  "state": "loaded",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 390,
+  "innerW": 390,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "390x844",
+  "state": "Vote",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 390,
+  "innerW": 390,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "390x844",
+  "state": "Chat",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 390,
+  "innerW": 390,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "390x844",
+  "state": "Teach",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 390,
+  "innerW": 390,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "390x844",
+  "state": "More",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 390,
+  "innerW": 390,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "360x780",
+  "state": "loaded",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 360,
+  "innerW": 360,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 34,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "360x780",
+  "state": "Vote",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 360,
+  "innerW": 360,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 34,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "360x780",
+  "state": "Chat",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 360,
+  "innerW": 360,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 34,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "360x780",
+  "state": "Teach",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 360,
+  "innerW": 360,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 34,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "360x780",
+  "state": "More",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 360,
+  "innerW": 360,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 44,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 37,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 34,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 34,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "430x932",
+  "state": "loaded",
+  "note": "",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 430,
+  "innerW": 430,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "430x932",
+  "state": "Vote",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 430,
+  "innerW": 430,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "430x932",
+  "state": "Chat",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 430,
+  "innerW": 430,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "430x932",
+  "state": "Teach",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 430,
+  "innerW": 430,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ },
+ {
+  "view": "430x932",
+  "state": "More",
+  "note": "TAB NOT FOUND",
+  "page_errors": [],
+  "console_errors": [],
+  "scrollW": 430,
+  "innerW": 430,
+  "overflow": false,
+  "taps": [
+   {
+    "el": "a.on \"room\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "a \"brain\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"diary\"",
+    "w": 50,
+    "h": 29
+   },
+   {
+    "el": "a \"sees\"",
+    "w": 43,
+    "h": 29
+   },
+   {
+    "el": "#todaybtn \"today \u25be\"",
+    "w": 54,
+    "h": 32
+   },
+   {
+    "el": "button \"\ud83d\udc4b\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2764\ufe0f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude02\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\ude2e\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\ud83d\udc4f\"",
+    "w": 40,
+    "h": 44
+   },
+   {
+    "el": "button \"\u2728\"",
+    "w": 40,
+    "h": 44
+   }
+  ],
+  "over": []
+ }
+]

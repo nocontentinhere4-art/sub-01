@@ -1,4 +1,4 @@
-LATEST: UI QA of preview/interactive 4deaa67 → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`), newest commit only. On preview/sova-phone-src: pushing to preview/ui-simple-qa needs the owner's explicit OK.
+LATEST: UI QA of preview/interactive 107961b → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`), newest commit only. On preview/sova-phone-src: pushing to preview/ui-simple-qa needs the owner's explicit OK.
 
 ## Test fixes on main 01f3a0d (all 3 from the interactive merge)
 - **One cause for all three:**
