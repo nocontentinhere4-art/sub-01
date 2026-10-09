@@ -922,6 +922,8 @@ let V5 = null;                                        // (char_v5.js / char_mixa
     if (o.isBone && o.name === "Head") head = o;
   });
   mixer = new THREE.AnimationMixer(boy);
+  // every action is made here: a clip's tracks for nodes this body has not are dropped first (pruneTracks)
+  mixer.clipAction = function(clip, root, blend){ pruneTracks(clip, root || boy); return THREE.AnimationMixer.prototype.clipAction.call(this, clip, root, blend); };
   addClips("sit", g.animations);
   scene.add(phone); makeProps(); tripoBottle();
   if (slidesInit()) { SLIDES.parked.visible = true;                 // its shader is built now, not when he first goes to bed
@@ -957,6 +959,18 @@ function loadMoves(){
   }).catch(() => {});
 }
 const clips = {};
+// A clip's tracks for nodes the rig has not, removed in place (the clip keeps its name, duration and identity: an action
+// already made of it stays its action; a clip left with no track still plays, as a no-op). The lookup is the one three.js's
+// PropertyBinding does, so exactly the tracks it would warn about ("No target node found for track") and then ignore go:
+// the old rig's clips (boy_*.glb, boy_moves.glb and the stills made of them) key "headfront", the MakeHuman head's front,
+// which the Mixamo skeleton has not. ?debug: one line per pruned clip
+function pruneTracks(clip, root){
+  if (!clip || !clip.tracks || !root) return clip;
+  const PB = THREE.PropertyBinding, gone = [];
+  clip.tracks = clip.tracks.filter(tr => PB.findNode(root, PB.parseTrackName(tr.name).nodeName) ? true : (gone.push(tr.name), false));
+  if (gone.length && DEBUG) console.debug(`clip ${clip.name}: ${gone.length} track(s) dropped, no such node on this body: ${[...new Set(gone.map(n => n.slice(0, n.lastIndexOf("."))))].join(", ")}`);
+  return clip;
+}
 // "hold" is a static upper-body pose (right arm, neck, head) taken from a texting animation on the same rig: it replaces
 // those bones of the sitting / standing idle clips; the left arm keeps the idle pose (resting on his knee / hanging)
 function addClips(name, list){
