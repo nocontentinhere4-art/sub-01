@@ -1436,7 +1436,7 @@ export function createMH(env) {
   }
   function svEvents(st) {                                     // what the page received since the last frame (wherever he is)
     for (const m of env.deskEvents ? env.deskEvents() : []) { const was = SV.pick.chess, r = SV.pick.event(m, st.T);
-      if (r && r.wave && !M.wave && M.mode === "desk_watch" && st.at === "desk" && !st.step && !M.ev) { M.wave = {t: 0}; M.log.push([+st.T.toFixed(2), "wave <glance"]); }   // (viewers' waves: he waves back at once, on top of whatever loop plays; wave() lets it be only while he sits watching)
+      if (r && r.wave && !M.wave && M.mode === "desk_watch" && st.at === "desk" && !st.step && !M.ev) { M.wave = {t: 0}; M.respond = (M.respond || 0) + 1; M.log.push([+st.T.toFixed(2), "wave <glance"]); }   // (viewers' waves: he waves back at once, on top of whatever loop plays; wave() lets it be only while he sits watching)
       const c = SV.pick.chess; if (m && m.type === "chess" && c && c.turn === "his" && (!was || was.turn !== "his")) SV.turnAt = st.T; }
   }
   function svStep(st) {
@@ -1454,6 +1454,7 @@ export function createMH(env) {
       M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, fade: SV_EV_FADE, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
         SV.cur = n ? {name: q.name} : {name: "desk_watch"}; SV.since = T2; SV.until = T2 + (n ? q.hold : 4); return n; }};
       M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "") + " back " + back.toFixed(3)]);
+      if (p.why === "glance") M.respond = (M.respond || 0) + 1;   // (an answer to viewers: room/glance_cam.js turns the camera to him)
       return;
     }
     const n = svLoop(p), cur = st.current; if (!n || n.a === cur) { SV.until = T + p.hold; return; }   // (already playing: no restart)
