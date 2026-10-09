@@ -10,7 +10,7 @@ export const VIEW = {fwd: 0.55, side: 0.85, up: 0.12, dist: 1.15, face: 0.0, nea
 // and lying on the bed with the phone (room/boy_mh.js's bed layer holds it), on a wide screen only: the follow camera keeps
 // its angle and slowly comes in toward him (the phone was a speck from the overview), and goes back out when he puts it
 // down; a glance answer still turns it to his face on top of that
-export const BED = {dist: 2.1, in: 3.0, out: 2.0};          // (m from his chest; s to come in, to go out)
+export const BED = {dist: 2.6, in: 3.0, out: 2.0};          // (m from his chest; s to come in, to go out)
 
 // the room's inside (room.html IN_ROOM: x -1.75..3.5, z -1.3..3.5), 0.2 m in from its walls
 export const ROOM = {x0: -1.55, x1: 3.3, z0: -1.1, z1: 3.3};

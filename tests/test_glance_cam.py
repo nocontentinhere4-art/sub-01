@@ -28,7 +28,7 @@ def test_envelope_eases_in_holds_and_out():
     w = out["w"]
     assert w[0] == 0 and w[1] == 0 and w[2] == 0.5 and w[3] == 1 and w[4] == 1 and w[5] == 1, w   # (eased in, held)
     assert 0 < w[6] < 1 and w[7] == 0 and w[8] == 0, w                                       # (eased out by 4.4 s)
-    assert out["bed"] == {"dist": 2.1, "in": 3.0, "out": 2.0}, out          # (on the phone in bed: slowly in, out)
+    assert out["bed"] == {"dist": 2.6, "in": 3.0, "out": 2.0}, out          # (on the phone in bed: slowly in, out)
 
 
 def test_bed_zoom_wide_screens_only_and_only_a_clip_held_phone():
