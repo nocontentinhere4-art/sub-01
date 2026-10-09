@@ -140,3 +140,17 @@ Stills: `desktop_vote.png` (your vote and the counts), `desktop_glance.png` (the
   stimulus to the simulated brain regions. That keeps it a nudge he can't be "forced" by and needs no new model.
 - Viewers behind one NAT with an identical browser build count as one voter (the IP + UA hash). That's the rule as
   asked: cookie **and** hash.
+
+## Follow-up (2026-10-09): abuse limits
+- Reactions are rate-limited per viewer by the IP + UA hash (a new cookie per connection no longer gives a fresh
+  bucket), and per address: 1 a second, burst 15, all of an address's browsers together.
+- Votes: at most 10 voters per address per round (`VOTES_PER_ADDRESS`), so one machine faking a new cookie and user
+  agent per vote is capped. A shared network still gets 10.
+- `test_abuse_rapid_requests_and_cookieless_clients`:
+  - 50 rapid votes and reactions from one viewer: 1 vote and 5 reactions count;
+  - a cookie-less client: 1 vote and 5 reactions;
+  - a new cookie per connection: nothing more;
+  - a new cookie and UA per connection: the address caps hold;
+  - `POST /api/vote`: 405.
+- `tests/test_interactive.py`: 17 passed; smoke OK. `origin/main` is merged in (`7e72cd3`).
+- The full pytest run asked for was stopped when the work was reprioritised; the last full results are above.
