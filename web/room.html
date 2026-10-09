@@ -483,7 +483,7 @@ const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t
 // ---------- renderer, scene, camera ----------
 const host = $("scene");
 // a weak computer (a viewer, 2026-10-09: "it makes my computer want to crash and my browser freeze"): little memory,
-// few cores or a software/integrated GPU get a lighter room - 1x pixels, no shadows, no live brain beside it.
+// few cores or a software/integrated GPU get a lighter room - no antialias, no shadows, no live brain beside it even with ?brainlive.
 // ?lite forces it, ?full turns it off, headless checks always draw the full room; adapt() lightens it later if frames stay slow
 const QS = new URLSearchParams(location.search);
 const GPU = (() => { try { const g = document.createElement("canvas").getContext("webgl"), x = g && g.getExtension("WEBGL_debug_renderer_info");
@@ -493,14 +493,16 @@ const LITE = QS.has("lite") || (!QS.has("full") && !navigator.webdriver && ((nav
   /SwiftShader|llvmpipe|softpipe|Software|Microsoft Basic Render|Mali-4|Adreno \(TM\) [2-5]\d\d|Intel.*(HD Graphics [2-5]\d{3}|HD Graphics$|GMA)/i.test(GPU)));
 window.LITE = LITE;
 const renderer = new THREE.WebGLRenderer({antialias:!LITE, powerPreference:"high-performance"});
-const DPR_MAX = Math.min(LITE ? 1 : 1.5, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, devicePixelRatio > 1 ? 1 : 0.75);   // adaptive, see adapt()
+// 1x pixels for everyone (a 1.5x room on a retina Mac drew 2.25x the pixels and ran the fans), adaptive below that, see adapt()
+const DPR_MAX = Math.min(1, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, devicePixelRatio > 1 ? 1 : 0.75);
+const FRAME_MS = 1000 / 30;                                 // the room is drawn at most 30 times a second, see frame()
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = !LITE;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;          // shadow maps are redrawn only when needed, see shadows()
+renderer.shadowMap.type = THREE.PCFShadowMap;              // (not the soft variant: 4x the taps) redrawn only when needed, see shadows()
 renderer.setClearColor(0x08080b);
 host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
@@ -522,7 +524,7 @@ addEventListener("resize", resize); resize();
 // ---------- lights (driven by the Tokyo clock and by what he is doing) ----------
 const hemi = new THREE.HemisphereLight(0xfff1dd, 0x1a1a24, 0.6); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffe2c0, 1.0);        // daylight / moonlight through the window
-sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
 Object.assign(sun.shadow.camera, {left:-3, right:3, top:3, bottom:-3, near:0.5, far:20});
 sun.shadow.autoUpdate = false; sun.shadow.needsUpdate = true;
 scene.add(sun, sun.target);
@@ -605,11 +607,12 @@ function shrinkTextures(gltf){
 }
 function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g)),
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
-// the live brain beside the room is a second 3D page (17 MB of fibres): it starts only once the room is up, and a weak
-// computer (or one that cannot hold the frame rate, see adapt()) gets a plain link instead
+// the live brain beside the room is a second 3D page (17 MB of fibres, its own WebGL loop): two GL pages in one tab
+// overheated a Mac, so by default everyone gets a still, styled link to /brain instead; ?brainlive starts the embed
+// (not on a weak computer), and adapt() still drops it when frames stay slow
 function brainPip(after){
   const f = document.querySelector("#brainpip iframe"); if (!f) return;
-  if (LITE) { brainOff(); return; }
+  if (LITE || !QS.has("brainlive")) { brainOff(); return; }
   setTimeout(() => { if (!LITE && f.isConnected && !f.src) f.src = f.dataset.src; }, after);
 }
 function brainOff(){
@@ -3548,7 +3551,9 @@ $("chat").addEventListener("submit", ev => {
 
 // ---------- loop ----------
 const clock = new THREE.Clock();
-// adaptive resolution: lower the pixel ratio while frames are slow, raise it again after a while of fast frames
+// adaptive resolution: lower the pixel ratio while frames are slow, raise it again after a while of fast frames.
+// Only drawn frames are measured (see frame()), so a healthy page shows ~FRAME_MS between them and "slow" is a
+// frame that missed the display's tick after the cap (at 60 Hz: 50 ms instead of 33)
 let frameAt = 0, winN = 0, winSum = 0, winMax = 0, goodFor = 0, dprFail = 1e9, slowFor = 0;
 function adapt(now){
   const ms = now - frameAt; frameAt = now;
@@ -3556,17 +3561,17 @@ function adapt(now){
   winN++; winSum += ms; winMax = Math.max(winMax, ms);
   if (winSum < 1000 || winN < 3) return;
   const avg = (winSum - winMax) / (winN - 1); winN = winSum = winMax = 0;    // one hitch (a shader compile) is not "slow"
-  if (avg > 26 && dpr > DPR_MIN) {                                    // under ~38 fps for a second
+  if (avg > FRAME_MS + 9 && dpr > DPR_MIN) {                          // under ~24 fps for a second (most frames missed a tick)
     dprFail = Math.min(dprFail, dpr); setDpr(Math.max(DPR_MIN, dpr - 0.25)); goodFor = 0;
   } else if (avg > 50 && !navigator.webdriver && ++slowFor >= 3) {    // still under 20 fps at the lowest: lighten the room
     slowFor = 0; brainOff(); if (renderer.shadowMap.enabled) { renderer.shadowMap.enabled = false; scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; }); }
-  } else if (avg < 20 && dpr < DPR_MAX) {
+  } else if (avg < FRAME_MS + 3 && dpr < DPR_MAX) {                   // holding the cap
     if (++goodFor >= (dpr + 0.25 >= dprFail ? 60 : 5)) { setDpr(Math.min(DPR_MAX, dpr + 0.25)); goodFor = 0; }   // retry a failed level after 1 min
   } else goodFor = 0;
 }
 function setDpr(v){ dpr = v; renderer.setPixelRatio(dpr); resize(); }
-// shadow maps: only the boy (and the phone) cast shadows, so redraw them ~30x a second while he is in the room
-// (every frame while he walks), once when he leaves, and the lamp's only while it is lit
+// shadow maps: only the boy (and the phone) cast shadows, so redraw them at most ~30x a second while he is in the room
+// (every drawn frame while he walks), once when he leaves, and the lamp's only while it is lit
 let shadowAt = 0, boyIn = null;
 function shadows(now, moving){
   const inRoom = !!(boy && boy.visible);
@@ -3574,9 +3579,14 @@ function shadows(now, moving){
     sun.shadow.needsUpdate = true; if (lamp.intensity > 0.01) lamp.shadow.needsUpdate = true; shadowAt = now; boyIn = inRoom;
   }
 }
+let drawnAt = -1e9;
 function frame(now){
-  requestAnimationFrame(frame);
-  const late = clock.getDelta();                                  // (read every frame: a frozen page's time is not caught up)
+  requestAnimationFrame(frame);                                   // (still every display tick: a hidden tab pauses as before)
+  // at most 30 frames a second: a 60/120 Hz display skips every other/three ticks; a skipped tick does not read the
+  // clock, so its time goes to the next drawn frame and he moves at real speed (a Mac drew 60 fps and overheated)
+  if (now - drawnAt < FRAME_MS - 2) return;
+  drawnAt = now;
+  const late = clock.getDelta();                                  // (read on every drawn tick: a frozen page's time is not caught up)
   if (document.hidden || (DEBUG && window.FREEZE)) return;       // ?debug: FREEZE and step the simulation with sim()
   adapt(now);
   // his time follows the clock, not the frame rate: a late frame is caught up in steps of at most 0.1 s (a slow device
