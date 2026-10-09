@@ -301,6 +301,9 @@ export function createMH(env) {
       M.spots = {sit: [sx + a.x - sdn[0] - w0.x, sitF], up: [sx + e.x - SEAT.up[0] - s0.x, sz + e.z - SEAT.up[1] - s0.z], seat: sa.slice()};
       env.setSpots(M.spots); }
     M.ready = true;
+    // the desk states (by default with the mixamo character): loaded after he is ready, so they never hold him back; until
+    // they are in, and if they fail, the Mixamo clips play (a clip that fails is left out)
+    if (env.anim === "sova") svLoad(make, bodyHips).then(() => seatHeight(), e => { SV = null; M.sv = null; console.warn("desk states not loaded, Mixamo clips only", e); });
   }
   // the page puts the root at the seat anchor less the clip's hips; the MakeHuman clips have the feet at y = 0, so the
   // seated slots' hip height is the seat anchor's height over the floor: the root (his feet) stays on the floor
@@ -322,6 +325,7 @@ export function createMH(env) {
     const n = env.chairNode && env.chairNode(); if (!n) return;
     const p = n.localToWorld(V(0, 0.735, 0.02)), hy = p.y - env.F, H = env.HIPS;
     for (const k of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", "sit", "dine", "eat", "edge", "phone_sit", "type"]) if (H[k]) H[k][1] = hy;
+    if (SV) for (const k of [...SV.loops, ...Object.keys(M.rare).filter(k => M.rare[k].sv).map(k => "rare_" + k)]) H[k][1] = hy;   // (the desk states: seated as desk_watch)
   }
   // the room's keyboard and mouse: separate nodes when the room has them (G10d's), else the numbers above
   // (G10d's are top-level scene nodes: "keyboard" with its origin on the home row (the middle of F and J) on the desk
@@ -352,6 +356,11 @@ export function createMH(env) {
       if (act === "research" && query) M.typeUntil = st.T + Math.min(8, Math.max(4, 2.5 + 0.18 * query.length));
     }
     if (act === "watch_video" || kind === "video" || kind === "short") return "desk_watch";
+    const sv = M.sv;                                         // (the desk states: he waits in the chair while the opponent thinks,
+    if (sv && act === "play_chess") {                        // and looks at the board a moment before he takes the mouse)
+      const c = sv.pick.chess;
+      if (c && (c.done || c.turn === "opponent" || st.T - (sv.turnAt ?? -1e9) < sv.look)) return "desk_watch";   // (the game over: he sits back)
+    }
     if (act === "research" && st.T < M.typeUntil) return "desk_type";
     return "desk_mouse";
   }
@@ -473,6 +482,7 @@ export function createMH(env) {
     if (DESK !== null) return DESK;
     const st = env.scene && env.scene.getObjectByName("room_static"); if (!st) return (DESK = false);
     const meshes = []; st.traverse(m => { if (m.isMesh) meshes.push(m); });
+    for (const m of meshes) if (m.geometry.computeBoundsTree && !m.geometry.boundsTree) m.geometry.computeBoundsTree();   // (a cut drops a mesh's tree: 12 000 rays without one took seconds)
     const sides = meshes.map(m => m.material.side); meshes.forEach(m => { m.material.side = THREE.DoubleSide; });
     const x0 = -1.92, x1 = -0.30, z0 = -1.47, z1 = -0.72, c = 0.01, nx = Math.ceil((x1 - x0) / c), nz = Math.ceil((z1 - z0) / c), tops = new Float32Array(nx * nz).fill(NaN);
     const ray = new THREE.Raycaster(), o = V(), up = V(0, 1, 0);
@@ -497,6 +507,99 @@ export function createMH(env) {
         for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (bs.has(o.skeleton.bones[k0])) all.push([o, n]); } });
       const st = Math.max(1, Math.ceil(all.length / 120)); ARM[side] = all.filter((_, n) => n % st === 0); }
     let d = 0; for (const [o, n] of ARM[side]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld); d = Math.max(d, inDesk(_g)); }
+    return d;
+  }
+  // seated at the desk and not on the keys or the mouse (riding the chair in, watching, eating): an arm whose skin (or its
+  // hand's) is in the desk's slab is swung about the shoulder by the least angle that takes it out (3 mm of slack).
+  // The clips put a forearm on the desk 1.2-1.8 cm too low (walking_8: riding in, 100 sampled vertices up to 18 mm under
+  // its top) - unseen until the room's raycasts saw the whole desk again
+  M.clear = {frames: 0, maxIn: 0, maxA: 0};                 // (?debug)
+  const HANDSKIN = {};
+  function handIn(side) {                                    // the deepest point of his hand's skin (palm and fingers, up to 120 vertices) in the desk
+    if (!HANDSKIN[side]) { const bs = new Set(); env.bones[side + "Hand"].traverse(b => { if (b.isBone) bs.add(b); }); const all = [];
+      env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
+        for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (bs.has(o.skeleton.bones[k0])) all.push([o, n]); } });
+      const st = Math.max(1, Math.ceil(all.length / 120)); HANDSKIN[side] = all.filter((_, n) => n % st === 0); }
+    let d = 0; for (const [o, n] of HANDSKIN[side]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld); d = Math.max(d, inDesk(_g)); }
+    return d;
+  }
+  // (eased, preview/freeze-why-ease: the swing keeps last frame's way while that way still clears - the least angle
+  // over all four flipped from 6 deg back to 7 deg forward in one frame mid-crossfade, a fingertip 147 mm - and it lets
+  // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
+  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008, CLR_TURN = 0.12;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go; s: a change of way)
+  const WLIFT = {}, WLIFT_STEP = 0.04;                        // (weighted(): the wrist's lift over the desk, m, and its most per frame)
+  function deskClear(side, dt = 1 / 30) {
+    const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
+    const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
+    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
+    const f = fwdV(), lat = V().crossVectors(f, _up1).normalize(), MAX = 25 * Math.PI / 180;
+    const axes = {lat, fwd: f};
+    const set = (ax, a) => { ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, a).clone().multiply(w0)); ua.updateMatrixWorld(true); };
+    const least = (k, sg) => { const ax = axes[k]; set(ax, sg * MAX); if (inn() > 0.003) return null;   // (the least angle that way that clears; none within 25 deg)
+      let lo = 0, hi = MAX; for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; set(ax, sg * m); if (inn() > 0.003) lo = m; else hi = m; } return hi; };
+    const prev = CLR[side], fade = prev ? prev.a * Math.exp(-dt / CLR_OUT) : 0;
+    let best = null;
+    if (d0 > 0.003) {
+      M.clear.frames++; M.clear.maxIn = Math.max(M.clear.maxIn, d0);
+      // the whole arm swung about the shoulder - back or forward (his left-right axis), out or in (his forward axis) - by
+      // the least angle that takes its skin and the hand's out: last frame's way if it still can, else the least of all four
+      if (prev) { const a = least(prev.k, prev.sg); if (a != null) best = {k: prev.k, sg: prev.sg, a}; }
+      if (!best) for (const k of ["lat", "fwd"]) for (const sg of [1, -1]) { const a = least(k, sg); if (a != null && (!best || a < best.a)) best = {k, sg, a}; }
+      if (best && prev && best.k === prev.k && best.sg === prev.sg) best.a = Math.max(best.a, fade);   // (never less than the release allows)
+    } else if (prev && fade > 0.003) {                       // out of the desk: the swing lets go gradually - as much of it as keeps him out
+      set(axes[prev.k], prev.sg * fade);                     // (the clip's arm has moved on: the old way may now push it in. Letting go,
+      // up to 8 mm of the slab is allowed - the desk's check counts skin more than 1 cm in - for the way back to the clip's
+      // arm can pass the desk's edge: held to 3 mm, an 18 deg swing dropped at once, a fingertip 175-195 mm in a frame)
+      let a = fade; if (inn() > CLR_SLACK) { let lo = 0, hi = fade; for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; set(axes[prev.k], prev.sg * m); if (inn() > CLR_SLACK) hi = m; else lo = m; } a = lo; }
+      if (a > 0.003) best = {k: prev.k, sg: prev.sg, a};
+    }
+    // a change of way (the last way no longer clears): the old swing hands over to the new one over CLR_TURN instead of
+    // at once (walking_8, riding in: back 21 deg to forward 22 deg in a frame, the left fingertip 378 mm); a little skin
+    // may stay in the slab for those frames
+    if (best && prev && (best.k !== prev.k || best.sg !== prev.sg)) { best.from = prev.from && prev.r < 1 ? prev.from : {k: prev.k, sg: prev.sg, a: prev.a}; best.r = 0; }
+    else if (best && prev && prev.from) { best.from = prev.from; best.r = prev.r; }
+    if (best && best.from) { best.r = Math.min(1, best.r + dt / CLR_TURN); const r = best.r * best.r * (3 - 2 * best.r);
+      ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axes[best.k], best.sg * best.a * r).clone().multiply(new THREE.Quaternion().setFromAxisAngle(axes[best.from.k], best.from.sg * best.from.a * (1 - r))).multiply(w0));
+      ua.updateMatrixWorld(true); if (best.r >= 1) best.from = null; }
+    else if (best) set(axes[best.k], best.sg * best.a);
+    else set(lat, 0);
+    if (best) M.clear.maxA = Math.max(M.clear.maxA || 0, best.a);
+    CLR[side] = best;
+    if (M.clearLog) M.clearLog.push([side, +d0.toFixed(4), best ? best.k + (best.sg > 0 ? "+" : "-") : "none", best ? +(best.a * 57.3).toFixed(1) : 0]);   // (?debug)
+  }
+  // eating at the desk (room_eat): the clip's reach for a bite goes 0.44 m out from the shoulder, 30 cm past the dish
+  // and up into the monitor (eating_19: 774 sampled vertices of the right hand inside it). While the clip's hand is out
+  // ahead of him (0.26 -> 0.40 m), it is taken to just over the dish instead; to the mouth and back the clip is as it was
+  // ... the share follows the clip at most 1 / 0.5 s, and the hand goes to a point between the clip's and the dish's,
+  // pinned at full weight (pin() is not linear in its weight: weighted, it leapt 20 cm in a frame as the share fell)
+  // the keys or the mouse taking over (their weight past 0.01) while an arm was swung out of the desk: the swing fades
+  // (~0.4 s) on top of the hands' solve instead of going at once (walking_8: sitting down, then the mouse - the left
+  // fingertip moved 188 mm in a frame as the swing went)
+  function clearRelease(side, dt) {
+    const p = CLR[side], ua = env.bones[side + "Arm"]; if (!p || !ua) return;
+    const a = p.a * Math.exp(-dt / 0.15); if (a < 0.003) { CLR[side] = null; return; }
+    const f = fwdV(), ax = p.k === "lat" ? V().crossVectors(f, _up1).normalize() : f;
+    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
+    ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, p.sg * a).clone().multiply(w0)); ua.updateMatrixWorld(true);
+    CLR[side] = {k: p.k, sg: p.sg, a};
+  }
+  M.eatReach = 0;                                            // (?debug: the share)
+  function eatReach(st, dt) {
+    const B = env.bones, eating = !!env.DISH_AT && st.at === "desk" && st.current === M.actions.act_eat;
+    const sh = B.RightArm && B.RightArm.getWorldPosition(V()), hand = B.RightHand && B.RightHand.getWorldPosition(V()); if (!sh || !hand) return;
+    const f = fwdV(), ext = hand.clone().sub(sh).dot(f), u = Math.min(1, Math.max(0, (ext - 0.26) / 0.14)), want = eating ? u * u * (3 - 2 * u) : 0;
+    M.eatReach += Math.max(-dt / 0.5, Math.min(dt / 0.5, want - M.eatReach)); if (M.eatReach < 1e-3) { M.eatReach = 0; return; }
+    const tgt = V().copy(env.DISH_AT).add(V(0, 0.10, 0)).addScaledVector(f, -0.05);   // (10 cm over the dish, its near side)
+    pin("Right", tgt.sub(hand).multiplyScalar(M.eatReach), 1, null, {iters: 4});
+  }
+  const FORE = {};
+  function foreIn(side) {                                    // armIn() on the forearm's skin alone (120 vertices there, not spread over the upper arm,
+    if (!FORE[side]) { const bs = new Set(), hand = env.bones[side + "Hand"];   // whose samples missed forearm skin 1 cm in the desk's edge over the mouse)
+      env.bones[side + "ForeArm"].traverse(b => { if (!b.isBone) return; let n = b; while (n && n !== hand) n = n.parent; if (!n) bs.add(b); }); const all = [];
+      env.boy.traverse(o => { if (!o.isSkinnedMesh || /_inside$/.test(o.name)) return; const I = o.geometry.attributes.skinIndex, W = o.geometry.attributes.skinWeight;
+        for (let n = 0; n < I.count; n++) { let k0 = 0, w0 = 0; for (let c = 0; c < 4; c++) if (W.getComponent(n, c) > w0) { w0 = W.getComponent(n, c); k0 = I.getComponent(n, c); } if (bs.has(o.skeleton.bones[k0])) all.push([o, n]); } });
+      const st = Math.max(1, Math.ceil(all.length / 120)); FORE[side] = all.filter((_, n) => n % st === 0); }
+    let d = 0; for (const [o, n] of FORE[side]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld); d = Math.max(d, inDesk(_g)); }
     return d;
   }
   M.swing = {frames: 0, maxIn: 0, maxA: 0};                 // (?debug: how often and how far the elbow had to swing)
@@ -538,7 +641,16 @@ export function createMH(env) {
       ccd(side, t, weight); swingElbow(side, weight); keepTurn();
       const d = fit ? fit() : V(); if (d.length() <= 0.001 && !o.iters) break; t.addScaledVector(d, weight);
     }
-    if (e0) { swivelTo(side, e0, weight); swingElbow(side, weight); keepTurn(); }   // (once the wrist is placed)
+    if (e0) {                                                // (once the wrist is placed)
+      // the elbow towards its reference, as far as the desk allows: on the mouse, where the full swing left the forearm in
+      // the desk's edge (the 15 deg elbow lift could not clear it), only the share that keeps it out
+      const ua = env.bones[side + "Arm"], q = ua.quaternion.clone(), go = k => { ua.quaternion.copy(q); ua.updateMatrixWorld(true); if (k > 0) swivelTo(side, e0, weight * k); swingElbow(side, weight); };
+      swivelTo(side, e0, weight); swingElbow(side, weight);   // (the whole swing, as before)
+      // (on the mouse only: typing, both forearms rest on the desk's edge and capping there moved the left hand's fit, 80%
+      // of resting tips on their caps against 81%)
+      if (M.w.mouse > 0.5 && foreIn(side) > 0.003) { let lo = 0, hi = 1; for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; go(m); if (foreIn(side) > 0.003) hi = m; else lo = m; } go(lo); }
+      keepTurn();
+    }
   }
   const palmAt = (side, out) => env.bones[side + "Hand"].getWorldPosition(out).lerp(S(side, 3, 1).getWorldPosition(_e), 0.6);
   function knuckleNeed(side, name) { let dy = -1; for (let i = 2; i <= 5; i++) { const k = S(side, i, 1); if (!k) continue; k.getWorldPosition(_s); dy = Math.max(dy, under(name, _s) + KN_R - _s.y); } return dy; }
@@ -720,9 +832,33 @@ export function createMH(env) {
 
   const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V();
   function hands(dt) {
+    for (const sd of ["Left", "Right"]) forearmTwistKeep(sd);
     const t0 = performance.now(); handsBody(dt); const ms = performance.now() - t0;
+    for (const sd of ["Left", "Right"]) forearmTwistBack(sd);
     if (ELB_REF.Left || ELB_REF.Right) { elbowKeep(); ELB_REF.Left = ELB_REF.Right = null; }   // (other placements keep the clip's elbow)
     M.handsMs = ms; M.handsMsAvg = M.handsMsAvg == null ? ms : M.handsMsAvg + (ms - M.handsMsAvg) * 0.05;   // (?debug: the hands' cost per frame)
+  }
+  // a rig with no forearm twist bones (the Mixamo character): the arm's solve leaves the upper arm's and the forearm's own
+  // twist (about their length) free, and frame to frame they jumped - the upper arm 145 deg in one frame while he typed,
+  // the hand's turn on the forearm 151-165 deg, the sleeve wrung round. Handing the twist to the wrist or the forearm only
+  // moved the flip (the elbow then 121-179 deg a frame). So the upper arm and the forearm keep the clip's own twist, each
+  // child turned back by as much: the hand's pose in the room, the fingertips and the contacts unchanged, the elbow where
+  // it was. The default page's v5 has twist bones
+  const FTW = {};
+  const twistOf = (q, a) => { const v = V(q.x, q.y, q.z), p = a.clone().multiplyScalar(v.dot(a)), t = new THREE.Quaternion(p.x, p.y, p.z, q.w);
+    if (t.lengthSq() < 1e-12) return 0; t.normalize(); if (t.w < 0) t.set(-t.x, -t.y, -t.z, -t.w); return 2 * Math.acos(Math.min(1, t.w)) * Math.sign(V(t.x, t.y, t.z).dot(a) || 1); };
+  function noTwistBones(side) { return !env.bones[(side === "Left" ? "L" : "R") + "_ForearmTwist01"]; }
+  const TWIST_CHAIN = side => [[side + "Arm", side + "ForeArm"], [side + "ForeArm", side + "Hand"]];   // (each bone, the child on its length)
+  function forearmTwistKeep(side) {                          // before the hands are placed: the clip's twist of the upper arm and the forearm
+    FTW[side] = noTwistBones(side) ? TWIST_CHAIN(side).map(([b, c]) => { const B = env.bones[b], C = env.bones[c];
+      return B && C && C.parent === B ? twistOf(B.quaternion, C.position.clone().normalize()) : null; }) : null;
+  }
+  function forearmTwistBack(side) {                          // after: back to it (the upper arm first), each child turned back by as much
+    if (!FTW[side]) return; const out = [];
+    TWIST_CHAIN(side).forEach(([b, c], k) => { const t0 = FTW[side][k], B = env.bones[b], C = env.bones[c]; if (t0 == null) return;
+      const a = C.position.clone().normalize(); let d = t0 - twistOf(B.quaternion, a); d = Math.atan2(Math.sin(d), Math.cos(d)); out.push(+(d * 57.3).toFixed(1)); if (Math.abs(d) < 1e-4) return;
+      const R = new THREE.Quaternion().setFromAxisAngle(a, d); B.quaternion.multiply(R); C.quaternion.premultiply(R.invert()); B.updateMatrixWorld(true); });
+    M.wrist = M.wrist || {}; M.wrist[side] = out;            // (?debug: how far the solve had turned the upper arm and the forearm)
   }
   function handsBody(dt) {
     const typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse";
@@ -747,15 +883,21 @@ export function createMH(env) {
     if (ot && M.w.type > 0.01) OT.t += dt * OT.json.speed;
     if (ot && M.w.mouse > 0.01) OT.tr += dt * OT.json.speed * OT_REST;
     const mix = wk > 0 ? M.w.mouse / (M.w.type + M.w.mouse) : 0;
-    if (wk > 0.01) { if (ot) ownerKeys("Left", wk, dt, {mix}); else keyOn("Left", wk, dt); }
+    // (the left hand stays on the keys between the keys and the mouse, its weight then never low: as before. Into and out of
+    // the desk modes it fades from or to the clip's pose: blended from its pose at full weight)
+    const inSwitch = M.w.type > 0.01 && M.w.mouse > 0.01;
+    if (wk > 0.01) { if (ot) { if (inSwitch) ownerKeys("Left", wk, dt, {mix}); else weighted("Left", wk, w => ownerKeys("Left", w, dt, {mix})); } else keyOn("Left", wk, dt); }
     const both = ot && M.w.type > 0.01 && M.w.mouse > 0.01, qc = both ? rightChain().map(b => b.quaternion.clone()) : null;   // (the clip's right arm, before the mouse moves it)
     if (M.w.mouse > 0.01 && P.mouseNode) {
       const ry = env.boy.rotation.y, home = V(P.mouse[0] - Math.sin(ry) * HUMP, P.mouse[1], P.mouse[2] - Math.cos(ry) * HUMP);
       omStep(dt); const F = omNow(), f = fwdV(), k2 = S("Right", 2, 1), k5 = S("Right", 5, 1), pw = k2 && k5 ? k2.getWorldPosition(V()).distanceTo(k5.getWorldPosition(_a)) : 0;   // (his palm width, 5 -> 17: the character's)
       if (F) home.addScaledVector(f, F.move[0] * pw).addScaledVector(V(-f.z, 0, f.x), F.move[1] * pw);   // (his wrist's travel over the pad)
-      const wm = both ? 1 : M.w.mouse;                       // (mid-switch the mouse's pose at full weight: the crossfade below then runs between two whole poses)
-      pin("Right", home.sub(toWorld(CLIP.mouse, _c)), wm);   // the recorded hand carried to the room's mouse: where it goes, the mouse goes
-      follow(); mouseHold(wm);                               // then the hand onto the mouse
+      // (mid-switch the mouse's pose at full weight: the crossfade below then runs between two whole poses; fading alone,
+      // the pose at full weight blended from the clip's by the weight)
+      const off = home.sub(toWorld(CLIP.mouse, _c));
+      weighted("Right", both ? 1 : M.w.mouse, () => {
+        pin("Right", off, 1);                                // the recorded hand carried to the room's mouse: where it goes, the mouse goes
+        follow(); mouseHold(1); });                          // then the hand onto the mouse
     } else M.grab = null;
     // (after the mouse: its pin carries the clip's own hand by an offset, so it must see the clip's hand, not one already
     // placed on the keys - mid-switch that sent the right hand 22 cm in one frame; the typing placement is absolute.) While
@@ -779,14 +921,42 @@ export function createMH(env) {
         swivelTo("Right", ew);                             // (the elbow to the two poses' elbow, blended)
         hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(hq));
         chain.forEach((b, i) => { if (i >= 3) b.quaternion.copy(qm[i].slerp(qt[i], wt)); }); env.boy.updateMatrixWorld(true); }
-      else ownerKeys("Right", M.w.type, dt);
+      else weighted("Right", M.w.type, w => ownerKeys("Right", w, dt));
     }
   }
-  const RCHAIN = [];
-  function rightChain() {                                    // the bones the right hand's placement turns: the arm, the hand, the fingers
-    if (!RCHAIN.length) { for (const n of ["RightArm", "RightForeArm", "RightHand"]) if (env.bones[n]) RCHAIN.push(env.bones[n]);
-      for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S("Right", i, j); if (b) RCHAIN.push(b); } }
-    return RCHAIN;
+  const CHAINS = {Left: [], Right: []};
+  function chainOf(side) {                                   // the bones a hand's placement turns: the arm, the hand, the fingers
+    const C = CHAINS[side];
+    if (!C.length) { for (const n of ["Arm", "ForeArm", "Hand"]) if (env.bones[side + n]) C.push(env.bones[side + n]);
+      for (let i = 1; i <= 5; i++) for (let j = 1; j <= 3; j++) { const b = S(side, i, j); if (b) C.push(b); } }
+    return C;
+  }
+  const rightChain = () => chainOf("Right");
+  // a hand placed at a fading weight (preview/freeze-why-ease): solved at full weight, then the arm blended bone by bone
+  // from the clip's pose by the weight. pin() is not linear in its weight: at a weight of 0.02 the mouse hold still had his
+  // hand on the mouse, then at 0.01 let go - the fingers 295 mm in one frame. At full weight (steady typing, mousing)
+  // nothing changes
+  function weighted(side, w, solve) {
+    if (w >= 0.999) return solve(1);
+    const C = chainOf(side), q0 = C.map(b => b.quaternion.clone());
+    solve(1);
+    C.forEach((b, i) => b.quaternion.copy(q0[i].slerp(b.quaternion, w))); env.boy.updateMatrixWorld(true);
+    // the blend's way from the clip's hand to the solved one went through the desk (sitting down, then the mouse: both
+    // hands 13 frames in it, 500-940 sampled vertices): the wrist goes up over the desk's top on the way (the solve's own
+    // ends are out of it: at either end nothing is lifted)
+    if (M.noLift) return;                                    // (?debug)
+    // (the lift grows at most WLIFT_STEP a frame: all at once it popped the hand 8 cm up on the blend's first frame)
+    WLIFT[side] = WLIFT[side] || 0; let up = 0;
+    for (let k = 0; k < 2; k++) { const need = underTop(side); if (need <= 0.003) break; const d = Math.min(need + 0.01, WLIFT[side] + WLIFT_STEP - up); if (d <= 0) break; up += d; pin(side, V(0, d, 0), 1, null, {iters: 3}); }
+    WLIFT[side] = up; M.lifted = M.lifted || {}; M.lifted[side] = +up.toFixed(3);
+  }
+  function underTop(side) {                                  // how far the lowest of his hand's and forearm's skin in the desk is under its top (m)
+    handIn(side); foreIn(side); const D = deskCols(); if (!D) return 0; let need = 0;
+    for (const [o, n] of [...HANDSKIN[side], ...FORE[side]]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld);
+      const i = Math.floor((_g.x - D.x0) / D.c), k = Math.floor((_g.z - D.z0) / D.c); if (i < 0 || k < 0 || i >= D.nx || k >= D.nz) continue;
+      const t = D.tops[i * D.nz + k] + (M.deskTest || 0); if (Number.isNaN(t) || _g.y >= t || _g.y < t - 0.15) continue;   // (anywhere in the desk's top 15 cm: deeper than its 3 cm slab too)
+      need = Math.max(need, t - _g.y); }
+    return need;
   }
   function mouseHold(w) {                                    // his hand from the take, placed so palm and fingertips meet the shell
     const F = omNow(); if (!F || !S("Right", 2, 1) || !S("Right", 3, 1) || !S("Right", 5, 1)) return; shellSync();   // (palmFrame needs the knuckles)
@@ -1168,6 +1338,12 @@ export function createMH(env) {
     const room = env.room && env.room(); if (!room) return null;
     const ch = env.chairNode && env.chairNode(), solid = [];                // (the room's furniture, not the chair he sits on)
     room.traverse(o => { if (!o.isMesh || !o.visible) return; for (let p = o; p; p = p.parent) if (p === ch) return; solid.push(o); });
+    if (SV) {                                                // (the desk states: the things on the desk too (the monitor, the lamp), and the
+      const mine = o => { for (let p = o; p; p = p.parent) if (p === env.boy || p === ch || p === room) return true; return false; };   // room's trees built
+      env.scene.traverse(o => { if (!o.isMesh || !o.visible || o.isSkinnedMesh || mine(o)) return;                                      // anew where the
+        const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(V()); if (Math.max(sz.x, sz.y, sz.z) < 2 && bb.max.y < 2.5) solid.push(o); });   // the
+      for (const m of solid) if (m.geometry.computeBoundsTree && !m.geometry.boundsTree) m.geometry.computeBoundsTree();             // keyboard's cut, if dropped)
+    }
     const ray = new THREE.Raycaster(), o = V(), d = V(f.x, 0, f.z), side = solid.map(m => m.material.side);
     solid.forEach(m => { m.material.side = THREE.DoubleSide; });          // (a face seen from behind is still the desk)
     const D = FREE.lat.map(x => FREE.ys.map(y => { o.set(S.x + l.x * x, env.F + y, S.z + l.z * x); ray.set(o, d); ray.far = 1.5;
@@ -1199,12 +1375,92 @@ export function createMH(env) {
   }
   function rareStep(dt) {                                     // its phases: ride back, the capture, ride in
     const E = M.ev; if (!E) { M.evOff = 0; return; }
-    E.t += dt; const t = E.t, D = E.R.dur, end = RIDE + D;
-    M.evOff = E.R.back * (t < RIDE ? sstep(0, RIDE, t) : t < end ? 1 : 1 - sstep(end, end + RIDE, t));
-    const w = M.actions.desk_watch;
-    if (t >= RIDE && !E.on) { E.on = true; E.a.reset(); E.a.setEffectiveWeight(1); E.a.fadeIn(EV_FADE).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EV_FADE); env.setCurrent(E.a); }
-    if (E.on && !E.off && t >= end - EV_FADE) { E.off = true; w.reset(); w.setEffectiveWeight(1); w.fadeIn(EV_FADE).play(); E.a.fadeOut(EV_FADE); env.setCurrent(w); }
-    if (t >= end + RIDE) { E.a.stop(); M.ev = null; }
+    // (the desk states' events, desk_states.js: no ride when the take needs no room (ride 0), a window of a long take
+    // (from, R.dur), and on out of it into the slot the picker chose (then()); the page's rare() as before)
+    const RD = E.ride ?? RIDE;
+    E.t += dt; const t = E.t, D = E.R.dur, end = RD + D;
+    M.evOff = E.R.back * (t < RD ? sstep(0, RD, t) : t < end ? 1 : 1 - sstep(end, end + RD, t));
+    const EF = E.fade || EV_FADE;                             // (the desk states' takes fade slower: their poses lie far apart)
+    if (t >= RD && !E.on) { E.on = true; E.a.reset(); E.a.time = E.from || 0; E.a.setEffectiveWeight(1); E.a.fadeIn(EF).play(); const cur = env.state().current; if (cur && cur !== E.a) cur.fadeOut(EF); env.setCurrent(E.a); }
+    if (E.on && !E.off && t >= end - EF) { E.off = true; const n = E.then && E.then(), w = n ? n.a : M.actions.desk_watch;
+      w.reset(); if (n) w.time = n.from; w.setEffectiveWeight(1); w.fadeIn(EF).play(); E.a.fadeOut(EF); env.setCurrent(w);
+      for (const k of ["sit", "type"]) env.actions[k] = w; }
+    if (t >= end + RD) { E.a.stop(); M.ev = null; }
+  }
+  // ---------- the desk states (room.html?char=mixamo&anim=sova; desk_states.js decides, this plays) ----------
+  // In desk_watch (a video, a page, the opponent's turn at chess) the seated loop is one of several: idle variants, his
+  // attention on the monitor, a small gesture, now and then a reaction to what the page received. Loops crossfade
+  // (SV_FADE) each from a random phase of its clip, for a random hold; a gesture or a reaction plays once through the
+  // rare events' path (rareStep): the chair rides back first by what the take needs (backFor; no ride if it needs none),
+  // and out of it he crossfades into the next loop the picker chose. Off desk_watch (typing, the mouse) the page's modes
+  // play as before; the default page never loads any of this.
+  const SV_FADE = 0.8, SV_LOOK = 2.5, SV_MIN = 1.5, SV_EV_FADE = 1.3, SV_REACT_BACK = 0.12;   // (s; SV_EV_FADE: into and out of a gesture or a reaction - 0.8 s from the hands on his thighs to his arms crossed moved a fingertip 107-187 mm in a frame)          // (s) a loop's crossfade; a look at the board; the least a loop holds before an event
+  let SV = null;
+  async function svLoad(make, bodyHips) {
+    const D = await import("./desk_states.js"), dir = env.clipDir || "room/mh";
+    let named = {}, seats = {}, once = [];                   // (slot -> its own clip's file; a list: <slot>.glb)
+    try { const r = await fetch(`${D.DIR}/index.json`); if (r.ok) { const j = await r.json(); const c = j.clips || [];
+      named = Array.isArray(c) ? Object.fromEntries(c.map(n => [n, n + ".glb"])) : c; seats = j.seat || {}; once = j.once || []; } } catch (e) { /* stand-ins */ }
+    for (const n of ["finger1-4", "finger3-4", "finger5-4"]) for (const sd of ["L", "R"]) if (env.bones[`${n}.${sd}`]) PARTS.push([`${n}.${sd}`, 0.02]);   // (the fingertips too: up, a hand reaches 18 cm past the wrist)
+    const files = {}, have = [], clipOf = {}, durOf = {}, loops = [];
+    for (const [k, f] of [...Object.entries(CL), ...Object.entries(RARE).map(([k, f]) => ["rare_" + k, f])])   // (the clips already loaded: not again)
+      if (M.clips[k]) files[`${dir}/${f}.glb`] = Promise.resolve(M.clips[k]);
+    const get = f => files[f] || (files[f] = env.load(f).then(g => env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0], () => null));
+    for (const [n, sl0] of Object.entries(D.SLOTS)) {
+      const own = n in named, sl = own ? {...sl0, span: null, once: sl0.once || once.includes(n), seat: seats[n]} : sl0;   // (its own clip: whole, at its own seat point)
+      if (own) D.SLOTS[n] = sl;
+      const f = own ? `${D.DIR}/${named[n]}` : sl.standIn ? `${dir}/${sl.standIn}.glb` : null, c0 = f && await get(f); if (!c0) continue;
+      const c = c0.clone(); c.name = "sv_" + n; have.push(n); clipOf[n] = f; durOf[n] = c.duration;
+      const z = sl.seat; if (z != null) SEAT_AT[(sl.once || sl.span ? "rare_sv_" : "sv_") + n] = [0, z];
+      if (sl.once || sl.span) { const k = "sv_" + n, a = M.actions["rare_" + k] = make(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
+        env.HIPS["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration, sv: n}; }
+      else { const a = M.actions["sv_" + n] = make(c); a.setLoop(THREE.LoopRepeat, Infinity); env.HIPS["sv_" + n] = bodyHips(c); loops.push("sv_" + n); }
+    }
+    SV = {D, loops, cur: null, until: 0, since: 0, turnAt: null, look: SV_LOOK,
+      pick: D.createPicker({have, clipOf: n => clipOf[n], durOf: n => durOf[n], rng: env.rng || Math.random})};
+    FREE.ys = Array.from({length: 30}, (_, i) => 0.03 + 0.05 * i);   // (the desk states: up to 1.48 m, the monitor's height too)
+    SV.pick.S.lastClip = `${dir}/${CL.desk_watch}.glb`;      // (desk_watch's own clip counts as the one just played)
+    M.sv = SV;                                                // (?debug; svForce(name): that slot next, as if an event called for it)
+    M.svBack = k => { const R = M.rare[k], ch = env.chairNode(), ry = env.boy.rotation.y, f = V(Math.sin(ry), 0, Math.cos(ry)), l = V(Math.cos(ry), 0, -Math.sin(ry));
+      const at = (window.__seatAt && window.__seatAt["rare_" + k]) || SEAT_AT["rare_" + k] || SEAT_AT.desk_watch; ch.updateMatrixWorld(true); const S = ch.localToWorld(V(at[0], 0, at[1]));
+      const D = free(S, f, l); let need = 0, w = null;
+      for (const [x, y, z, r] of R.pts) { const i = FREE.lat.reduce((b, v, j) => Math.abs(v - x) < Math.abs(FREE.lat[b] - x) ? j : b, 0), [te, ty] = D.top[i];
+        if (Math.abs(ty - y) <= r && z + r - te > need) { need = z + r - te; w = ["top", x, y, z, te, ty]; }
+        for (let j = 0; j < FREE.ys.length; j++) if (Math.abs(FREE.ys[j] - y) <= r + 0.025 && z + r - D[i][j] > need) { need = z + r - D[i][j]; w = ["wall", x, y, z, D[i][j], FREE.ys[j]]; } }
+      const ymax = Math.max(...R.pts.map(p => p[1])), zmax = Math.max(...R.pts.map(p => p[2]));
+      return {need, w, ymax, zmax, ys: FREE.ys.length, S: S.toArray(), D: D.map(c => c.map(x => +x.toFixed(2))), top: D.top}; };   // (?debug)
+    M.svForce = n => { const T = env.state().T; SV.pick.S.at = {gesture: -1e9, react: -1e9}; SV.pick.S.last = SV.pick.S.lastClip = null; SV.pick.S.queue.push({slot: n, T, src: "force"}); SV.until = 0; SV.since = -1e9; };
+  }
+  function svLoop(p) {                                        // a loop slot: its action, crossfaded in from its phase
+    const a = M.actions["sv_" + p.name]; if (!a) return null; return {a, from: p.from};
+  }
+  function svEvents(st) {                                     // what the page received since the last frame (wherever he is)
+    for (const m of env.deskEvents ? env.deskEvents() : []) { const was = SV.pick.chess; SV.pick.event(m, st.T);
+      const c = SV.pick.chess; if (m && m.type === "chess" && c && c.turn === "his" && (!was || was.turn !== "his")) SV.turnAt = st.T; }
+  }
+  function svStep(st) {
+    const T = st.T;
+    if (M.link || M.ev || M.sc) return;
+    const life = st.life || {}, mode = life.activity === "play_chess" ? "wait" : "watch";
+    if (!SV.cur) { SV.cur = {name: "desk_watch"}; SV.since = T; SV.until = T + 3 + 3 * (env.rng || Math.random)(); return; }   // (the mode's own loop first)
+    if (T < SV.until && !(SV.pick.pending(T) && T - SV.since >= SV_MIN)) return;
+    const p = SV.pick.next(T, mode); if (!p) { SV.until = T + 2; return; }
+    if (p.once) {                                             // a gesture or a reaction: once, through rareStep, then the next loop
+      const k = "sv_" + p.name, R = M.rare[k], a = M.actions["rare_" + k]; if (!R || !a) return;
+      // (a reaction rides at least SV_REACT_BACK back: its take's own frames clear the desk, but the crossfade from his hands
+      // on his thighs to his arms crossed swept them through the desk's edge, where the desk clearing then swung and flipped)
+      const back = Math.max(backFor(R, k), p.kind === "react" ? SV_REACT_BACK : 0), dur = Math.min(R.dur - p.from, p.hold);
+      M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, fade: SV_EV_FADE, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
+        SV.cur = n ? {name: q.name} : {name: "desk_watch"}; SV.since = T2; SV.until = T2 + (n ? q.hold : 4); return n; }};
+      M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "") + " back " + back.toFixed(3)]);
+      return;
+    }
+    const n = svLoop(p), cur = st.current; if (!n || n.a === cur) { SV.until = T + p.hold; return; }   // (already playing: no restart)
+    n.a.reset(); n.a.time = n.from; n.a.setEffectiveWeight(1); n.a.fadeIn(SV_FADE).play();
+    if (cur && cur !== n.a) cur.fadeOut(SV_FADE); env.setCurrent(n.a);
+    for (const k of ["sit", "type"]) env.actions[k] = n.a;   // (the page's play("sit") keeps it)
+    SV.cur = {name: p.name}; SV.since = T; SV.until = T + p.hold;
+    M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "")]); if (M.log.length > 50) M.log.shift();
   }
   function handRoll(m) {                                     // the roll back (m) that puts the clip's keyboard / mouse on the room's
     const ry = env.boy.rotation.y; _f.set(Math.sin(ry), 0, Math.cos(ry)); env.boy.updateMatrixWorld(true);
@@ -1215,6 +1471,9 @@ export function createMH(env) {
       return (M.off || 0) - (_m.sub(toWorld(M.mouseHips, _c)).dot(_f) - MOUSE_HIPS_BACK); }
     return null;
   }
+  // eating at the desk (room_eat) he leans in over the dish: from the seat the desk modes use, his belly went 3.1 cm into
+  // the desk's front edge and the right forearm 2.6 cm (eating_19, once the room's raycasts saw the whole desk)
+  const EAT_BACK = env.eatBack ?? 0.05;                       // (per character: room/char_mixamo.js ROOM.eatBack)
   function roll(dt) {
     const lap = M.sc && ["read", "phone", "phone_scroll"].includes(M.sc.k);
     const p = env.boy.position, H = env.HIPS, k = 1 - Math.exp(-dt / 0.35);
@@ -1225,15 +1484,16 @@ export function createMH(env) {
     let want;
     if (desk) { const hr = handRoll(M.mode) ?? (M.held ?? handRoll("desk_mouse")); if (M.mode && M.mode !== "desk_watch") M.held = hr; want = (hr ?? 0) + (M.evOff || 0); }
     else want = lap ? 0.45 : 0.12 - (env.seatIn || 0);
+    if (env.state().current === M.actions.act_eat) want += window.__eatBack ?? EAT_BACK;   // (?debug: __eatBack)   // (eating leans in: 5 cm further from the desk, see EAT_BACK)
     const off = M.off || 0, nxt = off + (want - off) * k, d = nxt - off; M.off = nxt;
     if (ch && Math.abs(d) > 1e-6) { ch.position.x += -s * d; ch.position.z += -c * d; ch.updateMatrixWorld(true); }   // (back: against the way he faces)
     if (ch && desk) {                                        // his root: each mode's hips on its seat point, blended as the clips are
       ch.updateMatrixWorld(true); let tx = 0, tz = 0, W = 0;
-      for (const m of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", ...Object.keys(M.rare).map(k => "rare_" + k)]) {
+      for (const m of ["desk_type", "desk_mouse", "desk_watch", "type_in", "type_out", ...Object.keys(M.rare).map(k => "rare_" + k), ...(SV ? SV.loops : [])]) {
         const a = M.actions[m], w = a && a.isRunning() ? a.getEffectiveWeight() : 0; if (w < 1e-3) continue;   // (an action never played reports weight 1)
         const hm = H[m], at = (window.__seatAt && window.__seatAt[m]) || SEAT_AT[m] || SEAT_AT.desk_watch; ch.localToWorld(_st.set(at[0], 0, at[1]));
         tx += w * (_st.x - (hm[0] * c + hm[2] * s)); tz += w * (_st.z - (-hm[0] * s + hm[2] * c)); W += w; }
-      if (W > 0.5) { p.x = tx / W; p.z = tz / W; }
+      if (W > 0.5) { p.x = tx / W; p.z = tz / W; } else if (Math.abs(d) > 1e-6) { p.x += -s * d; p.z += -c * d; }   // (no desk clip: he goes with the chair)
     } else if (Math.abs(d) > 1e-6) { p.x += -s * d; p.z += -c * d; }
     M.rollAt = [p.x, p.z];
   }
@@ -1419,8 +1679,11 @@ export function createMH(env) {
   // a body thicker than the clips' (v5: the hoodie, the thighs) sits higher on the seat: env.seatLift (m), seated at the
   // desk; it eases in and out over the sit-down and the stand-up (?debug: window.__seatLift overrides it)
   function seatLift(st) {
-    const L = window.__seatLift ?? env.seatLift ?? 0; if (!L) return;
     const s = st.step, t = s ? Math.min(1, Math.max(0, s.t || 0)) : 0;     // (a step's t runs 0 -> 1)
+    // sitting down onto the desk chair: a lift that peaks mid-way and is 0 at both ends (the seated pose is unchanged), for
+    // a character whose thighs brush the seat's front on the way down (env.sitBump, m; ?debug: window.__sitBump)
+    const SB = window.__sitBump ?? env.sitBump ?? 0; if (SB && s && s.k === "pose" && s.to === "desk") env.boy.position.y += SB * Math.sin(Math.PI * t);
+    const L = window.__seatLift ?? env.seatLift ?? 0; if (!L) return;
     const k = st.at === "desk" && (!s || s.k === "chair") ? 1 : s && s.k === "pose" && s.to === "desk" ? t : s && s.k === "pose" && st.at === "desk" ? 1 - t : 0;
     env.boy.position.y += L * k;
   }
@@ -1654,6 +1917,7 @@ export function createMH(env) {
   // ---------- one step (instead of the page's animate: the mixer, his plan and walk, the desk modes, the wrists) ----------
   function animate(dt) {
     contactRestore();                                          // (the page's finger turns undone before the mixer runs)
+    if (M.ready && SV) { const s0 = env.state(); svEvents(s0); if (M.mode === "desk_watch" && s0.at === "desk" && !s0.step) svStep(s0); }   // (the desk states: likewise)
     if (M.ready) rareStep(dt);                                 // (before the mixer: a crossfade it starts is in this frame's pose)
     const moving = env.step0(dt);
     if (!M.ready) return moving;
@@ -1670,6 +1934,7 @@ export function createMH(env) {
       // (riding the chair out to leave too: he sits back first, so the page rides it with the seated loop on its seat point)
       if (st.at === "desk" && (!st.step || st.step.k === "chair") && cur !== a) { a.reset(); a.setEffectiveWeight(1); a.fadeIn(FADE).play(); if (cur) cur.fadeOut(FADE); env.setCurrent(a); }
     }
+    if (SV && M.mode !== "desk_watch") SV.cur = null;        // (the desk states start over with the mode's own loop)
     if (!transition(st)) onBed(st);
     // the quilt and the pillow give under him lying awake on the bed: in as he lies down (the lift follows it frame by
     // frame through the step, no pop once he is down), out as he gets up or falls asleep under the duvet
@@ -1686,6 +1951,8 @@ export function createMH(env) {
     bedThings(st, dt);
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.held = null; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
+    if ((st.at === "desk" || (st.step && st.step.to === "desk")) && !(M.mode && M.w.type + M.w.mouse > 0.01)) { env.boy.updateMatrixWorld(true); eatReach(st, dt); deskClear("Left", dt); deskClear("Right", dt); }
+    else if (CLR.Left || CLR.Right) { env.boy.updateMatrixWorld(true); clearRelease("Left", dt); clearRelease("Right", dt); }   // (the keys or the mouse take over: the swing lets go gently)
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;

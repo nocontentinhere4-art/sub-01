@@ -179,6 +179,10 @@ MEDIA_BAD_WORDS = re.compile(r"\b(" + _HARM_WORDS + r")\b", re.I)
 # ... but gambling promotion still counts, like coin pressure ("Best online casino bonus", "free spins")
 GAMBLING_PROMO = re.compile(r"\b(online casinos?|casino bonus(es)?|free spins?|no deposit bonus|sportsbooks?|"
                             r"sports betting|betting (tips|odds)|bet365|stake\.com)\b", re.I)
+# money-making and trading promotion (owner rules: no financial advice or buy pressure, no Fomo / trading on the monitor;
+# live 2026-10-09 09:03 Tokyo: "How to make millions on FOMO app", "Prop Firm Scalper ... Made $2.5+ Million"): never
+# searched, opened or shown, as a page, a video or a song; plain finance words ("Stockholm", "stock photo") pass
+MONEY_HYPE = re.compile(r"\b(fomo app|pump\.fun|crypto (trading|signals|gems?)|day ?trad(ing|er|ers)|forex|scalp(ing|er|ers)|prop firms?|ict trader|options trading|trading (strategy|signals|bot|course)|get rich|make (\$?\d[\d,.]*[kmb]?|millions?|thousands?|money) (fast|online|daily|a day|with|from|on|trading)|how to make (millions?|money|\$\d)|passive income|100x|1000x|to the moon|financial freedom)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
@@ -387,7 +391,7 @@ def title_ok(text):
     t = text or ""
     return not (chat.URL.search(t) or chat.SOL_ADDR.search(t) or chat.ETH_ADDR.search(t) or chat.EMAIL.search(t)
                 or MONEY_ASK.search(t) or chat.SLUR_RE.search(chat.normalise(t))
-                or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t))
+                or BAD_WORDS.search(t) or BAD_HOST.search(t) or TOPIC_BLOCK.search(t) or MONEY_HYPE.search(t))
 
 
 def media_title_ok(text):
@@ -400,7 +404,7 @@ def media_title_ok(text):
     in "Nazionale", "Killing in the Name"), FINANCE_TALK ("Stockholm Syndrome") and the phone rule ("2000 - 2010")."""
     import chat
     t = text or ""
-    return (not (MEDIA_BAD_WORDS.search(t) or GAMBLING_PROMO.search(t))
+    return (not (MEDIA_BAD_WORDS.search(t) or GAMBLING_PROMO.search(t) or MONEY_HYPE.search(t))
             and chat.blocked(t, media=True) is None)
 
 
@@ -1345,14 +1349,15 @@ class Browser:
 
     SEED_GAP_S = 6 * 3600                                      # a seed site's front page at most every 6 hours
 
-    async def _seed(self, sc, why, topic=None, hungry=False):
+    async def _seed(self, sc, why, topic=None, hungry=False, only_topic=False):
         """A seed site's front page (a feed that changes, so not held to the 7-day rule), rotating: the ones opened in
-        the last SEED_GAP_S are left out; the topic's own sites first; cooking sites only when he is hungry."""
+        the last SEED_GAP_S are left out; the topic's own sites first (only them with only_topic: a failed search
+        falls back on a site about it or none); cooking sites only when he is hungry."""
         now = time.time()
-        pool = [u for u in SEEDS + (SEED_TOPICS["food"] if hungry else [])
+        mine = SEED_TOPICS.get(topic or "", [])
+        pool = [u for u in (mine if only_topic else SEEDS + (SEED_TOPICS["food"] if hungry else []))
                 if now - self.seed_t.get(u, 0) > self.SEED_GAP_S and self.host_ok(urllib.parse.urlsplit(u).hostname)]
         self.rng.shuffle(pool)
-        mine = SEED_TOPICS.get(topic or "", [])
         pool.sort(key=lambda u: u not in mine)
         for u in pool[:3]:
             self.seed_t[u] = now
@@ -1918,7 +1923,13 @@ class Browser:
         if await self._public_videos(sc, "shorts" if sc.name == "phone" else "youtube", q, why, origin,
                                      short=sc.name == "phone"):
             return True
-        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry)
+        # else a site about it, or nothing: never one about something else (live 2026-10-08: "Mark Rober" -> a Tokyo
+        # guide, "ramen in Osaka" -> a games site, "Day Deals" -> a music magazine)
+        if not topic or not SEED_TOPICS.get(topic):
+            self.last_skip = f"no search for “{q[:40]}” and no site about it"
+            return False
+        return await self._seed(sc, f"no search for “{q[:40]}”, opened a site about it instead", topic, self.hungry,
+                                only_topic=True)
 
     async def _video_search(self, sc, vq, q, why, origin):
         """A search asking for videos: the phone's short-video feed, or a video source at the desk."""

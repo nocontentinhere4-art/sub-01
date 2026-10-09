@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SUB-01 · room</title>
+<title>SUB-01 · room</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root { --bg:#08080b; --fg:#ececf2; --dim:#8f8fa3; --faint:#5c5c72; --line:rgba(255,255,255,.08); --or:#ff6a00; --st:#ff9a3c;
@@ -31,7 +31,7 @@
   #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; transition:background .4s; }
   #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; animation:breathe 2.6s ease-in-out infinite; }
   @keyframes breathe { 50% { box-shadow:0 0 3px #39f5a0; } }
-  #story { margin-top:12px; font-size:27px; line-height:1.28; letter-spacing:-.01em; text-shadow:0 2px 24px #000, 0 1px 3px rgba(0,0,0,.8); min-height:1.3em; }
+  #story { margin-top:12px; font-size:21px; line-height:1.28; letter-spacing:-.01em; text-shadow:0 2px 24px #000, 0 1px 3px rgba(0,0,0,.8); min-height:1.3em; }
   #story.in { animation:storyin .7s ease-out; }
   @keyframes storyin { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
   #story em { font-style:normal; color:var(--st); }
@@ -158,6 +158,28 @@
   #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:8px; cursor:pointer; }
   #chat button:hover { background:#fff; }
   #note { font-size:10px; color:var(--faint); margin-top:5px; min-height:1.2em; }
+  /* viewers (preview/interactive): the reactions bar and the viewer count in the dock, reactions floating up over the room */
+  #rx { display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+  #rx button { flex:1 1 0; min-width:0; height:34px; font-size:17px; line-height:1; background:var(--card); border:1px solid var(--line); border-radius:8px;
+    cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); transition:transform .12s, border-color .2s; padding:0; }
+  #rx button:active { transform:scale(.9); } #rx button:hover { border-color:rgba(255,255,255,.25); }
+  #rx button.off { opacity:.45; }
+  #viewers { flex:none; font-size:10.5px; color:var(--dim); padding:0 4px 0 6px; white-space:nowrap; text-shadow:0 1px 6px #000; }
+  #viewers::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:#39f5a0; margin-right:5px; vertical-align:1px; }
+  #rxfloat { position:fixed; inset:0; pointer-events:none; z-index:4; overflow:hidden; }
+  #rxfloat span { position:absolute; bottom:18%; font-size:26px; will-change:transform, opacity; animation:rxup var(--d, 3s) ease-out forwards;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+  @keyframes rxup { 0% { transform:translate(0, 0) scale(.6); opacity:0; } 12% { opacity:1; transform:translate(0, -6vh) scale(1); }
+    100% { transform:translate(var(--dx, 0px), -52vh) scale(1.05); opacity:0; } }
+  /* the vote on what he does next */
+  #votecard .opt { position:relative; display:flex; justify-content:space-between; gap:8px; align-items:center; width:100%; margin-top:6px;
+    background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:9px 10px; font:inherit;
+    font-size:12.5px; text-align:left; cursor:pointer; overflow:hidden; }
+  #votecard .opt .bar { position:absolute; left:0; top:0; bottom:0; background:rgba(255,154,60,.16); transition:width .4s; pointer-events:none; }
+  #votecard .opt span { position:relative; } #votecard .opt .n { color:var(--dim); font-size:11.5px; white-space:nowrap; }
+  #votecard .opt.mine { border-color:rgba(255,154,60,.7); } #votecard .opt.mine .n::before { content:"your vote · "; color:var(--st); }
+  #votecard .opt:disabled { cursor:default; }
+  #votecard .s.err { color:#ff8a8a; }
   #note.err { color:#ff8a8a; }
   #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:13px; color:#d8d8e2; background:rgba(8,8,11,.6);
     border:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
@@ -176,8 +198,13 @@
     body { position:relative; }        /* body is the scroller: the scene and the header scroll away with the cards */
     #scene { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
     #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
-    #top { position:absolute; left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:19px; }
-    #brand h1 { font-size:16px; } #state { margin-top:14px; } #why { max-width:none; }
+    #top { position:absolute; left:0; right:0; top:0; max-width:none; padding:12px 16px 18px;
+      background:linear-gradient(rgba(4,4,6,.82), rgba(4,4,6,.55) 70%, rgba(4,4,6,0)); }   /* phones: the header reads over any part of the room */
+    #story { font-size:15px; line-height:1.3; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    #state { font-size:11px; gap:8px; } #why { font-size:11px; margin-top:5px; color:#b9b9c6; }
+    #cam { display:none; }
+    #note { font-size:9.5px; }
+    #brand h1 { font-size:15px; } #state { margin-top:10px; } #why { max-width:none; }
     #side { position:static; width:auto; max-height:none; margin:62vh 16px 0; }
     #corner { position:static; display:block; }
     #brainpip { display:block; width:auto; margin:12px 16px 0; }
@@ -192,9 +219,120 @@
     #feed .ln { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
       padding:0 9px; border-top:5px solid transparent; border-bottom:5px solid transparent; box-shadow:0 0 0 1px var(--line); }
     #feed .ln.his { border-top-color:transparent; border-bottom-color:transparent; box-shadow:0 0 0 1px rgba(255,154,60,.35); }   /* clipped at two lines: no padding for a third to show in */
-    #plan { max-width:none; font-size:11px; padding:5px 8px; } #plan .r { display:none; }
-    #away { top:31vh; width:calc(100vw - 48px); }
+    #plan { max-width:none; font-size:10.5px; padding:4px 8px; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2;
+      -webkit-box-orient:vertical; overflow:hidden; } #plan .r { display:none; }
+    #away { top:36vh; width:calc(100vw - 64px); font-size:11.5px; padding:8px 10px; }
+    #rxfloat { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
+    #rx button { height:32px; font-size:16px; }
   }
+
+  /* ===== preview/interactive: the simplified room page. The room is the hero; a minimal header; one tabbed panel
+     (Vote · Chat · Teach · More); a reactions pill; a round brain thumbnail. One card style, one radius (12 px). ===== */
+  :root { --r:12px; --panel:340px; --gap:20px; }
+  #top { left:var(--gap); top:var(--gap); max-width:min(560px, calc(100vw - var(--panel) - 3 * var(--gap))); }
+  #brand h1 { font-size:16px; padding:3px 8px 2px; }
+  #brand nav { font-size:12px; }
+  #brand nav a { padding:10px 7px; }
+  #state { margin-top:12px; font-size:12px; gap:10px; }
+  #chip { font-size:10.5px; }
+  #story { margin-top:8px; font-size:18px; line-height:1.35; }
+  #tools { display:flex; gap:8px; margin-top:10px; pointer-events:auto; }
+  #tools button, #cam { margin:0; min-height:32px; font:inherit; font-size:11px; color:var(--dim); background:rgba(10,10,16,.62);
+    border:1px solid var(--line); border-radius:var(--r); padding:6px 12px; cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #tools button:hover { color:var(--fg); border-color:rgba(255,255,255,.22); }
+  #todaybtn[aria-expanded="true"] { color:var(--fg); border-color:rgba(255,154,60,.5); }
+  #today { position:absolute; left:0; top:100%; margin-top:8px; width:min(440px, calc(100vw - 2 * var(--gap))); pointer-events:auto;
+    background:var(--card2); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; backdrop-filter:var(--glass);
+    -webkit-backdrop-filter:var(--glass); }
+  #today[hidden] { display:none; }
+  #today #why { margin:0; max-width:none; text-shadow:none; }
+  #today #plan { margin-top:8px; background:none; border:0; border-left:2px solid var(--st); border-radius:0; padding:2px 0 2px 10px; text-shadow:none; }
+
+  /* the panel: one glass card, tabs on top, the open tab's content scrolls inside it */
+  #side { right:var(--gap); top:var(--gap); width:var(--panel); gap:0; padding:0; max-height:calc(100vh - 2 * var(--gap)); overflow:hidden;
+    background:var(--card); border:1px solid var(--line); border-radius:var(--r); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #tabs { display:flex; gap:4px; padding:6px; border-bottom:1px solid var(--line); flex:none; }
+  #tabs button { flex:1; min-height:44px; font:inherit; font-size:12px; color:var(--dim); background:none; border:0; border-radius:8px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+  #tabs button:hover { color:var(--fg); }
+  #tabs button.on { color:var(--fg); background:rgba(255,255,255,.07); }
+  #tab-left { font-size:10.5px; color:var(--st); }
+  #tab-dot { width:6px; height:6px; border-radius:50%; background:var(--st); display:inline-block; }
+  #tab-dot[hidden] { display:none; }
+  .pane { display:none; overflow-y:auto; scrollbar-width:thin; padding:16px; flex:1; min-height:0; }
+  .pane.on { display:block; }
+  #side .card { background:none; border:0; border-radius:0; padding:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  #side .card + .card { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+  .pane[data-pane="more"] > * { margin-top:0 !important; padding-top:0 !important; border-top:0 !important; }
+  .pane[data-pane="more"] > :not([hidden]) ~ :not([hidden]) { margin-top:18px !important; padding-top:16px !important;
+    border-top:1px solid var(--line) !important; }   /* (a divider only between sections that are shown) */
+  .card .k { font-size:10.5px; letter-spacing:.14em; margin-bottom:12px; }
+  .card .m { font-size:13px; } .card .t { font-size:14px; }
+  #votecard:not([hidden]) + .empty { display:none; }
+  .empty { color:var(--dim); font-size:13px; }
+  #votecard .opt { min-height:52px; font-size:13px; margin-top:8px; border-radius:var(--r); padding:12px 14px; }
+  #votecard .opt .bar { background:rgba(255,154,60,.18); }
+  /* More: collapsible sections (tap the label) */
+  .pane[data-pane="more"] .card > .k { cursor:pointer; user-select:none; margin-bottom:0; min-height:24px; }
+  .pane[data-pane="more"] .card > .k { justify-content:flex-start; }
+  .pane[data-pane="more"] .card > .k > :nth-child(2) { margin-left:auto; text-align:right; }
+  .pane[data-pane="more"] .card > .k::after { content:"▾"; color:var(--faint); padding-left:10px; }
+  .pane[data-pane="more"] .card > .k > :only-child { margin-right:auto; }
+  .pane[data-pane="more"] .card.shut > .k::after { content:"▸"; }
+  .pane[data-pane="more"] .card > .k + * { margin-top:12px; }
+  .pane[data-pane="more"] .card.shut > :not(.k) { display:none; }
+  #honest { display:block; background:none; padding:0; backdrop-filter:none; -webkit-backdrop-filter:none; text-shadow:none; font-size:10.5px; max-width:none; }
+  #honest .tx { white-space:normal; }
+  /* chat */
+  #dock { position:static; width:auto; }
+  #feed { max-height:none; margin-bottom:12px; }
+  #feed[hidden] { display:block; } #feed[hidden]::before { content:"No messages yet."; color:var(--dim); font-size:13px; }
+  #chat input, #chat button { min-height:44px; border-radius:var(--r); }
+  #teachcard input, #teachcard button { min-height:44px; border-radius:var(--r); font-size:13px; }
+  #teachcard .row { gap:8px; } #teachcard form { gap:8px; }
+  /* reactions: one pill at the bottom centre of the room */
+  #rxpill { position:fixed; left:calc((100vw - var(--panel) - var(--gap)) / 2); bottom:var(--gap); transform:translateX(-50%); z-index:6;
+    background:rgba(10,10,16,.72); border:1px solid var(--line); border-radius:999px; padding:4px 6px 4px 4px;
+    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #rx { margin:0; gap:2px; }
+  #rx button { flex:none; width:44px; height:44px; border:0; background:none; border-radius:50%; font-size:20px; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  #rx button:hover { background:rgba(255,255,255,.08); }
+  #viewers { padding:0 10px 0 8px; font-size:11px; }
+  /* the brain: a small round thumbnail, bottom-left */
+  #corner { left:var(--gap); bottom:var(--gap); right:auto; }
+  #brainpip { width:72px; height:72px; aspect-ratio:auto; border-radius:50%; box-shadow:none; }
+  #brainpip iframe { width:300px; height:225px; transform:translate(-114px, -76px) scale(.5); transform-origin:center; }
+  #brainpip span { display:none; }
+
+  @media (max-width: 900px) {
+    #scene, #vignette, #rxfloat { height:56vh; }
+    #top { padding:12px 16px 18px; max-width:none; }
+    #story { font-size:15px; margin-top:6px; }
+    #tools { margin-top:8px; } #cam { display:none; }
+    #today { width:calc(100vw - 32px); }
+    #side { position:static; width:auto; max-height:none; margin:56vh 0 0; padding-top:26px; border:0; border-radius:var(--r) var(--r) 0 0; overflow:visible;
+      background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none; }
+    #tabs { position:sticky; top:0; z-index:3; margin:0 12px; padding:10px 0; background:var(--bg); border-bottom:0; }
+    #tabs { gap:0; } #tabs button { border:1px solid var(--line); border-radius:0; background:var(--card2); }
+    #tabs button:first-child { border-radius:var(--r) 0 0 var(--r); } #tabs button:last-child { border-radius:0 var(--r) var(--r) 0; }
+    #tabs button + button { border-left:0; }
+    #tabs button.on { background:rgba(255,255,255,.1); }
+    .pane { padding:8px 16px 32px; overflow:visible; }
+    #corner { display:none; }
+    #honest { padding:0; }
+    #dock { position:static; padding:0; background:none; border:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
+    #feed .ln:not(:last-child) { display:block; } #feed .ln { display:block; padding:5px 9px; border:1px solid var(--line); box-shadow:none; }
+    #feed .ln.his { border-color:rgba(255,154,60,.35); border-left:2px solid var(--st); box-shadow:none; }
+    #feed .ln.his .re { display:block; }
+    #chat { position:fixed; left:0; right:0; bottom:0; z-index:7; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+      background:rgba(8,8,11,.94); border-top:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+    body:not([data-tab="chat"]) #chat { display:none; }
+    body[data-tab="chat"] .pane[data-pane="chat"] { padding-bottom:96px; }
+    #rxpill { position:absolute; left:50%; top:calc(56vh - 30px); bottom:auto; max-width:calc(100vw - 24px); }
+    #rx button { width:40px; height:44px; font-size:18px; }
+    #viewers { font-size:10.5px; padding:0 8px 0 4px; }
+  }
+  @media (max-width: 380px) { #rx button { width:34px; font-size:17px; } #viewers { font-size:10px; padding:0 6px 0 2px; } #rxpill { padding:3px 4px 3px 3px; } }
 </style>
 </head>
 <body>
@@ -205,12 +343,53 @@
   <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
+  <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
+<button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
+  <div id="today" hidden>
   <div id="why"></div>
   <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's AI budget is used up; back tomorrow.</span></div>
-  <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
+  </div>
 </div>
 
 <div id="side">
+  <nav id="tabs" role="tablist" aria-label="panels">
+    <button type="button" role="tab" data-tab="vote" class="on" aria-selected="true">Vote <span id="tab-left"></span></button>
+    <button type="button" role="tab" data-tab="chat">Chat <i id="tab-dot" hidden></i></button>
+    <button type="button" role="tab" data-tab="teach">Teach</button>
+    <button type="button" role="tab" data-tab="more">More</button>
+  </nav>
+  <section class="pane on" data-pane="vote" role="tabpanel">
+  <div class="card" id="votecard" hidden>
+    <div class="k"><span>What next? · viewers vote</span><span id="v-left"></span></div>
+    <div id="v-opts"></div>
+    <div class="s" id="v-note">one vote per viewer per round</div>
+    <div class="s" id="v-last" hidden></div>
+    <div class="s">When the round ends, the most-voted option goes to his activity model as a strong nudge. Needs such as
+      food and sleep still come first; if he is asleep, it waits until he wakes. A tie goes to the option listed first.</div>
+  </div>
+  <div class="card empty">The first round opens in a moment.</div>
+  </section>
+  <section class="pane" data-pane="chat" role="tabpanel">
+<div id="dock">
+  <div id="feed" hidden aria-live="polite"></div>
+  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
+  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+  </section>
+  <section class="pane" data-pane="teach" role="tabpanel">
+  <div class="card" id="teachcard">
+    <div class="k"><span>Teach him something</span><span id="tc-left"></span></div>
+    <form id="tc-form">
+      <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
+      <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
+    </form>
+    <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
+    <div class="h">Taught today</div>
+    <div id="tc-today"><div class="it"><span class="w">nothing yet today</span></div></div>
+    <div id="tc-yday" hidden><div class="h" id="tc-yk">Remembered from yesterday</div><div id="tc-ylist"></div></div>
+    <div class="s" id="tc-honest"></div>
+  </div>
+  </section>
+  <section class="pane" data-pane="more" role="tabpanel">
   <div class="card" id="screencard" hidden>
     <div class="k"><span id="s-k">On his screen</span><a id="s-link" href="#" target="_blank" rel="noopener noreferrer">open ↗</a></div>
     <div class="frame"><img id="s-img" alt="what is on his screen"></div>
@@ -243,38 +422,28 @@
     <div class="s" id="mem-how"></div>
     <div class="s">Recall by a simulated spiking network from a partial cue; a model, not a mind.</div>
   </div>
-  <div class="card" id="teachcard">
-    <div class="k"><span>Teach him something</span><span id="tc-left"></span></div>
-    <form id="tc-form">
-      <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
-      <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
-    </form>
-    <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
-    <div class="h">Taught today</div>
-    <div id="tc-today"><div class="it"><span class="w">nothing yet today</span></div></div>
-    <div id="tc-yday" hidden><div class="h" id="tc-yk">Remembered from yesterday</div><div id="tc-ylist"></div></div>
-    <div class="s" id="tc-honest"></div>
+  <div class="card" id="needs">
+    <div class="k"><span>Body</span><span id="n-food"></span></div>
+    <div class="m" id="n-text"></div>
   </div>
   <div class="card" id="mapcard">
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
     <div id="map"></div>
   </div>
-  <div class="card" id="needs">
-    <div class="k"><span>Body</span><span id="n-food"></span></div>
-    <div class="m" id="n-text"></div>
-  </div>
+  <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
+    An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
+    <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
+  
+  </section>
 </div>
 
 <div id="corner">
 <a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
-<div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
-  An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
-  <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
 </div>
-<div id="dock">
-  <div id="feed" hidden aria-live="polite"></div>
-  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
-  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+<div id="rxpill">
+  <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
+</div>
+<div id="rxfloat" aria-hidden="true"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -288,6 +457,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { createGlance } from "./room/glance.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 // (bounding-volume trees for the room's meshes: the camera's collision casts rays into them every frame)
@@ -326,6 +496,8 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.35;
 const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 200);
+const GLANCE = createGlance(THREE);                   // he glances toward the camera when viewers' reactions spike
+if (DEBUG) window.GLANCE = GLANCE;
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.enablePan = false;
 controls.minPolarAngle = 0.35; controls.maxPolarAngle = 1.35; controls.minDistance = 0.4; controls.maxDistance = 12;
@@ -388,6 +560,8 @@ const ACT = {                                        // activity -> [anchor, cli
   chart:["desk","sit"], eat:["desk","dine"], window:["sill","lean"],   // dine: seated, the food in his hands (alive())
   get_delivery:["deskside","deliver"],               // to the door, open it, take the bag, close it, carry it to the desk (#63)
   chat:["desk","sit"],                               // answering chat at the computer (the mind layer, #33/#46)
+  watch_video:["desk","sit"], play_chess:["desk","sit"],   // (seated at the desk too: missing here, they fell back on standing there, and each switch to them
+                                                     // started a pose step that took him off the desk modes for a frame - the hands snapped 38 cm)
   listen_music:["bedlie","listen"],                  // on his back on the bed, headphones on (#68); alive() nods to it
 };
 // poses made here on top of a clip: the clip each one plays
@@ -398,7 +572,26 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const progress = {};
 function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) => a + p[0], 0), t = v.reduce((a, p) => a + p[1], 0);
   const bar = $("boot-bar"); if (t && bar) bar.style.width = `${Math.round(100 * l / t)}%`; }
-function load(url){ return new Promise((ok, fail) => loader.load(url, ok,
+// phones and tablets: textures over TEX_MAX are drawn down before they reach the GPU (iOS Safari closes the tab past
+// a few hundred MB; the character's two 4096 maps alone were ~256 MB, the room ~170 MB)
+const TOUCH = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const TEX_MAX = TOUCH ? 1024 : Infinity;
+function shrinkTextures(gltf){
+  if (!isFinite(TEX_MAX)) return gltf;
+  const done = new Set();
+  gltf.scene.traverse(o => { if (!o.material) return;
+    for (const m of [].concat(o.material)) for (const k in m) { const t = m[k];
+      if (!t || !t.isTexture || done.has(t) || !t.image) continue; done.add(t);
+      const im = t.image, w = im.width || 0, h = im.height || 0;
+      if (Math.max(w, h) <= TEX_MAX) continue;
+      const f = TEX_MAX / Math.max(w, h), c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(w * f)); c.height = Math.max(1, Math.round(h * f));
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      if (im.close) im.close();                         // (an ImageBitmap: free the full-size copy now)
+      t.image = c; t.needsUpdate = true; window.texShrunk = (window.texShrunk || 0) + 1; } });   // (?debug: how many)
+  return gltf;
+}
+function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g)),
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
 function bootError(e){
   console.error(e); $("boot").classList.add("err");
@@ -464,6 +657,11 @@ function readMarkers(root){
 const TRIPO = !OLD_ROOM && new URLSearchParams(location.search).get("props") !== "old";
 const MUG_AT = new THREE.Vector3(-0.50, 0.97, -0.98);       // props_hard.py's MUG on the desk top (DTOP)
 const SNEAKERS_AT = [1.70, 0.16, 1.32, -2.6];               // x, floor, z, turn: the front right corner, off his routes
+// a geometry whose triangles changed loses its bounding-volume tree (camRoom() builds them on every room mesh from the
+// first frame, before these cuts run): a tree built on the old index made every raycast against the room miss what was
+// re-indexed (the desk's surfaces under the keyboard cut: 26% of them in the visual checks' desk zone); camRoom() builds
+// a new one on its next refresh
+const dropBVH = g => { if (g.boundsTree) g.disposeBoundsTree(); };
 function cutBox(root, box){                                 // drop a merged mesh's triangles lying wholly inside a world box
   const v = new THREE.Vector3();
   root.traverse(o => { if (!o.isMesh || !o.geometry.index) return;
@@ -471,7 +669,7 @@ function cutBox(root, box){                                 // drop a merged mes
     const inside = i => box.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
     for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
       if (!(inside(a) && inside(b) && inside(c))) keep.push(a, b, c); }
-    if (keep.length < idx.count) o.geometry.setIndex(keep); });
+    if (keep.length < idx.count) { o.geometry.setIndex(keep); dropBVH(o.geometry); } });
 }
 if (TRIPO) Promise.all([load("room/props_tripo.glb"),
   new Promise(ok => { const wait = () => room ? ok() : setTimeout(wait, 100); wait(); })]).then(([g]) => {
@@ -542,7 +740,7 @@ function splitBox(root, box, name){                         // a merged mesh's t
     for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
       (inside(a) && inside(b) && inside(c) ? out : keep).push(a, b, c); }
     if (!out.length) return;
-    o.geometry.setIndex(keep);
+    o.geometry.setIndex(keep); dropBVH(o.geometry);
     const remap = new Map(), used = []; for (const i of out) if (!remap.has(i)) { remap.set(i, used.length); used.push(i); }
     const ng = new THREE.BufferGeometry();                  // its own compact vertices, so its bounds are the keyboard's
     for (const k in o.geometry.attributes) { const src = o.geometry.attributes[k], n = src.itemSize, arr = new Float32Array(used.length * n);
@@ -658,7 +856,12 @@ if (TRIPO) Promise.all([new THREE.ImageLoader().loadAsync("room/poster_car.webp"
 // room/mh_v5/); ?char=old: the live character (room/boy.glb) with its own clips; ?char=mixamo: the same character on the
 // Mixamo Standard Skeleton (room/char_mixamo.glb, rig/autorig.sh; room/char_mixamo.js), playing the Mixamo clips on
 // their own skeleton (room/mh_mx/, baked for our chair: kimodo/mx_build.sh) and v5's other room clips carried over
-const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q === "mixamo";
+const CHAR_Q = new URLSearchParams(location.search).get("char"), CHAR_V5 = CHAR_Q !== "old", CHAR_MX = CHAR_Q !== "v5" && CHAR_Q !== "old";   // (the launch default: the mixamo character with the Sova desk states; ?char=v5: v5)
+// ?char=mixamo&anim=sova (preview/desk-states): the seated states at the desk (room/desk_states.js), fed the messages the
+// page already receives that they react to (chess, a decision, a dopamine burst, a viewer's chat); off by default
+const DESK_EV = CHAR_MX && new URLSearchParams(location.search).get("anim") !== "mixamo" ? [] : null;   // (?char=mixamo: the Sova desk states by default, &anim=mixamo without them; not on v5, whose clips they do not fit)
+const deskEv = m => { if (DESK_EV && m && ["chess", "decision", "dopamine", "chat", "glance"].includes(m.type)) { DESK_EV.push(m); if (DESK_EV.length > 32) DESK_EV.shift(); } };
+if (DEBUG && DESK_EV) window.__deskEv = deskEv;     // (?debug: the visual checks hand it messages as the socket would)
 let V5 = null;                                        // (char_v5.js / char_mixamo.js and the body's clip conversion)
 (CHAR_V5 ? Promise.all([CHAR_MX ? load("room/char_mixamo.glb") : load("room/char_v5.glb"), import(CHAR_MX ? "./room/char_mixamo.js" : "./room/char_v5.js")])
   .then(([g, m]) => { V5 = {m, conv: m.prep(THREE, g), mx: CHAR_MX};
@@ -777,7 +980,9 @@ function buildSurfaces(){
   monitor = makeScreen(m.w, m.h);
   monitor.mesh.rotation.set(m.rx, m.ry, 0, "YXZ"); monitor.mesh.position.set(...m.c);
   monitor.mesh.position.add(new THREE.Vector3(0, 0, m.off ?? 0.045).applyEuler(monitor.mesh.rotation)); scene.add(monitor.mesh);
-  monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+  // (12 cm in front of the screen: at 35 cm it sat in his chest at the desk, 16 cm from his neck, and with its 1/d^2 fall-off
+  // and no shadow the hood's folds a few cm from it came out white, his back's hood rim too, lit from inside him)
+  monitorGlow.position.set(m.c[0], m.c[1] - 0.05, m.c[2]).add(new THREE.Vector3(0, 0, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
   const w = SURF.window;
   sky = windowView.build(w, scene, renderer);        // the view out of the window, on the glass marker (#98 G7)
   if (skyLight) {                    // just inside the glass, shining into the room
@@ -1081,7 +1286,7 @@ function chessTex(){
   if (chessTxVer !== chessVer) { chessTxVer = chessVer; chessTx.needsUpdate = true; }
   return chessTx;
 }
-function onChess(m){ chessGame = m; panelKey = null; }
+function onChess(m){ chessGame = m; panelKey = null; deskEv({type: "chess", ...m}); }
 fetch("/api/chess").then(r => r.ok ? r.json() : null).then(d => { if (d && d.playing && d.game && !chessGame) onChess(d.game); }).catch(() => {});
 
 // views drawn here (no browser needed): the market chart at the desk, the food app on the phone
@@ -1290,11 +1495,46 @@ $("cam").onclick = () => { follow = !follow; $("cam").classList.toggle("on", fol
 controls.addEventListener("start", () => { userMovedAt = performance.now(); });
 const camGoal = {pos:OVERVIEW.pos.clone(), target:OVERVIEW.target.clone()};
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
+// phones (a canvas taller than wide): the overview's room does not fit across, and the bed fell off the left edge with him
+// in it. There the camera keeps the overview's angle but frames him: a sphere round his hips (him, and the bed when he is
+// in it) fitted into the part of the canvas under the header (#top lies over the canvas's top), so the distance follows
+// the aspect and the header's height; the monitor shot waits until he is at the desk. Wider canvases keep the old goals.
+const OV_DIR = OVERVIEW.pos.clone().sub(OVERVIEW.target).normalize();
+const OV_UP = UP.clone().addScaledVector(OV_DIR, -UP.dot(OV_DIR)).normalize();     // the overview camera's up
+const FRAME_R = 1.08;                                // the sphere round his hips: his height lying, his feet standing
+let hudAt = -1e9, hudTop = 1;
+// only the body that is drawn, once it is ready (set by the rig layer below: the v5 / MakeHuman layer takes over a while
+// after load, and until then the old rig's hips can sit ~100 m up), and only hips inside the room; else the overview
+let bodyReady = () => true;
+const IN_ROOM = new THREE.Box3(new THREE.Vector3(-1.75, 0, -1.3), new THREE.Vector3(3.5, 2.5, 3.5));
+const narrow = () => camera.aspect < 1 && !!(boy && boy.visible && bones.Hips) && bodyReady()
+  && IN_ROOM.containsPoint(bones.Hips.getWorldPosition(v3));     // (a NaN fails this too)
+function hudBand(){                                  // the header's bottom, as NDC y over the canvas (read twice a second)
+  const now = performance.now(); if (now - hudAt < 500) return hudTop; hudAt = now;
+  const c = renderer.domElement.getBoundingClientRect(), t = $("top").getBoundingClientRect();
+  return hudTop = c.height > 0 ? clamp(1 - 2 * Math.max(0, t.bottom - c.top) / c.height, 0.2, 1) : 1;
+}
+// how far up to move a camera d metres from its target so the target sits in the middle of the band under the header
+const DESK_SLIDE = 0.85;                              // (phones, the monitor shot: how far towards his head)
+const bandShift = d => -(hudBand() - 1) / 2 * Math.tan(camera.fov * Math.PI / 360) * d;
+function frameHim(){
+  const ty = Math.tan(camera.fov * Math.PI / 360), half = (hudBand() + 1) / 2;   // the free band's half height (NDC)
+  const d = FRAME_R / Math.sin(Math.atan(Math.min(ty * camera.aspect, ty * half)));
+  bones.Hips.getWorldPosition(v1).addScaledVector(OV_UP, bandShift(d));       // (his hips at the band's middle)
+  camGoal.target.copy(v1); camGoal.pos.copy(v1).addScaledVector(OV_DIR, d);
+}
 function updateCameraGoal(){
-  if ((screenOn === "desk" || chatting) && monitor) {
+  const nar = narrow();
+  if ((screenOn === "desk" || chatting) && monitor && !(nar && (at !== "desk" || step))) {   // (phones: the monitor shot once he is seated; until then he is framed)
     const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
     camGoal.target.set(...m.c);
     camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+    if (nar) { const off = bandShift(camGoal.pos.distanceTo(camGoal.target));     // (phones: the same shot, slid under the header)
+      v1.subVectors(camGoal.target, camGoal.pos).normalize(); v2.copy(UP).addScaledVector(v1, -UP.dot(v1)).normalize();
+      camGoal.target.addScaledVector(v2, off); camGoal.pos.addScaledVector(v2, off);
+      // (and slid sideways halfway to his head: the shot over his shoulder left it off the narrow canvas's edge)
+      if (head) { v3.crossVectors(v1, UP).normalize(); (bones.headfront || head).getWorldPosition(v4); const o = v4.sub(camGoal.target).dot(v3) * DESK_SLIDE;
+        camGoal.target.addScaledVector(v3, o); camGoal.pos.addScaledVector(v3, o); } }
   } else if (screenOn === "phone" && phone.visible && head) {
     // above his right shoulder, looking down past his cheek onto the screen: phone, hands and face in frame
     phone.getWorldPosition(v1); (bones.headfront || head).getWorldPosition(v2);
@@ -1306,7 +1546,8 @@ function updateCameraGoal(){
       camGoal.target.copy(v1).lerp(v2, 0.3);
       camGoal.pos.copy(v2).addScaledVector(UP, 0.38).addScaledVector(v4, 0.45).addScaledVector(v3, -0.42);
     }
-  } else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
+  } else if (nar) frameHim();
+  else { camGoal.pos.copy(OVERVIEW.pos); camGoal.target.copy(OVERVIEW.target); }
 }
 
 // ---------- the camera never inside him: the visitor can orbit and zoom in close (to 0.4 m from the target, the
@@ -1350,7 +1591,8 @@ function camRoom(){                                   // the solids, refreshed e
   if (!room) return null; const now = performance.now();
   if (CAMR.meshes && now - CAMR.at < 2000) return CAMR.meshes; CAMR.at = now;
   const isBoy = o => { for (let q = o; q; q = q.parent) if (q === boy) return true; return false; };
-  CAMR.meshes = []; scene.traverse(o => { if (!o.isMesh || !o.visible || isBoy(o) || o.name === "duvet_over" || o.name === "quilt_dent" || o.name === "pillow_dent") return;
+  CAMR.meshes = []; scene.traverse(o => { if (!o.isMesh || !o.visible || isBoy(o) || o.name === "duvet_over" || o.name === "quilt_dent" || o.name === "pillow_dent"
+    || o.name === "shadow_shell") return;                // (the sun's shadow slabs: unseen, no colour, no depth; on a phone the framing shot looked through them)
     if (!o.geometry.boundsTree) o.geometry.computeBoundsTree(); CAMR.meshes.push(o); });
   if (!CAMR.box) { const st = room.getObjectByName("room_static"); if (st) CAMR.box = new THREE.Box3().setFromObject(st); }
   return CAMR.meshes;
@@ -3051,6 +3293,110 @@ $("tc-form").addEventListener("submit", ev => {
   sock.send(JSON.stringify({type:"teach", text, nick}));
 });
 
+// ---------- viewers: the vote on what he does next, the viewer count, reactions (preview/interactive) ----------
+let RX = [], vote = null, voteMine = null, voteEnds = 0, voteLast = null;
+function onAudienceHello(a){
+  RX = a.reactions || [];
+  const bar = $("rx"); bar.querySelectorAll("button").forEach(b => b.remove());
+  RX.forEach((e, k) => { const b = document.createElement("button"); b.type = "button"; b.textContent = e; b.title = "react";
+    b.addEventListener("click", () => react(k)); bar.insertBefore(b, $("viewers")); });
+  viewersText(a.viewers);
+  if (a.vote) { voteLast = a.vote.last; setRound(a.vote.round); if (a.vote.waiting) voteNote(`viewers voted “${a.vote.waiting.label}” · waiting until he is awake`); }
+}
+function viewersText(n){ if (typeof n === "number") put("viewers", "textContent", `${n} watching`); }
+function setRound(r){
+  vote = r; voteMine = r && typeof r.mine === "number" ? r.mine : null;
+  voteEnds = r ? performance.now() + r.ends_in * 1000 : 0; renderVote();
+}
+function renderVote(){
+  const card = $("votecard"); card.hidden = !vote && !voteLast; if (card.hidden) return;
+  const r = vote, tot = r ? Math.max(1, r.total) : 1;
+  $("v-opts").innerHTML = r ? r.options.map((o, k) => `<button type="button" class="opt${voteMine === k ? " mine" : ""}" data-k="${k}"${voteMine != null ? " disabled" : ""}>`
+    + `<i class="bar" style="width:${Math.round(100 * o.n / tot)}%"></i><span>${esc(o.label)}</span><span class="n">${o.n}</span></button>`).join("")
+    : `<div class="m">the next round opens soon</div>`;
+  $("v-last").hidden = !voteLast;
+  if (voteLast) $("v-last").textContent = voteLast.winner ? `Last round: viewers voted “${voteLast.label}” (${voteLast.options.find(o => o.act === voteLast.winner).n} of ${voteLast.total} votes)`
+    : "Last round: no votes, no nudge";
+  voteClock();
+}
+function voteClock(){
+  if (!vote) { put("v-left", "textContent", ""); put("tab-left", "textContent", ""); return; }
+  const s = Math.max(0, Math.round((voteEnds - performance.now()) / 1000));
+  put("v-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)} h ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} min left`
+    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} left`);
+  put("tab-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}`
+    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);           // (the Vote tab's header: time left)
+}
+setInterval(voteClock, 1000);
+function voteNote(t, err){ $("v-note").textContent = t; $("v-note").className = err ? "s err" : "s"; }
+$("v-opts").addEventListener("click", ev => {
+  const b = ev.target.closest(".opt"); if (!b || b.disabled || !vote) return;
+  if (!sock || sock.readyState !== 1) { voteNote("still connecting", true); return; }
+  sock.send(JSON.stringify({type: "vote", k: +b.dataset.k}));
+});
+function onVote(m){
+  if (m.type === "vote") { voteLast = m.last || voteLast; setRound(m.round); voteNote("one vote per viewer per round"); }
+  else if (m.type === "vote_ack") { if (typeof m.mine === "number") voteMine = m.mine;
+    voteNote(m.ok ? "vote counted · results when the round ends" : `not counted: ${m.reason}`, !m.ok); renderVote(); }
+  else if (m.type === "vote_result") { voteLast = m; vote = null; renderVote();
+    voteNote(m.winner ? `viewers voted “${m.label}” · passed to his activity model when he is awake` : "no votes this round"); }
+  else if (m.type === "vote_applied") voteNote(`viewers voted “${m.label}” · now a strong nudge in his activity model`);
+}
+function onAudience(m){
+  const a = m.aud; viewersText(a.n);
+  if (a.v && vote && a.v[0] === vote.id) {
+    const [, counts, left] = a.v; let changed = false;
+    counts.forEach((n, k) => { if (vote.options[k] && vote.options[k].n !== n) { vote.options[k].n = n; changed = true; } });
+    vote.total = counts.reduce((x, y) => x + y, 0); voteEnds = performance.now() + left * 1000;
+    if (changed) renderVote();
+  }
+  if (m.rx) floatUp(m.rx);
+}
+let rxAt = [], rxOff = 0;
+function react(k){
+  if (!sock || sock.readyState !== 1) return;
+  const now = performance.now(); rxAt = rxAt.filter(t => now - t < 15000);
+  if (now < rxOff) return;                                // (the server's limit, mirrored: 1 every 3 s, burst 5)
+  sock.send(JSON.stringify({type: "react", k}));
+}
+function rxSlow(){ rxOff = performance.now() + 3000; $("rx").querySelectorAll("button").forEach(b => b.classList.add("off"));
+  setTimeout(() => $("rx").querySelectorAll("button").forEach(b => b.classList.remove("off")), 3000); }
+const RX_MAX = 40;
+function floatUp(counts){                                 // the reactions since the last tick, over the room for everyone
+  if (document.hidden) return;
+  const box = $("rxfloat");
+  counts.forEach((n, k) => { for (let i = 0; i < Math.min(n, 6); i++) {
+    if (box.childElementCount >= RX_MAX) return;
+    const el = document.createElement("span"); el.textContent = RX[k] || "";
+    const narrow = innerWidth <= 900, left = narrow ? 8 + Math.random() * 74 : 22 + Math.random() * 40;
+    el.style.left = `${left}%`; el.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * 80)}px`);
+    el.style.setProperty("--d", `${(2.6 + Math.random() * 1.2).toFixed(2)}s`); el.style.animationDelay = `${(i * 0.18 + Math.random() * 0.2).toFixed(2)}s`;
+    el.addEventListener("animationend", () => el.remove()); box.appendChild(el); } });
+}
+
+
+// ---------- the panel's tabs (Vote · Chat · Teach · More) and the header's "today" toggle (preview/interactive) ----------
+{
+  const tabs = [...document.querySelectorAll("#tabs [data-tab]")], panes = [...document.querySelectorAll(".pane[data-pane]")];
+  const set = t => {
+    document.body.dataset.tab = t;
+    for (const b of tabs) { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }
+    for (const p of panes) p.classList.toggle("on", p.dataset.pane === t);
+    if (t === "chat") { $("tab-dot").hidden = true; const f = $("feed"); f.scrollTop = f.scrollHeight; }
+    if (t === "more") window.dispatchEvent(new Event("resize"));     // (the map sizes itself once it can be seen)
+    try { localStorage.setItem("sub01.tab", t); } catch (e) {}
+  };
+  for (const b of tabs) b.addEventListener("click", () => set(b.dataset.tab));
+  let saved = null; try { saved = localStorage.getItem("sub01.tab"); } catch (e) {}
+  set(tabs.some(b => b.dataset.tab === saved) ? saved : "vote");
+  for (const k of document.querySelectorAll('.pane[data-pane="more"] .card > .k')) k.addEventListener("click", ev => {
+    if (ev.target.closest("a")) return; k.parentElement.classList.toggle("shut"); window.dispatchEvent(new Event("resize")); });
+  new MutationObserver(() => { if (document.body.dataset.tab !== "chat") $("tab-dot").hidden = false; })   // a new chat line
+    .observe($("feed"), {childList: true});
+  const btn = $("todaybtn"), box = $("today");
+  btn.addEventListener("click", () => { box.hidden = !box.hidden; btn.setAttribute("aria-expanded", !box.hidden); });
+  document.addEventListener("click", ev => { if (!box.hidden && !ev.target.closest("#today, #todaybtn")) { box.hidden = true; btn.setAttribute("aria-expanded", false); } });
+}
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery", buy_konbini:"at the konbini"};
 let sock = null, tickMsg = null, uiTimer = 0, uiAt = 0, panAt = 0, mePos = "";
@@ -3065,6 +3411,7 @@ function connect(){
   ws.onclose = () => { $("live").classList.remove("on"); setTimeout(connect, 1500); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
+    if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
     if (m.type === "chess") { onChess(m); return; }
@@ -3074,7 +3421,9 @@ function connect(){
       talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
               ...(m.replies || []).map(r => ({his:true, t:r.t || "", text:String(r.text || ""), re:r.replying_to || "", tag:r.tag || REPLY_TAG}))]
         .filter(x => x.text).map((x, i) => [x, i]).sort((a, b) => a[0].t < b[0].t ? -1 : a[0].t > b[0].t ? 1 : a[1] - b[1]).map(a => a[0]).slice(-40);
-      typing = null; chatDirty = true; renderFeed(); return;
+      typing = null; chatDirty = true; renderFeed();
+      if (m.audience) onAudienceHello(m.audience);
+      return;
     }
     if (m.type === "chat") { if (m.text) { addTalk({his:false, t:m.t || "", text:String(m.text)}); chatDirty = true; renderFeed(); } return; }
     if (m.type === "chat_reply") { hearReply(m, true); renderFeed(); return; }
@@ -3086,6 +3435,10 @@ function connect(){
       return;
     }
     if (m.type === "taught") { if (performance.now() - taughtAt > 2000) loadTaught(); return; }
+    if (m.type === "vote" || m.type === "vote_ack" || m.type === "vote_result" || m.type === "vote_applied") { onVote(m); return; }
+    if (m.type === "react_ack") { rxSlow(); return; }
+    if (m.type === "glance") { GLANCE.trigger(!(lastLife && /^lying/.test(lastLife.pose || ""))); return; }
+    if (m.type === "tick" && m.aud) onAudience(m);
     if (m.type !== "tick" || !m.life) return;
     if ((m.events || []).some(ev => ev.type === "replay" && ev.source === "taught")) loadTaught();   // a new count
     for (const t of m.trades || []) { trades.push({t:Date.now() / 1000, kind:t.kind, usd:t.usd}); chartDirty = true; }
@@ -3197,13 +3550,15 @@ function shadows(now, moving){
 }
 function frame(now){
   requestAnimationFrame(frame);
+  const late = clock.getDelta();                                  // (read every frame: a frozen page's time is not caught up)
   if (document.hidden || (DEBUG && window.FREEZE)) return;       // ?debug: FREEZE and step the simulation with sim()
   adapt(now);
   // his time follows the clock, not the frame rate: a late frame is caught up in steps of at most 0.1 s (a slow device
   // or a headless check at a few frames a second played him at a fraction of real time - standing by the chair for a
-  // minute while the caption said he was at the computer); at most 8 s at once (a tab coming back; a step costs ~30 ms of
-  // the 100 it covers, so even a frame every 4 s keeps up)
-  const real = Math.min(8, clock.getDelta()), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n;
+  // minute while the caption said he was at the computer). Up to 30 s at once: under headless software GL a frame takes
+  // 8-16 s while he moves (live 2026-10-08 08:02: the chair empty for 3 minutes of "at the computer"; with 8 s at most
+  // he still ran at about half of real time). A tab coming back catches up 8 s at most, as before (CATCH.back)
+  const real = Math.min(CATCH.back ?? CATCH.max, late), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n; CATCH.back = null;
   windowView.update(real, hour);                      // the sky, the city, the weather follow his clock
   let moving = false; for (let i = 0; i < n; i++) moving = animate(dt) || moving;
   if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
@@ -3217,6 +3572,8 @@ function frame(now){
   controls.update(); keepClear(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
+const CATCH = {max: 30, back: null};
+document.addEventListener("visibilitychange", () => { if (!document.hidden) CATCH.back = 8; });
 function animate(dt){                                // one step of him: clips, his plan, seats, life, the phone, the head
   untouch(); if (mixer) mixer.update(dt); T += dt;
   if (!boy) return false;
@@ -3230,7 +3587,7 @@ function animate(dt){                                // one step of him: clips, 
   aliveHead(); inBed(dt);
   return moving;
 }
-if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
+if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, clock, CATCH, SURF, ANCHOR, phone, buildSurfaces, camGoal, updateCameraGoal, fitTop, screenTexture,
   setHour: h => { hour = h; }, windowView, setWeather: k => windowView.setWeather(k), setDoor, setMusic: m => { musicNow = m; renderMusic(); }, setScreen: s => { screenOn = s; }, setStage: s => { stage = s; }, applyTick, drawChart, drawFood, drawReading,
   place, screens, play, snap, actions, hearReply, renderFeed, renderPlan, setPlan: (p, rest) => { mindPlan = p; mindResting = !!rest; renderPlan(); },
   addTalk: x => { addTalk(x); chatDirty = true; renderFeed(); }, bones, GRIP, thigh: (a, d) => { G_THIGH = a; if (d != null) G_DESK = d; }, settle: () => { for (let i = 0; i < 80; i++) lighting(0.1); },
@@ -3298,9 +3655,10 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
   const animate0 = animate; let motion = null, mh = null, rig = null;
   // preview/room-mh: with the MakeHuman body (room/boy.glb = boy_mh.glb) room/boy_mh.js drives him instead (desk modes
   // from the real mocap); it waits for the old clips to finish loading, then takes over every slot
-  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
+  const mhEnv = () => ({THREE, load, bones, actions, HIPS, F, DISH_AT, chairNode, room: () => room, scene, setStride: v => { STRIDE_V = v; }, get boy(){ return boy; }, get mixer(){ return mixer; },
     ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     ...(V5 && V5.mx ? {clipDir: "room/mh_mx", ...V5.m.ROOM} : {}),   // (?char=mixamo: its clips, which clip plays which slot, the clips' keyboard and mouse)
+    ...(DESK_EV ? {anim: "sova", deskEvents: () => DESK_EV.splice(0)} : {}),   // (&anim=sova: the desk states and what they react to)
     movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; },
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),
@@ -3325,6 +3683,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
       if (w > 0 && (DUV.acc >= 0.1 || w < 1)) { DUV.acc = 0; boy.updateMatrixWorld(true); coverShape(); }
       COV.mesh.visible = w > 0; DUV.src.visible = !COV.mesh.visible; },
     step0: dt => { untouch(); if (mixer) mixer.update(dt); T += dt; if (!boy) return false; boy.visible = visible; const m = drive(dt); storyCheck(); return m; }});
+  bodyReady = () => !!rig && (rig !== "mh" || !!(mh && mh.ready));   // (the phone framing: see narrow())
   const pickRig = () => {
     if (rig || !boy) return rig;
     rig = bones["metacarpal1L"] || bones["metacarpal1.L"] || V5 ? "mh" : "old";   // (three.js drops the dot from node names; v5: boy_mh.js too)
@@ -3342,8 +3701,11 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, SU
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
     HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
     setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
-  animate = dt => { if (pickRig() === "mh") return mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
-    const moving = animate0(dt); if (motion) motion.update(dt); return moving; };
+  animate = dt => { let moving;
+    if (pickRig() === "mh") moving = mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
+    else { moving = animate0(dt); if (motion) motion.update(dt); }
+    GLANCE.apply(dt, boy, bones, camera);              // (preview/interactive: a glance at the camera when reactions spike)
+    return moving; };
   if (DEBUG) window.animate_ = animate;                // the debug step (tests/visual) runs the layer too
 }
 // ===== end #98 G3 =====

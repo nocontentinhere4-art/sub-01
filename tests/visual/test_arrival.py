@@ -79,3 +79,30 @@ def test_he_sits_in_real_time_on_a_slow_frame_rate(tmp_path):
             time.sleep(0.5)
         h.browser.close()
     assert seated is not None and seated < 45, f"not seated within 45 s of real time (seated at {seated})"
+
+
+CATCH_UP = """async () => {
+  const T0 = () => dbg().T, wait = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const late = async (s, back) => { const g = clock.getDelta.bind(clock); let once = true;
+    clock.getDelta = () => { g(); if (once) { once = false; return s; } return 0; };   // (one late frame; the next ones no time)
+    if (back) document.dispatchEvent(new Event("visibilitychange"));
+    const t = T0(); window.FREEZE = false; await wait(); window.FREEZE = true; clock.getDelta = g; return +(T0() - t).toFixed(2); };
+  return {slow: await late(20, false), back: await late(20, true)}; }"""
+
+
+def test_a_slow_frame_is_caught_up_whole(tmp_path):
+    """Live 2026-10-08 08:02 (17:04-17:07 Tokyo): "is at the computer" for 3 minutes with the chair empty, and a minute before
+    standing by the bed while "lying on the bed listening to music". The live room was still 8d159d2 (his time 0.1 s a
+    frame: 1.9 s of his time in 220 s at ~0.09 fps). On main a late frame was caught up 8 s at most, and under headless
+    software GL a frame takes 8-16 s while he moves: he ran at ~0.5x real time. A slow frame is now caught up whole (up
+    to 30 s); a tab coming back still catches up 8 s at most."""
+    if not H.chromium_ok():
+        pytest.skip("playwright / chromium not installed")
+    from playwright.sync_api import sync_playwright
+    h = H.Harness(tmp_path, log=lambda *a: None)
+    with Server() as server, sync_playwright() as p:
+        pg = _browser(p, h, server)
+        r = pg.evaluate(CATCH_UP)
+        h.browser.close()
+    assert 19.5 <= r["slow"] <= 20.6, r                           # (a 20 s frame: 20 s of his time, in 0.1 s steps)
+    assert 7.5 <= r["back"] <= 8.6, r                             # (back from a hidden tab: 8 s, as before)

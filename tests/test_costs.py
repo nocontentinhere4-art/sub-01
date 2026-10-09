@@ -321,3 +321,49 @@ def test_api_costs_needs_the_token(tmp_path, monkeypatch):
         finally:
             await c.close()
     asyncio.run(run())
+
+
+# --- the eye's cap paced over his waking day (live 2026-10-07/08: 0.80 of 1.00 spent by 11:00, capped all evening) ---
+def _simulate_day(tmp_path, every_s=30, frame_usd=costs.FLUX_SCHNELL_USD + costs.llm_usd(900, 40)):
+    """A frame (and its thought) every `every_s` seconds round the clock whenever the ledger allows one: the
+    worst case (frames every 30 s, dreams at night too). -> (ledger, [(t, spent after)] of the frames made)."""
+    now = [at(2026, 10, 8, 0, 0)]
+    led = costs.Ledger(tmp_path, clock=lambda: now[0])
+    made, end = [], at(2026, 10, 9, 0, 0) - 1
+    while now[0] < end:
+        if led.why_not("eye") is None:
+            led.record("eye", "flux+llm", 1, frame_usd, "frame")
+            made.append((now[0], led.spent_today("eye")))
+        now[0] += every_s
+    return led, made
+
+
+def test_eye_spend_is_paced_over_his_waking_day(tmp_path):
+    cap = costs.caps()["eye"]
+    led, made = _simulate_day(tmp_path)
+    spent = lambda h: max([s for t, s in made if t < at(2026, 10, 8, h)] or [0])
+    assert spent(11) <= cap * 0.40                               # (live, unpaced: 0.80 by 11:00)
+    assert spent(20) < cap                                       # not capped before the evening
+    for h in (20, 21, 22, 23):                                   # he still sees in every evening hour
+        assert any(at(2026, 10, 8, h) <= t < at(2026, 10, 8, h) + 3600 for t, _ in made), h
+    assert made[-1][1] <= cap + 1e-9                             # and the day stays within the cap
+    assert spent(8) <= cap * costs.EYE_PACE_SLACK + 0.01         # the night (dreams) gets the slack only
+
+
+def test_eye_pacing_can_be_turned_off_and_leaves_the_other_caps_alone(tmp_path, monkeypatch):
+    monkeypatch.setenv("SUB01_EYE_PACE", "0")
+    led, made = _simulate_day(tmp_path)
+    capped_at = next(t for t, s in made if s >= costs.caps()["eye"] - 0.004)
+    assert capped_at < at(2026, 10, 8, 12)                       # unpaced, the worst case hits the cap by noon
+    monkeypatch.delenv("SUB01_EYE_PACE")
+    led = costs.Ledger(tmp_path / "d", clock=lambda: at(2026, 10, 8, 9))
+    assert led.pace_allowed("diary") == costs.caps()["diary"] and led.why_not("diary") is None
+
+
+def test_the_night_keeps_enough_frames_for_the_dream_diary(tmp_path):
+    """The diary is made of the night's frames (2026-10-05: 76, 2026-10-07: 71): before he wakes the slack must allow
+    at least 75 of them, however fast the dreams ask (every 5 s here), and the day still ends within the cap."""
+    led, made = _simulate_day(tmp_path, every_s=5)
+    night = [t for t, _ in made if t < at(2026, 10, 8, 8)]
+    assert len(night) >= 75
+    assert made[-1][1] <= costs.caps()["eye"] + 1e-9

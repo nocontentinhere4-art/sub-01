@@ -47,6 +47,9 @@ SCENES = {
     # since #104: `walking` true with `path` and `path_to` (before that the page treated him as already at the desk)
     "walking":  (life("research", "desk", "walking to the desk", reading=READING, walking=True, path=["desk"], path_to="desk"), "AWAKE", "door", None, None, "m_walk"),
     "window":   (life("window", "window", "looking out of the window"), "AWAKE", None, 1.5, "sill", "m_window"),
+    # lying awake on the bed with music on (#68), for the phone-camera test only (not in the shot sets)
+    "music":    (life("listen_music", "bed", "listening to music", music={"id": "qa", "title": "QA track", "artist": "QA", "playing": True}),
+                 "AWAKE", None, 3.0, "bedlie", None),
     # at the computer with a page on the screen, as the live server sends it once his walk there has ended (the caption:
     # "at the computer" only once the page has him seated; tests/visual/test_arrival.py)
     "computer": (life("research", "desk", "reading at the computer", reading=READING,
@@ -57,7 +60,7 @@ SCENES = {
 # reports these instead: the desk modes (desk_type_ik / desk_mouse_ik / desk_watch), the stand and the lie stills, the
 # recorded walk loop; eating plays room_eat, asleep he lies as room_bedtime ends (mh_sleep)
 MH_CLIP = {"desk": "desk_", "eating": "room_eat", "sleeping": "mh_sleep", "sleeping_side": "mh_sleep", "phone": "mh_lie",
-           "door": "mh_stand", "walking": "room_walk", "window": "mh_stand"}
+           "door": "mh_stand", "walking": "room_walk", "window": "mh_stand", "music": None}
 
 
 def makehuman_rig():
@@ -74,9 +77,12 @@ def makehuman_rig():
     return any(nd.get("name") == "metacarpal1.L" for nd in g.get("nodes", []))
 
 
-NATURAL_HOUR = {"computer": 14, "desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19}
+NATURAL_HOUR = {"computer": 14, "desk": 14, "eating": 19, "sleeping": 23, "sleeping_side": 23, "phone": 23, "door": 8, "walking": 8, "window": 19, "music": 23}
 HOURS = (8, 14, 19, 23)
 SIZES = {"1280": (1280, 800, False), "390": (390, 844, True)}
+SHOT_SIZES = ("1280", "390")                                  # the shot sets; the phone-camera test adds two more phones
+PHONE_SIZES = {"360": (360, 780, True), "430": (430, 932, True)}
+SIZES.update(PHONE_SIZES)
 
 # close-ups: name -> (scene to take it in, hour, JS camera recipe name in page_checks.js)
 CLOSEUPS = {
@@ -91,9 +97,9 @@ CLOSEUPS = {
     "night": ("sleeping", 23, "bed"),       # the same bed at night: what the dark room shows
     "side":  ("sleeping_side", 14, "bed"),  # asleep on his side under the duvet (#108)
 }
-CORE_SCENES = [s for s in SCENES if s not in ("sleeping_side", "computer")]   # the side pose: its close-up; the computer: test_arrival.py
+CORE_SCENES = [s for s in SCENES if s not in ("sleeping_side", "computer", "music")]   # the side pose: its close-up; the computer: test_arrival.py; music: test_phone_camera.py
 CORE_SHOTS = [(s, NATURAL_HOUR[s], "1280") for s in CORE_SCENES] + [("desk", 14, "390"), ("sleeping", 23, "390")]
-FULL_SHOTS = [(s, h, z) for s in CORE_SCENES for h in HOURS for z in SIZES] + [("sleeping_side", 23, "1280"), ("sleeping_side", 14, "390")]
+FULL_SHOTS = [(s, h, z) for s in CORE_SCENES for h in HOURS for z in SHOT_SIZES] + [("sleeping_side", 23, "1280"), ("sleeping_side", 14, "390")]
 
 
 # the brain page's per-region activity (214 regions of web/brain.json): a flat resting level, enough to colour the fibres
