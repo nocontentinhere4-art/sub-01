@@ -21,8 +21,8 @@ Measured (measure.py, whole clip; plane = his lowest torso point):
 
 | | legs vs plane, this morning | v2 | anything below plane | hands in body |
 |---|---|---|---|---|
-| sleep_back | +1.6 … +1.8 cm, knees up | 0 … +0.1 cm, legs on it | **0** | 0 / 0 |
-| sleep_back_idle | +0.5 cm, knees up | −0.1 … +0.6 cm | **0.1 cm** | 0 / 0 |
+| sleep_back | +0.7 … +1.0 cm, knees up | 0 … +0.1 cm, legs on it | **0** | 0 / 0 |
+| sleep_back_idle | +0.6 cm, knees up | −0.1 … +0.6 cm | **0.1 cm** | 0 / 0 |
 | sleep_roll_to_back | −2.1 … +1.4 cm (side part) | −2.1 … +1.4 cm (same) | 2.1 cm (as this morning, side part) | 0 / 0 |
 
 **Not done:** the page's room pass with place_dx applied; it needs G14's bedPlace change.
