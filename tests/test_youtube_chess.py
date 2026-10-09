@@ -426,7 +426,7 @@ def test_at_most_one_chess_game_an_hour_and_no_videos_without_a_browser():
     lf.hear("let's play chess", NOON)
     assert lf.desire("play_chess", NOON) > 0
     lf.start("play_chess", NOON, "test")
-    assert not lf.chess_ok(NOON + 3599) and lf.chess_ok(NOON + 3600)
+    assert not lf.chess_ok(NOON + 3599) and not lf.chess_ok(NOON + 3600) and lf.chess_ok(NOON + 86400)   # one a day (L1)
     for seed in range(200):
         lf.rng = random.Random(seed)
         lf.hear("chess chess", NOON + 1800)
