@@ -1,4 +1,4 @@
-LATEST: test fixes for main 01f3a0d → `docs/qa/test-fixes/0001-viewer-state-in-init_sockets.patch` (one commit, `git am`-ready; not pushed to preview/test-fixes: pushing another branch needs the owner's explicit OK). UI QA loop on preview/interactive keeps publishing to `docs/qa/ui-simple/`.
+LATEST: test fixes for main 01f3a0d → commit 46f6e71 on preview/sova-phone-src (origin/main merged in first, 5fc23a0; the fix is its own commit, cause in its message). The 3 tests + test_interactive: 20 passed; smoke_demo: SMOKE OK. The patch file in docs/qa/test-fixes/ is the same change.
 
 ## Test fixes on main 01f3a0d (all 3 from the interactive merge)
 - **One cause for all three:**
