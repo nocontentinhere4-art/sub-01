@@ -18,3 +18,9 @@
 - Phones: the bar, the room (55vh), the reactions pill, one compact vote card ("What next?", time left, 3 short rows, "one vote each"), and a fixed bottom chat bar. Its ••• opens a sheet with Chat history · Teach · More. No tab row.
 - Desktop keeps the tabbed panel under the bar; the vote explainer is gone there too.
 - Checked at 1280, 430, 390 and 360: no horizontal scroll, no console errors. test_interactive, test_desk_states, test_char_mixamo: 24 passed; smoke OK; test_phone_camera: 6 passed.
+
+## Desktop 1280×800 check (reported black canvas, "reading 'reset'" / "reading 'length'")
+Not reproduced on `0dfbfdd`, which contains `107961b`. What was run:
+- `live_server.py --demo` at real time (11:39 Tokyo, him out walking) and at 21:00 (on the bed), with `/` and with `/?debug`: no page errors and no console errors in 25 s, and the room renders under the bar (`desktop_1280_v2_25s.png`, `desktop_1280_v2_25s_2100.png`).
+- `tests/visual/test_visual.py::test_room_renders_without_hard_errors` checks for JS errors and a blank canvas at 1280. It found no JS error and no blank canvas. Its one remaining item is the desk-penetration item in `walking_8_1280`, which also fails on the base `96d6cad`.
+- Both messages come from the animation code (`.reset()` on an action, `.length` on clip data). If a clip GLB fails to load, its action is undefined. That points to failed or slow asset loads in the run that saw it, not to the bar or layout code; the code that is new in v2 doesn't call either.
