@@ -448,6 +448,15 @@
    "hands_in_body_after_fit_cm": {
     "Left": 0.0,
     "Right": 0.9
+   },
+   "version": "v2",
+   "place_dx": 0.0,
+   "v2": {
+    "legs": "knees down: the leg bones 90% toward straight, then the thighs turned until the calves and heels rest on the mattress (refit_back.py)",
+    "place": "frame 0 (on his side) stays where the page puts it; during the roll he moves 0.14 m up the bed in the clip, so the end matches sleep_back placed with its place_dx. place_dx: metres toward the headboard to add to bedPlace (the page anchors frame 0's hips, so a shift inside the clip cancels out).",
+    "back_and_head": "the back already lies flat (upper back at the buttocks' level) and the head at the pillow's height (12 cm over his back): the propped look was the head off the pillow's edge, fixed by place_dx",
+    "render": "mattina/sleep_back_v2.mp4",
+    "legs_floor": "the roll's legs no deeper than this morning's (legs_floor.py)"
    }
   },
   {
@@ -491,6 +500,14 @@
    "hands_in_body_after_fit_cm": {
     "Left": 0.0,
     "Right": 0.0
+   },
+   "version": "v2",
+   "place_dx": 0.14,
+   "v2": {
+    "legs": "knees down: the leg bones 90% toward straight, then the thighs turned until the calves and heels rest on the mattress (refit_back.py)",
+    "place": "his head lies 0.51 m from the hips along the bed: anchored at BED.hips it lands at x -1.41, the pillow's foot edge; 0.14 m toward the headboard puts it at -1.55, on the pillow's top. place_dx: metres toward the headboard to add to bedPlace (the page anchors frame 0's hips, so a shift inside the clip cancels out).",
+    "back_and_head": "the back already lies flat (upper back at the buttocks' level) and the head at the pillow's height (12 cm over his back): the propped look was the head off the pillow's edge, fixed by place_dx",
+    "render": "mattina/sleep_back_v2.mp4"
    }
   },
   {
@@ -535,7 +552,14 @@
     "Left": 1.6,
     "Right": 0.0
    },
-   "place_note": "feet 5.6 cm past the mattress end with the page bedPlace (hips at BED.hips): place this slot 6 cm toward the headboard (BED.hips x -0.06); a hips shift inside the clip would be cancelled by bedPlace"
+   "version": "v2",
+   "place_dx": 0.26,
+   "v2": {
+    "legs": "knees down: the leg bones 90% toward straight, then the thighs turned until the calves and heels rest on the mattress (refit_back.py)",
+    "place": "head 0.39 m from the hips: 0.26 m toward the headboard puts it on the pillow (and takes the feet off the mattress end). place_dx: metres toward the headboard to add to bedPlace (the page anchors frame 0's hips, so a shift inside the clip cancels out).",
+    "back_and_head": "the back already lies flat (upper back at the buttocks' level) and the head at the pillow's height (12 cm over his back): the propped look was the head off the pillow's edge, fixed by place_dx",
+    "render": "mattina/sleep_back_v2.mp4"
+   }
   },
   {
    "slug": "sleep_wake_and_back",
