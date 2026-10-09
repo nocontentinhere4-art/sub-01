@@ -270,6 +270,12 @@
   .card .m { font-size:13px; } .card .t { font-size:14px; }
   #votecard:not([hidden]) + .empty { display:none; }
   .empty { color:var(--dim); font-size:13px; }
+  #votecard .how { margin-top:10px; font-size:11px; color:var(--dim); }
+  #votecard .how summary { cursor:pointer; list-style:none; min-height:32px; display:flex; align-items:center; flex-wrap:wrap; gap:0 4px; }
+  #votecard .how summary::-webkit-details-marker { display:none; }
+  #votecard .how summary span { color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--faint); }
+  #votecard .how[open] summary span::after { content:" ▴"; } #votecard .how summary span::after { content:" ▾"; }
+  #votecard .how .s { margin-top:4px; }
   #votecard .opt { min-height:52px; font-size:13px; margin-top:8px; border-radius:var(--r); padding:12px 14px; }
   #votecard .opt .bar { background:rgba(255,154,60,.18); }
   /* More: collapsible sections (tap the label) */
@@ -310,7 +316,7 @@
     #story { font-size:15px; margin-top:6px; }
     #tools { margin-top:8px; } #cam { display:none; }
     #today { width:calc(100vw - 32px); }
-    #side { position:static; width:auto; max-height:none; margin:56vh 0 0; padding-top:26px; border:0; border-radius:var(--r) var(--r) 0 0; overflow:visible;
+    #side { position:static; width:auto; max-height:none; margin:56vh 0 0; padding-top:4px; border:0; border-radius:var(--r) var(--r) 0 0; overflow:visible;
       background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none; }
     #tabs { position:sticky; top:0; z-index:3; margin:0 12px; padding:10px 0; background:var(--bg); border-bottom:0; }
     #tabs { gap:0; } #tabs button { border:1px solid var(--line); border-radius:0; background:var(--card2); }
@@ -327,8 +333,12 @@
     #chat { position:fixed; left:0; right:0; bottom:0; z-index:7; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
       background:rgba(8,8,11,.94); border-top:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
     body:not([data-tab="chat"]) #chat { display:none; }
-    body[data-tab="chat"] .pane[data-pane="chat"] { padding-bottom:96px; }
-    #rxpill { position:absolute; left:50%; top:calc(56vh - 30px); bottom:auto; max-width:calc(100vw - 24px); }
+    body[data-tab="chat"] .pane[data-pane="chat"] { padding-bottom:160px; }
+    /* phones: the pill stays on screen on every tab (fixed at the bottom; above the chat input on the Chat tab) */
+    #rxpill { position:fixed; left:50%; top:auto; bottom:calc(12px + env(safe-area-inset-bottom)); max-width:calc(100vw - 24px);
+      background:rgba(10,10,16,.9); }
+    body[data-tab="chat"] #rxpill { bottom:calc(76px + env(safe-area-inset-bottom)); }
+    .pane { padding-bottom:96px; }
     #rx button { width:40px; height:44px; font-size:18px; }
     #viewers { font-size:10.5px; padding:0 8px 0 4px; }
   }
@@ -364,8 +374,9 @@
     <div id="v-opts"></div>
     <div class="s" id="v-note">one vote per viewer per round</div>
     <div class="s" id="v-last" hidden></div>
-    <div class="s">When the round ends, the most-voted option goes to his activity model as a strong nudge. Needs such as
-      food and sleep still come first; if he is asleep, it waits until he wakes. A tie goes to the option listed first.</div>
+    <details class="how"><summary>The winner nudges what he does next · <span>how it works</span></summary>
+      <div class="s">When the round ends, the most-voted option goes to his activity model as a strong nudge. Needs such as
+      food and sleep still come first; if he is asleep, it waits until he wakes. A tie goes to the option listed first.</div></details>
   </div>
   <div class="card empty">The first round opens in a moment.</div>
   </section>

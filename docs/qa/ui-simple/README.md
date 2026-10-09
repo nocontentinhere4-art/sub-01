@@ -7,3 +7,7 @@
 - **Choices made here:** every element id and all JS are kept (cards moved, not renamed), with one card style and one 12 px radius. Checks before the first push: no console errors (desktop, 390 px); test_interactive, test_desk_states, test_char_mixamo: 24 passed; smoke OK. tests/visual/test_phone_camera: **6 passed** with the new header (`hudBand()` reads `#top`; the today popover is absolutely positioned and doesn't change its height). No console errors on any tab at 1280×800 or 390×844, and no horizontal scroll.
 
 - **360 px:** checked on the Vote, Chat and More tabs: no horizontal scroll, no console errors. The reactions pill fits with its viewer count (34 px emoji below 380 px). More draws a divider only between sections that are shown.
+- **Polish (after e79f243):**
+  - Phones: the reactions pill is fixed at the bottom of the screen on every tab, above the chat input on Chat. It used to sit at the room's edge and scrolled away with the page. The panes leave room under it.
+  - The vote explainer is one line, "The winner nudges what he does next · how it works ▾", with the full rule behind the fold.
+  - Checked at 390 and 360 px on Vote, Teach and Chat, at the top and scrolled: no horizontal scroll, no errors.
