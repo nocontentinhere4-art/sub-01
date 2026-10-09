@@ -1,4 +1,32 @@
-LATEST: 4ba066a — **bed_phone_lift v2** in `docs/qa/sova/mattina/bed/bed_phone_lift.glb` (+ 10 s render `mattina/bed_phone_lift_v2.mp4`): legs on the mattress, 0 into the mattress and 0 in the body.
+LATEST: c312689 — **back sleeping refit** (`mattina/bed/sleep_back.glb`, `sleep_back_idle.glb`, `sleep_roll_to_back.glb`, render `mattina/sleep_back_v2.mp4`): knees down, legs on the mattress, 0 into the mattress. **G14: apply `place_dx` from `mattina/bed/index.json` in bedPlace** (0.14 m sleep_back, 0.26 m sleep_back_idle, toward the headboard), or the head stays off the pillow. bed_phone_lift v2: 4ba066a.
+
+## Sleeping on his back — c312689
+What was wrong, measured in the clips (G14's sleep_duvet_sheet):
+- **The knees were up:** sleep_back's left knee joint 47 cm over his back (bent 99°, thigh up 41°). That is the duvet's mound.
+- **The back and head were not propped.** The upper back already lies at the buttocks' level, and the back of the head 12 cm over his back, the pillow's height (top 0.95 m in the room over the 0.82 m mattress).
+- **The head was off the pillow.** The page anchors frame 0's hips at BED.hips (x −0.90), and the head lies only **0.51 m** from them along the bed (sleep_back_idle **0.39 m**). So the head lands at x −1.41 (idle −1.29), the pillow's foot edge (the pillow spans −1.80 … −1.36, highest at −1.55): hanging at pillow height over nothing reads as propped.
+
+What changed:
+- **Clips** (`refit_back.py`, MATTINA settings, no hands pass): the leg bones go 90% toward straight, then both thighs turn until the calves and heels rest on the mattress, not under it.
+  - Knees: left bent 99° → 11°, thigh 41° → 5°.
+  - Highest shin point over his back: 52 → 28 cm (sleep_back), 32 → 27 cm (idle).
+- **Placement** (needs the page): `place_dx` in `mattina/bed/index.json`, metres toward the headboard to add in bedPlace: **sleep_back 0.14, sleep_back_idle 0.26**. The head then sits at x −1.55, on the pillow's top. A shift inside the clip cancels out, because the page anchors the hips. The idle shift also takes its feet off the mattress end (they were 5.6 cm past it).
+- **sleep_roll_to_back:**
+  - frame 0 (on his side, head on the pillow) is unchanged, so the page's anchor is the same;
+  - as he turns onto his back he moves 0.144 m up the bed in the clip, so the end lines up with sleep_back placed with its place_dx;
+  - knees down on the back part;
+  - the side part's legs are no deeper than this morning's (`legs_floor.py`).
+
+Measured (measure.py, whole clip; plane = his lowest torso point):
+
+| | legs vs plane, this morning | v2 | anything below plane | hands in body |
+|---|---|---|---|---|
+| sleep_back | +1.6 … +1.8 cm, knees up | 0 … +0.1 cm, legs on it | **0** | 0 / 0 |
+| sleep_back_idle | +0.5 cm, knees up | −0.1 … +0.6 cm | **0.1 cm** | 0 / 0 |
+| sleep_roll_to_back | −2.1 … +1.4 cm (side part) | −2.1 … +1.4 cm (same) | 2.1 cm (as this morning, side part) | 0 / 0 |
+
+**Not done:** the page's room pass with place_dx applied; it needs G14's bedPlace change.
+
 
 ## bed_phone_lift v2 (for the bed layer) — 4ba066a
 The source (IN BED 03 A) lies back **across** a bed with its feet on the floor. Laid along our mattress, the calves hung 31–33 cm into it (G14: 7122 sampled vertices).
