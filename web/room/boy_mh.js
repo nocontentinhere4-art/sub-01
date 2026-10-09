@@ -1435,7 +1435,8 @@ export function createMH(env) {
     const a = M.actions["sv_" + p.name]; if (!a) return null; return {a, from: p.from};
   }
   function svEvents(st) {                                     // what the page received since the last frame (wherever he is)
-    for (const m of env.deskEvents ? env.deskEvents() : []) { const was = SV.pick.chess; SV.pick.event(m, st.T);
+    for (const m of env.deskEvents ? env.deskEvents() : []) { const was = SV.pick.chess, r = SV.pick.event(m, st.T);
+      if (r && r.wave && !M.wave && M.mode === "desk_watch" && st.at === "desk" && !st.step && !M.ev) { M.wave = {t: 0}; M.respond = (M.respond || 0) + 1; M.log.push([+st.T.toFixed(2), "wave <glance"]); }   // (viewers' waves: he waves back at once, on top of whatever loop plays; wave() lets it be only while he sits watching)
       const c = SV.pick.chess; if (m && m.type === "chess" && c && c.turn === "his" && (!was || was.turn !== "his")) SV.turnAt = st.T; }
   }
   function svStep(st) {
@@ -1453,6 +1454,7 @@ export function createMH(env) {
       M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, fade: SV_EV_FADE, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
         SV.cur = n ? {name: q.name} : {name: "desk_watch"}; SV.since = T2; SV.until = T2 + (n ? q.hold : 4); return n; }};
       M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "") + " back " + back.toFixed(3)]);
+      if (p.why === "glance") M.respond = (M.respond || 0) + 1;   // (an answer to viewers: room/glance_cam.js turns the camera to him)
       return;
     }
     const n = svLoop(p), cur = st.current; if (!n || n.a === cur) { SV.until = T + p.hold; return; }   // (already playing: no restart)
@@ -1953,9 +1955,32 @@ export function createMH(env) {
     if (M.mode) hands(dt);
     if ((st.at === "desk" || (st.step && st.step.to === "desk")) && !(M.mode && M.w.type + M.w.mouse > 0.01)) { env.boy.updateMatrixWorld(true); eatReach(st, dt); deskClear("Left", dt); deskClear("Right", dt); }
     else if (CLR.Left || CLR.Right) { env.boy.updateMatrixWorld(true); clearRelease("Left", dt); clearRelease("Right", dt); }   // (the keys or the mouse take over: the swing lets go gently)
+    wave(st, dt);
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
+  }
+  // a short wave of his right hand toward the viewers (viewers' reactions spiked, mostly waves: desk_states.js GLANCE),
+  // seated and watching only, drawn on top of the seated loop: the upper arm out and forward, the forearm up, the hand
+  // swung side to side a few times, then back down. Anything else (typing, the mouse, a reaction, getting up) fades it out
+  const WAVE = {in: 0.45, hold: 1.8, out: 0.55, hz: 2.2, amp: 0.35};
+  function wave(st, dt) {
+    const W = M.wave; if (!W) return;
+    const B = env.bones, ua = B.RightArm, fa = B.RightForeArm, hd = B.RightHand, k3 = S("Right", 3, 1); if (!ua || !fa || !hd || !B.LeftArm) { M.wave = null; return; }
+    const ok = st.at === "desk" && !st.step && M.mode === "desk_watch" && !M.ev && !M.sc;
+    if (!ok && W.t < WAVE.in + WAVE.hold) W.t = WAVE.in + WAVE.hold + WAVE.out * (1 - Math.min(1, W.t / WAVE.in));   // (stopped early: straight to the way down, from where it is)
+    W.t += dt; const t = W.t, sm = u => u * u * (3 - 2 * u), L = WAVE.in + WAVE.hold + WAVE.out;
+    if (t >= L) { M.wave = null; return; }
+    const w = t < WAVE.in ? sm(t / WAVE.in) : t < WAVE.in + WAVE.hold ? 1 : sm(1 - (t - WAVE.in - WAVE.hold) / WAVE.out);
+    env.boy.updateMatrixWorld(true);
+    const f = fwdV(), up = V(0, 1, 0), r = ua.getWorldPosition(V()).sub(B.LeftArm.getWorldPosition(V())).setY(0).normalize();   // (his right, from his shoulders)
+    const sway = Math.sin(2 * Math.PI * WAVE.hz * Math.max(0, t - WAVE.in * 0.5)) * WAVE.amp * w;
+    const aim = (b, c, dir) => { const cur = c.getWorldPosition(V()).sub(b.getWorldPosition(V())).normalize();
+      const q = new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(cur, dir.clone().normalize()), w);
+      b.quaternion.copy(b.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(q.multiply(b.getWorldQuaternion(new THREE.Quaternion())))); b.updateMatrixWorld(true); };
+    aim(ua, fa, V().addScaledVector(r, 0.6).addScaledVector(f, 0.55).addScaledVector(up, 0.1));   // (the elbow out and forward, about shoulder height)
+    aim(fa, hd, V().addScaledVector(up, 1).addScaledVector(f, 0.15).addScaledVector(r, sway));     // (the forearm up, swaying)
+    if (k3) aim(hd, k3, V().addScaledVector(up, 1).addScaledVector(f, 0.1).addScaledVector(r, sway * 1.4));   // (the hand along it, a little more)
   }
   // ?debug: where the wrists are in the clip's frame (to check the pins), and the tips' clearance
   function dbg() {

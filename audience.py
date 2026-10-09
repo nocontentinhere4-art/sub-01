@@ -280,7 +280,7 @@ class Reactions:
         self.limit = TokenBucket(every, burst, clock)
         self.limit_ip = TokenBucket(REACT_IP_EVERY_S, REACT_IP_BURST, clock)
         self.counts = [0] * len(REACTIONS)
-        self.recent = deque()                               # times of accepted reactions, the last SPIKE_S seconds
+        self.recent = deque()                               # (time, reaction index) of accepted reactions, the last SPIKE_S seconds
         self.last_glance = -1e18
         self.total = 0
 
@@ -297,7 +297,7 @@ class Reactions:
             self.limit_ip.allow(addr)
         self.counts[k] += 1
         self.total += 1
-        self.recent.append(self.clock())
+        self.recent.append((self.clock(), k))
         return True, ""
 
     def drain(self):
@@ -308,12 +308,17 @@ class Reactions:
         return out
 
     def glance_due(self):
-        """True once when reactions spike (SPIKE_N within SPIKE_S), at most every GLANCE_EVERY_S."""
+        """Once when reactions spike (SPIKE_N within SPIKE_S), at most every GLANCE_EVERY_S: the spike's dominant reaction
+        (the emoji most sent in it; a tie goes to the latest of them), which picks how he answers; else None."""
         now = self.clock()
-        while self.recent and now - self.recent[0] > SPIKE_S:
+        while self.recent and now - self.recent[0][0] > SPIKE_S:
             self.recent.popleft()
         if len(self.recent) >= SPIKE_N and now - self.last_glance >= GLANCE_EVERY_S:
+            n, last = [0] * len(REACTIONS), {}
+            for i, (_, k) in enumerate(self.recent):
+                n[k] += 1; last[k] = i
+            top = max(range(len(REACTIONS)), key=lambda k: (n[k], last.get(k, -1)))
             self.last_glance = now
             self.recent.clear()
-            return True
-        return False
+            return REACTIONS[top]
+        return None

@@ -535,6 +535,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { createGlance } from "./room/glance.js";
+import { createGlanceCam } from "./room/glance_cam.js";   // (the camera turns to him while he answers viewers)
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 // (bounding-volume trees for the room's meshes: the camera's collision casts rays into them every frame)
@@ -573,7 +574,7 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.35;
 const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 200);
-const GLANCE = createGlance(THREE);                   // he glances toward the camera when viewers' reactions spike
+const GLANCE = createGlance(THREE), GCAM = createGlanceCam(THREE);                   // he glances toward the camera when viewers' reactions spike
 if (DEBUG) window.GLANCE = GLANCE;
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.enablePan = false;
@@ -3661,7 +3662,7 @@ function frame(now){
     camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
   }
   shadows(now, moving);
-  controls.update(); keepClear(); renderer.render(scene, camera);
+  controls.update(); keepClear(); GCAM.apply(real, follow && performance.now() - userMovedAt > 20000, camera, controls, boy, bones); renderer.render(scene, camera); GCAM.restore(camera, controls);
 }
 requestAnimationFrame(frame);
 const CATCH = {max: 30, back: null};

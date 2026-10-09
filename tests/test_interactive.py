@@ -161,6 +161,20 @@ def test_reactions_summed_and_only_the_fixed_set():
     assert r.drain() is None
 
 
+def test_spike_glance_names_its_dominant_reaction():
+    """The glance carries the spike's most-sent reaction (it picks his answer: desk_states.js GLANCE); a tie goes to the
+    latest of the tied ones."""
+    clk = Clock(0.0)
+    r = Reactions(clock=clk)
+    for i, k in enumerate([2, 2, 2, 2, 0, 0, 1, 2, 5, 2]):              # mostly the laugh
+        r.react(f"v{i}", k)
+    assert r.glance_due() == "😂"
+    clk.t += 130
+    for i, k in enumerate([0, 0, 0, 0, 0, 4, 4, 4, 4, 4]):              # 5 waves, 5 claps: the claps came last
+        r.react(f"w{i}", k)
+    assert r.glance_due() == "👏"
+
+
 def test_spike_glance_at_most_once_per_2_min():
     clk = Clock(0.0)
     r = Reactions(clock=clk)

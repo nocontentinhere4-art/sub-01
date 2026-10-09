@@ -1624,8 +1624,10 @@ class Live:
         rx = self.reactions.drain()
         if rx:
             msg["rx"] = rx
-        if audience.glance_ok(self.engine.stage, msg.get("life")) and self.reactions.glance_due():   # (else it waits)
-            await self.broadcast({"type": "glance"})
+        if audience.glance_ok(self.engine.stage, msg.get("life")):   # (else it waits)
+            emoji = self.reactions.glance_due()
+            if emoji:
+                await self.broadcast({"type": "glance", "emoji": emoji})   # (the spike's dominant reaction: how he answers)
 
     def audience_hello(self, ws):
         if getattr(self, "votes", None) is None:               # a Live with only its websocket parts (as music, replies)
