@@ -1,4 +1,26 @@
-LATEST: UI QA of preview/interactive 107961b → `docs/qa/ui-simple/QA.md` + `qa_sheet.jpg` (per commit in `docs/qa/ui-simple/<sha>/`), newest commit only. On preview/sova-phone-src: pushing to preview/ui-simple-qa needs the owner's explicit OK.
+LATEST: 4ba066a — **bed_phone_lift v2** in `docs/qa/sova/mattina/bed/bed_phone_lift.glb` (+ 10 s render `mattina/bed_phone_lift_v2.mp4`): legs on the mattress, 0 into the mattress and 0 in the body.
+
+## bed_phone_lift v2 (for the bed layer) — 4ba066a
+The source (IN BED 03 A) lies back **across** a bed with its feet on the floor. Laid along our mattress, the calves hung 31–33 cm into it (G14: 7122 sampled vertices).
+
+Two changes on this morning's clip (MATTINA settings, no hands pass, body otherwise as baked):
+- **Legs** (`refit_lift.py`): sleep_back's lying legs (each bone's median); both thighs then turn 6–8° about the pelvis's side axis so they rest on the mattress.
+- **Phone arm** (`lift_arm.py`): lowered by his side, it sank up to 3.2 cm deeper than his back. On those frames only, the wrist lifts it (IK, the hand keeps its turn, the phone with it, eased), then the hand is cleared out of the torso. Three passes: 3.2 → 1.9 → 0.5 → 0 cm. The fingers are not touched.
+- Then `bed_build.py` as this morning: his lowest torso point on 0.66 m less 1.5 cm give.
+
+**Measured** on the whole clip (measure.py; plane = his lowest torso point, which already sinks the 1.5 cm give):
+
+| | this morning | v2 |
+|---|---|---|
+| legs vs that plane | −32.8 … −30.5 cm (into the mattress) | **+2.1 … +3.2 cm** (lying on it) |
+| lowest point of anything below the plane | 32.8 cm | **0.0** |
+| hands in his body | 0 | **0** (L / R) |
+| phone in his face | 0 (gap 8.3 cm) | 0 (gap 8.3 cm) |
+| fingers in the phone | 0.3 cm | 0.3 cm |
+| eye→screen | 21–68 cm | 21–68 cm |
+
+**Not done:** the page's room contact pass (contact_pass, bed lie) on v2. The mattress numbers above come from the clip's own frame.
+
 
 ## Test fixes on main 01f3a0d (all 3 from the interactive merge)
 - **One cause for all three:**
