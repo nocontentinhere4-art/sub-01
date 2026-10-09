@@ -7,6 +7,11 @@
 export const ENV = {in: 0.6, hold: 3.0, out: 0.8};          // (s)
 export const VIEW = {fwd: 0.55, side: 0.85, up: 0.12, dist: 1.15, face: 0.0, near: 0.55, margin: 0.3};   // (m; near: the closest it comes when something stands in the way; margin: kept from it - at 0.1 m from the room's wall its edge showed past where the room ends)   // the view: from his front and one side (m)
 
+// and lying on the bed with the phone (room/boy_mh.js's bed layer holds it), on a wide screen only: the follow camera keeps
+// its angle and slowly comes in toward him (the phone was a speck from the overview), and goes back out when he puts it
+// down; a glance answer still turns it to his face on top of that
+export const BED = {dist: 2.1, in: 3.0, out: 2.0};          // (m from his chest; s to come in, to go out)
+
 // the room's inside (room.html IN_ROOM: x -1.75..3.5, z -1.3..3.5), 0.2 m in from its walls
 export const ROOM = {x0: -1.55, x1: 3.3, z0: -1.1, z1: 3.3};
 
@@ -22,6 +27,7 @@ export const LENGTH = ENV.in + ENV.hold + ENV.out;
 
 export function createGlanceCam(THREE) {
   let t = -1, seen = null, side = 0, dist = VIEW.dist;
+  let wb = 0; const bt = new THREE.Vector3(), bd = new THREE.Vector3();
   const ray = new THREE.Raycaster();
   const P = new THREE.Vector3(), Q = new THREE.Vector3(), h = new THREE.Vector3(), c = new THREE.Vector3(), f = new THREE.Vector3(),
     r = new THREE.Vector3(), g = new THREE.Vector3(), at = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
@@ -35,6 +41,14 @@ export function createGlanceCam(THREE) {
       const M = globalThis.mh && globalThis.mh.M, n = M ? M.respond || 0 : 0;
       if (seen === null) seen = n;
       if (n !== seen) { seen = n; if (follows) { t = 0; side = 0; } }   // (a new answer: from the start)
+      // the bed's zoom: its weight eases in and out; the page's camera brought in along its own direction to BED.dist
+      const B = M && M.bed, onPhone = !!(B && B.cur && B.clips[B.cur] && B.clips[B.cur].phone);
+      wb = Math.max(0, Math.min(1, wb + (follows && onPhone && camera.aspect >= 1 && boy && boy.visible ? dt / BED.in : -dt / BED.out)));
+      if (wb > 0 && boy && bones.Head) { const k = wb * wb * (3 - 2 * wb);
+        if (!saved) { P.copy(camera.position); Q.copy(controls.target); saved = true; }
+        bones.Head.getWorldPosition(bt); (bones.Spine2 || bones.Spine02 || bones.Spine1 || bones.Spine01 || bones.Head).getWorldPosition(c); bt.lerp(c, 0.5);
+        bd.copy(camera.position).sub(controls.target); const d0 = bd.length(); bd.normalize();
+        controls.target.lerp(bt, k); camera.position.copy(controls.target).addScaledVector(bd, d0 + (Math.min(d0, BED.dist) - d0) * k); controls.update(); }
       if (t < 0) return;
       t += dt; if (t >= LENGTH || !follows || !boy || !boy.visible || !bones.Head) { t = -1; return; }
       const w = weightAt(t);
@@ -52,7 +66,7 @@ export function createGlanceCam(THREE) {
         c.copy(g).multiplyScalar(dist).add(at);                // left the camera outside, the dark beyond the wall in view)
         if (c.x > ROOM.x0 && c.x < ROOM.x1 && c.z > ROOM.z0 && c.z < ROOM.z1) break; }
       g.multiplyScalar(dist).add(at); g.y += VIEW.up;
-      P.copy(camera.position); Q.copy(controls.target); saved = true;
+      if (!saved) { P.copy(camera.position); Q.copy(controls.target); saved = true; }
       camera.position.lerp(g, w); controls.target.lerp(at, w); controls.update();
     },
     // after the render: the page's own camera back
