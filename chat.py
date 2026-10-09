@@ -43,7 +43,8 @@ SELF_HARM = ("kys", "kill yourself")
 HATE_SLURS = ("nigger", "nigga", "faggot", "fag", "kike", "spic", "chink", "gook", "wetback", "tranny", "retard",
               "dyke", "cunt", "whore", "slut")
 INSULTS = ("bitch", "bastard", "idiot", "moron", "imbecile", "stupid", "dumbass", "loser", "asshole", "dickhead",
-           "motherfucker", "fuck you", "fuck off", "stfu", "shut up", "piece of shit", "worthless", "pathetic", "ugly")
+           "motherfucker", "fuck you", "fuck yourself", "fuck u", "fuck off", "stfu", "shut up", "piece of shit",
+           "worthless", "pathetic", "ugly")
 SLURS = HATE_SLURS + SELF_HARM + INSULTS
 _slur_re = lambda words: re.compile(r"\b(" + "|".join(re.escape(w) for w in words) + r")(s|es|ed|ing|y|ic)?\b")  # noqa: E731
 SLUR_RE = _slur_re(SLURS)
@@ -133,6 +134,18 @@ def dedupe_key(text):
     return re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", text).lower())
 
 
+# the chat is on everyone's screen: trading/"get rich" pushes and adult requests are dropped (never stored or shown),
+# like the pages he may read (browse.MONEY_HYPE) - seen live 2026-10-09: "take a look on pump fun, and learn how to
+# trade like a pro", "when you wake up, look on fomo", "watch porno"
+HYPE = re.compile(r"\b(fomo( app)?|pump[\s.]?fun|pumpfun|crypto (trading|signals|gems?|calls?)|day ?trad(e|ing|er|ers)|forex|"
+                  r"scalp(ing|er|ers)|prop firms?|options trading|trad(e|ing) (like a pro|signals?|bots?|course|calls?|strategy)|"
+                  r"learn (how )?to trade|get rich|make (\$?\d[\d,.]*[kmb]?|millions?|thousands?|money) (fast|online|daily|"
+                  r"a day|with|from|on|trading)|passive income|100x|1000x|to the moon|financial freedom|airdrops?|presale|"
+                  r"whitelist|mint (is )?live|shill)\b", re.I)
+ADULT = re.compile(r"\b(porn\w*|xxx|nsfw|nudes?|naked|sex|sexual|hentai|onlyfans|strip(per|tease)?|blowjob|dick pics?|"
+                   r"cum|horny|boobs?|tits|pussy|cock)\b", re.I)
+
+
 def blocked(text, media=False):
     """Reason string if the message must be dropped, else None. media=True: a song or video title, shown as it is:
     no slur check, only self-harm prompts (MEDIA_RE) and calls to violence against a group (incitement); tickers only as coins
@@ -149,6 +162,10 @@ def blocked(text, media=False):
         return "no requests for money"
     if (MEDIA_RE if media else SLUR_RE).search(normalise(text)) or media and incitement(text):
         return "insults are not allowed"
+    if not media and HYPE.search(normalise(text)):
+        return "no trading or get-rich talk"
+    if not media and ADULT.search(normalise(text)):
+        return "keep it clean"
     return None
 
 
