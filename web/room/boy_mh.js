@@ -1641,8 +1641,11 @@ export function createMH(env) {
   // a body thicker than the clips' (v5: the hoodie, the thighs) sits higher on the seat: env.seatLift (m), seated at the
   // desk; it eases in and out over the sit-down and the stand-up (?debug: window.__seatLift overrides it)
   function seatLift(st) {
-    const L = window.__seatLift ?? env.seatLift ?? 0; if (!L) return;
     const s = st.step, t = s ? Math.min(1, Math.max(0, s.t || 0)) : 0;     // (a step's t runs 0 -> 1)
+    // sitting down onto the desk chair: a lift that peaks mid-way and is 0 at both ends (the seated pose is unchanged), for
+    // a character whose thighs brush the seat's front on the way down (env.sitBump, m; ?debug: window.__sitBump)
+    const SB = window.__sitBump ?? env.sitBump ?? 0; if (SB && s && s.k === "pose" && s.to === "desk") env.boy.position.y += SB * Math.sin(Math.PI * t);
+    const L = window.__seatLift ?? env.seatLift ?? 0; if (!L) return;
     const k = st.at === "desk" && (!s || s.k === "chair") ? 1 : s && s.k === "pose" && s.to === "desk" ? t : s && s.k === "pose" && st.at === "desk" ? 1 - t : 0;
     env.boy.position.y += L * k;
   }

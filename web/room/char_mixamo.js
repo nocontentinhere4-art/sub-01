@@ -97,4 +97,7 @@ export const ROOM = {
   // eating at the desk: how much further back he sits than for watching (boy_mh.js EAT_BACK, v5 0.05): room_eat on this
   // skeleton leans his chest 52 sampled vertices into the desk's edge at 0.05 m, none at 0.10 m (eating_19, 8 s sweep)
   eatBack: 0.10,
+  // sitting down at the desk (room_mx_stand_to_sit): the right thigh brushed the seat's front edge (1-7 sampled vertices
+  // for a few frames, walking_8); lifted by up to this much mid-way, 0 at both ends (boy_mh.js seatLift())
+  sitBump: 0.015,
 };
