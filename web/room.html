@@ -907,7 +907,7 @@ let V5 = null;                                        // (char_v5.js / char_mixa
   : load("room/boy.glb")).then(g => {
   boy = g.scene; scene.add(boy);                     // rigged in metres (1.72 m); the room is ~1 unit per metre
   boy.traverse(o => {
-    if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = !/_inside$/.test(o.name); o.receiveShadow = true;   // (the inside copies cast none: 425k skinned triangles less per shadow pass)
       const m = o.material; m.emissive.setRGB(0, 0, 0); m.emissiveIntensity = 0;   // was self-lit: let the room light him
       m.roughness = 0.78; m.envMapIntensity = 0.5; }
     if (o.isBone) bones[o.name] = o;
@@ -3570,12 +3570,12 @@ function adapt(now){
   } else goodFor = 0;
 }
 function setDpr(v){ dpr = v; renderer.setPixelRatio(dpr); resize(); }
-// shadow maps: only the boy (and the phone) cast shadows, so redraw them at most ~30x a second while he is in the room
+// shadow maps: only the boy (and the phone) move, so redraw them ~10x a second while he is in the room
 // (every drawn frame while he walks), once when he leaves, and the lamp's only while it is lit
 let shadowAt = 0, boyIn = null;
 function shadows(now, moving){
   const inRoom = !!(boy && boy.visible);
-  if (inRoom !== boyIn || (inRoom && (moving || now - shadowAt > 30))) {
+  if (inRoom !== boyIn || (inRoom && (moving || now - shadowAt > 100))) {   // seated: 10x a second (every drawn frame cost ~24 ms of JS pushing 137 casters)
     sun.shadow.needsUpdate = true; if (lamp.intensity > 0.01) lamp.shadow.needsUpdate = true; shadowAt = now; boyIn = inRoom;
   }
 }
