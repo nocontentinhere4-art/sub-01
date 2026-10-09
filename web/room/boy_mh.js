@@ -1842,18 +1842,18 @@ export function createMH(env) {
     H.position.add(H.parent.worldToLocal(w1).sub(H.parent.worldToLocal(w0)));
   }
   // the clothes' corrective shapes (G4's morph targets on the hoodie and the trousers: seated, elbow_L/R, lying), weighted
-  // each frame after the animation from the joints, by the drivers the file carries (extras.correctives)
+  // each frame after the animation from the joints, by the drivers the file carries (extras.correctives). The file is
+  // read for its header only when this body has shapes to drive (v5 and the Mixamo character have none: 983 KB saved)
   const CORR = {drivers: null, meshes: []};
-  fetch("room/boy.glb").then(r => r.arrayBuffer()).then(buf => {
+  env.boy.traverse(o => { if (o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences) CORR.meshes.push(o); });
+  if (CORR.meshes.length) fetch("room/boy.glb").then(r => r.arrayBuffer()).then(buf => {
     const dv = new DataView(buf), n = dv.getUint32(12, true);
     const js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, n)));
     CORR.drivers = ((js.extras || {}).correctives || {}).drivers || null;
   }).catch(() => {});
   const smooth = (a, b, x) => sstep(a, b, x), _cdn = V(), _c1 = V(), _c2 = V(), _c3 = V(), _c4 = V();
   function correctives() {
-    if (!CORR.drivers) return;
-    if (!CORR.meshes.length) env.boy.traverse(o => { if (o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences) CORR.meshes.push(o); });
-    if (!CORR.meshes.length) return;
+    if (!CORR.drivers || !CORR.meshes.length) return;
     const B = env.bones, p = (n, o) => B[n].getWorldPosition(o);   // (into a scratch vector: a dozen joints a frame)
     const down = p("Hips", _cdn).sub(p("neck", _c1)).normalize(), deg = (a, b) => THREE.MathUtils.radToDeg(a.angleTo(b)), w = {};
     for (const [name, d] of Object.entries(CORR.drivers)) {

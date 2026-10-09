@@ -17,6 +17,7 @@ No network is used besides the browser's own CDN fetches (three.js from jsdelivr
 """
 import argparse
 import asyncio
+import base64
 import json
 from pathlib import Path
 
@@ -36,6 +37,16 @@ API_EMPTY = {
     "/api/config": {"qa": True}, "/api/diary": {}, "/api/reading": {}, "/api/frames": [], "/api/browsing": {},
     "/api/screens": {}, "/api/tastes": {}, "/api/spiking/live": {},
 }
+# the screens' pictures (/api/screen/desk.jpg, /api/screen/phone.jpg, fetched for the monitor and the phone when a scene
+# has a page on them): one dark 1x1 JPEG, so a visual run logs no 404 when he sits at the computer
+SCREEN_JPG = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8a"
+    "Gi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQF"
+    "BgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNk"
+    "ZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEB"
+    "AQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZH"
+    "SElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oA"
+    "DAMBAAIRAxEAPwDg6KKKAP/Z")
 
 
 class State:
@@ -102,6 +113,9 @@ def make_app(state=None):
     async def api(request):
         return web.json_response(API_EMPTY[request.path])
 
+    async def screen_jpg(request):
+        return web.Response(body=SCREEN_JPG, content_type="image/jpeg")
+
     async def room(request):
         raise web.HTTPFound("/room.html" + (("?" + request.query_string) if request.query_string else ""))
 
@@ -111,6 +125,7 @@ def make_app(state=None):
     app.router.add_get("/mini-brain", mini_brain)              # the real /brain?mini page, for the harness's own PiP check
     for p in API_EMPTY:
         app.router.add_get(p, api)
+    app.router.add_get("/api/screen/{device}.jpg", screen_jpg)
     app.router.add_get("/", room)
     app.router.add_static("/", WEB)
     return app

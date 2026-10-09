@@ -928,6 +928,11 @@ let V5 = null;                                        // (char_v5.js / char_mixa
   scene.add(phone); makeProps(); tripoBottle();
   if (slidesInit()) { SLIDES.parked.visible = true;                 // its shader is built now, not when he first goes to bed
     renderer.compileAsync(SLIDES.parked, camera, scene).catch(() => {}).finally(() => { SLIDES.parked.visible = SLIDES.off; }); }
+  // the first rig's clips (boy_*.glb, and #76's boy_moves.glb after them) are that rig's: on the Mixamo character they
+  // cannot play (other bones; room/boy_mh.js takes every slot from room/mh_mx/ once he is in, and its interim actions did
+  // nothing useful), so they are not fetched (0.84 MB, and up to 60 s of waiting on them before boy_mh.js could start) and
+  // #76 counts as done at once; v5 and ?char=old load them as before
+  if (V5 && V5.mx) { movesOn = true; return; }
   Promise.all(Object.entries({sleep:"boy_sleep", eat:"boy_eat", hold:"boy_text", idle:"boy_idle", door:"boy_door", walk:"boy_walk"})
     .map(([name, file]) => load(`room/${file}.glb`).then(a => addClips(name, a.animations)).catch(() => {}))).then(loadMoves);
 }).catch(bootError);
@@ -1519,7 +1524,12 @@ function renderPlan(){
   put("p-reason", "hidden", !(steps.length && p.reason));
   put("p-rest", "hidden", !mindResting);
 }
+// a hidden tab polls nothing: a load that comes due while it is hidden (its interval, a socket message, the vote's clock)
+// is noted and runs once when the tab is seen again (the cards are up to date as it comes back, and not a byte sooner)
+const DUE = new Set(), unseen = f => document.hidden ? (DUE.add(f), true) : false;
+document.addEventListener("visibilitychange", () => { if (!document.hidden) for (const f of [...DUE]) { DUE.delete(f); f(); } });
 function loadMind(){
+  if (unseen(loadMind)) return;
   fetch("/api/mind").then(r => r.ok ? r.json() : null).then(d => {
     if (!d) return;
     const on = !!d.on;
@@ -3312,6 +3322,7 @@ const MEM_LABEL = {"after sleep": "tested after its compressed sleep, the same e
 const memWhen = d => d.label === "next day"
   ? `tested ${d.days_since > 1 ? d.days_since + " days" : "a day"} later, at the next session, after forgetting` : MEM_LABEL[d.label] || "";
 function loadMemory(){
+  if (unseen(loadMemory)) return;
   fetch("/api/memory").then(r => r.ok ? r.json() : null).then(d => {
     const items = d && d.items ? d.items.filter(x => x.source === "reading") : [];
     $("memcard").hidden = !items.length;
@@ -3342,6 +3353,7 @@ function taughtRow(it, gpu){
 }
 let taughtAt = 0;
 function loadTaught(){
+  if (unseen(loadTaught)) return;
   taughtAt = performance.now();
   fetch("/api/taught").then(r => r.ok ? r.json() : null).then(d => {
     if (!d) return;
@@ -3389,6 +3401,7 @@ function renderVote(){
   voteClock();
 }
 function voteClock(){
+  if (unseen(voteClock)) return;                          // (a hidden tab: the clock catches up as it comes back)
   if (!vote) { put("v-left", "textContent", ""); put("tab-left", "textContent", ""); return; }
   const s = Math.max(0, Math.round((voteEnds - performance.now()) / 1000));
   put("v-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)} h ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} min left`
@@ -3476,8 +3489,11 @@ function put(id, prop, v){ const k = id + "." + prop; if (shown.get(k) === v) re
 // one socket and one reconnect timer per page. The server answers {"type":"full"} and closes with 1013 when it has no
 // room for us (its per-address or total cap): the page says so and comes back after ~30 s, doubling to 2 min, with
 // jitter; any other drop: 1.5 s doubling to 30 s. The dot is lit only once the hello arrived; 20 s without a tick
-// while open is a dead connection (a phone that slept, a proxy that went away) and is dropped and redone
-let reTimer = 0, retry = 0, full = null, gotHello = false, tickAt = 0, tickWatch = 0;
+// while open is a dead connection (a phone that slept, a proxy that went away) and is dropped and redone. The 20 s are
+// counted on the drawn frames' clock (drawn: frame() adds each drawn frame's time, a second at most, so a main-thread
+// stall counts for a second and a hidden tab for nothing), and only once he is in the scene: a slow machine decoding
+// the character stalls the main thread for longer than that, and said "connection lost" while still booting
+let reTimer = 0, retry = 0, full = null, gotHello = false, tickAt = 0, tickWatch = 0, drawn = 0;
 const FULL_TXT = {ip:"too many tabs open on this address · retrying in a moment", all:"the room is full · retrying in a moment"},
       LOST_TXT = "connection lost · reconnecting…", SLOW_TXT = "cannot reach his room · still trying";
 function offline(text){ $("live").classList.remove("on"); $("story").textContent = text; put("chip", "textContent", "…");
@@ -3488,8 +3504,8 @@ function connect(){
   clearTimeout(reTimer); reTimer = 0;
   // ~5 ticks a second without the per-region brain arrays (a server that ignores the query sends every tick: still fine)
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=5&lite=1`);
-  gotHello = false; full = null; tickAt = performance.now();
-  clearInterval(tickWatch); tickWatch = setInterval(() => { if (sock === ws && gotHello && performance.now() - tickAt > 20000) { offline(LOST_TXT); ws.close(); } }, 5000);
+  gotHello = false; full = null; tickAt = drawn;
+  clearInterval(tickWatch); tickWatch = setInterval(() => { if (sock === ws && gotHello && boy && drawn - tickAt > 20000) { offline(LOST_TXT); ws.close(); } }, 5000);
   ws.onclose = ev => {
     if (sock !== ws) return;                                      // (an old socket closing after a new one opened)
     sock = null; clearInterval(tickWatch);
@@ -3503,7 +3519,7 @@ function connect(){
     const m = JSON.parse(e.data);
     if (m.type === "full") { full = m.why === "ip" ? "ip" : "all"; offline(FULL_TXT[full]); return; }
     if (m.type === "hello") { gotHello = true; $("live").classList.add("on"); }
-    if (m.type === "tick") { tickAt = performance.now(); retry = 0; }
+    if (m.type === "tick") { tickAt = drawn; retry = 0; }
     if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
@@ -3648,13 +3664,17 @@ function shadows(now, moving){
     sun.shadow.needsUpdate = true; if (lamp.intensity > 0.01) lamp.shadow.needsUpdate = true; shadowAt = now; boyIn = inRoom;
   }
 }
-let drawnAt = -1e9;
+let drawnAt = -1e9, booting = null;
 function frame(now){
   requestAnimationFrame(frame);                                   // (still every display tick: a hidden tab pauses as before)
+  // booting (he is not in the scene yet): at most 5 frames a second and the lowest resolution, so the character's decode
+  // gets the main thread (full frames of the empty room starved it: he was in at 67 s against ~9 s of network, measured);
+  // his first frame restores the cap and the resolution, and adapt() takes it from there. The boot bar is the loader's
+  if (!boy !== booting) { booting = !boy; if (dpr !== (booting ? DPR_MIN : DPR_MAX)) setDpr(booting ? DPR_MIN : DPR_MAX); }
   // at most 30 frames a second: a 60/120 Hz display skips every other/three ticks; a skipped tick does not read the
   // clock, so its time goes to the next drawn frame and he moves at real speed (a Mac drew 60 fps and overheated)
-  if (now - drawnAt < FRAME_MS - 2) return;
-  drawnAt = now;
+  if (now - drawnAt < (booting ? 200 : FRAME_MS) - 2) return;
+  drawn += Math.min(1000, now - drawnAt); drawnAt = now;           // (the drawn frames' clock: the socket's watchdog runs on it)
   const late = clock.getDelta();                                  // (read on every drawn tick: a frozen page's time is not caught up)
   if (document.hidden || (DEBUG && window.FREEZE)) return;       // ?debug: FREEZE and step the simulation with sim()
   adapt(now);
