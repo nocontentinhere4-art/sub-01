@@ -182,7 +182,7 @@ GAMBLING_PROMO = re.compile(r"\b(online casinos?|casino bonus(es)?|free spins?|n
 # money-making and trading promotion (owner rules: no financial advice or buy pressure, no Fomo / trading on the monitor;
 # live 2026-10-09 09:03 Tokyo: "How to make millions on FOMO app", "Prop Firm Scalper ... Made $2.5+ Million"): never
 # searched, opened or shown, as a page, a video or a song; plain finance words ("Stockholm", "stock photo") pass
-MONEY_HYPE = re.compile(r"\b(fomo app|pump\.fun|memecoins?|meme coins?|altcoins?|crypto (trading|signals|gems?)|day ?trad(ing|er|ers)|forex|scalp(ing|er|ers)|prop firms?|ict trader|options trading|trading (strategy|signals|bot|course)|get rich|make (\$?\d[\d,.]*[kmb]?|millions?|thousands?|money) (fast|online|daily|a day|with|from|on|trading)|how to make (millions?|money|\$\d)|passive income|100x|1000x|to the moon|financial freedom)\b", re.I)
+MONEY_HYPE = re.compile(r"\b(fomo app|pump\.fun|crypto (trading|signals|gems?)|day ?trad(ing|er|ers)|forex|scalp(ing|er|ers)|prop firms?|ict trader|options trading|trading (strategy|signals|bot|course)|get rich|make (\$?\d[\d,.]*[kmb]?|millions?|thousands?|money) (fast|online|daily|a day|with|from|on|trading)|how to make (millions?|money|\$\d)|passive income|100x|1000x|to the moon|financial freedom)\b", re.I)
 BOT_WALL = re.compile(r"attention required|just a moment|access denied|are you a (robot|human)|verify you are human|"
                       r"checking your browser|pardon our interruption|access to this page has been denied|"
                       r"ddos-guard|please wait while we verify|"
