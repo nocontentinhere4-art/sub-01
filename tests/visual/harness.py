@@ -312,7 +312,7 @@ class Harness:
         # the room's own embed: what URL it loads (#116: /brain?mini, without neurons=1)
         with urllib.request.urlopen(self.base + "/room.html", timeout=30) as resp:
             room_html = resp.read().decode("utf-8", "replace")
-        m = re.search(r'<a id="brainpip"[^>]*>\s*<iframe[^>]*\ssrc="([^"]*)"', room_html)
+        m = re.search(r'<a id="brainpip"[^>]*>\s*<iframe[^>]*\s(?:data-)?src="([^"]*)"', room_html)
         embed_src = m.group(1) if m else None
         pg.goto(self.base + PIP_URL, wait_until="load")
         try:

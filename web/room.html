@@ -128,6 +128,7 @@
   #brainpip:hover { border-color:rgba(255,255,255,.22); }
   #brainpip iframe { width:100%; height:100%; border:0; pointer-events:none; }
   #brainpip span { position:absolute; left:10px; bottom:8px; font-size:10px; letter-spacing:.08em; color:#c6c6d4; text-shadow:0 1px 4px #000; }
+  #brainpip.still { background:radial-gradient(circle at 50% 45%, rgba(255,140,60,.28), rgba(10,10,14,.9) 70%); }
   #brainpip span::before { content:"◉ "; color:var(--st); }
   #honest a { color:var(--dim); white-space:nowrap; } #honest a:hover { color:var(--fg); }
   /* one line on desktop: the text is cut with an ellipsis, the /about link stays visible; hover or focus shows it all */
@@ -438,7 +439,7 @@
 </div>
 
 <div id="corner">
-<a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
+<a id="brainpip" href="/brain" title="open the brain"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
 </div>
 <div id="rxpill">
   <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
@@ -481,14 +482,24 @@ const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t
 
 // ---------- renderer, scene, camera ----------
 const host = $("scene");
-const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
-const DPR_MAX = Math.min(1.5, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, devicePixelRatio > 1 ? 1 : 0.75);   // adaptive, see adapt()
+// a weak computer (a viewer, 2026-10-09: "it makes my computer want to crash and my browser freeze"): little memory,
+// few cores or a software/integrated GPU get a lighter room - 1x pixels, no shadows, no live brain beside it.
+// ?lite forces it, ?full turns it off, headless checks always draw the full room; adapt() lightens it later if frames stay slow
+const QS = new URLSearchParams(location.search);
+const GPU = (() => { try { const g = document.createElement("canvas").getContext("webgl"), x = g && g.getExtension("WEBGL_debug_renderer_info");
+  const r = x ? String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)) : ""; const l = g && g.getExtension("WEBGL_lose_context"); if (l) l.loseContext();
+  return r; } catch (e) { return ""; } })();
+const LITE = QS.has("lite") || (!QS.has("full") && !navigator.webdriver && ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4 ||
+  /SwiftShader|llvmpipe|softpipe|Software|Microsoft Basic Render|Mali-4|Adreno \(TM\) [2-5]\d\d|Intel.*(HD Graphics [2-5]\d{3}|HD Graphics$|GMA)/i.test(GPU)));
+window.LITE = LITE;
+const renderer = new THREE.WebGLRenderer({antialias:!LITE, powerPreference:"high-performance"});
+const DPR_MAX = Math.min(LITE ? 1 : 1.5, devicePixelRatio), DPR_MIN = Math.min(DPR_MAX, devicePixelRatio > 1 ? 1 : 0.75);   // adaptive, see adapt()
 let dpr = DPR_MAX;
 renderer.setPixelRatio(dpr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !LITE;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;          // shadow maps are redrawn only when needed, see shadows()
 renderer.setClearColor(0x08080b);
 host.appendChild(renderer.domElement);
@@ -573,10 +584,10 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const progress = {};
 function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) => a + p[0], 0), t = v.reduce((a, p) => a + p[1], 0);
   const bar = $("boot-bar"); if (t && bar) bar.style.width = `${Math.round(100 * l / t)}%`; }
-// phones and tablets: textures over TEX_MAX are drawn down before they reach the GPU (iOS Safari closes the tab past
+// textures over TEX_MAX are drawn down before they reach the GPU (iOS Safari closes the tab past
 // a few hundred MB; the character's two 4096 maps alone were ~256 MB, the room ~170 MB)
 const TOUCH = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const TEX_MAX = TOUCH ? 1024 : Infinity;
+const TEX_MAX = TOUCH || LITE ? 1024 : 2048;   // desktops too: 4096 maps were ~425 MB of GPU memory
 function shrinkTextures(gltf){
   if (!isFinite(TEX_MAX)) return gltf;
   const done = new Set();
@@ -594,6 +605,17 @@ function shrinkTextures(gltf){
 }
 function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g)),
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
+// the live brain beside the room is a second 3D page (17 MB of fibres): it starts only once the room is up, and a weak
+// computer (or one that cannot hold the frame rate, see adapt()) gets a plain link instead
+function brainPip(after){
+  const f = document.querySelector("#brainpip iframe"); if (!f) return;
+  if (LITE) { brainOff(); return; }
+  setTimeout(() => { if (!LITE && f.isConnected && !f.src) f.src = f.dataset.src; }, after);
+}
+function brainOff(){
+  const a = $("brainpip"), f = a && a.querySelector("iframe"); if (!f) return;
+  f.remove(); a.classList.add("still");
+}
 function bootError(e){
   console.error(e); $("boot").classList.add("err");
   $("boot-t").innerHTML = `the room did not load (${esc(e && e.message || "network error")}).<br><button onclick="location.reload()">try again</button>`;
@@ -630,7 +652,7 @@ load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
       for (const k of ["map", "normalMap", "roughnessMap"]) if (m[k]) m[k].anisotropy = Math.min(8, aniso);
     });
   }
-  $("boot").classList.add("off"); setTimeout(() => $("boot").remove(), 800); buildSurfaces();
+  $("boot").classList.add("off"); setTimeout(() => $("boot").remove(), 800); buildSurfaces(); brainPip(4000);
 }).catch(bootError);
 function mergeBoxes(list){           // axis-aligned boxes [[x0,x1],[y0,y1],[z0,z1]] -> one geometry
   const pos = [], idx = [];
@@ -3527,7 +3549,7 @@ $("chat").addEventListener("submit", ev => {
 // ---------- loop ----------
 const clock = new THREE.Clock();
 // adaptive resolution: lower the pixel ratio while frames are slow, raise it again after a while of fast frames
-let frameAt = 0, winN = 0, winSum = 0, winMax = 0, goodFor = 0, dprFail = 1e9;
+let frameAt = 0, winN = 0, winSum = 0, winMax = 0, goodFor = 0, dprFail = 1e9, slowFor = 0;
 function adapt(now){
   const ms = now - frameAt; frameAt = now;
   if (!room || !boy || ms > 1000) { winN = winSum = winMax = 0; return; }   // loading, or back from a hidden tab
@@ -3536,6 +3558,8 @@ function adapt(now){
   const avg = (winSum - winMax) / (winN - 1); winN = winSum = winMax = 0;    // one hitch (a shader compile) is not "slow"
   if (avg > 26 && dpr > DPR_MIN) {                                    // under ~38 fps for a second
     dprFail = Math.min(dprFail, dpr); setDpr(Math.max(DPR_MIN, dpr - 0.25)); goodFor = 0;
+  } else if (avg > 50 && !navigator.webdriver && ++slowFor >= 3) {    // still under 20 fps at the lowest: lighten the room
+    slowFor = 0; brainOff(); if (renderer.shadowMap.enabled) { renderer.shadowMap.enabled = false; scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; }); }
   } else if (avg < 20 && dpr < DPR_MAX) {
     if (++goodFor >= (dpr + 0.25 >= dprFail ? 60 : 5)) { setDpr(Math.min(DPR_MAX, dpr + 0.25)); goodFor = 0; }   // retry a failed level after 1 min
   } else goodFor = 0;
@@ -3574,7 +3598,7 @@ function frame(now){
   controls.update(); keepClear(); GCAM.apply(real, follow && performance.now() - userMovedAt > 20000, camera, controls, boy, bones); renderer.render(scene, camera); GCAM.restore(camera, controls);
 }
 requestAnimationFrame(frame);
-const CATCH = {max: 30, back: null};
+const CATCH = {max: navigator.webdriver ? 30 : 2, back: null};   // (headless checks only: see frame())
 document.addEventListener("visibilitychange", () => { if (!document.hidden) CATCH.back = 8; });
 function animate(dt){                                // one step of him: clips, his plan, seats, life, the phone, the head
   untouch(); if (mixer) mixer.update(dt); T += dt;
