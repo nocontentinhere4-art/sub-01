@@ -526,7 +526,7 @@ export function createMH(env) {
   // (eased, preview/freeze-why-ease: the swing keeps last frame's way while that way still clears - the least angle
   // over all four flipped from 6 deg back to 7 deg forward in one frame mid-crossfade, a fingertip 147 mm - and it lets
   // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
-  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go)
+  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008, CLR_TURN = 0.12;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go)
   function deskClear(side, dt = 1 / 30) {
     const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
     const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
@@ -552,7 +552,17 @@ export function createMH(env) {
       let a = fade; if (inn() > CLR_SLACK) { let lo = 0, hi = fade; for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; set(axes[prev.k], prev.sg * m); if (inn() > CLR_SLACK) hi = m; else lo = m; } a = lo; }
       if (a > 0.003) best = {k: prev.k, sg: prev.sg, a};
     }
-    if (best) { set(axes[best.k], best.sg * best.a); M.clear.maxA = Math.max(M.clear.maxA || 0, best.a); } else set(lat, 0);
+    // a change of way (the last way no longer clears): the old swing hands over to the new one over CLR_TURN instead of
+    // at once (walking_8, riding in: back 21 deg to forward 22 deg in a frame, the left fingertip 378 mm); a little skin
+    // may stay in the slab for those frames
+    if (best && prev && (best.k !== prev.k || best.sg !== prev.sg)) { best.from = prev.from && prev.r < 1 ? prev.from : {k: prev.k, sg: prev.sg, a: prev.a}; best.r = 0; }
+    else if (best && prev && prev.from) { best.from = prev.from; best.r = prev.r; }
+    if (best && best.from) { best.r = Math.min(1, best.r + dt / CLR_TURN); const r = best.r * best.r * (3 - 2 * best.r);
+      ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(axes[best.k], best.sg * best.a * r).clone().multiply(new THREE.Quaternion().setFromAxisAngle(axes[best.from.k], best.from.sg * best.from.a * (1 - r))).multiply(w0));
+      ua.updateMatrixWorld(true); if (best.r >= 1) best.from = null; }
+    else if (best) set(axes[best.k], best.sg * best.a);
+    else set(lat, 0);
+    if (best) M.clear.maxA = Math.max(M.clear.maxA || 0, best.a);
     CLR[side] = best;
     if (M.clearLog) M.clearLog.push([side, +d0.toFixed(4), best ? best.k + (best.sg > 0 ? "+" : "-") : "none", best ? +(best.a * 57.3).toFixed(1) : 0]);   // (?debug)
   }
@@ -561,6 +571,17 @@ export function createMH(env) {
   // ahead of him (0.26 -> 0.40 m), it is taken to just over the dish instead; to the mouth and back the clip is as it was
   // ... the share follows the clip at most 1 / 0.5 s, and the hand goes to a point between the clip's and the dish's,
   // pinned at full weight (pin() is not linear in its weight: weighted, it leapt 20 cm in a frame as the share fell)
+  // the keys or the mouse taking over (their weight past 0.01) while an arm was swung out of the desk: the swing fades
+  // (~0.4 s) on top of the hands' solve instead of going at once (walking_8: sitting down, then the mouse - the left
+  // fingertip moved 188 mm in a frame as the swing went)
+  function clearRelease(side, dt) {
+    const p = CLR[side], ua = env.bones[side + "Arm"]; if (!p || !ua) return;
+    const a = p.a * Math.exp(-dt / 0.15); if (a < 0.003) { CLR[side] = null; return; }
+    const f = fwdV(), ax = p.k === "lat" ? V().crossVectors(f, _up1).normalize() : f;
+    const pq = ua.parent.getWorldQuaternion(new THREE.Quaternion()).invert(), w0 = ua.getWorldQuaternion(new THREE.Quaternion());
+    ua.quaternion.copy(pq).multiply(_rq.setFromAxisAngle(ax, p.sg * a).clone().multiply(w0)); ua.updateMatrixWorld(true);
+    CLR[side] = {k: p.k, sg: p.sg, a};
+  }
   M.eatReach = 0;                                            // (?debug: the share)
   function eatReach(st, dt) {
     const B = env.bones, eating = !!env.DISH_AT && st.at === "desk" && st.current === M.actions.act_eat;
@@ -1914,6 +1935,7 @@ export function createMH(env) {
     if (st.at === "desk" && !st.step) roll(dt); else { M.off = 0; M.held = null; M.rollAt = null; }   // (off the desk the page places him and the chair)
     if (M.mode) hands(dt);
     if ((st.at === "desk" || (st.step && st.step.to === "desk")) && !(M.mode && M.w.type + M.w.mouse > 0.01)) { env.boy.updateMatrixWorld(true); eatReach(st, dt); deskClear("Left", dt); deskClear("Right", dt); }
+    else if (CLR.Left || CLR.Right) { env.boy.updateMatrixWorld(true); clearRelease("Left", dt); clearRelease("Right", dt); }   // (the keys or the mouse take over: the swing lets go gently)
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
     return moving;
