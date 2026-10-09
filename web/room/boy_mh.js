@@ -526,7 +526,8 @@ export function createMH(env) {
   // (eased, preview/freeze-why-ease: the swing keeps last frame's way while that way still clears - the least angle
   // over all four flipped from 6 deg back to 7 deg forward in one frame mid-crossfade, a fingertip 147 mm - and it lets
   // go over ~0.25 s instead of at once; it still comes in at once, so no skin stays in the desk)
-  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008, CLR_TURN = 0.12;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go)
+  const CLR = {Left: null, Right: null}, CLR_OUT = 0.09, CLR_SLACK = 0.008, CLR_TURN = 0.12;   // (s: the release's time constant, ~0.25 s to nothing; m: in the slab while letting go; s: a change of way)
+  const WLIFT = {}, WLIFT_STEP = 0.04;                        // (weighted(): the wrist's lift over the desk, m, and its most per frame)
   function deskClear(side, dt = 1 / 30) {
     const ua = env.bones[side + "Arm"]; if (!ua || !env.bones[side + "Hand"] || M.noClear) return;   // (?debug: M.noClear)
     const inn = () => Math.max(armIn(side), handIn(side)), d0 = inn();
@@ -940,6 +941,22 @@ export function createMH(env) {
     const C = chainOf(side), q0 = C.map(b => b.quaternion.clone());
     solve(1);
     C.forEach((b, i) => b.quaternion.copy(q0[i].slerp(b.quaternion, w))); env.boy.updateMatrixWorld(true);
+    // the blend's way from the clip's hand to the solved one went through the desk (sitting down, then the mouse: both
+    // hands 13 frames in it, 500-940 sampled vertices): the wrist goes up over the desk's top on the way (the solve's own
+    // ends are out of it: at either end nothing is lifted)
+    if (M.noLift) return;                                    // (?debug)
+    // (the lift grows at most WLIFT_STEP a frame: all at once it popped the hand 8 cm up on the blend's first frame)
+    WLIFT[side] = WLIFT[side] || 0; let up = 0;
+    for (let k = 0; k < 2; k++) { const need = underTop(side); if (need <= 0.003) break; const d = Math.min(need + 0.01, WLIFT[side] + WLIFT_STEP - up); if (d <= 0) break; up += d; pin(side, V(0, d, 0), 1, null, {iters: 3}); }
+    WLIFT[side] = up; M.lifted = M.lifted || {}; M.lifted[side] = +up.toFixed(3);
+  }
+  function underTop(side) {                                  // how far the lowest of his hand's and forearm's skin in the desk is under its top (m)
+    handIn(side); foreIn(side); const D = deskCols(); if (!D) return 0; let need = 0;
+    for (const [o, n] of [...HANDSKIN[side], ...FORE[side]]) { o.getVertexPosition(n, _g).applyMatrix4(o.matrixWorld);
+      const i = Math.floor((_g.x - D.x0) / D.c), k = Math.floor((_g.z - D.z0) / D.c); if (i < 0 || k < 0 || i >= D.nx || k >= D.nz) continue;
+      const t = D.tops[i * D.nz + k] + (M.deskTest || 0); if (Number.isNaN(t) || _g.y >= t || _g.y < t - 0.15) continue;   // (anywhere in the desk's top 15 cm: deeper than its 3 cm slab too)
+      need = Math.max(need, t - _g.y); }
+    return need;
   }
   function mouseHold(w) {                                    // his hand from the take, placed so palm and fingertips meet the shell
     const F = omNow(); if (!F || !S("Right", 2, 1) || !S("Right", 3, 1) || !S("Right", 5, 1)) return; shellSync();   // (palmFrame needs the knuckles)
