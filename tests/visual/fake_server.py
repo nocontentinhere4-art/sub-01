@@ -56,6 +56,7 @@ class State:
         self.version = 0
         self.clients = set()
         self.hits = []          # every request path, for the test's own-origin 404 check
+        self.extra = []         # messages a test asked to send once, over the socket, before the next tick (Server.send)
 
 
 def make_app(state=None):
@@ -79,6 +80,9 @@ def make_app(state=None):
             await sock.send_json({"type": "hello", "chat": [], "replies": [], "music": None})
             seen = -1
             while not sock.closed:
+                for extra in st.extra:                        # (a glance, a chess result: what live_server broadcasts between ticks)
+                    await sock.send_json(extra)
+                st.extra = []
                 msg = S.tick(st.scene, st.hour)
                 if brain:
                     msg = dict(msg, act=S.ACT_FLAT, sync=0.4, groups={})
@@ -176,6 +180,13 @@ class Server:
             self.state.version += 1
         fut = asyncio.run_coroutine_threadsafe(_set(), self._loop)
         fut.result(5)
+
+    def send(self, msg):
+        """Send one message over the fake socket to every connected page (before its next tick), as live_server
+        broadcasts a glance or a chess result."""
+        async def _send():
+            self.state.extra.append(dict(msg))
+        asyncio.run_coroutine_threadsafe(_send(), self._loop).result(5)
 
 
 def main():

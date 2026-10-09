@@ -1464,7 +1464,7 @@ export function createMH(env) {
         env.HIPS["rare_" + k] = bodyHips(c); M.rare[k] = {pts: parts(c), dur: c.duration, sv: n}; }
       else { const a = M.actions["sv_" + n] = make(c); a.setLoop(THREE.LoopRepeat, Infinity); env.HIPS["sv_" + n] = bodyHips(c); loops.push("sv_" + n); }
     }
-    SV = {D, loops, cur: null, until: 0, since: 0, turnAt: null, look: SV_LOOK,
+    SV = {D, loops, cur: null, until: 0, since: 0, turnAt: null, look: SV_LOOK, waveUntil: null,   // (waveUntil: a viewers' wave asked for, until when)
       pick: D.createPicker({have, clipOf: n => clipOf[n], durOf: n => durOf[n], rng: env.rng || Math.random})};
     FREE.ys = Array.from({length: 30}, (_, i) => 0.03 + 0.05 * i);   // (the desk states: up to 1.48 m, the monitor's height too)
     SV.pick.S.lastClip = `${dir}/${CL.desk_watch}.glb`;      // (desk_watch's own clip counts as the one just played)
@@ -1484,8 +1484,15 @@ export function createMH(env) {
   }
   function svEvents(st) {                                     // what the page received since the last frame (wherever he is)
     for (const m of env.deskEvents ? env.deskEvents() : []) { const was = SV.pick.chess, r = SV.pick.event(m, st.T);
-      if (r && r.wave && !M.wave && M.mode === "desk_watch" && st.at === "desk" && !st.step && !M.ev) { M.wave = {t: 0}; M.respond = (M.respond || 0) + 1; M.log.push([+st.T.toFixed(2), "wave <glance"]); }   // (viewers' waves: he waves back at once, on top of whatever loop plays; wave() lets it be only while he sits watching)
+      if (r && r.wave) SV.waveUntil = st.T + SV.D.KEEP;       // (viewers' waves: a request with a deadline; svWave() starts it the first frame he sits watching)
       const c = SV.pick.chess; if (m && m.type === "chess" && c && c.turn === "his" && (!was || was.turn !== "his")) SV.turnAt = st.T; }
+    svWave(st);
+  }
+  function svWave(st) {                                       // the wave viewers asked for: on top of whatever loop plays, as soon as he sits
+    if (SV.waveUntil == null) return;                         // watching (wave() lets it be only then); not by its deadline: it lapses
+    if (st.T > SV.waveUntil) { SV.waveUntil = null; return; }
+    if (M.wave || M.mode !== "desk_watch" || st.at !== "desk" || st.step || M.ev) return;
+    SV.waveUntil = null; M.wave = {t: 0}; M.respond = (M.respond || 0) + 1; M.log.push([+st.T.toFixed(2), "wave <glance"]);
   }
   function svStep(st) {
     const T = st.T;
@@ -1494,6 +1501,8 @@ export function createMH(env) {
     if (!SV.cur) { SV.cur = {name: "desk_watch"}; SV.since = T; SV.until = T + 3 + 3 * (env.rng || Math.random)(); return; }   // (the mode's own loop first)
     if (T < SV.until && !(SV.pick.pending(T) && T - SV.since >= SV_MIN)) return;
     const p = SV.pick.next(T, mode); if (!p) { SV.until = T + 2; return; }
+    if (p.wave && !M.wave && SV.waveUntil == null) SV.waveUntil = T + 1;   // (the answer to a wave is a wave: asked again, in case the request lapsed while he typed)
+    if (p.why === "glance" && !p.wave) M.respond = (M.respond || 0) + 1;   // (an answer to viewers: room/glance_cam.js turns the camera to him; a wave counts itself)
     if (p.once) {                                             // a gesture or a reaction: once, through rareStep, then the next loop
       const k = "sv_" + p.name, R = M.rare[k], a = M.actions["rare_" + k]; if (!R || !a) return;
       // (a reaction rides at least SV_REACT_BACK back: its take's own frames clear the desk, but the crossfade from his hands
@@ -1502,7 +1511,6 @@ export function createMH(env) {
       M.ev = {k, a, t: 0, from: p.from, ride: back > 0 ? RIDE : 0, fade: SV_EV_FADE, R: {...R, dur, back}, then: () => { const T2 = env.state().T, q = SV.pick.loop(T2, mode), n = q && svLoop(q);
         SV.cur = n ? {name: q.name} : {name: "desk_watch"}; SV.since = T2; SV.until = T2 + (n ? q.hold : 4); return n; }};
       M.log.push([+T.toFixed(2), "sv:" + p.name + (p.why ? " <" + p.why : "") + " back " + back.toFixed(3)]);
-      if (p.why === "glance") M.respond = (M.respond || 0) + 1;   // (an answer to viewers: room/glance_cam.js turns the camera to him)
       return;
     }
     const n = svLoop(p), cur = st.current; if (!n || n.a === cur) { SV.until = T + p.hold; return; }   // (already playing: no restart)

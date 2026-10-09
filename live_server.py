@@ -828,9 +828,16 @@ class Live:
             print(f"memory: {dropped} blocked messages purged", flush=True)
 
     def client_ip(self, request):
+        """The address the rate limits and the vote's per-address cap key on. Behind the reverse proxy (--trust-proxy)
+        it is the entry the proxy itself appended to X-Forwarded-For: the rightmost one. Anything before it is what the
+        client sent in its own header (one hop: a client cannot choose its key by sending "X-Forwarded-For: 1.2.3.4").
+        X-Real-IP, when the proxy sets it instead, is that same address. Without --trust-proxy the headers are ignored.
+        A proxy chain of more than one trusted hop would need the trusted count configured; Railway adds one."""
         key = request.remote
-        if self.trust_proxy and request.headers.get("X-Forwarded-For"):
-            key = request.headers["X-Forwarded-For"].split(",")[0].strip()
+        if self.trust_proxy:
+            xff = [p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
+            real = request.headers.get("X-Real-IP", "").strip()
+            key = xff[-1] if xff else real or key
         return key
 
     def sleep_tick(self):
@@ -1292,13 +1299,17 @@ class Live:
         mood = {"boredom": self.life.boredom, "pressure": self.engine.pressure(t), "tired": self.engine.tired}
         gain = self.engine.gain
         topics = [Tastes.topics(o, page.get("title", "")) for o in opts]
-        tastes = [self.tastes.predict(tp) for tp in topics]
+        here = (self.pagewatch.cur or {}).get("topics")        # the page he is on: its taste is the leave row's (negated there)
+        tastes = [self.tastes.predict(here if here and o.get("action") == "leave" else tp, vote=True)
+                  for o, tp in zip(opts, topics)]
+        recent = list(getattr(self, "recent_picks", None) or [])   # repeat_key of the last choices: the repeat penalty
         clone = self.brain.clone()                            # snapshot on the event loop, simulated in a thread
         decider = getattr(self, "decider", None)
         sp = await decider.ask([o["label"] for o in opts], "browse") if decider else None   # GPU, else CPU, <= ~3.5 s
         dec = await loop.run_in_executor(None, lambda: brain_vote.vote(
-            clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng, spiking=sp))
+            clone, opts, gain, mood, tastes, [self.novel(o) for o in opts], self.vote_rng, spiking=sp, recent=recent))
         chosen = opts[dec["chosen"]]
+        self.recent_picks = (recent + [brain_vote.repeat_key(chosen)])[-brain_vote.REPEAT_N:]
         brain_vote.apply(self.brain, chosen, gain)             # the live brain receives the chosen stimulus
         act = {k: chosen.get(k) for k in ("action", "target", "label", "href")}
         if chosen.get("action") in brain_vote.VIDEO_ACTIONS:     # how long he watches: boredom + the brain's response
@@ -1765,28 +1776,43 @@ class Live:
     async def audience_tick(self, msg, tsim, rel, hot):
         """Each brain tick: the viewer count and the vote's counts go in the tick, the reactions since the last tick too;
         a round that ends hands its winner to his activity model (when he is awake and it is possible), a new round
-        opens with what his model allows now and at its end; a spike of reactions makes him glance at the camera."""
+        opens, while he is awake, with what his model allows now and at its end minus what he is doing already; the
+        page hears `vote_applied` when the voted activity actually begins (not when the nudge is set); a spike of
+        reactions makes him glance at the camera."""
         v = self.votes
         now = v.clock()
+        awake = self.engine.stage == "AWAKE"
         if v.due(now):
             res = v.close(tsim)
             if res:
                 await self.broadcast({"type": "vote_result", **res})
-            pressure = self.engine.pressure(tsim)
-            end = tsim + v.round_s * self.time_scale
-            opts = audience.pick_options(self.life.scores(tsim, rel, hot, pressure),
-                                         self.life.scores(end, rel, hot, pressure), v.rng)
+            opts = []
+            if awake:                                            # asleep: no round (it would only wait for morning)
+                pressure = self.engine.pressure(tsim)
+                end = tsim + v.round_s * self.time_scale
+                opts = audience.pick_options(self.life.scores(tsim, rel, hot, pressure),
+                                             self.life.scores(end, rel, hot, pressure), v.rng,
+                                             exclude={self.life.activity})
             if v.open(opts, now):
                 await self.broadcast({"type": "vote", **v.public(now)})
         p = v.pending
         held = bool(p) and self.life.activity == "play_chess"   # L4: a vote never cuts a game; finish_chess applies it
         if p and not held:
-            awake = self.engine.stage == "AWAKE" \
-                and self.life.scores(tsim, rel, hot, self.engine.pressure(tsim)).get(p["act"], 0.0) > 0
-            got = v.take_pending(tsim, awake)
-            if got and self.life.apply_vote(got["act"], tsim):
-                await self.broadcast({"type": "vote_applied", "act": got["act"], "label": got["label"],
-                                      "round": got["round"], "t": hhmm(tsim)})
+            if awake and self.life.activity == p["act"]:          # he got there by himself meanwhile: nothing to nudge
+                v.pending = None
+            else:
+                can = awake and self.life.scores(tsim, rel, hot, self.engine.pressure(tsim)).get(p["act"], 0.0) > 0
+                got = v.take_pending(tsim, can)
+                if got and self.life.apply_vote(got["act"], tsim):
+                    self.vote_due = got                              # announced when it starts (below)
+        due = getattr(self, "vote_due", None)
+        if due:
+            if self.life.activity == due["act"]:                 # life.start() took the nudge: the vote is carried out
+                self.vote_due = None
+                await self.broadcast({"type": "vote_applied", "act": due["act"], "label": due["label"],
+                                      "round": due["round"], "t": hhmm(tsim), "started": True})
+            elif self.life.nudge(tsim) != due["act"]:            # the nudge ran out (an hour) without a start: dropped
+                self.vote_due = None
         msg["aud"] = {"n": len(self.sockets), "v": v.compact(now)}
         if held:
             msg["aud"]["held"] = "after the game"
@@ -1838,8 +1864,8 @@ class Live:
         self.sockets.add(ws)
         self.ws_per_ip[key] = self.ws_per_ip.get(key, 0) + 1
         self.viewer_addr[ws] = self.viewer_fp.address(key)
-        self.viewer_ids[ws] = self.viewer_fp.ids(request.cookies.get(audience.VIEWER_COOKIE), key,
-                                                 request.headers.get("User-Agent", ""))
+        self.viewer_ids[ws] = self.viewer_fp.ids(audience.issued_cookie(request.cookies.get(audience.VIEWER_COOKIE)),
+                                                 key, request.headers.get("User-Agent", ""))   # (a made-up cookie: none)
         try:
             if request.transport is not None:                    # sends never wait: see backlogged()
                 request.transport.set_write_buffer_limits(high=WS_HIGH_WATER)
@@ -2031,9 +2057,10 @@ font:inherit">enter</button>{msg}</form></body>"""
 
 @web.middleware
 async def viewer_cookie(request, handler):
-    """The vote's one-per-viewer cookie (audience.py): a random id, HttpOnly, set on the pages (never on /ws, /api)."""
+    """The vote's one-per-viewer cookie (audience.py): a random id, HttpOnly, set on the pages (never on /ws, /api);
+    set again when the browser's one is not an id this server issued (a restart forgot it, or it was made up)."""
     resp = await handler(request)
-    if request.method == "GET" and audience.VIEWER_COOKIE not in request.cookies and not resp.prepared \
+    if request.method == "GET" and not audience.issued_cookie(request.cookies.get(audience.VIEWER_COOKIE)) and not resp.prepared \
             and request.path in ("/", "/brain", "/room.html", "/index.html"):
         resp.set_cookie(audience.VIEWER_COOKIE, audience.new_viewer_id(), max_age=365 * 86400, httponly=True,
                         samesite="Lax", secure=request.secure or request.headers.get("X-Forwarded-Proto") == "https")

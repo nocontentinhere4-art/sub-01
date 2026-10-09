@@ -1,19 +1,25 @@
 """Viewers in the room (preview/interactive): the vote on what he does next, the live viewer count, the reactions.
 
-The vote. Every round (VOTE_ROUND_S, default 60 min) viewers pick one of 3 activities. The options come from what his
-activity model (life.py) allows at that hour, both now and when the round ends (never "go to the park" at 3 am). When
-the round ends, the most-voted option becomes a strong nudge in his activity model (Life.viewer_nudge: a bonus on that
-activity's score, like the day plan's tilt but stronger); needs still come first. Asleep: it waits until he wakes.
-  * one vote per viewer per round: an HttpOnly cookie (a random id) AND a salted hash of IP + user agent; both are
-    hashed with a salt that lives only in memory (a new one each round), so nothing about a viewer is ever stored raw
-    or written to disk, and a round's hashes are dropped when it closes;
+The vote. Every round (VOTE_ROUND_S, default 10 min: a vote should show within minutes, not an hour) viewers pick one
+of 3 activities. The options come from what his activity model (life.py) allows at that hour, both now and when the
+round ends (never "go to the park" at 3 am), and never what he is already doing (a no-op option). When the round ends,
+the most-voted option becomes a strong nudge in his activity model (Life.viewer_nudge: a bonus on that activity's
+score, like the day plan's tilt but stronger); needs still come first. Asleep: no round opens, and a result waits until
+he wakes (at most PENDING_MAX_S). The page is told when the voted activity actually begins (live_server: vote_applied).
+  * one vote per viewer per round: the HttpOnly cookie (a random id the server issued and still remembers: a made-up
+    cookie counts for nothing) when the browser has one, else a salted hash of IP + user agent; both are hashed with
+    a salt that lives only in memory (a new one each round), so nothing about a viewer is ever stored raw or written
+    to disk, and a round's hashes are dropped when it closes. Behind one address at most VOTES_PER_ADDRESS voters count
+    (the backstop against a script minting cookies), so two people on one network with the same browser both vote;
   * a tie goes to the tied option listed first; options are listed in the order his own model ranks them now (its
     activity scores), so a tie falls to what the model already leaned toward; no votes at all: no nudge.
 
 The reactions. A fixed set of emoji (REACTIONS), no free text. Each viewer has a token bucket (1 every REACT_EVERY_S,
-burst REACT_BURST). Accepted reactions are summed server-side and go out in the existing tick ("rx": counts per emoji
-since the last tick). When they spike (SPIKE_N within SPIKE_S seconds) he glances toward the camera once, at most once
-every GLANCE_EVERY_S.
+burst REACT_BURST: a burst is a spike's worth, so one viewer alone can make him glance). Accepted reactions are summed
+server-side and go out in the existing tick ("rx": counts per emoji since the last tick). When they spike (SPIKE_N
+within SPIKE_S seconds) he glances toward the camera once, at most once every GLANCE_EVERY_S. Behind the per-viewer and
+per-address buckets (both keyed on what the client sends: cookie, address, user agent) sit flood buckets over all
+clients together (REACT_ALL_*, VOTE_ALL_*) that depend on nothing a client can forge.
 
 Nothing here spends on an API or a language model; it is counting."""
 import hashlib
@@ -23,13 +29,15 @@ import secrets
 import time
 from collections import deque
 
-VOTE_ROUND_S = float(os.environ.get("SUB01_VOTE_ROUND_S", 3600))
+VOTE_ROUND_S = float(os.environ.get("SUB01_VOTE_ROUND_S", 600))
 VOTE_OPTIONS = 3
-VOTES_PER_ADDRESS = 10        # at most this many voters per address per round (a shared network is fine; one machine
-                              # faking a new cookie and user agent per vote is not)
+VOTES_PER_ADDRESS = 25        # at most this many voters per address per round (a shared network - a dorm, an office -
+                              # is fine; one machine minting a cookie and a user agent per vote is not)
+VOTE_ALL_EVERY_S, VOTE_ALL_BURST = 0.05, 60    # flood backstop over every client together (20 votes/s, 60 saved)
 VOTE_BONUS = 1.2              # added to the winning activity's score (the day plan's tilt is 0.35, a meal need 1.6)
 NUDGE_HOLD_S = 3600           # simulated seconds the nudge stays on once he is awake (then it is spent)
-PENDING_MAX_S = 2 * 86400     # simulated seconds a result may wait for him to wake (a long night, a nap)
+PENDING_MAX_S = 12 * 3600     # simulated seconds a result may wait for him to wake (a night; not two days)
+ISSUED_MAX = 50_000           # cookie ids the server remembers having issued (memory only; the oldest are forgotten)
 # activity -> what the option says (neutral: what he would do, never what he wants). Food, sleep and the door are needs
 # and never put to a vote; nothing financial is ever an option (S1: there is no chart activity any more).
 VOTABLE = {
@@ -44,22 +52,37 @@ VOTABLE = {
 
 REACTIONS = ("👋", "❤️", "😂", "😮", "👏", "✨")
 REACT_EVERY_S = 3.0           # one token every 3 s ...
-REACT_BURST = 5               # ... up to 5 saved up
-REACT_IP_EVERY_S, REACT_IP_BURST = 1.0, 15   # and per address (all its browsers together): a fresh cookie or user agent
+REACT_BURST = 10              # ... up to 10 saved up (= SPIKE_N: a viewer alone, tapping, can make him glance)
+REACT_IP_EVERY_S, REACT_IP_BURST = 1.0, 20   # and per address (all its browsers together): a fresh cookie or user agent
                                              # per connection cannot multiply the rate
+REACT_ALL_EVERY_S, REACT_ALL_BURST = 0.02, 200   # flood backstop over every client together (50/s, 200 saved)
+RECENT_MAX = 200              # accepted reactions remembered for the spike (bounded whatever the tick rate)
 SPIKE_N, SPIKE_S = 10, 10.0   # 10 reactions within 10 s: he glances toward the camera
 GLANCE_EVERY_S = 120.0        # at most once every 2 minutes
 VIEWER_COOKIE = "sub01v"
 
+_ISSUED = {}                  # cookie id -> None, in issue order (a bounded set: the ids this process handed out)
+
 
 def new_viewer_id():
-    """The cookie's value: random, says nothing about the viewer."""
-    return secrets.token_urlsafe(16)
+    """The cookie's value: random, says nothing about the viewer. Remembered (memory only) so a vote can tell a cookie
+    this server issued from one a script made up."""
+    v = secrets.token_urlsafe(16)
+    _ISSUED[v] = None
+    while len(_ISSUED) > ISSUED_MAX:
+        del _ISSUED[next(iter(_ISSUED))]
+    return v
+
+
+def issued_cookie(cookie):
+    """`cookie` if this server issued it (and still remembers it), else None: an unknown cookie (made up, or from
+    before a restart: the page middleware then sets a fresh one) counts as no cookie."""
+    return cookie if isinstance(cookie, str) and cookie in _ISSUED else None
 
 
 class Fingerprints:
-    """Salted hashes of a viewer's cookie and of IP + user agent. The salt lives in memory only; rotate() makes a new
-    one (each vote round), so last round's hashes can never be matched again."""
+    """Salted hashes of a viewer's cookie, or of IP + user agent without one. The salt lives in memory only; rotate()
+    makes a new one (each vote round), so last round's hashes can never be matched again."""
 
     def __init__(self):
         self.rotate()
@@ -71,11 +94,11 @@ class Fingerprints:
         return hmac.new(self.salt, f"{kind}|{value}".encode("utf-8", "replace"), hashlib.sha256).hexdigest()[:24]
 
     def ids(self, cookie, ip, ua):
-        """The hashes one viewer is known by: the cookie's (if any) and IP + UA's."""
-        out = [self._h("ip-ua", f"{ip or ''}|{(ua or '')[:300]}")]
+        """The hash one viewer is known by: the cookie's when there is one (the caller passes only a cookie the server
+        issued: issued_cookie), else IP + UA's. One tuple either way (what the vote and the reactions key on)."""
         if cookie:
-            out.append(self._h("cookie", cookie[:64]))
-        return tuple(out)
+            return (self._h("cookie", cookie[:64]),)
+        return (self._h("ip-ua", f"{ip or ''}|{(ua or '')[:300]}"),)
 
     def address(self, ip):
         """The address alone, hashed (the reactions' per-address bucket; never used for the vote)."""
@@ -98,9 +121,10 @@ class VoteRound:
         self.per_addr = {}                                 # address hash -> voters from it this round (memory only)
         self.closed = False
 
-    def cast(self, ids, k, now, addr=None):
-        """(ok, reason). ids: the viewer's hashes (cookie, IP + UA); any one of them seen already = voted. addr: the
-        address's hash; at most VOTES_PER_ADDRESS voters from one address per round."""
+    def cast(self, ids, k, now, addr=None, flood=None):
+        """(ok, reason). ids: the viewer's hashes (the cookie's, or IP + UA's); any one of them seen already = voted.
+        addr: the address's hash; at most VOTES_PER_ADDRESS voters from one address per round. flood: a callable
+        asked last, only for a vote that would count (the backstop over all clients: False refuses it)."""
         if self.closed or now >= self.end:
             return False, "this round has ended"
         if not isinstance(k, int) or isinstance(k, bool) or not 0 <= k < len(self.options):
@@ -109,6 +133,8 @@ class VoteRound:
             return False, "one vote per viewer per round"
         if addr is not None and self.per_addr.get(addr, 0) >= VOTES_PER_ADDRESS:
             return False, "too many votes from this network this round"
+        if flood is not None and not flood():
+            return False, "too many votes at once; try again in a moment"
         if addr is not None:
             self.per_addr[addr] = self.per_addr.get(addr, 0) + 1
         for i in ids:
@@ -143,10 +169,11 @@ class VoteRound:
                 **({"mine": mine} if mine is not None else {})}
 
 
-def pick_options(scores_now, scores_end, rng, n=VOTE_OPTIONS, votable=VOTABLE):
+def pick_options(scores_now, scores_end, rng, n=VOTE_OPTIONS, votable=VOTABLE, exclude=()):
     """Up to n votable activities his model allows both now and at the round's end (score > 0 at both), drawn at random
-    and listed in the order his model ranks them now (the tie rule). Fewer than 2 possible: no round."""
-    ok = [a for a in votable if scores_now.get(a, 0.0) > 0 and scores_end.get(a, 0.0) > 0]
+    and listed in the order his model ranks them now (the tie rule). `exclude`: what he is doing now (voting for it
+    would change nothing). Fewer than 2 possible: no round."""
+    ok = [a for a in votable if a not in exclude and scores_now.get(a, 0.0) > 0 and scores_end.get(a, 0.0) > 0]
     if len(ok) < 2:
         return []
     pick = rng.sample(ok, min(n, len(ok)))
@@ -164,8 +191,9 @@ class Votes:
         self.round = None
         self.n = 0
         self.pending = None          # {"act", "label", "round", "votes", "total", "at"} waiting for him to be awake
-        self.retry_at = 0.0          # no round could open (fewer than 2 options): when to try again
+        self.retry_at = 0.0          # no round could open (fewer than 2 options, or asleep): when to try again
         self.last = None             # the last closed round's public result (for the card)
+        self.flood = TokenBucket(VOTE_ALL_EVERY_S, VOTE_ALL_BURST)   # over all clients: no header can lift it
 
     def due(self, now=None):
         now = self.clock() if now is None else now
@@ -215,7 +243,8 @@ class Votes:
         now = self.clock() if now is None else now
         if self.round is None:
             return False, "no round right now"
-        return self.round.cast(self.fp.rehash(ids), k, now, None if addr is None else self.fp.rehash((addr,))[0])
+        return self.round.cast(self.fp.rehash(ids), k, now, None if addr is None else self.fp.rehash((addr,))[0],
+                               flood=lambda: self.flood.allow("all"))
 
     def mine(self, ids):
         return None if self.round is None else self.round.choice_of(self.fp.rehash(ids))
@@ -279,25 +308,36 @@ class Reactions:
         self.clock = clock
         self.limit = TokenBucket(every, burst, clock)
         self.limit_ip = TokenBucket(REACT_IP_EVERY_S, REACT_IP_BURST, clock)
+        self.limit_all = TokenBucket(REACT_ALL_EVERY_S, REACT_ALL_BURST, clock)   # over all clients together
         self.counts = [0] * len(REACTIONS)
-        self.recent = deque()                               # (time, reaction index) of accepted reactions, the last SPIKE_S seconds
+        self.recent = deque(maxlen=RECENT_MAX)              # (time, reaction index) of accepted reactions, the last SPIKE_S seconds
         self.last_glance = -1e18
         self.total = 0
 
+    def _trim(self, now):
+        while self.recent and now - self.recent[0][0] > SPIKE_S:
+            self.recent.popleft()
+
     def react(self, key, k, addr=None):
-        """(ok, reason). key: the viewer's IP + UA hash; addr: the address's hash (never the raw address). Both
-        buckets must have a token: per viewer (1 every 3 s, burst 5) and per address (1 a second, burst 15)."""
+        """(ok, reason). key: the viewer's hash (cookie, or IP + UA); addr: the address's hash (never the raw address).
+        Every bucket must have a token: per viewer (1 every 3 s, burst 10), per address (1 a second, burst 20) and
+        over all clients (50 a second, burst 200: the flood backstop no client header can lift)."""
         if not isinstance(k, int) or isinstance(k, bool) or not 0 <= k < len(REACTIONS):
             return False, "not a reaction"
         if addr is not None and self.limit_ip.peek(addr) < 1.0:
+            return False, "slow down"
+        if self.limit_all.peek("all") < 1.0:
             return False, "slow down"
         if not self.limit.allow(key):
             return False, "slow down"
         if addr is not None:
             self.limit_ip.allow(addr)
+        self.limit_all.allow("all")
         self.counts[k] += 1
         self.total += 1
-        self.recent.append((self.clock(), k))
+        now = self.clock()
+        self._trim(now)
+        self.recent.append((now, k))
         return True, ""
 
     def drain(self):
@@ -311,8 +351,7 @@ class Reactions:
         """Once when reactions spike (SPIKE_N within SPIKE_S), at most every GLANCE_EVERY_S: the spike's dominant reaction
         (the emoji most sent in it; a tie goes to the latest of them), which picks how he answers; else None."""
         now = self.clock()
-        while self.recent and now - self.recent[0][0] > SPIKE_S:
-            self.recent.popleft()
+        self._trim(now)
         if len(self.recent) >= SPIKE_N and now - self.last_glance >= GLANCE_EVERY_S:
             n, last = [0] * len(REACTIONS), {}
             for i, (_, k) in enumerate(self.recent):

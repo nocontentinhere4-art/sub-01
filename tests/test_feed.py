@@ -286,7 +286,10 @@ def test_a_failed_send_drops_the_client():
 
 
 async def _open(client, ip):
-    ws = await client.ws_connect("/ws?rate=5&lite=1", headers={"X-Forwarded-For": f"{ip}, 10.0.0.1"})
+    # the trusted proxy appends the connecting address LAST; what comes before it is whatever the client put in its own
+    # header (here a spoofed 10.0.0.1), which must not become the key (it did, when [0] was taken: one client could
+    # pick a fresh key per connection and walk past every per-address limit)
+    ws = await client.ws_connect("/ws?rate=5&lite=1", headers={"X-Forwarded-For": f"10.0.0.1, {ip}"})
     first = await ws.receive_json(timeout=5)
     return ws, first["type"]
 
@@ -325,6 +328,22 @@ def test_caps_total_and_per_ip():
             assert live.ws_per_ip == {} and live.clients == set() and live.variants == {}
 
     asyncio.run(main())
+
+
+def test_client_key_is_the_proxys_entry_not_the_clients():
+    """--trust-proxy: the key is the rightmost X-Forwarded-For entry (the hop the proxy appended), so a leading spoofed
+    entry changes nothing; X-Real-IP serves when the proxy sets that instead; without the flag the headers are ignored."""
+    req = lambda **h: SimpleNamespace(remote="127.0.0.1", headers=h)
+    live = bare_live(trust_proxy=True)
+    assert live.client_ip(req(**{"X-Forwarded-For": "1.1.1.1"})) == "1.1.1.1"
+    assert live.client_ip(req(**{"X-Forwarded-For": "9.9.9.9, 1.1.1.1"})) == "1.1.1.1"       # spoofed first entry: same key
+    assert live.client_ip(req(**{"X-Forwarded-For": "9.9.9.9 , 8.8.8.8,1.1.1.1 "})) == "1.1.1.1"
+    assert live.client_ip(req(**{"X-Real-IP": "2.2.2.2"})) == "2.2.2.2"
+    assert live.client_ip(req(**{"X-Forwarded-For": "1.1.1.1", "X-Real-IP": "2.2.2.2"})) == "1.1.1.1"
+    assert live.client_ip(req(**{"X-Forwarded-For": " , "})) == "127.0.0.1"                 # an empty header: the socket's
+    assert live.client_ip(req()) == "127.0.0.1"
+    off = bare_live(trust_proxy=False)
+    assert off.client_ip(req(**{"X-Forwarded-For": "1.1.1.1", "X-Real-IP": "2.2.2.2"})) == "127.0.0.1"
 
 
 def test_without_trust_proxy_the_header_is_ignored():

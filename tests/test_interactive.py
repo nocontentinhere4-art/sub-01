@@ -28,9 +28,12 @@ def test_one_vote_per_viewer_per_round():
     assert v.cast(a, 1) == (True, "")
     assert v.cast(a, 0)[0] is False                                    # same cookie, same IP + UA
     assert v.cast(v.fp.ids("cookie-a", "9.9.9.9", "other"), 0)[0] is False   # same cookie, other network: still voted
-    assert v.cast(v.fp.ids(None, "1.2.3.4", "UA-a"), 0)[0] is False    # cookie cleared, same IP + UA: still voted
+    # no cookie, same IP + UA: a cookieless viewer is known by IP + UA alone, so this counts (two people on one network
+    # with the same browser both vote; a script clearing its cookie runs into the per-address cap, VOTES_PER_ADDRESS)
+    assert v.cast(v.fp.ids(None, "1.2.3.4", "UA-a"), 0) == (True, "")
+    assert v.cast(v.fp.ids(None, "1.2.3.4", "UA-a"), 2)[0] is False    # (and only once)
     assert v.cast(v.fp.ids("cookie-b", "5.6.7.8", "UA-b"), 1) == (True, "")
-    assert v.round.counts == [0, 2, 0]
+    assert v.round.counts == [1, 2, 0]
     assert v.mine(a) == 1
 
 
@@ -258,13 +261,13 @@ def test_server_cookie_vote_and_react(server):
             await ws2.send_json({"type": "vote", "k": 0})
             ack2 = await ws2.receive_json()
             assert ack2["ok"] is False and ack2["mine"] == 2
-            for _ in range(6):
+            for _ in range(audience.REACT_BURST + 1):
                 await ws.send_json({"type": "react", "k": 1})
             nack = await ws.receive_json()
             assert nack == {"type": "react_ack", "ok": False, "reason": "slow down"}
             msg = {"type": "tick"}
             await live.audience_tick(msg, tsim, {}, 0)
-            assert msg["aud"]["n"] == 2 and msg["rx"] == [0, 5, 0, 0, 0, 0]
+            assert msg["aud"]["n"] == 2 and msg["rx"] == [0, audience.REACT_BURST, 0, 0, 0, 0]
             assert msg["aud"]["v"][1] == [0, 0, 1]
             # nothing about the viewer in what the server keeps: hashes only
             assert all(len(i) == 24 for ids in live.viewer_ids.values() for i in ids)
@@ -287,7 +290,8 @@ def test_server_round_end_applies_when_awake(server):
         await live.audience_tick(msg, live.clock.now(), {}, 0)
         assert v.pending and v.pending["act"] == "window" and live.life.nudge(live.clock.now()) is None
         live.engine.stage = "AWAKE"                                    # he wakes up: now it is applied
-        await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)
+        live.life.activity = "research"                               # (the demo starts him at the window: a vote for what he
+        await live.audience_tick({"type": "tick"}, live.clock.now(), {}, 0)   # already does is dropped, not nudged)
         assert v.pending is None and live.life.nudge(live.clock.now()) == "window"
     asyncio.run(run())
 
@@ -360,10 +364,11 @@ def test_abuse_rapid_requests_and_cookieless_clients(server):
             acks = await drain_acks(ws, 100)
             votes = [a for a in acks if a["type"] == "vote_ack"]
             assert len(votes) == 50 and sum(a["ok"] for a in votes) == 1
-            assert sum(1 for a in acks if a["type"] == "react_ack") == 45            # 5 got through, 45 refused
-            assert await counts() == ([1, 0, 0], 5)
+            B = audience.REACT_BURST
+            assert sum(1 for a in acks if a["type"] == "react_ack") == 50 - B       # a burst got through, the rest refused
+            assert await counts() == ([1, 0, 0], B)
 
-            # a cookie-less client (no cookie jar), its own user agent: one vote, a burst of 5 reactions, no more
+            # a cookie-less client (no cookie jar), its own user agent: one vote, a burst of reactions, no more
             async with aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar()) as s:
                 url = c.make_url("/ws")
                 ws2 = await s.ws_connect(url, headers={"User-Agent": "UA-b"})
@@ -372,9 +377,10 @@ def test_abuse_rapid_requests_and_cookieless_clients(server):
                     await ws2.send_json({"type": "vote", "k": 1})
                     await ws2.send_json({"type": "react", "k": 2})
                 await drain_acks(ws2, 100)
-                assert await counts() == ([1, 1, 0], 5)
+                assert await counts() == ([1, 1, 0], min(B, audience.REACT_IP_BURST - B))   # (the address's bucket, part used)
                 await ws2.close()
-                # the same browser, a new cookie on every connection: still the same IP + UA, nothing more counts
+                # the same browser, a made-up cookie on every connection: not one the server issued, so it counts for
+                # nothing - the same IP + UA as before, nothing more counts
                 for i in range(6):
                     w = await s.ws_connect(url, headers={"User-Agent": "UA-b", "Cookie": f"sub01v=fake{i}"})
                     await w.receive_json(); await w.receive_json()
@@ -394,7 +400,7 @@ def test_abuse_rapid_requests_and_cookieless_clients(server):
                     await drain_acks(w, 6)
                     await w.close()
                 c_votes, rx = await counts()
-                assert sum(c_votes) == audience.VOTES_PER_ADDRESS               # 2 + 8 more from the fake ones
+                assert sum(c_votes) == audience.VOTES_PER_ADDRESS               # 2 + 23 more from the fake ones, then the cap
                 assert rx <= audience.REACT_IP_BURST                            # the address's bucket (already part used)
 
             # /api/vote is read-only
