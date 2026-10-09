@@ -253,7 +253,7 @@
     background:var(--card); border:1px solid var(--line); border-radius:var(--r); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
   #tabs { display:flex; gap:4px; padding:6px; border-bottom:1px solid var(--line); flex:none; }
   #tabs button { flex:1; min-height:44px; font:inherit; font-size:12px; color:var(--dim); background:none; border:0; border-radius:8px; cursor:pointer;
-    display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:color .2s, background .2s; }
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; }
   #tabs button:hover { color:var(--fg); }
   #tabs button.on { color:var(--fg); background:rgba(255,255,255,.07); }
   #tab-left { font-size:10.5px; color:var(--st); }
@@ -272,7 +272,10 @@
   #votecard .opt .bar { background:rgba(255,154,60,.18); }
   /* More: collapsible sections (tap the label) */
   .pane[data-pane="more"] .card > .k { cursor:pointer; user-select:none; margin-bottom:0; min-height:24px; }
-  .pane[data-pane="more"] .card > .k::after { content:"▾"; color:var(--faint); margin-left:auto; padding-left:8px; }
+  .pane[data-pane="more"] .card > .k { justify-content:flex-start; }
+  .pane[data-pane="more"] .card > .k > :nth-child(2) { margin-left:auto; text-align:right; }
+  .pane[data-pane="more"] .card > .k::after { content:"▾"; color:var(--faint); padding-left:10px; }
+  .pane[data-pane="more"] .card > .k > :only-child { margin-right:auto; }
   .pane[data-pane="more"] .card.shut > .k::after { content:"▸"; }
   .pane[data-pane="more"] .card > .k + * { margin-top:12px; }
   .pane[data-pane="more"] .card.shut > :not(.k) { display:none; }
