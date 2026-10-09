@@ -41,7 +41,7 @@ from life import WORLD, Life
 from twin.body import Body
 from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
-from browse import Browser, card_title_ok
+from browse import Browser, card_title_ok, screen_showable
 import audience
 import brain_vote
 import chess_game
@@ -970,13 +970,16 @@ class Live:
         return {"research": "desk", "phone": "phone", "watch_video": "desk"}.get(self.life.activity)
 
     def screen_status(self, dev):
+        """The public status of a screen: the browser's last status for it, or the restarting-style placeholder
+        (device only) while the browser restarts and when the status must not be shown (S2: a title the card filter
+        refuses, a finance / trading page)."""
         if self.browser.restarting:
             return {"device": dev, "restarting": True}
         st = public_why(self.browser.screens.get(dev))      # S4: "from chat", never the viewer's words
         dec = self.decisions.get(dev)
-        if st and not card_title_ok(st.get("title", ""), st.get("host", "")):   # the public card never shows such a title
-            st = dict(st, title=st.get("host", ""))
-        elif st and (m := screens.TIKTOK_ID.search(str(st.get("url") or ""))):   # #89: viewers may play it in
+        if st and not screen_showable(st):                   # S2: a refused title or a finance page: the placeholder
+            return {"device": dev, "restarting": True}        # (device only: no title, url, id or screenshot)
+        if st and (m := screens.TIKTOK_ID.search(str(st.get("url") or ""))):     # #89: viewers may play it in
             st = dict(st, embed={"src": screens.TIKTOK_EMBED.format(m.group(1)),     # TikTok's official player
                                  "label": "TikTok (official embed)"})
         elif st and (m := screens.YT_ID.search(str(st.get("url") or ""))):        # ... or YouTube's
@@ -2066,8 +2069,10 @@ async def main(args):
 
     async def screen_shot(request):               # latest screenshot of the desk or phone screen
         dev = request.match_info["device"]
-        try:
-            shot = await live.browser.shot(dev) if live.browser and dev in ("desk", "phone") else None
+        st = (getattr(live.browser, "screens", None) or {}).get(dev) if live.browser else None
+        try:                                      # S2 / B8: no current status (closed, timed out), a refused title
+            shot = (await live.browser.shot(dev) if live.browser and dev in ("desk", "phone")   # or a finance page:
+                    and st and screen_showable(st) else None)                                   # nothing to show
         except BrowserDown:
             shot = None
         if not shot:

@@ -463,6 +463,18 @@ def test_the_life_phone_shows_only_a_real_screen_and_tiktok_gets_its_embed(tmp_p
     assert "#cards [hidden]" in css                                          # empty cards are really hidden
 
 
+def test_a_refused_title_or_a_finance_page_gets_the_placeholder_and_no_screenshot():
+    """S2: the public card never shows a title the card filter refuses or a finance / trading page: the status is
+    the restarting-style placeholder (device only) and /api/screen/<dev>.jpg has nothing to serve."""
+    bad = {"url": "https://example.org/b", "title": "Bitcoin price today", "host": "example.org", "id": 4}
+    fin = {"url": "https://example.org/c", "title": "A page", "host": "example.org", "id": 5, "finance": True}
+    live = SimpleNamespace(browser=SimpleNamespace(restarting=False, screens={"phone": bad, "desk": fin}), decisions={})
+    assert Live.screen_status(live, "phone") == {"device": "phone", "restarting": True}
+    assert Live.screen_status(live, "desk") == {"device": "desk", "restarting": True}
+    assert not browse.screen_showable(bad) and not browse.screen_showable(fin)
+    assert SC.DopamineBursts(clock=Clock()).on_new("finance", "crypto") is None       # no reward from it either
+
+
 def test_todays_screens_survive_a_deploy(tmp_path):
     """#89 live (2026-10-04): /api/screens had 44 pages today at 05:26; after the next deploy counts {} and last []."""
     clock = Clock()
