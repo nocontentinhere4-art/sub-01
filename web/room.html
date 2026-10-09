@@ -286,6 +286,8 @@
   #feed { max-height:none; margin-bottom:12px; }
   #feed[hidden] { display:block; } #feed[hidden]::before { content:"No messages yet."; color:var(--dim); font-size:13px; }
   #chat input, #chat button { min-height:44px; border-radius:var(--r); }
+  #teachcard input, #teachcard button { min-height:44px; border-radius:var(--r); font-size:13px; }
+  #teachcard .row { gap:8px; } #teachcard form { gap:8px; }
   /* reactions: one pill at the bottom centre of the room */
   #rxpill { position:fixed; left:calc((100vw - var(--panel) - var(--gap)) / 2); bottom:var(--gap); transform:translateX(-50%); z-index:6;
     background:rgba(10,10,16,.72); border:1px solid var(--line); border-radius:999px; padding:4px 6px 4px 4px;
