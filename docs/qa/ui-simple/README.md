@@ -11,3 +11,10 @@
   - Phones: the reactions pill is fixed at the bottom of the screen on every tab, above the chat input on Chat. It used to sit at the room's edge and scrolled away with the page. The panes leave room under it.
   - The vote explainer is one line, "The winner nudges what he does next · how it works ▾", with the full rule behind the fold.
   - Checked at 390 and 360 px on Vote, Teach and Chat, at the top and scrolled: no horizontal scroll, no errors.
+
+## v2 (owner's feedback: nothing over the room, much less below)
+- A slim solid bar **above** the room: SUB-01 + nav + "today ▾" on one line, the status line, then "is …" on one line with an ellipsis. The empty-room note is a small line in the bar. The camera chip and the room's vignette are gone. The room canvas starts under the bar (`--barh`, measured), so `hudBand()` reads 1.
+- `frameHim()` keeps a 10% margin round him (`FRAME_PAD`). The old header over the room used to add it; without it, the get-up from bed was 0.79 in frame (min 0.8).
+- Phones: the bar, the room (55vh), the reactions pill, one compact vote card ("What next?", time left, 3 short rows, "one vote each"), and a fixed bottom chat bar. Its ••• opens a sheet with Chat history · Teach · More. No tab row.
+- Desktop keeps the tabbed panel under the bar; the vote explainer is gone there too.
+- Checked at 1280, 430, 390 and 360: no horizontal scroll, no console errors. test_interactive, test_desk_states, test_char_mixamo: 24 passed; smoke OK; test_phone_camera: 6 passed.
