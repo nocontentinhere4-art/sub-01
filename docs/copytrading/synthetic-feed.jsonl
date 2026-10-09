@@ -1,0 +1,300 @@
+{"id": "q0a", "t": 0.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o0", "t": 1.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q0b", "t": 61.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.86396048016196, "B": 99.5540453587529, "C": 92.82609269045847}}
+{"id": "q1a", "t": 90.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o1", "t": 91.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q1b", "t": 151.0, "type": "quote", "source": "synthetic", "prices": {"A": 104.7421069209891, "B": 99.76338966668278, "C": 93.11593643091003}}
+{"id": "q2a", "t": 180.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o2", "t": 181.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q2b", "t": 241.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.65761691159929, "B": 98.95279526049087, "C": 92.91143099046519}}
+{"id": "q3a", "t": 270.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o3", "t": 271.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q3b", "t": 331.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.73533124163882, "B": 97.5710556032895, "C": 93.36678246653112}}
+{"id": "q4a", "t": 360.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o4", "t": 361.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q4b", "t": 421.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.15886478249583, "B": 97.09272513001737, "C": 90.79470171830005}}
+{"id": "q5a", "t": 450.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o5", "t": 451.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q5b", "t": 511.0, "type": "quote", "source": "synthetic", "prices": {"A": 109.49711553158656, "B": 97.59930526870416, "C": 91.26885812258728}}
+{"id": "q6a", "t": 540.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o6", "t": 541.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q6b", "t": 601.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.0452288441079, "B": 96.85701939845282, "C": 92.02035545129586}}
+{"id": "q7a", "t": 630.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o7", "t": 631.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q7b", "t": 691.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.31099273675157, "B": 100.73515953599552, "C": 94.51681078826448}}
+{"id": "q8a", "t": 720.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o8", "t": 721.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q8b", "t": 781.0, "type": "quote", "source": "synthetic", "prices": {"A": 101.22209380258509, "B": 92.77746688508081, "C": 91.5630697698621}}
+{"id": "q9a", "t": 810.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o9", "t": 811.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q9b", "t": 871.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.94452397105911, "B": 98.03410749374652, "C": 92.54330482755641}}
+{"id": "q10a", "t": 900.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o10", "t": 901.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q10b", "t": 961.0, "type": "quote", "source": "synthetic", "prices": {"A": 113.29459688762762, "B": 94.7199480932693, "C": 91.05598748218252}}
+{"id": "q11a", "t": 990.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o11", "t": 991.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q11b", "t": 1051.0, "type": "quote", "source": "synthetic", "prices": {"A": 113.10692901873082, "B": 99.11675749050461, "C": 93.65765843094064}}
+{"id": "q12a", "t": 1080.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o12", "t": 1081.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q12b", "t": 1141.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.71498407078136, "B": 93.37981207286087, "C": 92.41866186055685}}
+{"id": "q13a", "t": 1170.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o13", "t": 1171.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q13b", "t": 1231.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.27253521955387, "B": 94.43161986438857, "C": 90.29193334554859}}
+{"id": "q14a", "t": 1260.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o14", "t": 1261.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q14b", "t": 1321.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.81989080068193, "B": 95.13812094234805, "C": 91.75432508036945}}
+{"id": "q15a", "t": 1350.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o15", "t": 1351.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q15b", "t": 1411.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.23870756867365, "B": 97.58896559263871, "C": 90.73427085421422}}
+{"id": "q16a", "t": 1440.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o16", "t": 1441.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q16b", "t": 1501.0, "type": "quote", "source": "synthetic", "prices": {"A": 109.48437017946455, "B": 99.72791738570582, "C": 92.8021207614164}}
+{"id": "q17a", "t": 1530.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o17", "t": 1531.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q17b", "t": 1591.0, "type": "quote", "source": "synthetic", "prices": {"A": 105.95442443152423, "B": 99.3291307094636, "C": 90.74639995383237}}
+{"id": "q18a", "t": 1620.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o18", "t": 1621.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q18b", "t": 1681.0, "type": "quote", "source": "synthetic", "prices": {"A": 110.19790154571996, "B": 94.8205314578064, "C": 94.28616800782196}}
+{"id": "q19a", "t": 1710.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o19", "t": 1711.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q19b", "t": 1771.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.9498413634613, "B": 94.37812777416397, "C": 91.21525132008288}}
+{"id": "q20a", "t": 1800.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o20", "t": 1801.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q20b", "t": 1861.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.13525569692885, "B": 98.18197834791114, "C": 89.54452968764755}}
+{"id": "q21a", "t": 1890.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o21", "t": 1891.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q21b", "t": 1951.0, "type": "quote", "source": "synthetic", "prices": {"A": 105.23156738208701, "B": 97.9989613321177, "C": 90.8331259578005}}
+{"id": "q22a", "t": 1980.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o22", "t": 1981.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q22b", "t": 2041.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.58876402932556, "B": 99.39879880619594, "C": 87.87803158412262}}
+{"id": "q23a", "t": 2070.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o23", "t": 2071.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q23b", "t": 2131.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.63597029129404, "B": 100.56161741883933, "C": 91.25618288907383}}
+{"id": "q24a", "t": 2160.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o24", "t": 2161.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q24b", "t": 2221.0, "type": "quote", "source": "synthetic", "prices": {"A": 105.97296354190608, "B": 99.38060956794898, "C": 92.63361629052037}}
+{"id": "q25a", "t": 2250.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o25", "t": 2251.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q25b", "t": 2311.0, "type": "quote", "source": "synthetic", "prices": {"A": 110.23970767694391, "B": 96.6369607248718, "C": 88.29545431569447}}
+{"id": "q26a", "t": 2340.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o26", "t": 2341.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q26b", "t": 2401.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.72497308822186, "B": 96.38542961747191, "C": 93.93830955511893}}
+{"id": "q27a", "t": 2430.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o27", "t": 2431.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q27b", "t": 2491.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.48408212094289, "B": 93.42287691891225, "C": 89.012092299742}}
+{"id": "q28a", "t": 2520.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o28", "t": 2521.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q28b", "t": 2581.0, "type": "quote", "source": "synthetic", "prices": {"A": 110.20947259146814, "B": 99.19941254354463, "C": 90.39939158522878}}
+{"id": "q29a", "t": 2610.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o29", "t": 2611.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q29b", "t": 2671.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.9973780085818, "B": 98.61393388444046, "C": 93.17101083961819}}
+{"id": "q30a", "t": 2700.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o30", "t": 2701.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q30b", "t": 2761.0, "type": "quote", "source": "synthetic", "prices": {"A": 110.19060549028588, "B": 98.14121406805391, "C": 91.76292915257875}}
+{"id": "q31a", "t": 2790.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o31", "t": 2791.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q31b", "t": 2851.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.35287983803039, "B": 100.13935700133312, "C": 86.37286431230365}}
+{"id": "q32a", "t": 2880.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o32", "t": 2881.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q32b", "t": 2941.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.65336168727167, "B": 97.58250025996014, "C": 88.43662759782454}}
+{"id": "q33a", "t": 2970.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o33", "t": 2971.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q33b", "t": 3031.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.83203403284512, "B": 95.87179746889151, "C": 94.15611199078937}}
+{"id": "q34a", "t": 3060.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o34", "t": 3061.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q34b", "t": 3121.0, "type": "quote", "source": "synthetic", "prices": {"A": 107.68601978991418, "B": 99.17288310197362, "C": 95.04710901292806}}
+{"id": "q35a", "t": 3150.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o35", "t": 3151.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q35b", "t": 3211.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.95732395678368, "B": 95.31069714144289, "C": 88.2142034207384}}
+{"id": "q36a", "t": 3240.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o36", "t": 3241.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q36b", "t": 3301.0, "type": "quote", "source": "synthetic", "prices": {"A": 112.38346029379093, "B": 97.22176951703119, "C": 90.2785876309142}}
+{"id": "q37a", "t": 3330.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o37", "t": 3331.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q37b", "t": 3391.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.36064272015207, "B": 97.02147167379339, "C": 94.13035566053172}}
+{"id": "q38a", "t": 3420.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o38", "t": 3421.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q38b", "t": 3481.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.08482045609276, "B": 97.53437395904605, "C": 90.21355069741759}}
+{"id": "q39a", "t": 3510.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o39", "t": 3511.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q39b", "t": 3571.0, "type": "quote", "source": "synthetic", "prices": {"A": 109.17392024686873, "B": 94.91533319411253, "C": 93.66472359940991}}
+{"id": "q40a", "t": 3600.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o40", "t": 3601.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q40b", "t": 3661.0, "type": "quote", "source": "synthetic", "prices": {"A": 111.80984378247534, "B": 93.68828490475212, "C": 85.83442692162171}}
+{"id": "q41a", "t": 3690.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o41", "t": 3691.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q41b", "t": 3751.0, "type": "quote", "source": "synthetic", "prices": {"A": 109.54219688788581, "B": 103.8697445387078, "C": 89.49768787782027}}
+{"id": "q42a", "t": 3780.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o42", "t": 3781.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q42b", "t": 3841.0, "type": "quote", "source": "synthetic", "prices": {"A": 104.87326060299502, "B": 98.97242233445118, "C": 89.89819602485423}}
+{"id": "q43a", "t": 3870.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o43", "t": 3871.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q43b", "t": 3931.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.73493629015816, "B": 96.62970633329056, "C": 93.3300052157295}}
+{"id": "q44a", "t": 3960.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o44", "t": 3961.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q44b", "t": 4021.0, "type": "quote", "source": "synthetic", "prices": {"A": 106.9867440965172, "B": 98.19470710020039, "C": 91.55866685276605}}
+{"id": "q45a", "t": 4050.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o45", "t": 4051.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q45b", "t": 4111.0, "type": "quote", "source": "synthetic", "prices": {"A": 105.88832224087099, "B": 96.70043435564195, "C": 89.6240008370802}}
+{"id": "q46a", "t": 4140.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o46", "t": 4141.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q46b", "t": 4201.0, "type": "quote", "source": "synthetic", "prices": {"A": 108.01628746467438, "B": 94.69033443108592, "C": 89.26776407676189}}
+{"id": "q47a", "t": 4230.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o47", "t": 4231.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q47b", "t": 4291.0, "type": "quote", "source": "synthetic", "prices": {"A": 111.64240453826312, "B": 97.36703944923664, "C": 91.8652449363199}}
+{"id": "q48a", "t": 4320.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o48", "t": 4321.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q48b", "t": 4381.0, "type": "quote", "source": "synthetic", "prices": {"A": 109.27884104979404, "B": 96.44785749362782, "C": 91.42866158130461}}
+{"id": "q49a", "t": 4410.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o49", "t": 4411.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q49b", "t": 4471.0, "type": "quote", "source": "synthetic", "prices": {"A": 109.06287183832977, "B": 98.20603960561101, "C": 89.10175818266892}}
+{"id": "q50a", "t": 4500.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o50", "t": 4501.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q50b", "t": 4561.0, "type": "quote", "source": "synthetic", "prices": {"A": 94.08335649167415, "B": 96.02391264177739, "C": 105.35980262421454}}
+{"id": "q51a", "t": 4590.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o51", "t": 4591.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q51b", "t": 4651.0, "type": "quote", "source": "synthetic", "prices": {"A": 89.74881232500238, "B": 96.5236366391117, "C": 112.06825063655768}}
+{"id": "q52a", "t": 4680.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o52", "t": 4681.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q52b", "t": 4741.0, "type": "quote", "source": "synthetic", "prices": {"A": 89.06116023769805, "B": 97.90018973133586, "C": 102.65543910477355}}
+{"id": "q53a", "t": 4770.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o53", "t": 4771.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q53b", "t": 4831.0, "type": "quote", "source": "synthetic", "prices": {"A": 91.99608266713702, "B": 99.74891604369002, "C": 107.40834169484637}}
+{"id": "q54a", "t": 4860.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o54", "t": 4861.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q54b", "t": 4921.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.42661269029165, "B": 98.07877766014634, "C": 109.75037937787661}}
+{"id": "q55a", "t": 4950.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o55", "t": 4951.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q55b", "t": 5011.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.65914392754352, "B": 102.43118463482448, "C": 108.52291868084069}}
+{"id": "q56a", "t": 5040.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o56", "t": 5041.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q56b", "t": 5101.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.51897475061766, "B": 97.18505202503339, "C": 107.81875363595046}}
+{"id": "q57a", "t": 5130.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o57", "t": 5131.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q57b", "t": 5191.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.2718434586953, "B": 97.42493046692641, "C": 108.4349148472405}}
+{"id": "q58a", "t": 5220.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o58", "t": 5221.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q58b", "t": 5281.0, "type": "quote", "source": "synthetic", "prices": {"A": 87.82287484846222, "B": 99.57407239010011, "C": 106.56315182769742}}
+{"id": "q59a", "t": 5310.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o59", "t": 5311.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q59b", "t": 5371.0, "type": "quote", "source": "synthetic", "prices": {"A": 89.06710325888244, "B": 99.09437789910359, "C": 111.2933150184652}}
+{"id": "q60a", "t": 5400.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o60", "t": 5401.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q60b", "t": 5461.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.2325703737486, "B": 97.9028982846138, "C": 105.66944923657012}}
+{"id": "q61a", "t": 5490.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o61", "t": 5491.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q61b", "t": 5551.0, "type": "quote", "source": "synthetic", "prices": {"A": 99.17891834453376, "B": 99.70064655165378, "C": 105.15176332414255}}
+{"id": "q62a", "t": 5580.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o62", "t": 5581.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q62b", "t": 5641.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.05090520940064, "B": 97.71744812142977, "C": 104.11317217001003}}
+{"id": "q63a", "t": 5670.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o63", "t": 5671.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q63b", "t": 5731.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.42157601752629, "B": 96.3523211107181, "C": 111.06567650079056}}
+{"id": "q64a", "t": 5760.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o64", "t": 5761.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q64b", "t": 5821.0, "type": "quote", "source": "synthetic", "prices": {"A": 94.40538665907061, "B": 90.72178640641306, "C": 108.10425646506827}}
+{"id": "q65a", "t": 5850.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o65", "t": 5851.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q65b", "t": 5911.0, "type": "quote", "source": "synthetic", "prices": {"A": 87.95633125119078, "B": 100.2740949981213, "C": 108.42026467281956}}
+{"id": "q66a", "t": 5940.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o66", "t": 5941.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q66b", "t": 6001.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.37101363046749, "B": 94.83718817799175, "C": 112.57107559498876}}
+{"id": "q67a", "t": 6030.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o67", "t": 6031.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q67b", "t": 6091.0, "type": "quote", "source": "synthetic", "prices": {"A": 97.05018341787611, "B": 94.83807239343447, "C": 108.93203780466578}}
+{"id": "q68a", "t": 6120.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o68", "t": 6121.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q68b", "t": 6181.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.31674392902454, "B": 97.44107515784816, "C": 104.83590755193859}}
+{"id": "q69a", "t": 6210.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o69", "t": 6211.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q69b", "t": 6271.0, "type": "quote", "source": "synthetic", "prices": {"A": 96.66786378645155, "B": 95.07705122229333, "C": 107.25979046250626}}
+{"id": "q70a", "t": 6300.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o70", "t": 6301.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q70b", "t": 6361.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.2537073277763, "B": 95.88109830395967, "C": 107.40171892566926}}
+{"id": "q71a", "t": 6390.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o71", "t": 6391.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q71b", "t": 6451.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.59090038393259, "B": 97.16634811290926, "C": 105.07364341224925}}
+{"id": "q72a", "t": 6480.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o72", "t": 6481.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q72b", "t": 6541.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.90502981099424, "B": 96.98276768821938, "C": 107.16568499048967}}
+{"id": "q73a", "t": 6570.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o73", "t": 6571.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q73b", "t": 6631.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.14172488723449, "B": 96.76724445160819, "C": 109.88302852109845}}
+{"id": "q74a", "t": 6660.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o74", "t": 6661.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q74b", "t": 6721.0, "type": "quote", "source": "synthetic", "prices": {"A": 91.19201018553542, "B": 97.1583760092603, "C": 106.33804666001036}}
+{"id": "q75a", "t": 6750.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o75", "t": 6751.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q75b", "t": 6811.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.6837128997119, "B": 94.33876802295072, "C": 109.29696230219493}}
+{"id": "q76a", "t": 6840.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o76", "t": 6841.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q76b", "t": 6901.0, "type": "quote", "source": "synthetic", "prices": {"A": 89.14370495586877, "B": 95.63535900452919, "C": 108.89811163002801}}
+{"id": "q77a", "t": 6930.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o77", "t": 6931.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q77b", "t": 6991.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.00643341486133, "B": 96.49971312248732, "C": 102.951835473778}}
+{"id": "q78a", "t": 7020.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o78", "t": 7021.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q78b", "t": 7081.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.05128321823894, "B": 98.14890864723014, "C": 104.46904696132056}}
+{"id": "q79a", "t": 7110.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o79", "t": 7111.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q79b", "t": 7171.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.92580520698624, "B": 95.74725049891643, "C": 105.18452970961675}}
+{"id": "q80a", "t": 7200.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o80", "t": 7201.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q80b", "t": 7261.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.23932677741064, "B": 97.05382392150196, "C": 108.50656000247787}}
+{"id": "q81a", "t": 7290.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o81", "t": 7291.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q81b", "t": 7351.0, "type": "quote", "source": "synthetic", "prices": {"A": 87.9856298541889, "B": 102.03057529068093, "C": 106.49335346364069}}
+{"id": "q82a", "t": 7380.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o82", "t": 7381.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q82b", "t": 7441.0, "type": "quote", "source": "synthetic", "prices": {"A": 88.15085172875897, "B": 99.04710547141788, "C": 107.11298967474706}}
+{"id": "q83a", "t": 7470.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o83", "t": 7471.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q83b", "t": 7531.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.81214621443226, "B": 96.6509789234374, "C": 107.8506490988002}}
+{"id": "q84a", "t": 7560.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o84", "t": 7561.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q84b", "t": 7621.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.6144321093466, "B": 95.63336779004275, "C": 109.69684898964888}}
+{"id": "q85a", "t": 7650.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o85", "t": 7651.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q85b", "t": 7711.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.82524975230115, "B": 95.32578213957382, "C": 108.19258105455624}}
+{"id": "q86a", "t": 7740.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o86", "t": 7741.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q86b", "t": 7801.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.11260319622761, "B": 96.9273016459534, "C": 105.8437005323011}}
+{"id": "q87a", "t": 7830.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o87", "t": 7831.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q87b", "t": 7891.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.54946391577158, "B": 93.09917801969306, "C": 105.42283965991118}}
+{"id": "q88a", "t": 7920.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o88", "t": 7921.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q88b", "t": 7981.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.09880722633346, "B": 94.09735150423732, "C": 108.06998566062292}}
+{"id": "q89a", "t": 8010.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o89", "t": 8011.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q89b", "t": 8071.0, "type": "quote", "source": "synthetic", "prices": {"A": 91.86284220495384, "B": 99.74684947214541, "C": 105.71302412046677}}
+{"id": "q90a", "t": 8100.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o90", "t": 8101.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q90b", "t": 8161.0, "type": "quote", "source": "synthetic", "prices": {"A": 90.43523369089588, "B": 98.3329542117525, "C": 101.85609102448548}}
+{"id": "q91a", "t": 8190.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o91", "t": 8191.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q91b", "t": 8251.0, "type": "quote", "source": "synthetic", "prices": {"A": 99.75010574728647, "B": 95.75337317384557, "C": 106.1754123681861}}
+{"id": "q92a", "t": 8280.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o92", "t": 8281.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q92b", "t": 8341.0, "type": "quote", "source": "synthetic", "prices": {"A": 94.15281877725928, "B": 97.4004203964108, "C": 103.55142845324102}}
+{"id": "q93a", "t": 8370.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o93", "t": 8371.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q93b", "t": 8431.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.56731845023153, "B": 99.63844458499803, "C": 106.87513431631015}}
+{"id": "q94a", "t": 8460.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o94", "t": 8461.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q94b", "t": 8521.0, "type": "quote", "source": "synthetic", "prices": {"A": 91.29599910426992, "B": 98.71496149314848, "C": 105.72804937521387}}
+{"id": "q95a", "t": 8550.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o95", "t": 8551.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q95b", "t": 8611.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.09597141051728, "B": 97.99824627611125, "C": 106.3126684605602}}
+{"id": "q96a", "t": 8640.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o96", "t": 8641.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q96b", "t": 8701.0, "type": "quote", "source": "synthetic", "prices": {"A": 88.51974531547039, "B": 96.93598542309728, "C": 105.81144435434958}}
+{"id": "q97a", "t": 8730.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o97", "t": 8731.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q97b", "t": 8791.0, "type": "quote", "source": "synthetic", "prices": {"A": 94.5035255642004, "B": 97.86021342124981, "C": 109.95521130639973}}
+{"id": "q98a", "t": 8820.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o98", "t": 8821.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q98b", "t": 8881.0, "type": "quote", "source": "synthetic", "prices": {"A": 92.33655483836114, "B": 98.15725279271258, "C": 106.04250270692405}}
+{"id": "q99a", "t": 8910.0, "type": "quote", "source": "synthetic", "prices": {"A": 100.0, "B": 100.0, "C": 100.0}}
+{"id": "o99", "t": 8911.0, "type": "offer", "source": "synthetic", "signals": [{"trader": "alpha", "asset": "A", "side": "buy"}, {"trader": "bravo", "asset": "B", "side": "buy"}, {"trader": "charlie", "asset": "C", "side": "buy"}]}
+{"id": "q99b", "t": 8971.0, "type": "quote", "source": "synthetic", "prices": {"A": 93.67011856643036, "B": 101.96174568576757, "C": 107.22578111120615}}

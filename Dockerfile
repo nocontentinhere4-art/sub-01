@@ -23,6 +23,7 @@ COPY audience.py brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py l
      search_sources.py sessions.py view_only.py interests.py short_videos.py music.py music_curated.json clips.py readings.py screens.py novelty.py youtube_api.py memory_guard.py ./
 COPY twin ./twin
 COPY spiking ./spiking
+COPY copytrading ./copytrading
 COPY web ./web
 COPY out/connectome.npz out/atlas_names.json ./out/
 COPY out/rest ./out/rest

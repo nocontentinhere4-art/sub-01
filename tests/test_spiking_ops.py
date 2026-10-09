@@ -23,7 +23,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from aiohttp import web
+from aiohttp import ClientConnectionError, web
 from aiohttp.test_utils import TestClient, TestServer
 
 from spiking import podpack, pod_manager, server as spiking_server
@@ -879,7 +879,12 @@ def test_server_ws_message_cap_and_replace(tmp_path):
         msg = await ws1.receive()
         assert msg.type.name in ("CLOSE", "CLOSING", "CLOSED")
         assert await until(lambda: hub.ws is not None and not hub.ws.closed)
-        await ws2.send_str("x" * (2 * 1024 * 1024))                                            # over 1 MB: closed
+        try:
+            await ws2.send_str("x" * (2 * 1024 * 1024))                                        # over 1 MB: closed
+        except (ConnectionError, ClientConnectionError):
+            # The server may close at the message cap before the newer aiohttp
+            # client finishes draining the oversized frame. Still require closure below.
+            pass
         msg = await ws2.receive()
         assert msg.type.name in ("CLOSE", "CLOSING", "CLOSED")
         assert await until(lambda: not hub.connected)

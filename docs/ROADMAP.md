@@ -1,5 +1,7 @@
 # SUB-01 — roadmap (coordinator)
 
+**2026-10-07, paper copy-trading branch:** imported chronological observations → external recent-return reputation + native preference → paper copy/cash → delayed net outcome and native credit. Requested profiles: 100k simple / 500k trading on CUDA; existing GPU sessions remain 1M. No Fomo connector, account, funds or live trading. Implementation and explicit limits: [copytrading/README.md](copytrading/README.md).
+
 Last pass: **2026-10-04 05:30 UTC** (pass 40). Updated after every coordinator pass. Read with `docs/HANDOFF.md`.
 
 ## Waiting for the owner
