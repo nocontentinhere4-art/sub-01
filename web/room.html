@@ -225,6 +225,107 @@
     #rxfloat { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
     #rx button { height:32px; font-size:16px; }
   }
+
+  /* ===== preview/interactive: the simplified room page. The room is the hero; a minimal header; one tabbed panel
+     (Vote · Chat · Teach · More); a reactions pill; a round brain thumbnail. One card style, one radius (12 px). ===== */
+  :root { --r:12px; --panel:340px; --gap:20px; }
+  #top { left:var(--gap); top:var(--gap); max-width:min(560px, calc(100vw - var(--panel) - 3 * var(--gap))); }
+  #brand h1 { font-size:16px; padding:3px 8px 2px; }
+  #brand nav { font-size:12px; }
+  #brand nav a { padding:10px 7px; }
+  #state { margin-top:12px; font-size:12px; gap:10px; }
+  #chip { font-size:10.5px; }
+  #story { margin-top:8px; font-size:18px; line-height:1.35; }
+  #tools { display:flex; gap:8px; margin-top:10px; pointer-events:auto; }
+  #tools button, #cam { margin:0; min-height:32px; font:inherit; font-size:11px; color:var(--dim); background:rgba(10,10,16,.62);
+    border:1px solid var(--line); border-radius:var(--r); padding:6px 12px; cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #tools button:hover { color:var(--fg); border-color:rgba(255,255,255,.22); }
+  #todaybtn[aria-expanded="true"] { color:var(--fg); border-color:rgba(255,154,60,.5); }
+  #today { position:absolute; left:0; top:100%; margin-top:8px; width:min(440px, calc(100vw - 2 * var(--gap))); pointer-events:auto;
+    background:var(--card2); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; backdrop-filter:var(--glass);
+    -webkit-backdrop-filter:var(--glass); }
+  #today[hidden] { display:none; }
+  #today #why { margin:0; max-width:none; text-shadow:none; }
+  #today #plan { margin-top:8px; background:none; border:0; border-left:2px solid var(--st); border-radius:0; padding:2px 0 2px 10px; text-shadow:none; }
+
+  /* the panel: one glass card, tabs on top, the open tab's content scrolls inside it */
+  #side { right:var(--gap); top:var(--gap); width:var(--panel); gap:0; padding:0; max-height:calc(100vh - 2 * var(--gap)); overflow:hidden;
+    background:var(--card); border:1px solid var(--line); border-radius:var(--r); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #tabs { display:flex; gap:4px; padding:6px; border-bottom:1px solid var(--line); flex:none; }
+  #tabs button { flex:1; min-height:44px; font:inherit; font-size:12px; color:var(--dim); background:none; border:0; border-radius:8px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:color .2s, background .2s; }
+  #tabs button:hover { color:var(--fg); }
+  #tabs button.on { color:var(--fg); background:rgba(255,255,255,.07); }
+  #tab-left { font-size:10.5px; color:var(--st); }
+  #tab-dot { width:6px; height:6px; border-radius:50%; background:var(--st); display:inline-block; }
+  #tab-dot[hidden] { display:none; }
+  .pane { display:none; overflow-y:auto; scrollbar-width:thin; padding:16px; flex:1; min-height:0; }
+  .pane.on { display:block; }
+  #side .card { background:none; border:0; border-radius:0; padding:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  #side .card + .card, .pane[data-pane="more"] > * + * { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+  .pane[data-pane="more"] > [hidden] + * { margin-top:0; padding-top:0; border-top:0; }
+  .card .k { font-size:10.5px; letter-spacing:.14em; margin-bottom:12px; }
+  .card .m { font-size:13px; } .card .t { font-size:14px; }
+  #votecard:not([hidden]) + .empty { display:none; }
+  .empty { color:var(--dim); font-size:13px; }
+  #votecard .opt { min-height:52px; font-size:13px; margin-top:8px; border-radius:var(--r); padding:12px 14px; }
+  #votecard .opt .bar { background:rgba(255,154,60,.18); }
+  /* More: collapsible sections (tap the label) */
+  .pane[data-pane="more"] .card > .k { cursor:pointer; user-select:none; margin-bottom:0; min-height:24px; }
+  .pane[data-pane="more"] .card > .k::after { content:"▾"; color:var(--faint); margin-left:auto; padding-left:8px; }
+  .pane[data-pane="more"] .card.shut > .k::after { content:"▸"; }
+  .pane[data-pane="more"] .card > .k + * { margin-top:12px; }
+  .pane[data-pane="more"] .card.shut > :not(.k) { display:none; }
+  #honest { display:block; background:none; padding:0; backdrop-filter:none; -webkit-backdrop-filter:none; text-shadow:none; font-size:10.5px; max-width:none; }
+  #honest .tx { white-space:normal; }
+  /* chat */
+  #dock { position:static; width:auto; }
+  #feed { max-height:none; margin-bottom:12px; }
+  #feed[hidden] { display:block; } #feed[hidden]::before { content:"No messages yet."; color:var(--dim); font-size:13px; }
+  #chat input, #chat button { min-height:44px; border-radius:var(--r); }
+  /* reactions: one pill at the bottom centre of the room */
+  #rxpill { position:fixed; left:calc((100vw - var(--panel) - var(--gap)) / 2); bottom:var(--gap); transform:translateX(-50%); z-index:6;
+    background:rgba(10,10,16,.72); border:1px solid var(--line); border-radius:999px; padding:4px 6px 4px 4px;
+    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+  #rx { margin:0; gap:2px; }
+  #rx button { flex:none; width:44px; height:44px; border:0; background:none; border-radius:50%; font-size:20px; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  #rx button:hover { background:rgba(255,255,255,.08); }
+  #viewers { padding:0 10px 0 8px; font-size:11px; }
+  /* the brain: a small round thumbnail, bottom-left */
+  #corner { left:var(--gap); bottom:var(--gap); right:auto; }
+  #brainpip { width:72px; height:72px; aspect-ratio:auto; border-radius:50%; box-shadow:none; }
+  #brainpip iframe { width:300px; height:225px; transform:translate(-114px, -76px) scale(.5); transform-origin:center; }
+  #brainpip span { display:none; }
+
+  @media (max-width: 900px) {
+    #scene, #vignette, #rxfloat { height:56vh; }
+    #top { padding:12px 16px 18px; max-width:none; }
+    #story { font-size:15px; margin-top:6px; }
+    #tools { margin-top:8px; } #cam { display:none; }
+    #today { width:calc(100vw - 32px); }
+    #side { position:static; width:auto; max-height:none; margin:56vh 0 0; padding-top:26px; border:0; border-radius:var(--r) var(--r) 0 0; overflow:visible;
+      background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none; }
+    #tabs { position:sticky; top:0; z-index:3; margin:0 12px; padding:10px 0; background:var(--bg); border-bottom:0; }
+    #tabs { gap:0; } #tabs button { border:1px solid var(--line); border-radius:0; background:var(--card2); }
+    #tabs button:first-child { border-radius:var(--r) 0 0 var(--r); } #tabs button:last-child { border-radius:0 var(--r) var(--r) 0; }
+    #tabs button + button { border-left:0; }
+    #tabs button.on { background:rgba(255,255,255,.1); }
+    .pane { padding:8px 16px 32px; overflow:visible; }
+    #corner { display:none; }
+    #honest { padding:0; }
+    #dock { position:static; padding:0; background:none; border:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
+    #feed .ln:not(:last-child) { display:block; } #feed .ln { display:block; padding:5px 9px; border:1px solid var(--line); box-shadow:none; }
+    #feed .ln.his { border-color:rgba(255,154,60,.35); border-left:2px solid var(--st); box-shadow:none; }
+    #feed .ln.his .re { display:block; }
+    #chat { position:fixed; left:0; right:0; bottom:0; z-index:7; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+      background:rgba(8,8,11,.94); border-top:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
+    body:not([data-tab="chat"]) #chat { display:none; }
+    body[data-tab="chat"] .pane[data-pane="chat"] { padding-bottom:96px; }
+    #rxpill { position:absolute; left:50%; top:calc(56vh - 30px); bottom:auto; max-width:calc(100vw - 24px); }
+    #rx button { width:40px; height:44px; font-size:18px; }
+    #viewers { font-size:10.5px; padding:0 8px 0 4px; }
+  }
+  @media (max-width: 360px) { #rx button { width:36px; } #viewers { display:none; } }
 </style>
 </head>
 <body>
@@ -235,12 +336,22 @@
   <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
+  <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
+<button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
+  <div id="today" hidden>
   <div id="why"></div>
   <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's AI budget is used up; back tomorrow.</span></div>
-  <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
+  </div>
 </div>
 
 <div id="side">
+  <nav id="tabs" role="tablist" aria-label="panels">
+    <button type="button" role="tab" data-tab="vote" class="on" aria-selected="true">Vote <span id="tab-left"></span></button>
+    <button type="button" role="tab" data-tab="chat">Chat <i id="tab-dot" hidden></i></button>
+    <button type="button" role="tab" data-tab="teach">Teach</button>
+    <button type="button" role="tab" data-tab="more">More</button>
+  </nav>
+  <section class="pane on" data-pane="vote" role="tabpanel">
   <div class="card" id="votecard" hidden>
     <div class="k"><span>What next? · viewers vote</span><span id="v-left"></span></div>
     <div id="v-opts"></div>
@@ -249,6 +360,29 @@
     <div class="s">When the round ends, the most-voted option goes to his activity model as a strong nudge. Needs such as
       food and sleep still come first; if he is asleep, it waits until he wakes. A tie goes to the option listed first.</div>
   </div>
+  <div class="card empty">The first round opens in a moment.</div>
+  </section>
+  <section class="pane" data-pane="chat" role="tabpanel">
+<div id="dock">
+  <div id="feed" hidden aria-live="polite"></div>
+  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
+  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+  </section>
+  <section class="pane" data-pane="teach" role="tabpanel">
+  <div class="card" id="teachcard">
+    <div class="k"><span>Teach him something</span><span id="tc-left"></span></div>
+    <form id="tc-form">
+      <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
+      <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
+    </form>
+    <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
+    <div class="h">Taught today</div>
+    <div id="tc-today"><div class="it"><span class="w">nothing yet today</span></div></div>
+    <div id="tc-yday" hidden><div class="h" id="tc-yk">Remembered from yesterday</div><div id="tc-ylist"></div></div>
+    <div class="s" id="tc-honest"></div>
+  </div>
+  </section>
+  <section class="pane" data-pane="more" role="tabpanel">
   <div class="card" id="screencard" hidden>
     <div class="k"><span id="s-k">On his screen</span><a id="s-link" href="#" target="_blank" rel="noopener noreferrer">open ↗</a></div>
     <div class="frame"><img id="s-img" alt="what is on his screen"></div>
@@ -281,40 +415,28 @@
     <div class="s" id="mem-how"></div>
     <div class="s">Recall by a simulated spiking network from a partial cue; a model, not a mind.</div>
   </div>
-  <div class="card" id="teachcard">
-    <div class="k"><span>Teach him something</span><span id="tc-left"></span></div>
-    <form id="tc-form">
-      <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
-      <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
-    </form>
-    <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
-    <div class="h">Taught today</div>
-    <div id="tc-today"><div class="it"><span class="w">nothing yet today</span></div></div>
-    <div id="tc-yday" hidden><div class="h" id="tc-yk">Remembered from yesterday</div><div id="tc-ylist"></div></div>
-    <div class="s" id="tc-honest"></div>
+  <div class="card" id="needs">
+    <div class="k"><span>Body</span><span id="n-food"></span></div>
+    <div class="m" id="n-text"></div>
   </div>
   <div class="card" id="mapcard">
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
     <div id="map"></div>
   </div>
-  <div class="card" id="needs">
-    <div class="k"><span>Body</span><span id="n-food"></span></div>
-    <div class="m" id="n-text"></div>
-  </div>
+  <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
+    An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
+    <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
+  
+  </section>
 </div>
 
 <div id="corner">
 <a id="brainpip" href="/brain" title="open the brain"><iframe src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
-<div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
-  An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
-  <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
+</div>
+<div id="rxpill">
+  <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
 </div>
 <div id="rxfloat" aria-hidden="true"></div>
-<div id="dock">
-  <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
-  <div id="feed" hidden aria-live="polite"></div>
-  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
-  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3191,10 +3313,12 @@ function renderVote(){
   voteClock();
 }
 function voteClock(){
-  if (!vote) { put("v-left", "textContent", ""); return; }
+  if (!vote) { put("v-left", "textContent", ""); put("tab-left", "textContent", ""); return; }
   const s = Math.max(0, Math.round((voteEnds - performance.now()) / 1000));
   put("v-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)} h ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} min left`
     : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} left`);
+  put("tab-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}`
+    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);           // (the Vote tab's header: time left)
 }
 setInterval(voteClock, 1000);
 function voteNote(t, err){ $("v-note").textContent = t; $("v-note").className = err ? "s err" : "s"; }
@@ -3243,6 +3367,29 @@ function floatUp(counts){                                 // the reactions since
     el.addEventListener("animationend", () => el.remove()); box.appendChild(el); } });
 }
 
+
+// ---------- the panel's tabs (Vote · Chat · Teach · More) and the header's "today" toggle (preview/interactive) ----------
+{
+  const tabs = [...document.querySelectorAll("#tabs [data-tab]")], panes = [...document.querySelectorAll(".pane[data-pane]")];
+  const set = t => {
+    document.body.dataset.tab = t;
+    for (const b of tabs) { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }
+    for (const p of panes) p.classList.toggle("on", p.dataset.pane === t);
+    if (t === "chat") { $("tab-dot").hidden = true; const f = $("feed"); f.scrollTop = f.scrollHeight; }
+    if (t === "more") window.dispatchEvent(new Event("resize"));     // (the map sizes itself once it can be seen)
+    try { localStorage.setItem("sub01.tab", t); } catch (e) {}
+  };
+  for (const b of tabs) b.addEventListener("click", () => set(b.dataset.tab));
+  let saved = null; try { saved = localStorage.getItem("sub01.tab"); } catch (e) {}
+  set(tabs.some(b => b.dataset.tab === saved) ? saved : "vote");
+  for (const k of document.querySelectorAll('.pane[data-pane="more"] .card > .k')) k.addEventListener("click", ev => {
+    if (ev.target.closest("a")) return; k.parentElement.classList.toggle("shut"); window.dispatchEvent(new Event("resize")); });
+  new MutationObserver(() => { if (document.body.dataset.tab !== "chat") $("tab-dot").hidden = false; })   // a new chat line
+    .observe($("feed"), {childList: true});
+  const btn = $("todaybtn"), box = $("today");
+  btn.addEventListener("click", () => { box.hidden = !box.hidden; btn.setAttribute("aria-expanded", !box.hidden); });
+  document.addEventListener("click", ev => { if (!box.hidden && !ev.target.closest("#today, #todaybtn")) { box.hidden = true; btn.setAttribute("aria-expanded", false); } });
+}
 // ---------- live ----------
 const LABEL_AWAY = {park:"at the park, Inokashira", buy_bread:"at the bakery", buy_konbini:"at the konbini"};
 let sock = null, tickMsg = null, uiTimer = 0, uiAt = 0, panAt = 0, mePos = "";

@@ -1,0 +1,7 @@
+# Room page, simplified (G24, on preview/interactive)
+
+- **Header:** "SUB-01" + nav, one status line (dot · pill · Tokyo time · where), one "is …" line (18 px desktop / 15 px phone). The why-line and the day plan sit behind a "today ▾" toggle, a popover that doesn't change the header's height, so `hudBand()` stays correct.
+- **Panel:** one glass panel (340 px, right) with tabs Vote (default, time left in its tab) · Chat (a dot for new lines) · Teach · More. More holds the screen/chess card, music, reading, the memory test, body, map and the footnote, each collapsible by tapping its label. The tab is remembered per viewer (localStorage).
+- **Reactions and brain:** a pill at the bottom centre of the room (6 emoji + "N watching", 44 px taps). The brain is a round 72 px thumbnail, bottom-left, linking to /brain; it's hidden on phones.
+- **Phones (≤ 900 px):** the room at 56 vh with the header on a gradient; the pill on the room's bottom edge; the tabs as a sticky segmented control with their content below. The chat input is fixed at the bottom only on the Chat tab. No horizontal scroll at 390 px.
+- **Choices made here:** every element id and all JS are kept (cards moved, not renamed), with one card style and one 12 px radius. Checks before the first push: no console errors (desktop, 390 px); test_interactive, test_desk_states, test_char_mixamo: 24 passed; smoke OK. test_phone_camera hasn't been re-run yet (one case already failed on main before this, see docs/qa/interactive).
