@@ -847,7 +847,7 @@ class Live:
         out = []
         for ev in e.update(t, dt_real=TICK):
             if ev["type"] == "replay":
-                m = self.memory.pick(t, e.night_start(), replayed=e.replay_counts())
+                m = self.memory.pick(t, e.night_start(), replayed=e.replay_counts(), avoid=e.last_replay_key())
                 if m is None:
                     continue
                 b.stimulate("memory", 6.0)                                   # hippocampus drives the replay
