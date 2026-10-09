@@ -316,6 +316,7 @@ class Live:
         self.store = Store(data_dir)
         saved, mem = self.store.load()
         self.memory = Memory(mem)
+        self.purge_blocked(saved)
         if start is None and saved and time_scale != 1:
             start = saved["t"]                                   # accelerated clock resumes where it stopped
         self.clock = Clock(time_scale, start)
@@ -737,6 +738,25 @@ class Live:
         feed = self.feeds.pop(ws, None)
         if feed is not None and feed not in self.feeds.values():
             self.variants.pop(feed.key, None)            # last client of this variant: its buffers go with it
+
+    def purge_blocked(self, saved):
+        """Messages the chat filter blocks today (chat.blocked: trading pushes, adult requests, insults...) that were
+        accepted before the rule existed are dropped from his memory, so they are neither in the history the page
+        gets on hello nor replayed in his sleep (2026-10-09: "watch porno" from 22:31 came back as a night replay
+        and in the diary), and from the saved nights' replay lists."""
+        from chat import blocked
+        n0 = len(self.memory.items)
+        self.memory.items = [m for m in self.memory.items
+                             if m.get("source", "chat") != "chat" or not blocked(str(m.get("text", "")))]
+        dropped = n0 - len(self.memory.items)
+        for night in ([saved.get("night"), saved.get("last_night")] if saved else []):
+            if night and isinstance(night.get("replays"), list):
+                before = len(night["replays"])
+                night["replays"] = [r for r in night["replays"]
+                                    if r.get("source") in ("reading", "taught") or not blocked(str(r.get("text", "")))]
+                dropped += before - len(night["replays"])
+        if dropped:
+            print(f"memory: {dropped} blocked messages purged", flush=True)
 
     def client_ip(self, request):
         key = request.remote
