@@ -196,7 +196,10 @@ class Harness:
         if S.makehuman_rig():
             clip = S.MH_CLIP.get(name, clip)
         ok_at = at is None or pose.get("at") == at
-        ok_clip = clip is None or clip in (pose.get("clip") or "")
+        got = pose.get("clip") or ""
+        # (the bed layer, room/boy_mh.js bedStep: with the mixamo character's Sova clips the bed plays its own takes over the
+        # lie and sleep clips - bed_sleep_side, bed_bed_phone_watch_portrait, ...)
+        ok_clip = clip is None or clip in got or (clip in ("mh_sleep", "mh_lie") and got.startswith("bed_"))
         if name == "walking":
             ok_at = bool(pose.get("step")) and pose["step"]["k"] == "walk"
         if not (ok_at and ok_clip):
