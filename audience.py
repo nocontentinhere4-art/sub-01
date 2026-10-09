@@ -31,7 +31,7 @@ VOTE_BONUS = 1.2              # added to the winning activity's score (the day p
 NUDGE_HOLD_S = 3600           # simulated seconds the nudge stays on once he is awake (then it is spent)
 PENDING_MAX_S = 2 * 86400     # simulated seconds a result may wait for him to wake (a long night, a nap)
 # activity -> what the option says (neutral: what he would do, never what he wants). Food, sleep and the door are needs
-# and never put to a vote; the chart is left out (nothing financial).
+# and never put to a vote; nothing financial is ever an option (S1: there is no chart activity any more).
 VOTABLE = {
     "research": "read at the computer",
     "watch_video": "watch a video at the desk",

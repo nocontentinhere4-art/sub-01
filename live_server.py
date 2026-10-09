@@ -195,10 +195,28 @@ def decode_trades(logs, mint=None, pools=None):
 
 LITE_DROP = ("act", "wave", "groups", "slow")     # per-region brain activity: only the brain page draws it
 ACT_LO, ACT_HI = 0.01, 10.0     # q=1: act on a log scale, one byte a region (~1.4 % steps), clipped to this range
-# q=1 keeps only what web/index.html draws (one source of truth for the brain page's fields)
-BRAIN_KEEP = ("type", "sync", "trades", "events", "sleep", "baseline", "slow", "life")
+# q=1 keeps only what web/index.html draws (one source of truth for the brain page's fields). S1: the coin's trades
+# are a stimulus only (Live.apply), never in a tick: no trade tape, amounts or buy / sell words reach a page.
+BRAIN_KEEP = ("type", "sync", "events", "sleep", "baseline", "slow", "life")
 BRAIN_SLEEP = ("stage", "burst", "clock", "tz", "gain", "debt", "woken_tonight")
 BRAIN_LIFE = ("doing", "walking")
+
+
+# S4: a search or reading that started from the chat says so ("a viewer's wish in chat", "from chat"), never what the
+# viewer wrote: the quoted text after the chat origin is cut from every `why` the server hands out (the screen card,
+# the reading card, /api/reading), whatever the browser or the reader stored
+CHAT_WHY = re.compile(r"^(.*?\bchat)\s*[:：]\s*[“\"'].*$", re.S)
+
+
+def public_why(rec, copy=True):
+    """`rec` (a status or reading dict, or None) with its `why` cut after a chat origin; copy=False edits it in place."""
+    why = rec.get("why") if isinstance(rec, dict) else None
+    if not isinstance(why, str) or not (m := CHAT_WHY.match(why)):
+        return rec
+    if copy:
+        rec = dict(rec)
+    rec["why"] = m.group(1)
+    return rec
 
 
 def quantise_act(act):
@@ -216,7 +234,7 @@ def dequantise_act(text):
 
 class Feed:
     """What a websocket client gets. Default (plain /ws): every tick, 20 a second, as before.
-    /ws?rate=5 sends ~5 ticks a second, carrying the trades and events of the skipped ticks;
+    /ws?rate=5 sends ~5 ticks a second, carrying the events of the skipped ticks;
     &lite=1 leaves out the per-region activity and the spiking frames (for pages that do not draw the brain, e.g. the room);
     &q=1 is the brain page's feed: `act` quantised to one byte a region (`aq`, see quantise_act) and only the
     fields the brain page draws (well under 1.5 KB a tick).
@@ -226,10 +244,10 @@ class Feed:
     RATES = (1.0, 20.0)                                 # ticks a second a client may ask for
 
     def __init__(self, rate=None, lite=False, q=False):
-        if rate is not None:                            # clamped: a tiny rate would buffer trades/events without bound
+        if rate is not None:                            # clamped: a tiny rate would buffer events without bound
             rate = min(max(rate, self.RATES[0]), self.RATES[1])
         self.every = max(1, round(1.0 / (TICK * rate))) if rate else 1
-        self.lite, self.q, self.n, self.trades, self.events = lite, q and not lite, 0, [], []
+        self.lite, self.q, self.n, self.events = lite, q and not lite, 0, []
         self.rx = None                                  # reactions summed over skipped ticks
         self.bps = 0.0                                  # bytes a second of this feed's ticks (slow-client check)
         self.phase = 0                                  # global tick (mod every) its sends land on; see Live.feed_for
@@ -258,18 +276,17 @@ class Feed:
             return data
         out = msg
         if self.every > 1:
-            self.trades += msg.get("trades") or []
             self.events += msg.get("events") or []
             if msg.get("rx"):                          # viewers' reactions: summed over the skipped ticks
                 self.rx = [a + b for a, b in zip(self.rx, msg["rx"])] if self.rx else list(msg["rx"])
             self.n += 1
             if (self.n - 1) % self.every:              # the first tick goes out at once, then every n-th
                 return None
-            out = msg | {"trades": self.trades, "events": self.events}
+            out = msg | {"events": self.events}
             out.pop("rx", None)
             if self.rx:
                 out["rx"] = self.rx
-            self.trades, self.events, self.rx = [], [], None
+            self.events, self.rx = [], None
         if self.lite:
             out = {k: v for k, v in out.items() if k not in LITE_DROP}
         elif self.q:
@@ -545,7 +562,7 @@ class Live:
         art = self.reader.current()
         if art and "tonight" in art and art.get("tonight_night") != night_date(next_bedtime(t)):
             art = {k: v for k, v in art.items() if k != "tonight"}
-        return art
+        return public_why(art)
 
     async def handle_chat(self, ws, key, text):
         ok, reason = chat_check(text, key, self.limiter, self.dedupe)      # filter first; blocked = never stored
@@ -744,7 +761,7 @@ class Live:
         accepted before the rule existed are dropped from his memory, so they are neither in the history the page
         gets on hello nor replayed in his sleep (2026-10-09: "watch porno" from 22:31 came back as a night replay
         and in the diary), and from the saved nights' replay lists."""
-        from chat import blocked
+        from chat import message_blocked as blocked
         n0 = len(self.memory.items)
         self.memory.items = [m for m in self.memory.items
                              if m.get("source", "chat") != "chat" or not blocked(str(m.get("text", "")))]
@@ -834,11 +851,9 @@ class Live:
             act = acc / (steps // 5)
             wave = {k: float(z.real[i].mean()) for k, i in gidx.items()}
             st = b.state()
-            msg = {"type": "tick", "act": np.round(act, 3).tolist(), "wave": wave,
-                   "groups": (groups := {k: round(float(act[i].mean()), 3) for k, i in gidx.items()}),
-                   "sync": round(st["sync"], 3), "stats": self.stats,
-                   "trades": [{k: t[k] for k in ("kind", "usd", "tx", "who")} for t in due],
-                   "pool": self.pool_name, "events": events,
+            msg = {"type": "tick", "act": np.round(act, 3).tolist(), "wave": wave,     # (S1: no trades, counts or
+                   "groups": (groups := {k: round(float(act[i].mean()), 3) for k, i in gidx.items()}),  # coin name)
+                   "sync": round(st["sync"], 3), "events": events,
                    "sleep": self.engine.status() | {"burst": round(self.burst, 2)},
                    "baseline": self.baseline.status() if self.baseline else None,
                    "slow": b.slow.status() if b.slow_on else None}
@@ -935,6 +950,7 @@ class Live:
         """A reading (a page he stayed on, or the Wikipedia fallback) becomes a stimulus and a memory, is estimated
         for tonight's replay and goes out on the feed with its host and kind."""
         loop = asyncio.get_running_loop()
+        public_why(art, copy=False)                        # S4: the reason never quotes a viewer (also in the log)
         m = self.absorb_reading(art)
         if art.get("via") == "browser":
             self.reader.record(art)                        # "on his mind" and /api/reading show it
@@ -956,7 +972,7 @@ class Live:
     def screen_status(self, dev):
         if self.browser.restarting:
             return {"device": dev, "restarting": True}
-        st = self.browser.screens.get(dev)
+        st = public_why(self.browser.screens.get(dev))      # S4: "from chat", never the viewer's words
         dec = self.decisions.get(dev)
         if st and not card_title_ok(st.get("title", ""), st.get("host", "")):   # the public card never shows such a title
             st = dict(st, title=st.get("host", ""))
@@ -2119,7 +2135,7 @@ async def main(args):
     app.router.add_get("/api/diary/{date}", diary_night)
 
     async def reading(request):                   # what it read at the computer, newest last
-        return web.json_response({"log": live.reader.log[-20:]})
+        return web.json_response({"log": [public_why(a) for a in live.reader.log[-20:]]})
     app.router.add_get("/api/reading", reading)
 
     async def frames(request):                    # recent eye frames for the world page
