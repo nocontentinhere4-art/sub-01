@@ -593,22 +593,26 @@ function showProgress(){ const v = Object.values(progress), l = v.reduce((a, p) 
 // a few hundred MB; the character's two 4096 maps alone were ~256 MB, the room ~170 MB)
 const TOUCH = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const TEX_MAX = TOUCH || LITE ? 1024 : 2048;   // desktops too: 4096 maps were ~425 MB of GPU memory
-function shrinkTextures(gltf){
-  if (!isFinite(TEX_MAX)) return gltf;
+// the room and its props never need more than 1024 on any screen (the floor's colour, the room's baked occlusion, the
+// second prop batch's atlas and the door sneakers' occlusion came at 2048: 35 textures at 2048² on the owner's Mac);
+// only the character keeps TEX_MAX
+const ROOM_TEX_MAX = Math.min(TEX_MAX, 1024), CHAR_GLB = /\/(char_\w+|boy)\.glb$/;
+function shrinkTextures(gltf, max = TEX_MAX){
+  if (!isFinite(max)) return gltf;
   const done = new Set();
   gltf.scene.traverse(o => { if (!o.material) return;
     for (const m of [].concat(o.material)) for (const k in m) { const t = m[k];
       if (!t || !t.isTexture || done.has(t) || !t.image) continue; done.add(t);
       const im = t.image, w = im.width || 0, h = im.height || 0;
-      if (Math.max(w, h) <= TEX_MAX) continue;
-      const f = TEX_MAX / Math.max(w, h), c = document.createElement("canvas");
+      if (Math.max(w, h) <= max) continue;
+      const f = max / Math.max(w, h), c = document.createElement("canvas");
       c.width = Math.max(1, Math.round(w * f)); c.height = Math.max(1, Math.round(h * f));
       c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
       if (im.close) im.close();                         // (an ImageBitmap: free the full-size copy now)
       t.image = c; t.needsUpdate = true; window.texShrunk = (window.texShrunk || 0) + 1; } });   // (?debug: how many)
   return gltf;
 }
-function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g)),
+function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(shrinkTextures(g, CHAR_GLB.test(url) ? TEX_MAX : ROOM_TEX_MAX)),
   e => { progress[url] = [e.loaded, e.total || e.loaded]; showProgress(); }, fail)); }
 // the live brain beside the room is a second 3D page (17 MB of fibres, its own WebGL loop): two GL pages in one tab
 // overheated a Mac, so by default everyone gets a still, styled link to /brain instead; ?brainlive starts the embed
@@ -1553,12 +1557,13 @@ function frameHim(){
   bones.Hips.getWorldPosition(v1).addScaledVector(OV_UP, bandShift(d));       // (his hips at the band's middle)
   camGoal.target.copy(v1); camGoal.pos.copy(v1).addScaledVector(OV_DIR, d);
 }
+const _cgN = new THREE.Vector3();                      // (scratch: the monitor shot's facing; no allocation per frame)
 function updateCameraGoal(){
   const nar = narrow();
   if ((screenOn === "desk" || chatting) && monitor && !(nar && (at !== "desk" || step))) {   // (phones: the monitor shot once he is seated; until then he is framed)
-    const m = SURF.monitor, n = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry);
+    const m = SURF.monitor, n = _cgN.set(0, 0, 1).applyAxisAngle(UP, m.ry);
     camGoal.target.set(...m.c);
-    camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), m.ry));
+    camGoal.pos.set(...m.c).addScaledVector(n, 1.9).add(v1.set(0.55, 0.45, 0).applyAxisAngle(UP, m.ry));
     if (nar) { const off = bandShift(camGoal.pos.distanceTo(camGoal.target));     // (phones: the same shot, slid under the header)
       v1.subVectors(camGoal.target, camGoal.pos).normalize(); v2.copy(UP).addScaledVector(v1, -UP.dot(v1)).normalize();
       camGoal.target.addScaledVector(v2, off); camGoal.pos.addScaledVector(v2, off);
@@ -1646,14 +1651,31 @@ function armClear(){
   let best = dist;
   for (const [sx, sy] of [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
     _kb.copy(c).addScaledVector(_kr, sx * w).addScaledVector(_ku, sy * h); _ka.subVectors(_kb, t); const L = _ka.length(); _ka.normalize();
-    CAMR.ray.set(_kb.copy(t).addScaledVector(_ka, START), _ka); CAMR.ray.far = Math.max(0, L - START); CAMR.ray.firstHitOnly = false;
+    // close in, only the nearest hit is read (the loop breaks on it): the tree answers that alone; far out, the walls
+    // and the floor are skipped, so every hit is needed in order
+    CAMR.ray.set(_kb.copy(t).addScaledVector(_ka, START), _ka); CAMR.ray.far = Math.max(0, L - START); CAMR.ray.firstHitOnly = !far;
     for (const hit of CAMR.ray.intersectObjects(M, false)) { if (far && onShell(hit)) continue; best = Math.min(best, hit.distance + START - ARM); break; } }
   if (best < dist) c.copy(t).addScaledVector(_kd, Math.max(0.05, best));
 }
 const _kc = new THREE.Vector3(), _kq = new THREE.Vector3(), _kL = new THREE.Line3();
+// the last run: where it left the camera and its target, and where he was. With a still camera over a seated boy the
+// five raycasts and the capsule pass gave the same answer every frame (~1 ms a frame of the owner's overheating Mac):
+// while the camera, its target, his root and his hips all stayed within a millimetre of that, and nothing else changed
+// (his visibility, his clip, his capsules arriving, the room's solids refreshing), the camera is still where the last
+// run left it and the run is skipped. The reference is not moved on a skip: a slow drift adds up and runs it.
+const KC = {c:new THREE.Vector3(), t:new THREE.Vector3(), b:new THREE.Vector3(), h:new THREE.Vector3(), ry:NaN, vis:null, clip:null, at:-1, segs:null, ran:0, skipped:0};
+const _kh = new THREE.Vector3(), MM2 = 1e-6;          // (a millimetre, squared)
 function keepClear(){
   if (DEBUG && window.NOCLEAR) return;                 // (?debug: the camera as it would be without this)
+  camRoom();                                           // (the solids' 2 s refresh keeps its cadence: a refresh forces a run)
+  const c = camera.position, t = controls.target, vis = !!(boy && boy.visible);
+  const hip = vis && bones.Hips ? bones.Hips.getWorldPosition(_kh) : _kh.set(0, 0, 0);
+  if (CAMR.at === KC.at && CAMB.segs === KC.segs && vis === KC.vis && current === KC.clip
+    && c.distanceToSquared(KC.c) < MM2 && t.distanceToSquared(KC.t) < MM2
+    && (!vis || (boy.position.distanceToSquared(KC.b) < MM2 && Math.abs(boy.rotation.y - KC.ry) < 1e-3 && hip.distanceToSquared(KC.h) < MM2))) { KC.skipped++; return; }
   keepBody(); armClear(); keepBody();                  // (out of him, then nothing between it and its target, then out of him again)
+  KC.c.copy(c); KC.t.copy(t); KC.at = CAMR.at; KC.segs = CAMB.segs; KC.vis = vis; KC.clip = current; KC.ran++;
+  if (vis) { KC.b.copy(boy.position); KC.ry = boy.rotation.y; KC.h.copy(hip); }
 }
 function keepBody(){
   const S = boy && boy.visible ? camBody() : null; if (!S) return;
@@ -3707,7 +3729,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
   live: (a, x = {}) => { const l = {activity:a, place:"room", ...x}; lastLife = l; place(l); screens(l, "AWAKE"); },
   act: (a, x = {}) => { untouch(); if (step && step.k === "act") endAct(step); if (bag === "hand") endAct({name:"put"}); if (chairNode()) placeChair(0); const l = {activity:a, place:"room", ...x}; lastLife = l; at = null; goal = null; place(l); screens(l, "AWAKE"); placed = true; snap(goal.anchor, goal.clip); holdW = phoneWanted ? 1 : 0; mixer.update(1); },
   setLife: x => { lastLife = {...lastLife, ...x}; }, gz: () => ({p:GZ.p.toArray().map(v => +v.toFixed(2)), w:+GZ.w.toFixed(2), why:GZ.why, iv:IV.cur && IV.cur.n, ctx:ctxNow, bag, eat:EAT.kind, trash:trash && (trash.held ? "held" : "desk"), tpos:trash && trash.g.position.toArray().map(v => +v.toFixed(2))}),
-  setSeed: v => { seed = v; }, __keepClear: () => keepClear(), dbg: () => ({lean, T, clr:clearance(), TL:TL.toArray(), TU:TU.toArray(), TF:TF.toArray()}), armTo, torso, reach, bend, TL, shiftHips, variant: (n, d = 4) => { IV.cur = {n, d, t:0, side:"Left", s:0.3}; IV.last = n; }, setDoor,
+  setSeed: v => { seed = v; }, __keepClear: () => keepClear(), __keepClearStats: KC, dbg: () => ({lean, T, clr:clearance(), TL:TL.toArray(), TU:TU.toArray(), TF:TF.toArray()}), armTo, torso, reach, bend, TL, shiftHips, variant: (n, d = 4) => { IV.cur = {n, d, t:0, side:"Left", s:0.3}; IV.last = n; }, setDoor,
   pose: () => ({at, step:step && {k:step.k, t:step.t && +step.t.toFixed(2), to:step.to}, plan:plan.map(p => p.k + (p.to ? ":" + p.to : "")), goal, clip:current && current.getClip().name,
     root:boy.position.toArray().map(x => +x.toFixed(3)), ry:+boy.rotation.y.toFixed(2)}) });
   Object.defineProperties(window, {room:{get:() => room}, boy:{get:() => boy}, current:{get:() => current}, want:{get:() => want}, hand:{get:() => hand}, head:{get:() => head},
