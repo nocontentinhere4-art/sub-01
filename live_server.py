@@ -1847,6 +1847,20 @@ def add_ops_routes(app, live, data_dir):
             return web.json_response(fn(request), headers={"Cache-Control": "no-store"})
         return handler
     app.router.add_get("/api/costs", admin(lambda r: live.ledger.report()))
+
+    async def api_wake(request):                     # the owner gets him out of bed now (curl -X POST -H "X-Admin-Token: ...")
+        if not (admin_ok(request) or request.app.get(GATED)):
+            raise web.HTTPUnauthorized(text="admin token required")
+        t = live.clock.now()
+        if not live.engine.asleep:
+            return web.json_response({"ok": True, "text": "already awake"})
+        ev = live.engine.get_up(t, "owner")
+        try:
+            await live.broadcast({"type": "event", **ev})
+        except Exception:
+            pass
+        return web.json_response({"ok": True, **ev})
+    app.router.add_post("/api/wake", api_wake)
     app.router.add_get("/api/health", admin(lambda r: live.health()))
 
     async def diag_shot(request):

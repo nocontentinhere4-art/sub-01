@@ -158,3 +158,13 @@ It works without keys, from a curated list of public tracks (`music_curated.json
 Check: `/api/music` → `source` reads "Spotify Web API search" and `api` reads "ok". `api: "down: …"` (status only, no
 secrets) means the token or search failed; he uses the curated list meanwhile. Free: the Web API costs nothing, so there
 is no cap. To refresh the curated list: `python analysis/build_music_list.py` (dev machine, reads public playlist metadata).
+
+
+## Getting him up
+
+- Every day: still asleep at `SUB01_WAKE_HOUR` (default 08:00 Tokyo, any time until +4 h) after a night of 3 h or
+  more he gets up by himself (an alarm), unless he is short of sleep by more than 2 h (then he sleeps in, and the
+  model repays the debt with an earlier night). Once a day.
+- Now: `curl -X POST -H "X-Admin-Token: $SUB01_ADMIN_TOKEN" https://subzerone.live/api/wake` (the token is the
+  service's `SUB01_ADMIN_TOKEN` variable on Railway). He gets up as rested as the cycle is at that hour and stays on
+  his feet until the morning's own drive takes over; bedtime stays his usual (~23:50).

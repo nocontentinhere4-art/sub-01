@@ -99,6 +99,10 @@ BIG_TRADE_USD = 5000
 REPLAY_MEAN_S = 4 * 60 # mean interval between REM replays
 TAU_DEPTH = 10 * 60.0  # s, NREM depth index follows its target with this lag
 MORNING_HOUR, WAKE_HOUR, EVENING_HOUR = 5, 8, 20   # natural wake from 05:00 closes the night; so does 08:00 awake
+ALARM_HOUR = int(os.environ.get("SUB01_WAKE_HOUR", WAKE_HOUR))   # still asleep at this hour: he gets up (an alarm)
+ALARM_WINDOW_H = 4                                 # ... any time until ALARM_HOUR + 4 (a server that was off at 08:00)
+ALARM_DEBT_H = 2.0                                 # ... unless he is short of sleep by more than this: then he sleeps in
+UP_STATE = None                                    # (V_m, V_v) of the rested cycle's awake branch, read once (see up_state)
 TRANSITION_S = 30.0          # exponential glide time constant (sim s) of the stage parameters: ~95 % after 90 s
 TRANSITION_REAL_S = 1.0      # ...but never faster than this in real seconds (high --time-scale)
 STEP_S = 5.0                 # max integration substep (s); the populations have tau = 10 s
@@ -365,6 +369,17 @@ def expected_replays():
     return _EXPECTED_REPLAYS
 
 
+def up_state():
+    """(V_m, V_v) of the rested reference cycle at ALARM_HOUR + 1 of some day: the awake branch of the flip-flop."""
+    global UP_STATE
+    if UP_STATE is None:
+        ref = Reference.get()
+        tod = (ALARM_HOUR + 1) * 3600.0
+        st = ref.states[int(tod / 60) % 1440]
+        UP_STATE = (st[0], st[1])
+    return UP_STATE
+
+
 def day_of(t):
     """The waking day t belongs to, named like the night that follows it (08:00 -> 08:00 next morning)."""
     return (local(t) - timedelta(hours=WAKE_HOUR)).date().isoformat()
@@ -398,6 +413,8 @@ class SleepEngine:
         self.arousal_log = []                          # recent [t, amount, kind, usd]
         self.last_stim = -1e18
         self.night = None                              # current night record (see open_night)
+        self.alarm_day = None                          # the day the alarm last got him up (once a day)
+        self.up_until = -1e18                          # got up early: the circuit is pinned awake until then, see get_up
         self.last_night = None                         # summary of the previous closed night
         self.next_replay = None
         self.repairs = list(REPAIRS)                   # a fresh engine needs none of the one-time repairs
@@ -515,6 +532,8 @@ class SleepEngine:
                 ts = t0 + i * h
                 self.arousal *= math.exp(-h * (slow if self.asleep else 1.0) / AROUSAL_TAU_S)
                 self.C = step_circuit(s, h, (ts + off) % 86400.0, self.arousal_drive())
+                if ts < self.up_until and self.V_v - self.V_m < SWITCH_MV:   # got up early: on his feet (see get_up) - the
+                    s[0], s[1] = up_state()                                    # awake branch, H rising at its normal rate
                 self.V_m, self.V_v, self.H, self.V_on, self.V_off, self.rem_p = s
                 self.t = ts
                 self._classify(ts, ev)
@@ -532,6 +551,13 @@ class SleepEngine:
             self.open_night(t)
         if self.night is not None and not self.asleep and WAKE_HOUR <= local(t).hour < EVENING_HOUR:
             self.close_night(t)
+        # an alarm: still asleep at ALARM_HOUR he gets up (2026-10-09 he slept to 13:00 - viewers saw a bed all morning)
+        # (a night's sleep of 3 h or more, not a recovery nap after a night kept awake by messages; and not when he is
+        # really short of sleep, debt over ALARM_DEBT_H: cut short every morning that debt never repays - tried: he
+        # napped at 11 and 14 for days - so he sleeps in, as the model always did, and the alarm rules the normal days)
+        if self.asleep and ALARM_HOUR <= local(t).hour < ALARM_HOUR + ALARM_WINDOW_H and self.alarm_day != day_of(t) \
+                and self.onset is not None and t - self.onset >= 3 * 3600 and self.debt < ALARM_DEBT_H:
+            ev.append(self.get_up(t, "alarm"))
 
         if self.stage == "REM":
             if self.next_replay is None:
@@ -605,6 +631,25 @@ class SleepEngine:
         self.asleep, self.onset, self.rem, self.stage = True, t, False, "NREM"
         n["timeline"].append({"t": stamp(t), "stage": "NREM"})
         return {"type": "sleep", "text": f"fell asleep at {hhmm(t)}"}
+
+    def get_up(self, t, why="alarm"):
+        """Get him out of bed now: the circuit is set to the rested cycle's state for this time of day (the flip-flop
+        would otherwise put him straight back to sleep); sleep pressure (H) is kept, so a short night ends the day
+        early. No arousal is held to keep him up (held arousal drove H up like a night of chat: debt +8 h in 2 h);
+        before dawn the circuit may take him back to bed. why: "alarm" (once a day, see update) or "owner" (POST
+        /api/wake)."""
+        v_m, v_v, h_ref, v_on, v_off, rem_p = Reference.get().at(t)
+        self.V_m, self.V_v, self.V_on, self.V_off, self.rem_p = v_m, v_v, v_on, v_off, rem_p
+        if why == "owner":                                        # the owner's call: as rested as the cycle is at this hour
+            self.H = min(self.H, h_ref)
+        # before the day's own drive (from about ALARM_HOUR) the circuit would take him straight back to bed (3 min, in
+        # the tests): pinned on the awake branch until then; H still rises at an awake day's normal rate
+        d = local(t)
+        self.up_until = d.replace(hour=ALARM_HOUR, minute=30, second=0, microsecond=0).timestamp() if d.hour < ALARM_HOUR else t
+        if self.V_v - self.V_m > -SWITCH_MV:                      # the rested cycle sleeps at this hour too: force awake
+            self.V_m, self.V_v = max(self.V_m, self.V_v + 2 * SWITCH_MV), self.V_v
+        self.alarm_day = day_of(t)
+        return self.wake(t, f"got up at {hhmm(t)} ({why})", natural=why == "alarm")
 
     def wake(self, t, text, natural=False):
         self.asleep, self.rem, self.stage, self.depth = False, False, "AWAKE", 0.0
@@ -690,7 +735,7 @@ class SleepEngine:
 
     # --- persistence ---------------------------------------------------------------
     STATE_KEYS = ("t", "asleep", "rem", "stage", "depth", "onset", "k_base", "awake_since", "last_wake", "arousal",
-                  "arousal_log", "last_stim", "night", "last_night", "params", "C", "repairs") + CIRCUIT
+                  "arousal_log", "last_stim", "night", "last_night", "params", "C", "repairs", "alarm_day", "up_until") + CIRCUIT
 
     def to_dict(self):
         return {k: getattr(self, k) for k in self.STATE_KEYS} | {"debt": round(self.debt, 3)}

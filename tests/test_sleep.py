@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 
 import chat
+from sleep import day_of
 import sleep
 from sleep import TZ, Clock, Memory, SleepEngine, Store, WAKE_THRESHOLD
 
@@ -89,6 +90,33 @@ def test_rem_grows_and_nrem_deepest_early():
             deep[k] = max(deep[k], e2.depth)
     assert rem_min[0] < rem_min[3], rem_min
     assert deep[0] > deep[3], deep
+
+
+def test_the_alarm_gets_him_up_and_keeps_him_up():
+    e = asleep_engine()
+    e.H += 1.2                                                   # some sleep pressure: left alone he sleeps past 08:00
+    _, ev = run(e, loc(2, "00:05"), loc(2, "10:30"), step=60)
+    ups = [x for x in ev if x["type"] == "wake" and "(alarm)" in x["text"]]
+    assert len(ups) == 1 and ups[0]["at"] <= loc(2, "08:02"), [sleep.hhmm(x["at"]) + " " + x["text"] for x in ev if x["type"] in ("sleep", "wake")]
+    assert not e.asleep and e.last_night is not None and e.alarm_day == day_of(loc(2, "09:00"))
+    _, ev2 = run(e, loc(2, "10:30"), loc(2, "11:30"), step=60)
+    assert not any("(alarm)" in x["text"] for x in ev2 if x["type"] == "wake")   # once a day
+
+
+def test_short_of_sleep_he_sleeps_in():
+    e = asleep_engine()
+    e.debt = 6.0                                                 # six hours owed (a night kept awake before)
+    _, ev = run(e, loc(2, "00:05"), loc(2, "08:30"), step=60)
+    assert e.asleep and e.debt > sleep.ALARM_DEBT_H
+    assert not any("(alarm)" in x["text"] for x in ev if x["type"] == "wake")   # he sleeps in
+
+
+def test_get_up_now_by_the_owner():
+    e = asleep_engine(at="04:50")
+    ev = e.get_up(loc(2, "04:50"), "owner")
+    assert ev["type"] == "wake" and "(owner)" in ev["text"] and not e.asleep
+    stages, _ = run(e, loc(2, "04:50"), loc(2, "06:00"), step=60)
+    assert all(s == "AWAKE" for _, s in stages)                  # up before dawn and he stays up
 
 
 def test_wakes_in_the_morning_and_writes_timeline():
