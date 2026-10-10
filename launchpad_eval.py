@@ -129,7 +129,11 @@ async def evaluate(live, title, concept, rng=None):
             decider.followed(sp, dec["chosen"], [o["label"] for o in opts], "launchpad", rewarded=False)
         except Exception:
             pass
-    return "ok", {"decision": "build" if dec["chosen"] == 0 else "pass", "networks": nets, "vote": dec,
+    # The launchpad takes the vote's build probability, not the dice: build when p(build) >= 0.5 (the browsing
+    # choices keep their temperature sampling; an idea his brain liked at 91 % must not fall on "pass" by chance —
+    # owner 2026-10-10, "Konbini Confession"). The sampled pick stays in the record as vote.chosen.
+    p_build = float(dec["options"][0]["p"]) if dec.get("options") else (1.0 if dec["chosen"] == 0 else 0.0)
+    return "ok", {"decision": "build" if p_build >= 0.5 else "pass", "p_build": round(p_build, 3), "networks": nets, "vote": dec,
                   "mood": {k: round(float(v), 3) for k, v in mood.items()}, "stage": stage, "gain": round(gain, 3),
                   "as_if_awake": sleeping_gain is not None, "sleeping_gain": None if sleeping_gain is None else round(float(sleeping_gain), 3)}
 
