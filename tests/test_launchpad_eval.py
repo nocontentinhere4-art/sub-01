@@ -75,9 +75,9 @@ def test_vote_and_replay(tmp_path, monkeypatch):
     assert len((tmp_path / "launchpad_evals.jsonl").read_text().splitlines()) == 1
 
 
-def test_asleep_is_409(tmp_path, monkeypatch):
+def test_asleep_still_votes_and_says_so(tmp_path, monkeypatch):
     [(s, r)] = call(fake_live("NREM"), tmp_path, IDEA, signed(IDEA), monkeypatch)
-    assert s == 409 and r["status"] == "asleep" and r["stage"] == "NREM"
+    assert s == 200 and r["status"] == "ok" and r["stage"] == "NREM" and r["decision"] in ("build", "pass")
 
 
 def test_bad_or_stale_signature(tmp_path, monkeypatch):

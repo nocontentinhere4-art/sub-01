@@ -12,7 +12,8 @@ so an idea he builds is also something he "heard".
 What this is not: the model does not read or understand the idea. Words are routed to brain networks by a hand-written
 table; the vote is a rule on simulated activity. No language model is involved here.
 
-Asleep (NREM / REM): no vote, 409 with the stage; the launchpad queues the idea until he is awake.
+Always on (owner, 2026-10-10): asleep he votes too, on the clone with his sleeping gain and mood, and every answer
+and ledger row carries the stage.
 Auth: HMAC-SHA256 over "<timestamp>.<body>" with LAUNCHPAD_BRAIN_SECRET (header X-Launchpad-Signature,
 X-Launchpad-Timestamp, max 300 s skew). No secret set: the route answers 503 (off).
 Idempotent: the same request_id returns the stored record (data_dir/launchpad_evals.jsonl), never a second vote.
@@ -83,10 +84,8 @@ class Store:
 
 
 async def evaluate(live, title, concept, rng=None):
-    """-> (status, payload). status: 'ok' | 'asleep'."""
+    """-> (status, payload). status: 'ok' (always on: a sleeping brain votes too and says its stage)."""
     stage = getattr(live.engine, "stage", "AWAKE")
-    if stage != "AWAKE":
-        return "asleep", {"stage": stage}
     nets = idea_networks(title, concept)
     opts = [{"action": "build", "label": f"build: {title[:60]}", "networks": nets},
             {"action": "pass", "label": "pass: keep doing what he is doing", "networks": dict(PASS)}]
