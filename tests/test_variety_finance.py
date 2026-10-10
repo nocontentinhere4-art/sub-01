@@ -140,7 +140,7 @@ def test_a_simulated_day_is_varied_with_little_wikipedia():
         async def _pick_link(sc_, interest):
             return (f"https://{sc.info['host']}/p{len(shown)}", sc.info.get("title", "")) if sc.info else None
 
-        async def _seed(sc_, why, topic=None, hungry=False, only_topic=False):
+        async def _seed(sc_, why, topic=None, hungry=False, only_topic=False, hour=None, **kw):   # (hour: B4)
             note(topic or "front page", "news.example")
             return True
         b._search, b._open, b._public_videos, b._pick_link, b._seed = _search, _open, _public_videos, _pick_link, _seed
