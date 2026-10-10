@@ -175,4 +175,13 @@ is no cap. To refresh the curated list: `python analysis/build_music_list.py` (d
 fictional-character line, with a copy button: the official address, so nobody has to trust one pasted in the chat
 (addresses stay blocked there). Only a valid Solana address (32 bytes of base58) is shown; empty: nothing. It is also
 in `/api/config` (`ca`) and in the websocket `hello`. No chart, no market link and no "buy" anywhere: the address only.
-The city (his map of Kichijōji, the walks, Street View) is `/life.html`; `/city`, `/life` and `/map` redirect there.
+With neither set, `DEFAULT_CA` in `live_server.py` is the owner's address (2026-10-11).
+
+## The city popout
+
+The city is the separate site `SUB01_CITY_URL` (default https://city.subzerone.live/). The room shows a card with a
+preview and a live dot: `/api/city` pings the city's front page at most once a minute for everyone (up = 200). The
+city's own headers forbid framing by other sites (`frame-ancestors 'self'`), so the card is not an iframe: a click opens
+the city in its own window (a popout; a new tab where popups are blocked), as does "city" in every page's navigation and
+`/city`. If the city site ever allows `https://subzerone.live` in its `frame-ancestors`, the card can become a live
+embed. The old map of Kichijōji (walks, Street View) stays at `/life.html` (`/map`, `/life`).

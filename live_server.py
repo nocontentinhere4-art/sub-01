@@ -144,11 +144,15 @@ def b58decode(text):
     return b"\0" * (len(text) - len(text.lstrip("1"))) + raw
 
 
+DEFAULT_CA = "6WCtKQfkWurd77tCCAYWuL5TwyAvuovTzworfnfupump"      # the coin's contract address (owner, 2026-10-11)
+CITY_URL = os.environ.get("SUB01_CITY_URL", "https://city.subzerone.live/").strip()   # the city: his neighbourhood site
+
+
 def coin_address(mint=""):
-    """The coin's contract address for the pages (owner, 2026-10-11): SUB01_CA, else MINT. The pages show it as it is,
-    with a copy button and no market link: not advice, only the official address, so nobody has to trust one pasted
-    in the chat (where addresses stay blocked). Not a Solana address (32 bytes of base58): nothing is shown."""
-    ca = (os.environ.get("SUB01_CA") or mint or "").strip()
+    """The coin's contract address for the pages (owner, 2026-10-11): SUB01_CA, else MINT, else DEFAULT_CA. The pages
+    show it as it is, with a copy button and no market link: not advice, only the official address, so nobody has to
+    trust one pasted in the chat (where addresses stay blocked). Not a Solana address (32 bytes of base58): nothing."""
+    ca = (os.environ.get("SUB01_CA") or mint or DEFAULT_CA or "").strip()
     try:
         return ca if ca and len(b58decode(ca)) == 32 else ""
     except ValueError:
@@ -2084,7 +2088,7 @@ async def viewer_cookie(request, handler):
 # links visitors may still have from before the launch, sent to the page they meant
 OLD_PATHS = {"/login": "/", "/room": "/", "/room/": "/", "/home": "/", "/index": "/", "/sees": "/world.html",
              "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html",
-             "/city": "/life.html", "/life": "/life.html", "/map": "/life.html"}   # the city: his map of Kichijōji
+             "/city": CITY_URL, "/life": "/life.html", "/map": "/life.html"}   # the city site; the old map at /map
 
 NOT_FOUND_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>SUB-01</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><body style="margin:0;height:100vh;
@@ -2320,6 +2324,24 @@ async def main(args):
         referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
         return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else "", "ca": live.ca})
     app.router.add_get("/api/config", config)
+
+    city_state = {"up": False, "checked": 0.0}
+
+    async def city(request):
+        """The city site's pulse for the room's popout card: one GET of its front page at most every 60 s (shared by
+        every viewer), up = 200. The city forbids being framed by other sites (frame-ancestors 'self'), so the card is
+        a preview and a live dot, and the click opens the city in its own window."""
+        if time.time() - city_state["checked"] > 60:
+            city_state["checked"] = time.time()
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as http, \
+                        http.get(CITY_URL, headers={"User-Agent": "SUB-01 room (city pulse)"}) as r:
+                    city_state["up"] = r.status == 200
+            except Exception:
+                city_state["up"] = False
+        return web.json_response({"url": CITY_URL, "up": city_state["up"], "checked": int(city_state["checked"])},
+                                 headers={"Cache-Control": "no-store"})
+    app.router.add_get("/api/city", city)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
     app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
