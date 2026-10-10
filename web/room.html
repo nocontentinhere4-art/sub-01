@@ -3546,7 +3546,11 @@ function cityPulse(){
   }).catch(() => {});
 }
 cityPulse(); setInterval(cityPulse, 90000);
-if (matchMedia("(max-width: 900px)").matches) $("side").insertBefore($("citypip"), $("tabs"));   // phones: a strip above the tabs
+{ // phones: the card is a strip just above the tabs; desktops: in the corner column (also after a rotation or resize)
+  const mq = matchMedia("(max-width: 900px)");
+  const place = () => { if (mq.matches) $("side").insertBefore($("citypip"), $("tabs")); else $("corner").insertBefore($("citypip"), $("brainpip")); };
+  place(); mq.addEventListener("change", place);
+}
 document.querySelectorAll("a.city").forEach(a => a.addEventListener("click", e => {
   if (e.metaKey || e.ctrlKey || e.shiftKey) return;              // (the viewer wants a tab: keep the browser's behaviour)
   const w = Math.min(1180, screen.availWidth - 40), h = Math.min(800, screen.availHeight - 60);
