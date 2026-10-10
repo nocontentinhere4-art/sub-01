@@ -55,6 +55,19 @@ LEAVE_CHAIN = 0.6            # leave bonus at the end of a long chain of pages (
 VIDEO_ACTIONS = ("open_video", "play_video")
 SPIKING_W = float(os.environ.get("SUB01_SPIKING_W", 0.3))   # the spiking network's lean, next to value/taste/novelty
 NETWORKS = {"gpu": "1M-neuron network on GPU", "cpu": "20k-neuron network on CPU", "rate": "rate model only"}
+
+
+def network_label(net, n_neurons=None):
+    """The record's wording follows the network that actually ran (SUB01_SPIKING_LIVE_NEURONS can make the CPU net
+    500k): "500k-neuron network on CPU". The NETWORKS defaults stay for answers that carry no size."""
+    try:
+        n = int(n_neurons or 0)
+    except (TypeError, ValueError):
+        n = 0
+    if net in ("cpu", "gpu") and n > 0:
+        size = f"{n // 1_000_000}M" if n >= 1_000_000 and n % 1_000_000 == 0 else f"{n // 1000}k" if n >= 1000 else str(n)
+        return f"{size}-neuron network on {'GPU' if net == 'gpu' else 'CPU'}"
+    return NETWORKS[net]
 T0 = 0.15                    # softmax temperature when rested and not bored ...
 T_MAX = 0.35                 # ... and the most it rises to (bored and tired): the terms still decide, not the dice
 WATCH_MIN, WATCH_MAX = 2.0, 10.0   # simulated minutes he watches a chosen video before the brain decides again (#17)
@@ -243,7 +256,7 @@ def vote(clone, options, gain=1.0, mood=None, tastes=None, novel=None, rng=None,
     else:
         top_k = int(np.argmax(spk))
         net = spiking.get("net") if spiking.get("net") in NETWORKS else "cpu"
-        sp_rec = {"used": True, "net": net, "network": NETWORKS[net], "weight": SPIKING_W,
+        sp_rec = {"used": True, "net": net, "network": network_label(net, spiking.get("n_neurons")), "weight": SPIKING_W,
                   "pick": int(spiking.get("pick", top_k)), "leaned_to": options[top_k]["label"],
                   "pool_rates": [round(float(x), 3) for x in spiking["pool_rates"]] if spiking.get("pool_rates") else None,
                   "sim_ms": spiking.get("sim_ms"), "n_neurons": spiking.get("n_neurons"), "id": spiking.get("id")}
@@ -386,7 +399,7 @@ class Backend:
         self.pending = {"id": ans["id"], "net": net, "followed": int(chosen), "t": t} if rewarded else None
         lt = spiking_term(ans, len(labels)) if net != "rate" else None
         ln = [round(float(x), 3) for x in lt] if lt is not None else None
-        self.last = {"t": round(t), "kind": kind, "net": net, "network": NETWORKS[net], "labels": labels,
+        self.last = {"t": round(t), "kind": kind, "net": net, "network": network_label(net, (ans or {}).get("n_neurons") if isinstance(ans, dict) else None), "labels": labels,
                      "followed": int(chosen), "followed_label": labels[int(chosen)], "lean": ln,
                      "leaned_to": labels[int(np.argmax(ln))] if ln else None,
                      "pick_label": labels[ans["pick"]] if "net_pick" in extra else None, "why": ans.get("why")}
