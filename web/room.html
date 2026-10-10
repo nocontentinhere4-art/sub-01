@@ -1110,6 +1110,13 @@ load("room/hand_phone.glb").then(g => {
   s.mesh.geometry.dispose(); s.mesh.geometry = new THREE.PlaneGeometry(w * 0.84, h * 0.93); s.aspect = 0.84 * w / (0.93 * h); s.mesh.position.z = d / 2 + 0.0006;
   phoneGlass();                                        // the canvas follows the glass's new aspect
 }).catch(() => {});
+// the gripping prop hand stands in for his own hand only while holdPhone() poses the arm; when a clip holds the phone in
+// his own hand (the bed layer: phone.userData.byClip) the prop goes and the phone's own body shows - with both, he had
+// three hands (2026-10-10)
+function propHand(on){
+  if (!HAND.mesh || HAND.mesh.visible === on) return;
+  HAND.mesh.visible = on; phone.children[0].visible = !on;
+}
 // holding the phone in his right hand: the phone sits in front of his chest facing his eyes; the right arm starts from
 // the "hold" pose and a two-bone IK puts the wrist where the gripping HAND needs it. Until that model has loaded
 // (or if it fails), his own hand is turned so that the phone lies on the palm
@@ -1181,7 +1188,7 @@ function wristOnPhone(){
 const RAMP = ["RightArm", "RightForeArm", "RightHand"], _q0 = RAMP.map(() => new THREE.Quaternion()), _up = new THREE.Vector3();
 // w: 0..1, how far the arm and head have gone from the clip's pose to the grip (it ramps up when he picks the phone up)
 function holdPhone(w){
-  if (phone.userData.byClip) return;                    // (a clip that holds the phone itself: room/boy_mh.js's bed layer)
+  if (phone.userData.byClip) return;                    // (a clip that holds the phone itself: room/boy_mh.js's bed layer; see propHand)
   const B = bones, G = GRIP, t = T; if (!B.RightArm || !B.LeftArm || !head) return;
   const lying = (current && current === actions.phone_lie) || TU.y < 0.5;   // (the torso, so a clip change mid-ramp keeps it right)
   touch(B.RightArm, B.RightForeArm, B.RightHand, head);
@@ -3746,6 +3753,7 @@ function animate(dt){                                // one step of him: clips, 
   const out = (phoneWanted || peek) && boy.visible && !!hand;                   // the arm comes up to the phone, and goes down
   holdW = out ? Math.min(1, holdW + dt / 0.7) : Math.max(0, holdW - dt / 0.5);
   phone.visible = holdW > 0.25 && boy.visible && !!hand;
+  propHand(!phone.userData.byClip);
   if (holdW > 0) holdPhone(holdW);
   aliveHead(); inBed(dt);
   return moving;
@@ -3822,7 +3830,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
     ...(V5 ? {clipDir: "room/mh_v5", fixClip: c => V5.m.fixClip(THREE, c, V5.conv), pageHips: h => V5.m.legacyHips(THREE, h, V5.conv), seatUp: 0, seatIn: 0.06, noHair: true} : {}),   // (v5: its clips, the live chair, its own hair)
     ...(V5 && V5.mx ? {clipDir: "room/mh_mx", ...V5.m.ROOM} : {}),   // (?char=mixamo: its clips, which clip plays which slot, the clips' keyboard and mouse)
     ...(DESK_EV ? {anim: "sova", deskEvents: () => DESK_EV.splice(0)} : {}),   // (&anim=sova: the desk states and what they react to)
-    movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; }, phone: () => phone,
+    movesDone: () => !MOVES || movesOn, setCurrent: a => { current = a; }, phone: () => phone, propHand,
     resnap: () => { if (placed && goal) snap(goal.anchor, goal.clip); },
     state: () => ({at, step, goal, current, want, T, life:lastLife}),
     chairChanged: () => { VOX = null; },                // (the chair's shape changed: its collision voxels anew)

@@ -2027,7 +2027,7 @@ export function createMH(env) {
   }
   function bedOff() {
     const B = M.bed; for (const [k, a] of Object.entries(B.def)) if (a) env.actions[k] = a;
-    B.cur = B.slot = null; const ph = env.phone && env.phone(); if (ph && ph.userData.byClip) { ph.userData.byClip = false; ph.visible = false; }
+    B.cur = B.slot = null; const ph = env.phone && env.phone(); if (ph && ph.userData.byClip) { ph.userData.byClip = false; ph.visible = false; if (env.propHand) env.propHand(true); }
   }
   function bedStep(st, dt) {
     const B = M.bed; if (!B) return;
@@ -2057,8 +2057,9 @@ export function createMH(env) {
     // the phone: in his left hand by the clip's grip (else the page holds it as before)
     // (this body's step - the page's step0 - has no phone of its own: shown here while a clip holds it, hidden after)
     const ph = env.phone && env.phone(); if (!ph) return;
-    if (!C.phone) { if (ph.userData.byClip) { ph.userData.byClip = false; ph.visible = false; } return; }
+    if (!C.phone) { if (ph.userData.byClip) { ph.userData.byClip = false; ph.visible = false; if (env.propHand) env.propHand(true); } return; }
     ph.userData.byClip = true; ph.visible = true;
+    if (env.propHand) env.propHand(false);                   // his own hand grips it: the page's prop hand goes, the phone body shows
     const hb = env.bones.LeftHand; if (!hb) return; hb.updateWorldMatrix(true, false);
     ph.position.copy(hb.localToWorld(C.phone.t.clone())); ph.quaternion.copy(hb.getWorldQuaternion(new THREE.Quaternion()).multiply(C.phone.q).multiply(BED_AXES)); ph.updateMatrixWorld(true);
   }
