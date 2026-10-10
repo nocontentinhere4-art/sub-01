@@ -144,6 +144,17 @@ def b58decode(text):
     return b"\0" * (len(text) - len(text.lstrip("1"))) + raw
 
 
+def coin_address(mint=""):
+    """The coin's contract address for the pages (owner, 2026-10-11): SUB01_CA, else MINT. The pages show it as it is,
+    with a copy button and no market link: not advice, only the official address, so nobody has to trust one pasted
+    in the chat (where addresses stay blocked). Not a Solana address (32 bytes of base58): nothing is shown."""
+    ca = (os.environ.get("SUB01_CA") or mint or "").strip()
+    try:
+        return ca if ca and len(b58decode(ca)) == 32 else ""
+    except ValueError:
+        return ""
+
+
 def b58encode(b):
     n, out = int.from_bytes(b, "big"), ""
     while n:
@@ -335,6 +346,7 @@ class Live:
     def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
         self.mint, self.demo = mint, demo
+        self.ca = coin_address(mint)       # shown on the pages (hello, /api/config); "" until the owner sets it
         self.trust_proxy = trust_proxy
         self.store = Store(data_dir)
         saved, mem = self.store.load()
@@ -1882,7 +1894,7 @@ class Live:
                                 "replies": getattr(self, "replies", [])[-10:],
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD,
                                 "music": self.music.public(self.music.now) if getattr(self, "music", None) else None,
-                                "audience": self.audience_hello(ws)})
+                                "audience": self.audience_hello(ws), "ca": self.ca})
             await ws.send_json(self.nights())
             if self.last_frame:
                 await ws.send_json(self.eye_frame())
@@ -2071,7 +2083,8 @@ async def viewer_cookie(request, handler):
 
 # links visitors may still have from before the launch, sent to the page they meant
 OLD_PATHS = {"/login": "/", "/room": "/", "/room/": "/", "/home": "/", "/index": "/", "/sees": "/world.html",
-             "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html"}
+             "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html",
+             "/city": "/life.html", "/life": "/life.html", "/map": "/life.html"}   # the city: his map of Kichijōji
 
 NOT_FOUND_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>SUB-01</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><body style="margin:0;height:100vh;
@@ -2305,7 +2318,7 @@ async def main(args):
     async def config(request):                    # browser config (Maps JS keys are referrer-restricted by design)
         key = os.environ.get("GOOGLE_MAPS_KEY", "")
         referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
-        return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else ""})
+        return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else "", "ca": live.ca})
     app.router.add_get("/api/config", config)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))

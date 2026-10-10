@@ -38,6 +38,12 @@
   /* the one line that is always on the first screen, before any tick: what he is (S10). Never hidden, never moved off */
   #fiction { margin-top:6px; font-size:11.5px; color:#d8d8e2; line-height:1.45; text-shadow:0 1px 8px #000, 0 0 3px #000, 0 0 1px #000; max-width:60ch; }   /* (readable over the white wall) */
   #fiction a { color:#b9b9c6; text-decoration:underline dotted; } #fiction a:hover { color:var(--fg); } #fiction .short { display:none; }
+  /* the coin's contract address (owner, 2026-10-11): the official one, to copy; no chart, no market link, no "buy" */
+  #ca { margin-top:7px; display:flex; align-items:center; gap:8px; font-size:11.5px; color:#d8d8e2; max-width:60ch; pointer-events:auto; text-shadow:0 1px 8px #000, 0 0 3px #000; }
+  #ca .k { color:var(--dim); letter-spacing:.14em; font-size:10.5px; flex:none; }
+  #ca .addr { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all; }
+  #ca button { flex:none; background:rgba(10,10,14,.7); color:var(--fg); border:1px solid #2a2a36; border-radius:4px; font:inherit; font-size:10.5px; padding:2px 7px; cursor:pointer; }
+  #ca button:hover { border-color:var(--or); color:var(--or); } #ca button.ok { border-color:#39f5a0; color:#39f5a0; }
   /* the night line under the story while he sleeps: when he fell asleep, what was replayed (R3) */
   #night { margin-top:6px; font-size:12px; color:#9fb4ff; line-height:1.5; text-shadow:0 1px 8px #000; max-width:60ch; }
   #night[hidden] { display:none; }
@@ -361,10 +367,11 @@
 <div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
 <div id="top">
-  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
+  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/life.html">city</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
   <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></span><span class="short">A simulated character. Not a person, not conscious. <a href="/about.html">about</a></span></div>
+  <div id="ca" hidden><span class="k">CA</span><span class="addr" id="ca-addr"></span><button id="ca-copy" type="button" title="copy the contract address">copy</button></div>
   <div id="night" hidden></div>
   <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
 <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
@@ -3510,6 +3517,18 @@ function put(id, prop, v){ const k = id + "." + prop; if (shown.get(k) === v) re
 let reTimer = 0, retry = 0, full = null, gotHello = false, tickAt = 0, tickWatch = 0, drawn = 0;
 const FULL_TXT = {ip:"too many tabs open on this address · retrying in a moment", all:"the room is full · retrying in a moment"},
       LOST_TXT = "connection lost · reconnecting…", SLOW_TXT = "cannot reach his room · still trying";
+// the coin's contract address from the server (SUB01_CA or MINT): shown once set, with a copy button; nothing else
+function showCA(ca){
+  const ok = typeof ca === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ca);
+  $("ca").hidden = !ok; if (ok) $("ca-addr").textContent = ca;
+}
+$("ca-copy").onclick = async () => {
+  const b = $("ca-copy"), ca = $("ca-addr").textContent; let done = false;
+  try { await navigator.clipboard.writeText(ca); done = true; } catch (e) {}
+  if (!done) { const r = document.createRange(); r.selectNodeContents($("ca-addr")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  b.textContent = done ? "copied" : "select + copy"; b.classList.toggle("ok", done);
+  setTimeout(() => { b.textContent = "copy"; b.classList.remove("ok"); }, 1800);
+};
 function offline(text){ $("live").classList.remove("on"); $("story").textContent = text; put("chip", "textContent", "…");
   for (const k of ["story.innerHTML", "chip.textContent", "chip.background"]) shown.delete(k); }   // (the next tick rewrites them)
 function reconnect(ms){ clearTimeout(reTimer); reTimer = setTimeout(() => { reTimer = 0; connect(); }, ms); }
@@ -3532,7 +3551,7 @@ function connect(){
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.type === "full") { full = m.why === "ip" ? "ip" : "all"; offline(FULL_TXT[full]); return; }
-    if (m.type === "hello") { gotHello = true; $("live").classList.add("on"); }
+    if (m.type === "hello") { gotHello = true; $("live").classList.add("on"); showCA(m.ca); }
     if (m.type === "tick") { tickAt = drawn; retry = 0; }
     if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }

@@ -168,3 +168,11 @@ is no cap. To refresh the curated list: `python analysis/build_music_list.py` (d
 - Now: `curl -X POST -H "X-Admin-Token: $SUB01_ADMIN_TOKEN" https://subzerone.live/api/wake` (the token is the
   service's `SUB01_ADMIN_TOKEN` variable on Railway). He gets up as rested as the cycle is at that hour and stays on
   his feet until the morning's own drive takes over; bedtime stays his usual (~23:50).
+
+## The coin's address on the pages
+
+`SUB01_CA` (Railway variable; `MINT` is used when it is empty) is the contract address the room shows under the
+fictional-character line, with a copy button: the official address, so nobody has to trust one pasted in the chat
+(addresses stay blocked there). Only a valid Solana address (32 bytes of base58) is shown; empty: nothing. It is also
+in `/api/config` (`ca`) and in the websocket `hello`. No chart, no market link and no "buy" anywhere: the address only.
+The city (his map of Kichijōji, the walks, Street View) is `/life.html`; `/city`, `/life` and `/map` redirect there.
