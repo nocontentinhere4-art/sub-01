@@ -1374,7 +1374,8 @@ class Live:
         g = self.chess
         if g is None:
             if playing:
-                g = self.chess = chess_game.Game(t, rng=self.chess_rng)
+                level = chess_game.level_for(tail_jsonl(self.chess_path, chess_game.LEVEL_GAMES))   # W/D/L-tuned
+                g = self.chess = chess_game.Game(t, rng=self.chess_rng, level=level)
                 g.next_at = time.time() + self.chess_pace(g.his_turn)
                 await self.broadcast({"type": "chess", **g.public()})
             return
