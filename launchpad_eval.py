@@ -90,8 +90,16 @@ async def evaluate(live, title, concept, rng=None):
     opts = [{"action": "build", "label": f"build: {title[:60]}", "networks": nets},
             {"action": "pass", "label": "pass: keep doing what he is doing", "networks": dict(PASS)}]
     t = live.clock.now()
-    mood = live.mood(t)
+    mood = dict(live.mood(t))
     gain = live.engine.gain
+    # Owner 2026-10-10: ideas are judged in his daytime tone even at night. Asleep, the vote runs on the clone with the
+    # awake gain (SUB01_LAUNCHPAD_AWAKE_GAIN, default 1.0) and without the sleep tiredness; the answer says so
+    # ("as_if_awake", with the sleeping gain it replaced), so nothing is hidden.
+    sleeping_gain = None
+    if stage != "AWAKE":
+        sleeping_gain = gain
+        gain = max(float(gain), float(os.environ.get("SUB01_LAUNCHPAD_AWAKE_GAIN") or 1.0))
+        mood["tired"] = 0.0
     clone = live.brain.clone()
     decider = getattr(live, "decider", None)
     sp = None
@@ -112,7 +120,8 @@ async def evaluate(live, title, concept, rng=None):
         except Exception:
             pass
     return "ok", {"decision": "build" if dec["chosen"] == 0 else "pass", "networks": nets, "vote": dec,
-                  "mood": {k: round(float(v), 3) for k, v in mood.items()}, "stage": stage, "gain": round(gain, 3)}
+                  "mood": {k: round(float(v), 3) for k, v in mood.items()}, "stage": stage, "gain": round(gain, 3),
+                  "as_if_awake": sleeping_gain is not None, "sleeping_gain": None if sleeping_gain is None else round(float(sleeping_gain), 3)}
 
 
 def add_routes(app, live, data_dir):

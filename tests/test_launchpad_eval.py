@@ -78,6 +78,7 @@ def test_vote_and_replay(tmp_path, monkeypatch):
 def test_asleep_still_votes_and_says_so(tmp_path, monkeypatch):
     [(s, r)] = call(fake_live("NREM"), tmp_path, IDEA, signed(IDEA), monkeypatch)
     assert s == 200 and r["status"] == "ok" and r["stage"] == "NREM" and r["decision"] in ("build", "pass")
+    assert r["as_if_awake"] is True and r["gain"] >= 1.0 and r["sleeping_gain"] is not None
 
 
 def test_bad_or_stale_signature(tmp_path, monkeypatch):
