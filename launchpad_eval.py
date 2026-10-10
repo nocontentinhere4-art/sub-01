@@ -30,6 +30,7 @@ from aiohttp import web
 
 import brain_vote
 import chat
+from sleep import AWAKE
 
 VERSION = "launchpad-eval/1"
 MAX_SKEW_S = 300
@@ -101,6 +102,15 @@ async def evaluate(live, title, concept, rng=None):
         gain = max(float(gain), float(os.environ.get("SUB01_LAUNCHPAD_AWAKE_GAIN") or 1.0))
         mood["tired"] = 0.0
     clone = live.brain.clone()
+    if sleeping_gain is not None and hasattr(clone, "set_rhythm"):
+        # the clone wakes up too: awake rhythm and excitability, then a second to settle, so the cortex model responds
+        # to the idea as it would by day (a sleeping clone answers nothing and the vote fell to chance)
+        clone.set_rhythm(AWAKE["f_hz"], AWAKE["coupling"], AWAKE["noise"])
+        clone.a = AWAKE["a"]
+        try:
+            clone.step(int(round(1.0 / float(getattr(clone, "dt", 0.001)))))
+        except Exception:
+            pass
     decider = getattr(live, "decider", None)
     sp = None
     if decider:
