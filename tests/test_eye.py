@@ -18,7 +18,7 @@ import eye as E
 
 # --- the filters -------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("thought", ["I feel alive", "I should buy the dip", "I am conscious now", "my hands are cold",
-                                     "the coin is pumping", "I understand what you mean", "send me 5 sol",
+                                     "the coin is pumping", "I am conscious of myself", "send me 5 sol",
                                      "watch porno tonight"])
 def test_thought_refused(thought):
     assert not E.thought_ok(thought)
