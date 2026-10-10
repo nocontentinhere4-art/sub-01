@@ -37,7 +37,7 @@
   #story em { font-style:normal; color:var(--st); }
   /* the one line that is always on the first screen, before any tick: what he is (S10). Never hidden, never moved off */
   #fiction { margin-top:6px; font-size:11.5px; color:#d8d8e2; line-height:1.45; text-shadow:0 1px 8px #000, 0 0 3px #000, 0 0 1px #000; max-width:60ch; }   /* (readable over the white wall) */
-  #fiction a { color:#b9b9c6; text-decoration:underline dotted; } #fiction a:hover { color:var(--fg); }
+  #fiction a { color:#b9b9c6; text-decoration:underline dotted; } #fiction a:hover { color:var(--fg); } #fiction .short { display:none; }
   /* the night line under the story while he sleeps: when he fell asleep, what was replayed (R3) */
   #night { margin-top:6px; font-size:12px; color:#9fb4ff; line-height:1.5; text-shadow:0 1px 8px #000; max-width:60ch; }
   #night[hidden] { display:none; }
@@ -209,7 +209,11 @@
       background:linear-gradient(rgba(4,4,6,.82), rgba(4,4,6,.55) 70%, rgba(4,4,6,0)); }   /* phones: the header reads over any part of the room */
     #story { font-size:15px; line-height:1.3; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     #state { font-size:11px; gap:8px; } #why { font-size:11px; margin-top:5px; color:#b9b9c6; }
-    #fiction { font-size:10.5px; margin-top:5px; max-width:none; } #night { font-size:11px; margin-top:5px; }
+    /* phones: one short line at the foot of the room instead of in the header's flow - the header's height is the band
+       the camera gives up (hudBand), and two more lines there put his head out of a 360 px frame */
+    #fiction { position:absolute; left:16px; right:16px; top:calc(62vh - 24px); margin:0; font-size:10.5px; max-width:none;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #fiction .long { display:none; } #fiction .short { display:inline; } #night { font-size:11px; margin-top:5px; }
     #cam { display:none; }
     #note { font-size:9.5px; }
     #brand h1 { font-size:15px; } #state { margin-top:10px; } #why { max-width:none; }
@@ -360,7 +364,7 @@
   <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
-  <div id="fiction">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></div>
+  <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></span><span class="short">A simulated character. Not a person, not conscious. <a href="/about.html">about</a></span></div>
   <div id="night" hidden></div>
   <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
 <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
