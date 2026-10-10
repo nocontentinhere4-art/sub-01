@@ -348,7 +348,7 @@ class Backend:
         rates = ans.get("pool_rates")
         return (rates is None and rates_optional) or (isinstance(rates, (list, tuple)) and len(rates) == k)
 
-    async def ask(self, options, kind="browse"):
+    async def ask(self, options, kind="browse", timeout=None):
         """-> the answer of the first network that answered in time ({"net": "gpu"|"cpu", "id", "pick",
         "pool_rates", ...}), or {"net": "rate", "id", "why"}."""
         labels = [str(o) for o in options][:MAX_OPTIONS]
@@ -364,7 +364,7 @@ class Backend:
             if ans is not None:
                 why.append("GPU network answer did not fit")
         if self.cpu is not None:
-            ans = await self.cpu.decide(labels, kind, did=did)
+            ans = await self.cpu.decide(labels, kind, did=did, timeout=timeout)
             if self._fits(ans, len(labels)):
                 return {**ans, "net": "cpu", "id": did}
             why.append(ans.get("why") or "CPU network error")

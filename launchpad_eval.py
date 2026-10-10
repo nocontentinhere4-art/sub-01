@@ -97,7 +97,9 @@ async def evaluate(live, title, concept, rng=None):
     sp = None
     if decider:
         try:
-            sp = await decider.ask([o["label"] for o in opts], "launchpad")
+            # the launchpad can wait for a big network (SUB01_LAUNCHPAD_DECIDE_S, default 15 s); browsing cannot
+            sp = await decider.ask([o["label"] for o in opts], "launchpad",
+                                   timeout=float(os.environ.get("SUB01_LAUNCHPAD_DECIDE_S") or 15))
         except Exception:
             sp = None
     loop = asyncio.get_running_loop()
