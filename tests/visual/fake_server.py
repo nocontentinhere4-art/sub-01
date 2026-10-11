@@ -34,7 +34,7 @@ API_EMPTY = {
     "/api/mind": {"on": False}, "/api/music": {"now": None}, "/api/chess": {"playing": False},
     "/api/memory": {"items": []}, "/api/taught": {"left": 30, "per_day": 30, "today": [], "yesterday": [], "gpu": False,
                                                   "note": "visual QA: no server"},
-    "/api/config": {"qa": True}, "/api/diary": {}, "/api/reading": {}, "/api/frames": [], "/api/browsing": {},
+    "/api/config": {"qa": True}, "/api/city": {"url": "", "up": False}, "/api/diary": {}, "/api/reading": {}, "/api/frames": [], "/api/browsing": {},
     "/api/screens": {}, "/api/tastes": {}, "/api/spiking/live": {},
 }
 # the screens' pictures (/api/screen/desk.jpg, /api/screen/phone.jpg, fetched for the monitor and the phone when a scene

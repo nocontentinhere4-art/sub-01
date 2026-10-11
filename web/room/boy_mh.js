@@ -852,7 +852,7 @@ export function createMH(env) {
     let worst = 0; for (let i = first; i <= 5; i++) if (S(side, i, 1)) worst = Math.min(worst, gap(side, name, i, 1)); return worst;
   }
 
-  const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V();
+  const _k = V(), _c = V(), _m = V(), dK = V(), _hp = V(), _lh = V();
   // the solve at M.handsHz (15 a second): the contact solves skin vertices inside bisection searches for 15 joints x 2 hands,
   // 13-16 ms a frame under software GL and the hottest thing on the owner's Mac (its fans). The frames between re-apply
   // the last solve's local turns of the bones it touches (both arms: upper arm, forearm, hand, every finger bone - chainOf)
@@ -861,15 +861,26 @@ export function createMH(env) {
   // time accumulated since. Every frame still while a reach is in progress (a mode switch: the weights move each frame,
   // minimum-jerk), on a mode or a clip change, until a first solve is held, and while nothing is placed (the modes' weights
   // gone: nothing to hold, and the body is cheap)
-  const HZ = {acc: 0, held: false, mode: null, cur: null, q: {Left: [], Right: []}};
+  // (the frames between two solves draw the arms between them - the last solve and the one before, slerped bone by bone by
+  // the time since, half an interval (33 ms at 15 Hz) behind the solve - so the hands move every frame instead of standing
+  // still for a frame and jumping the whole way the next: at 15 Hz the fingertips stepped 0 / 30 mm on alternate frames
+  // while he typed. In steady typing or mousing only: a reach or a mode switch solves every frame and is drawn as solved -
+  // the arm's local turns drawn a frame late over a crossfading torso put the fingertip 20-80 mm off where the solve had it.
+  // ?debug: mh.M.handsLerp = false draws every solve as it was, held between solves)
+  const HZ = {acc: 0, held: false, mode: null, cur: null, q: {Left: [], Right: []}, qp: {Left: [], Right: []}, two: false};
+  const _hq = new THREE.Quaternion(); M.hz = HZ; M.chainOf = side => chainOf(side);   // (?debug)
   function hands(dt) {
     const t0 = performance.now(), typing = M.mode === "desk_type", mousing = M.mode === "desk_mouse", cur = env.state().current;
     const reaching = (typing ? M.ph.type < 1 : M.ph.type > 0) || (mousing ? M.ph.mouse < 1 : M.ph.mouse > 0);
     HZ.acc += dt;
     const full = !(M.handsHz > 0) || !HZ.held || reaching || M.noIK || M.mode !== HZ.mode || cur !== HZ.cur || HZ.acc >= 1 / M.handsHz - 1e-6;
+    const steady = M.handsHz > 0 && !reaching && !M.noIK && M.mode === HZ.mode && cur === HZ.cur && M.handsLerp !== false;
     HZ.mode = M.mode; HZ.cur = cur;
-    if (full) { const dta = HZ.acc; HZ.acc = 0; handsSolve(dta); HZ.held = M.w.type > 0.01 || M.w.mouse > 0.01; if (HZ.held) handsHold(true); }
-    else handsHold(false);
+    // (the clip's turns of the whole chain kept before the solve and put back before the next mixer update (contactRestore):
+    // the mixer rewrites a bone only when its blend changed, so an arm left as drawn would be the next solve's "clip" pose)
+    if (full) { const dta = HZ.acc, was = HZ.held; HZ.acc = 0; for (const sd of ["Left", "Right"]) for (const b of chainOf(sd)) grKeep(b);
+      handsSolve(dta); HZ.held = M.w.type > 0.01 || M.w.mouse > 0.01; HZ.two = was && HZ.held && steady; if (HZ.held) handsHold(true, 0.5); }
+    else handsHold(false, 0.5 + 0.5 * Math.min(1, HZ.acc * M.handsHz));
     const ms = performance.now() - t0;
     M.handsMs = ms; M.handsMsAvg = M.handsMsAvg == null ? ms : M.handsMsAvg + (ms - M.handsMsAvg) * 0.05;   // (?debug: the hands' cost per frame)
   }
@@ -879,10 +890,12 @@ export function createMH(env) {
     for (const sd of ["Left", "Right"]) forearmTwistBack(sd);
     if (ELB_REF.Left || ELB_REF.Right) { elbowKeep(); ELB_REF.Left = ELB_REF.Right = null; }   // (other placements keep the clip's elbow)
   }
-  function handsHold(save) {                                 // save: the solved pose kept; else put back over the clip's (between solves)
-    for (const side of ["Left", "Right"]) { const C = chainOf(side), Q = HZ.q[side];
-      C.forEach((b, i) => { if (save) { (Q[i] || (Q[i] = new THREE.Quaternion())).copy(b.quaternion); return; }
-        grKeep(b); b.quaternion.copy(Q[i]); }); }               // (the clip's turn kept: back before the next mixer update)
+  function handsHold(save, f = 1) {                          // save: the solved pose kept (and the one before it); drawn between the two by f (how far from the one before), over the clip's
+    for (const side of ["Left", "Right"]) { const C = chainOf(side), Q = HZ.q[side], P = HZ.qp[side];
+      C.forEach((b, i) => { if (save) { if (HZ.two) (P[i] || (P[i] = new THREE.Quaternion())).copy(Q[i]); (Q[i] || (Q[i] = new THREE.Quaternion())).copy(b.quaternion); }
+        else grKeep(b);                                       // (the clip's turn kept: back before the next mixer update)
+        if (HZ.two) b.quaternion.copy(_hq.copy(P[i]).slerp(Q[i], f)); else if (!save) b.quaternion.copy(Q[i]); }); }
+    if (save && HZ.two) env.boy.updateMatrixWorld(true);
   }
   // a rig with no forearm twist bones (the Mixamo character): the arm's solve leaves the upper arm's and the forearm's own
   // twist (about their length) free, and frame to frame they jumped - the upper arm 145 deg in one frame while he typed,
@@ -1583,6 +1596,7 @@ export function createMH(env) {
       if (to === "bedlie" && from === "bedside") { const h = u => hipsAt(M.clips.bedtime, B.edge + (B.end - B.edge) * u);
         return {k: "bedtime", a: B.edge, b: B.end, at: u => mixPlace(B.edgePl, B.lie, sstep(0.1, 0.7, u), h(u))}; }
     }
+    if (to === "bedlie" && from === "bedlie") return {k: "relie"};         // (a change of lying clip: relie())
     if (to === "desk" && from !== "desk") return {k: "sit_down", a: G.sit.from, b: G.sit.to, at: () => chairPlace(G.seatDown || SEAT.down, null, SEAT_AT.desk_watch), back: true};   // (onto the seated loop's seat point)
     if (!to && from === "desk") return {k: "stand_up", a: 0, b: M.clips.stand_up.duration, at: () => chairPlace(SEAT.up, null, SEAT_AT.desk_watch), back: true};
     if (to === "bedside" && from !== "bedlie") return {k: "bed_lie", a: G.lie.stand, b: G.lie.edge, at: () => G.lieEdge};
@@ -1712,24 +1726,56 @@ export function createMH(env) {
     for (const k of ["sit_down", "stand_up", "bed_lie", "bed_wake", "bedtime", "getupL", "getupR"]) if (k !== on) { const a = M.actions[k]; if (a && (a.isRunning() || a.getEffectiveWeight() > 0)) { a.setEffectiveWeight(0); a.stop(); } }
     if (!T) return false;
     if (T.flow) return flow(S, T);
+    if (T.k === "relie") return relie(S, st);
     const place = T.at(Math.min(1, Math.max(0, S.t))); if (!place) return false;
-    if (S.mhd === undefined) { S.mhd = S.d; S.d = Math.max(S.d, T.b - T.a); }   // the step lasts as long as the clip's stretch (the page's ~1 s is too quick)
+    if (S.mhd === undefined) { S.mhd = S.d; S.d = Math.max(S.d, T.b - T.a);   // the step lasts as long as the clip's stretch (the page's ~1 s is too quick)
+      // (he came walking with the stand still blended in (pivot: short strides as he slowed): startPose stopped it and set the
+      // walk to 1 - a 15 cm pop at the feet. The stand's share of last frame goes on here and leaves over 0.3 s)
+      S.sigma0 = M.pvAt != null && M.frame - M.pvAt <= 1 ? Math.min(0.85, M.pvShare || 0) : 0; }
     const u = Math.min(1, Math.max(0, S.t)), w = sstep(0, 0.15, u) * (1 - sstep(0.85, 1, u));
     const a = M.actions[T.k]; if (!a.isRunning()) { a.reset(); a.play(); }
     a.paused = true; a.time = T.a + (T.b - T.a) * u; a.setEffectiveWeight(w);
     if (S.A && S.A !== a) S.A.setEffectiveWeight(u < 0.5 ? 1 - w : 0);          // the page's poses only at the two ends
     if (S.B && S.B !== a) S.B.setEffectiveWeight(u < 0.5 ? 0 : 1 - w);
+    const St = M.actions.stand, sg = S.sigma0 ? S.sigma0 * (1 - sstep(0, 0.3, u * S.d)) : 0;   // (the stand's share of the whole blend, whose weights sum to 1)
+    if (sg > 0.002 && St !== S.A && St !== S.B && St !== a) { if (!St.isRunning()) { St.reset(); St.play(); } St.stopFading(); St.setEffectiveWeight(sg / (1 - sg)); }
+    else if (S.sigma0 && !S.sigmaOff && St !== S.A && St !== S.B) { S.sigmaOff = true; St.setEffectiveWeight(0); St.stop(); }
     env.mixer.update(0);
     // the root: from the page's toward the clip's placement (onto the bed: kept); sitting down from further out than the
-    // clip starts (TURN_CLEAR), over the first 35 % while he already sits back, so it adds to his own travel
-    const b = env.boy, wr = T.k === "sit_down" && u < 0.5 ? sstep(0, 0.35, u) : T.back ? w : sstep(0, 0.15, u);
-    b.position.set(b.position.x + (place.x - b.position.x) * wr, b.position.y + (env.F - b.position.y) * wr, b.position.z + (place.z - b.position.z) * wr);
+    // clip starts (TURN_CLEAR), over the first 35 % while he already sits back, so it adds to his own travel; to the bed's
+    // edge the same 35 % (the walk-in's frame faces up to 3 rad from the way he arrived: over 15 % he spun at 6 rad/s)
+    const b = env.boy, wr = T.k === "sit_down" && u < 0.5 ? sstep(0, 0.35, u) : T.back ? w : sstep(0, 0.35, u);
+    // (the height is the floor's: the clips have the feet on it and the lifts (bedLift, seatLift) add theirs after. The
+    // page's own keyed height was built on last frame's lifted root, so it carried the bed's lift a second time: a 10 cm
+    // hop as the lie-down began)
+    b.position.set(b.position.x + (place.x - b.position.x) * wr, env.F, b.position.z + (place.z - b.position.z) * wr);
     b.rotation.y = angLerp(b.rotation.y, place.ry, wr);
+    return true;
+  }
+  // a change of lying clip (asleep <-> the phone, both on the bed): the page's pose step plans the hips' path between two
+  // lying placements of its own, neither the bed layer's, and a lying clip's root sits a metre from the hips: over the 0.8 s
+  // his hips swung 1.3 m off the bed and back, then he jumped to the new clip's place. Here the hips stay where they were
+  // drawn last frame while the body turns to the new clip's heading, the two clips crossfading as the page has them
+  // (S.w); the bed layer then eases from the end of it (bedPlay, M.lastRoot)
+  const RELIE_S = 1.8;                                        // (s: the roll from one lying clip to the other)
+  function relie(S, st) {
+    if (S.rl === undefined) { const H = M.lastHips, L = M.lastRoot; S.rl = null;
+      if (H && L) { const sleep = M.seg.bt && st.goal && st.goal.clip === "sleep", P1 = sleep ? M.seg.bt.lie : M.seg.bedLie;   // (where onBed() puts the new clip)
+        const h = a => { const c = a && a.getClip(), n = c && c.name, bc = M.bed && n && n.startsWith("bed_") && M.bed.clips[n.slice(4)];   // (a clip's hips, in the body's frame)
+          return bc ? bc.h0 : c ? hipsAt(c, Math.min(a.time, c.duration)) : null; };
+        const hA = h(S.A), hB = h(S.B); if (hA && hB) { S.rl = {x: H.x, z: H.z, r0: L.ry, r1: P1.ry, hA, hB};
+          // (the two clips' frames lie up to 120 deg apart about the hips: over the page's 0.8 s the blend kicked his legs
+          // 70 cm into the air at 6 m/s; a roll from one's side onto one's back takes about two seconds)
+          S.mhd = S.d; S.d = Math.max(S.d, RELIE_S); } } }
+    const R = S.rl; if (!R) return false;
+    const w = S.w ?? sstep(0, 1, S.t), ry = angLerp(R.r0, R.r1, w), c = Math.cos(ry), s = Math.sin(ry), b = env.boy;
+    const hx = R.hA[0] + (R.hB[0] - R.hA[0]) * w, hz = R.hA[2] + (R.hB[2] - R.hA[2]) * w;   // (the blend's hips, as the mixer blends them)
+    b.position.set(R.x - (hx * c + hz * s), env.F, R.z - (-hx * s + hz * c)); b.rotation.y = ry;
     return true;
   }
   // the clips were recorded on another bed: while he sits on, lies down on or gets up from this one, any of his skin
   // that dips into the mattress lifts him by as much (eased back down when clear)
-  let skin = null;
+  let skin = null; const BED_DIP = 0.55, BED_RISE = 0.6;      // (m under the mattress top: deeper is a foot or a hand on the floor, not a dip; m/s: the lift's rise - see bedLift)
   function baseY() {                                         // his height as the page has it, without the lifts below
     const y = env.boy.position.y; if (M.lastY === undefined || Math.abs(y - M.lastY) > 1e-7) M.baseY = y;
     env.boy.position.y = M.baseY; return M.baseY;
@@ -1749,9 +1795,15 @@ export function createMH(env) {
     const on = st.at === "bedlie" || st.at === "bedside" || (st.step && (st.step.to === "bedlie" || st.step.to === "bedside" || st.step.from === "bedlie" || st.step.from === "bedside"));
     if (!on && !M.lift) return;
     const b = env.boy; let need = 0, every = 3;
-    if (on && !st.step) {                                      // still on the bed: every other vertex, once a second (cheap on a phone)
-      M.liftT = (M.liftT || 0) - dt; if (M.liftT > 0) { b.position.y += M.lift; return; }
-      M.liftT = 1; every = 2; M.lift = 0;
+    // (the lift follows the need it last measured at BED_RISE a second up and 0.1 down, every frame: the need itself is
+    // measured once a second while he lies still (a change of lying clip too, relie()), every frame while he moves. Set to
+    // the new need at once, a lift no longer needed dropped him 20 cm in one frame asleep, and as the lie-down's legs swung
+    // in over the mattress the lift came all at once - 10 to 27 cm of the whole of him in one frame, three times on the way
+    // into bed; a few frames of skin in the duvet instead)
+    const follow = () => { M.lift = Math.min(Math.max(M.liftNeed || 0, (M.lift || 0) - 0.1 * dt), (M.lift || 0) + BED_RISE * dt); if (M.lift < 1e-4) M.lift = 0; b.position.y += M.lift; };
+    if (on && (!st.step || st.step.rl)) {                     // still on the bed: every other vertex, once a second (cheap on a phone)
+      M.liftT = (M.liftT || 0) - dt; if (M.liftT > 0) { follow(); return; }
+      M.liftT = 1; every = 2;
     }
     if (on) {
       if (!skin) { skin = []; b.traverse(o => { if (o.isSkinnedMesh && !/_inside$/.test(o.name)) skin.push(o); }); }     // every part (dressed: his clothes too; not the page's drawn inside)
@@ -1759,14 +1811,19 @@ export function createMH(env) {
       // (lying awake on top of it, he rests on the folded quilt pressed flat under him, env.quiltTop, not on the bare
       // mattress: there his back and soles went 1 to 3 cm into the dented quilt)
       const top = env.quiltTop ? BED.top + (M.dentW || 0) * (env.quiltTop - BED.top) : BED.top;
-      for (const o of skin) { if (!o.visible) continue; const P = o.geometry.attributes.position;
+      // (on his feet beside it - hips high, both feet on the floor - nothing of him rests on the mattress: a hand swinging
+      // past its edge inside the footprint lifted the whole of him 18 cm as room_bedtime walked him in)
+      const Bn = env.bones, hy = Bn.Hips ? Bn.Hips.getWorldPosition(v).y : 0, fy = Bn.LeftFoot && Bn.RightFoot ? Math.max(Bn.LeftFoot.getWorldPosition(v).y, Bn.RightFoot.getWorldPosition(v).y) : 9;
+      const afoot = hy - env.F > 0.8 && fy < env.F + 0.15;
+      for (const o of skin) { if (afoot || !o.visible) continue; const P = o.geometry.attributes.position;
       for (let i = 0; i < P.count; i += every) { o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
         const e = Math.min(v.x - BED.box[0], BED.box[1] - v.x, v.z - BED.box[2], BED.box[3] - v.z);
-        if (e > 0) need = Math.max(need, top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y); } }   // (its edge is rounded, r 5 cm)
+        // (a dip is skin under the top; a part deeper than BED_DIP (the mattress top is 0.645 m up) is on the floor inside the
+        // footprint - a foot, as room_bedtime walks him in over the mattress's corner, lifted the whole of him 54 cm onto it)
+        const d = top - (e < 0.05 ? 0.05 - Math.sqrt(0.0025 - (0.05 - e) ** 2) : 0) - v.y;   // (its edge is rounded, r 5 cm)
+        if (e > 0 && d < BED_DIP) need = Math.max(need, d); } }
     }
-    M.lift = Math.max(need, (M.lift || 0) - 0.1 * dt);
-    if (M.lift < 1e-4) M.lift = 0;
-    b.position.y += M.lift;
+    M.liftNeed = need; follow();
   }
   // the soles: no vertex of his feet (or of the slides on them) under the floor; a step that dips lifts him by as much,
   // eased back down. The vertices whose main bone is a foot or a toe, gathered once over every skinned part - only the
@@ -1831,10 +1888,27 @@ export function createMH(env) {
     _lp.copy(b.position); M.lpOk = true;
     const walking = !!(S && (S.k === "walk" || S.k === "turn") && st.current === W);
     const want = walking ? Math.min(1, Math.max(0.15, speed / 0.35)) : 1;
-    if (walking && !M.wasWalking) M.ww = S.flow ? 1 : 0.15;     // (from standing: the first steps are short ones; after the get-up he is mid-stride)
+    // (from standing: the first steps are short ones; after the get-up he is mid-stride. From the walk itself - its last
+    // step ended and a turn on the spot begins - from the walk's share as it is: set to 0.15 at once, 85 % of the standing
+    // pose landed in one frame, a foot 24 cm)
+    if (walking && !M.wasWalking) { const we = W.getEffectiveWeight(), se = St.isRunning() ? St.getEffectiveWeight() : 0; M.ww = S.flow ? 1 : Math.max(0.15, we / Math.max(1e-3, we + se)); }
     M.wasWalking = walking;
-    M.ww = (M.ww == null ? 1 : M.ww) + (want - (M.ww == null ? 1 : M.ww)) * (1 - Math.exp(-dt / 0.15));
-    if (!walking) { M.ry0 = null; if (M.pivoting) { M.pivoting = false; if (St !== st.current) { St.setEffectiveWeight(0); St.stop(); } } M.ww = 1; return; }
+    const ww0 = M.ww == null ? 1 : M.ww;                        // (the strides shrink over 0.3 s, grow back over 0.15)
+    M.ww = ww0 + (want - ww0) * (1 - Math.exp(-dt / (want < ww0 ? 0.3 : 0.15)));
+    M.frame = (M.frame || 0) + 1;
+    if (!walking) { M.ry0 = null;
+      if (M.pivoting) {
+        // the turn is over and nothing else plays yet (the walk still current between two steps): the stand's share goes over
+        // ~0.15 s, not at once (halfSteps(false) set the walk to 1 and the stand fading: its share jumped 0.15 -> 0.54, then
+        // the stop here made it 1 - a fingertip 24 cm in a frame). Anything else that took over blends on from these weights:
+        // a play() fades from them (room.html), a pose step carries the stand's share into its own blend (transition(), pvShare)
+        if (st.current === W && !S) { M.ww = ww0 + (1 - ww0) * (1 - Math.exp(-dt / 0.15)); M.pvShare = 1 - M.ww; M.pvAt = M.frame;
+          W.setEffectiveWeight(M.ww); St.setEffectiveWeight(1 - M.ww); env.mixer.update(0);
+          if (M.ww > 0.99) { M.pivoting = false; St.setEffectiveWeight(0); St.stop(); M.ww = 1; } return; }
+        M.pivoting = false; M.pvShare = 1 - ww0; M.pvAt = M.frame;
+        if (st.current !== W && st.current !== St && !(S && S.k === "pose") && St.isRunning() && St.getEffectiveWeight() > 0 && !St._weightInterpolant) St.fadeOut(0.3);
+      }
+      M.ww = 1; return; }
     if (M.ry0 == null || M.ww > 0.99) M.ry0 = b.rotation.y;    // (where this turn on the spot started)
     if (M.ww > 0.995 && !M.pivoting) return;
     M.pivoting = M.ww <= 0.995;
@@ -2000,6 +2074,7 @@ export function createMH(env) {
   // the page's phone (x its width, y its length, z out of its screen) in the clips' phone box (x its thickness = the screen's
   // normal, y its length, z its width)
   const BED_AXES = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(0, 0, -1), V(0, 1, 0), V(1, 0, 0)));
+  const _bh = V();                                            // (bedStep: his hips in the body's frame this frame)
   async function bedLoad(make) {
     const r = await fetch(`${BED_DIR}/index.json`); if (!r.ok) throw new Error(`${BED_DIR}/index.json: ${r.status}`);
     const ix = (await r.json()).clips || {}, clips = {};
@@ -2007,7 +2082,12 @@ export function createMH(env) {
       const c0 = env.fixClip ? env.fixClip(g.animations[0]) : g.animations[0]; if (!c0) return; const c = c0.clone(); c.name = "bed_" + name;
       const a = make(c); if (e.loop) a.setLoop(THREE.LoopRepeat, Infinity); else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
       const sp = sampler(c), p0 = sp(0); sp.done();
-      clips[name] = {a, dur: c.duration, loop: !!e.loop, place: bedPlace(p0), phone: e.phone ? {t: V(...e.phone.node_translation), q: new THREE.Quaternion(...e.phone.node_rotation_xyzw)} : null};
+      // (the page's pose steps plan a change of lying clip (sleep <-> the phone) by each clip's hips (hipsOf -> HIPS[clip
+      // name]); with none registered a bed clip read as standing (HIPS.idle, the hips a metre up) and he swung 1.3 m off
+      // the bed and back over the step, then jumped to the new clip's place: the whole body 1.3-2.2 m in one frame)
+      env.HIPS["bed_" + name] = [p0.hips.x, p0.hips.y, p0.hips.z];
+      clips[name] = {a, dur: c.duration, loop: !!e.loop, place: bedPlace(p0), h0: [p0.hips.x, p0.hips.y, p0.hips.z],
+        phone: e.phone ? {t: V(...e.phone.node_translation), q: new THREE.Quaternion(...e.phone.node_rotation_xyzw)} : null};
     }, () => null)));
     if (!Object.keys(clips).length) throw new Error("no bed clip loaded");
     const A = env.actions; M.bed = {clips, cur: null, slot: null, until: 0, def: {phone_lie: A.phone_lie, lie_phone: A.lie_phone, sleep: A.sleep}, from: null, k: 1};
@@ -2022,7 +2102,10 @@ export function createMH(env) {
     const B = M.bed, C = B.clips[name], a = C.a, cur = st.current;
     a.reset(); a.setEffectiveWeight(1); a.fadeIn(BED_FADE).play(); if (cur && cur !== a) cur.fadeOut(BED_FADE); env.setCurrent(a);
     for (const k of B.slot === "phone" ? ["phone_lie", "lie_phone"] : ["sleep"]) env.actions[k] = a;   // (the page's play() keeps it)
-    const b = env.boy; B.from = {x: b.position.x, z: b.position.z, ry: b.rotation.y}; B.k = 0; B.cur = name;
+    // (from where he was drawn last frame: on the first frame after a pose step onBed() has already snapped the root to the
+    // page's lying placement, 10-80 cm from the bed layer's; eased from there he jumped to it, every part of him in one frame)
+    const b = env.boy, L = M.lastRoot, Hh = M.lastHips; B.from = L ? {x: L.x, z: L.z, ry: L.ry} : {x: b.position.x, z: b.position.z, ry: b.rotation.y};
+    B.hips0 = Hh ? [Hh.x, Hh.z] : null; B.k = 0; B.cur = name;   // (and where his hips were: the ease carries them straight to the new clip's)
     M.log.push([+st.T.toFixed(2), "bed:" + name]); if (M.log.length > 50) M.log.shift();
   }
   function bedOff() {
@@ -2051,9 +2134,18 @@ export function createMH(env) {
     if (M.bedForce && has(M.bedForce)) want = M.bedForce;      // (?debug: that clip, now)
     if (want && want !== B.cur && has(want)) bedPlay(want, st);
     const C = B.clips[B.cur]; if (!C) return;
-    // the root: each clip's own placement on the bed (the page's is the lie clip's), eased over the crossfade
-    if ((window.__bedPlace ?? "own") === "own") { B.k = Math.min(1, B.k + dt / BED_FADE); const k = B.k * B.k * (3 - 2 * B.k), F0 = B.from || C.place, b = env.boy;
-      b.position.set(F0.x + (C.place.x - F0.x) * k, env.F, F0.z + (C.place.z - F0.z) * k); b.rotation.y = angLerp(F0.ry, C.place.ry, k); b.updateMatrixWorld(true); }
+    // the root: each clip's own placement on the bed (the page's is the lie clip's), eased over the crossfade - by his hips,
+    // not the root: lying, the root sits a metre from the hips, and two placements whose turns differ swung the hips 35 cm
+    // out over the bed's edge and back as the root's turn and place were eased apart (6-13 cm a frame). His hips (as the
+    // mixer blends them this frame, in the body's frame) go straight from where they were to where the new clip's placement
+    // puts them while the body turns to its heading; at the end the root is the placement itself
+    if ((window.__bedPlace ?? "own") === "own") { B.k = Math.min(1, B.k + dt / BED_FADE); const k = B.k * B.k * (3 - 2 * B.k), F0 = B.from || C.place, b = env.boy, P1 = C.place;
+      if (k >= 1 || !B.hips0) { const p = k >= 1 ? P1 : mixPlace(F0, P1, k, C.h0); b.position.set(p.x, env.F, p.z); b.rotation.y = p.ry; }
+      else { const Hb = env.bones.Hips; b.updateMatrixWorld(true); const hb = Hb ? b.worldToLocal(Hb.getWorldPosition(_bh)) : _bh.set(...C.h0);
+        const ry = angLerp(F0.ry, P1.ry, k), c = Math.cos(ry), s = Math.sin(ry), c1 = Math.cos(P1.ry), s1 = Math.sin(P1.ry);
+        const hx = B.hips0[0] + (P1.x + hb.x * c1 + hb.z * s1 - B.hips0[0]) * k, hz = B.hips0[1] + (P1.z - hb.x * s1 + hb.z * c1 - B.hips0[1]) * k;
+        b.position.set(hx - (hb.x * c + hb.z * s), env.F, hz - (-hb.x * s + hb.z * c)); b.rotation.y = ry; }
+      b.updateMatrixWorld(true); }
     // the phone: in his left hand by the clip's grip (else the page holds it as before)
     // (this body's step - the page's step0 - has no phone of its own: shown here while a clip holds it, hidden after)
     const ph = env.phone && env.phone(); if (!ph) return;
@@ -2107,6 +2199,8 @@ export function createMH(env) {
     wave(st, dt);
     props_(st); hairInit(); hairLights(dt);
     env.boy.updateMatrixWorld(true); correctives();           // (last: on the final pose)
+    { const b = env.boy, L = M.lastRoot || (M.lastRoot = {}); L.x = b.position.x; L.z = b.position.z; L.ry = b.rotation.y;   // (where he was drawn: bedPlay eases from it,
+      const Hp = env.bones.Hips; if (Hp) { Hp.getWorldPosition(_lh); const H = M.lastHips || (M.lastHips = {}); H.x = _lh.x; H.y = _lh.y; H.z = _lh.z; } }   //  relie() holds his hips there)
     return moving;
   }
   // a short wave of his right hand toward the viewers (viewers' reactions spiked, mostly waves: desk_states.js GLANCE),

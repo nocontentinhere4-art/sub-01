@@ -1053,8 +1053,12 @@ function play(name, fade = 0.4){
   want = name; const a = actions[name] || actions[ALIAS[name]] || actions.idle || actions.sit;
   if (!a || a === current) return;
   for (const x of Object.values(actions)) if (x !== a && x !== current && x.isRunning() && x.getEffectiveWeight() > 0) x.fadeOut(fade);   // (half steps)
+  // (an action already in the blend - the stand under the half steps, at 0.85 after a turn on the spot - fades on from its
+  // weight, not from 0: fadeIn's 0 dropped its share for a frame and the walk's share jumped 0.15 -> 1, a foot 24 cm)
+  const w0 = a.isRunning() ? Math.min(1, a.getEffectiveWeight()) : 0;
   a.reset(); a.weight = 1;                             // (a pose step may have left its weight at 0; reset() keeps it)
-  a.fadeIn(fade).play(); if (current) current.fadeOut(fade); current = a;
+  a.fadeIn(fade).play(); if (w0 > 0.001 && a._weightInterpolant) a._weightInterpolant.sampleValues[0] = w0;
+  if (current) current.fadeOut(fade); current = a;
 }
 
 // ---------- live surfaces: monitor, phone, window ----------
@@ -2148,7 +2152,7 @@ function drive(dt){                                   // one frame of the plan; 
     if (S.off0 && (S.off0.lengthSq() > 1e-8 || Math.abs(S.r0) > 1e-4)) { CHAIR.node.position.addScaledVector(S.off0, 1 - e); CHAIR.node.rotation.y += S.r0 * (1 - e); CHAIR.node.updateMatrixWorld(true); }   // (no jump: from where it is)
     if (S.ride) { boy.position.copy(S.rel); CHAIR.node.localToWorld(boy.position); boy.rotation.y = CHAIR.node.rotation.y + S.rr; }
     else if (S.step) { boy.position.x = S.p0.x + (S.step[0] - S.p0.x) * e; boy.position.z = S.p0.z + (S.step[1] - S.p0.z) * e; }   // gives way as it comes
-    if (S.hand) handOn(Math.sin(Math.PI * Math.min(1, S.t / 0.6)));               // a hand on the backrest to start it, then lets go
+    if (S.hand) handOn(Math.sin(Math.PI * Math.min(1, S.t)));                     // a hand on the backrest to start it, then lets go (over the whole step: in 0.54 s the fingertips went 15 cm a frame, 4.4 m/s)
     if (S.t >= 1) step = null; return true; }
   if (S.k === "turn") { if (S.stepping) halfSteps(true);
     if (turnTo(S.r, S.stepping ? TURN_V : 1.6, dt)) { boy.rotation.y = Math.atan2(Math.sin(S.r), Math.cos(S.r)); step = null; if (S.stepping) halfSteps(false); } return true; }
