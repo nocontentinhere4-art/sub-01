@@ -62,6 +62,20 @@
   #music ul { list-style:none; margin:8px 0 0; padding:0; font-size:11px; color:var(--dim); }
   #music li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
   #music li.c { color:var(--fg); }
+  /* the meters card (a viewer's wish: "extra meters in the brain section, dopamine spikes etc"): the model's simulated
+     neuromodulator levels, tiredness, sync, the busiest networks. A name and a plain hint left, the number right, a thin
+     bar under both; the tick on a bar marks the model's resting-wake level (1.0). Nothing of it in the room's mini. */
+  #meters .mt { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; row-gap:3px; align-items:center; padding:4px 0 5px; font-size:11px; }
+  #meters .mt .n { color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #meters .mt .n i { font-style:normal; color:var(--faint); margin-left:7px; }
+  #meters .mt .v { color:var(--fg); font-variant-numeric:tabular-nums; text-align:right; min-width:3.6em; }
+  #meters .mt .b { grid-column:1 / -1; position:relative; height:4px; border-radius:2px; background:rgba(255,255,255,.07); overflow:hidden; }
+  #meters .mt .b i { display:block; height:100%; width:0; border-radius:2px; background:#9aa3c4; transition:width .35s; }
+  #meters .mt .b.ref::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(255,255,255,.3); }
+  #meters .mt.da .b i { background:var(--or); } #meters .mt.sl .b i { background:#4d7cff; } #meters .mt.sy .b i { background:#39f5a0; }
+  #meters .sub { font-size:10.5px; color:var(--dim); letter-spacing:.08em; text-transform:uppercase; margin:8px 0 1px; }
+  #meters .m { margin-top:3px; }
+  @media (max-width: 900px) { #meters { min-width:min(340px, calc(100vw - 32px)); } }   /* the hints fit on a 390 px phone */
 
   #dock { position:fixed; right:24px; bottom:22px; width:var(--panel-w); display:flex; flex-direction:column; gap:10px; }
   #layers { display:flex; flex-wrap:wrap; gap:6px; }
@@ -135,7 +149,7 @@
   #neurons { min-width:0; }
   #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
-  body.mini #top, body.mini #cards, body.mini #dock, body.mini #ticker, body.mini #honest, body.mini #vignette { display:none !important; }
+  body.mini #top, body.mini #cards, body.mini #meters, body.mini #dock, body.mini #ticker, body.mini #honest, body.mini #vignette { display:none !important; }
 
   @media (max-width: 900px) {
     html,body { overflow:auto; }
@@ -166,12 +180,28 @@
 </div>
 
 <div id="cards">
+  <!-- the meters: simulated levels in the model, read from the tick (no extra request); updated by metersTick() -->
+  <div class="card" id="meters">
+    <div class="k"><span>Meters</span><span>simulated levels in the model</span></div>
+    <div class="mt da" id="mt-da"><span class="n">dopamine <i>reward signal, wanting</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
+    <div class="m" id="mt-dab">no burst in the last 10 min</div>
+    <canvas id="da" width="300" height="64" style="width:100%;height:64px;margin:6px 0 2px"></canvas>
+    <div class="m" id="da-l">simulated dopamine-like reward signal in the model</div>
+    <div class="mt" id="mt-5ht"><span class="n">serotonin 5HT <i>mood, patience</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
+    <div class="mt" id="mt-ne"><span class="n">noradrenaline NE <i>alertness, arousal</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
+    <div class="mt" id="mt-ach"><span class="n">acetylcholine ACh <i>attention, learning</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
+    <div class="sub" id="mt-stage">sleep</div>
+    <div class="mt sl" id="mt-tired"><span class="n">tiredness <i>from the sleep circuit</i></span><span class="v">—</span><span class="b"><i></i></span></div>
+    <div class="mt sl" id="mt-debt"><span class="n">sleep debt <i>hours owed</i></span><span class="v">—</span><span class="b"><i></i></span></div>
+    <div class="sub">networks</div>
+    <div class="mt sy" id="mt-sync"><span class="n">sync <i>regions beating together</i></span><span class="v">—</span><span class="b"><i></i></span></div>
+    <div class="m" id="mt-top">busiest vs own baseline: …</div>
+    <div class="m">the tick on a bar: the model's resting-wake level (1.0). These are a model's variables, not feelings.</div>
+  </div>
   <div class="card" id="screens">
     <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
     <div class="m" id="sc-b"></div>
     <div class="m" id="sc-share"></div>
-    <canvas id="da" width="300" height="64" style="width:100%;height:64px;margin:6px 0 2px"></canvas>
-    <div class="m" id="da-l">simulated dopamine-like reward signal in the model</div>
     <div class="m" id="sc-src"></div>
     <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
     <div id="sc-tt"></div>
@@ -532,7 +562,7 @@ const CHIP = {AWAKE:"#ff9a3c", NREM:"#4d7cff", REM:"#c26bff"};
 const CHIPTXT = {AWAKE:"AWAKE", NREM:"DEEP SLEEP", REM:"REM"};
 const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
 let stage = null, target = [1,0,0], mix = null, burst = 0, boost = 0, sci = 0, sciT = 0;
-let fibreMat, cortexMat, nodes = [], showRegions = false, n3dim = 0;
+let fibreMat, cortexMat, nodes = [], nodeGrp = null, showRegions = false, n3dim = 0;
 let pulse = {t:-1, start:0};
 const OPACITY = MINI ? 0.021 : 0.0105;     // the mini keeps 1 fibre in 6: each drawn twice as bright
 let actNew = false, onScreen = true, drawnAt = 0;
@@ -546,6 +576,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
   nodes = d.nodes;
   const lab2node = new Int16Array(512).fill(-1); nodes.forEach((n, i) => lab2node[n.lab] = i);
   const isLang = n => n && n.name.startsWith("LH_") && (n.name.includes("Temp") || n.name.includes("FrOper"));
+  nodeGrp = nodes.map(n => isLang(n) ? "language" : n.group);      // each region's network, for the meters card's busiest-networks line
   const keep = MINI ? 6 : 1;
   const P = new Float32Array(fbuf), E = new Int16Array(ebuf), k = meta.pts, n = Math.floor(meta.n / keep), segs = n * (k - 1);
   const pos = new Float32Array(segs*6), dcol = new Float32Array(segs*6), info = new Float32Array(segs*8), nod = new Float32Array(segs*4);
@@ -830,6 +861,7 @@ function daLevel(v){
 }
 function daSpike(m){
   daSpikes.push({at: daCount, size: m.size, kind: m.kind}); if (daSpikes.length > 60) daSpikes.shift();
+  daBursts.push({at: Date.now(), size: +m.size || 0}); if (daBursts.length > 200) daBursts.shift(); daBurstLine();
   $("da-l").textContent = `${m.label}: ${m.why} · burst ${(+m.size).toFixed(2)}`
     + (m.n > 1 ? ` · clip ${m.n} of this scroll session (habituating)` : "");
   tick(`dopamine-like burst <b>${(+m.size).toFixed(2)}</b> · ${esc(m.why)} (novelty ${m.novelty}, predicted interest ${m.interest}, expectation ${m.expect}) → reward regions`);
@@ -847,6 +879,58 @@ function drawDA(){
   for (const s of daSpikes) { const i = s.at - (daCount - daTrace.length) - 1; if (i < 0) continue;
     g.fillRect(x(i) - 1, H - 4 - Math.min(1, s.size) * (H - 8), 2, Math.min(1, s.size) * (H - 8)); }
   g.fillStyle = "rgba(236,236,242,.6)"; g.font = "10px sans-serif"; g.fillText("DA", 4, 11);
+}
+// ---------- the meters card: simulated levels in the model (a viewer's wish: "extra meters, dopamine spikes etc") ----------
+// Everything here is read from the tick the page already gets (neuro, sleep, sync, the per-region activity): no request,
+// no extra message. A bar or a number is written only when its shown value changes (the DOM is the cost, not the
+// arithmetic): a tick costs a few string compares, well under 0.1 ms. Nothing of it runs in the room's mini.
+const MT = {};                                             // id -> {bar, val, w, t}: the width and text last written
+function meter(id, v, lo, hi, text){
+  let m = MT[id]; if (!m) { const el = $(id); m = MT[id] = {bar: el.querySelector(".b i"), val: el.querySelector(".v"), w: -1, t: null}; }
+  const w = Math.round(100 * Math.min(1, Math.max(0, (v - lo) / (hi - lo))));
+  if (w !== m.w) { m.w = w; m.bar.style.width = w + "%"; }
+  if (text !== m.t) { m.t = text; m.val.textContent = text; }
+}
+const mtShown = {};
+function mtPut(id, t){ if (mtShown[id] === t) return; mtShown[id] = t; $(id).textContent = t; }
+const daBursts = [];                                       // {at: Date.now(), size} of the bursts seen (daSpike), pruned to 10 min
+function daBurstLine(){
+  if (MINI) return;
+  const now = Date.now(); while (daBursts.length && now - daBursts[0].at > 600000) daBursts.shift();
+  const n = daBursts.length, lb = daBursts[n - 1], ago = lb ? Math.round((now - lb.at) / 60000) : 0;
+  mtPut("mt-dab", n ? `${n} burst${n === 1 ? "" : "s"} in the last 10 min · last ${lb.size.toFixed(2)}, ${ago < 1 ? "just now" : ago + " min ago"}`
+                    : "no burst in the last 10 min");
+}
+function metersTick(m){
+  if (MINI) return;
+  const nm = m.neuro;
+  if (nm && typeof nm.DA === "number") {                   // 0..2 on the bar, the tick at 1.0 = resting wake
+    meter("mt-da", nm.DA, 0, 2, nm.DA.toFixed(2)); meter("mt-5ht", nm["5HT"], 0, 2, (+nm["5HT"]).toFixed(2));
+    meter("mt-ne", nm.NE, 0, 2, (+nm.NE).toFixed(2)); meter("mt-ach", nm.ACh, 0, 2, (+nm.ACh).toFixed(2));
+  }
+  const sl = m.sleep;
+  if (sl) {
+    if (typeof sl.tired === "number") meter("mt-tired", sl.tired, 0, 1, Math.round(sl.tired * 100) + "%");
+    if (typeof sl.debt === "number") meter("mt-debt", sl.debt, 0, 12, sl.debt.toFixed(1) + " h");
+    mtPut("mt-stage", `sleep · ${CHIPTXT[sl.stage] || sl.stage || "…"}${typeof sl.gain === "number" ? ` · stimulus gain ${Math.round(sl.gain * 100)}%` : ""}`
+      + (sl.woken_tonight ? ` · woken ${sl.woken_tonight}× tonight` : ""));
+  }
+  if (typeof m.sync === "number") meter("mt-sync", m.sync, 0, 1, Math.round(m.sync * 100) + "%");
+  daBurstLine();
+}
+// the 3 networks most above their own ~25 s baseline, from the activity vector and the running base the page keeps
+// anyway (once a second: the ratios jitter tick to tick)
+let topAt = 0;
+function topNets(a){
+  if (MINI || !nodeGrp || !base) return;
+  const now = performance.now(); if (now - topAt < 1000) return; topAt = now;
+  const s = {}, n = {};
+  for (let i = 0, L = Math.min(a.length, nodeGrp.length); i < L; i++) {
+    const g = nodeGrp[i]; if (!g || g === "other") continue;
+    s[g] = (s[g] || 0) + a[i] / Math.max(base[i], 0.02); n[g] = (n[g] || 0) + 1;
+  }
+  const top = Object.keys(s).map(g => [g, s[g] / n[g]]).sort((x, y) => y[1] - x[1]).slice(0, 3);
+  mtPut("mt-top", "busiest vs own baseline: " + (top.length ? top.map(([g, r]) => `${g} ×${r.toFixed(1)}`).join(" · ") : "…"));
 }
 // an official embed player (Spotify, TikTok, YouTube) in the screens card: replaced only when its source changes, never
 // autoplayed; one allowlist of the official players' hosts, whatever the server sends (R2)
@@ -937,6 +1021,7 @@ function connect(){
       if (!MINI) $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
     }
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
+    metersTick(m);
     for (const ev of m.events || []) {
       if (ev.type === "replay") { lastReplay = {text: ev.text, received: ev.received, at: performance.now()};
         tick(`${esc(ev.t)} · replay ${{reading: "of what it read or watched ", taught: "of what it was taught "}[ev.source] || ""}<b>“${esc(ev.text.slice(0, 60))}”</b> (from ${esc(ev.received)}) → ${esc((ev.networks || []).join(", "))}`);
@@ -951,6 +1036,7 @@ function connect(){
     actFrom = act ? act.slice() : a; actTo = a; actAt = now; actNew = true;
     const k = 0.002 * 20 / RATE;                   // same ~25 s baseline as at 20 ticks/s
     if (!base) base = a.slice(); else base = base.map((b, i) => b * (1 - k) + a[i] * k);
+    topNets(a);
   };
   ws.onclose = () => {
     $("live").classList.remove("on");

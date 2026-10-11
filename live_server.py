@@ -218,8 +218,8 @@ LITE_DROP = ("act", "wave", "groups", "slow")     # per-region brain activity: o
 ACT_LO, ACT_HI = 0.01, 10.0     # q=1: act on a log scale, one byte a region (~1.4 % steps), clipped to this range
 # q=1 keeps only what web/index.html draws (one source of truth for the brain page's fields). S1: the coin's trades
 # are a stimulus only (Live.apply), never in a tick: no trade tape, amounts or buy / sell words reach a page.
-BRAIN_KEEP = ("type", "sync", "events", "sleep", "baseline", "slow", "life")
-BRAIN_SLEEP = ("stage", "burst", "clock", "tz", "gain", "debt", "woken_tonight")
+BRAIN_KEEP = ("type", "sync", "events", "sleep", "baseline", "slow", "life", "neuro")   # neuro: the meters card + the DA trace (4 numbers)
+BRAIN_SLEEP = ("stage", "burst", "clock", "tz", "gain", "debt", "tired", "woken_tonight")
 BRAIN_LIFE = ("doing", "walking")
 
 
@@ -347,6 +347,7 @@ def local_accounts():
 
 
 class Live:
+    ca = ""                            # the coin's address (set in __init__; a bare instance in tests has none)
     def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
         self.mint, self.demo = mint, demo

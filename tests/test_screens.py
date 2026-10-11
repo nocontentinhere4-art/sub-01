@@ -640,6 +640,27 @@ def test_room_handles_the_night_and_brain_says_a_word_reaches_him_through_the_sl
     assert 'capPut("story", story())' in brain                            # R4: the caption is written only when it changed
 
 
+def test_brain_meters_card_reads_the_tick_it_already_gets_and_stays_out_of_the_mini():
+    """A viewer's wish ("extra meters in the brain section, dopamine spikes etc"): /brain has a meters card fed from the
+    tick alone (the q=1 feed carries neuro and sleep.tired for it; no request, no extra message), labelled as simulated
+    levels in the model, never as feelings; nothing of it runs or shows in the room's mini."""
+    brain = (WEB / "index.html").read_text()
+    for el in ('id="meters"', 'id="mt-da"', 'id="mt-dab"', 'id="mt-5ht"', 'id="mt-ne"', 'id="mt-ach"', 'id="mt-tired"',
+               'id="mt-debt"', 'id="mt-stage"', 'id="mt-sync"', 'id="mt-top"', 'id="da"'):
+        assert el in brain, el
+    assert "simulated levels in the model" in brain and "not feelings" in brain
+    assert "his feelings" not in brain and "conscious" not in brain
+    assert "neuro" in live_server.BRAIN_KEEP and "tired" in live_server.BRAIN_SLEEP         # the fields the card draws
+    mt = _js_function(brain, "function metersTick(")
+    assert mt.startswith("function metersTick(m){\n  if (MINI) return;") and "fetch(" not in mt and "sock.send" not in mt
+    assert "m.neuro" in mt and "sl.tired" in mt and "sl.debt" in mt and "m.sync" in mt
+    assert "metersTick(m);" in _js_function(brain, "function connect(")
+    me = _js_function(brain, "function meter(")
+    assert "if (w !== m.w)" in me and "if (text !== m.t)" in me                        # written only when the shown value changes
+    assert "daBursts.push" in _js_function(brain, "function daSpike(") and "600000" in _js_function(brain, "function daBurstLine(")
+    assert "body.mini #meters" in brain
+
+
 def test_phone_battery_curve_is_continuous():
     """R4: the phone's battery look has no jump at midnight or at 07:00 and stays within 12 %..100 %."""
     js = (WEB / "room_phone.js").read_text()
