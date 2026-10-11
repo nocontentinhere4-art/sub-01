@@ -143,5 +143,7 @@ it learned from. No GPU run was made for this PR.
 |---|---|---|
 | `SUB01_SPIKING_LIVE` | `1` | `0` does not start the child: the vote is the rate model's alone |
 | `SUB01_SPIKING_W` | `0.3` | the weight of its lean in the vote |
-| `SUB01_SPIKING_LIVE_NEURONS` | `20000` | the network's size. Learned weights are only loaded into the same size |
+| `SUB01_SPIKING_LIVE_NEURONS` | `20000` | the network's base size (500k on Railway). Learned weights are only loaded into the same base size |
+| `SUB01_GROW_PER_DAY` | `5000` | neurogenesis (`docs/spiking/live.md`, `spiking/growth.py`): neurons added once a waking day, at his wake-up; `0` turns growth off |
+| `SUB01_NEURONS_MAX` | `1000000` | the cap the network never grows past (and the cost guard refuses what does not fit the container or the decision deadline) |
 | `SUB01_SPIKING_LIVE_IDLE_MS` | `50` | background activity between decisions, every 2 s, for the page's raster (`0`: none) |

@@ -41,7 +41,12 @@ Protocol: the decision protocol shared with the 1M-neuron GPU network (#58), one
     {"type": "reward", "id": "b-1", "value": 0.3, "followed": 0}   (value = the tastes prediction error; "followed",
         an extension of this child, is the option the vote followed: default the network's own pick)
         -> {"type": "rewarded", "id": "b-1", "ok", "eta", "n_learn"}
-    {"type": "status", "id": "s-1"} -> {"type": "status", "id": "s-1", "cpu_s", "uptime_s", "n_decisions", ...}
+    {"type": "status", "id": "s-1"} -> {"type": "status", "id": "s-1", "cpu_s", "uptime_s", "n_decisions", ...,
+        + the growth fields: "grown", "grow_today", "synapses", "cap", "grow_per_day", "n_base", "growth"}
+    {"type": "grow", "id": "grow-2026-10-11"} -> {"type": "grown", "id", "added", "why", + the growth fields}
+        (neurogenesis, spiking/growth.py: the server sends it when the sleep engine says AWAKE; the child grows at most
+        once a Tokyo day, by SUB01_GROW_PER_DAY neurons up to SUB01_NEURONS_MAX, when the cost guard says it fits;
+        the grown network and its formed synapses persist in /data/spiking/growth.npz)
 Unasked, it streams {"type": "spiking", "net": "cpu", ...} frames like the GPU session's (groups, mean rate), in the
 compact form of spiking/frames.py (per-region rates + a sample of every neuron's spikes, #62), at most every FRAME_S
 while it simulates. Between decisions it runs IDLE_MS of background
@@ -92,6 +97,8 @@ FRAME_S = 0.2                     # at most 5 frames/s to the page
 RASTER_ROWS = 200
 IDLE_MS = int(os.environ.get("SUB01_SPIKING_LIVE_IDLE_MS", 50))     # background run between decisions (0: none)
 IDLE_EVERY_S = 2.0
+GROWTH_SAVE_S = 60.0              # the growth file (formed synapses) is written at most this often, and at a growth step
+GROW_KEYS = ("n_neurons", "n_synapses", "synapses", "grown", "grow_today", "cap", "grow_per_day", "n_base", "growth")
 GROUP_KEYS = ("visual", "somatomotor", "attention", "salience", "limbic", "control", "default", "reward", "fear",
               "memory", "relay", "language")
 
@@ -149,13 +156,16 @@ class LiveNet(Layout):
         src = src[order]
         self.dst = np.concatenate(dst_l)[order]
         self.w = np.concatenate(w_l)[order]
-        delay = np.concatenate(d_l)[order]
-        self.D = int(delay.max()) + 1
+        self.delay = np.concatenate(d_l)[order]
+        self.D = int(self.delay.max()) + 1
         self.rowptr = np.zeros(self.n + 1, dtype=np.int64)
         self.rowptr[1:] = np.cumsum(np.bincount(src, minlength=self.n))
-        self.slot_off = delay.astype(np.int64) * self.n + self.dst      # where a spike's input lands, from slot 0
+        self.slot_off = self.delay.astype(np.int64) * self.n + self.dst      # where a spike's input lands, from slot 0
         self.src = src
         self.n_syn = len(src)
+        # neurogenesis (spiking/growth.py): the base CSR above never changes; grown neurons' innate synapses come as one
+        # more CSR per day block (shared with the twin), the activity-formed ones as one CSR of the learner's own
+        self.innate, self.formed = [], None
         self.a = cfg.dt / cfg.tau_m
         self.n_ref = int(round(cfg.t_ref / cfg.dt))
         self.noise_sd = np.float32(cfg.sigma_ext * math.sqrt(self.a))
@@ -163,6 +173,63 @@ class LiveNet(Layout):
         self.row_of, self.raster_ids, self.raster = None, [], []
         self.hook = None                                         # hook(net) every CHECK_MS steps (frames)
         self._state()
+
+    # --- neurogenesis ------------------------------------------------------------------------------------------------
+    def _csr(self, src, dst, w, delay):
+        """A synapse set sorted by src as a CSR over all n neurons (src/dst int32, w float32, delay uint8)."""
+        rowptr = np.zeros(self.n + 1, dtype=np.int64)
+        rowptr[1:] = np.cumsum(np.bincount(src, minlength=self.n))
+        return {"rowptr": rowptr, "dst": dst, "w": w, "delay": delay, "slot_off": delay.astype(np.int64) * self.n + dst,
+                "n": len(src)}
+
+    def grow(self, add, seed):
+        """Append one block of `add[r]` neurons per region with their innate synapses (growth.innate_synapses); the
+        state arrays grow with them (new neurons start at a random membrane potential). The few ms of inputs in
+        flight are dropped (growth happens between decisions). -> innate synapses added."""
+        from spiking.growth import innate_synapses
+        n_old = self.n
+        blk = self.grow_layout(add)
+        src, dst, w, delay = innate_synapses(self, blk, seed)
+        n, D = self.n, max(self.D, int(delay.max()) + 1 if len(delay) else 1)
+        self.rowptr = np.concatenate([self.rowptr, np.full(n - n_old, self.rowptr[-1], dtype=np.int64)])
+        self.slot_off = self.delay.astype(np.int64) * n + self.dst          # the ring buffer is (D, n): re-address
+        for x in self.innate:
+            x["rowptr"] = np.concatenate([x["rowptr"], np.full(n - n_old, x["rowptr"][-1], dtype=np.int64)])
+            x["slot_off"] = x["delay"].astype(np.int64) * n + x["dst"]
+        self.innate.append(self._csr(src, dst, w, delay))
+        self.n_syn += len(src)
+        if self.formed is not None:
+            self.set_formed(self.formed["src"], self.formed["dst"], self.formed["w"], self.formed["delay"])
+        c = self.cfg
+        rng = np.random.default_rng(c.seed + 3000 + 101 * len(self.blocks))
+        self.v = np.concatenate([self.v, (rng.random(n - n_old) * (c.v_th - c.v_reset) + c.v_reset).astype(np.float32)])
+        self.ref = np.concatenate([self.ref, np.zeros(n - n_old, dtype=np.int16)])
+        self.count = np.concatenate([self.count, np.zeros(n - n_old, dtype=np.int64)])
+        self.mu = np.concatenate([self.mu, np.full(n - n_old, c.mu_ext, dtype=np.float32)])
+        self.D = D
+        self.buf = np.zeros(D * n, dtype=np.float32)
+        if self.row_of is not None:
+            self.row_of = np.concatenate([self.row_of, np.full(n - n_old, -1, dtype=np.int16)])
+        return len(src)
+
+    def set_formed(self, src, dst, w, delay):
+        """The activity-formed synapses (growth.Growth.formed), replacing the previous set."""
+        if self.n_syn and self.formed is not None:
+            self.n_syn -= self.formed["n"]
+        self.formed = self._csr(np.asarray(src, np.int32), np.asarray(dst, np.int32), np.asarray(w, np.float32),
+                                np.asarray(delay, np.uint8)) if len(src) else None
+        if self.formed is not None:
+            self.n_syn += self.formed["n"]
+
+    def _deliver(self, rowptr, slot_off, w, spk, slot):
+        """Event-driven: add the outgoing synapses of the spiking neurons to the ring buffer."""
+        start = rowptr[spk]
+        cnt = rowptr[spk + 1] - start
+        tot = int(cnt.sum())
+        if tot:
+            syn = np.repeat(start - np.cumsum(cnt) + cnt, cnt) + np.arange(tot)
+            tgt = (slot_off[syn] + slot) % self.buf.size
+            np.add.at(self.buf, tgt, w[syn])
 
     def enable_raster(self, n_rows=RASTER_ROWS, seed=0):
         """Record the spikes of a fixed sample for the page: one neuron per region (net.py's choice), first n_rows."""
@@ -188,6 +255,8 @@ class LiveNet(Layout):
         tw = object.__new__(LiveNet)
         tw.__dict__.update(self.__dict__)
         tw.w = self.w.copy()
+        tw.blocks, tw.innate, tw.formed = list(self.blocks), list(self.innate), None   # grown alike; no formed synapses
+        tw.n_syn = self.n_syn - (self.formed["n"] if self.formed is not None else 0)
         tw.row_of, tw.raster_ids, tw.raster, tw.hook = None, [], [], None
         tw._state(seed=1)
         return tw
@@ -221,13 +290,11 @@ class LiveNet(Layout):
                 rows = rows[rows >= 0]
                 if rows.size:
                     self.raster.append((self.t, rows))
-            start = self.rowptr[spk]
-            cnt = self.rowptr[spk + 1] - start
-            tot = int(cnt.sum())
-            if tot:
-                syn = np.repeat(start - np.cumsum(cnt) + cnt, cnt) + np.arange(tot)
-                tgt = (self.slot_off[syn] + slot) % self.buf.size
-                np.add.at(self.buf, tgt, self.w[syn])
+            self._deliver(self.rowptr, self.slot_off, self.w, spk, slot)
+            for x in self.innate:                                        # grown neurons' innate synapses (growth.py)
+                self._deliver(x["rowptr"], x["slot_off"], x["w"], spk, slot)
+            if self.formed is not None:                                  # ...and the activity-formed ones
+                self._deliver(self.formed["rowptr"], self.formed["slot_off"], self.formed["w"], spk, slot)
         self.t += 1
         return spk.size
 
@@ -261,6 +328,15 @@ class Chooser:
         self.w_max = net.cfg.w_max_ctx
         self.thr_hz = None
         self.timeout_ms = TIMEOUT_MS
+
+    def refresh(self):
+        """After a growth step: the cue space and the action pools include the grown neurons (the plastic synapses, the
+        word hashing and the threshold stay: they belong to the base network)."""
+        net, reg = self.net, self.net.reg
+        cue_regions = sorted(set(sum((reg.groups[g] for g in CUE_GROUPS), [])))
+        self.cue_space = np.concatenate([net.region_neurons(r, exc_only=True) for r in cue_regions])
+        self.action = net.group_neurons(ACTION_GROUP, exc_only=True)
+        self._cue, self._aff = {}, {}
 
     def cue(self, label):
         if label not in self._cue:
@@ -338,18 +414,36 @@ def _save_npz_atomic(path, **arrays):
 
 
 class LiveBrain:
-    def __init__(self, n_neurons=N_NEURONS, weights=None, regions=None, twin=True, log=print):
+    def __init__(self, n_neurons=N_NEURONS, weights=None, regions=None, twin=True, log=print, growth=None,
+                 per_day=None, cap=None, deadline_s=None):
+        """growth: the growth state file (default: next to `weights`; None with no weights path: growth in memory
+        only); per_day / cap: SUB01_GROW_PER_DAY / SUB01_NEURONS_MAX; deadline_s: the parent's decision deadline (the
+        cost guard keeps a decision under it)."""
+        from spiking.growth import Growth
         self.cfg = Config(n_neurons=n_neurons)
         self.net = LiveNet(self.cfg, regions)
+        self.log = log
+        self.path = Path(weights) if weights else None
+        self.growth_path = Path(growth) if growth else (self.path.with_name("growth.npz") if self.path else None)
+        self.growth = Growth(self.cfg, self.net.reg, self.net.n_base, per_day=per_day, cap=cap, log=log)
+        if self.growth_path is not None and self.growth.load(self.growth_path):
+            t0 = time.time()
+            self.growth.replay(self.net)                              # the grown neurons, rebuilt from the ledger
+            self.log(f"spiking growth: {self.growth.grown:,} grown neurons in {len(self.growth.days)} blocks rebuilt in "
+                     f"{time.time() - t0:.1f} s ({self.net.n:,} neurons, {len(self.growth.formed['src']):,} formed synapses)")
         self.ch = Chooser(self.net)
         self.tw = Chooser(self.net.twin()) if twin else None
         if self.tw is not None:
             self.tw.pidx, self.tw.pre, self.tw.post = self.ch.pidx, self.ch.pre, self.ch.post
+        f = self.growth.formed
+        self.net.set_formed(f["src"], f["dst"], f["w"], f["delay"])
+        self.deadline_s = deadline_s
+        self.ms_per_ms = None                                         # wall ms per simulated ms, measured in idle runs
+        self.act_rng = np.random.default_rng(self.cfg.seed + 4000)
+        self.growth_saved = time.time()
         self.dw = np.zeros(len(self.ch.pidx), dtype=np.float32)
         self.n_learn, self.n_decisions = 0, 0
-        self.path = Path(weights) if weights else None
         self.pending = {}
-        self.log = log
         self.t_start = time.time()
         self.calib = None
         self.emit, self.phase, self.last_da = None, "idle", 0.0     # emit(frame): the page's raster (serve() sets it)
@@ -357,6 +451,7 @@ class LiveBrain:
         self.net.enable_raster()
         self._record_all()
         self._frame_reset()
+        self._act_reset()
         self.load()
         if self.ch.thr_hz is None:
             dw, self.dw = self.dw, np.zeros_like(self.dw)
@@ -409,6 +504,63 @@ class LiveBrain:
     def eta(self):
         return ETA * max(ETA_FLOOR, 1.0 / (1.0 + self.n_learn / ETA_HALF))
 
+    # --- neurogenesis (spiking/growth.py) ---------------------------------------------------------------------------
+    def fits(self, n_new):
+        """The cost guard's reason against growing to n_new, or None (growth.fit_reason on this process's numbers)."""
+        from spiking import growth as G
+        return G.fit_reason(self.net.n, n_new, rss=G.own_rss_bytes(), room=G.mem_room_bytes(), ms_per_ms=self.ms_per_ms,
+                            deadline_s=self.deadline_s, twin=self.tw is not None, decision_ms=SETTLE_MS + TIMEOUT_MS)
+
+    def grow_today(self, day=None):
+        """Today's growth step (the server asks at his confirmed wake-up; once a day whatever happens). -> the growth
+        status plus "added" and "why"."""
+        day = day or _today()
+        r = self.growth.grow_today(self.net, day, self.fits)
+        if r["added"]:
+            self.ch.refresh()
+            self._retwin()
+            self._record_all()
+            self._frame_reset()
+            self._act_reset()
+        if self.growth.dirty:
+            self.save_growth()
+        return {**r, **self.growth.status(day), "n_neurons": self.net.n, "synapses": self.net.n_syn}
+
+    def _retwin(self):
+        """The frozen twin after a growth step: the grown network with every learned change removed."""
+        if self.tw is None:
+            return
+        self.tw = Chooser(self.net.twin())
+        self.tw.pidx, self.tw.pre, self.tw.post, self.tw.thr_hz = self.ch.pidx, self.ch.pre, self.ch.post, self.ch.thr_hz
+        self.tw.net.w[self.ch.pidx] = self.ch.w0                          # the twin never learned
+
+    def _act_reset(self):
+        self.act_t, self.act_count = self.net.t, self.net.count.copy()
+
+    def _maybe_activity(self):
+        """The activity-dependent rule, every ACT_EVERY_MS of simulated time (learner only; the twin keeps its wiring)."""
+        from spiking.growth import ACT_EVERY_MS
+        net = self.net
+        if net.t - self.act_t < ACT_EVERY_MS:
+            return None
+        stats = self.growth.activity(net, net.count - self.act_count, net.t - self.act_t, self.act_rng)
+        f = self.growth.formed
+        net.set_formed(f["src"], f["dst"], f["w"], f["delay"])
+        self._act_reset()
+        return stats
+
+    def save_growth(self, every_s=0.0):
+        """Write the growth file when it changed (at most every `every_s` wall seconds)."""
+        if self.growth_path is None or not self.growth.dirty or time.time() - self.growth_saved < every_s:
+            return False
+        try:
+            self.growth.save(self.growth_path)
+        except OSError as e:
+            self.log(f"spiking growth: not saved ({type(e).__name__})")
+            return False
+        self.growth_saved = time.time()
+        return True
+
     # --- frames for the page (the GPU session's format, net "cpu") ---------------------------------------------------
     def _frame_reset(self):
         self.f_wall, self.f_t, self.f_count = time.time(), self.net.t, self.net.count.copy()
@@ -429,8 +581,8 @@ class LiveBrain:
         steps = net.t - self.f_t
         sim_s = steps * net.cfg.dt / 1000.0
         d = net.count - self.f_count
-        rr = np.add.reduceat(d, net.off) / net.size / sim_s
-        sz = net.size
+        sz = net.region_size()                                            # base + grown neurons per region
+        rr = np.bincount(net.region_of_np, weights=d, minlength=net.reg.n) / sz / sim_s
         groups = {g: round(float((rr[ix] * sz[ix]).sum() / sz[ix].sum()), 2) for g, ix in net.reg.groups.items()
                   if ix and g in GROUP_KEYS}
         if net.raster:
@@ -458,18 +610,25 @@ class LiveBrain:
         if net.n <= np.iinfo(np.int16).max:
             net.row_of = np.arange(net.n, dtype=np.int16)
             net.raster_ids, net.raster = np.arange(net.n), []
-        self.sample = frames.Sample.from_ids(net.raster_ids, net.off, net.size)
+        self.sample = frames.Sample.from_layout(net.raster_ids, net)
 
     def idle(self, ms=IDLE_MS):
-        """Background activity between decisions (no cue), shown on the page."""
+        """Background activity between decisions (no cue), shown on the page; also where the step time is measured
+        (the cost guard) and the growth file is written when it changed."""
         self.phase = "idle"
         self.net.drive()
         self.net.hook = self._hook
+        t0 = time.perf_counter()
         try:
             self.net.run(ms)
         finally:
             self.net.hook = None
+        if ms > 0:
+            per = (time.perf_counter() - t0) * 1000.0 / ms
+            self.ms_per_ms = per if self.ms_per_ms is None else 0.8 * self.ms_per_ms + 0.2 * per
         self.flush()
+        self._maybe_activity()
+        self.save_growth(every_s=GROWTH_SAVE_S)
 
     # --- the protocol ----------------------------------------------------------------------------------------------
     def decide(self, labels, did=None):
@@ -487,6 +646,7 @@ class LiveBrain:
             self.net.hook = None
             self.flush()
             self.phase = "idle"
+        self._maybe_activity()
         out = {"pick": pick, "pool_rates": [round(float(r), 3) for r in rates], "sim_ms": float(ms),
                "timeout": bool(timeout), "n_neurons": self.net.n, "threshold_hz": round(self.ch.thr_hz, 3)}
         if self.tw is not None:
@@ -539,12 +699,14 @@ class LiveBrain:
             self.last_da, self.da_t = v, time.time()
 
     def status(self):
-        return {"n_neurons": self.net.n, "n_synapses": self.net.n_syn, "n_plastic": len(self.dw),
+        return {"n_neurons": self.net.n, "n_synapses": self.net.n_syn, "synapses": self.net.n_syn, "n_plastic": len(self.dw),
                 "n_decisions": self.n_decisions, "n_learn": self.n_learn, "eta": round(self.eta(), 4),
                 "threshold_hz": None if self.ch.thr_hz is None else round(self.ch.thr_hz, 3),
                 "dw_abs_mean": round(float(np.abs(self.dw).mean()), 5), "calibration": self.calib,
                 "cpu_s": round(time.process_time(), 2), "uptime_s": round(time.time() - self.t_start, 1),
-                "build_s": round(self.net.build_s, 2), "twin": self.tw is not None}
+                "build_s": round(self.net.build_s, 2), "twin": self.tw is not None,
+                "ms_per_ms": None if self.ms_per_ms is None else round(self.ms_per_ms, 4),
+                **self.growth.status(_today())}                       # grown, grow_today, cap, grow_per_day, growth
 
 
 def serve(brain, fd_in, out, idle_ms=IDLE_MS, idle_every=IDLE_EVERY_S):
@@ -584,6 +746,8 @@ def handle(brain, line, send):
             brain.burst(msg.get("value"))
         elif kind == "status":
             send({"type": "status", "id": rid, **brain.status()})
+        elif kind == "grow":                              # neurogenesis: the server says he is awake (once a day)
+            send({"type": "grown", "id": rid, **brain.grow_today(msg.get("day"))})
         elif kind == "stop":
             send({"type": "stopped", "id": rid})
             return "stop"
@@ -726,14 +890,17 @@ class LiveClient:
         self.last_frame = 0.0
         self._reader_task = None
         self._stopping = False
+        self.stage, self.grow_day = None, None   # neurogenesis: the sleep engine's stage; the day a grow was sent
 
     # --- the child process ---------------------------------------------------------------------------------------
     async def start(self):
         import asyncio
         env = {k: v for k, v in os.environ.items()
-               if k in ("PATH", "HOME", "LANG", "TZ", "SUB01_TZ", "PYTHONPATH", "SUB01_SPIKING_LIVE_IDLE_MS")}
+               if k in ("PATH", "HOME", "LANG", "TZ", "SUB01_TZ", "PYTHONPATH", "SUB01_SPIKING_LIVE_IDLE_MS",
+                        "SUB01_GROW_PER_DAY", "SUB01_NEURONS_MAX")}
         env.update(OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", PYTHONUNBUFFERED="1")
-        args = [self.python, "-m", "spiking.live", "--data-dir", str(self.data_dir), "--neurons", str(self.n_neurons)]
+        args = [self.python, "-m", "spiking.live", "--data-dir", str(self.data_dir), "--neurons", str(self.n_neurons),
+                "--deadline-s", str(self.timeout)]
         if not self.twin:
             args.append("--no-twin")
         self.ready = False
@@ -758,8 +925,15 @@ class LiveClient:
                 kind = msg.get("type")
                 if kind == "ready":
                     self.info, self.ready = msg, True
-                    print(f"spiking live: ready, {msg.get('n_neurons')} neurons, {msg.get('n_learn')} learned decisions",
-                          flush=True)
+                    print(f"spiking live: ready, {msg.get('n_neurons')} neurons ({msg.get('grown')} grown), "
+                          f"{msg.get('n_learn')} learned decisions", flush=True)
+                    if self.stage == "AWAKE":             # (re)started while he is awake: today's step, if not done
+                        self.grow(force=True)
+                elif kind == "grown":
+                    self.info.update({k: v for k, v in msg.items() if k in GROW_KEYS})
+                    if msg.get("added"):
+                        print(f"spiking live: grew by {msg['added']:,} neurons today: {msg.get('n_neurons'):,} "
+                              f"({msg.get('grown'):,} grown, cap {msg.get('cap'):,})", flush=True)
                 elif kind == "spiking":
                     self.last_frame = time.time()
                     if self.on_frame is not None:
@@ -830,7 +1004,7 @@ class LiveClient:
                             "avg_pct": round(100 * st["cpu_s"] / max(1.0, st.get("uptime_s") or 1.0), 2)}
                 if prev:
                     self.cpu["recent_pct"] = round(100 * (now[1] - prev[1]) / max(1.0, now[0] - prev[0]), 2)
-                self.info.update({k: st[k] for k in ("n_decisions", "n_learn", "eta", "dw_abs_mean") if k in st})
+                self.info.update({k: st[k] for k in ("n_decisions", "n_learn", "eta", "dw_abs_mean") + GROW_KEYS if k in st})
                 backoff = 5.0
 
     async def stop(self):
@@ -877,6 +1051,21 @@ class LiveClient:
         """#89: a dopamine-like burst from his screens, shown on the neurons panel (fire and forget)."""
         return self.send({"type": "burst", "value": round(float(value), 4)})
 
+    def on_stage(self, stage):
+        """The sleep engine's stage (live_server, every tick): the network grows once a day, at his wake-up (AWAKE),
+        never while he sleeps. The child itself refuses a second step on the same Tokyo day."""
+        was, self.stage = self.stage, stage
+        if stage == "AWAKE" and was != "AWAKE":
+            self.grow()
+
+    def grow(self, force=False):
+        """Ask the child for today's growth step (once a day from here; `force` resends, e.g. after a restart)."""
+        day = _today()
+        if not self.ready or (self.grow_day == day and not force):
+            return False
+        self.grow_day = day
+        return self.send({"type": "grow", "id": f"grow-{day}", "day": day})
+
     def state(self):
         return "live" if self.ready else ("starting" if self.alive() else "offline")
 
@@ -893,8 +1082,14 @@ def view(backend):
     n = (cpu.info.get("n_neurons") if cpu else None) or (cpu.n_neurons if cpu else N_NEURONS)
     w = float(os.environ.get("SUB01_SPIKING_W", 0.3))
     by_net = {k: sum(1 for r in td if r.get("net") == k) for k in ("gpu", "cpu", "rate")}
+    info = cpu.info if cpu else {}
+    from spiking import growth as G
+    # neurogenesis (spiking/growth.py): the page shows "neurons: 505,000 (+5,000 today)"; the counts are the network's own
+    grow = {"grown": info.get("grown", 0), "grow_today": info.get("grow_today", 0), "synapses": info.get("synapses"),
+            "cap": info.get("cap", G.NEURONS_MAX), "grow_per_day": info.get("grow_per_day", G.GROW_PER_DAY),
+            "n_base": info.get("n_base", cpu.n_neurons if cpu else None), "growth": info.get("growth")}
     return {"state": cpu.state() if cpu else "off", "n_neurons": n, "card": CARD.format(n=f"{n:,}"), "note": NOTE.format(w=w),
-            "weight": w, "decisions_today": len(td), "by_net_today": by_net,
+            **grow, "weight": w, "decisions_today": len(td), "by_net_today": by_net,
             "learned_today": sum(1 for r in td if r.get("net") == "cpu" and r.get("reward") is not None),
             "n_decisions": cpu.info.get("n_decisions") if cpu else None, "n_learn": cpu.info.get("n_learn") if cpu else None,
             "last": getattr(backend, "last", None), "score": score(rows), "today": score(td),
@@ -916,13 +1111,16 @@ def main(argv=None):
     ap.add_argument("--data-dir", default="data")
     ap.add_argument("--neurons", type=int, default=N_NEURONS)
     ap.add_argument("--no-twin", action="store_true")
+    ap.add_argument("--deadline-s", type=float, default=None, help="the parent's decision deadline (the cost guard)")
     a = ap.parse_args(argv)
     proto = sys.stdout
     sys.stdout = sys.stderr                                   # only protocol lines go to the parent's pipe
     log = lambda *x: print(*x, file=sys.stderr, flush=True)
-    brain = LiveBrain(a.neurons, Path(a.data_dir) / "spiking" / "live_weights.npz", twin=not a.no_twin, log=log)
-    log(f"spiking live: {brain.net.n:,} neurons, {brain.net.n_syn:,} synapses, {len(brain.dw):,} plastic, "
-        f"threshold {brain.ch.thr_hz:.2f} Hz, built in {brain.net.build_s:.1f} s")
+    brain = LiveBrain(a.neurons, Path(a.data_dir) / "spiking" / "live_weights.npz", twin=not a.no_twin, log=log,
+                      deadline_s=a.deadline_s)
+    log(f"spiking live: {brain.net.n:,} neurons ({brain.growth.grown:,} grown, cap {brain.growth.cap:,}), "
+        f"{brain.net.n_syn:,} synapses, {len(brain.dw):,} plastic, threshold {brain.ch.thr_hz:.2f} Hz, "
+        f"built in {brain.net.build_s:.1f} s")
     serve(brain, sys.stdin.fileno(), proto)
 
 

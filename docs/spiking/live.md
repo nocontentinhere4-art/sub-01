@@ -278,6 +278,97 @@ the 50 decisions, waited for the night phases, and deleted the pod.
 - The pod named "BRAIN" was never touched.
 - Cost log: `docs/spiking/live/costs.jsonl`.
 
+## Neurogenesis: the day network grows (owner decision, 2026-10-11)
+
+The owner wants the brain cultivated like a real one: not a fixed size, but one that grows a little every day. The
+day network's size is now a persisted number that grows by `SUB01_GROW_PER_DAY` neurons (5,000) once a waking day,
+at his confirmed wake-up, up to `SUB01_NEURONS_MAX` (1,000,000). Code: `spiking/growth.py` (torch-free), applied by
+the CPU day network of #55 (`spiking/live.py`); tests in `tests/test_spiking_grow.py`.
+
+Honest framing first: more neurons never mean understanding or consciousness. It is the same simulated network, a
+little bigger each day; the page says how many and when.
+
+**Which network grows.** The CPU day network (`SUB01_SPIKING_LIVE_NEURONS`, 500k on Railway today) grows toward the
+cap. The 1M GPU network of this document stays at 1M = the default cap: its learned weights are tied to its exact size
+(`config_hash` + `P`), and 1M is what the A4000 budget was measured for. `growth.gpu_fit_reason` is the same cost
+guard for the pod types (from the measured 5.7 GB and 1.24× real time at 1M) for the day the GPU network grows too.
+
+**When.** `live_server.py` passes the sleep engine's stage to the CPU network's client every tick
+(`LiveClient.on_stage`). On the switch to AWAKE the client sends `{"type": "grow"}` once per Tokyo day (and again when
+the child restarts while he is awake); the child applies at most one step per Tokyo day (the day is in the state
+file, so a restart or a deploy never grows twice). Nothing grows while he sleeps.
+
+**Where the new neurons go.** The step is split among the 214 regions in proportion to the connectome's regional
+volumes (the base layout's own allocation, `wiring.allocate` with minimum 0), so the atlas proportions are kept; the
+block's excitatory count keeps each region's total at 80 %. New neurons are appended after the existing ones
+(`wiring.Layout.grow_layout`): the base layout, its synapses, `memory.py`'s word hashing and the learned-weight files
+are untouched, so what was learned survives a growth step and the learned-weights file still loads.
+
+**Innate synapses** (`growth.innate_synapses`): each new neuron gets the base network's fixed in-degree from its own
+region's statistics: `k_e_local` (45) excitatory and `k_i_local` (25) inhibitory sources uniform in its region (base
+and grown alike, no autapses), `k_long` (30) excitatory sources from other regions with probability proportional to
+the streamline count into its region and the fibre-length delays, plus the hippocampal collaterals where the region
+has them: exactly `wiring.synapse_lists`' rules for one more neuron. New neurons start with no outgoing synapses:
+like adult-born neurons they listen first, and gain outputs as later blocks draw them as sources and through the
+activity rule. Keeping every in-degree at the base budget keeps the inhibition-dominated regime, so the rates stay in
+range at any size: measured at 5,000 + 800 neurons, base E 7.3 Hz, grown E 6.8 Hz, grown I 7.5 Hz (the test); at
+500k + 5k and + 50k the mean rate is unchanged (numbers below). The innate wiring is deterministic from (seed, block
+index, the ledger), so the state file stores the ledger, not the synapses.
+
+**Activity-dependent rule** (`Growth.activity`, every `ACT_EVERY_MS` = 2,000 ms of simulated time, on that window's
+spike counts; the learner only, the frozen twin keeps its wiring):
+
+| step | rule | parameter |
+|---|---|---|
+| active | a neuron whose rate in the window was ≥ `ACT_HZ` | 15 Hz (background ~5 Hz: a Poisson neuron crosses it by chance with p ≈ 1e-7 in 2 s; in practice the cue-driven neurons of a decision) |
+| formation | up to `FORM_PER_RUN` new synapses between co-active neurons, pre excitatory; grown neurons drawn `YOUNG_BIAS` times more often (young neurons are the more plastic ones); initial weight `FORM_W`; delay as the wiring rule (1–2 ms in the region, fibre length / 6 m/s across); a pair already formed is reinforced instead of duplicated | 200 a window, ×4, 0.25 mV (= j_e / 2) |
+| reinforcement | a formed synapse whose pre and post are both active gains `REINF_W`, up to `W_MAX` | 0.1 mV, 1.0 mV (= 2 j_e) |
+| decay, pruning | formed weights decay with `TAU_DECAY_S` of simulated time; pruned when weak (w < `W_MIN`: never reinforced for ~1.6 simulated hours) or unused (its source silent for `PRUNE_SILENT_S`) | 3,600 s; 0.05 mV; 600 s |
+| budget | a neuron receives at most `EXTRA_BUDGET` formed synapses on top of its innate in-degree (~100, ~300 in the hippocampus); when full, the weakest formed synapse onto it is replaced | 10 (so every neuron stays within its budget + 10 %, and formed synapses number ≤ 10 n) |
+
+The innate synapses are never pruned (they are the regenerable fixed in-degree); only formed ones are stored.
+
+**State** `/data/spiking/growth.npz` (atomic write, at a growth step and at most every 60 s when formed synapses
+changed): version, the base config hash and size, the ledger (blocks × regions, int32, each block's Tokyo day), the
+formed synapses (src/dst int32, w float16, delay uint8) and a small JSON meta (last day, today's addition, refusals,
+history). ~1 KB a day of ledger plus 11 bytes a formed synapse; the innate wiring is rebuilt at start (0.1 s for 1,000
+grown neurons, ~1 s per 5,000 at 500k). On load, a file for another base network or version is kept aside as
+`.other-<time>`, an unreadable one as `.corrupt-<time>`; the base network runs and the log says so once.
+
+**Cost guard** (`growth.fit_reason`, before every step, in addition to the cap): the child's own memory (RSS, scaled
+by the new size, +30 % for the rebuild) must fit the room left under the container's memory limit (cgroup v2 / v1,
+else `MemAvailable`) at 75 %, and a projected decision at the new size (settle + race, learner and twin, from the wall
+ms per simulated ms measured in the idle runs) must stay under 80 % of the parent's deadline
+(`SUB01_SPIKING_LIVE_TIMEOUT_S`). A refusal is logged once a day with its reason (`spiking growth: no growth today: …`)
+and shown in `growth.refused`.
+
+**What the page reads** (`GET /api/spiking/live`, the "In the day" card; also in the child's `ready`, `status` and
+`grown` messages and the `hello`/`decision`/`spiking` frames' `n_neurons`, which already carry the real size):
+
+| field | meaning |
+|---|---|
+| `n_neurons` | the network's current size (base + grown) |
+| `grown` | neurons added since the first growth step |
+| `grow_today` | neurons added today (0 before the step, when refused, or at the cap): "neurons: 505,000 (+5,000 today)" |
+| `synapses` | all synapses now: base + innate of the grown + formed |
+| `cap` | `SUB01_NEURONS_MAX` |
+| `grow_per_day` | `SUB01_GROW_PER_DAY` |
+| `n_base` | the base size the network is built from |
+| `growth` | `{last_day, blocks, formed, formed_total, pruned_total, refused, history[-7:]}` |
+
+`brain_vote.network_label` already names the network by its real size ("505k-neuron network on CPU").
+
+**Measured on this sandbox** (one core, numpy, 2026-10-11; a slow core: ~2.5× slower than the laptop core of the 500k
+note in `spiking/live.py`): build of the 500k base 17 s; one +5,000 step 2.4 s (504,900 innate synapses), nine more
+steps to 550k 5.6 s in all; wall ms per simulated ms 13.6 at 500k → 13.9 at 505k (+2.8 %) → 17.4 at 550k; mean rate
+3.99 Hz at 500k, 3.98 Hz at 505k and 550k, the grown neurons themselves at 3.98 Hz; RSS 1.95 GB at 505k. At that
+speed a learner + twin decision projects to ~9.8 s, so with a 2 s deadline the guard refuses the step here
+(`time: a decision at 505,000 neurons would take ~9.7 s …`): on Railway the deadline that counts is
+`SUB01_SPIKING_LIVE_TIMEOUT_S` (a 500k network already needs it raised), and the log says when the guard refused.
+GPU: not runnable in this sandbox; the GPU network is unchanged (fixed at 1M).
+
+Switches: `SUB01_GROW_PER_DAY` (5000; `0` turns growth off), `SUB01_NEURONS_MAX` (1000000). Nothing else to set.
+
 ## Owner actions after merge
 
 Set these on Railway:

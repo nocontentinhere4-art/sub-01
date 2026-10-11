@@ -24,7 +24,12 @@ def allocate(n, volumes, minimum):
 
 
 class Layout:
-    """Population layout of a network (needs self.cfg and self.reg): one population per region, excitatory first."""
+    """Population layout of a network (needs self.cfg and self.reg): one population per region, excitatory first.
+
+    Neurogenesis (spiking/growth.py): the base layout (off, size, n_exc: the seed's populations, what memory.py's word
+    hashing and the learned-weight files are built on) never changes; neurons grown later are appended after it in
+    day blocks, each block holding one sub-population per region (excitatory first). `n`, `region_of_np` and
+    `is_exc_np` cover base + blocks; `region_neurons` returns both; `region_size` / `region_n_exc` are the totals."""
 
     def _layout(self):
         c, R = self.cfg, self.reg.n
@@ -41,10 +46,56 @@ class Layout:
             is_exc[self.off[r]:self.off[r] + self.n_exc[r]] = True
         self.region_of_np, self.is_exc_np = region_of, is_exc
         self.hc_regions = set(self.reg.groups["memory"])
+        self.n_base = self.n                                                 # the seed's network; grown neurons are >= n_base
+        self.blocks = []                                                     # neurogenesis day blocks: {"off", "size", "n_exc"}
+
+    def grow_layout(self, add):
+        """Append one block of `add[r]` new neurons per region after the current last neuron; the block's excitatory
+        count keeps the region's total at frac_exc (exact over any sequence of small steps). Returns the block; the
+        base arrays are untouched."""
+        c, R = self.cfg, self.reg.n
+        add = np.asarray(add, dtype=np.int64)
+        assert add.shape == (R,) and (add >= 0).all()
+        n_exc = np.clip(np.round(c.frac_exc * (self.region_size() + add)) - self.region_n_exc(), 0, add).astype(np.int64)
+        blk = {"off": self.n + np.concatenate([[0], np.cumsum(add)[:-1]]), "size": add, "n_exc": n_exc}
+        is_exc = np.zeros(int(add.sum()), dtype=bool)
+        for r in np.flatnonzero(add):
+            o = blk["off"][r] - self.n
+            is_exc[o:o + n_exc[r]] = True
+        self.region_of_np = np.concatenate([self.region_of_np, np.repeat(np.arange(R), add)])
+        self.is_exc_np = np.concatenate([self.is_exc_np, is_exc])
+        self.n += int(add.sum())
+        self.blocks.append(blk)
+        return blk
+
+    def region_size(self):
+        """Neurons per region, base + grown blocks."""
+        return self.size + sum((b["size"] for b in self.blocks), np.zeros_like(self.size))
+
+    def region_n_exc(self):
+        return self.n_exc + sum((b["n_exc"] for b in self.blocks), np.zeros_like(self.n_exc))
 
     def region_neurons(self, r, exc_only=False):
-        """Global ids of region r (excitatory first)."""
-        return np.arange(self.off[r], self.off[r] + (self.n_exc[r] if exc_only else self.size[r]))
+        """Global ids of region r (excitatory first), base population then each grown block's."""
+        ids = [np.arange(self.off[r], self.off[r] + (self.n_exc[r] if exc_only else self.size[r]))]
+        for b in self.blocks:
+            if b["size"][r]:
+                ids.append(np.arange(b["off"][r], b["off"][r] + (b["n_exc"][r] if exc_only else b["size"][r])))
+        return ids[0] if len(ids) == 1 else np.concatenate(ids)
+
+    def region_rank(self, ids):
+        """Position of each id inside its region's `region_neurons` list (base ids first, then block by block)."""
+        ids = np.asarray(ids, dtype=np.int64)
+        reg = self.region_of_np[ids]
+        rank = ids - self.off[reg]
+        grown = ids >= self.n_base
+        if grown.any():
+            before = self.size.copy()
+            for b in self.blocks:
+                inb = grown & (ids >= b["off"][reg]) & (ids < b["off"][reg] + b["size"][reg])
+                rank[inb] = before[reg[inb]] + ids[inb] - b["off"][reg[inb]]
+                before = before + b["size"]
+        return rank
 
     def group_neurons(self, group, exc_only=False):
         return np.concatenate([self.region_neurons(r, exc_only) for r in self.reg.groups[group]])

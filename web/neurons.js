@@ -221,7 +221,9 @@ window.Neurons = (() => {
     show("day", true);
     const head = h("div", "nx-row");
     head.append(document.createTextNode("In the day · "), h("b", null, d.state === "live" ? "live" : d.state === "starting" ? "starting" : "offline"),
-      document.createTextNode(` · ${int(d.n_neurons)} neurons · ${int(d.decisions_today)} choices today · learned from ${int(d.learned_today)}`));
+      document.createTextNode(` · ${int(d.n_neurons)} neurons${num(d.grow_today) && d.grow_today > 0 ? ` (+${int(d.grow_today)} today)` : ""}` +
+        `${num(d.grown) && d.grown > 0 ? ` · grown ${int(d.grown)} so far${num(d.cap) ? ` of ${int(d.cap)}` : ""}` : ""}` +
+        ` · ${int(d.decisions_today)} choices today · learned from ${int(d.learned_today)}`));   // (neurogenesis: a count, never a mind)
     box.append(head);
     const bn = d.by_net_today || {};
     if (num(d.decisions_today) && d.decisions_today > 0)

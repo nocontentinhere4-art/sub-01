@@ -891,6 +891,9 @@ class Live:
                     self.store.save(e, self.memory)                          # night closed: write it now
         if self.spiking:
             self.spiking.forward_sleep(e.stage)
+        cpu_net = getattr(self.decider, "cpu", None)                     # neurogenesis: the day network grows at his
+        if cpu_net is not None and hasattr(cpu_net, "on_stage"):         # confirmed wake-up (spiking/growth.py)
+            cpu_net.on_stage(e.stage)
         p = e.params
         b.set_rhythm(p["f_hz"], p["coupling"], p["noise"])
         b.a = p["a"]

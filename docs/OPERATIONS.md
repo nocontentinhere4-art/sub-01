@@ -110,6 +110,9 @@ raster uses 1.4–2 % of a core (`SUB01_SPIKING_LIVE_IDLE_MS=0`: none). The Neur
 on `/brain` shows "its process: … % of one CPU core on average" (budget: < 10 %). `SUB01_SPIKING_LIVE=0` turns it off.
 The vote then is the rate model's alone, as it is whenever the process is down or slower than 2 s. Its state:
 `/data/spiking/live_weights.npz`. The day's decisions are in `/data/spiking/decisions-YYYY-MM-DD.jsonl`.
+It grows by `SUB01_GROW_PER_DAY` (5,000) neurons at his wake-up, up to `SUB01_NEURONS_MAX` (1,000,000), when the
+memory and the decision deadline allow it (neurogenesis, `docs/spiking/live.md`); the grown network and its formed
+synapses are in `/data/spiking/growth.npz`. `SUB01_GROW_PER_DAY=0` turns growth off; the page shows "+N today".
 
 ## Railway usage alerts
 Workspace → **Usage** → **Usage limits**:

@@ -81,6 +81,15 @@ class Sample:
         return cls(reg, np.clip(slot, 0, SLOTS - 1))
 
     @classmethod
+    def from_layout(cls, ids, net):
+        """Neuron ids of a wiring.Layout that may have grown (spiking/growth.py): region from region_of_np, slot from
+        the id's rank inside the region's neuron list over the region's total size. Equals from_ids on a base layout."""
+        ids = np.asarray(ids, dtype=np.int64)
+        reg = net.region_of_np[ids]
+        slot = net.region_rank(ids) * SLOTS // np.maximum(1, net.region_size()[reg])
+        return cls(reg, np.clip(slot, 0, SLOTS - 1))
+
+    @classmethod
     def one_per_region(cls, n_rows, n_regions, slot=SLOTS // 2):
         """net.py's raster with n_rows <= regions: row r is region r's sampled neuron (the slot unknown: the middle)."""
         rows = np.arange(n_rows)
