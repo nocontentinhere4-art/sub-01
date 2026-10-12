@@ -70,6 +70,8 @@ if __name__ == "__main__":
                 "quatrefoil_jacquard_fabric",
                 "interior_tiles",
                 "fine_grained_wood",
+                "rough_linen",
+                "marble_01",
             ]
         ]
         records = [j.result() for j in jobs]

@@ -117,7 +117,8 @@ function pbr(name, repeat = [1, 1]) {
 const scannedWood = pbr("wooden_floor_02", [1, 1]),
   scannedWall = pbr("white_plaster_02", [2, 2]),
   scannedFabric = pbr("quatrefoil_jacquard_fabric", [2, 2]),
-  scannedTiles = pbr("interior_tiles", [2, 2]);
+  scannedTiles = pbr("interior_tiles", [2, 2]),
+  scannedLinen = pbr("rough_linen", [2, 2]);
 const woodTex = scannedWood.map,
   fabricTex = scannedFabric.map,
   plasterTex = scannedWall.map;
@@ -132,9 +133,9 @@ const M = {
   white: mat("#f3efde", 0.6),
   metal: mat("#353a35", 0.38),
   black: mat("#151b1b", 0.55),
-  stone: mat("#a5a29a", 0.83, plasterTex),
-  linen: scannedFabric.clone(),
-  blue: scannedFabric.clone(),
+  stone: pbr("marble_01", [1, 1]),
+  linen: scannedLinen,
+  blue: scannedLinen.clone(),
   brass: new T.MeshStandardMaterial({
     color: "#b19762",
     metalness: 0.55,
@@ -142,6 +143,7 @@ const M = {
   }),
 };
 M.darkwood.color.set("#c5aa83");
+M.stone.roughness = 0.35;
 M.blue.color.set("#9bb0ad");
 M.sofa.color.set("#9ca995");
 let meshCount = 0;
@@ -226,18 +228,24 @@ function drape(w, d, x, y, z, m, drop) {
   for (let i = 0; i < a.count; i++) {
     const xx = a.getX(i),
       zz = a.getZ(i),
-      edge = Math.max(0, (Math.abs(xx) - w * 0.46) / (w * 0.04));
+      edge = T.MathUtils.smoothstep(Math.abs(xx), w * 0.39, w * 0.5),
+      front = T.MathUtils.smoothstep(zz, d * 0.36, d * 0.5),
+      crease = Math.sin(xx * 8 + Math.sin(zz * 3.1) * 1.4);
+    a.setX(i, xx + 0.012 * Math.sin(zz * 7.3) * edge);
+    a.setZ(i, zz + 0.01 * Math.sin(xx * 9.2) * front);
     a.setY(
       i,
-      0.005 * Math.sin(xx * 11 + zz * 7) +
-        0.004 * Math.sin(zz * 16 - xx * 5) -
-        drop * edge * edge,
+      0.012 * crease +
+        0.006 * Math.sin(zz * 12.7 - xx * 4.3) -
+        drop * edge -
+        0.25 * drop * front,
     );
   }
   g.computeVertexNormals();
   const material = m.clone();
   material.side = T.DoubleSide;
   const mesh = new T.Mesh(g, material);
+  mesh.userData.flexibleCloth = true;
   mesh.position.set(x, y, z);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
@@ -1825,7 +1833,7 @@ async function applyContactLighting() {
     baked.scene.traverse((part) => {
       if (!part.isMesh) return;
       const original = bakedObjects.get(part.userData.bakeId || part.name);
-      if (!original || !part.geometry.attributes.uv1) return;
+      if (!original || original.userData.flexibleCloth || !part.geometry.attributes.uv1) return;
       const geometry = part.geometry.clone();
       geometry.applyMatrix4(part.matrixWorld);
       geometry.applyMatrix4(original.matrixWorld.clone().invert());

@@ -432,5 +432,55 @@
         "bytes": 736804
       }
     ]
+  },
+  {
+    "asset": "rough_linen",
+    "source": "https://polyhaven.com/a/rough_linen",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "file": "rough_linen/diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rough_linen/rough_linen_diff_1k.jpg",
+        "sha256": "04897d7611d7390ddf5b2c6f7273f448dfc48341fdbd1f4f207fa30b331d7f57",
+        "bytes": 835801
+      },
+      {
+        "file": "rough_linen/normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rough_linen/rough_linen_nor_gl_1k.jpg",
+        "sha256": "e2402166d1a489f7414814e69e1836ab672aa24e30bec2d41fea356f81687e53",
+        "bytes": 916843
+      },
+      {
+        "file": "rough_linen/rough.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rough_linen/rough_linen_rough_1k.jpg",
+        "sha256": "734ad6718841a6e296aacaa6e9ee2e1686eed5f62bb8d71c915c5605e162bcb4",
+        "bytes": 1083725
+      }
+    ]
+  },
+  {
+    "asset": "marble_01",
+    "source": "https://polyhaven.com/a/marble_01",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "file": "marble_01/diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/marble_01/marble_01_diff_1k.jpg",
+        "sha256": "b10dabea976d68baa976a0d4e8dac58789df8d26a1b50697f320106f1b00a229",
+        "bytes": 305029
+      },
+      {
+        "file": "marble_01/normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/marble_01/marble_01_nor_gl_1k.jpg",
+        "sha256": "77c2a9b549a6a408659f8197be91945aeb0abc33e697f1dd2ce24ee8dc7c2bc0",
+        "bytes": 110230
+      },
+      {
+        "file": "marble_01/rough.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/marble_01/marble_01_rough_1k.jpg",
+        "sha256": "a3e9f373d22aebc449af73f6a18c9817e2146f17e567a083609ba8fbb62a72f5",
+        "bytes": 91848
+      }
+    ]
   }
 ]
