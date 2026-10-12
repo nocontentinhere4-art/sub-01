@@ -6,7 +6,7 @@ import { HDRLoader } from "./vendor/HDRLoader.js";
 import { mergeGeometries } from "./vendor/BufferGeometryUtils.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { MeshoptDecoder } from "./vendor/meshopt_decoder.module.js";
-import { createWindowView } from "/room/window_view.js";
+import { createWindowView } from "/room/window_view.js?v=home1";
 const lite =
   new URLSearchParams(location.search).has("lite") ||
   innerWidth < 700 ||
