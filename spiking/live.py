@@ -179,7 +179,7 @@ class LiveNet(Layout):
         """A synapse set sorted by src as a CSR over all n neurons (src/dst int32, w float32, delay uint8)."""
         rowptr = np.zeros(self.n + 1, dtype=np.int64)
         rowptr[1:] = np.cumsum(np.bincount(src, minlength=self.n))
-        return {"rowptr": rowptr, "dst": dst, "w": w, "delay": delay, "slot_off": delay.astype(np.int64) * self.n + dst,
+        return {"rowptr": rowptr, "src": src, "dst": dst, "w": w, "delay": delay, "slot_off": delay.astype(np.int64) * self.n + dst,
                 "n": len(src)}
 
     def grow(self, add, seed):
