@@ -23,6 +23,7 @@ out/rest/*.part.npz
 
 # secrets (API keys) never go to git
 .env
+.env.*
 out/anatomy_work/
 # the window plates' photographic sources (~120 MB): room_build/window_cards.py --fetch re-downloads them
 room_build/plates/

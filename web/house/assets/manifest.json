@@ -358,5 +358,79 @@
         "bytes": 1604354
       }
     ]
+  },
+  {
+    "asset": "throw_pillows_01",
+    "source": "https://polyhaven.com/a/throw_pillows_01",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "file": "throw_pillows_01/throw_pillows_01.gltf",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/throw_pillows_01/throw_pillows_01_1k.gltf",
+        "sha256": "dd3f985a4446c82035028392ae905b9d996b8be10316a4572a870561a57f76fa",
+        "bytes": 4548
+      },
+      {
+        "file": "throw_pillows_01/textures/throw_pillows_01_rough_1k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/throw_pillows_01/throw_pillows_01_rough_1k.jpg",
+        "sha256": "05518d80893cd4b0a1390ccf1330e94ecae7f386b60e2b55761a1e9856e29f9b",
+        "bytes": 339241
+      },
+      {
+        "file": "throw_pillows_01/textures/throw_pillows_01_diff_1k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/throw_pillows_01/throw_pillows_01_diff_1k.jpg",
+        "sha256": "1d52fb47f06b88b5079f20a99309ae1e94547e778a5f89614d70f842c0696412",
+        "bytes": 299887
+      },
+      {
+        "file": "throw_pillows_01/throw_pillows_01.bin",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/throw_pillows_01/throw_pillows_01.bin",
+        "sha256": "cac134c38612894a301d265a0b2ad4ddbe57d15d7473d57592c397d445366476",
+        "bytes": 146012
+      },
+      {
+        "file": "throw_pillows_01/textures/throw_pillows_01_nor_gl_1k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/throw_pillows_01/throw_pillows_01_nor_gl_1k.jpg",
+        "sha256": "074da9df1286aecf0d107bdd0839f0ec382fa99b16313626c7f6690d2765b4d7",
+        "bytes": 404720
+      }
+    ]
+  },
+  {
+    "asset": "desk_lamp_arm_01",
+    "source": "https://polyhaven.com/a/desk_lamp_arm_01",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "file": "desk_lamp_arm_01/desk_lamp_arm_01.gltf",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/desk_lamp_arm_01/desk_lamp_arm_01_1k.gltf",
+        "sha256": "2ac8389afc1519449a9cfdf7efd9fa36780a2177bb47ab58f7a7dda7d247dc8c",
+        "bytes": 4453
+      },
+      {
+        "file": "desk_lamp_arm_01/textures/desk_lamp_arm_01_nor_gl_1k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/desk_lamp_arm_01/desk_lamp_arm_01_nor_gl_1k.jpg",
+        "sha256": "feefedc3835ecef3634e97a24977451671f8f57747a023f48cd14c84bc73513a",
+        "bytes": 651826
+      },
+      {
+        "file": "desk_lamp_arm_01/textures/desk_lamp_arm_01_arm_1k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/desk_lamp_arm_01/desk_lamp_arm_01_arm_1k.jpg",
+        "sha256": "206404c79fb7dcf8e2c4558c13544342f87d2190526231a1750c3c9adc256fbc",
+        "bytes": 780379
+      },
+      {
+        "file": "desk_lamp_arm_01/textures/desk_lamp_arm_01_diff_1k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/desk_lamp_arm_01/desk_lamp_arm_01_diff_1k.jpg",
+        "sha256": "159eb178aba3271bd555cbe07ca36431d8af9a006f0b8e9d8c67030cbdc9e4d3",
+        "bytes": 702522
+      },
+      {
+        "file": "desk_lamp_arm_01/desk_lamp_arm_01.bin",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/desk_lamp_arm_01/desk_lamp_arm_01.bin",
+        "sha256": "07f34e32abecbaa63d28b9d12d6a0eb82b775a0f50c92327655909d72ff8489b",
+        "bytes": 736804
+      }
+    ]
   }
 ]

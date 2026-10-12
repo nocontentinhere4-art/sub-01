@@ -262,6 +262,7 @@ export function createWindowView(THREE, opts = {}){
   const base = opts.base ?? "room/window/";
   const loader = new THREE.TextureLoader();
   const tex = (name, srgb, aniso = 4, wrap = true) => {
+    if (opts.textures?.[name]) return opts.textures[name];
     const t = loader.load(base + name + ".webp");
     t.wrapS = wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;

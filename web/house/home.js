@@ -6,6 +6,7 @@ import { HDRLoader } from "./vendor/HDRLoader.js";
 import { mergeGeometries } from "./vendor/BufferGeometryUtils.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { MeshoptDecoder } from "./vendor/meshopt_decoder.module.js";
+import { createWindowView } from "/room/window_view.js";
 const lite =
   new URLSearchParams(location.search).has("lite") ||
   innerWidth < 700 ||
@@ -325,6 +326,36 @@ windowFrame(-2, 1.7, 3.85, 3.65, 2.02);
 windowFrame(0.65, 1.7, 3.85, 0.9, 2.02);
 windowFrame(3.25, 1.7, 3.85, 0.9, 2.02);
 windowFrame(-2, 4.45, 3.85, 3.6, 2.5);
+// Reuse the existing photographed Tokyo layers; no second scene or reflection render.
+const windowViews = [];
+let sharedWindowTextures;
+for (const surface of [
+  { c: [-3.94, 1.675, 0], w: 7.9, h: 2.15, ry: Math.PI / 2 },
+  { c: [-1.3, 1.675, 3.94], w: 5.35, h: 2.15, ry: Math.PI },
+  { c: [3.25, 1.675, 3.94], w: 1.35, h: 2.15, ry: Math.PI },
+  { c: [-2.075, 4.45, 3.94], w: 3.7, h: 2.5, ry: Math.PI },
+]) {
+  const view = createWindowView(T, {
+    base: "/room/window/",
+    textures: sharedWindowTextures,
+  });
+  if (!sharedWindowTextures) {
+    sharedWindowTextures = {};
+    for (const [name, uniform] of Object.entries({
+      near: "tNear",
+      mid: "tMid",
+      mid_n: "tMidN",
+      mid_l: "tMidL",
+      far: "tFar",
+      sky: "tSky",
+      noise: "tNoise",
+    })) {
+      sharedWindowTextures[name] = view.material.uniforms[uniform].value;
+    }
+  }
+  view.build(surface, scene, null);
+  windowViews.push(view);
+}
 // A real exit through the front wall to the entrance terrace.
 floor(2.5, 1.8, 2, 0, 4.9);
 windowFrame(2, 1.12, 3.87, 1.1, 2.24);
@@ -432,6 +463,8 @@ furnished("sofa_03", -2, 0, 1.85, 2.5);
 furnished("modern_coffee_table_01", -2, 0, 0.3, 1.65, Math.PI / 2);
 furnished("potted_plant_01", -3.45, 0, 2.7, 0.7);
 furnished("modern_arm_chair_01", -1.2, 3, 4.5, 0.65);
+furnished("throw_pillows_01", -2, 0.42, 2.02, 1.25);
+furnished("desk_lamp_arm_01", 2.78, 0.855, -3.15, 0.32, -0.7);
 // Kitchen, integrated oak cabinetry, stone countertop, sink and coffee corner.
 box(3.05, 0.86, 0.62, -2.2, 0.43, -3.55, M.wood, 0.015);
 box(3.16, 0.055, 0.7, -2.2, 0.895, -3.53, M.stone, 0.018);
@@ -1856,6 +1889,9 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(accumulated, 0.05);
   accumulated = 0;
   update(dt);
+  if (!privacyActive)
+    for (const view of windowViews)
+      view.update(dt, homeTime ? (homeTime / 3600 + 9) % 24 : 14);
   renderer.render(
     privacyActive ? privacyScene : scene,
     privacyActive ? privacyCamera : camera,
@@ -1868,6 +1904,10 @@ renderer.setAnimationLoop(() => {
       location.hostname === "127.0.0.1"
         ? `${Math.round(frames / elapsed)} fps · ${renderer.info.render.calls} draw calls · ${camera.position.y > 3 ? "piano 2" : "piano 1"}`
         : "";
+    document.getElementById("status").dataset.direction = JSON.stringify([
+      camera.rotation.x,
+      camera.rotation.y,
+    ]);
     document.getElementById("status").dataset.position = JSON.stringify([
       camera.position.x,
       camera.position.y,

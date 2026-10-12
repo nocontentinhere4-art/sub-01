@@ -28,6 +28,8 @@ Baseline main at the start of this branch has unrelated failing tests. A full lo
 
 ## Offline contact lighting
 
+The `/house` rollout on the existing Railway service was checked on October 12: live brain feed, wall-TV Pong and real Linux boot are working. The production root remains the legacy room. Operator editing requires the private admin credential; browser-screen verification is still pending an active browsing task. Photographic Tokyo window layers reuse the existing room's public-domain/CC0 assets and credits, sharing textures and disabling reflection-probe renders. Scanned cushions and a desk lamp include 512px phone variants.
+
 A CPU ray-traced contact-occlusion atlas adds depth to fixed architecture without a post-processing pass. The geometry atlas is about 4 MB; its approximately 1 megapixel grayscale JPEG uses about 4 MB of GPU memory (a 512px mobile variant is prebuilt). Dynamic doors and devices keep their original geometry. Matching world bounds reject outdated baked parts. The fallback remains usable if the optional atlas fails.
 
 To rebuild, export the house with the local-only `?bake=1` button, rename `out/home-bake-source.png` to `.glb`, and install `xatlas`, `pygltflib`, `numpy` plus the npm packages `three@0.180.0` and `three-mesh-bvh@0.9.2` in a tooling directory. Run `prepare_home_lightmap.py SOURCE.glb web/house/assets/lighting/architecture.glb`, then `HOME_BAKE_MODULES=/path/to/tooling node tools/bake_home_contact.mjs web/house/assets/lighting/architecture.glb`. Convert its PGM to the full/lite JPEGs with Pillow. The export filename is only an accommodation for the existing local snapshot helper; it contains GLB bytes. This is ambient contact lighting, not a claim of full global illumination or Unreal quality.

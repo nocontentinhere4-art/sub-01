@@ -59,6 +59,8 @@ if __name__ == "__main__":
                 "modern_arm_chair_01",
                 "potted_plant_01",
                 "modern_coffee_table_01",
+                "throw_pillows_01",
+                "desk_lamp_arm_01",
             ]
         ] + [
             p.submit(asset, x)
@@ -71,5 +73,13 @@ if __name__ == "__main__":
             ]
         ]
         records = [j.result() for j in jobs]
-    (ROOT / "manifest.json").write_text(json.dumps(records, indent=2))
+    manifest = ROOT / "manifest.json"
+    existing = json.loads(manifest.read_text()) if manifest.exists() else []
+    by_name = {a["asset"]: a for a in existing}
+    for record in records:
+        previous = by_name.get(record["asset"], {})
+        downloaded = {f["file"] for f in record["files"]}
+        record["files"] += [f for f in previous.get("files", []) if f["file"] not in downloaded]
+        by_name[record["asset"]] = record
+    manifest.write_text(json.dumps(list(by_name.values()), indent=2))
     print("Downloaded", sum(f["bytes"] for a in records for f in a["files"]), "bytes")
