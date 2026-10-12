@@ -336,7 +336,7 @@ for (const surface of [
   { c: [-2.075, 4.45, 3.94], w: 3.7, h: 2.5, ry: Math.PI },
 ]) {
   const view = createWindowView(T, {
-    base: "/room/window/",
+    base: lite ? "/house/assets/lite/window/" : "/room/window/",
     textures: sharedWindowTextures,
   });
   if (!sharedWindowTextures) {
