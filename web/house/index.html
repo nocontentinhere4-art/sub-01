@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SUB-01 · Home</title>
+    <link rel="stylesheet" href="/house/style.css" />
+    <script type="importmap">
+      { "imports": { "three": "/house/vendor/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <header>
+      <small>SUB-01 / THROUGH HIS EYES</small>
+      <h1 id="place">Connecting…</h1>
+      <p id="activity">One brain. One home. A shared life.</p>
+    </header>
+    <nav>
+      <button id="follow" class="active">Follow SUB-01</button
+      ><button id="explore">Explore</button><button id="pc">Computer</button
+      ><button id="tv">TV / Games</button><button id="phone">Phone</button
+      ><a href="/brain">Brain</a>
+    </nav>
+    <div id="reticle">+</div>
+    <div id="action"></div>
+    <div id="notice" role="status"></div>
+    <aside id="panel" hidden>
+      <button id="close" aria-label="Close">×</button>
+      <h2 id="panel-title"></h2>
+      <div id="panel-body"></div>
+    </aside>
+    <footer>
+      <button id="lamp">Lamp</button><button id="curtain">Curtains</button
+      ><span id="connection">Connecting to his brain…</span
+      ><small id="status"></small>
+      <p id="hint">Drag to look · Explore: W A S D · E to use a device</p>
+    </footer>
+    <div id="touch">
+      <button data-key="w">↑</button>
+      <div>
+        <button data-key="a">←</button><button data-key="s">↓</button
+        ><button data-key="d">→</button>
+      </div>
+    </div>
+    <div id="load">SUB-01 / HOME<span>Opening his world…</span></div>
+    <script>
+      addEventListener("error", (e) => {
+        document.querySelector("#load span").textContent =
+          e.message || "Could not load the home";
+      });
+      addEventListener("unhandledrejection", (e) => {
+        document.querySelector("#load span").textContent = String(e.reason);
+      });
+    </script>
+    <script type="module" src="/house/home.js?v=2"></script>
+  </body>
+</html>

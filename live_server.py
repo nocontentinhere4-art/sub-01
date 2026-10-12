@@ -38,6 +38,9 @@ from eye import Eye, ReplicateLLM, load_env, market_mood
 from diary import Diary
 from real_baseline import RealBaseline
 from life import LABEL as LIFE_LABEL, WORLD, Life
+from home_world import HomeWorld
+from home_computer import Computer
+from home_api import add_home_routes
 from twin.body import Body
 from twin.neurochem import Neuromodulators
 from research import Reader, reading_stimulus
@@ -397,6 +400,12 @@ class Live:
         atlas = json.load(open(HERE / "out" / "atlas_names.json"))
         self.nm_idx = np.array([atlas.index(n) for n in self.brain.names])
         self.life = Life(life_state, body=self.body)
+        self.home_enabled = os.environ.get("HOME_ENABLED", "0") == "1"
+        self.home_path = self.data_dir / "home.json"
+        self.home = HomeWorld(load_json(self.home_path, {})) if self.home_enabled else None
+        self.computer = Computer(data_dir) if self.home_enabled else None
+        self.life.home_enabled = self.home_enabled
+        self.home_device_at = 0.0
         self.time_scale = time_scale
         self.life.time_scale = time_scale
         self.reading_path = Path(data_dir) / "reading.json"
@@ -951,10 +960,21 @@ class Live:
                 b.stimulate(grp, amt * TICK / 2.0)                    # settles at `amt` (stimuli decay with tau 2 s)
             hot = min(1.0, sum(1 for x in self.recent_trades if now - x[0] < 60) / 10)
             tsim = self.clock.now()
+            if self.home:
+                self.life.home_bladder = self.home.bladder
             self.life.update(tsim, TICK, TICK * self.time_scale, self.engine.stage, rel, hot,
                              self.engine.pressure(tsim))
             self.life.music = self.music.tick_view()
             msg["life"] = self.life.snapshot()
+            if self.home:
+                self.home.update(TICK, TICK*self.time_scale, msg["life"], rel)
+                msg["home"] = self.home.view(compact=True)
+                if self.home.pong.reward:
+                    b.stimulate("reward" if self.home.pong.reward > 0 else "salience", abs(self.home.pong.reward))
+                    self.home.pong.reward = 0.0
+                if now-self.home_device_at >= 1:
+                    self.home_device_at=now
+                    await self.computer.agent_step(self.home, rel)
             if self.music.now:
                 self.music_watch.feed(rel, now, TICK)
             msg["neuro"] = {k: round(v, 2) for k, v in levels.items()}
@@ -986,6 +1006,8 @@ class Live:
         files += [(self.life_path, self.life.to_dict(), {}),
                   (self.body_path, {"body": self.body.to_dict(), "neuro": self.neuro.to_dict()}, {}),
                   (self.reading_path, self.reader.to_dict(), {"ensure_ascii": False})]
+        if getattr(self, "home", None):
+            files.append((self.home_path, self.home.to_dict(), {"ensure_ascii": False}))
         return files
 
     async def save_state(self):
@@ -2215,6 +2237,7 @@ async def main(args):
         live.mind = mind_mod.Mind(data_dir, budget=mind_mod.mind_budget(data_dir), clock=live.clock.now)
 
     add_ops_routes(app, live, data_dir)
+    add_home_routes(app, live, admin_ok)
     if os.environ.get("CLIPS", "1") != "0":       # #59: daily clips for the social accounts, made in nice'd children
         live.clips = clips.ClipMaker(data_dir)
         live.clips.ledger = live.ledger
@@ -2346,7 +2369,8 @@ async def main(args):
         return web.json_response({"url": CITY_URL, "up": city_state["up"], "checked": int(city_state["checked"])},
                                  headers={"Cache-Control": "no-store"})
     app.router.add_get("/api/city", city)
-    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
+    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / ("house/index.html" if live.home_enabled and os.environ.get("HOME_ENTRYPOINT", "1") == "1" else "room.html"), headers=NOCACHE))
+    app.router.add_get("/room-classic", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
     app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
     for old, new in OLD_PATHS.items():             # links from before the launch (the login page, short names)
@@ -2366,6 +2390,8 @@ async def main(args):
     tasks = [supervised("brain", live.run_brain, backoff=1.0), supervised("research", live.run_research),
              supervised("trades", live.demo_trades if args.demo else live.rpc_trades),
              supervised("chess", live.run_chess), supervised("music", live.run_music)]
+    if live.computer:
+        tasks.append(supervised("home computer", live.computer.run))
     if live.eye:
         tasks.append(supervised("eye", live.run_eye))
     if live.browser:
@@ -2397,6 +2423,8 @@ async def main(args):
             manager.shutdown()
         if cpu_net:
             await cpu_net.stop()
+        if live.home:
+            save_json(live.home_path, live.home.to_dict(), ensure_ascii=False)
         live.save_screens()                               # #89: today's screens survive the deploy
         if live.browser:
             try:

@@ -1,0 +1,4 @@
+
+# Local vendored upstream libraries are excluded from source-language statistics.
+web/house/vendor/** linguist-vendored
+computer/libv86.cjs linguist-vendored

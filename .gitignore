@@ -30,3 +30,9 @@ room_build/plates/
 # visual QA harness (tests/visual): screenshots and the CDN cache are never committed
 tests/visual/out/
 tests/visual/.cdn_cache/
+
+# Local home geometry export for offline baking
+out/home-bake-source.png
+
+# Guest binaries: bootstrap verifies/downloads official upstream versions.
+computer/*.bin

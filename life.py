@@ -30,7 +30,7 @@ NEED_W = 1.6
 FOOD_WAITING = 1.2          # a meal waiting at home and hunger above SATED: eating it wins within minutes
 INTERRUPT_MARGIN = 0.3      # a food action that beats the current activity by this much ends it early
 FOOD_ACTS = ("eat", "buy_bread", "buy_konbini", "order_food", "get_delivery")
-INTERRUPTIBLE = ("phone", "window", "research", "chat", "watch_video", "play_chess", "listen_music")
+INTERRUPTIBLE = ("play_console", "use_computer", "phone", "window", "research", "chat", "watch_video", "play_chess", "listen_music")
 # ---- the day's shape (L1-L3) ----------------------------------------------------------------------------------
 CHOICE_T = 0.1              # softmax temperature over the scores: a 0.15 gap is ~80/20, a 0.3 gap ~95/5
 REPEAT_WINDOW, REPEAT_W = 3 * 3600, 0.5   # each start of the same activity in the last 3 sim hours halves its score
@@ -49,7 +49,7 @@ PARK_CLOSES = 20            # the bench is left by 20:00; a trip starts only whe
 NIGHT_END = 6               # 00:00-06:00: no computer and no window unless chat is waiting (an input wake is phone or music)
 # a wish heard in the chat for one of these (a desire of at least WISH_MIN) that beats what he is doing at home, or on
 # the park bench, by INTERRUPT_MARGIN ends it early: "let's play chess" leads to a game within minutes, not hours
-WISH_INTERRUPTS, WISH_MIN = ("play_chess",), 0.5
+WISH_INTERRUPTS, WISH_MIN = ("play_chess", "play_console", "use_computer", "use_bathroom"), 0.5
 # background music (#68): a flag, not an activity; live_server may put a track on during these, or on a walk outside
 MUSIC_BG = ("research", "play_chess", "park")
 
@@ -144,6 +144,9 @@ ACTIVITIES = {              # place, pose, (min, max) simulated minutes
     "chat": ("desk", "sitting_desk", (6, 15)),
     "watch_video": ("desk", "sitting_desk", (10, 30)),    # one or more muted videos, each 2-10 min (#17)
     "play_chess": ("desk", "sitting_desk", (30, 60)),     # ends earlier when the game ends (live_server)
+    "use_computer": ("desk", "sitting_desk", (4, 12)),
+    "play_console": ("window", "standing", (5, 15)),
+    "use_bathroom": ("window", "standing", (1, 2)),
     "listen_music": ("bed", "lying_headphones", (8, 25)),  # tracks his brain model picks, shown as Spotify embeds (#68)
 }
 # what he eats (#63): a delivery is one dish, picked when he orders (a viewer's wish heard in the last sim hour, else at
@@ -167,7 +170,11 @@ LABEL = {"sleep": "sleeping", "phone": "in bed scrolling the phone", "eat": "eat
          "order_food": "ordering food on the phone", "get_delivery": "getting the delivery at the door",
          "chat": "answering chat at the computer", "watch_video": "watching a video at the computer (muted)",
          "play_chess": "playing chess at the desk", "listen_music": "lying on the bed listening to music"}
-DESIRES = [  # chat words -> short-lived desire
+LABEL.update(use_computer="using his Linux computer", play_console="playing Pong on the wall TV", use_bathroom="in the bathroom (private)")
+DESIRES = [
+    (r"\b(pong|console|tv game|videogame)\b", "play_console"),
+    (r"\b(linux|terminal|emulator|computer)\b", "use_computer"),
+    (r"\b(bathroom|bagno|toilet)\b", "use_bathroom"),  # chat words -> short-lived desire
     (r"\b(pane|bread|fame|hungry|mangia|eat|colazione|breakfast)\b", "buy_bread"),
     (r"\b(tiktok|telefono|phone|scroll|social|video)\b", "phone"),
     (r"\b(parco|park|fuori|outside|passeggia|walk|aria)\b", "park"),
@@ -390,6 +397,12 @@ class Life:
                              + (0.15 if 18 <= h or h < 1 else 0.0) + 0.15 * max(0, rel.get("reward", 1) - 1)
                              + self.desire("listen_music", t)),
         }
+        if getattr(self, "home_enabled", False):
+            s.update(
+                play_console=(0.18 + .5*self.boredom + .18*max(0,rel.get("somatomotor",1)-1)
+                              + self.desire("play_console",t))*desk,
+                use_computer=(.22 + .2*max(0,rel.get("attention",1)-1) + self.desire("use_computer",t))*desk,
+                use_bathroom=max(0,(getattr(self,"home_bladder",0)-.45)*4)+self.desire("use_bathroom",t))
         if s.get(self.plan_hint, 0.0) > 0:              # the plan only tilts what is possible now
             s[self.plan_hint] += PLAN_BONUS
         nudge = self.nudge(t)
@@ -554,7 +567,7 @@ class Life:
             self.start("get_delivery", t, "the courier rings: goes to the door")
         if self.activity in ("window", "research"):
             self.boredom = min(1.0, self.boredom + dt_sim / (2 * 3600))
-        if self.activity in ("phone", "chat", "watch_video", "play_chess", "listen_music"):
+        if self.activity in ("phone", "chat", "watch_video", "play_chess", "listen_music", "play_console", "use_computer"):
             self.boredom = max(0.0, self.boredom - dt_sim / (40 * 60))
         if self.activity == "park":
             self.boredom = max(0.0, self.boredom - dt_sim / (30 * 60))
@@ -630,6 +643,9 @@ class Life:
                 "get_delivery": "the courier rings: goes to the door",
                 "chat": "chat messages are waiting: sits at the computer to answer",
                 "watch_video": "bored: puts a video on at the computer (muted)",
+                "play_console": "turns on the wall TV for Pong",
+                "use_computer": "opens his Linux computer",
+                "use_bathroom": "takes a bathroom break",
                 "play_chess": "sits down for a game of chess at the desk",
                 "listen_music": "bored: lies down with his headphones on" if self.boredom >= 0.5
                                 else "lies down with his headphones on",

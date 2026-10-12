@@ -12,3 +12,6 @@ out/brand
 out/eye
 docs
 tests
+
+# Guest system binaries are fetched from pinned upstream during the image build.
+computer/*.bin

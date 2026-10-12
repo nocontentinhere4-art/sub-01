@@ -8,7 +8,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 # #59: ffmpeg (H.264) + DejaVu fonts for the daily clips (clips.py renders in nice'd children)
 RUN pip install --no-cache-dir -r requirements-server.txt \
  && python -m playwright install --with-deps --only-shell chromium \
- && apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core \
+ && apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core nodejs \
  && rm -rf /var/lib/apt/lists/*
 # #18: the server and Chromium run as sub01 (uid 1000), so Chromium can keep its sandbox. The image still starts as root:
 # entrypoint.sh hands the root-owned /data volume to uid 1000 and drops privileges with setpriv (util-linux, already in
@@ -21,6 +21,9 @@ RUN chmod 755 /usr/local/bin/sub01-entrypoint \
 COPY audience.py brain_sim.py sleep.py chat.py eye.py real_baseline.py life.py live_server.py diary.py research.py browse.py launchpad_eval.py \
      runpod_api.py browse_service.py eyes.py brain_vote.py tastes.py state_io.py mind.py costs.py chess_game.py \
      search_sources.py sessions.py view_only.py interests.py short_videos.py music.py music_curated.json clips.py readings.py screens.py novelty.py youtube_api.py memory_guard.py lexicon.py ./
+COPY home_world.py home_computer.py home_api.py ./
+COPY computer ./computer
+RUN python computer/bootstrap.py /app/computer
 COPY twin ./twin
 COPY spiking ./spiking
 COPY web ./web

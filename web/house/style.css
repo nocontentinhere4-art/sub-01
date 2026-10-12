@@ -1,0 +1,271 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #121915;
+  color: #f4eee4;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+  touch-action: none;
+}
+header {
+  position: fixed;
+  top: 28px;
+  left: 32px;
+  pointer-events: none;
+  text-shadow: 0 2px 16px #0008;
+}
+small {
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+header small {
+  color: #ff9e59;
+}
+h1 {
+  font-size: 27px;
+  font-weight: 400;
+  margin: 8px 0;
+}
+header p {
+  font-size: 12px;
+  color: #faf5e4;
+  margin: 0;
+  max-width: 350px;
+}
+nav {
+  position: fixed;
+  right: 24px;
+  top: 28px;
+  display: flex;
+  gap: 6px;
+}
+button,
+a {
+  border: 1px solid #ffffff24;
+  border-radius: 6px;
+  background: #17201bd9;
+  color: #eee6d6;
+  padding: 10px 13px;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+  backdrop-filter: blur(10px);
+}
+button:hover,
+button.active {
+  border-color: #ff9e59;
+  color: #ffaf74;
+}
+footer {
+  position: fixed;
+  bottom: 25px;
+  left: 32px;
+  right: 32px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+footer p {
+  width: 100%;
+  font-size: 10px;
+  color: #f0e7d1;
+  text-shadow: 0 1px 5px #000;
+}
+#connection,
+#status {
+  font-size: 10px;
+  background: #18211ad9;
+  padding: 8px;
+  border-radius: 5px;
+}
+#status {
+  margin-left: auto;
+  letter-spacing: 0;
+}
+#reticle {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  color: #eee9;
+  font-size: 15px;
+  pointer-events: none;
+}
+#action {
+  position: fixed;
+  left: 50%;
+  bottom: 160px;
+  transform: translateX(-50%);
+  background: #161f17dd;
+  padding: 13px 18px;
+  border-radius: 8px;
+  display: none;
+  font-size: 12px;
+}
+#load {
+  position: fixed;
+  inset: 0;
+  background: #17201b;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  text-align: center;
+  letter-spacing: 4px;
+  color: #ffae6d;
+}
+#load span {
+  font-size: 11px;
+  letter-spacing: 0;
+  color: #ccc;
+}
+#panel {
+  position: fixed;
+  right: 24px;
+  top: 95px;
+  bottom: 135px;
+  width: min(520px, calc(100vw - 48px));
+  border: 1px solid #ffffff25;
+  border-radius: 12px;
+  background: #121b18f5;
+  padding: 24px;
+  overflow: auto;
+  backdrop-filter: blur(18px);
+}
+#panel[hidden] {
+  display: none;
+}
+#close {
+  float: right;
+  font-size: 17px;
+  padding: 3px 9px;
+}
+h2 {
+  font-size: 18px;
+  font-weight: 400;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #a4ddba;
+}
+input,
+textarea {
+  width: 100%;
+  background: #0b1410;
+  color: #ddd;
+  border: 1px solid #46574c;
+  border-radius: 5px;
+  padding: 12px;
+  margin: 8px 0;
+}
+textarea {
+  height: 100px;
+}
+#panel canvas {
+  width: 100%;
+  height: auto;
+  max-height: 350px;
+}
+#panel img {
+  width: 100%;
+  border-radius: 6px;
+}
+.apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.entry {
+  border-bottom: 1px solid #ffffff15;
+  padding: 12px 0;
+  font-size: 12px;
+}
+.muted {
+  color: #b1bab2;
+  font-size: 11px;
+  line-height: 1.6;
+}
+#notice {
+  position: fixed;
+  top: 100px;
+  left: 32px;
+  padding: 12px;
+  font-size: 12px;
+  background: #17201bdc;
+  display: none;
+  max-width: 330px;
+}
+#touch {
+  display: none;
+  position: fixed;
+  bottom: 120px;
+  left: 20px;
+  text-align: center;
+}
+#touch button {
+  font-size: 18px;
+  padding: 13px;
+}
+@media (max-width: 700px) {
+  header {
+    top: 16px;
+    left: 18px;
+  }
+  h1 {
+    font-size: 20px;
+  }
+  header p {
+    max-width: 210px;
+    font-size: 10px;
+  }
+  nav {
+    top: auto;
+    bottom: 20px;
+    left: 16px;
+    right: 16px;
+    flex-wrap: wrap;
+  }
+  nav button,
+  nav a {
+    padding: 8px 9px;
+  }
+  footer {
+    left: 18px;
+    right: 18px;
+    bottom: 83px;
+  }
+  footer > button,
+  footer p {
+    display: none;
+  }
+  #status {
+    font-size: 9px;
+  }
+  #touch {
+    display: block;
+  }
+  #panel {
+    top: 100px;
+    bottom: 135px;
+    right: 12px;
+    width: calc(100vw - 24px);
+  }
+  #action {
+    bottom: 230px;
+  }
+  #notice {
+    left: 18px;
+    top: 90px;
+  }
+}
+
+body:has(#panel:not([hidden])) #touch {
+  display: none;
+}
