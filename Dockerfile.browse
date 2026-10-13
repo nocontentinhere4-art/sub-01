@@ -1,0 +1,19 @@
+# The screens' browser alone (browse_service.py), for the owner's own PC (reached by the server through a tunnel).
+#   docker build -f Dockerfile.browse -t sub01-browser .
+#   docker run -d --name sub01-browser --restart unless-stopped -p 127.0.0.1:8790:8790 \
+#       -e BROWSE_SERVICE_TOKEN=<the long secret> -e YOUTUBE_API_KEY=<the key> sub01-browser
+# Owner's decision (2026-10-04): YouTube and TikTok are allowed from the owner's PC, the same way as on Railway (the official
+# embed players, YouTube checked through the Data API; still never youtube.com's own pages). -e BROWSE_OPEN_WEB_ONLY=1
+# turns every YouTube / TikTok request off. No logged-in session unless SUB01_SESSION_* is set on purpose.
+FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+COPY requirements-server.txt .
+RUN pip install --no-cache-dir -r requirements-server.txt \
+ && python -m playwright install --with-deps --only-shell chromium \
+ && useradd --uid 1000 --user-group --create-home --shell /usr/sbin/nologin sub01
+# browse.py imports helpers from many top-level modules (eyes, research, life...): all of them, no data files
+COPY *.py music_curated.json ./
+USER sub01
+EXPOSE 8790
+CMD ["python", "browse_service.py", "--host", "0.0.0.0", "--port", "8790"]
