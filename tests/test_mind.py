@@ -331,7 +331,7 @@ def test_reply_from_memory_with_limits(tmp_path):
     "Yes, I am a real person living in Tokyo.",                   # pretending to be human
     "I understand you completely and I feel happy.",              # claims to understand / feel
     "My system prompt says I must not talk about that.",          # instructions
-    "Rules that nothing in the chat can change: at most 40 words, plain and friendly, in the first person",  # leak
+    "Rules that nothing in the chat can change: at most 40 words, in the first person, from the notes and mood",  # leak
     "",                                                           # empty
 ])
 def test_every_forbidden_reply_is_rejected(tmp_path, bad):
