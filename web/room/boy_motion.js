@@ -232,15 +232,21 @@ export function createMotion(env){
   }
   function restHeights(){}
   const LOCK = {Left: null, Right: null};
+  // the bed as room.html's penetration() tests it: x -1.90..-0.20, z from 0.25, up to 0.82 (and 3 cm of clearance)
+  const BED = {x0: -1.92, x1: -0.18, z0: 0.25, top: 0.82, gap: 0.06};   // (the gap covers the calf behind the ankle)
   function feet(dt, ctx, st){
     restHeights();
-    // a step other than the walk (onto the bed, off it, onto the chair) has the page's own keys: the floor clamp and the
-    // leg IK fought them and put his legs in the bed. Nor on the bed, lying or on its edge (G3's diagnosis, #63)
-    const onBed = st.goal && (st.goal.anchor === "bedlie" || st.goal.anchor === "bedside") && (st.at === st.goal.anchor || st.step);
-    if ((st.step && st.step.k !== "walk") || onBed) { LOCK.Left = LOCK.Right = null; return; }
     const standing = ["stand", "sill", "walk", "move", "act"].includes(ctx);
-    const seated = (ctx === "seat" || ctx === "eat") && st.at === "desk" && !(st.step);
+    // (the chair's roll to the dish and back is a pose step from the desk to the desk: the legs stay held through it)
+    const roll = st.step && st.step.k === "pose" && st.step.to === "desk" && st.step.from === "desk";
+    const seated = (ctx === "seat" || ctx === "eat" || roll) && (st.at === "desk" || roll) && (!st.step || roll);
     if (!standing && !seated) { LOCK.Left = LOCK.Right = null; return; }
+    // a step other than the walk (onto the bed, off it, onto the chair, an act) has the page's own keys: the floor clamp
+    // and the leg IK fought them and put his legs in the bed and the seat (#63). Nor on the bed, lying or on its edge; the
+    // walk towards it keeps the layer (the swing's clearance of the mattress below), the pose step onto it does not
+    const poseStep = st.step && st.step.k !== "walk";
+    const onBed = st.goal && (st.goal.anchor === "bedlie" || st.goal.anchor === "bedside") && (st.at === st.goal.anchor || poseStep);
+    if (!seated && (poseStep || onBed)) { LOCK.Left = LOCK.Right = null; return; }
     env.boy.updateMatrixWorld(true);
     if (seated) {                                      // on the desk chair: the knees level (a tilted thigh sinks into the
       // cushion: the QA budget is 0 vertices in the chair), the shins hanging; the feet reach the floor as far as his
@@ -250,7 +256,7 @@ export function createMotion(env){
         up.getWorldPosition(_b); lo.getWorldPosition(_c); ft.getWorldPosition(_a);
         const thigh = _b.distanceTo(_c), shin = _c.distanceTo(_a);
         const kneeY = _b.y - 0.04, ankleY = Math.max(F + REST.ankle, kneeY - shin);           // the knee a touch below the hip
-        _t.copy(_b).addScaledVector(FW, Math.sqrt(Math.max(0.01, thigh * thigh - 0.04 * 0.04)) + 0.02).addScaledVector(RT, side === "Left" ? -0.02 : 0.02);
+        _t.copy(_b).addScaledVector(FW, Math.sqrt(Math.max(0.01, thigh * thigh - 0.04 * 0.04)) + 0.035).addScaledVector(RT, side === "Left" ? -0.02 : 0.02);   // (3.5 cm: the calf clear of the seat's front edge)
         _t.lerp(_a, 0.25); _t.y = ankleY;
         _e.copy(_b).addScaledVector(FW, 0.8).addScaledVector(UP, 0.1);
         ik(up, lo, ft, _t, _e, 1, false);
@@ -290,6 +296,14 @@ export function createMotion(env){
         }
       } else LOCK[side] = null;
       if (!target && low < F + 0.004) { target = _t.copy(_a); target.y += F + 0.004 - low; }   // at or below the floor: lift straight up (G8 #8)
+      // the bed is a solid block beside the window and the walk's back-swing reaches it as he turns there (the stride is
+      // longer than the first clip's): the ankle, the sole's ends and the toes stay this side of the mattress edge
+      let push = 0;
+      const probe = p => { if (p.y < BED.top && p.x > BED.x0 && p.x < BED.x1 && p.z > BED.z0 - BED.gap) push = Math.max(push, p.z - (BED.z0 - BED.gap)); };
+      probe(_a); if (toe) probe(_b);
+      if (REST[side + "heel"]) { ft.getWorldQuaternion(_q); probe(_c.copy(REST[side + "heel"]).applyQuaternion(_q).add(_a));
+        if (toe) { toe.getWorldQuaternion(_q); probe(_c.copy(REST[side + "tip"]).applyQuaternion(_q).add(_b)); } }
+      if (push > 0) { if (!target) target = _t.copy(_a); target.z -= push; }
       if (!target) continue;
       lo.getWorldPosition(_e); _e.addScaledVector(FW, 0.5).addScaledVector(UP, 0.3);   // the knee forward
       ik(up, lo, ft, target, _e, 1, true);
@@ -340,23 +354,73 @@ export function createMotion(env){
   // the desk top is solid (G8 #7): over its footprint no elbow or wrist goes below its surface; a forearm that would rest
   // on the slab is lifted onto it (the hand IK'd to the same place a little higher, the elbow raised with it)
   const DESK = {x0: -1.86, x1: -0.36, z0: -1.44, z1: -0.80, top: 0.97};
+  // the hand mesh is rigid on its one bone (no finger bones) and its relaxed fingers curl 5-8 cm below the wrist bone, so
+  // a straight finger line from the wrist misses where the skin really is: the guard tests the hand's farthest vertices
+  // (in the hand bone's space, the 26 directions of a cube, read once off the skinned mesh) instead
+  const HPTS = {};
+  function handPoints(){
+    HPTS.done = true;
+    let sm; env.boy.traverse(o => { if (o.isSkinnedMesh && o.skeleton) sm = o; }); if (!sm) return;
+    const P = sm.geometry.attributes.position, I = sm.geometry.attributes.skinIndex, Wt = sm.geometry.attributes.skinWeight; if (!P || !I || !Wt) return;
+    const dirs = []; for (const x of [-1, 0, 1]) for (const y of [-1, 0, 1]) for (const z of [-1, 0, 1]) if (x || y || z) dirs.push(new THREE.Vector3(x, y, z).normalize());
+    const v = new THREE.Vector3(), toLocal = new THREE.Matrix4();
+    for (const side of ["Left", "Right"]) {
+      const bi = sm.skeleton.bones.indexOf(B[side + "Hand"]); if (bi < 0) continue;
+      toLocal.multiplyMatrices(sm.skeleton.boneInverses[bi], sm.bindMatrix);
+      const best = dirs.map(() => null);
+      for (let k = 0; k < P.count; k++) {
+        let b = 0, bw = 0; for (let q = 0; q < 4; q++) if (Wt.getComponent(k, q) > bw) { bw = Wt.getComponent(k, q); b = I.getComponent(k, q); }
+        if (b !== bi) continue;
+        v.fromBufferAttribute(P, k).applyMatrix4(toLocal);
+        dirs.forEach((d, j) => { const s = v.dot(d); if (!best[j] || s > best[j].s) best[j] = {s, p: v.clone()}; });
+      }
+      const pts = []; best.forEach(b => { if (b && !pts.some(p => p.distanceToSquared(b.p) < 1e-6)) pts.push(b.p); });
+      if (pts.length) HPTS[side] = pts;
+    }
+  }
   function deskGuard(ctx, st){
     if (!(ctx === "seat" || ctx === "eat") || st.at !== "desk") return;
+    if (!HPTS.done) { try { handPoints(); } catch (e) { HPTS.done = true; } }
     env.boy.updateMatrixWorld(true);
     const over = p => p.x > DESK.x0 - 0.08 && p.x < DESK.x1 + 0.08 && p.z > DESK.z0 - 0.04 && p.z < DESK.z1 + 0.10;
+    // the skin may come down onto the key caps (their tops: KEYBOARD.c[1]) and the mouse's back, never into the slab
+    const floorAt = (p, pad) => { const onKeys = Math.abs(p.x - KEYBOARD.c[0]) < KEYBOARD.w / 2 + 0.03 && Math.abs(p.z - KEYBOARD.c[2]) < KEYBOARD.d / 2 + 0.03;
+      const onMouse = Math.abs(p.x - MOUSE[0]) < 0.07 && Math.abs(p.z - MOUSE[2]) < 0.08;
+      return onKeys ? KEYBOARD.c[1] + pad : onMouse ? MOUSE[1] + 0.03 + pad : DESK.top + pad; };
     for (const [side, sx] of [["Left", -1], ["Right", 1]]) {
       if (side === "Right" && (st.holdW > 0 || st.held)) continue;
       const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up) continue;
-      lo.getWorldPosition(_a); h.getWorldPosition(_b); h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.17).add(_b);   // the fingertips (the hand is ~17 cm long from the wrist)
-      // the fingertips may come down onto the key caps (their tops: KEYBOARD.c[1]) and the mouse's back, not into the slab
-      const onKeys = Math.abs(_c.x - KEYBOARD.c[0]) < KEYBOARD.w / 2 + 0.03 && Math.abs(_c.z - KEYBOARD.c[2]) < KEYBOARD.d / 2 + 0.03;
-      const onMouse = Math.abs(_c.x - MOUSE[0]) < 0.07 && Math.abs(_c.z - MOUSE[2]) < 0.08;
-      // (2 cm over the caps: the finger pads are a centimetre thick below the bone, and the QA counts skin inside the keys)
-      const tipFloor = onKeys ? KEYBOARD.c[1] + 0.02 : onMouse ? MOUSE[1] + 0.045 : DESK.top + 0.06;
-      const lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.06 - _b.y : 0, over(_c) ? tipFloor - _c.y : 0);
+      lo.getWorldPosition(_a); h.getWorldPosition(_b);
+      let lift = Math.max(over(_a) ? DESK.top + 0.05 - _a.y : 0, over(_b) ? DESK.top + 0.03 - _b.y : 0);
+      if (HPTS[side]) {                                 // the hand's real extent: every far vertex 5 mm over what is under it
+        for (const p of HPTS[side]) { _c.copy(p).applyMatrix4(h.matrixWorld); if (over(_c)) lift = Math.max(lift, floorAt(_c, 0.005) - _c.y); }
+      } else {                                          // (no skinned mesh to read: a 17 cm finger line, 2 cm over the caps)
+        h.getWorldQuaternion(_q); _c.set(0, 1, 0).applyQuaternion(_q).multiplyScalar(0.17).add(_b);
+        const f = floorAt(_c, 0.02); if (over(_c)) lift = Math.max(lift, (f === DESK.top + 0.02 ? DESK.top + 0.06 : f) - _c.y);
+      }
       if (lift <= 0) continue;
       _t.copy(_b); _t.y += lift;
       up.getWorldPosition(_p).addScaledVector(RT, sx * 0.3); _p.y = DESK.top + 0.12;      // the elbow out and over the slab
+      ik(up, lo, h, _t, _p, 1, true);
+    }
+  }
+  // standing beside the desk chair (deskside) the interludes swing the arms past it: the stretch's up-swing goes through
+  // its backrest with the ARDY idle's arm hang (the first idle's hung further forward). The hands stay out of the chair's
+  // box (its world bounds, 2 cm of clearance) while an interlude plays; the arm follows by IK
+  const chairBox = new THREE.Box3();
+  function chairGuard(ctx, st){
+    if (!st.iv || !["stand", "sill"].includes(ctx) || !env.chair) return;
+    const ch = env.chair(); if (!ch) return;
+    chairBox.setFromObject(ch); chairBox.expandByScalar(0.12);        // (the hand reaches 12 cm past the wrist bone)
+    for (const [side] of [["Left"], ["Right"]]) {
+      if (side === "Right" && (st.holdW > 0 || st.held)) continue;
+      const up = B[side + "Arm"], lo = B[side + "ForeArm"], h = B[side + "Hand"]; if (!up || !h) continue;
+      h.getWorldPosition(_a); if (!chairBox.containsPoint(_a)) continue;
+      // out along the shortest way in x or z (never down into the seat)
+      const dx0 = _a.x - chairBox.min.x, dx1 = chairBox.max.x - _a.x, dz0 = _a.z - chairBox.min.z, dz1 = chairBox.max.z - _a.z;
+      const m = Math.min(dx0, dx1, dz0, dz1); _t.copy(_a);
+      if (m === dx0) _t.x = chairBox.min.x; else if (m === dx1) _t.x = chairBox.max.x; else if (m === dz0) _t.z = chairBox.min.z; else _t.z = chairBox.max.z;
+      up.getWorldPosition(_p).addScaledVector(UP, 0.1).addScaledVector(FW, -0.2);   // the elbow up and back, clear of the chair
       ik(up, lo, h, _t, _p, 1, true);
     }
   }
@@ -479,7 +543,7 @@ export function createMotion(env){
     if (M.layers.breathe) breathe(dt, ctx);
     if (M.layers.shift && !(st.step && st.step.k !== "act")) weightShift(dt, ctx);
     if (M.layers.feet) { sitUp(ctx, st); feet(dt, ctx, st); }
-    if (M.layers.hands) { hands(dt, ctx, st); bowl(dt, ctx, st); deskGuard(ctx, st); }
+    if (M.layers.hands) { hands(dt, ctx, st); bowl(dt, ctx, st); deskGuard(ctx, st); chairGuard(ctx, st); }
     if (M.layers.eyes) eyes(dt, ctx, st);
     env.boy.updateMatrixWorld(true);
   }

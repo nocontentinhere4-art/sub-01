@@ -171,8 +171,10 @@ def test_module_and_its_single_hook():
     assert html.count("#98 G3") == 2 and html.count('import("./room/boy_motion.js")') == 1   # one marked block, one import
     block = html[html.index("// ===== #98 G3"):html.index("// ===== end #98 G3")]
     assert "animate = dt =>" in block and "setCurrent" in block and "touch" in block
-    for name in ("movesDone", "HIPS0", "stride0", "setStride"):      # #76's clips go in first; ?motion=old gets the first ones back
+    for name in ("movesDone", "HIPS0", "stride0", "setStride", "chair:"):   # #76's clips go in first; ?motion=old gets the first ones back; the chair for the hand guard
         assert name in block, name
+    for name in ("chairGuard(", "const BED = ", "st.step.k !== \"walk\""):   # clearance: the hands out of the chair beside him, the feet out of the bed, nothing added in a pose step
+        assert name in js, name
     for name in ("createMotion", "breathe(", "weightShift(", "feet(", "hands(", "bowl(", "eyes(", "smoothBones("):
         assert name in js, name
     # the per-activity clip choice is one explicit table, overridable with ?motion=ardy|ual|old (per slot too)

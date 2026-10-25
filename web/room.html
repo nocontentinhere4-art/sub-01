@@ -3938,6 +3938,7 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
     setCurrent: a => { current = a; },
     movesDone: () => !MOVES || movesOn,            // #76's clips go in first (same slots); these take over after them
     HIPS0: JSON.parse(JSON.stringify(HIPS)), stride0: STRIDE_V,   // the table and stride before any clip swap (?motion=old)
+    chair: () => chairNode(),                       // the desk chair node (the hands stay out of it beside it)
     setStride: v => { STRIDE_V = v; }}); if (DEBUG) window.motion = motion; }).catch(e => console.warn("motion layer off:", e));
   animate = dt => { let moving;
     if (pickRig() === "mh") moving = mh ? mh.animate(dt) : mhEnv().step0(dt);   // (the old rig's layers stay off)
