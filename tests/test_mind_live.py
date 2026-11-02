@@ -135,7 +135,7 @@ def test_chat_is_answered_in_order_one_viewer_at_a_time_and_tagged(tmp_path):
     live.life.activity = "chat"
     run(live.mind_step())
     r = replies(live)
-    assert len(r) == 1 and r[0]["tag"] == "his reply (AI-written)" and r[0]["source"] == "ai" and r[0]["to"] == "mika"
+    assert len(r) == 1 and r[0]["tag"] == "his reply" and r[0]["source"] == "ai" and r[0]["to"] == "mika"
     assert r[0]["text"].startswith("I read about sourdough") and r[0]["replying_to"] == "what did you read today?"
     assert len(live.chat_inbox) == 2 and live.mind_view()["replies"][-1]["text"] == r[0]["text"]
     user = json.loads(live.mind.provider.calls[0][1])
@@ -225,7 +225,7 @@ def test_pages_he_reads_become_notes_off_the_loop(tmp_path):
         await asyncio.gather(*live.bg)
     run(go())
     sent = [m for m in live.sent if m["type"] == "mind_read"]
-    assert sent and sent[0]["tag"] == "notes written by an AI" and sent[0]["topics"] == ["sourdough", "yeast"]
+    assert sent and sent[0]["tag"] == "his notes" and sent[0]["topics"] == ["sourdough", "yeast"]
     assert live.read_topics["Sourdough"] == ["sourdough", "yeast"]
     assert live.mind_view()["notes"]["read"][0]["summary"].startswith("Sourdough")
     assert live.mind_interest() is None or isinstance(live.mind_interest(), str)

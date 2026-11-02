@@ -431,7 +431,7 @@ class Live:
         self.chat_inbox = []             # {t, text, key, nick, tries}: messages he may answer at the computer, FIFO (C1)
         self.chat_served = {}            # viewer key -> sim t of their last answered message (round-robin, memory only)
         self.cap_noted = None            # Tokyo day the "resting, back tomorrow" chat line was posted (C2)
-        self.replies = []                # his recent replies (AI-written), for the hello and /api/mind
+        self.replies = []                # his recent replies, for the hello and /api/mind
         self.read_topics = {}            # page title -> topics an AI noted (the eye's dream scenes)
         self.interest = (0.0, None)      # (wall time, mind.next_interest()) cached for the browser
         self.search_rng = random.Random()  # which of his query sources the browser's next search comes from (#56)
@@ -1578,7 +1578,7 @@ class Live:
         if it.get("summary"):
             await self.broadcast({"type": "mind_read", "t": hhmm(it["t"]), "summary": it["summary"],
                                   "topics": it.get("topics", []), "host": it.get("host", ""),
-                                  "tag": "notes written by an AI"})
+                                  "tag": "his notes"})
 
     def mood(self, t):
         return {"boredom": self.life.boredom, "pressure": self.engine.pressure(t), "tired": self.engine.tired}
@@ -1607,7 +1607,7 @@ class Live:
                 x["t"] = hhmm(x["t"])
         return {"on": True, "caption": mind_mod.CAPTION, "status": m.status(), "plan": m.plan_public(),
                 "interests": self.interest[1] or [], "notes": notes, "replies": self.replies[-10:],
-                "budget": m.budget.summary(), "reply_tag": "his reply (AI-written)",
+                "budget": m.budget.summary(), "reply_tag": "his reply",
                 "note": "An AI writes notes on what he reads, proposes day plans and writes his chat replies; his brain "
                         "model votes among the plans. It does not understand what it reads."}
 
@@ -1679,7 +1679,7 @@ class Live:
                 while len(self.chat_served) > 200:
                     self.chat_served.pop(next(iter(self.chat_served)))
                 rec = {"t": hhmm(self.clock.now()), "text": r["reply"], "to": item["nick"] or "a viewer",
-                       "replying_to": item["text"], "tag": "his reply (AI-written)", "source": r["source"]}
+                       "replying_to": item["text"], "tag": "his reply", "source": r["source"]}
                 self.replies = (self.replies + [rec])[-30:]
                 await self.broadcast({"type": "chat_reply", **rec})
             elif r["why"] == "no AI reply":                         # transient: one more try, then a visible miss

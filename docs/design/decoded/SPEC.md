@@ -21,7 +21,7 @@ uppercase mono captions, red for LIVE, teal for PROJECTED):
 
 ## Hard rules (project): see docs/HANDOFF.md "Hard rules" and "Science status"
 - Honest: it is a MODEL, not a mind. Never say it feels, thinks, understands, is alive or conscious. "He" is shorthand
-  for a fictional character. All readouts are "model readouts, not measurements of anyone". AI-written text is labelled.
+  for a fictional character. All readouts are "model readouts, not measurements of anyone". No text is labelled as AI-written (owner, 2026-11-02; this supersedes the earlier rule, see `docs/HANDOFF_DECODED.md` decision 14).
 - Never name or hint at the real scanned person; the data credit lives on /about.html only.
 - No coin promotion, no financial advice, no trade tape. No secrets. No third-party fonts/scripts beyond the CDNs
   already used (cdnjs three.js r128 is fine). No external tracking.
@@ -32,18 +32,16 @@ uppercase mono captions, red for LIVE, teal for PROJECTED):
    `/brain` → `web/index.html` unchanged (the deep 3D brain). `/diary`, `/world.html`, `/tastes.html`,
    `/about.html`, `/life.html` unchanged. Old links: `/live` → `/`, `/room/` → `/room`, `/home`,`/index` → `/`.
 2. Nav order on every page: **live** (`/`) · **brain** (`/brain`) · **room** (`/room`) · **diary** (`/diary`) ·
-   **sees** (`/world.html`). The city link was dropped on 2026-11-02 (`docs/HANDOFF_DECODED.md`, decision 7); no page links to it.
+   **sees** (`/world.html`). The city was removed on 2026-11-02 (`docs/HANDOFF_DECODED.md`, decision 7): no nav link, and no page links to it.
    Pages that also link about/map keep those links after the common ones.
 3. Design system: `web/ui.css` (already written; read it). Use its tokens/classes. Black #000 ground. Headlines in
    --ui-sans weight 700/800 tight tracking; captions/data in --ui-mono 10–12px uppercase tracked. Red = live,
    teal = projected/estimated. Respect prefers-reduced-motion.
-4. Voice (copy): bold, declarative, short lines; honest sub-lines in mono. Example hero: "A brain, decoded live."
-   sub: "A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. These are
-   model readouts, not measurements of anyone." His chat replies already use his casual voice (mind.py, lowercase,
-   light slang) — show them tagged "his reply · AI-written".
-   Scientific register (owner, 2026-11-02): the front page's hero lines and feed captions describe the method, the data
-   and the readouts; the example hero above is replaced by those lines, and the fictional framing stays. His chat replies
-   keep the casual voice; whether they take the scientific register too is the owner's decision.
+4. Voice (copy): plain factual sentences, short lines, honest sub-lines in mono, in a scientific register. The front page
+   describes the method, the data and the readouts ("A brain model, live." / "Send it a message." / "A model, not a mind.").
+   The fictional framing stays. No fragment-for-punch headlines and no "AI" labels on any page (owner, 2026-11-02).
+   His chat replies keep the casual voice from `mind.py` (lowercase, light slang) and are tagged "his reply". Whether
+   they take the scientific register too is the owner's decision.
 
 ## Live data contract (WebSocket `/ws?rate=5&q=1`, JSON messages; see live_server.py Feed.brain_view)
 After the server agent's change the q=1 tick is:
@@ -75,6 +73,8 @@ Brain geometry (static, already served): web/brain.json {nodes:[{name,group,p:[x
   edges, mesh:{left:{v:[flat xyz]×10242, f:[flat tri idx]}, right:{...}}, groups:[11 names]}. Vertex→region: nearest
   node `q` among cortical nodes (names starting LH_/RH_), as web/index.html does at line ~650 (within 30 mm).
   Axial (top) view: x = left-right, y = back-front, z = up: project (x, y), front (+y) at the top of the panel.
+
+Room embed (`web/room.html?embed`, the viewport when his screen is off): parent → iframe `postMessage({type:"sub01-embed", visible:boolean}, location.origin)`. `visible:false` stops its render loop; `visible:true` starts it again and lets him catch up 8 s. Iframe → parent `{type:"sub01-embed-ready"}` once he is first drawn. `live.html` posts `visible:false` when he is at a screen, when the tab is hidden, when the viewport is off screen and while the intro deck is open. The embed is chromeless: scene only, a fading mono caption of what he does, 30 fps, DPR 1.
 
 ## Readouts (page-side; all are model readouts, label them so)
  rel(g) = groups[g] / EMA25s(groups[g]); R(x) = clamp(50 + 40*log2(x), 0, 100)  (50 = his own baseline)

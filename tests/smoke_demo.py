@@ -214,7 +214,7 @@ async def run(args, proc):
                              for m in tracks):
                     failures.append("--music: a track without the official embed URL or without 3-5 options")
             if args.mind:
-                print(f"mind: {sent} chat messages sent, {seen.get('chat_reply', 0)} replies (AI-written tag), "
+                print(f"mind: {sent} chat messages sent, {seen.get('chat_reply', 0)} replies, "
                       f"{seen.get('plan', 0)} plan event(s)")
                 if not seen.get("plan"):
                     failures.append("--mind: no day plan arrived during the measurement")
