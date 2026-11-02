@@ -1,5 +1,8 @@
 # What is licensed how
 
+The MIT licence in `LICENSE` grants the code and the documentation only. The data and the assets listed below keep their
+own terms; some are not covered by any licence yet and are not granted by `LICENSE`.
+
 The MIT licence in `LICENSE` covers the code (the Python, the JavaScript, the HTML and CSS) and the documentation.
 Everything else in the repository comes from somewhere, and keeps its own terms. The full credits with every paper
 and author are on the site at `/about.html` (section 05) and in `web/room/CREDITS.md`.
