@@ -110,7 +110,8 @@
       const home = now => { const c = chosen(); if (c.length !== 1) { seg.classList.remove("has-thumb"); th.style.opacity = "0"; return; }
         seg.classList.add("has-thumb"); place(th, c[0], now); };
       settle(home);
-      new MutationObserver(() => home()).observe(seg, {subtree:true, attributes:true, attributeFilter:["class", "aria-pressed", "hidden", "style"]});
+      // (the thumb's own style changes are ours: ignoring them keeps this from re-firing itself forever)
+      new MutationObserver(ms => { if (ms.some(m => m.target !== th)) home(); }).observe(seg, {subtree:true, attributes:true, attributeFilter:["class", "aria-pressed", "hidden", "style"]});
       seg.addEventListener("pointerenter", () => home(true));
       if (typeof IntersectionObserver === "function") new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) home(true); }).observe(seg);
     }
