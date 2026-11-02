@@ -5,7 +5,7 @@ screenshots and the audit, never the code, the brief or JURY-1), from 6 pages pl
 from the demo server at http://localhost:8799 with the /jury skill with the intro flag preset (`--init`), so the critic
 scored the dashboard this time (desktop 1440, a phone at 390 throttled to 4× CPU and slow 4G, reduced motion, keyboard
 focus, hover pairs, page transitions). Scored after the jury fix round, the owner's removals and the v3 controls (commits
-c7bebf9 … 27f341a).
+7220a8e … 105aeff).
 
 **The idea, as the critic read it:** a round-the-clock live stream of an invented man in a small Tokyo room, whose sleep,
 reading, diary and chat replies are driven by a brain model built from one real person's open MRI data, with "a model,
