@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="What SUB-01 is: a model of brain activity built from one person's public MRI, the numbers behind it (negative results included), what it does each day, costs, credits and licences.">
 <title>SUB-01 · about</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="canonical" href="/about.html">
 <link rel="stylesheet" href="/ui.css">
 <style>
   /* SUB-01 · about: slide 06 of the deck, a column of numbered slides. Tokens and chrome come from /ui.css. */
@@ -71,11 +72,19 @@
   table { width:100%; border-collapse:collapse; font-size:13px; margin:0 0 12px; }
   th, td { text-align:left; padding:9px 8px 9px 0; border-bottom:1px solid var(--ui-line); vertical-align:top; color:var(--ui-fg2); }
   th { color:var(--ui-dim); font-weight:400; font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
-  td.ph { color:var(--ui-dim); font-style:italic; }
+  td.ph { color:var(--ui-dim); font-style:italic; white-space:nowrap; }
 
   .box { border:1px solid var(--ui-line2); border-radius:var(--ui-r2); padding:14px 16px; background:var(--ui-panel); }
   .box p { margin:0; color:var(--ui-fg); }
   .box code { font-size:13px; color:var(--ui-fg); }
+  /* the address: a full-width block in the mono caption style (case kept: it is case-sensitive), with a copy button */
+  .ca { display:flex; flex-direction:column; gap:10px; }
+  .ca-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; }
+  .ca-pre { flex:1 1 280px; min-width:0; margin:0; }
+  .ca-pre code { display:block; width:100%; padding:10px 12px; font-family:var(--ui-mono); font-size:12.5px; line-height:1.5; letter-spacing:.06em;
+    color:var(--ui-fg); background:var(--ui-bg); border:1px solid var(--ui-line); border-radius:var(--ui-r2);
+    word-break:break-all; overflow-wrap:anywhere; white-space:pre-wrap; user-select:all; -webkit-user-select:all; }
+  #ca-copy { flex:none; }
 
   #note { color:var(--ui-dim); font-size:10.5px; padding:20px var(--ui-pad) 30px; max-width:1240px; margin:0 auto; line-height:1.6;
     border-top:1px solid var(--ui-line); }
@@ -101,7 +110,7 @@
   </div>
 </header>
 
-<main>
+<main id="main">
 <div class="ui-caption cap-row">06 / 06 · about</div>
 
 <h1 class="lead ui-in">SUB-01 is a computer model of brain activity, built from one person's public MRI scans. It drives an
@@ -217,7 +226,7 @@ code around it do.</p>
 
 <article class="tile ph">
   <div class="ui-num">
-    <span class="ui-caption">Daily memory test, live results <span class="tag">placeholder</span></span>
+    <span class="ui-caption">Daily memory test, live results <span class="tag">not measured yet</span></span>
     <span class="ui-big off">—</span>
     <span class="ui-caption">results over time</span>
   </div>
@@ -258,13 +267,13 @@ code around it do.</p>
 <section class="slide" id="costs">
 <div class="ui-title"><span class="ui-caption">05</span><h2>Costs</h2></div>
 <div class="body">
-<p>What it costs to run, per day. To be filled from the cost ledger once it exists.</p>
+<p>What it costs to run, per day. The cost ledger starts when the site runs around the clock. Nothing has been measured as of 2 November 2026.</p>
 <table>
   <tr><th>item</th><th>per day</th></tr>
-  <tr><td>Eye images (the frames on <a href="/world.html">/world</a> and the dream images)</td><td class="ph">placeholder</td></tr>
-  <tr><td>Browsing options, page notes, day plans and chat replies (one ledger, capped at $2.00)</td><td class="ph">placeholder</td></tr>
-  <tr><td>GPU memory test (rented GPU, at most 1 hour a day)</td><td class="ph">placeholder</td></tr>
-  <tr><td>Server</td><td class="ph">placeholder</td></tr>
+  <tr><td>Eye images (the frames on <a href="/world.html">/world</a> and the dream images)</td><td class="ph">not measured yet</td></tr>
+  <tr><td>Browsing options, page notes, day plans and chat replies (one ledger, capped at $2.00)</td><td class="ph">not measured yet</td></tr>
+  <tr><td>GPU memory test (rented GPU, at most 1 hour a day)</td><td class="ph">not measured yet</td></tr>
+  <tr><td>Server</td><td class="ph">not measured yet</td></tr>
 </table>
 <p class="src">One-off GPU validation runs: the first cost about $0.01 (<code>docs/spiking/results.md</code>).
 The reading-memory run behind the 6/6 figure cost about $0.033, and that whole task about $0.036 (PR #9;
@@ -294,7 +303,7 @@ results in <code>docs/spiking/gpu_reading/</code>).</p>
     <span class="src"><code>web/room/CREDITS.md</code></span>.</li>
   <li><strong>3D character</strong> (<code>web/room/boy*.glb</code>, <code>web/room/hand_phone.glb</code>): made for
     this project with Higgsfield (image concepts turned into 3D with Meshy, then rigged and animated).
-    <span class="tag">placeholder</span>No licence is stated for these files; the terms they are used under are to
+    <span class="tag">not stated</span>No licence is stated for these files; the terms they are used under are to
     be confirmed.</li>
   <li><strong>Neuron shapes</strong> (the close-ups and the whole-brain neuron view on /brain, <code>web/neurons_morph.json</code>): real reconstructed
     neurons from <a href="https://neuromorpho.org">NeuroMorpho.Org</a> (RRID:SCR_002145), licensed
@@ -344,21 +353,40 @@ results in <code>docs/spiking/gpu_reading/</code>).</p>
   <li><strong>3D engine:</strong> three.js, MIT licence.</li>
   <li><strong>Sleep model:</strong> Phillips &amp; Robinson (2007), J Biol Rhythms 22:167; constants cross-checked
     in the MIT-licensed R package sleepR.</li>
-  <li><strong>Code:</strong> <span class="tag">placeholder</span>The repository does not state a licence yet.</li>
+  <li><strong>Code:</strong> <span class="tag">not stated</span>The repository does not state a licence yet.</li>
 </ul>
 </div>
 </section>
 <section class="slide" id="coin">
 <div class="ui-title"><span class="ui-caption">07</span><h2>Contract address</h2></div>
 <div class="body">
-<div class="box">
-  <p>CA <code style="user-select:all">6WCtKQfkWurd77tCCAYWuL5TwyAvuovTzworfnfupump</code></p>
+<div class="box ca">
+  <span class="ui-caption" id="ca-l">contract address</span>
+  <div class="ca-row">
+    <pre class="ca-pre"><code id="ca" aria-labelledby="ca-l">6WCtKQfkWurd77tCCAYWuL5TwyAvuovTzworfnfupump</code></pre>
+    <button class="ui-btn" id="ca-copy" type="button" aria-label="copy the contract address">copy</button>
+  </div>
 </div>
 </div>
 </section>
 </main>
 <div id="note">SUB-01 · a model of brain activity built from public MRI data of the MyConnectome project. Not a mind, not the person.
 The character and his life are fiction.</div>
+<script>
+(() => {
+  const code = document.getElementById("ca"), btn = document.getElementById("ca-copy");
+  if (!code || !btn) return;
+  const pick = () => { const r = document.createRange(); r.selectNodeContents(code); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+  const say = t => { btn.textContent = t; clearTimeout(say.t); say.t = setTimeout(() => btn.textContent = "copy", 1500); };
+  btn.addEventListener("click", async () => {
+    const text = code.textContent.trim();
+    try { await navigator.clipboard.writeText(text); pick(); say("copied"); return; } catch {}
+    pick();                                       // no clipboard API (or refused): the text stays selected
+    let ok = false; try { ok = document.execCommand("copy"); } catch {}
+    say(ok ? "copied" : "selected");
+  });
+})();
+</script>
 <script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>

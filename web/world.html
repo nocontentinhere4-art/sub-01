@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · what it sees</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="description" content="What the brain model sees: one view at a time, rendered from its state and from chat messages.">
+<link rel="canonical" href="/world.html">
 <link rel="stylesheet" href="/ui.css">
 <style>
   /* SUB-01 · 05 sees: a single-frame viewer. The frame is the page; a 56 px filmstrip under it (newest at the right);
@@ -67,6 +68,7 @@
     -webkit-mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%); mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
     -webkit-mask-size:min(78vmin, 720px) min(78vmin, 720px); mask-size:min(78vmin, 720px) min(78vmin, 720px);
     -webkit-mask-position:50% 50%; mask-position:50% 50%; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+  #empty p.live-line { max-width:none; font-family:var(--ui-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
   #empty p { margin:0; max-width:34em; font-family:var(--ui-sans); font-size:16px; line-height:1.5; letter-spacing:0; text-transform:none; color:var(--ui-fg2); }
 
   /* the honesty line: one short sentence above the pulse */
@@ -102,11 +104,12 @@
   <section id="empty" class="ui-in" style="--i:1" hidden>
     <span class="ui-caption">05 · SEES</span>
     <p>No pictures yet. One appears when the model renders a scene.</p>
+    <p class="ui-caption live-line" id="next-frame" aria-live="off"></p>
   </section>
 
   <div id="stage" hidden>
     <figure id="panel" class="ui-in" style="--i:1; margin:0" aria-label="the frame on show">
-      <img id="a" alt=""><img id="b" alt="">
+      <img id="a" width="768" height="432" alt=""><img id="b" width="768" height="432" alt="">
       <div id="box">
         <div class="ov" id="ov-top">
           <div id="cap"><span class="ui-caption" id="cap-t">--:--</span><span class="ui-chip" id="now-chip" hidden>now</span></div>
@@ -128,6 +131,19 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---- a live line on the empty state, from the Tokyo clock alone (his usual night: 23:56 to 07:54, docs/twin/sleep.md) ----
+const tokyoHM = new Intl.DateTimeFormat("en-GB", {hour:"2-digit", minute:"2-digit", hourCycle:"h23", timeZone:"Asia/Tokyo"});
+function tokyoMin(){ const p = Object.fromEntries(tokyoHM.formatToParts(new Date()).map(x => [x.type, x.value])); return { m:(+p.hour) * 60 + (+p.minute), hm:`${p.hour}:${p.minute}` }; }
+const BED = 23 * 60 + 56, WAKE = 7 * 60 + 54;
+const asleepAt = m => m >= BED || m < WAKE;
+function nextFrame(){
+  const el = $("next-frame"), t = tokyoMin(), up = !asleepAt(t.m);
+  el.textContent = up ? `Next frame: while he is awake, about every 90 s \u00b7 ${t.hm} Tokyo \u00b7 awake now`
+                      : `Next frame: while he sleeps, less often \u00b7 ${t.hm} Tokyo \u00b7 asleep now`;
+}
+nextFrame(); setInterval(nextFrame, 60000);
+
 let frames = [], at = -1, front = "a", world = [], resting = null;
 
 // the overlays follow the image's drawn box (object-fit: contain inside #panel)
@@ -177,7 +193,7 @@ async function refresh(follow){
   const none = !frames.length;
   $("empty").hidden = !none; $("kick").hidden = none; $("stage").hidden = none; $("film").hidden = none;
   if (none) return;
-  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)} · ${esc(stageName(f.stage))}" aria-label="${esc(f.t)} ${esc(stageName(f.stage))}"><img src="${esc(f.img)}" loading="lazy" decoding="async" alt=""></button>`).join("");
+  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)} · ${esc(stageName(f.stage))}" aria-label="${esc(f.t)} ${esc(stageName(f.stage))}"><img src="${esc(f.img)}" width="56" height="56" loading="lazy" decoding="async" alt=""></button>`).join("");
   let to = frames.length - 1;
   if (!follow && !wasLatest && keep) { const k = frames.findIndex(f => f.img === keep); if (k >= 0) to = k; }
   if (follow === false && !wasLatest) $("newpill").hidden = false;

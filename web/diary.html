@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · night log</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="description" content="The night log of a brain model: one night at a time, the images rendered from its state during dream sleep, the chat messages it played again and the pages it read that day.">
+<link rel="canonical" href="/diary">
 <link rel="stylesheet" href="/ui.css">
 <style>
   /* SUB-01 · 04 diary: one night at a time. A row of night pills under the header (← → move between nights,
@@ -95,6 +96,7 @@
     -webkit-mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%) ; mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
     -webkit-mask-size:min(78vmin, 720px) min(78vmin, 720px); mask-size:min(78vmin, 720px) min(78vmin, 720px);
     -webkit-mask-position:50% 50%; mask-position:50% 50%; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+  #empty p.live-line { max-width:none; font-family:var(--ui-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
   #empty p { margin:0; max-width:34em; font-family:var(--ui-sans); font-size:16px; line-height:1.5; letter-spacing:0; text-transform:none; color:var(--ui-fg2); }
   /* the honesty line: one short sentence above the pulse */
   #note { flex:none; margin:0; padding:6px var(--gut) 8px; font-size:12px; border-top:1px solid var(--ui-line); }
@@ -127,7 +129,7 @@
   </div>
 </header>
 
-<main id="log" aria-label="night log">
+<main id="main" aria-label="night log">
   <h1 class="sr">Diary</h1>
   <p class="ui-caption kick" id="kick" hidden>04 · DIARY</p>
   <div id="bar" hidden>
@@ -138,6 +140,7 @@
   <section id="empty" class="ui-in" style="--i:1" hidden>
     <span class="ui-caption">04 · DIARY</span>
     <p>No dream diary yet. He writes it after he sleeps, around 08:00 Tokyo.</p>
+    <p class="ui-caption live-line" id="next-dream" aria-live="off"></p>
   </section>
 
   <article id="night" hidden>
@@ -149,7 +152,7 @@
     </div>
     <div id="n-view" class="ui-in" style="--i:2">
       <figure id="dream" aria-label="the dream image on show">
-        <span class="ui-caption k" id="d-k"></span><img id="a" alt=""><img id="b" alt=""><div id="dream-none" hidden>no image rendered this night</div>
+        <span class="ui-caption k" id="d-k"></span><img id="a" width="768" height="432" alt=""><img id="b" width="768" height="432" alt=""><div id="dream-none" hidden>no image rendered this night</div>
       </figure>
       <p id="d-line"></p>
       <div id="strip" role="listbox" aria-label="the night's frames (↑ ↓ move)"></div>
@@ -176,6 +179,20 @@ function dayParts(date){                       // "2026-11-01" → ["01 Nov", "S
   if (!m) return [date || "—", ""];
   return [`${m[3]} ${MON[+m[2] - 1]}`, DAY[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()]];
 }
+
+
+// ---- a live line on the empty state, from the Tokyo clock alone (his usual night: 23:56 to 07:54, docs/twin/sleep.md) ----
+const tokyoHM = new Intl.DateTimeFormat("en-GB", {hour:"2-digit", minute:"2-digit", hourCycle:"h23", timeZone:"Asia/Tokyo"});
+function tokyoMin(){ const p = Object.fromEntries(tokyoHM.formatToParts(new Date()).map(x => [x.type, x.value])); return { m:(+p.hour) * 60 + (+p.minute), hm:`${p.hour}:${p.minute}` }; }
+const BED = 23 * 60 + 56, WAKE = 7 * 60 + 54;
+const asleepAt = m => m >= BED || m < WAKE;
+function nextDream(){
+  const el = $("next-dream"), t = tokyoMin();
+  if (asleepAt(t.m)) { el.textContent = "He is probably asleep now \u00b7 dream sleep (REM) shows here"; return; }
+  const left = (BED - t.m + 1440) % 1440, h = Math.floor(left / 60), mi = left % 60;
+  el.textContent = `Next dream window: tonight after 23:56 Tokyo \u00b7 in ${h ? `${h} h ` : ""}${mi} min`;
+}
+nextDream(); setInterval(nextDream, 60000);
 
 let nights = [], ni = -1, night = null, fi = -1, front = "a";
 const cache = new Map();
@@ -240,7 +257,7 @@ function fill(d){
   $("n-entry").textContent = d.text || ""; $("n-entry").hidden = true;
 
   // the image and the strip
-  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)}" aria-label="frame ${k + 1}, ${esc(f.t)}"><img src="${esc(f.img)}" loading="lazy" decoding="async" alt=""></button>`).join("");
+  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)}" aria-label="frame ${k + 1}, ${esc(f.t)}"><img src="${esc(f.img)}" width="56" height="56" loading="lazy" decoding="async" alt=""></button>`).join("");
   $("strip").hidden = frames.length < 2;
   $("dream-none").hidden = frames.length > 0; $("d-line").hidden = !frames.length;
   if (!frames.length) { $("dream").style.height = "200px"; $("a").removeAttribute("src"); $("b").removeAttribute("src"); $("a").classList.remove("on"); $("b").classList.remove("on"); $("d-k").textContent = ""; }
