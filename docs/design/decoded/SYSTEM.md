@@ -10,7 +10,7 @@ Dovetail (compact command-center density), plus the owner's "Humans Decoded" scr
 
 ## Deck order and the header (identical markup on every page)
 01 live `/` · 02 brain `/brain` · 03 room `/room` · 04 diary `/diary` · 05 sees `/world.html` · 06 about `/about.html`.
-Secondary pages (`/life.html`, `/tastes.html`, `/fibres.html`) are notes: their counter reads `—`.
+Secondary pages (`/life.html`, `/tastes.html`, `/fibres.html`) are notes: they declare no `data-deck`.
 The page declares itself with `<body data-deck="02" data-pulse>` (`data-pulse` = show the pulse strip; `/` omits it).
 
     <header class="ui-hdr" id="hdr">
@@ -20,7 +20,6 @@ The page declares itself with `<body data-deck="02" data-pulse>` (`data-pulse` =
       <div class="ui-state">
         <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
         <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
-        <span class="ui-counter" id="ui-counter">02 / 06</span>
       </div>
     </header>
     … page …
@@ -32,7 +31,7 @@ Pages that had extra links (about on tastes, map on life) keep them after the si
 
 ## web/deck.js (defer, every page)
 - marks the current nav link `.on` (by pathname; `/` only for `/`);
-- fills `#ui-counter` from `body[data-deck]` ("02 / 06"; "—" when absent);
+- no slide counter (owner, 11-02): the deck position shows only as the `.on` nav link;
 - ← → (and `[` `]`) go to the previous / next slide unless focus is in an input, textarea, select or
   contenteditable, or a modal dialog is open (`dialog[open]`, `#intro:not([hidden])`);
 - cross-document view transitions: ui.css declares `@view-transition { navigation: auto; }` and a 320 ms crossfade on
@@ -64,12 +63,11 @@ left edge to right edge in 900 ms (ease-out), then a 200 ms fade; under reduced 
 pulse.js calls it itself on every `chat` message from the socket (also in feed mode, through `feed()`), so every open page
 shows a stimulus sent from anywhere; calls less than 500 ms apart count as one (the sender's call and the echo). Tokens: `--ui-dim`
 #9494a1 and `--ui-faint` #8a8a98 (both at least 4.5:1 on #141418); text never below 11 px (`.ui-honest` 12 px); the focus ring
-is a 2 px white outline with a 1 px black ring inside it (also `.ui-input:focus-visible`). The deck counter's aria-label reads
-"page 2 of 6 · ← → or [ ] change page" and carries `aria-keyshortcuts`.
+is a 2 px white outline with a 1 px black ring inside it (also `.ui-input:focus-visible`).
 
 ## Classes (web/ui.css v2; everything v1 stays and keeps working)
 - tokens v1 + `--ui-blue:#3f7bff; --ui-blue2:#8fb3ff; --ui-r3:16px;`
-- `.ui-lockup`, `.ui-state`, `.ui-clock`, `.ui-counter` (header)
+- `.ui-lockup`, `.ui-state`, `.ui-clock` (header; `.ui-counter` stays in ui.css, unused)
 - `.ui-seg` segmented control: one bordered pill, `button` children, `.on` filled white with black text
 - `.ui-btn.primary` white fill, black text; `.ui-btn` stays the hairline pill
 - `.ui-caption` 11 px mono tracked uppercase dim (same as `.ui-label`, alias)

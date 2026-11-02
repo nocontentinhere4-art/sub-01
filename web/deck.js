@@ -1,5 +1,5 @@
 // SUB-01 · deck.js (every page, defer). Every page is one slide of the same deck (docs/design/decoded/SYSTEM.md):
-// inserts the skip link, marks the current nav link, writes the slide counter, and moves to the previous / next slide on ← → (or [ ]).
+// inserts the skip link, marks the current nav link, and moves to the previous / next slide on ← → (or [ ]).
 // <body data-keys>: the page owns ← → (a frame viewer, say); [ ] still move between slides there.
 // The crossfade between pages is CSS (ui.css: @view-transition). Missing elements are fine: nothing here throws.
 (() => {
@@ -14,7 +14,6 @@
     if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
     return ALIAS[p] || p || "/";
   };
-  const pad = n => String(n).padStart(2, "0");
   const body = document.body;
   const here = norm(location.pathname);
 
@@ -51,12 +50,6 @@
   // the slide: body[data-deck] ("02"), else the pathname's place in the deck; secondary pages are notes ("—")
   const declared = body ? parseInt(body.getAttribute("data-deck"), 10) : NaN;
   const slide = declared >= 1 && declared <= DECK.length ? declared : 0;
-  const counter = document.getElementById("ui-counter");
-  if (counter) {
-    counter.textContent = slide ? `${pad(slide)} / ${pad(DECK.length)}` : "—";
-    counter.setAttribute("aria-label", slide ? `page ${slide} of ${DECK.length} · ← → or [ ] change page` : "a note, outside the deck");
-    if (slide) counter.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight BracketLeft BracketRight");
-  }
   const at = slide || (DECK.indexOf(here) + 1);          // the keys also work on a deck page that has not declared itself
 
   // ← → and [ ]: the previous / next slide, unless the key belongs to something else on the page
