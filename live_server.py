@@ -216,11 +216,13 @@ def decode_trades(logs, mint=None, pools=None):
 
 LITE_DROP = ("act", "wave", "groups", "slow")     # per-region brain activity: only the brain page draws it
 ACT_LO, ACT_HI = 0.01, 10.0     # q=1: act on a log scale, one byte a region (~1.4 % steps), clipped to this range
-# q=1 keeps only what web/index.html draws (one source of truth for the brain page's fields). S1: the coin's trades
-# are a stimulus only (Live.apply), never in a tick: no trade tape, amounts or buy / sell words reach a page.
-BRAIN_KEEP = ("type", "sync", "events", "sleep", "baseline", "slow", "life", "neuro")   # neuro: the meters card + the DA trace (4 numbers)
+# q=1 keeps only what web/index.html and web/live.html draw (one source of truth for the brain pages' fields). S1: the
+# coin's trades are a stimulus only (Live.apply), never in a tick: no trade tape, amounts or buy / sell words reach a page.
+BRAIN_KEEP = ("type", "sync", "events", "sleep", "baseline", "slow", "life", "neuro",
+              "groups", "aud")     # neuro: the meters card + the DA trace (4 numbers); groups: the networks' levels; aud: viewers
 BRAIN_SLEEP = ("stage", "burst", "clock", "tz", "gain", "debt", "tired", "woken_tonight")
-BRAIN_LIFE = ("doing", "walking")
+BRAIN_LIFE = ("doing", "walking", "activity", "place", "phone", "screen")
+BRAIN_SCREEN = ("device", "title", "host", "url", "kind", "id", "restarting", "embed", "video")   # not the decision block
 
 
 # S4: a search or reading that started from the chat says so ("a viewer's wish in chat", "from chat"), never what the
@@ -257,8 +259,8 @@ class Feed:
     """What a websocket client gets. Default (plain /ws): every tick, 20 a second, as before.
     /ws?rate=5 sends ~5 ticks a second, carrying the events of the skipped ticks;
     &lite=1 leaves out the per-region activity and the spiking frames (for pages that do not draw the brain, e.g. the room);
-    &q=1 is the brain page's feed: `act` quantised to one byte a region (`aq`, see quantise_act) and only the
-    fields the brain page draws (well under 1.5 KB a tick).
+    &q=1 is the brain pages' feed (web/live.html, web/index.html): `act` quantised to one byte a region (`aq`, see
+    quantise_act) and only the fields those pages draw (well under 1.5 KB a tick).
     Clients asking for the same (rate, lite, q) share one Feed (Live.feed_for), so a tick is serialised once per
     variant, not once per client."""
 
@@ -325,6 +327,8 @@ class Feed:
             out["sleep"] = {k: out["sleep"][k] for k in BRAIN_SLEEP if k in out["sleep"]}
         if isinstance(out.get("life"), dict):
             out["life"] = {k: out["life"][k] for k in BRAIN_LIFE if k in out["life"]}
+            if isinstance(out["life"].get("screen"), dict):      # the decision block stays out: the `screen` message has it
+                out["life"]["screen"] = {k: out["life"]["screen"][k] for k in BRAIN_SCREEN if k in out["life"]["screen"]}
         if isinstance(out.get("slow"), dict):
             out["slow"] = {"label": out["slow"].get("label")}
         if isinstance(out.get("baseline"), dict):
@@ -2083,23 +2087,24 @@ async def viewer_cookie(request, handler):
     set again when the browser's one is not an id this server issued (a restart forgot it, or it was made up)."""
     resp = await handler(request)
     if request.method == "GET" and not audience.issued_cookie(request.cookies.get(audience.VIEWER_COOKIE)) and not resp.prepared \
-            and request.path in ("/", "/brain", "/room.html", "/index.html"):
+            and request.path in ("/", "/brain", "/room", "/room.html", "/index.html"):
         resp.set_cookie(audience.VIEWER_COOKIE, audience.new_viewer_id(), max_age=365 * 86400, httponly=True,
                         samesite="Lax", secure=request.secure or request.headers.get("X-Forwarded-Proto") == "https")
     return resp
 
 
 # links visitors may still have from before the launch, sent to the page they meant
-OLD_PATHS = {"/login": "/", "/room": "/", "/room/": "/", "/home": "/", "/index": "/", "/sees": "/world.html",
-             "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html",
+OLD_PATHS = {"/login": "/", "/room/": "/room", "/home": "/", "/index": "/", "/live": "/", "/live.html": "/",
+             "/sees": "/world.html", "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html",
              "/city": CITY_URL, "/life": "/life.html", "/map": "/life.html"}   # the city site; the old map at /map
+# (/room is a page of its own now, so it is not in here: a redirect registered first would shadow its route)
 
 NOT_FOUND_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>SUB-01</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><body style="margin:0;height:100vh;
 display:grid;place-items:center;background:#040406;color:#ececf2;font-family:ui-monospace,Menlo,monospace">
 <div style="display:grid;gap:14px;justify-items:center;text-align:center;padding:16px">
 <div style="background:#ff6a00;color:#0a0a0a;font-size:28px;letter-spacing:.12em;padding:2px 12px">SUB-01</div>
-<div>this page doesn't exist</div><a href="/" style="color:#ff6a00">back to his room</a></div></body>"""
+<div>this page doesn't exist</div><a href="/" style="color:#ff6a00">back to the live brain</a></div></body>"""
 
 
 @web.middleware
@@ -2346,7 +2351,9 @@ async def main(args):
         return web.json_response({"url": CITY_URL, "up": city_state["up"], "checked": int(city_state["checked"])},
                                  headers={"Cache-Control": "no-store"})
     app.router.add_get("/api/city", city)
-    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))   # his room is the front page       # the life is the front page
+    # the brain, decoded live, is the front page; the room moved to /room (the 3D room, web/room.html)
+    app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "live.html", headers=NOCACHE))
+    app.router.add_get("/room", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))
     app.router.add_get("/brain", lambda r: web.FileResponse(HERE / "web" / "index.html", headers=NOCACHE))
     app.router.add_get("/diary", lambda r: web.FileResponse(HERE / "web" / "diary.html", headers=NOCACHE))
     for old, new in OLD_PATHS.items():             # links from before the launch (the login page, short names)

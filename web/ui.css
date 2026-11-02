@@ -1,0 +1,80 @@
+/* SUB-01 · shared design tokens and page chrome (2026-11: the "decoded" redesign).
+   Black ground, bold white grotesk headlines, monospace data labels, one red for anything LIVE and one teal for
+   anything PROJECTED (estimated by the model, not read from it). Pages load this before their own styles and use
+   the .ui-* classes; nothing here styles bare tags, so the older pages keep their own layouts. */
+:root {
+  --ui-bg: #000;            --ui-bg2: #0a0a0c;         --ui-panel: #0e0e11;       --ui-panel2: #141418;
+  --ui-fg: #fff;            --ui-fg2: #c9c9d1;         --ui-dim: #7d7d8a;         --ui-faint: #4a4a56;
+  --ui-line: rgba(255,255,255,.1);                     --ui-line2: rgba(255,255,255,.18);
+  --ui-live: #ff2d55;       --ui-live2: #ff6b8a;       --ui-proj: #2ee6c5;        --ui-warn: #ffb020;
+  --ui-attn: #ffffff;       --ui-arousal: #5aa9ff;     --ui-load: #ffd166;        --ui-neural: #2ee6c5;
+  --ui-sans: "Helvetica Neue", Helvetica, Inter, "Segoe UI", Arial, system-ui, sans-serif;
+  --ui-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ui-r: 6px;              --ui-r2: 12px;             --ui-gap: 12px;            --ui-pad: 16px;
+  --ui-ease: cubic-bezier(.2,.7,.2,1);
+}
+.ui-sans { font-family: var(--ui-sans); }
+.ui-mono { font-family: var(--ui-mono); }
+
+/* header: wordmark · nav · state */
+.ui-hdr { display:flex; align-items:center; gap:18px; padding:10px var(--ui-pad); color:var(--ui-fg);
+  font-family: var(--ui-mono); font-size:12px; letter-spacing:.02em; }
+.ui-wordmark { font-family: var(--ui-sans); font-weight:800; font-size:18px; letter-spacing:-.03em; line-height:1;
+  color:var(--ui-fg); text-decoration:none; margin:0; }
+.ui-wordmark small { display:block; font-family:var(--ui-mono); font-weight:400; font-size:9px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ui-dim); margin-top:3px; }
+.ui-nav { display:flex; gap:2px; }
+.ui-nav a { color:var(--ui-dim); text-decoration:none; padding:5px 9px; border-radius:999px; text-transform:lowercase;
+  transition: color .2s var(--ui-ease), background .2s var(--ui-ease); }
+.ui-nav a:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
+.ui-nav a.on { color:var(--ui-fg); background:rgba(255,255,255,.1); }
+.ui-nav a.ext::after { content:" ↗"; color:var(--ui-faint); }
+.ui-spacer { flex:1; }
+.ui-counter { color:var(--ui-dim); font-variant-numeric: tabular-nums; }
+
+/* small uppercase label, as in the reference's panel captions */
+.ui-label { font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
+.ui-label b { color:var(--ui-fg); font-weight:600; }
+
+/* chips */
+.ui-chip { display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; font-family:var(--ui-mono);
+  font-size:10px; letter-spacing:.12em; text-transform:uppercase; border:1px solid var(--ui-line2); color:var(--ui-fg2); }
+.ui-chip.live { border-color:transparent; background:var(--ui-live); color:#fff; }
+.ui-chip.proj { border-color:var(--ui-proj); color:var(--ui-proj); }
+.ui-chip.ai   { border-color:var(--ui-line2); color:var(--ui-dim); }
+.ui-dot { width:7px; height:7px; border-radius:50%; background:currentColor; animation: ui-pulse 1.6s ease-in-out infinite; }
+@keyframes ui-pulse { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.45; transform:scale(.78);} }
+
+/* panels */
+.ui-panel { background:var(--ui-panel); border:1px solid var(--ui-line); border-radius:var(--ui-r2); overflow:hidden; }
+.ui-panel > .ui-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px;
+  border-bottom:1px solid var(--ui-line); }
+
+/* big numbers (the "47", "6", "10 ↑+34" of the reference) */
+.ui-big { font-family:var(--ui-sans); font-weight:700; font-size:clamp(40px, 6vw, 72px); letter-spacing:-.05em;
+  line-height:.9; color:var(--ui-fg); font-variant-numeric: tabular-nums; }
+.ui-delta { font-family:var(--ui-mono); font-size:13px; }
+.ui-delta.up { color:var(--ui-proj); } .ui-delta.down { color:var(--ui-live2); }
+
+/* buttons and inputs */
+.ui-btn { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; text-transform:lowercase;
+  color:var(--ui-fg2); background:transparent; border:1px solid var(--ui-line2); border-radius:999px; padding:5px 11px; cursor:pointer;
+  transition: background .15s var(--ui-ease), color .15s var(--ui-ease), border-color .15s var(--ui-ease); }
+.ui-btn:hover { background:rgba(255,255,255,.08); color:var(--ui-fg); }
+.ui-btn.on { background:var(--ui-fg); color:#000; border-color:var(--ui-fg); }
+.ui-btn.live { border-color:var(--ui-live); color:var(--ui-live2); }
+.ui-input { font:inherit; font-family:var(--ui-mono); font-size:12px; color:var(--ui-fg); background:var(--ui-panel2);
+  border:1px solid var(--ui-line2); border-radius:999px; padding:8px 14px; outline:none; }
+.ui-input:focus { border-color:var(--ui-fg2); }
+
+/* the honesty line: always visible, never covered */
+.ui-honest { font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
+.ui-honest a { color:var(--ui-fg2); }
+
+/* motion: a page may add .ui-in to things that enter */
+.ui-in { animation: ui-in .6s var(--ui-ease) both; }
+@keyframes ui-in { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:none;} }
+@media (prefers-reduced-motion: reduce) {
+  .ui-dot, .ui-in { animation:none !important; }
+  * { transition-duration:.01ms !important; }
+}

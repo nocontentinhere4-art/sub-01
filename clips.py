@@ -614,7 +614,7 @@ class ClipMaker:
         cookie = None
         if os.environ.get("SITE_PASSWORD"):                    # the gate's cookie (the same hash as the login sets)
             cookie = hashlib.sha256(("sub01:" + os.environ["SITE_PASSWORD"]).encode()).hexdigest()
-        req = {"url": f"http://127.0.0.1:{port}/", "out": str(self.day_dir(day)), "cookie": cookie}
+        req = {"url": f"http://127.0.0.1:{port}/room", "out": str(self.day_dir(day)), "cookie": cookie}
         code, out = await self.run_child(["capture"], json.dumps(req).encode())
         self.note(f"room capture {day}: {'ok' if code == 0 else 'failed'} {out[-120:].strip()}")
 

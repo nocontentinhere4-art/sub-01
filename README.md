@@ -23,7 +23,7 @@ The live site is private (password-gated) for now. Everything here runs locally 
 | | |
 |---|---|
 | <img src="docs/readme/room_desk.jpg" alt="Over-the-shoulder view of the character at his desk in daylight: a web page on the monitor, a water bottle, keyboard, plant and coffee mug on the desk"> | <img src="docs/readme/room_window.jpg" alt="Close view of the room's window at dusk: a laundry hanger with socks and a towel in front of the glass, and a photographic Tokyo skyline with lit towers behind it"> |
-| **The room** (`/`): his day in 3D on the Tokyo clock. He works at the desk, eats, uses his phone, looks out of the window and sleeps; the monitor and phone show the pages he is on. (Here at 14:00; the page on the monitor is a test fixture.) | **The window:** photographic Tokyo plates with real parallax, sky and weather that follow the hour (here 18:00). |
+| **The room** (`/room`): his day in 3D on the Tokyo clock. He works at the desk, eats, uses his phone, looks out of the window and sleeps; the monitor and phone show the pages he is on. (Here at 14:00; the page on the monitor is a test fixture.) | **The window:** photographic Tokyo plates with real parallax, sky and weather that follow the hour (here 18:00). |
 | <img src="docs/readme/room_window_standing.jpg" alt="The same room cutaway, the character standing at the window looking out"> | <img src="docs/readme/brain_fibres.jpg" alt="Side view of a brain made of thousands of thin coloured fibre bundles traced from diffusion MRI, coloured by direction"> |
 | He gets up from the desk and looks out of the window. | **His brain** (`/brain`): the real nerve-fibre bundles traced from the diffusion MRI. Chat messages travel along them as stimuli. |
 | <img src="docs/readme/brain_specimen.jpg" alt="Side view of a pink-grey brain surface with folded gyri and the cerebellum below, rendered as a fresh specimen"> | <img src="docs/readme/brain_dissected.jpg" alt="The brain cut open on a coronal plane: his own T1 scan shows grey and white matter on the cut, the folded cortex and the cerebellum beside it"> |
@@ -118,7 +118,7 @@ Each number comes from a file in this repository; negative results stay.
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-server.txt        # the live server (requirements.txt is the MRI pipeline)
-BROWSE=0 python live_server.py --demo         # http://localhost:8765 : room at /, brain at /brain, diary at /diary
+BROWSE=0 python live_server.py --demo         # http://localhost:8765 : live at /, room at /room, brain at /brain, diary at /diary
 python live_server.py --demo --time-scale 60 --start 23:55   # an accelerated night
 ```
 
@@ -147,7 +147,7 @@ the raw MRI needs `requirements.txt` and `./fetch_data.sh` (~900 MB): see [docs/
 | `spiking/` | the spiking network: model, plasticity, memory, GPU sessions, caps |
 | `build_*.py`, `export_*.py`, `process_rest.py` | MRI pipeline: connectome, cortex, fibres, recordings |
 | `analysis/` | offline analyses: real wiring, PCI, anatomy, neuron morphologies, benchmarks |
-| `web/` | the pages: `room.html`, `index.html` (`/brain`), `diary.html`, `world.html`, `about.html`, and their assets |
+| `web/` | the pages: `live.html` (`/`), `room.html` (`/room`), `index.html` (`/brain`), `diary.html`, `world.html`, `about.html`, and their assets |
 | `room_build/` | the Blender and Node scripts that build the room, props and character clips |
 | `tests/` | unit tests, the demo smoke test and the room's visual QA (`tests/visual/`) |
 | `docs/` | reports, design notes, screenshots and the project's working docs |

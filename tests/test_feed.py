@@ -230,10 +230,12 @@ def test_brain_feed_is_small_and_keeps_what_the_brain_page_draws():
     text = f.take(m, json.dumps(m))
     assert len(json.dumps(m)) > 3000 and len(text) < 1500, len(text)
     o = json.loads(text)
-    assert "act" not in o and "wave" not in o and "groups" not in o
+    assert "act" not in o and "wave" not in o
+    assert o["groups"] == m["groups"]                                      # the live page's network traces (12 numbers)
     assert o["neuro"] == NEURO and o["sleep"]["tired"] == 0.0            # the meters card: 4 levels + tiredness (~60 bytes)
     assert dequantise_act(o["aq"]) == pytest.approx(m["act"], rel=0.015)
-    assert o["life"] == {"doing": "reading at the computer", "walking": False}
+    assert o["life"]["doing"] == "reading at the computer" and o["life"]["walking"] is False
+    assert not set(o["life"]) - {"doing", "walking", "activity", "place", "phone", "screen"}   # BRAIN_LIFE only
     assert o["sleep"]["stage"] == "AWAKE" and o["sleep"]["clock"] == "11:53" and "burst" in o["sleep"]
     assert o["slow"] == {"label": m["slow"]["label"]} and o["sync"] == 0.31
     assert o["events"][0]["text"] == "hello"

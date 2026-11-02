@@ -21,7 +21,8 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 ## Pages (all on `main`)
 | path | file | what |
 |---|---|---|
-| `/` | `web/room.html` | his room in 3D (three.js r169; Higgsfield/Meshy GLBs in `web/room/`, meshopt + WebP, 3 MB), Tokyo day/night through the window, live screens (monitor + phone in his hands, arm IK), camera follows what he looks at, map when he is out, mini brain. `?debug&nolive&hour=21` previews a time of day |
+| `/` | `web/live.html` | the brain, decoded live: his screen, the live readouts timeline, two brain panels, the feed |
+| `/room` | `web/room.html` | his room in 3D (three.js r169; Higgsfield/Meshy GLBs in `web/room/`, meshopt + WebP, 3 MB), Tokyo day/night through the window, live screens (monitor + phone in his hands, arm IK), camera follows what he looks at, map when he is out, mini brain. `?debug&nolive&hour=21` previews a time of day |
 | `/brain` | `web/index.html` | brain v2: full-screen real fibres coloured by sleep stage; chat messages travel along real fibres; `?mini` for the PiP |
 | `/diary` | `web/diary.html` | dream diary written each morning (Tokyo) from unattended REM frames |
 | `/world.html` | eye frames | what the eye (Replicate FLUX + Llama 3) "sees" |
@@ -676,7 +677,7 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
   RLIMIT_CPU 120 s over Pillow + ffmpeg (`-threads 1 -preset veryfast`), one at a time, only at Tokyo 01:00-07:00 or
   with at most `SUB01_CLIPS_LOW_VIEWERS` (20) websockets. A day clip costs ~17 CPU-s, dream ~13, choice ~8.
   `analysis/bench_clips.py` measures the tick with renders running (see the PR for numbers).
-- Room capture (`CLIPS_ROOM=1`, off by default): 6 frames of `/` in a headless Chromium child, once a day. Software
+- Room capture (`CLIPS_ROOM=1`, off by default): 6 frames of `/room` in a headless Chromium child, once a day. Software
   WebGL makes it ~380 CPU-s per capture, so it stays off on Railway's shared CPU.
 - `/admin/clips` (the site password's cookie, the `SUB01_ADMIN_TOKEN` header, or the token typed into its form, which
   sets an HttpOnly cookie on `/admin`): today's and recent clips, download, the ready caption (<= 150 characters with
