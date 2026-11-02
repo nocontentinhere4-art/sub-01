@@ -39,6 +39,8 @@ Pages that had extra links (about on tastes, map on life) keep them after the si
   `::view-transition-old(root)` / `::view-transition-new(root)`; browsers without it just navigate; off under
   prefers-reduced-motion;
 - tolerates missing elements (no errors on a page that lacks the header).
+- `<body data-keys>`: the page owns ← → (a frame viewer, a night viewer); deck.js binds only `[` `]` there. `[` `]`
+  also work with Alt/AltGr (an Italian keyboard needs them to type a bracket).
 
 ## web/pulse.js (defer, every page with `body[data-pulse]`)
 Creates `<div id="ui-pulse" role="img" aria-label="live readouts">` fixed at the bottom: 28 px tall, full width,
