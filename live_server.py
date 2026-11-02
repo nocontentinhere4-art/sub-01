@@ -2091,12 +2091,14 @@ OLD_PATHS = {"/login": "/", "/room/": "/room", "/home": "/", "/index": "/", "/li
              "/life": "/life.html", "/map": "/life.html"}   # the old map at /map
 # (/room is a page of its own now, so it is not in here: a redirect registered first would shadow its route)
 
-NOT_FOUND_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>SUB-01</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><body style="margin:0;height:100vh;
-display:grid;place-items:center;background:#040406;color:#ececf2;font-family:ui-monospace,Menlo,monospace">
-<div style="display:grid;gap:14px;justify-items:center;text-align:center;padding:16px">
-<div style="background:#ff6a00;color:#0a0a0a;font-size:28px;letter-spacing:.12em;padding:2px 12px">SUB-01</div>
-<div>this page doesn't exist</div><a href="/" style="color:#ff6a00">back to the live brain</a></div></body>"""
+NOT_FOUND_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUB-01 · not found</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/ui.css"></head>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#fff;font-family:var(--ui-sans)">
+<main style="display:grid;gap:18px;justify-items:center;text-align:center;padding:24px">
+<p class="ui-caption" style="margin:0">404 · not found</p>
+<h1 style="margin:0;font-weight:800;font-size:clamp(40px,8vw,96px);letter-spacing:-.045em;line-height:.95">Nothing here.</h1>
+<p class="ui-honest" style="margin:0">A model, not a mind. The page you wanted is not part of the deck.</p>
+<a class="ui-btn primary" href="/" style="text-decoration:none">back to the live view</a></main></body></html>"""
 
 
 @web.middleware

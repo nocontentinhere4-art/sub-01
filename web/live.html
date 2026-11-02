@@ -324,9 +324,9 @@
   .i-hint.off { opacity:0; }
   .i-hint .h-touch { display:none; }
   /* the skip button: touch screens only (a keyboard has esc) */
-  .i-skip { position:absolute; top:12px; right:12px; z-index:3; width:44px; height:44px; padding:0; border:1px solid var(--ui-line2);
+  .i-skip { display:flex; position:absolute; top:12px; right:12px; z-index:3; width:44px; height:44px; padding:0; border:1px solid var(--ui-line2);
     border-radius:50%; background:rgba(0,0,0,.6); color:var(--ui-fg); font:inherit; font-size:18px; line-height:1; cursor:pointer;
-    display:none; align-items:center; justify-content:center; }
+    align-items:center; justify-content:center; }   /* visible on every pointer: the jury wanted a skip on desktop too */
   @media (pointer: coarse) {
     .i-hint .h-fine { display:none; } .i-hint .h-touch { display:inline; }
     .i-skip { display:flex; }
@@ -361,6 +361,7 @@
     #intro, .i-slide, .i-slide.on, .i-slide .i-h, .i-slide .i-s, .i-slide .i-fig, .i-slide .i-act, .i-hint { transition:none !important; }
   }
 </style>
+<meta property="og:type" content="website"><meta property="og:site_name" content="SUB-01"><meta property="og:title" content="SUB-01 · a brain model, live"><meta property="og:description" content="A whole-brain simulation on one person's public MRI wiring runs a fictional guy in a Tokyo room. Watch the model, send him a message."><meta property="og:image" content="/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="SUB-01 · a brain model, live"><meta name="twitter:description" content="A whole-brain simulation on one person's public MRI wiring runs a fictional guy in a Tokyo room. Watch the model, send him a message."><meta name="twitter:image" content="/og.jpg">
 </head>
 <body data-deck="01">
 <header class="ui-hdr" id="hdr">
@@ -506,8 +507,8 @@ const Intro = (() => {
   const behind = ["hdr", "hero", "grid", "foot"].map(id => document.getElementById(id)).filter(Boolean);
   const KEY = "sub01.intro";
   let i = 0, open = false, back = null;
-  const seen = () => { try { return sessionStorage.getItem(KEY) === "1"; } catch (e) { return false; } };
-  const mark = () => { try { sessionStorage.setItem(KEY, "1"); } catch (e) {} };
+  const seen = () => { try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; } };
+  const mark = () => { try { localStorage.setItem(KEY, "1"); } catch (e) {} };
   dots.innerHTML = slides.map((_, k) => `<button type="button" data-k="${k}" aria-label="slide ${k + 1} of ${N}"></button>`).join("");
   function go(k){
     k = Math.max(0, Math.min(N - 1, k)); if (k === i && slides[k].classList.contains("on")) return;
