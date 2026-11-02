@@ -27,6 +27,8 @@ Read this first. It replaces the local memory that cloud sessions cannot see.
 | `/diary` | `web/diary.html` | dream diary written each morning (Tokyo) from unattended REM frames |
 | `/world.html` | eye frames | what the eye (Replicate FLUX + Llama 3) "sees" |
 
+The city link, the city card and the coin-address chip were removed on 2026-11-02 (`docs/HANDOFF_DECODED.md`, decision 7). The nav on every page is live · brain · room · diary · sees (then about / map where a page had them).
+
 ## Runtime modules
 - `brain_sim.py` (10 Hz delayed Stuart-Landau; `step` reads the delayed coupling with one sparse product per step on
   the ring buffer, `ring_coupling()`, #19: ~4 ms CPU per 50 ms tick instead of ~30, same as the old dense step to ~1e-15

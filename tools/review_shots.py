@@ -17,7 +17,7 @@ with sync_playwright() as p:
             try:
                 pg.goto(base + r, wait_until="domcontentloaded", timeout=30000); time.sleep(7 if r in ("/", "/brain", "/room") else 3)
                 name = (r.strip("/").replace("/", "_").replace(".html", "") or "live") + "-" + tag + ".png"
-                pg.screenshot(path=os.path.join(out, name), full_page=(tag == "phone"))
+                pg.screenshot(path=os.path.join(out, name), full_page=(tag == "phone"), timeout=120000)   # the 3D room under software GL needs well over 30 s
                 sw = pg.evaluate("document.documentElement.scrollWidth"); cw = pg.evaluate("document.documentElement.clientWidth")
                 report[r + " " + tag] = {"errors": errs[:5], "hscroll": sw > cw + 1, "shot": name}
             except Exception as e:

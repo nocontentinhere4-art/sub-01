@@ -172,19 +172,14 @@ is no cap. To refresh the curated list: `python analysis/build_music_list.py` (d
   service's `SUB01_ADMIN_TOKEN` variable on Railway). He gets up as rested as the cycle is at that hour and stays on
   his feet until the morning's own drive takes over; bedtime stays his usual (~23:50).
 
-## The coin's address on the pages
+## The coin's address on the pages (removed 2026-11-02)
 
-`SUB01_CA` (Railway variable; `MINT` is used when it is empty) is the contract address the room shows under the
-fictional-character line, with a copy button: the official address, so nobody has to trust one pasted in the chat
-(addresses stay blocked there). Only a valid Solana address (32 bytes of base58) is shown; empty: nothing. It is also
-in `/api/config` (`ca`) and in the websocket `hello`. No chart, no market link and no "buy" anywhere: the address only.
-With neither set, `DEFAULT_CA` in `live_server.py` is the owner's address (2026-10-11).
+The room no longer shows the coin's address chip, and `/api/config` and the websocket `hello` no longer carry `ca`.
+`DEFAULT_CA` and `coin_address()` are gone from `live_server.py`, and the server no longer reads `SUB01_CA`, so that
+variable is not used and can be removed in Railway's Variables tab. `MINT` still selects the dormant trade feed, which
+is off while `MINT` is unset (`docs/HANDOFF_DECODED.md`, decision 7).
 
-## The city popout
+## The city (removed 2026-11-02)
 
-The city is the separate site `SUB01_CITY_URL` (default https://city.subzerone.live/). The room shows a card with a
-preview and a live dot: `/api/city` pings the city's front page at most once a minute for everyone (up = 200). The
-city's own headers forbid framing by other sites (`frame-ancestors 'self'`), so the card is not an iframe: a click opens
-the city in its own window (a popout; a new tab where popups are blocked), as does "city" in every page's navigation and
-`/city`. If the city site ever allows `https://subzerone.live` in its `frame-ancestors`, the card can become a live
-embed. The old map of Kichijōji (walks, Street View) stays at `/life.html` (`/map`, `/life`).
+The city site is no longer linked or polled. The server no longer has `/api/city`, the `/city` redirect or `SUB01_CITY_URL`,
+and the room has no city card or popout. The old map of Kichijōji (walks, Street View) stays at `/life.html` (`/map`, `/life`).

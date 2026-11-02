@@ -32,7 +32,7 @@ uppercase mono captions, red for LIVE, teal for PROJECTED):
    `/brain` → `web/index.html` unchanged (the deep 3D brain). `/diary`, `/world.html`, `/tastes.html`,
    `/about.html`, `/life.html` unchanged. Old links: `/live` → `/`, `/room/` → `/room`, `/home`,`/index` → `/`.
 2. Nav order on every page: **live** (`/`) · **brain** (`/brain`) · **room** (`/room`) · **diary** (`/diary`) ·
-   **sees** (`/world.html`) · **city** (https://city.subzerone.live/, target=_blank rel=noopener, class ext).
+   **sees** (`/world.html`). The city link was dropped on 2026-11-02 (`docs/HANDOFF_DECODED.md`, decision 7); no page links to it.
    Pages that also link about/map keep those links after the common ones.
 3. Design system: `web/ui.css` (already written; read it). Use its tokens/classes. Black #000 ground. Headlines in
    --ui-sans weight 700/800 tight tracking; captions/data in --ui-mono 10–12px uppercase tracked. Red = live,
@@ -41,6 +41,9 @@ uppercase mono captions, red for LIVE, teal for PROJECTED):
    sub: "A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. These are
    model readouts, not measurements of anyone." His chat replies already use his casual voice (mind.py, lowercase,
    light slang) — show them tagged "his reply · AI-written".
+   Scientific register (owner, 2026-11-02): the front page's hero lines and feed captions describe the method, the data
+   and the readouts; the example hero above is replaced by those lines, and the fictional framing stays. His chat replies
+   keep the casual voice; whether they take the scientific register too is the owner's decision.
 
 ## Live data contract (WebSocket `/ws?rate=5&q=1`, JSON messages; see live_server.py Feed.brain_view)
 After the server agent's change the q=1 tick is:
@@ -56,7 +59,7 @@ After the server agent's change the q=1 tick is:
   `life.screen` is absent when he is not at a screen (asleep, out, demo without BROWSE). `groups` are mean |z| per
   network this tick (absolute level; divide by a running ~25 s EMA baseline per network to get "vs own baseline").
 Other messages (all already exist):
-  hello {chat:[{t,text,networks,nick?}], replies:[{t,text,to,replying_to,tag,source}], rules, world, music, audience:{viewers,reactions,...}, ca}
+  hello {chat:[{t,text,networks,nick?}], replies:[{t,text,to,replying_to,tag,source}], rules, world, music, audience:{viewers,reactions,...}}
   chat {t,text,networks:[..],asleep,gain,nick?}        chat_ack {ok,reason?,queued,will_reply}     chat_reply {t,text,to,replying_to,tag,source}
   dopamine {size,rpe,novelty,interest,expect,n,kind,habituation,why,label,da}   (a reward burst: a marker on the timeline)
   screen {device,title,host,url,kind,id,restarting,embed?,video?,decision?{options,reason,eyes,outcome,watch_min}}
@@ -67,7 +70,7 @@ Other messages (all already exist):
   tick.events[]: {type:"replay",t,text,networks,received,source} | {type:"sleep"...,t,text}
 Chat send: ws.send(JSON.stringify({type:"chat", text, nick?})) → chat_ack. Max 200 chars; no links/addresses/tickers.
 Screenshots: GET /api/screen/desk.jpg or /api/screen/phone.jpg (404 when nothing showable; poll ≤ every 3 s; add a
-cache-buster). Other reads: /api/screens, /api/mind, /api/music, /api/diary, /api/config, /api/city.
+cache-buster). Other reads: /api/screens, /api/mind, /api/music, /api/diary, /api/config.
 Brain geometry (static, already served): web/brain.json {nodes:[{name,group,p:[x,y,z],q:[x,y,z],lab}]×214,
   edges, mesh:{left:{v:[flat xyz]×10242, f:[flat tri idx]}, right:{...}}, groups:[11 names]}. Vertex→region: nearest
   node `q` among cortical nodes (names starting LH_/RH_), as web/index.html does at line ~650 (within 30 mm).
