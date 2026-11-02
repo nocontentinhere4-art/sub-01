@@ -365,9 +365,30 @@
   #brand nav.ui-nav a.on::after { content:none; }
   #brand nav.ui-nav a.ext::after { content:" \2197"; display:inline; height:auto; margin:0; background:none; color:var(--ui-faint); }
   @media (max-width:900px) { #brand h1.ui-wordmark { font-size:16px; } #brand nav.ui-nav a { padding:8px 7px; } }
+
+  /* ===== ?embed: the room as a chromeless camera on him, inside the front page's "his screen" viewport (/room?embed in
+     an iframe). Only the canvas (the room, the window and its sky) and the lens stay; every UI layer is hidden (and its
+     JS kept, only guarded), and one dim caption line says what he is doing for 4 s after it changes ===== */
+  html.embed, html.embed body { overflow:hidden !important; height:100%; }
+  body.embed :is(#top, #brand, #state, #story, #fiction, #night, #tools, #cam, #todaybtn, #today, #why, #plan, #side, #tabs, #dock,
+    #feed, #chat, #note, #honest, #corner, #brainpip, #dream, #rxpill, #rx, #rxfloat, #away, #mapcard, #map) { display:none !important; }
+  body.embed #boot > div { display:none; }                     /* (the boot screen stays a dark field: no wordmark, no place name) */
+  body.embed #scene, body.embed #vignette { position:fixed !important; inset:0 !important; height:auto !important; }
+  body.embed #vignette { background:radial-gradient(ellipse at 50% 48%, transparent 50%, rgba(0,0,0,.5) 100%);
+    animation:vbreathe 13s ease-in-out infinite alternate; }   /* the lens breathes with the camera */
+  @keyframes vbreathe { from { opacity:.74; } to { opacity:1; } }
+  body.embed.paused #vignette { animation-play-state:paused; }
+  #ecap { position:fixed; left:14px; bottom:11px; max-width:calc(100% - 28px); z-index:6; pointer-events:none;
+    font:10px/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace; text-transform:uppercase; letter-spacing:.16em;
+    color:rgba(236,236,242,.6); text-shadow:0 1px 6px rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,.6); white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; opacity:0; transition:opacity 1.6s ease; }
+  #ecap.on { opacity:1; transition-duration:1.1s; }
+  body.embed.idle, body.embed.idle * { cursor:none !important; }
+  @media (prefers-reduced-motion: reduce) { body.embed #vignette { animation:none; } #ecap { transition-duration:.4s; } }
 </style>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).has("embed")) { document.documentElement.classList.add("embed"); document.body.classList.add("embed"); }</script>
 <div id="scene"></div><div id="vignette"></div>
 <div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
@@ -520,6 +541,9 @@ const host = $("scene");
 // few cores or a software/integrated GPU get a lighter room - no antialias, no shadows, no live brain beside it even with ?brainlive.
 // ?lite forces it, ?full turns it off, headless checks always draw the full room; adapt() lightens it later if frames stay slow
 const QS = new URLSearchParams(location.search);
+// ?embed: the chromeless camera the front page frames (see the CSS's ?embed block and the loop's drift, below)
+const EMBED = QS.has("embed");
+if (EMBED) { document.documentElement.classList.add("embed"); document.body.classList.add("embed"); }
 const GPU = (() => { try { const g = document.createElement("canvas").getContext("webgl"), x = g && g.getExtension("WEBGL_debug_renderer_info");
   const r = x ? String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)) : ""; const l = g && g.getExtension("WEBGL_lose_context"); if (l) l.loseContext();
   return r; } catch (e) { return ""; } })();
@@ -552,10 +576,11 @@ if (DEBUG) window.GLANCE = GLANCE;
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.enablePan = false;
 controls.minPolarAngle = 0.35; controls.maxPolarAngle = 1.35; controls.minDistance = 0.4; controls.maxDistance = 12;
+controls.enabled = !EMBED;                                  // (?embed: the front page takes every click; the camera only follows him)
 const OVERVIEW = {pos:new THREE.Vector3(5.2, 5.0, 6.0), target:new THREE.Vector3(0, 0.6, 0)};
 camera.position.copy(OVERVIEW.pos); controls.target.copy(OVERVIEW.target);
 function resize(){ const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
-  if (w > 900) camera.setViewOffset(w, h, 120, -10, w, h); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }
+  if (w > 900 && !EMBED) camera.setViewOffset(w, h, 120, -10, w, h); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
 
 // ---------- lights (driven by the Tokyo clock and by what he is doing) ----------
@@ -653,7 +678,7 @@ function load(url){ return new Promise((ok, fail) => loader.load(url, g => ok(sh
 // (not on a weak computer), and adapt() still drops it when frames stay slow
 function brainPip(after){
   const f = document.querySelector("#brainpip iframe"); if (!f) return;
-  if (LITE || !QS.has("brainlive")) { brainOff(); return; }
+  if (LITE || EMBED || !QS.has("brainlive")) { brainOff(); return; }
   setTimeout(() => { if (!LITE && f.isConnected && !f.src) f.src = f.dataset.src; }, after);
 }
 function brainOff(){
@@ -663,6 +688,7 @@ function brainOff(){
 function bootError(e){
   console.error(e); $("boot").classList.add("err");
   $("boot-t").innerHTML = `the room did not load (${esc(e && e.message || "network error")}).<br><button onclick="location.reload()">try again</button>`;
+  if (EMBED) setTimeout(() => location.reload(), 60000);     // (?embed has no button to press: it tries again on its own)
 }
 
 let room = null, boy = null, mixer = null, actions = {}, current = null, want = null, hand = null, head = null;
@@ -2366,7 +2392,7 @@ function renderMusic(){
   $("mu-k").textContent = m.mode === "background" ? "in the background" : "headphones on";
   $("mu-t").textContent = m.title || ""; $("mu-a").textContent = [m.artist, m.genre_label].filter(Boolean).join(" · ");
   const art = $("mu-art"), ok = /^https:\/\//.test(m.art || ""); art.hidden = !ok; if (ok && art.src !== m.art) art.src = m.art;
-  if (SPOTIFY_EMBED.test(m.embed || "") && m.embed !== musicEmbed) { musicEmbed = m.embed; $("mu-embed").src = m.embed; }
+  if (!EMBED && SPOTIFY_EMBED.test(m.embed || "") && m.embed !== musicEmbed) { musicEmbed = m.embed; $("mu-embed").src = m.embed; }
   $("mu-card").textContent = m.card || "his brain model picked this track; press play to listen on your own device";
 }
 async function loadMusic(){
@@ -3474,7 +3500,7 @@ function rxSlow(){ rxOff = performance.now() + 3000; $("rx").querySelectorAll("b
   setTimeout(() => $("rx").querySelectorAll("button").forEach(b => b.classList.remove("off")), 3000); }
 const RX_MAX = 40;
 function floatUp(counts){                                 // the reactions since the last tick, over the room for everyone
-  if (document.hidden) return;
+  if (document.hidden || EMBED) return;
   const box = $("rxfloat");
   counts.forEach((n, k) => { for (let i = 0; i < Math.min(n, 6); i++) {
     if (box.childElementCount >= RX_MAX) return;
@@ -3621,7 +3647,7 @@ function storyText(life, outside, seated){
   if (outside && life.walking) return `is <em>walking</em> · next: ${esc(life.doing)}.`;   // a walk home takes minutes: don't say he's already there
   return r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`;
 }
-function story(life, outside){ put("story", "innerHTML", storyText(life, outside, !(visible && !seatedAtDesk()))); }
+function story(life, outside){ put("story", "innerHTML", storyText(life, outside, !(visible && !seatedAtDesk()))); if (EMBED) embedCaption(); }
 // ---------- the night (R3): while he sleeps the room is not dead air: the eye's newest frame, and the night so far ----------
 let eyeFrame = null, nights = null, stageWas = null;
 function onEye(f){ if (f && f.img) { eyeFrame = f; dreamCard(); } }
@@ -3669,7 +3695,7 @@ function applyTick(m){
     put("away", "display", outside ? "block" : "none");
     put("away", "textContent", outside ? `the room is empty · he is ${life.walking ? "walking" : LABEL_AWAY[life.activity] || "out"} — see the map` : "");
     if (shown.get("mapcard.out") !== outside) { shown.set("mapcard.out", outside); $("mapcard").classList.toggle("out", outside); }
-    if (routes) {
+    if (routes && !EMBED) {                          // (?embed: no map)
       const pos = life.geo ? [life.geo.lat, life.geo.lng] : outside && life.activity === "park" ? routes.places.park
         : outside ? routes.places.bakery : routes.places.home;
       if (String(pos) !== mePos) { mePos = String(pos); meMk.setLatLng(pos); }
@@ -3729,7 +3755,9 @@ function shadows(now, moving){
   }
 }
 let drawnAt = -1e9, booting = null;
+let embedOn = true, looping = true, readySent = false;          // (?embed: the front page says when its viewport shows us)
 function frame(now){
+  if (!embedOn) { looping = false; return; }                      // (?embed, out of view: no loop at all until it is back)
   requestAnimationFrame(frame);                                   // (still every display tick: a hidden tab pauses as before)
   // booting (he is not in the scene yet): at most 5 frames a second and the lowest resolution, so the character's decode
   // gets the main thread (full frames of the empty room starved it: he was in at 67 s against ~9 s of network, measured);
@@ -3752,17 +3780,71 @@ function frame(now){
   let moving = false; for (let i = 0; i < n; i++) moving = animate(dt) || moving;
   if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
   lighting(real);
+  if (EMBED) driftExposure();
   if (follow && performance.now() - userMovedAt > 20000) {
     updateCameraGoal();
     const k = 1 - Math.exp(-real * 1.2);
     camera.position.lerp(camGoal.pos, k); controls.target.lerp(camGoal.target, k);
   }
   shadows(now, moving);
-  controls.update(); keepClear(); GCAM.apply(real, follow && performance.now() - userMovedAt > 20000, camera, controls, boy, bones); renderer.render(scene, camera); GCAM.restore(camera, controls);
+  controls.update(); keepClear(); GCAM.apply(real, follow && performance.now() - userMovedAt > 20000, camera, controls, boy, bones);
+  if (EMBED) driftApply(real);
+  renderer.render(scene, camera);
+  if (EMBED) { driftRestore(); window.__embedFrames = (window.__embedFrames || 0) + 1;
+    if (boy && !readySent && parent !== window) { readySent = true; parent.postMessage({type:"sub01-embed-ready"}, location.origin); } }
+  GCAM.restore(camera, controls);
 }
 requestAnimationFrame(frame);
 const CATCH = {max: navigator.webdriver ? 30 : 2, back: null};   // (headless checks only: see frame())
 document.addEventListener("visibilitychange", () => { if (!document.hidden) CATCH.back = 8; });
+
+// ---------- ?embed: the front page's camera on him ----------
+// The camera still follows him (its goal, the glance turn, keepClear); on top of that, only for the drawn frame, a slow
+// drift: a few degrees of orbit round its target over 40 s, a breath in and out (+-3 % of the distance) over 12 s and a
+// hair of tilt, eased in over 4 s once he is in, all sines (no edges, nothing to jump), and put back after the render so
+// the follow underneath never feels it. The exposure breathes with it (+-3.5 % over 16 s). prefers-reduced-motion: none.
+// The parent says when its viewport shows us: postMessage({type:"sub01-embed", visible:boolean}) from the same origin;
+// visible:false stops the loop outright (the socket stays, as on a hidden tab), visible:true starts it again and lets him
+// catch up 8 s, as a tab coming back does. Once he is first drawn the page posts {type:"sub01-embed-ready"} to the parent.
+const CALM = matchMedia("(prefers-reduced-motion: reduce)");
+const DRIFT = {t:0, w:0, saved:false, P:new THREE.Vector3(), Q:new THREE.Quaternion(), o:new THREE.Vector3(), a:new THREE.Vector3()};
+function driftApply(dt){
+  DRIFT.saved = false;
+  const on = !CALM.matches && follow && !!boy;
+  DRIFT.w = clamp(DRIFT.w + (on ? dt / 4 : -dt / 1.5), 0, 1);
+  if (DRIFT.w <= 0) return;
+  DRIFT.t += Math.min(dt, 0.5);
+  const w = DRIFT.w * DRIFT.w * (3 - 2 * DRIFT.w), T = DRIFT.t, TAU = 2 * Math.PI;
+  const yaw = w * 0.07 * Math.sin(TAU * T / 40);                  // (+-4 degrees round him over 40 s)
+  const tilt = w * 0.012 * Math.sin(TAU * T / 29 + 1.3);           // (+-0.7 degrees up and down, out of step with it)
+  const dolly = 1 + w * 0.03 * Math.sin(TAU * T / 12 + 0.6);       // (the breath: +-3 % of the distance over 12 s)
+  DRIFT.P.copy(camera.position); DRIFT.Q.copy(camera.quaternion); DRIFT.saved = true;
+  const tg = controls.target, o = DRIFT.o.subVectors(camera.position, tg).applyAxisAngle(UP, yaw);
+  const ax = DRIFT.a.crossVectors(UP, o); if (ax.lengthSq() > 1e-8) o.applyAxisAngle(ax.normalize(), tilt);
+  camera.position.copy(tg).addScaledVector(o, dolly); camera.lookAt(tg);
+}
+function driftRestore(){ if (!DRIFT.saved) return; DRIFT.saved = false; camera.position.copy(DRIFT.P); camera.quaternion.copy(DRIFT.Q); }
+function driftExposure(){ if (DRIFT.w > 0) renderer.toneMappingExposure *= 1 + 0.035 * DRIFT.w * Math.sin(2 * Math.PI * DRIFT.t / 16); }
+// the one line of text: what he is doing (the story line, without its "is" and its full stop), for 4 s after it changes
+const ECAP = EMBED ? document.body.appendChild(Object.assign(document.createElement("div"), {id:"ecap"})) : null;
+let ecapWas = "", ecapTimer = 0;
+function embedCaption(){
+  if (!ECAP) return;
+  const t = $("story").textContent.replace(/^is\s+/, "").replace(/\.\s*$/, "").trim();
+  if (!t || t === ecapWas) return; ecapWas = t;
+  ECAP.textContent = t; ECAP.classList.add("on"); clearTimeout(ecapTimer); ecapTimer = setTimeout(() => ECAP.classList.remove("on"), 4000);
+}
+if (EMBED) {
+  addEventListener("message", e => {
+    if (e.origin !== location.origin || e.source !== parent) return;
+    const d = e.data; if (!d || d.type !== "sub01-embed" || typeof d.visible !== "boolean") return;
+    embedOn = d.visible; document.body.classList.toggle("paused", !embedOn);
+    if (embedOn && !looping) { looping = true; CATCH.back = 8; requestAnimationFrame(frame); }
+  });
+  // the cursor goes after 2 s still over the scene (the parent takes the clicks; nothing here needs the pointer)
+  let idle = 0; const wake = () => { document.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add("idle"), 2000); };
+  addEventListener("pointermove", wake, {passive:true}); wake();
+}
 function animate(dt){                                // one step of him: clips, his plan, seats, life, the phone, the head
   untouch(); if (mixer) mixer.update(dt); T += dt;
   if (!boy) return false;
