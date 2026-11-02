@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/ui.css">
 <title>SUB-01 · live</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="A brain model, live. Simulated on one person's real MRI wiring. Model readouts, not measurements.">
+<meta name="description" content="A brain model, live. It runs on one person's real MRI wiring. Every number here is read from the model.">
 <style>
   /* SUB-01 · live: the brain-first dashboard ("decoded" redesign). Tokens and chrome come from /ui.css. */
   :root { --rp:#a78bfa; --gut:16px; --c1:280px; --c3:320px; --row2:clamp(220px, 34vh, 300px); --hdr:52px; --hero-h:clamp(110px, 15vh, 170px); }
@@ -39,7 +39,7 @@
     text-align:center; padding:12px var(--gut); overflow:hidden; isolation:isolate; }   /* grows with its text: a short window never clips the line */
   /* the real fibre render (decorative), muted, centred behind and below the line; it never leaves the hero box */
   #hero-img { position:absolute; left:50%; top:50%; z-index:-1; height:200%; width:auto; max-width:none; pointer-events:none; user-select:none;
-    transform:translate(-50%, -30%); transform-origin:50% 45%; opacity:.55;
+    transform:translate(-50%, -30%); transform-origin:50% 45%; opacity:calc(.55 * (1 + .08 * var(--hb, 0))); transition:opacity 2s ease-in-out;
     -webkit-mask-image:radial-gradient(ellipse 56% 54% at 50% 50%, #000 40%, transparent 78%); mask-image:radial-gradient(ellipse 56% 54% at 50% 50%, #000 40%, transparent 78%);
     animation:kb 20s ease-in-out infinite alternate; }
   @keyframes kb { from { scale:1; } to { scale:1.04; } }
@@ -64,11 +64,18 @@
   .fill { position:absolute; inset:0; display:flex; flex-direction:column; min-height:0; }
 
   /* brain panels */
+  #grid .ui-panel { transition:border-color .4s var(--ui-ease), box-shadow .6s var(--ui-ease); }
+  #grid .ui-panel:hover { border-color:var(--ui-line2); }
   .brainp { transition:border-color .6s var(--ui-ease), box-shadow .6s var(--ui-ease); }
-  .brainp.pulse { border-color:var(--ui-live); box-shadow:0 0 0 1px var(--ui-live), 0 0 32px rgba(255,45,85,.25); transition:none; }
+  #grid .brainp.pulse { border-color:var(--ui-live); box-shadow:0 0 0 1px var(--ui-live), 0 0 32px rgba(255,45,85,.25); transition:none; }
   .bhead { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px 0; }
   .bcv { position:relative; flex:1; min-height:100px; }
   .bcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  /* the bloom: a soft glow in the baseline blue under the brain; it breathes with the model's synchrony (--bl, --bs,
+     set at most 10 times a second) and the transitions do the easing */
+  .bcv .bloom { position:absolute; left:8%; right:8%; top:10%; bottom:8%; border-radius:50%; pointer-events:none;
+    background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(63,123,255,.26), rgba(63,123,255,.09) 48%, transparent 72%);
+    opacity:var(--bl, .7); transform:scale(var(--bs, 1)); transition:opacity 1.6s ease-in-out, transform 1.6s ease-in-out; }
   .bcv.loading::before { content:""; position:absolute; left:18%; right:18%; top:10%; bottom:10%; border-radius:46% 46% 42% 42%;
     background:linear-gradient(100deg, rgba(63,123,255,.06) 30%, rgba(63,123,255,.18) 50%, rgba(63,123,255,.06) 70%) 0 0/250% 100%;
     animation:shim 1.4s linear infinite; }
@@ -84,6 +91,8 @@
   .bword { font-family:var(--ui-mono); font-size:11px; color:var(--ui-live2); }
   .bword.up { color:var(--ui-proj); } .bword.mid { color:var(--ui-dim); }
   .bnum .ui-big.dim { color:var(--ui-dim); }
+  .bnum .ui-big { transition:text-shadow .9s ease-out, filter .9s ease-out; }
+  .bnum .ui-big.flash { text-shadow:0 0 22px rgba(150,190,255,.55); filter:brightness(1.35); transition:text-shadow .12s ease-out, filter .12s ease-out; }
   .bcap { margin-top:8px; }
   .bline { margin-top:8px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
   .bline > div { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -96,6 +105,11 @@
   #stage { position:relative; flex:1 1 auto; min-height:0; background:#040406; overflow:hidden; }
   #stage > img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; opacity:0; transition:opacity .7s var(--ui-ease); }
   #stage > img.on { opacity:1; }
+  /* the 3D room (/room?embed), made once and kept: shown with opacity, so it never reloads; a shield above it takes the clicks */
+  #v-room { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity .9s var(--ui-ease); }
+  #v-room.on { opacity:1; pointer-events:auto; }
+  #v-room iframe { position:absolute; inset:0; width:100%; height:100%; border:0; display:block; pointer-events:none; }
+  #v-room .shield { position:absolute; inset:0; }
   #v-embed { position:absolute; inset:0; display:none; background:#000; }
   #v-embed iframe { width:100%; height:100%; border:0; display:block; }
   #away { position:absolute; inset:0; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-end; padding:28px 28px 30px;
@@ -203,7 +217,9 @@
     transition:background .15s var(--ui-ease), color .15s var(--ui-ease); }
   #foot .go:hover { background:rgba(255,255,255,.06); color:var(--ui-fg); }
 
-  /* entering */
+  /* entering; after the intro the grid fades in (600 ms) and the panels run their stagger again */
+  #grid.reveal { animation:gridin .6s var(--ui-ease) both; }
+  @keyframes gridin { from { opacity:0; } to { opacity:1; } }
   .ui-in.d1 { animation-delay:60ms; } .ui-in.d2 { animation-delay:120ms; } .ui-in.d3 { animation-delay:180ms; } .ui-in.d4 { animation-delay:240ms; } .ui-in.d5 { animation-delay:300ms; }
 
   /* ≤ 1100: two columns (centre + feed); the brains side by side under the timeline */
@@ -223,7 +239,7 @@
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
     #h-clock { display:none; }
     #hero { height:auto; padding:22px var(--gut) 18px; }
-    #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:.3; }
+    #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:calc(.3 * (1 + .08 * var(--hb, 0))); }
     #hero-s { font-size:10.5px; }
     #grid { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-template-areas:"view" "time" "brains" "feed"; }
     #p-time { height:300px; }
@@ -237,6 +253,9 @@
   @media (prefers-reduced-motion: reduce) {
     .bcv.loading::before, #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl, #hero-img { animation:none !important; }
     #f-ack { transition:none !important; }
+    .bcv .bloom, .bnum .ui-big, .bnum .ui-big.flash, #hero-img, #grid .ui-panel, #v-room { transition:none !important; }
+    .bnum .ui-big.flash { text-shadow:none; filter:none; }
+    #grid.reveal { animation:none !important; }
     #hero-h, #hero-s { transition:none !important; }
   }
 
@@ -340,7 +359,7 @@
 <section id="hero" aria-live="polite">
   <img id="hero-img" src="/hero_brain.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="low" width="1400" height="954">
   <h1 id="hero-h">A brain model, live.</h1>
-  <p id="hero-s">Simulated on one person's real MRI wiring. Model readouts, not measurements.</p>
+  <p id="hero-s">It runs on one person's real MRI wiring. Every number here is read from the model.</p>
 </section>
 
 <main id="grid">
@@ -348,7 +367,7 @@
     <section class="ui-panel brainp ui-in d1" id="p-live" aria-label="live brain, top view">
       <div class="fill">
         <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · --:--</span><span class="ui-chip live"><i class="ui-dot"></i>live</span></div>
-        <div class="bcv loading" id="l-cv"><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
+        <div class="bcv loading" id="l-cv"><i class="bloom" aria-hidden="true"></i><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
           <span class="orient">front</span></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">at his baseline</span></div>
@@ -359,7 +378,7 @@
     <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's response to the last event">
       <div class="fill">
         <div class="bhead"><span class="ui-label" id="r-head"><b>RESPONSE</b></span><span class="tag" id="r-kind" hidden></span></div>
-        <div class="bcv loading" id="r-cv"><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
+        <div class="bcv loading" id="r-cv"><i class="bloom" aria-hidden="true"></i><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="r-num">--</span><span class="ui-delta" id="r-delta"></span></div>
           <div class="ui-label bcap" id="r-cap">ATTENTION · WAITING</div>
@@ -371,6 +390,7 @@
 
   <section class="ui-panel ui-in d2" id="p-view" aria-label="his screen">
     <div id="stage">
+      <div id="v-room"></div>
       <div id="away"><span class="ui-label" id="away-k">off screen</span><h2 id="away-h">…</h2><p id="away-s">connecting…</p></div>
       <img id="v-a" alt=""><img id="v-b" alt="">
       <div id="v-embed"></div>
@@ -437,7 +457,7 @@
     <div class="i-fig"><img src="/intro_brain_top.webp" alt="the fibre tracts seen from above" width="1200" height="1748" decoding="async"></div>
   </section>
   <section class="i-slide i-split" aria-label="3 of 5">
-    <div class="i-txt"><h2 class="i-h">Simulated activity.</h2><p class="i-s">A model runs on that wiring, day and night. A model, not a mind: it does not feel or think.</p></div>
+    <div class="i-txt"><h2 class="i-h">Simulated activity.</h2><p class="i-s">A model runs on that wiring without pause. It does not feel or think.</p></div>
     <div class="i-fig hot"><img src="/intro_brain_top.webp" alt="the same wiring, two regions running above their baseline" width="1200" height="1748" decoding="async"></div>
   </section>
   <section class="i-slide i-split" aria-label="4 of 5">
@@ -448,7 +468,7 @@
   </section>
   <section class="i-slide i-last" aria-label="5 of 5">
     <h2 class="i-h">Send a stimulus.</h2>
-    <p class="i-s">Type a message. It enters the model, and the RESPONSE panel shows what changed. Replies are fiction, AI-written.</p>
+    <p class="i-s">Type a message. It enters the model and the RESPONSE panel shows what changed. He answers from the model; he is fiction.</p>
     <div class="i-act"><button type="button" class="btn-primary" id="i-enter">Enter the live view →</button>
       <button type="button" class="i-link" id="i-later">replay the intro later from the header</button></div>
   </section>
@@ -483,12 +503,18 @@ const Intro = (() => {
     behind.forEach(el => { el.inert = true; });
     slides.forEach(s => s.classList.remove("on")); i = -1; go(0);
     box.focus({preventScroll:true});
+    try { roomSync(); } catch (e) {}                                 // (the room below rests while the deck shows)
   }
   function close(focusEl){
     if (!open) return; open = false;
     document.documentElement.classList.remove("intro-open");
     behind.forEach(el => { el.inert = false; });
     box.classList.add("out");
+    try { roomSync(); } catch (e) {}
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {   // the grid fades in; the panels run their stagger again
+      const g = document.getElementById("grid"), ps = g ? [...g.querySelectorAll(".ui-panel.ui-in")] : [];
+      if (g) { g.classList.remove("reveal"); ps.forEach(p => p.classList.remove("ui-in")); void g.offsetWidth; g.classList.add("reveal"); ps.forEach(p => p.classList.add("ui-in")); }
+    }
     const done = () => { if (!open) box.hidden = true; };
     matchMedia("(prefers-reduced-motion: reduce)").matches ? done() : setTimeout(done, 360);
     const f = focusEl || (back && back !== document.body && document.contains(back) ? back : null);
@@ -787,7 +813,7 @@ function chatLine(c){
 }
 function replyLine(r){
   if (!r || !r.text) return;
-  addLine(`<span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${r.to ? `<span class="nets">@${esc(r.to)} </span>` : ""}${esc(trunc(r.text, 280))} <span class="tag">his reply · AI-written</span>${tm(r.t)}</span>`, "me");
+  addLine(`<span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${r.to ? `<span class="nets">@${esc(r.to)} </span>` : ""}${esc(trunc(r.text, 280))} <span class="tag">his reply</span>${tm(r.t)}</span>`, "me");
 }
 function sysLine(t, text, nets){
   addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${tm(t)}</span>`, "sys", Array.isArray(nets) && nets.length ? `entered through ${nets.slice(0, 4).join(" · ")}` : "");
@@ -1048,12 +1074,13 @@ function drawTimeline(now){
   const series = [["n", COL.n, 1.1, .9], ["l", COL.l, 1.1, .9], ["r", COL.r, 1.2, .95], ["a", COL.a, 1.7, 1]];
   if (pts.length > 1) for (const [k, col, lw, al] of series) {
     c.strokeStyle = col; c.globalAlpha = al; c.lineWidth = lw; c.lineJoin = "round"; c.beginPath();
+    if (k === "a" && !RM) { c.shadowBlur = 6; c.shadowColor = "rgba(255,255,255,.55)"; }
     let px = tx(pts[0].t, now), py = ty(pts[0][k]); c.moveTo(px, py);
     for (let i = 1; i < pts.length; i++) {
       const x = tx(pts[i].t, now), y = ty(pts[i][k]);
       c.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2); px = x; py = y;
     }
-    c.lineTo(px, py); c.stroke();
+    c.lineTo(px, py); c.stroke(); c.shadowBlur = 0;
   }
   c.globalAlpha = 1;
   // markers
@@ -1076,6 +1103,10 @@ function drawTimeline(now){
   }
   // the playhead, at now
   c.strokeStyle = COL.da; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x1 + .5, y0 - 6); c.lineTo(x1 + .5, y1); c.stroke();
+  if (!RM) {                                                // a soft halo, once every 2 s
+    const ph = (performance.now() / 2000) % 1, a = 0.35 * (1 - ph);
+    c.strokeStyle = `rgba(255,45,85,${a.toFixed(3)})`; c.lineWidth = 1; c.beginPath(); c.arc(x1 + .5, y0 - 6, 3 + 6 * ph, 0, 7); c.stroke();
+  }
   c.fillStyle = COL.da; c.beginPath(); c.arc(x1 + .5, y0 - 6, 3, 0, 7); c.fill();
   c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(S.clock || "--:--", x1 + 6, y0 - 2);
   const last = pts[pts.length - 1];
@@ -1108,7 +1139,33 @@ const PLACE = {bed:"in bed", window:"at the window", table:"at the table", desk:
   street_home:"out · Kichijōji", street_bakery:"out · Kichijōji", street_park:"out · Kichijōji", street:"out · Kichijōji",
   bakery_door:"out · the bakery", bakery_in:"out · the bakery", counter:"out · the bakery", bakery:"out · the bakery",
   park_gate:"out · the park", bench:"out · the park", park:"out · the park"};
-const view = {mode:"", embedSrc:"", embedOk:false, embedBad:new Set(), front:$("v-a"), back:$("v-b"), shotFails:0, shotBusy:false, shotAt:0, lastDev:""};
+const view = {mode:"", embedSrc:"", embedOk:false, embedBad:new Set(), front:$("v-a"), back:$("v-b"), shotFails:0, shotBusy:false, shotAt:0, lastDev:"",
+  room:null, roomReady:false, roomWant:false, roomPosted:null, stageIn:true};
+// the room: one iframe, made the first time he is away from a screen; it renders only while it shows (visible:true),
+// the tab is visible and the viewport is on screen; it says when he is first drawn (sub01-embed-ready) and then fades in
+function roomMake(){
+  if (view.room) return;
+  const box = $("v-room"), fr = document.createElement("iframe");
+  fr.src = "/room?embed"; fr.title = "his room"; fr.allow = "autoplay"; fr.loading = "eager"; fr.tabIndex = -1;
+  fr.addEventListener("load", () => { view.roomPosted = null; roomSync(); });   // (a reload inside it: tell it again)
+  const shield = document.createElement("div"); shield.className = "shield"; shield.setAttribute("aria-hidden", "true");
+  box.append(fr, shield); view.room = fr;
+}
+function roomSync(){
+  const fr = view.room; if (!fr) return;
+  const show = view.roomWant && view.roomReady;
+  $("v-room").classList.toggle("on", show);
+  const vis = view.roomWant && !document.hidden && view.stageIn && !document.documentElement.classList.contains("intro-open");   // (the deck covers it: no frames)
+  if (vis === view.roomPosted || !fr.contentWindow) return;
+  view.roomPosted = vis;
+  try { fr.contentWindow.postMessage({type:"sub01-embed", visible:vis}, location.origin); } catch (e) {}
+}
+addEventListener("message", e => {
+  if (e.origin !== location.origin || !view.room || e.source !== view.room.contentWindow) return;
+  if (e.data && e.data.type === "sub01-embed-ready") { view.roomReady = true; dirty.view = true; }
+});
+document.addEventListener("visibilitychange", roomSync);
+if ("IntersectionObserver" in window) new IntersectionObserver(es => { view.stageIn = es[es.length - 1].isIntersecting; roomSync(); }).observe($("stage"));
 function placeText(){
   const L = S.life || {};
   if (S.stage === "NREM") return "asleep · NREM";
@@ -1143,12 +1200,15 @@ function renderView(){
   if (mode === "embed") setEmbed(emb.src, emb.label); else setEmbed("", "");
   if (mode === "shot") { if (dev !== view.lastDev) { view.shotFails = 0; view.lastDev = dev; } shot(dev); }
   else { view.front.classList.remove("on"); view.back.classList.remove("on"); if (!sc) view.shotFails = 0; }
-  const showAway = mode === "away" || (mode === "shot" && !view.front.classList.contains("on"));
+  // away from a screen: the room (its own caption says what he does); until he is first drawn, this card stands in
+  if (mode === "away") roomMake();
+  view.roomWant = mode === "away"; roomSync();
+  const showAway = (mode === "away" && !view.roomReady) || (mode === "shot" && !view.front.classList.contains("on"));
   $("away").classList.toggle("hide", !showAway);
   if (showAway) {
     put("away-h", placeText());
     const L = S.life || {};
-    put("away-k", sc && sc.restarting ? "restarting" : sc ? "loading" : "off screen");
+    put("away-k", sc && sc.restarting ? "restarting" : sc ? "loading" : "camera on him · loading");
     put("away-s", S.stage === "NREM" ? `the model's slow waves run; a word reaches it at ${Math.round(S.gain * 100)}%`
       : S.stage === "REM" ? "the model replays the day's words; nothing here is a dream anyone has"
       : L.doing ? `${L.walking ? "walking · " : ""}${L.doing}` : "connecting…");
@@ -1173,10 +1233,10 @@ function renderFeed(){
   putH("f-now", L.doing ? `<b>${esc(L.walking ? "walking · " + L.doing : L.doing)}</b> · ${esc(where)}` : `<b>${esc(where)}</b>`);
   put("f-where", S.clock ? `${S.clock} ${S.tz}` : "");
   const note = $("f-note");
-  if (S.note && S.note.summary) { note.hidden = false; putH("f-note", `<span class="tag">AI-written</span>${esc(trunc(S.note.summary, 200))}`); }
+  if (S.note && S.note.summary) { note.hidden = false; putH("f-note", `<span class="tag">his notes</span>${esc(trunc(S.note.summary, 200))}`); }
   else note.hidden = true;
   const why = $("f-why");
-  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">why · AI-written</span>${esc(trunc(S.decision.reason, 200))}`); }
+  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">why</span>${esc(trunc(S.decision.reason, 200))}`); }
   else why.hidden = true;
   const p = S.plan;
   put("f-plan", p && (p.text || p.steps) ? trunc(p.text || "Today's plan", 160) : "no plan yet today");
@@ -1195,7 +1255,14 @@ function renderHeader(){
   const st = $("h-stage"); st.classList.toggle("nrem", S.stage === "NREM"); st.classList.toggle("rem", S.stage === "REM");
 }
 const tween = {};                       // id -> {from, to, t0, cur}
-function tweenTo(id, v){ const tw = tween[id] || (tween[id] = {from:v, to:v, t0:0, cur:v}); if (Math.round(v) === Math.round(tw.to)) return; tw.from = tw.cur; tw.to = v; tw.t0 = performance.now(); }
+function tweenTo(id, v){
+  const tw = tween[id] || (tween[id] = {from:v, to:v, t0:0, cur:v, fl:0}); if (Math.round(v) === Math.round(tw.to)) return;
+  const now = performance.now();
+  if (!RM && Math.abs(v - tw.to) >= 5 && now - tw.fl > 2000 && (id === "l-num" || id === "r-num")) {
+    tw.fl = now; const el = $(id); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 160);
+  }
+  tw.from = tw.cur; tw.to = v; tw.t0 = now;
+}
 function tweenStep(now){
   for (const id in tween) {
     // clamped at 0 too: t0 is performance.now() inside a frame and `now` that frame's earlier rAF stamp; a negative p made the cubic extrapolate (a big number read -6 or 217 on a slow frame)
@@ -1242,8 +1309,8 @@ function pulseResp(){
 
 // ---------------------------------------------------------------- hero
 const HERO = [
-  ["A brain model, live.", "Simulated on one person's real MRI wiring. Model readouts, not measurements."],
-  ["Stimuli in. Readouts out.", "Messages enter the model. Attention, arousal and load are read from it."],
+  ["A brain model, live.", "It runs on one person's real MRI wiring. Every number here is read from the model."],
+  ["Send it a message.", "Your words enter the model. Attention, arousal and load respond."],
   ["A model, not a mind.", "The character and his room are fiction. Credits on /about.html."],
 ];
 let heroI = 0;
@@ -1258,7 +1325,16 @@ if (!RM) setInterval(() => { if (!document.hidden) heroNext(); }, 8000);        
 
 // ---------------------------------------------------------------- the frame loop
 const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 30;
-let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0, respWaitAt = 0, respDrawn = null, respDrawnV = -1;
+let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0, respWaitAt = 0, respDrawn = null, respDrawnV = -1, lastGlow = 0;
+// breath runs 0.7 (desynchronised) to 1.15 (in step): the blooms and the hero's light follow it, eased by CSS
+const glowWas = {l:"", r:"", h:""}, glowEl = {l:$("l-cv"), r:$("r-cv"), h:$("hero")};
+function glow(breath, frozen){
+  const u = clamp((breath - 0.7) / 0.45, 0, 1);
+  const set = (k, prop, v) => { if (glowWas[k + prop] === v) return; glowWas[k + prop] = v; glowEl[k].style.setProperty(prop, v); };
+  set("l", "--bl", (0.45 + 0.5 * u).toFixed(2)); set("l", "--bs", (0.96 + 0.06 * u).toFixed(3));
+  set("r", "--bl", frozen ? "0.8" : (0.3 + 0.3 * u).toFixed(2)); set("r", "--bs", frozen ? "1" : (0.96 + 0.04 * u).toFixed(3));
+  set("h", "--hb", (2 * u - 1).toFixed(2));
+}
 const relDraw = {live:null};
 const hdrEl = $("hdr");                                   // the grid is one screen minus the header (which may wrap)
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", hdrEl.offsetHeight + "px")).observe(hdrEl);
@@ -1286,6 +1362,7 @@ function frame(pnow){
         else { const L = relDraw.live; for (let i = 0; i < L.length; i++) L[i] += (T[i] - L[i]) * e; }
       }
       liveBrain.draw(relDraw.live, t, breath);
+      if (!RM && pnow - lastGlow >= 100) { lastGlow = pnow; glow(breath, !!(respMk && respMk.rel)); }
       // RESPONSE: on an event it is redrawn only when its snapshot changes (the 3 s peak search) or the canvas resizes;
       // before the first event it shows the live brain, dimmed, at 5 fps
       const mk = respMk;
