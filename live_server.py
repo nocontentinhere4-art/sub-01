@@ -344,6 +344,63 @@ def local_accounts():
         return {"error": type(e).__name__}
 
 
+
+class Readouts:
+    """The live page's four model readouts (attention, alertness, effort, activity), computed here with the page's own
+    formulas (web/live.html onTick) and kept one row per second for 15 minutes, so a visitor's chart starts with the
+    last quarter hour instead of empty. Rows are [age_s, a, r, l, n] at hello (ages, so the visitor's clock does not
+    matter)."""
+    KEEP_S = 15 * 60
+
+    def __init__(self):
+        self.g_ema = {}
+        self.base = None
+        self.rows = []
+        self.bin = None
+
+    @staticmethod
+    def _r(x):
+        return max(0.0, min(100.0, 50.0 + 40.0 * math.log2(max(1e-4, x))))
+
+    def update(self, groups, act, levels, now_ms):
+        k = TICK / 25.0                                              # the page's 25 s baseline, per broadcast tick
+        for g, v in groups.items():
+            v = float(v)
+            if not math.isfinite(v):
+                continue
+            e = self.g_ema.get(g)
+            self.g_ema[g] = max(v, 1e-3) if e is None else e * (1.0 - k) + v * k
+        grel = {g: float(v) / max(self.g_ema[g], 1e-3) for g, v in groups.items() if g in self.g_ema}
+        att = [grel[g] for g in ("attention", "salience", "visual") if g in grel]
+        ctl = [grel[g] for g in ("control", "default") if g in grel]
+        a = self._r(sum(att) / len(att)) if att else 50.0
+        ne = float(levels.get("NE") or 0.0)
+        r = max(0.0, min(100.0, 50.0 + 30.0 * math.log2(ne))) if ne > 0 else 50.0
+        ach = levels.get("ACh")
+        ach_v = max(0.0, min(100.0, float(ach) / 2.0 * 100.0)) if ach is not None and math.isfinite(float(ach)) else None
+        if ctl:
+            l = 0.7 * self._r(sum(ctl) / len(ctl)) + 0.3 * ach_v if ach_v is not None else self._r(sum(ctl) / len(ctl))
+        else:
+            l = ach_v if ach_v is not None else 50.0
+        act = np.asarray(act, dtype=float)
+        if self.base is None or self.base.shape != act.shape:
+            self.base = act.copy()
+        self.base = self.base * (1.0 - k) + act * k
+        n = self._r(float(np.mean(act / np.maximum(self.base, 0.02)))) if act.size else 50.0
+        if self.bin is None or now_ms - self.bin[0] >= 1000:
+            if self.bin is not None and self.bin[5]:
+                c = self.bin[5]
+                self.rows.append([int(self.bin[0])] + [int(round(self.bin[i] / c)) for i in (1, 2, 3, 4)])
+                cut = now_ms - self.KEEP_S * 1000
+                while self.rows and self.rows[0][0] < cut:
+                    self.rows.pop(0)
+            self.bin = [now_ms, 0.0, 0.0, 0.0, 0.0, 0]
+        b = self.bin
+        b[1] += a; b[2] += r; b[3] += l; b[4] += n; b[5] += 1
+
+    def history(self, now_ms):
+        return [[round((now_ms - t) / 1000.0, 1), a, r, l, n] for t, a, r, l, n in self.rows]
+
 class Live:
     def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
@@ -424,6 +481,7 @@ class Live:
         self.recent_read_replays = []    # ...and titles of replayed readings
         self.last_groups = {}
         self.last_rel = {}               # group activity / mean, guides what it reads next
+        self.readouts = Readouts()       # the live page's four readouts, the last 15 minutes (sent at hello)
         self.last_frame = None
         self.spiking = None              # SpikingHub, set by spiking.server.attach in main()
         self.decider = None              # brain_vote.Backend (main()): a spiking network votes too, GPU or CPU (#55)
@@ -954,6 +1012,12 @@ class Live:
             if self.music.now:
                 self.music_watch.feed(rel, now, TICK)
             msg["neuro"] = {k: round(v, 2) for k, v in levels.items()}
+            try:
+                if not hasattr(self, "readouts"):                  # (a server built without __init__, as in tests)
+                    self.readouts = Readouts()
+                self.readouts.update(groups, act, levels, int(time.time() * 1000))
+            except Exception:
+                pass                                                  # a readout must never stop a tick
             if self.life.activity == "research" and not self.life.path:
                 msg["life"]["reading"] = self.reading_now(tsim)
             if self.browser and (dev := self.screen_device()):
@@ -1898,7 +1962,8 @@ class Live:
                                 "replies": getattr(self, "replies", [])[-10:],
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD,
                                 "music": self.music.public(self.music.now) if getattr(self, "music", None) else None,
-                                "audience": self.audience_hello(ws)})
+                                "audience": self.audience_hello(ws),
+                                "readouts": rd.history(int(time.time() * 1000)) if (rd := getattr(self, "readouts", None)) else []})
             await ws.send_json(self.nights())
             if self.last_frame:
                 await ws.send_json(self.eye_frame())

@@ -181,7 +181,6 @@
   .fmeta { margin-top:7px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fmeta .tag { margin-right:6px; }
-  #f-plan { font-size:13px; line-height:1.4; color:var(--ui-fg2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fchat { flex:1 1 0; min-height:150px; display:flex; flex-direction:column; padding:12px 0 0; }
   @media (min-width:1101px) and (max-height:940px) { .fsec { padding:10px 14px; } }
   .fchat .ui-label { padding:0 14px 6px; }
@@ -441,17 +440,13 @@
     </div>
   </section>
 
-  <section class="ui-panel ui-in d5" id="p-feed" aria-label="now, up next and chat">
+  <section class="ui-panel ui-in d5" id="p-feed" aria-label="now and chat">
     <div class="fill">
       <div class="fsec">
         <div class="ui-label"><span><b>Now</b></span><span id="f-where"></span></div>
         <div class="nowbox" id="f-now">…</div>
         <div class="fmeta" id="f-note" hidden></div>
         <div class="fmeta" id="f-why" hidden></div>
-      </div>
-      <div class="fsec">
-        <div class="ui-label"><span><b>Up next</b></span><span class="tag teal">planned by the model</span></div>
-        <div id="f-plan">…</div>
       </div>
       <div class="fchat">
         <div class="ui-label"><b>Chat</b></div>
@@ -788,6 +783,11 @@ function handle(m){
       pendingHello = rows; setTimeout(() => { if (pendingHello === rows) renderHello(); }, 3000);
       if (m.audience && typeof m.audience.viewers === "number") S.viewers = m.audience.viewers;
       if (m.music && typeof m.music === "object" && m.music.title) S.music = m.music;
+      if (Array.isArray(m.readouts) && m.readouts.length) {         // the server's last 15 minutes: the chart starts full
+        const now = Date.now(), have = ring.length ? ring[0].t : Infinity, rows = [];
+        for (const r of m.readouts) { if (!Array.isArray(r) || r.length < 5) continue; const t = now - r[0] * 1000; if (t < have) rows.push({t, a:+r[1], r:+r[2], l:+r[3], n:+r[4]}); }
+        if (rows.length) { ring.unshift(...rows); dirty.tl = true; }
+      }
       dirty.hdr = dirty.view = true; return;
     }
     case "chat": chatLine(m); addMarker("chat", `“${trunc(m.text, 60)}”`, m.t); return;
@@ -1296,7 +1296,7 @@ function renderView(){
   view.mode = mode;
 }
 
-// ---------------------------------------------------------------- feed (now, up next)
+// ---------------------------------------------------------------- feed (now; the up-next block was removed on 2 November, owner)
 function renderFeed(){
   const L = S.life || {};
   const where = placeText();
@@ -1309,7 +1309,6 @@ function renderFeed(){
   if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">why</span>${esc(trunc(S.decision.reason, 200))}`); }
   else why.hidden = true;
   const p = S.plan;
-  put("f-plan", p && (p.text || p.steps) ? trunc(p.text || "Today's plan", 160) : "no plan yet today");
 }
 
 // ---------------------------------------------------------------- header, panels
