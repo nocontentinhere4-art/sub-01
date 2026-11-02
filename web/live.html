@@ -25,14 +25,16 @@
   /* header */
   #hdr { position:sticky; top:0; z-index:20; background:rgba(0,0,0,.82); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
     border-bottom:1px solid var(--ui-line); flex-wrap:wrap; row-gap:8px; }
-  #hdr .ui-wordmark { white-space:nowrap; }
+  #hdr .ui-lockup { display:block; text-decoration:none; color:var(--ui-fg); line-height:1; white-space:nowrap; }
+  #hdr .ui-lockup b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
+  #hdr .ui-lockup small { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim); }
   #hdr .ui-nav { flex-wrap:wrap; }
-  #h-live.off { background:transparent; border-color:var(--ui-line2); color:var(--ui-dim); }
-  #h-live.off .ui-dot { animation:none; }
-  #h-clock { color:var(--ui-fg2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #ui-live.off { background:transparent; border-color:var(--ui-line2); color:var(--ui-dim); }
+  #ui-live.off .ui-dot { animation:none; }
+  #ui-clock { font-family:var(--ui-mono); color:var(--ui-fg2); font-variant-numeric:tabular-nums; white-space:nowrap; }
   #h-stage.nrem { border-color:#3f7bff; color:#8fb3ff; }
   #h-stage.rem { border-color:var(--rp); color:var(--rp); }
-  .h-state { display:flex; align-items:center; gap:12px; }
+  #hdr .ui-state { display:flex; align-items:center; gap:12px; }
 
   /* hero: one bold line, rotating */
   #hero { position:relative; min-height:var(--hero-h); display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -55,7 +57,7 @@
   /* the grid: [LIVE brain] [screen + timeline] [feed + RESPONSE brain] */
   /* desktop: header + hero + grid = one screen (the footer scrolls in below); never crushed under 560px */
   #grid { display:grid; gap:var(--ui-gap); padding:0 var(--gut); max-width:1720px; margin:0 auto;
-    height:calc(100vh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--ui-gap)); height:calc(100dvh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--ui-gap)); min-height:560px;
+    height:calc(100vh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--foot-px, 60px)); height:calc(100dvh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--foot-px, 60px)); min-height:560px;
     grid-template-columns:var(--c1) minmax(0, 1fr) var(--c3); grid-template-rows:minmax(0, 1fr) var(--row2);
     grid-template-areas:"live view feed" "live time resp"; }
   #brains { display:contents; }
@@ -211,7 +213,7 @@
   .seg button:focus-visible { outline-offset:0; }
 
   /* footer: the honesty line, never under a panel */
-  #foot { max-width:1720px; margin:0 auto; padding:16px var(--gut) 28px; display:flex; gap:12px 28px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  #foot { max-width:1720px; margin:0 auto; padding:12px var(--gut) 14px; display:flex; gap:12px 28px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
   #foot .ui-honest { margin:0; }
   #foot .go { font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); text-decoration:none; border:1px solid var(--ui-line2); border-radius:999px; padding:5px 12px; white-space:nowrap;
     transition:background .15s var(--ui-ease), color .15s var(--ui-ease); }
@@ -222,6 +224,8 @@
   @keyframes gridin { from { opacity:0; } to { opacity:1; } }
   .ui-in.d1 { animation-delay:60ms; } .ui-in.d2 { animation-delay:120ms; } .ui-in.d3 { animation-delay:180ms; } .ui-in.d4 { animation-delay:240ms; } .ui-in.d5 { animation-delay:300ms; }
 
+  /* a short desktop screen: a shorter hero band, so header + hero + grid + footer still fit the first screen */
+  @media (min-width:1101px) and (max-height:820px) { :root { --hero-h:clamp(84px, 12vh, 170px); } #hero { padding:8px var(--gut); } }
   /* ≤ 1100: two columns (centre + feed); the brains side by side under the timeline */
   @media (max-width:1100px) {
     #grid { height:auto; min-height:0; grid-template-columns:minmax(0, 1fr) 300px; grid-template-rows:auto 330px auto;
@@ -229,7 +233,7 @@
     #brains { display:grid; grid-area:brains; grid-template-columns:1fr 1fr; gap:var(--ui-gap); }
     #p-live, #p-resp { grid-area:auto; height:430px; }
     #stage { flex:none; aspect-ratio:16/9; }
-    .h-state .ui-counter { display:none; }
+    #hdr .ui-state .ui-counter { display:none; }
   }
   /* ≤ 720: one column: screen, timeline, LIVE, RESPONSE, feed */
   @media (max-width:720px) {
@@ -237,7 +241,7 @@
     #hdr { padding:10px var(--gut); gap:8px 12px; }
     #hdr .ui-nav { order:5; width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
-    #h-clock { display:none; }
+    #ui-clock { display:none; }
     #hero { height:auto; padding:22px var(--gut) 18px; }
     #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:calc(.3 * (1 + .08 * var(--hb, 0))); }
     #hero-s { font-size:10.5px; }
@@ -342,17 +346,17 @@
   }
 </style>
 </head>
-<body>
+<body data-deck="01">
 <header class="ui-hdr" id="hdr">
-  <a class="ui-wordmark" href="/">SUB-01</a>
-  <nav class="ui-nav" aria-label="pages"><a class="on" href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav>
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
   <button type="button" id="i-replay" title="replay the intro">intro</button>
   <div class="ui-spacer"></div>
-  <div class="h-state">
-    <span class="ui-chip live off" id="h-live"><i class="ui-dot"></i><span id="h-live-t">connecting</span></span>
-    <span id="h-clock" class="mono">--:-- Tokyo</span>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
     <span class="ui-chip" id="h-stage">…</span>
-    <span class="ui-counter" id="h-count">01 / 03</span>
+    <span class="ui-counter" id="ui-counter">01 / 06</span>
   </div>
 </header>
 
@@ -366,7 +370,7 @@
   <div id="brains">
     <section class="ui-panel brainp ui-in d1" id="p-live" aria-label="live brain, top view">
       <div class="fill">
-        <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · --:--</span><span class="ui-chip live"><i class="ui-dot"></i>live</span></div>
+        <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · --:--</span></div>
         <div class="bcv loading" id="l-cv"><i class="bloom" aria-hidden="true"></i><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
           <span class="orient">front</span></div>
         <div class="bfoot">
@@ -394,7 +398,7 @@
       <div id="away"><span class="ui-label" id="away-k">off screen</span><h2 id="away-h">…</h2><p id="away-s">connecting…</p></div>
       <img id="v-a" alt=""><img id="v-b" alt="">
       <div id="v-embed"></div>
-      <div class="vchips tl"><span class="ui-chip live"><i class="ui-dot"></i>live</span><span class="ui-chip" id="v-src">his room</span></div>
+      <div class="vchips tl"><span class="ui-chip" id="v-src">his room</span></div>
       <div class="vchips tr"><span class="ui-chip" id="v-watch">– watching</span></div>
     </div>
     <div id="v-strip" hidden><span id="v-title"></span><span id="v-music"></span><span class="ui-chip proj" id="v-kind" hidden>model-chosen page</span></div>
@@ -1245,12 +1249,12 @@ function renderFeed(){
 // ---------------------------------------------------------------- header, panels
 const STAGE = {AWAKE:"awake", NREM:"NREM · asleep", REM:"REM · dreaming"};
 function renderHeader(){
-  const live = $("h-live");
+  const live = $("ui-live");
   live.classList.toggle("off", !S.conn);
   const n = S.viewers;
-  put("h-live-t", S.full ? "full · back in a minute" : !S.conn ? "offline · reconnecting" : `live${typeof n === "number" ? ` · ${n} watching` : ""}`);
+  put("ui-live-t", S.full ? "full · back in a minute" : !S.conn ? "offline · reconnecting" : `live${typeof n === "number" ? ` · ${n} watching` : ""}`);
   put("v-watch", typeof n === "number" ? `${n} watching` : "– watching");
-  put("h-clock", S.clock ? `${S.clock} ${S.tz}` : "--:-- Tokyo");
+  put("ui-clock", S.clock ? `${S.clock} ${S.tz}` : "--:-- Tokyo");
   put("h-stage", STAGE[S.stage] || "…");
   const st = $("h-stage"); st.classList.toggle("nrem", S.stage === "NREM"); st.classList.toggle("rem", S.stage === "REM");
 }
@@ -1316,7 +1320,7 @@ const HERO = [
 let heroI = 0;
 function heroNext(){
   heroI = (heroI + 1) % HERO.length;
-  const hero = $("hero"), set = () => { $("hero-h").textContent = HERO[heroI][0]; $("hero-s").textContent = HERO[heroI][1]; put("h-count", `${String(heroI + 1).padStart(2, "0")} / ${String(HERO.length).padStart(2, "0")}`); };
+  const hero = $("hero"), set = () => { $("hero-h").textContent = HERO[heroI][0]; $("hero-s").textContent = HERO[heroI][1]; };
   if (RM) { set(); return; }
   hero.classList.add("swap");
   setTimeout(() => { set(); hero.classList.remove("swap"); hero.classList.add("enter"); void hero.offsetWidth; hero.classList.remove("enter"); }, 400);
@@ -1338,7 +1342,8 @@ function glow(breath, frozen){
 const relDraw = {live:null};
 const hdrEl = $("hdr");                                   // the grid is one screen minus the header (which may wrap)
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", hdrEl.offsetHeight + "px")).observe(hdrEl);
-new ResizeObserver(() => document.documentElement.style.setProperty("--hero-px", $("hero").offsetHeight + "px")).observe($("hero"));   // the hero's real height, so the grid still fills the rest of the screen
+new ResizeObserver(() => document.documentElement.style.setProperty("--hero-px", $("hero").offsetHeight + "px")).observe($("hero"));
+new ResizeObserver(() => document.documentElement.style.setProperty("--foot-px", $("foot").offsetHeight + "px")).observe($("foot"));   // the footer sits inside the first screen   // the hero's real height, so the grid still fills the rest of the screen
 function frame(pnow){
   requestAnimationFrame(frame);
   try {
@@ -1377,5 +1382,6 @@ connect(); loadMind(); loadMusic();
 setInterval(() => { if (!document.hidden) loadMind(); }, 60000);
 // a viewer's local clock is not his: while the socket is down, the panels keep the last values and say so in the header
 </script>
+<script src="/deck.js" defer></script>
 </body>
 </html>
