@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SUB-01 · live</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>SUB-01 · brain</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/ui.css">
 <style>
   :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
           --card:rgba(10,10,16,.74); --st:#ff9a3c;
@@ -165,6 +166,16 @@
     #scene, #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:72vh; }
     #top { position:absolute; }
   }
+  /* ui.css header look (2026-11): black wordmark, mono pill links, current page highlighted */
+  #brand { flex-wrap:wrap; }
+  #brand h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
+  #brand nav.ui-nav { font-size:12px; color:var(--ui-dim); gap:2px; flex-wrap:wrap; }
+  #brand nav.ui-nav a { color:var(--ui-dim); padding:6px 9px; border-radius:999px; text-transform:lowercase; }
+  #brand nav.ui-nav a:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
+  #brand nav.ui-nav a.on { color:var(--ui-fg); background:rgba(255,255,255,.1); }
+  #brand nav.ui-nav a.on::after { content:none; }
+  #brand nav.ui-nav a.ext::after { content:" \2197"; display:inline; height:auto; margin:0; background:none; color:var(--ui-faint); }
+  @media (max-width:900px) { #brand h1.ui-wordmark { font-size:16px; } #brand nav.ui-nav a { padding:8px 7px; } }
 </style>
 <link rel="stylesheet" href="/neurons.css">
 </head>
@@ -173,7 +184,7 @@
 <div id="scene"></div><div id="vignette"></div>
 
 <div id="top">
-  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/brain">brain</a><a href="/">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" target="_blank" rel="noopener">city</a></nav></div>
+  <div id="brand"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a class="on" href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="ext" target="_blank" rel="noopener">city</a></nav></div>
   <div id="state"><span id="live" title="live connection"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
   <div id="sub"></div>

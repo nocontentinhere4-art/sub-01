@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui.css">
+<title>SUB-01 · live</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="description" content="A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. Model readouts, not measurements of anyone.">
+<style>
+  /* SUB-01 · live: the brain-first dashboard ("decoded" redesign). Tokens and chrome come from /ui.css. */
+  :root { --rp:#a78bfa; --gut:16px; --c1:280px; --c3:320px; --row2:360px; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--ui-bg); color:var(--ui-fg); }
+  body { font-family:var(--ui-sans); overflow-x:hidden; -webkit-font-smoothing:antialiased; min-height:100vh; }
+  a { color:inherit; }
+  button { font:inherit; }
+  .mono { font-family:var(--ui-mono); }
+  .tag { font-family:var(--ui-mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-dim);
+    border:1px solid var(--ui-line2); border-radius:999px; padding:1px 6px; white-space:nowrap; vertical-align:1px; }
+  .tag.red { color:var(--ui-live2); border-color:rgba(255,45,85,.45); }
+  .tag.teal { color:var(--ui-proj); border-color:rgba(46,230,197,.45); }
+  .tag.vi { color:var(--rp); border-color:rgba(167,139,250,.5); }
+
+  /* header */
+  #hdr { position:sticky; top:0; z-index:20; background:rgba(0,0,0,.82); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--ui-line); flex-wrap:wrap; row-gap:8px; }
+  #hdr .ui-wordmark { white-space:nowrap; }
+  #hdr .ui-nav { flex-wrap:wrap; }
+  #h-live.off { background:transparent; border-color:var(--ui-line2); color:var(--ui-dim); }
+  #h-live.off .ui-dot { animation:none; }
+  #h-clock { color:var(--ui-fg2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #h-stage.nrem { border-color:#3f7bff; color:#8fb3ff; }
+  #h-stage.rem { border-color:var(--rp); color:var(--rp); }
+  .h-state { display:flex; align-items:center; gap:12px; }
+
+  /* hero: one bold line, rotating */
+  #hero { position:relative; height:clamp(150px, 21vh, 220px); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:0 var(--gut); overflow:hidden; }
+  #hero::before { content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse 50% 70% at 50% 120%, rgba(63,123,255,.16), transparent 70%); }
+  #hero-h { position:relative; margin:0; font-weight:800; font-size:clamp(28px, 4.6vw, 68px); letter-spacing:-.045em; line-height:.98;
+    max-width:min(1100px, 100%); text-wrap:balance; }
+  #hero-s { position:relative; margin:14px 0 0; font-family:var(--ui-mono); font-size:11.5px; line-height:1.55; color:var(--ui-dim);
+    max-width:760px; text-wrap:balance; }
+  #hero-h, #hero-s { transition:opacity .4s var(--ui-ease), transform .4s var(--ui-ease); }
+  #hero.swap #hero-h { opacity:0; transform:translateY(-14px); }
+  #hero.swap #hero-s { opacity:0; transform:translateY(-8px); }
+  #hero.enter #hero-h, #hero.enter #hero-s { opacity:0; transform:translateY(14px); transition:none; }
+
+  /* the grid: [LIVE brain] [screen + timeline] [feed + RESPONSE brain] */
+  #grid { display:grid; gap:var(--ui-gap); padding:0 var(--gut); max-width:1720px; margin:0 auto;
+    grid-template-columns:var(--c1) minmax(0, 1fr) var(--c3); grid-template-rows:auto var(--row2);
+    grid-template-areas:"live view feed" "live time resp"; }
+  #brains { display:contents; }
+  #p-live { grid-area:live; } #p-view { grid-area:view; } #p-time { grid-area:time; } #p-feed { grid-area:feed; } #p-resp { grid-area:resp; }
+  .ui-panel { position:relative; min-width:0; }
+  .fill { position:absolute; inset:0; display:flex; flex-direction:column; min-height:0; }
+
+  /* brain panels */
+  .brainp { transition:border-color .6s var(--ui-ease), box-shadow .6s var(--ui-ease); }
+  .brainp.pulse { border-color:var(--ui-live); box-shadow:0 0 0 1px var(--ui-live), 0 0 32px rgba(255,45,85,.25); transition:none; }
+  .bhead { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px 0; }
+  .bcv { position:relative; flex:1; min-height:120px; }
+  .bcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .bcv.loading::before { content:""; position:absolute; left:18%; right:18%; top:10%; bottom:10%; border-radius:46% 46% 42% 42%;
+    background:linear-gradient(100deg, rgba(63,123,255,.06) 30%, rgba(63,123,255,.18) 50%, rgba(63,123,255,.06) 70%) 0 0/250% 100%;
+    animation:shim 1.4s linear infinite; }
+  .bcv.loading::after { content:"loading his wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
+    font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint); }
+  @keyframes shim { from { background-position:100% 0; } to { background-position:-150% 0; } }
+  .bcv .orient { position:absolute; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
+  .bcv .o-f { top:4px; left:50%; transform:translateX(-50%); } .bcv .o-l { left:8px; top:50%; } .bcv .o-r { right:8px; top:50%; }
+  .bfoot { padding:0 16px 14px; }
+  .bnum { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .bnum .ui-big { font-size:clamp(44px, 4.4vw, 64px); display:inline-block; transform-origin:0 80%; }
+  .bnum .ui-big.pop { animation:pop .5s var(--ui-ease); }
+  @keyframes pop { 0% { transform:scale(1); } 30% { transform:scale(1.14); color:var(--ui-live2); } 100% { transform:scale(1); } }
+  .bword { font-family:var(--ui-mono); font-size:11px; color:var(--ui-live2); }
+  .bword.up { color:var(--ui-proj); } .bword.mid { color:var(--ui-dim); }
+  .bcap { margin-top:8px; }
+  .bline { margin-top:8px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
+  .bline b { color:var(--ui-fg2); font-weight:500; }
+  #r-after { color:var(--ui-fg2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* his screen */
+  #stage { position:relative; aspect-ratio:16/9; background:#040406; overflow:hidden; }
+  #stage > img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .7s var(--ui-ease); }
+  #stage > img.on { opacity:1; }
+  #v-embed { position:absolute; inset:0; display:none; background:#000; }
+  #v-embed iframe { width:100%; height:100%; border:0; display:block; }
+  #away { position:absolute; inset:0; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-end; padding:28px 28px 30px;
+    background:radial-gradient(ellipse 70% 90% at 75% 20%, var(--away-c, rgba(63,123,255,.20)), transparent 70%), linear-gradient(180deg, #07070b, #000);
+    transition:opacity .6s var(--ui-ease); }
+  #away::before { content:""; position:absolute; inset:-40px; pointer-events:none; opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size:40px 40px; animation:gridmove 14s linear infinite;
+    -webkit-mask-image:radial-gradient(ellipse at 60% 40%, #000 20%, transparent 75%); mask-image:radial-gradient(ellipse at 60% 40%, #000 20%, transparent 75%); }
+  @keyframes gridmove { from { transform:translate(0, 0); } to { transform:translate(40px, 40px); } }
+  #away.hide { opacity:0; pointer-events:none; }
+  #away-k { position:relative; }
+  #away-h { position:relative; margin:10px 0 0; font-weight:800; font-size:clamp(30px, 5vw, 72px); letter-spacing:-.045em; line-height:.95; }
+  #away-s { position:relative; margin:12px 0 0; font-family:var(--ui-mono); font-size:12px; color:var(--ui-fg2); max-width:560px; line-height:1.5; }
+  .vchips { position:absolute; top:12px; display:flex; gap:6px; pointer-events:none; z-index:2; }
+  .vchips.tl { left:12px; } .vchips.tr { right:12px; }
+  .vchips .ui-chip { background:rgba(0,0,0,.55); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  .vchips .ui-chip.live { background:var(--ui-live); }
+  #v-strip { display:flex; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--ui-line); min-height:42px;
+    font-family:var(--ui-mono); font-size:11.5px; color:var(--ui-fg2); }
+  #v-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #v-title i { font-style:normal; color:var(--ui-dim); }
+  #v-music { color:var(--ui-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38%; }
+
+  /* timeline */
+  #p-time .fill { display:flex; flex-direction:column; }
+  .thead { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px 14px 4px; flex-wrap:wrap; }
+  #legend { display:flex; flex-wrap:wrap; gap:4px 16px; font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); }
+  #legend span { white-space:nowrap; font-variant-numeric:tabular-nums; }
+  #legend i { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px; }
+  #legend b { color:var(--ui-fg); font-weight:600; }
+  .tright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  .capred { font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-live); white-space:nowrap; }
+  .wins { display:flex; gap:4px; }
+  .wins .ui-btn { padding:3px 9px; font-size:10.5px; }
+  .tcv { position:relative; flex:1; min-height:150px; margin:0 6px; }
+  .tcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
+  #tip { position:absolute; top:6px; pointer-events:none; background:rgba(14,14,17,.94); border:1px solid var(--ui-line2); border-radius:8px;
+    padding:7px 9px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-fg2); white-space:nowrap; display:none; z-index:3; }
+  #tip b { color:var(--ui-fg); }
+  .tfoot { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 14px 12px; flex-wrap:wrap; }
+  #evbtns { display:flex; gap:6px; flex-wrap:wrap; min-height:24px; align-items:center; }
+  #evbtns .ui-btn { padding:3px 10px; font-size:10.5px; text-transform:none; animation:pin .25s var(--ui-ease) both; }
+  #evbtns .ui-btn.on { background:transparent; color:var(--ui-fg); border-color:var(--ui-fg); }
+  #evbtns .k-da { color:var(--ui-live); } #evbtns .k-chat { color:var(--ui-fg); } #evbtns .k-replay { color:var(--rp); }
+  #evbtns .none { font-family:var(--ui-mono); font-size:10.5px; color:var(--ui-faint); }
+  @keyframes pin { from { transform:scale(0); opacity:0; } to { transform:none; opacity:1; } }
+  .tkey { font-family:var(--ui-mono); font-size:10px; color:var(--ui-faint); letter-spacing:.06em; }
+  .tkey .r { color:var(--ui-live); } .tkey .v { color:var(--rp); } .tkey .w { color:var(--ui-fg2); }
+
+  /* feed */
+  #p-feed .fill { padding:0; }
+  .fsec { padding:12px 14px; border-bottom:1px solid var(--ui-line); }
+  .fsec .ui-label { display:flex; align-items:center; gap:8px; justify-content:space-between; margin-bottom:8px; }
+  .nowbox { background:var(--ui-panel2); border:1px solid var(--ui-line); border-radius:var(--ui-r); padding:9px 11px; font-size:13px; line-height:1.4; }
+  .nowbox b { font-weight:700; }
+  .fmeta { margin-top:7px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .fmeta .tag { margin-right:4px; }
+  #f-steps { list-style:none; margin:7px 0 0; padding:0; font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); }
+  #f-steps li { display:flex; gap:10px; padding:2px 0; }
+  #f-steps li span { color:var(--ui-faint); }
+  #f-plan { font-size:13px; line-height:1.4; color:var(--ui-fg2); }
+  .fchat { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 0 0; }
+  .fchat .ui-label { padding:0 14px 6px; display:flex; justify-content:space-between; }
+  #f-chat { flex:1; min-height:0; overflow-y:auto; padding:0 14px 6px; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+  .cl { display:flex; gap:9px; padding:5px 0; font-size:12.5px; line-height:1.4; color:var(--ui-fg2); animation:ui-in .45s var(--ui-ease) both; }
+  .cl .av { flex:0 0 20px; height:20px; border-radius:50%; background:var(--ui-panel2); border:1px solid var(--ui-line2); color:var(--ui-dim);
+    font-family:var(--ui-mono); font-size:9.5px; display:flex; align-items:center; justify-content:center; text-transform:uppercase; margin-top:1px; }
+  .cl .tx { min-width:0; overflow-wrap:anywhere; }
+  .cl .nk { color:var(--ui-fg); font-weight:600; margin-right:5px; }
+  .cl .nets { font-family:var(--ui-mono); font-size:10px; color:var(--ui-dim); }
+  .cl .tm { font-family:var(--ui-mono); font-size:9.5px; color:var(--ui-faint); margin-left:4px; }
+  .cl.me .av { background:#fff; color:#000; border-color:#fff; font-weight:700; }
+  .cl.me .tx { color:#fff; }
+  .cl.sys { color:var(--ui-dim); font-family:var(--ui-mono); font-size:10.5px; }
+  .cl.sys .av { border-color:rgba(167,139,250,.5); color:var(--rp); }
+  #f-form { display:flex; gap:6px; padding:8px 14px 4px; }
+  #f-form .ui-input { flex:1; min-width:0; }
+  #f-form .ui-btn { background:#fff; color:#000; border-color:#fff; font-weight:600; }
+  #f-ack { padding:2px 14px 12px; font-family:var(--ui-mono); font-size:10px; color:var(--ui-faint); line-height:1.45; }
+  #f-ack.ok { color:var(--ui-proj); } #f-ack.err { color:var(--ui-live2); }
+
+  /* footer: the honesty line, never under a panel */
+  #foot { max-width:1720px; margin:0 auto; padding:16px var(--gut) 28px; display:flex; gap:18px 28px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+  #foot .ui-honest { max-width:880px; margin:0; }
+  #f-slow { display:block; margin-top:4px; color:var(--ui-faint); }
+  #foot .go { font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg); text-decoration:none; border:1px solid var(--ui-line2); border-radius:999px; padding:6px 12px; white-space:nowrap; }
+  #foot .go:hover { background:rgba(255,255,255,.08); }
+
+  /* entering */
+  .ui-in.d1 { animation-delay:60ms; } .ui-in.d2 { animation-delay:120ms; } .ui-in.d3 { animation-delay:180ms; } .ui-in.d4 { animation-delay:240ms; } .ui-in.d5 { animation-delay:300ms; }
+
+  /* ≤ 1100: two columns (centre + feed); the brains side by side under the timeline */
+  @media (max-width:1100px) {
+    #grid { grid-template-columns:minmax(0, 1fr) 300px; grid-template-rows:auto 330px auto;
+      grid-template-areas:"view feed" "time feed" "brains brains"; }
+    #brains { display:grid; grid-area:brains; grid-template-columns:1fr 1fr; gap:var(--ui-gap); }
+    #p-live, #p-resp { grid-area:auto; height:430px; }
+    .h-state .ui-counter { display:none; }
+  }
+  /* ≤ 720: one column: screen, timeline, LIVE, RESPONSE, feed */
+  @media (max-width:720px) {
+    :root { --gut:12px; }
+    #hdr { padding:10px var(--gut); gap:8px 12px; }
+    #hdr .ui-nav { order:5; width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+    #hdr .ui-nav::-webkit-scrollbar { display:none; }
+    #hdr .ui-wordmark small { display:none; }
+    #h-clock { display:none; }
+    #hero { height:auto; padding:22px var(--gut) 18px; }
+    #hero-s { font-size:10.5px; }
+    #grid { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-template-areas:"view" "time" "brains" "feed"; }
+    #p-time { height:300px; }
+    #brains { grid-template-columns:minmax(0, 1fr); }
+    #p-live, #p-resp { height:400px; }
+    #p-feed { height:600px; }
+    #away { padding:16px; } #away-s { font-size:11px; }
+    .capred { font-size:9px; }
+    #v-music { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bcv.loading::before, #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl { animation:none !important; }
+    #hero-h, #hero-s { transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-wordmark" href="/">SUB-01<small>a brain, decoded live</small></a>
+  <nav class="ui-nav" aria-label="pages"><a class="on" href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="ext" target="_blank" rel="noopener">city</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="h-state">
+    <span class="ui-chip live off" id="h-live"><i class="ui-dot"></i><span id="h-live-t">connecting</span></span>
+    <span id="h-clock" class="mono">--:-- Tokyo</span>
+    <span class="ui-chip" id="h-stage">…</span>
+    <span class="ui-counter" id="h-count">01 / 05</span>
+  </div>
+</header>
+
+<section id="hero" aria-live="polite">
+  <h1 id="hero-h">A brain, decoded live.</h1>
+  <p id="hero-s">A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. These are model readouts, not measurements of anyone.</p>
+</section>
+
+<main id="grid">
+  <div id="brains">
+    <section class="ui-panel brainp ui-in d1" id="p-live" aria-label="live brain, top view">
+      <div class="fill">
+        <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · brain from above</span><span class="ui-chip live"><i class="ui-dot"></i>live</span></div>
+        <div class="bcv loading" id="l-cv"><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
+          <span class="orient o-f">front</span><span class="orient o-l">L</span><span class="orient o-r">R</span></div>
+        <div class="bfoot">
+          <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">at his baseline</span></div>
+          <div class="ui-label bcap" id="l-cap">ATTENTION · LIVE</div>
+          <div class="bline" id="l-line">Blue: at its own baseline. Yellow to red: a region running above it. Read from the model, not measured.</div>
+        </div>
+      </div>
+    </section>
+    <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's response to the last event">
+      <div class="fill">
+        <div class="bhead"><span class="ui-label" id="r-head">RESPONSE · <b>waiting</b></span><span class="tag" id="r-kind">no event yet</span></div>
+        <div class="bcv loading" id="r-cv"><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
+        <div class="bfoot">
+          <div class="bnum"><span class="ui-big" id="r-num">--</span><span class="ui-delta" id="r-delta"></span></div>
+          <div class="ui-label bcap" id="r-cap">ATTENTION · RESPONSE</div>
+          <div class="bline"><div id="r-after">send a message: it enters through language areas</div><span id="r-line">Waiting for an event (a chat stimulus, a reward burst or a replay). Read from the model, not measured.</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="ui-panel ui-in d2" id="p-view" aria-label="his screen">
+    <div id="stage">
+      <div id="away"><span class="ui-label" id="away-k">his screen · not in view</span><h2 id="away-h">…</h2><p id="away-s">connecting to the model…</p></div>
+      <img id="v-a" alt=""><img id="v-b" alt="">
+      <div id="v-embed"></div>
+      <div class="vchips tl"><span class="ui-chip live"><i class="ui-dot"></i>live</span><span class="ui-chip" id="v-src">his room · fiction</span></div>
+      <div class="vchips tr"><span class="ui-chip" id="v-watch">– watching</span></div>
+    </div>
+    <div id="v-strip"><span id="v-title">…</span><span id="v-music"></span><span class="ui-chip proj" id="v-kind" hidden>model-chosen page</span></div>
+  </section>
+
+  <section class="ui-panel ui-in d3" id="p-time" aria-label="model readouts over time">
+    <div class="fill">
+      <div class="thead">
+        <div id="legend">
+          <span><i style="background:var(--ui-attn)"></i>Attention <b id="lg-a">--</b>%</span>
+          <span><i style="background:var(--ui-arousal)"></i>Arousal <b id="lg-r">--</b>%</span>
+          <span><i style="background:var(--ui-load)"></i>Cognitive load <b id="lg-l">--</b>%</span>
+          <span><i style="background:var(--ui-neural)"></i>Neural activity <b id="lg-n">--</b>%</span>
+        </div>
+        <div class="tright"><span class="capred">● model readouts — not measured from anyone</span>
+          <span class="wins" role="group" aria-label="window"><button class="ui-btn" data-w="60">1m</button><button class="ui-btn on" data-w="300">5m</button><button class="ui-btn" data-w="900">15m</button></span></div>
+      </div>
+      <div class="tcv"><canvas id="tl" aria-label="timeline of the four readouts with event markers"></canvas><div id="tip"></div></div>
+      <div class="tfoot"><div id="evbtns"><span class="none">events appear here · click one to see the brain at that moment</span></div>
+        <span class="tkey"><span class="r">◆</span> reward burst · <span class="w">│</span> chat stimulus · <span class="v">│</span> replay · 50 = his own baseline</span></div>
+    </div>
+  </section>
+
+  <section class="ui-panel ui-in d5" id="p-feed" aria-label="now, up next and chat">
+    <div class="fill">
+      <div class="fsec">
+        <div class="ui-label"><span><b>Now</b></span><span id="f-where"></span></div>
+        <div class="nowbox" id="f-now">…</div>
+        <div class="fmeta" id="f-note" hidden></div>
+        <div class="fmeta" id="f-why" hidden></div>
+      </div>
+      <div class="fsec">
+        <div class="ui-label"><span><b>Up next</b></span><span class="tag teal">voted by his brain model</span></div>
+        <div id="f-plan">…</div>
+        <ul id="f-steps"></ul>
+      </div>
+      <div class="fchat">
+        <div class="ui-label"><span><b>Chat</b> · every message is a stimulus</span><span id="f-n"></span></div>
+        <div id="f-chat" aria-live="polite"></div>
+        <form id="f-form" autocomplete="off"><input class="ui-input" id="f-msg" maxlength="200" placeholder="send a stimulus…" aria-label="message"><button class="ui-btn" type="submit">send</button></form>
+        <div id="f-ack">max 200 characters · no links, addresses or tickers · it reaches his model as words</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="foot">
+  <p class="ui-honest">Simulated activity on one real person's public MRI wiring. A model, not a mind: it does not feel, think or understand.
+    The character, his room and his life are fiction. Numbers and credits: <a href="/about.html">/about.html</a>.
+    <span id="f-slow"></span></p>
+  <a class="go" href="/brain">open the 3D brain →</a>
+</footer>
+
+<script>
+"use strict";
+// ============================================================================================================
+// SUB-01 · live. One WebSocket (/ws?rate=5&q=1); the math runs per message (a few hundred floats), every DOM and
+// canvas write runs in one requestAnimationFrame loop. All readouts are formulas over the model's simulated activity.
+// ============================================================================================================
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
+const R = x => clamp(50 + 40 * Math.log2(Math.max(1e-4, x)));          // 50 = his own baseline
+const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN;
+const trunc = (s, n) => { s = String(s ?? ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const PHONE = matchMedia("(max-width: 720px)").matches || /Mobi|Android/i.test(navigator.userAgent);
+const DPR = () => Math.min(2, window.devicePixelRatio || 1);
+const RATE = 5, ACT_LO = 0.01, ACT_HI = 10;
+const ACT_LUT = Float32Array.from({length:256}, (_, b) => ACT_LO * Math.pow(ACT_HI / ACT_LO, b / 255));
+const NET = {visual:"Visual", somatomotor:"Somatomotor", attention:"Attention", salience:"Salience", limbic:"Limbic", control:"Control",
+  default:"Default mode", reward:"Reward", fear:"Fear", memory:"Memory", relay:"Relay", insula:"Insula", language:"Language"};
+const COL = {a:"#ffffff", r:"#5aa9ff", l:"#ffd166", n:"#2ee6c5", da:"#ff2d55", chat:"#ffffff", replay:"#a78bfa"};
+(() => { const cs = getComputedStyle(document.documentElement), g = k => cs.getPropertyValue(k).trim();
+  COL.a = g("--ui-attn") || COL.a; COL.r = g("--ui-arousal") || COL.r; COL.l = g("--ui-load") || COL.l; COL.n = g("--ui-neural") || COL.n; COL.da = g("--ui-live") || COL.da; })();
+const shown = {};                                           // id -> last text written (the DOM is the cost)
+function put(id, t){ if (shown[id] === t) return; shown[id] = t; const el = $(id); if (el) el.textContent = t; }
+function putH(id, h){ if (shown[id] === h) return; shown[id] = h; const el = $(id); if (el) el.innerHTML = h; }
+
+// ---------------------------------------------------------------- state
+const S = {
+  conn:false, full:false, stage:null, clock:"", tz:"Tokyo", gain:1, sync:0, syncS:0.1, viewers:null, life:null, screen:null,
+  music:null, slow:"", neuro:null, act:null, base:null, rel:null, nodes:null, gEma:{}, grel:{},
+  read:{a:50, r:50, l:50, n:50}, readS:{a:50, r:50, l:50, n:50}, plan:null, note:null, decision:null, lastTickAt:0,
+};
+const dirty = {tick:true, hdr:true, view:true, feed:true, resp:false, respNew:false, marks:false, tl:true};
+const ring = [];                     // {t, a, r, l, n}: one sample per 500 ms, 15 minutes
+const RING_MS = 15 * 60 * 1000;
+let bin = null;                      // the 500 ms bin being filled
+const recent = [];                   // {t, a}: tick-level attention, last 10 s (the 5 s before an event)
+const markers = [];                  // {id, t, kind, label, clock, pre, peak, rel, top, born, until}
+let markerSeq = 0, track = null, respMk = null, respUser = 0;
+
+// ---------------------------------------------------------------- readouts (per tick: arithmetic only)
+function onTick(m){
+  const now = Date.now();
+  S.lastTickAt = now;
+  const sl = m.sleep;
+  if (sl && typeof sl === "object") { S.stage = sl.stage || S.stage; S.clock = sl.clock || S.clock; S.tz = sl.tz || "Tokyo";
+    if (typeof sl.gain === "number") S.gain = sl.gain; }
+  if (m.aud && typeof m.aud.n === "number") S.viewers = m.aud.n;
+  if (m.life && typeof m.life === "object") { S.life = m.life; S.screen = m.life.screen && typeof m.life.screen === "object" ? m.life.screen : null; }
+  if (m.neuro && typeof m.neuro === "object") S.neuro = m.neuro;
+  if (typeof m.sync === "number") { S.sync = m.sync; S.syncS += (m.sync - S.syncS) * 0.1; }
+  if (m.slow && m.slow.label) S.slow = m.slow.label;
+  for (const ev of Array.isArray(m.events) ? m.events : []) onEvent(ev);
+
+  // per-region activity vs its own ~25 s baseline
+  let a = null;
+  if (typeof m.aq === "string") { try { const bin = atob(m.aq); a = new Float32Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = ACT_LUT[bin.charCodeAt(i)]; } catch (e) { a = null; } }
+  else if (Array.isArray(m.act)) a = Float32Array.from(m.act, v => +v || 0);
+  const k = 1 / (25 * RATE);
+  let neural = NaN;
+  if (a && a.length) {
+    if (!S.base || S.base.length !== a.length) { S.base = a.slice(); S.rel = new Float32Array(a.length).fill(1); }
+    let s = 0;
+    for (let i = 0; i < a.length; i++) {
+      S.base[i] = S.base[i] * (1 - k) + a[i] * k;
+      const r = a[i] / Math.max(S.base[i], 0.02);
+      S.rel[i] = S.rel[i] * 0.8 + r * 0.2;                  // ~1 s display smoothing
+      s += r;
+    }
+    S.act = a; neural = R(s / a.length);
+  }
+  // network levels: the tick's `groups` (mean |z| a network), else the mean activity of each network's regions
+  let groups = m.groups && typeof m.groups === "object" ? m.groups : null;
+  if (!groups && a && S.nodes) {
+    const sum = {}, n = {};
+    for (let i = 0; i < Math.min(a.length, S.nodes.length); i++) { const g = S.nodes[i].group; if (!g) continue; sum[g] = (sum[g] || 0) + a[i]; n[g] = (n[g] || 0) + 1; }
+    groups = {}; for (const g in sum) groups[g] = sum[g] / n[g];
+  }
+  if (groups) for (const g in groups) {
+    const v = +groups[g]; if (!isFinite(v)) continue;
+    const e = S.gEma[g] = S.gEma[g] === undefined ? Math.max(v, 1e-3) : S.gEma[g] * (1 - k) + v * k;
+    S.grel[g] = v / Math.max(e, 1e-3);
+  }
+  const rel = g => S.grel[g];
+  const pick = ks => ks.map(rel).filter(v => isFinite(v));
+  const att = pick(["attention", "salience", "visual"]), ctl = pick(["control", "default"]);
+  const nm = S.neuro || {};
+  const rd = S.read;
+  if (att.length) rd.a = R(mean(att));
+  if (isFinite(+nm.NE)) rd.r = clamp(+nm.NE / 2 * 100);
+  if (ctl.length) rd.l = isFinite(+nm.ACh) ? 0.7 * R(mean(ctl)) + 0.3 * clamp(+nm.ACh / 2 * 100) : R(mean(ctl));
+  else if (isFinite(+nm.ACh)) rd.l = clamp(+nm.ACh / 2 * 100);
+  if (isFinite(neural)) rd.n = neural;
+  for (const key of ["a", "r", "l", "n"]) S.readS[key] += (rd[key] - S.readS[key]) * 0.25;
+
+  // the 500 ms samples
+  if (!bin) bin = {t0:now, a:0, r:0, l:0, n:0, c:0};
+  bin.a += rd.a; bin.r += rd.r; bin.l += rd.l; bin.n += rd.n; bin.c++;
+  if (now - bin.t0 >= 500) {
+    ring.push({t:now, a:bin.a / bin.c, r:bin.r / bin.c, l:bin.l / bin.c, n:bin.n / bin.c});
+    bin = null;
+    while (ring.length && now - ring[0].t > RING_MS) ring.shift();
+  }
+  recent.push({t:now, a:rd.a}); while (recent.length && now - recent[0].t > 10000) recent.shift();
+
+  // an event's response: the peak attention within 3 s after it, the brain at that peak
+  if (track && now - track.t <= 3000) {
+    if (rd.a >= track.peak) { track.peak = rd.a; track.rel = S.rel ? S.rel.slice() : null; track.top = topNets(); if (respMk === track) dirty.resp = true; }
+  } else track = null;
+  dirty.tick = true;
+}
+function topNets(){
+  return Object.keys(S.grel).filter(g => NET[g] && g !== "relay" && isFinite(S.grel[g]))
+    .sort((x, y) => S.grel[y] - S.grel[x]).slice(0, 3).map(g => NET[g]);
+}
+function addMarker(kind, label, clock){
+  const now = Date.now();
+  const before = recent.filter(x => now - x.t <= 5000).map(x => x.a);
+  const pre = before.length ? mean(before) : S.read.a;
+  const mk = {id:++markerSeq, t:now, kind, label:String(label || ""), clock:clock || S.clock || "--:--", pre, peak:S.read.a,
+    rel:S.rel ? S.rel.slice() : null, top:topNets(), born:performance.now(), stage:S.stage};
+  markers.push(mk);
+  while (markers.length && (now - markers[0].t > RING_MS || markers.length > 300)) markers.shift();
+  track = mk;
+  if (!respUser || performance.now() - respUser > 15000) { respMk = mk; respUser = 0; dirty.respNew = true; }
+  dirty.resp = true; dirty.marks = true;
+}
+function onEvent(ev){
+  if (!ev || typeof ev !== "object") return;
+  if (ev.type === "replay") {
+    addMarker("replay", `replay of “${trunc(ev.text, 60)}”`, ev.t);
+    sysLine(ev.t, `replay of “${trunc(ev.text, 70)}”${ev.received ? ` (from ${ev.received})` : ""}`, ev.networks);
+  } else if (ev.text) sysLine(ev.t, trunc(ev.text, 120));
+}
+
+// ---------------------------------------------------------------- socket
+let sock = null, retry = 0;
+function connect(){
+  let ws;
+  try { ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=${RATE}&q=1`); }
+  catch (e) { setTimeout(connect, 5000); return; }
+  ws.onopen = () => { S.conn = true; dirty.hdr = true; };
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (!m || typeof m !== "object") return;
+    try { handle(m); } catch (err) { console.warn("live: message skipped", m.type, err); }
+  };
+  ws.onclose = () => {
+    S.conn = false; dirty.hdr = true;
+    // full: about a minute, then longer (to 4 min), with jitter; otherwise 1.5 s doubling to 30 s
+    const wait = S.full ? 60000 * Math.min(4, 2 ** retry) * (0.75 + 0.5 * Math.random())
+                        : Math.min(30000, 1500 * 2 ** retry) * (0.75 + 0.5 * Math.random());
+    retry = Math.min(retry + 1, 5);
+    setTimeout(connect, wait);
+  };
+}
+function handle(m){
+  switch (m.type) {
+    case "tick": S.full = false; retry = 0; onTick(m); return;
+    case "full": S.full = true; dirty.hdr = true; return;
+    case "hello": {
+      chatEl.replaceChildren(); chatCount = 0;
+      const rows = [];
+      for (const c of Array.isArray(m.chat) ? m.chat : []) rows.push({t:c.t || "", kind:"chat", c});
+      for (const r of Array.isArray(m.replies) ? m.replies : []) rows.push({t:r.t || "", kind:"reply", c:r});
+      rows.sort((x, y) => String(x.t).localeCompare(String(y.t)));
+      for (const r of rows.slice(-30)) r.kind === "chat" ? chatLine(r.c) : replyLine(r.c);
+      if (m.audience && typeof m.audience.viewers === "number") S.viewers = m.audience.viewers;
+      if (m.music && typeof m.music === "object" && m.music.title) S.music = m.music;
+      dirty.hdr = dirty.view = true; return;
+    }
+    case "chat": chatLine(m); addMarker("chat", `“${trunc(m.text, 60)}”`, m.t); return;
+    case "chat_reply": replyLine(m); return;
+    case "chat_ack": {
+      const el = $("f-ack");
+      el.textContent = m.ok ? (m.will_reply ? "sent · it travels along his fibres · his model may reply (AI-written)" : "sent · it travels along his fibres")
+                            : `not sent: ${m.reason || "try again later"}`;
+      el.className = m.ok ? "ok" : "err";
+      if (m.ok) $("f-msg").value = "";
+      return;
+    }
+    case "dopamine": addMarker("da", `reward burst ${isFinite(+m.size) ? (+m.size).toFixed(2) : ""}${m.why ? " · " + trunc(m.why, 60) : ""}`, S.clock); return;
+    case "music":
+      if (m.playing) S.music = m; else if (!S.music || S.music.id === m.id) S.music = null;
+      dirty.view = true; return;
+    case "screen":
+      if (m.decision && m.decision.reason) { S.decision = {reason:m.decision.reason, t:S.clock}; dirty.feed = true; }
+      return;
+    case "decision": if (m.reason) { S.decision = {reason:m.reason, t:m.t || S.clock, page:m.page}; dirty.feed = true; } return;
+    case "mind_read": if (m.summary) { S.note = {summary:m.summary, t:m.t, host:m.host}; dirty.feed = true; } return;
+    case "plan": if (m.text || m.steps) { S.plan = m; dirty.feed = true; } return;
+    default: return;                                // reading, vote, eye, nights, taught, spiking…: not on this page
+  }
+}
+async function loadMind(){
+  try {
+    const d = await (await fetch("/api/mind")).json();
+    if (d && d.plan) S.plan = d.plan;
+    const rd = d && d.notes && Array.isArray(d.notes.read) ? d.notes.read : [];
+    const last = rd[rd.length - 1];
+    if (last && last.summary && !S.note) S.note = {summary:last.summary, t:"", host:last.host};
+    dirty.feed = true;
+  } catch (e) {}
+  try {
+    const d = await (await fetch("/api/decisions")).json();
+    const l = d && Array.isArray(d.decisions) ? d.decisions[d.decisions.length - 1] : null;
+    if (l && l.reason && !S.decision) { S.decision = {reason:l.reason, t:l.t, page:l.page}; dirty.feed = true; }
+  } catch (e) {}
+}
+async function loadMusic(){
+  try { const d = await (await fetch("/api/music")).json(); if (d && d.now && d.now.title) { S.music = d.now; dirty.view = true; } } catch (e) {}
+}
+
+// ---------------------------------------------------------------- chat feed
+const chatEl = $("f-chat");
+let chatCount = 0;
+function nearBottom(){ return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 40; }
+function addLine(html, cls){
+  const stick = nearBottom();
+  const d = document.createElement("div"); d.className = "cl " + (cls || ""); d.innerHTML = html;
+  chatEl.appendChild(d); chatCount++;
+  while (chatEl.children.length > 30) chatEl.firstChild.remove();
+  if (stick) chatEl.scrollTop = chatEl.scrollHeight;
+}
+function chatLine(c){
+  if (!c || !c.text) return;
+  const nick = c.nick ? String(c.nick) : "viewer";
+  const nets = Array.isArray(c.networks) && c.networks.length ? ` <span class="nets">→ ${esc(c.networks.slice(0, 4).join(" · "))}</span>` : "";
+  const sleep = c.asleep ? ` <span class="nets">(through the sleep at ${Math.round((+c.gain || 0) * 100)}%)</span>` : "";
+  addLine(`<span class="av">${esc(nick[0] || "v")}</span><span class="tx"><span class="nk">${esc(nick)}</span>${esc(trunc(c.text, 200))}${nets}${sleep}<span class="tm">${esc(c.t)}</span></span>`);
+}
+function replyLine(r){
+  if (!r || !r.text) return;
+  addLine(`<span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${r.to ? `<span class="nets">@${esc(r.to)} </span>` : ""}${esc(trunc(r.text, 280))} <span class="tag">his reply · AI-written</span><span class="tm">${esc(r.t)}</span></span>`, "me");
+}
+function sysLine(t, text, nets){
+  addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${Array.isArray(nets) && nets.length ? ` → ${esc(nets.slice(0, 4).join(" · "))}` : ""}<span class="tm">${esc(t)}</span></span>`, "sys");
+}
+$("f-form").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const el = $("f-msg"), text = el.value.trim(), ack = $("f-ack");
+  if (!text) return;
+  if (text.length > 200) { ack.textContent = "not sent: max 200 characters"; ack.className = "err"; return; }
+  if (!sock || sock.readyState !== 1) { ack.textContent = "not sent: reconnecting, try again in a moment"; ack.className = "err"; return; }
+  sock.send(JSON.stringify({type:"chat", text}));
+  ack.textContent = "sending…"; ack.className = "";
+});
+
+// ---------------------------------------------------------------- brain geometry (in a worker: the first paint stays fast)
+// brain.json: the real cortex mesh (both hemispheres) and 214 regions. Each vertex takes the nearest cortical region
+// (LH_/RH_) within 30 mm; the mesh is in the regions' `p` space (`q` is the denser cortex.bin's space). The connectome's
+// strongest edges are added as faint curved strokes, so the top view reads as fibres, not as a net.
+function buildBrain(url){
+  return fetch(url).then(r => r.json()).then(d => {
+    const nodes = d.nodes || [], mesh = d.mesh || {}, hemis = [mesh.left, mesh.right].filter(h => h && h.v && h.f);
+    let nv = 0; for (const h of hemis) nv += h.v.length / 3;
+    const ARC = 14, edges = (d.edges || []).filter(e => nodes[e[0]] && nodes[e[1]] && nodes[e[0]].p && nodes[e[1]].p).slice(0, 900);
+    const N = nv + edges.length * (ARC + 1);
+    const pos = new Float32Array(N * 2), depth = new Float32Array(N), reg = new Float32Array(N).fill(-1);
+    const cort = []; nodes.forEach((n, i) => { if (/^(LH|RH)_/.test(n.name)) cort.push(i); });
+    const key = cort.length && nodes[cort[0]].p ? "p" : "q";
+    const cx = new Float32Array(cort.length), cy = new Float32Array(cort.length), cz = new Float32Array(cort.length);
+    cort.forEach((i, j) => { const p = nodes[i][key]; cx[j] = p[0]; cy[j] = p[1]; cz[j] = p[2]; });
+    let zmin = 1e9, zmax = -1e9, xmin = 1e9, xmax = -1e9, ymin = 1e9, ymax = -1e9, o = 0;
+    const zs = new Float32Array(nv);
+    for (const h of hemis) for (let v = 0; v < h.v.length / 3; v++, o++) {
+      const x = h.v[3 * v], y = h.v[3 * v + 1], z = h.v[3 * v + 2];
+      pos[2 * o] = x; pos[2 * o + 1] = y; zs[o] = z;
+      if (z < zmin) zmin = z; if (z > zmax) zmax = z; if (x < xmin) xmin = x; if (x > xmax) xmax = x; if (y < ymin) ymin = y; if (y > ymax) ymax = y;
+      let best = -1, bd = 900;
+      for (let j = 0; j < cort.length; j++) { const dx = x - cx[j], dy = y - cy[j], dz = z - cz[j], dd = dx * dx + dy * dy + dz * dz; if (dd < bd) { bd = dd; best = j; } }
+      reg[o] = best >= 0 ? cort[best] : -1;
+    }
+    for (let v = 0; v < nv; v++) depth[v] = (zs[v] - zmin) / Math.max(1e-3, zmax - zmin);
+    // mesh edges from the triangles, each once
+    const seen = new Set(), mi = []; let off = 0;
+    for (const h of hemis) {
+      const f = h.f;
+      for (let t = 0; t < f.length; t += 3) for (let e = 0; e < 3; e++) {
+        let a = f[t + e] + off, b = f[t + (e + 1) % 3] + off; if (a > b) { const s = a; a = b; b = s; }
+        const kk = a * 65536 + b; if (seen.has(kk)) continue; seen.add(kk); mi.push(a, b);
+      }
+      off += h.v.length / 3;
+    }
+    // fibre strokes: quadratic curves between connected regions, bowed towards the midline and the brain's centre
+    const ai = []; let w0 = 1; edges.forEach(e => { w0 = Math.max(w0, +e[2] || 0); });
+    edges.forEach((e, ei) => {
+      const A = nodes[e[0]].p, B = nodes[e[1]].p, w = (+e[2] || 0.3) / w0;
+      const mx = (A[0] + B[0]) / 2 * 0.3, my = (A[1] + B[1]) / 2 * 0.85 - 4;
+      const base = nv + ei * (ARC + 1);
+      for (let s = 0; s <= ARC; s++) {
+        const t = s / ARC, u = 1 - t, q = base + s;
+        pos[2 * q] = u * u * A[0] + 2 * u * t * mx + t * t * B[0];
+        pos[2 * q + 1] = u * u * A[1] + 2 * u * t * my + t * t * B[1];
+        depth[q] = 0.25 + 0.55 * w * (1 - 0.6 * Math.sin(Math.PI * t));
+        reg[q] = t < 0.5 ? e[0] : e[1];
+        if (s) ai.push(q - 1, q);
+      }
+    });
+    return {pos, depth, reg, mIdx:Uint16Array.from(mi), aIdx:Uint16Array.from(ai), nMesh:nv,
+      box:[xmin, xmax, ymin, ymax], nodes:nodes.map(n => ({name:n.name, group:n.group}))};
+  });
+}
+function loadBrain(){
+  const url = location.origin + "/brain.json";
+  return new Promise((resolve, reject) => {
+    let w = null;
+    try {
+      const src = `const buildBrain = ${buildBrain.toString()};
+        onmessage = e => buildBrain(e.data).then(g => postMessage(g, [g.pos.buffer, g.depth.buffer, g.reg.buffer, g.mIdx.buffer, g.aIdx.buffer]),
+                                                 err => postMessage({error:String(err)}));`;
+      w = new Worker(URL.createObjectURL(new Blob([src], {type:"text/javascript"})));
+    } catch (e) { w = null; }
+    if (!w) { buildBrain(url).then(resolve, reject); return; }
+    w.onmessage = e => { w.terminate(); e.data && !e.data.error ? resolve(e.data) : buildBrain(url).then(resolve, reject); };
+    w.onerror = ev => { ev.preventDefault(); w.terminate(); buildBrain(url).then(resolve, reject); };
+    w.postMessage(url);
+  });
+}
+
+// ---------------------------------------------------------------- brain renderer (WebGL, additive strokes; 2D fallback)
+const VS = `attribute vec2 aPos; attribute float aDepth; attribute float aRel;
+uniform vec2 uScale; uniform vec2 uOff; uniform float uBreath; uniform float uAlpha; uniform float uPt; uniform float uMode;
+varying vec3 vCol; varying float vA;
+void main(){
+  float h1 = pow(clamp((aRel - 1.0) / 0.3, 0.0, 1.0), 1.4);          // rel 1.0 blue -> 1.3 yellow
+  float h2 = clamp((aRel - 1.3) / 0.5, 0.0, 1.0);                     // 1.3 yellow -> 1.8 red
+  vec3 blue = mix(vec3(0.106, 0.227, 0.541), vec3(0.247, 0.482, 1.0), aDepth);
+  vec3 warm = h2 < 0.5 ? mix(vec3(1.0, 0.85, 0.28), vec3(1.0, 0.5, 0.1), h2 * 2.0) : mix(vec3(1.0, 0.5, 0.1), vec3(1.0, 0.14, 0.1), h2 * 2.0 - 1.0);
+  vCol = mix(blue, warm, h1);
+  float lit = 0.18 + 0.82 * aDepth * aDepth;
+  if (uMode > 0.5) {                                                   // the glow: soft points, large where a region runs hot
+    vA = uAlpha * uBreath * (0.10 * lit + h1 * (0.55 + 0.45 * aDepth));
+    gl_PointSize = uPt * (0.8 + 1.4 * h1 + 0.8 * h2);
+  } else {
+    vA = uAlpha * uBreath * lit * (1.0 + 1.5 * h1);
+    gl_PointSize = 1.0;
+  }
+  gl_Position = vec4(aPos * uScale + uOff, 0.0, 1.0);
+}`;
+const FS = `precision mediump float; varying vec3 vCol; varying float vA; uniform float uMode;
+void main(){ float a = vA; if (uMode > 0.5) { vec2 d = gl_PointCoord - 0.5; a *= exp(-dot(d, d) * 16.0); } gl_FragColor = vec4(vCol * a, a); }`;
+
+class BrainView {
+  constructor(canvas){ this.cv = canvas; this.geo = null; this.heat = null; this.w = 0; this.h = 0; this.visible = true;
+    try { this.gl = canvas.getContext("webgl", {alpha:true, antialias:true, premultipliedAlpha:true}) || null; } catch (e) { this.gl = null; }
+    if (this.gl && !this.initGL()) this.gl = null;
+    if (!this.gl) this.g2 = canvas.getContext("2d");
+    new ResizeObserver(() => this.resize()).observe(canvas.parentElement); this.resize();
+    if ("IntersectionObserver" in window) new IntersectionObserver(es => { this.visible = es[0].isIntersecting; }).observe(canvas);
+  }
+  initGL(){
+    const gl = this.gl, sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; };
+    const v = sh(gl.VERTEX_SHADER, VS), f = sh(gl.FRAGMENT_SHADER, FS); if (!v || !f) return false;
+    const p = gl.createProgram(); gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) return false;
+    this.p = p; gl.useProgram(p);
+    this.loc = {}; for (const n of ["aPos", "aDepth", "aRel"]) this.loc[n] = gl.getAttribLocation(p, n);
+    for (const n of ["uScale", "uOff", "uBreath", "uAlpha", "uPt", "uMode"]) this.loc[n] = gl.getUniformLocation(p, n);
+    this.cv.addEventListener("webglcontextlost", e => e.preventDefault());
+    return true;
+  }
+  setGeometry(g){
+    this.geo = g; this.heat = new Float32Array(g.depth.length).fill(1);
+    const gl = this.gl; if (!gl) return;
+    const buf = (data, target = gl.ARRAY_BUFFER, usage = gl.STATIC_DRAW) => { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, usage); return b; };
+    this.bPos = buf(g.pos); this.bDepth = buf(g.depth); this.bRel = buf(this.heat, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW);
+    this.bM = buf(g.mIdx, gl.ELEMENT_ARRAY_BUFFER); this.bA = buf(g.aIdx, gl.ELEMENT_ARRAY_BUFFER);
+    const at = (b, l, n) => { if (l < 0) return; gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, n, gl.FLOAT, false, 0, 0); };
+    at(this.bPos, this.loc.aPos, 2); at(this.bDepth, this.loc.aDepth, 1); at(this.bRel, this.loc.aRel, 1);
+  }
+  resize(){
+    const r = this.cv.parentElement.getBoundingClientRect(), d = DPR();
+    this.w = Math.max(1, Math.round(r.width * d)); this.h = Math.max(1, Math.round(r.height * d)); this.d = d;
+    if (this.cv.width !== this.w || this.cv.height !== this.h) { this.cv.width = this.w; this.cv.height = this.h; }
+  }
+  fit(){
+    const [x0, x1, y0, y1] = this.geo.box, bw = x1 - x0, bh = y1 - y0, pad = 0.9;
+    const s = Math.min(this.w * pad / bw, this.h * pad / bh);          // px per mm
+    return {s, sx:2 * s / this.w, sy:2 * s / this.h, cx:(x0 + x1) / 2, cy:(y0 + y1) / 2};
+  }
+  draw(rel, t, breath){
+    if (!this.geo || !this.visible || this.w < 4 || this.h < 4) return;
+    const g = this.geo, reg = g.reg, heat = this.heat;
+    if (rel) for (let v = 0; v < heat.length; v++) { const r = reg[v]; heat[v] = r >= 0 && r < rel.length ? rel[r] : 1; }
+    else heat.fill(1);
+    if (this.gl) return this.drawGL(t, breath);
+    this.draw2D(breath);
+  }
+  drawGL(t, breath){
+    const gl = this.gl, L = this.loc, f = this.fit();
+    gl.viewport(0, 0, this.w, this.h); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bRel); gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.heat);
+    gl.uniform2f(L.uScale, f.sx, f.sy); gl.uniform2f(L.uOff, -f.cx * f.sx, -f.cy * f.sy); gl.uniform1f(L.uBreath, breath);
+    const dens = clamp(f.s / 2.2, 0.55, 1.6);                        // fewer pixels a stroke when the brain is drawn small
+    gl.uniform1f(L.uMode, 1); gl.uniform1f(L.uAlpha, 0.5); gl.uniform1f(L.uPt, 7 * this.d * Math.min(1.4, f.s / 2.6));
+    gl.drawArrays(gl.POINTS, 0, this.geo.nMesh);
+    gl.uniform1f(L.uMode, 0); gl.uniform1f(L.uAlpha, 0.20 / dens);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bM); gl.drawElements(gl.LINES, this.geo.mIdx.length, gl.UNSIGNED_SHORT, 0);
+    gl.uniform1f(L.uAlpha, 0.30 / dens);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bA); gl.drawElements(gl.LINES, this.geo.aIdx.length, gl.UNSIGNED_SHORT, 0);
+  }
+  draw2D(breath){                                                       // no WebGL: points, coloured in four steps
+    const c = this.g2, f = this.fit(), g = this.geo, W = this.w, H = this.h;
+    c.clearRect(0, 0, W, H); c.globalCompositeOperation = "lighter";
+    const cols = ["rgba(63,123,255,", "rgba(255,217,71,", "rgba(255,128,26,", "rgba(255,36,26,"];
+    for (let v = 0; v < g.nMesh; v += 2) {
+      const r = this.heat[v], k = r < 1.15 ? 0 : r < 1.4 ? 1 : r < 1.8 ? 2 : 3;
+      c.fillStyle = cols[k] + (0.18 + 0.5 * g.depth[v]) * breath * (k ? 1.6 : 0.6) + ")";
+      c.fillRect(W / 2 + (g.pos[2 * v] - f.cx) * f.s, H / 2 - (g.pos[2 * v + 1] - f.cy) * f.s, k ? 2 * this.d : this.d, k ? 2 * this.d : this.d);
+    }
+    c.globalCompositeOperation = "source-over";
+  }
+}
+const liveBrain = new BrainView($("l-canvas")), respBrain = new BrainView($("r-canvas"));
+loadBrain().then(g => {
+  S.nodes = g.nodes;
+  liveBrain.setGeometry(g); respBrain.setGeometry(g);
+  $("l-cv").classList.remove("loading"); $("r-cv").classList.remove("loading");
+}).catch(e => { console.warn("live: brain.json", e); put("l-line", "The brain mesh did not load; the readouts still run."); });
+
+// ---------------------------------------------------------------- timeline
+const tl = $("tl"), tlc = tl.getContext("2d"), tip = $("tip");
+let winS = 300, tlW = 0, tlH = 0, hoverX = null;
+function tlResize(){ const r = tl.getBoundingClientRect(), d = DPR(); tlW = r.width; tlH = r.height; tl.width = Math.max(1, Math.round(r.width * d)); tl.height = Math.max(1, Math.round(r.height * d)); dirty.tl = true; }
+new ResizeObserver(tlResize).observe(tl.parentElement); tlResize();
+document.querySelectorAll(".wins .ui-btn").forEach(b => b.addEventListener("click", () => {
+  winS = +b.dataset.w; document.querySelectorAll(".wins .ui-btn").forEach(x => x.classList.toggle("on", x === b)); dirty.tl = true;
+}));
+const TL = {l:8, r:62, t:24, b:20};
+const TL_FONT = "10px " + (getComputedStyle(document.documentElement).getPropertyValue("--ui-mono").trim() || "monospace");
+const tx = (t, now) => TL.l + (tlW - TL.l - TL.r) * (1 - (now - t) / (winS * 1000));
+const ty = v => TL.t + (tlH - TL.t - TL.b) * (1 - clamp(v) / 100);
+function markerAt(x, now){
+  let best = null, bd = 10;
+  for (const mk of markers) { const d = Math.abs(tx(mk.t, now) - x); if (d < bd) { bd = d; best = mk; } }
+  return best;
+}
+tl.addEventListener("mousemove", e => { hoverX = e.clientX - tl.getBoundingClientRect().left; dirty.tl = true; });
+tl.addEventListener("mouseleave", () => { hoverX = null; tip.style.display = "none"; dirty.tl = true; });
+tl.addEventListener("click", e => { const mk = markerAt(e.clientX - tl.getBoundingClientRect().left, Date.now()); if (mk) scrub(mk); });
+function scrub(mk){ respMk = mk; respUser = performance.now(); dirty.resp = dirty.respNew = dirty.marks = dirty.tl = true; }
+function fmtAgo(ms){ const s = Math.round(ms / 1000); return s < 60 ? `−${s}s` : `−${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+function drawTimeline(now){
+  const c = tlc, d = tl.width / Math.max(1, tlW), W = tlW, H = tlH;
+  if (W < 20 || H < 20) return;
+  c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, W, H);
+  const x0 = TL.l, x1 = W - TL.r, y0 = TL.t, y1 = H - TL.b, span = winS * 1000;
+  // grid: 25/50/75, relative time along the bottom
+  c.strokeStyle = "rgba(255,255,255,.06)"; c.lineWidth = 1; c.setLineDash([2, 4]);
+  for (const v of [25, 75]) { c.beginPath(); c.moveTo(x0, ty(v) + .5); c.lineTo(x1, ty(v) + .5); c.stroke(); }
+  c.setLineDash([]); c.strokeStyle = "rgba(255,255,255,.12)"; c.beginPath(); c.moveTo(x0, ty(50) + .5); c.lineTo(x1, ty(50) + .5); c.stroke();
+  c.font = TL_FONT; c.fillStyle = "rgba(255,255,255,.32)"; c.textBaseline = "alphabetic";
+  const step = winS <= 60 ? 10 : winS <= 300 ? 60 : 180;
+  for (let s = step; s < winS; s += step) {
+    const x = tx(now - s * 1000, now); c.strokeStyle = "rgba(255,255,255,.04)"; c.beginPath(); c.moveTo(x + .5, y0); c.lineTo(x + .5, y1); c.stroke();
+    c.textAlign = "center"; c.fillText(fmtAgo(s * 1000), x, H - 5);
+  }
+  c.textAlign = "left"; c.fillText("50", x1 + 6, ty(50) + 3);
+  // reward bursts: a red band (the 3 s the response is read from)
+  for (const mk of markers) {
+    if (mk.kind !== "da" || now - mk.t > span + 3000) continue;
+    const a = Math.max(x0, tx(mk.t, now)), b = Math.min(x1, Math.max(tx(mk.t + 3000, now), a + 6));
+    c.fillStyle = "rgba(255,45,85,.13)"; c.fillRect(a, y0, b - a, y1 - y0);
+  }
+  // the traces
+  const pts = []; for (let i = ring.length - 1; i >= 0; i--) { if (now - ring[i].t > span + 1000) break; pts.push(ring[i]); }
+  pts.reverse();
+  const series = [["n", COL.n, 1.1, .9], ["l", COL.l, 1.1, .9], ["r", COL.r, 1.2, .95], ["a", COL.a, 1.7, 1]];
+  if (pts.length > 1) for (const [k, col, lw, al] of series) {
+    c.strokeStyle = col; c.globalAlpha = al; c.lineWidth = lw; c.lineJoin = "round"; c.beginPath();
+    let px = tx(pts[0].t, now), py = ty(pts[0][k]); c.moveTo(px, py);
+    for (let i = 1; i < pts.length; i++) {
+      const x = tx(pts[i].t, now), y = ty(pts[i][k]);
+      c.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2); px = x; py = y;
+    }
+    c.lineTo(px, py); c.stroke();
+  }
+  c.globalAlpha = 1;
+  // markers
+  const pnow = performance.now();
+  for (const mk of markers) {
+    if (now - mk.t > span) continue;
+    const x = tx(mk.t, now), p = RM ? 1 : Math.min(1, (pnow - mk.born) / 250), sc = p < 1 ? 1 + 2.7 * Math.pow(p - 1, 3) + 1.7 * Math.pow(p - 1, 2) : 1;   // 0 -> 1, a small overshoot
+    const sel = respMk === mk;
+    if (mk.kind === "da") {
+      c.strokeStyle = "rgba(255,45,85,.55)"; c.lineWidth = 1; c.beginPath(); c.moveTo(x + .5, y0 - 4); c.lineTo(x + .5, y1); c.stroke();
+      const r = 5 * sc; c.fillStyle = COL.da; c.beginPath(); c.moveTo(x, y0 - 12 - r); c.lineTo(x + r, y0 - 12); c.lineTo(x, y0 - 12 + r); c.lineTo(x - r, y0 - 12); c.closePath(); c.fill();
+      if (sel) { c.strokeStyle = "#fff"; c.lineWidth = 1.2; c.stroke(); }
+    } else {
+      const col = mk.kind === "replay" ? COL.replay : COL.chat;
+      c.strokeStyle = col; c.globalAlpha = .35; c.lineWidth = 1; c.beginPath(); c.moveTo(x + .5, y0); c.lineTo(x + .5, y1); c.stroke(); c.globalAlpha = 1;
+      c.lineWidth = 2; c.beginPath(); c.moveTo(x, y1); c.lineTo(x, y1 - 9 * sc); c.stroke();
+      c.fillStyle = col; c.beginPath(); c.arc(x, y0 - 12, 3 * sc, 0, 7); c.fill();
+      if (sel) { c.strokeStyle = "#fff"; c.lineWidth = 1.2; c.beginPath(); c.arc(x, y0 - 12, 6, 0, 7); c.stroke(); }
+    }
+  }
+  // the playhead, at now
+  c.strokeStyle = COL.da; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x1 + .5, y0 - 6); c.lineTo(x1 + .5, y1); c.stroke();
+  c.fillStyle = COL.da; c.beginPath(); c.arc(x1 + .5, y0 - 6, 3, 0, 7); c.fill();
+  c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(S.clock || "--:--", x1 + 6, y0 - 2);
+  const last = pts[pts.length - 1];
+  if (last) for (const [k, col] of series) { c.fillStyle = col; c.beginPath(); c.arc(x1, ty(last[k]), k === "a" ? 3 : 2.2, 0, 7); c.fill(); }
+  // hover: a line and the values at that moment
+  if (hoverX !== null && hoverX >= x0 && hoverX <= x1 && pts.length) {
+    const t = now - (1 - (hoverX - x0) / (x1 - x0)) * span;
+    let best = pts[0]; for (const p of pts) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+    const mk = markerAt(hoverX, now);
+    c.strokeStyle = "rgba(255,255,255,.4)"; c.lineWidth = 1; c.beginPath(); c.moveTo(hoverX + .5, y0); c.lineTo(hoverX + .5, y1); c.stroke();
+    const html = `<b>${esc(fmtAgo(now - best.t))}</b> · ${esc(S.clock)} now<br>Attention <b>${Math.round(best.a)}</b> · Arousal <b>${Math.round(best.r)}</b><br>Load <b>${Math.round(best.l)}</b> · Neural <b>${Math.round(best.n)}</b>`
+      + (mk ? `<br><span style="color:${mk.kind === "da" ? COL.da : mk.kind === "replay" ? COL.replay : "#fff"}">${esc(trunc(mk.label, 48))} · click</span>` : "");
+    if (tip.innerHTML !== html) tip.innerHTML = html;
+    tip.style.display = "block";
+    const tw = tip.offsetWidth; tip.style.left = Math.max(0, Math.min(W - tw, hoverX + 12 + tw > W ? hoverX - tw - 12 : hoverX + 12)) + "px";
+    tl.style.cursor = mk ? "pointer" : "crosshair";
+  }
+}
+function renderMarkerButtons(){
+  const box = $("evbtns"), last = markers.slice(-6);
+  if (!last.length) return;
+  const glyph = {da:"◆", chat:"●", replay:"◇"};
+  box.innerHTML = last.map(mk => `<button class="ui-btn${respMk === mk ? " on" : ""}" data-id="${mk.id}" title="${esc(mk.label)}"><span class="k-${mk.kind}">${glyph[mk.kind] || "◆"}</span> ${esc(mk.clock)}</button>`).join("");
+}
+$("evbtns").addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (!b) return; const mk = markers.find(x => x.id === +b.dataset.id); if (mk) scrub(mk); });
+
+// ---------------------------------------------------------------- his screen
+const EMBED_OK = /^https:\/\/(www\.youtube-nocookie\.com\/embed\/|www\.youtube\.com\/embed\/|www\.tiktok\.com\/(embed|player)\/)/;
+const PLACE = {bed:"in bed", window:"at the window", table:"at the table", desk:"at the desk", door_in:"at the door", door_out:"heading out",
+  street_home:"out · Kichijōji", street_bakery:"out · Kichijōji", street_park:"out · Kichijōji", street:"out · Kichijōji",
+  bakery_door:"out · the bakery", bakery_in:"out · the bakery", counter:"out · the bakery", bakery:"out · the bakery",
+  park_gate:"out · the park", bench:"out · the park", park:"out · the park"};
+const view = {mode:"", embedSrc:"", embedOk:false, embedBad:new Set(), front:$("v-a"), back:$("v-b"), shotFails:0, shotBusy:false, shotAt:0, lastDev:""};
+function placeText(){
+  const L = S.life || {};
+  if (S.stage === "NREM") return "asleep · NREM";
+  if (S.stage === "REM") return "dreaming · REM";
+  if (L.walking) return "out · Kichijōji";
+  return PLACE[L.place] || (L.place ? String(L.place).replace(/_/g, " ") : "in his room");
+}
+function setEmbed(src, label){
+  const box = $("v-embed");
+  if (view.embedSrc === src) return;
+  view.embedSrc = src; view.embedOk = !!src;
+  if (!src) { box.innerHTML = ""; box.style.display = "none"; return; }
+  box.innerHTML = `<iframe src="${esc(src)}" title="${esc(label || "official embed")}" allow="encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+  box.style.display = "block";
+  const fr = box.querySelector("iframe"); fr.onload = () => { fr.dataset.loaded = "1"; };
+  setTimeout(() => { if (view.embedSrc === src && !fr.dataset.loaded) { view.embedBad.add(src); dirty.view = true; } }, 8000);   // did not load: the capture instead
+}
+function shot(dev){
+  if (view.shotBusy || Date.now() - view.shotAt < 3000) return;
+  view.shotBusy = true; view.shotAt = Date.now();
+  const url = `/api/screen/${dev}.jpg?t=${Date.now()}`, im = view.back;
+  im.onload = () => { view.shotBusy = false; view.shotFails = 0; im.classList.add("on"); view.front.classList.remove("on"); view.back = view.front; view.front = im; dirty.view = true; };
+  im.onerror = () => { view.shotBusy = false; view.shotFails++; dirty.view = true; };
+  im.src = url;
+}
+function renderView(){
+  const sc = S.screen, dev = sc && /^(desk|phone)$/.test(sc.device) ? sc.device : "";
+  const emb = sc && sc.embed && typeof sc.embed.src === "string" && EMBED_OK.test(sc.embed.src) ? sc.embed : null;
+  let mode = "away";
+  if (sc && emb && !view.embedBad.has(emb.src)) mode = "embed";
+  else if (sc && dev && !sc.restarting && view.shotFails < 3) mode = "shot";
+  if (mode === "embed") setEmbed(emb.src, emb.label); else setEmbed("", "");
+  if (mode === "shot") { if (dev !== view.lastDev) { view.shotFails = 0; view.lastDev = dev; } shot(dev); }
+  else { view.front.classList.remove("on"); view.back.classList.remove("on"); if (!sc) view.shotFails = 0; }
+  const showAway = mode === "away" || (mode === "shot" && !view.front.classList.contains("on"));
+  $("away").classList.toggle("hide", !showAway);
+  if (showAway) {
+    put("away-h", placeText());
+    const L = S.life || {};
+    put("away-k", sc && sc.restarting ? "his screen · restarting" : sc ? "his screen · loading" : "his screen · not in view");
+    put("away-s", S.stage === "NREM" ? `the model's slow waves run; a word reaches it at ${Math.round(S.gain * 100)}%`
+      : S.stage === "REM" ? "the model replays the day's words; nothing here is a dream anyone has"
+      : L.doing ? `${L.walking ? "walking · " : ""}${L.doing}` : "connecting to the model…");
+    $("away").style.setProperty("--away-c", S.stage === "REM" ? "rgba(167,139,250,.22)" : S.stage === "NREM" ? "rgba(40,70,200,.22)" : "rgba(63,123,255,.18)");
+  }
+  put("v-src", mode === "embed" ? (emb.label || "official embed") : mode === "shot" ? `his ${dev} · live capture` : "his room · fiction");
+  // the strip: the card title the server gives, its host, what kind of page his model chose
+  if (sc && (sc.title || sc.host)) putH("v-title", `${esc(trunc(sc.title || sc.host, 80))}${sc.title && sc.host ? ` <i>· ${esc(trunc(sc.host, 40))}</i>` : ""}`);
+  else putH("v-title", `<i>${esc(S.life && S.life.doing ? trunc(S.life.doing, 80) : "nothing on his screen right now")}</i>`);
+  const kindEl = $("v-kind"), kind = sc && sc.kind ? String(sc.kind) : "";
+  kindEl.hidden = !kind;
+  if (kind) put("v-kind", `model-chosen ${({video:"video", search:"search", shorts:"short", page:"page"})[kind] || "page"}`);
+  const mu = S.music;
+  put("v-music", mu && mu.title ? `♪ ${trunc(mu.title, 40)}${mu.artist ? " — " + trunc(mu.artist, 30) : ""}` : "");
+  view.mode = mode;
+}
+
+// ---------------------------------------------------------------- feed (now, up next)
+function renderFeed(){
+  const L = S.life || {};
+  const where = placeText();
+  putH("f-now", L.doing ? `<b>${esc(L.walking ? "walking · " + L.doing : L.doing)}</b> · ${esc(where)}` : `<b>${esc(where)}</b>`);
+  put("f-where", S.clock ? `${S.clock} ${S.tz}` : "");
+  const note = $("f-note");
+  if (S.note && S.note.summary) { note.hidden = false; putH("f-note", `<span class="tag">notes written by an AI</span>${esc(trunc(S.note.summary, 200))}`); }
+  else note.hidden = true;
+  const why = $("f-why");
+  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">why his model clicked</span>${esc(trunc(S.decision.reason, 200))}`); }
+  else why.hidden = true;
+  const p = S.plan;
+  if (p && (p.text || p.steps)) {
+    put("f-plan", trunc(p.text || "Today's plan", 160));
+    const next = (Array.isArray(p.steps) ? p.steps : []).filter(s => s && !s.done).slice(0, 2);
+    putH("f-steps", next.length ? next.map((s, i) => `<li><span>${String(i + 1).padStart(2, "0")}</span>${esc(trunc(s.label || s.activity, 60))}</li>`).join("")
+                                : `<li><span>—</span>nothing left on today's plan</li>`);
+  } else { put("f-plan", "no plan yet today"); putH("f-steps", ""); }
+}
+
+// ---------------------------------------------------------------- header, panels
+const STAGE = {AWAKE:"awake", NREM:"NREM · asleep", REM:"REM · dreaming"};
+function renderHeader(){
+  const live = $("h-live");
+  live.classList.toggle("off", !S.conn);
+  const n = S.viewers;
+  put("h-live-t", S.full ? "full · back in a minute" : !S.conn ? "offline · reconnecting" : `live${typeof n === "number" ? ` · ${n} watching` : ""}`);
+  put("v-watch", typeof n === "number" ? `${n} watching` : "– watching");
+  put("h-clock", S.clock ? `${S.clock} ${S.tz}` : "--:-- Tokyo");
+  put("h-stage", STAGE[S.stage] || "…");
+  const st = $("h-stage"); st.classList.toggle("nrem", S.stage === "NREM"); st.classList.toggle("rem", S.stage === "REM");
+  put("f-slow", S.slow ? `Slow layer: ${S.slow}` : "");
+}
+const tween = {};                       // id -> {from, to, t0, cur}
+function tweenTo(id, v){ const tw = tween[id] || (tween[id] = {from:v, to:v, t0:0, cur:v}); if (Math.round(v) === Math.round(tw.to)) return; tw.from = tw.cur; tw.to = v; tw.t0 = performance.now(); }
+function tweenStep(now){
+  for (const id in tween) {
+    const tw = tween[id], p = RM ? 1 : Math.min(1, (now - tw.t0) / 300), e = 1 - Math.pow(1 - p, 3);
+    tw.cur = tw.from + (tw.to - tw.from) * e; put(id, String(Math.round(tw.cur)));
+  }
+}
+function level(v){ return v < 42 ? ["below his baseline", ""] : v > 58 ? ["above his baseline", "up"] : ["at his baseline", "mid"]; }
+function renderLive(){
+  const v = S.readS.a; tweenTo("l-num", v);
+  const [w, cls] = level(v); put("l-word", w); $("l-word").className = "bword " + cls;
+  put("l-cap", S.stage && S.stage !== "AWAKE" ? `SLEEP · ${S.stage} · attention readout` : "ATTENTION · LIVE");
+  putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
+  put("lg-a", String(Math.round(S.readS.a))); put("lg-r", String(Math.round(S.readS.r))); put("lg-l", String(Math.round(S.readS.l))); put("lg-n", String(Math.round(S.readS.n)));
+}
+function renderResp(){
+  const mk = respMk;
+  if (!mk) return;
+  const asleep = mk.stage && mk.stage !== "AWAKE";
+  putH("r-head", `${mk.kind === "replay" ? "REPLAY AT" : "RESPONSE AT"} <b>${esc(mk.clock)}</b>`);
+  put("r-kind", mk.kind === "da" ? "reward burst" : mk.kind === "replay" ? "sleep replay" : "chat stimulus");
+  $("r-kind").className = "tag " + (mk.kind === "da" ? "red" : mk.kind === "replay" ? "vi" : "");
+  tweenTo("r-num", mk.peak);
+  const d = Math.round(mk.peak - mk.pre), del = $("r-delta");
+  put("r-delta", d >= 0 ? `↑ +${d}` : `↓ ${d}`); del.className = "ui-delta " + (d >= 0 ? "up" : "down");
+  put("r-cap", asleep ? `SLEEP · ${mk.stage} · ATTENTION · RESPONSE` : "ATTENTION · RESPONSE");
+  put("r-after", `after: ${mk.label}`);
+  putH("r-line", `Recruiting <b>${esc((mk.top && mk.top.length ? mk.top : ["…"]).join(" · "))}</b>. Read from the model at ${esc(mk.clock)}, not measured.`);
+}
+function pulseResp(){
+  if (RM) return;
+  const p = $("p-resp"), n = $("r-num");
+  p.classList.add("pulse"); n.classList.remove("pop"); void n.offsetWidth; n.classList.add("pop");
+  setTimeout(() => p.classList.remove("pulse"), 600);
+}
+
+// ---------------------------------------------------------------- hero
+const HERO = [
+  ["A brain, decoded live.", "A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. These are model readouts, not measurements of anyone."],
+  ["Real wiring. One model. All day.", "214 regions from one public MRI scan, coupled along its real fibres. A simulation that runs around the clock, not a recording."],
+  ["Watch what his brain does with what he watches.", "His model picks the pages and videos; the traces below are the model's response to them. Nobody's feelings are shown here."],
+  ["Attention, arousal, load: read from the model, not from anyone.", "Each number is a formula over simulated activity against its own baseline (50). Nothing on this page is measured from a person."],
+  ["He sleeps. It replays.", "At night the model cycles through NREM and REM and replays the day's words. He is fiction; the replays are model output, not dreams."],
+];
+let heroI = 0;
+function heroNext(){
+  heroI = (heroI + 1) % HERO.length;
+  const hero = $("hero"), set = () => { $("hero-h").textContent = HERO[heroI][0]; $("hero-s").textContent = HERO[heroI][1]; put("h-count", `${String(heroI + 1).padStart(2, "0")} / ${String(HERO.length).padStart(2, "0")}`); };
+  if (RM) { set(); return; }
+  hero.classList.add("swap");
+  setTimeout(() => { set(); hero.classList.remove("swap"); hero.classList.add("enter"); void hero.offsetWidth; hero.classList.remove("enter"); }, 400);
+}
+setInterval(() => { if (!document.hidden) heroNext(); }, 8000);
+
+// ---------------------------------------------------------------- the frame loop
+const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 60;
+let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0;
+const relDraw = {live:null};
+function frame(pnow){
+  requestAnimationFrame(frame);
+  try {
+    const now = Date.now();
+    if (pnow - lastDom > 250 || dirty.hdr) { lastDom = pnow; renderHeader(); renderLive(); dirty.hdr = false; }
+    if (dirty.feed || pnow - lastView > 1000) { renderFeed(); dirty.feed = false; }
+    if (dirty.view || pnow - lastView > 1000) { lastView = pnow; renderView(); dirty.view = false; }
+    if (dirty.resp) { renderResp(); dirty.resp = false; }
+    if (dirty.respNew) { dirty.respNew = false; pulseResp(); }
+    if (dirty.marks) { renderMarkerButtons(); dirty.marks = false; }
+    tweenStep(pnow);
+    if (pnow - lastTl >= 1000 / FPS_TL - 2) { lastTl = pnow; drawTimeline(now); }
+    if (pnow - lastBrain >= 1000 / FPS_BRAIN - 2) {
+      lastBrain = pnow;
+      const t = pnow / 1000;
+      const breath = RM ? 1 : clamp(0.82 + 0.9 * S.syncS + 0.06 * Math.sin(t * 1.1), 0.7, 1.25);
+      if (S.rel) {                                        // the live brain eases towards the latest smoothed activity
+        if (!relDraw.live || relDraw.live.length !== S.rel.length) relDraw.live = S.rel.slice();
+        const L = relDraw.live; for (let i = 0; i < L.length; i++) L[i] += (S.rel[i] - L[i]) * 0.15;
+      }
+      liveBrain.draw(relDraw.live, t, breath);
+      respBrain.draw(respMk && respMk.rel ? respMk.rel : relDraw.live, t, RM ? 1 : (respMk ? 1 + 0.05 * Math.sin(t * 0.8) : 0.55));
+    }
+  } catch (e) { console.warn("live: frame", e); }
+}
+requestAnimationFrame(frame);
+connect(); loadMind(); loadMusic();
+setInterval(() => { if (!document.hidden) loadMind(); }, 60000);
+// a viewer's local clock is not his: while the socket is down, the panels keep the last values and say so in the header
+</script>
+</body>
+</html>

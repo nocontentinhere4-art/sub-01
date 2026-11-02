@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · world</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/ui.css">
 <style>
   :root { --bg:#040406; --fg:#ececf2; --dim:#7a7a8c; --or:#ff6a00; }
   * { box-sizing:border-box; }
@@ -44,10 +45,14 @@
   #note { color:#55556a; font-size:11px; padding:0 28px 18px; max-width:90ch; line-height:1.5; }
   @media (max-width: 800px) { header, main, #strip, #note { padding-left:16px; padding-right:16px; }
     main { grid-template-columns: 1fr; } #thought { font-size:16px; } }
+  header { background:#000; }
+  header h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
+  header nav.ui-nav { font-size:12px; flex-wrap:wrap; }
+  header nav.ui-nav a { padding:5px 9px; }
 </style>
 </head>
 <body>
-<header><h1>SUB-01</h1><div class="sub">the simulated world · <span id="stage">…</span> · <a href="/" style="color:inherit">room</a> · <a href="/brain" style="color:inherit">brain</a> · <a href="/diary" style="color:inherit">dream diary</a> · <a href="https://city.subzerone.live/" style="color:inherit" target="_blank" rel="noopener">city</a></div></header>
+<header><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a class="on" href="/world.html">sees</a><a href="https://city.subzerone.live/" class="ext" target="_blank" rel="noopener">city</a></nav><div class="sub">the simulated world · <span id="stage">…</span></div></header>
 <main>
   <div>
     <div id="view"><img id="a" alt=""><img id="b" alt=""><div id="thought"></div></div>

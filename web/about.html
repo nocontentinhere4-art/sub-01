@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · about</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/ui.css">
 <style>
   :root { --bg:#040406; --fg:#ececf2; --dim:#7a7a8c; --line:#1c1c26; --or:#ff6a00; }
   * { box-sizing:border-box; }
@@ -45,10 +46,14 @@
     p, li { font-size:13.5px; }
     th, td { padding:6px 4px; font-size:12px; }
   }
+  header { background:#000; }
+  header h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
+  header nav.ui-nav { font-size:12px; flex-wrap:wrap; }
+  header nav.ui-nav a { padding:5px 9px; }
 </style>
 </head>
 <body>
-<header><h1>SUB-01</h1><div class="sub">about · <a href="/">life</a> · <a href="/brain">brain</a> · <a href="/diary">diary</a> · <a href="/world.html">world</a></div></header>
+<header><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="ext" target="_blank" rel="noopener">city</a></nav><div class="sub">about</div></header>
 <main>
 
 <p class="lead">SUB-01 is a computer model of brain activity, built from one person's public MRI scans. It drives an

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · room</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/ui.css">
 <style>
   :root { --bg:#08080b; --fg:#ececf2; --dim:#8f8fa3; --faint:#5c5c72; --line:rgba(255,255,255,.08); --or:#ff6a00; --st:#ff9a3c;
           --card:rgba(12,12,18,.72); --card2:rgba(12,12,18,.86); --glass:blur(14px) saturate(1.2); }
@@ -378,6 +379,16 @@
     #viewers { font-size:10.5px; padding:0 8px 0 4px; }
   }
   @media (max-width: 380px) { #rx button { width:34px; font-size:17px; } #viewers { font-size:10px; padding:0 6px 0 2px; } #rxpill { padding:3px 4px 3px 3px; } }
+  /* ui.css header look (2026-11): black wordmark, mono pill links, current page highlighted */
+  #brand { flex-wrap:wrap; }
+  #brand h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
+  #brand nav.ui-nav { font-size:12px; color:var(--ui-dim); gap:2px; flex-wrap:wrap; }
+  #brand nav.ui-nav a { color:var(--ui-dim); padding:6px 9px; border-radius:999px; text-transform:lowercase; }
+  #brand nav.ui-nav a:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
+  #brand nav.ui-nav a.on { color:var(--ui-fg); background:rgba(255,255,255,.1); }
+  #brand nav.ui-nav a.on::after { content:none; }
+  #brand nav.ui-nav a.ext::after { content:" \2197"; display:inline; height:auto; margin:0; background:none; color:var(--ui-faint); }
+  @media (max-width:900px) { #brand h1.ui-wordmark { font-size:16px; } #brand nav.ui-nav a { padding:8px 7px; } }
 </style>
 </head>
 <body>
@@ -385,7 +396,7 @@
 <div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
 <div id="top">
-  <div id="brand"><h1>SUB-01</h1><nav><a class="on" href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="city" target="_blank" rel="noopener">city</a></nav></div>
+  <div id="brand"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a class="on" href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="city ext" target="_blank" rel="noopener">city</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
   <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></span><span class="short">A simulated character. Not a person, not conscious. <a href="/about.html">about</a></span></div>

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · map</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/ui.css">
 <style>
   :root { --bg:#050507; --fg:#ececf2; --dim:#80808f; --or:#ff6a00; }
   * { box-sizing:border-box; }
@@ -66,6 +67,9 @@
     padding:4px 8px; border-radius:3px; display:none; }
   #hud, #tools, #phone, #brainpip, #foot { z-index:3; }
   #neurons { min-width:0; }
+  #hud h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; font-size:18px; letter-spacing:-.03em; vertical-align:middle; }
+  #hud nav#nav { display:inline-flex; flex-wrap:wrap; vertical-align:middle; margin-left:12px; font-size:12px; pointer-events:auto; }
+  #hud nav#nav a { margin-right:0; }
 </style>
 <link rel="stylesheet" href="/neurons.css">
 </head>
@@ -73,7 +77,7 @@
 <div id="wrap">
   <div id="scene">
     <div id="hud">
-      <h1>SUB-01</h1><span id="nav"><a href="/">room</a><a href="/brain">brain</a><a href="/diary">diary</a><a href="/world.html">sees</a><a class="on" href="/life.html">map</a><a href="https://city.subzerone.live/" target="_blank" rel="noopener">city</a></span>
+      <h1 class="ui-wordmark">SUB-01</h1><nav id="nav" class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="ext" target="_blank" rel="noopener">city</a><a class="on" href="/life.html">map</a></nav>
       <div id="doing">connecting…</div>
       <div id="meta"></div>
       <div id="thought"></div>
