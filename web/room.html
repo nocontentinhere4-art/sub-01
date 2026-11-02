@@ -559,8 +559,8 @@ renderer.setPixelRatio(dpr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-// under 768 px (a phone; ?embed: by the screen, not its frame) no shadow maps either: the room has no lighter model yet
-// (room.glb is the earlier scan, not a decimated room_clean.glb), and the pixel ratio is already capped at 1 for everyone
+// under 768 px (a phone; ?embed: by the screen, not its frame) no shadow maps, and the lighter room_phone.glb (room_clean.glb
+// with textures capped at 1024 and fewer triangles, built with gltf-transform; room.glb is the earlier scan, not a decimated one)
 const SMALL = (EMBED ? screen.width : innerWidth) < 768;
 renderer.shadowMap.enabled = !LITE && !SMALL;
 renderer.shadowMap.type = THREE.PCFShadowMap;              // (not the soft variant: 4x the taps) redrawn only when needed, see shadows()
@@ -701,7 +701,7 @@ function fit(obj, size){ const b = new THREE.Box3().setFromObject(obj), s = new 
   const b2 = new THREE.Box3().setFromObject(obj), c = new THREE.Vector3(); b2.getCenter(c);
   obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= b2.min.y; }
 
-load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
+load(OLD_ROOM ? "room/room.glb" : SMALL ? "room/room_phone.glb" : "room/room_clean.glb").then(g => {   // phones: the lighter model (see room_phone.glb)
   room = g.scene; scene.add(room);
   const aniso = renderer.capabilities.getMaxAnisotropy();
   if (OLD_ROOM) {

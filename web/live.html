@@ -221,9 +221,6 @@
   /* footer: the honesty line, never under a panel */
   #foot { max-width:1720px; margin:0 auto; padding:12px var(--gut) 14px; display:flex; gap:12px 28px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
   #foot .ui-honest { margin:0; }
-  #foot .go { font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); text-decoration:none; border:1px solid var(--ui-line2); border-radius:999px; padding:5px 12px; white-space:nowrap;
-    transition:background .15s var(--ui-ease), color .15s var(--ui-ease); }
-  #foot .go:hover { background:rgba(255,255,255,.06); color:var(--ui-fg); }
 
   /* entering; after the intro the grid fades in (600 ms) and the panels run their stagger again */
   #grid.reveal { animation:gridin .6s var(--ui-ease) both; }
@@ -461,7 +458,6 @@
 
 <footer id="foot">
   <p class="ui-honest">A model, not a mind: it does not feel, think or understand. The character and his room are fiction. Credits: <a href="/about.html">/about.html</a>.</p>
-  <a class="go" href="/brain">open the 3D model →</a>
 </footer>
 
 <div id="intro" role="dialog" aria-modal="true" aria-label="introduction" tabindex="-1">

@@ -168,6 +168,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const attr = (k, v) => `${k}="${esc(v)}"`;   // (an attribute built at run time: the served source carries no href="${…}" for a crawler to read)
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAY = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const tokyo = new Intl.DateTimeFormat("en-GB", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tokyo"});
@@ -250,7 +251,7 @@ function fill(d){
     : `<span class="stage">asleep or not over yet</span> · ${plural(frames.length, "frame")} so far`;
   const cover = frames[Math.floor(frames.length / 2)];
   $("n-acts").innerHTML = closed ? (d.share ? `<button class="ui-btn primary" type="button" data-a="copy">copy share text</button>` : "")
-    + (cover ? `<a class="ui-btn" href="${esc(cover.img)}" target="_blank" rel="noopener">image ↗</a>` : "")
+    + (cover ? `<a class="ui-btn" ${attr("href", cover.img)} target="_blank" rel="noopener">image ↗</a>` : "")
     + (d.text ? `<button class="ui-btn" type="button" data-a="entry" aria-expanded="false">entry</button>` : "")
     + (d.share ? `<span class="ui-caption">${d.share.length} / 280</span>` : "") : "";
   $("n-entry").textContent = d.text || ""; $("n-entry").hidden = true;
@@ -271,7 +272,7 @@ function fill(d){
     + (reps.length ? list(reps, repLi, 6) : `<span class="none">none · nobody wrote that day</span>`);
   const read = x.read || [];
   const readLi = a => `<li class="${a.replayed ? "" : "no"}"><span class="n">${a.replayed ? `×${a.replayed}` : "—"}</span><span class="vb">${esc(a.verb || "read")}</span>`
-    + `<span class="tx" title="${esc(a.title)}">${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}${a.today === false ? ` <span class="ago">· earlier</span>` : ""}</span></li>`;
+    + `<span class="tx" title="${esc(a.title)}">${a.url ? `<a ${attr("href", a.url)} target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}${a.today === false ? ` <span class="ago">· earlier</span>` : ""}</span></li>`;
   $("l-read").innerHTML = `<div class="ui-caption"><span>read that day · played again that night</span><span>${read.length}</span></div>`
     + (!closed ? `<span class="none">written in the morning</span>` : read.length ? list(read, readLi, 6) : `<span class="none">nothing read that day</span>`);
 }

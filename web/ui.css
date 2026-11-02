@@ -379,3 +379,9 @@ body:not([data-pulse]) .ui-toast { bottom:16px; }
   .ui-shimmer { color:var(--ui-dim); background:none; -webkit-background-clip:border-box; background-clip:border-box; }
   .ui-seg > .ui-seg-thumb, .ui-nav > .ui-nav-pill, .ui-panel.has-spot::before, .ui-panel.has-spot { transition:none !important; }
 }
+
+/* the nav pill answers the pointer too (jury round 2): the pill brightens under the pointer, the link lifts 1 px */
+.ui-nav.has-pill > a { transition:color .2s var(--ui-ease), background .2s var(--ui-ease), transform .2s var(--ui-ease); }
+.ui-nav.has-pill > a:hover { transform:translateY(-1px); }
+.ui-nav.has-pill:hover > .ui-nav-pill { background:rgba(255,255,255,.16); }
+@media (prefers-reduced-motion: reduce) { .ui-nav.has-pill > a:hover { transform:none; } }
