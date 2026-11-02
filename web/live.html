@@ -638,7 +638,8 @@ function loadBrain(){
 }
 
 // ---------------------------------------------------------------- brain renderer (WebGL, additive strokes; 2D fallback)
-const VS = `attribute vec2 aPos; attribute float aDepth; attribute float aRel;
+const VS = `precision mediump float;                                        // the same precision as the fragment shader: WebGL1 refuses to link a uniform (uMode) declared highp in one and mediump in the other
+attribute vec2 aPos; attribute float aDepth; attribute float aRel;
 uniform vec2 uScale; uniform vec2 uOff; uniform float uBreath; uniform float uAlpha; uniform float uPt; uniform float uMode;
 varying vec3 vCol; varying float vA; varying float vMode;
 void main(){
@@ -664,7 +665,9 @@ void main(){ float a = vA; if (vMode > 0.5) { vec2 d = gl_PointCoord - 0.5; a *=
 class BrainView {
   constructor(canvas){ this.cv = canvas; this.geo = null; this.heat = null; this.w = 0; this.h = 0; this.visible = true;
     try { this.gl = canvas.getContext("webgl", {alpha:true, antialias:true, premultipliedAlpha:true}) || null; } catch (e) { this.gl = null; }
-    if (this.gl && !this.initGL()) this.gl = null;
+    if (this.gl && !this.initGL()) {                                  // a canvas that once gave a WebGL context never gives a 2D one: swap in a fresh canvas
+      this.gl = null; const fresh = canvas.cloneNode(false); canvas.replaceWith(fresh); canvas = this.cv = fresh;
+    }
     if (!this.gl) this.g2 = canvas.getContext("2d");
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement); this.resize();
     if ("IntersectionObserver" in window) new IntersectionObserver(es => { this.visible = es[0].isIntersecting; }).observe(canvas);
