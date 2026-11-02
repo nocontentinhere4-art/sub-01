@@ -121,8 +121,10 @@ Branch `claude/compassionate-fermat-piv6wx`. The jury card is `docs/design/decod
 - **Tests:** green except the five pre-existing failures from main (`test_boy_mh`, `test_reading`, `test_spiking_live`,
   `test_spiking_ops`, `test_tastes_faster`) and `tests/test_interactive.py::test_server_round_end_applies_when_awake`, which
   depends on the Tokyo clock (the "window" activity scores zero around midnight).
-- **Still open from this round:** a decimated room GLB for phones; real-GPU and phone checks; the public origin (canonical
-  links, sitemap); two template-literal links in served HTML that the audit reads as 404s; the second jury card.
+- **Closed later the same night:** the phone room model (`web/room/room_phone.glb`, 1.85 MB); the public origin is
+  https://subzerone.live (Railway service `sub01`, project `sub-01`; also sub01-production.up.railway.app), so canonical links,
+  share images and the sitemap are absolute; the template-literal links are gone; the second card is JURY-2.md. Merged to
+  `main` (fast-forward to 70ef00f) and deployed on 3 November, 04:00 Tokyo. Still open: real-GPU and phone checks by the owner.
 
 ## Open items (what remains)
 From the jury review and the audience round:
